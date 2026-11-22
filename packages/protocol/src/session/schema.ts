@@ -121,7 +121,42 @@ const EventTokens = z.object({
   input: z.number(),
   cacheRead: z.number(),
   output: z.number(),
+  cacheWrite: z.exactOptional(z.number()),
+  reasoning: z.exactOptional(z.number()),
+  contextUsed: z.exactOptional(z.number()),
+  contextWindow: z.exactOptional(z.number()),
 }) satisfies Codec<T.EventTokens>;
+
+export const SessionPermissionMode = z.enum(T.SessionPermissionModeValues) satisfies Codec<T.SessionPermissionMode>;
+
+export const SessionPermissionDecision = z.enum(T.SessionPermissionDecisionValues) satisfies Codec<T.SessionPermissionDecision>;
+
+export const SessionPermissionRequest = z.object({
+  requestId: z.string(),
+  tool: z.string(),
+  summary: z.string(),
+  input: z.exactOptional(z.string()),
+}) satisfies Codec<T.SessionPermissionRequest>;
+
+export const SessionInteractionOption = z.object({
+  id: z.string(),
+  label: z.string(),
+  description: z.exactOptional(z.string()),
+  warning: z.exactOptional(z.string()),
+}) satisfies Codec<T.SessionInteractionOption>;
+
+export const SessionInteractionRequest = z.object({
+  requestId: z.string(),
+  question: z.string(),
+  options: z.array(SessionInteractionOption),
+  allowCustom: z.boolean(),
+}) satisfies Codec<T.SessionInteractionRequest>;
+
+export const SessionInteractionResolution = z.object({
+  requestId: z.string(),
+  accepted: z.boolean(),
+  choice: z.exactOptional(z.string()),
+}) satisfies Codec<T.SessionInteractionResolution>;
 
 export const SessionEvent = z.object({
   seq: z.number(),
@@ -141,7 +176,51 @@ export const SessionEvent = z.object({
   ok: z.exactOptional(z.boolean()),
   tokens: z.exactOptional(EventTokens),
   connection: z.exactOptional(ToolConnection),
+  permission: z.exactOptional(SessionPermissionRequest),
+  interaction: z.exactOptional(SessionInteractionRequest),
+  interactionResolution: z.exactOptional(SessionInteractionResolution),
 }) satisfies Codec<T.SessionEvent>;
+
+export const SessionContextFile = z.object({
+  path: z.string(),
+  startLine: z.exactOptional(z.number()),
+  endLine: z.exactOptional(z.number()),
+}) satisfies Codec<T.SessionContextFile>;
+
+export const SessionWorkspace = z.object({
+  id: SessionId,
+  session: Session,
+  model: z.exactOptional(z.string()),
+  effort: z.exactOptional(z.string()),
+  permissionMode: SessionPermissionMode,
+}) satisfies Codec<T.SessionWorkspace>;
+
+export const SessionWatchEvent = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("state"),
+    session: Session,
+    model: z.exactOptional(z.string()),
+    effort: z.exactOptional(z.string()),
+    permissionMode: SessionPermissionMode,
+    pendingPermissions: z.array(SessionPermissionRequest),
+    pendingInteractions: z.array(SessionInteractionRequest),
+    tokens: z.exactOptional(EventTokens),
+  }),
+  z.object({
+    kind: z.literal("history"),
+    session: SessionId,
+    events: z.array(SessionEvent),
+  }),
+  z.object({
+    kind: z.literal("event"),
+    session: SessionId,
+    event: SessionEvent,
+  }),
+  z.object({
+    kind: z.literal("missing"),
+    session: SessionId,
+  }),
+]) satisfies Codec<T.SessionWatchEvent>;
 
 const RunTriggerKind = z.enum(T.RunTriggerKindValues) satisfies Codec<T.RunTriggerKind>;
 

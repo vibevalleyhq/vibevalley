@@ -76,6 +76,7 @@ export type {
 } from "./repo/shapes.gen";
 export {
   type DoingView,
+  type EventTokens,
   type IssueAnswer,
   type Phase,
   type PhaseView,
@@ -85,7 +86,18 @@ export {
   type SessionAction,
   type SessionEvent,
   type SessionEventType,
+  type SessionInteractionRequest,
+  type SessionOpenWorkspaceInput,
+  type SessionPermissionDecision,
+  type SessionPermissionMode,
+  type SessionPermissionRequest,
+  type SessionRespondInteractionInput,
+  type SessionRespondPermissionInput,
+  type SessionSendInput,
+  type SessionSetConfigInput,
   type SessionView,
+  type SessionWatchEvent,
+  type SessionWorkspace,
   type ToolAction,
 } from "./session/shapes.gen";
 export {

@@ -250,14 +250,14 @@
       "inProcess": false
     },
     "antigravity": {
-      "steer": false,
+      "steer": true,
       "refused": {
         "systemPrompt": "Antigravity ACP 没有系统提示覆盖",
-        "appendSystemPrompt": "Antigravity ACP 没有系统提示追加",
-        "effort": "Antigravity 没有推理强度通道"
+        "disallowedTools": "Antigravity ACP 没有会话级的工具黑名单"
       },
       "capabilities": ["listModels", "checkUpdate"],
-      "inProcess": false
+      "inProcess": false,
+      "inSessionConfig": true
     },
     "dsh": {
       "steer": false,

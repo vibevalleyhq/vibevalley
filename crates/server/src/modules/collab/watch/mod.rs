@@ -374,11 +374,20 @@ impl Watch {
         }
     }
 
-    /// The helpers on the farm (`isHired`): an orchestrator is on duty, not hired.
+    /// The helpers on the farm (`isHired`): an orchestrator is on duty, not
+    /// hired; direct workspace chat sessions stay out of channel dispatch.
     fn hired(&self) -> Vec<Session> {
         self.hub
             .upgrade()
-            .map(|h| h.read(|s| s.sessions.iter().filter(|h| h.role == AgentRole::Worker).cloned().collect()))
+            .map(|h| {
+                h.read(|s| {
+                    s.sessions
+                        .iter()
+                        .filter(|h| h.role == AgentRole::Worker && !crate::modules::work::session::is_workspace(h))
+                        .cloned()
+                        .collect()
+                })
+            })
             .unwrap_or_default()
     }
 

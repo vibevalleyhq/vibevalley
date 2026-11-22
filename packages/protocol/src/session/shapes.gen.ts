@@ -77,19 +77,33 @@ machine?: string, phase: Phase, };
  */
 export type SessionView = { id: SessionId, role: AgentRole, name: string, agent: string, runtime: string, brief: string, repo?: string, branch?: string, worktree?: string, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, channel?: string, issue?: IssueId, refining: boolean, subagents?: SessionSubagents, toolConnections?: Array<ToolConnection>, machine?: string, phase: PhaseView, phaseText: string, };
 
-export const SessionEventTypeValues = ["run/start", "user/message", "memory/recalled", "assistant/thinking", "assistant/message", "tool/call", "tool/result", "llm/retry", "llm/usage", "run/error", "run/end"] as const;
+export const SessionEventTypeValues = ["run/start", "user/message", "memory/recalled", "assistant/thinking", "assistant/message", "tool/call", "tool/result", "permission/request", "permission/resolved", "interaction/request", "interaction/resolved", "llm/retry", "llm/usage", "run/error", "run/end"] as const;
 export type SessionEventType = (typeof SessionEventTypeValues)[number];
 
 export const ToolActionValues = ["run_command", "read_file", "edit_file", "search", "web", "mcp", "wait", "other"] as const;
 export type ToolAction = (typeof ToolActionValues)[number];
 
-export type EventTokens = { input: number, cacheRead: number, output: number, };
+export type EventTokens = { input: number, cacheRead: number, output: number, cacheWrite?: number, reasoning?: number, contextUsed?: number, contextWindow?: number, };
+
+export const SessionPermissionModeValues = ["ask", "acceptEdits", "bypass", "readOnly"] as const;
+export type SessionPermissionMode = (typeof SessionPermissionModeValues)[number];
+
+export const SessionPermissionDecisionValues = ["allowOnce", "allowAlways", "deny"] as const;
+export type SessionPermissionDecision = (typeof SessionPermissionDecisionValues)[number];
+
+export type SessionPermissionRequest = { requestId: string, tool: string, summary: string, input?: string, };
+
+export type SessionInteractionOption = { id: string, label: string, description?: string, warning?: string, };
+
+export type SessionInteractionRequest = { requestId: string, question: string, options: Array<SessionInteractionOption>, allowCustom: boolean, };
+
+export type SessionInteractionResolution = { requestId: string, accepted: boolean, choice?: string, };
 
 export type SessionEvent = { seq: number,
 /**
  * Increases when this step's streaming text or input changes; independent of transport delivery order.
  */
-revision: number, time: number, type: SessionEventType, run?: string, call?: number, under?: number, threadId?: string, text: string, action?: ToolAction, actionText?: string, tool?: string, input?: string, output?: string, ok?: boolean, tokens?: EventTokens, connection?: ToolConnection, };
+revision: number, time: number, type: SessionEventType, run?: string, call?: number, under?: number, threadId?: string, text: string, action?: ToolAction, actionText?: string, tool?: string, input?: string, output?: string, ok?: boolean, tokens?: EventTokens, connection?: ToolConnection, permission?: SessionPermissionRequest, interaction?: SessionInteractionRequest, interactionResolution?: SessionInteractionResolution, };
 
 export const RunTriggerKindValues = ["issue", "comment", "cron", "refine", "runtime"] as const;
 export type RunTriggerKind = (typeof RunTriggerKindValues)[number];
@@ -143,3 +157,21 @@ export type SessionListInput = { agent?: string, };
 export type SessionGetInput = { id: string, };
 
 export type SessionEventListInput = { id: string, run?: string, };
+
+export type SessionContextFile = { path: string, startLine?: number, endLine?: number, };
+
+export type SessionOpenWorkspaceInput = { sessionId?: string, runtime: string, cwd: string, repo?: string, model?: string, effort?: string, permissionMode?: SessionPermissionMode, title?: string, };
+
+export type SessionWorkspace = { id: SessionId, session: Session, model?: string, effort?: string, permissionMode: SessionPermissionMode, };
+
+export type SessionSendInput = { id: string, text: string, attachments?: Array<string>, contextFiles?: Array<SessionContextFile>, };
+
+export type SessionRespondPermissionInput = { id: string, requestId: string, decision: SessionPermissionDecision, message?: string, };
+
+export type SessionRespondInteractionInput = { id: string, requestId: string, optionId?: string, text?: string, cancelled?: boolean, };
+
+export type SessionSetConfigInput = { id: string, model?: string, effort?: string, permissionMode?: SessionPermissionMode, };
+
+export type SessionWatchPayload = { id: string, afterSeq?: number, };
+
+export type SessionWatchEvent = { "kind": "state", session: Session, model?: string, effort?: string, permissionMode: SessionPermissionMode, pendingPermissions: Array<SessionPermissionRequest>, pendingInteractions: Array<SessionInteractionRequest>, tokens?: EventTokens, } | { "kind": "history", session: SessionId, events: Array<SessionEvent>, } | { "kind": "event", session: SessionId, event: SessionEvent, } | { "kind": "missing", session: SessionId, };

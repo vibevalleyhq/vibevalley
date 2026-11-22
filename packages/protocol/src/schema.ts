@@ -38,7 +38,24 @@ export {
   RepoTemplates,
   SubmitBranch,
 } from "./repo/schema";
-export { IssueAnswer, LastRun, Phase, Run, RunTrigger, Session, SessionEvent } from "./session/schema";
+export {
+  IssueAnswer,
+  LastRun,
+  Phase,
+  Run,
+  RunTrigger,
+  Session,
+  SessionContextFile,
+  SessionEvent,
+  SessionInteractionOption,
+  SessionInteractionRequest,
+  SessionInteractionResolution,
+  SessionPermissionDecision,
+  SessionPermissionMode,
+  SessionPermissionRequest,
+  SessionWatchEvent,
+  SessionWorkspace,
+} from "./session/schema";
 export {
   Channel,
   ChannelEvent,

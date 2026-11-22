@@ -8,10 +8,14 @@ use std::sync::Arc;
 
 use vibevalley_core::rules::{session_ids_of, stage_wants_user};
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, SessionId, Subscription, ops};
+use vibevalley_protocol::{
+    ApiError, BizCode, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, Session, SessionId, SessionWatchEvent, Subscription, ops, subscriptions,
+};
 
 use crate::base::{LookIn, missing};
+use crate::modules::content::attachment::Attachments;
 use crate::modules::work::issue::Board;
+use crate::modules::work::ledger::BoardError;
 use crate::{Hub, Server, Sink};
 
 pub(crate) mod db;
@@ -26,15 +30,34 @@ mod runs;
 mod sessions;
 mod subagents;
 mod talk;
+mod workspace;
 
 pub use drivers::{Drive, Drivers, HelperPlace, Persona, RuntimeDrivers};
 pub use journal::{Journal, Trajectories};
 pub use report::{ANSWER_ONLY, Report, ReportQuestion, ReportStatus};
 pub use runs::trigger_of;
 pub use sessions::{DraftEnd, Hire, Rounds, Sessions};
+pub use workspace::WorkspaceSnapshot;
+pub(crate) use workspace::is_workspace;
 
 fn helper_ref(id: &str) -> ApiError {
     missing(t("server.helperRef", &[("id", id.into())]), LookIn::Session)
+}
+
+fn session_error(e: BoardError) -> ApiError {
+    match e {
+        BoardError::Api(e) => e,
+        BoardError::Agent(err) => match err {
+            vibevalley_runtime::oar::AgentError::UnknownRuntime(_)
+            | vibevalley_runtime::oar::AgentError::NotAvailable(_)
+            | vibevalley_runtime::oar::AgentError::Unsupported { .. } => ApiError::new(BizCode::RuntimeRefused, err.to_string()),
+            vibevalley_runtime::oar::AgentError::Rejected(_)
+            | vibevalley_runtime::oar::AgentError::Io(_)
+            | vibevalley_runtime::oar::AgentError::Protocol(_) => ApiError::new(BizCode::SessionRefused, err.to_string()),
+        },
+        BoardError::Store(e) => ApiError::new(BizCode::InternalError, e.to_string()),
+        other => ApiError::new(BizCode::SessionRefused, other.to_string()),
+    }
 }
 
 /// `issue.watch` (an SSE route in VibeValley, `/api/v1/issue/watch/:id`):
@@ -47,7 +70,7 @@ impl Subscription for IssueWatchStream {
     type Event = IssueWatch;
 }
 
-pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>) {
+pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>, attachments: Option<Arc<Attachments>>) {
     hub.on::<ops::SessionList>(move |ctx, input| {
         let agent = input.agent.unwrap_or_default();
         let mut out: Vec<_> = ctx
@@ -65,6 +88,37 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>) {
     hub.on::<ops::SessionEventList>(move |_, input| Ok(tr.events(&input.id, input.run.as_deref()).unwrap_or_default()));
     let b = board.clone();
     hub.on::<ops::SessionStop>(move |_, input| stop(&b, &input.id));
+
+    let b = board.clone();
+    hub.on::<ops::SessionOpenWorkspace>(move |_, input| b.sessions().open_workspace(input).map_err(session_error));
+    let b = board.clone();
+    let att = attachments;
+    hub.on::<ops::SessionSend>(move |_, input| b.sessions().send_workspace(input, att.as_deref()).map_err(session_error));
+    let b = board.clone();
+    hub.on::<ops::SessionRespondPermission>(move |_, input| b.sessions().respond_permission(input).map_err(session_error));
+    let b = board.clone();
+    hub.on::<ops::SessionRespondInteraction>(move |_, input| b.sessions().respond_interaction(input).map_err(session_error));
+    let b = board.clone();
+    hub.on::<ops::SessionSetConfig>(move |_, input| b.sessions().set_workspace_config(input).map_err(session_error));
+
+    let b = board.clone();
+    let tr = trajectories.clone();
+    let me = Arc::downgrade(hub);
+    hub.on_subscription::<subscriptions::SessionWatch>(move |hub, input, sink| {
+        let initial = b.session(&input.id).ok_or_else(|| helper_ref(&input.id))?;
+        let live = hub.live();
+        let states = hub.state_frames();
+        let workspace_updates = b.sessions().watch_workspace(&initial.id);
+        let sessions = b.sessions().clone();
+        let tr = tr.clone();
+        let hub = me.clone();
+        let after_seq = input.after_seq;
+        std::thread::Builder::new()
+            .name("vibevalley-session-watch".into())
+            .spawn(move || watch_session(initial, after_seq, &hub, &sessions, states, live, workspace_updates, &tr, sink))
+            .map_err(crate::base::internal)?;
+        Ok(())
+    });
 
     let b = board.clone();
     let tr = trajectories;
@@ -90,13 +144,127 @@ pub(crate) fn stop(board: &Board, id: &str) -> Result<(), ApiError> {
     let Some(session) = board.session(id).filter(|s| board.sessions().is_live(&s.id)) else {
         return Err(helper_ref(id));
     };
-    if session.phase.is_working()
-        && let Some(issue) = &session.issue
-    {
-        // A stop that is not taken is not a refusal.
-        let _ = board.stop(issue);
+    if session.phase.is_working() {
+        if let Some(issue) = &session.issue {
+            // A stop that is not taken is not a refusal.
+            let _ = board.stop(issue);
+        } else {
+            let _ = board.sessions().stop(&session.id);
+        }
     }
     Ok(())
+}
+
+fn workspace_state_event(session: Session, sessions: &Sessions) -> SessionWatchEvent {
+    let snap = sessions.workspace_snapshot(&session.id);
+    SessionWatchEvent::State {
+        session,
+        model: snap.model,
+        effort: snap.effort,
+        permission_mode: snap.permission_mode,
+        pending_permissions: snap.pending_permissions,
+        pending_interactions: snap.pending_interactions,
+        tokens: snap.tokens,
+    }
+}
+
+#[allow(clippy::too_many_arguments, reason = "watch thread carries hub, session streams, and sink")]
+fn watch_session(
+    initial: Session,
+    after_seq: Option<i64>,
+    hub: &std::sync::Weak<Hub>,
+    sessions: &Sessions,
+    states: flume::Receiver<Arc<vibevalley_protocol::StateFrame>>,
+    live: flume::Receiver<LiveEvent>,
+    workspace_updates: flume::Receiver<()>,
+    trajectories: &Trajectories,
+    sink: Sink,
+) {
+    let id = initial.id.clone();
+    let history: Vec<_> = trajectories
+        .events(&id, None)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|e| after_seq.is_none_or(|after| e.seq > after))
+        .collect();
+    if !sink.send(&SessionWatchEvent::History {
+        session: id.clone(),
+        events: history,
+    }) {
+        return;
+    }
+    let first_state = workspace_state_event(initial, sessions);
+    if !sink.send(&first_state) {
+        return;
+    }
+    let mut previous: Option<SessionWatchEvent> = Some(first_state);
+    let mut workspace_open = true;
+    enum Msg {
+        State,
+        WorkspaceDropped,
+        Live(Box<LiveEvent>),
+    }
+    loop {
+        if sink.stopped() {
+            return;
+        }
+        let next = if workspace_open {
+            flume::Selector::new()
+                .recv(&states, |r| r.ok().map(|_| Msg::State))
+                .recv(&workspace_updates, |r| Some(if r.is_ok() { Msg::State } else { Msg::WorkspaceDropped }))
+                .recv(&live, |r| r.ok().map(|e| Msg::Live(Box::new(e))))
+                .wait_timeout(std::time::Duration::from_millis(500))
+        } else {
+            flume::Selector::new()
+                .recv(&states, |r| r.ok().map(|_| Msg::State))
+                .recv(&live, |r| r.ok().map(|e| Msg::Live(Box::new(e))))
+                .wait_timeout(std::time::Duration::from_millis(500))
+        };
+        let got = match next {
+            Ok(Some(got)) => got,
+            Ok(None) => return,
+            Err(_) => continue,
+        };
+        match got {
+            Msg::Live(ev) => {
+                if let LiveEvent::Event(e) = *ev
+                    && e.id == id
+                    && !sink.send(&SessionWatchEvent::Event {
+                        session: e.id.clone(),
+                        event: e.activity,
+                    })
+                {
+                    return;
+                }
+            }
+            Msg::State | Msg::WorkspaceDropped => {
+                if matches!(got, Msg::WorkspaceDropped) {
+                    workspace_open = false;
+                }
+                let Some(hub) = hub.upgrade() else { return };
+                let current = hub.read(|s| s.sessions.iter().find(|x| x.id == id).cloned());
+                drop(hub);
+                let Some(session) = current else {
+                    let missing = SessionWatchEvent::Missing { session: id.clone() };
+                    if previous.as_ref() != Some(&missing) {
+                        if !sink.send(&missing) {
+                            return;
+                        }
+                        previous = Some(missing);
+                    }
+                    continue;
+                };
+                let state = workspace_state_event(session, sessions);
+                if previous.as_ref() == Some(&state) {
+                    continue;
+                }
+                if !sink.send(&state) {
+                    return;
+                }
+                previous = Some(state);
+            }
+        }
+    }
 }
 
 const SHOWN_SESSIONS: usize = 8;

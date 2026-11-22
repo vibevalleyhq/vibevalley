@@ -165,6 +165,31 @@ impl Record {
             EventKind::SubagentPlanUpdated { thread_id, turn_id, steps } => rec
                 .events
                 .push(json!({"kind":"subagent_plan_updated","threadId":thread_id,"turnId":turn_id,"steps":steps})),
+            EventKind::InteractionRequested {
+                request_id,
+                question,
+                options,
+                allow_custom,
+            } => {
+                rec.kind = Kind::Marker;
+                rec.marker = Some(json!({"name": "interaction_requested"}));
+                rec.events.push(json!({
+                    "kind": "interaction_requested",
+                    "requestId": request_id,
+                    "question": question,
+                    "options": options,
+                    "allowCustom": allow_custom,
+                }));
+            }
+            EventKind::InteractionResolved { request_id, decision } => {
+                rec.kind = Kind::Marker;
+                rec.marker = Some(json!({"name": "interaction_resolved"}));
+                rec.events.push(json!({
+                    "kind": "interaction_resolved",
+                    "requestId": request_id,
+                    "decision": decision,
+                }));
+            }
             EventKind::TurnFinished { reason, usage } => {
                 rec.events.push(json!({"kind":"usage","usage":{"tokens":tokens(usage)}}));
                 let outcome = match reason {
@@ -194,7 +219,13 @@ fn tokens(usage: &Usage) -> Value {
     if usage.input_tokens.is_none() && usage.output_tokens.is_none() && usage.cost_usd.is_none() {
         return Value::Null;
     }
-    let mut tokens = json!({"inputTokens":usage.input_tokens.unwrap_or_default(),"outputTokens":usage.output_tokens.unwrap_or_default(),"cacheReadTokens":0,"cacheWriteTokens":0,"reasoningTokens":0});
+    let mut tokens = json!({
+        "inputTokens": usage.input_tokens.unwrap_or_default(),
+        "outputTokens": usage.output_tokens.unwrap_or_default(),
+        "cacheReadTokens": usage.cache_read_tokens.unwrap_or_default(),
+        "cacheWriteTokens": usage.cache_write_tokens.unwrap_or_default(),
+        "reasoningTokens": usage.reasoning_tokens.unwrap_or_default(),
+    });
     if let Some(cost) = usage.cost_usd {
         tokens["costMicros"] = json!((cost * 1_000_000.0).round() as i64);
     }

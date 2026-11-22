@@ -250,14 +250,14 @@
       "inProcess": false
     },
     "antigravity": {
-      "steer": false,
+      "steer": true,
       "refused": {
         "systemPrompt": "Antigravity ACP cannot replace the system prompt",
-        "appendSystemPrompt": "Antigravity ACP cannot append to the system prompt",
-        "effort": "Antigravity has no channel for effort"
+        "disallowedTools": "Antigravity ACP has no per-session tool blocklist"
       },
       "capabilities": ["listModels", "checkUpdate"],
-      "inProcess": false
+      "inProcess": false,
+      "inSessionConfig": true
     },
     "dsh": {
       "steer": false,

@@ -188,6 +188,11 @@
 | `session.list` | 列出执行会话，可以只看一份角色的 | `/api/v1/session/list` | ✓ | ✓ | ✓ | ✓ |
 | `session.get` | 看一个执行会话 | `/api/v1/session/get` | ✓ | ✓ |   |   |
 | `session.event.list` | 读一个执行会话的轨迹，从早到晚 | `/api/v1/session/event/list` | ✓ | ✓ |   |   |
+| `session.openWorkspace` | 在工作区目录打开或续接直连对话会话 | `/api/v1/session/openWorkspace` | ✓ | ✓ |   |   |
+| `session.send` | 向直连对话会话发消息（空闲启轮，运行中引导） | `/api/v1/session/send` | ✓ | ✓ |   |   |
+| `session.respondPermission` | 答复会话的工具权限请求 | `/api/v1/session/respondPermission` | ✓ | ✓ |   |   |
+| `session.respondInteraction` | 回复会话的交互式提问 | `/api/v1/session/respondInteraction` | ✓ | ✓ |   |   |
+| `session.setConfig` | 调整工作区会话的模型、推理强度或权限模式 | `/api/v1/session/setConfig` | ✓ | ✓ |   |   |
 
 ## artifact
 

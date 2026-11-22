@@ -80,6 +80,8 @@ pub struct Capabilities {
     pub model_selection: bool,
     pub subagents: bool,
     pub usage: bool,
+    #[serde(default)]
+    pub config_options: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -227,6 +229,7 @@ fn refused_options(runtime: &str) -> &'static [RefusableOption] {
             ServiceTier,
             LaunchArgs,
         ],
+        "antigravity" => &[SystemPrompt, DisallowedTools, AllowedTools, OutputSchema, Name, ServiceTier, LaunchArgs],
         "grok" | "opencode" => &[
             DisallowedTools,
             AllowedTools,
@@ -393,6 +396,16 @@ pub struct Usage {
     pub input_tokens: Option<u64>,
     pub output_tokens: Option<u64>,
     pub cost_usd: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_read_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_write_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_used_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_window_tokens: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -400,6 +413,27 @@ pub enum PermissionDecision {
     AllowOnce,
     AllowAlways,
     Deny { message: Option<String> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InteractionOption {
+    pub id: String,
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warning: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum InteractionDecision {
+    Select { option_id: String },
+    Custom { text: String },
+    Cancel,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -458,12 +492,34 @@ pub enum ToolAction {
 }
 
 pub fn tool_action(name: &str, input: &serde_json::Value) -> ToolAction {
+    if let Some(kind) = input.get("kind").and_then(serde_json::Value::as_str) {
+        match kind {
+            "execute" => return ToolAction::RunCommand,
+            "read" => return ToolAction::ReadFile,
+            "edit" | "delete" | "move" => return ToolAction::EditFile,
+            "search" => return ToolAction::Search,
+            "fetch" => return ToolAction::Web,
+            _ => {}
+        }
+    }
     match name {
-        "Bash" | "BashOutput" | "shell" | "exec_command" | "local_shell" | "commandExecution" => ToolAction::RunCommand,
-        "Read" | "NotebookRead" | "read_file" => ToolAction::ReadFile,
-        "Edit" | "Write" | "MultiEdit" | "NotebookEdit" | "apply_patch" | "fileChange" => ToolAction::EditFile,
-        "Grep" | "Glob" | "LS" | "search" => ToolAction::Search,
-        "WebFetch" | "WebSearch" | "web_search" | "webSearch" => ToolAction::Web,
+        "Bash" | "BashOutput" | "shell" | "exec_command" | "local_shell" | "commandExecution" | "execute" | "run_command" | "command_status"
+        | "send_command_input" => ToolAction::RunCommand,
+        "Read" | "NotebookRead" | "read_file" | "read" | "view_file" | "view_file_outline" | "view_code_item" => ToolAction::ReadFile,
+        "Edit"
+        | "Write"
+        | "MultiEdit"
+        | "NotebookEdit"
+        | "apply_patch"
+        | "fileChange"
+        | "edit"
+        | "delete"
+        | "move"
+        | "write_to_file"
+        | "replace_file_content"
+        | "multi_replace_file_content" => ToolAction::EditFile,
+        "Grep" | "Glob" | "LS" | "search" | "grep_search" | "find_by_name" | "list_dir" => ToolAction::Search,
+        "WebFetch" | "WebSearch" | "web_search" | "webSearch" | "fetch" | "read_url_content" | "search_web" => ToolAction::Web,
         "collabAgentToolCall" if input["tool"] == "wait" => ToolAction::Wait,
         "mcpToolCall" => ToolAction::Mcp,
         n if n.starts_with("mcp__") || n.starts_with("mcp:") => ToolAction::Mcp,
@@ -550,6 +606,18 @@ pub enum EventKind {
     PermissionResolved {
         request_id: String,
         decision: PermissionDecision,
+    },
+    /// The agent asks an interactive question (e.g. `agy` `interaction_*`) and
+    /// waits until `Session::respond_interaction` is called; never auto-approved.
+    InteractionRequested {
+        request_id: String,
+        question: String,
+        options: Vec<InteractionOption>,
+        allow_custom: bool,
+    },
+    InteractionResolved {
+        request_id: String,
+        decision: InteractionDecision,
     },
     /// The agent asks the user something and waits for the next prompt.
     Question {
@@ -654,6 +722,18 @@ pub trait Session: Send + Sync {
     fn queue(&self, content: Vec<ContentBlock>) -> Result<()>;
     fn abort(&self) -> Result<()>;
     fn respond_permission(&self, request_id: &str, decision: PermissionDecision) -> Result<()>;
+    fn respond_interaction(&self, _request_id: &str, _decision: InteractionDecision) -> Result<()> {
+        Err(AgentError::Unsupported {
+            option: "respond_interaction".into(),
+            reason: "runtime has no interactive question channel".into(),
+        })
+    }
+    fn set_config(&self, _model: Option<&str>, _effort: Option<&str>, _permission_mode: Option<PermissionMode>) -> Result<()> {
+        Err(AgentError::Unsupported {
+            option: "set_config".into(),
+            reason: "runtime does not support live config updates".into(),
+        })
+    }
     /// Stops the underlying process. The session can still be resumed by id.
     fn dispose(&self);
     /// Like `events`, but the receiver first yields every event emitted so

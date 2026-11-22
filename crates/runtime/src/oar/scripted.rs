@@ -190,6 +190,7 @@ impl Script {
                         input_tokens: Some(1200),
                         output_tokens: Some(85),
                         cost_usd: Some(0.0042),
+                        ..Default::default()
                     },
                 }),
             ])
@@ -225,6 +226,7 @@ impl ScriptedRuntime {
                 model_selection: true,
                 subagents: true,
                 usage: true,
+                config_options: false,
             },
             models: vec![
                 ModelInfo::new("scripted-small", "Scripted Small"),

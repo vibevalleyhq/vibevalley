@@ -23,6 +23,7 @@ export const RuntimeSupport = z.object({
   refused: z.record(z.string(), z.string()),
   capabilities: z.array(RuntimeCapability),
   inProcess: z.boolean(),
+  inSessionConfig: z.exactOptional(z.boolean()),
 }) satisfies Codec<T.RuntimeSupport>;
 
 const Via = z.enum(T.ViaValues) satisfies Codec<T.Via>;
@@ -59,6 +60,7 @@ export const ModelEntry = z.object({
   id: z.string(),
   name: z.string(),
   effortLevels: z.array(z.string()),
+  defaultEffort: z.exactOptional(z.string()),
   isDefault: z.boolean(),
 }) satisfies Codec<T.ModelEntry>;
 

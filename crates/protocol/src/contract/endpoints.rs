@@ -358,6 +358,51 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Vec<SessionEvent>"),
     },
     Endpoint {
+        op: "session.openWorkspace",
+        module: "session",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionOpenWorkspaceInput"),
+        result: Some("SessionWorkspace"),
+    },
+    Endpoint {
+        op: "session.send",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionSendInput"),
+        result: Some("Session"),
+    },
+    Endpoint {
+        op: "session.respondPermission",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionRespondPermissionInput"),
+        result: None,
+    },
+    Endpoint {
+        op: "session.respondInteraction",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionRespondInteractionInput"),
+        result: None,
+    },
+    Endpoint {
+        op: "session.setConfig",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionSetConfigInput"),
+        result: Some("SessionWorkspace"),
+    },
+    Endpoint {
         op: "issue.conversation.get",
         module: "issue",
         about: &["id"],
@@ -1975,6 +2020,41 @@ pub mod ops {
         type Input = t::SessionEventListInput;
         type Result = Vec<t::SessionEvent>;
     }
+    /// Opens or resumes a direct workspace chat session in a directory with no issue.
+    pub struct SessionOpenWorkspace;
+    impl Op for SessionOpenWorkspace {
+        const NAME: &'static str = "session.openWorkspace";
+        type Input = t::SessionOpenWorkspaceInput;
+        type Result = t::SessionWorkspace;
+    }
+    /// Sends a user message to a workspace session (starts a turn when idle or steers when working).
+    pub struct SessionSend;
+    impl Op for SessionSend {
+        const NAME: &'static str = "session.send";
+        type Input = t::SessionSendInput;
+        type Result = t::Session;
+    }
+    /// Answers a pending tool permission request for a session.
+    pub struct SessionRespondPermission;
+    impl Op for SessionRespondPermission {
+        const NAME: &'static str = "session.respondPermission";
+        type Input = t::SessionRespondPermissionInput;
+        type Result = ();
+    }
+    /// Answers a pending interactive question from a session.
+    pub struct SessionRespondInteraction;
+    impl Op for SessionRespondInteraction {
+        const NAME: &'static str = "session.respondInteraction";
+        type Input = t::SessionRespondInteractionInput;
+        type Result = ();
+    }
+    /// Updates model, effort, or permission mode on a workspace session.
+    pub struct SessionSetConfig;
+    impl Op for SessionSetConfig {
+        const NAME: &'static str = "session.setConfig";
+        type Input = t::SessionSetConfigInput;
+        type Result = t::SessionWorkspace;
+    }
     pub struct IssueConversationGet;
     impl Op for IssueConversationGet {
         const NAME: &'static str = "issue.conversation.get";
@@ -2997,5 +3077,11 @@ pub mod subscriptions {
         const NAME: &'static str = "artifact.suggestion.follow";
         type Payload = t::ArtifactSuggestionFollowPayload;
         type Event = t::SuggestionEvent;
+    }
+    pub struct SessionWatch;
+    impl Subscription for SessionWatch {
+        const NAME: &'static str = "session.watch";
+        type Payload = t::SessionWatchPayload;
+        type Event = t::SessionWatchEvent;
     }
 }

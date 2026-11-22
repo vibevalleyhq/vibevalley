@@ -108,6 +108,7 @@ impl Runtime for SdkRuntime {
             model_selection: true,
             subagents: true,
             usage: true,
+            config_options: false,
         }
     }
     fn installation(&self) -> Installation {

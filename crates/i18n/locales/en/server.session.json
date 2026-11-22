@@ -12,5 +12,13 @@
     "noStep": "{label}'s log has no step {on}",
     "notAsked": "Step {on} is not something {label} was told",
     "notInConversation": "What step {on} told {label} did not reach its conversation (was {label} not up then?)"
+  },
+  "workspace": {
+    "badCwd": "Working directory does not exist: {cwd}",
+    "runtimeRequired": "A runtime id is required",
+    "notWorkspace": "Session is not a workspace chat",
+    "emptyMessage": "Message cannot be empty",
+    "notLive": "Session is not currently live",
+    "interactionDecisionRequired": "Choose an option, enter custom text, or cancel"
   }
 }

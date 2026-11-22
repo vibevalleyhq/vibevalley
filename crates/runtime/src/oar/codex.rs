@@ -1041,6 +1041,7 @@ impl Runtime for CodexRuntime {
             model_selection: true,
             subagents: true,
             usage: true,
+            config_options: false,
         }
     }
 

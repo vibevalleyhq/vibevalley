@@ -409,6 +409,18 @@ export class VibeValleyApi {
     list: (a: { agent?: string }, options?: { signal?: AbortSignal }): Promise<T.Session[]> =>
       this.call<T.Session[]>("session.list", "/api/v1/session/list", a, options),
     get: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Session> => this.call<T.Session>("session.get", "/api/v1/session/get", a, options),
+    /** Opens or resumes a direct workspace chat session in a directory with no issue. */
+    openWorkspace: (a: T.SessionOpenWorkspaceInput, options?: { signal?: AbortSignal }): Promise<T.SessionWorkspace> =>
+      this.call<T.SessionWorkspace>("session.openWorkspace", "/api/v1/session/openWorkspace", a, options),
+    /** Starts a turn when idle; steers the current turn when working. */
+    send: (a: T.SessionSendInput, options?: { signal?: AbortSignal }): Promise<T.Session> =>
+      this.call<T.Session>("session.send", "/api/v1/session/send", a, options),
+    respondPermission: (a: T.SessionRespondPermissionInput, options?: { signal?: AbortSignal }): Promise<void> =>
+      this.call<void>("session.respondPermission", "/api/v1/session/respondPermission", a, options),
+    respondInteraction: (a: T.SessionRespondInteractionInput, options?: { signal?: AbortSignal }): Promise<void> =>
+      this.call<void>("session.respondInteraction", "/api/v1/session/respondInteraction", a, options),
+    setConfig: (a: T.SessionSetConfigInput, options?: { signal?: AbortSignal }): Promise<T.SessionWorkspace> =>
+      this.call<T.SessionWorkspace>("session.setConfig", "/api/v1/session/setConfig", a, options),
     event: {
       /** Its log, oldest first. run gives one run's only. */
       list: (a: { id: string; run?: string }, options?: { signal?: AbortSignal }): Promise<T.SessionEvent[]> =>

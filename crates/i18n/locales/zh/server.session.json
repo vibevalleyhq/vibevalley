@@ -12,5 +12,13 @@
     "noStep": "{label}轨迹里没有第 {on} 步",
     "notAsked": "第 {on} 步不是{label}收到的话",
     "notInConversation": "第 {on} 步收到的话没进{label}的对话（那时{label}没起来？）"
+  },
+  "workspace": {
+    "badCwd": "工作区不存在：{cwd}",
+    "runtimeRequired": "需要指定引擎",
+    "notWorkspace": "该执行会话不是工作区对话",
+    "emptyMessage": "消息内容不能为空",
+    "notLive": "执行会话当前未运行",
+    "interactionDecisionRequired": "需要选择选项、填写回复或取消"
   }
 }

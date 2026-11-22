@@ -328,6 +328,7 @@ impl Fleet {
                     name: if m.display_name.is_empty() { m.id.clone() } else { m.display_name },
                     id: m.id,
                     effort_levels: m.effort_levels,
+                    default_effort: m.default_effort,
                     is_default: m.is_default,
                 })
                 .collect()
@@ -511,6 +512,54 @@ impl Fleet {
             model: options.model,
             effort: options.effort,
             env: options.env,
+        })
+    }
+
+    /// What a direct workspace session on `runtime_id` opens with, using
+    /// saved runtime settings (binary path, env, defaults) without blocking on
+    /// a full background model probe.
+    pub fn resolve_runtime(&self, runtime_id: &str, model: Option<&str>, effort: Option<&str>) -> Result<Resolved, ApiError> {
+        let runtime = self
+            .runtime(runtime_id)
+            .ok_or_else(|| refused(t("server.runtime.cannotDrive", &[("runtime", runtime_id.into())])))?;
+        let settings = self.profiles.settings(runtime_id);
+        Self::use_binary(runtime_id, &settings.bin_path);
+        if let Some(obs) = self.held(runtime_id) {
+            match obs.info.installation {
+                Installation::NotFound(_) => {
+                    return Err(refused(t(
+                        "server.runtime.cannotSend",
+                        &[
+                            ("name", runtime_label(runtime_id).into()),
+                            ("why", format!("{runtime_id} is not installed").into()),
+                        ],
+                    )));
+                }
+                Installation::Unsupported(u) => {
+                    return Err(refused(t(
+                        "server.runtime.cannotSend",
+                        &[("name", runtime_label(runtime_id).into()), ("why", u.reason.into())],
+                    )));
+                }
+                Installation::Available(_) | Installation::Checking(_) => {}
+            }
+        }
+        let model = model
+            .map(str::trim)
+            .filter(|m| !m.is_empty())
+            .map(String::from)
+            .unwrap_or_else(|| settings.default_model.clone());
+        let effort = effort
+            .map(str::trim)
+            .filter(|e| !e.is_empty())
+            .map(String::from)
+            .unwrap_or_else(|| settings.default_effort.clone());
+        Ok(Resolved {
+            runtime,
+            bin_path: settings.bin_path,
+            model,
+            effort,
+            env: settings.env,
         })
     }
 }

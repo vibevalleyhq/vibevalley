@@ -436,6 +436,14 @@ pub enum SessionEventType {
     ToolCall,
     #[serde(rename = "tool/result")]
     ToolResult,
+    #[serde(rename = "permission/request")]
+    PermissionRequest,
+    #[serde(rename = "permission/resolved")]
+    PermissionResolved,
+    #[serde(rename = "interaction/request")]
+    InteractionRequest,
+    #[serde(rename = "interaction/resolved")]
+    InteractionResolved,
     #[serde(rename = "llm/retry")]
     LlmRetry,
     #[serde(rename = "llm/usage")]
@@ -447,7 +455,7 @@ pub enum SessionEventType {
 }
 
 impl SessionEventType {
-    pub const ALL: [SessionEventType; 11] = [
+    pub const ALL: [SessionEventType; 15] = [
         SessionEventType::RunStart,
         SessionEventType::UserMessage,
         SessionEventType::MemoryRecalled,
@@ -455,6 +463,10 @@ impl SessionEventType {
         SessionEventType::AssistantMessage,
         SessionEventType::ToolCall,
         SessionEventType::ToolResult,
+        SessionEventType::PermissionRequest,
+        SessionEventType::PermissionResolved,
+        SessionEventType::InteractionRequest,
+        SessionEventType::InteractionResolved,
         SessionEventType::LlmRetry,
         SessionEventType::LlmUsage,
         SessionEventType::RunError,
@@ -471,6 +483,10 @@ impl SessionEventType {
             SessionEventType::AssistantMessage => "assistant/message",
             SessionEventType::ToolCall => "tool/call",
             SessionEventType::ToolResult => "tool/result",
+            SessionEventType::PermissionRequest => "permission/request",
+            SessionEventType::PermissionResolved => "permission/resolved",
+            SessionEventType::InteractionRequest => "interaction/request",
+            SessionEventType::InteractionResolved => "interaction/resolved",
             SessionEventType::LlmRetry => "llm/retry",
             SessionEventType::LlmUsage => "llm/usage",
             SessionEventType::RunError => "run/error",
@@ -536,6 +552,111 @@ pub struct EventTokens {
     pub input: i64,
     pub cache_read: i64,
     pub output: i64,
+    pub cache_write: Option<i64>,
+    pub reasoning: Option<i64>,
+    pub context_used: Option<i64>,
+    pub context_window: Option<i64>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum SessionPermissionMode {
+    #[default]
+    Ask,
+    AcceptEdits,
+    Bypass,
+    ReadOnly,
+}
+
+impl SessionPermissionMode {
+    pub const ALL: [SessionPermissionMode; 4] = [
+        SessionPermissionMode::Ask,
+        SessionPermissionMode::AcceptEdits,
+        SessionPermissionMode::Bypass,
+        SessionPermissionMode::ReadOnly,
+    ];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SessionPermissionMode::Ask => "ask",
+            SessionPermissionMode::AcceptEdits => "acceptEdits",
+            SessionPermissionMode::Bypass => "bypass",
+            SessionPermissionMode::ReadOnly => "readOnly",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum SessionPermissionDecision {
+    AllowOnce,
+    AllowAlways,
+    Deny,
+}
+
+impl SessionPermissionDecision {
+    pub const ALL: [SessionPermissionDecision; 3] = [
+        SessionPermissionDecision::AllowOnce,
+        SessionPermissionDecision::AllowAlways,
+        SessionPermissionDecision::Deny,
+    ];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SessionPermissionDecision::AllowOnce => "allowOnce",
+            SessionPermissionDecision::AllowAlways => "allowAlways",
+            SessionPermissionDecision::Deny => "deny",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionPermissionRequest {
+    pub request_id: String,
+    pub tool: String,
+    pub summary: String,
+    pub input: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionInteractionOption {
+    pub id: String,
+    pub label: String,
+    pub description: Option<String>,
+    pub warning: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionInteractionRequest {
+    pub request_id: String,
+    pub question: String,
+    pub options: Vec<SessionInteractionOption>,
+    pub allow_custom: bool,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionInteractionResolution {
+    pub request_id: String,
+    pub accepted: bool,
+    pub choice: Option<String>,
 }
 
 #[skip_serializing_none]
@@ -562,6 +683,9 @@ pub struct SessionEvent {
     pub ok: Option<bool>,
     pub tokens: Option<EventTokens>,
     pub connection: Option<ToolConnection>,
+    pub permission: Option<SessionPermissionRequest>,
+    pub interaction: Option<SessionInteractionRequest>,
+    pub interaction_resolution: Option<SessionInteractionResolution>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -784,6 +908,141 @@ pub struct SessionEventListInput {
     pub run: Option<String>,
 }
 
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionContextFile {
+    pub path: String,
+    pub start_line: Option<i64>,
+    pub end_line: Option<i64>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionOpenWorkspaceInput {
+    pub session_id: Option<String>,
+    pub runtime: String,
+    pub cwd: String,
+    pub repo: Option<String>,
+    pub model: Option<String>,
+    pub effort: Option<String>,
+    pub permission_mode: Option<SessionPermissionMode>,
+    pub title: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionWorkspace {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
+    pub id: SessionId,
+    pub session: Session,
+    pub model: Option<String>,
+    pub effort: Option<String>,
+    pub permission_mode: SessionPermissionMode,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSendInput {
+    pub id: String,
+    pub text: String,
+    pub attachments: Option<Vec<String>>,
+    pub context_files: Option<Vec<SessionContextFile>>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionRespondPermissionInput {
+    pub id: String,
+    pub request_id: String,
+    pub decision: SessionPermissionDecision,
+    pub message: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionRespondInteractionInput {
+    pub id: String,
+    pub request_id: String,
+    pub option_id: Option<String>,
+    pub text: Option<String>,
+    pub cancelled: Option<bool>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSetConfigInput {
+    pub id: String,
+    pub model: Option<String>,
+    pub effort: Option<String>,
+    pub permission_mode: Option<SessionPermissionMode>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionWatchPayload {
+    pub id: String,
+    pub after_seq: Option<i64>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum SessionWatchEvent {
+    #[serde(rename_all = "camelCase")]
+    State {
+        session: Session,
+        model: Option<String>,
+        effort: Option<String>,
+        permission_mode: SessionPermissionMode,
+        pending_permissions: Vec<SessionPermissionRequest>,
+        pending_interactions: Vec<SessionInteractionRequest>,
+        tokens: Option<EventTokens>,
+    },
+    #[serde(rename_all = "camelCase")]
+    History {
+        #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
+        session: SessionId,
+        events: Vec<SessionEvent>,
+    },
+    #[serde(rename_all = "camelCase")]
+    Event {
+        #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
+        session: SessionId,
+        event: SessionEvent,
+    },
+    #[serde(rename_all = "camelCase")]
+    Missing {
+        #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
+        session: SessionId,
+    },
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "session";
@@ -815,6 +1074,12 @@ crate::typescript::module! {
     SessionEventType,
     ToolAction,
     EventTokens,
+    SessionPermissionMode,
+    SessionPermissionDecision,
+    SessionPermissionRequest,
+    SessionInteractionOption,
+    SessionInteractionRequest,
+    SessionInteractionResolution,
     SessionEvent,
     RunTriggerKind,
     RunTrigger,
@@ -830,6 +1095,15 @@ crate::typescript::module! {
     SessionStopInput,
     SessionListInput,
     SessionGetInput,
-    SessionEventListInput];
+    SessionEventListInput,
+    SessionContextFile,
+    SessionOpenWorkspaceInput,
+    SessionWorkspace,
+    SessionSendInput,
+    SessionRespondPermissionInput,
+    SessionRespondInteractionInput,
+    SessionSetConfigInput,
+    SessionWatchPayload,
+    SessionWatchEvent];
     aliases: [];
 }
