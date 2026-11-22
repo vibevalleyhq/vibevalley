@@ -1,7 +1,4 @@
-// A busy workbench for tests, stories and the app's fake server
-// (VIBEVALLEY_FAKE_SERVER=ui/vv/fixtures/workbench, written by fixtures.test.ts):
-// the issues and helpers of VibeValley's Board story (issue.samples.ts),
-// as a SliceBundle and the answers of the reads the pages make.
+// Written by write.sh and validated by fixtures.test.ts; VIBEVALLEY_FAKE_SERVER reads this directory.
 import type { AchievementList, Agent, Issue, IssueHistory, SliceBundle } from "@vibevalley/protocol";
 import { issueId } from "@vibevalley/protocol/schema";
 

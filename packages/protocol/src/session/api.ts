@@ -20,9 +20,7 @@ export interface SessionHandlers {
   readonly "session.respondInteraction": (a: T.SessionRespondInteractionInput) => Promise<void>;
   readonly "session.setConfig": (a: T.SessionSetConfigInput) => Promise<T.SessionWorkspace>;
   readonly "session.childTranscript": (a: T.SessionChildTranscriptInput) => Promise<T.SessionChildTranscript>;
-  /** Attaches a context reference to an existing session. */
   readonly "session.binding.attach": (a: T.SessionBindingInput) => Promise<T.Session>;
-  /** Detaches a context reference from an existing session. */
   readonly "session.binding.detach": (a: T.SessionBindingInput) => Promise<T.Session>;
 }
 

@@ -99,7 +99,7 @@
 | `useTimeout` | `base/timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the reactive owner's end clears it. |
 | `typedMarks` | `base/typedMarks.ts` | The text with the marks just typed before the caret as the syntax they stand for. undefined when there are none. |
 | `call` | `bridge.ts` | One endpoint by name. Never rejects: failures are envelopes with a non-zero bizCode. |
-| `watchSlice` | `bridge.ts` | Watches a server slice topic (`slice:<kind>`), delivering the newest cached frame if already active and unwatching when the last caller stops. |
+| `watchSlice` | `bridge.ts` | A listener joining an active topic gets the newest cached frame at once. |
 | `frame` | `bridge.ts` |  |
 | `frameRev` | `bridge.ts` | The frame's revision (reactive): goes up by one per frame this view received. |
 | `onLive` | `bridge.ts` | Every LiveEvent from now on. Returns how to stop listening. |
@@ -226,8 +226,8 @@
 | `defineAtom` | `state/atom.ts` | A value of the page's that lasts until it closes (a dialog the shell and a page both open, the farm's overlays). |
 | `linkIn` | `state/atom.ts` | Whether the stream link is up now, read from its source: subscribing would open and close a slice stream. |
 | `sliceIn` | `state/atom.ts` | The registry's latest value for one slice kind. |
-| `subscribeSlice` | `state/atom.ts` | Hears each update of one slice in the registry's source, and follows the source when a test swaps it. |
-| `subscribeLink` | `state/atom.ts` | Hears link transitions of the registry's source, and follows the source when a test swaps it. |
+| `subscribeSlice` | `state/atom.ts` | Re-subscribes when a test swaps the registry's source, emitting its current value at once. |
+| `subscribeLink` | `state/atom.ts` | Re-subscribes when a test swaps the registry's source, emitting the current link at once. |
 | `useLatest` | `state/atom.ts` | The answer to the newest `key()` while the component lives; undefined while there is nothing to ask. |
 | `bySeq` | `state/intent.ts` | A reply that carries the seq of the fold with its change (an issue moved): shown once the slice has caught up. |
 | `defineIntent` | `state/intent.ts` |  |

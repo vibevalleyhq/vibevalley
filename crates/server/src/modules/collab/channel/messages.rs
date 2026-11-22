@@ -340,11 +340,13 @@ impl Chat {
         let mut at = 0;
         self.change(&mut inner, &row, |db, revision, now| {
             db::delete_message(db, id, now, revision)?;
+            db::delete_mentions_for_message(db, id)?;
             db::withdraw_deliveries_for_message(db, id, now)?;
             seq = db::insert_event(db, "removed", &row.channel_id, id, now)?;
             at = now;
             Ok(())
         })?;
+        self.publish_user_mentions(&inner)?;
         let event = EventRow {
             seq,
             kind: "removed".into(),

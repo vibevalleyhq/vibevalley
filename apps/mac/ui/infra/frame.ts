@@ -1,6 +1,3 @@
-// Independent per-slice reactive streams fed by the transport (infra/transport.ts).
-// Each slice kind (`board`, `sessions`, `collab`, `inbox`, `ops`, `farm`) has its own
-// subscription and signal so updating one slice never re-runs consumers of another.
 import { cleanup, signal, type Accessor } from "nsh";
 
 import {
@@ -25,13 +22,11 @@ export type Link = "connecting" | "open" | "lost";
 
 const SLICE_KINDS: readonly SliceKind[] = ["board", "sessions", "collab", "inbox", "ops", "farm"];
 
-/** Reactive per-slice accessors and link status for a subtree. */
 export interface Slices {
   readonly slice: <K extends SliceKind>(kind: K) => Accessor<SliceMap[K] | undefined>;
   readonly link: Accessor<Link>;
 }
 
-/** Where slices come from: the shared stream below, or a source of a test's own. */
 export interface SlicesSource {
   readonly get: <K extends SliceKind>(kind: K) => SliceMap[K] | undefined;
   readonly subscribe: (kind: SliceKind, listener: () => void) => () => void;
@@ -239,7 +234,6 @@ export function createSlices(source: SlicesSource = slices): Slices {
 }
 
 let shared: Slices | undefined;
-/** The nearest provided slices, else the app's shared streams. */
 const useSlices = (): Slices => useContext(SlicesContext) ?? (shared ??= createSlices());
 
 function useSlice<K extends SliceKind>(kind: K): Accessor<SliceMap[K] | undefined> {

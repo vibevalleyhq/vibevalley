@@ -8,7 +8,7 @@ use vibevalley_protocol::{PkmComment, PkmCommentStatus};
 
 use crate::db::generated::content_pkm as queries;
 pub(super) use queries::{AddChangeParams as NewChange, AddSuggestionParams as Suggestion, KeepRemarkParams as Remark};
-pub const SCHEMA: &str = include_str!("sql/schema.sql");
+pub const SCHEMA: &str = crate::db::schema::CONTENT_PKM;
 
 pub fn add_change(db: &mut SqliteConnection, change: NewChange) -> sqlx::Result<()> {
     block_on(queries::add_change(db, change))

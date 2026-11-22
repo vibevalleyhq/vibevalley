@@ -1,15 +1,4 @@
-// The Rust <-> TSX bridge (Rust side: crates/vibevalley-bridge, apps/mac/src/hosted).
-//
-// Server traffic, in VibeValley's shapes:
-//   call(op, payload)            -> Promise<Envelope>        (action "call", event "reply:<id>")
-//   watchSlice(kind, fn)         -> SliceMap[kind] stream    (actions "watch"/"unwatch", events "frame:slice:<kind>")
-//   frame("live") / onLive(fn)   -> LiveEvents               (action "watch", events "frame:live")
-//   subscribe(name, payload, on, ended) -> stop              (actions "subscribe"/"unsubscribe", events "sub:<id>")
-// Host capabilities (VibeValley's packages/protocol/src/host.ts, plus the terminal):
-//   hostApi.notify / tray / locale / reveal / theme / opening / openTerminal / openUrl / openFile / pixelDir / info
-//   = call("host.<name>", payload), answered by the shell.
-// Shell frames and actions (VibeValley's own panels): frame(<topic>) for topics Rust pushes,
-// act({ type, ... }) for intent back.
+// Rust side: crates/server/src/transport/bridge, apps/mac/src/hosted; action and event names must match there.
 import { cleanup, host, signal, type Signal } from "nsh";
 
 import type { SliceKind } from "@vibevalley/protocol";
@@ -176,7 +165,7 @@ function topic(name: string): TopicEntry {
   return entry;
 }
 
-/** Watches a server slice topic (`slice:<kind>`), delivering the newest cached frame if already active and unwatching when the last caller stops. */
+/** A listener joining an active topic gets the newest cached frame at once. */
 export function watchSlice(kind: SliceKind, listener: (data: unknown) => void): () => void {
   const name = `${SLICE_PREFIX}${kind}`;
   const { entry, release } = acquireSlice(name);
@@ -191,7 +180,7 @@ export function watchSlice(kind: SliceKind, listener: (data: unknown) => void): 
   };
 }
 
-/** The latest frame of `name` (reactive), `null` until the first one. Slice topics (`slice:<kind>`) watch on mount and unwatch on cleanup. */
+/** `null` until the first frame arrives. */
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- each topic pushes its own contract shape from Rust
 export function frame<T = unknown>(name: string): () => T | null {
   if (isSliceTopic(name)) {

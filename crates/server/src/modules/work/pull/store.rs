@@ -14,7 +14,7 @@ use crate::modules::infra::column::{read_word, word};
 
 use crate::db::generated::work_pull as queries;
 
-pub const SCHEMA: &str = include_str!("sql/schema.sql");
+pub const SCHEMA: &str = crate::db::schema::WORK_PULL;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PullRecord {

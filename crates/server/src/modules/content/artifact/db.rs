@@ -11,7 +11,7 @@ pub use queries::{
     VersionRow,
 };
 
-pub const SCHEMA: &str = include_str!("sql/schema.sql");
+pub const SCHEMA: &str = crate::db::schema::CONTENT_ARTIFACT;
 
 pub fn artifact(db: &mut SqliteConnection, id: &str) -> Q<Option<ArtifactRow>> {
     optional(block_on(queries::artifact(db, queries::ArtifactParams { id: id.into() })))
@@ -228,7 +228,6 @@ pub fn prune(db: &mut SqliteConnection, before: i64) -> Q<()> {
         let mut tx = db.begin().await?;
         queries::prune_changes(&mut *tx, queries::PruneChangesParams { created_at: before }).await?;
         queries::prune_revisions(&mut *tx, queries::PruneRevisionsParams { created_at: before }).await?;
-        queries::prune_artifact_entry_changes(&mut *tx, queries::PruneArtifactEntryChangesParams { created_at: before }).await?;
         tx.commit().await
     })
 }
@@ -254,15 +253,18 @@ fn change(row: queries::ChangeByBatchRow) -> Q<ChangeRow> {
     Ok(ChangeRow {
         artifact_id: row.artifact_id,
         seq: row.seq,
-        batch_id: row.batch_id,
+        batch_id: row.batch_id.unwrap_or_default(),
         block_ids: read_json(row.block_ids)?,
         results: read_json(row.results)?,
     })
 }
 pub fn change_by_batch(db: &mut SqliteConnection, batch: &str) -> Q<Option<ChangeRow>> {
-    optional(block_on(queries::change_by_batch(db, queries::ChangeByBatchParams { batch_id: batch.into() })))?
-        .map(change)
-        .transpose()
+    optional(block_on(queries::change_by_batch(
+        db,
+        queries::ChangeByBatchParams { batch_id: Some(batch.into()) },
+    )))?
+    .map(change)
+    .transpose()
 }
 pub fn add_change(db: &mut SqliteConnection, c: &NewChange) -> Q<()> {
     block_on(queries::add_change(
@@ -270,10 +272,10 @@ pub fn add_change(db: &mut SqliteConnection, c: &NewChange) -> Q<()> {
         queries::AddChangeParams {
             artifact_id: c.artifact_id.into(),
             seq: c.seq,
-            batch_id: c.batch_id.into(),
+            batch_id: Some(c.batch_id.into()),
             actor: c.actor.into(),
-            block_ids: json(&c.block_ids)?,
-            results: json(&c.results)?,
+            targets: json(&c.block_ids)?,
+            payload: json(&c.results)?,
             created_at: c.created_at,
         },
     ))
@@ -462,8 +464,8 @@ pub fn add_entry_change(db: &mut SqliteConnection, artifact: &str, seq: i64, act
             artifact_id: artifact.into(),
             seq,
             actor: actor.into(),
-            paths: json(&paths)?,
-            deleted: json(&deleted)?,
+            targets: json(&paths)?,
+            payload: json(&deleted)?,
             created_at,
         },
     ))

@@ -595,10 +595,7 @@ impl SessionChat {
     }
 
     fn withdraw_message_mailbox(&self, message_id: &str) {
-        for agent in self.agents.profiles.all() {
-            let key = direct_mail_key(&agent.id, message_id);
-            let _ = self.board.sessions().withdraw_mailbox(&key);
-        }
+        let _ = self.board.sessions().withdraw_mailbox_by_message(message_id);
     }
 
     fn on_transition(&self, hub: &Arc<Hub>, tr: &Transition) {
@@ -642,7 +639,13 @@ impl SessionChat {
                     .map(|s| s.id)
                     .unwrap_or_else(|| format!("profile:{}", d.recipient_id));
                 let key = direct_mail_key(&d.recipient_id, &d.message_id);
-                let _ = sessions.enqueue_mailbox(&mailbox_owner, &key, mailbox::MailboxSource::ChannelDirect, &dispatched.committed.row.body);
+                let _ = sessions.enqueue_mailbox(
+                    &mailbox_owner,
+                    &key,
+                    mailbox::MailboxSource::ChannelDirect,
+                    Some(&d.message_id),
+                    &dispatched.committed.row.body,
+                );
                 self.enqueue_lane(
                     d.recipient_id.clone(),
                     DirectWake {
@@ -725,7 +728,13 @@ impl SessionChat {
             .map(|s| s.id)
             .unwrap_or_else(|| format!("profile:{}", d.recipient_id));
         let mail_entry = sessions
-            .enqueue_mailbox(&mailbox_owner, &mail_key, mailbox::MailboxSource::ChannelDirect, &c.row.body)
+            .enqueue_mailbox(
+                &mailbox_owner,
+                &mail_key,
+                mailbox::MailboxSource::ChannelDirect,
+                Some(&d.message_id),
+                &c.row.body,
+            )
             .ok();
         let claimed = sessions.claim_mailbox_by_key(&mail_key).unwrap_or(false);
         if !claimed

@@ -1,6 +1,4 @@
-// A transport answered inside the page from a fixture (`state` as SliceBundle, and
-// `responses` as vibevalley_bridge::fake reads them): for stories and for
-// pictures on a real host, where no Rust side answers the bridge.
+// `responses` are read as crates/server/src/transport/bridge/fake.rs reads them: change them there and here together.
 import type { BoardSlice, CollabSlice, FarmFrame, InboxSlice, LiveEvent, OpsSlice, SessionsSlice, SliceBundle, SliceKind } from "@vibevalley/protocol";
 
 import type { Envelope, SliceMap, Transport } from "./transport";

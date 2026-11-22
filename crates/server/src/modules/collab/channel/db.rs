@@ -8,7 +8,7 @@ use super::queries;
 pub type Sql<T> = sqlx::Result<T>;
 // Inner serializes access; a read borrows mutably only while the SQLx worker executes its statement.
 pub type Connection = RefCell<SqliteConnection>;
-pub const SCHEMA: &str = include_str!("sql/schema.sql");
+pub const SCHEMA: &str = crate::db::schema::COLLAB_CHANNEL;
 
 pub(super) fn control(db: &Connection, statement: &'static str) -> Sql<()> {
     block_on(sqlx::raw_sql(statement).execute(&mut *db.borrow_mut())).map(|_| ())
@@ -549,6 +549,15 @@ pub fn insert_mention(db: &Connection, message: &str, target: &str, resolved: &s
             message_id: message.to_owned(),
             target_id: target.to_owned(),
             resolved: resolved.to_owned(),
+        },
+    ))
+}
+
+pub fn delete_mentions_for_message(db: &Connection, message: &str) -> Sql<()> {
+    block_on(queries::delete_mentions_for_message(
+        &mut *db.borrow_mut(),
+        queries::DeleteMentionsForMessageParams {
+            message_id: message.to_owned(),
         },
     ))
 }

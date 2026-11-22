@@ -20,7 +20,7 @@
 | `crates/server/src/modules/work/pull/publish.rs` | `Publisher`：检出与远端校验、锁外 `.vibevalley/check`、按 `<SHA>:refs/heads/<branch>` 推送、GitHub（`gh`）与 GitLab.com（`glab`）查询和创建 |
 | `crates/server/src/modules/work/pull/snapshot.rs` | `Pulls::snapshot`：GitHub PR 检查、评审、评论与行内评审线程的 GraphQL/REST 分页快照、CI SHA-256 指纹与失败 Actions job 日志提取 |
 | `crates/server/src/modules/work/pull/poll.rs` | `Pulls::poll`：CI 指纹变化检测、跳过当前登录者自发评论，以及同轮机器人评审去重（`bot_round_key`、`bot_round`） |
-| `crates/server/src/modules/work/pull/sql/schema.sql`、`queries.sql` | 表 `pull`（`unique (repo, number)`、可空 `issue_id references issue(id) on delete set null`）与 `pull_event`（`pull_id references pull(id) on delete cascade`）的建表与 sqlc 查询 |
+| `crates/server/src/db/{schema,queries,generated}/work_pull.*` | 表 `pull`（`unique (repo, number)`、可空 `issue_id references issue(id) on delete set null`）与 `pull_event`（`pull_id references pull(id) on delete cascade`）的建表与 sqlc 查询 |
 | `crates/server/src/modules/team/mcp/resource.rs` | 将 `vv://github/<repo>/pulls/<n>`（及 `/checks`、`/reviews`、`/comments`）接入 `Pulls::snapshot` |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`repo.pr.submit`）。

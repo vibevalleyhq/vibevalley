@@ -306,3 +306,34 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
     );
     server.close();
 }
+
+#[test]
+fn regression_deleted_unread_user_mention_clears_inbox_slice() {
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.hub.clone();
+    let gid = started.chat.default_channel();
+
+    let (msg, _) = started
+        .chat
+        .post(vibevalley_server::modules::collab::channel::Posting {
+            from: "orchestrator".into(),
+            channel: gid,
+            text: "请看一下 @用户".into(),
+            ..Default::default()
+        })
+        .unwrap();
+    assert!(
+        hub.inbox_slice().items.iter().any(|item| item.kind == vibevalley_protocol::InboxKind::Mention),
+        "unread @user mention must appear in InboxSlice"
+    );
+
+    ok(hub.call_as(Caller::User, "channel.message.delete", json!({ "id": msg.id })));
+    assert!(
+        hub.inbox_slice().items.iter().all(|item| item.kind != vibevalley_protocol::InboxKind::Mention),
+        "deleting unread @user mention must immediately clear InboxSlice: {:?}",
+        hub.inbox_slice().items
+    );
+    started.close();
+}

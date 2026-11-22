@@ -1,12 +1,6 @@
-// Where the reused VibeValley web code's requests and streams go. In
-// VibeValley they are HTTP (`/api/v1/<op>`) and SSE (`/api/v1/slice/<name>`,
-// `/api/v1/live`); in VibeValley they are the bridge to the Rust server
-// (docs/vibevalley-port.md, "Bridge"): `call(op, payload)` answering
-// VibeValley's envelope, the `slice:<kind>` and `live` frames. Stories and tests
-// set a transport of their own (apps/mac/ui/infra/fixtures.ts).
 import type { BoardSlice, CollabSlice, FarmFrame, InboxSlice, LiveEvent, OpsSlice, SessionsSlice, SliceKind } from "@vibevalley/protocol";
 
-/** Maps each slice kind to the typed payload pushed by the server. */
+/** Each kind's payload, as the server pushes it. */
 export interface SliceMap {
   readonly board: BoardSlice;
   readonly sessions: SessionsSlice;

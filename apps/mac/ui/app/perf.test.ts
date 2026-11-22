@@ -246,13 +246,11 @@ test("slice indexed selectors resolve in O(1) and isolate reactivity per slice",
   expect(sessionsRuns).toBe(1);
   expect(collabRuns).toBe(1);
 
-  // Updating collab must NEVER re-trigger board or sessions consumers.
   mock.push("collab", { ...baseState.collab, seq: baseState.collab.seq + 1 });
   expect(collabRuns).toBe(2);
   expect(boardRuns).toBe(1);
   expect(sessionsRuns).toBe(1);
 
-  // Updating sessions must re-trigger sessions consumers without touching board or collab.
   mock.push("sessions", {
     ...baseState.sessions,
     seq: baseState.sessions.seq + 1,
@@ -264,7 +262,6 @@ test("slice indexed selectors resolve in O(1) and isolate reactivity per slice",
   expect(boardRuns).toBe(1);
   expect(collabRuns).toBe(2);
 
-  // Updating board must re-trigger board consumers without touching sessions or collab.
   mock.push("board", {
     ...baseState.board,
     seq: baseState.board.seq + 1,

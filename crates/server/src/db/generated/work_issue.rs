@@ -22,19 +22,20 @@ pub struct ListIssuesRow {
     pub r#conflict: Option<String>,
     pub r#last_run: Option<String>,
     pub r#answer: Option<String>,
+    pub r#delivery_evidence: Option<String>,
     pub r#blocked_by: String,
     pub r#criteria: String,
     pub r#checks: String,
     pub r#findings: String,
     pub r#questions: String,
     pub r#assignments: String,
-    pub r#evidence: Option<String>,
 }
 
 pub async fn r#list_issues<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
 ) -> Result<Vec<ListIssuesRow>, sqlx::Error> {
-    sqlx::query_as::<_, ListIssuesRow>(r#"SELECT i.id, i.number, i.title, i.description, i.repo, i.priority, i.rank, i.deliver, i.parent, i.created_at, i.queued_at, i.closed_at, i.reviewed_at, i.canceled, i.delivered, i.mandate, i.constraints, i."conflict", i.last_run, i.answer, i.blocked_by, i.criteria, i.checks, i.findings, i.questions, i.assignments, e.evidence FROM issue AS i LEFT JOIN issue_delivery_evidence AS e ON e.issue_id = i.id ORDER BY i.number"#)
+    sqlx::query_as::<_, ListIssuesRow>(r#"SELECT id, number, title, description, repo, priority, rank, deliver, parent, created_at, queued_at, closed_at, reviewed_at, canceled, delivered, mandate, constraints, conflict, last_run, answer, delivery_evidence, blocked_by, criteria, checks, findings, questions, assignments
+FROM issue ORDER BY number"#)
         .fetch_all(db).await
 }
 
@@ -59,6 +60,7 @@ pub struct PutIssueParams {
     pub r#conflict: Option<String>,
     pub r#last_run: Option<String>,
     pub r#answer: Option<String>,
+    pub r#delivery_evidence: Option<String>,
     pub r#blocked_by: String,
     pub r#criteria: String,
     pub r#checks: String,
@@ -71,8 +73,8 @@ pub async fn r#put_issue<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: PutIssueParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"INSERT INTO issue (id, number, title, description, repo, priority, rank, deliver, parent, created_at, queued_at, closed_at, reviewed_at, canceled, delivered, mandate, constraints, conflict, last_run, answer, blocked_by, criteria, checks, findings, questions, assignments)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)
+    sqlx::query(r#"INSERT INTO issue (id, number, title, description, repo, priority, rank, deliver, parent, created_at, queued_at, closed_at, reviewed_at, canceled, delivered, mandate, constraints, conflict, last_run, answer, delivery_evidence, blocked_by, criteria, checks, findings, questions, assignments)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)
 ON CONFLICT(id) DO UPDATE SET
   number = excluded.number,
   title = excluded.title,
@@ -93,6 +95,7 @@ ON CONFLICT(id) DO UPDATE SET
   conflict = excluded.conflict,
   last_run = excluded.last_run,
   answer = excluded.answer,
+  delivery_evidence = excluded.delivery_evidence,
   blocked_by = excluded.blocked_by,
   criteria = excluded.criteria,
   checks = excluded.checks,
@@ -119,55 +122,13 @@ ON CONFLICT(id) DO UPDATE SET
         .bind(params.r#conflict)
         .bind(params.r#last_run)
         .bind(params.r#answer)
+        .bind(params.r#delivery_evidence)
         .bind(params.r#blocked_by)
         .bind(params.r#criteria)
         .bind(params.r#checks)
         .bind(params.r#findings)
         .bind(params.r#questions)
         .bind(params.r#assignments)
-        .execute(db).await.map(|_| ())
-}
-
-pub struct PutIssueEvidenceParams {
-    pub r#issue_id: String,
-    pub r#evidence: String,
-}
-
-pub async fn r#put_issue_evidence<'e>(
-    db: impl sqlx::SqliteExecutor<'e>,
-    params: PutIssueEvidenceParams,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"INSERT INTO issue_delivery_evidence (issue_id, evidence)
-VALUES (?1, ?2)
-ON CONFLICT(issue_id) DO UPDATE SET evidence = excluded.evidence"#)
-        .bind(params.r#issue_id)
-        .bind(params.r#evidence)
-        .execute(db).await.map(|_| ())
-}
-
-pub struct DeleteIssueEvidenceParams {
-    pub r#issue_id: String,
-}
-
-pub async fn r#delete_issue_evidence<'e>(
-    db: impl sqlx::SqliteExecutor<'e>,
-    params: DeleteIssueEvidenceParams,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"DELETE FROM issue_delivery_evidence WHERE issue_id = ?1"#)
-        .bind(params.r#issue_id)
-        .execute(db).await.map(|_| ())
-}
-
-pub struct DeleteIssueWordsParams {
-    pub r#issue: String,
-}
-
-pub async fn r#delete_issue_words<'e>(
-    db: impl sqlx::SqliteExecutor<'e>,
-    params: DeleteIssueWordsParams,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"DELETE FROM issue_word WHERE issue = ?1"#)
-        .bind(params.r#issue)
         .execute(db).await.map(|_| ())
 }
 
@@ -184,62 +145,35 @@ pub async fn r#delete_issue<'e>(
         .execute(db).await.map(|_| ())
 }
 
-#[derive(sqlx::FromRow)]
-pub struct ReadIssueNumberRow {
-    pub r#last_number: i64,
+pub struct GetIssueQueuedWordsParams {
+    pub r#id: String,
 }
 
-pub async fn r#read_issue_number<'e>(
+#[derive(sqlx::FromRow)]
+pub struct GetIssueQueuedWordsRow {
+    pub r#queued_words: String,
+}
+
+pub async fn r#get_issue_queued_words<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
-) -> Result<ReadIssueNumberRow, sqlx::Error> {
-    sqlx::query_as::<_, ReadIssueNumberRow>(r#"SELECT last_number FROM issue_counter WHERE id = 1"#)
+    params: GetIssueQueuedWordsParams,
+) -> Result<GetIssueQueuedWordsRow, sqlx::Error> {
+    sqlx::query_as::<_, GetIssueQueuedWordsRow>(r#"SELECT queued_words FROM issue WHERE id = ?1"#)
+        .bind(params.r#id)
         .fetch_one(db).await
 }
 
-pub struct WriteIssueNumberParams {
-    pub r#last_number: i64,
+pub struct SetIssueQueuedWordsParams {
+    pub r#id: String,
+    pub r#queued_words: String,
 }
 
-pub async fn r#write_issue_number<'e>(
+pub async fn r#set_issue_queued_words<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
-    params: WriteIssueNumberParams,
+    params: SetIssueQueuedWordsParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"INSERT INTO issue_counter (id, last_number) VALUES (1, ?1) ON CONFLICT(id) DO UPDATE SET last_number = excluded.last_number"#)
-        .bind(params.r#last_number)
+    sqlx::query(r#"UPDATE issue SET queued_words = ?2 WHERE id = ?1"#)
+        .bind(params.r#id)
+        .bind(params.r#queued_words)
         .execute(db).await.map(|_| ())
-}
-
-pub struct KeepIssueWordsParams {
-    pub r#issue: String,
-    pub r#text: String,
-    pub r#created_at: i64,
-}
-
-pub async fn r#keep_issue_words<'e>(
-    db: impl sqlx::SqliteExecutor<'e>,
-    params: KeepIssueWordsParams,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"INSERT INTO issue_word (issue, text, created_at) VALUES (?1, ?2, ?3)"#)
-        .bind(params.r#issue)
-        .bind(params.r#text)
-        .bind(params.r#created_at)
-        .execute(db).await.map(|_| ())
-}
-
-pub struct ListIssueWordsParams {
-    pub r#issue: String,
-}
-
-#[derive(sqlx::FromRow)]
-pub struct ListIssueWordsRow {
-    pub r#text: String,
-}
-
-pub async fn r#list_issue_words<'e>(
-    db: impl sqlx::SqliteExecutor<'e>,
-    params: ListIssueWordsParams,
-) -> Result<Vec<ListIssueWordsRow>, sqlx::Error> {
-    sqlx::query_as::<_, ListIssueWordsRow>(r#"SELECT text FROM issue_word WHERE issue = ?1 ORDER BY seq"#)
-        .bind(params.r#issue)
-        .fetch_all(db).await
 }

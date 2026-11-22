@@ -1,11 +1,11 @@
 //! Derived status and stage are rebuilt from issues and sessions, never persisted.
 use crate::modules::infra::column::{json, optional, read_json, read_word, word};
-use vibevalley_protocol::{Issue, Millis};
+use vibevalley_protocol::Issue;
 use vibevalley_runtime::agent::durable::Sqlite;
 
 use crate::db::generated::work_issue as queries;
 
-pub const SCHEMA: &str = include_str!("sql/schema.sql");
+pub const SCHEMA: &str = crate::db::schema::WORK_ISSUE;
 
 fn read(r: queries::ListIssuesRow) -> sqlx::Result<Issue> {
     let mut issue = Issue::new(r.id, r.number, r.title, r.created_at);
@@ -31,7 +31,7 @@ fn read(r: queries::ListIssuesRow) -> sqlx::Result<Issue> {
     issue.conflict = r.conflict.map(read_json).transpose()?;
     issue.last_run = r.last_run.map(read_json).transpose()?;
     issue.answer = r.answer.map(read_json).transpose()?;
-    issue.delivery_evidence = r.evidence.map(read_json).transpose()?;
+    issue.delivery_evidence = r.delivery_evidence.map(read_json).transpose()?;
     Ok(issue)
 }
 
@@ -67,43 +67,27 @@ pub fn put(db: &Sqlite<'_>, t: &Issue) -> sqlx::Result<()> {
         conflict: t.conflict.as_ref().map(json).transpose()?,
         last_run: t.last_run.as_ref().map(json).transpose()?,
         answer: t.answer.as_ref().map(json).transpose()?,
+        delivery_evidence: t.delivery_evidence.as_ref().map(json).transpose()?,
     };
-    db.query(async |c| queries::put_issue(c, params).await)?;
-    if let Some(evidence) = &t.delivery_evidence {
-        let params = queries::PutIssueEvidenceParams {
-            issue_id: t.id.clone(),
-            evidence: json(evidence)?,
-        };
-        db.query(async |c| queries::put_issue_evidence(c, params).await)?;
-    }
-    Ok(())
+    db.query(async |c| queries::put_issue(c, params).await)
 }
 
 pub fn remove(db: &Sqlite<'_>, id: &str) -> sqlx::Result<()> {
-    db.query(async |c| {
-        queries::delete_issue_evidence(&mut *c, queries::DeleteIssueEvidenceParams { issue_id: id.into() }).await?;
-        queries::delete_issue_words(&mut *c, queries::DeleteIssueWordsParams { issue: id.into() }).await?;
-        queries::delete_issue(c, queries::DeleteIssueParams { id: id.into() }).await
-    })
+    db.query(async |c| queries::delete_issue(c, queries::DeleteIssueParams { id: id.into() }).await)
 }
 
-pub fn next_number(db: &Sqlite<'_>, at_least: i64) -> sqlx::Result<i64> {
+pub fn keep_words(db: &Sqlite<'_>, issue: &str, words: &str) -> sqlx::Result<()> {
     db.query(async |c| {
-        let prev = optional(queries::read_issue_number(&mut *c).await)?.map_or(0, |r| r.last_number);
-        let next = prev.max(at_least) + 1;
-        queries::write_issue_number(c, queries::WriteIssueNumberParams { last_number: next }).await?;
-        Ok(next)
-    })
-}
-
-pub fn keep_words(db: &Sqlite<'_>, issue: &str, words: &str, at: Millis) -> sqlx::Result<()> {
-    db.query(async |c| {
-        queries::keep_issue_words(
+        let Some(row) = optional(queries::get_issue_queued_words(&mut *c, queries::GetIssueQueuedWordsParams { id: issue.into() }).await)? else {
+            return Ok(());
+        };
+        let mut kept: Vec<String> = read_json(row.queued_words)?;
+        kept.push(words.to_string());
+        queries::set_issue_queued_words(
             c,
-            queries::KeepIssueWordsParams {
-                issue: issue.into(),
-                text: words.into(),
-                created_at: at,
+            queries::SetIssueQueuedWordsParams {
+                id: issue.into(),
+                queued_words: json(&kept)?,
             },
         )
         .await
@@ -112,8 +96,20 @@ pub fn keep_words(db: &Sqlite<'_>, issue: &str, words: &str, at: Millis) -> sqlx
 
 pub fn take_words(db: &Sqlite<'_>, issue: &str) -> sqlx::Result<Vec<String>> {
     db.query(async |c| {
-        let kept = queries::list_issue_words(&mut *c, queries::ListIssueWordsParams { issue: issue.into() }).await?;
-        queries::delete_issue_words(c, queries::DeleteIssueWordsParams { issue: issue.into() }).await?;
-        Ok(kept.into_iter().map(|r| r.text).collect())
+        let Some(row) = optional(queries::get_issue_queued_words(&mut *c, queries::GetIssueQueuedWordsParams { id: issue.into() }).await)? else {
+            return Ok(Vec::new());
+        };
+        let kept: Vec<String> = read_json(row.queued_words)?;
+        if !kept.is_empty() {
+            queries::set_issue_queued_words(
+                c,
+                queries::SetIssueQueuedWordsParams {
+                    id: issue.into(),
+                    queued_words: "[]".into(),
+                },
+            )
+            .await?;
+        }
+        Ok(kept)
     })
 }

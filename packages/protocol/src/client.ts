@@ -431,10 +431,8 @@ export class VibeValleyApi {
         this.call<T.SessionEventPage>("session.event.list", "/api/v1/session/event/list", a, options),
     },
     binding: {
-      /** Attaches a context reference to an existing session. */
       attach: (a: T.SessionBindingInput, options?: { signal?: AbortSignal }): Promise<T.Session> =>
         this.call<T.Session>("session.binding.attach", "/api/v1/session/binding/attach", a, options),
-      /** Detaches a context reference from an existing session. */
       detach: (a: T.SessionBindingInput, options?: { signal?: AbortSignal }): Promise<T.Session> =>
         this.call<T.Session>("session.binding.detach", "/api/v1/session/binding/detach", a, options),
     },
@@ -560,7 +558,6 @@ export class VibeValleyApi {
 
   readonly game = {
     achievement: {
-      /** Every achievement and its current standing. */
       list: (options?: { signal?: AbortSignal }): Promise<T.AchievementList> =>
         this.call<T.AchievementList>("game.achievement.list", "/api/v1/game/achievement/list", undefined, options),
     },

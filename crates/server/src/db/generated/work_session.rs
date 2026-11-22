@@ -25,11 +25,10 @@ pub struct ListSessionsRow {
 pub async fn r#list_sessions<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
 ) -> Result<Vec<ListSessionsRow>, sqlx::Error> {
-    sqlx::query_as::<_, ListSessionsRow>(r#"SELECT s.id, s.controller, s.role, s.name, s.profile, s.runtime, s.brief, s.cwd, s.policy, s.bindings, s.hired_at, s.runs, s.last_run, s.spent, s.tool_connections, s.machine, s.phase, a.summary AS subagents
+    sqlx::query_as::<_, ListSessionsRow>(r#"SELECT s.id, s.controller, s.role, s.name, s.profile, s.runtime, s.brief, s.cwd, s.policy, s.bindings, s.hired_at, s.runs, s.last_run, s.spent, s.tool_connections, s.machine, s.phase,
+  (SELECT r.subagent_summary FROM session_run AS r WHERE r.session = s.id ORDER BY r.started_at DESC, r.rowid DESC LIMIT 1) AS subagents
 FROM session AS s
-LEFT JOIN session_run_subagents AS a ON a.run = (
-  SELECT r.id FROM session_run AS r WHERE r.session = s.id ORDER BY r.started_at DESC, r.rowid DESC LIMIT 1
-) WHERE s.departed = 0 ORDER BY s.hired_at, s.id"#)
+WHERE s.departed = 0 ORDER BY s.hired_at, s.id"#)
         .fetch_all(db).await
 }
 
@@ -43,11 +42,10 @@ pub async fn r#get_past_session<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: GetPastSessionParams,
 ) -> Result<GetPastSessionRow, sqlx::Error> {
-    sqlx::query_as::<_, GetPastSessionRow>(r#"SELECT s.id, s.controller, s.role, s.name, s.profile, s.runtime, s.brief, s.cwd, s.policy, s.bindings, s.hired_at, s.runs, s.last_run, s.spent, s.tool_connections, s.machine, s.phase, a.summary AS subagents
+    sqlx::query_as::<_, GetPastSessionRow>(r#"SELECT s.id, s.controller, s.role, s.name, s.profile, s.runtime, s.brief, s.cwd, s.policy, s.bindings, s.hired_at, s.runs, s.last_run, s.spent, s.tool_connections, s.machine, s.phase,
+  (SELECT r.subagent_summary FROM session_run AS r WHERE r.session = s.id ORDER BY r.started_at DESC, r.rowid DESC LIMIT 1) AS subagents
 FROM session AS s
-LEFT JOIN session_run_subagents AS a ON a.run = (
-  SELECT r.id FROM session_run AS r WHERE r.session = s.id ORDER BY r.started_at DESC, r.rowid DESC LIMIT 1
-) WHERE s.id = ?1 AND s.departed = 1"#)
+WHERE s.id = ?1 AND s.departed = 1"#)
         .bind(params.r#id)
         .fetch_one(db).await
 }
@@ -161,17 +159,17 @@ pub async fn r#put_session_config<'e>(
 }
 
 pub struct PutSubagentsParams {
-    pub r#run: String,
-    pub r#summary: String,
+    pub r#id: String,
+    pub r#subagent_summary: Option<String>,
 }
 
 pub async fn r#put_subagents<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: PutSubagentsParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"INSERT INTO session_run_subagents (run, summary) VALUES (?1, ?2) ON CONFLICT(run) DO UPDATE SET summary = excluded.summary"#)
-        .bind(params.r#run)
-        .bind(params.r#summary)
+    sqlx::query(r#"UPDATE session_run SET subagent_summary = ?2 WHERE id = ?1"#)
+        .bind(params.r#id)
+        .bind(params.r#subagent_summary)
         .execute(db).await.map(|_| ())
 }
 
@@ -186,12 +184,14 @@ pub struct ListSessionExtrasRow {
 pub async fn r#list_session_extras<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
 ) -> Result<Vec<ListSessionExtrasRow>, sqlx::Error> {
-    sqlx::query_as::<_, ListSessionExtrasRow>(r#"SELECT session, agent_session, base, run FROM session_extra"#)
+    sqlx::query_as::<_, ListSessionExtrasRow>(r#"SELECT id AS session, agent_session, base, run
+FROM session
+WHERE agent_session IS NOT NULL OR base IS NOT NULL OR run IS NOT NULL"#)
         .fetch_all(db).await
 }
 
 pub struct PutSessionExtraParams {
-    pub r#session: String,
+    pub r#id: String,
     pub r#agent_session: Option<String>,
     pub r#base: Option<String>,
     pub r#run: Option<String>,
@@ -201,9 +201,8 @@ pub async fn r#put_session_extra<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: PutSessionExtraParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"INSERT OR REPLACE INTO session_extra (session, agent_session, base, run)
-VALUES (?1, ?2, ?3, ?4)"#)
-        .bind(params.r#session)
+    sqlx::query(r#"UPDATE session SET agent_session = ?2, base = ?3, run = ?4 WHERE id = ?1"#)
+        .bind(params.r#id)
         .bind(params.r#agent_session)
         .bind(params.r#base)
         .bind(params.r#run)
@@ -211,15 +210,15 @@ VALUES (?1, ?2, ?3, ?4)"#)
 }
 
 pub struct DeleteSessionExtraParams {
-    pub r#session: String,
+    pub r#id: String,
 }
 
 pub async fn r#delete_session_extra<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: DeleteSessionExtraParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"DELETE FROM session_extra WHERE session = ?1"#)
-        .bind(params.r#session)
+    sqlx::query(r#"UPDATE session SET agent_session = NULL, base = NULL, run = NULL WHERE id = ?1"#)
+        .bind(params.r#id)
         .execute(db).await.map(|_| ())
 }
 
@@ -247,9 +246,8 @@ pub async fn r#get_run<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: GetRunParams,
 ) -> Result<GetRunRow, sqlx::Error> {
-    sqlx::query_as::<_, GetRunRow>(r#"SELECT r.id, r.session, r.issue, r.triggered_by, r.heard, r.started_at, r.ended_at, r.outcome, r.summary, r.spent, a.summary AS subagents, d.doc_kind AS reconciliation
+    sqlx::query_as::<_, GetRunRow>(r#"SELECT r.id, r.session, r.issue, r.triggered_by, r.heard, r.started_at, r.ended_at, r.outcome, r.summary, r.spent, r.subagent_summary AS subagents, d.doc_kind AS reconciliation
 FROM session_run AS r
-LEFT JOIN session_run_subagents AS a ON a.run = r.id
 LEFT JOIN durable_document AS d ON d.scope_kind = 'run' AND d.scope_id = r.id AND d.doc_kind = 'workspace.reconciliation' WHERE r.id = ?1"#)
         .bind(params.r#id)
         .fetch_one(db).await
@@ -265,9 +263,8 @@ pub async fn r#list_runs<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: ListRunsParams,
 ) -> Result<Vec<ListRunsRow>, sqlx::Error> {
-    sqlx::query_as::<_, ListRunsRow>(r#"SELECT r.id, r.session, r.issue, r.triggered_by, r.heard, r.started_at, r.ended_at, r.outcome, r.summary, r.spent, a.summary AS subagents, d.doc_kind AS reconciliation
+    sqlx::query_as::<_, ListRunsRow>(r#"SELECT r.id, r.session, r.issue, r.triggered_by, r.heard, r.started_at, r.ended_at, r.outcome, r.summary, r.spent, r.subagent_summary AS subagents, d.doc_kind AS reconciliation
 FROM session_run AS r
-LEFT JOIN session_run_subagents AS a ON a.run = r.id
 LEFT JOIN durable_document AS d ON d.scope_kind = 'run' AND d.scope_id = r.id AND d.doc_kind = 'workspace.reconciliation' WHERE r.issue = ?1 ORDER BY r.started_at, CAST(substr(r.id, 2) AS INTEGER)"#)
         .bind(params.r#issue)
         .fetch_all(db).await
@@ -290,8 +287,18 @@ pub async fn r#put_run<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: PutRunParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"INSERT OR REPLACE INTO session_run (id, session, issue, triggered_by, heard, started_at, ended_at, outcome, summary, spent)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"#)
+    sqlx::query(r#"INSERT INTO session_run (id, session, issue, triggered_by, heard, started_at, ended_at, outcome, summary, spent)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+ON CONFLICT(id) DO UPDATE SET
+  session = excluded.session,
+  issue = excluded.issue,
+  triggered_by = excluded.triggered_by,
+  heard = excluded.heard,
+  started_at = excluded.started_at,
+  ended_at = excluded.ended_at,
+  outcome = excluded.outcome,
+  summary = excluded.summary,
+  spent = excluded.spent"#)
         .bind(params.r#id)
         .bind(params.r#session)
         .bind(params.r#issue)
@@ -305,42 +312,8 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"#)
         .execute(db).await.map(|_| ())
 }
 
-pub struct ReadSessionCounterParams {
-    pub r#name: String,
-}
-
-#[derive(sqlx::FromRow)]
-pub struct ReadSessionCounterRow {
-    pub r#last_number: i64,
-}
-
-pub async fn r#read_session_counter<'e>(
-    db: impl sqlx::SqliteExecutor<'e>,
-    params: ReadSessionCounterParams,
-) -> Result<ReadSessionCounterRow, sqlx::Error> {
-    sqlx::query_as::<_, ReadSessionCounterRow>(r#"SELECT last_number FROM session_counter WHERE name = ?1"#)
-        .bind(params.r#name)
-        .fetch_one(db).await
-}
-
-pub struct WriteSessionCounterParams {
-    pub r#name: String,
-    pub r#last_number: i64,
-}
-
-pub async fn r#write_session_counter<'e>(
-    db: impl sqlx::SqliteExecutor<'e>,
-    params: WriteSessionCounterParams,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"INSERT OR REPLACE INTO session_counter (name, last_number)
-VALUES (?1, ?2)"#)
-        .bind(params.r#name)
-        .bind(params.r#last_number)
-        .execute(db).await.map(|_| ())
-}
-
 pub struct ClearSessionRunParams {
-    pub r#session: String,
+    pub r#id: String,
     pub r#run: Option<String>,
 }
 
@@ -348,14 +321,14 @@ pub async fn r#clear_session_run<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: ClearSessionRunParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"UPDATE session_extra SET run = NULL WHERE session = ?1 AND run = ?2"#)
-        .bind(params.r#session)
+    sqlx::query(r#"UPDATE session SET run = NULL WHERE id = ?1 AND run = ?2"#)
+        .bind(params.r#id)
         .bind(params.r#run)
         .execute(db).await.map(|_| ())
 }
 
 pub struct FindActiveRunParams {
-    pub r#session: String,
+    pub r#id: String,
     pub r#run: Option<String>,
     pub r#agent_session: Option<String>,
 }
@@ -369,8 +342,8 @@ pub async fn r#find_active_run<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: FindActiveRunParams,
 ) -> Result<FindActiveRunRow, sqlx::Error> {
-    sqlx::query_as::<_, FindActiveRunRow>(r#"SELECT COUNT(*) AS active FROM session_extra WHERE session = ?1 AND run = ?2 AND agent_session = ?3"#)
-        .bind(params.r#session)
+    sqlx::query_as::<_, FindActiveRunRow>(r#"SELECT COUNT(*) AS active FROM session WHERE id = ?1 AND run = ?2 AND agent_session = ?3"#)
+        .bind(params.r#id)
         .bind(params.r#run)
         .bind(params.r#agent_session)
         .fetch_one(db).await
@@ -380,6 +353,7 @@ pub struct InsertMailboxParams {
     pub r#session_id: String,
     pub r#idempotency_key: String,
     pub r#source: String,
+    pub r#source_message_id: Option<String>,
     pub r#payload: String,
     pub r#created_at: i64,
 }
@@ -388,11 +362,12 @@ pub async fn r#insert_mailbox<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: InsertMailboxParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"INSERT OR IGNORE INTO session_mailbox (session_id, idempotency_key, source, payload, status, created_at, updated_at)
-VALUES (?1, ?2, ?3, ?4, 'pending', ?5, ?5)"#)
+    sqlx::query(r#"INSERT OR IGNORE INTO session_mailbox (session_id, idempotency_key, source, source_message_id, payload, status, created_at, updated_at)
+VALUES (?1, ?2, ?3, ?4, ?5, 'pending', ?6, ?6)"#)
         .bind(params.r#session_id)
         .bind(params.r#idempotency_key)
         .bind(params.r#source)
+        .bind(params.r#source_message_id)
         .bind(params.r#payload)
         .bind(params.r#created_at)
         .execute(db).await.map(|_| ())
@@ -408,6 +383,7 @@ pub struct GetMailboxByKeyRow {
     pub r#session_id: String,
     pub r#idempotency_key: String,
     pub r#source: String,
+    pub r#source_message_id: Option<String>,
     pub r#payload: String,
     pub r#status: String,
     pub r#created_at: i64,
@@ -419,7 +395,7 @@ pub async fn r#get_mailbox_by_key<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: GetMailboxByKeyParams,
 ) -> Result<GetMailboxByKeyRow, sqlx::Error> {
-    sqlx::query_as::<_, GetMailboxByKeyRow>(r#"SELECT id, session_id, idempotency_key, source, payload, status, created_at, updated_at, result
+    sqlx::query_as::<_, GetMailboxByKeyRow>(r#"SELECT id, session_id, idempotency_key, source, source_message_id, payload, status, created_at, updated_at, result
 FROM session_mailbox WHERE idempotency_key = ?1"#)
         .bind(params.r#idempotency_key)
         .fetch_one(db).await
@@ -435,7 +411,7 @@ pub async fn r#next_pending_mailbox<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: NextPendingMailboxParams,
 ) -> Result<NextPendingMailboxRow, sqlx::Error> {
-    sqlx::query_as::<_, NextPendingMailboxRow>(r#"SELECT id, session_id, idempotency_key, source, payload, status, created_at, updated_at, result
+    sqlx::query_as::<_, NextPendingMailboxRow>(r#"SELECT id, session_id, idempotency_key, source, source_message_id, payload, status, created_at, updated_at, result
 FROM session_mailbox WHERE session_id = ?1 AND status = 'pending' ORDER BY id ASC LIMIT 1"#)
         .bind(params.r#session_id)
         .fetch_one(db).await
@@ -486,6 +462,21 @@ pub async fn r#withdraw_mailbox<'e>(
         .execute(db).await.map(|r| r.rows_affected())
 }
 
+pub struct WithdrawMailboxByMessageParams {
+    pub r#source_message_id: Option<String>,
+    pub r#updated_at: i64,
+}
+
+pub async fn r#withdraw_mailbox_by_message<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: WithdrawMailboxByMessageParams,
+) -> Result<u64, sqlx::Error> {
+    sqlx::query(r#"UPDATE session_mailbox SET status = 'withdrawn', updated_at = ?2 WHERE source_message_id = ?1 AND status = 'pending'"#)
+        .bind(params.r#source_message_id)
+        .bind(params.r#updated_at)
+        .execute(db).await.map(|r| r.rows_affected())
+}
+
 pub struct SettleMailboxParams {
     pub r#id: i64,
     pub r#status: String,
@@ -515,7 +506,7 @@ pub async fn r#list_mailbox<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: ListMailboxParams,
 ) -> Result<Vec<ListMailboxRow>, sqlx::Error> {
-    sqlx::query_as::<_, ListMailboxRow>(r#"SELECT id, session_id, idempotency_key, source, payload, status, created_at, updated_at, result
+    sqlx::query_as::<_, ListMailboxRow>(r#"SELECT id, session_id, idempotency_key, source, source_message_id, payload, status, created_at, updated_at, result
 FROM session_mailbox WHERE session_id = ?1 ORDER BY id ASC"#)
         .bind(params.r#session_id)
         .fetch_all(db).await

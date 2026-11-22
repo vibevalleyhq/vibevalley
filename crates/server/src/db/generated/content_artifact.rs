@@ -509,14 +509,14 @@ pub async fn r#prune_revisions<'e>(
 }
 
 pub struct ChangeByBatchParams {
-    pub r#batch_id: String,
+    pub r#batch_id: Option<String>,
 }
 
 #[derive(sqlx::FromRow)]
 pub struct ChangeByBatchRow {
     pub r#artifact_id: String,
     pub r#seq: i64,
-    pub r#batch_id: String,
+    pub r#batch_id: Option<String>,
     pub r#block_ids: String,
     pub r#results: String,
 }
@@ -525,7 +525,8 @@ pub async fn r#change_by_batch<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: ChangeByBatchParams,
 ) -> Result<ChangeByBatchRow, sqlx::Error> {
-    sqlx::query_as::<_, ChangeByBatchRow>(r#"select artifact_id, seq, batch_id, block_ids, results from artifact_change where batch_id = ?1"#)
+    sqlx::query_as::<_, ChangeByBatchRow>(r#"select artifact_id, seq, batch_id, targets as block_ids, payload as results
+  from artifact_change where batch_id = ?1 and kind = 'blocks'"#)
         .bind(params.r#batch_id)
         .fetch_one(db).await
 }
@@ -533,10 +534,10 @@ pub async fn r#change_by_batch<'e>(
 pub struct AddChangeParams {
     pub r#artifact_id: String,
     pub r#seq: i64,
-    pub r#batch_id: String,
+    pub r#batch_id: Option<String>,
     pub r#actor: String,
-    pub r#block_ids: String,
-    pub r#results: String,
+    pub r#targets: String,
+    pub r#payload: String,
     pub r#created_at: i64,
 }
 
@@ -544,13 +545,14 @@ pub async fn r#add_change<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: AddChangeParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"insert into artifact_change (artifact_id, seq, batch_id, actor, block_ids, results, created_at) values (?1, ?2, ?3, ?4, ?5, ?6, ?7)"#)
+    sqlx::query(r#"insert into artifact_change (artifact_id, seq, kind, batch_id, actor, targets, payload, created_at)
+  values (?1, ?2, 'blocks', ?3, ?4, ?5, ?6, ?7)"#)
         .bind(params.r#artifact_id)
         .bind(params.r#seq)
         .bind(params.r#batch_id)
         .bind(params.r#actor)
-        .bind(params.r#block_ids)
-        .bind(params.r#results)
+        .bind(params.r#targets)
+        .bind(params.r#payload)
         .bind(params.r#created_at)
         .execute(db).await.map(|_| ())
 }
@@ -567,8 +569,8 @@ pub async fn r#changes_after<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: ChangesAfterParams,
 ) -> Result<Vec<ChangesAfterRow>, sqlx::Error> {
-    sqlx::query_as::<_, ChangesAfterRow>(r#"select artifact_id, seq, batch_id, block_ids, results from artifact_change
-  where artifact_id = ?1 and seq > ?2 order by seq limit ?3"#)
+    sqlx::query_as::<_, ChangesAfterRow>(r#"select artifact_id, seq, batch_id, targets as block_ids, payload as results
+  from artifact_change where artifact_id = ?1 and kind = 'blocks' and seq > ?2 order by seq limit ?3"#)
         .bind(params.r#artifact_id)
         .bind(params.r#seq)
         .bind(params.r#limit)
@@ -858,8 +860,8 @@ pub struct AddArtifactEntryChangeParams {
     pub r#artifact_id: String,
     pub r#seq: i64,
     pub r#actor: String,
-    pub r#paths: String,
-    pub r#deleted: String,
+    pub r#targets: String,
+    pub r#payload: String,
     pub r#created_at: i64,
 }
 
@@ -867,13 +869,13 @@ pub async fn r#add_artifact_entry_change<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: AddArtifactEntryChangeParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"insert into artifact_entry_change (artifact_id, seq, actor, paths, deleted, created_at)
-  values (?1, ?2, ?3, ?4, ?5, ?6)"#)
+    sqlx::query(r#"insert into artifact_change (artifact_id, seq, kind, actor, targets, payload, created_at)
+  values (?1, ?2, 'entries', ?3, ?4, ?5, ?6)"#)
         .bind(params.r#artifact_id)
         .bind(params.r#seq)
         .bind(params.r#actor)
-        .bind(params.r#paths)
-        .bind(params.r#deleted)
+        .bind(params.r#targets)
+        .bind(params.r#payload)
         .bind(params.r#created_at)
         .execute(db).await.map(|_| ())
 }
@@ -895,25 +897,12 @@ pub async fn r#artifact_entry_changes_after<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: ArtifactEntryChangesAfterParams,
 ) -> Result<Vec<ArtifactEntryChangesAfterRow>, sqlx::Error> {
-    sqlx::query_as::<_, ArtifactEntryChangesAfterRow>(r#"select seq, paths, deleted
-  from artifact_entry_change where artifact_id = ?1 and seq > ?2 order by seq limit ?3"#)
+    sqlx::query_as::<_, ArtifactEntryChangesAfterRow>(r#"select seq, targets as paths, payload as deleted
+  from artifact_change where artifact_id = ?1 and kind = 'entries' and seq > ?2 order by seq limit ?3"#)
         .bind(params.r#artifact_id)
         .bind(params.r#seq)
         .bind(params.r#limit)
         .fetch_all(db).await
-}
-
-pub struct PruneArtifactEntryChangesParams {
-    pub r#created_at: i64,
-}
-
-pub async fn r#prune_artifact_entry_changes<'e>(
-    db: impl sqlx::SqliteExecutor<'e>,
-    params: PruneArtifactEntryChangesParams,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"delete from artifact_entry_change where created_at < ?1"#)
-        .bind(params.r#created_at)
-        .execute(db).await.map(|_| ())
 }
 
 pub struct ArtifactCollabParams {

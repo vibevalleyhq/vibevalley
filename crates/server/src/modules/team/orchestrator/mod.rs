@@ -416,8 +416,12 @@ impl Orchestrator {
     }
 
     fn handle_chat_delivery(self: &Arc<Self>, chat: &Chat, d: &QueuedDelivery, committed: Option<&Arc<Committed>>) {
+        use crate::modules::work::session::mailbox::{MailboxSource, MailboxStatus};
+
         const HANDED_EMOJI: &str = "👀";
+        let sessions = self.farm.board.sessions();
         if !chat.delivery_is_pending(d.id).unwrap_or(false) {
+            let _ = sessions.withdraw_mailbox_by_message(&d.message_id);
             return;
         }
         if !self.farm.agents.profiles.is_orchestrator(&d.recipient_id) {
@@ -433,11 +437,17 @@ impl Orchestrator {
                     &owned
                 }
                 None => {
+                    let _ = sessions.withdraw_mailbox_by_message(&d.message_id);
                     let _ = chat.withdraw_delivery(d.id);
                     return;
                 }
             },
         };
+        if c.row.deleted_at.is_some() {
+            let _ = sessions.withdraw_mailbox_by_message(&d.message_id);
+            let _ = chat.withdraw_delivery(d.id);
+            return;
+        }
         let m = chat.addressed_of(&c.row);
         let line = words::orchestrator_lines(std::slice::from_ref(&m));
         if !d.wakes {
@@ -445,6 +455,19 @@ impl Orchestrator {
             let _ = chat.settle_delivery(d.id, true);
             return;
         }
+        let mail_key = format!("orchestrator:{}:{}", d.recipient_id, d.message_id);
+        let mail_entry = sessions
+            .enqueue_mailbox(&d.recipient_id, &mail_key, MailboxSource::ChannelOrchestrator, Some(&d.message_id), &c.row.body)
+            .ok();
+        let claimed = sessions.claim_mailbox_by_key(&mail_key).unwrap_or(false);
+        if !claimed
+            && mail_entry
+                .as_ref()
+                .is_some_and(|e| matches!(e.status, MailboxStatus::Withdrawn | MailboxStatus::Done | MailboxStatus::Claimed))
+        {
+            return;
+        }
+        let settle_id = mail_entry.as_ref().map(|e| e.id);
         let actor = actor_of(&c.row.sender_kind, c.row.sender_agent.as_deref(), &c.row.sender_id, Some(&c.row.sender_name));
         let meta = meta_of(c.row.meta.as_deref());
         let from_user = matches!(actor, Actor::User { .. });
@@ -483,11 +506,17 @@ impl Orchestrator {
             port: meta.response_port.clone(),
         };
         if self.hear(input) {
+            if let Some(id) = settle_id {
+                let _ = sessions.settle_mailbox(id, true, Some(&d.recipient_id));
+            }
             let _ = chat.settle_delivery(d.id, true);
             if let Err(e) = chat.react(&c.row.id, &d.recipient_id, HANDED_EMOJI, true) {
                 eprintln!("vibevalley-server: orchestrator: 👀: {}", e.message);
             }
         } else if !self.closed.load(Ordering::Acquire) {
+            if let Some(id) = settle_id {
+                let _ = sessions.settle_mailbox(id, false, Some("rejected"));
+            }
             let _ = chat.settle_delivery(d.id, false);
         }
     }

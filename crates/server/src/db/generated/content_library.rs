@@ -21,7 +21,7 @@ pub async fn r#get_item<'e>(
 ) -> Result<GetItemRow, sqlx::Error> {
     sqlx::query_as::<_, GetItemRow>(r#"SELECT i.attachment_id, i.origin, i.added_at, i.last_at, a.name, a.type, a.size
 FROM media_library_item i JOIN attachment a ON a.id = i.attachment_id
-WHERE i.attachment_id = ?1"#)
+WHERE i.attachment_id = ?1 AND i.removed_at IS NULL"#)
         .bind(params.r#attachment_id)
         .fetch_one(db).await
 }
@@ -44,7 +44,8 @@ pub async fn r#list_items<'e>(
 SELECT i.attachment_id, i.origin, i.added_at, i.last_at, a.name, a.type, a.size
 FROM media_library_item i JOIN attachment a ON a.id = i.attachment_id
 CROSS JOIN requested
-WHERE (CAST(?1 AS TEXT) = '' OR i.kind = ?1)
+WHERE i.removed_at IS NULL
+AND (CAST(?1 AS TEXT) = '' OR i.kind = ?1)
 AND (CAST(?2 AS TEXT) = ''
   OR (?2 = 'other' AND substr(a.type, 1, instr(a.type || '/', '/') - 1) NOT IN ('image','audio','video'))
   OR substr(a.type, 1, instr(a.type || '/', '/') - 1) = ?2)
@@ -74,43 +75,16 @@ pub async fn r#keep_item<'e>(
 ) -> Result<(), sqlx::Error> {
     sqlx::query(r#"INSERT INTO media_library_item (attachment_id, kind, origin, added_at, last_at)
 VALUES (?1, ?2, ?3, ?4, ?4)
-ON CONFLICT (attachment_id) DO UPDATE SET last_at = max(media_library_item.last_at, excluded.last_at)"#)
+ON CONFLICT (attachment_id) DO UPDATE SET
+  kind = CASE WHEN media_library_item.removed_at IS NOT NULL THEN excluded.kind ELSE media_library_item.kind END,
+  origin = CASE WHEN media_library_item.removed_at IS NOT NULL THEN excluded.origin ELSE media_library_item.origin END,
+  last_at = max(media_library_item.last_at, excluded.last_at),
+  removed_at = NULL"#)
         .bind(params.r#attachment_id)
         .bind(params.r#kind)
         .bind(params.r#origin)
         .bind(params.r#added_at)
         .execute(db).await.map(|_| ())
-}
-
-pub struct JobCountParams {
-    pub r#job_id: String,
-}
-
-#[derive(sqlx::FromRow)]
-pub struct JobCountRow {
-    pub r#count: i64,
-}
-
-pub async fn r#job_count<'e>(
-    db: impl sqlx::SqliteExecutor<'e>,
-    params: JobCountParams,
-) -> Result<JobCountRow, sqlx::Error> {
-    sqlx::query_as::<_, JobCountRow>(r#"SELECT count(*) AS count FROM media_library_job WHERE job_id = ?1"#)
-        .bind(params.r#job_id)
-        .fetch_one(db).await
-}
-
-pub struct MarkJobParams {
-    pub r#job_id: String,
-}
-
-pub async fn r#mark_job<'e>(
-    db: impl sqlx::SqliteExecutor<'e>,
-    params: MarkJobParams,
-) -> Result<u64, sqlx::Error> {
-    sqlx::query(r#"INSERT OR IGNORE INTO media_library_job (job_id) VALUES (?1)"#)
-        .bind(params.r#job_id)
-        .execute(db).await.map(|r| r.rows_affected())
 }
 
 pub struct KeepGeneratedParams {
@@ -118,30 +92,48 @@ pub struct KeepGeneratedParams {
     pub r#kind: String,
     pub r#origin: String,
     pub r#added_at: i64,
+    pub r#source_job_id: Option<String>,
 }
 
 pub async fn r#keep_generated<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: KeepGeneratedParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"INSERT INTO media_library_item (attachment_id, kind, origin, added_at, last_at)
-VALUES (?1, ?2, ?3, ?4, ?4) ON CONFLICT(attachment_id) DO NOTHING"#)
+    sqlx::query(r#"INSERT INTO media_library_item (attachment_id, kind, origin, added_at, last_at, source_job_id)
+VALUES (?1, ?2, ?3, ?4, ?4, ?5)
+ON CONFLICT DO NOTHING"#)
         .bind(params.r#attachment_id)
         .bind(params.r#kind)
         .bind(params.r#origin)
         .bind(params.r#added_at)
+        .bind(params.r#source_job_id)
         .execute(db).await.map(|_| ())
 }
 
-pub struct RemoveItemParams {
+pub struct SoftRemoveGeneratedItemParams {
+    pub r#attachment_id: String,
+    pub r#removed_at: Option<i64>,
+}
+
+pub async fn r#soft_remove_generated_item<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: SoftRemoveGeneratedItemParams,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(r#"UPDATE media_library_item SET removed_at = ?2 WHERE attachment_id = ?1 AND source_job_id IS NOT NULL"#)
+        .bind(params.r#attachment_id)
+        .bind(params.r#removed_at)
+        .execute(db).await.map(|_| ())
+}
+
+pub struct DeleteNonGeneratedItemParams {
     pub r#attachment_id: String,
 }
 
-pub async fn r#remove_item<'e>(
+pub async fn r#delete_non_generated_item<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
-    params: RemoveItemParams,
+    params: DeleteNonGeneratedItemParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"DELETE FROM media_library_item WHERE attachment_id = ?1"#)
+    sqlx::query(r#"DELETE FROM media_library_item WHERE attachment_id = ?1 AND source_job_id IS NULL"#)
         .bind(params.r#attachment_id)
         .execute(db).await.map(|_| ())
 }

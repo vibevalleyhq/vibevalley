@@ -26,7 +26,7 @@
 |---|---|
 | `crates/server/src/modules/collab/channel/` | `Chat` 核心、事务保存点（`store.rs`）、消息写入/编辑/搜索（`messages.rs`）、房间/投递/订阅流（`rooms.rs`）、DTO 与映射（`types.rs`）及 Hub 端点安装（`service.rs`）；每条消息连同 `channel_event` 与 `channel_delivery` 待发记录在同一个事务里落库，提交后非阻塞发出 `Chat::committed` 与 `Chat::dispatches` |
 | `crates/server/src/modules/collab/channel/dispatch.rs` | 纯受众规则（`who_hears`）、两道环路刹车（`brakes`：`hopLimit = 4`、`cooldown = 60s`）与 `plan_deliveries`，仅读频道模型与参与者表，零依赖 `issue`、`session` 或 `orchestrator` |
-| [频道表结构](crates/server/src/modules/collab/channel/sql/schema.sql)、[命名查询](crates/server/src/db/queries/collab_channel.sql)、`db.rs` | sqlc 生成 SQLx 查询。频道连接在 `server.db` 上读写消息、串与 `channel_delivery` |
+| [频道表结构](crates/server/src/db/schema/collab_channel.sql)、[命名查询](crates/server/src/db/queries/collab_channel.sql)、`db.rs` | sqlc 生成 SQLx 查询。频道连接在 `server.db` 上读写消息、串与 `channel_delivery` |
 | `crates/server/src/modules/collab/channel/model.rs` | 写事务在频道锁内更新镜像。回滚恢复原镜像与环路记账，提交后才向订阅者发布 |
 | `crates/server/src/modules/collab/channel/words.rs` | `@` 识别、地址解析、搜索过滤与公网链接预览 |
 | `crates/server/src/transport/http/mod.rs` | 订阅流（SSE，`/api/v1/subscribe/<名字>`，[SSE 流](docs/subsystems/core.md#sse-流和其余路由)） |
@@ -49,7 +49,7 @@
   - 会话收下投递的消息记进 `channel_seen`（`Chat::mark_seen`）：下游消费方（`work/issue`、`team/orchestrator`）成功交出消息后结算 `channel_delivery`、记 `channel_seen` 并贴 👀。未读（`UnreadOf`）和说话前的新鲜度（`UnseenIn`）都排除这两样。
 - **参与者只记谁在说话，线上读 `ChatMessage.actor`**：一个农场只有一个人。`channel_participant` 记 `kind`（`user`、`agent`、`system`）、名字、「家」，和 agent 的席位代哪个档案说话（`agent_id`）：助手是档案自己说话（没有），帮工（会话、私聊里档案的席位）代它的档案说。消息的 `Actor` 由此得出（代档案说的是 `worker`，否则是 `orchestrator`）。农机、会话里的角色是 `Session` 的事，不记在聊天里；席位由所属领域排（`Chat::seat`：助手在 `channel/service.rs`，工单会话在 `work/issue`，私聊会话在 `work/session`）。
 - **写话按要做的事分四个门，都落进同一个写**：`say`（用户的话，页面和命令行都走它，农场随之上线）、`speak`（agent 经说话工具说的话：同样的话 60 秒内是同一条，有没看过的新话先给它看、不发，读完串立刻发顶层频道要确认）、`post`（以谁的名义写进一处：它的家、带上做出来的 Artifact 或图片、服务端里跑的 agent 一轮说的话、通话里说的、工单对它的帮工说的；说话的人读到自己这句）、`notice`（农场的通知，尽力而为、不会失败；`untilUserSpeaks` 的在一处只说一次，直到用户再在那里说话）。消息的 `run` 由调用方给（工具、Artifact 的 `Maker`），频道不问会话。
-- **频道只靠底座，同步路由与异步唤醒严格分层**：`modules/collab/channel` 只用附件和 `Hub`，零 import `issue`、`session`、`orchestrator`。每次写入在同一个 SQLite 事务内完成 < 1 ms 的纯策略计算（`dispatch::plan_deliveries`）并落盘 `channel_delivery`（`pending`）与 `channel_event`；若触发 `hop_limit` 则紧跟原消息写出通知；提交后非阻塞推送 `Chat::dispatches()` 与 `Chat::committed()` 即返回，绝不等待慢速 `Board::tell_message` 或 `runtime.open`。`Chat::remove` 在同一事务中将对应消息的 `pending` 投递立刻标记为 `withdrawn`，`Chat::preview_remove` 直接从 `channel_delivery` 统计待撤回条数。参与者的「家」（`channel_participant.home_id`，`Chat::home_of`）是空目标的去处，由工单与会话模块在开串、拉起私聊时给。删频道时查谁还指着它：频道只数自己的话题串，工单、帮工与连接器各自通过 `guard_removal` 登记理由。
+- **频道只靠底座，同步路由与异步唤醒严格分层**：`modules/collab/channel` 只用附件和 `Hub`，零 import `issue`、`session`、`orchestrator`。每次写入在同一个 SQLite 事务内完成 < 1 ms 的纯策略计算（`dispatch::plan_deliveries`）并落盘 `channel_delivery`（`pending`）与 `channel_event`；若触发 `hop_limit` 则紧跟原消息写出通知；提交后非阻塞推送 `Chat::dispatches()` 与 `Chat::committed()` 即返回，绝不等待慢速 `Board::tell_message` 或 `runtime.open`。`Chat::remove` 在同一事务中清除该消息的 `channel_mention` 行并将对应 `pending` 投递标记为 `withdrawn`，提交后同步刷新 `InboxSlice` 的 `userMentions`（查询过滤已删消息与已删回复）并通过 `Chat::committed()` 触发 `SessionChat` 按 `source_message_id` 调用 `withdraw_mailbox_by_message` 统一撤回私聊、工单与助手的未领用信箱项；`Chat::preview_remove` 直接从 `channel_delivery` 统计待撤回条数。参与者的「家」（`channel_participant.home_id`，`Chat::home_of`）是空目标的去处，由工单与会话模块在开串、拉起私聊时给。删频道时查谁还指着它：频道只数自己的话题串，工单、帮工与连接器各自通过 `guard_removal` 登记理由。
 - **发送幂等键 `sendKey`**：用户发言带 `sendKey`（唯一索引 `(sender, send_key)`），重发返回原消息；帮工 60 秒内向同处发相同正文也自动去重。
 
 ### 受众计算与说话防撞

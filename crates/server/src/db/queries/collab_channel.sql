@@ -102,6 +102,9 @@ update channel_member set left_at = ?1 where participant_id = ?2 and left_at is 
 -- name: InsertMention :exec
 insert into channel_mention (message_id, target_id, resolved) values (?1, ?2, ?3) on conflict do nothing;
 
+-- name: DeleteMentionsForMessage :exec
+delete from channel_mention where message_id = ?1;
+
 -- name: MarkSeen :exec
 insert into channel_seen (participant_id, message_id, seen_at)
 select p.id, m.id, cast(sqlc.arg(seen_at) as integer) from channel_message m, channel_participant p where m.id = sqlc.arg(message_id) and p.id = sqlc.arg(participant_id)
@@ -150,8 +153,9 @@ select d.* from channel_message_detail d where d.channel_id = ?1 and d.number = 
 
 -- name: UserMentions :many
 select d.* from channel_message_location d join channel_mention n on n.message_id = d.id left join channel_read_cursor r on r.channel_id = d.channel_id and r.participant_id = 'user' where n.target_id = 'user' and d.sender_id <> 'user'
+  and d.deleted_at is null
   and d.number > coalesce(r.read_number, 0)
-  and not exists (select 1 from channel_message reply where reply.channel_id = d.channel_id and reply.sender_id = 'user' and reply.number > d.number)
+  and not exists (select 1 from channel_message reply where reply.channel_id = d.channel_id and reply.sender_id = 'user' and reply.deleted_at is null and reply.number > d.number)
 order by d.id;
 
 -- name: MessagesBefore :many

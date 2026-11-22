@@ -61,10 +61,7 @@ function isUnderNonRustSubtree(file: string): boolean {
   return NON_RUST_SUBTREES.some((prefix) => file === prefix.slice(0, -1) || file.startsWith(prefix));
 }
 
-/**
- * Maps repository-relative changed files to affected Cargo workspace packages,
- * expanding transitively along the reverse dependency graph.
- */
+/** A changed crate also affects every crate that depends on it, transitively. */
 export function parseChangedPackages(metadata: CargoMetadata, changedFiles: readonly string[], baseRoot: string): ChangedPackagesResult {
   const memberIds = new Set(metadata.workspace_members);
   const members = memberIds.size > 0 ? metadata.packages.filter((pkg) => memberIds.has(pkg.id)) : metadata.packages;

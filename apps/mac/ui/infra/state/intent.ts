@@ -42,11 +42,10 @@ function projectIntent<I, R>(key: string, input: I, state: IntentState<R>): Inte
 }
 
 interface SliceIntentKind<I, R, K extends SliceKind> {
-  /** The slice whose updates confirm this intent. */
   readonly slice: K;
   /** Sends it with its key; a repeat with the same key is the same request. */
   readonly send: (input: I, key: string) => Promise<R>;
-  /** What the user sees shows the change. Asked on every slice update, whenever `watch` says, and when the server answers. */
+  /** Asked on every slice update, whenever `watch` says, and when the server answers. */
   readonly confirmed: (slice: SliceMap[K] | undefined, intent: Intent<I, R>) => boolean;
   /** A source the check reads besides the slice (a channel's messages): watched while the intent is kept. */
   readonly watch?: (input: I, changed: () => void) => () => void;

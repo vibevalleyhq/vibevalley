@@ -435,8 +435,10 @@ impl Board {
             IssueStatus::Backlog | IssueStatus::Todo => self.keep_words(&issue.id, words),
             _ => {
                 self.room_for_round(&issue)?;
-                self.change(&issue.id, IssueChange::Answered)?;
-                self.send(&issue.id, Some(words.to_string()), RunTriggerKind::Comment).map(|_| ())
+                if matches!(self.send(&issue.id, Some(words.to_string()), RunTriggerKind::Comment)?, Sent::Queued { .. }) {
+                    self.change(&issue.id, IssueChange::Answered)?;
+                }
+                Ok(())
             }
         }
     }
@@ -460,8 +462,12 @@ impl Board {
             &mail_owner,
             &mail_key,
             crate::modules::work::session::mailbox::MailboxSource::IssueComment,
+            Some(key),
             words,
         )?;
+        if mail_entry.status == crate::modules::work::session::mailbox::MailboxStatus::Withdrawn {
+            return Ok(());
+        }
         if issue.status.is_closed() {
             let e = BoardError::Refused(if issue.was_sent() { Refusal::Reopen } else { Refusal::Revive });
             let _ = sessions.settle_mailbox(mail_entry.id, false, Some(&e.to_string()));
@@ -496,8 +502,10 @@ impl Board {
         if self.room_for_round(issue).is_err() {
             return Ok(());
         }
-        self.change(&issue.id, IssueChange::Answered)?;
-        self.send(&issue.id, None, RunTriggerKind::Comment).map(|_| ())
+        if matches!(self.send(&issue.id, None, RunTriggerKind::Comment)?, Sent::Queued { .. }) {
+            self.change(&issue.id, IssueChange::Answered)?;
+        }
+        Ok(())
     }
 
     /// Stops the running turn of the issue's session (its drafter's while
@@ -588,7 +596,7 @@ impl Board {
     }
 
     pub(super) fn keep_words(&self, id: &str, words: &str) -> Result<()> {
-        self.0.ledger.database(|db| super::db::keep_words(db, id, words, now()))
+        self.0.ledger.database(|db| super::db::keep_words(db, id, words))
     }
 
     pub(super) fn take_words(&self, id: &str) -> Result<Option<String>> {

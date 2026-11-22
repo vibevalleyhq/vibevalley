@@ -1,8 +1,9 @@
 //! Persistent SQLite mailbox for every `AgentSession`.
 //!
-//! All external message inputs (workspace chat, direct channel talks, issue
-//! comments) enter `session_mailbox` with an `idempotency_key` so retries are
-//! deduplicated and deleted messages can be withdrawn before claim.
+//! All external message inputs (workspace chat, direct channel talks,
+//! orchestrator wakes, issue comments) enter `session_mailbox` with an
+//! `idempotency_key` (and optional `source_message_id`) so retries are
+//! deduplicated and deleted channel messages withdraw pending entries before claim.
 
 use serde::{Deserialize, Serialize};
 use vibevalley_runtime::agent::durable::Sqlite;
@@ -15,6 +16,7 @@ use crate::modules::infra::column::{optional, read_word, word};
 pub enum MailboxSource {
     WorkspaceUser,
     ChannelDirect,
+    ChannelOrchestrator,
     IssueComment,
 }
 
@@ -34,6 +36,7 @@ pub struct MailboxEntry {
     pub session_id: String,
     pub idempotency_key: String,
     pub source: MailboxSource,
+    pub source_message_id: Option<String>,
     pub payload: String,
     pub status: MailboxStatus,
     pub created_at: i64,
@@ -47,6 +50,7 @@ fn read_row(r: queries::GetMailboxByKeyRow) -> sqlx::Result<MailboxEntry> {
         session_id: r.session_id,
         idempotency_key: r.idempotency_key,
         source: read_word(r.source)?,
+        source_message_id: r.source_message_id,
         payload: r.payload,
         status: read_word(r.status)?,
         created_at: r.created_at,
@@ -59,7 +63,15 @@ fn read_row(r: queries::GetMailboxByKeyRow) -> sqlx::Result<MailboxEntry> {
 pub struct SessionMailbox;
 
 impl SessionMailbox {
-    pub fn enqueue(db: &Sqlite<'_>, session_id: &str, idempotency_key: &str, source: MailboxSource, payload: &str, at: i64) -> sqlx::Result<MailboxEntry> {
+    pub fn enqueue(
+        db: &Sqlite<'_>,
+        session_id: &str,
+        idempotency_key: &str,
+        source: MailboxSource,
+        source_message_id: Option<&str>,
+        payload: &str,
+        at: i64,
+    ) -> sqlx::Result<MailboxEntry> {
         let source_word = word(&source)?;
         db.query(async |c| {
             queries::insert_mailbox(
@@ -68,6 +80,7 @@ impl SessionMailbox {
                     session_id: session_id.to_string(),
                     idempotency_key: idempotency_key.to_string(),
                     source: source_word,
+                    source_message_id: source_message_id.map(str::to_string),
                     payload: payload.to_string(),
                     created_at: at,
                 },
@@ -96,6 +109,19 @@ impl SessionMailbox {
             .await
         })?;
         Ok(affected > 0)
+    }
+
+    pub fn withdraw_by_message(db: &Sqlite<'_>, message_id: &str, at: i64) -> sqlx::Result<u64> {
+        db.query(async |c| {
+            queries::withdraw_mailbox_by_message(
+                c,
+                queries::WithdrawMailboxByMessageParams {
+                    source_message_id: Some(message_id.to_string()),
+                    updated_at: at,
+                },
+            )
+            .await
+        })
     }
 
     pub fn claim_next(db: &Sqlite<'_>, session_id: &str, at: i64) -> sqlx::Result<Option<MailboxEntry>> {
@@ -175,17 +201,32 @@ impl super::sessions::Sessions {
         session_id: &str,
         idempotency_key: &str,
         source: MailboxSource,
+        source_message_id: Option<&str>,
         payload: &str,
     ) -> crate::modules::work::ledger::Result<MailboxEntry> {
-        self.0
-            .ledger
-            .database(|db| SessionMailbox::enqueue(db, session_id, idempotency_key, source, payload, crate::modules::work::ledger::now()))
+        self.0.ledger.database(|db| {
+            SessionMailbox::enqueue(
+                db,
+                session_id,
+                idempotency_key,
+                source,
+                source_message_id,
+                payload,
+                crate::modules::work::ledger::now(),
+            )
+        })
     }
 
     pub fn withdraw_mailbox(&self, idempotency_key: &str) -> crate::modules::work::ledger::Result<bool> {
         self.0
             .ledger
             .database(|db| SessionMailbox::withdraw(db, idempotency_key, crate::modules::work::ledger::now()))
+    }
+
+    pub fn withdraw_mailbox_by_message(&self, message_id: &str) -> crate::modules::work::ledger::Result<u64> {
+        self.0
+            .ledger
+            .database(|db| SessionMailbox::withdraw_by_message(db, message_id, crate::modules::work::ledger::now()))
     }
 
     pub fn claim_next_mailbox(&self, session_id: &str) -> crate::modules::work::ledger::Result<Option<MailboxEntry>> {
@@ -224,14 +265,17 @@ mod tests {
         let mut conn = pollster::block_on(open_sqlx_db_at(&dir.path().join("server.db"))).unwrap();
         let db = Sqlite::new(&mut conn);
 
-        let a = SessionMailbox::enqueue(&db, "s1", "k1", MailboxSource::WorkspaceUser, "hello", 10).unwrap();
-        let a_dup = SessionMailbox::enqueue(&db, "s1", "k1", MailboxSource::WorkspaceUser, "changed", 20).unwrap();
+        let a = SessionMailbox::enqueue(&db, "s1", "k1", MailboxSource::WorkspaceUser, None, "hello", 10).unwrap();
+        let a_dup = SessionMailbox::enqueue(&db, "s1", "k1", MailboxSource::WorkspaceUser, None, "changed", 20).unwrap();
         assert_eq!(a_dup.id, a.id);
         assert_eq!(a_dup.payload, "hello");
         assert_eq!(a_dup.status, MailboxStatus::Pending);
 
-        let b = SessionMailbox::enqueue(&db, "s1", "k2", MailboxSource::ChannelDirect, "second", 30).unwrap();
-        assert!(SessionMailbox::withdraw(&db, "k2", 31).unwrap());
+        let b = SessionMailbox::enqueue(&db, "s1", "k2", MailboxSource::ChannelDirect, Some("m-2"), "second", 30).unwrap();
+        let c = SessionMailbox::enqueue(&db, "orch", "k3", MailboxSource::ChannelOrchestrator, Some("m-2"), "second", 30).unwrap();
+        let d = SessionMailbox::enqueue(&db, "issue:1", "k4", MailboxSource::IssueComment, Some("m-2"), "second", 30).unwrap();
+        assert_eq!(SessionMailbox::withdraw_by_message(&db, "m-2", 31).unwrap(), 3);
+        assert_eq!(SessionMailbox::withdraw_by_message(&db, "m-2", 32).unwrap(), 0);
         assert!(!SessionMailbox::withdraw(&db, "k2", 32).unwrap());
 
         assert!(SessionMailbox::claim_by_key(&db, "k1", 40).unwrap());
@@ -247,5 +291,9 @@ mod tests {
         assert_eq!(entries[0].result.as_deref(), Some("ok"));
         assert_eq!(entries[1].id, b.id);
         assert_eq!(entries[1].status, MailboxStatus::Withdrawn);
+        assert_eq!(SessionMailbox::list(&db, "orch").unwrap()[0].id, c.id);
+        assert_eq!(SessionMailbox::list(&db, "orch").unwrap()[0].status, MailboxStatus::Withdrawn);
+        assert_eq!(SessionMailbox::list(&db, "issue:1").unwrap()[0].id, d.id);
+        assert_eq!(SessionMailbox::list(&db, "issue:1").unwrap()[0].status, MailboxStatus::Withdrawn);
     }
 }

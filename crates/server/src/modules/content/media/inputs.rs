@@ -84,7 +84,7 @@ fn phase(inner: &mut Inner, id: &str, p: &str) -> Result<(), ApiError> {
 impl Inputs {
     pub fn open(home: &Path, files: Arc<Attachments>) -> Result<Arc<Self>, ApiError> {
         let mut db = block_on(open_sqlx_db(home)).map_err(storage)?;
-        block_on(sqlx::raw_sql(include_str!("sql/inputs.sql")).execute(&mut db)).map_err(storage)?;
+        block_on(sqlx::raw_sql(crate::db::schema::CONTENT_MEDIA).execute(&mut db)).map_err(storage)?;
         let inputs = Arc::new(Self {
             inner: Mutex::new(Inner { db, uploading: HashSet::new() }),
             files,

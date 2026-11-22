@@ -96,14 +96,16 @@ delete from artifact_change where created_at < ?1;
 delete from artifact_block_revision where created_at < ?1;
 
 -- name: ChangeByBatch :one
-select artifact_id, seq, batch_id, block_ids, results from artifact_change where batch_id = ?1;
+select artifact_id, seq, batch_id, targets as block_ids, payload as results
+  from artifact_change where batch_id = ?1 and kind = 'blocks';
 
 -- name: AddChange :exec
-insert into artifact_change (artifact_id, seq, batch_id, actor, block_ids, results, created_at) values (?1, ?2, ?3, ?4, ?5, ?6, ?7);
+insert into artifact_change (artifact_id, seq, kind, batch_id, actor, targets, payload, created_at)
+  values (?1, ?2, 'blocks', ?3, ?4, ?5, ?6, ?7);
 
 -- name: ChangesAfter :many
-select artifact_id, seq, batch_id, block_ids, results from artifact_change
-  where artifact_id = ?1 and seq > ?2 order by seq limit ?3;
+select artifact_id, seq, batch_id, targets as block_ids, payload as results
+  from artifact_change where artifact_id = ?1 and kind = 'blocks' and seq > ?2 order by seq limit ?3;
 
 -- name: AddSuggestion :exec
 insert into artifact_suggestion (id, artifact_id, block_id, author, origin, at_rev, change, cursor_start, cursor_end, start_offset, end_offset, anchor_text, replacement_text, status, created_at)
@@ -155,15 +157,12 @@ insert into artifact_entry (artifact_id, path, kind, mime, value, attachment_id,
 delete from artifact_entry where artifact_id = ?1 and path = ?2;
 
 -- name: AddArtifactEntryChange :exec
-insert into artifact_entry_change (artifact_id, seq, actor, paths, deleted, created_at)
-  values (?1, ?2, ?3, ?4, ?5, ?6);
+insert into artifact_change (artifact_id, seq, kind, actor, targets, payload, created_at)
+  values (?1, ?2, 'entries', ?3, ?4, ?5, ?6);
 
 -- name: ArtifactEntryChangesAfter :many
-select seq, paths, deleted
-  from artifact_entry_change where artifact_id = ?1 and seq > ?2 order by seq limit ?3;
-
--- name: PruneArtifactEntryChanges :exec
-delete from artifact_entry_change where created_at < ?1;
+select seq, targets as paths, payload as deleted
+  from artifact_change where artifact_id = ?1 and kind = 'entries' and seq > ?2 order by seq limit ?3;
 
 -- name: ArtifactCollab :one
 select snapshot from artifact_collab where artifact_id = ?1;

@@ -360,11 +360,14 @@ impl IssueChange {
             }
             IssueChange::Started { session, worker } => {
                 t.queued_at = None;
-                if worker
-                    && t.latest_session_id() != Some(&session)
-                    && let Some(a) = t.assignments.iter_mut().rev().find(|a| a.ended_at.is_none())
-                {
-                    a.executions.push(Execution::Worker { session, started_at: at });
+                if worker {
+                    t.questions.clear();
+                    t.reviewed_at = None;
+                    if t.latest_session_id() != Some(&session)
+                        && let Some(a) = t.assignments.iter_mut().rev().find(|a| a.ended_at.is_none())
+                    {
+                        a.executions.push(Execution::Worker { session, started_at: at });
+                    }
                 }
             }
         }
@@ -401,6 +404,7 @@ pub struct Ledger {
 fn database(path: &Path) -> Result<SqliteConnection> {
     Ok(pollster::block_on(async {
         let mut db = open_sqlx_db_at(path).await?;
+        sqlx::raw_sql(crate::db::schema::SHARED).execute(&mut db).await?;
         sqlx::raw_sql(issue_db::SCHEMA).execute(&mut db).await?;
         sqlx::raw_sql(session_db::SCHEMA).execute(&mut db).await?;
         Ok::<_, sqlx::Error>(db)
@@ -758,12 +762,6 @@ impl Ledger {
     /// The next number of `counter`, above `at_least`.
     pub fn next(&self, counter: &str, at_least: i64) -> Result<i64> {
         let _write = lock(&self.write);
-        self.database(|db| {
-            if counter == "issue" {
-                issue_db::next_number(db, at_least)
-            } else {
-                session_db::next(db, counter, at_least)
-            }
-        })
+        self.database(|db| crate::db::next_seq(db, counter, at_least))
     }
 }

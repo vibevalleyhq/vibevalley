@@ -50,7 +50,7 @@
 ## 模型和不变量
 
 - **生命周期统一走 `setStatus` 状态机**：用户只能将工单移至 `backlog`、`todo`、`done`、`canceled`；`in_progress` 与 `in_review` 从在场会话实时派生。
-- **核心状态保留活跃与近期工单**：全量工单存 `issue` 表（`PutIssue` 使用 `ON CONFLICT(id) DO UPDATE` 避免清空 `cron`、`pull`、`artifact` 的 `ON DELETE SET NULL` 外键；`Issue.cron` 与 `Issue.pull_request` 由各自模块经 `Board::use_cron_of_issue`、`Board::use_pull_of_issue` 同步投影，不在 `issue` 表存冗余列）；`SpaceState.issues` 保留未关工单及最近关闭的 50 张工单（含子工单，`keepClosedIssues`）。
+- **核心状态保留活跃与近期工单**：全量工单收拢进单张 `issue` 表（内嵌 `delivery_evidence` 与 `queued_words` 列，工单编号走共享 `seq_counter`，建表与查询位于 `crates/server/src/db/{schema,queries,generated}/work_issue.*`；`PutIssue` 使用 `ON CONFLICT(id) DO UPDATE` 避免清空 `cron`、`pull`、`artifact` 的 `ON DELETE SET NULL` 外键；`Issue.cron` 与 `Issue.pull_request` 由各自模块经 `Board::use_cron_of_issue`、`Board::use_pull_of_issue` 同步投影，不在 `issue` 表存冗余列）；`SpaceState.issues` 保留未关工单及最近关闭的 50 张工单（含子工单，`keepClosedIssues`）。
 - **写操作收敛为「挪状态」与「说话」，建单与留言规则内聚在 `Issue`**：流转调 `issue.status.update`，评论调 `issue.comment.create`。`Board::create` 收拢仓库推导、父单继承与派发；端点和工具只做解码与格式化。
 - **看板挪一张工单只写一行**：`edit`（`issue/edits.rs`）在相邻两张未派发工单的 `rank` 之间取中值（排在两端时加减 1024），一次 `UPDATE`、一次发布；间距用完或超出 ±2,000,000,000 时才在一个事务里按 1024 的步长重排全部未派发工单。
 - **引用解析统一在服务内完成**：接口支持传入 `#41`、`41`、工单 UUID 或曾执行该工单的 `Session` ID。
@@ -141,7 +141,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 定时任务
 
-定时任务（`Cron`，存在 `server.db` 的 `cron` 表，`issue_id references issue(id) on delete set null` 并建 `cron_by_issue` 索引，经 `Board::use_cron_of_issue` 投影到 `Issue.cron`）是工单的时间触发器：每次到期，更新运行时间，随后准备它固定的那张工单（最近建的那张，或重开，或新建），交给帮工，或在它的频道交给助手。接口见 [capabilities.md](docs/reference/capabilities.md)（`cron.*`，其中 `cron.update` 仅对用户与 `remote` 开放），服务端在 `crates/server/src/modules/work/cron/`（`mod.rs`、`db.rs`、`sql/schema.sql`），时间规则在 `vibevalley-core::cron`。
+定时任务（`Cron`，存在 `server.db` 的 `cron` 表，`issue_id references issue(id) on delete set null` 并建 `cron_by_issue` 索引，经 `Board::use_cron_of_issue` 投影到 `Issue.cron`）是工单的时间触发器：每次到期，更新运行时间，随后准备它固定的那张工单（最近建的那张，或重开，或新建），交给帮工，或在它的频道交给助手。接口见 [capabilities.md](docs/reference/capabilities.md)（`cron.*`，其中 `cron.update` 仅对用户与 `remote` 开放），服务端在 `crates/server/src/modules/work/cron/`（`mod.rs`、`db.rs`）与 `crates/server/src/db/{schema,queries,generated}/work_cron.*`，时间规则在 `vibevalley-core::cron`。
 
 - **五种时间规格（`CronWhen`）**：`once`、`every`、`daily`、`weekly` 与五段式 `cron`（`once` 跑完自动关闭）；每项携带 IANA 时区或偏移量，缺省取本机时区；8 年内无合法触发时刻的表达式（如 2 月 30 日）直接拒绝。
 - **下次运行时间不落库，实时从 `last_run` 推导**：`nextRun` 计算严格晚于 `last_run`（未运行过则取创建时间）的下一个匹配分钟；夏令时跳过的时刻顺延，重复的时刻取第一次；重新开启已关闭的周期任务时将 `last_run` 设为当前时间，不补跑关闭期间的时刻。

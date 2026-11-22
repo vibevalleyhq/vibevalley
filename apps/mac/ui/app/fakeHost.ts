@@ -30,9 +30,8 @@ export interface FakeHost {
   pump(app: App): Promise<void>;
   /** One pump per hop: an event can queue a further RPC, so a single pump is not enough. */
   pumpUntil(app: App, done: () => boolean, timeoutMs?: number): Promise<void>;
-  /** A new SliceBundle to every watched slice (seq one up), as fake.setState. */
+  /** To every watched slice, seq one up. */
   setState(app: App, state: SliceBundle): Promise<void>;
-  /** Updates a single slice and pushes it to watchers of that slice only. */
   setSlice<K extends SliceKind>(app: App, kind: K, slice: SliceMap[K]): Promise<void>;
   /** Push a server LiveEvent on `frame:live`. */
   pushLive(app: App, event: unknown): Promise<void>;

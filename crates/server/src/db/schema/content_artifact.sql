@@ -58,13 +58,15 @@ create index if not exists artifact_block_revision_by_block on artifact_block_re
 create table if not exists artifact_change (
   artifact_id text not null references artifact (id) on delete cascade,
   seq         integer not null,
-  batch_id    text not null unique,
+  kind        text not null check (kind in ('blocks', 'entries')),
+  batch_id    text unique,
   actor       text not null,
-  block_ids   text not null,
-  results     text not null,
+  targets     text not null,
+  payload     text not null,
   created_at  integer not null,
   primary key (artifact_id, seq)
 );
+create index if not exists artifact_change_by_created on artifact_change (created_at);
 create table if not exists artifact_suggestion (
   id               text primary key,
   artifact_id      text not null references artifact (id) on delete cascade,
@@ -99,16 +101,6 @@ create table if not exists artifact_entry (
   primary key (artifact_id, path)
 );
 create index if not exists artifact_entry_by_artifact on artifact_entry (artifact_id, path);
-create table if not exists artifact_entry_change (
-  artifact_id text not null references artifact (id) on delete cascade,
-  seq         integer not null,
-  actor       text not null,
-  paths       text not null,
-  deleted     text not null,
-  created_at  integer not null,
-  primary key (artifact_id, seq)
-);
-create index if not exists artifact_entry_change_by_created on artifact_entry_change (created_at);
 create table if not exists artifact_collab (
   artifact_id text primary key references artifact (id) on delete cascade,
   snapshot    blob not null,

@@ -3,7 +3,6 @@ import * as S from "../schema";
 import type * as T from "../shapes";
 
 export interface GameHandlers {
-  /** Every achievement and its current standing. */
   readonly "game.achievement.list": () => Promise<T.AchievementList>;
   readonly "game.title.set": (a: T.ChooseTitleRequest) => Promise<void>;
 }

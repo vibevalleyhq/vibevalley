@@ -52,7 +52,7 @@ pub struct Store {
 impl Store {
     pub fn open(home: &Path) -> Kept<Store> {
         Ok(Store {
-            db: ModuleDb::open(home, include_str!("sql/schema.sql"))?,
+            db: ModuleDb::open(home, crate::db::schema::COLLAB_CONNECTOR)?,
         })
     }
 

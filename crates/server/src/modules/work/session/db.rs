@@ -6,7 +6,7 @@ use vibevalley_runtime::agent::durable::Sqlite;
 
 use crate::db::generated::work_session as queries;
 
-pub const SCHEMA: &str = include_str!("sql/schema.sql");
+pub const SCHEMA: &str = crate::db::schema::WORK_SESSION;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SessionConfig {
@@ -18,8 +18,8 @@ pub struct SessionConfig {
 
 pub fn put_subagents(db: &Sqlite<'_>, summary: &SessionSubagents) -> sqlx::Result<()> {
     let params = queries::PutSubagentsParams {
-        run: summary.run.clone(),
-        summary: json(summary)?,
+        id: summary.run.clone(),
+        subagent_summary: Some(json(summary)?),
     };
     db.query(async |c| queries::put_subagents(c, params).await)
 }
@@ -218,7 +218,7 @@ pub fn extras(db: &Sqlite<'_>) -> sqlx::Result<HashMap<String, Extra>> {
 
 pub fn put_extra(db: &Sqlite<'_>, session: &str, e: &Extra) -> sqlx::Result<()> {
     let params = queries::PutSessionExtraParams {
-        session: session.into(),
+        id: session.into(),
         agent_session: e.agent_session.clone(),
         base: e.base.clone(),
         run: e.run.clone(),
@@ -227,7 +227,7 @@ pub fn put_extra(db: &Sqlite<'_>, session: &str, e: &Extra) -> sqlx::Result<()> 
 }
 
 pub fn remove_extra(db: &Sqlite<'_>, session: &str) -> sqlx::Result<()> {
-    db.query(async |c| queries::delete_session_extra(c, queries::DeleteSessionExtraParams { session: session.into() }).await)
+    db.query(async |c| queries::delete_session_extra(c, queries::DeleteSessionExtraParams { id: session.into() }).await)
 }
 
 pub fn clear_run(db: &Sqlite<'_>, session: &str, run: &str) -> sqlx::Result<()> {
@@ -235,7 +235,7 @@ pub fn clear_run(db: &Sqlite<'_>, session: &str, run: &str) -> sqlx::Result<()> 
         queries::clear_session_run(
             c,
             queries::ClearSessionRunParams {
-                session: session.into(),
+                id: session.into(),
                 run: Some(run.into()),
             },
         )
@@ -245,7 +245,7 @@ pub fn clear_run(db: &Sqlite<'_>, session: &str, run: &str) -> sqlx::Result<()> 
 
 pub fn active_run(db: &Sqlite<'_>, session: &str, run: &str, root: &str) -> sqlx::Result<bool> {
     let params = queries::FindActiveRunParams {
-        session: session.into(),
+        id: session.into(),
         run: Some(run.into()),
         agent_session: Some(root.into()),
     };
@@ -296,21 +296,4 @@ pub fn put_run(db: &Sqlite<'_>, r: &Run) -> sqlx::Result<()> {
         spent: r.spent.as_ref().map(json).transpose()?,
     };
     db.query(async |c| queries::put_run(c, params).await)
-}
-
-pub fn next(db: &Sqlite<'_>, name: &str, at_least: i64) -> sqlx::Result<i64> {
-    db.query(async |c| {
-        let last =
-            optional(queries::read_session_counter(&mut *c, queries::ReadSessionCounterParams { name: name.into() }).await)?.map_or(0, |r| r.last_number);
-        let next = last.max(at_least) + 1;
-        queries::write_session_counter(
-            c,
-            queries::WriteSessionCounterParams {
-                name: name.into(),
-                last_number: next,
-            },
-        )
-        .await?;
-        Ok(next)
-    })
 }

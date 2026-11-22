@@ -271,13 +271,17 @@ impl Sessions {
         );
         session.profile = (!h.drive.agent.is_empty()).then(|| h.drive.agent.clone());
         session.brief = h.brief;
-        self.set_extra(&id, |e| e.base = h.base)?;
+        lock(&self.0.extras).entry(id.clone()).or_default().base = h.base;
         session.cwd = Some(h.cwd.to_string_lossy().into_owned());
         session.attach_binding(vibevalley_protocol::ContextRef::Issue {
             id: h.issue.id.clone(),
             refining: h.drafting.then_some(true),
         });
-        self.start(h.drive, session, h.issue, h.prompt, false, h.trigger)
+        let started = self.start(h.drive, session, h.issue, h.prompt, false, h.trigger);
+        if started.is_err() {
+            lock(&self.0.extras).remove(&id);
+        }
+        started
     }
 
     /// Opens the agent for `session`, puts it on the board and sends the
@@ -397,7 +401,12 @@ impl Sessions {
     /// pumped into facts. The issue it works changes in the same commit.
     pub(super) fn go_live(&self, agent: Arc<dyn vibevalley_runtime::oar::Session>, session: Session, issue: Option<(&str, IssueChange)>) -> Result<()> {
         let events = agent.events_with_history();
-        self.set_extra(&session.id, |e| e.agent_session = agent.resume_id())?;
+        let extra = {
+            let mut extras = lock(&self.0.extras);
+            let entry = extras.entry(session.id.clone()).or_default();
+            entry.agent_session = agent.resume_id();
+            entry.clone()
+        };
         let generation = self.0.generation.fetch_add(1, Ordering::SeqCst) + 1;
         lock(&self.0.live).insert(
             session.id.clone(),
@@ -419,6 +428,8 @@ impl Sessions {
             }
             None => self.0.ledger.apply(vec![changed])?,
         }
+        // Persist extra columns after the `session` row exists in SQLite.
+        self.0.ledger.database(|db| super::db::put_extra(db, &id, &extra))?;
         if let Some(before) = previous {
             let me = self.clone();
             let session_id = id.clone();
@@ -459,9 +470,12 @@ impl Sessions {
             Some(agent) => {
                 let _ = std::fs::remove_file(self.report_path(&session.id));
                 // Working from now, not from when the pump reads the turn's
-                // start: the room is counted by it.
+                // start: the room is counted by it. Apply `Answered` atomically
+                // so an `Asking` issue never flickers through `InReview`.
                 let phase = Phase::working(now(), SessionAction::Thinking, "");
-                self.0.ledger.apply(vec![self.phase_changed(session.id.clone(), phase)])?;
+                self.0.ledger.change_with(&issue.id, IssueChange::Answered, |fact| {
+                    vec![self.phase_changed(session.id.clone(), phase), fact]
+                })?;
                 let run = self.begin_run(&session.id, &issue.id, trigger)?;
                 let words = self.with_recall(session, words);
                 self.record(&session.id, Step::Asked { text: words.clone() });

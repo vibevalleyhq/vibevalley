@@ -105,7 +105,7 @@ impl Memories {
     pub fn open(home: &Path, agents: Arc<Agents>) -> Result<Arc<Memories>, ApiError> {
         let db = pollster::block_on(async {
             let mut conn = open_sqlx_db(home).await?;
-            sqlx::raw_sql(include_str!("sql/schema.sql")).execute(&mut conn).await?;
+            sqlx::raw_sql(crate::db::schema::TEAM_MEMORY).execute(&mut conn).await?;
             let version = i64::from(m::TERMS_VERSION);
             let stale = queries::list_stale_terms(&mut conn, queries::ListStaleTermsParams { terms_of: version }).await?;
             if !stale.is_empty() {

@@ -653,7 +653,6 @@ test("regression: whiteboard ChannelSidePane survives artifact polling, remount 
   expect(sendPayload?.sendKey).toBeTruthy();
   expect(app.count("id:pending-line-sending")).toBe(1);
 
-  // A fresh slice bundle update must not detach the send intent's second `followed` listener.
   await fake.setState(app, { ...fixture.state });
 
   const sampleMsg = (fixture.responses["channel.message.list"] as ChatMessage[] | undefined)?.[0];

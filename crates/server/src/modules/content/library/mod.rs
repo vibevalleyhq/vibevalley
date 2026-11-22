@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use sqlx::Connection;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     Actor, ApiError, Attachment, BizCode, Fact, JobKind, LibraryAddRequest, LibraryItem, LibraryListRequest, LibraryOrigin, LibraryOriginFetchedFrom,
@@ -125,7 +124,7 @@ pub struct Library {
 impl Library {
     pub fn open(home: &Path, files: Arc<Attachments>) -> Result<Arc<Library>, ApiError> {
         Ok(Arc::new(Library {
-            db: ModuleDb::open(home, include_str!("sql/schema.sql")).map_err(db_failed)?,
+            db: ModuleDb::open(home, crate::db::schema::CONTENT_LIBRARY).map_err(db_failed)?,
             files,
             sub: Mutex::new(None),
         }))
@@ -171,23 +170,17 @@ impl Library {
             let origin = LibraryOrigin::Generated { job: id.into(), job_kind };
             self.db
                 .run(async |db| {
-                    if q::job_count(&mut *db, q::JobCountParams { job_id: id.into() }).await?.count > 0 {
-                        return Ok(());
-                    }
-                    let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
-                    if q::mark_job(&mut *tx, q::MarkJobParams { job_id: id.into() }).await? != 0 {
-                        q::keep_generated(
-                            &mut *tx,
-                            q::KeepGeneratedParams {
-                                attachment_id: attachment.into(),
-                                kind: origin_kind(&origin).into(),
-                                origin: serde_json::to_string(&origin).expect("JSON"),
-                                added_at: updated_at,
-                            },
-                        )
-                        .await?;
-                    }
-                    tx.commit().await
+                    q::keep_generated(
+                        db,
+                        q::KeepGeneratedParams {
+                            attachment_id: attachment.into(),
+                            kind: origin_kind(&origin).into(),
+                            origin: serde_json::to_string(&origin).expect("JSON"),
+                            added_at: updated_at,
+                            source_job_id: Some(id.into()),
+                        },
+                    )
+                    .await
                 })
                 .map_err(db_failed)?;
         }
@@ -283,8 +276,19 @@ impl Library {
 
     pub fn remove(&self, id: &str) -> Result<(), ApiError> {
         self.found(id)?;
+        let at = now();
         self.db
-            .run(async |db| q::remove_item(db, q::RemoveItemParams { attachment_id: id.into() }).await)
+            .run(async |db| {
+                q::soft_remove_generated_item(
+                    &mut *db,
+                    q::SoftRemoveGeneratedItemParams {
+                        attachment_id: id.into(),
+                        removed_at: Some(at),
+                    },
+                )
+                .await?;
+                q::delete_non_generated_item(db, q::DeleteNonGeneratedItemParams { attachment_id: id.into() }).await
+            })
             .map_err(db_failed)
     }
 

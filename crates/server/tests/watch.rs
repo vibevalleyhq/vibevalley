@@ -431,3 +431,162 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
     assert_eq!(entries.iter().find(|e| e.payload == "撤回这条").unwrap().status, MailboxStatus::Withdrawn);
     started.close();
 }
+
+#[test]
+fn regression_channel_delete_withdraws_pending_mailbox_by_source_message_across_direct_issue_and_orchestrator() {
+    use vibevalley_server::modules::work::session::mailbox::{MailboxSource, MailboxStatus};
+
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let mut registry = vibevalley_runtime::oar::Registry::new();
+    registry.register(Arc::new(ScriptedRuntime::demo()));
+    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+        registry: Some(Arc::new(registry)),
+        probe_runtimes: false,
+        link_previews: false,
+        tick_crons: false,
+        orchestrator_listens: false,
+        ..vibevalley_server::ServerConfig::under(dir.path())
+    })
+    .unwrap();
+    let call = |op: &str, p: Value| {
+        let e = started.hub.call_as(Caller::User, op, p);
+        assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
+        e.data.unwrap_or(Value::Null)
+    };
+
+    let general = started.chat.default_channel();
+    call(
+        "channel.message.send",
+        json!({ "id": general, "text": "待撤回消息", "sendKey": "multi-withdraw" }),
+    );
+    let msgs = call("channel.message.list", json!({ "id": general }));
+    let msg_id = msgs.as_array().unwrap().iter().find(|m| m["text"] == "待撤回消息").unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let sessions = started.board.sessions();
+    sessions
+        .enqueue_mailbox(
+            "profile:direct-1",
+            "direct:direct-1:msg",
+            MailboxSource::ChannelDirect,
+            Some(&msg_id),
+            "待撤回消息",
+        )
+        .unwrap();
+    sessions
+        .enqueue_mailbox("issue:42", "issue:42:msg", MailboxSource::IssueComment, Some(&msg_id), "待撤回消息")
+        .unwrap();
+    sessions
+        .enqueue_mailbox(
+            "orchestrator",
+            "orchestrator:orchestrator:msg",
+            MailboxSource::ChannelOrchestrator,
+            Some(&msg_id),
+            "待撤回消息",
+        )
+        .unwrap();
+
+    call("channel.message.delete", json!({ "id": msg_id }));
+    until("all three pending mailbox rows withdrawn by source_message_id", || {
+        let direct_w = sessions
+            .mailbox_entries("profile:direct-1")
+            .ok()?
+            .iter()
+            .any(|e| e.status == MailboxStatus::Withdrawn);
+        let issue_w = sessions.mailbox_entries("issue:42").ok()?.iter().any(|e| e.status == MailboxStatus::Withdrawn);
+        let orch_w = sessions
+            .mailbox_entries("orchestrator")
+            .ok()?
+            .iter()
+            .any(|e| e.status == MailboxStatus::Withdrawn);
+        (direct_w && issue_w && orch_w).then_some(())
+    });
+    started.close();
+}
+
+#[test]
+fn regression_issue_comment_clears_asking_in_board_slice_before_returning() {
+    use vibevalley_protocol::{InboxKind, IssueStageKind, IssueStatus};
+    use vibevalley_runtime::oar::scripted::Step as ScriptStep;
+
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let script = Script::new()
+        .turn(vec![ScriptStep::text("Ask the user: Which port? (options: 8797 | 8080)\n")])
+        .turn(vec![ScriptStep::text("Configured port 8797.")]);
+    let mut registry = vibevalley_runtime::oar::Registry::new();
+    registry.register(Arc::new(ScriptedRuntime::new("scripted", script)));
+    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+        registry: Some(Arc::new(registry)),
+        probe_runtimes: false,
+        link_previews: false,
+        tick_crons: false,
+        orchestrator_listens: false,
+        ..vibevalley_server::ServerConfig::under(dir.path())
+    })
+    .unwrap();
+    let hub = started.hub.clone();
+    let call = |op: &str, p: Value| {
+        let e = hub.call_as(Caller::User, op, p);
+        assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
+        e.data.unwrap_or(Value::Null)
+    };
+
+    let mut helper = started.agents.profiles.install_template("reviewer").unwrap();
+    helper.runtime = "scripted".into();
+    let helper = started.agents.profiles.save(helper).unwrap();
+    call("repo.create", json!({ "name": "clock" }));
+    let issue = call("issue.create", json!({ "title": "Pick port", "repo": "clock", "agent": helper.id }));
+    let id = issue["id"].as_str().unwrap().to_string();
+    call("issue.status.update", json!({ "id": id, "status": "todo" }));
+
+    until("issue reaches asking stage", || {
+        let board = hub.board_slice();
+        let item = board.issues.iter().find(|i| i.id == id)?;
+        (item.status == IssueStatus::InProgress && item.stage.state == IssueStageKind::Asking).then_some(())
+    });
+    assert!(hub.inbox_slice().items.iter().any(|item| item.kind == InboxKind::Ask));
+
+    // Record every post-Asking board state transition while answering so we
+    // verify there is no spurious intermediate `InReview` flicker.
+    let states = Arc::new(std::sync::Mutex::new(Vec::<(IssueStatus, IssueStageKind)>::new()));
+    let states_sub = states.clone();
+    let id_sub = id.clone();
+    let _sub = hub.subscribe_transitions("test-asking-transition", move |_, tr| {
+        let before = tr.before.issues.iter().find(|i| i.id == id_sub).map(|i| (i.status, i.stage.state));
+        let after = tr.after.issues.iter().find(|i| i.id == id_sub).map(|i| (i.status, i.stage.state));
+        if let Some(next) = after
+            && before != Some(next)
+        {
+            states_sub.lock().unwrap().push(next);
+        }
+    });
+
+    call("issue.comment.create", json!({ "id": id, "text": "用 8797" }));
+
+    // Immediately on return (no polling): BoardSlice must no longer be `Asking`
+    // and InboxSlice must have dropped the `Ask` item.
+    let board_now = hub.board_slice();
+    let item_now = board_now.issues.iter().find(|i| i.id == id).expect("issue present");
+    assert!(item_now.questions.is_empty(), "questions still present: {:?}", item_now.questions);
+    assert_ne!(item_now.stage.state, IssueStageKind::Asking, "still Asking immediately after comment");
+    assert!(!hub.inbox_slice().items.iter().any(|item| item.kind == InboxKind::Ask));
+
+    until("second round settles in_review", || {
+        let board = hub.board_slice();
+        let item = board.issues.iter().find(|i| i.id == id)?;
+        (item.status == IssueStatus::InReview && item.stage.state == IssueStageKind::Reviewing).then_some(())
+    });
+
+    // The very first transition after answering must enter `Working`, never `InReview`.
+    let seen = states.lock().unwrap();
+    assert!(
+        seen.first().is_some_and(|&(s, k)| s == IssueStatus::InProgress && k == IssueStageKind::Working),
+        "expected first transition after comment to be (InProgress, Working), saw: {:?}",
+        *seen
+    );
+    started.close();
+}

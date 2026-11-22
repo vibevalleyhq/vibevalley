@@ -16,7 +16,7 @@ crates/server/             服务端（二进制 vibevalley-server）：src/modu
                            team：agent、orchestrator、memory、tool、mcp；collab：channel、connector、voice；
                            content：attachment、library、media、artifact、pkm；skin：game；infra：setting、provider、http、column；
                            任务板拆成 work/issue（状态与交付）、work/session（领域无关 AgentSession、SQLite session_mailbox 与游标轨迹 session_event）、work/workplace（worktree 与合并），都只经 work/ledger 写），
-                           src/db/{queries,generated}/ 集中管理 SQLite 命名查询与 sqlc 生成绑定；
+                           src/db/{schema,queries,generated}/ 集中管理 SQLite 建表语句（13 份，含 shared.sql 共享 seq_counter）、命名查询与 sqlc 生成绑定；
                            src/transport/ 收拢接口契约（api）、进程内桥（bridge）与 HTTP 门（http）；
                            lib.rs 组装 Hub（含 EventBus、SliceFeed、CallerContext 与观察/故障/宿主调试插槽），start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、作品类型指南（artifact/types/）、主助手和执行会话的提示
 crates/cli/                命令行（二进制 vibevalley，clap）：按五大业务域（work/team/collab/content/infra）组织的纯 HTTP 客户端；评测另拆为可选二进制 vibevalley-eval（--features eval）

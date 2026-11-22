@@ -8,7 +8,7 @@ use crate::modules::infra::column::{json, read_json, read_word, word};
 
 use crate::db::generated::work_cron as queries;
 
-pub const SCHEMA: &str = include_str!("sql/schema.sql");
+pub const SCHEMA: &str = crate::db::schema::WORK_CRON;
 
 pub struct StoredCron {
     pub cron: Cron,

@@ -101,6 +101,7 @@ pub struct IssueChat {
     coordinator: Mutex<Option<JoinHandle<()>>>,
     lanes: Mutex<HashMap<String, flume::Sender<IssueWake>>>,
     lane_handles: Mutex<Vec<JoinHandle<()>>>,
+    delivery_waiters: Mutex<HashMap<String, Vec<flume::Sender<()>>>>,
 }
 
 impl IssueChat {
@@ -118,6 +119,7 @@ impl IssueChat {
             coordinator: Mutex::new(None),
             lanes: Mutex::new(HashMap::new()),
             lane_handles: Mutex::new(Vec::new()),
+            delivery_waiters: Mutex::new(HashMap::new()),
         });
 
         let w = Arc::downgrade(&ic);
@@ -160,6 +162,7 @@ impl IssueChat {
 
     pub fn close(&self) {
         self.closed.store(true, Ordering::Release);
+        lock(&self.delivery_waiters).clear();
         let _ = lock(&self.stop).take();
         if let Some(sub) = lock(&self.sub).take() {
             sub.close();
@@ -179,9 +182,9 @@ impl IssueChat {
         }
     }
 
-    /// `issue.comment.create`: writes the user's words into the issue's thread;
-    /// `Chat::say` commits the message and durable delivery synchronously while
-    /// waking the issue's session asynchronously off-thread.
+    /// `issue.comment.create`: writes the user's words into the issue's thread
+    /// and waits for its issue-lane delivery to settle before returning so
+    /// `BoardSlice` reflects the accepted comment (e.g. leaving `Asking`).
     pub fn comment(&self, issue: &str, text: &str, send_key: &str) -> Result<(), ApiError> {
         let item = self
             .board
@@ -205,13 +208,46 @@ impl IssueChat {
                 .read(|st| st.sessions.iter().find(|x| &x.id == s).and_then(|x| x.channel_id().map(str::to_string)))
         });
         let thread = self.chat.issue_thread(&item.id, &item.title, channel.as_deref())?;
-        self.chat.say(Saying {
+        let (msg, _) = self.chat.say(Saying {
             text: text.into(),
             channel: Some(thread),
             send_key: send_key.into(),
             ..Saying::default()
         })?;
+        self.await_comment_delivery(&item.id, &msg.id);
         Ok(())
+    }
+
+    fn await_comment_delivery(&self, issue_id: &str, message_id: &str) {
+        if self.closed.load(Ordering::Acquire) {
+            return;
+        }
+        let rx = {
+            let mut waiters = lock(&self.delivery_waiters);
+            if self.closed.load(Ordering::Acquire) {
+                return;
+            }
+            let pending = self
+                .chat
+                .pending_deliveries(DeliveryTargetKind::Issue)
+                .map(|rows| rows.iter().any(|d| d.recipient_id == issue_id && d.message_id == message_id))
+                .unwrap_or(false);
+            if !pending {
+                return;
+            }
+            let (tx, rx) = flume::bounded(1);
+            waiters.entry(message_id.to_string()).or_default().push(tx);
+            rx
+        };
+        let _ = rx.recv();
+    }
+
+    fn notify_delivery_settled(&self, message_id: &str) {
+        if let Some(waiters) = lock(&self.delivery_waiters).remove(message_id) {
+            for tx in waiters {
+                let _ = tx.send(());
+            }
+        }
     }
 
     /// Ensures an issue session has its thread opened and seat recorded.
@@ -508,10 +544,20 @@ impl IssueChat {
     }
 
     fn route_dispatched(self: &Arc<Self>, dispatched: crate::modules::collab::channel::ChannelDispatched) {
+        let sessions = self.board.sessions();
         for d in dispatched.deliveries {
             match d.recipient_kind {
                 DeliveryTargetKind::Issue => {
                     let issue_id = d.recipient_id.clone();
+                    let owner = self.on_issue(&issue_id).map(|s| s.id).unwrap_or_else(|| format!("issue:{issue_id}"));
+                    let mail_key = format!("issue:{issue_id}:{}", d.message_id);
+                    let _ = sessions.enqueue_mailbox(
+                        &owner,
+                        &mail_key,
+                        crate::modules::work::session::mailbox::MailboxSource::IssueComment,
+                        Some(&d.message_id),
+                        &dispatched.committed.row.body,
+                    );
                     self.enqueue_lane(
                         issue_id,
                         IssueWake::Issue {
@@ -522,6 +568,15 @@ impl IssueChat {
                 }
                 DeliveryTargetKind::Session if d.wakes => {
                     if let Some(issue_id) = self.session_issue(&d.recipient_id) {
+                        let owner = self.on_issue(&issue_id).map(|s| s.id).unwrap_or_else(|| d.recipient_id.clone());
+                        let mail_key = format!("issue:{issue_id}:{}", d.message_id);
+                        let _ = sessions.enqueue_mailbox(
+                            &owner,
+                            &mail_key,
+                            crate::modules::work::session::mailbox::MailboxSource::IssueComment,
+                            Some(&d.message_id),
+                            &dispatched.committed.row.body,
+                        );
                         self.enqueue_lane(
                             issue_id.clone(),
                             IssueWake::Session {
@@ -593,10 +648,26 @@ impl IssueChat {
     }
 
     fn deliver_to_issue(&self, delivery: QueuedDelivery, committed: Option<Arc<Committed>>) {
+        struct SettleGuard<'a> {
+            chat: &'a IssueChat,
+            message_id: String,
+        }
+        impl Drop for SettleGuard<'_> {
+            fn drop(&mut self) {
+                self.chat.notify_delivery_settled(&self.message_id);
+            }
+        }
+        let _settle_guard = SettleGuard {
+            chat: self,
+            message_id: delivery.message_id.clone(),
+        };
+
         if !self.chat.delivery_is_pending(delivery.id).unwrap_or(false) {
+            let _ = self.board.sessions().withdraw_mailbox_by_message(&delivery.message_id);
             return;
         }
         let Some(c) = committed.or_else(|| self.chat.committed_of(&delivery.message_id).ok().flatten().map(Arc::new)) else {
+            let _ = self.board.sessions().withdraw_mailbox_by_message(&delivery.message_id);
             let _ = self.chat.withdraw_delivery(delivery.id);
             return;
         };
@@ -661,6 +732,7 @@ impl IssueChat {
 
     fn deliver_to_session(&self, delivery: QueuedDelivery, issue_id: &str, committed: Option<Arc<Committed>>) {
         if !self.chat.delivery_is_pending(delivery.id).unwrap_or(false) {
+            let _ = self.board.sessions().withdraw_mailbox_by_message(&delivery.message_id);
             return;
         }
         let pending = self

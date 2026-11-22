@@ -587,7 +587,7 @@ impl Sessions {
         let entry = self
             .0
             .ledger
-            .database(|db| SessionMailbox::enqueue(db, &session.id, &mail_key, MailboxSource::WorkspaceUser, &logged_text, now()))?;
+            .database(|db| SessionMailbox::enqueue(db, &session.id, &mail_key, MailboxSource::WorkspaceUser, None, &logged_text, now()))?;
 
         let agent = match self.live_agent(&session.id) {
             Some(agent) => agent,

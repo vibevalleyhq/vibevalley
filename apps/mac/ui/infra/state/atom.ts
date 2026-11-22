@@ -167,7 +167,7 @@ export const linkIn = (registry: Registry): Link => registry.get(slicesSource).l
 /** The registry's latest value for one slice kind. */
 export const sliceIn = <K extends SliceKind>(registry: Registry, kind: K): SliceMap[K] | undefined => registry.get(slicesSource).get(kind);
 
-/** Hears each update of one slice in the registry's source, and follows the source when a test swaps it. */
+/** Re-subscribes when a test swaps the registry's source, emitting its current value at once. */
 export function subscribeSlice<K extends SliceKind>(registry: Registry, kind: K, heard: (slice: SliceMap[K] | undefined) => void): () => void {
   let off = () => {};
   const follow = (source: SlicesSource) => {
@@ -185,7 +185,7 @@ export function subscribeSlice<K extends SliceKind>(registry: Registry, kind: K,
   };
 }
 
-/** Hears link transitions of the registry's source, and follows the source when a test swaps it. */
+/** Re-subscribes when a test swaps the registry's source, emitting the current link at once. */
 export function subscribeLink(registry: Registry, heard: (link: Link) => void): () => void {
   let off = () => {};
   const follow = (source: SlicesSource) => {

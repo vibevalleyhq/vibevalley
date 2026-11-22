@@ -46,7 +46,7 @@
 | `crates/server/src/modules/work/session/talk.rs` | 私聊会话：绑定频道的 `AgentSession`，在独立目录里一轮一轮答，答的话经 `SessionChat` 贴进私聊 |
 | `crates/server/src/modules/work/session/workspace.rs` | 工作区直连对话会话（`open_workspace`、`close_workspace`、`send_workspace`、`respond_permission`、`respond_interaction`、`set_workspace_config`、`swarm_snapshot`、`read_child_transcript`、`session_title`）：作为 `controller: User` 的 `AgentSession` 统一落盘 `server.db` 的 `session` / `session_mailbox` / `session_event` 表，不占工单板并发上限、不进收件箱与像素农场 |
 | `crates/server/src/modules/work/session/drivers.rs`、`crates/server/src/modules/team/agent/drive.rs` | 把工单指派的档案变成农机和启动参数（规矩、人设、记性、MCP） |
-| `crates/server/src/modules/work/session/journal.rs` | 游标分页轨迹：每个会话的步骤落盘 SQLite `session_event` 表（按 `(session_id, seq)` 索引，经 `crates/server/src/db/{queries,generated}/work_session.*` 访问），变化时每 300 毫秒推一次、每 1.5 秒刷盘；权限、交互提问与用量步骤立即刷盘 |
+| `crates/server/src/modules/work/session/journal.rs` | 游标分页轨迹：每个会话的步骤落盘 SQLite `session_event` 表（按 `(session_id, seq)` 索引，经 `crates/server/src/db/{schema,queries,generated}/work_session.*` 定义与访问），变化时每 300 毫秒推一次、每 1.5 秒刷盘；权限、交互提问与用量步骤立即刷盘 |
 | `crates/server/src/modules/work/session/mod.rs` | `session.*` 端点（含 `openWorkspace`、`closeWorkspace`、`send`、`respondPermission`、`respondInteraction`、`setConfig`、`childTranscript`、`binding.attach`）和 `issue.watch` / `session.watch` 订阅流（按 `SessionsSlice` 与事件驱动同步 `title` 与 `swarm` 增量） |
 | `crates/server/src/modules/team/mcp/mod.rs` | 帮工的 `/mcp` 门：JSON-RPC，令牌由工单板开帮工时签发（`Board::who` 认人），工具是农场的帮工工具（[工具](docs/subsystems/orchestrator.md)） |
 | `crates/runtime/src/oar/` | 驱动各家农机：`claude.rs`、`codex.rs`、`acp/`（`mod.rs`、`antigravity.rs`、`antigravity_db.rs`、`antigravity_swarm.rs`）、`sdk.rs`、`scripted.rs`；`record.rs`、`voyage.rs` 是 `oar-voyage/3` JSONL 记录流（内置农机在 `crates/runtime/src/agent/runtime/mod.rs`），`core.rs` 预留关闭态零开销的全局 `OarObserver` 钩子并支持 `TurnOptions { trace_id }` 透传 |
@@ -57,12 +57,12 @@
 - **`Session` 与 `Run` 分开**：`Session` 是档案或工作区的持续执行现场，编号单调递增；`Run` 是一次触发到一次结束汇报；底层 oar 会话可在同一 `Session` 下更换。
 - **在场阶段（`Session.phase`）**：`working`（可带 `quiet_since`）、`done`、`failed`、`resting`、`closed`。显式交回且没有待答问题才 `done`。
 - **结构化交接（`issue_report`）**：帮工经 `/mcp` 的 `issue_report` 交状态、问题、`checks` 与 `answer`（`Board::report`）；一轮没交汇报就从它说的话里读问题。
-- **统一持久信箱 `session_mailbox` 与带话**：工作区输入、私聊消息与工单评论均经 `session_mailbox`（按 `idempotency_key` 幂等去重，`pending` / `claimed` / `done` / `failed` / `withdrawn`）入队，支持消费前撤回与重启恢复；会话在干活时插进当前一轮，歇着时开下一轮，排队工单的话随派工一并交给帮工。
+- **统一持久信箱 `session_mailbox` 与带话**：工作区输入、私聊消息、工单评论与助手频道投递（`MailboxSource::ChannelOrchestrator`）均经 `session_mailbox`（按 `idempotency_key` 幂等去重，并记录 `source_message_id` 与部分索引，`pending` / `claimed` / `done` / `failed` / `withdrawn`）入队；频道消息删除时按 `source_message_id` 通过 `withdraw_mailbox_by_message` 统一撤回未领用的投递，重启可恢复。会话在干活时插进当前一轮，歇着时开下一轮，排队工单的话随派工一并交给帮工。
 - **并发上限**：全农场最多 6 个在干活的工单受控会话，单仓库默认 3 个；满了工单留在 `todo`（`stage: queued`），空出来按看板顺序补派；工作区直连会话（`controller: User`）不占工单并发槽位。
 - **无沙箱与无逐条权限确认（工单帮工）**：工单帮工在 worktree 里直接执行命令，农机的权限请求一律放行（`PermissionMode::Bypass`）；安全边界是服务端只听 `127.0.0.1`。
 - **工作区直连对话、Swarm 旁路与独立交互提问通道**：工作区直连会话（`controller: User`、`policy: DirectCwd`、0 绑定启动）复用同一套 `AgentSession`、`oar::Session`、`session_mailbox`、`session_event` 与 `oar-voyage/3` 记录流，不占工单板 `space_limit` / `per_repo` 并发配额，也不进收件箱与像素农场；关闭标签页时由原生壳直接调 `session.closeWorkspace` 确定性停机回收；会话内可切换模型、思考深度与权限模式（`Ask` / `AcceptEdits` / `Bypass` / `ReadOnly`），真实会话标题经 `Session.title` 与 `SessionsSlice` 实时同步，Antigravity Swarm 与子代理通过只读旁路（mtime 缓存 + `256 KiB` 尾部裁剪 + 防符号链接/路径穿越）按需暴露 `swarm` 状态与 `session.childTranscript`；其中 `InteractionRequested`（如 Antigravity 的 `interaction_*` 提问）进入 `WaitingReply`，**即使在 `Bypass` 模式下也绝不自动放行**。
 - **会话向外发消息**：`Sessions::on_news` 订阅步骤与汇报中的记性；启动时在恢复中断轮之前挂上订阅，轨迹写入与记性落盘各自接收，会话不调用轨迹或记性服务。订阅同步完成，保持同一会话的步骤顺序。
-- **会话、信箱与轨迹统一落 SQLite**：`session`、`session_extra`、`session_run`、`session_run_subagents`、`session_counter`、`session_mailbox` 与 `session_event` 全部存于 `server.db`（命名查询集中在 `crates/server/src/db/queries/work_session.sql`，sqlc 生成至 `crates/server/src/db/generated/work_session.rs`）；枚举和嵌套字段在读库边界解码，坏值使读取失败。流式草稿按 `(session_id, seq)` 与 `revision` 原地增长，不进 `SpaceState`。
+- **会话、信箱与轨迹统一落 SQLite（4 表 + 共享序号）**：`work_session` 收拢为 4 张表——`session`（含内嵌的 `agent_session`、`base`、`run` 列）、`session_run`（含内嵌 `subagent_summary` 列）、`session_mailbox`（含 `source_message_id`）与 `session_event`，单调编号统一走共享 `seq_counter`（`crates/server/src/db/{schema,queries,generated}/{work_session,shared}.*`）；枚举和嵌套字段在读库边界解码，坏值使读取失败。流式草稿按 `(session_id, seq)` 与 `revision` 原地增长，不进 `SpaceState`。
 - **重启**：开机时还在干活的会话那一轮记 `interrupted`，会话停在 `resting`，工单进 `stuck: interrupted`，用户点「继续」或再说话时接着做；worktree 丢了的工单取消（`lost`）。
 
 ## 和谁打交道

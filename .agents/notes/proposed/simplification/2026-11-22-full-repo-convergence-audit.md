@@ -71,7 +71,7 @@ Status: proposed
 
 ### 为什么不连同三核架构重构与数据库布局收口一起全做进本批？
 
-三核解耦（`EventBus`、`AgentSession` + `SessionMailbox`、5 域切片 + 删 `/api/v1/state`）与 `crates/server/src/db/{queries,generated}/` 收口本身已经跨全栈全部包与客户端；把 ~15k–75k 行的裁剪、依赖删减与产品线取舍强行混在同一个窗口执行，会放大回归定位难度，也剥夺产品侧对 `S1`–`S6` 的单独拍板机会。因此先落 Note 登记总账，待核心架构稳定后按梯队逐批清理。
+三核解耦（`EventBus`、`AgentSession` + `SessionMailbox`、5 域切片 + 删 `/api/v1/state`）与 `crates/server/src/db/{schema,queries,generated}/` 收口本身已经跨全栈全部包与客户端；把 ~15k–75k 行的裁剪、依赖删减与产品线取舍强行混在同一个窗口执行，会放大回归定位难度，也剥夺产品侧对 `S1`–`S6` 的单独拍板机会。因此先落 Note 登记总账，待核心架构稳定后按梯队逐批清理。
 
 ### 为什么不直接放着不记 Note？
 
