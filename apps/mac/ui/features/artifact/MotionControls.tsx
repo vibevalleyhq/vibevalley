@@ -120,7 +120,7 @@ export function MotionControls(props: Controls) {
                   testID="motion-chapter"
                   accessibilityState={{ selected: active() }}
                   onPress={() => seek(ch().at)}
-                  class={`h-6 flex-row items-center gap-1 rounded-full border px-2.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                  class={`h-6 flex-row items-center gap-1 rounded-full border px-2.5 focus-visible:outline-2 focus-visible:outline-focus ${
                     active() ? "border-accent bg-selected" : "border-line bg-side hover:border-faint hover:bg-hover"
                   }`}
                 >

@@ -126,6 +126,10 @@
       "title": "Document",
       "summary": "Collaborative block document with tracked suggestions and Markdown export"
     },
+    "outline": {
+      "title": "Outline",
+      "summary": "Single-column infinitely nested tree outline with fold/zoom, checkable tasks, and live human-agent co-editing"
+    },
     "slides": {
       "title": "Slide Deck",
       "summary": "16:9 or 4:3 multi-file deck (deck.json + deck.css + slide HTML) with fragments, presenter view, and PDF print"

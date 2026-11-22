@@ -48,11 +48,36 @@ impl Render for Shell {
             .key_context("Shell")
             .track_focus(&self.focus)
             .capture_any_mouse_down(|_, _, _| crate::host::restore_window_first_responder())
-            .on_mouse_down(MouseButton::Left, |e, window, _| {
-                if e.click_count == 2 && f32::from(e.position.y) <= 36.0 {
-                    window.zoom_window();
+            .capture_key_down(cx.listener(|s, e: &gpui::KeyDownEvent, _, cx| {
+                if s.chat_menu_group.is_some() && e.keystroke.key == "escape" && !e.keystroke.modifiers.modified() {
+                    s.chat_menu_group = None;
+                    cx.stop_propagation();
+                    cx.notify();
                 }
-            })
+            }))
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|s, e: &gpui::MouseDownEvent, window, cx| {
+                    if s.chat_menu_group.take().is_some() {
+                        cx.notify();
+                    }
+                    if s.palette.as_ref().is_none_or(|p| !p.open)
+                        && s.launch.is_none()
+                        && !e.modifiers.control
+                        && !e.modifiers.platform
+                        && crate::panes::is_titlebar_hit(f32::from(e.position.y))
+                    {
+                        if e.click_count >= 2 {
+                            s.window_drag_origin = None;
+                            if !window.is_fullscreen() {
+                                window.titlebar_double_click();
+                            }
+                        } else {
+                            s.window_drag_origin = Some((f32::from(e.position.x), f32::from(e.position.y)));
+                        }
+                    }
+                }),
+            )
             .on_action(cx.listener(|s, _: &OpenAbout, _, cx| {
                 s.native_workspace = false;
                 s.native_pixel = None;
@@ -101,6 +126,7 @@ impl Render for Shell {
             .on_action(cx.listener(|s, _: &CommandPalette, w, cx| s.open_palette(PaletteMode::Commands, w, cx)))
             .on_action(cx.listener(|s, _: &SearchProject, w, cx| s.open_palette(PaletteMode::Search, w, cx)))
             .on_action(cx.listener(|s, _: &NewTerminal, w, cx| s.new_terminal(None, w, cx)))
+            .on_action(cx.listener(|s, _: &NewChat, w, cx| s.new_chat(None, w, cx)))
             .on_action(cx.listener(|s, _: &CloseTab, w, cx| s.close_active_tab(w, cx)))
             .on_action(cx.listener(|s, _: &SplitRight, w, cx| s.split(Axis::Horizontal, w, cx)))
             .on_action(cx.listener(|s, _: &SplitDown, w, cx| s.split(Axis::Vertical, w, cx)))
@@ -156,7 +182,14 @@ impl Render for Shell {
                             .flex_none()
                             .bg(colors.border)
                             .cursor_col_resize()
-                            .on_mouse_down(MouseButton::Left, cx.listener(|s, _, _, _| s.resizing_sidebar = true))
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|s, _, _, cx| {
+                                    cx.stop_propagation();
+                                    s.window_drag_origin = None;
+                                    s.resizing_sidebar = true;
+                                }),
+                            )
                     }))
                     .child(div().flex_1().h_full().min_w_0().child(main))
                     .children((self.inspector_open && f32::from(window.viewport_size().width) >= 1040.0).then(|| {
@@ -167,7 +200,14 @@ impl Render for Shell {
                             .flex_none()
                             .bg(colors.border)
                             .cursor_col_resize()
-                            .on_mouse_down(MouseButton::Left, cx.listener(|s, _, _, _| s.resizing_inspector = true))
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|s, _, _, cx| {
+                                    cx.stop_propagation();
+                                    s.window_drag_origin = None;
+                                    s.resizing_inspector = true;
+                                }),
+                            )
                     }))
                     .children(
                         (self.inspector_open && f32::from(window.viewport_size().width) >= 1040.0)

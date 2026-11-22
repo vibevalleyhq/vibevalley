@@ -38,10 +38,7 @@ export function TemplatesPage() {
     <Scroll testID="templates-page" class="h-full flex-1 bg-page" contentClass="px-5 pt-4 pb-8">
       <PageBody width="manage" class="gap-5">
         <View class="gap-1">
-          <A
-            href="/agents"
-            class="group self-start rounded-md px-1.5 py-0.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
-          >
+          <A href="/agents" class="group self-start rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover">
             <Text class="text-xs text-muted group-hover:text-ink">{t("web.agent.all")}</Text>
           </A>
           <View class="flex-row items-center gap-1.5">

@@ -31,6 +31,7 @@ flume = "0.12.0"
 futures-util = { version = "0.3.34", features = ["sink"] }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
 jiff = { version = "1.0.1", default-features = false, features = ["std", "tz-system", "tzdb-zoneinfo", "perf-inline"] }
+loro = { version = "1.18.0", default-features = false }
 pollster = "0.4.0"
 regex = "1.13.1"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "json", "stream"] }
@@ -73,4 +74,7 @@ opt-level = 2
 opt-level = 3
 
 [profile.release]
+# Keep default unwinding (`panic = "unwind"`): nsh-core's SVG engine relies on catch_unwind.
+lto = "thin"
+codegen-units = 1
 strip = "symbols"

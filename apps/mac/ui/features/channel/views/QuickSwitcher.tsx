@@ -9,6 +9,7 @@ import { Dialog } from "../../../design/Dialog";
 import { OrchestratorFace } from "../../../design/domain/Face";
 import { Icon } from "../../../design/Icon";
 import { Kbd } from "../../../design/layout";
+import { motionClass } from "../../../design/motion";
 import { Bubble } from "../../../design/Tip";
 import { useOrchestrators, useWorkAgents } from "../../../infra/agents";
 import { api } from "../../../infra/api";
@@ -114,7 +115,7 @@ function SwitcherBody(props: { onClose: () => void }) {
         if (to) go(to);
       }}
       class="gap-2.5"
-      searchBarClass="h-10 flex-row items-center gap-2 rounded-md border border-line bg-page px-3 transition duration-120 ease-out hover:border-faint focus-within:border-focus"
+      searchBarClass="h-10 flex-row items-center gap-2 rounded-md border border-line bg-page px-3 hover:border-faint focus-within:border-focus"
       searchPrefix={<Icon name="search" size={16} tone="muted" />}
       searchSuffix={
         <If when={query().length > 0}>
@@ -123,7 +124,7 @@ function SwitcherBody(props: { onClose: () => void }) {
             accessibilityLabel={t("web.issue.page.clear")}
             tooltip={<Bubble text={t("web.issue.page.clear")} />}
             onPress={() => query.set("")}
-            class="size-5 shrink-0 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+            class={`size-5 shrink-0 items-center justify-center rounded-sm ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
           >
             <Icon name="close" size={12} tone="muted" />
           </View>
@@ -137,7 +138,7 @@ function SwitcherBody(props: { onClose: () => void }) {
           <Text class="text-xs font-semibold text-muted">{g.heading}</Text>
         </View>
       )}
-      itemClass="group h-8.5 flex-row items-center rounded-md px-2.5 transition duration-120 ease-out hover:bg-hover focus:bg-selected"
+      itemClass="group h-8.5 flex-row items-center rounded-md px-2.5 hover:bg-hover focus:bg-selected"
       empty={
         <View class="items-center py-8">
           <Text class="text-sm text-muted">{t("web.channel.switcher.none")}</Text>

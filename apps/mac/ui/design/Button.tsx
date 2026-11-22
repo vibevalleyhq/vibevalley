@@ -4,6 +4,7 @@ import { Text, View, type JSX } from "nsh";
 import { Link as A } from "../infra/router";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
+import { motionClass } from "./motion";
 import { mix, tone as toneColor } from "./tone";
 
 export type Tone = "plain" | "primary" | "quiet" | "danger";
@@ -36,7 +37,7 @@ export function Words(props: { children?: JSX.Element; ink?: Ink; class?: string
 
 function buttonClass(tone: Tone, compact: boolean, disabled: boolean, extra?: string) {
   return [
-    "flex-row items-center justify-center gap-1.5 rounded-md border transition duration-120 ease-out",
+    `flex-row items-center justify-center gap-1.5 rounded-md border ${motionClass("transition-transform duration-120 ease-out")}`,
     compact ? "h-6 px-2" : "h-7 px-2.5",
     resting[tone],
     disabled ? "opacity-50" : `${interactive[tone]} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`,

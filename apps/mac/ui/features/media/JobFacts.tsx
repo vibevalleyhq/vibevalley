@@ -13,6 +13,7 @@ import { ConfirmButton } from "../../design/ConfirmButton";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
 import { Banner, type BannerTone as LayoutBannerTone } from "../../design/layout";
+import { motionClass } from "../../design/motion";
 import { CountPill, Dot, type DotTone } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
 import { mix } from "../../design/tone";
@@ -242,7 +243,7 @@ export function ResultAudio(props: {
               tooltip={<Bubble text={playing() ? t("web.catalog.stop") : t("web.catalog.play")} />}
               disabled={act.busy()}
               onPress={() => togglePlay(file().path)}
-              class={`size-7 shrink-0 items-center justify-center rounded-md border transition duration-120 ease-out active:translate-y-px ${
+              class={`size-7 shrink-0 items-center justify-center rounded-md border ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px ${
                 playing() ? "border-accent bg-ok-soft" : "border-line bg-page hover:bg-hover"
               } ${act.busy() ? "opacity-50" : ""}`}
             >

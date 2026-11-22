@@ -50,16 +50,24 @@ export function createEffect<T>(
   apply?: (value: T, prev: T | undefined) => unknown,
   options?: { defer?: boolean },
 ): void {
+  if (!apply) {
+    let prev: T | undefined;
+    effect(() => {
+      prev = compute(prev);
+    });
+    return;
+  }
+  const value = computed(compute);
   let prev: T | undefined;
   let first = true;
   effect(() => {
-    const value = compute(prev);
+    const next = value();
     const skip = first && options?.defer === true;
     first = false;
     const before = prev;
-    prev = value;
-    if (skip || !apply) return;
-    const done = untracked(() => apply(value, before));
+    prev = next;
+    if (skip) return;
+    const done = untracked(() => apply(next, before));
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Solid effect apply returns an optional zero-arg cleanup function
     return typeof done === "function" ? (done as () => void) : undefined;
   });

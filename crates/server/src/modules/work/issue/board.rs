@@ -558,10 +558,12 @@ impl Board {
     }
 
     /// Room left for one more session on `issue`: in the space, and in its repository.
+    /// Direct workspace chat sessions do not count toward issue board concurrency limits.
     pub(super) fn room(&self, issue: &Issue, except: &str) -> (usize, usize) {
         let room = self.read(|s| {
+            let board_sessions: Vec<Session> = s.sessions.iter().filter(|h| !crate::modules::work::session::is_workspace(h)).cloned().collect();
             vibevalley_core::rules::room_left(
-                &s.sessions,
+                &board_sessions,
                 issue.repo.as_deref().unwrap_or(""),
                 self.0.config.space_limit,
                 self.0.config.per_repo,

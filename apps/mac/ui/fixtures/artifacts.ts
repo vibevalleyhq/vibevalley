@@ -411,8 +411,13 @@ const defaultEntry = initialBoardEntries().get("elements/c-1")!;
 /** `{ op: data }`, a function of the call's payload where the answer depends on it. */
 export const responses: Record<string, unknown> = {
   "artifact.list": Object.assign(
-    (p: { issue?: string; channel?: string }) =>
-      artifacts.filter((a) => (p?.issue === undefined || a.issue === p.issue) && (p?.channel === undefined || a.channel === p.channel)),
+    (p: { issue?: string; channel?: string; artifactType?: string }) =>
+      artifacts.filter(
+        (a) =>
+          (p?.issue === undefined || a.issue === p.issue) &&
+          (p?.channel === undefined || a.channel === p.channel) &&
+          (p?.artifactType === undefined || a.artifactType === p.artifactType),
+      ),
     { toJSON: () => artifacts },
   ),
   "artifact.get": Object.assign((p: unknown) => one(p) ?? missing, { toJSON: () => artifacts[0] }),
@@ -484,9 +489,26 @@ export const responses: Record<string, unknown> = {
     { toJSON: () => ({ batchId: "", seq: 0, results: [], blocks: [] }) },
   ),
   "artifact.suggestion.list": [],
-  "artifact.create": { ...artifacts[3], id: id("art-new"), title: "未命名", seq: 0 },
+  "artifact.create": Object.assign(
+    (p: { title?: string; kind?: string; artifactType?: Artifact["artifactType"] }) => ({
+      ...artifacts[3],
+      id: id("art-new"),
+      title: p?.title ?? "未命名",
+      body: p?.kind === "html" ? ("html" as const) : p?.kind === "store" ? ("store" as const) : ("blocks" as const),
+      ...(p?.artifactType ? { artifactType: p.artifactType } : {}),
+      seq: 0,
+    }),
+    { toJSON: () => ({ ...artifacts[3], id: id("art-new"), title: "未命名", seq: 0 }) },
+  ),
   "artifact.update": artifacts[0],
   "artifact.delete": null,
   "artifact.html.edit": artifacts[1],
   "artifact.demo": null,
+  "artifact.presence.update": null,
+  "artifact.history.list": [],
+  "artifact.history.preview": { artifactId: id("art-plan"), body: "blocks", frontiers: "f0", blocks: blocks["art-plan"] ?? [] },
+  "artifact.history.restore": artifacts[0],
+  "artifact.history.fork": { ...artifacts[0], id: id("art-forked"), title: "看板拖拽的方案（分支）" },
+  "artifact.history.undoOrigin": artifacts[0],
+  "artifact.history.compact": artifacts[0],
 };

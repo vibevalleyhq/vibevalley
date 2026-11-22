@@ -927,6 +927,8 @@ impl OarExtension {
                     | EventKind::SubagentStatusChanged { .. }
                     | EventKind::FileChanged { .. }
                     | EventKind::PermissionResolved { .. }
+                    | EventKind::InteractionRequested { .. }
+                    | EventKind::InteractionResolved { .. }
                     | EventKind::Question { .. } => {}
                 },
             }

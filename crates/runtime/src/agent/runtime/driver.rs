@@ -251,6 +251,7 @@ impl WorkerDriver {
                             input_tokens: Some(usage.input),
                             output_tokens: Some(usage.output),
                             cost_usd: deepseek_price(&model).map(|p| charge_usd(p, usage)),
+                            ..Default::default()
                         },
                     });
                 } else {

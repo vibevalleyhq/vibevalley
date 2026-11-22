@@ -17,10 +17,50 @@ pub enum ThemeChoice {
     System,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MotionChoice {
+    Off,
+    On,
+    #[default]
+    System,
+}
+
+impl MotionChoice {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            MotionChoice::Off => "off",
+            MotionChoice::On => "on",
+            MotionChoice::System => "system",
+        }
+    }
+
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw {
+            "off" => Some(MotionChoice::Off),
+            "on" => Some(MotionChoice::On),
+            "system" => Some(MotionChoice::System),
+            _ => None,
+        }
+    }
+}
+
+fn is_truthy_env(raw: Option<&str>) -> bool {
+    matches!(raw.map(str::trim), Some("1" | "true" | "TRUE" | "True"))
+}
+
+/// `VIBEVALLEY_NO_ANIMATION=1` (or `true`) forces animations off for deterministic UI testing
+/// without overwriting persisted `Settings.motion`.
+pub fn env_no_animation() -> bool {
+    is_truthy_env(std::env::var("VIBEVALLEY_NO_ANIMATION").ok().as_deref())
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
     pub theme: ThemeChoice,
+    #[serde(default)]
+    pub motion: MotionChoice,
     pub mono_font: String,
     pub terminal_font_size: f32,
     pub ui_font_size: f32,
@@ -35,10 +75,17 @@ pub struct Settings {
     pub last_route: Option<String>,
 }
 
+impl Settings {
+    pub fn effective_motion(&self) -> MotionChoice {
+        if env_no_animation() { MotionChoice::Off } else { self.motion }
+    }
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Settings {
             theme: ThemeChoice::System,
+            motion: MotionChoice::System,
             mono_font: DEFAULT_MONO_FONT.into(),
             terminal_font_size: 13.0,
             ui_font_size: 13.0,
@@ -247,5 +294,98 @@ impl Ui {
         ui.epoch = epoch;
         cx.set_global(ui);
         cx.refresh_windows();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::OsString;
+    use std::sync::Mutex;
+
+    use super::*;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    struct EnvGuard {
+        key: &'static str,
+        previous: Option<OsString>,
+    }
+
+    impl EnvGuard {
+        fn set(key: &'static str, value: Option<&str>) -> Self {
+            let previous = std::env::var_os(key);
+            // SAFETY: serialized via `ENV_LOCK` across tests in this module.
+            unsafe {
+                match value {
+                    Some(v) => std::env::set_var(key, v),
+                    None => std::env::remove_var(key),
+                }
+            }
+            EnvGuard { key, previous }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            // SAFETY: serialized via `ENV_LOCK` across tests in this module.
+            unsafe {
+                match &self.previous {
+                    Some(v) => std::env::set_var(self.key, v),
+                    None => std::env::remove_var(self.key),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn motion_choice_serde_and_parse_roundtrip() {
+        for (choice, wire) in [
+            (MotionChoice::Off, "\"off\""),
+            (MotionChoice::On, "\"on\""),
+            (MotionChoice::System, "\"system\""),
+        ] {
+            let encoded = serde_json::to_string(&choice).expect("serialize MotionChoice");
+            assert_eq!(encoded, wire);
+            let decoded: MotionChoice = serde_json::from_str(&encoded).expect("deserialize MotionChoice");
+            assert_eq!(decoded, choice);
+            assert_eq!(MotionChoice::parse(choice.as_str()), Some(choice));
+        }
+        assert_eq!(MotionChoice::parse("reduced"), None);
+
+        let settings: Settings = serde_json::from_str("{}").expect("default settings deserialize");
+        assert_eq!(settings.motion, MotionChoice::System);
+    }
+
+    #[test]
+    fn effective_motion_respects_env_no_animation_override() {
+        let _lock = ENV_LOCK.lock().expect("lock env");
+        let on = Settings {
+            motion: MotionChoice::On,
+            ..Settings::default()
+        };
+        let system = Settings::default();
+
+        {
+            let _unset = EnvGuard::set("VIBEVALLEY_NO_ANIMATION", None);
+            assert!(!env_no_animation());
+            assert_eq!(on.effective_motion(), MotionChoice::On);
+            assert_eq!(system.effective_motion(), MotionChoice::System);
+        }
+        {
+            let _zero = EnvGuard::set("VIBEVALLEY_NO_ANIMATION", Some("0"));
+            assert!(!env_no_animation());
+            assert_eq!(on.effective_motion(), MotionChoice::On);
+        }
+        {
+            let _one = EnvGuard::set("VIBEVALLEY_NO_ANIMATION", Some("1"));
+            assert!(env_no_animation());
+            assert_eq!(on.effective_motion(), MotionChoice::Off);
+            assert_eq!(system.effective_motion(), MotionChoice::Off);
+        }
+        {
+            let _true = EnvGuard::set("VIBEVALLEY_NO_ANIMATION", Some("true"));
+            assert!(env_no_animation());
+            assert_eq!(on.effective_motion(), MotionChoice::Off);
+        }
     }
 }

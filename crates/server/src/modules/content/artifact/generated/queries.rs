@@ -580,8 +580,15 @@ pub struct AddSuggestionParams {
     pub r#artifact_id: String,
     pub r#block_id: String,
     pub r#author: String,
+    pub r#origin: Option<String>,
     pub r#at_rev: i64,
     pub r#change: String,
+    pub r#cursor_start: Option<String>,
+    pub r#cursor_end: Option<String>,
+    pub r#start_offset: Option<i64>,
+    pub r#end_offset: Option<i64>,
+    pub r#anchor_text: Option<String>,
+    pub r#replacement_text: Option<String>,
     pub r#created_at: i64,
 }
 
@@ -589,15 +596,53 @@ pub async fn r#add_suggestion<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: AddSuggestionParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"insert into artifact_suggestion (id, artifact_id, block_id, author, at_rev, change, status, created_at)
-  values (?1, ?2, ?3, ?4, ?5, ?6, 'open', ?7)"#)
+    sqlx::query(r#"insert into artifact_suggestion (id, artifact_id, block_id, author, origin, at_rev, change, cursor_start, cursor_end, start_offset, end_offset, anchor_text, replacement_text, status, created_at)
+  values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, 'open', ?14)"#)
         .bind(params.r#id)
         .bind(params.r#artifact_id)
         .bind(params.r#block_id)
         .bind(params.r#author)
+        .bind(params.r#origin)
         .bind(params.r#at_rev)
         .bind(params.r#change)
+        .bind(params.r#cursor_start)
+        .bind(params.r#cursor_end)
+        .bind(params.r#start_offset)
+        .bind(params.r#end_offset)
+        .bind(params.r#anchor_text)
+        .bind(params.r#replacement_text)
         .bind(params.r#created_at)
+        .execute(db).await.map(|_| ())
+}
+
+pub struct UpdateSuggestionParams {
+    pub r#id: String,
+    pub r#at_rev: i64,
+    pub r#change: String,
+    pub r#cursor_start: Option<String>,
+    pub r#cursor_end: Option<String>,
+    pub r#start_offset: Option<i64>,
+    pub r#end_offset: Option<i64>,
+    pub r#anchor_text: Option<String>,
+    pub r#replacement_text: Option<String>,
+}
+
+pub async fn r#update_suggestion<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: UpdateSuggestionParams,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(r#"update artifact_suggestion
+  set at_rev = ?2, change = ?3, cursor_start = ?4, cursor_end = ?5, start_offset = ?6, end_offset = ?7, anchor_text = ?8, replacement_text = ?9
+  where id = ?1 and status = 'open'"#)
+        .bind(params.r#id)
+        .bind(params.r#at_rev)
+        .bind(params.r#change)
+        .bind(params.r#cursor_start)
+        .bind(params.r#cursor_end)
+        .bind(params.r#start_offset)
+        .bind(params.r#end_offset)
+        .bind(params.r#anchor_text)
+        .bind(params.r#replacement_text)
         .execute(db).await.map(|_| ())
 }
 
@@ -611,8 +656,15 @@ pub struct SuggestionRow {
     pub r#artifact_id: String,
     pub r#block_id: String,
     pub r#author: String,
+    pub r#origin: Option<String>,
     pub r#at_rev: i64,
     pub r#change: String,
+    pub r#cursor_start: Option<String>,
+    pub r#cursor_end: Option<String>,
+    pub r#start_offset: Option<i64>,
+    pub r#end_offset: Option<i64>,
+    pub r#anchor_text: Option<String>,
+    pub r#replacement_text: Option<String>,
     pub r#status: String,
     pub r#created_at: i64,
     pub r#resolved_at: Option<i64>,
@@ -623,7 +675,7 @@ pub async fn r#suggestion<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: SuggestionParams,
 ) -> Result<SuggestionRow, sqlx::Error> {
-    sqlx::query_as::<_, SuggestionRow>(r#"select id, artifact_id, block_id, author, at_rev, change, status, created_at, resolved_at, resolved_by from artifact_suggestion where id = ?1"#)
+    sqlx::query_as::<_, SuggestionRow>(r#"select id, artifact_id, block_id, author, origin, at_rev, change, cursor_start, cursor_end, start_offset, end_offset, anchor_text, replacement_text, status, created_at, resolved_at, resolved_by from artifact_suggestion where id = ?1"#)
         .bind(params.r#id)
         .fetch_one(db).await
 }
@@ -639,7 +691,7 @@ pub async fn r#suggestions<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: SuggestionsParams,
 ) -> Result<Vec<SuggestionsRow>, sqlx::Error> {
-    sqlx::query_as::<_, SuggestionsRow>(r#"select id, artifact_id, block_id, author, at_rev, change, status, created_at, resolved_at, resolved_by from artifact_suggestion where artifact_id = ?1 order by created_at, id limit ?2"#)
+    sqlx::query_as::<_, SuggestionsRow>(r#"select id, artifact_id, block_id, author, origin, at_rev, change, cursor_start, cursor_end, start_offset, end_offset, anchor_text, replacement_text, status, created_at, resolved_at, resolved_by from artifact_suggestion where artifact_id = ?1 order by created_at, id limit ?2"#)
         .bind(params.r#artifact_id)
         .bind(params.r#limit)
         .fetch_all(db).await
@@ -861,5 +913,44 @@ pub async fn r#prune_artifact_entry_changes<'e>(
 ) -> Result<(), sqlx::Error> {
     sqlx::query(r#"delete from artifact_entry_change where created_at < ?1"#)
         .bind(params.r#created_at)
+        .execute(db).await.map(|_| ())
+}
+
+pub struct ArtifactCollabParams {
+    pub r#artifact_id: String,
+}
+
+#[derive(sqlx::FromRow)]
+pub struct ArtifactCollabRow {
+    pub r#snapshot: Vec<u8>,
+}
+
+pub async fn r#artifact_collab<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: ArtifactCollabParams,
+) -> Result<ArtifactCollabRow, sqlx::Error> {
+    sqlx::query_as::<_, ArtifactCollabRow>(r#"select snapshot from artifact_collab where artifact_id = ?1"#)
+        .bind(params.r#artifact_id)
+        .fetch_one(db).await
+}
+
+pub struct UpsertArtifactCollabParams {
+    pub r#artifact_id: String,
+    pub r#snapshot: Vec<u8>,
+    pub r#updated_at: i64,
+}
+
+pub async fn r#upsert_artifact_collab<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: UpsertArtifactCollabParams,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(r#"insert into artifact_collab (artifact_id, snapshot, updated_at)
+  values (?1, ?2, ?3)
+  on conflict (artifact_id) do update set
+    snapshot = excluded.snapshot,
+    updated_at = excluded.updated_at"#)
+        .bind(params.r#artifact_id)
+        .bind(params.r#snapshot)
+        .bind(params.r#updated_at)
         .execute(db).await.map(|_| ())
 }

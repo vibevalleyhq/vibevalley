@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use std::ops::Range;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use gpui::{
     AnyElement, AppContext as _, Context, EventEmitter, FocusHandle, Focusable, FontWeight, HighlightStyle, Hsla, InteractiveElement as _, IntoElement,
@@ -194,6 +195,8 @@ pub struct DiffView {
     focus: FocusHandle,
     busy: bool,
     error: Option<String>,
+    load_gen: u64,
+    show_skeleton: bool,
 }
 
 impl DiffView {
@@ -209,6 +212,8 @@ impl DiffView {
             focus: cx.focus_handle(),
             busy: false,
             error: None,
+            load_gen: 0,
+            show_skeleton: false,
         };
         view.reload(cx);
         view
@@ -229,6 +234,21 @@ impl DiffView {
     }
 
     pub fn reload(&mut self, cx: &mut Context<Self>) {
+        self.load_gen = self.load_gen.wrapping_add(1);
+        let generation = self.load_gen;
+        if self.files.is_none() {
+            self.show_skeleton = false;
+            cx.spawn(async move |this, cx| {
+                cx.background_executor().timer(Duration::from_millis(150)).await;
+                let _ = this.update(cx, |v, cx| {
+                    if v.load_gen == generation && v.files.is_none() {
+                        v.show_skeleton = true;
+                        cx.notify();
+                    }
+                });
+            })
+            .detach();
+        }
         let (root, target, path) = (self.repo_root.clone(), self.spec.to_target(), self.path.clone());
         let task = cx.background_spawn(async move {
             let repo = Repo::discover(&root).map_err(|e| e.to_string())?.ok_or("not a git repository")?;
@@ -237,9 +257,13 @@ impl DiffView {
         cx.spawn(async move |this, cx| {
             let result = task.await;
             let _ = this.update(cx, |v, cx| {
+                if v.load_gen != generation {
+                    return;
+                }
                 let len = result.as_ref().map_or(0, Vec::len);
                 v.collapsed.retain(|&idx| idx < len);
                 v.files = Some(result.map(Arc::new));
+                v.show_skeleton = false;
                 v.rebuild();
                 cx.notify();
             });
@@ -499,6 +523,69 @@ fn side_cell(s: Option<&Side>, width: f32, c: &Palette) -> impl IntoElement {
         )
 }
 
+fn diff_skeleton(line_height: f32, colors: &Palette) -> AnyElement {
+    const ROWS: &[(f32, f32)] = &[
+        (0.0, 260.0),
+        (14.0, 320.0),
+        (14.0, 210.0),
+        (28.0, 290.0),
+        (14.0, 180.0),
+        (0.0, 240.0),
+        (14.0, 350.0),
+        (14.0, 220.0),
+        (0.0, 140.0),
+    ];
+    let header = div()
+        .h(px(line_height + 4.0))
+        .w_full()
+        .px(px(12.0))
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap(px(8.0))
+        .bg(colors.surface)
+        .border_b_1()
+        .border_color(colors.border)
+        .child(div().size(px(14.0)).rounded(px(4.0)).bg(colors.hover))
+        .child(div().w(px(180.0)).h(px(10.0)).rounded(px(4.0)).bg(colors.hover));
+    let mut rows = div().size_full().flex().flex_col().child(header);
+    for (i, &(indent, width)) in ROWS.iter().enumerate() {
+        let bar_bg = if i % 2 == 0 { colors.hover } else { colors.surface };
+        rows = rows.child(
+            div()
+                .h(px(line_height))
+                .w_full()
+                .flex()
+                .flex_row()
+                .items_center()
+                .child(
+                    div()
+                        .w(px(46.0))
+                        .h_full()
+                        .flex_none()
+                        .bg(colors.surface)
+                        .border_r_1()
+                        .border_color(colors.border)
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(div().w(px(16.0)).h(px(8.0)).rounded(px(4.0)).bg(colors.hover)),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .h_full()
+                        .pl(px(16.0 + indent))
+                        .flex()
+                        .items_center()
+                        .child(div().w(px(width)).max_w_full().h(px(10.0)).rounded(px(4.0)).bg(bar_bg)),
+                ),
+        );
+    }
+    rows.into_any_element()
+}
+
 fn state_card(title: &'static str, detail: String, danger: bool, colors: &Palette) -> AnyElement {
     let (bg, border, title_color) = if danger {
         (colors.removed_bg, Hsla { a: 0.35, ..colors.danger }, colors.danger)
@@ -724,15 +811,8 @@ impl Render for DiffView {
                     .child(quiet_btn("refresh", "Refresh").on_click(cx.listener(|v, _, _, cx| v.reload(cx)))),
             );
         let body: AnyElement = match &self.files {
-            None => div()
-                .size_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .text_color(colors.muted)
-                .text_size(px(12.5))
-                .child("Loading diff…")
-                .into_any_element(),
+            None if self.show_skeleton => diff_skeleton(line_height, &colors),
+            None => div().size_full().into_any_element(),
             Some(Err(e)) => state_card("Could not read diff", e.clone(), true, &colors),
             Some(Ok(files)) if files.is_empty() => state_card("No changes", "This diff target is clean.".into(), false, &colors),
             Some(Ok(files)) => {

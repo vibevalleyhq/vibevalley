@@ -63,6 +63,7 @@ fn launch(home: &Path, window: &str) -> (Started, vibevalley_server::transport::
                         input_tokens: Some(12),
                         output_tokens: Some(4),
                         cost_usd: None,
+                        ..Default::default()
                     },
                 }),
             ])

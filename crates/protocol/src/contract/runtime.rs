@@ -86,6 +86,9 @@ pub struct RuntimeSupport {
     pub refused: BTreeMap<String, String>,
     pub capabilities: Vec<RuntimeCapability>,
     pub in_process: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<bool>", optional))]
+    pub in_session_config: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -172,6 +175,7 @@ pub struct ModelEntry {
     pub id: String,
     pub name: String,
     pub effort_levels: Vec<String>,
+    pub default_effort: Option<String>,
     pub is_default: bool,
 }
 

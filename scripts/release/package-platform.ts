@@ -4,6 +4,13 @@ import { newer } from "./releases.ts";
 
 export const minimumMacOS = "14.0";
 
+export function channelIconFile(version: string): string {
+  if (version === "0.0.0") return "apps/mac/resources/icon-dev.icns";
+  if (version.includes("-alpha.")) return "apps/mac/resources/icon-alpha.icns";
+  if (version.includes("-beta.")) return "apps/mac/resources/icon-beta.icns";
+  return "apps/mac/resources/icon.icns";
+}
+
 const version = (v: string) => (v + ".0.0").split(".").slice(0, 3).join(".");
 
 const machArch = { arm64: "arm64", x64: "x86_64" };

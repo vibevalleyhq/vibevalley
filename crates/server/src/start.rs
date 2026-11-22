@@ -338,13 +338,13 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     let pulls = modules::work::pull::Pulls::open(&config.home, publisher, Some(repos.clone()), Some(board.clone()), None, None)
         .map_err(|e| failed("the pulls")(&e.message))?;
     modules::work::pull::install(&hub, pulls.clone(), config.poll_pulls);
+    let attachments = modules::content::attachment::Attachments::open(&config.home).map_err(|e| failed("the attachments")(&e))?;
+    modules::content::attachment::install(&hub, attachments.clone());
     modules::work::issue::install_on(&hub, board.clone(), Some(agents.clone()));
-    modules::work::session::install(&hub, board.clone(), trajectories.clone());
+    modules::work::session::install(&hub, board.clone(), trajectories.clone(), Some(attachments.clone()));
     modules::work::repo::install_templates(&hub, repos.clone(), board.clone(), agents.clone());
     let crons = modules::work::cron::Crons::open(&config.home, &hub, board.clone(), agents.clone()).map_err(|e| failed("the crons")(&e.message))?;
     modules::work::cron::install(&hub, crons.clone(), config.tick_crons);
-    let attachments = modules::content::attachment::Attachments::open(&config.home).map_err(|e| failed("the attachments")(&e))?;
-    modules::content::attachment::install(&hub, attachments.clone());
     let media_inputs = modules::content::media::inputs::Inputs::open(&config.home, attachments.clone()).map_err(|e| failed("the media inputs")(&e.message))?;
     modules::content::media::inputs::install(&hub, media_inputs.clone());
     let chat =

@@ -27,7 +27,7 @@ test("sandbox owns isolation, readiness, validation failure and cleanup", async 
     const created = await fetch(server + '/api/v1/issue/create', {method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({title:'sandbox fixture'})});
     if (!created.ok) throw new Error('create failed: ' + await created.text());
     const issue = (await created.json()).data;
-    const cli = spawnSync(process.env.VIBEVALLEY_VERIFY_CLI, ['issue', 'list', '--format', 'json'], {env:process.env, encoding:'utf8'});
+    const cli = spawnSync(process.env.VIBEVALLEY_VERIFY_CLI, ['issue', 'list', '--json'], {env:process.env, encoding:'utf8'});
     if (cli.status !== 0) throw new Error('issue list failed');
     const issues = JSON.parse(cli.stdout);
     if (!issues.some(i => i.id === issue.id)) throw new Error('fixture absent from issue list');
@@ -75,10 +75,10 @@ test("with the scripted helper, an issue goes out, comes back and is completed t
       vv issue create 写打卡并提交 --repo clock --agent docs > /dev/null
       vv issue status 1 todo > /dev/null
       vv issue show 1 --watch --timeout 60 > /dev/null
-      vv issue diff 1 --format json
-      vv issue status 1 done --dry-run --format json
-      vv issue status 1 done --format json
-      repo=$(vv repo list --format json | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8"))[0].path)')
+      vv issue diff 1 --json
+      vv issue status 1 done --dry-run --json
+      vv issue status 1 done --json
+      repo=$(vv repo list --json | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8"))[0].path)')
       git -C "$repo" ls-tree --name-only main clock.ts`,
     ],
     { scriptedHelper: true },

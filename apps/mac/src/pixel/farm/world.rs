@@ -182,6 +182,7 @@ fn facing_of(v: &str) -> Facing {
     }
 }
 
+#[derive(Clone)]
 pub struct Prop {
     pub spot: String,
     pub sprite: String,
@@ -219,6 +220,7 @@ pub struct GoalInput<'a> {
 
 const REACH: f32 = 15.0;
 
+#[derive(Clone)]
 pub struct VillageWorld {
     pub level: Level,
     pub plots: HashMap<usize, Point>,

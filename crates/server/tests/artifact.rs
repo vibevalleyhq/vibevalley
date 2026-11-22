@@ -724,10 +724,13 @@ fn structured_artifact_types_guides_and_starters() {
     let hub = started.hub.clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
 
-    // Lists all 7 artifact types and serves bilingual progressive-disclosure guides.
+    // Lists all 8 artifact types and serves bilingual progressive-disclosure guides.
     let listed = ok(call("artifact.type.list", json!({})));
     let types: Vec<&str> = listed.as_array().unwrap().iter().map(|t| t["type"].as_str().unwrap()).collect();
-    assert_eq!(types, vec!["docs", "slides", "dashboard", "motion", "whiteboard", "design", "design-system"]);
+    assert_eq!(
+        types,
+        vec!["docs", "outline", "slides", "dashboard", "motion", "whiteboard", "design", "design-system"]
+    );
     let slides_info = listed.as_array().unwrap().iter().find(|t| t["type"] == "slides").unwrap();
     assert_eq!(slides_info["references"], json!(["craft", "format", "layout"]));
 
@@ -1036,5 +1039,460 @@ fn artifact_issue_fk_sets_null_on_issue_delete() {
     let after = ok(call("artifact.get", json!({ "id": artifact_id })));
     assert_eq!(after["id"], artifact_id);
     assert!(after.get("issue").is_none());
+    started.close();
+}
+
+#[test]
+fn outline_artifact_create_read_edit_type_read_card_and_issue_link() {
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.hub.clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+    let general = started.chat.default_channel();
+
+    // Bilingual guide for `outline`.
+    let guide_zh = ok(call("artifact.type.read", json!({ "type": "outline" })));
+    assert_eq!(guide_zh["type"], "outline");
+    assert!(guide_zh["content"].as_str().unwrap().contains("outline"));
+    vibevalley_i18n::set_locale("en");
+    let guide_en = ok(call("artifact.type.read", json!({ "type": "outline" })));
+    assert!(guide_en["content"].as_str().unwrap().contains("Tree Outline"));
+    vibevalley_i18n::set_locale("zh");
+
+    let issue_id = ok(call("issue.create", json!({ "title": "大纲关联任务" })))["id"].as_str().unwrap().to_string();
+    let made = ok(call(
+        "artifact.create",
+        json!({
+            "title": "发布检查清单",
+            "artifactType": "outline",
+            "content": "- 准备\n  - 核对契约\n- [ ] 上线验证",
+            "channel": general,
+            "issue": issue_id,
+            "note": "初版大纲"
+        }),
+    ));
+    assert_eq!(
+        (made["body"].as_str(), made["artifactType"].as_str(), made["issue"].as_str()),
+        (Some("blocks"), Some("outline"), Some(issue_id.as_str()))
+    );
+    let id = made["id"].as_str().unwrap().to_string();
+    let card = last_message(&call, &general);
+    assert_eq!(card["artifact"]["artifactType"], "outline");
+    assert_eq!(card["artifact"]["body"], "blocks");
+
+    let snap = ok(call("artifact.block.list", json!({ "id": id })));
+    assert_eq!(snap["blocks"].as_array().unwrap().len(), 3);
+    let root_id = snap["blocks"][0]["id"].as_str().unwrap().to_string();
+    ok(call(
+        "artifact.block.create",
+        json!({ "id": id, "parentId": root_id, "type": "todo", "checked": true, "text": "补齐单测" }),
+    ));
+    let md = ok(call("artifact.markdown.get", json!({ "id": id })))["markdown"].as_str().unwrap().to_string();
+    assert!(md.contains("补齐单测"));
+
+    // `.outline.md` filename suffix inference.
+    let inferred = ok(call("artifact.create", json!({ "title": "周会纪要.outline.md", "content": "- 议题一" })));
+    assert_eq!(
+        (inferred["title"].as_str(), inferred["body"].as_str(), inferred["artifactType"].as_str()),
+        (Some("周会纪要"), Some("blocks"), Some("outline"))
+    );
+
+    let outlines = ok(call("artifact.list", json!({ "artifactType": "outline" })));
+    assert_eq!(outlines.as_array().unwrap().len(), 2);
+    started.close();
+}
+
+#[test]
+fn presence_update_follow_and_legacy_presence_entries_never_write_sqlite() {
+    use sqlx::{Connection, Row, SqliteConnection, sqlite::SqliteConnectOptions};
+
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.hub.clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    let board = ok(call(
+        "artifact.create",
+        json!({
+            "title": "协作白板",
+            "artifactType": "whiteboard",
+            "entries": [
+                { "op": "set", "path": "board/meta", "kind": "json", "value": "{\"title\":\"协作白板\"}" }
+            ]
+        }),
+    ));
+    let id = board["id"].as_str().unwrap().to_string();
+    assert_eq!(board["seq"], 1);
+
+    let (sub_id, rx) = hub.subscribe("artifact.presence.follow", json!({ "id": id })).unwrap();
+    let snap = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    assert_eq!(snap["_tag"], "Snapshot");
+    assert_eq!(snap["peers"], json!([]));
+
+    // 1. Direct `artifact.presence.update` streams `Upsert` without bumping `seq` or writing SQLite.
+    ok(call(
+        "artifact.presence.update",
+        json!({
+            "id": id,
+            "presence": {
+                "id": "user",
+                "name": "Alice",
+                "color": "#3b82f6",
+                "kind": "cursor",
+                "x": 120,
+                "y": 240,
+                "status": "构图中",
+                "viewport": { "x": 0, "y": 0, "w": 1280, "h": 720, "zoom": 1.25 },
+                "updatedAt": 0
+            }
+        }),
+    ));
+    let up = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    assert_eq!(up["_tag"], "Upsert");
+    assert_eq!(up["peer"]["id"], "user");
+    assert_eq!(up["peer"]["status"], "构图中");
+    assert_eq!(up["peer"]["viewport"]["zoom"], 1.25);
+
+    // 2. Legacy `presence/*` entry batch is intercepted into in-memory `PresenceHub` — zero DB rows, `seq` untouched.
+    let legacy = ok(call(
+        "artifact.entry.batch",
+        json!({
+            "id": id,
+            "writes": [{
+                "op": "set",
+                "path": "presence/session-w1",
+                "kind": "json",
+                "value": serde_json::to_string(&json!({
+                    "id": "session-w1",
+                    "name": "Planner",
+                    "x": 300,
+                    "y": 400,
+                    "selector": "#hero",
+                    "status": "排版中"
+                })).unwrap()
+            }]
+        }),
+    ));
+    assert_eq!((legacy["applied"].as_bool(), legacy["seq"].as_i64()), (Some(true), Some(1)));
+    let up2 = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    assert_eq!(up2["_tag"], "Upsert");
+    assert_eq!(up2["peer"]["id"], "session-w1");
+    assert_eq!(up2["peer"]["selector"], "#hero");
+
+    // Verify zero `presence/*` rows in SQLite and `artifact.seq` stayed at 1.
+    assert_eq!(ok(call("artifact.get", json!({ "id": id })))["seq"], 1);
+    let opts = SqliteConnectOptions::new().filename(dir.path().join("server.db"));
+    let mut inspect = pollster::block_on(SqliteConnection::connect_with(&opts)).unwrap();
+    let count: i64 = pollster::block_on(
+        sqlx::query("SELECT count(*) AS n FROM artifact_entry WHERE artifact_id = ?1 AND path LIKE 'presence/%'")
+            .bind(&id)
+            .fetch_one(&mut inspect),
+    )
+    .unwrap()
+    .get("n");
+    assert_eq!(count, 0);
+
+    // 3. Sandbox viewer (`artifact.view`) embeds strict-CSP-safe presence highlight listener & active highlights.
+    let view = ok(call("artifact.view", json!({ "id": id, "theme": "light" })));
+    let view_html = view["content"].as_str().unwrap();
+    assert!(view_html.contains("presence-highlight"));
+    assert!(view_html.contains("#hero"));
+    assert!(view["headers"]["content-security-policy"].as_str().unwrap().starts_with("sandbox "));
+
+    // 4. Clearing presence via legacy delete & `presence.update` emits `Remove`.
+    ok(call(
+        "artifact.entry.batch",
+        json!({ "id": id, "writes": [{ "op": "delete", "path": "presence/session-w1" }] }),
+    ));
+    let rm1 = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    assert_eq!((rm1["_tag"].as_str(), rm1["peerId"].as_str()), (Some("Remove"), Some("session-w1")));
+
+    ok(call("artifact.presence.update", json!({ "id": id, "peerId": "user" })));
+    let rm2 = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    assert_eq!((rm2["_tag"].as_str(), rm2["peerId"].as_str()), (Some("Remove"), Some("user")));
+
+    hub.unsubscribe(sub_id);
+    started.close();
+}
+
+#[test]
+fn persistent_cursor_suggestion_survives_upstream_edit_and_coalesces_same_origin() {
+    use vibevalley_core::collab::CommitMeta;
+
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.hub.clone();
+    let a = started.artifacts.clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    let doc = ok(call("artifact.create", json!({ "title": "共编文档", "artifactType": "docs" })));
+    let id = doc["id"].as_str().unwrap().to_string();
+    let b = ok(call("artifact.block.create", json!({ "id": id, "text": "Hello world, ship v1 today." })));
+    let block_id = b["blockId"].as_str().unwrap().to_string();
+
+    // Helper edits user-authored block twice in the same turn/origin -> coalesces into one persistent-cursor suggestion.
+    let meta_turn1 = CommitMeta::session("Backend", "backend", "w1", 1, Some("bump version".into()), 1_700_000_000_000);
+    let r1 = a
+        .update_block_with_meta(
+            &id,
+            "backend",
+            &BlockUpdate {
+                block: block_id.clone(),
+                base_rev: 1,
+                text: Some("Hello world, ship v2 today.".into()),
+                r#type: None,
+                level: None,
+                checked: None,
+                language: None,
+            },
+            &meta_turn1,
+        )
+        .unwrap();
+    assert!(r1.suggestion.is_some());
+    let s1_id = r1.suggestion.unwrap();
+
+    let r2 = a
+        .update_block_with_meta(
+            &id,
+            "backend",
+            &BlockUpdate {
+                block: block_id.clone(),
+                base_rev: 1,
+                text: Some("Hello world, ship v2.5 today.".into()),
+                r#type: None,
+                level: None,
+                checked: None,
+                language: None,
+            },
+            &meta_turn1,
+        )
+        .unwrap();
+    assert_eq!(r2.suggestion.as_deref(), Some(s1_id.as_str()));
+
+    let before_drift = ok(call("artifact.suggestion.list", json!({ "id": id })));
+    assert_eq!(before_drift.as_array().unwrap().len(), 1);
+    assert!(before_drift[0]["cursorStart"].is_string());
+    assert!(before_drift[0]["cursorEnd"].is_string());
+    assert_eq!(before_drift[0]["startOffset"], 19);
+    assert_eq!(before_drift[0]["endOffset"], 20);
+
+    // User inserts upstream prefix ("NOTE: ") — rev moves 1 -> 2.
+    ok(call(
+        "artifact.block.update",
+        json!({ "id": id, "block": block_id, "baseRev": 1, "text": "NOTE: Hello world, ship v1 today." }),
+    ));
+
+    // Suggestion offsets drift forward by 6 Unicode chars ("NOTE: ").
+    let after_drift = ok(call("artifact.suggestion.list", json!({ "id": id })));
+    assert_eq!(after_drift[0]["startOffset"], 25);
+    assert_eq!(after_drift[0]["endOffset"], 26);
+
+    // Accepting the suggestion merges cleanly at the drifted cursor range without clobbering the user's prefix!
+    let accepted = ok(call("artifact.suggestion.accept", json!({ "id": id, "suggestion": s1_id })));
+    assert_eq!(accepted["status"], "accepted");
+    let snap = ok(call("artifact.block.list", json!({ "id": id })));
+    assert_eq!(texts(&snap["blocks"]), "NOTE: Hello world, ship v2.5 today.");
+    started.close();
+}
+
+#[test]
+fn time_travel_preview_restore_fork_compaction_and_selective_origin_undo() {
+    use vibevalley_core::collab::CommitMeta;
+
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.hub.clone();
+    let a = started.artifacts.clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    // 1. Interleaved block history: user + session A + session B.
+    let outline = ok(call("artifact.create", json!({ "title": "迭代大纲", "artifactType": "outline" })));
+    let id = outline["id"].as_str().unwrap().to_string();
+
+    let b1 = a
+        .insert_block_with_meta(
+            &id,
+            "backend",
+            &BlockCreate {
+                r#type: Some("bulleted".into()),
+                text: "Spec: base".into(),
+                ..Default::default()
+            },
+            &CommitMeta::user("user", Some("initial outline".into()), 1_700_000_001_000),
+        )
+        .unwrap();
+    let b1_id = b1.block_id.clone();
+
+    let meta_a = CommitMeta::session("AgentA", "backend", "sA", 1, Some("add A1".into()), 1_700_000_002_000);
+    a.update_block_with_meta(
+        &id,
+        "backend",
+        &BlockUpdate {
+            block: b1_id.clone(),
+            base_rev: 1,
+            text: Some("Spec: base [A1]".into()),
+            r#type: None,
+            level: None,
+            checked: None,
+            language: None,
+        },
+        &meta_a,
+    )
+    .unwrap();
+    a.insert_block_with_meta(
+        &id,
+        "backend",
+        &BlockCreate {
+            r#type: Some("bulleted".into()),
+            text: "A1 detail".into(),
+            ..Default::default()
+        },
+        &meta_a,
+    )
+    .unwrap();
+
+    let meta_b = CommitMeta::session("AgentB", "frontend", "sB", 1, Some("add B1".into()), 1_700_000_003_000);
+    a.update_block_with_meta(
+        &id,
+        "frontend",
+        &BlockUpdate {
+            block: b1_id.clone(),
+            base_rev: 2,
+            text: Some("Spec: base [A1] [B1]".into()),
+            r#type: None,
+            level: None,
+            checked: None,
+            language: None,
+        },
+        &meta_b,
+    )
+    .unwrap();
+    a.insert_block_with_meta(
+        &id,
+        "frontend",
+        &BlockCreate {
+            r#type: Some("bulleted".into()),
+            text: "B1 detail".into(),
+            ..Default::default()
+        },
+        &meta_b,
+    )
+    .unwrap();
+
+    // History timeline lists newest first with persisted `CommitMeta`.
+    let history = ok(call("artifact.history.list", json!({ "id": id })));
+    let entries = history.as_array().unwrap();
+    assert_eq!(entries.len(), 5);
+    assert_eq!(entries[0]["origin"], "session:sB:turn:1");
+    assert_eq!(entries[4]["origin"], "user");
+    let first_frontiers = entries[4]["frontiers"].as_str().unwrap().to_string();
+    let after_a1_frontiers = entries[2]["frontiers"].as_str().unwrap().to_string();
+
+    // Time-travel read-only preview at initial commit.
+    let preview = ok(call("artifact.history.preview", json!({ "id": id, "frontiers": first_frontiers })));
+    assert_eq!(preview["body"], "blocks");
+    assert_eq!(preview["blocks"].as_array().unwrap().len(), 1);
+    assert_eq!(texts(&preview["blocks"]), "Spec: base");
+    assert!(preview["markdown"].as_str().unwrap().contains("Spec: base"));
+
+    // Fork at `after_a1_frontiers` creates an independent outline without B1.
+    let forked = ok(call(
+        "artifact.history.fork",
+        json!({ "id": id, "frontiers": after_a1_frontiers, "title": "大纲分叉" }),
+    ));
+    assert_eq!((forked["title"].as_str(), forked["artifactType"].as_str()), (Some("大纲分叉"), Some("outline")));
+    let forked_snap = ok(call("artifact.block.list", json!({ "id": forked["id"] })));
+    assert_eq!(texts(&forked_snap["blocks"]), "Spec: base [A1]|A1 detail");
+
+    // Selective per-origin undo removes ONLY `session:sA:turn:1`, keeping user + `session:sB:turn:1`!
+    ok(call("artifact.history.undoOrigin", json!({ "id": id, "origin": "session:sA:turn:1" })));
+    let after_undo = ok(call("artifact.block.list", json!({ "id": id })));
+    assert_eq!(texts(&after_undo["blocks"]), "Spec: base [B1]|B1 detail");
+
+    // Restore back to `first_frontiers` as a new forward commit.
+    ok(call(
+        "artifact.history.restore",
+        json!({ "id": id, "frontiers": first_frontiers, "note": "回到初版" }),
+    ));
+    let after_restore = ok(call("artifact.block.list", json!({ "id": id })));
+    assert_eq!(texts(&after_restore["blocks"]), "Spec: base");
+
+    // Shallow snapshot compaction preserves exact current state.
+    ok(call("artifact.history.compact", json!({ "id": id })));
+    assert_eq!(
+        ok(call("artifact.markdown.get", json!({ "id": id })))["markdown"].as_str().unwrap().trim(),
+        "- Spec: base"
+    );
+
+    // 2. Store (whiteboard) selective per-origin undo preserves concurrent property edits on the same element.
+    let board = ok(call(
+        "artifact.create",
+        json!({
+            "title": "白板历史",
+            "artifactType": "whiteboard",
+            "entries": [
+                { "op": "set", "path": "elements/box1", "kind": "json", "value": "{\"id\":\"box1\",\"x\":100,\"color\":\"blue\"}" }
+            ]
+        }),
+    ));
+    let bid = board["id"].as_str().unwrap().to_string();
+    let maker_a = Maker {
+        from: "sA".into(),
+        by: "backend".into(),
+        run: None,
+    };
+    let maker_b = Maker {
+        from: "sB".into(),
+        by: "frontend".into(),
+        run: None,
+    };
+    a.batch_entries_with_meta(
+        &maker_a,
+        &vibevalley_protocol::ArtifactEntryBatchRequest {
+            id: bid.clone(),
+            writes: vec![vibevalley_protocol::ArtifactEntryWriteInput {
+                op: vibevalley_protocol::ArtifactEntryOp::Patch,
+                path: "elements/box1".into(),
+                kind: None,
+                value: Some("{\"color\":\"red\"}".into()),
+                from: None,
+                mime: None,
+                if_rev: None,
+            }],
+            note: Some("recolor".into()),
+            announce: Some(false),
+        },
+        &CommitMeta::session("AgentA", "backend", "sA", 1, Some("recolor".into()), 1_700_000_010_000),
+    )
+    .unwrap();
+    a.batch_entries_with_meta(
+        &maker_b,
+        &vibevalley_protocol::ArtifactEntryBatchRequest {
+            id: bid.clone(),
+            writes: vec![vibevalley_protocol::ArtifactEntryWriteInput {
+                op: vibevalley_protocol::ArtifactEntryOp::Patch,
+                path: "elements/box1".into(),
+                kind: None,
+                value: Some("{\"x\":500}".into()),
+                from: None,
+                mime: None,
+                if_rev: None,
+            }],
+            note: Some("move".into()),
+            announce: Some(false),
+        },
+        &CommitMeta::session("AgentB", "frontend", "sB", 1, Some("move".into()), 1_700_000_011_000),
+    )
+    .unwrap();
+
+    ok(call("artifact.history.undoOrigin", json!({ "id": bid, "origin": "session:sA:turn:1" })));
+    let box1 = ok(call("artifact.entry.get", json!({ "id": bid, "path": "elements/box1" })));
+    let box1_val: Value = serde_json::from_str(box1["value"].as_str().unwrap()).unwrap();
+    assert_eq!(box1_val["color"], "blue");
+    assert_eq!(box1_val["x"], 500);
     started.close();
 }

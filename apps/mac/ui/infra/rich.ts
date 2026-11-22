@@ -4,6 +4,8 @@
 import { nativeModule, type ComponentHostProps, type JSX, type Modifiers } from "nsh";
 import type { TextViewClasses, TextViewLinks, TextViewStyles } from "nsh/base";
 
+import { setTranslator } from "@vibevalley/i18n";
+
 export interface BlockRefPayload {
   block: string;
   body?: string | null;
@@ -54,7 +56,7 @@ export interface VvWikilinkPressEvent {
   label: string;
 }
 
-export type VvMarkdownSize = "base" | "sm";
+export type VvMarkdownSize = "base" | "sm" | "doc";
 
 export interface VvCanvasProps extends ComponentHostProps {
   data: string;
@@ -87,9 +89,17 @@ export interface VvGenUiProps extends ComponentHostProps {
   onAction?: (event: VvGenUiActionEvent) => void;
 }
 
+export interface VvIconProps extends ComponentHostProps {
+  name: string;
+  size?: number;
+  color?: string;
+  label?: string | null;
+}
+
 export interface VvMarkdownProps extends ComponentHostProps {
   text: string;
   size?: VvMarkdownSize;
+  baseDir?: string | null;
   mentions?: boolean;
   pkm?: boolean;
   refs?: readonly BlockRefPayload[];
@@ -109,14 +119,70 @@ export interface VvMarkdownProps extends ComponentHostProps {
   onGenUiAction?: (event: VvGenUiActionEvent) => void;
 }
 
+export interface VvWhiteboardBatchEvent {
+  writesJson: string;
+}
+
+export interface VvWhiteboardSelectionEvent {
+  idsJson: string;
+  count: number;
+}
+
+export interface VvWhiteboardChatEvent {
+  selectedIdsJson: string;
+}
+
+export interface VvWhiteboardExportEvent {
+  format: string;
+  filename: string;
+  mime: string;
+  content: string;
+}
+
+export interface VvWhiteboardCursorEvent {
+  x: number;
+  y: number;
+  viewportX: number;
+  viewportY: number;
+  viewportW: number;
+  viewportH: number;
+  zoom: number;
+}
+
+export interface VvWhiteboardViewportEvent {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  zoom: number;
+}
+
+export interface VvWhiteboardProps extends ComponentHostProps {
+  entriesJson: string;
+  presencesJson?: string;
+  seq?: number;
+  title?: string;
+  readOnly?: boolean;
+  locale?: string;
+  onBatch?: (event: VvWhiteboardBatchEvent) => void;
+  onSelectionChange?: (event: VvWhiteboardSelectionEvent) => void;
+  onOpenChat?: (event: VvWhiteboardChatEvent) => void;
+  onExport?: (event: VvWhiteboardExportEvent) => void;
+  onCursorMove?: (event: VvWhiteboardCursorEvent) => void;
+  onViewportChange?: (event: VvWhiteboardViewportEvent) => void;
+}
+
 export interface VvRichModule {
   VvCanvas: (props: VvCanvasProps) => JSX.Element;
   VvChart: (props: VvChartProps) => JSX.Element;
   VvCodeBlock: (props: VvCodeBlockProps) => JSX.Element;
   VvDiagram: (props: VvDiagramProps) => JSX.Element;
   VvGenUi: (props: VvGenUiProps) => JSX.Element;
+  VvIcon: (props: VvIconProps) => JSX.Element;
   VvMarkdown: (props: VvMarkdownProps) => JSX.Element;
+  VvWhiteboard: (props: VvWhiteboardProps) => JSX.Element;
   matchPinyin: (text: string, query: string) => boolean;
+  translate?: (locale: string, key: string, paramsJson?: string) => string;
 }
 
 let cached: VvRichModule | null | undefined;
@@ -129,4 +195,11 @@ export function richNative(): VvRichModule | undefined {
     cached = null;
   }
   return cached ?? undefined;
+}
+
+/** Routes `@vibevalley/i18n` through native Rust `VvI18n` when the host registers it. */
+export function installNativeI18n(): void {
+  const translate = richNative()?.translate;
+  if (!translate) return;
+  setTranslator((locale, key, params) => (params ? translate(locale, key, JSON.stringify(params)) : translate(locale, key)));
 }

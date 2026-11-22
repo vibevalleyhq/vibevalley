@@ -7,6 +7,7 @@ import { OrchestratorFace } from "../../../design/domain/Face";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { ActiveBar } from "../../../design/layout";
+import { motionDuration, motionOff } from "../../../design/motion";
 import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { useOrchestrators } from "../../../infra/agents";
@@ -101,7 +102,7 @@ export function IssueList(props: {
               return (
                 <View accessibilityLabel={label()} testID="issue-group" class="mb-1.5">
                   {/* A head of words on the page, not a bar: its line under it sets the group off. */}
-                  <View class="mt-2 h-8.5 flex-row items-center rounded-t-md border-b border-line bg-page pr-1 transition duration-120 ease-out hover:bg-hover">
+                  <View class="mt-2 h-8.5 flex-row items-center rounded-t-md border-b border-line bg-page pr-1 hover:bg-hover">
                     <View
                       role="button"
                       testID={`issue-group-${g().key || "none"}`}
@@ -113,8 +114,7 @@ export function IssueList(props: {
                         class="w-4 shrink-0 items-center justify-center"
                         style={{
                           transform: [{ rotate: isFolded() ? "0deg" : "90deg" }],
-                          transitionProperty: "transform",
-                          transitionDuration: 120,
+                          ...(motionOff() ? {} : { transitionProperty: "transform", transitionDuration: motionDuration(120) }),
                         }}
                       >
                         <Icon name="expand" size={10} tone="muted" />
@@ -201,7 +201,7 @@ function Row(props: {
       accessibilityState={{ selected: props.selected }}
       tooltip={look().detail ? <Bubble text={look().detail} /> : undefined}
       onPress={() => props.onOpen(props.card.id)}
-      class={`relative min-h-9.5 flex-row items-center gap-2.5 rounded-md px-2.5 py-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${props.selected ? "bg-selected" : "hover:bg-hover"}`}
+      class={`relative min-h-9.5 flex-row items-center gap-2.5 rounded-md px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-focus ${props.selected ? "bg-selected" : "hover:bg-hover"}`}
     >
       <If when={props.selected}>
         <ActiveBar />

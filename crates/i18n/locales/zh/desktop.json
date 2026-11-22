@@ -25,13 +25,21 @@
     "zoomOut": "缩小",
     "fullScreen": "进入全屏幕",
     "window": "窗口",
+    "newChat": "新建对话",
     "close": "关闭窗口",
     "closeTab": "关闭标签页"
+  },
+  "workspace": {
+    "newChat": "新对话",
+    "newTerminal": "新终端",
+    "newChatWith": "新建 {runtime} 对话",
+    "chooseRuntime": "选择对话引擎"
   },
   "terminal": {
     "noProject": "请先打开项目，再启动终端。",
     "missingFolder": "工作区已不存在，无法在此打开终端。",
-    "dismiss": "知道了"
+    "dismiss": "知道了",
+    "agentTurnDone": "{agent} 本轮已完成"
   },
   "files": {
     "missingInWorktree": "此任务的工作区中无法打开 {path}"

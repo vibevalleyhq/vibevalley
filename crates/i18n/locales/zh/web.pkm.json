@@ -10,25 +10,6 @@
     "journal": "日记",
     "archive": "归档"
   },
-  "list": {
-    "label": "页面和日历",
-    "find": "搜笔记",
-    "newPage": "新建页面",
-    "newPagePlaceholder": "输入标题，回车建页",
-    "open": "{n} 项没做完",
-    "today": "今天"
-  },
-  "calendar": {
-    "label": "日历",
-    "previous": "上个月",
-    "next": "下个月"
-  },
-  "radar": {
-    "inbox": "收件箱",
-    "stale": "搁着",
-    "overdue": "过期",
-    "days": "{n} 天没动"
-  },
   "gone": "没有这一页，或者它的文件已经删掉了。",
   "page": {
     "more": "更多",
@@ -39,8 +20,6 @@
     "undo": "撤销上一次改动",
     "undone": "撤销了：{what}",
     "nothingToUndo": "没有可以撤销的改动",
-    "tier": "放在哪",
-    "moved": "挪到了{tier}",
     "append": "接着写…",
     "collapse": "收起",
     "expand": "展开",
@@ -58,15 +37,6 @@
     "copiedRef": "块引用复制好了",
     "toIssue": "转为任务",
     "issueMade": "已创建任务"
-  },
-  "props": {
-    "deadline": "截止 {day}",
-    "left": "截止 {day} · 还剩 {n} 天",
-    "dueToday": "截止 {day} · 今天到期",
-    "overdue": "截止 {day} · 过了 {n} 天",
-    "area": "领域",
-    "more": "还有 {n} 项属性",
-    "fewer": "收起属性"
   },
   "marker": {
     "TODO": "待办",
@@ -89,12 +59,6 @@
   },
   "complete": {
     "newPage": "新页面"
-  },
-  "rail": {
-    "label": "这一页的旁注",
-    "show": "打开旁注",
-    "hide": "收起旁注",
-    "contents": "这页的大纲"
   },
   "search": {
     "title": "搜笔记",
@@ -122,13 +86,5 @@
     "accepted": "采纳了",
     "rejected": "不要了",
     "on": "「{span}」"
-  },
-  "tierOne": {
-    "project": "项目",
-    "area": "领域",
-    "resource": "资料",
-    "inbox": "收件箱",
-    "journal": "日记",
-    "archive": "归档"
   }
 }

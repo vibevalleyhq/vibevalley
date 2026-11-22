@@ -56,7 +56,7 @@
     "width": "Navigation width (drag; double-click for the default)"
   },
   "words": {
-    "general": "language start workbench farm theme dark light size zoom scale font",
+    "general": "language start workbench farm theme dark light size zoom scale font animation motion reduce",
     "models": "keys accounts DeepSeek MOSS Agora API key models binding",
     "voice": "Agora call phone recognition speech MOSS live realtime vision dictation transcription",
     "connections": "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
@@ -81,6 +81,13 @@
     "themes": {
       "light": "Light",
       "dark": "Dark",
+      "system": "System"
+    },
+    "motion": "Animations",
+    "motionHint": "Disable UI transitions and motion loops for deterministic UI testing or reduced motion.",
+    "motionOption": {
+      "off": "Off",
+      "on": "On",
       "system": "System"
     },
     "scale": "Interface size",

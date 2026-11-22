@@ -25,13 +25,21 @@
     "zoomOut": "Zoom Out",
     "fullScreen": "Toggle Full Screen",
     "window": "Window",
+    "newChat": "New Chat",
     "close": "Close Window",
     "closeTab": "Close Tab"
+  },
+  "workspace": {
+    "newChat": "New Chat",
+    "newTerminal": "New Terminal",
+    "newChatWith": "New {runtime} chat",
+    "chooseRuntime": "Choose chat runtime"
   },
   "terminal": {
     "noProject": "Open a project to start a terminal.",
     "missingFolder": "This working directory no longer exists. The terminal could not open here.",
-    "dismiss": "OK"
+    "dismiss": "OK",
+    "agentTurnDone": "{agent} finished its turn"
   },
   "files": {
     "missingInWorktree": "This file is unavailable in the issue worktree: {path}"

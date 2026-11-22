@@ -7,6 +7,7 @@ import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
 import { Banner } from "../../design/layout";
+import { motionClass } from "../../design/motion";
 import { Bubble } from "../../design/Tip";
 import { mix } from "../../design/tone";
 import { api, reasonOf } from "../../infra/api";
@@ -89,10 +90,10 @@ function ApprovalRow(props: { item: OrchestratorApproval; first: boolean; busy: 
           role="button"
           accessibilityState={{ expanded: expanded() }}
           onPress={() => expanded.set(!expanded())}
-          class="group -ml-1 h-6 flex-row items-center gap-1 self-start rounded-sm px-1 transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+          class="group -ml-1 h-6 flex-row items-center gap-1 self-start rounded-sm px-1 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
         >
           <View
-            class="size-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+            class={`size-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
             style={{ transform: [{ rotate: expanded() ? "90deg" : "0deg" }] }}
           >
             <Icon name="expand" size={10} tone="faint" />

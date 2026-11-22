@@ -8,6 +8,7 @@ import { createAct } from "../../../design/act";
 import { OrchestratorFace } from "../../../design/domain/Face";
 import { Icon } from "../../../design/Icon";
 import { ActiveBar, Kbd, SidebarSection } from "../../../design/layout";
+import { motionClass } from "../../../design/motion";
 import { TextLink } from "../../../design/TextLink";
 import { Bubble } from "../../../design/Tip";
 import { useAgent } from "../../../infra/agents";
@@ -55,7 +56,7 @@ export function BarButton(props: {
       tooltip={<Bubble text={props.label} />}
       disabled={props.disabled}
       onPress={() => props.onPress()}
-      class={`${box()} shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-hover ${
+      class={`${box()} shrink-0 items-center justify-center rounded-md hover:bg-hover ${
         props.pressed === true ? "bg-selected" : ""
       } ${props.disabled === true ? "opacity-50" : "active:translate-y-px"}`}
     >
@@ -91,8 +92,8 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
   const row = (c: Channel) => <ChannelRow channel={c} here={c.id === props.channel?.id} unread={unreadOf(c)} onClick={() => go(c)} reorder={reorder} />;
   return (
     <View accessibilityLabel={t("web.channel.side")} testID="channels-side" class="w-full flex-1 border-r border-line bg-side">
-      <View class="h-16.5 shrink-0 flex-row items-center gap-2 border-b border-line px-4">
-        <Text role="header" class="min-w-0 flex-1 truncate text-xl font-semibold text-ink">
+      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line px-3.5">
+        <Text role="header" class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
           {t("web.channel.tab.chat")}
         </Text>
         <If when={totalUnread() > 0}>
@@ -100,14 +101,13 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
             <Count n={totalUnread()} />
           </View>
         </If>
-        <BarButton icon="search" size={16} testid="farm-search-open" label={t("web.channel.farmSearch.open")} onPress={() => props.onSearch()} />
       </View>
       <Scroll class="flex-1" contentClass="px-3 py-3">
         <View
           role="button"
           testID="switcher-open"
           onPress={() => switcher.show()}
-          class="mb-3 h-8 w-full flex-row items-center gap-2 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+          class={`mb-3 h-8 w-full flex-row items-center gap-2 rounded-md border border-line bg-page px-2.5 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
         >
           <Icon name="search" size={14} tone="faint" />
           <Text class="min-w-0 flex-1 truncate text-sm text-muted">{t("web.channel.switcher.open")}</Text>
@@ -150,7 +150,7 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
                   testID="new-direct"
                   accessibilityLabel={t("web.channel.direct.add")}
                   tooltip={<Bubble text={t("web.channel.direct.add")} />}
-                  class={`h-6 w-6 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-hover active:translate-y-px ${
+                  class={`h-6 w-6 shrink-0 items-center justify-center rounded-md ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px ${
                     picking() ? "bg-selected" : ""
                   }`}
                 >
@@ -326,7 +326,7 @@ function ChannelRow(props: { channel: Channel; here: boolean; unread: number; on
       accessibilityLabel={channelName(props.channel)}
       accessibilityState={{ selected: props.here }}
       onPress={() => props.onClick?.()}
-      class={`relative h-7 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${props.here ? "bg-selected" : "hover:bg-hover"} ${
+      class={`relative h-7 flex-row items-center gap-2 rounded-md px-2 focus-visible:outline-2 focus-visible:outline-focus ${props.here ? "bg-selected" : "hover:bg-hover"} ${
         props.reorder.dragged() === props.channel.id ? "opacity-40" : ""
       }`}
     >
@@ -373,7 +373,7 @@ function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channe
         if (current) props.onShow(current);
       }}
       tooltip={<Bubble text={`${props.h.name} · ${phase()}`} />}
-      class={`relative h-8 flex-row items-center gap-2 overflow-hidden rounded-md px-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${props.active ? "bg-selected" : "hover:bg-hover"}`}
+      class={`relative h-8 flex-row items-center gap-2 overflow-hidden rounded-md px-2 focus-visible:outline-2 focus-visible:outline-focus ${props.active ? "bg-selected" : "hover:bg-hover"}`}
     >
       <If when={props.active}>
         <ActiveBar />
@@ -428,7 +428,7 @@ function OrchestratorLine(props: { agent: string }) {
         testID="channel-orchestrator-runs"
         accessibilityLabel={t("web.channel.orchestratorRuns")}
         tooltip={<Bubble text={t("web.channel.orchestratorRuns")} />}
-        class="group min-w-0 flex-1 flex-row items-center gap-2.5 rounded-md px-1.5 py-1 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+        class={`group min-w-0 flex-1 flex-row items-center gap-2.5 rounded-md px-1.5 py-1 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
       >
         <View class="relative shrink-0">
           <OrchestratorFace size={32} agent={props.agent} />

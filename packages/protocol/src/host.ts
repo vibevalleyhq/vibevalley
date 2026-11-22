@@ -77,6 +77,10 @@ export const ThemeChoiceValues = ["light", "dark", "system"] as const;
 export type ThemeChoice = (typeof ThemeChoiceValues)[number];
 export const ThemeChoice = z.enum(ThemeChoiceValues) satisfies Codec<ThemeChoice>;
 
+export const MotionChoiceValues = ["off", "on", "system"] as const;
+export type MotionChoice = (typeof MotionChoiceValues)[number];
+export const MotionChoice = z.enum(MotionChoiceValues) satisfies Codec<MotionChoice>;
+
 export interface Host {
   readonly name: "desktop" | "browser";
   readonly notify?: (notice: Notice) => Promise<void>;
@@ -84,6 +88,7 @@ export interface Host {
   readonly locale?: (locale: Locale) => void;
   readonly reveal?: (path: string) => void;
   readonly theme?: (theme: ThemeChoice) => void;
+  readonly motion?: (choice: MotionChoice) => void;
   /** Terminal phases uncover the page. */
   readonly opening?: (opening: Opening) => Promise<void>;
   readonly update?: Updates;

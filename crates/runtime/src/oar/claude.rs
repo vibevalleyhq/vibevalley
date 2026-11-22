@@ -393,6 +393,7 @@ impl Projector {
                             input_tokens,
                             output_tokens: count("output_tokens"),
                             cost_usd,
+                            ..Default::default()
                         },
                     },
                 ));
@@ -935,6 +936,7 @@ impl Runtime for ClaudeRuntime {
             model_selection: true,
             subagents: true,
             usage: true,
+            config_options: false,
         }
     }
 

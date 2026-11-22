@@ -142,7 +142,7 @@ export function DashboardView(props: StoreViewerProps) {
 
   return (
     <View testID="dashboard-view" class="min-h-0 min-w-0 flex-1">
-      <View class="min-h-11 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-page px-3 py-2">
+      <View class="min-h-9 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-page px-3 py-0.5">
         <If when={marks().length > 0}>
           <View
             testID="dashboard-provenance-badge"
@@ -224,7 +224,7 @@ export function DashboardView(props: StoreViewerProps) {
                             setSelectedDataset(ds());
                             setDrawer({ tag: "browse" });
                           }}
-                          class={`h-7 justify-center rounded-md px-2.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                          class={`h-7 justify-center rounded-md px-2.5 focus-visible:outline-2 focus-visible:outline-focus ${
                             active() ? "bg-selected" : "hover:bg-hover"
                           }`}
                         >
@@ -287,7 +287,7 @@ export function DashboardView(props: StoreViewerProps) {
                               </View>
                               <Each of={activeRows().slice(0, 30)}>
                                 {(row) => (
-                                  <View class="min-h-8 flex-row items-center border-t border-line bg-page transition duration-120 ease-out hover:bg-hover">
+                                  <View class="min-h-8 flex-row items-center border-t border-line bg-page hover:bg-hover">
                                     <Each of={activeCols()}>
                                       {(col) => (
                                         <View class="w-28 shrink-0 px-2.5 py-1.5">

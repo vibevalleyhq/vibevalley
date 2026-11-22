@@ -78,6 +78,20 @@ pub fn load_all(store: &dyn Persistence) -> crate::store::Result<Vec<LoadedProje
     projects.into_iter().map(|info| load_existing(store, info)).collect()
 }
 
+/// Blocking. Drops stored projects whose directory no longer exists on disk
+/// (such as removed git worktrees) and deletes their stale rows from the store.
+pub fn prune_missing_projects(store: &dyn Persistence, projects: Vec<LoadedProject>) -> Vec<LoadedProject> {
+    let mut kept = Vec::with_capacity(projects.len());
+    for project in projects {
+        if project.info.path.is_dir() {
+            kept.push(project);
+        } else {
+            let _ = store.remove_project(project.info.id);
+        }
+    }
+    kept
+}
+
 fn load_existing(store: &dyn Persistence, info: Project) -> crate::store::Result<LoadedProject> {
     let layout = store.layout(info.id)?;
     let terminals = store.terminals(info.id)?;
@@ -601,5 +615,30 @@ mod tests {
         };
         assert!(restore_command(&empty, &dir, "/bin/zsh").unwrap().is_none());
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn regression_prune_missing_projects_removes_deleted_directories_from_store() {
+        let store = MemStore::default();
+        let live_dir = std::env::temp_dir().join(format!("vibevalley-ws-live-{}", new_id()));
+        std::fs::create_dir_all(&live_dir).unwrap();
+        let gone_dir = std::env::temp_dir().join(format!("vibevalley-ws-gone-{}", new_id()));
+        let _ = std::fs::remove_dir_all(&gone_dir);
+
+        load_project(&store, &live_dir).unwrap();
+        load_project(&store, &gone_dir).unwrap();
+
+        let loaded = load_all(&store).unwrap();
+        assert_eq!(loaded.len(), 2);
+
+        let kept = prune_missing_projects(&store, loaded);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].info.path, live_dir);
+
+        let stored = store.projects().unwrap();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].path, live_dir);
+
+        let _ = std::fs::remove_dir_all(live_dir);
     }
 }

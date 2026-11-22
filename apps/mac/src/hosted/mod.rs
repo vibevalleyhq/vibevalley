@@ -45,10 +45,12 @@ impl BridgeHub {
                 match vibevalley_server::start(crate::serving::config(&home, crate::serving::work_root())) {
                     Ok(started) => {
                         let hub: std::sync::Arc<dyn vibevalley_server::transport::bridge::Server> = started.hub.clone();
-                        let port: u16 = std::env::var("VIBEVALLEY_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(0);
-                        let addr = format!("127.0.0.1:{port}").parse().expect("an address");
+                        let preference = port_preference_from(std::env::var("VIBEVALLEY_PORT").ok().as_deref(), vibevalley_protocol::home::default_port());
                         // The loopback API: the CLI finds it through server.json, the helpers' MCP door is on it.
-                        let (listener, announced) = match vibevalley_server::transport::http::serve(started.hub.clone(), addr) {
+                        let (listener, announced) = match preference.and_then(|pref| {
+                            bind_preferred_or_ephemeral(pref, |addr| vibevalley_server::transport::http::serve(started.hub.clone(), addr))
+                                .map_err(|e| format!("vibevalley http: {e}"))
+                        }) {
                             Ok(listener) => {
                                 started.board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));
                                 match vibevalley_server::home::announce(&home, &listener.url()) {
@@ -63,7 +65,7 @@ impl BridgeHub {
                                 }
                             }
                             Err(e) => {
-                                let _ = ready.send_replace(Some(Err(format!("vibevalley http: {e}"))));
+                                let _ = ready.send_replace(Some(Err(e)));
                                 (None, None)
                             }
                         };
@@ -110,7 +112,7 @@ impl Replier {
     }
 }
 
-/// The farm's home: `VIBEVALLEY_HOME`, else `~/.vibevalley` (packages/home).
+/// The farm's home: `VIBEVALLEY_HOME`, else `$HOME/<current_channel().home_dir_name()>`.
 pub fn server_home() -> std::path::PathBuf {
     vibevalley_server::home::home()
 }
@@ -140,64 +142,123 @@ fn capabilities_from(raw: &str) -> String {
 
 #[cfg(not(debug_assertions))]
 const BUNDLE_JS: &str = include_str!(concat!(env!("OUT_DIR"), "/ui/bundle.js"));
+#[cfg(not(debug_assertions))]
+const BUNDLE_NSHC: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/ui/bundle.nshc"));
 #[cfg(debug_assertions)]
 const BUNDLE_JS: &str = "throw new Error('VibeValley UI bundle missing on disk: run vp run mac:check.');\n";
+#[cfg(debug_assertions)]
+const BUNDLE_NSHC: &[u8] = &[];
 const CAPABILITIES: &str = include_str!(concat!(env!("OUT_DIR"), "/ui/capabilities.json"));
 
-fn dev_ui_build_dir() -> Option<std::path::PathBuf> {
-    if let Some(dir) = std::env::var_os("VIBEVALLEY_UI_BUNDLE") {
-        return Some(std::path::PathBuf::from(dir));
+#[cfg(not(debug_assertions))]
+const SHELL_BUNDLE_JS: &str = include_str!(concat!(env!("OUT_DIR"), "/ui-shell/bundle.js"));
+#[cfg(not(debug_assertions))]
+const SHELL_BUNDLE_NSHC: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/ui-shell/bundle.nshc"));
+#[cfg(debug_assertions)]
+const SHELL_BUNDLE_JS: &str = "throw new Error('VibeValley shell UI bundle missing on disk: run vp run mac:check.');\n";
+#[cfg(debug_assertions)]
+const SHELL_BUNDLE_NSHC: &[u8] = &[];
+const SHELL_CAPABILITIES: &str = include_str!(concat!(env!("OUT_DIR"), "/ui-shell/capabilities.json"));
+
+fn is_workbench_view(view: &str) -> bool {
+    matches!(view, "vv" | "vibevalley" | "farm-form" | "farm-phone")
+}
+
+fn dir_has_bundle(dir: &std::path::Path) -> bool {
+    dir.join("bundle.nshc").is_file() || dir.join("bundle.js").is_file()
+}
+
+fn resolve_bundle_dir_from(override_dir: Option<&std::path::Path>, ui_root: &std::path::Path, workbench: bool) -> Option<std::path::PathBuf> {
+    if let Some(dir) = override_dir {
+        if !workbench {
+            let nested = dir.join("build-shell");
+            if dir_has_bundle(&nested) {
+                return Some(nested);
+            }
+            if dir.file_name().is_some_and(|n| n == "build") {
+                let sibling = dir.with_file_name("build-shell");
+                if dir_has_bundle(&sibling) {
+                    return Some(sibling);
+                }
+            }
+        }
+        return Some(dir.to_path_buf());
     }
     if cfg!(debug_assertions) {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/build");
-        if dir.join("bundle.js").is_file() {
-            return Some(dir);
+        if !workbench {
+            let shell = ui_root.join("build-shell");
+            if dir_has_bundle(&shell) {
+                return Some(shell);
+            }
+        }
+        let full = ui_root.join("build");
+        if dir_has_bundle(&full) {
+            return Some(full);
         }
     }
     None
 }
 
-/// The bundle every hosted view runs: `VIBEVALLEY_UI_BUNDLE` (or `ui/build` in
-/// debug builds) when present on disk, else the one embedded at build time.
-/// Cached process-wide so multiple hosted views share one disk read, and prefers
-/// the precompiled `bundle.nshc` bytecode when present to skip parsing 4+ MB JS.
-fn bundle() -> Bundle {
-    static CACHED: std::sync::OnceLock<Bundle> = std::sync::OnceLock::new();
-    CACHED
-        .get_or_init(|| {
-            if let Some(dir) = dev_ui_build_dir() {
-                let raw_caps = std::fs::read_to_string(dir.join("capabilities.json")).unwrap_or_else(|_| CAPABILITIES.to_string());
-                let nshc = dir.join("bundle.nshc");
-                if nshc.is_file()
-                    && let Ok(bytes) = std::fs::read(&nshc)
+fn build_embedded_bundle(bytecode: &[u8], js: &str, caps_json: &str) -> Bundle {
+    if !bytecode.is_empty() {
+        // SAFETY: bytecode emitted by `nsh build` in `build.rs` during this build.
+        let b = unsafe { Bundle::bytecode(bytecode.to_vec()) };
+        if let Ok(b) = b.with_app_id(Some("dev.vibevalley.ui")).with_capabilities_json(Some(caps_json)) {
+            return b;
+        }
+    }
+    Bundle::source(js.to_string())
+        .with_app_id(Some("dev.vibevalley.ui"))
+        .with_capabilities_json(Some(caps_json))
+        .expect("capabilities.json written by nsh build")
+}
+
+fn load_bundle_slot(workbench: bool, bytecode: &[u8], js: &str, fallback_caps: &str) -> Bundle {
+    let override_dir = std::env::var_os("VIBEVALLEY_UI_BUNDLE").map(std::path::PathBuf::from);
+    let ui_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui");
+    if let Some(dir) = resolve_bundle_dir_from(override_dir.as_deref(), &ui_root, workbench) {
+        let raw_caps = std::fs::read_to_string(dir.join("capabilities.json")).unwrap_or_else(|_| fallback_caps.to_string());
+        let caps_json = capabilities_from(&raw_caps);
+        let nshc = dir.join("bundle.nshc");
+        if nshc.is_file()
+            && let Ok(bytes) = std::fs::read(&nshc)
+            && !bytes.is_empty()
+        {
+            // SAFETY: local `nsh build` output under the workspace's own `ui/build*`.
+            let b = unsafe { Bundle::bytecode(bytes) };
+            if let Ok(b) = b.with_app_id(Some("dev.vibevalley.ui")).with_capabilities_json(Some(&caps_json)) {
+                return b;
+            }
+        }
+        match std::fs::read_to_string(dir.join("bundle.js")) {
+            Ok(source) if !source.is_empty() => {
+                if let Ok(b) = Bundle::source(source)
+                    .with_app_id(Some("dev.vibevalley.ui"))
+                    .with_capabilities_json(Some(&caps_json))
                 {
-                    // SAFETY: local `nsh build` output under the workspace's own `ui/build/`.
-                    let b = unsafe { Bundle::bytecode(bytes) };
-                    if let Ok(b) = b
-                        .with_app_id(Some("dev.vibevalley.ui"))
-                        .with_capabilities_json(Some(&capabilities_from(&raw_caps)))
-                    {
-                        return b;
-                    }
-                }
-                match std::fs::read_to_string(dir.join("bundle.js")) {
-                    Ok(js) => {
-                        if let Ok(b) = Bundle::source(js)
-                            .with_app_id(Some("dev.vibevalley.ui"))
-                            .with_capabilities_json(Some(&capabilities_from(&raw_caps)))
-                        {
-                            return b;
-                        }
-                    }
-                    Err(e) => eprintln!("ui bundle at {}: {e}; using the embedded bundle", dir.display()),
+                    return b;
                 }
             }
-            Bundle::source(BUNDLE_JS.to_string())
-                .with_app_id(Some("dev.vibevalley.ui"))
-                .with_capabilities_json(Some(&capabilities_from(CAPABILITIES)))
-                .expect("capabilities.json written by nsh build")
-        })
-        .clone()
+            Ok(_) => {}
+            Err(e) => eprintln!("ui bundle at {}: {e}; using the embedded bundle", dir.display()),
+        }
+    }
+    let caps_json = capabilities_from(fallback_caps);
+    build_embedded_bundle(bytecode, js, &caps_json)
+}
+
+/// Full workbench bundle for `"vv"`/`"vibevalley"`, lightweight shell bundle for
+/// all other hosted surfaces, cached process-wide so views share one load.
+fn bundle_for(view: &str) -> Bundle {
+    if is_workbench_view(view) {
+        static WORKBENCH: std::sync::OnceLock<Bundle> = std::sync::OnceLock::new();
+        WORKBENCH.get_or_init(|| load_bundle_slot(true, BUNDLE_NSHC, BUNDLE_JS, CAPABILITIES)).clone()
+    } else {
+        static SHELL: std::sync::OnceLock<Bundle> = std::sync::OnceLock::new();
+        SHELL
+            .get_or_init(|| load_bundle_slot(false, SHELL_BUNDLE_NSHC, SHELL_BUNDLE_JS, SHELL_CAPABILITIES))
+            .clone()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -242,6 +303,7 @@ impl HostedView {
         let hub = cx.try_global::<BridgeHub>().map(|h| h.0.clone());
         let mut client = None;
         let ui_font_size = cx.try_global::<crate::theme::Ui>().map(|ui| ui.settings.ui_font_size).unwrap_or(13.0);
+        let motion = cx.try_global::<crate::theme::Ui>().map(|ui| ui.settings.effective_motion()).unwrap_or_default();
         let app = cx.new(|cx| {
             let app = AppView::new(options, window, cx);
             app.set_appearance(if dark { Appearance::Dark } else { Appearance::Light }, cx);
@@ -253,6 +315,7 @@ impl HostedView {
             let mut params = params;
             params.insert("view".into(), json!(name));
             params.entry("locale").or_insert_with(|| json!(vibevalley_i18n::locale()));
+            params.entry("motion").or_insert_with(|| json!(motion.as_str()));
             params.entry("randomSeed").or_insert_with(|| json!(crate::host::random_seed_hex()));
             let pixel_dir = crate::pixel::assets_dir().join("pixel");
             let has_pixel_dir = pixel_dir.join("sprites.json").is_file();
@@ -303,7 +366,7 @@ impl HostedView {
                 eprintln!("hosted view {label}: {message}");
                 let _ = err_tx.send(message.to_string());
             });
-            load(&app, cx);
+            load(&app, &name, cx);
             app
         });
         cx.spawn(async move |this, cx| {
@@ -356,6 +419,10 @@ impl HostedView {
         }
     }
 
+    pub fn is_ready(&self) -> bool {
+        self.ready
+    }
+
     /// Sends `data` as the frame of `topic` unless the view already has it.
     pub fn push(&mut self, topic: &str, data: Value, cx: &App) {
         if let Some((name, envelope)) = self.outbox.envelope(topic, data) {
@@ -378,6 +445,10 @@ impl HostedView {
 
     pub fn set_locale(&self, locale: &str, cx: &App) {
         let _ = self.app.read(cx).host().send("locale", json!(locale));
+    }
+
+    pub fn set_motion(&self, motion: crate::theme::MotionChoice, cx: &App) {
+        let _ = self.app.read(cx).host().send("motion", json!(motion.as_str()));
     }
 
     pub fn set_ui_font_size(&self, size: f32, cx: &mut App) {
@@ -424,14 +495,14 @@ fn route_to_bridge(bridge: &vibevalley_server::transport::bridge::Client, v: &Va
     true
 }
 
-fn load(app: &AppView, cx: &mut Context<AppView>) {
+fn load(app: &AppView, view: &str, cx: &mut Context<AppView>) {
     #[cfg(feature = "nsh-dev")]
     if let Ok(url) = std::env::var("VIBEVALLEY_UI_DEV") {
         app.connect_dev_server(url, cx);
         return;
     }
     let _ = cx;
-    app.load(NshApp::Js(bundle()));
+    app.load(NshApp::Js(bundle_for(view)));
 }
 
 impl EventEmitter<HostedEvent> for HostedView {}
@@ -455,5 +526,114 @@ impl Render for HostedView {
                 let _ = this.app.read(cx).host().send("farm-key-up", json!(key));
             }
         }))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PortPreference {
+    Explicit(u16),
+    ChannelDefault(u16),
+}
+
+fn port_preference_from(raw_port: Option<&str>, channel_default: u16) -> Result<PortPreference, String> {
+    match raw_port.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(raw) => raw
+            .parse::<u16>()
+            .map(PortPreference::Explicit)
+            .map_err(|e| format!("invalid VIBEVALLEY_PORT {raw:?}: {e}")),
+        None => Ok(PortPreference::ChannelDefault(channel_default)),
+    }
+}
+
+fn bind_preferred_or_ephemeral<T, F>(preference: PortPreference, mut bind: F) -> std::io::Result<T>
+where
+    F: FnMut(std::net::SocketAddr) -> std::io::Result<T>,
+{
+    let loopback = |port: u16| std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    match preference {
+        PortPreference::Explicit(port) => bind(loopback(port)),
+        PortPreference::ChannelDefault(port) => match bind(loopback(port)) {
+            Ok(bound) => Ok(bound),
+            Err(err) if err.kind() == std::io::ErrorKind::AddrInUse && port != 0 => {
+                eprintln!("vibevalley http: 127.0.0.1:{port} is already in use; falling back to an ephemeral port");
+                bind(loopback(0))
+            }
+            Err(err) => Err(err),
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::ErrorKind;
+    use std::net::TcpListener;
+
+    use super::*;
+
+    #[test]
+    fn port_preference_parses_explicit_and_channel_defaults() {
+        assert_eq!(port_preference_from(None, 8789), Ok(PortPreference::ChannelDefault(8789)));
+        assert_eq!(port_preference_from(Some("  "), 8790), Ok(PortPreference::ChannelDefault(8790)));
+        assert_eq!(port_preference_from(Some("0"), 8789), Ok(PortPreference::Explicit(0)));
+        assert_eq!(port_preference_from(Some("9123"), 8789), Ok(PortPreference::Explicit(9123)));
+        assert!(port_preference_from(Some("bogus"), 8789).is_err());
+    }
+
+    #[test]
+    fn channel_default_port_falls_back_to_ephemeral_on_addr_in_use() {
+        let occupied = TcpListener::bind("127.0.0.1:0").expect("occupy loopback port");
+        let busy_port = occupied.local_addr().unwrap().port();
+
+        let fallback = bind_preferred_or_ephemeral(PortPreference::ChannelDefault(busy_port), TcpListener::bind)
+            .expect("channel default should fall back to ephemeral port");
+        let bound_port = fallback.local_addr().unwrap().port();
+        assert_ne!(bound_port, 0);
+        assert_ne!(bound_port, busy_port);
+
+        let explicit_err = bind_preferred_or_ephemeral(PortPreference::Explicit(busy_port), TcpListener::bind)
+            .expect_err("explicit VIBEVALLEY_PORT must not silently fall back on AddrInUse");
+        assert_eq!(explicit_err.kind(), ErrorKind::AddrInUse);
+    }
+
+    #[test]
+    fn is_workbench_view_routes_workbench_and_farm_views() {
+        for view in ["vv", "vibevalley", "farm-form", "farm-phone"] {
+            assert!(is_workbench_view(view), "{view} should use the full workbench bundle");
+        }
+        for view in ["sidebar", "palette", "markdown", "workspace-chat", "probe"] {
+            assert!(!is_workbench_view(view), "{view} should use the lightweight shell bundle");
+        }
+    }
+
+    #[test]
+    fn resolve_bundle_dir_prefers_build_shell_and_falls_back_gracefully() {
+        let tmp = std::env::temp_dir().join(format!("vv-bundle-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let build = tmp.join("build");
+        let build_shell = tmp.join("build-shell");
+        std::fs::create_dir_all(&build).unwrap();
+        std::fs::write(build.join("bundle.js"), "/* full */").unwrap();
+
+        assert_eq!(resolve_bundle_dir_from(Some(&build), &tmp, true), Some(build.clone()));
+        assert_eq!(resolve_bundle_dir_from(Some(&build), &tmp, false), Some(build.clone()));
+
+        std::fs::create_dir_all(&build_shell).unwrap();
+        std::fs::write(build_shell.join("bundle.nshc"), [1u8, 2, 3]).unwrap();
+        assert_eq!(resolve_bundle_dir_from(Some(&build), &tmp, false), Some(build_shell.clone()));
+        assert_eq!(resolve_bundle_dir_from(Some(&build), &tmp, true), Some(build.clone()));
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn embedded_bundle_falls_back_to_source_when_bytecode_is_empty() {
+        let caps = capabilities_from(r#"{"host":["action"]}"#);
+        let _bundle = build_embedded_bundle(&[], "export default function() {}", &caps);
+    }
+
+    #[test]
+    fn embedded_bundle_accepts_non_empty_bytecode_with_empty_source() {
+        let caps = capabilities_from(r#"{"host":["action"]}"#);
+        let _bundle = build_embedded_bundle(&[1u8, 2, 3, 4], "", &caps);
     }
 }

@@ -5,6 +5,7 @@
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use gpui::{
     AnyElement, AppContext as _, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable, FontWeight, HighlightStyle, Hsla, InteractiveElement as _,
@@ -44,6 +45,8 @@ pub struct FileViewer {
     scroll: UniformListScrollHandle,
     pending_line: Option<u32>,
     reloads: u64,
+    load_gen: u64,
+    show_skeleton: bool,
 }
 
 fn matches_scope(scope: &str, prefix: &str) -> bool {
@@ -174,6 +177,8 @@ impl FileViewer {
             scroll: UniformListScrollHandle::new(),
             pending_line: None,
             reloads: 0,
+            load_gen: 0,
+            show_skeleton: false,
         };
         viewer.reload(cx);
         viewer
@@ -201,6 +206,21 @@ impl FileViewer {
     }
 
     pub fn reload(&mut self, cx: &mut Context<Self>) {
+        self.load_gen = self.load_gen.wrapping_add(1);
+        let generation = self.load_gen;
+        if matches!(self.state, State::Loading) {
+            self.show_skeleton = false;
+            cx.spawn(async move |this, cx| {
+                cx.background_executor().timer(Duration::from_millis(150)).await;
+                let _ = this.update(cx, |v, cx| {
+                    if v.load_gen == generation && matches!(v.state, State::Loading) {
+                        v.show_skeleton = true;
+                        cx.notify();
+                    }
+                });
+            })
+            .detach();
+        }
         let path = self.path.clone();
         let task = cx.background_spawn(async move {
             match vibevalley_files::load_file(&path, MAX_BYTES) {
@@ -220,7 +240,11 @@ impl FileViewer {
         cx.spawn(async move |this, cx| {
             let state = task.await;
             let _ = this.update(cx, |v, cx| {
+                if v.load_gen != generation {
+                    return;
+                }
                 v.state = state;
+                v.show_skeleton = false;
                 v.reloads += 1;
                 if let Some(line) = v.pending_line.take() {
                     v.scroll_to_line(line, cx);
@@ -331,6 +355,60 @@ fn action_button(id: &'static str, label: &'static str, tone: ButtonTone, colors
             .text_color(colors.accent)
             .hover(move |s| s.bg(hover)),
     }
+}
+
+fn file_skeleton(line_height: f32, colors: &Palette) -> AnyElement {
+    const ROWS: &[(f32, f32)] = &[
+        (0.0, 220.0),
+        (0.0, 310.0),
+        (16.0, 260.0),
+        (16.0, 190.0),
+        (32.0, 340.0),
+        (32.0, 240.0),
+        (16.0, 150.0),
+        (0.0, 90.0),
+        (0.0, 280.0),
+        (16.0, 320.0),
+        (16.0, 210.0),
+        (0.0, 130.0),
+    ];
+    let mut rows = div().size_full().flex().flex_col().py(px(8.0));
+    for (i, &(indent, width)) in ROWS.iter().enumerate() {
+        let bar_bg = if i % 3 == 0 { colors.hover } else { colors.surface };
+        rows = rows.child(
+            div()
+                .h(px(line_height))
+                .w_full()
+                .flex()
+                .flex_row()
+                .items_center()
+                .child(
+                    div()
+                        .w(px(52.0))
+                        .h_full()
+                        .flex_none()
+                        .pr(px(12.0))
+                        .flex()
+                        .items_center()
+                        .justify_end()
+                        .bg(colors.surface)
+                        .border_r_1()
+                        .border_color(colors.border)
+                        .child(div().w(px(18.0)).h(px(8.0)).rounded(px(4.0)).bg(colors.hover)),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .h_full()
+                        .pl(px(14.0 + indent))
+                        .flex()
+                        .items_center()
+                        .child(div().w(px(width)).max_w_full().h(px(10.0)).rounded(px(4.0)).bg(bar_bg)),
+                ),
+        );
+    }
+    rows.into_any_element()
 }
 
 fn state_card(title: &'static str, detail: String, hint: Option<&'static str>, danger: bool, colors: &Palette) -> AnyElement {
@@ -474,15 +552,8 @@ impl Render for FileViewer {
                     ),
             );
         let body = match &self.state {
-            State::Loading => div()
-                .size_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .text_color(colors.muted)
-                .text_size(px(12.5))
-                .child("Loading file…")
-                .into_any_element(),
+            State::Loading if self.show_skeleton => file_skeleton(line_height, &colors),
+            State::Loading => div().size_full().into_any_element(),
             State::Error(e) => state_card("Could not open file", e.clone(), None, true, &colors),
             State::Binary(size) => state_card(
                 "Binary file",

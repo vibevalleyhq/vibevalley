@@ -56,7 +56,7 @@ export function Segmented<T extends string>(props: {
               disabled={o().disabled}
               onPress={() => props.onChange(o().value)}
               class={[
-                "group h-6 flex-row items-center justify-center gap-1.5 rounded-sm border px-2.5 transition duration-120 ease-out",
+                "group h-6 flex-row items-center justify-center gap-1.5 rounded-sm border px-2.5",
                 props.block === true ? "min-w-0 flex-1" : "",
                 on() ? "border-line bg-elevated shadow-raise" : disabled() ? "border-transparent" : "border-transparent hover:bg-hover",
                 disabled() ? "opacity-50" : "focus-visible:outline-2 focus-visible:outline-focus",

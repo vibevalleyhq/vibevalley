@@ -1,5 +1,4 @@
 {
-  "title": "Library",
   "upload": "Upload",
   "uploading": "Uploading…",
   "make": "Generate",
@@ -8,21 +7,6 @@
   "emptyHow": "Generate an image or speech, upload or drop in a file, or ask a helper in the chat to put what it found here.",
   "nothingShown": "Nothing matches these filters.",
   "drop": "Let go to put it in the library",
-  "rail": {
-    "where": "From",
-    "kind": "Kind",
-    "artifacts": "Deliverables",
-    "channels": "From channels",
-    "agents": "From helpers",
-    "anyWhere": "Any origin",
-    "anyKind": "Any kind"
-  },
-  "origin": {
-    "all": "All",
-    "generated": "Generated",
-    "uploaded": "Uploaded",
-    "fetched": "Brought back"
-  },
   "kind": {
     "all": "All",
     "image": "Images",
@@ -30,16 +14,6 @@
     "video": "Video",
     "other": "Other"
   },
-  "artifactKind": {
-    "all": "All deliverables",
-    "canvas": "Visual",
-    "slides": "Slides",
-    "dashboard": "Dashboard",
-    "whiteboard": "Whiteboard",
-    "page": "Pages & docs"
-  },
-  "newArtifact": "New deliverable",
-  "search": "Search names",
   "sortLabel": "Sort",
   "sort": {
     "recent": "Recent",
@@ -71,14 +45,11 @@
     "from": "From",
     "added": "Added",
     "openChannel": "See it in {channel}",
-    "openWorkbench": "Open in workbench",
     "versionBadge": "v{version}",
-    "byMaker": "By {name}",
     "selected": "{n} selected",
     "clear": "Clear selection",
     "more": "More"
   },
-  "download": "Download",
   "sendTo": "Send to a channel",
   "sentTo": "Sent to {channel}",
   "remove": "Remove from library",
@@ -93,5 +64,188 @@
     "image": "Image",
     "speech": "Speech",
     "audio": "Audio workbench"
+  },
+  "content": {
+    "title": "Content",
+    "new": "New",
+    "searchAll": "Search all content…",
+    "sidebarToggle": "Toggle content sidebar",
+    "recent": "All recent",
+    "pinned": "Pinned",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "pinnedToast": "Pinned",
+    "unpinnedToast": "Unpinned",
+    "notes": "Outline notes",
+    "newNote": "New outline note",
+    "artifacts": "Artifacts",
+    "media": "Media",
+    "notesTodoCount": "{n, plural, one {# todo} other {# todos}}",
+    "sendArtifact": "Send to channel",
+    "exportArtifact": "Export",
+    "turnIntoIssue": "Turn into ticket",
+    "issueCreated": "Ticket created",
+    "back": "Back",
+    "source": {
+      "all": "All sources",
+      "agent": "From helpers",
+      "user": "Created by me"
+    },
+    "artifactType": {
+      "all": "All artifacts",
+      "outline": "Outline notes",
+      "whiteboard": "Whiteboard",
+      "docs": "Docs",
+      "slides": "Slides",
+      "dashboard": "Dashboard",
+      "design": "Design",
+      "designSystem": "Design system",
+      "motion": "Motion",
+      "html": "Web page"
+    },
+    "inspector": {
+      "openExternal": "Open externally",
+      "saveAs": "Save as",
+      "copyPath": "Copy path",
+      "copiedPath": "Path copied",
+      "reveal": "Reveal in Finder",
+      "stopAudio": "Stop audio"
+    },
+    "templates": {
+      "title": "New content",
+      "search": "Search templates…",
+      "empty": "No matching templates",
+      "cat": {
+        "recommended": "Recommended",
+        "note": "Outline notes",
+        "whiteboard": "Whiteboards",
+        "deliverable": "Deliverables",
+        "ai": "AI media"
+      },
+      "items": {
+        "noteBlank": {
+          "name": "Blank outline note",
+          "desc": "Single-column outline with nesting, todos, and wikilinks"
+        },
+        "noteTech": {
+          "name": "Tech spec outline",
+          "desc": "Context, goals, architecture, and implementation checklist"
+        },
+        "noteMeeting": {
+          "name": "Meeting notes",
+          "desc": "Key discussion points, decisions, and follow-up todos"
+        },
+        "noteDaily": {
+          "name": "Daily log",
+          "desc": "Today's focus, blockers, and handoff summary"
+        },
+        "wbBlank": {
+          "name": "Blank whiteboard",
+          "desc": "Infinite canvas with dot grid and native connectors"
+        },
+        "wbArch": {
+          "name": "System architecture",
+          "desc": "Layered service nodes with directional data-flow arrows"
+        },
+        "wbTimeline": {
+          "name": "Launch timeline",
+          "desc": "Milestone cards and delivery stages"
+        },
+        "wbJourney": {
+          "name": "User journey",
+          "desc": "Touchpoints, friction points, and improvement opportunities"
+        },
+        "wbWorkshop": {
+          "name": "Kickoff workshop",
+          "desc": "Goal framing, brainstorming stickies, and convergence"
+        },
+        "artDocs": {
+          "name": "Collaborative doc",
+          "desc": "Long-form specs, review reports, and technical guides"
+        },
+        "artSlides": {
+          "name": "Slide deck",
+          "desc": "Widescreen multi-slide deck with speaker notes"
+        },
+        "artDashboard": {
+          "name": "Data dashboard",
+          "desc": "KPI cards, trend charts, and verified tables"
+        },
+        "artDesign": {
+          "name": "Design canvas",
+          "desc": "Multi-artboard UI explorations with live prop controls"
+        },
+        "artDesignSystem": {
+          "name": "Design system",
+          "desc": "Color tokens, typography scale, and contrast checks"
+        },
+        "artMotion": {
+          "name": "Motion clip",
+          "desc": "Interactive animated canvas with video export"
+        },
+        "artHtml": {
+          "name": "Web page",
+          "desc": "Standalone interactive HTML page with version history"
+        },
+        "aiImage": {
+          "name": "AI image",
+          "desc": "Generate concept art, icons, or illustrations from text"
+        },
+        "aiSpeech": {
+          "name": "AI speech",
+          "desc": "Synthesize natural voiceover audio from text"
+        },
+        "aiAudio": {
+          "name": "Audio studio",
+          "desc": "Multi-speaker dialogue, voice design, cloning, and transcription"
+        }
+      },
+      "seed": {
+        "noteTech": "## Context & Goals\n- Core problem statement and expected impact\n## Core Design\n- Module boundaries and data flow\n## Implementation Checklist\n- [ ] Break down steps and add verification checks",
+        "noteMeeting": "## Discussion Focus\n- Key agenda topics for this session\n## Key Decisions\n- Record agreed conclusions and trade-offs\n## Follow-ups\n- [ ] Track confirmed action items",
+        "noteDaily": "## Today's Focus\n- [ ] List today's top priorities\n## Blockers & Risks\n- Note items awaiting collaboration\n## Handoff Summary\n- Outcomes shipped and next steps",
+        "wbBlankTitle": "Central Topic",
+        "wbBlankBody": "Add cards, stickies, and arrows from the toolbar",
+        "wbArchN1Title": "Client / UI",
+        "wbArchN1Body": "Boundary decoding and event dispatch",
+        "wbArchN2Title": "Core Engine",
+        "wbArchN2Body": "Pure state folding and domain rules",
+        "wbArchN3Title": "SQLite / Git",
+        "wbArchN3Body": "Durable writes and workspace sync",
+        "wbArchE1": "request",
+        "wbArchE2": "persist",
+        "wbTlP1Title": "Phase 1 · Scope",
+        "wbTlP1Body": "Finalize specs and interactive prototype",
+        "wbTlP2Title": "Phase 2 · Build",
+        "wbTlP2Body": "Ship core flows and integration tests",
+        "wbTlP3Title": "Phase 3 · Launch",
+        "wbTlP3Body": "Visual check across themes and release",
+        "wbJourneyJ1Title": "1. Entry",
+        "wbJourneyJ1Body": "Open unified Content workspace",
+        "wbJourneyJ2Title": "2. Discover",
+        "wbJourneyJ2Body": "Search or browse across notes and media",
+        "wbJourneyJ3Title": "3. Deliver",
+        "wbJourneyJ3Body": "Share to channel or turn into ticket",
+        "wbJourneyS1Title": "Friction note",
+        "wbJourneyS1Body": "Reduce clicks between browsing and editing",
+        "wbJourneyE1": "locate",
+        "wbJourneyE2": "ship",
+        "wbWorkW1Title": "Session Goal",
+        "wbWorkW1Body": "Align on scope, constraints, and priorities",
+        "wbWorkW2Title": "Diverge",
+        "wbWorkW2Body": "Collect high-frequency friction points",
+        "wbWorkW3Title": "Converge",
+        "wbWorkW3Body": "Pick top priorities for first milestone",
+        "wbWorkE1": "explore",
+        "wbWorkE2": "decide"
+      }
+    },
+    "search": {
+      "title": "Search content",
+      "placeholder": "Search notes, artifacts, and media…",
+      "empty": "No matching notes, artifacts, or media",
+      "typeNote": "Note",
+      "typeMedia": "Media"
+    }
   }
 }

@@ -1,17 +1,9 @@
-import type { HtmlAnchor, HtmlShellMessage } from "@vibevalley/protocol";
+import { type ArtifactPresence, type HtmlAnchor, type HtmlShellMessage, userId } from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 /** The workbench theme the page is shown in: the frame cannot read the workbench's own setting. */
 export const ShellThemeValues = ["light", "dark"] as const;
 export type ShellTheme = (typeof ShellThemeValues)[number];
-
-export const themeVariables: Record<ShellTheme, string> = {
-  light:
-    "color-scheme:light;--vv-page:#fcfcfb;--vv-side:#f6f5f3;--vv-ink:#1c1917;--vv-muted:#5e5852;--vv-faint:#716a64;--vv-line:#1c191714;--vv-accent:#4d7a2a;--vv-leaf:#74a046;--vv-wheat:#e5a93c;--vv-berry:#a83a2c;--vv-water:#2f6fa8;",
-  dark: "color-scheme:dark;--vv-page:#151413;--vv-side:#1b1a18;--vv-ink:#ecebe8;--vv-muted:#a9a49e;--vv-faint:#8b867f;--vv-line:#ecebe81a;--vv-accent:#7fae4f;--vv-leaf:#8dbb5c;--vv-wheat:#e5a93c;--vv-berry:#e47d6d;--vv-water:#6aa6dc;",
-};
-export const typeVariables =
-  '--vv-font-sans:"PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;--vv-font-mono:Menlo,ui-monospace,monospace;--vv-radius:8px;';
 
 export const shellMessageOf = (data: unknown): HtmlShellMessage | undefined => {
   const got = S.HtmlShellMessage.safeParse(data);
@@ -26,4 +18,63 @@ export function selectionOf(data: unknown): HtmlAnchor | undefined {
   if (message?.vibevalley !== "selection") return undefined;
   const { anchor } = message;
   return anchor.exact.length > wordsMax || anchor.prefix.length > contextMax || anchor.suffix.length > contextMax ? undefined : anchor;
+}
+
+/** One live collaborator highlight rendered inside a sandboxed HTML/slides/design WebView without relaxing CSP. */
+export interface PresenceHighlightItem {
+  readonly id: string;
+  readonly name: string;
+  readonly color: string;
+  readonly selector?: string;
+  readonly status?: string;
+  readonly x?: number;
+  readonly y?: number;
+  readonly w?: number;
+  readonly h?: number;
+}
+
+/** Matches `crates/core/src/artifact/shell.rs::PresenceHighlightCommand`. */
+export interface PresenceHighlightCommand {
+  readonly vibevalley: "presence-highlight";
+  readonly items: readonly PresenceHighlightItem[];
+}
+
+const presencePalette: Readonly<Record<string, string>> = {
+  coral: "#d9774f",
+  teal: "#2f9d8f",
+  blue: "#4f86d9",
+  water: "#4f86d9",
+  wheat: "#c79a2e",
+  leaf: "#45bf8c",
+  berry: "#d9534f",
+  lavender: "#8a5cc4",
+};
+
+function resolveHighlightColor(raw: string | undefined): string {
+  if (!raw) return "#4f86d9";
+  if (/^#[0-9a-f]{3,8}$/iu.test(raw)) return raw;
+  return presencePalette[raw.toLowerCase()] ?? "#4f86d9";
+}
+
+export function presenceHighlightCommand(peers: readonly ArtifactPresence[], opts?: { readonly path?: string | undefined }): PresenceHighlightCommand {
+  const items: PresenceHighlightItem[] = [];
+  for (const p of peers) {
+    if (p.id === userId) continue;
+    if (opts?.path !== undefined && p.path !== undefined && p.path !== opts.path) continue;
+    const hasSelector = typeof p.selector === "string" && p.selector.length > 0;
+    const hasPoint = typeof p.x === "number" && typeof p.y === "number";
+    if (!hasSelector && !hasPoint) continue;
+    items.push({
+      id: p.id,
+      name: p.name,
+      color: resolveHighlightColor(p.color),
+      ...(hasSelector ? { selector: p.selector } : {}),
+      ...(p.status !== undefined ? { status: p.status } : {}),
+      ...(typeof p.x === "number" ? { x: p.x } : {}),
+      ...(typeof p.y === "number" ? { y: p.y } : {}),
+      ...(typeof p.w === "number" ? { w: p.w } : {}),
+      ...(typeof p.h === "number" ? { h: p.h } : {}),
+    });
+  }
+  return { vibevalley: "presence-highlight", items };
 }

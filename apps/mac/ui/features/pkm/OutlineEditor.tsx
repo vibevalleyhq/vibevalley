@@ -134,7 +134,7 @@ export function Row(props: {
         testID="pkm-bullet"
         // A leaf's bullet folds nothing, and is still what the row is dragged by.
         onPress={() => props.parent && props.onToggle()}
-        class="mt-1 h-4 w-4 shrink-0 items-center justify-center rounded-xs transition duration-120 ease-out hover:bg-hover"
+        class="mt-1 h-4 w-4 shrink-0 items-center justify-center rounded-xs hover:bg-hover"
       >
         <If
           when={props.parent && props.folded}
@@ -163,7 +163,7 @@ export function Row(props: {
             accessibilityLabel={t(`web.pkm.marker.${props.block.marker ?? "TODO"}`)}
             tooltip={<Bubble text={t(`web.pkm.marker.${props.block.marker ?? "TODO"}`)} />}
             onPress={() => props.onMarker(props.block.marker === "DONE" ? "TODO" : "DONE")}
-            class="mt-1 h-4 w-4 shrink-0 items-center justify-center rounded-xs border transition duration-120 ease-out"
+            class="mt-1 h-4 w-4 shrink-0 items-center justify-center rounded-xs border"
             style={{ borderColor: tone(l().border), ...(fillOf(l().fill) ? { backgroundColor: fillOf(l().fill) } : {}) }}
           >
             <If when={l().icon}>{(icon) => <Icon name={icon()} size={10} tone={l().ink} />}</If>
@@ -202,7 +202,7 @@ export function Row(props: {
               void Clipboard.writeText(`((${props.block.id}))`);
               toast(t("web.pkm.page.copiedRef"));
             }}
-            class="h-5 w-5 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-selected"
+            class="h-5 w-5 items-center justify-center rounded-sm hover:bg-selected"
           >
             <Icon name="copy" size={11} tone="muted" />
           </View>
@@ -214,7 +214,7 @@ export function Row(props: {
                 accessibilityLabel={t("web.pkm.page.toIssue")}
                 tooltip={<Bubble text={t("web.pkm.page.toIssue")} />}
                 onPress={() => make()()}
-                class="h-5 w-5 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-selected"
+                class="h-5 w-5 items-center justify-center rounded-sm hover:bg-selected"
               >
                 <Icon name="issues" size={11} tone="muted" />
               </View>

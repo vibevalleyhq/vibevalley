@@ -199,7 +199,6 @@
     "searchNotes": "Search notes for “{q}”"
   },
   "farmSearch": {
-    "open": "Search everything",
     "title": "Search everything",
     "hint": "Find messages…",
     "filters": "from:user  in:#channel  has:file / image / link  before: / after:2026-10-01",

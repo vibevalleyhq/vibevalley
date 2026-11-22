@@ -226,7 +226,7 @@ function SectionLink(props: { section: Section; current: boolean }) {
       testID={`settings-section-${props.section.id}`}
       accessibilityLabel={props.section.label}
       accessibilityState={{ selected: props.current }}
-      class={`relative group h-7 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${props.current ? "bg-selected" : "hover:bg-hover"}`}
+      class={`relative group h-7 flex-row items-center gap-2 rounded-md px-2 focus-visible:outline-2 focus-visible:outline-focus ${props.current ? "bg-selected" : "hover:bg-hover"}`}
     >
       <If when={props.current}>
         <ActiveBar />

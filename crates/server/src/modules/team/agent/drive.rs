@@ -154,6 +154,30 @@ impl Drivers for Agents {
         self.drive_on(&profile)
     }
 
+    fn drive_runtime(&self, runtime: &str, model: Option<&str>, effort: Option<&str>) -> Result<Drive, BoardError> {
+        let runtime_id = runtime.trim();
+        let resolved = self.fleet.resolve_runtime(runtime_id, model, effort).map_err(BoardError::Api)?;
+        let wire_id = runtime_id.strip_prefix("acp:").unwrap_or(runtime_id).to_string();
+        let label = super::presets::runtime_label(&wire_id);
+        let name = if label == wire_id {
+            resolved.runtime.display_name().to_string()
+        } else {
+            label
+        };
+        Ok(Drive {
+            agent: wire_id.clone(),
+            runtime: resolved.runtime,
+            runtime_id: wire_id,
+            name,
+            model: (!resolved.model.is_empty()).then_some(resolved.model),
+            env: resolved.env.into_iter().collect(),
+            persona: None,
+            effort: (!resolved.effort.is_empty()).then_some(resolved.effort),
+            mcp_servers: vec![],
+            disallowed_tools: vec![],
+        })
+    }
+
     fn drafter(&self, issue: &Issue) -> Result<Drive, BoardError> {
         let named = match issue.assigned_agent() {
             Some(id) => {

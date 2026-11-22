@@ -18,4 +18,7 @@ mod testing;
 pub use layout::{Axis, DiffSpec, Group, GroupId, Layout, Node, PaneKind, Split, SplitId, Tab, TabId, TerminalLink};
 pub use persist::Persistence;
 pub use store::{Project, ProjectId, SavedTerminal, Store, StoreError};
-pub use workspace::{LoadedProject, OpenProject, RestoreCommand, SaveJob, TerminalEntry, TerminalHandle, Workspace, load_all, load_project, restore_command};
+pub use workspace::{
+    LoadedProject, OpenProject, RestoreCommand, SaveJob, TerminalEntry, TerminalHandle, Workspace, load_all, load_project, prune_missing_projects,
+    restore_command,
+};

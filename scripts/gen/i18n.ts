@@ -33,7 +33,7 @@ const namespaces = (locale: Locale) =>
         .toSorted()
     : [];
 
-/** Rust-only namespaces (`server.*`, `cli`, `desktop`) stay in `crates/i18n`; TS bundles only UI catalogs. */
+/** Rust-only namespaces (`server.*`, `desktop`) stay in `crates/i18n`; TS bundles only UI catalogs. */
 const isUiNamespace = (ns: string) => ns === "shared" || ns.startsWith("web.");
 
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by this script
@@ -87,7 +87,7 @@ function gen() {
 }
 
 const sources = () =>
-  execFileSync("git", ["ls-files", "-co", "--exclude-standard", "--", "apps", "packages", "crates", "scripts/gen/capabilities.ts"], {
+  execFileSync("git", ["ls-files", "-co", "--exclude-standard", "--", "apps", "packages", "crates"], {
     cwd: root,
     encoding: "utf8",
   })
@@ -96,10 +96,9 @@ const sources = () =>
       (f) =>
         (/^(apps|packages)\/[^/]+\/(src|scripts)\/.*\.tsx?$/u.test(f) ||
           /^apps\/[^/]+\/vite\.config\.ts$/u.test(f) ||
-          // The Rust server, the command line and the native app say theirs from the same catalogs.
+          // The Rust server and the native app say theirs from the same catalogs.
           /^(crates\/[^/]+\/src\/.*|apps\/mac\/src\/.*)\.rs$/u.test(f) ||
-          /^apps\/mac\/ui\/(?!build\/).*\.tsx?$/u.test(f) ||
-          f === "scripts/gen/capabilities.ts") &&
+          /^apps\/mac\/ui\/(?!build(?:-shell)?\/).*\.tsx?$/u.test(f)) &&
         !f.endsWith("packages/i18n/src/catalogs.ts") &&
         existsSync(join(root, f)),
     );

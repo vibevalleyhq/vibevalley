@@ -102,7 +102,7 @@ function AgentsPage() {
   };
 
   return (
-    <Scroll testID="agents-page" onLayout={(e) => width.set(e.bounds.size.width)} class="h-full flex-1 bg-page" contentClass="px-5 pt-4 pb-8">
+    <Scroll testID="agents-page" onLayout={(e) => width.set(e.bounds.size.width)} class="h-full flex-1 bg-page" contentClass="px-3.5 pt-3 pb-8">
       <PageBody width="manage">
         <View testID="agents-toolbar" class="flex-row flex-wrap items-center justify-between gap-3">
           <View class="flex-row flex-wrap items-center gap-2">
@@ -128,11 +128,17 @@ function AgentsPage() {
               class="w-56"
             />
           </View>
-          <View class="flex-row flex-wrap items-center gap-2">
-            <ButtonLink href="/agents/templates" testID="open-templates" icon="folder" tooltip={<Bubble text={t("web.agent.templates.openLine")} />}>
+          <View class="flex-row flex-wrap items-center gap-1.5">
+            <ButtonLink
+              href="/agents/templates"
+              tone="quiet"
+              testID="open-templates"
+              icon="folder"
+              tooltip={<Bubble text={t("web.agent.templates.openLine")} />}
+            >
               {t("web.agent.templates.open")}
             </ButtonLink>
-            <ButtonLink href="/agents/new?role=orchestrator" testID="new-orchestrator" icon="add">
+            <ButtonLink href="/agents/new?role=orchestrator" tone="quiet" testID="new-orchestrator" icon="add">
               {t("web.agent.list.makeOrchestrator")}
             </ButtonLink>
             <ButtonLink href="/agents/new" tone="primary" testID="new-agent" icon="add">
@@ -246,7 +252,7 @@ function GroupSection(props: { title: string; count: number; testid: string; chi
 function RowShell(props: { agent: Agent; to: string; first: boolean; muted?: boolean; trailing?: JSX.Element; children: JSX.Element }) {
   return (
     <View
-      class={`flex-row items-center gap-3 px-3.5 py-2.5 transition-colors duration-120 ease-out hover:bg-hover ${
+      class={`flex-row items-center gap-3 px-3.5 py-2.5 hover:bg-hover ${
         props.first ? "" : "border-t border-line"
       } ${props.muted === true ? "opacity-75" : ""}`}
     >

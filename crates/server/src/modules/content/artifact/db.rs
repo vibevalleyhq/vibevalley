@@ -294,40 +294,79 @@ pub fn changes_after(db: &mut SqliteConnection, artifact: &str, seq: i64, n: i64
     .collect()
 }
 
-fn decode_suggestion(row: queries::SuggestionRow) -> Q<Suggestion> {
-    Ok(Suggestion {
-        id: row.id,
-        artifact_id: row.artifact_id,
-        block_id: row.block_id,
-        author: row.author,
-        base_rev: row.at_rev,
-        change: read_json(row.change)?,
-        status: read_word(row.status)?,
-        created_at: row.created_at,
-        resolved_at: row.resolved_at,
-        resolved_by: row.resolved_by,
+pub struct StoredSuggestion {
+    pub wire: Suggestion,
+    pub origin: Option<String>,
+    pub anchor_text: Option<String>,
+    pub replacement_text: Option<String>,
+}
+
+fn decode_stored_suggestion(row: queries::SuggestionRow) -> Q<StoredSuggestion> {
+    Ok(StoredSuggestion {
+        wire: Suggestion {
+            id: row.id,
+            artifact_id: row.artifact_id,
+            block_id: row.block_id,
+            author: row.author,
+            base_rev: row.at_rev,
+            change: read_json(row.change)?,
+            status: read_word(row.status)?,
+            created_at: row.created_at,
+            resolved_at: row.resolved_at,
+            resolved_by: row.resolved_by,
+            cursor_start: row.cursor_start,
+            cursor_end: row.cursor_end,
+            start_offset: row.start_offset.and_then(|n| u32::try_from(n).ok()),
+            end_offset: row.end_offset.and_then(|n| u32::try_from(n).ok()),
+        },
+        origin: row.origin,
+        anchor_text: row.anchor_text,
+        replacement_text: row.replacement_text,
     })
 }
-pub fn add_suggestion(db: &mut SqliteConnection, s: &Suggestion) -> Q<()> {
+pub fn add_suggestion(db: &mut SqliteConnection, s: &StoredSuggestion) -> Q<()> {
     block_on(queries::add_suggestion(
         db,
         queries::AddSuggestionParams {
-            id: s.id.clone(),
-            artifact_id: s.artifact_id.clone(),
-            block_id: s.block_id.clone(),
-            author: s.author.clone(),
-            at_rev: s.base_rev,
-            change: json(&s.change)?,
-            created_at: s.created_at,
+            id: s.wire.id.clone(),
+            artifact_id: s.wire.artifact_id.clone(),
+            block_id: s.wire.block_id.clone(),
+            author: s.wire.author.clone(),
+            origin: s.origin.clone(),
+            at_rev: s.wire.base_rev,
+            change: json(&s.wire.change)?,
+            cursor_start: s.wire.cursor_start.clone(),
+            cursor_end: s.wire.cursor_end.clone(),
+            start_offset: s.wire.start_offset.map(i64::from),
+            end_offset: s.wire.end_offset.map(i64::from),
+            anchor_text: s.anchor_text.clone(),
+            replacement_text: s.replacement_text.clone(),
+            created_at: s.wire.created_at,
         },
     ))
 }
-pub fn suggestion(db: &mut SqliteConnection, id: &str) -> Q<Option<Suggestion>> {
+pub fn update_suggestion(db: &mut SqliteConnection, s: &StoredSuggestion) -> Q<()> {
+    block_on(queries::update_suggestion(
+        db,
+        queries::UpdateSuggestionParams {
+            id: s.wire.id.clone(),
+            at_rev: s.wire.base_rev,
+            change: json(&s.wire.change)?,
+            cursor_start: s.wire.cursor_start.clone(),
+            cursor_end: s.wire.cursor_end.clone(),
+            start_offset: s.wire.start_offset.map(i64::from),
+            end_offset: s.wire.end_offset.map(i64::from),
+            anchor_text: s.anchor_text.clone(),
+            replacement_text: s.replacement_text.clone(),
+        },
+    ))
+}
+pub fn stored_suggestion(db: &mut SqliteConnection, id: &str) -> Q<Option<StoredSuggestion>> {
     optional(block_on(queries::suggestion(db, queries::SuggestionParams { id: id.into() })))?
-        .map(decode_suggestion)
+        .map(decode_stored_suggestion)
         .transpose()
 }
-pub fn suggestions(db: &mut SqliteConnection, artifact: &str, limit: i64) -> Q<Vec<Suggestion>> {
+pub fn stored_suggestions(db: &mut SqliteConnection, artifact: &str, limit: i64) -> Q<Vec<StoredSuggestion>> {
     block_on(queries::suggestions(
         db,
         queries::SuggestionsParams {
@@ -336,8 +375,33 @@ pub fn suggestions(db: &mut SqliteConnection, artifact: &str, limit: i64) -> Q<V
         },
     ))?
     .into_iter()
-    .map(decode_suggestion)
+    .map(decode_stored_suggestion)
     .collect()
+}
+pub fn suggestion(db: &mut SqliteConnection, id: &str) -> Q<Option<Suggestion>> {
+    Ok(stored_suggestion(db, id)?.map(|s| s.wire))
+}
+pub fn suggestions(db: &mut SqliteConnection, artifact: &str, limit: i64) -> Q<Vec<Suggestion>> {
+    Ok(stored_suggestions(db, artifact, limit)?.into_iter().map(|s| s.wire).collect())
+}
+
+pub fn artifact_collab(db: &mut SqliteConnection, artifact: &str) -> Q<Option<Vec<u8>>> {
+    Ok(optional(block_on(queries::artifact_collab(
+        db,
+        queries::ArtifactCollabParams { artifact_id: artifact.into() },
+    )))?
+    .map(|row| row.snapshot))
+}
+
+pub fn upsert_artifact_collab(db: &mut SqliteConnection, artifact: &str, snapshot: &[u8], updated_at: i64) -> Q<()> {
+    block_on(queries::upsert_artifact_collab(
+        db,
+        queries::UpsertArtifactCollabParams {
+            artifact_id: artifact.into(),
+            snapshot: snapshot.to_vec(),
+            updated_at,
+        },
+    ))
 }
 
 pub fn entries(db: &mut SqliteConnection, artifact: &str) -> Q<Vec<EntryRow>> {

@@ -126,6 +126,10 @@
       "title": "协作文档",
       "summary": "多执行会话与用户按块共同编辑、带建议流与 Markdown 互转的长文档"
     },
+    "outline": {
+      "title": "树状大纲",
+      "summary": "单栏无限缩进树状大纲，支持折叠聚焦、待办勾选与多执行会话实时共编"
+    },
     "slides": {
       "title": "幻灯片",
       "summary": "16:9 或 4:3 分页讲稿（deck.json + deck.css + 每页 HTML），支持渐进揭示、演讲者视图与矢量 PDF"

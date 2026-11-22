@@ -1,9 +1,9 @@
 ---
 name: 结构化作品
-description: 做数据看板（dashboard）、动态图形短片（motion）、白板图（whiteboard）、多画板界面稿（design）、设计系统（design-system）或协作文档（docs）时用：先调 artifact_type_read 读规范，再用 artifact_entry_batch 增量交付。
+description: 做数据看板（dashboard）、动态图形短片（motion）、白板图（whiteboard）、多画板界面稿（design）、设计系统（design-system）、树状大纲（outline）或协作文档（docs）时用：先调 artifact_type_read 读规范，再用 artifact_block_* 或 artifact_entry_batch 增量交付。
 ---
 
-工作台内置 7 种结构化 `ArtifactType`：`docs`、`slides`、`dashboard`、`motion`、`whiteboard`、`design`、`design-system`。
+工作台内置 8 种结构化 `ArtifactType`：`docs`、`outline`、`slides`、`dashboard`、`motion`、`whiteboard`、`design`、`design-system`。
 
 1. **动笔前先读规范**：调 `artifact_type_read`（传 `type`）拿该类型的文件结构、运行时全局对象与质量门禁；有需要再传 `reference` 读细分章节。
 2. **数据与表现分离**：

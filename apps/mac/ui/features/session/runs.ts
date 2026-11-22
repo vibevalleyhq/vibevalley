@@ -165,6 +165,14 @@ export function spanLabel(step: SessionEvent) {
       return t("web.session.runs.span.cache");
     case "run/error":
       return t("web.session.runs.span.error");
+    case "permission/request":
+      return t("web.shell.chat.permissionBadge");
+    case "permission/resolved":
+      return t("web.shell.chat.toolOk");
+    case "interaction/request":
+      return t("web.shell.chat.statusWaiting");
+    case "interaction/resolved":
+      return t("web.shell.chat.interactionAnswered");
     case "run/start":
     case "run/end":
     case "tool/result":
@@ -187,7 +195,12 @@ export function spanTone(step: SessionEvent): string {
       return "leaf-500";
     case "llm/retry":
     case "llm/usage":
+    case "permission/request":
+    case "interaction/request":
       return "wheat-hover";
+    case "permission/resolved":
+    case "interaction/resolved":
+      return "leaf-300";
     case "run/error":
       return "berry";
     case "run/start":
@@ -347,6 +360,10 @@ export function waterfallOf(log: readonly SessionEvent[], end: number): Waterfal
           waiting = e.time;
           break;
         case "llm/retry":
+        case "permission/request":
+        case "permission/resolved":
+        case "interaction/request":
+        case "interaction/resolved":
         case "run/end":
         case "run/start":
           break;
@@ -427,6 +444,14 @@ export function tagOf(step: SessionEvent, asked?: string, issue = false): string
       return t("web.session.runs.tag.usage");
     case "run/error":
       return t("web.session.runs.span.error");
+    case "permission/request":
+      return t("web.shell.chat.permissionBadge");
+    case "permission/resolved":
+      return t("web.shell.chat.toolOk");
+    case "interaction/request":
+      return t("web.shell.chat.statusWaiting");
+    case "interaction/resolved":
+      return t("web.shell.chat.interactionAnswered");
     case "tool/call":
       if (farmToolText(step.text) !== undefined) return t("web.session.runs.span.farm");
       return step.tool ? toolName(step.tool) : spanLabel(step);

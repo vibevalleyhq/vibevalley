@@ -1,12 +1,13 @@
-import { cleanup, untracked, View, WebView, type JSX } from "nsh";
+import { cleanup, effect, untracked, View, WebView, type JSX } from "nsh";
 
 import type { Artifact, ArtifactDisplay } from "@vibevalley/protocol";
 
 import { shownTheme } from "../../infra/state/prefs";
 import { createFrame, type Frame, shim, withShellQuery } from "./frame";
 import { MotionControls } from "./MotionControls";
+import { presenceHighlightCommand } from "./shell";
 import { SlidesControls } from "./SlidesControls";
-import { useArtifactPage, useReportViewContext, useStoreViewHtml } from "./store";
+import { useArtifactPage, useArtifactPresence, useReportViewContext, useStoreViewHtml } from "./store";
 
 /** What the controls under a display are given. */
 export interface Controls {
@@ -38,6 +39,7 @@ export interface HtmlFrameProps {
   readonly viewElementId?: string;
   readonly viewSeq?: number;
   readonly hideControls?: boolean;
+  readonly disablePresence?: boolean;
   readonly onPresent?: (on: boolean) => void;
   readonly onFrame?: (frame: Frame) => void;
   readonly onMessage?: (raw: unknown) => void;
@@ -89,6 +91,19 @@ export function HtmlFrame(props: HtmlFrameProps) {
       },
     );
   }
+
+  const presence = useArtifactPresence(() => props.artifact.id, {
+    enabled: () => props.disablePresence !== true,
+  });
+
+  // Forward ephemeral collaborator highlight boxes via postMessage without relaxing WebView CSP.
+  effect(() => {
+    if (props.disablePresence === true) return;
+    const peers = presence.peers();
+    const state = frame.state();
+    if (state !== "loaded") return;
+    frame.send(presenceHighlightCommand(peers, { path: props.viewPath }));
+  });
 
   const stateText = () => {
     const s = frame.state();

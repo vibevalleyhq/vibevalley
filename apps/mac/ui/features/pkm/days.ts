@@ -14,7 +14,7 @@ const midnightOf = (day: string) => {
 };
 
 /** A journal's title: Nov 3 Mon (the year too when it is not this year's); undefined for a value that is not a day. */
-export function dayTitle(day: string, today: string, locale: Locale = currentLocale()): string | undefined {
+function dayTitle(day: string, today: string, locale: Locale = currentLocale()): string | undefined {
   const at = midnightOf(day);
   if (Number.isNaN(at)) return undefined;
   const otherYear = day.slice(0, 4) !== today.slice(0, 4);
@@ -31,31 +31,3 @@ export function daysUntil(day: string, today: string): number | undefined {
   if (Number.isNaN(at) || Number.isNaN(now)) return undefined;
   return Math.round((at - now) / 86_400_000);
 }
-
-export interface MonthDay {
-  readonly day: string;
-  readonly inMonth: boolean;
-}
-
-/** The weeks of a month (month 0 is January), Monday first, filled out with the days of the months around it. */
-export function monthWeeks(year: number, month: number): MonthDay[][] {
-  const first = new Date(year, month, 1);
-  const lead = (first.getDay() + 6) % 7;
-  const days = new Date(year, month + 1, 0).getDate();
-  const cells = Math.ceil((lead + days) / 7) * 7;
-  const weeks: MonthDay[][] = [];
-  for (let i = 0; i < cells; i += 1) {
-    const at = new Date(year, month, 1 - lead + i);
-    if (i % 7 === 0) weeks.push([]);
-    weeks.at(-1)?.push({ day: dayKey(at.getTime()), inMonth: at.getMonth() === month });
-  }
-  return weeks;
-}
-
-/** The month's name above the grid: Nov 2026. */
-export const monthTitle = (year: number, month: number, locale: Locale = currentLocale()) =>
-  new Intl.DateTimeFormat(locale, { year: "numeric", month: "long" }).format(new Date(year, month, 1));
-
-/** The weekdays over the grid's columns, Monday first: Mon..Sun. */
-export const weekdayNames = (locale: Locale = currentLocale()) =>
-  Array.from({ length: 7 }, (_, i) => new Intl.DateTimeFormat(locale, { weekday: "narrow" }).format(new Date(2024, 0, 1 + i)));

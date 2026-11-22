@@ -8,6 +8,7 @@ import { OrchestratorFace, UserFace } from "../../../design/domain/Face";
 import { Icon } from "../../../design/Icon";
 import type { IconName } from "../../../design/icons";
 import { Markdown } from "../../../design/Markdown";
+import { motionClass } from "../../../design/motion";
 import { Tag, type TagTone } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
@@ -239,7 +240,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
             role="button"
             testID="to-latest"
             onPress={toLatest}
-            class="h-7 flex-row items-center gap-1.5 rounded-full border border-line bg-elevated px-3 shadow-float transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+            class={`h-7 flex-row items-center gap-1.5 rounded-full border border-line bg-elevated px-3 shadow-float ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
           >
             <View style={{ transform: [{ rotate: "90deg" }] }}>
               <Icon name="expand" size={12} tone="muted" />
@@ -444,7 +445,7 @@ function Dispatch(props: { m: ChatMessage }) {
         accessibilityLabel={open() ? t("web.channel.messages.foldDispatch") : t("web.channel.messages.unfoldDispatch")}
         accessibilityState={{ expanded: open() }}
         tooltip={<Bubble text={open() ? t("web.channel.messages.foldDispatch") : t("web.channel.messages.unfoldDispatch")} />}
-        class="h-6 w-6 shrink-0 items-center justify-center rounded-md opacity-70 transition duration-120 ease-out hover:bg-hover hover:opacity-100"
+        class={`h-6 w-6 shrink-0 items-center justify-center rounded-md opacity-70 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-hover hover:opacity-100`}
       >
         <Icon name={open() ? "collapse" : "enlarge"} size={12} tone="muted" />
       </View>
@@ -596,7 +597,7 @@ function ThreadPreview(props: { thread: Channel }) {
       role="button"
       testID={`thread-preview-${props.thread.id}`}
       onPress={() => router.navigate(chatPath(props.thread))}
-      class="mt-2 w-full max-w-xl gap-1.5 rounded-lg border border-line bg-page px-3 py-2 transition duration-120 ease-out hover:bg-hover"
+      class="mt-2 w-full max-w-xl gap-1.5 rounded-lg border border-line bg-page px-3 py-2 hover:bg-hover"
     >
       <View class="w-full flex-row items-center gap-1.5">
         <Icon name="thread" size={14} tone="accent" />

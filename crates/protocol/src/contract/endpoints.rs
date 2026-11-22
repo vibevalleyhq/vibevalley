@@ -358,6 +358,60 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Vec<SessionEvent>"),
     },
     Endpoint {
+        op: "session.openWorkspace",
+        module: "session",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionOpenWorkspaceInput"),
+        result: Some("SessionWorkspace"),
+    },
+    Endpoint {
+        op: "session.send",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionSendInput"),
+        result: Some("Session"),
+    },
+    Endpoint {
+        op: "session.respondPermission",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionRespondPermissionInput"),
+        result: None,
+    },
+    Endpoint {
+        op: "session.respondInteraction",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionRespondInteractionInput"),
+        result: None,
+    },
+    Endpoint {
+        op: "session.setConfig",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionSetConfigInput"),
+        result: Some("SessionWorkspace"),
+    },
+    Endpoint {
+        op: "session.childTranscript",
+        module: "session",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("SessionChildTranscriptInput"),
+        result: Some("SessionChildTranscript"),
+    },
+    Endpoint {
         op: "issue.conversation.get",
         module: "issue",
         about: &["id"],
@@ -1411,6 +1465,69 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: None,
     },
     Endpoint {
+        op: "artifact.presence.update",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("ArtifactPresenceUpdateRequest"),
+        result: None,
+    },
+    Endpoint {
+        op: "artifact.history.list",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactHistoryListRequest"),
+        result: Some("Vec<ArtifactHistoryEntry>"),
+    },
+    Endpoint {
+        op: "artifact.history.preview",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactHistoryPreviewRequest"),
+        result: Some("ArtifactHistoryPreviewResult"),
+    },
+    Endpoint {
+        op: "artifact.history.restore",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactHistoryRestoreRequest"),
+        result: Some("Artifact"),
+    },
+    Endpoint {
+        op: "artifact.history.fork",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactHistoryForkRequest"),
+        result: Some("Artifact"),
+    },
+    Endpoint {
+        op: "artifact.history.undoOrigin",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactHistoryUndoOriginRequest"),
+        result: Some("Artifact"),
+    },
+    Endpoint {
+        op: "artifact.history.compact",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactHistoryCompactRequest"),
+        result: Some("Artifact"),
+    },
+    Endpoint {
         op: "pkm.page.list",
         module: "pkm",
         about: &[],
@@ -1974,6 +2091,48 @@ pub mod ops {
         const NAME: &'static str = "session.event.list";
         type Input = t::SessionEventListInput;
         type Result = Vec<t::SessionEvent>;
+    }
+    /// Opens or resumes a direct workspace chat session in a directory with no issue.
+    pub struct SessionOpenWorkspace;
+    impl Op for SessionOpenWorkspace {
+        const NAME: &'static str = "session.openWorkspace";
+        type Input = t::SessionOpenWorkspaceInput;
+        type Result = t::SessionWorkspace;
+    }
+    /// Sends a user message to a workspace session (starts a turn when idle or steers when working).
+    pub struct SessionSend;
+    impl Op for SessionSend {
+        const NAME: &'static str = "session.send";
+        type Input = t::SessionSendInput;
+        type Result = t::Session;
+    }
+    /// Answers a pending tool permission request for a session.
+    pub struct SessionRespondPermission;
+    impl Op for SessionRespondPermission {
+        const NAME: &'static str = "session.respondPermission";
+        type Input = t::SessionRespondPermissionInput;
+        type Result = ();
+    }
+    /// Answers a pending interactive question from a session.
+    pub struct SessionRespondInteraction;
+    impl Op for SessionRespondInteraction {
+        const NAME: &'static str = "session.respondInteraction";
+        type Input = t::SessionRespondInteractionInput;
+        type Result = ();
+    }
+    /// Updates model, effort, or permission mode on a workspace session.
+    pub struct SessionSetConfig;
+    impl Op for SessionSetConfig {
+        const NAME: &'static str = "session.setConfig";
+        type Input = t::SessionSetConfigInput;
+        type Result = t::SessionWorkspace;
+    }
+    /// Reads bounded recent transcript steps for a child agent or swarm member.
+    pub struct SessionChildTranscript;
+    impl Op for SessionChildTranscript {
+        const NAME: &'static str = "session.childTranscript";
+        type Input = t::SessionChildTranscriptInput;
+        type Result = t::SessionChildTranscript;
     }
     pub struct IssueConversationGet;
     impl Op for IssueConversationGet {
@@ -2734,6 +2893,55 @@ pub mod ops {
         type Input = t::ArtifactDemoInput;
         type Result = ();
     }
+    /// Ephemeral live presence update (cursor, selection, highlight, viewport); never persisted to SQLite.
+    pub struct ArtifactPresenceUpdate;
+    impl Op for ArtifactPresenceUpdate {
+        const NAME: &'static str = "artifact.presence.update";
+        type Input = t::ArtifactPresenceUpdateRequest;
+        type Result = ();
+    }
+    /// Commit history timeline for a collaborative artifact, newest first.
+    pub struct ArtifactHistoryList;
+    impl Op for ArtifactHistoryList {
+        const NAME: &'static str = "artifact.history.list";
+        type Input = t::ArtifactHistoryListRequest;
+        type Result = Vec<t::ArtifactHistoryEntry>;
+    }
+    /// Read-only snapshot projection at the requested Loro frontiers.
+    pub struct ArtifactHistoryPreview;
+    impl Op for ArtifactHistoryPreview {
+        const NAME: &'static str = "artifact.history.preview";
+        type Input = t::ArtifactHistoryPreviewRequest;
+        type Result = t::ArtifactHistoryPreviewResult;
+    }
+    /// Restore an artifact to the snapshot at the requested Loro frontiers as a new commit.
+    pub struct ArtifactHistoryRestore;
+    impl Op for ArtifactHistoryRestore {
+        const NAME: &'static str = "artifact.history.restore";
+        type Input = t::ArtifactHistoryRestoreRequest;
+        type Result = t::Artifact;
+    }
+    /// Fork a new artifact starting from the snapshot at the requested Loro frontiers.
+    pub struct ArtifactHistoryFork;
+    impl Op for ArtifactHistoryFork {
+        const NAME: &'static str = "artifact.history.fork";
+        type Input = t::ArtifactHistoryForkRequest;
+        type Result = t::Artifact;
+    }
+    /// Selectively undo commits matching one origin while preserving concurrent edits from other actors.
+    pub struct ArtifactHistoryUndoOrigin;
+    impl Op for ArtifactHistoryUndoOrigin {
+        const NAME: &'static str = "artifact.history.undoOrigin";
+        type Input = t::ArtifactHistoryUndoOriginRequest;
+        type Result = t::Artifact;
+    }
+    /// Compact old operation history into a shallow snapshot while keeping current state intact.
+    pub struct ArtifactHistoryCompact;
+    impl Op for ArtifactHistoryCompact {
+        const NAME: &'static str = "artifact.history.compact";
+        type Input = t::ArtifactHistoryCompactRequest;
+        type Result = t::Artifact;
+    }
     /// Every page in the vault, newest first; files changed on disk are read again first.
     pub struct PkmPageList;
     impl Op for PkmPageList {
@@ -2997,5 +3205,17 @@ pub mod subscriptions {
         const NAME: &'static str = "artifact.suggestion.follow";
         type Payload = t::ArtifactSuggestionFollowPayload;
         type Event = t::SuggestionEvent;
+    }
+    pub struct ArtifactPresenceFollow;
+    impl Subscription for ArtifactPresenceFollow {
+        const NAME: &'static str = "artifact.presence.follow";
+        type Payload = t::ArtifactPresenceFollowRequest;
+        type Event = t::ArtifactPresenceEvent;
+    }
+    pub struct SessionWatch;
+    impl Subscription for SessionWatch {
+        const NAME: &'static str = "session.watch";
+        type Payload = t::SessionWatchPayload;
+        type Event = t::SessionWatchEvent;
     }
 }

@@ -37,6 +37,7 @@ const displayLabel: Record<ArtifactDisplay, string> = {
 
 const artifactTypeLabel: Record<ArtifactType, string> = {
   docs: t("web.artifact.types.docs"),
+  outline: t("web.artifact.types.outline"),
   slides: t("web.artifact.types.slides"),
   dashboard: t("web.artifact.types.dashboard"),
   motion: t("web.artifact.types.motion"),
@@ -47,6 +48,7 @@ const artifactTypeLabel: Record<ArtifactType, string> = {
 
 export const artifactTypeIcon: Record<ArtifactType, IconName> = {
   docs: "artifacts",
+  outline: "notes",
   slides: "present",
   dashboard: "catalog",
   motion: "video",
@@ -57,6 +59,7 @@ export const artifactTypeIcon: Record<ArtifactType, IconName> = {
 
 const artifactTypeSuffix: Record<ArtifactType, string> = {
   docs: ".doc.md",
+  outline: ".outline.md",
   slides: ".slide.html",
   dashboard: ".dashboard.html",
   motion: ".motion.html",
@@ -110,7 +113,7 @@ export function ArtifactCard(props: { card: Card }) {
       href={href()}
       testID="artifact-card"
       accessibilityLabel={t("web.artifact.card.open", { title: props.card.title })}
-      class="group mt-1 w-full max-w-md flex-row items-center gap-3 rounded-lg border border-line bg-page px-3 py-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+      class="group mt-1 w-full max-w-md flex-row items-center gap-3 rounded-lg border border-line bg-page px-3 py-2.5 hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
     >
       <View class="size-9 shrink-0 items-center justify-center rounded-md bg-side">
         <Icon name={artifactIcon(props.card)} size={20} tone="muted" />

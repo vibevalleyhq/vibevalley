@@ -363,6 +363,8 @@ mod tests {
             "web.base.rich.more",
             "web.base.rich.less",
             "web.base.rich.diagram",
+            "web.artifact.whiteboard.inspector",
+            "web.artifact.whiteboard.fitView",
             "web.pkm.page.missingRef",
         ] {
             for lang in ["zh", "en"] {

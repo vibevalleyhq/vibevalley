@@ -4,9 +4,10 @@ import { Input } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 
 import { Icon } from "./Icon";
+import { motionClass } from "./motion";
 import { Bubble } from "./Tip";
 
-const field = "h-8 min-w-0 rounded-md border border-line bg-page px-2.5 font-mono text-sm text-ink placeholder:text-faint transition duration-120 ease-out";
+const field = "h-8 min-w-0 rounded-md border border-line bg-page px-2.5 font-mono text-sm text-ink placeholder:text-faint";
 
 /** Words as chips: enter (or a comma) adds the typed one, backspace on an empty box takes the last off. */
 export function ChipsInput(props: { value: readonly string[]; onChange: (v: string[]) => void; placeholder?: string; label: string; disabled?: boolean }) {
@@ -19,7 +20,7 @@ export function ChipsInput(props: { value: readonly string[]; onChange: (v: stri
   return (
     <View
       class={[
-        "min-h-8 w-full flex-row flex-wrap items-center gap-1 rounded-md border border-line bg-page px-1.5 py-1 transition duration-120 ease-out",
+        "min-h-8 w-full flex-row flex-wrap items-center gap-1 rounded-md border border-line bg-page px-1.5 py-1",
         props.disabled === true ? "bg-side opacity-50" : "hover:border-faint focus-within:border-focus",
       ].join(" ")}
     >
@@ -33,7 +34,7 @@ export function ChipsInput(props: { value: readonly string[]; onChange: (v: stri
               accessibilityLabel={t("web.base.chips.drop", { v: v() })}
               tooltip={<Bubble text={t("web.base.chips.drop", { v: v() })} />}
               onPress={() => props.onChange(props.value.filter((x) => x !== v()))}
-              class="size-4 items-center justify-center rounded-xs transition duration-120 ease-out hover:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
+              class="size-4 items-center justify-center rounded-xs hover:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
             >
               <Icon name="close" size={10} tone="muted" />
             </View>
@@ -97,7 +98,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
                 tooltip={<Bubble text={t("web.base.chips.removeKey", { k: k() })} />}
                 onPress={() => props.onChange(Object.fromEntries(rows().filter(([x]) => x !== k())))}
                 class={[
-                  "group h-8 shrink-0 items-center justify-center rounded-md px-2 transition duration-120 ease-out",
+                  "group h-8 shrink-0 items-center justify-center rounded-md px-2",
                   props.disabled === true ? "" : "hover:bg-bad-soft focus-visible:outline-2 focus-visible:outline-focus",
                 ].join(" ")}
               >
@@ -134,7 +135,7 @@ export function KeyValueEditor(props: { value: Readonly<Record<string, string>>;
           disabled={addDisabled()}
           onPress={add}
           class={[
-            "h-8 shrink-0 items-center justify-center rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out",
+            `h-8 shrink-0 items-center justify-center rounded-md border border-line bg-page px-2.5 ${motionClass("transition-transform duration-120 ease-out")}`,
             addDisabled() ? "opacity-50" : "hover:border-faint hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus",
           ].join(" ")}
         >

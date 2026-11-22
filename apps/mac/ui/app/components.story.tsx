@@ -3,6 +3,7 @@ import { mount, Scroll, signal, Text, View } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
+import "@vibevalley/i18n/catalogs";
 import type { SessionEvent } from "@vibevalley/protocol";
 
 import { Button } from "../design/Button";

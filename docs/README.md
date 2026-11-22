@@ -19,8 +19,8 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [pull.md](docs/subsystems/pull.md) | PR 与分支发布：分支预检与推送、GitHub PR / GitLab.com MR、状态轮询、CI/评审去重与 `vv://github/...` 快照 |
 | [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、工作目录、经 oar 开会话、`/mcp`、规矩和汇报、轨迹、额度和上限 |
 | [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、本地合并、GitHub 检测、提交统计 |
-| [artifact.md](docs/subsystems/artifact.md) | Artifact：结构化多条目作品（`store`，七种 `ArtifactType`）、协作块文档（`blocks`）与单页网页（`html`）；乐观并发、双语指南、沙箱预览与 `/library` 统一交付物 |
-| [pkm.md](docs/subsystems/pkm.md) | 笔记：用户的 Logseq 式大纲页面，按 PARA 分文件夹；文件是真相，读进内存再写回，块引用、反链、搜索、闪念、剪藏、改写和撤销 |
+| [artifact.md](docs/subsystems/artifact.md) | Artifact：结构化多条目作品（`store`，七种 `ArtifactType`）、协作块文档（`blocks`）与单页网页（`html`）；乐观并发、双语指南、全出血原生白板与统一内容中心 |
+| [pkm.md](docs/subsystems/pkm.md) | 笔记：Logseq 式大纲页面，工作台单栏极简编辑（磁盘保留 PARA 目录）；文件是真相，读进内存再写回，块引用、反链、搜索、闪念、剪藏、改写和撤销 |
 | [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、消息和事件、工单串 |
 | [watch.md](docs/subsystems/watch.md) | 观察层：按游标读频道的事件、谁听见、刹车、帮工的串和回执；收件箱：要你处理的事、刚来的、巡查 |
 | [brain.md](docs/subsystems/brain.md) | VibeValley 自己的 agent（`vibevalley-runtime::agent`）：模型请求、循环、对话文件、压缩、工具、技能、记性、自己的任务 |
@@ -30,7 +30,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [attachment.md](docs/subsystems/attachment.md) | 附件：农场留下的一份文件，按 SHA-256 内容寻址落盘存一次；消息、媒体结果和素材库都引用它 |
 | [setting.md](docs/subsystems/setting.md) | 设置：settings.json、配置和环境变量、钥匙和打码 |
 | [provider.md](docs/subsystems/provider.md) | AI 服务：供应商连接、模型目录、默认用途、凭据与配置版本 |
-| [media.md](docs/subsystems/media.md) | 媒体和素材库：一个任务机上的生图与语音任务、本机输入、独立下载与安全校验；素材库一份文件一张卡，记着来路 |
+| [media.md](docs/subsystems/media.md) | 媒体和素材库：一个任务机上的生图与语音任务、本机输入、独立下载与安全校验；统一内容中心浏览与原生媒体详情栏 |
 | [game.md](docs/subsystems/game.md) | 游戏：账本、金币和成就、等级、空地和特效 |
 | [core.md](docs/subsystems/core.md) | 核心状态：一份状态只因事实而变、SSE 流和全部路由、接口和能力表、重启 |
 | [foundation.md](docs/subsystems/foundation.md) | 地基：Cargo 与 pnpm 工作区、深模块、边界一次解码的类型、契约的生成、SQLite 存储、测试分层 |

@@ -448,7 +448,7 @@ export class BlockEditor {
     const nb: BlockInput = {
       id: newBlockId(),
       orderKey: keyBetween(last?.orderKey ?? "", ""),
-      type: "paragraph",
+      type: this.artifact?.artifactType === "outline" ? "bulleted" : "paragraph",
       attrs: {},
       text: [],
     };
@@ -456,6 +456,50 @@ export class BlockEditor {
     this.reorder();
     this.queue.push({ ids: new Set([nb.id]), build: () => ({ op: "insert_block", block: nb }) });
     this.focusId = nb.id;
+    this.changed();
+    void this.send();
+  }
+
+  indent(b: EditBlock) {
+    const siblings = this.blocks.filter((x) => x.parentId === b.parentId);
+    const idx = siblings.indexOf(b);
+    const prevSibling = idx > 0 ? siblings[idx - 1] : undefined;
+    if (!prevSibling) return;
+    const prevChildren = this.blocks.filter((x) => x.parentId === prevSibling.id);
+    const lastChild = prevChildren.at(-1);
+    const orderKey = keyBetween(lastChild?.orderKey ?? "", "");
+    b.parentId = prevSibling.id;
+    b.orderKey = orderKey;
+    this.reorder();
+    this.queue.push({
+      ids: new Set([b.id]),
+      build: () => ({ op: "move_block", blockId: b.id, parentId: prevSibling.id, orderKey }),
+    });
+    if (b.focused) this.focusId = b.id;
+    this.changed();
+    void this.send();
+  }
+
+  outdent(b: EditBlock) {
+    if (b.parentId === undefined) return;
+    const parent = this.byId.get(b.parentId);
+    if (!parent) return;
+    const nextAfterParent = this.nextSibling(parent);
+    const orderKey = keyBetween(parent.orderKey, nextAfterParent?.orderKey ?? "");
+    const nextParentId = parent.parentId;
+    b.parentId = nextParentId;
+    b.orderKey = orderKey;
+    this.reorder();
+    this.queue.push({
+      ids: new Set([b.id]),
+      build: () => ({
+        op: "move_block",
+        blockId: b.id,
+        ...(nextParentId !== undefined ? { parentId: nextParentId } : {}),
+        orderKey,
+      }),
+    });
+    if (b.focused) this.focusId = b.id;
     this.changed();
     void this.send();
   }

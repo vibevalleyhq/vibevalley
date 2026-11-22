@@ -9,7 +9,7 @@ export type RuntimePreset = { id: string, label: string, blurb: string, look: Lo
 export const RuntimeCapabilityValues = ["listModels", "accountUsage", "checkUpdate", "upgrade", "skills", "mcpServers", "tools"] as const;
 export type RuntimeCapability = (typeof RuntimeCapabilityValues)[number];
 
-export type RuntimeSupport = { steer: boolean, refused: { [key in string]: string }, capabilities: Array<RuntimeCapability>, inProcess: boolean, };
+export type RuntimeSupport = { steer: boolean, refused: { [key in string]: string }, capabilities: Array<RuntimeCapability>, inProcess: boolean, inSessionConfig?: boolean, };
 
 export const ViaValues = ["executable", "bundled"] as const;
 export type Via = (typeof ViaValues)[number];
@@ -27,7 +27,7 @@ export type InstallationUnsupported = { "status": "unsupported", reason: string,
  */
 export type Installation = InstallationAvailable | InstallationNotFound | InstallationChecking | InstallationUnsupported;
 
-export type ModelEntry = { id: string, name: string, effortLevels: Array<string>, isDefault: boolean, };
+export type ModelEntry = { id: string, name: string, effortLevels: Array<string>, defaultEffort?: string, isDefault: boolean, };
 
 export type UsageWindow = { label: string, usedPercent: number, resetsAt: number | null, };
 

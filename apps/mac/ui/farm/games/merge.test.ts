@@ -1,6 +1,8 @@
 import "../../infra/polyfill";
 import { describe, expect, test } from "nsh/test";
 
+import "@vibevalley/i18n/catalogs";
+
 import {
   canSlide,
   type Merge,

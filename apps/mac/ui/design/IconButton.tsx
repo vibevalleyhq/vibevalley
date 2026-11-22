@@ -4,6 +4,7 @@ import { hostApi } from "../infra/bridge";
 import { Link as A } from "../infra/router";
 import { Icon, type IconSize } from "./Icon";
 import type { IconName } from "./icons";
+import { motionClass } from "./motion";
 import { Bubble } from "./Tip";
 
 /** A button that is only its icon: its label is what hovering shows and what a screen reader says. */
@@ -30,7 +31,7 @@ export function IconButton(props: {
       tooltip={<Bubble text={props.label} />}
       onPress={() => props.onClick()}
       class={[
-        "size-7 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out",
+        `size-7 shrink-0 items-center justify-center rounded-md ${motionClass("transition-transform duration-120 ease-out")}`,
         props.pressed === true ? "bg-selected" : "",
         disabled() ? "opacity-50" : `${hover()} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`,
       ].join(" ")}
@@ -46,7 +47,7 @@ export function OutLink(props: { href: string; label: string }) {
     <View
       role="link"
       onPress={() => void hostApi.openUrl(props.href)}
-      class="group -mx-1 shrink-0 flex-row items-center gap-1 rounded-sm px-1 py-0.5 transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+      class="group -mx-1 shrink-0 flex-row items-center gap-1 rounded-sm px-1 py-0.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
     >
       <Text class="text-xs text-muted group-hover:text-ink">{props.label}</Text>
       <Icon name="open" size={12} tone="muted" />
@@ -61,7 +62,7 @@ export function IconLink(props: { href: `/${string}`; label: string; icon?: Icon
       href={props.href}
       accessibilityLabel={props.label}
       tooltip={<Bubble text={props.label} />}
-      class="size-7 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus"
+      class={`size-7 shrink-0 items-center justify-center rounded-md ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
     >
       <Icon name={props.icon ?? "open"} size={16} tone="muted" />
     </A>

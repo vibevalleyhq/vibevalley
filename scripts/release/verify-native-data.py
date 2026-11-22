@@ -3,6 +3,7 @@
 import argparse
 import base64
 from contextlib import contextmanager
+import datetime
 import hashlib
 import json
 import os
@@ -82,7 +83,7 @@ class Client:
 
     def cli(self, *args):
         run = subprocess.run(
-            [self.exe, *args, "--format", "json"],
+            [self.exe, "--json", *args],
             capture_output=True,
             text=True,
             timeout=30,
@@ -198,21 +199,25 @@ def seed_old(c):
     issue = c.cli("issue", "create", "写打卡并提交", "--repo", "demo", "--agent", "docs")["id"]
     c.cli("issue", "status", issue, "todo")
     wait("old helper report", lambda: c.cli("issue", "show", issue)["stage"]["state"] == "reviewing")
-    general = next(ch["id"] for ch in c.call("channel.list") if ch["type"] == "channel")
-    c.call("channel.message.send", {"id": general, "text": "checkpoint-old", "sendKey": "checkpoint-old"})
+    general = next(ch["id"] for ch in c.cli("channel", "list") if ch["type"] == "channel")
+    c.cli("channel", "message", "send", general, "checkpoint-old", "--send-key", "checkpoint-old")
     profile = c.cli("agent", "list")
     agent = next(p["id"] for p in profile if p["id"] == "docs" or p.get("name") == "docs")
-    memory = c.call("memory.create", {"agent": agent, "text": "retain old note", "requestKey": "legacy-note"})
-    page = c.call("pkm.page.save", {"title": "Checkpoint", "markdown": "- retain old block\n"})
-    artifact = c.call(
-        "artifact.create",
-        {"kind": "html", "title": "Checkpoint", "content": "<!DOCTYPE html><html><body>old artifact</body></html>"},
+    memory = c.cli("memory", "create", agent, "retain old note", "--key", "legacy-note")
+    page = c.cli("pkm", "page", "save", "Checkpoint", "--", "- retain old block\n")
+    artifact = c.cli(
+        "artifact",
+        "create",
+        "Checkpoint",
+        "--kind",
+        "html",
+        "--content",
+        "<!DOCTYPE html><html><body>old artifact</body></html>",
     )
-    image = sample_png()
-    attachment = c.call(
-        "attachment.create", {"name": "old.png", "type": "image/png", "data": base64.b64encode(image).decode()}
-    )
-    c.call("library.item.add", {"attachment": attachment["id"]})
+    png_file = Path(c.env["TMPDIR"]) / "old.png"
+    png_file.write_bytes(sample_png())
+    attachment = c.cli("attachment", "upload", str(png_file), "--name", "old.png", "--mime", "image/png")
+    c.cli("library", "add", "--attachment", attachment["id"])
     media_input = c.call("media.input.adopt", {"attachment": attachment["id"]})
     c.call(
         "provider.update",
@@ -242,15 +247,18 @@ def seed_old(c):
             ),
         },
     )
-    cron = c.call(
-        "cron.create",
-        {
-            "name": "checkpoint schedule",
-            "text": "Review fixture",
-            "agent": "docs",
-            "repo": "demo",
-            "when": {"kind": "once", "at": int(time.time() * 1000) + 86400000},
-        },
+    due = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1)
+    cron = c.cli(
+        "cron",
+        "create",
+        "checkpoint schedule",
+        "Review fixture",
+        "--agent",
+        "docs",
+        "--repo",
+        "demo",
+        "--at",
+        due.isoformat(timespec="seconds"),
     )
     job = c.call(
         "media.image.create",
@@ -266,7 +274,7 @@ def seed_old(c):
     )
 
     def media_result():
-        result = c.call("media.job.get", {"id": job["id"]})
+        result = c.cli("media", "job", "show", job["id"])
         return result if result["phase"] not in ("queued", "generating", "downloading") else None
 
     media = wait("offline media outcome", media_result)
@@ -292,26 +300,26 @@ def seed_old(c):
 
 
 def verify_old_content(c, ids):
+    assert any(i["id"] == ids["issue"] for i in c.cli("state")["state"]["issues"])
     assert c.cli("issue", "show", ids["issue"])["stage"]["state"] == "reviewing"
     assert c.call("issue.run.list", {"id": ids["issue"]})[0]["id"] == ids["run"]
     assert git(ids["repo"], "rev-parse", "HEAD") == ids["base"]
     assert any(f["path"] == "clock.ts" for f in c.cli("issue", "diff", ids["issue"])["files"])
-    messages = c.call("channel.message.list", {"id": ids["channel"]})
+    messages = c.cli("channel", "message", "list", ids["channel"])
     assert sum(m["text"] == "checkpoint-old" for m in messages) == 1
-    assert any(m["id"] == ids["memory"] for m in c.call("memory.list", {"agent": ids["agent"]})["memories"])
-    assert c.call("pkm.page.get", {"page": ids["page"]})["page"]["blocks"][0]["body"] == "retain old block"
-    assert c.call("artifact.get", {"id": ids["artifact"]})["title"] == "Checkpoint"
-    with urllib.request.urlopen(f"{c.url}/api/v1/artifact/{ids['artifact']}/1", timeout=10) as version:
-        assert b"old artifact" in version.read()
+    assert any(m["id"] == ids["memory"] for m in c.cli("memory", "list", ids["agent"])["memories"])
+    assert c.cli("pkm", "page", "show", ids["page"])["page"]["blocks"][0]["body"] == "retain old block"
+    assert c.cli("artifact", "show", ids["artifact"])["title"] == "Checkpoint"
+    assert "old artifact" in c.cli("artifact", "read", ids["artifact"], "--version", "1")["content"]
 
-    assert any(i["attachment"]["id"] == ids["attachment"] for i in c.call("library.item.list", {}))
-    with urllib.request.urlopen(c.url + "/api/v1/attachment/" + ids["attachment"], timeout=10) as response:
-        assert hashlib.sha256(response.read()).hexdigest() == ids["attachment"]
+    assert any(i["attachment"]["id"] == ids["attachment"] for i in c.cli("library", "list"))
+    downloaded = base64.b64decode(c.cli("attachment", "get", ids["attachment"])["data"])
+    assert hashlib.sha256(downloaded).hexdigest() == ids["attachment"]
     assert c.call("media.input.get", {"id": ids["mediaInput"]})["hash"] == ids["attachment"]
-    job = c.call("media.job.get", {"id": ids["mediaJob"]})
+    job = c.cli("media", "job", "show", ids["mediaJob"])
     assert (job["phase"], job["attachment"]["id"]) == (ids["mediaPhase"], ids["generatedAttachment"])
-    assert any(item["id"] == ids["cron"] for item in c.call("cron.list"))
-    rows = c.call("library.item.list", {"origin": "generated"})
+    assert any(item["id"] == ids["cron"] for item in c.cli("cron", "list"))
+    rows = c.cli("library", "list", "--origin", "generated")
     assert any(item["attachment"]["id"] == ids["generatedAttachment"] for item in rows)
 
 
@@ -354,9 +362,9 @@ def sqlite_versions(c, live, agent, stage):
             CREATE TRIGGER sample_engine AFTER INSERT ON memory
             BEGIN INSERT INTO compat_engine VALUES(sqlite_version(),sqlite_source_id()); END;""")
     try:
-        row = c.call("memory.create", {"agent": agent, "text": "engine probe " + stage})
+        row = c.cli("memory", "create", agent, "engine probe " + stage)
         version, source = read_db(path, "SELECT version,source_id FROM compat_engine")[0]
-        c.call("memory.delete", {"agent": agent, "memory": row["id"]})
+        c.cli("memory", "delete", agent, row["id"])
     finally:
         with sqlite3.connect(path) as db:
             db.executescript("DROP TRIGGER sample_engine; DROP TABLE compat_engine;")
@@ -409,14 +417,10 @@ def verify(old, new, root):
         assert wait("upgraded layout", lambda: window_state(dump)) == old_window
         verify_old_content(c, ids)
         verify_connector(c, live)
-        c.call(
-            "channel.message.send", {"id": ids["channel"], "text": "checkpoint-old", "sendKey": "checkpoint-old"}
-        )
+        c.cli("channel", "message", "send", ids["channel"], "checkpoint-old", "--send-key", "checkpoint-old")
         verify_old_content(c, ids)
-        marker = c.call(
-            "memory.create", {"agent": ids["agent"], "text": "upgraded-only note", "requestKey": "new-only"}
-        )
-        c.call("artifact.update", {"id": ids["artifact"], "title": "New title"})
+        marker = c.cli("memory", "create", ids["agent"], "upgraded-only note", "--key", "new-only")
+        c.cli("artifact", "update", ids["artifact"], "--title", "New title")
         revision = c.cli("issue", "diff", ids["issue"])["revision"]
         c.cli(
             "issue",
@@ -455,8 +459,8 @@ def verify(old, new, root):
         )
         assert submitted == [(request[0][0], "done")], submitted
 
-        assert c.call("artifact.get", {"id": ids["artifact"]})["title"] == "New title"
-        assert any(m["id"] == marker["id"] for m in c.call("memory.list", {"agent": ids["agent"]})["memories"])
+        assert c.cli("artifact", "show", ids["artifact"])["title"] == "New title"
+        assert any(m["id"] == marker["id"] for m in c.cli("memory", "list", ids["agent"])["memories"])
     live.rename(root / "upgraded-cohort")
     shutil.copytree(backup, live, symlinks=True)
     assert manifest(live) == original
@@ -467,7 +471,7 @@ def verify(old, new, root):
         assert wait("rollback layout", lambda: window_state(dump)) == old_window
         verify_old_content(c, ids)
         verify_connector(c, live)
-        assert all(m["id"] != marker["id"] for m in c.call("memory.list", {"agent": ids["agent"]})["memories"])
+        assert all(m["id"] != marker["id"] for m in c.cli("memory", "list", ids["agent"])["memories"])
     archived_repo = root / "upgraded-cohort" / Path(ids["repo"]).relative_to(live)
     assert git(archived_repo, "rev-parse", "HEAD") == upgraded_commit
     for cohort in (live, backup, root / "upgraded-cohort"):

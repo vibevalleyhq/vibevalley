@@ -12,7 +12,7 @@
 4. **嵌套圆角逐级减一档**：外框圆角减去内边距大于或等于下一级内框圆角（如 `lg` 8px 框内套 `md` 6px 控件，最小到 `xs` 3px）。
 5. **1px 实线与两档阴影**：卡片与分区默认靠 `1px` `border-line` 隔开，只在悬浮与抬起时使用 `shadow-raise` 或 `shadow-float`。
 6. **容器不撑开**：列表行与网格项始终携带 `min-w-0` 和截断策略，防止长路径、URL 或中英混排撑破父容器。
-7. **线条图标与像素图分工明确**：工作台功能操作使用 `apps/mac/ui/design/icons.ts` 的 `reicon` 线条图标（`<Icon>`），角色头像、农机图标与场景元素使用 `design/pixel` 产出的像素图，不使用系统 emoji 字符替代业务图标。
+7. **线条图标与像素图分工明确**：工作台功能操作使用 `crates/rich/src/icon.rs` 原生 `VvIcon` 渲染的 97 枚 `reicon` 线条图标（TS 侧由 `apps/mac/ui/design/icons.ts` 声明 `IconName`，经 `<Icon>` 调用），角色头像、农机图标与场景元素使用 `design/pixel` 产出的像素图，不使用系统 emoji 字符替代业务图标。
 8. **双语同框对齐**：同一界面与同一份状态内可同时出现中英文内容与标识符，标签长度按弹性排布而非硬编码固定宽度。
 9. **键盘是一等操作**：页面导航、列表选中、命令面板、关闭弹窗和农具切换全部绑定明确键位并标在快捷键面板中。
 10. **工作台像工具，农场像世界**：工作台追求低噪声和信息密度，农场和记忆树追求物理空间、昼夜氛围和动画连续性，两者的配色系统相互隔离。
@@ -164,7 +164,7 @@ UI 代码由 `scripts/audit/ui-tokens.ts` 通过 AST 扫描校验（覆盖工作
 | `24` | 独立工具栏大图标、模态弹窗提示图标 |
 | `48` | `Empty` 空状态主视觉图标 |
 
-工作台与工作区外壳的全部矢量图标已统一收拢至 `apps/mac/ui/design/icons.ts`（`<Icon name>`），具体跨载体核查见 [第九篇](docs/design/09-design-system-audit.md)。
+工作台与工作区外壳的全部 97 枚矢量图标路径已下沉至原生 Rust `crates/rich/src/icon.rs`（`VvIcon` 无锁 `OnceLock` 缓存共享），TS 侧 `apps/mac/ui/design/icons.ts` 仅保留纯类型 `IconName` 与 `<Icon name>` 入口，具体跨载体核查见 [第九篇](docs/design/09-design-system-audit.md)。
 
 ## 1.6 动效时长与缓动曲线全集
 

@@ -13,6 +13,7 @@ import { Icon } from "../../design/Icon";
 import { OutLink } from "../../design/IconButton";
 import { KeyField, SaveBar } from "../../design/KeyField";
 import { Card, Quiet, SecretInput } from "../../design/layout";
+import { motionClass } from "../../design/motion";
 import { Dot } from "../../design/Tag";
 import { Bubble, Hint } from "../../design/Tip";
 import { mix } from "../../design/tone";
@@ -236,7 +237,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
                         />
                       </Field>
                     </View>
-                    <View class="h-8 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out hover:bg-hover">
+                    <View class="h-8 flex-row items-center gap-2 rounded-md px-2 hover:bg-hover">
                       <Checkbox
                         testid="provider-enabled"
                         label={t("web.provider.enabled")}
@@ -291,7 +292,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
                           <Scroll class="max-h-48" contentClass="gap-0.5">
                             <Each of={result().models}>
                               {(model) => (
-                                <View class="rounded-sm px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover">
+                                <View class="rounded-sm px-1.5 py-0.5 hover:bg-hover">
                                   <Text class="font-mono text-xs text-ink">{model().id}</Text>
                                 </View>
                               )}
@@ -344,7 +345,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
                                 <Link
                                   href="/library?make=speech"
                                   testID="provider-speech-open"
-                                  class="rounded-sm px-1 py-0.5 transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+                                  class="rounded-sm px-1 py-0.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
                                 >
                                   <Text class="text-xs font-medium text-water underline">{t("web.provider.openSpeechShort")}</Text>
                                 </Link>
@@ -431,10 +432,10 @@ function Adapted(props: { status: ProviderStatus }) {
         testID="provider-adapted-toggle"
         accessibilityState={{ expanded: open() }}
         onPress={() => open.set(!open())}
-        class="flex-row items-center gap-1.5 rounded-md px-2 py-1.5 transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+        class="flex-row items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
       >
         <View
-          class="size-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+          class={`size-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
           style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}
         >
           <Icon name="expand" size={10} tone="muted" />

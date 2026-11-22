@@ -238,3 +238,6 @@ fn a_sent_issue_is_logged_listed_and_watched() {
 
 #[path = "session/subagent_progress.rs"]
 mod subagent_progress;
+
+#[path = "session/workspace.rs"]
+mod workspace;

@@ -11,7 +11,8 @@
 //!   (`vibevalley-onig`) highlighters into `nsh_base::editor` (`<Editor>` and `<DiffView>`),
 //!   working with `nsh-base/highlight` (`syntect`/`two-face`/`onig_sys`) disabled.
 //! - Native `#[component]`s: [`VvMarkdown`], [`VvCodeBlock`], [`VvDiagram`], [`VvCanvas`],
-//!   [`VvChart`] (backed by `vibevalley-chart`), and [`VvGenUi`] (backed by `vibevalley-genui`).
+//!   [`VvChart`] (backed by `vibevalley-chart`), [`VvGenUi`] (backed by `vibevalley-genui`),
+//!   [`VvIcon`] (static reicon vector registry), and [`VvWhiteboard`].
 //! - Optional [`ChartRenderer`] and [`GenUiRenderer`] override traits for custom host or test hooks.
 
 pub mod cache;
@@ -24,10 +25,13 @@ pub mod genui;
 pub mod grammars;
 pub mod highlight;
 pub mod hooks;
+pub mod i18n;
+pub mod icon;
 pub mod markdown;
 mod math;
 pub mod pinyin;
 pub mod theme;
+pub mod whiteboard;
 
 use nsh_core::element::Registry;
 
@@ -55,6 +59,8 @@ pub use hooks::{
     ChartRenderer, ChartRendererContext, GenUiAction, GenUiActionSink, GenUiRenderer, GenUiRendererContext, RenderedSvg, active_chart_renderer,
     active_genui_renderer, clear_chart_renderer, clear_genui_renderer, register_chart_renderer, register_genui_renderer,
 };
+pub use i18n::{VvI18n, translate_json};
+pub use icon::{DEFAULT_ICON_SIZE, ICON_NAMES, IconShape, VvIcon, VvIconElement, VvIconProps, icon_shapes, paint_icon, resolve_icon_color, vv_icon};
 pub use markdown::{
     BlockRefPayload, CustomNodeKind, PATTERN_BLOCK_REF, PATTERN_EMBED, PATTERN_ISSUE, PATTERN_MENTION, PATTERN_REMARK, PATTERN_TAG, PATTERN_WIKILINK,
     VvBlockRefPressEvent, VvEmbedPressEvent, VvIssuePressEvent, VvLinkPressEvent, VvMarkdown, VvMarkdownElement, VvMarkdownEvent, VvMarkdownProps,
@@ -65,6 +71,10 @@ pub use pinyin::VvPinyin;
 pub use theme::{
     AdaptiveUi, CODE_FONT_MONO, DIAGRAM_FONT_SANS, SHIKI_DARK_THEME, SHIKI_LIGHT_THEME, UiPalette, vv_canvas_palette, vv_chart_palette, vv_pele_palette,
     vv_shiki_dark_theme, vv_shiki_light_theme,
+};
+pub use whiteboard::{
+    VvWhiteboard, VvWhiteboardBatchEvent, VvWhiteboardChatEvent, VvWhiteboardCursorEvent, VvWhiteboardElement, VvWhiteboardEvent, VvWhiteboardExportEvent,
+    VvWhiteboardProps, VvWhiteboardSelectionEvent, VvWhiteboardViewportEvent, vv_whiteboard,
 };
 
 /// JS module specifier passed to `nativeModule("vibevalley/rich")` and `Registry::ui_set`.
@@ -83,6 +93,9 @@ pub fn registry() -> Registry {
         .register::<VvCanvas>()
         .register::<VvChart>()
         .register::<VvGenUi>()
+        .register::<VvIcon>()
+        .register::<VvWhiteboard>()
+        .module::<VvI18n>()
         .module::<VvPinyin>();
     set
 }

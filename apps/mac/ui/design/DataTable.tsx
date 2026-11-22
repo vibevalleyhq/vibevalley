@@ -82,7 +82,7 @@ export function DataTable<T, K extends string>(props: {
                       role="button"
                       testID={`table-sort-${column().id}`}
                       onPress={() => sort(column().id)}
-                      class="-ml-1.5 h-6 flex-row items-center gap-1 self-start rounded-md px-1.5 transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+                      class="-ml-1.5 h-6 flex-row items-center gap-1 self-start rounded-md px-1.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
                     >
                       <Text class={`truncate text-xs ${sorted() ? "font-semibold text-ink" : "font-medium text-muted"}`}>{header(column().id)}</Text>
                       <Icon name={sorted() === "asc" ? "moveUp" : sorted() === "desc" ? "moveDown" : "choose"} size={12} tone={sorted() ? "ink" : "faint"} />
@@ -102,7 +102,7 @@ export function DataTable<T, K extends string>(props: {
                   role="row"
                   testID="table-row"
                   accessibilityState={{ selected: selected() }}
-                  class={`min-h-10 flex-row items-center border-t border-line transition duration-120 ease-out ${selected() ? "bg-selected" : "bg-page hover:bg-hover"}`}
+                  class={`min-h-10 flex-row items-center border-t border-line ${selected() ? "bg-selected" : "bg-page hover:bg-hover"}`}
                 >
                   <If when={props.selection}>
                     <View class="w-10 shrink-0 items-center justify-center py-2">

@@ -188,6 +188,12 @@
 | `session.list` | 列出执行会话，可以只看一份角色的 | `/api/v1/session/list` | ✓ | ✓ | ✓ | ✓ |
 | `session.get` | 看一个执行会话 | `/api/v1/session/get` | ✓ | ✓ |   |   |
 | `session.event.list` | 读一个执行会话的轨迹，从早到晚 | `/api/v1/session/event/list` | ✓ | ✓ |   |   |
+| `session.openWorkspace` | 在工作区目录打开或续接直连对话会话 | `/api/v1/session/openWorkspace` | ✓ | ✓ |   |   |
+| `session.send` | 向直连对话会话发消息（空闲启轮，运行中引导） | `/api/v1/session/send` | ✓ | ✓ |   |   |
+| `session.respondPermission` | 答复会话的工具权限请求 | `/api/v1/session/respondPermission` | ✓ | ✓ |   |   |
+| `session.respondInteraction` | 回复会话的交互式提问 | `/api/v1/session/respondInteraction` | ✓ | ✓ |   |   |
+| `session.setConfig` | 调整工作区会话的模型、推理强度或权限模式 | `/api/v1/session/setConfig` | ✓ | ✓ |   |   |
+| `session.childTranscript` | 读取子代理或协作组员最近的轨迹步骤 | `/api/v1/session/childTranscript` | ✓ | ✓ |   |   |
 
 ## artifact
 
@@ -221,6 +227,13 @@
 | `artifact.entry.get` | 读取结构化作品的一个条目与当前版本号 | `/api/v1/artifact/entry/get` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.entry.batch` | 原子批量增改、合并或删除结构化作品的条目（带版本号校验） | `/api/v1/artifact/entry/batch` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.demo` | 开演示：几个执行会话一起写一篇作品，不花模型的钱 | `/api/v1/artifact/demo` | ✓ |   |   |   |
+| `artifact.presence.update` | 更新实时在场状态（光标、选区、高亮区域或视口），仅驻留内存不落库 | `/api/v1/artifact/presence/update` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.history.list` | 列出作品的协作提交时间线，最新的在前 | `/api/v1/artifact/history/list` | ✓ | ✓ |   |   |
+| `artifact.history.preview` | 只读预览指定历史前沿上的作品快照 | `/api/v1/artifact/history/preview` | ✓ | ✓ |   |   |
+| `artifact.history.restore` | 把作品恢复到指定历史前沿并记为一次新提交 | `/api/v1/artifact/history/restore` | ✓ | ✓ |   |   |
+| `artifact.history.fork` | 从指定的历史前沿分叉出一篇新作品 | `/api/v1/artifact/history/fork` | ✓ | ✓ |   |   |
+| `artifact.history.undoOrigin` | 按提交来源选择性撤销某一轮的改动，保留其他人的并发编辑 | `/api/v1/artifact/history/undoOrigin` | ✓ | ✓ |   |   |
+| `artifact.history.compact` | 把较早的操作历史压缩成浅快照，当前内容保持不变 | `/api/v1/artifact/history/compact` | ✓ | ✓ |   |   |
 
 ## game
 

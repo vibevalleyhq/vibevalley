@@ -128,11 +128,7 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
 
   const bar = () => (
     <View testID="profile-bar" class="flex-row flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-line py-3">
-      <A
-        href="/agents"
-        testID="back"
-        class="group rounded-md px-1.5 py-0.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
-      >
+      <A href="/agents" testID="back" class="group rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover">
         <Text class="text-sm text-muted group-hover:text-ink">{t("web.agent.all")}</Text>
       </A>
       <Text class="text-sm text-faint">/</Text>
@@ -199,7 +195,7 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
                   role="button"
                   accessibilityState={{ selected: pose() === p().pose }}
                   onPress={() => pose.set(p().pose)}
-                  class={`h-6 justify-center rounded-full px-2.5 transition duration-120 ease-out ${pose() === p().pose ? "bg-ink" : "bg-hover hover:bg-selected"}`}
+                  class={`h-6 justify-center rounded-full px-2.5 ${pose() === p().pose ? "bg-ink" : "bg-hover hover:bg-selected"}`}
                 >
                   <Text class={`text-xs font-medium ${pose() === p().pose ? "text-page" : "text-ink"}`}>{p().label}</Text>
                 </View>

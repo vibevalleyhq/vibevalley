@@ -27,7 +27,7 @@
 | `crates/runtime/src/` | `oar/` 驱动与自研 `agent/` 持久对话引擎（`execution.db`） |
 | `crates/rich/`、`crates/engines/{onig,pele,shiki}` | 原生富内容组件与内部引擎（`canvas`、`chart`、`genui`、`pinyin`）及底层正则/高亮/图谱引擎 |
 | `apps/mac/crates/workspace/src/store/mod.rs` | 原生应用外壳的 `state.db`（SQLite）：项目、终端与布局；连同 `pixel`、`terminal` 共 3 个桌面支撑 crate |
-| `crates/i18n/src/lib.rs`、`crates/i18n/locales/` | 消息格式与词典；词典构建时编进去 |
+| `crates/i18n/src/lib.rs`、`crates/i18n/locales/` | 消息格式与词典；词典构建时编进去，前端 `web.*` 词典挂在可选特性 `web` 下（仅 `crates/rich` 开启） |
 | `crates/server/src/testing.rs` | 测试和验收沙箱用的替身农机 `pi`（`VIBEVALLEY_TEST_RUNTIMES=1`） |
 | `packages/protocol/src/<概念>/` | 页面用的契约：生成的 `shapes.gen.ts`，手写的 `schema.ts`（Zod）和 `api.ts`（额外导出或别名才设 `shapes.ts`）；`src/rules/` 是页面用的纯函数规则；`src/client.ts` 是生成的 `VibeValleyApi` |
 
@@ -92,7 +92,7 @@
 
 ### 话放在哪
 
-- **对用户的话进词典**：`crates/i18n/locales/{zh,en}/<命名空间>.json`；TS 调 `t("key")`（`vibevalley/no-cjk-literal` 拦硬编码中文），Rust 调 `vibevalley_i18n::t`。
+- **对用户的话进词典**：`crates/i18n/locales/{zh,en}/<命名空间>.json`；TS 调 `t("key")`（`vibevalley/no-cjk-literal` 拦硬编码中文），Rust 调 `vibevalley_i18n::t`。`vibevalley-i18n` 将前端 `web.*` 词典收在可选特性 `web` 下（默认关闭，保持 `vibevalley-cli` 与独立服务端精简），仅 `crates/rich` 开启该特性并向 `apps/mac` 暴露原生 `VvI18n`（`"vibevalley/rich"` `.translate(...)`），使生产 UI 包无需打入 JS 词典；由 `vp run i18n:gen` 生成的 `@vibevalley/i18n` JS 词典目录（`packages/i18n/src/catalogs.ts`）专供 Node 脚本与无宿主 `nsh test` 按需加载。
 - **词典检查覆盖两端**：`vpx scripts/gen/i18n.ts check` 检查缺键、未用键、语言与占位符；识别 TS 模板键和 Rust `format!` 动态键的字面量前缀。Rust 与 TS 的缺键都使检查失败，删词条时两种语言一起删，再运行 `vp run i18n:gen`。
 - **对模型的话在 `assets/`**：助手的提示在 `crates/server/assets/orchestrator/prompts.json`，工具说明在 `crates/server/assets/tools/`，以 Rust 为准；中文编写，要求模型按用户的语言回答。
 - **语言**：存于家目录 `settings.json` 的 `locale`（`vibevalley-protocol::home`）。

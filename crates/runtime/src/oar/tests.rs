@@ -626,3 +626,45 @@ fn regression_cumulative_usage_requires_a_known_preceding_turn_boundary() {
     assert_eq!(turn(Some((21, 6))), (None, None));
     assert_eq!(turn(Some((24, 7))), (Some(3), Some(1)));
 }
+
+#[test]
+fn regression_antigravity_external_accounting_uses_gemini_additive_totals_even_when_resumed() {
+    use serde_json::json;
+    let core = crate::oar::core::SessionCore::new("antigravity", "agy-meter", None);
+    // Even if a caller marks the meter resumed, Antigravity stays in per-turn mode.
+    core.resume_meter(&Value::Null, "acp_resume_baseline_unknown");
+    let rx = core.subscribe(false);
+    core.begin_turn("first").unwrap();
+    let frame = json!({
+        "sessionId": "agy-meter",
+        "update": {
+            "sessionUpdate": "usage_update",
+            "used": 12_000,
+            "size": 1_000_000,
+            "usage": {
+                "inputTokens": 400,
+                "cachedReadTokens": 1_600,
+                "cachedWriteTokens": 200,
+                "outputTokens": 150,
+                "thoughtTokens": 350
+            }
+        }
+    });
+    drop(core.record_raw("session/update/usage_update", vec![], &frame.to_string(), &frame));
+    core.emit_root(EventKind::TurnFinished {
+        reason: StopReason::Completed,
+        usage: Usage::default(),
+    });
+    let usage = loop {
+        if let EventKind::TurnFinished { usage, .. } = rx.recv_timeout(Duration::from_secs(2)).unwrap().kind {
+            break usage;
+        }
+    };
+    assert_eq!(usage.input_tokens, Some(2_000));
+    assert_eq!(usage.output_tokens, Some(500));
+    assert_eq!(usage.cache_read_tokens, Some(1_600));
+    assert_eq!(usage.cache_write_tokens, Some(200));
+    assert_eq!(usage.reasoning_tokens, Some(350));
+    assert_eq!(usage.context_used_tokens, Some(12_000));
+    assert_eq!(usage.context_window_tokens, Some(1_000_000));
+}

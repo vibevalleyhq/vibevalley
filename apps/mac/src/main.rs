@@ -32,6 +32,7 @@ pub fn ensure_main_window(cx: &mut App) {
             appears_transparent: true,
             traffic_light_position: Some(point(px(12.0), px(11.0))),
         }),
+        app_owns_titlebar_drag: true,
         ..Default::default()
     };
     let mut built = None;
@@ -49,6 +50,7 @@ pub fn ensure_main_window(cx: &mut App) {
 }
 
 fn main() {
+    host::disable_default_font_smoothing();
     update::enter_bundle();
     vibevalley_i18n::set_locale(vibevalley_server::home::saved_locale(&hosted::server_home()));
     let app = gpui_platform::application();

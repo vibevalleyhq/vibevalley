@@ -21,8 +21,8 @@ export function StoreArtifactView(props: StoreViewerProps) {
   const kind = () => props.artifact.artifactType;
   return (
     <>
-      <If when={kind() === "docs"}>
-        <BlocksView id={props.artifact.id} />
+      <If when={kind() === "docs" || kind() === "outline"}>
+        <BlocksView id={props.artifact.id} artifactType={kind()} />
       </If>
       <If when={kind() === "slides"}>
         <SlidesStoreView {...props} />

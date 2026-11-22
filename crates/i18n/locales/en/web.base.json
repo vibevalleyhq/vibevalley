@@ -39,9 +39,6 @@
     }
   },
   "tab": {
-    "library": "Library",
-    "artifacts": "Artifacts",
-    "pkm": "Notes",
     "roles": "Roles",
     "runtimes": "Engines",
     "skills": "Skills",
@@ -57,7 +54,6 @@
   "farmShort": "Farm",
   "update": "Update",
   "working": "Open · {n} working",
-  "off": "Not open",
   "runsHint": "View active runs, assistant approvals, and trajectories",
   "chips": {
     "drop": "Remove {v}",

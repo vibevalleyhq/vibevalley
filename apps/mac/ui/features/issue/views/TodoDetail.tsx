@@ -168,12 +168,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     <View>
       <If when={props.item.parent}>
         {(parent) => (
-          <View
-            role="button"
-            testID="parent-issue"
-            class="-mx-1 mb-2 self-start rounded-sm px-1 py-0.5 transition duration-120 ease-out hover:bg-hover"
-            onPress={() => props.onDone(parent())}
-          >
+          <View role="button" testID="parent-issue" class="-mx-1 mb-2 self-start rounded-sm px-1 py-0.5 hover:bg-hover" onPress={() => props.onDone(parent())}>
             <Text class="text-xs text-water">{t("web.issue.family.parent")}</Text>
           </View>
         )}
@@ -258,12 +253,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         else={
           <>
             {talk()}
-            <View
-              role="button"
-              testID="issue-write-own"
-              onPress={() => own.set(true)}
-              class="-mx-1.5 mt-3 self-start rounded-md px-1.5 py-1 transition duration-120 ease-out hover:bg-hover"
-            >
+            <View role="button" testID="issue-write-own" onPress={() => own.set(true)} class="-mx-1.5 mt-3 self-start rounded-md px-1.5 py-1 hover:bg-hover">
               <Text class="text-sm text-muted">{t("web.issue.todo.writeOwn")}</Text>
             </View>
           </>
@@ -334,12 +324,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             onChange={(v) => edit({ repo: v })}
             options={[...new Set([...repos(), ...(d().repo ? [d().repo] : [])])].map((p) => ({ value: p, label: p }))}
           />
-          <View
-            role="button"
-            testID="new-repo"
-            onPress={() => newRepo.set(true)}
-            class="-ml-1 self-start rounded-sm px-1 py-0.5 transition duration-120 ease-out hover:bg-hover"
-          >
+          <View role="button" testID="new-repo" onPress={() => newRepo.set(true)} class="-ml-1 self-start rounded-sm px-1 py-0.5 hover:bg-hover">
             <Text class="text-xs text-water">{repos().length === 0 && !d().repo ? t("web.issue.todo.firstRepo") : t("web.issue.todo.newRepoLink")}</Text>
           </View>
         </View>

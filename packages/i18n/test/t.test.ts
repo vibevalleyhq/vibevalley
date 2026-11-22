@@ -1,8 +1,10 @@
 import { expect, test } from "vite-plus/test";
 
-import { format, list, placeholders, setLocale, t } from "../src";
+import { format, list, placeholders, setLocale, setTranslator, t } from "../src";
+import { catalogTranslate } from "../src/catalog-translator";
 
 test("a message is said in the language in use, its placeholders filled", () => {
+  setTranslator(catalogTranslate);
   setLocale("zh");
   expect(t("web.setting.keys.saved")).toBe("存好了，马上就用上。");
   expect(t("web.setting.source.configure", { label: "EverOS" })).toBe("配置 EverOS");
@@ -11,6 +13,17 @@ test("a message is said in the language in use, its placeholders filled", () => 
   expect(list(["a", "b"])).toBe("a, b");
   setLocale("zh");
   expect(list(["甲", "乙"])).toBe("甲、乙");
+});
+
+test("setTranslator routes lookups through a custom backend", () => {
+  setTranslator((locale, key, params) => `${locale}:${key}:${params ? JSON.stringify(params) : ""}`);
+  try {
+    setLocale("en");
+    expect(t("web.setting.keys.saved")).toBe("en:web.setting.keys.saved:");
+    expect(t("web.setting.source.configure", { label: "EverOS" })).toBe('en:web.setting.source.configure:{"label":"EverOS"}');
+  } finally {
+    setTranslator(catalogTranslate);
+  }
 });
 
 test("placeholders are {name}; one not given stays as written", () => {

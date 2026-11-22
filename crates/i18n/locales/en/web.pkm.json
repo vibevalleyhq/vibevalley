@@ -10,25 +10,6 @@
     "journal": "Journals",
     "archive": "Archive"
   },
-  "list": {
-    "label": "Pages and calendar",
-    "find": "Search notes",
-    "newPage": "New page",
-    "newPagePlaceholder": "Page title, Enter to create",
-    "open": "{n} open",
-    "today": "Today"
-  },
-  "calendar": {
-    "label": "Calendar",
-    "previous": "Previous month",
-    "next": "Next month"
-  },
-  "radar": {
-    "inbox": "Inbox",
-    "stale": "Stale",
-    "overdue": "Overdue",
-    "days": "{n} days untouched"
-  },
   "gone": "There is no such page, or its file was deleted.",
   "page": {
     "more": "More",
@@ -39,8 +20,6 @@
     "undo": "Undo the last change",
     "undone": "Undone: {what}",
     "nothingToUndo": "Nothing to undo",
-    "tier": "Where it goes",
-    "moved": "Moved to {tier}",
     "append": "Keep writing…",
     "collapse": "Collapse",
     "expand": "Expand",
@@ -58,15 +37,6 @@
     "copiedRef": "Block ref copied",
     "toIssue": "Turn into issue",
     "issueMade": "Issue created"
-  },
-  "props": {
-    "deadline": "Due {day}",
-    "left": "Due {day} · {n} days left",
-    "dueToday": "Due {day} · today",
-    "overdue": "Due {day} · {n} days ago",
-    "area": "Area",
-    "more": "{n} more properties",
-    "fewer": "Fewer properties"
   },
   "marker": {
     "TODO": "To do",
@@ -89,12 +59,6 @@
   },
   "complete": {
     "newPage": "New page"
-  },
-  "rail": {
-    "label": "Beside this page",
-    "show": "Show the side panel",
-    "hide": "Hide the side panel",
-    "contents": "On this page"
   },
   "search": {
     "title": "Search notes",
@@ -122,13 +86,5 @@
     "accepted": "Accepted",
     "rejected": "Dismissed",
     "on": "“{span}”"
-  },
-  "tierOne": {
-    "project": "Project",
-    "area": "Area",
-    "resource": "Resource",
-    "inbox": "Inbox",
-    "journal": "Journal",
-    "archive": "Archive"
   }
 }

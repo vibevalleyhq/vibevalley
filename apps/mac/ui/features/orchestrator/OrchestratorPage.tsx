@@ -7,6 +7,7 @@ import { orchestratorLooks } from "../../design/domain/cast";
 import { OrchestratorFace } from "../../design/domain/Face";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
+import { motionClass } from "../../design/motion";
 import { Tabs } from "../../design/Tabs";
 import { useAgent } from "../../infra/agents";
 import { Keyed, variant } from "../../infra/base/dom";
@@ -56,10 +57,7 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
   const look = () => orchestratorLooks.find((l) => l.id === (profile()?.look.orchestrator ?? "farmer"));
   const head = () => (
     <View class="gap-2 pt-4">
-      <A
-        href="/agents"
-        class="group -ml-1.5 self-start rounded-md px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
-      >
+      <A href="/agents" class="group -ml-1.5 self-start rounded-md px-1.5 py-0.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus">
         <Text class="text-xs text-muted group-hover:text-ink">{t("web.orchestrator.orchestrator.all")}</Text>
       </A>
       <View class="flex-row flex-wrap items-center gap-4">
@@ -87,14 +85,14 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
           <A
             href={runsHref({ session: props.agent })}
             testID="orchestrator-runs-link"
-            class="h-7 shrink-0 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus"
+            class={`h-7 shrink-0 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 ${motionClass("transition-transform duration-120 ease-out")} hover:border-faint hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
           >
             <Icon name="log" size={14} tone="muted" />
             <Text class="text-sm text-ink">{t("web.orchestrator.orchestrator.runsLink")}</Text>
           </A>
           <A
             href={`/agents/${encodeURIComponent(props.agent)}`}
-            class="h-7 shrink-0 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus"
+            class={`h-7 shrink-0 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 ${motionClass("transition-transform duration-120 ease-out")} hover:border-faint hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
           >
             <Icon name="edit" size={14} tone="muted" />
             <Text class="text-sm text-ink">{t("web.orchestrator.orchestrator.profile")}</Text>

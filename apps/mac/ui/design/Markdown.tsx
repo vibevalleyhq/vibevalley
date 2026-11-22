@@ -47,15 +47,22 @@ const fallbackClasses = {
   rule: "my-2 border-line",
 };
 
-const fallbackHeadings = (sm: boolean) =>
-  sm
-    ? { heading1: "text-base", heading2: "text-sm", heading3: "text-sm", heading4: "text-sm", heading5: "text-sm", heading6: "text-sm" }
-    : { heading1: "text-lg", heading2: "text-base", heading3: "text-sm", heading4: "text-sm", heading5: "text-sm", heading6: "text-sm" };
+const fallbackHeadings = (size: "base" | "sm" | "doc") => {
+  switch (size) {
+    case "sm":
+      return { heading1: "text-base", heading2: "text-sm", heading3: "text-sm", heading4: "text-sm", heading5: "text-sm", heading6: "text-sm" };
+    case "doc":
+      return { heading1: "text-2xl", heading2: "text-xl", heading3: "text-base", heading4: "text-sm", heading5: "text-sm", heading6: "text-xs" };
+    case "base":
+      return { heading1: "text-lg", heading2: "text-base", heading3: "text-sm", heading4: "text-sm", heading5: "text-sm", heading6: "text-sm" };
+  }
+};
 
 export interface MarkdownProps {
   text: string;
   class?: string | undefined;
-  size?: "base" | "sm";
+  size?: "base" | "sm" | "doc";
+  baseDir?: string | null;
   mentions?: boolean;
   pkm?: boolean;
   refs?: readonly BlockRefPayload[];
@@ -74,7 +81,7 @@ export interface MarkdownProps {
 /** Chat text, descriptions, notes, and reports. */
 export function Markdown(props: MarkdownProps) {
   const router = useRouter();
-  const small = () => props.size === "sm";
+  const size = () => props.size ?? "base";
   const openLink = (url: string) => {
     if (url.startsWith("/")) router.navigate(url);
     else void hostApi.openUrl(url);
@@ -85,7 +92,8 @@ export function Markdown(props: MarkdownProps) {
     return (
       <VvMarkdown
         text={props.text}
-        size={props.size ?? "base"}
+        size={size()}
+        baseDir={props.baseDir ?? null}
         mentions={props.mentions === true}
         pkm={props.pkm === true}
         refs={props.refs}
@@ -119,8 +127,8 @@ export function Markdown(props: MarkdownProps) {
       selectable={props.selectable ?? true}
       classes={{
         ...fallbackClasses,
-        ...fallbackHeadings(small()),
-        root: `min-w-0 gap-0 text-ink ${small() ? "text-sm" : "text-base"} ${props.class ?? ""}`,
+        ...fallbackHeadings(size()),
+        root: `min-w-0 gap-0 text-ink ${size() === "sm" ? "text-sm" : "text-base"} ${props.class ?? ""}`,
       }}
       renderCodeBlock={(block) => {
         switch (block.language) {

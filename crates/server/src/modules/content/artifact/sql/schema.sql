@@ -2,7 +2,7 @@ create table if not exists artifact (
   id            text primary key,
   title         text not null,
   body          text not null check (body in ('blocks', 'html', 'store')),
-  artifact_type text check (artifact_type is null or artifact_type in ('docs', 'slides', 'dashboard', 'motion', 'whiteboard', 'design', 'design-system')),
+  artifact_type text check (artifact_type is null or artifact_type in ('docs', 'outline', 'slides', 'dashboard', 'motion', 'whiteboard', 'design', 'design-system')),
   is_default    integer not null default 0 check (not is_default or artifact_type = 'design-system'),
   display       text check ((body = 'html') = (display is not null) and (display is null or display in ('page', 'slides', 'motion'))),
   channel_id    text,
@@ -66,16 +66,23 @@ create table if not exists artifact_change (
   primary key (artifact_id, seq)
 );
 create table if not exists artifact_suggestion (
-  id          text primary key,
-  artifact_id text not null references artifact (id) on delete cascade,
-  block_id    text not null references artifact_block (id) on delete cascade,
-  author      text not null,
-  at_rev      integer not null,
-  change      text not null,
-  status      text not null default 'open' check (status in ('open', 'accepted', 'rejected')),
-  created_at  integer not null,
-  resolved_at integer,
-  resolved_by text
+  id               text primary key,
+  artifact_id      text not null references artifact (id) on delete cascade,
+  block_id         text not null references artifact_block (id) on delete cascade,
+  author           text not null,
+  origin           text,
+  at_rev           integer not null,
+  change           text not null,
+  cursor_start     text,
+  cursor_end       text,
+  start_offset     integer,
+  end_offset       integer,
+  anchor_text      text,
+  replacement_text text,
+  status           text not null default 'open' check (status in ('open', 'accepted', 'rejected')),
+  created_at       integer not null,
+  resolved_at      integer,
+  resolved_by      text
 );
 create index if not exists artifact_suggestion_by_artifact on artifact_suggestion (artifact_id, created_at);
 create table if not exists artifact_entry (
@@ -102,3 +109,8 @@ create table if not exists artifact_entry_change (
   primary key (artifact_id, seq)
 );
 create index if not exists artifact_entry_change_by_created on artifact_entry_change (created_at);
+create table if not exists artifact_collab (
+  artifact_id text primary key references artifact (id) on delete cascade,
+  snapshot    blob not null,
+  updated_at  integer not null
+);

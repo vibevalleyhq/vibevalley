@@ -15,6 +15,10 @@ export const subscriptions = {
   "artifact.entry.follow": { payload: z.object({ id: z.string(), after: z.number() }), event: S.ArtifactEntryEvent },
   /** An artifact's suggestions as they now are, then the whole list after each change. */
   "artifact.suggestion.follow": { payload: z.object({ id: z.string() }), event: S.SuggestionEvent },
+  /** An artifact's ephemeral live presence peers as a snapshot, then incremental upserts and removals. */
+  "artifact.presence.follow": { payload: S.ArtifactPresenceFollowRequest, event: S.ArtifactPresenceEvent },
+  /** One session's state, pending permissions/interactions, and live trajectory events after afterSeq. */
+  "session.watch": { payload: z.object({ id: z.string(), afterSeq: z.exactOptional(z.number()) }), event: S.SessionWatchEvent },
 } as const;
 
 export type SubscriptionName = keyof typeof subscriptions;

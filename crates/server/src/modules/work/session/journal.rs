@@ -9,7 +9,10 @@ use std::time::{Duration, Instant};
 
 use vibevalley_core::rules::cut;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{Outcome, SessionEvent, SessionEventType, ToolAction};
+use vibevalley_protocol::{
+    EventTokens, Outcome, SessionEvent, SessionEventType, SessionInteractionOption, SessionInteractionRequest, SessionInteractionResolution,
+    SessionPermissionRequest, ToolAction,
+};
 
 use crate::modules::work::ledger::Step;
 use crate::{Hub, lock, now};
@@ -56,6 +59,9 @@ fn blank(kind: SessionEventType, text: String) -> SessionEvent {
         ok: None,
         tokens: None,
         connection: None,
+        permission: None,
+        interaction: None,
+        interaction_resolution: None,
     }
 }
 
@@ -87,6 +93,7 @@ pub struct Journal {
     dirty: Vec<i64>,
     pushing: Option<Instant>,
     saving: Option<Instant>,
+    urgent: bool,
     run: Option<String>,
     keep: usize,
 }
@@ -103,6 +110,7 @@ impl Journal {
             dirty: vec![],
             pushing: None,
             saving: None,
+            urgent: false,
             run: None,
             keep: KEEP_EVENTS,
         }
@@ -294,6 +302,71 @@ impl Journal {
 
     pub fn note(&mut self, kind: SessionEventType, text: &str, from: From) {
         self.add(blank(kind, text.to_string()), from);
+        if matches!(kind, SessionEventType::RunError) {
+            self.urgent = true;
+        }
+    }
+
+    pub fn permission_requested(&mut self, request: SessionPermissionRequest, from: From) {
+        let mut step = blank(SessionEventType::PermissionRequest, request.summary.clone());
+        step.tool = Some(request.tool.clone());
+        step.input = request.input.clone();
+        step.permission = Some(request);
+        self.add(step, from);
+        self.urgent = true;
+    }
+
+    pub fn permission_resolved(&mut self, request_id: &str, decision: &vibevalley_runtime::oar::PermissionDecision, from: From) {
+        let (text, allowed) = match decision {
+            vibevalley_runtime::oar::PermissionDecision::AllowOnce => ("allowOnce".to_string(), true),
+            vibevalley_runtime::oar::PermissionDecision::AllowAlways => ("allowAlways".to_string(), true),
+            vibevalley_runtime::oar::PermissionDecision::Deny { message } => {
+                (message.as_deref().map(str::trim).filter(|m| !m.is_empty()).unwrap_or("deny").to_string(), false)
+            }
+        };
+        let mut step = blank(SessionEventType::PermissionResolved, text);
+        step.ok = Some(allowed);
+        step.permission = Some(SessionPermissionRequest {
+            request_id: request_id.to_string(),
+            tool: String::new(),
+            summary: String::new(),
+            input: None,
+        });
+        self.add(step, from);
+        self.urgent = true;
+    }
+
+    pub fn interaction_requested(&mut self, request: SessionInteractionRequest, from: From) {
+        let mut step = blank(SessionEventType::InteractionRequest, request.question.clone());
+        step.interaction = Some(request);
+        self.add(step, from);
+        self.urgent = true;
+    }
+
+    pub fn interaction_resolved(&mut self, resolution: SessionInteractionResolution, from: From) {
+        let text = resolution.choice.clone().unwrap_or_else(|| {
+            if resolution.accepted {
+                "accepted".to_string()
+            } else {
+                "cancelled".to_string()
+            }
+        });
+        let mut step = blank(SessionEventType::InteractionResolved, text);
+        step.ok = Some(resolution.accepted);
+        step.interaction_resolution = Some(resolution);
+        self.add(step, from);
+        self.urgent = true;
+    }
+
+    pub fn usage(&mut self, tokens: EventTokens, from: From) {
+        let mut step = blank(SessionEventType::LlmUsage, String::new());
+        step.tokens = Some(tokens);
+        self.add(step, from);
+        self.urgent = true;
+    }
+
+    fn take_urgent(&mut self) -> bool {
+        std::mem::take(&mut self.urgent)
     }
 
     /// Seals what is being written.
@@ -304,6 +377,29 @@ impl Journal {
     pub fn body(&self) -> String {
         serde_json::to_string(&self.steps).unwrap_or_else(|_| "[]".into())
     }
+}
+
+pub(super) fn event_tokens_of(usage: &vibevalley_runtime::oar::Usage) -> Option<EventTokens> {
+    if usage.input_tokens.is_none()
+        && usage.output_tokens.is_none()
+        && usage.cache_read_tokens.is_none()
+        && usage.cache_write_tokens.is_none()
+        && usage.reasoning_tokens.is_none()
+        && usage.context_used_tokens.is_none()
+        && usage.context_window_tokens.is_none()
+    {
+        return None;
+    }
+    let to_i64 = |v: Option<u64>| v.and_then(|n| i64::try_from(n).ok());
+    Some(EventTokens {
+        input: to_i64(usage.input_tokens).unwrap_or(0),
+        cache_read: to_i64(usage.cache_read_tokens).unwrap_or(0),
+        output: to_i64(usage.output_tokens).unwrap_or(0),
+        cache_write: to_i64(usage.cache_write_tokens),
+        reasoning: to_i64(usage.reasoning_tokens),
+        context_used: to_i64(usage.context_used_tokens),
+        context_window: to_i64(usage.context_window_tokens),
+    })
 }
 
 /// What a tool call is shown as: the command, file, pattern or address it
@@ -504,36 +600,110 @@ impl Trajectories {
 
     /// Takes one of the board's steps for session `id` working in `cwd`.
     pub fn step(&self, id: &str, cwd: &str, step: Step) {
-        self.with(id, |j| match step {
-            Step::RunStarted { run } => j.run_started(&run),
-            Step::RunEnded { run, outcome } => {
-                j.run_ended(&run, outcome);
-                j.close();
-            }
-            Step::Asked { text } => j.asked(&text, &[]),
-            Step::Agent(event) => {
-                let from = event.agent_path.as_slice();
-                use vibevalley_runtime::oar::EventKind as K;
-                match event.kind {
-                    K::TextDelta { text } => j.said(&text, from),
-                    K::ThinkingDelta { text } => j.thought(&text, from),
-                    K::ToolCallStarted { id: call, name, input } => {
-                        let detail = tool_detail(&input, cwd);
-                        let text = if detail.is_empty() { name.clone() } else { detail };
-                        let action = tool_action(&name, &input);
-                        let input = match &input {
-                            serde_json::Value::Null => None,
-                            serde_json::Value::String(s) => Some(s.clone()),
-                            v => Some(v.to_string()),
-                        };
-                        j.tool_started(&call, text, action, &name, input, from);
+        let urgent = self
+            .with(id, |j| {
+                match step {
+                    Step::RunStarted { run } => j.run_started(&run),
+                    Step::RunEnded { run, outcome } => {
+                        j.run_ended(&run, outcome);
+                        j.close();
                     }
-                    K::ToolCallFinished { id: call, ok, output } => j.tool_ended(&call, &output, ok, from),
-                    K::Question { text } => j.said(&text, from),
-                    K::Error { message } => j.note(SessionEventType::RunError, &message, from),
-                    _ => {}
+                    Step::Asked { text } => j.asked(&text, &[]),
+                    Step::Agent(event) => {
+                        let from = event.agent_path.as_slice();
+                        use vibevalley_runtime::oar::EventKind as K;
+                        match event.kind {
+                            K::TextDelta { text } => j.said(&text, from),
+                            K::ThinkingDelta { text } => j.thought(&text, from),
+                            K::ToolCallStarted { id: call, name, input } => {
+                                let detail = tool_detail(&input, cwd);
+                                let text = if detail.is_empty() { name.clone() } else { detail };
+                                let action = tool_action(&name, &input);
+                                let input = match &input {
+                                    serde_json::Value::Null => None,
+                                    serde_json::Value::String(s) => Some(s.clone()),
+                                    v => Some(v.to_string()),
+                                };
+                                j.tool_started(&call, text, action, &name, input, from);
+                            }
+                            K::ToolCallFinished { id: call, ok, output } => j.tool_ended(&call, &output, ok, from),
+                            K::PermissionRequested {
+                                request_id,
+                                tool,
+                                input,
+                                summary,
+                            } => {
+                                let req = SessionPermissionRequest {
+                                    request_id,
+                                    tool,
+                                    summary,
+                                    input: super::workspace::clip_json_input(&input),
+                                };
+                                j.permission_requested(req, from);
+                            }
+                            K::PermissionResolved { request_id, decision } => j.permission_resolved(&request_id, &decision, from),
+                            K::InteractionRequested {
+                                request_id,
+                                question,
+                                options,
+                                allow_custom,
+                            } => {
+                                let req = SessionInteractionRequest {
+                                    request_id,
+                                    question,
+                                    options: options
+                                        .into_iter()
+                                        .map(|o| SessionInteractionOption {
+                                            id: o.id,
+                                            label: o.label,
+                                            description: o.description,
+                                            warning: o.warning,
+                                        })
+                                        .collect(),
+                                    allow_custom,
+                                };
+                                j.interaction_requested(req, from);
+                            }
+                            K::InteractionResolved { request_id, decision } => {
+                                let resolution = match decision {
+                                    vibevalley_runtime::oar::InteractionDecision::Select { option_id } => SessionInteractionResolution {
+                                        request_id,
+                                        accepted: true,
+                                        choice: Some(option_id),
+                                    },
+                                    vibevalley_runtime::oar::InteractionDecision::Custom { text } => SessionInteractionResolution {
+                                        request_id,
+                                        accepted: true,
+                                        choice: Some(text),
+                                    },
+                                    vibevalley_runtime::oar::InteractionDecision::Cancel => SessionInteractionResolution {
+                                        request_id,
+                                        accepted: false,
+                                        choice: None,
+                                    },
+                                };
+                                j.interaction_resolved(resolution, from);
+                            }
+                            K::TurnFinished { usage, .. } if from.is_empty() => {
+                                if let Some(tokens) = event_tokens_of(&usage) {
+                                    j.usage(tokens, from);
+                                }
+                            }
+                            K::Question { text } => j.said(&text, from),
+                            K::Error { message } => j.note(SessionEventType::RunError, &message, from),
+                            _ => {}
+                        }
+                    }
                 }
+                if j.take_urgent() { j.due(true) } else { vec![] }
+            })
+            .unwrap_or_default();
+        if !urgent.is_empty()
+            && let Some(hub) = self.hub.upgrade()
+        {
+            for e in urgent {
+                hub.session_event(id, e);
             }
-        });
+        }
     }
 }

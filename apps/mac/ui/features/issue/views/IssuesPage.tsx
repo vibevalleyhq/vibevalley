@@ -8,6 +8,7 @@ import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { SearchField, Select } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
+import { motionClass } from "../../../design/motion";
 import { Segmented } from "../../../design/Segmented";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
@@ -343,12 +344,12 @@ function IssueView(props: { onBack: () => void; backLabel: string; blocked: () =
   return (
     <IssueChromeContext.Provider value={chrome}>
       <View testID="issue" class="min-h-0 flex-1">
-        <View class="h-11 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-4">
+        <View class="h-9 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-3.5">
           <View
             role="button"
             testID="issue-close"
             onPress={() => props.onBack()}
-            class="-ml-2 h-7 flex-row items-center gap-1 rounded-md px-2 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+            class={`-ml-2 h-7 flex-row items-center gap-1 rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
           >
             <Icon name="back" size={14} tone="muted" />
             <Text class="text-sm font-medium text-muted">{props.backLabel}</Text>
@@ -361,7 +362,7 @@ function IssueView(props: { onBack: () => void; backLabel: string; blocked: () =
               accessibilityState={{ selected: chrome.inspectorVisible() }}
               tooltip={<Bubble text={t("web.issue.detail.properties")} placement="bottom" />}
               onPress={() => chrome.toggleInspector()}
-              class={`h-7 flex-row items-center gap-1.5 rounded-md border px-2 transition duration-120 ease-out active:translate-y-px ${
+              class={`h-7 flex-row items-center gap-1.5 rounded-md border px-2 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px ${
                 chrome.inspectorVisible() ? "border-line bg-selected" : "border-transparent hover:bg-hover"
               }`}
             >
@@ -389,7 +390,7 @@ function Toolbar(props: {
   const repos = () => [...new Set(props.cards.map(cardRepo).filter((p): p is string => !!p))].toSorted();
   const agents = () => [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].toSorted((a, b) => nameOf()(a).localeCompare(nameOf()(b)));
   return (
-    <View class="flex-row flex-wrap items-center gap-2 px-3 pt-3 pb-2.5">
+    <View class="flex-row flex-wrap items-center gap-2 px-3.5 py-2">
       <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-2">
         <SearchField
           testid="issue-search"
@@ -430,7 +431,7 @@ function Toolbar(props: {
             role="button"
             testID="filter-clear"
             onPress={() => props.onFilter(noFilter)}
-            class="h-7 flex-row items-center rounded-md px-2 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+            class={`h-7 flex-row items-center rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
           >
             <Text class="text-xs font-medium text-water">{t("web.issue.page.clear")}</Text>
           </View>
@@ -458,7 +459,7 @@ function Toolbar(props: {
 function IssuesOnboarding(props: { onNavigate: (path: string) => void; onNew: () => void }) {
   return (
     <Scroll testID="issues-empty-onboarding" class="min-h-0 flex-1">
-      <View class="mx-auto my-8 w-full max-w-160 px-6">
+      <View class="mx-auto my-6 w-full max-w-160 px-6">
         <View class="rounded-xl border border-line bg-page p-6">
           <Text role="header" class="text-lg font-semibold text-ink">
             {t("web.issue.onboarding.title")}

@@ -18,7 +18,7 @@
 |---|---|
 | `scripts/docs/agent-notes.ts`、`skills.ts`、`doc-links.ts` | 校验 Note 目录格式并生成 `CATALOG.md`、校验 skill 结构、校验文档链接与反引号路径（含 `.rs`、`.toml`） |
 | `scripts/docs/stale-names.ts`、`glossary.ts` | 拦截已废弃旧名字、校验用语表代码名 |
-| `scripts/gen/capabilities.ts`、`api-client.ts`、`primitives.ts`、`i18n.ts` | 生成并校验 `capabilities.md`、`client.ts`、`primitives.md` 与双语词典的 `catalogs.ts`；`i18n.ts check` 也扫 Rust 的 `t("key")`，`server.*`、`cli.*`、`shared.*` 的未用键只在 `check --rust` 列出、不报错 |
+| `scripts/gen/capabilities.ts`、`api-client.ts`、`primitives.ts`、`i18n.ts` | 生成并校验 `capabilities.md`、`client.ts`、`primitives.md` 与双语词典的 `catalogs.ts`；`i18n.ts check` 同步扫描 Rust 的 `t("key")` 与前端词条，缺键和未用键直接报错 |
 | `scripts/audit/oxlint-plugin.ts`、`deadcode.ts` | 仓库自定义 lint 规则、`knip` 死代码检查 |
 | `scripts/release/regression.ts`、`verify-server.ts` | PR 回归测试修改门禁、启动隔离沙箱服务端 |
 | `vite.config.ts` 的 `rust:check`、`protocol:check`、`mac:check` | Rust 的格式、clippy（`-D warnings`）与测试；生成的契约类型和 golden 是不是最新；原生页面的 nsh 类型检查 |

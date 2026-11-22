@@ -1100,6 +1100,7 @@
      "description": "只列某一种结构化 ArtifactType；不填列全部",
      "enum": [
       "docs",
+      "outline",
       "slides",
       "dashboard",
       "motion",
@@ -1173,9 +1174,10 @@
      "type": "boolean"
     },
     "artifactType": {
-     "description": "结构化作品类型：docs（协作块文档）、slides（多文件演示稿）、dashboard（数据集+溯源看板）、motion（时间轴动态图形短片）、whiteboard（无限画布白板）、design（多画板 .dc.html 设计稿）、design-system（常驻设计令牌体系）。动笔前先调 artifact_type_read 读规范",
+     "description": "结构化作品类型：docs（协作块文档）、outline（树状大纲）、slides（多文件演示稿）、dashboard（数据集+溯源看板）、motion（时间轴动态图形短片）、whiteboard（无限画布白板）、design（多画板 .dc.html 设计稿）、design-system（常驻设计令牌体系）。动笔前先调 artifact_type_read 读规范",
      "enum": [
       "docs",
+      "outline",
       "slides",
       "dashboard",
       "motion",
@@ -1434,7 +1436,7 @@
  {
   "op": "artifact.type.list",
   "name": "artifact_type_list",
-  "description": "列出工作台支持的 7 种结构化 ArtifactType（docs、slides、dashboard、motion、whiteboard、design、design-system）、各自简介、可用参考分册以及当前默认的 Design System。",
+  "description": "列出工作台支持的 8 种结构化 ArtifactType（docs、outline、slides、dashboard、motion、whiteboard、design、design-system）、各自简介、可用参考分册以及当前默认的 Design System。",
   "parameters": {
    "additionalProperties": true,
    "properties": {},
@@ -1453,9 +1455,10 @@
      "type": "string"
     },
     "type": {
-     "description": "要读规范的类型：docs、slides、dashboard、motion、whiteboard、design、design-system",
+     "description": "要读规范的类型：docs、outline、slides、dashboard、motion、whiteboard、design、design-system",
      "enum": [
       "docs",
+      "outline",
       "slides",
       "dashboard",
       "motion",

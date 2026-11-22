@@ -1,7 +1,8 @@
-//! Bundles the hosted views (`ui/`) with the `nsh` CLI into `$OUT_DIR/ui`,
-//! which the binary embeds. The CLI is found through `NSH_BIN`, the repo's
-//! `.tools/bin/nsh` (`vp run nsh:install`), or `PATH`.
-//! Without it the build still succeeds, with a bundle that reports the
+//! Bundles the hosted views (`ui/`) with the `nsh` CLI into `$OUT_DIR/ui`
+//! (`App.tsx`) and `$OUT_DIR/ui-shell` (`ShellApp.tsx`), which release builds
+//! embed as stripped QuickJS bytecode. The CLI is found through `NSH_BIN`, the
+//! repo's `.tools/bin/nsh` (`vp run nsh:install`), or `PATH`.
+//! Without it debug builds still succeed, with a bundle that reports the
 //! missing UI at run time.
 
 use std::path::{Path, PathBuf};
@@ -12,9 +13,7 @@ fn main() {
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let repo = manifest.join("../..").canonicalize().unwrap();
     let ui = manifest.join("ui");
-    let ui_build = ui.join("build");
-    let out = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("ui");
-    std::fs::create_dir_all(&out).unwrap();
+    let out_root = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=NSH_BIN");
     println!("cargo:rerun-if-env-changed=VIBEVALLEY_EMBED_UI");
@@ -24,27 +23,48 @@ fn main() {
         watch(&ui);
     }
 
-    // In debug builds, `hosted::bundle()` loads `ui/build/` straight from disk so
-    // editing TSX files never recompiles or relinks `vibevalley-mac`.
-    if !release && ui_build.join("bundle.js").is_file() && ui_build.join("capabilities.json").is_file() {
-        let _ = std::fs::copy(ui_build.join("capabilities.json"), out.join("capabilities.json"));
+    build_entry(&repo, &ui, "App.tsx", &ui.join("build"), &out_root.join("ui"), release);
+    build_entry(&repo, &ui, "ShellApp.tsx", &ui.join("build-shell"), &out_root.join("ui-shell"), release);
+}
+
+fn build_entry(repo: &Path, ui: &Path, entry: &str, dev_dir: &Path, out: &Path, release: bool) {
+    std::fs::create_dir_all(out).unwrap();
+
+    // In debug builds, `hosted::bundle_for()` loads `ui/build/` and `ui/build-shell/`
+    // straight from disk so editing TSX files never recompiles or relinks `vibevalley-mac`.
+    if !release && dev_dir.join("bundle.js").is_file() && dev_dir.join("capabilities.json").is_file() {
+        let _ = std::fs::copy(dev_dir.join("capabilities.json"), out.join("capabilities.json"));
         return;
     }
 
-    let target_dir = if release { &out } else { &ui_build };
+    let target_dir = if release { out } else { dev_dir };
     let _ = std::fs::create_dir_all(target_dir);
-    let built = find_nsh(&repo).and_then(|nsh| {
-        let result = Command::new(&nsh).arg("build").arg(ui.join("App.tsx")).arg("-o").arg(target_dir).output();
+    let built = find_nsh(repo).and_then(|nsh| {
+        let mut cmd = Command::new(&nsh);
+        cmd.arg("build");
+        if release {
+            cmd.arg("--release");
+        }
+        let result = cmd.arg(ui.join(entry)).arg("-o").arg(target_dir).output();
         match result {
             Ok(o) if o.status.success() => {
-                if !release {
+                if release {
+                    let has_bytecode = out.join("bundle.nshc").metadata().is_ok_and(|meta| meta.is_file() && meta.len() > 0);
+                    if has_bytecode {
+                        // Embed only stripped QuickJS bytecode in release binaries so `bundle.js` is not duplicated.
+                        std::fs::write(out.join("bundle.js"), "").unwrap();
+                    } else {
+                        // Sentinel so release `include_bytes!` always succeeds and falls back to `bundle.js`.
+                        std::fs::write(out.join("bundle.nshc"), []).unwrap();
+                    }
+                } else {
                     let _ = std::fs::copy(target_dir.join("capabilities.json"), out.join("capabilities.json"));
                 }
                 Some(())
             }
             Ok(o) => {
                 for line in String::from_utf8_lossy(&o.stderr).lines().chain(String::from_utf8_lossy(&o.stdout).lines()) {
-                    println!("cargo:warning=nsh build: {line}");
+                    println!("cargo:warning=nsh build ({entry}): {line}");
                 }
                 None
             }
@@ -55,8 +75,8 @@ fn main() {
         }
     });
     if built.is_none() {
-        assert!(!release, "release builds require a working nsh UI bundle; install nsh and rebuild");
-        println!("cargo:warning=hosted views not bundled; install the nsh CLI (see build.rs)");
+        assert!(!release, "release builds require a working nsh UI bundle ({entry}); install nsh and rebuild");
+        println!("cargo:warning=hosted views ({entry}) not bundled; install the nsh CLI (see build.rs)");
         std::fs::write(
             out.join("bundle.js"),
             "throw new Error('VibeValley was built without its UI bundle: install the nsh CLI and rebuild.');\n",
@@ -99,7 +119,7 @@ fn watch(dir: &Path) {
         let path = entry.path();
         let name = entry.file_name();
         let name = name.to_string_lossy();
-        if name.starts_with('.') || name == "build" || name == "node_modules" {
+        if name.starts_with('.') || name == "build" || name == "build-shell" || name == "node_modules" {
             continue;
         }
         if path.is_dir() {

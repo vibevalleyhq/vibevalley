@@ -8,7 +8,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::Ordering;
 
 use sqlx::SqliteConnection;
-use vibevalley_core::artifact::{Page, blocks_of_markdown, inline_spans, markdown_of, ordered, unmarked};
+use vibevalley_core::artifact::{Page, blocks_of_markdown, inline_spans, markdown_of, ordered, plain, unmarked};
+use vibevalley_core::collab::{CommitMeta, SuggestionSpan, coalesce_suggestions};
 use vibevalley_core::rules::key_between;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
@@ -17,7 +18,8 @@ use vibevalley_protocol::{
     SuggestionCreate, SuggestionEvent, SuggestionEventKind, SuggestionStatus, TextSpan, USER_ID,
 };
 
-use super::db::{self, ArtifactRow, ChangeRow};
+use super::collab::commit_meta_for_actor;
+use super::db::{self, ArtifactRow, ChangeRow, StoredSuggestion};
 use super::{Artifacts, Change, lock, new_id, q, refused};
 use crate::base::LookIn;
 use crate::{Sink, now};
@@ -205,11 +207,16 @@ impl Artifacts {
     /// `submit`: one batch, in one transaction, one at a time.
     pub fn submit(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>) -> Result<BlockAck, ApiError> {
         let _batches = lock(&self.batches);
-        self.submit_locked(id, actor, batch_id, ops)
+        self.submit_locked(id, actor, batch_id, ops, None)
+    }
+
+    pub fn submit_with_meta(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>, meta: &CommitMeta) -> Result<BlockAck, ApiError> {
+        let _batches = lock(&self.batches);
+        self.submit_locked(id, actor, batch_id, ops, Some(meta))
     }
 
     /// One batch, under the batch lock the caller holds.
-    fn submit_locked(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>) -> Result<BlockAck, ApiError> {
+    fn submit_locked(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>, meta: Option<&CommitMeta>) -> Result<BlockAck, ApiError> {
         if batch_id.trim().is_empty() {
             return Err(refused(t("server.artifact.noBatch", &[])));
         }
@@ -217,7 +224,7 @@ impl Artifacts {
             let mut conn = self.db();
             use sqlx::Connection;
             let mut tx = pollster::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
-            let result = self.apply_batch(&mut tx, id, actor, batch_id, &ops)?;
+            let result = self.apply_batch(&mut tx, id, actor, batch_id, &ops, meta)?;
             pollster::block_on(tx.commit()).map_err(q)?;
             result
         };
@@ -227,7 +234,15 @@ impl Artifacts {
         Ok(ack)
     }
 
-    fn apply_batch(&self, db: &mut SqliteConnection, id: &str, actor: &str, batch_id: &str, ops: &[BlockOp]) -> Result<(BlockAck, bool), ApiError> {
+    fn apply_batch(
+        &self,
+        db: &mut SqliteConnection,
+        id: &str,
+        actor: &str,
+        batch_id: &str,
+        ops: &[BlockOp],
+        explicit_meta: Option<&CommitMeta>,
+    ) -> Result<(BlockAck, bool), ApiError> {
         let row = self.found_blocks(db, id)?;
         let all = db::blocks(db, id).map_err(q)?;
         if let Some(seen) = db::change_by_batch(db, batch_id).map_err(q)? {
@@ -264,6 +279,7 @@ impl Artifacts {
         p.taken = Box::new(move |block| taken.contains(block));
         let results: Vec<BlockOpResult> = ops.iter().map(|op| p.apply(op)).collect();
         let changed = p.changed_blocks();
+        let post_all: Vec<Block> = p.all().cloned().collect();
         for b in &changed {
             db::put_block(db, id, b).map_err(q)?;
         }
@@ -285,6 +301,10 @@ impl Artifacts {
         )
         .map_err(q)?;
         db::artifact_accepted(db, id, seq, at).map_err(q)?;
+        if !changed.is_empty() {
+            let meta = explicit_meta.cloned().unwrap_or_else(|| commit_meta_for_actor(actor, None, at));
+            self.sync_blocks_to_collab(db, &row, &all, &post_all, &changed, &meta)?;
+        }
         Ok((
             BlockAck {
                 batch_id: batch_id.into(),
@@ -322,10 +342,18 @@ impl Artifacts {
             base_rev,
             text: spans_of(kind, text),
         });
-        Ok(Self::one(self.submit_locked(artifact, actor, &new_id(), vec![op])?, block))
+        Ok(Self::one(self.submit_locked(artifact, actor, &new_id(), vec![op], None)?, block))
     }
 
     pub fn insert_block(&self, artifact: &str, actor: &str, req: &BlockCreate) -> Result<BlockOpResult, ApiError> {
+        self.insert_block_inner(artifact, actor, req, None)
+    }
+
+    pub fn insert_block_with_meta(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
+        self.insert_block_inner(artifact, actor, req, Some(meta))
+    }
+
+    fn insert_block_inner(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
         self.found_blocks(&mut self.db(), artifact)?;
         let name = req.r#type.as_deref().map(str::trim).filter(|s| !s.is_empty()).unwrap_or("paragraph");
         let kind = append_type(name).ok_or_else(bad_block_type)?;
@@ -365,11 +393,19 @@ impl Artifacts {
             attrs: attrs_for(kind, &req.into()),
             text: spans_of(kind, &req.text),
         };
-        let ack = self.submit_locked(artifact, actor, &new_id(), vec![BlockOp::InsertBlock(BlockOpInsertBlock { block })])?;
+        let ack = self.submit_locked(artifact, actor, &new_id(), vec![BlockOp::InsertBlock(BlockOpInsertBlock { block })], meta)?;
         ack.results.into_iter().next().ok_or_else(|| refused(t("server.artifact.notApplied", &[])))
     }
 
     pub fn update_block(&self, artifact: &str, actor: &str, req: &BlockUpdate) -> Result<BlockOpResult, ApiError> {
+        self.update_block_inner(artifact, actor, req, None)
+    }
+
+    pub fn update_block_with_meta(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
+        self.update_block_inner(artifact, actor, req, Some(meta))
+    }
+
+    fn update_block_inner(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
         let block = req.block.trim().to_string();
         let Some(now_b) = self.blocks_of(artifact)?.into_iter().find(|b| b.id == block) else {
             return Err(refused(t("server.artifact.op.noBlock", &[("id", block.as_str().into())])));
@@ -394,9 +430,11 @@ impl Artifacts {
                 unset: None,
                 delete: None,
             };
-            let made = self.suggest(
+            let origin = meta.map(|m| m.origin.as_str());
+            let made = self.suggest_with_origin(
                 artifact,
                 actor,
+                origin,
                 &SuggestionCreate {
                     block: block.clone(),
                     base_rev: req.base_rev,
@@ -439,11 +477,22 @@ impl Artifacts {
         if ops.is_empty() {
             return Err(refused(t("server.artifact.nothingToChange", &[])));
         }
-        let ack = self.submit(artifact, actor, &new_id(), ops)?;
+        let ack = match meta {
+            Some(m) => self.submit_with_meta(artifact, actor, &new_id(), ops, m)?,
+            None => self.submit(artifact, actor, &new_id(), ops)?,
+        };
         ack.results.into_iter().last().ok_or_else(|| refused(t("server.artifact.notApplied", &[])))
     }
 
     pub fn delete_block(&self, artifact: &str, actor: &str, req: &BlockDelete) -> Result<BlockOpResult, ApiError> {
+        self.delete_block_inner(artifact, actor, req, None)
+    }
+
+    pub fn delete_block_with_meta(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
+        self.delete_block_inner(artifact, actor, req, Some(meta))
+    }
+
+    fn delete_block_inner(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
         let block = req.block.trim().to_string();
         let now_b = self.blocks_of(artifact)?.into_iter().find(|b| b.id == block);
         if let Some(b) = now_b
@@ -454,9 +503,11 @@ impl Artifacts {
                 delete: Some(true),
                 ..SuggestionChange::default()
             };
-            let made = self.suggest(
+            let origin = meta.map(|m| m.origin.as_str());
+            let made = self.suggest_with_origin(
                 artifact,
                 actor,
+                origin,
                 &SuggestionCreate {
                     block: block.clone(),
                     base_rev: b.rev,
@@ -465,7 +516,11 @@ impl Artifacts {
             )?;
             return Ok(diverted(&block, b.rev, &made));
         }
-        let ack = self.submit(artifact, actor, &new_id(), vec![BlockOp::DeleteBlock(BlockOpDeleteBlock { block_id: block })])?;
+        let ops = vec![BlockOp::DeleteBlock(BlockOpDeleteBlock { block_id: block })];
+        let ack = match meta {
+            Some(m) => self.submit_with_meta(artifact, actor, &new_id(), ops, m)?,
+            None => self.submit(artifact, actor, &new_id(), ops)?,
+        };
         ack.results.into_iter().next().ok_or_else(|| refused(t("server.artifact.notApplied", &[])))
     }
 
@@ -523,7 +578,9 @@ impl Artifacts {
     pub fn suggestions(&self, id: &str) -> Result<Vec<Suggestion>, ApiError> {
         let mut db = self.db();
         self.found_blocks(&mut db, id)?;
-        db::suggestions(&mut db, id, SUGGESTIONS_LISTED).map_err(q)
+        let mut list = db::suggestions(&mut db, id, SUGGESTIONS_LISTED).map_err(q)?;
+        self.hydrate_suggestion_offsets(&mut db, id, &mut list);
+        Ok(list)
     }
 
     fn publish_suggestions(&self, id: &str) -> Result<(), ApiError> {
@@ -533,10 +590,15 @@ impl Artifacts {
     }
 
     pub fn suggest(&self, artifact: &str, actor: &str, req: &SuggestionCreate) -> Result<Suggestion, ApiError> {
+        self.suggest_with_origin(artifact, actor, None, req)
+    }
+
+    pub fn suggest_with_origin(&self, artifact: &str, actor: &str, origin: Option<&str>, req: &SuggestionCreate) -> Result<Suggestion, ApiError> {
         let made = {
             let mut db = self.db();
-            self.found_blocks(&mut db, artifact)?;
-            let block = db::blocks(&mut db, artifact).map_err(q)?.into_iter().find(|b| b.id == req.block);
+            let row = self.found_blocks(&mut db, artifact)?;
+            let all_blocks = db::blocks(&mut db, artifact).map_err(q)?;
+            let block = all_blocks.iter().find(|b| b.id == req.block);
             let Some(block) = block.filter(|b| b.deleted != Some(true)) else {
                 return Err(refused(t("server.artifact.suggestion.noBlock", &[("id", req.block.as_str().into())])));
             };
@@ -549,32 +611,134 @@ impl Artifacts {
                     &[("rev", req.base_rev.into()), ("now", block.rev.into())],
                 )));
             }
+            let at = now();
+            let effective_origin = origin.map(str::to_string).unwrap_or_else(|| commit_meta_for_actor(actor, None, at).origin);
+            let is_text_only = req.change.text.is_some()
+                && req.change.r#type.is_none()
+                && req.change.attrs.is_none()
+                && req.change.unset.is_none()
+                && req.change.delete != Some(true);
+
+            let (cursor_start, cursor_end, start_offset, end_offset, anchor_text, replacement_text) = if let Some(spans) = &req.change.text {
+                let new_text = plain(spans);
+                let (cs, ce, so, eo, orig, repl) = self.anchor_suggestion_range(&mut db, &row, &all_blocks, block, &new_text)?;
+                (Some(cs), Some(ce), Some(so), Some(eo), Some(orig), Some(repl))
+            } else {
+                (None, None, None, None, None, None)
+            };
+
+            // Coalesce overlapping/adjacent text-only suggestions from the same origin on the same block.
+            if is_text_only && let (Some(so), Some(eo)) = (start_offset, end_offset) {
+                let open_same: Vec<StoredSuggestion> = db::stored_suggestions(&mut db, artifact, SUGGESTIONS_LISTED)
+                    .map_err(q)?
+                    .into_iter()
+                    .filter(|s| {
+                        s.wire.status == SuggestionStatus::Open
+                            && s.wire.block_id == req.block
+                            && s.origin.as_deref() == Some(effective_origin.as_str())
+                            && s.wire.change.text.is_some()
+                            && s.wire.change.r#type.is_none()
+                            && s.wire.change.attrs.is_none()
+                            && s.wire.change.unset.is_none()
+                            && s.wire.change.delete != Some(true)
+                    })
+                    .collect();
+                if !open_same.is_empty() {
+                    let mut spans: Vec<SuggestionSpan> = open_same
+                        .iter()
+                        .filter_map(|s| {
+                            Some(SuggestionSpan {
+                                id: s.wire.id.clone(),
+                                origin: effective_origin.clone(),
+                                text_key: s.wire.block_id.clone(),
+                                start: s.wire.start_offset? as usize,
+                                end: s.wire.end_offset? as usize,
+                                replacement: s.replacement_text.clone().unwrap_or_default(),
+                                cursor_start: s.wire.cursor_start.clone(),
+                                cursor_end: s.wire.cursor_end.clone(),
+                            })
+                        })
+                        .collect();
+                    let new_marker = "__new_suggestion__".to_string();
+                    spans.push(SuggestionSpan {
+                        id: new_marker.clone(),
+                        origin: effective_origin.clone(),
+                        text_key: req.block.clone(),
+                        start: so as usize,
+                        end: eo as usize,
+                        replacement: replacement_text.clone().unwrap_or_default(),
+                        cursor_start: cursor_start.clone(),
+                        cursor_end: cursor_end.clone(),
+                    });
+                    let before_len = spans.len();
+                    let folded = coalesce_suggestions(spans);
+                    if folded.len() < before_len
+                        && let Some(existing) = open_same
+                            .iter()
+                            .find(|o| o.wire.start_offset.zip(o.wire.end_offset).is_some_and(|(es, ee)| es <= eo && so <= ee))
+                    {
+                        let mut updated = StoredSuggestion {
+                            wire: Suggestion {
+                                base_rev: req.base_rev,
+                                change: req.change.clone(),
+                                cursor_start: cursor_start.clone(),
+                                cursor_end: cursor_end.clone(),
+                                start_offset,
+                                end_offset,
+                                ..existing.wire.clone()
+                            },
+                            origin: existing.origin.clone(),
+                            anchor_text: anchor_text.clone(),
+                            replacement_text: replacement_text.clone(),
+                        };
+                        db::update_suggestion(&mut db, &updated).map_err(q)?;
+                        let mut wire = db::suggestion(&mut db, &updated.wire.id).map_err(q)?.unwrap_or_else(|| updated.wire.clone());
+                        self.hydrate_suggestion_offsets(&mut db, artifact, std::slice::from_mut(&mut wire));
+                        updated.wire = wire;
+                        drop(db);
+                        self.publish_suggestions(artifact)?;
+                        return Ok(updated.wire);
+                    }
+                }
+            }
+
             let id = new_id();
-            let open = Suggestion {
-                id: id.clone(),
-                artifact_id: artifact.into(),
-                block_id: req.block.clone(),
-                author: actor.into(),
-                base_rev: req.base_rev,
-                change: req.change.clone(),
-                status: SuggestionStatus::Open,
-                created_at: now(),
-                resolved_at: None,
-                resolved_by: None,
+            let open = StoredSuggestion {
+                wire: Suggestion {
+                    id: id.clone(),
+                    artifact_id: artifact.into(),
+                    block_id: req.block.clone(),
+                    author: actor.into(),
+                    base_rev: req.base_rev,
+                    change: req.change.clone(),
+                    status: SuggestionStatus::Open,
+                    created_at: at,
+                    resolved_at: None,
+                    resolved_by: None,
+                    cursor_start,
+                    cursor_end,
+                    start_offset,
+                    end_offset,
+                },
+                origin: Some(effective_origin),
+                anchor_text,
+                replacement_text,
             };
             db::add_suggestion(&mut db, &open).map_err(q)?;
-            db::suggestion(&mut db, &id)
+            let mut made = db::suggestion(&mut db, &id)
                 .map_err(q)?
-                .ok_or_else(|| refused(t("server.artifact.suggestion.missing", &[("id", id.as_str().into())])))?
+                .ok_or_else(|| refused(t("server.artifact.suggestion.missing", &[("id", id.as_str().into())])))?;
+            self.hydrate_suggestion_offsets(&mut db, artifact, std::slice::from_mut(&mut made));
+            made
         };
         self.publish_suggestions(artifact)?;
         Ok(made)
     }
 
-    fn open_suggestion(&self, artifact: &str, suggestion: &str) -> Result<Suggestion, ApiError> {
-        db::suggestion(&mut self.db(), suggestion)
+    fn open_stored_suggestion(&self, artifact: &str, suggestion: &str) -> Result<StoredSuggestion, ApiError> {
+        db::stored_suggestion(&mut self.db(), suggestion)
             .map_err(q)?
-            .filter(|s| s.artifact_id == artifact)
+            .filter(|s| s.wire.artifact_id == artifact)
             .ok_or_else(|| refused(t("server.artifact.suggestion.missing", &[("id", suggestion.into())])))
     }
 
@@ -590,47 +754,62 @@ impl Artifacts {
 
     pub fn accept_suggestion(&self, artifact: &str, suggestion: &str, actor: &str) -> Result<Suggestion, ApiError> {
         let _batches = lock(&self.batches);
-        let row = self.open_suggestion(artifact, suggestion)?;
+        let stored = self.open_stored_suggestion(artifact, suggestion)?;
+        let row = &stored.wire;
         if row.status != SuggestionStatus::Open {
-            return Ok(row);
+            return Ok(row.clone());
         }
         let block = self.blocks_of(artifact)?.into_iter().find(|b| b.id == row.block_id);
         let Some(block) = block.filter(|b| b.deleted != Some(true)) else {
             return Err(refused(t("server.artifact.suggestion.noBlock", &[("id", row.block_id.as_str().into())])));
         };
-        if block.rev != row.base_rev {
-            return Err(refused(t(
-                "server.artifact.suggestion.stale",
-                &[("rev", row.base_rev.into()), ("now", block.rev.into())],
-            )));
-        }
         let c = &row.change;
-        let mut ops = vec![];
-        if c.delete == Some(true) {
-            ops.push(BlockOp::DeleteBlock(BlockOpDeleteBlock { block_id: block.id.clone() }));
+        let is_text_only = c.text.is_some() && c.r#type.is_none() && c.attrs.is_none() && c.unset.is_none() && c.delete != Some(true);
+        let ops = if block.rev != row.base_rev {
+            // When the block moved on, a persistent Loro `Cursor` anchor lets
+            // text-only suggestions apply cleanly if the anchored span is intact.
+            if is_text_only && let Some(merged_text) = self.try_merge_cursor_suggestion(artifact, &block, &stored)? {
+                vec![BlockOp::UpdateText(BlockOpUpdateText {
+                    block_id: block.id.clone(),
+                    base_rev: block.rev,
+                    text: spans_of(block.r#type, &merged_text),
+                })]
+            } else {
+                return Err(refused(t(
+                    "server.artifact.suggestion.stale",
+                    &[("rev", row.base_rev.into()), ("now", block.rev.into())],
+                )));
+            }
         } else {
-            if let Some(kind) = c.r#type {
-                ops.push(BlockOp::SetType(BlockOpSetType {
-                    block_id: block.id.clone(),
-                    r#type: kind,
-                    attrs: c.attrs.clone().unwrap_or_default(),
-                }));
-            } else if c.attrs.is_some() || c.unset.is_some() {
-                ops.push(BlockOp::SetAttrs(BlockOpSetAttrs {
-                    block_id: block.id.clone(),
-                    attrs: c.attrs.clone().unwrap_or_default(),
-                    unset: c.unset.clone(),
-                }));
+            let mut ops = vec![];
+            if c.delete == Some(true) {
+                ops.push(BlockOp::DeleteBlock(BlockOpDeleteBlock { block_id: block.id.clone() }));
+            } else {
+                if let Some(kind) = c.r#type {
+                    ops.push(BlockOp::SetType(BlockOpSetType {
+                        block_id: block.id.clone(),
+                        r#type: kind,
+                        attrs: c.attrs.clone().unwrap_or_default(),
+                    }));
+                } else if c.attrs.is_some() || c.unset.is_some() {
+                    ops.push(BlockOp::SetAttrs(BlockOpSetAttrs {
+                        block_id: block.id.clone(),
+                        attrs: c.attrs.clone().unwrap_or_default(),
+                        unset: c.unset.clone(),
+                    }));
+                }
+                if let Some(text) = &c.text {
+                    ops.push(BlockOp::UpdateText(BlockOpUpdateText {
+                        block_id: block.id.clone(),
+                        base_rev: row.base_rev,
+                        text: text.clone(),
+                    }));
+                }
             }
-            if let Some(text) = &c.text {
-                ops.push(BlockOp::UpdateText(BlockOpUpdateText {
-                    block_id: block.id.clone(),
-                    base_rev: row.base_rev,
-                    text: text.clone(),
-                }));
-            }
-        }
-        let ack = self.submit_locked(artifact, actor, &format!("suggestion:{suggestion}"), ops)?;
+            ops
+        };
+        let accept_meta = commit_meta_for_actor(actor, Some(format!("accept suggestion {suggestion}")), now());
+        let ack = self.submit_locked(artifact, actor, &format!("suggestion:{suggestion}"), ops, Some(&accept_meta))?;
         if let Some(bad) = ack
             .results
             .iter()
@@ -638,16 +817,17 @@ impl Artifacts {
         {
             return Err(refused(bad.reason.clone().unwrap_or_else(|| t("server.artifact.notApplied", &[]))));
         }
-        self.resolve(artifact, &row, SuggestionStatus::Accepted, actor)
+        self.resolve(artifact, row, SuggestionStatus::Accepted, actor)
     }
 
     pub fn reject_suggestion(&self, artifact: &str, suggestion: &str, actor: &str) -> Result<Suggestion, ApiError> {
         let _batches = lock(&self.batches);
-        let row = self.open_suggestion(artifact, suggestion)?;
+        let stored = self.open_stored_suggestion(artifact, suggestion)?;
+        let row = &stored.wire;
         if row.status != SuggestionStatus::Open {
-            return Ok(row);
+            return Ok(row.clone());
         }
-        self.resolve(artifact, &row, SuggestionStatus::Rejected, actor)
+        self.resolve(artifact, row, SuggestionStatus::Rejected, actor)
     }
 
     /// `suggestionStream`: the list now, then the whole list after each change.
@@ -673,7 +853,14 @@ impl Artifacts {
     }
 
     /// `fill`: Markdown read into blocks, as one batch.
-    pub(super) fn fill(&self, db: &mut SqliteConnection, id: &str, markdown: &str, actor: &str) -> Result<Option<BlockAck>, ApiError> {
+    pub(super) fn fill_with_meta(
+        &self,
+        db: &mut SqliteConnection,
+        id: &str,
+        markdown: &str,
+        actor: &str,
+        meta: &CommitMeta,
+    ) -> Result<Option<BlockAck>, ApiError> {
         let mut parents: Vec<String> = vec![];
         let mut last: HashMap<String, String> = HashMap::new();
         let mut ops = vec![];
@@ -699,7 +886,7 @@ impl Artifacts {
         if ops.is_empty() {
             return Ok(None);
         }
-        let (ack, _) = self.apply_batch(db, id, actor, &new_id(), &ops)?;
+        let (ack, _) = self.apply_batch(db, id, actor, &new_id(), &ops, Some(meta))?;
         Ok(Some(ack))
     }
 
@@ -736,7 +923,7 @@ impl Artifacts {
         }
         b.order_key = key_or_refuse(&after, &before)?;
         let id = b.id.clone();
-        let ack = self.submit_locked(artifact, writer, &new_id(), vec![BlockOp::InsertBlock(BlockOpInsertBlock { block: b })])?;
+        let ack = self.submit_locked(artifact, writer, &new_id(), vec![BlockOp::InsertBlock(BlockOpInsertBlock { block: b })], None)?;
         let status = ack.results.first().map(|r| r.status);
         let not_inserted = |s: &str| refused(t("server.artifact.demoNotInserted", &[("status", s.into())]));
         if status != Some(BlockOpStatus::Applied) {

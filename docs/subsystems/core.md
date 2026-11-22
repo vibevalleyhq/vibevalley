@@ -22,7 +22,7 @@
 | `crates/protocol/src/contract/` | `SpaceState`、`Fact`、`StateFrame`、`LiveEvent` 与接口表 `ENDPOINTS`（`endpoints.rs`），手写的源头，TS 由它生成 |
 | `crates/protocol/src/envelope.rs` | 全信封、`BizCode`、`ApiError` |
 | `crates/server/src/transport/http/mod.rs` | axum 路由：命令接口、`/state`、`/live`、订阅流、工单观察流、附件、网页 Artifact、`/mcp`；来源校验 `from_the_farm`；`media.rs` 媒体输入与语音流 |
-| `crates/cli/src/` | 命令行 `vibevalley`：`main.rs` 入口与全局参数、`farm.rs` 找服务端、`commands/` 按领域的子命令 |
+| `crates/cli/src/` | 命令行 `vibevalley`：`main.rs` 入口、`client.rs` HTTP/SSE 客户端与退出码、`output.rs` 输出格式化、`domains/` 按五大业务域组织的强类型子命令 |
 
 全部接口与权限矩阵见生成的 [capabilities.md](docs/reference/capabilities.md)。
 
@@ -56,7 +56,7 @@ SSE 以外的路由：
 - `/mcp`：帮工的工具（[频道](docs/subsystems/channel.md)）。
 - `/chord/ws`：执行治理文档 `space` 的 WebSocket 订阅（快照、按修订号续读与 `budget.raise` 命令，见 [Chord](crates/server/src/transport/chord/README.md)）。
 
-- **客户端拥有流与订阅的生命周期**：原生页面经 `crates/server/src/transport/bridge` 直接收发 `StateFrame`、`LiveEvent` 与订阅事件，视图关闭或取消订阅时立即释放 `Subscription`；命令行的 `sse_events`（`crates/cli/src/farm.rs`）在 HTTP SSE 上按空行分帧解码，坏帧、HTTP 拒绝或退出时立即释放连接。
+- **客户端拥有流与订阅的生命周期**：原生页面经 `crates/server/src/transport/bridge` 直接收发 `StateFrame`、`LiveEvent` 与订阅事件，视图关闭或取消订阅时立即释放 `Subscription`；命令行的 `Client::sse`（`crates/cli/src/client.rs`）在 HTTP SSE 上按空行分帧解码，坏帧、HTTP 拒绝或退出时立即释放连接。
 - **心跳**：每条 SSE 连接（含工单观察流和订阅流）每 20 秒发 `: ping` 心跳；订阅方断开时释放源订阅。
 - **写接口返回 `seq` 对齐画面帧**：工单写接口（`issue.create`、`issue.update`、`issue.status.update`、`issue.comment.create`）在 `Hub::apply` 后返回当前 `seq`，页面以 `frame.seq >= reply.seq` 作为意图结算条件。
 
@@ -69,7 +69,7 @@ SSE 以外的路由：
 - **开关写成幂等设值**：回应、置顶、归档定义为带 `on: boolean` 的 `*.set` 接口，重复设置相同值不产生副作用。
 - **破坏性操作配对试跑 `dryRun`**：删除、合并、关单接口在 `endpoints` 中指向对应的 `preview<动词>` 接口。试跑与真做共用同一套前置判断函数，试跑不写库、不碰 git。
 - **拒绝响应附带下一步 `next`**：业务拒绝与未找到错误在 `error.next` 中携带 `{ say, run? }[]`，给出可直接运行的 CLI 命令或指引。
-- **CLI 是纯 HTTP 客户端**：`crates/cli` 不载入服务端、不直连数据库，通过 `--server`、`VIBEVALLEY_SERVER` 或 `$VIBEVALLEY_HOME/server.json`（`crates/protocol/src/home.rs`）连接服务端；失败时 stderr 打一行 JSON，退出码同 TS 版。
+- **CLI 是纯 HTTP 客户端**：`crates/cli` 不载入服务端、不直连数据库，通过 `--server`、`VIBEVALLEY_SERVER` 或当前发布通道家目录的 `server.json`（未记录时回落到当前通道默认端口，见 `crates/protocol/src/home.rs`）连接服务端；失败时 stderr 打一行 JSON，退出码同 TS 版。
 - **拥有者负责协调与身份分配**：处理器只传业务意图，由拥有者模块协调内部步骤并在锁内分配新实体 ID；查询缺失关联时列入 `missingSessions`，不伪造缺省对象。
 
 ## 怎么走
@@ -86,7 +86,7 @@ SSE 以外的路由：
 
 1. `start`（`crates/server/src/start.rs`）从空状态起 `Hub`，按序打开设置、游戏、AI 服务、档案和农机、仓库、记性、轨迹、工单板（共用 `server.db`）、PR 与分支发布、定时任务、附件、媒体输入、频道、素材库、媒体任务、Artifact、笔记、助手、观察层与连接器；各自从 `server.db` 与家目录文件读回并施加初始事实。
 2. 工单板接回停机时在场的会话；观察层按游标读完漏读的频道事件。
-3. `main.rs` 绑定端口（`VIBEVALLEY_PORT=0` 时取任意端口），写出 `server.json`，`--ready-json` 打印 `{"url","pid"}`。
+3. `main.rs` 绑定端口（按 `VIBEVALLEY_PORT`，`0` 为随机端口；未设时取当前发布通道默认端口：`release` `8787`、`beta` `8788`、`alpha` `8789`、`dev` `8790`），写出 `server.json`，`--ready-json` 打印 `{"url","pid"}`。
 
 ## 和谁打交道
 

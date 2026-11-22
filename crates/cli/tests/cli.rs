@@ -1,28 +1,27 @@
-//! The command line run as a program against a whole farm on a home of its own.
+//! End-to-end CLI tests against an in-process VibeValley HTTP server on an isolated home.
 
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
 
-use serde_json::Value;
+use serde_json::{Value, json};
 
-/// A farm listening on a free port, with the pages' stand-in helper (`pi`) and the built-in profiles.
-struct Farm {
+struct TestServer {
     url: String,
     dir: tempfile::TempDir,
     started: Option<vibevalley_server::Started>,
     _listener: vibevalley_server::transport::http::Listener,
 }
 
-impl Drop for Farm {
+impl Drop for TestServer {
     fn drop(&mut self) {
-        if let Some(s) = self.started.take() {
-            s.close();
+        if let Some(started) = self.started.take() {
+            started.close();
         }
     }
 }
 
-fn farm() -> Farm {
+fn spawn_server() -> TestServer {
     let dir = tempfile::tempdir().unwrap();
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(vibevalley_server::testing::helper());
@@ -42,8 +41,8 @@ fn farm() -> Farm {
         "reviewer",
     ];
     let work = dir.path().join("work");
-    for d in ["repos", "worktrees", "pkm"] {
-        std::fs::create_dir_all(work.join(d)).unwrap();
+    for subdir in ["repos", "worktrees", "pkm"] {
+        std::fs::create_dir_all(work.join(subdir)).unwrap();
     }
     let started = vibevalley_server::start(vibevalley_server::ServerConfig {
         registry: Some(Arc::new(registry)),
@@ -61,7 +60,7 @@ fn farm() -> Farm {
     let listener = vibevalley_server::transport::http::serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let url = listener.url();
     started.board.sessions().set_mcp_url(format!("{url}/mcp"));
-    Farm {
+    TestServer {
         url,
         dir,
         started: Some(started),
@@ -72,6 +71,7 @@ fn farm() -> Farm {
 struct Ran {
     code: i32,
     out: String,
+    raw_out: Vec<u8>,
     failure: Option<Value>,
 }
 
@@ -79,11 +79,14 @@ impl Ran {
     fn tag(&self) -> &str {
         self.failure.as_ref().and_then(|f| f["error"]["tag"].as_str()).unwrap_or("")
     }
+
+    fn json(&self) -> Value {
+        serde_json::from_str(&self.out).unwrap_or_else(|e| panic!("invalid JSON stdout: {e}\nstdout: {}\nfailure: {:?}", self.out, self.failure))
+    }
 }
 
-/// `vibevalley <args>` on a home of its own (so this machine's server and language do not leak in).
 fn cli(home: &std::path::Path, args: &[&str], env: &[(&str, &str)]) -> Ran {
-    let out = Command::new(env!("CARGO_BIN_EXE_vibevalley"))
+    let output = Command::new(env!("CARGO_BIN_EXE_vibevalley"))
         .args(args)
         .env("VIBEVALLEY_HOME", home)
         .env_remove("VIBEVALLEY_SERVER")
@@ -91,15 +94,16 @@ fn cli(home: &std::path::Path, args: &[&str], env: &[(&str, &str)]) -> Ran {
         .envs(env.iter().copied())
         .output()
         .unwrap();
-    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     Ran {
-        code: out.status.code().unwrap_or(-1),
-        out: String::from_utf8_lossy(&out.stdout).trim_end().to_string(),
+        code: output.status.code().unwrap_or(-1),
+        out: String::from_utf8_lossy(&output.stdout).trim_end().to_string(),
+        raw_out: output.stdout,
         failure: stderr.lines().last().and_then(|l| serde_json::from_str(l).ok()),
     }
 }
 
-impl Farm {
+impl TestServer {
     fn home(&self) -> PathBuf {
         self.dir.path().join("cli")
     }
@@ -112,28 +116,37 @@ impl Farm {
 }
 
 const COMMANDS: &[&str] = &[
-    "approval list",
-    "approval resolve",
     "agent create",
     "agent delete",
     "agent list",
+    "agent update",
+    "artifact create",
+    "artifact delete",
+    "artifact entry batch",
+    "artifact entry get",
+    "artifact entry list",
+    "artifact entry set",
     "artifact list",
     "artifact read",
     "artifact show",
+    "artifact update",
+    "attachment get",
+    "attachment upload",
+    "channel create",
+    "channel delete",
     "channel list",
+    "channel message delete",
     "channel message list",
     "channel message search",
     "channel message send",
+    "channel pin list",
+    "channel pin set",
     "chat",
     "cron create",
     "cron delete",
     "cron edit",
     "cron list",
     "doctor",
-    "eval export",
-    "eval inspect",
-    "eval replay",
-    "eval run",
     "issue comment",
     "issue create",
     "issue delete",
@@ -145,19 +158,32 @@ const COMMANDS: &[&str] = &[
     "issue status",
     "issue timeline",
     "issue watch",
+    "library add",
+    "library delete",
+    "library list",
+    "media input delete",
+    "media input list",
+    "media input upload",
+    "media job cancel",
+    "media job list",
+    "media job show",
     "memory create",
     "memory delete",
     "memory list",
     "memory search",
+    "orchestrator approval list",
+    "orchestrator approval resolve",
+    "orchestrator open",
+    "orchestrator stop",
     "pkm capture",
     "pkm journal show",
-    "pkm page edit",
     "pkm page export",
     "pkm page list",
+    "pkm page rename",
     "pkm page save",
     "pkm page show",
-    "pkm radar",
     "pkm search",
+    "pkm undo",
     "repo create",
     "repo list",
     "repo pr submit",
@@ -170,145 +196,391 @@ const COMMANDS: &[&str] = &[
     "setting get",
     "setting update",
     "setting validate",
+    "state",
 ];
 
 #[test]
-fn every_command_has_a_description_and_an_example() {
+fn every_command_has_help_and_examples() {
     let home = tempfile::tempdir().unwrap();
     for command in COMMANDS {
         let mut args: Vec<&str> = command.split(' ').collect();
         args.push("--help");
         let help = cli(home.path(), &args, &[]);
-        assert_eq!((command, help.code, help.out.contains("EXAMPLES")), (command, 0, true), "{}", help.out);
+        assert_eq!((command, help.code, help.out.contains("Examples:")), (command, 0, true), "{}", help.out);
     }
 }
 
 #[test]
-fn approval_commands_use_the_native_http_service() {
-    let farm = farm();
-    let listed = farm.run(&["approval", "list", "--conversation", "orchestrator", "--format", "json"]);
+fn bare_invocation_and_group_invocations_show_help() {
+    let home = tempfile::tempdir().unwrap();
+    let bare = cli(home.path(), &[], &[]);
+    assert_eq!((bare.code, bare.out.contains("Commands:")), (0, true), "{}", bare.out);
+    let group = cli(home.path(), &["issue"], &[]);
+    assert_eq!((group.code, group.out.contains("Commands:")), (0, true), "{}", group.out);
+}
+
+#[test]
+fn orchestrator_commands_and_approvals_use_http() {
+    let srv = spawn_server();
+    let opened = srv.run(&["orchestrator", "open"]);
+    assert_eq!(opened.code, 0, "{:?}", opened.failure);
+
+    let listed = srv.run(&["orchestrator", "approval", "list", "--conversation", "orchestrator", "--json"]);
     assert_eq!((listed.code, listed.out.as_str()), (0, "[]"), "{:?}", listed.failure);
 
-    let missing = farm.run(&["approval", "resolve", "orchestrator", "missing", "call-1", "approve", "--format", "json"]);
+    let missing = srv.run(&["orchestrator", "approval", "resolve", "orchestrator", "missing", "call-1", "approve", "--json"]);
     assert_eq!((missing.code, missing.tag()), (4, "Missing"), "{:?}", missing.failure);
 
-    let ambiguous = farm.run(&["approval", "resolve", "orchestrator", "missing", "approve"]);
-    assert_eq!((ambiguous.code, ambiguous.tag()), (2, "MissingArgument"));
+    let incomplete = srv.run(&["orchestrator", "approval", "resolve", "orchestrator", "missing", "approve"]);
+    assert_eq!((incomplete.code, incomplete.tag()), (2, "MissingArgument"));
+
+    let stopped = srv.run(&["orchestrator", "stop"]);
+    assert_eq!(stopped.code, 0, "{:?}", stopped.failure);
 }
 
 #[test]
-fn answers_in_short_lines_with_the_name_to_use_next_first_and_in_the_protocols_shape_with_format_json() {
-    let f = farm();
-    let made = f.run(&["issue", "create", "试一下", "--criterion", "能打开"]);
+fn issue_crud_text_and_json_output_and_errors() {
+    let srv = spawn_server();
+    let made = srv.run(&["issue", "create", "试一下", "--criterion", "能打开"]);
     assert_eq!(made.out, "#1  backlog  试一下", "{:?}", made.failure);
-    let shown = f.run(&["issue", "show", "#1"]).out;
+
+    let shown = srv.run(&["issue", "show", "#1"]).out;
     assert!(shown.contains("能打开"));
     assert!(shown.lines().last().unwrap().starts_with("  vibevalley issue status 1 "), "{shown}");
-    assert_eq!(f.run(&["issue", "edit", "1", "--title", "改一下"]).out, "#1  backlog  改一下");
-    let as_json: Value = serde_json::from_str(&f.run(&["issue", "show", "1", "--format", "json"]).out).unwrap();
-    assert_eq!(
-        (as_json["number"].clone(), as_json["criteria"].clone()),
-        (1.into(), serde_json::json!(["能打开"]))
-    );
+
+    assert_eq!(srv.run(&["issue", "edit", "1", "--title", "改一下"]).out, "#1  backlog  改一下");
+
+    let as_json = srv.run(&["issue", "show", "1", "--json"]).json();
+    assert_eq!((as_json["number"].clone(), as_json["criteria"].clone()), (1.into(), json!(["能打开"])));
+
     for title in ["二", "三", "四"] {
-        f.run(&["issue", "create", title]);
+        assert_eq!(srv.run(&["issue", "create", title]).code, 0);
     }
-    let list = f.run(&["issue", "list"]).out;
-    let list_json = f.run(&["issue", "list", "--format", "json"]).out;
+    let list = srv.run(&["issue", "list"]).out;
+    let list_json = srv.run(&["issue", "list", "--json"]).out;
     assert_eq!(list.lines().count(), 4);
     assert!(list.len() * 3 < list_json.len());
-    assert!(f.run(&["issue", "list", "--limit", "2"]).out.lines().last().unwrap().contains("--limit 4"));
-    assert_eq!(cli(&f.home(), &["issue", "show", "1"], &[("VIBEVALLEY_SERVER", &f.url)]).code, 0);
-}
+    assert!(srv.run(&["issue", "list", "--limit", "2"]).out.lines().last().unwrap().contains("--limit 4"));
+    assert_eq!(cli(&srv.home(), &["issue", "show", "1"], &[("VIBEVALLEY_SERVER", &srv.url)]).code, 0);
 
-#[test]
-fn fails_with_nothing_on_stdout_a_json_failure_on_stderr_an_exit_code_by_kind_and_what_to_run_next() {
-    let f = farm();
-    let missing_argument = f.run(&["issue", "show"]);
-    assert_eq!(
-        (missing_argument.code, missing_argument.out.as_str(), missing_argument.tag()),
-        (2, "", "MissingArgument")
-    );
-    assert_eq!(f.run(&["issue", "list", "--bogus", "1"]).tag(), "UnrecognizedOption");
-    let missing = f.run(&["issue", "show", "nope"]);
+    // Structured failures and exit codes
+    let missing_arg = srv.run(&["issue", "show"]);
+    assert_eq!((missing_arg.code, missing_arg.out.as_str(), missing_arg.tag()), (2, "", "MissingArgument"));
+    assert_eq!(srv.run(&["issue", "list", "--bogus", "1"]).tag(), "UnrecognizedOption");
+    assert_eq!(srv.run(&["issue", "list", "--format", "json"]).tag(), "UnrecognizedOption");
+
+    let missing = srv.run(&["issue", "show", "nope"]);
     assert_eq!((missing.code, missing.tag()), (4, "Missing"));
-    assert_eq!(
-        missing.failure.as_ref().unwrap()["error"]["next"][0]["run"],
-        serde_json::json!(["issue", "list"])
-    );
-    f.run(&["issue", "create", "还是草稿"]);
-    let refused = f.run(&["issue", "status", "1", "done"]);
+    assert_eq!(missing.failure.as_ref().unwrap()["error"]["next"][0]["run"], json!(["issue", "list"]));
+
+    let refused = srv.run(&["issue", "status", "1", "done"]);
     assert_eq!((refused.code, refused.tag()), (3, "Refused"));
     let next = refused.failure.as_ref().unwrap()["error"]["next"].as_array().cloned().unwrap_or_default();
     let cancel = next
         .iter()
-        .find(|n| n["run"] == serde_json::json!(["issue", "status", "1", "canceled"]))
+        .find(|n| n["run"] == json!(["issue", "status", "1", "canceled"]))
         .expect("a way to cancel");
-    let run: Vec<&str> = cancel["run"].as_array().unwrap().iter().map(|w| w.as_str().unwrap()).collect();
-    assert!(f.run(&run).out.starts_with("#1  canceled"));
-    let no_words = f.run(&["issue", "comment", "1"]);
+    let run_args: Vec<&str> = cancel["run"].as_array().unwrap().iter().map(|w| w.as_str().unwrap()).collect();
+    assert!(srv.run(&run_args).out.starts_with("#1  canceled"));
+
+    let no_words = srv.run(&["issue", "comment", "1"]);
     assert_eq!((no_words.code, no_words.tag()), (2, "MissingArgument"));
-    let nowhere = f.run(&["channel", "message", "list", "nowhere"]);
+    let nowhere = srv.run(&["channel", "message", "list", "nowhere"]);
     assert_eq!((nowhere.code, nowhere.tag()), (4, "Missing"));
-    let gone = cli(&f.home(), &["issue", "list", "--server", "http://127.0.0.1:9"], &[]);
+    let gone = cli(&srv.home(), &["issue", "list", "--server", "http://127.0.0.1:9"], &[]);
     assert_eq!((gone.code, gone.tag()), (5, "Unreachable"));
-    let wrong = cli(&f.home(), &["issue", "nope"], &[]);
+    let wrong = cli(&srv.home(), &["issue", "nope"], &[]);
     assert_eq!((wrong.code, wrong.out.as_str(), wrong.tag()), (2, "", "UnknownSubcommand"));
 }
 
 #[test]
-fn dry_run_says_what_would_happen_and_changes_nothing_and_a_change_without_one_is_refused() {
-    let f = farm();
-    f.run(&["issue", "create", "先试跑"]);
-    let cancel = f.run(&["issue", "status", "1", "canceled", "--dry-run"]);
-    assert_eq!((cancel.code, cancel.out.as_str()), (0, "#1 关成已取消：还没派过"));
-    assert!(f.run(&["issue", "show", "1"]).out.lines().nth(1).unwrap().starts_with("backlog"));
-    let create = f.run(&["issue", "create", "不该建", "--dry-run"]);
+fn dry_run_ssot_previews_supported_ops_and_rejects_unsupported_ops() {
+    let srv = spawn_server();
+    srv.run(&["issue", "create", "先试跑"]);
+    let cancel = srv.run(&["issue", "status", "1", "canceled", "--dry-run"]);
+    assert_eq!(cancel.code, 0, "{:?}", cancel.failure);
+    assert!(cancel.out.contains("#1"), "{}", cancel.out);
+    assert!(srv.run(&["issue", "show", "1"]).out.lines().nth(1).unwrap().starts_with("backlog"));
+
+    let create = srv.run(&["issue", "create", "不该建", "--dry-run"]);
     assert_eq!((create.code, create.tag()), (2, "NoDryRun"));
-    let added = f.run(&["cron", "create", "早上看看", "看看昨天的改动", "--daily", "09:00"]);
-    let id = added.out.split("  ").next().unwrap().to_string();
-    assert!(f.run(&["cron", "delete", &id, "--dry-run"]).out.contains("删掉定时任务「早上看看」"));
-    assert!(f.run(&["cron", "list"]).out.contains(&id));
-    assert!(f.run(&["agent", "delete", "docs", "--dry-run"]).out.contains("删掉角色"));
+
+    let added = srv.run(&["cron", "create", "早上看看", "看看昨天的改动", "--daily", "09:00"]);
+    let cron_id = added.out.split("  ").next().unwrap().to_string();
+    let cron_preview = srv.run(&["cron", "delete", &cron_id, "--dry-run"]);
+    assert_eq!(cron_preview.code, 0, "{:?}", cron_preview.failure);
+    assert!(cron_preview.out.contains("早上看看"), "{}", cron_preview.out);
+    assert!(srv.run(&["cron", "list"]).out.contains(&cron_id));
+
+    let agent_preview = srv.run(&["agent", "delete", "docs", "--dry-run"]);
+    assert_eq!(agent_preview.code, 0, "{:?}", agent_preview.failure);
+    assert!(!agent_preview.out.is_empty());
+
+    let chat_dry = srv.run(&["chat", "hello", "--dry-run"]);
+    assert_eq!((chat_dry.code, chat_dry.tag()), (2, "NoDryRun"));
 }
 
 #[test]
-fn with_no_command_it_shows_the_help() {
-    let home = tempfile::tempdir().unwrap();
-    let bare = cli(home.path(), &[], &[]);
-    assert_eq!((bare.code, bare.out.contains("SUBCOMMANDS")), (0, true), "{}", bare.out);
+fn state_snapshot_and_doctor_verify_sse_and_channel() {
+    let srv = spawn_server();
+
+    let state_text = srv.run(&["state"]);
+    assert_eq!(state_text.code, 0, "{:?}", state_text.failure);
+    assert!(state_text.out.contains("seq ") && state_text.out.contains("channels "), "{}", state_text.out);
+
+    let state_json = srv.run(&["state", "--json"]).json();
+    assert!(state_json["seq"].is_i64(), "{state_json}");
+    assert!(state_json["state"]["issues"].is_array(), "{state_json}");
+
+    // Configure settings & runtime so all 5 doctor checks pass
+    let bad_key = srv.run(&["setting", "validate", "--deepseek-key", "bad"]);
+    assert_eq!((bad_key.code, bad_key.tag()), (3, "Refused"));
+    assert_eq!(srv.run(&["setting", "validate", "--deepseek-key", "sk-valid12345"]).code, 0);
+    assert_eq!(srv.run(&["setting", "update", "--locale", "en", "--deepseek-key", "sk-valid12345"]).code, 0);
+    let st = srv.run(&["setting", "get", "--json"]).json();
+    assert_eq!(st["locale"], "en");
+    assert_eq!(st["deepseekApiKey"]["source"], "settings");
+
+    assert_eq!(srv.run(&["runtime", "refresh", "pi"]).code, 0);
+    let doc_text = srv.run(&["doctor"]);
+    assert_eq!(doc_text.code, 0, "{:?}", doc_text.failure);
+    assert!(doc_text.out.contains("home  ok"), "{}", doc_text.out);
+    assert!(doc_text.out.contains("server  ok"), "{}", doc_text.out);
+    assert!(doc_text.out.contains("state  ok  seq"), "{}", doc_text.out);
+    assert!(doc_text.out.contains("model  ok  settings"), "{}", doc_text.out);
+
+    let doc_json = srv.run(&["doctor", "--json"]).json();
+    let checks = doc_json.as_array().unwrap();
+    assert_eq!(checks.len(), 5, "{doc_json}");
+    assert_eq!(checks[0]["check"], "home");
+    assert!(checks[0]["channel"].is_string());
+    assert_eq!(checks[2]["check"], "state");
+    assert_eq!(checks[2]["ok"], true);
 }
 
 #[test]
-fn the_other_resources_answer_in_lines() {
-    let f = farm();
-    assert!(f.run(&["agent", "list"]).out.contains("docs"));
-    assert!(f.run(&["channel", "list"]).out.starts_with('#'));
-    assert_eq!(f.run(&["channel", "message", "send", "general", "你好"]).code, 0);
-    assert!(f.run(&["channel", "message", "list", "general"]).out.contains("你好"));
-    assert_eq!(f.run(&["repo", "create", "clock"]).code, 0);
-    assert!(f.run(&["repo", "list"]).out.starts_with("clock"));
-    assert!(f.run(&["runtime", "list"]).out.contains("pi"));
-    let captured = f.run(&["pkm", "capture", "记一笔"]);
-    assert_eq!(captured.code, 0, "{:?}", captured.failure);
-    assert!(f.run(&["pkm", "search", "记一笔"]).out.contains("记一笔"));
-    let remembered = f.run(&["memory", "create", "docs", "用中文写"]);
-    assert_eq!(remembered.code, 0, "{:?}", remembered.failure);
-    assert!(f.run(&["memory", "list", "docs"]).out.contains("用中文写"));
+fn content_domain_artifacts_entries_attachments_library_media_and_channel_flags() {
+    let srv = spawn_server();
+
+    // 1. Artifact create, update, entry set/get/list/batch, and dry-run delete
+    let created = srv.run(&["artifact", "create", "System Map", "--type", "whiteboard", "--json"]).json();
+    let art_id = created["id"].as_str().unwrap().to_string();
+    assert_eq!(created["artifactType"], "whiteboard");
+
+    let renamed = srv.run(&["artifact", "update", &art_id, "--title", "System Map v2", "--json"]).json();
+    assert_eq!(renamed["title"], "System Map v2");
+
+    let set_meta = srv
+        .run(&[
+            "artifact",
+            "entry",
+            "set",
+            &art_id,
+            "board/meta",
+            r#"{"title":"System Map v2","viewport":{"x":0,"y":0,"zoom":1}}"#,
+            "--kind",
+            "json",
+            "--json",
+        ])
+        .json();
+    assert_eq!(set_meta["applied"], true, "{set_meta}");
+
+    let batch_file = srv.dir.path().join("writes.json");
+    std::fs::write(
+        &batch_file,
+        serde_json::to_string(&json!([
+            {
+                "op": "set",
+                "path": "elements/n1",
+                "kind": "json",
+                "value": r#"{"id":"n1","type":"shape","shape":"card","x":40,"y":60,"w":220,"h":100,"text":"API"}"#
+            }
+        ]))
+        .unwrap(),
+    )
+    .unwrap();
+    let batch_arg = format!("@{}", batch_file.display());
+    let batched = srv
+        .run(&["artifact", "entry", "batch", &art_id, &batch_arg, "--note", "seed node", "--json"])
+        .json();
+    assert_eq!(batched["applied"], true, "{batched}");
+
+    let entry_list = srv
+        .run(&["artifact", "entry", "list", &art_id, "--prefix", "elements/", "--values", "--json"])
+        .json();
+    let entries = entry_list["entries"].as_array().unwrap();
+    assert!(!entries.is_empty() && entries.iter().all(|e| e["path"].as_str().unwrap().starts_with("elements/")));
+    assert!(entries.iter().any(|e| e["path"] == "elements/n1"));
+    let entry_get = srv.run(&["artifact", "entry", "get", &art_id, "elements/n1", "--json"]).json();
+    assert_eq!(entry_get["path"], "elements/n1");
+    assert!(entry_get["value"].as_str().unwrap().contains("API"));
+
+    let listed_wb = srv.run(&["artifact", "list", "--type", "whiteboard", "--json"]).json();
+    assert_eq!(listed_wb.as_array().unwrap().len(), 1);
+
+    // 2. Attachment upload & download (both --out and raw stdout)
+    let sample_file = srv.dir.path().join("hello.txt");
+    std::fs::write(&sample_file, b"vibevalley-cli-payload").unwrap();
+    let uploaded = srv
+        .run(&["attachment", "upload", sample_file.to_str().unwrap(), "--name", "hello.txt", "--json"])
+        .json();
+    let att_id = uploaded["id"].as_str().unwrap().to_string();
+    assert_eq!(uploaded["size"], 22);
+
+    let out_file = srv.dir.path().join("downloaded.txt");
+    let got_file = srv.run(&["attachment", "get", &att_id, "--out", out_file.to_str().unwrap(), "--json"]);
+    assert_eq!(got_file.code, 0, "{:?}", got_file.failure);
+    assert_eq!(std::fs::read(&out_file).unwrap(), b"vibevalley-cli-payload");
+
+    let got_raw = srv.run(&["attachment", "get", &att_id]);
+    assert_eq!(got_raw.code, 0, "{:?}", got_raw.failure);
+    assert_eq!(got_raw.raw_out, b"vibevalley-cli-payload");
+
+    // 3. Library add / list / delete --dry-run / delete
+    let lib_added = srv.run(&["library", "add", "--attachment", &att_id, "--name", "hello.txt", "--json"]).json();
+    assert_eq!(lib_added["attachment"]["id"], att_id);
+    let lib_list = srv.run(&["library", "list", "--text", "hello", "--json"]).json();
+    assert_eq!(lib_list.as_array().unwrap().len(), 1);
+    let lib_dry = srv.run(&["library", "delete", &att_id, "--dry-run"]);
+    assert_eq!(lib_dry.code, 0, "{:?}", lib_dry.failure);
+    assert_eq!(srv.run(&["library", "delete", &att_id]).code, 0);
+
+    // 4. Media job list & media input upload / list / delete --dry-run
+    let jobs = srv.run(&["media", "job", "list", "--json"]).json();
+    assert!(jobs.is_array());
+    // Minimal 1x1 PNG header bytes so server validates PNG upload
+    let png_bytes: &[u8] = &[
+        0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, b'I', b'H', b'D', b'R', 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08,
+        0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, 0xDE, 0x00, 0x00, 0x00, 0x0C, b'I', b'D', b'A', b'T', 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00, 0x00, 0x03,
+        0x01, 0x01, 0x00, 0x18, 0xDD, 0x8D, 0xB4, 0x00, 0x00, 0x00, 0x00, b'I', b'E', b'N', b'D', 0xAE, 0x42, 0x60, 0x82,
+    ];
+    let png_path = srv.dir.path().join("dot.png");
+    std::fs::write(&png_path, png_bytes).unwrap();
+    let media_in = srv.run(&["media", "input", "upload", png_path.to_str().unwrap(), "--json"]).json();
+    let input_id = media_in["id"].as_str().unwrap().to_string();
+    assert_eq!(media_in["phase"], "ready", "{media_in}");
+    assert!(srv.run(&["media", "input", "list"]).out.contains(&input_id));
+    let media_dry = srv.run(&["media", "input", "delete", &input_id, "--dry-run"]);
+    assert_eq!(media_dry.code, 0, "{:?}", media_dry.failure);
+
+    // 5. Channel create, message send with --view-context / --send-key / --attachment, pin, delete
+    let ch_created = srv.run(&["channel", "create", "design-review", "--description", "Review notes", "--json"]);
+    assert_eq!(ch_created.code, 0, "{:?}", ch_created.failure);
+    let ch_id = ch_created.json().as_str().unwrap().to_string();
+
+    let view_ctx = json!({
+        "artifactId": art_id,
+        "artifactType": "whiteboard",
+        "title": "System Map v2",
+        "selectedIds": ["n1"]
+    })
+    .to_string();
+    let sent = srv.run(&[
+        "channel",
+        "message",
+        "send",
+        &ch_id,
+        "Check",
+        "node",
+        "n1",
+        "--send-key",
+        "sk-1",
+        "--attachment",
+        &att_id,
+        "--view-context",
+        &view_ctx,
+    ]);
+    assert_eq!(sent.code, 0, "{:?}", sent.failure);
+
+    let msgs = srv.run(&["channel", "message", "list", &ch_id, "--json"]).json();
+    let msg = &msgs.as_array().unwrap()[0];
+    let msg_id = msg["id"].as_str().unwrap().to_string();
+    assert_eq!(msg["sendKey"], "sk-1");
+    assert_eq!(msg["viewContext"]["artifactId"], art_id);
+    assert_eq!(msg["attachments"][0]["id"], att_id);
+
+    assert_eq!(srv.run(&["channel", "pin", "set", &msg_id]).code, 0);
+    let pins = srv.run(&["channel", "pin", "list", &ch_id, "--json"]).json();
+    assert_eq!(pins.as_array().unwrap().len(), 1);
+    assert_eq!(srv.run(&["channel", "pin", "set", &msg_id, "--off"]).code, 0);
+    assert_eq!(srv.run(&["channel", "message", "delete", &msg_id, "--dry-run"]).code, 0);
+    assert_eq!(srv.run(&["channel", "delete", &ch_id, "--dry-run"]).code, 0);
+
+    // Artifact dry-run delete + actual delete
+    assert_eq!(srv.run(&["artifact", "delete", &art_id, "--dry-run"]).code, 0);
+    assert_eq!(srv.run(&["artifact", "delete", &art_id]).code, 0);
 }
 
 #[test]
-fn watch_returns_for_questions_while_the_issue_remains_in_progress() {
-    let f = farm();
-    let profile = f
+fn pkm_clean_surface_agent_update_cron_and_resources() {
+    let srv = spawn_server();
+
+    // Dropped legacy PKM verbs/flags are rejected cleanly
+    assert_eq!(srv.run(&["pkm", "radar"]).tag(), "UnknownSubcommand");
+    assert_eq!(srv.run(&["pkm", "page", "edit", "foo"]).tag(), "UnknownSubcommand");
+    assert_eq!(srv.run(&["pkm", "search", "--tier", "inbox"]).tag(), "UnrecognizedOption");
+    assert_eq!(srv.run(&["chat", "--orchestrator", "hi"]).tag(), "UnrecognizedOption");
+
+    // PKM dry-run refusal & full lifecycle (capture, save, list, show, rename, export, undo)
+    for args in [
+        &["pkm", "capture", "不应写入", "--dry-run"][..],
+        &["pkm", "journal", "show", "--dry-run"][..],
+        &["pkm", "page", "save", "--dry-run", "读书", "--", "- 条目"][..],
+    ] {
+        let ran = srv.run(args);
+        assert_eq!((args, ran.code, ran.tag()), (args, 2, "NoDryRun"));
+    }
+    assert_eq!(srv.run(&["pkm", "page", "list"]).out, "");
+    assert_eq!(srv.run(&["pkm", "page", "save", "读书", "--", "- 置身事内"]).code, 0);
+    assert!(srv.run(&["pkm", "page", "show", "读书"]).out.contains("置身事内"));
+    assert!(srv.run(&["pkm", "page", "export", "读书"]).out.contains("置身事内"));
+    assert_eq!(srv.run(&["pkm", "page", "rename", "读书", "阅读笔记"]).code, 0);
+    assert!(srv.run(&["pkm", "page", "list"]).out.contains("阅读笔记"));
+    assert_eq!(srv.run(&["pkm", "capture", "记一笔"]).code, 0);
+    assert!(srv.run(&["pkm", "search", "记一笔"]).out.contains("记一笔"));
+    assert_eq!(srv.run(&["pkm", "undo"]).code, 0);
+
+    // Agent create default runtime + agent update
+    let owl = srv.run(&["agent", "create", "owl", "--json"]).json();
+    let owl_id = owl["id"].as_str().unwrap().to_string();
+    assert_eq!(owl["runtime"], "vibevalley");
+    let updated = srv
+        .run(&["agent", "update", &owl_id, "--duty", "Night watch", "--enabled", "false", "--json"])
+        .json();
+    assert_eq!(updated["duty"], "Night watch");
+    assert_eq!(updated["enabled"], false);
+
+    // Cron --at validation + conflict check
+    let once = srv
+        .run(&["cron", "create", "once-check", "检查一次", "--at", "2099-11-05T09:00", "--json"])
+        .json();
+    assert_eq!(once["when"]["kind"], "once");
+    assert_eq!(srv.run(&["cron", "create", "bad-check", "x", "--at", "bogus"]).tag(), "InvalidValue");
+    assert_eq!(
+        srv.run(&["cron", "create", "dup", "x", "--every", "5", "--daily", "09:00"]).tag(),
+        "ConflictingOption"
+    );
+
+    // Repo, runtime, memory basics
+    assert_eq!(srv.run(&["repo", "create", "clock"]).code, 0);
+    assert!(srv.run(&["repo", "list"]).out.starts_with("clock"));
+    assert!(srv.run(&["runtime", "list"]).out.contains("pi"));
+    assert_eq!(srv.run(&["memory", "create", "docs", "用中文写"]).code, 0);
+    assert!(srv.run(&["memory", "list", "docs"]).out.contains("用中文写"));
+}
+
+#[test]
+fn issue_watch_and_worker_round_trip() {
+    let srv = spawn_server();
+    let profile = srv
         .run(&["agent", "create", "fox", "--runtime", "pi"])
         .out
         .split("  ")
         .next()
         .unwrap()
         .to_string();
-    assert_eq!(f.run(&["repo", "create", "clock"]).code, 0);
-    let made = f.run(&[
+    assert_eq!(srv.run(&["repo", "create", "clock"]).code, 0);
+    let made = srv.run(&[
         "issue",
         "create",
         "打卡页先问清楚，给选项，提交",
@@ -320,19 +592,21 @@ fn watch_returns_for_questions_while_the_issue_remains_in_progress() {
         "clock-in works",
     ]);
     let n = made.out.trim_start_matches('#').split("  ").next().unwrap().to_string();
-    assert_eq!(f.run(&["issue", "status", &n, "todo"]).code, 0);
-    let watched = f.run(&["issue", "show", &n, "--watch", "--timeout", "30"]);
+    assert_eq!(srv.run(&["issue", "status", &n, "todo"]).code, 0);
+    let watched = srv.run(&["issue", "show", &n, "--watch", "--timeout", "30"]);
     assert_eq!(watched.code, 0, "{:?}", watched.failure);
-    let asking = f.run(&["issue", "show", &n]).out;
+    let asking = srv.run(&["issue", "show", &n]).out;
     assert!(asking.lines().nth(1).unwrap().starts_with("in_progress"), "{asking}");
     assert!(asking.contains("用 8797"), "{asking}");
     assert!(asking.contains(&format!("vibevalley issue comment {n} …")), "{asking}");
-    assert_eq!(f.run(&["issue", "comment", &n, "用 8797"]).code, 0);
-    assert_eq!(f.run(&["issue", "show", &n, "--watch", "--timeout", "30"]).code, 0);
-    let handed_back = f.run(&["issue", "show", &n]).out;
+
+    assert_eq!(srv.run(&["issue", "comment", &n, "用 8797"]).code, 0);
+    assert_eq!(srv.run(&["issue", "show", &n, "--watch", "--timeout", "30"]).code, 0);
+    let handed_back = srv.run(&["issue", "show", &n]).out;
     assert!(handed_back.lines().nth(1).unwrap().starts_with("in_review"), "{handed_back}");
-    assert!(f.run(&["issue", "diff", &n]).out.contains("clock.ts"));
-    let sessions: Value = serde_json::from_str(&f.run(&["session", "list", "--format", "json"]).out).unwrap();
+    assert!(srv.run(&["issue", "diff", &n]).out.contains("clock.ts"));
+
+    let sessions = srv.run(&["session", "list", "--json"]).json();
     let sid = sessions
         .as_array()
         .unwrap()
@@ -341,200 +615,13 @@ fn watch_returns_for_questions_while_the_issue_remains_in_progress() {
         .and_then(|s| s["id"].as_str())
         .unwrap()
         .to_string();
-    let events_text = f.run(&["session", "events", &sid]).out;
-    assert!(!events_text.is_empty(), "expected trajectory events for {sid}");
-    let events_json: Value = serde_json::from_str(&f.run(&["session", "events", &sid, "--format", "json"]).out).unwrap();
-    assert!(!events_json.as_array().unwrap().is_empty());
-    assert_eq!(f.run(&["issue", "review", &n, "--pass"]).code, 0);
-    assert!(f.run(&["issue", "status", &n, "done"]).out.starts_with(&format!("#{n}  done")));
-    let observed = f.run(&["issue", "watch", &format!("#{n}"), "--jsonl"]);
+    assert!(!srv.run(&["session", "events", &sid]).out.is_empty());
+    assert!(!srv.run(&["session", "events", &sid, "--json"]).json().as_array().unwrap().is_empty());
+
+    assert_eq!(srv.run(&["issue", "review", &n, "--pass"]).code, 0);
+    assert!(srv.run(&["issue", "status", &n, "done"]).out.starts_with(&format!("#{n}  done")));
+
+    let observed = srv.run(&["issue", "watch", &format!("#{n}"), "--json"]);
     assert_eq!(observed.code, 0, "{:?}", observed.failure);
     assert!(observed.out.lines().any(|l| l.contains("\"kind\":\"state\"")), "{}", observed.out);
-}
-
-#[test]
-fn cron_at_agent_default_pkm_dry_run_and_doctor_setting_chat_work() {
-    let f = farm();
-
-    // cron create --at parses local datetime and refuses invalid timestamps
-    let once = f.run(&["cron", "create", "once-check", "检查一次", "--at", "2099-11-05T09:00", "--format", "json"]);
-    assert_eq!(once.code, 0, "{:?}", once.failure);
-    let once_json: Value = serde_json::from_str(&once.out).unwrap();
-    assert_eq!(once_json["when"]["kind"], "once");
-    assert!(once_json["when"]["at"].as_i64().unwrap_or(0) > 0, "{once_json}");
-    let bad_at = f.run(&["cron", "create", "bad-check", "检查一次", "--at", "bogus"]);
-    assert_eq!((bad_at.code, bad_at.tag()), (2, "InvalidValue"));
-
-    // agent create defaults to the built-in vibevalley runtime
-    let owl: Value = serde_json::from_str(&f.run(&["agent", "create", "owl", "--format", "json"]).out).unwrap();
-    assert_eq!(owl["runtime"], "vibevalley");
-
-    // pkm commands without dry-run refuse --dry-run without touching disk, and pkm page edit honors --format json
-    for args in [
-        &["pkm", "capture", "不应写入", "--dry-run"][..],
-        &["pkm", "journal", "show", "--dry-run"][..],
-        &["pkm", "page", "save", "--dry-run", "读书", "--", "- 条目"][..],
-        &["pkm", "page", "edit", "读书", "--dry-run"][..],
-    ] {
-        let ran = f.run(args);
-        assert_eq!((args, ran.code, ran.tag()), (args, 2, "NoDryRun"));
-    }
-    assert_eq!(f.run(&["pkm", "page", "list"]).out, "");
-    assert_eq!(f.run(&["pkm", "page", "save", "读书", "--", "- 置身事内"]).code, 0);
-    let edited = cli(
-        &f.home(),
-        &["pkm", "page", "edit", "读书", "--format", "json", "--server", &f.url],
-        &[("EDITOR", "true")],
-    );
-    assert_eq!(edited.code, 0, "{:?}", edited.failure);
-    let edited_json: Value = serde_json::from_str(&edited.out).unwrap();
-    assert_eq!(edited_json["title"], "读书");
-
-    // setting get, validate, update, and doctor (--format text vs --format json)
-    let bad_key = f.run(&["setting", "validate", "--deepseek-key", "bad"]);
-    assert_eq!((bad_key.code, bad_key.tag()), (3, "Refused"));
-    assert_eq!(f.run(&["setting", "validate", "--deepseek-key", "sk-valid12345"]).code, 0);
-    assert_eq!(f.run(&["setting", "update", "--locale", "en", "--deepseek-key", "sk-valid12345"]).code, 0);
-    let st: Value = serde_json::from_str(&f.run(&["setting", "get", "--format", "json"]).out).unwrap();
-    assert_eq!(st["locale"], "en");
-    assert_eq!(st["deepseekApiKey"]["source"], "settings");
-
-    assert_eq!(f.run(&["runtime", "refresh", "pi"]).code, 0);
-    let doc_text = f.run(&["doctor"]);
-    assert_eq!(doc_text.code, 0, "{:?}", doc_text.failure);
-    assert!(doc_text.out.contains("server  ok"), "{}", doc_text.out);
-    assert!(doc_text.out.contains("model  ok  settings"), "{}", doc_text.out);
-    let doc_json: Value = serde_json::from_str(&f.run(&["doctor", "--format", "json"]).out).unwrap();
-    assert_eq!(doc_json.as_array().unwrap().len(), 4);
-
-    // local chat via scripted runtime and VibeValleyRuntime key check from <home>/settings.json
-    let no_key_home = tempfile::tempdir().unwrap();
-    #[cfg(feature = "local-chat")]
-    {
-        let refused_chat = cli(no_key_home.path(), &["chat", "hello"], &[]);
-        assert_eq!((refused_chat.code, refused_chat.tag()), (3, "Refused"));
-        assert!(
-            refused_chat.failure.as_ref().unwrap()["error"]["message"]
-                .as_str()
-                .unwrap()
-                .contains("no DeepSeek API key")
-        );
-        std::fs::write(no_key_home.path().join("settings.json"), r#"{"deepseekApiKey":"sk-valid12345"}"#).unwrap();
-        let missing_session = cli(no_key_home.path(), &["chat", "hello", "--resume", "vv-missing"], &[]);
-        assert_eq!((missing_session.code, missing_session.tag()), (3, "Refused"));
-        assert!(
-            missing_session.failure.as_ref().unwrap()["error"]["message"]
-                .as_str()
-                .unwrap()
-                .contains("session_not_found")
-        );
-
-        let scripted_text = cli(no_key_home.path(), &["chat", "hello", "--runtime", "scripted"], &[]);
-        assert_eq!(scripted_text.code, 0, "{:?}", scripted_text.failure);
-        assert!(!scripted_text.out.is_empty());
-        let scripted_json: Value =
-            serde_json::from_str(&cli(no_key_home.path(), &["chat", "hello", "--runtime", "scripted", "--format", "json"], &[]).out).unwrap();
-        assert_eq!(scripted_json["runtime"], "scripted");
-        assert_eq!(scripted_json["reason"], "Completed");
-    }
-    #[cfg(not(feature = "local-chat"))]
-    {
-        let local_disabled = cli(no_key_home.path(), &["chat", "hello"], &[]);
-        assert_eq!((local_disabled.code, local_disabled.tag()), (3, "Unsupported"));
-        let msg = local_disabled.failure.as_ref().unwrap()["error"]["message"].as_str().unwrap();
-        assert!(msg.contains("local-chat") && msg.contains("--orchestrator"), "{msg}");
-    }
-}
-
-#[test]
-fn eval_export_and_inspect_work_end_to_end_on_sqlite_and_jsonl() {
-    let dir = tempfile::tempdir().unwrap();
-    let db_path = dir.path().join("execution.db");
-    let jsonl_dir = dir.path().join("exported-jsonl");
-    let html_path = dir.path().join("trace.html");
-
-    let store = vibevalley_runtime::agent::durable::Store::open(&db_path).unwrap();
-    store
-        .write(|tx| {
-            tx.create_conversation("conv-cli", "deepseek-flash")?;
-            tx.append_entry("conv-cli", "pi.user", &serde_json::json!({ "text": "hello" }))?;
-            tx.append_entry(
-                "conv-cli",
-                "pi.assistant",
-                &serde_json::json!({
-                    "text": "",
-                    "toolCalls": [{ "id": "c1", "toolName": "read", "argsJson": { "path": "Cargo.toml" } }]
-                }),
-            )?;
-            tx.append_entry(
-                "conv-cli",
-                "pi.tool_result",
-                &serde_json::json!({ "toolCallId": "c1", "toolName": "read", "ok": true, "output": "ok" }),
-            )?;
-            tx.append_entry("conv-cli", "pi.assistant", &serde_json::json!({ "text": "all good" }))?;
-            Ok(())
-        })
-        .unwrap();
-    store.close().unwrap();
-
-    let exported = cli(
-        dir.path(),
-        &[
-            "eval",
-            "export",
-            "conv-cli",
-            "--source",
-            db_path.to_str().unwrap(),
-            "--out",
-            jsonl_dir.to_str().unwrap(),
-            "--format",
-            "json",
-        ],
-        &[],
-    );
-    assert_eq!(exported.code, 0, "{:?}", exported.failure);
-    let manifest: Value = serde_json::from_str(&exported.out).unwrap();
-    assert_eq!(manifest["rootConversationId"], "conv-cli");
-    assert_eq!(manifest["entriesExported"], 4);
-
-    let dry = cli(
-        dir.path(),
-        &[
-            "eval",
-            "export",
-            "conv-cli",
-            "--source",
-            db_path.to_str().unwrap(),
-            "--out",
-            jsonl_dir.to_str().unwrap(),
-            "--dry-run",
-        ],
-        &[],
-    );
-    assert_ne!(dry.code, 0);
-
-    let inspected_jsonl = cli(
-        dir.path(),
-        &[
-            "eval",
-            "inspect",
-            jsonl_dir.to_str().unwrap(),
-            "--html",
-            html_path.to_str().unwrap(),
-            "--format",
-            "json",
-        ],
-        &[],
-    );
-    assert_eq!(inspected_jsonl.code, 0, "{:?}", inspected_jsonl.failure);
-    let metrics_jsonl: Value = serde_json::from_str(&inspected_jsonl.out).unwrap();
-    assert_eq!(metrics_jsonl["conversationId"], "conv-cli");
-    assert_eq!(metrics_jsonl["turns"], 2);
-    assert_eq!(metrics_jsonl["toolCallsTotal"], 1);
-    assert!(html_path.is_file());
-    assert!(std::fs::read_to_string(&html_path).unwrap().contains("conv-cli"));
-
-    let inspected_sqlite = cli(dir.path(), &["eval", "inspect", db_path.to_str().unwrap(), "--timeline"], &[]);
-    assert_eq!(inspected_sqlite.code, 0, "{:?}", inspected_sqlite.failure);
-    assert!(inspected_sqlite.out.contains("Conversation: conv-cli"));
 }

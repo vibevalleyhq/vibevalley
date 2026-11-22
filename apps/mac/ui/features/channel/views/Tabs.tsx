@@ -35,10 +35,7 @@ export function Sessions(props: { channel: Channel }) {
             const thread = () => sessionThreadOf(core()?.chat, h());
             const meta = () => [`@${h().id}`, h().repo, h().branch].filter(Boolean).join(" · ");
             return (
-              <View
-                testID={`channel-session-${h().id}`}
-                class="flex-row items-center gap-3 rounded-lg border border-line bg-page px-3.5 py-3 transition duration-120 ease-out hover:bg-hover"
-              >
+              <View testID={`channel-session-${h().id}`} class="flex-row items-center gap-3 rounded-lg border border-line bg-page px-3.5 py-3 hover:bg-hover">
                 <View class="relative shrink-0">
                   <HelperFace agent={h().agent} runtime={h().runtime} size={36} />
                   <View class="absolute -right-0.5 -bottom-0.5">

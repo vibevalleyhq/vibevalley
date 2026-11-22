@@ -199,7 +199,6 @@
     "searchNotes": "在笔记里搜「{q}」"
   },
   "farmSearch": {
-    "open": "全部搜索",
     "title": "全部搜索",
     "hint": "找消息…",
     "filters": "from:用户  in:#频道  has:file / image / link  before: / after:2026-10-01",

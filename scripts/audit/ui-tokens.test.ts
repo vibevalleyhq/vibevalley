@@ -119,4 +119,50 @@ describe("ui-tokens guardrail", () => {
     ].join("\n");
     expect(scanUiTokens("apps/mac/ui/workspace/chrome.tsx", goodHost)).toEqual([]);
   });
+
+  it("flags color transitions that animate on light/dark theme switches while allowing managed transform/opacity/shadow transitions", () => {
+    const file = "apps/mac/ui/design/Button.tsx";
+    const bad = [
+      'const cls = "rounded-md border border-line bg-page transition duration-120 ease-out";',
+      "export function Demo() {",
+      '  return <View class="bg-page transition-colors duration-180 ease-out" style={{ transitionProperty: "colors,shadow" }} />;',
+      "}",
+    ].join("\n");
+    expect(scanUiTokens(file, bad).map((f) => ({ line: f.line, rule: f.rule }))).toEqual([
+      { line: 1, rule: "color-transition" },
+      { line: 3, rule: "color-transition" },
+      { line: 3, rule: "color-transition" },
+    ]);
+
+    const good = [
+      "export function Good() {",
+      '  return <View class={`rounded-md bg-page ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px`} style={motionOff() ? undefined : { transitionProperty: "shadow", transitionDuration: motionDuration(180) }} />;',
+      "}",
+    ].join("\n");
+    expect(scanUiTokens(file, good)).toEqual([]);
+  });
+
+  it("flags raw transition-*, animate-*, animation=fade, popup starting/ending classes, and inline transitionDuration outside design/motion.ts", () => {
+    const file = "apps/mac/ui/design/Dialog.tsx";
+    const bad = [
+      "export function Bad() {",
+      '  return <Dialog animation="fade" popupStartingClass="opacity-0" class="transition-transform duration-120 ease-out animate-pulse" style={{ transitionProperty: "transform", transitionDuration: 120 }} />;',
+      "}",
+    ].join("\n");
+    expect(scanUiTokens(file, bad).map((f) => ({ rule: f.rule, snippet: f.snippet }))).toEqual([
+      { rule: "unmanaged-motion", snippet: 'animation="fade"' },
+      { rule: "unmanaged-motion", snippet: 'popupStartingClass="opacity-0"' },
+      { rule: "unmanaged-motion", snippet: "transition-transform" },
+      { rule: "unmanaged-motion", snippet: "animate-pulse" },
+      { rule: "unmanaged-motion", snippet: 'transitionProperty: "transform"' },
+      { rule: "unmanaged-motion", snippet: "transitionDuration: 120" },
+    ]);
+
+    const good = [
+      "export function Good() {",
+      '  return <Dialog animation={fadeAnimation()} popupStartingClass={popupTransition("opacity-0")} class={`${motionClass("transition-opacity duration-120 ease-out")} ${motionClass("animate-pulse")}`} />;',
+      "}",
+    ].join("\n");
+    expect(scanUiTokens(file, good)).toEqual([]);
+  });
 });

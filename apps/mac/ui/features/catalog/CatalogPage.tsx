@@ -5,6 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { SearchField } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { Banner } from "../../design/layout";
+import { motionClass } from "../../design/motion";
 import { playSound, SOUND_GROUPS, SOUND_LABEL, type SoundName } from "../../design/pixel/sound";
 import { Segmented } from "../../design/Segmented";
 import { Tabs } from "../../design/Tabs";
@@ -126,7 +127,7 @@ function ShelfButton(props: { id: string; label: string; count: number; on: bool
       testID={`shelf-${props.id}`}
       accessibilityState={{ selected: props.on }}
       onPress={props.onPress}
-      class={`group h-7.5 w-full flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+      class={`group h-7.5 w-full flex-row items-center gap-2 rounded-md px-2 focus-visible:outline-2 focus-visible:outline-focus ${
         props.on ? "bg-selected" : "hover:bg-hover"
       }`}
     >
@@ -144,12 +145,12 @@ function ShelfSection(props: { title: string; count: string; hint?: string; chil
         role="button"
         accessibilityState={{ expanded: open() }}
         onPress={() => open.set(!open())}
-        class={`group min-h-10.5 flex-row items-center gap-2 px-3.5 py-2 transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus ${
+        class={`group min-h-10.5 flex-row items-center gap-2 px-3.5 py-2 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus ${
           open() ? "border-b border-line" : ""
         }`}
       >
         <View
-          class="size-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+          class={`size-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
           style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}
         >
           <Icon name="expand" size={10} tone="muted" />
@@ -183,7 +184,7 @@ function Tile(props: { p: Picture; selected: boolean; has: (n: string) => boolea
       accessibilityState={{ selected: props.selected }}
       tooltip={<Bubble text={`${props.p.name} · ${numberText(props.p.w)}×${numberText(props.p.h)}`} />}
       onPress={() => router.navigate(`/catalog/${encodeURIComponent(props.p.name)}`)}
-      class={`group w-23 items-center gap-1.5 rounded-lg border p-1 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+      class={`group w-23 items-center gap-1.5 rounded-lg border p-1 focus-visible:outline-2 focus-visible:outline-focus ${
         props.selected ? "border-accent bg-selected" : "border-transparent hover:bg-hover"
       }`}
     >
@@ -435,7 +436,7 @@ function Sounds(props: { tabs: JSX.Element }) {
                           accessibilityLabel={t("web.catalog.playSound", { name: SOUND_LABEL[name()] })}
                           tooltip={<Bubble text={t("web.catalog.playSound", { name: SOUND_LABEL[name()] })} />}
                           onPress={() => trigger(name())}
-                          class={`h-8 flex-row items-center gap-2 rounded-md border px-2.5 transition duration-120 ease-out active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus ${
+                          class={`h-8 flex-row items-center gap-2 rounded-md border px-2.5 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus ${
                             active() ? "border-accent bg-ok-soft" : "border-line bg-page hover:bg-hover active:bg-selected"
                           }`}
                         >

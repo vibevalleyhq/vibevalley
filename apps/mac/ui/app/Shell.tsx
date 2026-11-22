@@ -2,20 +2,24 @@ import { colorScheme, effect, host, keymap, Scroll, Text, View, windowSize, type
 
 import { t } from "@vibevalley/i18n";
 
+import { Button } from "../design/Button";
 import { OrchestratorFace } from "../design/domain/Face";
 import { Icon } from "../design/Icon";
+import { IconButton } from "../design/IconButton";
 import type { IconName } from "../design/icons";
+import { motionClass } from "../design/motion";
 import { usePixelDir } from "../design/pixel/atlas";
 import { ShortcutSheet } from "../design/ShortcutSheet";
 import { Tabs } from "../design/Tabs";
-import { Bubble, Hint } from "../design/Tip";
+import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
 import { QuickSwitcher, switcher } from "../features/channel";
+import { contentSidebarOpen, openContentSearch, openTemplatePicker, safeLastContentPath } from "../features/content";
 import { waitingOnUser } from "../features/inbox";
 import { NotesSearch } from "../features/pkm";
 import { Keyed, variant } from "../infra/base/dom";
 import { useCore, useFrames } from "../infra/frame";
-import { Link as A, NavLink, useLocation, useMatches } from "../infra/router";
+import { NavLink, useLocation, useMatches } from "../infra/router";
 import { useUpdates } from "../infra/settings";
 import { catalogPlace, type Place, places, runsPlace, settingsPlace } from "./places";
 
@@ -41,7 +45,7 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
       accessibilityLabel={props.label}
       tooltip={<Bubble text={props.label} placement="right" />}
       class={[
-        "relative items-center justify-center gap-0.5 rounded-lg px-0.5 transition duration-120 ease-out",
+        "relative items-center justify-center gap-0.5 rounded-lg px-0.5",
         hero() ? (small() ? "h-12 w-12" : compactTall() ? "h-15.5 w-16" : "h-16 w-16") : small() ? "h-11 w-11" : compactTall() ? "h-11.5 w-16" : "h-12.5 w-16",
         current() ? "" : "hover:bg-hover",
       ].join(" ")}
@@ -84,6 +88,7 @@ const railGroups = ["work", "setup"] as const;
 
 function Rail(props: { here?: Place | undefined; farm: boolean }) {
   const pixelDir = usePixelDir();
+  const core = useCore();
   const frames = useFrames();
   const updates = useUpdates();
   const ready = () => {
@@ -91,6 +96,8 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
     return s ? variant(s, "_tag", "ready") : undefined;
   };
   const waiting = () => waitingOnUser(frames.frame?.inbox ?? []);
+  const working = () => core()?.sessions.filter((s) => s.phase._tag === "working").length ?? 0;
+  const onRuns = () => props.here === runsPlace;
   const settings = settingsPlace;
   const atSettings = () => props.here === settings;
   const location = useLocation();
@@ -107,7 +114,7 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
       style={globalShell ? { width: width() } : undefined}
     >
       <If when={globalShell}>
-        <View class="h-7 shrink-0" />
+        <View class="h-7 shrink-0" desktop={{ windowDrag: true }} />
       </If>
       <View class={`shrink-0 items-center ${globalShell ? "pt-1 pb-2" : compactTall() ? "pt-1.5 pb-2" : "pt-2 pb-2"}`}>
         <Slot
@@ -152,7 +159,7 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
                 </If>
                 <Each of={places.filter((p) => p.group === group() && p.id !== "settings")}>
                   {(p) => {
-                    const to = () => (p().id === "workspace" && globalShell ? "/workspace" : p().path);
+                    const to = () => (p().id === "workspace" && globalShell ? "/workspace" : p().id === "content" ? safeLastContentPath() : p().path);
                     const isCurrent = () => (p().id === "workspace" ? location().pathname === "/workspace" || p() === props.here : p() === props.here);
                     return (
                       <Slot
@@ -185,6 +192,30 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
             />
           )}
         </If>
+        <NavLink
+          href="/runs"
+          testID="rail-runs-status"
+          accessibilityLabel={working() > 0 ? t("web.base.working", { n: working() }) : t("web.base.runsHint")}
+          tooltip={
+            <Bubble
+              text={working() > 0 ? `${t("web.base.working", { n: working() })} · ${t("web.base.runsHint")}` : t("web.base.runsHint")}
+              placement="right"
+            />
+          }
+          class={`h-7 shrink-0 flex-row items-center justify-center gap-1.5 rounded-full border px-2 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus ${
+            working() > 0 ? "" : onRuns() ? "border-line bg-selected" : "border-transparent hover:bg-hover"
+          }`}
+          style={working() > 0 ? { backgroundColor: mix("leaf", 0.14), borderColor: mix("leaf", 0.45) } : undefined}
+        >
+          <View class="size-3 shrink-0 items-center justify-center rounded-full" style={working() > 0 ? { backgroundColor: mix("leaf", 0.25) } : undefined}>
+            <View
+              class={`size-1.5 rounded-full ${working() > 0 ? `bg-leaf ${motionClass("animate-pulse")}` : core()?.call === "live" ? "bg-leaf" : "bg-faint"}`}
+            />
+          </View>
+          <If when={working() > 0}>
+            <Text class="font-mono text-2xs font-semibold text-leaf tabular-nums">{String(working())}</Text>
+          </If>
+        </NavLink>
         <Slot
           to={settings.path}
           place={settings.id}
@@ -198,75 +229,8 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
   );
 }
 
-type DeskRunState = "working" | "idle" | "offline";
-
-function deskRunStateOf(call: string | undefined, working: number): DeskRunState {
-  if (working > 0) return "working";
-  return call === "live" ? "idle" : "offline";
-}
-
-interface DeskRunPresentation {
-  readonly label: string;
-  readonly pillClass: (onRuns: boolean) => string;
-  readonly pillStyle: (onRuns: boolean) => Record<string, string> | undefined;
-  readonly pillHoverStyle: (onRuns: boolean) => Record<string, string> | undefined;
-  readonly haloBg: () => string | undefined;
-  readonly dotClass: string;
-  readonly textClass: string;
-}
-
-function deskRunPresentation(state: DeskRunState, workingCount: number): DeskRunPresentation {
-  switch (state) {
-    case "working":
-      return {
-        label: t("web.base.working", { n: workingCount }),
-        pillClass: (onRuns) => (onRuns ? "border-focus bg-selected" : ""),
-        pillStyle: (onRuns) => (onRuns ? undefined : { backgroundColor: mix("leaf", 0.1), borderColor: mix("leaf", 0.45) }),
-        pillHoverStyle: (onRuns) => (onRuns ? undefined : { backgroundColor: mix("leaf", 0.16) }),
-        haloBg: () => mix("leaf", 0.25),
-        dotClass: "bg-leaf",
-        textClass: "font-semibold text-ink tabular-nums",
-      };
-    case "idle":
-      return {
-        label: t("web.base.working", { n: 0 }),
-        pillClass: (onRuns) => (onRuns ? "border-accent bg-selected" : "border-line bg-side hover:bg-selected"),
-        pillStyle: () => undefined,
-        pillHoverStyle: () => undefined,
-        haloBg: () => undefined,
-        dotClass: "bg-leaf",
-        textClass: "font-medium text-muted tabular-nums",
-      };
-    case "offline":
-      return {
-        label: t("web.base.off"),
-        pillClass: (onRuns) => (onRuns ? "border-accent bg-selected" : "border-line bg-side hover:bg-selected"),
-        pillStyle: () => undefined,
-        pillHoverStyle: () => undefined,
-        haloBg: () => undefined,
-        dotClass: "bg-idle",
-        textClass: "font-medium text-muted",
-      };
-  }
-}
-
 function Desk(props: { place?: Place | undefined }) {
-  const core = useCore();
   const location = useLocation();
-  const working = () => core()?.sessions.filter((s) => s.phase._tag === "working").length ?? 0;
-  const runState = () => deskRunStateOf(core()?.call, working());
-  const view = () => deskRunPresentation(runState(), working());
-  const onRuns = () => props.place?.id === "runs";
-  const haloStyle = () => {
-    const bg = view().haloBg();
-    return bg !== undefined ? { backgroundColor: bg } : undefined;
-  };
-  const contentTab = () => {
-    const p = location().pathname;
-    if (p.startsWith("/artifacts")) return "content-artifacts";
-    if (p.startsWith("/pkm")) return "content-pkm";
-    return "content-library";
-  };
   const teamTab = () => {
     const p = location().pathname;
     if (p.startsWith("/runtimes")) return "team-runtimes";
@@ -274,33 +238,32 @@ function Desk(props: { place?: Place | undefined }) {
     if (p.startsWith("/team/memory")) return "team-memory";
     return "team-roles";
   };
+  const showContentActions = () => props.place?.id === "content" && !contentSidebarOpen.get();
   return (
-    <View testID="desk" class="min-h-16.5 shrink-0 flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-5 py-2">
+    <View testID="desk" desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center justify-between gap-3 border-b border-line px-3.5">
       <If when={props.place} else={<View class="flex-1" />}>
         {(place) => (
-          <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-3 gap-y-1.5">
-            <View class="min-w-0 flex-row items-center gap-2.5">
-              <Keyed key={place().icon}>{() => <Icon name={place().icon} size={20} />}</Keyed>
-              <View class="min-w-0 flex-row items-center gap-1.5">
-                <Text role="header" class="truncate text-lg font-semibold text-ink">
-                  {place().label}
-                </Text>
-                <Hint text={place().hint} />
+          <View class="min-w-0 flex-1 flex-row items-center gap-2.5 overflow-hidden">
+            <View class="min-w-0 shrink flex-row items-center gap-2">
+              <If when={place().id === "content"}>
+                <IconButton
+                  icon="sidebar"
+                  size={16}
+                  label={t("web.library.content.sidebarToggle")}
+                  testid="content-sidebar-toggle"
+                  pressed={contentSidebarOpen.get()}
+                  onClick={() => contentSidebarOpen.update((open) => !open)}
+                />
+              </If>
+              <View class="shrink-0">
+                <Keyed key={place().icon}>{() => <Icon name={place().icon} size={16} />}</Keyed>
               </View>
+              <Text role="header" class="min-w-0 truncate text-sm font-semibold text-ink">
+                {place().label}
+              </Text>
             </View>
-            <If when={place().id === "content"}>
-              <Tabs
-                look="pills"
-                label={place().label}
-                value={contentTab()}
-                items={[
-                  { value: "content-library", label: t("web.base.tab.library"), icon: "media", href: "/library" },
-                  { value: "content-artifacts", label: t("web.base.tab.artifacts"), icon: "artifacts", href: "/artifacts" },
-                  { value: "content-pkm", label: t("web.base.tab.pkm"), icon: "notes", href: "/pkm" },
-                ]}
-              />
-            </If>
             <If when={place().id === "team"}>
+              <View class="h-4 w-px shrink-0 bg-line" />
               <Tabs
                 look="pills"
                 label={place().label}
@@ -316,20 +279,14 @@ function Desk(props: { place?: Place | undefined }) {
           </View>
         )}
       </If>
-      <A
-        href="/runs"
-        accessibilityLabel={view().label}
-        testID="desk-status"
-        tooltip={<Bubble text={t("web.base.runsHint")} placement="bottom" />}
-        class={`h-7 shrink-0 flex-row items-center gap-2 rounded-full border px-3 transition duration-120 ease-out active:translate-y-px ${view().pillClass(onRuns())}`}
-        style={view().pillStyle(onRuns())}
-        hoverStyle={view().pillHoverStyle(onRuns())}
-      >
-        <View class="size-3.5 shrink-0 items-center justify-center rounded-full" style={haloStyle()}>
-          <View class={`size-2 rounded-full ${view().dotClass}`} />
+      <If when={showContentActions()}>
+        <View class="shrink-0 flex-row items-center gap-1.5">
+          <IconButton icon="search" size={14} label={t("web.library.content.searchAll")} testid="desk-content-search" onClick={() => openContentSearch()} />
+          <Button tone="primary" size="compact" icon="add" testID="desk-content-new" onPress={() => openTemplatePicker()}>
+            {t("web.library.content.new")}
+          </Button>
         </View>
-        <Text class={`text-xs ${view().textClass}`}>{view().label}</Text>
-      </A>
+      </If>
     </View>
   );
 }

@@ -1,10 +1,11 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-import { minimumMacOS, packageArchitecture, requireDeveloperId, verifyMacExecutable } from "./package-platform.ts";
+import { shouldPackageAsset } from "./package-assets.ts";
+import { channelIconFile, minimumMacOS, packageArchitecture, requireDeveloperId, verifyMacExecutable } from "./package-platform.ts";
 
 const root = resolve(import.meta.dirname, "../..");
 const { values } = parseArgs({
@@ -53,12 +54,8 @@ if (!values["skip-build"]) {
   run("swift", ["build", "-c", "release", "--package-path", "apps/island"]);
 }
 const arch = packageArchitecture(process.arch);
-for (const file of [
-  join(target, "vibevalley-mac"),
-  join(target, "vibevalley"),
-  join(root, "apps/mac/ui/build/bundle.js"),
-  join(root, "apps/island/.build/release/VibeValleyIsland"),
-]) {
+const icon = join(root, channelIconFile(version));
+for (const file of [join(target, "vibevalley-mac"), join(target, "vibevalley"), join(root, "apps/island/.build/release/VibeValleyIsland"), icon]) {
   if (!existsSync(file)) throw new Error(`Missing package input: ${file}. Build it before --skip-build`);
 }
 for (const binary of [join(target, "vibevalley-mac"), join(target, "vibevalley"), join(root, "apps/island/.build/release/VibeValleyIsland")]) {
@@ -71,8 +68,13 @@ mkdirSync(resources, { recursive: true });
 cpSync(join(target, "vibevalley-mac"), join(macos, "vibevalley-mac"));
 cpSync(join(target, "vibevalley"), join(macos, "vibevalley"));
 cpSync(join(root, "apps/island/.build/release/VibeValleyIsland"), join(macos, "VibeValleyIsland"));
-cpSync(join(root, "assets"), join(resources, "assets"), { recursive: true, dereference: true });
-cpSync(join(root, "apps/mac/ui/build"), join(resources, "ui"), { recursive: true });
+const assetsRoot = join(root, "assets");
+cpSync(assetsRoot, join(resources, "assets"), {
+  recursive: true,
+  dereference: true,
+  filter: (src) => shouldPackageAsset(relative(assetsRoot, src)),
+});
+cpSync(icon, join(resources, "icon.icns"));
 const sign = (path: string, microphone = false) =>
   run("codesign", [
     "--force",
@@ -90,6 +92,7 @@ writeFileSync(
 <key>CFBundleIdentifier</key><string>dev.vibevalley.app</string>
 <key>CFBundleName</key><string>VibeValley</string>
 <key>CFBundleExecutable</key><string>vibevalley-mac</string>
+<key>CFBundleIconFile</key><string>icon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>VibeValleyVersion</key><string>${version}</string>
 <key>CFBundleShortVersionString</key><string>${version.split("-")[0]}</string>

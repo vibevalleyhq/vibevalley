@@ -181,7 +181,7 @@ export function DesignSystemView(props: StoreViewerProps) {
 
   return (
     <View testID="design-system-view" class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-page">
-      <View class="min-h-11 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-side px-3 py-2">
+      <View class="min-h-9 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-side px-3 py-0.5">
         <Tabs label={props.artifact.title} value={tab()} onChange={(v) => tab.set(v)} items={tabItems} />
         <View class="ml-auto flex-row flex-wrap items-center gap-1.5">
           <If when={props.artifact.isDefault === true}>
@@ -377,7 +377,7 @@ export function DesignSystemView(props: StoreViewerProps) {
                     testID="ds-component-item"
                     accessibilityState={{ selected: selected() }}
                     onPress={() => selectedComponent.set(comp().id)}
-                    class={`relative h-7 justify-center rounded-md px-2.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                    class={`relative h-7 justify-center rounded-md px-2.5 focus-visible:outline-2 focus-visible:outline-focus ${
                       selected() ? "bg-selected" : "hover:bg-hover"
                     }`}
                   >

@@ -2,7 +2,7 @@ import { signal, type Accessor, type WebViewRef } from "nsh";
 
 import type { HtmlAnchor, HtmlShellCommand, HtmlShellMessage } from "@vibevalley/protocol";
 
-import { selectionOf, shellMessageOf } from "./shell";
+import { type PresenceHighlightCommand, selectionOf, shellMessageOf } from "./shell";
 
 export type { HtmlShellCommand };
 
@@ -81,7 +81,7 @@ export interface Frame {
   readonly picked: Accessor<(HtmlAnchor & { readonly path?: string }) | undefined>;
   /** The page loaded (onLoad), or why it did not (onError). */
   readonly state: Accessor<"loading" | "loaded" | { readonly error: string }>;
-  readonly send: (command: HtmlShellCommand | Record<string, unknown>) => void;
+  readonly send: (command: HtmlShellCommand | PresenceHighlightCommand | Record<string, unknown>) => void;
   readonly heard: (data: string) => void;
   readonly onMessage: (listener: (raw: unknown) => void) => () => void;
   readonly setRef: (ref: WebViewRef | undefined) => void;

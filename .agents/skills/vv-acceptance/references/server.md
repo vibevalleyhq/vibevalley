@@ -27,7 +27,7 @@
 2. 调这次改动的接口、看状态：
 
    ```bash
-   vpx scripts/release/verify-server.ts -- sh -c '"$VIBEVALLEY_VERIFY_CLI" issue list --format json'
+   vpx scripts/release/verify-server.ts -- sh -c '"$VIBEVALLEY_VERIFY_CLI" state --json && "$VIBEVALLEY_VERIFY_CLI" issue list --json'
    ```
 
    要造数据或断言，写进同一个子命令。
@@ -41,14 +41,14 @@
      vv issue create 写打卡并提交 --repo clock --agent docs
      vv issue status 1 todo
      vv issue show 1 --watch --timeout 60
-     vv issue diff 1 --format json
-     vv issue status 1 done --dry-run --format json
-     vv issue status 1 done --format json
-     git -C "$(vv repo list --format json | jq -r ".[0].path")" log --oneline main
+     vv issue diff 1 --json
+     vv issue status 1 done --dry-run --json
+     vv issue status 1 done --json
+     git -C "$(vv repo list --json | jq -r ".[0].path")" log --oneline main
    '
    ```
 
-   带 `--format json` 的命令，stdout 是一个 JSON 文档（不带是给人和 agent 读的短文字）：`issue status 1 todo` 派出去，`issue show --watch` 等帮工交回来（经过的状态在 stderr），`issue diff` 是改动，`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「提交」写 `clock.ts` 并提交，别的字眼见 [testing.rs](crates/server/src/testing.rs)）。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/release/verify-server.test.ts` 跑着同样的一遍。
+   带 `--json` 的命令，stdout 是一个 JSON 文档（不带是给人和 agent 读的短文字）：`issue status 1 todo` 派出去，`issue show --watch` 等帮工交回来（经过的状态在 stderr），`issue diff` 是改动，`--dry-run` 答复会做什么（`{"does":[…]}`）、什么都不动，真做以后 `status` 是 `done`、`delivered` 是 `merged`，`git log` 里有帮工的提交。帮工照标题里的字眼干活（「提交」写 `clock.ts` 并提交，别的字眼见 [testing.rs](crates/server/src/testing.rs)）。被拒的命令退出码是 3，stderr 最后一行是带 `next` 的 JSON，`next` 里的 `run` 能原样接在 `vv` 后面跑；要断言失败，用 `|| true` 接住，再读那一行。`scripts/release/verify-server.test.ts` 跑着同样的一遍。
 
 4. 页面也改了的，再照 [app.md](.agents/skills/vv-acceptance/references/app.md) 起应用截图。
 
@@ -56,7 +56,7 @@
 
 仅在用户已授权真实农机验收时执行；需要本机登录的 Codex 或 Claude Code，会消耗模型额度。先跑最低层的测试：`cargo test -p vibevalley-server --test session --test mcp`、`cargo test -p vibevalley-cli`。
 
-1. 子命令里建仓库和用真农机的档案（`vv repo create acceptance`、`vv agent create acceptance --runtime codex`），建一张只让帮工经 `vibevalley` MCP 调 `session_list` 再调 `issue_report` 交回的工单，派出去，`vv issue watch 1 --jsonl` 看到工具调用与交回。
+1. 子命令里建仓库和用真农机的档案（`vv repo create acceptance`、`vv agent create acceptance --runtime codex`），建一张只让帮工经 `vibevalley` MCP 调 `session_list` 再调 `issue_report` 交回的工单，派出去，`vv issue watch 1 --json` 看到工具调用与交回。
 2. 非法 Bearer 令牌请求 `POST /mcp` 被拒（401/403 或 JSON-RPC 鉴权错误），响应不回显有效凭证。
 3. 不带 `--scripted-helper` 执行：`env -u OAR_SUBAGENT_DEPTH vpx scripts/release/verify-server.ts -- sh <证据目录>/worker.sh`，保存命令、HEAD、stdout、stderr 和退出码。健康检查、agent 自述或单独的退出码不能替代工单的轨迹与状态。
 

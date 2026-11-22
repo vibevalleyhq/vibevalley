@@ -32,7 +32,7 @@ sqlx = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
-ureq = { version = "3.5.2", features = ["json"] }
+ureq = { workspace = true, features = ["rustls-no-provider", "platform-verifier"] }
 uuid = { workspace = true }
 vibevalley-protocol = { version = "0.1.0", path = "../protocol" }
 

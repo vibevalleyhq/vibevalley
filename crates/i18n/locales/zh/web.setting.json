@@ -56,7 +56,7 @@
     "width": "导航的宽窄（拖动，双击回默认）"
   },
   "words": {
-    "general": "语言 language 启动 打开 工作台 农场 主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号",
+    "general": "语言 language 启动 打开 工作台 农场 主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号 动画 无动画 动效 motion animation",
     "models": "密钥 钥匙 账号 DeepSeek MOSS 声网 Agora API Key 模型 绑定",
     "voice": "声网 Agora 电话 通话 MOSS Live 实时 视觉 听写 转写 语音",
     "connections": "微信 飞书 QQ 连接器 配对 GitHub gh PR 登录",
@@ -81,6 +81,13 @@
     "themes": {
       "light": "浅色",
       "dark": "深色",
+      "system": "跟随系统"
+    },
+    "motion": "动画",
+    "motionHint": "关闭后跳过界面过渡动画与背景帧循环，更适合 UI 测试与专注模式。",
+    "motionOption": {
+      "off": "无动画",
+      "on": "动画",
       "system": "跟随系统"
     },
     "scale": "界面大小",

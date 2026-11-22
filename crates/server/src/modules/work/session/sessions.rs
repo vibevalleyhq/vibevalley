@@ -105,6 +105,7 @@ pub(super) struct Inner {
     pub(super) listeners: Mutex<Vec<super::news::Listener>>,
     /// Held while a direct talk finds or hires its session.
     pub talking: Mutex<()>,
+    pub(super) workspaces: Mutex<HashMap<String, super::workspace::WorkspaceState>>,
 }
 
 impl Sessions {
@@ -130,6 +131,7 @@ impl Sessions {
             listeners: Mutex::new(Vec::new()),
             recovering: Default::default(),
             talking: Mutex::new(()),
+            workspaces: Mutex::new(HashMap::new()),
         })))
     }
 
@@ -524,6 +526,7 @@ impl Sessions {
         }
         lock(&self.0.extras).remove(session_id);
         self.0.ledger.database(|db| super::db::remove_extra(db, session_id))?;
+        self.remove_workspace_meta(session_id);
         Ok(())
     }
 
@@ -571,8 +574,9 @@ impl Sessions {
             }
             self.record(session_id, Step::Agent(event.clone()));
             match event.kind {
-                EventKind::SessionStarted { session_id: vendor, .. } if root => {
+                EventKind::SessionStarted { session_id: vendor, model } if root => {
                     let _ = self.set_extra(session_id, |e| e.agent_session = Some(vendor));
+                    self.on_workspace_session_started(session_id, model);
                 }
                 EventKind::TurnStarted { .. } if root => {
                     said.clear();
@@ -598,17 +602,51 @@ impl Sessions {
                         options: vec![],
                     });
                 }
-                EventKind::PermissionRequested { request_id, .. } if self.0.config.permission == PermissionMode::Bypass => {
-                    let agent = lock(&self.0.live).get(session_id).map(|l| l.agent.clone());
-                    if let Some(agent) = agent {
-                        let _ = agent.respond_permission(&request_id, PermissionDecision::AllowOnce);
+                EventKind::PermissionRequested {
+                    request_id,
+                    tool,
+                    input,
+                    summary,
+                } => {
+                    if self.session(session_id).is_some_and(|s| super::workspace::is_workspace(&s)) {
+                        self.on_workspace_permission_requested(session_id, request_id, tool, input, summary);
+                    } else if self.0.config.permission == PermissionMode::Bypass {
+                        let agent = lock(&self.0.live).get(session_id).map(|l| l.agent.clone());
+                        if let Some(agent) = agent {
+                            let _ = agent.respond_permission(&request_id, PermissionDecision::AllowOnce);
+                        }
                     }
+                }
+                EventKind::PermissionResolved { request_id, .. } => {
+                    self.on_workspace_permission_resolved(session_id, &request_id);
+                }
+                EventKind::InteractionRequested {
+                    request_id,
+                    question,
+                    options,
+                    allow_custom,
+                } => {
+                    if self.session(session_id).is_some_and(|s| super::workspace::is_workspace(&s)) {
+                        self.on_workspace_interaction_requested(session_id, request_id, question, options, allow_custom);
+                    } else if root {
+                        asked.push(Question {
+                            question,
+                            options: options.into_iter().map(|o| o.label).collect(),
+                        });
+                    }
+                }
+                EventKind::InteractionResolved { request_id, .. } => {
+                    self.on_workspace_interaction_resolved(session_id, &request_id);
                 }
                 EventKind::Error { message } if root => failure = Some(message),
                 EventKind::TurnFinished { reason, usage } if root => {
                     observed_run = None;
+                    let is_ws = self.session(session_id).is_some_and(|s| super::workspace::is_workspace(&s));
+                    if is_ws {
+                        self.on_workspace_turn_finished(session_id, &usage);
+                    }
                     self.finish(session_id, reason, reported_spent(&usage), &said, &asked, failure.as_deref());
-                    if let Some(rounds) = self.0.rounds.get() {
+                    if !is_ws && let Some(rounds) = self.0.rounds.get() {
                         rounds.after();
                     }
                 }
@@ -617,8 +655,13 @@ impl Sessions {
             }
         }
         let mut live = lock(&self.0.live);
-        if live.get(session_id).is_some_and(|l| l.generation == generation) {
+        let was_current = live.get(session_id).is_some_and(|l| l.generation == generation);
+        if was_current {
             live.remove(session_id);
+        }
+        drop(live);
+        if was_current {
+            self.on_workspace_pump_exited(session_id);
         }
     }
 
@@ -702,6 +745,10 @@ impl Sessions {
     /// work round's report onto its issue.
     fn finish(&self, session_id: &str, reason: StopReason, spent: Option<Spent>, said: &str, asked: &[Question], failure: Option<&str>) {
         let Some(session) = self.session(session_id) else { return };
+        if super::workspace::is_workspace(&session) {
+            self.finish_workspace(&session, reason, spent, said, failure);
+            return;
+        }
         if session.issue.is_none() && session.channel.is_some() {
             self.finish_talk(&session, reason, said, spent);
             return;

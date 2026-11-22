@@ -108,7 +108,7 @@ function SearchBody(props: { initial: string; onClose: () => void }) {
   keymap.bind({ up: () => move(-1), down: () => move(1) }, { when: "always" });
   return (
     <View class="gap-3">
-      <View class="h-10 flex-row items-center gap-2 rounded-md border border-line bg-page px-3 transition duration-120 ease-out hover:border-faint focus-within:border-focus">
+      <View class="h-10 flex-row items-center gap-2 rounded-md border border-line bg-page px-3 hover:border-faint focus-within:border-focus">
         <Icon name="search" size={16} tone="muted" />
         <Input
           autoFocus
@@ -175,7 +175,7 @@ function SearchBody(props: { initial: string; onClose: () => void }) {
                     accessibilityState={{ selected: active() === r().index }}
                     onMouseEnter={() => setActive(r().index)}
                     onPress={() => open(r().row)}
-                    class={`rounded-md px-2.5 py-1.5 transition duration-120 ease-out ${active() === r().index ? "bg-selected" : "hover:bg-hover"}`}
+                    class={`rounded-md px-2.5 py-1.5 ${active() === r().index ? "bg-selected" : "hover:bg-hover"}`}
                   >
                     <FoundRow row={r().row} words={words()} />
                   </View>
@@ -246,7 +246,7 @@ function Filter(props: { on: boolean; label: string; testid: string; onToggle: (
       testID={props.testid}
       accessibilityState={{ selected: props.on }}
       onPress={() => props.onToggle()}
-      class={`group h-6 justify-center rounded-full border px-2.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${props.on ? "border-accent bg-selected" : "border-transparent hover:bg-hover"}`}
+      class={`group h-6 justify-center rounded-full border px-2.5 focus-visible:outline-2 focus-visible:outline-focus ${props.on ? "border-accent bg-selected" : "border-transparent hover:bg-hover"}`}
     >
       <Text class={`text-xs font-medium ${props.on ? "text-ink" : "text-muted group-hover:text-ink"}`}>{props.label}</Text>
     </View>

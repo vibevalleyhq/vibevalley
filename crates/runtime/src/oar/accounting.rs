@@ -17,6 +17,7 @@ pub struct TokenTotals {
 fn count(v: &Value, keys: &[&str]) -> Option<u64> {
     keys.iter().find_map(|k| v.get(k)?.as_u64())
 }
+
 fn cost(v: &Value) -> Option<u64> {
     v["costMicros"].as_u64().or_else(|| {
         ["costUSD", "cost_usd", "total_cost_usd"]
@@ -24,8 +25,18 @@ fn cost(v: &Value) -> Option<u64> {
             .find_map(|key| v.get(key)?.as_f64().map(|s| (s * 1_000_000.0).round() as u64))
     })
 }
+
+fn extract_context(v: &Value) -> Option<(u64, u64)> {
+    let from = |obj: &Value| -> Option<(u64, u64)> {
+        let used = count(obj, &["used", "contextUsed", "context_used", "tokens"])?;
+        let window = count(obj, &["size", "contextWindow", "context_window"])?;
+        (used > 0 && window > 0).then_some((used, window))
+    };
+    from(v).or_else(|| v.get("context").and_then(from))
+}
+
 impl TokenTotals {
-    fn parse(v: &Value) -> Option<Self> {
+    pub(crate) fn parse(v: &Value) -> Option<Self> {
         let v = v.get("total").or_else(|| v.get("usage")).unwrap_or(v);
         Some(Self {
             input_tokens: count(v, &["inputTokens", "input_tokens"])?,
@@ -33,6 +44,8 @@ impl TokenTotals {
             cache_read_tokens: count(
                 v,
                 &[
+                    "cachedReadTokens",
+                    "cached_read_tokens",
                     "cachedInputTokens",
                     "cacheReadInputTokens",
                     "cacheReadTokens",
@@ -43,12 +56,21 @@ impl TokenTotals {
             .unwrap_or(0),
             cache_write_tokens: count(
                 v,
-                &["cacheCreationInputTokens", "cacheWriteTokens", "cacheWrite", "cache_creation_input_tokens"],
+                &[
+                    "cachedWriteTokens",
+                    "cached_write_tokens",
+                    "cacheCreationInputTokens",
+                    "cacheWriteTokens",
+                    "cacheWrite",
+                    "cache_creation_input_tokens",
+                ],
             )
             .unwrap_or(0),
             reasoning_tokens: count(
                 v,
                 &[
+                    "thoughtTokens",
+                    "thought_tokens",
                     "reasoningOutputTokens",
                     "reasoningTokens",
                     "reasoning",
@@ -60,6 +82,23 @@ impl TokenTotals {
             cost_micros: cost(v),
         })
     }
+
+    /// Antigravity / Gemini reports `inputTokens` excluding `cachedReadTokens` and
+    /// `outputTokens` excluding `thoughtTokens`; normalize to inclusive totals.
+    pub(crate) fn parse_antigravity(v: &Value) -> Option<Self> {
+        let raw = Self::parse(v)?;
+        let total_input = raw.input_tokens.saturating_add(raw.cache_read_tokens);
+        let total_output = raw.output_tokens.saturating_add(raw.reasoning_tokens);
+        Some(Self {
+            input_tokens: total_input,
+            output_tokens: total_output,
+            cache_read_tokens: raw.cache_read_tokens.min(total_input),
+            cache_write_tokens: raw.cache_write_tokens.min(total_input),
+            reasoning_tokens: raw.reasoning_tokens.min(total_output),
+            cost_micros: raw.cost_micros,
+        })
+    }
+
     fn add(self, b: Self) -> Self {
         Self {
             input_tokens: self.input_tokens.saturating_add(b.input_tokens),
@@ -75,6 +114,7 @@ impl TokenTotals {
             },
         }
     }
+
     pub(crate) fn subtract(self, b: Self) -> Self {
         Self {
             input_tokens: self.input_tokens.saturating_sub(b.input_tokens),
@@ -85,11 +125,17 @@ impl TokenTotals {
             cost_micros: self.cost_micros.zip(b.cost_micros).map(|(a, b)| a.saturating_sub(b)),
         }
     }
-    pub(crate) fn native(self) -> crate::oar::Usage {
+
+    pub(crate) fn native_with_context(self, context: Option<(u64, u64)>) -> crate::oar::Usage {
         crate::oar::Usage {
             input_tokens: Some(self.input_tokens),
             output_tokens: Some(self.output_tokens),
             cost_usd: self.cost_micros.map(|n| n as f64 / 1_000_000.0),
+            cache_read_tokens: (self.cache_read_tokens > 0).then_some(self.cache_read_tokens),
+            cache_write_tokens: (self.cache_write_tokens > 0).then_some(self.cache_write_tokens),
+            reasoning_tokens: (self.reasoning_tokens > 0).then_some(self.reasoning_tokens),
+            context_used_tokens: context.and_then(|(used, _)| (used > 0).then_some(used)),
+            context_window_tokens: context.and_then(|(_, window)| (window > 0).then_some(window)),
         }
     }
 }
@@ -98,6 +144,7 @@ impl TokenTotals {
 pub(crate) struct Meter {
     pub totals: Option<TokenTotals>,
     pub turn_local: Option<TokenTotals>,
+    pub last_context_pair: Option<(u64, u64)>,
     resumed: bool,
     seen_start: bool,
     base: Option<TokenTotals>,
@@ -115,6 +162,7 @@ impl Meter {
         self.resumed = true;
         self.unknown = reason;
     }
+
     pub fn baseline(&mut self, v: &Value) {
         if let Some(models) = by_model(v) {
             self.models = models
@@ -125,20 +173,26 @@ impl Meter {
         }
         self.base = TokenTotals::parse(v.get("tokenUsage").unwrap_or(v));
     }
+
     fn report(&mut self, tokens: Option<TokenTotals>, ctx: Option<(u64, u64)>, reason: &str) -> Value {
         self.totals = tokens;
         if tokens.is_none() {
             self.turn_local = None;
         }
-        let mut usage = json!({"tokens":tokens});
-        if let Some((used, window)) = ctx.filter(|&(a, b)| a > 0 && b > 0) {
-            usage["context"] = json!({"tokens":used,"contextWindow":window,"percent":((used as f64/window as f64)*100.0).min(100.0)});
+        let valid_ctx = ctx.filter(|&(a, b)| a > 0 && b > 0);
+        if valid_ctx.is_some() {
+            self.last_context_pair = valid_ctx;
+        }
+        let mut usage = json!({"tokens": tokens});
+        if let Some((used, window)) = valid_ctx {
+            usage["context"] = json!({"tokens": used, "contextWindow": window, "percent": ((used as f64 / window as f64) * 100.0).min(100.0)});
         }
         if tokens.is_none() && !reason.is_empty() {
             usage["unknownReason"] = json!(reason);
         }
-        json!({"kind":"usage","usage":usage})
+        json!({"kind": "usage", "usage": usage})
     }
+
     pub fn stream(&mut self, runtime: &str, frame: &Value) -> Option<Value> {
         if frame["type"] == "stream_event"
             && frame.pointer("/event/type") == Some(&json!("message_start"))
@@ -192,6 +246,7 @@ impl Meter {
         }
         Some(self.report(tokens, ctx, if self.resumed { "missing_flat_resume_baseline" } else { "usage_not_reported" }))
     }
+
     pub fn codex(&mut self, method: &str, params: &Value, root: bool) -> Option<Value> {
         if method == "turn/started" && root {
             self.seen_start = true;
@@ -219,18 +274,28 @@ impl Meter {
         };
         Some(self.report(result, ctx, if self.resumed { "missing_codex_resume_baseline" } else { "" }))
     }
-    pub fn acp(&mut self, u: &Value) -> Option<Value> {
+
+    pub fn acp(&mut self, runtime_id: &str, u: &Value) -> Option<Value> {
         if u["sessionUpdate"] != "usage_update" {
             return None;
         }
-        let raw = u.get("usage").or_else(|| u.get("content"))?;
-        let t = TokenTotals::parse(raw)?;
-        let tokens = if self.resumed {
+        let ctx = extract_context(u);
+        let raw = u.get("usage").or_else(|| u.get("content")).unwrap_or(u);
+        let per_turn_antigravity = matches!(runtime_id, "antigravity" | "acp:antigravity");
+        let parsed = if per_turn_antigravity {
+            TokenTotals::parse_antigravity(raw)
+        } else {
+            TokenTotals::parse(raw)
+        };
+        let Some(t) = parsed else {
+            return ctx.map(|c| self.report(self.totals, Some(c), ""));
+        };
+        let tokens = if self.resumed && !per_turn_antigravity {
             None
         } else {
             self.turn_local = Some(self.turn_local.map_or(t, |prev| prev.add(t)));
             Some(self.totals.map_or(t, |previous| previous.add(t)))
         };
-        Some(self.report(tokens, None, "acp_resume_baseline_unknown"))
+        Some(self.report(tokens, ctx, "acp_resume_baseline_unknown"))
     }
 }

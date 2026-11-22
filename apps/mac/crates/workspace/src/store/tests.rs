@@ -26,6 +26,9 @@ fn store_is_send_and_sync() {
 fn default_path_is_under_application_support() {
     let path = Store::default_path();
     assert!(path.ends_with("Library/Application Support/VibeValley/state.db"));
+    assert!(Store::default_path_for("VibeValley-beta").ends_with("Library/Application Support/VibeValley-beta/state.db"));
+    assert!(Store::default_path_for("VibeValley-alpha").ends_with("Library/Application Support/VibeValley-alpha/state.db"));
+    assert!(Store::default_path_for("VibeValley-dev").ends_with("Library/Application Support/VibeValley-dev/state.db"));
 }
 
 #[test]

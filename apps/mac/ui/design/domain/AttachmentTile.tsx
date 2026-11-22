@@ -7,6 +7,7 @@ import type { Attachment } from "@vibevalley/protocol";
 import { useAttachmentUrl } from "../../infra/attachmentFile";
 import { Icon } from "../Icon";
 import type { IconName } from "../icons";
+import { motionClass } from "../motion";
 import { Bubble } from "../Tip";
 
 /** How a file shows: a picture, a player, a PDF to open in a tab, or a file to save. */
@@ -25,10 +26,7 @@ export function AttachmentTile(props: { file: Attachment; onRemove?: (() => void
   const url = useAttachmentUrl(() => props.file.id);
   const removeHover = signal(false);
   return (
-    <View
-      testID={props.testid}
-      class="group max-w-64 flex-row items-center gap-2 rounded-md border border-line bg-page p-1.5 pr-2 transition duration-120 ease-out hover:border-faint"
-    >
+    <View testID={props.testid} class="group max-w-64 flex-row items-center gap-2 rounded-md border border-line bg-page p-1.5 pr-2 hover:border-faint">
       <View class="h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-line bg-side">
         <If when={kind() === "image" ? url() : undefined} else={<Icon name={kindIcon[kind()]} size={16} tone="muted" />}>
           {(src) => <Image testID="attachment-thumb" src={src()} class="h-8 w-8 object-cover" />}
@@ -47,7 +45,7 @@ export function AttachmentTile(props: { file: Attachment; onRemove?: (() => void
             onMouseEnter={() => removeHover.set(true)}
             onMouseLeave={() => removeHover.set(false)}
             onPress={() => remove()()}
-            class="ml-auto size-6 shrink-0 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-bad-soft active:translate-y-px"
+            class={`ml-auto size-6 shrink-0 items-center justify-center rounded-sm ${motionClass("transition-transform duration-120 ease-out")} hover:bg-bad-soft active:translate-y-px`}
           >
             <Icon name="close" size={12} tone={removeHover() ? "berry" : "muted"} />
           </View>

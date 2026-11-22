@@ -9,7 +9,7 @@
    - 官网站点（`apps/site/`）：用 Tailwind CSS v4 读 `apps/site/src/ui/global.css` 的 `@theme static`。
    - 原生 GPUI/像素/终端（`apps/mac/src/`）：用 Rust `theme.rs` 与 `pixel::draw::DrawList`。
 2. **复用已有的共用原语**：新建跨模块帮手或状态原语前，先查 [primitives.md](docs/reference/primitives.md) 与 `apps/mac/ui/design/` 目录，禁止抄写第二份功能重叠的按钮、标签、弹窗、分栏或复选框。
-3. **严守两套图标边界**：工作台按钮、导航与表单操作只能从 `apps/mac/ui/design/icons.ts` 取 `reicon` 图标；像素头像、农机标识与装饰图只能取 `assets/pixel/`；两者均严禁使用 emoji 替代，也不在页面局部用 `<Canvas>` 手绘新图标路径。
+3. **严守两套图标边界**：工作台按钮、导航与表单操作只能使用 `crates/rich/src/icon.rs`（原生 `VvIcon`）承载、`apps/mac/ui/design/icons.ts` 声明 `IconName` 的 `reicon` 图标（`<Icon name>`）；像素头像、农机标识与装饰图只能取 `assets/pixel/`；两者均严禁使用 emoji 替代，也不在页面局部用 `<Canvas>` 手绘新图标路径。
 
 ## 8.2 样式、色彩与布局纪律
 

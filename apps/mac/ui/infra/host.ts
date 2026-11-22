@@ -31,6 +31,7 @@ const desktop: Host = {
   locale: (locale) => void hostApi.locale(locale),
   reveal: (path) => void hostApi.reveal(path),
   theme: (theme) => void hostApi.theme(theme),
+  motion: (choice) => void hostApi.motion(choice),
   opening: (opening) => done(hostApi.opening(opening)),
   update: {
     watch: (listener) => {

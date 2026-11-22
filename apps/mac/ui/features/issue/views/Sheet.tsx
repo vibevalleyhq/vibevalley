@@ -101,7 +101,7 @@ export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; sid
       <If when={!wide() && drawerOpen()}>
         <View testID="issue-inspector-backdrop" class="absolute inset-0 z-20 bg-scrim" onPress={() => chrome?.closeDrawer()} />
         <View testID="issue-inspector" class="absolute top-0 right-0 bottom-0 z-30 w-72 max-w-full border-l border-line bg-side shadow-float">
-          <View class="h-10 shrink-0 flex-row items-center justify-between border-b border-line px-4">
+          <View class="h-9 shrink-0 flex-row items-center justify-between border-b border-line px-3.5">
             <Text class="text-xs font-semibold text-muted">{t("web.issue.detail.properties")}</Text>
             <IconButton icon="close" size={14} label={t("web.issue.sheet.less")} onClick={() => chrome?.closeDrawer()} />
           </View>
@@ -154,7 +154,7 @@ export function Fold(props: {
           testID={props.testID}
           accessibilityState={{ expanded: open() }}
           onPress={toggle}
-          class="-mx-2 min-w-0 flex-1 flex-row items-center gap-2 rounded-md px-2 py-2.5 transition duration-120 ease-out hover:bg-hover"
+          class="-mx-2 min-w-0 flex-1 flex-row items-center gap-2 rounded-md px-2 py-2.5 hover:bg-hover"
         >
           <View class="size-3.5 shrink-0 items-center justify-center" style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}>
             <Icon name="expand" size={10} tone="muted" />
@@ -183,7 +183,7 @@ export function More(props: { children: JSX.Element }) {
         role="button"
         testID="sheet-more"
         onPress={() => open.set(!open())}
-        class="-mx-1.5 flex-row items-center gap-1.5 self-start rounded-md px-1.5 py-1 transition duration-120 ease-out hover:bg-hover"
+        class="-mx-1.5 flex-row items-center gap-1.5 self-start rounded-md px-1.5 py-1 hover:bg-hover"
       >
         <View class="size-3.5 shrink-0 items-center justify-center" style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}>
           <Icon name="expand" size={10} tone="muted" />

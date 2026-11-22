@@ -15,6 +15,14 @@
       "types": "./dist/schema.d.ts",
       "default": "./src/schema.ts"
     },
+    "./session/schema": {
+      "types": "./dist/session/schema.d.ts",
+      "default": "./src/session/schema.ts"
+    },
+    "./runtime/schema": {
+      "types": "./dist/runtime/schema.d.ts",
+      "default": "./src/runtime/schema.ts"
+    },
     "./api": {
       "types": "./dist/api.d.ts",
       "default": "./src/api.ts"

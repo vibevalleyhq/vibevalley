@@ -23,13 +23,13 @@ use serde_json::{Value, json};
 use vibevalley_files::{FileIndex, FsChange, Watcher};
 use vibevalley_git::{Branch, Commit, Status, Worktree};
 use vibevalley_terminal::TermSession;
-use vibevalley_workspace::{PaneKind, ProjectId, Store, TabId, Workspace, load_all, load_project};
+use vibevalley_workspace::{PaneKind, ProjectId, Store, TabId, Workspace, load_all, load_project, prune_missing_projects};
 
 use crate::hosted::frames::{self, PaletteMode, TreeState};
 use crate::hosted::{HostedEvent, HostedView, Panel};
 use crate::panes::{PaneEntity, SplitBounds};
 use crate::terminal::TerminalView;
-use crate::theme::{Settings, ThemeChoice, Ui};
+use crate::theme::{MotionChoice, Settings, ThemeChoice, Ui};
 
 pub(super) const SETTINGS_KEY: &str = crate::theme::SETTINGS_KEY;
 pub(super) const ACTIVE_KEY: &str = "app.active_project";
@@ -83,6 +83,12 @@ pub struct PixelSlot {
     pub(super) _sub: Subscription,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct ChatTabStatus {
+    pub status: String,
+    pub attention: bool,
+}
+
 pub struct Shell {
     pub store: Option<Arc<Store>>,
     pub(super) project_open: Option<gpui::Task<()>>,
@@ -101,6 +107,8 @@ pub struct Shell {
     pub terminals: HashMap<String, TerminalSlot>,
     pub(crate) terminal_notice: Option<String>,
     pub panes: HashMap<(ProjectId, TabId), PaneSlot>,
+    pub chat_statuses: HashMap<(ProjectId, TabId), ChatTabStatus>,
+    pub chat_menu_group: Option<vibevalley_workspace::GroupId>,
     pub sidebar: Entity<HostedView>,
     pub inspector: Entity<HostedView>,
     pub workbench: Entity<HostedView>,
@@ -123,6 +131,7 @@ pub struct Shell {
     pub(super) resizing_inspector: bool,
     pub split_bounds: SplitBounds,
     pub dragging_split: Option<(u64, usize)>,
+    pub window_drag_origin: Option<(f32, f32)>,
     pub(super) focus: FocusHandle,
     pub(super) save_pending: bool,
     pub(super) fs_tx: flume::Sender<(ProjectId, Vec<FsChange>)>,
@@ -181,6 +190,7 @@ impl Shell {
             this.projects.clear();
             this.terminals.clear();
             this.panes.clear();
+            this.chat_statuses.clear();
             let store = this.store.take();
             async move {
                 let done = std::thread::spawn(move || {
@@ -214,8 +224,10 @@ impl Shell {
             server_ready: matches!(already_settled, Some(Ok(()))),
             workbench_ready: false,
             island: None,
-            launch: (std::env::var_os("VIBEVALLEY_NO_OPENING").is_none() && !matches!(already_settled, Some(Err(_))))
-                .then(|| cx.new(|cx| crate::pixel::view::PixelView::new("opening:launch", json!({}), cx))),
+            launch: (std::env::var_os("VIBEVALLEY_NO_OPENING").is_none()
+                && Ui::get(cx).settings.effective_motion() != MotionChoice::Off
+                && !matches!(already_settled, Some(Err(_))))
+            .then(|| cx.new(|cx| crate::pixel::view::PixelView::new("opening:launch", json!({}), cx))),
             load_error: match &already_settled {
                 Some(Err(e)) => Some(e.clone()),
                 _ => None,
@@ -225,6 +237,8 @@ impl Shell {
             terminal_notice: None,
             terminals: HashMap::new(),
             panes: HashMap::new(),
+            chat_statuses: HashMap::new(),
+            chat_menu_group: None,
             sidebar,
             inspector,
             workbench,
@@ -246,6 +260,7 @@ impl Shell {
             resizing_inspector: false,
             split_bounds: SplitBounds::default(),
             dragging_split: None,
+            window_drag_origin: None,
             focus: cx.focus_handle(),
             save_pending: false,
             fs_tx,
@@ -356,7 +371,7 @@ impl Shell {
                     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
                 }
                 let store = Store::open(&path).map_err(|e| e.to_string())?;
-                let mut projects = load_all(&store).map_err(|e| e.to_string())?;
+                let mut projects = prune_missing_projects(&store, load_all(&store).map_err(|e| e.to_string())?);
                 if projects.is_empty() {
                     let initial = cwd
                         .filter(|dir| dir != Path::new("/") && vibevalley_git::Repo::discover(dir).ok().flatten().is_some())
@@ -373,6 +388,7 @@ impl Shell {
                 Ok((store, projects, settings, active)) => {
                     let was_dark = Ui::get(cx).colors.dark;
                     let was_ui_size = Ui::get(cx).settings.ui_font_size;
+                    let was_motion = Ui::get(cx).settings.effective_motion();
                     this.sidebar_width = settings.sidebar_width;
                     this.sidebar_visible = settings.sidebar_visible;
                     this.inspector_open = settings.inspector_open;
@@ -380,6 +396,13 @@ impl Shell {
                     let saved_route = settings.last_route.clone();
                     let ui_size = settings.ui_font_size;
                     Ui::apply(settings, cx);
+                    let effective_motion = Ui::get(cx).settings.effective_motion();
+                    if effective_motion != was_motion {
+                        this.notify_motion(effective_motion, cx);
+                    }
+                    if effective_motion == MotionChoice::Off {
+                        this.launch = None;
+                    }
                     if let Some(route) = saved_route
                         && !route.is_empty()
                         && route != "/issues"

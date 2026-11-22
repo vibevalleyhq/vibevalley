@@ -284,12 +284,14 @@ function runGallery(): void {
   mkdirSync(fakeRoot, { recursive: true });
 
   const uiBundle = resolve(root, "apps/mac/ui/build/bundle.nshc");
+  const uiShellBundle = resolve(root, "apps/mac/ui/build-shell/bundle.nshc");
   const nshBin = resolve(root, ".tools/bin/nsh");
   const targetDir = process.env.CARGO_TARGET_DIR ? resolve(root, process.env.CARGO_TARGET_DIR) : resolve(root, "target");
   const macBin = resolve(targetDir, "debug/vibevalley-mac");
 
-  if (!options.skipBuild || !existsSync(uiBundle)) {
+  if (!options.skipBuild || !existsSync(uiBundle) || !existsSync(uiShellBundle)) {
     runChecked(nshBin, ["build", "App.tsx", "-o", "build"], { cwd: resolve(root, "apps/mac/ui") });
+    runChecked(nshBin, ["build", "ShellApp.tsx", "-o", "build-shell"], { cwd: resolve(root, "apps/mac/ui") });
   }
   if (!options.skipBuild || !existsSync(macBin)) {
     runChecked("cargo", ["build", "-p", "vibevalley-mac", "--features", "shot"], { cwd: root });
@@ -331,6 +333,7 @@ function runGallery(): void {
       VIBEVALLEY_WORK_ROOT: workDir,
       VIBEVALLEY_STORE: storeDb,
       VIBEVALLEY_NO_OPENING: "1",
+      VIBEVALLEY_NO_ANIMATION: "1",
       VIBEVALLEY_FAKE_SERVER: fakeDir,
       VIBEVALLEY_DEBUG_DUMP: dumpPath,
       VIBEVALLEY_DEBUG_SCRIPT: stepsPath,

@@ -1,10 +1,12 @@
-import { Clipboard, effect, host, Image, Scroll, signal, Text, View, type JSX } from "nsh";
-import { Button, ContextMenu, MenuItem, MenuSeparator } from "nsh/base";
+import { Clipboard, effect, host, Image, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
+import { Button, ContextMenu, Menu, MenuItem, MenuSeparator } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../design/Icon";
+import type { IconName } from "../design/icons";
 import { ActiveBar } from "../design/layout";
+import { motionClass, motionOff, popupTransition } from "../design/motion";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
 import { act, call, frame, frameRev, hostApi } from "../infra/bridge";
@@ -155,21 +157,6 @@ function summarizeRepo(repo: RepoNode): ActivitySummary {
   return { working, ready, attention, tabs };
 }
 
-function summarizeRepos(repos: RepoNode[]): ActivitySummary {
-  let working = 0;
-  let ready = 0;
-  let attention = 0;
-  let tabs = 0;
-  for (const repo of repos) {
-    const r = summarizeRepo(repo);
-    working += r.working;
-    ready += r.ready;
-    attention += r.attention;
-    tabs += r.tabs;
-  }
-  return { working, ready, attention, tabs };
-}
-
 function disambiguatorMap(repos: RepoNode[]): Map<string, string> {
   const byName = new Map<string, RepoNode[]>();
   for (const r of repos) {
@@ -201,6 +188,50 @@ function disambiguatorMap(repos: RepoNode[]): Map<string, string> {
     }
   }
   return result;
+}
+
+function TabIconStatus(props: {
+  tabId: number;
+  logoSrc?: string | undefined;
+  fallbackIcon: IconName;
+  iconTone: string;
+  state: RailRunningState;
+  attention: boolean;
+  sweepPhase: boolean;
+}) {
+  return (
+    <View class="relative size-4 shrink-0 items-center justify-center">
+      {props.logoSrc ? <Image src={props.logoSrc} class="size-4 object-contain" /> : <Icon name={props.fallbackIcon} size={14} tone={props.iconTone} />}
+      {props.state === "working" ? (
+        <View
+          testID={`sidebar-tab-working-${props.tabId}`}
+          class="pointer-events-none absolute -bottom-1 left-0 h-0.5 w-4 overflow-hidden rounded-full"
+          style={{ backgroundColor: mix("leaf", 0.24) }}
+        >
+          {motionOff() ? (
+            <View class="h-full w-full rounded-full bg-leaf" />
+          ) : (
+            <View
+              class={`h-full w-2 rounded-full bg-leaf ${motionClass("transition-transform duration-280 ease-in-out")}`}
+              style={{ transform: [{ translateX: props.sweepPhase ? 8 : 0 }] }}
+            />
+          )}
+        </View>
+      ) : null}
+      {props.attention ? (
+        <View
+          testID={`sidebar-tab-attention-${props.tabId}`}
+          class={`pointer-events-none absolute -right-0.5 ${props.state === "working" ? "-top-0.5" : "-bottom-0.5"} size-1.5 rounded-full bg-wheat`}
+        />
+      ) : props.state === "ready" ? (
+        <View
+          testID={`sidebar-tab-ready-${props.tabId}`}
+          class="pointer-events-none absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full border bg-side"
+          style={{ borderColor: mix("leaf", 0.72) }}
+        />
+      ) : null}
+    </View>
+  );
 }
 
 function StatusDots(props: { state: RailRunningState; attention?: boolean; readyRing?: boolean }) {
@@ -236,10 +267,10 @@ function ChevronSlot(props: { expandable: boolean; expanded: boolean; label: str
     <Button
       onPress={props.onToggle}
       accessibilityLabel={props.label}
-      class="h-4.5 w-3.5 shrink-0 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
+      class={`h-4.5 w-3.5 shrink-0 items-center justify-center rounded-sm ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
     >
       <View
-        class="size-2.5 items-center justify-center transition-transform duration-120 ease-out"
+        class={`size-2.5 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
         style={{ transform: [{ rotate: props.expanded ? "90deg" : "0deg" }] }}
       >
         <Icon name="expand" size={10} tone="muted" />
@@ -251,7 +282,7 @@ function ChevronSlot(props: { expandable: boolean; expanded: boolean; label: str
 function formatTabTooltip(tab: RailTab, group: WorktreeGroup): string {
   const state = tabRunningState(tab);
   const parts: string[] = [tab.title];
-  if (tab.kind === "terminal") {
+  if (tab.kind === "terminal" || tab.kind === "chat") {
     const label =
       tab.runningLabel && tab.runningLabel !== tab.title ? tab.runningLabel : tab.runningAgent && tab.runningAgent !== "cmd" ? tab.runningAgent : null;
     if (state === "working") {
@@ -259,7 +290,7 @@ function formatTabTooltip(tab: RailTab, group: WorktreeGroup): string {
     } else if (state === "ready") {
       parts.push(label ? t("web.shell.sidebar.readyAgent", { agent: label }) : t("web.shell.sidebar.ready"));
     }
-    if (tab.attention === true) parts.push(t("web.shell.sidebar.needsAttention"));
+    if (tab.attention === true) parts.push(tab.kind === "chat" ? t("web.shell.sidebar.chatWaiting") : t("web.shell.sidebar.needsAttention"));
   }
   parts.push(group.path);
   return parts.join(" · ");
@@ -283,8 +314,27 @@ export function Sidebar() {
   const vvRepos = signal<VvRepo[]>([]);
   const pixelDir = signal<string | undefined>(typeof host.params.pixelDir === "string" ? host.params.pixelDir : undefined);
   const foldOverrides = signal<Record<string, boolean>>({});
-  const otherSectionCollapsed = signal(false);
   const hoveredKey = signal<string | null>(null);
+  const openMenuKey = signal<string | null>(null);
+  const sweepPhase = signal(false);
+
+  const hasWorkingTab = () => {
+    for (const proj of rail()?.projects ?? []) {
+      for (const tab of proj.tabs ?? []) {
+        if ((tab.kind === "terminal" || tab.kind === "chat") && tabRunningState(tab) === "working") return true;
+      }
+    }
+    return false;
+  };
+
+  effect(() => {
+    if (!hasWorkingTab() || motionOff()) {
+      sweepPhase.set(false);
+      return;
+    }
+    const timer = setInterval(() => sweepPhase.set(!untracked(sweepPhase)), 420);
+    return () => clearInterval(timer);
+  });
 
   if (host.available()) {
     if (!pixelDir()) {
@@ -306,8 +356,7 @@ export function Sidebar() {
 
   const panel = () => rail()?.panel ?? "files";
 
-  const rowClass = (selected: boolean) =>
-    `relative h-7 flex-row items-center gap-1.5 rounded-md pr-1.5 transition duration-120 ease-out ${selected ? "bg-selected" : "hover:bg-hover"}`;
+  const rowClass = (selected: boolean) => `relative h-7 flex-row items-center gap-1.5 rounded-md pr-1.5 ${selected ? "bg-selected" : "hover:bg-hover"}`;
 
   const spriteSrc = (name: string | undefined) => {
     const dir = pixelDir();
@@ -355,7 +404,7 @@ export function Sidebar() {
 
     return (
       <View testID="workspace-inspector" class="flex-1 bg-side">
-        <View role="tablist" class="h-9 flex-row items-center gap-0.5 border-b border-line px-2">
+        <View role="tablist" desktop={{ windowDrag: true }} class="h-9 flex-row items-center gap-0.5 border-b border-line px-2">
           {inspectorTabs.map((item) => {
             const isCur = currentView() === item.id;
             const count = item.badge?.() ?? 0;
@@ -366,7 +415,7 @@ export function Sidebar() {
                 selected={isCur}
                 accessibilityLabel={count > 0 ? `${item.label} (${count})` : item.label}
                 tooltip={<Bubble text={item.tip} />}
-                class={`h-6 flex-row items-center justify-center gap-1 rounded-md px-2 transition duration-120 ease-out active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus ${
+                class={`h-6 flex-row items-center justify-center gap-1 rounded-md px-2 ${motionClass("transition-opacity duration-120 ease-out")} active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus ${
                   isCur ? "bg-selected" : "bg-transparent hover:bg-hover"
                 }`}
               >
@@ -579,24 +628,25 @@ export function Sidebar() {
     } else {
       // Restore defaults: expand active repo and worktrees with open tabs.
       foldOverrides.set({});
-      otherSectionCollapsed.set(false);
     }
   };
 
-  /** VibeValley's repos first; folders opened only for their terminals after them. */
-  const sections = (): { id: string; title: string; repos: RepoNode[] }[] => {
+  const orderedRepos = (): RepoNode[] => {
     const all = repoTree();
-    const own = all.filter((r) => r.vibevalley);
-    const other = all.filter((r) => !r.vibevalley);
-    if (own.length === 0 || other.length === 0) return [{ id: "all", title: "", repos: all }];
-    return [
-      { id: "own", title: "", repos: own },
-      { id: "other", title: t("web.shell.sidebar.otherFolders"), repos: other },
-    ];
+    return [...all.filter((r) => r.vibevalley), ...all.filter((r) => !r.vibevalley)];
   };
 
   const withWorktreeMenu = (group: WorktreeGroup, trigger: JSX.Element) => (
     <ContextMenu trigger={trigger} popupClass={menuPopupClass}>
+      <MenuItem
+        onSelect={() => {
+          setFold(groupFoldKey(group), true);
+          act({ type: "new_chat_at", path: group.path });
+        }}
+        class={menuItemClass}
+      >
+        <Text class="text-sm text-ink">{t("web.shell.sidebar.newChatHere")}</Text>
+      </MenuItem>
       <MenuItem
         onSelect={() => {
           setFold(groupFoldKey(group), true);
@@ -627,12 +677,16 @@ export function Sidebar() {
     const rowKey = `tab:${group.path}:${tab.id}`;
     const isSelected = group.active && tab.active;
     const isHovered = () => hoveredKey() === rowKey;
-    // Each terminal tab displays strictly its own PTY status (never polluted by group.sessionRunning).
-    const state = tab.kind === "terminal" ? tabRunningState(tab) : "idle";
-    const ownAgent = tab.kind === "terminal" ? tab.runningAgent : undefined;
+    const isMenuOpen = () => openMenuKey() === rowKey;
+    // Each terminal/chat tab displays strictly its own status (never polluted by group.sessionRunning).
+    const state = tab.kind === "terminal" || tab.kind === "chat" ? tabRunningState(tab) : "idle";
+    const ownAgent = tab.kind === "terminal" || tab.kind === "chat" ? tab.runningAgent : undefined;
     const logoSrc = spriteSrc(runtimeLogoOf(ownAgent ?? undefined));
-    const canClose = tab.kind === "terminal" || group.tabs.length > 1;
+    const canClose = tab.kind === "terminal" || tab.kind === "chat" || group.tabs.length > 1;
     const tabIconTone = () => (state === "working" ? "leaf" : isSelected ? "ink" : "muted");
+    const fallbackIcon: IconName = tab.kind === "chat" ? "chat" : tab.kind === "diff" ? "diff" : tab.kind === "file" ? "file" : "terminal";
+    const tabMenuItemClass = "h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-hover focus:bg-hover";
+    const tabMenuDangerClass = "h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-bad-soft focus:bg-bad-soft";
 
     return (
       <View
@@ -651,30 +705,90 @@ export function Sidebar() {
           onPress={() => act({ type: "activate_tab", path: group.path, tab_id: tab.id })}
           class="h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
         >
-          <View class="size-4 shrink-0 items-center justify-center">
-            {logoSrc ? (
-              <Image src={logoSrc} class="size-4 object-contain" />
-            ) : (
-              <Icon name={tab.kind === "diff" ? "diff" : tab.kind === "file" ? "file" : "terminal"} size={14} tone={tabIconTone()} />
-            )}
-          </View>
+          <TabIconStatus
+            tabId={tab.id}
+            logoSrc={logoSrc}
+            fallbackIcon={fallbackIcon}
+            iconTone={tabIconTone()}
+            state={state}
+            attention={tab.attention === true}
+            sweepPhase={sweepPhase()}
+          />
           <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{tab.title}</Text>
         </Button>
-        <View class="shrink-0 flex-row items-center gap-1">
-          {state !== "idle" || tab.attention === true ? <StatusDots state={state} attention={tab.attention === true} /> : null}
-          {canClose && isHovered() ? (
-            <ShellIconButton
-              compact
-              icon="close"
-              size={11}
-              label={t("web.shell.sidebar.closeTab", { title: tab.title })}
-              onPress={() => {
-                if (hoveredKey() === rowKey) hoveredKey.set(null);
-                act({ type: "close_tab_at", path: group.path, tab_id: tab.id });
+        {isHovered() || isMenuOpen() ? (
+          <Menu
+            open={isMenuOpen()}
+            onOpenChange={(e) => {
+              if (e.open) openMenuKey.set(rowKey);
+              else if (openMenuKey() === rowKey) openMenuKey.set(null);
+            }}
+            placement="bottom"
+            align="end"
+            offset={4}
+            popupClass={`${menuPopupClass} ${motionClass("transition-opacity duration-120 ease-out")}`}
+            popupStartingClass={popupTransition("opacity-0")}
+            popupEndingClass={popupTransition("opacity-0")}
+            trigger={
+              <View
+                testID={`sidebar-tab-more-${tab.id}`}
+                accessibilityLabel={t("web.shell.sidebar.tabMore")}
+                tooltip={<Bubble text={t("web.shell.sidebar.tabMore")} />}
+                class={`size-5 shrink-0 items-center justify-center rounded-sm ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected aria-expanded:bg-selected focus-visible:outline-2 focus-visible:outline-focus`}
+              >
+                <Icon name="more" size={13} tone="muted" />
+              </View>
+            }
+          >
+            <MenuItem
+              testID={`sidebar-tab-menu-chat-${tab.id}`}
+              onSelect={() => {
+                setFold(groupFoldKey(group), true);
+                act({ type: "new_chat_at", path: group.path });
               }}
-            />
-          ) : null}
-        </View>
+              class={tabMenuItemClass}
+            >
+              <Icon name="chat" size={13} tone="muted" />
+              <Text class="text-sm text-ink">{t("web.shell.sidebar.newChatHere")}</Text>
+            </MenuItem>
+            <MenuItem
+              testID={`sidebar-tab-menu-term-${tab.id}`}
+              onSelect={() => {
+                setFold(groupFoldKey(group), true);
+                act({ type: "new_terminal_at", path: group.path });
+              }}
+              class={tabMenuItemClass}
+            >
+              <Icon name="terminal" size={13} tone="muted" />
+              <Text class="text-sm text-ink">{t("web.shell.sidebar.newTerminalHere")}</Text>
+            </MenuItem>
+            <MenuItem testID={`sidebar-tab-menu-reveal-${tab.id}`} onSelect={() => void hostApi.reveal(group.path)} class={tabMenuItemClass}>
+              <Icon name="folder" size={13} tone="muted" />
+              <Text class="text-sm text-ink">{t("web.shell.sidebar.revealInFinder")}</Text>
+            </MenuItem>
+            <MenuItem testID={`sidebar-tab-menu-copy-${tab.id}`} onSelect={() => void Clipboard.writeText(group.path)} class={tabMenuItemClass}>
+              <Icon name="copy" size={13} tone="muted" />
+              <Text class="text-sm text-ink">{t("web.shell.sidebar.copyPath")}</Text>
+            </MenuItem>
+            {canClose ? (
+              <>
+                <MenuSeparator class={menuSeparatorClass} />
+                <MenuItem
+                  testID={`sidebar-tab-menu-close-${tab.id}`}
+                  onSelect={() => {
+                    if (hoveredKey() === rowKey) hoveredKey.set(null);
+                    if (openMenuKey() === rowKey) openMenuKey.set(null);
+                    act({ type: "close_tab_at", path: group.path, tab_id: tab.id });
+                  }}
+                  class={tabMenuDangerClass}
+                >
+                  <Icon name="close" size={13} tone="berry" />
+                  <Text class="text-sm text-berry">{t("web.shell.sidebar.closeTab")}</Text>
+                </MenuItem>
+              </>
+            ) : null}
+          </Menu>
+        ) : null}
       </View>
     );
   };
@@ -728,6 +842,16 @@ export function Sidebar() {
               {isHovered() ? (
                 <>
                   {expandable && !expanded ? <CollapsedSummary summary={summary} /> : group.sessionRunning ? <StatusDots state="working" /> : null}
+                  <ShellIconButton
+                    compact
+                    icon="chat"
+                    size={12}
+                    label={t("web.shell.sidebar.newChat", { name: group.label })}
+                    onPress={() => {
+                      setFold(groupFoldKey(group), true);
+                      act({ type: "new_chat_at", path: group.path });
+                    }}
+                  />
                   <ShellIconButton
                     compact
                     icon="add"
@@ -805,6 +929,16 @@ export function Sidebar() {
             <>
               <ShellIconButton
                 compact
+                icon="chat"
+                size={12}
+                label={t("web.shell.sidebar.newChat", { name: repo.name })}
+                onPress={() => {
+                  setFold(repoFoldKey(repo), true);
+                  act({ type: "new_chat_at", path: repo.path });
+                }}
+              />
+              <ShellIconButton
+                compact
                 icon="add"
                 size={12}
                 label={t("web.shell.sidebar.newTerminal", { name: repo.name })}
@@ -864,7 +998,7 @@ export function Sidebar() {
 
   return (
     <View testID="workspace-sidebar" class="flex-1 bg-side">
-      <View class="h-9 flex-row items-center justify-between border-b border-line pr-2 pl-3">
+      <View desktop={{ windowDrag: true }} class="h-9 flex-row items-center justify-between border-b border-line pr-2 pl-3">
         <Text class="text-xs font-semibold text-ink">{t("web.shell.sidebar.title")}</Text>
         <View class="flex-row items-center gap-1">
           <ShellIconButton icon="catalog" size={13} label={t("web.shell.sidebar.manageRepos")} onPress={() => act({ type: "open_route", path: "/repos" })} />
@@ -880,7 +1014,7 @@ export function Sidebar() {
             onPress={() => act({ type: "add_project" })}
             accessibilityLabel={t("web.shell.sidebar.addRepo")}
             tooltip={<Bubble text={t("web.shell.sidebar.addRepoTooltip")} />}
-            class="h-5.5 flex-row items-center gap-1 rounded-md border border-line bg-hover px-2 transition duration-120 ease-out hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
+            class={`h-5.5 flex-row items-center gap-1 rounded-md border border-line bg-hover px-2 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
           >
             <Icon name="add" size={11} tone="ink" />
             <Text class="text-2xs font-medium text-ink">{t("web.shell.sidebar.addRepoButton")}</Text>
@@ -890,50 +1024,15 @@ export function Sidebar() {
 
       <Scroll
         class="flex-1"
-        contentClass="gap-1.5 px-2 py-1.5"
+        contentClass="gap-0.5 px-2 py-1.5"
         onMouseLeave={() => {
           if (hoveredKey() !== null) hoveredKey.set(null);
         }}
       >
         {(() => {
-          const allRepos = repoTree();
+          const allRepos = orderedRepos();
           const disambiguators = disambiguatorMap(allRepos);
-          return sections().map((section) => {
-            const isCollapsibleSection = section.id === "other" && section.title.length > 0;
-            const isCollapsed = isCollapsibleSection && otherSectionCollapsed();
-            const sectionSummary = isCollapsibleSection ? summarizeRepos(section.repos) : undefined;
-            return (
-              <View class="gap-0.5">
-                {section.title ? (
-                  <Button
-                    onPress={() => {
-                      if (isCollapsibleSection) otherSectionCollapsed.update((v) => !v);
-                    }}
-                    accessibilityLabel={
-                      isCollapsed
-                        ? t("web.shell.sidebar.expandSection", { title: section.title })
-                        : t("web.shell.sidebar.collapseSection", { title: section.title })
-                    }
-                    class="mx-px mt-1 h-6 flex-row items-center gap-1.5 rounded-md px-1.5 transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
-                  >
-                    <View
-                      class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
-                      style={{ transform: [{ rotate: isCollapsed ? "0deg" : "90deg" }] }}
-                    >
-                      <Icon name="expand" size={10} tone="muted" />
-                    </View>
-                    <Text class="flex-1 truncate text-2xs font-semibold text-muted">{section.title}</Text>
-                    {isCollapsed && sectionSummary ? (
-                      <CollapsedSummary summary={sectionSummary} />
-                    ) : (
-                      <Text class="text-2xs font-medium text-faint tabular-nums">{String(section.repos.length)}</Text>
-                    )}
-                  </Button>
-                ) : null}
-                {!isCollapsed ? section.repos.map((repo) => renderRepoNode(repo, disambiguators)) : null}
-              </View>
-            );
-          });
+          return allRepos.map((repo) => renderRepoNode(repo, disambiguators));
         })()}
       </Scroll>
     </View>

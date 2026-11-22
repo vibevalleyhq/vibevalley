@@ -739,6 +739,7 @@ pub fn artifact_suffix_of(body: &str, artifact_type: Option<ArtifactType>, displ
     if let Some(at) = artifact_type {
         return match at {
             ArtifactType::Docs => ".doc.md",
+            ArtifactType::Outline => ".outline.md",
             ArtifactType::Slides => ".slide.html",
             ArtifactType::Dashboard => ".dashboard.html",
             ArtifactType::Motion => ".motion.html",
@@ -795,6 +796,7 @@ static RE_NAME_MOTION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.+?
 static RE_NAME_WHITEBOARD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.+?)\.whiteboard(?:\.json|\.html)?$").expect("regex"));
 static RE_NAME_DS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.+?)\.(?:design-system|tokens)\.json$").expect("regex"));
 static RE_NAME_HTML: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.+?)\.(?:page\.html|html|htm)$").expect("regex"));
+static RE_NAME_OUTLINE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.+?)\.outline\.md$").expect("regex"));
 static RE_NAME_MD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.+?)\.(?:doc\.md|md|markdown)$").expect("regex"));
 
 pub fn infer_artifact_from_name(name: &str, content: Option<&str>) -> InferredArtifactName {
@@ -859,6 +861,14 @@ pub fn infer_artifact_from_name(name: &str, content: Option<&str>) -> InferredAr
             kind: ArtifactKind::Html,
             display: Some(display),
             artifact_type: None,
+        };
+    }
+    if let Some(c) = RE_NAME_OUTLINE.captures(trimmed) {
+        return InferredArtifactName {
+            title: title_of(&c),
+            kind: ArtifactKind::Markdown,
+            display: None,
+            artifact_type: Some(ArtifactType::Outline),
         };
     }
     if let Some(c) = RE_NAME_MD.captures(trimmed) {

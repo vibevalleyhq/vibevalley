@@ -89,7 +89,12 @@ fn config(home: &Path, model: Arc<Model>) -> ServerConfig {
             Step::text(format!("committed {file}")),
             Step::Emit(vibevalley_runtime::oar::EventKind::TurnFinished {
                 reason: vibevalley_runtime::oar::StopReason::Completed,
-                usage: vibevalley_runtime::oar::Usage { input_tokens: Some(30), output_tokens: Some(12), cost_usd: Some(0.001) },
+                usage: vibevalley_runtime::oar::Usage {
+                    input_tokens: Some(30),
+                    output_tokens: Some(12),
+                    cost_usd: Some(0.001),
+                    ..Default::default()
+                },
             }),
         ])
     })))));

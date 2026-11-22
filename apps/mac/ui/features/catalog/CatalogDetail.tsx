@@ -7,6 +7,7 @@ import { Button, Words } from "../../design/Button";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import { Card, Toggle } from "../../design/layout";
+import { motionClass } from "../../design/motion";
 import { useCursorUrl, useSpriteUrl } from "../../design/pixel/atlas";
 import { Segmented } from "../../design/Segmented";
 import { Bubble } from "../../design/Tip";
@@ -81,7 +82,7 @@ function Copy(props: { text: string }) {
       accessibilityLabel={label()}
       tooltip={<Bubble text={label()} />}
       onPress={() => void copy()}
-      class={`h-6 shrink-0 flex-row items-center gap-1 rounded-md px-1.5 transition duration-120 ease-out active:translate-y-px ${
+      class={`h-6 shrink-0 flex-row items-center gap-1 rounded-md px-1.5 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px ${
         done() ? "bg-ok-soft" : "hover:bg-hover"
       }`}
     >
@@ -224,7 +225,7 @@ export function Detail(props: { picture: Picture; has: (n: string) => boolean; b
                           accessibilityLabel={name()}
                           tooltip={<Bubble text={name()} />}
                           onPress={() => router.navigate(`/catalog/${encodeURIComponent(name())}`)}
-                          class={`rounded-md border-2 p-px transition duration-120 ease-out ${active() ? "border-accent" : "border-transparent hover:border-line"}`}
+                          class={`rounded-md border-2 p-px ${active() ? "border-accent" : "border-transparent hover:border-line"}`}
                         >
                           <GroundBox ground={props.ground} checked class="h-11 w-11 items-center justify-center rounded-sm">
                             <Img p={p()} scale={fitScale(p(), 38)} />
@@ -296,7 +297,7 @@ export function CursorTile(props: { name: string; hx: number; hy: number; ground
     <View
       testID="cursor"
       tooltip={<Bubble text={`${props.name} · (${numberText(props.hx)}, ${numberText(props.hy)})`} />}
-      class="group w-26 items-center gap-1.5 rounded-lg p-1.5 transition duration-120 ease-out hover:bg-hover"
+      class="group w-26 items-center gap-1.5 rounded-lg p-1.5 hover:bg-hover"
     >
       <GroundBox ground={props.ground} checked class="h-16 w-full items-center justify-center rounded-md border border-line">
         <View style={{ height, width: widthPx() }}>

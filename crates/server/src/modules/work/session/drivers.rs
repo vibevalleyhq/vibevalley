@@ -51,6 +51,8 @@ pub trait Drivers: Send + Sync {
     fn check(&self, agent: &str) -> Result<()>;
     /// What the agent runs `issue` on now; `None` is nobody assigned.
     fn drive(&self, agent: Option<&str>, issue: &Issue) -> Result<Drive>;
+    /// What a direct workspace session opens on, named by runtime id.
+    fn drive_runtime(&self, runtime: &str, model: Option<&str>, effort: Option<&str>) -> Result<Drive>;
     /// Who drafts `issue` (`refine`); the board assigns it when nobody is.
     fn drafter(&self, issue: &Issue) -> Result<Drive> {
         self.drive(issue.assigned_agent(), issue)
@@ -98,22 +100,28 @@ impl Drivers for RuntimeDrivers {
 
     fn drive(&self, agent: Option<&str>, _issue: &Issue) -> Result<Drive> {
         let agent = agent.filter(|a| !a.trim().is_empty()).unwrap_or("claude");
-        let runtime = self.registry.require(agent)?;
+        self.drive_runtime(agent, None, None)
+    }
+
+    fn drive_runtime(&self, runtime_id: &str, model: Option<&str>, effort: Option<&str>) -> Result<Drive> {
+        let runtime_id = runtime_id.trim();
+        let runtime = self.registry.require(runtime_id)?;
         match runtime.installation() {
             Installation::Available { .. } => {}
-            Installation::LoginRequired { .. } => return Err(BoardError::Other(format!("{agent} requires a local sign-in"))),
-            Installation::NotInstalled => return Err(BoardError::Other(format!("{agent} is not installed"))),
-            Installation::Unusable { reason } => return Err(BoardError::Other(format!("{agent} cannot be used: {reason}"))),
+            Installation::LoginRequired { .. } => return Err(BoardError::Other(format!("{runtime_id} requires a local sign-in"))),
+            Installation::NotInstalled => return Err(BoardError::Other(format!("{runtime_id} is not installed"))),
+            Installation::Unusable { reason } => return Err(BoardError::Other(format!("{runtime_id} cannot be used: {reason}"))),
         }
+        let wire_id = runtime.id().strip_prefix("acp:").unwrap_or(runtime.id()).to_string();
         Ok(Drive {
-            agent: agent.to_string(),
-            runtime_id: runtime.id().to_string(),
+            agent: wire_id.clone(),
+            runtime_id: wire_id,
             name: runtime.display_name().to_string(),
             runtime,
-            model: self.model.clone(),
+            model: model.map(str::trim).filter(|m| !m.is_empty()).map(String::from).or_else(|| self.model.clone()),
             env: vec![],
             persona: None,
-            effort: None,
+            effort: effort.map(str::trim).filter(|e| !e.is_empty()).map(String::from),
             mcp_servers: vec![],
             disallowed_tools: vec![],
         })

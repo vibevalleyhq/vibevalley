@@ -199,10 +199,7 @@ export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: Voi
           <Icon name="info" size={12} tone="faint" />
         </View>
         <Text class="text-xs leading-relaxed text-muted">{t("web.voice.voice.persona.intro")}</Text>
-        <A
-          href="/settings/voice/call"
-          class="rounded-sm px-0.5 transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
-        >
+        <A href="/settings/voice/call" class="rounded-sm px-0.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus">
           <Text class="text-xs font-medium text-water underline">{t("web.voice.voice.section.label")}</Text>
         </A>
         <Text class="text-xs leading-relaxed text-muted">{t("web.voice.voice.persona.page")}</Text>
@@ -324,7 +321,7 @@ export function VoiceAgentSection(props: { draft: VoiceSettings; set: (next: Voi
                           <View
                             role="button"
                             onPress={() => props.set({ ...props.draft, tts: { ...narrowed(), voiceName: v() } })}
-                            class="rounded-sm border border-line bg-side px-2 py-0.5 transition duration-120 ease-out hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+                            class="rounded-sm border border-line bg-side px-2 py-0.5 hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
                           >
                             <Text class="font-mono text-2xs text-muted">{v()}</Text>
                           </View>
@@ -397,7 +394,7 @@ function MiniMaxVoices(props: { value: string; onChange: (id: string) => void })
           const isPlaying = () => playing() === v().id;
           return (
             <View
-              class={`h-8.5 flex-row items-center rounded-md border transition duration-120 ease-out ${
+              class={`h-8.5 flex-row items-center rounded-md border ${
                 chosen() ? "border-accent bg-ok-soft" : "border-line bg-page hover:border-faint hover:bg-hover"
               }`}
               style={{ width: windowSize().width >= 640 ? "32.4%" : "48.6%" }}
@@ -409,7 +406,7 @@ function MiniMaxVoices(props: { value: string; onChange: (id: string) => void })
                   accessibilityLabel={
                     isPlaying() ? t("web.voice.voice.persona.stop", { name: v().label }) : t("web.voice.voice.persona.play", { name: v().label })
                   }
-                  class="ml-0.5 size-7 shrink-0 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+                  class="ml-0.5 size-7 shrink-0 items-center justify-center rounded-sm hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
                   style={isPlaying() ? { backgroundColor: mix("water", 0.16) } : undefined}
                   onPress={() => play(v().id, v().sample)}
                 >

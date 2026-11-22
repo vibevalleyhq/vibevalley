@@ -7,7 +7,10 @@ use std::sync::{Arc, Mutex, MutexGuard, Weak};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::oar::record::Recorder;
-use crate::oar::{AgentError, Capabilities, ContentBlock, Event, EventKind, PermissionDecision, Result, Session, SessionStatus, StopReason, Usage};
+use crate::oar::{
+    AgentError, Capabilities, ContentBlock, Event, EventKind, InteractionDecision, PermissionDecision, PermissionMode, Result, Session, SessionStatus,
+    StopReason, Usage,
+};
 
 /// One-word reasons carried at the front of `AgentError::Rejected`
 /// (`"busy: a turn is running"`); see `AgentError::rejection_code`. The words
@@ -57,6 +60,7 @@ pub const HISTORY_LIMIT: usize = 10_000;
 pub struct StatusFold {
     turn_active: bool,
     pending_permissions: Vec<(String, Vec<String>)>,
+    pending_interactions: Vec<(String, Vec<String>)>,
     question: bool,
     failed: bool,
     ended: bool,
@@ -75,6 +79,7 @@ impl StatusFold {
                 self.question = false;
                 self.failed = false;
                 self.pending_permissions.clear();
+                self.pending_interactions.clear();
             }
             EventKind::PermissionRequested { request_id, .. } => {
                 self.pending_permissions.push((request_id.clone(), event.agent_path.clone()));
@@ -82,10 +87,17 @@ impl StatusFold {
             EventKind::PermissionResolved { request_id, .. } => {
                 self.pending_permissions.retain(|(id, _)| id != request_id);
             }
+            EventKind::InteractionRequested { request_id, .. } => {
+                self.pending_interactions.push((request_id.clone(), event.agent_path.clone()));
+            }
+            EventKind::InteractionResolved { request_id, .. } => {
+                self.pending_interactions.retain(|(id, _)| id != request_id);
+            }
             EventKind::Question { .. } if root => self.question = true,
             EventKind::TurnFinished { reason, .. } if root => {
                 self.turn_active = false;
                 self.pending_permissions.clear();
+                self.pending_interactions.clear();
                 self.failed = *reason == StopReason::Error;
             }
             EventKind::Error { .. } if root && !self.turn_active => self.failed = true,
@@ -98,6 +110,8 @@ impl StatusFold {
     pub fn status(&self) -> SessionStatus {
         if self.ended {
             if self.failed { SessionStatus::Failed } else { SessionStatus::Ended }
+        } else if !self.pending_interactions.is_empty() {
+            SessionStatus::WaitingReply
         } else if self.turn_active {
             if self.pending_permissions.is_empty() {
                 SessionStatus::Running
@@ -122,8 +136,17 @@ impl StatusFold {
         self.pending_permissions.iter().map(|(id, _)| id.clone()).collect()
     }
 
+    /// Ids of the interactive questions still waiting for a reply.
+    pub fn pending_interactions(&self) -> Vec<String> {
+        self.pending_interactions.iter().map(|(id, _)| id.clone()).collect()
+    }
+
     fn permission_path(&self, request_id: &str) -> Option<Vec<String>> {
         self.pending_permissions.iter().find(|(id, _)| id == request_id).map(|(_, p)| p.clone())
+    }
+
+    fn interaction_path(&self, request_id: &str) -> Option<Vec<String>> {
+        self.pending_interactions.iter().find(|(id, _)| id == request_id).map(|(_, p)| p.clone())
     }
 }
 
@@ -149,6 +172,7 @@ struct CoreState {
     record_subscribers: Vec<flume::Sender<crate::oar::voyage::Record>>,
     ended: bool,
     disposed: bool,
+    unresumable: bool,
     queue: VecDeque<QueuedInput>,
     meter: crate::oar::accounting::Meter,
     extras: crate::oar::frames::Frames,
@@ -205,6 +229,7 @@ impl SessionCore {
                 record_subscribers: vec![],
                 ended: false,
                 disposed: false,
+                unresumable: false,
                 queue: VecDeque::new(),
                 meter: Default::default(),
                 extras: Default::default(),
@@ -244,10 +269,14 @@ impl SessionCore {
         &self.runtime_id
     }
 
+    pub(crate) fn mark_unresumable(&self) {
+        self.lock().unresumable = true;
+    }
+
     fn external(&self) -> bool {
         matches!(
             self.runtime_id(),
-            "claude" | "codex" | "qwen" | "qoder" | "kimi" | "grok" | "opencode" | "codebuddy"
+            "claude" | "codex" | "antigravity" | "qwen" | "qoder" | "kimi" | "grok" | "opencode" | "codebuddy"
         ) || self.runtime_id().starts_with("acp:")
     }
 
@@ -272,7 +301,17 @@ impl SessionCore {
                             (total.input_tokens >= base.input_tokens && total.output_tokens >= base.output_tokens).then(|| total.subtract(base))
                         })
                     });
-                    *usage = delta.map(crate::oar::TokenTotals::native).unwrap_or_default();
+                    *usage = delta.map(|d| d.native_with_context(state.meter.last_context_pair)).unwrap_or_else(|| {
+                        let (context_used_tokens, context_window_tokens) = match state.meter.last_context_pair {
+                            Some((u, w)) if u > 0 && w > 0 => (Some(u), Some(w)),
+                            _ => (None, None),
+                        };
+                        Usage {
+                            context_used_tokens,
+                            context_window_tokens,
+                            ..Default::default()
+                        }
+                    });
                     state.previous_turn = total;
                 }
                 _ => {}
@@ -468,8 +507,16 @@ impl SessionCore {
         let telemetry = match self.runtime_id() {
             "claude" | "qwen" | "qoder" => meter.stream(self.runtime_id(), frame),
             "codex" => meter.codex(kind, frame, path.is_empty()),
-            _ if kind == "session/prompt_result" => meter.acp(&serde_json::json!({"sessionUpdate":"usage_update","usage":frame["usage"]})),
-            _ => meter.acp(&frame["update"]),
+            runtime if kind == "session/prompt_result" => meter.acp(
+                runtime,
+                &serde_json::json!({
+                    "sessionUpdate": "usage_update",
+                    "usage": frame["usage"],
+                    "used": frame.get("used").or_else(|| frame.pointer("/context/used")),
+                    "size": frame.get("size").or_else(|| frame.pointer("/context/size")),
+                }),
+            ),
+            runtime => meter.acp(runtime, &frame["update"]),
         };
         if let Some(ev) = telemetry {
             if path.is_empty() {
@@ -640,6 +687,15 @@ pub trait Driver: Send + Sync + 'static {
     fn read_subagent(&self, _thread_id: &str, _turn_id: Option<&str>) -> Result<crate::oar::SubagentSnapshot> {
         Err(crate::oar::SubagentSnapshot::unsupported())
     }
+    fn swarm_snapshot(&self) -> Option<crate::oar::SwarmSnapshot> {
+        None
+    }
+    fn read_child_transcript(&self, _conversation_id: &str, _limit: usize) -> Vec<crate::oar::ChildTranscriptStep> {
+        Vec::new()
+    }
+    fn session_title(&self) -> Option<String> {
+        None
+    }
     /// Refuses content the runtime cannot take, before the turn is recorded.
     fn check_content(&self, _content: &[ContentBlock]) -> Result<()> {
         Ok(())
@@ -660,6 +716,18 @@ pub trait Driver: Send + Sync + 'static {
         })
     }
     fn respond_permission(&self, request_id: &str, decision: &PermissionDecision) -> Result<()>;
+    fn respond_interaction(&self, _request_id: &str, _decision: &InteractionDecision) -> Result<()> {
+        Err(AgentError::Unsupported {
+            option: "respond_interaction".into(),
+            reason: "runtime has no interactive question channel".into(),
+        })
+    }
+    fn set_config(&self, _model: Option<&str>, _effort: Option<&str>, _permission_mode: Option<PermissionMode>) -> Result<()> {
+        Err(AgentError::Unsupported {
+            option: "set_config".into(),
+            reason: "runtime does not support live config updates".into(),
+        })
+    }
     fn dispose(&self);
 }
 
@@ -908,6 +976,9 @@ impl<D: Driver> Session for CoreSession<D> {
         rx
     }
     fn resume_id(&self) -> Option<String> {
+        if self.core.lock().unresumable {
+            return None;
+        }
         let id = self.id();
         if (self.runtime_id() == "qwen" && id == "qwen-pending") || (self.runtime_id() == "qoder" && id == "qoder-pending") {
             return None;
@@ -917,6 +988,15 @@ impl<D: Driver> Session for CoreSession<D> {
 
     fn read_subagent(&self, thread_id: &str, turn_id: Option<&str>) -> Result<crate::oar::SubagentSnapshot> {
         self.driver.read_subagent(thread_id, turn_id)
+    }
+    fn swarm_snapshot(&self) -> Option<crate::oar::SwarmSnapshot> {
+        self.driver.swarm_snapshot()
+    }
+    fn read_child_transcript(&self, conversation_id: &str, limit: usize) -> Vec<crate::oar::ChildTranscriptStep> {
+        self.driver.read_child_transcript(conversation_id, limit)
+    }
+    fn session_title(&self) -> Option<String> {
+        self.driver.session_title()
     }
     fn runtime_id(&self) -> &str {
         self.core.runtime_id()
@@ -966,6 +1046,41 @@ impl<D: Driver> Session for CoreSession<D> {
             },
         );
         Ok(())
+    }
+
+    fn respond_interaction(&self, request_id: &str, decision: InteractionDecision) -> Result<()> {
+        let path = {
+            let state = self.core.lock();
+            if let Some(error) = SessionCore::unreachable(&state) {
+                return Err(error);
+            }
+            state.fold.interaction_path(request_id)
+        };
+        let Some(path) = path else {
+            return Err(rejected(
+                rejection::UNKNOWN_REQUEST,
+                format!("no interaction request `{request_id}` is waiting"),
+            ));
+        };
+        self.driver.respond_interaction(request_id, &decision)?;
+        self.core.emit(
+            path,
+            EventKind::InteractionResolved {
+                request_id: request_id.to_string(),
+                decision,
+            },
+        );
+        Ok(())
+    }
+
+    fn set_config(&self, model: Option<&str>, effort: Option<&str>, permission_mode: Option<PermissionMode>) -> Result<()> {
+        {
+            let state = self.core.lock();
+            if let Some(error) = SessionCore::unreachable(&state) {
+                return Err(error);
+            }
+        }
+        self.driver.set_config(model, effort, permission_mode)
     }
 
     fn dispose(&self) {

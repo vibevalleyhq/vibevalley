@@ -291,3 +291,27 @@ fn catalog_models_pricing_and_stream_cancel() {
         .unwrap_err();
     assert!(matches!(no_key, BrainError::NoKey));
 }
+
+#[test]
+fn deepseek_https_client_initializes_rustls_platform_verifier_without_webpki() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let server = std::thread::spawn(move || {
+        let _ = listener.accept();
+    });
+
+    let err = OpenAiClient::new(format!("https://{addr}"), || Some("sk-tls-test".into()))
+        .with_retry(RetryPolicy::none())
+        .fetch_balance()
+        .unwrap_err();
+    let _ = server.join();
+    match err {
+        BrainError::Network(msg) => {
+            assert!(
+                !msg.contains("requires feature") && !msg.contains("CryptoProvider") && !msg.contains("WebPki"),
+                "HTTPS must initialize rustls + platform verifier cleanly, got: {msg}"
+            );
+        }
+        other => panic!("expected network EOF during TLS handshake against closed socket, got: {other:?}"),
+    }
+}

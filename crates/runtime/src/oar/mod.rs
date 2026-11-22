@@ -9,6 +9,7 @@
 //! CONTRACT: the items in this file are the public API other crates compile
 //! against. The owner may add items; do not rename or remove existing ones.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -80,6 +81,8 @@ pub struct Capabilities {
     pub model_selection: bool,
     pub subagents: bool,
     pub usage: bool,
+    #[serde(default)]
+    pub config_options: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -227,6 +230,7 @@ fn refused_options(runtime: &str) -> &'static [RefusableOption] {
             ServiceTier,
             LaunchArgs,
         ],
+        "antigravity" => &[SystemPrompt, DisallowedTools, AllowedTools, OutputSchema, Name, ServiceTier, LaunchArgs],
         "grok" | "opencode" => &[
             DisallowedTools,
             AllowedTools,
@@ -393,6 +397,16 @@ pub struct Usage {
     pub input_tokens: Option<u64>,
     pub output_tokens: Option<u64>,
     pub cost_usd: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_read_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_write_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_used_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_window_tokens: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -400,6 +414,27 @@ pub enum PermissionDecision {
     AllowOnce,
     AllowAlways,
     Deny { message: Option<String> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InteractionOption {
+    pub id: String,
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warning: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum InteractionDecision {
+    Select { option_id: String },
+    Custom { text: String },
+    Cancel,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -445,6 +480,126 @@ impl SubagentSnapshot {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SwarmMemberState {
+    Working,
+    Waiting,
+    Stopped,
+    Killed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwarmMember {
+    pub name: String,
+    pub conversation_id: String,
+    pub role: String,
+    pub state: SwarmMemberState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wake_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wait_since: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_read_seq: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwarmPlanThread {
+    pub id: String,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal: Option<String>,
+    #[serde(default)]
+    pub tasks: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwarmPlan {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal_title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal_line: Option<String>,
+    #[serde(default)]
+    pub tasks: BTreeMap<String, String>,
+    #[serde(default)]
+    pub threads: Vec<SwarmPlanThread>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwarmMessage {
+    pub seq: u64,
+    pub agent: String,
+    pub text: String,
+    pub time: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwarmSnapshot {
+    pub swarm_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+    pub members: Vec<SwarmMember>,
+    pub working_count: u32,
+    pub waiting_count: u32,
+    pub stopped_count: u32,
+    pub killed_count: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan: Option<SwarmPlan>,
+    pub messages: Vec<SwarmMessage>,
+    pub total_messages: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChildToolCall {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChildTranscriptStep {
+    pub step_index: u64,
+    pub source: String,
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_read_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_tokens: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(default)]
+    pub tool_calls: Vec<ChildToolCall>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToolAction {
     RunCommand,
@@ -458,12 +613,34 @@ pub enum ToolAction {
 }
 
 pub fn tool_action(name: &str, input: &serde_json::Value) -> ToolAction {
+    if let Some(kind) = input.get("kind").and_then(serde_json::Value::as_str) {
+        match kind {
+            "execute" => return ToolAction::RunCommand,
+            "read" => return ToolAction::ReadFile,
+            "edit" | "delete" | "move" => return ToolAction::EditFile,
+            "search" => return ToolAction::Search,
+            "fetch" => return ToolAction::Web,
+            _ => {}
+        }
+    }
     match name {
-        "Bash" | "BashOutput" | "shell" | "exec_command" | "local_shell" | "commandExecution" => ToolAction::RunCommand,
-        "Read" | "NotebookRead" | "read_file" => ToolAction::ReadFile,
-        "Edit" | "Write" | "MultiEdit" | "NotebookEdit" | "apply_patch" | "fileChange" => ToolAction::EditFile,
-        "Grep" | "Glob" | "LS" | "search" => ToolAction::Search,
-        "WebFetch" | "WebSearch" | "web_search" | "webSearch" => ToolAction::Web,
+        "Bash" | "BashOutput" | "shell" | "exec_command" | "local_shell" | "commandExecution" | "execute" | "run_command" | "command_status"
+        | "send_command_input" => ToolAction::RunCommand,
+        "Read" | "NotebookRead" | "read_file" | "read" | "view_file" | "view_file_outline" | "view_code_item" => ToolAction::ReadFile,
+        "Edit"
+        | "Write"
+        | "MultiEdit"
+        | "NotebookEdit"
+        | "apply_patch"
+        | "fileChange"
+        | "edit"
+        | "delete"
+        | "move"
+        | "write_to_file"
+        | "replace_file_content"
+        | "multi_replace_file_content" => ToolAction::EditFile,
+        "Grep" | "Glob" | "LS" | "search" | "grep_search" | "find_by_name" | "list_dir" => ToolAction::Search,
+        "WebFetch" | "WebSearch" | "web_search" | "webSearch" | "fetch" | "read_url_content" | "search_web" => ToolAction::Web,
         "collabAgentToolCall" if input["tool"] == "wait" => ToolAction::Wait,
         "mcpToolCall" => ToolAction::Mcp,
         n if n.starts_with("mcp__") || n.starts_with("mcp:") => ToolAction::Mcp,
@@ -550,6 +727,18 @@ pub enum EventKind {
     PermissionResolved {
         request_id: String,
         decision: PermissionDecision,
+    },
+    /// The agent asks an interactive question (e.g. `agy` `interaction_*`) and
+    /// waits until `Session::respond_interaction` is called; never auto-approved.
+    InteractionRequested {
+        request_id: String,
+        question: String,
+        options: Vec<InteractionOption>,
+        allow_custom: bool,
+    },
+    InteractionResolved {
+        request_id: String,
+        decision: InteractionDecision,
     },
     /// The agent asks the user something and waits for the next prompt.
     Question {
@@ -641,6 +830,20 @@ pub trait Session: Send + Sync {
     fn read_subagent(&self, _thread_id: &str, _turn_id: Option<&str>) -> Result<SubagentSnapshot> {
         Err(SubagentSnapshot::unsupported())
     }
+    /// Snapshot of an active native swarm sidecar (e.g. Antigravity `/swarm`),
+    /// or `None` when the session has no swarm.
+    fn swarm_snapshot(&self) -> Option<SwarmSnapshot> {
+        None
+    }
+    /// Bounded recent steps from a child agent or swarm member's transcript.
+    fn read_child_transcript(&self, _conversation_id: &str, _limit: usize) -> Vec<ChildTranscriptStep> {
+        Vec::new()
+    }
+    /// Real session title reported by the runtime (e.g. ACP `session_info_update`
+    /// or Codex `thread/name/updated`), when available.
+    fn session_title(&self) -> Option<String> {
+        None
+    }
     fn runtime_id(&self) -> &str;
     fn status(&self) -> SessionStatus;
     /// A new receiver that yields every event from now on. May be called
@@ -654,6 +857,18 @@ pub trait Session: Send + Sync {
     fn queue(&self, content: Vec<ContentBlock>) -> Result<()>;
     fn abort(&self) -> Result<()>;
     fn respond_permission(&self, request_id: &str, decision: PermissionDecision) -> Result<()>;
+    fn respond_interaction(&self, _request_id: &str, _decision: InteractionDecision) -> Result<()> {
+        Err(AgentError::Unsupported {
+            option: "respond_interaction".into(),
+            reason: "runtime has no interactive question channel".into(),
+        })
+    }
+    fn set_config(&self, _model: Option<&str>, _effort: Option<&str>, _permission_mode: Option<PermissionMode>) -> Result<()> {
+        Err(AgentError::Unsupported {
+            option: "set_config".into(),
+            reason: "runtime does not support live config updates".into(),
+        })
+    }
     /// Stops the underlying process. The session can still be resumed by id.
     fn dispose(&self);
     /// Like `events`, but the receiver first yields every event emitted so

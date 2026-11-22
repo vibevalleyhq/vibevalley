@@ -9,6 +9,7 @@ import { Button } from "../../../design/Button";
 import { Dialog } from "../../../design/Dialog";
 import { TextArea } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
+import { motionClass } from "../../../design/motion";
 import { mix } from "../../../design/tone";
 import { reasonOf } from "../../../infra/api";
 import { variant } from "../../../infra/base/dom";
@@ -485,11 +486,11 @@ function FileRow(props: { file: ChangedFile; conflict: boolean; last: boolean; r
         accessibilityState={hasPatch() ? { expanded: open() } : undefined}
         disabled={!hasPatch()}
         onPress={() => open.set(!open())}
-        class={`min-h-8 w-full flex-row items-center gap-2 px-2.5 py-1.5 transition duration-120 ease-out ${open() ? "bg-side hover:bg-hover" : hasPatch() ? "hover:bg-hover" : ""}`}
+        class={`min-h-8 w-full flex-row items-center gap-2 px-2.5 py-1.5 ${open() ? "bg-side hover:bg-hover" : hasPatch() ? "hover:bg-hover" : ""}`}
       >
         <If when={props.reserveChevron}>
           <View
-            class="size-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+            class={`size-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
             style={hasPatch() ? { transform: [{ rotate: open() ? "90deg" : "0deg" }] } : undefined}
           >
             <If when={hasPatch()}>

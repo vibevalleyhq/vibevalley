@@ -152,7 +152,7 @@ def verify(app, cli, assets, root):
         return envelope.get("data")
 
     def command(*args):
-        result = subprocess.run([cli, *args, "--format", "json"], cwd=work, env=env, text=True, capture_output=True, timeout=35)
+        result = subprocess.run([cli, "--json", *args], cwd=work, env=env, text=True, capture_output=True, timeout=35)
         assert result.returncode == 0, (args, result.stdout, result.stderr)
         return json.loads(result.stdout)
 
@@ -167,19 +167,19 @@ def verify(app, cli, assets, root):
         address = receipt["url"]
         save(root / "server.json", receipt)
         command("repo", "create", "field-project")
-        api("runtime.refresh", {"id": "pi"})
+        command("runtime", "refresh", "pi")
         doctor = command("doctor")
         assert all(item["ok"] for item in doctor)
         save(root / "doctor.json", doctor)
         interaction = until("farm manager opened the field chat", field_open)
         save(root / "interaction.json", interaction)
         def submitted():
-            hits = api("channel.message.search", {"text": UTTERANCE})
+            hits = command("channel", "message", "search", UTTERANCE)
             return next((h["message"] for h in hits if h["message"]["text"] == UTTERANCE), None)
         user_message = until("field textarea submitted the message", submitted)
         assert user_message["sendKey"]
         until("local model received the field message", lambda: any(e["heard"] for e in model.events))
-        dispatched = until("issue dispatched by the field chat", lambda: next((i for i in api("issue.list", {}) if i["title"] == TITLE), None))
+        dispatched = until("issue dispatched by the field chat", lambda: next((i for i in command("issue", "list") if i["title"] == TITLE), None))
         field_run = completed(dispatched["id"])
         until("orchestrator received issue_create result", lambda: any(TOOL_CALL in e["toolResultIds"] for e in model.events))
         save(root / "field.json", {"message": user_message, "issue": dispatched, "runs": field_run})
@@ -194,7 +194,7 @@ def verify(app, cli, assets, root):
 
         due = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=4)
         timer = command("cron", "create", "release-check", "Scheduled worker", "--at", due.isoformat(timespec="seconds"), "--agent", "docs", "--repo", "field-project")
-        scheduled = until("real clock tick", lambda: next((i for i in api("issue.list", {}) if i.get("cron") == timer["id"]), None), 50)
+        scheduled = until("real clock tick", lambda: next((i for i in command("issue", "list") if i.get("cron") == timer["id"]), None), 50)
         scheduled_run = completed(scheduled["id"])
         recorded_timer = next(t for t in command("cron", "list") if t["id"] == timer["id"])
         assert not recorded_timer["enabled"] and recorded_timer["lastRun"] >= timer["when"]["at"]
