@@ -5,12 +5,14 @@
 //! VibeValley's words and codes.
 
 mod board;
+mod chat;
 pub(crate) mod db;
 mod edits;
 mod family;
 mod refine;
 
 pub use board::{Board, NewIssue, Sent};
+pub use chat::IssueChat;
 pub use family::{ChildDraft, MAX_CHILDREN};
 
 use std::collections::HashMap;

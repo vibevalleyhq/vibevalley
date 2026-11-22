@@ -1,11 +1,24 @@
 //! The ledger and its fold (VibeValley `progress.test.ts`, `game.test.ts`).
 
+use std::time::{Duration, Instant};
+
 use serde_json::json;
 use vibevalley_core::empty_space_state;
 use vibevalley_core::progress::harvest_coins;
 use vibevalley_protocol::{Caller, CommitCount, Fact, FactProgressChanged, LedgerEntry, LedgerEntryHarvested};
 use vibevalley_server::Hub;
 use vibevalley_server::modules::skin::game::Game;
+
+fn until<T>(what: &str, mut f: impl FnMut() -> Option<T>) -> T {
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        if let Some(v) = f() {
+            return v;
+        }
+        assert!(Instant::now() < deadline, "waited for {what}");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
 
 #[test]
 fn a_harvest_pays_by_its_commits_and_the_streak() {
@@ -43,12 +56,15 @@ fn the_ledger_folds_back_through_a_restart_and_skips_what_it_cannot_read() {
             commits: Some(CommitCount { total: 1000, repos: vec![] }),
             station: None,
         })]);
-        let p = hub.read(|s| s.progress.clone()).unwrap();
+        let p = until("farm_level updated by async game bus", || {
+            hub.read(|s| s.progress.clone().filter(|p| p.counts.get("farm_level").copied().unwrap_or(0) > 1))
+        });
         assert!(p.counts.get("farm_level").copied().unwrap_or(0) > 1, "{:?}", p.counts);
         let titled = hub.call_as(Caller::User, "game.title.set", json!({ "achievement": "harvests", "tier": 1 }));
         assert!(titled.error.is_none(), "{}", titled.message);
         let list = hub.call_as(Caller::User, "game.achievement.list", json!(null)).data.unwrap();
         assert!(!list.as_array().unwrap().is_empty());
+        hub.close_bus();
         hub.read(|s| s.progress.clone()).unwrap()
     };
     let ledger = home.path().join("ledger.jsonl");

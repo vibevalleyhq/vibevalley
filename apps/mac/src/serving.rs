@@ -105,6 +105,26 @@ pub fn shutdown() {
     running.started.close();
 }
 
+/// Aborts and disposes a closed workspace chat tab's OAR session off the UI thread.
+pub fn close_workspace_session(session_id: String) {
+    let session_id = session_id.trim().to_string();
+    if session_id.is_empty() {
+        return;
+    }
+    let Some(sessions) = lock_running().as_ref().map(|r| r.started.board.sessions().clone()) else {
+        return;
+    };
+    let bg_sessions = sessions.clone();
+    let bg_id = session_id.clone();
+    if let Err(e) = std::thread::Builder::new()
+        .name("vibevalley-close-workspace".into())
+        .spawn(move || bg_sessions.close_workspace(&bg_id))
+    {
+        eprintln!("vibevalley: spawning workspace close thread for {session_id}: {e}");
+        sessions.close_workspace(&session_id);
+    }
+}
+
 pub fn voice() -> Result<std::sync::Arc<vibevalley_server::modules::collab::voice::Voice>, String> {
     lock_running()
         .as_ref()

@@ -73,6 +73,7 @@ pub struct Fleet {
     stop: Mutex<Option<flume::Sender<()>>>,
     stop_rx: flume::Receiver<()>,
     usage_thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+    sub: Mutex<Option<crate::event_bus::Subscription>>,
 }
 
 /// Runs `f` on its own thread; none when it takes longer than `limit`.
@@ -130,6 +131,7 @@ impl Fleet {
             stop: Mutex::new(Some(stop_tx)),
             stop_rx: stop_rx.clone(),
             usage_thread: Mutex::new(None),
+            sub: Mutex::new(None),
         });
         if background {
             for id in fleet.ids() {
@@ -153,13 +155,15 @@ impl Fleet {
                 *lock(&fleet.usage_thread) = Some(handle);
             }
             let f = Arc::downgrade(&fleet);
-            hub.watch(Arc::new(move |_, tr| {
+            let sub = hub.subscribe_transitions("runtime-usage", move |_, tr| {
                 let vibevalley_protocol::Fact::SessionReported(r) = &tr.fact else { return };
                 let Some(fleet) = f.upgrade() else { return };
                 if let Some(s) = tr.after.sessions.iter().chain(&tr.before.sessions).find(|s| s.id == r.id) {
                     fleet.usage_soon(&s.runtime);
                 }
-            }));
+            });
+            let prev = lock(&fleet.sub).replace(sub);
+            drop(prev);
         }
         fleet
     }
@@ -212,6 +216,8 @@ impl Fleet {
     /// Stops answering with new probes (`close`).
     pub fn close(&self) {
         self.closed.store(true, Ordering::Relaxed);
+        let prev = lock(&self.sub).take();
+        drop(prev);
         let _ = lock(&self.stop).take();
         if let Some(handle) = lock(&self.usage_thread).take()
             && handle.thread().id() != std::thread::current().id()

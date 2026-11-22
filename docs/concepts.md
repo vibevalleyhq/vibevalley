@@ -64,7 +64,7 @@ Host（~/.vibevalley：密钥、引擎、全局角色模板）
 | 作品 | `Artifact`（正文 `blocks`、`store` 或 `html`） | 留下来要人看的作品：协作块文档、结构化多条目作品（幻灯片、看板、短片、白板、界面画板、设计体系）或按稿保存的单页网页 |
 | 笔记 | `Pkm`（`PkmPage`、`PkmBlock`） | 用户的大纲知识库：按 PARA 文件夹与日记组织的 Markdown 页面 |
 | 定时任务 | `Cron` | 一个任务的一种触发：一个定时任务对应一个任务，派给一个角色或主助手，每次到点是它的一次 run |
-| 收件箱 | `InboxItem` | 要你处理的事，从核心状态现算（[观察层的收件箱](docs/subsystems/watch.md#收件箱)） |
+| 收件箱 | `InboxItem` | 要你处理的事，从核心状态现算（[核心状态的收件箱](docs/subsystems/core.md#收件箱)） |
 | 记忆 | `Memory` | 一个角色记得的事 |
 | 技能 | `Skill` | 角色能带的技能 |
 

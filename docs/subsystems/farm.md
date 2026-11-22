@@ -8,7 +8,7 @@
 |---|---|
 | 384×256 的像素村、整数倍缩放裁边、LDtk 地图、A* 寻路、昼夜天色 | 地块庄稼与木牌状态的计算（`crates/core/src/game.rs` 的 `plot_of`，[游戏](docs/subsystems/game.md)） |
 | 帮工在院子里的去处（`Whereabouts`）、朝向、姿势与 800ms 最短保持时间 | 帮工真实阶段与工单状态流转（[帮工](docs/subsystems/session.md)、[工单](docs/subsystems/issue.md)） |
-| 仓库群岛地图、记忆树、开场、图鉴的贴图书架 | 哪些事项进 Inbox（[收件箱](docs/subsystems/watch.md#收件箱)）、像素渲染（[像素渲染与光影](docs/design/04-motion-and-pixel-rendering.md)）与工作台各页（[桌面架构与页面清单](docs/design/06-desktop-architecture-and-topology.md)） |
+| 仓库群岛地图、记忆树、开场、图鉴的贴图书架 | 哪些事项进 Inbox（[收件箱](docs/subsystems/core.md#收件箱)）、像素渲染（[像素渲染与光影](docs/design/04-motion-and-pixel-rendering.md)）与工作台各页（[桌面架构与页面清单](docs/design/06-desktop-architecture-and-topology.md)） |
 | 点地块、院内建筑、岛屿时去哪一页或开哪个终端（`PixelEvent`） | 窗口、标签页和工作台的路由（[客户端](docs/subsystems/app.md)） |
 
 ## 在哪

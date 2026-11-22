@@ -1230,36 +1230,188 @@ where m.kind = 'report' and m.deleted_at is null
         .fetch_all(db).await
 }
 
-pub struct CursorOfParams {
-    pub r#name: String,
+pub struct InsertDeliveryParams {
+    pub r#message_id: String,
+    pub r#channel_id: String,
+    pub r#recipient_kind: String,
+    pub r#recipient_id: String,
+    pub r#reason: String,
+    pub r#wakes: i64,
+    pub r#held_by: Option<String>,
+    pub r#created_at: i64,
 }
 
 #[derive(sqlx::FromRow)]
-pub struct CursorOfRow {
-    pub r#seq: i64,
+pub struct InsertDeliveryRow {
+    pub r#id: i64,
 }
 
-pub async fn r#cursor_of<'e>(
+pub async fn r#insert_delivery<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
-    params: CursorOfParams,
-) -> Result<CursorOfRow, sqlx::Error> {
-    sqlx::query_as::<_, CursorOfRow>(r#"select seq from watch_cursor where name = ?1"#)
-        .bind(params.r#name)
+    params: InsertDeliveryParams,
+) -> Result<InsertDeliveryRow, sqlx::Error> {
+    sqlx::query_as::<_, InsertDeliveryRow>(r#"insert into channel_delivery (message_id, channel_id, recipient_kind, recipient_id, reason, wakes, held_by, status, created_at)
+values (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8)
+returning id"#)
+        .bind(params.r#message_id)
+        .bind(params.r#channel_id)
+        .bind(params.r#recipient_kind)
+        .bind(params.r#recipient_id)
+        .bind(params.r#reason)
+        .bind(params.r#wakes)
+        .bind(params.r#held_by)
+        .bind(params.r#created_at)
         .fetch_one(db).await
 }
 
-pub struct MoveCursorParams {
-    pub r#name: String,
-    pub r#seq: i64,
+pub struct PendingDeliveriesByKindParams {
+    pub r#recipient_kind: String,
 }
 
-pub async fn r#move_cursor<'e>(
+#[derive(sqlx::FromRow)]
+pub struct PendingDeliveriesByKindRow {
+    pub r#id: i64,
+    pub r#message_id: String,
+    pub r#channel_id: String,
+    pub r#recipient_kind: String,
+    pub r#recipient_id: String,
+    pub r#reason: String,
+    pub r#wakes: i64,
+    pub r#held_by: Option<String>,
+    pub r#status: String,
+    pub r#created_at: i64,
+    pub r#settled_at: Option<i64>,
+}
+
+pub async fn r#pending_deliveries_by_kind<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
-    params: MoveCursorParams,
+    params: PendingDeliveriesByKindParams,
+) -> Result<Vec<PendingDeliveriesByKindRow>, sqlx::Error> {
+    sqlx::query_as::<_, PendingDeliveriesByKindRow>(r#"select id, message_id, channel_id, recipient_kind, recipient_id, reason, wakes, held_by, status, created_at, settled_at
+from channel_delivery
+where recipient_kind = ?1 and status = 'pending'
+order by id"#)
+        .bind(params.r#recipient_kind)
+        .fetch_all(db).await
+}
+
+pub struct PendingDeliveriesForRecipientParams {
+    pub r#recipient_kind: String,
+    pub r#recipient_id: String,
+    pub r#id: i64,
+}
+
+pub type PendingDeliveriesForRecipientRow = PendingDeliveriesByKindRow;
+
+pub async fn r#pending_deliveries_for_recipient<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: PendingDeliveriesForRecipientParams,
+) -> Result<Vec<PendingDeliveriesForRecipientRow>, sqlx::Error> {
+    sqlx::query_as::<_, PendingDeliveriesForRecipientRow>(r#"select id, message_id, channel_id, recipient_kind, recipient_id, reason, wakes, held_by, status, created_at, settled_at
+from channel_delivery
+where recipient_kind = ?1 and recipient_id = ?2 and status = 'pending' and id <= ?3
+order by id"#)
+        .bind(params.r#recipient_kind)
+        .bind(params.r#recipient_id)
+        .bind(params.r#id)
+        .fetch_all(db).await
+}
+
+pub struct DeliveryIsPendingParams {
+    pub r#id: i64,
+}
+
+#[derive(sqlx::FromRow)]
+pub struct DeliveryIsPendingRow {
+    pub r#total: i64,
+}
+
+pub async fn r#delivery_is_pending<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: DeliveryIsPendingParams,
+) -> Result<DeliveryIsPendingRow, sqlx::Error> {
+    sqlx::query_as::<_, DeliveryIsPendingRow>(r#"select count(*) as total from channel_delivery where id = ?1 and status = 'pending'"#)
+        .bind(params.r#id)
+        .fetch_one(db).await
+}
+
+pub struct PendingDeliveriesForMessageParams {
+    pub r#message_id: String,
+}
+
+#[derive(sqlx::FromRow)]
+pub struct PendingDeliveriesForMessageRow {
+    pub r#total: i64,
+}
+
+pub async fn r#pending_deliveries_for_message<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: PendingDeliveriesForMessageParams,
+) -> Result<PendingDeliveriesForMessageRow, sqlx::Error> {
+    sqlx::query_as::<_, PendingDeliveriesForMessageRow>(r#"select count(*) as total from channel_delivery where message_id = ?1 and status = 'pending'"#)
+        .bind(params.r#message_id)
+        .fetch_one(db).await
+}
+
+pub struct SettleDeliveryParams {
+    pub r#status: String,
+    pub r#settled_at: Option<i64>,
+    pub r#id: i64,
+}
+
+pub async fn r#settle_delivery<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: SettleDeliveryParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"insert into watch_cursor (name, seq) values (?1, ?2) on conflict (name) do update set seq = max(seq, excluded.seq)"#)
-        .bind(params.r#name)
-        .bind(params.r#seq)
+    sqlx::query(r#"update channel_delivery set status = ?1, settled_at = ?2 where id = ?3 and status = 'pending'"#)
+        .bind(params.r#status)
+        .bind(params.r#settled_at)
+        .bind(params.r#id)
+        .execute(db).await.map(|_| ())
+}
+
+pub struct WithdrawDeliveriesForMessageParams {
+    pub r#settled_at: Option<i64>,
+    pub r#message_id: String,
+}
+
+pub async fn r#withdraw_deliveries_for_message<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: WithdrawDeliveriesForMessageParams,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(r#"update channel_delivery set status = 'withdrawn', settled_at = ?1 where message_id = ?2 and status = 'pending'"#)
+        .bind(params.r#settled_at)
+        .bind(params.r#message_id)
+        .execute(db).await.map(|_| ())
+}
+
+pub struct WithdrawDeliveriesForRecipientParams {
+    pub r#settled_at: Option<i64>,
+    pub r#recipient_kind: String,
+    pub r#recipient_id: String,
+}
+
+pub async fn r#withdraw_deliveries_for_recipient<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: WithdrawDeliveriesForRecipientParams,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(r#"update channel_delivery set status = 'withdrawn', settled_at = ?1 where recipient_kind = ?2 and recipient_id = ?3 and status = 'pending'"#)
+        .bind(params.r#settled_at)
+        .bind(params.r#recipient_kind)
+        .bind(params.r#recipient_id)
+        .execute(db).await.map(|_| ())
+}
+
+pub struct RemoveChannelDeliveriesParams {
+    pub r#channel_id: String,
+}
+
+pub async fn r#remove_channel_deliveries<'e>(
+    db: impl sqlx::SqliteExecutor<'e>,
+    params: RemoveChannelDeliveriesParams,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(r#"delete from channel_delivery where channel_id = ?1 or channel_id in (select id from channel where parent_id = ?1)"#)
+        .bind(params.r#channel_id)
         .execute(db).await.map(|_| ())
 }
 

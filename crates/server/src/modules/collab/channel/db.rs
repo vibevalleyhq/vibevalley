@@ -132,6 +132,21 @@ pub struct EventRow {
     pub at: i64,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct DeliveryRow {
+    pub id: i64,
+    pub message_id: String,
+    pub channel_id: String,
+    pub recipient_kind: String,
+    pub recipient_id: String,
+    pub reason: String,
+    pub wakes: bool,
+    pub held_by: Option<String>,
+    pub status: String,
+    pub created_at: i64,
+    pub settled_at: Option<i64>,
+}
+
 pub struct SearchParams<'a> {
     pub text: &'a str,
     pub channel: &'a str,
@@ -204,6 +219,24 @@ impl From<queries::EventsAfterRow> for EventRow {
             channel_id: r.channel_id,
             message_id: r.message_id,
             at: r.at,
+        }
+    }
+}
+
+impl From<queries::PendingDeliveriesByKindRow> for DeliveryRow {
+    fn from(r: queries::PendingDeliveriesByKindRow) -> Self {
+        Self {
+            id: r.id,
+            message_id: r.message_id,
+            channel_id: r.channel_id,
+            recipient_kind: r.recipient_kind,
+            recipient_id: r.recipient_id,
+            reason: r.reason,
+            wakes: r.wakes != 0,
+            held_by: r.held_by,
+            status: r.status,
+            created_at: r.created_at,
+            settled_at: r.settled_at,
         }
     }
 }
@@ -908,24 +941,106 @@ pub fn user_read_reports(db: &Connection) -> Sql<Vec<(String, i64, i64)>> {
     block_on(queries::user_read_reports(&mut *db.borrow_mut())).map(|rows| rows.into_iter().map(|r| (r.sender_id, r.created_at, r.updated_at)).collect())
 }
 
-pub fn cursor_of(db: &Connection, name: &str) -> Sql<i64> {
-    optional(block_on(queries::cursor_of(
+#[allow(clippy::too_many_arguments)]
+pub fn insert_delivery(
+    db: &Connection,
+    message_id: &str,
+    channel_id: &str,
+    recipient_kind: &str,
+    recipient_id: &str,
+    reason: &str,
+    wakes: bool,
+    held_by: Option<&str>,
+    at: i64,
+) -> Sql<i64> {
+    block_on(queries::insert_delivery(
         &mut *db.borrow_mut(),
-        queries::CursorOfParams { name: name.to_owned() },
-    )))
-    .map(|row| row.map_or(0, |r| r.seq))
+        queries::InsertDeliveryParams {
+            message_id: message_id.to_owned(),
+            channel_id: channel_id.to_owned(),
+            recipient_kind: recipient_kind.to_owned(),
+            recipient_id: recipient_id.to_owned(),
+            reason: reason.to_owned(),
+            wakes: i64::from(wakes),
+            held_by: held_by.map(str::to_owned),
+            created_at: at,
+        },
+    ))
+    .map(|r| r.id)
 }
 
-pub fn move_cursor(db: &Connection, name: &str, seq: i64) -> Sql<()> {
-    block_on(queries::move_cursor(
+pub fn pending_deliveries_by_kind(db: &Connection, recipient_kind: &str) -> Sql<Vec<DeliveryRow>> {
+    block_on(queries::pending_deliveries_by_kind(
         &mut *db.borrow_mut(),
-        queries::MoveCursorParams { name: name.to_owned(), seq },
+        queries::PendingDeliveriesByKindParams {
+            recipient_kind: recipient_kind.to_owned(),
+        },
+    ))
+    .map(|rows| rows.into_iter().map(Into::into).collect())
+}
+
+pub fn pending_deliveries_for_recipient(db: &Connection, recipient_kind: &str, recipient_id: &str, max_id: i64) -> Sql<Vec<DeliveryRow>> {
+    block_on(queries::pending_deliveries_for_recipient(
+        &mut *db.borrow_mut(),
+        queries::PendingDeliveriesForRecipientParams {
+            recipient_kind: recipient_kind.to_owned(),
+            recipient_id: recipient_id.to_owned(),
+            id: max_id,
+        },
+    ))
+    .map(|rows| rows.into_iter().map(Into::into).collect())
+}
+
+pub fn delivery_is_pending(db: &Connection, id: i64) -> Sql<bool> {
+    block_on(queries::delivery_is_pending(&mut *db.borrow_mut(), queries::DeliveryIsPendingParams { id })).map(|r| r.total > 0)
+}
+
+pub fn pending_deliveries_for_message(db: &Connection, message_id: &str) -> Sql<i64> {
+    block_on(queries::pending_deliveries_for_message(
+        &mut *db.borrow_mut(),
+        queries::PendingDeliveriesForMessageParams {
+            message_id: message_id.to_owned(),
+        },
+    ))
+    .map(|r| r.total)
+}
+
+pub fn settle_delivery(db: &Connection, id: i64, status: &str, at: i64) -> Sql<()> {
+    block_on(queries::settle_delivery(
+        &mut *db.borrow_mut(),
+        queries::SettleDeliveryParams {
+            status: status.to_owned(),
+            settled_at: Some(at),
+            id,
+        },
+    ))
+}
+
+pub fn withdraw_deliveries_for_message(db: &Connection, message_id: &str, at: i64) -> Sql<()> {
+    block_on(queries::withdraw_deliveries_for_message(
+        &mut *db.borrow_mut(),
+        queries::WithdrawDeliveriesForMessageParams {
+            settled_at: Some(at),
+            message_id: message_id.to_owned(),
+        },
+    ))
+}
+
+pub fn withdraw_deliveries_for_recipient(db: &Connection, recipient_kind: &str, recipient_id: &str, at: i64) -> Sql<()> {
+    block_on(queries::withdraw_deliveries_for_recipient(
+        &mut *db.borrow_mut(),
+        queries::WithdrawDeliveriesForRecipientParams {
+            settled_at: Some(at),
+            recipient_kind: recipient_kind.to_owned(),
+            recipient_id: recipient_id.to_owned(),
+        },
     ))
 }
 
 pub fn delete_channel(db: &Connection, id: &str) -> Sql<()> {
     let mut db = db.borrow_mut();
     block_on(async {
+        queries::remove_channel_deliveries(&mut *db, queries::RemoveChannelDeliveriesParams { channel_id: id.to_owned() }).await?;
         queries::remove_thread_messages(
             &mut *db,
             queries::RemoveThreadMessagesParams {

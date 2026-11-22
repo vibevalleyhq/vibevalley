@@ -37,7 +37,7 @@
 | 农机 | `Agents` 的农机部分（`agent/runtime.rs`；接口仍是 `runtime.*`） | `config.json` 农机设置 | `Runtime`、`Registry` |
 | 工单、父子工单 | `Board`（`crates/server/src/modules/work/issue/board.rs`），接口在 `issue/mod.rs` | `server.db`、`issues/` | — |
 | 帮工、一轮 | `Sessions`（`session/sessions.rs`）与 `runs.rs`，农机经 `drivers.rs` 开会话；轨迹在 `session/journal.rs` | `server.db`、`events/` | 一个帮工是一个 oar `Session`，一轮对应一个 turn |
-| 频道、附件 | `Chat`（`channel/mod.rs`）、`Attachments`（`attachment.rs`）；谁听见与投递在 `Watch`（`watch/mod.rs`） | `server.db` 的 `channel*`、`attachment`、`watch_cursor` 表 | 投递成帮工会话里的一段话 |
+| 频道、附件 | `Chat`（`channel/mod.rs`）、`dispatch.rs`（纯受众与刹车）、`Attachments`（`attachment.rs`） | `server.db` 的 `channel*`、`channel_delivery`、`attachment` 表 | 异步投递成帮工会话里的一段话 |
 | Artifact | `Artifacts`（`artifact/mod.rs`） | `server.db` 的 `artifact*` 表 | — |
 | 笔记 | `Pkm`（`pkm/mod.rs`） | `pkm/` 下的 Markdown 页面、`pkm_comment`、`pkm_change` 表 | — |
 | 记性 | `Memories`（`modules/team/memory/`） | `memory` 表 | — |

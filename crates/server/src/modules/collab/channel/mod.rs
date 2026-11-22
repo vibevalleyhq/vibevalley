@@ -1,12 +1,15 @@
 //! The chat (田头): channels, threads and direct channels, numbered
-//! messages, members and read cursors, kept in `server.db` with the places
-//! in memory (`model`), the state's `chat` kept by the four facts.
+//! messages, members, read cursors, pure audience/loop-guard dispatch policy,
+//! and durable pending deliveries (`channel_delivery`) kept in `server.db`
+//! with the places in memory (`model`), the state's `chat` kept by the four facts.
 //!
-//! Every message is written with a numbered event (`channel_event`); the
-//! event goes to the readers ([`Chat::committed`]) once it is committed,
-//! and the write returns once [`Chat::await_reader`]'s readers handled it.
+//! Every message is written with a numbered event (`channel_event`) and its
+//! synchronous `DeliveryPolicy` rows in one transaction; once committed,
+//! [`Chat::committed`] and non-blocking [`Chat::dispatches`] notify downstream
+//! consumers without blocking the writer.
 
 pub mod db;
+pub mod dispatch;
 #[rustfmt::skip]
 #[path = "generated/queries.rs"]
 mod queries;
@@ -18,6 +21,7 @@ mod store;
 mod types;
 pub mod words;
 
+pub use dispatch::{ChannelDispatched, DeliveryTargetKind, HeldBy, QueuedDelivery, Reason};
 pub use service::{direct, install, profile_id};
 pub use store::Inner;
 pub use types::{
@@ -35,6 +39,7 @@ use vibevalley_protocol::{
 };
 
 use self::db::{Connection, EventRow, MsgRow, ParticipantRow};
+use self::dispatch::Reach;
 use self::model::ChatModel;
 use self::store::{Q, tx};
 use self::types::{Write, Written, new_id};
@@ -69,7 +74,6 @@ fn no_channel(id: &str) -> ApiError {
 
 type BeforePost<'a> = Box<dyn FnOnce(&mut SqliteConnection, &ChatMessage) -> Result<(), ApiError> + 'a>;
 
-type Reader = Arc<dyn Fn(i64) -> Result<(), ApiError> + Send + Sync>;
 type Guard = Arc<dyn Fn(&str) -> Vec<String> + Send + Sync>;
 type Seater = Arc<dyn Fn(&str) + Send + Sync>;
 
@@ -84,8 +88,8 @@ pub struct Chat {
     me: Weak<Chat>,
     said: Mutex<Vec<flume::Sender<ChatMessage>>>,
     told: Mutex<Vec<flume::Sender<Told>>>,
+    dispatches: Mutex<Vec<flume::Sender<ChannelDispatched>>>,
     user_reads: Mutex<Vec<flume::Sender<(String, i64, i64)>>>,
-    readers: RwLock<Vec<Reader>>,
     guards: RwLock<Vec<Guard>>,
     seaters: RwLock<Vec<Seater>>,
     /// Link previews are read off the web; tests turn it off.
@@ -145,12 +149,13 @@ impl Chat {
                 db: conn,
                 transaction_depth: 0,
                 model,
+                reach: Reach::default(),
             }),
             me: me.clone(),
             said: Mutex::default(),
             told: Mutex::default(),
+            dispatches: Mutex::default(),
             user_reads: Mutex::default(),
-            readers: RwLock::default(),
             guards: RwLock::default(),
             seaters: RwLock::default(),
             embeds,
@@ -272,6 +277,8 @@ impl Chat {
                     again: true,
                     row: seen,
                     event: None,
+                    deliveries: vec![],
+                    hop_limit_hit: false,
                 });
             }
             let sender = me
@@ -341,6 +348,39 @@ impl Chat {
                 message_id: id,
                 at,
             };
+            let (deliveries, hop_limit_hit) = if row.kind != "notice"
+                && let Some(posted) = me.committed_from(&row, &event)
+            {
+                let plan = dispatch::plan_deliveries(&me.model, &mut me.reach, &posted, at);
+                let mut queued = Vec::with_capacity(plan.deliveries.len());
+                for d in plan.deliveries {
+                    let did = db::insert_delivery(
+                        &me.db,
+                        &row.id,
+                        &row.channel_id,
+                        d.recipient_kind.as_str(),
+                        &d.recipient_id,
+                        d.reason.as_str(),
+                        d.wakes,
+                        d.held_by.map(HeldBy::as_str),
+                        at,
+                    )
+                    .q()?;
+                    queued.push(QueuedDelivery {
+                        id: did,
+                        message_id: row.id.clone(),
+                        channel_id: row.channel_id.clone(),
+                        recipient_kind: d.recipient_kind,
+                        recipient_id: d.recipient_id,
+                        reason: d.reason,
+                        wakes: d.wakes,
+                        held_by: d.held_by,
+                    });
+                }
+                (queued, plan.hop_limit_hit)
+            } else {
+                (vec![], false)
+            };
             Ok(Written {
                 absent,
                 answers: None,
@@ -348,6 +388,8 @@ impl Chat {
                 again: false,
                 row,
                 event: Some(event),
+                deliveries,
+                hop_limit_hit,
             })
         })?;
         if written.again {
@@ -368,19 +410,31 @@ impl Chat {
             self.publish_channel(inner, &written.thread)?;
         }
         if let Some(posted) = inner.committed_from(&written.row, &event) {
-            publish(&self.told, &Told::Posted(Box::new(posted)));
+            let posted = Arc::new(posted);
+            publish(&self.told, &Told::Posted(Box::new((*posted).clone())));
+            if !written.deliveries.is_empty() {
+                publish(
+                    &self.dispatches,
+                    &ChannelDispatched {
+                        committed: posted,
+                        deliveries: written.deliveries.clone(),
+                    },
+                );
+            }
+        }
+        if written.hop_limit_hit {
+            self.notice_locked(
+                inner,
+                Noticing {
+                    channel: w.channel,
+                    text: t("server.channel.hopLimit", &[("limit", dispatch::HOP_LIMIT.into())]),
+                    code: "hop_limit".into(),
+                    until_user_speaks: true,
+                    ..Noticing::default()
+                },
+            );
         }
         Ok(written)
-    }
-
-    /// `handled`: every reader has handled the write's event.
-    fn handled(&self, event: Option<&EventRow>) -> Result<(), ApiError> {
-        let Some(event) = event else { return Ok(()) };
-        let readers = self.readers.read().unwrap_or_else(|e| e.into_inner()).clone();
-        for reader in readers {
-            reader(event.seq)?;
-        }
-        Ok(())
     }
 
     /// `embedLater`: a message's link previews, read after it is out and

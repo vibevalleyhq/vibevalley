@@ -6,7 +6,8 @@ use vibevalley_protocol::{
     SubjectKind, USER_ID,
 };
 
-use super::db::{self, ChannelRow, EventRow, MsgRow, ParticipantRow};
+use super::db::{self, ChannelRow, DeliveryRow, EventRow, MsgRow, ParticipantRow};
+use super::dispatch::{ChannelDispatched, DeliveryTargetKind, HeldBy, QueuedDelivery, Reason};
 use super::store::{Inner, Q, tx};
 use super::types::{AddressedMessage, Committed, Info, Place, ReadOptions, ReadResult, Seat, Told, head, info_of, new_id, notify_of, optional, to_message};
 use super::words;
@@ -187,9 +188,40 @@ impl Chat {
         })
     }
 
-    /// A reader the chat's writes wait on (a notice does not).
-    pub fn await_reader(&self, reader: impl Fn(i64) -> Result<(), ApiError> + Send + Sync + 'static) {
-        self.readers.write().unwrap_or_else(|e| e.into_inner()).push(Arc::new(reader));
+    /// Non-blocking stream of committed messages with their pending deliveries.
+    pub fn dispatches(&self) -> flume::Receiver<ChannelDispatched> {
+        let (tx, rx) = flume::unbounded();
+        lock(&self.dispatches).push(tx);
+        rx
+    }
+
+    pub fn pending_deliveries(&self, kind: DeliveryTargetKind) -> Result<Vec<QueuedDelivery>, ApiError> {
+        Ok(db::pending_deliveries_by_kind(&self.locked().db, kind.as_str())
+            .q()?
+            .into_iter()
+            .map(queued_from_row)
+            .collect())
+    }
+
+    pub fn pending_deliveries_for(&self, kind: DeliveryTargetKind, recipient: &str, max_id: i64) -> Result<Vec<QueuedDelivery>, ApiError> {
+        Ok(db::pending_deliveries_for_recipient(&self.locked().db, kind.as_str(), recipient, max_id)
+            .q()?
+            .into_iter()
+            .map(queued_from_row)
+            .collect())
+    }
+
+    pub fn delivery_is_pending(&self, id: i64) -> Result<bool, ApiError> {
+        db::delivery_is_pending(&self.locked().db, id).q()
+    }
+
+    pub fn settle_delivery(&self, id: i64, delivered: bool) -> Result<(), ApiError> {
+        let status = if delivered { "delivered" } else { "failed" };
+        db::settle_delivery(&self.locked().db, id, status, now()).q()
+    }
+
+    pub fn withdraw_delivery(&self, id: i64) -> Result<(), ApiError> {
+        db::settle_delivery(&self.locked().db, id, "withdrawn", now()).q()
     }
 
     /// Ensures a session's thread is opened and seated before it speaks or reads.
@@ -212,14 +244,16 @@ impl Chat {
         tx(&mut inner, |me| me.seat(seat))
     }
 
-    /// A participant gone: in nothing, never back.
+    /// A participant gone: in nothing, never back; pending session deliveries withdrawn.
     pub fn leave(&self, participant: &str) -> Result<(), ApiError> {
         let mut inner = self.locked();
         let at = now();
         tx(&mut inner, |me| {
             db::participant_left(&me.db, participant, at).q()?;
             db::remove_from_all(&me.db, participant, at).q()?;
+            db::withdraw_deliveries_for_recipient(&me.db, DeliveryTargetKind::Session.as_str(), participant, at).q()?;
             me.model.left(participant, at);
+            me.reach.left(participant);
             Ok(())
         })
     }
@@ -263,7 +297,7 @@ impl Chat {
         db::latest_number(&self.locked().db, channel).q()
     }
 
-    pub fn dispatches(&self, thread: &str) -> Result<i64, ApiError> {
+    pub fn dispatch_count(&self, thread: &str) -> Result<i64, ApiError> {
         db::dispatches_in(&self.locked().db, thread).q()
     }
 
@@ -280,15 +314,6 @@ impl Chat {
 
     pub fn addressed_of(&self, row: &MsgRow) -> AddressedMessage {
         self.locked().addressed_of(row, &self.files)
-    }
-
-    /// How far the reader `name` has handled the events (watch_cursor).
-    pub fn cursor_of(&self, name: &str) -> Result<i64, ApiError> {
-        db::cursor_of(&self.locked().db, name).q()
-    }
-
-    pub fn move_cursor(&self, name: &str, seq: i64) -> Result<(), ApiError> {
-        db::move_cursor(&self.locked().db, name, seq).q()
     }
 
     /// A place as an agent addresses it (`#general`, `#general/12`, `@name`).
@@ -569,6 +594,7 @@ impl Chat {
         tx(&mut inner, |me| {
             db::delete_channel(&me.db, id).q()?;
             me.model.removed(id);
+            me.reach.channel_removed(id);
             me.model.last_read.retain(|_, target| !gone.contains(target));
             Ok(())
         })?;
@@ -734,6 +760,19 @@ impl Chat {
             })
             .map_err(internal)?;
         Ok(())
+    }
+}
+
+fn queued_from_row(r: DeliveryRow) -> QueuedDelivery {
+    QueuedDelivery {
+        id: r.id,
+        message_id: r.message_id,
+        channel_id: r.channel_id,
+        recipient_kind: DeliveryTargetKind::from_db(&r.recipient_kind),
+        recipient_id: r.recipient_id,
+        reason: Reason::from_db(&r.reason),
+        wakes: r.wakes,
+        held_by: r.held_by.as_deref().and_then(HeldBy::from_db),
     }
 }
 

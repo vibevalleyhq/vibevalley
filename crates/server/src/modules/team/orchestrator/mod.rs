@@ -1,10 +1,10 @@
 //! The orchestrator (VibeValley `modules/orchestrator/orchestrator.ts`): one
 //! assistant per orchestrator profile, each a durable conversation on
 //! `vibevalley-agent` (`Harness` / SQLite `execution.db`) holding the farm's
-//! tools. The watch hands it what the chat says to it; crons for no profile
-//! come to it too. Before each input it is shown the time and the farm
-//! (`situation`), or what changed since; its words are said in the place it
-//! answers.
+//! tools. It subscribes to orchestrator-targeted dispatches from `Chat`; crons
+//! for no profile come to it too. Before each input it is shown the time and
+//! the farm (`situation`), or what changed since; its words are said in the
+//! place it answers.
 //!
 //! Inputs that come while it works wait and go in together as the next
 //! turn.
@@ -21,8 +21,8 @@ use std::sync::{Arc, Condvar, Mutex, Weak};
 
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    AgentRole, ApiError, BizCode, Doing, Fact, FactSessionChanged, FactSessionPhaseChanged, NoticeLevel, ORCHESTRATOR_RUNTIME, OrchestratorEval, Outcome,
-    Phase, PhaseResting, PhaseWorking, Session, SessionAction, SessionEventType, ops,
+    Actor, AgentRole, ApiError, BizCode, ChannelType, Doing, Fact, FactSessionChanged, FactSessionPhaseChanged, NoticeLevel, ORCHESTRATOR_RUNTIME,
+    OrchestratorEval, Outcome, Phase, PhaseResting, PhaseWorking, Session, SessionAction, SessionEventType, ops,
 };
 use vibevalley_runtime::agent::extensions::governance::Permissions;
 use vibevalley_runtime::agent::extensions::memory::{MemoryPort, Remember, RewriteMemory};
@@ -32,7 +32,7 @@ use vibevalley_runtime::agent::{AgentEvent, Brain, Message, ModelClient, OpenAiC
 use self::words::Source;
 use crate::Hub;
 use crate::base::{LookIn, missing, refused};
-use crate::modules::collab::channel::{Picked, Posting};
+use crate::modules::collab::channel::{Chat, Committed, DeliveryTargetKind, Picked, Posting, QueuedDelivery, actor_of, meta_of};
 use crate::modules::team::tool::{Farm, Route, held};
 use crate::modules::work::ledger::Step;
 use crate::modules::work::session::Trajectories;
@@ -123,6 +123,7 @@ pub struct Orchestrator {
     mcp: mcp::ProfileServers,
     /// The live answers not yet taken by a turn.
     ports: Mutex<HashMap<String, flume::Sender<String>>>,
+    chat_listener: Mutex<Option<(flume::Sender<()>, std::thread::JoinHandle<()>)>>,
     closed: AtomicBool,
 }
 
@@ -190,6 +191,7 @@ impl Orchestrator {
             client: p.client,
             instances: Default::default(),
             ports: Default::default(),
+            chat_listener: Default::default(),
             mcp: Default::default(),
             closed: AtomicBool::new(false),
         });
@@ -379,8 +381,134 @@ impl Orchestrator {
         let _ = self.execution.stop(&id);
     }
 
+    /// Subscribes to orchestrator-targeted deliveries from `chat` asynchronously
+    /// (plus replays any pending deliveries left from a prior process).
+    pub fn listen_chat(self: &Arc<Self>, chat: Arc<Chat>) {
+        let dispatches = chat.dispatches();
+        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
+        let o = Arc::downgrade(self);
+        let handle = std::thread::Builder::new()
+            .name("vibevalley-orchestrator-dispatch".into())
+            .spawn(move || {
+                if let Some(o) = o.upgrade()
+                    && let Ok(pending) = chat.pending_deliveries(DeliveryTargetKind::Orchestrator)
+                {
+                    for d in pending {
+                        if o.closed.load(Ordering::Acquire) {
+                            return;
+                        }
+                        o.handle_chat_delivery(&chat, &d, None);
+                    }
+                }
+                loop {
+                    let dispatched = flume::Selector::new().recv(&dispatches, |r| r.ok()).recv(&stop_rx, |_| None).wait();
+                    let Some(dispatched) = dispatched else { return };
+                    let Some(o) = o.upgrade() else { return };
+                    if o.closed.load(Ordering::Acquire) {
+                        return;
+                    }
+                    for d in &dispatched.deliveries {
+                        if d.recipient_kind == DeliveryTargetKind::Orchestrator {
+                            o.handle_chat_delivery(&chat, d, Some(&dispatched.committed));
+                        }
+                    }
+                }
+            })
+            .expect("orchestrator dispatch thread");
+        let prev = lock(&self.chat_listener).replace((stop_tx, handle));
+        if let Some((old_stop, old_handle)) = prev {
+            drop(old_stop);
+            if old_handle.thread().id() != std::thread::current().id() {
+                let _ = old_handle.join();
+            }
+        }
+    }
+
+    fn handle_chat_delivery(self: &Arc<Self>, chat: &Chat, d: &QueuedDelivery, committed: Option<&Arc<Committed>>) {
+        const HANDED_EMOJI: &str = "👀";
+        if !chat.delivery_is_pending(d.id).unwrap_or(false) {
+            return;
+        }
+        if !self.farm.agents.profiles.is_orchestrator(&d.recipient_id) {
+            let _ = chat.settle_delivery(d.id, false);
+            return;
+        }
+        let owned;
+        let c = match committed {
+            Some(c) => c.as_ref(),
+            None => match chat.committed_of(&d.message_id).ok().flatten() {
+                Some(c) => {
+                    owned = c;
+                    &owned
+                }
+                None => {
+                    let _ = chat.withdraw_delivery(d.id);
+                    return;
+                }
+            },
+        };
+        let m = chat.addressed_of(&c.row);
+        let line = words::orchestrator_lines(std::slice::from_ref(&m));
+        if !d.wakes {
+            self.overhear(Some(&d.recipient_id), line);
+            let _ = chat.settle_delivery(d.id, true);
+            return;
+        }
+        let actor = actor_of(&c.row.sender_kind, c.row.sender_agent.as_deref(), &c.row.sender_id, Some(&c.row.sender_name));
+        let meta = meta_of(c.row.meta.as_deref());
+        let from_user = matches!(actor, Actor::User { .. });
+        let mut picked_note = String::new();
+        if let Some(p) = &meta.picked {
+            if let Some(a) = p.agent.as_deref().and_then(|a| self.farm.agents.profiles.agent(a)) {
+                picked_note += &words::picked_agent(&a.name);
+            }
+            if let Some(r) = &p.repo {
+                picked_note += &words::picked_repo(r);
+            }
+        }
+        let view_note = meta
+            .view_context
+            .as_ref()
+            .filter(|_| c.row.deleted_at.is_none())
+            .map(|vc| format!("{}\n", words::format_artifact_view_context(vc)))
+            .unwrap_or_default();
+        let text = c.row.body.trim();
+        let said = match meta.voice_mode.as_deref() {
+            Some("dictated") => format!("{picked_note}{view_note}{}{}", words::DICTATED, words::user_line(text)),
+            Some("conversation") => format!("{}\n{}", words::PROMPTS.voice, words::user_line(text)),
+            _ if from_user && (c.channel_type == ChannelType::Direct || c.row.channel_id == chat.default_channel()) => {
+                format!("{picked_note}{view_note}{}", words::user_line(text))
+            }
+            _ => format!("{picked_note}{}", words::chat_line(&m.target, &line)),
+        };
+        let input = Input {
+            agent: Some(d.recipient_id.clone()),
+            channel: c.row.channel_id.clone(),
+            source: if from_user { Source::User } else { Source::Chat },
+            line: said,
+            user: from_user,
+            picked: meta.picked.clone(),
+            messages: vec![c.row.id.clone()],
+            port: meta.response_port.clone(),
+        };
+        if self.hear(input) {
+            let _ = chat.settle_delivery(d.id, true);
+            if let Err(e) = chat.react(&c.row.id, &d.recipient_id, HANDED_EMOJI, true) {
+                eprintln!("vibevalley-server: orchestrator: 👀: {}", e.message);
+            }
+        } else if !self.closed.load(Ordering::Acquire) {
+            let _ = chat.settle_delivery(d.id, false);
+        }
+    }
+
     pub fn close(&self) {
         self.closed.store(true, Ordering::Release);
+        if let Some((stop, handle)) = lock(&self.chat_listener).take() {
+            drop(stop);
+            if handle.thread().id() != std::thread::current().id() {
+                let _ = handle.join();
+            }
+        }
         self.execution.close();
         self.mcp.close();
         for me in lock(&self.instances).values() {

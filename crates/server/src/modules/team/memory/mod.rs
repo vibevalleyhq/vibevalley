@@ -76,6 +76,7 @@ pub struct FinishedRun {
 pub struct Memories {
     db: Mutex<SqliteConnection>,
     agents: Arc<Agents>,
+    sub: Mutex<Option<crate::event_bus::Subscription>>,
 }
 
 fn to_wire(x: m::Memory) -> Memory {
@@ -127,7 +128,16 @@ impl Memories {
             Ok::<_, sqlx::Error>(conn)
         })
         .map_err(db_failed)?;
-        Ok(Arc::new(Memories { db: Mutex::new(db), agents }))
+        Ok(Arc::new(Memories {
+            db: Mutex::new(db),
+            agents,
+            sub: Mutex::new(None),
+        }))
+    }
+
+    pub fn close(&self) {
+        let prev = lock(&self.sub).take();
+        drop(prev);
     }
 
     pub fn observe_sessions(self: &Arc<Self>, sessions: &crate::modules::work::session::Sessions) {
@@ -613,13 +623,13 @@ pub fn install(hub: &Arc<Hub>, memories: Arc<Memories>) {
     let s = memories.clone();
     hub.on::<ops::MemoryPreviewDelete>(move |_, input| s.preview_forget(&input.agent, &input.memory));
 
-    // A round that reported: what it did is kept for its profile.
+    // A round that reported: what it did is kept for its profile on the async bus thread.
     let s = Arc::downgrade(&memories);
-    hub.watch(Arc::new(move |_, tr| {
+    let sub = hub.subscribe_transitions("memory", move |_, tr| {
         let Fact::SessionReported(r) = &tr.fact else { return };
         let Some(store) = s.upgrade() else { return };
         let Some(h) = tr.after.sessions.iter().find(|h| h.id == r.id) else { return };
-        if h.role != vibevalley_protocol::AgentRole::Worker {
+        if h.role != vibevalley_protocol::AgentRole::Worker || crate::modules::work::session::is_workspace(h) {
             return;
         }
         let summary = h.last_run.as_ref().map(|l| l.summary.clone()).unwrap_or_default();
@@ -633,9 +643,84 @@ pub fn install(hub: &Arc<Hub>, memories: Arc<Memories>) {
             outcome,
             summary,
         };
-        // Off the hub's thread: the store takes its own lock.
-        let _ = std::thread::Builder::new()
-            .name("vibevalley-memory-keep".into())
-            .spawn(move || store.keep(&run));
-    }));
+        store.keep(&run);
+    });
+    let prev = lock(&memories.sub).replace(sub);
+    drop(prev);
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use vibevalley_core::empty_space_state;
+    use vibevalley_protocol::{FactSessionChanged, FactSessionReported, Session};
+
+    use super::*;
+
+    #[test]
+    fn session_reported_keeps_issue_worker_and_skips_workspace_sessions() {
+        let home = tempfile::tempdir().unwrap();
+        let hub = Hub::new(empty_space_state());
+        let registry = Arc::new(vibevalley_runtime::oar::Registry::new());
+        let agents = Agents::open(&hub, home.path(), &[], registry, false).unwrap();
+        let memories = Memories::open(home.path(), agents).unwrap();
+        install(&hub, memories.clone());
+
+        // Workspace chat session reports: must be skipped cleanly.
+        let mut ws = Session::worker("ws1", "Direct Chat", 1);
+        ws.agent = "antigravity".into();
+        ws.runtime = "antigravity".into();
+        ws.brief = "workspace chat".into();
+        hub.apply(vec![Fact::SessionChanged(FactSessionChanged { at: 1, session: ws })]);
+        hub.apply(vec![Fact::SessionReported(FactSessionReported {
+            at: 2,
+            id: "ws1".into(),
+            run: None,
+            outcome: Outcome::Completed,
+            phase: None,
+            summary: "workspace reply".into(),
+            runs: 1,
+            spent: None,
+            questions: vec![],
+            checks: vec![],
+            answer: None,
+        })]);
+
+        // Issue worker reports: kept directly on the async bus thread.
+        let mut worker = Session::worker("w1", "Backend", 3);
+        worker.agent = "backend".into();
+        worker.runtime = "scripted".into();
+        worker.issue = Some("i1".into());
+        worker.repo = Some("farm".into());
+        worker.brief = "fix bug".into();
+        hub.apply(vec![Fact::SessionChanged(FactSessionChanged { at: 3, session: worker })]);
+        hub.apply(vec![Fact::SessionReported(FactSessionReported {
+            at: 4,
+            id: "w1".into(),
+            run: None,
+            outcome: Outcome::Completed,
+            phase: None,
+            summary: "fixed it".into(),
+            runs: 1,
+            spent: None,
+            questions: vec![],
+            checks: vec![],
+            answer: None,
+        })]);
+
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            if !memories.list("backend").unwrap().is_empty() {
+                break;
+            }
+            assert!(Instant::now() < deadline, "issue memory was not recorded");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+
+        assert!(memories.list("antigravity").unwrap().is_empty(), "workspace session leaked into memory");
+        assert_eq!(memories.list("backend").unwrap().len(), 1);
+        memories.close();
+        hub.close_bus();
+    }
 }

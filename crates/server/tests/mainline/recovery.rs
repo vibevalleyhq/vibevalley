@@ -148,8 +148,8 @@ fn regression_replies_and_reports_across_process_exit() {
             call(&url, "issue.status.update", json!({"id": issue["id"],"status":"todo"}));
             let (issue, thread) = issue_thread(&server);
             until(&server, "first report", || (count_notes(&server, &thread, "initial") == 1).then_some(()));
-            // Hold the router before accepting the next chat write, leaving its cursor behind the message.
-            server.watch.close();
+            // Hold the issue dispatcher before accepting the next chat write, leaving its delivery pending in SQLite.
+            server.issue_chat.close();
             comment(&url, &issue, FOLLOW_UP);
             assert!(
                 server

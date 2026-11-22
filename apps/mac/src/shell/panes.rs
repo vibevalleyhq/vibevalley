@@ -460,8 +460,12 @@ impl Shell {
     pub fn close_tab(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
         let Some(project) = self.ws.active_mut() else { return };
         let pid = project.id();
-        if let Some(PaneKind::Terminal { terminal_id, .. }) = project.close_tab(tab) {
-            self.terminals.remove(&terminal_id);
+        let closed = project.close_tab(tab);
+        if let Some(PaneKind::Terminal { terminal_id, .. }) = &closed {
+            self.terminals.remove(terminal_id);
+        }
+        if let Some(session_id) = closed_chat_session_id(closed.as_ref()) {
+            crate::serving::close_workspace_session(session_id);
         }
         self.panes.remove(&(pid, tab));
         self.chat_statuses.remove(&(pid, tab));
@@ -754,6 +758,12 @@ impl Shell {
     }
 }
 
+fn closed_chat_session_id(closed: Option<&PaneKind>) -> Option<String> {
+    let PaneKind::Chat { session_id, .. } = closed? else { return None };
+    let trimmed = session_id.trim();
+    (!trimmed.is_empty()).then(|| trimmed.to_string())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TerminalFileAction {
     Viewer { path: PathBuf, line: Option<u32> },
@@ -943,5 +953,38 @@ mod url_tests {
             super::classify_terminal_file_action(proj_rs.clone(), Some(1), None),
             super::TerminalFileAction::SystemOpen(proj_rs)
         );
+    }
+
+    #[test]
+    fn closed_chat_session_id_only_matches_non_empty_chat_tabs() {
+        use std::path::PathBuf;
+        use vibevalley_workspace::PaneKind;
+
+        assert_eq!(
+            super::closed_chat_session_id(Some(&PaneKind::Chat {
+                session_id: " w42 ".into(),
+                runtime: "antigravity".into(),
+                cwd: PathBuf::from("/tmp"),
+                title: None,
+            })),
+            Some("w42".into())
+        );
+        assert_eq!(
+            super::closed_chat_session_id(Some(&PaneKind::Chat {
+                session_id: "   ".into(),
+                runtime: "antigravity".into(),
+                cwd: PathBuf::from("/tmp"),
+                title: None,
+            })),
+            None
+        );
+        assert_eq!(
+            super::closed_chat_session_id(Some(&PaneKind::Terminal {
+                terminal_id: "t1".into(),
+                link: None,
+            })),
+            None
+        );
+        assert_eq!(super::closed_chat_session_id(None), None);
     }
 }

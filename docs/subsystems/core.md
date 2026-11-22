@@ -15,9 +15,9 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/core/src/core.rs` | `Core`：`reduce`、`frame_of`、`Transition`；状态折叠和出帧的纯函数 |
-| `crates/server/src/lib.rs` | `Hub`：持有 `Core`、按操作名注册处理函数（`Hub::on`）和订阅（`Hub::on_subscription`），`Hub::apply` 施加事实，按 `STATE_EVERY_MS` 出帧，`live` 事件 |
-| `crates/server/src/start.rs` | `start`：按序打开设置、档案、仓库、工单板、频道、媒体、助手、观察层，注册所有端点 |
+| `crates/core/src/core.rs`、`inbox.rs`、`patrol.rs` | `Core`：`reduce`、`frame_of`、`Transition`；收件箱纯计算（`inbox`、`inbox_entries`、`fresh_of`）与巡查规则（`patrol_step`） |
+| `crates/server/src/lib.rs`、`event_bus.rs` | `Hub` 与有界异步 `EventBus`：持有 `Core`、按操作名注册处理函数（`Hub::on`）和订阅（`Hub::on_subscription`），`Hub::apply` 施加事实后非阻塞扇出 `Transition` 给独立线程订阅者（`Hub::subscribe_transitions` / `Hub::close_bus`），按 `STATE_EVERY_MS` 出帧，`live` 事件 |
+| `crates/server/src/start.rs` | `start`：按序打开设置、档案、仓库、工单板、频道、媒体、助手，并接线 `IssueChat`、`SessionChat` 与助手频道订阅，注册所有端点；`Started::close` 先停 `Hub::close_bus()` 再清理各领域服务 |
 | `crates/server/src/main.rs` | 二进制 `vibevalley-server`：`--web`、`--ready-json`，读环境变量，写 `server.json` |
 | `crates/protocol/src/contract/` | `SpaceState`、`Fact`、`StateFrame`、`LiveEvent` 与接口表 `ENDPOINTS`（`endpoints.rs`），手写的源头，TS 由它生成 |
 | `crates/protocol/src/envelope.rs` | 全信封、`BizCode`、`ApiError` |
@@ -33,10 +33,29 @@
 - **单一内存投影，按事实演进**：`SpaceState` 只在 `Hub::apply(facts)` 中修改。未改变状态的事实不广播、不递增 `seq`、不触发特效。
 - **「事实」专指 `Hub::apply` 的输入**：农机能力叫 `RuntimeSupport`，会话事件映射叫 `Reaction`，一条频道消息和它的听众叫 `ChannelHearers`，排序键叫 `RowKeys`。
 - **事实命名表达发生了什么**：实体新增或更新叫 `<实体>Changed`，移除叫 `<实体>Removed`，生命周期结清用动词过去式（`sessionPhaseChanged`、`sessionReported`、`sessionLeft`）。
-- **批次原子可见，单条保留因果**：`Hub::apply`（`crates/server/src/lib.rs`）是同步函数：在局部状态上逐条折叠并收集每条 `Transition`（`{ before, fact, after }`）与特效，再一次性替换可见状态、递增一次 `seq`，然后按序发布事实、`Transition` 和特效，返回前全部做完。状态在一把锁里换，各线程都可以就地调 `apply`。`reduce` 不得修改传入的旧状态。
+- **批次原子可见，异步扇出不重入**：`Hub::apply`（`crates/server/src/lib.rs`）在局部状态上逐条折叠并收集每条 `Transition`（`{ before, fact, after }`）与特效，一次性替换可见状态、递增一次 `seq` 并立即释放核心锁，再经有界异步 `EventBus`（每订阅者独立线程 `vibevalley-bus-{name}`、容量 1024）非阻塞扇出 `Transition`，禁止在 `Hub::apply` 锁内同步写盘或重入。`reduce` 不得修改传入的旧状态。
 - **先落库，后发事实**：各模块先提交数据库事务或文件，再调 `Hub::apply`。重启时从空状态由各模块从 `server.db` 及家目录文件恢复。
 - **按依赖重算工单派生状态**：`reduce` 仅在工单或会话集合引用变化时重算工单状态与动作（`withIssueStatuses`）；聊天或花费事实不触发工单重算。一轮进行中的 `sessionPhaseChanged` 只改了 `doing` 或 `spent`（`since`、`quietSince` 不变，`phaseAffectsIssue`）时也跳过重算。
 - **界面文案只在出帧时填充**：`frame_of` 在状态副本上填入 `phaseText`、`actionText`、`whenText`、工单 `stage` 与可执行动作；`reduce` 与持久层不含界面文案。
+
+### 收件箱
+
+八种待处理事项（`InboxKind`，定义在 `crates/core/src/inbox.rs`）：
+
+| 种类 | 触发条件 | 默认巡查宽限期 |
+|---|---|---|
+| `review` | 工单处于 `reviewing`（帮工做完一轮或全部子单完成，等用户验收） | 2 小时 |
+| `ask` | 工单处于 `asking`（帮工带着问题等用户回答） | 15 分钟 |
+| `fix` | 工单处于 `stuck: failed`（上一轮失败） | — |
+| `interrupted` | 工单处于 `stuck: interrupted`（上一轮停在半路） | 30 分钟 |
+| `conflict` | 工单处于 `stuck: conflict`（合入主分支存在冲突） | 2 小时 |
+| `quiet` | 工单处于 `stuck: quiet`（执行中长时间无事件） | 20 分钟 |
+| `mention` | 频道或串中有未读且未回复的 `@用户` 消息（`Chat.userMentions`） | 15 分钟 |
+| `cron-ask` | 助手创建的定时任务处于 `pending` 等待用户同意 | — |
+
+- **纯函数现算，不落库**：`InboxEntry[]` 直接从 `SpaceState` 算出，放进每帧的 `StateFrame.inbox`；每条有稳定的 id，带 `who` 和预填好的文案 `words`（`label`、`title`、`body`、`tray`）。原生子工单成功完成后自动合入父分支，不单独产生 `review`。
+- **开机时已有的不响铃（`fresh_of`）**：服务端开机与页面首次打开都先记下存量 id，之后新出现的 id 才响铃和通知，同一个只响一次。
+- **巡查（`patrol_step`；规则和测例在 `crates/core/src/patrol.rs`）**：超过宽限期的按频道生成 `source = "patrol"` 摘要；同一件事 4 小时内最多报一次；用户读过报告所在的位置（`Chat::user_read_reports`），宽限期从读的时候起至少再延 2 小时。
 
 ### SSE 流和其余路由
 
@@ -78,20 +97,20 @@ SSE 以外的路由：
 
 1. 拥有者模块提交数据库事务或文件后，调用 `Hub::apply(facts)`。
 2. `Core` 运行 `reduce`；若状态未变则直接结束。
-3. 原子替换可见状态、递增 `seq`，按序把 `Transition` 交给订阅它的模块（`Watcher`）。
+3. 原子替换可见状态、递增 `seq` 并释放锁，经有界异步 `EventBus` 把 `Transition` 扇出给订阅它的模块（`Hub::subscribe_transitions`）。
 4. HTTP 和像素场景在 200 毫秒窗口结束时接收当前状态和窗口内的有序特效。
 5. 原生工作台订阅最新状态。空闲后的首次变化立即唤醒窗口。连续变化在同一帧线程合并。工作台快照的 `effects` 为空。每个窗口有一个容量为 1 的唤醒通道。窗口确认已应用当前帧后，才接收下一份快照。
 
 **服务端启动**
 
-1. `start`（`crates/server/src/start.rs`）从空状态起 `Hub`，按序打开设置、游戏、AI 服务、档案和农机、仓库、记性、轨迹、工单板（共用 `server.db`）、PR 与分支发布、定时任务、附件、媒体输入、频道、素材库、媒体任务、Artifact、笔记、助手、观察层与连接器；各自从 `server.db` 与家目录文件读回并施加初始事实。
-2. 工单板接回停机时在场的会话；观察层按游标读完漏读的频道事件。
+1. `start`（`crates/server/src/start.rs`）从空状态起 `Hub`，按序打开设置、游戏、AI 服务、档案和农机、仓库、记性、轨迹、工单板（共用 `server.db`）、PR 与分支发布、定时任务、附件、媒体输入、频道、素材库、媒体任务、Artifact、笔记、助手、`IssueChat`、`SessionChat` 与连接器；各自从 `server.db` 与家目录文件读回并施加初始事实。
+2. 工单板接回停机时在场的会话；`IssueChat`、`SessionChat` 与 `Orchestrator` 各自补投 SQLite 中未结算的 `channel_delivery` 与 `issue.report`。
 3. `main.rs` 绑定端口（按 `VIBEVALLEY_PORT`，`0` 为随机端口；未设时取当前发布通道默认端口：`release` `8787`、`beta` `8788`、`alpha` `8789`、`dev` `8790`），写出 `server.json`，`--ready-json` 打印 `{"url","pid"}`。
 
 ## 和谁打交道
 
 - **施加事实的模块**：工单板（`modules/work/issue` 与 `modules/work/session`，经 `modules/work/ledger.rs`）、`channel`、`media`、`cron`、`game`、`agent`。
-- **订阅事实的模块**：`game`、`watch`（收件箱）、`issue`、`channel`、`media`。
+- **订阅事实的模块（`EventBus`）**：`game`、`memory`、`runtime`、`library`、`issue`（`issue-watch`）、`session`（`session-chat`）。
 - **外部客户端**：`apps/mac`（进程内经桥）、命令行 `vibevalley`（HTTP）。
 
 ## 为什么这样

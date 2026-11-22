@@ -118,35 +118,93 @@ fn refused_session(message: String) -> BoardError {
     BoardError::Api(ApiError::new(BizCode::SessionRefused, message))
 }
 
+fn load_workspace_meta_at(path: &Path) -> WorkspaceMeta {
+    let body = match std::fs::read_to_string(path) {
+        Ok(body) => body,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return WorkspaceMeta::default(),
+        Err(e) => {
+            eprintln!("vibevalley: reading workspace metadata {}: {e}", path.display());
+            return WorkspaceMeta::default();
+        }
+    };
+    match serde_json::from_str::<WorkspaceMeta>(&body) {
+        Ok(meta) => meta,
+        Err(e) => {
+            eprintln!("vibevalley: parsing workspace metadata {}: {e}", path.display());
+            WorkspaceMeta::default()
+        }
+    }
+}
+
+fn save_workspace_meta_at(path: &Path, meta: &WorkspaceMeta) {
+    if let Some(dir) = path.parent()
+        && let Err(e) = std::fs::create_dir_all(dir)
+    {
+        eprintln!("vibevalley: creating workspace metadata directory {}: {e}", dir.display());
+        return;
+    }
+    let bytes = match serde_json::to_vec(meta) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            eprintln!("vibevalley: serializing workspace metadata {}: {e}", path.display());
+            return;
+        }
+    };
+    let tmp = path.with_extension("json.tmp");
+    if let Err(e) = std::fs::write(&tmp, bytes) {
+        eprintln!("vibevalley: writing workspace metadata {}: {e}", tmp.display());
+        return;
+    }
+    if let Err(e) = std::fs::rename(&tmp, path) {
+        eprintln!("vibevalley: renaming workspace metadata {} -> {}: {e}", tmp.display(), path.display());
+        let _ = std::fs::remove_file(&tmp);
+    }
+}
+
 impl Sessions {
     fn workspace_meta_path(&self, session_id: &str) -> PathBuf {
         self.0.config.data_dir.join("workspace").join(format!("{session_id}.json"))
     }
 
     fn load_workspace_meta(&self, session_id: &str) -> WorkspaceMeta {
-        let path = self.workspace_meta_path(session_id);
-        std::fs::read_to_string(path)
-            .ok()
-            .and_then(|body| serde_json::from_str::<WorkspaceMeta>(&body).ok())
-            .unwrap_or_default()
+        load_workspace_meta_at(&self.workspace_meta_path(session_id))
     }
 
     fn save_workspace_meta(&self, session_id: &str, meta: &WorkspaceMeta) {
-        let path = self.workspace_meta_path(session_id);
-        if let Some(dir) = path.parent() {
-            let _ = std::fs::create_dir_all(dir);
-        }
-        let tmp = path.with_extension("json.tmp");
-        if let Ok(bytes) = serde_json::to_vec(meta)
-            && std::fs::write(&tmp, bytes).is_ok()
-        {
-            let _ = std::fs::rename(tmp, path);
-        }
+        save_workspace_meta_at(&self.workspace_meta_path(session_id), meta);
     }
 
     pub(super) fn remove_workspace_meta(&self, session_id: &str) {
         lock(&self.0.workspaces).remove(session_id);
-        let _ = std::fs::remove_file(self.workspace_meta_path(session_id));
+        let path = self.workspace_meta_path(session_id);
+        if let Err(e) = std::fs::remove_file(&path)
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            eprintln!("vibevalley: removing workspace metadata {}: {e}", path.display());
+        }
+    }
+
+    /// Aborts and disposes a workspace chat session when its tab closes, ending
+    /// any running turn as interrupted without touching the project directory.
+    pub fn close_workspace(&self, session_id: &str) {
+        let session_id = session_id.trim();
+        if session_id.is_empty() {
+            return;
+        }
+        let existing = self.session(session_id);
+        if existing.as_ref().is_some_and(|s| !is_workspace(s)) {
+            return;
+        }
+        if let Some(session) = existing.as_ref().filter(|s| s.phase.is_working()) {
+            if let Err(e) = self.end_run(session_id, Outcome::Interrupted, "", None) {
+                eprintln!("vibevalley: ending workspace run {session_id}: {e}");
+            }
+            self.finish_workspace(session, StopReason::Aborted, None, "", None);
+        }
+        if let Err(e) = self.dismiss(session_id, crate::modules::work::workplace::Leave::Keep) {
+            eprintln!("vibevalley: closing workspace session {session_id}: {e}");
+            self.remove_workspace_meta(session_id);
+        }
     }
 
     fn ensure_workspace_entry<'a>(&self, map: &'a mut std::collections::HashMap<String, WorkspaceState>, session_id: &str) -> &'a mut WorkspaceState {
@@ -856,5 +914,274 @@ impl Sessions {
         } else if had_pending {
             self.notify_workspace(session_id);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex};
+
+    use vibevalley_core::Applied;
+    use vibevalley_protocol::{Fact, Outcome, Session, SessionOpenWorkspaceInput, SessionSendInput, SpaceState, StateFrame};
+    use vibevalley_runtime::oar::{
+        Capabilities, ControlAction, ControlOutcome, ControlStatus, Event, Installation, ModelInfo, Registry, Runtime, Session as OarSession, SessionOptions,
+        SessionStatus, voyage,
+    };
+
+    use super::*;
+    use crate::modules::work::ledger::{BoardConfig, Facts, Ledger, LocalFacts};
+    use crate::modules::work::session::RuntimeDrivers;
+    use crate::modules::work::workplace::Workplace;
+
+    #[derive(Default)]
+    struct RecordingFacts {
+        inner: LocalFacts,
+        applied: Mutex<Vec<Fact>>,
+    }
+
+    impl Facts for RecordingFacts {
+        fn apply(&self, facts: Vec<Fact>) -> Applied {
+            self.applied.lock().unwrap().extend(facts.iter().cloned());
+            self.inner.apply(facts)
+        }
+
+        fn read(&self, f: &mut dyn FnMut(&SpaceState)) {
+            self.inner.read(f);
+        }
+
+        fn frame(&self) -> StateFrame {
+            self.inner.frame()
+        }
+    }
+
+    struct StubSession {
+        id: String,
+        tx: flume::Sender<Event>,
+        rx: flume::Receiver<Event>,
+        aborts: Arc<AtomicUsize>,
+        disposes: Arc<AtomicUsize>,
+    }
+
+    impl OarSession for StubSession {
+        fn id(&self) -> String {
+            self.id.clone()
+        }
+
+        fn control(&self, action: ControlAction, _: &str, input_id: &str, span_id: &str) -> vibevalley_runtime::oar::Result<ControlOutcome> {
+            Ok(ControlOutcome {
+                action,
+                status: ControlStatus::Accepted,
+                code: String::new(),
+                reason: String::new(),
+                span_id: span_id.into(),
+                input_id: input_id.into(),
+            })
+        }
+
+        fn records(&self) -> Vec<voyage::Record> {
+            vec![]
+        }
+
+        fn subscribe_records(&self, _: Option<u64>) -> flume::Receiver<voyage::Record> {
+            let (_tx, rx) = flume::bounded(1);
+            rx
+        }
+
+        fn runtime_id(&self) -> &str {
+            "stub"
+        }
+
+        fn status(&self) -> SessionStatus {
+            SessionStatus::Idle
+        }
+
+        fn events(&self) -> flume::Receiver<Event> {
+            self.rx.clone()
+        }
+
+        fn prompt(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
+            Ok(())
+        }
+
+        fn steer(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
+            Ok(())
+        }
+
+        fn queue(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
+            Ok(())
+        }
+
+        fn abort(&self) -> vibevalley_runtime::oar::Result<()> {
+            self.aborts.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+
+        fn respond_permission(&self, _: &str, _: PermissionDecision) -> vibevalley_runtime::oar::Result<()> {
+            Ok(())
+        }
+
+        fn dispose(&self) {
+            self.disposes.fetch_add(1, Ordering::SeqCst);
+            let _ = self.tx.try_send(Event {
+                seq: 0,
+                at_ms: 0,
+                agent_path: vec![],
+                kind: vibevalley_runtime::oar::EventKind::SessionEnded,
+            });
+        }
+    }
+
+    struct StubRuntime {
+        aborts: Arc<AtomicUsize>,
+        disposes: Arc<AtomicUsize>,
+    }
+
+    impl Runtime for StubRuntime {
+        fn id(&self) -> &str {
+            "stub"
+        }
+
+        fn display_name(&self) -> &str {
+            "Stub"
+        }
+
+        fn capabilities(&self) -> Capabilities {
+            Capabilities::default()
+        }
+
+        fn installation(&self) -> Installation {
+            Installation::Available {
+                version: None,
+                path: PathBuf::from("/bin/true"),
+            }
+        }
+
+        fn list_models(&self) -> vibevalley_runtime::oar::Result<Vec<ModelInfo>> {
+            Ok(vec![])
+        }
+
+        fn open(&self, _: SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn OarSession>> {
+            let (tx, rx) = flume::unbounded();
+            Ok(Arc::new(StubSession {
+                id: "stub-1".into(),
+                tx,
+                rx,
+                aborts: self.aborts.clone(),
+                disposes: self.disposes.clone(),
+            }))
+        }
+    }
+
+    #[test]
+    fn workspace_meta_handles_missing_valid_and_corrupt_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("workspace").join("w1.json");
+        assert_eq!(load_workspace_meta_at(&path).permission_mode, SessionPermissionMode::AcceptEdits);
+
+        let meta = WorkspaceMeta {
+            title: Some("Refactor".into()),
+            model: Some("claude-sonnet".into()),
+            effort: Some("high".into()),
+            permission_mode: SessionPermissionMode::ReadOnly,
+        };
+        save_workspace_meta_at(&path, &meta);
+        let loaded = load_workspace_meta_at(&path);
+        assert_eq!(loaded.title.as_deref(), Some("Refactor"));
+        assert_eq!(loaded.model.as_deref(), Some("claude-sonnet"));
+        assert_eq!(loaded.effort.as_deref(), Some("high"));
+        assert_eq!(loaded.permission_mode, SessionPermissionMode::ReadOnly);
+
+        std::fs::write(&path, "{not-json").unwrap();
+        let fallback = load_workspace_meta_at(&path);
+        assert_eq!(fallback.permission_mode, SessionPermissionMode::AcceptEdits);
+        assert!(fallback.title.is_none());
+    }
+
+    #[test]
+    fn close_workspace_aborts_disposes_ends_turn_preserves_dir_and_emits_session_left() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_dir = dir.path().join("repo");
+        std::fs::create_dir_all(&project_dir).unwrap();
+        let sentinel = project_dir.join("keep.txt");
+        std::fs::write(&sentinel, "precious").unwrap();
+
+        let db_path = dir.path().join("server.db");
+        let facts = Arc::new(RecordingFacts::default());
+        let (ledger, _) = Ledger::open(&db_path, facts.clone()).unwrap();
+        let durable = vibevalley_runtime::agent::durable::Store::open(&db_path).unwrap();
+        let config = Arc::new(BoardConfig::under(dir.path()));
+        let workplaces = Arc::new(Workplace::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
+
+        let aborts = Arc::new(AtomicUsize::new(0));
+        let disposes = Arc::new(AtomicUsize::new(0));
+        let mut registry = Registry::new();
+        registry.register(Arc::new(StubRuntime {
+            aborts: aborts.clone(),
+            disposes: disposes.clone(),
+        }));
+        let drivers = Arc::new(RuntimeDrivers {
+            registry: Arc::new(registry),
+            model: None,
+        });
+        let sessions = Sessions::new(durable, Arc::new(ledger), drivers, workplaces, config).unwrap();
+
+        let opened = sessions
+            .open_workspace(SessionOpenWorkspaceInput {
+                runtime: "stub".into(),
+                cwd: project_dir.to_string_lossy().into_owned(),
+                repo: None,
+                model: None,
+                effort: None,
+                permission_mode: None,
+                title: Some("Chat tab".into()),
+                session_id: None,
+            })
+            .unwrap();
+        let sid = opened.id.clone();
+        assert!(sessions.is_live(&sid));
+        let meta_path = sessions.workspace_meta_path(&sid);
+        assert!(meta_path.is_file());
+
+        sessions
+            .send_workspace(
+                SessionSendInput {
+                    id: sid.clone(),
+                    text: "investigate".into(),
+                    attachments: None,
+                    context_files: None,
+                },
+                None,
+            )
+            .unwrap();
+        assert!(sessions.session(&sid).unwrap().phase.is_working());
+
+        let mut issue_session = Session::worker("w-issue", "worker", now());
+        issue_session.issue = Some("i1".into());
+        sessions.0.ledger.apply(vec![Fact::session_changed(now(), issue_session)]).unwrap();
+
+        sessions.close_workspace("w-issue");
+        assert!(sessions.session("w-issue").is_some(), "non-workspace session must not be closed");
+
+        sessions.close_workspace(&sid);
+        assert_eq!(aborts.load(Ordering::SeqCst), 1);
+        assert_eq!(disposes.load(Ordering::SeqCst), 1);
+        assert!(!sessions.is_live(&sid));
+        assert!(sessions.session(&sid).is_none());
+        assert!(!lock(&sessions.0.workspaces).contains_key(&sid));
+        assert!(!meta_path.exists());
+        assert_eq!(std::fs::read_to_string(&sentinel).unwrap(), "precious");
+
+        let applied = facts.applied.lock().unwrap();
+        assert!(
+            applied
+                .iter()
+                .any(|f| matches!(f, Fact::SessionReported(r) if r.id == sid && r.outcome == Outcome::Interrupted)),
+            "closing a working workspace session must interrupt its active turn"
+        );
+        assert!(
+            applied.iter().any(|f| matches!(f, Fact::SessionLeft(l) if l.id == sid)),
+            "closing a workspace session must emit Fact::session_left"
+        );
     }
 }
