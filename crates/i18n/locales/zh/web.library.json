@@ -1,5 +1,4 @@
 {
-  "title": "媒体库",
   "upload": "上传",
   "uploading": "正在上传…",
   "make": "生成",
@@ -8,21 +7,6 @@
   "emptyHow": "生成一张图或一段语音、上传或拖进来一个文件，或者在对话里让执行会话把找到的东西放进来。",
   "nothingShown": "没有符合筛选的内容。",
   "drop": "松开，放进媒体库",
-  "rail": {
-    "where": "来路",
-    "kind": "种类",
-    "artifacts": "作品交付",
-    "channels": "来自频道",
-    "agents": "来自执行会话",
-    "anyWhere": "全部来路",
-    "anyKind": "全部种类"
-  },
-  "origin": {
-    "all": "全部",
-    "generated": "生成的",
-    "uploaded": "你上传的",
-    "fetched": "执行会话拿回来的"
-  },
   "kind": {
     "all": "全部",
     "image": "图片",
@@ -30,16 +14,6 @@
     "video": "视频",
     "other": "其它"
   },
-  "artifactKind": {
-    "all": "全部作品",
-    "canvas": "视觉画板",
-    "slides": "幻灯片",
-    "dashboard": "仪表盘",
-    "whiteboard": "白板",
-    "page": "网页与文档"
-  },
-  "newArtifact": "新建作品",
-  "search": "搜索名字",
   "sortLabel": "排序",
   "sort": {
     "recent": "最近",
@@ -71,14 +45,11 @@
     "from": "来路",
     "added": "加入",
     "openChannel": "去 {channel} 看",
-    "openWorkbench": "打开工作台",
     "versionBadge": "第 {version} 稿",
-    "byMaker": "作者：{name}",
     "selected": "已选 {n} 个",
     "clear": "不选了",
     "more": "更多"
   },
-  "download": "下载",
   "sendTo": "发到频道",
   "sentTo": "发到了 {channel}",
   "remove": "从库里拿掉",
@@ -93,5 +64,190 @@
     "image": "生图",
     "speech": "单人语音",
     "audio": "音频工作台"
+  },
+  "content": {
+    "title": "内容",
+    "new": "新建",
+    "searchAll": "搜索全部内容…",
+    "sidebarToggle": "展开或收起内容导航",
+    "recent": "全部最近",
+    "pinned": "置顶收藏",
+    "pin": "置顶",
+    "unpin": "取消置顶",
+    "pinnedToast": "已置顶收藏",
+    "unpinnedToast": "已取消置顶",
+    "notes": "大纲笔记",
+    "notesAll": "全部大纲笔记",
+    "newNote": "新建大纲笔记",
+    "artifacts": "作品",
+    "media": "素材",
+    "aiGenerate": "AI 生成素材",
+    "notesTodoCount": "{n} 项待办",
+    "notesHint": "Tab 缩进 · Enter 换行 · / 命令 · [[ 双链",
+    "sendArtifact": "发到频道",
+    "exportArtifact": "导出",
+    "turnIntoIssue": "转为任务",
+    "issueCreated": "已创建任务",
+    "back": "返回",
+    "source": {
+      "all": "全部来源",
+      "agent": "执行会话交付",
+      "user": "我创建的"
+    },
+    "artifactType": {
+      "all": "全部作品",
+      "whiteboard": "无限白板",
+      "docs": "协作文档",
+      "slides": "幻灯片",
+      "dashboard": "数据看板",
+      "design": "界面画板",
+      "designSystem": "设计体系",
+      "motion": "动态短片",
+      "html": "单页网页"
+    },
+    "inspector": {
+      "openExternal": "系统打开",
+      "saveAs": "另存为",
+      "copyPath": "复制路径",
+      "copiedPath": "已复制路径",
+      "reveal": "在访达中显示",
+      "stopAudio": "停止播放"
+    },
+    "templates": {
+      "title": "新建内容",
+      "search": "搜索模板…",
+      "empty": "没有匹配的模板",
+      "cat": {
+        "recommended": "推荐",
+        "note": "大纲笔记",
+        "whiteboard": "白板与图表",
+        "deliverable": "交付作品",
+        "ai": "AI 生成"
+      },
+      "items": {
+        "noteBlank": {
+          "name": "空白大纲笔记",
+          "desc": "轻量单栏大纲，支持缩进、待办与双链"
+        },
+        "noteTech": {
+          "name": "技术方案大纲",
+          "desc": "背景目标、核心设计与拆解清单"
+        },
+        "noteMeeting": {
+          "name": "会议纪要",
+          "desc": "讨论焦点、关键结论与后续待办"
+        },
+        "noteDaily": {
+          "name": "每日工作记录",
+          "desc": "今日主线、阻塞点与交接摘要"
+        },
+        "wbBlank": {
+          "name": "空白白板",
+          "desc": "自由无限画布，点阵网格与原生连线"
+        },
+        "wbArch": {
+          "name": "系统架构图",
+          "desc": "分层节点与数据流箭头连线"
+        },
+        "wbTimeline": {
+          "name": "产品发布时间线",
+          "desc": "里程碑节点与交付阶段节奏"
+        },
+        "wbJourney": {
+          "name": "用户旅程图",
+          "desc": "关键触点、痛点观察与改进机会"
+        },
+        "wbWorkshop": {
+          "name": "启动工作坊",
+          "desc": "目标拆解、发散便签与收口结论"
+        },
+        "artDocs": {
+          "name": "协作文档",
+          "desc": "长文规范、评审报告或技术说明"
+        },
+        "artSlides": {
+          "name": "演示幻灯片",
+          "desc": "宽屏多页演示文稿与分页备注"
+        },
+        "artDashboard": {
+          "name": "数据看板",
+          "desc": "指标卡片、趋势核验与明细表"
+        },
+        "artDesign": {
+          "name": "界面画板",
+          "desc": "多画板界面探索与组件属性调节"
+        },
+        "artDesignSystem": {
+          "name": "设计体系",
+          "desc": "色彩令牌、字阶规范与对比度核验"
+        },
+        "artMotion": {
+          "name": "动态短片",
+          "desc": "可交互动效预览与视频导出"
+        },
+        "artHtml": {
+          "name": "单页网页",
+          "desc": "独立可交互网页与版本迭代"
+        },
+        "aiImage": {
+          "name": "AI 生成图片",
+          "desc": "根据描述生成概念插画、图标或配图"
+        },
+        "aiSpeech": {
+          "name": "AI 单人语音",
+          "desc": "将文案合成为自然人声音频文件"
+        },
+        "aiAudio": {
+          "name": "音频工作台",
+          "desc": "多人对白、音色设计、克隆与转写"
+        }
+      },
+      "seed": {
+        "noteTech": "- ## 背景与目标\n  - 说明要解决的核心问题与收益边界\n- ## 核心设计\n  - 梳理模块边界与数据流\n- ## 实施拆解\n  - TODO 拆分任务步骤并补全验收测试",
+        "noteMeeting": "- ## 讨论焦点\n  - 记录本次沟通的核心议题\n- ## 关键结论\n  - 写下已达成一致的决定\n- ## 后续待办\n  - TODO 跟进确认后的行动项",
+        "noteDaily": "- ## 今日主线\n  - TODO 列出今天优先推进的事项\n- ## 阻塞与风险\n  - 记录需要协作解开的卡点\n- ## 交接摘要\n  - 今日完成的结果与后续衔接点",
+        "wbBlankTitle": "中心主题",
+        "wbBlankBody": "从工具栏添加卡片、便签与连线",
+        "wbArchN1Title": "接入层 · UI",
+        "wbArchN1Body": "边界输入与事件分发",
+        "wbArchN2Title": "核心域 · Core",
+        "wbArchN2Body": "纯状态折叠与规则校验",
+        "wbArchN3Title": "持久化 · 存储",
+        "wbArchN3Body": "落盘写入与工作区同步",
+        "wbArchE1": "请求",
+        "wbArchE2": "写入",
+        "wbTlP1Title": "阶段一 · 锁定范围",
+        "wbTlP1Body": "确认交互原型与核心边界",
+        "wbTlP2Title": "阶段二 · 原生实现",
+        "wbTlP2Body": "完成核心功能与集成测试",
+        "wbTlP3Title": "阶段三 · 验收发布",
+        "wbTlP3Body": "双主题截图核验与发布上线",
+        "wbJourneyJ1Title": "1. 触发入口",
+        "wbJourneyJ1Body": "进入统一内容工作台",
+        "wbJourneyJ2Title": "2. 定位筛选",
+        "wbJourneyJ2Body": "一次定位笔记、作品与素材",
+        "wbJourneyJ3Title": "3. 协作交付",
+        "wbJourneyJ3Body": "发到频道或转为任务推进",
+        "wbJourneyS1Title": "痛点观察",
+        "wbJourneyS1Body": "减少列表与编辑页之间的来回切换",
+        "wbJourneyE1": "定位",
+        "wbJourneyE2": "闭环",
+        "wbWorkW1Title": "本次目标",
+        "wbWorkW1Body": "对齐交付范围、约束与优先级",
+        "wbWorkW2Title": "痛点发散",
+        "wbWorkW2Body": "贴出高频摩擦场景与想法",
+        "wbWorkW3Title": "方案收口",
+        "wbWorkW3Body": "收敛第一阶段优先落地的改动",
+        "wbWorkE1": "发散",
+        "wbWorkE2": "收敛"
+      }
+    },
+    "search": {
+      "title": "搜索内容",
+      "placeholder": "搜索笔记、作品和素材…",
+      "empty": "未找到匹配的笔记、作品或素材",
+      "typeNote": "大纲笔记",
+      "typeMedia": "素材"
+    }
   }
 }

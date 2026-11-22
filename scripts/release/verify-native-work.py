@@ -79,7 +79,7 @@ def verify(app, cli, root, prepare_trial):
                 proc.wait()
 
     def command(*args):
-        r = subprocess.run([cli, *args, "--format", "json"], env={**env, "VIBEVALLEY_SERVER": address}, capture_output=True, text=True, timeout=30)
+        r = subprocess.run([cli, "--json", *args], env={**env, "VIBEVALLEY_SERVER": address}, capture_output=True, text=True, timeout=30)
         if r.returncode:
             raise RuntimeError(f"{args}: {r.stderr}")
         return json.loads(r.stdout)
@@ -117,7 +117,7 @@ def verify(app, cli, root, prepare_trial):
         command("issue", "status", interrupted, "todo")
 
         def written():
-            sessions = call("session.list", {})
+            sessions = command("session", "list")
             worker = next((s for s in sessions if s.get("issue") == interrupted and s["phase"]["_tag"] == "working"), None)
             if worker and git(worker["worktree"], "log", "-1", "--format=%s") == "版本 B":
                 return worker["worktree"]

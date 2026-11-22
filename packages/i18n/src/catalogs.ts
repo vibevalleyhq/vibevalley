@@ -240,28 +240,19 @@ export const catalogs = {
     "web.artifact": {
       card: { version: "第 {version} 稿", open: "打开「{title}」" },
       page: {
-        by: "{name} 做的",
-        updated: "{when}更新",
         delete: "删掉",
         deleteAsk: "删掉「{title}」？对话里的卡片还在。",
         deleted: "删掉了「{title}」",
         gone: "这份作品已经删掉了，或者没有这份作品。",
         frame: "「{title}」第 {version} 稿",
-        list: "全部作品",
         new: "新建",
         none: "还没有作品：写个标题新建一篇，或者让执行会话交一份上来。",
         all: "全部作品",
-        forIssue: "为 #{number} 做的",
-        untitled: "没起名的作品",
-        find: "按标题找",
-        nothingFound: "没有标题对得上的",
         title: "标题",
         more: "更多",
-        group: { delivered: "执行会话和主助手交的", mine: "我写的" },
         rail: "这篇的旁注",
         railShow: "打开旁注",
         railHide: "收起旁注",
-        backToLibrary: "返回媒体库",
       },
       issue: { title: "作品" },
       blocks: {
@@ -317,7 +308,6 @@ export const catalogs = {
       },
       body: { blocks: "一起写的", html: "网页", store: "结构化作品", slides: "幻灯片", motion: "动画" },
       types: {
-        pick: "选一种要新建的作品",
         defaultBadge: "默认体系",
         setDefault: "设为默认设计体系",
         unsetDefault: "取消默认",
@@ -328,8 +318,6 @@ export const catalogs = {
         whiteboard: "无限白板",
         design: "界面画板",
         designSystem: "设计体系",
-        html: "单页网页",
-        exportMarkdown: "导出 Markdown",
       },
       motion: {
         play: "播放",
@@ -381,26 +369,19 @@ export const catalogs = {
         inspector: "属性检查器",
         label: "标题",
         body: "正文",
-        fill: "配色",
-        variant: "文本样式",
-        highlight: "高亮词",
-        curve: "连线曲率",
-        style: "线型",
-        stickers: "顶部贴纸",
         noSticker: "无贴纸",
         save: "保存",
         entryJson: "条目 JSON",
         saveJson: "保存 JSON",
-        savedElement: "已保存元素",
         exportedSvg: "已导出 SVG",
+        exportedPng: "已导出 PNG",
         exportedJson: "已导出 JSON",
+        exportedJsonCanvas: "已导出 JSON Canvas",
         deleteSelected: "删除选中",
         zoomIn: "放大",
         zoomOut: "缩小",
         fitView: "适应画布",
         elements: "{n} 个元素",
-        doubleClickEdit: "双击编辑文字",
-        empty: "空白白板：从底部工具栏放置卡片、时间线与贴纸，或在对话里让主助手一起画",
         emptyHint: "从底部工具栏放置卡片、时间线、连线与贴纸，或一键载入模板开始协作",
         fillDefault: "默认",
         fillSun: "暖黄",
@@ -415,57 +396,6 @@ export const catalogs = {
         curveStraight: "直线",
         styleSolid: "实线",
         styleDashed: "虚线",
-        variantBody: "正文",
-        variantTitle: "大标题",
-        variantSubtitle: "副标题",
-        variantCallout: "提示条",
-        tplArchTitle: "系统架构协同白板",
-        tplArchSubtitle: "前后端事件流、边界容器与核心存储拓扑（15 分钟评审）",
-        tplArchHighlight: "15 分钟",
-        tplArchZoneCore: "核心服务区",
-        tplArchZoneStore: "状态与持久层",
-        tplArchClient: "客户端工作台",
-        tplArchClientBody: "GPUI 壳面 + nsh TSX 交互页",
-        tplArchApi: "协议网关",
-        tplArchApiBody: "一次解码、流式帧与并发批写",
-        tplArchCore: "状态归约引擎",
-        tplArchCoreBody: "确定性 StateFrame 折叠",
-        tplArchSqlite: "SQLite + 轨迹库",
-        tplArchSqliteBody: "sqlc 编译期绑定检查",
-        tplArchCallout: "关键约束：页面只读 StateFrame，所有写操作经批提交接口",
-        tplTimeTitle: "产品发布时间线",
-        tplTimeSubtitle: "从方案锁定到正式交付上线：全链路协同冲刺 12 天",
-        tplTimeHighlight: "12 天",
-        tplTimeDay1: "Day 1",
-        tplTimeDay2: "Day 2",
-        tplTimeDay3: "Day 3",
-        tplTimeDay7: "Day 7",
-        tplTimeDay8: "Day 8",
-        tplTimeRoad: "联调与压测冲刺 4 天",
-        tplTimeStep1Title: "锁定核心范围",
-        tplTimeStep1Body: "核心功能已拍板",
-        tplTimeStep2Title: "确认发布清单",
-        tplTimeStep2Body: "拆解到每天交付物",
-        tplTimeStep3Title: "确定资源预算",
-        tplTimeStep3Body: "算力与配额已就位",
-        tplTimeStep4Title: "批产核心模块",
-        tplTimeStep4Body: "23 项任务并发推进",
-        tplTimeStep5Title: "准点抵达验收",
-        tplTimeStep5Body: "进入主站发布通道",
-        tplTimeStep6Title: "灰度与全量验证",
-        tplTimeStep6Body: "先验 12 组，再放量 500",
-        tplTimeCallout: "风险提示：合包检查需等待终版配置锁定",
-        tplDefaultTitle: "新建卡片",
-        tplDefaultBody: "双击编辑说明文字",
-        tplDefaultNote: "想法便签",
-        tplDefaultFrame: "分区边界",
-        tplDefaultHeading: "标题或批注",
-        tplDefaultTimelineStart: "阶段一",
-        tplDefaultTimelineMid: "阶段二",
-        tplDefaultTimelineEnd: "交付",
-        tplUser: "你",
-        tplAgentOrch: "主助手",
-        tplAgentHelper: "老周",
       },
       design: {
         canvas: "全部画板",
@@ -636,7 +566,7 @@ export const catalogs = {
         catalog: { label: "素材图鉴", hint: "像素与界面素材：每张图、指针、声音和工作台零件" },
         settings: { label: "设置", hint: "通用与外观、模型与密钥、语音与通话、外部连接、关于与数据" },
       },
-      tab: { library: "媒体库", artifacts: "作品", pkm: "笔记", roles: "角色", runtimes: "引擎", skills: "技能", memory: "记忆" },
+      tab: { roles: "角色", runtimes: "引擎", skills: "技能", memory: "记忆" },
       link: { connecting: "连接中", open: "已连上", lost: "断了，重连中" },
       rail: "工作台",
       farm: "回农场",
@@ -1671,7 +1601,6 @@ export const catalogs = {
       },
     },
     "web.library": {
-      title: "媒体库",
       upload: "上传",
       uploading: "正在上传…",
       make: "生成",
@@ -1680,12 +1609,7 @@ export const catalogs = {
       emptyHow: "生成一张图或一段语音、上传或拖进来一个文件，或者在对话里让执行会话把找到的东西放进来。",
       nothingShown: "没有符合筛选的内容。",
       drop: "松开，放进媒体库",
-      rail: { where: "来路", kind: "种类", artifacts: "作品交付", channels: "来自频道", agents: "来自执行会话", anyWhere: "全部来路", anyKind: "全部种类" },
-      origin: { all: "全部", generated: "生成的", uploaded: "你上传的", fetched: "执行会话拿回来的" },
       kind: { all: "全部", image: "图片", audio: "音频", video: "视频", other: "其它" },
-      artifactKind: { all: "全部作品", canvas: "视觉画板", slides: "幻灯片", dashboard: "仪表盘", whiteboard: "白板", page: "网页与文档" },
-      newArtifact: "新建作品",
-      search: "搜索名字",
       sortLabel: "排序",
       sort: { recent: "最近", name: "名字", size: "大小" },
       tileSize: "缩略图大小",
@@ -1713,14 +1637,11 @@ export const catalogs = {
         from: "来路",
         added: "加入",
         openChannel: "去 {channel} 看",
-        openWorkbench: "打开工作台",
         versionBadge: "第 {version} 稿",
-        byMaker: "作者：{name}",
         selected: "已选 {n} 个",
         clear: "不选了",
         more: "更多",
       },
-      download: "下载",
       sendTo: "发到频道",
       sentTo: "发到了 {channel}",
       remove: "从库里拿掉",
@@ -1732,6 +1653,120 @@ export const catalogs = {
       understandTitle: "理解「{name}」",
       understood: "理解的结果",
       makeTabs: { image: "生图", speech: "单人语音", audio: "音频工作台" },
+      content: {
+        title: "内容",
+        new: "新建",
+        searchAll: "搜索全部内容…",
+        sidebarToggle: "展开或收起内容导航",
+        recent: "全部最近",
+        pinned: "置顶收藏",
+        pin: "置顶",
+        unpin: "取消置顶",
+        pinnedToast: "已置顶收藏",
+        unpinnedToast: "已取消置顶",
+        notes: "大纲笔记",
+        notesAll: "全部大纲笔记",
+        newNote: "新建大纲笔记",
+        artifacts: "作品",
+        media: "素材",
+        aiGenerate: "AI 生成素材",
+        notesTodoCount: "{n} 项待办",
+        notesHint: "Tab 缩进 · Enter 换行 · / 命令 · [[ 双链",
+        sendArtifact: "发到频道",
+        exportArtifact: "导出",
+        turnIntoIssue: "转为任务",
+        issueCreated: "已创建任务",
+        back: "返回",
+        source: { all: "全部来源", agent: "执行会话交付", user: "我创建的" },
+        artifactType: {
+          all: "全部作品",
+          whiteboard: "无限白板",
+          docs: "协作文档",
+          slides: "幻灯片",
+          dashboard: "数据看板",
+          design: "界面画板",
+          designSystem: "设计体系",
+          motion: "动态短片",
+          html: "单页网页",
+        },
+        inspector: {
+          openExternal: "系统打开",
+          saveAs: "另存为",
+          copyPath: "复制路径",
+          copiedPath: "已复制路径",
+          reveal: "在访达中显示",
+          stopAudio: "停止播放",
+        },
+        templates: {
+          title: "新建内容",
+          search: "搜索模板…",
+          empty: "没有匹配的模板",
+          cat: { recommended: "推荐", note: "大纲笔记", whiteboard: "白板与图表", deliverable: "交付作品", ai: "AI 生成" },
+          items: {
+            noteBlank: { name: "空白大纲笔记", desc: "轻量单栏大纲，支持缩进、待办与双链" },
+            noteTech: { name: "技术方案大纲", desc: "背景目标、核心设计与拆解清单" },
+            noteMeeting: { name: "会议纪要", desc: "讨论焦点、关键结论与后续待办" },
+            noteDaily: { name: "每日工作记录", desc: "今日主线、阻塞点与交接摘要" },
+            wbBlank: { name: "空白白板", desc: "自由无限画布，点阵网格与原生连线" },
+            wbArch: { name: "系统架构图", desc: "分层节点与数据流箭头连线" },
+            wbTimeline: { name: "产品发布时间线", desc: "里程碑节点与交付阶段节奏" },
+            wbJourney: { name: "用户旅程图", desc: "关键触点、痛点观察与改进机会" },
+            wbWorkshop: { name: "启动工作坊", desc: "目标拆解、发散便签与收口结论" },
+            artDocs: { name: "协作文档", desc: "长文规范、评审报告或技术说明" },
+            artSlides: { name: "演示幻灯片", desc: "宽屏多页演示文稿与分页备注" },
+            artDashboard: { name: "数据看板", desc: "指标卡片、趋势核验与明细表" },
+            artDesign: { name: "界面画板", desc: "多画板界面探索与组件属性调节" },
+            artDesignSystem: { name: "设计体系", desc: "色彩令牌、字阶规范与对比度核验" },
+            artMotion: { name: "动态短片", desc: "可交互动效预览与视频导出" },
+            artHtml: { name: "单页网页", desc: "独立可交互网页与版本迭代" },
+            aiImage: { name: "AI 生成图片", desc: "根据描述生成概念插画、图标或配图" },
+            aiSpeech: { name: "AI 单人语音", desc: "将文案合成为自然人声音频文件" },
+            aiAudio: { name: "音频工作台", desc: "多人对白、音色设计、克隆与转写" },
+          },
+          seed: {
+            noteTech:
+              "- ## 背景与目标\n  - 说明要解决的核心问题与收益边界\n- ## 核心设计\n  - 梳理模块边界与数据流\n- ## 实施拆解\n  - TODO 拆分任务步骤并补全验收测试",
+            noteMeeting: "- ## 讨论焦点\n  - 记录本次沟通的核心议题\n- ## 关键结论\n  - 写下已达成一致的决定\n- ## 后续待办\n  - TODO 跟进确认后的行动项",
+            noteDaily:
+              "- ## 今日主线\n  - TODO 列出今天优先推进的事项\n- ## 阻塞与风险\n  - 记录需要协作解开的卡点\n- ## 交接摘要\n  - 今日完成的结果与后续衔接点",
+            wbBlankTitle: "中心主题",
+            wbBlankBody: "从工具栏添加卡片、便签与连线",
+            wbArchN1Title: "接入层 · UI",
+            wbArchN1Body: "边界输入与事件分发",
+            wbArchN2Title: "核心域 · Core",
+            wbArchN2Body: "纯状态折叠与规则校验",
+            wbArchN3Title: "持久化 · 存储",
+            wbArchN3Body: "落盘写入与工作区同步",
+            wbArchE1: "请求",
+            wbArchE2: "写入",
+            wbTlP1Title: "阶段一 · 锁定范围",
+            wbTlP1Body: "确认交互原型与核心边界",
+            wbTlP2Title: "阶段二 · 原生实现",
+            wbTlP2Body: "完成核心功能与集成测试",
+            wbTlP3Title: "阶段三 · 验收发布",
+            wbTlP3Body: "双主题截图核验与发布上线",
+            wbJourneyJ1Title: "1. 触发入口",
+            wbJourneyJ1Body: "进入统一内容工作台",
+            wbJourneyJ2Title: "2. 定位筛选",
+            wbJourneyJ2Body: "一次定位笔记、作品与素材",
+            wbJourneyJ3Title: "3. 协作交付",
+            wbJourneyJ3Body: "发到频道或转为任务推进",
+            wbJourneyS1Title: "痛点观察",
+            wbJourneyS1Body: "减少列表与编辑页之间的来回切换",
+            wbJourneyE1: "定位",
+            wbJourneyE2: "闭环",
+            wbWorkW1Title: "本次目标",
+            wbWorkW1Body: "对齐交付范围、约束与优先级",
+            wbWorkW2Title: "痛点发散",
+            wbWorkW2Body: "贴出高频摩擦场景与想法",
+            wbWorkW3Title: "方案收口",
+            wbWorkW3Body: "收敛第一阶段优先落地的改动",
+            wbWorkE1: "发散",
+            wbWorkE2: "收敛",
+          },
+        },
+        search: { title: "搜索内容", placeholder: "搜索笔记、作品和素材…", empty: "未找到匹配的笔记、作品或素材", typeNote: "大纲笔记", typeMedia: "素材" },
+      },
     },
     "web.media": {
       speech: {
@@ -1913,9 +1948,6 @@ export const catalogs = {
     "web.pkm": {
       place: { label: "笔记" },
       tier: { project: "项目", area: "领域", resource: "资源", inbox: "收件箱", journal: "日记", archive: "归档" },
-      list: { label: "页面和日历", find: "搜笔记", newPage: "新建页面", newPagePlaceholder: "输入标题，回车建页", open: "{n} 项没做完", today: "今天" },
-      calendar: { label: "日历", previous: "上个月", next: "下个月" },
-      radar: { inbox: "收件箱", stale: "搁着", overdue: "过期", days: "{n} 天没动" },
       gone: "没有这一页，或者它的文件已经删掉了。",
       page: {
         more: "更多",
@@ -1926,8 +1958,6 @@ export const catalogs = {
         undo: "撤销上一次改动",
         undone: "撤销了：{what}",
         nothingToUndo: "没有可以撤销的改动",
-        tier: "放在哪",
-        moved: "挪到了{tier}",
         append: "接着写…",
         collapse: "收起",
         expand: "展开",
@@ -1967,7 +1997,6 @@ export const catalogs = {
         today: "链到今天的日记",
       },
       complete: { newPage: "新页面" },
-      rail: { label: "这一页的旁注", show: "打开旁注", hide: "收起旁注", contents: "这页的大纲" },
       search: {
         title: "搜笔记",
         placeholder: "搜页面和块",
@@ -1980,7 +2009,6 @@ export const catalogs = {
       },
       backlinks: { title: "链到这里的 · {n}", none: "还没有别的页链到这里", projects: "项目", journals: "日记", areas: "领域和资源", archives: "归档" },
       comments: { title: "评论 · {n}", count: "{n} 条评论", accept: "采纳", reject: "不要", accepted: "采纳了", rejected: "不要了", on: "「{span}」" },
-      tierOne: { project: "项目", area: "领域", resource: "资料", inbox: "收件箱", journal: "日记", archive: "归档" },
     },
     "web.provider": {
       speechNotice:
@@ -2399,7 +2427,7 @@ export const catalogs = {
         width: "导航的宽窄（拖动，双击回默认）",
       },
       words: {
-        general: "语言 language 启动 打开 工作台 农场 主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号",
+        general: "语言 language 启动 打开 工作台 农场 主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号 动画 无动画 动效 motion animation",
         models: "密钥 钥匙 账号 DeepSeek MOSS 声网 Agora API Key 模型 绑定",
         voice: "声网 Agora 电话 通话 MOSS Live 实时 视觉 听写 转写 语音",
         connections: "微信 飞书 QQ 连接器 配对 GitHub gh PR 登录",
@@ -2416,6 +2444,9 @@ export const catalogs = {
         theme: "主题",
         themeHint: "跟随系统时随电脑的浅色和深色变",
         themes: { light: "浅色", dark: "深色", system: "跟随系统" },
+        motion: "动画",
+        motionHint: "关闭后跳过界面过渡动画与背景帧循环，更适合 UI 测试与专注模式。",
+        motionOption: { off: "无动画", on: "动画", system: "跟随系统" },
         scale: "界面大小",
         scaleHint: "缩放整个工作台；像素农场按整数倍放大，不跟着变",
         monoFont: "终端与代码字体",
@@ -2506,7 +2537,6 @@ export const catalogs = {
         addRepoButton: "仓库",
         addRepoTooltip: "添加本地仓库或文件夹",
         manageRepos: "管理仓库",
-        otherFolders: "其他文件夹",
         running: "正在运行",
         runningAgent: "{agent} 正在运行",
         ready: "待命",
@@ -2525,8 +2555,6 @@ export const catalogs = {
         expandCurrent: "展开当前",
         collapseItem: "折叠 {name}",
         expandItem: "展开 {name}",
-        collapseSection: "折叠 {title}",
-        expandSection: "展开 {title}",
         newTerminalHere: "在此新建终端",
         revealInFinder: "在 Finder 中显示",
         copyPath: "复制路径",
@@ -3032,28 +3060,19 @@ export const catalogs = {
     "web.artifact": {
       card: { version: "Version {version}", open: 'Open "{title}"' },
       page: {
-        by: "Made by {name}",
-        updated: "Updated {when}",
         delete: "Delete",
         deleteAsk: "Delete “{title}”? Its cards stay in the conversation.",
         deleted: 'Deleted "{title}"',
         gone: "This artifact was deleted, or there is no such artifact.",
         frame: '"{title}" version {version}',
-        list: "All artifacts",
         new: "New",
         none: "No artifacts yet: give one a title to start it, or have a helper hand one in.",
         all: "All artifacts",
-        forIssue: "For #{number}",
-        untitled: "Untitled",
-        find: "Find by title",
-        nothingFound: "No title matches",
         title: "Title",
         more: "More",
-        group: { delivered: "Handed in by helpers", mine: "Written by you" },
         rail: "Beside this artifact",
         railShow: "Show the side panel",
         railHide: "Hide the side panel",
-        backToLibrary: "Back to library",
       },
       issue: { title: "Artifacts" },
       blocks: {
@@ -3109,7 +3128,6 @@ export const catalogs = {
       },
       body: { blocks: "Written together", html: "Web page", store: "Structured", slides: "Slides", motion: "Motion" },
       types: {
-        pick: "Choose an artifact type to create",
         defaultBadge: "Default DS",
         setDefault: "Set as default design system",
         unsetDefault: "Unset default",
@@ -3120,8 +3138,6 @@ export const catalogs = {
         whiteboard: "Whiteboard",
         design: "Design Canvas",
         designSystem: "Design System",
-        html: "Web Page",
-        exportMarkdown: "Export Markdown",
       },
       motion: {
         play: "Play",
@@ -3173,26 +3189,19 @@ export const catalogs = {
         inspector: "Inspector",
         label: "Title / Label",
         body: "Body",
-        fill: "Fill",
-        variant: "Variant",
-        highlight: "Highlight",
-        curve: "Curve",
-        style: "Style",
-        stickers: "Sticker",
         noSticker: "None",
         save: "Save",
         entryJson: "Entry JSON",
         saveJson: "Save JSON",
-        savedElement: "Saved element",
         exportedSvg: "Exported SVG",
+        exportedPng: "Exported PNG",
         exportedJson: "Exported JSON",
+        exportedJsonCanvas: "Exported JSON Canvas",
         deleteSelected: "Delete selected",
         zoomIn: "Zoom in",
         zoomOut: "Zoom out",
         fitView: "Fit view",
         elements: "{n} elements",
-        doubleClickEdit: "Double-click to edit text",
-        empty: "Empty whiteboard: place cards, timelines, and stickers from the toolbar, or draw together in chat",
         emptyHint: "Place cards, timelines, connectors, and stickers from the bottom bar, or start from a template",
         fillDefault: "Default",
         fillSun: "Sun",
@@ -3207,57 +3216,6 @@ export const catalogs = {
         curveStraight: "Straight",
         styleSolid: "Solid",
         styleDashed: "Dashed",
-        variantBody: "Body",
-        variantTitle: "Title",
-        variantSubtitle: "Subtitle",
-        variantCallout: "Callout",
-        tplArchTitle: "System Architecture Overview",
-        tplArchSubtitle: "Event flow, domain boundaries, and storage topology in 15 mins review",
-        tplArchHighlight: "15 mins",
-        tplArchZoneCore: "Core Services",
-        tplArchZoneStore: "State & Storage",
-        tplArchClient: "Desktop Workbench",
-        tplArchClientBody: "GPUI shell & reactive views",
-        tplArchApi: "HTTP / SSE Gateway",
-        tplArchApiBody: "Typed codecs & live stream",
-        tplArchCore: "Core Reducer",
-        tplArchCoreBody: "Deterministic StateFrame fold",
-        tplArchSqlite: "SQLite & Ledgers",
-        tplArchSqliteBody: "Compiled sqlc bindings",
-        tplArchCallout: "Rule: UI never folds facts locally; writes go through optimistic batches",
-        tplTimeTitle: "Product Launch Timeline",
-        tplTimeSubtitle: "From locked scope to holiday delivery in 12 days",
-        tplTimeHighlight: "12 days",
-        tplTimeDay1: "Day 1",
-        tplTimeDay2: "Day 2",
-        tplTimeDay3: "Day 3",
-        tplTimeDay7: "Day 7",
-        tplTimeDay8: "Day 8",
-        tplTimeRoad: "4 days on the road",
-        tplTimeStep1Title: "Lock scope",
-        tplTimeStep1Body: "Milestone v1 locked",
-        tplTimeStep2Title: "Build checklist",
-        tplTimeStep2Body: "How many deliverables?",
-        tplTimeStep3Title: "Lock budget",
-        tplTimeStep3Body: "What's the quota cost?",
-        tplTimeStep4Title: "Ship core batch",
-        tplTimeStep4Body: "23 parallel tasks",
-        tplTimeStep5Title: "Arrive for staging",
-        tplTimeStep5Body: "Ready in main depot",
-        tplTimeStep6Title: "Rollout test",
-        tplTimeStep6Body: "12 pilots, then 500",
-        tplTimeCallout: "Blocker: compliance check waits on the locked spec",
-        tplDefaultTitle: "New card",
-        tplDefaultBody: "Double-click to edit details",
-        tplDefaultNote: "Quick note",
-        tplDefaultFrame: "Zone",
-        tplDefaultHeading: "Heading",
-        tplDefaultTimelineStart: "Phase 1",
-        tplDefaultTimelineMid: "Phase 2",
-        tplDefaultTimelineEnd: "Launch",
-        tplUser: "You",
-        tplAgentOrch: "Assistant",
-        tplAgentHelper: "Helper",
       },
       design: {
         canvas: "All artboards",
@@ -3429,7 +3387,7 @@ export const catalogs = {
         catalog: { label: "Catalog", hint: "Assets: pixel sprites, cursors, sounds, and workbench UI kit" },
         settings: { label: "Settings", hint: "General & appearance, models & keys, voice, connections, about" },
       },
-      tab: { library: "Library", artifacts: "Artifacts", pkm: "Notes", roles: "Roles", runtimes: "Engines", skills: "Skills", memory: "Memory" },
+      tab: { roles: "Roles", runtimes: "Engines", skills: "Skills", memory: "Memory" },
       link: { connecting: "Connecting", open: "Connected", lost: "Lost, reconnecting" },
       rail: "Workbench",
       farm: "Back to the farm",
@@ -4533,7 +4491,6 @@ export const catalogs = {
       },
     },
     "web.library": {
-      title: "Library",
       upload: "Upload",
       uploading: "Uploading…",
       make: "Generate",
@@ -4542,20 +4499,7 @@ export const catalogs = {
       emptyHow: "Generate an image or speech, upload or drop in a file, or ask a helper in the chat to put what it found here.",
       nothingShown: "Nothing matches these filters.",
       drop: "Let go to put it in the library",
-      rail: {
-        where: "From",
-        kind: "Kind",
-        artifacts: "Deliverables",
-        channels: "From channels",
-        agents: "From helpers",
-        anyWhere: "Any origin",
-        anyKind: "Any kind",
-      },
-      origin: { all: "All", generated: "Generated", uploaded: "Uploaded", fetched: "Brought back" },
       kind: { all: "All", image: "Images", audio: "Audio", video: "Video", other: "Other" },
-      artifactKind: { all: "All deliverables", canvas: "Visual", slides: "Slides", dashboard: "Dashboard", whiteboard: "Whiteboard", page: "Pages & docs" },
-      newArtifact: "New deliverable",
-      search: "Search names",
       sortLabel: "Sort",
       sort: { recent: "Recent", name: "Name", size: "Size" },
       tileSize: "Thumbnail size",
@@ -4583,14 +4527,11 @@ export const catalogs = {
         from: "From",
         added: "Added",
         openChannel: "See it in {channel}",
-        openWorkbench: "Open in workbench",
         versionBadge: "v{version}",
-        byMaker: "By {name}",
         selected: "{n} selected",
         clear: "Clear selection",
         more: "More",
       },
-      download: "Download",
       sendTo: "Send to a channel",
       sentTo: "Sent to {channel}",
       remove: "Remove from library",
@@ -4602,6 +4543,127 @@ export const catalogs = {
       understandTitle: "Understand “{name}”",
       understood: "What it shows",
       makeTabs: { image: "Image", speech: "Speech", audio: "Audio workbench" },
+      content: {
+        title: "Content",
+        new: "New",
+        searchAll: "Search all content…",
+        sidebarToggle: "Toggle content sidebar",
+        recent: "All recent",
+        pinned: "Pinned",
+        pin: "Pin",
+        unpin: "Unpin",
+        pinnedToast: "Pinned",
+        unpinnedToast: "Unpinned",
+        notes: "Outline notes",
+        notesAll: "All outline notes",
+        newNote: "New outline note",
+        artifacts: "Artifacts",
+        media: "Media",
+        aiGenerate: "AI generate media",
+        notesTodoCount: "{n, plural, one {# todo} other {# todos}}",
+        notesHint: "Tab indent · Enter new line · / commands · [[ wikilink",
+        sendArtifact: "Send to channel",
+        exportArtifact: "Export",
+        turnIntoIssue: "Turn into ticket",
+        issueCreated: "Ticket created",
+        back: "Back",
+        source: { all: "All sources", agent: "From helpers", user: "Created by me" },
+        artifactType: {
+          all: "All artifacts",
+          whiteboard: "Whiteboard",
+          docs: "Docs",
+          slides: "Slides",
+          dashboard: "Dashboard",
+          design: "Design",
+          designSystem: "Design system",
+          motion: "Motion",
+          html: "Web page",
+        },
+        inspector: {
+          openExternal: "Open externally",
+          saveAs: "Save as",
+          copyPath: "Copy path",
+          copiedPath: "Path copied",
+          reveal: "Reveal in Finder",
+          stopAudio: "Stop audio",
+        },
+        templates: {
+          title: "New content",
+          search: "Search templates…",
+          empty: "No matching templates",
+          cat: { recommended: "Recommended", note: "Outline notes", whiteboard: "Whiteboards", deliverable: "Deliverables", ai: "AI media" },
+          items: {
+            noteBlank: { name: "Blank outline note", desc: "Single-column outline with nesting, todos, and wikilinks" },
+            noteTech: { name: "Tech spec outline", desc: "Context, goals, architecture, and implementation checklist" },
+            noteMeeting: { name: "Meeting notes", desc: "Key discussion points, decisions, and follow-up todos" },
+            noteDaily: { name: "Daily log", desc: "Today's focus, blockers, and handoff summary" },
+            wbBlank: { name: "Blank whiteboard", desc: "Infinite canvas with dot grid and native connectors" },
+            wbArch: { name: "System architecture", desc: "Layered service nodes with directional data-flow arrows" },
+            wbTimeline: { name: "Launch timeline", desc: "Milestone cards and delivery stages" },
+            wbJourney: { name: "User journey", desc: "Touchpoints, friction points, and improvement opportunities" },
+            wbWorkshop: { name: "Kickoff workshop", desc: "Goal framing, brainstorming stickies, and convergence" },
+            artDocs: { name: "Collaborative doc", desc: "Long-form specs, review reports, and technical guides" },
+            artSlides: { name: "Slide deck", desc: "Widescreen multi-slide deck with speaker notes" },
+            artDashboard: { name: "Data dashboard", desc: "KPI cards, trend charts, and verified tables" },
+            artDesign: { name: "Design canvas", desc: "Multi-artboard UI explorations with live prop controls" },
+            artDesignSystem: { name: "Design system", desc: "Color tokens, typography scale, and contrast checks" },
+            artMotion: { name: "Motion clip", desc: "Interactive animated canvas with video export" },
+            artHtml: { name: "Web page", desc: "Standalone interactive HTML page with version history" },
+            aiImage: { name: "AI image", desc: "Generate concept art, icons, or illustrations from text" },
+            aiSpeech: { name: "AI speech", desc: "Synthesize natural voiceover audio from text" },
+            aiAudio: { name: "Audio studio", desc: "Multi-speaker dialogue, voice design, cloning, and transcription" },
+          },
+          seed: {
+            noteTech:
+              "- ## Context & Goals\n  - Core problem statement and expected impact\n- ## Core Design\n  - Module boundaries and data flow\n- ## Implementation Plan\n  - TODO Break down steps and add verification checks",
+            noteMeeting:
+              "- ## Discussion Focus\n  - Key agenda topics for this session\n- ## Key Decisions\n  - Record agreed conclusions and trade-offs\n- ## Follow-ups\n  - TODO Track confirmed action items",
+            noteDaily:
+              "- ## Today's Focus\n  - TODO List today's top priorities\n- ## Blockers & Risks\n  - Note items awaiting collaboration\n- ## Handoff Summary\n  - Outcomes shipped and next steps",
+            wbBlankTitle: "Central Topic",
+            wbBlankBody: "Add cards, stickies, and arrows from the toolbar",
+            wbArchN1Title: "Client / UI",
+            wbArchN1Body: "Boundary decoding and event dispatch",
+            wbArchN2Title: "Core Engine",
+            wbArchN2Body: "Pure state folding and domain rules",
+            wbArchN3Title: "SQLite / Git",
+            wbArchN3Body: "Durable writes and workspace sync",
+            wbArchE1: "request",
+            wbArchE2: "persist",
+            wbTlP1Title: "Phase 1 · Scope",
+            wbTlP1Body: "Finalize specs and interactive prototype",
+            wbTlP2Title: "Phase 2 · Build",
+            wbTlP2Body: "Ship core flows and integration tests",
+            wbTlP3Title: "Phase 3 · Launch",
+            wbTlP3Body: "Visual check across themes and release",
+            wbJourneyJ1Title: "1. Entry",
+            wbJourneyJ1Body: "Open unified Content workspace",
+            wbJourneyJ2Title: "2. Discover",
+            wbJourneyJ2Body: "Search or browse across notes and media",
+            wbJourneyJ3Title: "3. Deliver",
+            wbJourneyJ3Body: "Share to channel or turn into ticket",
+            wbJourneyS1Title: "Friction note",
+            wbJourneyS1Body: "Reduce clicks between browsing and editing",
+            wbJourneyE1: "locate",
+            wbJourneyE2: "ship",
+            wbWorkW1Title: "Session Goal",
+            wbWorkW1Body: "Align on scope, constraints, and priorities",
+            wbWorkW2Title: "Diverge",
+            wbWorkW2Body: "Collect high-frequency friction points",
+            wbWorkW3Title: "Converge",
+            wbWorkW3Body: "Pick top priorities for first milestone",
+            wbWorkE1: "explore",
+            wbWorkE2: "decide",
+          },
+        },
+        search: {
+          title: "Search content",
+          placeholder: "Search notes, artifacts, and media…",
+          empty: "No matching notes, artifacts, or media",
+          typeNote: "Note",
+          typeMedia: "Media",
+        },
+      },
     },
     "web.media": {
       speech: {
@@ -4796,16 +4858,6 @@ export const catalogs = {
     "web.pkm": {
       place: { label: "Notes" },
       tier: { project: "Projects", area: "Areas", resource: "Resources", inbox: "Inbox", journal: "Journals", archive: "Archive" },
-      list: {
-        label: "Pages and calendar",
-        find: "Search notes",
-        newPage: "New page",
-        newPagePlaceholder: "Page title, Enter to create",
-        open: "{n} open",
-        today: "Today",
-      },
-      calendar: { label: "Calendar", previous: "Previous month", next: "Next month" },
-      radar: { inbox: "Inbox", stale: "Stale", overdue: "Overdue", days: "{n} days untouched" },
       gone: "There is no such page, or its file was deleted.",
       page: {
         more: "More",
@@ -4816,8 +4868,6 @@ export const catalogs = {
         undo: "Undo the last change",
         undone: "Undone: {what}",
         nothingToUndo: "Nothing to undo",
-        tier: "Where it goes",
-        moved: "Moved to {tier}",
         append: "Keep writing…",
         collapse: "Collapse",
         expand: "Expand",
@@ -4857,7 +4907,6 @@ export const catalogs = {
         today: "Link today's journal",
       },
       complete: { newPage: "New page" },
-      rail: { label: "Beside this page", show: "Show the side panel", hide: "Hide the side panel", contents: "On this page" },
       search: {
         title: "Search notes",
         placeholder: "Search pages and blocks",
@@ -4885,7 +4934,6 @@ export const catalogs = {
         rejected: "Dismissed",
         on: "“{span}”",
       },
-      tierOne: { project: "Project", area: "Area", resource: "Resource", inbox: "Inbox", journal: "Journal", archive: "Archive" },
     },
     "web.provider": {
       speechNotice:
@@ -5326,7 +5374,7 @@ export const catalogs = {
         width: "Navigation width (drag; double-click for the default)",
       },
       words: {
-        general: "language start workbench farm theme dark light size zoom scale font",
+        general: "language start workbench farm theme dark light size zoom scale font animation motion reduce",
         models: "keys accounts DeepSeek MOSS Agora API key models binding",
         voice: "Agora call phone recognition speech MOSS live realtime vision dictation transcription",
         connections: "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
@@ -5343,6 +5391,9 @@ export const catalogs = {
         theme: "Theme",
         themeHint: "With the system, it follows the computer's light and dark",
         themes: { light: "Light", dark: "Dark", system: "System" },
+        motion: "Animations",
+        motionHint: "Disable UI transitions and motion loops for deterministic UI testing or reduced motion.",
+        motionOption: { off: "Off", on: "On", system: "System" },
         scale: "Interface size",
         scaleHint: "Scales the whole workbench; the farm keeps its whole-number scaling",
         monoFont: "Terminal & code font",
@@ -5433,7 +5484,6 @@ export const catalogs = {
         addRepoButton: "Repo",
         addRepoTooltip: "Add a local repository or folder",
         manageRepos: "Manage repositories",
-        otherFolders: "Other folders",
         running: "Running",
         runningAgent: "{agent} running",
         ready: "Ready",
@@ -5452,8 +5502,6 @@ export const catalogs = {
         expandCurrent: "Expand current",
         collapseItem: "Collapse {name}",
         expandItem: "Expand {name}",
-        collapseSection: "Collapse {title}",
-        expandSection: "Expand {title}",
         newTerminalHere: "New terminal here",
         revealInFinder: "Reveal in Finder",
         copyPath: "Copy path",
@@ -6052,28 +6100,18 @@ export interface Messages {
   "web.artifact.motion.time": { readonly at: string | number; readonly duration: string | number };
   "web.artifact.motion.tooLong": undefined;
   "web.artifact.page.all": undefined;
-  "web.artifact.page.backToLibrary": undefined;
-  "web.artifact.page.by": { readonly name: string | number };
   "web.artifact.page.delete": undefined;
   "web.artifact.page.deleteAsk": { readonly title: string | number };
   "web.artifact.page.deleted": { readonly title: string | number };
-  "web.artifact.page.find": undefined;
-  "web.artifact.page.forIssue": { readonly number: string | number };
   "web.artifact.page.frame": { readonly title: string | number; readonly version: string | number };
   "web.artifact.page.gone": undefined;
-  "web.artifact.page.group.delivered": undefined;
-  "web.artifact.page.group.mine": undefined;
-  "web.artifact.page.list": undefined;
   "web.artifact.page.more": undefined;
   "web.artifact.page.new": undefined;
   "web.artifact.page.none": undefined;
-  "web.artifact.page.nothingFound": undefined;
   "web.artifact.page.rail": undefined;
   "web.artifact.page.railHide": undefined;
   "web.artifact.page.railShow": undefined;
   "web.artifact.page.title": undefined;
-  "web.artifact.page.untitled": undefined;
-  "web.artifact.page.updated": { readonly when: string | number };
   "web.artifact.presenter.aside": undefined;
   "web.artifact.presenter.clock": undefined;
   "web.artifact.presenter.current": undefined;
@@ -6133,10 +6171,7 @@ export interface Messages {
   "web.artifact.types.design": undefined;
   "web.artifact.types.designSystem": undefined;
   "web.artifact.types.docs": undefined;
-  "web.artifact.types.exportMarkdown": undefined;
-  "web.artifact.types.html": undefined;
   "web.artifact.types.motion": undefined;
-  "web.artifact.types.pick": undefined;
   "web.artifact.types.setDefault": undefined;
   "web.artifact.types.slides": undefined;
   "web.artifact.types.unsetDefault": undefined;
@@ -6146,21 +6181,19 @@ export interface Messages {
   "web.artifact.whiteboard.card": undefined;
   "web.artifact.whiteboard.chatWithOrchestrator": undefined;
   "web.artifact.whiteboard.container": undefined;
-  "web.artifact.whiteboard.curve": undefined;
   "web.artifact.whiteboard.curveOrthogonal": undefined;
   "web.artifact.whiteboard.curveSmooth": undefined;
   "web.artifact.whiteboard.curveStraight": undefined;
   "web.artifact.whiteboard.deleteSelected": undefined;
   "web.artifact.whiteboard.diamond": undefined;
-  "web.artifact.whiteboard.doubleClickEdit": undefined;
   "web.artifact.whiteboard.duplicate": undefined;
   "web.artifact.whiteboard.elements": { readonly n: string | number };
-  "web.artifact.whiteboard.empty": undefined;
   "web.artifact.whiteboard.emptyHint": undefined;
   "web.artifact.whiteboard.entryJson": undefined;
   "web.artifact.whiteboard.exportedJson": undefined;
+  "web.artifact.whiteboard.exportedJsonCanvas": undefined;
+  "web.artifact.whiteboard.exportedPng": undefined;
   "web.artifact.whiteboard.exportedSvg": undefined;
-  "web.artifact.whiteboard.fill": undefined;
   "web.artifact.whiteboard.fillBerry": undefined;
   "web.artifact.whiteboard.fillDefault": undefined;
   "web.artifact.whiteboard.fillLavender": undefined;
@@ -6170,7 +6203,6 @@ export interface Messages {
   "web.artifact.whiteboard.fillSun": undefined;
   "web.artifact.whiteboard.fillWater": undefined;
   "web.artifact.whiteboard.fitView": undefined;
-  "web.artifact.whiteboard.highlight": undefined;
   "web.artifact.whiteboard.inspector": undefined;
   "web.artifact.whiteboard.label": undefined;
   "web.artifact.whiteboard.noSticker": undefined;
@@ -6180,71 +6212,16 @@ export interface Messages {
   "web.artifact.whiteboard.redo": undefined;
   "web.artifact.whiteboard.save": undefined;
   "web.artifact.whiteboard.saveJson": undefined;
-  "web.artifact.whiteboard.savedElement": undefined;
   "web.artifact.whiteboard.select": undefined;
   "web.artifact.whiteboard.sticker": undefined;
-  "web.artifact.whiteboard.stickers": undefined;
   "web.artifact.whiteboard.sticky": undefined;
-  "web.artifact.whiteboard.style": undefined;
   "web.artifact.whiteboard.styleDashed": undefined;
   "web.artifact.whiteboard.styleSolid": undefined;
   "web.artifact.whiteboard.templateArchitecture": undefined;
   "web.artifact.whiteboard.templateTimeline": undefined;
   "web.artifact.whiteboard.text": undefined;
   "web.artifact.whiteboard.timeline": undefined;
-  "web.artifact.whiteboard.tplAgentHelper": undefined;
-  "web.artifact.whiteboard.tplAgentOrch": undefined;
-  "web.artifact.whiteboard.tplArchApi": undefined;
-  "web.artifact.whiteboard.tplArchApiBody": undefined;
-  "web.artifact.whiteboard.tplArchCallout": undefined;
-  "web.artifact.whiteboard.tplArchClient": undefined;
-  "web.artifact.whiteboard.tplArchClientBody": undefined;
-  "web.artifact.whiteboard.tplArchCore": undefined;
-  "web.artifact.whiteboard.tplArchCoreBody": undefined;
-  "web.artifact.whiteboard.tplArchHighlight": undefined;
-  "web.artifact.whiteboard.tplArchSqlite": undefined;
-  "web.artifact.whiteboard.tplArchSqliteBody": undefined;
-  "web.artifact.whiteboard.tplArchSubtitle": undefined;
-  "web.artifact.whiteboard.tplArchTitle": undefined;
-  "web.artifact.whiteboard.tplArchZoneCore": undefined;
-  "web.artifact.whiteboard.tplArchZoneStore": undefined;
-  "web.artifact.whiteboard.tplDefaultBody": undefined;
-  "web.artifact.whiteboard.tplDefaultFrame": undefined;
-  "web.artifact.whiteboard.tplDefaultHeading": undefined;
-  "web.artifact.whiteboard.tplDefaultNote": undefined;
-  "web.artifact.whiteboard.tplDefaultTimelineEnd": undefined;
-  "web.artifact.whiteboard.tplDefaultTimelineMid": undefined;
-  "web.artifact.whiteboard.tplDefaultTimelineStart": undefined;
-  "web.artifact.whiteboard.tplDefaultTitle": undefined;
-  "web.artifact.whiteboard.tplTimeCallout": undefined;
-  "web.artifact.whiteboard.tplTimeDay1": undefined;
-  "web.artifact.whiteboard.tplTimeDay2": undefined;
-  "web.artifact.whiteboard.tplTimeDay3": undefined;
-  "web.artifact.whiteboard.tplTimeDay7": undefined;
-  "web.artifact.whiteboard.tplTimeDay8": undefined;
-  "web.artifact.whiteboard.tplTimeHighlight": undefined;
-  "web.artifact.whiteboard.tplTimeRoad": undefined;
-  "web.artifact.whiteboard.tplTimeStep1Body": undefined;
-  "web.artifact.whiteboard.tplTimeStep1Title": undefined;
-  "web.artifact.whiteboard.tplTimeStep2Body": undefined;
-  "web.artifact.whiteboard.tplTimeStep2Title": undefined;
-  "web.artifact.whiteboard.tplTimeStep3Body": undefined;
-  "web.artifact.whiteboard.tplTimeStep3Title": undefined;
-  "web.artifact.whiteboard.tplTimeStep4Body": undefined;
-  "web.artifact.whiteboard.tplTimeStep4Title": undefined;
-  "web.artifact.whiteboard.tplTimeStep5Body": undefined;
-  "web.artifact.whiteboard.tplTimeStep5Title": undefined;
-  "web.artifact.whiteboard.tplTimeStep6Body": undefined;
-  "web.artifact.whiteboard.tplTimeStep6Title": undefined;
-  "web.artifact.whiteboard.tplTimeSubtitle": undefined;
-  "web.artifact.whiteboard.tplTimeTitle": undefined;
-  "web.artifact.whiteboard.tplUser": undefined;
   "web.artifact.whiteboard.undo": undefined;
-  "web.artifact.whiteboard.variant": undefined;
-  "web.artifact.whiteboard.variantBody": undefined;
-  "web.artifact.whiteboard.variantCallout": undefined;
-  "web.artifact.whiteboard.variantSubtitle": undefined;
-  "web.artifact.whiteboard.variantTitle": undefined;
   "web.artifact.whiteboard.zoomIn": undefined;
   "web.artifact.whiteboard.zoomOut": undefined;
   "web.audio.account": undefined;
@@ -6467,10 +6444,7 @@ export interface Messages {
   "web.base.shortcuts.say.tool": undefined;
   "web.base.shortcuts.say.voice": undefined;
   "web.base.shortcuts.title": undefined;
-  "web.base.tab.artifacts": undefined;
-  "web.base.tab.library": undefined;
   "web.base.tab.memory": undefined;
-  "web.base.tab.pkm": undefined;
   "web.base.tab.roles": undefined;
   "web.base.tab.runtimes": undefined;
   "web.base.tab.skills": undefined;
@@ -7456,13 +7430,135 @@ export interface Messages {
   "web.issue.trigger.missed": undefined;
   "web.issue.trigger.refine": undefined;
   "web.issue.trigger.runtime": undefined;
-  "web.library.artifactKind.all": undefined;
-  "web.library.artifactKind.canvas": undefined;
-  "web.library.artifactKind.dashboard": undefined;
-  "web.library.artifactKind.page": undefined;
-  "web.library.artifactKind.slides": undefined;
-  "web.library.artifactKind.whiteboard": undefined;
-  "web.library.download": undefined;
+  "web.library.content.aiGenerate": undefined;
+  "web.library.content.artifactType.all": undefined;
+  "web.library.content.artifactType.dashboard": undefined;
+  "web.library.content.artifactType.design": undefined;
+  "web.library.content.artifactType.designSystem": undefined;
+  "web.library.content.artifactType.docs": undefined;
+  "web.library.content.artifactType.html": undefined;
+  "web.library.content.artifactType.motion": undefined;
+  "web.library.content.artifactType.slides": undefined;
+  "web.library.content.artifactType.whiteboard": undefined;
+  "web.library.content.artifacts": undefined;
+  "web.library.content.back": undefined;
+  "web.library.content.exportArtifact": undefined;
+  "web.library.content.inspector.copiedPath": undefined;
+  "web.library.content.inspector.copyPath": undefined;
+  "web.library.content.inspector.openExternal": undefined;
+  "web.library.content.inspector.reveal": undefined;
+  "web.library.content.inspector.saveAs": undefined;
+  "web.library.content.inspector.stopAudio": undefined;
+  "web.library.content.issueCreated": undefined;
+  "web.library.content.media": undefined;
+  "web.library.content.new": undefined;
+  "web.library.content.newNote": undefined;
+  "web.library.content.notes": undefined;
+  "web.library.content.notesAll": undefined;
+  "web.library.content.notesHint": undefined;
+  "web.library.content.notesTodoCount": { readonly n: number };
+  "web.library.content.pin": undefined;
+  "web.library.content.pinned": undefined;
+  "web.library.content.pinnedToast": undefined;
+  "web.library.content.recent": undefined;
+  "web.library.content.search.empty": undefined;
+  "web.library.content.search.placeholder": undefined;
+  "web.library.content.search.title": undefined;
+  "web.library.content.search.typeMedia": undefined;
+  "web.library.content.search.typeNote": undefined;
+  "web.library.content.searchAll": undefined;
+  "web.library.content.sendArtifact": undefined;
+  "web.library.content.sidebarToggle": undefined;
+  "web.library.content.source.agent": undefined;
+  "web.library.content.source.all": undefined;
+  "web.library.content.source.user": undefined;
+  "web.library.content.templates.cat.ai": undefined;
+  "web.library.content.templates.cat.deliverable": undefined;
+  "web.library.content.templates.cat.note": undefined;
+  "web.library.content.templates.cat.recommended": undefined;
+  "web.library.content.templates.cat.whiteboard": undefined;
+  "web.library.content.templates.empty": undefined;
+  "web.library.content.templates.items.aiAudio.desc": undefined;
+  "web.library.content.templates.items.aiAudio.name": undefined;
+  "web.library.content.templates.items.aiImage.desc": undefined;
+  "web.library.content.templates.items.aiImage.name": undefined;
+  "web.library.content.templates.items.aiSpeech.desc": undefined;
+  "web.library.content.templates.items.aiSpeech.name": undefined;
+  "web.library.content.templates.items.artDashboard.desc": undefined;
+  "web.library.content.templates.items.artDashboard.name": undefined;
+  "web.library.content.templates.items.artDesign.desc": undefined;
+  "web.library.content.templates.items.artDesign.name": undefined;
+  "web.library.content.templates.items.artDesignSystem.desc": undefined;
+  "web.library.content.templates.items.artDesignSystem.name": undefined;
+  "web.library.content.templates.items.artDocs.desc": undefined;
+  "web.library.content.templates.items.artDocs.name": undefined;
+  "web.library.content.templates.items.artHtml.desc": undefined;
+  "web.library.content.templates.items.artHtml.name": undefined;
+  "web.library.content.templates.items.artMotion.desc": undefined;
+  "web.library.content.templates.items.artMotion.name": undefined;
+  "web.library.content.templates.items.artSlides.desc": undefined;
+  "web.library.content.templates.items.artSlides.name": undefined;
+  "web.library.content.templates.items.noteBlank.desc": undefined;
+  "web.library.content.templates.items.noteBlank.name": undefined;
+  "web.library.content.templates.items.noteDaily.desc": undefined;
+  "web.library.content.templates.items.noteDaily.name": undefined;
+  "web.library.content.templates.items.noteMeeting.desc": undefined;
+  "web.library.content.templates.items.noteMeeting.name": undefined;
+  "web.library.content.templates.items.noteTech.desc": undefined;
+  "web.library.content.templates.items.noteTech.name": undefined;
+  "web.library.content.templates.items.wbArch.desc": undefined;
+  "web.library.content.templates.items.wbArch.name": undefined;
+  "web.library.content.templates.items.wbBlank.desc": undefined;
+  "web.library.content.templates.items.wbBlank.name": undefined;
+  "web.library.content.templates.items.wbJourney.desc": undefined;
+  "web.library.content.templates.items.wbJourney.name": undefined;
+  "web.library.content.templates.items.wbTimeline.desc": undefined;
+  "web.library.content.templates.items.wbTimeline.name": undefined;
+  "web.library.content.templates.items.wbWorkshop.desc": undefined;
+  "web.library.content.templates.items.wbWorkshop.name": undefined;
+  "web.library.content.templates.search": undefined;
+  "web.library.content.templates.seed.noteDaily": undefined;
+  "web.library.content.templates.seed.noteMeeting": undefined;
+  "web.library.content.templates.seed.noteTech": undefined;
+  "web.library.content.templates.seed.wbArchE1": undefined;
+  "web.library.content.templates.seed.wbArchE2": undefined;
+  "web.library.content.templates.seed.wbArchN1Body": undefined;
+  "web.library.content.templates.seed.wbArchN1Title": undefined;
+  "web.library.content.templates.seed.wbArchN2Body": undefined;
+  "web.library.content.templates.seed.wbArchN2Title": undefined;
+  "web.library.content.templates.seed.wbArchN3Body": undefined;
+  "web.library.content.templates.seed.wbArchN3Title": undefined;
+  "web.library.content.templates.seed.wbBlankBody": undefined;
+  "web.library.content.templates.seed.wbBlankTitle": undefined;
+  "web.library.content.templates.seed.wbJourneyE1": undefined;
+  "web.library.content.templates.seed.wbJourneyE2": undefined;
+  "web.library.content.templates.seed.wbJourneyJ1Body": undefined;
+  "web.library.content.templates.seed.wbJourneyJ1Title": undefined;
+  "web.library.content.templates.seed.wbJourneyJ2Body": undefined;
+  "web.library.content.templates.seed.wbJourneyJ2Title": undefined;
+  "web.library.content.templates.seed.wbJourneyJ3Body": undefined;
+  "web.library.content.templates.seed.wbJourneyJ3Title": undefined;
+  "web.library.content.templates.seed.wbJourneyS1Body": undefined;
+  "web.library.content.templates.seed.wbJourneyS1Title": undefined;
+  "web.library.content.templates.seed.wbTlP1Body": undefined;
+  "web.library.content.templates.seed.wbTlP1Title": undefined;
+  "web.library.content.templates.seed.wbTlP2Body": undefined;
+  "web.library.content.templates.seed.wbTlP2Title": undefined;
+  "web.library.content.templates.seed.wbTlP3Body": undefined;
+  "web.library.content.templates.seed.wbTlP3Title": undefined;
+  "web.library.content.templates.seed.wbWorkE1": undefined;
+  "web.library.content.templates.seed.wbWorkE2": undefined;
+  "web.library.content.templates.seed.wbWorkW1Body": undefined;
+  "web.library.content.templates.seed.wbWorkW1Title": undefined;
+  "web.library.content.templates.seed.wbWorkW2Body": undefined;
+  "web.library.content.templates.seed.wbWorkW2Title": undefined;
+  "web.library.content.templates.seed.wbWorkW3Body": undefined;
+  "web.library.content.templates.seed.wbWorkW3Title": undefined;
+  "web.library.content.templates.title": undefined;
+  "web.library.content.title": undefined;
+  "web.library.content.turnIntoIssue": undefined;
+  "web.library.content.unpin": undefined;
+  "web.library.content.unpinnedToast": undefined;
   "web.library.drop": undefined;
   "web.library.empty": undefined;
   "web.library.emptyHow": undefined;
@@ -7472,7 +7568,6 @@ export interface Messages {
   "web.library.from.uploadedHere": undefined;
   "web.library.from.uploadedIn": { readonly channel: string | number };
   "web.library.inspector.added": undefined;
-  "web.library.inspector.byMaker": { readonly name: string | number };
   "web.library.inspector.bytes": undefined;
   "web.library.inspector.clear": undefined;
   "web.library.inspector.from": undefined;
@@ -7480,7 +7575,6 @@ export interface Messages {
   "web.library.inspector.length": undefined;
   "web.library.inspector.more": undefined;
   "web.library.inspector.openChannel": { readonly channel: string | number };
-  "web.library.inspector.openWorkbench": undefined;
   "web.library.inspector.pixels": undefined;
   "web.library.inspector.selected": { readonly n: string | number };
   "web.library.inspector.versionBadge": { readonly version: string | number };
@@ -7502,24 +7596,11 @@ export interface Messages {
   "web.library.makeTabs.image": undefined;
   "web.library.makeTabs.speech": undefined;
   "web.library.makeTitle": undefined;
-  "web.library.newArtifact": undefined;
   "web.library.nothingShown": undefined;
-  "web.library.origin.all": undefined;
-  "web.library.origin.fetched": undefined;
-  "web.library.origin.generated": undefined;
-  "web.library.origin.uploaded": undefined;
-  "web.library.rail.agents": undefined;
-  "web.library.rail.anyKind": undefined;
-  "web.library.rail.anyWhere": undefined;
-  "web.library.rail.artifacts": undefined;
-  "web.library.rail.channels": undefined;
-  "web.library.rail.kind": undefined;
-  "web.library.rail.where": undefined;
   "web.library.remove": undefined;
   "web.library.removeAsk": { readonly name: string | number };
   "web.library.removeSome": { readonly n: string | number };
   "web.library.removeSure": undefined;
-  "web.library.search": undefined;
   "web.library.sendTo": undefined;
   "web.library.sentTo": { readonly channel: string | number };
   "web.library.sort.name": undefined;
@@ -7527,7 +7608,6 @@ export interface Messages {
   "web.library.sort.size": undefined;
   "web.library.sortLabel": undefined;
   "web.library.tileSize": undefined;
-  "web.library.title": undefined;
   "web.library.understand": undefined;
   "web.library.understandTitle": { readonly name: string | number };
   "web.library.understood": undefined;
@@ -7710,9 +7790,6 @@ export interface Messages {
   "web.pkm.backlinks.none": undefined;
   "web.pkm.backlinks.projects": undefined;
   "web.pkm.backlinks.title": { readonly n: string | number };
-  "web.pkm.calendar.label": undefined;
-  "web.pkm.calendar.next": undefined;
-  "web.pkm.calendar.previous": undefined;
   "web.pkm.command.clear": undefined;
   "web.pkm.command.code": undefined;
   "web.pkm.command.doing": undefined;
@@ -7730,12 +7807,6 @@ export interface Messages {
   "web.pkm.comments.title": { readonly n: string | number };
   "web.pkm.complete.newPage": undefined;
   "web.pkm.gone": undefined;
-  "web.pkm.list.find": undefined;
-  "web.pkm.list.label": undefined;
-  "web.pkm.list.newPage": undefined;
-  "web.pkm.list.newPagePlaceholder": undefined;
-  "web.pkm.list.open": { readonly n: string | number };
-  "web.pkm.list.today": undefined;
   "web.pkm.marker.CANCELED": undefined;
   "web.pkm.marker.DOING": undefined;
   "web.pkm.marker.DONE": undefined;
@@ -7759,14 +7830,12 @@ export interface Messages {
   "web.pkm.page.issueMade": undefined;
   "web.pkm.page.missingRef": undefined;
   "web.pkm.page.more": undefined;
-  "web.pkm.page.moved": { readonly tier: string | number };
   "web.pkm.page.notSaved": { readonly why: string | number };
   "web.pkm.page.nothingToUndo": undefined;
   "web.pkm.page.outline": undefined;
   "web.pkm.page.refFrom": { readonly page: string | number };
   "web.pkm.page.rename": undefined;
   "web.pkm.page.renamed": { readonly title: string | number };
-  "web.pkm.page.tier": undefined;
   "web.pkm.page.toIssue": undefined;
   "web.pkm.page.undo": undefined;
   "web.pkm.page.undone": { readonly what: string | number };
@@ -7778,14 +7847,6 @@ export interface Messages {
   "web.pkm.props.left": { readonly day: string | number; readonly n: string | number };
   "web.pkm.props.more": { readonly n: string | number };
   "web.pkm.props.overdue": { readonly day: string | number; readonly n: string | number };
-  "web.pkm.radar.days": { readonly n: string | number };
-  "web.pkm.radar.inbox": undefined;
-  "web.pkm.radar.overdue": undefined;
-  "web.pkm.radar.stale": undefined;
-  "web.pkm.rail.contents": undefined;
-  "web.pkm.rail.hide": undefined;
-  "web.pkm.rail.label": undefined;
-  "web.pkm.rail.show": undefined;
   "web.pkm.search.all": undefined;
   "web.pkm.search.filters": undefined;
   "web.pkm.search.linked": undefined;
@@ -7800,12 +7861,6 @@ export interface Messages {
   "web.pkm.tier.journal": undefined;
   "web.pkm.tier.project": undefined;
   "web.pkm.tier.resource": undefined;
-  "web.pkm.tierOne.archive": undefined;
-  "web.pkm.tierOne.area": undefined;
-  "web.pkm.tierOne.inbox": undefined;
-  "web.pkm.tierOne.journal": undefined;
-  "web.pkm.tierOne.project": undefined;
-  "web.pkm.tierOne.resource": undefined;
   "web.provider.adapted": undefined;
   "web.provider.add": undefined;
   "web.provider.bindingHint": undefined;
@@ -8224,6 +8279,11 @@ export interface Messages {
   "web.setting.appearance.monoFont": undefined;
   "web.setting.appearance.monoFontHint": undefined;
   "web.setting.appearance.monoFontRow": undefined;
+  "web.setting.appearance.motion": undefined;
+  "web.setting.appearance.motionHint": undefined;
+  "web.setting.appearance.motionOption.off": undefined;
+  "web.setting.appearance.motionOption.on": undefined;
+  "web.setting.appearance.motionOption.system": undefined;
   "web.setting.appearance.scale": undefined;
   "web.setting.appearance.scaleHint": undefined;
   "web.setting.appearance.terminalFontSize": undefined;
@@ -8407,11 +8467,9 @@ export interface Messages {
   "web.shell.sidebar.closeTab": { readonly title: string | number };
   "web.shell.sidebar.collapseAll": undefined;
   "web.shell.sidebar.collapseItem": { readonly name: string | number };
-  "web.shell.sidebar.collapseSection": { readonly title: string | number };
   "web.shell.sidebar.copyPath": undefined;
   "web.shell.sidebar.expandCurrent": undefined;
   "web.shell.sidebar.expandItem": { readonly name: string | number };
-  "web.shell.sidebar.expandSection": { readonly title: string | number };
   "web.shell.sidebar.files": undefined;
   "web.shell.sidebar.filesTip": undefined;
   "web.shell.sidebar.gitBranches": undefined;
@@ -8426,7 +8484,6 @@ export interface Messages {
   "web.shell.sidebar.needsAttention": undefined;
   "web.shell.sidebar.newTerminal": { readonly name: string | number };
   "web.shell.sidebar.newTerminalHere": undefined;
-  "web.shell.sidebar.otherFolders": undefined;
   "web.shell.sidebar.ready": undefined;
   "web.shell.sidebar.readyAgent": { readonly agent: string | number };
   "web.shell.sidebar.readyCount": { readonly n: string | number };

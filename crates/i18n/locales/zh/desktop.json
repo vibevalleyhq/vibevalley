@@ -31,7 +31,8 @@
   "terminal": {
     "noProject": "请先打开项目，再启动终端。",
     "missingFolder": "工作区已不存在，无法在此打开终端。",
-    "dismiss": "知道了"
+    "dismiss": "知道了",
+    "agentTurnDone": "{agent} 本轮已完成"
   },
   "files": {
     "missingInWorktree": "此任务的工作区中无法打开 {path}"

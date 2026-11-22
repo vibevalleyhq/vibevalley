@@ -39,9 +39,6 @@
     }
   },
   "tab": {
-    "library": "Library",
-    "artifacts": "Artifacts",
-    "pkm": "Notes",
     "roles": "Roles",
     "runtimes": "Engines",
     "skills": "Skills",

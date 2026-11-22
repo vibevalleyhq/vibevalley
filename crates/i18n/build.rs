@@ -14,10 +14,10 @@ fn main() {
             if path.extension().is_some_and(|e| e == "json")
                 && (stem == "shared"
                     || stem == "desktop"
-                    || stem == "cli"
                     || stem == "server"
                     || stem.starts_with("server.")
                     || stem == "web.base"
+                    || stem == "web.artifact"
                     || stem == "web.pkm"
                     || stem == "web.farm"
                     || stem.starts_with("web.farm."))

@@ -10,16 +10,16 @@ interface Nested {
   readonly [k: string]: string | Nested;
 }
 
-const cliMessages = new Map<string, string>();
+const copy = new Map<string, string>();
 const walk = (prefix: string, v: string | Nested) => {
-  if (typeof v === "string") cliMessages.set(prefix, v);
+  if (typeof v === "string") copy.set(prefix, v);
   else for (const [k, x] of Object.entries(v)) walk(`${prefix}.${k}`, x);
 };
-// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- cli.json is validated by scripts/gen/i18n.ts check
-walk("cli", JSON.parse(readFileSync(join(root, "crates/i18n/locales/zh/cli.json"), "utf8")) as Nested);
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- static docs copy owned by this generator
+walk("cap", JSON.parse(readFileSync(join(root, "scripts/gen/capabilities-zh.json"), "utf8")) as Nested);
 
-const maybe = (key: string): string | undefined => cliMessages.get(key);
-const t = (key: string): string => cliMessages.get(key) ?? key;
+const maybe = (key: string): string | undefined => copy.get(key);
+const t = (key: string): string => copy.get(key) ?? key;
 
 const head = `# 能力表
 
@@ -43,9 +43,9 @@ for (const e of endpoints) {
 const mark = (on: boolean) => (on ? "✓" : " ");
 let text = head;
 for (const [g, list] of groups) {
-  text += `\n## ${g}\n\n${maybe(`cli.group.${g}.about`) ?? ""}\n\n| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |\n|---|---|---|---|---|---|---|\n`;
+  text += `\n## ${g}\n\n${maybe(`cap.group.${g}.about`) ?? ""}\n\n| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |\n|---|---|---|---|---|---|---|\n`;
   for (const e of list)
-    text += `| \`${e.op}\` | ${t(`cli.op.${e.op}`)} | \`${pathOf(e.op)}\` | ${mark(e.can.includes("user"))} | ${mark(e.can.includes("remote"))} | ${mark(e.can.includes("orchestrator"))} | ${mark(e.can.includes("session"))} |\n`;
+    text += `| \`${e.op}\` | ${t(`cap.op.${e.op}`)} | \`${pathOf(e.op)}\` | ${mark(e.can.includes("user"))} | ${mark(e.can.includes("remote"))} | ${mark(e.can.includes("orchestrator"))} | ${mark(e.can.includes("session"))} |\n`;
 }
 
 if (process.argv.includes("--check")) {

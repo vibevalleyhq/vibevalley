@@ -39,9 +39,6 @@
     }
   },
   "tab": {
-    "library": "媒体库",
-    "artifacts": "作品",
-    "pkm": "笔记",
     "roles": "角色",
     "runtimes": "引擎",
     "skills": "技能",
