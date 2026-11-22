@@ -179,7 +179,7 @@ function Entry(props: { to: string; on: boolean; title: string; detail: string }
       href={props.to}
       testID="skill-entry"
       accessibilityState={{ selected: props.on }}
-      class={`relative rounded-md px-2 py-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${props.on ? "bg-selected" : "hover:bg-hover"}`}
+      class={`relative rounded-md px-2 py-1.5 focus-visible:outline-2 focus-visible:outline-focus ${props.on ? "bg-selected" : "hover:bg-hover"}`}
     >
       <If when={props.on}>
         <ActiveBar tall />
@@ -221,10 +221,7 @@ function SkillUsers(props: { agents: readonly Agent[] }) {
         <View class="flex-row flex-wrap gap-2">
           <Each of={props.agents} key={(a) => a.id}>
             {(a) => (
-              <A
-                href={`/agents/${encodeURIComponent(a().id)}`}
-                class="flex-row items-center gap-1.5 rounded-md bg-hover py-1 pr-3 pl-1 transition duration-120 ease-out hover:bg-selected"
-              >
+              <A href={`/agents/${encodeURIComponent(a().id)}`} class="flex-row items-center gap-1.5 rounded-md bg-hover py-1 pr-3 pl-1 hover:bg-selected">
                 <AgentFace agentId={a().id} name={a().name} runtime={a().runtime} look={a().look} size={26} />
                 <Text class="text-sm font-medium text-ink">{a().name}</Text>
               </A>

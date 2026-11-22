@@ -101,6 +101,8 @@ test("workspace sidebar renders repos, tabs, collapse toggle, and posts project/
   expect(app.texts()).toContain("vibevalley");
   expect(app.texts()).toContain("README.md");
   expect(app.texts()).toContain("notes");
+  expect(app.texts()).not.toContain("其他文件夹");
+  expect(app.texts()).not.toContain("Other folders");
 
   host.clearActs();
   await app.press("text:README.md");

@@ -62,6 +62,11 @@ pub enum TerminalEvent {
     TitleChanged,
     Bell,
     CommandFinished,
+    /// An interactive coding agent finished a turn and settled back to its prompt.
+    AgentTurnFinished {
+        agent: String,
+        label: String,
+    },
     Exited,
     OpenLink(LinkTarget),
 }
@@ -73,6 +78,13 @@ enum Input {
 }
 
 impl Input {
+    fn is_submit(&self) -> bool {
+        match self {
+            Input::Key(key) => matches!(key.key, vibevalley_terminal::Key::Enter) && !key.mods.shift && !key.mods.alt,
+            Input::Text(text) | Input::Paste(text) => text.contains('\n') || text.contains('\r'),
+        }
+    }
+
     fn deliver(self, session: &TermSession) {
         session.scroll_to_bottom();
         match self {
@@ -127,11 +139,117 @@ impl TerminalStatus {
     pub fn idle() -> Self {
         Self::default()
     }
+
+    pub fn is_coding_agent(&self) -> bool {
+        self.agent.as_deref().is_some_and(|agent| agent != "cmd")
+    }
+}
+
+pub fn agent_display_name(agent: &str, label: &str) -> String {
+    match agent {
+        "antigravity" => "Antigravity".into(),
+        "claude" => "Claude Code".into(),
+        "codex" => "Codex".into(),
+        "opencode" => "OpenCode".into(),
+        "cursor" => "Cursor".into(),
+        "kimi" => "Kimi".into(),
+        "pi" => "Pi".into(),
+        "dsh" => "dsh".into(),
+        "grok" => "Grok".into(),
+        _ if !label.trim().is_empty() => label.trim().to_string(),
+        _ => agent.to_string(),
+    }
 }
 
 /// PTY output within this window treats an interactive agent/TUI as actively
 /// working rather than sitting idle at its input prompt.
 const ACTIVE_OUTPUT_WINDOW: Duration = Duration::from_secs(3);
+
+/// Local keystroke echo arrives within this window of typing; ignore it when
+/// deciding whether a coding agent has started an actual turn.
+const KEYSTROKE_ECHO_WINDOW: Duration = Duration::from_millis(300);
+
+#[derive(Debug, Default)]
+struct AgentTurnTracker {
+    turn_active: bool,
+    last_non_submit_input_at: Option<Instant>,
+    notified_for_turn: bool,
+}
+
+impl AgentTurnTracker {
+    fn on_input(&mut self, is_submit: bool, now: Instant) {
+        if is_submit {
+            self.last_non_submit_input_at = None;
+            self.notified_for_turn = false;
+        } else {
+            self.last_non_submit_input_at = Some(now);
+        }
+    }
+
+    fn on_output(&mut self, status: &TerminalStatus, now: Instant) {
+        if !status.is_coding_agent() {
+            self.turn_active = false;
+            self.notified_for_turn = false;
+            return;
+        }
+        if status.state == RunningState::Working {
+            let is_local_echo = !self.turn_active
+                && self
+                    .last_non_submit_input_at
+                    .is_some_and(|t| now.saturating_duration_since(t) < KEYSTROKE_ECHO_WINDOW);
+            if !is_local_echo {
+                self.turn_active = true;
+                self.notified_for_turn = false;
+            }
+        }
+    }
+
+    fn on_bell(&mut self, status: &TerminalStatus) -> Option<(String, String)> {
+        if status.is_coding_agent() && (self.turn_active || status.state == RunningState::Working) && !self.notified_for_turn {
+            self.notified_for_turn = true;
+            self.turn_active = false;
+            return Self::notice(status);
+        }
+        None
+    }
+
+    fn on_settled(&mut self, previous: &TerminalStatus, current: &TerminalStatus) -> Option<(String, String)> {
+        if !current.is_coding_agent() {
+            self.turn_active = false;
+            self.notified_for_turn = false;
+            return None;
+        }
+        if previous.state == RunningState::Working && current.state == RunningState::Ready && self.turn_active && !self.notified_for_turn {
+            self.notified_for_turn = true;
+            self.turn_active = false;
+            return Self::notice(current);
+        }
+        None
+    }
+
+    fn on_command_finished(&mut self, previous: &TerminalStatus) -> Option<(String, String)> {
+        let notice = if previous.is_coding_agent() && self.turn_active && !self.notified_for_turn {
+            Self::notice(previous)
+        } else {
+            None
+        };
+        self.turn_active = false;
+        self.notified_for_turn = notice.is_some();
+        notice
+    }
+
+    fn reset(&mut self) {
+        self.turn_active = false;
+        self.last_non_submit_input_at = None;
+        self.notified_for_turn = false;
+    }
+
+    fn notice(status: &TerminalStatus) -> Option<(String, String)> {
+        let agent = status.agent.clone()?;
+        let label = status.label.clone().unwrap_or_else(|| agent.clone());
+        Some((agent, label))
+    }
+}
 
 struct HoveredLink {
     link: LinkMatch,
@@ -156,6 +274,7 @@ pub struct TerminalView {
     last_output_at: Option<Instant>,
     settle_pending: bool,
     last_status: TerminalStatus,
+    turn_tracker: AgentTurnTracker,
     exited: bool,
     scroll_remainder: Pixels,
     /// Left button went down inside the grid (selection or reported drag).
@@ -209,7 +328,10 @@ impl TerminalView {
             loop {
                 cx.background_executor().timer(Duration::from_millis(530)).await;
                 let alive = this.update(cx, |view, cx| {
-                    let blinking = view.focused && Ui::get(cx).settings.cursor_blink && view.snapshot().is_some_and(|s| s.cursor.visible && s.cursor.blinking);
+                    let blinking = view.focused
+                        && Ui::get(cx).settings.cursor_blink
+                        && Ui::get(cx).settings.effective_motion() != crate::theme::MotionChoice::Off
+                        && view.snapshot().is_some_and(|s| s.cursor.visible && s.cursor.blinking);
                     if blinking {
                         view.blink_on = !view.blink_on;
                         cx.notify();
@@ -241,6 +363,7 @@ impl TerminalView {
             last_output_at: None,
             settle_pending: false,
             last_status: TerminalStatus::idle(),
+            turn_tracker: AgentTurnTracker::default(),
             exited: false,
             scroll_remainder: px(0.0),
             dragging: false,
@@ -347,7 +470,11 @@ impl TerminalView {
                             return Some((ACTIVE_OUTPUT_WINDOW - elapsed) + Duration::from_millis(80));
                         }
                         view.settle_pending = false;
+                        let previous = view.last_status.clone();
                         let now = view.terminal_status();
+                        if let Some((agent, label)) = view.turn_tracker.on_settled(&previous, &now) {
+                            cx.emit(TerminalEvent::AgentTurnFinished { agent, label });
+                        }
                         if now != view.last_status {
                             view.last_status = now;
                             cx.emit(TerminalEvent::TitleChanged);
@@ -384,6 +511,7 @@ impl TerminalView {
     }
 
     fn input(&mut self, input: Input) {
+        self.turn_tracker.on_input(input.is_submit(), Instant::now());
         match &self.state {
             State::Running(session) if !self.exited => input.deliver(session),
             State::Unsized | State::Spawning => self.pending_input.push(input),
@@ -483,8 +611,10 @@ impl TerminalView {
         match event {
             TermEvent::Dirty => {
                 self.invalidate_stale_hover();
-                self.last_output_at = Some(Instant::now());
+                let now = Instant::now();
+                self.last_output_at = Some(now);
                 let now_status = self.terminal_status();
+                self.turn_tracker.on_output(&now_status, now);
                 if now_status.state == RunningState::Working {
                     self.ensure_settle_timer(cx);
                 }
@@ -508,11 +638,19 @@ impl TerminalView {
                 cx.emit(TerminalEvent::TitleChanged);
             }
             TermEvent::CwdChanged(_) => cx.emit(TerminalEvent::TitleChanged),
-            TermEvent::Bell => cx.emit(TerminalEvent::Bell),
+            TermEvent::Bell => {
+                let status = self.terminal_status();
+                if let Some((agent, label)) = self.turn_tracker.on_bell(&status) {
+                    cx.emit(TerminalEvent::AgentTurnFinished { agent, label });
+                }
+                cx.emit(TerminalEvent::Bell);
+            }
             TermEvent::CommandStarted(block) => {
                 self.running_command = Some(block.command).filter(|c| !c.trim().is_empty());
-                self.last_output_at = Some(Instant::now());
+                let now = Instant::now();
+                self.last_output_at = Some(now);
                 let now_status = self.terminal_status();
+                self.turn_tracker.on_output(&now_status, now);
                 if now_status.state == RunningState::Working {
                     self.ensure_settle_timer(cx);
                 }
@@ -520,15 +658,20 @@ impl TerminalView {
                 cx.emit(TerminalEvent::TitleChanged);
             }
             TermEvent::CommandFinished(_) => {
+                let previous = self.last_status.clone();
                 self.running_command = None;
                 self.last_output_at = None;
                 self.last_status = self.terminal_status();
+                if let Some((agent, label)) = self.turn_tracker.on_command_finished(&previous) {
+                    cx.emit(TerminalEvent::AgentTurnFinished { agent, label });
+                }
                 cx.emit(TerminalEvent::CommandFinished);
             }
             TermEvent::Exited { .. } => {
                 self.running_command = None;
                 self.last_output_at = None;
                 self.last_status = TerminalStatus::idle();
+                self.turn_tracker.reset();
                 self.exited = true;
                 cx.emit(TerminalEvent::Exited);
                 cx.notify();
@@ -1318,5 +1461,55 @@ mod tests {
 
         let exited_agy = classify_terminal_status(true, Some("agy"), None, None, false, &[], &[], false, true);
         assert_eq!(exited_agy, TerminalStatus::idle());
+    }
+
+    #[test]
+    fn agent_turn_tracker_notifies_once_per_turn_and_ignores_typing_echo() {
+        let working_claude = TerminalStatus {
+            state: RunningState::Working,
+            agent: Some("claude".into()),
+            label: Some("claude".into()),
+        };
+        let ready_claude = TerminalStatus {
+            state: RunningState::Ready,
+            agent: Some("claude".into()),
+            label: Some("claude".into()),
+        };
+        let working_cmd = TerminalStatus {
+            state: RunningState::Working,
+            agent: Some("cmd".into()),
+            label: Some("cargo".into()),
+        };
+        let ready_cmd = TerminalStatus {
+            state: RunningState::Ready,
+            agent: Some("cmd".into()),
+            label: Some("cargo".into()),
+        };
+
+        let mut tracker = AgentTurnTracker::default();
+        let t0 = Instant::now();
+
+        // Typing without submitting only produces local echo within KEYSTROKE_ECHO_WINDOW.
+        tracker.on_input(false, t0);
+        tracker.on_output(&working_claude, t0 + Duration::from_millis(50));
+        assert_eq!(tracker.on_settled(&working_claude, &ready_claude), None);
+
+        // Submitting a prompt and settling after output notifies once.
+        tracker.on_input(true, t0 + Duration::from_secs(1));
+        tracker.on_output(&working_claude, t0 + Duration::from_secs(2));
+        assert_eq!(tracker.on_settled(&working_claude, &ready_claude), Some(("claude".into(), "claude".into())));
+        // Duplicate settle without a new turn does not notify again.
+        assert_eq!(tracker.on_settled(&working_claude, &ready_claude), None);
+
+        // Next turn emits Bell early; subsequent settle must not double-notify.
+        tracker.on_input(true, t0 + Duration::from_secs(10));
+        tracker.on_output(&working_claude, t0 + Duration::from_secs(11));
+        assert_eq!(tracker.on_bell(&working_claude), Some(("claude".into(), "claude".into())));
+        assert_eq!(tracker.on_settled(&working_claude, &ready_claude), None);
+
+        // Plain commands are not coding agents and never trigger agent turn notifications.
+        tracker.on_input(true, t0 + Duration::from_secs(20));
+        tracker.on_output(&working_cmd, t0 + Duration::from_secs(21));
+        assert_eq!(tracker.on_settled(&working_cmd, &ready_cmd), None);
     }
 }

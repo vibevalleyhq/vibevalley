@@ -10,6 +10,7 @@ import { Dialog } from "../../../design/Dialog";
 import { OrchestratorFace } from "../../../design/domain/Face";
 import { Select, TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
+import { motionClass } from "../../../design/motion";
 import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
@@ -69,7 +70,7 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
           <View
             role="button"
             testID={`pin-${m().id}`}
-            class="gap-0.5 rounded-md px-2 py-1.5 transition duration-120 ease-out hover:bg-hover"
+            class="gap-0.5 rounded-md px-2 py-1.5 hover:bg-hover"
             onPress={() => {
               router.navigate(messagePath(channelOf(core()?.chat, m().channel), m().number));
               untracked(() => props.onPick)();
@@ -192,7 +193,7 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
   };
   return (
     <View testID="thread-pane" accessibilityLabel={t("web.channel.thread")} class="min-w-0 flex-1">
-      <View class="h-16.5 shrink-0 flex-row items-center gap-2.5 border-b border-line px-4">
+      <View class="h-12 shrink-0 flex-row items-center gap-2.5 border-b border-line px-4">
         <View class="h-8 w-8 shrink-0 items-center justify-center rounded-md bg-side">
           <If when={session()} else={<Icon name="thread" size={16} tone="muted" />}>
             {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={32} />}
@@ -311,11 +312,11 @@ export function ThreadList(props: { channel: Channel; onPick: () => void }) {
           role="button"
           testID="threads-archived"
           accessibilityState={{ expanded: showArchived() }}
-          class="group mt-1 h-7 flex-row items-center gap-1.5 rounded-md px-1.5 transition duration-120 ease-out hover:bg-hover"
+          class="group mt-1 h-7 flex-row items-center gap-1.5 rounded-md px-1.5 hover:bg-hover"
           onPress={() => showArchived.set(!showArchived())}
         >
           <View
-            class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+            class={`h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
             style={{ transform: [{ rotate: showArchived() ? "90deg" : "0deg" }] }}
           >
             <Icon name="expand" size={10} tone="faint" />

@@ -4,6 +4,7 @@ import { Dialog as Base } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 
 import { IconButton } from "./IconButton";
+import { fadeAnimation } from "./motion";
 
 /** A modal over the page. Open while `open`. */
 export function Dialog(props: { open: boolean; onClose: () => void; title: string; children: JSX.Element; wide?: boolean; testid?: string }) {
@@ -13,7 +14,7 @@ export function Dialog(props: { open: boolean; onClose: () => void; title: strin
       open={props.open}
       testID={props.testid}
       accessibilityLabel={props.title}
-      animation="fade"
+      animation={fadeAnimation()}
       onOpenChange={(e) => !e.open && props.onClose()}
       backdropClass="bg-scrim"
       class="m-auto overflow-hidden rounded-lg border border-line bg-elevated shadow-float"

@@ -76,7 +76,7 @@ function BoxButton(props: {
       tooltip={<Bubble text={props.label} />}
       disabled={props.disabled}
       onPress={() => props.onPress()}
-      class={`h-7 w-7 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-hover ${
+      class={`h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-hover ${
         props.disabled === true ? "opacity-50" : "active:translate-y-px"
       } ${props.class ?? ""}`}
     >
@@ -355,7 +355,7 @@ export function Composer(props: {
           </Each>
         </View>
       </If>
-      <View class={`rounded-lg border bg-page transition duration-120 ease-out ${focused() ? "border-focus" : "border-line"}`}>
+      <View class={`rounded-lg border bg-page ${focused() ? "border-focus" : "border-line"}`}>
         <Input
           ref={(el) => {
             inputRef = el;
@@ -426,11 +426,7 @@ export function Composer(props: {
               insert(e);
             }}
             trigger={
-              <View
-                class={`h-7 w-7 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-hover ${
-                  props.channel ? "active:translate-y-px" : "opacity-50"
-                }`}
-              >
+              <View class={`h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-hover ${props.channel ? "active:translate-y-px" : "opacity-50"}`}>
                 <Icon name="react" size={16} tone="muted" />
               </View>
             }
@@ -453,7 +449,7 @@ export function Composer(props: {
             tooltip={<Bubble text={t("web.channel.composer.sendHint")} />}
             disabled={!box.canSend()}
             onPress={() => void box.send()}
-            class={`h-7 w-7 shrink-0 items-center justify-center rounded-md border transition duration-120 ease-out ${
+            class={`h-7 w-7 shrink-0 items-center justify-center rounded-md border ${
               box.canSend() ? "border-accent bg-accent hover:bg-accent-hover active:translate-y-px" : "border-transparent bg-hover opacity-50"
             }`}
           >

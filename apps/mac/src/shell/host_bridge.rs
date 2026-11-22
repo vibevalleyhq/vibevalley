@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use vibevalley_workspace::PaneKind;
 
 use crate::hosted::{Action, HostedEvent, HostedView};
-use crate::theme::{ThemeChoice, Ui};
+use crate::theme::{MotionChoice, ThemeChoice, Ui};
 
 use super::panes::percent_decode;
 use super::{Shell, update_menus};
@@ -213,7 +213,8 @@ impl Shell {
                     "monoFonts": fonts,
                     "terminalFontSize": settings.terminal_font_size,
                     "uiFontSize": settings.ui_font_size,
-                    "capabilities": ["notify", "tray", "locale", "reveal", "theme", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile", "commandLine", "seekAudio", "pcm", "pickFile", "saveFile", "update", "mossVoice"],
+                    "motion": settings.effective_motion().as_str(),
+                    "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile", "commandLine", "seekAudio", "pcm", "pickFile", "saveFile", "update", "mossVoice"],
                 }))
             }
             "host.cliState" | "host.cliInstall" | "host.cliRemove" => {
@@ -320,6 +321,13 @@ impl Shell {
                     None => refusal(BizCode::InvalidInput, "theme is light, dark or system"),
                 }
             }
+            "host.motion" => match payload.as_str().and_then(MotionChoice::parse) {
+                Some(choice) => {
+                    self.set_motion(choice, cx);
+                    Envelope::void()
+                }
+                None => refusal(BizCode::InvalidInput, "motion is off, on or system"),
+            },
             "host.opening" => match serde_json::from_value::<crate::serving::Opening>(payload.clone()) {
                 Ok(state) => {
                     if let Some(opening) = &self.launch {

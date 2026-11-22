@@ -77,7 +77,7 @@ function Pill(props: { label: string; on: boolean; onClick: () => void; testid?:
       testID={props.testid}
       accessibilityState={{ selected: props.on }}
       onPress={() => props.onClick()}
-      class={`h-6 justify-center rounded-full border px-2.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+      class={`h-6 justify-center rounded-full border px-2.5 focus-visible:outline-2 focus-visible:outline-focus ${
         props.on ? "border-accent bg-selected" : "border-transparent bg-hover hover:bg-selected"
       }`}
     >

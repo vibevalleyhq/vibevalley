@@ -1,6 +1,6 @@
 import { expect, test } from "vite-plus/test";
 
-import { CommandLineState, ThemeChoice, UpdateState } from "./host";
+import { CommandLineState, MotionChoice, ThemeChoice, UpdateState } from "./host";
 
 test("host state schemas decode valid wire payloads and reject malformed shapes", () => {
   expect(
@@ -27,4 +27,9 @@ test("host state schemas decode valid wire payloads and reject malformed shapes"
 
   expect(ThemeChoice.parse("system")).toBe("system");
   expect(ThemeChoice.safeParse("sepia").success).toBe(false);
+
+  expect(MotionChoice.parse("off")).toBe("off");
+  expect(MotionChoice.parse("on")).toBe("on");
+  expect(MotionChoice.parse("system")).toBe("system");
+  expect(MotionChoice.safeParse("reduced").success).toBe(false);
 });

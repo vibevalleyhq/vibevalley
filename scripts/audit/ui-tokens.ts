@@ -28,10 +28,16 @@ const EXCLUDE_GLOBS = [
 
 const SWITCH_PRIMITIVE = "apps/mac/ui/design/layout.tsx";
 const CHECKBOX_PRIMITIVE = "apps/mac/ui/design/Checkbox.tsx";
+const MOTION_PRIMITIVE = "apps/mac/ui/design/motion.ts";
 
 const HEX_LITERAL_RE = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![0-9a-fA-F-])/gu;
 const RGB_CALL_RE = /\brgba?\s*\(/gu;
 const TAILWIND_ARBITRARY_RE = /\b(?:bg|text|border|ring|outline|fill|stroke|from|to|via|rounded|shadow)-\[[^\]]+\]/gu;
+const COLOR_TRANSITION_CLASS_RE = /(?:^|\s)(transition(?:-(?:colors|all))?)(?=\s|$)/gu;
+const COLOR_TRANSITION_TIMED_RE = /(?:^|\s)(transition-(?:colors|all)|transition\s+(?:duration-|ease-|delay-)\S*)(?=\s|$)/gu;
+const COLOR_TRANSITION_PROP_RE = /\b(?:colors|all)\b/u;
+const MANAGED_MOTION_CLASS_RE = /(?:^|\s)(transition-(?:transform|opacity|shadow)|animate-(?:pulse|spin|bounce|ping))(?=\s|$)/gu;
+const POPUP_TRANSITION_ATTRS = new Set(["startingClass", "endingClass", "popupStartingClass", "popupEndingClass"]);
 const HEX_ALPHA_SUFFIX_RE = /^[0-9a-fA-F]{2}$/u;
 const FULL_BORDER_TWO_RE = /\bborder-2\b/u;
 const FULL_BORDER_ONE_RE = /(?:^|\s)border(?:\s|$)/u;
@@ -53,7 +59,7 @@ const BOX_GEOMETRY_STYLE_KEYS = new Set([
   "paddingRight",
 ]);
 
-export type ViolationRule = "hardcoded-color" | "arbitrary-tailwind" | "raw-control" | "selection-layout-shift";
+export type ViolationRule = "hardcoded-color" | "arbitrary-tailwind" | "raw-control" | "selection-layout-shift" | "color-transition" | "unmanaged-motion";
 
 export interface Finding {
   readonly file: string;
@@ -290,7 +296,62 @@ function rawTemplateText(quasi: AstNode): string {
   return "";
 }
 
-function scanStringValue(out: Finding[], file: string, line: number, text: string, checkColor: boolean): void {
+function insideClassAttr(ancestors: readonly AstNode[]): boolean {
+  for (let i = ancestors.length - 1; i >= 0; i--) {
+    const a = ancestors[i];
+    if (a?.type === "JSXAttribute") {
+      const name = jsxAttrName(a);
+      return name === "class" || (name !== undefined && name.endsWith("Class"));
+    }
+  }
+  return false;
+}
+
+function insideMotionCall(ancestors: readonly AstNode[]): boolean {
+  for (let i = ancestors.length - 1; i >= 0; i--) {
+    const a = ancestors[i];
+    if (a?.type === "CallExpression" && isAstNode(a.callee) && a.callee.type === "Identifier") {
+      return a.callee.name === "motionClass" || a.callee.name === "popupTransition";
+    }
+    if (a?.type === "JSXAttribute") return false;
+  }
+  return false;
+}
+
+function insideMotionOffGuard(ancestors: readonly AstNode[], source: string): boolean {
+  for (let i = ancestors.length - 1; i >= 0; i--) {
+    const a = ancestors[i];
+    if (a?.type === "ConditionalExpression" && isAstNode(a.test)) {
+      const start = typeof a.test.start === "number" ? a.test.start : 0;
+      const end = typeof a.test.end === "number" ? a.test.end : 0;
+      if (/\bmotionOff\s*\(/u.test(source.slice(start, end))) return true;
+    }
+  }
+  return false;
+}
+
+const COLOR_TRANSITION_FIX =
+  "avoid animating colors (nsh interpolates them on light/dark theme switches); use `transition-transform`, `transition-opacity`, or `transition-shadow` via `motionClass(...)`, or omit `transition` for instant color feedback";
+const UNMANAGED_MOTION_FIX =
+  "route UI animations through `design/motion.ts` (`motionClass`, `motionDuration`, `motionOff`, `fadeAnimation`, or `popupTransition`) so the Animations setting and `VIBEVALLEY_NO_ANIMATION=1` can disable them";
+
+function scanColorTransition(out: Finding[], file: string, line: number, text: string, inClassAttr: boolean): void {
+  const re = inClassAttr ? COLOR_TRANSITION_CLASS_RE : COLOR_TRANSITION_TIMED_RE;
+  re.lastIndex = 0;
+  for (const match of text.matchAll(re)) {
+    out.push({ file, line, rule: "color-transition", snippet: match[1] ?? match[0].trim(), fix: COLOR_TRANSITION_FIX });
+  }
+}
+
+function scanUnmanagedMotion(out: Finding[], file: string, line: number, text: string, inMotionCall: boolean): void {
+  if (file === MOTION_PRIMITIVE || inMotionCall) return;
+  MANAGED_MOTION_CLASS_RE.lastIndex = 0;
+  for (const match of text.matchAll(MANAGED_MOTION_CLASS_RE)) {
+    out.push({ file, line, rule: "unmanaged-motion", snippet: match[1] ?? match[0].trim(), fix: UNMANAGED_MOTION_FIX });
+  }
+}
+
+function scanStringValue(out: Finding[], file: string, line: number, text: string, checkColor: boolean, inClassAttr: boolean, inMotionCall: boolean): void {
   pushRegexMatches(
     out,
     file,
@@ -300,6 +361,8 @@ function scanStringValue(out: Finding[], file: string, line: number, text: strin
     TAILWIND_ARBITRARY_RE,
     "use canonical theme tokens from `design/tokens.json` (`apps/mac/ui/design/theme.json` / `nsh.json`)",
   );
+  scanColorTransition(out, file, line, text, inClassAttr);
+  scanUnmanagedMotion(out, file, line, text, inMotionCall);
   if (!checkColor) return;
   const masked = text.replace(TAILWIND_ARBITRARY_RE, (m) => " ".repeat(m.length));
   pushRegexMatches(
@@ -334,13 +397,39 @@ export function scanUiTokens(relFile: string, source: string): Finding[] {
     const line = lineAt(starts, offset);
 
     if (node.type === "Literal" && typeof node.value === "string" && !("regex" in node && node.regex !== undefined)) {
-      scanStringValue(rawFindings, normalized, line, node.value, !isStringParsingHelper(ancestors));
+      scanStringValue(rawFindings, normalized, line, node.value, !isStringParsingHelper(ancestors), insideClassAttr(ancestors), insideMotionCall(ancestors));
       continue;
+    }
+
+    if (node.type === "Property") {
+      const propName = propertyKeyName(node);
+      if (propName === "transitionProperty") {
+        const value = stringLiteralOf(node.value);
+        if (value !== undefined && COLOR_TRANSITION_PROP_RE.test(value)) {
+          rawFindings.push({ file: normalized, line, rule: "color-transition", snippet: `transitionProperty: "${value}"`, fix: COLOR_TRANSITION_FIX });
+        } else if (normalized !== MOTION_PRIMITIVE && value !== undefined && !insideMotionOffGuard(ancestors, source)) {
+          rawFindings.push({ file: normalized, line, rule: "unmanaged-motion", snippet: `transitionProperty: "${value}"`, fix: UNMANAGED_MOTION_FIX });
+        }
+        continue;
+      }
+      if (
+        propName === "transitionDuration" &&
+        normalized !== MOTION_PRIMITIVE &&
+        isAstNode(node.value) &&
+        node.value.type === "Literal" &&
+        typeof node.value.value === "number" &&
+        node.value.value > 0
+      ) {
+        rawFindings.push({ file: normalized, line, rule: "unmanaged-motion", snippet: `transitionDuration: ${node.value.value}`, fix: UNMANAGED_MOTION_FIX });
+        continue;
+      }
     }
 
     if (node.type === "TemplateLiteral" && Array.isArray(node.quasis)) {
       const expressions = Array.isArray(node.expressions) ? node.expressions.filter(isAstNode) : [];
       const inStyleOrJsx = insideStyleOrJsxAttr(ancestors);
+      const inClass = insideClassAttr(ancestors);
+      const inMotion = insideMotionCall(ancestors);
       for (let i = 0; i < node.quasis.length; i++) {
         const q = node.quasis[i];
         if (!isAstNode(q)) continue;
@@ -348,7 +437,7 @@ export function scanUiTokens(relFile: string, source: string): Finding[] {
         const qOffset = typeof q.start === "number" ? q.start : offset;
         const qLine = lineAt(starts, qOffset);
 
-        scanStringValue(rawFindings, normalized, qLine, value, !isStringParsingHelper(ancestors));
+        scanStringValue(rawFindings, normalized, qLine, value, !isStringParsingHelper(ancestors), inClass, inMotion);
 
         if (i > 0 && HEX_ALPHA_SUFFIX_RE.test(value)) {
           const prevExpr = expressions[i - 1];
@@ -385,21 +474,34 @@ export function scanUiTokens(relFile: string, source: string): Finding[] {
       continue;
     }
 
-    if (
-      node.type === "JSXAttribute" &&
-      isAstNode(node.name) &&
-      node.name.type === "JSXIdentifier" &&
-      node.name.name === "role" &&
-      jsxAttrStringValue(node) === "checkbox" &&
-      normalized !== CHECKBOX_PRIMITIVE
-    ) {
-      rawFindings.push({
-        file: normalized,
-        line,
-        rule: "raw-control",
-        snippet: 'role="checkbox"',
-        fix: 'use `Checkbox` from `apps/mac/ui/design/Checkbox.tsx` instead of custom `role="checkbox"`',
-      });
+    if (node.type === "JSXAttribute") {
+      const attrName = jsxAttrName(node);
+      const literal = jsxAttrStringValue(node);
+      if (attrName === "role" && literal === "checkbox" && normalized !== CHECKBOX_PRIMITIVE) {
+        rawFindings.push({
+          file: normalized,
+          line,
+          rule: "raw-control",
+          snippet: 'role="checkbox"',
+          fix: 'use `Checkbox` from `apps/mac/ui/design/Checkbox.tsx` instead of custom `role="checkbox"`',
+        });
+      } else if (normalized !== MOTION_PRIMITIVE && attrName === "animation" && literal !== undefined && literal !== "none") {
+        rawFindings.push({
+          file: normalized,
+          line,
+          rule: "unmanaged-motion",
+          snippet: `animation="${literal}"`,
+          fix: UNMANAGED_MOTION_FIX,
+        });
+      } else if (normalized !== MOTION_PRIMITIVE && attrName !== undefined && POPUP_TRANSITION_ATTRS.has(attrName) && literal !== undefined) {
+        rawFindings.push({
+          file: normalized,
+          line,
+          rule: "unmanaged-motion",
+          snippet: `${attrName}="${literal}"`,
+          fix: UNMANAGED_MOTION_FIX,
+        });
+      }
     }
   }
 

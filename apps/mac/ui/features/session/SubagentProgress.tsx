@@ -4,6 +4,7 @@ import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../../design/Icon";
 import { Banner } from "../../design/layout";
+import { motionClass } from "../../design/motion";
 import { CountPill, Dot, type DotTone } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
 import { mix } from "../../design/tone";
@@ -107,12 +108,12 @@ export function SubagentProgress(props: { session: string; progress: SubagentSum
                 testID={`subagent-${thread().threadId}`}
                 accessibilityLabel={t("web.session.subagents.openLog", { task: labels().name(thread().threadId) })}
                 accessibilityState={{ expanded: isOpen() }}
-                class={`gap-1 px-2.5 py-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${isOpen() ? "bg-hover" : "hover:bg-hover"}`}
+                class={`gap-1 px-2.5 py-2 focus-visible:outline-2 focus-visible:outline-focus ${isOpen() ? "bg-hover" : "hover:bg-hover"}`}
                 onPress={() => picked.set(isOpen() ? undefined : { session: props.session, run: props.progress.run, thread: thread().threadId })}
               >
                 <View class="flex-row items-center gap-2">
                   <View
-                    class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+                    class={`h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
                     style={{ transform: [{ rotate: isOpen() ? "90deg" : "0deg" }] }}
                   >
                     <Icon name="expand" size={10} tone="muted" />

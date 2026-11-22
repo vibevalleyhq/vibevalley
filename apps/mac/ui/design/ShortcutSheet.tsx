@@ -29,7 +29,7 @@ function Shortcuts() {
             <Text class="px-1.5 pb-0.5 text-xs font-semibold text-muted">{t(`web.base.shortcuts.place.${place()}`)}</Text>
             <Each of={shortcuts.filter((s) => s.place === place())}>
               {(s) => (
-                <View class="min-h-7 flex-row items-center justify-between gap-4 rounded-sm px-1.5 py-1 transition duration-120 ease-out hover:bg-hover">
+                <View class="min-h-7 flex-row items-center justify-between gap-4 rounded-sm px-1.5 py-1 hover:bg-hover">
                   <Text class="min-w-0 flex-1 text-sm text-ink">{t(`web.base.shortcuts.say.${s().id}`)}</Text>
                   <View class="shrink-0 flex-row items-center justify-end gap-1">
                     <Each of={s().keys}>{(key) => <Kbd size="md">{keyCap(key())}</Kbd>}</Each>

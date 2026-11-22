@@ -3,6 +3,7 @@ import { Tooltip, type Placement } from "nsh/base";
 
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
+import { motionClass, popupTransition } from "./motion";
 import { mix } from "./tone";
 
 const delay = 300;
@@ -14,10 +15,10 @@ export function Bubble(props: { text: string; placement?: Placement | undefined 
       offset={6}
       margin={8}
       placement={props.placement}
-      class="max-w-72 rounded-md border bg-ink px-2.5 py-1.5 shadow-float transition duration-120 ease-out"
+      class={`max-w-72 rounded-md border bg-ink px-2.5 py-1.5 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`}
       style={{ borderColor: mix("page", 0.14) }}
-      startingClass="opacity-0"
-      endingClass="opacity-0"
+      startingClass={popupTransition("opacity-0")}
+      endingClass={popupTransition("opacity-0")}
     >
       <Text class="min-w-0 text-xs leading-snug text-page">{props.text}</Text>
     </Tooltip>
@@ -37,7 +38,7 @@ export function Hint(props: { text: string; icon?: IconName; placement?: Placeme
       accessibilityLabel={props.text}
       tooltip={<Bubble text={props.text} placement={props.placement} />}
       // A form of ten fields should not read as ten marks: help stays out of the way.
-      class="size-4 shrink-0 items-center justify-center rounded-sm opacity-60 transition duration-120 ease-out hover:bg-hover hover:opacity-100 focus:bg-hover focus:opacity-100"
+      class={`size-4 shrink-0 items-center justify-center rounded-sm opacity-60 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-hover hover:opacity-100 focus:bg-hover focus:opacity-100`}
     >
       <Icon name={props.icon ?? "info"} size={12} tone="faint" />
     </View>

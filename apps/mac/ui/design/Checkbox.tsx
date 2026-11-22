@@ -25,7 +25,7 @@ export function Checkbox(props: {
       testID={props.testid}
       onChange={(e) => props.onChange(e.checked)}
       class={[
-        "size-4 shrink-0 items-center justify-center rounded-xs border transition duration-120 ease-out",
+        "size-4 shrink-0 items-center justify-center rounded-xs border",
         on()
           ? disabled()
             ? "border-accent bg-accent"

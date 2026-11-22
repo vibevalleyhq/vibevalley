@@ -4,10 +4,11 @@ import { Input, Select as Base } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 
 import { Icon } from "./Icon";
+import { motionClass, popupTransition } from "./motion";
 import { Bubble, Hint } from "./Tip";
 import { mix } from "./tone";
 
-const box = "rounded-md border border-line bg-page px-2.5 py-1.5 text-ink placeholder:text-faint transition duration-120 ease-out";
+const box = "rounded-md border border-line bg-page px-2.5 py-1.5 text-ink placeholder:text-faint";
 
 type ControlAppearance = {
   /** Placement only: margins, grow, a width when `wide` is false. */
@@ -105,7 +106,7 @@ export function SearchField(props: {
   const clearLabel = () => props.clearLabel ?? t("web.issue.page.clear");
   return (
     <View
-      class={`h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2 transition duration-120 ease-out hover:border-faint focus-within:border-focus ${props.class ?? ""}`}
+      class={`h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2 hover:border-faint focus-within:border-focus ${props.class ?? ""}`}
     >
       <Icon name="search" size={14} tone="faint" />
       <Input
@@ -123,7 +124,7 @@ export function SearchField(props: {
           accessibilityLabel={clearLabel()}
           tooltip={<Bubble text={clearLabel()} />}
           onPress={() => props.onInput("")}
-          class="size-4.5 shrink-0 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+          class="size-4.5 shrink-0 items-center justify-center rounded-sm hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
         >
           <Icon name="close" size={10} tone="muted" />
         </View>
@@ -203,11 +204,11 @@ export function Select<V extends string>(props: {
       }}
       offset={4}
       align="start"
-      popupClass="max-h-72 rounded-lg border border-line bg-elevated p-1 shadow-float transition duration-120 ease-out"
-      popupStartingClass="opacity-0"
-      popupEndingClass="opacity-0"
+      popupClass={`max-h-72 rounded-lg border border-line bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`}
+      popupStartingClass={popupTransition("opacity-0")}
+      popupEndingClass={popupTransition("opacity-0")}
       listClass="gap-0.5"
-      itemClass="group h-7 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out focus:bg-hover selected:bg-selected disabled:opacity-50"
+      itemClass="group h-7 flex-row items-center gap-2 rounded-md px-2 focus:bg-hover selected:bg-selected disabled:opacity-50"
       renderItem={(entry) => (
         <View class="min-w-0 flex-1 flex-row items-center gap-2">
           <Text class={`min-w-0 flex-1 truncate ${textClass()} text-ink group-selected:font-medium group-disabled:text-faint`}>{entry.title}</Text>
@@ -222,7 +223,7 @@ export function Select<V extends string>(props: {
           testID={props.testid ? `${props.testid}-trigger` : undefined}
           accessibilityState={{ busy: props.state === "pending", invalid: props.state === "failed" }}
           class={[
-            "min-w-0 flex-row items-center gap-1.5 rounded-md border transition duration-120 ease-out",
+            "min-w-0 flex-row items-center gap-1.5 rounded-md border",
             props.size === "control" ? "h-7 px-2" : "h-8 px-2.5",
             triggerSurface(),
             disabled() ? "opacity-50" : "aria-expanded:border-focus focus-visible:outline-2 focus-visible:outline-focus",

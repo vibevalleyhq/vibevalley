@@ -5,12 +5,13 @@ import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../design/Icon";
 import type { IconName } from "../design/icons";
+import { motionClass } from "../design/motion";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
 
-export const menuPopupClass = "min-w-44 gap-0.5 rounded-lg border border-line bg-elevated p-1 shadow-float transition duration-120 ease-out";
-export const menuItemClass = "h-7 justify-center rounded-md px-2.5 transition duration-120 ease-out hover:bg-hover focus:bg-hover";
-export const menuDangerItemClass = "h-7 justify-center rounded-md px-2.5 transition duration-120 ease-out hover:bg-bad-soft focus:bg-bad-soft";
+export const menuPopupClass = "min-w-44 gap-0.5 rounded-lg border border-line bg-elevated p-1 shadow-float";
+export const menuItemClass = "h-7 justify-center rounded-md px-2.5 hover:bg-hover focus:bg-hover";
+export const menuDangerItemClass = "h-7 justify-center rounded-md px-2.5 hover:bg-bad-soft focus:bg-bad-soft";
 export const menuSeparatorClass = "my-1 h-px bg-line";
 
 export const startEllipsis: TextStyle = { textOverflow: "ellipsis-start" };
@@ -101,7 +102,7 @@ export function SectionHead(props: {
     <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
       {props.collapsible === true ? (
         <View
-          class="size-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+          class={`size-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
           style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}
         >
           <Icon name="expand" size={10} tone={hovered() ? "ink" : "muted"} />
@@ -124,7 +125,7 @@ export function SectionHead(props: {
           onMouseEnter={() => hovered.set(true)}
           onMouseLeave={() => hovered.set(false)}
           accessibilityLabel={open() ? t("web.shell.section.collapse", { title: props.title }) : t("web.shell.section.expand", { title: props.title })}
-          class="-ml-1 h-6 min-w-0 flex-1 flex-row items-center rounded-md px-1 transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+          class="-ml-1 h-6 min-w-0 flex-1 flex-row items-center rounded-md px-1 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
         >
           {labelRow()}
         </Button>
@@ -163,7 +164,7 @@ export function ShellIconButton(props: {
       tooltip={<Bubble text={props.label} />}
       class={[
         props.compact === true ? "size-5 rounded-sm" : "size-5.5 rounded-md",
-        "shrink-0 items-center justify-center transition duration-120 ease-out",
+        `shrink-0 items-center justify-center ${motionClass("transition-opacity duration-120 ease-out")}`,
         props.disabled === true
           ? "opacity-50"
           : `${props.danger === true ? "hover:bg-bad-soft" : "hover:bg-selected"} active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`,

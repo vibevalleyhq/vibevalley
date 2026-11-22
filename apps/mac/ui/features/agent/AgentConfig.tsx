@@ -195,7 +195,7 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
                   accessibilityState={{ selected: active() }}
                   accessibilityLabel={info().preset.label}
                   onPress={() => choose(info())}
-                  class={`flex-row items-center gap-2 rounded-md border p-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+                  class={`flex-row items-center gap-2 rounded-md border p-2 focus-visible:outline-2 focus-visible:outline-focus ${
                     active() ? "border-accent bg-selected" : "border-line hover:border-faint hover:bg-hover"
                   }`}
                 >
@@ -349,7 +349,7 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
               const on = () => props.draft.skills.includes(s().id);
               return (
                 <View
-                  class={`flex-row items-start gap-2.5 rounded-md border p-2.5 transition duration-120 ease-out ${
+                  class={`flex-row items-start gap-2.5 rounded-md border p-2.5 ${
                     on() ? "border-accent bg-selected" : "border-line hover:border-faint hover:bg-hover"
                   }`}
                 >
@@ -425,7 +425,7 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
                   disabled={!!mcpRefused()}
                   accessibilityLabel={t("web.agent.removeNamed", { name: s().name })}
                   onPress={() => props.patch({ ...props.draft, mcpServers: props.draft.mcpServers.filter((x) => x.name !== s().name) })}
-                  class="group rounded-sm px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover"
+                  class="group rounded-sm px-1.5 py-0.5 hover:bg-hover"
                 >
                   <Text class="text-xs text-muted group-hover:text-berry">{t("web.agent.remove")}</Text>
                 </View>
@@ -487,7 +487,7 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
                   <View
                     role="button"
                     onPress={() => props.patch({ ...props.draft, disallowedTools: [...props.draft.disallowedTools, tool().name] })}
-                    class="group rounded-sm border border-line bg-page px-1.5 py-0.5 transition duration-120 ease-out hover:bg-hover"
+                    class="group rounded-sm border border-line bg-page px-1.5 py-0.5 hover:bg-hover"
                   >
                     <Text class="font-mono text-xs text-muted group-hover:text-ink">{`+ ${tool().name}`}</Text>
                   </View>

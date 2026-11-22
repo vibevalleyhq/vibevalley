@@ -6,6 +6,7 @@ import type { SessionEvent } from "@vibevalley/protocol";
 import { Icon } from "../../design/Icon";
 import { actionIcon, type IconName } from "../../design/icons";
 import { Markdown } from "../../design/Markdown";
+import { motionClass } from "../../design/motion";
 import { Dot } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
 import { mix, tone } from "../../design/tone";
@@ -70,12 +71,12 @@ export function RunSteps(props: { session: string; run: string | undefined; orch
             testID="run-steps"
             onPress={() => open.set(!open())}
             accessibilityState={{ expanded: open() }}
-            class={`flex-row items-center gap-1.5 self-start rounded-md border px-2 py-1 transition duration-120 ease-out ${
+            class={`flex-row items-center gap-1.5 self-start rounded-md border px-2 py-1 ${
               open() ? "border-line bg-hover" : "border-transparent hover:border-line hover:bg-hover"
             }`}
           >
             <View
-              class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+              class={`h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
               style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}
             >
               <Icon name="expand" size={10} tone="muted" />
@@ -136,10 +137,10 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
         onPress={() => toggled.set(!open())}
         accessibilityLabel={open() ? t("web.session.log.fold") : t("web.session.log.unfold")}
         accessibilityState={{ expanded: open() }}
-        class="flex-row items-center gap-2 rounded-md px-1.5 py-1 transition duration-120 ease-out hover:bg-hover"
+        class="flex-row items-center gap-2 rounded-md px-1.5 py-1 hover:bg-hover"
       >
         <View
-          class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+          class={`h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
           style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}
         >
           <Icon name="expand" size={10} tone="muted" />
@@ -186,7 +187,7 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
           role="button"
           testID="run-see"
           onPress={() => toggled.set(true)}
-          class="flex-row items-center gap-1.5 self-start rounded-md px-2 py-1 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+          class="flex-row items-center gap-1.5 self-start rounded-md px-2 py-1 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
         >
           <Icon name="expand" size={10} tone="water" />
           <Text class="text-xs font-medium text-water tabular-nums">{t("web.session.log.see", { n: props.run.steps.length })}</Text>
@@ -238,7 +239,7 @@ function Folded(props: { text: string; lines: number; markdown?: boolean; muted?
         <View
           role="button"
           onPress={() => open.set(!open())}
-          class="mt-1 flex-row items-center gap-1 rounded-sm px-1.5 py-0.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+          class="mt-1 flex-row items-center gap-1 rounded-sm px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
         >
           <Text class="text-xs font-medium text-water">{open() ? t("web.session.log.less") : t("web.session.log.all")}</Text>
         </View>
@@ -335,13 +336,13 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
         testID="tool-step"
         onPress={() => open.set(!open())}
         accessibilityState={{ expanded: open() }}
-        class={`w-full flex-row items-center gap-2 rounded-md px-2 py-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+        class={`w-full flex-row items-center gap-2 rounded-md px-2 py-1.5 focus-visible:outline-2 focus-visible:outline-focus ${
           failed() ? "hover:bg-hover" : open() ? "bg-hover" : "hover:bg-hover"
         }`}
         style={failed() ? { backgroundColor: open() ? mix("bad-soft", 0.85) : mix("bad-soft", 0.45) } : undefined}
       >
         <View
-          class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+          class={`h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
           style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}
         >
           <Icon name="expand" size={10} tone="muted" />

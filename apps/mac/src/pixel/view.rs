@@ -765,7 +765,10 @@ impl Render for PixelView {
             Scene::Failed(e) => Some(e.clone()),
             _ => None,
         };
-        if list.is_some() && self.scene.needs_animation() && window.is_window_active() {
+        let allow_animation = cx
+            .try_global::<crate::theme::Ui>()
+            .is_none_or(|ui| ui.settings.effective_motion() != crate::theme::MotionChoice::Off);
+        if list.is_some() && self.scene.needs_animation() && allow_animation && window.is_window_active() {
             window.request_animation_frame();
         }
         let atlas = self.scene.atlas();

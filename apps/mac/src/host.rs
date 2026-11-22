@@ -12,11 +12,14 @@ pub struct Storage {
 
 impl Storage {
     pub fn configured() -> Self {
-        Self::from_override(std::env::var_os("VIBEVALLEY_STORE").map(PathBuf::from))
+        Self::for_channel(std::env::var_os("VIBEVALLEY_STORE").as_deref(), vibevalley_protocol::home::current_channel())
     }
 
-    fn from_override(path: Option<PathBuf>) -> Self {
-        let database = path.unwrap_or_else(vibevalley_workspace::Store::default_path);
+    fn for_channel(override_path: Option<&std::ffi::OsStr>, channel: vibevalley_protocol::home::ReleaseChannel) -> Self {
+        let database = override_path
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from)
+            .unwrap_or_else(|| vibevalley_workspace::Store::default_path_for(channel.app_support_dir_name()));
         let views = if database.file_name() == Some(std::ffi::OsStr::new("state.db")) {
             database.with_file_name("nsh")
         } else {
@@ -37,7 +40,19 @@ pub fn worktree_file(worktree: &Path, relative: &Path) -> Option<(PathBuf, PathB
 
 /// AppleScript string literal for `text`.
 fn applescript_string(text: &str) -> String {
-    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
+    let single_line = text.replace(['\r', '\n'], " ");
+    format!("\"{}\"", single_line.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
+/// Whether this application is currently active in the macOS foreground.
+pub fn is_app_active() -> bool {
+    use objc2_app_kit::NSApplication;
+    use objc2_foundation::MainThreadMarker;
+
+    let Some(mtm) = MainThreadMarker::new() else {
+        return false;
+    };
+    NSApplication::sharedApplication(mtm).isActive()
 }
 
 /// A system notification. Blocking (runs `osascript`).
@@ -289,8 +304,49 @@ pub fn reveal(path: &Path) -> Result<(), String> {
     }
 }
 
-/// Sets the macOS Dock / Command-Tab icon from `resources/icon.icns` so
-/// launching the binary directly does not show the generic `exec` icon.
+fn channel_icon_names(channel: vibevalley_protocol::home::ReleaseChannel) -> (&'static str, &'static str) {
+    use vibevalley_protocol::home::ReleaseChannel;
+    match channel {
+        ReleaseChannel::Release => ("icon.icns", "pixel/app-sprout.png"),
+        ReleaseChannel::Beta => ("icon-beta.icns", "pixel/app-sprout-beta.png"),
+        ReleaseChannel::Alpha => ("icon-alpha.icns", "pixel/app-sprout-alpha.png"),
+        ReleaseChannel::Dev => ("icon-dev.icns", "pixel/app-sprout-dev.png"),
+    }
+}
+
+fn bundled_resources_icon(exe: Option<&Path>) -> Option<PathBuf> {
+    let macos = exe?.parent()?;
+    if macos.file_name() != Some(std::ffi::OsStr::new("MacOS")) {
+        return None;
+    }
+    let contents = macos.parent()?;
+    if contents.file_name() != Some(std::ffi::OsStr::new("Contents")) {
+        return None;
+    }
+    let bundle = contents.parent()?;
+    let is_app = bundle.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("app"));
+    is_app.then(|| contents.join("Resources/icon.icns"))
+}
+
+fn app_icon_candidates(channel: vibevalley_protocol::home::ReleaseChannel, exe: Option<&Path>, manifest_dir: &Path, assets_dir: &Path) -> Vec<PathBuf> {
+    let (icns, png) = channel_icon_names(channel);
+    let mut candidates = Vec::with_capacity(5);
+    if let Some(bundled) = bundled_resources_icon(exe) {
+        candidates.push(bundled);
+    }
+    candidates.push(manifest_dir.join("resources").join(icns));
+    candidates.push(assets_dir.join(png));
+    if icns != "icon.icns" {
+        candidates.push(manifest_dir.join("resources/icon.icns"));
+    }
+    if png != "pixel/app-sprout.png" {
+        candidates.push(assets_dir.join("pixel/app-sprout.png"));
+    }
+    candidates
+}
+
+/// Sets the macOS Dock / Command-Tab icon for the active release channel so
+/// launching unpackaged binaries or `.app` bundles shows the matching logo.
 pub fn set_app_icon() {
     use objc2::AnyThread as _;
     use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy, NSImage};
@@ -299,11 +355,14 @@ pub fn set_app_icon() {
     let Some(mtm) = MainThreadMarker::new() else { return };
     let app = NSApplication::sharedApplication(mtm);
     app.setActivationPolicy(NSApplicationActivationPolicy::Regular);
+    let exe = std::env::current_exe().ok();
     let dir = crate::pixel::assets_dir();
-    let candidate = [
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/icon.icns"),
-        dir.join("pixel/app-sprout.png"),
-    ]
+    let candidate = app_icon_candidates(
+        vibevalley_protocol::home::current_channel(),
+        exe.as_deref(),
+        Path::new(env!("CARGO_MANIFEST_DIR")),
+        &dir,
+    )
     .into_iter()
     .find(|p| p.is_file());
     if let Some(path) = candidate {
@@ -341,6 +400,81 @@ pub fn restore_window_first_responder() {
     }
 }
 
+const APPLE_FONT_SMOOTHING_KEY: &str = "AppleFontSmoothing";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CfPrefValue {
+    Unset,
+    Int(i64),
+    Other,
+}
+
+/// Reads a preference via the exact `CFPreferencesCopyAppValue` lookup
+/// `gpui-fast-apple` uses for `AppleFontSmoothing`.
+fn cf_app_pref(key: &str) -> CfPrefValue {
+    use std::ffi::c_void;
+
+    use objc2_foundation::NSString;
+
+    const K_CF_NUMBER_SINT64_TYPE: isize = 4;
+
+    unsafe extern "C" {
+        static kCFPreferencesCurrentApplication: *const c_void;
+        fn CFPreferencesCopyAppValue(key: *const c_void, application_id: *const c_void) -> *const c_void;
+        fn CFGetTypeID(cf: *const c_void) -> usize;
+        fn CFNumberGetTypeID() -> usize;
+        fn CFNumberGetValue(number: *const c_void, the_type: isize, value_ptr: *mut c_void) -> bool;
+        fn CFRelease(cf: *const c_void);
+    }
+
+    let ns_key = NSString::from_str(key);
+    // SAFETY: `NSString` is toll-free bridged to `CFStringRef` and `value` is released before returning.
+    unsafe {
+        let value = CFPreferencesCopyAppValue((&*ns_key as *const NSString).cast::<c_void>(), kCFPreferencesCurrentApplication);
+        if value.is_null() {
+            return CfPrefValue::Unset;
+        }
+        let result = if CFGetTypeID(value) == CFNumberGetTypeID() {
+            let mut out = 0i64;
+            if CFNumberGetValue(value, K_CF_NUMBER_SINT64_TYPE, (&raw mut out).cast::<c_void>()) {
+                CfPrefValue::Int(out)
+            } else {
+                CfPrefValue::Other
+            }
+        } else {
+            CfPrefValue::Other
+        };
+        CFRelease(value);
+        result
+    }
+}
+
+fn disable_default_font_smoothing_for(key: &str) {
+    use objc2::runtime::AnyObject;
+    use objc2::{class, msg_send};
+    use objc2_foundation::NSString;
+
+    if cf_app_pref(key) != CfPrefValue::Unset {
+        return;
+    }
+    let ns_key = NSString::from_str(key);
+    // Register in-memory only (`NSRegistrationDomain`) so nothing is written to the user's plist
+    // while `CFPreferencesCopyAppValue` observes `0` unless explicitly overridden.
+    unsafe {
+        let defaults: *mut AnyObject = msg_send![class!(NSUserDefaults), standardUserDefaults];
+        let zero: *mut AnyObject = msg_send![class!(NSNumber), numberWithLongLong: 0i64];
+        let dict: *mut AnyObject = msg_send![class!(NSDictionary), dictionaryWithObject: zero, forKey: &*ns_key];
+        let _: () = msg_send![defaults, registerDefaults: dict];
+    }
+}
+
+/// Disables CoreGraphics' default font-smoothing stroke dilation (10–22% heavier ink)
+/// in-memory before GPUI initializes its text system, while preserving any explicit
+/// CLI `-AppleFontSmoothing` or `defaults` preference.
+pub fn disable_default_font_smoothing() {
+    disable_default_font_smoothing_for(APPLE_FONT_SMOOTHING_KEY);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -365,19 +499,89 @@ mod tests {
 
     #[test]
     fn regression_hosted_views_use_the_same_directory_as_the_host_store() {
+        use std::ffi::OsStr;
+        use vibevalley_protocol::home::ReleaseChannel;
+
         let root = tempfile::tempdir().unwrap();
         let state = root.path().join("host.db");
-        let paths = Storage::from_override(Some(state.clone()));
+        let paths = Storage::for_channel(Some(state.as_os_str()), ReleaseChannel::Release);
         assert_eq!(paths.database, state);
         assert_eq!(paths.views, root.path().join("host.db.nsh"));
-        let sibling = Storage::from_override(Some(root.path().join("other.db")));
+        let sibling = Storage::for_channel(Some(root.path().join("other.db").as_os_str()), ReleaseChannel::Alpha);
         assert_eq!(sibling.views, root.path().join("other.db.nsh"));
-        let isolated = Storage::from_override(Some(root.path().join("state.db")));
+        let isolated = Storage::for_channel(Some(root.path().join("state.db").as_os_str()), ReleaseChannel::Dev);
         assert_eq!(isolated.views, root.path().join("nsh"));
+        let empty_override = Storage::for_channel(Some(OsStr::new("")), ReleaseChannel::Alpha);
+        assert!(empty_override.database.ends_with("Library/Application Support/VibeValley-alpha/state.db"));
+        assert!(empty_override.views.ends_with("Library/Application Support/VibeValley-alpha/nsh"));
 
-        let installed = Storage::from_override(None);
-        assert!(installed.database.ends_with("Library/Application Support/VibeValley/state.db"));
-        assert!(installed.views.ends_with("Library/Application Support/VibeValley/nsh"));
+        for (channel, dir_name) in [
+            (ReleaseChannel::Release, "VibeValley"),
+            (ReleaseChannel::Beta, "VibeValley-beta"),
+            (ReleaseChannel::Alpha, "VibeValley-alpha"),
+            (ReleaseChannel::Dev, "VibeValley-dev"),
+        ] {
+            let storage = Storage::for_channel(None, channel);
+            assert!(
+                storage.database.ends_with(format!("Library/Application Support/{dir_name}/state.db")),
+                "unexpected db path for {channel:?}: {}",
+                storage.database.display()
+            );
+            assert!(
+                storage.views.ends_with(format!("Library/Application Support/{dir_name}/nsh")),
+                "unexpected views path for {channel:?}: {}",
+                storage.views.display()
+            );
+        }
+    }
+
+    #[test]
+    fn app_icon_candidates_prefer_bundle_then_channel_then_fallback() {
+        use vibevalley_protocol::home::ReleaseChannel;
+
+        let manifest = Path::new("/repo/apps/mac");
+        let assets = Path::new("/repo/assets");
+
+        let bundled = app_icon_candidates(
+            ReleaseChannel::Alpha,
+            Some(Path::new("/Applications/VibeValley.app/Contents/MacOS/vibevalley-mac")),
+            manifest,
+            assets,
+        );
+        assert_eq!(
+            bundled,
+            vec![
+                PathBuf::from("/Applications/VibeValley.app/Contents/Resources/icon.icns"),
+                PathBuf::from("/repo/apps/mac/resources/icon-alpha.icns"),
+                PathBuf::from("/repo/assets/pixel/app-sprout-alpha.png"),
+                PathBuf::from("/repo/apps/mac/resources/icon.icns"),
+                PathBuf::from("/repo/assets/pixel/app-sprout.png"),
+            ]
+        );
+
+        let dev = app_icon_candidates(ReleaseChannel::Dev, Some(Path::new("/repo/target/debug/vibevalley-mac")), manifest, assets);
+        assert_eq!(
+            dev,
+            vec![
+                PathBuf::from("/repo/apps/mac/resources/icon-dev.icns"),
+                PathBuf::from("/repo/assets/pixel/app-sprout-dev.png"),
+                PathBuf::from("/repo/apps/mac/resources/icon.icns"),
+                PathBuf::from("/repo/assets/pixel/app-sprout.png"),
+            ]
+        );
+
+        let beta = app_icon_candidates(ReleaseChannel::Beta, None, manifest, assets);
+        assert_eq!(beta[0], PathBuf::from("/repo/apps/mac/resources/icon-beta.icns"));
+        assert_eq!(beta[1], PathBuf::from("/repo/assets/pixel/app-sprout-beta.png"));
+
+        let release = app_icon_candidates(ReleaseChannel::Release, None, manifest, assets);
+        assert_eq!(
+            release,
+            vec![
+                PathBuf::from("/repo/apps/mac/resources/icon.icns"),
+                PathBuf::from("/repo/assets/pixel/app-sprout.png"),
+            ]
+        );
     }
 
     #[test]
@@ -424,5 +628,54 @@ mod tests {
         let manifest = pixel_manifest().unwrap();
         assert!(manifest.len() > 700);
         assert!(manifest.contains_key("bear-farmer-down"));
+    }
+
+    #[test]
+    fn disable_default_font_smoothing_sets_zero_without_overriding_explicit_value() {
+        use std::ffi::c_void;
+
+        use objc2::runtime::AnyObject;
+        use objc2::{class, msg_send};
+        use objc2_foundation::NSString;
+
+        unsafe extern "C" {
+            static NSArgumentDomain: *const c_void;
+        }
+
+        // Unset key becomes 0 via `CFPreferencesCopyAppValue` (same lookup as `gpui-fast-apple`).
+        let unset_key = "VibeValleyTestFontSmoothingUnset";
+        assert_eq!(cf_app_pref(unset_key), CfPrefValue::Unset);
+        disable_default_font_smoothing_for(unset_key);
+        assert_eq!(cf_app_pref(unset_key), CfPrefValue::Int(0));
+
+        // Explicit non-zero value in `NSArgumentDomain` (e.g. CLI `-AppleFontSmoothing 2`) is preserved.
+        let override_key = "VibeValleyTestFontSmoothingOverride";
+        let ns_override = NSString::from_str(override_key);
+        unsafe {
+            let defaults: *mut AnyObject = msg_send![class!(NSUserDefaults), standardUserDefaults];
+            let prev: *mut AnyObject = msg_send![defaults, volatileDomainForName: NSArgumentDomain];
+            let next: *mut AnyObject = if prev.is_null() {
+                msg_send![class!(NSMutableDictionary), dictionary]
+            } else {
+                msg_send![class!(NSMutableDictionary), dictionaryWithDictionary: prev]
+            };
+            let two: *mut AnyObject = msg_send![class!(NSNumber), numberWithLongLong: 2i64];
+            let _: () = msg_send![next, setObject: two, forKey: &*ns_override];
+            let _: () = msg_send![defaults, setVolatileDomain: next, forName: NSArgumentDomain];
+
+            disable_default_font_smoothing_for(override_key);
+            assert_eq!(cf_app_pref(override_key), CfPrefValue::Int(2));
+
+            let restore: *mut AnyObject = if prev.is_null() { msg_send![class!(NSDictionary), dictionary] } else { prev };
+            let _: () = msg_send![defaults, setVolatileDomain: restore, forName: NSArgumentDomain];
+        }
+
+        // Exercise the production entry point on `AppleFontSmoothing`.
+        let before = cf_app_pref(APPLE_FONT_SMOOTHING_KEY);
+        disable_default_font_smoothing();
+        match before {
+            CfPrefValue::Unset => assert_eq!(cf_app_pref(APPLE_FONT_SMOOTHING_KEY), CfPrefValue::Int(0)),
+            explicit => assert_eq!(cf_app_pref(APPLE_FONT_SMOOTHING_KEY), explicit),
+        }
     }
 }

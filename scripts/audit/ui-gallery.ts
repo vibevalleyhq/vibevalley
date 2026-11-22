@@ -331,6 +331,7 @@ function runGallery(): void {
       VIBEVALLEY_WORK_ROOT: workDir,
       VIBEVALLEY_STORE: storeDb,
       VIBEVALLEY_NO_OPENING: "1",
+      VIBEVALLEY_NO_ANIMATION: "1",
       VIBEVALLEY_FAKE_SERVER: fakeDir,
       VIBEVALLEY_DEBUG_DUMP: dumpPath,
       VIBEVALLEY_DEBUG_SCRIPT: stepsPath,

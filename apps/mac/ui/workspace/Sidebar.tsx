@@ -5,6 +5,7 @@ import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../design/Icon";
 import { ActiveBar } from "../design/layout";
+import { motionClass } from "../design/motion";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
 import { act, call, frame, frameRev, hostApi } from "../infra/bridge";
@@ -155,21 +156,6 @@ function summarizeRepo(repo: RepoNode): ActivitySummary {
   return { working, ready, attention, tabs };
 }
 
-function summarizeRepos(repos: RepoNode[]): ActivitySummary {
-  let working = 0;
-  let ready = 0;
-  let attention = 0;
-  let tabs = 0;
-  for (const repo of repos) {
-    const r = summarizeRepo(repo);
-    working += r.working;
-    ready += r.ready;
-    attention += r.attention;
-    tabs += r.tabs;
-  }
-  return { working, ready, attention, tabs };
-}
-
 function disambiguatorMap(repos: RepoNode[]): Map<string, string> {
   const byName = new Map<string, RepoNode[]>();
   for (const r of repos) {
@@ -236,10 +222,10 @@ function ChevronSlot(props: { expandable: boolean; expanded: boolean; label: str
     <Button
       onPress={props.onToggle}
       accessibilityLabel={props.label}
-      class="h-4.5 w-3.5 shrink-0 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
+      class={`h-4.5 w-3.5 shrink-0 items-center justify-center rounded-sm ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
     >
       <View
-        class="size-2.5 items-center justify-center transition-transform duration-120 ease-out"
+        class={`size-2.5 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
         style={{ transform: [{ rotate: props.expanded ? "90deg" : "0deg" }] }}
       >
         <Icon name="expand" size={10} tone="muted" />
@@ -283,7 +269,6 @@ export function Sidebar() {
   const vvRepos = signal<VvRepo[]>([]);
   const pixelDir = signal<string | undefined>(typeof host.params.pixelDir === "string" ? host.params.pixelDir : undefined);
   const foldOverrides = signal<Record<string, boolean>>({});
-  const otherSectionCollapsed = signal(false);
   const hoveredKey = signal<string | null>(null);
 
   if (host.available()) {
@@ -306,8 +291,7 @@ export function Sidebar() {
 
   const panel = () => rail()?.panel ?? "files";
 
-  const rowClass = (selected: boolean) =>
-    `relative h-7 flex-row items-center gap-1.5 rounded-md pr-1.5 transition duration-120 ease-out ${selected ? "bg-selected" : "hover:bg-hover"}`;
+  const rowClass = (selected: boolean) => `relative h-7 flex-row items-center gap-1.5 rounded-md pr-1.5 ${selected ? "bg-selected" : "hover:bg-hover"}`;
 
   const spriteSrc = (name: string | undefined) => {
     const dir = pixelDir();
@@ -366,7 +350,7 @@ export function Sidebar() {
                 selected={isCur}
                 accessibilityLabel={count > 0 ? `${item.label} (${count})` : item.label}
                 tooltip={<Bubble text={item.tip} />}
-                class={`h-6 flex-row items-center justify-center gap-1 rounded-md px-2 transition duration-120 ease-out active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus ${
+                class={`h-6 flex-row items-center justify-center gap-1 rounded-md px-2 ${motionClass("transition-opacity duration-120 ease-out")} active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus ${
                   isCur ? "bg-selected" : "bg-transparent hover:bg-hover"
                 }`}
               >
@@ -579,20 +563,12 @@ export function Sidebar() {
     } else {
       // Restore defaults: expand active repo and worktrees with open tabs.
       foldOverrides.set({});
-      otherSectionCollapsed.set(false);
     }
   };
 
-  /** VibeValley's repos first; folders opened only for their terminals after them. */
-  const sections = (): { id: string; title: string; repos: RepoNode[] }[] => {
+  const orderedRepos = (): RepoNode[] => {
     const all = repoTree();
-    const own = all.filter((r) => r.vibevalley);
-    const other = all.filter((r) => !r.vibevalley);
-    if (own.length === 0 || other.length === 0) return [{ id: "all", title: "", repos: all }];
-    return [
-      { id: "own", title: "", repos: own },
-      { id: "other", title: t("web.shell.sidebar.otherFolders"), repos: other },
-    ];
+    return [...all.filter((r) => r.vibevalley), ...all.filter((r) => !r.vibevalley)];
   };
 
   const withWorktreeMenu = (group: WorktreeGroup, trigger: JSX.Element) => (
@@ -880,7 +856,7 @@ export function Sidebar() {
             onPress={() => act({ type: "add_project" })}
             accessibilityLabel={t("web.shell.sidebar.addRepo")}
             tooltip={<Bubble text={t("web.shell.sidebar.addRepoTooltip")} />}
-            class="h-5.5 flex-row items-center gap-1 rounded-md border border-line bg-hover px-2 transition duration-120 ease-out hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
+            class={`h-5.5 flex-row items-center gap-1 rounded-md border border-line bg-hover px-2 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
           >
             <Icon name="add" size={11} tone="ink" />
             <Text class="text-2xs font-medium text-ink">{t("web.shell.sidebar.addRepoButton")}</Text>
@@ -890,50 +866,15 @@ export function Sidebar() {
 
       <Scroll
         class="flex-1"
-        contentClass="gap-1.5 px-2 py-1.5"
+        contentClass="gap-0.5 px-2 py-1.5"
         onMouseLeave={() => {
           if (hoveredKey() !== null) hoveredKey.set(null);
         }}
       >
         {(() => {
-          const allRepos = repoTree();
+          const allRepos = orderedRepos();
           const disambiguators = disambiguatorMap(allRepos);
-          return sections().map((section) => {
-            const isCollapsibleSection = section.id === "other" && section.title.length > 0;
-            const isCollapsed = isCollapsibleSection && otherSectionCollapsed();
-            const sectionSummary = isCollapsibleSection ? summarizeRepos(section.repos) : undefined;
-            return (
-              <View class="gap-0.5">
-                {section.title ? (
-                  <Button
-                    onPress={() => {
-                      if (isCollapsibleSection) otherSectionCollapsed.update((v) => !v);
-                    }}
-                    accessibilityLabel={
-                      isCollapsed
-                        ? t("web.shell.sidebar.expandSection", { title: section.title })
-                        : t("web.shell.sidebar.collapseSection", { title: section.title })
-                    }
-                    class="mx-px mt-1 h-6 flex-row items-center gap-1.5 rounded-md px-1.5 transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
-                  >
-                    <View
-                      class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
-                      style={{ transform: [{ rotate: isCollapsed ? "0deg" : "90deg" }] }}
-                    >
-                      <Icon name="expand" size={10} tone="muted" />
-                    </View>
-                    <Text class="flex-1 truncate text-2xs font-semibold text-muted">{section.title}</Text>
-                    {isCollapsed && sectionSummary ? (
-                      <CollapsedSummary summary={sectionSummary} />
-                    ) : (
-                      <Text class="text-2xs font-medium text-faint tabular-nums">{String(section.repos.length)}</Text>
-                    )}
-                  </Button>
-                ) : null}
-                {!isCollapsed ? section.repos.map((repo) => renderRepoNode(repo, disambiguators)) : null}
-              </View>
-            );
-          });
+          return allRepos.map((repo) => renderRepoNode(repo, disambiguators));
         })()}
       </Scroll>
     </View>

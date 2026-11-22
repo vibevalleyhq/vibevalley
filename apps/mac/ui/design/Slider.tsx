@@ -117,7 +117,7 @@ export function Slider(props: SliderProps) {
       </View>
       <View
         class={[
-          "absolute size-3.5 rounded-full border-2 bg-paper shadow-raise transition duration-120 ease-out",
+          "absolute size-3.5 rounded-full border-2 bg-paper shadow-raise",
           props.disabled === true ? "border-idle" : dragging() || focused() ? "border-focus" : "border-accent group-hover:border-focus",
           focused() ? "outline-2 outline-focus" : "",
         ].join(" ")}

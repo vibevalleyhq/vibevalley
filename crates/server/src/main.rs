@@ -37,7 +37,7 @@ fn run() -> Result<(), String> {
     let home = vibevalley_server::home::home();
     let port: u16 = match env("VIBEVALLEY_PORT") {
         Some(p) => p.parse().map_err(|_| format!("VIBEVALLEY_PORT is not a port: {p}"))?,
-        None => 8787,
+        None => vibevalley_server::home::default_port(),
     };
     let config = vibevalley_server::ServerConfig::from_env(home.clone(), env!("CARGO_PKG_VERSION"));
     let started = vibevalley_server::start(config).map_err(|e| e.to_string())?;

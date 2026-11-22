@@ -154,7 +154,7 @@ export function Fold(props: {
           testID={props.testID}
           accessibilityState={{ expanded: open() }}
           onPress={toggle}
-          class="-mx-2 min-w-0 flex-1 flex-row items-center gap-2 rounded-md px-2 py-2.5 transition duration-120 ease-out hover:bg-hover"
+          class="-mx-2 min-w-0 flex-1 flex-row items-center gap-2 rounded-md px-2 py-2.5 hover:bg-hover"
         >
           <View class="size-3.5 shrink-0 items-center justify-center" style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}>
             <Icon name="expand" size={10} tone="muted" />
@@ -183,7 +183,7 @@ export function More(props: { children: JSX.Element }) {
         role="button"
         testID="sheet-more"
         onPress={() => open.set(!open())}
-        class="-mx-1.5 flex-row items-center gap-1.5 self-start rounded-md px-1.5 py-1 transition duration-120 ease-out hover:bg-hover"
+        class="-mx-1.5 flex-row items-center gap-1.5 self-start rounded-md px-1.5 py-1 hover:bg-hover"
       >
         <View class="size-3.5 shrink-0 items-center justify-center" style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}>
           <Icon name="expand" size={10} tone="muted" />

@@ -10,6 +10,7 @@ import { SearchField, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { Quiet } from "../../design/layout";
 import { Markdown } from "../../design/Markdown";
+import { motionClass } from "../../design/motion";
 import { Dot } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
 import { mix, tone } from "../../design/tone";
@@ -327,10 +328,10 @@ export function Trajectory(props: {
                     accessibilityState={{ expanded: isRunOpen() }}
                     accessibilityLabel={isRunOpen() ? t("web.session.log.fold") : t("web.session.log.unfold")}
                     onPress={() => toggleRun(group().key)}
-                    class="mb-0.5 flex-row items-center gap-2 rounded-md px-2 py-1 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+                    class="mb-0.5 flex-row items-center gap-2 rounded-md px-2 py-1 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
                   >
                     <View
-                      class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+                      class={`h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
                       style={{ transform: [{ rotate: isRunOpen() ? "90deg" : "0deg" }] }}
                     >
                       <Icon name="expand" size={10} tone="muted" />
@@ -409,7 +410,7 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
     <View
       ref={(el) => props.refTo(el)}
       testID="step"
-      class={`rounded-md transition duration-120 ease-out ${props.marked ? "" : props.open ? "bg-hover" : "hover:bg-hover"}`}
+      class={`rounded-md ${props.marked ? "" : props.open ? "bg-hover" : "hover:bg-hover"}`}
       style={props.marked ? { backgroundColor: mix("wheat", 0.25) } : undefined}
     >
       <View
@@ -420,7 +421,7 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
         class="w-full flex-row items-start gap-2 px-2 py-1"
       >
         <View
-          class="mt-1 h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+          class={`mt-1 h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
           style={{ transform: [{ rotate: props.open ? "90deg" : "0deg" }] }}
         >
           <Icon name="expand" size={10} tone="muted" />
@@ -645,7 +646,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
           testID="mark-wrong"
           tooltip={<Bubble text={t("web.session.trajectory.wrong")} />}
           onPress={() => writing.set(true)}
-          class="absolute top-0.5 right-1 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 py-0.5 shadow-raise transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover active:translate-y-px"
+          class={`absolute top-0.5 right-1 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 py-0.5 shadow-raise ${motionClass("transition-transform duration-120 ease-out")} focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover active:translate-y-px`}
           style={{ opacity: over() ? 1 : 0 }}
           focusStyle={{ opacity: 1 }}
         >

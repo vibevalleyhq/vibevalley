@@ -4,7 +4,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkS
 import { resolve, join } from "node:path";
 import { parseArgs } from "node:util";
 
-import { minimumMacOS, packageArchitecture, requireDeveloperId, verifyMacExecutable } from "./package-platform.ts";
+import { channelIconFile, minimumMacOS, packageArchitecture, requireDeveloperId, verifyMacExecutable } from "./package-platform.ts";
 
 const root = resolve(import.meta.dirname, "../..");
 const { values } = parseArgs({
@@ -53,11 +53,13 @@ if (!values["skip-build"]) {
   run("swift", ["build", "-c", "release", "--package-path", "apps/island"]);
 }
 const arch = packageArchitecture(process.arch);
+const icon = join(root, channelIconFile(version));
 for (const file of [
   join(target, "vibevalley-mac"),
   join(target, "vibevalley"),
   join(root, "apps/mac/ui/build/bundle.js"),
   join(root, "apps/island/.build/release/VibeValleyIsland"),
+  icon,
 ]) {
   if (!existsSync(file)) throw new Error(`Missing package input: ${file}. Build it before --skip-build`);
 }
@@ -73,6 +75,7 @@ cpSync(join(target, "vibevalley"), join(macos, "vibevalley"));
 cpSync(join(root, "apps/island/.build/release/VibeValleyIsland"), join(macos, "VibeValleyIsland"));
 cpSync(join(root, "assets"), join(resources, "assets"), { recursive: true, dereference: true });
 cpSync(join(root, "apps/mac/ui/build"), join(resources, "ui"), { recursive: true });
+cpSync(icon, join(resources, "icon.icns"));
 const sign = (path: string, microphone = false) =>
   run("codesign", [
     "--force",
@@ -90,6 +93,7 @@ writeFileSync(
 <key>CFBundleIdentifier</key><string>dev.vibevalley.app</string>
 <key>CFBundleName</key><string>VibeValley</string>
 <key>CFBundleExecutable</key><string>vibevalley-mac</string>
+<key>CFBundleIconFile</key><string>icon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>VibeValleyVersion</key><string>${version}</string>
 <key>CFBundleShortVersionString</key><string>${version.split("-")[0]}</string>

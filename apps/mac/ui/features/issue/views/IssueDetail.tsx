@@ -11,6 +11,7 @@ import { TextArea, TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { Markdown } from "../../../design/Markdown";
+import { motionClass } from "../../../design/motion";
 import { Dot } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
@@ -117,12 +118,7 @@ export function IssueDetail(props: {
           {(onParent) => (
             <>
               <Icon name="next" size={12} tone="muted" />
-              <View
-                role="button"
-                testID="parent-issue"
-                onPress={() => onParent()()}
-                class="-mx-1 rounded-sm px-1 py-0.5 transition duration-120 ease-out hover:bg-hover"
-              >
+              <View role="button" testID="parent-issue" onPress={() => onParent()()} class="-mx-1 rounded-sm px-1 py-0.5 hover:bg-hover">
                 <Text class="text-xs text-water">{parent()?.title ?? t("web.issue.family.parent")}</Text>
               </View>
             </>
@@ -356,11 +352,7 @@ export function IssueDetail(props: {
         </If>
         <If when={props.issue.pullRequest}>
           {(pr) => (
-            <View
-              role="link"
-              class="-mx-1 mt-1 self-start rounded-sm px-1 py-0.5 transition duration-120 ease-out hover:bg-hover"
-              onPress={() => void hostApi.openUrl(pr().url)}
-            >
+            <View role="link" class="-mx-1 mt-1 self-start rounded-sm px-1 py-0.5 hover:bg-hover" onPress={() => void hostApi.openUrl(pr().url)}>
               <Text class="text-sm text-water">{t("shared.join.aside", { text: `PR #${pr().number}`, aside: pr().state })}</Text>
             </View>
           )}
@@ -387,7 +379,7 @@ export function IssueDetail(props: {
               <A
                 href={runsHref({ session: head().id, issue: props.issue.id })}
                 testID="issue-open-trajectory"
-                class="h-6 shrink-0 flex-row items-center gap-1 rounded-md px-2 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+                class={`h-6 shrink-0 flex-row items-center gap-1 rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
               >
                 <Icon name="log" size={12} tone="muted" />
                 <Text class="text-xs font-medium text-muted">{t("web.issue.detail.openTrajectory")}</Text>
@@ -608,7 +600,7 @@ function IssueTitle(props: { shown: string; full: string; editable: boolean; sta
                 typed = props.full;
                 editing.set(true);
               }}
-              class="-mx-1 self-start rounded-sm px-1 transition duration-120 ease-out hover:bg-hover"
+              class="-mx-1 self-start rounded-sm px-1 hover:bg-hover"
             >
               <Text role="header" testID="issue-title" class="line-clamp-2 text-lg font-semibold text-ink">
                 {props.shown}

@@ -405,6 +405,35 @@ impl Shell {
                         entry.attention = true;
                     }
                 }
+                TerminalEvent::AgentTurnFinished { agent, label } => {
+                    if !on_screen
+                        && let Some(project) = this.ws.project_mut(owner)
+                        && let Some(entry) = project.terminal_mut(&tid)
+                    {
+                        entry.attention = true;
+                    }
+                    if !crate::host::is_app_active() {
+                        let title = this
+                            .ws
+                            .project(owner)
+                            .and_then(|p| p.root().file_name())
+                            .and_then(|n| n.to_str())
+                            .filter(|s| !s.is_empty())
+                            .unwrap_or("VibeValley")
+                            .to_string();
+                        let display = crate::terminal::agent_display_name(agent, label);
+                        let body = vibevalley_i18n::t("desktop.terminal.agentTurnDone", &[("agent", display.into())]);
+                        Self::bg(
+                            cx,
+                            move || crate::host::notify(&title, &body),
+                            |_, r, _| {
+                                if let Err(e) = r {
+                                    eprintln!("notify: {e}");
+                                }
+                            },
+                        );
+                    }
+                }
                 TerminalEvent::Exited => {
                     if let Some(project) = this.ws.project_mut(owner)
                         && let Some(entry) = project.terminal_mut(&tid)

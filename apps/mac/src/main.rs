@@ -49,6 +49,7 @@ pub fn ensure_main_window(cx: &mut App) {
 }
 
 fn main() {
+    host::disable_default_font_smoothing();
     update::enter_bundle();
     vibevalley_i18n::set_locale(vibevalley_server::home::saved_locale(&hosted::server_home()));
     let app = gpui_platform::application();

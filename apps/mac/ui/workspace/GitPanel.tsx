@@ -10,6 +10,7 @@ import { t } from "@vibevalley/i18n";
 import { Button as DesignButton } from "../design/Button";
 import { Icon } from "../design/Icon";
 import { ActiveBar } from "../design/layout";
+import { motionClass } from "../design/motion";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
 import { act, frame, hostApi } from "../infra/bridge";
@@ -83,7 +84,7 @@ function FileRow(props: { row: GitRow; staged: boolean }) {
     <View
       onMouseEnter={() => hovered.set(true)}
       onMouseLeave={() => hovered.set(false)}
-      class={`mx-1.5 h-6.5 flex-row items-center gap-1 rounded-md px-1.5 transition duration-120 ease-out ${showActions() ? "bg-hover" : "bg-transparent"}`}
+      class={`mx-1.5 h-6.5 flex-row items-center gap-1 rounded-md px-1.5 ${showActions() ? "bg-hover" : "bg-transparent"}`}
     >
       <Button
         onPress={() => {
@@ -108,13 +109,13 @@ function FileRow(props: { row: GitRow; staged: boolean }) {
               confirmingDiscard.set(false);
               act({ type: "discard", paths: [props.row.path] });
             }}
-            class="h-5 justify-center rounded-sm bg-berry px-1.5 transition duration-120 ease-out active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
+            class={`h-5 justify-center rounded-sm bg-berry px-1.5 ${motionClass("transition-opacity duration-120 ease-out")} active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
           >
             <Text class="text-2xs font-medium text-page">{t("web.shell.git.confirmDiscard")}</Text>
           </Button>
           <Button
             onPress={() => confirmingDiscard.set(false)}
-            class="h-5 justify-center rounded-sm bg-selected px-1.5 transition duration-120 ease-out hover:bg-hover active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
+            class={`h-5 justify-center rounded-sm bg-selected px-1.5 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-hover active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
           >
             <Text class="text-2xs text-ink">{t("web.shell.git.cancel")}</Text>
           </Button>
@@ -184,7 +185,7 @@ function WorktreeRow(props: {
   };
   const trigger = (
     <View
-      class={`relative gap-1 border-b border-line px-3 py-2 transition duration-120 ease-out ${w().current === true ? "bg-selected" : "bg-transparent hover:bg-hover"} ${isRemoving() ? "opacity-60" : ""}`}
+      class={`relative gap-1 border-b border-line px-3 py-2 ${motionClass("transition-opacity duration-120 ease-out")} ${w().current === true ? "bg-selected" : "bg-transparent hover:bg-hover"} ${isRemoving() ? "opacity-60" : ""}`}
     >
       {w().current === true ? <ActiveBar /> : null}
       <Button
@@ -261,13 +262,13 @@ function WorktreeRow(props: {
           <Text class="text-2xs text-muted">{dirty() ? t("web.shell.git.wtDirtyPrompt") : t("web.shell.git.wtConfirmDeletePrompt")}</Text>
           <Button
             onPress={() => props.onConfirmRemove(w(), dirty())}
-            class="h-5.5 justify-center rounded-sm bg-berry px-2 transition duration-120 ease-out active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
+            class={`h-5.5 justify-center rounded-sm bg-berry px-2 ${motionClass("transition-opacity duration-120 ease-out")} active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
           >
             <Text class="text-2xs font-medium text-page">{dirty() ? t("web.shell.git.wtForceDelete") : t("web.shell.git.wtConfirmDelete")}</Text>
           </Button>
           <Button
             onPress={() => props.setPendingRemove(null)}
-            class="h-5.5 justify-center rounded-sm border border-line bg-hover px-2 transition duration-120 ease-out hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
+            class={`h-5.5 justify-center rounded-sm border border-line bg-hover px-2 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
           >
             <Text class="text-2xs text-ink">{t("web.shell.git.cancel")}</Text>
           </Button>
@@ -430,7 +431,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
               if (next) ensureOpen(sectionKey);
             }}
             accessibilityLabel={t("web.shell.git.newWorktree")}
-            class="h-5 flex-row items-center gap-1 rounded-md bg-hover px-1.5 transition duration-120 ease-out hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
+            class={`h-5 flex-row items-center gap-1 rounded-md bg-hover px-1.5 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
           >
             <Icon name="add" size={10} tone="ink" />
             <Text class="text-2xs font-medium text-ink">{creatingWt() ? t("web.shell.git.creatingWorktree") : t("web.shell.git.createWorktreeBtn")}</Text>
@@ -451,7 +452,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
               <Button
                 onPress={submitNewWorktree}
                 disabled={!newBranch().trim() || creatingWt()}
-                class={`h-6.5 justify-center rounded-md border px-2.5 transition duration-120 ease-out ${
+                class={`h-6.5 justify-center rounded-md border px-2.5 ${
                   !newBranch().trim() || creatingWt()
                     ? "border-line bg-hover"
                     : "border-accent bg-accent hover:bg-accent-hover active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
@@ -536,7 +537,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 return (
                   <Button
                     onPress={() => localTab.set(item.id)}
-                    class={`h-6 flex-1 items-center justify-center rounded-md transition duration-120 ease-out active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus ${
+                    class={`h-6 flex-1 items-center justify-center rounded-md ${motionClass("transition-opacity duration-120 ease-out")} active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus ${
                       cur() ? "bg-selected" : "bg-transparent hover:bg-hover"
                     }`}
                   >
@@ -574,7 +575,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                   {(f()?.staged?.length ?? 0) === 0 && (f()?.changes?.length ?? 0) > 0 ? (
                     <Button
                       onPress={() => act({ type: "stage", paths: (f()?.changes ?? []).map((r) => r.path) })}
-                      class="h-6.5 flex-row items-center justify-center gap-1 rounded-md border border-line bg-transparent px-2.5 transition duration-120 ease-out hover:bg-hover active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
+                      class={`h-6.5 flex-row items-center justify-center gap-1 rounded-md border border-line bg-transparent px-2.5 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-hover active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
                     >
                       <Icon name="add" size={11} tone="ink" />
                       <Text class="text-xs font-medium text-ink">
@@ -712,7 +713,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                                   accessibilityLabel={
                                     b().head ? t("web.shell.git.currentBranch", { name: b().name }) : t("web.shell.git.switchBranch", { name: b().name })
                                   }
-                                  class={`relative mx-1.5 h-6.5 flex-row items-center gap-1.5 rounded-md px-1.5 transition duration-120 ease-out ${
+                                  class={`relative mx-1.5 h-6.5 flex-row items-center gap-1.5 rounded-md px-1.5 ${
                                     switchingBranch() !== null ? "" : "active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
                                   } ${b().head ? "bg-selected" : "bg-transparent hover:bg-hover"}`}
                                 >
@@ -764,7 +765,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                           onPress={() => act({ type: "open_commit", id: c().id })}
                           accessibilityLabel={`Commit ${c().short}: ${c().summary}`}
                           tooltip={<Bubble text={`${c().short} · ${c().summary}`} />}
-                          class="gap-1 border-b border-line px-3 py-2 transition duration-120 ease-out hover:bg-hover active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
+                          class={`gap-1 border-b border-line px-3 py-2 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-hover active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
                         >
                           <View class="flex-row items-center gap-2">
                             <Text class="min-w-0 flex-1 truncate text-sm text-ink" style={autoDirection}>

@@ -6,6 +6,7 @@ import { ContextMenu, MenuItem, MenuSeparator, Tree, type TreeItem } from "nsh/b
 import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../design/Icon";
+import { motionClass } from "../design/motion";
 import { act, hostApi } from "../infra/bridge";
 import { gitToneIconTone, gitToneTextClass, menuItemClass, menuPopupClass, menuSeparatorClass, PanelEmpty, SectionHead, ShellIconButton } from "./chrome";
 
@@ -95,7 +96,9 @@ export function FileTree(props: { frame: FilesFrame | null }) {
               <View class="h-6.5 flex-row items-center gap-1.5 pr-2" style={{ paddingLeft: 6 + entry.depth * 14 }}>
                 <View class="size-3.5 shrink-0 items-center justify-center">
                   {entry.folder ? (
-                    <View class="size-3.5 items-center justify-center transition-transform duration-120 ease-out group-aria-expanded:rotate-90">
+                    <View
+                      class={`size-3.5 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")} group-aria-expanded:rotate-90`}
+                    >
                       <Icon name="expand" size={10} tone="muted" />
                     </View>
                   ) : null}

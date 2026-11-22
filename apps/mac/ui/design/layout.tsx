@@ -7,6 +7,7 @@ import { Link as A } from "../infra/router";
 import { TextInput, type TextInputProps } from "./Field";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
+import { motionClass } from "./motion";
 import { CountPill } from "./Tag";
 import { Bubble, Hint } from "./Tip";
 import { mix } from "./tone";
@@ -124,10 +125,10 @@ export function SidebarSection(props: {
           testID={props.toggleTestID}
           accessibilityState={{ expanded: expanded() }}
           onPress={toggle}
-          class="group h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md px-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+          class="group h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md px-1.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
         >
           <View
-            class="h-3.5 w-3.5 shrink-0 items-center justify-center transition-transform duration-120 ease-out"
+            class={`h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
             style={{ transform: [{ rotate: expanded() ? "90deg" : "0deg" }] }}
           >
             <Icon name="expand" size={10} tone="faint" />
@@ -199,7 +200,7 @@ export function ListRow(props: { to: string; item?: string; active?: boolean; ti
       testID={props.item === undefined ? "list-row" : `list-row-${props.item}`}
       accessibilityLabel={props.title}
       accessibilityState={{ selected: active() }}
-      class={`relative flex-row items-center gap-2.5 rounded-md border px-2.5 py-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+      class={`relative flex-row items-center gap-2.5 rounded-md border px-2.5 py-2 focus-visible:outline-2 focus-visible:outline-focus ${
         active() ? "border-line bg-selected" : "border-transparent hover:bg-hover"
       }`}
     >
@@ -280,8 +281,8 @@ function ToggleSwitch(props: {
       accessibilityLabel={props.ariaLabel}
       onChange={(e) => props.onChange(e.checked)}
       class={props.class}
-      trackClass="h-4 w-7 justify-center rounded-full border border-line bg-selected p-0.5 transition-colors duration-180 ease-out checked:border-accent checked:bg-accent focus-visible:outline-2 focus-visible:outline-focus"
-      thumbClass="size-2.5 rounded-full bg-paper shadow-raise transition-transform duration-180 ease-out checked:translate-x-3"
+      trackClass="h-4 w-7 justify-center rounded-full border border-line bg-selected p-0.5 checked:border-accent checked:bg-accent focus-visible:outline-2 focus-visible:outline-focus"
+      thumbClass={`size-2.5 rounded-full bg-paper shadow-raise ${motionClass("transition-transform duration-180 ease-out")} checked:translate-x-3`}
     />
   );
 }
@@ -352,7 +353,7 @@ export function SecretInput(props: TextInputProps) {
         accessibilityLabel={label()}
         tooltip={<Bubble text={label()} />}
         onPress={() => shown.set(!shown())}
-        class="absolute top-1 right-1 size-6 items-center justify-center rounded-sm transition duration-120 ease-out hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+        class="absolute top-1 right-1 size-6 items-center justify-center rounded-sm hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
       >
         <Icon name={shown() ? "hide" : "show"} size={14} tone="muted" />
       </View>

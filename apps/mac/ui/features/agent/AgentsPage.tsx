@@ -246,7 +246,7 @@ function GroupSection(props: { title: string; count: number; testid: string; chi
 function RowShell(props: { agent: Agent; to: string; first: boolean; muted?: boolean; trailing?: JSX.Element; children: JSX.Element }) {
   return (
     <View
-      class={`flex-row items-center gap-3 px-3.5 py-2.5 transition-colors duration-120 ease-out hover:bg-hover ${
+      class={`flex-row items-center gap-3 px-3.5 py-2.5 hover:bg-hover ${
         props.first ? "" : "border-t border-line"
       } ${props.muted === true ? "opacity-75" : ""}`}
     >

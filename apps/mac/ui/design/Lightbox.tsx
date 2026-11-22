@@ -8,6 +8,7 @@ import { saveFile } from "../infra/attachmentFile";
 import { hostApi } from "../infra/bridge";
 import { createEffect } from "../infra/solid";
 import { IconButton } from "./IconButton";
+import { fadeAnimation } from "./motion";
 import { toast } from "./toasts";
 import { mix } from "./tone";
 
@@ -58,7 +59,7 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
       open={props.at !== undefined}
       testID="lightbox"
       accessibilityLabel={shown()?.name ?? t("web.base.lightbox.label")}
-      animation="fade"
+      animation={fadeAnimation()}
       onOpenChange={(e) => !e.open && props.onAt(undefined)}
       backdropStyle={{ backgroundColor: mix("ink-950", colorScheme() === "dark" ? 0.88 : 0.78) }}
       class="m-auto items-center justify-center gap-3"

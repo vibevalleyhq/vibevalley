@@ -8,6 +8,7 @@ import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { SearchField, Select } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
+import { motionClass } from "../../../design/motion";
 import { Segmented } from "../../../design/Segmented";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
@@ -348,7 +349,7 @@ function IssueView(props: { onBack: () => void; backLabel: string; blocked: () =
             role="button"
             testID="issue-close"
             onPress={() => props.onBack()}
-            class="-ml-2 h-7 flex-row items-center gap-1 rounded-md px-2 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+            class={`-ml-2 h-7 flex-row items-center gap-1 rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
           >
             <Icon name="back" size={14} tone="muted" />
             <Text class="text-sm font-medium text-muted">{props.backLabel}</Text>
@@ -361,7 +362,7 @@ function IssueView(props: { onBack: () => void; backLabel: string; blocked: () =
               accessibilityState={{ selected: chrome.inspectorVisible() }}
               tooltip={<Bubble text={t("web.issue.detail.properties")} placement="bottom" />}
               onPress={() => chrome.toggleInspector()}
-              class={`h-7 flex-row items-center gap-1.5 rounded-md border px-2 transition duration-120 ease-out active:translate-y-px ${
+              class={`h-7 flex-row items-center gap-1.5 rounded-md border px-2 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px ${
                 chrome.inspectorVisible() ? "border-line bg-selected" : "border-transparent hover:bg-hover"
               }`}
             >
@@ -430,7 +431,7 @@ function Toolbar(props: {
             role="button"
             testID="filter-clear"
             onPress={() => props.onFilter(noFilter)}
-            class="h-7 flex-row items-center rounded-md px-2 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+            class={`h-7 flex-row items-center rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
           >
             <Text class="text-xs font-medium text-water">{t("web.issue.page.clear")}</Text>
           </View>

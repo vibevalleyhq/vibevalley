@@ -318,7 +318,6 @@ export {
   type LibraryItem,
   type LibraryListRequest,
   type LibraryOrigin,
-  type LibraryOriginKind,
   type LibrarySort,
   LibrarySortValues,
 } from "./media/shapes";

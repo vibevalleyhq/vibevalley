@@ -3,6 +3,7 @@ import { Menu, MenuItem, MenuSeparator } from "nsh/base";
 
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
+import { motionClass, popupTransition } from "./motion";
 import { Bubble } from "./Tip";
 
 export interface MoreItem {
@@ -34,15 +35,15 @@ export function MoreMenu(props: {
       placement={props.side ?? "bottom"}
       align="end"
       offset={4}
-      popupClass="min-w-44 gap-0.5 rounded-lg border border-line bg-elevated p-1 shadow-float transition duration-120 ease-out"
-      popupStartingClass="opacity-0"
-      popupEndingClass="opacity-0"
+      popupClass={`min-w-44 gap-0.5 rounded-lg border border-line bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`}
+      popupStartingClass={popupTransition("opacity-0")}
+      popupEndingClass={popupTransition("opacity-0")}
       trigger={
         <View
           testID={props.testid}
           accessibilityLabel={props.label}
           tooltip={<Bubble text={props.label} />}
-          class="size-7 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-hover active:translate-y-px aria-expanded:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
+          class={`size-7 shrink-0 items-center justify-center rounded-md ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px aria-expanded:bg-selected focus-visible:outline-2 focus-visible:outline-focus`}
         >
           <Icon name={props.icon ?? "more"} size={16} tone="muted" />
         </View>
@@ -57,7 +58,7 @@ export function MoreMenu(props: {
             <MenuItem
               testID={`more-${item().key}`}
               onSelect={() => item().onSelect()}
-              class={`h-7 flex-row items-center gap-2 rounded-md px-2 transition duration-120 ease-out ${
+              class={`h-7 flex-row items-center gap-2 rounded-md px-2 ${
                 item().danger === true ? "hover:bg-bad-soft focus:bg-bad-soft" : "hover:bg-hover focus:bg-hover"
               }`}
             >

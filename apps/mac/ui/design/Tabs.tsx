@@ -43,7 +43,7 @@ export function Tabs<T extends string>(props: {
                 if (href !== undefined) router.navigate(href);
                 props.onChange?.(item().value);
               }}
-              class={`group flex-row items-center gap-1.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${look().tab(on())}`}
+              class={`group flex-row items-center gap-1.5 focus-visible:outline-2 focus-visible:outline-focus ${look().tab(on())}`}
             >
               <If when={item().icon}>{(icon) => <Icon name={icon()} size={props.look === "line" ? 16 : 14} tone={on() ? "ink" : "muted"} />}</If>
               <Text class={`text-sm font-medium ${on() ? "text-ink" : "text-muted group-hover:text-ink"}`}>{item().label}</Text>

@@ -144,10 +144,15 @@ impl Store {
         })
     }
 
+    /// `~/Library/Application Support/<app_dir_name>/state.db` on macOS.
+    pub fn default_path_for(app_dir_name: &str) -> PathBuf {
+        let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
+        home.join("Library/Application Support").join(app_dir_name).join("state.db")
+    }
+
     /// `~/Library/Application Support/VibeValley/state.db` on macOS.
     pub fn default_path() -> PathBuf {
-        let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
-        home.join("Library/Application Support/VibeValley/state.db")
+        Self::default_path_for("VibeValley")
     }
 
     /// The schema version this build migrates databases to.

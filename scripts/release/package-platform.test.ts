@@ -1,11 +1,26 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { expect, test } from "vite-plus/test";
 
-import { packageArchitecture, requireDeveloperId, verifyMacExecutable } from "./package-platform.ts";
+import { channelIconFile, packageArchitecture, requireDeveloperId, verifyMacExecutable } from "./package-platform.ts";
+
+test("channelIconFile selects matching channel icns assets", () => {
+  const root = resolve(import.meta.dirname, "../..");
+  const cases: readonly (readonly [string, string])[] = [
+    ["0.0.0", "apps/mac/resources/icon-dev.icns"],
+    ["0.4.0-alpha.1", "apps/mac/resources/icon-alpha.icns"],
+    ["0.4.0-beta.2", "apps/mac/resources/icon-beta.icns"],
+    ["0.4.0", "apps/mac/resources/icon.icns"],
+  ];
+  for (const [version, expected] of cases) {
+    const file = channelIconFile(version);
+    expect(file).toBe(expected);
+    expect(existsSync(join(root, file))).toBe(true);
+  }
+});
 
 test("regression: unknown package architectures and non-distribution signatures fail", () => {
   expect(() => packageArchitecture("ia32")).toThrow("architecture");

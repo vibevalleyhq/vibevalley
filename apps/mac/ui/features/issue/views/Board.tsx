@@ -5,6 +5,7 @@ import { type BoardSummary, maxRunning } from "@vibevalley/protocol";
 
 import { Icon } from "../../../design/Icon";
 import type { IconName } from "../../../design/icons";
+import { motionClass, motionDuration, motionOff } from "../../../design/motion";
 import { Bubble, Hint } from "../../../design/Tip";
 import { mix, tone } from "../../../design/tone";
 import {
@@ -33,7 +34,7 @@ export function OlderLink(props: { hidden: number; onClick: () => void }) {
     <View
       onPress={() => props.onClick()}
       role="button"
-      class="self-center rounded-md px-2.5 py-1 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+      class={`self-center rounded-md px-2.5 py-1 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
     >
       <Text class="text-xs font-medium text-water">{props.hidden > 0 ? t("web.issue.board.earlier", { n: props.hidden }) : t("web.issue.board.recent")}</Text>
     </View>
@@ -260,7 +261,7 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; co
           role="button"
           testID="issue-new"
           accessibilityLabel={t("web.issue.new.title")}
-          class="group mt-1.5 h-9 w-full shrink-0 flex-row items-center justify-center gap-1.5 rounded-md border border-dashed border-line transition duration-120 ease-out hover:border-faint hover:bg-page active:translate-y-px"
+          class={`group mt-1.5 h-9 w-full shrink-0 flex-row items-center justify-center gap-1.5 rounded-md border border-dashed border-line ${motionClass("transition-transform duration-120 ease-out")} hover:border-faint hover:bg-page active:translate-y-px`}
         >
           <Icon name="add" size={14} tone="muted" />
           <Text class="text-sm font-medium text-muted group-hover:text-ink">{t("web.issue.new.card")}</Text>
@@ -307,7 +308,7 @@ function SmallIconButton(props: { label: string; icon: IconName; onPress: () => 
       testID={props.testID}
       accessibilityLabel={props.label}
       tooltip={<Bubble text={props.label} />}
-      class="h-6 w-6 shrink-0 items-center justify-center rounded-md transition duration-120 ease-out hover:bg-selected active:translate-y-px"
+      class={`h-6 w-6 shrink-0 items-center justify-center rounded-md ${motionClass("transition-transform duration-120 ease-out")} hover:bg-selected active:translate-y-px`}
     >
       <Icon name={props.icon} size={14} tone="muted" />
     </View>
@@ -346,10 +347,7 @@ function CardView(props: {
   });
   const before = () => props.drag.before() === props.card.id;
   const urgency = () => cardUrgencyTone(props.card);
-  const cardStyle = () => ({
-    transitionProperty: "colors,shadow",
-    transitionDuration: 180,
-  });
+  const cardStyle = () => (motionOff() ? undefined : { transitionProperty: "shadow", transitionDuration: motionDuration(180) });
   return (
     <View ref={(r) => props.drag.card(props.card.id, r, () => props.placeable)}>
       <If when={before()}>

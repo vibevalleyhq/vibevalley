@@ -66,7 +66,7 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
               role="button"
               testID="child-issue"
               accessibilityLabel={child().title}
-              class={`w-full flex-row items-center gap-3 px-3.5 py-2.5 transition duration-120 ease-out hover:bg-hover ${i() < props.children.length - 1 ? "border-b border-line" : ""}`}
+              class={`w-full flex-row items-center gap-3 px-3.5 py-2.5 hover:bg-hover ${i() < props.children.length - 1 ? "border-b border-line" : ""}`}
               onPress={() => props.onOpen(child().id)}
             >
               <Text class="w-10 shrink-0 font-mono text-xs text-muted tabular-nums">{`#${child().number}`}</Text>

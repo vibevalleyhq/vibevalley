@@ -4,6 +4,7 @@ import { Popover } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../../../design/Icon";
+import { motionClass } from "../../../design/motion";
 import { Segmented } from "../../../design/Segmented";
 import { Bubble } from "../../../design/Tip";
 import { type BoardLook, defaultLook, groupingLabel, groupings, orderingLabel, orderings } from "../model/display";
@@ -29,7 +30,7 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
           role="button"
           accessibilityLabel={t("web.issue.display.show")}
           tooltip={<Bubble text={t("web.issue.display.show")} />}
-          class="h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+          class={`h-7 flex-row items-center gap-1.5 rounded-md border border-line bg-page px-2.5 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
         >
           <Icon name="settings" size={14} tone="muted" />
           <Text class="text-sm text-ink">{t("web.issue.display.show")}</Text>
@@ -75,7 +76,7 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
           <View
             role="button"
             testID="display-reset"
-            class="mt-2 self-start rounded-md px-2 py-1 transition duration-120 ease-out hover:bg-hover active:translate-y-px"
+            class={`mt-2 self-start rounded-md px-2 py-1 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
             onPress={() => props.onChange({ ...props.look, grouping: defaultLook.grouping, ordering: defaultLook.ordering })}
           >
             <Text class="text-xs font-medium text-water">{t("web.issue.display.reset")}</Text>

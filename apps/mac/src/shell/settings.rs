@@ -3,7 +3,7 @@ use std::time::Duration;
 use gpui::{Context, MouseMoveEvent, Window};
 
 use crate::panes::PaneEntity;
-use crate::theme::{ThemeChoice, Ui};
+use crate::theme::{MotionChoice, ThemeChoice, Ui};
 
 use super::{SETTINGS_KEY, SIDEBAR_MAX, SIDEBAR_MIN, Shell};
 
@@ -113,6 +113,41 @@ impl Shell {
     pub fn toggle_theme(&mut self, cx: &mut Context<Self>) {
         let choice = if Ui::get(cx).colors.dark { ThemeChoice::Light } else { ThemeChoice::Dark };
         self.set_theme(choice, cx);
+    }
+
+    pub fn set_motion(&mut self, choice: MotionChoice, cx: &mut Context<Self>) {
+        let mut settings = Ui::get(cx).settings.clone();
+        settings.motion = choice;
+        let effective = settings.effective_motion();
+        Ui::apply(settings, cx);
+        if effective == MotionChoice::Off {
+            self.launch = None;
+            for t in self.terminals.values() {
+                t.view.update(cx, |t, cx| {
+                    if !t.blink_on {
+                        t.blink_on = true;
+                        cx.notify();
+                    }
+                });
+            }
+        }
+        self.notify_motion(effective, cx);
+        self.save_settings(cx);
+        cx.notify();
+    }
+
+    pub(super) fn notify_motion(&mut self, motion: MotionChoice, cx: &mut Context<Self>) {
+        self.sidebar.update(cx, |v, cx| v.set_motion(motion, cx));
+        self.inspector.update(cx, |v, cx| v.set_motion(motion, cx));
+        self.workbench.update(cx, |v, cx| v.set_motion(motion, cx));
+        if let Some(p) = &self.palette {
+            p.view.update(cx, |v, cx| v.set_motion(motion, cx));
+        }
+        for pane in self.panes.values() {
+            if let PaneEntity::Hosted(view) = &pane.entity {
+                view.update(cx, |v, cx| v.set_motion(motion, cx));
+            }
+        }
     }
 
     pub(super) fn apply_ui_font_size(&mut self, cx: &mut Context<Self>) {

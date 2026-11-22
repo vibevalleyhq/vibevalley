@@ -1,11 +1,12 @@
 import { host, setColorScheme, signal } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { type ThemeChoice, ThemeChoiceValues } from "@vibevalley/protocol/host";
+import { MotionChoiceValues, type ThemeChoice, ThemeChoiceValues } from "@vibevalley/protocol/host";
 
 import { SettingRow, SettingsGroup } from "../../design/domain/settings";
 import { Select } from "../../design/Field";
 import type { IconName } from "../../design/icons";
+import { applyMotion, chooseMotion, motionChoice } from "../../design/motion";
 import { Segmented } from "../../design/Segmented";
 import { hostApi } from "../../infra/bridge";
 import { currentHost } from "../../infra/host";
@@ -29,8 +30,9 @@ const fontSizes = [11, 12, 13, 14, 15, 16, 18, 20] as const;
 
 const chooseTheme = (theme: ThemeChoice) => {
   setTheme(theme);
-  setColorScheme(theme);
-  currentHost().theme?.(theme);
+  const hostTheme = currentHost().theme;
+  if (hostTheme) hostTheme(theme);
+  else setColorScheme(theme);
 };
 
 export function AppearanceGroups() {
@@ -43,6 +45,7 @@ export function AppearanceGroups() {
   if (host.available()) {
     void hostApi.info().then((env) => {
       if (env.bizCode === 0 && env.data) {
+        if (env.data.motion) applyMotion(env.data.motion);
         if (env.data.monoFont) monoFont.set(env.data.monoFont);
         if (Array.isArray(env.data.monoFonts) && env.data.monoFonts.length > 0) {
           const merged: string[] = [...defaultMonoFonts];
@@ -70,6 +73,15 @@ export function AppearanceGroups() {
           value={theme()}
           options={ThemeChoiceValues.map((v) => ({ value: v, icon: themeIcon[v], label: t(`web.setting.appearance.themes.${v}`) }))}
           onChange={chooseTheme}
+        />
+      </SettingRow>
+      <SettingRow label={t("web.setting.appearance.motion")} hint={t("web.setting.appearance.motionHint")}>
+        <Segmented
+          label={t("web.setting.appearance.motion")}
+          testid="motion"
+          value={motionChoice()}
+          options={MotionChoiceValues.map((v) => ({ value: v, label: t(`web.setting.appearance.motionOption.${v}`) }))}
+          onChange={chooseMotion}
         />
       </SettingRow>
       <SettingRow label={t("web.setting.appearance.scale")} hint={t("web.setting.appearance.scaleHint")}>

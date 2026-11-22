@@ -45,10 +45,12 @@ impl BridgeHub {
                 match vibevalley_server::start(crate::serving::config(&home, crate::serving::work_root())) {
                     Ok(started) => {
                         let hub: std::sync::Arc<dyn vibevalley_server::transport::bridge::Server> = started.hub.clone();
-                        let port: u16 = std::env::var("VIBEVALLEY_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(0);
-                        let addr = format!("127.0.0.1:{port}").parse().expect("an address");
+                        let preference = port_preference_from(std::env::var("VIBEVALLEY_PORT").ok().as_deref(), vibevalley_protocol::home::default_port());
                         // The loopback API: the CLI finds it through server.json, the helpers' MCP door is on it.
-                        let (listener, announced) = match vibevalley_server::transport::http::serve(started.hub.clone(), addr) {
+                        let (listener, announced) = match preference.and_then(|pref| {
+                            bind_preferred_or_ephemeral(pref, |addr| vibevalley_server::transport::http::serve(started.hub.clone(), addr))
+                                .map_err(|e| format!("vibevalley http: {e}"))
+                        }) {
                             Ok(listener) => {
                                 started.board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));
                                 match vibevalley_server::home::announce(&home, &listener.url()) {
@@ -63,7 +65,7 @@ impl BridgeHub {
                                 }
                             }
                             Err(e) => {
-                                let _ = ready.send_replace(Some(Err(format!("vibevalley http: {e}"))));
+                                let _ = ready.send_replace(Some(Err(e)));
                                 (None, None)
                             }
                         };
@@ -110,7 +112,7 @@ impl Replier {
     }
 }
 
-/// The farm's home: `VIBEVALLEY_HOME`, else `~/.vibevalley` (packages/home).
+/// The farm's home: `VIBEVALLEY_HOME`, else `$HOME/<current_channel().home_dir_name()>`.
 pub fn server_home() -> std::path::PathBuf {
     vibevalley_server::home::home()
 }
@@ -242,6 +244,7 @@ impl HostedView {
         let hub = cx.try_global::<BridgeHub>().map(|h| h.0.clone());
         let mut client = None;
         let ui_font_size = cx.try_global::<crate::theme::Ui>().map(|ui| ui.settings.ui_font_size).unwrap_or(13.0);
+        let motion = cx.try_global::<crate::theme::Ui>().map(|ui| ui.settings.effective_motion()).unwrap_or_default();
         let app = cx.new(|cx| {
             let app = AppView::new(options, window, cx);
             app.set_appearance(if dark { Appearance::Dark } else { Appearance::Light }, cx);
@@ -253,6 +256,7 @@ impl HostedView {
             let mut params = params;
             params.insert("view".into(), json!(name));
             params.entry("locale").or_insert_with(|| json!(vibevalley_i18n::locale()));
+            params.entry("motion").or_insert_with(|| json!(motion.as_str()));
             params.entry("randomSeed").or_insert_with(|| json!(crate::host::random_seed_hex()));
             let pixel_dir = crate::pixel::assets_dir().join("pixel");
             let has_pixel_dir = pixel_dir.join("sprites.json").is_file();
@@ -380,6 +384,10 @@ impl HostedView {
         let _ = self.app.read(cx).host().send("locale", json!(locale));
     }
 
+    pub fn set_motion(&self, motion: crate::theme::MotionChoice, cx: &App) {
+        let _ = self.app.read(cx).host().send("motion", json!(motion.as_str()));
+    }
+
     pub fn set_ui_font_size(&self, size: f32, cx: &mut App) {
         let scale = size / 13.0;
         let scale = ((scale - 1.0).abs() > 0.01).then_some(scale);
@@ -455,5 +463,72 @@ impl Render for HostedView {
                 let _ = this.app.read(cx).host().send("farm-key-up", json!(key));
             }
         }))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PortPreference {
+    Explicit(u16),
+    ChannelDefault(u16),
+}
+
+fn port_preference_from(raw_port: Option<&str>, channel_default: u16) -> Result<PortPreference, String> {
+    match raw_port.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(raw) => raw
+            .parse::<u16>()
+            .map(PortPreference::Explicit)
+            .map_err(|e| format!("invalid VIBEVALLEY_PORT {raw:?}: {e}")),
+        None => Ok(PortPreference::ChannelDefault(channel_default)),
+    }
+}
+
+fn bind_preferred_or_ephemeral<T, F>(preference: PortPreference, mut bind: F) -> std::io::Result<T>
+where
+    F: FnMut(std::net::SocketAddr) -> std::io::Result<T>,
+{
+    let loopback = |port: u16| std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    match preference {
+        PortPreference::Explicit(port) => bind(loopback(port)),
+        PortPreference::ChannelDefault(port) => match bind(loopback(port)) {
+            Ok(bound) => Ok(bound),
+            Err(err) if err.kind() == std::io::ErrorKind::AddrInUse && port != 0 => {
+                eprintln!("vibevalley http: 127.0.0.1:{port} is already in use; falling back to an ephemeral port");
+                bind(loopback(0))
+            }
+            Err(err) => Err(err),
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::ErrorKind;
+    use std::net::TcpListener;
+
+    use super::*;
+
+    #[test]
+    fn port_preference_parses_explicit_and_channel_defaults() {
+        assert_eq!(port_preference_from(None, 8789), Ok(PortPreference::ChannelDefault(8789)));
+        assert_eq!(port_preference_from(Some("  "), 8790), Ok(PortPreference::ChannelDefault(8790)));
+        assert_eq!(port_preference_from(Some("0"), 8789), Ok(PortPreference::Explicit(0)));
+        assert_eq!(port_preference_from(Some("9123"), 8789), Ok(PortPreference::Explicit(9123)));
+        assert!(port_preference_from(Some("bogus"), 8789).is_err());
+    }
+
+    #[test]
+    fn channel_default_port_falls_back_to_ephemeral_on_addr_in_use() {
+        let occupied = TcpListener::bind("127.0.0.1:0").expect("occupy loopback port");
+        let busy_port = occupied.local_addr().unwrap().port();
+
+        let fallback = bind_preferred_or_ephemeral(PortPreference::ChannelDefault(busy_port), TcpListener::bind)
+            .expect("channel default should fall back to ephemeral port");
+        let bound_port = fallback.local_addr().unwrap().port();
+        assert_ne!(bound_port, 0);
+        assert_ne!(bound_port, busy_port);
+
+        let explicit_err = bind_preferred_or_ephemeral(PortPreference::Explicit(busy_port), TcpListener::bind)
+            .expect_err("explicit VIBEVALLEY_PORT must not silently fall back on AddrInUse");
+        assert_eq!(explicit_err.kind(), ErrorKind::AddrInUse);
     }
 }

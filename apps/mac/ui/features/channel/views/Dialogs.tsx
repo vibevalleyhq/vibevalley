@@ -12,6 +12,7 @@ import { OrchestratorFace } from "../../../design/domain/Face";
 import { Field, TextArea, TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { Banner } from "../../../design/layout";
+import { motionClass } from "../../../design/motion";
 import { Segmented } from "../../../design/Segmented";
 import { Bubble } from "../../../design/Tip";
 import { mix } from "../../../design/tone";
@@ -35,7 +36,7 @@ function Offered(props: { value: string; onChange: (v: string) => void; offered:
                 role="button"
                 testID={`${props.testid}-offer-${o()}`}
                 onPress={() => props.onChange(o())}
-                class="group rounded-md border border-line bg-side px-2 py-0.5 transition duration-120 ease-out hover:border-faint hover:bg-hover active:translate-y-px"
+                class={`group rounded-md border border-line bg-side px-2 py-0.5 ${motionClass("transition-transform duration-120 ease-out")} hover:border-faint hover:bg-hover active:translate-y-px`}
               >
                 <Text class="text-xs text-muted group-hover:text-ink">{o()}</Text>
               </View>
@@ -271,7 +272,7 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
                 {(a) => {
                   const checked = () => form.members().includes(a().id);
                   return (
-                    <View class="flex-row items-center gap-2 rounded-md px-1.5 py-1 transition duration-120 ease-out hover:bg-hover">
+                    <View class="flex-row items-center gap-2 rounded-md px-1.5 py-1 hover:bg-hover">
                       <Checkbox testid={`channel-member-${a().id}`} label={a().name} checked={checked()} onChange={(on) => form.setMember(a().id, on)} />
                       <View role="button" onPress={() => form.setMember(a().id, !checked())} class="min-w-0 flex-1 flex-row items-center gap-2">
                         <OrchestratorFace size={18} agent={a().id} />

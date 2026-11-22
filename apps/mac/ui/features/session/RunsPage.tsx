@@ -386,7 +386,7 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
       accessibilityLabel={entryName(props.entry)}
       accessibilityState={{ selected: props.selected }}
       onPress={props.onSelect}
-      class={`relative flex-row items-start gap-2.5 rounded-md border px-2.5 py-2 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus ${
+      class={`relative flex-row items-start gap-2.5 rounded-md border px-2.5 py-2 focus-visible:outline-2 focus-visible:outline-focus ${
         props.selected ? "border-line bg-selected" : "border-transparent hover:bg-hover"
       }`}
     >
@@ -475,7 +475,7 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
               role="button"
               testID="runs-back"
               onPress={props.onBack}
-              class="-ml-1.5 self-start rounded-md px-1.5 py-0.5 transition duration-120 ease-out focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+              class="-ml-1.5 self-start rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
             >
               <Text class="text-xs font-medium text-muted">{t("web.session.hub.back")}</Text>
             </View>
