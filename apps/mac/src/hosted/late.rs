@@ -226,6 +226,10 @@ impl Server for LateServer {
     fn remote_auth(&self) -> Option<vibevalley_server::transport::api::SharedRemoteAuth> {
         self.cell.get().and_then(|s| s.remote_auth())
     }
+
+    fn machine_bus(&self) -> Option<vibevalley_server::transport::api::SharedMachineBus> {
+        self.cell.get().and_then(|s| s.machine_bus())
+    }
 }
 
 #[cfg(test)]
@@ -498,5 +502,58 @@ mod tests {
             let failed_env = unattached.call_with_async(CallerContext::local(), "issue.list".into(), json!({})).await;
             assert_eq!(failed_env.biz_code, BizCode::ServiceUnavailable.code());
         });
+    }
+
+    #[test]
+    fn machine_bus_forwards_after_attach() {
+        struct DummyMachineBus;
+        impl vibevalley_server::transport::api::MachineBus for DummyMachineBus {
+            fn accept_connection(&self, _conn: vibevalley_server::transport::api::MachineConnection) {}
+        }
+
+        struct MachineBusServer {
+            inner: Arc<FakeServer>,
+            bus: vibevalley_server::transport::api::SharedMachineBus,
+        }
+
+        impl Server for MachineBusServer {
+            fn call(&self, op: &str, payload: Value) -> Envelope {
+                self.inner.call(op, payload)
+            }
+
+            fn slice_snapshot(&self, slice: SliceKind) -> Value {
+                self.inner.slice_snapshot(slice)
+            }
+
+            fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+                self.inner.watch_slice(slice, after_seq, stop, receive);
+            }
+
+            fn live(&self) -> flume::Receiver<LiveEvent> {
+                self.inner.live()
+            }
+
+            fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+                self.inner.subscribe(name, payload)
+            }
+
+            fn unsubscribe(&self, id: u64) {
+                self.inner.unsubscribe(id);
+            }
+
+            fn machine_bus(&self) -> Option<vibevalley_server::transport::api::SharedMachineBus> {
+                Some(self.bus.clone())
+            }
+        }
+
+        let late = LateServer::new();
+        assert!(late.machine_bus().is_none());
+        let bus: vibevalley_server::transport::api::SharedMachineBus = Arc::new(DummyMachineBus);
+        late.attach(Arc::new(MachineBusServer {
+            inner: Arc::new(FakeServer::new()),
+            bus: bus.clone(),
+        }));
+        let forwarded = late.machine_bus().expect("machine_bus forwarded after attach");
+        assert!(Arc::ptr_eq(&forwarded, &bus));
     }
 }

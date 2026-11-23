@@ -5,16 +5,25 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::future::Future;
+use std::io;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use futures_util::StreamExt;
+use futures_util::{Stream, StreamExt, TryStreamExt};
 use parking_lot::Mutex;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
-use tokio_util::sync::CancellationToken;
-use vibevalley_protocol::{BizCode, Envelope, LiveEvent, SliceKind};
+use tokio::sync::{broadcast, watch};
+use tokio_util::codec::{FramedRead, LinesCodec, LinesCodecError};
+use tokio_util::io::StreamReader;
+use tokio_util::sync::{CancellationToken, DropGuard};
+use vibevalley_protocol::{BizCode, BoardSlice, CollabSlice, Envelope, FarmFrame, InboxSlice, LiveEvent, OpsSlice, SessionsSlice, SliceKind};
+use vibevalley_server::slice_feed::{Sequenced, SliceFeed, SliceSnapshot, SliceSubscription};
 use vibevalley_server::transport::api::{BoxFuture, CallerContext, Server, refusal};
+use vibevalley_server::transport::bridge::fake::empty_bundle;
 
 use crate::hosted::connection::{Secret, is_loopback_url, normalize_url};
 
@@ -23,6 +32,7 @@ const BACKOFF_MS: &[u64] = &[500, 1_000, 2_000, 4_000, 8_000];
 const CALL_TIMEOUT: Duration = Duration::from_secs(60);
 const SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(15);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const LIVE_BROADCAST_CAP: usize = 256;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SseMessage {
@@ -30,76 +40,28 @@ struct SseMessage {
     data: String,
 }
 
-/// Incremental UTF-8 Server-Sent Events parser matching W3C EventSource framing.
+/// Line-based Server-Sent Events accumulator matching W3C EventSource field framing.
 #[derive(Default)]
-struct SseParser {
-    buffer: String,
-    skip_leading_lf: bool,
+struct SseEventAccumulator {
     last_event_id: Option<String>,
     data_lines: Vec<String>,
 }
 
-impl SseParser {
-    fn push(&mut self, chunk: &str, on_message: &mut impl FnMut(SseMessage)) {
-        let mut text = chunk;
-        if self.skip_leading_lf {
-            if let Some(rest) = text.strip_prefix('\n') {
-                text = rest;
-            }
-            if !chunk.is_empty() {
-                self.skip_leading_lf = false;
-            }
-        }
-        self.buffer.push_str(text);
-
-        let buf = std::mem::take(&mut self.buffer);
-        let bytes = buf.as_bytes();
-        let mut start = 0usize;
-        let mut i = 0usize;
-        while i < bytes.len() {
-            match bytes[i] {
-                b'\n' => {
-                    self.handle_line(&buf[start..i], on_message);
-                    i += 1;
-                    start = i;
-                }
-                b'\r' => {
-                    self.handle_line(&buf[start..i], on_message);
-                    if i + 1 < bytes.len() {
-                        if bytes[i + 1] == b'\n' {
-                            i += 2;
-                        } else {
-                            i += 1;
-                        }
-                        start = i;
-                    } else {
-                        self.skip_leading_lf = true;
-                        i += 1;
-                        start = i;
-                    }
-                }
-                _ => i += 1,
-            }
-        }
-        if start < buf.len() {
-            self.buffer.push_str(&buf[start..]);
-        }
-    }
-
-    fn handle_line(&mut self, line: &str, on_message: &mut impl FnMut(SseMessage)) {
+impl SseEventAccumulator {
+    fn push_line(&mut self, line: &str) -> Option<SseMessage> {
         if line.is_empty() {
-            if !self.data_lines.is_empty() {
-                let data = self.data_lines.join("\n");
-                self.data_lines.clear();
-                on_message(SseMessage {
-                    id: self.last_event_id.clone(),
-                    data,
-                });
+            if self.data_lines.is_empty() {
+                return None;
             }
-            return;
+            let data = self.data_lines.join("\n");
+            self.data_lines.clear();
+            return Some(SseMessage {
+                id: self.last_event_id.clone(),
+                data,
+            });
         }
         if line.starts_with(':') {
-            return;
+            return None;
         }
         let (field, raw_value) = match line.split_once(':') {
             Some((f, v)) => (f, v.strip_prefix(' ').unwrap_or(v)),
@@ -110,7 +72,138 @@ impl SseParser {
             "id" if !raw_value.contains('\0') => self.last_event_id = Some(raw_value.to_string()),
             _ => {}
         }
+        None
     }
+}
+
+/// Decodes a streaming HTTP response body into UTF-8 lines across arbitrary TCP chunk boundaries.
+fn sse_lines(response: reqwest::Response) -> impl Stream<Item = Result<String, LinesCodecError>> + Send {
+    FramedRead::new(StreamReader::new(response.bytes_stream().map_err(io::Error::other)), LinesCodec::new())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SseStep {
+    Continue,
+    ContinueWithSeq(i64),
+    Stop,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SseStop {
+    StreamEnded,
+    Stopped,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LoopExit {
+    Cancelled,
+    AuthRefused,
+    Closed,
+}
+
+async fn drain_sse_response<F, Fut>(
+    response: reqwest::Response,
+    cancel: &CancellationToken,
+    last_seq: &mut Option<i64>,
+    is_closed: &mut impl FnMut() -> bool,
+    on_message: &mut F,
+) -> SseStop
+where
+    F: FnMut(SseMessage) -> Fut,
+    Fut: Future<Output = SseStep>,
+{
+    let lines = sse_lines(response);
+    tokio::pin!(lines);
+    let mut acc = SseEventAccumulator::default();
+
+    loop {
+        if is_closed() {
+            return SseStop::Stopped;
+        }
+        let next = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return SseStop::Stopped,
+            item = lines.next() => item,
+        };
+        let Some(Ok(line)) = next else {
+            return SseStop::StreamEnded;
+        };
+        if is_closed() {
+            return SseStop::Stopped;
+        }
+        if let Some(msg) = acc.push_line(&line) {
+            match on_message(msg).await {
+                SseStep::Continue => {}
+                SseStep::ContinueWithSeq(seq) => *last_seq = Some(seq),
+                SseStep::Stop => return SseStop::Stopped,
+            }
+        }
+        if cancel.is_cancelled() {
+            return SseStop::Stopped;
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_sse_loop<F, Fut>(
+    client: reqwest::Client,
+    token: Secret,
+    url: String,
+    cancel: CancellationToken,
+    last_seq: &mut Option<i64>,
+    mut is_closed: impl FnMut() -> bool,
+    mut on_auth_refused: impl FnMut(reqwest::StatusCode),
+    mut on_message: F,
+) -> LoopExit
+where
+    F: FnMut(SseMessage) -> Fut,
+    Fut: Future<Output = SseStep>,
+{
+    let mut attempt = 0usize;
+    while !cancel.is_cancelled() && !is_closed() {
+        let mut req = attach_headers(client.get(&url).header("accept", "text/event-stream"), &token);
+        if let Some(seq) = *last_seq {
+            req = req.header("last-event-id", seq.to_string());
+        }
+        let response = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return LoopExit::Cancelled,
+            res = req.send() => res,
+        };
+        match response {
+            Ok(res) if matches!(res.status(), reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN) => {
+                on_auth_refused(res.status());
+                return LoopExit::AuthRefused;
+            }
+            Ok(res) if res.status().is_success() => {
+                attempt = 0;
+                if drain_sse_response(res, &cancel, last_seq, &mut is_closed, &mut on_message).await == SseStop::Stopped {
+                    return if cancel.is_cancelled() { LoopExit::Cancelled } else { LoopExit::Closed };
+                }
+            }
+            Ok(_) | Err(_) => {}
+        }
+
+        if cancel.is_cancelled() {
+            return LoopExit::Cancelled;
+        }
+        if is_closed() {
+            return LoopExit::Closed;
+        }
+        let delay = backoff_delay(attempt);
+        attempt = attempt.saturating_add(1);
+        tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return LoopExit::Cancelled,
+            _ = tokio::time::sleep(delay) => {}
+        }
+    }
+
+    if cancel.is_cancelled() { LoopExit::Cancelled } else { LoopExit::Closed }
+}
+
+fn parse_sse_seq(msg: &SseMessage, fallback_seq: i64) -> i64 {
+    msg.id.as_deref().and_then(|id| id.trim().parse::<i64>().ok()).unwrap_or(fallback_seq)
 }
 
 fn fallback_biz_code(status: reqwest::StatusCode) -> BizCode {
@@ -167,6 +260,129 @@ fn backoff_delay(attempt: usize) -> Duration {
     Duration::from_millis(BACKOFF_MS[idx])
 }
 
+fn slice_topic(kind: SliceKind) -> &'static str {
+    match kind {
+        SliceKind::Board => "slice:board",
+        SliceKind::Sessions => "slice:sessions",
+        SliceKind::Collab => "slice:collab",
+        SliceKind::Inbox => "slice:inbox",
+        SliceKind::Ops => "slice:ops",
+        SliceKind::Farm => "slice:farm",
+    }
+}
+
+struct RemoteSlice<T> {
+    kind: SliceKind,
+    feed: Arc<SliceFeed<T>>,
+    pump: Arc<Mutex<Option<CancellationToken>>>,
+}
+
+impl<T> RemoteSlice<T>
+where
+    T: Sequenced + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+    fn new(kind: SliceKind, initial: T) -> Self {
+        Self {
+            kind,
+            feed: Arc::new(SliceFeed::new(slice_topic(kind), initial)),
+            pump: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    fn subscribe(&self, server: &RemoteServer) -> watch::Receiver<Arc<SliceSnapshot<T>>> {
+        let rx = self.feed.subscribe();
+        let mut guard = self.pump.lock();
+        if guard.as_ref().is_none_or(CancellationToken::is_cancelled) {
+            let cancel = server.shutdown.child_token();
+            *guard = Some(cancel.clone());
+            let feed = self.feed.clone();
+            let pump = self.pump.clone();
+            let client = server.client.clone();
+            let token = server.token.clone();
+            let kind = self.kind;
+            let url = format!("{}/api/v1/slice/{}", server.base_url, kind.as_str());
+
+            vibevalley_runtime::rt::handle().spawn(async move {
+                let mut last_seq: Option<i64> = None;
+                loop {
+                    let exit = run_sse_loop(
+                        client.clone(),
+                        token.clone(),
+                        url.clone(),
+                        cancel.clone(),
+                        &mut last_seq,
+                        || !feed.has_watchers(),
+                        |status| {
+                            tracing::warn!("remote slice stream {} refused with HTTP {}", kind.as_str(), status.as_u16());
+                        },
+                        |msg| {
+                            let feed = &feed;
+                            async move {
+                                if !feed.has_watchers() {
+                                    return SseStep::Stop;
+                                }
+                                match serde_json::from_str::<T>(&msg.data) {
+                                    Ok(slice) => {
+                                        let seq = parse_sse_seq(&msg, slice.seq());
+                                        feed.replace(slice);
+                                        feed.publish_forced();
+                                        if feed.has_watchers() { SseStep::ContinueWithSeq(seq) } else { SseStep::Stop }
+                                    }
+                                    Err(err) => {
+                                        tracing::warn!("remote slice {} decode failed: {err}", kind.as_str());
+                                        if feed.has_watchers() { SseStep::Continue } else { SseStep::Stop }
+                                    }
+                                }
+                            }
+                        },
+                    )
+                    .await;
+
+                    let mut guard = pump.lock();
+                    if exit == LoopExit::Closed && feed.has_watchers() && !cancel.is_cancelled() {
+                        // A new subscriber attached right as the loop observed zero watchers.
+                        continue;
+                    }
+                    cancel.cancel();
+                    if guard.as_ref().is_some_and(CancellationToken::is_cancelled) {
+                        *guard = None;
+                    }
+                    break;
+                }
+            });
+        }
+        rx
+    }
+}
+
+struct RemoteSlices {
+    board: RemoteSlice<BoardSlice>,
+    sessions: RemoteSlice<SessionsSlice>,
+    collab: RemoteSlice<CollabSlice>,
+    inbox: RemoteSlice<InboxSlice>,
+    ops: RemoteSlice<OpsSlice>,
+    farm: RemoteSlice<FarmFrame>,
+}
+
+impl RemoteSlices {
+    fn new() -> Self {
+        let bundle = empty_bundle(0);
+        Self {
+            board: RemoteSlice::new(SliceKind::Board, bundle.board),
+            sessions: RemoteSlice::new(SliceKind::Sessions, bundle.sessions),
+            collab: RemoteSlice::new(SliceKind::Collab, bundle.collab),
+            inbox: RemoteSlice::new(SliceKind::Inbox, bundle.inbox),
+            ops: RemoteSlice::new(SliceKind::Ops, bundle.ops),
+            farm: RemoteSlice::new(SliceKind::Farm, bundle.farm),
+        }
+    }
+}
+
+struct LivePump {
+    tx: broadcast::Sender<LiveEvent>,
+    cancel: CancellationToken,
+}
+
 /// Remote Control Plane `Server` talking HTTP + SSE to a remote `vibevalley-server`.
 pub struct RemoteServer {
     base_url: String,
@@ -176,6 +392,9 @@ pub struct RemoteServer {
     subs: Arc<Mutex<HashMap<u64, CancellationToken>>>,
     next_sub_id: AtomicU64,
     shutdown: CancellationToken,
+    _shutdown_guard: DropGuard,
+    slices: RemoteSlices,
+    live_bus: Arc<Mutex<Option<LivePump>>>,
 }
 
 impl fmt::Debug for RemoteServer {
@@ -192,6 +411,8 @@ impl RemoteServer {
     pub fn new(base_url: String, token: Secret, label: Option<String>) -> Result<Self, String> {
         let base_url = normalize_url(&base_url)?;
         let client = build_client(&base_url)?;
+        let shutdown = CancellationToken::new();
+        let _shutdown_guard = shutdown.clone().drop_guard();
         Ok(Self {
             base_url,
             token,
@@ -199,7 +420,10 @@ impl RemoteServer {
             client,
             subs: Arc::new(Mutex::new(HashMap::new())),
             next_sub_id: AtomicU64::new(1),
-            shutdown: CancellationToken::new(),
+            shutdown,
+            _shutdown_guard,
+            slices: RemoteSlices::new(),
+            live_bus: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -217,16 +441,6 @@ impl RemoteServer {
             Err(err) => return refusal(BizCode::ServiceUnavailable, format!("failed reading remote response: {err}")),
         };
         parse_envelope_or_fallback(status, &text)
-    }
-}
-
-impl Drop for RemoteServer {
-    fn drop(&mut self) {
-        self.shutdown.cancel();
-        let tokens: Vec<CancellationToken> = self.subs.lock().drain().map(|(_, t)| t).collect();
-        for token in tokens {
-            token.cancel();
-        }
     }
 }
 
@@ -268,87 +482,34 @@ impl Server for RemoteServer {
 
         vibevalley_runtime::rt::handle().spawn(async move {
             let mut last_seq = after_seq;
-            let mut attempt = 0usize;
-
-            while !task_cancel.is_cancelled() && !tx.is_disconnected() {
-                let mut req = attach_headers(client.get(&url).header("accept", "text/event-stream"), &token);
-                if let Some(seq) = last_seq {
-                    req = req.header("last-event-id", seq.to_string());
-                }
-                let response = tokio::select! {
-                    biased;
-                    _ = task_cancel.cancelled() => break,
-                    res = req.send() => res,
-                };
-                match response {
-                    Ok(res) if res.status() == reqwest::StatusCode::UNAUTHORIZED || res.status() == reqwest::StatusCode::FORBIDDEN => {
-                        tracing::warn!("remote slice stream {} refused with HTTP {}", slice.as_str(), res.status().as_u16());
-                        break;
+            let _ = run_sse_loop(
+                client,
+                token,
+                url,
+                task_cancel.clone(),
+                &mut last_seq,
+                || tx.is_disconnected(),
+                |status| {
+                    tracing::warn!("remote slice stream {} refused with HTTP {}", slice.as_str(), status.as_u16());
+                },
+                |msg| {
+                    let tx = &tx;
+                    let cancel = &task_cancel;
+                    async move {
+                        let Ok(val) = serde_json::from_str::<Value>(&msg.data) else {
+                            return SseStep::Continue;
+                        };
+                        let seq = parse_sse_seq(&msg, val.get("seq").and_then(Value::as_i64).unwrap_or(0));
+                        let sent = tokio::select! {
+                            biased;
+                            _ = cancel.cancelled() => false,
+                            res = tx.send_async((seq, val)) => res.is_ok(),
+                        };
+                        if sent { SseStep::ContinueWithSeq(seq) } else { SseStep::Stop }
                     }
-                    Ok(res) if res.status().is_success() => {
-                        attempt = 0;
-                        let mut stream = res.bytes_stream();
-                        let mut parser = SseParser::default();
-                        let mut pending: Vec<SseMessage> = Vec::new();
-                        let mut closed_by_receiver = false;
-
-                        loop {
-                            let next = tokio::select! {
-                                biased;
-                                _ = task_cancel.cancelled() => None,
-                                item = stream.next() => item,
-                            };
-                            let Some(chunk_res) = next else {
-                                break;
-                            };
-                            let Ok(bytes) = chunk_res else {
-                                break;
-                            };
-                            let text = String::from_utf8_lossy(&bytes);
-                            parser.push(&text, &mut |msg| pending.push(msg));
-                            for msg in pending.drain(..) {
-                                let Ok(val) = serde_json::from_str::<Value>(&msg.data) else {
-                                    continue;
-                                };
-                                let seq = msg
-                                    .id
-                                    .as_deref()
-                                    .and_then(|id| id.trim().parse::<i64>().ok())
-                                    .or_else(|| val.get("seq").and_then(Value::as_i64))
-                                    .unwrap_or(0);
-                                last_seq = Some(seq);
-                                let sent = tokio::select! {
-                                    biased;
-                                    _ = task_cancel.cancelled() => Err(()),
-                                    res = tx.send_async((seq, val)) => res.map_err(|_| ()),
-                                };
-                                if sent.is_err() {
-                                    closed_by_receiver = true;
-                                    break;
-                                }
-                            }
-                            if closed_by_receiver || task_cancel.is_cancelled() {
-                                break;
-                            }
-                        }
-                        if closed_by_receiver {
-                            break;
-                        }
-                    }
-                    Ok(_) | Err(_) => {}
-                }
-
-                if task_cancel.is_cancelled() || tx.is_disconnected() {
-                    break;
-                }
-                let delay = backoff_delay(attempt);
-                attempt = attempt.saturating_add(1);
-                tokio::select! {
-                    biased;
-                    _ = task_cancel.cancelled() => break,
-                    _ = tokio::time::sleep(delay) => {}
-                }
-            }
+                },
+            )
+            .await;
         });
 
         enum Step {
@@ -375,84 +536,106 @@ impl Server for RemoteServer {
         }
     }
 
+    fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
+        Some(match slice {
+            SliceKind::Board => SliceSubscription::Board(self.slices.board.subscribe(self)),
+            SliceKind::Sessions => SliceSubscription::Sessions(self.slices.sessions.subscribe(self)),
+            SliceKind::Collab => SliceSubscription::Collab(self.slices.collab.subscribe(self)),
+            SliceKind::Inbox => SliceSubscription::Inbox(self.slices.inbox.subscribe(self)),
+            SliceKind::Ops => SliceSubscription::Ops(self.slices.ops.subscribe(self)),
+            SliceKind::Farm => SliceSubscription::Farm {
+                rx: self.slices.farm.subscribe(self),
+                strip_initial_effects: false,
+            },
+        })
+    }
+
     fn live(&self) -> flume::Receiver<LiveEvent> {
         let (tx, rx) = flume::unbounded::<LiveEvent>();
+        if let Some(mut live_rx) = self.subscribe_live() {
+            let cancel = self.shutdown.child_token();
+            vibevalley_runtime::rt::handle().spawn(async move {
+                loop {
+                    let event = tokio::select! {
+                        biased;
+                        _ = cancel.cancelled() => break,
+                        res = live_rx.recv() => match res {
+                            Ok(ev) => ev,
+                            Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                            Err(broadcast::error::RecvError::Closed) => break,
+                        },
+                    };
+                    if tx.send(event).is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+        rx
+    }
+
+    fn subscribe_live(&self) -> Option<broadcast::Receiver<LiveEvent>> {
+        let mut guard = self.live_bus.lock();
+        if let Some(pump) = guard.as_ref()
+            && !pump.cancel.is_cancelled()
+        {
+            return Some(pump.tx.subscribe());
+        }
+        if let Some(old) = guard.take() {
+            old.cancel.cancel();
+        }
+        let (tx, rx) = broadcast::channel(LIVE_BROADCAST_CAP);
+        let cancel = self.shutdown.child_token();
+        *guard = Some(LivePump {
+            tx: tx.clone(),
+            cancel: cancel.clone(),
+        });
+        drop(guard);
+
+        let live_bus = self.live_bus.clone();
         let client = self.client.clone();
         let token = self.token.clone();
-        let cancel = self.shutdown.child_token();
         let url = format!("{}/api/v1/live", self.base_url);
 
         vibevalley_runtime::rt::handle().spawn(async move {
-            let mut attempt = 0usize;
-            while !cancel.is_cancelled() && !tx.is_disconnected() {
-                let req = attach_headers(client.get(&url).header("accept", "text/event-stream"), &token);
-                let response = tokio::select! {
-                    biased;
-                    _ = cancel.cancelled() => break,
-                    res = req.send() => res,
-                };
-                match response {
-                    Ok(res) if res.status() == reqwest::StatusCode::UNAUTHORIZED || res.status() == reqwest::StatusCode::FORBIDDEN => {
-                        break;
-                    }
-                    Ok(res) if res.status().is_success() => {
-                        attempt = 0;
-                        let mut stream = res.bytes_stream();
-                        let mut parser = SseParser::default();
-                        let mut pending: Vec<SseMessage> = Vec::new();
-                        let mut disconnected = false;
-
-                        loop {
-                            let next = tokio::select! {
-                                biased;
-                                _ = cancel.cancelled() => None,
-                                item = stream.next() => item,
-                            };
-                            let Some(chunk_res) = next else {
-                                break;
-                            };
-                            let Ok(bytes) = chunk_res else {
-                                break;
-                            };
-                            if tx.is_disconnected() {
-                                disconnected = true;
-                                break;
+            let mut last_seq = None;
+            loop {
+                let exit = run_sse_loop(
+                    client.clone(),
+                    token.clone(),
+                    url.clone(),
+                    cancel.clone(),
+                    &mut last_seq,
+                    || tx.receiver_count() == 0,
+                    |_| {},
+                    |msg| {
+                        let tx = &tx;
+                        async move {
+                            if tx.receiver_count() == 0 {
+                                return SseStep::Stop;
                             }
-                            let text = String::from_utf8_lossy(&bytes);
-                            parser.push(&text, &mut |msg| pending.push(msg));
-                            for msg in pending.drain(..) {
-                                if let Ok(event) = serde_json::from_str::<LiveEvent>(&msg.data)
-                                    && tx.send(event).is_err()
-                                {
-                                    disconnected = true;
-                                    break;
-                                }
+                            if let Ok(event) = serde_json::from_str::<LiveEvent>(&msg.data) {
+                                return if tx.send(event).is_ok() { SseStep::Continue } else { SseStep::Stop };
                             }
-                            if disconnected || cancel.is_cancelled() {
-                                break;
-                            }
+                            if tx.receiver_count() > 0 { SseStep::Continue } else { SseStep::Stop }
                         }
-                        if disconnected {
-                            break;
-                        }
-                    }
-                    Ok(_) | Err(_) => {}
-                }
+                    },
+                )
+                .await;
 
-                if cancel.is_cancelled() || tx.is_disconnected() {
-                    break;
+                let mut guard = live_bus.lock();
+                if exit == LoopExit::Closed && tx.receiver_count() > 0 && !cancel.is_cancelled() {
+                    continue;
                 }
-                let delay = backoff_delay(attempt);
-                attempt = attempt.saturating_add(1);
-                tokio::select! {
-                    biased;
-                    _ = cancel.cancelled() => break,
-                    _ = tokio::time::sleep(delay) => {}
+                cancel.cancel();
+                if guard.as_ref().is_some_and(|p| p.cancel.is_cancelled()) {
+                    *guard = None;
                 }
+                break;
             }
         });
 
-        rx
+        Some(rx)
     }
 
     fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
@@ -491,36 +674,18 @@ impl Server for RemoteServer {
         let subs = self.subs.clone();
 
         vibevalley_runtime::rt::handle().spawn(async move {
-            let mut stream = response.bytes_stream();
-            let mut parser = SseParser::default();
-            let mut pending: Vec<SseMessage> = Vec::new();
-            loop {
-                let next = tokio::select! {
-                    biased;
-                    _ = cancel.cancelled() => None,
-                    item = stream.next() => item,
-                };
-                let Some(chunk_res) = next else {
-                    break;
-                };
-                let Ok(bytes) = chunk_res else {
-                    break;
-                };
-                let text = String::from_utf8_lossy(&bytes);
-                parser.push(&text, &mut |msg| pending.push(msg));
-                let mut closed = false;
-                for msg in pending.drain(..) {
-                    if let Ok(val) = serde_json::from_str::<Value>(&msg.data)
-                        && tx.send(val).is_err()
-                    {
-                        closed = true;
-                        break;
+            let mut last_seq = None;
+            let mut is_closed = || tx.is_disconnected();
+            let mut on_message = |msg: SseMessage| {
+                let tx = &tx;
+                async move {
+                    if let Ok(val) = serde_json::from_str::<Value>(&msg.data) {
+                        return if tx.send(val).is_ok() { SseStep::Continue } else { SseStep::Stop };
                     }
+                    if tx.is_disconnected() { SseStep::Stop } else { SseStep::Continue }
                 }
-                if closed || cancel.is_cancelled() {
-                    break;
-                }
-            }
+            };
+            let _ = drain_sse_response(response, &cancel, &mut last_seq, &mut is_closed, &mut on_message).await;
             subs.lock().remove(&sub_id);
         });
 
@@ -546,6 +711,7 @@ mod tests {
     use vibevalley_protocol::{ApiError, BizCode, Issue, LiveEvent, NoticeLevel, RemoteDeviceSummary, RemotePlatform};
     use vibevalley_server::transport::api::{RemoteAuth, RemoteDeviceIdentity};
     use vibevalley_server::transport::bridge::fake::{FakeServer, empty_bundle};
+    use vibevalley_server::transport::bridge::{ClientIdentity, ClientKind, Hub as BridgeHub, Outlet};
     use vibevalley_server::transport::http;
 
     use super::*;
@@ -608,18 +774,98 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct Recorder(Mutex<Vec<(String, Value)>>);
+
+    impl Outlet for Recorder {
+        fn send(&self, event: &str, data: Value) {
+            self.0.lock().push((event.to_string(), data));
+        }
+    }
+
+    impl Recorder {
+        fn named(&self, name: &str) -> Vec<Value> {
+            self.0.lock().iter().filter(|(n, _)| n == name).map(|(_, d)| d.clone()).collect()
+        }
+    }
+
     #[test]
-    fn sse_parser_handles_chunk_boundaries_crlf_comments_and_multiline_data() {
-        let mut parser = SseParser::default();
-        let mut messages = Vec::new();
-        parser.push(": ping\r\nid: 7\r\ndata: {\"a\":\r", &mut |m| messages.push(m));
-        assert!(messages.is_empty());
-        parser.push("\ndata: 1}\r\n\r\ndata: second\n\n", &mut |m| messages.push(m));
-        assert_eq!(messages.len(), 2);
-        assert_eq!(messages[0].id.as_deref(), Some("7"));
-        assert_eq!(messages[0].data, "{\"a\":\n1}");
-        assert_eq!(messages[1].id.as_deref(), Some("7"));
-        assert_eq!(messages[1].data, "second");
+    fn sse_codec_and_accumulator_handle_chunk_boundaries_crlf_comments_and_multiline_data() {
+        vibevalley_runtime::rt::block_on(async {
+            let chunks = vec![
+                Ok::<_, io::Error>(b": ping\r\nid: 7\r\ndata: {\"a\":\r".to_vec()),
+                Ok(b"\ndata: 1}\r\n\r\ndata: second\n\n".to_vec()),
+            ];
+            let stream = futures_util::stream::iter(chunks.into_iter().map(|r| r.map(io::Cursor::new)));
+            let mut lines = FramedRead::new(StreamReader::new(stream), LinesCodec::new());
+            let mut acc = SseEventAccumulator::default();
+            let mut messages = Vec::new();
+            while let Some(line) = lines.next().await {
+                if let Some(msg) = acc.push_line(&line.unwrap()) {
+                    messages.push(msg);
+                }
+            }
+            assert_eq!(messages.len(), 2);
+            assert_eq!(messages[0].id.as_deref(), Some("7"));
+            assert_eq!(messages[0].data, "{\"a\":\n1}");
+            assert_eq!(messages[1].id.as_deref(), Some("7"));
+            assert_eq!(messages[1].data, "second");
+        });
+    }
+
+    #[test]
+    fn regression_sse_preserves_multibyte_utf8_split_across_http_chunks() {
+        let chinese_text = "你好世界：远程控制面中文事件流分片测试";
+        let notice = LiveEvent::Notice(vibevalley_protocol::LiveEventNotice {
+            at: 99,
+            level: NoticeLevel::Info,
+            text: chinese_text.into(),
+        });
+        let payload = format!("data: {}\n\n", serde_json::to_string(&notice).unwrap());
+        let raw_bytes = payload.as_bytes().to_vec();
+        // Split strictly inside the first 3-byte Chinese UTF-8 codepoint (`你` = E4 BD A0).
+        let first_non_ascii = raw_bytes.iter().position(|&b| b >= 0x80).expect("multi-byte UTF-8");
+        let split_at = first_non_ascii + 1;
+        assert!(std::str::from_utf8(&raw_bytes[..split_at]).is_err(), "split must fall mid-codepoint");
+        let part1 = raw_bytes[..split_at].to_vec();
+        let part2 = raw_bytes[split_at..].to_vec();
+
+        let addr = vibevalley_runtime::rt::block_on(async move {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            tokio::spawn(async move {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut req_buf = vec![0u8; 4096];
+                let _ = socket.read(&mut req_buf).await;
+                let head = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ntransfer-encoding: chunked\r\n\r\n";
+                socket.write_all(head.as_bytes()).await.unwrap();
+                let chunk1 = format!("{:x}\r\n", part1.len());
+                socket.write_all(chunk1.as_bytes()).await.unwrap();
+                socket.write_all(&part1).await.unwrap();
+                socket.write_all(b"\r\n").await.unwrap();
+                socket.flush().await.unwrap();
+
+                tokio::time::sleep(Duration::from_millis(20)).await;
+
+                let chunk2 = format!("{:x}\r\n", part2.len());
+                socket.write_all(chunk2.as_bytes()).await.unwrap();
+                socket.write_all(&part2).await.unwrap();
+                socket.write_all(b"\r\n0\r\n\r\n").await.unwrap();
+                socket.flush().await.unwrap();
+            });
+            addr
+        });
+
+        let remote = RemoteServer::new(format!("http://{addr}"), Secret::new("vv_dev_utf8_test"), None).unwrap();
+        let live_rx = remote.live();
+        let received = live_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        match received {
+            LiveEvent::Notice(got) => {
+                assert!(!got.text.contains('\u{FFFD}'), "unexpected U+FFFD replacement char: {}", got.text);
+                assert_eq!(got.text, chinese_text);
+            }
+            other => panic!("expected Notice, got {other:?}"),
+        }
     }
 
     #[test]
@@ -770,7 +1016,56 @@ mod tests {
         drop(stop_tx);
         handle.join().unwrap();
 
-        // 5. live SSE receives LiveEvent.
+        // 5. subscribe_slice + subscribe_live drive BridgeHub via zero-thread async fast paths.
+        let hub = BridgeHub::new(remote.clone(), 2);
+        let rec = Arc::new(Recorder::default());
+        let client = hub.attach(
+            ClientIdentity {
+                id: "remote-bridge".into(),
+                kind: ClientKind::GpuiWorkbench,
+                label: "remote-bridge".into(),
+            },
+            rec.clone(),
+        );
+        client.watch("slice:board").unwrap();
+        client.watch("live").unwrap();
+
+        let start = Instant::now();
+        loop {
+            let frames = rec.named("frame:slice:board");
+            if let Some(last) = frames.last() {
+                if let Some(rev) = last["rev"].as_u64() {
+                    client.applied_slice("slice:board", rev);
+                }
+                if last["data"]["seq"] == 2 {
+                    assert_eq!(last["data"]["issues"][0]["id"], "i-remote");
+                    break;
+                }
+            }
+            assert!(start.elapsed() < Duration::from_secs(5), "timed out waiting for BridgeHub remote board slice");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+
+        let start = Instant::now();
+        while fake.live_watchers() == 0 {
+            assert!(start.elapsed() < Duration::from_secs(5), "timed out waiting for subscribe_live SSE attach");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let bridge_notice = LiveEvent::Notice(vibevalley_protocol::LiveEventNotice {
+            at: 43,
+            level: NoticeLevel::Info,
+            text: "hello bridge live".into(),
+        });
+        fake.push_live(bridge_notice);
+        let start = Instant::now();
+        while rec.named("frame:live").is_empty() {
+            assert!(start.elapsed() < Duration::from_secs(5), "timed out waiting for BridgeHub remote live event");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(rec.named("frame:live")[0]["data"]["text"], "hello bridge live");
+        drop(client);
+
+        // 6. live SSE receives LiveEvent.
         let live_rx = remote.live();
         let start = Instant::now();
         while fake.live_watchers() == 0 {
@@ -787,7 +1082,7 @@ mod tests {
         assert_eq!(ev, expected_notice);
         drop(live_rx);
 
-        // 6. subscribe SSE streams events, handles refusal, and unsubscribes cleanly.
+        // 7. subscribe SSE streams events, handles refusal, and unsubscribes cleanly.
         let (sub_id, sub_rx) = remote.subscribe("channel.follow", json!({ "id": "general", "after": 0 })).unwrap();
         fake.emit("channel.follow", json!({ "seq": 10, "text": "ping" }));
         let sub_ev = sub_rx.recv_timeout(Duration::from_secs(5)).unwrap();
