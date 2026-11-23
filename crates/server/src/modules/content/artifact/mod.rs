@@ -16,11 +16,12 @@ mod types;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use parking_lot::Mutex;
 use sqlx::{Connection, SqliteConnection};
+use tokio::sync::broadcast;
+use tokio_util::sync::CancellationToken;
 use vibevalley_core::artifact::{
     artifact_headers, artifact_problem, html_check, html_edit, html_problem, import_outline_markdown, infer_artifact_from_name, shell_theme_of,
     starter_entries_for_type, with_shell,
@@ -46,6 +47,8 @@ use crate::{Hub, now};
 
 /// How many the farm-wide list shows.
 const LISTED_MAX: i64 = 200;
+/// Bounded ring capacity for artifact change/suggestion/presence broadcasts.
+const STREAM_CAPACITY: usize = 256;
 
 fn refused(text: impl Into<String>) -> ApiError {
     ApiError::new(BizCode::ArtifactRefused, text.into())
@@ -163,40 +166,52 @@ pub struct Artifacts {
     entry_locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
     files: Arc<Attachments>,
     channel: Arc<dyn ChannelAnnouncePort>,
-    changes: Mutex<Vec<flume::Sender<Change>>>,
-    entry_changes: Mutex<Vec<flume::Sender<EntryChange>>>,
-    suggestion_changes: Mutex<Vec<flume::Sender<SuggestionsNow>>>,
+    changes: broadcast::Sender<Change>,
+    entry_changes: broadcast::Sender<EntryChange>,
+    suggestion_changes: broadcast::Sender<SuggestionsNow>,
     /// Pure in-memory Loro EphemeralStore presence hubs keyed by artifact_id (never written to SQLite).
     presences: Mutex<HashMap<String, PresenceHub>>,
     presence_extra: Mutex<PresenceExtra>,
-    presence_changes: Mutex<Vec<flume::Sender<(String, ArtifactPresenceEvent)>>>,
-    closed: AtomicBool,
+    presence_changes: broadcast::Sender<(String, ArtifactPresenceEvent)>,
+    cancel: CancellationToken,
     prune_ticker: Mutex<Option<Ticker>>,
 }
 
 impl Artifacts {
-    /// Opens artifacts on the shared [`ServerDb`] and schedules the daily prune ticker.
+    /// Opens artifacts on the shared [`ServerDb`]. The daily prune ticker is
+    /// attached to the hub's task tracker when [`install`] wires the endpoints.
     pub fn open(db: Arc<ServerDb>, files: Arc<Attachments>, channel: Arc<dyn ChannelAnnouncePort>) -> Arc<Artifacts> {
-        let me = Arc::new(Artifacts {
+        let (changes, _) = broadcast::channel(STREAM_CAPACITY);
+        let (entry_changes, _) = broadcast::channel(STREAM_CAPACITY);
+        let (suggestion_changes, _) = broadcast::channel(STREAM_CAPACITY);
+        let (presence_changes, _) = broadcast::channel(STREAM_CAPACITY);
+        Arc::new(Artifacts {
             db,
             rows: Mutex::default(),
             batches: Mutex::default(),
             entry_locks: Mutex::default(),
             files,
             channel,
-            changes: Mutex::default(),
-            entry_changes: Mutex::default(),
-            suggestion_changes: Mutex::default(),
+            changes,
+            entry_changes,
+            suggestion_changes,
             presences: Mutex::default(),
             presence_extra: Mutex::default(),
-            presence_changes: Mutex::default(),
-            closed: AtomicBool::new(false),
+            presence_changes,
+            cancel: CancellationToken::new(),
             prune_ticker: Mutex::new(None),
-        });
-        let weak = Arc::downgrade(&me);
-        let ticker = Ticker::spawn_detached(Duration::from_millis(blocks::DAY_MS as u64), true, move || {
+        })
+    }
+
+    fn start_prune_ticker(self: &Arc<Self>, hub: &Hub) {
+        let mut slot = self.prune_ticker.lock();
+        if slot.is_some() || self.cancel.is_cancelled() {
+            return;
+        }
+        let weak = Arc::downgrade(self);
+        let ticker = Ticker::spawn_on(hub, Duration::from_millis(blocks::DAY_MS as u64), true, move || {
             let Some(a) = weak.upgrade() else { return false };
-            if a.closed.load(Ordering::Relaxed) {
+            if a.cancel.is_cancelled() {
                 return false;
             }
             let before = now() - blocks::KEPT_DAYS * blocks::DAY_MS;
@@ -205,13 +220,12 @@ impl Artifacts {
             }
             true
         });
-        *me.prune_ticker.lock() = Some(ticker);
-        me
+        *slot = Some(ticker);
     }
 
-    /// Stops the daily prune ticker.
+    /// Stops the daily prune ticker and active subscription streams.
     pub fn close(&self) {
-        self.closed.store(true, Ordering::Relaxed);
+        self.cancel.cancel();
         if let Some(ticker) = self.prune_ticker.lock().take() {
             ticker.stop();
         }
@@ -1070,6 +1084,7 @@ fn issue_id(hub: &Hub, reference: &str) -> Result<String, ApiError> {
 /// Every `artifact.*` endpoint and subscription, as the user calls them
 /// (`gateway/http/handlers/artifact.ts`).
 pub fn install(hub: &Hub, artifacts: Arc<Artifacts>) {
+    artifacts.start_prune_ticker(hub);
     let a = artifacts;
     hub.on::<ops::ArtifactList>({
         let a = a.clone();
@@ -1271,15 +1286,15 @@ pub fn install(hub: &Hub, artifacts: Arc<Artifacts>) {
     hub.on::<native_ops::ArtifactTokensInspect>(move |_, r| Ok(Artifacts::inspect_tokens(&r)));
     hub.on_subscription::<subscriptions::ArtifactFollow>({
         let a = a.clone();
-        move |_, p, sink| a.follow(&p.id, p.after, sink)
+        move |hub, p, sink| a.follow(hub, &p.id, p.after, sink)
     });
     hub.on_subscription::<subscriptions::ArtifactEntryFollow>({
         let a = a.clone();
-        move |_, p, sink| a.follow_entries(&p.id, p.after, sink)
+        move |hub, p, sink| a.follow_entries(hub, &p.id, p.after, sink)
     });
     hub.on_subscription::<subscriptions::ArtifactSuggestionFollow>({
         let a = a.clone();
-        move |_, p, sink| a.follow_suggestions(&p.id, sink)
+        move |hub, p, sink| a.follow_suggestions(hub, &p.id, sink)
     });
-    hub.on_subscription::<subscriptions::ArtifactPresenceFollow>(move |_, p, sink| a.follow_presence(&p.id, sink));
+    hub.on_subscription::<subscriptions::ArtifactPresenceFollow>(move |hub, p, sink| a.follow_presence(hub, &p.id, sink));
 }

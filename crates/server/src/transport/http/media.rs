@@ -8,9 +8,10 @@ use axum::{
 };
 use futures_util::StreamExt;
 use std::{
-    io::{self, Read, Seek},
+    io::{self, Read},
     time::{Duration, Instant},
 };
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use vibevalley_protocol::{BizCode, Envelope};
 const MAX: u64 = 512_000_000;
 enum Chunk {
@@ -28,7 +29,7 @@ impl Read for UploadReader {
             return Ok(0);
         }
         loop {
-            let n = self.current.read(out)?;
+            let n = std::io::Read::read(&mut self.current, out)?;
             if n > 0 {
                 return Ok(n);
             }
@@ -139,14 +140,13 @@ pub(super) async fn content(State(state): State<HttpState>, Path(id): Path<Strin
     let Some(inputs) = server.media_inputs() else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    let found = tokio::task::spawn_blocking(move || {
-        let found = inputs.content(&id).map_err(|_| ())?;
-        let file = std::fs::File::open(&found.path).map_err(|_| ())?;
-        let size = file.metadata().map_err(|_| ())?.len();
-        Ok::<_, ()>((found, file, size))
-    })
-    .await;
-    let Ok(Ok((found, mut file, size))) = found else {
+    let Ok(Ok(found)) = tokio::task::spawn_blocking(move || inputs.content(&id)).await else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let Ok(mut file) = tokio::fs::File::open(&found.path).await else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let Ok(size) = file.metadata().await.map(|m| m.len()) else {
         return StatusCode::NOT_FOUND.into_response();
     };
     let text = headers.get("range");
@@ -157,7 +157,7 @@ pub(super) async fn content(State(state): State<HttpState>, Path(id): Path<Strin
     let Some((start, end)) = bounds else {
         return (StatusCode::RANGE_NOT_SATISFIABLE, [("content-range", format!("bytes */{size}"))]).into_response();
     };
-    if file.seek(io::SeekFrom::Start(start)).is_err() {
+    if start > 0 && file.seek(io::SeekFrom::Start(start)).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
     }
     let length = end - start + 1;
@@ -165,17 +165,13 @@ pub(super) async fn content(State(state): State<HttpState>, Path(id): Path<Strin
         if left == 0 {
             return Ok::<_, io::Error>(None);
         }
-        tokio::task::spawn_blocking(move || {
-            let mut bytes = vec![0; left.min(64 * 1024) as usize];
-            let n = file.read(&mut bytes)?;
-            if n == 0 {
-                return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "media input truncated"));
-            }
-            bytes.truncate(n);
-            Ok(Some((Bytes::from(bytes), (file, left - n as u64))))
-        })
-        .await
-        .map_err(io::Error::other)?
+        let mut bytes = vec![0u8; left.min(64 * 1024) as usize];
+        let n = file.read(&mut bytes).await?;
+        if n == 0 {
+            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "media input truncated"));
+        }
+        bytes.truncate(n);
+        Ok(Some((Bytes::from(bytes), (file, left - n as u64))))
     });
     let filename = found.name.as_bytes().iter().map(|b| format!("%{b:02X}")).collect::<String>();
     let mut response = Response::builder()

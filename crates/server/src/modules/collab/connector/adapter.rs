@@ -3,6 +3,7 @@
 //! own typed keys; the bridge holds them sealed, as one `Secret`.
 
 use std::future::Future;
+use std::pin::Pin;
 use std::time::Duration;
 
 use parking_lot::Mutex;
@@ -81,73 +82,32 @@ pub struct Receiving<'a> {
     pub accept: &'a Accept<'a>,
 }
 
-/// Ends an account's work: waits wake at once, vendor calls are dropped.
-#[derive(Default)]
-pub struct Stop {
-    token: CancellationToken,
-}
-
-impl Stop {
-    pub fn set(&self) {
-        self.token.cancel();
-    }
-
-    pub fn is_set(&self) -> bool {
-        self.token.is_cancelled()
-    }
-
-    /// Whether it was stopped before `d` went by.
-    pub fn sleep(&self, d: Duration) -> bool {
-        if self.is_set() {
-            return true;
-        }
-        vibevalley_runtime::rt::block_on(async {
-            tokio::select! {
-                biased;
-                _ = self.token.cancelled() => true,
-                _ = tokio::time::sleep(d) => false,
-            }
-        })
-    }
-
-    pub(super) async fn stopped(&self) {
-        self.token.cancelled().await;
-    }
-}
+/// Boxed `Send` future for dyn-dispatched [`App`] methods.
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// One chat app, with its own keys.
 pub trait Adapter: Send + Sync + 'static {
-    type Keys: Serialize + DeserializeOwned;
+    type Keys: Serialize + DeserializeOwned + Send + Sync;
     const ID: ConnectorID;
     /// In UTF-16 units; longer messages are cut.
     const MAX_CHARS: usize;
 
     async fn login(&self, input: &ConnectorLogin, io: &LoginIo<'_>) -> Result<Linked<Self::Keys>, AppFailed>;
     /// Until the connection ends: why it did.
-    async fn receive(&self, keys: &Self::Keys, io: &Receiving<'_>) -> AppFailed;
+    fn receive(&self, keys: &Self::Keys, io: &Receiving<'_>) -> impl Future<Output = AppFailed> + Send;
     /// The app's id of what was sent; "" when it names none.
-    async fn send(&self, keys: &Self::Keys, to: &str, text: &str, reply: &str) -> Result<String, AppFailed>;
+    fn send(&self, keys: &Self::Keys, to: &str, text: &str, reply: &str) -> impl Future<Output = Result<String, AppFailed>> + Send;
 }
 
-/// An adapter as the bridge holds it: blocking, its keys sealed. `None` is a
-/// call given up because the account's work was stopped.
+/// An adapter as the bridge holds it: async receive/send, its keys sealed.
 pub trait App: Send + Sync {
     fn id(&self) -> ConnectorID;
     fn max_chars(&self) -> usize;
     fn reads(&self, keys: &Secret) -> bool;
-    fn login(&self, input: &ConnectorLogin, io: &LoginIo<'_>, stop: &Stop) -> Option<Result<Linked<Secret>, AppFailed>>;
-    fn receive(&self, keys: &Secret, io: &Receiving<'_>, stop: &Stop) -> Option<AppFailed>;
-    fn send(&self, keys: &Secret, to: &str, text: &str, reply: &str) -> Result<String, AppFailed>;
-}
-
-fn until_stopped<T>(stop: &Stop, work: impl Future<Output = T>) -> Option<T> {
-    vibevalley_runtime::rt::block_on(async {
-        tokio::select! {
-            biased;
-            _ = stop.stopped() => None,
-            done = work => Some(done),
-        }
-    })
+    /// Drives login until completion or cancellation (`None` when cancelled).
+    fn login(&self, input: &ConnectorLogin, io: &LoginIo<'_>, cancel: &CancellationToken) -> Option<Result<Linked<Secret>, AppFailed>>;
+    fn receive<'a>(&'a self, keys: &'a Secret, io: &'a Receiving<'a>) -> BoxFuture<'a, AppFailed>;
+    fn send<'a>(&'a self, keys: &'a Secret, to: &'a str, text: &'a str, reply: &'a str) -> BoxFuture<'a, Result<String, AppFailed>>;
 }
 
 fn unsealed<K: DeserializeOwned>(keys: &Secret) -> Result<K, AppFailed> {
@@ -167,8 +127,15 @@ impl<A: Adapter> App for A {
         unsealed::<A::Keys>(keys).is_ok()
     }
 
-    fn login(&self, input: &ConnectorLogin, io: &LoginIo<'_>, stop: &Stop) -> Option<Result<Linked<Secret>, AppFailed>> {
-        let linked = until_stopped(stop, Adapter::login(self, input, io))?;
+    fn login(&self, input: &ConnectorLogin, io: &LoginIo<'_>, cancel: &CancellationToken) -> Option<Result<Linked<Secret>, AppFailed>> {
+        // `Weixin::login` holds a non-Send URL serializer across an await, so login runs on a single thread via `block_on`.
+        let linked = vibevalley_runtime::rt::block_on(async {
+            tokio::select! {
+                biased;
+                _ = cancel.cancelled() => None,
+                done = Adapter::login(self, input, io) => Some(done),
+            }
+        })?;
         Some(linked.and_then(|l| {
             let sealed = serde_json::to_string(&l.keys).map_err(|e| AppFailed::failed(e.to_string()))?;
             Ok(Linked {
@@ -178,17 +145,21 @@ impl<A: Adapter> App for A {
         }))
     }
 
-    fn receive(&self, keys: &Secret, io: &Receiving<'_>, stop: &Stop) -> Option<AppFailed> {
-        let keys = match unsealed::<A::Keys>(keys) {
-            Ok(k) => k,
-            Err(e) => return Some(e),
-        };
-        until_stopped(stop, Adapter::receive(self, &keys, io))
+    fn receive<'a>(&'a self, keys: &'a Secret, io: &'a Receiving<'a>) -> BoxFuture<'a, AppFailed> {
+        Box::pin(async move {
+            let keys = match unsealed::<A::Keys>(keys) {
+                Ok(k) => k,
+                Err(e) => return e,
+            };
+            Adapter::receive(self, &keys, io).await
+        })
     }
 
-    fn send(&self, keys: &Secret, to: &str, text: &str, reply: &str) -> Result<String, AppFailed> {
-        let keys = unsealed::<A::Keys>(keys)?;
-        vibevalley_runtime::rt::block_on(Adapter::send(self, &keys, to, text, reply))
+    fn send<'a>(&'a self, keys: &'a Secret, to: &'a str, text: &'a str, reply: &'a str) -> BoxFuture<'a, Result<String, AppFailed>> {
+        Box::pin(async move {
+            let keys = unsealed::<A::Keys>(keys)?;
+            Adapter::send(self, &keys, to, text, reply).await
+        })
     }
 }
 
