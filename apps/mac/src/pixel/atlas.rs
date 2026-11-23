@@ -3,9 +3,10 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use image::RgbaImage;
+use parking_lot::Mutex;
 use serde::Deserialize;
 
 /// VibeValley's level width in art pixels; the map's PNG width over it is the density.
@@ -118,7 +119,7 @@ impl Atlas {
     /// The decoded PNG (straight RGBA, `density` pixels per art pixel); `None`
     /// when it is not in the atlas or cannot be read. Decoded once.
     pub fn image(&self, name: &str) -> Option<Arc<RgbaImage>> {
-        if let Some(found) = self.images.lock().ok()?.get(name) {
+        if let Some(found) = self.images.lock().get(name) {
             return found.clone();
         }
         let decoded = self
@@ -127,12 +128,12 @@ impl Atlas {
             .then(|| decode(&self.dir.join(format!("{name}.png"))))
             .flatten()
             .map(Arc::new);
-        self.images.lock().ok()?.insert(name.to_string(), decoded.clone());
+        self.images.lock().insert(name.to_string(), decoded.clone());
         decoded
     }
 
     pub fn normals(&self, name: &str, img: &RgbaImage) -> Arc<RgbaImage> {
-        let mut cache = self.normals.lock().expect("sprite normals");
+        let mut cache = self.normals.lock();
         cache
             .entry(name.to_owned())
             .or_insert_with(|| {

@@ -2,10 +2,10 @@
 //! message, and the bot hears direct (C2C) messages over the gateway's
 //! WebSocket; replies are passive, each to a message of the user's.
 
-use std::sync::Mutex;
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
@@ -180,13 +180,7 @@ impl Qq {
     async fn token(&self, keys: &Keys) -> Result<String, AppFailed> {
         let of = format!("{}\u{0}{}", keys.app_id, keys.secret.expose());
         let at = now();
-        if let Some(cached) = self
-            .token
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .as_ref()
-            .filter(|c| c.of == of && c.until > at)
-        {
+        if let Some(cached) = self.token.lock().as_ref().filter(|c| c.of == of && c.until > at) {
             return Ok(cached.token.clone());
         }
         let auth = |why: String| AppFailed::failed(t("server.connector.qq.auth", &[("why", why.into())]));
@@ -214,7 +208,7 @@ impl Qq {
             Some(Seconds::Text(s)) => s.trim().parse().unwrap_or(7200),
             None => 7200,
         };
-        *self.token.lock().unwrap_or_else(|e| e.into_inner()) = Some(Token {
+        *self.token.lock() = Some(Token {
             of,
             token: token.clone(),
             until: at + (seconds - 60) * 1000,
@@ -320,7 +314,7 @@ impl Adapter for Qq {
         let mut payload = json!({ "content": text, "msg_type": 0 });
         if !reply.is_empty() {
             payload["msg_id"] = json!(reply);
-            payload["msg_seq"] = json!(next_reply_seq(&mut self.reply_seq.lock().unwrap_or_else(|e| e.into_inner()), reply));
+            payload["msg_seq"] = json!(next_reply_seq(&mut self.reply_seq.lock(), reply));
         }
         let failed = |why: String| AppFailed::failed(t("server.connector.qq.send", &[("why", why.into())]));
         let mut url = url::Url::parse(&self.api).map_err(|e| failed(e.to_string()))?;

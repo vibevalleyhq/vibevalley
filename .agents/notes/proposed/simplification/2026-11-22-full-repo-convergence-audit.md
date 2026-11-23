@@ -40,28 +40,18 @@ Status: proposed
 | `S5` | `crates/engines/pele` 33 种图谱（约 3.5–4 万行） | 由 [diagram.rs](crates/rich/src/diagram.rs) 调用 | **完整保留**：已移入下方「核实保留基线（不得误删）」 |
 | `S6` | `artifact/collab.rs` 旧 `presence/*` 拦截与 `blocks::demo`（~330 行） | 网页已走强类型接口，仅缺 helper MCP 专用工具 | **淘汰旧的、迁移到新的**：补齐 helper MCP 专用工具后删除旧 `presence/*` 拦截与 `blocks::demo` 演示脚本 |
 
-### 延后收敛组：IO 调度收敛与常用依赖减压（`I1`–`I3`）
+### 延后收敛组：IO 调度收敛与常用依赖减压（`I3` 剩余项）
 
-当前全仓存在 7 处生产级独立 `tokio::runtime::Builder`、105 处 `std::thread::spawn` / `thread::Builder::new` 及多套手写停机通道、重试循环与锁解毒样板。待三核解耦落定后，应按 `I1` → `I2` → `I3` 收敛进程内 IO 调度与基础依赖，不应引入重型 Actor 框架（进程内模块间继续保持强类型 trait 直调）。
+`I1`（进程级唯一共享 Tokio 运行时 `vibevalley_runtime::rt` 与 `CancellationToken`/`TaskTracker` 级联停机）、`I2`（基于 `tokio::sync::watch` + `WatchStream` 的 `SliceFeed<T>`、`tokio::sync::broadcast` 承载 `LiveEvent` 与穷尽 `ChannelEvent` 单源广播、`EventBus` / `BridgeHub` 异步任务收口与 `spawn_blocking`）以及 `I3` 第一批（`arc-swap` 无锁热读观察者/插槽、`parking_lot` 全仓去毒化、`backon` 统一指数退避、以及 `crates/runtime` 与 `crates/cli` 生产路径收口工作区 `reqwest`）已落地并沉淀进[地基](docs/subsystems/foundation.md)、[核心状态](docs/subsystems/core.md)与[频道](docs/subsystems/channel.md)。
 
-1. **`I1`（单一共享 Tokio Runtime + `tokio_util` 生命周期原语）**：收拢 7 处独立 `tokio::runtime::Builder`（[transport/http/mod.rs](crates/server/src/transport/http/mod.rs)、[infra/http.rs](crates/server/src/modules/infra/http.rs)、[media/jobs.rs](crates/server/src/modules/content/media/jobs.rs)、[connector/adapter.rs](crates/server/src/modules/collab/connector/adapter.rs)、[mcp/client.rs](crates/runtime/src/agent/resources/mcp/client.rs)、[live_voice.rs](apps/mac/src/live_voice.rs)、[server/main.rs](crates/server/src/main.rs)）为单一进程级运行时与传入的 `Handle`。启用 [crates/server/Cargo.toml](crates/server/Cargo.toml) 已引入但几乎未用的 `tokio_util::sync::CancellationToken`（通过 `.child_token()` 按作用域树形级联取消）与 `tokio_util::task::TaskTracker`，取代全仓 60 余处手写 `std::thread::spawn` + `(flume::Sender<()>, JoinHandle<()>)` + `flume::Selector` 停机样板。
-2. **`I2`（标准 `tokio::sync` + `tokio-stream` 取代手写流与并发槽位）**：用 `tokio::sync::watch` 配合 `tokio_stream::wrappers::WatchStream` 简化脏帧合并推送（`SliceFeed` 与 SSE 切片流），用 `tokio::sync::broadcast` 承载 `LiveEvent` 扇出，用 `tokio::sync::Semaphore` 管理并发槽位与限流；同步 CPU 密集任务（Git、SQLite 批量查询、像素渲染）显式走 `tokio::task::spawn_blocking`，不阻塞异步工作线程。
-3. **`I3`（轻依赖减压清单）**：用成熟小 crate 替代仓库内反复手写的并发原语、重试、观测与缓存样板：
+本组尚待后续排期的 `I3` 减压项如下（不引入重型 Actor 框架，进程内模块间继续保持强类型 trait 直调）：
 
-| 依赖 | 取代目标与当前落点 | 收益 |
+| 依赖 / 项 | 取代目标与当前落点 | 收益 |
 | :--- | :--- | :--- |
-| `arc-swap` | 全局热读观察者与配置（`OarObserver`、`InvokeObserver`、`FaultGate`、`settings`，见 [oar/core.rs](crates/runtime/src/oar/core.rs)） | 无锁读替换 `RwLock`，消除锁内 Drop 触发的锁顺序死锁 |
-| `parking_lot` | 全仓 `std::sync::{Mutex, RwLock}` 与重复 `.lock().unwrap_or_else(\|e\| e.into_inner())` 解毒包装 | 锁无毒化、体积更小，测试期可开 `deadlock_detection` |
-| `backon` | `connector`、[ai/retry.rs](crates/runtime/src/agent/ai/retry.rs)、`session`、`update` 等多处手写指数退避与 jitter 循环 | 统一同步/异步退避策略与取消对接 |
 | `tracing` + `tracing-subscriber` | 零散 `eprintln!` 与手工 `trace_id` 透传 | DevTools V1 阶段接入，自定义 `Layer` 直驱四泳道事件采集 |
 | `moka`（或 `quick_cache`） | 手写 `Mutex<HashMap>` 缓存淘汰与并发击穿防护 | 提供有界容量、TTL 与单飞加载 |
-| 统一 `reqwest` / 评估 `notify-debouncer-mini` | 重复的 `ureq` 客户端（[cli/client.rs](crates/cli/src/client.rs)、[deepseek.rs](crates/runtime/src/agent/ai/providers/deepseek.rs)）与 [crates/files/Cargo.toml](crates/files/Cargo.toml) 下手写监听防抖 | 收拢单套 HTTP + TLS 栈，减少重复防抖状态机 |
-
-**分步落地优先级**：
-
-1. 第一步：落地 `I1` 与 `I2`，统一共享 Tokio Runtime，用 `CancellationToken`、`TaskTracker`、`watch` / `WatchStream` 与 `Semaphore` 替换多运行时和手写停机线程。
-2. 第二步：落地 `I3` 中的 `arc-swap`、`parking_lot`、`backon` 与 `reqwest` 收口（按需评估 `moka` 与 `notify-debouncer-mini`），清掉锁解毒与退避样板。
-3. 第三步：在 DevTools V1 启动时接入 `tracing` + `tracing-subscriber`，用 span 上下文替代手工 `trace_id` 传递并接通四泳道 `Layer`。
+| `notify-debouncer-mini`（待评估） | [crates/files/Cargo.toml](crates/files/Cargo.toml) 下手写监听防抖状态机 | 减少重复防抖状态机维护 |
+| 测试侧 `ureq` 收尾 | `crates/server/Cargo.toml` 的 `[dev-dependencies]` 与根 `Cargo.toml` 剩余 `ureq` 条目 | 生产路径已全面统一 `reqwest`，补齐测试迁移后可从工作区彻底移除 `ureq` |
 
 ### 核实保留基线（不得误删）
 

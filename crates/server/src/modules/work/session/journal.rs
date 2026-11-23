@@ -4,9 +4,10 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
+use parking_lot::Mutex;
 use vibevalley_core::rules::cut;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
@@ -15,7 +16,7 @@ use vibevalley_protocol::{
 };
 
 use crate::modules::work::ledger::Step;
-use crate::{Hub, lock, now};
+use crate::{Hub, now};
 
 const KEEP_EVENTS: usize = 240;
 const TEXT_MAX: usize = 6000;
@@ -601,13 +602,13 @@ impl Trajectories {
                 t.flush(false);
             }
         }) {
-            *lock(&t.thread) = Some(handle);
+            *t.thread.lock() = Some(handle);
         }
         t
     }
 
     fn next_deadline(&self) -> Option<Instant> {
-        lock(&self.open).values().filter_map(Journal::next_deadline).min()
+        self.open.lock().values().filter_map(Journal::next_deadline).min()
     }
 
     fn notify_worker(&self) {
@@ -638,7 +639,7 @@ impl Trajectories {
 
     fn flush_session(&self, id: &str) {
         let dirty = {
-            let mut open = lock(&self.open);
+            let mut open = self.open.lock();
             open.get_mut(id).map(|j| j.take_dirty_for_save(false)).unwrap_or_default()
         };
         if !dirty.is_empty() {
@@ -651,7 +652,7 @@ impl Trajectories {
         let mut pushes = Vec::new();
         let mut writes = Vec::new();
         {
-            let mut open = lock(&self.open);
+            let mut open = self.open.lock();
             for (id, j) in open.iter_mut() {
                 for e in j.due(all) {
                     pushes.push((id.clone(), e));
@@ -674,9 +675,9 @@ impl Trajectories {
         if !known_id(id) {
             return None;
         }
-        let existing_tail = if lock(&self.open).contains_key(id) { None } else { Some(self.load_tail(id)) };
+        let existing_tail = if self.open.lock().contains_key(id) { None } else { Some(self.load_tail(id)) };
         let (out, dirty) = {
-            let mut open = lock(&self.open);
+            let mut open = self.open.lock();
             let j = open.entry(id.to_string()).or_insert_with(|| Journal::new(existing_tail.unwrap_or_default()));
             let out = f(j);
             (out, j.next_deadline().is_some())
@@ -693,7 +694,7 @@ impl Trajectories {
             return None;
         }
         self.flush_session(id);
-        let is_open = lock(&self.open).contains_key(id);
+        let is_open = self.open.lock().contains_key(id);
         let run_id = run.filter(|r| !r.is_empty()).unwrap_or("");
         let (has_any, events) = self
             .db
@@ -751,7 +752,7 @@ impl Trajectories {
 
     /// Seals and flushes a session's open log to SQLite.
     pub fn finish(&self, id: &str) {
-        let Some(mut j) = lock(&self.open).remove(id) else { return };
+        let Some(mut j) = self.open.lock().remove(id) else { return };
         j.close();
         let pushes = j.due(true);
         let dirty = j.take_dirty_for_save(false);
@@ -766,7 +767,7 @@ impl Trajectories {
     }
 
     fn finish_all(&self) {
-        let ids: Vec<String> = lock(&self.open).keys().cloned().collect();
+        let ids: Vec<String> = self.open.lock().keys().cloned().collect();
         for id in ids {
             self.finish(&id);
         }
@@ -774,8 +775,8 @@ impl Trajectories {
 
     /// Seals and flushes every open log.
     pub fn close(&self) {
-        let _ = lock(&self.stop).take();
-        if let Some(handle) = lock(&self.thread).take()
+        let _ = self.stop.lock().take();
+        if let Some(handle) = self.thread.lock().take()
             && handle.thread().id() != std::thread::current().id()
         {
             let _ = handle.join();
@@ -793,7 +794,7 @@ impl Trajectories {
         if !known_id(id) {
             return;
         }
-        lock(&self.open).remove(id);
+        self.open.lock().remove(id);
         let _ = self.db.run(async |c| super::db::delete_events(c, id).await);
     }
 

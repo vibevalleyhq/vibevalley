@@ -56,18 +56,21 @@ fn call(url: &str, op: &str, input: Value) -> Value {
 }
 
 fn until<T>(server: &Started, what: &str, mut read: impl FnMut() -> Option<T>) -> T {
-    let board_dirty = server.hub.watch_slice_signal(vibevalley_protocol::SliceKind::Board, false);
-    let sessions_dirty = server.hub.watch_slice_signal(vibevalley_protocol::SliceKind::Sessions, false);
+    let mut board = server.hub.subscribe_slice_feed(vibevalley_protocol::SliceKind::Board);
+    let mut sessions = server.hub.subscribe_slice_feed(vibevalley_protocol::SliceKind::Sessions);
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
         if let Some(value) = read() {
             return value;
         }
         assert!(Instant::now() < deadline, "timed out: {what}");
-        let _ = flume::Selector::new()
-            .recv(&board_dirty, |_| ())
-            .recv(&sessions_dirty, |_| ())
-            .wait_timeout(Duration::from_millis(50));
+        vibevalley_runtime::rt::block_on(async {
+            tokio::select! {
+                _ = board.changed() => {}
+                _ = sessions.changed() => {}
+                _ = tokio::time::sleep(Duration::from_millis(50)) => {}
+            }
+        });
     }
 }
 

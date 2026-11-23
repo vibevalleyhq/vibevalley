@@ -17,8 +17,9 @@ pub use execution::Execution;
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, Weak};
+use std::sync::{Arc, Weak};
 
+use parking_lot::{Condvar, Mutex};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     Actor, AgentRole, ApiError, BizCode, ChannelType, Doing, ExecutionPolicy, Fact, FactSessionChanged, FactSessionPhaseChanged, NoticeLevel,
@@ -36,7 +37,7 @@ use crate::modules::collab::channel::{Chat, Committed, DeliveryTargetKind, Picke
 use crate::modules::team::tool::{Farm, Route, held};
 use crate::modules::work::ledger::Step;
 use crate::modules::work::session::Trajectories;
-use crate::{lock, now};
+use crate::now;
 
 const DEFAULT_MODEL: &str = "deepseek-flash";
 /// `quotaLow`: a runtime with less left than this is nearly used up.
@@ -88,7 +89,7 @@ impl Reply {
 impl Drop for Reply {
     fn drop(&mut self) {
         if let Some(o) = self.orchestrator.upgrade() {
-            lock(&o.ports).remove(&self.id);
+            o.ports.lock().remove(&self.id);
         }
     }
 }
@@ -269,7 +270,7 @@ impl Orchestrator {
     }
 
     fn instance(self: &Arc<Self>, id: &str) -> Arc<Instance> {
-        let mut all = lock(&self.instances);
+        let mut all = self.instances.lock();
         if let Some(i) = all.get(id) {
             return i.clone();
         }
@@ -301,7 +302,7 @@ impl Orchestrator {
         }
         let id = self.target(input.agent.as_deref());
         let me = self.instance(&id);
-        let mut queue = lock(&me.queue);
+        let mut queue = me.queue.lock();
         if let Err(error) = self.execution.enqueue(&id, &input) {
             if let Some(hub) = self.hub() {
                 hub.notice(NoticeLevel::Error, error.to_string());
@@ -317,7 +318,7 @@ impl Orchestrator {
     fn open_port(self: &Arc<Self>) -> Reply {
         let id = uuid::Uuid::new_v4().to_string();
         let (tx, words) = flume::unbounded();
-        lock(&self.ports).insert(id.clone(), tx);
+        self.ports.lock().insert(id.clone(), tx);
         Reply {
             id,
             words,
@@ -361,14 +362,14 @@ impl Orchestrator {
     /// Words it heard that did not wake it: shown with its next input.
     pub fn overhear(self: &Arc<Self>, agent: Option<&str>, line: String) {
         let id = self.target(agent);
-        lock(&self.instance(&id).news).lines.push(line);
+        self.instance(&id).news.lock().lines.push(line);
     }
 
     /// `stop`: ends its turn under way and drops what waits for it.
     pub fn stop(&self, agent: Option<&str>) {
         let id = self.target(agent);
-        let Some(me) = lock(&self.instances).get(&id).cloned() else { return };
-        lock(&me.queue).clear();
+        let Some(me) = self.instances.lock().get(&id).cloned() else { return };
+        me.queue.lock().clear();
         let _ = self.execution.stop(&id);
     }
 
@@ -406,7 +407,7 @@ impl Orchestrator {
                 }
             })
             .expect("orchestrator dispatch thread");
-        let prev = lock(&self.chat_listener).replace((stop_tx, handle));
+        let prev = self.chat_listener.lock().replace((stop_tx, handle));
         if let Some((old_stop, old_handle)) = prev {
             drop(old_stop);
             if old_handle.thread().id() != std::thread::current().id() {
@@ -523,7 +524,7 @@ impl Orchestrator {
 
     pub fn close(&self) {
         self.closed.store(true, Ordering::Release);
-        if let Some((stop, handle)) = lock(&self.chat_listener).take() {
+        if let Some((stop, handle)) = self.chat_listener.lock().take() {
             drop(stop);
             if handle.thread().id() != std::thread::current().id() {
                 let _ = handle.join();
@@ -531,7 +532,7 @@ impl Orchestrator {
         }
         self.execution.close();
         self.mcp.close();
-        for me in lock(&self.instances).values() {
+        for me in self.instances.lock().values() {
             me.more.notify_all();
         }
     }
@@ -687,7 +688,7 @@ impl Orchestrator {
     fn work(o: Weak<Orchestrator>, me: Arc<Instance>) {
         loop {
             {
-                let mut q = lock(&me.queue);
+                let mut q = me.queue.lock();
                 loop {
                     let Some(o) = o.upgrade() else { return };
                     if o.closed.load(Ordering::Relaxed) {
@@ -703,7 +704,7 @@ impl Orchestrator {
                     if saved {
                         break;
                     }
-                    q = me.more.wait_timeout(q, std::time::Duration::from_secs(1)).unwrap_or_else(|e| e.into_inner()).0;
+                    me.more.wait_for(&mut q, std::time::Duration::from_secs(1));
                 }
             };
             let Some(o) = o.upgrade() else { return };
@@ -798,7 +799,7 @@ impl Orchestrator {
         let channel = batch.last().map(|i| i.channel.clone()).unwrap_or_default();
         let situation = self.situation(&channel);
         let shown = {
-            let mut was = lock(&me.shown);
+            let mut was = me.shown.lock();
             let delta = if was.is_empty() {
                 situation.clone()
             } else {
@@ -807,7 +808,7 @@ impl Orchestrator {
             *was = situation;
             delta
         };
-        let heard: Vec<String> = std::mem::take(&mut lock(&me.news).lines);
+        let heard: Vec<String> = std::mem::take(&mut me.news.lock().lines);
         let news = if heard.is_empty() { String::new() } else { words::news(&heard.join("\n")) };
         let at = jiff::Timestamp::from_millisecond(now())
             .unwrap_or_default()
@@ -837,10 +838,10 @@ impl Orchestrator {
         };
         // Taken now: a turn that cannot start ends them unanswered.
         let ports: Vec<flume::Sender<String>> = {
-            let mut open = lock(&self.ports);
+            let mut open = self.ports.lock();
             batch.iter().filter_map(|i| i.port.as_ref().and_then(|p| open.remove(p))).collect()
         };
-        *lock(&me.route) = route.clone();
+        *me.route.lock() = route.clone();
         let cannot = |why: String| {
             let _ = self.execution.finish_inputs(&requests, false, &serde_json::json!({"error":why}));
             // The round is still in its log, failed: what it was told can be read and judged there.
@@ -851,7 +852,7 @@ impl Orchestrator {
                 outcome: Outcome::Failed,
             });
             run.phase(None);
-            let mut said = lock(&me.cannot);
+            let mut said = me.cannot.lock();
             if said.get(&route.channel) != Some(&why) {
                 said.insert(route.channel.clone(), why.clone());
                 let _ = self.farm.chat.post(Posting {
@@ -872,7 +873,7 @@ impl Orchestrator {
             Ok(m) => m,
             Err(why) => return cannot(t("server.orchestrator.cannotStart", &[("why", why.into())])),
         };
-        lock(&me.cannot).clear();
+        me.cannot.lock().clear();
         let text = self.input_of(me, &batch);
         let mut run = Run::start(self, me, &route, format!("run-{}", requests[0]), Some(&model));
         run.ports = ports;
@@ -953,7 +954,7 @@ impl<'a> Run<'a> {
     }
 
     fn record_event(&self, event: &vibevalley_runtime::oar::Event) {
-        let mut slot = lock(&self.recorder);
+        let mut slot = self.recorder.lock();
         let Some(rec) = slot.as_mut() else { return };
         let mut row = vibevalley_runtime::oar::voyage::Record::event(self.me.id.clone(), event);
         row.seq = self.record_seq.fetch_add(1, Ordering::Relaxed);

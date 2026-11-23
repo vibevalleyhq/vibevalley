@@ -17,13 +17,15 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::Arc;
 
+use parking_lot::{Mutex, RwLock};
 use serde_json::{Value, json};
+use tokio::sync::broadcast;
+use tokio_util::sync::CancellationToken;
 use vibevalley_protocol::{BoardSlice, CollabSlice, FarmFrame, InboxSlice, OpsSlice, SessionsSlice, SliceBundle, SliceKind};
 
-use crate::lock;
-use crate::slice_feed::SliceFeed;
+use crate::slice_feed::{SliceFeed, SliceSubscription};
 use crate::transport::api::{BizCode, CallerContext, ClientIdentity, Envelope, LiveEvent, Server, refusal};
 
 struct FakeFeeds {
@@ -68,7 +70,6 @@ struct Inner {
     responses: HashMap<String, Value>,
     calls: Vec<(String, Value)>,
     last_client: Option<ClientIdentity>,
-    live_txs: Vec<flume::Sender<LiveEvent>>,
     subs: HashMap<u64, (String, flume::Sender<Value>)>,
     next_sub: u64,
 }
@@ -77,6 +78,7 @@ struct Inner {
 pub struct FakeServer {
     bundle: Arc<RwLock<SliceBundle>>,
     feeds: Arc<FakeFeeds>,
+    live: broadcast::Sender<LiveEvent>,
     inner: Arc<Mutex<Inner>>,
 }
 
@@ -98,9 +100,11 @@ impl FakeServer {
 
     pub fn from_bundle(bundle: SliceBundle) -> FakeServer {
         let feeds = Arc::new(FakeFeeds::new(&bundle));
+        let (live, _rx) = broadcast::channel(512);
         FakeServer {
             bundle: Arc::new(RwLock::new(bundle)),
             feeds,
+            live,
             inner: Arc::new(Mutex::new(Inner::default())),
         }
     }
@@ -117,7 +121,7 @@ impl FakeServer {
             Ok(text) => {
                 let value: Value = serde_json::from_str(&text).map_err(|e| format!("responses.json: {e}"))?;
                 if let Value::Object(map) = value {
-                    lock(&fake.inner).responses.extend(map);
+                    fake.inner.lock().responses.extend(map);
                 }
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
@@ -129,12 +133,12 @@ impl FakeServer {
     /// Replaces the backing [`SliceBundle`] and notifies every slice watcher.
     /// Returns the total number of active slice watchers notified.
     pub fn swap_bundle(&self, bundle: SliceBundle) -> usize {
-        *self.bundle.write().unwrap_or_else(|e| e.into_inner()) = bundle.clone();
+        *self.bundle.write() = bundle.clone();
         self.feeds.replace_and_publish(&bundle)
     }
 
     pub fn bundle_now(&self) -> SliceBundle {
-        self.bundle.read().unwrap_or_else(|e| e.into_inner()).clone()
+        self.bundle.read().clone()
     }
 
     pub fn slice_watchers(&self, slice: SliceKind) -> usize {
@@ -149,17 +153,15 @@ impl FakeServer {
     }
 
     pub fn push_live(&self, event: LiveEvent) {
-        lock(&self.inner).live_txs.retain(|tx| tx.send(event.clone()).is_ok());
+        let _ = self.live.send(event);
     }
 
     pub fn live_watchers(&self) -> usize {
-        let mut inner = lock(&self.inner);
-        inner.live_txs.retain(|tx| !tx.is_disconnected());
-        inner.live_txs.len()
+        self.live.receiver_count()
     }
 
     pub fn emit(&self, name: &str, event: Value) {
-        for (n, tx) in lock(&self.inner).subs.values() {
+        for (n, tx) in self.inner.lock().subs.values() {
             if n == name {
                 let _ = tx.send(event.clone());
             }
@@ -168,23 +170,23 @@ impl FakeServer {
 
     /// Ends every subscription of `name` (drops its sender).
     pub fn end(&self, name: &str) {
-        lock(&self.inner).subs.retain(|_, (n, _)| n != name);
+        self.inner.lock().subs.retain(|_, (n, _)| n != name);
     }
 
     pub fn respond(&self, op: &str, data: Value) {
-        lock(&self.inner).responses.insert(op.to_string(), data);
+        self.inner.lock().responses.insert(op.to_string(), data);
     }
 
     pub fn calls(&self) -> Vec<(String, Value)> {
-        lock(&self.inner).calls.clone()
+        self.inner.lock().calls.clone()
     }
 
     pub fn last_client(&self) -> Option<ClientIdentity> {
-        lock(&self.inner).last_client.clone()
+        self.inner.lock().last_client.clone()
     }
 
     pub fn subscriber_count(&self) -> usize {
-        lock(&self.inner).subs.len()
+        self.inner.lock().subs.len()
     }
 }
 
@@ -195,7 +197,7 @@ impl Server for FakeServer {
 
     fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
         {
-            let mut inner = lock(&self.inner);
+            let mut inner = self.inner.lock();
             inner.calls.push((op.to_string(), payload.clone()));
             if let Some(client) = &ctx.client {
                 inner.last_client = Some(client.clone());
@@ -253,7 +255,7 @@ impl Server for FakeServer {
                     .map(|(op, payload)| json!({ "op": op, "payload": payload }))
                     .collect::<Vec<_>>()
             )),
-            _ => match lock(&self.inner).responses.get(op).cloned() {
+            _ => match self.inner.lock().responses.get(op).cloned() {
                 Some(v) if v.get("bizCode").is_some() => {
                     serde_json::from_value(v).unwrap_or_else(|e| refusal(BizCode::InternalError, format!("bad canned envelope for {op}: {e}")))
                 }
@@ -285,10 +287,26 @@ impl Server for FakeServer {
         }
     }
 
+    fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
+        Some(match slice {
+            SliceKind::Board => SliceSubscription::Board(self.feeds.board.subscribe()),
+            SliceKind::Sessions => SliceSubscription::Sessions(self.feeds.sessions.subscribe()),
+            SliceKind::Collab => SliceSubscription::Collab(self.feeds.collab.subscribe()),
+            SliceKind::Inbox => SliceSubscription::Inbox(self.feeds.inbox.subscribe()),
+            SliceKind::Ops => SliceSubscription::Ops(self.feeds.ops.subscribe()),
+            SliceKind::Farm => SliceSubscription::Farm {
+                rx: self.feeds.farm.subscribe(),
+                strip_initial_effects: false,
+            },
+        })
+    }
+
     fn live(&self) -> flume::Receiver<LiveEvent> {
-        let (tx, rx) = flume::unbounded();
-        lock(&self.inner).live_txs.push(tx);
-        rx
+        crate::bridge_live_receiver(self.live.subscribe(), CancellationToken::new())
+    }
+
+    fn subscribe_live(&self) -> Option<broadcast::Receiver<LiveEvent>> {
+        Some(self.live.subscribe())
     }
 
     fn subscribe(&self, name: &str, _payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
@@ -296,7 +314,7 @@ impl Server for FakeServer {
             return Err(refusal(BizCode::ChannelNotFound, "no such channel"));
         }
         let (tx, rx) = flume::unbounded();
-        let mut inner = lock(&self.inner);
+        let mut inner = self.inner.lock();
         inner.next_sub += 1;
         let id = inner.next_sub;
         inner.subs.insert(id, (name.to_string(), tx));
@@ -304,7 +322,7 @@ impl Server for FakeServer {
     }
 
     fn unsubscribe(&self, id: u64) {
-        lock(&self.inner).subs.remove(&id);
+        self.inner.lock().subs.remove(&id);
     }
 }
 

@@ -20,7 +20,7 @@ use vibevalley_protocol::{
 
 use super::collab::commit_meta_for_actor;
 use super::db::{self, ArtifactRow, ChangeRow, StoredSuggestion};
-use super::{Artifacts, Change, lock, new_id, q, refused};
+use super::{Artifacts, Change, new_id, q, refused};
 use crate::base::LookIn;
 use crate::{Sink, now};
 
@@ -206,12 +206,12 @@ impl Artifacts {
 
     /// `submit`: one batch, in one transaction, one at a time.
     pub fn submit(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>) -> Result<BlockAck, ApiError> {
-        let _batches = lock(&self.batches);
+        let _batches = self.batches.lock();
         self.submit_locked(id, actor, batch_id, ops, None)
     }
 
     pub fn submit_with_meta(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>, meta: &CommitMeta) -> Result<BlockAck, ApiError> {
-        let _batches = lock(&self.batches);
+        let _batches = self.batches.lock();
         self.submit_locked(id, actor, batch_id, ops, Some(meta))
     }
 
@@ -321,7 +321,7 @@ impl Artifacts {
             artifact: id.into(),
             ack: ack.clone(),
         };
-        lock(&self.changes).retain(|tx| tx.send(change.clone()).is_ok());
+        self.changes.lock().retain(|tx| tx.send(change.clone()).is_ok());
     }
 
     fn one(ack: BlockAck, block: &str) -> (Option<Block>, Option<BlockOpResult>) {
@@ -331,7 +331,7 @@ impl Artifacts {
 
     /// `updateText`: a block's whole text, as `actor`.
     fn update_text(&self, artifact: &str, actor: &str, block: &str, base_rev: i64, text: &str) -> Result<(Option<Block>, Option<BlockOpResult>), ApiError> {
-        let _batches = lock(&self.batches);
+        let _batches = self.batches.lock();
         let kind = self
             .blocks_of(artifact)?
             .into_iter()
@@ -360,7 +360,7 @@ impl Artifacts {
         if let Some(problem) = attr_problem(kind, &req.into()) {
             return Err(problem);
         }
-        let _batches = lock(&self.batches);
+        let _batches = self.batches.lock();
         let page = Page::new(artifact, actor, 0, &self.blocks_of(artifact)?);
         let parent = req.parent_id.as_deref().map(str::trim).unwrap_or("").to_string();
         if !parent.is_empty() {
@@ -545,7 +545,7 @@ impl Artifacts {
             self.found_blocks(&mut db, id)?;
             // Subscribed before the catch-up is read; live ones are told by seq.
             let (tx, rx) = flume::unbounded();
-            lock(&self.changes).push(tx);
+            self.changes.lock().push(tx);
             let missed = db::changes_after(&mut db, id, after, CATCH_UP_MAX as i64 + 1).map_err(q)?;
             (rx, missed, db::blocks(&mut db, id).map_err(q)?)
         };
@@ -585,7 +585,7 @@ impl Artifacts {
 
     fn publish_suggestions(&self, id: &str) -> Result<(), ApiError> {
         let list = self.suggestions(id)?;
-        lock(&self.suggestion_changes).retain(|tx| tx.send((id.to_string(), list.clone())).is_ok());
+        self.suggestion_changes.lock().retain(|tx| tx.send((id.to_string(), list.clone())).is_ok());
         Ok(())
     }
 
@@ -753,7 +753,7 @@ impl Artifacts {
     }
 
     pub fn accept_suggestion(&self, artifact: &str, suggestion: &str, actor: &str) -> Result<Suggestion, ApiError> {
-        let _batches = lock(&self.batches);
+        let _batches = self.batches.lock();
         let stored = self.open_stored_suggestion(artifact, suggestion)?;
         let row = &stored.wire;
         if row.status != SuggestionStatus::Open {
@@ -821,7 +821,7 @@ impl Artifacts {
     }
 
     pub fn reject_suggestion(&self, artifact: &str, suggestion: &str, actor: &str) -> Result<Suggestion, ApiError> {
-        let _batches = lock(&self.batches);
+        let _batches = self.batches.lock();
         let stored = self.open_stored_suggestion(artifact, suggestion)?;
         let row = &stored.wire;
         if row.status != SuggestionStatus::Open {
@@ -833,7 +833,7 @@ impl Artifacts {
     /// `suggestionStream`: the list now, then the whole list after each change.
     pub fn follow_suggestions(&self, id: &str, sink: Sink) -> Result<(), ApiError> {
         let (tx, rx) = flume::unbounded();
-        lock(&self.suggestion_changes).push(tx);
+        self.suggestion_changes.lock().push(tx);
         let first = self.suggestions(id)?;
         let id = id.to_string();
         std::thread::Builder::new()
@@ -908,7 +908,7 @@ impl Artifacts {
     /// key is picked under the batch lock, so two writers cannot pick the
     /// same place.
     fn demo_insert(&self, artifact: &str, writer: &str, mut b: BlockInput, at: Option<(&[String], usize)>) -> Result<i64, ApiError> {
-        let _batches = lock(&self.batches);
+        let _batches = self.batches.lock();
         let all = self.blocks_of(artifact)?;
         let page = Page::new(artifact, writer, 0, &all);
         let top = page.children("");

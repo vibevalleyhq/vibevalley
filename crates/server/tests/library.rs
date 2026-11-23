@@ -244,3 +244,45 @@ fn regression_library_sort_filter_and_attachment_identity_survive_reopen() {
     assert_eq!(std::fs::read(s.attachments.file(&ids[1]).unwrap().path).unwrap(), b"a");
     s.close();
 }
+
+#[test]
+fn regression_library_observes_edited_message_attachments() {
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let call = |op: &str, p: Value| started.hub.call_as(Caller::User, op, p);
+    let list = || ok(call("library.item.list", json!({})));
+    let general = ok(call("channel.list", json!(null)))[0]["id"].as_str().unwrap().to_string();
+
+    let attached = ok(call("attachment.create", file("draft.txt", "first version", "text/plain")));
+    ok(call(
+        "channel.message.send",
+        json!({ "id": general, "text": "initial", "sendKey": "edit-k1", "attachments": [attached["id"]] }),
+    ));
+    let message_id = ok(call("channel.message.list", json!({ "id": general })))[0]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let first = wait_for("initial attachment in library", || {
+        Some(list()).filter(|v| v.as_array().is_some_and(|a| a.len() == 1))
+    });
+    let first_last_at = first[0]["lastAt"].as_i64().unwrap();
+
+    // Remove the library entry so the subsequent edit proves `ChannelEvent::Edited`
+    // re-records the attachment with its updated timestamp.
+    ok(call("library.item.delete", json!({ "id": attached["id"] })));
+    assert_eq!(list(), json!([]));
+
+    std::thread::sleep(Duration::from_millis(5));
+    ok(call(
+        "channel.message.update",
+        json!({ "id": message_id, "text": "edited with same attachment" }),
+    ));
+    let restored = wait_for("edited message attachment in library", || {
+        Some(list()).filter(|v| v.as_array().is_some_and(|a| a.len() == 1))
+    });
+    assert_eq!(restored[0]["attachment"], attached);
+    assert_eq!(restored[0]["origin"]["channel"], general.as_str());
+    assert_eq!(restored[0]["origin"]["message"], message_id.as_str());
+    assert!(restored[0]["lastAt"].as_i64().unwrap() >= first_last_at);
+    started.close();
+}

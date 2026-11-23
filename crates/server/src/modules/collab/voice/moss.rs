@@ -442,10 +442,10 @@ mod tests {
     fn the_key_is_asked_over_https_without_opening_a_session() {
         use crate::modules::infra::http::Response;
         let probe = |answer: Result<(u16, &'static str), FetchError>| {
-            let answer = std::sync::Mutex::new(Some(answer));
+            let answer = parking_lot::Mutex::new(Some(answer));
             HttpProbe(Arc::new(move |r: Request| {
                 assert_eq!(r.url, "https://api.mosi.cn/v1/realtime?model=moss-live-1.0");
-                answer.lock().unwrap().take().unwrap().map(|(status, body)| Response {
+                answer.lock().take().unwrap().map(|(status, body)| Response {
                     status,
                     headers: vec![],
                     body: Box::new(std::io::Cursor::new(body.as_bytes().to_vec())),

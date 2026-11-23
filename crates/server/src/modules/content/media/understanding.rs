@@ -254,7 +254,7 @@ impl Jobs {
     /// What the job uploaded goes at the vendor and its inputs are let go; a file the vendor never answered for
     /// leaves the cleanup unknown and is named, and a deletion that fails leaves it blocked, to be asked again.
     fn tidy_understanding(&self, id: &str) {
-        let _one = self.cleaning.lock().unwrap_or_else(|e| e.into_inner());
+        let _one = self.cleaning.lock();
         let cleaned = self.remove_remote(id).and_then(|()| self.inputs.release(id)).and_then(|()| self.found(id));
         let wrote = match cleaned {
             Ok(r) => {

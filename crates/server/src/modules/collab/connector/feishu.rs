@@ -8,10 +8,10 @@
 //! with `{"code":200}`.
 
 use std::collections::HashMap;
-use std::sync::Mutex;
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
+use parking_lot::Mutex;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -468,13 +468,7 @@ impl Feishu {
     async fn tenant_token(&self, keys: &Keys) -> Result<String, AppFailed> {
         let of = format!("{}\u{0}{}", keys.app_id, keys.app_secret.expose());
         let at = now();
-        if let Some(cached) = self
-            .token
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .as_ref()
-            .filter(|c| c.of == of && c.until > at)
-        {
+        if let Some(cached) = self.token.lock().as_ref().filter(|c| c.of == of && c.until > at) {
             return Ok(cached.token.clone());
         }
         let why = |e: String| AppFailed::failed(t("server.connector.feishu.send", &[("why", e.into())]));
@@ -488,7 +482,7 @@ impl Feishu {
         let Some(token) = body.tenant_access_token.filter(|x| !x.is_empty() && body.code.unwrap_or(0) == 0) else {
             return Err(why(format!("{} {}", body.code.unwrap_or(0), body.msg.unwrap_or_default())));
         };
-        *self.token.lock().unwrap_or_else(|e| e.into_inner()) = Some(Token {
+        *self.token.lock() = Some(Token {
             of,
             token: token.clone(),
             until: at + (body.expire.unwrap_or(7200) - 60) * 1000,

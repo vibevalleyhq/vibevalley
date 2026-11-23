@@ -25,19 +25,19 @@ pub(crate) async fn open_sqlx_db_at(path: &Path) -> sqlx::Result<sqlx::SqliteCon
         .await
 }
 
-pub(crate) struct ModuleDb(std::sync::Mutex<sqlx::SqliteConnection>);
+pub(crate) struct ModuleDb(parking_lot::Mutex<sqlx::SqliteConnection>);
 
 impl ModuleDb {
     pub(crate) fn open(home: &Path, schema: &'static str) -> sqlx::Result<Self> {
         pollster::block_on(async {
             let mut connection = open_sqlx_db(home).await?;
             sqlx::raw_sql(schema).execute(&mut connection).await?;
-            Ok(Self(std::sync::Mutex::new(connection)))
+            Ok(Self(parking_lot::Mutex::new(connection)))
         })
     }
 
     pub(crate) fn run<T>(&self, query: impl AsyncFnOnce(&mut sqlx::SqliteConnection) -> sqlx::Result<T>) -> sqlx::Result<T> {
-        let mut connection = crate::lock(&self.0);
+        let mut connection = self.0.lock();
         pollster::block_on(query(&mut connection))
     }
 }
@@ -111,7 +111,7 @@ const REQUEST_KEY_TTL_MS: i64 = 5 * 60_000;
 /// `requestKeys`: a retry with the same key gets the first answer for five
 /// minutes; a failure is forgotten.
 pub struct RequestKeys<T> {
-    seen: std::sync::Mutex<Answered<T>>,
+    seen: parking_lot::Mutex<Answered<T>>,
 }
 
 /// The keys oldest first, and each key's expiry and answer.
@@ -120,7 +120,7 @@ type Answered<T> = (Vec<String>, std::collections::HashMap<String, (i64, T)>);
 impl<T> Default for RequestKeys<T> {
     fn default() -> Self {
         RequestKeys {
-            seen: std::sync::Mutex::default(),
+            seen: parking_lot::Mutex::default(),
         }
     }
 }
@@ -135,7 +135,7 @@ impl<T: Clone> RequestKeys<T> {
             ));
         }
         // Held while working: a duplicate waits for the first answer.
-        let mut seen = crate::lock(&self.seen);
+        let mut seen = self.seen.lock();
         if let Some((expires, done)) = seen.1.get(key)
             && *expires > crate::now()
         {

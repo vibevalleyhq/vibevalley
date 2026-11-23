@@ -19,11 +19,12 @@ pub mod view;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 
 use atlas::Atlas;
 use farm::world::VillageWorld;
 use level::Level;
+use parking_lot::Mutex;
 
 /// Where the processed art is: `VIBEVALLEY_ASSETS`, else the repo's `assets/`.
 pub fn assets_dir() -> PathBuf {
@@ -45,14 +46,14 @@ fn village_cache() -> &'static Mutex<HashMap<PathBuf, Arc<VillageWorld>>> {
 /// Non-blocking cache lookup for the sprite atlas; returns `Some` in 0ms once loaded.
 pub fn try_cached_atlas() -> Option<Arc<Atlas>> {
     let dir = assets_dir();
-    atlas_cache().lock().ok()?.get(&dir).cloned()
+    atlas_cache().lock().get(&dir).cloned()
 }
 
 /// Non-blocking cache lookup for the farm world and atlas; returns `Some` in 0ms once loaded.
 pub fn try_cached_village() -> Option<(VillageWorld, Arc<Atlas>)> {
     let dir = assets_dir();
-    let atlas = atlas_cache().lock().ok()?.get(&dir).cloned()?;
-    let world = village_cache().lock().ok()?.get(&dir).cloned()?;
+    let atlas = atlas_cache().lock().get(&dir).cloned()?;
+    let world = village_cache().lock().get(&dir).cloned()?;
     Some(((*world).clone(), atlas))
 }
 
@@ -60,14 +61,12 @@ pub fn try_cached_village() -> Option<(VillageWorld, Arc<Atlas>)> {
 /// computed normals persist across Farm / Map / Tree switches. Blocking on cold miss.
 pub fn load_atlas() -> Result<Arc<Atlas>, String> {
     let dir = assets_dir();
-    if let Some(cached) = atlas_cache().lock().ok().and_then(|map| map.get(&dir).cloned()) {
+    if let Some(cached) = atlas_cache().lock().get(&dir).cloned() {
         return Ok(cached);
     }
     let loaded = Arc::new(Atlas::load(&dir.join("pixel"), 2.0)?);
-    if let Ok(mut map) = atlas_cache().lock() {
-        return Ok(map.entry(dir).or_insert_with(|| loaded.clone()).clone());
-    }
-    Ok(loaded)
+    let mut map = atlas_cache().lock();
+    Ok(map.entry(dir).or_insert_with(|| loaded.clone()).clone())
 }
 
 /// The village and its sprites. Cached process-wide per `assets_dir()`.
@@ -75,16 +74,14 @@ pub fn load_atlas() -> Result<Arc<Atlas>, String> {
 pub fn load_village() -> Result<(VillageWorld, Arc<Atlas>), String> {
     let dir = assets_dir();
     let atlas = load_atlas()?;
-    if let Some(cached) = village_cache().lock().ok().and_then(|map| map.get(&dir).cloned()) {
+    if let Some(cached) = village_cache().lock().get(&dir).cloned() {
         return Ok(((*cached).clone(), atlas));
     }
     let ldtk = std::fs::read_to_string(dir.join("village.ldtk")).map_err(|e| format!("{}: {e}", dir.join("village.ldtk").display()))?;
     let world = Arc::new(VillageWorld::new(Level::parse(&ldtk)?)?);
-    if let Ok(mut map) = village_cache().lock() {
-        let stored = map.entry(dir).or_insert_with(|| world.clone()).clone();
-        return Ok(((*stored).clone(), atlas));
-    }
-    Ok(((*world).clone(), atlas))
+    let mut map = village_cache().lock();
+    let stored = map.entry(dir).or_insert_with(|| world.clone()).clone();
+    Ok(((*stored).clone(), atlas))
 }
 
 #[cfg(test)]

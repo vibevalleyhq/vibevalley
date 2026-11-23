@@ -5,13 +5,13 @@
 
 use std::collections::HashMap;
 use std::io::Read;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use base64::Engine;
+use parking_lot::Mutex;
 use serde_json::{Value, json};
 
-use crate::lock;
 use crate::modules::infra::http::{Fetch, FetchError, Request, Response};
 
 const MOSS: &str = "https://api.mosi.cn/v1";
@@ -227,7 +227,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
         };
         let mut data = vec![json!({ "id": id, "object": "audio.voice", "name": "Offline voice", "created_at": 1 })];
         if !last {
-            data.extend(lock(state).cloned.get(&auth).cloned().unwrap_or_default());
+            data.extend(state.lock().cloned.get(&auth).cloned().unwrap_or_default());
         }
         let last_id = data.last().map(|d| d["id"].clone()).unwrap_or(Value::Null);
         return json_response(
@@ -255,7 +255,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
         if name.contains("[clone:rejected]") {
             return empty(422);
         }
-        let mut s = lock(state);
+        let mut s = state.lock();
         let n = next(&mut s);
         let voice = json!({ "id": format!("voice-cloned-{n}"), "object": "audio.voice", "name": name, "created_at": 1 });
         s.cloned.entry(auth).or_default().push(voice.clone());
@@ -264,7 +264,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
     if let Some(id) = path.strip_prefix(&format!("{MOSS}/audio/tasks/"))
         && r.method == "GET"
     {
-        let mut s = lock(state);
+        let mut s = state.lock();
         let Some(task) = s.tasks.get(id).filter(|t| t["account"] == auth.as_str()) else {
             return json_response(404, &json!({ "error": { "code": "task_not_found" } }));
         };
@@ -298,7 +298,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
     }
     if path == format!("{MOSS}/audio/transcriptions") && r.method == "POST" && !form {
         let file = input["file_id"].as_str().unwrap_or("");
-        let mut s = lock(state);
+        let mut s = state.lock();
         if s.files.get(file).is_none_or(|f| f.purpose != "audio") {
             return empty(400);
         }
@@ -369,7 +369,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
         let large = text.contains("[audio:large]");
         let format = if !large && input["response_format"] == "mp3" { "mp3" } else { "wav" };
         let kind = if format == "mp3" { "audio/mpeg" } else { "audio/wav" };
-        let mut s = lock(state);
+        let mut s = state.lock();
         let id = format!("audio-{}", next(&mut s));
         let url = format!("https://media.example.com/{id}.{format}");
         let bytes = if large {
@@ -402,7 +402,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
             return empty(503);
         }
         if input["stream"] == json!(true) {
-            let id = format!("stream-{}", next(&mut lock(state)));
+            let id = format!("stream-{}", next(&mut state.lock()));
             let mono = &wav(2880)[44..];
             let mut stereo = Vec::with_capacity(mono.len() * 2);
             for pair in mono.as_chunks::<2>().0 {
@@ -451,7 +451,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
         if input["async"] == json!(true) {
             let format = if !large && asked == "mp3" { "mp3" } else { "wav" };
             let kind = if format == "mp3" { "audio/mpeg" } else { "audio/wav" };
-            let mut s = lock(state);
+            let mut s = state.lock();
             let id = format!("speech-{}", next(&mut s));
             let url = format!("https://media.example.com/{id}.{format}");
             let bytes = if large {
@@ -480,7 +480,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
         }
         let format = if large { "wav" } else { asked };
         let kind = if format == "wav" { "audio/wav" } else { "audio/mpeg" };
-        let mut s = lock(state);
+        let mut s = state.lock();
         let n = next(&mut s);
         let url = format!("https://media.example.com/{n}.{format}");
         let bytes = if large {
@@ -508,7 +508,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
         let file = parts.iter().find(|p| p.0 == "file" && p.1.is_some());
         let purpose = parts.iter().find(|p| p.0 == "purpose").map(|p| String::from_utf8_lossy(&p.2).to_string());
         let (Some(file), Some(purpose)) = (file, purpose) else { return empty(400) };
-        let mut s = lock(state);
+        let mut s = state.lock();
         let id = format!("file-{}", next(&mut s));
         s.files.insert(
             id.clone(),
@@ -525,7 +525,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
     if let Some(id) = path.strip_prefix(&format!("{MOSS}/files/"))
         && r.method == "DELETE"
     {
-        let mut s = lock(state);
+        let mut s = state.lock();
         let Some(file) = s.files.get_mut(id) else { return empty(404) };
         if file.fail_once {
             file.fail_once = false;
@@ -546,7 +546,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
             .collect::<Vec<_>>()
             .join("\n");
         let media: Vec<&Value> = content.iter().filter(|p| p["type"] != "input_text").collect();
-        let mut s = lock(state);
+        let mut s = state.lock();
         if media.iter().any(|p| {
             let want = if p["type"] == "input_image" { "image" } else { "video" };
             s.files.get(p["file_id"].as_str().unwrap_or("")).is_none_or(|f| f.purpose != want)
@@ -590,7 +590,7 @@ fn serve(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
     if r.headers.iter().any(|(k, _)| k.eq_ignore_ascii_case("authorization")) {
         return Err(FetchError::Network("an asset download carried credentials".into()));
     }
-    let mut s = lock(state);
+    let mut s = state.lock();
     let Some(asset) = s.assets.get_mut(&r.url) else {
         return Err(FetchError::Network(format!("no asset at {}", r.url)));
     };

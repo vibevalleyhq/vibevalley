@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
-use std::sync::{Arc, Mutex, Weak, atomic::Ordering};
+use std::sync::{Arc, Weak, atomic::Ordering};
 
+use parking_lot::Mutex;
 use serde_json::{Value, json};
 use vibevalley_runtime::agent::core::engine::{BrainProvider, Request};
 use vibevalley_runtime::agent::core::pipeline::Transcript;
@@ -16,7 +17,6 @@ use vibevalley_runtime::agent::{AgentEvent, Brain, BrainError, Message, TurnOutc
 use vibevalley_protocol::{ApiError, BizCode, OrchestratorApproval, OrchestratorApprovalResolveInput};
 
 use super::{Input, Orchestrator, Run};
-use crate::lock;
 use crate::modules::collab::channel::Posting;
 use crate::modules::team::tool::Route;
 
@@ -45,7 +45,7 @@ impl BrainProvider for Bound {
     }
 
     fn observe(&self, conv: &str, _task: &str, event: AgentEvent) {
-        if let Some(s) = lock(&self.listeners).get(conv) {
+        if let Some(s) = self.listeners.lock().get(conv) {
             let _ = s.send(event);
         }
     }
@@ -141,7 +141,7 @@ impl Execution {
     }
 
     pub(super) fn close(&self) {
-        lock(&self.shutdown).take();
+        self.shutdown.lock().take();
         self.harness.close();
     }
 
@@ -328,9 +328,9 @@ impl Execution {
     pub(super) fn run(&self, run: &mut Run<'_>, input: TurnInput<'_>) -> vibevalley_runtime::agent::Result<TurnOutcome> {
         let id = run.me.id.clone();
         let (send, events) = flume::unbounded();
-        lock(&self.bound.listeners).insert(id.clone(), send);
+        self.bound.listeners.lock().insert(id.clone(), send);
         let result = self.dispatch(run, &input, &events);
-        lock(&self.bound.listeners).remove(&id);
+        self.bound.listeners.lock().remove(&id);
         result.map_err(|e| BrainError::Store(e.to_string()))
     }
 

@@ -293,6 +293,19 @@ fn catalog_models_pricing_and_stream_cancel() {
 }
 
 #[test]
+fn retry_policy_backoff_doubles_caps_and_honors_retry_after() {
+    let policy = RetryPolicy::default();
+    let seq: Vec<Duration> = policy.backoff().collect();
+    assert_eq!(seq, vec![Duration::from_millis(250), Duration::from_millis(500), Duration::from_secs(1)]);
+    assert_eq!(policy.delay_for(0, None), Duration::from_millis(250));
+    assert_eq!(policy.delay_for(1, None), Duration::from_millis(500));
+    assert_eq!(policy.delay_for(4, None), Duration::from_secs(4));
+    assert_eq!(policy.delay_for(100, None), Duration::from_secs(4));
+    assert_eq!(policy.delay_for(0, Some(Duration::from_secs(120))), Duration::from_secs(60));
+    assert_eq!(RetryPolicy::none().backoff().next(), None);
+}
+
+#[test]
 fn deepseek_https_client_initializes_rustls_platform_verifier_without_webpki() {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();

@@ -5,19 +5,22 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use std::thread::JoinHandle;
 
+use parking_lot::Mutex;
+use tokio::task::JoinHandle as TaskHandle;
+use tokio_util::sync::CancellationToken;
 use vibevalley_core::Transition;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{Actor, AgentRole, ApiError, ChannelType, Fact, FactSessionReported, MessageKind, NoticeLevel, Outcome, Session, SubjectKind, ops};
 
 use super::Board;
+use crate::Hub;
 use crate::event_bus::Subscription;
 use crate::modules::collab::channel::{
     Chat, Committed, DeliveryTargetKind, Meta, Note, Noticing, QueuedDelivery, Saying, Seat, ThreadSubject, actor_of, meta_of,
 };
-use crate::{Hub, lock};
 
 const HANDED_EMOJI: &str = "👀";
 const REPORT_MAX: usize = 1500;
@@ -97,8 +100,7 @@ pub struct IssueChat {
     opening: Mutex<()>,
     closed: AtomicBool,
     sub: Mutex<Option<Subscription>>,
-    stop: Mutex<Option<flume::Sender<()>>>,
-    coordinator: Mutex<Option<JoinHandle<()>>>,
+    coordinator: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
     lanes: Mutex<HashMap<String, flume::Sender<IssueWake>>>,
     lane_handles: Mutex<Vec<JoinHandle<()>>>,
     delivery_waiters: Mutex<HashMap<String, Vec<flume::Sender<()>>>>,
@@ -106,7 +108,6 @@ pub struct IssueChat {
 
 impl IssueChat {
     pub fn start(hub: &Arc<Hub>, board: Board, chat: Arc<Chat>) -> Arc<Self> {
-        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
         let dispatches = chat.dispatches();
         let ic = Arc::new(Self {
             hub: Arc::downgrade(hub),
@@ -115,7 +116,6 @@ impl IssueChat {
             opening: Mutex::new(()),
             closed: AtomicBool::new(false),
             sub: Mutex::new(None),
-            stop: Mutex::new(Some(stop_tx)),
             coordinator: Mutex::new(None),
             lanes: Mutex::new(HashMap::new()),
             lane_handles: Mutex::new(Vec::new()),
@@ -127,29 +127,36 @@ impl IssueChat {
             let Some(ic) = w.upgrade() else { return };
             ic.on_transition(tr);
         });
-        *lock(&ic.sub) = Some(sub);
+        *ic.sub.lock() = Some(sub);
 
         let w = Arc::downgrade(&ic);
-        let coordinator = std::thread::Builder::new()
-            .name("vibevalley-issue-dispatch".into())
-            .spawn(move || {
-                let Some(ic) = w.upgrade() else { return };
-                ic.open_threads();
-                ic.replay_reports();
-                ic.replay_pending_deliveries();
-                drop(ic);
-                loop {
-                    let dispatched = flume::Selector::new().recv(&dispatches, |r| r.ok()).recv(&stop_rx, |_| None).wait();
-                    let Some(dispatched) = dispatched else { return };
-                    let Some(ic) = w.upgrade() else { return };
-                    if ic.closed.load(Ordering::Acquire) {
-                        return;
-                    }
-                    ic.route_dispatched(dispatched);
-                }
+        let cancel = hub.child_token();
+        let task_cancel = cancel.clone();
+        let coordinator = hub.spawn_task(async move {
+            let Some(boot_ic) = w.upgrade() else { return };
+            let _ = tokio::task::spawn_blocking(move || {
+                boot_ic.open_threads();
+                boot_ic.replay_reports();
+                boot_ic.replay_pending_deliveries();
             })
-            .expect("issue dispatch thread");
-        *lock(&ic.coordinator) = Some(coordinator);
+            .await;
+            loop {
+                let dispatched = tokio::select! {
+                    biased;
+                    _ = task_cancel.cancelled() => return,
+                    res = dispatches.recv_async() => match res {
+                        Ok(dispatched) => dispatched,
+                        Err(_) => return,
+                    },
+                };
+                let Some(ic) = w.upgrade() else { return };
+                if ic.closed.load(Ordering::Acquire) {
+                    return;
+                }
+                let _ = tokio::task::spawn_blocking(move || ic.route_dispatched(dispatched)).await;
+            }
+        });
+        *ic.coordinator.lock() = Some((cancel, coordinator));
 
         let c = ic.clone();
         hub.on::<ops::IssueCommentCreate>(move |ctx, input| {
@@ -162,19 +169,17 @@ impl IssueChat {
 
     pub fn close(&self) {
         self.closed.store(true, Ordering::Release);
-        lock(&self.delivery_waiters).clear();
-        let _ = lock(&self.stop).take();
-        if let Some(sub) = lock(&self.sub).take() {
+        self.delivery_waiters.lock().clear();
+        if let Some(sub) = self.sub.lock().take() {
             sub.close();
         }
-        let me = std::thread::current().id();
-        if let Some(handle) = lock(&self.coordinator).take()
-            && handle.thread().id() != me
-        {
-            let _ = handle.join();
+        if let Some((cancel, handle)) = self.coordinator.lock().take() {
+            cancel.cancel();
+            let _ = vibevalley_runtime::rt::block_on(handle);
         }
-        lock(&self.lanes).clear();
-        let handles: Vec<_> = lock(&self.lane_handles).drain(..).collect();
+        let me = std::thread::current().id();
+        self.lanes.lock().clear();
+        let handles: Vec<_> = self.lane_handles.lock().drain(..).collect();
         for handle in handles {
             if handle.thread().id() != me {
                 let _ = handle.join();
@@ -223,7 +228,7 @@ impl IssueChat {
             return;
         }
         let rx = {
-            let mut waiters = lock(&self.delivery_waiters);
+            let mut waiters = self.delivery_waiters.lock();
             if self.closed.load(Ordering::Acquire) {
                 return;
             }
@@ -243,7 +248,7 @@ impl IssueChat {
     }
 
     fn notify_delivery_settled(&self, message_id: &str) {
-        if let Some(waiters) = lock(&self.delivery_waiters).remove(message_id) {
+        if let Some(waiters) = self.delivery_waiters.lock().remove(message_id) {
             for tx in waiters {
                 let _ = tx.send(());
             }
@@ -255,7 +260,7 @@ impl IssueChat {
         if !h.is_board_worker() || h.issue_id().is_none() {
             return;
         }
-        let _guard = lock(&self.opening);
+        let _guard = self.opening.lock();
         if self.chat.home_of(&h.id).is_none()
             && let Err(e) = self.open_thread_locked(h)
         {
@@ -271,7 +276,7 @@ impl IssueChat {
             Fact::SessionChanged(f)
                 if f.session.is_board_worker() && f.session.issue_id().is_some() && !tr.before.sessions.iter().any(|s| s.id == f.session.id) =>
             {
-                let _guard = lock(&self.opening);
+                let _guard = self.opening.lock();
                 if let Err(e) = self.open_thread_locked(&f.session) {
                     warn(&format!("{}'s thread", f.session.id), &e);
                 }
@@ -327,7 +332,7 @@ impl IssueChat {
     }
 
     fn open_threads(&self) {
-        let _guard = lock(&self.opening);
+        let _guard = self.opening.lock();
         for h in self.issue_sessions() {
             if let Err(e) = self.open_thread_locked(&h) {
                 warn(&format!("{}'s thread", h.id), &e);
@@ -596,7 +601,7 @@ impl IssueChat {
         if self.closed.load(Ordering::Acquire) {
             return;
         }
-        let mut lanes = lock(&self.lanes);
+        let mut lanes = self.lanes.lock();
         if let Some(tx) = lanes.get(&issue_id)
             && tx.send(wake.clone()).is_ok()
         {
@@ -615,7 +620,7 @@ impl IssueChat {
                         Ok(item) => item,
                         Err(flume::TryRecvError::Empty) => {
                             let Some(ic) = ic.upgrade() else { return };
-                            let mut lanes = lock(&ic.lanes);
+                            let mut lanes = ic.lanes.lock();
                             match rx.try_recv() {
                                 Ok(item) => item,
                                 Err(_) => {
@@ -635,7 +640,7 @@ impl IssueChat {
             })
             .expect("issue delivery lane thread");
         drop(lanes);
-        let mut handles = lock(&self.lane_handles);
+        let mut handles = self.lane_handles.lock();
         handles.retain(|h| !h.is_finished());
         handles.push(handle);
     }

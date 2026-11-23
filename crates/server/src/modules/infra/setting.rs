@@ -4,8 +4,9 @@
 //! feature's readiness.
 
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
@@ -342,7 +343,7 @@ impl Setting {
     }
 
     fn stored(&self) -> Stored {
-        self.stored.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        self.stored.lock().clone()
     }
 
     /// The voice's defaults, in the farm's language as it is now.
@@ -531,7 +532,7 @@ impl Setting {
         if !problem.is_empty() {
             return Err(ApiError::new(BizCode::SettingRefused, problem));
         }
-        let mut guard = self.stored.lock().unwrap_or_else(|e| e.into_inner());
+        let mut guard = self.stored.lock();
         let mut next = guard.clone();
         let keys = [
             (&u.deepseek_api_key, &mut next.deepseek_api_key),
@@ -593,7 +594,7 @@ impl Setting {
 
     /// Changes the providers under the settings' lock (`updateProviders`).
     pub fn update_providers(&self, change: impl FnOnce(&Providers) -> Result<Providers, ApiError>) -> Result<Providers, ApiError> {
-        let mut guard = self.stored.lock().unwrap_or_else(|e| e.into_inner());
+        let mut guard = self.stored.lock();
         let providers = change(&guard.providers.clone().unwrap_or_default())?;
         let mut next = guard.clone();
         next.providers = Some(providers.clone());

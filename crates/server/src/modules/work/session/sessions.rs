@@ -7,9 +7,10 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use vibevalley_protocol::{
     Deliverable, Doing, Fact, Issue, IssueAnswer, Millis, Outcome, Phase, PhaseWorking, Question, RunTrigger, Session, SessionAction, Spent,
@@ -18,7 +19,7 @@ use vibevalley_runtime::oar::{ContentBlock, EventKind, McpServer, PermissionDeci
 
 use super::drivers::{Drive, Drivers, HelperPlace, Persona};
 use super::report::{Report, ReportQuestion, ReportStatus};
-use crate::modules::work::ledger::{BoardConfig, BoardError, IssueChange, Ledger, Result, Step, io, lock, now};
+use crate::modules::work::ledger::{BoardConfig, BoardError, IssueChange, Ledger, Result, Step, io, now};
 use crate::modules::work::workplace::{Leave, Leaving, Workplace};
 
 /// What the board keeps of a session beyond the wire `Session`: the
@@ -143,7 +144,7 @@ impl Sessions {
     /// The agents this process drives stop; their rounds are recorded as
     /// interrupted when the board opens next.
     pub fn close(&self) {
-        let live: Vec<Live> = lock(&self.0.live).drain().map(|(_, l)| l).collect();
+        let live: Vec<Live> = self.0.live.lock().drain().map(|(_, l)| l).collect();
         for l in live {
             l.agent.dispose();
         }
@@ -155,11 +156,11 @@ impl Sessions {
 
     /// Whether this process drives the session now.
     pub fn is_live(&self, session: &str) -> bool {
-        lock(&self.0.live).contains_key(session)
+        self.0.live.lock().contains_key(session)
     }
 
     pub(super) fn live_agent(&self, session: &str) -> Option<Arc<dyn vibevalley_runtime::oar::Session>> {
-        lock(&self.0.live).get(session).map(|l| l.agent.clone())
+        self.0.live.lock().get(session).map(|l| l.agent.clone())
     }
 
     /// The record file of a session's agent events.
@@ -187,12 +188,12 @@ impl Sessions {
     /// Where helpers reach the farm's MCP door (`http://<addr>/mcp`); a helper
     /// started before it is known gets no door.
     pub fn set_mcp_url(&self, url: String) {
-        lock(&self.0.door).url = Some(url);
-        let ids = std::mem::take(&mut *lock(&self.0.recovering));
+        self.0.door.lock().url = Some(url);
+        let ids = std::mem::take(&mut *self.0.recovering.lock());
         for id in ids {
             if let Err(e) = self.restore_generation(&id) {
                 eprintln!("vibevalley: restoring {id}: {e}");
-                lock(&self.0.recovering).push(id);
+                self.0.recovering.lock().push(id);
             }
         }
     }
@@ -202,12 +203,12 @@ impl Sessions {
         if token.is_empty() {
             return None;
         }
-        lock(&self.0.door).tokens.get(token).cloned()
+        self.0.door.lock().tokens.get(token).cloned()
     }
 
     /// The helper's door entry, minting its token once.
     pub(super) fn door_for(&self, session: &str) -> Option<McpServer> {
-        let mut door = lock(&self.0.door);
+        let mut door = self.0.door.lock();
         let url = door.url.clone()?;
         let token = match door.tokens.iter().find(|(_, s)| s.as_str() == session) {
             Some((t, _)) => t.clone(),
@@ -225,11 +226,11 @@ impl Sessions {
     }
 
     pub(super) fn extra(&self, session: &str) -> Extra {
-        lock(&self.0.extras).get(session).cloned().unwrap_or_default()
+        self.0.extras.lock().get(session).cloned().unwrap_or_default()
     }
 
     pub(super) fn set_extra(&self, session: &str, change: impl FnOnce(&mut Extra)) -> Result<()> {
-        let mut extras = lock(&self.0.extras);
+        let mut extras = self.0.extras.lock();
         let extra = extras.entry(session.to_string()).or_default();
         change(extra);
         self.0.ledger.database(|db| super::db::put_extra(db, session, extra))?;
@@ -271,7 +272,7 @@ impl Sessions {
         );
         session.profile = (!h.drive.agent.is_empty()).then(|| h.drive.agent.clone());
         session.brief = h.brief;
-        lock(&self.0.extras).entry(id.clone()).or_default().base = h.base;
+        self.0.extras.lock().entry(id.clone()).or_default().base = h.base;
         session.cwd = Some(h.cwd.to_string_lossy().into_owned());
         session.attach_binding(vibevalley_protocol::ContextRef::Issue {
             id: h.issue.id.clone(),
@@ -279,7 +280,7 @@ impl Sessions {
         });
         let started = self.start(h.drive, session, h.issue, h.prompt, false, h.trigger);
         if started.is_err() {
-            lock(&self.0.extras).remove(&id);
+            self.0.extras.lock().remove(&id);
         }
         started
     }
@@ -317,7 +318,7 @@ impl Sessions {
         Ok(())
     }
     pub(crate) fn recover_on_connect(&self, ids: Vec<String>) {
-        lock(&self.0.recovering).extend(ids);
+        self.0.recovering.lock().extend(ids);
     }
 
     fn restore_generation(&self, id: &str) -> Result<()> {
@@ -402,13 +403,13 @@ impl Sessions {
     pub(super) fn go_live(&self, agent: Arc<dyn vibevalley_runtime::oar::Session>, session: Session, issue: Option<(&str, IssueChange)>) -> Result<()> {
         let events = agent.events_with_history();
         let extra = {
-            let mut extras = lock(&self.0.extras);
+            let mut extras = self.0.extras.lock();
             let entry = extras.entry(session.id.clone()).or_default();
             entry.agent_session = agent.resume_id();
             entry.clone()
         };
         let generation = self.0.generation.fetch_add(1, Ordering::SeqCst) + 1;
-        lock(&self.0.live).insert(
+        self.0.live.lock().insert(
             session.id.clone(),
             Live {
                 agent: agent.clone(),
@@ -465,7 +466,7 @@ impl Sessions {
     /// still drives it, else reopened (resumed when the runtime can, else
     /// told `again`).
     pub fn next_round(&self, issue: &Issue, session: &Session, words: String, again: impl FnOnce(&str) -> String, trigger: RunTrigger) -> Result<String> {
-        let agent = lock(&self.0.live).get(&session.id).map(|l| l.agent.clone());
+        let agent = self.0.live.lock().get(&session.id).map(|l| l.agent.clone());
         match agent {
             Some(agent) => {
                 let _ = std::fs::remove_file(self.report_path(&session.id));
@@ -499,7 +500,7 @@ impl Sessions {
         if !session.phase.is_working() {
             return None;
         }
-        let agent = lock(&self.0.live).get(&session.id).map(|l| l.agent.clone())?;
+        let agent = self.0.live.lock().get(&session.id).map(|l| l.agent.clone())?;
         self.record(&session.id, Step::Asked { text: words.to_string() });
         Some(match agent.steer(text(words)) {
             Ok(()) => Ok(()),
@@ -509,7 +510,7 @@ impl Sessions {
 
     /// Stops the running turn of `session`.
     pub fn stop(&self, session: &str) -> Result<()> {
-        let agent = lock(&self.0.live).get(session).map(|l| l.agent.clone());
+        let agent = self.0.live.lock().get(session).map(|l| l.agent.clone());
         let agent = agent.ok_or_else(|| BoardError::Other("nothing is running".into()))?;
         agent.abort()?;
         Ok(())
@@ -546,7 +547,7 @@ impl Sessions {
     /// Lets a session go: its agent stops, its open round ends, its
     /// workplace is left as `leave` says, and it leaves the board.
     pub fn dismiss(&self, session_id: &str, leave: Leave) -> Result<()> {
-        let live = lock(&self.0.live).remove(session_id);
+        let live = self.0.live.lock().remove(session_id);
         if let Some(live) = live {
             let _ = live.agent.abort();
             live.agent.dispose();
@@ -569,18 +570,18 @@ impl Sessions {
             self.0.workplaces.release(&leaving, leave)?;
         }
         let _ = std::fs::remove_file(self.report_path(session_id));
-        lock(&self.0.door).tokens.retain(|_, s| s != session_id);
+        self.0.door.lock().tokens.retain(|_, s| s != session_id);
         if session.is_some() {
             self.0.ledger.apply(vec![Fact::session_left(now(), session_id, None)])?;
         }
-        lock(&self.0.extras).remove(session_id);
+        self.0.extras.lock().remove(session_id);
         self.0.ledger.database(|db| super::db::remove_extra(db, session_id))?;
         self.remove_workspace_meta(session_id);
         Ok(())
     }
 
     fn current(&self, session: &str, generation: u64) -> bool {
-        lock(&self.0.live).get(session).is_some_and(|l| l.generation == generation)
+        self.0.live.lock().get(session).is_some_and(|l| l.generation == generation)
     }
 
     /// Turns the agent's events into facts until the session ends or leaves.
@@ -663,7 +664,7 @@ impl Sessions {
                     {
                         self.on_workspace_permission_requested(session_id, request_id, tool, input, summary);
                     } else if self.0.config.permission == PermissionMode::Bypass {
-                        let agent = lock(&self.0.live).get(session_id).map(|l| l.agent.clone());
+                        let agent = self.0.live.lock().get(session_id).map(|l| l.agent.clone());
                         if let Some(agent) = agent {
                             let _ = agent.respond_permission(&request_id, PermissionDecision::AllowOnce);
                         }
@@ -711,7 +712,7 @@ impl Sessions {
                 _ => {}
             }
         }
-        let mut live = lock(&self.0.live);
+        let mut live = self.0.live.lock();
         let was_current = live.get(session_id).is_some_and(|l| l.generation == generation);
         if was_current {
             live.remove(session_id);
@@ -887,7 +888,7 @@ impl Sessions {
             return;
         }
         if let Some(id) = run_id {
-            if let Some(extra) = lock(&self.0.extras).get_mut(session_id)
+            if let Some(extra) = self.0.extras.lock().get_mut(session_id)
                 && extra.run.as_ref() == Some(&id)
             {
                 extra.run = None;

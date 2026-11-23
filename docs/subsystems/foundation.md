@@ -25,7 +25,7 @@
 | `crates/server/src/modules/`、`crates/server/src/transport/` | 按六大域分组的业务模块（`work`、`team`、`collab`、`content`、`skin`、`infra`）与传输层（`api`、`bridge`、`http`） |
 | `crates/protocol/src/contract/`、`crates/protocol/tests/typescript.rs`、`crates/protocol/src/home.rs` | 线上类型（含 5 域切片、`FarmFrame` 与 `host.rs` 壳协议，`ts-rs` 写出 `packages/protocol` 的 `*.gen.ts`，`vp run protocol:check` 查最新）与家目录约定（`server.json`、语言） |
 | `crates/core/src/` | 纯规则中心：`reduce`、`SliceMask` 与按域切片投影、状态派生、收件箱、依赖、定时任务（`cron/`）、笔记大纲（`pkm/`）、作品引擎（`artifact/`） |
-| `crates/runtime/src/` | `oar/` 驱动与自研 `agent/` 持久对话引擎（`execution.db`） |
+| `crates/runtime/src/` | 进程级共享 Tokio 运行时 `rt.rs`（`vibevalley_runtime::rt::{handle, spawn, block_on}`）、`oar/` 驱动与自研 `agent/` 持久对话引擎（`execution.db`） |
 | `crates/rich/`、`crates/engines/{onig,pele,shiki}` | 原生富内容组件与内部引擎（`canvas`、`chart`、`genui`、`pinyin`）及底层正则/高亮/图谱引擎 |
 | `apps/mac/crates/workspace/src/store/mod.rs` | 原生应用外壳的 `state.db`（SQLite）：项目、终端与布局；连同 `pixel`、`terminal` 共 3 个桌面支撑 crate |
 | `crates/i18n/src/lib.rs`、`crates/i18n/locales/` | 消息格式与词典；词典构建时编进去，前端 `web.*` 词典挂在可选特性 `web` 下（仅 `crates/rich` 开启） |
@@ -55,7 +55,7 @@
 - **边界解码一次，门内全是类型**：HTTP 的入参经 `decode`（`crates/server/src/lib.rs`，serde）按端点的类型解成结构体，解不开当场拒绝；文件、厂商响应、模型给的工具参数各在进门处解成结构体和 enum。门内不传 `serde_json::Value`，不按字符串分支。
 - **钥匙是 `Secret`**：`settings.json` 里的钥匙读成 `Secret`（`crates/server/src/modules/infra/setting.rs`），打印只出提示。
 - **拒绝带 `BizCode`**：对调用方的拒绝是 `ApiError`（带 `bizCode` 与 `next`），网关写成全信封；模块内部可分辨的失败是 `thiserror` 的 enum；预期的结果（合进去或冲突）返回 enum，不当错误。
-- **同步领域接口，异步适配器**。领域模块保留同步接口。HTTP 由 axum 和 Tokio 驱动，MCP 客户端共享专用运行时。SQLx 的 SQLite 工作线程执行查询。宿主把可能等待写锁的工作放在后台线程。
+- **同步领域接口，共享异步底座**。领域模块保留同步接口，内部互斥锁统一用 `parking_lot`（无毒化），全局热读观察者与脊柱插槽用 `arc-swap` 无锁读取，重试退避用 `backon`。全进程共享唯一多线 Tokio 运行时 `vibevalley_runtime::rt`（工作线程 `vibevalley-io-{n}`，初始化即安装 `rustls` `ring` 提供方），集中承载 `axum` HTTP 门、工作区 `reqwest` 出站调用、`SliceFeed`/`WatchStream`、`BridgeHub`、`EventBus`、MCP 客户端与原生语音流；取消与停机经 `tokio_util::sync::CancellationToken` 与 `TaskTracker` 级联收敛。SQLx 的 SQLite 工作线程执行查询，同步阻塞工作显式走 `spawn_blocking` 或后台线程。
 
 ### 契约、规则和数据库
 
@@ -112,7 +112,7 @@
 
 - **只有一个服务端，Rust 的**：原生应用和命令行直接用它的类型；用户选了激进重构、速度优先（[原生的 VibeValley](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
 - **SQLite，不是 Postgres**：一台电脑一个人，SQLite 开箱即用、不带 WASM；多机与外部库不在当前计划里。
-- **阻塞线程而非 async**：模块里大多是子进程、文件和 SQLite，阻塞写法最直白；异步只留在 HTTP 那层。
+- **领域同步直调、IO 集中异步**：模块内部多为子进程、文件与 SQLite，对外保留同步直调并在异步任务中经 `spawn_blocking` 隔离；网络、流式扇出与取消统一收拢到共享 `vibevalley_runtime::rt` 运行时，不引入重型 Actor 框架。
 - **对模型的话保持中文、不进词典**：避免双份提示调优与评测漂移。
 
 ## 怎么验证

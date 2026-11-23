@@ -12,13 +12,15 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock, Weak};
+use std::sync::{Arc, OnceLock, Weak};
 use std::time::Duration;
 
+use parking_lot::{Mutex, MutexGuard};
 use pollster::block_on;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::{Connection, SqliteConnection};
+use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, Attachment, BizCode, Caller, Fact, JsNumber, MediaAudioFormat, MediaAudioMetadata, MediaAudioMetadataSource, MediaAudioResult, MediaCleanup,
@@ -516,14 +518,15 @@ pub struct Jobs {
     closed: AtomicBool,
     me: OnceLock<Weak<Jobs>>,
     streams: Mutex<HashMap<String, Stream>>,
-    /// Dropped at close, which ends the minute's sweep.
-    sweeping: Mutex<Option<flume::Sender<()>>>,
+    /// Cancelled at close, which ends the minute's sweep and delayed stream cleanup.
+    cancel: CancellationToken,
 }
 
 impl Jobs {
     pub fn open(p: Parts) -> Result<Arc<Jobs>, ApiError> {
         let mut db = block_on(open_sqlx_db(&p.home)).map_err(storage)?;
         block_on(sqlx::raw_sql(crate::db::schema::CONTENT_MEDIA).execute(&mut db)).map_err(storage)?;
+        let cancel = p.hub.upgrade().map(|h| h.child_token()).unwrap_or_default();
         let jobs = Arc::new(Jobs {
             db: Mutex::new(db),
             held: Mutex::default(),
@@ -541,7 +544,7 @@ impl Jobs {
             closed: AtomicBool::new(false),
             me: OnceLock::new(),
             streams: Mutex::default(),
-            sweeping: Mutex::default(),
+            cancel,
         });
         let _ = jobs.me.set(Arc::downgrade(&jobs));
         jobs.pick_up()?;
@@ -550,33 +553,33 @@ impl Jobs {
         }
         jobs.publish();
         jobs.schedule();
-        jobs.sweep_each_minute()?;
+        jobs.sweep_each_minute();
         Ok(jobs)
     }
 
     /// Approvals no orchestrator used in time are ended every minute, until close.
-    fn sweep_each_minute(self: &Arc<Self>) -> Result<(), ApiError> {
-        let (stop, stopped) = flume::bounded::<()>(1);
-        *self.sweeping.lock().unwrap_or_else(|e| e.into_inner()) = Some(stop);
+    fn sweep_each_minute(self: &Arc<Self>) {
+        let cancel = self.cancel.clone();
         let me = Arc::downgrade(self);
-        std::thread::Builder::new()
-            .name("media-job-sweep".into())
-            .spawn(move || {
-                while matches!(stopped.recv_timeout(Duration::from_secs(60)), Err(flume::RecvTimeoutError::Timeout)) {
-                    let Some(jobs) = me.upgrade() else { break };
-                    jobs.expire_approvals();
+        vibevalley_runtime::rt::handle().spawn(async move {
+            loop {
+                tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => break,
+                    _ = tokio::time::sleep(Duration::from_secs(60)) => {}
                 }
-            })
-            .map_err(storage)?;
-        Ok(())
+                let Some(jobs) = me.upgrade() else { break };
+                let _ = tokio::task::spawn_blocking(move || jobs.expire_approvals()).await;
+            }
+        });
     }
 
     fn db(&self) -> MutexGuard<'_, SqliteConnection> {
-        self.db.lock().unwrap_or_else(|e| e.into_inner())
+        self.db.lock()
     }
 
     fn runs(&self) -> MutexGuard<'_, HashMap<String, Running>> {
-        self.runs.lock().unwrap_or_else(|e| e.into_inner())
+        self.runs.lock()
     }
 
     fn read(db: &mut SqliteConnection, id: &str) -> Result<Option<Record>, ApiError> {
@@ -689,7 +692,7 @@ impl Jobs {
         self.open_for_work()?;
         {
             // Another worker may scan queued jobs as soon as the transaction commits.
-            let _schedule = self.scheduling.lock().unwrap_or_else(|e| e.into_inner());
+            let _schedule = self.scheduling.lock();
             let mut db = self.db();
             let mut tx = block_on(db.begin_with("BEGIN IMMEDIATE")).map_err(storage)?;
             if let Some(old) = Self::read(&mut tx, r.id())? {
@@ -716,7 +719,7 @@ impl Jobs {
     }
 
     pub(super) fn hold(&self, id: &str, held: Held) {
-        self.held.lock().unwrap_or_else(|e| e.into_inner()).insert(id.to_string(), held);
+        self.held.lock().insert(id.to_string(), held);
     }
 
     /// An image; orchestrators must have the user's word first (their tool checks it).
@@ -786,7 +789,7 @@ impl Jobs {
         if streaming && (!matches!(source, MediaSource::User {}) || request.asynchronous == Some(true) || request.format != MediaAudioFormat::Pcm) {
             return Err(refused("speechInvalid"));
         }
-        if streaming && self.streams.lock().unwrap_or_else(|e| e.into_inner()).len() >= 8 {
+        if streaming && self.streams.lock().len() >= 8 {
             return Err(refused("speechInvalid"));
         }
         let ask = Ask::Speech(request.clone());
@@ -803,10 +806,7 @@ impl Jobs {
         let body = Moss::prepare_speech(&account.model, &request.text, &request.voice, request.format.as_str()).map_err(|_| refused("speechInvalid"))?;
         if streaming {
             let (tx, rx) = flume::bounded(16);
-            self.streams
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .insert(request.id.clone(), Stream { tx, rx, claimed: false });
+            self.streams.lock().insert(request.id.clone(), Stream { tx, rx, claimed: false });
         }
         let r = Record::new(
             ask,
@@ -825,7 +825,7 @@ impl Jobs {
             return;
         }
         let Some(me) = self.me.get().and_then(Weak::upgrade) else { return };
-        let _one = self.scheduling.lock().unwrap_or_else(|e| e.into_inner());
+        let _one = self.scheduling.lock();
         let waiting = match self.rows(async |db| q::waiting_jobs(db).await) {
             Ok(w) => w,
             Err(e) => return eprintln!("media: {}", e.message),
@@ -856,7 +856,7 @@ impl Jobs {
                 work.work(&id, &stop);
                 {
                     let mut runs = work.runs();
-                    if runs.get(&id).is_some_and(|x| Arc::ptr_eq(&x.stop.0, &stop.0)) {
+                    if runs.get(&id).is_some_and(|x| x.stop.same_as(&stop)) {
                         runs.remove(&id);
                     }
                 }
@@ -891,7 +891,7 @@ impl Jobs {
 
     fn generate(self: &Arc<Self>, r: Record, stop: &Stop) {
         let id = r.id().to_string();
-        let held = self.held.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
+        let held = self.held.lock().remove(&id);
         let first = if matches!(r.ask, Ask::Understanding(_)) {
             Phase::Uploading
         } else {
@@ -1031,12 +1031,8 @@ impl Jobs {
                 Err(e) if e.retryable() => {}
                 Err(_) => break,
             }
-            let until = std::time::Instant::now() + POLL;
-            while std::time::Instant::now() < until {
-                if stop.aborted() {
-                    return;
-                }
-                std::thread::sleep(Duration::from_millis(50));
+            if stop.wait_timeout(POLL) {
+                return;
             }
         }
         let _ = self.change(id, &[Phase::Generating], |r| {
@@ -1191,7 +1187,7 @@ impl Jobs {
 
     /// One event to the job's page, waiting while it is behind; false once the page or the job is gone.
     fn emit(&self, id: &str, event: Value, stop: &Stop) -> bool {
-        let Some(tx) = self.streams.lock().unwrap_or_else(|e| e.into_inner()).get(id).map(|s| s.tx.clone()) else {
+        let Some(tx) = self.streams.lock().get(id).map(|s| s.tx.clone()) else {
             return false;
         };
         let mut event = Some(event);
@@ -1287,11 +1283,18 @@ impl Jobs {
             _ => {}
         }
         // A finished stream's events stay a minute for a page that comes late.
-        let me = self.clone();
+        let me = Arc::downgrade(self);
+        let cancel = self.cancel.clone();
         let job = id.to_string();
-        let _ = std::thread::Builder::new().name(format!("speech-end-{id}")).spawn(move || {
-            std::thread::sleep(Duration::from_secs(60));
-            me.streams.lock().unwrap_or_else(|e| e.into_inner()).remove(&job);
+        vibevalley_runtime::rt::handle().spawn(async move {
+            tokio::select! {
+                biased;
+                _ = cancel.cancelled() => {}
+                _ = tokio::time::sleep(Duration::from_secs(60)) => {}
+            }
+            if let Some(me) = me.upgrade() {
+                me.streams.lock().remove(&job);
+            }
         });
     }
 
@@ -1439,7 +1442,7 @@ impl Jobs {
             if moved && unsent {
                 self.inputs.release(id)?;
             }
-            self.held.lock().unwrap_or_else(|e| e.into_inner()).remove(id);
+            self.held.lock().remove(id);
             self.stop_run(id);
             self.schedule();
             self.settle(id);
@@ -1473,12 +1476,16 @@ impl Jobs {
             return Err(refused(r.ask.words().no_resume));
         }
         self.account_of(&r)?;
-        self.change(r.id(), &[r.phase], |r| {
-            r.phase = Phase::Generating;
-            r.problem.clear();
-        })?;
-        // Snapshot the Generating state before scheduling so the worker cannot race ahead of the caller's view.
-        let updated = self.found(r.id())?;
+        // Hold `scheduling` across the transition and snapshot so a finishing worker cannot
+        // pick up the resumed job before the caller observes `Generating`.
+        let updated = {
+            let _schedule = self.scheduling.lock();
+            self.change(r.id(), &[r.phase], |r| {
+                r.phase = Phase::Generating;
+                r.problem.clear();
+            })?;
+            self.found(r.id())?
+        };
         self.schedule();
         Ok(updated)
     }
@@ -1533,7 +1540,7 @@ impl Jobs {
 
     /// Stops every run; what was running is picked up at the next start.
     pub fn close(&self) {
-        self.sweeping.lock().unwrap_or_else(|e| e.into_inner()).take();
+        self.cancel.cancel();
         self.closed.store(true, Ordering::SeqCst);
         for run in self.runs().values() {
             run.stop.abort();
@@ -1567,13 +1574,13 @@ fn speech_view(r: &Record) -> MediaSpeechJob {
     }
 }
 
-/// Async vendor work run on this thread, given up when `stop` is set.
+/// Async vendor work run on the shared `vibevalley-io` runtime, given up when `stop` is set.
 fn until_stopped<T>(stop: &Stop, work: Work<'_, T>) -> Option<Result<T, Failure>> {
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().ok()?;
-    let result = runtime.block_on(async {
+    let result = vibevalley_runtime::rt::block_on(async {
         tokio::select! {
+            biased;
+            _ = stop.cancelled() => None,
             r = work => Some(r),
-            _ = async { while !stop.aborted() { tokio::time::sleep(Duration::from_millis(20)).await } } => None,
         }
     });
     if stop.aborted() { None } else { result }
@@ -1644,7 +1651,7 @@ pub fn install(hub: &Hub, jobs: Arc<Jobs>) {
 impl crate::transport::api::media::SpeechStreams for Jobs {
     fn claim(&self, id: &str) -> Result<crate::transport::api::media::SpeechClaim, ApiError> {
         let events = {
-            let mut streams = self.streams.lock().unwrap_or_else(|e| e.into_inner());
+            let mut streams = self.streams.lock();
             let Some(s) = streams.get_mut(id).filter(|s| !s.claimed) else {
                 return Err(refused("speechStreamUnavailable"));
             };
@@ -1658,7 +1665,7 @@ impl crate::transport::api::media::SpeechStreams for Jobs {
             // The page gone: its job is canceled and its work stopped (a finished one is left as it is).
             gone: Box::new(move || {
                 let Some(me) = me.upgrade() else { return };
-                me.streams.lock().unwrap_or_else(|e| e.into_inner()).remove(&job);
+                me.streams.lock().remove(&job);
                 let _ = me.change(&job, &[Phase::Queued, Phase::Generating], |r| {
                     r.phase = Phase::Canceled;
                     r.problem = t("server.media.canceled", &[]);

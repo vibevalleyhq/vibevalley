@@ -10,7 +10,7 @@ use vibevalley_runtime::oar::{SessionOptions, StopReason};
 
 use super::drivers::Persona;
 use super::sessions::{Sessions, text};
-use crate::modules::work::ledger::{BoardError, Result, Step, io, lock, now};
+use crate::modules::work::ledger::{BoardError, Result, Step, io, now};
 
 impl Sessions {
     /// The session talking for `agent` in `channel`, still on the board.
@@ -27,7 +27,7 @@ impl Sessions {
     /// The user's words to `agent` in `channel`: its talking session's next
     /// round, hiring one the first time.
     pub fn talk(&self, agent: &str, channel: &str, words: &str) -> Result<String> {
-        let _talking = lock(&self.0.talking);
+        let _talking = self.0.talking.lock();
         if let Some(session) = self.talker(agent, channel) {
             if let Some(live) = self.live_agent(&session.id) {
                 let phase = Phase::working(now(), SessionAction::Thinking, "");

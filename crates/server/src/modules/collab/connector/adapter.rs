@@ -3,11 +3,12 @@
 //! own typed keys; the bridge holds them sealed, as one `Secret`.
 
 use std::future::Future;
-use std::sync::{Condvar, Mutex};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ConnectorID, ConnectorLogin, ConnectorState};
 
@@ -83,30 +84,34 @@ pub struct Receiving<'a> {
 /// Ends an account's work: waits wake at once, vendor calls are dropped.
 #[derive(Default)]
 pub struct Stop {
-    set: Mutex<bool>,
-    changed: Condvar,
+    token: CancellationToken,
 }
 
 impl Stop {
     pub fn set(&self) {
-        *self.set.lock().unwrap_or_else(|e| e.into_inner()) = true;
-        self.changed.notify_all();
+        self.token.cancel();
     }
 
     pub fn is_set(&self) -> bool {
-        *self.set.lock().unwrap_or_else(|e| e.into_inner())
+        self.token.is_cancelled()
     }
 
     /// Whether it was stopped before `d` went by.
     pub fn sleep(&self, d: Duration) -> bool {
-        let set = self.set.lock().unwrap_or_else(|e| e.into_inner());
-        *self.changed.wait_timeout_while(set, d, |s| !*s).unwrap_or_else(|e| e.into_inner()).0
+        if self.is_set() {
+            return true;
+        }
+        vibevalley_runtime::rt::block_on(async {
+            tokio::select! {
+                biased;
+                _ = self.token.cancelled() => true,
+                _ = tokio::time::sleep(d) => false,
+            }
+        })
     }
 
-    async fn stopped(&self) {
-        while !self.is_set() {
-            tokio::time::sleep(Duration::from_millis(20)).await;
-        }
+    pub(super) async fn stopped(&self) {
+        self.token.cancelled().await;
     }
 }
 
@@ -135,19 +140,12 @@ pub trait App: Send + Sync {
     fn send(&self, keys: &Secret, to: &str, text: &str, reply: &str) -> Result<String, AppFailed>;
 }
 
-fn runtime() -> tokio::runtime::Runtime {
-    crate::install_tls();
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("a runtime for a chat app's call")
-}
-
 fn until_stopped<T>(stop: &Stop, work: impl Future<Output = T>) -> Option<T> {
-    runtime().block_on(async {
+    vibevalley_runtime::rt::block_on(async {
         tokio::select! {
-            done = work => Some(done),
+            biased;
             _ = stop.stopped() => None,
+            done = work => Some(done),
         }
     })
 }
@@ -190,17 +188,21 @@ impl<A: Adapter> App for A {
 
     fn send(&self, keys: &Secret, to: &str, text: &str, reply: &str) -> Result<String, AppFailed> {
         let keys = unsealed::<A::Keys>(keys)?;
-        runtime().block_on(Adapter::send(self, &keys, to, text, reply))
+        vibevalley_runtime::rt::block_on(Adapter::send(self, &keys, to, text, reply))
     }
 }
 
-/// A client for one call: each call runs on a runtime of its own, so no
-/// connection is kept for the next.
+/// Shared `reqwest::Client` reused across connector calls on the shared `vibevalley-io` runtime.
 pub fn client() -> Result<reqwest::Client, AppFailed> {
-    reqwest::Client::builder()
-        .pool_max_idle_per_host(0)
-        .build()
-        .map_err(|e| AppFailed::failed(e.to_string()))
+    static CLIENT: OnceLock<Result<reqwest::Client, String>> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            crate::install_tls();
+            reqwest::Client::builder().build().map_err(|e| e.to_string())
+        })
+        .as_ref()
+        .cloned()
+        .map_err(AppFailed::failed)
 }
 
 /// `work` with a deadline; past it, what `late` says.

@@ -17,10 +17,11 @@
 //! ```
 
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use parking_lot::Mutex;
 use serde_json::json;
 
 use crate::oar::core::{CoreSession, Driver, SessionCore, check_cwd, render_text};
@@ -369,7 +370,7 @@ impl Driver for ScriptedDriver {
             abort: AtomicBool::new(false),
             answer: self.answers_rx.clone(),
         });
-        *self.current.lock().unwrap_or_else(|p| p.into_inner()) = Some(control.clone());
+        *self.current.lock() = Some(control.clone());
         let core = self.core.clone();
         let prompt = render_text(&content);
         std::thread::Builder::new()
@@ -414,7 +415,7 @@ impl Driver for ScriptedDriver {
     }
 
     fn abort(&self) -> Result<()> {
-        if let Some(control) = self.current.lock().unwrap_or_else(|p| p.into_inner()).as_ref() {
+        if let Some(control) = self.current.lock().as_ref() {
             control.abort.store(true, Ordering::SeqCst);
         }
         Ok(())

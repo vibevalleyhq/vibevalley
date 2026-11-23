@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
+use std::time::Duration;
 
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use tokio::sync::{Notify, broadcast};
+use tokio_util::sync::CancellationToken;
 
-use crate::lock;
 use crate::transport::bridge::{BizCode, Caller, CallerContext, CallerPrincipal, ClientIdentity, Envelope, Server, SliceKind, refusal};
 
 /// Where a view's events go (the app wires it to nsh's `HostChannel::send`).
@@ -80,7 +83,7 @@ impl Hub {
     pub fn attach(&self, identity: ClientIdentity, outlet: Arc<dyn Outlet>) -> Client {
         let client_key = self.next_client.fetch_add(1, Ordering::Relaxed) + 1;
         let inner = Arc::new(Mutex::new(Inner::default()));
-        lock(&self.clients).insert(
+        self.clients.lock().insert(
             client_key,
             ClientRecord {
                 identity: identity.clone(),
@@ -93,6 +96,7 @@ impl Hub {
             identity,
             outlet,
             inner,
+            cancel: CancellationToken::new(),
             revisions: Arc::new(AtomicU64::new(0)),
         }
     }
@@ -100,7 +104,7 @@ impl Hub {
     /// Snapshot of all connected clients and their active watches and subscriptions.
     pub fn clients_snapshot(&self) -> Vec<ClientSnapshot> {
         let active: Vec<(ClientIdentity, Arc<Mutex<Inner>>)> = {
-            let mut clients = lock(&self.clients);
+            let mut clients = self.clients.lock();
             clients.retain(|_, rec| rec.inner.strong_count() > 0);
             clients
                 .values()
@@ -109,7 +113,7 @@ impl Hub {
         };
         let mut out = Vec::with_capacity(active.len());
         for (identity, inner) in active {
-            let guard = lock(&inner);
+            let guard = inner.lock();
             let mut watches: Vec<String> = guard.watches.keys().cloned().collect();
             watches.sort();
             let mut subscriptions: Vec<String> = guard.subs.values().map(|(name, _)| name.clone()).collect();
@@ -125,15 +129,15 @@ impl Hub {
     }
 }
 
-/// Stops a forwarding thread when dropped.
+/// Cancels a forwarding task when dropped.
 struct Pump {
-    stop: Option<flume::Sender<()>>,
+    cancel: Option<CancellationToken>,
     server_sub: Option<u64>,
 }
 
 struct SliceReceipt {
     pending: AtomicU64,
-    received: flume::Sender<()>,
+    ack: Notify,
 }
 
 #[derive(Default)]
@@ -150,6 +154,7 @@ pub struct Client {
     identity: ClientIdentity,
     outlet: Arc<dyn Outlet>,
     inner: Arc<Mutex<Inner>>,
+    cancel: CancellationToken,
     revisions: Arc<AtomicU64>,
 }
 
@@ -157,30 +162,28 @@ fn parse_slice_topic(topic: &str) -> Option<SliceKind> {
     topic.strip_prefix("slice:").and_then(SliceKind::from_str)
 }
 
-/// Forwards every event until the subscriber stops or the source closes.
-fn pump<T: Send + 'static>(rx: flume::Receiver<T>, mut each: impl FnMut(T) + Send + 'static, ended: impl FnOnce(bool) + Send + 'static) -> flume::Sender<()> {
-    let (stop_tx, stop_rx) = flume::bounded::<()>(1);
-    std::thread::spawn(move || {
-        enum Step<T> {
-            Item(T),
-            Ended,
-            Stopped,
-        }
+/// Forwards every item from `rx` on the shared Tokio runtime until `cancel`
+/// fires or the source closes.
+fn pump_flume<T: Send + 'static>(
+    rx: flume::Receiver<T>,
+    cancel: CancellationToken,
+    mut each: impl FnMut(T) + Send + 'static,
+    ended: impl FnOnce(bool) + Send + 'static,
+) {
+    vibevalley_runtime::rt::handle().spawn(async move {
         let stopped = loop {
-            let step = flume::Selector::new()
-                .recv(&rx, |r| r.map_or(Step::Ended, Step::Item))
-                .recv(&stop_rx, |_| Step::Stopped)
-                .wait();
-            let item = match step {
-                Step::Item(item) => item,
-                Step::Ended => break false,
-                Step::Stopped => break true,
+            let item = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => break true,
+                res = rx.recv_async() => match res {
+                    Ok(item) => item,
+                    Err(_) => break false,
+                },
             };
             each(item);
         };
         ended(stopped);
     });
-    stop_tx
 }
 
 impl Client {
@@ -192,52 +195,147 @@ impl Client {
     /// `"slice:collab"`, `"slice:inbox"`, `"slice:ops"`, `"slice:farm"`, or `"live"`.
     /// A topic watched twice keeps one stream.
     pub fn watch(&self, topic: &str) -> Result<(), String> {
-        let mut inner = lock(&self.inner);
+        let mut inner = self.inner.lock();
         if inner.watches.contains_key(topic) {
             return Ok(());
         }
         let outlet = self.outlet.clone();
-        let stop = if let Some(slice_kind) = parse_slice_topic(topic) {
-            let (stop, stopped) = flume::bounded(0);
-            let (received, ack) = flume::bounded(1);
+        let cancel = self.cancel.child_token();
+        if let Some(slice_kind) = parse_slice_topic(topic) {
             let receipt = Arc::new(SliceReceipt {
                 pending: AtomicU64::new(0),
-                received,
+                ack: Notify::new(),
             });
             inner.slice_receipts.insert(topic.to_string(), receipt.clone());
             let revisions = self.revisions.clone();
             let server = self.hub.server.clone();
             let event_name = format!("frame:{topic}");
-            std::thread::spawn(move || {
-                server.watch_slice(slice_kind, None, &stopped, &mut |_seq, frame| {
-                    if stopped.is_disconnected() {
-                        return;
+            let task_cancel = cancel.clone();
+            if let Some(mut sub) = server.subscribe_slice(slice_kind) {
+                let slice_topic = sub.topic();
+                vibevalley_runtime::rt::handle().spawn(async move {
+                    let mut is_initial = true;
+                    let mut seen_gen = None;
+                    loop {
+                        let (_seq, generation, frame) = sub.borrow_and_update(is_initial);
+                        if !is_initial && seen_gen == Some(generation) {
+                            let changed = tokio::select! {
+                                biased;
+                                _ = task_cancel.cancelled() => break,
+                                ok = sub.changed() => ok,
+                            };
+                            if !changed {
+                                break;
+                            }
+                            continue;
+                        }
+                        if let Some(gate) = server.fault_gate() {
+                            if gate.should_disconnect(slice_topic) {
+                                break;
+                            }
+                            let delay = gate.delay_ms(slice_topic);
+                            if delay > 0 {
+                                tokio::select! {
+                                    biased;
+                                    _ = task_cancel.cancelled() => break,
+                                    _ = tokio::time::sleep(Duration::from_millis(delay)) => {}
+                                }
+                            }
+                        }
+                        if task_cancel.is_cancelled() {
+                            break;
+                        }
+                        seen_gen = Some(generation);
+                        is_initial = false;
+                        let notified = receipt.ack.notified();
+                        tokio::pin!(notified);
+                        notified.as_mut().enable();
+                        let rev = revisions.fetch_add(1, Ordering::Relaxed) + 1;
+                        receipt.pending.store(rev, Ordering::Release);
+                        outlet.send(&event_name, json!({ "rev": rev, "data": frame }));
+                        tokio::select! {
+                            biased;
+                            _ = task_cancel.cancelled() => break,
+                            _ = notified => {}
+                        }
+                        let changed = tokio::select! {
+                            biased;
+                            _ = task_cancel.cancelled() => break,
+                            ok = sub.changed() => ok,
+                        };
+                        if !changed {
+                            break;
+                        }
                     }
-                    let rev = revisions.fetch_add(1, Ordering::Relaxed) + 1;
-                    receipt.pending.store(rev, Ordering::Release);
-                    outlet.send(&event_name, json!({ "rev": rev, "data": frame }));
-                    flume::Selector::new().recv(&stopped, |_| ()).recv(&ack, |_| ()).wait();
                 });
-            });
-            stop
+            } else {
+                // Fallback for `Server` implementations without `SliceFeed` (e.g. `LateServer`).
+                let (stop_tx, stop_rx) = flume::bounded::<()>(0);
+                let stop_cancel = task_cancel.clone();
+                vibevalley_runtime::rt::handle().spawn(async move {
+                    stop_cancel.cancelled().await;
+                    drop(stop_tx);
+                });
+                vibevalley_runtime::rt::handle().spawn_blocking(move || {
+                    server.watch_slice(slice_kind, None, &stop_rx, &mut |_seq, frame| {
+                        if task_cancel.is_cancelled() || stop_rx.is_disconnected() {
+                            return;
+                        }
+                        vibevalley_runtime::rt::block_on(async {
+                            let notified = receipt.ack.notified();
+                            tokio::pin!(notified);
+                            notified.as_mut().enable();
+                            let rev = revisions.fetch_add(1, Ordering::Relaxed) + 1;
+                            receipt.pending.store(rev, Ordering::Release);
+                            outlet.send(&event_name, json!({ "rev": rev, "data": frame }));
+                            tokio::select! {
+                                biased;
+                                _ = task_cancel.cancelled() => {}
+                                _ = notified => {}
+                            }
+                        });
+                    });
+                });
+            }
         } else if topic == "live" {
             let mut rev = 0u64;
-            pump(
-                self.hub.server.live(),
-                move |event| {
-                    rev += 1;
-                    let data = serde_json::to_value(event).unwrap_or(Value::Null);
-                    outlet.send("frame:live", json!({ "rev": rev, "data": data }));
-                },
-                |_| {},
-            )
+            let task_cancel = cancel.clone();
+            if let Some(mut rx) = self.hub.server.subscribe_live() {
+                vibevalley_runtime::rt::handle().spawn(async move {
+                    loop {
+                        let event = tokio::select! {
+                            biased;
+                            _ = task_cancel.cancelled() => break,
+                            res = rx.recv() => match res {
+                                Ok(ev) => ev,
+                                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                                Err(broadcast::error::RecvError::Closed) => break,
+                            },
+                        };
+                        rev += 1;
+                        let data = serde_json::to_value(event).unwrap_or(Value::Null);
+                        outlet.send("frame:live", json!({ "rev": rev, "data": data }));
+                    }
+                });
+            } else {
+                pump_flume(
+                    self.hub.server.live(),
+                    task_cancel,
+                    move |event| {
+                        rev += 1;
+                        let data = serde_json::to_value(event).unwrap_or(Value::Null);
+                        outlet.send("frame:live", json!({ "rev": rev, "data": data }));
+                    },
+                    |_| {},
+                );
+            }
         } else {
             return Err(format!("no topic {topic}"));
-        };
+        }
         inner.watches.insert(
             topic.to_string(),
             Pump {
-                stop: Some(stop),
+                cancel: Some(cancel),
                 server_sub: None,
             },
         );
@@ -247,17 +345,17 @@ impl Client {
     /// Acknowledges that the view applied revision `rev` for `topic` (`"slice:<kind>"`),
     /// releasing Bounded-1 backpressure for that slice stream.
     pub fn applied_slice(&self, topic: &str, rev: u64) {
-        let inner = lock(&self.inner);
+        let inner = self.inner.lock();
         if rev != 0
             && let Some(receipt) = inner.slice_receipts.get(topic)
             && receipt.pending.compare_exchange(rev, 0, Ordering::AcqRel, Ordering::Acquire).is_ok()
         {
-            let _ = receipt.received.try_send(());
+            receipt.ack.notify_one();
         }
     }
 
     pub fn unwatch(&self, topic: &str) {
-        let mut inner = lock(&self.inner);
+        let mut inner = self.inner.lock();
         inner.watches.remove(topic);
         inner.slice_receipts.remove(topic);
     }
@@ -282,7 +380,7 @@ impl Client {
     /// for a refusal.
     pub fn subscribe(&self, id: &str, name: &str, payload: Value) {
         let event_name = format!("sub:{id}");
-        if lock(&self.inner).subs.contains_key(id) {
+        if self.inner.lock().subs.contains_key(id) {
             let e = refusal(BizCode::InvalidInput, format!("subscription {id} already exists"));
             self.outlet.send(&event_name, json!({ "end": e }));
             return;
@@ -294,31 +392,33 @@ impl Client {
                 let end_outlet = self.outlet.clone();
                 let inner = Arc::downgrade(&self.inner);
                 let key = id.to_string();
-                let stop = pump(
+                let cancel = self.cancel.child_token();
+                pump_flume(
                     rx,
+                    cancel.clone(),
                     move |event| outlet.send(&each_name, json!({ "event": event })),
                     move |_| {
                         // Only a subscription still registered ended on the
                         // server's side; one the view stopped says nothing.
                         let Some(inner) = inner.upgrade() else { return };
-                        let Some((_, mut pump)) = lock(&inner).subs.remove(&key) else { return };
+                        let Some((_, mut pump)) = inner.lock().subs.remove(&key) else { return };
                         pump.server_sub = None;
-                        pump.stop = None;
+                        pump.cancel = None;
                         end_outlet.send(&event_name, json!({ "end": null }));
                     },
                 );
                 let pump = Pump {
-                    stop: Some(stop),
+                    cancel: Some(cancel),
                     server_sub: Some(server_id),
                 };
-                lock(&self.inner).subs.insert(id.to_string(), (name.to_string(), pump));
+                self.inner.lock().subs.insert(id.to_string(), (name.to_string(), pump));
             }
             Err(envelope) => self.outlet.send(&event_name, json!({ "end": envelope })),
         }
     }
 
     pub fn unsubscribe(&self, id: &str) {
-        let entry = lock(&self.inner).subs.remove(id);
+        let entry = self.inner.lock().subs.remove(id);
         if let Some((_, mut pump)) = entry {
             if let Some(server_id) = pump.server_sub.take() {
                 self.hub.server.unsubscribe(server_id);
@@ -328,14 +428,15 @@ impl Client {
     }
 
     pub fn subscription_count(&self) -> usize {
-        lock(&self.inner).subs.len()
+        self.inner.lock().subs.len()
     }
 }
 
 impl Drop for Client {
     fn drop(&mut self) {
-        lock(&self.hub.clients).remove(&self.client_key);
-        let inner = std::mem::take(&mut *lock(&self.inner));
+        self.cancel.cancel();
+        self.hub.clients.lock().remove(&self.client_key);
+        let inner = std::mem::take(&mut *self.inner.lock());
         for (_, (_, mut pump)) in inner.subs {
             if let Some(id) = pump.server_sub.take() {
                 self.hub.server.unsubscribe(id);
@@ -346,8 +447,8 @@ impl Drop for Client {
 
 impl Drop for Pump {
     fn drop(&mut self) {
-        if let Some(stop) = self.stop.take() {
-            let _ = stop.try_send(());
+        if let Some(cancel) = self.cancel.take() {
+            cancel.cancel();
         }
     }
 }
@@ -366,13 +467,13 @@ mod tests {
 
     impl Outlet for Recorder {
         fn send(&self, event: &str, data: Value) {
-            self.0.lock().unwrap().push((event.to_string(), data));
+            self.0.lock().push((event.to_string(), data));
         }
     }
 
     impl Recorder {
         fn named(&self, name: &str) -> Vec<Value> {
-            self.0.lock().unwrap().iter().filter(|(n, _)| n == name).map(|(_, d)| d.clone()).collect()
+            self.0.lock().iter().filter(|(n, _)| n == name).map(|(_, d)| d.clone()).collect()
         }
     }
 

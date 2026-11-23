@@ -5,9 +5,10 @@
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use base64::Engine;
+use parking_lot::{Mutex, MutexGuard};
 use sha2::{Digest, Sha256};
 use sqlx::SqliteConnection;
 use vibevalley_i18n::t;
@@ -53,8 +54,8 @@ impl Attachments {
         self.root.join(id)
     }
 
-    fn db(&self) -> std::sync::MutexGuard<'_, SqliteConnection> {
-        crate::lock(&self.db)
+    fn db(&self) -> MutexGuard<'_, SqliteConnection> {
+        self.db.lock()
     }
 
     /// `attach`: an upload, as base64, kept.

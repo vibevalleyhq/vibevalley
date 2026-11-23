@@ -4,13 +4,13 @@
 //! kept here, so they read as missing.
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+use parking_lot::Mutex;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use vibevalley_protocol::{Issue, Session};
 
-use crate::lock;
 use crate::modules::collab::channel::Chat;
 use crate::modules::work::issue::Board;
 use crate::modules::work::pull::Pulls;
@@ -193,12 +193,12 @@ impl Resources {
         let text: Vec<u16> = if offset == 0 {
             let loaded = self.load(r, reader, orchestrator, &uri)?;
             let units: Vec<u16> = loaded.encode_utf16().collect();
-            if !lock(&self.cache).put(key, units.clone()) {
+            if !self.cache.lock().put(key, units.clone()) {
                 return Err(SNAPSHOT_TOO_LARGE.into());
             }
             units
         } else {
-            let cache = lock(&self.cache);
+            let cache = self.cache.lock();
             cache.texts.get(&key).cloned().ok_or(SNAPSHOT_MISSING)?
         };
         let limit = args.limit.unwrap_or(DEFAULT_LIMIT as i64).clamp(1, MAX_LIMIT as i64) as usize;

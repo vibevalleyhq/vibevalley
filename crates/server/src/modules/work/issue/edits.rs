@@ -8,7 +8,7 @@ use vibevalley_i18n::t;
 use vibevalley_protocol::{Assignment, Deliverable, Fact, Finding, Issue, IssueStatus, IssueUpdate, ReviewRevision};
 
 use super::board::Board;
-use crate::modules::work::ledger::{BoardError, IssueChange, Result, lock, now};
+use crate::modules::work::ledger::{BoardError, IssueChange, Result, now};
 use crate::modules::work::workplace::Leave;
 
 const RANK_STEP: i64 = 1024;
@@ -24,7 +24,7 @@ impl Board {
     /// sent. An empty `agent` leaves it unassigned; `before` places it on
     /// the board before that issue ("" last).
     pub fn edit(&self, reference: &str, upd: &IssueUpdate) -> Result<Issue> {
-        let _work = lock(&self.0.work);
+        let _work = self.0.work.lock();
         let was = self.stored(reference)?;
         let while_open = upd.description.is_none() && upd.repo.is_none() && upd.agent.is_none() && upd.criteria.is_none() && upd.before.is_none();
         if while_open {
@@ -126,7 +126,7 @@ impl Board {
     /// Deletes an issue never sent: a draft being written goes home, its
     /// checkout is cleared.
     pub fn remove(&self, reference: &str) -> Result<()> {
-        let _work = lock(&self.0.work);
+        let _work = self.0.work.lock();
         let issue = self.stored(reference)?;
         if issue.executions().next().is_some() {
             return Err(refused("server.issue.started", &[]));
@@ -150,7 +150,7 @@ impl Board {
     /// user completes it by moving it to done); a fail records the findings
     /// and sends them to the session for another round.
     pub fn review(&self, reference: &str, pass: bool, findings: &[String], text: &str, seen: Option<&ReviewRevision>) -> Result<Issue> {
-        let _work = pass.then(|| lock(&self.0.work));
+        let _work = pass.then(|| self.0.work.lock());
         let issue = self.stored(reference)?;
         if issue.status != IssueStatus::InReview {
             return Err(refused("server.issue.nothingToAccept", &[]));
@@ -216,7 +216,7 @@ pub(super) fn assign(issue: &mut Issue, agent: &str, at: i64) {
 
 impl Board {
     pub fn hand_over_and_move(&self, reference: &str, agent: &str, words: Option<&str>, findings: &[String]) -> Result<vibevalley_core::Move> {
-        let _work = lock(&self.0.work);
+        let _work = self.0.work.lock();
         let issue = self.stored(reference)?;
         let agent = agent.trim();
         self.0.drivers.check(agent)?;

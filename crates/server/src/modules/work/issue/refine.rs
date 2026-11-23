@@ -7,7 +7,7 @@ use vibevalley_protocol::{Fact, IssueStatus, Outcome, RunTriggerKind};
 use vibevalley_runtime::oar::StopReason;
 
 use super::board::Board;
-use crate::modules::work::ledger::{BoardError, IssueChange, Result, lock, now};
+use crate::modules::work::ledger::{BoardError, IssueChange, Result, now};
 use crate::modules::work::session::{DraftEnd, Hire, trigger_of};
 use crate::modules::work::workplace::Leave;
 
@@ -19,7 +19,7 @@ impl Board {
 
     /// `refine`, with the issue's discussion so far for the drafting prompt.
     pub fn refine_with(&self, reference: &str, words: &str, discussion: &str) -> Result<String> {
-        let _work = lock(&self.0.work);
+        let _work = self.0.work.lock();
         let issue = self.stored(reference)?;
         if issue.status != IssueStatus::Backlog {
             return Err(BoardError::Other("only an issue in the backlog is drafted".into()));

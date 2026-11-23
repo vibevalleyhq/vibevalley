@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use vibevalley_protocol::{Assignment, Deliverable, Fact, Issue, IssueConstraints, IssueStageKind as StageKind};
 
 use super::board::Board;
-use crate::modules::work::ledger::{BoardError, IssueChange, Result, lock, now};
+use crate::modules::work::ledger::{BoardError, IssueChange, Result, now};
 use crate::modules::work::workplace::{Joined, Leave, OnDisk, Workplace};
 
 /// One child of a split (`IssueChildDraft`).
@@ -34,7 +34,7 @@ impl Board {
     /// Splits an open issue into child issues, all queued: each goes once
     /// the siblings it needs are done.
     pub fn split(&self, reference: &str, drafts: Vec<ChildDraft>) -> Result<Vec<Issue>> {
-        let _work = lock(&self.0.work);
+        let _work = self.0.work.lock();
         let parent = self.stored(reference)?;
         if parent.status.is_closed() {
             return Err(BoardError::Other(format!("issue #{} is closed", parent.number)));

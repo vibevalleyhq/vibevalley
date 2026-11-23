@@ -39,7 +39,7 @@ impl Sessions {
             spent: None,
         };
         {
-            let mut extras = self.0.extras.lock().unwrap_or_else(|e| e.into_inner());
+            let mut extras = self.0.extras.lock();
             let mut extra = extras.get(session).cloned().unwrap_or_default();
             extra.run = Some(id.clone());
             self.0.durable.write(|tx| {
@@ -64,7 +64,7 @@ impl Sessions {
 
     /// The open round of `session`, if any, ends with `outcome`.
     pub fn end_run(&self, session: &str, outcome: Outcome, summary: &str, spent: Option<Spent>) -> Result<()> {
-        let mut extras = self.0.extras.lock().unwrap_or_else(|e| e.into_inner());
+        let mut extras = self.0.extras.lock();
         let mut extra = extras.get(session).cloned().unwrap_or_default();
         let Some(id) = extra.run.take() else { return Ok(()) };
         self.0.durable.write(|tx| {

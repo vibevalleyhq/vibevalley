@@ -5,9 +5,14 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use std::thread::JoinHandle;
+use std::time::Duration;
 
+use parking_lot::Mutex;
+use tokio::sync::broadcast;
+use tokio::task::JoinHandle as TaskHandle;
+use tokio_util::sync::CancellationToken;
 use vibevalley_core::Transition;
 use vibevalley_core::rules::{session_ids_of, stage_wants_user};
 use vibevalley_i18n::t;
@@ -19,13 +24,14 @@ use vibevalley_protocol::{
 use crate::base::{LookIn, missing};
 use crate::event_bus::Subscription as BusSubscription;
 use crate::modules::collab::channel::{
-    ChannelDispatched, Chat, Committed, DeliveryTargetKind, Meta, Note, Noticing, QueuedDelivery, Seat, Told, meta_of, profile_id,
+    ChannelDispatched, ChannelEvent, Chat, Committed, DeliveryTargetKind, Meta, Note, Noticing, QueuedDelivery, Seat, meta_of, profile_id,
 };
 use crate::modules::content::attachment::Attachments;
 use crate::modules::team::agent::Agents;
 use crate::modules::work::issue::Board;
 use crate::modules::work::ledger::BoardError;
-use crate::{Hub, Server, Sink, lock};
+use crate::slice_feed::SliceSubscription;
+use crate::{Hub, Sink};
 
 pub(crate) mod db;
 mod delivery;
@@ -134,17 +140,26 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>, at
     let me = Arc::downgrade(hub);
     hub.on_subscription::<subscriptions::SessionWatch>(move |hub, input, sink| {
         let initial = b.session(&input.id).ok_or_else(|| helper_ref(&input.id))?;
-        let live = hub.live();
-        let sessions_dirty = hub.watch_slice_signal(SliceKind::Sessions, false);
+        let live = hub.subscribe_live();
+        let sessions_sub = hub.subscribe_slice_feed(SliceKind::Sessions);
         let workspace_updates = b.sessions().watch_workspace(&initial.id);
         let sessions = b.sessions().clone();
         let tr = tr.clone();
-        let hub = me.clone();
+        let hub_weak = me.clone();
+        let cancel = hub.child_token();
         let after_seq = input.after_seq;
-        std::thread::Builder::new()
-            .name("vibevalley-session-watch".into())
-            .spawn(move || watch_session(initial, after_seq, &hub, &sessions, sessions_dirty, live, workspace_updates, &tr, sink))
-            .map_err(crate::base::internal)?;
+        hub.spawn_task(watch_session(
+            initial,
+            after_seq,
+            hub_weak,
+            sessions,
+            sessions_sub,
+            live,
+            workspace_updates,
+            tr,
+            cancel,
+            sink,
+        ));
         Ok(())
     });
 
@@ -155,15 +170,13 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>, at
         let initial = b
             .issue(&input.id)
             .ok_or_else(|| missing(t("server.issue.issueRef", &[("ref", input.id.clone().into())]), LookIn::Issue))?;
-        let live = hub.live();
-        let board_dirty = hub.watch_slice_signal(SliceKind::Board, true);
-        let sessions_dirty = hub.watch_slice_signal(SliceKind::Sessions, false);
+        let live = hub.subscribe_live();
+        let board_sub = hub.subscribe_slice_feed(SliceKind::Board);
+        let sessions_sub = hub.subscribe_slice_feed(SliceKind::Sessions);
         let tr = tr.clone();
-        let hub = me.clone();
-        std::thread::Builder::new()
-            .name("vibevalley-issue-watch".into())
-            .spawn(move || watch_issue(initial, &hub, board_dirty, sessions_dirty, live, &tr, sink))
-            .map_err(crate::base::internal)?;
+        let hub_weak = me.clone();
+        let cancel = hub.child_token();
+        hub.spawn_task(watch_issue(initial, hub_weak, board_sub, sessions_sub, live, tr, cancel, sink));
         Ok(())
     });
 }
@@ -201,32 +214,37 @@ fn workspace_state_event(session: Session, sessions: &Sessions) -> SessionWatchE
     }
 }
 
-#[allow(clippy::too_many_arguments, reason = "watch thread carries hub, session streams, and sink")]
-fn watch_session(
+#[allow(clippy::too_many_arguments, reason = "watch task carries hub, session streams, cancel token, and sink")]
+async fn watch_session(
     initial: Session,
     after_seq: Option<i64>,
-    hub: &std::sync::Weak<Hub>,
-    sessions: &Sessions,
-    sessions_dirty: flume::Receiver<()>,
-    live: flume::Receiver<LiveEvent>,
+    hub: std::sync::Weak<Hub>,
+    sessions: Sessions,
+    mut sessions_sub: SliceSubscription,
+    mut live: broadcast::Receiver<LiveEvent>,
     workspace_updates: flume::Receiver<()>,
-    trajectories: &Trajectories,
+    trajectories: Arc<Trajectories>,
+    cancel: CancellationToken,
     sink: Sink,
 ) {
     let id = initial.id.clone();
-    let history: Vec<_> = trajectories
-        .events(&id, None)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|e| after_seq.is_none_or(|after| e.seq > after))
-        .collect();
+    let history: Vec<_> = {
+        let tr = trajectories.clone();
+        let sid = id.clone();
+        tokio::task::spawn_blocking(move || tr.events(&sid, None).unwrap_or_default())
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|e| after_seq.is_none_or(|after| e.seq > after))
+            .collect()
+    };
     if !sink.send(&SessionWatchEvent::History {
         session: id.clone(),
         events: history,
     }) {
         return;
     }
-    let first_state = workspace_state_event(initial, sessions);
+    let first_state = workspace_state_event(initial, &sessions);
     if !sink.send(&first_state) {
         return;
     }
@@ -236,30 +254,30 @@ fn watch_session(
         State,
         WorkspaceDropped,
         Live(Box<LiveEvent>),
+        Stop,
     }
     loop {
-        if sink.stopped() {
+        if sink.stopped() || cancel.is_cancelled() {
             return;
         }
-        let next = if workspace_open {
-            flume::Selector::new()
-                .recv(&sessions_dirty, |r| r.ok().map(|_| Msg::State))
-                .recv(&workspace_updates, |r| Some(if r.is_ok() { Msg::State } else { Msg::WorkspaceDropped }))
-                .recv(&live, |r| r.ok().map(|e| Msg::Live(Box::new(e))))
-                .wait_timeout(std::time::Duration::from_millis(500))
-        } else {
-            flume::Selector::new()
-                .recv(&sessions_dirty, |r| r.ok().map(|_| Msg::State))
-                .recv(&live, |r| r.ok().map(|e| Msg::Live(Box::new(e))))
-                .wait_timeout(std::time::Duration::from_millis(500))
-        };
-        let got = match next {
-            Ok(Some(got)) => got,
-            Ok(None) => return,
+        let got = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => Msg::Stop,
+            _ = sink.stop.recv_async() => Msg::Stop,
+            changed = sessions_sub.changed() => if changed { Msg::State } else { Msg::Stop },
+            ws = workspace_updates.recv_async(), if workspace_open => {
+                if ws.is_ok() { Msg::State } else { Msg::WorkspaceDropped }
+            }
+            ev = live.recv() => match ev {
+                Ok(e) => Msg::Live(Box::new(e)),
+                Err(broadcast::error::RecvError::Lagged(_)) => Msg::State,
+                Err(broadcast::error::RecvError::Closed) => Msg::Stop,
+            },
             // Poll mtime-cached swarm snapshots on the 500 ms tick; identical states are skipped.
-            Err(_) => Msg::State,
+            _ = tokio::time::sleep(Duration::from_millis(500)) => Msg::State,
         };
         match got {
+            Msg::Stop => return,
             Msg::Live(ev) => {
                 if let LiveEvent::Event(e) = *ev
                     && e.id == id
@@ -288,7 +306,7 @@ fn watch_session(
                     }
                     continue;
                 };
-                let state = workspace_state_event(session, sessions);
+                let state = workspace_state_event(session, &sessions);
                 if previous.as_ref() == Some(&state) {
                     continue;
                 }
@@ -307,13 +325,15 @@ const HISTORY: usize = 241;
 /// `watchIssue`: the issue and its last eight sessions as each frame shows
 /// them (only when changed), their logs when first seen (and again once it
 /// settles), and their steps live.
-fn watch_issue(
+#[allow(clippy::too_many_arguments, reason = "watch task carries hub, slice feeds, live stream, cancel token, and sink")]
+async fn watch_issue(
     initial: Issue,
-    hub: &std::sync::Weak<Hub>,
-    board_dirty: flume::Receiver<()>,
-    sessions_dirty: flume::Receiver<()>,
-    live: flume::Receiver<LiveEvent>,
-    trajectories: &Trajectories,
+    hub: std::sync::Weak<Hub>,
+    mut board_sub: SliceSubscription,
+    mut sessions_sub: SliceSubscription,
+    mut live: broadcast::Receiver<LiveEvent>,
+    trajectories: Arc<Trajectories>,
+    cancel: CancellationToken,
     sink: Sink,
 ) {
     let last = |ids: Vec<&SessionId>| -> Vec<SessionId> { ids.iter().skip(ids.len().saturating_sub(SHOWN_SESSIONS)).map(|s| (*s).clone()).collect() };
@@ -321,23 +341,38 @@ fn watch_issue(
     let mut loaded = false;
     let mut was_settled = false;
     let mut previous: Option<IssueWatch> = None;
+    let mut emit_initial = true;
+    enum Step {
+        State,
+        Live(Box<LiveEvent>),
+        Stop,
+    }
     loop {
-        if sink.stopped() {
+        if sink.stopped() || cancel.is_cancelled() {
             return;
         }
-        let next = flume::Selector::new()
-            .recv(&board_dirty, |r| r.ok().map(Ok))
-            .recv(&sessions_dirty, |r| r.ok().map(Ok))
-            .recv(&live, |r| r.ok().map(Err))
-            .wait_timeout(std::time::Duration::from_millis(500));
-        let got = match next {
-            Ok(Some(got)) => got,
-            Ok(None) => return,
-            Err(_) => continue,
+        let step = if emit_initial {
+            emit_initial = false;
+            Step::State
+        } else {
+            tokio::select! {
+                biased;
+                _ = cancel.cancelled() => Step::Stop,
+                _ = sink.stop.recv_async() => Step::Stop,
+                changed = board_sub.changed() => if changed { Step::State } else { Step::Stop },
+                changed = sessions_sub.changed() => if changed { Step::State } else { Step::Stop },
+                ev = live.recv() => match ev {
+                    Ok(e) => Step::Live(Box::new(e)),
+                    Err(broadcast::error::RecvError::Lagged(_)) => Step::State,
+                    Err(broadcast::error::RecvError::Closed) => Step::Stop,
+                },
+            }
         };
-        match got {
-            Err(LiveEvent::Event(e)) => {
-                if ids.contains(&e.id)
+        match step {
+            Step::Stop => return,
+            Step::Live(ev) => {
+                if let LiveEvent::Event(e) = *ev
+                    && ids.contains(&e.id)
                     && !sink.send(&IssueWatch::Event {
                         session: e.id.clone(),
                         event: e.activity,
@@ -346,9 +381,8 @@ fn watch_issue(
                     return;
                 }
             }
-            Err(_) => {}
             // A frame says the state changed; the full sessions are the hub's.
-            Ok(_) => {
+            Step::State => {
                 let Some(hub) = hub.upgrade() else { return };
                 let (issues, sessions) = hub.read(|s| (s.issues.clone(), s.sessions.clone()));
                 drop(hub);
@@ -383,7 +417,11 @@ fn watch_issue(
                     if loaded && ids.contains(id) && !(settled && !was_settled) {
                         continue;
                     }
-                    let history = trajectories.events(id, None).unwrap_or_default();
+                    let tr = trajectories.clone();
+                    let sid = id.clone();
+                    let history = tokio::task::spawn_blocking(move || tr.events(&sid, None).unwrap_or_default())
+                        .await
+                        .unwrap_or_default();
                     let history = history[history.len().saturating_sub(HISTORY)..].to_vec();
                     match history.first().map(|e| e.seq) {
                         Some(first) if first > 0 => rows.push(IssueWatch::Gap {
@@ -445,17 +483,15 @@ pub struct SessionChat {
     agents: Arc<Agents>,
     closed: AtomicBool,
     sub: Mutex<Option<BusSubscription>>,
-    stop: Mutex<Option<flume::Sender<()>>>,
-    coordinator: Mutex<Option<JoinHandle<()>>>,
+    coordinator: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
     lanes: Mutex<HashMap<String, flume::Sender<DirectWake>>>,
     lane_handles: Mutex<Vec<JoinHandle<()>>>,
 }
 
 impl SessionChat {
     pub fn start(hub: &Arc<Hub>, board: Board, chat: Arc<Chat>, agents: Arc<Agents>, ensure_issue_thread: Arc<dyn Fn(&Session) + Send + Sync>) -> Arc<Self> {
-        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
         let dispatches = chat.dispatches();
-        let committed = chat.committed();
+        let mut events = chat.subscribe_events();
         let sc = Arc::new(Self {
             hub: Arc::downgrade(hub),
             board,
@@ -463,7 +499,6 @@ impl SessionChat {
             agents,
             closed: AtomicBool::new(false),
             sub: Mutex::new(None),
-            stop: Mutex::new(Some(stop_tx)),
             coordinator: Mutex::new(None),
             lanes: Mutex::new(HashMap::new()),
             lane_handles: Mutex::new(Vec::new()),
@@ -512,66 +547,74 @@ impl SessionChat {
             let Some(sc) = w.upgrade() else { return };
             sc.on_transition(hub, tr);
         });
-        *lock(&sc.sub) = Some(sub);
+        *sc.sub.lock() = Some(sub);
 
         let w = Arc::downgrade(&sc);
-        let coordinator = std::thread::Builder::new()
-            .name("vibevalley-session-direct".into())
-            .spawn(move || {
-                enum CoordinatorEvent {
-                    Dispatched(ChannelDispatched),
-                    Removed(String),
-                    Ignore,
-                    Stop,
-                }
+        let cancel = hub.child_token();
+        let task_cancel = cancel.clone();
+        let coordinator = hub.spawn_task(async move {
+            enum CoordinatorEvent {
+                Dispatched(ChannelDispatched),
+                Removed(String),
+                Ignore,
+                Stop,
+            }
+            let Some(boot_sc) = w.upgrade() else { return };
+            let _ = tokio::task::spawn_blocking(move || boot_sc.boot()).await;
+            loop {
+                let event = tokio::select! {
+                    biased;
+                    _ = task_cancel.cancelled() => CoordinatorEvent::Stop,
+                    res = dispatches.recv_async() => match res {
+                        Ok(dispatched) => CoordinatorEvent::Dispatched(dispatched),
+                        Err(_) => CoordinatorEvent::Stop,
+                    },
+                    res = events.recv() => match res {
+                        Ok(ChannelEvent::Removed { event, .. }) => CoordinatorEvent::Removed(event.message_id),
+                        Ok(
+                            ChannelEvent::Posted(_)
+                            | ChannelEvent::Edited(_)
+                            | ChannelEvent::Reacted(_)
+                            | ChannelEvent::Pinned(_)
+                            | ChannelEvent::UserRead { .. },
+                        ) => CoordinatorEvent::Ignore,
+                        Err(broadcast::error::RecvError::Lagged(_)) => CoordinatorEvent::Ignore,
+                        Err(broadcast::error::RecvError::Closed) => CoordinatorEvent::Stop,
+                    },
+                };
                 let Some(sc) = w.upgrade() else { return };
-                sc.boot();
-                drop(sc);
-                loop {
-                    let event = flume::Selector::new()
-                        .recv(&dispatches, |r| match r {
-                            Ok(dispatched) => CoordinatorEvent::Dispatched(dispatched),
-                            Err(_) => CoordinatorEvent::Stop,
-                        })
-                        .recv(&committed, |r| match r {
-                            Ok(Told::Removed(ev)) => CoordinatorEvent::Removed(ev.message_id),
-                            Ok(Told::Posted(_)) => CoordinatorEvent::Ignore,
-                            Err(_) => CoordinatorEvent::Stop,
-                        })
-                        .recv(&stop_rx, |_| CoordinatorEvent::Stop)
-                        .wait();
-                    let Some(sc) = w.upgrade() else { return };
-                    if sc.closed.load(Ordering::Acquire) {
-                        return;
-                    }
-                    match event {
-                        CoordinatorEvent::Dispatched(dispatched) => sc.route_dispatched(dispatched),
-                        CoordinatorEvent::Removed(message_id) => sc.withdraw_message_mailbox(&message_id),
-                        CoordinatorEvent::Ignore => {}
-                        CoordinatorEvent::Stop => return,
-                    }
+                if sc.closed.load(Ordering::Acquire) {
+                    return;
                 }
-            })
-            .expect("session direct dispatch thread");
-        *lock(&sc.coordinator) = Some(coordinator);
+                match event {
+                    CoordinatorEvent::Dispatched(dispatched) => {
+                        let _ = tokio::task::spawn_blocking(move || sc.route_dispatched(dispatched)).await;
+                    }
+                    CoordinatorEvent::Removed(message_id) => {
+                        let _ = tokio::task::spawn_blocking(move || sc.withdraw_message_mailbox(&message_id)).await;
+                    }
+                    CoordinatorEvent::Ignore => {}
+                    CoordinatorEvent::Stop => return,
+                }
+            }
+        });
+        *sc.coordinator.lock() = Some((cancel, coordinator));
 
         sc
     }
 
     pub fn close(&self) {
         self.closed.store(true, Ordering::Release);
-        let _ = lock(&self.stop).take();
-        if let Some(sub) = lock(&self.sub).take() {
+        if let Some(sub) = self.sub.lock().take() {
             sub.close();
         }
-        let me = std::thread::current().id();
-        if let Some(handle) = lock(&self.coordinator).take()
-            && handle.thread().id() != me
-        {
-            let _ = handle.join();
+        if let Some((cancel, handle)) = self.coordinator.lock().take() {
+            cancel.cancel();
+            let _ = vibevalley_runtime::rt::block_on(handle);
         }
-        lock(&self.lanes).clear();
-        let handles: Vec<_> = lock(&self.lane_handles).drain(..).collect();
+        let me = std::thread::current().id();
+        self.lanes.lock().clear();
+        let handles: Vec<_> = self.lane_handles.lock().drain(..).collect();
         for handle in handles {
             if handle.thread().id() != me {
                 let _ = handle.join();
@@ -661,7 +704,7 @@ impl SessionChat {
         if self.closed.load(Ordering::Acquire) {
             return;
         }
-        let mut lanes = lock(&self.lanes);
+        let mut lanes = self.lanes.lock();
         if let Some(tx) = lanes.get(&agent_id)
             && tx.send(wake.clone()).is_ok()
         {
@@ -680,7 +723,7 @@ impl SessionChat {
                         Ok(item) => item,
                         Err(flume::TryRecvError::Empty) => {
                             let Some(sc) = sc.upgrade() else { return };
-                            let mut lanes = lock(&sc.lanes);
+                            let mut lanes = sc.lanes.lock();
                             match rx.try_recv() {
                                 Ok(item) => item,
                                 Err(_) => {
@@ -700,7 +743,7 @@ impl SessionChat {
             })
             .expect("direct talk lane thread");
         drop(lanes);
-        let mut handles = lock(&self.lane_handles);
+        let mut handles = self.lane_handles.lock();
         handles.retain(|h| !h.is_finished());
         handles.push(handle);
     }

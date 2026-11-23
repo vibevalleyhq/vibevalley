@@ -804,6 +804,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "backon"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cffb0e931875b666fc4fcb20fee52e9bbd1ef836fd9e9e04ec21555f9f85f7ef"
+dependencies = [
+ "fastrand",
+ "gloo-timers",
+ "tokio",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3611,6 +3622,18 @@ dependencies = [
  "bitflags 1.3.2",
  "ignore",
  "walkdir",
+]
+
+[[package]]
+name = "gloo-timers"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbb143cf96099802033e0d4f4963b19fd2e0b728bcf076cd9cf7f6634f092994"
+dependencies = [
+ "futures-channel",
+ "futures-core",
+ "js-sys",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -9073,6 +9096,7 @@ checksum = "16a1cfa75cc186dd73d5818e510e042e40927bccc9c236b061cea97e1eb08029"
 dependencies = [
  "base64 0.23.1",
  "bytes",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "http",
@@ -11025,6 +11049,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -11723,10 +11748,11 @@ dependencies = [
  "base64 0.23.1",
  "clap",
  "jiff 1.0.1",
+ "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "tempfile",
- "ureq",
  "vibevalley-core",
  "vibevalley-protocol",
  "vibevalley-runtime",
@@ -11786,6 +11812,7 @@ dependencies = [
 name = "vibevalley-mac"
 version = "0.1.0"
 dependencies = [
+ "backon",
  "base64 0.23.1",
  "flume 0.12.0",
  "futures-util",
@@ -11799,6 +11826,7 @@ dependencies = [
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
+ "parking_lot",
  "percent-encoding",
  "rustybuzz",
  "serde",
@@ -11808,6 +11836,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-tungstenite 0.29.0",
+ "tokio-util",
  "unicode-segmentation",
  "unicode-width",
  "uuid",
@@ -11817,6 +11846,7 @@ dependencies = [
  "vibevalley-pixel",
  "vibevalley-protocol",
  "vibevalley-rich",
+ "vibevalley-runtime",
  "vibevalley-server",
  "vibevalley-terminal",
  "vibevalley-workspace",
@@ -11887,6 +11917,8 @@ name = "vibevalley-runtime"
 version = "0.1.0"
 dependencies = [
  "agent-client-protocol",
+ "arc-swap",
+ "backon",
  "base64 0.23.1",
  "flume 0.12.0",
  "futures-util",
@@ -11899,10 +11931,12 @@ dependencies = [
  "oxc_ast_visit",
  "oxc_parser",
  "oxc_span",
+ "parking_lot",
  "pollster 0.4.0",
  "proptest",
  "quickjs-jit",
  "regex",
+ "reqwest",
  "rmcp",
  "rustls",
  "schemars 1.2.3",
@@ -11913,7 +11947,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
- "ureq",
+ "tokio-util",
  "uuid",
  "vibevalley-protocol",
 ]
@@ -11922,7 +11956,9 @@ dependencies = [
 name = "vibevalley-server"
 version = "0.1.0"
 dependencies = [
+ "arc-swap",
  "axum",
+ "backon",
  "base64 0.23.1",
  "crc32fast",
  "flate2",
@@ -11930,6 +11966,7 @@ dependencies = [
  "futures-util",
  "include_dir",
  "jiff 1.0.1",
+ "parking_lot",
  "pollster 0.4.0",
  "regex",
  "reqwest",
@@ -11943,6 +11980,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
+ "tokio-stream",
  "tokio-tungstenite 0.29.0",
  "tokio-util",
  "ureq",

@@ -9,10 +9,11 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{
-    Arc, Mutex,
+    Arc,
     atomic::{AtomicBool, Ordering},
 };
 
+use parking_lot::Mutex;
 use serde::Deserialize;
 use serde_json::Value;
 use vibevalley_i18n::t;
@@ -325,13 +326,13 @@ impl Repos {
                 repos.refresh_github();
             }
         }) {
-            *self.probe.lock().unwrap_or_else(|e| e.into_inner()) = Some(handle);
+            *self.probe.lock() = Some(handle);
         }
     }
 
     pub fn close(&self) {
         self.closed.store(true, Ordering::Relaxed);
-        if let Some(handle) = self.probe.lock().unwrap_or_else(|e| e.into_inner()).take() {
+        if let Some(handle) = self.probe.lock().take() {
             let _ = handle.join();
         }
     }
@@ -348,7 +349,7 @@ impl Repos {
     /// The folders under the root; links are not repos.
     pub fn list(&self) -> Vec<RepoFolder> {
         let Ok(entries) = std::fs::read_dir(&self.root) else { return vec![] };
-        let pending = self.pending.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let pending = self.pending.lock().clone();
         let mut out: Vec<RepoFolder> = entries
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
@@ -371,10 +372,10 @@ impl Repos {
     }
 
     fn capability(&self, name: &str) -> PullRequestCapability {
-        if let Some(c) = self.capabilities.lock().unwrap_or_else(|e| e.into_inner()).get(name) {
+        if let Some(c) = self.capabilities.lock().get(name) {
             return c.clone();
         }
-        let status = self.github.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let status = self.github.lock().clone();
         match status {
             Some(s) if !s.reason.is_empty() => PullRequestCapability {
                 available: false,
@@ -450,7 +451,7 @@ impl Repos {
                 e.to_string()
             }));
         }
-        self.pending.lock().unwrap_or_else(|e| e.into_inner()).insert(req.name.clone());
+        self.pending.lock().insert(req.name.clone());
         let made = (|| {
             if let Some((_, url)) = req.github.as_deref().and_then(github_repository) {
                 let known = self.github_status();
@@ -470,7 +471,7 @@ impl Repos {
                 self.ensure(&req.name).map(|_| ())
             }
         })();
-        self.pending.lock().unwrap_or_else(|e| e.into_inner()).remove(&req.name);
+        self.pending.lock().remove(&req.name);
         match made {
             Ok(()) => {
                 let path = std::fs::canonicalize(&path).unwrap_or(path);
@@ -538,7 +539,7 @@ impl Repos {
     }
 
     pub fn github_status(&self) -> GitHubStatus {
-        match self.github.lock().unwrap_or_else(|e| e.into_inner()).clone() {
+        match self.github.lock().clone() {
             Some(s) if s.checked_at != 0 => s,
             _ => GitHubStatus {
                 reason: t("server.repo.github.unchecked", &[]),
@@ -597,8 +598,8 @@ impl Repos {
             }
             next.insert(p.name, c);
         }
-        *self.github.lock().unwrap_or_else(|e| e.into_inner()) = Some(probed.clone());
-        *self.capabilities.lock().unwrap_or_else(|e| e.into_inner()) = next;
+        *self.github.lock() = Some(probed.clone());
+        *self.capabilities.lock() = next;
         probed
     }
 }

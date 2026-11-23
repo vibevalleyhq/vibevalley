@@ -1,6 +1,10 @@
 use std::time::Duration;
 
+use backon::{BackoffBuilder, ExponentialBackoff, ExponentialBuilder};
+
 use crate::agent::ai::stream::CancelToken;
+
+const MAX_RETRY_AFTER: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RetryPolicy {
@@ -32,17 +36,32 @@ impl RetryPolicy {
         matches!(status, 408 | 429 | 500 | 502 | 503 | 504)
     }
 
-    pub fn is_retryable_error(err: &ureq::Error) -> bool {
-        matches!(err, ureq::Error::Timeout(_) | ureq::Error::Io(_) | ureq::Error::Protocol(_))
+    pub fn is_retryable_error(err: &reqwest::Error) -> bool {
+        err.is_timeout() || err.is_connect() || err.is_request() || err.is_body()
+    }
+
+    fn builder(&self) -> ExponentialBuilder {
+        ExponentialBuilder::new()
+            .with_factor(2.0)
+            .with_min_delay(self.initial_backoff.min(self.max_backoff))
+            .with_max_delay(self.max_backoff)
+    }
+
+    pub fn backoff(&self) -> ExponentialBackoff {
+        self.builder().with_max_times(self.max_retries).build()
     }
 
     pub fn delay_for(&self, attempt: usize, retry_after: Option<Duration>) -> Duration {
         if let Some(after) = retry_after {
-            return after.min(Duration::from_secs(60));
+            return after.min(MAX_RETRY_AFTER);
         }
-        let shift = u32::try_from(attempt).unwrap_or(31).min(31);
-        let factor = 1u32.checked_shl(shift).unwrap_or(u32::MAX);
-        self.initial_backoff.saturating_mul(factor).min(self.max_backoff)
+        let mut backoff = self.builder().without_max_times().build();
+        // After 32 doublings any non-zero delay has already saturated to `max_backoff`.
+        backoff.nth(attempt.min(32)).unwrap_or(self.max_backoff).min(self.max_backoff)
+    }
+
+    pub(crate) fn resolve_delay(backoff_delay: Duration, retry_after: Option<Duration>) -> Duration {
+        retry_after.map(|after| after.min(MAX_RETRY_AFTER)).unwrap_or(backoff_delay)
     }
 }
 
@@ -68,5 +87,19 @@ pub fn sleep_interruptible(duration: Duration, cancel: &CancelToken) -> bool {
             std::thread::sleep(duration);
             true
         }
+    }
+}
+
+pub(crate) async fn sleep_interruptible_async(duration: Duration, cancel: &CancelToken) -> bool {
+    if cancel.is_cancelled() {
+        return false;
+    }
+    if duration.is_zero() {
+        return true;
+    }
+    tokio::select! {
+        biased;
+        () = cancel.cancelled() => false,
+        () = tokio::time::sleep(duration) => true,
     }
 }

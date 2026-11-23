@@ -1,10 +1,11 @@
 use crate::oar::{
     AgentError, ContentBlock, ControlAction, ControlOutcome, Event, PermissionDecision, Registry, Result, Session, SessionOptions, SessionStatus, TurnOptions,
-    core::lock, voyage::Record,
+    voyage::Record,
 };
+use parking_lot::Mutex;
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex, Weak},
+    sync::{Arc, Weak},
 };
 
 const DEPTH: &str = "OAR_SUBAGENT_DEPTH";
@@ -44,7 +45,7 @@ impl Pool {
         })
     }
     pub fn active(&self) -> usize {
-        lock(&self.slots).active.len()
+        self.slots.lock().active.len()
     }
     pub fn spawn(self: &Arc<Self>, runtime: &str, mut options: SessionOptions) -> Result<Arc<dyn Session>> {
         let runtime = self.registry.require(runtime)?;
@@ -63,7 +64,7 @@ impl Pool {
             return Err(AgentError::Rejected(format!("depth_limit: reached nesting level {depth}")));
         }
         let slot = {
-            let mut slots = lock(&self.slots);
+            let mut slots = self.slots.lock();
             if slots.closed {
                 return Err(AgentError::Rejected("pool_closed: child pool closed".into()));
             }
@@ -80,12 +81,12 @@ impl Pool {
         let inner = match runtime.open(options) {
             Ok(session) => session,
             Err(error) => {
-                lock(&self.slots).active.remove(&slot);
+                self.slots.lock().active.remove(&slot);
                 return Err(error);
             }
         };
         {
-            let mut slots = lock(&self.slots);
+            let mut slots = self.slots.lock();
             if slots.closed {
                 drop(slots);
                 inner.dispose();
@@ -101,7 +102,7 @@ impl Pool {
     }
     pub fn close(&self) {
         let children = {
-            let mut slots = lock(&self.slots);
+            let mut slots = self.slots.lock();
             slots.closed = true;
             std::mem::take(&mut slots.active)
         };
@@ -124,7 +125,7 @@ struct Child {
 impl Child {
     fn release(&self) {
         if let Some(pool) = self.pool.upgrade() {
-            lock(&pool.slots).active.remove(&self.slot);
+            pool.slots.lock().active.remove(&self.slot);
         }
     }
 }

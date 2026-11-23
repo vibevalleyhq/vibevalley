@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use std::ffi::{CStr, CString, c_char};
 use std::path::Path;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 
 use base64::Engine as _;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
 type AudioWork = Box<dyn FnOnce() + Send>;
@@ -247,12 +248,12 @@ pub fn play_sound(name: SoundName) -> Result<(), String> {
 fn cached_sound_wav(name: SoundName) -> Arc<[u8]> {
     static CACHE: OnceLock<Mutex<HashMap<SoundName, Arc<[u8]>>>> = OnceLock::new();
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-    if let Some(existing) = cache.lock().expect("sound cache lock").get(&name).cloned() {
+    if let Some(existing) = cache.lock().get(&name).cloned() {
         return existing;
     }
     let seed = (name as u32 + 1).wrapping_mul(2_654_435_761);
     let wav: Arc<[u8]> = synth::render_wav(name, seed).into();
-    let mut guard = cache.lock().expect("sound cache lock");
+    let mut guard = cache.lock();
     guard.entry(name).or_insert_with(|| wav.clone()).clone()
 }
 

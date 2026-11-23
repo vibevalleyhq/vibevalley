@@ -58,7 +58,7 @@ impl Sessions {
     /// Reserve input against a running external process before writing to its protocol stream.
     /// An unknown outcome is reconciled from this run on recovery.
     pub(crate) fn bind_to_active_run(&self, session: &str, submission: &Submission) -> Result<bool> {
-        let extras = self.0.extras.lock().unwrap_or_else(|e| e.into_inner());
+        let extras = self.0.extras.lock();
         let Some(id) = extras.get(session).and_then(|e| e.run.as_deref()) else {
             return Ok(false);
         };

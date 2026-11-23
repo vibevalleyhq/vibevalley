@@ -12,13 +12,14 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use base64::Engine;
+use parking_lot::Mutex;
 use serde_json::{Value, json};
 
-use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, lock, rejected, rejection};
+use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, rejected, rejection};
 use crate::oar::process::{LineChild, LoginCheck, LoginStatus, Spawn, probe_installation_with, require_binary};
 use crate::oar::record::{self, Recorder};
 use crate::oar::{
@@ -480,7 +481,7 @@ impl Shared {
     fn control_request(&self, request: Value) -> Result<flume::Receiver<std::result::Result<Value, String>>> {
         let id = format!("vibevalley-{}", self.next_control.fetch_add(1, Ordering::SeqCst));
         let (tx, rx) = flume::bounded(1);
-        lock(&self.control).insert(id.clone(), tx);
+        self.control.lock().insert(id.clone(), tx);
         self.child()?
             .write_json(&json!({ "type": "control_request", "request_id": id, "request": request }))?;
         Ok(rx)
@@ -505,29 +506,29 @@ impl Shared {
                 model: str_of(&message, "model").map(String::from),
             });
         }
-        let path = lock(&self.projector).agent_path(&message);
+        let path = self.projector.lock().agent_path(&message);
         let ty = str_of(&message, "type").unwrap_or("unknown");
         let kind = str_of(&message, "subtype").map_or_else(|| ty.to_owned(), |s| format!("{ty}/{s}"));
         let _frame = self.core.record_raw(&kind, path, line, &message);
-        let outs = lock(&self.projector).feed(&message);
+        let outs = self.projector.lock().feed(&message);
         for out in outs {
             match out {
                 Out::RootActivity => {
                     if self.opened.load(Ordering::SeqCst) && !self.core.turn_active() {
-                        let steer = lock(&self.steers).drain(..).collect::<Vec<_>>().join("\n");
+                        let steer = self.steers.lock().drain(..).collect::<Vec<_>>().join("\n");
                         let _ = self.core.begin_turn(&steer);
                     }
                 }
                 Out::Event(path, kind) => {
                     let finished = path.is_empty() && matches!(kind, EventKind::TurnFinished { .. });
                     if finished {
-                        lock(&self.pending).clear();
+                        self.pending.lock().clear();
                         self.turns_finished.fetch_add(1, Ordering::SeqCst);
                     }
                     self.core.emit(path, kind);
                 }
                 Out::ControlResponse { request_id, result } => {
-                    if let Some(waiter) = lock(&self.control).remove(&request_id) {
+                    if let Some(waiter) = self.control.lock().remove(&request_id) {
                         let _ = waiter.send(result);
                     }
                 }
@@ -539,7 +540,7 @@ impl Shared {
                     summary,
                     suggestions,
                 } => {
-                    lock(&self.pending).insert(
+                    self.pending.lock().insert(
                         request_id.clone(),
                         PendingPermission {
                             tool: tool.clone(),
@@ -571,7 +572,7 @@ impl Shared {
                     );
                 }
                 Out::PermissionCancelled { request_id } => {
-                    if let Some(pending) = lock(&self.pending).remove(&request_id) {
+                    if let Some(pending) = self.pending.lock().remove(&request_id) {
                         self.core.emit(
                             pending.agent_path,
                             EventKind::PermissionResolved {
@@ -589,7 +590,7 @@ impl Shared {
 
     fn on_exit(&self, code: Option<i32>, stderr: String) {
         self.core.observe_exit(self.child.get().and_then(|c| c.status()));
-        lock(&self.secrets).take();
+        self.secrets.lock().take();
         let runtime = self.core.runtime_id();
         let mut message = match code {
             Some(code) => format!("{runtime} exited with status {code}"),
@@ -599,10 +600,10 @@ impl Shared {
             message.push_str(": ");
             message.push_str(stderr.trim());
         }
-        for (_, waiter) in lock(&self.control).drain() {
+        for (_, waiter) in self.control.lock().drain() {
             let _ = waiter.send(Err(message.clone()));
         }
-        *lock(&self.exit) = Some(message.clone());
+        *self.exit.lock() = Some(message.clone());
         if self.opened.load(Ordering::SeqCst) {
             self.finish(message);
         }
@@ -686,18 +687,18 @@ impl Driver for ClaudeDriver {
     }
 
     fn start_turn(&self, content: Vec<ContentBlock>) -> Result<()> {
-        lock(&self.shared.steers).clear();
+        self.shared.steers.lock().clear();
         self.send_user(&content)
     }
 
     fn steer(&self, content: Vec<ContentBlock>) -> Result<()> {
         self.send_user(&content)?;
-        lock(&self.shared.steers).push_back(crate::oar::core::render_text(&content));
+        self.shared.steers.lock().push_back(crate::oar::core::render_text(&content));
         Ok(())
     }
 
     fn abort(&self) -> Result<()> {
-        lock(&self.shared.projector).abort_requested = true;
+        self.shared.projector.lock().abort_requested = true;
         // The interrupt's own answer says nothing new; the `result` frame ends the turn.
         drop(self.shared.control_request(json!({ "subtype": "interrupt" }))?);
         let shared = self.shared.clone();
@@ -720,7 +721,7 @@ impl Driver for ClaudeDriver {
     }
 
     fn respond_permission(&self, request_id: &str, decision: &PermissionDecision) -> Result<()> {
-        let Some(pending) = lock(&self.shared.pending).remove(request_id) else {
+        let Some(pending) = self.shared.pending.lock().remove(request_id) else {
             return Err(rejected(rejection::UNKNOWN_REQUEST, format!("claude no longer waits on `{request_id}`")));
         };
         let response = match decision {
@@ -770,7 +771,7 @@ impl Driver for ClaudeDriver {
             child.kill();
             self.shared.core.observe_exit(child.status());
         }
-        lock(&self.shared.secrets).take();
+        self.shared.secrets.lock().take();
     }
 }
 
@@ -1006,7 +1007,7 @@ fn running(started: Started, opts: &SessionOptions, caps: Capabilities) -> Arc<d
         model: resolved_model(&started.init, opts.model.as_deref()),
     });
     shared.opened.store(true, Ordering::SeqCst);
-    if let Some(message) = lock(&shared.exit).clone() {
+    if let Some(message) = shared.exit.lock().clone() {
         shared.finish(message);
     }
     let core = shared.core.clone();

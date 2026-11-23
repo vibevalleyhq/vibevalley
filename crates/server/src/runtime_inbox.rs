@@ -2,16 +2,19 @@
 //! [`Hub`] so `InboxSlice` surfaces them immediately.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+use parking_lot::Mutex;
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{InboxFrom, InboxFromRuntime, InboxItem, InboxKind, InboxTarget, InboxTargetRuntime, InboxWords};
 use vibevalley_runtime::agent::durable;
 
-use crate::{Hub, lock};
+use crate::Hub;
 
 pub(crate) struct RuntimeInboxObserver {
-    observer: Mutex<Option<(flume::Sender<()>, std::thread::JoinHandle<()>)>>,
+    observer: Mutex<Option<(CancellationToken, JoinHandle<()>)>>,
 }
 
 #[derive(Default)]
@@ -38,31 +41,35 @@ impl RuntimeInboxObserver {
         }
         hub.set_runtime_inbox(projection.items());
         let weak = Arc::downgrade(hub);
-        let (stop, shutdown) = flume::bounded(0);
-        let handle = std::thread::Builder::new()
-            .name("vibevalley-runtime-inbox".into())
-            .spawn(move || {
-                while let Some(event) = flume::Selector::new().recv(&shutdown, |_| None).recv(&events, Result::ok).wait() {
-                    if event.document.doc_kind != "pi.inbox" {
-                        continue;
-                    }
-                    if projection.apply_doc(&event.document, event.retired) {
-                        let Some(hub) = weak.upgrade() else { return };
-                        hub.set_runtime_inbox(projection.items());
-                    }
+        let cancel = hub.child_token();
+        let task_cancel = cancel.clone();
+        let handle = hub.spawn_task(async move {
+            loop {
+                let event = tokio::select! {
+                    biased;
+                    _ = task_cancel.cancelled() => return,
+                    res = events.recv_async() => match res {
+                        Ok(event) => event,
+                        Err(_) => return,
+                    },
+                };
+                if event.document.doc_kind != "pi.inbox" {
+                    continue;
                 }
-            })
-            .map_err(|e| durable::Error::Invalid(e.to_string()))?;
-        *lock(&self.observer) = Some((stop, handle));
+                if projection.apply_doc(&event.document, event.retired) {
+                    let Some(hub) = weak.upgrade() else { return };
+                    hub.set_runtime_inbox(projection.items());
+                }
+            }
+        });
+        *self.observer.lock() = Some((cancel, handle));
         Ok(())
     }
 
     pub fn stop(&self) {
-        if let Some((stop, thread)) = lock(&self.observer).take() {
-            drop(stop);
-            if thread.thread().id() != std::thread::current().id() {
-                let _ = thread.join();
-            }
+        if let Some((cancel, handle)) = self.observer.lock().take() {
+            cancel.cancel();
+            let _ = vibevalley_runtime::rt::block_on(handle);
         }
     }
 }

@@ -17,8 +17,9 @@ pub use family::{ChildDraft, MAX_CHILDREN};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+use parking_lot::Mutex;
 use vibevalley_core::Move;
 use vibevalley_core::brief::{findings_of, milestones_of, resume_words};
 use vibevalley_core::rules::short_title;
@@ -96,7 +97,7 @@ impl RequestKeys {
             ));
         }
         // Held while working: a duplicate waits for the first answer.
-        let mut seen = self.seen.lock().unwrap_or_else(|e| e.into_inner());
+        let mut seen = self.seen.lock();
         if let Some((expires, done)) = seen.1.get(key)
             && *expires > now()
         {

@@ -5,8 +5,8 @@
 //!
 //! Every message is written with a numbered event (`channel_event`) and its
 //! synchronous `DeliveryPolicy` rows in one transaction; once committed,
-//! [`Chat::committed`] and non-blocking [`Chat::dispatches`] notify downstream
-//! consumers without blocking the writer.
+//! [`Chat::subscribe_events`] and non-blocking [`Chat::dispatches`] notify
+//! downstream consumers without blocking the writer.
 
 pub mod db;
 pub mod dispatch;
@@ -23,13 +23,15 @@ pub use dispatch::{ChannelDispatched, DeliveryTargetKind, HeldBy, QueuedDelivery
 pub use service::{direct, install, profile_id};
 pub use store::Inner;
 pub use types::{
-    AddressedMessage, ArtifactRef, Committed, FileAt, Info, Made, Meta, Note, Noticing, Picked, Place, Posting, ReadOptions, ReadResult, Saying, Seat,
-    Speaking, Spoken, ThreadSubject, Told, actor_of, line_of, meta_of, meta_text, to_message,
+    AddressedMessage, ArtifactRef, ChannelEvent, Committed, FileAt, Info, Made, Meta, Note, Noticing, Picked, Place, Posting, ReadOptions, ReadResult, Saying,
+    Seat, Speaking, Spoken, ThreadSubject, actor_of, line_of, meta_of, meta_text, to_message,
 };
 
-use std::sync::{Arc, Mutex, MutexGuard, RwLock, Weak};
+use std::sync::{Arc, Weak};
 
+use parking_lot::{Mutex, MutexGuard, RwLock};
 use sqlx::SqliteConnection;
+use tokio::sync::broadcast;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, BizCode, ChatMessage, DEFAULT_ORCHESTRATOR, Embed, Fact, FactChannelChanged, FactMessageChanged, FactUserMentionsChanged, QuotedBlock, USER_ID,
@@ -43,7 +45,9 @@ use self::store::{Q, tx};
 use self::types::{Write, Written, new_id};
 use crate::base::{LookIn, internal, missing, open_sqlx_db, refused as refuse};
 use crate::modules::content::attachment::Attachments;
-use crate::{Hub, lock, now};
+use crate::{Hub, now};
+
+const CHANNEL_EVENT_CAPACITY: usize = 1024;
 
 /// The channel a new farm opens with.
 const FIRST_CHANNEL: &str = "general";
@@ -84,10 +88,8 @@ pub struct Chat {
     files: Arc<Attachments>,
     inner: Mutex<Inner>,
     me: Weak<Chat>,
-    said: Mutex<Vec<flume::Sender<ChatMessage>>>,
-    told: Mutex<Vec<flume::Sender<Told>>>,
+    events: broadcast::Sender<ChannelEvent>,
     dispatches: Mutex<Vec<flume::Sender<ChannelDispatched>>>,
-    user_reads: Mutex<Vec<flume::Sender<(String, i64, i64)>>>,
     guards: RwLock<Vec<Guard>>,
     seaters: RwLock<Vec<Seater>>,
     /// Link previews are read off the web; tests turn it off.
@@ -97,7 +99,7 @@ pub struct Chat {
 }
 
 fn publish<T: Clone>(to: &Mutex<Vec<flume::Sender<T>>>, value: &T) {
-    lock(to).retain(|tx| tx.send(value.clone()).is_ok());
+    to.lock().retain(|tx| tx.send(value.clone()).is_ok());
 }
 
 impl Chat {
@@ -140,6 +142,7 @@ impl Chat {
             db::read_cursors_of(&conn, USER_ID).q()?,
             &db::all_members(&conn).q()?,
         );
+        let (events, _events_rx) = broadcast::channel(CHANNEL_EVENT_CAPACITY);
         let chat = Arc::new_cyclic(|me| Chat {
             hub: Arc::downgrade(hub),
             files,
@@ -150,17 +153,15 @@ impl Chat {
                 reach: Reach::default(),
             }),
             me: me.clone(),
-            said: Mutex::default(),
-            told: Mutex::default(),
+            events,
             dispatches: Mutex::default(),
-            user_reads: Mutex::default(),
             guards: RwLock::default(),
             seaters: RwLock::default(),
             embeds,
             quoter: RwLock::default(),
         });
         {
-            let inner = lock(&chat.inner);
+            let inner = chat.inner.lock();
             let mut recent = db::recent_channels(&inner.db, KEEP_CHANNELS).q()?;
             recent.reverse();
             let mut facts = vec![];
@@ -182,8 +183,12 @@ impl Chat {
         }
     }
 
+    fn emit_event(&self, event: ChannelEvent) {
+        let _ = self.events.send(event);
+    }
+
     fn locked(&self) -> MutexGuard<'_, Inner> {
-        lock(&self.inner)
+        self.inner.lock()
     }
 
     /// `publishChannel`: the place as it stands into the state.
@@ -224,26 +229,30 @@ impl Chat {
         let message = to_message(row);
         self.apply(vec![Fact::MessageChanged(FactMessageChanged {
             at: now(),
-            message: message.clone(),
+            message,
             thread,
             answers,
         })]);
         inner.model.note_published(&row.channel_id, row.number);
-        publish(&self.said, &message);
     }
 
     /// `readThrough`: a read that moves the cursor; the user's is told.
     fn read_through(&self, inner: &mut Inner, who: &str, channel: &str, upto: i64) -> Result<(), ApiError> {
-        tx(inner, |me| me.set_read(who, channel, upto, now()))?;
+        let at = now();
+        tx(inner, |me| me.set_read(who, channel, upto, at))?;
         if who == USER_ID {
-            publish(&self.user_reads, &(channel.to_string(), upto, now()));
+            self.emit_event(ChannelEvent::UserRead {
+                channel: channel.to_string(),
+                upto,
+                at,
+            });
             self.publish_user_mentions(inner)?;
         }
         Ok(())
     }
 
-    /// One message changed with its channel's next revision; then whoever
-    /// follows its channel is told it as it now is.
+    /// One message changed with its channel's next revision; caller emits the
+    /// matching [`ChannelEvent`] variant.
     fn change(&self, inner: &mut Inner, row: &MsgRow, work: impl FnOnce(&Connection, i64, i64) -> sqlx::Result<()>) -> Result<ChatMessage, ApiError> {
         let at = now();
         tx(inner, |me| {
@@ -252,7 +261,6 @@ impl Chat {
         })?;
         let updated = db::message_by_id(&inner.db, &row.id).q()?;
         let message = to_message(updated.as_ref().unwrap_or(row));
-        publish(&self.said, &message);
         self.publish_channel(inner, &row.channel_id)?;
         Ok(message)
     }
@@ -409,7 +417,7 @@ impl Chat {
         }
         if let Some(posted) = inner.committed_from(&written.row, &event) {
             let posted = Arc::new(posted);
-            publish(&self.told, &Told::Posted(Box::new((*posted).clone())));
+            self.emit_event(ChannelEvent::Posted(Box::new((*posted).clone())));
             if !written.deliveries.is_empty() {
                 publish(
                     &self.dispatches,
@@ -447,7 +455,7 @@ impl Chat {
         }
         let me = self.me.clone();
         let row = row.clone();
-        let _ = std::thread::Builder::new().name("vibevalley-chat-embeds".into()).spawn(move || {
+        vibevalley_runtime::rt::handle().spawn_blocking(move || {
             let found: Vec<Embed> = links.iter().filter_map(|l| words::read_embed(l)).collect();
             let Some(chat) = me.upgrade() else { return };
             let mut inner = chat.locked();
@@ -462,17 +470,19 @@ impl Chat {
             }
             meta.embeds = Some(found);
             let text = meta_text(Some(&meta));
-            let _ = chat.change(&mut inner, &current, |db, revision, _| db::set_meta(db, &current.id, text.as_deref(), revision));
+            if let Ok(message) = chat.change(&mut inner, &current, |db, revision, _| db::set_meta(db, &current.id, text.as_deref(), revision)) {
+                chat.emit_event(ChannelEvent::Edited(message));
+            }
         });
     }
 
     /// The artifact module quotes the blocks a user's message carries.
     pub fn set_quoter(&self, quoter: Quoter) {
-        *self.quoter.write().unwrap_or_else(|e| e.into_inner()) = Some(quoter);
+        *self.quoter.write() = Some(quoter);
     }
 
     fn quoted(&self, refs: &[vibevalley_protocol::BlockRef]) -> Vec<QuotedBlock> {
-        let quoter = self.quoter.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let quoter = self.quoter.read().clone();
         match quoter {
             Some(q) if !refs.is_empty() => q(refs),
             _ => vec![],

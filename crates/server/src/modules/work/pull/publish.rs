@@ -8,9 +8,10 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
+use parking_lot::Mutex;
 use serde_json::Value;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
@@ -437,14 +438,8 @@ impl Publisher {
         } else {
             &common
         };
-        let gate = self
-            .serial
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .entry(key.display().to_string())
-            .or_default()
-            .clone();
-        let _held = gate.lock().unwrap_or_else(|e| e.into_inner());
+        let gate = self.serial.lock().entry(key.display().to_string()).or_default().clone();
+        let _held = gate.lock();
         self.publish(&cwd, req)
     }
 

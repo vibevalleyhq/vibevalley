@@ -9,7 +9,7 @@ crates/protocol/           契约与环境约定（vibevalley-protocol）：src/
 crates/i18n/               对用户说的话（vibevalley-i18n）：locales/<语言>/<宿主.模块>.json 的词典，Rust 里 t("key")
 crates/core/               核心状态与纯规则（vibevalley-core）：reduce、SliceMask 与按域切片投影（board/sessions/collab/inbox/ops/farm）、任务状态和阶段、收件箱、巡查、农场画面、简报起草、定时任务（cron/）、笔记大纲（pkm/）与作品引擎（artifact/）
 crates/git/ · files/       仓库 Git 封装（vibevalley-git）与工作区文件搜索和监听（vibevalley-files）
-crates/runtime/            运行时与自研 agent（vibevalley-runtime）：oar/ 驱动（Claude Code、Codex、ACP、scripted；含零开销 OarObserver 与 oar-voyage/3 记录）与 agent/ 模型请求（DeepSeek）、持久执行引擎、工具、对话循环和内置 vibevalley 运行时
+crates/runtime/            运行时与自研 agent（vibevalley-runtime）：rt（进程共享 Tokio 运行时）、oar/ 驱动（Claude Code、Codex、ACP、scripted；含基于 arc-swap 的零开销 OarObserver 与 oar-voyage/3 记录）与 agent/ 模型请求（DeepSeek，reqwest + backon）、持久执行引擎、工具、对话循环和内置 vibevalley 运行时
 crates/engines/            底层引擎：纯 Rust 正则（onig）、语法高亮（shiki）与图谱渲染（pele），供 crates/rich 使用
 crates/rich/               原生富内容组件与辅助（vibevalley-rich）：Markdown、代码块、图谱、画布、图表、GenUI 与拼音匹配（engine/ 含 canvas、chart、genui、pinyin）
 crates/server/             服务端（二进制 vibevalley-server）：src/modules 按 6 个业务域分组（work：issue、session、workplace、repo、cron、pull、ledger；

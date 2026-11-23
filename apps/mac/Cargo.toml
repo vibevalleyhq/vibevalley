@@ -12,6 +12,7 @@ vibevalley-i18n = { version = "0.1.0", path = "../../crates/i18n" }
 vibevalley-pixel = { version = "0.1.0", path = "crates/pixel" }
 vibevalley-protocol = { version = "0.1.0", path = "../../crates/protocol" }
 vibevalley-rich = { version = "0.1.0", path = "../../crates/rich" }
+vibevalley-runtime = { version = "0.1.0", path = "../../crates/runtime" }
 vibevalley-server = { version = "0.1.0", path = "../../crates/server" }
 vibevalley-terminal = { version = "0.1.0", path = "crates/terminal" }
 vibevalley-workspace = { version = "0.1.0", path = "crates/workspace" }
@@ -49,8 +50,11 @@ rustybuzz = "0.20.1"
 unicode-width = "0.2.3"
 uuid = { workspace = true }
 
+backon = { workspace = true }
+parking_lot = { workspace = true }
 tokio = { workspace = true }
 tokio-tungstenite = { workspace = true }
+tokio-util = { workspace = true }
 futures-util = { workspace = true }
 
 [features]

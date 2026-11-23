@@ -16,7 +16,7 @@
 | 位置 | 职责 |
 |---|---|
 | `crates/core/src/core.rs`、`inbox.rs`、`patrol.rs` | `Core`：`reduce`、`SliceMask`、6 路切片投影（`board_slice`、`sessions_slice`、`collab_slice`、`inbox_slice`、`ops_slice`、`farm_frame`）与离线 `slice_bundle`、`Transition`；收件箱纯计算（`inbox`、`inbox_entries`、`fresh_of`）与巡查规则（`patrol_step`） |
-| `crates/server/src/lib.rs`、`event_bus.rs`、`slice_feed.rs`、`runtime_inbox.rs` | `Hub`、有界异步 `EventBus`、6 路有界容量 1 脏合并 `SliceFeed<T>` 与 `RuntimeInboxObserver`：持有 `Core`、端点表与订阅表，按 `Applied.dirty: SliceMask` 仅推送变脏切片（`effects` 仅进 `farm`），将持久 `pi.inbox` 运行时告警实时并入 `InboxSlice`；挂接 `CallerContext`/`ClientIdentity` 与关闭态零开销的 `InvokeObserver`/`FaultGate`/`HostDebugBridge` 插槽 |
+| `crates/server/src/lib.rs`、`event_bus.rs`、`slice_feed.rs`、`runtime_inbox.rs` | `Hub`、有界异步 `EventBus`、基于 `tokio::sync::watch` 的 6 路脏合并 `SliceFeed<T>` 与 `RuntimeInboxObserver`：持有 `Core`、端点表、订阅表、`tokio::sync::broadcast` 实时事件流与 `CancellationToken`/`TaskTracker` 停机作用域，按 `Applied.dirty: SliceMask` 仅推送变脏切片（`effects` 仅进 `farm`），将持久 `pi.inbox` 运行时告警实时并入 `InboxSlice`；经 `arc-swap` 无锁挂接 `CallerContext`/`ClientIdentity` 与 `InvokeObserver`/`FaultGate`/`HostDebugBridge` 插槽 |
 | `crates/server/src/start.rs` | `start`：按序打开设置、档案、仓库、工单板、频道、媒体、助手，并接线 `IssueChat`、`SessionChat`、助手频道订阅与 `RuntimeInboxObserver`，注册所有端点；`Started::close` 先停 `Hub::close_bus()` 再清理各领域服务 |
 | `crates/server/src/main.rs` | 二进制 `vibevalley-server`：`--web`、`--ready-json`，读环境变量，写 `server.json` |
 | `crates/protocol/src/contract/` | `SpaceState`、`Fact`、`SliceKind`、5 域切片、`FarmFrame`、`SliceBundle`、`LiveEvent`、GPUI 壳强类型协议（`host.rs`：`Host*` 帧与 `HostAction`）与接口表 `ENDPOINTS`（`endpoints.rs`），手写的源头，TS 由它生成 |
@@ -33,11 +33,11 @@
 - **单一内存投影，按事实演进**：`SpaceState` 只在 `Hub::apply(facts)` 中修改。未改变状态的事实不广播、不递增 `seq`、不触发特效。
 - **「事实」专指 `Hub::apply` 的输入**：农机能力叫 `RuntimeSupport`，会话事件映射叫 `Reaction`，一条频道消息和它的听众叫 `ChannelHearers`，排序键叫 `RowKeys`。
 - **事实命名表达发生了什么**：实体新增或更新叫 `<实体>Changed`，移除叫 `<实体>Removed`，生命周期结清用动词过去式（`sessionPhaseChanged`、`sessionReported`、`sessionLeft`）。
-- **批次原子可见，按脏掩码精准出切片**：`Hub::apply`（`crates/server/src/lib.rs`）在局部状态上逐条折叠并收集每条 `Transition`（`{ before, fact, after }`）、特效与累计脏切片掩码 `Applied.dirty: SliceMask`，一次性替换可见状态、递增一次 `seq` 并立即释放核心锁，再经有界异步 `EventBus`（每订阅者独立线程 `vibevalley-bus-{name}`、容量 1024）非阻塞扇出 `Transition`，同时仅唤醒 `dirty` 命中的 `SliceFeed<T>`（`effects` 仅发往 `SliceKind::Farm`），禁止在 `Hub::apply` 锁内同步写盘或重入。`reduce` 不得修改传入的旧状态。
+- **批次原子可见，按脏掩码精准出切片**：`Hub::apply`（`crates/server/src/lib.rs`）在局部状态上逐条折叠并收集每条 `Transition`（`{ before, fact, after }`）、特效与累计脏切片掩码 `Applied.dirty: SliceMask`，一次性替换可见状态、递增一次 `seq` 并立即释放核心锁，再经有界异步 `EventBus`（每订阅者在共享 `vibevalley_runtime::rt` 运行时上以轻量 Tokio 任务消费容量 1024 的 `tokio::sync::mpsc`，同步处理体经 `spawn_blocking` 执行，由 `CancellationToken` 协作停机）非阻塞扇出 `Transition`，同时仅唤醒 `dirty` 命中的 `SliceFeed<T>`（`effects` 仅发往 `SliceKind::Farm`），禁止在 `Hub::apply` 锁内同步写盘或重入。`reduce` 不得修改传入的旧状态。
 - **先落库，后发事实**：各模块先提交数据库事务或文件，再调 `Hub::apply`。重启时从空状态由各模块从 `server.db` 及家目录文件恢复。
 - **按依赖重算工单派生状态**：`reduce` 仅在工单或会话集合引用变化时重算工单状态与动作（`withIssueStatuses`）；聊天或花费事实不触发工单重算。一轮进行中的 `sessionPhaseChanged` 只改了 `doing` 或 `spent`（`since`、`quietSince` 不变，`phaseAffectsIssue`）时跳过工单重算且不标脏 `BOARD`。
 - **界面文案只在出切片时填充**：6 个纯投影函数（`board_slice`、`sessions_slice`、`collab_slice`、`inbox_slice`、`ops_slice`、`farm_frame`）按需在对应切片上填入 `phaseText`、`actionText`、`whenText`、工单 `stage` 与可执行动作；`reduce` 与持久层不含界面文案。`SliceBundle` 仅用于离线夹具与 `export_scenarios` 导出，不对外提供聚合 HTTP 端点。
-- **可插拔脊柱钩子关闭态零开销**：`Hub` 与 `Server::call_with` 统一透传 `CallerContext`（`caller`、`principal: CallerPrincipal`、`client: Option<ClientIdentity>`、`trace_id: u64`），并预留 `InvokeObserver`、`FaultGate` 与 `HostDebugBridge` 三处钩子（`Hub::attach_observer` / `attach_fault_gate` / `attach_host_debug`）；未挂载时仅做原子标志判断，零锁零堆分配。
+- **可插拔脊柱钩子关闭态零开销**：`Hub` 与 `Server::call_with` 统一透传 `CallerContext`（`caller`、`principal: CallerPrincipal`、`client: Option<ClientIdentity>`、`trace_id: u64`），并经 `arc_swap::ArcSwapOption` 挂接 `InvokeObserver`、`FaultGate` 与 `HostDebugBridge` 三处钩子（`Hub::attach_observer` / `attach_fault_gate` / `attach_host_debug`）；未挂载时仅做无锁原子读取，零锁零堆分配。
 
 ### 收件箱
 
@@ -63,8 +63,8 @@
 
 | 路径 | 编码 Schema | 初始消息 | 后续推送 | 消费者 |
 |---|---|---|---|---|
-| `GET /api/v1/slice/{name}`（`name` ∈ `board` \| `sessions` \| `collab` \| `inbox` \| `ops` \| `farm`） | `BoardSlice` / `SessionsSlice` / `CollabSlice` / `InboxSlice` / `OpsSlice` / `FarmFrame` | 带 `Accept: application/json` 或 `?once=1` 直接返回当前 JSON 快照；SSE 首帧推送最新切片（支持 `Last-Event-ID` 或 `?after=<seq>` 续读跳过已收序号） | 经 `SliceFeed<T>` 有界容量 1 脏合并推送（`id: <seq>\ndata: <json>\n\n`）；`farm` 携带窗口内有序 `effects` | HTTP 客户端、CLI |
-| `GET /api/v1/live`（别名 `/api/v1/events`） | `LiveEvent` | 无 | `SessionEvent`、`Notice`、`Runtime` | 页面 |
+| `GET /api/v1/slice/{name}`（`name` ∈ `board` \| `sessions` \| `collab` \| `inbox` \| `ops` \| `farm`） | `BoardSlice` / `SessionsSlice` / `CollabSlice` / `InboxSlice` / `OpsSlice` / `FarmFrame` | 带 `Accept: application/json` 或 `?once=1` 直接返回当前 JSON 快照；SSE 首帧推送最新切片（支持 `Last-Event-ID` 或 `?after=<seq>` 续读跳过已收序号） | 经 `SliceFeed<T>`（`tokio::sync::watch` + `WatchStream`）脏合并推送（`id: <seq>\ndata: <json>\n\n`），无阻塞线程开销；`farm` 携带窗口内有序 `effects` | HTTP 客户端、CLI |
+| `GET /api/v1/live`（别名 `/api/v1/events`） | `LiveEvent` | 无 | 经 `Hub::subscribe_live()`（有界 `tokio::sync::broadcast`）推送 `SessionEvent`、`Notice`、`Runtime` | 页面 |
 | `GET /api/v1/issue/watch/:id` | `IssueWatch` | 工单状态与保留的轨迹 | 状态、轨迹和缺口（[观察执行](docs/subsystems/issue.md#观察执行)） | `issue watch` |
 | `GET /api/v1/subscribe/<名字>?payload=<JSON>` | 各订阅的 `event`（`packages/protocol/src/rpc.ts` 定义） | 补齐 `after` 之后的变化 | 之后的每次变化 | 页面：`channel.follow`、`channel.reports`、`artifact.follow`、`artifact.suggestion.follow` |
 
@@ -100,7 +100,7 @@ SSE 以外的路由：
 2. `Core` 运行 `reduce`，收集变更与脏切片掩码 `dirty: SliceMask`；若状态未变则直接结束。
 3. 原子替换可见状态、递增 `seq` 并释放锁，经有界异步 `EventBus` 把 `Transition` 扇出给订阅它的模块（`Hub::subscribe_transitions`）。
 4. `Hub` 仅向 `dirty` 命中的切片 `SliceFeed<T>` 发出脏信号（`effects` 仅入 `farm` 通道）；未变脏的切片不复制、不序列化、不唤醒下游消费者。
-5. 每个 `SliceFeed<T>` 订阅方持有容量为 1 的唤醒通道，空闲后首次变脏立即唤醒，连续变化自动合并为最新快照；原生窗口经 `applied` 确认 `rev` 后才接收下一份切片快照。
+5. `SliceFeed<T>` 以 `tokio::sync::watch` 持有最新切片快照，空闲后首次变脏立即唤醒，连续变化自动合并为最新快照；HTTP SSE 经 `WatchStream` 直接推送，`BridgeHub` 以轻量 Tokio 任务与每连接 `CancellationToken` 维持单帧 ACK（确认 `rev` 后再推下一份快照）。
 
 **服务端启动**
 

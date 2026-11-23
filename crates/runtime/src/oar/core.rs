@@ -3,9 +3,11 @@
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard, RwLock, Weak};
+use std::sync::{Arc, Weak};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+use arc_swap::ArcSwapOption;
+use parking_lot::{Mutex, MutexGuard};
 
 use crate::oar::record::Recorder;
 use crate::oar::voyage::normalize_trace_id;
@@ -18,33 +20,21 @@ pub trait OarObserver: Send + Sync {
     fn on_event(&self, session_id: &str, event: &Event);
 }
 
-static HAS_OBSERVER: AtomicBool = AtomicBool::new(false);
-static OBSERVER: RwLock<Option<Arc<dyn OarObserver>>> = RwLock::new(None);
+struct ObserverSlot(Arc<dyn OarObserver>);
+
+static OBSERVER: ArcSwapOption<ObserverSlot> = ArcSwapOption::const_empty();
 
 pub fn set_observer(observer: Option<Arc<dyn OarObserver>>) {
-    let has = observer.is_some();
-    // Drop the displaced observer outside the write lock: its Drop may drop a Session and emit SessionEnded.
-    let previous = {
-        let mut slot = OBSERVER.write().unwrap_or_else(|poisoned| poisoned.into_inner());
-        let previous = std::mem::replace(&mut *slot, observer);
-        HAS_OBSERVER.store(has, Ordering::Release);
-        previous
-    };
-    drop(previous);
+    OBSERVER.store(observer.map(|obs| Arc::new(ObserverSlot(obs))));
 }
 
 pub fn has_observer() -> bool {
-    HAS_OBSERVER.load(Ordering::Relaxed)
+    OBSERVER.load().is_some()
 }
 
 fn notify_observer(session_id: &str, event: &Event) {
-    // Clone and release the RwLock before invoking so callbacks may inspect session state or clear the observer without deadlocking.
-    let observer = {
-        let guard = OBSERVER.read().unwrap_or_else(|poisoned| poisoned.into_inner());
-        guard.clone()
-    };
-    if let Some(observer) = observer {
-        observer.on_event(session_id, event);
+    if let Some(slot) = OBSERVER.load_full() {
+        slot.0.on_event(session_id, event);
     }
 }
 
@@ -74,10 +64,6 @@ pub(crate) fn rejected(code: &str, detail: impl AsRef<str>) -> AgentError {
 
 pub(crate) fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
-}
-
-pub(crate) fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// Derives `SessionStatus` from events, one at a time. The same fold backs
@@ -288,15 +274,15 @@ impl SessionCore {
     }
 
     fn lock(&self) -> MutexGuard<'_, CoreState> {
-        self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+        self.state.lock()
     }
 
     pub(crate) fn session_id(&self) -> String {
-        lock(&self.session_id).clone()
+        self.session_id.lock().clone()
     }
 
     pub(crate) fn identify(&self, id: &str) -> bool {
-        let mut known = lock(&self.session_id);
+        let mut known = self.session_id.lock();
         if known.as_str() == id {
             return false;
         }
@@ -378,8 +364,8 @@ impl SessionCore {
             state.span_id = format!("turn-{}", event.seq);
         }
         let mut envelope = crate::oar::voyage::Record::event(self.session_id(), &event);
-        // Zero locking and zero allocation when no observer is installed; callbacks run after callers drop `state`.
-        let observed = HAS_OBSERVER.load(Ordering::Relaxed).then(|| (envelope.session_id.clone(), event.clone()));
+        // Lock-free atomic check avoids cloning when no observer is installed; callbacks run after callers drop `state`.
+        let observed = has_observer().then(|| (envelope.session_id.clone(), event.clone()));
         if event.agent_path.is_empty() {
             if let EventKind::Error { message } = &event.kind {
                 state.last_error = Some(message.clone());
@@ -591,7 +577,7 @@ impl SessionCore {
         }
         if finished_root_turn {
             // Cloned out: the hook can finish another turn and re-enter `emit`.
-            let hook = self.after_turn.lock().unwrap_or_else(|p| p.into_inner()).clone();
+            let hook = self.after_turn.lock().clone();
             if let Some(hook) = hook {
                 hook();
             }
@@ -827,7 +813,7 @@ impl<D: Driver> CoreSession<D> {
             capabilities,
         });
         let weak: Weak<Self> = Arc::downgrade(&session);
-        *core.after_turn.lock().unwrap_or_else(|p| p.into_inner()) = Some(Arc::new(move || {
+        *core.after_turn.lock() = Some(Arc::new(move || {
             if let Some(session) = weak.upgrade() {
                 session.drain_queue();
             }

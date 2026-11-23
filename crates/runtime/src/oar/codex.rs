@@ -19,12 +19,13 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
+use parking_lot::Mutex;
 use serde_json::{Value, json};
 
-use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, lock, rejected, rejection};
+use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, rejected, rejection};
 use crate::oar::process::{LineChild, LoginCheck, LoginStatus, Spawn, probe_installation_with, require_binary};
 use crate::oar::record::{self, Recorder};
 use crate::oar::{
@@ -615,12 +616,12 @@ impl Shared {
 
     fn call_async(&self, method: &str, params: Value, callback: RpcCallback) -> Result<()> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
-        lock(&self.calls).insert(id, callback);
+        self.calls.lock().insert(id, callback);
         let sent = self
             .child()
             .and_then(|c| c.write_json(&json!({ "id": id, "method": method, "params": params })));
         if sent.is_err() {
-            lock(&self.calls).remove(&id);
+            self.calls.lock().remove(&id);
         }
         sent
     }
@@ -659,7 +660,7 @@ impl Shared {
         let id = message.get("id").filter(|id| !id.is_null());
         match (method, id) {
             (None, Some(id)) => {
-                let Some(callback) = id.as_u64().and_then(|id| lock(&self.calls).remove(&id)) else {
+                let Some(callback) = id.as_u64().and_then(|id| self.calls.lock().remove(&id)) else {
                     return;
                 };
                 let result = match message.get("error") {
@@ -672,7 +673,7 @@ impl Shared {
             (Some(method), None) => {
                 let params = message.get("params").cloned().unwrap_or(Value::Null);
                 let session = {
-                    let mut early = lock(&self.early);
+                    let mut early = self.early.lock();
                     match self.session.get() {
                         Some(session) => session,
                         None => {
@@ -689,7 +690,7 @@ impl Shared {
 
     fn on_notification(&self, session: &SessionState, method: &str, params: &Value, line: &str) {
         let (projected, path) = {
-            let mut projector = lock(&session.projector);
+            let mut projector = session.projector.lock();
             let projected = projector.project(method, params);
             let path = projector.path(params);
             if let Some(events) = &projected {
@@ -723,14 +724,14 @@ impl Shared {
                 _ => None,
             };
             if let Some(title) = next_title.map(str::trim).filter(|t| !t.is_empty()) {
-                *lock(&session.session_title) = Some(title.to_string());
+                *session.session_title.lock() = Some(title.to_string());
             }
         }
         let _frame = session.core.record_raw(method, path, line, params);
         let Some(events) = projected else { return };
         if root && method == "turn/started" {
             let turn_id = params.pointer("/turn/id").and_then(Value::as_str).map(str::to_string);
-            *lock(&session.turn_id) = turn_id.clone();
+            *session.turn_id.lock() = turn_id.clone();
             // A turn codex started by itself still has a beginning.
             let _ = session.core.begin_turn("");
             if let Some(turn_id) = turn_id
@@ -741,10 +742,10 @@ impl Shared {
         }
         for (path, kind) in events {
             if path.is_empty() && matches!(kind, EventKind::TurnFinished { .. }) {
-                *lock(&session.turn_id) = None;
+                *session.turn_id.lock() = None;
                 session.abort_wanted.store(false, Ordering::SeqCst);
                 session.turns_finished.fetch_add(1, Ordering::SeqCst);
-                lock(&session.approvals).clear();
+                session.approvals.lock().clear();
             }
             session.core.emit(path, kind);
         }
@@ -754,7 +755,7 @@ impl Shared {
                 .get("requestId")
                 .map(|id| id.as_str().map(str::to_string).unwrap_or_else(|| id.to_string()));
             if let Some(id) = id
-                && lock(&session.approvals).remove(&id).is_some()
+                && session.approvals.lock().remove(&id).is_some()
             {
                 session.core.emit_root(EventKind::PermissionResolved {
                     request_id: id,
@@ -771,7 +772,7 @@ impl Shared {
             self.reply(id, Err((-32601, "method not found")));
             return;
         };
-        let request = lock(&session.projector).server_request(method, params);
+        let request = session.projector.lock().server_request(method, params);
         match request {
             ServerRequest::Permission {
                 agent_path,
@@ -780,7 +781,7 @@ impl Shared {
                 summary,
             } => {
                 let request_id = id.as_str().map(str::to_string).unwrap_or_else(|| id.to_string());
-                lock(&session.approvals).insert(
+                session.approvals.lock().insert(
                     request_id.clone(),
                     PendingApproval {
                         native_id: id.clone(),
@@ -819,11 +820,11 @@ impl Shared {
             message.push_str(": ");
             message.push_str(stderr.trim());
         }
-        let calls: Vec<RpcCallback> = lock(&self.calls).drain().map(|(_, callback)| callback).collect();
+        let calls: Vec<RpcCallback> = self.calls.lock().drain().map(|(_, callback)| callback).collect();
         for callback in calls {
             callback(Err(message.clone()));
         }
-        *lock(&self.exit) = Some(message.clone());
+        *self.exit.lock() = Some(message.clone());
         if let Some(session) = self.session.get() {
             finish(session, message);
         }
@@ -878,7 +879,7 @@ impl Driver for CodexDriver {
     }
 
     fn session_title(&self) -> Option<String> {
-        lock(&self.session().session_title).clone()
+        self.session().session_title.lock().clone()
     }
 
     fn check_content(&self, content: &[ContentBlock]) -> Result<()> {
@@ -904,7 +905,7 @@ impl Driver for CodexDriver {
                 match result {
                     Ok(reply) => {
                         if let Some(turn_id) = reply.pointer("/turn/id").and_then(Value::as_str) {
-                            lock(&session.turn_id).get_or_insert_with(|| turn_id.to_string());
+                            session.turn_id.lock().get_or_insert_with(|| turn_id.to_string());
                         }
                     }
                     Err(message) => {
@@ -923,7 +924,7 @@ impl Driver for CodexDriver {
 
     fn steer(&self, content: Vec<ContentBlock>) -> Result<()> {
         let session = self.session();
-        let Some(turn_id) = lock(&session.turn_id).clone() else {
+        let Some(turn_id) = session.turn_id.lock().clone() else {
             return Err(rejected(rejection::NO_ACTIVE_TURN, "codex has not reported the running turn's id yet"));
         };
         let input = user_input(&session.cwd, &content)?;
@@ -945,7 +946,7 @@ impl Driver for CodexDriver {
     fn abort(&self) -> Result<()> {
         let session = self.session();
         session.abort_wanted.store(true, Ordering::SeqCst);
-        if let Some(turn_id) = lock(&session.turn_id).clone() {
+        if let Some(turn_id) = session.turn_id.lock().clone() {
             self.shared.interrupt(session, &turn_id);
         }
         let shared = self.shared.clone();
@@ -969,7 +970,7 @@ impl Driver for CodexDriver {
 
     /// codex has no field for a denial's message; it is not delivered.
     fn respond_permission(&self, request_id: &str, decision: &PermissionDecision) -> Result<()> {
-        let Some(pending) = lock(&self.session().approvals).remove(request_id) else {
+        let Some(pending) = self.session().approvals.lock().remove(request_id) else {
             return Err(rejected(rejection::UNKNOWN_REQUEST, format!("codex no longer waits on `{request_id}`")));
         };
         self.shared
@@ -1193,11 +1194,11 @@ impl Runtime for CodexRuntime {
             effort: opts.effort.clone(),
         });
         if let Some(session) = shared.session.get() {
-            let held: Vec<(String, Value, String)> = std::mem::take(&mut *lock(&shared.early));
+            let held: Vec<(String, Value, String)> = std::mem::take(&mut *shared.early.lock());
             for (method, params, line) in held {
                 shared.on_notification(session, &method, &params, &line);
             }
-            let exited = lock(&shared.exit).clone();
+            let exited = shared.exit.lock().clone();
             if let Some(message) = exited {
                 finish(session, message);
             }
