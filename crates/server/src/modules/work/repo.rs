@@ -16,6 +16,8 @@ use serde_json::Value;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
+use tracing::Instrument;
+use tracing::instrument::WithSubscriber;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, Author, BizCode, DayCount, GitHubStatus, IssueTemplate, JsNumber, LanguageCount, MAX_RUNNING, NewRepo, PullRequestCapability, RepoActivity,
@@ -114,6 +116,31 @@ struct Run {
     out: String,
     err: String,
     missing: bool,
+}
+
+async fn run_async(program: &str, args: &[&str], cwd: Option<&Path>, env: &[(&str, &str)]) -> Run {
+    let mut c = tokio::process::Command::new(program);
+    c.args(args).stdin(Stdio::null()).kill_on_drop(true);
+    if let Some(cwd) = cwd {
+        c.current_dir(cwd);
+    }
+    for (k, v) in env {
+        c.env(k, v);
+    }
+    match c.output().await {
+        Ok(o) => Run {
+            ok: o.status.success(),
+            out: String::from_utf8_lossy(&o.stdout).into_owned(),
+            err: String::from_utf8_lossy(&o.stderr).into_owned(),
+            missing: false,
+        },
+        Err(e) => Run {
+            ok: false,
+            out: String::new(),
+            err: e.to_string(),
+            missing: e.kind() == std::io::ErrorKind::NotFound,
+        },
+    }
 }
 
 fn run(program: &str, args: &[&str], cwd: Option<&Path>, env: &[(&str, &str)]) -> Run {
@@ -240,19 +267,23 @@ pub fn counts_of(output: &str) -> Option<Vec<LanguageCount>> {
     Some(out)
 }
 
+async fn gh_async(args: &[&str]) -> Run {
+    let mut r = run_async("gh", args, None, &[("GH_HOST", "github.com"), ("GH_PROMPT_DISABLED", "1")]).await;
+    r.out = format!("{}{}", r.out, r.err);
+    r
+}
+
 fn gh(args: &[&str]) -> Run {
     let mut r = run("gh", args, None, &[("GH_HOST", "github.com"), ("GH_PROMPT_DISABLED", "1")]);
     r.out = format!("{}{}", r.out, r.err);
     r
 }
 
-/// `probeGitHub`.
-pub fn probe_github() -> GitHubStatus {
+fn parse_github_probe(version: Run, auth: Option<Run>) -> GitHubStatus {
     let mut s = GitHubStatus {
         checked_at: now(),
         ..Default::default()
     };
-    let version = gh(&["--version"]);
     if !version.ok {
         s.reason = t(if version.missing { "server.repo.gh.missing" } else { "server.repo.gh.failed" }, &[]);
         return s;
@@ -264,7 +295,10 @@ pub fn probe_github() -> GitHubStatus {
         .find_map(|l| l.strip_prefix("gh version "))
         .and_then(|rest| rest.split_whitespace().next())
         .map(str::to_string);
-    let auth = gh(&["auth", "status", "--hostname", "github.com", "--active"]);
+    let Some(auth) = auth else {
+        s.reason = t("server.repo.gh.signedOut", &[]);
+        return s;
+    };
     if !auth.ok {
         s.reason = t("server.repo.gh.signedOut", &[]);
         return s;
@@ -281,6 +315,26 @@ pub fn probe_github() -> GitHubStatus {
         None => s.reason = t("server.repo.gh.noAccount", &[]),
     }
     s
+}
+
+/// `probeGitHub` (async).
+pub async fn probe_github_async() -> GitHubStatus {
+    let version = gh_async(&["--version"]).await;
+    if !version.ok {
+        return parse_github_probe(version, None);
+    }
+    let auth = gh_async(&["auth", "status", "--hostname", "github.com", "--active"]).await;
+    parse_github_probe(version, Some(auth))
+}
+
+/// `probeGitHub`.
+pub fn probe_github() -> GitHubStatus {
+    let version = gh(&["--version"]);
+    if !version.ok {
+        return parse_github_probe(version, None);
+    }
+    let auth = gh(&["auth", "status", "--hostname", "github.com", "--active"]);
+    parse_github_probe(version, Some(auth))
 }
 
 /// A folder under the repos root.
@@ -322,19 +376,32 @@ impl Repos {
 
     pub fn probe_in_background(self: &Arc<Repos>) {
         let weak = Arc::downgrade(self);
-        let handle = crate::spawn_blocking_traced(move || {
-            let Some(repos) = weak.upgrade() else { return };
-            if !repos.cancel.is_cancelled() {
-                repos.refresh_github();
+        let span = tracing::debug_span!("repo.probe");
+        let handle = vibevalley_runtime::rt::current_or_global_handle().spawn(
+            async move {
+                let Some(repos) = weak.upgrade() else { return };
+                if !repos.cancel.is_cancelled() {
+                    let _ = repos.refresh_github_async().await;
+                }
             }
-        });
+            .instrument(span)
+            .with_current_subscriber(),
+        );
         *self.probe.lock() = Some(handle);
+    }
+
+    pub async fn close_async(&self) {
+        self.cancel.cancel();
+        let handle = self.probe.lock().take();
+        if let Some(handle) = handle {
+            let _ = handle.await;
+        }
     }
 
     pub fn close(&self) {
         self.cancel.cancel();
         if let Some(handle) = self.probe.lock().take() {
-            let _ = vibevalley_runtime::rt::block_on(handle);
+            handle.abort();
         }
     }
 
@@ -349,27 +416,23 @@ impl Repos {
 
     /// The folders under the root; links are not repos.
     pub fn list(&self) -> Vec<RepoFolder> {
-        let Ok(entries) = std::fs::read_dir(&self.root) else { return vec![] };
         let pending = self.pending.lock().clone();
-        let mut out: Vec<RepoFolder> = entries
-            .filter_map(Result::ok)
-            .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
-            .filter_map(|e| {
-                let name = e.file_name().into_string().ok()?;
-                if name.starts_with('.') || pending.contains(&name) {
-                    return None;
-                }
-                let path = std::fs::canonicalize(e.path()).ok()?;
-                let git = path.join(".git").exists();
-                Some(RepoFolder { name, path, git })
-            })
-            .collect();
-        out.sort_by(|a, b| a.name.cmp(&b.name));
-        out
+        list_folders(&self.root, &pending)
+    }
+
+    pub async fn list_async(&self) -> Vec<RepoFolder> {
+        let root = self.root.clone();
+        let pending = self.pending.lock().clone();
+        crate::spawn_blocking_traced(move || list_folders(&root, &pending)).await.unwrap_or_default()
     }
 
     pub fn find(&self, name: &str) -> Option<RepoFolder> {
         self.list().into_iter().find(|p| p.name == name)
+    }
+
+    pub async fn find_async(&self, name: &str) -> Option<RepoFolder> {
+        let name = name.to_string();
+        self.list_async().await.into_iter().find(|p| p.name == name)
     }
 
     fn capability(&self, name: &str) -> PullRequestCapability {
@@ -389,26 +452,32 @@ impl Repos {
         }
     }
 
-    pub fn summary(&self, p: &RepoFolder) -> RepoSummary {
-        let last = if p.git {
-            seconds_of(&git_quiet(&p.path, &["log", "--all", "-1", "--format=%at"]))
-        } else {
-            0
-        };
-        RepoSummary {
-            name: p.name.clone(),
-            path: p.path.to_string_lossy().into_owned(),
-            git: p.git,
-            last: (last > 0).then_some(last),
-            max_sessions: self.max_sessions(),
-            pull_request: self.capability(&p.name),
-        }
+    pub async fn summary_async(&self, p: RepoFolder) -> RepoSummary {
+        let max_sessions = self.max_sessions();
+        let pull_request = self.capability(&p.name);
+        crate::spawn_blocking_traced(move || summary_of(p, max_sessions, pull_request))
+            .await
+            .unwrap_or_else(|_| RepoSummary {
+                name: String::new(),
+                path: String::new(),
+                git: false,
+                last: None,
+                max_sessions,
+                pull_request: PullRequestCapability {
+                    available: false,
+                    reason: t("server.repo.notChecked", &[]),
+                },
+            })
     }
 
-    pub fn summaries(&self) -> Vec<RepoSummary> {
-        let folders = self.list();
+    pub async fn summaries_async(&self) -> Vec<RepoSummary> {
+        let folders = self.list_async().await;
         if folders.len() <= 1 {
-            return folders.iter().map(|p| self.summary(p)).collect();
+            let mut out = Vec::with_capacity(folders.len());
+            for p in folders {
+                out.push(self.summary_async(p).await);
+            }
+            return out;
         }
         let max_sessions = self.max_sessions();
         let items: Vec<(usize, RepoFolder, PullRequestCapability)> = folders
@@ -419,134 +488,135 @@ impl Repos {
                 (idx, p, cap)
             })
             .collect();
-        let mut out = vibevalley_runtime::rt::block_on(async move {
-            let sem = Arc::new(Semaphore::new(REPO_CONCURRENCY));
-            let mut set = JoinSet::new();
-            for (idx, p, pull_request) in items {
-                let sem = sem.clone();
-                set.spawn(async move {
+        let sem = Arc::new(Semaphore::new(REPO_CONCURRENCY));
+        let mut set = JoinSet::new();
+        for (idx, p, pull_request) in items {
+            let sem = sem.clone();
+            set.spawn(
+                async move {
                     let Ok(_permit) = sem.acquire_owned().await else { return None };
-                    let summary = crate::spawn_blocking_traced(move || {
-                        let last = if p.git {
-                            seconds_of(&git_quiet(&p.path, &["log", "--all", "-1", "--format=%at"]))
-                        } else {
-                            0
-                        };
-                        RepoSummary {
-                            name: p.name,
-                            path: p.path.to_string_lossy().into_owned(),
-                            git: p.git,
-                            last: (last > 0).then_some(last),
-                            max_sessions,
-                            pull_request,
-                        }
-                    })
-                    .await
-                    .ok()?;
+                    let summary = crate::spawn_blocking_traced(move || summary_of(p, max_sessions, pull_request)).await.ok()?;
                     Some((idx, summary))
-                });
-            }
-            let mut rows = Vec::new();
-            while let Some(joined) = set.join_next().await {
-                if let Ok(Some(item)) = joined {
-                    rows.push(item);
                 }
+                .in_current_span()
+                .with_current_subscriber(),
+            );
+        }
+        let mut out = Vec::new();
+        while let Some(joined) = set.join_next().await {
+            if let Ok(Some(item)) = joined {
+                out.push(item);
             }
-            rows
-        });
+        }
         out.sort_by_key(|(idx, _)| *idx);
         out.into_iter().map(|(_, s)| s).collect()
     }
 
     /// The repo's folder, a repository with a first commit (`ensure`).
     pub fn ensure(&self, name: &str) -> Result<PathBuf, ApiError> {
-        if !good_name(name) {
-            return Err(refused(t("server.repo.notRepoName", &[("name", name.into())])));
-        }
-        let made = self.root.join(name);
-        std::fs::create_dir_all(&made).map_err(|e| refused(e.to_string()))?;
-        let path = std::fs::canonicalize(&made).map_err(|e| refused(e.to_string()))?;
-        let root = std::fs::canonicalize(&self.root).map_err(|e| refused(e.to_string()))?;
-        if path.parent() != Some(root.as_path()) {
-            return Err(refused(t("server.repo.outside", &[])));
-        }
-        if !path.join(".git").exists() {
-            vibevalley_git::init(&path, Some("main")).map_err(|e| refused(reason(&e.to_string())))?;
-            if !path.join(".gitignore").exists() {
-                std::fs::write(path.join(".gitignore"), GITIGNORE).map_err(|e| refused(e.to_string()))?;
-            }
-            let others = std::fs::read_dir(&path).map(|d| d.filter_map(Result::ok).filter(|e| e.file_name() != ".git").count());
-            if others.unwrap_or(0) <= 1 {
-                std::fs::write(path.join("README.md"), format!("# {name}\n")).map_err(|e| refused(e.to_string()))?;
-            }
-            git(&path, &["add", "-A"])?;
-            commit(&path, &t("server.repo.commit.initial", &[]))?;
-        } else if !git_raw(&path, &["rev-parse", "--verify", "HEAD"]).is_ok_and(|r| r.ok()) {
-            commit(&path, &t("server.repo.commit.initialShort", &[]))?;
-        }
-        Ok(path)
+        ensure_under(&self.root, name)
     }
 
     /// `create`: a new repo by name, empty or cloned from GitHub.
-    pub fn create(&self, req: &NewRepo) -> Result<RepoFolder, ApiError> {
+    pub async fn create_async(&self, req: &NewRepo) -> Result<RepoFolder, ApiError> {
         let problem = repo_problem(req);
         if !problem.is_empty() {
             return Err(refused(problem));
         }
         let path = self.root.join(&req.name);
-        if let Err(e) = std::fs::create_dir(&path) {
-            return Err(refused(if e.kind() == std::io::ErrorKind::AlreadyExists {
-                t("server.repo.exists", &[("name", req.name.clone().into())])
-            } else {
-                e.to_string()
-            }));
+        {
+            let path = path.clone();
+            let name = req.name.clone();
+            crate::spawn_blocking_traced(move || {
+                std::fs::create_dir(&path).map_err(|e| {
+                    refused(if e.kind() == std::io::ErrorKind::AlreadyExists {
+                        t("server.repo.exists", &[("name", name.into())])
+                    } else {
+                        e.to_string()
+                    })
+                })
+            })
+            .await
+            .map_err(|e| refused(e.to_string()))??;
         }
         self.pending.lock().insert(req.name.clone());
-        let made = (|| {
-            if let Some((_, url)) = req.github.as_deref().and_then(github_repository) {
-                let known = self.github_status();
-                let known = if known.checked_at != 0 { known } else { self.refresh_github() };
-                let path_text = path.to_string_lossy().into_owned();
-                if known.logged_in {
-                    if !gh(&["repo", "clone", &github_origin(&url), &path_text]).ok {
-                        return Err(refused(t("server.repo.cloneFailedGh", &[])));
-                    }
-                } else {
-                    if vibevalley_git::clone(&url, &path).is_err() {
-                        return Err(refused(t("server.repo.cloneFailed", &[])));
-                    }
-                }
-                Ok(())
-            } else {
-                self.ensure(&req.name).map(|_| ())
+        struct PendingGuard<'a> {
+            pending: &'a Mutex<std::collections::HashSet<String>>,
+            name: String,
+        }
+        impl Drop for PendingGuard<'_> {
+            fn drop(&mut self) {
+                self.pending.lock().remove(&self.name);
             }
-        })();
-        self.pending.lock().remove(&req.name);
+        }
+        let _pending_guard = PendingGuard {
+            pending: &self.pending,
+            name: req.name.clone(),
+        };
+
+        let made = if let Some((_, url)) = req.github.as_deref().and_then(github_repository) {
+            let known = self.github_status();
+            let known = if known.checked_at != 0 { known } else { self.refresh_github_async().await };
+            if known.logged_in {
+                let origin = github_origin(&url);
+                let path_text = path.to_string_lossy().into_owned();
+                if gh_async(&["repo", "clone", &origin, &path_text]).await.ok {
+                    Ok(())
+                } else {
+                    Err(refused(t("server.repo.cloneFailedGh", &[])))
+                }
+            } else {
+                let path = path.clone();
+                crate::spawn_blocking_traced(move || {
+                    vibevalley_git::clone(&url, &path)
+                        .map(|_| ())
+                        .map_err(|_| refused(t("server.repo.cloneFailed", &[])))
+                })
+                .await
+                .map_err(|e| refused(e.to_string()))
+                .and_then(|r| r)
+            }
+        } else {
+            let root = self.root.clone();
+            let name = req.name.clone();
+            crate::spawn_blocking_traced(move || ensure_under(&root, &name).map(|_| ()))
+                .await
+                .map_err(|e| refused(e.to_string()))
+                .and_then(|r| r)
+        };
+        drop(_pending_guard);
         match made {
             Ok(()) => {
-                let path = std::fs::canonicalize(&path).unwrap_or(path);
+                let path_for_canon = path.clone();
+                let canonical = crate::spawn_blocking_traced(move || std::fs::canonicalize(&path_for_canon).unwrap_or(path_for_canon))
+                    .await
+                    .unwrap_or(path);
                 Ok(RepoFolder {
                     name: req.name.clone(),
-                    path,
+                    path: canonical,
                     git: true,
                 })
             }
             Err(e) => {
-                let _ = std::fs::remove_dir_all(&path);
+                let path_for_rm = path;
+                let _ = crate::spawn_blocking_traced(move || {
+                    let _ = std::fs::remove_dir_all(&path_for_rm);
+                })
+                .await;
                 Err(e)
             }
         }
     }
 
-    pub fn languages(&self, name: &str) -> Result<Option<RepoLanguages>, ApiError> {
-        let Some(p) = self.find(name) else { return Ok(None) };
+    pub async fn languages_async(&self, name: &str) -> Result<Option<RepoLanguages>, ApiError> {
+        let Some(p) = self.find_async(name).await else { return Ok(None) };
         let path = p.path.to_string_lossy().into_owned();
         let mut args = vec!["--output", "json"];
         for x in LEFT_OUT {
             args.extend(["--exclude", x]);
         }
         args.push(&path);
-        let r = run(&self.tokei, &args, None, &[]);
+        let r = run_async(&self.tokei, &args, None, &[]).await;
         if r.missing {
             return Err(refused(t("server.repo.noTokei", &[])));
         }
@@ -561,31 +631,36 @@ impl Repos {
         }))
     }
 
-    pub fn activity(&self, name: &str) -> Option<RepoActivity> {
-        let p = self.find(name)?;
-        let at = now();
-        let mut out = RepoActivity {
-            repo: name.into(),
-            at,
-            ..Default::default()
-        };
-        if !p.git {
-            return Some(out);
-        }
-        let since = jiff::Timestamp::from_millisecond(at - YEAR_DAYS * 86_400_000)
-            .map(|t| t.to_string())
-            .unwrap_or_default();
-        let log = git_quiet(&p.path, &["log", "--all", "--no-merges", &format!("--since={since}"), "--format=%at%x09%aN"]);
-        let total = git_quiet(&p.path, &["rev-list", "--all", "--no-merges", "--count"]);
-        let roots = git_quiet(&p.path, &["log", "--all", "--max-parents=0", "--format=%at"]);
-        let last = seconds_of(&git_quiet(&p.path, &["log", "--all", "-1", "--format=%at"]));
-        let (days, authors) = activity_of(&log, local_day);
-        out.days = days;
-        out.authors = authors;
-        out.total = total.trim().parse().unwrap_or(0);
-        out.first = roots.lines().map(seconds_of).filter(|x| *x > 0).min();
-        out.last = (last > 0).then_some(last);
-        Some(out)
+    pub async fn activity_async(&self, name: &str) -> Option<RepoActivity> {
+        let p = self.find_async(name).await?;
+        let name = name.to_string();
+        crate::spawn_blocking_traced(move || {
+            let at = now();
+            let mut out = RepoActivity {
+                repo: name,
+                at,
+                ..Default::default()
+            };
+            if !p.git {
+                return out;
+            }
+            let since = jiff::Timestamp::from_millisecond(at - YEAR_DAYS * 86_400_000)
+                .map(|t| t.to_string())
+                .unwrap_or_default();
+            let log = git_quiet(&p.path, &["log", "--all", "--no-merges", &format!("--since={since}"), "--format=%at%x09%aN"]);
+            let total = git_quiet(&p.path, &["rev-list", "--all", "--no-merges", "--count"]);
+            let roots = git_quiet(&p.path, &["log", "--all", "--max-parents=0", "--format=%at"]);
+            let last = seconds_of(&git_quiet(&p.path, &["log", "--all", "-1", "--format=%at"]));
+            let (days, authors) = activity_of(&log, local_day);
+            out.days = days;
+            out.authors = authors;
+            out.total = total.trim().parse().unwrap_or(0);
+            out.first = roots.lines().map(seconds_of).filter(|x| *x > 0).min();
+            out.last = (last > 0).then_some(last);
+            out
+        })
+        .await
+        .ok()
     }
 
     pub fn github_status(&self) -> GitHubStatus {
@@ -599,15 +674,19 @@ impl Repos {
     }
 
     /// `refreshGitHub`: gh probed again, and each repo's pull requests (bounded fan-out).
-    pub fn refresh_github(&self) -> GitHubStatus {
+    pub async fn refresh_github_async(&self) -> GitHubStatus {
         #[derive(Deserialize)]
         struct ViewerPermission {
             #[serde(rename = "viewerPermission")]
             viewer_permission: Option<String>,
         }
 
-        let probed = probe_github();
-        let folders = self.list();
+        let probed = tokio::select! {
+            biased;
+            _ = self.cancel.cancelled() => return self.github_status(),
+            status = probe_github_async() => status,
+        };
+        let folders = self.list_async().await;
         let next = if !probed.logged_in {
             let mut map = HashMap::with_capacity(folders.len());
             for p in folders {
@@ -625,16 +704,16 @@ impl Repos {
             map
         } else {
             let cancel = self.cancel.clone();
-            vibevalley_runtime::rt::block_on(async move {
-                let sem = Arc::new(Semaphore::new(REPO_CONCURRENCY));
-                let mut set = JoinSet::new();
-                for p in folders {
-                    if cancel.is_cancelled() {
-                        break;
-                    }
-                    let sem = sem.clone();
-                    let cancel = cancel.clone();
-                    set.spawn(async move {
+            let sem = Arc::new(Semaphore::new(REPO_CONCURRENCY));
+            let mut set = JoinSet::new();
+            for p in folders {
+                if cancel.is_cancelled() {
+                    break;
+                }
+                let sem = sem.clone();
+                let cancel = cancel.clone();
+                set.spawn(
+                    async move {
                         let permit = tokio::select! {
                             biased;
                             _ = cancel.cancelled() => return None,
@@ -644,54 +723,127 @@ impl Repos {
                         if cancel.is_cancelled() {
                             return None;
                         }
-                        crate::spawn_blocking_traced(move || {
-                            let repo = github_origin(&git_quiet(&p.path, &["remote", "get-url", "origin"]));
-                            let c = if !p.git || repo.is_empty() {
-                                PullRequestCapability {
-                                    available: false,
-                                    reason: t("server.repo.github.notGithub", &[]),
-                                }
-                            } else {
-                                let view = gh(&["repo", "view", &repo, "--json", "viewerPermission"]);
-                                let permission = if view.ok {
-                                    serde_json::from_str::<ViewerPermission>(&view.out).ok().and_then(|v| v.viewer_permission)
-                                } else {
-                                    None
-                                };
-                                match permission.as_deref() {
-                                    None => PullRequestCapability {
-                                        available: false,
-                                        reason: t("server.repo.github.noPermission", &[]),
-                                    },
-                                    Some("ADMIN" | "MAINTAIN" | "WRITE") => PullRequestCapability {
-                                        available: true,
-                                        reason: String::new(),
-                                    },
-                                    Some(_) => PullRequestCapability {
-                                        available: false,
-                                        reason: t("server.repo.github.readOnly", &[]),
-                                    },
-                                }
+                        let origin = if p.git {
+                            let path = p.path.clone();
+                            crate::spawn_blocking_traced(move || github_origin(&git_quiet(&path, &["remote", "get-url", "origin"])))
+                                .await
+                                .unwrap_or_default()
+                        } else {
+                            String::new()
+                        };
+                        let c = if !p.git || origin.is_empty() {
+                            PullRequestCapability {
+                                available: false,
+                                reason: t("server.repo.github.notGithub", &[]),
+                            }
+                        } else {
+                            let view_args = ["repo", "view", &origin, "--json", "viewerPermission"];
+                            let view = tokio::select! {
+                                biased;
+                                _ = cancel.cancelled() => return None,
+                                view = gh_async(&view_args) => view,
                             };
-                            (p.name, c)
-                        })
-                        .await
-                        .ok()
-                    });
-                }
-                let mut map = HashMap::new();
-                while let Some(joined) = set.join_next().await {
-                    if let Ok(Some((name, c))) = joined {
-                        map.insert(name, c);
+                            let permission = if view.ok {
+                                serde_json::from_str::<ViewerPermission>(&view.out).ok().and_then(|v| v.viewer_permission)
+                            } else {
+                                None
+                            };
+                            match permission.as_deref() {
+                                None => PullRequestCapability {
+                                    available: false,
+                                    reason: t("server.repo.github.noPermission", &[]),
+                                },
+                                Some("ADMIN" | "MAINTAIN" | "WRITE") => PullRequestCapability {
+                                    available: true,
+                                    reason: String::new(),
+                                },
+                                Some(_) => PullRequestCapability {
+                                    available: false,
+                                    reason: t("server.repo.github.readOnly", &[]),
+                                },
+                            }
+                        };
+                        Some((p.name, c))
                     }
+                    .in_current_span()
+                    .with_current_subscriber(),
+                );
+            }
+            let mut map = HashMap::new();
+            while let Some(joined) = set.join_next().await {
+                if let Ok(Some((name, c))) = joined {
+                    map.insert(name, c);
                 }
-                map
-            })
+            }
+            map
         };
         *self.github.lock() = Some(probed.clone());
         *self.capabilities.lock() = next;
         probed
     }
+}
+
+fn list_folders(root: &Path, pending: &std::collections::HashSet<String>) -> Vec<RepoFolder> {
+    let Ok(entries) = std::fs::read_dir(root) else { return vec![] };
+    let mut out: Vec<RepoFolder> = entries
+        .filter_map(Result::ok)
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
+        .filter_map(|e| {
+            let name = e.file_name().into_string().ok()?;
+            if name.starts_with('.') || pending.contains(&name) {
+                return None;
+            }
+            let path = std::fs::canonicalize(e.path()).ok()?;
+            let git = path.join(".git").exists();
+            Some(RepoFolder { name, path, git })
+        })
+        .collect();
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+    out
+}
+
+fn summary_of(p: RepoFolder, max_sessions: i64, pull_request: PullRequestCapability) -> RepoSummary {
+    let last = if p.git {
+        seconds_of(&git_quiet(&p.path, &["log", "--all", "-1", "--format=%at"]))
+    } else {
+        0
+    };
+    RepoSummary {
+        name: p.name,
+        path: p.path.to_string_lossy().into_owned(),
+        git: p.git,
+        last: (last > 0).then_some(last),
+        max_sessions,
+        pull_request,
+    }
+}
+
+fn ensure_under(repos_root: &Path, name: &str) -> Result<PathBuf, ApiError> {
+    if !good_name(name) {
+        return Err(refused(t("server.repo.notRepoName", &[("name", name.into())])));
+    }
+    let made = repos_root.join(name);
+    std::fs::create_dir_all(&made).map_err(|e| refused(e.to_string()))?;
+    let path = std::fs::canonicalize(&made).map_err(|e| refused(e.to_string()))?;
+    let root = std::fs::canonicalize(repos_root).map_err(|e| refused(e.to_string()))?;
+    if path.parent() != Some(root.as_path()) {
+        return Err(refused(t("server.repo.outside", &[])));
+    }
+    if !path.join(".git").exists() {
+        vibevalley_git::init(&path, Some("main")).map_err(|e| refused(reason(&e.to_string())))?;
+        if !path.join(".gitignore").exists() {
+            std::fs::write(path.join(".gitignore"), GITIGNORE).map_err(|e| refused(e.to_string()))?;
+        }
+        let others = std::fs::read_dir(&path).map(|d| d.filter_map(Result::ok).filter(|e| e.file_name() != ".git").count());
+        if others.unwrap_or(0) <= 1 {
+            std::fs::write(path.join("README.md"), format!("# {name}\n")).map_err(|e| refused(e.to_string()))?;
+        }
+        git(&path, &["add", "-A"])?;
+        commit(&path, &t("server.repo.commit.initial", &[]))?;
+    } else if !git_raw(&path, &["rev-parse", "--verify", "HEAD"]).is_ok_and(|r| r.ok()) {
+        commit(&path, &t("server.repo.commit.initialShort", &[]))?;
+    }
+    Ok(path)
 }
 
 /// A commit as the user, else as the farm (`repository.commit`).
@@ -744,22 +896,22 @@ fn global_email() -> String {
         .unwrap_or_default()
 }
 
-/// `contributionsOf`: the user's commits in each repository under `root`
+/// `contributionsOf` (async): the user's commits in each repository under `root`
 /// (by the global and the repo's own `user.email`, and `extra`).
-pub fn contributions_of(root: &Path, extra: &[String]) -> Vec<vibevalley_protocol::Repo> {
-    let dirs = repo_dirs(root, 3);
+pub async fn contributions_of_async(root: PathBuf, extra: Vec<String>) -> Vec<vibevalley_protocol::Repo> {
+    let dirs = crate::spawn_blocking_traced(move || repo_dirs(&root, 3)).await.unwrap_or_default();
     if dirs.is_empty() {
         return vec![];
     }
-    let global = global_email();
-    let extra_lower: Arc<Vec<String>> = Arc::new(extra.iter().map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty()).collect());
+    let global = crate::spawn_blocking_traced(global_email).await.unwrap_or_default();
+    let extra_lower: Arc<Vec<String>> = Arc::new(extra.into_iter().map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty()).collect());
 
-    let mut commons = vibevalley_runtime::rt::block_on(async move {
-        let sem = Arc::new(Semaphore::new(REPO_CONCURRENCY));
-        let mut set = JoinSet::new();
-        for (idx, dir) in dirs.into_iter().enumerate() {
-            let sem = sem.clone();
-            set.spawn(async move {
+    let sem = Arc::new(Semaphore::new(REPO_CONCURRENCY));
+    let mut set = JoinSet::new();
+    for (idx, dir) in dirs.into_iter().enumerate() {
+        let sem = sem.clone();
+        set.spawn(
+            async move {
                 let Ok(_permit) = sem.acquire_owned().await else { return None };
                 crate::spawn_blocking_traced(move || {
                     let common = git_quiet(&dir, &["rev-parse", "--path-format=absolute", "--git-common-dir"]);
@@ -768,16 +920,17 @@ pub fn contributions_of(root: &Path, extra: &[String]) -> Vec<vibevalley_protoco
                 .await
                 .ok()
                 .flatten()
-            });
-        }
-        let mut out = Vec::new();
-        while let Some(joined) = set.join_next().await {
-            if let Ok(Some(item)) = joined {
-                out.push(item);
             }
+            .in_current_span()
+            .with_current_subscriber(),
+        );
+    }
+    let mut commons = Vec::new();
+    while let Some(joined) = set.join_next().await {
+        if let Ok(Some(item)) = joined {
+            commons.push(item);
         }
-        out
-    });
+    }
     commons.sort_by_key(|(idx, _, _)| *idx);
 
     // Worktrees share their repository's history: one count per repository.
@@ -787,14 +940,14 @@ pub fn contributions_of(root: &Path, extra: &[String]) -> Vec<vibevalley_protoco
         .filter_map(|(idx, dir, common)| seen.insert(common).then_some((idx, dir)))
         .collect();
 
-    let mut out = vibevalley_runtime::rt::block_on(async move {
-        let sem = Arc::new(Semaphore::new(REPO_CONCURRENCY));
-        let mut set = JoinSet::new();
-        for (idx, dir) in unique {
-            let sem = sem.clone();
-            let global = global.clone();
-            let extra_lower = extra_lower.clone();
-            set.spawn(async move {
+    let sem = Arc::new(Semaphore::new(REPO_CONCURRENCY));
+    let mut set = JoinSet::new();
+    for (idx, dir) in unique {
+        let sem = sem.clone();
+        let global = global.clone();
+        let extra_lower = extra_lower.clone();
+        set.spawn(
+            async move {
                 let Ok(_permit) = sem.acquire_owned().await else { return None };
                 crate::spawn_blocking_traced(move || {
                     let own = git_quiet(&dir, &["config", "user.email"]).to_lowercase();
@@ -813,21 +966,32 @@ pub fn contributions_of(root: &Path, extra: &[String]) -> Vec<vibevalley_protoco
                 })
                 .await
                 .ok()
-            });
-        }
-        let mut rows = Vec::new();
-        while let Some(joined) = set.join_next().await {
-            if let Ok(Some(item)) = joined {
-                rows.push(item);
             }
+            .in_current_span()
+            .with_current_subscriber(),
+        );
+    }
+    let mut out = Vec::new();
+    while let Some(joined) = set.join_next().await {
+        if let Ok(Some(item)) = joined {
+            out.push(item);
         }
-        rows
-    });
+    }
     out.sort_by_key(|(idx, _)| *idx);
     out.into_iter().map(|(_, repo)| repo).collect()
 }
 
+/// Sync shim for synchronous callers (`skin/game` and integration tests).
+pub fn contributions_of(root: &Path, extra: &[String]) -> Vec<vibevalley_protocol::Repo> {
+    vibevalley_runtime::rt::block_on(contributions_of_async(root.to_path_buf(), extra.to_vec()))
+}
+
 impl Repos {
+    /// `contributions` (async): the user's commits per repository under the root.
+    pub async fn contributions_async(&self, extra: Vec<String>) -> Vec<vibevalley_protocol::Repo> {
+        contributions_of_async(self.root().to_path_buf(), extra).await
+    }
+
     /// `contributions`: the user's commits per repository under the root.
     pub fn contributions(&self, extra: &[String]) -> Vec<vibevalley_protocol::Repo> {
         contributions_of(self.root(), extra)
@@ -836,17 +1000,38 @@ impl Repos {
 
 pub fn install(hub: &Hub, repos: Arc<Repos>) {
     let r = repos.clone();
-    hub.on::<ops::RepoList>(move |_, ()| Ok(r.summaries()));
-    hub.on::<ops::RepoValidate>(move |_, req| Ok(Validation { problem: repo_problem(&req) }));
+    hub.on_async::<ops::RepoList, _, _>(move |_, ()| {
+        let r = r.clone();
+        async move { Ok(r.summaries_async().await) }
+    });
+    hub.on_async::<ops::RepoValidate, _, _>(move |_, req| async move { Ok(Validation { problem: repo_problem(&req) }) });
     let r = repos.clone();
-    hub.on::<ops::RepoCreate>(move |_, req| r.create(&req).map(|p| r.summary(&p)));
+    hub.on_async::<ops::RepoCreate, _, _>(move |_, req| {
+        let r = r.clone();
+        async move {
+            let p = r.create_async(&req).await?;
+            Ok(r.summary_async(p).await)
+        }
+    });
     let r = repos.clone();
-    hub.on::<ops::RepoLanguageList>(move |_, i| r.languages(&i.id)?.ok_or_else(|| repo_ref(&i.id)));
+    hub.on_async::<ops::RepoLanguageList, _, _>(move |_, i| {
+        let r = r.clone();
+        async move { r.languages_async(&i.id).await?.ok_or_else(|| repo_ref(&i.id)) }
+    });
     let r = repos.clone();
-    hub.on::<ops::RepoActivityGet>(move |_, i| r.activity(&i.id).ok_or_else(|| repo_ref(&i.id)));
+    hub.on_async::<ops::RepoActivityGet, _, _>(move |_, i| {
+        let r = r.clone();
+        async move { r.activity_async(&i.id).await.ok_or_else(|| repo_ref(&i.id)) }
+    });
     let r = repos.clone();
-    hub.on::<ops::GithubGet>(move |_, ()| Ok(r.github_status()));
-    hub.on::<ops::GithubRefresh>(move |_, ()| Ok(repos.refresh_github()));
+    hub.on_async::<ops::GithubGet, _, _>(move |_, ()| {
+        let r = r.clone();
+        async move { Ok(r.github_status()) }
+    });
+    hub.on_async::<ops::GithubRefresh, _, _>(move |_, ()| {
+        let repos = repos.clone();
+        async move { Ok(repos.refresh_github_async().await) }
+    });
 }
 
 #[cfg(test)]
@@ -908,6 +1093,53 @@ mod tests {
         assert_eq!(detected.name, "python");
         assert_eq!(detected.lint.as_deref(), Some("ruff check ."));
         repos.close();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn async_repo_handlers_and_contributions_run_on_hub_on_async() {
+        let work = tempfile::tempdir().unwrap();
+        let repos = Repos::open(work.path(), 3).unwrap();
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        install(&hub, repos.clone());
+
+        let created = hub
+            .invoke_async::<ops::RepoCreate>(
+                &crate::CallerContext::local(),
+                NewRepo {
+                    name: "alpha".into(),
+                    github: None,
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(created.name, "alpha");
+        assert!(created.git);
+
+        let _beta = hub
+            .invoke_async::<ops::RepoCreate>(
+                &crate::CallerContext::local(),
+                NewRepo {
+                    name: "beta".into(),
+                    github: None,
+                },
+            )
+            .await
+            .unwrap();
+
+        let listed = hub.invoke_async::<ops::RepoList>(&crate::CallerContext::local(), ()).await.unwrap();
+        assert_eq!(listed.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(), vec!["alpha", "beta"]);
+
+        let activity = hub
+            .invoke_async::<ops::RepoActivityGet>(&crate::CallerContext::local(), vibevalley_protocol::RepoActivityGetInput { id: "alpha".into() })
+            .await
+            .unwrap();
+        assert_eq!(activity.repo, "alpha");
+        assert!(activity.total >= 1);
+
+        let contribs = repos.contributions_async(vec!["vibevalley@localhost".into()]).await;
+        assert_eq!(contribs.len(), 2);
+
+        repos.close_async().await;
     }
 }
 
@@ -1071,56 +1303,74 @@ impl Repos {
             .collect();
         Some(stack_of(&files))
     }
+
+    pub async fn stack_async(&self, name: &str) -> Option<RepoStack> {
+        let p = self.find_async(name).await?;
+        crate::spawn_blocking_traced(move || {
+            let files: std::collections::HashMap<&str, String> = STACK_FILES
+                .iter()
+                .filter_map(|f| std::fs::read_to_string(p.path.join(f)).ok().map(|body| (*f, body)))
+                .collect();
+            stack_of(&files)
+        })
+        .await
+        .ok()
+    }
 }
 
 /// `repo.template.list` (`issue.templates`): the stack, the titles last
 /// sent there, and the catalog filled with its commands.
 pub fn install_templates(hub: &Hub, repos: Arc<Repos>, agents: Arc<crate::modules::team::agent::Agents>) {
-    hub.on::<ops::RepoTemplateList>(move |ctx, input| {
-        let name = input.id;
-        let stack = repos
-            .stack(&name)
-            .ok_or_else(|| missing(t("server.issue.repoRef", &[("name", name.clone().into())]), LookIn::Repo))?;
-        let mut mine: Vec<vibevalley_protocol::Issue> = ctx.hub.read(|s| {
-            s.issues
+    hub.on_async::<ops::RepoTemplateList, _, _>(move |ctx, input| {
+        let repos = repos.clone();
+        let agents = agents.clone();
+        async move {
+            let name = input.id;
+            let stack = repos
+                .stack_async(&name)
+                .await
+                .ok_or_else(|| missing(t("server.issue.repoRef", &[("name", name.clone().into())]), LookIn::Repo))?;
+            let mut mine: Vec<vibevalley_protocol::Issue> = ctx.hub.read(|s| {
+                s.issues
+                    .iter()
+                    .filter(|i| {
+                        i.repo.as_deref() == Some(name.as_str())
+                            && i.was_sent()
+                            && i.parent.is_none()
+                            && i.cron.is_none()
+                            && !i.assigned_agent().is_some_and(|a| agents.profiles.is_orchestrator(a))
+                    })
+                    .cloned()
+                    .collect()
+            });
+            mine.sort_by_key(|i| std::cmp::Reverse(i.created_at));
+            let mut recent: Vec<String> = Vec::new();
+            for i in mine {
+                let title = i.title.split_whitespace().collect::<Vec<_>>().join(" ");
+                if title.is_empty() || title.chars().count() > 60 || recent.contains(&title) {
+                    continue;
+                }
+                recent.push(title);
+                if recent.len() == 5 {
+                    break;
+                }
+            }
+            let kinds = catalog()
+                .kinds
                 .iter()
-                .filter(|i| {
-                    i.repo.as_deref() == Some(name.as_str())
-                        && i.was_sent()
-                        && i.parent.is_none()
-                        && i.cron.is_none()
-                        && !i.assigned_agent().is_some_and(|a| agents.profiles.is_orchestrator(a))
+                .map(|k| TemplateKind {
+                    id: k.id.clone(),
+                    name: k.name.clone(),
+                    icon: k.icon.clone(),
+                    templates: k.templates.iter().map(|s| filled_template(s, &stack)).collect(),
                 })
-                .cloned()
-                .collect()
-        });
-        mine.sort_by_key(|i| std::cmp::Reverse(i.created_at));
-        let mut recent: Vec<String> = Vec::new();
-        for i in mine {
-            let title = i.title.split_whitespace().collect::<Vec<_>>().join(" ");
-            if title.is_empty() || title.chars().count() > 60 || recent.contains(&title) {
-                continue;
-            }
-            recent.push(title);
-            if recent.len() == 5 {
-                break;
-            }
-        }
-        let kinds = catalog()
-            .kinds
-            .iter()
-            .map(|k| TemplateKind {
-                id: k.id.clone(),
-                name: k.name.clone(),
-                icon: k.icon.clone(),
-                templates: k.templates.iter().map(|s| filled_template(s, &stack)).collect(),
+                .collect();
+            Ok(RepoTemplates {
+                repo: name,
+                stack,
+                recent,
+                kinds,
             })
-            .collect();
-        Ok(RepoTemplates {
-            repo: name,
-            stack,
-            recent,
-            kinds,
-        })
+        }
     });
 }

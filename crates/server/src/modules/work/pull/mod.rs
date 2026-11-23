@@ -12,14 +12,17 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
+use tokio_util::sync::CancellationToken;
+use tracing::Instrument;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, BranchPublication, Caller, PublishPlatform, PullRequest, PullRequestState, SubmitBranch, ops};
 
-use crate::base::{ServerDb, Ticker, refused as refuse};
+use crate::base::{ServerDb, refused as refuse};
 use crate::modules::work::issue::Board;
 use crate::modules::work::repo::Repos;
 use crate::{Hub, now};
 
+use publish::HostRunner;
 pub use publish::{Answer, HostRun, HostedRepo, Network, Publisher, hosted_origin};
 pub use snapshot::{GitHubCheck, GitHubComment, GitHubPullSnapshot, GitHubReview, actions_job_of, checks_fingerprint, checks_verdict};
 pub use store::{KnownPullEvent, PullIndex, PullRecord, PullStore, UpsertPullInput};
@@ -31,12 +34,12 @@ pub struct Pulls {
     pub(crate) publisher: Arc<Publisher>,
     pub(crate) repos: Option<Arc<Repos>>,
     pub(crate) board: Option<Board>,
-    pub(crate) gh: HostRun,
-    pub(crate) glab: HostRun,
-    pub(crate) refresh_lock: Mutex<()>,
-    pub(crate) poll_lock: Mutex<()>,
+    pub(crate) gh: HostRunner,
+    pub(crate) glab: HostRunner,
+    pub(crate) refresh_lock: tokio::sync::Mutex<()>,
+    pub(crate) poll_lock: tokio::sync::Mutex<()>,
     closed: std::sync::atomic::AtomicBool,
-    poller: Mutex<Option<Ticker>>,
+    poller: Mutex<Option<(CancellationToken, tokio::task::JoinHandle<()>)>>,
 }
 
 impl Pulls {
@@ -60,19 +63,29 @@ impl Pulls {
             publisher,
             repos,
             board,
-            gh: gh.unwrap_or_else(|| publish::host_command("gh")),
-            glab: glab.unwrap_or_else(|| publish::host_command("glab")),
-            refresh_lock: Mutex::new(()),
-            poll_lock: Mutex::new(()),
+            gh: gh.map_or(HostRunner::Cli("gh"), HostRunner::Custom),
+            glab: glab.map_or(HostRunner::Cli("glab"), HostRunner::Custom),
+            refresh_lock: tokio::sync::Mutex::new(()),
+            poll_lock: tokio::sync::Mutex::new(()),
             closed: Default::default(),
             poller: Mutex::new(None),
         }))
     }
 
+    pub async fn close_async(&self) {
+        self.closed.store(true, std::sync::atomic::Ordering::Relaxed);
+        let poller = self.poller.lock().take();
+        if let Some((cancel, handle)) = poller {
+            cancel.cancel();
+            let _ = handle.await;
+        }
+    }
+
     pub fn close(&self) {
         self.closed.store(true, std::sync::atomic::Ordering::Relaxed);
-        if let Some(poller) = self.poller.lock().take() {
-            poller.stop();
+        if let Some((cancel, handle)) = self.poller.lock().take() {
+            cancel.cancel();
+            handle.abort();
         }
     }
 
@@ -92,18 +105,24 @@ impl Pulls {
         &self.store
     }
 
-    fn infer_farm_repo(&self, cwd: &str) -> Option<String> {
-        let repos = self.repos.as_ref()?;
-        let discovered = vibevalley_git::Repo::discover(Path::new(cwd)).ok()??;
-        let root_real = std::fs::canonicalize(discovered.root()).ok()?;
-        let listed = repos.list();
-        listed
-            .into_iter()
-            .find(|p| std::fs::canonicalize(&p.path).ok().as_ref() == Some(&root_real))
-            .map(|p| p.name)
+    async fn infer_farm_repo_async(&self, cwd: &str) -> Option<String> {
+        let repos = self.repos.clone()?;
+        let cwd = cwd.to_string();
+        crate::spawn_blocking_traced(move || {
+            let discovered = vibevalley_git::Repo::discover(Path::new(&cwd)).ok()??;
+            let root_real = std::fs::canonicalize(discovered.root()).ok()?;
+            let listed = repos.list();
+            listed
+                .into_iter()
+                .find(|p| std::fs::canonicalize(&p.path).ok().as_ref() == Some(&root_real))
+                .map(|p| p.name)
+        })
+        .await
+        .ok()
+        .flatten()
     }
 
-    pub(crate) fn hosted_repo_of(&self, name: &str, platform: Option<PublishPlatform>) -> Result<HostedRepo, ApiError> {
+    pub(crate) async fn hosted_repo_of_async(&self, name: &str, platform: Option<PublishPlatform>) -> Result<HostedRepo, ApiError> {
         if name.contains('/') {
             let chosen = platform.unwrap_or(PublishPlatform::Github);
             let host = match chosen {
@@ -114,111 +133,163 @@ impl Pulls {
         }
         let repos = self
             .repos
-            .as_ref()
+            .clone()
             .ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
-        let found = repos
-            .list()
-            .into_iter()
-            .find(|p| p.name == name)
-            .ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
-        let output = std::process::Command::new("git")
-            .arg("-C")
-            .arg(&found.path)
-            .args(["remote", "get-url", "origin"])
-            .output()
-            .ok();
-        let origin = output
-            .filter(|o| o.status.success())
-            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-            .unwrap_or_default();
-        let hosted = hosted_origin(&origin).ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
-        if let Some(want) = platform
-            && hosted.platform != want
-        {
-            return Err(refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])));
-        }
-        Ok(hosted)
+        let name = name.to_string();
+        crate::spawn_blocking_traced(move || {
+            let found = repos
+                .list()
+                .into_iter()
+                .find(|p| p.name == name)
+                .ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
+            let output = std::process::Command::new("git")
+                .arg("-C")
+                .arg(&found.path)
+                .args(["remote", "get-url", "origin"])
+                .output()
+                .ok();
+            let origin = output
+                .filter(|o| o.status.success())
+                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                .unwrap_or_default();
+            let hosted = hosted_origin(&origin).ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
+            if let Some(want) = platform
+                && hosted.platform != want
+            {
+                return Err(refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])));
+            }
+            Ok(hosted)
+        })
+        .await
+        .map_err(|_| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?
     }
 
-    pub(crate) fn github_remote(&self, name: &str) -> Result<String, ApiError> {
-        Ok(self.hosted_repo_of(name, Some(PublishPlatform::Github))?.name)
+    pub(crate) async fn github_remote_async(&self, name: &str) -> Result<String, ApiError> {
+        Ok(self.hosted_repo_of_async(name, Some(PublishPlatform::Github)).await?.name)
     }
 
-    pub fn pull_request_state(&self, repo: &str, number: i64, platform: Option<PublishPlatform>) -> Result<PullRequestState, ApiError> {
-        let hosted = self.hosted_repo_of(repo, platform)?;
+    pub async fn pull_request_state_async(&self, repo: &str, number: i64, platform: Option<PublishPlatform>) -> Result<PullRequestState, ApiError> {
+        let hosted = self.hosted_repo_of_async(repo, platform).await?;
         let runner = match hosted.platform {
             PublishPlatform::Github => &self.gh,
             PublishPlatform::Gitlab => &self.glab,
         };
-        publish::remote_pull_state(&hosted, number, runner)
+        publish::remote_pull_state(&hosted, number, runner).await
     }
 
-    /// Publishes a branch via `Publisher::submit` and durably tracks non-dry-run
+    /// Publishes a branch via `Publisher::submit_async` and durably tracks non-dry-run
     /// pull/merge requests (both issue-linked and standalone `issue_id = None`).
-    pub fn publish(&self, req: &SubmitBranch, issue_id: Option<&str>) -> Result<BranchPublication, ApiError> {
-        let out = self.publisher.submit(req)?;
+    pub async fn publish_async(&self, req: &SubmitBranch, issue_id: Option<&str>) -> Result<BranchPublication, ApiError> {
+        let out = self.publisher.submit_async(req).await?;
         if req.dry_run != Some(true)
             && out.pushed
             && let (Some(number), Some(url)) = (out.number, out.url.as_ref())
         {
-            let tracked_repo = self.infer_farm_repo(&req.cwd).unwrap_or_else(|| out.repository.clone());
-            self.store.upsert(UpsertPullInput {
-                platform: out.platform,
-                repo: tracked_repo,
-                number,
-                url: url.clone(),
-                branch: out.branch.clone(),
-                base: out.base.clone(),
-                state: PullRequestState::Open,
-                issue_id: issue_id.map(str::to_owned),
-                at: now(),
-            })?;
-            if let (Some(board), Some(id)) = (&self.board, issue_id) {
-                board.refresh_issue(id);
+            let tracked_repo = self.infer_farm_repo_async(&req.cwd).await.unwrap_or_else(|| out.repository.clone());
+            self.store
+                .upsert_async(UpsertPullInput {
+                    platform: out.platform,
+                    repo: tracked_repo,
+                    number,
+                    url: url.clone(),
+                    branch: out.branch.clone(),
+                    base: out.base.clone(),
+                    state: PullRequestState::Open,
+                    issue_id: issue_id.map(str::to_owned),
+                    at: now(),
+                })
+                .await?;
+            if let (Some(board), Some(id)) = (self.board.clone(), issue_id.map(str::to_owned)) {
+                let _ = crate::spawn_blocking_traced(move || board.refresh_issue(&id)).await;
             }
         }
         Ok(out)
     }
 
+    /// Sync shim for synchronous callers (e.g. `team/tool/issue`).
+    pub fn publish(&self, req: &SubmitBranch, issue_id: Option<&str>) -> Result<BranchPublication, ApiError> {
+        vibevalley_runtime::rt::block_on(self.publish_async(req, issue_id))
+    }
+
     /// Fetches a GitHub pull request snapshot (`checks`, `reviews`, `comments`).
+    pub async fn snapshot_async(&self, repo: &str, number: i64) -> Result<GitHubPullSnapshot, ApiError> {
+        let remote = self.github_remote_async(repo).await?;
+        snapshot::fetch_snapshot(&self.gh, &remote, number).await
+    }
+
+    /// Sync shim for synchronous callers (e.g. `team/mcp/resource`).
     pub fn snapshot(&self, repo: &str, number: i64) -> Result<GitHubPullSnapshot, ApiError> {
-        let remote = self.github_remote(repo)?;
-        snapshot::fetch_snapshot(&self.gh, &remote, number)
+        vibevalley_runtime::rt::block_on(self.snapshot_async(repo, number))
     }
 
-    pub fn refresh(&self) {
-        poll::refresh(self);
+    pub async fn refresh_async(&self) {
+        poll::refresh(self).await;
     }
 
-    pub fn poll(&self) {
-        poll::poll(self);
+    pub async fn poll_async(&self) {
+        poll::poll(self).await;
     }
 }
 
 /// Registers `repo.pr.submit` (user-only) and optionally starts the background poller.
 pub fn install(hub: &Hub, pulls: Arc<Pulls>, poll_seconds: Option<u64>) {
     let p = pulls.clone();
-    hub.on::<ops::RepoPrSubmit>(move |ctx, req| {
-        if ctx.caller != Caller::User {
-            return Err(refuse(BizCode::RepoRefused, t("server.repo.publish.userOnly", &[])));
+    hub.on_async::<ops::RepoPrSubmit, _, _>(move |ctx, req| {
+        let p = p.clone();
+        async move {
+            if ctx.caller != Caller::User {
+                return Err(refuse(BizCode::RepoRefused, t("server.repo.publish.userOnly", &[])));
+            }
+            let issue_id = if let Some(board) = p.board.clone() {
+                let cwd = req.cwd.clone();
+                let branch = req.branch.clone();
+                crate::spawn_blocking_traced(move || board.open_issue_for_branch(&cwd, &branch).map(|i| i.id))
+                    .await
+                    .ok()
+                    .flatten()
+            } else {
+                None
+            };
+            p.publish_async(&req, issue_id.as_deref()).await
         }
-        let issue_id = p.board.as_ref().and_then(|b| b.open_issue_for_branch(&req.cwd, &req.branch)).map(|i| i.id);
-        p.publish(&req, issue_id.as_deref())
     });
 
     if let Some(secs) = poll_seconds {
         let interval = Duration::from_secs(if secs > 0 { secs } else { DEFAULT_POLL_SECONDS });
+        let cancel = hub.child_token();
+        let task_cancel = cancel.clone();
         let weak = Arc::downgrade(&pulls);
-        let ticker = Ticker::spawn_on(hub, interval, false, move || {
-            let Some(p) = weak.upgrade() else { return false };
-            if p.closed.load(std::sync::atomic::Ordering::Relaxed) {
-                return false;
+        let span = tracing::debug_span!("pull.poll", interval_secs = interval.as_secs());
+        let handle = hub.spawn_task(
+            async move {
+                let mut timer = tokio::time::interval_at(tokio::time::Instant::now() + interval, interval);
+                timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                loop {
+                    tokio::select! {
+                        biased;
+                        _ = task_cancel.cancelled() => return,
+                        _ = timer.tick() => {}
+                    }
+                    if task_cancel.is_cancelled() {
+                        return;
+                    }
+                    let Some(p) = weak.upgrade() else { return };
+                    if p.closed.load(std::sync::atomic::Ordering::Relaxed) {
+                        return;
+                    }
+                    tokio::select! {
+                        biased;
+                        _ = task_cancel.cancelled() => return,
+                        _ = async {
+                            p.refresh_async().await;
+                            p.poll_async().await;
+                        } => {}
+                    }
+                }
             }
-            p.refresh();
-            p.poll();
-            true
-        });
-        *pulls.poller.lock() = Some(ticker);
+            .instrument(span),
+        );
+        *pulls.poller.lock() = Some((cancel, handle));
     }
 }
 
@@ -291,8 +362,8 @@ mod tests {
         assert_eq!(actions_job_of("https://github.com/acme/demo/actions/runs/1/job/4299"), Some("4299".into()));
     }
 
-    #[test]
-    fn pull_refresh_poll_snapshot_and_issue_fk_preservation() {
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn pull_refresh_poll_snapshot_and_issue_fk_preservation() {
         let dir = tempfile::tempdir().unwrap();
         let hub = Hub::new(vibevalley_core::empty_space_state());
         let mut reg = Registry::new();
@@ -434,11 +505,11 @@ mod tests {
         assert!(page.contains("deadbeef") && page.contains("FAILURE"), "{page}");
 
         // Poll CI + reviews/comments: viewer skipped, review+inline comment share bot_round 1, standalone bot comment gets bot_round 2
-        pulls.poll();
+        pulls.poll_async().await;
         let after_poll = pulls.find("acme/demo", 9).unwrap();
         assert_eq!(after_poll.check_revision, 1);
         assert!(!after_poll.check_fingerprint.is_empty());
-        let events = pulls.store().known_events(&linked.id).unwrap();
+        let events = pulls.store().known_events_async(&linked.id).await.unwrap();
         assert_eq!(events.len(), 3, "viewer review must be skipped: {events:?}");
         let r_review = events.iter().find(|e| e.key.ends_with(":review:100")).unwrap();
         let r_inline = events.iter().find(|e| e.key.ends_with(":comment:200")).unwrap();
@@ -448,12 +519,12 @@ mod tests {
         assert_eq!(r_second.bot_round, Some(2));
 
         // Second poll with unchanged snapshot does not increment check_revision
-        pulls.poll();
+        pulls.poll_async().await;
         assert_eq!(pulls.find("acme/demo", 9).unwrap().check_revision, 1);
 
         // Refresh transitions PR to MERGED -> settles issue as Landing::PullRequest
         *pr_state.lock() = "MERGED".into();
-        pulls.refresh();
+        pulls.refresh_async().await;
         assert_eq!(pulls.find("acme/demo", 9).unwrap().state, PullRequestState::Merged);
         let settled = board.issue(&issue.id).unwrap();
         assert_eq!(settled.delivered, Some(Landing::PullRequest));
@@ -470,7 +541,7 @@ mod tests {
             .unwrap();
         pulls
             .store()
-            .upsert(UpsertPullInput {
+            .upsert_async(UpsertPullInput {
                 platform: PublishPlatform::Github,
                 repo: "acme/demo".into(),
                 number: 11,
@@ -481,12 +552,75 @@ mod tests {
                 issue_id: Some(issue2.id.clone()),
                 at: 1002,
             })
+            .await
             .unwrap();
         board.refresh_issue(&issue2.id);
         *pr_state.lock() = "CLOSED".into();
-        pulls.refresh();
+        pulls.refresh_async().await;
         assert_eq!(board.issue(&issue2.id).unwrap().canceled, Some(IssueCanceled::Dismissed));
 
+        pulls.close_async().await;
         board.close();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn pull_background_poller_preserves_pull_poll_span_and_stops_on_hub_close() {
+        let dir = tempfile::tempdir().unwrap();
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let db = ServerDb::open(dir.path()).unwrap();
+        let seen_span = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let seen_span_gh = seen_span.clone();
+        let notify = Arc::new(tokio::sync::Notify::new());
+        let notify_gh = notify.clone();
+        let gh: HostRun = Arc::new(move |args: &[String]| {
+            let current = tracing::Span::current();
+            if current.metadata().is_some_and(|m| m.name() == "pull.poll") {
+                seen_span_gh.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+            if args.first().map(String::as_str) == Some("pr") {
+                notify_gh.notify_one();
+                return Answer {
+                    ok: true,
+                    out: r#"{"state":"MERGED"}"#.into(),
+                    missing: false,
+                };
+            }
+            Answer {
+                ok: false,
+                out: String::new(),
+                missing: false,
+            }
+        });
+        let pulls = Pulls::open(db, Arc::new(Publisher::default()), None, None, Some(gh), None).unwrap();
+        pulls
+            .store()
+            .upsert_async(UpsertPullInput {
+                platform: PublishPlatform::Github,
+                repo: "acme/demo".into(),
+                number: 42,
+                url: "https://github.com/acme/demo/pull/42".into(),
+                branch: "feat/span".into(),
+                base: "main".into(),
+                state: PullRequestState::Open,
+                issue_id: None,
+                at: 1000,
+            })
+            .await
+            .unwrap();
+
+        let subscriber = tracing_subscriber::fmt().with_max_level(tracing::Level::DEBUG).with_test_writer().finish();
+        let _guard = tracing::subscriber::set_default(subscriber);
+        install(&hub, pulls.clone(), Some(1));
+
+        tokio::time::timeout(Duration::from_secs(5), notify.notified())
+            .await
+            .expect("background pull poller should fire within 5s");
+        assert!(
+            seen_span.load(std::sync::atomic::Ordering::SeqCst),
+            "pull.poll span must propagate into HostRunner"
+        );
+
+        pulls.close_async().await;
+        hub.close_async().await;
     }
 }

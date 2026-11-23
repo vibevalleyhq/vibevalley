@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use vibevalley_protocol::{ApiError, BizCode};
 
 use crate::base::refused as refuse;
-use crate::modules::work::pull::publish::HostRun;
+use crate::modules::work::pull::publish::HostRunner;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GitHubCheck {
@@ -114,9 +114,9 @@ pub fn actions_job_of(check_url: &str) -> Option<String> {
     if digits.is_empty() { None } else { Some(digits) }
 }
 
-fn gh_call(gh: &HostRun, args: &[&str]) -> Result<String, ApiError> {
+async fn gh_call(gh: &HostRunner, args: &[&str]) -> Result<String, ApiError> {
     let owned: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
-    let ans = gh(&owned);
+    let ans = gh.run_async(owned).await;
     if !ans.ok {
         let stage = if ans.missing { "gh missing" } else { "gh snapshot" };
         return Err(refuse(BizCode::RepoRefused, format!("GitHub {stage} failed")));
@@ -213,21 +213,30 @@ fn is_bot(user: &RawUser) -> bool {
 }
 
 /// Fetches a GitHub PR snapshot (`pr view`, `reviews`, `comments`, `issue comments`, `viewer`).
-pub fn fetch_snapshot(gh: &HostRun, remote_repo: &str, number: i64) -> Result<GitHubPullSnapshot, ApiError> {
+pub(crate) async fn fetch_snapshot(gh: &HostRunner, remote_repo: &str, number: i64) -> Result<GitHubPullSnapshot, ApiError> {
+    let number_str = number.to_string();
     let pr_out = gh_call(
         gh,
-        &[
-            "pr",
-            "view",
-            &number.to_string(),
-            "--repo",
-            remote_repo,
-            "--json",
-            "state,headRefOid,statusCheckRollup",
-        ],
-    )?;
+        &["pr", "view", &number_str, "--repo", remote_repo, "--json", "state,headRefOid,statusCheckRollup"],
+    )
+    .await?;
     let pr: RawPrView = serde_json::from_str(&pr_out).map_err(|_| refuse(BizCode::RepoRefused, "GitHub PR decode failed"))?;
-    let viewer = gh_call(gh, &["api", "user"])
+
+    let reviews_path = format!("repos/{remote_repo}/pulls/{number}/reviews");
+    let review_comments_path = format!("repos/{remote_repo}/pulls/{number}/comments");
+    let issue_comments_path = format!("repos/{remote_repo}/issues/{number}/comments");
+    let reviews_args = ["api", reviews_path.as_str()];
+    let review_comments_args = ["api", review_comments_path.as_str()];
+    let issue_comments_args = ["api", issue_comments_path.as_str()];
+
+    let (viewer_res, reviews_res, review_comments_res, issue_comments_res) = tokio::join!(
+        gh_call(gh, &["api", "user"]),
+        gh_call(gh, &reviews_args),
+        gh_call(gh, &review_comments_args),
+        gh_call(gh, &issue_comments_args),
+    );
+
+    let viewer = viewer_res
         .ok()
         .and_then(|s| serde_json::from_str::<RawViewer>(&s).ok())
         .map(|v| v.login)
@@ -245,7 +254,7 @@ pub fn fetch_snapshot(gh: &HostRun, remote_repo: &str, number: i64) -> Result<Gi
         .collect();
     checks.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.url.cmp(&b.url)));
 
-    let reviews_raw: Vec<RawReview> = gh_call(gh, &["api", &format!("repos/{remote_repo}/pulls/{number}/reviews")])
+    let reviews_raw: Vec<RawReview> = reviews_res
         .ok()
         .and_then(|s| serde_json::from_str::<Vec<RawReview>>(&s).ok())
         .unwrap_or_default();
@@ -264,11 +273,11 @@ pub fn fetch_snapshot(gh: &HostRun, remote_repo: &str, number: i64) -> Result<Gi
         })
         .collect();
 
-    let review_comments_raw: Vec<RawReviewComment> = gh_call(gh, &["api", &format!("repos/{remote_repo}/pulls/{number}/comments")])
+    let review_comments_raw: Vec<RawReviewComment> = review_comments_res
         .ok()
         .and_then(|s| serde_json::from_str::<Vec<RawReviewComment>>(&s).ok())
         .unwrap_or_default();
-    let issue_comments_raw: Vec<RawIssueComment> = gh_call(gh, &["api", &format!("repos/{remote_repo}/issues/{number}/comments")])
+    let issue_comments_raw: Vec<RawIssueComment> = issue_comments_res
         .ok()
         .and_then(|s| serde_json::from_str::<Vec<RawIssueComment>>(&s).ok())
         .unwrap_or_default();
@@ -316,11 +325,11 @@ pub fn fetch_snapshot(gh: &HostRun, remote_repo: &str, number: i64) -> Result<Gi
 }
 
 /// Tail of a failed GitHub Actions job log (last 40 lines, capped at 4000 bytes).
-pub fn failed_job_log(gh: &HostRun, remote_repo: &str, check_url: &str) -> String {
+pub(crate) async fn failed_job_log(gh: &HostRunner, remote_repo: &str, check_url: &str) -> String {
     let Some(job) = actions_job_of(check_url) else {
         return String::new();
     };
-    let Ok(out) = gh_call(gh, &["run", "view", "--job", &job, "--log-failed", "--repo", remote_repo]) else {
+    let Ok(out) = gh_call(gh, &["run", "view", "--job", &job, "--log-failed", "--repo", remote_repo]).await else {
         return String::new();
     };
     let lines: Vec<&str> = out.trim().lines().collect();

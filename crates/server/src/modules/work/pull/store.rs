@@ -199,6 +199,26 @@ impl PullStore {
         self.index.lock().open()
     }
 
+    pub async fn upsert_async(&self, input: UpsertPullInput) -> Result<PullRecord, ApiError> {
+        let params = queries::UpsertPullParams {
+            id: uuid::Uuid::now_v7().to_string(),
+            platform: word(&input.platform).map_err(internal)?,
+            repo: input.repo,
+            number: input.number,
+            url: input.url,
+            branch: input.branch,
+            base: input.base,
+            state: word(&input.state).map_err(internal)?,
+            issue_id: input.issue_id,
+            created_at: input.at,
+            updated_at: input.at,
+        };
+        let mut conn = self.db.acquire_write().await.map_err(internal)?;
+        let saved = queries::upsert_pull(&mut *conn, params).await.and_then(record_of).map_err(internal)?;
+        drop(conn);
+        Ok(self.index.lock().put(saved))
+    }
+
     pub fn upsert(&self, input: UpsertPullInput) -> Result<PullRecord, ApiError> {
         let params = queries::UpsertPullParams {
             id: uuid::Uuid::now_v7().to_string(),
@@ -221,6 +241,18 @@ impl PullStore {
         Ok(self.index.lock().put(saved))
     }
 
+    pub async fn set_state_async(&self, id: &str, state: PullRequestState, at: i64) -> Result<PullRecord, ApiError> {
+        let params = queries::SetPullStateParams {
+            id: id.into(),
+            state: word(&state).map_err(internal)?,
+            updated_at: at,
+        };
+        let mut conn = self.db.acquire_write().await.map_err(internal)?;
+        let saved = queries::set_pull_state(&mut *conn, params).await.and_then(record_of).map_err(internal)?;
+        drop(conn);
+        Ok(self.index.lock().put(saved))
+    }
+
     pub fn set_state(&self, id: &str, state: PullRequestState, at: i64) -> Result<PullRecord, ApiError> {
         let params = queries::SetPullStateParams {
             id: id.into(),
@@ -232,6 +264,19 @@ impl PullStore {
             .run(async |conn| queries::set_pull_state(conn, params).await)
             .and_then(record_of)
             .map_err(internal)?;
+        Ok(self.index.lock().put(saved))
+    }
+
+    pub async fn observe_checks_async(&self, id: &str, fingerprint: &str, revision: i64, at: i64) -> Result<PullRecord, ApiError> {
+        let params = queries::ObservePullChecksParams {
+            id: id.into(),
+            check_fingerprint: fingerprint.into(),
+            check_revision: revision,
+            updated_at: at,
+        };
+        let mut conn = self.db.acquire_write().await.map_err(internal)?;
+        let saved = queries::observe_pull_checks(&mut *conn, params).await.and_then(record_of).map_err(internal)?;
+        drop(conn);
         Ok(self.index.lock().put(saved))
     }
 
@@ -250,6 +295,21 @@ impl PullStore {
         Ok(self.index.lock().put(saved))
     }
 
+    pub async fn known_events_async(&self, pull_id: &str) -> Result<Vec<KnownPullEvent>, ApiError> {
+        let mut conn = self.db.acquire_read_async().await.map_err(internal)?;
+        let rows = queries::known_pull_events(&mut *conn, queries::KnownPullEventsParams { pull_id: pull_id.into() })
+            .await
+            .map_err(internal)?;
+        Ok(rows
+            .into_iter()
+            .map(|r| KnownPullEvent {
+                key: r.key,
+                bot_round_key: r.bot_round_key,
+                bot_round: r.bot_round,
+            })
+            .collect())
+    }
+
     pub fn known_events(&self, pull_id: &str) -> Result<Vec<KnownPullEvent>, ApiError> {
         let rows = self
             .db
@@ -263,6 +323,21 @@ impl PullStore {
                 bot_round: r.bot_round,
             })
             .collect())
+    }
+
+    pub async fn keep_event_async(&self, pull_id: &str, key: &str, bot_round_key: Option<&str>, bot_round: Option<i64>) -> Result<(), ApiError> {
+        let mut conn = self.db.acquire_write().await.map_err(internal)?;
+        queries::keep_pull_event(
+            &mut *conn,
+            queries::KeepPullEventParams {
+                pull_id: pull_id.into(),
+                key: key.into(),
+                bot_round_key: bot_round_key.map(str::to_owned),
+                bot_round,
+            },
+        )
+        .await
+        .map_err(internal)
     }
 
     pub fn keep_event(&self, pull_id: &str, key: &str, bot_round_key: Option<&str>, bot_round: Option<i64>) -> Result<(), ApiError> {
