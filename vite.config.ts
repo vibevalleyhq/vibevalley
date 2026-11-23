@@ -62,6 +62,11 @@ export default defineConfig({
         cache: false,
       },
       "rust:changed": { command: "vpx scripts/release/rust-changed.ts", cache: false },
+      "rust:loom": {
+        command:
+          "cargo test --release -p vibevalley-runtime --features loom --lib loom_models && cargo test --release -p vibevalley-server --features loom --lib loom_models",
+        cache: false,
+      },
       "protocol:check": {
         command: "cargo test -p vibevalley-protocol --features ts-gen --test typescript && vp run goldens --check",
         cache: false,

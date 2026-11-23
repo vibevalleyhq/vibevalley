@@ -33,6 +33,7 @@ flume = "0.12.0"
 futures-util = { version = "0.3.34", features = ["sink"] }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
 jiff = { version = "1.0.1", default-features = false, features = ["std", "tz-system", "tzdb-zoneinfo", "perf-inline"] }
+loom = "0.7"
 loro = { version = "1.18.0", default-features = false }
 parking_lot = "0.12"
 regex = "1.13.1"

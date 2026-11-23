@@ -11926,6 +11926,7 @@ dependencies = [
  "globset",
  "ignore",
  "jiff 1.0.1",
+ "loom",
  "nix 0.32.0",
  "oxc_allocator",
  "oxc_ast",
