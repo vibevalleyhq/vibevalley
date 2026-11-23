@@ -9,10 +9,11 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
 use std::thread::ThreadId;
+use std::time::Duration;
 
 use parking_lot::Mutex;
 use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
+use tokio::task::{JoinHandle, JoinSet};
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::Transition;
 
@@ -20,6 +21,7 @@ use crate::Hub;
 
 /// Bounded per-subscriber transition queue depth.
 pub const CHANNEL_CAPACITY: usize = 1024;
+const BUS_SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 
 struct Subscriber {
     id: u64,
@@ -41,7 +43,7 @@ impl Subscriber {
             return;
         }
         if let Some(handle) = self.handle.lock().take() {
-            let _ = vibevalley_runtime::rt::block_on(handle);
+            let _ = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(BUS_SHUTDOWN_GRACE, handle).await });
         }
     }
 
@@ -222,7 +224,8 @@ impl EventBus {
         }
     }
 
-    /// Cooperatively signals and awaits every registered subscriber task.
+    /// Cooperatively cancels and concurrently awaits every registered
+    /// subscriber task, bounded by [`BUS_SHUTDOWN_GRACE`].
     pub fn close(&self) {
         self.cancel.cancel();
         let subs = {
@@ -230,11 +233,32 @@ impl EventBus {
             st.closed = true;
             std::mem::take(&mut st.subscribers)
         };
+        let current_tid = std::thread::current().id();
+        let mut handles = Vec::with_capacity(subs.len());
         for sub in &subs {
             sub.signal_stop();
+            if *sub.running_thread.lock() != Some(current_tid)
+                && let Some(handle) = sub.handle.lock().take()
+            {
+                handles.push(handle);
+            }
         }
-        for sub in &subs {
-            sub.join();
+        if handles.is_empty() {
+            return;
+        }
+        let timed_out = vibevalley_runtime::rt::block_on(async {
+            let mut set = JoinSet::new();
+            for handle in handles {
+                set.spawn(async move {
+                    let _ = handle.await;
+                });
+            }
+            tokio::time::timeout(BUS_SHUTDOWN_GRACE, async { while set.join_next().await.is_some() {} })
+                .await
+                .is_err()
+        });
+        if timed_out {
+            tracing::warn!(timeout_secs = BUS_SHUTDOWN_GRACE.as_secs(), "event_bus.close timed out waiting for subscribers");
         }
     }
 }
@@ -349,5 +373,37 @@ mod tests {
         hub.apply(vec![commit_fact(3)]);
         done_rx.recv_timeout(Duration::from_secs(2)).expect("self-closer completed");
         hub.close_bus();
+    }
+
+    #[test]
+    fn close_awaits_multiple_subscribers_concurrently() {
+        let hub = Hub::new(empty_space_state());
+        let (entered_tx, entered_rx) = flume::bounded::<()>(4);
+        let (release_tx, release_rx) = flume::bounded::<()>(1);
+
+        let mut subs = Vec::new();
+        for name in ["slow-a", "slow-b", "slow-c", "slow-d"] {
+            let entered_tx = entered_tx.clone();
+            let release_rx = release_rx.clone();
+            subs.push(hub.subscribe_transitions(name, move |_, _| {
+                let _ = entered_tx.try_send(());
+                let _ = release_rx.recv_timeout(Duration::from_secs(5));
+                std::thread::sleep(Duration::from_millis(120));
+            }));
+        }
+
+        hub.apply(vec![commit_fact(1)]);
+        for _ in 0..4 {
+            entered_rx.recv_timeout(Duration::from_secs(2)).expect("subscriber entered");
+        }
+
+        let started = std::time::Instant::now();
+        drop(release_tx);
+        hub.close_bus();
+        let elapsed = started.elapsed();
+        drop(subs);
+
+        // Sequential draining would take >= 4 * 120ms = 480ms; concurrent join finishes in ~120ms.
+        assert!(elapsed < Duration::from_millis(380), "close_bus drained sequentially: {elapsed:?}");
     }
 }
