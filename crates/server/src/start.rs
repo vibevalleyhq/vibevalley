@@ -62,6 +62,8 @@ pub struct ServerConfig {
     pub connector: modules::collab::connector::Options,
     /// Enables DevTools diagnostics (`debug.*` endpoints, timeline observer, fault gate).
     pub debug_enabled: bool,
+    /// Wall clock for domain timers/TTLs (`cron`, `remote`, `media`, `issue`, `game`).
+    pub clock: vibevalley_core::SharedClock,
 }
 
 impl ServerConfig {
@@ -100,6 +102,7 @@ impl ServerConfig {
             orchestrator_listens: true,
             connector: modules::collab::connector::Options::default(),
             debug_enabled: false,
+            clock: vibevalley_core::system_clock(),
         }
     }
 
@@ -128,6 +131,68 @@ impl ServerConfig {
             crate::testing::configure(&mut config, env_str("VIBEVALLEY_TEST_MODEL_PORT").as_deref());
         }
         config
+    }
+}
+
+type Closer = (&'static str, Box<dyn FnOnce() + Send>);
+
+/// Ordered shutdown registry populated beside each module's construction in [`start`].
+///
+/// Drains in three deterministic phases:
+/// 1. `pre_drain` (FIFO): cancel the root shutdown token and detach hub hooks before stopping modules.
+/// 2. `concurrent` (parallel `JoinSet`, bounded by `grace`): drain every registered module closer.
+/// 3. `finalizers` (LIFO): flush buffered state and close spine resources last (`trajectories` -> `hub` -> `db`).
+#[derive(Default)]
+pub(crate) struct ShutdownList {
+    pre_drain: Vec<Closer>,
+    concurrent: Vec<Closer>,
+    finalizers: Vec<Closer>,
+}
+
+impl ShutdownList {
+    pub(crate) fn push_pre_drain(&mut self, name: &'static str, close: impl FnOnce() + Send + 'static) {
+        self.pre_drain.push((name, Box::new(close)));
+    }
+
+    pub(crate) fn push_concurrent(&mut self, name: &'static str, close: impl FnOnce() + Send + 'static) {
+        self.concurrent.push((name, Box::new(close)));
+    }
+
+    pub(crate) fn push_finalizer(&mut self, name: &'static str, close: impl FnOnce() + Send + 'static) {
+        self.finalizers.push((name, Box::new(close)));
+    }
+
+    /// Runs all registered shutdown phases once and returns whether the concurrent drain timed out.
+    pub(crate) fn drain(&mut self, grace: std::time::Duration) -> bool {
+        for (name, close) in self.pre_drain.drain(..) {
+            tracing::trace!(module = name, "server.close pre-drain");
+            close();
+        }
+
+        let concurrent = std::mem::take(&mut self.concurrent);
+        let timed_out = if concurrent.is_empty() {
+            false
+        } else {
+            vibevalley_runtime::rt::block_on(async move {
+                let mut set = tokio::task::JoinSet::new();
+                for (name, close) in concurrent.into_iter().rev() {
+                    set.spawn_blocking(move || {
+                        tracing::trace!(module = name, "server.close draining module");
+                        close();
+                    });
+                }
+                tokio::time::timeout(grace, async { while set.join_next().await.is_some() {} }).await.is_err()
+            })
+        };
+        if timed_out {
+            tracing::warn!(timeout_secs = grace.as_secs(), "server.close timed out waiting for modules to drain");
+        }
+
+        for (name, close) in self.finalizers.drain(..).rev() {
+            tracing::trace!(module = name, "server.close finalizer");
+            close();
+        }
+        timed_out
     }
 }
 
@@ -161,6 +226,7 @@ pub struct Started {
     pub(crate) debug: Arc<modules::infra::debug::DebugKit>,
     pub(crate) remote: Arc<modules::infra::remote::Remote>,
     pub(crate) machines: Arc<modules::infra::machine::MachineManager>,
+    shutdown: parking_lot::Mutex<ShutdownList>,
 }
 
 /// White-box test view over `Started` internals for `crates/server/tests/*`.
@@ -241,68 +307,8 @@ impl Started {
     /// closing the shared `ServerDb`.
     pub fn close(&self) {
         const SHUTDOWN_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
-
-        self.hub.shutdown_token().cancel();
-        if self.debug.is_enabled() {
-            self.hub.attach_observer(None);
-            self.hub.attach_fault_gate(None);
-            vibevalley_runtime::oar::set_observer(None);
-        }
-        self.hub.attach_machine_bus(None);
-        self.hub.attach_remote_auth(None);
-
-        let machines = self.machines.clone();
-        let remote = self.remote.clone();
-        let connectors = self.connectors.clone();
-        let pulls = self.pulls.clone();
-        let crons = self.crons.clone();
-        let voice = self.voice.clone();
-        let hub_bus = self.hub.clone();
-        let issue_chat = self.issue_chat.clone();
-        let session_chat = self.session_chat.clone();
-        let orchestrator = self.orchestrator.clone();
-        let hub_inbox = self.hub.clone();
-        let agents = self.agents.clone();
-        let repos = self.repos.clone();
-        let artifacts = self.artifacts.clone();
-        let media = self.media.clone();
-        let media_inputs = self.media_inputs.clone();
-        let library = self.library.clone();
-        let game = self.game.clone();
-        let board = self.board.clone();
-
-        let timed_out = vibevalley_runtime::rt::block_on(async {
-            let mut set = tokio::task::JoinSet::new();
-            set.spawn_blocking(move || machines.close());
-            set.spawn_blocking(move || remote.close());
-            set.spawn_blocking(move || connectors.close());
-            set.spawn_blocking(move || pulls.close());
-            set.spawn_blocking(move || crons.close());
-            set.spawn_blocking(move || voice.close());
-            set.spawn_blocking(move || hub_bus.close_bus());
-            set.spawn_blocking(move || issue_chat.close());
-            set.spawn_blocking(move || session_chat.close());
-            set.spawn_blocking(move || orchestrator.close());
-            set.spawn_blocking(move || hub_inbox.runtime_inbox.stop());
-            set.spawn_blocking(move || agents.fleet.close());
-            set.spawn_blocking(move || repos.close());
-            set.spawn_blocking(move || artifacts.close());
-            set.spawn_blocking(move || media.close());
-            set.spawn_blocking(move || media_inputs.close());
-            set.spawn_blocking(move || library.close());
-            set.spawn_blocking(move || game.close());
-            set.spawn_blocking(move || board.close());
-            tokio::time::timeout(SHUTDOWN_GRACE, async { while set.join_next().await.is_some() {} })
-                .await
-                .is_err()
-        });
-        if timed_out {
-            tracing::warn!(timeout_secs = SHUTDOWN_GRACE.as_secs(), "server.close timed out waiting for modules to drain");
-        }
-
-        self.trajectories.close();
-        self.hub.close();
-        self.db.close();
+        let mut shutdown = std::mem::take(&mut *self.shutdown.lock());
+        shutdown.drain(SHUTDOWN_GRACE);
     }
 }
 
@@ -434,8 +440,25 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     }
 
     // L0: single shared SQLite pool + Hub spine
+    let mut shutdown = ShutdownList::default();
     let db = ServerDb::open(&config.home).map_err(|e| failed("the database")(&e))?;
+    shutdown.push_finalizer("db", {
+        let db = db.clone();
+        move || db.close()
+    });
     let hub = Hub::new(vibevalley_core::empty_space_state());
+    shutdown.push_pre_drain("hub.cancel", {
+        let h = hub.clone();
+        move || h.shutdown_token().cancel()
+    });
+    shutdown.push_concurrent("hub.bus", {
+        let h = hub.clone();
+        move || h.close_bus()
+    });
+    shutdown.push_finalizer("hub", {
+        let h = hub.clone();
+        move || h.close()
+    });
 
     // L1: infra/*, content/attachment, team/agent
     modules::infra::install_health_version(&hub, &config.version);
@@ -465,6 +488,14 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     let machines = modules::infra::machine::MachineManager::open(&hub, registry.clone(), attachments.clone(), config.version.clone());
     modules::infra::machine::install(&hub, machines.clone());
     hub.attach_machine_bus(Some(Arc::new(modules::infra::machine::MachineBusAdapter(machines.clone()))));
+    shutdown.push_pre_drain("hub.machine_bus", {
+        let h = hub.clone();
+        move || h.attach_machine_bus(None)
+    });
+    shutdown.push_concurrent("machines", {
+        let m = machines.clone();
+        move || m.close()
+    });
     let agents = Agents::open_with_machines(
         &hub,
         &config.home,
@@ -474,10 +505,18 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         config.probe_runtimes,
     )
     .map_err(|e| failed("the profiles")(&e))?;
+    shutdown.push_concurrent("agents.fleet", {
+        let a = agents.clone();
+        move || a.fleet.close()
+    });
     modules::team::agent::install(&hub, agents.clone());
 
     // Skin observer starts on the empty state so loaded facts replay cleanly.
-    let game = modules::skin::game::Game::open(&config.home, &hub);
+    let game = modules::skin::game::Game::open_with_clock(&config.home, &hub, config.clock.clone());
+    shutdown.push_concurrent("game", {
+        let g = game.clone();
+        move || g.close()
+    });
     modules::skin::game::install(&hub, game.clone());
 
     // L2: team/memory, collab/channel, content/{artifact,library,media}, work/{repo,session,issue,pull,chat}
@@ -493,25 +532,44 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     }
 
     let artifacts = modules::content::artifact::Artifacts::open(db.clone(), attachments.clone(), chat.clone());
+    shutdown.push_concurrent("artifacts", {
+        let a = artifacts.clone();
+        move || a.close()
+    });
     modules::content::artifact::install(&hub, artifacts.clone());
 
     let library = modules::content::library::Library::open(db.clone(), attachments.clone());
+    shutdown.push_concurrent("library", {
+        let l = library.clone();
+        move || l.close()
+    });
     modules::content::library::install(&hub, library.clone(), Some(chat.clone()));
 
-    let media_inputs =
-        modules::content::media::inputs::Inputs::open(&config.home, db.clone(), attachments.clone()).map_err(|e| failed("the media inputs")(&e.message))?;
+    let media_inputs = modules::content::media::inputs::Inputs::open_with_clock(&config.home, db.clone(), attachments.clone(), config.clock.clone())
+        .map_err(|e| failed("the media inputs")(&e.message))?;
+    shutdown.push_concurrent("media_inputs", {
+        let mi = media_inputs.clone();
+        move || mi.close()
+    });
     modules::content::media::inputs::install(&hub, media_inputs.clone());
-    let media = modules::content::media::jobs::Jobs::open(modules::content::media::jobs::Parts {
-        db: db.clone(),
-        hub: Arc::downgrade(&hub),
-        setting: setting.clone(),
-        files: attachments.clone(),
-        inputs: media_inputs.clone(),
-        channel: chat.clone(),
-        vendor,
-        download,
-    })
+    let media = modules::content::media::jobs::Jobs::open_with_clock(
+        modules::content::media::jobs::Parts {
+            db: db.clone(),
+            hub: Arc::downgrade(&hub),
+            setting: setting.clone(),
+            files: attachments.clone(),
+            inputs: media_inputs.clone(),
+            channel: chat.clone(),
+            vendor,
+            download,
+        },
+        config.clock.clone(),
+    )
     .map_err(|e| failed("media jobs")(&e.message))?;
+    shutdown.push_concurrent("media", {
+        let m = media.clone();
+        move || m.close()
+    });
     modules::content::media::jobs::install(&hub, media.clone());
     hub.attach_speech_streams(media.clone());
 
@@ -522,6 +580,10 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         ..BoardConfig::under(&config.home)
     };
     let repos = modules::work::repo::Repos::open(&config.work_root, board_config.per_repo).map_err(|e| failed("the repos")(&e))?;
+    shutdown.push_concurrent("repos", {
+        let r = repos.clone();
+        move || r.close()
+    });
     modules::work::repo::install(&hub, repos.clone());
     modules::work::repo::install_templates(&hub, repos.clone(), agents.clone());
     if config.probe_runtimes {
@@ -530,6 +592,10 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     game.count_commits(repos.clone(), config.git_emails.clone());
 
     let trajectories = modules::work::session::Trajectories::open(db.clone(), &hub);
+    shutdown.push_finalizer("trajectories", {
+        let t = trajectories.clone();
+        move || t.close()
+    });
     let drivers = Arc::new(modules::work::session::AgentDrivers::new(agents.clone(), Some(memories.clone())));
     let board = Board::open_with(
         db.clone(),
@@ -546,7 +612,11 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         },
     )
     .map_err(|e| failed("the board")(&e))?;
-    modules::work::issue::install_on(&hub, board.clone(), Some(agents.clone()));
+    shutdown.push_concurrent("board", {
+        let b = board.clone();
+        move || b.close()
+    });
+    modules::work::issue::install_on_with_clock(&hub, board.clone(), Some(agents.clone()), config.clock.clone());
     modules::work::issue::install_conversation(&hub, board.clone(), chat.clone());
     {
         let g = game.clone();
@@ -557,9 +627,17 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     let publisher = config.publisher.clone().unwrap_or_else(|| Arc::new(modules::work::pull::Publisher::default()));
     let pulls = modules::work::pull::Pulls::open(db.clone(), publisher, Some(repos.clone()), Some(board.clone()), None, None)
         .map_err(|e| failed("the pulls")(&e.message))?;
+    shutdown.push_concurrent("pulls", {
+        let p = pulls.clone();
+        move || p.close()
+    });
     modules::work::pull::install(&hub, pulls.clone(), config.poll_pulls);
 
     let issue_chat = modules::work::chat::IssueChat::start(&hub, board.clone(), chat.clone());
+    shutdown.push_concurrent("issue_chat", {
+        let ic = issue_chat.clone();
+        move || ic.close()
+    });
     let session_chat = {
         let ic = issue_chat.clone();
         modules::work::chat::SessionChat::start(
@@ -570,6 +648,10 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
             Arc::new(move |session| ic.ensure_session_thread(session)),
         )
     };
+    shutdown.push_concurrent("session_chat", {
+        let sc = session_chat.clone();
+        move || sc.close()
+    });
 
     // L3: team/mcp, team/tool, team/orchestrator, work/cron + collab/voice & collab/connector
     let resources = modules::team::mcp::Resources::with_pulls(board.clone(), chat.clone(), trajectories.clone(), pulls.clone());
@@ -604,15 +686,35 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         listen_chat: config.orchestrator_listens,
     })
     .map_err(|e| failed("durable execution")(&e))?;
+    shutdown.push_concurrent("orchestrator", {
+        let o = orchestrator.clone();
+        move || o.close()
+    });
     let _ = execution.set(vibevalley_runtime::agent::harness::SharedExecution::new(orchestrator.execution.harness.clone()));
     hub.runtime_inbox
         .attach(orchestrator.execution.store(), &hub)
         .map_err(|e| failed("durable projection")(&e))?;
+    shutdown.push_concurrent("hub.runtime_inbox", {
+        let h = hub.clone();
+        move || h.runtime_inbox.stop()
+    });
     modules::team::orchestrator::install(&hub, orchestrator.clone());
 
     let cron_orchestrator: Option<Arc<dyn CronOrchestratorPort>> = config.orchestrator_listens.then(|| orchestrator.clone() as Arc<dyn CronOrchestratorPort>);
-    let crons = modules::work::cron::Crons::open(db.clone(), &hub, board.clone(), agents.clone(), Some(chat.clone()), cron_orchestrator)
-        .map_err(|e| failed("the crons")(&e.message))?;
+    let crons = modules::work::cron::Crons::open_with_clock(
+        db.clone(),
+        &hub,
+        board.clone(),
+        agents.clone(),
+        Some(chat.clone()),
+        cron_orchestrator,
+        config.clock.clone(),
+    )
+    .map_err(|e| failed("the crons")(&e.message))?;
+    shutdown.push_concurrent("crons", {
+        let c = crons.clone();
+        move || c.close()
+    });
     modules::work::cron::install(&hub, crons.clone(), config.tick_crons);
 
     board.refresh_queue().map_err(|e| failed("the queue")(&e))?;
@@ -625,11 +727,19 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         fetch: voice_fetch,
         realtime: None,
     });
+    shutdown.push_concurrent("voice", {
+        let v = voice.clone();
+        move || v.close()
+    });
     modules::collab::voice::install(&hub, voice.clone());
     hub.attach_voice(voice.clone());
 
     let connectors = modules::collab::connector::Connectors::open(db.clone(), &hub, chat.clone(), config.connector.clone())
         .map_err(|e| failed("the connectors")(&e.message))?;
+    shutdown.push_concurrent("connectors", {
+        let c = connectors.clone();
+        move || c.close()
+    });
     modules::collab::connector::install(&hub, connectors.clone());
 
     let debug = modules::infra::debug::DebugKit::new(modules::infra::debug::DebugParts {
@@ -653,11 +763,27 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         hub.attach_observer(Some(debug.collector()));
         hub.attach_fault_gate(Some(debug.collector()));
         vibevalley_runtime::oar::set_observer(Some(debug.collector()));
+        shutdown.push_pre_drain("debug.detach", {
+            let h = hub.clone();
+            move || {
+                h.attach_observer(None);
+                h.attach_fault_gate(None);
+                vibevalley_runtime::oar::set_observer(None);
+            }
+        });
     }
 
-    let remote =
-        modules::infra::remote::Remote::open(db.clone(), Arc::downgrade(&hub), config.version.clone()).map_err(|e| failed("remote access")(&e.message))?;
+    let remote = modules::infra::remote::Remote::open_with_clock(db.clone(), Arc::downgrade(&hub), config.version.clone(), config.clock.clone())
+        .map_err(|e| failed("remote access")(&e.message))?;
     hub.attach_remote_auth(Some(remote.clone()));
+    shutdown.push_pre_drain("hub.remote_auth", {
+        let h = hub.clone();
+        move || h.attach_remote_auth(None)
+    });
+    shutdown.push_concurrent("remote", {
+        let r = remote.clone();
+        move || r.close()
+    });
     modules::infra::remote::install(&hub, remote.clone());
     remote.restore_if_enabled();
 
@@ -690,5 +816,74 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         debug,
         remote,
         machines,
+        shutdown: parking_lot::Mutex::new(shutdown),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Barrier};
+    use std::time::Duration;
+
+    use parking_lot::Mutex;
+
+    use super::*;
+
+    #[test]
+    fn shutdown_list_runs_phases_in_order_and_drains_modules_concurrently() {
+        let events: Arc<Mutex<Vec<&'static str>>> = Arc::new(Mutex::new(Vec::new()));
+        // A 2-party barrier inside two concurrent closers proves JoinSet runs them in parallel
+        // (sequential execution would deadlock).
+        let barrier = Arc::new(Barrier::new(2));
+
+        let mut list = ShutdownList::default();
+        list.push_pre_drain("pre_1", {
+            let log = events.clone();
+            move || log.lock().push("pre_1")
+        });
+        list.push_pre_drain("pre_2", {
+            let log = events.clone();
+            move || log.lock().push("pre_2")
+        });
+        list.push_finalizer("db", {
+            let log = events.clone();
+            move || log.lock().push("fin_db")
+        });
+        list.push_finalizer("hub", {
+            let log = events.clone();
+            move || log.lock().push("fin_hub")
+        });
+        list.push_finalizer("trajectories", {
+            let log = events.clone();
+            move || log.lock().push("fin_trajectories")
+        });
+        list.push_concurrent("mod_a", {
+            let log = events.clone();
+            let b = barrier.clone();
+            move || {
+                b.wait();
+                log.lock().push("mod_a");
+            }
+        });
+        list.push_concurrent("mod_b", {
+            let log = events.clone();
+            let b = barrier.clone();
+            move || {
+                b.wait();
+                log.lock().push("mod_b");
+            }
+        });
+
+        assert!(!list.drain(Duration::from_secs(5)), "concurrent barrier drain must not time out");
+        // Second drain is a no-op.
+        assert!(!list.drain(Duration::from_secs(5)));
+
+        let trace = events.lock().clone();
+        assert_eq!(trace.len(), 7, "{trace:?}");
+        assert_eq!(&trace[..2], &["pre_1", "pre_2"]);
+        let mut middle = trace[2..4].to_vec();
+        middle.sort_unstable();
+        assert_eq!(middle, vec!["mod_a", "mod_b"]);
+        assert_eq!(&trace[4..], &["fin_trajectories", "fin_hub", "fin_db"]);
+    }
 }

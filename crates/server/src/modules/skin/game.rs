@@ -15,12 +15,12 @@ use parking_lot::Mutex;
 use tokio::sync::Notify;
 use tokio::task::JoinHandle as TaskHandle;
 use tokio_util::sync::CancellationToken;
-use vibevalley_core::Transition;
 use vibevalley_core::progress::{Folded, catch_up, entries_for, progress_fold, progress_step};
+use vibevalley_core::{SharedClock, Transition, system_clock};
 use vibevalley_protocol::{Fact, FactProgressChanged, FactProgressChangedStation, LedgerEntry, LedgerEntryTitled, ops};
 
+use crate::Hub;
 use crate::event_bus::Subscription;
-use crate::{Hub, now};
 
 const COUNT_EVERY: std::time::Duration = std::time::Duration::from_secs(120);
 const COUNT_AFTER_RUN: std::time::Duration = std::time::Duration::from_secs(15);
@@ -31,6 +31,7 @@ const WANT_STATION_FOR_MS: i64 = 10_000;
 pub struct Game {
     file: PathBuf,
     hub: Weak<Hub>,
+    clock: SharedClock,
     folded: Mutex<Folded>,
     wanted: Mutex<Option<(i64, i64)>>,
     /// Asks the counting task for a count soon.
@@ -101,10 +102,15 @@ impl Game {
     /// The ledger under `home`, folded into the hub's state; from now on
     /// each fact's entries are kept.
     pub fn open(home: &Path, hub: &Arc<Hub>) -> Arc<Game> {
+        Self::open_with_clock(home, hub, system_clock())
+    }
+
+    /// Same as [`Game::open`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
+    pub fn open_with_clock(home: &Path, hub: &Arc<Hub>, clock: SharedClock) -> Arc<Game> {
         let file = home.join("ledger.jsonl");
         let folded = progress_fold(&read_ledger(&file));
         hub.apply(vec![Fact::ProgressChanged(FactProgressChanged {
-            at: now(),
+            at: clock.now_ms(),
             progress: Some(folded.progress.clone()),
             news: None,
             commits: None,
@@ -113,6 +119,7 @@ impl Game {
         let game = Arc::new(Game {
             file,
             hub: Arc::downgrade(hub),
+            clock,
             folded: Mutex::new(folded),
             wanted: Mutex::new(None),
             soon: Arc::new(Notify::new()),
@@ -150,7 +157,7 @@ impl Game {
                 && until > f.at
             {
                 hub.apply(vec![Fact::ProgressChanged(FactProgressChanged {
-                    at: now(),
+                    at: self.clock.now_ms(),
                     progress: None,
                     news: None,
                     commits: None,
@@ -217,7 +224,7 @@ impl Game {
             return;
         }
         hub.apply(vec![Fact::ProgressChanged(FactProgressChanged {
-            at: now(),
+            at: self.clock.now_ms(),
             progress: None,
             news: None,
             commits: Some(next),
@@ -238,7 +245,8 @@ impl Game {
     /// Keeps one entry (stamped now) and folds it in; one that is not kept
     /// is left out, and the farm goes on.
     pub fn record(&self, entry: LedgerEntry) {
-        let entry = entry.with_at(now());
+        let at = self.clock.now_ms();
+        let entry = entry.with_at(at);
         let Ok(line) = serde_json::to_string(&entry) else { return };
         let fact = {
             let mut folded = self.folded.lock();
@@ -255,7 +263,7 @@ impl Game {
             let progress = next.progress.clone();
             *folded = next;
             Fact::ProgressChanged(FactProgressChanged {
-                at: now(),
+                at,
                 progress: Some(progress),
                 news: told.then_some(news),
                 commits: None,
@@ -286,7 +294,7 @@ impl Game {
 
     /// The next session hired within ten seconds goes to `station`.
     pub fn want(&self, station: i64) {
-        *self.wanted.lock() = Some((station, now() + WANT_STATION_FOR_MS));
+        *self.wanted.lock() = Some((station, self.clock.now_ms() + WANT_STATION_FOR_MS));
     }
 }
 
@@ -309,13 +317,14 @@ pub fn install(hub: &Hub, game: Arc<Game>) {
 mod tests {
     use std::time::{Duration, Instant};
 
-    use vibevalley_core::empty_space_state;
+    use vibevalley_core::{ManualClock, empty_space_state};
     use vibevalley_protocol::{
         ContextRef, Doing, ExecutionPolicy, FactSessionChanged, FactSessionPhaseChanged, FactSessionReported, LedgerEntryHarvested, Outcome, Phase,
         PhaseWorking, Session, SessionAction, SessionController, SessionPermissionMode,
     };
 
     use super::*;
+    use crate::now;
 
     fn until<T>(what: &str, mut f: impl FnMut() -> Option<T>) -> T {
         let deadline = Instant::now() + Duration::from_secs(3);
@@ -535,5 +544,58 @@ mod tests {
             "120s virtual-clock schedule must finish instantaneously, took {:?}",
             wall_start.elapsed()
         );
+    }
+
+    #[test]
+    fn want_station_window_uses_injected_clock_without_sleeping() {
+        let home = tempfile::tempdir().unwrap();
+        let hub = Hub::new(empty_space_state());
+        let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+        let game = Game::open_with_clock(home.path(), &hub, clock.clone());
+
+        // Plant a station wish at t0, advance 9_999ms (still within WANT_STATION_FOR_MS = 10_000ms).
+        game.want(4);
+        let at_inside = clock.advance(Duration::from_millis((WANT_STATION_FOR_MS - 1) as u64));
+        hub.apply(vec![Fact::SessionChanged(FactSessionChanged {
+            at: at_inside,
+            session: issue_worker("w-in", "i1", false),
+        })]);
+        until("station claimed inside window", || {
+            hub.read(|s| (s.plays.as_ref().and_then(|p| p.get("w-in")).map(|p| p.station) == Some(4)).then_some(()))
+        });
+
+        // Plant another wish and advance past WANT_STATION_FOR_MS; the wish must expire without assigning station 5.
+        game.want(5);
+        let at_expired = clock.advance(Duration::from_millis(WANT_STATION_FOR_MS as u64));
+        hub.apply(vec![Fact::SessionChanged(FactSessionChanged {
+            at: at_expired,
+            session: issue_worker("w-out", "i2", false),
+        })]);
+        // Send a phase change as causal barrier so we know the game transition handler processed w-out.
+        hub.apply(vec![Fact::SessionPhaseChanged(FactSessionPhaseChanged {
+            at: at_expired,
+            id: "w-out".into(),
+            phase: working_phase(at_expired),
+            channel: None,
+            spent: None,
+            brief: None,
+        })]);
+        until("second worker hired tally processed", || {
+            hub.read(|s| {
+                s.progress
+                    .as_ref()
+                    .and_then(|p| p.agents.get("backend"))
+                    .is_some_and(|t| t.hired == 2)
+                    .then_some(())
+            })
+        });
+        assert_ne!(
+            hub.read(|s| s.plays.as_ref().and_then(|p| p.get("w-out")).map(|p| p.station)),
+            Some(5),
+            "expired station wish must not be applied"
+        );
+
+        game.close();
+        hub.close_bus();
     }
 }
