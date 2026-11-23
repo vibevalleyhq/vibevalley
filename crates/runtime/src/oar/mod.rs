@@ -1142,6 +1142,18 @@ pub trait Runtime: Send + Sync {
     }
 }
 
+pub(crate) fn find_runtime(runtimes: &[Arc<dyn Runtime>], id: &str) -> Option<Arc<dyn Runtime>> {
+    runtimes
+        .iter()
+        .find(|r| r.id() == id)
+        .or_else(|| {
+            runtimes
+                .iter()
+                .find(|r| r.id().strip_prefix("acp:") == Some(id) || id.strip_prefix("acp:") == Some(r.id()))
+        })
+        .cloned()
+}
+
 pub struct Registry {
     runtimes: Vec<Arc<dyn Runtime>>,
 }
@@ -1164,15 +1176,7 @@ impl Registry {
     }
 
     pub fn get(&self, id: &str) -> Option<Arc<dyn Runtime>> {
-        self.runtimes
-            .iter()
-            .find(|r| r.id() == id)
-            .or_else(|| {
-                self.runtimes
-                    .iter()
-                    .find(|r| r.id().strip_prefix("acp:") == Some(id) || id.strip_prefix("acp:") == Some(r.id()))
-            })
-            .cloned()
+        find_runtime(&self.runtimes, id)
     }
 
     pub fn require(&self, id: &str) -> Result<Arc<dyn Runtime>> {
