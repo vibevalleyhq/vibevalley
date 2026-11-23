@@ -153,6 +153,8 @@ fn bind_and_serve(server: Shared, addr: SocketAddr, is_remote: bool) -> std::io:
     let std_listener = std::net::TcpListener::bind(addr)?;
     std_listener.set_nonblocking(true)?;
     let addr = std_listener.local_addr()?;
+    // Stay anchored on the global multi-thread runtime: `Listener::drop` synchronously awaits
+    // `task` via `rt::block_on`, which would deadlock if spawned on a `CurrentThread` test runtime.
     let listener = {
         let _guard = vibevalley_runtime::rt::handle().enter();
         tokio::net::TcpListener::from_std(std_listener)?

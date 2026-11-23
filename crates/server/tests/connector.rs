@@ -8,7 +8,7 @@ use std::future::Future;
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use axum::Router;
 use axum::body::Bytes;
@@ -66,11 +66,13 @@ struct World {
     feishu_scanned: AtomicBool,
     feishu_in: (flume::Sender<String>, flume::Receiver<String>),
     feishu_acks: AtomicUsize,
+    feishu_acks_notify: Notify,
 
     /// Each token given: (appId, token).
     qq_tokens: Mutex<Vec<(String, String)>>,
     qq_expires: Mutex<Value>,
     qq_gateway_auth: Mutex<Vec<String>>,
+    qq_gateway_notify: Notify,
     qq_in: (flume::Sender<QqCmd>, flume::Receiver<QqCmd>),
     /// Each reply's (msg_id, msg_seq).
     qq_seqs: Mutex<Vec<(String, u64)>>,
@@ -277,9 +279,11 @@ impl World {
                 feishu_scanned: AtomicBool::new(false),
                 feishu_in: flume::unbounded(),
                 feishu_acks: AtomicUsize::new(0),
+                feishu_acks_notify: Notify::new(),
                 qq_tokens: Mutex::default(),
                 qq_expires: Mutex::new(json!(7200)),
                 qq_gateway_auth: Mutex::default(),
+                qq_gateway_notify: Notify::new(),
                 qq_in: flume::unbounded(),
                 qq_seqs: Mutex::default(),
             }
@@ -425,6 +429,7 @@ impl World {
                     .lock()
                     .unwrap()
                     .push(r.headers.get("authorization").cloned().unwrap_or_default());
+                self.qq_gateway_notify.notify_waiters();
                 (200, json!({ "url": self.qq_ws }))
             }
             ("POST", path) if path.starts_with("/v2/users/") => {
@@ -484,6 +489,7 @@ impl World {
                     let (method, payload) = read_feishu_frame(&bytes);
                     if method == 1 && serde_json::from_slice::<Value>(&payload).is_ok_and(|p| p["code"] == 200) {
                         self.feishu_acks.fetch_add(1, Ordering::SeqCst);
+                        self.feishu_acks_notify.notify_waiters();
                     }
                 }
                 Ok(_) => {}
@@ -610,15 +616,19 @@ fn call(s: &Started, op: &str, payload: Value) -> Value {
     e.data.unwrap_or(Value::Null)
 }
 
-fn until<T>(what: &str, look: impl Fn() -> Option<T>) -> T {
-    let deadline = Instant::now() + Duration::from_secs(15);
-    loop {
-        if let Some(found) = look() {
-            return found;
+fn wait_notify<T>(notify: &Notify, what: &str, mut look: impl FnMut() -> Option<T>) -> T {
+    vibevalley_runtime::rt::block_on(async {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
+        loop {
+            let notified = notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            if let Some(found) = look() {
+                return found;
+            }
+            assert!(tokio::time::timeout_at(deadline, notified).await.is_ok(), "never: {what}");
         }
-        assert!(Instant::now() < deadline, "never: {what}");
-        std::thread::sleep(Duration::from_millis(10));
-    }
+    })
 }
 
 fn status(s: &Started, id: &str) -> Value {
@@ -627,7 +637,9 @@ fn status(s: &Started, id: &str) -> Value {
 }
 
 fn status_is(s: &Started, id: &str, what: &str, ok: impl Fn(&Value) -> bool) -> Value {
-    until(&format!("{id}: {what}"), || Some(status(s, id)).filter(|st| ok(st)))
+    crate::support::wait_until_settled(Some(&s.hub), Duration::from_secs(15), &format!("{id}: {what}"), || {
+        Some(status(s, id)).filter(|st| ok(st))
+    })
 }
 
 fn reaches(s: &Started, id: &str, state: &str) -> Value {
@@ -635,16 +647,7 @@ fn reaches(s: &Started, id: &str, state: &str) -> Value {
 }
 
 fn nth(world: &World, app: &'static str, n: usize) -> Sent {
-    vibevalley_runtime::rt::block_on(async {
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
-        loop {
-            let notified = world.sent_notify.notified();
-            if let Some(found) = world.by(app).get(n).cloned() {
-                return found;
-            }
-            assert!(tokio::time::timeout_at(deadline, notified).await.is_ok(), "never: {app}'s message {n}");
-        }
-    })
+    wait_notify(&world.sent_notify, &format!("{app}'s message {n}"), || world.by(app).get(n).cloned())
 }
 
 fn history(s: &Started, channel: &str) -> Vec<Value> {
@@ -702,7 +705,7 @@ fn weixin_is_scanned_and_verified_and_the_users_words_reach_the_default_channel_
     assert_eq!(connected["user"], "o9cq…chat");
     assert_eq!(connected["channel"], "general");
     // The core is told the status as it changes.
-    until("the state has it connected", || {
+    crate::support::wait_until_transition(&s.hub, Duration::from_secs(15), "the state has it connected", || {
         s.hub
             .read(|st| st.connectors.iter().any(|c| c.id.as_str() == "weixin" && c.state.as_str() == "connected"))
             .then_some(())
@@ -780,7 +783,9 @@ fn weixin_is_tied_to_another_channel_and_a_quoted_reply_goes_to_its_thread() {
         ],
     }));
     world.wx_log_notify.notify_waiters();
-    until("the quoted reply in the thread", || (said_in(&s, &thread) == vec!["接着说"]).then_some(()));
+    crate::support::wait_until_channel_event(s.test_internals().chat, Duration::from_secs(15), "the quoted reply in the thread", || {
+        (said_in(&s, &thread) == vec!["接着说"]).then_some(())
+    });
     assert_eq!(said_in(&s, &clock_in), vec!["打卡页怎么样了"]);
     s.close();
 }
@@ -833,7 +838,7 @@ fn what_weixin_refuses_waits_then_goes_out_later_or_is_withdrawn() {
     for word in ["二", "三", "四", "五"] {
         world.wx(USER, word, &format!("ctx-{word}"));
     }
-    until("four acknowledgements written", || {
+    crate::support::wait_until_channel_event(s.test_internals().chat, Duration::from_secs(15), "four acknowledgements written", || {
         (history(&s, &general)
             .iter()
             .filter(|m| m["from"] == "orchestrator" && m["text"].as_str().unwrap().starts_with("收到"))
@@ -846,7 +851,19 @@ fn what_weixin_refuses_waits_then_goes_out_later_or_is_withdrawn() {
     let fresh = nth(&world, "weixin", 1);
     assert_eq!((fresh.text.as_str(), fresh.reply.as_str()), ("【主助手】\n收到：六", "ctx-fresh"));
     pending(0, "nothing pending");
-    std::thread::sleep(Duration::from_millis(400));
+    let (pending_rows, sent_rows): (i64, i64) = vibevalley_runtime::rt::block_on(
+        sqlx::query_as("select sum(case when state = 'pending' then 1 else 0 end), sum(case when state = 'sent' then 1 else 0 end) from connector_outbox where connector = 'weixin'")
+            .fetch_one(&mut db),
+    )
+    .unwrap();
+    assert_eq!((pending_rows, sent_rows), (0, 2));
+    vibevalley_runtime::rt::block_on(async {
+        let notified = world.sent_notify.notified();
+        tokio::pin!(notified);
+        notified.as_mut().enable();
+        assert_eq!(world.by("weixin").len(), 2);
+        let _ = tokio::time::timeout(Duration::from_millis(400), notified).await;
+    });
     assert_eq!(world.by("weixin").len(), 2);
 
     // A logout forgets what waited.
@@ -937,11 +954,11 @@ fn qq_pairs_by_its_code_takes_only_the_users_words_and_listens_again_after_the_g
     // The gateway goes away right after handing a message over: it arrives, and the bot listens again.
     world.qq("user-openid", "断线前");
     let _ = world.qq_in.0.send(QqCmd::Drop);
-    until("the message before the failure", || {
+    crate::support::wait_until_channel_event(s.test_internals().chat, Duration::from_secs(15), "the message before the failure", || {
         said_in(&s, &general).contains(&"断线前".to_string()).then_some(())
     });
     world.qq("user-openid", "重连后");
-    until("the message after it listens again", || {
+    crate::support::wait_until_channel_event(s.test_internals().chat, Duration::from_secs(15), "the message after it listens again", || {
         said_in(&s, &general).contains(&"重连后".to_string()).then_some(())
     });
     assert!(world.qq_gateway_auth.lock().unwrap().len() >= 2);
@@ -956,7 +973,7 @@ fn regression_rotating_qq_credentials_evicts_the_previous_token_and_expired_toke
     let login = |app: &str, secret: &str| call(&s, "connector.login", json!({ "id": "qq", "appId": app, "secret": secret, "force": true }));
     let listening_with = |token: &str| {
         let auth = format!("QQBot {token}");
-        until(&format!("the gateway asked with {token}"), || {
+        wait_notify(&world.qq_gateway_notify, &format!("the gateway asked with {token}"), || {
             world.qq_gateway_auth.lock().unwrap().contains(&auth).then_some(())
         });
     };
@@ -1008,7 +1025,9 @@ fn the_feishu_bot_is_made_by_a_scan_and_takes_only_the_users_direct_words() {
     );
     assert_eq!(said_in(&s, &s.test_internals().chat.default_channel()), vec!["看看日志"]);
     // Every event is acknowledged, taken or not.
-    until("three acknowledgements", || (world.feishu_acks.load(Ordering::SeqCst) >= 3).then_some(()));
+    wait_notify(&world.feishu_acks_notify, "three acknowledgements", || {
+        (world.feishu_acks.load(Ordering::SeqCst) >= 3).then_some(())
+    });
 
     // What the farm says for the user goes out without the user asking.
     s.test_internals()

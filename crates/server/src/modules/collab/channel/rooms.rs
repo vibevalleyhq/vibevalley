@@ -957,7 +957,7 @@ impl Chat {
         if let Some(hub) = hub {
             hub.spawn_task(fut);
         } else {
-            vibevalley_runtime::rt::handle().spawn(fut);
+            vibevalley_runtime::rt::current_or_global_handle().spawn(fut);
         }
         Ok(())
     }
@@ -999,7 +999,7 @@ impl Chat {
         if let Some(hub) = hub {
             hub.spawn_task(fut);
         } else {
-            vibevalley_runtime::rt::handle().spawn(fut);
+            vibevalley_runtime::rt::current_or_global_handle().spawn(fut);
         }
         Ok(())
     }

@@ -58,7 +58,7 @@ impl Hub {
     pub fn call_with(&self, ctx: CallerContext, op: String, payload: Value, reply: impl FnOnce(Envelope) + Send + 'static) {
         let server = self.server.clone();
         let permits = self.permits.clone();
-        vibevalley_runtime::rt::handle().spawn(async move {
+        vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
             let Ok(_permit) = permits.acquire_owned().await else { return };
             let envelope = server.call_with_async(ctx, op, payload).await;
             reply(envelope);
@@ -274,13 +274,14 @@ fn spawn_slice_blocking_fallback(
     event_name: String,
     task_cancel: CancellationToken,
 ) {
+    let handle = vibevalley_runtime::rt::current_or_global_handle();
     let (stop_tx, stop_rx) = flume::bounded::<()>(0);
     let stop_cancel = task_cancel.clone();
-    vibevalley_runtime::rt::handle().spawn(async move {
+    handle.spawn(async move {
         stop_cancel.cancelled().await;
         drop(stop_tx);
     });
-    vibevalley_runtime::rt::handle().spawn_blocking(move || {
+    handle.spawn_blocking(move || {
         server.watch_slice(slice_kind, None, &stop_rx, &mut |_seq, frame| {
             if task_cancel.is_cancelled() || stop_rx.is_disconnected() {
                 return;
@@ -451,11 +452,12 @@ impl Client {
         let key = id.to_string();
         let sub_name = name.to_string();
         vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
-            let opened = tokio::select! {
-                biased;
-                _ = cancel.cancelled() => return,
-                res = server.clone().subscribe_with_async(ctx, sub_name, payload) => res,
-            };
+            if cancel.is_cancelled() {
+                return;
+            }
+            // Await `subscribe_with_async` to completion rather than cancelling it via `select!`:
+            // dropping the future mid-call would leak the server-side subscription handle.
+            let opened = server.clone().subscribe_with_async(ctx, sub_name, payload).await;
             match opened {
                 Ok((server_id, rx)) => {
                     let registered = if let Some(inner_arc) = inner.upgrade() {
@@ -771,7 +773,7 @@ mod tests {
         rec.wait_for("events", |r| r.named("sub:s1").len() == 1 && r.named("sub:s2").len() == 1);
         assert_eq!(rec.named("sub:s1")[0], json!({ "event": { "n": 1 } }));
         client.unsubscribe("s2");
-        assert_eq!(fake.inner.subscriber_count(), 1);
+        fake.wait_subscribers("unsubscribed s2", 1);
         fake.inner.emit("channel.follow", json!({ "n": 2 }));
         fake.inner.end("channel.follow");
         rec.wait_for("end", |r| r.named("sub:s1").last() == Some(&json!({ "end": null })));
@@ -791,7 +793,7 @@ mod tests {
         fake.wait_subscribers("subscriber registered", 1);
         assert_eq!(hub.clients_snapshot().len(), 1);
         drop(client);
-        assert_eq!(fake.inner.subscriber_count(), 0);
+        fake.wait_subscribers("unsubscribed on drop", 0);
         assert!(hub.clients_snapshot().is_empty());
     }
 }

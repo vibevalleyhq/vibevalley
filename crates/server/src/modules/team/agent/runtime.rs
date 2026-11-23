@@ -132,7 +132,7 @@ async fn probe_with_timeout<T: Send + 'static>(cancel: &CancellationToken, f: im
     if cancel.is_cancelled() {
         return None;
     }
-    let handle = vibevalley_runtime::rt::handle().spawn_blocking(f);
+    let handle = vibevalley_runtime::rt::current_or_global_handle().spawn_blocking(f);
     tokio::select! {
         biased;
         _ = cancel.cancelled() => None,

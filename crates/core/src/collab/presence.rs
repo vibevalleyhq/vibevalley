@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use loro::LoroValue;
 use loro::awareness::EphemeralStore;
@@ -72,7 +72,7 @@ pub struct PresencePayload {
 pub struct PresenceHub {
     store: EphemeralStore,
     ttl_ms: i64,
-    last_write_ms: Arc<Mutex<HashMap<String, u128>>>,
+    last_write_ms: Arc<Mutex<HashMap<String, i64>>>,
 }
 
 impl PresenceHub {
@@ -98,41 +98,54 @@ impl PresenceHub {
     pub fn upsert(&self, payload: PresencePayload) -> Result<Vec<u8>, CollabError> {
         let key = payload.id.clone();
         let encoded = serde_json::to_string(&payload)?;
-        self.with_monotonic_key_clock(&key, || {
+        self.mutate_with_monotonic_clock(&key, || {
             self.store.set(&key, encoded);
-            self.store.encode(&key)
         })
     }
 
     /// Removes a participant's presence and returns the encoded tombstone update.
     pub fn remove(&self, id: &str) -> Vec<u8> {
-        self.with_monotonic_key_clock(id, || {
+        self.mutate_with_monotonic_clock(id, || {
             self.store.delete(id);
-            self.store.encode(id)
         })
         .unwrap_or_default()
     }
 
     /// Loro's `EphemeralStore` stamps local mutations with wall-clock milliseconds and
     /// ignores incoming frames whose timestamp is `<=` the peer's stored timestamp.
-    /// Wait for the millisecond boundary (at most 2 ms) only on same-millisecond
-    /// consecutive writes to the same key so rapid upserts/tombstones always propagate.
-    fn with_monotonic_key_clock<T>(&self, key: &str, op: impl FnOnce() -> T) -> Result<T, CollabError> {
+    /// When consecutive writes to the same key land in the same millisecond, advance
+    /// the encoded Loro frame's timestamp by 1 ms and re-apply it locally so rapid
+    /// upserts/tombstones always propagate without sleeping.
+    fn mutate_with_monotonic_clock(&self, key: &str, op: impl FnOnce()) -> Result<Vec<u8>, CollabError> {
         let mut last_writes = self.last_write_ms.lock().unwrap_or_else(|p| p.into_inner());
-        let mut now = unix_now_ms();
-        if let Some(&prev_ms) = last_writes.get(key)
-            && now == prev_ms
-        {
-            let deadline = Instant::now() + Duration::from_millis(2);
-            while now == prev_ms && Instant::now() < deadline {
-                let remain_us = 1_000u64.saturating_sub(unix_sub_ms_micros()).max(50);
-                std::thread::sleep(Duration::from_micros(remain_us));
-                now = unix_now_ms();
+        let t_before = unix_now_ms();
+        op();
+        let t_after = unix_now_ms();
+        let mut bytes = self.store.encode(key);
+        let prev_ms = last_writes.get(key).copied();
+
+        let mut recorded_ts = t_after;
+        if let Some(prev_ms) = prev_ms {
+            let stamped = (t_before..=t_after).rev().find(|&ts| bytes.ends_with(&encode_zigzag_varint_i64(ts)));
+            if let Some(actual_ts) = stamped {
+                if actual_ts <= prev_ms {
+                    let next_ts = prev_ms.saturating_add(1);
+                    let old_suffix = encode_zigzag_varint_i64(actual_ts);
+                    let new_suffix = encode_zigzag_varint_i64(next_ts);
+                    bytes.truncate(bytes.len() - old_suffix.len());
+                    bytes.extend_from_slice(&new_suffix);
+                    self.store.apply(&bytes).map_err(|e| CollabError::Encoding(e.to_string()))?;
+                    recorded_ts = next_ts;
+                } else {
+                    recorded_ts = actual_ts;
+                }
+            } else {
+                recorded_ts = t_after.max(prev_ms);
             }
         }
-        let out = op();
-        last_writes.insert(key.to_owned(), unix_now_ms().max(now));
-        Ok(out)
+
+        last_writes.insert(key.to_owned(), recorded_ts);
+        Ok(bytes)
     }
 
     /// Encodes the latest state for a single participant (empty if missing or expired).
@@ -161,7 +174,7 @@ impl PresenceHub {
         let after = self.store.keys();
         let mut evicted: Vec<String> = before.into_iter().filter(|k| !after.contains(k)).collect();
         evicted.sort();
-        let cutoff = unix_now_ms().saturating_sub(self.ttl_ms.max(0) as u128);
+        let cutoff = unix_now_ms().saturating_sub(self.ttl_ms.max(0));
         self.last_write_ms.lock().unwrap_or_else(|p| p.into_inner()).retain(|_, ts| *ts >= cutoff);
         evicted
     }
@@ -174,7 +187,7 @@ impl PresenceHub {
         for (key, value) in states {
             let expired_by_payload = decode_payload(&value).is_none_or(|p| p.updated_at > 0 && now_ms.saturating_sub(p.updated_at) > self.ttl_ms);
             if expired_by_payload {
-                let _ = self.with_monotonic_key_clock(&key, || self.store.delete(&key));
+                let _ = self.mutate_with_monotonic_clock(&key, || self.store.delete(&key));
                 if !evicted.contains(&key) {
                     evicted.push(key);
                 }
@@ -218,10 +231,69 @@ fn decode_payload(value: &LoroValue) -> Option<PresencePayload> {
     serde_json::from_str::<PresencePayload>(raw.as_str()).ok()
 }
 
-fn unix_now_ms() -> u128 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis())
+fn unix_now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
 }
 
-fn unix_sub_ms_micros() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| (d.subsec_micros() % 1_000) as u64)
+fn encode_zigzag_varint_i64(value: i64) -> Vec<u8> {
+    let mut n = ((value << 1) ^ (value >> 63)) as u64;
+    let mut out = Vec::with_capacity(10);
+    loop {
+        let byte = (n & 0x7f) as u8;
+        n >>= 7;
+        if n == 0 {
+            out.push(byte);
+            return out;
+        }
+        out.push(byte | 0x80);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cursor(id: &str, x: f64, updated_at: i64) -> PresencePayload {
+        PresencePayload {
+            id: id.into(),
+            name: "Alice".into(),
+            color: "#22c55e".into(),
+            kind: PresenceKind::Cursor,
+            x: Some(x),
+            y: Some(0.0),
+            w: None,
+            h: None,
+            status: None,
+            block_id: None,
+            offset: None,
+            end_offset: None,
+            selector: None,
+            viewport: None,
+            updated_at,
+        }
+    }
+
+    #[test]
+    fn rapid_same_key_mutations_propagate_monotonically_without_sleeping() {
+        let a = PresenceHub::with_default_ttl();
+        let b = PresenceHub::with_default_ttl();
+
+        for i in 0..50 {
+            let p1 = cursor("peer:1", i as f64, 1_000 + i * 2);
+            let d1 = a.upsert(p1.clone()).unwrap();
+            b.apply(&d1).unwrap();
+            assert_eq!(b.get("peer:1"), Some(p1));
+
+            let p2 = cursor("peer:1", 100.0 + i as f64, 1_001 + i * 2);
+            let d2 = a.upsert(p2.clone()).unwrap();
+            b.apply(&d2).unwrap();
+            assert_eq!(b.get("peer:1"), Some(p2));
+
+            let tombstone = a.remove("peer:1");
+            b.apply(&tombstone).unwrap();
+            assert!(b.is_empty());
+        }
+    }
 }

@@ -614,7 +614,7 @@ impl Jobs {
         if let Some(hub) = self.hub.upgrade() {
             hub.spawn_task(fut);
         } else {
-            vibevalley_runtime::rt::handle().spawn(fut);
+            vibevalley_runtime::rt::current_or_global_handle().spawn(fut);
         }
     }
 
@@ -947,7 +947,7 @@ impl Jobs {
             if let Some(hub) = self.hub.upgrade() {
                 hub.spawn_blocking_task(run_job);
             } else {
-                vibevalley_runtime::rt::handle().spawn_blocking(run_job);
+                vibevalley_runtime::rt::current_or_global_handle().spawn_blocking(run_job);
             }
         }
     }
@@ -1401,7 +1401,7 @@ impl Jobs {
         if let Some(hub) = self.hub.upgrade() {
             hub.spawn_task(cleanup);
         } else {
-            vibevalley_runtime::rt::handle().spawn(cleanup);
+            vibevalley_runtime::rt::current_or_global_handle().spawn(cleanup);
         }
     }
 
