@@ -22,10 +22,10 @@ import { framesOf, groupsOf, type Picture, pictureMatches, picturesOf, shelfOf, 
 
 const usePictures = () => {
   const query = useSprites();
-  return () => {
+  return createMemo(() => {
     const manifest = ready(query, undefined);
     return manifest ? picturesOf(manifest) : undefined;
-  };
+  });
 };
 
 type ShelfTab = "sprites" | "cursors" | "sounds";
@@ -210,7 +210,7 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
   const ground = signal<Ground>("check");
   const byName = createMemo(() => new Map((pictures() ?? []).map((p) => [p.name, p])));
   const has = (n: string) => byName().has(n);
-  const selected = () => (props.id ? byName().get(props.id) : undefined);
+  const selected = createMemo(() => (props.id ? byName().get(props.id) : undefined));
   const counts = createMemo(() => {
     const c = new Map<string, number>();
     for (const p of pictures() ?? []) c.set(shelfOf(p.name), (c.get(shelfOf(p.name)) ?? 0) + 1);
@@ -228,9 +228,9 @@ function Sprites(props: { id?: string | undefined; tabs: JSX.Element }) {
     }
     return new Map([...on].map(([id, ps]) => [id, groupsOf(id, ps)]));
   });
-  const present = () => shelves.filter((s) => (counts().get(s.id) ?? 0) > 0);
-  const visible = () => (shelf() === "all" ? present() : present().filter((s) => s.id === shelf()));
-  const filtering = () => query().trim() !== "";
+  const present = createMemo(() => shelves.filter((s) => (counts().get(s.id) ?? 0) > 0));
+  const visible = createMemo(() => (shelf() === "all" ? present() : present().filter((s) => s.id === shelf())));
+  const filtering = createMemo(() => query().trim() !== "");
   return (
     <If when={pictures()}>
       {(pics) => (
@@ -323,17 +323,17 @@ function Cursors(props: { tabs: JSX.Element }) {
   const ground = signal<Ground>("check");
   const query = signal("");
   const cursors = useQuery(cursorsQuery);
-  const data = () => ready(cursors, undefined);
-  const total = () => Object.keys(data() ?? {}).length;
-  const all = () => {
+  const data = createMemo(() => ready(cursors, undefined));
+  const total = createMemo(() => Object.keys(data() ?? {}).length);
+  const all = createMemo(() => {
     const q = query().trim().toLowerCase();
     const d = data();
     return d ? Object.entries(d).filter(([name]) => !q || spelled(name, q)) : undefined;
-  };
-  const countBadge = () => {
+  });
+  const countBadge = createMemo(() => {
     const n = all()?.length ?? 0;
     return total() > 0 && n < total() ? `${n} / ${total()}` : String(n);
-  };
+  });
   return (
     <Layout
       left={
@@ -387,7 +387,7 @@ function Sounds(props: { tabs: JSX.Element }) {
     return !q || [group, name, SOUND_LABEL[name]].some((w) => spelled(w, q));
   };
   const total = SOUND_GROUPS.reduce((n, g) => n + g.names.length, 0);
-  const matchedTotal = () => SOUND_GROUPS.reduce((n, g) => n + g.names.filter((name) => matches(g.title, name)).length, 0);
+  const matchedTotal = createMemo(() => SOUND_GROUPS.reduce((n, g) => n + g.names.filter((name) => matches(g.title, name)).length, 0));
   const trigger = (name: SoundName) => {
     playSound(name);
     recent.set(name);
@@ -420,8 +420,8 @@ function Sounds(props: { tabs: JSX.Element }) {
       </If>
       <Each of={SOUND_GROUPS}>
         {(g) => {
-          const names = () => g().names.filter((n) => matches(g().title, n));
-          const badge = () => (names().length < g().names.length ? `${names().length} / ${g().names.length}` : String(names().length));
+          const names = createMemo(() => g().names.filter((n) => matches(g().title, n)));
+          const badge = createMemo(() => (names().length < g().names.length ? `${names().length} / ${g().names.length}` : String(names().length)));
           return (
             <If when={names().length > 0}>
               <ShelfSection title={g().title} count={badge()}>

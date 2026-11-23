@@ -1,11 +1,11 @@
-import { keymap, PanResponder, signal, untracked, View, type Accessor } from "nsh";
+import { computed, keymap, PanResponder, signal, untracked, View, type Accessor } from "nsh";
 
 import { useDesignHost } from "./host";
 
 /** A pane's width: the one the user dragged it to on this machine, else its default, kept between min and max. */
 export function usePaneWidth(pane: string, fallback: number, min: number, max: number): Accessor<number> {
   const designHost = useDesignHost();
-  return () => Math.min(max, Math.max(min, designHost.getPrefWidth(pane) ?? fallback));
+  return computed(() => Math.min(max, Math.max(min, designHost.getPrefWidth(pane) ?? fallback)));
 }
 
 /** side: the edge it is on, so dragging outward widens the pane. */
@@ -14,17 +14,27 @@ export function Splitter(props: { pane: string; side: "left" | "right"; width: n
   const dragging = signal(false);
   const focused = signal(false);
   const sign = () => (props.side === "left" ? -1 : 1);
-  const to = (w: number) => designHost.setPrefWidth(props.pane, Math.round(Math.min(props.max, Math.max(props.min, w))));
   let start = 0;
   let lastPress = 0;
+  let lastSent: number | undefined;
+  const to = (w: number) => {
+    const next = Math.round(Math.min(props.max, Math.max(props.min, w)));
+    if (next === untracked(() => props.width) || next === lastSent) return;
+    lastSent = next;
+    designHost.setPrefWidth(props.pane, next);
+  };
   const pan = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: () => {
       start = untracked(() => props.width);
+      lastSent = start;
       dragging.set(true);
       const now = Date.now();
-      if (now - lastPress < 300) designHost.setPrefWidth(props.pane, undefined);
+      if (now - lastPress < 300) {
+        lastSent = undefined;
+        designHost.setPrefWidth(props.pane, undefined);
+      }
       lastPress = now;
     },
     onPanResponderMove: (_e, g) => to(start + sign() * g.dx),

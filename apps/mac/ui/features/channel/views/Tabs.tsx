@@ -1,4 +1,4 @@
-import { effect, Scroll, signal, Text, View } from "nsh";
+import { computed, effect, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Channel, CronView } from "@vibevalley/protocol";
@@ -21,12 +21,13 @@ export function Sessions(props: { channel: Channel }) {
   const collab = useCollabSlice();
   const router = useRouter();
   const now = useNow();
-  const sessions = () =>
+  const sessions = computed(() =>
     (sessionsSlice()?.sessions ?? []).filter((h) => {
       if (isFreeUserSession(h)) return false;
       const channelId = sessionChannelId(h);
       return channelId ? channelId === props.channel.id : props.channel.default;
-    });
+    }),
+  );
   return (
     <If
       when={sessions().length > 0}
@@ -80,7 +81,7 @@ export function Sessions(props: { channel: Channel }) {
 
 export function Crons(props: { channel: Channel }) {
   const ops = useOpsSlice();
-  const crons = () => (ops()?.crons ?? []).filter((s) => s.channel === props.channel.id);
+  const crons = computed(() => (ops()?.crons ?? []).filter((s) => s.channel === props.channel.id));
   return (
     <If
       when={crons().length > 0}
@@ -118,14 +119,15 @@ function CronCard(props: { s: CronView }) {
     const timer = setTimeout(() => deleting.set(false), sureMs);
     return () => clearTimeout(timer);
   });
-  const meta = () =>
+  const meta = computed(() =>
     [
       props.s.whenText,
       props.s.pending ? props.s.nextText : t("web.channel.crons.next", { next: props.s.nextText }),
       ...(props.s.agent ? [t("web.channel.crons.direct", { agent: props.s.agent })] : []),
       // Only an orchestrator has the cron tool, so an agent's cron is the orchestrator's.
       ...(props.s.by === "agent" ? [t("web.channel.crons.byOrchestrator")] : []),
-    ].join(" · ");
+    ].join(" · "),
+  );
   return (
     <View
       testID={`cron-${props.s.id}`}

@@ -29,6 +29,7 @@ import {
   useSessionsSlice,
   useThreadOwner,
 } from "../infra/frame";
+import { prefsNow, setTheme, setWidth, usePrefs } from "../infra/state/prefs";
 import type { SliceMap } from "../infra/transport";
 
 function makeEvent(seq: number, revision = 1, run = "r1"): SessionEvent {
@@ -352,6 +353,69 @@ test("drafts.text debounces localStorage writes and createComposer memoizes canS
     drafts.clear(channel);
     alive.set(false);
   } finally {
+    localStorage.setItem = realSetItem;
+  }
+});
+
+test("setWidth no-op skips storage writes and usePrefs(theme) does not re-run when only width changes", () => {
+  const realSetItem = localStorage.setItem.bind(localStorage);
+  const initialTheme = prefsNow().theme;
+  const initialThreadWidth = prefsNow().widths.thread;
+  const prefWrites: string[] = [];
+  localStorage.setItem = (key: string, value: string) => {
+    if (key === "vibevalley.prefs") prefWrites.push(value);
+    realSetItem(key, value);
+  };
+
+  const alive = signal(true);
+  let themeRuns = 0;
+  let widthRuns = 0;
+  let lastTheme = initialTheme;
+  let lastWidth: number | undefined;
+
+  try {
+    effect(() => {
+      if (!alive()) return;
+      const theme = usePrefs((p) => p.theme);
+      const threadWidth = usePrefs((p) => p.widths.thread);
+      effect(() => {
+        themeRuns++;
+        lastTheme = theme();
+      });
+      effect(() => {
+        widthRuns++;
+        lastWidth = threadWidth();
+      });
+    });
+
+    expect(themeRuns).toBe(1);
+    expect(widthRuns).toBe(1);
+    expect(prefWrites.length).toBe(0);
+
+    setWidth("thread", 480);
+    expect(lastWidth).toBe(480);
+    expect(widthRuns).toBe(2);
+    expect(themeRuns).toBe(1);
+    expect(prefWrites.length).toBe(1);
+
+    // Repeating the same width must be a no-op with zero storage writes or listener notifications.
+    setWidth("thread", 480);
+    setWidth("unused-pane", undefined);
+    setTheme(lastTheme);
+    expect(widthRuns).toBe(2);
+    expect(themeRuns).toBe(1);
+    expect(prefWrites.length).toBe(1);
+
+    const nextTheme = initialTheme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    expect(lastTheme).toBe(nextTheme);
+    expect(themeRuns).toBe(2);
+    expect(widthRuns).toBe(2);
+    expect(prefWrites.length).toBe(2);
+  } finally {
+    alive.set(false);
+    setTheme(initialTheme);
+    setWidth("thread", initialThreadWidth);
     localStorage.setItem = realSetItem;
   }
 });

@@ -1,3 +1,4 @@
+import { computed } from "nsh";
 import { z } from "zod";
 
 import { ThemeChoice } from "@vibevalley/protocol/host";
@@ -44,7 +45,20 @@ const prefs = defineStored("prefs", PrefsSchema, {
 /** The choices now; read in a computation or a component, it follows them. */
 export const prefsNow = prefs.get;
 
-const set = (patch: Partial<Prefs>) => prefs.update((p) => ({ ...p, ...patch }));
+const prefKeySet: Record<keyof Prefs, true> = {
+  pick: true,
+  repo: true,
+  pet: true,
+  theme: true,
+  scale: true,
+  start: true,
+  widths: true,
+  libraryTile: true,
+};
+const prefKeys: readonly (keyof Prefs)[] = Object.keys(prefKeySet).filter((k): k is keyof Prefs => k in prefKeySet);
+
+const set = (patch: Partial<Prefs>) =>
+  prefs.update((p) => (prefKeys.some((key) => Object.hasOwn(patch, key) && !Object.is(p[key], patch[key])) ? { ...p, ...patch } : p));
 
 export const setTheme = (theme: ThemeChoice) => set({ theme });
 export const setScale = (scale: Scale) => set({ scale });
@@ -53,6 +67,7 @@ export const setLibraryTile = (libraryTile: number) => set({ libraryTile });
 /** A pane's width; none puts it back to its default. */
 export const setWidth = (pane: string, width: number | undefined) =>
   prefs.update((p) => {
+    if (p.widths[pane] === width) return p;
     const { [pane]: _was, ...rest } = p.widths;
     return { ...p, widths: width === undefined ? rest : { ...rest, [pane]: width } };
   });
@@ -64,10 +79,7 @@ export const rememberPick = (agent: string, repo: string) => {
 };
 
 /** One of the choices, following it. */
-export const usePrefs =
-  <T>(select: (p: Prefs) => T): Accessor<T> =>
-  () =>
-    select(prefs.get());
+export const usePrefs = <T>(select: (p: Prefs) => T): Accessor<T> => computed(() => select(prefs.get()));
 
 const dark = () => window.matchMedia("(prefers-color-scheme: dark)");
 

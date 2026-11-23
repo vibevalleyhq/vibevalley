@@ -27,7 +27,8 @@ export function createPersistentStorage(backend?: StorageBackend): PersistentLoc
   const dirty = new Set<string>();
   const listeners = new Set<(key: string, value: string) => void>();
   const hydrated = signal(backend === undefined);
-  let pending: Promise<void> = Promise.resolve();
+  const queued = new Map<string, string | null>();
+  let draining: Promise<void> | undefined;
 
   const ready: Promise<void> =
     backend === undefined
@@ -59,15 +60,33 @@ export function createPersistentStorage(backend?: StorageBackend): PersistentLoc
           }
         })();
 
-  const enqueue = (task: () => Promise<void>): void => {
-    if (backend === undefined) return;
-    pending = pending.then(async () => {
+  const drain = (): Promise<void> => {
+    if (draining !== undefined) return draining;
+    draining = (async () => {
       try {
-        await task();
-      } catch {
-        // Quota or unavailable storage: keep the value in the in-memory session cache.
+        while (queued.size > 0) {
+          const next = queued.entries().next();
+          if (next.done === true) break;
+          const [key, value] = next.value;
+          queued.delete(key);
+          try {
+            if (value === null) await backend?.removeItem(key);
+            else await backend?.setItem(key, value);
+          } catch {
+            // Quota or unavailable storage: keep the value in the in-memory session cache.
+          }
+        }
+      } finally {
+        draining = undefined;
       }
-    });
+    })();
+    return draining;
+  };
+
+  const enqueue = (key: string, value: string | null): void => {
+    if (backend === undefined) return;
+    queued.set(key, value);
+    if (draining === undefined) void drain();
   };
 
   return {
@@ -75,12 +94,12 @@ export function createPersistentStorage(backend?: StorageBackend): PersistentLoc
     setItem: (key, value) => {
       dirty.add(key);
       cache.set(key, value);
-      enqueue(() => backend?.setItem(key, value) ?? Promise.resolve());
+      enqueue(key, value);
     },
     removeItem: (key) => {
       dirty.add(key);
       cache.delete(key);
-      enqueue(() => backend?.removeItem(key) ?? Promise.resolve());
+      enqueue(key, null);
     },
     hydrated: () => hydrated(),
     ready,
@@ -92,7 +111,10 @@ export function createPersistentStorage(backend?: StorageBackend): PersistentLoc
     },
     flush: async () => {
       await ready;
-      await pending;
+      while (draining !== undefined || queued.size > 0) {
+        if (draining !== undefined) await draining;
+        else await drain();
+      }
     },
   };
 }

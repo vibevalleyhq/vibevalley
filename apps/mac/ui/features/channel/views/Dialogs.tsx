@@ -1,4 +1,4 @@
-import { signal, Text, untracked, View, type JSX } from "nsh";
+import { computed, signal, Text, untracked, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { type Channel, type Notify } from "@vibevalley/protocol";
@@ -24,7 +24,7 @@ import { channelName } from "../model/places";
 
 /** A text field with the values it knows offered under it: what a datalist offers there. */
 function Offered(props: { value: string; onChange: (v: string) => void; offered: readonly string[]; placeholder?: string; testid: string }) {
-  const shown = () => props.offered.filter((o) => o !== props.value && o.toLowerCase().includes(props.value.trim().toLowerCase())).slice(0, 6);
+  const shown = computed(() => props.offered.filter((o) => o !== props.value && o.toLowerCase().includes(props.value.trim().toLowerCase())).slice(0, 6));
   return (
     <View class="gap-1.5">
       <TextInput testID={props.testid} value={props.value} onInput={props.onChange} placeholder={props.placeholder} />
@@ -50,15 +50,8 @@ function Offered(props: { value: string; onChange: (v: string) => void; offered:
 
 function RepoInput(props: { value: string; onChange: (v: string) => void }) {
   const repos = useRepos();
-  return (
-    <Offered
-      testid="channel-repo"
-      value={props.value}
-      onChange={props.onChange}
-      placeholder={t("web.channel.dialog.repoExample")}
-      offered={ready(repos, []).map((p) => p.name)}
-    />
-  );
+  const offered = computed(() => ready(repos, []).map((p) => p.name));
+  return <Offered testid="channel-repo" value={props.value} onChange={props.onChange} placeholder={t("web.channel.dialog.repoExample")} offered={offered()} />;
 }
 
 function Form(props: {
@@ -163,7 +156,7 @@ function createChannelForm(channel?: Channel) {
     busy,
     error,
     /** Pressing save now would be sent: not busy, and a new channel has a name. */
-    ready: () => !busy() && (channel !== undefined || name().trim() !== ""),
+    ready: computed(() => !busy() && (channel !== undefined || name().trim() !== "")),
     save,
   };
 }
@@ -241,9 +234,9 @@ function ChannelSettingsForm(props: { channel: Channel; onClose: () => void; onG
   const form = createChannelForm(untracked(() => props.channel));
   const collab = useCollabSlice();
   const orchestrators = useOrchestrators();
-  const top = () => props.channel.type === "channel";
+  const top = computed(() => props.channel.type === "channel");
   // The groups the farm's channels are in, for the field to offer.
-  const categories = () => [...new Set((collab()?.chat?.channels ?? []).flatMap((c) => (c.category ? [c.category] : [])))];
+  const categories = computed(() => [...new Set((collab()?.chat?.channels ?? []).flatMap((c) => (c.category ? [c.category] : [])))]);
   const submit = async () => {
     if ((await form.save()) !== undefined) props.onClose();
   };

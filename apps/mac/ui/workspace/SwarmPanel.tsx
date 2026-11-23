@@ -134,7 +134,7 @@ function BoardMessageBody(props: { text: string }) {
 }
 
 function ChildStepCard(props: { step: SessionChildStep }) {
-  const totalTok = () => (props.step.inputTokens ?? 0) + (props.step.outputTokens ?? 0);
+  const totalTok = computed(() => (props.step.inputTokens ?? 0) + (props.step.outputTokens ?? 0));
   return (
     <View testID={`swarm-transcript-step-${props.step.stepIndex}`} class="gap-1 rounded-md border border-line bg-page p-2">
       <View class="flex-row items-center justify-between gap-2">
@@ -199,10 +199,10 @@ export function SwarmPanel(props: SwarmPanelProps) {
 
   const memberMap = computed((): ReadonlyMap<string, SessionSwarmMember> => new Map(props.swarm.members.map((m) => [m.name, m])));
 
-  const activeMember = (): SessionSwarmMember | undefined => {
+  const activeMember = computed((): SessionSwarmMember | undefined => {
     const name = selectedMemberName();
     return name ? memberMap().get(name) : undefined;
-  };
+  });
 
   const loadTranscript = (member: SessionSwarmMember) => {
     if (!props.sessionId || !member.conversationId) {
@@ -276,10 +276,10 @@ export function SwarmPanel(props: SwarmPanelProps) {
     { id: "board", label: t("web.shell.swarm.tabBoard"), count: () => props.swarm.totalMessages },
   ];
 
-  const hasOverviewContent = () => {
+  const hasOverviewContent = computed(() => {
     const ov = props.swarm.overview;
     return Boolean(ov && (ov.goalTitle || ov.goalLine || ov.threads.length > 0));
-  };
+  });
 
   return (
     <View testID="chat-swarm-panel" class="h-64 max-h-[45%] shrink-0 overflow-hidden border-b border-line bg-side">
