@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use tokio_util::sync::CancellationToken;
 use vibevalley_protocol::{
     Caller, Deliverable, Doing, Fact, Issue, IssueAnswer, IssueReportMemoryScope, MemoryCreateInput, Millis, Outcome, Phase, PhaseWorking, Question,
     RunTrigger, Session, SessionAction, Spent, ops,
@@ -462,10 +463,11 @@ impl Sessions {
         }
         // Persist extra columns after the `session` row exists in SQLite.
         self.0.ledger.database(|db| super::db::put_extra(db, &id, &extra))?;
+        let hub = self.0.hub.as_ref().and_then(Weak::upgrade);
         if let Some(before) = previous {
             let me = self.clone();
             let session_id = id.clone();
-            vibevalley_runtime::rt::handle().spawn_blocking(move || {
+            let reconcile = move || {
                 let mut after = before.clone();
                 let changed = super::subagents::read_back(&mut after, |thread, turn| agent.read_subagent(thread, turn), now);
                 if changed
@@ -474,12 +476,23 @@ impl Sessions {
                 {
                     eprintln!("could not reconcile subagents for {session_id}: {err}");
                 }
-            });
+            };
+            if let Some(hub) = &hub {
+                hub.spawn_blocking_task(reconcile);
+            } else {
+                vibevalley_runtime::rt::handle().spawn_blocking(reconcile);
+            }
         }
         let me = self.clone();
-        vibevalley_runtime::rt::handle().spawn(async move {
-            me.pump_async(id, generation, events).await;
-        });
+        let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
+        let pump = async move {
+            me.pump_async(id, generation, events, cancel).await;
+        };
+        if let Some(hub) = &hub {
+            hub.spawn_task(pump);
+        } else {
+            vibevalley_runtime::rt::handle().spawn(pump);
+        }
         Ok(())
     }
 
@@ -615,28 +628,32 @@ impl Sessions {
 
     /// Turns the agent's events into facts until the session ends or leaves,
     /// without pinning an OS thread while idle between agent events.
-    async fn pump_async(&self, session_id: String, generation: u64, events: flume::Receiver<vibevalley_runtime::oar::Event>) {
+    async fn pump_async(&self, session_id: String, generation: u64, events: flume::Receiver<vibevalley_runtime::oar::Event>, cancel: CancellationToken) {
         let quiet_after = self.0.config.quiet_after;
         let tick = quiet_after.min(Duration::from_secs(5)).max(Duration::from_millis(20));
         let mut last_event = Instant::now();
         let mut state = PumpState::default();
         loop {
-            let event = match tokio::time::timeout(tick, events.recv_async()).await {
-                Ok(Ok(event)) => event,
-                Ok(Err(flume::RecvError::Disconnected)) => break,
-                Err(_) => {
-                    if !self.current(&session_id, generation) {
-                        return;
+            let event = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => return,
+                res = tokio::time::timeout(tick, events.recv_async()) => match res {
+                    Ok(Ok(event)) => event,
+                    Ok(Err(flume::RecvError::Disconnected)) => break,
+                    Err(_) => {
+                        if !self.current(&session_id, generation) {
+                            return;
+                        }
+                        if last_event.elapsed() >= quiet_after {
+                            let me = self.clone();
+                            let sid = session_id.clone();
+                            let _ = tokio::task::spawn_blocking(move || me.set_quiet(&sid, Some(now()))).await;
+                        }
+                        continue;
                     }
-                    if last_event.elapsed() >= quiet_after {
-                        let me = self.clone();
-                        let sid = session_id.clone();
-                        let _ = tokio::task::spawn_blocking(move || me.set_quiet(&sid, Some(now()))).await;
-                    }
-                    continue;
-                }
+                },
             };
-            if !self.current(&session_id, generation) {
+            if cancel.is_cancelled() || !self.current(&session_id, generation) {
                 return;
             }
             last_event = Instant::now();
@@ -654,6 +671,9 @@ impl Sessions {
             if ended {
                 break;
             }
+        }
+        if cancel.is_cancelled() {
+            return;
         }
         let me = self.clone();
         let _ = tokio::task::spawn_blocking(move || {

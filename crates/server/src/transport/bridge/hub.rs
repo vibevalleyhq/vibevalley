@@ -152,28 +152,156 @@ fn parse_slice_topic(topic: &str) -> Option<SliceKind> {
     topic.strip_prefix("slice:").and_then(SliceKind::from_str)
 }
 
-/// Forwards every item from `rx` on the shared Tokio runtime until `cancel`
-/// fires or the source closes.
-fn pump_flume<T: Send + 'static>(
+/// Forwards every item from `rx` until `cancel` fires or the source closes.
+async fn pump_flume_async<T: Send + 'static>(
     rx: flume::Receiver<T>,
     cancel: CancellationToken,
     mut each: impl FnMut(T) + Send + 'static,
     ended: impl FnOnce(bool) + Send + 'static,
 ) {
-    vibevalley_runtime::rt::handle().spawn(async move {
-        let stopped = loop {
-            let item = tokio::select! {
-                biased;
-                _ = cancel.cancelled() => break true,
-                res = rx.recv_async() => match res {
-                    Ok(item) => item,
-                    Err(_) => break false,
-                },
-            };
-            each(item);
+    let stopped = loop {
+        let item = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => break true,
+            res = rx.recv_async() => match res {
+                Ok(item) => item,
+                Err(_) => break false,
+            },
         };
-        ended(stopped);
+        each(item);
+    };
+    ended(stopped);
+}
+
+/// Spawns [`pump_flume_async`] on the shared Tokio runtime.
+fn pump_flume<T: Send + 'static>(
+    rx: flume::Receiver<T>,
+    cancel: CancellationToken,
+    each: impl FnMut(T) + Send + 'static,
+    ended: impl FnOnce(bool) + Send + 'static,
+) {
+    vibevalley_runtime::rt::handle().spawn(pump_flume_async(rx, cancel, each, ended));
+}
+
+async fn pump_slice_subscription(
+    server: Arc<dyn Server>,
+    mut sub: crate::slice_feed::SliceSubscription,
+    receipt: Arc<SliceReceipt>,
+    revisions: Arc<AtomicU64>,
+    outlet: Arc<dyn Outlet>,
+    event_name: String,
+    task_cancel: CancellationToken,
+) {
+    let slice_topic = sub.topic();
+    let mut is_initial = true;
+    let mut seen_gen = None;
+    loop {
+        let (_seq, generation, frame) = sub.borrow_and_update(is_initial);
+        if !is_initial && seen_gen == Some(generation) {
+            let changed = tokio::select! {
+                biased;
+                _ = task_cancel.cancelled() => break,
+                ok = sub.changed() => ok,
+            };
+            if !changed {
+                break;
+            }
+            continue;
+        }
+        if let Some(gate) = server.fault_gate() {
+            if gate.should_disconnect(slice_topic) {
+                break;
+            }
+            let delay = gate.delay_ms(slice_topic);
+            if delay > 0 {
+                tokio::select! {
+                    biased;
+                    _ = task_cancel.cancelled() => break,
+                    _ = tokio::time::sleep(Duration::from_millis(delay)) => {}
+                }
+            }
+        }
+        if task_cancel.is_cancelled() {
+            break;
+        }
+        seen_gen = Some(generation);
+        is_initial = false;
+        let notified = receipt.ack.notified();
+        tokio::pin!(notified);
+        notified.as_mut().enable();
+        let rev = revisions.fetch_add(1, Ordering::Relaxed) + 1;
+        receipt.pending.store(rev, Ordering::Release);
+        outlet.send(&event_name, json!({ "rev": rev, "data": frame }));
+        tokio::select! {
+            biased;
+            _ = task_cancel.cancelled() => break,
+            _ = notified => {}
+        }
+        let changed = tokio::select! {
+            biased;
+            _ = task_cancel.cancelled() => break,
+            ok = sub.changed() => ok,
+        };
+        if !changed {
+            break;
+        }
+    }
+}
+
+/// Fallback for `Server` implementations without `SliceFeed` (e.g. custom test doubles).
+fn spawn_slice_blocking_fallback(
+    server: Arc<dyn Server>,
+    slice_kind: SliceKind,
+    receipt: Arc<SliceReceipt>,
+    revisions: Arc<AtomicU64>,
+    outlet: Arc<dyn Outlet>,
+    event_name: String,
+    task_cancel: CancellationToken,
+) {
+    let (stop_tx, stop_rx) = flume::bounded::<()>(0);
+    let stop_cancel = task_cancel.clone();
+    vibevalley_runtime::rt::handle().spawn(async move {
+        stop_cancel.cancelled().await;
+        drop(stop_tx);
     });
+    vibevalley_runtime::rt::handle().spawn_blocking(move || {
+        server.watch_slice(slice_kind, None, &stop_rx, &mut |_seq, frame| {
+            if task_cancel.is_cancelled() || stop_rx.is_disconnected() {
+                return;
+            }
+            vibevalley_runtime::rt::block_on(async {
+                let notified = receipt.ack.notified();
+                tokio::pin!(notified);
+                notified.as_mut().enable();
+                let rev = revisions.fetch_add(1, Ordering::Relaxed) + 1;
+                receipt.pending.store(rev, Ordering::Release);
+                outlet.send(&event_name, json!({ "rev": rev, "data": frame }));
+                tokio::select! {
+                    biased;
+                    _ = task_cancel.cancelled() => {}
+                    _ = notified => {}
+                }
+            });
+        });
+    });
+}
+
+async fn pump_live_broadcast(mut rx: broadcast::Receiver<crate::transport::bridge::LiveEvent>, outlet: Arc<dyn Outlet>, task_cancel: CancellationToken) {
+    let mut rev = 0u64;
+    loop {
+        let event = tokio::select! {
+            biased;
+            _ = task_cancel.cancelled() => break,
+            res = rx.recv() => match res {
+                Ok(ev) => ev,
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(broadcast::error::RecvError::Closed) => break,
+            },
+        };
+        rev += 1;
+        let data = serde_json::to_value(event).unwrap_or(Value::Null);
+        outlet.send("frame:live", json!({ "rev": rev, "data": data }));
+    }
 }
 
 impl Client {
@@ -201,115 +329,63 @@ impl Client {
             let server = self.hub.server.clone();
             let event_name = format!("frame:{topic}");
             let task_cancel = cancel.clone();
-            if let Some(mut sub) = server.subscribe_slice(slice_kind) {
-                let slice_topic = sub.topic();
+            if let Some(ready) = server.ready_async() {
                 vibevalley_runtime::rt::handle().spawn(async move {
-                    let mut is_initial = true;
-                    let mut seen_gen = None;
-                    loop {
-                        let (_seq, generation, frame) = sub.borrow_and_update(is_initial);
-                        if !is_initial && seen_gen == Some(generation) {
-                            let changed = tokio::select! {
-                                biased;
-                                _ = task_cancel.cancelled() => break,
-                                ok = sub.changed() => ok,
-                            };
-                            if !changed {
-                                break;
-                            }
-                            continue;
-                        }
-                        if let Some(gate) = server.fault_gate() {
-                            if gate.should_disconnect(slice_topic) {
-                                break;
-                            }
-                            let delay = gate.delay_ms(slice_topic);
-                            if delay > 0 {
-                                tokio::select! {
-                                    biased;
-                                    _ = task_cancel.cancelled() => break,
-                                    _ = tokio::time::sleep(Duration::from_millis(delay)) => {}
-                                }
-                            }
-                        }
-                        if task_cancel.is_cancelled() {
-                            break;
-                        }
-                        seen_gen = Some(generation);
-                        is_initial = false;
-                        let notified = receipt.ack.notified();
-                        tokio::pin!(notified);
-                        notified.as_mut().enable();
-                        let rev = revisions.fetch_add(1, Ordering::Relaxed) + 1;
-                        receipt.pending.store(rev, Ordering::Release);
-                        outlet.send(&event_name, json!({ "rev": rev, "data": frame }));
-                        tokio::select! {
-                            biased;
-                            _ = task_cancel.cancelled() => break,
-                            _ = notified => {}
-                        }
-                        let changed = tokio::select! {
-                            biased;
-                            _ = task_cancel.cancelled() => break,
-                            ok = sub.changed() => ok,
-                        };
-                        if !changed {
-                            break;
-                        }
+                    tokio::select! {
+                        biased;
+                        _ = task_cancel.cancelled() => return,
+                        _ = ready => {}
+                    }
+                    if task_cancel.is_cancelled() {
+                        return;
+                    }
+                    if let Some(sub) = server.subscribe_slice(slice_kind) {
+                        pump_slice_subscription(server, sub, receipt, revisions, outlet, event_name, task_cancel).await;
+                    } else {
+                        spawn_slice_blocking_fallback(server, slice_kind, receipt, revisions, outlet, event_name, task_cancel);
                     }
                 });
+            } else if let Some(sub) = server.subscribe_slice(slice_kind) {
+                vibevalley_runtime::rt::handle().spawn(pump_slice_subscription(server, sub, receipt, revisions, outlet, event_name, task_cancel));
             } else {
-                // Fallback for `Server` implementations without `SliceFeed` (e.g. `LateServer`).
-                let (stop_tx, stop_rx) = flume::bounded::<()>(0);
-                let stop_cancel = task_cancel.clone();
-                vibevalley_runtime::rt::handle().spawn(async move {
-                    stop_cancel.cancelled().await;
-                    drop(stop_tx);
-                });
-                vibevalley_runtime::rt::handle().spawn_blocking(move || {
-                    server.watch_slice(slice_kind, None, &stop_rx, &mut |_seq, frame| {
-                        if task_cancel.is_cancelled() || stop_rx.is_disconnected() {
-                            return;
-                        }
-                        vibevalley_runtime::rt::block_on(async {
-                            let notified = receipt.ack.notified();
-                            tokio::pin!(notified);
-                            notified.as_mut().enable();
-                            let rev = revisions.fetch_add(1, Ordering::Relaxed) + 1;
-                            receipt.pending.store(rev, Ordering::Release);
-                            outlet.send(&event_name, json!({ "rev": rev, "data": frame }));
-                            tokio::select! {
-                                biased;
-                                _ = task_cancel.cancelled() => {}
-                                _ = notified => {}
-                            }
-                        });
-                    });
-                });
+                spawn_slice_blocking_fallback(server, slice_kind, receipt, revisions, outlet, event_name, task_cancel);
             }
         } else if topic == "live" {
-            let mut rev = 0u64;
+            let server = self.hub.server.clone();
             let task_cancel = cancel.clone();
-            if let Some(mut rx) = self.hub.server.subscribe_live() {
+            if let Some(ready) = server.ready_async() {
                 vibevalley_runtime::rt::handle().spawn(async move {
-                    loop {
-                        let event = tokio::select! {
-                            biased;
-                            _ = task_cancel.cancelled() => break,
-                            res = rx.recv() => match res {
-                                Ok(ev) => ev,
-                                Err(broadcast::error::RecvError::Lagged(_)) => continue,
-                                Err(broadcast::error::RecvError::Closed) => break,
+                    tokio::select! {
+                        biased;
+                        _ = task_cancel.cancelled() => return,
+                        _ = ready => {}
+                    }
+                    if task_cancel.is_cancelled() {
+                        return;
+                    }
+                    if let Some(rx) = server.subscribe_live() {
+                        pump_live_broadcast(rx, outlet, task_cancel).await;
+                    } else {
+                        let mut rev = 0u64;
+                        pump_flume_async(
+                            server.live(),
+                            task_cancel,
+                            move |event| {
+                                rev += 1;
+                                let data = serde_json::to_value(event).unwrap_or(Value::Null);
+                                outlet.send("frame:live", json!({ "rev": rev, "data": data }));
                             },
-                        };
-                        rev += 1;
-                        let data = serde_json::to_value(event).unwrap_or(Value::Null);
-                        outlet.send("frame:live", json!({ "rev": rev, "data": data }));
+                            |_| {},
+                        )
+                        .await;
                     }
                 });
+            } else if let Some(rx) = server.subscribe_live() {
+                vibevalley_runtime::rt::handle().spawn(pump_live_broadcast(rx, outlet, task_cancel));
             } else {
+                let mut rev = 0u64;
                 pump_flume(
-                    self.hub.server.live(),
+                    server.live(),
                     task_cancel,
                     move |event| {
                         rev += 1;

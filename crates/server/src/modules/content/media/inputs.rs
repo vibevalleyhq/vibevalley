@@ -125,21 +125,19 @@ impl Inputs {
         found(&self.db, &self.inner(), id)
     }
     pub fn list(&self) -> Result<Vec<MediaInput>, ApiError> {
-        let inner = self.inner();
+        let uploading: HashSet<String> = self.inner().uploading.clone();
         let (rows, pins) = self
             .db
             .run(async |c| {
-                let mut tx = c.begin_with("BEGIN IMMEDIATE").await?;
-                let rows = q::list_inputs(&mut *tx).await?;
-                let pins = q::pinned_inputs(&mut *tx).await?;
-                tx.commit().await?;
+                let rows = q::list_inputs(&mut *c).await?;
+                let pins = q::pinned_inputs(&mut *c).await?;
                 Ok((rows, pins))
             })
             .map_err(storage)?;
         let pinned: HashSet<_> = pins.into_iter().map(|r| r.input_id).collect();
         rows.into_iter()
             .map(|row| {
-                let free = !pinned.contains(&row.id) && !inner.uploading.contains(&row.id);
+                let free = !pinned.contains(&row.id) && !uploading.contains(&row.id);
                 input(row, free)
             })
             .collect()

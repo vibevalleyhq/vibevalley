@@ -706,8 +706,9 @@ impl Chat {
             (live, db::messages_changed_after(&inner.db, channel, after, CATCH_UP_MAX as i64 + 1).q()?)
         };
         let channel = channel.to_string();
-        let cancel = self.hub.upgrade().map(|h| h.child_token()).unwrap_or_default();
-        vibevalley_runtime::rt::handle().spawn(async move {
+        let hub = self.hub.upgrade();
+        let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
+        let fut = async move {
             if missed.len() > CATCH_UP_MAX {
                 sink.send(&ProtocolChannelEvent::Reset {});
                 return;
@@ -719,7 +720,12 @@ impl Chat {
                 }
             }
             relay(live, cancel, &sink, |m| m.channel == channel && m.revision > upto).await;
-        });
+        };
+        if let Some(hub) = hub {
+            hub.spawn_task(fut);
+        } else {
+            vibevalley_runtime::rt::handle().spawn(fut);
+        }
         Ok(())
     }
 
@@ -739,8 +745,9 @@ impl Chat {
             };
             (live, missed)
         };
-        let cancel = self.hub.upgrade().map(|h| h.child_token()).unwrap_or_default();
-        vibevalley_runtime::rt::handle().spawn(async move {
+        let hub = self.hub.upgrade();
+        let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
+        let fut = async move {
             if missed.len() > CATCH_UP_MAX {
                 sink.send(&ProtocolChannelEvent::Reset {});
                 return;
@@ -752,7 +759,12 @@ impl Chat {
                 }
             }
             relay(live, cancel, &sink, |m| m.kind == MessageKind::Report && m.id > upto).await;
-        });
+        };
+        if let Some(hub) = hub {
+            hub.spawn_task(fut);
+        } else {
+            vibevalley_runtime::rt::handle().spawn(fut);
+        }
         Ok(())
     }
 }

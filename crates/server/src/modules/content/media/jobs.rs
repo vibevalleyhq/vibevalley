@@ -557,7 +557,7 @@ impl Jobs {
     fn sweep_each_minute(self: &Arc<Self>) {
         let cancel = self.cancel.clone();
         let me = Arc::downgrade(self);
-        vibevalley_runtime::rt::handle().spawn(async move {
+        let fut = async move {
             loop {
                 tokio::select! {
                     biased;
@@ -567,7 +567,12 @@ impl Jobs {
                 let Some(jobs) = me.upgrade() else { break };
                 let _ = tokio::task::spawn_blocking(move || jobs.expire_approvals()).await;
             }
-        });
+        };
+        if let Some(hub) = self.hub.upgrade() {
+            hub.spawn_task(fut);
+        } else {
+            vibevalley_runtime::rt::handle().spawn(fut);
+        }
     }
 
     fn db(&self) -> Result<crate::base::DbConn, ApiError> {
@@ -856,7 +861,7 @@ impl Jobs {
             drop(runs);
             let id = r.id().to_string();
             let work = me.clone();
-            let spawned = std::thread::Builder::new().name(format!("media-{id}")).spawn(move || {
+            let run_job = move || {
                 work.work(&id, &stop);
                 {
                     let mut runs = work.runs();
@@ -865,9 +870,11 @@ impl Jobs {
                     }
                 }
                 work.schedule();
-            });
-            if let Err(e) = spawned {
-                eprintln!("media: {e}");
+            };
+            if let Some(hub) = self.hub.upgrade() {
+                hub.spawn_blocking_task(run_job);
+            } else {
+                vibevalley_runtime::rt::handle().spawn_blocking(run_job);
             }
         }
     }
@@ -1309,7 +1316,7 @@ impl Jobs {
         let me = Arc::downgrade(self);
         let cancel = self.cancel.clone();
         let job = id.to_string();
-        vibevalley_runtime::rt::handle().spawn(async move {
+        let cleanup = async move {
             tokio::select! {
                 biased;
                 _ = cancel.cancelled() => {}
@@ -1318,7 +1325,12 @@ impl Jobs {
             if let Some(me) = me.upgrade() {
                 me.streams.lock().remove(&job);
             }
-        });
+        };
+        if let Some(hub) = self.hub.upgrade() {
+            hub.spawn_task(cleanup);
+        } else {
+            vibevalley_runtime::rt::handle().spawn(cleanup);
+        }
     }
 
     /// What came of a stream, kept as a WAV: ready when complete, else unknown with what came.

@@ -322,3 +322,30 @@ fn regression_native_media_paths_stream_validated_files_and_refuse_other_callers
     std::fs::write(stored["path"].as_str().unwrap(), b"changed").unwrap();
     assert_ne!(hub.call_as(Caller::User, "media.input.file", json!({"id":reserved.id})).biz_code, 0);
 }
+
+#[test]
+fn regression_list_reads_without_write_lock_during_concurrent_transaction() {
+    let (dir, _db, inputs, _, _) = setup();
+    let ready = inputs.create(&request()).unwrap();
+    inputs.upload(&ready.id, Cursor::new(png())).unwrap();
+    inputs.pin(std::slice::from_ref(&ready.id), "job-1").unwrap();
+    let free = inputs.create(&request()).unwrap();
+
+    // Hold a SQLite write lock open on a separate connection; `Inputs::list()` must
+    // use plain WAL reads without `BEGIN IMMEDIATE` and return immediately.
+    let mut writer = database(dir.path());
+    pollster::block_on(sqlx::raw_sql("BEGIN IMMEDIATE").execute(&mut writer)).unwrap();
+    let started = std::time::Instant::now();
+    let listed = inputs.list().expect("list must succeed while another connection holds write lock");
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(1),
+        "list blocked on writer lock for {:?}",
+        started.elapsed()
+    );
+    pollster::block_on(sqlx::raw_sql("ROLLBACK").execute(&mut writer)).unwrap();
+
+    let ready_entry = listed.iter().find(|i| i.id == ready.id).expect("ready input listed");
+    let free_entry = listed.iter().find(|i| i.id == free.id).expect("free input listed");
+    assert!(!ready_entry.can_delete);
+    assert!(free_entry.can_delete);
+}

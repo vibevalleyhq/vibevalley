@@ -92,10 +92,10 @@ fn main() {
         cx.activate(true);
         cx.on_app_quit(|cx| {
             let running = serving::RunningServer::take_for_shutdown(cx);
+            let background = cx.background_executor().clone();
             async move {
                 if let Some(running) = running {
-                    let done = std::thread::spawn(move || running.shutdown());
-                    let _ = done.join();
+                    background.spawn(async move { running.shutdown() }).await;
                 }
             }
         })
