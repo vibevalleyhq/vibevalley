@@ -1,11 +1,23 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
+import { createStyledDmg } from "./dmg-layout.ts";
 import { shouldPackageAsset } from "./package-assets.ts";
-import { channelIconFile, minimumMacOS, packageArchitecture, requireDeveloperId, verifyMacExecutable } from "./package-platform.ts";
+import {
+  channelBundleId,
+  channelBundleName,
+  channelFullIconFile,
+  channelIconFile,
+  compileAppIconCatalog,
+  dmgBackgroundFile,
+  minimumMacOS,
+  packageArchitecture,
+  requireDeveloperId,
+  verifyMacExecutable,
+} from "./package-platform.ts";
 
 const root = resolve(import.meta.dirname, "../..");
 const { values } = parseArgs({
@@ -39,7 +51,9 @@ const identity = values.sign ?? process.env.VIBEVALLEY_SIGN_IDENTITY ?? "-";
 const notary = values["notary-profile"] ?? process.env.VIBEVALLEY_NOTARY_PROFILE;
 if (notary && identity === "-") throw new Error("Notarization requires a Developer ID signing identity");
 const out = resolve(root, values.out ?? "apps/mac/dist");
-const app = join(out, "VibeValley.app");
+const bundleName = channelBundleName(version);
+const bundleId = channelBundleId(version);
+const app = join(out, `${bundleName}.app`);
 const macos = join(app, "Contents/MacOS");
 const resources = join(app, "Contents/Resources");
 const target = resolve(root, process.env.CARGO_TARGET_DIR ?? "target", profile);
@@ -55,7 +69,16 @@ if (!values["skip-build"]) {
 }
 const arch = packageArchitecture(process.arch);
 const icon = join(root, channelIconFile(version));
-for (const file of [join(target, "vibevalley-mac"), join(target, "vibevalley"), join(root, "apps/island/.build/release/VibeValleyIsland"), icon]) {
+const fullIcon = join(root, channelFullIconFile(version));
+const dmgBackground = join(root, dmgBackgroundFile);
+for (const file of [
+  join(target, "vibevalley-mac"),
+  join(target, "vibevalley"),
+  join(root, "apps/island/.build/release/VibeValleyIsland"),
+  icon,
+  fullIcon,
+  dmgBackground,
+]) {
   if (!existsSync(file)) throw new Error(`Missing package input: ${file}. Build it before --skip-build`);
 }
 for (const binary of [join(target, "vibevalley-mac"), join(target, "vibevalley"), join(root, "apps/island/.build/release/VibeValleyIsland")]) {
@@ -75,6 +98,7 @@ cpSync(assetsRoot, join(resources, "assets"), {
   filter: (src) => shouldPackageAsset(relative(assetsRoot, src)),
 });
 cpSync(icon, join(resources, "icon.icns"));
+compileAppIconCatalog(fullIcon, join(resources, "Assets.car"));
 const sign = (path: string, microphone = false) =>
   run("codesign", [
     "--force",
@@ -89,10 +113,11 @@ writeFileSync(
   `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleIdentifier</key><string>dev.vibevalley.app</string>
-<key>CFBundleName</key><string>VibeValley</string>
+<key>CFBundleIdentifier</key><string>${bundleId}</string>
+<key>CFBundleName</key><string>${bundleName}</string>
 <key>CFBundleExecutable</key><string>vibevalley-mac</string>
 <key>CFBundleIconFile</key><string>icon</string>
+<key>CFBundleIconName</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>VibeValleyVersion</key><string>${version}</string>
 <key>CFBundleShortVersionString</key><string>${version.split("-")[0]}</string>
@@ -123,18 +148,14 @@ if (notary) {
   makeZip();
 }
 if (!values["no-dmg"]) {
-  const stage = join(out, ".dmg-stage");
-  rmSync(stage, { recursive: true, force: true });
-  mkdirSync(stage);
-  cpSync(app, join(stage, "VibeValley.app"), { recursive: true });
-  symlinkSync("/Applications", join(stage, "Applications"));
   const dmg = join(out, `${name}.dmg`);
-  rmSync(dmg, { force: true });
-  try {
-    run("hdiutil", ["create", "-volname", `VibeValley ${version}`, "-srcfolder", stage, "-format", "UDZO", dmg]);
-  } finally {
-    rmSync(stage, { recursive: true, force: true });
-  }
+  createStyledDmg({
+    appPath: app,
+    bundleName,
+    volumeName: `${bundleName} ${version}`,
+    backgroundPath: dmgBackground,
+    outputPath: dmg,
+  });
   if (identity !== "-") sign(dmg);
   if (notary) {
     run("xcrun", ["notarytool", "submit", dmg, "--keychain-profile", notary, "--wait"]);

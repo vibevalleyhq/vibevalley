@@ -1,25 +1,82 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { expect, test } from "vite-plus/test";
 
-import { channelIconFile, packageArchitecture, requireDeveloperId, verifyMacExecutable } from "./package-platform.ts";
+import { buildFinderLayoutScript } from "./dmg-layout.ts";
+import {
+  channelBundleId,
+  channelBundleName,
+  channelFullIconFile,
+  channelIconFile,
+  compileAppIconCatalog,
+  dmgBackgroundFile,
+  packageArchitecture,
+  requireDeveloperId,
+  verifyMacExecutable,
+} from "./package-platform.ts";
 
-test("channelIconFile selects matching channel icns assets", () => {
+test("channel helpers resolve bundle names, bundle IDs, icons, and DMG background across all channels", () => {
   const root = resolve(import.meta.dirname, "../..");
-  const cases: readonly (readonly [string, string])[] = [
-    ["0.0.0", "apps/mac/resources/icon-dev.icns"],
-    ["0.4.0-alpha.1", "apps/mac/resources/icon-alpha.icns"],
-    ["0.4.0-beta.2", "apps/mac/resources/icon-beta.icns"],
-    ["0.4.0", "apps/mac/resources/icon.icns"],
+  const cases: readonly {
+    version: string;
+    bundleName: string;
+    bundleId: string;
+    icns: string;
+    fullIcon: string;
+  }[] = [
+    {
+      version: "0.0.0",
+      bundleName: "VibeValley-Dev",
+      bundleId: "dev.vibevalley.app.dev",
+      icns: "apps/mac/resources/icon-dev.icns",
+      fullIcon: "apps/mac/resources/appicon-dev.png",
+    },
+    {
+      version: "0.4.0-alpha.1",
+      bundleName: "VibeValley-Alpha",
+      bundleId: "dev.vibevalley.app.alpha",
+      icns: "apps/mac/resources/icon-alpha.icns",
+      fullIcon: "apps/mac/resources/appicon-alpha.png",
+    },
+    {
+      version: "0.4.0-beta.2",
+      bundleName: "VibeValley-Beta",
+      bundleId: "dev.vibevalley.app.beta",
+      icns: "apps/mac/resources/icon-beta.icns",
+      fullIcon: "apps/mac/resources/appicon-beta.png",
+    },
+    {
+      version: "0.4.0",
+      bundleName: "VibeValley",
+      bundleId: "dev.vibevalley.app",
+      icns: "apps/mac/resources/icon.icns",
+      fullIcon: "apps/mac/resources/appicon-release.png",
+    },
   ];
-  for (const [version, expected] of cases) {
-    const file = channelIconFile(version);
-    expect(file).toBe(expected);
-    expect(existsSync(join(root, file))).toBe(true);
+  for (const item of cases) {
+    expect(channelBundleName(item.version)).toBe(item.bundleName);
+    expect(channelBundleId(item.version)).toBe(item.bundleId);
+    expect(channelIconFile(item.version)).toBe(item.icns);
+    expect(channelFullIconFile(item.version)).toBe(item.fullIcon);
+    expect(existsSync(join(root, item.icns))).toBe(true);
+    expect(existsSync(join(root, item.fullIcon))).toBe(true);
   }
+  expect(dmgBackgroundFile).toBe("apps/mac/resources/dmg-background.png");
+  expect(existsSync(join(root, dmgBackgroundFile))).toBe(true);
+});
+
+test("buildFinderLayoutScript targets channel bundle name and exact Retina window coordinates", () => {
+  const script = buildFinderLayoutScript("VibeValley-Alpha 0.4.0-alpha.1", "VibeValley-Alpha.app");
+  expect(script).toContain('tell disk "VibeValley-Alpha 0.4.0-alpha.1"');
+  expect(script).toContain("set the bounds of container window to {120, 120, 800, 560}");
+  expect(script).toContain("set icon size of viewOptions to 128");
+  expect(script).toContain("set text size of viewOptions to 13");
+  expect(script).toContain('set background picture of viewOptions to file ".background:background.png"');
+  expect(script).toContain('set position of item "VibeValley-Alpha.app" of container window to {180, 210}');
+  expect(script).toContain('set position of item "Applications" of container window to {500, 210}');
 });
 
 test("regression: unknown package architectures and non-distribution signatures fail", () => {
@@ -40,6 +97,19 @@ test.skipIf(process.platform !== "darwin")("regression: package checks inspect M
     expect(() => verifyMacExecutable(object, "x64")).toThrow("requires x86_64");
     compile("arm64-apple-macos14.1");
     expect(() => verifyMacExecutable(object, "arm64")).toThrow("requires macOS 14.1");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test.skipIf(process.platform !== "darwin")("compileAppIconCatalog emits Assets.car from full-bleed channel PNG", () => {
+  const root = resolve(import.meta.dirname, "../..");
+  const dir = mkdtempSync(join(tmpdir(), "vv-car-"));
+  const car = join(dir, "Assets.car");
+  try {
+    compileAppIconCatalog(join(root, channelFullIconFile("0.4.0-alpha.1")), car);
+    expect(existsSync(car)).toBe(true);
+    expect(statSync(car).size).toBeGreaterThan(0);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
