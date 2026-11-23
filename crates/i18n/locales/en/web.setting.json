@@ -59,7 +59,7 @@
     "models": "keys accounts DeepSeek MOSS API key models binding",
     "voice": "call phone recognition speech MOSS live realtime vision transcription",
     "connections": "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
-    "remote": "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token",
+    "remote": "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
     "about": "version home folder settings data catalog"
   },
   "scope": {

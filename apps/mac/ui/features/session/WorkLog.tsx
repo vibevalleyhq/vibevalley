@@ -12,6 +12,7 @@ import { Bubble } from "../../design/Tip";
 import { mix, tone } from "../../design/tone";
 import { useNow } from "../../infra/base/dom";
 import { ago, tookText } from "../../infra/base/format";
+import { createEffect } from "../../infra/solid";
 import { createRunEvents } from "./events";
 import {
   answerOf,
@@ -56,6 +57,11 @@ function RunClockLog(props: { steps: SessionEvent[] }) {
 /** Under a report or the orchestrator's answer: the run behind it, folded to one line until opened. */
 export function RunSteps(props: { session: string; run: string | undefined; orchestrator?: boolean }) {
   const open = signal(false);
+  createEffect(
+    () => `${props.session}:${props.run ?? ""}`,
+    () => open.set(false),
+    { defer: true },
+  );
   const steps = createRunEvents(
     () => props.session,
     () => props.run,
@@ -229,11 +235,9 @@ function Folded(props: { text: string; lines: number; markdown?: boolean; muted?
   return (
     <View class="items-start">
       <View class="w-full overflow-hidden" style={clamp() ? { maxHeight: props.lines * 20 } : undefined}>
-        {props.markdown === true ? (
+        <If when={props.markdown === true} else={<Text class={`text-sm ${props.muted === true ? "text-muted" : "text-ink"}`}>{props.text}</Text>}>
           <Markdown size="sm" text={props.text} />
-        ) : (
-          <Text class={`text-sm ${props.muted === true ? "text-muted" : "text-ink"}`}>{props.text}</Text>
-        )}
+        </If>
       </View>
       <If when={long()}>
         <View

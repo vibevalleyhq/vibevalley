@@ -2,13 +2,16 @@
 //! interaction routing, and background-continuation tracking.
 
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::sync::OnceLock;
+use std::time::Duration;
 
 use regex::Regex;
+use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-use crate::oar::{EventKind, Installation, InteractionOption, PermissionMode, SessionOptions, SubagentStatus};
+use crate::oar::{AccountUsage, AgentError, EventKind, Installation, InteractionOption, PermissionMode, Result, SessionOptions, SubagentStatus, UsageWindow};
 
 pub(crate) const MIN_VERSION: (u64, u64, u64) = (1, 5, 0);
 pub(crate) const FIELD_TEXT_LIMIT: usize = 8 * 1024;
@@ -16,6 +19,7 @@ pub(crate) const PAYLOAD_BYTE_LIMIT: usize = 64 * 1024;
 pub(crate) const PAYLOAD_NODE_LIMIT: usize = 512;
 
 const AUTH_LINK_PREFIX: &str = "Open the following link to authenticate the ACP server:";
+const USAGE_TIMEOUT: Duration = Duration::from_secs(20);
 
 pub(crate) fn parse_semver(raw: &str) -> Option<(u64, u64, u64)> {
     for token in raw.split(|c: char| c.is_whitespace() || matches!(c, ',' | ';' | '(' | ')' | '[' | ']')) {
@@ -848,6 +852,395 @@ impl ChildActivityTracker {
         }
         (true, events)
     }
+}
+
+// ---- Account usage / quota probing (`agy --print /usage --output-format json`)
+
+#[derive(Deserialize)]
+struct WireUsageOutput {
+    #[serde(default)]
+    status: Option<String>,
+    #[serde(default)]
+    response: Option<String>,
+    #[serde(default)]
+    error: Option<WireUsageError>,
+    #[serde(default)]
+    command: Option<WireUsageCommand>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum WireUsageError {
+    Message(String),
+    Object {
+        #[serde(default)]
+        message: Option<String>,
+    },
+    Other(#[allow(dead_code)] serde::de::IgnoredAny),
+}
+
+impl WireUsageError {
+    fn as_str(&self) -> Option<&str> {
+        match self {
+            Self::Message(s) => Some(s.as_str()),
+            Self::Object { message } => message.as_deref(),
+            Self::Other(_) => None,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct WireUsageCommand {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    data: Option<WireUsageData>,
+}
+
+#[derive(Deserialize)]
+struct WireUsageData {
+    #[serde(default)]
+    groups: Option<Vec<WireUsageGroup>>,
+}
+
+#[derive(Deserialize)]
+struct WireUsageGroup {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    buckets: Option<Vec<WireUsageBucket>>,
+}
+
+#[derive(Deserialize)]
+struct WireUsageBucket {
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    window: Option<String>,
+    #[serde(default)]
+    remaining_fraction: Option<f64>,
+    #[serde(default)]
+    reset_time: Option<String>,
+}
+
+fn has_auth_hint(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    lower.contains("open the following link to authenticate")
+        || lower.contains("not logged in")
+        || lower.contains("not authenticated")
+        || lower.contains("authentication required")
+        || lower.contains("login required")
+        || lower.contains("unauthenticated")
+        || lower.contains("please log in")
+        || lower.contains("please sign in")
+}
+
+fn is_non_success_auth_hint(status: &str, detail: &str, raw: &str) -> bool {
+    if has_auth_hint(raw) || has_auth_hint(detail) {
+        return true;
+    }
+    let status_lower = status.to_ascii_lowercase();
+    let detail_lower = detail.to_ascii_lowercase();
+    status_lower.contains("auth") || status_lower.contains("login") || detail_lower.contains("authenticate") || detail_lower.contains("login")
+}
+
+fn normalize_group_name(raw: Option<&str>) -> Option<String> {
+    let trimmed = raw?.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    if lower == "gemini models" || lower == "gemini" {
+        return Some("Gemini".to_string());
+    }
+    if lower == "claude and gpt models" || lower == "claude and gpt" || lower == "claude/gpt" {
+        return Some("Claude/GPT".to_string());
+    }
+    let stripped = trimmed
+        .strip_suffix(" Models")
+        .or_else(|| trimmed.strip_suffix(" models"))
+        .unwrap_or(trimmed)
+        .trim();
+    (!stripped.is_empty()).then(|| stripped.to_string())
+}
+
+/// Normalizes a bucket's window key into `(display_label, duration_ms, sort_rank)`.
+/// Shorter windows sort first (`5h` before `7d`).
+fn normalize_window(window: Option<&str>, fallback_name: Option<&str>, fallback_id: Option<&str>) -> (String, Option<u64>, u8) {
+    const HOUR_MS: u64 = 3_600_000;
+    const DAY_MS: u64 = 24 * HOUR_MS;
+    if let Some(raw) = window.map(str::trim).filter(|s| !s.is_empty()) {
+        return match raw.to_ascii_lowercase().as_str() {
+            "5h" | "5_hour" | "five_hour" => ("5h".into(), Some(5 * HOUR_MS), 0),
+            "daily" | "1d" | "24h" => ("24h".into(), Some(DAY_MS), 1),
+            "weekly" | "7d" | "seven_day" | "1w" => ("7d".into(), Some(7 * DAY_MS), 2),
+            "monthly" | "30d" => ("30d".into(), Some(30 * DAY_MS), 3),
+            _ => (raw.to_string(), None, 4),
+        };
+    }
+    if let Some(name) = fallback_name.map(str::trim).filter(|s| !s.is_empty()) {
+        let lower = name.to_ascii_lowercase();
+        if lower.contains("five hour") || lower.contains("5h") || lower.contains("5-hour") {
+            return ("5h".into(), Some(5 * HOUR_MS), 0);
+        }
+        if lower.contains("weekly") || lower.contains("7d") || lower.contains("7-day") {
+            return ("7d".into(), Some(7 * DAY_MS), 2);
+        }
+        return (name.to_string(), None, 4);
+    }
+    if let Some(id) = fallback_id.map(str::trim).filter(|s| !s.is_empty()) {
+        return (id.to_string(), None, 5);
+    }
+    ("limit".into(), None, 5)
+}
+
+fn parse_usage_json(raw: &str) -> std::result::Result<WireUsageOutput, serde_json::Error> {
+    let trimmed = raw.trim();
+    match serde_json::from_str::<WireUsageOutput>(trimmed) {
+        Ok(parsed) => Ok(parsed),
+        Err(first_err) => {
+            if let (Some(start), Some(end)) = (trimmed.find('{'), trimmed.rfind('}'))
+                && start < end
+                && (start > 0 || end + 1 < trimmed.len())
+            {
+                serde_json::from_str::<WireUsageOutput>(&trimmed[start..=end]).map_err(|_| first_err)
+            } else {
+                Err(first_err)
+            }
+        }
+    }
+}
+
+/// Parses the JSON (or auth banner text) emitted by `agy --print /usage --output-format json`.
+pub(crate) fn usage_of(raw: &str) -> Result<AccountUsage> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Ok(AccountUsage::Unsupported {
+            reason: "quota_unavailable".into(),
+        });
+    }
+    let parsed = match parse_usage_json(trimmed) {
+        Ok(parsed) => parsed,
+        Err(err) => {
+            if has_auth_hint(trimmed) {
+                return Ok(AccountUsage::ReauthRequired {
+                    reason: "not_authenticated".into(),
+                });
+            }
+            return Err(AgentError::Protocol(format!("could not parse antigravity usage output: {err}")));
+        }
+    };
+
+    if let Some(status) = parsed.status.as_deref()
+        && !status.eq_ignore_ascii_case("SUCCESS")
+    {
+        let detail = parsed
+            .error
+            .as_ref()
+            .and_then(WireUsageError::as_str)
+            .or(parsed.response.as_deref())
+            .unwrap_or_default()
+            .trim();
+        if is_non_success_auth_hint(status, detail, trimmed) {
+            return Ok(AccountUsage::ReauthRequired {
+                reason: "not_authenticated".into(),
+            });
+        }
+        return Err(AgentError::Protocol(if detail.is_empty() {
+            format!("antigravity usage query returned status `{status}`")
+        } else {
+            format!("antigravity usage query failed ({status}): {detail}")
+        }));
+    }
+
+    let Some(command) = parsed.command else {
+        return Ok(AccountUsage::Unsupported {
+            reason: "quota_unavailable".into(),
+        });
+    };
+    if command.name.as_deref() != Some("usage") {
+        return Ok(AccountUsage::Unsupported {
+            reason: "quota_unavailable".into(),
+        });
+    }
+    let groups = command.data.and_then(|d| d.groups).unwrap_or_default();
+    if groups.is_empty() {
+        return Ok(AccountUsage::Unsupported {
+            reason: "quota_unavailable".into(),
+        });
+    }
+
+    let mut windows = Vec::new();
+    let mut non_empty_groups = 0usize;
+    let mut exhausted_groups = 0usize;
+
+    for group in groups {
+        let group_prefix = normalize_group_name(group.name.as_deref());
+        let mut group_windows: Vec<(u8, usize, UsageWindow)> = Vec::new();
+        for (idx, bucket) in group.buckets.unwrap_or_default().into_iter().enumerate() {
+            let Some(remaining) = bucket.remaining_fraction.filter(|r| r.is_finite()) else {
+                continue;
+            };
+            let (win_label, duration_ms, rank) = normalize_window(bucket.window.as_deref(), bucket.name.as_deref(), bucket.id.as_deref());
+            let label = match &group_prefix {
+                Some(prefix) => format!("{prefix} · {win_label}"),
+                None => win_label,
+            };
+            let used_ratio = ((1.0 - remaining).clamp(0.0, 1.0) * 1e6).round() / 1e6;
+            let resets_at = bucket.reset_time.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(str::to_string);
+            let id = bucket.id.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(str::to_string);
+            group_windows.push((
+                rank,
+                idx,
+                UsageWindow {
+                    label,
+                    used_ratio,
+                    resets_at,
+                    id,
+                    duration_ms,
+                },
+            ));
+        }
+        if group_windows.is_empty() {
+            continue;
+        }
+        group_windows.sort_by_key(|(rank, idx, _)| (*rank, *idx));
+        non_empty_groups += 1;
+        if group_windows.iter().any(|(_, _, w)| w.used_ratio >= 1.0) {
+            exhausted_groups += 1;
+        }
+        windows.extend(group_windows.into_iter().map(|(_, _, w)| w));
+    }
+
+    if windows.is_empty() {
+        return Ok(AccountUsage::Unsupported {
+            reason: "quota_unavailable".into(),
+        });
+    }
+
+    Ok(AccountUsage::Available {
+        plan: None,
+        email: None,
+        rate_limited: non_empty_groups > 0 && exhausted_groups == non_empty_groups,
+        windows,
+    })
+}
+
+/// Runs `agy --print /usage --output-format json` in a clean temp directory with
+/// auto-update disabled and a bounded async timeout + process-group reaper.
+pub(crate) fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
+    use tokio::io::AsyncReadExt as _;
+    use tokio::process::Command;
+
+    let binary = binary.to_path_buf();
+    let (status, stdout, stderr) = crate::rt::block_on(async move {
+        let mut child = Command::new(&binary)
+            .args(["--print", "/usage", "--output-format", "json"])
+            .current_dir(std::env::temp_dir())
+            .env("AGY_CLI_DISABLE_AUTO_UPDATE", "1")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .process_group(0)
+            .spawn()
+            .map_err(|e| AgentError::NotAvailable(format!("cannot start {}: {e}", binary.display())))?;
+        let pid = child.id().unwrap_or(0);
+        let stdout_task = child.stdout.take().map(|mut stdout| {
+            crate::rt::spawn(async move {
+                let mut bytes = Vec::new();
+                let _ = stdout.read_to_end(&mut bytes).await;
+                String::from_utf8_lossy(&bytes).into_owned()
+            })
+        });
+        let stderr_task = child.stderr.take().map(|mut stderr| {
+            crate::rt::spawn(async move {
+                let mut bytes = Vec::new();
+                let _ = stderr.read_to_end(&mut bytes).await;
+                String::from_utf8_lossy(&bytes).into_owned()
+            })
+        });
+
+        let status = match tokio::time::timeout(USAGE_TIMEOUT, child.wait()).await {
+            Ok(Ok(status)) => status,
+            Ok(Err(e)) => {
+                let _ = crate::oar::process::reap_process_group(&mut child, pid, Duration::from_millis(200)).await;
+                if let Some(h) = stdout_task {
+                    h.abort();
+                }
+                if let Some(h) = stderr_task {
+                    h.abort();
+                }
+                return Err(AgentError::Io(format!("failed waiting for antigravity usage query: {e}")));
+            }
+            Err(_) => {
+                let _ = crate::oar::process::reap_process_group(&mut child, pid, Duration::from_millis(200)).await;
+                if let Some(h) = stdout_task {
+                    h.abort();
+                }
+                if let Some(h) = stderr_task {
+                    h.abort();
+                }
+                return Err(AgentError::Io("antigravity did not answer the usage query in time".into()));
+            }
+        };
+
+        let stdout = match stdout_task {
+            Some(h) => h.await.unwrap_or_default(),
+            None => String::new(),
+        };
+        let stderr = match stderr_task {
+            Some(h) => h.await.unwrap_or_default(),
+            None => String::new(),
+        };
+        Ok((status, stdout, stderr))
+    })?;
+
+    if !stdout.trim().is_empty() {
+        match usage_of(&stdout) {
+            Ok(AccountUsage::Unsupported { .. }) if has_auth_hint(&stderr) => {
+                return Ok(AccountUsage::ReauthRequired {
+                    reason: "not_authenticated".into(),
+                });
+            }
+            Ok(usage) => return Ok(usage),
+            Err(_) if has_auth_hint(&stderr) => {
+                return Ok(AccountUsage::ReauthRequired {
+                    reason: "not_authenticated".into(),
+                });
+            }
+            Err(err) => {
+                if !status.success() {
+                    let detail = stderr.trim();
+                    let message = if detail.is_empty() {
+                        format!("antigravity usage query failed (exit {:?}): {err}", status.code())
+                    } else {
+                        format!("antigravity usage query failed (exit {:?}): {detail}", status.code())
+                    };
+                    return Err(AgentError::Protocol(message));
+                }
+                return Err(err);
+            }
+        }
+    }
+
+    if has_auth_hint(&stderr) {
+        return Ok(AccountUsage::ReauthRequired {
+            reason: "not_authenticated".into(),
+        });
+    }
+    if !status.success() {
+        let detail = stderr.trim();
+        return Err(AgentError::Protocol(format!(
+            "antigravity usage query failed (exit {:?}): {}",
+            status.code(),
+            if detail.is_empty() { "no output" } else { detail }
+        )));
+    }
+    Ok(AccountUsage::Unsupported {
+        reason: "quota_unavailable".into(),
+    })
 }
 
 #[cfg(test)]

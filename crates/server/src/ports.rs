@@ -238,3 +238,9 @@ pub trait ToolDispatchPort: Send + Sync {
 pub trait CronOrchestratorPort: Send + Sync {
     fn hear_cron(&self, agent: &str, channel: &str, line: &str) -> bool;
 }
+
+/// Read-only attachment byte access port allowing L1 `infra/machine` to serve
+/// `MachineAttachmentFetch` over the WS bus without importing `content/attachment`.
+pub trait AttachmentReadPort: Send + Sync {
+    fn read_bytes(&self, id: &str) -> Result<(String, Vec<u8>), ApiError>;
+}

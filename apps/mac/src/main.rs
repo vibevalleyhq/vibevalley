@@ -4,8 +4,10 @@ mod debug;
 mod diff;
 mod host;
 mod hosted;
+mod icon;
 mod island;
 mod live_voice;
+mod markdown_pane;
 mod panes;
 mod pixel;
 mod qr;
@@ -51,6 +53,8 @@ pub fn ensure_main_window(cx: &mut App) {
 
 fn init_tracing() {
     use tracing_subscriber::EnvFilter;
+    use tracing_subscriber::layer::SubscriberExt as _;
+    use tracing_subscriber::util::SubscriberInitExt as _;
 
     let filter = std::env::var("VIBEVALLEY_LOG")
         .ok()
@@ -58,7 +62,11 @@ fn init_tracing() {
         .or_else(|| std::env::var("RUST_LOG").ok().filter(|s| !s.trim().is_empty()))
         .and_then(|raw| EnvFilter::try_new(raw).ok())
         .unwrap_or_else(|| EnvFilter::new(if shell::devtools_enabled() { "info" } else { "warn" }));
-    let _ = tracing_subscriber::fmt().with_env_filter(filter).with_target(true).try_init();
+    let _ = tracing_subscriber::registry()
+        .with(filter)
+        .with(tracing_subscriber::fmt::layer().with_target(true))
+        .with(host::OsLogLayer::new())
+        .try_init();
 }
 
 fn main() {
@@ -85,10 +93,10 @@ fn main() {
         cx.activate(true);
         cx.on_app_quit(|cx| {
             let running = serving::RunningServer::take_for_shutdown(cx);
+            let background = cx.background_executor().clone();
             async move {
                 if let Some(running) = running {
-                    let done = std::thread::spawn(move || running.shutdown());
-                    let _ = done.join();
+                    background.spawn(async move { running.shutdown() }).await;
                 }
             }
         })

@@ -328,3 +328,89 @@ fn remote_platforms_scopes_and_runtime_inbox_fact_round_trip() {
         "items": [],
     }));
 }
+
+#[test]
+fn machine_contract_types_runtime_ref_and_routing_fields_round_trip() {
+    assert_eq!(LOCAL_MACHINE_ID, "local");
+    assert_eq!(MachinePlatform::ALL.map(MachinePlatform::as_str), ["macos", "linux", "container", "other"]);
+    for platform in MachinePlatform::ALL {
+        assert_eq!(platform.as_str().parse::<MachinePlatform>(), Ok(platform));
+    }
+    assert!("windows".parse::<MachinePlatform>().is_err());
+
+    assert_eq!(MachineStatus::ALL.map(MachineStatus::as_str), ["online", "offline", "draining"]);
+    for status in MachineStatus::ALL {
+        assert_eq!(status.as_str().parse::<MachineStatus>(), Ok(status));
+    }
+    assert!("broken".parse::<MachineStatus>().is_err());
+
+    assert_eq!(
+        MachineInputKind::ALL.map(MachineInputKind::as_str),
+        ["prompt", "steer", "queue", "abort", "setConfig", "dispose"]
+    );
+    for kind in MachineInputKind::ALL {
+        assert_eq!(kind.as_str().parse::<MachineInputKind>(), Ok(kind));
+    }
+    assert!("other".parse::<MachineInputKind>().is_err());
+
+    let local_ref = RuntimeRef::local("claude");
+    assert!(local_ref.is_local());
+    assert_eq!(local_ref.to_string(), "local/claude");
+    assert_eq!(RuntimeRef::parse("local/claude"), Ok(local_ref));
+    let remote_ref = RuntimeRef::parse("gpu-1/acp:opencode").expect("parse remote ref");
+    assert!(!remote_ref.is_local());
+    assert_eq!(remote_ref, RuntimeRef::new("gpu-1", "acp:opencode"));
+    assert_eq!(remote_ref.to_string(), "gpu-1/acp:opencode");
+    assert!(matches!(RuntimeRef::parse("claude"), Err(RuntimeRefParseError::InvalidFormat(_))));
+    assert!(matches!(RuntimeRef::parse("a/b/c"), Err(RuntimeRefParseError::InvalidFormat(_))));
+    assert!(matches!(RuntimeRef::parse("/claude"), Err(RuntimeRefParseError::EmptyMachineId(_))));
+    assert!(matches!(RuntimeRef::parse("gpu-1/"), Err(RuntimeRefParseError::EmptyRuntimeId(_))));
+
+    // Minimal Machine JSON omits optional fields while enriched Machine preserves them.
+    round_value::<Machine>(&serde_json::json!({
+        "id": "local",
+        "name": "Mac",
+        "here": true,
+        "online": true,
+        "joinedAt": 100,
+    }));
+    round_value::<Machine>(&serde_json::json!({
+        "id": "sbx-1",
+        "name": "Sandbox 1",
+        "here": false,
+        "online": true,
+        "joinedAt": 200,
+        "platform": "container",
+        "status": "draining",
+        "ephemeral": true,
+        "runtimes": ["claude", "codex"],
+    }));
+
+    let removed = Fact::machine_removed(99, "sbx-1");
+    assert_eq!(removed.at(), 99);
+    round_value::<Fact>(&serde_json::json!({
+        "type": "machineRemoved",
+        "at": 99,
+        "id": "sbx-1",
+    }));
+
+    // Routing fields on IssueRequest / IssueUpdate / IssueUpdateInput serialize cleanly.
+    round_value::<IssueRequest>(&serde_json::json!({
+        "title": "Run on GPU",
+        "machineId": "gpu-1",
+    }));
+    round_value::<IssueUpdate>(&serde_json::json!({
+        "machineId": "gpu-1",
+    }));
+    round_value::<IssueUpdateInput>(&serde_json::json!({
+        "id": "i1",
+        "machineId": "gpu-1",
+    }));
+
+    let ep = endpoint("machine.list").expect("machine.list endpoint");
+    assert_eq!(ep.module, "machine");
+    assert_eq!(ep.can, &[Caller::User, Caller::Remote]);
+    assert_eq!(ep.input, None);
+    assert_eq!(ep.result, Some("Vec<MachineInfo>"));
+    assert_eq!(<ops::MachineList as Op>::NAME, "machine.list");
+}

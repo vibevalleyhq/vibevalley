@@ -4,7 +4,7 @@ use vibevalley_protocol::{
 };
 
 use super::db::{self, EventRow, MsgRow};
-use super::store::{Q, tx};
+use super::store::{Q, message_of, tx};
 use super::types::{
     AddressedMessage, ChannelEvent, Made, Meta, Note, Noticing, Picked, Posting, Saying, Speaking, Spoken, ThreadSubject, Write, line_of, meta_of, meta_text,
     reactions_of, reactions_text, to_message,
@@ -17,26 +17,26 @@ use crate::now;
 impl Chat {
     /// `say`: the user's words in a place; the farm goes live.
     pub fn say(&self, s: Saying) -> Result<(ChatMessage, bool), ApiError> {
+        if let Some(hub) = self.hub.upgrade()
+            && hub.read(|st| st.call != CallState::Live)
+        {
+            hub.apply(vec![Fact::CallChanged(FactCallChanged {
+                at: now(),
+                state: CallState::Live,
+                reason: String::new(),
+            })]);
+        }
+        let files = self.files.of(&s.attachments)?;
+        if s.text.trim().is_empty() && files.is_empty() {
+            return Err(refused(t("server.channel.empty", &[])));
+        }
+        if s.send_key.encode_utf16().count() > SEND_KEY_MAX {
+            return Err(refused(t("server.channel.sendKeyLong", &[])));
+        }
         let written = {
             let mut inner = self.locked();
-            if let Some(hub) = self.hub.upgrade()
-                && hub.read(|st| st.call != CallState::Live)
-            {
-                hub.apply(vec![Fact::CallChanged(FactCallChanged {
-                    at: now(),
-                    state: CallState::Live,
-                    reason: String::new(),
-                })]);
-            }
-            let files = self.files.of(&s.attachments)?;
-            if s.text.trim().is_empty() && files.is_empty() {
-                return Err(refused(t("server.channel.empty", &[])));
-            }
-            if s.send_key.encode_utf16().count() > SEND_KEY_MAX {
-                return Err(refused(t("server.channel.sendKeyLong", &[])));
-            }
             if let Some(to) = &s.to
-                && !inner.is_orchestrator_seat(to)
+                && !inner.model.is_orchestrator_seat(to)
             {
                 return Err(refused(t("server.channel.notOrchestrator", &[("id", to.as_str().into())])));
             }
@@ -125,7 +125,7 @@ impl Chat {
             .channel(&channel)
             .cloned()
             .ok_or_else(|| refused(t("server.channel.channelGone", &[])))?;
-        let target = inner.target_of_channel(&row);
+        let target = inner.model.target_of_channel(&row);
         if let Some(again) = db::recent_duplicate(&inner.db, &s.from, &channel, text, now() - RETRY_WINDOW_MS).q()?
             && let Some(m) = db::message_by_id(&inner.db, &again).q()?
         {
@@ -144,7 +144,7 @@ impl Chat {
             let mut shown = vec![];
             for id in unseen.iter().take(HELD_SHOWN) {
                 if let Some(m) = db::message_by_id(&inner.db, id).q()? {
-                    shown.push(inner.addressed_of(&m, &self.files));
+                    shown.push(inner.model.addressed_of(&m, &self.files));
                 }
             }
             if let Some(newest) = shown.last() {
@@ -345,12 +345,13 @@ impl Chat {
     }
 
     pub fn preview_remove(&self, id: &str) -> Result<Preview, ApiError> {
-        let inner = self.locked();
-        let row = inner.message_of(id)?;
+        let db = self.read_db();
+        let row = message_of(&db, id)?;
         if row.deleted_at.is_some() {
             return Err(refused(t("server.channel.messageGone", &[])));
         }
-        let target = inner.model.channel(&row.channel_id).map(|c| inner.target_of_channel(c)).unwrap_or_default();
+        let model = self.model();
+        let target = model.channel(&row.channel_id).map(|c| model.target_of_channel(c)).unwrap_or_default();
         let mut does = vec![t(
             "server.channel.deletes",
             &[
@@ -360,7 +361,7 @@ impl Chat {
                 ("text", line_of(&row.body, LAST_MAX).into()),
             ],
         )];
-        let pending = db::pending_deliveries_for_message(&inner.db, id).q()?;
+        let pending = db::pending_deliveries_for_message(&db, id).q()?;
         if pending > 0 {
             does.push(t("server.channel.deletesDeliveries", &[("n", pending.into())]));
         }
@@ -415,11 +416,11 @@ impl Chat {
     }
 
     pub fn pins(&self, channel: &str) -> Result<Vec<ChatMessage>, ApiError> {
-        let inner = self.locked();
-        if inner.model.channel(channel).is_none() {
+        if self.model().channel(channel).is_none() {
             return Err(no_channel(channel));
         }
-        Ok(db::pinned_in(&inner.db, channel).q()?.iter().map(to_message).collect())
+        let db = self.read_db();
+        Ok(db::pinned_in(&db, channel).q()?.iter().map(to_message).collect())
     }
 
     /// `threadUnder`: the thread under a message in a channel, made if
@@ -443,6 +444,9 @@ impl Chat {
     /// `issueThread`: the issue's thread, opened under a notice in
     /// `channel` (else the default) when there is none.
     pub fn issue_thread(&self, issue: &str, title: &str, channel: Option<&str>) -> Result<String, ApiError> {
+        if let Some(existing) = self.model().thread_of_subject("issue", issue) {
+            return Ok(existing.to_string());
+        }
         let mut inner = self.locked();
         if let Some(existing) = inner.model.thread_of_subject("issue", issue) {
             return Ok(existing.to_string());
@@ -466,7 +470,7 @@ impl Chat {
     }
 
     pub fn issue_thread_id(&self, issue: &str) -> Option<String> {
-        self.locked().model.thread_of_subject("issue", issue).map(str::to_string)
+        self.model().thread_of_subject("issue", issue).map(str::to_string)
     }
 
     /// The newest 50 messages of an issue's thread.
@@ -476,13 +480,14 @@ impl Chat {
     }
 
     fn recent(&self, channel: &str, n: i64) -> Result<Vec<AddressedMessage>, ApiError> {
-        let inner = self.locked();
-        if inner.model.channel(channel).is_none() {
+        let model = self.model();
+        if model.channel(channel).is_none() {
             return Ok(vec![]);
         }
-        let mut rows = db::messages_before(&inner.db, channel, NO_NUMBER, n).q()?;
+        let db = self.read_db();
+        let mut rows = db::messages_before(&db, channel, NO_NUMBER, n).q()?;
         rows.reverse();
-        Ok(rows.iter().map(|r| inner.addressed_of(r, &self.files)).collect())
+        Ok(rows.iter().map(|r| model.addressed_of(r, &self.files)).collect())
     }
 
     pub fn search(&self, text: &str, channel: Option<&str>) -> Result<Vec<MessageHit>, ApiError> {
@@ -490,22 +495,23 @@ impl Chat {
         if q.words.is_empty() && q.from.is_none() && q.r#in.is_none() && q.has.is_empty() && q.before.is_none() && q.after.is_none() {
             return Err(refused(t("server.channel.empty", &[])));
         }
-        let inner = self.locked();
+        let model = self.model();
         let mut scope = channel.unwrap_or("").to_string();
         if let Some(name) = &q.r#in {
-            let named = inner.model.channel_by_name(name).ok_or_else(|| {
+            let named = model.channel_by_name(name).ok_or_else(|| {
                 missing(
                     t(
                         "server.channel.noChannelNamed",
-                        &[("name", name.as_str().into()), ("tags", inner.channel_tags().into())],
+                        &[("name", name.as_str().into()), ("tags", model.channel_tags().into())],
                     ),
                     LookIn::Channel,
                 )
             })?;
             scope = named.id.clone();
         }
+        let db = self.read_db();
         let rows = db::search_messages(
-            &inner.db,
+            &db,
             &db::SearchParams {
                 text: &q.words,
                 channel: &scope,
@@ -524,7 +530,7 @@ impl Chat {
             .map(|r| MessageHit {
                 message: to_message(&r.row),
                 channel: r.top_id.clone(),
-                address: inner.target_of_row(&r.channel_type, r.root_number, None, Some(&r.top_id), Some(&r.channel_name)),
+                address: model.target_of_row(&r.channel_type, r.root_number, None, Some(&r.top_id), Some(&r.channel_name)),
             })
             .collect())
     }

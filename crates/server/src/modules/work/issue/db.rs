@@ -26,6 +26,7 @@ fn read(r: queries::ListIssuesRow) -> sqlx::Result<Issue> {
     let mut issue = Issue::new(r.id, r.number, r.title, r.created_at);
     issue.description = r.description;
     issue.repo = r.repo;
+    issue.machine_id = r.machine_id;
     issue.parent = r.parent;
     issue.rank = r.rank;
     issue.queued_at = r.queued_at;
@@ -60,6 +61,7 @@ pub fn put(db: &Sqlite<'_>, t: &Issue) -> sqlx::Result<()> {
         title: t.title.clone(),
         description: t.description.clone(),
         repo: t.repo.clone(),
+        machine_id: t.machine_id.clone(),
         parent: t.parent.clone(),
         number: t.number,
         rank: t.rank,

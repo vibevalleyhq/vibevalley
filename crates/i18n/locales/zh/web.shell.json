@@ -242,10 +242,5 @@
     "boardBrief": "任务简报",
     "boardJumpLatest": "跳到最新",
     "boardCount": "{shown}/{total} 条"
-  },
-  "markdown": {
-    "source": "源码",
-    "openSource": "打开源码",
-    "loadingPreview": "正在加载预览"
   }
 }

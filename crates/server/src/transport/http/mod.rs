@@ -45,6 +45,7 @@ use vibevalley_protocol::{ApiError, BizCode, Caller, Envelope, SliceKind};
 
 use crate::transport::api::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, Server};
 
+mod machine_ws;
 mod media;
 
 const HEARTBEAT: Duration = Duration::from_secs(20);
@@ -159,6 +160,7 @@ fn router_with_shutdown(server: Shared, shutdown: CancellationToken, is_remote: 
         // Each GET path also matches ops of the same shape (POST
         // attachment/create, artifact/block/list): those go to `command`.
         .route("/api/v1/slice/{name}", get(slice).post(command))
+        .route("/api/v1/machine/ws", get(machine_ws::upgrade).post(command))
         .route("/api/v1/live", get(live).post(command))
         .route("/api/v1/events", get(live).post(command))
         .route("/api/v1/subscribe/{name}", get(subscribe).post(command))

@@ -398,9 +398,9 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
         <If
           when={props.entry.kind === "orchestrator"}
           else={
-            props.entry.kind === "worker" ? (
-              <AgentFace agentId={sessionProfile(props.entry.session) ?? ""} name={props.entry.session.name} look={props.look} size={30} />
-            ) : null
+            <If when={props.entry.kind === "worker" ? props.entry : undefined}>
+              {(w) => <AgentFace agentId={sessionProfile(w().session) ?? ""} name={w().session.name} look={props.look} size={30} />}
+            </If>
           }
         >
           <OrchestratorFace size={30} agent={props.entry.id} />
@@ -478,8 +478,9 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
               role="button"
               testID="runs-back"
               onPress={props.onBack}
-              class="-ml-1.5 self-start rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+              class="-ml-1.5 flex-row items-center gap-1 self-start rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
             >
+              <Icon name="back" size={12} tone="muted" />
               <Text class="text-xs font-medium text-muted">{t("web.session.hub.back")}</Text>
             </View>
           </If>
@@ -488,15 +489,17 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
               <If
                 when={props.entry.kind === "orchestrator"}
                 else={
-                  props.entry.kind === "worker" ? (
-                    <AgentFace
-                      agentId={sessionProfile(props.entry.session) ?? ""}
-                      name={props.entry.session.name}
-                      runtime={props.entry.session.runtime}
-                      look={props.look}
-                      size={36}
-                    />
-                  ) : null
+                  <If when={props.entry.kind === "worker" ? props.entry : undefined}>
+                    {(w) => (
+                      <AgentFace
+                        agentId={sessionProfile(w().session) ?? ""}
+                        name={w().session.name}
+                        runtime={w().session.runtime}
+                        look={props.look}
+                        size={36}
+                      />
+                    )}
+                  </If>
                 }
               >
                 <OrchestratorFace size={36} agent={props.entry.id} />
@@ -540,21 +543,24 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
             <If
               when={props.entry.kind === "orchestrator"}
               else={
-                props.entry.kind === "worker" ? (
-                  <TrajectoryLog
-                    id={props.entry.id}
-                    working={props.entry.active}
-                    subagents={(props.entry.live ?? props.entry.session).subagents}
-                    title={
-                      props.entry.issue
-                        ? `#${props.entry.issue.number} ${props.entry.issue.title}`
-                        : props.entry.session.brief
-                          ? oneLine(props.entry.session.brief).trim()
-                          : entryName(props.entry)
-                    }
-                    about={props.entry.session.brief || undefined}
-                  />
-                ) : null
+                <If when={props.entry.kind === "worker" ? props.entry : undefined}>
+                  {(w) => (
+                    <TrajectoryLog
+                      id={w().id}
+                      working={w().active}
+                      subagents={(w().live ?? w().session).subagents}
+                      title={(() => {
+                        const entry = w();
+                        return entry.issue
+                          ? `#${entry.issue.number} ${entry.issue.title}`
+                          : entry.session.brief
+                            ? oneLine(entry.session.brief).trim()
+                            : entryName(entry);
+                      })()}
+                      about={w().session.brief || undefined}
+                    />
+                  )}
+                </If>
               }
             >
               <TrajectoryLog

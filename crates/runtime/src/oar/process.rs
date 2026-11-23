@@ -1,20 +1,30 @@
-//! Finding agent binaries and running them as line-oriented child processes
-//! on plain threads (no async runtime).
+//! Finding agent binaries and running them as async `tokio::process` line-oriented
+//! child processes with kqueue-driven waits and process-group reaping.
 
 use std::collections::VecDeque;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read, Write};
-use std::os::unix::process::CommandExt;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{ExitStatus, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
+use nix::errno::Errno;
+use nix::sys::signal::{Signal, killpg};
+use nix::unistd::Pid;
 use parking_lot::Mutex;
 use serde_json::json;
+use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
+use tokio::process::{Child, ChildStdin, Command};
+use tokio::sync::{Mutex as AsyncMutex, Notify, oneshot, watch};
 
 use crate::oar::{AgentError, Installation, Result};
+
+const KILL_GRACE: Duration = Duration::from_secs(2);
+const STDOUT_EOF_EXIT_GRACE: Duration = Duration::from_secs(5);
+const CAPTURE_KILL_GRACE: Duration = Duration::from_millis(200);
+const GRANDCHILD_SETTLE: Duration = Duration::from_millis(50);
 
 /// Where CLIs get installed. An app started from Finder has a minimal PATH,
 /// so these are searched after it and handed to the child as well (most of
@@ -92,6 +102,174 @@ fn child_path() -> std::ffi::OsString {
     std::env::join_paths(search_dirs()).unwrap_or_default()
 }
 
+fn pgid_of(pid: u32) -> Option<Pid> {
+    i32::try_from(pid).ok().filter(|&p| p > 0).map(Pid::from_raw)
+}
+
+pub(crate) async fn reap_process_group(child: &mut Child, pid: u32, grace: Duration) -> Option<ExitStatus> {
+    let Some(pgid) = pgid_of(pid) else {
+        let _ = child.kill().await;
+        return child.wait().await.ok();
+    };
+    let _ = killpg(pgid, Signal::SIGTERM);
+    let leader_status = match tokio::time::timeout(grace, child.wait()).await {
+        Ok(res) => Some(res.ok()),
+        Err(_) => None,
+    };
+    if let Some(status) = leader_status {
+        if killpg(pgid, None) != Err(Errno::ESRCH) {
+            tokio::time::sleep(GRANDCHILD_SETTLE).await;
+            if killpg(pgid, None) != Err(Errno::ESRCH) {
+                let _ = killpg(pgid, Signal::SIGKILL);
+            }
+        }
+        return status;
+    }
+    let _ = killpg(pgid, Signal::SIGKILL);
+    child.wait().await.ok()
+}
+
+/// Captured output of a bounded-timeout subprocess run.
+#[derive(Debug, Clone)]
+pub struct CommandOutput {
+    pub status: Option<ExitStatus>,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+    pub stdout_truncated: bool,
+    pub stderr_truncated: bool,
+    pub timed_out: bool,
+}
+
+impl CommandOutput {
+    pub fn code(&self) -> Option<i32> {
+        self.status.and_then(|s| s.code())
+    }
+
+    pub fn success(&self) -> bool {
+        !self.timed_out && self.status.is_some_and(|s| s.success())
+    }
+
+    pub fn stdout_lossy(&self) -> String {
+        let mut text = String::from_utf8_lossy(&self.stdout).into_owned();
+        if self.stdout_truncated {
+            text.push_str("\n[truncated]");
+        }
+        text
+    }
+
+    pub fn stderr_lossy(&self) -> String {
+        let mut text = String::from_utf8_lossy(&self.stderr).into_owned();
+        if self.stderr_truncated {
+            text.push_str("\n[truncated]");
+        }
+        text
+    }
+}
+
+async fn read_pipe_bounded<R: tokio::io::AsyncRead + Unpin>(mut pipe: R, max_bytes: Option<usize>) -> (Vec<u8>, bool) {
+    let mut buf = Vec::new();
+    let mut chunk = [0u8; 4096];
+    let mut truncated = false;
+    loop {
+        match pipe.read(&mut chunk).await {
+            Ok(0) | Err(_) => break,
+            Ok(n) => match max_bytes {
+                Some(cap) => {
+                    let remaining = cap.saturating_sub(buf.len());
+                    if remaining > 0 {
+                        buf.extend_from_slice(&chunk[..n.min(remaining)]);
+                    }
+                    if n > remaining {
+                        truncated = true;
+                    }
+                }
+                None => buf.extend_from_slice(&chunk[..n]),
+            },
+        }
+    }
+    (buf, truncated)
+}
+
+async fn drain_pipe_task(mut task: tokio::task::JoinHandle<(Vec<u8>, bool)>, deadline: tokio::time::Instant) -> (Vec<u8>, bool) {
+    match tokio::time::timeout_at(deadline, &mut task).await {
+        Ok(Ok(res)) => res,
+        _ => {
+            task.abort();
+            (Vec::new(), false)
+        }
+    }
+}
+
+/// Runs `command` in its own process group (`process_group(0)`) with a hard `timeout`,
+/// capturing stdout and stderr asynchronously (optionally capped at `max_bytes` per stream)
+/// and reaping the entire process group via [`reap_process_group`] on timeout.
+///
+/// Returns `Err(io::Error)` only when spawning or waiting fails (preserving `ErrorKind::NotFound`).
+pub async fn run_output_with_timeout(mut command: Command, timeout: Duration, max_bytes: Option<usize>) -> std::io::Result<CommandOutput> {
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .process_group(0)
+        .kill_on_drop(true);
+    let mut child = command.spawn()?;
+    let pid = child.id().unwrap_or(0);
+    let stdout_task = child.stdout.take().map(|out| tokio::spawn(read_pipe_bounded(out, max_bytes)));
+    let stderr_task = child.stderr.take().map(|err| tokio::spawn(read_pipe_bounded(err, max_bytes)));
+
+    let deadline = tokio::time::Instant::now() + timeout;
+    match tokio::time::timeout_at(deadline, child.wait()).await {
+        Ok(Ok(status)) => {
+            let drain_deadline = deadline.max(tokio::time::Instant::now() + CAPTURE_KILL_GRACE);
+            let (stdout, stdout_truncated) = match stdout_task {
+                Some(task) => drain_pipe_task(task, drain_deadline).await,
+                None => (Vec::new(), false),
+            };
+            let (stderr, stderr_truncated) = match stderr_task {
+                Some(task) => drain_pipe_task(task, drain_deadline).await,
+                None => (Vec::new(), false),
+            };
+            Ok(CommandOutput {
+                status: Some(status),
+                stdout,
+                stderr,
+                stdout_truncated,
+                stderr_truncated,
+                timed_out: false,
+            })
+        }
+        Ok(Err(err)) => {
+            if let Some(task) = stdout_task {
+                task.abort();
+            }
+            if let Some(task) = stderr_task {
+                task.abort();
+            }
+            Err(err)
+        }
+        Err(_) => {
+            let _ = reap_process_group(&mut child, pid, CAPTURE_KILL_GRACE).await;
+            let drain_deadline = tokio::time::Instant::now() + CAPTURE_KILL_GRACE;
+            let (stdout, stdout_truncated) = match stdout_task {
+                Some(task) => drain_pipe_task(task, drain_deadline).await,
+                None => (Vec::new(), false),
+            };
+            let (stderr, stderr_truncated) = match stderr_task {
+                Some(task) => drain_pipe_task(task, drain_deadline).await,
+                None => (Vec::new(), false),
+            };
+            Ok(CommandOutput {
+                status: None,
+                stdout,
+                stderr,
+                stdout_truncated,
+                stderr_truncated,
+                timed_out: true,
+            })
+        }
+    }
+}
+
 /// Runs a short command and returns its stdout; `None` on failure or timeout.
 pub(crate) fn run_capture(binary: &Path, args: &[&str], timeout: Duration) -> Option<String> {
     run_capture_streams(binary, args, timeout, false).and_then(|(ok, text)| ok.then_some(text))
@@ -100,45 +278,17 @@ pub(crate) fn run_capture(binary: &Path, args: &[&str], timeout: Duration) -> Op
 /// Exit status and output; `with_stderr` appends stderr (some CLIs print
 /// their status there). `None` when it could not run or timed out.
 pub(crate) fn run_capture_streams(binary: &Path, args: &[&str], timeout: Duration, with_stderr: bool) -> Option<(bool, String)> {
-    let mut child = Command::new(binary)
-        .args(args)
-        .env("PATH", child_path())
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(if with_stderr { Stdio::piped() } else { Stdio::null() })
-        .spawn()
-        .ok()?;
-    let errors = child.stderr.take().map(|mut stderr| {
-        std::thread::spawn(move || {
-            let mut text = String::new();
-            let _ = stderr.read_to_string(&mut text);
-            text
-        })
-    });
-    let mut stdout = child.stdout.take()?;
-    let reader = std::thread::spawn(move || {
-        let mut text = String::new();
-        let _ = stdout.read_to_string(&mut text);
-        text
-    });
-    let deadline = Instant::now() + timeout;
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                let mut text = reader.join().ok()?;
-                if let Some(errors) = errors {
-                    text.push_str(&errors.join().unwrap_or_default());
-                }
-                return Some((status.success(), text));
-            }
-            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(20)),
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
-            }
-        }
+    let mut cmd = Command::new(binary);
+    cmd.args(args).env("PATH", child_path());
+    let output = crate::rt::block_on(run_output_with_timeout(cmd, timeout, None)).ok()?;
+    if output.timed_out {
+        return None;
     }
+    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
+    if with_stderr {
+        text.push_str(&String::from_utf8_lossy(&output.stderr));
+    }
+    Some((output.success(), text))
 }
 
 /// `--version` probe shared by the CLI runtimes.
@@ -221,15 +371,49 @@ pub(crate) struct Spawn<'a> {
     pub env_remove: &'a [&'a str],
 }
 
-/// A child process spoken to in lines. The reader runs on its own thread and
-/// owns the callbacks; `on_exit` runs exactly once, after the last line.
-pub(crate) struct LineChild {
-    child: Mutex<Child>,
-    stdin: Mutex<Option<ChildStdin>>,
-    stderr_tail: Arc<Mutex<VecDeque<String>>>,
+struct LineChildInner {
+    stdin: AsyncMutex<Option<ChildStdin>>,
+    stderr_tail: Mutex<VecDeque<String>>,
+    exit_status: Mutex<Option<ExitStatus>>,
     pid: u32,
+    exited: AtomicBool,
     killed: AtomicBool,
+    kill_notify: Notify,
+    exit_rx: watch::Receiver<Option<Option<ExitStatus>>>,
+}
+
+impl LineChildInner {
+    fn stderr_text(&self) -> String {
+        let tail = self.stderr_tail.lock();
+        tail.iter().cloned().collect::<Vec<_>>().join("\n")
+    }
+
+    fn signal_kill(&self) {
+        if let Some(pgid) = pgid_of(self.pid) {
+            let _ = killpg(pgid, Signal::SIGTERM);
+        }
+        if let Ok(mut stdin) = self.stdin.try_lock() {
+            stdin.take();
+        }
+        self.kill_notify.notify_one();
+    }
+}
+
+/// A child process spoken to in lines, driven by `tokio::process` on the shared
+/// async runtime. `on_exit` runs exactly once, after the last stdout line.
+/// Dropping the last `Arc<LineChild>` triggers graceful PGID cleanup so no
+/// orphan subprocesses survive crashes or aborts.
+pub(crate) struct LineChild {
+    inner: Arc<LineChildInner>,
     pub(crate) trace: Arc<Trace>,
+}
+
+impl Drop for LineChild {
+    fn drop(&mut self) {
+        if !self.inner.exited.load(Ordering::SeqCst) && !self.inner.killed.swap(true, Ordering::SeqCst) {
+            self.inner.signal_kill();
+        }
+    }
 }
 
 impl LineChild {
@@ -262,28 +446,89 @@ impl LineChild {
         for (name, value) in spec.env {
             command.env(name, value);
         }
-        let mut child = command
-            .spawn()
-            .map_err(|e| AgentError::NotAvailable(format!("cannot start {}: {e}", spec.binary.display())))?;
-        let pid = child.id();
+
+        // Enter the shared runtime so `tokio::process::Command` registers its pipes and SIGCHLD driver.
+        let mut child = {
+            let _enter = crate::rt::handle().enter();
+            command
+                .spawn()
+                .map_err(|e| AgentError::NotAvailable(format!("cannot start {}: {e}", spec.binary.display())))?
+        };
+        let pid = child.id().ok_or_else(|| AgentError::Io("spawned child has no pid".into()))?;
         let stdin = child.stdin.take();
         let stdout = child.stdout.take().ok_or_else(|| AgentError::Io("child has no stdout".into()))?;
         let stderr = child.stderr.take();
         let trace = Arc::new(Trace::open(spec.label, pid));
-        let stderr_tail = Arc::new(Mutex::new(VecDeque::new()));
-        let this = Arc::new(Self {
-            child: Mutex::new(child),
-            stdin: Mutex::new(stdin),
-            stderr_tail: stderr_tail.clone(),
+        let (exit_tx, exit_rx) = watch::channel(None);
+        let (stdout_eof_tx, stdout_eof_rx) = oneshot::channel::<()>();
+
+        let inner = Arc::new(LineChildInner {
+            stdin: AsyncMutex::new(stdin),
+            stderr_tail: Mutex::new(VecDeque::new()),
+            exit_status: Mutex::new(None),
             pid,
+            exited: AtomicBool::new(false),
             killed: AtomicBool::new(false),
+            kill_notify: Notify::new(),
+            exit_rx,
+        });
+
+        let this = Arc::new(Self {
+            inner: inner.clone(),
             trace: trace.clone(),
         });
 
-        let stderr_thread = stderr.map(|stderr| {
-            std::thread::spawn(move || {
-                for line in BufReader::new(stderr).lines().map_while(|l| l.ok()) {
-                    let mut tail = stderr_tail.lock();
+        // Task A: exclusively owns `Child` and reaps the process group on exit, kill, or stdout EOF.
+        let reaper_inner = inner.clone();
+        crate::rt::spawn(async move {
+            let status = tokio::select! {
+                res = child.wait() => {
+                    let status = res.ok();
+                    if reaper_inner.killed.load(Ordering::SeqCst)
+                        && let Some(pgid) = pgid_of(pid)
+                        && killpg(pgid, None) != Err(Errno::ESRCH)
+                    {
+                        tokio::time::sleep(GRANDCHILD_SETTLE).await;
+                        if killpg(pgid, None) != Err(Errno::ESRCH) {
+                            let _ = killpg(pgid, Signal::SIGKILL);
+                        }
+                    }
+                    status
+                }
+                _ = reaper_inner.kill_notify.notified() => {
+                    let status = reap_process_group(&mut child, pid, KILL_GRACE).await;
+                    reaper_inner.stdin.lock().await.take();
+                    status
+                }
+                _ = stdout_eof_rx => {
+                    // stdout closed: wait for natural exit, an explicit kill, or a 5s grace cutoff.
+                    tokio::select! {
+                        res = child.wait() => res.ok(),
+                        _ = reaper_inner.kill_notify.notified() => {
+                            let status = reap_process_group(&mut child, pid, KILL_GRACE).await;
+                            reaper_inner.stdin.lock().await.take();
+                            status
+                        }
+                        _ = tokio::time::sleep(STDOUT_EOF_EXIT_GRACE) => {
+                            let status = reap_process_group(&mut child, pid, Duration::from_millis(500)).await;
+                            reaper_inner.stdin.lock().await.take();
+                            status
+                        }
+                    }
+                }
+            };
+            *reaper_inner.exit_status.lock() = status;
+            reaper_inner.exited.store(true, Ordering::SeqCst);
+            let _ = exit_tx.send(Some(status));
+        });
+
+        // Task B: captures the rolling 40-line stderr tail asynchronously.
+        let stderr_task = stderr.map(|stderr| {
+            let stderr_inner = inner.clone();
+            crate::rt::spawn(async move {
+                let mut lines = BufReader::new(stderr).lines();
+                while let Ok(Some(line)) = lines.next_line().await {
+                    let mut tail = stderr_inner.stderr_tail.lock();
                     if tail.len() == 40 {
                         tail.pop_front();
                     }
@@ -292,66 +537,57 @@ impl LineChild {
             })
         });
 
-        let reader = this.clone();
-        std::thread::Builder::new()
-            .name(format!("vibevalley-agent-{}", spec.label))
-            .spawn(move || {
-                let mut lines = BufReader::new(stdout);
-                let mut buffer = Vec::new();
-                loop {
-                    buffer.clear();
-                    match lines.read_until(b'\n', &mut buffer) {
-                        Ok(0) | Err(_) => break,
-                        Ok(_) => {
-                            let line = String::from_utf8_lossy(&buffer);
-                            let line = line.trim();
-                            if !line.is_empty() {
-                                trace.log("recv", line);
-                                on_line(line);
-                            }
+        // Task C: streams stdout lines into `on_line`, then waits for exit + stderr before `on_exit`.
+        let reader_inner = inner.clone();
+        crate::rt::spawn(async move {
+            let mut lines = BufReader::new(stdout);
+            let mut buffer = Vec::new();
+            loop {
+                buffer.clear();
+                match lines.read_until(b'\n', &mut buffer).await {
+                    Ok(0) | Err(_) => break,
+                    Ok(_) => {
+                        let line = String::from_utf8_lossy(&buffer);
+                        let line = line.trim();
+                        if !line.is_empty() {
+                            trace.log("recv", line);
+                            // `on_line` is synchronous and may re-entrantly call `LineChild::kill()`.
+                            tokio::task::block_in_place(|| on_line(line));
                         }
                     }
                 }
-                let code = reader.wait_exit();
-                if let Some(thread) = stderr_thread {
-                    let _ = thread.join();
-                }
-                on_exit(code, reader.stderr_text());
-            })
-            .map_err(|e| AgentError::Io(format!("cannot start reader thread: {e}")))?;
+            }
+            let _ = stdout_eof_tx.send(());
+            let mut wait_rx = reader_inner.exit_rx.clone();
+            let status = wait_rx.wait_for(Option::is_some).await.ok().and_then(|v| *v).flatten();
+            if let Some(task) = stderr_task {
+                let _ = task.await;
+            }
+            let stderr_text = reader_inner.stderr_text();
+            tokio::task::block_in_place(|| on_exit(status.and_then(|s| s.code()), stderr_text));
+        });
+
         Ok(this)
     }
 
-    fn wait_exit(&self) -> Option<i32> {
-        // Polled rather than `wait()`: `kill` needs the same lock.
-        let deadline = Instant::now() + Duration::from_secs(5);
-        loop {
-            {
-                let mut child = self.child.lock();
-                match child.try_wait() {
-                    Ok(Some(status)) => return status.code(),
-                    Ok(None) if Instant::now() > deadline => {
-                        // stdout closed but the process lingers: it is of no use any more.
-                        let _ = child.kill();
-                    }
-                    Ok(None) => {}
-                    Err(_) => return None,
-                }
-            }
-            std::thread::sleep(Duration::from_millis(20));
-        }
-    }
-
     pub(crate) fn write_line(&self, line: &str) -> Result<()> {
-        let mut stdin = self.stdin.lock();
-        let Some(pipe) = stdin.as_mut() else {
-            return Err(AgentError::Io("the runtime's stdin is closed".into()));
-        };
-        self.trace.log("send", line);
-        pipe.write_all(line.as_bytes())
-            .and_then(|_| pipe.write_all(b"\n"))
-            .and_then(|_| pipe.flush())
-            .map_err(|e| AgentError::Io(format!("write to runtime failed: {e}")))
+        let inner = self.inner.clone();
+        let trace = self.trace.clone();
+        let owned = line.to_string();
+        crate::rt::block_on(async move {
+            let mut stdin = inner.stdin.lock().await;
+            let Some(pipe) = stdin.as_mut() else {
+                return Err(AgentError::Io("the runtime's stdin is closed".into()));
+            };
+            trace.log("send", &owned);
+            pipe.write_all(owned.as_bytes())
+                .await
+                .map_err(|e| AgentError::Io(format!("write to runtime failed: {e}")))?;
+            pipe.write_all(b"\n")
+                .await
+                .map_err(|e| AgentError::Io(format!("write to runtime failed: {e}")))?;
+            pipe.flush().await.map_err(|e| AgentError::Io(format!("write to runtime failed: {e}")))
+        })
     }
 
     pub(crate) fn write_json(&self, value: &serde_json::Value) -> Result<()> {
@@ -359,14 +595,13 @@ impl LineChild {
     }
 
     pub(crate) fn stderr_text(&self) -> String {
-        let tail = self.stderr_tail.lock();
-        tail.iter().cloned().collect::<Vec<_>>().join("\n")
+        self.inner.stderr_text()
     }
 
     /// The group may outlive its leader while a tool still has our pipes open.
     pub(crate) fn status(&self) -> Option<(i32, String)> {
         use std::os::unix::process::ExitStatusExt;
-        let status = self.child.lock().try_wait().ok()??;
+        let status = (*self.inner.exit_status.lock())?;
         let signal = status.signal().unwrap_or(0);
         let reason = match signal {
             0 => String::new(),
@@ -379,26 +614,175 @@ impl LineChild {
     }
 
     pub(crate) fn kill(self: &Arc<Self>) {
-        use nix::sys::signal::{Signal, killpg};
-        use nix::unistd::Pid;
-        if self.killed.swap(true, Ordering::SeqCst) {
+        if self.inner.killed.swap(true, Ordering::SeqCst) {
             return;
         }
-        let group = Pid::from_raw(self.pid as i32);
-        let _ = killpg(group, Signal::SIGTERM);
-        self.stdin.lock().take();
-        let deadline = Instant::now() + Duration::from_secs(2);
+        self.inner.signal_kill();
+        let mut rx = self.inner.exit_rx.clone();
+        crate::rt::block_on(async move {
+            let _ = rx.wait_for(Option::is_some).await;
+        });
+    }
+
+    pub(crate) async fn kill_async(self: &Arc<Self>) {
+        if self.inner.killed.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        self.inner.signal_kill();
+        let mut rx = self.inner.exit_rx.clone();
+        let _ = rx.wait_for(Option::is_some).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn wait_until_dead(pid: i32, timeout: Duration) {
+        let deadline = std::time::Instant::now() + timeout;
         loop {
-            let _ = self.child.lock().try_wait();
-            if killpg(group, None) == Err(nix::errno::Errno::ESRCH) {
+            if nix::sys::signal::kill(Pid::from_raw(pid), None) == Err(Errno::ESRCH) {
                 return;
             }
-            if Instant::now() >= deadline {
-                break;
-            }
+            assert!(std::time::Instant::now() < deadline, "process {pid} still alive after {timeout:?}");
             std::thread::sleep(Duration::from_millis(10));
         }
-        let _ = killpg(group, Signal::SIGKILL);
-        let _ = self.child.lock().wait();
+    }
+
+    #[test]
+    fn line_child_streams_lines_stderr_and_exit_status() {
+        let (line_tx, line_rx) = flume::unbounded();
+        let (exit_tx, exit_rx) = flume::bounded(1);
+        let child = LineChild::spawn(
+            Spawn {
+                label: "test-stream",
+                binary: Path::new("/bin/sh"),
+                args: vec!["-c".into(), "echo first; echo errline >&2; echo second; exit 7".into()],
+                cwd: Path::new("/tmp"),
+                env: &[],
+                options: None,
+                env_remove: &[],
+            },
+            move |line| {
+                let _ = line_tx.send(line.to_string());
+            },
+            move |code, stderr| {
+                let _ = exit_tx.send((code, stderr));
+            },
+        )
+        .unwrap();
+
+        let (code, stderr) = exit_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let lines: Vec<String> = line_rx.try_iter().collect();
+        assert_eq!(lines, vec!["first", "second"]);
+        assert_eq!(code, Some(7));
+        assert!(stderr.contains("errline"), "{stderr}");
+        assert_eq!(child.status(), Some((7, String::new())));
+    }
+
+    #[test]
+    fn line_child_kill_and_drop_reap_grandchild_process_groups() {
+        // Explicit kill() reaps a grandchild even when SIGTERM is ignored by the shell.
+        let (pid_tx, pid_rx) = flume::bounded(1);
+        let child = LineChild::spawn(
+            Spawn {
+                label: "test-kill-pgid",
+                binary: Path::new("/bin/sh"),
+                args: vec!["-c".into(), "sleep 30 & echo $!; wait".into()],
+                cwd: Path::new("/tmp"),
+                env: &[],
+                options: None,
+                env_remove: &[],
+            },
+            move |line| {
+                if let Ok(pid) = line.parse::<i32>() {
+                    let _ = pid_tx.send(pid);
+                }
+            },
+            |_, _| {},
+        )
+        .unwrap();
+        let grandchild_pid = pid_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        child.kill();
+        wait_until_dead(grandchild_pid, Duration::from_secs(2));
+
+        // Dropping the last Arc<LineChild> without calling kill() also reaps the process group.
+        let (drop_tx, drop_rx) = flume::bounded(1);
+        let orphan = LineChild::spawn(
+            Spawn {
+                label: "test-drop-pgid",
+                binary: Path::new("/bin/sh"),
+                args: vec!["-c".into(), "sleep 30 & echo $!; wait".into()],
+                cwd: Path::new("/tmp"),
+                env: &[],
+                options: None,
+                env_remove: &[],
+            },
+            move |line| {
+                if let Ok(pid) = line.parse::<i32>() {
+                    let _ = drop_tx.send(pid);
+                }
+            },
+            |_, _| {},
+        )
+        .unwrap();
+        let orphan_grandchild = drop_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        drop(orphan);
+        wait_until_dead(orphan_grandchild, Duration::from_secs(4));
+    }
+
+    #[test]
+    fn run_capture_streams_times_out_and_reaps_process_group() {
+        let dir = tempfile::tempdir().unwrap();
+        let pid_file = dir.path().join("probe.pid");
+        let script = format!("sleep 30 & echo $! > {}; wait", pid_file.display());
+        let res = run_capture_streams(Path::new("/bin/sh"), &["-c", &script], Duration::from_millis(150), true);
+        assert!(res.is_none());
+        if let Ok(raw) = std::fs::read_to_string(&pid_file)
+            && let Ok(pid) = raw.trim().parse::<i32>()
+        {
+            wait_until_dead(pid, Duration::from_secs(2));
+        }
+    }
+
+    #[test]
+    fn run_output_with_timeout_captures_truncates_and_reaps_pgid() {
+        let mut ok_cmd = Command::new("/bin/sh");
+        ok_cmd.args(["-c", "printf 'hello-out'; printf 'hello-err' >&2; exit 3"]);
+        let out = crate::rt::block_on(run_output_with_timeout(ok_cmd, Duration::from_secs(5), None)).unwrap();
+        assert!(!out.timed_out);
+        assert!(!out.success());
+        assert_eq!(out.code(), Some(3));
+        assert_eq!(out.stdout_lossy(), "hello-out");
+        assert_eq!(out.stderr_lossy(), "hello-err");
+
+        let mut trunc_cmd = Command::new("/bin/sh");
+        trunc_cmd.args(["-c", "printf '0123456789abcdef'"]);
+        let trunc = crate::rt::block_on(run_output_with_timeout(trunc_cmd, Duration::from_secs(5), Some(6))).unwrap();
+        assert!(trunc.success());
+        assert!(trunc.stdout_truncated);
+        assert_eq!(trunc.stdout_lossy(), "012345\n[truncated]");
+
+        let dir = tempfile::tempdir().unwrap();
+        let pid_file = dir.path().join("child.pid");
+        let mut timeout_cmd = Command::new("/bin/sh");
+        timeout_cmd.args(["-c", &format!("echo partial; sleep 30 & echo $! > {}; wait", pid_file.display())]);
+        let timed = crate::rt::block_on(run_output_with_timeout(timeout_cmd, Duration::from_millis(150), Some(1024))).unwrap();
+        assert!(timed.timed_out);
+        assert!(!timed.success());
+        assert!(timed.stdout_lossy().contains("partial"), "{}", timed.stdout_lossy());
+        if let Ok(raw) = std::fs::read_to_string(&pid_file)
+            && let Ok(pid) = raw.trim().parse::<i32>()
+        {
+            wait_until_dead(pid, Duration::from_secs(2));
+        }
+
+        let missing = crate::rt::block_on(run_output_with_timeout(
+            Command::new("/definitely/missing/vibevalley-binary"),
+            Duration::from_secs(1),
+            None,
+        ))
+        .unwrap_err();
+        assert_eq!(missing.kind(), std::io::ErrorKind::NotFound);
     }
 }

@@ -28,6 +28,7 @@ import { issueMove, movedCards, sendMove } from "../model/moves";
 import { issueSearch } from "../model/navigation";
 import { writeIssue } from "../model/write";
 import { IssueBoard } from "./Board";
+import { BoardOnboarding } from "./BoardOnboarding";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
 import { DisplayMenu } from "./DisplayMenu";
 import { FamilyDetail } from "./FamilyDetail";
@@ -36,6 +37,7 @@ import { IssueList, type ListAdd } from "./IssueList";
 import { NewIssue, type NewIssueAt } from "./NewIssue";
 import { createIssueChrome, IssueChromeContext } from "./Sheet";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
+import { WorkflowGuide } from "./WorkflowGuide";
 
 type Closing = { issue: Issue; session: Session | undefined; review: boolean; lane?: Lane };
 
@@ -129,7 +131,9 @@ export function IssuesPage(props: { rest: string }) {
     const f = filter();
     const repo = where.repo || f.repo;
     const agent = where.agent || f.agent;
-    newAt.set({ ...(repo ? { repo } : {}), ...(agent ? { agent } : {}) });
+    const text = where.text;
+    const machineId = where.machineId;
+    newAt.set({ ...(repo ? { repo } : {}), ...(agent ? { agent } : {}), ...(text ? { text } : {}), ...(machineId ? { machineId } : {}) });
   };
   const addInList: ListAdd = (where) => startNew(where);
   const dialogUp = () => draftAt() !== undefined || closing() !== undefined || reopening() !== undefined;
@@ -143,7 +147,7 @@ export function IssuesPage(props: { rest: string }) {
     { when: "notEditing" },
   );
   const keepNew = async (words: string, where: NewIssueAt, requestKey: string) => {
-    const made = await act.run(() => writeIssue(words, where.agent ?? "", where.repo ?? "", requestKey));
+    const made = await act.run(() => writeIssue(words, where.agent ?? "", where.repo ?? "", requestKey, where.machineId ?? ""));
     if (!made) return false;
     rememberPick(where.agent ?? "", where.repo ?? "");
     if (made.refused) toast(t("web.issue.page.notDrafted", { why: made.refused }));
@@ -189,6 +193,7 @@ export function IssuesPage(props: { rest: string }) {
                     />
                   }
                 >
+                  <WorkflowGuide />
                   <IssueBoard
                     cards={shown()}
                     summary={board()?.boardSummary}
@@ -208,7 +213,7 @@ export function IssuesPage(props: { rest: string }) {
                 </If>
               }
             >
-              <IssuesOnboarding onNavigate={(path) => router.navigate(path)} onNew={() => startNew({})} />
+              <BoardOnboarding issueCount={all().length} onNavigate={(path) => router.navigate(path)} onNew={(where) => startNew(where)} />
             </If>
           </>
         }
@@ -219,6 +224,7 @@ export function IssuesPage(props: { rest: string }) {
             const cur = id();
             return cur === undefined ? [] : [cur];
           })()}
+          key={(cur) => cur}
         >
           {(at) => (
             <IssueView onBack={() => open(undefined)} backLabel={fromScene() ?? t("web.issue.page.backToBoard")} blocked={dialogUp}>
@@ -287,8 +293,10 @@ function Detail(props: {
         </Scroll>
       }
     >
-      <Each of={shows("todo")}>{() => <TodoDetail item={cardOf("todo").issue} onDone={props.open} />}</Each>
-      <Each of={shows("issue")}>
+      <Each of={shows("todo")} key={(k) => k}>
+        {() => <TodoDetail item={cardOf("todo").issue} onDone={props.open} />}
+      </Each>
+      <Each of={shows("issue")} key={(k) => k}>
         {() => (
           <IssueDetail
             issue={cardOf("issue").issue}
@@ -299,8 +307,10 @@ function Detail(props: {
           />
         )}
       </Each>
-      <Each of={shows("orchestrator")}>{() => <OrchestratorIssueDetail issue={cardOf("orchestrator").issue} />}</Each>
-      <Each of={shows("missing")}>
+      <Each of={shows("orchestrator")} key={(k) => k}>
+        {() => <OrchestratorIssueDetail issue={cardOf("orchestrator").issue} />}
+      </Each>
+      <Each of={shows("missing")} key={(k) => k}>
         {() => (
           <Scroll class="min-h-0 flex-1">
             <View class="w-full max-w-200 self-center px-6 py-8">
@@ -312,7 +322,7 @@ function Detail(props: {
           </Scroll>
         )}
       </Each>
-      <Each of={shows("family")}>
+      <Each of={shows("family")} key={(k) => k}>
         {() => (
           <FamilyDetail
             issue={cardOf("family").issue}
@@ -454,63 +464,5 @@ function Toolbar(props: {
         </View>
       </View>
     </View>
-  );
-}
-
-function IssuesOnboarding(props: { onNavigate: (path: string) => void; onNew: () => void }) {
-  return (
-    <Scroll testID="issues-empty-onboarding" class="min-h-0 flex-1">
-      <View class="mx-auto my-6 w-full max-w-160 px-6">
-        <View class="rounded-xl border border-line bg-page p-6">
-          <Text role="header" class="text-lg font-semibold text-ink">
-            {t("web.issue.onboarding.title")}
-          </Text>
-          <Text class="mt-1 text-sm text-muted">{t("web.issue.onboarding.subtitle")}</Text>
-          <View class="mt-5 gap-2.5">
-            <View testID="onboarding-step-runtimes" class="flex-row items-center gap-3 rounded-lg bg-side p-3.5">
-              <View class="h-6 w-6 shrink-0 items-center justify-center rounded-full bg-selected">
-                <Text class="text-xs font-semibold text-ink tabular-nums">1</Text>
-              </View>
-              <View class="min-w-0 flex-1">
-                <Text class="text-sm font-medium text-ink">{t("web.issue.onboarding.step1Title")}</Text>
-                <Text class="mt-0.5 text-xs text-muted">{t("web.issue.onboarding.step1Desc")}</Text>
-              </View>
-              <Button icon="runtimes" testID="onboarding-runtimes" onPress={() => props.onNavigate("/runtimes")}>
-                {t("web.issue.onboarding.step1Action")}
-              </Button>
-            </View>
-            <View testID="onboarding-step-repos" class="flex-row items-center gap-3 rounded-lg bg-side p-3.5">
-              <View class="h-6 w-6 shrink-0 items-center justify-center rounded-full bg-selected">
-                <Text class="text-xs font-semibold text-ink tabular-nums">2</Text>
-              </View>
-              <View class="min-w-0 flex-1">
-                <Text class="text-sm font-medium text-ink">{t("web.issue.onboarding.step2Title")}</Text>
-                <Text class="mt-0.5 text-xs text-muted">{t("web.issue.onboarding.step2Desc")}</Text>
-              </View>
-              <Button icon="repos" testID="onboarding-repos" onPress={() => props.onNavigate("/repos")}>
-                {t("web.issue.onboarding.step2Action")}
-              </Button>
-            </View>
-            <View testID="onboarding-step-start" class="flex-row items-start gap-3 rounded-lg bg-side p-3.5">
-              <View class="mt-0.5 h-6 w-6 shrink-0 items-center justify-center rounded-full bg-selected">
-                <Text class="text-xs font-semibold text-ink tabular-nums">3</Text>
-              </View>
-              <View class="min-w-0 flex-1">
-                <Text class="text-sm font-medium text-ink">{t("web.issue.onboarding.step3Title")}</Text>
-                <Text class="mt-0.5 text-xs text-muted">{t("web.issue.onboarding.step3Desc")}</Text>
-                <View class="mt-2.5 flex-row flex-wrap items-center gap-2">
-                  <Button tone="primary" icon="add" testID="onboarding-new-issue" onPress={props.onNew}>
-                    {t("web.issue.onboarding.newIssue")}
-                  </Button>
-                  <Button icon="chat" testID="onboarding-chat" onPress={() => props.onNavigate("/chat")}>
-                    {t("web.issue.onboarding.openChat")}
-                  </Button>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-      </View>
-    </Scroll>
   );
 }

@@ -1,4 +1,4 @@
-import { effect, host, keymap, Scroll, signal, Text, untracked, View } from "nsh";
+import { computed, effect, host, keymap, Scroll, signal, Text, untracked, View } from "nsh";
 import { Input, Menu, MenuItem, MenuSeparator, TextView } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -459,8 +459,8 @@ export function WorkspaceChatPane() {
   const effectiveThoughtLevel = (): ThoughtLevel | undefined => clampThoughtLevel(currentModelInfo(), thoughtLevel());
   const hasAttention = () => pendingInteractions().length > 0 || pendingPermissions().length > 0;
   const effectivePhase = (): ChatPhase => (hasAttention() ? "waiting" : phase());
-  const shownSteps = () => visibleChatSteps(steps());
-  const telemetry = () => computeTelemetry(steps(), latestTokens());
+  const shownSteps = computed(() => visibleChatSteps(steps()));
+  const telemetry = computed(() => computeTelemetry(steps(), latestTokens()));
 
   if (host.available()) {
     void fetchWorkspaceRuntimes().then((list) => {

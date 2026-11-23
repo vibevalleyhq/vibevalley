@@ -50,6 +50,8 @@ export interface HttpRemoteTransport {
   readonly slice: <K extends SliceKind>(kind: K, listener: (data: RemoteSliceMap[K]) => void) => () => void;
   readonly live: (listener: (event: LiveEventShape) => void) => () => void;
   readonly subscribe: (name: string, payload: unknown, on: (event: unknown) => void, ended: (why: RemoteEnvelope | null) => void) => () => void;
+  readonly suspend: () => void;
+  readonly resume: () => void;
   readonly close: () => void;
 }
 
@@ -334,10 +336,14 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
   const token = options.token;
   const master = new AbortController();
   const controllers = new Set<AbortController>();
+  const attemptControllers = new Set<AbortController>();
+  const resumeWaiters = new Set<() => void>();
   const tasks = new Set<Promise<void>>();
 
   let closed = false;
   let unauthorized = false;
+  let suspended = false;
+  let resumeGeneration = 0;
   let connectionState: RemoteConnectionState | undefined;
   let connectedStreams = 0;
 
@@ -347,9 +353,46 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
     options.onConnectionChange?.(next);
   };
 
+  const abortActiveAttempts = () => {
+    for (const controller of [...attemptControllers]) {
+      if (!controller.signal.aborted) controller.abort();
+    }
+    attemptControllers.clear();
+  };
+
+  const releaseResumeWaiters = () => {
+    for (const wake of [...resumeWaiters]) {
+      wake();
+    }
+    resumeWaiters.clear();
+  };
+
+  const waitWhileSuspended = (signal: AbortSignal): Promise<boolean> => {
+    if (!suspended) return Promise.resolve(!signal.aborted && !closed && !unauthorized);
+    if (signal.aborted || closed || unauthorized) return Promise.resolve(false);
+    return new Promise<boolean>((resolve) => {
+      const cleanup = () => {
+        resumeWaiters.delete(onResume);
+        signal.removeEventListener("abort", onAbort);
+      };
+      const onResume = () => {
+        cleanup();
+        resolve(!signal.aborted && !closed && !unauthorized && !suspended);
+      };
+      const onAbort = () => {
+        cleanup();
+        resolve(false);
+      };
+      resumeWaiters.add(onResume);
+      signal.addEventListener("abort", onAbort, { once: true });
+    });
+  };
+
   const markUnauthorized = () => {
     unauthorized = true;
     reportState("unauthorized");
+    abortActiveAttempts();
+    releaseResumeWaiters();
   };
 
   const authHeaders = (extra?: Readonly<Record<string, string>>): Record<string, string> => ({
@@ -417,11 +460,25 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
     onEvent: (msg: SseMessage) => void,
   ): Promise<void> => {
     let attempt = 0;
-    if (connectedStreams === 0 && !unauthorized) {
+    if (!suspended && connectedStreams === 0 && !unauthorized) {
       reportState("connecting");
     }
 
     while (!signal.aborted && !closed && !unauthorized) {
+      if (suspended) {
+        const resumed = await waitWhileSuspended(signal);
+        if (!resumed || signal.aborted || closed || unauthorized) return;
+        attempt = 0;
+        if (connectedStreams === 0 && connectionState === undefined) {
+          reportState("connecting");
+        }
+      }
+
+      const attemptController = new AbortController();
+      const attemptLink = combineSignals(signal, attemptController.signal);
+      attemptControllers.add(attemptController);
+      const generationAtStart = resumeGeneration;
+
       let wasConnected = false;
       try {
         const lastId = getLastEventId();
@@ -431,7 +488,7 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
             accept: "text/event-stream",
             ...(lastId ? { "last-event-id": lastId } : {}),
           }),
-          signal,
+          signal: attemptLink.signal,
         });
 
         if (res.status === 401 || res.status === 403) {
@@ -443,23 +500,46 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
           wasConnected = true;
           connectedStreams++;
           reportState("connected");
-          await readSseStream(res.body, signal, (msg) => {
-            if (!signal.aborted && !closed) onEvent(msg);
+          await readSseStream(res.body, attemptLink.signal, (msg) => {
+            if (!attemptLink.signal.aborted && !signal.aborted && !closed) onEvent(msg);
           });
         }
       } catch {
-        // Network drops and aborts fall through to the reconnect check below.
+        // Network drops and aborts fall through to the lifecycle/reconnect check below.
       } finally {
+        attemptControllers.delete(attemptController);
+        attemptLink.cleanup();
         if (wasConnected) {
           connectedStreams = Math.max(0, connectedStreams - 1);
         }
       }
 
       if (signal.aborted || closed || unauthorized) return;
+      if (suspended || resumeGeneration !== generationAtStart) {
+        // Suspended cleanly or explicitly woken for instant resync: skip disconnect error and backoff.
+        attempt = 0;
+        continue;
+      }
+
       reportState("reconnecting");
       const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)] ?? 8000;
       attempt++;
-      const waited = await abortableDelay(delay, signal);
+      const backoffController = new AbortController();
+      const backoffLink = combineSignals(signal, backoffController.signal);
+      attemptControllers.add(backoffController);
+      const generationBeforeBackoff = resumeGeneration;
+      let waited = false;
+      try {
+        waited = await abortableDelay(delay, backoffLink.signal);
+      } finally {
+        attemptControllers.delete(backoffController);
+        backoffLink.cleanup();
+      }
+      if (signal.aborted || closed || unauthorized) return;
+      if (suspended || resumeGeneration !== generationBeforeBackoff) {
+        attempt = 0;
+        continue;
+      }
       if (!waited) return;
     }
   };
@@ -507,51 +587,93 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
         ended(why);
       };
 
-      try {
-        const query = encodeURIComponent(JSON.stringify(payload ?? {}));
-        const res = await fetchImpl(`${base}/api/v1/subscribe/${encodeURIComponent(name)}?payload=${query}`, {
-          method: "GET",
-          headers: authHeaders({ accept: "text/event-stream" }),
-          signal,
-        });
-        if (res.status === 401) {
-          markUnauthorized();
+      while (!finished && !signal.aborted && !closed && !unauthorized) {
+        if (suspended) {
+          const resumed = await waitWhileSuspended(signal);
+          if (!resumed || signal.aborted || closed || unauthorized) return;
         }
-        const contentType = res.headers.get("content-type") ?? "";
-        if (!res.ok || contentType.includes("application/json")) {
-          const text = await res.text();
-          const parsed = parseJsonSafe(text);
-          const env = toEnvelope(parsed) ?? {
-            bizCode: fallbackBizCode(res.status),
-            message: text.trim() || `HTTP ${res.status}`,
-          };
-          finish(env);
-          return;
-        }
-        if (!res.body) {
+
+        const attemptController = new AbortController();
+        const attemptLink = combineSignals(signal, attemptController.signal);
+        attemptControllers.add(attemptController);
+        const generationAtStart = resumeGeneration;
+
+        try {
+          const query = encodeURIComponent(JSON.stringify(payload ?? {}));
+          const res = await fetchImpl(`${base}/api/v1/subscribe/${encodeURIComponent(name)}?payload=${query}`, {
+            method: "GET",
+            headers: authHeaders({ accept: "text/event-stream" }),
+            signal: attemptLink.signal,
+          });
+          if (res.status === 401) {
+            markUnauthorized();
+          }
+          const contentType = res.headers.get("content-type") ?? "";
+          if (!res.ok || contentType.includes("application/json")) {
+            const text = await res.text();
+            const parsed = parseJsonSafe(text);
+            const env = toEnvelope(parsed) ?? {
+              bizCode: fallbackBizCode(res.status),
+              message: text.trim() || `HTTP ${res.status}`,
+            };
+            finish(env);
+            return;
+          }
+          if (!res.body) {
+            finish(null);
+            return;
+          }
+          await readSseStream(res.body, attemptLink.signal, (msg) => {
+            if (attemptLink.signal.aborted || signal.aborted || closed) return;
+            const parsed = parseJsonSafe(msg.data);
+            if (parsed !== undefined) on(parsed);
+          });
+          if (signal.aborted || closed) return;
+          if (suspended || resumeGeneration !== generationAtStart) {
+            continue;
+          }
           finish(null);
           return;
-        }
-        await readSseStream(res.body, signal, (msg) => {
+        } catch (err: unknown) {
           if (signal.aborted || closed) return;
-          const parsed = parseJsonSafe(msg.data);
-          if (parsed !== undefined) on(parsed);
-        });
-        finish(null);
-      } catch (err: unknown) {
-        if (signal.aborted || closed) return;
-        finish({
-          bizCode: BizCode.ServiceUnavailable,
-          message: err instanceof Error ? err.message : String(err),
-        });
+          if (suspended || resumeGeneration !== generationAtStart) {
+            continue;
+          }
+          finish({
+            bizCode: BizCode.ServiceUnavailable,
+            message: err instanceof Error ? err.message : String(err),
+          });
+          return;
+        } finally {
+          attemptControllers.delete(attemptController);
+          attemptLink.cleanup();
+        }
       }
     });
+  };
+
+  const suspend = () => {
+    if (closed || unauthorized || suspended) return;
+    suspended = true;
+    abortActiveAttempts();
+  };
+
+  const resume = () => {
+    if (closed || unauthorized) return;
+    suspended = false;
+    resumeGeneration++;
+    // Abort any stale socket or pending backoff delay, then wake suspended streams for immediate resync.
+    abortActiveAttempts();
+    releaseResumeWaiters();
   };
 
   const close = () => {
     if (closed) return;
     closed = true;
+    suspended = false;
     if (!master.signal.aborted) master.abort();
+    abortActiveAttempts();
+    releaseResumeWaiters();
     for (const controller of controllers) {
       if (!controller.signal.aborted) controller.abort();
     }
@@ -561,5 +683,5 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
     }
   };
 
-  return { call, slice, live, subscribe, close };
+  return { call, slice, live, subscribe, suspend, resume, close };
 }

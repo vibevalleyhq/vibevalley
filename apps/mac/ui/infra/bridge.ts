@@ -243,8 +243,31 @@ export function subscribe(name: string, payload: unknown, on: (event: unknown) =
   };
 }
 
+export interface DesktopConnectionSnapshot {
+  readonly activeMode: "embedded" | "remote";
+  readonly activeUrl?: string;
+  readonly activeLabel?: string;
+  readonly configuredMode: "embedded" | "remote";
+  readonly configuredUrl?: string;
+  readonly configuredLabel?: string;
+  readonly tokenHint?: string;
+  readonly source: "env" | "file" | "default";
+  readonly restartRequired: boolean;
+}
+
+export interface DesktopConnectionSaveInput {
+  readonly url: string;
+  readonly token?: string;
+  readonly pairCode?: string;
+  readonly deviceName?: string;
+  readonly label?: string;
+}
+
 /** The host's capabilities (packages/protocol's Host, desktop flavour) and the terminal. */
 export const hostApi = {
+  connectionState: () => call<DesktopConnectionSnapshot>("host.connectionState", {}),
+  connectionSave: (input: DesktopConnectionSaveInput) => call<DesktopConnectionSnapshot>("host.connectionSave", input),
+  connectionReset: () => call<DesktopConnectionSnapshot>("host.connectionReset", {}),
   info: () =>
     call<{
       name: string;

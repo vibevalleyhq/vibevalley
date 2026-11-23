@@ -401,12 +401,18 @@ impl Voice {
     /// Has the orchestrator answer `line` and reads its answer out on the call.
     fn tell(self: &Arc<Self>, agent: String, line: String) {
         let voice = self.clone();
-        vibevalley_runtime::rt::handle().spawn_blocking(move || {
+        let hub = self.hub.upgrade();
+        let task = move || {
             let Some(said) = voice.orchestrator.brief(line, ANSWER_WAIT) else { return };
             if !said.is_empty() {
                 voice.speak_on(&agent, &said);
             }
-        });
+        };
+        if let Some(hub) = hub {
+            hub.spawn_blocking_task(task);
+        } else {
+            vibevalley_runtime::rt::handle().spawn_blocking(task);
+        }
     }
 
     /// `voice.moss.verify`: whether MOSS Live takes the bound account's key;
@@ -542,7 +548,8 @@ impl MossLine {
                 tools.in_flight += 1;
             }
             let (voice, shared, tools, out) = (self.voice.clone(), self.shared.clone(), self.tools.clone(), self.out.clone());
-            vibevalley_runtime::rt::handle().spawn_blocking(move || {
+            let hub = self.voice.hub.upgrade();
+            let task = move || {
                 let answer = voice.orchestrator.brief(call.question, ANSWER_WAIT).unwrap_or_default();
                 let answer = if answer.is_empty() { t("server.voice.moss.toolFailed", &[]) } else { answer };
                 let mut tools = tools.lock();
@@ -552,7 +559,12 @@ impl MossLine {
                 }
                 tools.awaiting_ack.insert(call.call_id.clone());
                 let _ = out.send(moss::tool_output(&call.call_id, &answer));
-            });
+            };
+            if let Some(hub) = hub {
+                hub.spawn_blocking_task(task);
+            } else {
+                vibevalley_runtime::rt::handle().spawn_blocking(task);
+            }
         }
     }
 }

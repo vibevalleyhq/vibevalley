@@ -59,14 +59,19 @@ impl Sessions {
                     now(),
                 );
                 s.profile = Some(drive.agent.clone());
-                s.cwd = Some(self.0.config.data_dir.join("talk").join(&id).to_string_lossy().into_owned());
+                s.machine = (!drive.is_local).then(|| drive.machine_id.clone());
+                s.cwd = drive
+                    .is_local
+                    .then(|| self.0.config.data_dir.join("talk").join(&id).to_string_lossy().into_owned());
                 s.attach_binding(ContextRef::Channel { id: channel.to_string() });
                 s
             }
         };
         session.brief = vibevalley_core::text::clip(words, 120);
         let cwd = PathBuf::from(session.cwd.clone().unwrap_or_default());
-        std::fs::create_dir_all(&cwd).map_err(io)?;
+        if drive.is_local {
+            std::fs::create_dir_all(&cwd).map_err(io)?;
+        }
         let resume = if resuming && drive.runtime.capabilities().resume {
             self.extra(&session.id).agent_session
         } else {
@@ -85,13 +90,24 @@ impl Sessions {
         let mut mcp_servers: Vec<_> = self.door_for(&session.id).into_iter().collect();
         mcp_servers.extend(drive.mcp_servers.iter().cloned());
         let (append_system_prompt, prompt) = drive.work_instructions(rules, prompt);
+        let mut env = drive.env.clone();
+        if !drive.is_local {
+            let meta = crate::modules::infra::machine::RemoteDispatchMeta {
+                session_id: Some(session.id.clone()),
+                repo_ref: None,
+                branch: None,
+                base_ref: None,
+                mcp_session_token: Some(self.mcp_token_for(&session.id)),
+            };
+            crate::modules::infra::machine::attach_dispatch_meta(&mut env, &meta);
+        }
         let opts = SessionOptions {
             cwd,
             model: drive.model.clone(),
             resume,
             permission_mode: self.0.config.permission,
             append_system_prompt,
-            env: drive.env.clone(),
+            env,
             record_to: Some(self.record_path(&session.id)),
             effort: drive.effort.clone(),
             mcp_servers,

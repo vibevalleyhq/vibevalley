@@ -96,4 +96,5 @@ export type IconName =
   | "collapseAll"
   | "expandAll"
   | "lock"
-  | "sidebar";
+  | "sidebar"
+  | "sidebarRight";

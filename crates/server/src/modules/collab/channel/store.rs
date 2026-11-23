@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use arc_swap::ArcSwap;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{ApiError, Channel, ChannelLast, ChannelUnread, DEFAULT_ORCHESTRATOR, EVERYONE, SubjectKind, USER_ID};
 
@@ -23,18 +26,23 @@ impl<T> Q<T> for sqlx::Result<T> {
     }
 }
 
-/// The tables and the places in memory, under one lock (`locked`).
+/// Write-side state under `Chat::inner`: the active write transaction handle,
+/// the mutable `ChatModel` staged inside transactions, and delivery loop-guard
+/// state. Read-only queries bypass this lock and read `Chat::snapshot` + the
+/// WAL `read_pool` directly.
 pub struct Inner {
     pub(super) db: Connection,
     pub(super) transaction_depth: usize,
     pub(super) model: ChatModel,
     pub(super) reach: Reach,
+    pub(super) snapshot: Arc<ArcSwap<ChatModel>>,
 }
 
 /// A savepoint around `work`: on failure the tables and the model are as
 /// they were. The outermost one takes the write lock at once: other modules
 /// write to the same file, and a read that later wants to write would be
-/// refused (`SQLITE_BUSY`) rather than wait.
+/// refused (`SQLITE_BUSY`) rather than wait. On outermost commit, the committed
+/// `ChatModel` is published atomically to lock-free readers via `snapshot`.
 pub(super) fn tx<T>(inner: &mut Inner, work: impl FnOnce(&mut Inner) -> Result<T, ApiError>) -> Result<T, ApiError> {
     struct Savepoint<'a> {
         inner: &'a mut Inner,
@@ -69,10 +77,320 @@ pub(super) fn tx<T>(inner: &mut Inner, work: impl FnOnce(&mut Inner) -> Result<T
     let value = work(guard.inner)?;
     guard.inner.db.end_tx(commit, is_outer).q()?;
     guard.previous = None;
+    if is_outer {
+        guard.inner.publish_snapshot();
+    }
     Ok(value)
 }
 
+pub(super) fn message_of(db: &Connection, id: &str) -> Result<MsgRow, ApiError> {
+    db::message_by_id(db, id)
+        .q()?
+        .ok_or_else(|| missing(t("server.channel.noMessageId", &[("id", id.into())]), LookIn::Channel))
+}
+
+impl ChatModel {
+    pub(super) fn seat_matches(&self, p: &Seat) -> bool {
+        self.participant(&p.id).is_some_and(|held| {
+            held.kind == "agent"
+                && held.name == p.name
+                && held.agent_id == p.agent
+                && held.left_at.is_none()
+                && p.home.as_ref().is_none_or(|h| Some(h) == held.home_id.as_ref())
+        })
+    }
+
+    pub(super) fn is_orchestrator_seat(&self, id: &str) -> bool {
+        self.participant(id)
+            .is_some_and(|p| p.kind == "agent" && p.agent_id.is_none() && p.left_at.is_none())
+    }
+
+    pub(super) fn orchestrator_seats(&self) -> Vec<String> {
+        self.participants()
+            .iter()
+            .filter(|p| self.is_orchestrator_seat(&p.id))
+            .map(|p| p.id.clone())
+            .collect()
+    }
+
+    pub(super) fn top_of_row<'a>(&'a self, row: Option<&'a ChannelRow>) -> Option<&'a ChannelRow> {
+        match row {
+            Some(r) if r.r#type == "thread" => self.top_of_row(r.parent_id.as_deref().and_then(|p| self.channel(p))),
+            other => other,
+        }
+    }
+
+    pub(super) fn members_of_row(&self, row: Option<&ChannelRow>) -> Vec<String> {
+        match self.top_of_row(row) {
+            Some(top) if top.r#type != "direct" => self.members_of(&top.id),
+            _ => vec![],
+        }
+    }
+
+    /// The orchestrator a place's unaddressed words go to.
+    pub(super) fn orchestrator_in_row(&self, row: Option<&ChannelRow>) -> String {
+        if let Some(top) = self.top_of_row(row)
+            && top.r#type == "direct"
+        {
+            return top
+                .peer_id
+                .clone()
+                .filter(|p| self.is_orchestrator_seat(p))
+                .unwrap_or_else(|| DEFAULT_ORCHESTRATOR.into());
+        }
+        let members = self.members_of_row(row);
+        if members.iter().any(|m| m == DEFAULT_ORCHESTRATOR) {
+            return DEFAULT_ORCHESTRATOR.into();
+        }
+        members
+            .into_iter()
+            .find(|m| self.is_orchestrator_seat(m))
+            .unwrap_or_else(|| DEFAULT_ORCHESTRATOR.into())
+    }
+
+    pub(super) fn orchestrator_in(&self, id: &str) -> String {
+        self.orchestrator_in_row(self.channel(id))
+    }
+
+    fn channel_name(&self, id: &str) -> Option<String> {
+        self.channel(id).filter(|c| c.r#type != "thread").and_then(|c| c.name.clone())
+    }
+
+    pub(super) fn channel_tags(&self) -> String {
+        let mut named: Vec<&ChannelRow> = vec![];
+        let all = self.channels("channel");
+        for c in &all {
+            if c.name.is_some() {
+                named.push(c);
+            }
+        }
+        named.sort_by(|a, b| a.id.cmp(&b.id));
+        list(&named.iter().map(|c| format!("#{}", c.name.as_deref().unwrap_or(""))).collect::<Vec<_>>())
+    }
+
+    pub(super) fn direct_with(&self, who: &str, other: &str) -> Option<ChannelRow> {
+        let peer = if who == USER_ID {
+            other
+        } else if other == USER_ID {
+            who
+        } else {
+            ""
+        };
+        self.channels("direct").into_iter().find(|c| c.peer_id.as_deref() == Some(peer))
+    }
+
+    pub(super) fn target_of_row(
+        &self,
+        kind: &str,
+        root_number: Option<i64>,
+        name: Option<&str>,
+        channel_id: Option<&str>,
+        channel_name_of: Option<&str>,
+    ) -> String {
+        let shown = name.or(channel_name_of);
+        let channel = channel_name_of
+            .map(str::to_string)
+            .or_else(|| channel_id.and_then(|c| self.channel_name(c)))
+            .unwrap_or_default();
+        words::target_of(kind, root_number, shown, &channel)
+    }
+
+    pub(super) fn target_of_channel(&self, row: &ChannelRow) -> String {
+        self.target_of_row(&row.r#type, row.root_number, row.name.as_deref(), row.parent_id.as_deref(), None)
+    }
+
+    pub(super) fn to_channel(&self, row: &ChannelRow, unread: i64, title: String, last: Option<&MsgRow>) -> Channel {
+        Channel {
+            id: row.id.clone(),
+            r#type: channel_type(&row.r#type),
+            default: row.is_default,
+            peer: row.peer_id.clone(),
+            orchestrator: Some(self.orchestrator_in_row(Some(row))),
+            members: (row.r#type != "direct").then(|| self.members_of(&row.id)),
+            parent: row.parent_id.clone(),
+            category: row.category.clone().unwrap_or_default(),
+            position: row.position,
+            archived: row.archived_at,
+            notify: notify_of(&row.notify),
+            root: row.root_id.clone(),
+            root_number: row.root_number,
+            name: row.name.clone(),
+            description: row.description.clone().unwrap_or_default(),
+            repo: row.repo.clone(),
+            subject_kind: subject_kind(row.subject_kind.as_deref()),
+            subject_id: row.subject_id.clone(),
+            last_number: row.last_number,
+            replies: row.reply_count,
+            read: self.user_read_in(&row.id),
+            unread: (unread > 0).then_some(unread),
+            title,
+            last: last.map(|m| ChannelLast {
+                from: m.sender_id.clone(),
+                name: m.sender_name.clone(),
+                text: line_of(&m.body, LAST_MAX),
+                at: m.created_at,
+            }),
+            at: row.created_at,
+        }
+    }
+
+    /// `counted`: a channel as a page lists it, with the user's unread and
+    /// a title.
+    pub(super) fn counted(&self, db: &Connection, row: &ChannelRow) -> Result<Channel, ApiError> {
+        let n = match row.notify.as_str() {
+            "none" => 0,
+            "mentions" => db::user_mentions(db).q()?.iter().filter(|m| m.row.channel_id == row.id).count() as i64,
+            _ => db::user_unread(db, &row.id, self.user_read_in(&row.id).unwrap_or(0)).q()?,
+        };
+        let sk = row.subject_kind.as_deref();
+        let mut title = String::new();
+        if row.r#type == "thread" && row.name.as_deref().is_some_and(|n| !n.is_empty()) {
+            title = row.name.clone().unwrap_or_default();
+        } else if row.r#type == "direct"
+            && let Some(peer) = &row.peer_id
+        {
+            title = self.participant(peer).map(|p| p.name.clone()).unwrap_or_default();
+        } else if row.r#type == "thread"
+            && sk == Some("talk")
+            && let Some(s) = &row.subject_id
+        {
+            title = self.participant(s).map(|p| p.name.clone()).unwrap_or_default();
+        }
+        if title.is_empty()
+            && row.r#type == "thread"
+            && let Some(root) = &row.root_id
+        {
+            let body = db::message_by_id(db, root).q()?.map(|m| m.body).unwrap_or_default();
+            title = line_of(&body, THREAD_TITLE_MAX);
+        }
+        let last = match row.last_number {
+            Some(n) if n != 0 => db::message_by_number(db, &row.id, n).q()?,
+            _ => None,
+        };
+        Ok(self.to_channel(row, n, title, last.as_ref()))
+    }
+
+    pub(super) fn home_of(&self, participant: &str) -> Option<String> {
+        self.participant(participant)
+            .and_then(|p| p.home_id.clone())
+            .filter(|h| self.channel(h).is_some())
+    }
+
+    pub(super) fn place_of(&self, row: &ChannelRow) -> Place {
+        Place {
+            id: row.id.clone(),
+            r#type: channel_type(&row.r#type),
+            peer: row.peer_id.clone(),
+            parent: row.parent_id.clone(),
+            name: row.name.clone(),
+            last_number: row.last_number.unwrap_or(0),
+            root: row.root_id.clone().zip(row.root_number),
+            topic: subject_kind(row.subject_kind.as_deref()).zip(row.subject_id.clone()),
+        }
+    }
+
+    pub(super) fn addressed_of(&self, row: &MsgRow, files: &Attachments) -> AddressedMessage {
+        let meta = meta_of(row.meta.as_deref());
+        let gone = row.deleted_at.is_some_and(|d| d != 0);
+        let attached = meta.attachments.unwrap_or_default();
+        AddressedMessage {
+            id: row.id.clone(),
+            number: row.number,
+            target: self.channel(&row.channel_id).map(|p| self.target_of_channel(p)).unwrap_or_default(),
+            from: row.sender_id.clone(),
+            actor: actor_of(&row.sender_kind, row.sender_agent.as_deref(), &row.sender_id, Some(&row.sender_name)),
+            name: row.sender_name.clone(),
+            text: row.body.clone(),
+            reply_to: row.reply_number,
+            edited: row.edited_at.is_some_and(|e| e != 0).then_some(true),
+            deleted: gone.then_some(true),
+            attachments: (!attached.is_empty()).then(|| {
+                attached
+                    .iter()
+                    .map(|f| FileAt {
+                        name: f.name.clone(),
+                        path: files.path_of(&f.id).to_string_lossy().into_owned(),
+                    })
+                    .collect()
+            }),
+            artifact: meta.artifact.filter(|_| !gone).map(|a| ArtifactRef {
+                id: a.id,
+                title: a.title,
+                version: a.version,
+            }),
+            blocks: meta.blocks.filter(|b| !b.is_empty() && !gone),
+            view_context: meta.view_context.filter(|_| !gone),
+            picked: meta.picked,
+            response_port: meta.response_port.filter(|s| !s.is_empty()),
+            voice_mode: meta.voice_mode.filter(|s| !s.is_empty()),
+        }
+    }
+
+    /// A participant's unread: the channel given, or the one its home is
+    /// in (else the default), and the threads it follows.
+    pub(super) fn unread_of(&self, db: &Connection, who: &str, in_channel: Option<&str>) -> Result<Vec<ChannelUnread>, ApiError> {
+        let channel = in_channel
+            .map(str::to_string)
+            .or_else(|| self.home_of(who).and_then(|h| self.top_of_row(self.channel(&h)).map(|t| t.id.clone())))
+            .unwrap_or_else(|| self.default_id());
+        Ok(db::unread_of(db, who, &channel)
+            .q()?
+            .into_iter()
+            .map(|r| ChannelUnread {
+                channel: words::target_of(&r.r#type, r.root_number, None, &r.channel_name),
+                unread: r.unread,
+                mentions_you: r.mentions_you,
+                latest: r.latest_sender_name.filter(|n| !n.is_empty()),
+            })
+            .collect())
+    }
+
+    pub(super) fn committed_from(&self, row: &MsgRow, event: &EventRow) -> Option<Committed> {
+        let ch = self.channel(&row.channel_id)?;
+        let topic = if ch.r#type != "channel" {
+            subject_kind(ch.subject_kind.as_deref()).zip(ch.subject_id.clone())
+        } else {
+            None
+        };
+        Some(Committed {
+            event: event.clone(),
+            row: row.clone(),
+            place: self.place_of(ch),
+            channel_name: ch
+                .parent_id
+                .as_deref()
+                .and_then(|p| self.channel(p))
+                .and_then(|p| p.name.clone())
+                .or_else(|| ch.name.clone())
+                .unwrap_or_default(),
+            mentions: meta_of(row.meta.as_deref()).mentions.unwrap_or_default(),
+            channel_type: channel_type(&ch.r#type),
+            peer: ch.peer_id.clone(),
+            orchestrator: self.orchestrator_in_row(Some(ch)),
+            channel_members: self.members_of_row(Some(ch)),
+            members: if ch.r#type == "thread" { self.members_of(&ch.id) } else { vec![] },
+            topic,
+        })
+    }
+
+    /// `answersOf`: a helper's words answer the session that last named it
+    /// there since it last spoke.
+    pub(super) fn answers_of(&self, db: &Connection, row: &MsgRow) -> Result<Option<String>, ApiError> {
+        if row.kind != "chat" || row.sender_kind != "agent" || self.is_orchestrator_seat(&row.sender_id) {
+            return Ok(None);
+        }
+        let callers = db::callers_of(db, &row.sender_id, &row.channel_id, &row.id, CALLERS_MAX).q()?;
+        Ok(callers
+            .into_iter()
+            .find(|c| self.participant(c).is_some_and(|p| p.kind == "agent" && p.agent_id.is_some())))
+    }
+}
+
 impl Inner {
+    pub(super) fn publish_snapshot(&self) {
+        self.snapshot.store(Arc::new(self.model.clone()));
+    }
+
     pub(super) fn add_member(&mut self, channel: &str, participant: &str, reason: &str, from: i64) -> Result<(), ApiError> {
         db::add_member(&self.db, channel, participant, reason, from).q()?;
         self.model.member_added(channel, participant);
@@ -87,13 +405,7 @@ impl Inner {
 
     /// An agent's seat as it goes now; one already so is left as it is.
     pub(super) fn seat(&mut self, p: &Seat) -> Result<(), ApiError> {
-        if let Some(held) = self.model.participant(&p.id)
-            && held.kind == "agent"
-            && held.name == p.name
-            && held.agent_id == p.agent
-            && held.left_at.is_none()
-            && p.home.as_ref().is_none_or(|h| Some(h) == held.home_id.as_ref())
-        {
+        if self.model.seat_matches(p) {
             return Ok(());
         }
         self.upsert_participant(ParticipantRow {
@@ -144,263 +456,20 @@ impl Inner {
         Ok(id)
     }
 
-    pub(super) fn is_orchestrator_seat(&self, id: &str) -> bool {
-        self.model
-            .participant(id)
-            .is_some_and(|p| p.kind == "agent" && p.agent_id.is_none() && p.left_at.is_none())
-    }
-
-    fn orchestrator_seats(&self) -> Vec<String> {
-        self.model
-            .participants()
-            .iter()
-            .filter(|p| self.is_orchestrator_seat(&p.id))
-            .map(|p| p.id.clone())
-            .collect()
-    }
-
-    fn top_of_row<'a>(&'a self, row: Option<&'a ChannelRow>) -> Option<&'a ChannelRow> {
-        match row {
-            Some(r) if r.r#type == "thread" => self.top_of_row(r.parent_id.as_deref().and_then(|p| self.model.channel(p))),
-            other => other,
-        }
-    }
-
-    fn members_of_row(&self, row: Option<&ChannelRow>) -> Vec<String> {
-        match self.top_of_row(row) {
-            Some(top) if top.r#type != "direct" => self.model.members_of(&top.id),
-            _ => vec![],
-        }
-    }
-
-    /// The orchestrator a place's unaddressed words go to.
-    fn orchestrator_in_row(&self, row: Option<&ChannelRow>) -> String {
-        if let Some(top) = self.top_of_row(row)
-            && top.r#type == "direct"
-        {
-            return top
-                .peer_id
-                .clone()
-                .filter(|p| self.is_orchestrator_seat(p))
-                .unwrap_or_else(|| DEFAULT_ORCHESTRATOR.into());
-        }
-        let members = self.members_of_row(row);
-        if members.iter().any(|m| m == DEFAULT_ORCHESTRATOR) {
-            return DEFAULT_ORCHESTRATOR.into();
-        }
-        members
-            .into_iter()
-            .find(|m| self.is_orchestrator_seat(m))
-            .unwrap_or_else(|| DEFAULT_ORCHESTRATOR.into())
-    }
-
-    pub(super) fn orchestrator_in(&self, id: &str) -> String {
-        self.orchestrator_in_row(self.model.channel(id))
-    }
-
-    fn channel_name(&self, id: &str) -> Option<String> {
-        self.model.channel(id).filter(|c| c.r#type != "thread").and_then(|c| c.name.clone())
-    }
-
-    pub(super) fn channel_tags(&self) -> String {
-        let mut named: Vec<&ChannelRow> = vec![];
-        let all = self.model.channels("channel");
-        for c in &all {
-            if c.name.is_some() {
-                named.push(c);
-            }
-        }
-        named.sort_by(|a, b| a.id.cmp(&b.id));
-        list(&named.iter().map(|c| format!("#{}", c.name.as_deref().unwrap_or(""))).collect::<Vec<_>>())
-    }
-
-    fn direct_with(&self, who: &str, other: &str) -> Option<ChannelRow> {
-        let peer = if who == USER_ID {
-            other
-        } else if other == USER_ID {
-            who
-        } else {
-            ""
-        };
-        self.model.channels("direct").into_iter().find(|c| c.peer_id.as_deref() == Some(peer))
-    }
-
-    pub(super) fn target_of_row(
-        &self,
-        kind: &str,
-        root_number: Option<i64>,
-        name: Option<&str>,
-        channel_id: Option<&str>,
-        channel_name_of: Option<&str>,
-    ) -> String {
-        let shown = name.or(channel_name_of);
-        let channel = channel_name_of
-            .map(str::to_string)
-            .or_else(|| channel_id.and_then(|c| self.channel_name(c)))
-            .unwrap_or_default();
-        words::target_of(kind, root_number, shown, &channel)
-    }
-
-    pub(super) fn target_of_channel(&self, row: &ChannelRow) -> String {
-        self.target_of_row(&row.r#type, row.root_number, row.name.as_deref(), row.parent_id.as_deref(), None)
-    }
-
-    pub(super) fn to_channel(&self, row: &ChannelRow, unread: i64, title: String, last: Option<&MsgRow>) -> Channel {
-        Channel {
-            id: row.id.clone(),
-            r#type: channel_type(&row.r#type),
-            default: row.is_default,
-            peer: row.peer_id.clone(),
-            orchestrator: Some(self.orchestrator_in_row(Some(row))),
-            members: (row.r#type != "direct").then(|| self.model.members_of(&row.id)),
-            parent: row.parent_id.clone(),
-            category: row.category.clone().unwrap_or_default(),
-            position: row.position,
-            archived: row.archived_at,
-            notify: notify_of(&row.notify),
-            root: row.root_id.clone(),
-            root_number: row.root_number,
-            name: row.name.clone(),
-            description: row.description.clone().unwrap_or_default(),
-            repo: row.repo.clone(),
-            subject_kind: subject_kind(row.subject_kind.as_deref()),
-            subject_id: row.subject_id.clone(),
-            last_number: row.last_number,
-            replies: row.reply_count,
-            read: self.model.user_read_in(&row.id),
-            unread: (unread > 0).then_some(unread),
-            title,
-            last: last.map(|m| ChannelLast {
-                from: m.sender_id.clone(),
-                name: m.sender_name.clone(),
-                text: line_of(&m.body, LAST_MAX),
-                at: m.created_at,
-            }),
-            at: row.created_at,
-        }
-    }
-
-    /// `counted`: a channel as a page lists it, with the user's unread and
-    /// a title.
     pub(super) fn counted(&self, row: &ChannelRow) -> Result<Channel, ApiError> {
-        let n = match row.notify.as_str() {
-            "none" => 0,
-            "mentions" => db::user_mentions(&self.db).q()?.iter().filter(|m| m.row.channel_id == row.id).count() as i64,
-            _ => db::user_unread(&self.db, &row.id, self.model.user_read_in(&row.id).unwrap_or(0)).q()?,
-        };
-        let sk = row.subject_kind.as_deref();
-        let mut title = String::new();
-        if row.r#type == "thread" && row.name.as_deref().is_some_and(|n| !n.is_empty()) {
-            title = row.name.clone().unwrap_or_default();
-        } else if row.r#type == "direct"
-            && let Some(peer) = &row.peer_id
-        {
-            title = self.model.participant(peer).map(|p| p.name.clone()).unwrap_or_default();
-        } else if row.r#type == "thread"
-            && sk == Some("talk")
-            && let Some(s) = &row.subject_id
-        {
-            title = self.model.participant(s).map(|p| p.name.clone()).unwrap_or_default();
-        }
-        if title.is_empty()
-            && row.r#type == "thread"
-            && let Some(root) = &row.root_id
-        {
-            let body = db::message_by_id(&self.db, root).q()?.map(|m| m.body).unwrap_or_default();
-            title = line_of(&body, THREAD_TITLE_MAX);
-        }
-        let last = match row.last_number {
-            Some(n) if n != 0 => db::message_by_number(&self.db, &row.id, n).q()?,
-            _ => None,
-        };
-        Ok(self.to_channel(row, n, title, last.as_ref()))
-    }
-
-    pub(super) fn home_of(&self, participant: &str) -> Option<String> {
-        self.model
-            .participant(participant)
-            .and_then(|p| p.home_id.clone())
-            .filter(|h| self.model.channel(h).is_some())
-    }
-
-    pub(super) fn place_of(&self, row: &ChannelRow) -> Place {
-        Place {
-            id: row.id.clone(),
-            r#type: channel_type(&row.r#type),
-            peer: row.peer_id.clone(),
-            parent: row.parent_id.clone(),
-            name: row.name.clone(),
-            last_number: row.last_number.unwrap_or(0),
-            root: row.root_id.clone().zip(row.root_number),
-            topic: subject_kind(row.subject_kind.as_deref()).zip(row.subject_id.clone()),
-        }
-    }
-
-    pub(super) fn addressed_of(&self, row: &MsgRow, files: &Attachments) -> AddressedMessage {
-        let meta = meta_of(row.meta.as_deref());
-        let gone = row.deleted_at.is_some_and(|d| d != 0);
-        let attached = meta.attachments.unwrap_or_default();
-        AddressedMessage {
-            id: row.id.clone(),
-            number: row.number,
-            target: self.model.channel(&row.channel_id).map(|p| self.target_of_channel(p)).unwrap_or_default(),
-            from: row.sender_id.clone(),
-            actor: actor_of(&row.sender_kind, row.sender_agent.as_deref(), &row.sender_id, Some(&row.sender_name)),
-            name: row.sender_name.clone(),
-            text: row.body.clone(),
-            reply_to: row.reply_number,
-            edited: row.edited_at.is_some_and(|e| e != 0).then_some(true),
-            deleted: gone.then_some(true),
-            attachments: (!attached.is_empty()).then(|| {
-                attached
-                    .iter()
-                    .map(|f| FileAt {
-                        name: f.name.clone(),
-                        path: files.path_of(&f.id).to_string_lossy().into_owned(),
-                    })
-                    .collect()
-            }),
-            artifact: meta.artifact.filter(|_| !gone).map(|a| ArtifactRef {
-                id: a.id,
-                title: a.title,
-                version: a.version,
-            }),
-            blocks: meta.blocks.filter(|b| !b.is_empty() && !gone),
-            view_context: meta.view_context.filter(|_| !gone),
-            picked: meta.picked,
-            response_port: meta.response_port.filter(|s| !s.is_empty()),
-            voice_mode: meta.voice_mode.filter(|s| !s.is_empty()),
-        }
-    }
-
-    /// A participant's unread: the channel given, or the one its home is
-    /// in (else the default), and the threads it follows.
-    pub(super) fn unread_of(&self, who: &str, in_channel: Option<&str>) -> Result<Vec<ChannelUnread>, ApiError> {
-        let channel = in_channel
-            .map(str::to_string)
-            .or_else(|| self.home_of(who).and_then(|h| self.top_of_row(self.model.channel(&h)).map(|t| t.id.clone())))
-            .unwrap_or_else(|| self.model.default_id());
-        Ok(db::unread_of(&self.db, who, &channel)
-            .q()?
-            .into_iter()
-            .map(|r| ChannelUnread {
-                channel: words::target_of(&r.r#type, r.root_number, None, &r.channel_name),
-                unread: r.unread,
-                mentions_you: r.mentions_you,
-                latest: r.latest_sender_name.filter(|n| !n.is_empty()),
-            })
-            .collect())
+        self.model.counted(&self.db, row)
     }
 
     /// `resolveTarget`: an address as `who` would mean it.
     pub(super) fn resolve_target(&mut self, who: &str, target: &str) -> Result<(String, Option<String>), ApiError> {
         if target.trim().is_empty() {
-            return Ok((self.home_of(who).unwrap_or_else(|| self.model.default_id()), None));
+            return Ok((self.model.home_of(who).unwrap_or_else(|| self.model.default_id()), None));
         }
         let parsed = words::parse_chat_target(target).ok_or_else(|| refused(t("server.channel.badTarget", &[("target", target.into())])))?;
         let root = match parsed {
             ChatTarget::Direct(peer) => {
                 let direct = self
+                    .model
                     .direct_with(who, &peer)
                     .ok_or_else(|| refused(t("server.channel.noDirect", &[("target", target.trim().into())])))?;
                 return Ok((direct.id, None));
@@ -415,7 +484,10 @@ impl Inner {
         if !name.is_empty() {
             let found = self.model.channel_by_name(name).ok_or_else(|| {
                 missing(
-                    t("server.channel.noChannelNamed", &[("name", name.into()), ("tags", self.channel_tags().into())]),
+                    t(
+                        "server.channel.noChannelNamed",
+                        &[("name", name.into()), ("tags", self.model.channel_tags().into())],
+                    ),
                     LookIn::Channel,
                 )
             })?;
@@ -444,9 +516,7 @@ impl Inner {
     }
 
     pub(super) fn message_of(&self, id: &str) -> Result<MsgRow, ApiError> {
-        db::message_by_id(&self.db, id)
-            .q()?
-            .ok_or_else(|| missing(t("server.channel.noMessageId", &[("id", id.into())]), LookIn::Channel))
+        message_of(&self.db, id)
     }
 
     /// `settle`: who a message names, and who follows the thread from it.
@@ -458,8 +528,8 @@ impl Inner {
             .cloned()
             .ok_or_else(|| internal(format!("no channel {}", row.channel_id)))?;
         let mut meta = meta_of(row.meta.as_deref());
-        let orchestrators = self.orchestrator_seats();
-        let here = self.orchestrator_in_row(Some(&ch));
+        let orchestrators = self.model.orchestrator_seats();
+        let here = self.model.orchestrator_in_row(Some(&ch));
         let mentions = if ch.r#type == "direct" {
             vec![]
         } else {
@@ -506,42 +576,10 @@ impl Inner {
     }
 
     pub(super) fn committed_from(&self, row: &MsgRow, event: &EventRow) -> Option<Committed> {
-        let ch = self.model.channel(&row.channel_id)?;
-        let topic = if ch.r#type != "channel" {
-            subject_kind(ch.subject_kind.as_deref()).zip(ch.subject_id.clone())
-        } else {
-            None
-        };
-        Some(Committed {
-            event: event.clone(),
-            row: row.clone(),
-            place: self.place_of(ch),
-            channel_name: ch
-                .parent_id
-                .as_deref()
-                .and_then(|p| self.model.channel(p))
-                .and_then(|p| p.name.clone())
-                .or_else(|| ch.name.clone())
-                .unwrap_or_default(),
-            mentions: meta_of(row.meta.as_deref()).mentions.unwrap_or_default(),
-            channel_type: channel_type(&ch.r#type),
-            peer: ch.peer_id.clone(),
-            orchestrator: self.orchestrator_in_row(Some(ch)),
-            channel_members: self.members_of_row(Some(ch)),
-            members: if ch.r#type == "thread" { self.model.members_of(&ch.id) } else { vec![] },
-            topic,
-        })
+        self.model.committed_from(row, event)
     }
 
-    /// `answersOf`: a helper's words answer the session that last named it
-    /// there since it last spoke.
     pub(super) fn answers_of(&self, row: &MsgRow) -> Result<Option<String>, ApiError> {
-        if row.kind != "chat" || row.sender_kind != "agent" || self.is_orchestrator_seat(&row.sender_id) {
-            return Ok(None);
-        }
-        let callers = db::callers_of(&self.db, &row.sender_id, &row.channel_id, &row.id, CALLERS_MAX).q()?;
-        Ok(callers
-            .into_iter()
-            .find(|c| self.model.participant(c).is_some_and(|p| p.kind == "agent" && p.agent_id.is_some())))
+        self.model.answers_of(&self.db, row)
     }
 }

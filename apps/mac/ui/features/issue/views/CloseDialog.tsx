@@ -275,7 +275,7 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
                     <View class="min-w-0 flex-1">
                       <Text class="text-sm font-medium text-ink tabular-nums">{t("web.issue.changes.uncommitted", { n: c().uncommitted.length })}</Text>
                       <View class="mt-2 flex-row flex-wrap gap-1.5">
-                        <Each of={c().uncommitted}>
+                        <Each of={c().uncommitted} key={(f) => f.path}>
                           {(f) => {
                             const kind = () => changeKind(f().status);
                             const look = () => kindLook[f().status];
@@ -357,7 +357,7 @@ export function ConflictFiles(props: { files: string[]; worktree?: string | unde
   return (
     <View class="mt-2 gap-1.5">
       <View class="flex-row flex-wrap gap-1.5">
-        <Each of={props.files}>
+        <Each of={props.files} key={(path) => path}>
           {(path) => (
             <If
               when={props.worktree}
@@ -420,7 +420,7 @@ export function ChangesBody(props: { changes: Changes }) {
             {t("web.issue.changes.commits", { n: props.changes.commits.length })}
           </Text>
           <View class="overflow-hidden rounded-md border border-line">
-            <Each of={props.changes.commits}>
+            <Each of={props.changes.commits} key={(m) => m.hash}>
               {(m, i) => (
                 <View class={`flex-row items-center gap-2.5 px-2.5 py-1.5 ${i() === props.changes.commits.length - 1 ? "" : "border-b border-line"}`}>
                   <Text class="w-16 shrink-0 font-mono text-xs text-muted tabular-nums">{m().hash}</Text>
@@ -438,7 +438,7 @@ export function ChangesBody(props: { changes: Changes }) {
             {t("web.issue.changes.files", { n: props.changes.files.length })}
           </Text>
           <View class="overflow-hidden rounded-md border border-line">
-            <Each of={props.changes.files}>
+            <Each of={props.changes.files} key={(f) => f.path}>
               {(f, i) => (
                 <FileRow
                   file={f()}
@@ -588,12 +588,13 @@ function Patch(props: { text: string; path: string }) {
 
 function TintedLines(props: { text: string }) {
   return (
-    <Each of={patchLines(props.text)}>
+    <Each of={patchLines(props.text)} key="index">
       {(line) => {
-        const look = patchTone[patchMarkOf(line())];
+        const look = () => patchTone[patchMarkOf(line())];
+        const bg = () => look().bg?.();
         return (
-          <View class="px-2.5" style={look.bg ? { backgroundColor: look.bg() } : undefined}>
-            <Text class={`font-mono text-xs leading-[17px] ${look.ink}`}>{line() || " "}</Text>
+          <View class="px-2.5" style={bg() ? { backgroundColor: bg() } : undefined}>
+            <Text class={`font-mono text-xs leading-[17px] ${look().ink}`}>{line() || " "}</Text>
           </View>
         );
       }}

@@ -3,6 +3,7 @@ import { cleanup, PanResponder, Scroll, signal, Text, View, windowSize, type JSX
 import { t } from "@vibevalley/i18n";
 import { type BoardSummary, maxRunning } from "@vibevalley/protocol";
 
+import { Button } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
 import type { IconName } from "../../../design/icons";
 import { motionClass, motionDuration, motionOff } from "../../../design/motion";
@@ -26,6 +27,7 @@ import {
 } from "../model/cards";
 import { laneOrder, type Ordering } from "../model/display";
 import { useIssues, useNameOf } from "../model/history";
+import { emptyLaneGuide } from "../model/onboarding";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 
 /** Under the closed ones: how many older are folded away, or back to the recent ones. */
@@ -160,7 +162,7 @@ export function IssueBoard(props: BoardProps) {
     <View ref={drag.setRoot} class="min-h-0 flex-1 px-3 pb-3">
       <If when={narrow()}>
         <View accessibilityLabel={t("web.issue.board.whichLane")} class="mb-2 flex-row gap-0.5 rounded-md border border-line bg-side p-0.5">
-          <Each of={lanes}>
+          <Each of={lanes} key={(l) => l}>
             {(l) => (
               <View
                 testID={`board-lane-tab-${l()}`}
@@ -183,7 +185,7 @@ export function IssueBoard(props: BoardProps) {
         </View>
       </If>
       <View class="min-h-0 flex-1 flex-row gap-2.5">
-        <Each of={lanes}>
+        <Each of={lanes} key={(l) => l}>
           {(l) => (
             <If when={!narrow() || l() === lane()}>
               <LaneView
@@ -226,7 +228,8 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; co
   const ordered = () => laneOrder(props.lane, props.cards, p().ordering);
   const shown = () => (folded() ? ordered().slice(0, closedShown) : ordered());
   const hidden = () => (folded() ? ordered().length - closedShown : 0);
-  const hasBody = () => p().loading || props.cards.length > 0 || props.lane !== "todo";
+  const guide = () => emptyLaneGuide[props.lane];
+  const showTopNew = () => props.lane === "todo" && (p().loading || props.cards.length > 0);
   return (
     <View
       ref={(r) => props.drag.lane(props.lane, r)}
@@ -255,7 +258,7 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; co
           <Hint text={emptyText[props.lane]} />
         </View>
       </View>
-      <If when={props.lane === "todo"}>
+      <If when={showTopNew()}>
         <View
           onPress={() => p().onNew()}
           role="button"
@@ -267,35 +270,63 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; co
           <Text class="text-sm font-medium text-muted group-hover:text-ink">{t("web.issue.new.card")}</Text>
         </View>
       </If>
-      <If when={hasBody()}>
-        <Scroll class="mt-2 min-h-0 shrink" contentClass="gap-1.5 pb-0.5">
-          {p().loading ? (
-            <Text class="px-1 text-xs text-faint">{t("web.issue.reading")}</Text>
-          ) : props.cards.length === 0 ? (
-            <View testID="lane-empty" class={`h-12 rounded-md border border-dashed ${over() ? "border-leaf" : "border-line"}`} />
-          ) : (
-            <>
-              <Each of={shown()} key={(c) => c.id}>
-                {(c) => (
-                  <CardView
-                    card={c()}
-                    selected={c().id === p().selected}
-                    onOpen={p().onOpen}
-                    onRetry={p().onRetry}
-                    onPutBack={p().onPutBack}
-                    drag={props.drag}
-                    // Anything but manual hides the user's order of todo, so a card cannot be dropped between two there.
-                    placeable={c().kind === "todo" && p().ordering === "manual"}
-                  />
-                )}
-              </Each>
-              <If when={hidden() > 0 || (props.lane === "closed" && p().older && props.cards.length > closedShown)}>
-                <OlderLink hidden={hidden()} onClick={p().onOlder} />
-              </If>
-            </>
-          )}
-        </Scroll>
-      </If>
+      <Scroll class="mt-2 min-h-0 shrink" contentClass="gap-1.5 pb-0.5">
+        <If
+          when={p().loading}
+          else={
+            <If
+              when={props.cards.length === 0}
+              else={
+                <>
+                  <Each of={shown()} key={(c) => c.id}>
+                    {(c) => (
+                      <CardView
+                        card={c()}
+                        selected={c().id === p().selected}
+                        onOpen={p().onOpen}
+                        onRetry={p().onRetry}
+                        onPutBack={p().onPutBack}
+                        drag={props.drag}
+                        // Anything but manual hides the user's order of todo, so a card cannot be dropped between two there.
+                        placeable={c().kind === "todo" && p().ordering === "manual"}
+                      />
+                    )}
+                  </Each>
+                  <If when={hidden() > 0 || (props.lane === "closed" && p().older && props.cards.length > closedShown)}>
+                    <OlderLink hidden={hidden()} onClick={p().onOlder} />
+                  </If>
+                </>
+              }
+            >
+              <View testID="lane-empty" class={`rounded-md border border-dashed px-3 py-4 ${over() ? "border-leaf" : "border-line bg-page"}`}>
+                <View testID={`lane-empty-${props.lane}`} class="items-center gap-1.5">
+                  <Icon name={guide().icon} size={15} tone="muted" />
+                  <If
+                    when={p().filtered === true}
+                    else={
+                      <>
+                        <Text class="text-center text-xs font-medium text-ink">{t(guide().titleKey)}</Text>
+                        <Text class="text-center text-2xs leading-snug text-muted">{t(guide().bodyKey)}</Text>
+                      </>
+                    }
+                  >
+                    <Text class="text-center text-2xs leading-snug text-muted">{t("web.issue.board.emptyGuide.filtered")}</Text>
+                  </If>
+                  <If when={props.lane === "todo"}>
+                    <View class="pt-1">
+                      <Button size="compact" icon="add" testID="issue-new" onPress={() => p().onNew()}>
+                        {t("web.issue.new.card")}
+                      </Button>
+                    </View>
+                  </If>
+                </View>
+              </View>
+            </If>
+          }
+        >
+          <Text class="px-1 text-xs text-faint">{t("web.issue.reading")}</Text>
+        </If>
+      </Scroll>
     </View>
   );
 }
@@ -334,8 +365,15 @@ function CardView(props: {
     return pr === "urgent" || pr === "high" ? pr : undefined;
   };
   const showsStatus = () => ownStatus(props.card.lane, look().status);
+  const unassignedTodo = () => props.card.kind === "todo" && props.card.lane === "todo" && !cardAgent(props.card);
   const marks = () =>
-    showsStatus() || !!loud() || !!cardAgent(props.card) || props.card.kind === "orchestrator" || !!look().progress || look().flags.length > 0;
+    showsStatus() ||
+    !!loud() ||
+    !!cardAgent(props.card) ||
+    unassignedTodo() ||
+    props.card.kind === "orchestrator" ||
+    !!look().progress ||
+    look().flags.length > 0;
   const draggable = () => props.card.kind !== "orchestrator" && props.card.kind !== "missing" && props.card.move?.state !== "moving";
   const pan = PanResponder.create({
     // A press opens the card; only a move of a few points starts a drag.
@@ -367,7 +405,7 @@ function CardView(props: {
         testID="issue-card"
         accessibilityLabel={look().title}
         accessibilityState={{ selected: props.selected, busy: props.card.move?.state === "moving" }}
-        tooltip={look().detail ? <Bubble text={look().detail} /> : undefined}
+        tooltip={<If when={look().detail}>{(d) => <Bubble text={d()} />}</If>}
         class={[
           "relative overflow-hidden rounded-lg border px-2.5 py-2 focus-visible:outline-2 focus-visible:outline-focus",
           props.selected ? "border-accent bg-selected" : "border-line bg-elevated hover:border-faint hover:shadow-raise",
@@ -403,8 +441,20 @@ function CardView(props: {
             <If when={cardAgent(props.card) || props.card.kind === "orchestrator"}>
               <CardFace card={props.card} size={18} />
             </If>
+            <If when={unassignedTodo()}>
+              <View
+                testID="card-unassigned"
+                accessibilityLabel={t("web.issue.card.assignHelper")}
+                class="flex-row items-center gap-1 rounded-sm border border-dashed border-line bg-side px-1.5 py-0.5"
+              >
+                <Icon name="agents" size={11} tone="muted" />
+                <Text class="text-2xs font-medium text-muted">{t("web.issue.card.assignHelper")}</Text>
+              </View>
+            </If>
             <If when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
-            <Each of={look().flags}>{(f) => <FlagChip text={f().text} tone={f().tone} />}</Each>
+            <Each of={look().flags} key={(f) => `${f.tone}:${f.text}`}>
+              {(f) => <FlagChip text={f().text} tone={f().tone} />}
+            </Each>
           </View>
         </If>
       </View>

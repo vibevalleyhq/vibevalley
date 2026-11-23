@@ -789,6 +789,7 @@ struct Shared {
     exit: Mutex<Option<String>>,
     abort_killed: AtomicBool,
     turns_finished: AtomicU64,
+    turn_done: tokio::sync::Notify,
     cwd: PathBuf,
     timeout: Duration,
     secrets: Mutex<Option<tempfile::TempDir>>,
@@ -846,6 +847,7 @@ impl Shared {
                     if finished {
                         self.pending.lock().clear();
                         self.turns_finished.fetch_add(1, Ordering::SeqCst);
+                        self.turn_done.notify_waiters();
                     }
                     self.core.emit(path, kind);
                 }
@@ -929,6 +931,7 @@ impl Shared {
         if self.opened.load(Ordering::SeqCst) {
             self.finish(message);
         }
+        self.turn_done.notify_waiters();
     }
 
     fn finish(&self, message: String) {
@@ -1025,18 +1028,30 @@ impl Driver for ClaudeDriver {
         drop(self.shared.control_request(json!({ "subtype": "interrupt" }))?);
         let shared = self.shared.clone();
         let turn = shared.turns_finished.load(Ordering::SeqCst);
-        std::thread::spawn(move || {
-            let deadline = std::time::Instant::now() + ABORT_GRACE;
-            while std::time::Instant::now() < deadline {
+        crate::rt::handle().spawn(async move {
+            let deadline = tokio::time::Instant::now() + ABORT_GRACE;
+            loop {
+                let notified = shared.turn_done.notified();
+                tokio::pin!(notified);
+                notified.as_mut().enable();
                 if shared.turns_finished.load(Ordering::SeqCst) != turn || !shared.core.turn_active() {
                     return;
                 }
-                std::thread::sleep(Duration::from_millis(100));
-            }
-            // claude did not stop: take the process down; resume continues the session.
-            shared.abort_killed.store(true, Ordering::SeqCst);
-            if let Some(child) = shared.child.get() {
-                child.kill();
+                tokio::select! {
+                    biased;
+                    _ = notified => {}
+                    _ = tokio::time::sleep_until(deadline) => {
+                        if shared.turns_finished.load(Ordering::SeqCst) != turn || !shared.core.turn_active() {
+                            return;
+                        }
+                        // claude did not stop: take the process down; resume continues the session.
+                        shared.abort_killed.store(true, Ordering::SeqCst);
+                        if let Some(child) = shared.child.get() {
+                            child.kill_async().await;
+                        }
+                        return;
+                    }
+                }
             }
         });
         Ok(())
@@ -1093,6 +1108,7 @@ impl Driver for ClaudeDriver {
             child.kill();
             self.shared.core.observe_exit(child.status());
         }
+        self.shared.turn_done.notify_waiters();
         self.shared.secrets.lock().take();
     }
 }
@@ -1148,6 +1164,7 @@ fn start_stream(binary: &Path, session_id: &str, opts: &SessionOptions, recorder
         exit: Mutex::new(None),
         abort_killed: AtomicBool::new(false),
         turns_finished: AtomicU64::new(0),
+        turn_done: tokio::sync::Notify::new(),
         cwd: opts.cwd.clone(),
         timeout: opts.request_timeout.unwrap_or(OPEN_TIMEOUT),
         secrets: Mutex::new(launch.secrets),

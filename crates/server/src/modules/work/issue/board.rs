@@ -38,6 +38,9 @@ pub struct NewIssue {
     pub repo: Option<PathBuf>,
     /// The runtime that does it (`claude`, `codex`, `acp:…`, `scripted`).
     pub agent: String,
+    /// Optional execution host id (`"local"` or remote/sandbox machine id).
+    #[serde(default)]
+    pub machine_id: Option<String>,
     pub deliver: Deliverable,
     #[serde(default)]
     pub priority: Priority,
@@ -264,9 +267,22 @@ impl Board {
 
     pub fn create(&self, new: NewIssue) -> Result<Issue> {
         let _work = self.0.work.lock();
-        let repo = match &new.repo {
-            Some(path) => Some(self.0.workplaces.ensure_repo(self.0.workplaces.repo_dir(&path.to_string_lossy()))?),
-            None => None,
+        let machine_id = new.machine_id.as_deref().map(str::trim).filter(|m| !m.is_empty()).map(String::from);
+        let remote_machine = machine_id.as_deref().is_some_and(|m| m != vibevalley_protocol::LOCAL_MACHINE_ID);
+        let is_remote_repo_url = |raw: &str| {
+            let trimmed = raw.trim();
+            trimmed.starts_with("https://") || trimmed.starts_with("http://") || trimmed.starts_with("ssh://") || trimmed.starts_with("git@")
+        };
+        let (repo, remote_repo_ref) = match &new.repo {
+            Some(path) => {
+                let raw = path.to_string_lossy();
+                if remote_machine && is_remote_repo_url(&raw) {
+                    (None, Some(raw.trim().to_string()))
+                } else {
+                    (Some(self.0.workplaces.ensure_repo(self.0.workplaces.repo_dir(&raw))?), None)
+                }
+            }
+            None => (None, None),
         };
         if !new.agent.trim().is_empty() {
             self.0.drivers.check(new.agent.trim())?;
@@ -287,10 +303,11 @@ impl Board {
         {
             return Err(BoardError::Other(format!("issue #{} is closed", p.number)));
         }
-        let repo_root = match (&repo, &parent) {
-            (Some(r), _) => Some(self.0.workplaces.repo_ref(r.root())),
-            (None, Some(p)) => p.repo.clone(),
-            (None, None) => None,
+        let repo_root = match (&repo, remote_repo_ref, &parent) {
+            (Some(r), _, _) => Some(self.0.workplaces.repo_ref(r.root())),
+            (None, Some(url), _) => Some(url),
+            (None, None, Some(p)) => p.repo.clone(),
+            (None, None, None) => None,
         };
         let stored_max = state.issues.iter().map(|t| t.number).max().unwrap_or(0);
         let number = self.0.ledger.next("issue", stored_max)?;
@@ -315,6 +332,7 @@ impl Board {
         issue.criteria = vibevalley_core::refine::kept(&new.criteria);
         issue.deliver = new.deliver;
         issue.repo = repo_root;
+        issue.machine_id = machine_id;
         issue.priority = parent.as_ref().map(|p| p.priority).unwrap_or(new.priority);
         let parent_agent = parent.as_ref().and_then(|p| p.assigned_agent()).map(String::from);
         issue.parent = parent.map(|p| p.id);
@@ -667,14 +685,33 @@ impl Board {
     fn hire(&self, issue: &Issue, all: &[Issue], words: Option<String>, kind: RunTriggerKind) -> Result<String> {
         let drive = self.0.drivers.drive(issue.assigned_agent(), issue)?;
         let wp = &self.0.workplaces;
-        let (cwd, branch, base) = match wp.main_repo(issue.repo.as_deref())? {
-            Some(main) => {
+        let (cwd, branch, base) = if !drive.is_local {
+            // PR-first remote dispatch: skip local git worktree creation; the remote machine
+            // prepares its own isolated worktree using `repo_ref`, `branch`, and `base_ref`.
+            let branch = issue.repo.as_ref().map(|_| crate::modules::work::workplace::issue_branch(issue.number));
+            let base = if let Some(repo) = issue.repo.as_deref() {
                 let parent = issue.parent.as_ref().and_then(|p| self.issue(p)).map(|p| p.number);
-                let base = wp.base(&main, parent)?;
-                let (dir, branch) = wp.worktree(&main, issue.number, &base)?;
-                (dir, Some(branch), Some(base))
+                if let Some(p) = parent {
+                    Some(crate::modules::work::workplace::issue_branch(p))
+                } else {
+                    wp.existing(repo)?
+                        .and_then(|main| Workplace::main_branch(&main).ok())
+                        .or_else(|| Some("main".to_string()))
+                }
+            } else {
+                None
+            };
+            (PathBuf::new(), branch, base)
+        } else {
+            match wp.main_repo(issue.repo.as_deref())? {
+                Some(main) => {
+                    let parent = issue.parent.as_ref().and_then(|p| self.issue(p)).map(|p| p.number);
+                    let base = wp.base(&main, parent)?;
+                    let (dir, branch) = wp.worktree(&main, issue.number, &base)?;
+                    (dir, Some(branch), Some(base))
+                }
+                None => (wp.context(&issue.id)?, None, None),
             }
-            None => (wp.context(&issue.id)?, None, None),
         };
         let name = format!("{} #{}", drive.name, issue.number);
         self.0.sessions.hire(Hire {

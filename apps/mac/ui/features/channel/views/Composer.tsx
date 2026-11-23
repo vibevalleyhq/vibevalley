@@ -1,6 +1,5 @@
 import { computed, effect, keymap, Picker, signal, Text, untracked, View, type InputRef, type JSX } from "nsh";
 import { Input, Progress } from "nsh/base";
-import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import { userId } from "@vibevalley/protocol";
@@ -16,12 +15,12 @@ import { readFiles } from "../../../design/picked";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
-import { api } from "../../../infra/api";
+import { api, reasonOf } from "../../../infra/api";
+import { importLocalAttachment } from "../../../infra/attachmentFile";
 import { typedMarks } from "../../../infra/base/typedMarks";
 import { useCollabSlice, useSessionsSlice } from "../../../infra/frame";
 import { useRouter } from "../../../infra/router";
 import { useIntents } from "../../../infra/state/intent";
-import { transport } from "../../../infra/transport";
 import { activeArtifactViewContext, artifactChatFocus, clearActiveArtifactViewContext } from "../../artifact/store";
 import { attachFiles, chatMarks, chatSay, createComposer, draftOf, drafts, setEditingId, uploadsIn, useReplying, type ComposerKey } from "../model/composing";
 import { followed } from "../model/follow";
@@ -491,21 +490,16 @@ export function FileDrop(props: { channel: Channel | undefined; children: JSX.El
   );
 }
 
-const ReadFileData = z.object({ data: z.string(), type: z.string(), name: z.string() });
-
-/** Dropped files' bytes, read by the host, uploaded in turn. */
+/** Dropped local files imported straight into CAS when local, falling back to host read + upload when remote. */
 async function dropped(channel: string, uris: readonly string[]) {
-  const files: File[] = [];
-  for (const path of uris) {
-    const read = await transport().call("host.readFile", { path });
-    if (read.bizCode !== 0) {
-      uploadFailed(read.message);
-      continue;
+  for (const uri of uris) {
+    try {
+      const kept = await importLocalAttachment(uri);
+      drafts.add(channel, kept);
+    } catch (error) {
+      uploadFailed(reasonOf(error));
     }
-    const { data, type, name } = ReadFileData.parse(read.data);
-    files.push(new File([Uint8Array.from(atob(data), (c) => c.charCodeAt(0))], name, { type }));
   }
-  if (files.length > 0) await attachFiles(channel, files, uploadFailed);
 }
 
 const uploadFailed = (reason: string) => toast(t("web.channel.composer.uploadFailed", { why: reason }), "bad");

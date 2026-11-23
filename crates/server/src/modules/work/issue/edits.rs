@@ -26,7 +26,12 @@ impl Board {
     pub fn edit(&self, reference: &str, upd: &IssueUpdate) -> Result<Issue> {
         let _work = self.0.work.lock();
         let was = self.stored(reference)?;
-        let while_open = upd.description.is_none() && upd.repo.is_none() && upd.agent.is_none() && upd.criteria.is_none() && upd.before.is_none();
+        let while_open = upd.description.is_none()
+            && upd.repo.is_none()
+            && upd.agent.is_none()
+            && upd.machine_id.is_none()
+            && upd.criteria.is_none()
+            && upd.before.is_none();
         if while_open {
             if was.status.is_closed() {
                 return Err(refused("server.issue.closed", &[]));
@@ -67,6 +72,9 @@ impl Board {
         }
         if let Some(agent) = upd.agent.as_deref().map(str::trim) {
             assign(&mut issue, agent, at);
+        }
+        if let Some(machine) = upd.machine_id.as_deref().map(str::trim) {
+            issue.machine_id = (!machine.is_empty()).then(|| machine.to_string());
         }
         let mut facts = vec![Fact::issue_changed(at, issue)];
         if let Some(before) = &upd.before {

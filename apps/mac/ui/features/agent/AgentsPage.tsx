@@ -203,7 +203,10 @@ function AgentsPage() {
                   <Hint text={t("web.agent.templates.galleryIntro")} />
                 </View>
                 <ButtonLink href="/agents/templates" tone="quiet" size="compact" testID="gallery-manage-templates">
-                  {t("web.agent.templates.manageLink")}
+                  <>
+                    <Text class="text-xs text-ink">{t("web.agent.templates.manageLink")}</Text>
+                    <Icon name="next" size={12} tone="muted" />
+                  </>
                 </ButtonLink>
               </View>
               <Segmented

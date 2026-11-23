@@ -91,7 +91,9 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
       const th = sessionThreadOf(chat(), h);
       return sum + (th ? unreadOf(th) : 0);
     }, 0);
-  const row = (c: Channel) => <ChannelRow channel={c} here={c.id === props.channel?.id} unread={unreadOf(c)} onClick={() => go(c)} reorder={reorder} />;
+  const row = (c: () => Channel) => (
+    <ChannelRow channel={c()} here={c().id === props.channel?.id} unread={unreadOf(c())} onClick={() => go(c())} reorder={reorder} />
+  );
   return (
     <View accessibilityLabel={t("web.channel.side")} testID="channels-side" class="w-full flex-1 border-r border-line bg-side">
       <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line px-3.5">
@@ -122,12 +124,21 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
           unread={unreadSum(channels())}
           action={<BarButton icon="add" size={14} compact testid="new-channel" label={t("web.channel.newChannel")} onPress={() => props.onNew()} />}
         >
-          <Each of={groupsOf(channels())}>
+          <Each of={groupsOf(channels())} key={(g) => g.category ?? "__default__"}>
             {(g) => (
-              <If when={g().category} else={<Each of={g().channels}>{(c) => row(c())}</Each>}>
+              <If
+                when={g().category}
+                else={
+                  <Each of={g().channels} key={(c) => c.id}>
+                    {(c) => row(c)}
+                  </Each>
+                }
+              >
                 {(name) => (
                   <Section title={name()} item={`category:${name()}`} count={g().channels.length} unread={unreadSum(g().channels)} nested>
-                    <Each of={g().channels}>{(c) => row(c())}</Each>
+                    <Each of={g().channels} key={(c) => c.id}>
+                      {(c) => row(c)}
+                    </Each>
                   </Section>
                 )}
               </If>
@@ -170,7 +181,9 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
             </Popover>
           }
         >
-          <Each of={directs()}>{(c) => row(c())}</Each>
+          <Each of={directs()} key={(c) => c.id}>
+            {(c) => row(c)}
+          </Each>
         </Section>
         <Section title={t("web.channel.helpers")} item="helpers" count={sessions().length} unread={helpersUnread()}>
           <If when={sessions().length === 0}>
@@ -182,7 +195,9 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
         </Section>
         <If when={archived().length > 0}>
           <Section title={t("web.channel.manage.archivedTitle")} item="archived" count={archived().length} unread={unreadSum(archived())} closed>
-            <Each of={archived()}>{(c) => row(c())}</Each>
+            <Each of={archived()} key={(c) => c.id}>
+              {(c) => row(c)}
+            </Each>
           </Section>
         </If>
       </Scroll>
@@ -322,7 +337,11 @@ function ChannelRow(props: { channel: Channel; here: boolean; unread: number; on
     <View
       {...pan.panHandlers}
       ref={(r) => props.reorder.row(props.channel.id, r, () => props.channel)}
-      tooltip={movable() ? <Bubble text={t("web.channel.manage.drag")} /> : undefined}
+      tooltip={
+        <If when={movable()}>
+          <Bubble text={t("web.channel.manage.drag")} />
+        </If>
+      }
       role="button"
       testID={`channel-row-${props.channel.id}`}
       accessibilityLabel={channelName(props.channel)}

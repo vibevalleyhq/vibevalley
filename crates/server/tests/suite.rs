@@ -14,6 +14,7 @@ mod issue_edits;
 mod issue_family;
 mod ledger;
 mod library;
+mod machine_bus;
 mod mainline;
 mod mcp;
 mod media_inputs;

@@ -1,11 +1,11 @@
-import { effect, platform, Scroll, signal, Text, View } from "nsh";
+import { effect, List, platform, Scroll, signal, Text, View } from "nsh";
 import { isAvailable as mobileAvailable, SegmentedControl } from "nsh/mobile";
 
 import { t } from "@vibevalley/i18n";
 import type { Issue, IssueStatus } from "@vibevalley/protocol";
 
 import type { MobileLayout } from "../design/layout";
-import { EmptyPanel, FieldInput, PillButton, SectionCard, SplitPane, StatusTag, TopBar, type TagTone } from "../design/ui";
+import { EmptyPanel, FieldInput, MarkdownText, PillButton, SectionCard, SplitPane, StatusTag, TopBar, type TagTone } from "../design/ui";
 import { hapticImpact, hapticNotification, hapticSelection, type RemoteSession } from "../infra/session";
 
 type IssueFilterKind = "all" | "active" | "review" | "done";
@@ -69,6 +69,11 @@ export function IssuesTab(props: {
   const useNativeSegmented = mobileAvailable && platform.os === "ios";
 
   const allIssues = () => props.session.board()?.issues ?? [];
+  const machineLabelOf = (machineId: string | undefined): string | undefined => {
+    if (machineId === undefined || machineId === "") return undefined;
+    const found = (props.session.sessions()?.machines ?? []).find((m) => m.id === machineId);
+    return found ? found.name : machineId;
+  };
   const filteredIssues = () => allIssues().filter((issue) => matchesFilter(issue, filter()));
   const selectedIssue = () => {
     const id = props.selectedIssueId();
@@ -189,31 +194,41 @@ export function IssuesTab(props: {
       </View>
 
       <If when={filteredIssues().length > 0} else={<EmptyPanel testID="issues-empty" icon="issues" message={t("web.remote.issue.empty")} />}>
-        <Scroll class="flex-1" contentClass="gap-2.5 p-3.5">
-          <Each of={filteredIssues()} key={(issue) => issue.id}>
-            {(issue) => {
-              const active = () => isDual() && props.selectedIssueId() === issue().id;
-              return (
-                <SectionCard
-                  testID={`issue-row-${issue().id}`}
-                  onPress={() => {
-                    hapticImpact("light");
-                    actionError.set(undefined);
-                    props.onSelectIssue(issue().id);
-                  }}
-                  class={`gap-2 ${active() ? "border-focus bg-selected" : ""}`}
-                >
-                  <View class="flex-row items-center justify-between gap-2">
-                    <Text class="font-mono text-xs text-muted">#{String(issue().number)}</Text>
+        <List
+          testID="issues-list"
+          each={filteredIssues()}
+          keyExtractor={(issue) => issue.id}
+          estimatedItemSize={96}
+          class="min-h-0 flex-1"
+          contentClass="gap-2.5 p-3.5"
+        >
+          {(issue) => {
+            const active = () => isDual() && props.selectedIssueId() === issue().id;
+            return (
+              <SectionCard
+                testID={`issue-row-${issue().id}`}
+                onPress={() => {
+                  hapticImpact("light");
+                  actionError.set(undefined);
+                  props.onSelectIssue(issue().id);
+                }}
+                class={`gap-2 ${active() ? "border-focus bg-selected" : ""}`}
+              >
+                <View class="flex-row items-center justify-between gap-2">
+                  <Text class="font-mono text-xs text-muted">#{String(issue().number)}</Text>
+                  <View class="flex-row items-center gap-1.5">
+                    <If when={machineLabelOf(issue().machineId)}>
+                      {(label) => <StatusTag testID={`issue-machine-${issue().id}`} label={label()} icon="devices" tone="info" />}
+                    </If>
                     <StatusTag label={issue().status} tone={statusTone(issue().status)} />
                   </View>
-                  <Text class="text-sm font-semibold text-ink">{issue().title}</Text>
-                  <If when={issue().description}>{(desc) => <Text class="truncate text-xs text-muted">{desc()}</Text>}</If>
-                </SectionCard>
-              );
-            }}
-          </Each>
-        </Scroll>
+                </View>
+                <Text class="text-sm font-semibold text-ink">{issue().title}</Text>
+                <If when={issue().description}>{(desc) => <Text class="truncate text-xs text-muted">{desc()}</Text>}</If>
+              </SectionCard>
+            );
+          }}
+        </List>
       </If>
     </View>
   );
@@ -242,9 +257,14 @@ export function IssuesTab(props: {
             <SectionCard class="gap-2.5">
               <View class="flex-row items-center justify-between gap-2">
                 <Text class="text-xs font-semibold text-muted">{t("web.remote.issue.status")}</Text>
-                <StatusTag testID="issue-detail-status" label={issue().status} tone={statusTone(issue().status)} />
+                <View class="flex-row items-center gap-1.5">
+                  <If when={machineLabelOf(issue().machineId)}>
+                    {(label) => <StatusTag testID="issue-detail-machine" label={label()} icon="devices" tone="info" />}
+                  </If>
+                  <StatusTag testID="issue-detail-status" label={issue().status} tone={statusTone(issue().status)} />
+                </View>
               </View>
-              <If when={issue().description}>{(desc) => <Text class="text-sm text-ink">{desc()}</Text>}</If>
+              <If when={issue().description}>{(desc) => <MarkdownText testID="issue-detail-description" text={desc()} size="sm" />}</If>
               <View class="flex-row flex-wrap gap-2 pt-1">
                 <Each of={quickStatuses(issue())} key={(status) => status}>
                   {(status) => (

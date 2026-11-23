@@ -7,17 +7,20 @@
 //! are listed after them under their own ids.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 use parking_lot::Mutex;
+use tokio::sync::Semaphore;
+use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     Agent, AgentProblem, AgentProblemLevel, ApiError, BizCode, Installation, InstallationAvailable, InstallationChecking, InstallationNotFound,
-    InstallationUnsupported, JsNumber, ModelEntry, NoticeLevel, RuntimeInfo, RuntimeSettings, Via,
+    InstallationUnsupported, JsNumber, LOCAL_MACHINE_ID, ModelEntry, NoticeLevel, RuntimeInfo, RuntimeRef, RuntimeSettings, Via,
 };
+use vibevalley_runtime::machine::{MachineRegistry, MachineStatus as RtMachineStatus};
 use vibevalley_runtime::oar::{Registry, Runtime};
 
 use super::presets::{
@@ -29,6 +32,7 @@ use crate::base::Ticker;
 use crate::{Hub, now};
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
+const PROBE_CONCURRENCY: usize = 4;
 
 fn refused(text: String) -> ApiError {
     ApiError::new(BizCode::RuntimeRefused, text)
@@ -37,6 +41,8 @@ fn refused(text: String) -> ApiError {
 /// What a session on a profile is opened with (`Resolved`).
 pub struct Resolved {
     pub runtime: Arc<dyn Runtime>,
+    pub machine_id: String,
+    pub is_local: bool,
     pub bin_path: String,
     pub model: String,
     pub effort: String,
@@ -108,28 +114,30 @@ impl DailySpend {
 /// `RuntimeFleet`.
 pub struct Fleet {
     registry: Arc<Registry>,
+    machines: Arc<MachineRegistry>,
     profiles: Arc<Profiles>,
     hub: Weak<Hub>,
     held: Mutex<HashMap<String, Observation>>,
     spend: Mutex<DailySpend>,
     probing: Mutex<HashSet<String>>,
     reads: AtomicU64,
-    closed: AtomicBool,
     cancel: CancellationToken,
     usage_task: Mutex<Option<Ticker>>,
     sub: Mutex<Option<crate::event_bus::Subscription>>,
 }
 
-/// Runs `f` on its own thread; none when it takes longer than `limit`.
-fn within<T: Send + 'static>(limit: Duration, f: impl FnOnce() -> T + Send + 'static) -> Option<T> {
-    let (tx, rx) = flume::bounded(1);
-    std::thread::Builder::new()
-        .name("vibevalley-runtime-probe".into())
-        .spawn(move || {
-            let _ = tx.send(f());
-        })
-        .ok()?;
-    rx.recv_timeout(limit).ok()
+/// Runs a blocking OAR trait probe on Tokio's blocking pool with a hard `PROBE_TIMEOUT`
+/// and immediate wakeup on `cancel`.
+async fn probe_with_timeout<T: Send + 'static>(cancel: &CancellationToken, f: impl FnOnce() -> T + Send + 'static) -> Option<T> {
+    if cancel.is_cancelled() {
+        return None;
+    }
+    let handle = vibevalley_runtime::rt::handle().spawn_blocking(f);
+    tokio::select! {
+        biased;
+        _ = cancel.cancelled() => None,
+        res = tokio::time::timeout(PROBE_TIMEOUT, handle) => res.ok().and_then(Result::ok),
+    }
 }
 
 /// A runtime's usage is read again this often, and this long after a
@@ -163,16 +171,22 @@ impl Fleet {
     /// The fleet over `registry`. With `background`, every runtime is
     /// probed now, off the caller's thread.
     pub fn new(registry: Arc<Registry>, profiles: Arc<Profiles>, hub: &Arc<Hub>, background: bool) -> Arc<Fleet> {
+        let machines = Arc::new(MachineRegistry::with_local(registry.clone()));
+        Self::new_with_machines(registry, machines, profiles, hub, background)
+    }
+
+    /// The fleet backed by a shared `MachineRegistry` for local and remote dispatch.
+    pub fn new_with_machines(registry: Arc<Registry>, machines: Arc<MachineRegistry>, profiles: Arc<Profiles>, hub: &Arc<Hub>, background: bool) -> Arc<Fleet> {
         let cancel = hub.child_token();
         let fleet = Arc::new(Fleet {
             registry,
+            machines,
             profiles,
             hub: Arc::downgrade(hub),
             held: Mutex::default(),
             spend: Mutex::new(DailySpend::new()),
             probing: Mutex::default(),
             reads: AtomicU64::new(0),
-            closed: AtomicBool::new(false),
             cancel,
             usage_task: Mutex::new(None),
             sub: Mutex::new(None),
@@ -198,23 +212,50 @@ impl Fleet {
             drop(prev);
         }
         if background {
-            for id in fleet.ids() {
-                fleet.probe_later(&id);
-            }
+            let ids = fleet.ids();
+            let startup_fleet = Arc::downgrade(&fleet);
+            hub.spawn_task(async move {
+                let Some(fleet) = startup_fleet.upgrade() else { return };
+                fleet.probe_all_async(ids).await;
+            });
             let f = Arc::downgrade(&fleet);
             let ticker = Ticker::spawn_on(hub, USAGE_EVERY, false, move || {
                 let Some(fleet) = f.upgrade() else { return false };
-                if fleet.closed.load(Ordering::Relaxed) {
+                if fleet.cancel.is_cancelled() {
                     return false;
                 }
-                for id in fleet.ids() {
-                    fleet.refresh_usage(&id);
-                }
+                fleet.refresh_all_usage();
                 true
             });
             *fleet.usage_task.lock() = Some(ticker);
         }
         fleet
+    }
+
+    async fn probe_all_async(self: &Arc<Self>, ids: Vec<String>) {
+        let sem = Arc::new(Semaphore::new(PROBE_CONCURRENCY));
+        let mut set = JoinSet::new();
+        for id in ids {
+            if self.cancel.is_cancelled() || !self.probing.lock().insert(id.clone()) {
+                continue;
+            }
+            let fleet = self.clone();
+            let sem = sem.clone();
+            set.spawn(async move {
+                let permit = tokio::select! {
+                    biased;
+                    _ = fleet.cancel.cancelled() => None,
+                    p = sem.acquire_owned() => p.ok(),
+                };
+                if let Some(_permit) = permit
+                    && !fleet.cancel.is_cancelled()
+                {
+                    fleet.lookup_async(&id).await;
+                }
+                fleet.probing.lock().remove(&id);
+            });
+        }
+        while set.join_next().await.is_some() {}
     }
 
     fn record_spend(&self, runtime: &str, cny: f64) {
@@ -233,13 +274,17 @@ impl Fleet {
     /// runs share one read).
     pub fn usage_soon(self: &Arc<Self>, id: &str) {
         let key = format!("usage:{id}");
-        if self.closed.load(Ordering::Relaxed) || !self.probing.lock().insert(key.clone()) {
+        if self.cancel.is_cancelled() || !self.probing.lock().insert(key.clone()) {
             return;
         }
+        let Some(hub) = self.hub.upgrade() else {
+            self.probing.lock().remove(&key);
+            return;
+        };
         let fleet = Arc::downgrade(self);
         let cancel = self.cancel.clone();
         let id = id.to_string();
-        vibevalley_runtime::rt::handle().spawn(async move {
+        hub.spawn_task(async move {
             let stopped = tokio::select! {
                 biased;
                 _ = cancel.cancelled() => true,
@@ -248,20 +293,22 @@ impl Fleet {
             let Some(fleet) = fleet.upgrade() else { return };
             fleet.probing.lock().remove(&key);
             if !stopped {
-                let _ = tokio::task::spawn_blocking(move || fleet.refresh_usage(&id)).await;
+                fleet.refresh_usage_async(&id).await;
             }
         });
     }
 
-    /// `refreshUsage` (blocking): a runtime found available has its usage
-    /// read again; kept and told when it changed and no newer probe landed.
-    pub fn refresh_usage(&self, id: &str) {
+    async fn refresh_usage_async(&self, id: &str) {
         let Some(before) = self.held(id) else { return };
-        if !matches!(before.info.installation, Installation::Available(_)) || self.closed.load(Ordering::Relaxed) {
+        if !matches!(before.info.installation, Installation::Available(_)) || self.cancel.is_cancelled() {
             return;
         }
         let Some(runtime) = self.runtime(id) else { return };
-        let Some(usage) = within(PROBE_TIMEOUT, move || runtime.account_usage()).and_then(Result::ok).map(usage_from_oar) else {
+        let Some(usage) = probe_with_timeout(&self.cancel, move || runtime.account_usage())
+            .await
+            .and_then(Result::ok)
+            .map(usage_from_oar)
+        else {
             return;
         };
         let mut held = self.held.lock();
@@ -278,9 +325,44 @@ impl Fleet {
         }
     }
 
+    /// `refreshUsage` (blocking): a runtime found available has its usage
+    /// read again; kept and told when it changed and no newer probe landed.
+    pub fn refresh_usage(&self, id: &str) {
+        vibevalley_runtime::rt::block_on(self.refresh_usage_async(id));
+    }
+
+    /// Refreshes usage across all available runtimes in parallel with bounded concurrency.
+    fn refresh_all_usage(self: &Arc<Self>) {
+        let ids = self.ids();
+        let fleet = self.clone();
+        vibevalley_runtime::rt::block_on(async move {
+            let sem = Arc::new(Semaphore::new(PROBE_CONCURRENCY));
+            let mut set = JoinSet::new();
+            for id in ids {
+                if fleet.cancel.is_cancelled() {
+                    break;
+                }
+                let fleet = fleet.clone();
+                let sem = sem.clone();
+                set.spawn(async move {
+                    let permit = tokio::select! {
+                        biased;
+                        _ = fleet.cancel.cancelled() => return,
+                        p = sem.acquire_owned() => match p {
+                            Ok(p) => p,
+                            Err(_) => return,
+                        },
+                    };
+                    let _permit = permit;
+                    fleet.refresh_usage_async(&id).await;
+                });
+            }
+            while set.join_next().await.is_some() {}
+        });
+    }
+
     /// Stops answering with new probes (`close`).
     pub fn close(&self) {
-        self.closed.store(true, Ordering::Relaxed);
         self.cancel.cancel();
         let prev = self.sub.lock().take();
         drop(prev);
@@ -314,6 +396,7 @@ impl Fleet {
     fn placeholder(&self, id: &str, checked_at: i64) -> RuntimeInfo {
         RuntimeInfo {
             id: id.into(),
+            machine_id: None,
             preset: preset_of(id),
             support: support_of(id),
             installation: Installation::Checking(InstallationChecking {}),
@@ -348,8 +431,8 @@ impl Fleet {
         vibevalley_runtime::oar::set_binary(command, path);
     }
 
-    /// One probe of the machine (blocking).
-    fn probe(&self, id: &str) -> RuntimeInfo {
+    /// One probe of the machine (async; probes models and account usage in parallel).
+    async fn probe_async(&self, id: &str) -> RuntimeInfo {
         let mut info = self.placeholder(id, now());
         Self::use_binary(id, &info.settings.bin_path);
         let Some(runtime) = self.runtime(id) else {
@@ -362,9 +445,12 @@ impl Fleet {
             return info;
         };
         let probed = runtime.clone();
-        let installation = within(PROBE_TIMEOUT, move || probed.installation()).unwrap_or_else(|| vibevalley_runtime::oar::Installation::Unusable {
-            reason: t("server.runtime.probeTimeout", &[]),
-        });
+        let installation =
+            probe_with_timeout(&self.cancel, move || probed.installation())
+                .await
+                .unwrap_or_else(|| vibevalley_runtime::oar::Installation::Unusable {
+                    reason: t("server.runtime.probeTimeout", &[]),
+                });
         info.installation = match installation {
             vibevalley_runtime::oar::Installation::LoginRequired { path } => Installation::Unsupported(InstallationUnsupported {
                 reason: t("server.runtime.signInRequired", &[("runtime", info.preset.label.clone().into())]),
@@ -392,7 +478,12 @@ impl Fleet {
             return info;
         }
         let listed = runtime.clone();
-        info.models = within(PROBE_TIMEOUT, move || listed.list_models()).and_then(Result::ok).map(|models| {
+        let read = runtime.clone();
+        let (models_res, usage_res) = tokio::join!(
+            probe_with_timeout(&self.cancel, move || listed.list_models()),
+            probe_with_timeout(&self.cancel, move || read.account_usage()),
+        );
+        info.models = models_res.and_then(Result::ok).map(|models| {
             models
                 .into_iter()
                 .map(|m| ModelEntry {
@@ -404,15 +495,14 @@ impl Fleet {
                 })
                 .collect()
         });
-        let read = runtime.clone();
-        info.usage = within(PROBE_TIMEOUT, move || read.account_usage()).and_then(Result::ok).map(usage_from_oar);
+        info.usage = usage_res.and_then(Result::ok).map(usage_from_oar);
         info
     }
 
     /// A new lookup, kept and told on the live stream.
-    fn lookup(&self, id: &str) -> RuntimeInfo {
+    async fn lookup_async(&self, id: &str) -> RuntimeInfo {
         let read = self.reads.fetch_add(1, Ordering::Relaxed) + 1;
-        let info = self.shown(self.probe(id));
+        let info = self.shown(self.probe_async(id).await);
         let mut held = self.held.lock();
         // A slower older lookup does not overwrite a newer one.
         if held.get(id).is_none_or(|o| o.read < read) {
@@ -432,14 +522,22 @@ impl Fleet {
         info
     }
 
+    fn lookup(&self, id: &str) -> RuntimeInfo {
+        vibevalley_runtime::rt::block_on(self.lookup_async(id))
+    }
+
     fn probe_later(self: &Arc<Self>, id: &str) {
-        if self.closed.load(Ordering::Relaxed) || !self.probing.lock().insert(id.to_string()) {
+        if self.cancel.is_cancelled() || !self.probing.lock().insert(id.to_string()) {
             return;
         }
+        let Some(hub) = self.hub.upgrade() else {
+            self.probing.lock().remove(id);
+            return;
+        };
         let fleet = self.clone();
         let id = id.to_string();
-        let _ = std::thread::Builder::new().name(format!("vibevalley-runtime-{id}")).spawn(move || {
-            fleet.lookup(&id);
+        hub.spawn_task(async move {
+            fleet.lookup_async(&id).await;
             fleet.probing.lock().remove(&id);
         });
     }
@@ -502,7 +600,7 @@ impl Fleet {
 
     /// `refresh` (blocking): none for a runtime the farm does not know.
     pub fn refresh(&self, id: &str) -> Option<RuntimeInfo> {
-        if !self.known(id) || self.closed.load(Ordering::Relaxed) {
+        if !self.known(id) || self.cancel.is_cancelled() {
             return None;
         }
         Some(self.lookup(id))
@@ -564,15 +662,94 @@ impl Fleet {
         choose_agent(&self.candidates(), brief, named, picked)
     }
 
+    /// Shared execution-layer `MachineRegistry` for resolving local and remote runtimes.
+    pub fn machines(&self) -> &Arc<MachineRegistry> {
+        &self.machines
+    }
+
+    /// Resolves an explicit non-local `(machine_id, runtime_id)` pair from `MachineRegistry`.
+    fn resolve_remote_target(&self, machine_id: &str, runtime_id: &str) -> Result<(Arc<dyn Runtime>, bool), ApiError> {
+        let machine = self
+            .machines
+            .get(machine_id)
+            .ok_or_else(|| refused(format!("execution machine `{machine_id}` is not registered")))?;
+        let desc = machine.descriptor();
+        if desc.status != RtMachineStatus::Online {
+            return Err(refused(format!("execution machine `{machine_id}` is currently {:?}", desc.status)));
+        }
+        let runtime = machine
+            .runtime(runtime_id)
+            .ok_or_else(|| refused(format!("runtime `{runtime_id}` is not available on execution machine `{machine_id}`")))?;
+        match runtime.installation() {
+            vibevalley_runtime::oar::Installation::Available { .. } => Ok((runtime, desc.local)),
+            vibevalley_runtime::oar::Installation::NotInstalled => Err(refused(format!("runtime `{runtime_id}` is not installed on machine `{machine_id}`"))),
+            vibevalley_runtime::oar::Installation::LoginRequired { .. } => {
+                Err(refused(format!("runtime `{runtime_id}` requires sign-in on machine `{machine_id}`")))
+            }
+            vibevalley_runtime::oar::Installation::Unusable { reason } => {
+                Err(refused(format!("runtime `{runtime_id}` on machine `{machine_id}` is unusable: {reason}")))
+            }
+        }
+    }
+
     /// What a session on `agent` opens with; refused when its options
     /// cannot be honoured.
     pub fn resolve(&self, agent: &Agent) -> Result<Resolved, ApiError> {
+        self.resolve_on_machine(agent, None)
+    }
+
+    /// Resolves `agent` against an explicit `machine_override` (e.g. `Issue.machine_id`),
+    /// falling back to `agent.machine_id`, any `RuntimeRef` machine prefix on `agent.runtime`,
+    /// and finally `"local"`.
+    pub fn resolve_on_machine(&self, agent: &Agent, machine_override: Option<&str>) -> Result<Resolved, ApiError> {
+        let (ref_machine, bare_runtime) = match RuntimeRef::parse(agent.runtime.trim()) {
+            Ok(parsed) => (Some(parsed.machine_id), parsed.runtime_id),
+            Err(_) => (None, agent.runtime.trim().to_string()),
+        };
+        let target_machine = machine_override
+            .map(str::trim)
+            .filter(|m| !m.is_empty())
+            .or_else(|| agent.machine_id.as_deref().map(str::trim).filter(|m| !m.is_empty()))
+            .or(ref_machine.as_deref())
+            .unwrap_or(LOCAL_MACHINE_ID);
+
+        if target_machine != LOCAL_MACHINE_ID {
+            let (runtime, is_local) = self.resolve_remote_target(target_machine, &bare_runtime)?;
+            let settings = self.profiles.settings(&bare_runtime);
+            let model = if !agent.model.trim().is_empty() {
+                agent.model.trim().to_string()
+            } else {
+                settings.default_model
+            };
+            let effort = if !agent.effort.trim().is_empty() {
+                agent.effort.trim().to_string()
+            } else {
+                settings.default_effort
+            };
+            let mut env = settings.env;
+            env.extend(agent.env.clone());
+            return Ok(Resolved {
+                runtime,
+                machine_id: target_machine.to_string(),
+                is_local,
+                bin_path: String::new(),
+                model,
+                effort,
+                env,
+            });
+        }
+
         let runtime = self
-            .runtime(&agent.runtime)
-            .ok_or_else(|| refused(t("server.runtime.cannotDrive", &[("runtime", agent.runtime.clone().into())])))?;
-        let (settings, info) = self.configuration(&agent.runtime);
-        Self::use_binary(&agent.runtime, &settings.bin_path);
-        let options = session_options(agent, Some(&settings), info.as_ref());
+            .machines
+            .get(LOCAL_MACHINE_ID)
+            .and_then(|m| m.runtime(&bare_runtime))
+            .or_else(|| self.runtime(&bare_runtime))
+            .ok_or_else(|| refused(t("server.runtime.cannotDrive", &[("runtime", bare_runtime.clone().into())])))?;
+        let mut local_agent = agent.clone();
+        local_agent.runtime = bare_runtime.clone();
+        let (settings, info) = self.configuration(&bare_runtime);
+        Self::use_binary(&bare_runtime, &settings.bin_path);
+        let options = session_options(&local_agent, Some(&settings), info.as_ref());
         if let Some(problem) = options.problems.iter().find(|p| p.level == AgentProblemLevel::Error) {
             return Err(refused(t(
                 "server.runtime.cannotSend",
@@ -587,7 +764,7 @@ impl Fleet {
                 t(
                     "server.runtime.defaultModel",
                     &[
-                        ("runtime", runtime_label(&agent.runtime).into()),
+                        ("runtime", runtime_label(&bare_runtime).into()),
                         ("model", options.missing_model.clone().into()),
                         ("name", agent.name.clone().into()),
                     ],
@@ -596,6 +773,8 @@ impl Fleet {
         }
         Ok(Resolved {
             runtime,
+            machine_id: LOCAL_MACHINE_ID.to_string(),
+            is_local: true,
             bin_path: settings.bin_path,
             model: options.model,
             effort: options.effort,
@@ -605,10 +784,44 @@ impl Fleet {
 
     /// What a direct workspace session on `runtime_id` opens with, using
     /// saved runtime settings (binary path, env, defaults) without blocking on
-    /// a full background model probe.
+    /// a full background model probe. Accepts either `<runtime_id>` (local) or
+    /// `<machine_id>/<runtime_id>` (`RuntimeRef`).
     pub fn resolve_runtime(&self, runtime_id: &str, model: Option<&str>, effort: Option<&str>) -> Result<Resolved, ApiError> {
+        if let Ok(parsed) = RuntimeRef::parse(runtime_id.trim())
+            && !parsed.is_local()
+        {
+            let (runtime, is_local) = self.resolve_remote_target(&parsed.machine_id, &parsed.runtime_id)?;
+            let settings = self.profiles.settings(&parsed.runtime_id);
+            let model = model
+                .map(str::trim)
+                .filter(|m| !m.is_empty())
+                .map(String::from)
+                .unwrap_or(settings.default_model);
+            let effort = effort
+                .map(str::trim)
+                .filter(|e| !e.is_empty())
+                .map(String::from)
+                .unwrap_or(settings.default_effort);
+            return Ok(Resolved {
+                runtime,
+                machine_id: parsed.machine_id,
+                is_local,
+                bin_path: String::new(),
+                model,
+                effort,
+                env: settings.env,
+            });
+        }
+
+        let bare_id = RuntimeRef::parse(runtime_id.trim())
+            .map(|r| r.runtime_id)
+            .unwrap_or_else(|_| runtime_id.trim().to_string());
+        let runtime_id = bare_id.as_str();
         let runtime = self
-            .runtime(runtime_id)
+            .machines
+            .get(LOCAL_MACHINE_ID)
+            .and_then(|m| m.runtime(runtime_id))
+            .or_else(|| self.runtime(runtime_id))
             .ok_or_else(|| refused(t("server.runtime.cannotDrive", &[("runtime", runtime_id.into())])))?;
         let settings = self.profiles.settings(runtime_id);
         Self::use_binary(runtime_id, &settings.bin_path);
@@ -659,6 +872,8 @@ impl Fleet {
         }
         Ok(Resolved {
             runtime,
+            machine_id: LOCAL_MACHINE_ID.to_string(),
+            is_local: true,
             bin_path: settings.bin_path,
             model,
             effort,

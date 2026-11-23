@@ -12,7 +12,7 @@ describe("crates/rich/src/icon.rs SSOT icon generator", () => {
   const rustSource = readFileSync(resolve(root, "crates/rich/src/icon.rs"), "utf8");
   const macIconsSource = readFileSync(resolve(root, "apps/mac/ui/design/icons.ts"), "utf8");
 
-  it("extracts all 97 icons with non-empty SVG paths and exact parity with apps/mac/ui/design/icons.ts", () => {
+  it("extracts all 98 icons with non-empty SVG paths and exact parity with apps/mac/ui/design/icons.ts", () => {
     const entries = parseRustIcons(rustSource);
     const tsNames = parseTsIconNames(macIconsSource);
 

@@ -29,6 +29,7 @@ pub use types::{
 
 use std::sync::{Arc, Weak};
 
+use arc_swap::{ArcSwap, Guard as SnapshotGuard};
 use parking_lot::{Mutex, MutexGuard, RwLock};
 use tokio::sync::broadcast;
 use vibevalley_i18n::t;
@@ -83,7 +84,13 @@ type Seater = Arc<dyn Fn(&str) + Send + Sync>;
 /// The chat.
 pub struct Chat {
     hub: Weak<Hub>,
+    db: Arc<ServerDb>,
     files: Arc<Attachments>,
+    /// Lock-free atomic snapshot of the committed in-memory [`ChatModel`],
+    /// used by read-only queries alongside [`ServerDb`]'s WAL `read_pool`
+    /// without contending on `inner`.
+    snapshot: Arc<ArcSwap<ChatModel>>,
+    /// Write-side lock serializing transactions and protecting `reach`.
     inner: Mutex<Inner>,
     me: Weak<Chat>,
     events: broadcast::Sender<ChannelEvent>,
@@ -115,7 +122,7 @@ impl Chat {
         quoter: Option<Arc<dyn ChannelQuotePort>>,
         embeds: bool,
     ) -> Result<Arc<Chat>, ApiError> {
-        let conn = Connection::new(db);
+        let conn = Connection::new(db.clone());
         let at = now();
         for (id, kind, name) in [
             (USER_ID, "user", t("server.channel.name.user", &[])),
@@ -148,17 +155,21 @@ impl Chat {
             db::read_cursors_of(&conn, USER_ID).q()?,
             &db::all_members(&conn).q()?,
         );
+        let snapshot = Arc::new(ArcSwap::from_pointee(model.clone()));
         let (events, _events_rx) = broadcast::channel(CHANNEL_EVENT_CAPACITY);
         let (removals, _removals_rx) = broadcast::channel(CHANNEL_EVENT_CAPACITY);
         let (edited_messages, _edited_rx) = broadcast::channel(CHANNEL_EVENT_CAPACITY);
         let chat = Arc::new_cyclic(|me| Chat {
             hub: Arc::downgrade(hub),
+            db,
             files,
+            snapshot: snapshot.clone(),
             inner: Mutex::new(Inner {
                 db: conn,
                 transaction_depth: 0,
                 model,
                 reach: Reach::default(),
+                snapshot,
             }),
             me: me.clone(),
             events,
@@ -172,18 +183,19 @@ impl Chat {
             quoter,
         });
         {
-            let inner = chat.inner.lock();
-            let mut recent = db::recent_channels(&inner.db, KEEP_CHANNELS).q()?;
+            let model = chat.model();
+            let read_db = chat.read_db();
+            let mut recent = db::recent_channels(&read_db, KEEP_CHANNELS).q()?;
             recent.reverse();
             let mut facts = vec![];
             for c in &recent {
                 facts.push(Fact::ChannelChanged(FactChannelChanged {
                     at: now(),
-                    channel: inner.counted(c)?,
+                    channel: model.counted(&read_db, c)?,
                 }));
             }
             hub.apply(facts);
-            chat.publish_user_mentions(&inner)?;
+            chat.publish_user_mentions_with(&model, &read_db)?;
         }
         Ok(chat)
     }
@@ -211,6 +223,14 @@ impl Chat {
         self.inner.lock()
     }
 
+    pub(super) fn model(&self) -> SnapshotGuard<Arc<ChatModel>> {
+        self.snapshot.load()
+    }
+
+    pub(super) fn read_db(&self) -> Connection {
+        Connection::new(self.db.clone())
+    }
+
     /// `publishChannel`: the place as it stands into the state.
     fn publish_channel(&self, inner: &Inner, id: &str) -> Result<(), ApiError> {
         let Some(row) = inner.model.channel(id) else { return Ok(()) };
@@ -226,15 +246,19 @@ impl Chat {
     }
 
     fn publish_user_mentions(&self, inner: &Inner) -> Result<(), ApiError> {
-        let quiet = |id: &str| inner.model.channel(id).is_some_and(|c| c.notify == "none");
-        let rows = db::user_mentions(&inner.db).q()?;
+        self.publish_user_mentions_with(&inner.model, &inner.db)
+    }
+
+    fn publish_user_mentions_with(&self, model: &ChatModel, conn: &Connection) -> Result<(), ApiError> {
+        let quiet = |id: &str| model.channel(id).is_some_and(|c| c.notify == "none");
+        let rows = db::user_mentions(conn).q()?;
         let mentions = rows
             .into_iter()
             .filter(|r| !quiet(&r.row.channel_id) && !quiet(&r.top_id))
             .map(|r| UserMention {
                 message: to_message(&r.row),
                 channel: r.top_id.clone(),
-                address: inner.target_of_row(&r.channel_type, r.root_number, None, Some(&r.top_id), Some(&r.channel_name)),
+                address: model.target_of_row(&r.channel_type, r.root_number, None, Some(&r.top_id), Some(&r.channel_name)),
             })
             .collect();
         self.apply(vec![Fact::UserMentionsChanged(FactUserMentionsChanged { at: now(), mentions })]);
@@ -254,6 +278,7 @@ impl Chat {
             answers,
         })]);
         inner.model.note_published(&row.channel_id, row.number);
+        inner.publish_snapshot();
     }
 
     /// `readThrough`: a read that moves the cursor; the user's is told.
@@ -473,8 +498,21 @@ impl Chat {
         }
         let me = self.me.clone();
         let row = row.clone();
-        vibevalley_runtime::rt::handle().spawn_blocking(move || {
-            let found: Vec<Embed> = links.iter().filter_map(|l| words::read_embed(l)).collect();
+        let hub = self.hub.upgrade();
+        let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
+        let task = move || {
+            let mut found: Vec<Embed> = Vec::new();
+            for link in &links {
+                if cancel.is_cancelled() {
+                    return;
+                }
+                if let Some(embed) = words::read_embed(link) {
+                    found.push(embed);
+                }
+            }
+            if cancel.is_cancelled() {
+                return;
+            }
             let Some(chat) = me.upgrade() else { return };
             let mut inner = chat.locked();
             let Ok(Some(current)) = db::message_by_id(&inner.db, &row.id) else { return };
@@ -491,7 +529,12 @@ impl Chat {
             if let Ok(message) = chat.change(&mut inner, &current, |db, revision, _| db::set_meta(db, &current.id, text.as_deref(), revision)) {
                 chat.emit_event(ChannelEvent::Edited(message));
             }
-        });
+        };
+        if let Some(hub) = hub {
+            hub.spawn_blocking_task(task);
+        } else {
+            vibevalley_runtime::rt::handle().spawn_blocking(task);
+        }
     }
 
     fn quoted(&self, refs: &[vibevalley_protocol::BlockRef]) -> Vec<QuotedBlock> {
@@ -843,5 +886,74 @@ impl ChannelDispatchPort for Chat {
 impl crate::ports::ChannelMessageEventsPort for Chat {
     fn subscribe_edited_messages(&self) -> broadcast::Receiver<ChatMessage> {
         self.edited_messages.subscribe()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use super::*;
+
+    #[test]
+    fn read_paths_bypass_write_mutex_and_use_wal_read_pool() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = ServerDb::open(dir.path()).unwrap();
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let files = Attachments::open(dir.path(), db.clone());
+        let chat = Chat::open(db.clone(), &hub, files, None, false).unwrap();
+        let gid = chat.default_channel();
+
+        let (msg, _) = chat
+            .say(Saying {
+                channel: Some(gid.clone()),
+                text: "decontended wal read check".into(),
+                send_key: "decontend-1".into(),
+                ..Saying::default()
+            })
+            .unwrap();
+        chat.pin(&msg.id, true).unwrap();
+
+        // Hold BOTH the channel write mutex (`chat.locked()`) AND a SQLite `BEGIN IMMEDIATE`
+        // write transaction on `write_pool` simultaneously.
+        let _write_mutex_guard = chat.locked();
+        let mut write_conn = db.acquire().unwrap();
+        vibevalley_runtime::rt::block_on(async {
+            sqlx::raw_sql("BEGIN IMMEDIATE;").execute(&mut *write_conn).await.unwrap();
+        });
+
+        let started = Instant::now();
+        let (tx, rx) = flume::bounded(1);
+        let reader_chat = chat.clone();
+        let reader_gid = gid.clone();
+        let reader = std::thread::spawn(move || {
+            let channels = reader_chat.list().unwrap();
+            assert!(!channels.is_empty());
+            let history = reader_chat.history(&reader_gid, None, Some(20)).unwrap();
+            assert_eq!(history.len(), 1);
+            let hits = reader_chat.search("decontended", None).unwrap();
+            assert_eq!(hits.len(), 1);
+            let pins = reader_chat.pins(&reader_gid).unwrap();
+            assert_eq!(pins.len(), 1);
+            let recent = reader_chat.recent_rows(&reader_gid, 10).unwrap();
+            assert_eq!(recent.len(), 1);
+            let _unread = reader_chat.unread(USER_ID, None);
+            let _pending = reader_chat.pending_deliveries(DeliveryTargetKind::Orchestrator).unwrap();
+            assert_eq!(reader_chat.default_channel(), reader_gid);
+            let _ = tx.send(());
+        });
+
+        rx.recv_timeout(Duration::from_secs(2))
+            .expect("channel read paths must not block on Mutex<Inner> or write_pool");
+        reader.join().unwrap();
+        assert!(started.elapsed() < Duration::from_secs(1));
+
+        vibevalley_runtime::rt::block_on(async {
+            sqlx::raw_sql("ROLLBACK;").execute(&mut *write_conn).await.unwrap();
+        });
+        drop(write_conn);
+        drop(_write_mutex_guard);
+        hub.close();
+        db.close();
     }
 }

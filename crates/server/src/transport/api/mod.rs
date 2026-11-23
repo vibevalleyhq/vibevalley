@@ -155,6 +155,66 @@ pub trait RemoteAuth: Send + Sync {
 
 pub type SharedRemoteAuth = Arc<dyn RemoteAuth>;
 
+/// Authenticated bidirectional WebSocket frame channels handed from
+/// `transport::http::machine_ws` to the server's [`MachineBus`].
+pub struct MachineConnection {
+    pub device: RemoteDeviceIdentity,
+    pub incoming: flume::Receiver<vibevalley_protocol::MachineWireFrame>,
+    pub outgoing: flume::Sender<vibevalley_protocol::MachineWireFrame>,
+}
+
+/// Spine port connecting the `/api/v1/machine/ws` transport to the server's
+/// execution-layer machine manager without importing `crate::modules::*` into
+/// `transport/`.
+pub trait MachineBus: Send + Sync {
+    fn accept_connection(&self, conn: MachineConnection);
+
+    fn mcp_tunnel(&self, server: &dyn Server, req: vibevalley_protocol::MachineMcpRequest) -> vibevalley_protocol::MachineMcpResponse {
+        dispatch_mcp_tunnel(server, req)
+    }
+}
+
+pub type SharedMachineBus = Arc<dyn MachineBus>;
+
+/// Executes a reverse-tunneled MCP JSON-RPC HTTP request against `server.mcp()`,
+/// preserving the same single/batch semantics and device-token guard as `POST /mcp`.
+pub fn dispatch_mcp_tunnel(server: &dyn Server, req: vibevalley_protocol::MachineMcpRequest) -> vibevalley_protocol::MachineMcpResponse {
+    let reply = |status: u16, body: String| vibevalley_protocol::MachineMcpResponse {
+        request_id: req.request_id.clone(),
+        status,
+        content_type: "application/json".to_string(),
+        body,
+    };
+    if req.session_token.starts_with("vv_dev_") {
+        return reply(403, serde_json::json!({ "error": "forbidden" }).to_string());
+    }
+    if !req.method.eq_ignore_ascii_case("POST") {
+        return reply(405, serde_json::json!({ "error": "use POST" }).to_string());
+    }
+    let normalized_path = req.path.trim().trim_end_matches('/');
+    if !normalized_path.is_empty() && normalized_path != "/mcp" {
+        return reply(404, serde_json::json!({ "error": "no such route" }).to_string());
+    }
+    let Some(door) = server.mcp() else {
+        return reply(503, serde_json::json!({ "error": "no MCP here" }).to_string());
+    };
+    let Ok(message) = serde_json::from_str::<Value>(&req.body) else {
+        let error = serde_json::json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "parse error" } });
+        return reply(400, error.to_string());
+    };
+    let answered = match message {
+        Value::Array(batch) => {
+            let answers: Vec<Value> = batch.into_iter().filter_map(|m| door.message(&req.session_token, m)).collect();
+            if answers.is_empty() { None } else { Some(Value::Array(answers)) }
+        }
+        one => door.message(&req.session_token, one),
+    };
+    match answered {
+        Some(answer) => reply(200, serde_json::to_string(&answer).unwrap_or_default()),
+        None => reply(202, String::new()),
+    }
+}
+
 /// Live MOSS realtime line handle consumed by the desktop host audio pipeline.
 pub trait LiveVoiceLine: Send + Sync {
     fn url(&self) -> &str;
@@ -197,6 +257,13 @@ pub trait Server: Send + Sync {
     /// If `after_seq == Some(latest_seq)`, skips the initial send; otherwise
     /// delivers the latest snapshot immediately. Blocks until `stop` disconnects.
     fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value));
+    /// Optional asynchronous readiness hook for proxies that finish startup
+    /// off-thread (such as desktop `LateServer`). Returning `None` indicates
+    /// the server is immediately ready for [`Self::subscribe_slice`] and
+    /// [`Self::subscribe_live`].
+    fn ready_async(&self) -> Option<std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>> {
+        None
+    }
     /// Direct `tokio::sync::watch` subscription for a domain slice when backed
     /// by [`crate::slice_feed::SliceFeed`], avoiding blocking threads on SSE and bridge pumps.
     fn subscribe_slice(&self, _slice: SliceKind) -> Option<crate::slice_feed::SliceSubscription> {
@@ -246,6 +313,10 @@ pub trait Server: Send + Sync {
     }
     /// Optional remote device authenticator attached by the started server.
     fn remote_auth(&self) -> Option<SharedRemoteAuth> {
+        None
+    }
+    /// Optional execution-layer machine WS bus attached by the started server.
+    fn machine_bus(&self) -> Option<SharedMachineBus> {
         None
     }
 }

@@ -1,4 +1,4 @@
-import { effect, Scroll, signal, Text, View } from "nsh";
+import { effect, List, signal, Text, View } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
@@ -7,7 +7,7 @@ import { ChannelEvent as ChannelEventSchema, ChatMessage as ChatMessageSchema } 
 
 import { Icon } from "../design/Icon";
 import type { MobileLayout } from "../design/layout";
-import { EmptyPanel, FieldInput, PillButton, SectionCard, SplitPane, StatusTag, TopBar } from "../design/ui";
+import { EmptyPanel, FieldInput, MarkdownText, PillButton, SectionCard, SplitPane, StatusTag, TopBar } from "../design/ui";
 import { hapticImpact, hapticNotification, type RemoteSession } from "../infra/session";
 
 const ChatMessageListSchema = z.array(ChatMessageSchema);
@@ -153,40 +153,38 @@ export function ChannelsTab(props: {
 
   const renderMaster = () => (
     <If when={channels().length > 0} else={<EmptyPanel testID="channels-empty" icon="chat" message={t("web.remote.channel.empty")} />}>
-      <Scroll class="flex-1" contentClass="gap-2.5 p-3.5">
-        <Each of={channels()} key={(ch) => ch.id}>
-          {(ch) => {
-            const active = () => isDual() && props.selectedChannelId() === ch().id;
-            return (
-              <SectionCard
-                testID={`channel-row-${ch().id}`}
-                onPress={() => {
-                  hapticImpact("light");
-                  props.onSelectChannel(ch().id);
-                }}
-                class={`gap-1.5 ${active() ? "border-focus bg-selected" : ""}`}
-              >
-                <View class="flex-row items-center justify-between gap-2">
-                  <View class="min-w-0 flex-1 flex-row items-center gap-2">
-                    <Icon name="chat" size={16} tone="accent" />
-                    <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{channelLabel(ch())}</Text>
-                  </View>
-                  <If when={(ch().unread ?? 0) > 0}>
-                    <StatusTag label={String(ch().unread ?? 0)} tone="info" />
-                  </If>
+      <List testID="channels-list" each={channels()} keyExtractor={(ch) => ch.id} estimatedItemSize={72} class="min-h-0 flex-1" contentClass="gap-2.5 p-3.5">
+        {(ch) => {
+          const active = () => isDual() && props.selectedChannelId() === ch().id;
+          return (
+            <SectionCard
+              testID={`channel-row-${ch().id}`}
+              onPress={() => {
+                hapticImpact("light");
+                props.onSelectChannel(ch().id);
+              }}
+              class={`gap-1.5 ${active() ? "border-focus bg-selected" : ""}`}
+            >
+              <View class="flex-row items-center justify-between gap-2">
+                <View class="min-w-0 flex-1 flex-row items-center gap-2">
+                  <Icon name="chat" size={16} tone="accent" />
+                  <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{channelLabel(ch())}</Text>
                 </View>
-                <If when={ch().last}>
-                  {(last) => (
-                    <Text class="truncate text-xs text-muted">
-                      {last().name}: {last().text}
-                    </Text>
-                  )}
+                <If when={(ch().unread ?? 0) > 0}>
+                  <StatusTag label={String(ch().unread ?? 0)} tone="info" />
                 </If>
-              </SectionCard>
-            );
-          }}
-        </Each>
-      </Scroll>
+              </View>
+              <If when={ch().last}>
+                {(last) => (
+                  <Text class="truncate text-xs text-muted">
+                    {last().name}: {last().text}
+                  </Text>
+                )}
+              </If>
+            </SectionCard>
+          );
+        }}
+      </List>
     </If>
   );
 
@@ -211,19 +209,28 @@ export function ChannelsTab(props: {
       <If
         when={!loading() && messages().length === 0}
         else={
-          <Scroll class="flex-1" contentClass="gap-2.5 p-4">
-            <Each of={messages()} key={(msg) => msg.id}>
-              {(msg) => (
-                <SectionCard testID={`channel-message-${msg().id}`} class="gap-1">
-                  <View class="flex-row items-center justify-between gap-2">
-                    <Text class="text-xs font-semibold text-accent">{msg().name}</Text>
-                    <Text class="font-mono text-2xs text-faint">#{String(msg().number)}</Text>
-                  </View>
-                  <Text class="text-sm text-ink">{msg().text}</Text>
-                </SectionCard>
-              )}
-            </Each>
-          </Scroll>
+          <List
+            testID="channel-messages-list"
+            each={messages()}
+            keyExtractor={(msg) => msg.id}
+            estimatedItemSize={88}
+            alignment="bottom"
+            initialScrollAtEnd
+            maintainVisibleContentPosition={{ autoscrollToBottomThreshold: 64 }}
+            keyboardDismissMode="on-drag"
+            class="min-h-0 flex-1"
+            contentClass="gap-2.5 p-4"
+          >
+            {(msg) => (
+              <SectionCard testID={`channel-message-${msg().id}`} class="gap-1.5">
+                <View class="flex-row items-center justify-between gap-2">
+                  <Text class="text-xs font-semibold text-accent">{msg().name}</Text>
+                  <Text class="font-mono text-2xs text-faint">#{String(msg().number)}</Text>
+                </View>
+                <MarkdownText testID={`channel-message-body-${msg().id}`} text={msg().text} size="sm" />
+              </SectionCard>
+            )}
+          </List>
         }
       >
         <EmptyPanel testID="channel-messages-empty" icon="chat" message={t("web.remote.channel.empty")} />

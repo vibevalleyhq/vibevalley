@@ -16,6 +16,7 @@ pub mod game;
 pub mod host;
 pub mod inbox;
 pub mod issue;
+pub mod machine;
 pub mod media;
 pub mod memory;
 pub mod orchestrator;
@@ -41,6 +42,7 @@ pub use game::*;
 pub use host::*;
 pub use inbox::*;
 pub use issue::*;
+pub use machine::*;
 pub use media::*;
 pub use memory::*;
 pub use orchestrator::*;
@@ -69,6 +71,7 @@ pub(crate) fn ts_modules(cfg: &ts_rs::Config) -> Vec<crate::typescript::Module> 
         host::ts_module(cfg),
         inbox::ts_module(cfg),
         issue::ts_module(cfg),
+        machine::ts_module(cfg),
         media::ts_module(cfg),
         memory::ts_module(cfg),
         orchestrator::ts_module(cfg),

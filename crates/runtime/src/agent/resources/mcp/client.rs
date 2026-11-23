@@ -13,34 +13,22 @@ use crate::agent::ai::CancelToken;
 
 const CALL_TIMEOUT: Duration = Duration::from_secs(120);
 
-fn request<T: Send + 'static>(future: impl Future<Output = Result<T, String>> + Send + 'static, cancel: &CancelToken) -> Result<T, String> {
+async fn run_with_timeout<T>(future: impl Future<Output = Result<T, String>>, cancel: &CancelToken) -> Result<T, String> {
     if cancel.is_cancelled() {
         return Err("aborted by the user".into());
     }
-    let (tx, rx) = flume::bounded(1);
-    let task = crate::rt::handle().spawn(async move {
-        let result = tokio::time::timeout(CALL_TIMEOUT, future).await.unwrap_or_else(|_| Err("timed out".into()));
-        let _ = tx.send(result);
-    });
-    let receive = |result: Result<Result<T, String>, flume::RecvError>| result.map_err(|_| "MCP task stopped".to_string())?;
-    match cancel.receiver() {
-        None => receive(rx.recv()),
-        Some(stop) => flume::Selector::new()
-            .recv(&rx, receive)
-            .recv(stop, |_| {
-                task.abort();
-                Err("aborted by the user".into())
-            })
-            .wait(),
+    tokio::select! {
+        biased;
+        () = cancel.cancelled() => Err("aborted by the user".into()),
+        res = tokio::time::timeout(CALL_TIMEOUT, future) => res.unwrap_or_else(|_| Err("timed out".into())),
     }
 }
 
 pub(super) struct Client(RunningService<RoleClient, ClientConfig>);
 
 impl Client {
-    pub(super) fn connect(config: &McpServerConfig) -> Result<Self, String> {
-        let config = config.clone();
-        request(
+    pub(super) async fn connect_async(config: McpServerConfig) -> Result<Self, String> {
+        run_with_timeout(
             async move {
                 let info = ClientConfig::new(Default::default(), Implementation::new("vibevalley", env!("CARGO_PKG_VERSION")))
                     .with_protocol_version(ProtocolVersion::V_2025_06_18);
@@ -70,11 +58,12 @@ impl Client {
             },
             &CancelToken::never(),
         )
+        .await
     }
 
-    pub(super) fn tools(&self) -> Result<Vec<Tool>, String> {
+    pub(super) async fn tools_async(&self) -> Result<Vec<Tool>, String> {
         let peer = self.0.peer().clone();
-        request(
+        run_with_timeout(
             async move {
                 let mut tools = Vec::new();
                 let mut cursor = None;
@@ -93,17 +82,18 @@ impl Client {
             },
             &CancelToken::never(),
         )
+        .await
     }
 
     pub(super) fn call(&self, name: String, arguments: JsonObject, cancel: &CancelToken) -> Result<CallToolResult, String> {
         let peer = self.0.peer().clone();
-        request(
+        crate::rt::block_on(run_with_timeout(
             async move {
                 peer.call_tool(CallToolRequestParams::new(name).with_arguments(arguments))
                     .await
                     .map_err(|e| e.to_string())
             },
             cancel,
-        )
+        ))
     }
 }

@@ -32,7 +32,7 @@ export function Question(props: { ask: QuestionItem; busy: boolean; onPick: (wor
       <Text class="text-sm text-ink">{props.ask.question}</Text>
       <If when={props.ask.options.length}>
         <View class="mt-1.5 flex-row flex-wrap gap-1.5" accessibilityLabel={t("web.issue.detail.answerTo", { question: props.ask.question })}>
-          <Each of={props.ask.options}>
+          <Each of={props.ask.options} key={(o) => o}>
             {(o) => (
               <Button testID="answer-option" disabled={props.busy} onPress={() => props.onPick(o())}>
                 {o()}
@@ -103,7 +103,7 @@ export function Story(props: { milestones: Milestone[] }) {
   const now = useNow();
   return (
     <View>
-      <Each of={props.milestones}>
+      <Each of={props.milestones} key={(m) => `${m.at}:${m.kind}:${m.text}`}>
         {(m) => (
           <View testID="milestone" class="flex-row items-baseline gap-3 py-1">
             <Text class="w-24 shrink-0 text-xs text-muted tabular-nums">{shortMomentText(m().at, now())}</Text>
@@ -197,7 +197,7 @@ export function WorkLog(props: { steps: SessionEvent[] }) {
   const shown = () => props.steps.filter((e) => stepWord[e.type] !== undefined).slice(-240);
   return (
     <Scroll testID="issue-steps" class="max-h-[420px]">
-      <Each of={shown()}>
+      <Each of={shown()} key={(e) => e.seq}>
         {(e, i) => (
           <View class={`flex-row gap-2.5 py-1 ${i() < shown().length - 1 ? "border-b" : ""}`} style={{ borderColor: mix("line", 0.6) }}>
             <Text class="w-14 shrink-0 font-mono text-xs text-faint tabular-nums">{wallClockText(e().time)}</Text>
@@ -284,7 +284,7 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
       <Property label={t("web.issue.detail.answer")}>{t("web.issue.detail.answered")}</Property>
       <If when={props.issue.stage.acts.length > 0}>
         <View class="mt-3 flex-row flex-wrap gap-2">
-          <Each of={props.issue.stage.acts}>
+          <Each of={props.issue.stage.acts} key={(a) => a.act}>
             {(a) => (
               <Button
                 tone={a().act === props.issue.stage.lead ? "primary" : a().act === "close" ? "danger" : "plain"}
@@ -324,7 +324,9 @@ export function AnswerView(props: { answer: IssueAnswer }) {
     <If when={lines.length > 0}>
       <View class="mt-2">
         <Text class="text-xs text-muted">{head}</Text>
-        <Each of={lines}>{(l) => <Text class="text-sm text-ink">{`· ${l()}`}</Text>}</Each>
+        <Each of={lines} key="index">
+          {(l) => <Text class="text-sm text-ink">{`· ${l()}`}</Text>}
+        </Each>
       </View>
     </If>
   );

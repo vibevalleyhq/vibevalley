@@ -1,6 +1,6 @@
 import { Text, View } from "nsh";
 
-import { hostApi } from "../infra/bridge";
+import { useDesignHost } from "./host";
 import { Icon, type IconSize } from "./Icon";
 import type { IconName } from "./icons";
 import { motionClass } from "./motion";
@@ -42,10 +42,11 @@ export function IconButton(props: {
 
 /** A link out to another site that says where it goes: beside a field, where an icon alone would not. */
 export function OutLink(props: { href: string; label: string }) {
+  const designHost = useDesignHost();
   return (
     <View
       role="link"
-      onPress={() => void hostApi.openUrl(props.href)}
+      onPress={() => void designHost.openExternal(props.href)}
       class="group -mx-1 shrink-0 flex-row items-center gap-1 rounded-sm px-1 py-0.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
     >
       <Text class="text-xs text-muted group-hover:text-ink">{props.label}</Text>

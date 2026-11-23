@@ -84,6 +84,11 @@ export function handleChannelGenUiAction(m: Pick<ChatMessage, "channel" | "numbe
 
 export function MessageBody(props: { m: ChatMessage }) {
   const fold = signal<"short" | "folded" | "expanded">("short");
+  createEffect(
+    () => props.m.id,
+    () => fold.set("short"),
+    { defer: true },
+  );
   const isFolded = () => fold() === "folded";
   const isExpanded = () => fold() === "expanded";
   return (
@@ -307,6 +312,11 @@ export function Reactions(props: { m: ChatMessage; names: (id: string) => string
 function AddReaction(props: { m: ChatMessage; hovered: boolean }) {
   const react = useReact();
   const open = signal(false);
+  createEffect(
+    () => props.m.id,
+    () => open.set(false),
+    { defer: true },
+  );
   return (
     // Only on the message under the pointer, as the toolbar: every message has a 👀 to sit beside.
     <View style={{ opacity: open() || props.hovered ? 1 : 0 }}>
@@ -356,6 +366,11 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
   const router = useRouter();
   const collab = useCollabSlice();
   const menu = signal<ToolbarMenu>("closed");
+  createEffect(
+    () => props.m.id,
+    () => menu.set("closed"),
+    { defer: true },
+  );
   const picking = () => menu() === "quickEmoji" || menu() === "fullEmoji";
   const everyEmoji = () => menu() === "fullEmoji";
   const sure = () => menu() === "confirmDelete";
@@ -387,7 +402,7 @@ export function MessageTools(props: { m: ChatMessage; inChannel: boolean; onEdit
       >
         <If when={picking()}>
           <View accessibilityLabel={t("web.channel.tools.pick")} class="flex-row items-center gap-0.5 border-r border-line pr-0.5">
-            <Each of={quickReactions}>
+            <Each of={quickReactions} key={(emoji) => emoji}>
               {(emoji) => (
                 <View
                   role="button"
@@ -515,7 +530,7 @@ export function EditBox(props: { m: ChatMessage; onDone: () => void }) {
       />
       <If when={files.length > 0}>
         <View class="mt-1 flex-row flex-wrap gap-1.5">
-          <Each of={files}>
+          <Each of={files} key={(f) => f.id}>
             {(f) => {
               const keeps = () => kept().includes(f().id);
               return (

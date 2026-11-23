@@ -306,40 +306,38 @@ fn merge_path_entries(existing: Option<&std::ffi::OsStr>, login: &std::ffi::OsSt
 }
 
 fn resolve_login_shell_path(timeout: Duration) -> Option<String> {
+    use tokio::io::AsyncReadExt as _;
+
     let shell = std::env::var("SHELL")
         .ok()
         .filter(|s| Path::new(s).is_file())
         .unwrap_or_else(|| "/bin/zsh".into());
-    let mut child = std::process::Command::new(&shell)
-        .args(["-ilc", "printf '__VV_PATH__%s__VV_END__' \"$PATH\""])
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .ok()?;
-    let mut stdout = child.stdout.take()?;
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        use std::io::Read as _;
-        let mut buf = Vec::new();
-        let _ = stdout.read_to_end(&mut buf);
-        let _ = tx.send(buf);
-    });
-    let deadline = std::time::Instant::now() + timeout;
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => break,
-            Ok(None) if std::time::Instant::now() < deadline => std::thread::sleep(Duration::from_millis(15)),
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
-            }
+    vibevalley_runtime::rt::block_on(async move {
+        let mut child = tokio::process::Command::new(&shell)
+            .args(["-ilc", "printf '__VV_PATH__%s__VV_END__' \"$PATH\""])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .process_group(0)
+            .kill_on_drop(true)
+            .spawn()
+            .ok()?;
+        let mut stdout = child.stdout.take()?;
+        let reader = vibevalley_runtime::rt::spawn(async move {
+            let mut buf = Vec::new();
+            let _ = stdout.read_to_end(&mut buf).await;
+            buf
+        });
+        if tokio::time::timeout(timeout, child.wait()).await.is_err() {
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+            reader.abort();
+            return None;
         }
-    }
-    let bytes = rx.recv_timeout(Duration::from_millis(200)).ok()?;
-    let text = String::from_utf8_lossy(&bytes);
-    extract_login_path(&text).map(str::to_string)
+        let bytes = tokio::time::timeout(Duration::from_millis(200), reader).await.ok()?.ok()?;
+        let text = String::from_utf8_lossy(&bytes);
+        extract_login_path(&text).map(str::to_string)
+    })
 }
 
 pub fn enter_bundle() {

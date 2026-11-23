@@ -49,11 +49,19 @@ impl Connection {
         Self { pool, tx: RefCell::new(None) }
     }
 
-    pub(super) fn borrow_mut(&self) -> ConnGuard<'_> {
+    pub(super) fn borrow_read(&self) -> ConnGuard<'_> {
         if self.tx.borrow().is_some() {
             ConnGuard::Tx(self.tx.borrow_mut())
         } else {
-            ConnGuard::Pooled(self.pool.acquire().expect("server db pool open"))
+            ConnGuard::Pooled(self.pool.acquire_read().expect("server db read pool open"))
+        }
+    }
+
+    pub(super) fn borrow_write(&self) -> ConnGuard<'_> {
+        if self.tx.borrow().is_some() {
+            ConnGuard::Tx(self.tx.borrow_mut())
+        } else {
+            ConnGuard::Pooled(self.pool.acquire().expect("server db write pool open"))
         }
     }
 
@@ -370,12 +378,12 @@ impl From<queries::UserMentionsRow> for PlacedRow {
 }
 
 pub fn default_id(db: &Connection) -> Sql<Option<String>> {
-    optional(block_on(queries::default_id(&mut *db.borrow_mut()))).map(|row| row.map(|r| r.id))
+    optional(block_on(queries::default_id(&mut *db.borrow_read()))).map(|row| row.map(|r| r.id))
 }
 
 pub fn create_channel(db: &Connection, id: &str, is_default: bool, name: &str, description: Option<&str>, repo: Option<&str>, at: i64) -> Sql<()> {
     block_on(queries::create_channel(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::CreateChannelParams {
             id: id.to_owned(),
             is_default: i64::from(is_default),
@@ -389,7 +397,7 @@ pub fn create_channel(db: &Connection, id: &str, is_default: bool, name: &str, d
 
 pub fn create_direct(db: &Connection, id: &str, peer: &str, at: i64) -> Sql<()> {
     block_on(queries::create_direct(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::CreateDirectParams {
             id: id.to_owned(),
             peer_id: Some(peer.to_owned()),
@@ -399,16 +407,16 @@ pub fn create_direct(db: &Connection, id: &str, peer: &str, at: i64) -> Sql<()> 
 }
 
 pub fn clear_default(db: &Connection) -> Sql<()> {
-    block_on(queries::clear_default(&mut *db.borrow_mut()))
+    block_on(queries::clear_default(&mut *db.borrow_write()))
 }
 
 pub fn make_default(db: &Connection, id: &str) -> Sql<()> {
-    block_on(queries::make_default(&mut *db.borrow_mut(), queries::MakeDefaultParams { id: id.to_owned() }))
+    block_on(queries::make_default(&mut *db.borrow_write(), queries::MakeDefaultParams { id: id.to_owned() }))
 }
 
 pub fn update_channel(db: &Connection, id: &str, description: Option<&str>, repo: Option<&str>) -> Sql<()> {
     block_on(queries::update_channel(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::UpdateChannelParams {
             description: description.map(str::to_owned),
             repo: repo.map(str::to_owned),
@@ -429,7 +437,7 @@ pub fn create_thread(
     at: i64,
 ) -> Sql<()> {
     block_on(queries::create_thread(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::CreateThreadParams {
             id: id.to_owned(),
             root_id: Some(root_id.to_owned()),
@@ -443,16 +451,17 @@ pub fn create_thread(
 }
 
 pub fn all_channels(db: &Connection) -> Sql<Vec<ChannelRow>> {
-    block_on(queries::all_channels(&mut *db.borrow_mut())).map(|rows| rows.into_iter().map(Into::into).collect())
+    block_on(queries::all_channels(&mut *db.borrow_read())).map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
 pub fn recent_channels(db: &Connection, n: i64) -> Sql<Vec<ChannelRow>> {
-    block_on(queries::recent_channels(&mut *db.borrow_mut(), queries::RecentChannelsParams { limit: n })).map(|rows| rows.into_iter().map(Into::into).collect())
+    block_on(queries::recent_channels(&mut *db.borrow_read(), queries::RecentChannelsParams { limit: n }))
+        .map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
 pub fn touch_channel(db: &Connection, id: &str, number: i64) -> Sql<()> {
     block_on(queries::touch_channel(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::TouchChannelParams {
             last_number: number,
             id: id.to_owned(),
@@ -462,7 +471,7 @@ pub fn touch_channel(db: &Connection, id: &str, number: i64) -> Sql<()> {
 
 pub fn unread_of(db: &Connection, participant: &str, channel: &str) -> Sql<Vec<UnreadRow>> {
     block_on(queries::unread_of(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::UnreadOfParams {
             target_id: participant.to_owned(),
             id: channel.to_owned(),
@@ -472,12 +481,16 @@ pub fn unread_of(db: &Connection, participant: &str, channel: &str) -> Sql<Vec<U
 }
 
 pub fn bump_revision(db: &Connection, id: &str) -> Sql<i64> {
-    block_on(queries::bump_revision(&mut *db.borrow_mut(), queries::BumpRevisionParams { id: id.to_owned() })).map(|r| r.revision)
+    block_on(queries::bump_revision(
+        &mut *db.borrow_write(),
+        queries::BumpRevisionParams { id: id.to_owned() },
+    ))
+    .map(|r| r.revision)
 }
 
 pub fn rename_channel(db: &Connection, id: &str, name: Option<&str>) -> Sql<()> {
     block_on(queries::rename_channel(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::RenameChannelParams {
             name: name.map(str::to_owned),
             id: id.to_owned(),
@@ -487,7 +500,7 @@ pub fn rename_channel(db: &Connection, id: &str, name: Option<&str>) -> Sql<()> 
 
 pub fn set_category(db: &Connection, id: &str, category: Option<&str>) -> Sql<()> {
     block_on(queries::set_category(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::SetCategoryParams {
             category: category.map(str::to_owned),
             id: id.to_owned(),
@@ -497,7 +510,7 @@ pub fn set_category(db: &Connection, id: &str, category: Option<&str>) -> Sql<()
 
 pub fn place_channel(db: &Connection, id: &str, position: i64) -> Sql<()> {
     block_on(queries::place_channel(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::PlaceChannelParams {
             position: Some(position),
             id: id.to_owned(),
@@ -507,7 +520,7 @@ pub fn place_channel(db: &Connection, id: &str, position: i64) -> Sql<()> {
 
 pub fn set_archived(db: &Connection, id: &str, at: Option<i64>) -> Sql<()> {
     block_on(queries::set_archived(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::SetArchivedParams {
             archived_at: at,
             id: id.to_owned(),
@@ -517,7 +530,7 @@ pub fn set_archived(db: &Connection, id: &str, at: Option<i64>) -> Sql<()> {
 
 pub fn set_notify(db: &Connection, id: &str, notify: &str) -> Sql<()> {
     block_on(queries::set_notify(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::SetNotifyParams {
             notify: notify.to_owned(),
             id: id.to_owned(),
@@ -527,7 +540,7 @@ pub fn set_notify(db: &Connection, id: &str, notify: &str) -> Sql<()> {
 
 pub fn topic_threads_in(db: &Connection, id: &str) -> Sql<i64> {
     block_on(queries::topic_threads_in(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::TopicThreadsInParams {
             parent_id: Some(id.to_owned()),
         },
@@ -537,7 +550,7 @@ pub fn topic_threads_in(db: &Connection, id: &str) -> Sql<i64> {
 
 pub fn upsert_participant(db: &Connection, p: &ParticipantRow) -> Sql<()> {
     block_on(queries::upsert_participant(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::UpsertParticipantParams {
             id: p.id.clone(),
             kind: p.kind.clone(),
@@ -551,7 +564,7 @@ pub fn upsert_participant(db: &Connection, p: &ParticipantRow) -> Sql<()> {
 
 pub fn add_participant(db: &Connection, id: &str, kind: &str, name: &str, at: i64) -> Sql<()> {
     block_on(queries::add_participant(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::AddParticipantParams {
             id: id.to_owned(),
             kind: kind.to_owned(),
@@ -563,7 +576,7 @@ pub fn add_participant(db: &Connection, id: &str, kind: &str, name: &str, at: i6
 
 pub fn participant_left(db: &Connection, id: &str, at: i64) -> Sql<()> {
     block_on(queries::participant_left(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::ParticipantLeftParams {
             left_at: Some(at),
             id: id.to_owned(),
@@ -572,12 +585,12 @@ pub fn participant_left(db: &Connection, id: &str, at: i64) -> Sql<()> {
 }
 
 pub fn participants(db: &Connection) -> Sql<Vec<ParticipantRow>> {
-    block_on(queries::participants(&mut *db.borrow_mut())).map(|rows| rows.into_iter().map(Into::into).collect())
+    block_on(queries::participants(&mut *db.borrow_read())).map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
 pub fn add_member(db: &Connection, channel: &str, participant: &str, reason: &str, from: i64) -> Sql<()> {
     block_on(queries::add_member(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::AddMemberParams {
             channel_id: channel.to_owned(),
             participant_id: participant.to_owned(),
@@ -589,7 +602,7 @@ pub fn add_member(db: &Connection, channel: &str, participant: &str, reason: &st
 
 pub fn remove_member(db: &Connection, channel: &str, participant: &str, at: i64) -> Sql<()> {
     block_on(queries::remove_member(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::RemoveMemberParams {
             left_at: Some(at),
             channel_id: channel.to_owned(),
@@ -599,12 +612,12 @@ pub fn remove_member(db: &Connection, channel: &str, participant: &str, at: i64)
 }
 
 pub fn all_members(db: &Connection) -> Sql<Vec<(String, String)>> {
-    block_on(queries::all_members(&mut *db.borrow_mut())).map(|rows| rows.into_iter().map(|r| (r.channel_id, r.participant_id)).collect())
+    block_on(queries::all_members(&mut *db.borrow_read())).map(|rows| rows.into_iter().map(|r| (r.channel_id, r.participant_id)).collect())
 }
 
 pub fn remove_from_all(db: &Connection, participant: &str, at: i64) -> Sql<()> {
     block_on(queries::remove_from_all(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::RemoveFromAllParams {
             left_at: Some(at),
             participant_id: participant.to_owned(),
@@ -614,7 +627,7 @@ pub fn remove_from_all(db: &Connection, participant: &str, at: i64) -> Sql<()> {
 
 pub fn insert_mention(db: &Connection, message: &str, target: &str, resolved: &str) -> Sql<()> {
     block_on(queries::insert_mention(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::InsertMentionParams {
             message_id: message.to_owned(),
             target_id: target.to_owned(),
@@ -625,7 +638,7 @@ pub fn insert_mention(db: &Connection, message: &str, target: &str, resolved: &s
 
 pub fn delete_mentions_for_message(db: &Connection, message: &str) -> Sql<()> {
     block_on(queries::delete_mentions_for_message(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::DeleteMentionsForMessageParams {
             message_id: message.to_owned(),
         },
@@ -634,7 +647,7 @@ pub fn delete_mentions_for_message(db: &Connection, message: &str) -> Sql<()> {
 
 pub fn mark_seen(db: &Connection, participant: &str, message: &str, at: i64) -> Sql<()> {
     block_on(queries::mark_seen(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::MarkSeenParams {
             seen_at: at,
             message_id: message.to_owned(),
@@ -645,7 +658,7 @@ pub fn mark_seen(db: &Connection, participant: &str, message: &str, at: i64) -> 
 
 pub fn set_read_cursor(db: &Connection, participant: &str, channel: &str, upto: i64, at: i64) -> Sql<()> {
     block_on(queries::set_read_cursor(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::SetReadCursorParams {
             participant_id: participant.to_owned(),
             channel_id: channel.to_owned(),
@@ -657,7 +670,7 @@ pub fn set_read_cursor(db: &Connection, participant: &str, channel: &str, upto: 
 
 pub fn read_cursor(db: &Connection, participant: &str, channel: &str) -> Sql<Option<i64>> {
     optional(block_on(queries::read_cursor(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::ReadCursorParams {
             participant_id: participant.to_owned(),
             channel_id: channel.to_owned(),
@@ -668,7 +681,7 @@ pub fn read_cursor(db: &Connection, participant: &str, channel: &str) -> Sql<Opt
 
 pub fn read_cursors_of(db: &Connection, participant: &str) -> Sql<Vec<(String, i64)>> {
     block_on(queries::read_cursors_of(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::ReadCursorsOfParams {
             participant_id: participant.to_owned(),
         },
@@ -678,7 +691,7 @@ pub fn read_cursors_of(db: &Connection, participant: &str) -> Sql<Vec<(String, i
 
 pub fn mark_unread(db: &Connection, channel: &str, upto: i64, at: i64) -> Sql<()> {
     block_on(queries::mark_unread(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::MarkUnreadParams {
             channel_id: channel.to_owned(),
             read_number: upto,
@@ -689,7 +702,7 @@ pub fn mark_unread(db: &Connection, channel: &str, upto: i64, at: i64) -> Sql<()
 
 pub fn insert_event(db: &Connection, kind: &str, channel: &str, message: &str, at: i64) -> Sql<i64> {
     block_on(queries::insert_event(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::InsertEventParams {
             kind: kind.to_owned(),
             channel_id: channel.to_owned(),
@@ -702,7 +715,7 @@ pub fn insert_event(db: &Connection, kind: &str, channel: &str, message: &str, a
 
 pub fn events_after(db: &Connection, after: i64, n: i64) -> Sql<Vec<EventRow>> {
     block_on(queries::events_after(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::EventsAfterParams { seq: after, limit: n },
     ))
     .map(|rows| rows.into_iter().map(Into::into).collect())
@@ -710,7 +723,7 @@ pub fn events_after(db: &Connection, after: i64, n: i64) -> Sql<Vec<EventRow>> {
 
 pub fn event_of(db: &Connection, message: &str) -> Sql<Option<EventRow>> {
     optional(block_on(queries::event_of(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::EventOfParams {
             message_id: message.to_owned(),
         },
@@ -733,7 +746,7 @@ pub fn insert_message(
     reply_number: Option<i64>,
 ) -> Sql<i64> {
     block_on(queries::insert_message(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::InsertMessageParams {
             id: id.to_owned(),
             channel_id: channel.to_owned(),
@@ -752,7 +765,7 @@ pub fn insert_message(
 
 pub fn update_message_meta(db: &Connection, id: &str, meta: Option<&str>) -> Sql<()> {
     block_on(queries::update_message_meta(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::UpdateMessageMetaParams {
             meta: meta.map(str::to_owned),
             id: id.to_owned(),
@@ -762,7 +775,7 @@ pub fn update_message_meta(db: &Connection, id: &str, meta: Option<&str>) -> Sql
 
 pub fn message_by_id(db: &Connection, id: &str) -> Sql<Option<MsgRow>> {
     optional(block_on(queries::message_by_id(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::MessageByIdParams { id: id.to_owned() },
     )))
     .map(|row| row.map(Into::into))
@@ -770,7 +783,7 @@ pub fn message_by_id(db: &Connection, id: &str) -> Sql<Option<MsgRow>> {
 
 pub fn message_by_send_key(db: &Connection, sender: &str, key: &str) -> Sql<Option<MsgRow>> {
     optional(block_on(queries::message_by_send_key(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::MessageBySendKeyParams {
             sender_id: sender.to_owned(),
             send_key: Some(key.to_owned()),
@@ -781,7 +794,7 @@ pub fn message_by_send_key(db: &Connection, sender: &str, key: &str) -> Sql<Opti
 
 pub fn message_by_number(db: &Connection, channel: &str, number: i64) -> Sql<Option<MsgRow>> {
     optional(block_on(queries::message_by_number(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::MessageByNumberParams {
             channel_id: channel.to_owned(),
             number,
@@ -791,12 +804,12 @@ pub fn message_by_number(db: &Connection, channel: &str, number: i64) -> Sql<Opt
 }
 
 pub fn user_mentions(db: &Connection) -> Sql<Vec<PlacedRow>> {
-    block_on(queries::user_mentions(&mut *db.borrow_mut())).map(|rows| rows.into_iter().map(Into::into).collect())
+    block_on(queries::user_mentions(&mut *db.borrow_read())).map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
 pub fn messages_before(db: &Connection, channel: &str, number: i64, n: i64) -> Sql<Vec<MsgRow>> {
     block_on(queries::messages_before(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::MessagesBeforeParams {
             channel_id: channel.to_owned(),
             number,
@@ -808,7 +821,7 @@ pub fn messages_before(db: &Connection, channel: &str, number: i64, n: i64) -> S
 
 pub fn messages_after(db: &Connection, channel: &str, number: i64, n: i64) -> Sql<Vec<MsgRow>> {
     block_on(queries::messages_after(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::MessagesAfterParams {
             channel_id: channel.to_owned(),
             number,
@@ -819,12 +832,12 @@ pub fn messages_after(db: &Connection, channel: &str, number: i64, n: i64) -> Sq
 }
 
 pub fn recent_reports(db: &Connection, n: i64) -> Sql<Vec<MsgRow>> {
-    block_on(queries::recent_reports(&mut *db.borrow_mut(), queries::RecentReportsParams { limit: n })).map(|rows| rows.into_iter().map(Into::into).collect())
+    block_on(queries::recent_reports(&mut *db.borrow_read(), queries::RecentReportsParams { limit: n })).map(|rows| rows.into_iter().map(Into::into).collect())
 }
 
 pub fn reports_after(db: &Connection, after: &str, n: i64) -> Sql<Vec<MsgRow>> {
     block_on(queries::reports_after(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::ReportsAfterParams {
             id: after.to_owned(),
             limit: n,
@@ -835,7 +848,7 @@ pub fn reports_after(db: &Connection, after: &str, n: i64) -> Sql<Vec<MsgRow>> {
 
 pub fn recent_duplicate(db: &Connection, sender: &str, channel: &str, body: &str, since: i64) -> Sql<Option<String>> {
     optional(block_on(queries::recent_duplicate(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::RecentDuplicateParams {
             sender_id: sender.to_owned(),
             channel_id: channel.to_owned(),
@@ -848,7 +861,7 @@ pub fn recent_duplicate(db: &Connection, sender: &str, channel: &str, body: &str
 
 pub fn dispatches_in(db: &Connection, channel: &str) -> Sql<i64> {
     block_on(queries::dispatches_in(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::DispatchesInParams {
             channel_id: channel.to_owned(),
         },
@@ -858,7 +871,7 @@ pub fn dispatches_in(db: &Connection, channel: &str) -> Sql<i64> {
 
 pub fn user_unread(db: &Connection, channel: &str, read: i64) -> Sql<i64> {
     block_on(queries::user_unread(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::UserUnreadParams {
             channel_id: channel.to_owned(),
             number: read,
@@ -869,7 +882,7 @@ pub fn user_unread(db: &Connection, channel: &str, read: i64) -> Sql<i64> {
 
 pub fn latest_number(db: &Connection, channel: &str) -> Sql<i64> {
     block_on(queries::latest_number(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::LatestNumberParams {
             channel_id: channel.to_owned(),
         },
@@ -879,7 +892,7 @@ pub fn latest_number(db: &Connection, channel: &str) -> Sql<i64> {
 
 pub fn callers_of(db: &Connection, speaker: &str, channel: &str, before: &str, n: i64) -> Sql<Vec<String>> {
     block_on(queries::callers_of(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::CallersOfParams {
             target_id: speaker.to_owned(),
             channel_id: channel.to_owned(),
@@ -892,7 +905,7 @@ pub fn callers_of(db: &Connection, speaker: &str, channel: &str, before: &str, n
 
 pub fn unseen_in(db: &Connection, channel: &str, participant: &str) -> Sql<Vec<String>> {
     block_on(queries::unseen_in(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::UnseenInParams {
             channel_id: channel.to_owned(),
             sender_id: participant.to_owned(),
@@ -903,7 +916,7 @@ pub fn unseen_in(db: &Connection, channel: &str, participant: &str) -> Sql<Vec<S
 
 pub fn notice_since_user(db: &Connection, channel: &str, code: &str) -> Sql<i64> {
     block_on(queries::notice_since_user(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::NoticeSinceUserParams {
             channel_id: channel.to_owned(),
             meta: Some(code.to_owned()),
@@ -914,7 +927,7 @@ pub fn notice_since_user(db: &Connection, channel: &str, code: &str) -> Sql<i64>
 
 pub fn messages_changed_after(db: &Connection, channel: &str, revision: i64, n: i64) -> Sql<Vec<MsgRow>> {
     block_on(queries::messages_changed_after(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::MessagesChangedAfterParams {
             channel_id: channel.to_owned(),
             revision,
@@ -926,7 +939,7 @@ pub fn messages_changed_after(db: &Connection, channel: &str, revision: i64, n: 
 
 pub fn edit_message(db: &Connection, id: &str, body: &str, at: i64, revision: i64) -> Sql<()> {
     block_on(queries::edit_message(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::EditMessageParams {
             body: body.to_owned(),
             edited_at: Some(at),
@@ -938,7 +951,7 @@ pub fn edit_message(db: &Connection, id: &str, body: &str, at: i64, revision: i6
 
 pub fn delete_message(db: &Connection, id: &str, at: i64, revision: i64) -> Sql<()> {
     block_on(queries::delete_message(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::DeleteMessageParams {
             deleted_at: Some(at),
             revision,
@@ -949,7 +962,7 @@ pub fn delete_message(db: &Connection, id: &str, at: i64, revision: i64) -> Sql<
 
 pub fn set_reactions(db: &Connection, id: &str, reactions: Option<&str>, revision: i64) -> Sql<()> {
     block_on(queries::set_reactions(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::SetReactionsParams {
             reactions: reactions.map(str::to_owned),
             revision,
@@ -960,7 +973,7 @@ pub fn set_reactions(db: &Connection, id: &str, reactions: Option<&str>, revisio
 
 pub fn set_pinned(db: &Connection, id: &str, at: Option<i64>, revision: i64) -> Sql<()> {
     block_on(queries::set_pinned(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::SetPinnedParams {
             pinned_at: at,
             revision,
@@ -971,7 +984,7 @@ pub fn set_pinned(db: &Connection, id: &str, at: Option<i64>, revision: i64) -> 
 
 pub fn set_meta(db: &Connection, id: &str, meta: Option<&str>, revision: i64) -> Sql<()> {
     block_on(queries::set_meta(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::SetMetaParams {
             meta: meta.map(str::to_owned),
             revision,
@@ -982,7 +995,7 @@ pub fn set_meta(db: &Connection, id: &str, meta: Option<&str>, revision: i64) ->
 
 pub fn pinned_in(db: &Connection, channel: &str) -> Sql<Vec<MsgRow>> {
     block_on(queries::pinned_in(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::PinnedInParams {
             channel_id: channel.to_owned(),
         },
@@ -992,7 +1005,7 @@ pub fn pinned_in(db: &Connection, channel: &str) -> Sql<Vec<MsgRow>> {
 
 pub fn search_messages(db: &Connection, q: &SearchParams) -> Sql<Vec<PlacedRow>> {
     block_on(queries::search_messages(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::SearchMessagesParams {
             needle: q.text.to_owned(),
             place: q.channel.to_owned(),
@@ -1010,14 +1023,14 @@ pub fn search_messages(db: &Connection, q: &SearchParams) -> Sql<Vec<PlacedRow>>
 
 pub fn notification_receipt(db: &Connection, id: &str) -> Sql<Option<(Option<i64>, bool)>> {
     optional(block_on(queries::notification_receipt(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::NotificationReceiptParams { id: id.to_owned() },
     )))
     .map(|row| row.map(|r| (r.updated_at, r.superseded != 0)))
 }
 
 pub fn user_read_reports(db: &Connection) -> Sql<Vec<(String, i64, i64)>> {
-    block_on(queries::user_read_reports(&mut *db.borrow_mut())).map(|rows| rows.into_iter().map(|r| (r.sender_id, r.created_at, r.updated_at)).collect())
+    block_on(queries::user_read_reports(&mut *db.borrow_read())).map(|rows| rows.into_iter().map(|r| (r.sender_id, r.created_at, r.updated_at)).collect())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1033,7 +1046,7 @@ pub fn insert_delivery(
     at: i64,
 ) -> Sql<i64> {
     block_on(queries::insert_delivery(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::InsertDeliveryParams {
             message_id: message_id.to_owned(),
             channel_id: channel_id.to_owned(),
@@ -1050,7 +1063,7 @@ pub fn insert_delivery(
 
 pub fn pending_deliveries_by_kind(db: &Connection, recipient_kind: &str) -> Sql<Vec<DeliveryRow>> {
     block_on(queries::pending_deliveries_by_kind(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::PendingDeliveriesByKindParams {
             recipient_kind: recipient_kind.to_owned(),
         },
@@ -1060,7 +1073,7 @@ pub fn pending_deliveries_by_kind(db: &Connection, recipient_kind: &str) -> Sql<
 
 pub fn pending_deliveries_for_recipient(db: &Connection, recipient_kind: &str, recipient_id: &str, max_id: i64) -> Sql<Vec<DeliveryRow>> {
     block_on(queries::pending_deliveries_for_recipient(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::PendingDeliveriesForRecipientParams {
             recipient_kind: recipient_kind.to_owned(),
             recipient_id: recipient_id.to_owned(),
@@ -1071,12 +1084,12 @@ pub fn pending_deliveries_for_recipient(db: &Connection, recipient_kind: &str, r
 }
 
 pub fn delivery_is_pending(db: &Connection, id: i64) -> Sql<bool> {
-    block_on(queries::delivery_is_pending(&mut *db.borrow_mut(), queries::DeliveryIsPendingParams { id })).map(|r| r.total > 0)
+    block_on(queries::delivery_is_pending(&mut *db.borrow_read(), queries::DeliveryIsPendingParams { id })).map(|r| r.total > 0)
 }
 
 pub fn pending_deliveries_for_message(db: &Connection, message_id: &str) -> Sql<i64> {
     block_on(queries::pending_deliveries_for_message(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_read(),
         queries::PendingDeliveriesForMessageParams {
             message_id: message_id.to_owned(),
         },
@@ -1086,7 +1099,7 @@ pub fn pending_deliveries_for_message(db: &Connection, message_id: &str) -> Sql<
 
 pub fn settle_delivery(db: &Connection, id: i64, status: &str, at: i64) -> Sql<()> {
     block_on(queries::settle_delivery(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::SettleDeliveryParams {
             status: status.to_owned(),
             settled_at: Some(at),
@@ -1097,7 +1110,7 @@ pub fn settle_delivery(db: &Connection, id: i64, status: &str, at: i64) -> Sql<(
 
 pub fn withdraw_deliveries_for_message(db: &Connection, message_id: &str, at: i64) -> Sql<()> {
     block_on(queries::withdraw_deliveries_for_message(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::WithdrawDeliveriesForMessageParams {
             settled_at: Some(at),
             message_id: message_id.to_owned(),
@@ -1107,7 +1120,7 @@ pub fn withdraw_deliveries_for_message(db: &Connection, message_id: &str, at: i6
 
 pub fn withdraw_deliveries_for_recipient(db: &Connection, recipient_kind: &str, recipient_id: &str, at: i64) -> Sql<()> {
     block_on(queries::withdraw_deliveries_for_recipient(
-        &mut *db.borrow_mut(),
+        &mut *db.borrow_write(),
         queries::WithdrawDeliveriesForRecipientParams {
             settled_at: Some(at),
             recipient_kind: recipient_kind.to_owned(),
@@ -1117,7 +1130,7 @@ pub fn withdraw_deliveries_for_recipient(db: &Connection, recipient_kind: &str, 
 }
 
 pub fn delete_channel(db: &Connection, id: &str) -> Sql<()> {
-    let mut db = db.borrow_mut();
+    let mut db = db.borrow_write();
     block_on(async {
         queries::remove_channel_deliveries(&mut *db, queries::RemoveChannelDeliveriesParams { channel_id: id.to_owned() }).await?;
         queries::remove_thread_messages(

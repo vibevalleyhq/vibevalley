@@ -30,6 +30,7 @@ pub mod subagent;
 pub mod voyage;
 
 pub use crate::oar::core::{OarObserver, StatusFold, derive_status, has_observer, rejection, set_observer};
+pub use crate::oar::process::{CommandOutput, run_output_with_timeout};
 pub use crate::oar::record::{RecordHeader, read_record_with_header};
 
 #[derive(Debug, thiserror::Error)]
@@ -1142,6 +1143,18 @@ pub trait Runtime: Send + Sync {
     }
 }
 
+pub(crate) fn find_runtime(runtimes: &[Arc<dyn Runtime>], id: &str) -> Option<Arc<dyn Runtime>> {
+    runtimes
+        .iter()
+        .find(|r| r.id() == id)
+        .or_else(|| {
+            runtimes
+                .iter()
+                .find(|r| r.id().strip_prefix("acp:") == Some(id) || id.strip_prefix("acp:") == Some(r.id()))
+        })
+        .cloned()
+}
+
 pub struct Registry {
     runtimes: Vec<Arc<dyn Runtime>>,
 }
@@ -1164,15 +1177,7 @@ impl Registry {
     }
 
     pub fn get(&self, id: &str) -> Option<Arc<dyn Runtime>> {
-        self.runtimes
-            .iter()
-            .find(|r| r.id() == id)
-            .or_else(|| {
-                self.runtimes
-                    .iter()
-                    .find(|r| r.id().strip_prefix("acp:") == Some(id) || id.strip_prefix("acp:") == Some(r.id()))
-            })
-            .cloned()
+        find_runtime(&self.runtimes, id)
     }
 
     pub fn require(&self, id: &str) -> Result<Arc<dyn Runtime>> {

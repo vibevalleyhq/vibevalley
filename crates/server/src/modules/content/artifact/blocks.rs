@@ -5,8 +5,11 @@
 //! the batches and of the suggestions.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use sqlx::SqliteConnection;
+use tokio::sync::broadcast;
+use tokio_util::sync::CancellationToken;
 use vibevalley_core::artifact::{MdBlock, Page, blocks_of_markdown, inline_spans, markdown_of, ordered, plain, unmarked};
 use vibevalley_core::collab::{CommitMeta, SuggestionSpan, coalesce_suggestions};
 use vibevalley_core::rules::key_between;
@@ -20,7 +23,7 @@ use vibevalley_protocol::{
 use super::collab::commit_meta_for_actor;
 use super::db::{self, ArtifactRow, ChangeRow, StoredSuggestion};
 use super::{Artifacts, Change, new_id, q, refused};
-use crate::{Sink, now};
+use crate::{Hub, Sink, now};
 
 /// How long a batch is kept to answer it again, and a block's text to
 /// merge a stale update against.
@@ -318,7 +321,7 @@ impl Artifacts {
             artifact: id.into(),
             ack: ack.clone(),
         };
-        self.changes.lock().retain(|tx| tx.send(change.clone()).is_ok());
+        let _ = self.changes.send(change);
     }
 
     pub fn insert_block(&self, artifact: &str, actor: &str, req: &BlockCreate) -> Result<BlockOpResult, ApiError> {
@@ -566,39 +569,38 @@ impl Artifacts {
 
     /// `follow`: each batch after `after`, then each from now on; `Reset`
     /// when too far behind.
-    pub fn follow(&self, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
+    pub fn follow(&self, hub: &Hub, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
         let (rx, missed, current) = {
             let mut db = self.db();
             self.found_blocks(&mut db, id)?;
             // Subscribed before the catch-up is read; live ones are told by seq.
-            let (tx, rx) = flume::unbounded();
-            self.changes.lock().push(tx);
+            let rx = self.changes.subscribe();
             let missed = db::changes_after(&mut db, id, after, CATCH_UP_MAX as i64 + 1).map_err(q)?;
             (rx, missed, db::blocks(&mut db, id).map_err(q)?)
         };
         let id = id.to_string();
-        std::thread::Builder::new()
-            .name("vibevalley-artifact-follow".into())
-            .spawn(move || {
-                if missed.len() > CATCH_UP_MAX {
-                    sink.send(&ArtifactEvent::Reset {});
+        let hub_cancel = hub.child_token();
+        let closed = self.cancel.clone();
+        hub.spawn_task(async move {
+            if missed.len() > CATCH_UP_MAX {
+                sink.send(&ArtifactEvent::Reset {});
+                return;
+            }
+            let upto = missed.last().map_or(after, |c| c.seq);
+            for c in &missed {
+                let blocks = c.block_ids.iter().flat_map(|b| current.iter().filter(move |x| &x.id == b).cloned()).collect();
+                if !sink.send(&ArtifactEvent::Blocks { seq: c.seq, blocks }) {
                     return;
                 }
-                let upto = missed.last().map_or(after, |c| c.seq);
-                for c in &missed {
-                    let blocks = c.block_ids.iter().flat_map(|b| current.iter().filter(move |x| &x.id == b).cloned()).collect();
-                    if !sink.send(&ArtifactEvent::Blocks { seq: c.seq, blocks }) {
-                        return;
-                    }
-                }
-                relay(&rx, &sink, |c: Change| {
-                    (c.artifact == id && c.ack.seq > upto).then_some(ArtifactEvent::Blocks {
-                        seq: c.ack.seq,
-                        blocks: c.ack.blocks,
-                    })
-                });
+            }
+            relay_with_reset(rx, hub_cancel, closed, &sink, ArtifactEvent::Reset {}, |c: Change| {
+                (c.artifact == id && c.ack.seq > upto).then_some(ArtifactEvent::Blocks {
+                    seq: c.ack.seq,
+                    blocks: c.ack.blocks,
+                })
             })
-            .map_err(crate::base::internal)?;
+            .await;
+        });
         Ok(())
     }
 
@@ -612,7 +614,7 @@ impl Artifacts {
 
     fn publish_suggestions(&self, id: &str) -> Result<(), ApiError> {
         let list = self.suggestions(id)?;
-        self.suggestion_changes.lock().retain(|tx| tx.send((id.to_string(), list.clone())).is_ok());
+        let _ = self.suggestion_changes.send((id.to_string(), list));
         Ok(())
     }
 
@@ -858,24 +860,52 @@ impl Artifacts {
     }
 
     /// `suggestionStream`: the list now, then the whole list after each change.
-    pub fn follow_suggestions(&self, id: &str, sink: Sink) -> Result<(), ApiError> {
-        let (tx, rx) = flume::unbounded();
-        self.suggestion_changes.lock().push(tx);
+    pub fn follow_suggestions(self: &Arc<Self>, hub: &Hub, id: &str, sink: Sink) -> Result<(), ApiError> {
+        let mut rx = self.suggestion_changes.subscribe();
         let first = self.suggestions(id)?;
         let id = id.to_string();
-        std::thread::Builder::new()
-            .name("vibevalley-artifact-suggestions".into())
-            .spawn(move || {
-                let event = |suggestions| SuggestionEvent {
-                    tag: SuggestionEventKind::Suggestions,
-                    suggestions,
-                };
-                if !sink.send(&event(first)) {
+        let weak = Arc::downgrade(self);
+        let hub_cancel = hub.child_token();
+        let closed = self.cancel.clone();
+        hub.spawn_task(async move {
+            let event = |suggestions| SuggestionEvent {
+                tag: SuggestionEventKind::Suggestions,
+                suggestions,
+            };
+            if !sink.send(&event(first)) {
+                return;
+            }
+            loop {
+                if sink.stopped() {
                     return;
                 }
-                relay(&rx, &sink, |(artifact, list): (String, Vec<Suggestion>)| (artifact == id).then(|| event(list)));
-            })
-            .map_err(crate::base::internal)?;
+                let next = tokio::select! {
+                    biased;
+                    _ = hub_cancel.cancelled() => return,
+                    _ = closed.cancelled() => return,
+                    _ = sink.stop.recv_async() => return,
+                    res = rx.recv() => res,
+                };
+                match next {
+                    Ok((artifact, list)) => {
+                        if artifact == id && !sink.send(&event(list)) {
+                            return;
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => {
+                        let Some(a) = weak.upgrade() else { return };
+                        let aid = id.clone();
+                        let Ok(Ok(list)) = tokio::task::spawn_blocking(move || a.suggestions(&aid)).await else {
+                            return;
+                        };
+                        if !sink.send(&event(list)) {
+                            return;
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Closed) => return,
+                }
+            }
+        });
         Ok(())
     }
 
@@ -930,12 +960,26 @@ impl Artifacts {
     }
 }
 
-pub(super) fn relay<T, E: serde::Serialize>(rx: &flume::Receiver<T>, sink: &Sink, keep: impl Fn(T) -> Option<E>) {
+pub(super) async fn relay_with_reset<T: Clone, E: serde::Serialize>(
+    mut rx: broadcast::Receiver<T>,
+    hub_cancel: CancellationToken,
+    closed: CancellationToken,
+    sink: &Sink,
+    reset: E,
+    keep: impl Fn(T) -> Option<E>,
+) {
     loop {
         if sink.stopped() {
             return;
         }
-        match rx.recv_timeout(std::time::Duration::from_millis(500)) {
+        let next = tokio::select! {
+            biased;
+            _ = hub_cancel.cancelled() => return,
+            _ = closed.cancelled() => return,
+            _ = sink.stop.recv_async() => return,
+            res = rx.recv() => res,
+        };
+        match next {
             Ok(x) => {
                 if let Some(e) = keep(x)
                     && !sink.send(&e)
@@ -943,8 +987,11 @@ pub(super) fn relay<T, E: serde::Serialize>(rx: &flume::Receiver<T>, sink: &Sink
                     return;
                 }
             }
-            Err(flume::RecvTimeoutError::Timeout) => {}
-            Err(flume::RecvTimeoutError::Disconnected) => return,
+            Err(broadcast::error::RecvError::Lagged(_)) => {
+                let _ = sink.send(&reset);
+                return;
+            }
+            Err(broadcast::error::RecvError::Closed) => return,
         }
     }
 }

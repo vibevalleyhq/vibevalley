@@ -23,11 +23,11 @@ use vibevalley_protocol::{
     InspectedTokenValue, InspectedTokensSpec, InspectedTypeFamily, InspectedTypeStyle,
 };
 
-use super::blocks::relay;
+use super::blocks::relay_with_reset;
 use super::collab::commit_meta_for_maker;
 use super::{Artifacts, Maker, artifact_type_of, db, q, refused};
 use crate::base::{LookIn, missing};
-use crate::{Sink, now};
+use crate::{Hub, Sink, now};
 
 const CATCH_UP_MAX: usize = 200;
 
@@ -569,7 +569,7 @@ impl Artifacts {
         };
 
         let seq = change.seq;
-        self.entry_changes.lock().retain(|tx| tx.send(change.clone()).is_ok());
+        let _ = self.entry_changes.send(change);
         if req.announce == Some(true) {
             let channel = self.channel.place_of(&maker.from, row.channel_id.as_deref().unwrap_or(""))?;
             let note = req.note.as_deref().map(str::trim).filter(|n| !n.is_empty());
@@ -595,49 +595,48 @@ impl Artifacts {
         Ok(result)
     }
 
-    pub fn follow_entries(&self, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
+    pub fn follow_entries(&self, hub: &Hub, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
         let (rx, missed, current) = {
             let mut db = self.db();
             self.found_store(&mut db, id)?;
             // Subscribe before reading catch-up; live events are deduplicated by seq.
-            let (tx, rx) = flume::unbounded();
-            self.entry_changes.lock().push(tx);
+            let rx = self.entry_changes.subscribe();
             let missed = db::entry_changes_after(&mut db, id, after, CATCH_UP_MAX as i64 + 1).map_err(q)?;
             let current: HashMap<String, db::EntryRow> = db::entries(&mut db, id).map_err(q)?.into_iter().map(|r| (r.path.clone(), r)).collect();
             (rx, missed, current)
         };
         let id = id.to_string();
-        std::thread::Builder::new()
-            .name("vibevalley-artifact-entry-follow".into())
-            .spawn(move || {
-                if missed.len() > CATCH_UP_MAX {
-                    sink.send(&ArtifactEntryEvent::Reset {});
+        let hub_cancel = hub.child_token();
+        let closed = self.cancel.clone();
+        hub.spawn_task(async move {
+            if missed.len() > CATCH_UP_MAX {
+                sink.send(&ArtifactEntryEvent::Reset {});
+                return;
+            }
+            let upto = missed.last().map_or(after, |c| c.seq);
+            for c in &missed {
+                let entries: Vec<ArtifactEntry> = c
+                    .paths
+                    .iter()
+                    .filter_map(|p| current.get(p).map(|r| entry_of(r, r.size <= INLINE_EVENT_MAX_BYTES as i64)))
+                    .collect();
+                if !sink.send(&ArtifactEntryEvent::Entries {
+                    seq: c.seq,
+                    entries,
+                    deleted: c.deleted.clone(),
+                }) {
                     return;
                 }
-                let upto = missed.last().map_or(after, |c| c.seq);
-                for c in &missed {
-                    let entries: Vec<ArtifactEntry> = c
-                        .paths
-                        .iter()
-                        .filter_map(|p| current.get(p).map(|r| entry_of(r, r.size <= INLINE_EVENT_MAX_BYTES as i64)))
-                        .collect();
-                    if !sink.send(&ArtifactEntryEvent::Entries {
-                        seq: c.seq,
-                        entries,
-                        deleted: c.deleted.clone(),
-                    }) {
-                        return;
-                    }
-                }
-                relay(&rx, &sink, |c: EntryChange| {
-                    (c.artifact == id && c.seq > upto).then_some(ArtifactEntryEvent::Entries {
-                        seq: c.seq,
-                        entries: c.entries,
-                        deleted: c.deleted,
-                    })
-                });
+            }
+            relay_with_reset(rx, hub_cancel, closed, &sink, ArtifactEntryEvent::Reset {}, |c: EntryChange| {
+                (c.artifact == id && c.seq > upto).then_some(ArtifactEntryEvent::Entries {
+                    seq: c.seq,
+                    entries: c.entries,
+                    deleted: c.deleted,
+                })
             })
-            .map_err(crate::base::internal)?;
+            .await;
+        });
         Ok(())
     }
 

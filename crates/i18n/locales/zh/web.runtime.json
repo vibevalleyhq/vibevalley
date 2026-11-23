@@ -28,7 +28,7 @@
   "mcp": "MCP 服务器",
   "tools": "工具",
   "agents": "用到它的 agent",
-  "makeAgent": "用它捏一个新 agent →",
+  "makeAgent": "用它捏一个新 agent",
   "noneYet": "还没有。",
   "afterInstall": "装好以后才能读到。",
   "noUsage": "这个引擎不报告账户用量。",
@@ -119,5 +119,25 @@
   "spentTodayBudget": "今天执行会话花了约 {spent}，每日预算 {budget}。",
   "missingCommand": "请在本机安装 {runtime}，再点「重新检测」。如果已经安装，可填写可执行文件的完整路径。",
   "enterPath": "填写命令路径",
-  "signInTerminal": "打开终端登录"
+  "signInTerminal": "打开终端登录",
+  "machines": {
+    "title": "执行机器",
+    "kind": {
+      "local": "本机",
+      "remote": "远端",
+      "sandbox": "临时沙箱"
+    },
+    "platform": {
+      "macos": "macOS",
+      "linux": "Linux",
+      "container": "容器",
+      "other": "其他"
+    },
+    "status": {
+      "online": "在线",
+      "offline": "离线",
+      "draining": "排空中"
+    },
+    "noRuntimes": "未上报引擎"
+  }
 }

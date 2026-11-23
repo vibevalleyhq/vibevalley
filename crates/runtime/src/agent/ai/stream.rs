@@ -1,57 +1,98 @@
 use std::io::BufRead;
+use std::sync::{Arc, OnceLock};
 
 use parking_lot::Mutex;
 use serde_json::Value;
+use tokio_util::sync::CancellationToken;
 
 use crate::agent::ai::types::{Completion, Delta, FinishReason, Message, Role, ToolCall, Usage};
 use crate::agent::{BrainError, Result};
 
+#[derive(Debug)]
+struct CancelInner {
+    token: CancellationToken,
+    /// Lazily bridged `flume::Receiver<()>` for legacy sync callers using `flume::Selector` / `recv_timeout`.
+    bridge_rx: OnceLock<flume::Receiver<()>>,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct CancelToken {
-    rx: Option<flume::Receiver<()>>,
+    inner: Option<Arc<CancelInner>>,
 }
 
 impl CancelToken {
     pub fn never() -> Self {
-        Self { rx: None }
+        Self { inner: None }
+    }
+
+    pub fn from_tokio(token: CancellationToken) -> Self {
+        Self {
+            inner: Some(Arc::new(CancelInner {
+                token,
+                bridge_rx: OnceLock::new(),
+            })),
+        }
     }
 
     pub fn from_receiver(rx: flume::Receiver<()>) -> Self {
-        Self { rx: Some(rx) }
+        let token = CancellationToken::new();
+        let bridge_rx = OnceLock::new();
+        let _ = bridge_rx.set(rx.clone());
+        if rx.is_disconnected() {
+            token.cancel();
+        } else {
+            let tok = token.clone();
+            crate::rt::spawn(async move {
+                let _ = rx.recv_async().await;
+                tok.cancel();
+            });
+        }
+        Self {
+            inner: Some(Arc::new(CancelInner { token, bridge_rx })),
+        }
+    }
+
+    pub fn token(&self) -> Option<&CancellationToken> {
+        self.inner.as_ref().map(|i| &i.token)
     }
 
     pub fn is_cancelled(&self) -> bool {
-        self.rx.as_ref().is_some_and(flume::Receiver::is_disconnected)
+        self.inner.as_ref().is_some_and(|i| i.token.is_cancelled())
     }
 
     pub fn receiver(&self) -> Option<&flume::Receiver<()>> {
-        self.rx.as_ref()
+        let inner = self.inner.as_ref()?;
+        Some(inner.bridge_rx.get_or_init(|| {
+            let (tx, rx) = flume::bounded(0);
+            if inner.token.is_cancelled() {
+                drop(tx);
+            } else {
+                let tok = inner.token.clone();
+                crate::rt::spawn(async move {
+                    tok.cancelled().await;
+                    drop(tx);
+                });
+            }
+            rx
+        }))
     }
 
     pub(crate) async fn cancelled(&self) {
-        match &self.rx {
-            Some(rx) => {
-                let _ = rx.recv_async().await;
-            }
+        match &self.inner {
+            Some(inner) => inner.token.cancelled().await,
             None => std::future::pending().await,
         }
     }
 }
 
-struct Signal {
-    tx: Option<flume::Sender<()>>,
-    rx: flume::Receiver<()>,
-}
-
-impl Signal {
-    fn open() -> Self {
-        let (tx, rx) = flume::bounded(0);
-        Self { tx: Some(tx), rx }
-    }
-}
-
 pub struct CancelHandle {
-    state: Mutex<Signal>,
+    token: Mutex<CancellationToken>,
+}
+
+impl Drop for CancelHandle {
+    fn drop(&mut self) {
+        self.token.get_mut().cancel();
+    }
 }
 
 impl Default for CancelHandle {
@@ -63,23 +104,22 @@ impl Default for CancelHandle {
 impl CancelHandle {
     pub fn new() -> Self {
         Self {
-            state: Mutex::new(Signal::open()),
+            token: Mutex::new(CancellationToken::new()),
         }
     }
 
     pub fn token(&self) -> CancelToken {
-        let rx = self.state.lock().rx.clone();
-        CancelToken::from_receiver(rx)
+        CancelToken::from_tokio(self.token.lock().clone())
     }
 
     pub fn cancel(&self) {
-        self.state.lock().tx.take();
+        self.token.lock().cancel();
     }
 
     pub fn reset(&self) {
-        let mut state = self.state.lock();
-        if state.tx.is_none() {
-            *state = Signal::open();
+        let mut token = self.token.lock();
+        if token.is_cancelled() {
+            *token = CancellationToken::new();
         }
     }
 }

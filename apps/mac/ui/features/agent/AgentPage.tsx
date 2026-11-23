@@ -128,7 +128,12 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
 
   const bar = () => (
     <View testID="profile-bar" class="flex-row flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-line py-3">
-      <A href="/agents" testID="back" class="group rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover">
+      <A
+        href="/agents"
+        testID="back"
+        class="group flex-row items-center gap-1 rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+      >
+        <Icon name="back" size={14} tone="muted" />
         <Text class="text-sm text-muted group-hover:text-ink">{t("web.agent.all")}</Text>
       </A>
       <Text class="text-sm text-faint">/</Text>
@@ -183,9 +188,9 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
       {bar()}
       <If when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={(a) => draft.set(a)} />}</If>
       <Scroll class="min-h-0 flex-1" contentClass="min-h-full gap-3 pt-3 lg:flex-row">
-        <Scroll class="shrink-0 rounded-lg border border-line bg-page lg:w-76" contentClass="p-4">
+        <View class="shrink-0 rounded-lg border border-line bg-page p-4 lg:w-76">
           <LookPanel draft={draft()} onChange={(look) => draft.set({ ...draft(), look })} />
-        </Scroll>
+        </View>
         <View class="min-h-104 flex-1 overflow-hidden rounded-lg border border-line bg-page">
           <Stage draft={draft()} pose={pose()} />
           <View class="flex-row flex-wrap justify-center gap-1.5 p-3">

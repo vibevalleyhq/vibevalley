@@ -1,4 +1,4 @@
-import { Text, View } from "nsh";
+import { computed, Text, View } from "nsh";
 import { Command, type CommandItem } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -42,14 +42,14 @@ export function Palette() {
   const mode = (): PaletteMode => f()?.mode ?? "commands";
   const showEmptySkeleton = useDelayedBusy(() => f()?.loading === true && (f()?.items.length ?? 0) === 0);
 
-  const detailFor = (id: string): string => {
-    const list = f()?.items;
-    if (!list) return "";
-    for (const item of list) {
-      if (item.id === id) return item.detail ?? "";
+  const detailById = computed(() => {
+    const map = new Map<string, string>();
+    for (const item of f()?.items ?? []) {
+      if (item.detail) map.set(item.id, item.detail);
     }
-    return "";
-  };
+    return map;
+  });
+  const detailFor = (id: string): string => detailById().get(id) ?? "";
 
   return (
     <View testID="palette-root" class="flex-1 overflow-hidden rounded-xl border border-line bg-elevated">
@@ -75,7 +75,9 @@ export function Palette() {
           }
           searchSuffix={
             <View class="shrink-0 flex-row items-center gap-1.5">
-              {f()?.loading === true ? <Text class="text-2xs text-faint">{t("web.shell.palette.searching")}</Text> : null}
+              <If when={f()?.loading === true}>
+                <Text class="text-2xs text-faint">{t("web.shell.palette.searching")}</Text>
+              </If>
               <View class="h-5 items-center justify-center rounded-sm border border-line bg-hover px-1.5">
                 <Text class="text-2xs font-medium text-muted">{t(`web.shell.palette.mode.${mode()}`)}</Text>
               </View>
@@ -103,22 +105,24 @@ export function Palette() {
                     <Icon name={modeIcons[mode()]} size={13} tone="faint" />
                   </View>
                   <Text class={`shrink truncate text-sm font-medium text-ink ${mode() === "search" ? "font-mono" : ""}`}>{entry.label}</Text>
-                  {detail() ? (
-                    <Text class="shrink truncate text-2xs text-muted" style={startEllipsis}>
-                      {detail()}
-                    </Text>
-                  ) : null}
+                  <If when={detail()}>
+                    {(d) => (
+                      <Text class="shrink truncate text-2xs text-muted" style={startEllipsis}>
+                        {d()}
+                      </Text>
+                    )}
+                  </If>
                 </View>
-                {entry.shortcutLabel ? <KeyCap label={entry.shortcutLabel} /> : null}
+                <If when={entry.shortcutLabel}>{(label) => <KeyCap label={label()} />}</If>
               </View>
             );
           }}
         />
-        {showEmptySkeleton() ? (
+        <If when={showEmptySkeleton()}>
           <View class="pointer-events-none absolute top-12 right-0 bottom-0 left-0 px-4 py-3">
             <SkeletonLines testID="palette-skeleton" rows={["62%", "48%", "74%", "56%"]} gap="md" />
           </View>
-        ) : null}
+        </If>
       </View>
       <View class="h-8 flex-row items-center justify-between border-t border-line bg-side px-3.5">
         <View class="flex-row items-center gap-2.5">
@@ -136,15 +140,17 @@ export function Palette() {
           </View>
         </View>
         <View class="flex-row items-center gap-2.5">
-          {modeKeys.map((hint) => {
-            const active = () => mode() === hint.mode;
-            return (
-              <View class="flex-row items-center gap-1">
-                <KeyCap label={hint.keys} surface="surface" active={active()} />
-                <Text class={`text-2xs font-medium ${active() ? "text-ink" : "text-faint"}`}>{t(`web.shell.palette.mode.${hint.mode}`)}</Text>
-              </View>
-            );
-          })}
+          <Each of={modeKeys} key={(hint) => hint.mode}>
+            {(hint) => {
+              const active = () => mode() === hint().mode;
+              return (
+                <View class="flex-row items-center gap-1">
+                  <KeyCap label={hint().keys} surface="surface" active={active()} />
+                  <Text class={`text-2xs font-medium ${active() ? "text-ink" : "text-faint"}`}>{t(`web.shell.palette.mode.${hint().mode}`)}</Text>
+                </View>
+              );
+            }}
+          </Each>
         </View>
       </View>
     </View>

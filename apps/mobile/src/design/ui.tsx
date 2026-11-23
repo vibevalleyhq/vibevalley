@@ -1,5 +1,5 @@
-import { safeArea, Text, View, type JSX } from "nsh";
-import { Input } from "nsh/base";
+import { openUrl, safeArea, Text, View, type JSX } from "nsh";
+import { Input, TextView, type TextViewClasses } from "nsh/base";
 
 import type { IconName } from "../../design/icons";
 import { Icon } from "./Icon";
@@ -271,5 +271,62 @@ export function FieldInput(props: {
         ].join(" ")}
       />
     </View>
+  );
+}
+
+const MARKDOWN_CLASSES: TextViewClasses = {
+  link: "text-water underline",
+  strong: "font-semibold text-ink",
+  blockquote: "my-1 border-l-2 border-faint py-0.5 pl-3 text-muted",
+  alert: "my-1.5 rounded-md border border-line bg-side px-3 py-1.5",
+  code: "rounded-sm border border-line bg-side px-1.5 py-px font-mono text-xs text-ink",
+  keyboard: "rounded-xs border border-line bg-side px-1 py-px font-mono text-2xs text-ink",
+  heading: "mt-1 mb-0.5 font-semibold text-ink",
+  heading1: "text-base",
+  heading2: "text-sm",
+  heading3: "text-sm",
+  heading4: "text-sm",
+  heading5: "text-sm",
+  heading6: "text-sm",
+  paragraph: "my-0.5",
+  list: "my-0.5 pl-5",
+  listItem: "my-0.5 items-start",
+  listMarker: "text-muted tabular-nums",
+  listItemContent: "min-w-0 flex-1 gap-0",
+  taskMarker: "mt-0.5 size-3.5 rounded-xs border border-faint bg-page",
+  taskMarkerChecked: "border-accent bg-accent text-page",
+  table: "my-2 overflow-hidden rounded-md border border-line",
+  tableHead: "bg-side",
+  tableRow: "border-b border-line",
+  tableCell: "border border-line px-2 py-1 text-ink",
+  tableHeaderCell: "bg-side font-semibold text-ink",
+  rule: "my-2 border-line",
+};
+
+function openExternalLink(url: string): void {
+  if (!/^https?:\/\//iu.test(url)) return;
+  void openUrl(url).catch(() => undefined);
+}
+
+export function MarkdownText(props: {
+  readonly text: string;
+  readonly size?: "sm" | "base";
+  readonly selectable?: boolean;
+  readonly testID?: string;
+  readonly class?: string;
+}) {
+  const sizeClass = () => (props.size === "base" ? "text-base" : "text-sm");
+
+  return (
+    <TextView
+      testID={props.testID}
+      markdown={props.text}
+      selectable={props.selectable ?? true}
+      classes={{
+        ...MARKDOWN_CLASSES,
+        root: `min-w-0 gap-0 text-ink ${sizeClass()} ${props.class ?? ""}`,
+      }}
+      onLinkPress={(e) => openExternalLink(e.url)}
+    />
   );
 }

@@ -226,3 +226,146 @@ test("SettingsPage: legacy /settings/remote redirect, search words, sub-tab navi
   await app.press("id:connections-subnav-remote");
   await fake.pumpUntil(app, () => app.count("id:remote-access-page") === 1);
 });
+
+test("RemoteAccessPage: Control Plane Connection switches via pair code & bearer token, prompts restart, and resets to embedded", async () => {
+  setLocale("en");
+  let connectionState = {
+    activeMode: "embedded",
+    configuredMode: "embedded",
+    source: "default",
+    restartRequired: false,
+  } as Record<string, unknown>;
+
+  const { app, fake } = await mountSettings("/settings/connections/remote", (f) => {
+    f.respond("remote.status", () => ({
+      enabled: false,
+      listening: false,
+      port: 8791,
+      tailscaleOnline: false,
+      devices: [],
+    }));
+    f.respond("host.connectionState", () => ({ ...connectionState }));
+    f.respond("host.connectionSave", (payload: unknown) => {
+      const input = payload as { url: string; pairCode?: string; token?: string; label?: string };
+      connectionState = {
+        activeMode: "embedded",
+        configuredMode: "remote",
+        configuredUrl: input.url,
+        ...(input.label !== undefined ? { configuredLabel: input.label } : {}),
+        tokenHint: input.token !== undefined ? "…9999" : "…PAIR",
+        source: "file",
+        restartRequired: true,
+      };
+      return { ...connectionState };
+    });
+    f.respond("host.connectionReset", () => {
+      connectionState = {
+        activeMode: "embedded",
+        configuredMode: "embedded",
+        source: "default",
+        restartRequired: false,
+      };
+      return { ...connectionState };
+    });
+  });
+
+  await fake.pumpUntil(app, () => app.count("id:control-plane-section") === 1 && app.count("id:remote-access-page") === 1);
+  expect(app.texts()).toContain(t("web.remote.controlPlane.title"));
+  expect(app.texts()).toContain(t("web.remote.controlPlane.mode.embedded"));
+  expect(app.count("id:control-plane-configure")).toBe(1);
+  expect(app.count("id:control-plane-reset")).toBe(0);
+
+  await app.press("id:control-plane-configure");
+  await fake.pumpUntil(app, () => app.count("id:control-plane-editor") === 1);
+  await app.type("id:control-plane-url-input", "https://hub.tailnet.ts.net:8791");
+  await app.type("id:control-plane-code-input", "AB34CD");
+  await app.type("id:control-plane-label-input", "Studio Hub");
+  await app.press("id:control-plane-save");
+
+  await fake.pumpUntil(app, () => app.count("id:control-plane-restart") === 1);
+  expect(fake.calls.findLast((c) => c.op === "host.connectionSave")?.payload).toEqual({
+    url: "https://hub.tailnet.ts.net:8791",
+    pairCode: "AB34CD",
+    label: "Studio Hub",
+  });
+  expect(app.texts()).toContain("https://hub.tailnet.ts.net:8791");
+  expect(app.texts()).toContain(t("web.remote.controlPlane.tokenHint", { hint: "…PAIR" }));
+  expect(app.texts()).toContain(t("web.remote.controlPlane.restartToRemote", { url: "https://hub.tailnet.ts.net:8791" }));
+  expect(app.count("id:control-plane-reset")).toBe(1);
+
+  await app.press("id:control-plane-configure");
+  await fake.pumpUntil(app, () => app.count("id:control-plane-editor") === 1);
+  await app.press("id:control-plane-method-token");
+  await fake.pumpUntil(app, () => app.count("id:control-plane-token-input") === 1);
+  await app.type("id:control-plane-token-input", "vv_dev_secret_token_9999");
+  await app.press("id:control-plane-save");
+
+  await fake.pumpUntil(app, () => app.texts().includes(t("web.remote.controlPlane.tokenHint", { hint: "…9999" })));
+  expect(fake.calls.findLast((c) => c.op === "host.connectionSave")?.payload).toEqual({
+    url: "https://hub.tailnet.ts.net:8791",
+    token: "vv_dev_secret_token_9999",
+    label: "Studio Hub",
+  });
+
+  await app.press("id:control-plane-reset");
+  await fake.pumpUntil(app, () => app.count("id:control-plane-restart") === 0 && app.count("id:control-plane-reset") === 0);
+  expect(fake.calls.some((c) => c.op === "host.connectionReset")).toBe(true);
+});
+
+test("RemoteAccessPage: Control Plane Connection stays operable when remote server is unreachable and locks edits under env override", async () => {
+  setLocale("en");
+  const { app, fake } = await mountSettings("/settings/connections/remote", (f) => {
+    f.respond("remote.status", () => ({ bizCode: BizCode.ServiceUnavailable, message: "control plane unreachable" }));
+    f.respond("host.connectionState", () => ({
+      activeMode: "remote",
+      activeUrl: "https://remote-hub.ts.net:8791",
+      activeLabel: "Primary Hub",
+      configuredMode: "remote",
+      configuredUrl: "https://remote-hub.ts.net:8791",
+      configuredLabel: "Primary Hub",
+      tokenHint: "…7777",
+      source: "file",
+      restartRequired: false,
+    }));
+    f.respond("host.connectionReset", () => ({
+      activeMode: "remote",
+      activeUrl: "https://remote-hub.ts.net:8791",
+      configuredMode: "embedded",
+      source: "default",
+      restartRequired: true,
+    }));
+  });
+
+  await fake.pumpUntil(app, () => app.count("id:control-plane-section") === 1 && app.texts().includes(t("web.remote.controlPlane.mode.remote")));
+  expect(app.count("id:remote-access-page")).toBe(0);
+  expect(app.texts()).toContain("https://remote-hub.ts.net:8791");
+  expect(app.count("id:control-plane-reset")).toBe(1);
+
+  await app.press("id:control-plane-reset");
+  await fake.pumpUntil(app, () => app.count("id:control-plane-restart") === 1);
+  expect(app.texts()).toContain(t("web.remote.controlPlane.restartToEmbedded"));
+
+  const envMounted = await mountSettings("/settings/connections/remote", (f) => {
+    f.respond("remote.status", () => ({
+      enabled: false,
+      listening: false,
+      port: 8791,
+      tailscaleOnline: false,
+      devices: [],
+    }));
+    f.respond("host.connectionState", () => ({
+      activeMode: "remote",
+      activeUrl: "https://ci-hub.internal:8791",
+      configuredMode: "remote",
+      configuredUrl: "https://ci-hub.internal:8791",
+      tokenHint: "…ENV1",
+      source: "env",
+      restartRequired: false,
+    }));
+  });
+
+  await envMounted.fake.pumpUntil(envMounted.app, () => envMounted.app.count("id:control-plane-env-badge") === 1);
+  expect(envMounted.app.texts()).toContain(t("web.remote.controlPlane.envOverride"));
+  expect(envMounted.app.count("id:control-plane-configure")).toBe(0);
+  expect(envMounted.app.count("id:control-plane-reset")).toBe(0);
+});

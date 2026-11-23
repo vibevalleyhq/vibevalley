@@ -190,17 +190,17 @@ impl DevtoolsSlot {
 
 impl Shell {
     pub(super) fn start_devtools_refresh(&self, cx: &mut Context<Self>) {
-        if !self.devtools.state.enabled {
+        if !self.overlays.devtools.state.enabled {
             return;
         }
         cx.spawn(async move |this, cx| {
             loop {
                 cx.background_executor().timer(Duration::from_secs(1)).await;
                 let probe = this.update(cx, |shell, cx| {
-                    let route = shell.last_route.as_deref().unwrap_or("/issues").to_string();
+                    let route = shell.chrome.last_route.as_deref().unwrap_or("/issues").to_string();
                     let bridge = cx.try_global::<BridgeHub>().map(|b| b.0.clone());
                     let debug = cx.try_global::<ShellDebugHandle>().cloned();
-                    (shell.server_ready, route, bridge, debug)
+                    (shell.workspace.server_ready, route, bridge, debug)
                 });
                 let Ok((server_ready, route, bridge, debug)) = probe else {
                     break;
@@ -225,18 +225,18 @@ impl Shell {
                     })
                     .await;
                 let alive = this.update(cx, |shell, cx| {
-                    let prev = shell.devtools.state.capsule.clone();
+                    let prev = shell.overlays.devtools.state.capsule.clone();
                     if let Some(bound_port) = port {
-                        shell.devtools.state.capsule.port = bound_port;
+                        shell.overlays.devtools.state.capsule.port = bound_port;
                     }
-                    shell.devtools.state.capsule.route = route;
-                    shell.devtools.state.capsule.active_sessions = active_sessions;
-                    shell.devtools.state.capsule.active_subs = active_subs;
-                    shell.devtools.state.capsule.latest_seq = latest_seq;
-                    if shell.devtools.state.should_publish_periodic_host_debug() {
+                    shell.overlays.devtools.state.capsule.route = route;
+                    shell.overlays.devtools.state.capsule.active_sessions = active_sessions;
+                    shell.overlays.devtools.state.capsule.active_subs = active_subs;
+                    shell.overlays.devtools.state.capsule.latest_seq = latest_seq;
+                    if shell.overlays.devtools.state.should_publish_periodic_host_debug() {
                         shell.publish_host_debug(cx);
                     }
-                    if shell.devtools.state.capsule != prev {
+                    if shell.overlays.devtools.state.capsule != prev {
                         cx.notify();
                     }
                 });
@@ -249,26 +249,26 @@ impl Shell {
     }
 
     pub(super) fn sync_devtools_route(&mut self, route: &str) {
-        if !self.devtools.state.enabled {
+        if !self.overlays.devtools.state.enabled {
             return;
         }
-        self.devtools.state.capsule.route = if route.is_empty() { "/issues".to_string() } else { route.to_string() };
+        self.overlays.devtools.state.capsule.route = if route.is_empty() { "/issues".to_string() } else { route.to_string() };
     }
 
     fn push_devtools_overlay_visibility(&self, cx: &mut Context<Self>) {
-        if let Some((view, _)) = &self.devtools.overlay {
-            let frame = self.devtools.state.overlay_visibility_frame();
+        if let Some((view, _)) = &self.overlays.devtools.overlay {
+            let frame = self.overlays.devtools.state.overlay_visibility_frame();
             view.update(cx, |v, cx| v.push(DEVTOOLS_VISIBLE_TOPIC, frame, cx));
         }
     }
 
     pub fn toggle_devtools(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.devtools.state.enabled {
+        if !self.overlays.devtools.state.enabled {
             return;
         }
-        let was_detached = self.devtools.state.detached;
-        self.devtools.state.toggle();
-        if was_detached || !self.devtools.state.open {
+        let was_detached = self.overlays.devtools.state.detached;
+        self.overlays.devtools.state.toggle();
+        if was_detached || !self.overlays.devtools.state.open {
             self.close_detached_devtools_window(cx);
             self.push_devtools_overlay_visibility(cx);
         } else {
@@ -280,23 +280,23 @@ impl Shell {
     }
 
     pub fn close_devtools(&mut self, cx: &mut Context<Self>) {
-        if !self.devtools.state.enabled {
+        if !self.overlays.devtools.state.enabled {
             return;
         }
-        self.devtools.state.close();
+        self.overlays.devtools.state.close();
         self.close_detached_devtools_window(cx);
         self.push_devtools_overlay_visibility(cx);
         cx.notify();
     }
 
     pub fn detach_devtools(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.devtools.state.enabled {
+        if !self.overlays.devtools.state.enabled {
             return;
         }
-        self.devtools.state.detach();
-        self.devtools.overlay = None;
+        self.overlays.devtools.state.detach();
+        self.overlays.devtools.overlay = None;
         self.publish_host_debug(cx);
-        if let Some(handle) = self.devtools.detached_window {
+        if let Some(handle) = self.overlays.devtools.detached_window {
             let active = handle.update(cx, |_, win, cx| {
                 win.activate_window();
                 cx.activate(true);
@@ -305,9 +305,9 @@ impl Shell {
                 cx.notify();
                 return;
             }
-            self.devtools.detached_window = None;
-            self.devtools.detached_view = None;
-            self.devtools._detached_sub = None;
+            self.overlays.devtools.detached_window = None;
+            self.overlays.devtools.detached_view = None;
+            self.overlays.devtools._detached_sub = None;
         }
         let dark = Ui::get(cx).colors.dark;
         let main_shell = cx.weak_entity();
@@ -373,37 +373,37 @@ impl Shell {
                         let _ = shell_weak.update(cx, |shell, cx| shell.on_detached_devtools_closed(cx));
                     }
                 });
-                self.devtools.detached_window = Some(handle);
-                self.devtools.detached_view = created_view;
-                self.devtools._detached_sub = Some(closed_sub);
+                self.overlays.devtools.detached_window = Some(handle);
+                self.overlays.devtools.detached_view = created_view;
+                self.overlays.devtools._detached_sub = Some(closed_sub);
                 tracing::info!("opened detached devtools window");
             }
             Err(error) => {
                 tracing::warn!("failed to open detached devtools window: {error}");
-                self.devtools.state.on_detached_closed();
+                self.overlays.devtools.state.on_detached_closed();
             }
         }
         cx.notify();
     }
 
     pub(super) fn on_detached_devtools_closed(&mut self, cx: &mut Context<Self>) {
-        self.devtools.detached_window = None;
-        self.devtools.detached_view = None;
-        self.devtools._detached_sub = None;
-        self.devtools.state.on_detached_closed();
+        self.overlays.devtools.detached_window = None;
+        self.overlays.devtools.detached_view = None;
+        self.overlays.devtools._detached_sub = None;
+        self.overlays.devtools.state.on_detached_closed();
         cx.notify();
     }
 
     fn close_detached_devtools_window(&mut self, cx: &mut Context<Self>) {
-        self.devtools.detached_view = None;
-        self.devtools._detached_sub = None;
-        if let Some(handle) = self.devtools.detached_window.take() {
+        self.overlays.devtools.detached_view = None;
+        self.overlays.devtools._detached_sub = None;
+        if let Some(handle) = self.overlays.devtools.detached_window.take() {
             let _ = handle.update(cx, |_, window, _| window.remove_window());
         }
     }
 
     pub(super) fn ensure_devtools_overlay(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.devtools.state.is_overlay_open() || self.devtools.overlay.is_some() {
+        if !self.overlays.devtools.state.is_overlay_open() || self.overlays.devtools.overlay.is_some() {
             return;
         }
         let dark = Ui::get(cx).colors.dark;
@@ -413,24 +413,24 @@ impl Shell {
             HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
             HostedEvent::Ready => this.push_devtools_overlay_visibility(cx),
         });
-        self.devtools.overlay = Some((view, sub));
+        self.overlays.devtools.overlay = Some((view, sub));
         self.push_devtools_overlay_visibility(cx);
     }
 
     pub(super) fn devtools_for_each_view(&self, cx: &mut Context<Self>, mut f: impl FnMut(&mut HostedView, &mut Context<HostedView>)) {
-        if let Some((view, _)) = &self.devtools.overlay {
+        if let Some((view, _)) = &self.overlays.devtools.overlay {
             view.update(cx, &mut f);
         }
-        if let Some(view) = self.devtools.detached_view.as_ref().and_then(WeakEntity::upgrade) {
+        if let Some(view) = self.overlays.devtools.detached_view.as_ref().and_then(WeakEntity::upgrade) {
             view.update(cx, &mut f);
         }
     }
 
     pub(super) fn render_devtools_overlay(&self, cx: &Context<Self>) -> Option<gpui::Stateful<gpui::Div>> {
-        if !self.devtools.state.is_overlay_open() {
+        if !self.overlays.devtools.state.is_overlay_open() {
             return None;
         }
-        let (view, _) = self.devtools.overlay.as_ref()?;
+        let (view, _) = self.overlays.devtools.overlay.as_ref()?;
         let colors = &Ui::get(cx).colors;
         Some(
             div()
@@ -452,13 +452,13 @@ impl Shell {
     }
 
     pub(super) fn render_devtools_capsule(&self, cx: &mut Context<Self>) -> Option<gpui::Div> {
-        if !self.devtools.state.enabled {
+        if !self.overlays.devtools.state.enabled {
             return None;
         }
         let ui = Ui::get(cx);
         let colors = ui.colors.clone();
         let mono = ui.mono();
-        let state = &self.devtools.state;
+        let state = &self.overlays.devtools.state;
         let frame_color = if state.capsule.last_frame_ms >= 50.0 {
             colors.danger
         } else if state.capsule.last_frame_ms >= 16.0 {

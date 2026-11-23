@@ -120,7 +120,11 @@ export type IssueConstraints = { check?: string, scope: Array<string>, acceptanc
 
 export type IssueLastRun = { startedAt: number, endedAt?: number, outcome?: Outcome, };
 
-export type Issue = { constraints?: IssueConstraints, id: IssueId, number: number, title: string, description: string, mandate: IssueMandate, conflict?: Conflict, repo?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining,
+export type Issue = { constraints?: IssueConstraints, id: IssueId, number: number, title: string, description: string, mandate: IssueMandate, conflict?: Conflict, repo?: string,
+/**
+ * Target execution host id when pinned to a specific machine; omitted lets the control plane route.
+ */
+machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining,
 /**
  * Tracks runs executed without a worker session (e.g. in-process orchestrator); active while `endedAt` is absent.
  */
@@ -129,9 +133,13 @@ lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, };
 /**
  * Includes the Core fold `seq` that applied the mutation so clients can await state convergence.
  */
-export type AppliedIssue = { constraints?: IssueConstraints, id: IssueId, number: number, title: string, description: string, mandate: IssueMandate, conflict?: Conflict, repo?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, seq: number, };
+export type AppliedIssue = { constraints?: IssueConstraints, id: IssueId, number: number, title: string, description: string, mandate: IssueMandate, conflict?: Conflict, repo?: string,
+/**
+ * Target execution host id when pinned to a specific machine; omitted lets the control plane route.
+ */
+machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, seq: number, };
 
-export type IssueUpdate = { title?: string, description?: string, repo?: string, agent?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable,
+export type IssueUpdate = { title?: string, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable,
 /**
  * Board placement before this issue id; "" places it last. Valid only before dispatch.
  */
@@ -145,7 +153,7 @@ export type IssueRefineRequest = { text?: string,
  */
 edit?: IssueUpdate, };
 
-export type IssueRequest = { constraints?: IssueConstraints, title: string, parent?: IssueId, blockedBy?: Array<IssueId>, description?: string, repo?: string, agent?: string, priority?: Priority, deliver?: Deliverable, autoSubmitPr?: boolean, criteria?: Array<string>,
+export type IssueRequest = { constraints?: IssueConstraints, title: string, parent?: IssueId, blockedBy?: Array<IssueId>, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, deliver?: Deliverable, autoSubmitPr?: boolean, criteria?: Array<string>,
 /**
  * Idempotency key deduplicating retries after a lost response.
  */
@@ -215,7 +223,7 @@ export type IssueRunListInput = { id: string, };
 
 export type IssueTimelineGetInput = { id: string, };
 
-export type IssueUpdateInput = { id: string, title?: string, description?: string, repo?: string, agent?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable, before?: string, };
+export type IssueUpdateInput = { id: string, title?: string, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable, before?: string, };
 
 export type IssueDeleteInput = { id: string, };
 

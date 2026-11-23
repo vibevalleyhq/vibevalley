@@ -143,7 +143,11 @@ export function OrchestratorFace(props: { size?: number; agent?: string | undefi
   };
   return (
     <If when={cut()} else={<Initial size={size()} letter={letter()} ground={tone("avatar-sky")} />}>
-      {(c) => (avatarSprite() ? <Crop size={size()} cut={c()} class="bg-side" /> : <Crop size={size()} cut={c()} ground={tone("avatar-sky")} />)}
+      {(c) => (
+        <If when={avatarSprite()} else={<Crop size={size()} cut={c()} ground={tone("avatar-sky")} />}>
+          <Crop size={size()} cut={c()} class="bg-side" />
+        </If>
+      )}
     </If>
   );
 }

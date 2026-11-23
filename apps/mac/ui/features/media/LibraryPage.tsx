@@ -16,7 +16,7 @@ import { CountPill } from "../../design/Tag";
 import { toast } from "../../design/toasts";
 import { api } from "../../infra/api";
 import { attachmentData } from "../../infra/attachment";
-import { fileUrl, useAttachmentFile } from "../../infra/attachmentFile";
+import { fileUrl, importLocalAttachment, localPathFromUri, useAttachmentFile } from "../../infra/attachmentFile";
 import { hostApi } from "../../infra/bridge";
 import { useCollabSlice, useOpsSlice } from "../../infra/frame";
 import { ready, useAgents, useQuery, useQueryClient } from "../../infra/query";
@@ -336,11 +336,47 @@ export function LibraryPage() {
     await uploadEntries(chosenFiles.map((file) => ({ name: file.name, type: file.type, data: attachmentData(file) })));
   };
 
-  const dropUris = async (uris: readonly string[]) => {
-    const read = await Promise.all(uris.map((u) => hostApi.readFile(u)));
-    const ok = read.flatMap((r) => (r.bizCode === 0 && r.data ? [r.data] : []));
-    await uploadEntries(ok.map((f) => ({ name: f.name, type: f.type, data: Promise.resolve(f.data) })));
-  };
+  const dropUris = (uris: readonly string[]) =>
+    uris.length === 0
+      ? Promise.resolve()
+      : act.run(async () => {
+          let lastMedia: LibraryItem | undefined;
+          let lastArtifact: Artifact | undefined;
+          const inOutlineBucket = bucketArtifactType(untracked(contentBrowseBucket)) === "outline";
+          for (const uri of uris) {
+            const pathOrUri = localPathFromUri(uri) ?? uri;
+            const basename = pathOrUri.split("/").at(-1)?.trim() ?? "";
+            if (deliverableNameRe.test(basename)) {
+              const read = await hostApi.readFile(uri);
+              if (read.bizCode !== 0 || !read.data) continue;
+              const filename = read.data.name.trim() || basename || "file";
+              const content = base64ToUtf8(read.data.data);
+              const inferred = inferArtifactFromName(filename, content);
+              if (inferred.artifactType === "outline" || (inOutlineBucket && markdownFileRe.test(filename))) {
+                lastArtifact = await api.artifact.outline.import({ markdown: content, filename });
+              } else {
+                lastArtifact = await api.artifact.create({
+                  title: inferred.title,
+                  kind: inferred.kind,
+                  ...(inferred.display !== undefined ? { display: inferred.display } : {}),
+                  ...(inferred.artifactType !== undefined ? { artifactType: inferred.artifactType } : {}),
+                  content,
+                });
+              }
+            } else {
+              const kept = await importLocalAttachment(uri);
+              lastMedia = await api.library.item.add({ attachment: kept.id });
+            }
+          }
+          if (lastArtifact !== undefined) {
+            await queries.invalidate({ prefix: ["artifacts"] });
+            if (lastMedia === undefined) openArtifact(lastArtifact.id);
+          }
+          if (lastMedia !== undefined) {
+            void items.refetch();
+            selection.set(focusFile(lastMedia.attachment.id));
+          }
+        });
 
   const pick = (id: string, how: { readonly add: boolean; readonly range: boolean }) => {
     selection.set(pickFile(untracked(selection), id, how, ids()));

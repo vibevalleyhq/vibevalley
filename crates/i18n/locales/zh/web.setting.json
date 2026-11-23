@@ -59,7 +59,7 @@
     "models": "密钥 钥匙 账号 DeepSeek MOSS API Key 模型 绑定",
     "voice": "电话 通话 MOSS Live 实时 视觉 转写 语音",
     "connections": "微信 飞书 QQ 连接器 配对 GitHub gh PR 登录",
-    "remote": "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌",
+    "remote": "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
     "about": "版本 家目录 设置文件 数据 素材图鉴 version catalog"
   },
   "scope": {

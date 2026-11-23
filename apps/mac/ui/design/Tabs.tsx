@@ -1,6 +1,6 @@
 import { Text, View } from "nsh";
 
-import { useRouter } from "../infra/router";
+import { useDesignHost } from "./host";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 
@@ -26,11 +26,11 @@ export function Tabs<T extends string>(props: {
   look?: TabsLook;
   class?: string | undefined;
 }) {
-  const router = useRouter();
+  const designHost = useDesignHost();
   const look = () => looks[props.look ?? "pills"];
   return (
     <View role="tablist" accessibilityLabel={props.label} class={`${look().list} ${props.class ?? ""}`}>
-      <Each of={props.items}>
+      <Each of={props.items} key={(item) => item.value}>
         {(item) => {
           const on = () => item().value === props.value;
           return (
@@ -40,7 +40,7 @@ export function Tabs<T extends string>(props: {
               accessibilityState={{ selected: on() }}
               onPress={() => {
                 const href = item().href;
-                if (href !== undefined) router.navigate(href);
+                if (href !== undefined) designHost.navigate(href);
                 props.onChange?.(item().value);
               }}
               class={`group flex-row items-center gap-1.5 focus-visible:outline-2 focus-visible:outline-focus ${look().tab(on())}`}

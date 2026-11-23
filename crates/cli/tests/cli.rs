@@ -165,6 +165,8 @@ const COMMANDS: &[&str] = &[
     "library add",
     "library delete",
     "library list",
+    "machine list",
+    "machine up",
     "media input delete",
     "media input list",
     "media input upload",

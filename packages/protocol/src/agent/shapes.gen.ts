@@ -57,7 +57,11 @@ export type Agent = { id: string, name: string, role: AgentRole,
 /**
  * What it does, in a sentence (duty): orchestrators read it to pick who takes a job.
  */
-duty: string, enabled: boolean, runtime: string, model: string, effort: string, persona: string, personaMode: PersonaMode, skills: Array<string>, mcpServers: Array<MCPServer>, disallowedTools: Array<string>, env: { [key in string]: string }, workdir: string, worktree: boolean, tags: Array<string>, look: Look,
+duty: string, enabled: boolean, runtime: string,
+/**
+ * Target execution host id when pinned to a specific machine; omitted lets the control plane route.
+ */
+machineId?: string, model: string, effort: string, persona: string, personaMode: PersonaMode, skills: Array<string>, mcpServers: Array<MCPServer>, disallowedTools: Array<string>, env: { [key in string]: string }, workdir: string, worktree: boolean, tags: Array<string>, look: Look,
 /**
  * The template it was installed from, at that template's version; none for one made by hand.
  */

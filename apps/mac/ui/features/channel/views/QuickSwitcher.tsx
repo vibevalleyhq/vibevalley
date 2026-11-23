@@ -158,13 +158,13 @@ function SwitcherBody(props: { onClose: () => void }) {
           <View testID={`switch-${entry.id}`} class="min-w-0 flex-1 flex-row items-center gap-2.5">
             <View class="size-5 shrink-0 items-center justify-center">
               <If when={target()?.kind === "channel"}>
-                <Text class="font-mono text-sm font-semibold text-faint group-focus:text-muted">#</Text>
+                <Icon name="chat" size={14} tone="muted" />
               </If>
               <If when={target()?.kind === "thread"}>
                 <Icon name="thread" size={14} tone="muted" />
               </If>
               <If when={target()?.kind === "direct" || target()?.kind === "profile"}>
-                <If when={peer()} else={<Text class="font-mono text-sm font-semibold text-faint group-focus:text-muted">@</Text>}>
+                <If when={peer()} else={<Icon name="mention" size={14} tone="muted" />}>
                   {(id) => (
                     <If when={isOrchestrator(id())} else={<HelperFace agent={id()} size={20} />}>
                       <OrchestratorFace size={20} agent={id()} />

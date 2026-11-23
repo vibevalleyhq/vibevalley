@@ -92,14 +92,14 @@ export function IssueDetail(props: {
   const timeline = () => ready(timelineQuery, undefined);
 
   /** lead is read as it renders: the lead changes as the issue moves on. */
-  const button = (a: IssueAct, lead: () => boolean) => (
+  const ActButton = (p: { act: IssueAct; lead: boolean }) => (
     <Button
-      testID={`act-${a}`}
-      tone={lead() ? "primary" : acts.rejecting(a) || a === "close" ? "danger" : "plain"}
-      disabled={acts.disabled(a)}
-      onPress={() => go(a)}
+      testID={`act-${p.act}`}
+      tone={p.lead ? "primary" : acts.rejecting(p.act) || p.act === "close" ? "danger" : "plain"}
+      disabled={acts.disabled(p.act)}
+      onPress={() => go(p.act)}
     >
-      {acts.label(a)}
+      {acts.label(p.act)}
     </Button>
   );
 
@@ -136,7 +136,7 @@ export function IssueDetail(props: {
         </View>
         {/* Each part whole: a narrow screen wraps between them, not inside "第 1 轮". */}
         <View class="min-w-0 flex-1 flex-row flex-wrap">
-          <Each of={s().statusParts(now(), timeline()?.spent?.cny)}>
+          <Each of={s().statusParts(now(), timeline()?.spent?.cny)} key="index">
             {(part, i) => (
               <Text class={`text-sm tabular-nums ${tone() === "berry" ? "text-berry" : "text-ink"}`} style={tone() === "berry" ? undefined : { opacity: 0.8 }}>
                 {`${i() > 0 ? " · " : ""}${part()}`}
@@ -216,7 +216,7 @@ export function IssueDetail(props: {
                 {(conflict) => <ConflictFiles files={conflict().files} worktree={sessionWorktree(head())} />}
               </If>
               <If when={s().stage.state === "asking"}>
-                <Each of={props.issue.questions}>
+                <Each of={props.issue.questions} key={(a) => a.question}>
                   {(a) => <Question ask={a()} busy={busy()} onPick={(o) => void doAct("answer", o).then((ok) => ok && setText(""))} />}
                 </Each>
               </If>
@@ -238,8 +238,12 @@ export function IssueDetail(props: {
             </If>
             <View class="mt-2.5 flex-row flex-wrap gap-2">
               {/* Keyed by the act, as VibeValley's keyed Show: another lead is another button. */}
-              <Each of={((l) => (l ? [l] : []))(s().lead)}>{(lead) => button(lead(), () => true)}</Each>
-              <Each of={s().others.filter((a) => a !== "close" && a !== "stop")}>{(a) => button(a(), () => false)}</Each>
+              <Each of={((l) => (l ? [l] : []))(s().lead)} key={(l) => l}>
+                {(lead) => <ActButton act={lead()} lead />}
+              </Each>
+              <Each of={s().others.filter((a) => a !== "close" && a !== "stop")} key={(a) => a}>
+                {(a) => <ActButton act={a()} lead={false} />}
+              </Each>
             </View>
           </View>
         )}
@@ -259,7 +263,7 @@ export function IssueDetail(props: {
             autoFocus
           />
           <View class="mt-2 flex-row gap-2">
-            {button("tell", () => true)}
+            <ActButton act="tell" lead />
             <Button disabled={busy()} onPress={() => setBox(undefined)}>
               {t("web.issue.never")}
             </Button>
@@ -289,7 +293,9 @@ export function IssueDetail(props: {
         <If when={s().openFindings.length > 0}>
           <View class="mt-2">
             <Text class="text-xs text-muted">{t("web.issue.detail.rejected")}</Text>
-            <Each of={s().openFindings}>{(f) => <Text class="text-sm text-berry">{`· ${f().text}`}</Text>}</Each>
+            <Each of={s().openFindings} key="index">
+              {(f) => <Text class="text-sm text-berry">{`· ${f().text}`}</Text>}
+            </Each>
           </View>
         </If>
       </View>
@@ -468,7 +474,9 @@ export function IssueDetail(props: {
       <If when={agent()?.model}>{(model) => <Property label={t("web.issue.detail.model")}>{model()}</Property>}</If>
       <If when={sideActs().length > 0 || sessionWorktree(head())}>
         <View class="mt-3 flex-row flex-wrap items-center gap-2">
-          <Each of={sideActs()}>{(a) => button(a(), () => !s().ask && a() === s().lead)}</Each>
+          <Each of={sideActs()} key={(a) => a}>
+            {(a) => <ActButton act={a()} lead={!s().ask && a() === s().lead} />}
+          </Each>
           <If when={sessionWorktree(head())}>
             {(worktree) => <OpenTerminal cwd={worktree()} title={`#${props.issue.number}`} testid="issue-open-workspace" />}
           </If>
@@ -561,7 +569,9 @@ export function IssueDetail(props: {
         <If when={s().resolvedFindings.length > 0}>
           <Property align="start" label={t("web.issue.detail.resolved")}>
             <View class="pt-0.5">
-              <Each of={s().resolvedFindings}>{(f) => <Text class="text-sm text-faint line-through">{f().text}</Text>}</Each>
+              <Each of={s().resolvedFindings} key="index">
+                {(f) => <Text class="text-sm text-faint line-through">{f().text}</Text>}
+              </Each>
             </View>
           </Property>
         </If>

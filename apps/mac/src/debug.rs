@@ -44,6 +44,7 @@ pub fn grid_text(snapshot: &vibevalley_terminal::Snapshot) -> Vec<String> {
 
 pub fn dump(shell: &Shell, cx: &App) -> Value {
     let projects: Vec<Value> = shell
+        .workspace
         .ws
         .projects()
         .iter()
@@ -55,7 +56,7 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
                     let mut v = json!({ "id": t.id, "kind": serde_json::to_value(&t.kind).unwrap_or(Value::Null), "title": tab_title(shell, t, cx) });
                     match &t.kind {
                         PaneKind::Terminal { terminal_id, .. } => {
-                            if let Some(slot) = shell.terminals.get(terminal_id) {
+                            if let Some(slot) = shell.workspace.terminals.get(terminal_id) {
                                 let view = slot.view.read(cx);
                                 v["spawned"] = json!(view.session().is_some());
                                 v["exited"] = json!(view.has_exited());
@@ -65,8 +66,9 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
                             }
                             v["registered"] = json!(p.terminal(terminal_id).is_some());
                         }
-                        _ => match shell.panes.get(&(p.id(), t.id)).map(|s| &s.entity) {
+                        _ => match shell.workspace.panes.get(&(p.id(), t.id)).map(|s| &s.entity) {
                             Some(PaneEntity::File(f)) => v["viewer"] = json!({ "status": f.read(cx).status(), "reloads": f.read(cx).reloads() }),
+                            Some(PaneEntity::Markdown(m)) => v["markdown"] = json!({ "status": m.read(cx).status(), "reloads": m.read(cx).reloads() }),
                             Some(PaneEntity::Diff(d)) => v["diff"] = json!(d.read(cx).summary()),
                             Some(PaneEntity::Hosted(view)) => v["hosted"] = view.read(cx).debug_state(),
                             Some(PaneEntity::Pixel(view)) => v["pixel"] = view.read(cx).debug_state(),
@@ -76,12 +78,12 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
                     v
                 })
                 .collect();
-            let view = shell.projects.get(&p.id());
+            let view = shell.workspace.projects.get(&p.id());
             json!({
                 "id": p.id(),
                 "name": p.info.name,
                 "root": p.root(),
-                "active": shell.ws.active_id() == Some(p.id()),
+                "active": shell.workspace.ws.active_id() == Some(p.id()),
                 "layout": p.layout.to_json(),
                 "focused_group": p.layout.focused,
                 "tabs": tabs,
@@ -96,24 +98,27 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
         })
         .collect();
     json!({
-        "loaded": shell.loaded,
-        "load_error": shell.load_error,
-        "panel": format!("{:?}", shell.panel),
-        "native_workspace": shell.native_workspace,
-        "sidebar_visible": shell.sidebar_visible,
+        "loaded": shell.workspace.loaded,
+        "load_error": shell.workspace.load_error,
+        "panel": format!("{:?}", shell.chrome.panel),
+        "native_workspace": shell.chrome.native_workspace,
+        "sidebar_visible": shell.chrome.sidebar_visible,
+        "inspector_open": shell.chrome.inspector_open,
+        "inspector_mounted": shell.chrome.inspector.is_some(),
         "theme_dark": crate::theme::Ui::get(cx).colors.dark,
         "projects": projects,
-        "sidebar": shell.sidebar.read(cx).debug_state(),
-        "workbench": shell.workbench.read(cx).debug_state(),
-        "pixel": shell.native_pixel.as_ref().map(|s| s.view.read(cx).debug_state()),
-        "palette": shell.palette.as_ref().map(|p| json!({
+        "sidebar": shell.chrome.sidebar.read(cx).debug_state(),
+        "inspector": shell.chrome.inspector.as_ref().map(|s| s.view.read(cx).debug_state()),
+        "workbench": shell.chrome.workbench.read(cx).debug_state(),
+        "pixel": shell.chrome.native_pixel.as_ref().map(|s| s.view.read(cx).debug_state()),
+        "palette": shell.overlays.palette.as_ref().map(|p| json!({
             "open": p.open, "mode": p.mode.as_str(), "query": p.query, "view": p.view.read(cx).debug_state(),
         })),
-        "live_terminal_views": shell.terminals.len(),
-        "terminal_notice": shell.terminal_notice,
-        "bridge_probe": shell.probe,
-        "tray": shell.tray,
-        "pane_entities": shell.panes.len(),
+        "live_terminal_views": shell.workspace.terminals.len(),
+        "terminal_notice": shell.workspace.terminal_notice,
+        "bridge_probe": shell.overlays.probe,
+        "tray": shell.overlays.tray,
+        "pane_entities": shell.workspace.panes.len(),
     })
 }
 
@@ -154,7 +159,7 @@ pub fn start(shell: Entity<Shell>, window: WindowHandle<Shell>, cx: &mut App) {
         cx.spawn(async move |cx| {
             loop {
                 cx.background_executor().timer(Duration::from_millis(200)).await;
-                if cx.update(|cx| shell.read(cx).loaded) {
+                if cx.update(|cx| shell.read(cx).workspace.loaded) {
                     break;
                 }
             }
@@ -316,12 +321,12 @@ fn shot(_: &mut Window, path: &str) {
 
 fn active_pixel(s: &Shell, cx: &App) -> Option<Entity<crate::pixel::view::PixelView>> {
     let _ = cx;
-    if let Some(slot) = &s.native_pixel {
+    if let Some(slot) = &s.chrome.native_pixel {
         return Some(slot.view.clone());
     }
-    let project = s.ws.active()?;
+    let project = s.workspace.ws.active()?;
     let tab = project.layout.active_tab()?;
-    match s.panes.get(&(project.id(), tab.id)).map(|p| &p.entity) {
+    match s.workspace.panes.get(&(project.id(), tab.id)).map(|p| &p.entity) {
         Some(PaneEntity::Pixel(v)) => Some(v.clone()),
         _ => None,
     }
@@ -339,14 +344,14 @@ fn dump_pixels(
     Option<std::sync::Arc<crate::pixel::atlas::Atlas>>,
 )> {
     let mut out = Vec::new();
-    if let Some(slot) = &shell.native_pixel {
+    if let Some(slot) = &shell.chrome.native_pixel {
         slot.view.update(cx, |v, _| v.draw_unpainted());
         let v = slot.view.read(cx);
         if let Some((list, atlas)) = v.snapshot() {
             out.push((path.with_extension(format!("{}-native.png", v.kind)), list, atlas));
         }
     }
-    for ((_, tab), pane) in &shell.panes {
+    for ((_, tab), pane) in &shell.workspace.panes {
         if let PaneEntity::Pixel(view) = &pane.entity {
             view.update(cx, |v, _| v.draw_unpainted());
             let v = view.read(cx);
@@ -390,11 +395,11 @@ fn run(s: &mut Shell, cmd: &str, window: &mut Window, cx: &mut gpui::Context<She
         "toggle_theme" => s.toggle_theme(cx),
         "save" => s.save_now(cx),
         "send" => {
-            let Some(project) = s.ws.active() else { return };
+            let Some(project) = s.workspace.ws.active() else { return };
             let Some(PaneKind::Terminal { terminal_id, .. }) = project.layout.active_tab().map(|t| t.kind.clone()) else {
                 return;
             };
-            if let Some(t) = s.terminals.get(&terminal_id) {
+            if let Some(t) = s.workspace.terminals.get(&terminal_id) {
                 t.view.update(cx, |v, _| v.send_line(arg));
             }
         }
@@ -434,17 +439,19 @@ fn run(s: &mut Shell, cmd: &str, window: &mut Window, cx: &mut gpui::Context<She
         // `close_kind:terminal@/private/tmp` also needs the title to contain what follows `@`.
         "close_kind" => {
             let (kind, title) = arg.split_once('@').unwrap_or((arg, ""));
-            let tabs: Vec<TabId> =
-                s.ws.active()
-                    .map(|p| {
-                        p.layout
-                            .tabs()
-                            .filter(|t| serde_json::to_value(&t.kind).ok().and_then(|v| v["kind"].as_str().map(|k| k == kind)) == Some(true))
-                            .filter(|t| title.is_empty() || tab_title(s, t, cx).contains(title))
-                            .map(|t| t.id)
-                            .collect()
-                    })
-                    .unwrap_or_default();
+            let tabs: Vec<TabId> = s
+                .workspace
+                .ws
+                .active()
+                .map(|p| {
+                    p.layout
+                        .tabs()
+                        .filter(|t| serde_json::to_value(&t.kind).ok().and_then(|v| v["kind"].as_str().map(|k| k == kind)) == Some(true))
+                        .filter(|t| title.is_empty() || tab_title(s, t, cx).contains(title))
+                        .map(|t| t.id)
+                        .collect()
+                })
+                .unwrap_or_default();
             for tab in tabs {
                 s.close_tab(tab, window, cx);
             }

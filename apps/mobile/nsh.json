@@ -6,6 +6,8 @@
   "capabilities": {
     "application": true,
     "clipboard": true,
+    "host": ["keychain.get", "keychain.set", "keychain.delete"],
+    "notifications": true,
     "statusBar": true,
     "network": {
       "hosts": ["*"]

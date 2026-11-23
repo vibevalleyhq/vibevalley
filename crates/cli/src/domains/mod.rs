@@ -84,6 +84,8 @@ pub enum Command {
     Auth(infra::auth::AuthCmd),
     /// Manage remote access listener, pairing codes, and paired devices
     Remote(infra::remote::RemoteCmd),
+    /// List execution machines and run the outbound machine daemon
+    Machine(infra::machine::MachineCmd),
     /// Verify home, server, SSE slice stream, runtimes, and model key
     Doctor(infra::doctor::DoctorCmd),
 }
@@ -112,6 +114,7 @@ pub fn run(client: &Client, command: Command) -> Done {
         Command::Setting(cmd) => infra::setting::run(client, cmd),
         Command::Auth(cmd) => infra::auth::run(client, cmd),
         Command::Remote(cmd) => infra::remote::run(client, cmd),
+        Command::Machine(cmd) => infra::machine::run(client, cmd),
         Command::Doctor(cmd) => infra::doctor::run(client, cmd),
     }
 }

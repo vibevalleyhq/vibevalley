@@ -350,8 +350,28 @@ export default defineConfig({
       },
       {
         // Component views share bucketed clocks instead of spawning per-row timers (scripts/audit/oxlint-plugin.ts, no-component-interval).
-        files: ["apps/mac/ui/features/**/*.tsx", "apps/mac/ui/design/**/*.tsx"],
+        files: ["apps/mac/ui/features/**/*.tsx", "apps/mac/ui/design/**/*.tsx", "apps/mac/ui/workspace/**/*.tsx", "apps/mobile/src/**/*.tsx"],
         rules: { "vibevalley/no-component-interval": "error" },
+      },
+      {
+        // nsh fine-grained reactivity rules (docs/style/nsh-tsx.md; scripts/audit/oxlint-plugin.ts).
+        files: [
+          "apps/mac/ui/workspace/**/*.tsx",
+          "apps/mac/ui/design/**/*.tsx",
+          "apps/mac/ui/features/channel/**/*.tsx",
+          "apps/mac/ui/features/issue/**/*.tsx",
+          "apps/mac/ui/features/runtime/**/*.tsx",
+          "apps/mac/ui/features/setting/**/*.tsx",
+          "apps/mobile/src/**/*.tsx",
+        ],
+        excludeFiles: ["**/*.test.tsx", "**/*.story.tsx", "**/story.tsx", "**/stories/**"],
+        rules: {
+          "vibevalley/nsh-no-jsx-conditional": "error",
+          "vibevalley/nsh-no-jsx-map": "error",
+          "vibevalley/nsh-each-key": "error",
+          "vibevalley/nsh-no-props-destructure": "error",
+          "vibevalley/nsh-no-eager-accessor": "error",
+        },
       },
     ],
     // A disable comment whose rule no longer fires there is an error, so none outlives its reason.

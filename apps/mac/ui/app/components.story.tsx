@@ -38,6 +38,7 @@ import { fixtureTransport } from "../infra/fixtures";
 import { Root } from "../infra/Root";
 import { defineColumns, useTable } from "../infra/table";
 import { setTransport } from "../infra/transport";
+import { WorkbenchDesignHost } from "./DesignHost";
 
 setTransport(fixtureTransport(scenarios.typical));
 
@@ -335,7 +336,9 @@ function ComponentBench() {
 
 mount(() => (
   <Root>
-    <ComponentBench />
-    <ToastHost />
+    <WorkbenchDesignHost>
+      <ComponentBench />
+      <ToastHost />
+    </WorkbenchDesignHost>
   </Root>
 ));

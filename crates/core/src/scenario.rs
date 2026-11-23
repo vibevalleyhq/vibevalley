@@ -209,6 +209,7 @@ fn build_typical(b: &mut ScenarioBuilder) {
             here: true,
             online: true,
             joined_at: now - 48 * HOUR_MS,
+            ..Machine::default()
         },
     }));
     facts.push(Fact::ProgressChanged(FactProgressChanged {
@@ -704,6 +705,7 @@ fn build_edge(b: &mut ScenarioBuilder) -> SliceBundle {
             here: true,
             online: true,
             joined_at: now - 72 * HOUR_MS,
+            ..Machine::default()
         },
     }));
 

@@ -85,47 +85,64 @@ pub struct McpHub {
 }
 
 impl McpHub {
-    /// Each configured server connects and enumerates independently.
+    /// Each configured server connects and enumerates independently on the shared Tokio runtime.
     pub fn connect(config: &McpConfig) -> McpHub {
-        std::thread::scope(|scope| {
-            let handles: Vec<_> = config
-                .servers
-                .iter()
-                .map(|(name, cfg)| {
-                    (
-                        name,
-                        scope.spawn(move || {
-                            let client = Arc::new(Client::connect(cfg)?);
-                            let mut tools = Vec::new();
-                            for tool in client.tools()? {
-                                let remote = tool.name.into_owned();
-                                if remote.is_empty() {
-                                    continue;
-                                }
-                                let description = tool.description.as_deref().unwrap_or_default();
-                                tools.push(McpTool {
-                                    spec: ToolSpec {
-                                        name: tool_name(name, &remote),
-                                        description: format!("（{name}）{description}"),
-                                        parameters: Value::Object((*tool.input_schema).clone()),
-                                    },
-                                    server: name.clone(),
-                                    remote,
-                                    read_only: tool.annotations.and_then(|a| a.read_only_hint).unwrap_or(false),
-                                    client: client.clone(),
-                                });
+        if config.servers.is_empty() {
+            return McpHub {
+                tools: vec![],
+                failures: vec![],
+            };
+        }
+        let entries: Vec<(usize, String, McpServerConfig)> = config
+            .servers
+            .iter()
+            .enumerate()
+            .map(|(idx, (name, cfg))| (idx, name.clone(), cfg.clone()))
+            .collect();
+        crate::rt::block_on(async move {
+            let mut set = tokio::task::JoinSet::new();
+            for (idx, name, cfg) in entries {
+                set.spawn(async move {
+                    let outcome = async {
+                        let client = Arc::new(Client::connect_async(cfg).await?);
+                        let mut tools = Vec::new();
+                        for tool in client.tools_async().await? {
+                            let remote = tool.name.into_owned();
+                            if remote.is_empty() {
+                                continue;
                             }
-                            Ok::<_, String>(tools)
-                        }),
-                    )
-                })
-                .collect();
+                            let description = tool.description.as_deref().unwrap_or_default();
+                            tools.push(McpTool {
+                                spec: ToolSpec {
+                                    name: tool_name(&name, &remote),
+                                    description: format!("（{name}）{description}"),
+                                    parameters: Value::Object((*tool.input_schema).clone()),
+                                },
+                                server: name.clone(),
+                                remote,
+                                read_only: tool.annotations.and_then(|a| a.read_only_hint).unwrap_or(false),
+                                client: client.clone(),
+                            });
+                        }
+                        Ok::<_, String>(tools)
+                    }
+                    .await;
+                    (idx, name, outcome)
+                });
+            }
+            let mut results: Vec<(usize, String, Result<Vec<McpTool>, String>)> = Vec::new();
+            while let Some(joined) = set.join_next().await {
+                if let Ok(item) = joined {
+                    results.push(item);
+                }
+            }
+            results.sort_by_key(|(idx, _, _)| *idx);
             let mut hub = McpHub {
                 tools: vec![],
                 failures: vec![],
             };
-            for (name, handle) in handles {
-                match handle.join().unwrap_or_else(|_| Err("MCP connector thread stopped unexpectedly".into())) {
+            for (_, name, outcome) in results {
+                match outcome {
                     Ok(tools) => hub.tools.extend(tools),
                     Err(why) => hub.failures.push((name.clone(), format!("连不上 MCP 服务 {name}：{why}"))),
                 }

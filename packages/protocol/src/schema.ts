@@ -234,7 +234,7 @@ export {
   HostTreeItem,
   HostVoiceMutePayload,
 } from "./host/schema";
-export { Attachment, AttachmentUpload } from "./attachment/schema";
+export { Attachment, AttachmentImportPathInput, AttachmentUpload } from "./attachment/schema";
 export { ConnectorLogin, ConnectorsChannelRequest, ConnectorStatus, VerifyRequest } from "./connector/schema";
 export { SettingsUpdateVoice, VoiceCall, VoiceCallStart, VoiceGrant, VoiceHeard, VoiceSaid } from "./voice/schema";
 export { MemorySourceKind, SettingsStatus, SettingsUpdate } from "./setting/schema";
@@ -250,6 +250,7 @@ export {
   RemoteStatus,
   RemoteWhoami,
 } from "./remote/schema";
+export { MachineInfo, MachineInputKind, MachinePlatform, MachineRuntimeSummary, MachineStatus, MachineWireFrame, RuntimeRef } from "./machine/schema";
 export {
   LibraryAddRequest,
   LibraryItem,

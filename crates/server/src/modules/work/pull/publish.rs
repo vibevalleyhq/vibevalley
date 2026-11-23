@@ -90,7 +90,7 @@ fn git(cwd: &Path, args: &[&str]) -> Result<String, String> {
 /// `runGitHub` / `runGitLab`: the tool on PATH, 15 s at most.
 pub(crate) fn host_command(tool: &'static str) -> HostRun {
     Arc::new(move |args: &[String]| {
-        let mut c = Command::new(tool);
+        let mut c = tokio::process::Command::new(tool);
         c.args(args);
         if tool == "glab" {
             c.env("GITLAB_HOST", "gitlab.com").env("GLAB_PROMPT_DISABLED", "1");
@@ -119,24 +119,13 @@ pub(crate) fn host_command(tool: &'static str) -> HostRun {
 
 /// A command's exit code and stdout; none when it ran out of time; Err(true)
 /// when it is not installed.
-pub(crate) fn output_within(mut c: Command, limit: Duration) -> Result<Option<(i32, String)>, bool> {
-    c.stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-    let child = c.spawn().map_err(|e| e.kind() == std::io::ErrorKind::NotFound)?;
-    let (tx, rx) = flume::bounded(1);
-    let id = child.id();
-    std::thread::spawn(move || {
-        let _ = tx.send(child.wait_with_output());
-    });
-    match rx.recv_timeout(limit) {
-        Ok(Ok(o)) => Ok(Some((o.status.code().unwrap_or(-1), String::from_utf8_lossy(&o.stdout).into_owned()))),
-        Ok(Err(_)) => Err(false),
-        Err(_) => {
-            let _ = Command::new("kill").arg(id.to_string()).status();
-            Ok(None)
-        }
+pub(crate) fn output_within(c: tokio::process::Command, limit: Duration) -> Result<Option<(i32, String)>, bool> {
+    let out = vibevalley_runtime::rt::block_on(vibevalley_runtime::oar::run_output_with_timeout(c, limit, None))
+        .map_err(|e| e.kind() == std::io::ErrorKind::NotFound)?;
+    if out.timed_out {
+        return Ok(None);
     }
+    Ok(Some((out.code().unwrap_or(-1), String::from_utf8_lossy(&out.stdout).into_owned())))
 }
 
 /// `hostedOrigin`.
@@ -403,30 +392,16 @@ pub fn check_repository(cwd: &Path, limit: Duration) -> Result<BranchCheck, ApiE
     let inherited = std::env::var("PATH").unwrap_or_default();
     let mut path: Vec<String> = vec![cwd.join("node_modules").join(".bin").display().to_string()];
     path.extend(inherited.split(':').filter(|p| !p.contains("node_modules/.bin")).map(str::to_string));
-    let mut c = Command::new(&file);
+    let mut c = tokio::process::Command::new(&file);
     c.current_dir(cwd).env("PATH", path.join(":"));
-    c.stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-    let child = c
-        .spawn()
-        .map_err(|e| refuse(BizCode::RepoRefused, t("server.repo.check.failed", &[("why", e.to_string().into())])))?;
-    let (tx, rx) = flume::bounded(1);
-    let id = child.id();
-    std::thread::spawn(move || {
-        let _ = tx.send(child.wait_with_output());
-    });
-    let (why, said) = match rx.recv_timeout(limit) {
-        Ok(Ok(o)) if o.status.success() => return Ok(BranchCheck::Passed),
-        Ok(Ok(o)) => (
-            t("server.repo.check.exited", &[("code", i64::from(o.status.code().unwrap_or(-1)).into())]),
+    let (why, said) = match vibevalley_runtime::rt::block_on(vibevalley_runtime::oar::run_output_with_timeout(c, limit, None)) {
+        Ok(o) if o.timed_out => (t("server.repo.check.timedOut", &[("seconds", (limit.as_secs() as i64).into())]), String::new()),
+        Ok(o) if o.success() => return Ok(BranchCheck::Passed),
+        Ok(o) => (
+            t("server.repo.check.exited", &[("code", i64::from(o.code().unwrap_or(-1)).into())]),
             format!("{}{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr)),
         ),
-        Ok(Err(e)) => (t("server.repo.check.failed", &[("why", e.to_string().into())]), String::new()),
-        Err(_) => {
-            let _ = Command::new("kill").arg(id.to_string()).status();
-            (t("server.repo.check.timedOut", &[("seconds", (limit.as_secs() as i64).into())]), String::new())
-        }
+        Err(e) => (t("server.repo.check.failed", &[("why", e.to_string().into())]), String::new()),
     };
     let tail: Vec<&str> = said.trim().lines().collect();
     let tail = tail[tail.len().saturating_sub(40)..].join("\n");

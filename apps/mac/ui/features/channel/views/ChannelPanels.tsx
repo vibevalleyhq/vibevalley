@@ -122,7 +122,7 @@ export function Members(props: { channel: Channel }) {
         </View>
         <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{t("web.channel.members.user")}</Text>
       </View>
-      <Each of={inside()}>
+      <Each of={inside()} key={(id) => id}>
         {(id) => {
           const mood = () => orchestratorMood(sessions()?.sessions, id());
           return (
@@ -286,12 +286,12 @@ export function ThreadList(props: { channel: Channel; onPick: () => void }) {
   const live = () => threadsIn(chat(), props.channel);
   const archived = () => threadsIn(chat(), props.channel, true);
   const title = (channel: Channel) => threadTitle(channel, board()?.issues, sessions()?.sessions ?? []);
-  const item = (channel: Channel) => (
+  const item = (channel: () => Channel) => (
     <ThreadItem
-      thread={channel}
-      title={title(channel)}
+      thread={channel()}
+      title={title(channel())}
       onOpen={() => {
-        router.navigate(chatPath(channel));
+        router.navigate(chatPath(channel()));
         untracked(() => props.onPick)();
       }}
     />
@@ -308,7 +308,7 @@ export function ThreadList(props: { channel: Channel; onPick: () => void }) {
         </Text>
       </If>
       <Each of={live()} key={(c) => c.id}>
-        {(c) => item(c())}
+        {(c) => item(c)}
       </Each>
       <If when={archived().length > 0}>
         <View
@@ -328,7 +328,7 @@ export function ThreadList(props: { channel: Channel; onPick: () => void }) {
         </View>
         <If when={showArchived()}>
           <Each of={archived()} key={(c) => c.id}>
-            {(c) => item(c())}
+            {(c) => item(c)}
           </Each>
         </If>
       </If>

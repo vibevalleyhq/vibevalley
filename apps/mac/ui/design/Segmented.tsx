@@ -41,7 +41,7 @@ export function Segmented<T extends string>(props: {
       testID={props.testid}
       class={`flex-row flex-wrap gap-0.5 rounded-md border border-line bg-side p-0.5 ${props.block === true ? "w-full" : "self-start"}`}
     >
-      <Each of={props.options}>
+      <Each of={props.options} key={(o) => o.value}>
         {(o) => {
           const on = () => o().value === props.value;
           const disabled = () => o().disabled === true;
@@ -52,7 +52,7 @@ export function Segmented<T extends string>(props: {
               testID={props.testid ? `${props.testid}-${o().value}` : undefined}
               accessibilityLabel={o().label}
               accessibilityState={{ selected: on(), disabled: disabled() }}
-              tooltip={title() !== undefined ? <Bubble text={title() ?? ""} /> : undefined}
+              tooltip={<If when={title()}>{(txt) => <Bubble text={txt()} />}</If>}
               disabled={o().disabled}
               onPress={() => props.onChange(o().value)}
               class={[

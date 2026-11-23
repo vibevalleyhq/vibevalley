@@ -7,7 +7,8 @@
 
 use std::sync::OnceLock;
 
-use nsh_core::canvas::{FillRule, LineCap, LineJoin, Path, svg_path};
+use nsh_core::canvas::{FillRule, svg_path};
+pub use nsh_core::canvas::{LineCap, LineJoin, Num, Path, PathOp};
 use nsh_core::prelude::*;
 
 use crate::theme::UiPalette;
@@ -74,7 +75,7 @@ impl IconShape {
     }
 }
 
-/// All 97 registered workbench icon names.
+/// All 98 registered workbench icon names.
 pub const ICON_NAMES: &[&str] = &[
     "chat",
     "issues",
@@ -173,9 +174,10 @@ pub const ICON_NAMES: &[&str] = &[
     "expandAll",
     "lock",
     "sidebar",
+    "sidebarRight",
 ];
 
-const ICON_COUNT: usize = 97;
+const ICON_COUNT: usize = 98;
 
 const ICON_SHAPES: [&[IconShape]; ICON_COUNT] = [
     &[IconShape::filled_evenodd(
@@ -670,39 +672,52 @@ const ICON_SHAPES: [&[IconShape]; ICON_COUNT] = [
     )],
     &[IconShape::stroked_round("M6 12H18", 1.5)],
     &[
-        IconShape::stroked_round("M6.5 3.7 A2.3 2.3 0 1 0 6.5 8.3 A2.3 2.3 0 1 0 6.5 3.7 Z", 1.8),
-        IconShape::stroked_round("M6.5 15.7 A2.3 2.3 0 1 0 6.5 20.3 A2.3 2.3 0 1 0 6.5 15.7 Z", 1.8),
-        IconShape::stroked_round("M17.5 6.2 A2.3 2.3 0 1 0 17.5 10.8 A2.3 2.3 0 1 0 17.5 6.2 Z", 1.8),
-        IconShape::stroked_round("M6.5 8.3 V15.7", 1.8),
-        IconShape::stroked_round("M17.5 10.8 C17.5 14.5 13 15.7 6.5 15.7", 1.8),
+        IconShape::stroked_round("M6.5 3C5.12 3 4 4.12 4 5.5C4 6.88 5.12 8 6.5 8C7.88 8 9 6.88 9 5.5C9 4.12 7.88 3 6.5 3Z", 1.5),
+        IconShape::stroked_round(
+            "M6.5 16C5.12 16 4 17.12 4 18.5C4 19.88 5.12 21 6.5 21C7.88 21 9 19.88 9 18.5C9 17.12 7.88 16 6.5 16Z",
+            1.5,
+        ),
+        IconShape::stroked_round(
+            "M17.5 6C16.12 6 15 7.12 15 8.5C15 9.88 16.12 11 17.5 11C18.88 11 20 9.88 20 8.5C20 7.12 18.88 6 17.5 6Z",
+            1.5,
+        ),
+        IconShape::stroked_round("M6.5 8V16", 1.5),
+        IconShape::stroked_round("M17.5 11C17.5 14.2 14.2 16 6.5 16", 1.5),
+    ],
+    &[
+        IconShape::stroked_round("M9 22H15C20 22 22 20 22 15V9C22 4 20 2 15 2H9C4 2 2 4 2 9V15C2 20 4 22 9 22Z", 1.5),
+        IconShape::stroked_round("M12 6.75V11.75", 1.5),
+        IconShape::stroked_round("M9.5 9.25H14.5", 1.5),
+        IconShape::stroked_round("M9.5 15.75H14.5", 1.5),
+    ],
+    &[
+        IconShape::stroked_round("M7.5 4.75L11.29 8.54C11.68 8.93 12.32 8.93 12.71 8.54L16.5 4.75", 1.5),
+        IconShape::stroked_round("M7.5 19.25L11.29 15.46C11.68 15.07 12.32 15.07 12.71 15.46L16.5 19.25", 1.5),
+    ],
+    &[
+        IconShape::stroked_round("M7.5 8.75L11.29 4.96C11.68 4.57 12.32 4.57 12.71 4.96L16.5 8.75", 1.5),
+        IconShape::stroked_round("M7.5 15.25L11.29 19.04C11.68 19.43 12.32 19.43 12.71 19.04L16.5 15.25", 1.5),
     ],
     &[
         IconShape::stroked_round(
-            "M5.5 3.5 H18.5 Q20.5 3.5 20.5 5.5 V18.5 Q20.5 20.5 18.5 20.5 H5.5 Q3.5 20.5 3.5 18.5 V5.5 Q3.5 3.5 5.5 3.5 Z",
-            1.75,
+            "M16.5 22H7.5C4 22 3 21 3 17.5V14.5C3 11 4 10 7.5 10H16.5C20 10 21 11 21 14.5V17.5C21 21 20 22 16.5 22Z",
+            1.5,
         ),
-        IconShape::stroked_round("M12 7 V11.5", 1.75),
-        IconShape::stroked_round("M9.75 9.25 H14.25", 1.75),
-        IconShape::stroked_round("M9.75 15.5 H14.25", 1.75),
-    ],
-    &[
-        IconShape::stroked_round("M7 4.5 L12 9 L17 4.5", 1.9),
-        IconShape::stroked_round("M7 19.5 L12 15 L17 19.5", 1.9),
-    ],
-    &[
-        IconShape::stroked_round("M7 9 L12 4.5 L17 9", 1.9),
-        IconShape::stroked_round("M7 15 L12 19.5 L17 15", 1.9),
+        IconShape::stroked_round("M7 10V8C7 4.69 8 2 12 2C16 2 17 4.69 17 8V10", 1.5),
     ],
     &[
         IconShape::stroked_round(
-            "M7.88 11.25 H16.13 Q18 11.25 18 13.13 V17.63 Q18 19.5 16.13 19.5 H7.88 Q6 19.5 6 17.63 V13.13 Q6 11.25 7.88 11.25 Z",
-            1.75,
+            "M8.5 21H15.5C20 21 22 19 22 14.5V9.5C22 5 20 3 15.5 3H8.5C4 3 2 5 2 9.5V14.5C2 19 4 21 8.5 21Z",
+            1.5,
         ),
-        IconShape::stroked_round("M8.63 11.25 V8.25 A3.38 3.38 0 0 1 15.38 8.25 V11.25", 1.75),
+        IconShape::stroked_round("M8.5 3V21", 1.5),
     ],
     &[
-        IconShape::stroked_round("M5 4.5 H19 Q21 4.5 21 6.5 V17.5 Q21 19.5 19 19.5 H5 Q3 19.5 3 17.5 V6.5 Q3 4.5 5 4.5 Z", 1.75),
-        IconShape::stroked_round("M9.25 4.5 V19.5", 1.75),
+        IconShape::stroked_round(
+            "M8.5 21H15.5C20 21 22 19 22 14.5V9.5C22 5 20 3 15.5 3H8.5C4 3 2 5 2 9.5V14.5C2 19 4 21 8.5 21Z",
+            1.5,
+        ),
+        IconShape::stroked_round("M15.5 3V21", 1.5),
     ],
 ];
 
@@ -805,6 +820,7 @@ fn icon_index(name: &str) -> Option<usize> {
         "expandAll" => Some(94),
         "lock" => Some(95),
         "sidebar" => Some(96),
+        "sidebarRight" => Some(97),
         _ => None,
     }
 }
@@ -820,6 +836,11 @@ fn cached_icon_paths(index: usize) -> &'static [Path] {
 /// Returns the static vector shapes for a registered workbench icon, or `None` for unknown names.
 pub fn icon_shapes(name: &str) -> Option<&'static [IconShape]> {
     icon_index(name).map(|index| ICON_SHAPES[index])
+}
+
+/// Returns the lazily cached parsed vector paths for a registered workbench icon, or `None` for unknown names.
+pub fn icon_paths(name: &str) -> Option<&'static [Path]> {
+    icon_index(name).map(cached_icon_paths)
 }
 
 fn sanitize_size(size: f32) -> f32 {
@@ -936,8 +957,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn all_97_icons_are_registered_unique_and_parseable() {
-        assert_eq!(ICON_NAMES.len(), 97);
+    fn all_98_icons_are_registered_unique_and_parseable() {
+        assert_eq!(ICON_NAMES.len(), 98);
         assert_eq!(ICON_SHAPES.len(), ICON_NAMES.len());
 
         let mut seen = HashSet::with_capacity(ICON_NAMES.len());
@@ -959,7 +980,24 @@ mod tests {
     }
 
     #[test]
-    fn all_97_icons_paint_valid_drawings_without_panicking() {
+    fn all_stroked_icons_use_uniform_1_5_stroke_width() {
+        for &name in ICON_NAMES {
+            let shapes = icon_shapes(name).unwrap_or_else(|| panic!("missing icon_shapes for `{name}`"));
+            for (shape_idx, shape) in shapes.iter().enumerate() {
+                if let Some(width) = shape.stroke {
+                    assert!(
+                        (width - 1.5).abs() < f32::EPSILON,
+                        "icon `{name}` shape {shape_idx} has non-standard stroke width {width}; expected 1.5"
+                    );
+                    assert_eq!(shape.cap, LineCap::Round, "icon `{name}` shape {shape_idx} must use round line cap");
+                    assert_eq!(shape.join, LineJoin::Round, "icon `{name}` shape {shape_idx} must use round line join");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn all_98_icons_paint_valid_drawings_without_panicking() {
         let ink = UiPalette::LIGHT.ink;
         for &name in ICON_NAMES {
             let drawing = paint_icon(name, 16.0, ink).finish();

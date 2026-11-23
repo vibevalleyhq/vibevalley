@@ -7,6 +7,7 @@ pub struct ListIssuesRow {
     pub r#title: String,
     pub r#description: String,
     pub r#repo: Option<String>,
+    pub r#machine_id: Option<String>,
     pub r#priority: String,
     pub r#rank: Option<i64>,
     pub r#deliver: String,
@@ -34,7 +35,7 @@ pub struct ListIssuesRow {
 pub async fn r#list_issues<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
 ) -> Result<Vec<ListIssuesRow>, sqlx::Error> {
-    sqlx::query_as::<_, ListIssuesRow>(r#"SELECT id, number, title, description, repo, priority, rank, deliver, parent, created_at, queued_at, closed_at, reviewed_at, canceled, delivered, mandate, constraints, conflict, last_run, answer, delivery_evidence, blocked_by, criteria, checks, findings, questions, assignments
+    sqlx::query_as::<_, ListIssuesRow>(r#"SELECT id, number, title, description, repo, machine_id, priority, rank, deliver, parent, created_at, queued_at, closed_at, reviewed_at, canceled, delivered, mandate, constraints, conflict, last_run, answer, delivery_evidence, blocked_by, criteria, checks, findings, questions, assignments
 FROM issue ORDER BY number"#)
         .fetch_all(db).await
 }
@@ -45,6 +46,7 @@ pub struct PutIssueParams {
     pub r#title: String,
     pub r#description: String,
     pub r#repo: Option<String>,
+    pub r#machine_id: Option<String>,
     pub r#priority: String,
     pub r#rank: Option<i64>,
     pub r#deliver: String,
@@ -73,13 +75,14 @@ pub async fn r#put_issue<'e>(
     db: impl sqlx::SqliteExecutor<'e>,
     params: PutIssueParams,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"INSERT INTO issue (id, number, title, description, repo, priority, rank, deliver, parent, created_at, queued_at, closed_at, reviewed_at, canceled, delivered, mandate, constraints, conflict, last_run, answer, delivery_evidence, blocked_by, criteria, checks, findings, questions, assignments)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)
+    sqlx::query(r#"INSERT INTO issue (id, number, title, description, repo, machine_id, priority, rank, deliver, parent, created_at, queued_at, closed_at, reviewed_at, canceled, delivered, mandate, constraints, conflict, last_run, answer, delivery_evidence, blocked_by, criteria, checks, findings, questions, assignments)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28)
 ON CONFLICT(id) DO UPDATE SET
   number = excluded.number,
   title = excluded.title,
   description = excluded.description,
   repo = excluded.repo,
+  machine_id = excluded.machine_id,
   priority = excluded.priority,
   rank = excluded.rank,
   deliver = excluded.deliver,
@@ -107,6 +110,7 @@ ON CONFLICT(id) DO UPDATE SET
         .bind(params.r#title)
         .bind(params.r#description)
         .bind(params.r#repo)
+        .bind(params.r#machine_id)
         .bind(params.r#priority)
         .bind(params.r#rank)
         .bind(params.r#deliver)

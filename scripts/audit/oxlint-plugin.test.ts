@@ -146,6 +146,111 @@ tester.run("ui-layer-boundaries", rule("ui-layer-boundaries"), {
   ],
 });
 
+tester.run("nsh-no-jsx-conditional", rule("nsh-no-jsx-conditional"), {
+  valid: [
+    { code: "const v = <If when={ok()} else={<B />}><A /></If>;", filename: "a.tsx" },
+    { code: "const v = <View class={ok() ? 'bg-page' : 'bg-side'}><Text>{ok() ? 'yes' : 'no'}</Text></View>;", filename: "a.tsx" },
+    { code: "const v = <View tooltip={<If when={tip()}><Bubble text='hi' /></If>} />;", filename: "a.tsx" },
+    { code: "const v = <If when={a()} else={<If when={b()}><B /></If>}><A /></If>;", filename: "a.tsx" },
+  ],
+  invalid: [
+    { code: "const v = <View>{ok() ? <A /> : null}</View>;", filename: "a.tsx", errors: [{ messageId: "conditional" }] },
+    { code: "const v = <View>{ok() && <A />}</View>;", filename: "a.tsx", errors: [{ messageId: "conditional" }] },
+    { code: "const v = <View tooltip={tip() ? <Bubble /> : undefined} />;", filename: "a.tsx", errors: [{ messageId: "conditional" }] },
+    { code: "const v = <If when={a()} else={b() ? <B /> : null}><A /></If>;", filename: "a.tsx", errors: [{ messageId: "conditional" }] },
+    { code: "const v = <If when={val()}>{(c) => (ok() ? <A x={c()} /> : <B x={c()} />)}</If>;", filename: "a.tsx", errors: [{ messageId: "conditional" }] },
+  ],
+});
+
+tester.run("nsh-no-jsx-map", rule("nsh-no-jsx-map"), {
+  valid: [
+    { code: "const v = <Each of={items()} key={(x) => x.id}>{(x) => <Row item={x()} />}</Each>;", filename: "a.tsx" },
+    { code: "const opts = items.map((x) => ({ value: x.id, label: x.name }));", filename: "a.tsx" },
+    { code: "const v = <Text>{(() => { const x = m(); return x ? x.name : 'none'; })()}</Text>;", filename: "a.tsx" },
+  ],
+  invalid: [
+    { code: "const v = <View>{items().map((x) => <Row item={x} />)}</View>;", filename: "a.tsx", errors: [{ messageId: "map" }] },
+    { code: "const v = <View>{items().flatMap((x) => { return <Row item={x} />; })}</View>;", filename: "a.tsx", errors: [{ messageId: "map" }] },
+    { code: "const v = <View>{(() => <Row />)()}</View>;", filename: "a.tsx", errors: [{ messageId: "iife" }] },
+  ],
+});
+
+tester.run("nsh-each-key", rule("nsh-each-key"), {
+  valid: [
+    { code: "const v = <Each of={items()} key={(x) => x.id}>{(x) => <Row item={x()} />}</Each>;", filename: "a.tsx" },
+    { code: 'const v = <Each of={items()} key="index">{(x) => <Row item={x()} />}</Each>;', filename: "a.tsx" },
+  ],
+  invalid: [
+    { code: "const v = <Each of={items()}>{(x) => <Row item={x()} />}</Each>;", filename: "a.tsx", errors: [{ messageId: "missingKey" }] },
+    { code: "const v = <Each of={items()} key={undefined}>{(x) => <Row item={x()} />}</Each>;", filename: "a.tsx", errors: [{ messageId: "missingKey" }] },
+  ],
+});
+
+tester.run("nsh-no-props-destructure", rule("nsh-no-props-destructure"), {
+  valid: [
+    { code: "function Badge(props: { label: string }) { return <Text>{props.label}</Text>; }", filename: "a.tsx" },
+    {
+      code: "function Badge(props: { label: string; class?: string }) { const [own, rest] = split(props, ['class']); return <Text {...rest}>{own.label}</Text>; }",
+      filename: "a.tsx",
+    },
+    { code: "function Editor(props: { m: { id: string } }) { const { id } = untracked(() => props.m); return <Text>{id}</Text>; }", filename: "a.tsx" },
+    { code: "const renderItem = ({ id }: { id: string }) => <Text>{id}</Text>;", filename: "a.tsx" },
+  ],
+  invalid: [
+    { code: "function Badge({ label }: { label: string }) { return <Text>{label}</Text>; }", filename: "a.tsx", errors: [{ messageId: "param" }] },
+    { code: "const Badge = ({ label }: { label: string }) => <Text>{label}</Text>;", filename: "a.tsx", errors: [{ messageId: "param" }] },
+    {
+      code: "function Badge(props: { label: string }) { const { label } = props; return <Text>{label}</Text>; }",
+      filename: "a.tsx",
+      errors: [{ messageId: "body" }],
+    },
+  ],
+});
+
+tester.run("nsh-no-eager-accessor", rule("nsh-no-eager-accessor"), {
+  valid: [
+    { code: "function Row(props: { name: string }) { const upper = () => props.name.toUpperCase(); return <Text>{upper()}</Text>; }", filename: "a.tsx" },
+    { code: "function Row(props: { id: string }) { const snap = untracked(() => props.id); return <Text>{snap}</Text>; }", filename: "a.tsx" },
+    {
+      code: "const v = <Each of={items()} key={(x) => x.id}>{(x) => { const label = () => x().name; return <Text>{label()}</Text>; }}</Each>;",
+      filename: "a.tsx",
+    },
+    { code: "const v = <Each of={items()} key={(x) => x.id}>{(x) => row(x)}</Each>;", filename: "a.tsx" },
+    {
+      code: "function App(props: { fetchImpl?: unknown }) { const s = createRemoteSession(props.fetchImpl ? { fetch: props.fetchImpl } : undefined); return <View>{s}</View>; }",
+      filename: "a.tsx",
+    },
+  ],
+  invalid: [
+    {
+      code: "const v = <Each of={items()} key={(x) => x.id}>{(x) => { const item = x(); return <Text>{item.name}</Text>; }}</Each>;",
+      filename: "a.tsx",
+      errors: [{ messageId: "callbackAccessor" }],
+    },
+    { code: "const v = <Each of={items()} key={(x) => x.id}>{(c) => row(c())}</Each>;", filename: "a.tsx", errors: [{ messageId: "callbackAccessor" }] },
+    {
+      code: "const v = <If when={user()}>{(u) => { const name = u().name; return <Text>{name}</Text>; }}</If>;",
+      filename: "a.tsx",
+      errors: [{ messageId: "callbackAccessor" }],
+    },
+    {
+      code: "function Approvals(props: { id: string }) { const id = props.id; return <Text>{id}</Text>; }",
+      filename: "a.tsx",
+      errors: [{ messageId: "componentRead" }],
+    },
+    {
+      code: "function Chevron(props: { expandable: boolean }) { if (!props.expandable) return <View />; return <Icon />; }",
+      filename: "a.tsx",
+      errors: [{ messageId: "componentRead" }],
+    },
+    {
+      code: "function Counter() { const n = signal(0); const v = n(); return <Text>{v}</Text>; }",
+      filename: "a.tsx",
+      errors: [{ messageId: "componentRead" }],
+    },
+  ],
+});
+
 const root = resolve(import.meta.dirname, "../..");
 
 describe("what a rule says", () => {

@@ -1,10 +1,11 @@
-import { computed, platform, signal, UrlScheme, type Accessor } from "nsh";
+import { computed, effect, lifecycle, platform, signal, UrlScheme, wakeCount, type Accessor } from "nsh";
 import { Haptics, type HapticImpact, type HapticNotification } from "nsh/mobile";
 
 import { t } from "@vibevalley/i18n";
 import type {
   BoardSlice,
   CollabSlice,
+  InboxItem,
   InboxSlice,
   RemotePlatform,
   Session,
@@ -26,7 +27,17 @@ import {
 } from "@vibevalley/protocol/remote";
 import { SessionWatchEvent as SessionWatchEventSchema } from "@vibevalley/protocol/schema";
 
-import { clearCredentials, loadCredentials, saveCredentials, type StoredCredentials } from "./storage";
+import {
+  clearAllNotifications,
+  encodeInboxNotificationId,
+  encodeInteractionNotificationId,
+  encodePermissionNotificationId,
+  isHighPriorityInboxKind,
+  requestNotificationPermissionSafe,
+  showLocalNotification,
+  syncAppBadge,
+} from "./notifications";
+import { clearCredentials, createSecureTokenStore, loadCredentials, saveCredentials, type SecureTokenStore, type StoredCredentials } from "./storage";
 
 export interface SessionWatchState {
   readonly session?: Session;
@@ -50,6 +61,7 @@ export interface PendingInteractionItem {
 
 export interface RemoteSessionOptions {
   readonly fetch?: typeof fetch;
+  readonly tokenStore?: SecureTokenStore;
 }
 
 export interface RemoteSession {
@@ -216,6 +228,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function createRemoteSession(options?: RemoteSessionOptions): RemoteSession {
+  const tokenStore = options?.tokenStore ?? createSecureTokenStore();
   const credentials = signal<StoredCredentials | undefined>(undefined);
   const ready = signal(false);
   const connectionState = signal<RemoteConnectionState>("offline");
@@ -232,6 +245,10 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
   const watchRefs = new Map<string, { count: number; stop: () => void }>();
   const bgWatchStops = new Map<string, () => void>();
   const pendingTasks = new Set<Promise<unknown>>();
+  const notifiedIds = new Set<string>();
+  const watchedBefore = new Set<string>();
+  let inboxBootstrapped = false;
+  let transportSuspended = false;
   let disposed = false;
   let deepLinkStarted = false;
 
@@ -241,6 +258,84 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
       pendingTasks.delete(promise);
     });
     return promise;
+  };
+
+  const sessionNameFor = (sessionId: string): string => {
+    const watchName = watchMap()[sessionId]?.session?.name;
+    if (watchName) return watchName;
+    const listName = (sessions()?.sessions ?? []).find((s) => s.id === sessionId)?.name;
+    return listName ?? sessionId;
+  };
+
+  const notifyPermissionRequest = (sessionId: string, req: SessionPermissionRequest, sessionName?: string) => {
+    const id = encodePermissionNotificationId(sessionId, req.requestId);
+    if (notifiedIds.has(id)) return;
+    notifiedIds.add(id);
+    const title = sessionName ?? sessionNameFor(sessionId);
+    void trackTask(showLocalNotification({ id, title, body: req.summary || req.tool }));
+  };
+
+  const notifyInteractionRequest = (sessionId: string, req: SessionInteractionRequest, sessionName?: string) => {
+    const id = encodeInteractionNotificationId(sessionId, req.requestId);
+    if (notifiedIds.has(id)) return;
+    notifiedIds.add(id);
+    const title = sessionName ?? sessionNameFor(sessionId);
+    void trackTask(showLocalNotification({ id, title, body: req.question }));
+  };
+
+  const notifyInboxItem = (item: InboxItem) => {
+    if (!isHighPriorityInboxKind(item.kind)) return;
+    const id = encodeInboxNotificationId(item);
+    if (notifiedIds.has(id)) return;
+    notifiedIds.add(id);
+    void trackTask(
+      showLocalNotification({
+        id,
+        title: item.words.title || item.who,
+        body: item.words.body || item.text,
+      }),
+    );
+  };
+
+  const processInboxNotifications = (frame: InboxSlice) => {
+    if (!inboxBootstrapped) {
+      inboxBootstrapped = true;
+      for (const item of frame.items) {
+        notifiedIds.add(encodeInboxNotificationId(item));
+      }
+      return;
+    }
+    for (const item of frame.items) {
+      notifyInboxItem(item);
+    }
+  };
+
+  const processWatchNotifications = (sessionId: string, event: SessionWatchEvent) => {
+    switch (event.kind) {
+      case "state": {
+        const seenSession = watchedBefore.has(sessionId);
+        watchedBefore.add(sessionId);
+        for (const req of event.pendingPermissions) {
+          if (seenSession) notifyPermissionRequest(sessionId, req, event.session.name);
+          else notifiedIds.add(encodePermissionNotificationId(sessionId, req.requestId));
+        }
+        for (const req of event.pendingInteractions) {
+          if (seenSession) notifyInteractionRequest(sessionId, req, event.session.name);
+          else notifiedIds.add(encodeInteractionNotificationId(sessionId, req.requestId));
+        }
+        break;
+      }
+      case "event":
+        if (event.event.type === "permission/request" && event.event.permission) {
+          notifyPermissionRequest(sessionId, event.event.permission);
+        } else if (event.event.type === "interaction/request" && event.event.interaction) {
+          notifyInteractionRequest(sessionId, event.event.interaction);
+        }
+        break;
+      case "history":
+      case "missing":
+        break;
+    }
   };
 
   const updateWatchState = (sessionId: string, updater: (prev: SessionWatchState) => SessionWatchState) => {
@@ -265,6 +360,7 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
           const parsed = SessionWatchEventSchema.safeParse(raw);
           if (parsed.success) {
             updateWatchState(sessionId, (prev) => applySessionWatchEvent(prev, parsed.data));
+            processWatchNotifications(sessionId, parsed.data);
           }
         },
         () => {
@@ -333,6 +429,10 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
       transport.close();
       transport = undefined;
     }
+    transportSuspended = false;
+    inboxBootstrapped = false;
+    notifiedIds.clear();
+    watchedBefore.clear();
     inbox.set(undefined);
     collab.set(undefined);
     sessions.set(undefined);
@@ -352,11 +452,18 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
         if (!disposed) connectionState.set(state);
       },
     });
+    if (lifecycle() === "background") {
+      transportSuspended = true;
+      next.suspend();
+    } else {
+      transportSuspended = false;
+    }
     transport = next;
     sliceStops = [
       next.slice("inbox", (frame) => {
         if (disposed || transport !== next) return;
         inbox.set(frame);
+        processInboxNotifications(frame);
         reconcileBackgroundWatches();
       }),
       next.slice("collab", (frame) => {
@@ -404,10 +511,11 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
         deviceName: result.device.name || trimmedName,
         serverName: result.serverName,
       };
-      await saveCredentials(stored);
+      await saveCredentials(stored, tokenStore);
       if (disposed) return false;
       credentials.set(stored);
       connectWith(stored);
+      void trackTask(requestNotificationPermissionSafe());
       hapticNotification("success");
       return true;
     } catch (err: unknown) {
@@ -423,7 +531,9 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
 
   const disconnect = async (): Promise<void> => {
     teardownTransport();
-    await clearCredentials();
+    await clearCredentials(tokenStore);
+    void trackTask(syncAppBadge(0));
+    void trackTask(clearAllNotifications());
     if (disposed) return;
     credentials.set(undefined);
     pairError.set(undefined);
@@ -497,6 +607,44 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
     return items;
   });
 
+  const unreadInboxCount = computed<number>(() => pendingPermissions().length + pendingInteractions().length + (inbox()?.items.length ?? 0));
+
+  let lastBadgeSynced: number | undefined;
+  effect(() => {
+    const isPaired = credentials() !== undefined;
+    const count = isPaired ? unreadInboxCount() : 0;
+    if (disposed || count === lastBadgeSynced) return;
+    lastBadgeSynced = count;
+    void trackTask(syncAppBadge(count));
+  });
+
+  effect(() => {
+    const state = lifecycle();
+    if (disposed) return;
+    if (state === "background") {
+      if (!transportSuspended) {
+        transportSuspended = true;
+        transport?.suspend();
+      }
+      return;
+    }
+    if (state === "active" && transportSuspended) {
+      transportSuspended = false;
+      transport?.resume();
+    }
+  });
+
+  let lastWakeCount = wakeCount();
+  effect(() => {
+    const count = wakeCount();
+    if (disposed || count === lastWakeCount) return;
+    lastWakeCount = count;
+    if (lifecycle() !== "background") {
+      transportSuspended = false;
+      transport?.resume();
+    }
+  });
+
   const sessionWatchState = (sessionId: string): SessionWatchState => watchMap()[sessionId] ?? EMPTY_WATCH_STATE;
 
   const stopUrlScheme = UrlScheme.on("open", ({ url }) => {
@@ -507,7 +655,7 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
   });
 
   void trackTask(
-    loadCredentials().then((stored) => {
+    loadCredentials(tokenStore).then((stored) => {
       if (disposed) return;
       if (stored && !deepLinkStarted && credentials() === undefined) {
         credentials.set(stored);

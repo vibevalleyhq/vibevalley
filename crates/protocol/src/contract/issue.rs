@@ -737,6 +737,9 @@ pub struct Issue {
     pub mandate: IssueMandate,
     pub conflict: Option<Conflict>,
     pub repo: Option<String>,
+    /// Target execution host id when pinned to a specific machine; omitted lets the control plane route.
+    #[serde(default)]
+    pub machine_id: Option<String>,
     pub assignments: Vec<Assignment>,
     pub priority: Priority,
     pub rank: Option<i64>,
@@ -783,6 +786,9 @@ pub struct AppliedIssue {
     pub mandate: IssueMandate,
     pub conflict: Option<Conflict>,
     pub repo: Option<String>,
+    /// Target execution host id when pinned to a specific machine; omitted lets the control plane route.
+    #[serde(default)]
+    pub machine_id: Option<String>,
     pub assignments: Vec<Assignment>,
     pub priority: Priority,
     pub rank: Option<i64>,
@@ -824,6 +830,7 @@ impl AppliedIssue {
             mandate: issue.mandate,
             conflict: issue.conflict,
             repo: issue.repo,
+            machine_id: issue.machine_id,
             assignments: issue.assignments,
             priority: issue.priority,
             rank: issue.rank,
@@ -864,6 +871,8 @@ pub struct IssueUpdate {
     pub description: Option<String>,
     pub repo: Option<String>,
     pub agent: Option<String>,
+    #[serde(default)]
+    pub machine_id: Option<String>,
     pub priority: Option<Priority>,
     pub criteria: Option<Vec<String>>,
     pub deliver: Option<Deliverable>,
@@ -909,6 +918,8 @@ pub struct IssueRequest {
     pub description: Option<String>,
     pub repo: Option<String>,
     pub agent: Option<String>,
+    #[serde(default)]
+    pub machine_id: Option<String>,
     pub priority: Option<Priority>,
     pub deliver: Option<Deliverable>,
     pub auto_submit_pr: Option<bool>,
@@ -1173,6 +1184,8 @@ pub struct IssueUpdateInput {
     pub description: Option<String>,
     pub repo: Option<String>,
     pub agent: Option<String>,
+    #[serde(default)]
+    pub machine_id: Option<String>,
     pub priority: Option<Priority>,
     pub criteria: Option<Vec<String>>,
     pub deliver: Option<Deliverable>,

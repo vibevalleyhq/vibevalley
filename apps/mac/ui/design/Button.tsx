@@ -1,7 +1,7 @@
 // nsh's text styles do not come down from a View, so the words are a Text of their own in the tone's ink.
 import { Text, View, type JSX } from "nsh";
 
-import { Link as A } from "../infra/router";
+import { followDesignHref, useDesignHost } from "./host";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { motionClass } from "./motion";
@@ -105,14 +105,16 @@ export function ButtonLink(props: {
   accessibilityLabel?: string | undefined;
   tooltip?: JSX.Element | undefined;
 }) {
+  const designHost = useDesignHost();
   const tone = () => props.tone ?? "plain";
   const compact = () => props.size === "compact";
   return (
-    <A
-      href={props.href}
+    <View
+      role="link"
       testID={props.testID}
       accessibilityLabel={props.accessibilityLabel}
       tooltip={props.tooltip}
+      onPress={() => followDesignHref(designHost, props.href)}
       class={buttonClass(tone(), compact(), false, props.class)}
       style={tone() === "danger" ? { borderColor: mix("berry", 0.35) } : undefined}
       hoverStyle={tone() === "danger" ? { borderColor: toneColor("berry"), backgroundColor: toneColor("bad-soft") } : undefined}
@@ -120,6 +122,6 @@ export function ButtonLink(props: {
       <ButtonContent tone={tone()} compact={compact()} icon={props.icon}>
         {props.children}
       </ButtonContent>
-    </A>
+    </View>
   );
 }

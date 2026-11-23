@@ -17,9 +17,10 @@
    - 工作台只使用源自 `design/tokens.json` 并生成到 `apps/mac/ui/design/theme.json` 的颜色类名（`bg-page` / `bg-side` / `bg-rail` / `text-ink` / `text-muted` / `border-line` / `bg-accent` / `leaf` / `wheat` / `berry` / `water` 等）和 `apps/mac/ui/nsh.json` 定义的 `fontSize` / `radius` / `ease` / `shadow`。
    - 需要随主题自适应的半透明底色一律调用 `apps/mac/ui/design/tone.ts` 的 `mix(name, weight)`；状态标签与提醒优先使用语义类组合（`bg-ok-soft text-ok-ink`、`bg-warn-soft text-warn-ink`、`bg-bad-soft text-berry`、`bg-hover text-muted`），工作台 UI 禁止直接拿像素画布色（如 `bg-hat`、`text-bark-900`）或手写 `mix("wheat", 0.22)` 当浅/深双主题状态徽标。
    - 新增语义色用途必须同步写入 `design/tokens.json` 后执行 `vpx scripts/gen/tokens.ts` 重生成，不直接手改生成产物。
-2. **遵循 `nsh` 写法规范（[vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)）**：
+2. **遵循 `nsh` 样式与响应式规范（[vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)、[nsh-tsx.md](docs/style/nsh-tsx.md)）**：
    - 文字颜色与字号不会从父级 `<View>` 继承，所有字体样式直接挂在 `<Text>` 上。
    - `nsh` 模板统一写 `class`，禁用 `className` 与 `classList`（官网由 `vp check` 中 `vibevalley/style-attrs` 自动拦截）。
+   - 动态 JSX 分支统一用 `<If when={...} else={...}>`（多分支嵌套 `<If>`），动态列表统一用带稳定 `key` 的 `<Each>` 或 `<List keyExtractor={...}>`，不解构 `props`、不提前读取访问器，多处读取与索引派生用 `computed()`（完整规则与静态检查见 [nsh-tsx.md](docs/style/nsh-tsx.md)）。
    - 多状态/变体样式表使用 `Record<Variant, string>` 映射每行写一档；调用方传入的 `class?: string` 仅补位置、外边距或弹性拉伸，需要覆盖组件内置背景/高度/圆角时显式给组件增开变体参数（`tone` / `size`）。
 3. **单行防撑破、控件复用与圆角降档**：
    - 任何列表行、卡片标题或带徽标的水平行，弹性文字父容器必须带 `min-w-0 flex-1`，文字节点带 `truncate`；管理类列表页用 `<PageBody width="manage">`（`max-w-5xl`），文档/设置页用 `prose`（`max-w-3xl`）以免宽屏拉伸过长。

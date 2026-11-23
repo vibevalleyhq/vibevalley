@@ -2,7 +2,9 @@
 //! engine per view. Rust pushes frames, the view posts actions back.
 
 pub mod bridge;
+pub mod connection;
 pub mod frames;
+pub mod remote;
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, OnceLock, Weak};
@@ -33,6 +35,10 @@ impl gpui::Global for BridgeHub {}
 
 pub struct ServerStartup(pub tokio::sync::watch::Receiver<Option<Result<(), String>>>);
 impl gpui::Global for ServerStartup {}
+
+/// Control Plane connection mode active in this running desktop process.
+pub struct ActiveDesktopConnection(pub Arc<connection::Mode>);
+impl gpui::Global for ActiveDesktopConnection {}
 
 pub const MAX_DEBUG_FRAMES: usize = 128;
 pub const SLOW_FRAME_US: u64 = 16_000;
@@ -252,54 +258,88 @@ impl BridgeHub {
         let server: Arc<dyn vibevalley_server::transport::bridge::Server> = match std::env::var_os("VIBEVALLEY_FAKE_SERVER") {
             Some(dir) => {
                 drop(running_tx);
+                cx.set_global(ActiveDesktopConnection(Arc::new(connection::Mode::Embedded)));
                 let fake = vibevalley_server::transport::bridge::fake::FakeServer::from_dir(std::path::Path::new(&dir));
                 let _ = ready.send_replace(Some(fake.as_ref().map(|_| ()).map_err(ToString::to_string)));
                 Arc::new(fake.unwrap_or_else(|_| vibevalley_server::transport::bridge::fake::FakeServer::new()))
             }
-            None => Arc::new(late::LateServer::spawn(move || {
-                let home = server_home();
-                match vibevalley_server::start(crate::serving::config(&home, crate::serving::work_root())) {
-                    Ok(started) => {
-                        started.hub.attach_host_debug(Some(Arc::new(host_debug_for_boot.clone())));
-                        let hub: Arc<dyn vibevalley_server::transport::bridge::Server> = started.hub.clone();
-                        let preference = port_preference_from(std::env::var("VIBEVALLEY_PORT").ok().as_deref(), vibevalley_protocol::home::default_port());
-                        // The loopback API: the CLI finds it through server.json, the helpers' MCP door is on it.
-                        let (listener, announced) = match preference.and_then(|pref| {
-                            bind_preferred_or_ephemeral(pref, |addr| vibevalley_server::transport::http::serve(started.hub.clone(), addr))
-                                .map_err(|e| format!("vibevalley http: {e}"))
-                        }) {
-                            Ok(listener) => {
-                                let url = listener.url();
-                                host_debug_for_boot.set_boot_info(url.clone(), boot_started.elapsed().as_millis() as u64);
-                                started.set_mcp_url(format!("{url}/mcp"));
-                                match vibevalley_server::home::announce(&home, &url) {
-                                    Ok(announced) => {
-                                        let _ = ready.send_replace(Some(Ok(())));
-                                        (Some(listener), Some(announced))
-                                    }
-                                    Err(e) => {
-                                        let _ = ready.send_replace(Some(Err(format!("server.json: {e}"))));
-                                        (Some(listener), None)
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                let _ = ready.send_replace(Some(Err(e)));
-                                (None, None)
-                            }
-                        };
-                        let running = crate::serving::Running::new(started, listener, announced);
-                        if let Err(flume::SendError(running)) = running_tx.send(running) {
-                            running.shutdown();
+            None => match connection::resolve(&server_home()) {
+                Ok(resolved) if matches!(resolved.mode, connection::Mode::Remote { .. }) => {
+                    drop(running_tx);
+                    let active_mode = Arc::new(resolved.mode.clone());
+                    cx.set_global(ActiveDesktopConnection(active_mode));
+                    let connection::Mode::Remote { url, token, label } = resolved.mode else {
+                        unreachable!("checked Mode::Remote above");
+                    };
+                    match remote::RemoteServer::new(url.clone(), token, label) {
+                        Ok(remote_server) => {
+                            host_debug_for_boot.set_boot_info(url, boot_started.elapsed().as_millis() as u64);
+                            let _ = ready.send_replace(Some(Ok(())));
+                            Arc::new(remote_server)
                         }
-                        hub
-                    }
-                    Err(e) => {
-                        let _ = ready.send_replace(Some(Err(format!("vibevalley server: {e}"))));
-                        Arc::new(vibevalley_server::transport::bridge::fake::FakeServer::new())
+                        Err(e) => {
+                            let _ = ready.send_replace(Some(Err(format!("remote control plane: {e}"))));
+                            Arc::new(vibevalley_server::transport::bridge::fake::FakeServer::new())
+                        }
                     }
                 }
-            })),
+                Ok(_) => {
+                    cx.set_global(ActiveDesktopConnection(Arc::new(connection::Mode::Embedded)));
+                    Arc::new(late::LateServer::spawn(move || {
+                        let home = server_home();
+                        match vibevalley_server::start(crate::serving::config(&home, crate::serving::work_root())) {
+                            Ok(started) => {
+                                started.hub.attach_host_debug(Some(Arc::new(host_debug_for_boot.clone())));
+                                let hub: Arc<dyn vibevalley_server::transport::bridge::Server> = started.hub.clone();
+                                let preference =
+                                    port_preference_from(std::env::var("VIBEVALLEY_PORT").ok().as_deref(), vibevalley_protocol::home::default_port());
+                                // The loopback API: the CLI finds it through server.json, the helpers' MCP door is on it.
+                                let (listener, announced) = match preference.and_then(|pref| {
+                                    bind_preferred_or_ephemeral(pref, |addr| vibevalley_server::transport::http::serve(started.hub.clone(), addr))
+                                        .map_err(|e| format!("vibevalley http: {e}"))
+                                }) {
+                                    Ok(listener) => {
+                                        let url = listener.url();
+                                        host_debug_for_boot.set_boot_info(url.clone(), boot_started.elapsed().as_millis() as u64);
+                                        started.set_mcp_url(format!("{url}/mcp"));
+                                        match vibevalley_server::home::announce(&home, &url) {
+                                            Ok(announced) => {
+                                                let _ = ready.send_replace(Some(Ok(())));
+                                                (Some(listener), Some(announced))
+                                            }
+                                            Err(e) => {
+                                                let _ = ready.send_replace(Some(Err(format!("server.json: {e}"))));
+                                                (Some(listener), None)
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        let _ = ready.send_replace(Some(Err(e)));
+                                        (None, None)
+                                    }
+                                };
+                                let wake_hub = started.hub.clone();
+                                let wake_observer = crate::host::observe_system_wake(move || wake_hub.on_system_wake());
+                                let running = crate::serving::Running::new(started, listener, announced, Some(wake_observer));
+                                if let Err(flume::SendError(running)) = running_tx.send(running) {
+                                    running.shutdown();
+                                }
+                                hub
+                            }
+                            Err(e) => {
+                                let _ = ready.send_replace(Some(Err(format!("vibevalley server: {e}"))));
+                                Arc::new(vibevalley_server::transport::bridge::fake::FakeServer::new())
+                            }
+                        }
+                    }))
+                }
+                Err(e) => {
+                    drop(running_tx);
+                    cx.set_global(ActiveDesktopConnection(Arc::new(connection::Mode::Embedded)));
+                    let _ = ready.send_replace(Some(Err(format!("desktop connection config: {e}"))));
+                    Arc::new(vibevalley_server::transport::bridge::fake::FakeServer::new())
+                }
+            },
         };
         let bridge = vibevalley_server::transport::bridge::Hub::new(server, 4);
         let bridge_for_clients = bridge.clone();
@@ -335,6 +375,35 @@ impl Replier {
         let _ = self
             .channel
             .send(format!("reply:{}", self.id), serde_json::to_value(envelope).unwrap_or(Value::Null));
+    }
+}
+
+/// Handles desktop Control Plane connection inspection and switching without touching `crates/protocol`.
+fn handle_desktop_connection_op(op: &str, payload: Value, home: &std::path::Path, active: &connection::Mode) -> vibevalley_server::transport::bridge::Envelope {
+    use vibevalley_server::transport::bridge::{BizCode, Envelope, refusal};
+
+    let reply_snapshot = || match connection::snapshot(home, active) {
+        Ok(snap) => Envelope::ok(serde_json::to_value(snap).unwrap_or(Value::Null)),
+        Err(err) => refusal(BizCode::InternalError, err),
+    };
+
+    match op {
+        "host.connectionState" => reply_snapshot(),
+        "host.connectionSave" => {
+            let req: connection::ConnectionSaveRequest = match serde_json::from_value(payload) {
+                Ok(req) => req,
+                Err(err) => return refusal(BizCode::InvalidInput, format!("invalid connection request: {err}")),
+            };
+            match connection::configure_remote(home, req) {
+                Ok(_) => reply_snapshot(),
+                Err(err) => refusal(BizCode::InvalidInput, err),
+            }
+        }
+        "host.connectionReset" => match connection::reset(home) {
+            Ok(_) => reply_snapshot(),
+            Err(err) => refusal(BizCode::InternalError, err),
+        },
+        _ => refusal(BizCode::RouteNotFound, format!("unknown desktop connection op {op}")),
     }
 }
 
@@ -532,13 +601,17 @@ pub struct HostedView {
     _bridge: Option<std::sync::Arc<vibevalley_server::transport::bridge::Client>>,
 }
 
+pub fn ensure_ui_sets() {
+    // nsh serves only nsh/base's core part unless the host names more; register both nsh/base and vibevalley/rich.
+    static UI_SETS: std::sync::Once = std::sync::Once::new();
+    UI_SETS.call_once(|| nsh_platform_gpui::set_ui_sets(vec![nsh_base::registry(), vibevalley_rich::registry()]));
+}
+
 impl HostedView {
     /// `view` selects the surface in `ui/App.tsx`; `params` reach it as
     /// `host.params`.
     pub fn new(view: &str, params: Map<String, Value>, dark: bool, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        // nsh serves only nsh/base's core part unless the host names more; register both nsh/base and vibevalley/rich.
-        static UI_SETS: std::sync::Once = std::sync::Once::new();
-        UI_SETS.call_once(|| nsh_platform_gpui::set_ui_sets(vec![nsh_base::registry(), vibevalley_rich::registry()]));
+        ensure_ui_sets();
         let (tx, rx) = flume::unbounded::<EngineMessage>();
         let (err_tx, err_rx) = flume::unbounded::<String>();
         let options = AppOptions {
@@ -548,6 +621,10 @@ impl HostedView {
         };
         let name = view.to_string();
         let hub = cx.try_global::<BridgeHub>().map(|h| h.0.clone());
+        let active_connection = cx
+            .try_global::<ActiveDesktopConnection>()
+            .map(|c| c.0.clone())
+            .unwrap_or_else(|| Arc::new(connection::Mode::Embedded));
         let mut client = None;
         let ui_font_size = cx.try_global::<crate::theme::Ui>().map(|ui| ui.settings.ui_font_size).unwrap_or(13.0);
         let motion = cx.try_global::<crate::theme::Ui>().map(|ui| ui.settings.effective_motion()).unwrap_or_default();
@@ -563,6 +640,7 @@ impl HostedView {
             params.insert("view".into(), json!(name));
             params.entry("locale").or_insert_with(|| json!(vibevalley_i18n::locale()));
             params.entry("motion").or_insert_with(|| json!(motion.as_str()));
+            params.entry("connectionMode").or_insert_with(|| json!(active_connection.as_str()));
             params.entry("randomSeed").or_insert_with(|| json!(crate::host::random_seed_hex()));
             let pixel_dir = crate::pixel::assets_dir().join("pixel");
             let has_pixel_dir = pixel_dir.join("sprites.json").is_file();
@@ -583,6 +661,20 @@ impl HostedView {
                     && op.starts_with("host.")
                 {
                     let id = v["id"].as_str().unwrap_or_default();
+                    if matches!(op, "host.connectionState" | "host.connectionSave" | "host.connectionReset") {
+                        if !id.is_empty() {
+                            let op_name = op.to_string();
+                            let payload = v["payload"].clone();
+                            let reply_id = id.to_string();
+                            let reply_host = reply_host.clone();
+                            let active = active_connection.clone();
+                            vibevalley_runtime::rt::handle().spawn_blocking(move || {
+                                let env = handle_desktop_connection_op(&op_name, payload, &server_home(), &active);
+                                let _ = reply_host.send(format!("reply:{reply_id}"), serde_json::to_value(env).unwrap_or(Value::Null));
+                            });
+                        }
+                        return;
+                    }
                     match crate::host::decode_host_op(op, v["payload"].clone()) {
                         Err(env) => {
                             if !id.is_empty() {
@@ -1115,5 +1207,45 @@ mod tests {
         drop(client);
         drop(provider);
         assert_eq!(handle.snapshot()["clients"], json!([]));
+    }
+
+    #[test]
+    fn desktop_connection_host_ops_inspect_save_and_reset_without_leaking_token() {
+        let dir = tempfile::tempdir().unwrap();
+        let active = connection::Mode::Embedded;
+
+        let initial = handle_desktop_connection_op("host.connectionState", json!({}), dir.path(), &active);
+        assert_eq!(initial.biz_code, 0);
+        let data = initial.data.unwrap();
+        assert_eq!(data["activeMode"], "embedded");
+        assert_eq!(data["configuredMode"], "embedded");
+        assert_eq!(data["restartRequired"], false);
+
+        let raw_token = "vv_dev_host_op_secret_token_7788";
+        let saved = handle_desktop_connection_op(
+            "host.connectionSave",
+            json!({
+                "url": "https://hub.tailnet.ts.net:8791/",
+                "token": raw_token,
+                "label": "Studio Mac",
+            }),
+            dir.path(),
+            &active,
+        );
+        assert_eq!(saved.biz_code, 0);
+        let saved_data = saved.data.unwrap();
+        assert_eq!(saved_data["activeMode"], "embedded");
+        assert_eq!(saved_data["configuredMode"], "remote");
+        assert_eq!(saved_data["configuredUrl"], "https://hub.tailnet.ts.net:8791");
+        assert_eq!(saved_data["configuredLabel"], "Studio Mac");
+        assert_eq!(saved_data["tokenHint"], "…7788");
+        assert_eq!(saved_data["restartRequired"], true);
+        assert!(!saved_data.to_string().contains(raw_token));
+
+        let reset = handle_desktop_connection_op("host.connectionReset", json!({}), dir.path(), &active);
+        assert_eq!(reset.biz_code, 0);
+        let reset_data = reset.data.unwrap();
+        assert_eq!(reset_data["configuredMode"], "embedded");
+        assert_eq!(reset_data["restartRequired"], false);
     }
 }

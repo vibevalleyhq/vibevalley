@@ -63,7 +63,7 @@ export function Stamina(props: { quota: Quota; cells?: number; width?: number; h
       class={`flex-row gap-px rounded-sm bg-bark-800 p-px ${props.width === undefined ? "w-full max-w-56" : ""}`}
       style={{ ...(props.width !== undefined ? { width: props.width } : {}), height: props.height }}
     >
-      <Each of={Array.from({ length: cells() }, (_, i) => i)}>
+      <Each of={Array.from({ length: cells() }, (_, i) => i)} key={(i) => i}>
         {(i) => (
           <View
             class={`flex-1 rounded-xs ${i() < lit() ? toneChoices1[props.quota.level] : ""}`}
@@ -144,7 +144,9 @@ export function Usage(props: { info: RuntimeInfo; terminalDirectory?: string | u
                         <If when={u().subscription}>
                           <Text class="text-sm text-muted">{t("web.runtime.subscription", { tier: u().subscription ?? "" })}</Text>
                         </If>
-                        <Each of={u().windows}>{(w) => <Window window={w()} />}</Each>
+                        <Each of={u().windows} key={(w) => w.label}>
+                          {(w) => <Window window={w()} />}
+                        </Each>
                       </>
                     )}
                   </If>
@@ -202,7 +204,7 @@ export function SupportCard(props: { info: RuntimeInfo }) {
         <Text class="text-sm text-ink">{support().inProcess ? t("web.runtime.inProcess") : t("web.runtime.ownProcess")}</Text>
         <Text class="pt-2 text-xs font-medium text-muted">{t("web.runtime.refused")}</Text>
         <If when={refused().length > 0} else={<Text class="text-sm text-ink">{t("web.runtime.acceptsAll")}</Text>}>
-          <Each of={refused()}>
+          <Each of={refused()} key={(entry) => entry[0]}>
             {(entry) => (
               <Text class="text-sm text-ink">
                 <Text class="font-mono">{entry()[0]}</Text> <Text class="text-xs text-muted">{entry()[1]}</Text>
@@ -212,7 +214,7 @@ export function SupportCard(props: { info: RuntimeInfo }) {
         </If>
         <Text class="pt-2 text-xs font-medium text-muted">{t("web.runtime.queries")}</Text>
         <View class="flex-row flex-wrap gap-1.5">
-          <Each of={RuntimeCapabilityValues}>
+          <Each of={RuntimeCapabilityValues} key={(c) => c}>
             {(c) => (
               <View class={`rounded-sm px-1.5 py-0.5 ${support().capabilities.includes(c()) ? "bg-selected" : "bg-hover"}`}>
                 <Text class={`text-xs ${support().capabilities.includes(c()) ? "font-medium text-ink" : "text-faint line-through"}`}>
@@ -425,7 +427,7 @@ export function InventoryCard(props: { title: string; entries: InventoryEntry[] 
         {(entries) => (
           <If when={entries().length > 0} else={<Quiet>{t("web.runtime.none")}</Quiet>}>
             <View class="gap-1.5">
-              <Each of={entries()}>
+              <Each of={entries()} key={(e) => `${e.name}:${e.source ?? ""}`}>
                 {(e) => (
                   <View class="min-w-0">
                     <Text class={`truncate font-mono text-sm ${e().enabled === false ? "text-muted line-through" : "text-ink"}`}>{e().name}</Text>

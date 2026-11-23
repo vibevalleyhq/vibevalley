@@ -353,6 +353,9 @@ pub struct Agent {
     pub duty: String,
     pub enabled: bool,
     pub runtime: String,
+    /// Target execution host id when pinned to a specific machine; omitted lets the control plane route.
+    #[serde(default)]
+    pub machine_id: Option<String>,
     pub model: String,
     pub effort: String,
     pub persona: String,

@@ -103,7 +103,7 @@
       "worker": "执行会话"
     },
     "list": "运行列表",
-    "back": "← 全部运行",
+    "back": "全部运行",
     "filterAgent": "角色：{name}",
     "filterIssue": "任务：{label}",
     "clearFilter": "清掉筛选",

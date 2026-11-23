@@ -8,7 +8,8 @@
 //! job uploads to the vendor in `remote.rs`.
 //!
 //! Credentials stay in memory (`Held`) until the job runs; they never reach
-//! the job database. Each run is a thread of its own; vendor calls block.
+//! the job database. Each run executes as a tracked blocking task bounded by
+//! per-kind semaphores; vendor calls block.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -19,6 +20,7 @@ use parking_lot::{Mutex, MutexGuard};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::{Connection, SqliteConnection};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
@@ -202,14 +204,6 @@ impl Ask {
             Ask::Clone(_) => "clone",
             Ask::Transcription(_) => "transcription",
             Ask::Understanding(_) => "understanding",
-        }
-    }
-
-    /// How many of this kind run at once.
-    fn slots(&self) -> usize {
-        match self {
-            Ask::Image(_) => 1,
-            _ => 8,
         }
     }
 
@@ -481,10 +475,47 @@ struct Stream {
     claimed: bool,
 }
 
-/// A job running now.
+/// Per-kind concurrency gates: images run one at a time, other kinds up to 8.
+struct KindSemaphores {
+    image: Arc<Semaphore>,
+    speech: Arc<Semaphore>,
+    speakers: Arc<Semaphore>,
+    voice_design: Arc<Semaphore>,
+    clone: Arc<Semaphore>,
+    transcription: Arc<Semaphore>,
+    understanding: Arc<Semaphore>,
+}
+
+impl KindSemaphores {
+    fn new() -> Self {
+        Self {
+            image: Arc::new(Semaphore::new(1)),
+            speech: Arc::new(Semaphore::new(8)),
+            speakers: Arc::new(Semaphore::new(8)),
+            voice_design: Arc::new(Semaphore::new(8)),
+            clone: Arc::new(Semaphore::new(8)),
+            transcription: Arc::new(Semaphore::new(8)),
+            understanding: Arc::new(Semaphore::new(8)),
+        }
+    }
+
+    fn for_ask(&self, ask: &Ask) -> Arc<Semaphore> {
+        match ask {
+            Ask::Image(_) => self.image.clone(),
+            Ask::Speech(_) => self.speech.clone(),
+            Ask::Speakers(_) => self.speakers.clone(),
+            Ask::VoiceDesign(_) => self.voice_design.clone(),
+            Ask::Clone(_) => self.clone.clone(),
+            Ask::Transcription(_) => self.transcription.clone(),
+            Ask::Understanding(_) => self.understanding.clone(),
+        }
+    }
+}
+
+/// A job running now; dropping it releases its per-kind semaphore slot.
 struct Running {
-    kind: &'static str,
     stop: Stop,
+    _permit: OwnedSemaphorePermit,
 }
 
 /// What the machine reaches.
@@ -503,6 +534,7 @@ pub struct Jobs {
     db: Arc<ServerDb>,
     held: Mutex<HashMap<String, Held>>,
     runs: Mutex<HashMap<String, Running>>,
+    semaphores: KindSemaphores,
     /// One schedule at a time, so a waiting job starts once.
     scheduling: Mutex<()>,
     /// One cleanup at the vendor at a time.
@@ -528,6 +560,7 @@ impl Jobs {
             db: p.db,
             held: Mutex::default(),
             runs: Mutex::default(),
+            semaphores: KindSemaphores::new(),
             scheduling: Mutex::default(),
             cleaning: Mutex::default(),
             moss: Moss { fetch: p.vendor },
@@ -557,7 +590,7 @@ impl Jobs {
     fn sweep_each_minute(self: &Arc<Self>) {
         let cancel = self.cancel.clone();
         let me = Arc::downgrade(self);
-        vibevalley_runtime::rt::handle().spawn(async move {
+        let fut = async move {
             loop {
                 tokio::select! {
                     biased;
@@ -567,7 +600,12 @@ impl Jobs {
                 let Some(jobs) = me.upgrade() else { break };
                 let _ = tokio::task::spawn_blocking(move || jobs.expire_approvals()).await;
             }
-        });
+        };
+        if let Some(hub) = self.hub.upgrade() {
+            hub.spawn_task(fut);
+        } else {
+            vibevalley_runtime::rt::handle().spawn(fut);
+        }
     }
 
     fn db(&self) -> Result<crate::base::DbConn, ApiError> {
@@ -841,22 +879,24 @@ impl Jobs {
                 _ => false,
             };
             let mut runs = self.runs();
-            let busy = runs.values().filter(|x| x.kind == r.ask.kind()).count();
-            if !ready || runs.contains_key(r.id()) || busy >= r.ask.slots() {
+            if !ready || runs.contains_key(r.id()) {
                 continue;
             }
+            let Ok(permit) = self.semaphores.for_ask(&r.ask).try_acquire_owned() else {
+                continue;
+            };
             let stop = Stop::default();
             runs.insert(
                 r.id().to_string(),
                 Running {
-                    kind: r.ask.kind(),
                     stop: stop.clone(),
+                    _permit: permit,
                 },
             );
             drop(runs);
             let id = r.id().to_string();
             let work = me.clone();
-            let spawned = std::thread::Builder::new().name(format!("media-{id}")).spawn(move || {
+            let run_job = move || {
                 work.work(&id, &stop);
                 {
                     let mut runs = work.runs();
@@ -865,9 +905,11 @@ impl Jobs {
                     }
                 }
                 work.schedule();
-            });
-            if let Err(e) = spawned {
-                eprintln!("media: {e}");
+            };
+            if let Some(hub) = self.hub.upgrade() {
+                hub.spawn_blocking_task(run_job);
+            } else {
+                vibevalley_runtime::rt::handle().spawn_blocking(run_job);
             }
         }
     }
@@ -1213,18 +1255,17 @@ impl Jobs {
         let Some(tx) = self.streams.lock().get(id).map(|s| s.tx.clone()) else {
             return false;
         };
-        let mut event = Some(event);
-        while let Some(e) = event.take() {
-            if stop.aborted() {
-                return false;
-            }
-            match tx.send_timeout(e, Duration::from_millis(100)) {
-                Ok(()) => return true,
-                Err(flume::SendTimeoutError::Timeout(e)) => event = Some(e),
-                Err(flume::SendTimeoutError::Disconnected(_)) => return false,
-            }
+        if stop.aborted() {
+            return false;
         }
-        false
+        let token = stop.token();
+        vibevalley_runtime::rt::block_on(async {
+            tokio::select! {
+                biased;
+                _ = token.cancelled() => false,
+                res = tx.send_async(event) => res.is_ok(),
+            }
+        })
     }
 
     /// `receiveSpeechStream`: the vendor's PCM relayed to the page as it comes and kept whole (or as much as came) as a WAV.
@@ -1309,7 +1350,7 @@ impl Jobs {
         let me = Arc::downgrade(self);
         let cancel = self.cancel.clone();
         let job = id.to_string();
-        vibevalley_runtime::rt::handle().spawn(async move {
+        let cleanup = async move {
             tokio::select! {
                 biased;
                 _ = cancel.cancelled() => {}
@@ -1318,7 +1359,12 @@ impl Jobs {
             if let Some(me) = me.upgrade() {
                 me.streams.lock().remove(&job);
             }
-        });
+        };
+        if let Some(hub) = self.hub.upgrade() {
+            hub.spawn_task(cleanup);
+        } else {
+            vibevalley_runtime::rt::handle().spawn(cleanup);
+        }
     }
 
     /// What came of a stream, kept as a WAV: ready when complete, else unknown with what came.

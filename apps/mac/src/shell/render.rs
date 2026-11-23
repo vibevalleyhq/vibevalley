@@ -4,18 +4,19 @@ use vibevalley_workspace::Axis;
 use crate::hosted::frames::PaletteMode;
 use crate::theme::Ui;
 
-use super::Shell;
 use super::menus::*;
+use super::{Shell, should_mount_inspector};
 
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let frame_start = self.devtools.state.enabled.then(std::time::Instant::now);
+        let frame_start = self.overlays.devtools.state.enabled.then(std::time::Instant::now);
         self.ensure_panes(window, cx);
+        self.sync_inspector(window, cx);
         self.ensure_devtools_overlay(window, cx);
         let colors = Ui::get(cx).colors.clone();
-        let sidebar_w: Pixels = px(self.sidebar_width);
+        let sidebar_w: Pixels = px(self.chrome.sidebar_width);
         let main = crate::panes::render_main(self, window, cx);
-        let palette = self.palette.as_ref().filter(|p| p.open).map(|p| {
+        let palette = self.overlays.palette.as_ref().filter(|p| p.open).map(|p| {
             div()
                 .absolute()
                 .inset_0()
@@ -38,9 +39,15 @@ impl Render for Shell {
                         .child(p.view.clone()),
                 )
         });
-        let launch = self.launch.clone().map(|o| div().absolute().inset_0().child(o));
+        let launch = self.overlays.launch.clone().map(|o| div().absolute().inset_0().child(o));
         let devtools_overlay = self.render_devtools_overlay(cx);
         let devtools_capsule = self.render_devtools_capsule(cx);
+        let show_inspector = should_mount_inspector(
+            self.chrome.native_workspace,
+            self.chrome.inspector_open,
+            f32::from(window.viewport_size().width),
+        );
+        let inspector_view = show_inspector.then(|| self.chrome.inspector.as_ref().map(|slot| slot.view.clone())).flatten();
         let root = div()
             .id("shell")
             .size_full()
@@ -53,8 +60,8 @@ impl Render for Shell {
             .track_focus(&self.focus)
             .capture_any_mouse_down(|_, _, _| crate::host::restore_window_first_responder())
             .capture_key_down(cx.listener(|s, e: &gpui::KeyDownEvent, _, cx| {
-                if s.chat_menu_group.is_some() && e.keystroke.key == "escape" && !e.keystroke.modifiers.modified() {
-                    s.chat_menu_group = None;
+                if s.workspace.chat_menu_group.is_some() && e.keystroke.key == "escape" && !e.keystroke.modifiers.modified() {
+                    s.workspace.chat_menu_group = None;
                     cx.stop_propagation();
                     cx.notify();
                 }
@@ -62,22 +69,22 @@ impl Render for Shell {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|s, e: &gpui::MouseDownEvent, window, cx| {
-                    if s.chat_menu_group.take().is_some() {
+                    if s.workspace.chat_menu_group.take().is_some() {
                         cx.notify();
                     }
-                    if s.palette.as_ref().is_none_or(|p| !p.open)
-                        && s.launch.is_none()
+                    if s.overlays.palette.as_ref().is_none_or(|p| !p.open)
+                        && s.overlays.launch.is_none()
                         && !e.modifiers.control
                         && !e.modifiers.platform
                         && crate::panes::is_titlebar_hit(f32::from(e.position.y))
                     {
                         if e.click_count >= 2 {
-                            s.window_drag_origin = None;
+                            s.chrome.window_drag_origin = None;
                             if !window.is_fullscreen() {
                                 window.titlebar_double_click();
                             }
                         } else {
-                            s.window_drag_origin = Some((f32::from(e.position.x), f32::from(e.position.y)));
+                            s.chrome.window_drag_origin = Some((f32::from(e.position.x), f32::from(e.position.y)));
                         }
                     }
                 }),
@@ -129,19 +136,19 @@ impl Render for Shell {
             .on_action(cx.listener(|s, _: &SplitRight, w, cx| s.split(Axis::Horizontal, w, cx)))
             .on_action(cx.listener(|s, _: &SplitDown, w, cx| s.split(Axis::Vertical, w, cx)))
             .on_action(cx.listener(|s, _: &NextTab, w, cx| {
-                if let Some(p) = s.ws.active_mut() {
+                if let Some(p) = s.workspace.ws.active_mut() {
                     p.layout.tab_cycle(1);
                 }
                 s.layout_changed(w, cx);
             }))
             .on_action(cx.listener(|s, _: &PrevTab, w, cx| {
-                if let Some(p) = s.ws.active_mut() {
+                if let Some(p) = s.workspace.ws.active_mut() {
                     p.layout.tab_cycle(-1);
                 }
                 s.layout_changed(w, cx);
             }))
             .on_action(cx.listener(|s, _: &FocusNextGroup, w, cx| {
-                if let Some(p) = s.ws.active_mut() {
+                if let Some(p) = s.workspace.ws.active_mut() {
                     p.layout.focus_cycle(1);
                 }
                 s.layout_changed(w, cx);
@@ -155,9 +162,9 @@ impl Render for Shell {
             .on_action(cx.listener(|_, _: &Quit, _, cx| cx.quit()))
             .on_mouse_move(cx.listener(Self::on_mouse_move))
             .on_mouse_up(MouseButton::Left, cx.listener(|s, _, _, cx| s.on_mouse_up(cx)))
-            .child(div().size_full().child(self.workbench.clone()))
-            .children(self.native_workspace.then(|| {
-                let inspector_w: Pixels = px(self.inspector_width);
+            .child(div().size_full().child(self.chrome.workbench.clone()))
+            .children(self.chrome.native_workspace.then(|| {
+                let inspector_w: Pixels = px(self.chrome.inspector_width);
                 div()
                     .id("workspace")
                     .key_context("Workspace")
@@ -165,15 +172,16 @@ impl Render for Shell {
                     .top_0()
                     .bottom_0()
                     .right_0()
-                    .left(px(self.global_rail_width))
+                    .left(px(self.chrome.global_rail_width))
                     .flex()
                     .flex_row()
                     .bg(colors.bg)
                     .children(
-                        self.sidebar_visible
-                            .then(|| div().w(sidebar_w).h_full().flex_none().child(self.sidebar.clone())),
+                        self.chrome
+                            .sidebar_visible
+                            .then(|| div().w(sidebar_w).h_full().flex_none().child(self.chrome.sidebar.clone())),
                     )
-                    .children(self.sidebar_visible.then(|| {
+                    .children(self.chrome.sidebar_visible.then(|| {
                         div()
                             .id("sidebar-divider")
                             .w(px(1.0))
@@ -185,13 +193,13 @@ impl Render for Shell {
                                 MouseButton::Left,
                                 cx.listener(|s, _, _, cx| {
                                     cx.stop_propagation();
-                                    s.window_drag_origin = None;
-                                    s.resizing_sidebar = true;
+                                    s.chrome.window_drag_origin = None;
+                                    s.chrome.resizing_sidebar = true;
                                 }),
                             )
                     }))
                     .child(div().flex_1().h_full().min_w_0().child(main))
-                    .children((self.inspector_open && f32::from(window.viewport_size().width) >= 1040.0).then(|| {
+                    .children(inspector_view.is_some().then(|| {
                         div()
                             .id("inspector-divider")
                             .w(px(1.0))
@@ -203,27 +211,24 @@ impl Render for Shell {
                                 MouseButton::Left,
                                 cx.listener(|s, _, _, cx| {
                                     cx.stop_propagation();
-                                    s.window_drag_origin = None;
-                                    s.resizing_inspector = true;
+                                    s.chrome.window_drag_origin = None;
+                                    s.chrome.resizing_inspector = true;
                                 }),
                             )
                     }))
-                    .children(
-                        (self.inspector_open && f32::from(window.viewport_size().width) >= 1040.0)
-                            .then(|| div().w(inspector_w).h_full().flex_none().child(self.inspector.clone())),
-                    )
+                    .children(inspector_view.map(|view| div().w(inspector_w).h_full().flex_none().child(view)))
             }))
-            .children(self.native_pixel.as_ref().map(|slot| {
+            .children(self.chrome.native_pixel.as_ref().map(|slot| {
                 div()
                     .absolute()
                     .top_0()
                     .bottom_0()
                     .right_0()
-                    .left(px(self.global_rail_width))
+                    .left(px(self.chrome.global_rail_width))
                     .child(slot.view.clone())
             }))
             .children(palette)
-            .children(self.terminal_notice.as_ref().map(|message| {
+            .children(self.workspace.terminal_notice.as_ref().map(|message| {
                 div()
                     .id("terminal-folder-notice")
                     .absolute()
@@ -249,7 +254,7 @@ impl Render for Shell {
                             .on_mouse_down(
                                 MouseButton::Left,
                                 cx.listener(|s, _, _, cx| {
-                                    s.terminal_notice = None;
+                                    s.workspace.terminal_notice = None;
                                     cx.stop_propagation();
                                     cx.notify();
                                 }),
@@ -263,8 +268,8 @@ impl Render for Shell {
         if let Some(started) = frame_start {
             let duration_us = started.elapsed().as_micros() as u64;
             let ms = duration_us as f64 / 1000.0;
-            self.devtools.state.record_frame_ms(ms);
-            if self.devtools.state.should_record_frame(duration_us)
+            self.overlays.devtools.state.record_frame_ms(ms);
+            if self.overlays.devtools.state.should_record_frame(duration_us)
                 && let Some(handle) = cx.try_global::<crate::hosted::ShellDebugHandle>()
             {
                 handle.record_frame(duration_us, "Shell::render");

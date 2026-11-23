@@ -95,3 +95,8 @@ pub fn remove_worktree(main: &Repo, dir: &Path) -> Result<()> {
     let _ = git(main.root(), &["worktree", "prune"]);
     Ok(())
 }
+
+/// Returns the `origin` remote URL of `root`, if configured.
+pub fn remote_origin_url(root: &Path) -> Option<String> {
+    text(root, &["remote", "get-url", "origin"]).ok().filter(|u| !u.is_empty())
+}

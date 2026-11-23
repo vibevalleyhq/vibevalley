@@ -573,6 +573,7 @@ fn fact_kind(fact: &Fact) -> &'static str {
         Fact::CronRemoved(_) => "cronRemoved",
         Fact::ConnectorChanged(_) => "connectorChanged",
         Fact::MachineChanged(_) => "machineChanged",
+        Fact::MachineRemoved(_) => "machineRemoved",
         Fact::MediaChanged(_) => "mediaChanged",
         Fact::RuntimeInboxChanged(_) => "runtimeInboxChanged",
     }

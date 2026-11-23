@@ -1,6 +1,7 @@
 import "./src/infra/i18nBoot";
-import { mount } from "nsh";
+import { host, mount } from "nsh";
 
+import { decodeNotificationRoute, subscribeNotificationPress, type NotificationRoute } from "./src/infra/notifications";
 import { MobileApp } from "./src/MobileApp";
 
 const nativeFetch: typeof fetch = fetch;
@@ -37,4 +38,18 @@ const storyFetch: typeof fetch = async (input, init) => {
   return res;
 };
 
-mount(() => <MobileApp fetchImpl={storyFetch} />);
+// Bridges headless test `app.host.send("notification.press", { id })` events alongside native `Notifications.on("press")`.
+const storySubscribeNotificationPress = (onRoute: (route: NotificationRoute) => void): (() => void) => {
+  const stopNative = subscribeNotificationPress(onRoute);
+  const stopHost = host.on("notification.press", (payload: unknown) => {
+    if (typeof payload !== "object" || payload === null || !("id" in payload) || typeof payload.id !== "string") return;
+    const route = decodeNotificationRoute(payload.id);
+    if (route) onRoute(route);
+  });
+  return () => {
+    stopHost();
+    stopNative();
+  };
+};
+
+mount(() => <MobileApp fetchImpl={storyFetch} subscribeNotificationPress={storySubscribeNotificationPress} />);

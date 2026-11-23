@@ -1654,6 +1654,15 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Attachment"),
     },
     Endpoint {
+        op: "attachment.importPath",
+        module: "attachment",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("AttachmentImportPathInput"),
+        result: Some("Attachment"),
+    },
+    Endpoint {
         op: "server.health.get",
         module: "core",
         about: &[],
@@ -1805,6 +1814,15 @@ pub const ENDPOINTS: &[Endpoint] = &[
         dry_run: None,
         input: None,
         result: Some("RemoteWhoami"),
+    },
+    Endpoint {
+        op: "machine.list",
+        module: "machine",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: None,
+        result: Some("Vec<MachineInfo>"),
     },
 ];
 
@@ -3011,6 +3029,13 @@ pub mod ops {
         type Input = t::AttachmentUpload;
         type Result = t::Attachment;
     }
+    /// Local regular file imported directly into CAS without base64 framing (`Caller::User` only).
+    pub struct AttachmentImportPath;
+    impl Op for AttachmentImportPath {
+        const NAME: &'static str = "attachment.importPath";
+        type Input = t::AttachmentImportPathInput;
+        type Result = t::Attachment;
+    }
     pub struct ServerHealthGet;
     impl Op for ServerHealthGet {
         const NAME: &'static str = "server.health.get";
@@ -3112,6 +3137,12 @@ pub mod ops {
         const NAME: &'static str = "remote.whoami";
         type Input = ();
         type Result = t::RemoteWhoami;
+    }
+    pub struct MachineList;
+    impl Op for MachineList {
+        const NAME: &'static str = "machine.list";
+        type Input = ();
+        type Result = Vec<t::MachineInfo>;
     }
 }
 

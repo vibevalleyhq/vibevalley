@@ -2,12 +2,14 @@ import { reduceMotion, signal } from "nsh";
 
 import type { MotionChoice } from "@vibevalley/protocol/host";
 
-import { currentHost } from "../infra/host";
-import { readHostMotion } from "../infra/hostParams";
-
 const parseMotion = (value: unknown): MotionChoice | undefined => (value === "off" || value === "on" || value === "system" ? value : undefined);
 
-const choice = signal<MotionChoice>(readHostMotion() ?? "system");
+const choice = signal<MotionChoice>("system");
+let reportMotion: ((next: MotionChoice) => void) | undefined;
+
+export const setMotionReporter = (reporter: ((next: MotionChoice) => void) | undefined): void => {
+  reportMotion = reporter;
+};
 
 export const motionChoice = (): MotionChoice => choice();
 
@@ -18,7 +20,7 @@ export const applyMotion = (value: unknown): void => {
 
 export const chooseMotion = (next: MotionChoice): void => {
   choice.set(next);
-  currentHost().motion?.(next);
+  reportMotion?.(next);
 };
 
 export const motionOff = (): boolean => {

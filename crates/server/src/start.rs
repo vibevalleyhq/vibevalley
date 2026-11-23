@@ -160,6 +160,7 @@ pub struct Started {
     pub(crate) connectors: Arc<modules::collab::connector::Connectors>,
     pub(crate) debug: Arc<modules::infra::debug::DebugKit>,
     pub(crate) remote: Arc<modules::infra::remote::Remote>,
+    pub(crate) machines: Arc<modules::infra::machine::MachineManager>,
 }
 
 /// White-box test view over `Started` internals for `crates/server/tests/*`.
@@ -191,6 +192,7 @@ pub struct TestInternals<'a> {
     pub connectors: &'a Arc<modules::collab::connector::Connectors>,
     pub debug: &'a Arc<modules::infra::debug::DebugKit>,
     pub remote: &'a Arc<modules::infra::remote::Remote>,
+    pub machines: &'a Arc<modules::infra::machine::MachineManager>,
 }
 
 impl Started {
@@ -228,39 +230,76 @@ impl Started {
             connectors: &self.connectors,
             debug: &self.debug,
             remote: &self.remote,
+            machines: &self.machines,
         }
     }
 
     /// Lets the farm go, so `start()` can open the same home again in this
-    /// process: the tickers, probes, assistants and watcher stop, the
-    /// board's agents stop and its lock is released, and the shared `ServerDb`
-    /// checkpoints WAL + optimizes before closing.
+    /// process: cancels the root shutdown token immediately, drains modules
+    /// concurrently (bounded by a grace timeout), flushes trajectories and
+    /// tracked hub tasks, and checkpoints WAL (`TRUNCATE`) + optimizes before
+    /// closing the shared `ServerDb`.
     pub fn close(&self) {
+        const SHUTDOWN_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
+
+        self.hub.shutdown_token().cancel();
         if self.debug.is_enabled() {
             self.hub.attach_observer(None);
             self.hub.attach_fault_gate(None);
             vibevalley_runtime::oar::set_observer(None);
         }
+        self.hub.attach_machine_bus(None);
         self.hub.attach_remote_auth(None);
-        self.remote.close();
-        self.hub.shutdown_token().cancel();
-        self.connectors.close();
-        self.pulls.close();
-        self.crons.close();
-        self.voice.close();
-        self.hub.close_bus();
-        self.issue_chat.close();
-        self.session_chat.close();
-        self.orchestrator.close();
-        self.hub.runtime_inbox.stop();
-        self.agents.fleet.close();
-        self.repos.close();
-        self.artifacts.close();
-        self.media.close();
-        self.media_inputs.close();
-        self.library.close();
-        self.game.close();
-        self.board.close();
+
+        let machines = self.machines.clone();
+        let remote = self.remote.clone();
+        let connectors = self.connectors.clone();
+        let pulls = self.pulls.clone();
+        let crons = self.crons.clone();
+        let voice = self.voice.clone();
+        let hub_bus = self.hub.clone();
+        let issue_chat = self.issue_chat.clone();
+        let session_chat = self.session_chat.clone();
+        let orchestrator = self.orchestrator.clone();
+        let hub_inbox = self.hub.clone();
+        let agents = self.agents.clone();
+        let repos = self.repos.clone();
+        let artifacts = self.artifacts.clone();
+        let media = self.media.clone();
+        let media_inputs = self.media_inputs.clone();
+        let library = self.library.clone();
+        let game = self.game.clone();
+        let board = self.board.clone();
+
+        let timed_out = vibevalley_runtime::rt::block_on(async {
+            let mut set = tokio::task::JoinSet::new();
+            set.spawn_blocking(move || machines.close());
+            set.spawn_blocking(move || remote.close());
+            set.spawn_blocking(move || connectors.close());
+            set.spawn_blocking(move || pulls.close());
+            set.spawn_blocking(move || crons.close());
+            set.spawn_blocking(move || voice.close());
+            set.spawn_blocking(move || hub_bus.close_bus());
+            set.spawn_blocking(move || issue_chat.close());
+            set.spawn_blocking(move || session_chat.close());
+            set.spawn_blocking(move || orchestrator.close());
+            set.spawn_blocking(move || hub_inbox.runtime_inbox.stop());
+            set.spawn_blocking(move || agents.fleet.close());
+            set.spawn_blocking(move || repos.close());
+            set.spawn_blocking(move || artifacts.close());
+            set.spawn_blocking(move || media.close());
+            set.spawn_blocking(move || media_inputs.close());
+            set.spawn_blocking(move || library.close());
+            set.spawn_blocking(move || game.close());
+            set.spawn_blocking(move || board.close());
+            tokio::time::timeout(SHUTDOWN_GRACE, async { while set.join_next().await.is_some() {} })
+                .await
+                .is_err()
+        });
+        if timed_out {
+            tracing::warn!(timeout_secs = SHUTDOWN_GRACE.as_secs(), "server.close timed out waiting for modules to drain");
+        }
+
         self.trajectories.close();
         self.hub.close();
         self.db.close();
@@ -416,15 +455,26 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     };
     modules::infra::provider::install(&hub, Arc::new(modules::infra::provider::Provider::new(setting.clone(), vendor.clone())));
     let voice_fetch = vendor.clone();
+    let attachments = modules::content::attachment::Attachments::open(&config.home, db.clone());
+    modules::content::attachment::install(&hub, attachments.clone());
     let execution = Arc::new(std::sync::OnceLock::new());
     let registry = config
         .registry
         .clone()
         .unwrap_or_else(|| Arc::new(runtimes(&setting, &config.home, execution.clone(), config.model_client.clone())));
-    let agents = Agents::open(&hub, &config.home, &config.starters, registry.clone(), config.probe_runtimes).map_err(|e| failed("the profiles")(&e))?;
+    let machines = modules::infra::machine::MachineManager::open(&hub, registry.clone(), attachments.clone(), config.version.clone());
+    modules::infra::machine::install(&hub, machines.clone());
+    hub.attach_machine_bus(Some(Arc::new(modules::infra::machine::MachineBusAdapter(machines.clone()))));
+    let agents = Agents::open_with_machines(
+        &hub,
+        &config.home,
+        &config.starters,
+        registry.clone(),
+        machines.registry().clone(),
+        config.probe_runtimes,
+    )
+    .map_err(|e| failed("the profiles")(&e))?;
     modules::team::agent::install(&hub, agents.clone());
-    let attachments = modules::content::attachment::Attachments::open(&config.home, db.clone());
-    modules::content::attachment::install(&hub, attachments.clone());
 
     // Skin observer starts on the empty state so loaded facts replay cleanly.
     let game = modules::skin::game::Game::open(&config.home, &hub);
@@ -639,5 +689,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         connectors,
         debug,
         remote,
+        machines,
     })
 }

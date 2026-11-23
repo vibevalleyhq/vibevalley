@@ -1,15 +1,13 @@
 //! Local Tailscale status probe (`tailscale status --json`) with a short bounded timeout.
 
-use std::io::Read;
 use std::net::Ipv4Addr;
 use std::path::Path;
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde::Deserialize;
 
 const PROBE_TIMEOUT: Duration = Duration::from_millis(1200);
-const MAX_OUTPUT_BYTES: u64 = 512 * 1024;
+const MAX_OUTPUT_BYTES: usize = 512 * 1024;
 const CANDIDATE_PATHS: &[&str] = &[
     "/usr/local/bin/tailscale",
     "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
@@ -79,41 +77,10 @@ pub fn parse_status_json(raw: &str) -> Result<TailscaleInfo, serde_json::Error> 
 }
 
 fn run_tailscale_status(bin: &str) -> Option<String> {
-    let mut child = Command::new(bin)
-        .args(["status", "--json"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
-    let stdout = child.stdout.take()?;
-    let (tx, rx) = flume::bounded::<std::io::Result<String>>(1);
-    std::thread::spawn(move || {
-        let mut buf = String::new();
-        let res = stdout.take(MAX_OUTPUT_BYTES).read_to_string(&mut buf).map(|_| buf);
-        let _ = tx.send(res);
-    });
-    let deadline = Instant::now() + PROBE_TIMEOUT;
-    let output = match rx.recv_deadline(deadline) {
-        Ok(Ok(text)) => text,
-        Ok(Err(_)) | Err(_) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            return None;
-        }
-    };
-    let reap_deadline = Instant::now() + Duration::from_millis(200);
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => return status.success().then_some(output),
-            Ok(None) if Instant::now() < reap_deadline => std::thread::sleep(Duration::from_millis(5)),
-            Ok(None) | Err(_) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
-            }
-        }
-    }
+    let mut cmd = tokio::process::Command::new(bin);
+    cmd.args(["status", "--json"]);
+    let output = vibevalley_runtime::rt::block_on(vibevalley_runtime::oar::run_output_with_timeout(cmd, PROBE_TIMEOUT, Some(MAX_OUTPUT_BYTES))).ok()?;
+    output.success().then(|| String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 /// Probes the local Tailscale CLI without panicking when Tailscale is missing or stopped.

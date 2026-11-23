@@ -28,7 +28,7 @@
   "mcp": "MCP servers",
   "tools": "Tools",
   "agents": "Agents using it",
-  "makeAgent": "Make a new agent with it →",
+  "makeAgent": "Make a new agent with it",
   "noneYet": "None yet.",
   "afterInstall": "Readable once it is installed.",
   "noUsage": "This runtime does not report account usage.",
@@ -119,5 +119,25 @@
   "spentTodayBudget": "Helpers spent about {spent} today, against a daily budget of {budget}.",
   "missingCommand": "Install {runtime} on this computer, then check again. If it is installed, enter the full path to its executable.",
   "enterPath": "Enter command path",
-  "signInTerminal": "Open a terminal to sign in"
+  "signInTerminal": "Open a terminal to sign in",
+  "machines": {
+    "title": "Execution machines",
+    "kind": {
+      "local": "Local",
+      "remote": "Remote",
+      "sandbox": "Ephemeral sandbox"
+    },
+    "platform": {
+      "macos": "macOS",
+      "linux": "Linux",
+      "container": "Container",
+      "other": "Other"
+    },
+    "status": {
+      "online": "Online",
+      "offline": "Offline",
+      "draining": "Draining"
+    },
+    "noRuntimes": "No engines reported"
+  }
 }

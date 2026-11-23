@@ -111,7 +111,7 @@ export function MotionControls(props: Controls) {
 
       <If when={chapters().length > 0}>
         <View accessibilityLabel={t("web.artifact.motion.chapters")} testID="motion-chapters" class="flex-row flex-wrap items-center gap-1.5">
-          <Each of={chapters()}>
+          <Each of={chapters()} key={(ch) => `${ch.at}:${ch.label}`}>
             {(ch) => {
               const active = () => activeChapterAt() === ch().at;
               return (

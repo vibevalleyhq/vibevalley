@@ -68,6 +68,8 @@
 | `uploadAudio` | `attachmentFile.ts` |  |
 | `playInput` | `attachmentFile.ts` |  |
 | `useInputFile` | `attachmentFile.ts` |  |
+| `localPathFromUri` | `attachmentFile.ts` | Extracts an absolute local filesystem path from a POSIX path or `file:` URL. |
+| `importLocalAttachment` | `attachmentFile.ts` | Imports a dropped or picked local file into CAS. |
 | `useNow` | `base/dom.tsx` | The time, a new reading every `ms`: pooled per interval across active subscribers. |
 | `Keyed` | `base/dom.tsx` | Rebuilds its children whenever `key` changes, as a React key does: their state starts over. |
 | `createSettled` | `base/dom.tsx` | The value once it has stopped changing for `ms`: what is asked of the server while someone types. |
@@ -143,6 +145,7 @@
 | `readHostParams` | `hostParams.ts` |  |
 | `readHostLocale` | `hostParams.ts` |  |
 | `readHostMotion` | `hostParams.ts` |  |
+| `readConnectionMode` | `hostParams.ts` |  |
 | `readHostViewName` | `hostParams.ts` |  |
 | `hasHostView` | `hostParams.ts` |  |
 | `readChatPaneParams` | `hostParams.ts` |  |

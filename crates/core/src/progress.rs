@@ -409,6 +409,7 @@ pub fn entries_for(before: &SpaceState, fact: &Fact, after: &SpaceState) -> Vec<
         | Fact::CronChanged(_)
         | Fact::CronRemoved(_)
         | Fact::MachineChanged(_)
+        | Fact::MachineRemoved(_)
         | Fact::ConnectorChanged(_)
         | Fact::RuntimeInboxChanged(_) => {}
     }

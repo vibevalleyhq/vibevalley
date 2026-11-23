@@ -59,7 +59,8 @@
 - **结构化交接（`issue_report`）**：帮工经 `/mcp` 的 `issue_report` 交状态、问题、`checks` 与 `answer`（`Board::report`）；一轮没交汇报就从它说的话里读问题。
 - **统一持久信箱 `session_mailbox` 与带话**：工作区输入、私聊消息、工单评论与助手频道投递（`MailboxSource::ChannelOrchestrator`）均经 `session_mailbox`（按 `idempotency_key` 幂等去重，并记录 `source_message_id` 与部分索引，`pending` / `claimed` / `done` / `failed` / `withdrawn`）入队；频道消息删除时按 `source_message_id` 通过 `withdraw_mailbox_by_message` 统一撤回未领用的投递，重启可恢复。会话在干活时插进当前一轮，歇着时开下一轮，排队工单的话随派工一并交给帮工。
 - **并发上限**：全农场最多 6 个在干活的工单受控会话，单仓库默认 3 个；满了工单留在 `todo`（`stage: queued`），空出来按看板顺序补派；工作区直连会话（`controller: User`）不占工单并发槽位。
-- **无沙箱与无逐条权限确认（工单帮工）**：工单帮工在 worktree 里直接执行命令，农机的权限请求一律放行（`PermissionMode::Bypass`）；安全边界是服务端只听 `127.0.0.1`。
+- **无沙箱与无逐条权限确认（本地工单帮工）**：本地工单帮工在 worktree 里直接执行命令，农机的权限请求一律放行（`PermissionMode::Bypass`）；安全边界是主回环门只听 `127.0.0.1`。需要强隔离或远端算力时，可将角色或任务路由到经 `/api/v1/machine/ws` 接入的远程宿主机或一次性容器沙箱（`SandboxMachine`，见[执行层与运行机器](docs/subsystems/runtime.md)）。
+- **多机器路由、PR 优先远端交付与断线续传**：角色（`Agent.machineId`）与任务（`Issue.machineId`）均可指定目标执行机器（省略时默认由控制面路由到本地 `local`）。控制面通过无锁 `MachineRegistry` 解析 `RuntimeRef`（`(machineId, runtimeId)`）：命中 `LocalMachine` 时沿进程内路径零开销执行；命中 `RemoteMachine` 时由远端 `vibevalley machine up` 准备隔离 worktree（PR 优先分支推送交付）、通过本地回环代理将 `/mcp` 隧道回传控制面，并在 WebSocket 闪断重连后借带 `afterSeq` 的 `MachineSessionAttach` 无损补放事件而不中断正在运行的引擎进程。
 - **工作区直连对话、Swarm 旁路与独立交互提问通道**：工作区直连会话（`controller: User`、`policy: DirectCwd`、0 绑定启动）复用同一套 `AgentSession`、`oar::Session`、`session_mailbox`、`session_event` 与 `oar-voyage/3` 记录流，不占工单板 `space_limit` / `per_repo` 并发配额，也不进收件箱与像素农场；关闭标签页时由原生壳直接调 `session.closeWorkspace` 确定性停机回收；会话内可切换模型、思考深度与权限模式（`Ask` / `AcceptEdits` / `Bypass` / `ReadOnly`），真实会话标题经 `Session.title` 与 `SessionsSlice` 实时同步，Antigravity Swarm 与子代理通过只读旁路（mtime 缓存 + `256 KiB` 尾部裁剪 + 防符号链接/路径穿越）按需暴露 `swarm` 状态与 `session.childTranscript`；其中 `InteractionRequested`（如 Antigravity 的 `interaction_*` 提问）进入 `WaitingReply`，**即使在 `Bypass` 模式下也绝不自动放行**。
 - **会话向外发消息**：`Sessions::on_news` 订阅步骤与汇报中的记性；启动时在恢复中断轮之前挂上订阅，轨迹写入与记性落盘各自接收，会话不调用轨迹或记性服务。订阅同步完成，保持同一会话的步骤顺序。
 - **会话、信箱与轨迹统一落 SQLite（4 表 + 共享序号）**：`work_session` 收拢为 4 张表——`session`（含内嵌的 `agent_session`、`base`、`run` 列）、`session_run`（含内嵌 `subagent_summary` 列）、`session_mailbox`（含 `source_message_id`）与 `session_event`，单调编号统一走共享 `seq_counter`（`crates/server/src/db/{schema,queries,generated}/{work_session,shared}.*`）；枚举和嵌套字段在读库边界解码，坏值使读取失败。流式草稿按 `(session_id, seq)` 与 `revision` 原地增长，不进 `SpaceState`。
@@ -81,7 +82,7 @@
 
 ## 还没做的
 
-- 多台机器、MCP 连接观察：Rust 版从简，当前不在计划内。
+- MCP 连接观察：Rust 版从简，当前不在计划内。
 - `opencode`、`grok`、`kimi`、`codebuddy`、`qwen`、`qoder` 的真实厂商 CLI 实机验证：[持久执行与驱动验收](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)。
 
 ## 怎么验证

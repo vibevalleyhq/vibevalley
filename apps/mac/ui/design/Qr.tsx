@@ -1,36 +1,26 @@
-// Renders a QR code matrix computed in Rust (`host.qr`) onto a Canvas.
+// Renders a QR code matrix provided by `DesignHost.renderQr` onto a Canvas.
 import { Canvas, effect, signal } from "nsh";
 
-import { transport } from "../infra/transport";
-
-interface QrMatrix {
-  readonly size: number;
-  readonly rows: readonly string[];
-}
-
-function isQrMatrix(data: unknown): data is QrMatrix {
-  if (typeof data !== "object" || data === null) return false;
-  const candidate = data as { size?: unknown; rows?: unknown };
-  return typeof candidate.size === "number" && candidate.size > 0 && Array.isArray(candidate.rows);
-}
+import { useDesignHost, type QrMatrix } from "./host";
 
 /** A QR code of text, black on white with its quiet zone. */
 export function Qr(props: { text: string; size?: number; label: string }) {
+  const designHost = useDesignHost();
   const size = () => props.size ?? 208;
-  const matrix = signal<QrMatrix | null>(null);
+  const matrix = signal<QrMatrix | undefined>(undefined);
   let request = 0;
 
   effect(() => {
     const text = props.text;
     const seq = ++request;
-    void transport()
-      .call("host.qr", { text, border: 2 })
-      .then((envelope) => {
+    void designHost
+      .renderQr(text, 2)
+      .then((data) => {
         if (seq !== request) return;
-        matrix.set(envelope.bizCode === 0 && isQrMatrix(envelope.data) ? envelope.data : null);
+        matrix.set(data);
       })
       .catch(() => {
-        if (seq === request) matrix.set(null);
+        if (seq === request) matrix.set(undefined);
       });
   });
 
