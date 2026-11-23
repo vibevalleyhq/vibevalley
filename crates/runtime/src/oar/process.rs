@@ -22,10 +22,6 @@ use tokio::sync::{Mutex as AsyncMutex, Notify, oneshot, watch};
 use crate::oar::core::SessionCore;
 use crate::oar::{AgentError, EventKind, Installation, Result, StopReason, Usage};
 
-pub(crate) fn task_handle() -> tokio::runtime::Handle {
-    tokio::runtime::Handle::try_current().unwrap_or_else(|_| crate::rt::handle().clone())
-}
-
 /// Shared abort-grace watchdog across subprocess-backed `oar` drivers.
 /// Disarms immediately when the active turn finishes or the session exits;
 /// otherwise kills the child process after `grace` and marks the exit as aborted.
@@ -62,7 +58,7 @@ impl AbortWatchdog {
     {
         let this = Arc::clone(self);
         let turn = this.turns_finished.load(Ordering::SeqCst);
-        task_handle().spawn(async move {
+        crate::rt::current_or_global_handle().spawn(async move {
             let deadline = tokio::time::Instant::now() + grace;
             loop {
                 let notified = this.turn_done.notified();

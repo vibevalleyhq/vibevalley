@@ -10,10 +10,6 @@ use std::{
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
-fn task_handle() -> tokio::runtime::Handle {
-    tokio::runtime::Handle::try_current().unwrap_or_else(|_| crate::rt::handle().clone())
-}
-
 const WOKEN: &str = "__durable_woken_signal";
 type Phase = Arc<dyn Fn(&TaskContext) -> Result<Transition> + Send + Sync>;
 pub enum Transition {
@@ -210,7 +206,7 @@ impl Scheduler {
             wake: Notify::new(),
             shutdown: CancellationToken::new(),
         });
-        let handle = task_handle();
+        let handle = crate::rt::current_or_global_handle();
         let coord_is_current_thread = handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::CurrentThread;
         let e = Arc::clone(&engine);
         let coordinator = handle.spawn(run_scheduler(e, changes));

@@ -28,7 +28,6 @@ use serde_json::json;
 use tokio_util::sync::CancellationToken;
 
 use crate::oar::core::{CoreSession, Driver, SessionCore, check_cwd, render_text};
-use crate::oar::process::task_handle;
 use crate::oar::record::{self, Recorder};
 use crate::oar::{
     AgentError, Capabilities, ContentBlock, EventKind, FileChangeKind, Installation, McpServer, ModelInfo, PermissionDecision, Result, Runtime, Session,
@@ -377,7 +376,7 @@ impl Driver for ScriptedDriver {
         let answer = self.answers_rx.clone();
         let core = self.core.clone();
         let prompt = render_text(&content);
-        task_handle().spawn(async move {
+        crate::rt::current_or_global_handle().spawn(async move {
             let steps = match computed {
                 None => steps,
                 Some(turn) => {

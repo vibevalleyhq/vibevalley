@@ -29,7 +29,7 @@ use parking_lot::Mutex;
 use serde_json::{Map, Value, json};
 
 use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, rejected, rejection};
-use crate::oar::process::{AbortWatchdog, LineChild, Spawn, find_binary, run_capture, task_handle};
+use crate::oar::process::{AbortWatchdog, LineChild, Spawn, find_binary, run_capture};
 use crate::oar::record::{self, Recorder};
 use crate::oar::{
     AgentError, Capabilities, ChildTranscriptStep, ContentBlock, EventKind, FileChangeKind, Installation, InteractionDecision, InteractionOption, ModelInfo,
@@ -1890,7 +1890,7 @@ impl AcpRuntime {
             on_exit,
         )?;
         let _ = shared.child.set(child.clone());
-        task_handle().spawn(run_connection(
+        crate::rt::current_or_global_handle().spawn(run_connection(
             shared.clone(),
             child.clone(),
             incoming_rx,
