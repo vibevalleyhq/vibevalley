@@ -222,11 +222,17 @@ fn bash_streams_updates_respects_timeout_and_cancels_mid_run_under_500ms() {
     };
     let cancel_tool = TypedToolAdapter(Bash(cancel_ws));
     let handle = CancelHandle::new();
-    let cancel_ctx = ToolContext::with_cancel(handle.token());
+    let (ready_tx, ready_rx) = flume::bounded::<()>(1);
+    let mut cancel_ctx = ToolContext::with_cancel(handle.token());
+    cancel_ctx.on_update = Some(Arc::new(move |u| {
+        if u.text.contains("ready") {
+            let _ = ready_tx.try_send(());
+        }
+    }));
 
     let cancel_at = std::thread::scope(|scope| {
-        let running = scope.spawn(|| cancel_tool.execute_with_context(&json!({"command": "sleep 30"}), &cancel_ctx));
-        std::thread::sleep(Duration::from_millis(50));
+        let running = scope.spawn(|| cancel_tool.execute_with_context(&json!({"command": "echo ready; sleep 30"}), &cancel_ctx));
+        ready_rx.recv_timeout(Duration::from_secs(5)).expect("bash command started");
         let started = Instant::now();
         handle.cancel();
         let out = running.join().unwrap();

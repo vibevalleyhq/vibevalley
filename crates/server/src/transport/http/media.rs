@@ -65,31 +65,12 @@ pub(super) async fn upload(State(state): State<HttpState>, _local: LocalOnly, Pa
     };
     let stream = Box::pin(bounded_upload_stream(body, MAX, UPLOAD_TIMEOUT));
     let reader = SyncIoBridge::new(StreamReader::new(stream));
-    match tokio::task::spawn_blocking(move || inputs.upload(&id, Box::new(reader))).await {
-        Ok(Ok(input)) => reply(Envelope::of(Ok(input))),
-        Ok(Err(e)) => reply(Envelope::failure(&e)),
-        Err(e) => refuse(BizCode::InternalError, e.to_string()),
+    match inputs.upload_async(id, Box::new(reader)).await {
+        Ok(input) => reply(Envelope::of(Ok(input))),
+        Err(e) => reply(Envelope::failure(&e)),
     }
 }
-fn range(text: Option<&str>, size: u64) -> Option<(u64, u64)> {
-    if size == 0 {
-        return None;
-    }
-    let Some(text) = text else {
-        return Some((0, size - 1));
-    };
-    let (a, b) = text.strip_prefix("bytes=")?.split_once('-')?;
-    let number = |s: &str| {
-        if !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()) {
-            s.parse::<u64>().ok()
-        } else {
-            None
-        }
-    };
-    let start = if a.is_empty() { size.saturating_sub(number(b)?) } else { number(a)? };
-    let end = if !a.is_empty() && !b.is_empty() { number(b)?.min(size - 1) } else { size - 1 };
-    (start <= end && start < size).then_some((start, end))
-}
+
 pub(super) async fn content(State(state): State<HttpState>, _local: LocalOnlyStatus, Path(id): Path<String>, headers: HeaderMap) -> Response {
     let server = state.server;
     if !super::is_artifact_id(&id) {
@@ -98,7 +79,7 @@ pub(super) async fn content(State(state): State<HttpState>, _local: LocalOnlySta
     let Some(inputs) = server.media_inputs() else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    let Ok(Ok(found)) = tokio::task::spawn_blocking(move || inputs.content(&id)).await else {
+    let Ok(found) = inputs.content_async(id).await else {
         return StatusCode::NOT_FOUND.into_response();
     };
     let Ok(mut file) = tokio::fs::File::open(&found.path).await else {
@@ -109,8 +90,8 @@ pub(super) async fn content(State(state): State<HttpState>, _local: LocalOnlySta
     };
     let text = headers.get("range");
     let bounds = match text {
-        Some(v) => v.to_str().ok().and_then(|v| range(Some(v), size)),
-        None => range(None, size),
+        Some(v) => v.to_str().ok().and_then(|v| super::parse_byte_range(v, size)),
+        None => (size > 0).then_some((0, size - 1)),
     };
     let Some((start, end)) = bounds else {
         return (StatusCode::RANGE_NOT_SATISFIABLE, [("content-range", format!("bytes */{size}"))]).into_response();
@@ -154,10 +135,9 @@ pub(super) async fn speech(State(state): State<HttpState>, _local: LocalOnly, Pa
     let Some(streams) = server.speech_streams() else {
         return refuse(BizCode::ServiceUnavailable, "no speech here");
     };
-    let claim = match tokio::task::spawn_blocking(move || streams.claim(&id)).await {
-        Ok(Ok(c)) => c,
-        Ok(Err(e)) => return reply(Envelope::failure(&e)),
-        Err(_) => return refuse(BizCode::InternalError, "speech stream"),
+    let claim = match streams.claim(&id) {
+        Ok(c) => c,
+        Err(e) => return reply(Envelope::failure(&e)),
     };
     let gone = Gone(Some(claim.gone));
     let lines = claim.events.into_stream().map(move |event| {
@@ -178,7 +158,7 @@ pub(super) async fn speech(State(state): State<HttpState>, _local: LocalOnly, Pa
 
 #[cfg(test)]
 mod tests {
-    use super::range;
+    use super::super::parse_byte_range;
     #[test]
     fn byte_ranges() {
         for (s, want) in [
@@ -192,7 +172,9 @@ mod tests {
             ("bytes=0-1,2-3", None),
             ("bytes=+1-2", None),
         ] {
-            assert_eq!(range(Some(s), 10), want, "{s}");
+            assert_eq!(parse_byte_range(s, 10), want, "{s}");
         }
+        assert_eq!(parse_byte_range("bytes=-0", 10), None);
+        assert_eq!(parse_byte_range("bytes=0-0", 0), None);
     }
 }

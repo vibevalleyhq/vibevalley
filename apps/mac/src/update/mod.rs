@@ -323,7 +323,7 @@ fn resolve_login_shell_path(timeout: Duration) -> Option<String> {
             .spawn()
             .ok()?;
         let mut stdout = child.stdout.take()?;
-        let reader = vibevalley_runtime::rt::spawn(async move {
+        let reader = tokio::spawn(async move {
             let mut buf = Vec::new();
             let _ = stdout.read_to_end(&mut buf).await;
             buf
@@ -365,16 +365,30 @@ pub fn enter_bundle() {
 
 pub fn install(cx: &mut App) {
     let updater = updater().clone();
-    if updater.feed != Feed::Off {
+    let cancel = (updater.feed != Feed::Off).then(|| {
         let asking = updater.clone();
-        std::thread::spawn(move || {
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let task_cancel = cancel.clone();
+        vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+            let mut interval = tokio::time::interval(EVERY);
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
             loop {
-                asking.check();
-                std::thread::sleep(EVERY);
+                tokio::select! {
+                    biased;
+                    _ = task_cancel.cancelled() => break,
+                    _ = interval.tick() => {
+                        let check = asking.clone();
+                        let _ = tokio::task::spawn_blocking(move || check.check()).await;
+                    }
+                }
             }
         });
-    }
+        cancel
+    });
     cx.on_app_quit(move |_| {
+        if let Some(cancel) = &cancel {
+            cancel.cancel();
+        }
         updater.swap(false);
         async {}
     })

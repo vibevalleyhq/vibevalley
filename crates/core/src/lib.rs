@@ -6,6 +6,7 @@
 pub mod artifact;
 pub mod brief;
 pub mod channel;
+pub mod clock;
 #[cfg(feature = "collab")]
 pub mod collab;
 pub mod core;
@@ -24,6 +25,7 @@ pub mod scenario;
 pub mod status;
 pub mod text;
 
+pub use crate::clock::{Clock, ManualClock, SharedClock, SystemClock, system_clock};
 pub use crate::core::{
     Applied, Core, SliceMask, Transition, board_slice, collab_slice, cron_from_rules, cron_request_to_rules, cron_to_rules, empty_space_state, farm_frame,
     inbox_slice, ops_slice, reduce, sessions_slice, slice_bundle,

@@ -22,12 +22,13 @@ use serde_json::{Value, json};
 use sqlx::{Connection, SqliteConnection};
 use tokio::sync::{Mutex as AsyncMutex, OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
+use vibevalley_core::{SharedClock, system_clock};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, Attachment, BizCode, Caller, Fact, JsNumber, MediaAudioFormat, MediaAudioMetadata, MediaAudioMetadataSource, MediaAudioResult, MediaCleanup,
     MediaCloneRequest, MediaImageJob, MediaImageJobKind, MediaImageRequest, MediaInputKind, MediaInputReference, MediaInputRequest, MediaJob, MediaPhase,
     MediaSource, MediaSpeakersRequest, MediaSpeechJob, MediaSpeechJobKind, MediaSpeechRequest, MediaTranscriptionRequest, MediaUnderstandingPhase,
-    MediaUnderstandingRequest, MediaUnderstandingResult, MediaVoiceDesignRequest, Preview, ops,
+    MediaUnderstandingRequest, MediaUnderstandingResult, MediaVoiceDesignRequest, Millis, Preview, ops,
 };
 
 use super::remote::{RemoteFile, RemoteState};
@@ -41,7 +42,6 @@ use crate::modules::content::media::inputs::Inputs;
 use crate::modules::infra::http::{Fetch, Request, public_https};
 use crate::modules::infra::provider::{IMAGE_MODELS, Use};
 use crate::modules::infra::setting::Setting;
-use crate::now;
 use crate::ports::ChannelAnnouncePort;
 
 /// Jobs active at once, every kind together.
@@ -342,8 +342,7 @@ pub(super) struct Record {
 }
 
 impl Record {
-    pub(super) fn new(ask: Ask, source: MediaSource, connection: String, revision: i64, model: String, fingerprint: String) -> Record {
-        let at = now();
+    pub(super) fn new(ask: Ask, source: MediaSource, connection: String, revision: i64, model: String, fingerprint: String, at: Millis) -> Record {
         Record {
             ask,
             source,
@@ -546,6 +545,7 @@ pub struct Jobs {
     pub(super) inputs: Arc<Inputs>,
     pub(super) channel: Arc<dyn ChannelAnnouncePort>,
     hub: Weak<Hub>,
+    clock: SharedClock,
     closed: AtomicBool,
     me: OnceLock<Weak<Jobs>>,
     streams: Mutex<HashMap<String, Stream>>,
@@ -555,6 +555,11 @@ pub struct Jobs {
 
 impl Jobs {
     pub fn open(p: Parts) -> Result<Arc<Jobs>, ApiError> {
+        Self::open_with_clock(p, system_clock())
+    }
+
+    /// Same as [`Jobs::open`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
+    pub fn open_with_clock(p: Parts, clock: SharedClock) -> Result<Arc<Jobs>, ApiError> {
         let cancel = p.hub.upgrade().map(|h| h.child_token()).unwrap_or_default();
         let jobs = Arc::new(Jobs {
             db: p.db,
@@ -570,6 +575,7 @@ impl Jobs {
             inputs: p.inputs,
             channel: p.channel,
             hub: p.hub,
+            clock,
             closed: AtomicBool::new(false),
             me: OnceLock::new(),
             streams: Mutex::default(),
@@ -608,7 +614,7 @@ impl Jobs {
         if let Some(hub) = self.hub.upgrade() {
             hub.spawn_task(fut);
         } else {
-            vibevalley_runtime::rt::handle().spawn(fut);
+            vibevalley_runtime::rt::current_or_global_handle().spawn(fut);
         }
     }
 
@@ -657,8 +663,12 @@ impl Jobs {
         Self::decode_rows(q::authorized_jobs(&mut *db).await.map_err(storage)?)
     }
 
-    async fn save_db(db: &mut SqliteConnection, r: &mut Record) -> Result<(), ApiError> {
-        r.updated_at = now();
+    pub(super) fn now_ms(&self) -> Millis {
+        self.clock.now_ms()
+    }
+
+    async fn save_db(db: &mut SqliteConnection, r: &mut Record, at: Millis) -> Result<(), ApiError> {
+        r.updated_at = at;
         q::save_job(
             db,
             q::SaveJobParams {
@@ -688,7 +698,7 @@ impl Jobs {
             Ok(jobs) => {
                 if let Some(hub) = self.hub.upgrade() {
                     let jobs = jobs.iter().map(Record::view).collect();
-                    hub.apply(vec![Fact::MediaChanged(vibevalley_protocol::FactMediaChanged { at: now(), jobs })]);
+                    hub.apply(vec![Fact::MediaChanged(vibevalley_protocol::FactMediaChanged { at: self.now_ms(), jobs })]);
                 }
             }
             Err(e) => eprintln!("media: {}", e.message),
@@ -712,7 +722,7 @@ impl Jobs {
             if !was_active && active(r.phase) {
                 Self::require_capacity_db(&mut tx).await?;
             }
-            Self::save_db(&mut tx, &mut r).await?;
+            Self::save_db(&mut tx, &mut r, self.now_ms()).await?;
             tx.commit().await.map_err(storage)?;
         }
         self.publish_async().await;
@@ -768,7 +778,7 @@ impl Jobs {
             if !ids.is_empty() {
                 self.inputs.pin_in_async(&mut tx, &ids, r.id()).await?;
             }
-            Self::save_db(&mut tx, &mut r).await?;
+            Self::save_db(&mut tx, &mut r, self.now_ms()).await?;
             tx.commit().await.map_err(storage)?;
             if let Some(held) = held {
                 self.hold(r.id(), held);
@@ -809,6 +819,7 @@ impl Jobs {
             account.revision,
             account.model.clone(),
             account.fingerprint.clone(),
+            self.now_ms(),
         );
         self.admit_async(r, Some(Held::Image { account, body })).await.map(|r| image_view(&r))
     }
@@ -879,6 +890,7 @@ impl Jobs {
             account.revision,
             account.model.clone(),
             account.fingerprint.clone(),
+            self.now_ms(),
         );
         self.admit_async(r, Some(Held::Speech { account, body })).await.map(|r| speech_view(&r))
     }
@@ -935,7 +947,7 @@ impl Jobs {
             if let Some(hub) = self.hub.upgrade() {
                 hub.spawn_blocking_task(run_job);
             } else {
-                vibevalley_runtime::rt::handle().spawn_blocking(run_job);
+                vibevalley_runtime::rt::current_or_global_handle().spawn_blocking(run_job);
             }
         }
     }
@@ -1389,7 +1401,7 @@ impl Jobs {
         if let Some(hub) = self.hub.upgrade() {
             hub.spawn_task(cleanup);
         } else {
-            vibevalley_runtime::rt::handle().spawn(cleanup);
+            vibevalley_runtime::rt::current_or_global_handle().spawn(cleanup);
         }
     }
 
@@ -1813,15 +1825,122 @@ impl crate::transport::api::media::SpeechStreams for Jobs {
         Ok(crate::transport::api::media::SpeechClaim {
             events,
             // The page gone: its job is canceled and its work stopped (a finished one is left as it is).
+            // Runs asynchronously so `Drop` never calls `rt::block_on` on a Tokio I/O worker.
             gone: Box::new(move || {
                 let Some(me) = me.upgrade() else { return };
                 me.streams.lock().remove(&job);
-                let _ = me.change(&job, &[Phase::Queued, Phase::Generating], |r| {
-                    r.phase = Phase::Canceled;
-                    r.problem = t("server.media.canceled", &[]);
-                });
-                me.stop_run(&job);
+                let hub = me.hub.upgrade();
+                let fut = async move {
+                    let _ = me
+                        .change_async(&job, &[Phase::Queued, Phase::Generating], |r| {
+                            r.phase = Phase::Canceled;
+                            r.problem = t("server.media.canceled", &[]);
+                        })
+                        .await;
+                    me.stop_run(&job);
+                };
+                if let Some(hub) = hub {
+                    hub.spawn_task(fut);
+                } else {
+                    vibevalley_runtime::rt::current_or_global_handle().spawn(fut);
+                }
             }),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::modules::collab::channel::Chat;
+    use crate::modules::infra::setting::SettingConfig;
+    use crate::transport::api::media::SpeechStreams;
+
+    #[test]
+    fn regression_speech_claim_gone_does_not_block_tokio_worker_on_drop() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = ServerDb::open(dir.path()).unwrap();
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let setting = Setting::open(SettingConfig {
+            home: dir.path().to_path_buf(),
+            work_root: dir.path().to_path_buf(),
+            version: "0.1.0-test".into(),
+            deepseek_api_key: String::new(),
+        });
+        let files = Attachments::open(dir.path(), db.clone());
+        let chat = Chat::open(db.clone(), &hub, files.clone(), None, false).unwrap();
+        let inputs = Inputs::open(dir.path(), db.clone(), files.clone()).unwrap();
+        let (vendor, download) = crate::offline::network();
+        let jobs = Jobs::open(Parts {
+            db: db.clone(),
+            hub: Arc::downgrade(&hub),
+            setting,
+            files,
+            inputs: inputs.clone(),
+            channel: chat,
+            vendor,
+            download,
+        })
+        .unwrap();
+
+        let job_id = "speech-drop-1";
+        let req = MediaSpeechRequest {
+            id: job_id.into(),
+            text: "hello".into(),
+            voice: "alloy".into(),
+            format: MediaAudioFormat::Pcm,
+            connection: "moss".into(),
+            revision: 1,
+            streaming: Some(true),
+            asynchronous: None,
+        };
+        let mut rec = Record::new(
+            Ask::Speech(req),
+            MediaSource::User {},
+            "moss".into(),
+            1,
+            "moss-tts-1.0-pro".into(),
+            "fp".into(),
+            1_700_000_000_000,
+        );
+        rec.phase = Phase::Generating;
+        vibevalley_runtime::rt::block_on(async {
+            let mut conn = db.write_pool().acquire().await.unwrap();
+            Jobs::save_db(&mut conn, &mut rec, 1_700_000_000_000).await.unwrap();
+        });
+        let (tx, rx) = flume::bounded(16);
+        jobs.streams.lock().insert(job_id.into(), Stream { tx, rx, claimed: false });
+
+        let claim = jobs.claim(job_id).unwrap();
+
+        // Hold the sole write_pool connection on the Tokio worker while invoking `gone`:
+        // if `gone` still called `rt::block_on(change_async)`, this would deadlock before returning.
+        let jobs_async = jobs.clone();
+        let db_async = db.clone();
+        let hub_async = hub.clone();
+        vibevalley_runtime::rt::block_on(async move {
+            vibevalley_runtime::rt::spawn(async move {
+                let held_write = db_async.write_pool().acquire().await.unwrap();
+                (claim.gone)();
+                assert!(!jobs_async.streams.lock().contains_key(job_id));
+                drop(held_write);
+
+                let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
+                loop {
+                    if jobs_async.found_async(job_id).await.unwrap().phase == Phase::Canceled {
+                        break;
+                    }
+                    assert!(tokio::time::Instant::now() < deadline, "SpeechClaim::gone must cancel the job asynchronously");
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+                jobs_async.close();
+                hub_async.close_async().await;
+            })
+            .await
+            .unwrap();
+        });
+
+        inputs.close();
+        db.close();
     }
 }

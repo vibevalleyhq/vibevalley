@@ -269,7 +269,7 @@ fn test_submissions_and_settle_wakeup(store: &Store) -> Result<()> {
         Ok(Transition::Complete(tc.signal.as_ref().expect("settlement signal").payload.clone()))
     });
     sched.start(parent)?;
-    thread::sleep(Duration::from_millis(20));
+    assert_eq!(store.read(|r| r.task("parent-task"))?.status, TaskStatus::Sleeping);
 
     store.write(|tx| {
         tx.settle(&sub.id, SubmissionStatus::Done, &json!({"answer": 42}))?;

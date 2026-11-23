@@ -16,13 +16,16 @@
 //! assert_eq!(text.as_deref(), Some("hi there"));
 //! ```
 
+use std::future::Future;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use parking_lot::Mutex;
 use serde_json::json;
+use tokio_util::sync::CancellationToken;
 
 use crate::oar::core::{CoreSession, Driver, SessionCore, check_cwd, render_text};
 use crate::oar::record::{self, Recorder};
@@ -266,18 +269,13 @@ pub(crate) fn refuse_by_capabilities(runtime: &str, capabilities: &Capabilities,
     Ok(())
 }
 
-struct TurnControl {
-    abort: AtomicBool,
-    answer: flume::Receiver<PermissionDecision>,
-}
-
 struct ScriptedDriver {
     core: Arc<SessionCore>,
     script: Script,
     /// The session's folder and appended system prompt, for computed turns.
     opened: (PathBuf, Option<String>, Vec<McpServer>),
     turn_index: AtomicUsize,
-    current: Mutex<Option<Arc<TurnControl>>>,
+    current: Mutex<Option<CancellationToken>>,
     answers: flume::Sender<PermissionDecision>,
     answers_rx: flume::Receiver<PermissionDecision>,
 }
@@ -289,74 +287,81 @@ enum Flow {
     Aborted,
 }
 
-fn run_steps(core: &SessionCore, control: &TurnControl, steps: &[Step], prompt: &str) -> Flow {
-    for step in steps {
-        if control.abort.load(Ordering::SeqCst) {
+fn run_steps<'a>(
+    core: &'a SessionCore,
+    cancel: &'a CancellationToken,
+    answer: &'a flume::Receiver<PermissionDecision>,
+    steps: &'a [Step],
+    prompt: &'a str,
+) -> Pin<Box<dyn Future<Output = Flow> + Send + 'a>> {
+    Box::pin(async move {
+        if cancel.is_cancelled() {
             return Flow::Aborted;
         }
-        match step {
-            Step::Emit(kind) | Step::EmitFrom(_, kind) => {
-                let path = match step {
-                    Step::EmitFrom(path, _) => path.clone(),
-                    _ => Vec::new(),
-                };
-                let kind = match kind {
-                    EventKind::TextDelta { text } => EventKind::TextDelta {
-                        text: text.replace("{prompt}", prompt),
-                    },
-                    EventKind::ThinkingDelta { text } => EventKind::ThinkingDelta {
-                        text: text.replace("{prompt}", prompt),
-                    },
-                    other => other.clone(),
-                };
-                let finished = path.is_empty() && matches!(kind, EventKind::TurnFinished { .. });
-                core.emit(path, kind);
-                if finished {
-                    return Flow::Finished;
-                }
+        for step in steps {
+            if cancel.is_cancelled() {
+                return Flow::Aborted;
             }
-            Step::Sleep(duration) => {
-                let until = std::time::Instant::now() + *duration;
-                while std::time::Instant::now() < until {
-                    if control.abort.load(Ordering::SeqCst) {
-                        return Flow::Aborted;
-                    }
-                    std::thread::sleep(Duration::from_millis(5).min(*duration));
-                }
-            }
-            Step::Permission {
-                request_id,
-                tool,
-                input,
-                summary,
-                denied,
-            } => {
-                core.emit_root(EventKind::PermissionRequested {
-                    request_id: request_id.clone(),
-                    tool: tool.clone(),
-                    input: input.clone(),
-                    summary: summary.clone(),
-                });
-                let decision = loop {
-                    if control.abort.load(Ordering::SeqCst) {
-                        return Flow::Aborted;
-                    }
-                    match control.answer.recv_timeout(Duration::from_millis(10)) {
-                        Ok(decision) => break decision,
-                        Err(flume::RecvTimeoutError::Timeout) => {}
-                        Err(flume::RecvTimeoutError::Disconnected) => return Flow::Aborted,
-                    }
-                };
-                if matches!(decision, PermissionDecision::Deny { .. }) {
-                    return match run_steps(core, control, denied, prompt) {
-                        Flow::Continue => Flow::EndTurn,
-                        other => other,
+            match step {
+                Step::Emit(kind) | Step::EmitFrom(_, kind) => {
+                    let path = match step {
+                        Step::EmitFrom(path, _) => path.clone(),
+                        _ => Vec::new(),
                     };
+                    let kind = match kind {
+                        EventKind::TextDelta { text } => EventKind::TextDelta {
+                            text: text.replace("{prompt}", prompt),
+                        },
+                        EventKind::ThinkingDelta { text } => EventKind::ThinkingDelta {
+                            text: text.replace("{prompt}", prompt),
+                        },
+                        other => other.clone(),
+                    };
+                    let finished = path.is_empty() && matches!(kind, EventKind::TurnFinished { .. });
+                    core.emit(path, kind);
+                    if finished {
+                        return Flow::Finished;
+                    }
+                }
+                Step::Sleep(duration) => {
+                    tokio::select! {
+                        biased;
+                        _ = cancel.cancelled() => return Flow::Aborted,
+                        _ = tokio::time::sleep(*duration) => {}
+                    }
+                }
+                Step::Permission {
+                    request_id,
+                    tool,
+                    input,
+                    summary,
+                    denied,
+                } => {
+                    core.emit_root(EventKind::PermissionRequested {
+                        request_id: request_id.clone(),
+                        tool: tool.clone(),
+                        input: input.clone(),
+                        summary: summary.clone(),
+                    });
+                    let decision = tokio::select! {
+                        biased;
+                        _ = cancel.cancelled() => return Flow::Aborted,
+                        res = answer.recv_async() => match res {
+                            Ok(decision) => decision,
+                            Err(_) => return Flow::Aborted,
+                        },
+                    };
+                    if matches!(decision, PermissionDecision::Deny { .. }) {
+                        return match run_steps(core, cancel, answer, denied, prompt).await {
+                            Flow::Continue => Flow::EndTurn,
+                            other => other,
+                        };
+                    }
                 }
             }
         }
-    }
-    Flow::Continue
+        Flow::Continue
+    })
 }
 
 impl Driver for ScriptedDriver {
@@ -366,27 +371,26 @@ impl Driver for ScriptedDriver {
         let computed = self.script.computed.clone();
         let opened = self.opened.clone();
         while self.answers_rx.try_recv().is_ok() {}
-        let control = Arc::new(TurnControl {
-            abort: AtomicBool::new(false),
-            answer: self.answers_rx.clone(),
-        });
-        *self.current.lock() = Some(control.clone());
+        let cancel = CancellationToken::new();
+        *self.current.lock() = Some(cancel.clone());
+        let answer = self.answers_rx.clone();
         let core = self.core.clone();
         let prompt = render_text(&content);
-        std::thread::Builder::new()
-            .name("vibevalley-agent-scripted".into())
-            .spawn(move || {
-                let steps = match &computed {
-                    None => steps,
-                    Some(turn) => match turn(&TurnAsk {
+        crate::rt::current_or_global_handle().spawn(async move {
+            let steps = match computed {
+                None => steps,
+                Some(turn) => {
+                    // Computed test callbacks may perform blocking git/HTTP work (e.g. `reqwest::blocking`).
+                    let ask = TurnAsk {
                         prompt: prompt.clone(),
                         turn: index,
-                        cwd: opened.0.clone(),
-                        append_system_prompt: opened.1.clone(),
-                        mcp_servers: opened.2.clone(),
-                    }) {
-                        Ok(steps) => steps,
-                        Err(message) => {
+                        cwd: opened.0,
+                        append_system_prompt: opened.1,
+                        mcp_servers: opened.2,
+                    };
+                    match tokio::task::spawn_blocking(move || turn(&ask)).await {
+                        Ok(Ok(steps)) => steps,
+                        Ok(Err(message)) => {
                             core.emit_root(EventKind::Error { message });
                             core.emit_root(EventKind::TurnFinished {
                                 reason: StopReason::Error,
@@ -394,19 +398,29 @@ impl Driver for ScriptedDriver {
                             });
                             return;
                         }
-                    },
-                };
-                let reason = match run_steps(&core, &control, &steps, &prompt) {
-                    Flow::Finished => return,
-                    Flow::Aborted => StopReason::Aborted,
-                    Flow::Continue | Flow::EndTurn => StopReason::Completed,
-                };
-                core.emit_root(EventKind::TurnFinished {
-                    reason,
-                    usage: Usage::default(),
-                });
-            })
-            .map_err(|e| AgentError::Io(e.to_string()))?;
+                        Err(err) => {
+                            core.emit_root(EventKind::Error {
+                                message: format!("scripted turn panicked: {err}"),
+                            });
+                            core.emit_root(EventKind::TurnFinished {
+                                reason: StopReason::Error,
+                                usage: Usage::default(),
+                            });
+                            return;
+                        }
+                    }
+                }
+            };
+            let reason = match run_steps(&core, &cancel, &answer, &steps, &prompt).await {
+                Flow::Finished => return,
+                Flow::Aborted => StopReason::Aborted,
+                Flow::Continue | Flow::EndTurn => StopReason::Completed,
+            };
+            core.emit_root(EventKind::TurnFinished {
+                reason,
+                usage: Usage::default(),
+            });
+        });
         Ok(())
     }
 
@@ -415,8 +429,8 @@ impl Driver for ScriptedDriver {
     }
 
     fn abort(&self) -> Result<()> {
-        if let Some(control) = self.current.lock().as_ref() {
-            control.abort.store(true, Ordering::SeqCst);
+        if let Some(cancel) = self.current.lock().as_ref() {
+            cancel.cancel();
         }
         Ok(())
     }
@@ -491,5 +505,139 @@ impl Runtime for ScriptedRuntime {
             answers_rx,
         };
         Ok(CoreSession::new(core, driver, self.capabilities))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn scripted_driver_delayed_turn_advances_on_virtual_clock() {
+        let wall = std::time::Instant::now();
+        let runtime = ScriptedRuntime::new(
+            "scripted-delay",
+            Script::new().turn(vec![Step::text("before "), Step::Sleep(Duration::from_secs(30)), Step::text("after")]),
+        );
+        let session = runtime
+            .open(SessionOptions {
+                cwd: std::env::temp_dir(),
+                ..Default::default()
+            })
+            .unwrap();
+        let events = session.events();
+        session.prompt(vec![ContentBlock::Text("go".into())]).unwrap();
+
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(29)).await;
+        tokio::task::yield_now().await;
+        let early: Vec<_> = events.try_iter().collect();
+        assert!(
+            early.iter().any(|e| matches!(&e.kind, EventKind::TextDelta { text } if text == "before ")),
+            "expected first delta before sleep: {early:?}"
+        );
+        assert!(
+            !early.iter().any(|e| matches!(e.kind, EventKind::TurnFinished { .. })),
+            "turn should still be sleeping at 29s: {early:?}"
+        );
+
+        tokio::time::advance(Duration::from_secs(1)).await;
+        tokio::task::yield_now().await;
+        let tail: Vec<_> = events.try_iter().collect();
+        assert!(
+            tail.iter().any(|e| matches!(&e.kind, EventKind::TextDelta { text } if text == "after")),
+            "expected second delta after 30s: {tail:?}"
+        );
+        assert!(
+            tail.iter().any(|e| matches!(
+                e.kind,
+                EventKind::TurnFinished {
+                    reason: StopReason::Completed,
+                    ..
+                }
+            )),
+            "expected Completed TurnFinished: {tail:?}"
+        );
+        assert!(wall.elapsed() < Duration::from_secs(1), "virtual clock took {:?}", wall.elapsed());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn scripted_driver_cancels_sleeping_turn_instantly() {
+        let wall = std::time::Instant::now();
+        let runtime = ScriptedRuntime::new(
+            "scripted-cancel",
+            Script::new().turn(vec![Step::Sleep(Duration::from_secs(600)), Step::text("unreachable")]),
+        );
+        let session = runtime
+            .open(SessionOptions {
+                cwd: std::env::temp_dir(),
+                ..Default::default()
+            })
+            .unwrap();
+        let events = session.events();
+        session.prompt(vec![ContentBlock::Text("wait".into())]).unwrap();
+
+        tokio::task::yield_now().await;
+        session.abort().unwrap();
+        let finished = tokio::time::timeout(Duration::from_millis(10), async {
+            loop {
+                let event = events.recv_async().await.unwrap();
+                if let EventKind::TurnFinished { reason, .. } = event.kind {
+                    return reason;
+                }
+            }
+        })
+        .await
+        .expect("abort should finish sleeping turn immediately");
+        assert_eq!(finished, StopReason::Aborted);
+        assert!(wall.elapsed() < Duration::from_secs(1), "cancel took {:?}", wall.elapsed());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn scripted_driver_cancels_permission_wait_instantly() {
+        let wall = std::time::Instant::now();
+        let runtime = ScriptedRuntime::new(
+            "scripted-perm-cancel",
+            Script::new().turn(vec![Step::Permission {
+                request_id: "perm-1".into(),
+                tool: "Bash".into(),
+                input: json!({ "command": "echo hi" }),
+                summary: "Run echo".into(),
+                denied: vec![Step::text("denied")],
+            }]),
+        );
+        let session = runtime
+            .open(SessionOptions {
+                cwd: std::env::temp_dir(),
+                ..Default::default()
+            })
+            .unwrap();
+        let events = session.events();
+        session.prompt(vec![ContentBlock::Text("ask".into())]).unwrap();
+
+        tokio::time::timeout(Duration::from_millis(10), async {
+            loop {
+                let event = events.recv_async().await.unwrap();
+                if matches!(event.kind, EventKind::PermissionRequested { .. }) {
+                    return;
+                }
+            }
+        })
+        .await
+        .expect("permission request should arrive");
+
+        session.abort().unwrap();
+        let finished = tokio::time::timeout(Duration::from_millis(10), async {
+            loop {
+                let event = events.recv_async().await.unwrap();
+                if let EventKind::TurnFinished { reason, .. } = event.kind {
+                    return reason;
+                }
+            }
+        })
+        .await
+        .expect("abort should finish permission wait immediately");
+        assert_eq!(finished, StopReason::Aborted);
+        assert!(wall.elapsed() < Duration::from_secs(1), "cancel took {:?}", wall.elapsed());
     }
 }

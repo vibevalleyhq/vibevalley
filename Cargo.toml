@@ -33,6 +33,7 @@ flume = "0.12.0"
 futures-util = { version = "0.3.34", features = ["sink"] }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
 jiff = { version = "1.0.1", default-features = false, features = ["std", "tz-system", "tzdb-zoneinfo", "perf-inline"] }
+loom = "0.7"
 loro = { version = "1.18.0", default-features = false }
 parking_lot = "0.12"
 regex = "1.13.1"
@@ -47,7 +48,7 @@ thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["fs", "macros", "net", "process", "rt", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 tokio-tungstenite = { version = "0.29.0", default-features = false, features = ["connect", "handshake", "rustls-tls-native-roots"] }
-tokio-util = { version = "0.7.20", features = ["rt", "io", "io-util"] }
+tokio-util = { version = "0.7.20", features = ["rt", "io", "io-util", "codec"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 url = "2.5.8"
@@ -98,3 +99,9 @@ opt-level = 2
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
+
+[profile.loom]
+inherits = "dev"
+opt-level = 2
+debug = false
+incremental = true

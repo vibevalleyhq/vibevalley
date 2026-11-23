@@ -14,17 +14,6 @@ use vibevalley_runtime::oar::scripted::{Script, ScriptedRuntime};
 use vibevalley_runtime::oar::{Capabilities, Installation, ModelInfo, Runtime, Session, SessionOptions};
 use vibevalley_server::modules::collab::channel::DeliveryTargetKind;
 
-fn until<T>(what: &str, mut f: impl FnMut() -> Option<T>) -> T {
-    let deadline = Instant::now() + Duration::from_secs(30);
-    loop {
-        if let Some(v) = f() {
-            return v;
-        }
-        assert!(Instant::now() < deadline, "waited for {what}");
-        std::thread::sleep(Duration::from_millis(50));
-    }
-}
-
 #[test]
 fn the_watch_routes_the_chat_to_a_session() {
     vibevalley_i18n::set_locale("zh");
@@ -52,7 +41,7 @@ fn the_watch_routes_the_chat_to_a_session() {
     let issue = call("issue.create", json!({ "title": "say hello", "repo": "farm", "agent": helper.id }));
     let id = issue["id"].as_str().unwrap().to_string();
     call("issue.status.update", json!({ "id": id, "status": "todo" }));
-    let session = until("the session", || {
+    let session = crate::support::wait_until_transition(&hub, Duration::from_secs(30), "the session", || {
         started
             .test_internals()
             .board
@@ -68,10 +57,10 @@ fn the_watch_routes_the_chat_to_a_session() {
             .map(|a| a.iter().filter(|e| e["type"] == "run/end").count())
             .unwrap_or(0)
     };
-    until("the first run to end", || (runs(&session.id) >= 1).then_some(()));
+    crate::support::wait_until_live(&hub, Duration::from_secs(30), "the first run to end", || (runs(&session.id) >= 1).then_some(()));
 
     // The thread hangs under the dispatch in #general; the session is seated there.
-    let thread = until("the issue's thread", || chat.issue_thread_id(&id));
+    let thread = crate::support::wait_until_channel_event(&chat, Duration::from_secs(30), "the issue's thread", || chat.issue_thread_id(&id));
     assert_eq!(chat.home_of(&session.id).as_deref(), Some(thread.as_str()));
     let general = chat.default_channel();
     let said = call("channel.message.list", json!({ "id": general }));
@@ -86,7 +75,7 @@ fn the_watch_routes_the_chat_to_a_session() {
     assert_eq!(call("issue.conversation.get", json!({ "id": id })).as_str(), thread_id.as_deref());
 
     // The report lands in the thread from the session.
-    until("the report", || {
+    crate::support::wait_until_channel_event(&chat, Duration::from_secs(30), "the report", || {
         let rows = chat.issue_messages(&id).ok()?;
         rows.iter().any(|m| m.from == session.id).then_some(())
     });
@@ -95,12 +84,14 @@ fn the_watch_routes_the_chat_to_a_session() {
     call("issue.comment.create", json!({ "id": id, "text": "再说一遍" }));
     let rows = chat.issue_messages(&id).unwrap();
     let mine = rows.iter().rev().find(|m| m.text == "再说一遍").unwrap_or_else(|| panic!("{rows:?}"));
-    until("👀 on the comment", || {
+    crate::support::wait_until_channel_event(&chat, Duration::from_secs(30), "👀 on the comment", || {
         let seen = call("channel.message.list", json!({ "id": thread }));
         let mine_now = seen.as_array()?.iter().find(|m| m["id"] == mine.id.as_str())?;
         mine_now["reactions"].to_string().contains(&session.id).then_some(())
     });
-    until("the second run to end", || (runs(&session.id) >= 2).then_some(()));
+    crate::support::wait_until_live(&hub, Duration::from_secs(30), "the second run to end", || {
+        (runs(&session.id) >= 2).then_some(())
+    });
 
     // Words around in #general wait in SQLite `channel_delivery` for the session's next wake.
     call("channel.message.send", json!({ "id": general, "text": "大家好", "sendKey": "around" }));
@@ -110,7 +101,7 @@ fn the_watch_routes_the_chat_to_a_session() {
         .unwrap()
         .to_string();
     // Wait until the orchestrator settles its own delivery so only the session's passive delivery stays pending.
-    until("1 pending delivery on ambient message", || {
+    crate::support::wait_until_settled(Some(&hub), Duration::from_secs(30), "1 pending delivery on ambient message", || {
         let preview = call("channel.message.previewDelete", json!({ "id": around_id }));
         preview["does"].to_string().contains("1 份不再送").then_some(())
     });
@@ -120,11 +111,11 @@ fn the_watch_routes_the_chat_to_a_session() {
         "channel.message.send",
         json!({ "id": general, "text": format!("@{} 看一下", session.id), "sendKey": "named" }),
     );
-    until("the third run to end", || (runs(&session.id) >= 3).then_some(()));
+    crate::support::wait_until_live(&hub, Duration::from_secs(30), "the third run to end", || (runs(&session.id) >= 3).then_some(()));
     let events = call("session.event.list", json!({ "id": session.id }));
     let asked = events.to_string();
     assert!(asked.contains("[输入] 有 2 条给你的新消息"), "{asked}");
-    until("ambient delivery settled", || {
+    crate::support::wait_until_settled(Some(&hub), Duration::from_secs(30), "ambient delivery settled", || {
         let preview = call("channel.message.previewDelete", json!({ "id": around_id }));
         (preview["does"].as_array()?.len() == 1).then_some(())
     });
@@ -250,7 +241,7 @@ fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
 
     // Unblock `runtime.open` and verify the direct-channel talk settles and reports cleanly.
     let _ = release_tx.send(());
-    until("direct talk report landed", || {
+    crate::support::wait_until_channel_event(started.test_internals().chat, Duration::from_secs(30), "direct talk report landed", || {
         let rows = call("channel.message.list", json!({ "id": direct }));
         rows.as_array()?.iter().any(|m| m["kind"] == "report").then_some(())
     });
@@ -337,7 +328,7 @@ fn pr2_direct_talk_reopen_passes_resume() {
 
     s1.hub
         .call_as(Caller::User, "channel.message.send", json!({ "id": direct, "text": "第一轮", "sendKey": "t1" }));
-    until("first direct talk report", || {
+    crate::support::wait_until_channel_event(s1.test_internals().chat, Duration::from_secs(30), "first direct talk report", || {
         let rows = s1.hub.call_as(Caller::User, "channel.message.list", json!({ "id": direct })).data?;
         rows.as_array()?.iter().any(|m| m["kind"] == "report" && m["text"] == "round-1").then_some(())
     });
@@ -350,7 +341,7 @@ fn pr2_direct_talk_reopen_passes_resume() {
     let s2 = open_server(resumes.clone(), "round-2");
     s2.hub
         .call_as(Caller::User, "channel.message.send", json!({ "id": direct, "text": "第二轮", "sendKey": "t2" }));
-    until("second direct talk report", || {
+    crate::support::wait_until_channel_event(s2.test_internals().chat, Duration::from_secs(30), "second direct talk report", || {
         let rows = s2.hub.call_as(Caller::User, "channel.message.list", json!({ "id": direct })).data?;
         rows.as_array()?.iter().any(|m| m["kind"] == "report" && m["text"] == "round-2").then_some(())
     });
@@ -412,26 +403,36 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
         .unwrap()
         .to_string();
     let owner = format!("profile:{}", helper.id);
-    until("second message queued in mailbox", || {
+    crate::support::wait_until_settled(Some(&started.hub), Duration::from_secs(30), "second message queued in mailbox", || {
         let entries = started.test_internals().board.sessions().mailbox_entries(&owner).ok()?;
         entries.into_iter().find(|e| e.payload == "撤回这条" && e.status == MailboxStatus::Pending)
     });
 
     call("channel.message.delete", json!({ "id": msg2_id }));
-    until("deleted channel message withdraws pending mailbox entry", || {
-        let entries = started.test_internals().board.sessions().mailbox_entries(&owner).ok()?;
-        entries.into_iter().find(|e| e.payload == "撤回这条" && e.status == MailboxStatus::Withdrawn)
-    });
+    crate::support::wait_until_settled(
+        Some(&started.hub),
+        Duration::from_secs(30),
+        "deleted channel message withdraws pending mailbox entry",
+        || {
+            let entries = started.test_internals().board.sessions().mailbox_entries(&owner).ok()?;
+            entries.into_iter().find(|e| e.payload == "撤回这条" && e.status == MailboxStatus::Withdrawn)
+        },
+    );
 
     // Release BlockingRuntime so the first delivery finishes and the withdrawn second message is skipped.
     let _ = release_tx.send(());
     let _ = release_tx.send(());
-    until("first direct talk report landed and all deliveries cleared", || {
-        let rows = call("channel.message.list", json!({ "id": direct }));
-        let reports = rows.as_array()?.iter().filter(|m| m["kind"] == "report").count();
-        let pending = started.test_internals().chat.pending_deliveries(DeliveryTargetKind::Direct).ok()?;
-        (reports == 1 && pending.is_empty()).then_some(())
-    });
+    crate::support::wait_until_settled(
+        Some(&started.hub),
+        Duration::from_secs(30),
+        "first direct talk report landed and all deliveries cleared",
+        || {
+            let rows = call("channel.message.list", json!({ "id": direct }));
+            let reports = rows.as_array()?.iter().filter(|m| m["kind"] == "report").count();
+            let pending = started.test_internals().chat.pending_deliveries(DeliveryTargetKind::Direct).ok()?;
+            (reports == 1 && pending.is_empty()).then_some(())
+        },
+    );
     let entries = started.test_internals().board.sessions().mailbox_entries(&owner).unwrap();
     assert_eq!(entries.iter().find(|e| e.payload == "撤回这条").unwrap().status, MailboxStatus::Withdrawn);
     started.close();
@@ -495,20 +496,25 @@ fn regression_channel_delete_withdraws_pending_mailbox_by_source_message_across_
         .unwrap();
 
     call("channel.message.delete", json!({ "id": msg_id }));
-    until("all three pending mailbox rows withdrawn by source_message_id", || {
-        let direct_w = sessions
-            .mailbox_entries("profile:direct-1")
-            .ok()?
-            .iter()
-            .any(|e| e.status == MailboxStatus::Withdrawn);
-        let issue_w = sessions.mailbox_entries("issue:42").ok()?.iter().any(|e| e.status == MailboxStatus::Withdrawn);
-        let orch_w = sessions
-            .mailbox_entries("orchestrator")
-            .ok()?
-            .iter()
-            .any(|e| e.status == MailboxStatus::Withdrawn);
-        (direct_w && issue_w && orch_w).then_some(())
-    });
+    crate::support::wait_until_settled(
+        Some(&started.hub),
+        Duration::from_secs(30),
+        "all three pending mailbox rows withdrawn by source_message_id",
+        || {
+            let direct_w = sessions
+                .mailbox_entries("profile:direct-1")
+                .ok()?
+                .iter()
+                .any(|e| e.status == MailboxStatus::Withdrawn);
+            let issue_w = sessions.mailbox_entries("issue:42").ok()?.iter().any(|e| e.status == MailboxStatus::Withdrawn);
+            let orch_w = sessions
+                .mailbox_entries("orchestrator")
+                .ok()?
+                .iter()
+                .any(|e| e.status == MailboxStatus::Withdrawn);
+            (direct_w && issue_w && orch_w).then_some(())
+        },
+    );
     started.close();
 }
 
@@ -548,7 +554,7 @@ fn regression_issue_comment_clears_asking_in_board_slice_before_returning() {
     let id = issue["id"].as_str().unwrap().to_string();
     call("issue.status.update", json!({ "id": id, "status": "todo" }));
 
-    until("issue reaches asking stage", || {
+    crate::support::wait_until_transition(&hub, Duration::from_secs(30), "issue reaches asking stage", || {
         let board = hub.board_slice();
         let item = board.issues.iter().find(|i| i.id == id)?;
         (item.status == IssueStatus::InProgress && item.stage.state == IssueStageKind::Asking).then_some(())
@@ -580,7 +586,7 @@ fn regression_issue_comment_clears_asking_in_board_slice_before_returning() {
     assert_ne!(item_now.stage.state, IssueStageKind::Asking, "still Asking immediately after comment");
     assert!(!hub.inbox_slice().items.iter().any(|item| item.kind == InboxKind::Ask));
 
-    until("second round settles in_review", || {
+    crate::support::wait_until_transition(&hub, Duration::from_secs(30), "second round settles in_review", || {
         let board = hub.board_slice();
         let item = board.issues.iter().find(|i| i.id == id)?;
         (item.status == IssueStatus::InReview && item.stage.state == IssueStageKind::Reviewing).then_some(())

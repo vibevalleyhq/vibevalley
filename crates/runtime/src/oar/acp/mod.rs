@@ -11,12 +11,15 @@
 pub(crate) mod antigravity;
 pub(crate) mod antigravity_db;
 pub(crate) mod antigravity_swarm;
+mod turn_state;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
+
+use self::turn_state::{AcpTurnMachine, CancelOutcome, PromptErrOutcome, PromptOkOutcome, UsageOutcome};
 
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::v1::schema::{
@@ -29,7 +32,7 @@ use parking_lot::Mutex;
 use serde_json::{Map, Value, json};
 
 use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, rejected, rejection};
-use crate::oar::process::{LineChild, Spawn, find_binary, run_capture};
+use crate::oar::process::{AbortWatchdog, LineChild, Spawn, find_binary, run_capture};
 use crate::oar::record::{self, Recorder};
 use crate::oar::{
     AgentError, Capabilities, ChildTranscriptStep, ContentBlock, EventKind, FileChangeKind, Installation, InteractionDecision, InteractionOption, ModelInfo,
@@ -548,19 +551,13 @@ struct Shared {
     permission_mode: Mutex<PermissionMode>,
     available_modes: Mutex<Vec<String>>,
     config_options: Mutex<Vec<Value>>,
-    /// `session/load` replays the old conversation; that is not new output.
-    replaying: AtomicBool,
-    abort_wanted: AtomicBool,
-    abort_killed: AtomicBool,
-    turns_finished: AtomicU64,
-    turn_done: tokio::sync::Notify,
+    turn: AcpTurnMachine,
+    watchdog: Arc<AbortWatchdog>,
     image_input: AtomicBool,
-    in_flight_prompts: AtomicU64,
     background: Mutex<antigravity::BackgroundTracker>,
     has_child_activity: AtomicBool,
     child_activity: Mutex<antigravity::ChildActivityTracker>,
     swarm_reader: Mutex<Option<antigravity_swarm::SwarmReader>>,
-    detached_continuation: AtomicBool,
     turn_start_step_idx: Mutex<Option<i64>>,
     children: Mutex<HashMap<String, Vec<String>>>,
     updates: Mutex<std::collections::VecDeque<String>>,
@@ -612,7 +609,7 @@ impl Shared {
         {
             *self.session_title.lock() = Some(title.to_string());
         }
-        if self.replaying.load(Ordering::SeqCst) {
+        if self.turn.is_replaying() {
             return;
         }
         let Some(core) = self.core.get() else { return };
@@ -645,11 +642,14 @@ impl Shared {
         if self.flavor == AcpFlavor::Antigravity
             && path.is_empty()
             && update_kind == "usage_update"
-            && self.in_flight_prompts.load(Ordering::SeqCst) == 0
-            && self.detached_continuation.swap(false, Ordering::SeqCst)
+            && let UsageOutcome::FinishDetached { abort_wanted } = self.turn.on_usage_update()
         {
             self.background.lock().clear();
-            let (reason, error) = self.check_silent_error(StopReason::Completed, None);
+            let (reason, error) = if abort_wanted {
+                (StopReason::Aborted, None)
+            } else {
+                self.check_silent_error(StopReason::Completed, None)
+            };
             self.turn_finished(reason, error);
         }
     }
@@ -890,10 +890,7 @@ impl Shared {
 
     fn turn_finished(&self, reason: StopReason, error: Option<String>) {
         self.cancel_pending();
-        self.abort_wanted.store(false, Ordering::SeqCst);
-        self.detached_continuation.store(false, Ordering::SeqCst);
-        self.turns_finished.fetch_add(1, Ordering::SeqCst);
-        self.turn_done.notify_waiters();
+        self.watchdog.on_turn_finished();
         let Some(core) = self.core.get() else { return };
         if let Some(message) = error {
             core.emit_root(EventKind::Error { message });
@@ -1140,9 +1137,9 @@ async fn handshake(cx: &ConnectionTo<Agent>, shared: &Shared, opts: &SessionOpti
             }
             let params = serde_json::to_value(&request).map_err(|e| AgentError::Protocol(format!("session/load: {e}")))?;
             let msg = UntypedMessage::new("session/load", params).map_err(|e| AgentError::Protocol(acp_error("session/load", &e)))?;
-            shared.replaying.store(true, Ordering::SeqCst);
+            let _replay = shared.turn.enter_replay();
             let reply = cx.send_request(msg).block_task().await;
-            shared.replaying.store(false, Ordering::SeqCst);
+            drop(_replay);
             let reply = reply.map_err(|e| open_error("session/load", e))?;
             (id.clone(), reply)
         }
@@ -1330,65 +1327,60 @@ fn dispatch_prompt(
     session_id: &str,
     blocks: Vec<Value>,
 ) -> std::result::Result<(), agent_client_protocol::Error> {
-    if shared.flavor == AcpFlavor::Antigravity {
-        shared.detached_continuation.store(false, Ordering::SeqCst);
-        let prev = shared.in_flight_prompts.fetch_add(1, Ordering::SeqCst);
-        if prev == 0 {
-            let start_idx = shared.db_path.get().and_then(|p| antigravity_db::latest_step_index(p));
-            *shared.turn_start_step_idx.lock() = start_idx;
-        }
-    }
     let request = UntypedMessage::new("session/prompt", json!({ "sessionId": session_id, "prompt": blocks }))?;
-    let shared = shared.clone();
+    let start = shared.turn.begin_prompt();
+    if shared.flavor == AcpFlavor::Antigravity && start.is_first {
+        let start_idx = shared.db_path.get().and_then(|p| antigravity_db::latest_step_index(p));
+        *shared.turn_start_step_idx.lock() = start_idx;
+    }
+    let shared_cb = shared.clone();
     // Ordered: the answer is handled after every update that preceded it.
-    cx.send_request(request).on_receiving_result(move |result| async move {
+    if let Err(err) = cx.send_request(request).on_receiving_result(move |result| async move {
         match result {
             Ok(reply) => {
                 let raw_stop = str_of(&reply, "stopReason").map(str::to_string);
-                let _frame = shared
+                let _frame = shared_cb
                     .core
                     .get()
                     .map(|core| core.record_raw("session/prompt_result", vec![], &reply.to_string(), &reply));
-                match shared.flavor {
+                match shared_cb.flavor {
                     AcpFlavor::Generic => {
-                        let (reason, error) = stop_reason(&reply);
-                        shared.turn_finished(reason, error);
+                        if let PromptOkOutcome::Finish { .. } = shared_cb.turn.on_prompt_ok(false) {
+                            let (reason, error) = stop_reason(&reply);
+                            shared_cb.turn_finished(reason, error);
+                        }
                     }
                     AcpFlavor::Antigravity => {
-                        let remaining = shared.in_flight_prompts.fetch_sub(1, Ordering::SeqCst).saturating_sub(1);
-                        if remaining > 0 {
+                        if shared_cb.turn.try_finish_steered_prompt() {
                             return Ok(());
                         }
                         let (mut reason, mut error) = stop_reason(&reply);
                         if matches!(raw_stop.as_deref(), Some("end_turn" | "refusal")) {
-                            (reason, error) = shared.check_silent_error(reason, error);
+                            (reason, error) = shared_cb.check_silent_error(reason, error);
                         }
-                        if reason == StopReason::Completed && shared.background.lock().has_open() && !shared.abort_wanted.load(Ordering::SeqCst) {
-                            shared.detached_continuation.store(true, Ordering::SeqCst);
-                            return Ok(());
+                        let may_detach = reason == StopReason::Completed && shared_cb.background.lock().has_open();
+                        match shared_cb.turn.on_prompt_ok(may_detach) {
+                            PromptOkOutcome::StillInFlight | PromptOkOutcome::Detached => return Ok(()),
+                            PromptOkOutcome::Finish { .. } => {
+                                shared_cb.turn_finished(reason, error);
+                            }
                         }
-                        shared.turn_finished(reason, error);
                     }
                 }
             }
             Err(error) => {
-                if shared.flavor == AcpFlavor::Antigravity {
-                    let remaining = shared.in_flight_prompts.fetch_sub(1, Ordering::SeqCst).saturating_sub(1);
-                    if remaining > 0 {
-                        return Ok(());
-                    }
+                if let PromptErrOutcome::Finish { abort_wanted } = shared_cb.turn.on_prompt_err() {
+                    let reason = if abort_wanted { StopReason::Aborted } else { StopReason::Error };
+                    let message = (reason == StopReason::Error).then(|| acp_error("session/prompt", &error));
+                    shared_cb.turn_finished(reason, message);
                 }
-                let reason = if shared.abort_wanted.load(Ordering::SeqCst) {
-                    StopReason::Aborted
-                } else {
-                    StopReason::Error
-                };
-                let message = (reason == StopReason::Error).then(|| acp_error("session/prompt", &error));
-                shared.turn_finished(reason, message);
             }
         }
         Ok(())
-    })?;
+    }) {
+        shared.turn.rollback_prompt();
+        return Err(err);
+    }
     Ok(())
 }
 
@@ -1523,9 +1515,9 @@ async fn serve(
             Command::Cancel => {
                 shared.cancel_pending();
                 shared.background.lock().clear();
-                let was_detached = shared.detached_continuation.swap(false, Ordering::SeqCst);
+                let cancel_outcome = shared.turn.on_cancel();
                 cx.send_notification(CancelNotification::new(session_id.clone()))?;
-                if was_detached && shared.in_flight_prompts.load(Ordering::SeqCst) == 0 {
+                if cancel_outcome == CancelOutcome::FinishAborted {
                     shared.turn_finished(StopReason::Aborted, None);
                 }
             }
@@ -1535,7 +1527,7 @@ async fn serve(
     Ok(())
 }
 
-fn connection_thread(
+async fn run_connection(
     shared: Arc<Shared>,
     child: Arc<LineChild>,
     incoming: flume::Receiver<Option<std::io::Result<String>>>,
@@ -1548,14 +1540,14 @@ fn connection_thread(
         rx.recv_async().await.ok().flatten().map(|line| (line, rx))
     }));
     let outgoing = Box::pin(futures_util::sink::unfold(child, |child, line: String| async move {
-        child.write_line(&line).map_err(|e| std::io::Error::other(e.to_string()))?;
+        child.write_line_async(&line).await.map_err(|e| std::io::Error::other(e.to_string()))?;
         Ok::<_, std::io::Error>(child)
     }));
     let updates = shared.clone();
     let permissions = shared.clone();
     let serving = shared.clone();
     let ready_failed = ready.clone();
-    let connection = Builder::new(Client)
+    let result = Builder::new(Client)
         .name("vibevalley")
         .on_receive_notification(
             async move |notification: UntypedMessage, _cx| {
@@ -1575,8 +1567,8 @@ fn connection_thread(
         )
         .connect_with(Lines::new(outgoing, incoming), |cx: ConnectionTo<Agent>| {
             serve(cx, serving, opts, probe_models, commands, ready)
-        });
-    let result = crate::rt::block_on(connection);
+        })
+        .await;
     let child_error = shared.child.get().map(|c| c.stderr_text()).unwrap_or_default();
     let mut message = match &result {
         Ok(()) => format!("{} closed the connection", shared.runtime_id),
@@ -1593,21 +1585,14 @@ fn connection_thread(
         let _ = ready_failed.send(Err(AgentError::Protocol(message.clone())));
     }
     if let Some(child) = shared.child.get() {
-        child.kill();
+        child.kill_async().await;
     }
     if let Some(core) = shared.core.get() {
         core.observe_exit(shared.child.get().and_then(|c| c.status()));
-        if shared.abort_killed.load(Ordering::SeqCst) && core.turn_active() {
-            core.emit_root(EventKind::TurnFinished {
-                reason: StopReason::Aborted,
-                usage: Usage::default(),
-            });
-            core.finish(None);
-        } else {
-            core.finish(Some(message));
-        }
+        shared.watchdog.finish_on_exit(core, message);
+    } else {
+        shared.watchdog.wake();
     }
-    shared.turn_done.notify_waiters();
 }
 
 fn prompt_blocks(cwd: &Path, image_input: bool, content: &[ContentBlock]) -> Result<Vec<Value>> {
@@ -1691,37 +1676,11 @@ impl Driver for AcpDriver {
     }
 
     fn abort(&self) -> Result<()> {
-        self.shared.abort_wanted.store(true, Ordering::SeqCst);
+        self.shared.turn.request_abort();
         self.send(Command::Cancel)?;
-        let shared = self.shared.clone();
-        let turn = shared.turns_finished.load(Ordering::SeqCst);
-        crate::rt::handle().spawn(async move {
-            let deadline = tokio::time::Instant::now() + ABORT_GRACE;
-            loop {
-                let notified = shared.turn_done.notified();
-                tokio::pin!(notified);
-                notified.as_mut().enable();
-                let active = shared.core.get().is_some_and(|core| core.turn_active());
-                if shared.turns_finished.load(Ordering::SeqCst) != turn || !active {
-                    return;
-                }
-                tokio::select! {
-                    biased;
-                    _ = notified => {}
-                    _ = tokio::time::sleep_until(deadline) => {
-                        let active = shared.core.get().is_some_and(|core| core.turn_active());
-                        if shared.turns_finished.load(Ordering::SeqCst) != turn || !active {
-                            return;
-                        }
-                        shared.abort_killed.store(true, Ordering::SeqCst);
-                        if let Some(child) = shared.child.get() {
-                            child.kill_async().await;
-                        }
-                        return;
-                    }
-                }
-            }
-        });
+        if let (Some(core), Some(child)) = (self.shared.core.get(), self.shared.child.get()) {
+            self.shared.watchdog.arm(ABORT_GRACE, core.clone(), child.clone());
+        }
         Ok(())
     }
 
@@ -1811,7 +1770,7 @@ impl Driver for AcpDriver {
                 core.observe_exit(child.status());
             }
         }
-        self.shared.turn_done.notify_waiters();
+        self.shared.watchdog.wake();
     }
 }
 
@@ -1866,18 +1825,13 @@ impl AcpRuntime {
             permission_mode: Mutex::new(opts.permission_mode),
             available_modes: Mutex::new(Vec::new()),
             config_options: Mutex::new(Vec::new()),
-            replaying: AtomicBool::new(false),
-            abort_wanted: AtomicBool::new(false),
-            abort_killed: AtomicBool::new(false),
-            turns_finished: AtomicU64::new(0),
-            turn_done: tokio::sync::Notify::new(),
+            turn: AcpTurnMachine::new(),
+            watchdog: AbortWatchdog::new(),
             image_input: AtomicBool::new(false),
-            in_flight_prompts: AtomicU64::new(0),
             background: Mutex::new(antigravity::BackgroundTracker::default()),
             has_child_activity: AtomicBool::new(false),
             child_activity: Mutex::new(antigravity::ChildActivityTracker::default()),
             swarm_reader: Mutex::new(None),
-            detached_continuation: AtomicBool::new(false),
             turn_start_step_idx: Mutex::new(None),
             children: Default::default(),
             updates: Default::default(),
@@ -1928,18 +1882,15 @@ impl AcpRuntime {
             on_exit,
         )?;
         let _ = shared.child.set(child.clone());
-        let thread = {
-            let shared = shared.clone();
-            let child = child.clone();
-            let opts = opts.clone();
-            std::thread::Builder::new()
-                .name(format!("vibevalley-agent-{}", self.spec.id))
-                .spawn(move || connection_thread(shared, child, incoming_rx, opts, probe_models, commands_rx, ready_tx))
-        };
-        if let Err(error) = thread {
-            child.kill();
-            return Err(AgentError::Io(format!("cannot start the ACP thread: {error}")));
-        }
+        crate::rt::current_or_global_handle().spawn(run_connection(
+            shared.clone(),
+            child.clone(),
+            incoming_rx,
+            opts.clone(),
+            probe_models,
+            commands_rx,
+            ready_tx,
+        ));
         match ready_rx.recv_timeout(opts.request_timeout.unwrap_or(OPEN_TIMEOUT)) {
             Ok(Ok(opened)) => {
                 if flavor == AcpFlavor::Antigravity

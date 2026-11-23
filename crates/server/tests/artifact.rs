@@ -116,7 +116,10 @@ fn html_and_markdown_hand_ins_their_versions_and_refusals() {
     assert_eq!(code(call("artifact.page", json!({ "id": id, "version": 9 }))), BizCode::ArtifactNotFound.code());
 
     // Markdown is read into blocks, as its maker; it takes no version.
-    std::thread::sleep(Duration::from_millis(3));
+    // Backdate the prior HTML artifact so `notes` is deterministically newer in `updated_at DESC` ordering.
+    let mut db = crate::support::inspect_db(&dir.path().join("server.db"));
+    crate::support::execute_sql(&mut db, "update artifact set updated_at = updated_at - 1000");
+    drop(db);
     let linked_issue = ok(call("issue.create", json!({ "title": "关联工单" })))["id"].as_str().unwrap().to_string();
     let notes = started
         .test_internals()

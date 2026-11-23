@@ -10,12 +10,13 @@ use std::fmt;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::teardown_gate::TeardownGate;
 
 /// Redacted credential wrapper: serializes transparently, never exposes raw bytes in `Debug` or `Display`.
 #[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -702,11 +703,11 @@ impl SandboxProvider for MockSandboxProvider {
 }
 
 /// Ephemeral RAII sandbox lifecycle guard: guarantees `provider.terminate(&handle)` runs
-/// at most once on explicit `teardown()` or automatically on `Drop`.
+/// at most once to completion on explicit `teardown()` or automatically on `Drop`.
 pub struct SandboxMachine {
     provider: Arc<dyn SandboxProvider>,
     handle: SandboxHandle,
-    terminated: AtomicBool,
+    teardown: TeardownGate,
 }
 
 impl SandboxMachine {
@@ -719,7 +720,7 @@ impl SandboxMachine {
         Self {
             provider,
             handle,
-            terminated: AtomicBool::new(false),
+            teardown: TeardownGate::new(),
         }
     }
 
@@ -736,7 +737,7 @@ impl SandboxMachine {
     }
 
     pub fn is_terminated(&self) -> bool {
-        self.terminated.load(Ordering::Acquire)
+        self.teardown.is_terminated()
     }
 
     pub fn is_running(&self) -> Result<bool, SandboxError> {
@@ -746,17 +747,11 @@ impl SandboxMachine {
         self.provider.is_running(&self.handle)
     }
 
-    /// Idempotently terminates the container. If the provider fails, leaves the handle armed
-    /// so a subsequent `teardown()` or `Drop` retries termination.
+    /// Idempotently terminates the container. Concurrent callers wait for an in-flight
+    /// attempt rather than returning a premature `Ok(())`; if an attempt fails, the gate
+    /// rolls back so a waiting or subsequent caller retries termination.
     pub fn teardown(&self) -> Result<(), SandboxError> {
-        if self.terminated.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
-            return Ok(());
-        }
-        if let Err(err) = self.provider.terminate(&self.handle) {
-            self.terminated.store(false, Ordering::Release);
-            return Err(err);
-        }
-        Ok(())
+        self.teardown.teardown_once(|| self.provider.terminate(&self.handle))
     }
 }
 
@@ -984,5 +979,143 @@ mod tests {
         // 4. Unavailable provider refuses spawn cleanly.
         provider.set_available(false);
         assert!(matches!(SandboxMachine::launch(provider, &spec), Err(SandboxError::ProviderUnavailable { .. })));
+    }
+
+    #[test]
+    fn regression_concurrent_teardown_never_returns_false_ok_when_first_attempt_fails() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        struct ScriptedTerminateProvider {
+            failures_remaining: AtomicUsize,
+            in_flight: AtomicUsize,
+            max_in_flight: AtomicUsize,
+            calls: AtomicUsize,
+            entered_tx: flume::Sender<()>,
+            release_rx: flume::Receiver<()>,
+        }
+
+        impl SandboxProvider for ScriptedTerminateProvider {
+            fn name(&self) -> &'static str {
+                "scripted"
+            }
+
+            fn is_available(&self) -> bool {
+                true
+            }
+
+            fn spawn(&self, spec: &SandboxSpec) -> Result<SandboxHandle, SandboxError> {
+                Ok(SandboxHandle {
+                    sandbox_id: "scripted-sbx-1".into(),
+                    machine_id: spec.machine_id.clone(),
+                    container_id: "scripted-ctr-1".into(),
+                    provider: self.name().into(),
+                })
+            }
+
+            fn terminate(&self, _handle: &SandboxHandle) -> Result<(), SandboxError> {
+                let current = self.in_flight.fetch_add(1, Ordering::AcqRel) + 1;
+                self.max_in_flight.fetch_max(current, Ordering::AcqRel);
+                let attempt = self.calls.fetch_add(1, Ordering::AcqRel);
+                if attempt == 0 {
+                    let _ = self.entered_tx.send(());
+                    let _ = self.release_rx.recv();
+                }
+                self.in_flight.fetch_sub(1, Ordering::AcqRel);
+                let prev_failures = self.failures_remaining.try_update(Ordering::AcqRel, Ordering::Acquire, |n| n.checked_sub(1));
+                if prev_failures.is_ok() {
+                    Err(SandboxError::CommandFailed {
+                        provider: self.name().into(),
+                        command: "scripted terminate".into(),
+                        exit_code: Some(1),
+                        stderr: "transient busy".into(),
+                    })
+                } else {
+                    Ok(())
+                }
+            }
+
+            fn is_running(&self, _handle: &SandboxHandle) -> Result<bool, SandboxError> {
+                Ok(true)
+            }
+        }
+
+        // Case 1: first two attempts fail; concurrent caller must NOT observe false Ok(()).
+        {
+            let (entered_tx, entered_rx) = flume::bounded(1);
+            let (release_tx, release_rx) = flume::bounded(1);
+            let provider = Arc::new(ScriptedTerminateProvider {
+                failures_remaining: AtomicUsize::new(2),
+                in_flight: AtomicUsize::new(0),
+                max_in_flight: AtomicUsize::new(0),
+                calls: AtomicUsize::new(0),
+                entered_tx,
+                release_rx,
+            });
+            let machine = Arc::new(SandboxMachine::launch(provider.clone(), &sample_spec()).unwrap());
+
+            let m1 = Arc::clone(&machine);
+            let t1 = std::thread::spawn(move || m1.teardown());
+            entered_rx.recv().unwrap();
+
+            assert!(!machine.is_terminated(), "must not report terminated while terminate is still in flight");
+
+            let (t2_started_tx, t2_started_rx) = flume::bounded(1);
+            let m2 = Arc::clone(&machine);
+            let t2 = std::thread::spawn(move || {
+                let _ = t2_started_tx.send(());
+                m2.teardown()
+            });
+            t2_started_rx.recv().unwrap();
+            std::thread::yield_now();
+            release_tx.send(()).unwrap();
+
+            assert!(t1.join().unwrap().is_err());
+            assert!(t2.join().unwrap().is_err(), "concurrent caller must not return false Ok when teardown fails");
+            assert_eq!(provider.max_in_flight.load(Ordering::Acquire), 1);
+            assert_eq!(provider.calls.load(Ordering::Acquire), 2);
+            assert!(!machine.is_terminated());
+
+            // Third attempt succeeds and seals the gate.
+            machine.teardown().unwrap();
+            assert!(machine.is_terminated());
+            assert_eq!(provider.calls.load(Ordering::Acquire), 3);
+            machine.teardown().unwrap();
+            assert_eq!(provider.calls.load(Ordering::Acquire), 3);
+        }
+
+        // Case 2: first attempt fails, waiting concurrent caller retries and succeeds.
+        {
+            let (entered_tx, entered_rx) = flume::bounded(1);
+            let (release_tx, release_rx) = flume::bounded(1);
+            let provider = Arc::new(ScriptedTerminateProvider {
+                failures_remaining: AtomicUsize::new(1),
+                in_flight: AtomicUsize::new(0),
+                max_in_flight: AtomicUsize::new(0),
+                calls: AtomicUsize::new(0),
+                entered_tx,
+                release_rx,
+            });
+            let machine = Arc::new(SandboxMachine::launch(provider.clone(), &sample_spec()).unwrap());
+
+            let m1 = Arc::clone(&machine);
+            let t1 = std::thread::spawn(move || m1.teardown());
+            entered_rx.recv().unwrap();
+
+            let (t2_started_tx, t2_started_rx) = flume::bounded(1);
+            let m2 = Arc::clone(&machine);
+            let t2 = std::thread::spawn(move || {
+                let _ = t2_started_tx.send(());
+                m2.teardown()
+            });
+            t2_started_rx.recv().unwrap();
+            std::thread::yield_now();
+            release_tx.send(()).unwrap();
+
+            assert!(t1.join().unwrap().is_err());
+            assert!(t2.join().unwrap().is_ok());
+            assert_eq!(provider.max_in_flight.load(Ordering::Acquire), 1);
+            assert_eq!(provider.calls.load(Ordering::Acquire), 2);
+            assert!(machine.is_terminated());
+        }
     }
 }

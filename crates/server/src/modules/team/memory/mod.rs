@@ -610,7 +610,7 @@ pub fn install(hub: &Arc<Hub>, memories: Arc<Memories>) {
 
 #[cfg(test)]
 mod tests {
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
 
     use vibevalley_core::empty_space_state;
     use vibevalley_protocol::{FactSessionChanged, FactSessionReported, Session};
@@ -688,14 +688,21 @@ mod tests {
             answer: None,
         })]);
 
-        let deadline = Instant::now() + Duration::from_secs(3);
-        loop {
-            if !memories.list("backend").unwrap().is_empty() {
-                break;
-            }
-            assert!(Instant::now() < deadline, "issue memory was not recorded");
-            std::thread::sleep(Duration::from_millis(10));
-        }
+        // Memories persists directly to SQLite on the EventBus worker without emitting a follow-up Hub fact.
+        vibevalley_runtime::rt::block_on(async {
+            tokio::time::timeout(Duration::from_secs(3), async {
+                let mut tick = tokio::time::interval(Duration::from_millis(2));
+                tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                loop {
+                    tick.tick().await;
+                    if !memories.list("backend").unwrap().is_empty() {
+                        break;
+                    }
+                }
+            })
+            .await
+        })
+        .expect("issue memory was not recorded");
 
         assert!(memories.list("antigravity").unwrap().is_empty(), "workspace session leaked into memory");
         assert_eq!(memories.list("backend").unwrap().len(), 1);

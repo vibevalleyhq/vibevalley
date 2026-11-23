@@ -47,89 +47,84 @@ fn names_and_content_follow_vibevalley() {
 
 #[test]
 fn an_http_server_s_tools_are_offered_and_called() {
-    use std::io::{BufRead, BufReader, Read, Write};
-    use std::net::TcpListener;
+    use std::convert::Infallible;
+    use std::sync::{Arc, Mutex};
 
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    let handle = std::thread::spawn(move || {
-        loop {
-            let Ok((mut stream, _)) = listener.accept() else { break };
-            let mut reader = BufReader::new(stream.try_clone().unwrap());
-            let mut content_len = 0usize;
-            let mut auth_ok = false;
-            let mut session = None;
-            let mut first = String::new();
-            reader.read_line(&mut first).unwrap();
-            loop {
-                let mut line = String::new();
-                reader.read_line(&mut line).unwrap();
-                let trimmed = line.trim();
-                if trimmed.is_empty() {
-                    break;
-                }
-                if let Some((k, v)) = trimmed.split_once(':') {
-                    if k.eq_ignore_ascii_case("content-length") {
-                        content_len = v.trim().parse().unwrap_or(0);
-                    } else if k.eq_ignore_ascii_case("authorization") && v.trim() == "Bearer secret-key" {
-                        auth_ok = true;
-                    } else if k.eq_ignore_ascii_case("mcp-session-id") {
-                        session = Some(v.trim().to_owned());
-                    }
-                }
-            }
-            assert!(auth_ok, "expected Authorization header");
-            if first.starts_with("GET ") {
-                assert_eq!(session.as_deref(), Some("s1"));
-                stream
-                    .write_all(b"HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
-                    .unwrap();
-                continue;
-            }
-            assert!(first.starts_with("POST "), "{first}");
-            let mut body = vec![0u8; content_len];
-            reader.read_exact(&mut body).unwrap();
-            let msg: serde_json::Value = serde_json::from_slice(&body).unwrap();
-            if msg["method"] != "initialize" {
-                assert_eq!(session.as_deref(), Some("s1"), "{msg}");
-            }
-            let id = msg.get("id").cloned();
-            let resp = match msg["method"].as_str().unwrap_or_default() {
-                "initialize" => json!({"jsonrpc": "2.0", "id": id, "result": {
-                    "protocolVersion": "2025-06-18",
-                    "capabilities": {"tools": {}},
-                    "serverInfo": {"name": "http", "version": "1.0"}
-                }}),
-                "notifications/initialized" => {
-                    let _ = stream.write_all(b"HTTP/1.1 202 Accepted\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
-                    continue;
-                }
-                "tools/list" => json!({"jsonrpc": "2.0", "id": id, "result": {"tools": [
-                    {"name": "ping", "description": "Pings over SSE", "annotations": {"readOnlyHint": true}, "inputSchema": {"type": "object"}}
-                ]}}),
-                "tools/call" => {
-                    let sse = format!(
-                        "event: message\ndata: {}\n\n",
-                        json!({"jsonrpc": "2.0", "id": id, "result": {"content": [{"type": "text", "text": "pong"}]}})
-                    );
-                    let reply = format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                        sse.len(),
-                        sse
-                    );
-                    stream.write_all(reply.as_bytes()).unwrap();
-                    break;
-                }
-                _ => json!({"jsonrpc": "2.0", "id": id, "error": {"code": -32601, "message": "no"}}),
-            };
-            let bytes = serde_json::to_vec(&resp).unwrap();
-            let reply = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nMcp-Session-Id: s1\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                bytes.len()
-            );
-            stream.write_all(reply.as_bytes()).unwrap();
-            stream.write_all(&bytes).unwrap();
+    use axum::Router;
+    use axum::body::Bytes;
+    use axum::http::{HeaderMap, StatusCode, header};
+    use axum::response::IntoResponse;
+    use axum::response::sse::{Event, Sse};
+    use axum::routing::get;
+    use tokio::net::TcpListener;
+    use tokio_util::sync::CancellationToken;
+
+    let errors = Arc::new(Mutex::new(Vec::<String>::new()));
+    let check_auth = |headers: &HeaderMap, errors: &Mutex<Vec<String>>| {
+        if headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()) != Some("Bearer secret-key") {
+            errors.lock().unwrap().push("missing or wrong Authorization header".into());
         }
+    };
+    let get_errors = errors.clone();
+    let post_errors = errors.clone();
+    let app = Router::new().route(
+        "/mcp",
+        get(move |headers: HeaderMap| {
+            let errors = get_errors.clone();
+            async move {
+                check_auth(&headers, &errors);
+                if headers.get("mcp-session-id").and_then(|v| v.to_str().ok()) != Some("s1") {
+                    errors.lock().unwrap().push("GET /mcp missing Mcp-Session-Id: s1".into());
+                }
+                StatusCode::METHOD_NOT_ALLOWED
+            }
+        })
+        .post(move |headers: HeaderMap, body: Bytes| {
+            let errors = post_errors.clone();
+            async move {
+                check_auth(&headers, &errors);
+                let session = headers.get("mcp-session-id").and_then(|v| v.to_str().ok());
+                let msg: serde_json::Value = serde_json::from_slice(&body).unwrap();
+                if msg["method"] != "initialize" && session != Some("s1") {
+                    errors.lock().unwrap().push(format!("expected Mcp-Session-Id: s1 for {msg}"));
+                }
+                let id = msg.get("id").cloned();
+                let resp = match msg["method"].as_str().unwrap_or_default() {
+                    "initialize" => json!({"jsonrpc": "2.0", "id": id, "result": {
+                        "protocolVersion": "2025-06-18",
+                        "capabilities": {"tools": {}},
+                        "serverInfo": {"name": "http", "version": "1.0"}
+                    }}),
+                    "notifications/initialized" => return StatusCode::ACCEPTED.into_response(),
+                    "tools/list" => json!({"jsonrpc": "2.0", "id": id, "result": {"tools": [
+                        {"name": "ping", "description": "Pings over SSE", "annotations": {"readOnlyHint": true}, "inputSchema": {"type": "object"}}
+                    ]}}),
+                    "tools/call" => {
+                        let data = json!({"jsonrpc": "2.0", "id": id, "result": {"content": [{"type": "text", "text": "pong"}]}}).to_string();
+                        let stream = futures_util::stream::once(async move { Ok::<_, Infallible>(Event::default().event("message").data(data)) });
+                        return Sse::new(stream).into_response();
+                    }
+                    _ => json!({"jsonrpc": "2.0", "id": id, "error": {"code": -32601, "message": "no"}}),
+                };
+                (
+                    StatusCode::OK,
+                    [(header::CONTENT_TYPE.as_str(), "application/json"), ("mcp-session-id", "s1")],
+                    resp.to_string(),
+                )
+                    .into_response()
+            }
+        }),
+    );
+
+    let (addr, _guard) = vibevalley_runtime::rt::block_on(async move {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let cancel = CancellationToken::new();
+        let guard = cancel.clone().drop_guard();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).with_graceful_shutdown(cancel.cancelled_owned()).await;
+        });
+        (addr, guard)
     });
 
     let cfg: McpConfig = serde_json::from_value(json!({"mcpServers": {
@@ -145,7 +140,7 @@ fn an_http_server_s_tools_are_offered_and_called() {
     assert_eq!(tools.len(), 1);
     let out = tools[0].execute(&json!({}));
     assert_eq!((out.is_error, out.text.as_str()), (false, "pong"));
-    handle.join().unwrap();
+    assert!(errors.lock().unwrap().is_empty(), "{:?}", errors.lock().unwrap());
 }
 
 #[test]

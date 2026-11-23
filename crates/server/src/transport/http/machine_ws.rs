@@ -19,6 +19,7 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::{IntoResponse, Response};
 use futures_util::{SinkExt, StreamExt};
 use tokio_util::sync::CancellationToken;
+use tracing::Instrument as _;
 use vibevalley_protocol::{BizCode, MachinePing, MachinePong, MachineWireError, MachineWireFrame};
 
 use crate::transport::api::{MachineConnection, RemoteDeviceIdentity, Server, SharedMachineBus};
@@ -45,7 +46,8 @@ pub(super) async fn upgrade(
 
     let server = state.server;
     let shutdown = state.shutdown;
-    ws.on_upgrade(move |socket| handle_socket(socket, server, shutdown, bus, identity))
+    let span = tracing::debug_span!("machine.ws", device_id = %identity.device_id);
+    ws.on_upgrade(move |socket| handle_socket(socket, server, shutdown, bus, identity).instrument(span))
 }
 
 async fn handle_socket(socket: WebSocket, server: Arc<dyn Server>, shutdown: CancellationToken, bus: SharedMachineBus, device: RemoteDeviceIdentity) {
@@ -103,10 +105,13 @@ async fn handle_socket(socket: WebSocket, server: Arc<dyn Server>, shutdown: Can
                             let srv = server.clone();
                             let bus_ref = bus.clone();
                             let tx = out_tx.clone();
-                            tokio::task::spawn_blocking(move || {
-                                let resp = bus_ref.mcp_tunnel(&*srv, req);
-                                let _ = tx.send(MachineWireFrame::MachineMcpResponse(resp));
-                            });
+                            vibevalley_runtime::rt::current_or_global_handle().spawn(
+                                async move {
+                                    let resp = bus_ref.mcp_tunnel_async(srv, req).await;
+                                    let _ = tx.send_async(MachineWireFrame::MachineMcpResponse(resp)).await;
+                                }
+                                .in_current_span(),
+                            );
                         }
                         Ok(frame) => {
                             if in_tx.send_async(frame).await.is_err() {

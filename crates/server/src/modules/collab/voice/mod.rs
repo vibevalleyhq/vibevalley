@@ -411,7 +411,7 @@ impl Voice {
         if let Some(hub) = hub {
             hub.spawn_blocking_task(task);
         } else {
-            vibevalley_runtime::rt::handle().spawn_blocking(task);
+            crate::spawn_blocking_traced(task);
         }
     }
 
@@ -563,7 +563,7 @@ impl MossLine {
             if let Some(hub) = hub {
                 hub.spawn_blocking_task(task);
             } else {
-                vibevalley_runtime::rt::handle().spawn_blocking(task);
+                crate::spawn_blocking_traced(task);
             }
         }
     }

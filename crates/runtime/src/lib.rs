@@ -2,10 +2,12 @@
 //! machines (`machine`), and the built-in DeepSeek durable harness (`agent`).
 
 pub mod agent;
+mod loom_sync;
 pub mod machine;
 pub mod oar;
 pub mod rt;
 pub mod sandbox;
+mod teardown_gate;
 
 pub use machine::{
     LOCAL_MACHINE_ID, LocalMachine, Machine, MachineDescriptor, MachinePlatform, MachineRegistry, MachineRegistryEvent, MachineStatus, RuntimeRef,

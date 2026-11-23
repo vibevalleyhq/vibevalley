@@ -3,10 +3,15 @@
 use std::future::Future;
 use std::io::Read;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::pin::Pin;
 use std::sync::OnceLock;
+use std::task::{Context, Poll};
 use std::time::Duration;
 
-use tokio_util::sync::CancellationToken;
+use futures_util::TryStreamExt;
+use tokio::io::{AsyncRead, ReadBuf};
+use tokio_util::io::{StreamReader, SyncIoBridge};
+use tokio_util::sync::{CancellationToken, WaitForCancellationFutureOwned};
 
 pub struct Request {
     pub method: &'static str,
@@ -221,7 +226,7 @@ impl Fetch for PublicDownload {
 }
 
 /// Executes `r` asynchronously on `client`, awaiting response headers directly
-/// and streaming body chunks into [`Response::body`] on the shared Tokio runtime.
+/// and bridging body chunks into [`Response::body`] via `SyncIoBridge(StreamReader)`.
 pub(crate) async fn execute_request_async(client: reqwest::Client, r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
     if cancel.as_ref().is_some_and(CancellationToken::is_cancelled) {
         return Err(FetchError::Network("cancelled".into()));
@@ -234,7 +239,7 @@ pub(crate) async fn execute_request_async(client: reqwest::Client, r: Request, c
     if let Some((kind, mut reader)) = r.body {
         req = req.header("content-type", kind);
         let (body_tx, body_rx) = flume::bounded::<std::io::Result<Vec<u8>>>(8);
-        tokio::task::spawn_blocking(move || {
+        vibevalley_runtime::rt::current_or_global_handle().spawn_blocking(move || {
             let mut buf = [0u8; 64 * 1024];
             loop {
                 match reader.read(&mut buf) {
@@ -251,8 +256,7 @@ pub(crate) async fn execute_request_async(client: reqwest::Client, r: Request, c
                 }
             }
         });
-        let stream = futures_util::stream::unfold(body_rx, |rx| async move { rx.recv_async().await.ok().map(|chunk| (chunk, rx)) });
-        req = req.body(reqwest::Body::wrap_stream(stream));
+        req = req.body(reqwest::Body::wrap_stream(body_rx.into_stream()));
     }
     let send_res = match &cancel {
         Some(token) => tokio::select! {
@@ -262,7 +266,7 @@ pub(crate) async fn execute_request_async(client: reqwest::Client, r: Request, c
         },
         None => req.send().await,
     };
-    let mut response = send_res.map_err(|e| {
+    let response = send_res.map_err(|e| {
         if e.is_timeout() {
             FetchError::Timeout
         } else {
@@ -275,44 +279,19 @@ pub(crate) async fn execute_request_async(client: reqwest::Client, r: Request, c
         .iter()
         .filter_map(|(k, v)| Some((k.as_str().to_string(), v.to_str().ok()?.to_string())))
         .collect();
-    let (res_tx, res_rx) = flume::bounded::<std::io::Result<Vec<u8>>>(16);
-    vibevalley_runtime::rt::handle().spawn(async move {
-        loop {
-            let chunk_res = match &cancel {
-                Some(token) => tokio::select! {
-                    biased;
-                    _ = token.cancelled() => {
-                        let _ = res_tx.send_async(Err(std::io::Error::new(std::io::ErrorKind::Interrupted, "cancelled"))).await;
-                        break;
-                    }
-                    c = response.chunk() => c,
-                },
-                None => response.chunk().await,
-            };
-            match chunk_res {
-                Ok(Some(bytes)) => {
-                    if res_tx.send_async(Ok(bytes.to_vec())).await.is_err() {
-                        break;
-                    }
-                }
-                Ok(None) => break,
-                Err(e) => {
-                    let io_err = if e.is_timeout() {
-                        std::io::Error::new(std::io::ErrorKind::TimedOut, e.to_string())
-                    } else {
-                        std::io::Error::other(e.to_string())
-                    };
-                    let _ = res_tx.send_async(Err(io_err)).await;
-                    break;
-                }
-            }
+    let stream = response.bytes_stream().map_err(|e| {
+        if e.is_timeout() {
+            std::io::Error::new(std::io::ErrorKind::TimedOut, e.to_string())
+        } else {
+            std::io::Error::other(e)
         }
     });
-    Ok(Response {
-        status,
-        headers,
-        body: Box::new(ChannelReader::new(res_rx)),
-    })
+    let reader = StreamReader::new(stream);
+    let body: Box<dyn Read + Send> = match cancel {
+        Some(token) => Box::new(SyncIoBridge::new(CancelRead::new(Box::pin(reader), token))),
+        None => Box::new(SyncIoBridge::new(Box::pin(reader))),
+    };
+    Ok(Response { status, headers, body })
 }
 
 fn execute_request(client: reqwest::Client, r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
@@ -380,38 +359,31 @@ pub(crate) fn run_http<T: Send + 'static>(work: impl Future<Output = T> + Send +
     vibevalley_runtime::rt::block_on(work)
 }
 
-/// Adapts a chunk channel from an async `reqwest::Response` into a synchronous [`Read`].
-pub(crate) struct ChannelReader {
-    rx: flume::Receiver<std::io::Result<Vec<u8>>>,
-    buf: Vec<u8>,
-    pos: usize,
+/// Cancels an underlying [`AsyncRead`] immediately when its [`CancellationToken`] fires.
+struct CancelRead<R> {
+    inner: R,
+    cancelled: Option<Pin<Box<WaitForCancellationFutureOwned>>>,
 }
 
-impl ChannelReader {
-    pub(crate) fn new(rx: flume::Receiver<std::io::Result<Vec<u8>>>) -> Self {
-        Self { rx, buf: Vec::new(), pos: 0 }
+impl<R> CancelRead<R> {
+    fn new(inner: R, cancel: CancellationToken) -> Self {
+        Self {
+            inner,
+            cancelled: (!cancel.is_cancelled()).then(|| Box::pin(cancel.cancelled_owned())),
+        }
     }
 }
 
-impl Read for ChannelReader {
-    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
-        while self.pos >= self.buf.len() {
-            match self.rx.recv() {
-                Ok(Ok(chunk)) => {
-                    if chunk.is_empty() {
-                        continue;
-                    }
-                    self.buf = chunk;
-                    self.pos = 0;
-                }
-                Ok(Err(e)) => return Err(e),
-                Err(_) => return Ok(0),
-            }
+impl<R: AsyncRead + Unpin> AsyncRead for CancelRead<R> {
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+        let Some(cancelled) = self.cancelled.as_mut() else {
+            return Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Interrupted, "cancelled")));
+        };
+        if cancelled.as_mut().poll(cx).is_ready() {
+            self.cancelled = None;
+            return Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Interrupted, "cancelled")));
         }
-        let n = (self.buf.len() - self.pos).min(out.len());
-        out[..n].copy_from_slice(&self.buf[self.pos..self.pos + n]);
-        self.pos += n;
-        Ok(n)
+        Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }
 
@@ -448,10 +420,31 @@ pub(crate) fn public_https(url: &url::Url) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Cursor, Read, Write};
-    use std::net::TcpListener;
+    use std::convert::Infallible;
+    use std::io::{Cursor, Read};
+    use std::sync::{Arc, Mutex};
+
+    use axum::Router;
+    use axum::body::{Body, Bytes};
+    use axum::http::{HeaderMap, StatusCode, header};
+    use axum::routing::{get, post};
+    use tokio::net::TcpListener;
+    use tokio_util::sync::DropGuard;
 
     use super::*;
+
+    fn spawn_mock(router: Router) -> (SocketAddr, DropGuard) {
+        vibevalley_runtime::rt::block_on(async move {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let cancel = CancellationToken::new();
+            let guard = cancel.clone().drop_guard();
+            tokio::spawn(async move {
+                let _ = axum::serve(listener, router).with_graceful_shutdown(cancel.cancelled_owned()).await;
+            });
+            (addr, guard)
+        })
+    }
 
     #[test]
     fn download_addresses_cannot_reach_private_networks_or_carry_credentials() {
@@ -496,32 +489,22 @@ mod tests {
 
     #[test]
     fn http_fetch_streams_post_body_and_never_follows_redirects() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        let handle = std::thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut req = Vec::new();
-            let mut chunk = [0u8; 1024];
-            loop {
-                let n = stream.read(&mut chunk).unwrap();
-                req.extend_from_slice(&chunk[..n]);
-                if req.windows(7).any(|w| w == b"payload") {
-                    break;
-                }
-            }
-            let raw = String::from_utf8_lossy(&req);
-            assert!(raw.starts_with("POST /upload HTTP/1.1"), "{raw}");
-            assert!(raw.to_ascii_lowercase().contains("x-test: ok"), "{raw}");
-            stream
-                .write_all(b"HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: 11\r\nConnection: close\r\n\r\n{\"ok\":true}")
-                .unwrap();
-
-            let (mut stream, _) = listener.accept().unwrap();
-            let _ = stream.read(&mut chunk);
-            stream
-                .write_all(b"HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:1/other\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
-                .unwrap();
-        });
+        let seen = Arc::new(Mutex::new(None::<(Option<String>, Vec<u8>)>));
+        let seen_for_route = seen.clone();
+        let app = Router::new()
+            .route(
+                "/upload",
+                post(move |headers: HeaderMap, body: Bytes| {
+                    let x_test = headers.get("x-test").and_then(|v| v.to_str().ok()).map(ToString::to_string);
+                    *seen_for_route.lock().unwrap() = Some((x_test, body.to_vec()));
+                    async move { (StatusCode::CREATED, [(header::CONTENT_TYPE, "application/json")], r#"{"ok":true}"#) }
+                }),
+            )
+            .route(
+                "/redir",
+                get(|| async { (StatusCode::FOUND, [(header::LOCATION, "http://127.0.0.1:1/other")]) }),
+            );
+        let (addr, _guard) = spawn_mock(app);
 
         let mut res = Http
             .fetch(Request {
@@ -537,6 +520,7 @@ mod tests {
         let mut body = String::new();
         res.body.read_to_string(&mut body).unwrap();
         assert_eq!(body, "{\"ok\":true}");
+        assert_eq!(seen.lock().unwrap().as_ref(), Some(&(Some("ok".to_string()), b"payload".to_vec())));
 
         let redirect = Http
             .fetch(Request {
@@ -549,22 +533,12 @@ mod tests {
             .unwrap();
         assert_eq!(redirect.status, 302);
         assert_eq!(redirect.header("location"), Some("http://127.0.0.1:1/other"));
-
-        handle.join().unwrap();
     }
 
     #[test]
     fn async_fetch_and_public_download_reject_bad_urls_and_stream_without_block_on() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        let handle = std::thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut chunk = [0u8; 512];
-            let _ = stream.read(&mut chunk);
-            stream
-                .write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello")
-                .unwrap();
-        });
+        let app = Router::new().route("/ping", get(|| async { ([(header::CONTENT_TYPE, "text/plain")], "hello") }));
+        let (addr, _guard) = spawn_mock(app);
 
         vibevalley_runtime::rt::block_on(async move {
             assert!(matches!(
@@ -593,7 +567,82 @@ mod tests {
             .unwrap();
             assert_eq!(body, "hello");
         });
+    }
 
-        handle.join().unwrap();
+    #[test]
+    fn http_fetch_streams_chunks_enforces_read_max_and_aborts_on_cancel() {
+        let stream_cancel = CancellationToken::new();
+        let stream_cancel_for_route = stream_cancel.clone();
+        let app = Router::new()
+            .route(
+                "/chunks",
+                get(|| async {
+                    let stream = futures_util::stream::iter([Ok::<_, Infallible>(Bytes::from_static(b"hello")), Ok(Bytes::from_static(b"world"))]);
+                    ([(header::CONTENT_TYPE, "application/octet-stream")], Body::from_stream(stream))
+                }),
+            )
+            .route(
+                "/stalled",
+                get(move || {
+                    let cancel = stream_cancel_for_route.clone();
+                    let stream = futures_util::stream::unfold((true, cancel), |(first, cancel)| async move {
+                        if first {
+                            Some((Ok::<_, Infallible>(Bytes::from_static(b"first")), (false, cancel)))
+                        } else {
+                            cancel.cancelled().await;
+                            None
+                        }
+                    });
+                    async move { ([(header::CONTENT_TYPE, "text/plain")], Body::from_stream(stream)) }
+                }),
+            );
+        let (addr, _guard) = spawn_mock(app);
+        let _stream_guard = stream_cancel.drop_guard();
+
+        // Response size limit enforced over streamed chunks.
+        let mut res = Http
+            .fetch(Request {
+                method: "GET",
+                url: format!("http://{addr}/chunks"),
+                headers: vec![],
+                body: None,
+                timeout: Duration::from_secs(5),
+            })
+            .unwrap();
+        assert_eq!(read_max(&mut res.body, 8), Err(ReadError::TooLarge));
+        drop(res);
+
+        // Mid-stream cancellation immediately interrupts a stalled SyncIoBridge read.
+        let cancel = CancellationToken::new();
+        let mut res = Http
+            .fetch_with_cancel(
+                Request {
+                    method: "GET",
+                    url: format!("http://{addr}/stalled"),
+                    headers: vec![],
+                    body: None,
+                    timeout: Duration::from_secs(30),
+                },
+                cancel.clone(),
+            )
+            .unwrap();
+        let mut first = [0u8; 5];
+        res.body.read_exact(&mut first).unwrap();
+        assert_eq!(&first, b"first");
+
+        let cancel_trigger = cancel.clone();
+        let canceller = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(20));
+            cancel_trigger.cancel();
+        });
+        let started = std::time::Instant::now();
+        let mut rest = [0u8; 16];
+        let err = res.body.read(&mut rest).expect_err("cancelled read must fail");
+        assert_eq!(err.kind(), std::io::ErrorKind::Interrupted);
+        assert!(started.elapsed() < Duration::from_secs(2), "cancel must abort promptly");
+        // Subsequent reads after cancellation remain Interrupted without panicking.
+        assert_eq!(res.body.read(&mut rest).unwrap_err().kind(), std::io::ErrorKind::Interrupted);
+
+        canceller.join().unwrap();
     }
 }

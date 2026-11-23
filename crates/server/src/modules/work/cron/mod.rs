@@ -11,17 +11,18 @@ use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 use parking_lot::Mutex;
+use vibevalley_core::{SharedClock, system_clock};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ActorKind, ApiError, BizCode, Caller, Cron, CronRequest, Fact, FactCronChanged, FactCronRemoved, IssueStatus, NoticeLevel, Preview, ops,
 };
 
+use crate::Hub;
 use crate::base::{LookIn, ServerDb, Ticker, internal, missing};
 use crate::modules::collab::channel::{Chat, Noticing};
 use crate::modules::team::agent::Agents;
 use crate::modules::work::issue::{Board, NewIssue};
 use crate::ports::CronOrchestratorPort;
-use crate::{Hub, now};
 
 pub const DEFAULT_CHANNEL: &str = "general";
 const TICK: Duration = Duration::from_secs(20);
@@ -71,6 +72,7 @@ pub struct Crons {
     lock: Mutex<()>,
     chat: Option<Arc<Chat>>,
     orchestrator: Option<Arc<dyn CronOrchestratorPort>>,
+    clock: SharedClock,
     closed: std::sync::atomic::AtomicBool,
     ticker: Mutex<Option<Ticker>>,
 }
@@ -87,9 +89,22 @@ impl Crons {
         chat: Option<Arc<Chat>>,
         orchestrator: Option<Arc<dyn CronOrchestratorPort>>,
     ) -> Result<Arc<Crons>, ApiError> {
+        Self::open_with_clock(db, hub, board, agents, chat, orchestrator, system_clock())
+    }
+
+    /// Same as [`Crons::open`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
+    pub fn open_with_clock(
+        db: Arc<ServerDb>,
+        hub: &Arc<Hub>,
+        board: Board,
+        agents: Arc<Agents>,
+        chat: Option<Arc<Chat>>,
+        orchestrator: Option<Arc<dyn CronOrchestratorPort>>,
+        clock: SharedClock,
+    ) -> Result<Arc<Crons>, ApiError> {
         let stored = db.run(async |conn| db::list(conn).await).map_err(internal)?;
         let links = Arc::new(Mutex::new(CronLinks::default()));
-        let at = now();
+        let at = clock.now_ms();
         let mut facts = Vec::with_capacity(stored.len());
         {
             let mut map = links.lock();
@@ -114,6 +129,7 @@ impl Crons {
             lock: Mutex::new(()),
             chat,
             orchestrator,
+            clock,
             closed: Default::default(),
             ticker: Mutex::new(None),
         }))
@@ -148,7 +164,7 @@ impl Crons {
         let issue_id = self.issue_of(&cron.id);
         self.db.run(async |conn| db::upsert(conn, &cron, issue_id.as_deref()).await).map_err(internal)?;
         if let Some(hub) = self.hub() {
-            hub.apply(vec![Fact::CronChanged(FactCronChanged { at: now(), cron })]);
+            hub.apply(vec![Fact::CronChanged(FactCronChanged { at: self.clock.now_ms(), cron })]);
         }
         Ok(())
     }
@@ -177,7 +193,7 @@ impl Crons {
     /// `add`: `by` is who asks, and on whose word (`needsOK`).
     pub fn add(&self, req: CronRequest, by: ActorKind) -> Result<Cron, ApiError> {
         let _l = self.lock.lock();
-        let at = now();
+        let at = self.clock.now_ms();
         let rules = vibevalley_core::cron_request_to_rules(&req);
         let problem = vibevalley_core::cron::cron_problem(&rules, at);
         if !problem.is_empty() {
@@ -249,7 +265,7 @@ impl Crons {
             ..was.clone()
         };
         if enabled && !was.enabled && !matches!(was.when, vibevalley_protocol::CronWhen::Once(_)) {
-            cron.last_run = Some(now());
+            cron.last_run = Some(self.clock.now_ms());
         }
         self.put(cron.clone())?;
         Ok(cron)
@@ -261,7 +277,10 @@ impl Crons {
         self.db.run(async |conn| db::remove(conn, id).await).map_err(internal)?;
         let prev_issue = self.links.lock().link(id, None);
         if let Some(hub) = self.hub() {
-            hub.apply(vec![Fact::CronRemoved(FactCronRemoved { at: now(), id: id.into() })]);
+            hub.apply(vec![Fact::CronRemoved(FactCronRemoved {
+                at: self.clock.now_ms(),
+                id: id.into(),
+            })]);
         }
         if let Some(issue_id) = prev_issue {
             self.board.refresh_issue(&issue_id);
@@ -286,7 +305,7 @@ impl Crons {
     /// Runs every cron due now, each once however many runs it missed.
     pub fn tick(&self) {
         let _l = self.lock.lock();
-        let at = now();
+        let at = self.clock.now_ms();
         let all = self.list();
         let rules: Vec<vibevalley_core::cron::Cron> = all.iter().map(vibevalley_core::cron_to_rules).collect();
         for due in vibevalley_core::cron::due_crons(&rules, at) {
@@ -404,5 +423,107 @@ pub fn install(hub: &Arc<Hub>, crons: Arc<Crons>, tick: bool) {
             true
         });
         *crons.ticker.lock() = Some(ticker);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use vibevalley_core::{Clock, ManualClock};
+    use vibevalley_protocol::{CronRequest, CronWhen, CronWhenOnce};
+
+    use super::*;
+    use crate::ServerConfig;
+
+    struct CountingOrchestrator {
+        heard: AtomicUsize,
+    }
+
+    impl CronOrchestratorPort for CountingOrchestrator {
+        fn hear_cron(&self, _agent: &str, _channel: &str, _words: &str) -> bool {
+            self.heard.fetch_add(1, Ordering::SeqCst);
+            true
+        }
+    }
+
+    #[test]
+    fn manual_clock_drives_once_due_execution_and_reenable_timestamps_without_sleep() {
+        vibevalley_i18n::set_locale("en");
+        let dir = tempfile::tempdir().unwrap();
+        let started = crate::start(ServerConfig {
+            probe_runtimes: false,
+            orchestrator_listens: false,
+            link_previews: false,
+            tick_crons: false,
+            ..ServerConfig::under(dir.path())
+        })
+        .unwrap();
+
+        let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+        let orchestrator = Arc::new(CountingOrchestrator { heard: AtomicUsize::new(0) });
+        let crons = Crons::open_with_clock(
+            started.db.clone(),
+            &started.hub,
+            started.board.clone(),
+            started.agents.clone(),
+            Some(started.chat.clone()),
+            Some(orchestrator.clone()),
+            clock.clone(),
+        )
+        .unwrap();
+
+        let past = crons.add(
+            CronRequest {
+                name: "too late".into(),
+                text: "expired".into(),
+                channel: None,
+                agent: None,
+                repo: None,
+                when: CronWhen::Once(CronWhenOnce { at: clock.now_ms() - 1 }),
+                tz: None,
+            },
+            ActorKind::User,
+        );
+        assert_eq!(past.unwrap_err().biz_code, BizCode::CronRefused);
+
+        let due_at = clock.now_ms() + 60_000;
+        let once = crons
+            .add(
+                CronRequest {
+                    name: "standup".into(),
+                    text: "post standup notes".into(),
+                    channel: None,
+                    agent: None,
+                    repo: None,
+                    when: CronWhen::Once(CronWhenOnce { at: due_at }),
+                    tz: None,
+                },
+                ActorKind::User,
+            )
+            .unwrap();
+        assert_eq!(once.created, 1_700_000_000_000);
+        assert!(once.enabled);
+
+        // Before the deadline, tick does not fire.
+        clock.advance(Duration::from_millis(59_999));
+        crons.tick();
+        assert_eq!(orchestrator.heard.load(Ordering::SeqCst), 0);
+
+        // At the deadline, tick fires exactly once and disables the one-shot cron.
+        clock.advance(Duration::from_millis(1));
+        crons.tick();
+        assert_eq!(orchestrator.heard.load(Ordering::SeqCst), 1);
+        let after = crons.find(&once.id).unwrap();
+        assert!(!after.enabled);
+        assert_eq!(after.last_run, Some(due_at));
+
+        // Subsequent ticks do not re-fire.
+        clock.advance(Duration::from_secs(60));
+        crons.tick();
+        assert_eq!(orchestrator.heard.load(Ordering::SeqCst), 1);
+
+        crons.close();
+        started.close();
     }
 }

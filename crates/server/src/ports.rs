@@ -1,16 +1,12 @@
 //! Narrow spine port traits decoupling L1/L2/L3 domains without importing any
 //! concrete server domain modules.
 
-use std::sync::Arc;
 use std::time::Duration;
 
 use serde_json::Value;
 use tokio::sync::broadcast;
 use vibevalley_core::Applied;
-use vibevalley_protocol::{
-    ApiError, ArtifactCard, ArtifactViewContext, BlockRef, ChannelType, ChatMessage, Fact, MessageKind, QuotedBlock, Session, SliceBundle, SpaceState,
-    SubjectKind,
-};
+use vibevalley_protocol::{ApiError, ArtifactCard, BlockRef, ChatMessage, Fact, QuotedBlock, Session, SliceBundle, SpaceState};
 
 /// Where domain facts go and core state is read: the server's one state
 /// (`Hub`) or, standing alone, a `LocalFacts`.
@@ -58,160 +54,6 @@ pub trait ChannelAnnouncePort: Send + Sync {
     fn issue_thread_id(&self, issue_id: &str) -> Option<String>;
     fn say_in(&self, channel: &str, text: &str, send_key: String) -> Result<ChatMessage, ApiError>;
     fn history(&self, channel: &str, limit: i64) -> Result<Vec<ChatMessage>, ApiError>;
-}
-
-/// Pure delivery target kind mirrored across the L2 work <-> collab boundary.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChannelDeliveryKind {
-    Issue,
-    Session,
-    Direct,
-    Orchestrator,
-}
-
-/// Pure queued delivery descriptor returned by [`ChannelDispatchPort`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChannelDelivery {
-    pub id: i64,
-    pub message_id: String,
-    pub channel_id: String,
-    pub recipient_kind: ChannelDeliveryKind,
-    pub recipient_id: String,
-    pub reason: String,
-    pub wakes: bool,
-}
-
-/// Pure committed message snapshot delivered over [`ChannelDispatchPort`].
-#[derive(Debug, Clone)]
-pub struct ChannelPostedMessage {
-    pub event_seq: i64,
-    pub id: String,
-    pub channel_id: String,
-    pub number: i64,
-    pub sender_id: String,
-    pub sender_kind: String,
-    pub sender_name: String,
-    pub sender_agent: Option<String>,
-    pub kind: MessageKind,
-    pub body: String,
-    pub view_context: Option<ArtifactViewContext>,
-    pub reply_number: Option<i64>,
-    pub edited_at: Option<i64>,
-    pub deleted_at: Option<i64>,
-    pub channel_name: String,
-    pub channel_type: ChannelType,
-    pub peer: Option<String>,
-    pub orchestrator: String,
-    pub mentions: Vec<String>,
-    pub members: Vec<String>,
-    pub topic: Option<(SubjectKind, String)>,
-}
-
-/// One committed message and its routed deliveries for downstream lanes.
-#[derive(Debug, Clone)]
-pub struct ChannelDispatchedBatch {
-    pub committed: Arc<ChannelPostedMessage>,
-    pub deliveries: Vec<ChannelDelivery>,
-}
-
-/// Participant seat metadata for [`ChannelDispatchPort::seat`] and notes.
-#[derive(Debug, Clone, Default)]
-pub struct ChannelSeat {
-    pub id: String,
-    pub name: String,
-    pub agent: Option<String>,
-    pub home: Option<String>,
-}
-
-/// Pure place metadata returned by [`ChannelDispatchPort::place`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChannelPlace {
-    pub id: String,
-    pub r#type: ChannelType,
-    pub peer: Option<String>,
-    pub parent: Option<String>,
-    pub name: Option<String>,
-    pub last_number: i64,
-    pub root: Option<(String, i64)>,
-    pub topic: Option<(SubjectKind, String)>,
-}
-
-/// Thread subject metadata for [`ChannelNoteRequest`].
-#[derive(Debug, Clone)]
-pub struct ChannelThreadSubject {
-    pub kind: SubjectKind,
-    pub id: String,
-    pub owner: String,
-}
-
-/// Pure note request posted into a channel or thread on behalf of a worker/issue.
-#[derive(Debug, Clone)]
-pub struct ChannelNoteRequest {
-    pub channel: String,
-    pub from: String,
-    pub kind: MessageKind,
-    pub text: String,
-    pub meta_json: Option<String>,
-    pub topic: Option<ChannelThreadSubject>,
-    pub member: Option<String>,
-    pub seat: Option<ChannelSeat>,
-}
-
-/// Pure system notice request.
-#[derive(Debug, Clone, Default)]
-pub struct ChannelNoticeRequest {
-    pub channel: String,
-    pub text: String,
-    pub code: String,
-    pub send_key: String,
-    pub until_user_speaks: bool,
-}
-
-/// Pure channel participant record.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChannelParticipant {
-    pub id: String,
-    pub kind: String,
-    pub name: String,
-    pub agent_id: Option<String>,
-    pub home_id: Option<String>,
-    pub left_at: Option<i64>,
-}
-
-/// Pure channel dispatch & thread lifecycle port used by `work/chat` (L2)
-/// so `work` has zero concrete imports of `collab/channel`.
-pub trait ChannelDispatchPort: Send + Sync {
-    fn dispatches(&self) -> flume::Receiver<ChannelDispatchedBatch>;
-    fn subscribe_removals(&self) -> broadcast::Receiver<String>;
-    fn pending_deliveries(&self, kind: ChannelDeliveryKind) -> Result<Vec<ChannelDelivery>, ApiError>;
-    fn pending_deliveries_for(&self, kind: ChannelDeliveryKind, recipient_id: &str, max_id: i64) -> Result<Vec<ChannelDelivery>, ApiError>;
-    fn delivery_is_pending(&self, id: i64) -> Result<bool, ApiError>;
-    fn committed_of(&self, message_id: &str) -> Result<Option<ChannelPostedMessage>, ApiError>;
-    fn settle_delivery(&self, id: i64, delivered: bool) -> Result<(), ApiError>;
-    fn withdraw_delivery(&self, id: i64) -> Result<(), ApiError>;
-    fn mark_seen(&self, participant: &str, message_id: &str) -> Result<(), ApiError>;
-    fn react(&self, id: &str, who: &str, emoji: &str, on: bool) -> Result<ChatMessage, ApiError>;
-    fn note(&self, req: ChannelNoteRequest) -> Result<String, ApiError>;
-    fn note_once(&self, req: ChannelNoteRequest, send_key: Option<String>) -> Result<String, ApiError>;
-    fn notice(&self, req: ChannelNoticeRequest);
-    fn seat(&self, seat: ChannelSeat) -> Result<(), ApiError>;
-    fn leave(&self, participant: &str) -> Result<(), ApiError>;
-    fn add_follower(&self, thread: &str, participant: &str) -> Result<(), ApiError>;
-    fn members_of(&self, channel: &str) -> Vec<String>;
-    fn participants(&self) -> Vec<ChannelParticipant>;
-    fn home_of(&self, participant: &str) -> Option<String>;
-    fn place(&self, id: &str) -> Option<ChannelPlace>;
-    fn default_channel(&self) -> String;
-    fn orchestrator_in(&self, channel: &str) -> String;
-    fn target_of(&self, channel: &str) -> Option<String>;
-    fn thread_about(&self, kind: SubjectKind, id: &str) -> Option<String>;
-    fn latest(&self, channel: &str) -> Result<i64, ApiError>;
-    fn read_up_to(&self, participant: &str, channel: &str, upto: i64) -> Result<(), ApiError>;
-    fn dispatch_count(&self, channel: &str) -> Result<i64, ApiError>;
-    fn issue_thread(&self, issue_id: &str, title: &str, preferred_channel: Option<&str>) -> Result<String, ApiError>;
-    fn issue_thread_id(&self, issue_id: &str) -> Option<String>;
-    fn say_in(&self, channel: &str, text: &str, send_key: String) -> Result<ChatMessage, ApiError>;
-    fn ensure_seated(&self, cb: Arc<dyn Fn(&str) + Send + Sync>);
 }
 
 /// Read-only `vv://` resource reader port decoupling `team/tool` from `team/mcp`.

@@ -3,11 +3,12 @@ use super::{Error, Read, Result, Signal, Store, Task, TaskStatus, Tx, WaitMode};
 use serde_json::{Value, json};
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, Condvar, Mutex, OnceLock},
-    thread::{self, JoinHandle},
+    sync::{Arc, Mutex},
+    thread,
     time::Duration,
 };
-use tokio_util::sync::{CancellationToken, DropGuard};
+use tokio::sync::Notify;
+use tokio_util::sync::CancellationToken;
 
 const WOKEN: &str = "__durable_woken_signal";
 type Phase = Arc<dyn Fn(&TaskContext) -> Result<Transition> + Send + Sync>;
@@ -32,45 +33,45 @@ pub enum Transition {
     Fail(String),
 }
 
+struct CancelHandle {
+    token: CancellationToken,
+    // Dropping `tx` synchronously in `cancel()` wakes sync `flume::Selector` waiters
+    // immediately without async scheduling lag.
+    tx: Mutex<Option<flume::Sender<()>>>,
+    rx: flume::Receiver<()>,
+}
+
+impl CancelHandle {
+    fn new(parent: &CancellationToken) -> Arc<Self> {
+        let token = parent.child_token();
+        let (tx, rx) = flume::bounded(0);
+        let tx = if token.is_cancelled() { None } else { Some(tx) };
+        Arc::new(Self { token, tx: Mutex::new(tx), rx })
+    }
+
+    fn cancel(&self) {
+        self.token.cancel();
+        self.tx.lock().unwrap().take();
+    }
+}
+
 pub struct TaskContext {
     pub task: Task,
     pub store: Store,
     pub signal: Option<Signal>,
     pub children: Vec<Task>,
-    cancel: CancellationToken,
-    done: CancellationToken,
-    _done_guard: DropGuard,
-    stopped: OnceLock<flume::Receiver<()>>,
+    cancel: Arc<CancelHandle>,
 }
 impl TaskContext {
     pub fn is_cancelled(&self) -> bool {
-        self.cancel.is_cancelled()
+        self.cancel.token.is_cancelled()
     }
     pub fn cancel_token(&self) -> CancellationToken {
-        self.cancel.clone()
+        self.cancel.token.clone()
     }
     /// Disconnection wakes a phase blocked on an external model or tool.
     pub fn cancellation(&self) -> flume::Receiver<()> {
-        self.stopped
-            .get_or_init(|| {
-                let (tx, rx) = flume::bounded(0);
-                if self.cancel.is_cancelled() {
-                    drop(tx);
-                } else {
-                    let cancel = self.cancel.clone();
-                    let done = self.done.clone();
-                    crate::rt::spawn(async move {
-                        tokio::select! {
-                            biased;
-                            _ = cancel.cancelled() => {}
-                            _ = done.cancelled() => {}
-                        }
-                        drop(tx);
-                    });
-                }
-                rx
-            })
-            .clone()
+        self.cancel.rx.clone()
     }
     fn live_task(&self, tx: &Read<'_>) -> Result<Task> {
         let task = tx.task(&self.task.id)?;
@@ -126,34 +127,48 @@ impl TaskContext {
 }
 
 struct Runtime {
-    active: HashMap<String, CancellationToken>,
+    active: HashMap<String, Arc<CancelHandle>>,
     handlers: HashMap<(String, String), Phase>,
     started: bool,
 }
 struct Engine {
     store: Store,
     rt: Mutex<Runtime>,
-    idle: Condvar,
+    idle: Notify,
     max_workers: usize,
-    wake: flume::Sender<()>,
+    wake: Notify,
     shutdown: CancellationToken,
 }
 struct Owner {
     engine: Arc<Engine>,
-    coordinator: Mutex<Option<JoinHandle<()>>>,
+    coordinator: Mutex<Option<tokio::task::JoinHandle<()>>>,
+    coord_is_current_thread: bool,
 }
 impl Owner {
     fn close(&self) {
         let e = &self.engine;
         {
-            let _rt = e.rt.lock().unwrap();
+            let rt = e.rt.lock().unwrap();
             e.shutdown.cancel();
+            for cancel in rt.active.values() {
+                cancel.cancel();
+            }
         }
-        let _ = e.wake.try_send(());
-        if let Some(thread) = self.coordinator.lock().unwrap().take() {
-            let _ = thread.join();
+        e.wake.notify_one();
+        let coordinator = self.coordinator.lock().unwrap().take();
+        let on_current_thread = tokio::runtime::Handle::try_current().is_ok_and(|h| h.runtime_flavor() == tokio::runtime::RuntimeFlavor::CurrentThread);
+        if let Some(handle) = coordinator {
+            if self.coord_is_current_thread && on_current_thread {
+                // On a single-threaded runtime the coordinator is parked at an `.await` point;
+                // awaiting it synchronously would deadlock this thread.
+                handle.abort();
+            } else {
+                crate::rt::block_on(async move {
+                    let _ = handle.await;
+                });
+            }
         }
-        let _guard = e.idle.wait_while(e.rt.lock().unwrap(), |r| !r.active.is_empty()).unwrap();
+        crate::rt::block_on(wait_idle(e));
     }
 }
 impl Drop for Owner {
@@ -162,12 +177,23 @@ impl Drop for Owner {
     }
 }
 
+async fn wait_idle(e: &Engine) {
+    loop {
+        let notified = e.idle.notified();
+        tokio::pin!(notified);
+        notified.as_mut().enable();
+        if e.rt.lock().unwrap().active.is_empty() {
+            return;
+        }
+        notified.await;
+    }
+}
+
 #[derive(Clone)]
 pub struct Scheduler(Arc<Owner>);
 impl Scheduler {
     pub fn new(store: Store, max_workers: usize) -> Self {
         let changes = store.subscribe_tasks().expect("scheduler requires an open durable store");
-        let (wake, control) = flume::bounded(1);
         let engine = Arc::new(Engine {
             store,
             rt: Mutex::new(Runtime {
@@ -175,19 +201,19 @@ impl Scheduler {
                 handlers: HashMap::new(),
                 started: false,
             }),
-            idle: Condvar::new(),
+            idle: Notify::new(),
             max_workers: if max_workers == 0 { 32 } else { max_workers },
-            wake,
+            wake: Notify::new(),
             shutdown: CancellationToken::new(),
         });
+        let handle = crate::rt::current_or_global_handle();
+        let coord_is_current_thread = handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::CurrentThread;
         let e = Arc::clone(&engine);
-        let thread = thread::Builder::new()
-            .name("durable-scheduler".into())
-            .spawn(move || run_scheduler(e, changes, control))
-            .expect("start durable scheduler");
+        let coordinator = handle.spawn(run_scheduler(e, changes));
         Self(Arc::new(Owner {
             engine,
-            coordinator: Mutex::new(Some(thread)),
+            coordinator: Mutex::new(Some(coordinator)),
+            coord_is_current_thread,
         }))
     }
     pub fn store(&self) -> &Store {
@@ -204,7 +230,7 @@ impl Scheduler {
         }
         let result = e.store.write(|tx| tx.create_task(task))?;
         rt.started = true;
-        let _ = e.wake.try_send(());
+        e.wake.notify_one();
         Ok(result)
     }
     pub fn send_signal(&self, id: &str, name: &str, key: Option<&str>, payload: &Value) -> Result<(Signal, bool)> {
@@ -250,7 +276,7 @@ impl Scheduler {
         })?;
         rt.started = true;
         record_abort(&mut rt, aborts);
-        let _ = e.wake.try_send(());
+        e.wake.notify_one();
         Ok(())
     }
     pub fn abort(&self, id: &str) -> Result<()> {
@@ -264,7 +290,7 @@ impl Scheduler {
         Ok(())
     }
     pub fn wake(&self) {
-        let _ = self.0.engine.wake.try_send(());
+        self.0.engine.wake.notify_one();
     }
     pub fn active_workers(&self) -> usize {
         self.0.engine.rt.lock().unwrap().active.len()
@@ -393,36 +419,64 @@ fn wake_children(tx: &mut Tx<'_>, t: &mut Task) -> Result<bool> {
     Ok(ready)
 }
 
-fn run_scheduler(e: Arc<Engine>, changes: flume::Receiver<()>, control: flume::Receiver<()>) {
+enum DispatchStep {
+    Wait(Option<Duration>),
+    Stop,
+}
+
+async fn run_scheduler(e: Arc<Engine>, changes: flume::Receiver<()>) {
     loop {
-        let timeout = {
-            let mut rt = e.rt.lock().unwrap();
-            if e.shutdown.is_cancelled() {
-                break;
+        let engine = Arc::clone(&e);
+        let step = tokio::task::spawn_blocking(move || {
+            let mut rt = engine.rt.lock().unwrap();
+            if engine.shutdown.is_cancelled() {
+                return DispatchStep::Stop;
             }
-            if rt.started {
-                match dispatch(&e, &mut rt) {
-                    Ok(t) => t,
-                    Err(Error::Closed) => break,
-                    Err(err) => {
-                        eprintln!("durable dispatch: {err}");
-                        Some(Duration::from_millis(100))
-                    }
+            if !rt.started {
+                return DispatchStep::Wait(None);
+            }
+            match dispatch(&engine, &mut rt) {
+                Ok(t) => DispatchStep::Wait(t),
+                Err(Error::Closed) => DispatchStep::Stop,
+                Err(err) => {
+                    eprintln!("durable dispatch: {err}");
+                    DispatchStep::Wait(Some(Duration::from_millis(100)))
                 }
-            } else {
-                None
             }
+        })
+        .await;
+        let timeout = match step {
+            Ok(DispatchStep::Wait(t)) => t,
+            Ok(DispatchStep::Stop) | Err(_) => break,
         };
-        let select = flume::Selector::new().recv(&changes, |r| r).recv(&control, |r| r);
+        if e.shutdown.is_cancelled() {
+            break;
+        }
         match timeout {
             Some(d) => {
-                if let Ok(Err(_)) = select.wait_timeout(d) {
-                    break;
+                let deadline = tokio::time::Instant::now() + d;
+                tokio::select! {
+                    biased;
+                    _ = e.shutdown.cancelled() => break,
+                    _ = e.wake.notified() => {}
+                    msg = changes.recv_async() => {
+                        if msg.is_err() {
+                            break;
+                        }
+                    }
+                    _ = tokio::time::sleep_until(deadline) => {}
                 }
             }
             None => {
-                if select.wait().is_err() {
-                    break;
+                tokio::select! {
+                    biased;
+                    _ = e.shutdown.cancelled() => break,
+                    _ = e.wake.notified() => {}
+                    msg = changes.recv_async() => {
+                        if msg.is_err() {
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -468,10 +522,8 @@ fn dispatch(e: &Arc<Engine>, rt: &mut Runtime) -> Result<Option<Duration>> {
         Ok(())
     })?;
     for (task, signal, children) in claimed {
-        let cancel = e.shutdown.child_token();
-        let done = CancellationToken::new();
-        let done_guard = done.clone().drop_guard();
-        rt.active.insert(task.id.clone(), cancel.clone());
+        let cancel = CancelHandle::new(&e.shutdown);
+        rt.active.insert(task.id.clone(), Arc::clone(&cancel));
         let handler = rt.handlers.get(&(task.kind.clone(), task.phase_name.clone())).cloned();
         let engine = e.clone();
         let tc = TaskContext {
@@ -480,9 +532,6 @@ fn dispatch(e: &Arc<Engine>, rt: &mut Runtime) -> Result<Option<Duration>> {
             children,
             store: e.store.clone(),
             cancel,
-            done,
-            _done_guard: done_guard,
-            stopped: OnceLock::new(),
         };
         thread::spawn(move || {
             let started_ms = engine.store.now_ms();
@@ -531,8 +580,8 @@ fn dispatch(e: &Arc<Engine>, rt: &mut Runtime) -> Result<Option<Duration>> {
                 final_outcome = "cancelled".into();
             }
             rt.active.remove(&tc.task.id);
-            engine.idle.notify_all();
-            let _ = engine.wake.try_send(());
+            engine.idle.notify_waiters();
+            engine.wake.notify_one();
             drop(rt);
 
             let at_ms = engine.store.now_ms();

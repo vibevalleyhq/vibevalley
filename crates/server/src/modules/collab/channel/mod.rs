@@ -42,14 +42,11 @@ use self::db::{EventRow, MsgRow, ParticipantRow};
 use self::dispatch::Reach;
 use self::model::ChatModel;
 use self::store::{Q, WriteTx};
-use self::types::{ThreadSubject as ChannelThreadSubject, Write, Written, new_id};
+use self::types::{Write, Written, new_id};
 use self::words::ChatTarget;
 use crate::base::{LookIn, ServerDb, internal, missing, refused as refuse};
 use crate::modules::content::attachment::Attachments;
-use crate::ports::{
-    ChannelAnnouncePort, ChannelDelivery, ChannelDeliveryKind, ChannelDispatchPort, ChannelDispatchedBatch, ChannelNoteRequest, ChannelNoticeRequest,
-    ChannelParticipant, ChannelPlace, ChannelPostedMessage, ChannelQuotePort, ChannelSeat,
-};
+use crate::ports::{ChannelAnnouncePort, ChannelQuotePort};
 use crate::{Hub, now};
 
 const CHANNEL_EVENT_CAPACITY: usize = 1024;
@@ -98,7 +95,6 @@ pub struct Chat {
     removals: broadcast::Sender<String>,
     edited_messages: broadcast::Sender<ChatMessage>,
     dispatches: Mutex<Vec<flume::Sender<ChannelDispatched>>>,
-    port_dispatches: Mutex<Vec<flume::Sender<ChannelDispatchedBatch>>>,
     guards: RwLock<Vec<Guard>>,
     seaters: RwLock<Vec<Seater>>,
     /// Link previews are read off the web; tests turn it off.
@@ -193,7 +189,6 @@ impl Chat {
             removals,
             edited_messages,
             dispatches: Mutex::default(),
-            port_dispatches: Mutex::default(),
             guards: RwLock::default(),
             seaters: RwLock::default(),
             embeds,
@@ -377,7 +372,7 @@ impl Chat {
                 .q()?
                 .ok_or_else(|| refused(t("server.channel.noMessage", &[("n", root.into())])))?
         };
-        let talk = ChannelThreadSubject {
+        let talk = ThreadSubject {
             kind: SubjectKind::Talk,
             id: String::new(),
             owner: String::new(),
@@ -552,15 +547,10 @@ impl Chat {
                 publish(
                     &self.dispatches,
                     &ChannelDispatched {
-                        committed: posted.clone(),
+                        committed: posted,
                         deliveries: written.deliveries.clone(),
                     },
                 );
-                let batch = ChannelDispatchedBatch {
-                    committed: Arc::new(posted_to_port(&posted)),
-                    deliveries: written.deliveries.iter().map(delivery_to_port).collect(),
-                };
-                publish(&self.port_dispatches, &batch);
             }
         }
         if written.hop_limit_hit {
@@ -648,8 +638,13 @@ impl Chat {
         if let Some(hub) = hub {
             hub.spawn_task(fut);
         } else {
-            vibevalley_runtime::rt::handle().spawn(fut);
+            vibevalley_runtime::rt::current_or_global_handle().spawn(fut);
         }
+    }
+
+    /// Subscribes to removed message IDs without receiving other channel events.
+    pub fn subscribe_removals(&self) -> broadcast::Receiver<String> {
+        self.removals.subscribe()
     }
 
     fn quoted(&self, refs: &[vibevalley_protocol::BlockRef]) -> Vec<QuotedBlock> {
@@ -657,85 +652,6 @@ impl Chat {
             Some(q) if !refs.is_empty() => q.quote(refs),
             _ => vec![],
         }
-    }
-}
-
-fn kind_to_port(kind: DeliveryTargetKind) -> ChannelDeliveryKind {
-    match kind {
-        DeliveryTargetKind::Issue => ChannelDeliveryKind::Issue,
-        DeliveryTargetKind::Session => ChannelDeliveryKind::Session,
-        DeliveryTargetKind::Direct => ChannelDeliveryKind::Direct,
-        DeliveryTargetKind::Orchestrator => ChannelDeliveryKind::Orchestrator,
-    }
-}
-
-fn kind_from_port(kind: ChannelDeliveryKind) -> DeliveryTargetKind {
-    match kind {
-        ChannelDeliveryKind::Issue => DeliveryTargetKind::Issue,
-        ChannelDeliveryKind::Session => DeliveryTargetKind::Session,
-        ChannelDeliveryKind::Direct => DeliveryTargetKind::Direct,
-        ChannelDeliveryKind::Orchestrator => DeliveryTargetKind::Orchestrator,
-    }
-}
-
-fn delivery_to_port(d: &QueuedDelivery) -> ChannelDelivery {
-    ChannelDelivery {
-        id: d.id,
-        message_id: d.message_id.clone(),
-        channel_id: d.channel_id.clone(),
-        recipient_kind: kind_to_port(d.recipient_kind),
-        recipient_id: d.recipient_id.clone(),
-        reason: d.reason.as_str().to_string(),
-        wakes: d.wakes,
-    }
-}
-
-fn posted_to_port(c: &Committed) -> ChannelPostedMessage {
-    let view_context = meta_of(c.row.meta.as_deref()).view_context.filter(|_| c.row.deleted_at.is_none());
-    ChannelPostedMessage {
-        event_seq: c.event.seq,
-        id: c.row.id.clone(),
-        channel_id: c.row.channel_id.clone(),
-        number: c.row.number,
-        sender_id: c.row.sender_id.clone(),
-        sender_kind: c.row.sender_kind.clone(),
-        sender_name: c.row.sender_name.clone(),
-        sender_agent: c.row.sender_agent.clone(),
-        kind: types::message_kind(&c.row.kind),
-        body: c.row.body.clone(),
-        view_context,
-        reply_number: c.row.reply_number,
-        edited_at: c.row.edited_at,
-        deleted_at: c.row.deleted_at,
-        channel_name: c.channel_name.clone(),
-        channel_type: c.channel_type,
-        peer: c.peer.clone(),
-        orchestrator: c.orchestrator.clone(),
-        mentions: c.mentions.clone(),
-        members: c.members.clone(),
-        topic: c.topic.clone(),
-    }
-}
-
-fn note_from_port(req: ChannelNoteRequest) -> Note {
-    Note {
-        channel: req.channel,
-        from: req.from,
-        kind: req.kind,
-        text: req.text,
-        meta: meta_of(req.meta_json.as_deref()),
-        topic: req.topic.map(|t| ThreadSubject {
-            kind: t.kind,
-            id: t.id,
-            owner: t.owner,
-        }),
-        member: req.member,
-        seat: req.seat.map(|s| Seat {
-            id: s.id,
-            name: s.name,
-            agent: s.agent,
-            home: s.home,
-        }),
     }
 }
 
@@ -819,182 +735,6 @@ impl ChannelAnnouncePort for Chat {
 
     fn history(&self, channel: &str, limit: i64) -> Result<Vec<ChatMessage>, ApiError> {
         Chat::history(self, channel, None, Some(limit))
-    }
-}
-
-impl ChannelDispatchPort for Chat {
-    fn dispatches(&self) -> flume::Receiver<ChannelDispatchedBatch> {
-        let (tx, rx) = flume::unbounded();
-        self.port_dispatches.lock().push(tx);
-        rx
-    }
-
-    fn subscribe_removals(&self) -> broadcast::Receiver<String> {
-        self.removals.subscribe()
-    }
-
-    fn pending_deliveries(&self, kind: ChannelDeliveryKind) -> Result<Vec<ChannelDelivery>, ApiError> {
-        Ok(Chat::pending_deliveries(self, kind_from_port(kind))?.iter().map(delivery_to_port).collect())
-    }
-
-    fn pending_deliveries_for(&self, kind: ChannelDeliveryKind, recipient_id: &str, max_id: i64) -> Result<Vec<ChannelDelivery>, ApiError> {
-        Ok(Chat::pending_deliveries_for(self, kind_from_port(kind), recipient_id, max_id)?
-            .iter()
-            .map(delivery_to_port)
-            .collect())
-    }
-
-    fn delivery_is_pending(&self, id: i64) -> Result<bool, ApiError> {
-        Chat::delivery_is_pending(self, id)
-    }
-
-    fn committed_of(&self, message_id: &str) -> Result<Option<ChannelPostedMessage>, ApiError> {
-        Ok(Chat::committed_of(self, message_id)?.as_ref().map(posted_to_port))
-    }
-
-    fn settle_delivery(&self, id: i64, delivered: bool) -> Result<(), ApiError> {
-        Chat::settle_delivery(self, id, delivered)
-    }
-
-    fn withdraw_delivery(&self, id: i64) -> Result<(), ApiError> {
-        Chat::withdraw_delivery(self, id)
-    }
-
-    fn mark_seen(&self, participant: &str, message_id: &str) -> Result<(), ApiError> {
-        Chat::mark_seen(self, participant, message_id)
-    }
-
-    fn react(&self, id: &str, who: &str, emoji: &str, on: bool) -> Result<ChatMessage, ApiError> {
-        Chat::react(self, id, who, emoji, on)
-    }
-
-    fn note(&self, req: ChannelNoteRequest) -> Result<String, ApiError> {
-        Chat::note(self, note_from_port(req))
-    }
-
-    fn note_once(&self, req: ChannelNoteRequest, send_key: Option<String>) -> Result<String, ApiError> {
-        Chat::note_once(self, note_from_port(req), send_key)
-    }
-
-    fn notice(&self, req: ChannelNoticeRequest) {
-        Chat::notice(
-            self,
-            Noticing {
-                channel: req.channel,
-                text: req.text,
-                code: req.code,
-                send_key: req.send_key,
-                until_user_speaks: req.until_user_speaks,
-            },
-        );
-    }
-
-    fn seat(&self, seat: ChannelSeat) -> Result<(), ApiError> {
-        Chat::seat(
-            self,
-            &Seat {
-                id: seat.id,
-                name: seat.name,
-                agent: seat.agent,
-                home: seat.home,
-            },
-        )
-    }
-
-    fn leave(&self, participant: &str) -> Result<(), ApiError> {
-        Chat::leave(self, participant)
-    }
-
-    fn add_follower(&self, thread: &str, participant: &str) -> Result<(), ApiError> {
-        Chat::add_follower(self, thread, participant)
-    }
-
-    fn members_of(&self, channel: &str) -> Vec<String> {
-        Chat::members_of(self, channel)
-    }
-
-    fn participants(&self) -> Vec<ChannelParticipant> {
-        Chat::participants(self)
-            .into_iter()
-            .map(|p| ChannelParticipant {
-                id: p.id,
-                kind: p.kind,
-                name: p.name,
-                agent_id: p.agent_id,
-                home_id: p.home_id,
-                left_at: p.left_at,
-            })
-            .collect()
-    }
-
-    fn home_of(&self, participant: &str) -> Option<String> {
-        Chat::home_of(self, participant)
-    }
-
-    fn place(&self, id: &str) -> Option<ChannelPlace> {
-        Chat::place(self, id).map(|p| ChannelPlace {
-            id: p.id,
-            r#type: p.r#type,
-            peer: p.peer,
-            parent: p.parent,
-            name: p.name,
-            last_number: p.last_number,
-            root: p.root,
-            topic: p.topic,
-        })
-    }
-
-    fn default_channel(&self) -> String {
-        Chat::default_channel(self)
-    }
-
-    fn orchestrator_in(&self, channel: &str) -> String {
-        Chat::orchestrator_in(self, channel)
-    }
-
-    fn target_of(&self, channel: &str) -> Option<String> {
-        Chat::target_of(self, channel)
-    }
-
-    fn thread_about(&self, kind: vibevalley_protocol::SubjectKind, id: &str) -> Option<String> {
-        Chat::thread_about(self, kind, id)
-    }
-
-    fn latest(&self, channel: &str) -> Result<i64, ApiError> {
-        Chat::latest(self, channel)
-    }
-
-    fn read_up_to(&self, participant: &str, channel: &str, upto: i64) -> Result<(), ApiError> {
-        Chat::read_up_to(self, participant, channel, upto)
-    }
-
-    fn dispatch_count(&self, channel: &str) -> Result<i64, ApiError> {
-        Chat::dispatch_count(self, channel)
-    }
-
-    fn issue_thread(&self, issue_id: &str, title: &str, preferred_channel: Option<&str>) -> Result<String, ApiError> {
-        Chat::issue_thread(self, issue_id, title, preferred_channel)
-    }
-
-    fn issue_thread_id(&self, issue_id: &str) -> Option<String> {
-        Chat::issue_thread_id(self, issue_id)
-    }
-
-    fn say_in(&self, channel: &str, text: &str, send_key: String) -> Result<ChatMessage, ApiError> {
-        Chat::say(
-            self,
-            Saying {
-                text: text.to_string(),
-                channel: Some(channel.to_string()),
-                send_key,
-                ..Saying::default()
-            },
-        )
-        .map(|(m, _)| m)
-    }
-
-    fn ensure_seated(&self, cb: Arc<dyn Fn(&str) + Send + Sync>) {
-        self.seaters.write().push(cb);
     }
 }
 

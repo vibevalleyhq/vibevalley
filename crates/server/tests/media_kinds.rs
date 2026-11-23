@@ -3,7 +3,7 @@
 use serde_json::{Value, json};
 use std::{
     io::Cursor,
-    sync::{Arc, Mutex},
+    sync::{Arc, Condvar, Mutex},
     time::{Duration, Instant},
 };
 use vibevalley_protocol::Caller;
@@ -17,21 +17,26 @@ struct Network {
     download: Arc<dyn Fetch>,
     /// Every vendor request, as `METHOD /path`.
     calls: Arc<Mutex<Vec<String>>>,
+    changed: Arc<Condvar>,
 }
 impl Network {
     fn new() -> Network {
         let (vendor, download) = vibevalley_server::offline::network();
         let calls = Arc::new(Mutex::new(Vec::new()));
+        let changed = Arc::new(Condvar::new());
         let seen = calls.clone();
+        let notify = changed.clone();
         let recorded: Arc<dyn Fetch> = Arc::new(move |r: Request| {
             let path = r.url.trim_start_matches("https://api.mosi.cn/v1").to_string();
             seen.lock().unwrap().push(format!("{} {path}", r.method));
+            notify.notify_all();
             vendor.fetch(r)
         });
         Network {
             vendor: recorded,
             download,
             calls,
+            changed,
         }
     }
     fn count(&self, call: &str) -> usize {
@@ -39,13 +44,19 @@ impl Network {
     }
     fn until(&self, call: &str, times: usize) {
         let deadline = Instant::now() + Duration::from_secs(10);
-        while self.count(call) < times {
-            assert!(
-                Instant::now() < deadline,
-                "the vendor was not asked {call} {times} times: {:?}",
-                self.calls.lock().unwrap()
-            );
-            std::thread::sleep(Duration::from_millis(5));
+        let mut guard = self.calls.lock().unwrap();
+        loop {
+            if guard.iter().filter(|c| c.starts_with(call)).count() >= times {
+                return;
+            }
+            let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
+                panic!("the vendor was not asked {call} {times} times: {:?}", *guard);
+            };
+            let (next, res) = self.changed.wait_timeout(guard, remaining).unwrap();
+            guard = next;
+            if res.timed_out() && guard.iter().filter(|c| c.starts_with(call)).count() < times {
+                panic!("the vendor was not asked {call} {times} times: {:?}", *guard);
+            }
         }
     }
 }
@@ -109,18 +120,16 @@ fn deletable(s: &vibevalley_server::Started, input: &str) -> bool {
     ok(s, "media.input.get", json!({"id":input}))["canDelete"] == true
 }
 fn until(s: &vibevalley_server::Started, id: &str, what: &str, done: impl Fn(&Value) -> bool) -> Value {
-    let deadline = Instant::now() + Duration::from_secs(10);
-    loop {
+    crate::support::wait_until_settled(Some(&s.hub), Duration::from_secs(10), what, || {
         let j = ok(s, "media.job.get", json!({"id":id}));
-        if done(&j) {
-            return j;
-        }
-        assert!(Instant::now() < deadline, "job did not reach {what}: {j}");
-        std::thread::sleep(Duration::from_millis(5));
-    }
+        done(&j).then_some(j)
+    })
 }
 fn wait(s: &vibevalley_server::Started, id: &str, phase: &str) -> Value {
-    until(s, id, phase, |j| j["phase"] == phase)
+    crate::support::wait_until_transition(&s.hub, Duration::from_secs(10), phase, || {
+        let j = ok(s, "media.job.get", json!({"id":id}));
+        (j["phase"] == phase).then_some(j)
+    })
 }
 fn dialogue(id: &str, revision: i64, text: &str) -> Value {
     json!({

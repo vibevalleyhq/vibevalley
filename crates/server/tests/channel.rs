@@ -69,9 +69,10 @@ fn the_chat_through_its_endpoints() {
     assert_eq!((event["_tag"].as_str(), event["message"]["number"].as_i64()), (Some("Message"), Some(1)));
 
     // The state keeps the chat.
-    std::thread::sleep(Duration::from_millis(50));
-    let chat = hub.read(|s| s.chat.clone()).unwrap();
-    let kept = chat.channels.iter().find(|c| c.id == gid).unwrap();
+    let kept = crate::support::wait_until_transition(&hub, Duration::from_secs(5), "chat channel state updated", || {
+        let chat = hub.read(|s| s.chat.clone())?;
+        chat.channels.into_iter().find(|c| c.id == gid && c.last_number == Some(1) && c.read == Some(1))
+    });
     assert_eq!((kept.last_number, kept.read), (Some(1), Some(1)));
     assert_eq!(hub.read(|s| s.call), vibevalley_protocol::CallState::Live);
 
@@ -158,7 +159,9 @@ fn the_chat_through_its_endpoints() {
         list.as_array().unwrap().iter().find(|c| c["id"] == id).unwrap()["unread"].as_i64()
     };
     assert_eq!(unread(&gid), Some(1));
-    std::thread::sleep(Duration::from_millis(50));
+    crate::support::wait_until_transition(&hub, Duration::from_secs(5), "user mention in state", || {
+        hub.read(|s| s.chat.as_ref().is_some_and(|c| c.user_mentions.len() == 1)).then_some(())
+    });
     assert_eq!(hub.read(|s| s.chat.clone()).unwrap().user_mentions.len(), 1);
     ok(call("channel.markRead", json!({ "id": gid, "number": 2 })));
     assert_eq!(unread(&gid), None);
@@ -193,7 +196,10 @@ fn the_chat_through_its_endpoints() {
     let preview = ok(call("channel.previewDelete", json!({ "id": gid })));
     assert!(preview["does"][0].as_str().unwrap().contains("#general"), "{preview}");
     ok(call("channel.delete", json!({ "id": gid })));
-    std::thread::sleep(Duration::from_millis(50));
+    crate::support::wait_until_transition(&hub, Duration::from_secs(5), "deleted channel removed from state", || {
+        hub.read(|s| s.chat.as_ref().is_some_and(|c| c.channels.iter().all(|c| c.id != gid && c.id != thread)))
+            .then_some(())
+    });
     let chat = hub.read(|s| s.chat.clone()).unwrap();
     assert!(chat.channels.iter().all(|c| c.id != gid && c.id != thread));
 

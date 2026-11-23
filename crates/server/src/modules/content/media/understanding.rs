@@ -15,7 +15,6 @@ use super::Stop;
 use super::jobs::{Ask, Held, Jobs, Phase, Record, active, id_ok, refused};
 use super::vendor::{Account, Moss, Outcome};
 use crate::modules::infra::provider::Use;
-use crate::now;
 
 /// How long the user's approval waits for the orchestrator.
 const APPROVAL: i64 = 15 * 60_000;
@@ -140,6 +139,7 @@ impl Jobs {
             account.revision,
             account.model.clone(),
             account.fingerprint.clone(),
+            self.now_ms(),
         );
         r.inputs = inputs;
         r.cleanup = Some(MediaCleanup::Pending);
@@ -149,7 +149,7 @@ impl Jobs {
                 r.phase = Phase::Authorized;
                 r.authorization = Some(Authorization {
                     channel,
-                    expires_at: now() + APPROVAL,
+                    expires_at: self.now_ms() + APPROVAL,
                 });
                 None
             }
@@ -185,7 +185,11 @@ impl Jobs {
             .bound(Use::Understanding)
             .ok()
             .filter(|a| {
-                approval.expires_at > now() && a.connection == r.connection && a.revision == r.revision && a.model == r.model && a.fingerprint == r.fingerprint
+                approval.expires_at > self.now_ms()
+                    && a.connection == r.connection
+                    && a.revision == r.revision
+                    && a.model == r.model
+                    && a.fingerprint == r.fingerprint
             })
             .ok_or_else(|| refused("consentChanged"))?;
         if self
@@ -342,7 +346,7 @@ impl Jobs {
             Ok(w) => w,
             Err(e) => return eprintln!("media: {}", e.message),
         };
-        let at = now();
+        let at = self.now_ms();
         for r in waiting.iter().filter(|r| r.authorization.as_ref().is_some_and(|a| a.expires_at <= at)) {
             let expired = self
                 .change_async(r.id(), &[Phase::Authorized], |r| {
@@ -355,5 +359,131 @@ impl Jobs {
                 let _ = self.inputs.release_async(r.id()).await;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+    use std::time::Duration;
+
+    use serde_json::json;
+    use tokio_util::sync::CancellationToken;
+    use vibevalley_core::ManualClock;
+    use vibevalley_protocol::{Caller, MediaInputRequest, MediaUnderstandingPhase};
+
+    use super::*;
+    use crate::ServerConfig;
+    use crate::modules::content::media::inputs::Inputs;
+    use crate::modules::content::media::jobs::Parts;
+    use crate::modules::infra::http::{Fetch, FetchError, Request, Response};
+
+    struct UnusedFetch;
+
+    impl Fetch for UnusedFetch {
+        fn fetch(&self, _r: Request) -> Result<Response, FetchError> {
+            Err(FetchError::Network("unused in approval expiry test".into()))
+        }
+
+        fn fetch_with_cancel(&self, r: Request, _cancel: CancellationToken) -> Result<Response, FetchError> {
+            self.fetch(r)
+        }
+    }
+
+    #[test]
+    fn manual_clock_drives_understanding_approval_expiry_without_sleep() {
+        vibevalley_i18n::set_locale("en");
+        let dir = tempfile::tempdir().unwrap();
+        let started = crate::start(ServerConfig {
+            probe_runtimes: false,
+            orchestrator_listens: false,
+            link_previews: false,
+            tick_crons: false,
+            ..ServerConfig::under(dir.path())
+        })
+        .unwrap();
+
+        let rev = started.hub.call_as(Caller::User, "provider.get", serde_json::Value::Null).data.unwrap()["revision"]
+            .as_i64()
+            .unwrap();
+        let updated = started
+            .hub
+            .call_as(
+                Caller::User,
+                "provider.update",
+                json!({
+                    "revision": rev,
+                    "connections": [{"id": "moss", "name": "MOSS", "adapter": "moss", "enabled": true, "key": "test-key"}],
+                    "understanding": {"connection": "moss", "model": "moss-vl-1.0"},
+                    "image": null, "speech": null, "speakers": null, "voiceDesign": null, "transcription": null, "live": null, "vision": null,
+                }),
+            )
+            .data
+            .unwrap();
+        let revision = updated["revision"].as_i64().unwrap();
+
+        let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+        let inputs = Inputs::open_with_clock(dir.path(), started.db.clone(), started.attachments.clone(), clock.clone()).unwrap();
+        let fetch: Arc<dyn Fetch> = Arc::new(UnusedFetch);
+        let jobs = Jobs::open_with_clock(
+            Parts {
+                db: started.db.clone(),
+                hub: Arc::downgrade(&started.hub),
+                setting: started.setting.clone(),
+                files: started.attachments.clone(),
+                inputs: inputs.clone(),
+                channel: started.chat.clone(),
+                vendor: fetch.clone(),
+                download: fetch,
+            },
+            clock.clone(),
+        )
+        .unwrap();
+
+        let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
+        png.resize(24, 0);
+        let req: MediaInputRequest = serde_json::from_value(json!({"kind": "image", "mime": "image/png", "name": "cat.png", "size": 24})).unwrap();
+        let reserved = inputs.create(&req).unwrap();
+        inputs.upload(&reserved.id, Cursor::new(png)).unwrap();
+
+        let channel = started.chat.default_channel();
+        let auth_req: MediaUnderstandingAuthorizationRequest = serde_json::from_value(json!({
+            "id": "approval-clock-test",
+            "prompt": "Describe this image.",
+            "inputs": [reserved.id],
+            "connection": "moss",
+            "revision": revision,
+            "allowUpload": true,
+            "maxOutputTokens": 256,
+            "channel": channel,
+        }))
+        .unwrap();
+
+        vibevalley_runtime::rt::block_on(async {
+            let job = jobs.authorize_understanding_async(auth_req).await.unwrap();
+            assert_eq!(job.phase, MediaUnderstandingPhase::Authorized);
+            assert_eq!(job.authorization.as_ref().unwrap().expires_at, 1_700_000_000_000 + APPROVAL);
+            assert!(!inputs.get_async(&reserved.id).await.unwrap().can_delete);
+
+            // Just before APPROVAL elapses, sweep keeps the authorization intact.
+            clock.advance(Duration::from_millis((APPROVAL - 1) as u64));
+            jobs.expire_approvals_async().await;
+            assert_eq!(jobs.found_async("approval-clock-test").await.unwrap().phase, Phase::Authorized);
+
+            // At expiry, starting is refused and sweep cancels the approval and releases its input pin.
+            clock.advance(Duration::from_millis(1));
+            let refused_start = jobs.start_understanding_async("approval-clock-test", "orchestrator", &channel).await;
+            assert!(refused_start.is_err());
+
+            jobs.expire_approvals_async().await;
+            let ended = jobs.found_async("approval-clock-test").await.unwrap();
+            assert_eq!(ended.phase, Phase::Canceled);
+            assert_eq!(ended.cleanup, Some(MediaCleanup::Done));
+            assert!(inputs.get_async(&reserved.id).await.unwrap().can_delete);
+        });
+
+        jobs.close();
+        inputs.close();
+        started.close();
     }
 }

@@ -2,17 +2,22 @@
 //! `EventRingBuffer` (`seq`-indexed replay), `InputDeduplicator` (`input_id` idempotency),
 //! local `/mcp` HTTP proxy tunneling, permission responses, reconnect recovery, and git worktree isolation.
 
-use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
+use axum::Router;
+use axum::body::Bytes;
+use axum::extract::State;
+use axum::extract::ws::{Message as AxumWsMessage, WebSocket, WebSocketUpgrade};
+use axum::http::{HeaderMap, Method, StatusCode as AxumStatusCode, Uri, header};
+use axum::response::{IntoResponse, Response};
+use axum::routing::get;
 use futures_util::{SinkExt, StreamExt};
 use parking_lot::Mutex;
 use serde_json::{Value, json};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::tungstenite::Message as WsMessage;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request as WsRequest, Response as WsResponse};
@@ -638,60 +643,66 @@ fn machine_agent_worktree_prepare_cleanup_and_path_guard() {
     });
 }
 
+#[derive(Clone)]
+struct MockControlPlane {
+    state: Arc<Mutex<MockControlPlaneState>>,
+    machine_token: &'static str,
+    sandbox_token: &'static str,
+}
+
 #[derive(Default)]
 struct MockControlPlaneState {
     http_requests: Vec<(String, String, Option<String>, Value)>,
     ws_hellos: Vec<(String, MachineHello)>,
 }
 
-async fn handle_mock_http(mut stream: TcpStream, state: Arc<Mutex<MockControlPlaneState>>, machine_token: &str, sandbox_token: &str) {
-    let mut buf = Vec::new();
-    let mut chunk = [0u8; 4096];
-    let header_end = loop {
-        let Ok(n) = stream.read(&mut chunk).await else { return };
-        if n == 0 {
-            return;
-        }
-        buf.extend_from_slice(&chunk[..n]);
-        if let Some(pos) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
-            break pos + 4;
-        }
-    };
-
-    let head = String::from_utf8_lossy(&buf[..header_end - 4]);
-    let mut lines = head.split("\r\n");
-    let Some(first) = lines.next() else { return };
-    let mut parts = first.split_whitespace();
-    let method = parts.next().unwrap_or("").to_string();
-    let path = parts.next().unwrap_or("").to_string();
-    let mut headers = HashMap::new();
-    let mut content_length = 0usize;
-    for line in lines {
-        if let Some((k, v)) = line.split_once(':') {
-            let key = k.trim().to_ascii_lowercase();
-            let val = v.trim().to_string();
-            if key == "content-length" {
-                content_length = val.parse().unwrap_or(0);
+async fn recv_axum_frame(ws: &mut WebSocket) -> Option<MachineWireFrame> {
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            match ws.recv().await {
+                Some(Ok(AxumWsMessage::Text(text))) => return serde_json::from_str::<MachineWireFrame>(text.as_str()).ok(),
+                Some(Ok(AxumWsMessage::Ping(_) | AxumWsMessage::Pong(_))) => continue,
+                _ => return None,
             }
-            headers.insert(key, val);
         }
-    }
-    let mut body_bytes = buf[header_end..].to_vec();
-    while body_bytes.len() < content_length {
-        let Ok(n) = stream.read(&mut chunk).await else { break };
-        if n == 0 {
-            break;
-        }
-        body_bytes.extend_from_slice(&chunk[..n]);
-    }
-    body_bytes.truncate(content_length);
-    let body_json: Value = serde_json::from_slice(&body_bytes).unwrap_or(Value::Null);
-    let auth = headers.get("authorization").cloned();
-    state.lock().http_requests.push((method.clone(), path.clone(), auth, body_json.clone()));
+    })
+    .await
+    .ok()
+    .flatten()
+}
 
-    let (status, resp_body) = match (method.as_str(), path.as_str()) {
+async fn handle_mock_ws(State(cp): State<MockControlPlane>, headers: HeaderMap, ws: WebSocketUpgrade) -> Response {
+    let auth = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+    if auth == "Bearer vv_dev_forbidden_client_scope" {
+        return (AxumStatusCode::FORBIDDEN, "forbidden scope").into_response();
+    }
+    ws.on_upgrade(move |mut socket| async move {
+        let Some(MachineWireFrame::MachineHello(hello)) = recv_axum_frame(&mut socket).await else {
+            return;
+        };
+        let _ = recv_axum_frame(&mut socket).await; // MachineInventory
+        let ack = serde_json::to_string(&MachineWireFrame::MachineHelloAck(MachineHelloAck {
+            machine_id: hello.machine_id.clone(),
+            server_version: "0.2.0".into(),
+            heartbeat_ms: 15_000,
+        }))
+        .unwrap();
+        let _ = socket.send(AxumWsMessage::Text(ack.into())).await;
+        cp.state.lock().ws_hellos.push((auth, hello));
+        let _ = socket.send(AxumWsMessage::Close(None)).await;
+    })
+}
+
+async fn handle_mock_http(State(cp): State<MockControlPlane>, method: Method, uri: Uri, headers: HeaderMap, body: Bytes) -> impl IntoResponse {
+    let method_str = method.to_string();
+    let path = uri.path().to_string();
+    let body_json: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
+    let auth = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).map(ToString::to_string);
+    cp.state.lock().http_requests.push((method_str.clone(), path.clone(), auth, body_json.clone()));
+
+    let (status, resp_body) = match (method_str.as_str(), path.as_str()) {
         ("POST", "/api/v1/machine/list") => (
-            200,
+            AxumStatusCode::OK,
             json!({
                 "bizCode": 0,
                 "message": "ok",
@@ -739,12 +750,12 @@ async fn handle_mock_http(mut stream: TcpStream, state: Arc<Mutex<MockControlPla
             let scope = body_json["scope"].as_str().unwrap_or("remote:runtime");
             let name = body_json["deviceName"].as_str().unwrap_or("machine");
             let (dev_id, token) = if platform == "sandbox" {
-                ("dev_sbx_01", sandbox_token)
+                ("dev_sbx_01", cp.sandbox_token)
             } else {
-                ("dev_machine_01", machine_token)
+                ("dev_machine_01", cp.machine_token)
             };
             (
-                200,
+                AxumStatusCode::OK,
                 json!({
                     "bizCode": 0,
                     "message": "ok",
@@ -764,101 +775,38 @@ async fn handle_mock_http(mut stream: TcpStream, state: Arc<Mutex<MockControlPla
                 .to_string(),
             )
         }
-        _ => (404, json!({ "bizCode": 40400, "message": "not found" }).to_string()),
+        _ => (AxumStatusCode::NOT_FOUND, json!({ "bizCode": 40400, "message": "not found" }).to_string()),
     };
 
-    let reason = if status == 200 { "OK" } else { "Not Found" };
-    let response = format!(
-        "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{resp_body}",
-        resp_body.len()
-    );
-    let _ = stream.write_all(response.as_bytes()).await;
-    let _ = stream.flush().await;
+    (status, [(header::CONTENT_TYPE, "application/json; charset=utf-8")], resp_body)
 }
 
 #[test]
-#[allow(clippy::result_large_err)]
 fn cli_machine_list_and_machine_up_pair_exchange_persistence_and_ephemeral() {
     let state = Arc::new(Mutex::new(MockControlPlaneState::default()));
-    let state_bg = state.clone();
-    let stop = CancellationToken::new();
-    let stop_bg = stop.clone();
-
     let machine_token = "vv_dev_paired_machine_token_9876543210";
     let sandbox_token = "vv_dev_ephemeral_sbx_token_1122334455";
     let list_token = "vv_dev_cli_list_token_5566778899";
 
-    let (addr_tx, addr_rx) = std::sync::mpsc::channel::<String>();
-    let server_thread = std::thread::spawn(move || {
-        vibevalley_runtime::rt::block_on(async move {
-            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let addr = listener.local_addr().unwrap();
-            addr_tx.send(format!("http://{addr}")).unwrap();
-
-            loop {
-                tokio::select! {
-                    biased;
-                    () = stop_bg.cancelled() => break,
-                    accepted = listener.accept() => {
-                        let Ok((stream, _)) = accepted else { break };
-                        let state = state_bg.clone();
-                        tokio::spawn(async move {
-                            let mut peek_buf = [0u8; 512];
-                            let Ok(n) = stream.peek(&mut peek_buf).await else { return };
-                            let head = String::from_utf8_lossy(&peek_buf[..n]);
-                            if head.starts_with("GET /api/v1/machine/ws") {
-                                let captured_auth = Arc::new(Mutex::new(String::new()));
-                                let captured_auth_cb = captured_auth.clone();
-                                let Ok(mut ws) = tokio_tungstenite::accept_hdr_async(
-                                    stream,
-                                    move |req: &WsRequest, resp: WsResponse| -> Result<WsResponse, ErrorResponse> {
-                                        let auth = req
-                                            .headers()
-                                            .get("authorization")
-                                            .and_then(|v| v.to_str().ok())
-                                            .unwrap_or("")
-                                            .to_string();
-                                        if auth == "Bearer vv_dev_forbidden_client_scope" {
-                                            let mut err = ErrorResponse::new(Some("forbidden scope".into()));
-                                            *err.status_mut() = StatusCode::FORBIDDEN;
-                                            return Err(err);
-                                        }
-                                        *captured_auth_cb.lock() = auth;
-                                        Ok(resp)
-                                    },
-                                )
-                                .await
-                                else {
-                                    return;
-                                };
-                                let hello = match recv_frame(&mut ws).await {
-                                    MachineWireFrame::MachineHello(h) => h,
-                                    _ => return,
-                                };
-                                let _ = recv_frame(&mut ws).await; // MachineInventory
-                                send_frame(
-                                    &mut ws,
-                                    &MachineWireFrame::MachineHelloAck(MachineHelloAck {
-                                        machine_id: hello.machine_id.clone(),
-                                        server_version: "0.2.0".into(),
-                                        heartbeat_ms: 15_000,
-                                    }),
-                                )
-                                .await;
-                                state.lock().ws_hellos.push((captured_auth.lock().clone(), hello));
-                                let _ = ws.send(WsMessage::Close(None)).await;
-                                return;
-                            }
-
-                            handle_mock_http(stream, state, machine_token, sandbox_token).await;
-                        });
-                    }
-                }
-            }
+    let cp = MockControlPlane {
+        state: state.clone(),
+        machine_token,
+        sandbox_token,
+    };
+    let app = Router::new()
+        .route("/api/v1/machine/ws", get(handle_mock_ws))
+        .fallback(handle_mock_http)
+        .with_state(cp);
+    let (server_url, _server_guard) = vibevalley_runtime::rt::block_on(async move {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let cancel = CancellationToken::new();
+        let guard = cancel.clone().drop_guard();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).with_graceful_shutdown(cancel.cancelled_owned()).await;
         });
+        (format!("http://{addr}"), guard)
     });
-
-    let server_url = addr_rx.recv_timeout(Duration::from_secs(5)).unwrap();
     let home = tempfile::tempdir().unwrap();
 
     // 1. `vibevalley machine list --json` & compact table with Bearer auth.
@@ -1021,9 +969,6 @@ fn cli_machine_list_and_machine_up_pair_exchange_persistence_and_ephemeral() {
     );
     assert_eq!(code, 3);
     assert!(err.contains("Forbidden"), "{err}");
-
-    stop.cancel();
-    let _ = server_thread.join();
 }
 
 #[test]

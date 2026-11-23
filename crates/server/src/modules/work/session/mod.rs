@@ -22,6 +22,7 @@ use crate::{Hub, Sink};
 pub(crate) mod db;
 mod delivery;
 mod drivers;
+mod gen_table;
 pub mod journal;
 pub mod mailbox;
 mod news;

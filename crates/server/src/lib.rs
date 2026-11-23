@@ -14,17 +14,18 @@ use std::any::Any;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
-use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
 use std::time::{Duration, Instant};
 
 use arc_swap::ArcSwapOption;
 use parking_lot::{Mutex, RwLock};
 use serde_json::Value;
-use tokio::sync::{broadcast, watch};
-use tokio_util::sync::CancellationToken;
+use tokio::sync::{Notify, broadcast, watch};
+use tokio_util::sync::{CancellationToken, DropGuard};
 use tokio_util::task::TaskTracker;
 use tracing::Instrument as _;
+use tracing::instrument::WithSubscriber as _;
 use vibevalley_core::{Applied, Core, SliceMask, Transition};
 use vibevalley_protocol::{
     ApiError, BizCode, BoardSlice, Caller, CollabSlice, Envelope, Fact, FarmFrame, GameEffect, InboxSlice, LiveEvent, LiveEventNotice, LiveEventRuntime,
@@ -43,11 +44,13 @@ pub mod base;
 pub(crate) mod db;
 pub mod event_bus;
 pub use vibevalley_protocol::home;
+pub(crate) mod loom_sync;
 pub mod modules;
 pub mod offline;
 pub mod ports;
 mod runtime_inbox;
 pub mod slice_feed;
+mod slice_wake;
 mod start;
 pub mod testing;
 
@@ -59,6 +62,18 @@ const HUB_SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 /// Installs the process-wide `ring` TLS provider once (`reqwest` and `tokio-tungstenite`).
 pub fn install_tls() {
     let _ = rustls::crypto::ring::default_provider().install_default();
+}
+
+/// Spawns a blocking closure on the ambient Tokio runtime (falling back to
+/// `vibevalley-io` outside Tokio) while preserving [`tracing::Span::current`].
+pub fn spawn_blocking_traced<F, R>(f: F) -> tokio::task::JoinHandle<R>
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
+{
+    let dispatch = tracing::dispatcher::get_default(|d| d.clone());
+    let span = tracing::Span::current();
+    vibevalley_runtime::rt::current_or_global_handle().spawn_blocking(move || tracing::dispatcher::with_default(&dispatch, || span.in_scope(f)))
 }
 
 /// Unix milliseconds now.
@@ -149,20 +164,37 @@ impl Sink {
     }
 }
 
-type Opener = Arc<dyn Fn(&Hub, Value, Sink) -> Result<(), ApiError> + Send + Sync>;
+type SyncOpener = Arc<dyn Fn(&Hub, Value, Sink) -> Result<(), ApiError> + Send + Sync>;
+type AsyncOpener = Arc<dyn Fn(Arc<Hub>, Value, Sink) -> BoxFuture<'static, Result<(), ApiError>> + Send + Sync>;
 
-struct InvokeObserverSlot(SharedInvokeObserver);
-struct FaultGateSlot(SharedFaultGate);
-struct HostDebugSlot(SharedHostDebug);
-struct McpSlot(crate::transport::api::SharedMcp);
-struct RemoteAuthSlot(SharedRemoteAuth);
-struct MachineBusSlot(SharedMachineBus);
-struct SpeechStreamsSlot(crate::transport::api::media::SharedSpeechStreams);
-struct MediaInputsSlot(crate::transport::api::media::SharedMediaInputs);
+#[derive(Clone)]
+enum SubscriptionOpener {
+    Sync(SyncOpener),
+    Async(AsyncOpener),
+}
 
-struct Kick {
-    dirty: SliceMask,
-    effects: Vec<GameEffect>,
+struct Slot<T: ?Sized>(ArcSwapOption<Arc<T>>);
+
+impl<T: ?Sized> Slot<T> {
+    fn empty() -> Self {
+        Self(ArcSwapOption::empty())
+    }
+
+    fn set(&self, val: Option<Arc<T>>) {
+        self.0.store(val.map(Arc::new));
+    }
+
+    fn set_some(&self, val: Arc<T>) {
+        self.0.store(Some(Arc::new(val)));
+    }
+
+    fn get(&self) -> Option<Arc<T>> {
+        self.0.load().as_ref().map(|slot| (**slot).clone())
+    }
+
+    fn is_some(&self) -> bool {
+        self.0.load().is_some()
+    }
 }
 
 struct SliceFeeds {
@@ -192,38 +224,35 @@ const fn slice_index(kind: SliceKind) -> usize {
 pub struct Hub {
     self_weak: OnceLock<Weak<Hub>>,
     core: Mutex<Core>,
-    seq: AtomicI64,
-    dirty_seqs: [AtomicI64; 6],
+    slice_gate: slice_wake::SliceWakeGate,
     pub(crate) runtime_inbox: runtime_inbox::RuntimeInboxObserver,
     feeds: SliceFeeds,
-    bus: event_bus::EventBus,
     shutdown: CancellationToken,
+    // Dropped before `bus` and `slice_notify` so child tokens cancel before subscriber shutdown.
+    _shutdown_guard: DropGuard,
+    bus: event_bus::EventBus,
     tasks: TaskTracker,
     handlers: RwLock<HashMap<&'static str, RouteHandler>>,
     typed_handlers: RwLock<HashMap<&'static str, Arc<dyn Any + Send + Sync>>>,
-    openers: RwLock<HashMap<&'static str, (&'static [Caller], Opener)>>,
+    openers: RwLock<HashMap<&'static str, (&'static [Caller], SubscriptionOpener)>>,
     live: broadcast::Sender<LiveEvent>,
     subscriptions: Mutex<HashMap<u64, flume::Sender<()>>>,
     next_id: AtomicU64,
     next_trace_id: AtomicU64,
-    observer: ArcSwapOption<InvokeObserverSlot>,
-    fault_gate: ArcSwapOption<FaultGateSlot>,
-    host_debug: ArcSwapOption<HostDebugSlot>,
+    observer: Slot<dyn InvokeObserver>,
+    fault_gate: Slot<dyn FaultGate>,
+    host_debug: Slot<dyn HostDebugBridge>,
     voice: OnceLock<SharedLiveVoice>,
-    media_inputs: ArcSwapOption<MediaInputsSlot>,
-    mcp: ArcSwapOption<McpSlot>,
-    remote_auth: ArcSwapOption<RemoteAuthSlot>,
-    machine_bus: ArcSwapOption<MachineBusSlot>,
-    speech: ArcSwapOption<SpeechStreamsSlot>,
+    media_inputs: Slot<dyn crate::transport::api::media::MediaInputs>,
+    mcp: Slot<dyn crate::transport::api::Mcp>,
+    remote_auth: Slot<dyn RemoteAuth>,
+    machine_bus: Slot<dyn MachineBus>,
+    speech: Slot<dyn crate::transport::api::media::SpeechStreams>,
     wake: watch::Sender<u64>,
-    /// Each fold's dirty slice mask and farm effects, for the feed pump task.
-    kicks: flume::Sender<Kick>,
-}
-
-impl Drop for Hub {
-    fn drop(&mut self) {
-        self.shutdown.cancel();
-    }
+    /// Farm effects accumulated between pump ticks.
+    pending_effects: Mutex<Vec<GameEffect>>,
+    /// Coalesced wakeup notifier for the slice feed pump task.
+    slice_notify: Arc<Notify>,
 }
 
 impl Hub {
@@ -237,31 +266,39 @@ impl Hub {
         self.shutdown.child_token()
     }
 
-    /// Spawns a tracked background task on the shared `vibevalley-io` Tokio runtime.
+    /// Spawns a tracked background task on the ambient Tokio runtime (falling
+    /// back to `vibevalley-io` outside Tokio), preserving the current tracing span.
     pub fn spawn_task<F>(&self, future: F) -> tokio::task::JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        self.tasks.spawn_on(future, vibevalley_runtime::rt::handle())
+        let handle = vibevalley_runtime::rt::current_or_global_handle();
+        self.tasks.spawn_on(future.in_current_span().with_current_subscriber(), &handle)
     }
 
-    /// Spawns a tracked blocking task on the shared `vibevalley-io` Tokio runtime.
+    /// Spawns a tracked blocking task on the ambient Tokio runtime (falling
+    /// back to `vibevalley-io` outside Tokio), preserving the current tracing span.
     pub fn spawn_blocking_task<F, R>(&self, func: F) -> tokio::task::JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        self.tasks.spawn_blocking_on(func, vibevalley_runtime::rt::handle())
+        let handle = vibevalley_runtime::rt::current_or_global_handle();
+        let dispatch = tracing::dispatcher::get_default(|d| d.clone());
+        let span = tracing::Span::current();
+        self.tasks
+            .spawn_blocking_on(move || tracing::dispatcher::with_default(&dispatch, || span.in_scope(func)), &handle)
     }
 
-    /// Cancels the hub's shutdown token, stops the event bus, and waits up to
-    /// [`HUB_SHUTDOWN_GRACE`] for all tracked background tasks to finish.
-    pub fn close(&self) {
+    /// Asynchronously cancels the hub's shutdown token, stops the event bus,
+    /// and awaits up to [`HUB_SHUTDOWN_GRACE`] for all tracked background tasks
+    /// to finish without calling `rt::block_on`.
+    pub async fn close_async(&self) {
         self.shutdown.cancel();
-        self.bus.close();
+        self.bus.close_async().await;
         self.tasks.close();
-        if vibevalley_runtime::rt::block_on(async { tokio::time::timeout(HUB_SHUTDOWN_GRACE, self.tasks.wait()).await }).is_err() {
+        if tokio::time::timeout(HUB_SHUTDOWN_GRACE, self.tasks.wait()).await.is_err() {
             tracing::warn!(
                 remaining = self.tasks.len(),
                 timeout_secs = HUB_SHUTDOWN_GRACE.as_secs(),
@@ -270,33 +307,39 @@ impl Hub {
         }
     }
 
+    /// Cancels the hub's shutdown token, stops the event bus, and waits up to
+    /// [`HUB_SHUTDOWN_GRACE`] for all tracked background tasks to finish.
+    pub fn close(&self) {
+        vibevalley_runtime::rt::block_on(self.close_async());
+    }
+
     /// Streamed speech (`modules::content::media::jobs::Jobs`).
     pub fn attach_speech_streams(&self, streams: crate::transport::api::media::SharedSpeechStreams) {
-        self.speech.store(Some(Arc::new(SpeechStreamsSlot(streams))));
+        self.speech.set_some(streams);
     }
 
     /// The helpers' MCP door (`modules::team::mcp::Door`).
     pub fn attach_mcp(&self, door: crate::transport::api::SharedMcp) {
-        self.mcp.store(Some(Arc::new(McpSlot(door))));
+        self.mcp.set_some(door);
     }
 
     pub fn attach_media_inputs(&self, inputs: crate::transport::api::media::SharedMediaInputs) {
-        self.media_inputs.store(Some(Arc::new(MediaInputsSlot(inputs))));
+        self.media_inputs.set_some(inputs);
     }
 
     /// Attaches or clears the zero-overhead RPC / `Core::apply` observer.
     pub fn attach_observer(&self, observer: Option<SharedInvokeObserver>) {
-        self.observer.store(observer.map(|o| Arc::new(InvokeObserverSlot(o))));
+        self.observer.set(observer);
     }
 
     /// Attaches or clears the fault-injection gate for DevTools Lab & Overrides.
     pub fn attach_fault_gate(&self, gate: Option<SharedFaultGate>) {
-        self.fault_gate.store(gate.map(|g| Arc::new(FaultGateSlot(g))));
+        self.fault_gate.set(gate);
     }
 
     /// Attaches or clears the desktop host shell debug bridge.
     pub fn attach_host_debug(&self, bridge: Option<SharedHostDebug>) {
-        self.host_debug.store(bridge.map(|b| Arc::new(HostDebugSlot(b))));
+        self.host_debug.set(bridge);
     }
 
     /// Attaches the started voice controller port so desktop callers read it from [`Server::voice`].
@@ -306,12 +349,12 @@ impl Hub {
 
     /// Attaches or clears the remote mobile device authenticator.
     pub fn attach_remote_auth(&self, auth: Option<SharedRemoteAuth>) {
-        self.remote_auth.store(auth.map(|a| Arc::new(RemoteAuthSlot(a))));
+        self.remote_auth.set(auth);
     }
 
     /// Attaches or clears the execution-layer machine WS bus.
     pub fn attach_machine_bus(&self, bus: Option<SharedMachineBus>) {
-        self.machine_bus.store(bus.map(|b| Arc::new(MachineBusSlot(b))));
+        self.machine_bus.set(bus);
     }
 
     /// Notifies subscribed subsystems (connectors, machine heartbeats, runtime probes)
@@ -339,7 +382,7 @@ impl Hub {
     /// A server holding `state`, with no endpoint answered yet. Its feed
     /// pump ends when [`Hub::close`] is called or the last `Arc<Hub>` is dropped.
     pub fn new(state: SpaceState) -> Arc<Hub> {
-        let (kicks, kicked) = flume::unbounded();
+        let slice_notify = Arc::new(Notify::new());
         let (live, _live_rx) = broadcast::channel(LIVE_CAPACITY);
         let core = Core::new(state);
         let seq = core.seq();
@@ -352,17 +395,18 @@ impl Hub {
             farm: slice_feed::SliceFeed::new("slice:farm", core.farm_frame(vec![])),
         };
         let shutdown = CancellationToken::new();
+        let _shutdown_guard = shutdown.clone().drop_guard();
         let bus = event_bus::EventBus::new(shutdown.child_token());
         let (wake, _) = watch::channel(0u64);
         let hub = Arc::new(Hub {
             self_weak: OnceLock::new(),
             core: Mutex::new(core),
-            seq: AtomicI64::new(seq),
-            dirty_seqs: std::array::from_fn(|_| AtomicI64::new(seq)),
+            slice_gate: slice_wake::SliceWakeGate::new(seq),
             runtime_inbox: runtime_inbox::RuntimeInboxObserver::new(),
             feeds,
-            bus,
             shutdown,
+            _shutdown_guard,
+            bus,
             tasks: TaskTracker::new(),
             handlers: RwLock::default(),
             typed_handlers: RwLock::default(),
@@ -371,23 +415,24 @@ impl Hub {
             subscriptions: Mutex::default(),
             next_id: AtomicU64::new(1),
             next_trace_id: AtomicU64::new(1),
-            observer: ArcSwapOption::empty(),
-            fault_gate: ArcSwapOption::empty(),
-            host_debug: ArcSwapOption::empty(),
+            observer: Slot::empty(),
+            fault_gate: Slot::empty(),
+            host_debug: Slot::empty(),
             voice: OnceLock::new(),
-            media_inputs: ArcSwapOption::empty(),
-            mcp: ArcSwapOption::empty(),
-            remote_auth: ArcSwapOption::empty(),
-            machine_bus: ArcSwapOption::empty(),
-            speech: ArcSwapOption::empty(),
+            media_inputs: Slot::empty(),
+            mcp: Slot::empty(),
+            remote_auth: Slot::empty(),
+            machine_bus: Slot::empty(),
+            speech: Slot::empty(),
             wake,
-            kicks,
+            pending_effects: Mutex::new(Vec::new()),
+            slice_notify: slice_notify.clone(),
         });
         let _ = hub.self_weak.set(Arc::downgrade(&hub));
         hub.bus.attach_hub(Arc::downgrade(&hub));
         let weak = Arc::downgrade(&hub);
         let cancel = hub.child_token();
-        hub.spawn_task(pump_slices(weak, kicked, cancel));
+        hub.spawn_task(pump_slices(weak, slice_notify, cancel));
         hub
     }
 
@@ -400,21 +445,21 @@ impl Hub {
     }
 
     fn current_observer(&self) -> Option<SharedInvokeObserver> {
-        self.observer.load().as_ref().map(|slot| slot.0.clone())
+        self.observer.get()
     }
 
     fn current_fault_gate(&self) -> Option<SharedFaultGate> {
-        self.fault_gate.load().as_ref().map(|slot| slot.0.clone())
+        self.fault_gate.get()
     }
 
     /// Whether an RPC / `Core::apply` observer is currently attached.
     pub fn has_observer(&self) -> bool {
-        self.observer.load().is_some()
+        self.observer.is_some()
     }
 
     /// Whether a fault-injection gate is currently attached.
     pub fn has_fault_gate(&self) -> bool {
-        self.fault_gate.load().is_some()
+        self.fault_gate.is_some()
     }
 
     /// Current dirty sequence number for each of the six domain slices.
@@ -459,11 +504,15 @@ impl Hub {
     }
 
     pub fn seq(&self) -> i64 {
-        self.seq.load(Ordering::Acquire)
+        self.slice_gate.seq()
     }
 
     fn dirty_seq(&self, kind: SliceKind) -> i64 {
-        self.dirty_seqs[slice_index(kind)].load(Ordering::Acquire)
+        self.slice_gate.dirty_seq(slice_index(kind))
+    }
+
+    fn take_pending_effects(&self) -> Vec<GameEffect> {
+        std::mem::take(&mut *self.pending_effects.lock())
     }
 
     pub fn board_slice(&self) -> BoardSlice {
@@ -499,7 +548,7 @@ impl Hub {
     pub fn slice_bundle(&self) -> SliceBundle {
         let core = self.core.lock();
         let state = core.state();
-        let seq = self.seq.load(Ordering::Acquire);
+        let seq = self.slice_gate.seq();
         SliceBundle {
             seq,
             board: vibevalley_core::board_slice(state, self.dirty_seq(SliceKind::Board)),
@@ -511,82 +560,32 @@ impl Hub {
         }
     }
 
-    fn sync_slice(&self, kind: SliceKind) {
+    fn sync_feed<T>(&self, kind: SliceKind, feed: &slice_feed::SliceFeed<T>, build: impl FnOnce(&SpaceState, i64) -> T)
+    where
+        T: slice_feed::Sequenced + serde::Serialize + Send + Sync + 'static,
+    {
         let target = self.dirty_seq(kind);
         let locale = vibevalley_i18n::locale();
+        let snap = feed.snapshot();
+        if snap.seq >= target && snap.locale == locale {
+            return;
+        }
+        let core = self.core.lock();
+        let target = self.dirty_seq(kind);
+        let snap = feed.snapshot();
+        if snap.seq < target || snap.locale != locale {
+            feed.replace_if_newer(build(core.state(), target));
+        }
+    }
+
+    fn sync_slice(&self, kind: SliceKind) {
         match kind {
-            SliceKind::Board => {
-                let snap = self.feeds.board.snapshot();
-                if snap.seq >= target && snap.locale == locale {
-                    return;
-                }
-                let core = self.core.lock();
-                let target = self.dirty_seq(SliceKind::Board);
-                let snap = self.feeds.board.snapshot();
-                if snap.seq < target || snap.locale != locale {
-                    self.feeds.board.replace_if_newer(vibevalley_core::board_slice(core.state(), target));
-                }
-            }
-            SliceKind::Sessions => {
-                let snap = self.feeds.sessions.snapshot();
-                if snap.seq >= target && snap.locale == locale {
-                    return;
-                }
-                let core = self.core.lock();
-                let target = self.dirty_seq(SliceKind::Sessions);
-                let snap = self.feeds.sessions.snapshot();
-                if snap.seq < target || snap.locale != locale {
-                    self.feeds.sessions.replace_if_newer(vibevalley_core::sessions_slice(core.state(), target));
-                }
-            }
-            SliceKind::Collab => {
-                let snap = self.feeds.collab.snapshot();
-                if snap.seq >= target && snap.locale == locale {
-                    return;
-                }
-                let core = self.core.lock();
-                let target = self.dirty_seq(SliceKind::Collab);
-                let snap = self.feeds.collab.snapshot();
-                if snap.seq < target || snap.locale != locale {
-                    self.feeds.collab.replace_if_newer(vibevalley_core::collab_slice(core.state(), target));
-                }
-            }
-            SliceKind::Inbox => {
-                let snap = self.feeds.inbox.snapshot();
-                if snap.seq >= target && snap.locale == locale {
-                    return;
-                }
-                let core = self.core.lock();
-                let target = self.dirty_seq(SliceKind::Inbox);
-                let snap = self.feeds.inbox.snapshot();
-                if snap.seq < target || snap.locale != locale {
-                    self.feeds.inbox.replace_if_newer(vibevalley_core::inbox_slice(core.state(), target));
-                }
-            }
-            SliceKind::Ops => {
-                let snap = self.feeds.ops.snapshot();
-                if snap.seq >= target && snap.locale == locale {
-                    return;
-                }
-                let core = self.core.lock();
-                let target = self.dirty_seq(SliceKind::Ops);
-                let snap = self.feeds.ops.snapshot();
-                if snap.seq < target || snap.locale != locale {
-                    self.feeds.ops.replace_if_newer(vibevalley_core::ops_slice(core.state(), target));
-                }
-            }
-            SliceKind::Farm => {
-                let snap = self.feeds.farm.snapshot();
-                if snap.seq >= target && snap.locale == locale {
-                    return;
-                }
-                let core = self.core.lock();
-                let target = self.dirty_seq(SliceKind::Farm);
-                let snap = self.feeds.farm.snapshot();
-                if snap.seq < target || snap.locale != locale {
-                    self.feeds.farm.replace_if_newer(vibevalley_core::farm_frame(core.state(), vec![], target));
-                }
-            }
+            SliceKind::Board => self.sync_feed(kind, &self.feeds.board, vibevalley_core::board_slice),
+            SliceKind::Sessions => self.sync_feed(kind, &self.feeds.sessions, vibevalley_core::sessions_slice),
+            SliceKind::Collab => self.sync_feed(kind, &self.feeds.collab, vibevalley_core::collab_slice),
+            SliceKind::Inbox => self.sync_feed(kind, &self.feeds.inbox, vibevalley_core::inbox_slice),
+            SliceKind::Ops => self.sync_feed(kind, &self.feeds.ops, vibevalley_core::ops_slice),
+            SliceKind::Farm => self.sync_feed(kind, &self.feeds.farm, |state, seq| vibevalley_core::farm_frame(state, vec![], seq)),
         }
     }
 
@@ -662,23 +661,21 @@ impl Hub {
         let observer = self.current_observer();
         let trace_debug = tracing::enabled!(tracing::Level::DEBUG);
         let started = (observer.is_some() || trace_debug).then(Instant::now);
-        let (applied, seq) = {
+        let (applied, seq, should_wake) = {
             let mut core = self.core.lock();
             let changes = core.apply(facts);
-            let seq = if !changes.transitions.is_empty() {
-                let seq = self.seq.fetch_add(1, Ordering::AcqRel) + 1;
+            if !changes.transitions.is_empty() {
                 let mut dirty = changes.dirty;
                 if !changes.effects.is_empty() {
                     dirty |= SliceMask::FARM;
+                    self.pending_effects.lock().extend(changes.effects.iter().cloned());
                 }
-                for kind in dirty.kinds() {
-                    self.dirty_seqs[slice_index(kind)].store(seq, Ordering::Release);
-                }
-                seq
+                let (seq, should_wake) = self.slice_gate.record_commit(dirty.bits());
+                (changes, seq, should_wake)
             } else {
-                self.seq.load(Ordering::Acquire)
-            };
-            (changes, seq)
+                let seq = self.slice_gate.seq();
+                (changes, seq, false)
+            }
         };
         if applied.transitions.is_empty() {
             return applied;
@@ -697,10 +694,9 @@ impl Hub {
             );
         }
         self.bus.publish(&applied.transitions);
-        let _ = self.kicks.send(Kick {
-            dirty: applied.dirty,
-            effects: applied.effects.clone(),
-        });
+        if should_wake {
+            self.slice_notify.notify_one();
+        }
         applied
     }
 
@@ -717,6 +713,11 @@ impl Hub {
     /// Cooperatively signals and awaits all registered event bus subscribers.
     pub fn close_bus(&self) {
         self.bus.close();
+    }
+
+    /// Asynchronously signals and awaits all registered event bus subscribers.
+    pub async fn close_bus_async(&self) {
+        self.bus.close_async().await;
     }
 
     fn publish_live(&self, event: LiveEvent) {
@@ -1006,9 +1007,7 @@ impl Hub {
             TypedEntry::Sync(handler) => {
                 let hub = self.self_arc();
                 let ctx_owned = caller_ctx.clone();
-                let span = tracing::Span::current();
-                tokio::task::spawn_blocking(move || {
-                    let _entered = span.enter();
+                spawn_blocking_traced(move || {
                     let ctx = Ctx {
                         caller: ctx_owned.caller,
                         principal: ctx_owned.principal,
@@ -1199,9 +1198,7 @@ impl Hub {
             RouteHandler::Sync(handler) => {
                 let hub = self.self_arc();
                 let ctx_owned = caller_ctx.clone();
-                let span = tracing::Span::current();
-                match tokio::task::spawn_blocking(move || {
-                    let _entered = span.enter();
+                match spawn_blocking_traced(move || {
                     let ctx = Ctx {
                         caller: ctx_owned.caller,
                         principal: ctx_owned.principal,
@@ -1238,8 +1235,28 @@ impl Hub {
     /// until the subscriber stops. An `Err` is a refusal before the first
     /// event.
     pub fn on_subscription<S: Subscription>(&self, open: impl Fn(&Hub, S::Payload, Sink) -> Result<(), ApiError> + Send + Sync + 'static) {
-        let o: Opener = Arc::new(move |hub, payload, sink| open(hub, decode(payload)?, sink));
-        self.openers.write().insert(S::NAME, (S::CAN, o));
+        let o: SyncOpener = Arc::new(move |hub, payload, sink| open(hub, decode(payload)?, sink));
+        self.openers.write().insert(S::NAME, (S::CAN, SubscriptionOpener::Sync(o)));
+    }
+
+    /// Serves subscription `S` asynchronously on the Tokio runtime without
+    /// blocking an OS thread during catch-up queries or validation.
+    pub fn on_subscription_async<S, F, Fut>(&self, open: F)
+    where
+        S: Subscription,
+        S::Payload: Send + 'static,
+        F: Fn(Arc<Hub>, S::Payload, Sink) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<(), ApiError>> + Send + 'static,
+    {
+        let open = Arc::new(open);
+        let o: AsyncOpener = Arc::new(move |hub, payload, sink| {
+            let open = open.clone();
+            Box::pin(async move {
+                let decoded = decode(payload)?;
+                open(hub, decoded, sink).await
+            })
+        });
+        self.openers.write().insert(S::NAME, (S::CAN, SubscriptionOpener::Async(o)));
     }
 
     #[allow(clippy::result_large_err, reason = "the contract's refusal is an envelope")]
@@ -1254,7 +1271,39 @@ impl Hub {
         let (stop_tx, stop) = flume::bounded(1);
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let payload = if payload.is_null() { Value::Object(Default::default()) } else { payload };
-        open(self, payload, Sink { events, stop }).map_err(|e| Envelope::failure(&e))?;
+        match open {
+            SubscriptionOpener::Sync(open) => open(self, payload, Sink { events, stop }),
+            SubscriptionOpener::Async(open) => vibevalley_runtime::rt::block_on(open(self.self_arc(), payload, Sink { events, stop }).in_current_span()),
+        }
+        .map_err(|e| Envelope::failure(&e))?;
+        self.subscriptions.lock().insert(id, stop_tx);
+        Ok((id, rx))
+    }
+
+    /// Opens subscription `name` asynchronously, executing `on_subscription_async`
+    /// openers inline on the caller Tokio task without `spawn_blocking`.
+    #[allow(clippy::result_large_err, reason = "the contract's refusal is an envelope")]
+    pub async fn subscribe_with_async(&self, caller_ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        let Some((can, open)) = self.openers.read().get(name).cloned() else {
+            return Err(refusal(BizCode::RouteNotFound, format!("no subscription {name}")));
+        };
+        if caller_ctx.caller != Caller::User && !can.contains(&caller_ctx.caller) {
+            return Err(refusal(BizCode::Forbidden, format!("{name} is not for the {:?}", caller_ctx.caller)));
+        }
+        let (events, rx) = flume::unbounded();
+        let (stop_tx, stop) = flume::bounded(1);
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let payload = if payload.is_null() { Value::Object(Default::default()) } else { payload };
+        match open {
+            SubscriptionOpener::Async(open) => open(self.self_arc(), payload, Sink { events, stop }).await.map_err(|e| Envelope::failure(&e))?,
+            SubscriptionOpener::Sync(open) => {
+                let hub = self.self_arc();
+                match spawn_blocking_traced(move || open(&hub, payload, Sink { events, stop })).await {
+                    Ok(res) => res.map_err(|e| Envelope::failure(&e))?,
+                    Err(e) => return Err(refusal(BizCode::InternalError, e.to_string())),
+                }
+            }
+        }
         self.subscriptions.lock().insert(id, stop_tx);
         Ok((id, rx))
     }
@@ -1307,25 +1356,24 @@ pub fn decode<T: serde::de::DeserializeOwned>(payload: Value) -> Result<T, ApiEr
 /// The slice feed pump: leading-edge delivery for workbench slices when idle,
 /// and coalesced trailing-edge delivery after `STATE_EVERY_MS` for dirty slices
 /// plus accumulated farm effects on `SliceKind::Farm`.
-async fn pump_slices(hub: std::sync::Weak<Hub>, kicked: flume::Receiver<Kick>, cancel: CancellationToken) {
+async fn pump_slices(hub: std::sync::Weak<Hub>, notify: Arc<Notify>, cancel: CancellationToken) {
     loop {
-        let first = tokio::select! {
-            biased;
-            _ = cancel.cancelled() => return,
-            res = kicked.recv_async() => match res {
-                Ok(kick) => kick,
-                Err(_) => return,
-            },
+        let first_bits = {
+            let Some(h) = hub.upgrade() else { return };
+            h.slice_gate.take_pending()
         };
-        let mut dirty = first.dirty;
-        let mut effects = first.effects;
-        if !effects.is_empty() {
-            dirty |= SliceMask::FARM;
+        if first_bits == 0 {
+            tokio::select! {
+                biased;
+                _ = cancel.cancelled() => return,
+                _ = notify.notified() => continue,
+            }
         }
+        let mut dirty_bits = first_bits;
         let deadline = tokio::time::Instant::now() + Duration::from_millis(STATE_EVERY_MS);
         let Some(leading) = hub.upgrade() else { return };
         for kind in WORKBENCH_SLICES {
-            if dirty.contains(SliceMask::from_kind(kind)) {
+            if (dirty_bits & SliceMask::from_kind(kind).bits()) != 0 {
                 let target = leading.dirty_seq(kind);
                 if leading.should_publish_slice(kind, target, true) {
                     leading.sync_slice(kind);
@@ -1339,23 +1387,20 @@ async fn pump_slices(hub: std::sync::Weak<Hub>, kicked: flume::Receiver<Kick>, c
             _ = cancel.cancelled() => return,
             _ = tokio::time::sleep_until(deadline) => {}
         }
-        for more in kicked.drain() {
-            dirty |= more.dirty;
-            effects.extend(more.effects);
-        }
-        if !effects.is_empty() {
-            dirty |= SliceMask::FARM;
-        }
         let Some(hub) = hub.upgrade() else { return };
+        dirty_bits |= hub.slice_gate.take_pending();
         for kind in WORKBENCH_SLICES {
-            if dirty.contains(SliceMask::from_kind(kind)) && hub.slice_has_watchers(kind) {
+            if (dirty_bits & SliceMask::from_kind(kind).bits()) != 0 && hub.slice_has_watchers(kind) {
                 hub.sync_slice(kind);
                 hub.publish_slice(kind, false);
             }
         }
-        if dirty.contains(SliceMask::FARM) && hub.slice_has_watchers(SliceKind::Farm) {
-            hub.sync_farm_with_effects(effects);
-            hub.publish_slice(SliceKind::Farm, false);
+        if (dirty_bits & SliceMask::FARM.bits()) != 0 {
+            let effects = hub.take_pending_effects();
+            if hub.slice_has_watchers(SliceKind::Farm) {
+                hub.sync_farm_with_effects(effects);
+                hub.publish_slice(SliceKind::Farm, false);
+            }
         }
     }
 }
@@ -1400,19 +1445,19 @@ impl ports::Facts for std::sync::Weak<Hub> {
 
 impl Server for Hub {
     fn speech_streams(&self) -> Option<crate::transport::api::media::SharedSpeechStreams> {
-        self.speech.load().as_ref().map(|slot| slot.0.clone())
+        self.speech.get()
     }
 
     fn mcp(&self) -> Option<crate::transport::api::SharedMcp> {
-        self.mcp.load().as_ref().map(|slot| slot.0.clone())
+        self.mcp.get()
     }
 
     fn media_inputs(&self) -> Option<crate::transport::api::media::SharedMediaInputs> {
-        self.media_inputs.load().as_ref().map(|slot| slot.0.clone())
+        self.media_inputs.get()
     }
 
     fn host_debug(&self) -> Option<SharedHostDebug> {
-        self.host_debug.load().as_ref().map(|slot| slot.0.clone())
+        self.host_debug.get()
     }
 
     fn voice(&self) -> Option<SharedLiveVoice> {
@@ -1420,11 +1465,11 @@ impl Server for Hub {
     }
 
     fn remote_auth(&self) -> Option<SharedRemoteAuth> {
-        self.remote_auth.load().as_ref().map(|slot| slot.0.clone())
+        self.remote_auth.get()
     }
 
     fn machine_bus(&self) -> Option<SharedMachineBus> {
-        self.machine_bus.load().as_ref().map(|slot| slot.0.clone())
+        self.machine_bus.get()
     }
 
     fn call(&self, op: &str, payload: Value) -> Envelope {
@@ -1469,6 +1514,10 @@ impl Server for Hub {
         }
     }
 
+    fn slice_snapshot_json_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Arc<str>> {
+        Box::pin(async move { self.slice_snapshot_json(slice) })
+    }
+
     fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
         self.sync_slice(slice);
         let gate = self.current_fault_gate();
@@ -1502,6 +1551,10 @@ impl Server for Hub {
         Some(self.subscribe_slice_feed(slice))
     }
 
+    fn subscribe_slice_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Option<slice_feed::SliceSubscription>> {
+        Box::pin(async move { Some(self.subscribe_slice_feed(slice)) })
+    }
+
     fn fault_gate(&self) -> Option<SharedFaultGate> {
         self.current_fault_gate()
     }
@@ -1520,6 +1573,15 @@ impl Server for Hub {
 
     fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
         self.open_subscription(ctx, name, payload)
+    }
+
+    fn subscribe_with_async(
+        self: Arc<Self>,
+        ctx: CallerContext,
+        name: String,
+        payload: Value,
+    ) -> BoxFuture<'static, Result<(u64, flume::Receiver<Value>), Envelope>> {
+        Box::pin(async move { Hub::subscribe_with_async(&self, &ctx, &name, payload).await })
     }
 
     fn unsubscribe(&self, id: u64) {
@@ -1541,28 +1603,47 @@ mod tests {
         let async_done = Arc::new(AtomicBool::new(false));
         let blocking_done = Arc::new(AtomicBool::new(false));
 
+        let (async_entered_tx, async_entered_rx) = flume::bounded::<()>(1);
+        let async_release = Arc::new(tokio::sync::Notify::new());
+        let async_release_task = async_release.clone();
         let cancel = hub.child_token();
         let flag = async_done.clone();
         hub.spawn_task(async move {
+            let _ = async_entered_tx.send(());
             cancel.cancelled().await;
-            tokio::time::sleep(Duration::from_millis(20)).await;
+            async_release_task.notified().await;
             flag.store(true, Ordering::Release);
         });
 
         let flag = blocking_done.clone();
         let (entered_tx, entered_rx) = flume::bounded::<()>(1);
+        let (blocking_release_tx, blocking_release_rx) = flume::bounded::<()>(1);
         let cancel = hub.child_token();
         hub.spawn_blocking_task(move || {
             let _ = entered_tx.send(());
-            while !cancel.is_cancelled() {
-                std::thread::sleep(Duration::from_millis(5));
-            }
-            std::thread::sleep(Duration::from_millis(20));
+            let _ = blocking_release_rx.recv_timeout(Duration::from_secs(2));
+            assert!(cancel.is_cancelled(), "blocking task must observe shutdown cancellation");
             flag.store(true, Ordering::Release);
         });
+
+        async_entered_rx.recv_timeout(Duration::from_secs(2)).expect("async task entered");
         entered_rx.recv_timeout(Duration::from_secs(2)).expect("blocking task entered");
 
-        hub.close();
+        let (cancelled_tx, cancelled_rx) = flume::bounded::<()>(1);
+        let cancel_watch = hub.child_token();
+        vibevalley_runtime::rt::spawn(async move {
+            cancel_watch.cancelled().await;
+            let _ = cancelled_tx.send(());
+        });
+
+        let hub_close = hub.clone();
+        let closer = std::thread::spawn(move || hub_close.close());
+        cancelled_rx.recv_timeout(Duration::from_secs(2)).expect("Hub::close cancelled shutdown token");
+
+        async_release.notify_one();
+        drop(blocking_release_tx);
+        closer.join().unwrap();
+
         assert!(async_done.load(Ordering::Acquire), "Hub::close must drain tracked async tasks");
         assert!(blocking_done.load(Ordering::Acquire), "Hub::close must drain tracked blocking tasks");
     }
@@ -1757,7 +1838,7 @@ mod tests {
                 "missing custom span in logs:\n{logs}"
             );
 
-            hub.close();
+            hub.close_async().await;
         }
         .with_subscriber(subscriber)
         .await;
@@ -1836,7 +1917,7 @@ mod tests {
             wall_start.elapsed()
         );
 
-        hub.close();
+        hub.close_async().await;
     }
 
     #[test]
@@ -1957,5 +2038,183 @@ mod tests {
         assert_eq!(ends.iter().filter(|(_, code, _)| *code == BizCode::Forbidden.code()).count(), 2);
 
         hub.close();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn hub_spawn_task_and_blocking_preserve_span_and_drain_via_close_async() {
+        use std::io;
+
+        use parking_lot::Mutex;
+        use tracing::instrument::WithSubscriber as _;
+        use vibevalley_protocol::{Health, ops};
+
+        use super::CallerContext;
+
+        #[derive(Clone, Default)]
+        struct SharedBuf(Arc<Mutex<Vec<u8>>>);
+
+        struct BufWriter(Arc<Mutex<Vec<u8>>>);
+
+        impl io::Write for BufWriter {
+            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                self.0.lock().extend_from_slice(buf);
+                Ok(buf.len())
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for SharedBuf {
+            type Writer = BufWriter;
+
+            fn make_writer(&'a self) -> Self::Writer {
+                BufWriter(self.0.clone())
+            }
+        }
+
+        let buf = SharedBuf::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::DEBUG)
+            .with_ansi(false)
+            .with_writer(buf.clone())
+            .finish();
+
+        async {
+            let wall_start = std::time::Instant::now();
+            let hub = Hub::new(vibevalley_core::empty_space_state());
+            let drained = Arc::new(AtomicBool::new(false));
+            let drained_bg = drained.clone();
+            let bg_cancel = hub.child_token();
+            hub.spawn_task(async move {
+                bg_cancel.cancelled().await;
+                drained_bg.store(true, Ordering::Release);
+            });
+
+            let seen_async = Arc::new(Mutex::new(None::<(Option<&'static str>, Option<tracing::span::Id>)>));
+            let seen_blocking = Arc::new(Mutex::new(None::<(Option<&'static str>, Option<tracing::span::Id>)>));
+            let parent_span_id = Arc::new(Mutex::new(None::<tracing::span::Id>));
+            let async_done = Arc::new(tokio::sync::Notify::new());
+            let blocking_done = Arc::new(tokio::sync::Notify::new());
+
+            let seen_async_h = seen_async.clone();
+            let seen_blocking_h = seen_blocking.clone();
+            let parent_span_id_h = parent_span_id.clone();
+            let async_done_h = async_done.clone();
+            let blocking_done_h = blocking_done.clone();
+
+            hub.on_async::<ops::ServerHealthGet, _, _>(move |ctx, ()| {
+                let seen_async = seen_async_h.clone();
+                let seen_blocking = seen_blocking_h.clone();
+                let parent_span_id = parent_span_id_h.clone();
+                let async_done = async_done_h.clone();
+                let blocking_done = blocking_done_h.clone();
+                async move {
+                    *parent_span_id.lock() = tracing::Span::current().id();
+                    ctx.hub.spawn_task(async move {
+                        tokio::time::sleep(Duration::from_secs(60)).await;
+                        let current = tracing::Span::current();
+                        tracing::debug!("inside_hub_spawn_task");
+                        *seen_async.lock() = Some((current.metadata().map(|m| m.name()), current.id()));
+                        async_done.notify_one();
+                    });
+                    ctx.hub.spawn_blocking_task(move || {
+                        let current = tracing::Span::current();
+                        tracing::debug!("inside_hub_spawn_blocking_task");
+                        *seen_blocking.lock() = Some((current.metadata().map(|m| m.name()), current.id()));
+                        blocking_done.notify_one();
+                    });
+                    Ok(Health {
+                        ok: true,
+                        version: format!("ok-{}", ctx.trace_id),
+                    })
+                }
+            });
+
+            let health = hub.invoke_async::<ops::ServerHealthGet>(&CallerContext::local(), ()).await.unwrap();
+            assert_eq!(health.version, "ok-1");
+
+            blocking_done.notified().await;
+            tokio::time::advance(Duration::from_secs(60)).await;
+            async_done.notified().await;
+
+            let expected_id = parent_span_id.lock().clone();
+            assert!(expected_id.is_some());
+            assert_eq!(*seen_async.lock(), Some((Some("hub.op"), expected_id.clone())));
+            assert_eq!(*seen_blocking.lock(), Some((Some("hub.op"), expected_id)));
+
+            hub.close_async().await;
+            assert!(drained.load(Ordering::Acquire), "close_async must cancel and drain tracked tasks");
+
+            let logs = String::from_utf8(buf.0.lock().clone()).unwrap();
+            assert!(
+                logs.contains("hub.op{op=\"server.health.get\" trace_id=1}") && logs.contains("inside_hub_spawn_task"),
+                "missing spawn_task log in hub.op span:\n{logs}"
+            );
+            assert!(
+                logs.contains("hub.op{op=\"server.health.get\" trace_id=1}") && logs.contains("inside_hub_spawn_blocking_task"),
+                "missing spawn_blocking_task log in hub.op span:\n{logs}"
+            );
+            assert!(
+                wall_start.elapsed() < Duration::from_secs(1),
+                "virtual-clock Hub spawn & close_async must finish instantaneously, took {:?}",
+                wall_start.elapsed()
+            );
+        }
+        .with_subscriber(subscriber)
+        .await;
+    }
+
+    #[test]
+    fn on_subscription_async_runs_inline_without_spawn_blocking() {
+        use parking_lot::Mutex;
+        use serde_json::json;
+        use vibevalley_protocol::subscriptions;
+
+        use super::{CallerContext, Server};
+
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let recorded = Arc::new(Mutex::new(None::<(String, Option<tokio::task::Id>)>));
+        let rec = recorded.clone();
+        hub.on_subscription_async::<subscriptions::ChannelFollow, _, _>(move |_hub, payload, sink| {
+            let rec = rec.clone();
+            async move {
+                tokio::task::yield_now().await;
+                let thread = std::thread::current().name().unwrap_or_default().to_string();
+                *rec.lock() = Some((thread, tokio::task::try_id()));
+                let _ = sink.send(&json!({ "channel": payload.id, "after": payload.after }));
+                Ok(())
+            }
+        });
+
+        let (caller_task_id, first) = vibevalley_runtime::rt::block_on(async move {
+            vibevalley_runtime::rt::spawn(async move {
+                let caller_task_id = tokio::task::try_id();
+                let server: Arc<dyn Server> = hub.clone();
+                let (id, rx) = server
+                    .clone()
+                    .subscribe_with_async(CallerContext::local(), "channel.follow".into(), json!({ "id": "c1", "after": 5 }))
+                    .await
+                    .unwrap();
+                let first = rx.recv_async().await.unwrap();
+                server.unsubscribe(id);
+                hub.close_async().await;
+                (caller_task_id, first)
+            })
+            .await
+            .unwrap()
+        });
+
+        assert_eq!(first, json!({ "channel": "c1", "after": 5 }));
+        let (thread_name, task_id) = recorded.lock().clone().expect("opener ran");
+        assert!(
+            thread_name.starts_with("vibevalley-io-"),
+            "expected vibevalley-io worker thread, got {thread_name}"
+        );
+        assert_eq!(
+            task_id, caller_task_id,
+            "on_subscription_async opener must run inline on caller Tokio task without spawn_blocking"
+        );
     }
 }

@@ -1,7 +1,11 @@
+use std::io;
 use std::time::Duration;
 
+use futures_util::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Value, json};
+use tokio_util::codec::{FramedRead, LinesCodec};
+use tokio_util::io::StreamReader;
 
 use crate::agent::ai::retry::{RetryPolicy, parse_retry_after, sleep_interruptible_async};
 use crate::agent::ai::stream::{CancelToken, SseFold};
@@ -171,9 +175,11 @@ fn classify_http_error(status: u16, text: &str) -> BrainError {
     }
 }
 
-async fn fold_sse_response(mut response: reqwest::Response, cancel: &CancelToken, on: &mut dyn FnMut(Delta)) -> Result<Completion> {
+async fn fold_sse_response(response: reqwest::Response, cancel: &CancelToken, on: &mut dyn FnMut(Delta)) -> Result<Completion> {
+    let stream = response.bytes_stream().map_err(io::Error::other);
+    let lines = FramedRead::new(StreamReader::new(stream), LinesCodec::new());
+    tokio::pin!(lines);
     let mut fold = SseFold::new();
-    let mut buf = Vec::new();
     loop {
         if cancel.is_cancelled() {
             return Err(BrainError::Cancelled);
@@ -181,29 +187,18 @@ async fn fold_sse_response(mut response: reqwest::Response, cancel: &CancelToken
         let next = tokio::select! {
             biased;
             () = cancel.cancelled() => return Err(BrainError::Cancelled),
-            chunk = response.chunk() => chunk,
+            item = lines.next() => item,
         };
-        let Some(chunk) = next.map_err(|e| BrainError::Network(e.to_string()))? else {
+        let Some(line) = next else {
             break;
         };
-        buf.extend_from_slice(&chunk);
-        while let Some(pos) = buf.iter().position(|&b| b == b'\n') {
-            let raw_line: Vec<u8> = buf.drain(..=pos).collect();
-            let line = String::from_utf8_lossy(&raw_line);
-            if fold.push_line(&line, on)? {
-                return Ok(fold.finish());
-            }
-            if cancel.is_cancelled() {
-                return Err(BrainError::Cancelled);
-            }
+        let line = line.map_err(|e| BrainError::Network(e.to_string()))?;
+        if fold.push_line(&line, on)? {
+            return Ok(fold.finish());
         }
-    }
-    if !buf.is_empty() {
         if cancel.is_cancelled() {
             return Err(BrainError::Cancelled);
         }
-        let line = String::from_utf8_lossy(&buf);
-        let _ = fold.push_line(&line, on)?;
     }
     Ok(fold.finish())
 }
@@ -276,5 +271,66 @@ impl ModelClient for OpenAiClient {
                 return fold_sse_response(response, cancel, on).await;
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    use super::*;
+
+    #[test]
+    fn regression_deepseek_sse_preserves_multibyte_utf8_split_across_chunks() {
+        let chinese = "你好深度求索：分片测试";
+        let payload = format!("data: {{\"choices\":[{{\"index\":0,\"delta\":{{\"content\":\"{chinese}\"}}}}]}}\n\ndata: [DONE]\n\n");
+        let raw = payload.as_bytes().to_vec();
+        let first_non_ascii = raw.iter().position(|&b| b >= 0x80).expect("multi-byte UTF-8");
+        let split_at = first_non_ascii + 1;
+        assert!(std::str::from_utf8(&raw[..split_at]).is_err());
+        let part1 = raw[..split_at].to_vec();
+        let part2 = raw[split_at..].to_vec();
+
+        let addr = crate::rt::block_on(async move {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            tokio::spawn(async move {
+                let (mut sock, _) = listener.accept().await.unwrap();
+                let mut req_buf = vec![0u8; 4096];
+                let _ = sock.read(&mut req_buf).await;
+                sock.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n")
+                    .await
+                    .unwrap();
+                sock.write_all(format!("{:x}\r\n", part1.len()).as_bytes()).await.unwrap();
+                sock.write_all(&part1).await.unwrap();
+                sock.write_all(b"\r\n").await.unwrap();
+                sock.flush().await.unwrap();
+                tokio::time::sleep(Duration::from_millis(15)).await;
+                sock.write_all(format!("{:x}\r\n", part2.len()).as_bytes()).await.unwrap();
+                sock.write_all(&part2).await.unwrap();
+                sock.write_all(b"\r\n0\r\n\r\n").await.unwrap();
+                sock.flush().await.unwrap();
+            });
+            addr
+        });
+
+        let client = OpenAiClient::new(format!("http://{addr}"), || Some("sk-test".into())).with_retry(RetryPolicy::none());
+        let req = ChatRequest {
+            model: "deepseek-chat".into(),
+            messages: vec![Message::user("hi")],
+            ..Default::default()
+        };
+        let mut streamed = String::new();
+        let completion = client
+            .complete(&req, &mut |delta| {
+                if let Delta::Text(t) = delta {
+                    streamed.push_str(&t);
+                }
+            })
+            .unwrap();
+        assert!(!streamed.contains('\u{FFFD}'));
+        assert_eq!(streamed, chinese);
+        assert_eq!(completion.message.content.as_deref(), Some(chinese));
     }
 }

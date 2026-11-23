@@ -13,7 +13,7 @@ use axum::routing::post;
 use parking_lot::Mutex;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
-use tokio_util::sync::CancellationToken;
+use tokio_util::sync::{CancellationToken, DropGuard};
 use uuid::Uuid;
 use vibevalley_protocol::{MachineMcpRequest, MachineMcpResponse, MachineWireFrame};
 
@@ -39,6 +39,7 @@ pub fn resolve_mcp_response(pending: &PendingMcpMap, response: MachineMcpRespons
 pub struct LocalMcpProxy {
     url: String,
     cancel: CancellationToken,
+    _cancel_guard: DropGuard,
 }
 
 impl LocalMcpProxy {
@@ -55,6 +56,7 @@ impl LocalMcpProxy {
         let addr = listener.local_addr().map_err(|e| format!("failed to read local MCP proxy address: {e}"))?;
         let url = format!("http://{addr}/mcp");
         let cancel = parent_cancel.child_token();
+        let _cancel_guard = cancel.clone().drop_guard();
         let loop_cancel = cancel.clone();
 
         let state = ProxyState {
@@ -73,7 +75,7 @@ impl LocalMcpProxy {
             let _ = axum::serve(listener, app).with_graceful_shutdown(loop_cancel.cancelled_owned()).await;
         });
 
-        Ok(Self { url, cancel })
+        Ok(Self { url, cancel, _cancel_guard })
     }
 
     pub fn url(&self) -> &str {
@@ -81,12 +83,6 @@ impl LocalMcpProxy {
     }
 
     pub fn shutdown(&self) {
-        self.cancel.cancel();
-    }
-}
-
-impl Drop for LocalMcpProxy {
-    fn drop(&mut self) {
         self.cancel.cancel();
     }
 }

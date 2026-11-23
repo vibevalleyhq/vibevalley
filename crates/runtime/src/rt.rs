@@ -43,6 +43,13 @@ pub fn handle() -> &'static Handle {
     runtime().handle()
 }
 
+/// Returns the ambient Tokio runtime handle when called inside a Tokio
+/// context (e.g. a `#[tokio::test(start_paused = true)]` test runtime),
+/// falling back to the process-wide `vibevalley-io` runtime outside Tokio.
+pub fn current_or_global_handle() -> Handle {
+    Handle::try_current().unwrap_or_else(|_| handle().clone())
+}
+
 pub fn spawn<F>(future: F) -> tokio::task::JoinHandle<F::Output>
 where
     F: Future + Send + 'static,
@@ -142,5 +149,39 @@ mod tests {
         assert_eq!(resolve_io_workers(Some("8"), Some(16)), 8);
         assert_eq!(resolve_io_workers(Some("64"), Some(16)), 16);
         assert_eq!(resolve_io_workers(Some("invalid"), Some(12)), 4);
+    }
+
+    #[test]
+    fn current_or_global_handle_falls_back_to_global_runtime_outside_tokio() {
+        let name = block_on(async {
+            current_or_global_handle()
+                .spawn(async { std::thread::current().name().unwrap_or_default().to_string() })
+                .await
+                .unwrap()
+        });
+        assert!(name.starts_with("vibevalley-io-"), "expected vibevalley-io worker, got {name}");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn current_or_global_handle_attaches_to_paused_virtual_clock() {
+        let wall_start = std::time::Instant::now();
+        let t0 = tokio::time::Instant::now();
+        let task = current_or_global_handle().spawn(async {
+            tokio::time::sleep(Duration::from_secs(300)).await;
+            7usize
+        });
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(299)).await;
+        tokio::task::yield_now().await;
+        assert!(!task.is_finished(), "timer must wait for full 300s virtual delay");
+
+        tokio::time::advance(Duration::from_secs(1)).await;
+        assert_eq!(task.await.unwrap(), 7);
+        assert_eq!(t0.elapsed(), Duration::from_secs(300));
+        assert!(
+            wall_start.elapsed() < Duration::from_secs(1),
+            "5 virtual minutes must complete instantaneously, took {:?}",
+            wall_start.elapsed()
+        );
     }
 }

@@ -10,6 +10,7 @@ use std::sync::{Arc, OnceLock, Weak};
 use parking_lot::Mutex;
 use sha2::{Digest, Sha256};
 use tokio::sync::Mutex as AsyncMutex;
+use vibevalley_core::{SharedClock, system_clock};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, BizCode, Caller, Millis, RemoteDeviceRevokeRequest, RemoteDeviceSummary, RemoteEnableRequest, RemotePairCode, RemotePairExchangeRequest,
@@ -79,6 +80,7 @@ pub struct Remote {
     db: RemoteDb,
     hub: Weak<Hub>,
     version: String,
+    clock: SharedClock,
     enabled: AtomicBool,
     lifecycle: AsyncMutex<()>,
     listener: Mutex<Option<Listener>>,
@@ -173,21 +175,27 @@ fn build_pair_url(url: &str, code: &str, scope: Option<&str>) -> String {
     deep.to_string()
 }
 
-/// Drops a `Listener` off the Tokio I/O workers because `Listener::drop` awaits graceful shutdown synchronously.
+/// Gracefully stops a running remote listener asynchronously without blocking Tokio workers.
 async fn stop_listener_async(listener: Option<Listener>) {
     if let Some(live) = listener {
-        let _ = tokio::task::spawn_blocking(move || drop(live)).await;
+        live.shutdown().await;
     }
 }
 
 impl Remote {
     pub fn open(db: Arc<ServerDb>, hub: Weak<Hub>, version: String) -> Result<Arc<Self>, ApiError> {
+        Self::open_with_clock(db, hub, version, system_clock())
+    }
+
+    /// Same as [`Remote::open`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
+    pub fn open_with_clock(db: Arc<ServerDb>, hub: Weak<Hub>, version: String, clock: SharedClock) -> Result<Arc<Self>, ApiError> {
         let db = RemoteDb::new(db);
         let persisted_enabled = vibevalley_runtime::rt::block_on(db.get_config())?.is_some_and(|cfg| cfg.enabled);
         Ok(Arc::new(Self {
             db,
             hub,
             version,
+            clock,
             enabled: AtomicBool::new(persisted_enabled),
             lifecycle: AsyncMutex::new(()),
             listener: Mutex::new(None),
@@ -336,7 +344,9 @@ impl Remote {
 
         let current_addr = self.listener.lock().as_ref().map(|l| l.addr);
         if port != 0 && current_addr == Some(target) {
-            self.db.save_config(true, Some(&target.ip().to_string()), target.port(), crate::now()).await?;
+            self.db
+                .save_config(true, Some(&target.ip().to_string()), target.port(), self.clock.now_ms())
+                .await?;
             self.enabled.store(true, Ordering::Release);
             return self.status_with_tailscale_async(ts).await;
         }
@@ -363,7 +373,7 @@ impl Remote {
                             false,
                             stored.as_ref().and_then(|c| c.bind_addr.as_deref()),
                             stored.as_ref().map(|c| c.port).unwrap_or_else(default_remote_port),
-                            crate::now(),
+                            self.clock.now_ms(),
                         )
                         .await;
                 }
@@ -372,7 +382,9 @@ impl Remote {
         };
 
         let actual = next.addr;
-        self.db.save_config(true, Some(&actual.ip().to_string()), actual.port(), crate::now()).await?;
+        self.db
+            .save_config(true, Some(&actual.ip().to_string()), actual.port(), self.clock.now_ms())
+            .await?;
         let old = self.listener.lock().replace(next);
         stop_listener_async(old).await;
         self.enabled.store(true, Ordering::Release);
@@ -392,7 +404,7 @@ impl Remote {
         let stored = self.db.get_config().await?;
         let bind_addr = stored.as_ref().and_then(|c| c.bind_addr.as_deref());
         let port = stored.as_ref().map(|c| c.port).filter(|&p| p != 0).unwrap_or_else(default_remote_port);
-        self.db.save_config(false, bind_addr, port, crate::now()).await?;
+        self.db.save_config(false, bind_addr, port, self.clock.now_ms()).await?;
         self.status_async().await
     }
 
@@ -401,10 +413,6 @@ impl Remote {
     }
 
     pub fn pair_create_with_scope(&self, scope: Option<&str>) -> Result<RemotePairCode, ApiError> {
-        self.pair_create_at(crate::now(), PAIR_CODE_TTL_MS, scope)
-    }
-
-    fn pair_create_at(&self, now: Millis, ttl_ms: Millis, scope: Option<&str>) -> Result<RemotePairCode, ApiError> {
         if !self.enabled.load(Ordering::Acquire) {
             return Err(ApiError::new(BizCode::Refused, t("server.remote.disabled", &[])));
         }
@@ -419,7 +427,8 @@ impl Remote {
             None => None,
         };
 
-        let expires_at = now + ttl_ms;
+        let now = self.clock.now_ms();
+        let expires_at = now + PAIR_CODE_TTL_MS;
         let code = {
             let mut state = self.pairing.lock();
             state.codes.retain(|entry| entry.expires_at > now - EXPIRED_CODE_RETENTION_MS);
@@ -473,15 +482,6 @@ impl Remote {
     }
 
     pub async fn pair_exchange_async(&self, req: RemotePairExchangeRequest) -> Result<RemotePairExchangeResult, ApiError> {
-        self.pair_exchange_at_async(req, crate::now()).await
-    }
-
-    #[cfg(test)]
-    fn pair_exchange_at(&self, req: RemotePairExchangeRequest, now: Millis) -> Result<RemotePairExchangeResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.pair_exchange_at_async(req, now))
-    }
-
-    async fn pair_exchange_at_async(&self, req: RemotePairExchangeRequest, now: Millis) -> Result<RemotePairExchangeResult, ApiError> {
         if !self.enabled.load(Ordering::Acquire) {
             return Err(ApiError::new(BizCode::Refused, t("server.remote.disabled", &[])));
         }
@@ -494,6 +494,7 @@ impl Remote {
             None => None,
         };
 
+        let now = self.clock.now_ms();
         let submitted = req.code.trim().to_ascii_uppercase();
         let entry_scope = {
             let mut state = self.pairing.lock();
@@ -561,7 +562,7 @@ impl Remote {
 
     pub async fn revoke_device_async(&self, req: RemoteDeviceRevokeRequest) -> Result<(), ApiError> {
         let id = req.id.trim();
-        if id.is_empty() || !self.db.revoke_device(id, crate::now()).await? {
+        if id.is_empty() || !self.db.revoke_device(id, self.clock.now_ms()).await? {
             return Err(ApiError::new(BizCode::NotFound, t("server.remote.deviceNotFound", &[])));
         }
         self.last_seen_cache.lock().remove(id);
@@ -604,7 +605,7 @@ impl Remote {
             return Err(ApiError::new(BizCode::Unauthorized, t("server.remote.unauthorized", &[])));
         }
 
-        let now = crate::now();
+        let now = self.clock.now_ms();
         let should_touch = {
             let mut cache = self.last_seen_cache.lock();
             match cache.get(&device.id) {
@@ -680,6 +681,10 @@ pub fn install(hub: &Hub, remote: Arc<Remote>) {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use vibevalley_core::{Clock, ManualClock};
+
     use super::*;
 
     #[test]
@@ -688,7 +693,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
         let hub = Hub::new(vibevalley_core::empty_space_state());
-        let remote = Remote::open(db.clone(), Arc::downgrade(&hub), "0.1.0-test".into()).unwrap();
+        let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+        let remote = Remote::open_with_clock(db.clone(), Arc::downgrade(&hub), "0.1.0-test".into(), clock.clone()).unwrap();
 
         let status = remote
             .enable(RemoteEnableRequest {
@@ -699,94 +705,103 @@ mod tests {
         assert!(status.enabled && status.listening);
         assert!(status.port > 0);
 
-        let base_now = 1_700_000_000_000i64;
-        let mut created = Vec::new();
-        for i in 0..10 {
-            let entry = remote.pair_create_at(base_now + i, PAIR_CODE_TTL_MS, None).unwrap();
+        for _ in 0..10 {
+            let entry = remote.pair_create().unwrap();
             assert_eq!(entry.code.len(), PAIR_CODE_LEN);
             assert!(entry.code.bytes().all(|b| CODE_ALPHABET.contains(&b)));
             assert!(entry.pair_url.starts_with("vibevalley://pair?url="));
-            created.push(entry);
+            assert_eq!(entry.expires_at, clock.now_ms() + PAIR_CODE_TTL_MS);
+            clock.advance(Duration::from_millis(1));
         }
         assert_eq!(remote.pairing.lock().codes.len(), MAX_ACTIVE_PAIR_CODES);
 
-        let expired = remote.pair_create_at(base_now, 1000, None).unwrap();
+        // Create one code that expires first and one created later that stays valid past the rate-limit window.
+        let expiring = remote.pair_create().unwrap();
+        clock.advance(Duration::from_secs(200));
+        let fresh = remote.pair_create().unwrap();
+        clock.advance(Duration::from_secs(101));
+
         let err = remote
-            .pair_exchange_at(
-                RemotePairExchangeRequest {
-                    code: expired.code,
-                    device_name: "iPhone".into(),
-                    platform: RemotePlatform::Ios,
-                    scope: None,
-                },
-                base_now + 2000,
-            )
+            .pair_exchange(RemotePairExchangeRequest {
+                code: expiring.code,
+                device_name: "iPhone".into(),
+                platform: RemotePlatform::Ios,
+                scope: None,
+            })
             .unwrap_err();
         assert_eq!(err.biz_code, BizCode::AuthRefused);
         assert_eq!(err.message, t("server.remote.expiredCode", &[]));
 
+        clock.advance(Duration::from_millis(1));
         for _ in 0..9 {
             let err = remote
-                .pair_exchange_at(
-                    RemotePairExchangeRequest {
-                        code: "AAAAAA".into(),
-                        device_name: "iPhone".into(),
-                        platform: RemotePlatform::Ios,
-                        scope: None,
-                    },
-                    base_now + 2001,
-                )
-                .unwrap_err();
-            assert_eq!(err.message, t("server.remote.invalidCode", &[]));
-        }
-        let limited = remote
-            .pair_exchange_at(
-                RemotePairExchangeRequest {
-                    code: created.last().unwrap().code.clone(),
+                .pair_exchange(RemotePairExchangeRequest {
+                    code: "AAAAAA".into(),
                     device_name: "iPhone".into(),
                     platform: RemotePlatform::Ios,
                     scope: None,
-                },
-                base_now + 2002,
-            )
+                })
+                .unwrap_err();
+            assert_eq!(err.message, t("server.remote.invalidCode", &[]));
+        }
+        clock.advance(Duration::from_millis(1));
+        let limited = remote
+            .pair_exchange(RemotePairExchangeRequest {
+                code: fresh.code.clone(),
+                device_name: "iPhone".into(),
+                platform: RemotePlatform::Ios,
+                scope: None,
+            })
             .unwrap_err();
         assert_eq!(limited.biz_code, BizCode::Refused);
         assert_eq!(limited.message, t("server.remote.rateLimited", &[]));
 
+        // Advancing past RATE_LIMIT_WINDOW_MS clears the rate-limit window while `fresh` is still unexpired.
+        clock.advance(Duration::from_millis((RATE_LIMIT_WINDOW_MS + 5_000) as u64));
         let paired = remote
-            .pair_exchange_at(
-                RemotePairExchangeRequest {
-                    code: created.last().unwrap().code.clone(),
-                    device_name: "iPhone 16".into(),
-                    platform: RemotePlatform::Ios,
-                    scope: None,
-                },
-                base_now + RATE_LIMIT_WINDOW_MS + 5000,
-            )
+            .pair_exchange(RemotePairExchangeRequest {
+                code: fresh.code,
+                device_name: "iPhone 16".into(),
+                platform: RemotePlatform::Ios,
+                scope: None,
+            })
             .unwrap();
         assert!(paired.token.starts_with(TOKEN_PREFIX));
         assert_eq!(paired.token.len(), TOKEN_PREFIX.len() + 64);
         assert_eq!(paired.device.name, "iPhone 16");
         assert_eq!(paired.device.platform, RemotePlatform::Ios);
         assert_eq!(paired.device.scope, SCOPE_REMOTE_CLIENT);
+        assert_eq!(paired.device.created_at, clock.now_ms());
+
+        // Verify LAST_SEEN_THROTTLE_MS uses the injected clock deterministically.
+        let first_seen = clock.now_ms();
+        remote.verify_bearer(&paired.token).unwrap();
+        let dev = vibevalley_runtime::rt::block_on(remote.db.find_by_id(&paired.device.id)).unwrap().unwrap();
+        assert_eq!(dev.last_seen_at, Some(first_seen));
+
+        clock.advance(Duration::from_millis((LAST_SEEN_THROTTLE_MS - 1) as u64));
+        remote.verify_bearer(&paired.token).unwrap();
+        let dev = vibevalley_runtime::rt::block_on(remote.db.find_by_id(&paired.device.id)).unwrap().unwrap();
+        assert_eq!(dev.last_seen_at, Some(first_seen));
+
+        clock.advance(Duration::from_millis(1));
+        let refreshed_seen = clock.now_ms();
+        remote.verify_bearer(&paired.token).unwrap();
+        let dev = vibevalley_runtime::rt::block_on(remote.db.find_by_id(&paired.device.id)).unwrap().unwrap();
+        assert_eq!(dev.last_seen_at, Some(refreshed_seen));
 
         // Verify all 6 platforms round-trip and machine/client scopes persist & enforce bounds.
-        let mut idx = 0i64;
         for platform in RemotePlatform::ALL {
-            idx += 1;
-            let code = remote
-                .pair_create_at(base_now + RATE_LIMIT_WINDOW_MS + 10_000 + idx, PAIR_CODE_TTL_MS, None)
-                .unwrap();
+            clock.advance(Duration::from_millis(1));
+            let code = remote.pair_create().unwrap();
+            clock.advance(Duration::from_millis(1));
             let res = remote
-                .pair_exchange_at(
-                    RemotePairExchangeRequest {
-                        code: code.code,
-                        device_name: format!("dev-{}", platform.as_str()),
-                        platform,
-                        scope: None,
-                    },
-                    base_now + RATE_LIMIT_WINDOW_MS + 10_001 + idx,
-                )
+                .pair_exchange(RemotePairExchangeRequest {
+                    code: code.code,
+                    device_name: format!("dev-{}", platform.as_str()),
+                    platform,
+                    scope: None,
+                })
                 .unwrap();
             assert_eq!(res.device.platform, platform);
             let verified = remote.verify_bearer(&res.token).unwrap();
@@ -794,20 +809,17 @@ mod tests {
         }
 
         // Scoped pair code enforces exact scope match.
-        let scoped = remote
-            .pair_create_at(base_now + RATE_LIMIT_WINDOW_MS + 20_000, PAIR_CODE_TTL_MS, Some(SCOPE_REMOTE_CLIENT))
-            .unwrap();
+        clock.advance(Duration::from_millis(1));
+        let scoped = remote.pair_create_with_scope(Some(SCOPE_REMOTE_CLIENT)).unwrap();
         assert!(scoped.pair_url.contains("scope=remote%3Adefault"));
+        clock.advance(Duration::from_millis(1));
         let denied = remote
-            .pair_exchange_at(
-                RemotePairExchangeRequest {
-                    code: scoped.code,
-                    device_name: "Runner".into(),
-                    platform: RemotePlatform::Machine,
-                    scope: Some(SCOPE_REMOTE_MACHINE.into()),
-                },
-                base_now + RATE_LIMIT_WINDOW_MS + 20_001,
-            )
+            .pair_exchange(RemotePairExchangeRequest {
+                code: scoped.code,
+                device_name: "Runner".into(),
+                platform: RemotePlatform::Machine,
+                scope: Some(SCOPE_REMOTE_MACHINE.into()),
+            })
             .unwrap_err();
         assert_eq!(denied.biz_code, BizCode::Forbidden);
 

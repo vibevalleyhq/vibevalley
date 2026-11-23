@@ -13,6 +13,8 @@ use std::sync::{Arc, Weak};
 use base64::Engine as _;
 use parking_lot::RwLock;
 use tokio_util::sync::CancellationToken;
+use tracing::Instrument as _;
+use tracing::instrument::WithSubscriber as _;
 use vibevalley_protocol::{
     Fact, LOCAL_MACHINE_ID, Machine, MachineAttachmentData, MachineAttachmentFetch, MachineHello, MachineHelloAck, MachineInfo, MachinePing, MachinePlatform,
     MachineRuntimeSummary, MachineStatus, MachineWireError, MachineWireFrame, Millis, RuntimeCapability, ops,
@@ -270,8 +272,10 @@ impl MachineManager {
     }
 
     fn handle_attachment_fetch(&self, req: MachineAttachmentFetch, outgoing: flume::Sender<MachineWireFrame>) {
+        let span = tracing::debug_span!("machine.conn", op = "attachment_fetch", request_id = %req.request_id);
+        let _entered = span.enter();
         let attachments = self.attachments.clone();
-        vibevalley_runtime::rt::handle().spawn_blocking(move || {
+        let task = move || {
             let reply = match attachments.read_bytes(&req.attachment_id) {
                 Ok((mime, bytes)) => MachineAttachmentData {
                     request_id: req.request_id,
@@ -289,121 +293,134 @@ impl MachineManager {
                 },
             };
             let _ = outgoing.send(MachineWireFrame::MachineAttachmentData(reply));
-        });
+        };
+        if let Some(hub) = self.hub.upgrade() {
+            hub.spawn_blocking_task(task);
+        } else {
+            crate::spawn_blocking_traced(task);
+        }
     }
 
     async fn drive_connection(self: Arc<Self>, conn: MachineConnection) {
         let conn_id = self.next_conn_id.fetch_add(1, Ordering::Relaxed);
-        let cancel = self.cancel.clone();
-        let mut active: Option<Arc<RemoteMachine>> = None;
+        let span = tracing::debug_span!("machine.conn", conn_id, machine_id = tracing::field::Empty);
+        async move {
+            let cancel = self.cancel.clone();
+            let mut active: Option<Arc<RemoteMachine>> = None;
 
-        loop {
-            let frame = tokio::select! {
-                biased;
-                _ = cancel.cancelled() => break,
-                res = conn.incoming.recv_async() => match res {
-                    Ok(frame) => frame,
-                    Err(_) => break,
-                },
-            };
+            loop {
+                let frame = tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => break,
+                    res = conn.incoming.recv_async() => match res {
+                        Ok(frame) => frame,
+                        Err(_) => break,
+                    },
+                };
 
-            match frame {
-                MachineWireFrame::MachineHello(hello) => match self.handle_hello(hello, conn_id, &conn.outgoing) {
-                    Ok(remote) => active = Some(remote),
-                    Err(err) => {
-                        let _ = conn.outgoing.send_async(MachineWireFrame::MachineWireError(err)).await;
-                        break;
+                match frame {
+                    MachineWireFrame::MachineHello(hello) => match self.handle_hello(hello, conn_id, &conn.outgoing) {
+                        Ok(remote) => {
+                            tracing::Span::current().record("machine_id", remote.machine_id());
+                            active = Some(remote);
+                        }
+                        Err(err) => {
+                            let _ = conn.outgoing.send_async(MachineWireFrame::MachineWireError(err)).await;
+                            break;
+                        }
+                    },
+                    MachineWireFrame::MachineInventory(inv) => {
+                        if let Some(remote) = &active {
+                            remote.inner().update_inventory(inv.runtimes, now());
+                            self.registry.notify_updated(remote.machine_id());
+                            self.emit_changed(remote.protocol_machine());
+                        } else {
+                            let _ = conn
+                                .outgoing
+                                .send_async(MachineWireFrame::MachineWireError(MachineWireError {
+                                    request_id: None,
+                                    code: "hello_required".into(),
+                                    message: "expected machine.hello before machine.inventory".into(),
+                                }))
+                                .await;
+                        }
                     }
-                },
-                MachineWireFrame::MachineInventory(inv) => {
-                    if let Some(remote) = &active {
-                        remote.inner().update_inventory(inv.runtimes, now());
-                        self.registry.notify_updated(remote.machine_id());
-                        self.emit_changed(remote.protocol_machine());
-                    } else {
-                        let _ = conn
-                            .outgoing
-                            .send_async(MachineWireFrame::MachineWireError(MachineWireError {
-                                request_id: None,
-                                code: "hello_required".into(),
-                                message: "expected machine.hello before machine.inventory".into(),
-                            }))
-                            .await;
+                    MachineWireFrame::MachinePong(_) => {
+                        if let Some(remote) = &active {
+                            remote.inner().touch_last_seen(now());
+                        }
                     }
+                    MachineWireFrame::MachinePing(_) => {
+                        if let Some(remote) = &active {
+                            remote.inner().touch_last_seen(now());
+                        }
+                    }
+                    MachineWireFrame::MachineSessionOpened(opened) => {
+                        if let Some(remote) = &active {
+                            remote.inner().handle_session_opened(opened);
+                        }
+                    }
+                    MachineWireFrame::MachineSessionAck(ack) => {
+                        if let Some(remote) = &active {
+                            remote.inner().handle_session_ack(ack);
+                        }
+                    }
+                    MachineWireFrame::MachineSessionEvent(ev) => {
+                        if let Some(remote) = &active {
+                            remote.inner().handle_session_event(ev);
+                        }
+                    }
+                    MachineWireFrame::MachineSessionRecord(rec) => {
+                        if let Some(remote) = &active {
+                            remote.inner().handle_session_record(rec);
+                        }
+                    }
+                    MachineWireFrame::MachineWorktreeResult(res) => {
+                        if let Some(remote) = &active {
+                            remote.inner().handle_worktree_result(res);
+                        }
+                    }
+                    MachineWireFrame::MachineAttachmentFetch(req) => {
+                        if active.is_some() {
+                            self.handle_attachment_fetch(req, conn.outgoing.clone());
+                        } else {
+                            let _ = conn
+                                .outgoing
+                                .send_async(MachineWireFrame::MachineAttachmentData(MachineAttachmentData {
+                                    request_id: req.request_id,
+                                    ok: false,
+                                    mime: None,
+                                    bytes_b64: None,
+                                    error: Some("expected machine.hello first".into()),
+                                }))
+                                .await;
+                        }
+                    }
+                    MachineWireFrame::MachineWireError(err) => {
+                        if let Some(remote) = &active {
+                            remote.inner().handle_wire_error(err);
+                        }
+                    }
+                    // Server-to-machine frames should not be sent by peers; ignore gracefully.
+                    MachineWireFrame::MachineHelloAck(_)
+                    | MachineWireFrame::MachineSessionOpen(_)
+                    | MachineWireFrame::MachineSessionInput(_)
+                    | MachineWireFrame::MachineSessionRespond(_)
+                    | MachineWireFrame::MachineSessionAttach(_)
+                    | MachineWireFrame::MachineMcpRequest(_)
+                    | MachineWireFrame::MachineMcpResponse(_)
+                    | MachineWireFrame::MachineAttachmentData(_)
+                    | MachineWireFrame::MachineWorktreePrepare(_)
+                    | MachineWireFrame::MachineWorktreeCleanup(_) => {}
                 }
-                MachineWireFrame::MachinePong(_) => {
-                    if let Some(remote) = &active {
-                        remote.inner().touch_last_seen(now());
-                    }
-                }
-                MachineWireFrame::MachinePing(_) => {
-                    if let Some(remote) = &active {
-                        remote.inner().touch_last_seen(now());
-                    }
-                }
-                MachineWireFrame::MachineSessionOpened(opened) => {
-                    if let Some(remote) = &active {
-                        remote.inner().handle_session_opened(opened);
-                    }
-                }
-                MachineWireFrame::MachineSessionAck(ack) => {
-                    if let Some(remote) = &active {
-                        remote.inner().handle_session_ack(ack);
-                    }
-                }
-                MachineWireFrame::MachineSessionEvent(ev) => {
-                    if let Some(remote) = &active {
-                        remote.inner().handle_session_event(ev);
-                    }
-                }
-                MachineWireFrame::MachineSessionRecord(rec) => {
-                    if let Some(remote) = &active {
-                        remote.inner().handle_session_record(rec);
-                    }
-                }
-                MachineWireFrame::MachineWorktreeResult(res) => {
-                    if let Some(remote) = &active {
-                        remote.inner().handle_worktree_result(res);
-                    }
-                }
-                MachineWireFrame::MachineAttachmentFetch(req) => {
-                    if active.is_some() {
-                        self.handle_attachment_fetch(req, conn.outgoing.clone());
-                    } else {
-                        let _ = conn
-                            .outgoing
-                            .send_async(MachineWireFrame::MachineAttachmentData(MachineAttachmentData {
-                                request_id: req.request_id,
-                                ok: false,
-                                mime: None,
-                                bytes_b64: None,
-                                error: Some("expected machine.hello first".into()),
-                            }))
-                            .await;
-                    }
-                }
-                MachineWireFrame::MachineWireError(err) => {
-                    if let Some(remote) = &active {
-                        remote.inner().handle_wire_error(err);
-                    }
-                }
-                // Server-to-machine frames should not be sent by peers; ignore gracefully.
-                MachineWireFrame::MachineHelloAck(_)
-                | MachineWireFrame::MachineSessionOpen(_)
-                | MachineWireFrame::MachineSessionInput(_)
-                | MachineWireFrame::MachineSessionRespond(_)
-                | MachineWireFrame::MachineSessionAttach(_)
-                | MachineWireFrame::MachineMcpRequest(_)
-                | MachineWireFrame::MachineMcpResponse(_)
-                | MachineWireFrame::MachineAttachmentData(_)
-                | MachineWireFrame::MachineWorktreePrepare(_)
-                | MachineWireFrame::MachineWorktreeCleanup(_) => {}
+            }
+
+            if let Some(remote) = active {
+                self.handle_disconnect(&remote, conn_id);
             }
         }
-
-        if let Some(remote) = active {
-            self.handle_disconnect(&remote, conn_id);
-        }
+        .instrument(span)
+        .await
     }
 }
 
@@ -417,7 +434,7 @@ impl MachineBus for MachineBusAdapter {
         if let Some(hub) = manager.hub.upgrade() {
             hub.spawn_task(manager.drive_connection(conn));
         } else {
-            vibevalley_runtime::rt::spawn(manager.drive_connection(conn));
+            vibevalley_runtime::rt::current_or_global_handle().spawn(manager.drive_connection(conn).in_current_span().with_current_subscriber());
         }
     }
 }

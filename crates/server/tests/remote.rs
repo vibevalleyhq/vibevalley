@@ -8,9 +8,10 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 use sqlx::Row;
+use vibevalley_core::{Clock, ManualClock};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{BizCode, Caller};
-use vibevalley_server::modules::infra::remote::{default_remote_port, tailscale};
+use vibevalley_server::modules::infra::remote::{self, Remote, default_remote_port, tailscale};
 use vibevalley_server::transport::http::{is_allowed_remote_ip, serve, serve_remote};
 
 use crate::support::inspect_db;
@@ -372,4 +373,86 @@ fn remote_security_wall_rejects_privileged_ops_mcp_and_invalid_or_revoked_tokens
 
     drop(local_listener);
     started.close();
+}
+
+#[test]
+fn remote_manual_clock_drives_pair_expiry_rate_limit_and_last_seen_over_http() {
+    vibevalley_i18n::set_locale("en");
+    let dir = tempfile::tempdir().unwrap();
+    let db = vibevalley_server::base::ServerDb::open(dir.path()).unwrap();
+    let hub = vibevalley_server::Hub::new(vibevalley_core::empty_space_state());
+    let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+    let remote = Remote::open_with_clock(db.clone(), Arc::downgrade(&hub), "2.3.4-clock-test".into(), clock.clone()).unwrap();
+    hub.attach_remote_auth(Some(remote.clone()));
+    remote::install(&hub, remote.clone());
+
+    let enabled = hub
+        .call_as(Caller::User, "remote.enable", json!({ "bindAddr": "127.0.0.1", "port": 0 }))
+        .data
+        .unwrap();
+    let remote_url = enabled["url"].as_str().unwrap().to_string();
+
+    // Code 1 expires after 5 minutes; Code 2 created 3 minutes later remains valid past the 60s rate-limit window.
+    let expiring = hub.call_as(Caller::User, "remote.pair.create", json!({})).data.unwrap();
+    clock.advance(Duration::from_secs(180));
+    let fresh = hub.call_as(Caller::User, "remote.pair.create", json!({})).data.unwrap();
+    clock.advance(Duration::from_secs(121));
+
+    let (st, body) = post_json(
+        &format!("{remote_url}/api/v1/remote/pair/exchange"),
+        None,
+        json!({ "code": expiring["code"], "deviceName": "Expired Phone", "platform": "ios" }),
+    );
+    assert_eq!(st, 403, "{body}");
+    assert_eq!(body["bizCode"], BizCode::AuthRefused.code());
+    assert_eq!(body["message"], t("server.remote.expiredCode", &[]));
+
+    for _ in 0..9 {
+        let (st, body) = post_json(
+            &format!("{remote_url}/api/v1/remote/pair/exchange"),
+            None,
+            json!({ "code": "AAAAAA", "deviceName": "Bad Phone", "platform": "ios" }),
+        );
+        assert_eq!(st, 403, "{body}");
+        assert_eq!(body["message"], t("server.remote.invalidCode", &[]));
+    }
+
+    let (st, limited) = post_json(
+        &format!("{remote_url}/api/v1/remote/pair/exchange"),
+        None,
+        json!({ "code": fresh["code"], "deviceName": "Blocked Phone", "platform": "ios" }),
+    );
+    assert_eq!(st, 409, "{limited}");
+    assert_eq!(limited["bizCode"], BizCode::Refused.code());
+    assert_eq!(limited["message"], t("server.remote.rateLimited", &[]));
+
+    // Advancing 60s resets the rate-limit window immediately without sleeping.
+    clock.advance(Duration::from_secs(60));
+    let (st, paired) = post_json(
+        &format!("{remote_url}/api/v1/remote/pair/exchange"),
+        None,
+        json!({ "code": fresh["code"], "deviceName": "Clock Phone", "platform": "ios" }),
+    );
+    assert_eq!(st, 200, "{paired}");
+    let token = paired["data"]["token"].as_str().unwrap().to_string();
+
+    let t1 = clock.now_ms();
+    let (st, who1) = post_json(&format!("{remote_url}/api/v1/remote/whoami"), Some(&token), json!({}));
+    assert_eq!(st, 200, "{who1}");
+    assert_eq!(who1["data"]["device"]["lastSeenAt"], t1);
+
+    clock.advance(Duration::from_secs(30));
+    let (st, who2) = post_json(&format!("{remote_url}/api/v1/remote/whoami"), Some(&token), json!({}));
+    assert_eq!(st, 200, "{who2}");
+    assert_eq!(who2["data"]["device"]["lastSeenAt"], t1);
+
+    clock.advance(Duration::from_secs(30));
+    let t2 = clock.now_ms();
+    let (st, who3) = post_json(&format!("{remote_url}/api/v1/remote/whoami"), Some(&token), json!({}));
+    assert_eq!(st, 200, "{who3}");
+    assert_eq!(who3["data"]["device"]["lastSeenAt"], t2);
+
+    remote.close();
+    hub.close();
+    db.close();
 }

@@ -26,6 +26,8 @@ Status: proposed
 
 围绕现有 Tokio / `axum` / `tokio-util` / `tracing` 依赖树推进五项精简与基础设施收口，严守 [architecture-topology.md](docs/architecture-topology.md) 的控制面边界。
 
+> 进度：**Rounds 1–5 五项主线已全部落地于 `feat/tokio-ecosystem-5-rounds`**（全仓生产 HTTP 网关与 9 处测试桩收敛至 Axum、服务端类型化鉴权提取器与 `tokio-util` 流式 I/O + `DropGuard` 落地、无条件 `trace_id` 与异步 `tracing::Span` 传播、`work/chat` 归类 L3 并解散 `ChannelDispatchPort` 净减 463 LOC；双层虚拟时钟落地 Layer 1 `rt::current_or_global_handle()` + `close_async` + `tokio::time::Instant` 与 Layer 2 [clock.rs](crates/core/src/clock.rs) `Clock`/`ManualClock`；4 个原子并发内核经 `--features loom` 与 `[profile.loom]` 接入 `vp run rust:loom`，13/13 模型 2.4s 穷举通过；服务端与 Mac 端剩余 `rt::handle().spawn` 迁移及 `std::thread::sleep` 轮询清零）。
+
 ### 1. 全仓 HTTP 网关 100% Axum 收敛与类型化鉴权提取器
 
 - **服务端类型化鉴权提取器（`crates/server/src/transport/http/auth.rs`）**：基于 `axum::extract::FromRequestParts<HttpState>` 实现四类编译期强约束提取器，使未声明对应提取器的路由无法获取 `CallerContext`：

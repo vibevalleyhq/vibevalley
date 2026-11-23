@@ -5,6 +5,9 @@ edition.workspace = true
 license.workspace = true
 description = "VibeValley agent runtimes: external CLI/ACP engines (oar) and built-in DeepSeek harness (agent)"
 
+[features]
+loom = ["dep:loom"] # Test-only model checking (vp run rust:loom); never enable in release binaries.
+
 [dependencies]
 agent-client-protocol = "5.2.0"
 arc-swap = { workspace = true }
@@ -15,6 +18,7 @@ futures-util = { workspace = true }
 globset = "0.4.21"
 ignore = "0.4.34"
 jiff = { workspace = true }
+loom = { workspace = true, optional = true }
 nix = { version = "0.32.0", features = ["signal", "process"] }
 oxc_allocator = "0.159.0"
 oxc_ast = "0.159.0"
@@ -40,5 +44,6 @@ uuid = { workspace = true }
 vibevalley-protocol = { version = "0.1.0", path = "../protocol" }
 
 [dev-dependencies]
+axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio"] }
 proptest = "1.12.0"
 tokio = { workspace = true, features = ["test-util"] }

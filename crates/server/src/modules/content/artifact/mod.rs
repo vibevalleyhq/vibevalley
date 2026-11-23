@@ -1462,17 +1462,29 @@ pub fn install(hub: &Hub, artifacts: Arc<Artifacts>) {
         }
     });
     hub.on_async::<native_ops::ArtifactTokensInspect, _, _>(move |_, r| async move { Ok(Artifacts::inspect_tokens(&r)) });
-    hub.on_subscription::<subscriptions::ArtifactFollow>({
+    hub.on_subscription_async::<subscriptions::ArtifactFollow, _, _>({
         let a = a.clone();
-        move |hub, p, sink| a.follow(hub, &p.id, p.after, sink)
+        move |hub, p, sink| {
+            let a = a.clone();
+            async move { a.follow_async(&hub, &p.id, p.after, sink).await }
+        }
     });
-    hub.on_subscription::<subscriptions::ArtifactEntryFollow>({
+    hub.on_subscription_async::<subscriptions::ArtifactEntryFollow, _, _>({
         let a = a.clone();
-        move |hub, p, sink| a.follow_entries(hub, &p.id, p.after, sink)
+        move |hub, p, sink| {
+            let a = a.clone();
+            async move { a.follow_entries_async(&hub, &p.id, p.after, sink).await }
+        }
     });
-    hub.on_subscription::<subscriptions::ArtifactSuggestionFollow>({
+    hub.on_subscription_async::<subscriptions::ArtifactSuggestionFollow, _, _>({
         let a = a.clone();
-        move |hub, p, sink| a.follow_suggestions(hub, &p.id, sink)
+        move |hub, p, sink| {
+            let a = a.clone();
+            async move { a.follow_suggestions_async(&hub, &p.id, sink).await }
+        }
     });
-    hub.on_subscription::<subscriptions::ArtifactPresenceFollow>(move |hub, p, sink| a.follow_presence(hub, &p.id, sink));
+    hub.on_subscription_async::<subscriptions::ArtifactPresenceFollow, _, _>(move |hub, p, sink| {
+        let a = a.clone();
+        async move { a.follow_presence_async(&hub, &p.id, sink).await }
+    });
 }

@@ -27,6 +27,54 @@ pub struct Answer {
 
 pub type HostRun = Arc<dyn Fn(&[String]) -> Answer + Send + Sync>;
 
+/// Native async CLI runner for `gh`/`glab`, or an injected test callback.
+#[derive(Clone)]
+pub(crate) enum HostRunner {
+    Cli(&'static str),
+    Custom(HostRun),
+}
+
+impl HostRunner {
+    pub(crate) async fn run_async(&self, args: Vec<String>) -> Answer {
+        match self {
+            Self::Cli(tool) => {
+                let mut c = tokio::process::Command::new(tool);
+                c.args(&args);
+                if *tool == "glab" {
+                    c.env("GITLAB_HOST", "gitlab.com").env("GLAB_PROMPT_DISABLED", "1");
+                } else {
+                    c.env("GH_PROMPT_DISABLED", "1");
+                }
+                match output_within_async(c, Duration::from_secs(15)).await {
+                    Ok(Some((code, out))) => Answer {
+                        ok: code == 0,
+                        out,
+                        missing: false,
+                    },
+                    Ok(None) => Answer {
+                        ok: false,
+                        out: String::new(),
+                        missing: false,
+                    },
+                    Err(missing) => Answer {
+                        ok: false,
+                        out: String::new(),
+                        missing,
+                    },
+                }
+            }
+            Self::Custom(f) => {
+                let f = f.clone();
+                crate::spawn_blocking_traced(move || f(&args)).await.unwrap_or(Answer {
+                    ok: false,
+                    out: String::new(),
+                    missing: false,
+                })
+            }
+        }
+    }
+}
+
 /// git's network, apart so tests can stand in for a hosted remote.
 pub trait Network: Send + Sync {
     fn tip(&self, cwd: &Path, url: &str, branch: &str) -> Result<String, String>;
@@ -87,40 +135,11 @@ fn git(cwd: &Path, args: &[&str]) -> Result<String, String> {
     }
 }
 
-/// `runGitHub` / `runGitLab`: the tool on PATH, 15 s at most.
-pub(crate) fn host_command(tool: &'static str) -> HostRun {
-    Arc::new(move |args: &[String]| {
-        let mut c = tokio::process::Command::new(tool);
-        c.args(args);
-        if tool == "glab" {
-            c.env("GITLAB_HOST", "gitlab.com").env("GLAB_PROMPT_DISABLED", "1");
-        } else {
-            c.env("GH_PROMPT_DISABLED", "1");
-        }
-        match output_within(c, Duration::from_secs(15)) {
-            Ok(Some((code, out))) => Answer {
-                ok: code == 0,
-                out,
-                missing: false,
-            },
-            Ok(None) => Answer {
-                ok: false,
-                out: String::new(),
-                missing: false,
-            },
-            Err(missing) => Answer {
-                ok: false,
-                out: String::new(),
-                missing,
-            },
-        }
-    })
-}
-
 /// A command's exit code and stdout; none when it ran out of time; Err(true)
 /// when it is not installed.
-pub(crate) fn output_within(c: tokio::process::Command, limit: Duration) -> Result<Option<(i32, String)>, bool> {
-    let out = vibevalley_runtime::rt::block_on(vibevalley_runtime::oar::run_output_with_timeout(c, limit, None))
+pub(crate) async fn output_within_async(c: tokio::process::Command, limit: Duration) -> Result<Option<(i32, String)>, bool> {
+    let out = vibevalley_runtime::oar::run_output_with_timeout(c, limit, None)
+        .await
         .map_err(|e| e.kind() == std::io::ErrorKind::NotFound)?;
     if out.timed_out {
         return Ok(None);
@@ -223,7 +242,7 @@ impl WireGitlabMr {
 
 struct Hosting<'a> {
     repo: &'a HostedRepo,
-    run: &'a HostRun,
+    run: &'a HostRunner,
 }
 
 impl Hosting<'_> {
@@ -238,9 +257,9 @@ impl Hosting<'_> {
         )
     }
 
-    fn request(&self, args: &[&str]) -> Result<String, ApiError> {
+    async fn request(&self, args: &[&str]) -> Result<String, ApiError> {
         let args: Vec<String> = args.iter().map(|a| a.to_string()).collect();
-        let r = (self.run)(&args);
+        let r = self.run.run_async(args.clone()).await;
         if !r.ok {
             let stage = if r.missing {
                 if self.github() {
@@ -266,11 +285,13 @@ impl Hosting<'_> {
     }
 
     /// Reads a hosted pull/merge request's remote state (`open`, `merged`, `closed`).
-    pub(crate) fn state(&self, number: i64) -> Result<PullRequestState, ApiError> {
+    pub(crate) async fn state(&self, number: i64) -> Result<PullRequestState, ApiError> {
         let out = if self.github() {
-            self.request(&["pr", "view", &number.to_string(), "--repo", &self.repo.name, "--json", "state"])?
+            let num = number.to_string();
+            self.request(&["pr", "view", &num, "--repo", &self.repo.name, "--json", "state"]).await?
         } else {
-            self.request(&["api", &format!("{}/merge_requests/{number}", self.project())])?
+            let path = format!("{}/merge_requests/{number}", self.project());
+            self.request(&["api", &path]).await?
         };
         let wire: WirePullState = serde_json::from_str(&out).map_err(|_| platform_failed("pull state decode"))?;
         match wire.state.to_ascii_lowercase().as_str() {
@@ -281,35 +302,38 @@ impl Hosting<'_> {
         }
     }
 
-    fn inspect(&self) -> Result<String, ApiError> {
-        self.request(&["auth", "status", "--hostname", &self.repo.host])?;
+    async fn inspect(&self) -> Result<String, ApiError> {
+        self.request(&["auth", "status", "--hostname", &self.repo.host]).await?;
         if self.github() {
-            let out = self.request(&["repo", "view", &self.repo.name, "--json", "defaultBranchRef"])?;
+            let out = self.request(&["repo", "view", &self.repo.name, "--json", "defaultBranchRef"]).await?;
             let wire: WireGithubRepoView = serde_json::from_str(&out).map_err(|_| platform_failed("repository decode"))?;
             Ok(wire.default_branch_ref.name)
         } else {
-            let out = self.request(&["api", &self.project()])?;
+            let project = self.project();
+            let out = self.request(&["api", &project]).await?;
             let wire: WireGitlabProject = serde_json::from_str(&out).map_err(|_| platform_failed("repository decode"))?;
             Ok(wire.default_branch)
         }
     }
 
-    fn find(&self, branch: &str, base: &str) -> Result<Option<(i64, String)>, ApiError> {
+    async fn find(&self, branch: &str, base: &str) -> Result<Option<(i64, String)>, ApiError> {
         if self.github() {
-            let out = self.request(&[
-                "pr",
-                "list",
-                "--repo",
-                &self.repo.name,
-                "--head",
-                branch,
-                "--base",
-                base,
-                "--state",
-                "open",
-                "--json",
-                "url,number,isCrossRepository,state",
-            ])?;
+            let out = self
+                .request(&[
+                    "pr",
+                    "list",
+                    "--repo",
+                    &self.repo.name,
+                    "--head",
+                    branch,
+                    "--base",
+                    base,
+                    "--state",
+                    "open",
+                    "--json",
+                    "url,number,isCrossRepository,state",
+                ])
+                .await?;
             let list: Vec<WireGithubPr> = serde_json::from_str(&out).map_err(|_| platform_failed("list decode"))?;
             if list.len() > 1 {
                 return Err(platform_failed("list decode"));
@@ -321,15 +345,13 @@ impl Hosting<'_> {
                 .transpose();
         }
         let enc = |s: &str| url::form_urlencoded::byte_serialize(s.as_bytes()).collect::<String>();
-        let out = self.request(&[
-            "api",
-            &format!(
-                "{}/merge_requests?state=opened&source_branch={}&target_branch={}&per_page=2",
-                self.project(),
-                enc(branch),
-                enc(base)
-            ),
-        ])?;
+        let query = format!(
+            "{}/merge_requests?state=opened&source_branch={}&target_branch={}&per_page=2",
+            self.project(),
+            enc(branch),
+            enc(base)
+        );
+        let out = self.request(&["api", &query]).await?;
         let list: Vec<WireGitlabMr> = serde_json::from_str(&out).map_err(|_| platform_failed("list decode"))?;
         if list.len() > 1 {
             return Err(platform_failed("list decode"));
@@ -340,40 +362,49 @@ impl Hosting<'_> {
             .transpose()
     }
 
-    fn create(&self, req: &SubmitBranch) -> Result<(i64, String), ApiError> {
+    async fn create(&self, req: &SubmitBranch) -> Result<(i64, String), ApiError> {
         if self.github() {
-            let out = self.request(&[
-                "pr",
-                "create",
-                "--repo",
-                &self.repo.name,
-                "--head",
-                &req.branch,
-                "--base",
-                &req.base,
-                "--title",
-                &req.title,
-                "--body",
-                &req.body,
-            ])?;
+            let out = self
+                .request(&[
+                    "pr",
+                    "create",
+                    "--repo",
+                    &self.repo.name,
+                    "--head",
+                    &req.branch,
+                    "--base",
+                    &req.base,
+                    "--title",
+                    &req.title,
+                    "--body",
+                    &req.body,
+                ])
+                .await?;
             let url = out.trim();
             let n = url.rsplit('/').next().and_then(|n| n.parse().ok()).unwrap_or(0);
             return self.receipt(n, url);
         }
-        let out = self.request(&[
-            "api",
-            &format!("{}/merge_requests", self.project()),
-            "--method",
-            "POST",
-            "--raw-field",
-            &format!("source_branch={}", req.branch),
-            "--raw-field",
-            &format!("target_branch={}", req.base),
-            "--raw-field",
-            &format!("title={}", req.title),
-            "--raw-field",
-            &format!("description={}", req.body),
-        ])?;
+        let path = format!("{}/merge_requests", self.project());
+        let source_branch = format!("source_branch={}", req.branch);
+        let target_branch = format!("target_branch={}", req.base);
+        let title = format!("title={}", req.title);
+        let description = format!("description={}", req.body);
+        let out = self
+            .request(&[
+                "api",
+                &path,
+                "--method",
+                "POST",
+                "--raw-field",
+                &source_branch,
+                "--raw-field",
+                &target_branch,
+                "--raw-field",
+                &title,
+                "--raw-field",
+                &description,
+            ])
+            .await?;
         let m: WireGitlabMr = serde_json::from_str(&out).map_err(|_| platform_failed("create decode"))?;
         if !m.is_same_project_open() {
             return Err(platform_failed("create decode"));
@@ -384,9 +415,9 @@ impl Hosting<'_> {
 
 /// `checkRepository`: `.vibevalley/check` at cwd: not run when there is
 /// none, passed, or refused with its last lines.
-pub fn check_repository(cwd: &Path, limit: Duration) -> Result<BranchCheck, ApiError> {
+pub async fn check_repository(cwd: &Path, limit: Duration) -> Result<BranchCheck, ApiError> {
     let file = cwd.join(".vibevalley").join("check");
-    if std::fs::symlink_metadata(&file).is_err() {
+    if tokio::fs::symlink_metadata(&file).await.is_err() {
         return Ok(BranchCheck::NotRun);
     }
     let inherited = std::env::var("PATH").unwrap_or_default();
@@ -394,7 +425,7 @@ pub fn check_repository(cwd: &Path, limit: Duration) -> Result<BranchCheck, ApiE
     path.extend(inherited.split(':').filter(|p| !p.contains("node_modules/.bin")).map(str::to_string));
     let mut c = tokio::process::Command::new(&file);
     c.current_dir(cwd).env("PATH", path.join(":"));
-    let (why, said) = match vibevalley_runtime::rt::block_on(vibevalley_runtime::oar::run_output_with_timeout(c, limit, None)) {
+    let (why, said) = match vibevalley_runtime::oar::run_output_with_timeout(c, limit, None).await {
         Ok(o) if o.timed_out => (t("server.repo.check.timedOut", &[("seconds", (limit.as_secs() as i64).into())]), String::new()),
         Ok(o) if o.success() => return Ok(BranchCheck::Passed),
         Ok(o) => (
@@ -410,16 +441,22 @@ pub fn check_repository(cwd: &Path, limit: Duration) -> Result<BranchCheck, ApiE
 
 /// The publisher, with its tools.
 pub struct Publisher {
-    pub gh: HostRun,
-    pub glab: HostRun,
+    gh: HostRunner,
+    glab: HostRunner,
     pub network: Arc<dyn Network>,
     pub check_timeout: Duration,
-    serial: Mutex<HashMap<String, Arc<Mutex<()>>>>,
+    serial: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
 }
 
 impl Default for Publisher {
     fn default() -> Self {
-        Publisher::new(host_command("gh"), host_command("glab"), Arc::new(Git))
+        Publisher {
+            gh: HostRunner::Cli("gh"),
+            glab: HostRunner::Cli("glab"),
+            network: Arc::new(Git),
+            check_timeout: Duration::from_secs(600),
+            serial: Mutex::default(),
+        }
     }
 }
 
@@ -430,110 +467,131 @@ struct Remote {
     target: HostedRepo,
 }
 
+fn verify_unchanged(cwd: &Path, branch_want: &str, sha_want: &str) -> Result<(), ApiError> {
+    let status = git(cwd, &["status", "--porcelain=v2", "--branch", "--untracked-files=all"]).map_err(|_| refused("git failed; checkout retained"))?;
+    let branch = status.lines().find_map(|l| l.strip_prefix("# branch.head ")).unwrap_or("");
+    let sha = status.lines().find_map(|l| l.strip_prefix("# branch.oid ")).unwrap_or("");
+    let clean = status.lines().all(|l| l.starts_with("# ") || l.is_empty());
+    if branch != branch_want || sha != sha_want || !clean {
+        return Err(refused("checkout changed or dirty"));
+    }
+    Ok(())
+}
+
+fn read_destination(cwd: &Path) -> Result<Remote, ApiError> {
+    let out = git(cwd, &["config", "--null", "--list"]).map_err(|_| refused("git failed; checkout retained"))?;
+    let config: Vec<(String, String)> = out
+        .split('\0')
+        .filter(|e| !e.is_empty())
+        .map(|e| match e.split_once('\n') {
+            Some((k, v)) => (k.to_string(), v.to_string()),
+            None => (e.to_string(), String::new()),
+        })
+        .collect();
+    static URL_REWRITE: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| regex::Regex::new(r"^url\..*\.(insteadof|pushinsteadof)$").expect("regex"));
+    if config.iter().any(|(k, _)| URL_REWRITE.is_match(k)) {
+        return Err(refused("URL rewrite configuration"));
+    }
+    static REMOTE_NAME: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| regex::Regex::new(r"^remote\.(.+)\.[^.]+$").expect("regex"));
+    let mut names: Vec<String> = vec![];
+    for (k, _) in &config {
+        if let Some(n) = REMOTE_NAME.captures(k).and_then(|c| c.get(1))
+            && !names.iter().any(|x| x == n.as_str())
+        {
+            names.push(n.as_str().to_string());
+        }
+    }
+    let [name] = names.as_slice() else { return Err(refused("ambiguous remote")) };
+    if name.starts_with('-') {
+        return Err(refused("ambiguous remote"));
+    }
+    let reads: Vec<&String> = config.iter().filter(|(k, _)| *k == format!("remote.{name}.url")).map(|(_, v)| v).collect();
+    let writes: Vec<&String> = config.iter().filter(|(k, _)| *k == format!("remote.{name}.pushurl")).map(|(_, v)| v).collect();
+    let read = reads.first().map(|s| s.to_string()).unwrap_or_default();
+    let write = writes.first().map(|s| s.to_string()).unwrap_or_else(|| read.clone());
+    let (target, pushed) = (hosted_origin(&read), hosted_origin(&write));
+    match (target, pushed) {
+        (Some(target), Some(pushed)) if reads.len() == 1 && writes.len() <= 1 && target.host == pushed.host && target.name == pushed.name => Ok(Remote {
+            name: name.clone(),
+            read,
+            write,
+            target,
+        }),
+        _ => Err(refused("remote read / push destination")),
+    }
+}
+
 impl Publisher {
     pub fn new(gh: HostRun, glab: HostRun, network: Arc<dyn Network>) -> Publisher {
         Publisher {
-            gh,
-            glab,
+            gh: HostRunner::Custom(gh),
+            glab: HostRunner::Custom(glab),
             network,
             check_timeout: Duration::from_secs(600),
             serial: Mutex::default(),
         }
     }
 
-    /// `submitBranch` (blocking).
-    pub fn submit(&self, req: &SubmitBranch) -> Result<BranchPublication, ApiError> {
+    /// `submitBranch` (async).
+    pub async fn submit_async(&self, req: &SubmitBranch) -> Result<BranchPublication, ApiError> {
         if !Path::new(&req.cwd).is_absolute() || !sha_like(&req.sha) || req.title.trim().is_empty() {
             return Err(refused("cwd / sha / title"));
         }
-        let cwd = std::fs::canonicalize(&req.cwd).map_err(|_| refused("cwd"))?;
-        let loc =
-            git(&cwd, &["rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"]).map_err(|_| refused("git failed; checkout retained"))?;
-        let mut lines = loc.lines();
-        let (top, common) = (lines.next().unwrap_or(""), lines.next().unwrap_or(""));
-        if Path::new(top) != cwd || common.is_empty() {
-            return Err(refused("checkout root"));
-        }
-        let common = PathBuf::from(common);
-        let key = if common.file_name().is_some_and(|n| n == ".git") {
-            common.parent().unwrap_or(&common)
-        } else {
-            &common
-        };
-        let gate = self.serial.lock().entry(key.display().to_string()).or_default().clone();
-        let _held = gate.lock();
-        self.publish(&cwd, req)
-    }
-
-    fn unchanged(&self, cwd: &Path, req: &SubmitBranch) -> Result<(), ApiError> {
-        let status = git(cwd, &["status", "--porcelain=v2", "--branch", "--untracked-files=all"]).map_err(|_| refused("git failed; checkout retained"))?;
-        let branch = status.lines().find_map(|l| l.strip_prefix("# branch.head ")).unwrap_or("");
-        let sha = status.lines().find_map(|l| l.strip_prefix("# branch.oid ")).unwrap_or("");
-        let clean = status.lines().all(|l| l.starts_with("# ") || l.is_empty());
-        if branch != req.branch || sha != req.sha || !clean {
-            return Err(refused("checkout changed or dirty"));
-        }
-        Ok(())
-    }
-
-    fn destination(&self, cwd: &Path) -> Result<Remote, ApiError> {
-        let out = git(cwd, &["config", "--null", "--list"]).map_err(|_| refused("git failed; checkout retained"))?;
-        let config: Vec<(String, String)> = out
-            .split('\0')
-            .filter(|e| !e.is_empty())
-            .map(|e| match e.split_once('\n') {
-                Some((k, v)) => (k.to_string(), v.to_string()),
-                None => (e.to_string(), String::new()),
-            })
-            .collect();
-        static URL_REWRITE: std::sync::LazyLock<regex::Regex> =
-            std::sync::LazyLock::new(|| regex::Regex::new(r"^url\..*\.(insteadof|pushinsteadof)$").expect("regex"));
-        if config.iter().any(|(k, _)| URL_REWRITE.is_match(k)) {
-            return Err(refused("URL rewrite configuration"));
-        }
-        static REMOTE_NAME: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| regex::Regex::new(r"^remote\.(.+)\.[^.]+$").expect("regex"));
-        let mut names: Vec<String> = vec![];
-        for (k, _) in &config {
-            if let Some(n) = REMOTE_NAME.captures(k).and_then(|c| c.get(1))
-                && !names.iter().any(|x| x == n.as_str())
-            {
-                names.push(n.as_str().to_string());
+        let req_cwd = req.cwd.clone();
+        let (cwd, key) = crate::spawn_blocking_traced(move || {
+            let cwd = std::fs::canonicalize(&req_cwd).map_err(|_| refused("cwd"))?;
+            let loc = git(&cwd, &["rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"])
+                .map_err(|_| refused("git failed; checkout retained"))?;
+            let mut lines = loc.lines();
+            let (top, common) = (lines.next().unwrap_or(""), lines.next().unwrap_or(""));
+            if Path::new(top) != cwd || common.is_empty() {
+                return Err(refused("checkout root"));
             }
-        }
-        let [name] = names.as_slice() else { return Err(refused("ambiguous remote")) };
-        if name.starts_with('-') {
-            return Err(refused("ambiguous remote"));
-        }
-        let reads: Vec<&String> = config.iter().filter(|(k, _)| *k == format!("remote.{name}.url")).map(|(_, v)| v).collect();
-        let writes: Vec<&String> = config.iter().filter(|(k, _)| *k == format!("remote.{name}.pushurl")).map(|(_, v)| v).collect();
-        let read = reads.first().map(|s| s.to_string()).unwrap_or_default();
-        let write = writes.first().map(|s| s.to_string()).unwrap_or_else(|| read.clone());
-        let (target, pushed) = (hosted_origin(&read), hosted_origin(&write));
-        match (target, pushed) {
-            (Some(target), Some(pushed)) if reads.len() == 1 && writes.len() <= 1 && target.host == pushed.host && target.name == pushed.name => Ok(Remote {
-                name: name.clone(),
-                read,
-                write,
-                target,
-            }),
-            _ => Err(refused("remote read / push destination")),
-        }
+            let common = PathBuf::from(common);
+            let key = if common.file_name().is_some_and(|n| n == ".git") {
+                common.parent().unwrap_or(&common)
+            } else {
+                &common
+            };
+            Ok((cwd, key.display().to_string()))
+        })
+        .await
+        .map_err(|_| refused("git failed; checkout retained"))??;
+        let gate = self.serial.lock().entry(key).or_default().clone();
+        let _held = gate.lock_owned().await;
+        self.publish_async(&cwd, req).await
     }
 
-    fn publish(&self, cwd: &Path, req: &SubmitBranch) -> Result<BranchPublication, ApiError> {
-        let valid = |b: &str| run_git(cwd, &["check-ref-format", &format!("refs/heads/{b}")]).is_some_and(|r| r.0 == 0);
-        if !valid(&req.branch) || !valid(&req.base) || req.branch.starts_with('-') || req.base.starts_with('-') {
-            return Err(refused("branch / base"));
-        }
-        self.unchanged(cwd, req)?;
-        let remote = self.destination(cwd)?;
+    /// Sync shim for synchronous callers (e.g. integration tests).
+    pub fn submit(&self, req: &SubmitBranch) -> Result<BranchPublication, ApiError> {
+        vibevalley_runtime::rt::block_on(self.submit_async(req))
+    }
+
+    async fn publish_async(&self, cwd: &Path, req: &SubmitBranch) -> Result<BranchPublication, ApiError> {
+        let remote = {
+            let cwd = cwd.to_path_buf();
+            let branch = req.branch.clone();
+            let base = req.base.clone();
+            let sha = req.sha.clone();
+            crate::spawn_blocking_traced(move || {
+                let valid = |b: &str| run_git(&cwd, &["check-ref-format", &format!("refs/heads/{b}")]).is_some_and(|r| r.0 == 0);
+                if !valid(&branch) || !valid(&base) || branch.starts_with('-') || base.starts_with('-') {
+                    return Err(refused("branch / base"));
+                }
+                verify_unchanged(&cwd, &branch, &sha)?;
+                read_destination(&cwd)
+            })
+            .await
+            .map_err(|_| refused("git failed; checkout retained"))??
+        };
         let run = if remote.target.platform == PublishPlatform::Github {
             &self.gh
         } else {
             &self.glab
         };
         let host = Hosting { repo: &remote.target, run };
-        let default_branch = host.inspect()?;
+        let default_branch = host.inspect().await?;
         if req.branch == req.base || req.branch == default_branch {
             return Err(refused("default / base branch"));
         }
@@ -553,37 +611,59 @@ impl Publisher {
         if req.dry_run == Some(true) {
             return Ok(result);
         }
-        let net = |_: String| refused("git failed; checkout retained");
-        let base_sha = self.network.tip(cwd, &remote.read, &req.base).map_err(net)?;
-        self.network.fetch(cwd, &remote.read, &req.base).map_err(net)?;
-        let merged = run_git(cwd, &["merge-tree", "--write-tree", "--name-only", "--no-messages", &base_sha, &req.sha]);
-        match merged {
-            Some((0, _, _)) => {}
-            Some((1, _, _)) => {
-                return Err(refuse(BizCode::RepoRefused, t("server.repo.conflict", &[("base", req.base.clone().into())])));
-            }
-            _ => return Err(refused("git failed; checkout retained")),
-        }
-        result.check = check_repository(cwd, self.check_timeout)?;
-        let after = self.destination(cwd)?;
-        if after.name != remote.name
-            || after.read != remote.read
-            || after.write != remote.write
-            || self.network.tip(cwd, &remote.read, &req.base).map_err(net)? != base_sha
+        let base_sha = {
+            let network = self.network.clone();
+            let cwd = cwd.to_path_buf();
+            let read = remote.read.clone();
+            let base = req.base.clone();
+            let sha = req.sha.clone();
+            crate::spawn_blocking_traced(move || {
+                let net = |_: String| refused("git failed; checkout retained");
+                let base_sha = network.tip(&cwd, &read, &base).map_err(net)?;
+                network.fetch(&cwd, &read, &base).map_err(net)?;
+                let merged = run_git(&cwd, &["merge-tree", "--write-tree", "--name-only", "--no-messages", &base_sha, &sha]);
+                match merged {
+                    Some((0, _, _)) => Ok(base_sha),
+                    Some((1, _, _)) => Err(refuse(BizCode::RepoRefused, t("server.repo.conflict", &[("base", base.into())]))),
+                    _ => Err(refused("git failed; checkout retained")),
+                }
+            })
+            .await
+            .map_err(|_| refused("git failed; checkout retained"))??
+        };
+        result.check = check_repository(cwd, self.check_timeout).await?;
         {
-            return Err(refused("remote changed during check"));
+            let network = self.network.clone();
+            let cwd = cwd.to_path_buf();
+            let remote_name = remote.name.clone();
+            let remote_read = remote.read.clone();
+            let remote_write = remote.write.clone();
+            let branch = req.branch.clone();
+            let base = req.base.clone();
+            let sha = req.sha.clone();
+            crate::spawn_blocking_traced(move || {
+                let net = |_: String| refused("git failed; checkout retained");
+                let after = read_destination(&cwd)?;
+                if after.name != remote_name
+                    || after.read != remote_read
+                    || after.write != remote_write
+                    || network.tip(&cwd, &remote_read, &base).map_err(net)? != base_sha
+                {
+                    return Err(refused("remote changed during check"));
+                }
+                verify_unchanged(&cwd, &branch, &sha)?;
+                network
+                    .push(&cwd, &remote_write, &branch, &sha)
+                    .map_err(|_| refuse(BizCode::RepoRefused, t("server.repo.publish.pushUnconfirmed", &[("sha", sha.into())])))
+            })
+            .await
+            .map_err(|_| refused("git failed; checkout retained"))??;
         }
-        self.unchanged(cwd, req)?;
-        self.network.push(cwd, &remote.write, &req.branch, &req.sha).map_err(|_| {
-            refuse(
-                BizCode::RepoRefused,
-                t("server.repo.publish.pushUnconfirmed", &[("sha", req.sha.clone().into())]),
-            )
-        })?;
-        let linked = host.find(&req.branch, &req.base).and_then(|existing| match existing {
-            Some(r) => Ok((r, true)),
-            None => host.create(req).map(|r| (r, false)),
-        });
+        let linked = match host.find(&req.branch, &req.base).await {
+            Ok(Some(r)) => Ok((r, true)),
+            Ok(None) => host.create(req).await.map(|r| (r, false)),
+            Err(e) => Err(e),
+        };
         let ((number, url), reused) = linked.map_err(|e| {
             refuse(
                 BizCode::RepoRefused,
@@ -603,6 +683,6 @@ impl Publisher {
 }
 
 /// Queries the hosted platform (`gh`/`glab`) for a pull/merge request's current state.
-pub fn remote_pull_state(repo: &HostedRepo, number: i64, run: &HostRun) -> Result<PullRequestState, ApiError> {
-    Hosting { repo, run }.state(number)
+pub(crate) async fn remote_pull_state(repo: &HostedRepo, number: i64, run: &HostRunner) -> Result<PullRequestState, ApiError> {
+    Hosting { repo, run }.state(number).await
 }

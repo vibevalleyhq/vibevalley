@@ -171,15 +171,10 @@ fn ok(s: &vibevalley_server::Started, op: &str, p: Value) -> Value {
 }
 
 fn wait(s: &vibevalley_server::Started, id: &str, phase: &str) -> Value {
-    let deadline = Instant::now() + Duration::from_secs(5);
-    loop {
+    crate::support::wait_until_transition(&s.hub, Duration::from_secs(5), phase, || {
         let j = ok(s, "media.job.get", json!({"id":id}));
-        if j["phase"] == phase {
-            return j;
-        }
-        assert!(Instant::now() < deadline, "job did not reach {phase}: {j}");
-        std::thread::sleep(Duration::from_millis(5));
-    }
+        (j["phase"] == phase).then_some(j)
+    })
 }
 
 #[test]
@@ -201,16 +196,11 @@ fn generation_is_idempotent_download_retries_without_generating_again_and_librar
         std::fs::read(s.test_internals().attachments.file(ready["attachment"]["id"].as_str().unwrap()).unwrap().path).unwrap(),
         png()
     );
-    let deadline = Instant::now() + Duration::from_secs(3);
-    loop {
+    let items = crate::support::wait_until_settled(Some(&s.hub), Duration::from_secs(3), "library item recorded", || {
         let items = ok(&s, "library.item.list", json!({}));
-        if items.as_array().unwrap().len() == 1 {
-            assert_eq!(items[0]["origin"]["job"], "one");
-            break;
-        }
-        assert!(Instant::now() < deadline);
-        std::thread::sleep(Duration::from_millis(5));
-    }
+        (items.as_array().unwrap().len() == 1).then_some(items)
+    });
+    assert_eq!(items[0]["origin"]["job"], "one");
     assert!(!serde_json::to_string(&ready).unwrap().contains("signed=secret"));
     ok(&s, "library.item.delete", json!({"id": ready["attachment"]["id"]}));
     s.close();
@@ -218,8 +208,31 @@ fn generation_is_idempotent_download_retries_without_generating_again_and_librar
     assert_eq!(wait(&reopened, "one", "ready")["attachment"], ready["attachment"]);
     ok(&reopened, "media.image.create", request("one"));
     assert_eq!(backend.generations.load(Ordering::SeqCst), 1);
-    // An explicit deletion is not undone by historical mediaChanged frames.
-    std::thread::sleep(Duration::from_millis(30));
+    // Causal barrier on the FIFO `library` EventBus subscriber: a newly sent attachment
+    // is processed strictly after any historical `mediaChanged` frames from reopen,
+    // proving the explicit deletion of `"one"` was not undone.
+    let barrier = ok(
+        &reopened,
+        "attachment.create",
+        json!({ "name": "barrier.txt", "type": "text/plain", "data": "b2s=" }),
+    );
+    let general = reopened.test_internals().chat.default_channel();
+    ok(
+        &reopened,
+        "channel.message.send",
+        json!({ "id": general, "text": "barrier", "sendKey": "library-barrier", "attachments": [barrier["id"]] }),
+    );
+    let after_barrier = crate::support::wait_until_settled(Some(&reopened.hub), Duration::from_secs(3), "library barrier processed", || {
+        let items = ok(&reopened, "library.item.list", json!({}));
+        items
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["attachment"]["id"] == barrier["id"])
+            .then_some(items)
+    });
+    assert_eq!(after_barrier.as_array().unwrap().len(), 1, "deleted job must not reappear: {after_barrier}");
+    ok(&reopened, "library.item.delete", json!({ "id": barrier["id"] }));
     assert_eq!(ok(&reopened, "library.item.list", json!({})), json!([]));
     reopened.close();
     let bytes = std::fs::read(dir.path().join("server.db")).unwrap();
@@ -325,8 +338,7 @@ fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() 
     assert!(!result.is_error, "{}", result.text);
     let ready = wait(&s, "asked", "ready");
     assert_eq!(ready["source"], json!({"kind":"orchestrator","agent":"orchestrator","channel":channel}));
-    let deadline = Instant::now() + Duration::from_secs(3);
-    loop {
+    crate::support::wait_until_channel_event(s.test_internals().chat, Duration::from_secs(3), "generated image message", || {
         let messages = ok(&s, "channel.message.list", json!({"id":channel}));
         let made = messages
             .as_array()
@@ -334,12 +346,8 @@ fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() 
             .iter()
             .filter(|m| m["attachments"].as_array().is_some_and(|a| !a.is_empty()))
             .count();
-        if made == 1 {
-            break;
-        }
-        assert!(Instant::now() < deadline);
-        std::thread::sleep(Duration::from_millis(5));
-    }
+        (made == 1).then_some(())
+    });
     assert!(!tool.execute(&request("asked")).is_error);
     s.close();
     let reopened = start(dir.path(), Backend::new("ok"));

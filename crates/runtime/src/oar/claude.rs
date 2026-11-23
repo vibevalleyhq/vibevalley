@@ -21,7 +21,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, rejected, rejection};
-use crate::oar::process::{LineChild, LoginCheck, LoginStatus, Spawn, probe_installation_with, require_binary};
+use crate::oar::process::{AbortWatchdog, LineChild, LoginCheck, LoginStatus, Spawn, probe_installation_with, require_binary};
 use crate::oar::record::{self, Recorder};
 use crate::oar::{
     AccountUsage, AgentError, Capabilities, ContentBlock, EventKind, FileChangeKind, Installation, ModelInfo, PermissionDecision, PermissionMode, Result,
@@ -787,9 +787,7 @@ struct Shared {
     next_control: AtomicU64,
     opened: AtomicBool,
     exit: Mutex<Option<String>>,
-    abort_killed: AtomicBool,
-    turns_finished: AtomicU64,
-    turn_done: tokio::sync::Notify,
+    watchdog: Arc<AbortWatchdog>,
     cwd: PathBuf,
     timeout: Duration,
     secrets: Mutex<Option<tempfile::TempDir>>,
@@ -846,8 +844,7 @@ impl Shared {
                     let finished = path.is_empty() && matches!(kind, EventKind::TurnFinished { .. });
                     if finished {
                         self.pending.lock().clear();
-                        self.turns_finished.fetch_add(1, Ordering::SeqCst);
-                        self.turn_done.notify_waiters();
+                        self.watchdog.on_turn_finished();
                     }
                     self.core.emit(path, kind);
                 }
@@ -929,20 +926,9 @@ impl Shared {
         }
         *self.exit.lock() = Some(message.clone());
         if self.opened.load(Ordering::SeqCst) {
-            self.finish(message);
-        }
-        self.turn_done.notify_waiters();
-    }
-
-    fn finish(&self, message: String) {
-        if self.abort_killed.load(Ordering::SeqCst) && self.core.turn_active() {
-            self.core.emit_root(EventKind::TurnFinished {
-                reason: StopReason::Aborted,
-                usage: Usage::default(),
-            });
-            self.core.finish(None);
+            self.watchdog.finish_on_exit(&self.core, message);
         } else {
-            self.core.finish(Some(message));
+            self.watchdog.wake();
         }
     }
 }
@@ -1026,34 +1012,9 @@ impl Driver for ClaudeDriver {
         self.shared.projector.lock().abort_requested = true;
         // The interrupt's own answer says nothing new; the `result` frame ends the turn.
         drop(self.shared.control_request(json!({ "subtype": "interrupt" }))?);
-        let shared = self.shared.clone();
-        let turn = shared.turns_finished.load(Ordering::SeqCst);
-        crate::rt::handle().spawn(async move {
-            let deadline = tokio::time::Instant::now() + ABORT_GRACE;
-            loop {
-                let notified = shared.turn_done.notified();
-                tokio::pin!(notified);
-                notified.as_mut().enable();
-                if shared.turns_finished.load(Ordering::SeqCst) != turn || !shared.core.turn_active() {
-                    return;
-                }
-                tokio::select! {
-                    biased;
-                    _ = notified => {}
-                    _ = tokio::time::sleep_until(deadline) => {
-                        if shared.turns_finished.load(Ordering::SeqCst) != turn || !shared.core.turn_active() {
-                            return;
-                        }
-                        // claude did not stop: take the process down; resume continues the session.
-                        shared.abort_killed.store(true, Ordering::SeqCst);
-                        if let Some(child) = shared.child.get() {
-                            child.kill_async().await;
-                        }
-                        return;
-                    }
-                }
-            }
-        });
+        if let Some(child) = self.shared.child.get() {
+            self.shared.watchdog.arm(ABORT_GRACE, self.shared.core.clone(), child.clone());
+        }
         Ok(())
     }
 
@@ -1108,7 +1069,7 @@ impl Driver for ClaudeDriver {
             child.kill();
             self.shared.core.observe_exit(child.status());
         }
-        self.shared.turn_done.notify_waiters();
+        self.shared.watchdog.wake();
         self.shared.secrets.lock().take();
     }
 }
@@ -1162,9 +1123,7 @@ fn start_stream(binary: &Path, session_id: &str, opts: &SessionOptions, recorder
         next_control: AtomicU64::new(1),
         opened: AtomicBool::new(false),
         exit: Mutex::new(None),
-        abort_killed: AtomicBool::new(false),
-        turns_finished: AtomicU64::new(0),
-        turn_done: tokio::sync::Notify::new(),
+        watchdog: AbortWatchdog::new(),
         cwd: opts.cwd.clone(),
         timeout: opts.request_timeout.unwrap_or(OPEN_TIMEOUT),
         secrets: Mutex::new(launch.secrets),
@@ -1366,7 +1325,7 @@ fn running(started: Started, opts: &SessionOptions, caps: Capabilities) -> Arc<d
     });
     shared.opened.store(true, Ordering::SeqCst);
     if let Some(message) = shared.exit.lock().clone() {
-        shared.finish(message);
+        shared.watchdog.finish_on_exit(&shared.core, message);
     }
     let core = shared.core.clone();
     CoreSession::new(core, ClaudeDriver { shared }, caps)

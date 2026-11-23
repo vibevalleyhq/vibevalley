@@ -97,4 +97,5 @@ nsh-dev = ["nsh-platform-gpui/dev"]
 shot = ["gpui/test-support", "gpui-platform/test-support"]
 
 [dev-dependencies]
+axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio"] }
 tempfile = "3.27.0"

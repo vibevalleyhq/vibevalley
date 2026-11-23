@@ -827,7 +827,7 @@ impl HostedView {
                             let reply_id = id.to_string();
                             let reply_host = reply_host.clone();
                             let active = active_connection.clone();
-                            vibevalley_runtime::rt::handle().spawn_blocking(move || {
+                            vibevalley_runtime::rt::current_or_global_handle().spawn_blocking(move || {
                                 let env = handle_desktop_connection_op(&op_name, payload, &server_home(), &active);
                                 let _ = reply_host.send(format!("reply:{reply_id}"), serde_json::to_value(env).unwrap_or(Value::Null));
                             });
@@ -1204,20 +1204,43 @@ mod tests {
     fn route_to_bridge_watches_slices_forwards_applied_slice_and_unwatches() {
         use parking_lot::Mutex;
         use std::sync::Arc;
-        use std::time::{Duration, Instant};
+        use std::time::Duration;
+        use tokio::sync::Notify;
         use vibevalley_server::transport::bridge::fake::{FakeServer, empty_bundle};
         use vibevalley_server::transport::bridge::{Hub, Outlet, SliceKind};
 
         #[derive(Default)]
-        struct Recorder(Mutex<Vec<(String, Value)>>);
+        struct Recorder {
+            events: Mutex<Vec<(String, Value)>>,
+            notify: Notify,
+        }
         impl Outlet for Recorder {
             fn send(&self, event: &str, data: Value) {
-                self.0.lock().push((event.to_string(), data));
+                self.events.lock().push((event.to_string(), data));
+                self.notify.notify_waiters();
             }
         }
         impl Recorder {
             fn named(&self, name: &str) -> Vec<Value> {
-                self.0.lock().iter().filter(|(n, _)| n == name).map(|(_, d)| d.clone()).collect()
+                self.events.lock().iter().filter(|(n, _)| n == name).map(|(_, d)| d.clone()).collect()
+            }
+
+            fn wait_for(&self, what: &str, mut f: impl FnMut(&Self) -> bool) {
+                vibevalley_runtime::rt::block_on(async {
+                    tokio::time::timeout(Duration::from_secs(3), async {
+                        loop {
+                            let notified = self.notify.notified();
+                            tokio::pin!(notified);
+                            notified.as_mut().enable();
+                            if f(self) {
+                                return;
+                            }
+                            notified.await;
+                        }
+                    })
+                    .await
+                })
+                .unwrap_or_else(|_| panic!("timed out waiting for {what}"));
             }
         }
 
@@ -1240,11 +1263,7 @@ mod tests {
         // Legacy "state" topic is rejected internally (watch prints error, no watcher attached).
         assert!(route_to_bridge(&client, &json!({ "type": "watch", "topic": "state" })));
 
-        let start = Instant::now();
-        while rec.named("frame:slice:board").is_empty() {
-            assert!(start.elapsed() < Duration::from_secs(3), "timed out waiting for slice:board");
-            std::thread::sleep(Duration::from_millis(5));
-        }
+        rec.wait_for("slice:board", |r| !r.named("frame:slice:board").is_empty());
         let rev = rec.named("frame:slice:board")[0]["rev"].as_u64().unwrap();
         // `applied` acknowledges backpressure AND returns false so HostedView records debug bookkeeping.
         assert!(!route_to_bridge(&client, &json!({ "type": "applied", "topic": "slice:board", "rev": rev })));
@@ -1253,22 +1272,25 @@ mod tests {
         next.board.issues.push(vibevalley_protocol::Issue::new("i-1", 1, "Updated", 2));
         fake.swap_bundle(next);
 
-        let start = Instant::now();
-        while rec.named("frame:slice:board").len() < 2 {
-            assert!(
-                start.elapsed() < Duration::from_secs(3),
-                "timed out waiting for second slice:board after applied_slice"
-            );
-            std::thread::sleep(Duration::from_millis(5));
-        }
+        rec.wait_for("second slice:board after applied_slice", |r| r.named("frame:slice:board").len() >= 2);
         assert_eq!(rec.named("frame:slice:board").last().unwrap()["data"]["issues"][0]["id"], "i-1");
 
         assert!(route_to_bridge(&client, &json!({ "type": "unwatch", "topic": "slice:board" })));
-        let start = Instant::now();
-        while fake.slice_watchers(SliceKind::Board) != 0 {
-            assert!(start.elapsed() < Duration::from_secs(3), "timed out waiting for unwatch");
-            std::thread::sleep(Duration::from_millis(5));
-        }
+        vibevalley_runtime::rt::block_on(async {
+            tokio::time::timeout(Duration::from_secs(3), async {
+                let mut yields = 0usize;
+                while fake.slice_watchers(SliceKind::Board) != 0 {
+                    if yields < 64 {
+                        yields += 1;
+                        tokio::task::yield_now().await;
+                    } else {
+                        tokio::time::sleep(Duration::from_millis(1)).await;
+                    }
+                }
+            })
+            .await
+        })
+        .expect("timed out waiting for unwatch");
     }
 
     #[test]

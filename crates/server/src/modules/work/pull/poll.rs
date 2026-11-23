@@ -6,10 +6,12 @@ use std::sync::Arc;
 
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
+use tracing::Instrument;
+use tracing::instrument::WithSubscriber;
 use vibevalley_protocol::{PublishPlatform, PullRequestState};
 
 use crate::modules::work::pull::Pulls;
-use crate::modules::work::pull::publish::{HostRun, HostedRepo, remote_pull_state};
+use crate::modules::work::pull::publish::{HostRunner, HostedRepo, remote_pull_state};
 use crate::modules::work::pull::snapshot::{GitHubCheck, GitHubPullSnapshot, checks_fingerprint, checks_verdict, failed_job_log, fetch_snapshot};
 use crate::modules::work::pull::store::PullRecord;
 use crate::now;
@@ -17,60 +19,56 @@ use crate::now;
 const POLL_CONCURRENCY: usize = 4;
 
 /// Polls every tracked `open` PR's remote state in parallel (bounded); settles linked issues on `merged` / `closed`.
-pub fn refresh(pulls: &Pulls) {
-    let _guard = pulls.refresh_lock.lock();
-    let targets: Vec<(usize, PullRecord, HostedRepo, HostRun)> = pulls
-        .store
-        .open_pulls()
-        .into_iter()
-        .enumerate()
-        .filter_map(|(idx, row)| {
-            let hosted = pulls.hosted_repo_of(&row.repo, Some(row.platform)).ok()?;
-            let runner = match hosted.platform {
-                PublishPlatform::Github => pulls.gh.clone(),
-                PublishPlatform::Gitlab => pulls.glab.clone(),
-            };
-            Some((idx, row, hosted, runner))
-        })
-        .collect();
+pub async fn refresh(pulls: &Pulls) {
+    let _guard = pulls.refresh_lock.lock().await;
+    let open = pulls.store.open_pulls();
+    let mut targets: Vec<(usize, PullRecord, HostedRepo, HostRunner)> = Vec::with_capacity(open.len());
+    for (idx, row) in open.into_iter().enumerate() {
+        let Ok(hosted) = pulls.hosted_repo_of_async(&row.repo, Some(row.platform)).await else {
+            continue;
+        };
+        let runner = match hosted.platform {
+            PublishPlatform::Github => pulls.gh.clone(),
+            PublishPlatform::Gitlab => pulls.glab.clone(),
+        };
+        targets.push((idx, row, hosted, runner));
+    }
     if targets.is_empty() {
         return;
     }
 
-    let mut settled = vibevalley_runtime::rt::block_on(async move {
-        let sem = Arc::new(Semaphore::new(POLL_CONCURRENCY));
-        let mut set = JoinSet::new();
-        for (idx, row, hosted, runner) in targets {
-            let sem = sem.clone();
-            set.spawn(async move {
+    let sem = Arc::new(Semaphore::new(POLL_CONCURRENCY));
+    let mut set = JoinSet::new();
+    for (idx, row, hosted, runner) in targets {
+        let sem = sem.clone();
+        set.spawn(
+            async move {
                 let Ok(_permit) = sem.acquire_owned().await else { return None };
                 let number = row.number;
-                let state = tokio::task::spawn_blocking(move || remote_pull_state(&hosted, number, &runner))
-                    .await
-                    .ok()?
-                    .ok()?;
+                let state = remote_pull_state(&hosted, number, &runner).await.ok()?;
                 Some((idx, row, state))
-            });
-        }
-        let mut out = Vec::new();
-        while let Some(joined) = set.join_next().await {
-            if let Ok(Some(item)) = joined {
-                out.push(item);
             }
+            .in_current_span()
+            .with_current_subscriber(),
+        );
+    }
+    let mut settled = Vec::new();
+    while let Some(joined) = set.join_next().await {
+        if let Ok(Some(item)) = joined {
+            settled.push(item);
         }
-        out
-    });
+    }
     settled.sort_by_key(|(idx, _, _)| *idx);
 
     for (_, row, state) in settled {
         if state == PullRequestState::Open {
             continue;
         }
-        if pulls.store.set_state(&row.id, state, now()).is_err() {
+        if pulls.store.set_state_async(&row.id, state, now()).await.is_err() {
             continue;
         }
-        if let (Some(board), Some(issue_id)) = (&pulls.board, row.issue_id.as_deref()) {
-            let _ = board.settle_pull(issue_id, state);
+        if let (Some(board), Some(issue_id)) = (pulls.board.clone(), row.issue_id.clone()) {
+            let _ = crate::spawn_blocking_traced(move || board.settle_pull(&issue_id, state)).await;
         }
     }
 }
@@ -85,93 +83,87 @@ struct PollEvent {
 }
 
 /// Polls GitHub CI checks, reviews, and comments for every tracked `open` GitHub PR.
-pub fn poll(pulls: &Pulls) {
-    let _guard = pulls.poll_lock.lock();
-    let targets: Vec<(usize, PullRecord, String)> = pulls
-        .store
-        .open_pulls()
-        .into_iter()
-        .filter(|row| row.platform == PublishPlatform::Github)
-        .enumerate()
-        .filter_map(|(idx, row)| {
-            let remote = pulls.github_remote(&row.repo).ok()?;
-            Some((idx, row, remote))
-        })
-        .collect();
+pub async fn poll(pulls: &Pulls) {
+    let _guard = pulls.poll_lock.lock().await;
+    let open = pulls.store.open_pulls();
+    let mut targets: Vec<(usize, PullRecord, String)> = Vec::new();
+    for (idx, row) in open.into_iter().filter(|row| row.platform == PublishPlatform::Github).enumerate() {
+        let Ok(remote) = pulls.github_remote_async(&row.repo).await else {
+            continue;
+        };
+        targets.push((idx, row, remote));
+    }
     if targets.is_empty() {
         return;
     }
 
-    let gh = pulls.gh.clone();
-    let mut snapshots = vibevalley_runtime::rt::block_on(async move {
-        let sem = Arc::new(Semaphore::new(POLL_CONCURRENCY));
-        let mut set = JoinSet::new();
-        for (idx, row, remote) in targets {
-            let sem = sem.clone();
-            let gh = gh.clone();
-            set.spawn(async move {
+    let sem = Arc::new(Semaphore::new(POLL_CONCURRENCY));
+    let mut set = JoinSet::new();
+    for (idx, row, remote) in targets {
+        let sem = sem.clone();
+        let gh = pulls.gh.clone();
+        set.spawn(
+            async move {
                 let Ok(_permit) = sem.acquire_owned().await else { return None };
                 let number = row.number;
-                let remote_for_fetch = remote.clone();
-                let snapshot = tokio::task::spawn_blocking(move || fetch_snapshot(&gh, &remote_for_fetch, number))
-                    .await
-                    .ok()?
-                    .ok()?;
+                let snapshot = fetch_snapshot(&gh, &remote, number).await.ok()?;
                 Some((idx, row, remote, snapshot))
-            });
-        }
-        let mut out = Vec::new();
-        while let Some(joined) = set.join_next().await {
-            if let Ok(Some(item)) = joined {
-                out.push(item);
             }
+            .in_current_span()
+            .with_current_subscriber(),
+        );
+    }
+    let mut snapshots = Vec::new();
+    while let Some(joined) = set.join_next().await {
+        if let Ok(Some(item)) = joined {
+            snapshots.push(item);
         }
-        out
-    });
+    }
     snapshots.sort_by_key(|(idx, _, _, _)| *idx);
 
     for (_, row, remote, current) in snapshots {
-        poll_one(pulls, &row, &remote, current);
+        poll_one(pulls, &row, &remote, current).await;
     }
 }
 
-fn fetch_failed_job_logs(gh: &HostRun, remote: &str, failed: &[&GitHubCheck]) -> Vec<String> {
+async fn fetch_failed_job_logs(gh: &HostRunner, remote: &str, failed: &[&GitHubCheck]) -> Vec<String> {
     if failed.len() <= 1 {
-        return failed.iter().map(|check| failed_job_log(gh, remote, &check.url)).collect();
+        let mut out = Vec::with_capacity(failed.len());
+        for check in failed {
+            out.push(failed_job_log(gh, remote, &check.url).await);
+        }
+        return out;
     }
     let items: Vec<(usize, String)> = failed.iter().enumerate().map(|(idx, check)| (idx, check.url.clone())).collect();
-    let gh = gh.clone();
-    let remote = remote.to_string();
-    let mut logs = vibevalley_runtime::rt::block_on(async move {
-        let sem = Arc::new(Semaphore::new(POLL_CONCURRENCY));
-        let mut set = JoinSet::new();
-        for (idx, url) in items {
-            let sem = sem.clone();
-            let gh = gh.clone();
-            let remote = remote.clone();
-            set.spawn(async move {
+    let sem = Arc::new(Semaphore::new(POLL_CONCURRENCY));
+    let mut set = JoinSet::new();
+    for (idx, url) in items {
+        let sem = sem.clone();
+        let gh = gh.clone();
+        let remote = remote.to_string();
+        set.spawn(
+            async move {
                 let Ok(_permit) = sem.acquire_owned().await else {
                     return (idx, String::new());
                 };
-                let log = tokio::task::spawn_blocking(move || failed_job_log(&gh, &remote, &url))
-                    .await
-                    .unwrap_or_default();
+                let log = failed_job_log(&gh, &remote, &url).await;
                 (idx, log)
-            });
-        }
-        let mut out = Vec::new();
-        while let Some(joined) = set.join_next().await {
-            if let Ok(item) = joined {
-                out.push(item);
             }
+            .in_current_span()
+            .with_current_subscriber(),
+        );
+    }
+    let mut logs = Vec::new();
+    while let Some(joined) = set.join_next().await {
+        if let Ok(item) = joined {
+            logs.push(item);
         }
-        out
-    });
+    }
     logs.sort_by_key(|(idx, _)| *idx);
     logs.into_iter().map(|(_, log)| log).collect()
 }
 
-fn poll_one(pulls: &Pulls, row: &PullRecord, remote: &str, current: GitHubPullSnapshot) {
+async fn poll_one(pulls: &Pulls, row: &PullRecord, remote: &str, current: GitHubPullSnapshot) {
     let at = now();
     let linked_open = row
         .issue_id
@@ -183,12 +175,12 @@ fn poll_one(pulls: &Pulls, row: &PullRecord, remote: &str, current: GitHubPullSn
     if fingerprint != row.check_fingerprint {
         let revision = row.check_revision + 1;
         let (failed, finished) = checks_verdict(&current.checks);
-        let _ = pulls.store.observe_checks(&row.id, &fingerprint, revision, at);
+        let _ = pulls.store.observe_checks_async(&row.id, &fingerprint, revision, at).await;
         if let (Some(board), Some(issue)) = (&pulls.board, &linked_open)
             && (!failed.is_empty() || finished)
         {
             let text = if !failed.is_empty() {
-                let logs = fetch_failed_job_logs(&pulls.gh, remote, &failed);
+                let logs = fetch_failed_job_logs(&pulls.gh, remote, &failed).await;
                 failed
                     .iter()
                     .zip(logs)
@@ -222,11 +214,13 @@ fn poll_one(pulls: &Pulls, row: &PullRecord, remote: &str, current: GitHubPullSn
                     .join("\n")
             };
             let key = format!("{}#{}:ci:{revision}", row.repo, row.number);
-            let _ = board.tell_message(&issue.id, &text, &key);
+            let board = board.clone();
+            let issue_id = issue.id.clone();
+            let _ = crate::spawn_blocking_traced(move || board.tell_message(&issue_id, &text, &key)).await;
         }
     }
 
-    let Ok(known) = pulls.store.known_events(&row.id) else {
+    let Ok(known) = pulls.store.known_events_async(&row.id).await else {
         return;
     };
     let mut seen_keys: HashSet<String> = known.iter().map(|e| e.key.clone()).collect();
@@ -290,7 +284,7 @@ fn poll_one(pulls: &Pulls, row: &PullRecord, remote: &str, current: GitHubPullSn
             None
         };
         let round_key = round.map(|_| event.round_key.as_str());
-        if pulls.store.keep_event(&row.id, &event.key, round_key, round).is_err() {
+        if pulls.store.keep_event_async(&row.id, &event.key, round_key, round).await.is_err() {
             continue;
         }
         seen_keys.insert(event.key.clone());
@@ -301,7 +295,11 @@ fn poll_one(pulls: &Pulls, row: &PullRecord, remote: &str, current: GitHubPullSn
         if let (Some(board), Some(issue)) = (&pulls.board, &linked_open)
             && !event.text.is_empty()
         {
-            let _ = board.tell_message(&issue.id, &event.text, &event.key);
+            let board = board.clone();
+            let issue_id = issue.id.clone();
+            let text = event.text;
+            let key = event.key;
+            let _ = crate::spawn_blocking_traced(move || board.tell_message(&issue_id, &text, &key)).await;
         }
     }
 }

@@ -132,7 +132,7 @@ async fn probe_with_timeout<T: Send + 'static>(cancel: &CancellationToken, f: im
     if cancel.is_cancelled() {
         return None;
     }
-    let handle = vibevalley_runtime::rt::handle().spawn_blocking(f);
+    let handle = vibevalley_runtime::rt::current_or_global_handle().spawn_blocking(f);
     tokio::select! {
         biased;
         _ = cancel.cancelled() => None,
@@ -916,7 +916,7 @@ mod usage_tests {
 
     #[test]
     fn spent_today_accumulates_reported_cny_and_enforces_daily_budget() {
-        use std::time::Instant;
+        use tokio::sync::Notify;
         use vibevalley_protocol::{ExecutionPolicy, Fact, FactSessionChanged, FactSessionReported, Outcome, Session, SessionController, Spent};
 
         let home = tempfile::tempdir().unwrap();
@@ -937,6 +937,12 @@ mod usage_tests {
         let before = fleet.info("scripted").unwrap();
         assert_eq!(before.spent_today, None);
         assert!(before.stop.is_empty());
+
+        let notify = Arc::new(Notify::new());
+        let wake = notify.clone();
+        let sub = hub.subscribe_transitions("test-runtime-spend", move |_, _| {
+            wake.notify_one();
+        });
 
         let session = Session::new(
             "s1",
@@ -969,15 +975,30 @@ mod usage_tests {
             })]);
         }
 
-        let deadline = Instant::now() + Duration::from_secs(3);
-        let after = loop {
-            let info = fleet.info("scripted").unwrap();
-            if info.spent_today.map(JsNumber::get).unwrap_or(0.0) >= 5.5 {
-                break info;
-            }
-            assert!(Instant::now() < deadline, "spent_today did not accumulate: {:?}", info.spent_today);
-            std::thread::sleep(Duration::from_millis(10));
-        };
+        // With `background = false`, `record_spend` updates in-memory spend without publishing a
+        // cached `RuntimeInfo` fact; select on transition notifications plus a short async tick.
+        let after = vibevalley_runtime::rt::block_on(async {
+            let mut tick = tokio::time::interval(Duration::from_millis(2));
+            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            let res = tokio::time::timeout(Duration::from_secs(3), async {
+                loop {
+                    let notified = notify.notified();
+                    tokio::pin!(notified);
+                    notified.as_mut().enable();
+                    let info = fleet.info("scripted").unwrap();
+                    if info.spent_today.map(JsNumber::get).unwrap_or(0.0) >= 5.5 {
+                        return info;
+                    }
+                    tokio::select! {
+                        _ = notified => {}
+                        _ = tick.tick() => {}
+                    }
+                }
+            })
+            .await;
+            sub.close_async().await;
+            res.unwrap_or_else(|_| panic!("spent_today did not accumulate: {:?}", fleet.info("scripted").unwrap().spent_today))
+        });
         assert!(!after.stop.is_empty(), "daily budget stop should trigger at 5.5 >= 5.0");
         fleet.close();
         hub.close_bus();

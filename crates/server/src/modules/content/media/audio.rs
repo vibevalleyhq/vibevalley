@@ -5,9 +5,10 @@
 
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde_json::Value;
+use tokio::time::Instant;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, MediaAudioJob, MediaAudioResult, MediaAudioSegment, MediaCloneRequest, MediaInputKind, MediaInputPhase, MediaInputReference, MediaSource,
@@ -187,6 +188,7 @@ impl Jobs {
             account.revision,
             account.model.clone(),
             account.fingerprint.clone(),
+            self.now_ms(),
         );
         r.input = input;
         shown(&self.admit_async(r, Some(Held::Account(account))).await?)

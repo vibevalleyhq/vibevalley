@@ -17,19 +17,19 @@ pub use family::{ChildDraft, MAX_CHILDREN};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use vibevalley_core::Move;
 use vibevalley_core::brief::{findings_of, milestones_of, resume_words};
 use vibevalley_core::rules::short_title;
+use vibevalley_core::{Move, SharedClock, system_clock};
 use vibevalley_i18n::{Params, t};
 use vibevalley_protocol::{
     ActWords, ApiError, Applied, AppliedIssue, BizCode, ChangedFile, Changes, Commit, Issue, IssueAction, IssueHistory, IssueReviewInput, IssueStageKind,
     IssueStatus, IssueUpdate, Next, Preview, StuckReason, UncommittedItem, ops,
 };
 
+use crate::Hub;
 use crate::base::{LookIn, RequestKeys};
 use crate::modules::team::agent::Agents;
 use crate::modules::work::ledger::{BoardError, Undelivered};
-use crate::{Hub, now};
 
 fn refused(key: &str, params: Params) -> ApiError {
     ApiError::new(BizCode::IssueRefused, t(key, params))
@@ -448,9 +448,15 @@ pub fn install(hub: &Arc<Hub>, board: Board) {
 /// `install`, with an issue's agent one of `agents`' profiles (the board
 /// opened with `Board::open_with(.., agents, ..)`).
 pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
+    install_on_with_clock(hub, board, agents, system_clock());
+}
+
+/// Same as [`install_on`], injecting an explicit wall [`Clock`](vibevalley_core::Clock)
+/// for `issue.list` patrol ordering.
+pub fn install_on_with_clock(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>, clock: SharedClock) {
     let names = agents;
     let b = board.clone();
-    hub.on::<ops::IssueList>(move |_, filter| Ok(b.read(|s| vibevalley_core::pick_issues(&s.issues, &filter, now()))));
+    hub.on::<ops::IssueList>(move |_, filter| Ok(b.read(|s| vibevalley_core::pick_issues(&s.issues, &filter, clock.now_ms()))));
     let b = board.clone();
     hub.on::<ops::IssueGet>(move |_, input| get(&b, &input.id));
 
@@ -792,4 +798,81 @@ pub(crate) fn refine(
     };
     board.refine_with(&item.id, &said, &discussion).map_err(|e| api(board, e))?;
     get(board, &item.id)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use serde_json::json;
+    use vibevalley_core::{ManualClock, empty_space_state};
+    use vibevalley_protocol::{Caller, Fact, FactIssueChanged, IssueLastRun, Landing, Outcome};
+    use vibevalley_runtime::oar::Registry;
+
+    use super::*;
+    use crate::modules::work::ledger::BoardConfig;
+
+    #[test]
+    fn install_on_with_clock_uses_injected_clock_for_issue_list_patrol_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let hub = Hub::new(empty_space_state());
+        let board = Board::open_on(
+            &dir.path().join("server.db"),
+            Arc::new(Registry::new()),
+            BoardConfig::under(dir.path()),
+            Arc::new(Arc::downgrade(&hub)),
+        )
+        .unwrap();
+        let clock = Arc::new(ManualClock::new(1_000));
+        install_on_with_clock(&hub, board.clone(), None, clock.clone());
+
+        // A parent whose children are all closed is InReview with `stage.since == None`,
+        // so `pick_issues(..., clock.now_ms())` falls back to `clock.now_ms()`.
+        let first = board
+            .create(NewIssue {
+                title: "no-since".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        let mut child = board
+            .create(NewIssue {
+                title: "closed-child".into(),
+                parent: Some(first.id.clone()),
+                ..Default::default()
+            })
+            .unwrap();
+        child.delivered = Some(Landing::Merged);
+        child.closed_at = Some(900);
+
+        let mut second = board
+            .create(NewIssue {
+                title: "explicit-since".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        second.last_run = Some(IssueLastRun {
+            started_at: 4_000,
+            ended_at: Some(5_000),
+            outcome: Some(Outcome::Completed),
+        });
+        hub.apply(vec![
+            Fact::IssueChanged(FactIssueChanged { at: 1_000, issue: child }),
+            Fact::IssueChanged(FactIssueChanged { at: 1_000, issue: second }),
+        ]);
+
+        // At clock=1_000, `first` falls back to `clock.now_ms()` (1_000) < 5_000, so `first` sorts before `second`.
+        let list_early = hub.call_as(Caller::User, "issue.list", json!({ "wantsUser": true })).data.unwrap();
+        let titles_early: Vec<&str> = list_early.as_array().unwrap().iter().map(|item| item["title"].as_str().unwrap()).collect();
+        assert_eq!(titles_early, vec!["no-since", "explicit-since"]);
+
+        // Advancing ManualClock past 5_000 flips the patrol ordering deterministically.
+        clock.advance(Duration::from_secs(10));
+        let list_late = hub.call_as(Caller::User, "issue.list", json!({ "wantsUser": true })).data.unwrap();
+        let titles_late: Vec<&str> = list_late.as_array().unwrap().iter().map(|item| item["title"].as_str().unwrap()).collect();
+        assert_eq!(titles_late, vec!["explicit-since", "no-since"]);
+
+        board.close();
+        hub.close();
+    }
 }

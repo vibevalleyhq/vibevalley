@@ -5,7 +5,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serde_json::json;
+use vibevalley_core::{Clock, ManualClock};
 use vibevalley_protocol::{BizCode, Caller};
+use vibevalley_server::modules::work::cron::{self, Crons};
 
 fn server(dir: &std::path::Path) -> vibevalley_server::Started {
     let mut registry = vibevalley_runtime::oar::Registry::new();
@@ -25,6 +27,18 @@ fn crons_are_kept_refused_and_run_when_due() {
     let dir = tempfile::tempdir().unwrap();
     let started = server(dir.path());
     let hub = started.hub.clone();
+    let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+    let crons = Crons::open_with_clock(
+        started.test_internals().db.clone(),
+        &hub,
+        started.test_internals().board.clone(),
+        started.test_internals().agents.clone(),
+        Some(started.test_internals().chat.clone()),
+        None,
+        clock.clone(),
+    )
+    .unwrap();
+    cron::install(&hub, crons.clone(), false);
     let call = |op: &str, p| hub.call_as(Caller::User, op, p);
     let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
     helper.runtime = "scripted".into();
@@ -67,15 +81,17 @@ fn crons_are_kept_refused_and_run_when_due() {
     assert!(preview["does"][0].as_str().unwrap().contains("早报"));
     assert_eq!(call("cron.delete", json!({ "id": "nope" })).biz_code, BizCode::CronNotFound.code());
 
-    let at = vibevalley_server::now() + 120;
+    let at = clock.now_ms() + 60_000;
     let once = call(
         "cron.create",
         json!({ "name": "say hi", "text": "say hi in notes", "agent": "lab", "repo": "farm", "when": { "kind": "once", "at": at } }),
     );
     let once = once.data.unwrap_or_else(|| panic!("{}", once.message));
     assert_eq!(once["agent"], helper.id.as_str());
-    std::thread::sleep(Duration::from_millis(150));
-    started.test_internals().crons.tick();
+    crons.tick();
+    assert_eq!(started.test_internals().board.read(|s| s.issues.iter().filter(|i| i.cron.is_some()).count()), 0);
+    clock.advance(Duration::from_secs(60));
+    crons.tick();
     let made = started
         .test_internals()
         .board
@@ -84,9 +100,10 @@ fn crons_are_kept_refused_and_run_when_due() {
     assert_eq!(made.title, "say hi");
     assert!(made.was_sent() || made.status == vibevalley_protocol::IssueStatus::Todo, "{:?}", made.status);
     let after = hub.read(|s| s.crons.iter().find(|c| c.id == once["id"].as_str().unwrap()).cloned()).unwrap();
-    assert!(!after.enabled && after.last_run.is_some());
+    assert!(!after.enabled && after.last_run == Some(at));
     // Run once: the next tick makes nothing new.
-    started.test_internals().crons.tick();
+    clock.advance(Duration::from_secs(60));
+    crons.tick();
     assert_eq!(started.test_internals().board.read(|s| s.issues.iter().filter(|i| i.cron.is_some()).count()), 1);
     assert!(!dir.path().join("crons.json").exists(), "crons must live in server.db, not crons.json");
 
@@ -102,12 +119,10 @@ fn crons_are_kept_refused_and_run_when_due() {
             },
         )
         .unwrap();
-    assert_eq!(
-        started.test_internals().crons.issue_of(once["id"].as_str().unwrap()).as_deref(),
-        Some(made.id.as_str())
-    );
+    assert_eq!(crons.issue_of(once["id"].as_str().unwrap()).as_deref(), Some(made.id.as_str()));
 
     call("cron.delete", json!({ "id": id })).data.unwrap_or_default();
+    crons.close();
     started.test_internals().board.close();
     drop(started);
 

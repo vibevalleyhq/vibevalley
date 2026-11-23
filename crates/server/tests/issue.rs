@@ -70,11 +70,10 @@ fn an_issue_goes_through_the_endpoints_from_create_to_done() {
     let sent = call(&hub, "issue.status.update", json!({ "id": id, "status": "todo" }));
     assert_eq!(sent["bizCode"], 0, "{sent}");
     let board_issue = || hub.state_now().issues.into_iter().find(|i| i.id == id).unwrap();
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
-    while board_issue().status != vibevalley_protocol::IssueStatus::InReview {
-        assert!(std::time::Instant::now() < deadline, "{:#?}", board_issue());
-        std::thread::sleep(std::time::Duration::from_millis(10));
-    }
+    wait_until_transition(&hub, std::time::Duration::from_secs(15), "issue InReview", || {
+        let issue = board_issue();
+        (issue.status == vibevalley_protocol::IssueStatus::InReview).then_some(issue)
+    });
 
     let diff = call(&hub, "issue.diff.get", json!({ "id": id }));
     assert_eq!(diff["bizCode"], 0, "{diff}");
