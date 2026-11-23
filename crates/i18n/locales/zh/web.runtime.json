@@ -28,7 +28,7 @@
   "mcp": "MCP 服务器",
   "tools": "工具",
   "agents": "用到它的 agent",
-  "makeAgent": "用它捏一个新 agent →",
+  "makeAgent": "用它捏一个新 agent",
   "noneYet": "还没有。",
   "afterInstall": "装好以后才能读到。",
   "noUsage": "这个引擎不报告账户用量。",

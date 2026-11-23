@@ -20,6 +20,22 @@ interface Nested {
 }
 
 const han = /\p{Script=Han}/u;
+const leadingGlyphLabel = /^\s*(?:←|→|＋|\+\s+|×|✕)/u;
+const trailingGlyphLabel = /(?:←|→|＋|×|✕|\s+\+)\s*$/u;
+const inlineFlowArrow = /\{[^}]+\}\s*→\s*\{[^}]+\}/u;
+
+/** Flags leading/trailing glyph icon substitutes in `web.*` button/link labels. */
+export function glyphLabelProblems(locale: string, entries: ReadonlyMap<string, string>): string[] {
+  const problems: string[] = [];
+  for (const [key, value] of entries) {
+    if (!key.startsWith("web.") || key.startsWith("web.farm.phone.")) continue;
+    if (inlineFlowArrow.test(value)) continue;
+    if (leadingGlyphLabel.test(value) || trailingGlyphLabel.test(value)) {
+      problems.push(`${locale}: ${key} has a leading/trailing glyph icon substitute (${JSON.stringify(value)}); render <Icon /> instead`);
+    }
+  }
+  return problems;
+}
 /** Messages every language says the same way (a language's own name): Han in English is meant there. */
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by this script
 const same = new Set((JSON.parse(readFileSync(join(dictionaries, "same.json"), "utf8")) as { keys: string[] }).keys);
@@ -134,7 +150,11 @@ function check(): string[] {
   for (const u of uses) if (!u.prefix && !zh.has(u.key)) problems.push(`${u.file}:${u.line}: ${u.key} is not in the catalogs`);
   for (const k of zh.keys()) if (!used.has(k) && !prefixes.some((p) => k.startsWith(p))) problems.push(`unused: ${k}`);
   const glossary = readGlossary(readFileSync(join(root, "docs/README.md"), "utf8"));
-  for (const locale of locales) problems.push(...wordProblems(glossary, locale, messages(locale)));
+  for (const locale of locales) {
+    const localeMessages = messages(locale);
+    problems.push(...wordProblems(glossary, locale, localeMessages));
+    problems.push(...glyphLabelProblems(locale, localeMessages));
+  }
   if (!existsSync(catalogsFile) || readFileSync(catalogsFile, "utf8") !== formatted(generated()))
     problems.push("packages/i18n/src/catalogs.ts is stale: run vpx scripts/gen/i18n.ts gen");
   return problems;
@@ -161,26 +181,28 @@ function find(text: string) {
   }
 }
 
-const [command, ...rest] = process.argv.slice(2);
-switch (command) {
-  case "gen":
-    gen();
-    break;
-  case "scan":
-    for (const u of scan()) console.log(`${u.key}${u.prefix ? "*" : ""}\t${u.file}:${u.line}`);
-    break;
-  case "check": {
-    const problems = check();
-    for (const p of problems) console.log(p);
+if (import.meta.main) {
+  const [command, ...rest] = process.argv.slice(2);
+  switch (command) {
+    case "gen":
+      gen();
+      break;
+    case "scan":
+      for (const u of scan()) console.log(`${u.key}${u.prefix ? "*" : ""}\t${u.file}:${u.line}`);
+      break;
+    case "check": {
+      const problems = check();
+      for (const p of problems) console.log(p);
 
-    console.log(problems.length > 0 ? `i18n: ${problems.length} problems` : `i18n: ${messages("zh").size} messages ok`);
-    if (problems.length > 0) process.exit(1);
-    break;
+      console.log(problems.length > 0 ? `i18n: ${problems.length} problems` : `i18n: ${messages("zh").size} messages ok`);
+      if (problems.length > 0) process.exit(1);
+      break;
+    }
+    case "find":
+      find(rest.join(" "));
+      break;
+    default:
+      console.log("usage: vpx scripts/gen/i18n.ts gen | scan | check | find <text>");
+      process.exit(command ? 1 : 0);
   }
-  case "find":
-    find(rest.join(" "));
-    break;
-  default:
-    console.log("usage: vpx scripts/gen/i18n.ts gen | scan | check | find <text>");
-    process.exit(command ? 1 : 0);
 }

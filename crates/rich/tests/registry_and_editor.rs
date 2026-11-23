@@ -255,16 +255,17 @@ fn IconGalleryHarness() -> impl IntoElement {
 }
 
 #[test]
-fn vv_icon_mounts_all_97_icons_and_exposes_accessible_label() {
-    assert_eq!(ICON_NAMES.len(), 97);
+fn vv_icon_mounts_all_98_icons_and_exposes_accessible_label() {
+    assert_eq!(ICON_NAMES.len(), 98);
     assert!(icon_shapes("chat").is_some());
     assert!(icon_shapes("sidebar").is_some());
+    assert!(icon_shapes("sidebarRight").is_some());
 
     let mut harness = TestHarness::mount(Root::of::<IconGalleryHarness>());
-    // 97 catalog icons + 3 edge-case icons = 100 mounted canvas views; only the 99 valid icons emit non-empty drawings.
+    // 98 catalog icons + 3 edge-case icons = 101 mounted canvas views; only the 100 valid icons emit non-empty drawings.
     let canvas_views = harness.kinds.values().filter(|&&k| k == nsh_core::ViewKind::Canvas).count();
-    assert_eq!(canvas_views, 100);
-    assert_eq!(harness.canvases.len(), 99);
+    assert_eq!(canvas_views, 101);
+    assert_eq!(harness.canvases.len(), 100);
     assert!(harness.canvases.values().all(|d| !d.ops.is_empty()));
 
     let labeled = harness.find_label("Close dialog").expect("labeled VvIcon should be discoverable");

@@ -478,8 +478,9 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
               role="button"
               testID="runs-back"
               onPress={props.onBack}
-              class="-ml-1.5 self-start rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+              class="-ml-1.5 flex-row items-center gap-1 self-start rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
             >
+              <Icon name="back" size={12} tone="muted" />
               <Text class="text-xs font-medium text-muted">{t("web.session.hub.back")}</Text>
             </View>
           </If>

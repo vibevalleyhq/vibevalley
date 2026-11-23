@@ -28,7 +28,7 @@
   "mcp": "MCP servers",
   "tools": "Tools",
   "agents": "Agents using it",
-  "makeAgent": "Make a new agent with it →",
+  "makeAgent": "Make a new agent with it",
   "noneYet": "None yet.",
   "afterInstall": "Readable once it is installed.",
   "noUsage": "This runtime does not report account usage.",

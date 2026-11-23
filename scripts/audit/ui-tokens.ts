@@ -59,7 +59,14 @@ const BOX_GEOMETRY_STYLE_KEYS = new Set([
   "paddingRight",
 ]);
 
-export type ViolationRule = "hardcoded-color" | "arbitrary-tailwind" | "raw-control" | "selection-layout-shift" | "color-transition" | "unmanaged-motion";
+export type ViolationRule =
+  | "hardcoded-color"
+  | "arbitrary-tailwind"
+  | "raw-control"
+  | "selection-layout-shift"
+  | "color-transition"
+  | "unmanaged-motion"
+  | "glyph-icon-substitute";
 
 export interface Finding {
   readonly file: string;
@@ -76,7 +83,16 @@ const RULE_EXEMPTIONS: Readonly<Record<string, readonly ViolationRule[]>> = {
   "apps/mac/ui/features/artifact/shell.ts": ["hardcoded-color"],
   // Pure whiteboard SVG illustrations, canvas themes, and WebView runtime stylesheet.
   "apps/mac/ui/features/artifact/whiteboard.ts": ["hardcoded-color"],
+  // Emoji grid and keyboard shortcut labels legitimately render character glyphs.
+  "apps/mac/ui/features/channel/views/EmojiPicker.tsx": ["glyph-icon-substitute"],
+  "apps/mac/ui/infra/base/shortcuts.ts": ["glyph-icon-substitute"],
 };
+
+const GLYPH_ICON_EXEMPT_PREFIXES = ["apps/mac/ui/farm/games/"] as const;
+const GLYPH_ICON_HOST_TAGS = new Set(["Text", "Button", "ButtonLink"]);
+const GLYPH_ICON_EXEMPT_ANCESTORS = new Set(["Kbd", "KeyCap"]);
+const STANDALONE_GLYPH_ICONS = new Set(["×", "✕", "✖", "✓", "✔", "▸", "▾", "▲", "▼", "←", "→", "＋", "[x]", "[ ]"]);
+const GLYPH_ICON_FIX = 'use `<Icon name="..." />` from `apps/mac/ui/design/Icon.tsx` instead of a text glyph icon';
 
 interface AstNode {
   readonly type: string;
@@ -377,7 +393,100 @@ function scanStringValue(out: Finding[], file: string, line: number, text: strin
 
 export function isRuleExempt(file: string, rule: ViolationRule): boolean {
   const normalized = file.replaceAll("\\", "/");
+  if (rule === "glyph-icon-substitute" && GLYPH_ICON_EXEMPT_PREFIXES.some((prefix) => normalized.startsWith(prefix))) {
+    return true;
+  }
   return RULE_EXEMPTIONS[normalized]?.includes(rule) ?? false;
+}
+
+function jsxElementTagName(el: AstNode | undefined): string | undefined {
+  if (!el || el.type !== "JSXElement" || !isAstNode(el.openingElement)) return undefined;
+  const name = el.openingElement.name;
+  return isAstNode(name) && name.type === "JSXIdentifier" && typeof name.name === "string" ? name.name : undefined;
+}
+
+function insideExemptGlyphAncestor(ancestors: readonly AstNode[]): boolean {
+  for (let i = ancestors.length - 1; i >= 0; i--) {
+    const tag = jsxElementTagName(ancestors[i]);
+    if (tag !== undefined && GLYPH_ICON_EXEMPT_ANCESTORS.has(tag)) return true;
+  }
+  return false;
+}
+
+function isInlineFlowArrow(node: AstNode, ancestors: readonly AstNode[]): boolean {
+  if (jsxElementTagName(node) !== "Text") return false;
+  // Nested `<Text>{" → "}</Text>` inside an outer `<Text>` sentence (e.g., `tool args → result`).
+  for (let i = ancestors.length - 1; i >= 0; i--) {
+    if (jsxElementTagName(ancestors[i]) === "Text") return true;
+  }
+  // `<Text>branch</Text><Text>→</Text><Text>base</Text>` inside a non-interactive container.
+  const parent = ancestors[ancestors.length - 1];
+  if (!parent || parent.type !== "JSXElement" || !Array.isArray(parent.children)) return false;
+  const parentTag = jsxElementTagName(parent);
+  if (parentTag === "Button" || parentTag === "ButtonLink" || parentTag === "A" || parentTag === "Link") return false;
+  if (isAstNode(parent.openingElement) && isInteractiveJsxElement(parent.openingElement)) return false;
+
+  const significant = parent.children.filter(
+    (c): c is AstNode => isAstNode(c) && !(c.type === "JSXText" && typeof c.value === "string" && c.value.trim().length === 0),
+  );
+  const idx = significant.indexOf(node);
+  return idx > 0 && idx + 1 < significant.length && jsxElementTagName(significant[idx - 1]) === "Text" && jsxElementTagName(significant[idx + 1]) === "Text";
+}
+
+function collectExprGlyphStrings(expr: AstNode, out: { text: string; offset: number }[]): void {
+  const offset = typeof expr.start === "number" ? expr.start : 0;
+  if (expr.type === "Literal" && typeof expr.value === "string") {
+    out.push({ text: expr.value, offset });
+    return;
+  }
+  if (expr.type === "TemplateLiteral" && Array.isArray(expr.quasis) && Array.isArray(expr.expressions) && expr.expressions.length === 0) {
+    const raw = expr.quasis.filter(isAstNode).map(rawTemplateText).join("");
+    out.push({ text: raw, offset });
+    return;
+  }
+  if (expr.type === "ConditionalExpression") {
+    if (isAstNode(expr.consequent)) collectExprGlyphStrings(expr.consequent, out);
+    if (isAstNode(expr.alternate)) collectExprGlyphStrings(expr.alternate, out);
+    return;
+  }
+  if (expr.type === "LogicalExpression") {
+    if ((expr.operator === "||" || expr.operator === "??") && isAstNode(expr.left)) collectExprGlyphStrings(expr.left, out);
+    if (isAstNode(expr.right)) collectExprGlyphStrings(expr.right, out);
+    return;
+  }
+  if (expr.type === "ParenthesizedExpression" && isAstNode(expr.expression)) {
+    collectExprGlyphStrings(expr.expression, out);
+  }
+}
+
+function scanGlyphIconSubstitutes(out: Finding[], file: string, starts: readonly number[], node: AstNode, ancestors: readonly AstNode[]): void {
+  const tag = jsxElementTagName(node);
+  if (tag === undefined || !GLYPH_ICON_HOST_TAGS.has(tag)) return;
+  if (insideExemptGlyphAncestor(ancestors) || !Array.isArray(node.children)) return;
+
+  const candidates: { text: string; offset: number }[] = [];
+  for (const child of node.children) {
+    if (!isAstNode(child)) continue;
+    const childOffset = typeof child.start === "number" ? child.start : typeof node.start === "number" ? node.start : 0;
+    if (child.type === "JSXText" && typeof child.value === "string") {
+      candidates.push({ text: child.value, offset: childOffset });
+    } else if (child.type === "JSXExpressionContainer" && isAstNode(child.expression)) {
+      collectExprGlyphStrings(child.expression, candidates);
+    }
+  }
+
+  for (const candidate of candidates) {
+    const trimmed = candidate.text.trim();
+    if (!STANDALONE_GLYPH_ICONS.has(trimmed)) continue;
+    if (trimmed === "→" && isInlineFlowArrow(node, ancestors)) continue;
+    out.push({
+      file,
+      line: lineAt(starts, candidate.offset),
+      rule: "glyph-icon-substitute",
+      snippet: `<${tag}>${trimmed}</${tag}>`,
+      fix: GLYPH_ICON_FIX,
+    });
+  }
 }
 
 export function scanUiTokens(relFile: string, source: string): Finding[] {
@@ -451,6 +560,11 @@ export function scanUiTokens(relFile: string, source: string): Finding[] {
           }
         }
       }
+      continue;
+    }
+
+    if (node.type === "JSXElement") {
+      scanGlyphIconSubstitutes(rawFindings, normalized, starts, node, ancestors);
       continue;
     }
 

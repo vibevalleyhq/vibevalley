@@ -47,7 +47,7 @@
     "time": "时间写成 HH:MM，比如 09:00：{time}",
     "days": "每周的哪几天：0 到 6，0 是周日"
   },
-  "due": "{missed, select, true {⏰ 定时任务「{name}」到点了（服务端没开着时错过的，补一次）：{text}} other {⏰ 定时任务「{name}」到点了：{text}}}",
+  "due": "{missed, select, true {定时任务「{name}」到点了（服务端没开着时错过的，补一次）：{text}} other {定时任务「{name}」到点了：{text}}}",
   "noCron": "没有 {id} 号定时任务",
   "noChannel": "没有 {name} 这个频道",
   "noProfile": "没有叫 {name} 的角色",

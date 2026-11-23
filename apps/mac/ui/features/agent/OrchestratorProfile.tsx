@@ -10,6 +10,7 @@ import { ConfirmButton } from "../../design/ConfirmButton";
 import { orchestratorLooks } from "../../design/domain/cast";
 import { OrchestratorFace } from "../../design/domain/Face";
 import { Field, TextArea, TextInput } from "../../design/Field";
+import { Icon } from "../../design/Icon";
 import { Bubble } from "../../design/Tip";
 import { api } from "../../infra/api";
 import { useQueryClient } from "../../infra/query";
@@ -84,7 +85,12 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
     <Scroll testID="orchestrator-profile" class="h-full flex-1 bg-page" contentClass="px-5 pb-8">
       <View class="max-w-3xl gap-4">
         <View testID="profile-bar" class="flex-row flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-line py-3">
-          <A href="/agents" testID="back" class="group rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover">
+          <A
+            href="/agents"
+            testID="back"
+            class="group flex-row items-center gap-1 rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+          >
+            <Icon name="back" size={14} tone="muted" />
             <Text class="text-sm text-muted group-hover:text-ink">{t("web.agent.all")}</Text>
           </A>
           <Text class="text-sm text-faint">/</Text>
@@ -134,16 +140,17 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
           </View>
         </View>
         <If when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={(a) => draft.set(a)} />}</If>
-        <Text class="text-sm text-muted">
-          {`${t("web.agent.orchestrator.intro")} `}
+        <View class="gap-1">
+          <Text class="text-sm text-muted">{t("web.agent.orchestrator.intro")}</Text>
           <If when={props.saved}>
             {(saved) => (
-              <Text class="text-sm text-muted underline" onPress={() => router.navigate(orchestratorHref(saved().id))}>
-                {t("web.agent.orchestrator.page")}
-              </Text>
+              <A href={orchestratorHref(saved().id)} class="group flex-row items-center gap-1 self-start rounded-sm py-0.5 hover:bg-hover">
+                <Text class="text-sm text-muted underline group-hover:text-ink">{t("web.agent.orchestrator.page")}</Text>
+                <Icon name="next" size={13} tone="muted" />
+              </A>
             )}
           </If>
-        </Text>
+        </View>
         <View class="grid gap-4 sm:grid-cols-2">
           <Field label={t("web.agent.name")} hint={nameTaken() ? t("web.agent.nameTaken") : t("web.agent.orchestrator.nameTip")}>
             <TextInput testID="agent-name" accessibilityLabel={t("web.agent.name")} value={draft().name} onInput={(name) => patch({ name })} />

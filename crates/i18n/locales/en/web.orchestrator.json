@@ -30,7 +30,7 @@
       "memory": "Memory",
       "voice": "Voice"
     },
-    "all": "← All profiles",
+    "all": "All profiles",
     "title": "Assistant",
     "intro": "The assistant is not a helper: it hears what you want done, sends helpers to do it, watches progress and passes on results.",
     "look": "It looks like {name}.",

@@ -103,7 +103,7 @@
       "worker": "Helpers"
     },
     "list": "Runs",
-    "back": "← All runs",
+    "back": "All runs",
     "filterAgent": "Profile: {name}",
     "filterIssue": "Ticket: {label}",
     "clearFilter": "Clear filters",

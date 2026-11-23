@@ -4,6 +4,7 @@ mod debug;
 mod diff;
 mod host;
 mod hosted;
+mod icon;
 mod island;
 mod live_voice;
 mod panes;

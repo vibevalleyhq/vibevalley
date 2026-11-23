@@ -128,7 +128,12 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
 
   const bar = () => (
     <View testID="profile-bar" class="flex-row flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-line py-3">
-      <A href="/agents" testID="back" class="group rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover">
+      <A
+        href="/agents"
+        testID="back"
+        class="group flex-row items-center gap-1 rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+      >
+        <Icon name="back" size={14} tone="muted" />
         <Text class="text-sm text-muted group-hover:text-ink">{t("web.agent.all")}</Text>
       </A>
       <Text class="text-sm text-faint">/</Text>

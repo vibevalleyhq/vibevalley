@@ -9,11 +9,12 @@ use std::time::Duration;
 
 use gpui::{
     AnyElement, AppContext as _, Context, EventEmitter, FocusHandle, Focusable, FontWeight, HighlightStyle, Hsla, InteractiveElement as _, IntoElement,
-    ParentElement as _, PathBuilder, Render, StatefulInteractiveElement as _, Styled as _, StyledText, Window, canvas, div, point, px, uniform_list,
+    ParentElement as _, Render, StatefulInteractiveElement as _, Styled as _, StyledText, Window, div, px, uniform_list,
 };
 use vibevalley_git::{Change, FileDiff, LineKind, Repo};
 use vibevalley_workspace::DiffSpec;
 
+use crate::icon::gpui_icon;
 use crate::theme::{Palette, Ui};
 
 /// Emitted after a hunk was staged, unstaged or discarded.
@@ -365,32 +366,6 @@ impl Focusable for DiffView {
 
 fn transparent() -> Hsla {
     gpui::hsla(0.0, 0.0, 0.0, 0.0)
-}
-
-fn chevron_icon(expanded: bool, color: Hsla) -> AnyElement {
-    canvas(
-        |_, _, _| {},
-        move |bounds, _, window, _| {
-            let cx = f32::from(bounds.origin.x) + f32::from(bounds.size.width) * 0.5;
-            let cy = f32::from(bounds.origin.y) + f32::from(bounds.size.height) * 0.5;
-            let mut pb = PathBuilder::stroke(px(1.5));
-            if expanded {
-                pb.move_to(point(px(cx - 3.0), px(cy - 1.5)));
-                pb.line_to(point(px(cx), px(cy + 2.0)));
-                pb.line_to(point(px(cx + 3.0), px(cy - 1.5)));
-            } else {
-                pb.move_to(point(px(cx - 1.5), px(cy - 3.0)));
-                pb.line_to(point(px(cx + 2.0), px(cy)));
-                pb.line_to(point(px(cx - 1.5), px(cy + 3.0)));
-            }
-            if let Ok(path) = pb.build() {
-                window.paint_path(path, color);
-            }
-        },
-    )
-    .size(px(12.0))
-    .flex_none()
-    .into_any_element()
 }
 
 fn change_badge(change: Change, c: &Palette) -> (&'static str, Hsla, Hsla) {
@@ -867,7 +842,11 @@ impl Render for DiffView {
                                     row.children(any_expandable.then(|| {
                                         let slot = div().w(px(14.0)).flex_none().flex().items_center().justify_center();
                                         if has_hunks {
-                                            slot.child(chevron_icon(!collapsed, if *collapsed { c.muted } else { c.text }))
+                                            slot.child(gpui_icon(
+                                                if *collapsed { "expand" } else { "choose" },
+                                                11.0,
+                                                if *collapsed { c.muted } else { c.text },
+                                            ))
                                         } else {
                                             slot
                                         }

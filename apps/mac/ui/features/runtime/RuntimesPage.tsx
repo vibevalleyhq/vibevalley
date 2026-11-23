@@ -310,8 +310,13 @@ function Detail(props: { info: RuntimeInfo; agents: Agent[] }) {
       <Card
         title={t("web.runtime.agents")}
         action={
-          <A href={`/agents/new?runtime=${encodeURIComponent(props.info.id)}`} testID="new-agent" class="group rounded-sm px-1.5 py-0.5 hover:bg-hover">
+          <A
+            href={`/agents/new?runtime=${encodeURIComponent(props.info.id)}`}
+            testID="new-agent"
+            class="group flex-row items-center gap-1 rounded-sm px-1.5 py-0.5 hover:bg-hover"
+          >
             <Text class="text-xs text-muted underline group-hover:text-ink">{t("web.runtime.makeAgent")}</Text>
+            <Icon name="next" size={12} tone="muted" />
           </A>
         }
       >

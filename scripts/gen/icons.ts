@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../..");
 
-export const EXPECTED_ICON_COUNT = 97;
+export const EXPECTED_ICON_COUNT = 98;
 
 export type VectorLineCap = "butt" | "round" | "square";
 export type VectorLineJoin = "miter" | "round" | "bevel";
