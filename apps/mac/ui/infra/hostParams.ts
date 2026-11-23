@@ -6,6 +6,7 @@ import { MotionChoice, type MotionChoice as MotionChoiceType } from "@vibevalley
 import { InboxItem } from "@vibevalley/protocol/schema";
 
 export type HostLocale = "en" | "zh";
+export type HostConnectionMode = "embedded" | "remote";
 
 export interface HostParams {
   readonly view?: string | undefined;
@@ -15,6 +16,7 @@ export interface HostParams {
   readonly role?: string | undefined;
   readonly pixelDir?: string | undefined;
   readonly globalShell: boolean;
+  readonly connectionMode?: HostConnectionMode | undefined;
 }
 
 export interface ChatPaneParams {
@@ -54,6 +56,7 @@ export interface DevToolsParams {
 const optString = z.string().optional().catch(undefined);
 const localeSchema = z.enum(["en", "zh"]).catch("zh");
 const motionSchema = MotionChoice.optional().catch(undefined);
+const connectionModeSchema = z.enum(["embedded", "remote"]).optional().catch(undefined);
 
 const hostParamsSchema = z.object({
   view: optString,
@@ -63,6 +66,7 @@ const hostParamsSchema = z.object({
   role: optString,
   pixelDir: optString,
   globalShell: z.boolean().catch(false),
+  connectionMode: connectionModeSchema,
 });
 
 const chatPaneParamsSchema = z.object({
@@ -120,6 +124,10 @@ export function readHostLocale(): HostLocale {
 
 export function readHostMotion(): MotionChoiceType | undefined {
   return motionSchema.parse(rawParams().motion);
+}
+
+export function readConnectionMode(): HostConnectionMode | undefined {
+  return connectionModeSchema.parse(rawParams().connectionMode);
 }
 
 export function readHostViewName(): string {

@@ -379,3 +379,4 @@ GitHub 的检测：gh 装没装、登没登录
 | 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
 |---|---|---|---|---|---|---|
 | `attachment.create` | 上传一个文件，给消息带上或放进媒体库 | `/api/v1/attachment/create` | ✓ | ✓ |   |   |
+| `attachment.importPath` | cap.op.attachment.importPath | `/api/v1/attachment/importPath` | ✓ |   |   |   |

@@ -1,16 +1,14 @@
 import { Text, View, type JSX } from "nsh";
 
-import { hostApi } from "../infra/bridge";
-import { useRouter } from "../infra/router";
+import { followDesignHref, useDesignHost } from "./host";
 
 /** A quiet underlined word: a page to open, or onClick. */
 export function TextLink(props: { children: JSX.Element; href?: string; onClick?: () => void; danger?: boolean; testid?: string }) {
-  const router = useRouter();
+  const designHost = useDesignHost();
   const go = () => {
     const href = props.href;
     if (href === undefined) return props.onClick?.();
-    if (href.startsWith("/")) router.navigate(href);
-    else void hostApi.openUrl(href);
+    followDesignHref(designHost, href);
   };
   return (
     <View role={props.href === undefined ? "button" : "link"} testID={props.testid} onPress={go} class="self-start">

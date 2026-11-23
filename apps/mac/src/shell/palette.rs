@@ -14,7 +14,7 @@ use super::{Palette, Shell};
 
 impl Shell {
     pub fn open_palette(&mut self, mode: PaletteMode, window: &mut Window, cx: &mut Context<Self>) {
-        if self.palette.is_none() {
+        if self.overlays.palette.is_none() {
             let dark = Ui::get(cx).colors.dark;
             let view = cx.new(|cx| HostedView::new("palette", Map::new(), dark, window, cx));
             let sub = cx.subscribe_in(&view, window, |this, _, event: &HostedEvent, window, cx| match event {
@@ -22,16 +22,16 @@ impl Shell {
                 HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
                 HostedEvent::Ready => this.refresh_palette(cx),
             });
-            self.palette = Some(Palette {
+            self.overlays.palette = Some(Palette {
                 view,
-                open: false,
+                open: true,
                 mode,
                 query: String::new(),
                 seq: 0,
                 _sub: sub,
             });
         }
-        let p = self.palette.as_mut().expect("palette");
+        let p = self.overlays.palette.as_mut().expect("palette");
         if p.mode != mode {
             p.query.clear();
         }
@@ -44,23 +44,27 @@ impl Shell {
     }
 
     pub fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(p) = &mut self.palette {
-            p.open = false;
-        }
-        if self.native_workspace {
+        // Reclaim the command palette's QuickJS VM immediately when hidden.
+        self.overlays.palette = None;
+        if self.chrome.native_workspace {
             self.focus_active_pane(window, cx);
-        } else if self.native_pixel.is_some() {
+        } else if self.chrome.native_pixel.is_some() {
             window.focus(&self.focus, cx);
         } else {
-            let handle = self.workbench.read(cx).focus_handle(cx);
+            let handle = self.chrome.workbench.read(cx).focus_handle(cx);
             window.focus(&handle, cx);
         }
         cx.notify();
     }
 
     pub(super) fn refresh_palette(&mut self, cx: &mut Context<Self>) {
-        let index = self.ws.active_id().and_then(|id| self.projects.get(&id)).and_then(|pv| pv.index.clone());
-        let Some(p) = &mut self.palette else { return };
+        let index = self
+            .workspace
+            .ws
+            .active_id()
+            .and_then(|id| self.workspace.projects.get(&id))
+            .and_then(|pv| pv.index.clone());
+        let Some(p) = &mut self.overlays.palette else { return };
         if !p.open {
             return;
         }
@@ -83,7 +87,7 @@ impl Shell {
                     cx,
                     move || index.query(&query, 200),
                     move |s, matches, cx| {
-                        let Some(p) = &s.palette else { return };
+                        let Some(p) = &s.overlays.palette else { return };
                         if p.seq != seq {
                             return;
                         }
@@ -97,8 +101,8 @@ impl Shell {
     }
 
     pub(super) fn run_search(&mut self, regex: bool, case_sensitive: bool, cx: &mut Context<Self>) {
-        let root = self.ws.active().map(|p| p.root().to_path_buf());
-        let (Some(p), Some(root)) = (&mut self.palette, root) else { return };
+        let root = self.workspace.ws.active().map(|p| p.root().to_path_buf());
+        let (Some(p), Some(root)) = (&mut self.overlays.palette, root) else { return };
         p.seq += 1;
         let seq = p.seq;
         let query = p.query.clone();
@@ -126,7 +130,7 @@ impl Shell {
                 (root, hits, result.err().map(|e| e.to_string()))
             },
             move |s, (root, hits, error), cx| {
-                let Some(p) = &s.palette else { return };
+                let Some(p) = &s.overlays.palette else { return };
                 if p.seq != seq {
                     return;
                 }
@@ -140,7 +144,7 @@ impl Shell {
     pub(super) fn palette_select(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
         self.close_palette(window, cx);
         if let Some(rel) = id.strip_prefix("file:") {
-            if let Some(root) = self.ws.active().map(|p| p.root().to_path_buf()) {
+            if let Some(root) = self.workspace.ws.active().map(|p| p.root().to_path_buf()) {
                 self.open_file(root.join(rel), None, window, cx);
             }
             return;
@@ -174,8 +178,9 @@ impl Shell {
             "panel.files" | "panel.git" => {
                 self.show_workspace(cx);
                 self.with_workspace_project(window, cx, |_, _, _, _| {});
-                self.panel = if id == "panel.git" { Panel::Git } else { Panel::Files };
-                self.inspector_open = true;
+                self.chrome.panel = if id == "panel.git" { Panel::Git } else { Panel::Files };
+                self.chrome.inspector_open = true;
+                self.sync_inspector(window, cx);
                 self.push_sidebar(cx);
                 cx.notify();
             }
@@ -183,7 +188,7 @@ impl Shell {
             "git.diff_staged" => self.on_action(Action::OpenDiff { path: None, staged: true }, window, cx),
             "project.add" => self.add_project(window, cx),
             "project.close" => {
-                if let Some(id) = self.ws.active_id() {
+                if let Some(id) = self.workspace.ws.active_id() {
                     self.close_project(id, cx);
                 }
             }

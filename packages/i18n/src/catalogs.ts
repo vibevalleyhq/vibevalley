@@ -2931,7 +2931,6 @@ export const catalogs = {
         boardJumpLatest: "跳到最新",
         boardCount: "{shown}/{total} 条",
       },
-      markdown: { source: "源码", openSource: "打开源码", loadingPreview: "正在加载预览" },
     },
     "web.tree": { sky: "农场的记忆星空" },
     "web.ui.pixel": {
@@ -6078,7 +6077,6 @@ export const catalogs = {
         boardJumpLatest: "Latest",
         boardCount: "{shown}/{total}",
       },
-      markdown: { source: "Source", openSource: "Open source", loadingPreview: "Loading preview" },
     },
     "web.tree": { sky: "The farm's sky of memories" },
     "web.ui.pixel": {
@@ -9080,9 +9078,6 @@ export interface Messages {
   "web.shell.git.wtForceDelete": undefined;
   "web.shell.git.wtRemoveMenu": undefined;
   "web.shell.git.wtRunning": undefined;
-  "web.shell.markdown.loadingPreview": undefined;
-  "web.shell.markdown.openSource": undefined;
-  "web.shell.markdown.source": undefined;
   "web.shell.palette.a11y.commands": undefined;
   "web.shell.palette.a11y.files": undefined;
   "web.shell.palette.a11y.search": undefined;

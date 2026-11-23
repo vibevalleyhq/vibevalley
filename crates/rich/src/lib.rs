@@ -56,9 +56,9 @@ pub use highlight::{
 pub use i18n::{VvI18n, translate_json};
 pub use icon::{DEFAULT_ICON_SIZE, ICON_NAMES, IconShape, VvIcon, VvIconElement, VvIconProps, icon_shapes, paint_icon, resolve_icon_color, vv_icon};
 pub use markdown::{
-    CustomNodeKind, PATTERN_ISSUE, PATTERN_MENTION, VvIssuePressEvent, VvLinkPressEvent, VvMarkdown, VvMarkdownElement, VvMarkdownEvent, VvMarkdownProps,
-    VvMarkdownSize, VvMentionPressEvent, VvTaskPressEvent, is_incremental_streaming_safe, parse_vv_markdown, vv_markdown, vv_markdown_extensions,
-    vv_markdown_options,
+    CustomNodeKind, NativeMarkdownDoc, NativeMarkdownEvent, NativeMarkdownRoot, PATTERN_ISSUE, PATTERN_MENTION, VvIssuePressEvent, VvLinkPressEvent,
+    VvMarkdown, VvMarkdownElement, VvMarkdownEvent, VvMarkdownProps, VvMarkdownSize, VvMentionPressEvent, VvTaskPressEvent, is_incremental_streaming_safe,
+    native_markdown_root, parse_vv_markdown, vv_markdown, vv_markdown_extensions, vv_markdown_options,
 };
 pub use pinyin::VvPinyin;
 pub use theme::{

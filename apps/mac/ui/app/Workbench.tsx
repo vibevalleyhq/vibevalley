@@ -28,6 +28,7 @@ import type { RouterHistory } from "../infra/router/history";
 import { prefsNow } from "../infra/state/prefs";
 import { isStorageHydrated } from "../infra/state/storage";
 import { defineStored } from "../infra/state/stored";
+import { WorkbenchDesignHost } from "./DesignHost";
 import { places } from "./places";
 import { Shell } from "./Shell";
 
@@ -184,11 +185,13 @@ const routes: readonly RouteDefinition[] = [
 export function App(props: { history?: RouterHistory }) {
   return (
     <Root history={props.history}>
-      <Follow />
-      <View testID="workbench-page" class="flex-1 bg-page">
-        <Routes routes={routes} fallback={() => <MissingPage />} invalid={() => <MissingPage invalid />} />
-        <ToastHost />
-      </View>
+      <WorkbenchDesignHost>
+        <Follow />
+        <View testID="workbench-page" class="flex-1 bg-page">
+          <Routes routes={routes} fallback={() => <MissingPage />} invalid={() => <MissingPage invalid />} />
+          <ToastHost />
+        </View>
+      </WorkbenchDesignHost>
     </Root>
   );
 }

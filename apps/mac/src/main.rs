@@ -7,6 +7,7 @@ mod hosted;
 mod icon;
 mod island;
 mod live_voice;
+mod markdown_pane;
 mod panes;
 mod pixel;
 mod qr;

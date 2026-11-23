@@ -7,7 +7,6 @@ import { TextView } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
-import { hostApi } from "../infra/bridge";
 import {
   formatGenUiAction,
   richNative,
@@ -17,13 +16,12 @@ import {
   type VvMentionPressEvent,
   type VvTaskPressEvent,
 } from "../infra/rich";
-import { useRouter } from "../infra/router";
 import { Canvas } from "./code/Canvas";
 import { Chart } from "./code/Chart";
 import { CodeBlock } from "./code/CodeBlock";
 import { Diagram } from "./code/Diagram";
 import { GenUi } from "./code/GenUi";
-import { toast } from "./toasts";
+import { followDesignHref, useDesignHost } from "./host";
 
 const fallbackClasses = {
   link: "text-water underline",
@@ -76,12 +74,9 @@ export interface MarkdownProps {
 
 /** Chat text, descriptions, notes, and reports. */
 export function Markdown(props: MarkdownProps) {
-  const router = useRouter();
+  const designHost = useDesignHost();
   const size = () => props.size ?? "base";
-  const openLink = (url: string) => {
-    if (url.startsWith("/")) router.navigate(url);
-    else void hostApi.openUrl(url);
-  };
+  const openLink = (url: string) => followDesignHref(designHost, url);
   const handleGenUiAction = (event: VvGenUiActionEvent) => {
     if (props.onGenUiAction) {
       props.onGenUiAction(event);
@@ -90,18 +85,18 @@ export function Markdown(props: MarkdownProps) {
     const action = event.action.trim();
     const payload = event.payload.trim();
     if (action === "navigate" && payload.startsWith("/")) {
-      router.navigate(payload);
+      designHost.navigate(payload);
       return;
     }
     if (action === "copy" && payload) {
       void Clipboard.writeText(payload).then(
-        () => toast(t("web.base.rich.copied")),
+        () => designHost.toast(t("web.base.rich.copied")),
         () => undefined,
       );
       return;
     }
     const summary = formatGenUiAction(event);
-    if (summary) toast(summary);
+    if (summary) designHost.toast(summary);
   };
   const native = richNative();
   if (native) {
@@ -118,7 +113,7 @@ export function Markdown(props: MarkdownProps) {
         onLinkPress={(e) => openLink(e.url)}
         onIssuePress={(e) => {
           if (props.onIssuePress) props.onIssuePress(e);
-          else router.navigate(`/issues/${e.number}`);
+          else designHost.navigate(`/issues/${e.number}`);
         }}
         onMentionPress={props.onMentionPress}
         onTaskPress={props.onTaskPress}

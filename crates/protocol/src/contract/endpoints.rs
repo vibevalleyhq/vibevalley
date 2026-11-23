@@ -1654,6 +1654,15 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Attachment"),
     },
     Endpoint {
+        op: "attachment.importPath",
+        module: "attachment",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("AttachmentImportPathInput"),
+        result: Some("Attachment"),
+    },
+    Endpoint {
         op: "server.health.get",
         module: "core",
         about: &[],
@@ -3018,6 +3027,13 @@ pub mod ops {
     impl Op for AttachmentCreate {
         const NAME: &'static str = "attachment.create";
         type Input = t::AttachmentUpload;
+        type Result = t::Attachment;
+    }
+    /// Local regular file imported directly into CAS without base64 framing (`Caller::User` only).
+    pub struct AttachmentImportPath;
+    impl Op for AttachmentImportPath {
+        const NAME: &'static str = "attachment.importPath";
+        type Input = t::AttachmentImportPathInput;
         type Result = t::Attachment;
     }
     pub struct ServerHealthGet;

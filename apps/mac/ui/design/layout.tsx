@@ -3,8 +3,8 @@ import { Switch } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
-import { Link as A } from "../infra/router";
 import { TextInput, type TextInputProps } from "./Field";
+import { followDesignHref, useDesignHost } from "./host";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import { motionClass } from "./motion";
@@ -193,13 +193,15 @@ export function ActiveBar(props: { tall?: boolean; class?: string | undefined })
 
 /** A row: a link to its detail, marked when it is the open one. */
 export function ListRow(props: { to: string; item?: string; active?: boolean; title: string; line?: string; leading?: JSX.Element; trailing?: JSX.Element }) {
+  const designHost = useDesignHost();
   const active = () => props.active === true;
   return (
-    <A
-      href={props.to}
+    <View
+      role="link"
       testID={props.item === undefined ? "list-row" : `list-row-${props.item}`}
       accessibilityLabel={props.title}
       accessibilityState={{ selected: active() }}
+      onPress={() => followDesignHref(designHost, props.to)}
       class={`relative flex-row items-center gap-2.5 rounded-md border px-2.5 py-2 focus-visible:outline-2 focus-visible:outline-focus ${
         active() ? "border-line bg-selected" : "border-transparent hover:bg-hover"
       }`}
@@ -215,7 +217,7 @@ export function ListRow(props: { to: string; item?: string; active?: boolean; ti
         </If>
       </View>
       {props.trailing}
-    </A>
+    </View>
   );
 }
 

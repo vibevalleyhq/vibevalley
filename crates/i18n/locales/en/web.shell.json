@@ -242,10 +242,5 @@
     "boardBrief": "Brief",
     "boardJumpLatest": "Latest",
     "boardCount": "{shown}/{total}"
-  },
-  "markdown": {
-    "source": "Source",
-    "openSource": "Open source",
-    "loadingPreview": "Loading preview"
   }
 }

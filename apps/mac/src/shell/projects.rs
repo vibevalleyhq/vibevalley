@@ -26,19 +26,19 @@ type GitSnapshot = (
 
 impl Shell {
     pub fn activate_index(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(project) = self.ws.projects().get(index) {
+        if let Some(project) = self.workspace.ws.projects().get(index) {
             self.activate_path(project.root().to_owned(), window, cx, |_, _, _| {});
         }
     }
 
     pub fn activate_project(&mut self, id: ProjectId, window: &mut Window, cx: &mut Context<Self>) {
-        if self.ws.activate(id) {
+        if self.workspace.ws.activate(id) {
             self.after_activate(id, window, cx);
         }
     }
 
     pub(super) fn transient_project(&self, path: &Path) -> vibevalley_workspace::LoadedProject {
-        let next_id = self.ws.projects().iter().map(|p| p.id()).min().unwrap_or(0).min(0) - 1;
+        let next_id = self.workspace.ws.projects().iter().map(|p| p.id()).min().unwrap_or(0).min(0) - 1;
         let name = path
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
@@ -48,7 +48,7 @@ impl Shell {
                 id: next_id,
                 path: path.to_owned(),
                 name,
-                position: self.ws.projects().len() as i64,
+                position: self.workspace.ws.projects().len() as i64,
                 last_opened_ms: 0,
             },
             layout: None,
@@ -64,18 +64,19 @@ impl Shell {
         then: impl FnOnce(&mut Self, Result<ProjectId, String>, &mut Window, &mut Context<Self>) + 'static,
     ) {
         let running = self
+            .workspace
             .project_open
             .take()
             .and_then(|mut task| (&mut task).now_or_never().is_none().then_some(task));
-        let existing = self.ws.projects().iter().find(|p| p.root() == path).map(|p| p.id());
+        let existing = self.workspace.ws.projects().iter().find(|p| p.root() == path).map(|p| p.id());
         if running.is_none()
             && let Some(id) = existing
         {
             return then(self, Ok(id), window, cx);
         }
-        let store = self.store.clone();
+        let store = self.workspace.store.clone();
         let window = window.window_handle();
-        self.project_open = Some(cx.spawn(async move |this, cx| {
+        self.workspace.project_open = Some(cx.spawn(async move |this, cx| {
             // Preserve the user's order when a second path arrives during the first database load.
             if let Some(earlier) = running {
                 earlier.await;
@@ -92,10 +93,10 @@ impl Shell {
             let _ = cx.update_window(window, |_, window, cx| {
                 let _ = this.update(cx, |shell, cx| {
                     let id = loaded.map(|(path, loaded)| {
-                        if let Some(project) = shell.ws.projects().iter().find(|p| p.root() == path) {
+                        if let Some(project) = shell.workspace.ws.projects().iter().find(|p| p.root() == path) {
                             return project.id();
                         }
-                        let id = shell.ws.open(loaded.unwrap_or_else(|| shell.transient_project(&path)));
+                        let id = shell.workspace.ws.open(loaded.unwrap_or_else(|| shell.transient_project(&path)));
                         shell.ensure_project_view(id, cx);
                         shell.sync_chat_watches(cx);
                         id
@@ -125,7 +126,7 @@ impl Shell {
 
     pub(super) fn after_activate(&mut self, id: ProjectId, window: &mut Window, cx: &mut Context<Self>) {
         self.ensure_project_view(id, cx);
-        if let Some(store) = self.store.clone() {
+        if let Some(store) = self.workspace.store.clone() {
             Self::bg(
                 cx,
                 move || {
@@ -147,7 +148,7 @@ impl Shell {
             multiple: false,
             prompt: Some("Add Project".into()),
         });
-        let store = self.store.clone();
+        let store = self.workspace.store.clone();
         let window_handle = window.window_handle();
         cx.spawn(async move |this, cx| {
             let Ok(Ok(Some(paths))) = rx.await else { return };
@@ -158,7 +159,7 @@ impl Shell {
             let _ = cx.update_window(window_handle, |_, window, cx| {
                 let _ = this.update(cx, |s, cx| match loaded {
                     Ok(p) => {
-                        let id = s.ws.open(p);
+                        let id = s.workspace.ws.open(p);
                         s.activate_project(id, window, cx);
                         s.refresh_summaries(cx);
                     }
@@ -170,14 +171,14 @@ impl Shell {
     }
 
     pub(super) fn close_project(&mut self, id: ProjectId, cx: &mut Context<Self>) {
-        let Some(job) = self.ws.close(id) else { return };
-        self.projects.remove(&id);
-        self.panes.retain(|(p, _), _| *p != id);
-        self.chat_statuses.retain(|(p, _), _| *p != id);
+        let Some(job) = self.workspace.ws.close(id) else { return };
+        self.workspace.projects.remove(&id);
+        self.workspace.panes.retain(|(p, _), _| *p != id);
+        self.workspace.chat_statuses.retain(|(p, _), _| *p != id);
         self.sync_chat_watches(cx);
-        let live: std::collections::BTreeSet<String> = self.ws.projects().iter().flat_map(|p| p.layout.terminal_ids()).collect();
-        self.terminals.retain(|tid, _| live.contains(tid));
-        if let Some(store) = self.store.clone() {
+        let live: std::collections::BTreeSet<String> = self.workspace.ws.projects().iter().flat_map(|p| p.layout.terminal_ids()).collect();
+        self.workspace.terminals.retain(|tid, _| live.contains(tid));
+        if let Some(store) = self.workspace.store.clone() {
             Self::bg(
                 cx,
                 move || {
@@ -187,7 +188,7 @@ impl Shell {
                 |_, _, _| {},
             );
         }
-        if let Some(active) = self.ws.active_id() {
+        if let Some(active) = self.workspace.ws.active_id() {
             self.ensure_project_view(active, cx);
         }
         self.refresh_summaries(cx);
@@ -198,13 +199,13 @@ impl Shell {
     /// Starts the watcher, lists the root, reads git state and indexes files
     /// the first time a project is shown.
     pub fn ensure_project_view(&mut self, id: ProjectId, cx: &mut Context<Self>) {
-        if self.projects.contains_key(&id) {
+        if self.workspace.projects.contains_key(&id) {
             return;
         }
-        let Some(root) = self.ws.project(id).map(|p| p.root().to_path_buf()) else {
+        let Some(root) = self.workspace.ws.project(id).map(|p| p.root().to_path_buf()) else {
             return;
         };
-        self.projects.insert(
+        self.workspace.projects.insert(
             id,
             ProjectView {
                 tree: TreeState::new(root.clone()),
@@ -221,7 +222,7 @@ impl Shell {
                 _watcher: None,
             },
         );
-        let tx = self.fs_tx.clone();
+        let tx = self.workspace.fs_tx.clone();
         let watch_root = root.clone();
         Self::bg(
             cx,
@@ -233,7 +234,7 @@ impl Shell {
             },
             move |s, watcher, _| match watcher {
                 Ok(watcher) => {
-                    if let Some(pv) = s.projects.get_mut(&id) {
+                    if let Some(pv) = s.workspace.projects.get_mut(&id) {
                         pv._watcher = Some(watcher);
                     }
                 }
@@ -248,7 +249,7 @@ impl Shell {
             move || FileIndex::build(&index_root),
             move |s, index, cx| match index {
                 Ok(index) => {
-                    if let Some(pv) = s.projects.get_mut(&id) {
+                    if let Some(pv) = s.workspace.projects.get_mut(&id) {
                         pv.index = Some(Arc::new(index));
                     }
                     s.refresh_palette(cx);
@@ -259,7 +260,7 @@ impl Shell {
     }
 
     pub(super) fn load_dirs(&mut self, id: ProjectId, cx: &mut Context<Self>) {
-        let Some(pv) = self.projects.get(&id) else { return };
+        let Some(pv) = self.workspace.projects.get(&id) else { return };
         let wanted = pv.tree.wanted();
         if wanted.is_empty() {
             self.push_sidebar(cx);
@@ -278,7 +279,7 @@ impl Shell {
                     .collect::<Vec<_>>()
             },
             move |s, listed, cx| {
-                if let Some(pv) = s.projects.get_mut(&id) {
+                if let Some(pv) = s.workspace.projects.get_mut(&id) {
                     for (dir, result) in listed {
                         match result {
                             Ok(entries) => {
@@ -299,7 +300,7 @@ impl Shell {
 
     /// Reads the branch and worktrees of every project the sidebar lists.
     pub fn refresh_summaries(&mut self, cx: &mut Context<Self>) {
-        let roots: Vec<(ProjectId, PathBuf)> = self.ws.projects().iter().map(|p| (p.id(), p.root().to_path_buf())).collect();
+        let roots: Vec<(ProjectId, PathBuf)> = self.workspace.ws.projects().iter().map(|p| (p.id(), p.root().to_path_buf())).collect();
         Self::bg(
             cx,
             move || {
@@ -314,14 +315,14 @@ impl Shell {
                     .collect::<Vec<_>>()
             },
             |s, read, cx| {
-                s.git_summaries = read.into_iter().collect();
+                s.workspace.git_summaries = read.into_iter().collect();
                 s.push_sidebar(cx);
             },
         );
     }
 
     pub fn refresh_git(&mut self, id: ProjectId, cx: &mut Context<Self>) {
-        let Some(pv) = self.projects.get_mut(&id) else { return };
+        let Some(pv) = self.workspace.projects.get_mut(&id) else { return };
         pv.git_busy = true;
         let root = pv.tree.root.clone();
         Self::bg(
@@ -381,7 +382,7 @@ impl Shell {
                 Ok(Some((repo, status, branches, worktrees, worktree_activity, log)))
             },
             move |s, result, cx| {
-                if let Some(pv) = s.projects.get_mut(&id) {
+                if let Some(pv) = s.workspace.projects.get_mut(&id) {
                     pv.git_busy = false;
                     match result {
                         Ok(Some((repo, status, branches, worktrees, worktree_activity, log))) => {
@@ -410,7 +411,7 @@ impl Shell {
     pub(super) fn on_fs_changes(&mut self, id: ProjectId, changes: Vec<FsChange>, cx: &mut Context<Self>) {
         let mut git = false;
         let mut files = Vec::new();
-        if let Some(pv) = self.projects.get_mut(&id) {
+        if let Some(pv) = self.workspace.projects.get_mut(&id) {
             for change in &changes {
                 if Watcher::is_git_state_path(&change.path) {
                     git = true;
@@ -424,22 +425,31 @@ impl Shell {
                 self.load_dirs(id, cx);
             }
         }
-        for ((p, _), pane) in &self.panes {
-            if *p == id
-                && let PaneEntity::File(viewer) = &pane.entity
-            {
-                let path = viewer.read(cx).path().to_path_buf();
-                if files.contains(&path) {
-                    viewer.update(cx, |v, cx| v.reload(cx));
+        for ((p, _), pane) in &self.workspace.panes {
+            if *p == id {
+                match &pane.entity {
+                    PaneEntity::File(viewer) => {
+                        let path = viewer.read(cx).path().to_path_buf();
+                        if files.contains(&path) {
+                            viewer.update(cx, |v, cx| v.reload(cx));
+                        }
+                    }
+                    PaneEntity::Markdown(md) => {
+                        let path = md.read(cx).path().to_path_buf();
+                        if files.contains(&path) {
+                            md.update(cx, |v, cx| v.reload(cx));
+                        }
+                    }
+                    PaneEntity::Diff(_) | PaneEntity::Hosted(_) | PaneEntity::Pixel(_) => {}
                 }
             }
         }
-        if git && self.git_refresh_pending.insert(id) {
+        if git && self.workspace.git_refresh_pending.insert(id) {
             // Debounced: a checkout or build touches many files at once.
             cx.spawn(async move |this, cx| {
                 cx.background_executor().timer(Duration::from_millis(300)).await;
                 let _ = this.update(cx, |s, cx| {
-                    s.git_refresh_pending.remove(&id);
+                    s.workspace.git_refresh_pending.remove(&id);
                     s.refresh_git(id, cx);
                 });
             })
@@ -448,7 +458,7 @@ impl Shell {
     }
 
     pub(super) fn reload_diffs(&mut self, id: ProjectId, cx: &mut Context<Self>) {
-        for ((p, _), pane) in &self.panes {
+        for ((p, _), pane) in &self.workspace.panes {
             if *p == id
                 && let PaneEntity::Diff(view) = &pane.entity
             {
@@ -459,18 +469,19 @@ impl Shell {
 
     pub fn push_sidebar(&mut self, cx: &mut Context<Self>) {
         self.publish_host_debug(cx);
-        let sidebar_ready = self.sidebar.read(cx).is_ready();
-        let inspector_ready = self.inspector_open && self.inspector.read(cx).is_ready();
+        let sidebar_ready = self.chrome.sidebar.read(cx).is_ready();
+        let inspector_ready = self.chrome.inspector_open && self.chrome.inspector.as_ref().is_some_and(|slot| slot.view.read(cx).is_ready());
         if !sidebar_ready && !inspector_ready {
             return;
         }
         let rail_items: Vec<RailProject> = self
+            .workspace
             .ws
             .projects()
             .iter()
             .map(|p| {
-                let pv = self.projects.get(&p.id());
-                let summary = self.git_summaries.get(&p.id());
+                let pv = self.workspace.projects.get(&p.id());
+                let summary = self.workspace.git_summaries.get(&p.id());
                 let worktrees_src = pv.map(|v| &v.worktrees).filter(|w| !w.is_empty()).or(summary.map(|s| &s.worktrees));
                 let branch = pv
                     .and_then(|v| v.status.as_ref()?.branch.clone())
@@ -496,7 +507,12 @@ impl Shell {
                         let title = names.get(&t.id).cloned().unwrap_or_else(|| crate::panes::tab_title(self, t, cx));
                         let (kind, running, running_state, running_agent, running_label, attention) = match &t.kind {
                             PaneKind::Terminal { terminal_id, .. } => {
-                                let status = self.terminals.get(terminal_id).map(|v| v.view.read(cx).terminal_status()).unwrap_or_default();
+                                let status = self
+                                    .workspace
+                                    .terminals
+                                    .get(terminal_id)
+                                    .map(|v| v.view.read(cx).terminal_status())
+                                    .unwrap_or_default();
                                 let att = p.terminal(terminal_id).is_some_and(|e| e.attention);
                                 let running_label = if status.is_coding_agent() {
                                     status
@@ -521,7 +537,7 @@ impl Shell {
                                 )
                             }
                             PaneKind::Chat { runtime, .. } => {
-                                let st = self.chat_statuses.get(&(p.id(), t.id));
+                                let st = self.workspace.chat_statuses.get(&(p.id(), t.id));
                                 let raw = st.map(|s| s.status.as_str()).filter(|s| !s.is_empty()).unwrap_or("ready");
                                 let state = match raw {
                                     "working" => vibevalley_protocol::HostRailRunningState::Working,
@@ -560,8 +576,8 @@ impl Shell {
                     id: p.id(),
                     name: &p.info.name,
                     path: p.root(),
-                    active: Some(p.id()) == self.ws.active_id(),
-                    attention: p.needs_attention() || self.chat_statuses.iter().any(|((pid, _), st)| *pid == p.id() && st.attention),
+                    active: Some(p.id()) == self.workspace.ws.active_id(),
+                    attention: p.needs_attention() || self.workspace.chat_statuses.iter().any(|((pid, _), st)| *pid == p.id() && st.attention),
                     terminals: p.live_terminals(),
                     branch,
                     main_root,
@@ -570,8 +586,8 @@ impl Shell {
                 }
             })
             .collect();
-        let rail = frames::rail(&rail_items, self.panel, Some(self.inspector_open));
-        let (files, git) = match self.ws.active_id().and_then(|id| self.projects.get(&id)) {
+        let rail = frames::rail(&rail_items, self.chrome.panel, Some(self.chrome.inspector_open));
+        let (files, git) = match self.workspace.ws.active_id().and_then(|id| self.workspace.projects.get(&id)) {
             Some(pv) => (
                 frames::file_tree(&pv.tree, &pv.tones),
                 frames::git_panel(&frames::GitView {
@@ -585,17 +601,17 @@ impl Shell {
                     busy: pv.git_busy,
                 }),
             ),
-            None => (frames::empty_file_tree(!self.loaded), frames::empty_git_panel(!self.loaded)),
+            None => (frames::empty_file_tree(!self.workspace.loaded), frames::empty_git_panel(!self.workspace.loaded)),
         };
         if sidebar_ready {
-            self.sidebar.update(cx, |v, cx| {
+            self.chrome.sidebar.update(cx, |v, cx| {
                 v.push("rail", rail.clone(), cx);
                 v.push("files", files.clone(), cx);
                 v.push("git", git.clone(), cx);
             });
         }
-        if inspector_ready {
-            self.inspector.update(cx, |v, cx| {
+        if inspector_ready && let Some(slot) = &self.chrome.inspector {
+            slot.view.update(cx, |v, cx| {
                 v.push("rail", rail, cx);
                 v.push("files", files, cx);
                 v.push("git", git, cx);
@@ -608,8 +624,8 @@ impl Shell {
         if branch.is_empty() {
             return;
         }
-        let Some(active_id) = self.ws.active_id() else { return };
-        let Some(pv) = self.projects.get(&active_id) else { return };
+        let Some(active_id) = self.workspace.ws.active_id() else { return };
+        let Some(pv) = self.workspace.projects.get(&active_id) else { return };
         let main_root = pv
             .worktrees
             .iter()
@@ -627,7 +643,7 @@ impl Shell {
             .unwrap_or_else(|| Path::new("/tmp"))
             .join(".worktrees")
             .join(format!("{repo_name}-{slug}"));
-        if let Some(pv) = self.projects.get_mut(&active_id) {
+        if let Some(pv) = self.workspace.projects.get_mut(&active_id) {
             pv.git_busy = true;
             pv.git_error = None;
         }
@@ -650,13 +666,13 @@ impl Shell {
                 let _ = this.update(cx, |s, cx| match result {
                     Ok(new_path) => {
                         s.refresh_summaries(cx);
-                        if let Some(id) = s.ws.active_id() {
+                        if let Some(id) = s.workspace.ws.active_id() {
                             s.refresh_git(id, cx);
                         }
                         s.activate_path(new_path, window, cx, |_, _, _| {});
                     }
                     Err(e) => {
-                        if let Some(pv) = s.projects.get_mut(&active_id) {
+                        if let Some(pv) = s.workspace.projects.get_mut(&active_id) {
                             pv.git_busy = false;
                             pv.git_error = Some(e);
                         }
@@ -669,8 +685,8 @@ impl Shell {
     }
 
     pub(super) fn remove_worktree(&mut self, path: PathBuf, force: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(active_id) = self.ws.active_id() else { return };
-        let Some(pv) = self.projects.get(&active_id) else { return };
+        let Some(active_id) = self.workspace.ws.active_id() else { return };
+        let Some(pv) = self.workspace.projects.get(&active_id) else { return };
         let main_root = pv
             .worktrees
             .iter()
@@ -683,15 +699,15 @@ impl Shell {
             return;
         }
         // If the removed worktree is open as a workspace project, close it first and switch to the main repo.
-        let closing_id = self.ws.projects().iter().find(|p| p.info.path == path).map(|p| p.info.id);
+        let closing_id = self.workspace.ws.projects().iter().find(|p| p.info.path == path).map(|p| p.info.id);
         if let Some(cid) = closing_id {
-            if self.ws.active_id() == Some(cid) {
+            if self.workspace.ws.active_id() == Some(cid) {
                 self.activate_path(main_root.clone(), window, cx, |_, _, _| {});
             }
             self.close_project(cid, cx);
         }
-        let target_id = self.ws.active_id().unwrap_or(active_id);
-        if let Some(pv) = self.projects.get_mut(&target_id) {
+        let target_id = self.workspace.ws.active_id().unwrap_or(active_id);
+        if let Some(pv) = self.workspace.projects.get_mut(&target_id) {
             pv.git_busy = true;
             pv.git_error = None;
         }
@@ -706,7 +722,7 @@ impl Shell {
             },
             move |s, result, cx| {
                 if let Err(e) = result {
-                    if let Some(pv) = s.projects.get_mut(&target_id) {
+                    if let Some(pv) = s.workspace.projects.get_mut(&target_id) {
                         pv.git_busy = false;
                         pv.git_error = Some(e);
                     }
@@ -714,7 +730,7 @@ impl Shell {
                     return;
                 }
                 s.refresh_summaries(cx);
-                if let Some(id) = s.ws.active_id() {
+                if let Some(id) = s.workspace.ws.active_id() {
                     s.refresh_git(id, cx);
                 }
             },
@@ -722,8 +738,8 @@ impl Shell {
     }
 
     pub(super) fn git_op(&mut self, op: impl FnOnce(&Repo) -> vibevalley_git::Result<()> + Send + 'static, cx: &mut Context<Self>) {
-        let Some(id) = self.ws.active_id() else { return };
-        let Some(root) = self.projects.get(&id).map(|p| p.repo_root.clone().unwrap_or(p.tree.root.clone())) else {
+        let Some(id) = self.workspace.ws.active_id() else { return };
+        let Some(root) = self.workspace.projects.get(&id).map(|p| p.repo_root.clone().unwrap_or(p.tree.root.clone())) else {
             return;
         };
         Self::bg(
@@ -734,7 +750,7 @@ impl Shell {
             },
             move |s, result, cx| {
                 if let Err(e) = result
-                    && let Some(pv) = s.projects.get_mut(&id)
+                    && let Some(pv) = s.workspace.projects.get_mut(&id)
                 {
                     pv.git_error = Some(e);
                 }
@@ -749,10 +765,10 @@ impl Shell {
         cx: &mut Context<Self>,
         then: impl FnOnce(&mut Self, Result<ProjectId, String>, &mut Window, &mut Context<Self>) + 'static,
     ) {
-        if let Some(id) = self.ws.active_id() {
+        if let Some(id) = self.workspace.ws.active_id() {
             return then(self, Ok(id), window, cx);
         }
-        if !self.loaded {
+        if !self.workspace.loaded {
             return then(self, Err(vibevalley_i18n::t("desktop.terminal.noProject", &[])), window, cx);
         }
         let root = crate::serving::work_root();
@@ -762,7 +778,7 @@ impl Shell {
         };
         self.with_project_at(dir, window, cx, move |s, id, w, cx| {
             if let Ok(id) = id {
-                s.ws.activate(id);
+                s.workspace.ws.activate(id);
                 s.refresh_summaries(cx);
                 s.push_sidebar(cx);
             }

@@ -1,15 +1,11 @@
-import { colorScheme, Image, keymap, signal, Text, View, windowSize } from "nsh";
+import { colorScheme, effect, Image, keymap, signal, Text, View, windowSize } from "nsh";
 import { Dialog } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
-import { reasonOf } from "../infra/api";
-import { saveFile } from "../infra/attachmentFile";
-import { hostApi } from "../infra/bridge";
-import { createEffect } from "../infra/solid";
+import { useDesignHost } from "./host";
 import { IconButton } from "./IconButton";
 import { fadeAnimation } from "./motion";
-import { toast } from "./toasts";
 import { mix } from "./tone";
 
 export interface Picture {
@@ -20,6 +16,7 @@ export interface Picture {
 }
 
 export function Lightbox(props: { pictures: readonly Picture[]; at: number | undefined; onAt: (at: number | undefined) => void }) {
+  const designHost = useDesignHost();
   const count = () => props.pictures.length;
   const go = (step: number) => {
     if (props.at === undefined || count() < 2) return;
@@ -29,19 +26,21 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
   const shown = () => (props.at === undefined ? undefined : props.pictures[props.at]);
   // An Image takes no size from its picture: the picture's own, scaled down to the window (less the bar), never up.
   const natural = signal<{ src: string; width: number; height: number } | undefined>(undefined);
-  createEffect(
-    () => shown()?.src,
-    (src) => {
-      if (!src) {
-        natural.set(undefined);
-        return;
-      }
-      void Image.getSize(src).then(
-        (size) => natural.set({ src, width: size.width, height: size.height }),
-        () => natural.set(undefined),
-      );
-    },
-  );
+  effect(() => {
+    const src = shown()?.src;
+    if (!src) {
+      natural.set(undefined);
+      return;
+    }
+    let active = true;
+    void Image.getSize(src).then(
+      (size) => active && natural.set({ src, width: size.width, height: size.height }),
+      () => active && natural.set(undefined),
+    );
+    return () => {
+      active = false;
+    };
+  });
   const fit = () => {
     const n = natural();
     const boxW = Math.max(160, windowSize().width - 64);
@@ -89,14 +88,14 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
                       icon="open"
                       size={14}
                       label={t("web.base.lightbox.original")}
-                      onClick={() => void hostApi.openFile(path())}
+                      onClick={() => void designHost.openFile(path())}
                       testid="lightbox-original"
                     />
                     <IconButton
                       icon="download"
                       size={14}
                       label={t("web.base.form.save")}
-                      onClick={() => void saveFile(path(), p().name).catch((e: unknown) => toast(reasonOf(e), "bad"))}
+                      onClick={() => void designHost.saveFile(path(), p().name).catch((e: unknown) => designHost.toast(designHost.formatError(e), "bad"))}
                       testid="lightbox-save"
                     />
                   </>

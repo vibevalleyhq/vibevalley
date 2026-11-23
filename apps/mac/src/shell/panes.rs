@@ -7,6 +7,7 @@ use vibevalley_workspace::{Axis, PaneKind, ProjectId, TabId};
 
 use crate::diff::DiffView;
 use crate::hosted::HostedView;
+use crate::markdown_pane::{MarkdownPaneEvent, MarkdownView};
 use crate::panes::PaneEntity;
 use crate::terminal::{SpawnSpec, TerminalEvent, TerminalView};
 use crate::theme::Ui;
@@ -16,35 +17,35 @@ use super::{PaneSlot, PixelSlot, Shell, TerminalSlot};
 
 impl Shell {
     pub(super) fn navigate_workbench(&mut self, route: &str, cx: &mut Context<Self>) {
-        self.native_workspace = false;
-        self.native_pixel = None;
-        self.last_route = Some(route.to_string());
+        self.chrome.native_workspace = false;
+        self.chrome.native_pixel = None;
+        self.chrome.last_route = Some(route.to_string());
         self.sync_devtools_route(route);
-        self.workbench.update(cx, |v, cx| v.navigate(route, cx));
+        self.chrome.workbench.update(cx, |v, cx| v.navigate(route, cx));
         self.publish_host_debug(cx);
         cx.notify();
     }
 
     pub(super) fn show_workspace(&mut self, cx: &mut Context<Self>) {
-        self.native_workspace = true;
-        self.native_pixel = None;
-        self.last_route = Some("/workspace".to_string());
+        self.chrome.native_workspace = true;
+        self.chrome.native_pixel = None;
+        self.chrome.last_route = Some("/workspace".to_string());
         self.sync_devtools_route("/workspace");
-        self.workbench.update(cx, |v, cx| v.navigate("/workspace", cx));
+        self.chrome.workbench.update(cx, |v, cx| v.navigate("/workspace", cx));
         self.publish_host_debug(cx);
         cx.notify();
     }
 
     pub(super) fn show_pixel(&mut self, scene: &str, mut props: Value, window: &mut Window, cx: &mut Context<Self>) {
         if props.get("cwd").is_none() {
-            props["cwd"] = json!(self.ws.active().map(|p| p.root().to_path_buf()));
+            props["cwd"] = json!(self.workspace.ws.active().map(|p| p.root().to_path_buf()));
         }
         let view = cx.new(|cx| crate::pixel::view::PixelView::new(scene, props, cx));
         let sub = cx.subscribe_in(&view, window, |this, _, event: &crate::pixel::view::PixelEvent, window, cx| {
             this.on_pixel_event(event.clone(), window, cx)
         });
-        self.native_workspace = false;
-        self.native_pixel = Some(PixelSlot { view, _sub: sub });
+        self.chrome.native_workspace = false;
+        self.chrome.native_pixel = Some(PixelSlot { view, _sub: sub });
         self.publish_host_debug(cx);
         cx.notify();
     }
@@ -63,7 +64,7 @@ impl Shell {
         self.show_workspace(cx);
         self.with_workspace_project(window, cx, move |s, id, w, cx| {
             if let Ok(id) = id
-                && let Some(project) = s.ws.project_mut(id)
+                && let Some(project) = s.workspace.ws.project_mut(id)
             {
                 project.layout.open(kind);
                 s.layout_changed(w, cx);
@@ -75,13 +76,13 @@ impl Shell {
         self.show_workspace(cx);
         self.with_workspace_project(window, cx, move |s, id, window, cx| {
             let Ok(pid) = id else { return };
-            let Some(project) = s.ws.project_mut(pid) else { return };
+            let Some(project) = s.workspace.ws.project_mut(pid) else { return };
             let tab = project.layout.open(PaneKind::File { path: path.clone() });
-            if let Some(pv) = s.projects.get_mut(&pid) {
+            if let Some(pv) = s.workspace.projects.get_mut(&pid) {
                 pv.tree.selected = Some(path);
             }
             s.ensure_panes(window, cx);
-            if let (Some(line), Some(PaneEntity::File(v))) = (line, s.panes.get(&(pid, tab)).map(|s| &s.entity)) {
+            if let (Some(line), Some(PaneEntity::File(v))) = (line, s.workspace.panes.get(&(pid, tab)).map(|s| &s.entity)) {
                 v.update(cx, |v, cx| v.scroll_to_line(line, cx));
             }
             s.push_sidebar(cx);
@@ -90,10 +91,10 @@ impl Shell {
     }
 
     fn next_terminal_directory(&self, cx: &gpui::App) -> Option<PathBuf> {
-        let project = self.ws.active()?;
+        let project = self.workspace.ws.active()?;
         match project.layout.active_tab().map(|t| &t.kind) {
             Some(PaneKind::Terminal { terminal_id, .. }) => {
-                if let Some(slot) = self.terminals.get(terminal_id) {
+                if let Some(slot) = self.workspace.terminals.get(terminal_id) {
                     let cwd = slot.view.read(cx).directory();
                     if cwd.is_dir() {
                         return Some(cwd);
@@ -109,13 +110,15 @@ impl Shell {
     }
 
     pub fn new_chat(&mut self, runtime: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
-        self.chat_menu_group = None;
+        self.workspace.chat_menu_group = None;
         self.show_workspace(cx);
         self.with_workspace_project(window, cx, move |s, id, window, cx| {
             let Ok(id) = id else { return };
-            let cwd = s.next_terminal_directory(cx).or_else(|| s.ws.project(id).map(|p| p.root().to_path_buf()));
+            let cwd = s
+                .next_terminal_directory(cx)
+                .or_else(|| s.workspace.ws.project(id).map(|p| p.root().to_path_buf()));
             let Some(cwd) = cwd else { return };
-            let Some(project) = s.ws.project_mut(id) else { return };
+            let Some(project) = s.workspace.ws.project_mut(id) else { return };
             let runtime = runtime.as_deref().map(str::trim).filter(|r| !r.is_empty()).unwrap_or("antigravity").to_string();
             project.layout.add_tab(
                 None,
@@ -131,19 +134,20 @@ impl Shell {
     }
 
     pub(super) fn open_chat_at(&mut self, cwd: PathBuf, runtime: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
-        self.chat_menu_group = None;
+        self.workspace.chat_menu_group = None;
         if cwd.as_os_str().is_empty() {
             return self.new_chat(runtime, window, cx);
         }
         let Some(directory) = cwd.canonicalize().ok().filter(|p| p.is_dir()) else {
             let reason = format!("{} {}", vibevalley_i18n::t("desktop.terminal.missingFolder", &[]), cwd.display());
-            self.terminal_notice = Some(reason);
+            self.workspace.terminal_notice = Some(reason);
             cx.notify();
             return;
         };
         let repo = Repo::discover(&directory).ok().flatten();
         let root = repo.as_ref().map(|r| r.root()).unwrap_or(&directory);
         let target = self
+            .workspace
             .ws
             .projects()
             .iter()
@@ -156,9 +160,9 @@ impl Shell {
             .unwrap_or_else(|| root.to_owned());
         self.with_project_at(target, window, cx, move |s, id, window, cx| {
             let Ok(id) = id else { return };
-            s.ws.activate(id);
+            s.workspace.ws.activate(id);
             s.show_workspace(cx);
-            let Some(project) = s.ws.project_mut(id) else { return };
+            let Some(project) = s.workspace.ws.project_mut(id) else { return };
             let runtime = runtime.as_deref().map(str::trim).filter(|r| !r.is_empty()).unwrap_or("antigravity").to_string();
             project.layout.add_tab(
                 None,
@@ -177,14 +181,14 @@ impl Shell {
         self.show_workspace(cx);
         self.with_workspace_project(window, cx, move |s, id, window, cx| {
             let Ok(pid) = id else { return };
-            let Some(project) = s.ws.project_mut(pid) else { return };
+            let Some(project) = s.workspace.ws.project_mut(pid) else { return };
             let resolved = if path.is_absolute() { path } else { project.root().join(path) };
             let tab = project.layout.open_adjacent(PaneKind::File { path: resolved.clone() });
-            if let Some(pv) = s.projects.get_mut(&pid) {
+            if let Some(pv) = s.workspace.projects.get_mut(&pid) {
                 pv.tree.selected = Some(resolved);
             }
             s.ensure_panes(window, cx);
-            if let (Some(line), Some(PaneEntity::File(v))) = (line, s.panes.get(&(pid, tab)).map(|slot| &slot.entity)) {
+            if let (Some(line), Some(PaneEntity::File(v))) = (line, s.workspace.panes.get(&(pid, tab)).map(|slot| &slot.entity)) {
                 v.update(cx, |v, cx| v.scroll_to_line(line, cx));
             }
             s.push_sidebar(cx);
@@ -196,7 +200,7 @@ impl Shell {
         self.show_workspace(cx);
         self.with_workspace_project(window, cx, move |s, id, window, cx| {
             let Ok(pid) = id else { return };
-            let Some(project) = s.ws.project_mut(pid) else { return };
+            let Some(project) = s.workspace.ws.project_mut(pid) else { return };
             let root = project.root().to_path_buf();
             let rel = path.map(|p| p.strip_prefix(&root).map(Path::to_path_buf).unwrap_or(p));
             let spec = if staged {
@@ -214,9 +218,9 @@ impl Shell {
         let mut target_pid = None;
         let mut layout_dirty = false;
         let mut sid_changed = false;
-        let ids: Vec<ProjectId> = self.ws.projects().iter().map(|p| p.id()).collect();
+        let ids: Vec<ProjectId> = self.workspace.ws.projects().iter().map(|p| p.id()).collect();
         for pid in ids {
-            let Some(project) = self.ws.project_mut(pid) else { continue };
+            let Some(project) = self.workspace.ws.project_mut(pid) else { continue };
             let Some(vibevalley_workspace::Tab {
                 kind:
                     PaneKind::Chat {
@@ -249,7 +253,7 @@ impl Shell {
         }
         if let Some(pid) = target_pid {
             if session_id.is_empty() {
-                self.chat_statuses.remove(&(pid, tab_id));
+                self.workspace.chat_statuses.remove(&(pid, tab_id));
             }
             if sid_changed {
                 self.sync_chat_watches(cx);
@@ -263,10 +267,11 @@ impl Shell {
     }
 
     pub(super) fn sync_chat_watches(&mut self, cx: &mut Context<Self>) {
-        if !self.server_ready {
+        if !self.workspace.server_ready {
             return;
         }
         let wanted: std::collections::BTreeSet<String> = self
+            .workspace
             .ws
             .projects()
             .iter()
@@ -282,15 +287,15 @@ impl Shell {
         };
         let server = bridge.0.server().clone();
 
-        let stale: Vec<String> = self.chat_watches.keys().filter(|sid| !wanted.contains(*sid)).cloned().collect();
+        let stale: Vec<String> = self.workspace.chat_watches.keys().filter(|sid| !wanted.contains(*sid)).cloned().collect();
         for sid in stale {
-            if let Some((sub_id, _task)) = self.chat_watches.remove(&sid) {
+            if let Some((sub_id, _task)) = self.workspace.chat_watches.remove(&sid) {
                 server.unsubscribe(sub_id);
             }
         }
 
         for sid in wanted {
-            if self.chat_watches.contains_key(&sid) {
+            if self.workspace.chat_watches.contains_key(&sid) {
                 continue;
             }
             let Ok((sub_id, rx)) = server.subscribe("session.watch", json!({ "id": sid, "afterSeq": i64::MAX })) else {
@@ -307,14 +312,14 @@ impl Shell {
                     }
                 }
                 let _ = this.update(cx, |shell, cx| {
-                    if let Some((sub_id, _)) = shell.chat_watches.remove(&watch_sid)
+                    if let Some((sub_id, _)) = shell.workspace.chat_watches.remove(&watch_sid)
                         && let Some(bridge) = cx.try_global::<crate::hosted::BridgeHub>()
                     {
                         bridge.0.server().unsubscribe(sub_id);
                     }
                 });
             });
-            self.chat_watches.insert(sid, (sub_id, task));
+            self.workspace.chat_watches.insert(sid, (sub_id, task));
         }
     }
 
@@ -344,9 +349,9 @@ impl Shell {
                 let mut changed = false;
                 let mut layout_dirty = false;
                 let mut matched_tabs = Vec::new();
-                let ids: Vec<ProjectId> = self.ws.projects().iter().map(|p| p.id()).collect();
+                let ids: Vec<ProjectId> = self.workspace.ws.projects().iter().map(|p| p.id()).collect();
                 for pid in ids {
-                    let Some(project) = self.ws.project_mut(pid) else { continue };
+                    let Some(project) = self.workspace.ws.project_mut(pid) else { continue };
                     let tab_ids: Vec<_> = project
                         .layout
                         .tabs()
@@ -386,7 +391,7 @@ impl Shell {
                     }
                 }
                 for key in matched_tabs {
-                    let entry = self.chat_statuses.entry(key).or_default();
+                    let entry = self.workspace.chat_statuses.entry(key).or_default();
                     if entry.status != next_status || entry.attention != next_attention {
                         entry.status = next_status.clone();
                         entry.attention = next_attention;
@@ -403,19 +408,19 @@ impl Shell {
             }
             vibevalley_protocol::SessionWatchEvent::Missing { .. } => {
                 let mut changed = false;
-                let ids: Vec<ProjectId> = self.ws.projects().iter().map(|p| p.id()).collect();
+                let ids: Vec<ProjectId> = self.workspace.ws.projects().iter().map(|p| p.id()).collect();
                 for pid in ids {
-                    let Some(project) = self.ws.project(pid) else { continue };
+                    let Some(project) = self.workspace.ws.project(pid) else { continue };
                     for tab in project.layout.tabs() {
                         if let PaneKind::Chat { session_id: cur_sid, .. } = &tab.kind
                             && cur_sid == session_id
-                            && self.chat_statuses.remove(&(pid, tab.id)).is_some()
+                            && self.workspace.chat_statuses.remove(&(pid, tab.id)).is_some()
                         {
                             changed = true;
                         }
                     }
                 }
-                if let Some((sub_id, _)) = self.chat_watches.remove(session_id)
+                if let Some((sub_id, _)) = self.workspace.chat_watches.remove(session_id)
                     && let Some(bridge) = cx.try_global::<crate::hosted::BridgeHub>()
                 {
                     bridge.0.server().unsubscribe(sub_id);
@@ -436,10 +441,10 @@ impl Shell {
                 return;
             };
             let Ok(id) = id else { return };
-            let Some(project) = s.ws.project_mut(id) else { return };
+            let Some(project) = s.workspace.ws.project_mut(id) else { return };
             let (id, _) = project.new_terminal_tab();
             let slot = s.make_terminal(&id, spec, window, cx);
-            s.terminals.insert(id, slot);
+            s.workspace.terminals.insert(id, slot);
             s.layout_changed(window, cx);
         });
     }
@@ -458,7 +463,7 @@ impl Shell {
             self.show_workspace(cx);
             return self.with_workspace_project(window, cx, move |s, id, w, cx| {
                 let result = id.and_then(|id| {
-                    let cwd = s.ws.project(id).expect("loaded project").root().to_owned();
+                    let cwd = s.workspace.ws.project(id).expect("loaded project").root().to_owned();
                     s.terminal_in_active_project(cwd, title, command, w, cx)
                 });
                 done(result);
@@ -466,13 +471,14 @@ impl Shell {
         }
         let Some(directory) = cwd.canonicalize().ok().filter(|p| p.is_dir()) else {
             let reason = format!("{} {}", vibevalley_i18n::t("desktop.terminal.missingFolder", &[]), cwd.display());
-            self.terminal_notice = Some(reason.clone());
+            self.workspace.terminal_notice = Some(reason.clone());
             cx.notify();
             return done(Err(reason));
         };
         let repo = Repo::discover(&directory).ok().flatten();
         let root = repo.as_ref().map(|r| r.root()).unwrap_or(&directory);
         let target = self
+            .workspace
             .ws
             .projects()
             .iter()
@@ -485,12 +491,12 @@ impl Shell {
             .unwrap_or_else(|| root.to_owned());
         self.with_project_at(target, window, cx, move |s, id, window, cx| {
             let result = id.and_then(|id| {
-                s.ws.activate(id);
+                s.workspace.ws.activate(id);
                 s.show_workspace(cx);
                 s.terminal_in_active_project(directory, title, command, window, cx)
             });
             if let Err(reason) = &result {
-                s.terminal_notice = Some(reason.clone());
+                s.workspace.terminal_notice = Some(reason.clone());
                 cx.notify();
             }
             done(result);
@@ -506,7 +512,7 @@ impl Shell {
         cx: &mut Context<Self>,
     ) -> Result<String, String> {
         let no_project = || vibevalley_i18n::t("desktop.terminal.noProject", &[]);
-        self.terminal_notice = None;
+        self.workspace.terminal_notice = None;
         let mut spec = SpawnSpec::shell(cwd);
         spec.title = title.map(|t| t.trim().to_owned()).filter(|t| !t.is_empty());
         if let Some(command) = command.filter(|c| !c.trim().is_empty()) {
@@ -522,7 +528,7 @@ impl Shell {
                 directory: spec.cwd.clone(),
                 title: title.clone(),
             });
-        let project = self.ws.active_mut().ok_or_else(no_project)?;
+        let project = self.workspace.ws.active_mut().ok_or_else(no_project)?;
         if let Some(target) = &link {
             let existing = project.layout.tabs().find_map(|tab| {
                 let PaneKind::Terminal {
@@ -535,7 +541,7 @@ impl Shell {
                 if origin != target {
                     return None;
                 }
-                let in_directory = match self.terminals.get(terminal_id) {
+                let in_directory = match self.workspace.terminals.get(terminal_id) {
                     Some(slot) => slot.view.read(cx).can_reopen_in(&target.directory),
                     None => project
                         .saved_terminal(terminal_id)
@@ -553,7 +559,7 @@ impl Shell {
             let PaneKind::Terminal { terminal_id, link: None } = &tab.kind else {
                 return None;
             };
-            (project.saved_terminal(terminal_id).is_none() && !self.terminals.contains_key(terminal_id)).then(|| (terminal_id.clone(), tab.id))
+            (project.saved_terminal(terminal_id).is_none() && !self.workspace.terminals.contains_key(terminal_id)).then(|| (terminal_id.clone(), tab.id))
         });
         let (id, tab) = unused.unwrap_or_else(|| project.new_terminal_tab());
         if let Some(vibevalley_workspace::Tab {
@@ -564,7 +570,7 @@ impl Shell {
             *origin = link;
         }
         let slot = self.make_terminal(&id, spec, window, cx);
-        self.terminals.insert(id.clone(), slot);
+        self.workspace.terminals.insert(id.clone(), slot);
         self.layout_changed(window, cx);
         Ok(id)
     }
@@ -576,7 +582,7 @@ impl Shell {
         let cwd = path.parent().map(Path::to_path_buf).unwrap_or_default();
         let spec = SpawnSpec {
             cwd,
-            project_root: self.ws.active().map(|p| p.root().to_path_buf()),
+            project_root: self.workspace.ws.active().map(|p| p.root().to_path_buf()),
             program: Some(shell.clone()),
             args: vec!["-lc".into(), format!("${{EDITOR:-vi}} {quoted}; exec {shell} -l")],
             env: Vec::new(),
@@ -589,7 +595,7 @@ impl Shell {
     pub(super) fn split(&mut self, axis: Axis, window: &mut Window, cx: &mut Context<Self>) {
         let Some(cwd) = self.next_terminal_directory(cx) else { return };
         let id = vibevalley_workspace::util::new_id();
-        let Some(project) = self.ws.active_mut() else { return };
+        let Some(project) = self.workspace.ws.active_mut() else { return };
         if project
             .layout
             .split(
@@ -605,31 +611,31 @@ impl Shell {
             return;
         }
         let slot = self.make_terminal(&id, SpawnSpec::shell(cwd), window, cx);
-        self.terminals.insert(id, slot);
+        self.workspace.terminals.insert(id, slot);
         self.layout_changed(window, cx);
     }
 
     pub(super) fn close_active_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(project) = self.ws.active_mut() else { return };
+        let Some(project) = self.workspace.ws.active_mut() else { return };
         let Some(tab) = project.layout.active_tab().map(|t| t.id) else { return };
         self.close_tab(tab, window, cx);
     }
 
     pub fn close_tab(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(project) = self.ws.active_mut() else { return };
+        let Some(project) = self.workspace.ws.active_mut() else { return };
         let pid = project.id();
         let closed = project.close_tab(tab);
         if let Some(PaneKind::Terminal { terminal_id, .. }) = &closed {
-            self.terminals.remove(terminal_id);
+            self.workspace.terminals.remove(terminal_id);
         }
         if let Some(session_id) = closed_chat_session_id(closed.as_ref())
             && let Some(bridge) = cx.try_global::<crate::hosted::BridgeHub>()
         {
             bridge.0.call("session.closeWorkspace".into(), json!({ "id": session_id }), |_| {});
         }
-        self.panes.remove(&(pid, tab));
-        self.chat_statuses.remove(&(pid, tab));
-        if self.ws.active().is_some_and(|p| p.layout.tabs().next().is_none()) {
+        self.workspace.panes.remove(&(pid, tab));
+        self.workspace.chat_statuses.remove(&(pid, tab));
+        if self.workspace.ws.active().is_some_and(|p| p.layout.tabs().next().is_none()) {
             self.new_terminal(None, window, cx);
             return;
         }
@@ -647,11 +653,11 @@ impl Shell {
 
     pub fn focus_active_pane(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.ensure_panes(window, cx);
-        let Some(project) = self.ws.active() else { return };
+        let Some(project) = self.workspace.ws.active() else { return };
         let Some(tab) = project.layout.active_tab() else { return };
         let handle = match &tab.kind {
-            PaneKind::Terminal { terminal_id, .. } => self.terminals.get(terminal_id).map(|t| t.view.read(cx).focus_handle(cx)),
-            _ => self.panes.get(&(project.id(), tab.id)).map(|p| p.entity.focus_handle(cx)),
+            PaneKind::Terminal { terminal_id, .. } => self.workspace.terminals.get(terminal_id).map(|t| t.view.read(cx).focus_handle(cx)),
+            _ => self.workspace.panes.get(&(project.id(), tab.id)).map(|p| p.entity.focus_handle(cx)),
         };
         window.focus(&handle.unwrap_or_else(|| self.focus.clone()), cx);
     }
@@ -659,8 +665,8 @@ impl Shell {
     /// Creates the entities for every visible tab of the active project.
     /// Entities of hidden projects stay alive in the maps.
     pub fn ensure_panes(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(pid) = self.ws.active_id() else { return };
-        let Some(project) = self.ws.active() else { return };
+        let Some(pid) = self.workspace.ws.active_id() else { return };
+        let Some(project) = self.workspace.ws.active() else { return };
         let visible: Vec<(TabId, PaneKind)> = project
             .layout
             .groups()
@@ -671,10 +677,10 @@ impl Shell {
         for (tab, kind) in visible {
             match kind {
                 PaneKind::Terminal { terminal_id, .. } => {
-                    if self.terminals.contains_key(&terminal_id) {
+                    if self.workspace.terminals.contains_key(&terminal_id) {
                         continue;
                     }
-                    let saved = self.ws.active_mut().and_then(|p| p.take_restorable(&terminal_id));
+                    let saved = self.workspace.ws.active_mut().and_then(|p| p.take_restorable(&terminal_id));
                     let spec = match saved {
                         Some(saved) => SpawnSpec {
                             cwd: if saved.cwd.is_dir() { saved.cwd.clone() } else { root.clone() },
@@ -691,14 +697,14 @@ impl Shell {
                         },
                     };
                     let slot = self.make_terminal(&terminal_id, spec, window, cx);
-                    self.terminals.insert(terminal_id, slot);
+                    self.workspace.terminals.insert(terminal_id, slot);
                 }
                 kind => {
-                    if self.panes.contains_key(&(pid, tab)) {
+                    if self.workspace.panes.contains_key(&(pid, tab)) {
                         continue;
                     }
                     let pane = self.make_pane(pid, tab, &root, kind, window, cx);
-                    self.panes.insert((pid, tab), pane);
+                    self.workspace.panes.insert((pid, tab), pane);
                 }
             }
         }
@@ -706,16 +712,22 @@ impl Shell {
 
     fn make_terminal(&mut self, id: &str, mut spec: SpawnSpec, window: &mut Window, cx: &mut Context<Self>) -> TerminalSlot {
         if spec.project_root.is_none() {
-            spec.project_root = self.ws.active().map(|p| p.root().to_path_buf());
+            spec.project_root = self.workspace.ws.active().map(|p| p.root().to_path_buf());
         }
         let cwd = spec.cwd.clone();
         let initial_title = spec.title.clone();
         let view = cx.new(|cx| TerminalView::new(spec, cx));
         let tid = id.to_string();
         let sub = cx.subscribe_in(&view, window, move |this: &mut Shell, view, event: &TerminalEvent, window, cx| {
-            let owner = this.ws.projects().iter().find(|p| p.layout.terminal_ids().contains(&tid)).map(|p| p.id());
+            let owner = this
+                .workspace
+                .ws
+                .projects()
+                .iter()
+                .find(|p| p.layout.terminal_ids().contains(&tid))
+                .map(|p| p.id());
             let Some(owner) = owner else { return };
-            let on_screen = this.ws.active_id() == Some(owner);
+            let on_screen = this.workspace.ws.active_id() == Some(owner);
             match event {
                 TerminalEvent::OpenLink(target) => {
                     this.open_terminal_link(target.clone(), owner, window, cx);
@@ -723,14 +735,14 @@ impl Shell {
                 }
                 TerminalEvent::Spawned => {
                     if let Some(session) = view.read(cx).session()
-                        && let Some(project) = this.ws.project_mut(owner)
+                        && let Some(project) = this.workspace.ws.project_mut(owner)
                     {
                         project.attach_terminal(&tid, session.clone(), cwd.clone(), initial_title.clone());
                     }
                 }
                 TerminalEvent::TitleChanged => {
                     let title = view.read(cx).title().map(str::to_string);
-                    if let Some(project) = this.ws.project_mut(owner)
+                    if let Some(project) = this.workspace.ws.project_mut(owner)
                         && let Some(entry) = project.terminal_mut(&tid)
                     {
                         entry.title = title;
@@ -738,7 +750,7 @@ impl Shell {
                 }
                 TerminalEvent::Bell | TerminalEvent::CommandFinished => {
                     if !on_screen
-                        && let Some(project) = this.ws.project_mut(owner)
+                        && let Some(project) = this.workspace.ws.project_mut(owner)
                         && let Some(entry) = project.terminal_mut(&tid)
                     {
                         entry.attention = true;
@@ -746,13 +758,14 @@ impl Shell {
                 }
                 TerminalEvent::AgentTurnFinished { agent, label } => {
                     if !on_screen
-                        && let Some(project) = this.ws.project_mut(owner)
+                        && let Some(project) = this.workspace.ws.project_mut(owner)
                         && let Some(entry) = project.terminal_mut(&tid)
                     {
                         entry.attention = true;
                     }
                     if !crate::host::is_app_active() {
                         let title = this
+                            .workspace
                             .ws
                             .project(owner)
                             .and_then(|p| p.root().file_name())
@@ -774,7 +787,7 @@ impl Shell {
                     }
                 }
                 TerminalEvent::Exited => {
-                    if let Some(project) = this.ws.project_mut(owner)
+                    if let Some(project) = this.workspace.ws.project_mut(owner)
                         && let Some(entry) = project.terminal_mut(&tid)
                     {
                         entry.exited = true;
@@ -792,7 +805,12 @@ impl Shell {
         match target {
             vibevalley_terminal::LinkTarget::Url(url) => cx.open_url(&url),
             vibevalley_terminal::LinkTarget::File { path, line, col: _ } => {
-                let project_root = self.ws.project(owner).or_else(|| self.ws.active()).map(|p| p.root().to_path_buf());
+                let project_root = self
+                    .workspace
+                    .ws
+                    .project(owner)
+                    .or_else(|| self.workspace.ws.active())
+                    .map(|p| p.root().to_path_buf());
                 let window = window.window_handle();
                 cx.spawn(async move |this, cx| {
                     let viewer_target = cx
@@ -842,7 +860,7 @@ impl Shell {
                     params.insert("title".into(), json!(title));
                 }
                 let view = cx.new(|cx| HostedView::new("workspace-chat", params, dark, window, cx));
-                let sub = self.subscribe_hosted(&view, None, window, cx);
+                let sub = self.subscribe_hosted(&view, window, cx);
                 PaneSlot {
                     entity: PaneEntity::Hosted(view),
                     _sub: sub,
@@ -887,12 +905,44 @@ impl Shell {
                     _sub: sub,
                 }
             }
+            PaneKind::Hosted { module, props } if module == "markdown" => {
+                let path = props.get("path").and_then(|p| p.as_str()).map(PathBuf::from).unwrap_or_default();
+                let view = cx.new(|cx| MarkdownView::new(path, window, cx));
+                let sub = cx.subscribe_in(&view, window, |this, view, event: &MarkdownPaneEvent, window, cx| match event {
+                    MarkdownPaneEvent::OpenSource => {
+                        let path = view.read(cx).path().to_path_buf();
+                        this.open_file(path, None, window, cx);
+                    }
+                    MarkdownPaneEvent::OpenFile(path) => {
+                        this.open_file(path.clone(), None, window, cx);
+                    }
+                    MarkdownPaneEvent::OpenUrl(url) => {
+                        if url.starts_with("https://") || url.starts_with("http://") || url.starts_with("mailto:") {
+                            cx.open_url(url);
+                        }
+                    }
+                    MarkdownPaneEvent::OpenRoute(route) => {
+                        this.navigate_workbench(route, cx);
+                    }
+                    MarkdownPaneEvent::OpenInEditor => {
+                        let path = view.read(cx).path().to_path_buf();
+                        this.open_in_editor(&path, window, cx);
+                    }
+                    MarkdownPaneEvent::Reveal => {
+                        let path = view.read(cx).path().to_path_buf();
+                        Self::bg(cx, move || crate::host::reveal(&path), |_, _, _| {});
+                    }
+                });
+                PaneSlot {
+                    entity: PaneEntity::Markdown(view),
+                    _sub: sub,
+                }
+            }
             PaneKind::Hosted { module, props } => {
                 let mut params = props.as_object().cloned().unwrap_or_default();
                 params.insert("module".into(), json!(module));
-                let doc = (module == "markdown").then(|| props["path"].as_str().map(PathBuf::from)).flatten();
                 let view = cx.new(|cx| HostedView::new(&module, params, dark, window, cx));
-                let sub = self.subscribe_hosted(&view, doc, window, cx);
+                let sub = self.subscribe_hosted(&view, window, cx);
                 PaneSlot {
                     entity: PaneEntity::Hosted(view),
                     _sub: sub,
@@ -914,7 +964,7 @@ impl Shell {
                     _sub: sub,
                 }
             }
-            PaneKind::Terminal { .. } => unreachable!("terminals are kept in Shell::terminals"),
+            PaneKind::Terminal { .. } => unreachable!("terminals are kept in Shell::workspace.terminals"),
         }
     }
 }

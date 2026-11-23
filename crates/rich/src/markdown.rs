@@ -8,14 +8,16 @@
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use nsh_base::text_view::{
     CodeBlock, CustomNode, Document, Image as TextViewImage, ImageLength, MarkdownExtension, MarkdownOptions, Parser, TextViewClasses, TextViewLinkPressEvent,
     TextViewLinks, TextViewMath, TextViewPart, TextViewParts, TextViewStyles, TextViewTaskPressEvent, text_view,
 };
-use nsh_core::element::{ImageSrc, image_size};
+use nsh_core::element::{AnyValue, Children, Component, ImageSrc, NoEvent, PropError, PropSpec, Props, Root, Slot, TsTypes, image_size};
 use nsh_core::keymap::Modifiers;
 use nsh_core::prelude::*;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
 use crate::canvas::vv_canvas;
 use crate::chart::vv_chart;
@@ -881,4 +883,159 @@ pub fn VvMarkdown(props: VvMarkdownProps, cx: Scope<VvMarkdownEvent>) -> impl In
                 checked: ev.checked,
             }));
         })
+}
+
+/// Document payload pushed into a pure-Rust [`NativeMarkdownRoot`].
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NativeMarkdownDoc {
+    pub text: String,
+    pub base_dir: Option<String>,
+}
+
+/// User interactions emitted by a pure-Rust [`NativeMarkdownRoot`] back to its GPUI host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NativeMarkdownEvent {
+    LinkPress(String),
+    IssuePress(u32),
+    GenUiAction { action: String, payload: String },
+    CodeCopy(String),
+}
+
+/// Pure-Rust `nsh_core` root surface hosting [`VvMarkdown`] without spawning a QuickJS VM.
+pub struct NativeMarkdownRoot {
+    pub root: Root,
+    pub doc_tx: UnboundedSender<NativeMarkdownDoc>,
+    pub event_rx: UnboundedReceiver<NativeMarkdownEvent>,
+}
+
+struct NativeMarkdownBridge {
+    initial: NativeMarkdownDoc,
+    doc_rx: Mutex<Option<UnboundedReceiver<NativeMarkdownDoc>>>,
+    event_tx: UnboundedSender<NativeMarkdownEvent>,
+}
+
+struct BridgeHandle(Arc<NativeMarkdownBridge>);
+
+impl Clone for BridgeHandle {
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self.0))
+    }
+}
+
+impl PartialEq for BridgeHandle {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+#[derive(Clone, PartialEq)]
+struct NativeMarkdownSurfaceProps {
+    bridge: Option<BridgeHandle>,
+}
+
+impl Props for NativeMarkdownSurfaceProps {
+    fn spec(_: &mut TsTypes) -> Vec<PropSpec> {
+        Vec::new()
+    }
+
+    fn initial() -> Self {
+        Self { bridge: None }
+    }
+
+    fn set(&mut self, name: &str, _: Option<AnyValue>) -> Result<bool, PropError> {
+        Err(PropError(format!("unknown prop `{name}`")))
+    }
+
+    fn set_slot(&mut self, _: &str, _: Option<Slot>) -> bool {
+        false
+    }
+
+    fn set_children(&mut self, _: Children) -> bool {
+        false
+    }
+}
+
+struct NativeMarkdownSurface;
+
+impl Component for NativeMarkdownSurface {
+    type Props = NativeMarkdownSurfaceProps;
+    type Event = NoEvent;
+
+    fn view(props: Self::Props, _cx: Scope<Self::Event>) -> impl IntoElement {
+        let bridge = props.bridge.as_ref().map(|handle| Arc::clone(&handle.0));
+        let initial = bridge.as_ref().map(|b| b.initial.clone()).unwrap_or_default();
+        let text_sig = signal(SharedString::from(initial.text));
+        let base_dir_sig = signal(initial.base_dir.map(SharedString::from));
+
+        if let Some(ref bridge) = bridge
+            && let Some(mut rx) = bridge.doc_rx.lock().ok().and_then(|mut guard| guard.take())
+        {
+            spawn(async move {
+                while let Some(doc) = rx.recv().await {
+                    text_sig.set(SharedString::from(doc.text));
+                    base_dir_sig.set(doc.base_dir.map(SharedString::from));
+                }
+            });
+        }
+
+        let link_tx = bridge.as_ref().map(|b| b.event_tx.clone());
+        let issue_tx = bridge.as_ref().map(|b| b.event_tx.clone());
+        let genui_tx = bridge.as_ref().map(|b| b.event_tx.clone());
+        let copy_tx = bridge.as_ref().map(|b| b.event_tx.clone());
+
+        scroll().flex_1().min_h(px(0.0)).bg(AdaptiveUi::PAGE).child(
+            view().w_full().items_center().child(
+                view().w_full().max_w(px(820.0)).px(px(40.0)).py(px(32.0)).child(
+                    vv_markdown()
+                        .text(move || text_sig.get())
+                        .size(VvMarkdownSize::Doc)
+                        .base_dir(move || base_dir_sig.get())
+                        .selectable(true)
+                        .on_link_press(move |ev: &VvLinkPressEvent| {
+                            if let Some(ref tx) = link_tx {
+                                let _ = tx.send(NativeMarkdownEvent::LinkPress(ev.url.to_string()));
+                            }
+                        })
+                        .on_issue_press(move |ev: &VvIssuePressEvent| {
+                            if let Some(ref tx) = issue_tx {
+                                let _ = tx.send(NativeMarkdownEvent::IssuePress(ev.number));
+                            }
+                        })
+                        .on_gen_ui_action(move |ev: &VvGenUiActionEvent| {
+                            if let Some(ref tx) = genui_tx {
+                                let _ = tx.send(NativeMarkdownEvent::GenUiAction {
+                                    action: ev.action.to_string(),
+                                    payload: ev.payload.to_string(),
+                                });
+                            }
+                        })
+                        .on_code_copy(move |ev: &VvCodeCopyEvent| {
+                            if let Some(ref tx) = copy_tx {
+                                let _ = tx.send(NativeMarkdownEvent::CodeCopy(ev.code.to_string()));
+                            }
+                        }),
+                ),
+            ),
+        )
+    }
+}
+
+/// Builds a pure-Rust [`Root`] rendering a scrollable, centered editorial [`VvMarkdown`]
+/// document so GPUI panes can preview Markdown files with zero QuickJS VMs.
+pub fn native_markdown_root(initial: NativeMarkdownDoc, capabilities_json: Option<&str>) -> NativeMarkdownRoot {
+    let (doc_tx, doc_rx) = unbounded_channel();
+    let (event_tx, event_rx) = unbounded_channel();
+    let bridge = Arc::new(NativeMarkdownBridge {
+        initial,
+        doc_rx: Mutex::new(Some(doc_rx)),
+        event_tx,
+    });
+    let mut root = Root::new::<NativeMarkdownSurface>(move || NativeMarkdownSurfaceProps {
+        bridge: Some(BridgeHandle(Arc::clone(&bridge))),
+    })
+    .app_id("dev.vibevalley.markdown");
+    if let Some(caps) = capabilities_json {
+        root = root.capabilities_json(caps);
+    }
+    NativeMarkdownRoot { root, doc_tx, event_rx }
 }

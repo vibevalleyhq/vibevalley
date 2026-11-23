@@ -14,6 +14,7 @@ use vibevalley_workspace::{Axis, Group, Layout, Node, PaneKind, Tab, TabId};
 use crate::diff::DiffView;
 use crate::hosted::HostedView;
 use crate::icon::gpui_icon;
+use crate::markdown_pane::MarkdownView;
 use crate::pixel::view::PixelView;
 use crate::shell::Shell;
 use crate::theme::{Palette, Ui};
@@ -33,6 +34,7 @@ pub(crate) fn exceeded_window_drag_slop(origin: (f32, f32), current: (f32, f32))
 #[derive(Clone)]
 pub enum PaneEntity {
     File(Entity<FileViewer>),
+    Markdown(Entity<MarkdownView>),
     Diff(Entity<DiffView>),
     Hosted(Entity<HostedView>),
     Pixel(Entity<PixelView>),
@@ -42,6 +44,7 @@ impl PaneEntity {
     pub fn focus_handle(&self, cx: &App) -> FocusHandle {
         match self {
             PaneEntity::File(v) => v.read(cx).focus_handle(cx),
+            PaneEntity::Markdown(v) => v.read(cx).focus_handle(cx),
             PaneEntity::Diff(v) => v.read(cx).focus_handle(cx),
             PaneEntity::Hosted(view) => view.read(cx).focus_handle(cx),
             PaneEntity::Pixel(v) => v.read(cx).focus_handle(cx),
@@ -51,6 +54,7 @@ impl PaneEntity {
     fn element(&self) -> AnyElement {
         match self {
             PaneEntity::File(v) => v.clone().into_any_element(),
+            PaneEntity::Markdown(v) => v.clone().into_any_element(),
             PaneEntity::Diff(v) => v.clone().into_any_element(),
             PaneEntity::Hosted(view) => view.clone().into_any_element(),
             PaneEntity::Pixel(v) => v.clone().into_any_element(),
@@ -93,11 +97,11 @@ fn find_split(node: &Node, id: u64) -> Option<&vibevalley_workspace::Split> {
 
 pub fn render_main(shell: &mut Shell, window: &mut Window, cx: &mut Context<Shell>) -> AnyElement {
     let colors = Ui::get(cx).colors.clone();
-    let Some(project) = shell.ws.active() else {
-        if shell.load_error.is_none() && !shell.loaded {
+    let Some(project) = shell.workspace.ws.active() else {
+        if shell.workspace.load_error.is_none() && !shell.workspace.loaded {
             return div().size_full().bg(colors.bg).into_any_element();
         }
-        let text = match &shell.load_error {
+        let text = match &shell.workspace.load_error {
             Some(e) => format!("Could not open the project store: {e}"),
             None => vibevalley_i18n::t("desktop.terminal.noProject", &[]),
         };
@@ -120,7 +124,7 @@ fn render_node(shell: &mut Shell, layout: &Layout, node: &Node, window: &mut Win
         Node::Group(g) => render_group(shell, layout, g, window, cx),
         Node::Split(s) => {
             let colors = Ui::get(cx).colors.clone();
-            let bounds = shell.split_bounds.clone();
+            let bounds = shell.chrome.split_bounds.clone();
             let id = s.id;
             let horizontal = s.axis == Axis::Horizontal;
             let mut container = div().size_full().relative().flex().when_horizontal(horizontal).child(
@@ -153,8 +157,8 @@ fn render_node(shell: &mut Shell, layout: &Layout, node: &Node, window: &mut Win
                             MouseButton::Left,
                             cx.listener(move |shell, _, _, cx| {
                                 cx.stop_propagation();
-                                shell.window_drag_origin = None;
-                                shell.dragging_split = Some((id, i));
+                                shell.chrome.window_drag_origin = None;
+                                shell.chrome.dragging_split = Some((id, i));
                             }),
                         );
                     container = container.child(if horizontal {
@@ -411,6 +415,7 @@ pub fn tab_title(shell: &Shell, tab: &Tab, cx: &App) -> String {
     match &tab.kind {
         PaneKind::Terminal { link: Some(link), .. } => link.title.clone(),
         PaneKind::Terminal { terminal_id, .. } => shell
+            .workspace
             .terminals
             .get(terminal_id)
             .map(|t| terminal_name(t.view.read(cx)))
@@ -454,13 +459,13 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
     let hover_bg = colors.hover;
     let focused = layout.focused == g.id;
     let group_id = g.id;
-    let pid = shell.ws.active_id().unwrap_or_default();
+    let pid = shell.workspace.ws.active_id().unwrap_or_default();
     let groups = layout.groups();
     let multi_group = groups.len() > 1;
     let is_first_group = groups.first().is_some_and(|first| first.id == group_id);
     let is_last_group = groups.last().is_some_and(|last| last.id == group_id);
-    let sidebar_visible = shell.sidebar_visible;
-    let inspector_open = shell.inspector_open;
+    let sidebar_visible = shell.chrome.sidebar_visible;
+    let inspector_open = shell.chrome.inspector_open;
 
     let mut tabs_row = div()
         .id(("tabbar", group_id as usize))
@@ -498,14 +503,23 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                 ),
         );
     }
-    let names = shell.ws.active().map(|p| numbered_titles(shell, p.layout.tabs(), cx)).unwrap_or_default();
+    let names = shell
+        .workspace
+        .ws
+        .active()
+        .map(|p| numbered_titles(shell, p.layout.tabs(), cx))
+        .unwrap_or_default();
     for (i, tab) in g.tabs.iter().enumerate() {
         let active = i == g.active;
         let tab_id = tab.id;
         let title = names.get(&tab.id).cloned().unwrap_or_else(|| tab_title(shell, tab, cx));
         let (attention, chat_working) = match &tab.kind {
-            PaneKind::Terminal { terminal_id, .. } => (shell.ws.active().and_then(|p| p.terminal(terminal_id)).is_some_and(|t| t.attention), false),
+            PaneKind::Terminal { terminal_id, .. } => (
+                shell.workspace.ws.active().and_then(|p| p.terminal(terminal_id)).is_some_and(|t| t.attention),
+                false,
+            ),
             PaneKind::Chat { .. } => shell
+                .workspace
                 .chat_statuses
                 .get(&(pid, tab.id))
                 .map(|s| (s.attention, s.status == "working"))
@@ -559,9 +573,9 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                     }),
                 )
                 .on_click(cx.listener(move |shell, _, window, cx| {
-                    if let Some(p) = shell.ws.active_mut() {
+                    if let Some(p) = shell.workspace.ws.active_mut() {
                         p.layout.activate(tab_id);
-                        if let Some(p) = shell.ws.active_mut() {
+                        if let Some(p) = shell.workspace.ws.active_mut() {
                             p.layout.focus_group(group_id);
                         }
                     }
@@ -590,7 +604,7 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                 ),
         );
     }
-    let menu_open = shell.chat_menu_group == Some(group_id);
+    let menu_open = shell.workspace.chat_menu_group == Some(group_id);
     let new_btn = div()
         .id(("new-tab", group_id as usize))
         .size(px(26.0))
@@ -609,7 +623,7 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                 cx.stop_propagation();
                 // Use render-time `menu_open`: `on_mouse_down_out` already cleared
                 // `chat_menu_group` during capture when clicking `+` to toggle off.
-                shell.chat_menu_group = if menu_open { None } else { Some(group_id) };
+                shell.workspace.chat_menu_group = if menu_open { None } else { Some(group_id) };
                 cx.notify();
             }),
         );
@@ -676,11 +690,11 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         Some(Tab {
             kind: PaneKind::Terminal { terminal_id, .. },
             ..
-        }) => match shell.terminals.get(terminal_id) {
+        }) => match shell.workspace.terminals.get(terminal_id) {
             Some(t) => t.view.clone().into_any_element(),
             None => div().into_any_element(),
         },
-        Some(tab) => match shell.panes.get(&(pid, tab.id)) {
+        Some(tab) => match shell.workspace.panes.get(&(pid, tab.id)) {
             Some(p) => p.entity.element(),
             None => div().into_any_element(),
         },
@@ -705,7 +719,7 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
             .gap(px(2.0))
             .occlude()
             .on_mouse_down_out(cx.listener(|shell, _, _, cx| {
-                if shell.chat_menu_group.take().is_some() {
+                if shell.workspace.chat_menu_group.take().is_some() {
                     cx.notify();
                 }
             }))
@@ -738,8 +752,8 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                     .child(div().text_size(px(11.0)).text_color(colors.faint).child("⌘T"))
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .on_click(cx.listener(move |shell, _, window, cx| {
-                        shell.chat_menu_group = None;
-                        if let Some(p) = shell.ws.active_mut() {
+                        shell.workspace.chat_menu_group = None;
+                        if let Some(p) = shell.workspace.ws.active_mut() {
                             p.layout.focus_group(group_id);
                         }
                         shell.new_terminal(None, window, cx);
@@ -789,8 +803,8 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                     .children((idx == 0).then(|| div().text_size(px(11.0)).text_color(colors.faint).child("⇧⌘T")))
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .on_click(cx.listener(move |shell, _, window, cx| {
-                        shell.chat_menu_group = None;
-                        if let Some(p) = shell.ws.active_mut() {
+                        shell.workspace.chat_menu_group = None;
+                        if let Some(p) = shell.workspace.ws.active_mut() {
                             p.layout.focus_group(group_id);
                         }
                         shell.new_chat(Some(rt_owned.clone()), window, cx);
@@ -809,8 +823,8 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |shell, _, _, cx| {
-                let mut changed = shell.chat_menu_group.take().is_some();
-                if let Some(p) = shell.ws.active_mut()
+                let mut changed = shell.workspace.chat_menu_group.take().is_some();
+                if let Some(p) = shell.workspace.ws.active_mut()
                     && p.layout.focused != group_id
                 {
                     p.layout.focus_group(group_id);

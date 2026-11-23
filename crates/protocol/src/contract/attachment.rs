@@ -32,10 +32,23 @@ pub struct AttachmentUpload {
     pub data: String,
 }
 
+/// Local regular file imported directly into CAS without base64 framing (`Caller::User` only).
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct AttachmentImportPathInput {
+    pub path: String,
+    pub name: Option<String>,
+    pub mime: Option<String>,
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "attachment";
     types: [Attachment,
-    AttachmentUpload];
+    AttachmentUpload,
+    AttachmentImportPathInput];
     aliases: [];
 }

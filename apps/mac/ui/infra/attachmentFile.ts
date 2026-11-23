@@ -4,9 +4,12 @@
 // A refusal (a file gone) leaves the tiles with their icons.
 import { z } from "zod";
 
+import { VibeValleyApiError, type Attachment } from "@vibevalley/protocol";
+import { BizCode } from "@vibevalley/protocol/api";
 import * as S from "@vibevalley/protocol/schema";
 
 import { api } from "./api";
+import { readConnectionMode } from "./hostParams";
 import { defineQuery, ready, useQuery } from "./query";
 import { transport } from "./transport";
 
@@ -19,6 +22,7 @@ async function callData(op: string, payload: unknown): Promise<unknown> {
 
 const AttachmentFile = z.object({ path: z.string(), type: z.string(), name: z.exactOptional(z.string()) });
 const SavedResult = z.object({ saved: z.boolean() });
+const ReadFileData = z.object({ data: z.string(), type: z.string(), name: z.string() });
 
 const attachmentFileQuery = defineQuery({
   schema: AttachmentFile,
@@ -88,4 +92,55 @@ const inputFileQuery = defineQuery({
 export function useInputFile(id: () => string) {
   const query = useQuery(() => inputFileQuery(id()), { enabled: () => id() !== "" });
   return () => ready(query, undefined);
+}
+
+/** Extracts an absolute local filesystem path from a POSIX path or `file:` URL. */
+export function localPathFromUri(uriOrPath: string): string | undefined {
+  const trimmed = uriOrPath.trim();
+  if (trimmed === "") return undefined;
+  if (trimmed.startsWith("/")) return trimmed;
+  if (!/^file:\/\//iu.test(trimmed)) return undefined;
+  const withoutScheme = trimmed.slice("file://".length);
+  const slash = withoutScheme.indexOf("/");
+  if (slash < 0) return undefined;
+  const hostPart = withoutScheme.slice(0, slash);
+  if (hostPart !== "" && hostPart.toLowerCase() !== "localhost") return undefined;
+  const rawPath = withoutScheme.slice(slash);
+  try {
+    const decoded = decodeURIComponent(rawPath);
+    return decoded.startsWith("/") ? decoded : undefined;
+  } catch {
+    return rawPath.startsWith("/") ? rawPath : undefined;
+  }
+}
+
+/** True when desktop is connected to the local embedded server and can stream disk files straight into CAS. */
+function isLocalAttachmentImportAvailable(): boolean {
+  return readConnectionMode() === "embedded";
+}
+
+/**
+ * Imports a dropped or picked local file into CAS.
+ * Uses zero-Base64 `attachment.importPath` against the local embedded server and falls back to
+ * `host.readFile` + `attachment.create` when connected remotely or when the server does not allow local path import.
+ */
+export async function importLocalAttachment(uriOrPath: string, hints?: { name?: string; mime?: string }): Promise<Attachment> {
+  const localPath = localPathFromUri(uriOrPath);
+  if (isLocalAttachmentImportAvailable() && localPath !== undefined) {
+    try {
+      return await api.attachment.importPath({
+        path: localPath,
+        ...(hints?.name !== undefined && hints.name !== "" ? { name: hints.name } : {}),
+        ...(hints?.mime !== undefined && hints.mime !== "" ? { mime: hints.mime } : {}),
+      });
+    } catch (error) {
+      if (!(error instanceof VibeValleyApiError) || (error.bizCode !== BizCode.RouteNotFound && error.bizCode !== BizCode.Forbidden)) {
+        throw error;
+      }
+    }
+  }
+  const file = ReadFileData.parse(await callData("host.readFile", { path: uriOrPath }));
+  const name = hints?.name !== undefined && hints.name !== "" ? hints.name : file.name || "file";
+  const type = hints?.mime !== undefined && hints.mime !== "" ? hints.mime : file.type || "application/octet-stream";
+  return api.attachment.create({ name, type, data: file.data });
 }

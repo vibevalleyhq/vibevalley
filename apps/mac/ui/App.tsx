@@ -6,6 +6,7 @@ import { host, mount, Text, View, type Component } from "nsh";
 
 import { setLocale } from "@vibevalley/i18n";
 
+import { HostDesignProvider, installMotionReporter } from "./app/DesignHost";
 import { VibeValley } from "./app/VibeValley";
 import { applyMotion } from "./design/motion";
 import { FarmForm } from "./farm/FarmForm";
@@ -33,9 +34,15 @@ const views: Record<string, Component> = {
 host.on("locale", (loc) => {
   if (loc === "en" || loc === "zh") setLocale(loc);
 });
+installMotionReporter();
 applyMotion(readHostMotion());
 host.on("motion", applyMotion);
 if (host.available()) useBridge();
 
-mount(views[viewName()] ?? Unknown);
+const Surface = views[viewName()] ?? Unknown;
+mount(() => (
+  <HostDesignProvider>
+    <Surface />
+  </HostDesignProvider>
+));
 if (host.available()) host.post("action", { type: "ready" });

@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::path::Path;
+use std::time::Duration;
 
 use nsh_base::text_view::{Alert, Block, CustomNode, Inline};
 use nsh_core::ViewKind;
@@ -7,8 +8,8 @@ use nsh_core::element::Root;
 use nsh_core::prelude::*;
 use vibevalley_rich::markdown::{ResolvedMarkdownImage, read_local_image_dimensions, resolve_markdown_image_src};
 use vibevalley_rich::{
-    CustomNodeKind, VvCodeCopyEvent, VvGenUiActionEvent, VvIssuePressEvent, VvLinkPressEvent, VvMarkdownSize, VvMentionPressEvent, VvTaskPressEvent,
-    is_incremental_streaming_safe, parse_vv_markdown, vv_markdown, vv_markdown_extensions, vv_markdown_options,
+    CustomNodeKind, NativeMarkdownDoc, VvCodeCopyEvent, VvGenUiActionEvent, VvIssuePressEvent, VvLinkPressEvent, VvMarkdownSize, VvMentionPressEvent,
+    VvTaskPressEvent, is_incremental_streaming_safe, native_markdown_root, parse_vv_markdown, vv_markdown, vv_markdown_extensions, vv_markdown_options,
 };
 
 use crate::support::TestHarness;
@@ -532,4 +533,30 @@ fn doc_preview_mounts_relative_image_with_nonzero_aspect_ratio_and_missing_fallb
     assert!(harness.find_test_id("vv-image-missing").is_some());
     assert!(harness.contains_text("Missing graphic"));
     assert!(harness.contains_text("docs/images/missing-preview.png"));
+}
+
+#[test]
+fn native_markdown_root_mounts_and_updates_without_quickjs() {
+    let native = native_markdown_root(
+        NativeMarkdownDoc {
+            text: "# Initial Title\n\nInitial body copy.".to_string(),
+            base_dir: None,
+        },
+        None,
+    );
+    let mut harness = TestHarness::mount(native.root);
+    assert!(harness.contains_text("Initial Title"));
+    assert!(harness.contains_text("Initial body copy."));
+
+    native
+        .doc_tx
+        .send(NativeMarkdownDoc {
+            text: "# Reloaded Heading\n\nUpdated from watcher.".to_string(),
+            base_dir: None,
+        })
+        .expect("send updated markdown doc");
+
+    let updated = harness.wait_until(Duration::from_secs(2), |h| h.contains_text("Reloaded Heading"));
+    assert!(updated, "native markdown root should reactively update on doc_tx");
+    assert!(harness.contains_text("Updated from watcher."));
 }

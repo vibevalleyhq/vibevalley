@@ -743,6 +743,9 @@ export class VibeValleyApi {
     /** Kept once by its bytes: the same file again is the same attachment. */
     create: (a: T.AttachmentUpload, options?: { signal?: AbortSignal }): Promise<T.Attachment> =>
       this.call<T.Attachment>("attachment.create", "/api/v1/attachment/create", a, options),
+    /** Local regular file imported directly into CAS without base64 framing (`Caller::User` only). */
+    importPath: (a: T.AttachmentImportPathInput, options?: { signal?: AbortSignal }): Promise<T.Attachment> =>
+      this.call<T.Attachment>("attachment.importPath", "/api/v1/attachment/importPath", a, options),
   };
 
   private decodeBridgeEnvelope(path: string, raw: unknown): unknown {

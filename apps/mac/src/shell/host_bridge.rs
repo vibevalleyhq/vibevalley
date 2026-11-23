@@ -1,6 +1,4 @@
-use std::cell::RefCell;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 use std::sync::OnceLock;
 
 use gpui::{AppContext as _, Context, Entity, PathPromptOptions, Subscription, Window};
@@ -15,23 +13,23 @@ use super::{Shell, update_menus};
 
 impl Shell {
     pub fn on_action(&mut self, action: Action, window: &mut Window, cx: &mut Context<Self>) {
-        let active = self.ws.active_id();
+        let active = self.workspace.ws.active_id();
         match action {
             Action::GlobalRail { rail_width } => {
-                self.global_rail_width = rail_width.clamp(56.0, 80.0);
+                self.chrome.global_rail_width = rail_width.clamp(56.0, 80.0);
                 cx.notify();
             }
             Action::GlobalRoute { path } => {
-                self.native_workspace = path == "/workspace";
-                if self.native_workspace {
+                self.chrome.native_workspace = path == "/workspace";
+                if self.chrome.native_workspace {
                     self.with_workspace_project(window, cx, |_, _, _, _| {});
                 }
                 if !path.starts_with("/farm") && path != "/tree" && path != "/map" {
-                    self.native_pixel = None;
+                    self.chrome.native_pixel = None;
                 }
                 self.sync_devtools_route(&path);
-                if self.last_route.as_deref() != Some(path.as_str()) {
-                    self.last_route = Some(path);
+                if self.chrome.last_route.as_deref() != Some(path.as_str()) {
+                    self.chrome.last_route = Some(path);
                     self.save_settings(cx);
                 }
                 self.publish_host_debug(cx);
@@ -51,12 +49,12 @@ impl Shell {
             | Action::ToggleDevtools => {}
             Action::Probe { results } => {
                 eprintln!("bridge probe: {results}");
-                self.probe = Some(results);
+                self.overlays.probe = Some(results);
             }
             Action::Call { op, .. } => eprintln!("host call {op} reached the shell without a reply handle"),
             Action::ActivatePath { path } => self.activate_path(PathBuf::from(path), window, cx, |_, _, _| {}),
             Action::ActivateTab { path, tab_id } => self.activate_path(PathBuf::from(path), window, cx, move |s, window, cx| {
-                if let Some(p) = s.ws.active_mut() {
+                if let Some(p) = s.workspace.ws.active_mut() {
                     p.layout.activate(tab_id);
                 }
                 s.layout_changed(window, cx);
@@ -80,14 +78,15 @@ impl Shell {
             Action::AddProject => self.add_project(window, cx),
             Action::CloseProject { id } => self.close_project(id, cx),
             Action::ShowPanel { panel } => {
-                self.panel = panel;
-                self.inspector_open = true;
+                self.chrome.panel = panel;
+                self.chrome.inspector_open = true;
+                self.sync_inspector(window, cx);
                 self.push_sidebar(cx);
                 cx.notify();
             }
             Action::ExpandDir { path } => {
                 if let Some(id) = active
-                    && let Some(pv) = self.projects.get_mut(&id)
+                    && let Some(pv) = self.workspace.projects.get_mut(&id)
                 {
                     pv.tree.expanded.insert(PathBuf::from(path));
                     self.load_dirs(id, cx);
@@ -95,7 +94,7 @@ impl Shell {
             }
             Action::CollapseDir { path } => {
                 let path = PathBuf::from(path);
-                if let Some(pv) = active.and_then(|id| self.projects.get_mut(&id)) {
+                if let Some(pv) = active.and_then(|id| self.workspace.projects.get_mut(&id)) {
                     pv.tree.expanded.remove(&path);
                 }
                 self.push_sidebar(cx);
@@ -154,7 +153,7 @@ impl Shell {
                 }
             }
             Action::PaletteQuery { query } => {
-                if let Some(p) = &mut self.palette {
+                if let Some(p) = &mut self.overlays.palette {
                     p.query = query;
                 }
                 self.refresh_palette(cx);
@@ -162,7 +161,7 @@ impl Shell {
             Action::PaletteSelect { id } => self.palette_select(&id, window, cx),
             Action::PaletteClose => self.close_palette(window, cx),
             Action::Search { query, regex, case_sensitive } => {
-                if let Some(p) = &mut self.palette {
+                if let Some(p) = &mut self.overlays.palette {
                     p.query = query;
                 }
                 self.run_search(regex, case_sensitive, cx);
@@ -176,7 +175,7 @@ impl Shell {
     /// the route) or a terminal.
     pub fn on_pixel_event(&mut self, event: crate::pixel::view::PixelEvent, window: &mut Window, cx: &mut Context<Self>) {
         match event {
-            crate::pixel::view::PixelEvent::Sound(name) => self.workbench.read(cx).play_farm_sound(name, cx),
+            crate::pixel::view::PixelEvent::Sound(name) => self.chrome.workbench.read(cx).play_farm_sound(name, cx),
             crate::pixel::view::PixelEvent::HostCall { op, reply } => self.host_call(op, reply, window, cx),
             crate::pixel::view::PixelEvent::Route(route) => self.open_pane(
                 PaneKind::Hosted {
@@ -280,7 +279,7 @@ impl Shell {
                     lines: tray.lines.clone(),
                 };
                 crate::tray::update(&summary);
-                self.tray = Some(serde_json::to_value(&tray).unwrap_or(Value::Null));
+                self.overlays.tray = Some(serde_json::to_value(&tray).unwrap_or(Value::Null));
                 Envelope::void()
             }
             HostOp::Locale(locale) => {
@@ -289,7 +288,7 @@ impl Shell {
                 update_menus(cx);
                 crate::tray::refresh();
                 self.notify_locale(loc, cx);
-                self.locale = Some(loc.to_string());
+                self.overlays.locale = Some(loc.to_string());
                 Envelope::void()
             }
             HostOp::Reveal(path) => {
@@ -320,11 +319,11 @@ impl Shell {
                 Envelope::void()
             }
             HostOp::Opening(state) => {
-                if let Some(opening) = &self.launch {
+                if let Some(opening) = &self.overlays.launch {
                     let phase = crate::serving::opening_pixel_phase(state.phase);
                     opening.update(cx, |view, _| view.set_phase(phase, (state.progress as f32).clamp(0.0, 100.0)));
                 }
-                self.opening = Some(serde_json::to_value(&state).unwrap_or(Value::Null));
+                self.overlays.opening = Some(serde_json::to_value(&state).unwrap_or(Value::Null));
                 if state.phase == HostOpeningPhase::Ready {
                     self.finish_opening(true, cx);
                 }
@@ -583,47 +582,12 @@ impl Shell {
         );
     }
 
-    pub(super) fn subscribe_hosted(&mut self, view: &Entity<HostedView>, doc: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) -> Subscription {
-        // Overlap reading a markdown file with `HostedView` boot, then reuse the
-        // loaded frame on `Ready` so the file is never read from disk twice.
-        let cached_doc: Rc<RefCell<DocLoad>> = Rc::new(RefCell::new(if doc.is_some() { DocLoad::InFlight } else { DocLoad::None }));
-        if let Some(path) = doc.clone() {
-            self.push_doc_cached(view, path, cached_doc.clone(), cx);
-        }
-        let doc_cache = cached_doc;
-        cx.subscribe_in(view, window, move |this, view, event: &HostedEvent, window, cx| match event {
+    pub(super) fn subscribe_hosted(&mut self, view: &Entity<HostedView>, window: &mut Window, cx: &mut Context<Self>) -> Subscription {
+        cx.subscribe_in(view, window, move |this, _, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(a) => this.on_action(a.clone(), window, cx),
             HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
-            HostedEvent::Ready => {
-                if let Some(path) = &doc {
-                    let state = doc_cache.borrow().clone();
-                    match state {
-                        DocLoad::Loaded(frame) => view.update(cx, |v, cx| v.push("doc", frame, cx)),
-                        DocLoad::InFlight => {}
-                        DocLoad::None => {
-                            *doc_cache.borrow_mut() = DocLoad::InFlight;
-                            this.push_doc_cached(view, path.clone(), doc_cache.clone(), cx);
-                        }
-                    }
-                }
-            }
+            HostedEvent::Ready => {}
         })
-    }
-
-    fn push_doc_cached(&mut self, view: &Entity<HostedView>, path: PathBuf, cache: Rc<RefCell<DocLoad>>, cx: &mut Context<Self>) {
-        let view = view.clone();
-        Self::bg(
-            cx,
-            move || (std::fs::read_to_string(&path), path),
-            move |_, (text, path), cx| {
-                let frame = match text {
-                    Ok(text) => json!({ "path": path, "markdown": text }),
-                    Err(e) => json!({ "path": path, "error": e.to_string() }),
-                };
-                *cache.borrow_mut() = DocLoad::Loaded(frame.clone());
-                view.update(cx, |v, cx| v.push("doc", frame, cx));
-            },
-        );
     }
 }
 
@@ -648,13 +612,6 @@ enum CliOp {
     State,
     Install,
     Remove,
-}
-
-#[derive(Clone)]
-enum DocLoad {
-    None,
-    InFlight,
-    Loaded(Value),
 }
 
 #[cfg(test)]

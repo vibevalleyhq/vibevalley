@@ -601,13 +601,17 @@ pub struct HostedView {
     _bridge: Option<std::sync::Arc<vibevalley_server::transport::bridge::Client>>,
 }
 
+pub fn ensure_ui_sets() {
+    // nsh serves only nsh/base's core part unless the host names more; register both nsh/base and vibevalley/rich.
+    static UI_SETS: std::sync::Once = std::sync::Once::new();
+    UI_SETS.call_once(|| nsh_platform_gpui::set_ui_sets(vec![nsh_base::registry(), vibevalley_rich::registry()]));
+}
+
 impl HostedView {
     /// `view` selects the surface in `ui/App.tsx`; `params` reach it as
     /// `host.params`.
     pub fn new(view: &str, params: Map<String, Value>, dark: bool, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        // nsh serves only nsh/base's core part unless the host names more; register both nsh/base and vibevalley/rich.
-        static UI_SETS: std::sync::Once = std::sync::Once::new();
-        UI_SETS.call_once(|| nsh_platform_gpui::set_ui_sets(vec![nsh_base::registry(), vibevalley_rich::registry()]));
+        ensure_ui_sets();
         let (tx, rx) = flume::unbounded::<EngineMessage>();
         let (err_tx, err_rx) = flume::unbounded::<String>();
         let options = AppOptions {
@@ -636,6 +640,7 @@ impl HostedView {
             params.insert("view".into(), json!(name));
             params.entry("locale").or_insert_with(|| json!(vibevalley_i18n::locale()));
             params.entry("motion").or_insert_with(|| json!(motion.as_str()));
+            params.entry("connectionMode").or_insert_with(|| json!(active_connection.as_str()));
             params.entry("randomSeed").or_insert_with(|| json!(crate::host::random_seed_hex()));
             let pixel_dir = crate::pixel::assets_dir().join("pixel");
             let has_pixel_dir = pixel_dir.join("sprites.json").is_file();

@@ -14,3 +14,8 @@ type: string, size: number, };
  * At most attachmentMax bytes, as base64.
  */
 export type AttachmentUpload = { name: string, type: string, data: string, };
+
+/**
+ * Local regular file imported directly into CAS without base64 framing (`Caller::User` only).
+ */
+export type AttachmentImportPathInput = { path: string, name?: string, mime?: string, };

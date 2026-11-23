@@ -184,6 +184,7 @@ export const servedEndpoints = [
   { op: "orchestrator.approval.list", can: ["user"], about: ["conversationId"] },
   { op: "orchestrator.approval.resolve", can: ["user"], about: ["conversationId", "taskId", "toolCallId"] },
   { op: "attachment.create", can: ["user", "remote"], about: [] },
+  { op: "attachment.importPath", can: ["user"], about: [] },
   { op: "server.health.get", can: ["user", "remote"], about: [] },
   { op: "debug.snapshot", can: ["user"], about: [] },
   { op: "debug.timeline.list", can: ["user"], about: [] },

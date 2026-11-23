@@ -267,7 +267,7 @@ export type {
   OrchestratorEvalRequest,
 } from "./orchestrator/shapes.gen";
 export type { AchievementList, ChooseTitleRequest, Crop, FarmFrame } from "./game/shapes.gen";
-export { type Attachment, type AttachmentUpload } from "./attachment/shapes.gen";
+export { type Attachment, type AttachmentImportPathInput, type AttachmentUpload } from "./attachment/shapes.gen";
 export {
   type ConnectorID,
   ConnectorIDValues,

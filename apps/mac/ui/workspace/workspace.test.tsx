@@ -347,38 +347,6 @@ test("workspace Palette handles commands filter/select/close and remote search/f
   expect(host.acts).toContainEqual({ type: "search", query: "TODO" });
 });
 
-test("workspace MarkdownPane renders delayed skeleton, pushed markdown documents, and error states", async () => {
-  const host = workspaceHost({ view: "markdown" });
-  const app = await open("../ShellApp.story.tsx", {
-    width: 720,
-    height: 600,
-    colorScheme: "light",
-    platform: "macos",
-    clock: { time: 1_700_000_000_000 },
-    host: host.options,
-  });
-  const clock = app.clock;
-  if (!clock) throw new Error("MarkdownPane skeleton test requires a manual virtual clock");
-  await host.pump(app);
-
-  expect(app.count("id:markdown-pane")).toBe(1);
-  expect(app.count("id:markdown-pane-skeleton")).toBe(0);
-  expect(app.texts()).not.toContain("Loading preview…");
-
-  await clock.fastForward(160);
-  await host.pump(app);
-  expect(app.count("id:markdown-pane-skeleton")).toBe(1);
-
-  await host.pushFrame(app, "doc", { path: "README.md", markdown: "# Architecture\n\nRendered paragraph body." });
-  expect(app.count("id:markdown-pane-skeleton")).toBe(0);
-  expect(app.texts().some((s) => s.includes("Architecture"))).toBe(true);
-  expect(app.texts().some((s) => s.includes("Rendered paragraph body."))).toBe(true);
-
-  await host.pushFrame(app, "doc", { path: "missing.md", markdown: null, error: "File disappeared on disk" });
-  expect(app.count("id:markdown-pane-skeleton")).toBe(0);
-  expect(app.texts()).toContain("File disappeared on disk");
-});
-
 test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open, interaction_*, mid-turn steer, and telemetry", async () => {
   const baseSession = {
     id: "sess-ws-1",

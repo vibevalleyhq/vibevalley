@@ -96,4 +96,4 @@
 
 ## 2.6 工作区外壳共享原语（`apps/mac/ui/workspace/chrome.tsx`）
 
-`apps/mac/ui/workspace/` 承载原生工作区外壳（`Sidebar.tsx`、`FileTree.tsx`、`GitPanel.tsx`、`Palette.tsx`、`MarkdownPane.tsx`、`BridgeProbe.tsx`），与工作台使用同一套 `theme.json` / `nsh.json` Tailwind 类名、`<Icon name>`、`<ActiveBar />`、`design/Button.tsx`（`Button`）与 `design/Tip.tsx`（`Bubble`）；外壳共享的节标题 `SectionHead`、紧凑图标按钮 `ShellIconButton`、空提示 `PanelEmpty` 与右键菜单样式类集中于 `apps/mac/ui/workspace/chrome.tsx`。
+`apps/mac/ui/workspace/` 承载原生工作区外壳（`Sidebar.tsx`、`FileTree.tsx`、`GitPanel.tsx`、`Palette.tsx`、`ChatPane.tsx`、`BridgeProbe.tsx`），与工作台使用同一套 `theme.json` / `nsh.json` Tailwind 类名、`<Icon name>`、`<ActiveBar />`、`design/Button.tsx`（`Button`）与 `design/Tip.tsx`（`Bubble`）；外壳共享的节标题 `SectionHead`、紧凑图标按钮 `ShellIconButton`、空提示 `PanelEmpty` 与右键菜单样式类集中于 `apps/mac/ui/workspace/chrome.tsx`。Markdown 预览窗格由纯 GPUI 视图 `apps/mac/src/markdown_pane.rs` 直接承载 `vibevalley-rich`（零额外 QuickJS VM）。

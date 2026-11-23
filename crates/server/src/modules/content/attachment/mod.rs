@@ -3,14 +3,14 @@
 //! `server.db`'s `attachment` table. `attachment.create` as VibeValley
 //! serves it, and VibeValley's `attachment.file` (the file's absolute path).
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use base64::Engine;
 use sha2::{Digest, Sha256};
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, Attachment, AttachmentFile, AttachmentUpload, BizCode, native_ops, ops};
+use vibevalley_protocol::{ApiError, Attachment, AttachmentFile, AttachmentImportPathInput, AttachmentUpload, BizCode, native_ops, ops};
 
 use crate::base::{ServerDb, internal};
 use crate::db::generated::content_attachment as queries;
@@ -52,12 +52,93 @@ impl Attachments {
             .decode(upload.data.trim())
             .map_err(|e| ApiError::new(BizCode::InvalidInput, format!("data: {e}")))?;
         if bytes.len() > ATTACHMENT_MAX {
-            return Err(refused(t(
-                "server.attachment.fileTooBig",
-                &[("mb", ((ATTACHMENT_MAX as f64) / 1024.0 / 1024.0).round().into())],
-            )));
+            return Err(file_too_big());
         }
         self.keep(&bytes, &upload.name, &upload.r#type)
+    }
+
+    /// Streams a local regular file directly from disk into CAS without base64 framing (`Caller::User` only).
+    pub fn import_path(&self, input: &AttachmentImportPathInput) -> Result<Attachment, ApiError> {
+        let raw = input.path.trim();
+        let path = Path::new(raw);
+        if raw.is_empty() || !path.is_absolute() {
+            return Err(ApiError::new(BizCode::InvalidInput, "path must be an absolute path to a regular file"));
+        }
+        let sym_meta = std::fs::symlink_metadata(path).map_err(|e| refused(format!("{}: {e}", path.display())))?;
+        if sym_meta.file_type().is_symlink() {
+            return Err(refused("symlinks cannot be imported as attachments".into()));
+        }
+        if !sym_meta.file_type().is_file() {
+            return Err(refused(format!("{} is not a regular file", path.display())));
+        }
+        if sym_meta.len() == 0 {
+            return Err(refused(t("server.attachment.emptyFile", &[])));
+        }
+        if sym_meta.len() > ATTACHMENT_MAX as u64 {
+            return Err(file_too_big());
+        }
+
+        let mut source = std::fs::File::open(path).map_err(|e| refused(format!("{}: {e}", path.display())))?;
+        let file_meta = source.metadata().map_err(|e| refused(format!("{}: {e}", path.display())))?;
+        if !file_meta.is_file() {
+            return Err(refused(format!("{} is not a regular file", path.display())));
+        }
+        if file_meta.len() > ATTACHMENT_MAX as u64 {
+            return Err(file_too_big());
+        }
+
+        std::fs::create_dir_all(&self.root).map_err(|e| refused(e.to_string()))?;
+        let staging = self.root.join(format!(".put-{}", uuid::Uuid::new_v4()));
+        let streamed = (|| -> Result<(String, i64), ApiError> {
+            let mut dest = std::fs::File::create(&staging).map_err(|e| refused(e.to_string()))?;
+            let mut hasher = Sha256::new();
+            let mut buf = [0u8; 64 * 1024];
+            let mut total: u64 = 0;
+            loop {
+                let n = source.read(&mut buf).map_err(|e| refused(e.to_string()))?;
+                if n == 0 {
+                    break;
+                }
+                total = total.saturating_add(n as u64);
+                if total > ATTACHMENT_MAX as u64 {
+                    return Err(file_too_big());
+                }
+                hasher.update(&buf[..n]);
+                dest.write_all(&buf[..n]).map_err(|e| refused(e.to_string()))?;
+            }
+            if total == 0 {
+                return Err(refused(t("server.attachment.emptyFile", &[])));
+            }
+            dest.sync_all().map_err(|e| refused(e.to_string()))?;
+            let id = hasher.finalize().iter().map(|b| format!("{b:02x}")).collect::<String>();
+            Ok((id, total as i64))
+        })();
+
+        let (id, size) = match streamed {
+            Ok(pair) => pair,
+            Err(err) => {
+                let _ = std::fs::remove_file(&staging);
+                return Err(err);
+            }
+        };
+
+        let target = self.path_of(&id);
+        if std::fs::metadata(&target).is_ok_and(|m| m.len() == size as u64) {
+            let _ = std::fs::remove_file(&staging);
+        } else if let Err(err) = std::fs::rename(&staging, &target) {
+            let _ = std::fs::remove_file(&staging);
+            return Err(refused(err.to_string()));
+        }
+
+        let fallback_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+        let name = input.name.as_deref().map(str::trim).filter(|s| !s.is_empty()).unwrap_or(fallback_name);
+        let mime = input
+            .mime
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| guess_mime_from_path(path));
+        self.record(&id, name, mime, size)
     }
 
     /// `keep`: bytes kept once by their sha256; no size limit.
@@ -178,10 +259,144 @@ impl crate::ports::AttachmentReadPort for Attachments {
     }
 }
 
+fn file_too_big() -> ApiError {
+    refused(t(
+        "server.attachment.fileTooBig",
+        &[("mb", ((ATTACHMENT_MAX as f64) / 1024.0 / 1024.0).round().into())],
+    ))
+}
+
+fn guess_mime_from_path(path: &Path) -> &'static str {
+    let ext = path.extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
+    match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "heic" => "image/heic",
+        "svg" => "image/svg+xml",
+        "pdf" => "application/pdf",
+        "txt" | "log" => "text/plain",
+        "md" | "markdown" => "text/markdown",
+        "json" => "application/json",
+        "csv" => "text/csv",
+        "html" | "htm" => "text/html",
+        "mp4" | "m4v" => "video/mp4",
+        "mov" => "video/quicktime",
+        "webm" => "video/webm",
+        "mp3" => "audio/mpeg",
+        "m4a" => "audio/mp4",
+        "flac" => "audio/flac",
+        "aac" => "audio/aac",
+        "ogg" | "opus" => "audio/ogg",
+        "wav" => "audio/wav",
+        "zip" => "application/zip",
+        _ => "application/octet-stream",
+    }
+}
+
 pub fn install(hub: &Hub, files: Arc<Attachments>) {
     hub.on::<ops::AttachmentCreate>({
         let files = files.clone();
         move |_, upload| files.attach(&upload)
     });
+    hub.on::<ops::AttachmentImportPath>({
+        let files = files.clone();
+        move |_, input| files.import_path(&input)
+    });
     hub.on::<native_ops::AttachmentFile>(move |_, i| files.file(&i.id));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use vibevalley_protocol::Caller;
+
+    fn test_hub() -> (tempfile::TempDir, Arc<Hub>, Arc<Attachments>) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db = ServerDb::open(dir.path()).expect("open db");
+        let files = Attachments::open(dir.path(), db);
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        install(&hub, files.clone());
+        (dir, hub, files)
+    }
+
+    #[test]
+    fn import_path_succeeds_for_local_user_and_rejects_remote_caller_with_forbidden() {
+        let (dir, hub, files) = test_hub();
+        let sample = dir.path().join("diagram.png");
+        let payload = b"\x89PNG\r\n\x1a\nlocal-import-bytes";
+        std::fs::write(&sample, payload).expect("write sample");
+
+        let user_env = hub.call_as(Caller::User, "attachment.importPath", json!({ "path": sample.to_string_lossy() }));
+        assert_eq!(user_env.biz_code, 0, "local user must succeed: {}", user_env.message);
+        let att: Attachment = serde_json::from_value(user_env.data.expect("data")).expect("attachment");
+        assert_eq!(att.name, "diagram.png");
+        assert_eq!(att.r#type, "image/png");
+        assert_eq!(att.size, payload.len() as i64);
+        assert_eq!(std::fs::read(files.path_of(&att.id)).expect("cas bytes"), payload);
+
+        // Deduplicates with identical content via base64 attachment.create.
+        let b64 = base64::engine::general_purpose::STANDARD.encode(payload);
+        let created = hub.call_as(
+            Caller::User,
+            "attachment.create",
+            json!({ "name": "copy.png", "type": "image/png", "data": b64 }),
+        );
+        assert_eq!(created.biz_code, 0);
+        let att2: Attachment = serde_json::from_value(created.data.expect("data")).expect("attachment");
+        assert_eq!(att.id, att2.id);
+
+        // Remote caller MUST be rejected with Forbidden.
+        let remote_env = hub.call_as(Caller::Remote, "attachment.importPath", json!({ "path": sample.to_string_lossy() }));
+        assert_eq!(
+            remote_env.biz_code,
+            BizCode::Forbidden.code(),
+            "remote caller must receive Forbidden, got: {:?}",
+            remote_env
+        );
+    }
+
+    #[test]
+    fn import_path_enforces_absolute_regular_non_symlink_and_size_checks() {
+        let (dir, hub, _) = test_hub();
+
+        let rel = hub.call_as(Caller::User, "attachment.importPath", json!({ "path": "relative/file.txt" }));
+        assert_eq!(rel.biz_code, BizCode::InvalidInput.code());
+
+        let subdir = dir.path().join("folder");
+        std::fs::create_dir_all(&subdir).expect("mkdir");
+        let dir_res = hub.call_as(Caller::User, "attachment.importPath", json!({ "path": subdir.to_string_lossy() }));
+        assert_eq!(dir_res.biz_code, BizCode::AttachmentRefused.code());
+
+        let empty = dir.path().join("empty.txt");
+        std::fs::write(&empty, b"").expect("write empty");
+        let empty_res = hub.call_as(Caller::User, "attachment.importPath", json!({ "path": empty.to_string_lossy() }));
+        assert_eq!(empty_res.biz_code, BizCode::AttachmentRefused.code());
+
+        #[cfg(unix)]
+        {
+            let target = dir.path().join("real.txt");
+            let link = dir.path().join("link.txt");
+            std::fs::write(&target, b"secret").expect("write target");
+            std::os::unix::fs::symlink(&target, &link).expect("symlink");
+            let link_res = hub.call_as(Caller::User, "attachment.importPath", json!({ "path": link.to_string_lossy() }));
+            assert_eq!(link_res.biz_code, BizCode::AttachmentRefused.code());
+        }
+
+        // Explicit name and mime override extension defaults.
+        let custom = dir.path().join("blob");
+        std::fs::write(&custom, b"hello world").expect("write custom");
+        let custom_res = hub.call_as(
+            Caller::User,
+            "attachment.importPath",
+            json!({ "path": custom.to_string_lossy(), "name": "notes.md", "mime": "text/markdown" }),
+        );
+        assert_eq!(custom_res.biz_code, 0);
+        let att: Attachment = serde_json::from_value(custom_res.data.expect("data")).expect("attachment");
+        assert_eq!(att.name, "notes.md");
+        assert_eq!(att.r#type, "text/markdown");
+        assert_eq!(att.size, 11);
+    }
 }

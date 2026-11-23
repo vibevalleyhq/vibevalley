@@ -37,6 +37,7 @@ pub(super) const SETTINGS_KEY: &str = crate::theme::SETTINGS_KEY;
 pub(super) const ACTIVE_KEY: &str = "app.active_project";
 pub(super) const SIDEBAR_MIN: f32 = 180.0;
 pub(super) const SIDEBAR_MAX: f32 = 560.0;
+pub(super) const INSPECTOR_MIN_VIEWPORT_WIDTH: f32 = 1040.0;
 
 /// UI-side state of one open project: its tree, git state and file index.
 pub struct ProjectView {
@@ -61,6 +62,12 @@ pub struct Palette {
     pub query: String,
     /// Bumped per query so late results of an older one are dropped.
     pub(super) seq: u64,
+    pub(super) _sub: Subscription,
+}
+
+/// Lazily mounted right-side workspace inspector QuickJS surface; dropped immediately when closed.
+pub struct InspectorSlot {
+    pub view: Entity<HostedView>,
     pub(super) _sub: Subscription,
 }
 
@@ -91,17 +98,14 @@ pub struct ChatTabStatus {
     pub attention: bool,
 }
 
-pub struct Shell {
+/// Project store, workspace layout, live terminal/pane slots, file watches, and git state.
+pub struct WorkspaceProjects {
     pub store: Option<Arc<Store>>,
     pub(super) project_open: Option<gpui::Task<()>>,
     pub ws: Workspace<TermSession>,
     pub loaded: bool,
     pub(super) server_ready: bool,
     pub(super) workbench_ready: bool,
-    pub(super) island: Option<crate::island::Island>,
-    pub(super) island_client: Option<Arc<vibevalley_server::transport::bridge::Client>>,
-    /// VibeValley's opening over the window until the projects are in (`VIBEVALLEY_NO_OPENING=1` skips it).
-    pub launch: Option<Entity<crate::pixel::view::PixelView>>,
     pub load_error: Option<String>,
     pub projects: HashMap<ProjectId, ProjectView>,
     /// Every project's branch and worktrees, read for the sidebar whether or
@@ -113,35 +117,57 @@ pub struct Shell {
     pub chat_statuses: HashMap<(ProjectId, TabId), ChatTabStatus>,
     pub(super) chat_watches: HashMap<String, (u64, gpui::Task<()>)>,
     pub chat_menu_group: Option<vibevalley_workspace::GroupId>,
+    pub(super) save_pending: bool,
+    pub(super) fs_tx: flume::Sender<(ProjectId, Vec<FsChange>)>,
+    pub(super) git_refresh_pending: BTreeSet<ProjectId>,
+}
+
+/// Hosted chrome surfaces, layout visibility/widths, active route, and drag/resize tracking.
+pub struct HostChrome {
     pub sidebar: Entity<HostedView>,
-    pub inspector: Entity<HostedView>,
+    pub inspector: Option<InspectorSlot>,
     pub workbench: Entity<HostedView>,
     pub native_workspace: bool,
     pub native_pixel: Option<PixelSlot>,
     pub global_rail_width: f32,
-    pub palette: Option<Palette>,
-    pub devtools: devtools::DevtoolsSlot,
     pub panel: Panel,
     pub inspector_open: bool,
     pub inspector_width: f32,
     pub last_route: Option<String>,
     pub sidebar_width: f32,
     pub sidebar_visible: bool,
-    /// Last `host.tray` summary, `host.locale` and `host.opening` from the views.
-    pub tray: Option<Value>,
-    pub locale: Option<String>,
-    pub opening: Option<Value>,
-    pub probe: Option<Value>,
     pub(super) resizing_sidebar: bool,
     pub(super) resizing_inspector: bool,
     pub split_bounds: SplitBounds,
     pub dragging_split: Option<(u64, usize)>,
     pub window_drag_origin: Option<(f32, f32)>,
+}
+
+/// Transient overlays, companion processes (island/tray), and host-reported diagnostics.
+pub struct NativeOverlays {
+    pub(super) island: Option<crate::island::Island>,
+    pub(super) island_client: Option<Arc<vibevalley_server::transport::bridge::Client>>,
+    /// VibeValley's opening over the window until the projects are in (`VIBEVALLEY_NO_OPENING=1` skips it).
+    pub launch: Option<Entity<crate::pixel::view::PixelView>>,
+    pub palette: Option<Palette>,
+    pub devtools: devtools::DevtoolsSlot,
+    /// Last `host.tray` summary, `host.locale` and `host.opening` from the views.
+    pub tray: Option<Value>,
+    pub locale: Option<String>,
+    pub opening: Option<Value>,
+    pub probe: Option<Value>,
+}
+
+pub struct Shell {
+    pub workspace: WorkspaceProjects,
+    pub chrome: HostChrome,
+    pub overlays: NativeOverlays,
     pub(super) focus: FocusHandle,
-    pub(super) save_pending: bool,
-    pub(super) fs_tx: flume::Sender<(ProjectId, Vec<FsChange>)>,
-    pub(super) git_refresh_pending: BTreeSet<ProjectId>,
     pub(super) _subs: Vec<Subscription>,
+}
+
+pub(super) fn should_mount_inspector(native_workspace: bool, inspector_open: bool, viewport_width: f32) -> bool {
+    native_workspace && inspector_open && viewport_width >= INSPECTOR_MIN_VIEWPORT_WIDTH
 }
 
 impl Shell {
@@ -149,12 +175,6 @@ impl Shell {
         let dark = Ui::get(cx).colors.dark;
         let sidebar = cx.new(|cx| HostedView::new("sidebar", serde_json::from_value(json!({"contextual":true})).unwrap(), dark, window, cx));
         let sub = cx.subscribe_in(&sidebar, window, |this, _, event: &HostedEvent, window, cx| match event {
-            HostedEvent::Action(action) => this.on_action(action.clone(), window, cx),
-            HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
-            HostedEvent::Ready => this.push_sidebar(cx),
-        });
-        let inspector = cx.new(|cx| HostedView::new("sidebar", serde_json::from_value(json!({"role":"inspector"})).unwrap(), dark, window, cx));
-        let inspector_sub = cx.subscribe_in(&inspector, window, |this, _, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(action) => this.on_action(action.clone(), window, cx),
             HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
             HostedEvent::Ready => this.push_sidebar(cx),
@@ -172,7 +192,7 @@ impl Shell {
             HostedEvent::Action(action) => this.on_action(action.clone(), window, cx),
             HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
             HostedEvent::Ready => {
-                this.workbench_ready = true;
+                this.workspace.workbench_ready = true;
                 this.finish_opening(true, cx);
             }
         });
@@ -187,18 +207,20 @@ impl Shell {
         .detach();
         let quit = cx.on_app_quit(|this: &mut Shell, cx| {
             this.close_devtools(cx);
-            this.island = None;
-            this.island_client = None;
+            this.chrome.inspector = None;
+            this.overlays.palette = None;
+            this.overlays.island = None;
+            this.overlays.island_client = None;
             crate::live_voice::stop(None);
             crate::speech_audio::stop(None);
             crate::audio::stop_queued();
-            let jobs = this.ws.save_jobs();
-            let mut ws = std::mem::take(&mut this.ws);
-            this.projects.clear();
-            this.terminals.clear();
-            this.panes.clear();
-            this.chat_statuses.clear();
-            let watches = std::mem::take(&mut this.chat_watches);
+            let jobs = this.workspace.ws.save_jobs();
+            let mut ws = std::mem::take(&mut this.workspace.ws);
+            this.workspace.projects.clear();
+            this.workspace.terminals.clear();
+            this.workspace.panes.clear();
+            this.workspace.chat_statuses.clear();
+            let watches = std::mem::take(&mut this.workspace.chat_watches);
             if let Some(bridge) = cx.try_global::<crate::hosted::BridgeHub>() {
                 let server = bridge.0.server();
                 for (_, (sub_id, _task)) in watches {
@@ -206,7 +228,7 @@ impl Shell {
                 }
             }
             let running = crate::serving::RunningServer::take_for_shutdown(cx);
-            let store = this.store.take();
+            let store = this.workspace.store.take();
             let background = cx.background_executor().clone();
             async move {
                 background
@@ -235,59 +257,66 @@ impl Shell {
         });
         let startup_rx = cx.try_global::<crate::hosted::ServerStartup>().map(|s| s.0.clone());
         let already_settled = startup_rx.as_ref().and_then(|rx| rx.borrow().clone());
+        let ui_settings = Ui::get(cx).settings.clone();
         let mut shell = Shell {
-            store: None,
-            project_open: None,
-            ws: Workspace::new(),
-            loaded: false,
-            server_ready: matches!(already_settled, Some(Ok(()))),
-            workbench_ready: false,
-            island: None,
-            island_client: None,
-            launch: (std::env::var_os("VIBEVALLEY_NO_OPENING").is_none()
-                && Ui::get(cx).settings.effective_motion() != MotionChoice::Off
-                && !matches!(already_settled, Some(Err(_))))
-            .then(|| cx.new(|cx| crate::pixel::view::PixelView::new("opening:launch", json!({}), cx))),
-            load_error: match &already_settled {
-                Some(Err(e)) => Some(e.clone()),
-                _ => None,
+            workspace: WorkspaceProjects {
+                store: None,
+                project_open: None,
+                ws: Workspace::new(),
+                loaded: false,
+                server_ready: matches!(already_settled, Some(Ok(()))),
+                workbench_ready: false,
+                load_error: match &already_settled {
+                    Some(Err(e)) => Some(e.clone()),
+                    _ => None,
+                },
+                projects: HashMap::new(),
+                git_summaries: HashMap::new(),
+                terminals: HashMap::new(),
+                terminal_notice: None,
+                panes: HashMap::new(),
+                chat_statuses: HashMap::new(),
+                chat_watches: HashMap::new(),
+                chat_menu_group: None,
+                save_pending: false,
+                fs_tx,
+                git_refresh_pending: BTreeSet::new(),
             },
-            projects: HashMap::new(),
-            git_summaries: HashMap::new(),
-            terminal_notice: None,
-            terminals: HashMap::new(),
-            panes: HashMap::new(),
-            chat_statuses: HashMap::new(),
-            chat_watches: HashMap::new(),
-            chat_menu_group: None,
-            sidebar,
-            inspector,
-            workbench,
-            native_workspace: false,
-            native_pixel: None,
-            global_rail_width: 76.0,
-            palette: None,
-            devtools: devtools::DevtoolsSlot::new(devtools_enabled()),
-            panel: Panel::Files,
-            inspector_open: Ui::get(cx).settings.inspector_open,
-            inspector_width: Ui::get(cx).settings.inspector_width,
-            last_route: None,
-            sidebar_width: Ui::get(cx).settings.sidebar_width,
-            sidebar_visible: Ui::get(cx).settings.sidebar_visible,
-            tray: None,
-            locale: None,
-            opening: None,
-            probe: None,
-            resizing_sidebar: false,
-            resizing_inspector: false,
-            split_bounds: SplitBounds::default(),
-            dragging_split: None,
-            window_drag_origin: None,
+            chrome: HostChrome {
+                sidebar,
+                inspector: None,
+                workbench,
+                native_workspace: false,
+                native_pixel: None,
+                global_rail_width: 76.0,
+                panel: Panel::Files,
+                inspector_open: ui_settings.inspector_open,
+                inspector_width: ui_settings.inspector_width,
+                last_route: None,
+                sidebar_width: ui_settings.sidebar_width,
+                sidebar_visible: ui_settings.sidebar_visible,
+                resizing_sidebar: false,
+                resizing_inspector: false,
+                split_bounds: SplitBounds::default(),
+                dragging_split: None,
+                window_drag_origin: None,
+            },
+            overlays: NativeOverlays {
+                island: None,
+                island_client: None,
+                launch: (std::env::var_os("VIBEVALLEY_NO_OPENING").is_none()
+                    && ui_settings.effective_motion() != MotionChoice::Off
+                    && !matches!(already_settled, Some(Err(_))))
+                .then(|| cx.new(|cx| crate::pixel::view::PixelView::new("opening:launch", json!({}), cx))),
+                palette: None,
+                devtools: devtools::DevtoolsSlot::new(devtools_enabled()),
+                tray: None,
+                locale: None,
+                opening: None,
+                probe: None,
+            },
             focus: cx.focus_handle(),
-            save_pending: false,
-            fs_tx,
-            git_refresh_pending: BTreeSet::new(),
-            _subs: vec![sub, inspector_sub, workbench_sub, quit, appearance_sub],
+            _subs: vec![sub, workbench_sub, quit, appearance_sub],
         };
         if already_settled.is_none()
             && let Some(mut startup) = startup_rx
@@ -302,13 +331,13 @@ impl Shell {
                 let _ = this.update(cx, |shell, cx| {
                     match result {
                         Ok(()) => {
-                            shell.server_ready = true;
+                            shell.workspace.server_ready = true;
                             shell.sync_chat_watches(cx);
                             shell.finish_opening(true, cx);
                         }
                         Err(error) => {
                             eprintln!("{error}");
-                            shell.load_error = Some(error);
+                            shell.workspace.load_error = Some(error);
                             shell.finish_opening(false, cx);
                         }
                     }
@@ -319,7 +348,7 @@ impl Shell {
         }
         match crate::island::Island::start() {
             Ok(Some((island, opened))) => {
-                shell.island = Some(island);
+                shell.overlays.island = Some(island);
                 struct IslandOutlet(flume::Sender<(String, Value)>);
                 impl vibevalley_server::transport::bridge::Outlet for IslandOutlet {
                     fn send(&self, event: &str, data: Value) {
@@ -332,7 +361,7 @@ impl Shell {
                 if let Err(error) = client.watch("slice:board") {
                     eprintln!("island watch slice:board: {error}");
                 }
-                shell.island_client = Some(client.clone());
+                shell.overlays.island_client = Some(client.clone());
                 cx.spawn(async move |this, cx| {
                     while let Ok((event, envelope)) = rx.recv_async().await {
                         if event != "frame:slice:board" {
@@ -348,7 +377,7 @@ impl Shell {
                             }
                         };
                         let alive = this.update(cx, |shell, _| {
-                            if let Some(island) = &shell.island {
+                            if let Some(island) = &shell.overlays.island {
                                 island.show(&crate::island::glance(&board));
                             }
                         });
@@ -383,12 +412,40 @@ impl Shell {
         shell
     }
 
+    /// Lazily spawns the inspector QuickJS view only when the workspace inspector is visible
+    /// at a wide enough viewport, and drops it immediately when closed.
+    pub(super) fn sync_inspector(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.chrome.inspector_open {
+            self.chrome.inspector = None;
+            return;
+        }
+        if !should_mount_inspector(
+            self.chrome.native_workspace,
+            self.chrome.inspector_open,
+            f32::from(window.viewport_size().width),
+        ) {
+            return;
+        }
+        if self.chrome.inspector.is_some() {
+            return;
+        }
+        let dark = Ui::get(cx).colors.dark;
+        let view = cx.new(|cx| HostedView::new("sidebar", serde_json::from_value(json!({"role":"inspector"})).unwrap(), dark, window, cx));
+        let sub = cx.subscribe_in(&view, window, |this, _, event: &HostedEvent, window, cx| match event {
+            HostedEvent::Action(action) => this.on_action(action.clone(), window, cx),
+            HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
+            HostedEvent::Ready => this.push_sidebar(cx),
+        });
+        self.chrome.inspector = Some(InspectorSlot { view, _sub: sub });
+    }
+
     pub(super) fn publish_host_debug(&self, cx: &gpui::App) {
         let Some(handle) = cx.try_global::<crate::hosted::ShellDebugHandle>() else {
             return;
         };
-        let active_project = self.ws.active_id();
+        let active_project = self.workspace.ws.active_id();
         let projects: Vec<Value> = self
+            .workspace
             .ws
             .projects()
             .iter()
@@ -422,7 +479,7 @@ impl Shell {
                 })
             })
             .collect();
-        let active_pixel = self.native_pixel.as_ref().map(|slot| {
+        let active_pixel = self.chrome.native_pixel.as_ref().map(|slot| {
             let view = slot.view.read(cx);
             json!({
                 "kind": view.kind,
@@ -430,12 +487,12 @@ impl Shell {
             })
         });
         let routes = json!({
-            "current": self.last_route.as_deref().unwrap_or("/issues"),
-            "loaded": self.loaded,
-            "nativeWorkspace": self.native_workspace,
-            "panel": self.panel.as_str(),
-            "sidebarVisible": self.sidebar_visible,
-            "inspectorOpen": self.inspector_open,
+            "current": self.chrome.last_route.as_deref().unwrap_or("/issues"),
+            "loaded": self.workspace.loaded,
+            "nativeWorkspace": self.chrome.native_workspace,
+            "panel": self.chrome.panel.as_str(),
+            "sidebarVisible": self.chrome.sidebar_visible,
+            "inspectorOpen": self.chrome.inspector_open,
             "activeProjectId": active_project,
             "projects": projects,
             "activePixel": active_pixel,
@@ -443,22 +500,22 @@ impl Shell {
         let caches = vec![
             crate::hosted::DebugCacheEntry {
                 name: "panes".into(),
-                entries: self.panes.len() as u32,
+                entries: self.workspace.panes.len() as u32,
                 detail: Some("open pane entities".into()),
             },
             crate::hosted::DebugCacheEntry {
                 name: "terminals".into(),
-                entries: self.terminals.len() as u32,
+                entries: self.workspace.terminals.len() as u32,
                 detail: Some("live terminal views".into()),
             },
             crate::hosted::DebugCacheEntry {
                 name: "projects".into(),
-                entries: self.projects.len() as u32,
+                entries: self.workspace.projects.len() as u32,
                 detail: Some("loaded project views".into()),
             },
             crate::hosted::DebugCacheEntry {
                 name: "chatWatches".into(),
-                entries: self.chat_watches.len() as u32,
+                entries: self.workspace.chat_watches.len() as u32,
                 detail: Some("active chat status watches".into()),
             },
         ];
@@ -509,10 +566,13 @@ impl Shell {
                     let was_dark = Ui::get(cx).colors.dark;
                     let was_ui_size = Ui::get(cx).settings.ui_font_size;
                     let was_motion = Ui::get(cx).settings.effective_motion();
-                    this.sidebar_width = settings.sidebar_width;
-                    this.sidebar_visible = settings.sidebar_visible;
-                    this.inspector_open = settings.inspector_open;
-                    this.inspector_width = settings.inspector_width;
+                    this.chrome.sidebar_width = settings.sidebar_width;
+                    this.chrome.sidebar_visible = settings.sidebar_visible;
+                    this.chrome.inspector_open = settings.inspector_open;
+                    if !this.chrome.inspector_open {
+                        this.chrome.inspector = None;
+                    }
+                    this.chrome.inspector_width = settings.inspector_width;
                     let saved_route = settings.last_route.clone();
                     let ui_size = settings.ui_font_size;
                     Ui::apply(settings, cx);
@@ -521,15 +581,15 @@ impl Shell {
                         this.notify_motion(effective_motion, cx);
                     }
                     if effective_motion == MotionChoice::Off {
-                        this.launch = None;
+                        this.overlays.launch = None;
                     }
                     if let Some(route) = saved_route
                         && !route.is_empty()
                         && route != "/issues"
                     {
-                        this.last_route = Some(route.clone());
+                        this.chrome.last_route = Some(route.clone());
                         this.sync_devtools_route(&route);
-                        this.workbench.update(cx, |v, cx| v.navigate(&route, cx));
+                        this.chrome.workbench.update(cx, |v, cx| v.navigate(&route, cx));
                     }
                     if Ui::get(cx).colors.dark != was_dark {
                         this.theme_changed(cx);
@@ -538,8 +598,8 @@ impl Shell {
                         this.apply_ui_font_size(cx);
                     }
                     for p in projects {
-                        let id = this.ws.open(p);
-                        if let Some(proj) = this.ws.project_mut(id) {
+                        let id = this.workspace.ws.open(p);
+                        if let Some(proj) = this.workspace.ws.project_mut(id) {
                             // Workbench pages now belong to the application router.
                             let old_pages: Vec<_> = proj
                                 .layout
@@ -553,11 +613,11 @@ impl Shell {
                         }
                     }
                     if let Some(id) = active {
-                        this.ws.activate(id);
+                        this.workspace.ws.activate(id);
                     }
-                    this.store = Some(store);
-                    this.loaded = true;
-                    if let Some(id) = this.ws.active_id() {
+                    this.workspace.store = Some(store);
+                    this.workspace.loaded = true;
+                    if let Some(id) = this.workspace.ws.active_id() {
                         this.ensure_project_view(id, cx);
                     }
                     this.refresh_summaries(cx);
@@ -568,8 +628,8 @@ impl Shell {
                 }
                 Err(e) => {
                     eprintln!("could not load projects: {e}");
-                    this.load_error = Some(e);
-                    this.loaded = true;
+                    this.workspace.load_error = Some(e);
+                    this.workspace.loaded = true;
                     this.finish_opening(false, cx);
                     cx.notify();
                 }
@@ -579,8 +639,8 @@ impl Shell {
 
     /// The opening says it is there (or failed), then gives way after a moment.
     pub(super) fn finish_opening(&mut self, ok: bool, cx: &mut Context<Self>) {
-        let Some(opening) = self.launch.clone() else { return };
-        if ok && (!self.loaded || !self.server_ready || !self.workbench_ready || self.load_error.is_some()) {
+        let Some(opening) = self.overlays.launch.clone() else { return };
+        if ok && (!self.workspace.loaded || !self.workspace.server_ready || !self.workspace.workbench_ready || self.workspace.load_error.is_some()) {
             return;
         }
         opening.update(cx, |v, _| {
@@ -599,7 +659,7 @@ impl Shell {
         cx.spawn(async move |this, cx| {
             cx.background_executor().timer(std::time::Duration::from_millis(350)).await;
             let _ = this.update(cx, |s, cx| {
-                s.launch = None;
+                s.overlays.launch = None;
                 cx.notify();
             });
         })
@@ -609,12 +669,12 @@ impl Shell {
 
 impl Drop for Shell {
     fn drop(&mut self) {
-        if self.ws.projects().is_empty() {
+        if self.workspace.ws.projects().is_empty() {
             return;
         }
-        let jobs = self.ws.save_jobs();
-        let mut ws = std::mem::take(&mut self.ws);
-        let store = self.store.take();
+        let jobs = self.workspace.ws.save_jobs();
+        let mut ws = std::mem::take(&mut self.workspace.ws);
+        let store = self.workspace.store.take();
         std::thread::spawn(move || {
             if let Some(store) = store {
                 for job in jobs {
@@ -629,5 +689,19 @@ impl Drop for Shell {
 impl Focusable for Shell {
     fn focus_handle(&self, _: &gpui::App) -> FocusHandle {
         self.focus.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lazy_inspector_mounts_only_when_workspace_inspector_open_and_viewport_wide() {
+        assert!(!should_mount_inspector(false, true, 1440.0));
+        assert!(!should_mount_inspector(true, false, 1440.0));
+        assert!(!should_mount_inspector(true, true, 1039.0));
+        assert!(should_mount_inspector(true, true, 1040.0));
+        assert!(should_mount_inspector(true, true, 1440.0));
     }
 }
