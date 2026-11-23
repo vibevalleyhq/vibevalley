@@ -10,54 +10,30 @@
 //! - Every text frame decodes into strongly typed `MachineWireFrame` at the door;
 //!   `MachineMcpRequest` tunnels through `Server::mcp()` with zero `crate::modules::*` imports.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+use axum::extract::State;
 use axum::extract::ws::rejection::WebSocketUpgradeRejection;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{Query, State};
-use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
 use futures_util::{SinkExt, StreamExt};
 use tokio_util::sync::CancellationToken;
-use vibevalley_protocol::{BizCode, MachinePing, MachinePong, MachineWireError, MachineWireFrame, SCOPE_REMOTE_MACHINE};
+use vibevalley_protocol::{BizCode, MachinePing, MachinePong, MachineWireError, MachineWireFrame};
 
 use crate::transport::api::{MachineConnection, RemoteDeviceIdentity, Server, SharedMachineBus};
 
-use super::{HttpState, bearer_token, refuse, reply};
+use super::auth::MachineAuth;
+use super::{HttpState, refuse};
 
 const WS_CHANNEL_CAPACITY: usize = 256;
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
 
 pub(super) async fn upgrade(
     State(state): State<HttpState>,
-    Query(query): Query<HashMap<String, String>>,
-    headers: HeaderMap,
+    MachineAuth(identity): MachineAuth,
     ws: Result<WebSocketUpgrade, WebSocketUpgradeRejection>,
 ) -> Response {
-    let token = bearer_token(&headers)
-        .map(str::trim)
-        .filter(|t| !t.is_empty())
-        .or_else(|| query.get("token").map(String::as_str).map(str::trim).filter(|t| !t.is_empty()));
-
-    let Some(token) = token else {
-        return refuse(BizCode::Unauthorized, vibevalley_i18n::t("server.remote.unauthorized", &[]));
-    };
-
-    let Some(auth) = state.server.remote_auth() else {
-        return refuse(BizCode::Unauthorized, vibevalley_i18n::t("server.remote.unauthorized", &[]));
-    };
-
-    let identity = match auth.verify_bearer_async(token.to_string()).await {
-        Ok(id) => id,
-        Err(err) => return reply(vibevalley_protocol::Envelope::failure(&err)),
-    };
-
-    if identity.scope != SCOPE_REMOTE_MACHINE {
-        return refuse(BizCode::Forbidden, format!("machine WebSocket requires `{SCOPE_REMOTE_MACHINE}` scope"));
-    }
-
     let Some(bus) = state.server.machine_bus() else {
         return refuse(BizCode::ServiceUnavailable, "machine bus unavailable");
     };

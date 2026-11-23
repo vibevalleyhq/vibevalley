@@ -24,13 +24,16 @@
 use std::convert::Infallible;
 use std::io::{self, SeekFrom};
 use std::net::SocketAddr;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::Poll;
 use std::time::Duration;
 
 use axum::Router;
 use axum::body::{Body, Bytes};
-use axum::extract::{FromRef, Path, Query, State};
+use axum::extract::{FromRef, Path, Query, Request, State};
 use axum::http::{HeaderMap, StatusCode};
+use axum::middleware::{self, Next};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -40,15 +43,23 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
+use tokio_util::io::ReaderStream;
 use tokio_util::sync::CancellationToken;
-use vibevalley_protocol::{ApiError, BizCode, Caller, Envelope, SliceKind};
+use tracing::Instrument;
+use vibevalley_protocol::{ApiError, BizCode, Envelope, SliceKind};
 
-use crate::transport::api::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, Server};
+use crate::transport::api::{CallerContext, Server};
 
+mod auth;
 mod machine_ws;
 mod media;
 
+pub use auth::from_the_farm;
+use auth::{Authenticated, AuthenticatedQuery, LocalOnly, bearer_token};
+
 const HEARTBEAT: Duration = Duration::from_secs(20);
+const MAX_JSON_BODY_BYTES: usize = 16 * 1024 * 1024;
+const FILE_STREAM_CHUNK_BYTES: usize = 64 * 1024;
 
 type Shared = Arc<dyn Server>;
 
@@ -154,13 +165,11 @@ pub fn router(server: Shared) -> Router {
     router_with_shutdown(server, CancellationToken::new(), false)
 }
 
-fn router_with_shutdown(server: Shared, shutdown: CancellationToken, is_remote: bool) -> Router {
-    let state = HttpState { server, shutdown, is_remote };
+fn authenticated_api_routes() -> Router<HttpState> {
+    // Each GET path also matches ops of the same shape (POST
+    // attachment/create, artifact/block/list): those go to `command`.
     Router::new()
-        // Each GET path also matches ops of the same shape (POST
-        // attachment/create, artifact/block/list): those go to `command`.
         .route("/api/v1/slice/{name}", get(slice).post(command))
-        .route("/api/v1/machine/ws", get(machine_ws::upgrade).post(command))
         .route("/api/v1/live", get(live).post(command))
         .route("/api/v1/events", get(live).post(command))
         .route("/api/v1/subscribe/{name}", get(subscribe).post(command))
@@ -168,57 +177,35 @@ fn router_with_shutdown(server: Shared, shutdown: CancellationToken, is_remote: 
         .route("/api/v1/attachment/{id}", get(attachment).post(command))
         .route("/api/v1/artifact/{id}/view", get(artifact_view).post(command))
         .route("/api/v1/artifact/{id}/{version}", get(artifact_page).post(command))
+        .route("/api/v1/{*path}", post(command).get(not_allowed))
+}
+
+fn machine_routes() -> Router<HttpState> {
+    Router::new().route("/api/v1/machine/ws", get(machine_ws::upgrade).post(command))
+}
+
+fn local_only_routes() -> Router<HttpState> {
+    Router::new()
         .route("/api/v1/media/input/{id}/content", get(media::content).put(media::upload).post(command))
         .route("/api/v1/media/speech/{id}/stream", get(media::speech).post(command))
-        .route("/api/v1/{*path}", post(command).get(not_allowed))
         .route("/mcp", post(mcp).get(not_allowed))
+}
+
+async fn trace_request(req: Request, next: Next) -> Response {
+    let span = tracing::debug_span!("http.request", method = %req.method(), path = %req.uri().path());
+    next.run(req).instrument(span).await
+}
+
+fn router_with_shutdown(server: Shared, shutdown: CancellationToken, is_remote: bool) -> Router {
+    let state = HttpState { server, shutdown, is_remote };
+    Router::new()
+        .merge(authenticated_api_routes())
+        .merge(machine_routes())
+        .merge(local_only_routes())
         .fallback(not_found)
+        .layer(axum::extract::DefaultBodyLimit::max(MAX_JSON_BODY_BYTES))
+        .layer(middleware::from_fn(trace_request))
         .with_state(state)
-}
-
-fn is_loopback(host: &str) -> bool {
-    let Some(rest) = host
-        .strip_prefix("127.0.0.1")
-        .or_else(|| host.strip_prefix("localhost"))
-        .or_else(|| host.strip_prefix("[::1]"))
-    else {
-        return false;
-    };
-    match rest.strip_prefix(':') {
-        None => rest.is_empty(),
-        Some(port) => !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()),
-    }
-}
-
-/// Only this machine's own pages and tools.
-pub fn from_the_farm(headers: &HeaderMap) -> bool {
-    let header = |name: &str| headers.get(name).and_then(|v| v.to_str().ok());
-    let host = header("host").unwrap_or("");
-    let origin_ok = header("origin").is_none_or(|o| o == format!("http://{host}"));
-    let site_ok = header("sec-fetch-site").is_none_or(|s| s == "same-origin" || s == "none");
-    is_loopback(host) && origin_ok && site_ok
-}
-
-fn http_caller_context(headers: &HeaderMap) -> CallerContext {
-    let is_cli = headers
-        .get("x-vibevalley-client")
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(|v| v.eq_ignore_ascii_case("cli"));
-    let (id, kind, label) = if is_cli {
-        ("cli", ClientKind::Cli, "CLI")
-    } else {
-        ("http-loopback", ClientKind::HttpLoopback, "HTTP loopback")
-    };
-    CallerContext {
-        caller: Caller::User,
-        principal: CallerPrincipal::LocalOwner,
-        client: Some(ClientIdentity {
-            id: id.into(),
-            kind,
-            label: label.into(),
-        }),
-        trace_id: 0,
-    }
 }
 
 /// The envelope as VibeValley sends it, with the HTTP status its code has.
@@ -246,66 +233,31 @@ async fn not_allowed() -> Response {
     refuse(BizCode::MethodNotAllowed, "use POST")
 }
 
-fn bearer_token(headers: &HeaderMap) -> Option<&str> {
-    let raw = headers.get("authorization")?.to_str().ok()?.trim();
-    if raw.eq_ignore_ascii_case("bearer") {
-        return Some("");
-    }
-    let (scheme, token) = raw.split_once(char::is_whitespace)?;
-    scheme.eq_ignore_ascii_case("bearer").then(|| token.trim())
-}
-
-async fn authenticate(state: &HttpState, headers: &HeaderMap, path: &str) -> Result<CallerContext, ApiError> {
-    authenticate_with_token(state, headers, None, path).await
-}
-
-async fn authenticate_with_token(state: &HttpState, headers: &HeaderMap, query_token: Option<&str>, path: &str) -> Result<CallerContext, ApiError> {
-    let token = bearer_token(headers).or_else(|| query_token.map(str::trim).filter(|t| !t.is_empty()));
-    if let Some(token) = token {
-        let Some(auth) = state.server.remote_auth() else {
-            return Err(ApiError::new(BizCode::Unauthorized, vibevalley_i18n::t("server.remote.unauthorized", &[])));
-        };
-        let identity = auth.verify_bearer_async(token.to_string()).await?;
-        return Ok(CallerContext {
-            caller: Caller::Remote,
-            principal: CallerPrincipal::RemoteDevice {
-                device_id: identity.device_id.clone(),
-                scope: identity.scope,
-            },
-            client: Some(ClientIdentity {
-                id: identity.device_id,
-                kind: ClientKind::RemoteDevice,
-                label: identity.name,
-            }),
-            trace_id: 0,
-        });
-    }
-    if path.trim_end_matches('/') == "/api/v1/remote/pair/exchange" && state.server.remote_auth().is_some_and(|a| a.is_enabled()) {
-        return Ok(CallerContext {
-            caller: Caller::Remote,
-            principal: CallerPrincipal::RemoteDevice {
-                device_id: String::new(),
-                scope: String::new(),
-            },
-            client: Some(ClientIdentity {
-                id: "remote-pairing".into(),
-                kind: ClientKind::RemoteDevice,
-                label: "Remote pairing".into(),
-            }),
-            trace_id: 0,
-        });
-    }
-    if !state.is_remote && from_the_farm(headers) {
-        return Ok(http_caller_context(headers));
-    }
-    Err(ApiError::new(BizCode::Forbidden, "forbidden"))
+/// Streams exactly `length` bytes from `file` using `tokio_util::io::ReaderStream`,
+/// surfacing `UnexpectedEof` if the file was truncated beneath `length`.
+pub(super) fn file_range_stream(file: tokio::fs::File, length: u64, truncated_msg: &'static str) -> impl Stream<Item = io::Result<Bytes>> + Send + 'static {
+    let mut reader = ReaderStream::with_capacity(file.take(length), FILE_STREAM_CHUNK_BYTES);
+    let mut remaining = length;
+    futures_util::stream::poll_fn(move |cx| match Pin::new(&mut reader).poll_next(cx) {
+        Poll::Ready(Some(Ok(chunk))) => {
+            remaining = remaining.saturating_sub(chunk.len() as u64);
+            Poll::Ready(Some(Ok(chunk)))
+        }
+        Poll::Ready(Some(Err(err))) => Poll::Ready(Some(Err(err))),
+        Poll::Ready(None) if remaining > 0 => {
+            remaining = 0;
+            Poll::Ready(Some(Err(io::Error::new(io::ErrorKind::UnexpectedEof, truncated_msg))))
+        }
+        Poll::Ready(None) => Poll::Ready(None),
+        Poll::Pending => Poll::Pending,
+    })
 }
 
 /// A helper's MCP messages (streamable HTTP, answered as plain JSON): one
 /// message or a batch. Notifications alone are answered 202.
-async fn mcp(State(state): State<HttpState>, headers: HeaderMap, body: Bytes) -> Response {
+async fn mcp(State(state): State<HttpState>, _local: LocalOnly, headers: HeaderMap, body: Bytes) -> Response {
     let token = bearer_token(&headers).unwrap_or("").to_string();
-    if state.is_remote || !from_the_farm(&headers) || token.starts_with("vv_dev_") {
+    if token.starts_with("vv_dev_") {
         return refuse(BizCode::Forbidden, "forbidden");
     }
     let Some(door) = state.server.mcp() else {
@@ -332,11 +284,7 @@ async fn mcp(State(state): State<HttpState>, headers: HeaderMap, body: Bytes) ->
 
 /// The op is read from the URL, not a route parameter: the GET routes
 /// hand their POSTs here too.
-async fn command(State(state): State<HttpState>, uri: axum::http::Uri, headers: HeaderMap, body: Bytes) -> Response {
-    let ctx = match authenticate(&state, &headers, uri.path()).await {
-        Ok(ctx) => ctx,
-        Err(err) => return reply(Envelope::failure(&err)),
-    };
+async fn command(State(state): State<HttpState>, Authenticated(ctx): Authenticated, uri: axum::http::Uri, body: Bytes) -> Response {
     let path = uri.path().strip_prefix("/api/v1/").unwrap_or_default();
     let op = path.trim_matches('/').replace('/', ".");
     if vibevalley_protocol::NATIVE_ENDPOINTS.iter().any(|endpoint| endpoint.op == op) {
@@ -376,14 +324,11 @@ fn sse<S: Stream<Item = Result<Event, Infallible>> + Send + 'static>(stream: S) 
 /// blocking OS threads per client.
 async fn slice(
     State(state): State<HttpState>,
-    uri: axum::http::Uri,
+    _auth: Authenticated,
     Path(name): Path<String>,
     Query(query): Query<std::collections::HashMap<String, String>>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(err) = authenticate(&state, &headers, uri.path()).await {
-        return reply(Envelope::failure(&err));
-    }
     let Some(kind) = SliceKind::from_str(&name) else {
         return refuse(BizCode::RouteNotFound, format!("unknown slice {name}"));
     };
@@ -465,10 +410,7 @@ async fn slice(
     sse(stream)
 }
 
-async fn live(State(state): State<HttpState>, uri: axum::http::Uri, headers: HeaderMap) -> Response {
-    if let Err(err) = authenticate(&state, &headers, uri.path()).await {
-        return reply(Envelope::failure(&err));
-    }
+async fn live(State(state): State<HttpState>, _auth: Authenticated) -> Response {
     if let Some(rx) = state.server.subscribe_live() {
         let bstream = BroadcastStream::new(rx);
         let shutdown = state.shutdown;
@@ -508,15 +450,10 @@ impl Drop for Subscription {
 #[allow(clippy::result_large_err, reason = "Server::subscribe's contract returns the refusal envelope itself")]
 async fn subscribe(
     State(state): State<HttpState>,
-    uri: axum::http::Uri,
+    Authenticated(ctx): Authenticated,
     Path(name): Path<String>,
     Query(query): Query<std::collections::HashMap<String, String>>,
-    headers: HeaderMap,
 ) -> Response {
-    let ctx = match authenticate(&state, &headers, uri.path()).await {
-        Ok(ctx) => ctx,
-        Err(err) => return reply(Envelope::failure(&err)),
-    };
     let payload = match serde_json::from_str::<Value>(query.get("payload").map(String::as_str).unwrap_or("{}")) {
         Ok(v) => v,
         Err(e) => return refuse(BizCode::InvalidInput, e.to_string()),
@@ -540,15 +477,11 @@ fn is_artifact_version(version: &str) -> bool {
 /// VibeValley's `artifact/:id/view`: what a structured store artifact's `<iframe src>` loads.
 async fn artifact_view(
     State(state): State<HttpState>,
-    uri: axum::http::Uri,
+    Authenticated(ctx): Authenticated,
     Path(id): Path<String>,
     Query(query): Query<std::collections::HashMap<String, String>>,
     headers: HeaderMap,
 ) -> Response {
-    let ctx = match authenticate(&state, &headers, uri.path()).await {
-        Ok(ctx) => ctx,
-        Err(err) => return reply(Envelope::failure(&err)),
-    };
     let server = state.server;
     if !is_artifact_id(&id) {
         return StatusCode::NOT_FOUND.into_response();
@@ -596,15 +529,10 @@ async fn artifact_view(
 /// VibeValley's `artifactContent`: what an `<iframe src>` loads.
 async fn artifact_page(
     State(state): State<HttpState>,
-    uri: axum::http::Uri,
+    Authenticated(ctx): Authenticated,
     Path((id, version)): Path<(String, String)>,
     Query(query): Query<std::collections::HashMap<String, String>>,
-    headers: HeaderMap,
 ) -> Response {
-    let ctx = match authenticate(&state, &headers, uri.path()).await {
-        Ok(ctx) => ctx,
-        Err(err) => return reply(Envelope::failure(&err)),
-    };
     let server = state.server;
     let Some(version) = is_artifact_version(&version).then(|| version.parse::<u64>().ok()).flatten() else {
         return StatusCode::NOT_FOUND.into_response();
@@ -670,17 +598,7 @@ fn parse_byte_range(text: &str, size: u64) -> Option<(u64, u64)> {
     (start <= end && start < size).then_some((start, end))
 }
 
-async fn attachment(
-    State(state): State<HttpState>,
-    uri: axum::http::Uri,
-    Path(id): Path<String>,
-    Query(query): Query<std::collections::HashMap<String, String>>,
-    headers: HeaderMap,
-) -> Response {
-    let ctx = match authenticate_with_token(&state, &headers, query.get("token").map(String::as_str), uri.path()).await {
-        Ok(ctx) => ctx,
-        Err(err) => return reply(Envelope::failure(&err)),
-    };
+async fn attachment(State(state): State<HttpState>, AuthenticatedQuery(ctx): AuthenticatedQuery, Path(id): Path<String>, headers: HeaderMap) -> Response {
     let server = state.server;
     let envelope = server.call_with_async(ctx, "attachment.file".into(), serde_json::json!({ "id": id })).await;
     if envelope.biz_code != 0 {
@@ -729,18 +647,7 @@ async fn attachment(
         return refuse(BizCode::InternalError, e.to_string());
     }
     let length = end - start + 1;
-    let stream = futures_util::stream::try_unfold((file, length), |(mut file, left)| async move {
-        if left == 0 {
-            return Ok::<_, io::Error>(None);
-        }
-        let mut buf = vec![0u8; left.min(64 * 1024) as usize];
-        let n = file.read(&mut buf).await?;
-        if n == 0 {
-            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "attachment truncated"));
-        }
-        buf.truncate(n);
-        Ok(Some((Bytes::from(buf), (file, left - n as u64))))
-    });
+    let stream = file_range_stream(file, length, "attachment truncated");
     let mut response = Response::builder()
         .status(status)
         .header("content-type", kind)
@@ -756,11 +663,7 @@ async fn attachment(
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
-async fn issue_watch(State(state): State<HttpState>, uri: axum::http::Uri, Path(id): Path<String>, headers: HeaderMap) -> Response {
-    let ctx = match authenticate(&state, &headers, uri.path()).await {
-        Ok(ctx) => ctx,
-        Err(err) => return reply(Envelope::failure(&err)),
-    };
+async fn issue_watch(State(state): State<HttpState>, Authenticated(ctx): Authenticated, Path(id): Path<String>) -> Response {
     match open(state.server, state.shutdown, ctx, "issue.watch".into(), serde_json::json!({ "id": id })).await {
         Ok(Ok(stream)) => stream,
         Ok(Err(envelope)) if envelope.biz_code == BizCode::Forbidden.code() || envelope.biz_code == BizCode::Unauthorized.code() => reply(envelope),
