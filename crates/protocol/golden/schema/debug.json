@@ -1,0 +1,424 @@
+{
+ "DebugTimelineLane": [
+  "core_apply",
+  "bridge_rpc",
+  "oar_wire",
+  "gpui_frame"
+ ],
+ "DebugTimelineEvent": [
+  {
+   "id": 1,
+   "time": 1700000000000,
+   "lane": "bridge_rpc",
+   "kind": "issue.list",
+   "traceId": 42,
+   "durationUs": 1850,
+   "summary": "issue.list -> ok",
+   "detail": {
+    "status": "ok"
+   },
+   "slow": false
+  },
+  {
+   "id": 2,
+   "time": 1700000001000,
+   "lane": "core_apply",
+   "kind": "issueChanged",
+   "summary": "applied fact #2"
+  }
+ ],
+ "DebugTimelineQuery": [
+  {
+   "lane": "oar_wire",
+   "afterId": 10,
+   "limit": 100,
+   "search": "tool"
+  },
+  {}
+ ],
+ "DebugTimelinePage": [
+  {
+   "events": [
+    {
+     "id": 1,
+     "time": 1700000000000,
+     "lane": "gpui_frame",
+     "kind": "frame",
+     "durationUs": 12400,
+     "summary": "paint",
+     "slow": false
+    }
+   ],
+   "latestId": 1,
+   "dropped": 0
+  }
+ ],
+ "DebugTrajectoryKind": [
+  "issue_session",
+  "workspace_chat",
+  "orchestrator"
+ ],
+ "DebugTrajectorySummary": [
+  {
+   "id": "w1",
+   "kind": "issue_session",
+   "title": "Fix parser",
+   "runtime": "claude",
+   "status": "working",
+   "updatedAt": 1700000005000,
+   "eventCount": 14,
+   "hasVoyageRecord": true,
+   "hasSilentError": false,
+   "tokens": {
+    "input": 1200,
+    "cacheRead": 400,
+    "output": 350,
+    "cacheWrite": 100,
+    "reasoning": 50,
+    "contextUsed": 1600,
+    "contextWindow": 200000
+   }
+  },
+  {
+   "id": "orchestrator",
+   "kind": "orchestrator",
+   "title": "Assistant",
+   "runtime": "vibevalley",
+   "status": "resting",
+   "updatedAt": 1700000006000,
+   "eventCount": 3,
+   "hasVoyageRecord": false,
+   "hasSilentError": true
+  }
+ ],
+ "DebugTrajectoryRawEntry": [
+  {
+   "seq": 1,
+   "time": 1700000000100,
+   "kind": "recv",
+   "frameType": "assistant",
+   "agentPath": [
+    "root",
+    "worker-1"
+   ],
+   "traceId": 7,
+   "summary": "assistant delta",
+   "payload": "{\"delta\":\"hi\"}",
+   "originalBytes": 14,
+   "truncated": false
+  },
+  {
+   "seq": 2,
+   "time": 1700000000200,
+   "kind": "send",
+   "agentPath": [],
+   "summary": "user prompt",
+   "originalBytes": 8192,
+   "truncated": true
+  }
+ ],
+ "DebugTrajectoryTurn": [
+  {
+   "index": 0,
+   "prompt": "Run tests",
+   "startedAt": 1700000000000,
+   "endedAt": 1700000002000,
+   "durationMs": 2000,
+   "events": [
+    {
+     "seq": 1,
+     "revision": 1,
+     "time": 1700000000500,
+     "type": "assistant/message",
+     "text": "All tests pass."
+    }
+   ],
+   "rawEntries": [
+    {
+     "seq": 1,
+     "time": 1700000000100,
+     "kind": "recv",
+     "agentPath": [],
+     "summary": "delta",
+     "originalBytes": 20,
+     "truncated": false
+    }
+   ],
+   "tokens": {
+    "input": 500,
+    "cacheRead": 0,
+    "output": 120
+   },
+   "silentErrors": []
+  },
+  {
+   "index": 1,
+   "startedAt": 1700000003000,
+   "events": [],
+   "rawEntries": [],
+   "silentErrors": [
+    "parse frame failed"
+   ]
+  }
+ ],
+ "DebugTrajectoryDetail": [
+  {
+   "summary": {
+    "id": "w1",
+    "kind": "workspace_chat",
+    "title": "Chat",
+    "runtime": "codex",
+    "status": "done",
+    "updatedAt": 1700000005000,
+    "eventCount": 2,
+    "hasVoyageRecord": true,
+    "hasSilentError": false
+   },
+   "systemPrompt": "You are a helpful coding assistant.",
+   "turns": [
+    {
+     "index": 0,
+     "startedAt": 1700000000000,
+     "events": [],
+     "rawEntries": [],
+     "silentErrors": []
+    }
+   ],
+   "subagentPaths": [
+    "root/verifier"
+   ],
+   "voyageRecordCount": 5
+  }
+ ],
+ "DebugTrajectoryGetRequest": [
+  {
+   "id": "w1",
+   "kind": "issue_session"
+  },
+  {
+   "id": "orchestrator"
+  }
+ ],
+ "DebugRuntimeSummary": [
+  {
+   "id": "claude",
+   "name": "Claude Code",
+   "installed": true,
+   "ready": true,
+   "version": "1.2.3"
+  },
+  {
+   "id": "codex",
+   "name": "Codex",
+   "installed": false,
+   "ready": false
+  }
+ ],
+ "DebugOverview": [
+  {
+   "channel": "dev",
+   "version": "0.1.0",
+   "loopbackUrl": "http://127.0.0.1:8790",
+   "homePath": "/tmp/vv-home",
+   "workRoot": "/tmp/vv-work",
+   "dbPath": "/tmp/vv-home/server.db",
+   "bundleMode": "dev",
+   "bootMs": 145,
+   "activeSessions": 2,
+   "activeClients": 3,
+   "activeSubscriptions": 4,
+   "latestSeq": 99,
+   "lastFrameMs": 16.5,
+   "runtimes": [
+    {
+     "id": "claude",
+     "name": "Claude Code",
+     "installed": true,
+     "ready": true,
+     "version": "1.2.3"
+    }
+   ]
+  }
+ ],
+ "DebugGraphClient": [
+  {
+   "id": "gpui-workbench-1",
+   "kind": "gpui_workbench",
+   "label": "vv",
+   "watches": [
+    "slice:board",
+    "slice:sessions"
+   ],
+   "subscriptions": [
+    "channel.follow"
+   ]
+  }
+ ],
+ "DebugGraphSession": [
+  {
+   "sessionId": "w1",
+   "issueId": 42,
+   "title": "Fix bug",
+   "runtime": "claude",
+   "status": "working",
+   "worktree": "/tmp/vv-work/worktrees/demo.42",
+   "kind": "issue_session"
+  },
+  {
+   "sessionId": "chat-1",
+   "title": "Direct chat",
+   "runtime": "codex",
+   "status": "resting",
+   "kind": "workspace_chat"
+  }
+ ],
+ "DebugGraph": [
+  {
+   "clients": [
+    {
+     "id": "gpui-workbench-1",
+     "kind": "gpui_workbench",
+     "label": "vv",
+     "watches": [
+      "slice:board"
+     ],
+     "subscriptions": []
+    }
+   ],
+   "sessions": [
+    {
+     "sessionId": "w1",
+     "issueId": 1,
+     "title": "Init",
+     "runtime": "claude",
+     "status": "working",
+     "kind": "issue_session"
+    }
+   ]
+  }
+ ],
+ "DebugCacheStat": [
+  {
+   "name": "pkm_pages",
+   "entries": 24,
+   "detail": "indexed"
+  },
+  {
+   "name": "pixel_manifest",
+   "entries": 720
+  }
+ ],
+ "DebugStateCounts": [
+  {
+   "issues": 10,
+   "sessions": 2,
+   "channels": 3,
+   "agents": 4,
+   "repos": 2,
+   "artifacts": 5,
+   "inbox": 1,
+   "mediaJobs": 0
+  }
+ ],
+ "DebugStateCache": [
+  {
+   "seq": 99,
+   "sliceSeqs": {
+    "board": 99,
+    "sessions": 98
+   },
+   "sliceWatchers": {
+    "board": 2,
+    "sessions": 1
+   },
+   "counts": {
+    "issues": 10,
+    "sessions": 2,
+    "channels": 3,
+    "agents": 4,
+    "repos": 2,
+    "artifacts": 5,
+    "inbox": 1,
+    "mediaJobs": 0
+   },
+   "caches": [
+    {
+     "name": "pkm_pages",
+     "entries": 24
+    }
+   ]
+  }
+ ],
+ "DebugOverrideConfig": [
+  {
+   "rpcDelayMs": 250,
+   "sliceDelayMs": 100,
+   "targetFilter": "issue.*",
+   "disconnectTopic": "slice:board"
+  },
+  {
+   "rpcDelayMs": 0,
+   "sliceDelayMs": 0
+  }
+ ],
+ "DebugBundleResult": [
+  {
+   "path": "/tmp/vv-debug-bundle.zip",
+   "sizeBytes": 40960,
+   "files": [
+    "snapshot.json",
+    "timeline.jsonl"
+   ],
+   "redactedCount": 3
+  }
+ ],
+ "DebugSnapshot": [
+  {
+   "overview": {
+    "channel": "dev",
+    "version": "0.1.0",
+    "homePath": "/tmp/vv-home",
+    "workRoot": "/tmp/vv-work",
+    "dbPath": "/tmp/vv-home/server.db",
+    "activeSessions": 1,
+    "activeClients": 1,
+    "activeSubscriptions": 0,
+    "latestSeq": 12,
+    "runtimes": []
+   },
+   "routes": {
+    "route": "/issues",
+    "nativeWorkspace": false
+   },
+   "overrides": {
+    "rpcDelayMs": 0,
+    "sliceDelayMs": 0
+   },
+   "graph": {
+    "clients": [],
+    "sessions": []
+   },
+   "stateCache": {
+    "seq": 12,
+    "sliceSeqs": {
+     "board": 12
+    },
+    "sliceWatchers": {
+     "board": 1
+    },
+    "counts": {
+     "issues": 1,
+     "sessions": 1,
+     "channels": 1,
+     "agents": 1,
+     "repos": 1,
+     "artifacts": 0,
+     "inbox": 0,
+     "mediaJobs": 0
+    },
+    "caches": []
+   },
+   "recentTimeline": []
+  }
+ ]
+}

@@ -1,0 +1,128 @@
+{
+  "title": "开发者工具",
+  "tabs": {
+    "overview": "概览",
+    "routes": "路由",
+    "timeline": "时间线",
+    "trajectory": "轨迹",
+    "state": "状态与缓存",
+    "lab": "实验与覆盖"
+  },
+  "actions": {
+    "refresh": "刷新",
+    "autoRefresh": "自动刷新",
+    "pause": "暂停",
+    "resume": "继续",
+    "detach": "独立窗口打开",
+    "close": "关闭",
+    "clear": "清空",
+    "exportBundle": "导出诊断包",
+    "exporting": "正在导出…",
+    "copy": "复制",
+    "copied": "已复制",
+    "apply": "应用",
+    "reset": "重置",
+    "disconnect": "模拟断开"
+  },
+  "lanes": {
+    "all": "全部通道",
+    "coreApply": "Core::apply",
+    "bridgeRpc": "桥接 RPC",
+    "oarWire": "OAR 协议流",
+    "gpuiFrame": "GPUI 渲染帧"
+  },
+  "overview": {
+    "channel": "发布通道",
+    "version": "版本",
+    "loopbackUrl": "本地地址",
+    "homePath": "宿主目录",
+    "workRoot": "空间目录",
+    "dbPath": "数据库",
+    "bundleMode": "构建模式",
+    "bootTime": "启动耗时",
+    "activeSessions": "活跃执行会话",
+    "activeClients": "活跃客户端",
+    "activeSubscriptions": "活跃订阅",
+    "latestSeq": "最新序号",
+    "lastFrameMs": "最近帧耗时",
+    "runtimes": "引擎状态",
+    "installed": "已安装",
+    "notInstalled": "未安装",
+    "ready": "就绪",
+    "notReady": "未就绪",
+    "graph": "拓扑关系",
+    "clients": "客户端",
+    "sessions": "执行会话",
+    "watches": "监听切片",
+    "subscriptions": "订阅",
+    "bundleExported": "诊断包已导出至 {path}（已脱敏 {redacted} 处）"
+  },
+  "routes": {
+    "searchPlaceholder": "筛选路由…",
+    "empty": "暂无路由状态。"
+  },
+  "timeline": {
+    "searchPlaceholder": "搜索事件…",
+    "slowOnly": "仅看慢事件",
+    "slow": "慢",
+    "dropped": "已丢弃 {count} 条",
+    "empty": "暂无时间线事件。",
+    "durationUs": "{us} µs",
+    "correlationId": "关联 #{id}"
+  },
+  "trajectory": {
+    "kind": {
+      "issueSession": "任务",
+      "workspaceChat": "对话",
+      "orchestrator": "主助手"
+    },
+    "silentError": "静默错误",
+    "tokens": "Token 消耗",
+    "rawPayload": "原始载荷",
+    "truncated": "已截断（原 {bytes} B）",
+    "subagents": "子代理",
+    "systemPrompt": "系统提示词",
+    "turns": "轮次",
+    "turnIndex": "第 {index} 轮",
+    "prompt": "输入提示",
+    "events": "事件",
+    "rawEntries": "原始帧",
+    "voyageRecords": "原始记录",
+    "emptyList": "暂无轨迹记录。",
+    "selectPrompt": "选择一条轨迹以查看各轮详情和原始帧。"
+  },
+  "state": {
+    "seq": "状态序号",
+    "slices": "切片",
+    "watchers": "{count} 个监听者",
+    "counts": "实体计数",
+    "caches": "缓存统计",
+    "entries": "{count} 项",
+    "issues": "任务",
+    "sessions": "执行会话",
+    "channels": "频道",
+    "agents": "角色",
+    "repos": "仓库",
+    "artifacts": "作品",
+    "inbox": "收件箱",
+    "mediaJobs": "媒体",
+    "emptyCaches": "暂无缓存统计。"
+  },
+  "lab": {
+    "rpcDelayMs": "RPC 延迟 (ms)",
+    "sliceDelayMs": "切片延迟 (ms)",
+    "targetFilter": "目标过滤",
+    "targetFilterPlaceholder": "如 issue.* 或 slice:board",
+    "disconnectTopic": "模拟断开主题",
+    "disconnectTopicPlaceholder": "如 slice:board 或 channel.follow",
+    "applied": "覆盖配置已应用。",
+    "resetDone": "已恢复默认配置。",
+    "warning": "已启用故障注入，将影响当前进程内的所有视图。"
+  },
+  "status": {
+    "loading": "加载中…",
+    "error": "加载开发者工具数据失败：{reason}",
+    "disabled": "服务端未启用开发者工具。",
+    "empty": "暂无数据。"
+  }
+}

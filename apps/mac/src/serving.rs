@@ -17,33 +17,15 @@ pub fn config(home: &Path, work_root: PathBuf) -> vibevalley_server::ServerConfi
     config
 }
 
-#[derive(serde::Deserialize)]
-pub struct Opening {
-    pub phase: OpeningPhase,
-    pub progress: f32,
-}
-
-#[derive(serde::Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub enum OpeningPhase {
-    Connecting,
-    Reading,
-    Loading,
-    Ready,
-    Waiting,
-    Failed,
-}
-
-impl OpeningPhase {
-    pub fn pixel(&self) -> crate::pixel::opening::Phase {
-        use crate::pixel::opening::Phase;
-        match self {
-            Self::Connecting | Self::Waiting => Phase::Connecting,
-            Self::Reading => Phase::Reading,
-            Self::Loading => Phase::Loading,
-            Self::Ready => Phase::Ready,
-            Self::Failed => Phase::Failed,
-        }
+pub fn opening_pixel_phase(phase: vibevalley_protocol::HostOpeningPhase) -> crate::pixel::opening::Phase {
+    use crate::pixel::opening::Phase;
+    use vibevalley_protocol::HostOpeningPhase;
+    match phase {
+        HostOpeningPhase::Connecting | HostOpeningPhase::Waiting => Phase::Connecting,
+        HostOpeningPhase::Reading => Phase::Reading,
+        HostOpeningPhase::Loading => Phase::Loading,
+        HostOpeningPhase::Ready => Phase::Ready,
+        HostOpeningPhase::Failed => Phase::Failed,
     }
 }
 

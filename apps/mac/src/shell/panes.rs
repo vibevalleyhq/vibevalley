@@ -19,6 +19,7 @@ impl Shell {
         self.native_workspace = false;
         self.native_pixel = None;
         self.last_route = Some(route.to_string());
+        self.sync_devtools_route(route);
         self.workbench.update(cx, |v, cx| v.navigate(route, cx));
         self.publish_host_debug(cx);
         cx.notify();
@@ -28,6 +29,7 @@ impl Shell {
         self.native_workspace = true;
         self.native_pixel = None;
         self.last_route = Some("/workspace".to_string());
+        self.sync_devtools_route("/workspace");
         self.workbench.update(cx, |v, cx| v.navigate("/workspace", cx));
         self.publish_host_debug(cx);
         cx.notify();

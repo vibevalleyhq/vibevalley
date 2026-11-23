@@ -19,7 +19,7 @@ impl Shell {
             let view = cx.new(|cx| HostedView::new("palette", Map::new(), dark, window, cx));
             let sub = cx.subscribe_in(&view, window, |this, _, event: &HostedEvent, window, cx| match event {
                 HostedEvent::Action(a) => this.on_action(a.clone(), window, cx),
-                HostedEvent::HostCall { op, payload, reply } => this.host_call(op, payload.clone(), reply.clone(), window, cx),
+                HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
                 HostedEvent::Ready => this.refresh_palette(cx),
             });
             self.palette = Some(Palette {

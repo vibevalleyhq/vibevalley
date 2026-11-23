@@ -10,7 +10,7 @@
 //! [`Hub::on_subscription`]; they change the state only through
 //! [`Hub::apply`].
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
@@ -286,6 +286,47 @@ impl Hub {
         self.fault_gate.load().as_ref().map(|slot| slot.0.clone())
     }
 
+    /// Whether an RPC / `Core::apply` observer is currently attached.
+    pub fn has_observer(&self) -> bool {
+        self.observer.load().is_some()
+    }
+
+    /// Whether a fault-injection gate is currently attached.
+    pub fn has_fault_gate(&self) -> bool {
+        self.fault_gate.load().is_some()
+    }
+
+    /// Current dirty sequence number for each of the six domain slices.
+    pub fn slice_seqs(&self) -> BTreeMap<String, i64> {
+        SliceKind::ALL
+            .into_iter()
+            .map(|kind| (kind.as_str().to_string(), self.dirty_seq(kind)))
+            .collect()
+    }
+
+    /// Current active watcher count for each of the six domain slices.
+    pub fn slice_watcher_counts(&self) -> BTreeMap<String, u32> {
+        SliceKind::ALL
+            .into_iter()
+            .map(|kind| {
+                let count = match kind {
+                    SliceKind::Board => self.feeds.board.watcher_count(),
+                    SliceKind::Sessions => self.feeds.sessions.watcher_count(),
+                    SliceKind::Collab => self.feeds.collab.watcher_count(),
+                    SliceKind::Inbox => self.feeds.inbox.watcher_count(),
+                    SliceKind::Ops => self.feeds.ops.watcher_count(),
+                    SliceKind::Farm => self.feeds.farm.watcher_count(),
+                };
+                (kind.as_str().to_string(), count as u32)
+            })
+            .collect()
+    }
+
+    /// Number of currently open server subscriptions.
+    pub fn active_subscription_count(&self) -> u32 {
+        self.subscriptions.lock().len() as u32
+    }
+
     /// The state now.
     pub fn state_now(&self) -> SpaceState {
         self.core.lock().state().clone()
@@ -523,7 +564,8 @@ impl Hub {
     /// (routing `applied.effects` only to `farm`).
     pub fn apply(&self, facts: Vec<Fact>) -> Applied {
         let observer = self.current_observer();
-        let started = observer.as_ref().map(|_| Instant::now());
+        let trace_debug = tracing::enabled!(tracing::Level::DEBUG);
+        let started = (observer.is_some() || trace_debug).then(Instant::now);
         let (applied, seq) = {
             let mut core = self.core.lock();
             let changes = core.apply(facts);
@@ -545,8 +587,18 @@ impl Hub {
         if applied.transitions.is_empty() {
             return applied;
         }
-        if let (Some(obs), Some(t0)) = (observer, started) {
-            obs.on_apply(seq, applied.dirty, &applied.transitions, t0.elapsed().as_micros() as u64);
+        let duration_us = started.map(|t0| t0.elapsed().as_micros() as u64);
+        if let (Some(obs), Some(us)) = (observer, duration_us) {
+            obs.on_apply(seq, applied.dirty, &applied.transitions, us);
+        }
+        if trace_debug {
+            tracing::debug!(
+                seq,
+                transitions = applied.transitions.len(),
+                dirty = applied.dirty.bits(),
+                duration_us = duration_us.unwrap_or(0),
+                "hub.apply"
+            );
         }
         self.bus.publish(&applied.transitions);
         let _ = self.kicks.send(Kick {
@@ -617,7 +669,9 @@ impl Hub {
 
     /// Invokes one endpoint with caller identity, principal, and optional trace id.
     pub fn call_with(&self, caller_ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
-        let observer = self.current_observer();
+        let is_debug_op = op.starts_with("debug.");
+        let observer = if is_debug_op { None } else { self.current_observer() };
+        let trace_debug = tracing::enabled!(tracing::Level::DEBUG);
         let (started, effective_ctx_owned);
         let effective_ctx = if let Some(obs) = &observer {
             let trace_id = if caller_ctx.trace_id != 0 {
@@ -635,11 +689,11 @@ impl Hub {
             started = Some(Instant::now());
             &effective_ctx_owned
         } else {
-            started = None;
+            started = trace_debug.then(Instant::now);
             caller_ctx
         };
 
-        if let Some(gate) = self.current_fault_gate() {
+        if !is_debug_op && let Some(gate) = self.current_fault_gate() {
             let delay = gate.delay_ms(op);
             if delay > 0 {
                 std::thread::sleep(Duration::from_millis(delay));
@@ -647,8 +701,18 @@ impl Hub {
         }
 
         let envelope = self.dispatch_call(effective_ctx, op, payload);
-        if let (Some(obs), Some(t0)) = (observer, started) {
-            obs.on_call_end(effective_ctx, op, envelope.biz_code, t0.elapsed().as_micros() as u64);
+        let duration_us = started.map(|t0| t0.elapsed().as_micros() as u64);
+        if let (Some(obs), Some(us)) = (observer, duration_us) {
+            obs.on_call_end(effective_ctx, op, envelope.biz_code, us);
+        }
+        if trace_debug {
+            tracing::debug!(
+                op,
+                biz_code = envelope.biz_code,
+                trace_id = effective_ctx.trace_id,
+                duration_us = duration_us.unwrap_or(0),
+                "hub.call"
+            );
         }
         envelope
     }

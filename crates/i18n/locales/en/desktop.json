@@ -20,6 +20,7 @@
     "view": "View",
     "toggleSidebar": "Toggle Sidebar",
     "toggleTheme": "Toggle Theme",
+    "toggleDevtools": "Toggle DevTools",
     "resetZoom": "Actual Size",
     "zoomIn": "Zoom In",
     "zoomOut": "Zoom Out",

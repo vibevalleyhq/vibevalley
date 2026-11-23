@@ -49,7 +49,20 @@ pub fn ensure_main_window(cx: &mut App) {
     debug::start(shell, window, cx);
 }
 
+fn init_tracing() {
+    use tracing_subscriber::EnvFilter;
+
+    let filter = std::env::var("VIBEVALLEY_LOG")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .or_else(|| std::env::var("RUST_LOG").ok().filter(|s| !s.trim().is_empty()))
+        .and_then(|raw| EnvFilter::try_new(raw).ok())
+        .unwrap_or_else(|| EnvFilter::new(if shell::devtools_enabled() { "info" } else { "warn" }));
+    let _ = tracing_subscriber::fmt().with_env_filter(filter).with_target(true).try_init();
+}
+
 fn main() {
+    init_tracing();
     host::disable_default_font_smoothing();
     update::enter_bundle();
     vibevalley_i18n::set_locale(vibevalley_server::home::saved_locale(&hosted::server_home()));

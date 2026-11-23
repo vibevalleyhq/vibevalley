@@ -1,0 +1,128 @@
+{
+  "title": "DevTools",
+  "tabs": {
+    "overview": "Overview",
+    "routes": "Routes",
+    "timeline": "Timeline",
+    "trajectory": "Trajectory",
+    "state": "State & Cache",
+    "lab": "Lab & Overrides"
+  },
+  "actions": {
+    "refresh": "Refresh",
+    "autoRefresh": "Auto-refresh",
+    "pause": "Pause",
+    "resume": "Resume",
+    "detach": "Detach Window",
+    "close": "Close",
+    "clear": "Clear",
+    "exportBundle": "Export Bundle",
+    "exporting": "Exporting…",
+    "copy": "Copy",
+    "copied": "Copied",
+    "apply": "Apply",
+    "reset": "Reset",
+    "disconnect": "Simulate Disconnect"
+  },
+  "lanes": {
+    "all": "All Lanes",
+    "coreApply": "Core::apply",
+    "bridgeRpc": "Bridge RPC",
+    "oarWire": "OAR Wire",
+    "gpuiFrame": "GPUI Frame"
+  },
+  "overview": {
+    "channel": "Channel",
+    "version": "Version",
+    "loopbackUrl": "Loopback URL",
+    "homePath": "Host Path",
+    "workRoot": "Space Root",
+    "dbPath": "Database",
+    "bundleMode": "Bundle Mode",
+    "bootTime": "Boot Time",
+    "activeSessions": "Active Helpers",
+    "activeClients": "Active Clients",
+    "activeSubscriptions": "Active Subscriptions",
+    "latestSeq": "Latest Seq",
+    "lastFrameMs": "Last Frame",
+    "runtimes": "Engines",
+    "installed": "Installed",
+    "notInstalled": "Not Installed",
+    "ready": "Ready",
+    "notReady": "Not Ready",
+    "graph": "Topology",
+    "clients": "Clients",
+    "sessions": "Helpers",
+    "watches": "Watches",
+    "subscriptions": "Subscriptions",
+    "bundleExported": "Bundle saved to {path} ({redacted} redacted)"
+  },
+  "routes": {
+    "searchPlaceholder": "Filter routes…",
+    "empty": "No route state available."
+  },
+  "timeline": {
+    "searchPlaceholder": "Search events…",
+    "slowOnly": "Slow Only",
+    "slow": "Slow",
+    "dropped": "{count} dropped",
+    "empty": "No timeline events recorded yet.",
+    "durationUs": "{us} µs",
+    "correlationId": "Correlation #{id}"
+  },
+  "trajectory": {
+    "kind": {
+      "issueSession": "Ticket",
+      "workspaceChat": "Chat",
+      "orchestrator": "Assistant"
+    },
+    "silentError": "Silent Error",
+    "tokens": "Tokens",
+    "rawPayload": "Raw Payload",
+    "truncated": "Truncated ({bytes} B)",
+    "subagents": "Subagents",
+    "systemPrompt": "System Prompt",
+    "turns": "Rounds",
+    "turnIndex": "Round #{index}",
+    "prompt": "Prompt",
+    "events": "Events",
+    "rawEntries": "Wire Entries",
+    "voyageRecords": "Voyage Records",
+    "emptyList": "No trajectories recorded yet.",
+    "selectPrompt": "Select a trajectory to inspect its rounds and raw frames."
+  },
+  "state": {
+    "seq": "State Seq",
+    "slices": "Slices",
+    "watchers": "{count} watchers",
+    "counts": "Entity Counts",
+    "caches": "Caches",
+    "entries": "{count} entries",
+    "issues": "Tickets",
+    "sessions": "Helpers",
+    "channels": "Channels",
+    "agents": "Profiles",
+    "repos": "Repos",
+    "artifacts": "Artifacts",
+    "inbox": "Inbox",
+    "mediaJobs": "Media",
+    "emptyCaches": "No cache metrics reported."
+  },
+  "lab": {
+    "rpcDelayMs": "RPC Delay (ms)",
+    "sliceDelayMs": "Slice Delay (ms)",
+    "targetFilter": "Target Filter",
+    "targetFilterPlaceholder": "e.g. issue.* or slice:board",
+    "disconnectTopic": "Disconnect Topic",
+    "disconnectTopicPlaceholder": "e.g. slice:board or channel.follow",
+    "applied": "Overrides applied.",
+    "resetDone": "Overrides reset to defaults.",
+    "warning": "Active fault injection affects all views in this process."
+  },
+  "status": {
+    "loading": "Loading…",
+    "error": "Failed to load DevTools data: {reason}",
+    "disabled": "DevTools are disabled on the server.",
+    "empty": "Nothing to show."
+  }
+}

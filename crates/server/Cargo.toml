@@ -41,6 +41,8 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-tungstenite = { workspace = true }
 tokio-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
 vibevalley-core = { version = "0.1.0", path = "../core", features = ["collab"] }

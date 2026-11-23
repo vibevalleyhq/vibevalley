@@ -10,6 +10,7 @@ pub mod common;
 pub mod connector;
 pub mod core;
 pub mod cron;
+pub mod debug;
 pub mod endpoints;
 pub mod game;
 pub mod host;
@@ -34,6 +35,7 @@ pub use common::*;
 pub use connector::*;
 pub use core::*;
 pub use cron::*;
+pub use debug::*;
 pub use endpoints::*;
 pub use game::*;
 pub use host::*;
@@ -62,6 +64,7 @@ pub(crate) fn ts_modules(cfg: &ts_rs::Config) -> Vec<crate::typescript::Module> 
         connector::ts_module(cfg),
         core::ts_module(cfg),
         cron::ts_module(cfg),
+        debug::ts_module(cfg),
         game::ts_module(cfg),
         host::ts_module(cfg),
         inbox::ts_module(cfg),

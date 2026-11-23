@@ -144,6 +144,7 @@ impl Shell {
         if let Some(p) = &self.palette {
             p.view.update(cx, |v, cx| v.set_motion(motion, cx));
         }
+        self.devtools_for_each_view(cx, |v, cx| v.set_motion(motion, cx));
         for pane in self.panes.values() {
             if let PaneEntity::Hosted(view) = &pane.entity {
                 view.update(cx, |v, cx| v.set_motion(motion, cx));
@@ -159,6 +160,7 @@ impl Shell {
         if let Some(p) = &self.palette {
             p.view.update(cx, |v, cx| v.set_ui_font_size(size, cx));
         }
+        self.devtools_for_each_view(cx, |v, cx| v.set_ui_font_size(size, cx));
         for pane in self.panes.values() {
             if let PaneEntity::Hosted(view) = &pane.entity {
                 view.update(cx, |v, cx| v.set_ui_font_size(size, cx));
@@ -173,6 +175,7 @@ impl Shell {
         if let Some(p) = &self.palette {
             p.view.update(cx, |v, cx| v.set_locale(locale, cx));
         }
+        self.devtools_for_each_view(cx, |v, cx| v.set_locale(locale, cx));
         for pane in self.panes.values() {
             if let PaneEntity::Hosted(view) = &pane.entity {
                 view.update(cx, |v, cx| v.set_locale(locale, cx));
@@ -192,6 +195,7 @@ impl Shell {
         if let Some(p) = &self.palette {
             p.view.update(cx, |v, cx| v.set_dark(dark, cx));
         }
+        self.devtools_for_each_view(cx, |v, cx| v.set_dark(dark, cx));
         for pane in self.panes.values() {
             if let PaneEntity::Hosted(view) = &pane.entity {
                 view.update(cx, |v, cx| v.set_dark(dark, cx));

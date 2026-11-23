@@ -4,32 +4,74 @@
 pub mod bridge;
 pub mod frames;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+use std::sync::{Arc, OnceLock, Weak};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use gpui::{
     App, AppContext as _, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _,
     Window, div,
 };
 use nsh_platform_gpui::{App as NshApp, AppOptions, AppView, Appearance, Bundle};
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 pub use bridge::{Action, Outbox, Panel};
 
 mod late;
 
+pub type ClientsProvider = dyn Fn() -> Vec<vibevalley_server::transport::bridge::ClientSnapshot> + Send + Sync;
+
 /// The server every hosted view talks to (`call`, slices, `live`,
 /// subscriptions), shared app-wide.
-pub struct BridgeHub(pub vibevalley_server::transport::bridge::Hub);
+pub struct BridgeHub(
+    pub vibevalley_server::transport::bridge::Hub,
+    #[allow(dead_code, reason = "keeps weak client snapshot provider alive for the app lifetime")] Arc<ClientsProvider>,
+);
 
 impl gpui::Global for BridgeHub {}
 
 pub struct ServerStartup(pub tokio::sync::watch::Receiver<Option<Result<(), String>>>);
 impl gpui::Global for ServerStartup {}
 
+pub const MAX_DEBUG_FRAMES: usize = 128;
+pub const SLOW_FRAME_US: u64 = 16_000;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DebugFrameRecord {
+    pub seq: u64,
+    pub time: i64,
+    pub duration_us: u64,
+    pub slow: bool,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DebugCacheEntry {
+    pub name: String,
+    pub entries: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
+struct ShellDebugInner {
+    routes: Value,
+    caches: Vec<DebugCacheEntry>,
+    bundle_mode: Option<&'static str>,
+    loopback_url: Option<String>,
+    boot_ms: Option<u64>,
+    last_frame_ms: Option<f64>,
+    next_frame_seq: u64,
+    frames: VecDeque<DebugFrameRecord>,
+    clients: Option<Weak<ClientsProvider>>,
+}
+
 /// Lightweight GPUI shell state snapshot exposed to `Hub::host_debug()`.
 #[derive(Clone)]
 pub struct ShellDebugHandle {
-    snapshot: std::sync::Arc<parking_lot::RwLock<Value>>,
+    inner: Arc<parking_lot::RwLock<ShellDebugInner>>,
 }
 
 impl gpui::Global for ShellDebugHandle {}
@@ -40,21 +82,122 @@ impl Default for ShellDebugHandle {
     }
 }
 
+fn now_millis() -> i64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+}
+
+fn parse_loopback_port(url: &str) -> Option<u16> {
+    let rest = url.rsplit_once(':')?.1;
+    rest.split('/').next()?.parse::<u16>().ok()
+}
+
 impl ShellDebugHandle {
     pub fn new() -> Self {
         Self {
-            snapshot: std::sync::Arc::new(parking_lot::RwLock::new(json!({}))),
+            inner: Arc::new(parking_lot::RwLock::new(ShellDebugInner {
+                routes: json!({
+                    "current": "/issues",
+                    "nativeWorkspace": false,
+                    "panel": "files",
+                    "inspectorOpen": false,
+                    "projects": [],
+                }),
+                caches: Vec::new(),
+                bundle_mode: None,
+                loopback_url: None,
+                boot_ms: None,
+                last_frame_ms: None,
+                next_frame_seq: 0,
+                frames: VecDeque::with_capacity(MAX_DEBUG_FRAMES),
+                clients: None,
+            })),
         }
     }
 
-    pub fn update(&self, value: Value) {
-        *self.snapshot.write() = value;
+    pub fn update_shell(&self, routes: Value, caches: Vec<DebugCacheEntry>) {
+        let mut guard = self.inner.write();
+        guard.routes = routes;
+        guard.caches = caches;
+    }
+
+    pub fn set_boot_info(&self, loopback_url: String, boot_ms: u64) {
+        let mut guard = self.inner.write();
+        guard.loopback_url = Some(loopback_url);
+        guard.boot_ms = Some(boot_ms);
+    }
+
+    #[cfg(test)]
+    pub fn set_bundle_mode(&self, mode: &'static str) {
+        self.inner.write().bundle_mode = Some(mode);
+    }
+
+    pub fn attach_clients(&self, provider: &Arc<ClientsProvider>) {
+        self.inner.write().clients = Some(Arc::downgrade(provider));
+    }
+
+    pub fn loopback_port(&self) -> Option<u16> {
+        self.inner.read().loopback_url.as_deref().and_then(parse_loopback_port)
+    }
+
+    pub fn record_frame(&self, duration_us: u64, summary: &str) -> DebugFrameRecord {
+        let mut guard = self.inner.write();
+        guard.next_frame_seq += 1;
+        let record = DebugFrameRecord {
+            seq: guard.next_frame_seq,
+            time: now_millis(),
+            duration_us,
+            slow: duration_us >= SLOW_FRAME_US,
+            summary: summary.to_string(),
+        };
+        guard.last_frame_ms = Some(duration_us as f64 / 1000.0);
+        if guard.frames.len() >= MAX_DEBUG_FRAMES {
+            guard.frames.pop_front();
+        }
+        guard.frames.push_back(record.clone());
+        record
     }
 }
 
 impl vibevalley_server::HostDebugBridge for ShellDebugHandle {
     fn snapshot(&self) -> Value {
-        self.snapshot.read().clone()
+        let (routes, caches, bundle_mode, loopback_url, boot_ms, last_frame_ms, frames, provider) = {
+            let guard = self.inner.read();
+            (
+                guard.routes.clone(),
+                guard.caches.clone(),
+                guard.bundle_mode.unwrap_or_else(workbench_bundle_mode),
+                guard.loopback_url.clone(),
+                guard.boot_ms,
+                guard.last_frame_ms,
+                guard.frames.iter().cloned().collect::<Vec<_>>(),
+                guard.clients.as_ref().and_then(Weak::upgrade),
+            )
+        };
+        let clients: Vec<Value> = provider
+            .map(|p| {
+                p().into_iter()
+                    .map(|c| {
+                        json!({
+                            "id": c.identity.id,
+                            "kind": c.identity.kind.as_str(),
+                            "label": c.identity.label,
+                            "watches": c.watches,
+                            "subscriptions": c.subscriptions,
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        json!({
+            "routes": routes,
+            "clients": clients,
+            "bundleMode": bundle_mode,
+            "loopbackUrl": loopback_url,
+            "bootMs": boot_ms,
+            "lastFrameMs": last_frame_ms,
+            "frames": frames,
+            "caches": caches,
+        })
     }
 }
 
@@ -71,6 +214,7 @@ pub fn next_client_identity(kind: vibevalley_server::ClientKind, label: impl Int
 fn client_identity_for(view: &str, params: &Map<String, Value>) -> vibevalley_server::ClientIdentity {
     let (kind, label) = match view {
         "vv" | "vibevalley" => (vibevalley_server::ClientKind::GpuiWorkbench, view.to_string()),
+        "devtools" => (vibevalley_server::ClientKind::DevTools, "devtools".to_string()),
         "sidebar" => {
             let role = params.get("role").and_then(Value::as_str).unwrap_or("sidebar");
             (vibevalley_server::ClientKind::GpuiSidebar, role.to_string())
@@ -88,11 +232,13 @@ impl BridgeHub {
     /// (`state.json`, `responses.json`) for tests and debug scripts;
     /// `VIBEVALLEY_HOME=<dir>` moves the real one.
     pub fn install(cx: &mut App) {
+        let boot_started = Instant::now();
         let (ready, startup) = tokio::sync::watch::channel(None);
         cx.set_global(ServerStartup(startup));
         cx.set_global(crate::serving::RunningServer::new());
         let host_debug = ShellDebugHandle::new();
         cx.set_global(host_debug.clone());
+        let host_debug_for_boot = host_debug.clone();
         let (running_tx, running_rx) = flume::bounded::<crate::serving::Running>(1);
         cx.spawn(async move |cx| {
             if let Ok(running) = running_rx.recv_async().await {
@@ -103,19 +249,19 @@ impl BridgeHub {
             }
         })
         .detach();
-        let server: std::sync::Arc<dyn vibevalley_server::transport::bridge::Server> = match std::env::var_os("VIBEVALLEY_FAKE_SERVER") {
+        let server: Arc<dyn vibevalley_server::transport::bridge::Server> = match std::env::var_os("VIBEVALLEY_FAKE_SERVER") {
             Some(dir) => {
                 drop(running_tx);
                 let fake = vibevalley_server::transport::bridge::fake::FakeServer::from_dir(std::path::Path::new(&dir));
                 let _ = ready.send_replace(Some(fake.as_ref().map(|_| ()).map_err(ToString::to_string)));
-                std::sync::Arc::new(fake.unwrap_or_else(|_| vibevalley_server::transport::bridge::fake::FakeServer::new()))
+                Arc::new(fake.unwrap_or_else(|_| vibevalley_server::transport::bridge::fake::FakeServer::new()))
             }
-            None => std::sync::Arc::new(late::LateServer::spawn(move || {
+            None => Arc::new(late::LateServer::spawn(move || {
                 let home = server_home();
                 match vibevalley_server::start(crate::serving::config(&home, crate::serving::work_root())) {
                     Ok(started) => {
-                        started.hub.attach_host_debug(Some(std::sync::Arc::new(host_debug)));
-                        let hub: std::sync::Arc<dyn vibevalley_server::transport::bridge::Server> = started.hub.clone();
+                        started.hub.attach_host_debug(Some(Arc::new(host_debug_for_boot.clone())));
+                        let hub: Arc<dyn vibevalley_server::transport::bridge::Server> = started.hub.clone();
                         let preference = port_preference_from(std::env::var("VIBEVALLEY_PORT").ok().as_deref(), vibevalley_protocol::home::default_port());
                         // The loopback API: the CLI finds it through server.json, the helpers' MCP door is on it.
                         let (listener, announced) = match preference.and_then(|pref| {
@@ -123,8 +269,10 @@ impl BridgeHub {
                                 .map_err(|e| format!("vibevalley http: {e}"))
                         }) {
                             Ok(listener) => {
-                                started.board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));
-                                match vibevalley_server::home::announce(&home, &listener.url()) {
+                                let url = listener.url();
+                                host_debug_for_boot.set_boot_info(url.clone(), boot_started.elapsed().as_millis() as u64);
+                                started.board.sessions().set_mcp_url(format!("{url}/mcp"));
+                                match vibevalley_server::home::announce(&home, &url) {
                                     Ok(announced) => {
                                         let _ = ready.send_replace(Some(Ok(())));
                                         (Some(listener), Some(announced))
@@ -148,12 +296,16 @@ impl BridgeHub {
                     }
                     Err(e) => {
                         let _ = ready.send_replace(Some(Err(format!("vibevalley server: {e}"))));
-                        std::sync::Arc::new(vibevalley_server::transport::bridge::fake::FakeServer::new())
+                        Arc::new(vibevalley_server::transport::bridge::fake::FakeServer::new())
                     }
                 }
             })),
         };
-        cx.set_global(BridgeHub(vibevalley_server::transport::bridge::Hub::new(server, 4)));
+        let bridge = vibevalley_server::transport::bridge::Hub::new(server, 4);
+        let bridge_for_clients = bridge.clone();
+        let clients_provider: Arc<ClientsProvider> = Arc::new(move || bridge_for_clients.clients_snapshot());
+        host_debug.attach_clients(&clients_provider);
+        cx.set_global(BridgeHub(bridge, clients_provider));
     }
 }
 
@@ -234,8 +386,17 @@ const SHELL_BUNDLE_JS: &str = "throw new Error('VibeValley shell UI bundle missi
 const SHELL_BUNDLE_NSHC: &[u8] = &[];
 const SHELL_CAPABILITIES: &str = include_str!(concat!(env!("OUT_DIR"), "/ui-shell/capabilities.json"));
 
+static WORKBENCH_BUNDLE_MODE: OnceLock<&'static str> = OnceLock::new();
+
+pub fn workbench_bundle_mode() -> &'static str {
+    WORKBENCH_BUNDLE_MODE
+        .get()
+        .copied()
+        .unwrap_or(if !BUNDLE_NSHC.is_empty() { "nshc" } else { "js" })
+}
+
 fn is_workbench_view(view: &str) -> bool {
-    matches!(view, "vv" | "vibevalley" | "farm-form" | "farm-phone")
+    matches!(view, "vv" | "vibevalley" | "farm-form" | "farm-phone" | "devtools")
 }
 
 fn dir_has_bundle(dir: &std::path::Path) -> bool {
@@ -273,21 +434,22 @@ fn resolve_bundle_dir_from(override_dir: Option<&std::path::Path>, ui_root: &std
     None
 }
 
-fn build_embedded_bundle(bytecode: &[u8], js: &str, caps_json: &str) -> Bundle {
+fn build_embedded_bundle(bytecode: &[u8], js: &str, caps_json: &str) -> (Bundle, &'static str) {
     if !bytecode.is_empty() {
         // SAFETY: bytecode emitted by `nsh build` in `build.rs` during this build.
         let b = unsafe { Bundle::bytecode(bytecode.to_vec()) };
         if let Ok(b) = b.with_app_id(Some("dev.vibevalley.ui")).with_capabilities_json(Some(caps_json)) {
-            return b;
+            return (b, "nshc");
         }
     }
-    Bundle::source(js.to_string())
+    let b = Bundle::source(js.to_string())
         .with_app_id(Some("dev.vibevalley.ui"))
         .with_capabilities_json(Some(caps_json))
-        .expect("capabilities.json written by nsh build")
+        .expect("capabilities.json written by nsh build");
+    (b, "js")
 }
 
-fn load_bundle_slot(workbench: bool, bytecode: &[u8], js: &str, fallback_caps: &str) -> Bundle {
+fn load_bundle_slot(workbench: bool, bytecode: &[u8], js: &str, fallback_caps: &str) -> (Bundle, &'static str) {
     let override_dir = std::env::var_os("VIBEVALLEY_UI_BUNDLE").map(std::path::PathBuf::from);
     let ui_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("ui");
     if let Some(dir) = resolve_bundle_dir_from(override_dir.as_deref(), &ui_root, workbench) {
@@ -301,7 +463,7 @@ fn load_bundle_slot(workbench: bool, bytecode: &[u8], js: &str, fallback_caps: &
             // SAFETY: local `nsh build` output under the workspace's own `ui/build*`.
             let b = unsafe { Bundle::bytecode(bytes) };
             if let Ok(b) = b.with_app_id(Some("dev.vibevalley.ui")).with_capabilities_json(Some(&caps_json)) {
-                return b;
+                return (b, "nshc");
             }
         }
         match std::fs::read_to_string(dir.join("bundle.js")) {
@@ -310,7 +472,7 @@ fn load_bundle_slot(workbench: bool, bytecode: &[u8], js: &str, fallback_caps: &
                     .with_app_id(Some("dev.vibevalley.ui"))
                     .with_capabilities_json(Some(&caps_json))
                 {
-                    return b;
+                    return (b, "js");
                 }
             }
             Ok(_) => {}
@@ -321,16 +483,22 @@ fn load_bundle_slot(workbench: bool, bytecode: &[u8], js: &str, fallback_caps: &
     build_embedded_bundle(bytecode, js, &caps_json)
 }
 
-/// Full workbench bundle for `"vv"`/`"vibevalley"`, lightweight shell bundle for
+/// Full workbench bundle for `"vv"`/`"vibevalley"`/`"devtools"`, lightweight shell bundle for
 /// all other hosted surfaces, cached process-wide so views share one load.
 fn bundle_for(view: &str) -> Bundle {
     if is_workbench_view(view) {
-        static WORKBENCH: std::sync::OnceLock<Bundle> = std::sync::OnceLock::new();
-        WORKBENCH.get_or_init(|| load_bundle_slot(true, BUNDLE_NSHC, BUNDLE_JS, CAPABILITIES)).clone()
+        static WORKBENCH: OnceLock<Bundle> = OnceLock::new();
+        WORKBENCH
+            .get_or_init(|| {
+                let (bundle, mode) = load_bundle_slot(true, BUNDLE_NSHC, BUNDLE_JS, CAPABILITIES);
+                let _ = WORKBENCH_BUNDLE_MODE.set(mode);
+                bundle
+            })
+            .clone()
     } else {
-        static SHELL: std::sync::OnceLock<Bundle> = std::sync::OnceLock::new();
+        static SHELL: OnceLock<Bundle> = OnceLock::new();
         SHELL
-            .get_or_init(|| load_bundle_slot(false, SHELL_BUNDLE_NSHC, SHELL_BUNDLE_JS, SHELL_CAPABILITIES))
+            .get_or_init(|| load_bundle_slot(false, SHELL_BUNDLE_NSHC, SHELL_BUNDLE_JS, SHELL_CAPABILITIES).0)
             .clone()
     }
 }
@@ -340,12 +508,16 @@ pub enum HostedEvent {
     Action(Action),
     /// The view's script (re)started: it has no frames, push them all.
     Ready,
-    /// A `call` of a `host.*` op, answered by the shell on the UI thread.
+    /// A decoded `host.*` bridge call answered by the shell on the UI thread.
     HostCall {
-        op: String,
-        payload: Value,
+        op: vibevalley_protocol::HostOp,
         reply: Replier,
     },
+}
+
+enum EngineMessage {
+    Action(Value),
+    HostCall { id: String, op: vibevalley_protocol::HostOp },
 }
 
 pub struct HostedView {
@@ -366,7 +538,7 @@ impl HostedView {
         // nsh serves only nsh/base's core part unless the host names more; register both nsh/base and vibevalley/rich.
         static UI_SETS: std::sync::Once = std::sync::Once::new();
         UI_SETS.call_once(|| nsh_platform_gpui::set_ui_sets(vec![nsh_base::registry(), vibevalley_rich::registry()]));
-        let (tx, rx) = flume::unbounded::<Value>();
+        let (tx, rx) = flume::unbounded::<EngineMessage>();
         let (err_tx, err_rx) = flume::unbounded::<String>();
         let options = AppOptions {
             appearance: Appearance::System,
@@ -398,43 +570,58 @@ impl HostedView {
             }
             let identity = client_identity_for(&name, &params);
             host.set_params(params);
-            let bridge = hub.map(|hub| std::sync::Arc::new(hub.attach(identity, std::sync::Arc::new(ChannelOutlet(host.clone())))));
+            let bridge = hub.map(|hub| Arc::new(hub.attach(identity, Arc::new(ChannelOutlet(host.clone())))));
             client = bridge.clone();
             let reply_host = host.clone();
             // Runs on the engine thread. Server traffic and stateless host ops
-            // answer directly here; everything else is handed to the GPUI thread.
+            // answer directly here; decoded shell host ops go to the GPUI thread.
             host.handle("action", move |call| {
                 let v = call.data();
                 if v["type"].as_str() == Some("call")
                     && let Some(op) = v["op"].as_str()
+                    && op.starts_with("host.")
                 {
-                    if op == "host.pixelDir" {
-                        if let Some(id) = v["id"].as_str() {
-                            let env = if has_pixel_dir {
-                                vibevalley_server::transport::bridge::Envelope::ok(json!({ "path": pixel_dir }))
-                            } else {
-                                vibevalley_server::transport::bridge::refusal(
-                                    vibevalley_server::transport::bridge::BizCode::NotFound,
-                                    "the pixel art is not installed",
-                                )
-                            };
-                            let _ = reply_host.send(format!("reply:{id}"), serde_json::to_value(env).unwrap_or(Value::Null));
+                    let id = v["id"].as_str().unwrap_or_default();
+                    match crate::host::decode_host_op(op, v["payload"].clone()) {
+                        Err(env) => {
+                            if !id.is_empty() {
+                                let _ = reply_host.send(format!("reply:{id}"), serde_json::to_value(env).unwrap_or(Value::Null));
+                            }
                         }
-                        return;
-                    }
-                    if let Some(env) = crate::host::handle_stateless_op(op, &v["payload"]) {
-                        if let Some(id) = v["id"].as_str() {
-                            let _ = reply_host.send(format!("reply:{id}"), serde_json::to_value(env).unwrap_or(Value::Null));
+                        Ok(vibevalley_protocol::HostOp::PixelDir) => {
+                            if !id.is_empty() {
+                                let env = if has_pixel_dir {
+                                    vibevalley_server::transport::bridge::Envelope::ok(json!({ "path": pixel_dir }))
+                                } else {
+                                    vibevalley_server::transport::bridge::refusal(
+                                        vibevalley_server::transport::bridge::BizCode::NotFound,
+                                        "the pixel art is not installed",
+                                    )
+                                };
+                                let _ = reply_host.send(format!("reply:{id}"), serde_json::to_value(env).unwrap_or(Value::Null));
+                            }
                         }
-                        return;
+                        Ok(host_op) => {
+                            if let Some(env) = crate::host::handle_stateless_op(&host_op) {
+                                if !id.is_empty() {
+                                    let _ = reply_host.send(format!("reply:{id}"), serde_json::to_value(env).unwrap_or(Value::Null));
+                                }
+                            } else if !id.is_empty() {
+                                let _ = tx.send(EngineMessage::HostCall {
+                                    id: id.to_string(),
+                                    op: host_op,
+                                });
+                            }
+                        }
                     }
+                    return;
                 }
                 if let Some(bridge) = &bridge
                     && route_to_bridge(bridge, v)
                 {
                     return;
                 }
-                let _ = tx.send(v.clone());
+                let _ = tx.send(EngineMessage::Action(v.clone()));
             });
             let label = name.clone();
             app.on_error(move |message| {
@@ -445,8 +632,8 @@ impl HostedView {
             app
         });
         cx.spawn(async move |this, cx| {
-            while let Ok(value) = rx.recv_async().await {
-                let alive = this.update(cx, |view, cx| view.on_message(value, cx));
+            while let Ok(message) = rx.recv_async().await {
+                let alive = this.update(cx, |view, cx| view.on_message(message, cx));
                 if alive.is_err() {
                     break;
                 }
@@ -472,25 +659,37 @@ impl HostedView {
         }
     }
 
-    fn on_message(&mut self, value: Value, cx: &mut Context<Self>) {
-        match bridge::parse_action(&value) {
-            Ok(Action::Applied { topic, rev }) => {
-                self.applied.insert(topic, rev);
-            }
-            Ok(Action::Ready) => {
-                self.ready = true;
-                self.outbox.reset();
-                cx.emit(HostedEvent::Ready);
-            }
-            Ok(Action::Call { id, op, payload }) => {
+    fn on_message(&mut self, message: EngineMessage, cx: &mut Context<Self>) {
+        match message {
+            EngineMessage::HostCall { id, op } => {
                 let reply = Replier {
                     channel: self.app.read(cx).host(),
                     id,
                 };
-                cx.emit(HostedEvent::HostCall { op, payload, reply });
+                cx.emit(HostedEvent::HostCall { op, reply });
             }
-            Ok(action) => cx.emit(HostedEvent::Action(action)),
-            Err(e) => eprintln!("hosted view {}: {e}", self.view),
+            EngineMessage::Action(value) => match bridge::parse_action(&value) {
+                Ok(Action::Applied { topic, rev }) => {
+                    self.applied.insert(topic, rev);
+                }
+                Ok(Action::Ready) => {
+                    self.ready = true;
+                    self.outbox.reset();
+                    cx.emit(HostedEvent::Ready);
+                }
+                Ok(Action::Call { id, op, payload }) => {
+                    let reply = Replier {
+                        channel: self.app.read(cx).host(),
+                        id,
+                    };
+                    match crate::host::decode_host_op(&op, payload) {
+                        Ok(host_op) => cx.emit(HostedEvent::HostCall { op: host_op, reply }),
+                        Err(envelope) => reply.send(*envelope),
+                    }
+                }
+                Ok(action) => cx.emit(HostedEvent::Action(action)),
+                Err(e) => eprintln!("hosted view {}: {e}", self.view),
+            },
         }
     }
 
@@ -675,7 +874,7 @@ mod tests {
 
     #[test]
     fn is_workbench_view_routes_workbench_and_farm_views() {
-        for view in ["vv", "vibevalley", "farm-form", "farm-phone"] {
+        for view in ["vv", "vibevalley", "farm-form", "farm-phone", "devtools"] {
             assert!(is_workbench_view(view), "{view} should use the full workbench bundle");
         }
         for view in ["sidebar", "palette", "markdown", "workspace-chat", "probe"] {
@@ -706,13 +905,15 @@ mod tests {
     #[test]
     fn embedded_bundle_falls_back_to_source_when_bytecode_is_empty() {
         let caps = capabilities_from(r#"{"host":["action"]}"#);
-        let _bundle = build_embedded_bundle(&[], "export default function() {}", &caps);
+        let (_bundle, mode) = build_embedded_bundle(&[], "export default function() {}", &caps);
+        assert_eq!(mode, "js");
     }
 
     #[test]
     fn embedded_bundle_accepts_non_empty_bytecode_with_empty_source() {
         let caps = capabilities_from(r#"{"host":["action"]}"#);
-        let _bundle = build_embedded_bundle(&[1u8, 2, 3, 4], "", &caps);
+        let (_bundle, mode) = build_embedded_bundle(&[1u8, 2, 3, 4], "", &caps);
+        assert_eq!(mode, "nshc");
     }
 
     #[test]
@@ -721,6 +922,10 @@ mod tests {
         let wb = client_identity_for("vv", &empty);
         assert_eq!(wb.kind, vibevalley_server::ClientKind::GpuiWorkbench);
         assert_eq!(wb.label, "vv");
+
+        let dt = client_identity_for("devtools", &empty);
+        assert_eq!(dt.kind, vibevalley_server::ClientKind::DevTools);
+        assert_eq!(dt.label, "devtools");
 
         let sb = client_identity_for("sidebar", &empty);
         assert_eq!(sb.kind, vibevalley_server::ClientKind::GpuiSidebar);
@@ -815,9 +1020,16 @@ mod tests {
     }
 
     #[test]
-    fn shell_debug_handle_bridges_snapshots_into_server_hub() {
+    fn shell_debug_handle_bridges_snapshots_into_server_hub_with_bounded_frames_and_clients() {
         use vibevalley_protocol::{CallState, SpaceState};
+        use vibevalley_server::transport::bridge::fake::FakeServer;
+        use vibevalley_server::transport::bridge::{Hub as Bridge, Outlet};
         use vibevalley_server::{HostDebugBridge, Server};
+
+        struct NoopOutlet;
+        impl Outlet for NoopOutlet {
+            fn send(&self, _: &str, _: Value) {}
+        }
 
         let hub = vibevalley_server::Hub::new(SpaceState {
             call: CallState::Idle,
@@ -834,10 +1046,72 @@ mod tests {
             plays: None,
         });
         let handle = ShellDebugHandle::new();
-        hub.attach_host_debug(Some(std::sync::Arc::new(handle.clone())));
-        handle.update(json!({ "route": "/workspace", "nativeWorkspace": true }));
+        hub.attach_host_debug(Some(Arc::new(handle.clone())));
+        handle.set_bundle_mode("nshc");
+        handle.set_boot_info("http://127.0.0.1:8790".into(), 120);
+        assert_eq!(handle.loopback_port(), Some(8790));
+
+        let bridge_hub = Bridge::new(Arc::new(FakeServer::new()), 1);
+        let bridge_for_provider = bridge_hub.clone();
+        let provider: Arc<ClientsProvider> = Arc::new(move || bridge_for_provider.clients_snapshot());
+        handle.attach_clients(&provider);
+        let client = bridge_hub.attach(next_client_identity(vibevalley_server::ClientKind::DevTools, "devtools"), Arc::new(NoopOutlet));
+        client.watch("slice:sessions").unwrap();
+
+        handle.update_shell(
+            json!({
+                "current": "/workspace",
+                "nativeWorkspace": true,
+                "panel": "git",
+                "inspectorOpen": true,
+                "projects": [{ "id": 1, "name": "vv", "tabs": [] }],
+            }),
+            vec![DebugCacheEntry {
+                name: "panes".into(),
+                entries: 3,
+                detail: Some("open pane entities".into()),
+            }],
+        );
+
+        let fast = handle.record_frame(4_200, "Shell::render");
+        assert!(!fast.slow);
+        assert_eq!(fast.seq, 1);
+
+        let slow = handle.record_frame(16_000, "Shell::render");
+        assert!(slow.slow);
+        assert_eq!(slow.seq, 2);
+
+        for i in 0..200u64 {
+            let rec = handle.record_frame(5_000 + (i % 3) * 10_000, "Shell::render");
+            assert_eq!(rec.slow, rec.duration_us >= SLOW_FRAME_US);
+        }
+
         let bridge = hub.host_debug().expect("host debug bridge attached");
-        assert_eq!(bridge.snapshot()["route"], "/workspace");
-        assert_eq!(handle.snapshot()["nativeWorkspace"], true);
+        let snap = bridge.snapshot();
+        assert_eq!(snap["routes"]["current"], "/workspace");
+        assert_eq!(snap["routes"]["nativeWorkspace"], true);
+        assert_eq!(snap["routes"]["panel"], "git");
+        assert_eq!(snap["routes"]["inspectorOpen"], true);
+        assert_eq!(snap["bundleMode"], "nshc");
+        assert_eq!(snap["loopbackUrl"], "http://127.0.0.1:8790");
+        assert_eq!(snap["bootMs"], 120);
+        assert_eq!(snap["caches"][0]["name"], "panes");
+        assert_eq!(snap["caches"][0]["entries"], 3);
+
+        let clients = snap["clients"].as_array().expect("clients array");
+        assert_eq!(clients.len(), 1);
+        assert_eq!(clients[0]["kind"], "devTools");
+        assert_eq!(clients[0]["label"], "devtools");
+        assert_eq!(clients[0]["watches"], json!(["slice:sessions"]));
+
+        let frames = snap["frames"].as_array().expect("frames array");
+        assert_eq!(frames.len(), MAX_DEBUG_FRAMES);
+        assert_eq!(frames.first().unwrap()["seq"], 202 - MAX_DEBUG_FRAMES as u64 + 1);
+        assert_eq!(frames.last().unwrap()["seq"], 202);
+        assert!(snap["lastFrameMs"].as_f64().is_some());
+
+        drop(client);
+        drop(provider);
+        assert_eq!(handle.snapshot()["clients"], json!([]));
     }
 }

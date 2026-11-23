@@ -148,6 +148,7 @@
 | `readChatPaneParams` | `hostParams.ts` |  |
 | `readFarmFormParams` | `hostParams.ts` |  |
 | `readFarmPhoneParams` | `hostParams.ts` |  |
+| `readDevToolsParams` | `hostParams.ts` |  |
 | `loadSpriteManifest` | `pixelManifests.ts` | Lazily fetches `sprites.json` from Rust on first `useSprites()` call instead of inlining 105 KB into `bundle.js`. |
 | `cursorManifest` | `pixelManifests.ts` |  |
 | `retryRead` | `query.ts` |  |

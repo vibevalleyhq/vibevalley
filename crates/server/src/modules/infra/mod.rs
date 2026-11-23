@@ -3,6 +3,7 @@ use vibevalley_protocol::{Health, ops};
 use crate::Hub;
 
 pub(crate) mod column;
+pub mod debug;
 pub mod http;
 pub mod provider;
 pub mod setting;

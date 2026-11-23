@@ -17,9 +17,9 @@
 |---|---|
 | `crates/core/src/core.rs`、`inbox.rs`、`patrol.rs` | `Core`：`reduce`、`SliceMask`、6 路切片投影（`board_slice`、`sessions_slice`、`collab_slice`、`inbox_slice`、`ops_slice`、`farm_frame`）与离线 `slice_bundle`、`Transition`；收件箱纯计算（`inbox`、`inbox_entries`、`fresh_of`）与巡查规则（`patrol_step`） |
 | `crates/server/src/lib.rs`、`event_bus.rs`、`slice_feed.rs`、`runtime_inbox.rs` | `Hub`、有界异步 `EventBus`、基于 `tokio::sync::watch` 的 6 路脏合并 `SliceFeed<T>` 与 `RuntimeInboxObserver`：持有 `Core`、端点表、订阅表、`tokio::sync::broadcast` 实时事件流与 `CancellationToken`/`TaskTracker` 停机作用域，按 `Applied.dirty: SliceMask` 仅推送变脏切片（`effects` 仅进 `farm`），将持久 `pi.inbox` 运行时告警实时并入 `InboxSlice`；经 `arc-swap` 无锁挂接 `CallerContext`/`ClientIdentity` 与 `InvokeObserver`/`FaultGate`/`HostDebugBridge` 插槽 |
-| `crates/server/src/start.rs` | `start`：按序打开设置、档案、仓库、工单板、频道、媒体、助手，并接线 `IssueChat`、`SessionChat`、助手频道订阅与 `RuntimeInboxObserver`，注册所有端点；`Started::close` 先停 `Hub::close_bus()` 再清理各领域服务 |
-| `crates/server/src/main.rs` | 二进制 `vibevalley-server`：`--web`、`--ready-json`，读环境变量，写 `server.json` |
-| `crates/protocol/src/contract/` | `SpaceState`、`Fact`、`SliceKind`、5 域切片、`FarmFrame`、`SliceBundle`、`LiveEvent`、GPUI 壳强类型协议（`host.rs`：`Host*` 帧与 `HostAction`）与接口表 `ENDPOINTS`（`endpoints.rs`），手写的源头，TS 由它生成 |
+| `crates/server/src/start.rs` | `start`：按序打开设置、档案、仓库、工单板、频道、媒体、助手与 `DebugKit`（[debug/mod.rs](crates/server/src/modules/infra/debug/mod.rs)），接线 `IssueChat`、`SessionChat`、助手频道订阅与 `RuntimeInboxObserver`，注册所有端点；仅在 `VIBEVALLEY_DEBUG=1` 时挂接观察器、`FaultGate` 与 `OarObserver`，`Started::close` 停机并卸载全局观察器 |
+| `crates/server/src/main.rs` | 二进制 `vibevalley-server`：初始化工作区 `tracing_subscriber`（`VIBEVALLEY_LOG`/`RUST_LOG`，`VIBEVALLEY_DEBUG=1` 默认 `info` 否则 `warn`），支持 `--web`、`--ready-json`，读环境变量，写 `server.json` |
+| `crates/protocol/src/contract/` | `SpaceState`、`Fact`、`SliceKind`、5 域切片、`FarmFrame`、`SliceBundle`、`LiveEvent`、`DebugKit`（`debug.rs`）、GPUI 壳强类型协议（`host.rs`：`Host*` 帧、`HostAction` 与 `HostOp`）与接口表 `ENDPOINTS`（`endpoints.rs`），手写的源头，TS 由它生成 |
 | `crates/protocol/src/envelope.rs` | 全信封、`BizCode`、`ApiError` |
 | `crates/server/src/transport/http/mod.rs` | axum 路由：命令接口、`/api/v1/slice/{name}`、`/live`、订阅流、工单观察流、附件、网页 Artifact、`/mcp`；来源校验 `from_the_farm`；`media.rs` 媒体输入与语音流 |
 | `crates/cli/src/` | 命令行 `vibevalley`：`main.rs` 入口、`client.rs` HTTP/SSE 客户端（`Client::slice`）与退出码、`output.rs` 输出格式化、`domains/` 按五大业务域组织的强类型子命令 |
@@ -37,7 +37,7 @@
 - **先落库，后发事实**：各模块先提交数据库事务或文件，再调 `Hub::apply`。重启时从空状态由各模块从 `server.db` 及家目录文件恢复。
 - **按依赖重算工单派生状态**：`reduce` 仅在工单或会话集合引用变化时重算工单状态与动作（`withIssueStatuses`）；聊天或花费事实不触发工单重算。一轮进行中的 `sessionPhaseChanged` 只改了 `doing` 或 `spent`（`since`、`quietSince` 不变，`phaseAffectsIssue`）时跳过工单重算且不标脏 `BOARD`。
 - **界面文案只在出切片时填充**：6 个纯投影函数（`board_slice`、`sessions_slice`、`collab_slice`、`inbox_slice`、`ops_slice`、`farm_frame`）按需在对应切片上填入 `phaseText`、`actionText`、`whenText`、工单 `stage` 与可执行动作；`reduce` 与持久层不含界面文案。`SliceBundle` 仅用于离线夹具与 `export_scenarios` 导出，不对外提供聚合 HTTP 端点。
-- **可插拔脊柱钩子关闭态零开销**：`Hub` 与 `Server::call_with` 统一透传 `CallerContext`（`caller`、`principal: CallerPrincipal`、`client: Option<ClientIdentity>`、`trace_id: u64`），并经 `arc_swap::ArcSwapOption` 挂接 `InvokeObserver`、`FaultGate` 与 `HostDebugBridge` 三处钩子（`Hub::attach_observer` / `attach_fault_gate` / `attach_host_debug`）；未挂载时仅做无锁原子读取，零锁零堆分配。
+- **可插拔脊柱钩子关闭态零开销与 `DebugKit`**：`Hub` 与 `Server::call_with` 统一透传 `CallerContext`（`caller`、`principal: CallerPrincipal`、`client: Option<ClientIdentity>`、`trace_id: u64`），并经 `arc_swap::ArcSwapOption` 挂接 `InvokeObserver`、`FaultGate` 与 `HostDebugBridge` 三处钩子（`Hub::attach_observer` / `attach_fault_gate` / `attach_host_debug`）；未挂载时仅做无锁原子读取，零锁零堆分配。`crates/server/src/modules/infra/debug/` 提供 `DebugKit` 及 9 个仅限 `Caller::User` 的 `debug.*` 端点（`debug.snapshot`、`debug.timeline.{list,clear}`、`debug.trajectory.{list,get}`、`debug.graph`、`debug.override.{get,set}`、`debug.bundle.export`），仅在 `VIBEVALLEY_DEBUG=1` 时启用并挂接四泳道定长环形缓冲（`CoreApply`、`BridgeRpc`、`OarWire`、`GpuiFrame`，每泳道 512 条）、`FaultGate` 与 `OarObserver`；未启用时一律以 `BizCode::Refused` 拒绝。`Hub::call_with` 与 `FaultGate` 始终跳过 `debug.*` 前缀调用，避免延迟注入或轮询干扰 DevTools 与时间线；全部输出与纯 Rust ZIP 诊断包（`debug-bundle.zip`）均经过统一脱敏器。本机 `vibevalley` CLI 不提供 `debug` 子命令。
 
 ### 收件箱
 

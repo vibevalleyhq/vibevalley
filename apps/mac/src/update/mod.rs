@@ -387,20 +387,27 @@ pub fn ready() -> bool {
     matches!(*updater().state.lock(), State::Ready { .. })
 }
 
-pub fn host_call(op: &str, reply: crate::hosted::Replier, cx: &mut App) {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpdateOp {
+    State,
+    Check,
+    Install,
+}
+
+pub fn host_call(op: UpdateOp, reply: crate::hosted::Replier, cx: &mut App) {
     use vibevalley_server::transport::bridge::{BizCode, Envelope, refusal};
     let updater = updater().clone();
     match op {
-        "host.updateState" => reply.send(Envelope::ok(updater.state())),
+        UpdateOp::State => reply.send(Envelope::ok(updater.state())),
         // Answers once it has settled: it blocks while downloading.
-        "host.updateCheck" => {
+        UpdateOp::Check => {
             std::thread::spawn(move || {
                 updater.check();
                 reply.send(Envelope::ok(Value::Null));
             });
         }
         // Restarts into the new version.
-        "host.updateInstall" => {
+        UpdateOp::Install => {
             if updater.swap(true) {
                 reply.send(Envelope::ok(Value::Null));
                 cx.quit();
@@ -408,7 +415,6 @@ pub fn host_call(op: &str, reply: crate::hosted::Replier, cx: &mut App) {
                 reply.send(refusal(BizCode::Refused, "no update is ready"));
             }
         }
-        other => reply.send(refusal(BizCode::RouteNotFound, format!("the host has no op {other}"))),
     }
 }
 

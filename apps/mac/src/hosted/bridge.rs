@@ -150,6 +150,9 @@ mod tests {
             ),
             (json!({"type": "openRepoMap"}), Action::OpenRepoMap),
             (json!({"type": "openTree"}), Action::OpenTree),
+            (json!({"type": "toggle_devtools"}), Action::ToggleDevtools),
+            (json!({"type": "detach_devtools"}), Action::DetachDevtools),
+            (json!({"type": "close_devtools"}), Action::CloseDevtools),
         ];
         for (raw, expected) in cases {
             let parsed = parse_action(&raw).unwrap();
@@ -158,6 +161,70 @@ mod tests {
             assert_eq!(parse_action(&encoded).unwrap(), expected);
         }
         assert!(parse_action(&json!({"type": "show_panel", "panel": "unknown"})).is_err());
+    }
+
+    #[test]
+    fn host_op_from_wire_round_trips_representative_ops_and_errors() {
+        use vibevalley_protocol::{
+            HostFontPayload, HostMotionChoice, HostOp, HostOpeningPayload, HostOpeningPhase, HostPlaySoundPayload, HostQrPayload, HostSoundName,
+            HostThemeChoice, Locale,
+        };
+        use vibevalley_server::transport::bridge::BizCode;
+
+        let cases = vec![
+            ("host.info", json!(null), HostOp::Info),
+            ("host.updateState", json!({}), HostOp::UpdateState),
+            ("host.updateCheck", json!(null), HostOp::UpdateCheck),
+            ("host.updateInstall", json!({}), HostOp::UpdateInstall),
+            ("host.pixelDir", json!({}), HostOp::PixelDir),
+            ("host.pixelManifest", json!(null), HostOp::PixelManifest),
+            ("host.locale", json!("en"), HostOp::Locale(Locale::En)),
+            ("host.theme", json!("dark"), HostOp::Theme(HostThemeChoice::Dark)),
+            ("host.motion", json!("off"), HostOp::Motion(HostMotionChoice::Off)),
+            (
+                "host.font",
+                json!({ "monoFont": "Menlo", "uiFontSize": 14.0 }),
+                HostOp::Font(HostFontPayload {
+                    mono_font: Some("Menlo".into()),
+                    terminal_font_size: None,
+                    ui_font_size: Some(14.0),
+                }),
+            ),
+            (
+                "host.opening",
+                json!({ "phase": "ready", "progress": 100.0 }),
+                HostOp::Opening(HostOpeningPayload {
+                    phase: HostOpeningPhase::Ready,
+                    progress: 100.0,
+                }),
+            ),
+            (
+                "host.playSound",
+                json!({ "name": "tap" }),
+                HostOp::PlaySound(HostPlaySoundPayload { name: HostSoundName::Tap }),
+            ),
+            (
+                "host.qr",
+                json!({ "text": "https://vibevalley.dev", "border": 2 }),
+                HostOp::Qr(HostQrPayload {
+                    text: "https://vibevalley.dev".into(),
+                    border: Some(2),
+                }),
+            ),
+        ];
+
+        for (wire_op, payload, expected) in cases {
+            let decoded = crate::host::decode_host_op(wire_op, payload).unwrap_or_else(|e| panic!("{wire_op}: {}", e.message));
+            assert_eq!(decoded, expected);
+            assert_eq!(decoded.op_name(), wire_op);
+            let encoded = serde_json::to_value(&decoded).unwrap();
+            assert_eq!(encoded["op"], wire_op);
+        }
+
+        let unknown = crate::host::decode_host_op("host.unknownOp", json!({})).unwrap_err();
+        assert_eq!(unknown.biz_code, BizCode::RouteNotFound.code());
+        let bad_payload = crate::host::decode_host_op("host.theme", json!("neon")).unwrap_err();
+        assert_eq!(bad_payload.biz_code, BizCode::InvalidInput.code());
     }
 
     #[test]

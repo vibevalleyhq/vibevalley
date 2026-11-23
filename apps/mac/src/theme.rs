@@ -34,15 +34,6 @@ impl MotionChoice {
             MotionChoice::System => "system",
         }
     }
-
-    pub fn parse(raw: &str) -> Option<Self> {
-        match raw {
-            "off" => Some(MotionChoice::Off),
-            "on" => Some(MotionChoice::On),
-            "system" => Some(MotionChoice::System),
-            _ => None,
-        }
-    }
 }
 
 fn is_truthy_env(raw: Option<&str>) -> bool {
@@ -339,7 +330,7 @@ mod tests {
     }
 
     #[test]
-    fn motion_choice_serde_and_parse_roundtrip() {
+    fn motion_choice_serde_roundtrip() {
         for (choice, wire) in [
             (MotionChoice::Off, "\"off\""),
             (MotionChoice::On, "\"on\""),
@@ -349,9 +340,8 @@ mod tests {
             assert_eq!(encoded, wire);
             let decoded: MotionChoice = serde_json::from_str(&encoded).expect("deserialize MotionChoice");
             assert_eq!(decoded, choice);
-            assert_eq!(MotionChoice::parse(choice.as_str()), Some(choice));
+            assert_eq!(format!("\"{}\"", choice.as_str()), wire);
         }
-        assert_eq!(MotionChoice::parse("reduced"), None);
 
         let settings: Settings = serde_json::from_str("{}").expect("default settings deserialize");
         assert_eq!(settings.motion, MotionChoice::System);

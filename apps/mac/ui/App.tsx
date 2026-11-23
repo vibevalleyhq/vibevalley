@@ -10,6 +10,7 @@ import { VibeValley } from "./app/VibeValley";
 import { applyMotion } from "./design/motion";
 import { FarmForm } from "./farm/FarmForm";
 import { FarmPhone } from "./farm/FarmPhone";
+import { DevToolsApp } from "./features/devtools/DevToolsApp";
 import { viewName } from "./infra/bridge";
 import { useBridge } from "./infra/bridged";
 import { readHostMotion } from "./infra/hostParams";
@@ -28,6 +29,7 @@ function Unknown() {
 }
 
 const views: Record<string, Component> = {
+  devtools: DevToolsApp,
   "farm-form": FarmForm,
   "farm-phone": FarmPhone,
   sidebar: Sidebar,

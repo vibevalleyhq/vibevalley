@@ -71,6 +71,8 @@ pub struct ServerConfig {
     pub voice_line: modules::collab::voice::LineConfig,
     /// How the chat apps are reached and paced; tests point it at local stubs.
     pub connector: modules::collab::connector::Options,
+    /// Enables DevTools diagnostics (`debug.*` endpoints, timeline observer, fault gate).
+    pub debug_enabled: bool,
 }
 
 impl ServerConfig {
@@ -116,6 +118,7 @@ impl ServerConfig {
             watch_pkm: true,
             voice_line: Default::default(),
             connector: modules::collab::connector::Options::default(),
+            debug_enabled: false,
         }
     }
 
@@ -141,6 +144,7 @@ impl ServerConfig {
             git_emails: csv("VIBEVALLEY_GIT_EMAILS"),
             pkm_root: env_str("VIBEVALLEY_PKM_ROOT").map(PathBuf::from),
             poll_pulls: Some(env_str("VIBEVALLEY_GITHUB_PR_POLL_SECONDS").and_then(|s| s.parse::<u64>().ok()).unwrap_or(180)),
+            debug_enabled: env_str("VIBEVALLEY_DEBUG").as_deref() == Some("1"),
             ..Self::under(home)
         };
         config.voice_line.url = env_str("VIBEVALLEY_VOICE_LINE_URL").unwrap_or_default();
@@ -193,6 +197,8 @@ pub struct Started {
     pub voice: Arc<modules::collab::voice::Voice>,
     /// The chat apps tied to channels.
     pub connectors: Arc<modules::collab::connector::Connectors>,
+    /// DevTools diagnostics kit (`debug.*` endpoints, timeline collector, fault gate).
+    pub debug: Arc<modules::infra::debug::DebugKit>,
 }
 
 impl Started {
@@ -201,6 +207,11 @@ impl Started {
     /// board's agents stop and its lock is released. The hub stays usable
     /// for reads; it serves nothing that needs the board afterwards.
     pub fn close(&self) {
+        if self.debug.is_enabled() {
+            self.hub.attach_observer(None);
+            self.hub.attach_fault_gate(None);
+            vibevalley_runtime::oar::set_observer(None);
+        }
         self.hub.shutdown_token().cancel();
         self.connectors.close();
         self.pulls.close();
@@ -263,9 +274,89 @@ fn runtimes(
     registry
 }
 
+struct ServerDebugSources {
+    trajectories: Arc<modules::work::session::Trajectories>,
+    agents: Arc<Agents>,
+    repos: Arc<modules::work::repo::Repos>,
+    artifacts: Arc<modules::content::artifact::Artifacts>,
+    orchestrator: Arc<modules::team::orchestrator::Orchestrator>,
+}
+
+impl modules::infra::debug::DebugDataSource for ServerDebugSources {
+    fn trajectory_events(&self, session_id: &str) -> Vec<vibevalley_protocol::SessionEvent> {
+        self.trajectories.events(session_id, None).unwrap_or_default()
+    }
+
+    fn open_trajectory_ids(&self) -> Vec<String> {
+        self.trajectories.open_session_ids()
+    }
+
+    fn system_prompt(&self, session_id: &str, kind: vibevalley_protocol::DebugTrajectoryKind) -> Option<String> {
+        match kind {
+            vibevalley_protocol::DebugTrajectoryKind::Orchestrator => {
+                let prompt = self.orchestrator.system_prompt_snapshot(session_id);
+                (!prompt.trim().is_empty()).then_some(prompt)
+            }
+            vibevalley_protocol::DebugTrajectoryKind::IssueSession | vibevalley_protocol::DebugTrajectoryKind::WorkspaceChat => None,
+        }
+    }
+
+    fn runtime_probe(&self) -> modules::infra::debug::RuntimeProbeSnapshot {
+        let runtimes = self
+            .agents
+            .fleet
+            .cached_runtimes()
+            .into_iter()
+            .map(|info| {
+                let (installed, version) = match &info.installation {
+                    vibevalley_protocol::Installation::Available(a) => (true, a.version.clone()),
+                    vibevalley_protocol::Installation::NotFound(_)
+                    | vibevalley_protocol::Installation::Checking(_)
+                    | vibevalley_protocol::Installation::Unsupported(_) => (false, None),
+                };
+                let ready = installed && info.settings.enabled && info.stop.is_empty();
+                vibevalley_protocol::DebugRuntimeSummary {
+                    id: info.id.clone(),
+                    name: if info.preset.label.is_empty() {
+                        info.id.clone()
+                    } else {
+                        info.preset.label.clone()
+                    },
+                    installed,
+                    ready,
+                    version,
+                }
+            })
+            .collect();
+        let agent_count = self.agents.profiles.all().len() as u32;
+        let orchestrator_ids = self.agents.profiles.orchestrators().into_iter().map(|a| a.id).collect();
+        modules::infra::debug::RuntimeProbeSnapshot {
+            runtimes,
+            agent_count,
+            orchestrator_ids,
+        }
+    }
+
+    fn repo_count(&self) -> u32 {
+        self.repos.list().len() as u32
+    }
+
+    fn artifact_count(&self) -> u32 {
+        self.artifacts
+            .list(&vibevalley_protocol::ArtifactListRequest {
+                channel: None,
+                issue: None,
+                artifact_type: None,
+            })
+            .map(|list| list.len() as u32)
+            .unwrap_or(0)
+    }
+}
+
 /// Builds the whole server. Blocking (opens files); call it off the UI
 /// thread.
 pub fn start(config: ServerConfig) -> Result<Started, StartError> {
+    let boot_started = std::time::Instant::now();
     crate::install_tls();
     std::fs::create_dir_all(&config.home).map_err(|e| failed("the home")(&e))?;
     std::fs::create_dir_all(&config.work_root).map_err(|e| failed("the work root")(&e))?;
@@ -467,6 +558,28 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     let connectors = modules::collab::connector::Connectors::open(&config.home, &hub, chat.clone(), config.connector.clone())
         .map_err(|e| failed("the connectors")(&e.message))?;
     modules::collab::connector::install(&hub, connectors.clone());
+    let debug = modules::infra::debug::DebugKit::new(modules::infra::debug::DebugParts {
+        hub: Arc::downgrade(&hub),
+        setting: setting.clone(),
+        sources: Arc::new(ServerDebugSources {
+            trajectories: trajectories.clone(),
+            agents: agents.clone(),
+            repos: repos.clone(),
+            artifacts: artifacts.clone(),
+            orchestrator: orchestrator.clone(),
+        }),
+        home: config.home.clone(),
+        work_root: config.work_root.clone(),
+        version: config.version.clone(),
+        boot_started,
+        debug_enabled: config.debug_enabled,
+    });
+    modules::infra::debug::install(&hub, debug.clone());
+    if config.debug_enabled {
+        hub.attach_observer(Some(debug.collector()));
+        hub.attach_fault_gate(Some(debug.collector()));
+        vibevalley_runtime::oar::set_observer(Some(debug.collector()));
+    }
     Ok(Started {
         hub,
         setting,
@@ -493,5 +606,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         media,
         voice,
         connectors,
+        debug,
     })
 }

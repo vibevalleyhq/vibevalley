@@ -8,8 +8,8 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 |---|---|
 | 窗口外壳：项目栏、侧栏（文件、源码管理）、分栏和标签页、终端、文件和 diff 查看、命令面板、主题和字号 | 核心状态折叠与切片投影（[核心状态](docs/subsystems/core.md)） |
 | 在进程里起服务端，放出本机回环的 HTTP 门，写 `server.json`，挂接 `HostDebugBridge` | 服务端内部的组装（[地基](docs/subsystems/foundation.md)） |
-| 页面和服务端之间的桥：调用、按域切片推送、事件、订阅，以及强类型 `Host*` 帧与 `HostAction` | 协议形状与接口定义（[地基](docs/subsystems/foundation.md#契约规则和数据库)） |
-| 工作台：路由、外框、页面的分层、乐观意图与本机存下的选择、浅色和深色主题 | 全页面清单与状态机（[桌面架构与页面清单](docs/design/06-desktop-architecture-and-topology.md)）、设计系统与令牌（[设计系统全景](docs/design/README.md)） |
+| 页面和服务端之间的桥：调用、按域切片推送、事件、订阅，以及强类型 `Host*` 帧、`HostAction` 与 `HostOp` | 协议形状与接口定义（[地基](docs/subsystems/foundation.md#契约规则和数据库)） |
+| 工作台：路由、外框、页面的分层、乐观意图与本机存下的选择、浅色和深色主题，以及 `VIBEVALLEY_DEBUG=1` 下的 DevTools 胶囊、浮层与拆窗 | 全页面清单与状态机（[桌面架构与页面清单](docs/design/06-desktop-architecture-and-topology.md)）、设计系统与令牌（[设计系统全景](docs/design/README.md)） |
 | 宿主能力（`host.*`）：通知、主题、语言、打开文件和网址、终端、播放声音 | 像素场景画什么（[农场的皮](docs/subsystems/farm.md)） |
 |  | 命令行（`crates/cli`，[开发](docs/development.md#只用命令行派一个活)） |
 
@@ -17,8 +17,8 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 
 | 位置 | 职责 |
 |---|---|
-| `apps/mac/src/main.rs`、`shell/` | 开窗口；根视图 `Shell` 拆为 8 个职责文件（`mod.rs`、`projects.rs`、`panes.rs`、`render.rs`、`menus.rs`、`palette.rs`、`settings.rs`、`host_bridge.rs`）：项目、分栏布局、侧栏、命令面板、快捷键（`bind_keys`）与宿主接口 |
-| `apps/mac/src/hosted/` | 托管视图：一个视图一个 nsh 引擎，按 `is_workbench_view` 分别缓存与惰性装载双入口包（重型工作台 `App.tsx` → `ui/build`；轻量壳窗格 `ShellApp.tsx` → `ui/build-shell`）；`bridge.rs` 与 `frames.rs` 复用 `vibevalley_protocol::HostAction` 及强类型 `Host*` 帧（`HostRailFrame`、`HostFileTreeFrame`、`HostGitPanelFrame`、`HostPaletteFrame`），`late.rs` 让服务端在后台线程起来 |
+| `apps/mac/src/main.rs`、`shell/` | 开窗口并初始化工作区 `tracing_subscriber`（`VIBEVALLEY_LOG`/`RUST_LOG`，`VIBEVALLEY_DEBUG=1` 默认 `info` 否则 `warn`）；根视图 `Shell` 拆为 9 个职责文件（`mod.rs`、`projects.rs`、`panes.rs`、`render.rs`、`menus.rs`、`palette.rs`、`settings.rs`、`host_bridge.rs`、`devtools.rs`）：项目、分栏布局、侧栏、命令面板、快捷键（`bind_keys`）、宿主接口与 `VIBEVALLEY_DEBUG=1` 悬浮胶囊／`⇧⌥D` 浮层／独立拆窗 |
+| `apps/mac/src/hosted/` | 托管视图：一个视图一个 nsh 引擎，按 `is_workbench_view` 分别缓存与惰性装载双入口包（重型工作台 `App.tsx` → `ui/build`，含 `devtools`；轻量壳窗格 `ShellApp.tsx` → `ui/build-shell`）；`bridge.rs` 与 `frames.rs` 复用 `vibevalley_protocol` 的 `HostAction`、`HostOp` 与强类型 `Host*` 帧（`HostRailFrame`、`HostFileTreeFrame`、`HostGitPanelFrame`、`HostPaletteFrame`），`ShellDebugHandle` 向 `HostDebugBridge` 提供路由、客户端、包模式、回环地址、启动耗时、缓存统计与有界帧耗时（`>= 16 ms` 标慢），`late.rs` 让服务端在后台线程起来 |
 | `apps/mac/src/host.rs` | 宿主能力的原生一半：系统通知、Finder 里显示、`open`、本地文件选择与另存、读文件 |
 | `apps/mac/src/audio.rs`、`audio.m` | AVFoundation 文件播放、跳播与有界 PCM 队列；宿主音频命令按桥的接收顺序执行 |
 | `apps/mac/src/command_line.rs`、`tray.rs`、`island.rs` | 命令行符号链接、菜单栏摘要、灵动岛进程与工单摘要 |
@@ -28,7 +28,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 | `crates/rich/` | 原生富内容组件集（`VvMarkdown` 含 `Doc` 排版与相对图片解析、`VvIcon`（`crates/rich/src/icon.rs`，承载 97 枚工作台 reicon 线性图标并以无锁 `OnceLock<Vec<Path>>` 零拷贝共享解析路径；前端 `apps/mac/ui/design/icons.ts` 只保留纯类型 `IconName`）、`VvI18n`（`"vibevalley/rich"` 导出 `.translate(...)`，由 `installNativeI18n()` 接管 `@vibevalley/i18n`，使生产 UI 包不含 `packages/i18n` JS 词典）、`VvCodeBlock`、`VvDiagram`、`VvCanvas`、`VvChart`、`VvGenUi`、`VvWhiteboard`（含 Loro Phase A 实时在场光标/占位框/一键跟随视口与 `onCursorMove`/`onViewportChange` 回调）、`VvPinyin`）与内部渲染引擎 `engine/` |
 | `apps/mac/src/theme.rs`、`apps/mac/src/theme_tokens.rs` | 外壳的主题、动画幅度（`Settings.motion`）与字号设置；令牌从 `design/tokens.json` 同步生成 |
 | `apps/mac/src/debug.rs` | 不看屏幕检查应用的两个入口：状态转储和脚本（[验收](.agents/skills/vv-acceptance/references/app.md)） |
-| `apps/mac/ui/App.tsx`、`ShellApp.tsx`、`workspace/` | 双入口 TSX 包：`App.tsx` 供全量工作台（`vv` / `vibevalley`）与复用缓存工作台包的农场视图（`farm-form` / `farm-phone`），`ShellApp.tsx` 专供轻量工作区壳窗格（`sidebar`、`palette`、`markdown`、`workspace-chat`、`probe`），两份入口启动时均调 `installNativeI18n()` 走原生 `VvI18n`，按 `host.params.view` 挑视图 |
+| `apps/mac/ui/App.tsx`、`ShellApp.tsx`、`workspace/` | 双入口 TSX 包：`App.tsx` 供全量工作台（`vv` / `vibevalley`）、农场视图（`farm-form` / `farm-phone`）与六视图 DevTools（`devtools` → `features/devtools/`），`ShellApp.tsx` 专供轻量工作区壳窗格（`sidebar`、`palette`、`markdown`、`workspace-chat`、`probe`），两份入口启动时均调 `installNativeI18n()` 走原生 `VvI18n`，按 `host.params.view` 挑视图 |
 | `apps/mac/ui/{app,features,design,infra}/` | 工作台共 6 个顶级目录：入口外壳 `app/`（路由表 `Workbench.tsx`、6 项一级导航 `places.ts`、外框 `Shell.tsx`）、领域切片 `features/<概念>/`（含二元统一内容中心壳 `content/`、5 栏设置页、Artifact 引擎含 `TimelineBar.tsx` 时间旅行与 `outline` 大纲笔记、素材库及历史 `pkm` 兜底）、共享原语与表面 `design/`（含动效出口 `motion.ts` 与防闪烁骨架原语 `Skeleton.tsx`）、底层运行时与状态 `infra/`（`bridge.ts`、`solid.ts`、`polyfill.ts`、`state/`），另加 `workspace/` 与 `farm/` |
 | `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[哲学与令牌](docs/design/01-philosophy-and-tokens.md)） |
 | `crates/server/src/transport/bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
@@ -98,7 +98,8 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 ### 宿主
 
 - **宿主接口封闭，缺的能力就是没有**：页面经 `infra/host.ts` 的 `currentHost()` 看能力在不在，不按宿主的名字分支；没有宿主时（无头的测试和故事）是只有名字的那一个。
-- **外壳答的能力以 `host.info` 报的为准**（`apps/mac/src/shell/host_bridge.rs` 的 `host_call`）：通知、托盘摘要、语言、Finder 里显示、主题、动画幅度（`motion`）、字体和字号、开场、开终端、打开网址和文件、像素图的目录、播放声音、跳播、PCM 流、读文件、选择文件、另存和安装命令行。
+- **外壳答的能力以 `host.info` 报的为准，并在边界一次解码为 `HostOp`**（[host.rs](crates/protocol/src/contract/host.rs)、[host_bridge.rs](apps/mac/src/shell/host_bridge.rs)）：全部 40 个 `host.*` 调用经 `HostOp::from_wire(op, payload)` 一次性解码为封闭枚举后穷尽分发，不留裸 JSON 字段读取。涵盖通知、托盘摘要、语言、Finder 里显示、主题、动画幅度（`motion`）、字体和字号、开场、开终端、打开网址和文件、像素图目录与清单、哈希/随机数/二维码、音频播放与跳播、PCM 流、读文件、选择与另存文件、更新与安装命令行。
+- **DevTools 门禁与双态挂载**（[devtools.rs](apps/mac/src/shell/devtools.rs)、[DevToolsApp.tsx](apps/mac/ui/features/devtools/DevToolsApp.tsx)）：仅 `VIBEVALLEY_DEBUG=1` 时启用；关闭态不渲染悬浮胶囊、不建 `HostedView("devtools")`、不记录帧耗时且忽略 `ToggleDevtools`。开启后窗口底边显示 5 信号悬浮胶囊（通道与端口、路由、活跃会话与订阅、最新 `seq`、最近帧耗时），点击或按 `⇧⌥D` 展开底部浮层，并可经 `HostAction::{ToggleDevtools, DetachDevtools, CloseDevtools}` 拆出为独立 GPUI 窗口；界面复用 `HostedView("devtools")`（`ClientKind::DevTools`）呈现 Overview（含实时拓扑）、Routes、Timeline、Trajectory、State & Cache 与 Lab & Overrides 六个视图。
 - **动画幅度统一收口与测试覆盖**：设备本地设置 `Settings.motion`（`off | on | system`，默认 `system`，存于 `state.db` 的 `app.settings`）由外壳按 `effective_motion()` 解析，并经启动参数 `params.motion`、`host.info` 与 `"motion"` 事件同步到全部托管视图（工作台与工作区）。`VIBEVALLEY_NO_ANIMATION=1`（`1` 或 `true`）覆盖用户设置强制生效为 `off`（`scripts/audit/ui-gallery.ts` 默认注入），不会改写落盘设置；生效为 `off` 时同时跳过 `OpeningScene`、暂停终端光标闪烁并停止像素场景的 `request_animation_frame()` 循环。TSX 页面所有过渡、关键帧与弹层动画都经 `apps/mac/ui/design/motion.ts`（`motionOff`、`motionClass`、`motionDuration`、`fadeAnimation`、`popupTransition`）收口，`system` 档自动跟随 `nsh` 的 `reduceMotion()`；`scripts/audit/ui-tokens.ts` 的 `color-transition` 与 `unmanaged-motion` AST 规则在静态检查时拦住绕过 `motion.ts` 的裸过渡、关键帧与未托管弹层动画。
 - **命令行安装只管理自己的链接**：把包内 `Contents/MacOS/vibevalley` 链到 `~/.local/bin/vibevalley`，不覆盖已有文件或其他安装的链接；页面显示 PATH 是否包含这个目录。
 - **音频有序、有界**：文件经 AVFoundation 播放，跳播的秒数应有限且非负；PCM 是 16-bit little-endian、8–192 kHz 的单声道或双声道。宿主命令按接收顺序执行后回包，PCM 待播放队列最多五秒，满了明确拒绝。Flash 生成由用户明确点开始后，宿主持有服务端的 SpeechClaim，按 format 和 sequence 顺序拉取；播放队列满时可取消地等待容量，done 后等真实播放耗尽再释放引擎。页面只收播放状态，离开或停止时取消尚未结束的本机任务。
@@ -143,7 +144,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 ## 还没做的
 
 - 真实音频与麦克风验收、Developer ID 签名公证与签名包全路由截图验收，见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)的「剩下的」。
-- 应用语义调试驾驶舱（DevTools / `DebugKit`）与 GPUI 外壳 ↔ 托管界面强类型协议收拢，见[VibeValley DevTools 与跨边界强类型协议准则](.agents/notes/proposed/architecture/2026-11-22-devtools-and-protocol-boundaries.md)。
+- DevTools V2（画布 `Inspector` `testID` 点选与源码跳转、Loro 前沿视图、强类型 `DebugCommand` 替换 `apps/mac/src/debug.rs`），见[VibeValley DevTools 与跨边界强类型协议准则](.agents/notes/proposed/architecture/2026-11-22-devtools-and-protocol-boundaries.md)。
 - 宽屏对话次级标签收敛、历史 `pkm` 本地导入/退役与素材组织方式等后续项，见[工作台顶栏、页面交互精简与大纲笔记归属作品](.agents/notes/proposed/architecture/2026-11-22-workbench-ux-polish-and-outline-as-artifact.md)。
 
 ## 怎么验证

@@ -42,13 +42,12 @@ Status: proposed
 
 ### 延后收敛组：IO 调度收敛与常用依赖减压（`I3` 剩余项）
 
-`I1`（进程级唯一共享 Tokio 运行时 `vibevalley_runtime::rt` 与 `CancellationToken`/`TaskTracker` 级联停机）、`I2`（基于 `tokio::sync::watch` + `WatchStream` 的 `SliceFeed<T>`、`tokio::sync::broadcast` 承载 `LiveEvent` 与穷尽 `ChannelEvent` 单源广播、`EventBus` / `BridgeHub` 异步任务收口与 `spawn_blocking`）以及 `I3` 第一批（`arc-swap` 无锁热读观察者/插槽、`parking_lot` 全仓去毒化、`backon` 统一指数退避、以及 `crates/runtime` 与 `crates/cli` 生产路径收口工作区 `reqwest`）已落地并沉淀进[地基](docs/subsystems/foundation.md)、[核心状态](docs/subsystems/core.md)与[频道](docs/subsystems/channel.md)。
+`I1`（进程级唯一共享 Tokio 运行时 `vibevalley_runtime::rt` 与 `CancellationToken`/`TaskTracker` 级联停机）、`I2`（基于 `tokio::sync::watch` + `WatchStream` 的 `SliceFeed<T>`、`tokio::sync::broadcast` 承载 `LiveEvent` 与穷尽 `ChannelEvent` 单源广播、`EventBus` / `BridgeHub` 异步任务收口与 `spawn_blocking`）以及 `I3` 已落地项（`arc-swap` 无锁热读观察者/插槽、`parking_lot` 全仓去毒化、`backon` 统一指数退避、`crates/runtime` 与 `crates/cli` 生产路径收口工作区 `reqwest`，以及 `feat/devtools-v1` 接入的工作区 `tracing` + `tracing-subscriber`）均已沉淀进[地基](docs/subsystems/foundation.md)、[核心状态](docs/subsystems/core.md)与[频道](docs/subsystems/channel.md)。
 
 本组尚待后续排期的 `I3` 减压项如下（不引入重型 Actor 框架，进程内模块间继续保持强类型 trait 直调）：
 
 | 依赖 / 项 | 取代目标与当前落点 | 收益 |
 | :--- | :--- | :--- |
-| `tracing` + `tracing-subscriber` | 零散 `eprintln!` 与手工 `trace_id` 透传 | DevTools V1 阶段接入，自定义 `Layer` 直驱四泳道事件采集 |
 | `moka`（或 `quick_cache`） | 手写 `Mutex<HashMap>` 缓存淘汰与并发击穿防护 | 提供有界容量、TTL 与单飞加载 |
 | `notify-debouncer-mini`（待评估） | [crates/files/Cargo.toml](crates/files/Cargo.toml) 下手写监听防抖状态机 | 减少重复防抖状态机维护 |
 | 测试侧 `ureq` 收尾 | `crates/server/Cargo.toml` 的 `[dev-dependencies]` 与根 `Cargo.toml` 剩余 `ureq` 条目 | 生产路径已全面统一 `reqwest`，补齐测试迁移后可从工作区彻底移除 `ureq` |

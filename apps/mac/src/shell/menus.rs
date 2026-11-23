@@ -45,6 +45,7 @@ gpui::actions!(
         ZoomReset,
         ToggleSidebar,
         ToggleTheme,
+        ToggleDevtools,
         Quit,
     ]
 );
@@ -53,6 +54,21 @@ pub fn update_menus(cx: &mut gpui::App) {
     use gpui::{Menu, MenuItem, OsAction, SystemMenuType};
     use vibevalley_i18n::t;
     let app = [("app", "VibeValley".into())];
+    let mut view_items = vec![
+        MenuItem::action(t("desktop.menu.toggleSidebar", &[]), ToggleSidebar),
+        MenuItem::action(t("desktop.menu.toggleTheme", &[]), ToggleTheme),
+    ];
+    if super::devtools_enabled() {
+        view_items.push(MenuItem::action(t("desktop.menu.toggleDevtools", &[]), ToggleDevtools));
+    }
+    view_items.extend([
+        MenuItem::separator(),
+        MenuItem::action(t("desktop.menu.resetZoom", &[]), ZoomReset),
+        MenuItem::action(t("desktop.menu.zoomIn", &[]), ZoomIn),
+        MenuItem::action(t("desktop.menu.zoomOut", &[]), ZoomOut),
+        MenuItem::separator(),
+        MenuItem::action(t("desktop.menu.fullScreen", &[]), ToggleFullScreen),
+    ]);
     cx.set_menus(vec![
         Menu::new("VibeValley").items([
             MenuItem::action(t("desktop.menu.about", &app), OpenAbout),
@@ -76,16 +92,7 @@ pub fn update_menus(cx: &mut gpui::App) {
             MenuItem::os_action(t("desktop.menu.paste", &[]), EditPaste, OsAction::Paste),
             MenuItem::os_action(t("desktop.menu.selectAll", &[]), EditSelectAll, OsAction::SelectAll),
         ]),
-        Menu::new(t("desktop.menu.view", &[])).items([
-            MenuItem::action(t("desktop.menu.toggleSidebar", &[]), ToggleSidebar),
-            MenuItem::action(t("desktop.menu.toggleTheme", &[]), ToggleTheme),
-            MenuItem::separator(),
-            MenuItem::action(t("desktop.menu.resetZoom", &[]), ZoomReset),
-            MenuItem::action(t("desktop.menu.zoomIn", &[]), ZoomIn),
-            MenuItem::action(t("desktop.menu.zoomOut", &[]), ZoomOut),
-            MenuItem::separator(),
-            MenuItem::action(t("desktop.menu.fullScreen", &[]), ToggleFullScreen),
-        ]),
+        Menu::new(t("desktop.menu.view", &[])).items(view_items),
         Menu::new(t("desktop.menu.window", &[])).items([
             MenuItem::action(t("desktop.menu.newChat", &[]), NewChat),
             MenuItem::separator(),
@@ -115,6 +122,7 @@ pub fn bind_keys(cx: &mut gpui::App) {
         KeyBinding::new("cmd--", ZoomOut, Some("Shell")),
         KeyBinding::new("cmd-0", ZoomReset, Some("Shell")),
         KeyBinding::new("ctrl-cmd-f", ToggleFullScreen, Some("Shell")),
+        KeyBinding::new("shift-alt-d", ToggleDevtools, Some("Shell")),
         KeyBinding::new("cmd-q", Quit, Some("Shell")),
         // Workspace-only keys: active only inside `/workspace`, never stealing shortcuts from workbench text inputs.
         KeyBinding::new("cmd-1", ActivateProject1, Some("Workspace")),

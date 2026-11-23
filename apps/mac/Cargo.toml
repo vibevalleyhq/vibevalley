@@ -55,6 +55,8 @@ parking_lot = { workspace = true }
 tokio = { workspace = true }
 tokio-tungstenite = { workspace = true }
 tokio-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 futures-util = { workspace = true }
 
 [features]

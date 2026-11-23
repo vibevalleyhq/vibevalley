@@ -186,8 +186,21 @@ fn host_actions_and_frames_round_trip() {
         serde_json::json!({"type": "open_file_adjacent", "path": "src/lib.rs", "line": 42}),
         serde_json::json!({"type": "open_diff_adjacent", "path": "src/lib.rs", "staged": true}),
         serde_json::json!({"type": "bind_chat_session", "tab_id": 7, "session_id": "s1", "runtime": "claude"}),
+        serde_json::json!({"type": "toggle_devtools"}),
+        serde_json::json!({"type": "detach_devtools"}),
+        serde_json::json!({"type": "close_devtools"}),
     ] {
         round_value::<HostAction>(&sample);
+    }
+
+    for sample in [
+        serde_json::json!({"op": "host.info"}),
+        serde_json::json!({"op": "host.locale", "payload": "en"}),
+        serde_json::json!({"op": "host.theme", "payload": "dark"}),
+        serde_json::json!({"op": "host.openFile", "payload": {"path": "src/lib.rs", "worktree": "/tmp/wt"}}),
+        serde_json::json!({"op": "host.qr", "payload": {"text": "https://vibevalley.dev", "border": 2}}),
+    ] {
+        round_value::<HostOp>(&sample);
     }
 
     assert!(serde_json::from_value::<HostAction>(serde_json::json!({"type": "show_panel", "panel": "unknown"})).is_err());

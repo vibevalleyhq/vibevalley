@@ -1860,6 +1860,87 @@ pub const ENDPOINTS: &[Endpoint] = &[
         input: None,
         result: Some("Health"),
     },
+    Endpoint {
+        op: "debug.snapshot",
+        module: "debug",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: None,
+        result: Some("DebugSnapshot"),
+    },
+    Endpoint {
+        op: "debug.timeline.list",
+        module: "debug",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("DebugTimelineQuery"),
+        result: Some("DebugTimelinePage"),
+    },
+    Endpoint {
+        op: "debug.timeline.clear",
+        module: "debug",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: None,
+        result: None,
+    },
+    Endpoint {
+        op: "debug.trajectory.list",
+        module: "debug",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: None,
+        result: Some("Vec<DebugTrajectorySummary>"),
+    },
+    Endpoint {
+        op: "debug.trajectory.get",
+        module: "debug",
+        about: &["id"],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("DebugTrajectoryGetRequest"),
+        result: Some("DebugTrajectoryDetail"),
+    },
+    Endpoint {
+        op: "debug.graph",
+        module: "debug",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: None,
+        result: Some("DebugGraph"),
+    },
+    Endpoint {
+        op: "debug.override.get",
+        module: "debug",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: None,
+        result: Some("DebugOverrideConfig"),
+    },
+    Endpoint {
+        op: "debug.override.set",
+        module: "debug",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("DebugOverrideConfig"),
+        result: Some("DebugOverrideConfig"),
+    },
+    Endpoint {
+        op: "debug.bundle.export",
+        module: "debug",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: None,
+        result: Some("DebugBundleResult"),
+    },
 ];
 
 /// Each endpoint as a type: its name, input and result.
@@ -3217,6 +3298,60 @@ pub mod ops {
         const NAME: &'static str = "server.health.get";
         type Input = ();
         type Result = t::Health;
+    }
+    pub struct DebugSnapshot;
+    impl Op for DebugSnapshot {
+        const NAME: &'static str = "debug.snapshot";
+        type Input = ();
+        type Result = t::DebugSnapshot;
+    }
+    pub struct DebugTimelineList;
+    impl Op for DebugTimelineList {
+        const NAME: &'static str = "debug.timeline.list";
+        type Input = t::DebugTimelineQuery;
+        type Result = t::DebugTimelinePage;
+    }
+    pub struct DebugTimelineClear;
+    impl Op for DebugTimelineClear {
+        const NAME: &'static str = "debug.timeline.clear";
+        type Input = ();
+        type Result = ();
+    }
+    pub struct DebugTrajectoryList;
+    impl Op for DebugTrajectoryList {
+        const NAME: &'static str = "debug.trajectory.list";
+        type Input = ();
+        type Result = Vec<t::DebugTrajectorySummary>;
+    }
+    pub struct DebugTrajectoryGet;
+    impl Op for DebugTrajectoryGet {
+        const NAME: &'static str = "debug.trajectory.get";
+        type Input = t::DebugTrajectoryGetRequest;
+        type Result = t::DebugTrajectoryDetail;
+    }
+    pub struct DebugGraph;
+    impl Op for DebugGraph {
+        const NAME: &'static str = "debug.graph";
+        type Input = ();
+        type Result = t::DebugGraph;
+    }
+    pub struct DebugOverrideGet;
+    impl Op for DebugOverrideGet {
+        const NAME: &'static str = "debug.override.get";
+        type Input = ();
+        type Result = t::DebugOverrideConfig;
+    }
+    pub struct DebugOverrideSet;
+    impl Op for DebugOverrideSet {
+        const NAME: &'static str = "debug.override.set";
+        type Input = t::DebugOverrideConfig;
+        type Result = t::DebugOverrideConfig;
+    }
+    pub struct DebugBundleExport;
+    impl Op for DebugBundleExport {
+        const NAME: &'static str = "debug.bundle.export";
+        type Input = ();
+        type Result = t::DebugBundleResult;
     }
 }
 

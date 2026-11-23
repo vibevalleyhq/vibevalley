@@ -152,59 +152,78 @@ pub fn random_seed_hex() -> String {
     random_bytes_hex(32).expect("32 is within MAX_RANDOM_BYTES")
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Sha256Request {
-    text: String,
-}
+/// Decodes a `host.*` wire call once at the boundary into a typed [`vibevalley_protocol::HostOp`].
+pub fn decode_host_op(op: &str, payload: Value) -> Result<vibevalley_protocol::HostOp, Box<vibevalley_server::transport::bridge::Envelope>> {
+    use vibevalley_protocol::HostOp;
+    use vibevalley_server::transport::bridge::{BizCode, refusal};
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RandomBytesRequest {
-    length: usize,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-struct QrRequest {
-    text: String,
-    #[serde(default = "default_qr_border")]
-    border: usize,
-}
-
-fn default_qr_border() -> usize {
-    2
+    HostOp::from_wire(op, payload).map_err(|msg| {
+        let code = if HostOp::is_known_op(op) {
+            BizCode::InvalidInput
+        } else {
+            BizCode::RouteNotFound
+        };
+        Box::new(refusal(code, msg))
+    })
 }
 
 /// Handles fast, stateless host ops (`host.sha256`, `host.randomBytes`, `host.qr`,
 /// `host.pixelManifest`) on either the engine thread or the shell fallback path.
-pub fn handle_stateless_op(op: &str, payload: &Value) -> Option<vibevalley_server::transport::bridge::Envelope> {
+pub fn handle_stateless_op(op: &vibevalley_protocol::HostOp) -> Option<vibevalley_server::transport::bridge::Envelope> {
     use serde_json::json;
+    use vibevalley_protocol::HostOp;
     use vibevalley_server::transport::bridge::{BizCode, Envelope, refusal};
+
     match op {
-        "host.sha256" => Some(match serde_json::from_value::<Sha256Request>(payload.clone()) {
-            Ok(req) => Envelope::ok(json!({ "hex": sha256_hex(&req.text) })),
-            Err(e) => refusal(BizCode::InvalidInput, format!("sha256: {e}")),
+        HostOp::Sha256(req) => Some(Envelope::ok(json!({ "hex": sha256_hex(&req.text) }))),
+        HostOp::RandomBytes(req) => Some(match random_bytes_hex(req.length as usize) {
+            Ok(hex) => Envelope::ok(json!({ "hex": hex })),
+            Err(e) => refusal(BizCode::InvalidInput, e),
         }),
-        "host.randomBytes" => Some(match serde_json::from_value::<RandomBytesRequest>(payload.clone()) {
-            Ok(req) => match random_bytes_hex(req.length) {
-                Ok(hex) => Envelope::ok(json!({ "hex": hex })),
-                Err(e) => refusal(BizCode::InvalidInput, e),
-            },
-            Err(e) => refusal(BizCode::InvalidInput, format!("randomBytes: {e}")),
+        HostOp::Qr(req) => Some(match crate::qr::encode(&req.text, req.border.unwrap_or(2) as usize) {
+            Ok(matrix) => Envelope::ok(json!(matrix)),
+            Err(e) => refusal(BizCode::InvalidInput, e),
         }),
-        "host.qr" => Some(match serde_json::from_value::<QrRequest>(payload.clone()) {
-            Ok(req) => match crate::qr::encode(&req.text, req.border) {
-                Ok(matrix) => Envelope::ok(json!(matrix)),
-                Err(e) => refusal(BizCode::InvalidInput, e),
-            },
-            Err(e) => refusal(BizCode::InvalidInput, format!("qr: {e}")),
-        }),
-        "host.pixelManifest" => Some(match pixel_manifest() {
+        HostOp::PixelManifest => Some(match pixel_manifest() {
             Ok(manifest) => Envelope::ok(json!(manifest)),
             Err(e) => refusal(BizCode::NotFound, e),
         }),
-        _ => None,
+        HostOp::Info
+        | HostOp::UpdateState
+        | HostOp::UpdateCheck
+        | HostOp::UpdateInstall
+        | HostOp::CliState
+        | HostOp::CliInstall
+        | HostOp::CliRemove
+        | HostOp::Font(_)
+        | HostOp::Notify(_)
+        | HostOp::Tray(_)
+        | HostOp::Locale(_)
+        | HostOp::Reveal(_)
+        | HostOp::Theme(_)
+        | HostOp::Motion(_)
+        | HostOp::Opening(_)
+        | HostOp::OpenTerminal(_)
+        | HostOp::OpenUrl(_)
+        | HostOp::OpenFile(_)
+        | HostOp::PickFile
+        | HostOp::SaveFile(_)
+        | HostOp::SpeechState(_)
+        | HostOp::SpeechStart(_)
+        | HostOp::SpeechStop(_)
+        | HostOp::VoiceState(_)
+        | HostOp::VoiceStart(_)
+        | HostOp::VoiceStop(_)
+        | HostOp::VoiceMute(_)
+        | HostOp::PlayAudio(_)
+        | HostOp::PlaySound(_)
+        | HostOp::SeekAudio(_)
+        | HostOp::AudioState
+        | HostOp::PcmStart(_)
+        | HostOp::PcmAppend(_)
+        | HostOp::StopAudio
+        | HostOp::ReadFile(_)
+        | HostOp::PixelDir => None,
     }
 }
 
@@ -617,13 +636,20 @@ mod tests {
         assert!(random_bytes_hex(0).is_err());
         assert!(random_bytes_hex(MAX_RANDOM_BYTES + 1).is_err());
 
-        let sha_env = handle_stateless_op("host.sha256", &serde_json::json!({ "text": "abc" })).unwrap();
+        let sha_op = decode_host_op("host.sha256", serde_json::json!({ "text": "abc" })).unwrap();
+        let sha_env = handle_stateless_op(&sha_op).unwrap();
         assert_eq!(sha_env.biz_code, 0);
         assert_eq!(sha_env.data.unwrap()["hex"], "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
 
-        let qr_env = handle_stateless_op("host.qr", &serde_json::json!({ "text": "hello", "border": 2 })).unwrap();
+        let qr_op = decode_host_op("host.qr", serde_json::json!({ "text": "hello", "border": 2 })).unwrap();
+        let qr_env = handle_stateless_op(&qr_op).unwrap();
         assert_eq!(qr_env.biz_code, 0);
         assert_eq!(qr_env.data.unwrap()["size"], 25);
+
+        let unknown = decode_host_op("host.doesNotExist", serde_json::json!({})).unwrap_err();
+        assert_eq!(unknown.biz_code, vibevalley_server::transport::bridge::BizCode::RouteNotFound.code());
+        let malformed = decode_host_op("host.sha256", serde_json::json!({})).unwrap_err();
+        assert_eq!(malformed.biz_code, vibevalley_server::transport::bridge::BizCode::InvalidInput.code());
 
         let manifest = pixel_manifest().unwrap();
         assert!(manifest.len() > 700);

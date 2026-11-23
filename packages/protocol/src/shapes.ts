@@ -277,6 +277,23 @@ export {
   type Question,
 } from "./issue/shapes.gen";
 export { type Cron, type CronRequest, type CronUpdate, type CronView } from "./cron/shapes.gen";
+export type {
+  DebugBundleResult,
+  DebugGraph,
+  DebugOverrideConfig,
+  DebugOverview,
+  DebugSnapshot,
+  DebugStateCache,
+  DebugTimelineEvent,
+  DebugTimelineLane,
+  DebugTimelinePage,
+  DebugTimelineQuery,
+  DebugTrajectoryDetail,
+  DebugTrajectoryGetRequest,
+  DebugTrajectoryKind,
+  DebugTrajectorySummary,
+  DebugTrajectoryTurn,
+} from "./debug/shapes.gen";
 export type { InboxItem } from "./inbox/shapes.gen";
 export type {
   OrchestratorApproval,

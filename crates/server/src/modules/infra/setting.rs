@@ -425,6 +425,36 @@ impl Setting {
         self.stored().providers.unwrap_or_default()
     }
 
+    /// Non-empty live secret values (>= 6 chars) for diagnostics redaction, sorted longest first.
+    pub(crate) fn live_secrets(&self) -> Vec<String> {
+        let st = self.stored();
+        let mut out = Vec::new();
+        let mut push = |raw: &str| {
+            let trimmed = raw.trim();
+            if trimmed.chars().count() >= 6 && !out.iter().any(|existing: &String| existing == trimmed) {
+                out.push(trimmed.to_string());
+            }
+        };
+        push(st.deepseek_api_key.expose());
+        push(&self.config.deepseek_api_key);
+        push(st.agora_app_certificate.expose());
+        push(&self.config.agora_app_certificate);
+        push(st.asr_key.expose());
+        push(st.llm_key.expose());
+        push(st.tts_key.expose());
+        push(st.dictation_key.expose());
+        for source in &st.memory_sources {
+            push(source.key.expose());
+        }
+        if let Some(providers) = &st.providers {
+            for conn in &providers.connections {
+                push(conn.key.expose());
+            }
+        }
+        out.sort_by(|a, b| b.len().cmp(&a.len()).then_with(|| a.cmp(b)));
+        out
+    }
+
     pub fn status(&self) -> SettingsStatus {
         let st = self.stored();
         let c = &self.config;

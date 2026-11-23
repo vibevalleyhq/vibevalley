@@ -207,4 +207,13 @@ export const servedEndpoints = [
   { op: "orchestrator.approval.resolve", can: ["user"], about: ["conversationId", "taskId", "toolCallId"] },
   { op: "attachment.create", can: ["user", "remote"], about: [] },
   { op: "server.health.get", can: ["user", "remote"], about: [] },
+  { op: "debug.snapshot", can: ["user"], about: [] },
+  { op: "debug.timeline.list", can: ["user"], about: [] },
+  { op: "debug.timeline.clear", can: ["user"], about: [] },
+  { op: "debug.trajectory.list", can: ["user"], about: [] },
+  { op: "debug.trajectory.get", can: ["user"], about: ["id"] },
+  { op: "debug.graph", can: ["user"], about: [] },
+  { op: "debug.override.get", can: ["user"], about: [] },
+  { op: "debug.override.set", can: ["user"], about: [] },
+  { op: "debug.bundle.export", can: ["user"], about: [] },
 ] as const;
