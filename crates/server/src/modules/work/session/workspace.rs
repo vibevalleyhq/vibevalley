@@ -1,35 +1,29 @@
-//! Direct workspace chat sessions (`session.openWorkspace`, `session.send`,
+//! Direct user workspace chat sessions (`session.openWorkspace`, `session.send`,
 //! `session.respondPermission`, `session.respondInteraction`,
-//! `session.setConfig`): a `Session` with `issue: None` and `channel: None`
-//! pointed at a repository or worktree `cwd`, reusing `Sessions::go_live`,
-//! `pump()`, and `Trajectories`.
+//! `session.setConfig`): a `Session` with `SessionController::User` and
+//! `ExecutionPolicy::DirectCwd`, reusing `Sessions::go_live`, `pump()`, and `Trajectories`.
 
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, BizCode, EventTokens, Fact, FactSessionPhaseChanged, FactSessionReported, Outcome, Phase, PhaseFailed, PhaseResting, Session, SessionAction,
-    SessionChildStep, SessionChildToolCall, SessionChildTranscript, SessionChildTranscriptInput, SessionInteractionOption, SessionInteractionRequest,
-    SessionOpenWorkspaceInput, SessionPermissionDecision, SessionPermissionMode, SessionPermissionRequest, SessionRespondInteractionInput,
-    SessionRespondPermissionInput, SessionSendInput, SessionSetConfigInput, SessionSwarmMember, SessionSwarmMemberState, SessionSwarmMessage,
-    SessionSwarmOverview, SessionSwarmRole, SessionSwarmState, SessionSwarmThread, SessionWorkspace, Spent,
+    ApiError, BizCode, EventTokens, ExecutionPolicy, Fact, FactSessionPhaseChanged, FactSessionReported, Outcome, Phase, PhaseFailed, PhaseResting, Session,
+    SessionAction, SessionChildStep, SessionChildToolCall, SessionChildTranscript, SessionChildTranscriptInput, SessionController, SessionInteractionOption,
+    SessionInteractionRequest, SessionOpenWorkspaceInput, SessionPermissionDecision, SessionPermissionMode, SessionPermissionRequest,
+    SessionRespondInteractionInput, SessionRespondPermissionInput, SessionSendInput, SessionSetConfigInput, SessionSwarmMember, SessionSwarmMemberState,
+    SessionSwarmMessage, SessionSwarmOverview, SessionSwarmRole, SessionSwarmState, SessionSwarmThread, SessionWorkspace, Spent,
 };
 use vibevalley_runtime::oar::{
     AgentError, ContentBlock, InteractionDecision, InteractionOption, PermissionDecision, PermissionMode, RefusableOption, SessionOptions, StopReason,
-    SwarmMemberState, Usage,
+    SwarmMemberState, TurnOptions, Usage,
 };
 
+use super::db::SessionConfig;
+use super::mailbox::{MailboxSource, SessionMailbox};
 use super::sessions::Sessions;
 use crate::base::{LookIn, missing};
 use crate::modules::content::attachment::Attachments;
 use crate::modules::work::ledger::{BoardError, Result, Step, lock, now};
-
-/// Whether a session is a direct workspace chat (neither an issue worker nor a
-/// channel talker).
-pub(crate) fn is_workspace(session: &Session) -> bool {
-    session.issue.is_none() && session.channel.is_none()
-}
 
 pub(super) fn to_oar_permission(mode: SessionPermissionMode) -> PermissionMode {
     match mode {
@@ -62,16 +56,11 @@ pub(super) fn clip_json_input(input: &serde_json::Value) -> Option<String> {
     Some(vibevalley_core::rules::cut(&raw, 4000))
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
 pub(super) struct WorkspaceMeta {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
-    #[serde(default)]
     pub permission_mode: SessionPermissionMode,
 }
 
@@ -82,6 +71,17 @@ impl Default for WorkspaceMeta {
             model: None,
             effort: None,
             permission_mode: SessionPermissionMode::AcceptEdits,
+        }
+    }
+}
+
+impl From<SessionConfig> for WorkspaceMeta {
+    fn from(cfg: SessionConfig) -> Self {
+        Self {
+            title: cfg.title,
+            model: cfg.model,
+            effort: cfg.effort,
+            permission_mode: cfg.permission_mode.unwrap_or(SessionPermissionMode::AcceptEdits),
         }
     }
 }
@@ -119,34 +119,54 @@ fn refused_session(message: String) -> BoardError {
 }
 
 impl Sessions {
-    fn workspace_meta_path(&self, session_id: &str) -> PathBuf {
-        self.0.config.data_dir.join("workspace").join(format!("{session_id}.json"))
-    }
-
     fn load_workspace_meta(&self, session_id: &str) -> WorkspaceMeta {
-        let path = self.workspace_meta_path(session_id);
-        std::fs::read_to_string(path)
-            .ok()
-            .and_then(|body| serde_json::from_str::<WorkspaceMeta>(&body).ok())
-            .unwrap_or_default()
+        match self.0.ledger.database(|db| super::db::config(db, session_id)) {
+            Ok(Some(cfg)) => WorkspaceMeta::from(cfg),
+            Ok(None) => WorkspaceMeta::default(),
+            Err(e) => {
+                eprintln!("vibevalley: reading session config {session_id}: {e}");
+                WorkspaceMeta::default()
+            }
+        }
     }
 
     fn save_workspace_meta(&self, session_id: &str, meta: &WorkspaceMeta) {
-        let path = self.workspace_meta_path(session_id);
-        if let Some(dir) = path.parent() {
-            let _ = std::fs::create_dir_all(dir);
-        }
-        let tmp = path.with_extension("json.tmp");
-        if let Ok(bytes) = serde_json::to_vec(meta)
-            && std::fs::write(&tmp, bytes).is_ok()
-        {
-            let _ = std::fs::rename(tmp, path);
+        let cfg = SessionConfig {
+            title: meta.title.clone(),
+            model: meta.model.clone(),
+            effort: meta.effort.clone(),
+            permission_mode: Some(meta.permission_mode),
+        };
+        if let Err(e) = self.0.ledger.database(|db| super::db::put_config(db, session_id, &cfg)) {
+            eprintln!("vibevalley: saving session config {session_id}: {e}");
         }
     }
 
     pub(super) fn remove_workspace_meta(&self, session_id: &str) {
         lock(&self.0.workspaces).remove(session_id);
-        let _ = std::fs::remove_file(self.workspace_meta_path(session_id));
+    }
+
+    /// Aborts and disposes a user session when its tab closes, ending
+    /// any running turn as interrupted without touching the project directory.
+    pub fn close_workspace(&self, session_id: &str) {
+        let session_id = session_id.trim();
+        if session_id.is_empty() {
+            return;
+        }
+        let existing = self.session(session_id);
+        if existing.as_ref().is_some_and(|s| s.controller != SessionController::User) {
+            return;
+        }
+        if let Some(session) = existing.as_ref().filter(|s| s.phase.is_working()) {
+            if let Err(e) = self.end_run(session_id, Outcome::Interrupted, "", None) {
+                eprintln!("vibevalley: ending workspace run {session_id}: {e}");
+            }
+            self.finish_workspace(session, StopReason::Aborted, None, "", None);
+        }
+        if let Err(e) = self.dismiss(session_id, crate::modules::work::workplace::Leave::Keep) {
+            eprintln!("vibevalley: closing workspace session {session_id}: {e}");
+            self.remove_workspace_meta(session_id);
+        }
     }
 
     fn ensure_workspace_entry<'a>(&self, map: &'a mut std::collections::HashMap<String, WorkspaceState>, session_id: &str) -> &'a mut WorkspaceState {
@@ -343,7 +363,7 @@ impl Sessions {
         }
     }
 
-    /// Opens a new direct workspace session or reconnects an existing one.
+    /// Opens a new user workspace session or reconnects an existing one.
     pub fn open_workspace(&self, input: SessionOpenWorkspaceInput) -> Result<SessionWorkspace> {
         let cwd = input.cwd.trim().to_string();
         if cwd.is_empty() || !Path::new(&cwd).is_dir() {
@@ -351,15 +371,20 @@ impl Sessions {
         }
         if let Some(existing_id) = input.session_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
             let mut session = self.session(existing_id).ok_or_else(|| missing_session(existing_id))?;
-            if !is_workspace(&session) {
+            if session.controller != SessionController::User {
                 return Err(refused_session(t("server.session.workspace.notWorkspace", &[])));
             }
             let mut meta = self.workspace_snapshot(&session.id);
-            if let Some(m) = input.model.as_deref().map(str::trim).filter(|m| !m.is_empty()) {
+            let model_opt = input.model.as_deref().map(str::trim).filter(|m| !m.is_empty());
+            let effort_opt = input.effort.as_deref().map(str::trim).filter(|e| !e.is_empty());
+            let model_changed = model_opt.is_some_and(|m| meta.model.as_deref() != Some(m));
+            if let Some(m) = model_opt {
                 meta.model = Some(m.to_string());
             }
-            if let Some(e) = input.effort.as_deref().map(str::trim).filter(|e| !e.is_empty()) {
+            if let Some(e) = effort_opt {
                 meta.effort = Some(e.to_string());
+            } else if model_changed {
+                meta.effort = None;
             }
             if let Some(p) = input.permission_mode {
                 meta.permission_mode = p;
@@ -394,10 +419,12 @@ impl Sessions {
                 session.runtime.clone()
             };
             session.runtime = runtime_id.strip_prefix("acp:").unwrap_or(&runtime_id).to_string();
-            session.worktree = Some(cwd);
-            if let Some(repo) = input.repo.filter(|r| !r.trim().is_empty()) {
-                session.repo = Some(repo);
-            }
+            session.cwd = Some(cwd);
+            let next_repo = input.repo.filter(|r| !r.trim().is_empty()).or_else(|| session.repo_name().map(String::from));
+            session.policy = ExecutionPolicy::DirectCwd {
+                repo: next_repo,
+                permission_mode: meta.permission_mode,
+            };
             let next_meta = WorkspaceMeta {
                 title: meta.title,
                 model: meta.model,
@@ -421,12 +448,19 @@ impl Sessions {
             .clone()
             .filter(|_| !drive.runtime.refused_options().contains(&RefusableOption::Effort));
         let title = input.title.as_deref().map(str::trim).filter(|t| !t.is_empty()).map(String::from);
-        let mut session = Session::worker(&id, title.clone().unwrap_or_else(|| drive.name.clone()), now());
-        session.agent = drive.agent.clone();
-        session.runtime = drive.runtime_id.clone();
+        let mut session = Session::new(
+            &id,
+            SessionController::User,
+            title.clone().unwrap_or_else(|| drive.name.clone()),
+            drive.runtime_id.clone(),
+            ExecutionPolicy::DirectCwd {
+                repo: input.repo.filter(|r| !r.trim().is_empty()),
+                permission_mode,
+            },
+            now(),
+        );
         session.brief = title.clone().unwrap_or_default();
-        session.repo = input.repo.filter(|r| !r.trim().is_empty());
-        session.worktree = Some(cwd.clone());
+        session.cwd = Some(cwd.clone());
         session.phase = Phase::Resting(PhaseResting {});
 
         let meta = WorkspaceMeta {
@@ -435,7 +469,6 @@ impl Sessions {
             effort: effective_effort.clone(),
             permission_mode,
         };
-        self.set_workspace_meta(&id, meta);
 
         let opts = SessionOptions {
             cwd: PathBuf::from(&cwd),
@@ -447,14 +480,9 @@ impl Sessions {
             effort: effective_effort,
             ..Default::default()
         };
-        let agent = match drive.runtime.open(opts) {
-            Ok(agent) => agent,
-            Err(e) => {
-                self.remove_workspace_meta(&id);
-                return Err(e.into());
-            }
-        };
+        let agent = drive.runtime.open(opts)?;
         self.go_live(agent, session.clone(), None)?;
+        self.set_workspace_meta(&id, meta);
         self.notify_workspace(&id);
         Ok(self.workspace_reply(self.session(&id).unwrap_or(session)))
     }
@@ -467,7 +495,7 @@ impl Sessions {
     }
 
     fn launch_workspace_agent(&self, mut session: Session, mut meta: WorkspaceMeta, try_resume: bool) -> Result<Session> {
-        let cwd = session.worktree.clone().unwrap_or_default();
+        let cwd = session.cwd.clone().unwrap_or_default();
         if cwd.is_empty() || !Path::new(&cwd).is_dir() {
             return Err(invalid_input(t("server.session.workspace.badCwd", &[("cwd", cwd.into())])));
         }
@@ -482,7 +510,6 @@ impl Sessions {
         } else {
             None
         };
-        self.set_workspace_meta(&session.id, meta.clone());
         let opts = SessionOptions {
             cwd: PathBuf::from(&cwd),
             model: meta.model.clone(),
@@ -496,13 +523,18 @@ impl Sessions {
         let agent = drive.runtime.open(opts)?;
         session.phase = Phase::Resting(PhaseResting {});
         self.go_live(agent, session.clone(), None)?;
+        self.set_workspace_meta(&session.id, meta);
         self.notify_workspace(&session.id);
         Ok(self.session(&session.id).unwrap_or(session))
     }
 
-    /// Sends a user message to a workspace session: starts a turn when idle,
+    /// Sends a user message to a user workspace session: starts a turn when idle,
     /// or steers/queues when a turn is already running.
     pub fn send_workspace(&self, input: SessionSendInput, attachments: Option<&Attachments>) -> Result<Session> {
+        self.send_workspace_with_trace(input, attachments, None)
+    }
+
+    pub fn send_workspace_with_trace(&self, input: SessionSendInput, attachments: Option<&Attachments>, trace_id: Option<u64>) -> Result<Session> {
         let has_text = !input.text.trim().is_empty();
         let has_attachments = input.attachments.as_ref().is_some_and(|a| !a.is_empty());
         let has_context = input.context_files.as_ref().is_some_and(|f| !f.is_empty());
@@ -510,11 +542,11 @@ impl Sessions {
             return Err(invalid_input(t("server.session.workspace.emptyMessage", &[])));
         }
         let session = self.session(&input.id).ok_or_else(|| missing_session(&input.id))?;
-        if !is_workspace(&session) {
+        if session.controller != SessionController::User {
             return Err(refused_session(t("server.session.workspace.notWorkspace", &[])));
         }
 
-        let cwd = session.worktree.as_deref().map(PathBuf::from).unwrap_or_default();
+        let cwd = session.cwd.as_deref().map(PathBuf::from).unwrap_or_default();
         let mut blocks = Vec::new();
         if has_text {
             blocks.push(ContentBlock::Text(input.text.clone()));
@@ -546,6 +578,17 @@ impl Sessions {
             }
         }
 
+        let logged_text = if has_text {
+            input.text.clone()
+        } else {
+            format!("[{} attachment(s)]", blocks.len())
+        };
+        let mail_key = format!("ws:{}:{}", session.id, uuid::Uuid::new_v4());
+        let entry = self
+            .0
+            .ledger
+            .database(|db| SessionMailbox::enqueue(db, &session.id, &mail_key, MailboxSource::WorkspaceUser, None, &logged_text, now()))?;
+
         let agent = match self.live_agent(&session.id) {
             Some(agent) => agent,
             None => {
@@ -556,24 +599,41 @@ impl Sessions {
                     effort: snap.effort,
                     permission_mode: snap.permission_mode,
                 };
-                self.launch_workspace_agent(session.clone(), meta, true)?;
-                self.live_agent(&session.id)
-                    .ok_or_else(|| refused_session(t("server.session.workspace.notLive", &[])))?
+                match self.launch_workspace_agent(session.clone(), meta, true) {
+                    Ok(_) => self
+                        .live_agent(&session.id)
+                        .ok_or_else(|| refused_session(t("server.session.workspace.notLive", &[])))?,
+                    Err(e) => {
+                        let _ = self
+                            .0
+                            .ledger
+                            .database(|db| SessionMailbox::settle(db, entry.id, false, Some(&e.to_string()), now()));
+                        return Err(e);
+                    }
+                }
             }
         };
 
-        let logged_text = if has_text {
-            input.text.clone()
-        } else {
-            format!("[{} attachment(s)]", blocks.len())
-        };
+        if !self.0.ledger.database(|db| SessionMailbox::claim_by_key(db, &mail_key, now()))? {
+            return Ok(self.session(&session.id).unwrap_or(session));
+        }
+        let settle_id = entry.id;
 
+        let turn_opts = TurnOptions { trace_id };
         if session.phase.is_working() {
             self.record(&session.id, Step::Asked { text: logged_text });
-            match agent.steer(blocks.clone()) {
-                Ok(()) => {}
-                Err(_) => agent.queue(blocks)?,
+            let sent = match agent.steer(blocks.clone()) {
+                Ok(()) => Ok(()),
+                Err(_) => agent.queue_with(blocks, turn_opts),
+            };
+            if let Err(e) = sent {
+                let _ = self
+                    .0
+                    .ledger
+                    .database(|db| SessionMailbox::settle(db, settle_id, false, Some(&e.to_string()), now()));
+                return Err(e.into());
             }
+            let _ = self.0.ledger.database(|db| SessionMailbox::settle(db, settle_id, true, None, now()));
             return Ok(self.session(&session.id).unwrap_or(session));
         }
 
@@ -583,16 +643,21 @@ impl Sessions {
             at: now(),
             id: session.id.clone(),
             phase,
-            channel: None,
+            channel: session.channel_id().map(str::to_string),
             spent: None,
             brief,
         })])?;
         self.record(&session.id, Step::Asked { text: logged_text });
-        if let Err(e) = agent.prompt(blocks) {
+        if let Err(e) = agent.prompt_with(blocks, turn_opts) {
+            let _ = self
+                .0
+                .ledger
+                .database(|db| SessionMailbox::settle(db, settle_id, false, Some(&e.to_string()), now()));
             let _ = self.0.ledger.apply(vec![self.phase_changed(session.id.clone(), Phase::Failed(PhaseFailed {}))]);
             self.notify_workspace(&session.id);
             return Err(e.into());
         }
+        let _ = self.0.ledger.database(|db| SessionMailbox::settle(db, settle_id, true, None, now()));
         self.notify_workspace(&session.id);
         Ok(self.session(&session.id).unwrap_or(session))
     }
@@ -635,10 +700,10 @@ impl Sessions {
         Ok(())
     }
 
-    /// Updates a workspace session's `model`, `effort`, and/or `permission_mode`.
+    /// Updates a user session's `model`, `effort`, and/or `permission_mode`.
     pub fn set_workspace_config(&self, input: SessionSetConfigInput) -> Result<SessionWorkspace> {
-        let session = self.session(&input.id).ok_or_else(|| missing_session(&input.id))?;
-        if !is_workspace(&session) {
+        let mut session = self.session(&input.id).ok_or_else(|| missing_session(&input.id))?;
+        if session.controller != SessionController::User {
             return Err(refused_session(t("server.session.workspace.notWorkspace", &[])));
         }
         let snap = self.workspace_snapshot(&session.id);
@@ -650,11 +715,14 @@ impl Sessions {
         };
         let model_opt = input.model.as_deref().map(str::trim).filter(|m| !m.is_empty());
         let effort_opt = input.effort.as_deref().map(str::trim).filter(|e| !e.is_empty());
+        let model_changed = model_opt.is_some_and(|m| next.model.as_deref() != Some(m));
         if let Some(m) = model_opt {
             next.model = Some(m.to_string());
         }
         if let Some(e) = effort_opt {
             next.effort = Some(e.to_string());
+        } else if model_changed {
+            next.effort = None;
         }
         if let Some(p) = input.permission_mode {
             next.permission_mode = p;
@@ -665,6 +733,16 @@ impl Sessions {
                 Err(e) => return Err(e.into()),
             }
         }
+        if let ExecutionPolicy::DirectCwd { repo, .. } = &session.policy {
+            let next_policy = ExecutionPolicy::DirectCwd {
+                repo: repo.clone(),
+                permission_mode: next.permission_mode,
+            };
+            if session.policy != next_policy {
+                session.policy = next_policy;
+                let _ = self.0.ledger.apply(vec![Fact::session_changed(now(), session.clone())]);
+            }
+        }
         self.set_workspace_meta(&session.id, next);
         self.notify_workspace(&session.id);
         Ok(self.workspace_reply(self.session(&session.id).unwrap_or(session)))
@@ -672,7 +750,7 @@ impl Sessions {
 
     pub(super) fn on_workspace_session_started(&self, session_id: &str, model: Option<String>) {
         let Some(model) = model.filter(|m| !m.trim().is_empty()) else { return };
-        if !self.session(session_id).is_some_and(|s| is_workspace(&s)) {
+        if !self.session(session_id).is_some_and(|s| s.controller == SessionController::User) {
             return;
         }
         let mut updated = None;
@@ -774,7 +852,7 @@ impl Sessions {
     }
 
     pub(super) fn on_workspace_turn_finished(&self, session_id: &str, usage: &Usage) {
-        if !self.session(session_id).is_some_and(|s| is_workspace(&s)) {
+        if !self.session(session_id).is_some_and(|s| s.controller == SessionController::User) {
             return;
         }
         let tokens = super::journal::event_tokens_of(usage);
@@ -828,7 +906,7 @@ impl Sessions {
     }
 
     pub(super) fn on_workspace_pump_exited(&self, session_id: &str) {
-        let Some(session) = self.session(session_id).filter(is_workspace) else {
+        let Some(session) = self.session(session_id).filter(|s| s.controller == SessionController::User) else {
             return;
         };
         let had_pending = {
@@ -848,5 +926,304 @@ impl Sessions {
         } else if had_pending {
             self.notify_workspace(session_id);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex};
+
+    use vibevalley_core::Applied;
+    use vibevalley_protocol::{
+        ContextRef, ExecutionPolicy, Fact, Outcome, Session, SessionController, SessionOpenWorkspaceInput, SessionSendInput, SliceBundle, SpaceState,
+    };
+    use vibevalley_runtime::oar::{
+        Capabilities, ControlAction, ControlOutcome, ControlStatus, Event, Installation, ModelInfo, Registry, Runtime, Session as OarSession, SessionOptions,
+        SessionStatus, voyage,
+    };
+
+    use super::*;
+    use crate::modules::work::ledger::{BoardConfig, Facts, Ledger, LocalFacts};
+    use crate::modules::work::session::RuntimeDrivers;
+    use crate::modules::work::workplace::Workplace;
+
+    #[derive(Default)]
+    struct RecordingFacts {
+        inner: LocalFacts,
+        applied: Mutex<Vec<Fact>>,
+    }
+
+    impl Facts for RecordingFacts {
+        fn apply(&self, facts: Vec<Fact>) -> Applied {
+            self.applied.lock().unwrap().extend(facts.iter().cloned());
+            self.inner.apply(facts)
+        }
+
+        fn read(&self, f: &mut dyn FnMut(&SpaceState)) {
+            self.inner.read(f);
+        }
+
+        fn bundle(&self) -> SliceBundle {
+            self.inner.bundle()
+        }
+    }
+
+    struct StubSession {
+        id: String,
+        tx: flume::Sender<Event>,
+        rx: flume::Receiver<Event>,
+        aborts: Arc<AtomicUsize>,
+        disposes: Arc<AtomicUsize>,
+    }
+
+    impl OarSession for StubSession {
+        fn id(&self) -> String {
+            self.id.clone()
+        }
+
+        fn control(&self, action: ControlAction, _: &str, input_id: &str, span_id: &str) -> vibevalley_runtime::oar::Result<ControlOutcome> {
+            Ok(ControlOutcome {
+                action,
+                status: ControlStatus::Accepted,
+                code: String::new(),
+                reason: String::new(),
+                span_id: span_id.into(),
+                input_id: input_id.into(),
+            })
+        }
+
+        fn records(&self) -> Vec<voyage::Record> {
+            vec![]
+        }
+
+        fn subscribe_records(&self, _: Option<u64>) -> flume::Receiver<voyage::Record> {
+            let (_tx, rx) = flume::bounded(1);
+            rx
+        }
+
+        fn runtime_id(&self) -> &str {
+            "stub"
+        }
+
+        fn status(&self) -> SessionStatus {
+            SessionStatus::Idle
+        }
+
+        fn events(&self) -> flume::Receiver<Event> {
+            self.rx.clone()
+        }
+
+        fn prompt(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
+            Ok(())
+        }
+
+        fn steer(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
+            Ok(())
+        }
+
+        fn queue(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
+            Ok(())
+        }
+
+        fn abort(&self) -> vibevalley_runtime::oar::Result<()> {
+            self.aborts.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+
+        fn respond_permission(&self, _: &str, _: PermissionDecision) -> vibevalley_runtime::oar::Result<()> {
+            Ok(())
+        }
+
+        fn dispose(&self) {
+            self.disposes.fetch_add(1, Ordering::SeqCst);
+            let _ = self.tx.try_send(Event {
+                seq: 0,
+                at_ms: 0,
+                agent_path: vec![],
+                kind: vibevalley_runtime::oar::EventKind::SessionEnded,
+            });
+        }
+    }
+
+    struct StubRuntime {
+        aborts: Arc<AtomicUsize>,
+        disposes: Arc<AtomicUsize>,
+    }
+
+    impl Runtime for StubRuntime {
+        fn id(&self) -> &str {
+            "stub"
+        }
+
+        fn display_name(&self) -> &str {
+            "Stub"
+        }
+
+        fn capabilities(&self) -> Capabilities {
+            Capabilities::default()
+        }
+
+        fn installation(&self) -> Installation {
+            Installation::Available {
+                version: None,
+                path: PathBuf::from("/bin/true"),
+            }
+        }
+
+        fn list_models(&self) -> vibevalley_runtime::oar::Result<Vec<ModelInfo>> {
+            Ok(vec![])
+        }
+
+        fn open(&self, _: SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn OarSession>> {
+            let (tx, rx) = flume::unbounded();
+            Ok(Arc::new(StubSession {
+                id: "stub-1".into(),
+                tx,
+                rx,
+                aborts: self.aborts.clone(),
+                disposes: self.disposes.clone(),
+            }))
+        }
+    }
+
+    #[test]
+    fn sqlite_session_config_persists_without_workspace_json_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("server.db");
+        let facts = Arc::new(RecordingFacts::default());
+        let (ledger, _) = Ledger::open(&db_path, facts).unwrap();
+        let durable = vibevalley_runtime::agent::durable::Store::open(&db_path).unwrap();
+        let config = Arc::new(BoardConfig::under(dir.path()));
+        let workplaces = Arc::new(Workplace::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
+        let mut registry = Registry::new();
+        registry.register(Arc::new(StubRuntime {
+            aborts: Arc::new(AtomicUsize::new(0)),
+            disposes: Arc::new(AtomicUsize::new(0)),
+        }));
+        let drivers = Arc::new(RuntimeDrivers {
+            registry: Arc::new(registry),
+            model: None,
+        });
+        let sessions = Sessions::new(durable, Arc::new(ledger), drivers, workplaces, config.clone()).unwrap();
+
+        let session = Session::new(
+            "u1",
+            SessionController::User,
+            "Refactor",
+            "stub",
+            ExecutionPolicy::DirectCwd {
+                repo: None,
+                permission_mode: SessionPermissionMode::AcceptEdits,
+            },
+            now(),
+        );
+        sessions.0.ledger.apply(vec![Fact::session_changed(now(), session)]).unwrap();
+        assert_eq!(sessions.load_workspace_meta("u1").permission_mode, SessionPermissionMode::AcceptEdits);
+
+        let meta = WorkspaceMeta {
+            title: Some("Refactor".into()),
+            model: Some("claude-sonnet".into()),
+            effort: Some("high".into()),
+            permission_mode: SessionPermissionMode::ReadOnly,
+        };
+        sessions.save_workspace_meta("u1", &meta);
+        let loaded = sessions.load_workspace_meta("u1");
+        assert_eq!(loaded.title.as_deref(), Some("Refactor"));
+        assert_eq!(loaded.model.as_deref(), Some("claude-sonnet"));
+        assert_eq!(loaded.effort.as_deref(), Some("high"));
+        assert_eq!(loaded.permission_mode, SessionPermissionMode::ReadOnly);
+        assert!(!config.data_dir.join("workspace/u1.json").exists());
+    }
+
+    #[test]
+    fn close_workspace_aborts_disposes_ends_turn_preserves_dir_and_emits_session_left() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_dir = dir.path().join("repo");
+        std::fs::create_dir_all(&project_dir).unwrap();
+        let sentinel = project_dir.join("keep.txt");
+        std::fs::write(&sentinel, "precious").unwrap();
+
+        let db_path = dir.path().join("server.db");
+        let facts = Arc::new(RecordingFacts::default());
+        let (ledger, _) = Ledger::open(&db_path, facts.clone()).unwrap();
+        let durable = vibevalley_runtime::agent::durable::Store::open(&db_path).unwrap();
+        let config = Arc::new(BoardConfig::under(dir.path()));
+        let workplaces = Arc::new(Workplace::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
+
+        let aborts = Arc::new(AtomicUsize::new(0));
+        let disposes = Arc::new(AtomicUsize::new(0));
+        let mut registry = Registry::new();
+        registry.register(Arc::new(StubRuntime {
+            aborts: aborts.clone(),
+            disposes: disposes.clone(),
+        }));
+        let drivers = Arc::new(RuntimeDrivers {
+            registry: Arc::new(registry),
+            model: None,
+        });
+        let sessions = Sessions::new(durable, Arc::new(ledger), drivers, workplaces, config.clone()).unwrap();
+
+        let opened = sessions
+            .open_workspace(SessionOpenWorkspaceInput {
+                runtime: "stub".into(),
+                cwd: project_dir.to_string_lossy().into_owned(),
+                repo: None,
+                model: None,
+                effort: None,
+                permission_mode: None,
+                title: Some("Chat tab".into()),
+                session_id: None,
+            })
+            .unwrap();
+        let sid = opened.id.clone();
+        assert!(sessions.is_live(&sid));
+        assert!(!config.data_dir.join("workspace").exists());
+        assert_eq!(sessions.session(&sid).unwrap().controller, SessionController::User);
+        assert!(sessions.session(&sid).unwrap().is_free_user());
+
+        sessions
+            .send_workspace(
+                SessionSendInput {
+                    id: sid.clone(),
+                    text: "investigate".into(),
+                    attachments: None,
+                    context_files: None,
+                },
+                None,
+            )
+            .unwrap();
+        assert!(sessions.session(&sid).unwrap().phase.is_working());
+        assert_eq!(sessions.mailbox_entries(&sid).unwrap().len(), 1);
+
+        let mut issue_session = Session::new("w-issue", SessionController::IssueBoard, "worker", "stub", ExecutionPolicy::SandboxDir, now());
+        issue_session.attach_binding(ContextRef::Issue {
+            id: "i1".into(),
+            refining: None,
+        });
+        sessions.0.ledger.apply(vec![Fact::session_changed(now(), issue_session)]).unwrap();
+
+        sessions.close_workspace("w-issue");
+        assert!(sessions.session("w-issue").is_some(), "non-user session must not be closed");
+
+        sessions.close_workspace(&sid);
+        assert_eq!(aborts.load(Ordering::SeqCst), 1);
+        assert_eq!(disposes.load(Ordering::SeqCst), 1);
+        assert!(!sessions.is_live(&sid));
+        assert!(sessions.session(&sid).is_none());
+        assert!(!lock(&sessions.0.workspaces).contains_key(&sid));
+        assert_eq!(std::fs::read_to_string(&sentinel).unwrap(), "precious");
+
+        let applied = facts.applied.lock().unwrap();
+        assert!(
+            applied
+                .iter()
+                .any(|f| matches!(f, Fact::SessionReported(r) if r.id == sid && r.outcome == Outcome::Interrupted)),
+            "closing a working workspace session must interrupt its active turn"
+        );
+        assert!(
+            applied.iter().any(|f| matches!(f, Fact::SessionLeft(l) if l.id == sid)),
+            "closing a workspace session must emit Fact::session_left"
+        );
     }
 }

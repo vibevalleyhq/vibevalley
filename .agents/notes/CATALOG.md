@@ -2,7 +2,7 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（21 篇）
+## proposed（22 篇）
 
 ### feature
 
@@ -13,6 +13,10 @@
 - 2026-10-20 [几个帮工同时写一篇文章：在屏幕上看起来怎样](.agents/notes/proposed/feature/2026-10-20-block-editor-ux.md)
 - 2026-10-13 [帮工各自的音色](.agents/notes/proposed/feature/2026-10-13-helper-voices.md)
 - 2026-10-09 [商店和每日任务](.agents/notes/proposed/feature/2026-10-09-shop-and-daily-tasks.md)
+
+### simplification
+
+- 2026-11-22 [全仓收敛审计清单（C1–C14 与 S1–S6 待选收敛项）](.agents/notes/proposed/simplification/2026-11-22-full-repo-convergence-audit.md)
 
 ### architecture
 

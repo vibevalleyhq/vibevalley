@@ -96,7 +96,7 @@ fn regression_child_progress_outlives_log_retention_and_reopen() {
     let session = until("completed business round", || {
         server
             .board
-            .read(|s| s.sessions.iter().find(|s| s.issue.as_deref() == Some(id) && s.last_run.is_some()).cloned())
+            .read(|s| s.sessions.iter().find(|s| s.issue_id() == Some(id) && s.last_run.is_some()).cloned())
     });
     let session_id = session.id.as_str();
     let summary = call(&server, "session.get", json!({"id":session_id}))["subagents"].clone();
@@ -104,18 +104,35 @@ fn regression_child_progress_outlives_log_retention_and_reopen() {
     assert_eq!(summary["threads"][0]["parentThreadId"], "parent");
     assert_eq!(summary["threads"][0]["lastActivity"], "Tests passed");
     assert_eq!(summary["threads"][0]["steps"][0]["step"], "Tests");
-    let log = call(&server, "session.event.list", json!({"id":session_id}));
-    let log = log.as_array().unwrap();
-    assert_eq!(log.len(), 240);
-    assert!(log.iter().all(|e| e["type"] != "run/start"));
+    let page = call(&server, "session.event.list", json!({"id":session_id,"limit":1000}));
+    let log = page["events"].as_array().unwrap();
+    assert!(log.len() > 240, "expected >240 SQLite-persisted events, got {}", log.len());
+    assert!(!page["hasMore"].as_bool().unwrap());
+    assert!(log.iter().any(|e| e["type"] == "run/start"));
     let tool = log.iter().find(|e| e["tool"] == "commandExecution").expect("retained child command");
     assert_eq!(tool["threadId"], "tester");
     assert_eq!(tool["action"], "run_command");
     assert_eq!(tool["run"], summary["run"]);
+    let tail_page = call(&server, "session.event.list", json!({"id":session_id,"limit":50}));
+    assert_eq!(tail_page["events"].as_array().unwrap().len(), 50);
+    assert_eq!(tail_page["hasMore"], true);
+    let head_page = call(
+        &server,
+        "session.event.list",
+        json!({"id":session_id,"beforeSeq":tail_page["oldestSeq"],"limit":1000}),
+    );
+    assert_eq!(head_page["hasMore"], false);
+    assert_eq!(
+        head_page["events"].as_array().unwrap().len() + 50,
+        log.len(),
+        "cursor pagination must reconstruct full SQLite log without gaps"
+    );
     server.close();
     drop(server);
     let reopened = open(home.path());
     assert_eq!(call(&reopened, "session.get", json!({"id":session_id}))["subagents"], summary);
+    let reopened_page = call(&reopened, "session.event.list", json!({"id":session_id,"limit":1000}));
+    assert_eq!(reopened_page["events"].as_array().unwrap().len(), log.len());
     let runs = call(&reopened, "issue.run.list", json!({"id":id}));
     assert_eq!(runs[0]["subagents"], summary);
     reopened.close();

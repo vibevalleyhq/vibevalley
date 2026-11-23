@@ -1,5 +1,6 @@
 import { list, t } from "@vibevalley/i18n";
 import type {
+  BoardSlice,
   BoardSummary,
   Issue,
   IssueHistory,
@@ -9,7 +10,6 @@ import type {
   Priority,
   Session,
   SessionView,
-  SpaceView,
 } from "@vibevalley/protocol";
 import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, shortTitle, stageWantsUser } from "@vibevalley/protocol/rules";
 
@@ -58,17 +58,18 @@ export const closedShown = 15;
 
 // The board's and the list's rows.
 
-/** Each issue the frame keeps, its sessions found on the farm, in the history, or (one that left after the history was read) as the frame last had it. */
+/** Each issue the board keeps, its sessions found on the farm, in the history, or (one that left after the history was read) as last seen. */
 export function boardRows(
-  core: SpaceView | undefined,
+  board: BoardSlice | undefined,
+  sessions: readonly SessionView[] | undefined,
   history: readonly IssueHistory[] | undefined,
   older: boolean,
   seen: ReadonlyMap<string, Session> = new Map(),
 ): IssueHistory[] | undefined {
-  if (!core) return undefined;
+  if (!board) return undefined;
   const read = new Map((history ?? []).map((r) => [r.issue.id, r]));
-  const present = new Map<string, Session>(core.sessions.map((s) => [s.id, s]));
-  const live = core.issues.map((issue): IssueHistory => {
+  const present = new Map<string, Session>((sessions ?? []).map((s) => [s.id, s]));
+  const live = board.issues.map((issue): IssueHistory => {
     const row = read.get(issue.id);
     return {
       issue,
@@ -77,17 +78,17 @@ export function boardRows(
     };
   });
   if (!older || !history) return live;
-  const kept = new Set(core.issues.map((i) => i.id));
+  const kept = new Set(board.issues.map((i) => i.id));
   return [...live, ...history.filter((r) => !kept.has(r.issue.id))];
 }
 
-/** What the history adds to the frame changes only when an issue gets a session or one leaves the farm. */
-export const historyKey = (core: SpaceView | undefined): string =>
-  core
-    ? `${core.issues
+/** What the history adds to the board changes only when an issue gets a session or one leaves the farm. */
+export const historyKey = (board: BoardSlice | undefined, sessions: readonly SessionView[] | undefined): string =>
+  board
+    ? `${board.issues
         .filter((i) => sessionIdsOf(i).length > 0)
         .map((i) => `${i.id}:${sessionIdsOf(i).join(",")}`)
-        .join(";")}|${core.sessions.map((s) => s.id).join(",")}`
+        .join(";")}|${(sessions ?? []).map((s) => s.id).join(",")}`
     : "";
 
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
@@ -107,9 +108,14 @@ export type BoardCard = (
 export const cardRepo = (c: BoardCard) => c.issue.repo;
 export const cardAgent = (c: BoardCard) => assignedAgentOf(c.issue);
 
-export function buildCards(rows: IssueHistory[], core: SpaceView | undefined, orchestrators: ReadonlySet<string>): BoardCard[] {
+export function buildCards(
+  rows: IssueHistory[],
+  board: BoardSlice | undefined,
+  sessions: readonly SessionView[] | undefined,
+  orchestrators: ReadonlySet<string>,
+): BoardCard[] {
   const cards: BoardCard[] = [];
-  const byIssue = core?.boardSummary?.byIssue;
+  const byIssue = board?.boardSummary?.byIssue;
   const families = new Map<string, Issue[]>();
   for (const row of rows) {
     if (!row.issue.parent) continue;
@@ -142,7 +148,7 @@ export function buildCards(rows: IssueHistory[], core: SpaceView | undefined, or
                 ...base,
                 sessions: row.sessions,
                 tag: issueTag(issue),
-                session: issueSession(core, issue),
+                session: issueSession(sessions, issue),
                 needsWorktreeCheck: summary.needsWorktreeCheck,
               }),
             );
@@ -155,7 +161,7 @@ export function buildCards(rows: IssueHistory[], core: SpaceView | undefined, or
     else {
       if (executionsOf(issue).length === 0) cards.push({ kind: "todo", ...base });
       else if (row.missingSessions.length > 0 || row.sessions.length === 0) cards.push({ kind: "missing", ...base, missing: row.missingSessions });
-      else cards.push(omitUndefined({ kind: "issue" as const, ...base, sessions: row.sessions, tag: issueTag(issue), session: issueSession(core, issue) }));
+      else cards.push(omitUndefined({ kind: "issue" as const, ...base, sessions: row.sessions, tag: issueTag(issue), session: issueSession(sessions, issue) }));
     }
   }
   return cards;

@@ -10,12 +10,13 @@ import { useFollowed } from "../features/channel/model/follow";
 import { api, newSendKey, reasonOf } from "../infra/api";
 import { frame, call } from "../infra/bridge";
 import { useBridge } from "../infra/bridged";
-import { useCore } from "../infra/frame";
+import { useCollabSlice } from "../infra/frame";
+import { readFarmPhoneParams, readHostLocale, type FarmCalls } from "../infra/hostParams";
 import { Root } from "../infra/Root";
 import { GameIcon, GamePad, PhoneGame, type GameId } from "./PhoneGames";
 
 type Screen = "home" | "missed" | "log" | "orchestrator" | "games" | GameId;
-type Calls = { open: boolean; narrow: boolean; ringing: InboxItem | null; missed: InboxItem[]; log: { call: InboxItem; answered: boolean }[] };
+type Calls = FarmCalls;
 type Voice = { phase: "idle" | "connecting" | "live" | "stopping"; problem: string | null; heard: string; said: string };
 const games = ["blocks", "sokoban", "dino", "bugs", "merge"] as const;
 const isGame = (screen: Screen): screen is GameId => games.some((g) => g === screen);
@@ -51,10 +52,10 @@ function IconKey(props: { label: string; run: () => void; children: JSX.Element;
 }
 
 function Chat(props: { fold: () => void; large: () => boolean; resize: () => void; heard: () => string; said: () => string }) {
-  const core = useCore();
+  const collab = useCollabSlice();
   const chosen = signal<string | undefined>(undefined);
   const menu = signal(false);
-  const rooms = () => core()?.chat?.channels.filter((c) => c.archived === undefined) ?? [];
+  const rooms = () => collab()?.chat?.channels.filter((c) => c.archived === undefined) ?? [];
   const room = () => rooms().find((c) => c.id === chosen()) ?? rooms().find((c) => c.default) ?? rooms()[0];
   const messages = useFollowed(() => room()?.id);
   const input = signal("");
@@ -136,7 +137,7 @@ function Chat(props: { fold: () => void; large: () => boolean; resize: () => voi
 
 function Handset(props: { calls: () => Calls }) {
   const app = signal<Screen>("home");
-  const unfolded = signal(host.params.unfolded === true);
+  const unfolded = signal(readFarmPhoneParams().unfolded);
   const large = signal(false);
   const activeCall = signal<Voice>({ phase: "idle", problem: null, heard: "", said: "" });
   const voiceId = crypto.randomUUID();
@@ -211,7 +212,15 @@ function Handset(props: { calls: () => Calls }) {
     host.post("action", { type: "farm_call", id: item.id, answered });
     if (!answered) return;
     void dial();
-    if (item.target.kind === "chat") route(`/chat/${encodeURIComponent(item.target.channel)}`);
+    switch (item.target.kind) {
+      case "chat":
+        route(`/chat/${encodeURIComponent(item.target.channel)}`);
+        break;
+      case "issue":
+      case "session":
+      case "runtime":
+        break;
+    }
   };
   const helpers = [
     { id: "missed", label: t("web.farm.phone.app.missed"), icon: "icon-bell", run: () => app.set("missed") },
@@ -373,27 +382,10 @@ function Handset(props: { calls: () => Calls }) {
   );
 }
 
-const emptyCalls: Calls = { open: false, narrow: false, ringing: null, missed: [], log: [] };
-
-function isCalls(value: unknown): value is Calls {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "open" in value &&
-    typeof value.open === "boolean" &&
-    "narrow" in value &&
-    typeof value.narrow === "boolean" &&
-    "missed" in value &&
-    Array.isArray(value.missed) &&
-    "log" in value &&
-    Array.isArray(value.log)
-  );
-}
-
 export function FarmPhone() {
-  setLocale(host.params.locale === "en" ? "en" : "zh");
+  setLocale(readHostLocale());
   useBridge();
-  const initial = isCalls(host.params.calls) ? host.params.calls : emptyCalls;
+  const initial = readFarmPhoneParams().calls;
   const updates = frame<Calls>("calls");
   const calls = () => updates() ?? initial;
   return (

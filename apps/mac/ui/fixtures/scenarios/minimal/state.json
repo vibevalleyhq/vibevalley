@@ -1,29 +1,7 @@
 {
   "seq": 1,
-  "state": {
-    "call": "live",
-    "callReason": "",
-    "chat": {
-      "channels": [
-        {
-          "id": "general",
-          "type": "channel",
-          "default": true,
-          "orchestrator": "orchestrator",
-          "category": "",
-          "position": 1,
-          "notify": "all",
-          "name": "general",
-          "description": "团队默认频道",
-          "subjectKind": null,
-          "lastNumber": 2,
-          "replies": 0,
-          "title": "general",
-          "at": 1795194443624
-        }
-      ],
-      "userMentions": []
-    },
+  "board": {
+    "seq": 1,
     "issues": [
       {
         "id": "i1",
@@ -84,26 +62,54 @@
         }
       }
     ],
-    "connectors": [],
-    "machines": [],
+    "boardSummary": {
+      "laneCounts": {
+        "todo": 0,
+        "working": 1,
+        "waiting": 0,
+        "closed": 0
+      },
+      "runningSlots": 1,
+      "maxRunning": 6,
+      "byIssue": {
+        "i1": {
+          "lane": "working",
+          "cardKind": "issue",
+          "familyDone": 0,
+          "familyTotal": 0,
+          "needsWorktreeCheck": false
+        }
+      }
+    }
+  },
+  "sessions": {
+    "seq": 1,
     "sessions": [
       {
         "id": "w1",
+        "controller": "issueBoard",
         "role": "worker",
         "name": "老周",
-        "agent": "laozhou",
+        "profile": "laozhou",
         "runtime": "claude",
         "brief": "",
-        "repo": "~/vibevalley",
-        "branch": "issue-1-init",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "~/vibevalley",
+          "branch": "issue-1-init"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i1"
+          }
+        ],
         "hiredAt": 1795193963624,
         "runs": 1,
         "spent": {
           "tokens": 42000,
           "cny": 0.08
         },
-        "issue": "i1",
-        "refining": false,
         "phase": {
           "_tag": "working",
           "since": 1795194323624,
@@ -116,6 +122,47 @@
         "phaseText": "在改文件：session.ts"
       }
     ],
+    "machines": []
+  },
+  "collab": {
+    "seq": 1,
+    "chat": {
+      "channels": [
+        {
+          "id": "general",
+          "type": "channel",
+          "default": true,
+          "orchestrator": "orchestrator",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "name": "general",
+          "description": "团队默认频道",
+          "subjectKind": null,
+          "lastNumber": 2,
+          "replies": 0,
+          "title": "general",
+          "at": 1795194443624
+        }
+      ],
+      "userMentions": []
+    },
+    "channelSummary": {
+      "unreadTotal": 0,
+      "unreadUnder": {
+        "general": 0
+      }
+    },
+    "connectors": []
+  },
+  "inbox": {
+    "seq": 1,
+    "items": [],
+    "call": "live",
+    "callReason": ""
+  },
+  "ops": {
+    "seq": 1,
     "crons": [
       {
         "id": "c1",
@@ -138,186 +185,35 @@
         "nextText": "11/21 09:30"
       }
     ],
-    "boardSummary": {
-      "laneCounts": {
-        "todo": 0,
-        "working": 1,
-        "waiting": 0,
-        "closed": 0
-      },
-      "runningSlots": 1,
-      "maxRunning": 6,
-      "byIssue": {
-        "i1": {
-          "lane": "working",
-          "cardKind": "issue",
-          "familyDone": 0,
-          "familyTotal": 0,
-          "needsWorktreeCheck": false
-        }
-      }
-    },
     "mediaSummary": {
       "activeCount": 0,
       "activeIds": []
-    },
-    "channelSummary": {
-      "unreadTotal": 0,
-      "unreadUnder": {
-        "general": 0
-      }
     }
   },
-  "inbox": [],
-  "view": {
-    "level": {
-      "level": 1,
-      "xp": 0,
-      "need": 10
-    },
-    "plots": {
-      "i1": {
-        "crop": "sprout"
+  "farm": {
+    "seq": 1,
+    "view": {
+      "level": {
+        "level": 1,
+        "xp": 0,
+        "need": 10
+      },
+      "plots": {
+        "i1": {
+          "crop": "sprout"
+        }
+      },
+      "plays": {
+        "w1": {
+          "station": 0,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        }
       }
     },
-    "plays": {
-      "w1": {
-        "station": 0,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      }
-    },
-    "achievements": [
-      {
-        "id": "s_open",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_hire",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_tell",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_review",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_voice",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_split",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_call",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "harvests",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "first_try",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "big_graph",
-        "tier": 0,
-        "count": 0,
-        "next": 3
-      },
-      {
-        "id": "farm_level",
-        "tier": 0,
-        "count": 0,
-        "next": 5
-      },
-      {
-        "id": "steady",
-        "tier": 0,
-        "count": 0,
-        "next": 5
-      },
-      {
-        "id": "untangle",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "comeback",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "thrifty",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "every_machine",
-        "tier": 0,
-        "count": 0,
-        "next": 2
-      },
-      {
-        "id": "handoff",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "parallel_graph",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "night_owl",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "weekend",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "full_house",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      }
-    ]
-  },
-  "effects": []
+    "effects": []
+  }
 }

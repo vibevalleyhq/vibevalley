@@ -91,9 +91,8 @@ fn an_issue_run_by_no_session_goes_by_the_same_table() {
 }
 
 fn worker(outcome: Outcome) -> Session {
-    let mut s = Session::worker("w1", "Helper", 0);
-    s.agent = "lab".into();
-    s.runtime = "claude".into();
+    let mut s = Session::new("w1", SessionController::IssueBoard, "Helper", "claude", ExecutionPolicy::SandboxDir, 0);
+    s.profile = Some("lab".into());
     s.brief = "Task".into();
     s.runs = 1;
     s.phase = Phase::Done;
@@ -208,9 +207,9 @@ fn working(since: Millis, quiet: Option<Millis>) -> Phase {
 
 #[test]
 fn reduce_changes_the_moves_when_the_round_fails() {
-    let mut hired = Session::worker("w1", "阿狐", 1);
+    let mut hired = Session::new("w1", SessionController::IssueBoard, "阿狐", "", ExecutionPolicy::SandboxDir, 1);
     hired.runs = 1;
-    hired.issue = Some("t1".into());
+    hired.attach_binding(ContextRef::Issue { id: "t1".into(), refining: None });
     hired.phase = working(1, None);
     let mut t = seed();
     t.status = InProgress;
@@ -268,7 +267,7 @@ fn reduce_changes_the_moves_when_the_round_fails() {
 fn the_inbox_lists_what_waits_on_the_user_and_ids_stay_stable() {
     let mut core = Core::new();
     let mut s = worker(Outcome::Completed);
-    s.issue = Some("t1".into());
+    s.attach_binding(ContextRef::Issue { id: "t1".into(), refining: None });
     let mut t = seed();
     t.title = "Fix the clock".into();
     core.apply([Fact::SessionChanged { at: 1, session: s.clone() }, Fact::IssueChanged { at: 1, issue: t.clone() }]);
@@ -338,17 +337,99 @@ fn board_order_and_closed_issue_limit() {
 
 #[test]
 fn room_counts_busy_sessions_in_the_space_and_the_repo() {
-    let mut a = Session::worker("a", "a", 0);
-    a.repo = Some("r1".into());
+    let mut a = Session::new(
+        "a",
+        SessionController::IssueBoard,
+        "a",
+        "",
+        ExecutionPolicy::ManagedWorktree {
+            repo: "r1".into(),
+            branch: None,
+        },
+        0,
+    );
     a.phase = working(0, None);
-    let mut b = Session::worker("b", "b", 0);
-    b.repo = Some("r2".into());
+    let mut b = Session::new(
+        "b",
+        SessionController::IssueBoard,
+        "b",
+        "",
+        ExecutionPolicy::ManagedWorktree {
+            repo: "r2".into(),
+            branch: None,
+        },
+        0,
+    );
     b.phase = working(0, None);
-    let idle = Session::worker("c", "c", 0);
-    let sessions = vec![a, b, idle];
+    let idle = Session::new("c", SessionController::IssueBoard, "c", "", ExecutionPolicy::SandboxDir, 0);
+    let mut free_user = Session::new(
+        "u1",
+        SessionController::User,
+        "free",
+        "antigravity",
+        ExecutionPolicy::DirectCwd {
+            repo: Some("r1".into()),
+            permission_mode: SessionPermissionMode::AcceptEdits,
+        },
+        0,
+    );
+    free_user.phase = working(0, None);
+    let sessions = vec![a, b, idle, free_user];
     assert_eq!(room_left(&sessions, "r1", 6, 3, ""), (4, 2));
     assert_eq!(room_left(&sessions, "r1", 6, 3, "a"), (5, 3));
     assert_eq!(room_left(&sessions, "r1", 2, 0, ""), (0, usize::MAX));
+}
+
+#[test]
+fn regression_free_user_session_never_enters_slots_inbox_farm_or_progress() {
+    let mut core = Core::new();
+    let mut free_user = Session::new(
+        "u-free",
+        SessionController::User,
+        "Workspace",
+        "antigravity",
+        ExecutionPolicy::DirectCwd {
+            repo: Some("demo".into()),
+            permission_mode: SessionPermissionMode::AcceptEdits,
+        },
+        1,
+    );
+    free_user.cwd = Some("/tmp/demo".into());
+    free_user.phase = Phase::working(1, SessionAction::Thinking, "");
+
+    let fail_fact = Fact::SessionReported(FactSessionReported {
+        at: 2,
+        id: "u-free".into(),
+        run: None,
+        outcome: Outcome::Failed,
+        phase: None,
+        summary: "failed free chat".into(),
+        runs: 1,
+        spent: None,
+        questions: vec![],
+        checks: vec![],
+        answer: None,
+    });
+
+    let before = core.state().clone();
+    core.apply(vec![
+        Fact::SessionChanged(FactSessionChanged {
+            at: 1,
+            session: free_user.clone(),
+        }),
+    ]);
+    let working_frame = core.frame(vec![]);
+    assert_eq!(working_frame.state.board_summary.as_ref().unwrap().running_slots, 0);
+    assert!(working_frame.inbox.is_empty());
+    assert!(working_frame.view.plots.is_empty());
+    assert!(working_frame.view.plays.is_empty());
+    assert!(entries_for(&before, &Fact::SessionChanged(FactSessionChanged { at: 1, session: free_user }), core.state()).is_empty());
+
+    let before_fail = core.state().clone();
+    let applied = core.apply(vec![fail_fact.clone()]);
+    assert!(applied.effects.is_empty());
+    assert!(core.frame(vec![]).inbox.is_empty());
+    assert!(entries_for(&before_fail, &fail_fact, core.state()).is_empty());
 }
 
 #[test]

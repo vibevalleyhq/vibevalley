@@ -1,210 +1,7 @@
 {
   "seq": 2,
-  "state": {
-    "call": "connecting",
-    "callReason": "正在建立实时语音连接",
-    "media": [
-      {
-        "kind": "image",
-        "id": "job-img-ready",
-        "prompt": "像素风麦田与小木屋",
-        "model": "moss-image-1",
-        "connection": "moss-main",
-        "revision": 1,
-        "source": {
-          "kind": "user"
-        },
-        "usage": {
-          "images": 1,
-          "width": 1024,
-          "height": 1024
-        },
-        "phase": "ready",
-        "phaseText": "已生成",
-        "problem": "",
-        "attachment": {
-          "id": "lib-poster",
-          "name": "farm-poster.png",
-          "type": "image/png",
-          "size": 482113
-        },
-        "canCancel": false,
-        "canRetryDownload": false,
-        "createdAt": 1795192643624,
-        "updatedAt": 1795192703624
-      },
-      {
-        "kind": "speech",
-        "id": "job-speech-ready",
-        "prompt": "今天的回归测试全部通过。",
-        "model": "moss-tts-1.5-flash",
-        "connection": "moss-main",
-        "revision": 1,
-        "source": {
-          "kind": "orchestrator",
-          "agent": "orchestrator",
-          "channel": "general"
-        },
-        "voice": "voice-warm",
-        "format": "wav",
-        "contentType": "audio/wav",
-        "usage": {
-          "inputCharacters": 12
-        },
-        "canResume": false,
-        "canRelease": true,
-        "phase": "ready",
-        "phaseText": "已生成",
-        "problem": "",
-        "attachment": {
-          "id": "lib-speech",
-          "name": "speech.wav",
-          "type": "audio/wav",
-          "size": 115244
-        },
-        "resultInput": null,
-        "canCancel": false,
-        "canRetryDownload": false,
-        "createdAt": 1795193243624,
-        "updatedAt": 1795193303624
-      }
-    ],
-    "chat": {
-      "channels": [
-        {
-          "id": "design",
-          "type": "channel",
-          "default": false,
-          "orchestrator": "orchestrator",
-          "category": "",
-          "position": 1,
-          "notify": "all",
-          "name": "design",
-          "description": "UI 与设计系统",
-          "subjectKind": null,
-          "replies": 0,
-          "title": "design",
-          "at": 1795190843624
-        },
-        {
-          "id": "dm-laozhou",
-          "type": "direct",
-          "default": false,
-          "peer": "profile:laozhou",
-          "orchestrator": "orchestrator",
-          "category": "",
-          "position": 1,
-          "notify": "all",
-          "name": "老周",
-          "description": "",
-          "subjectKind": null,
-          "replies": 0,
-          "title": "老周",
-          "at": 1795193843624
-        },
-        {
-          "id": "general",
-          "type": "channel",
-          "default": true,
-          "orchestrator": "orchestrator",
-          "category": "",
-          "position": 1,
-          "notify": "all",
-          "name": "general",
-          "description": "日常协作与进度同步",
-          "subjectKind": null,
-          "lastNumber": 3,
-          "replies": 0,
-          "unread": 1,
-          "title": "general",
-          "last": {
-            "from": "w1",
-            "name": "老周",
-            "text": "工单 #18 正在收尾。",
-            "at": 1795194323624
-          },
-          "at": 1795194323624
-        },
-        {
-          "id": "t-login",
-          "type": "thread",
-          "default": false,
-          "orchestrator": "orchestrator",
-          "parent": "general",
-          "category": "",
-          "position": 1,
-          "notify": "all",
-          "rootNumber": 1,
-          "description": "",
-          "subjectKind": "issue",
-          "subjectId": "i18",
-          "replies": 4,
-          "title": "登录过期讨论",
-          "at": 1795194143624
-        }
-      ],
-      "userMentions": [
-        {
-          "message": {
-            "id": "m-mention",
-            "number": 3,
-            "channel": "general",
-            "from": "w2",
-            "actor": {
-              "kind": "agent",
-              "id": "xiaolin",
-              "role": "worker",
-              "name": "小林"
-            },
-            "name": "小林",
-            "kind": "chat",
-            "text": "@user 请看一眼 #33 的默认配置选型。",
-            "mentions": [],
-            "outcome": null,
-            "spoken": false,
-            "at": 1795194263624,
-            "revision": 1,
-            "reactions": [],
-            "attachments": [],
-            "embeds": []
-          },
-          "channel": "general",
-          "address": "#general"
-        }
-      ]
-    },
-    "commits": {
-      "total": 42,
-      "repos": []
-    },
-    "progress": {
-      "coins": 1280,
-      "streak": 4,
-      "bestStreak": 9,
-      "counts": {
-        "harvested": 14,
-        "reviewed": 11
-      },
-      "unlocked": [
-        {
-          "id": "first_harvest",
-          "tier": 1,
-          "at": 1795108043624
-        }
-      ],
-      "title": {
-        "id": "first_harvest",
-        "tier": 1
-      },
-      "agents": {
-        "laozhou": {
-          "hired": 8,
-          "harvested": 6,
-          "failed": 1
-        }
-      },
-      "multiplier": 1.2
-    },
+  "board": {
+    "seq": 2,
     "issues": [
       {
         "id": "i10",
@@ -3365,605 +3162,6 @@
         }
       }
     ],
-    "connectors": [
-      {
-        "id": "weixin",
-        "state": "connected",
-        "qr": "",
-        "pairCode": "",
-        "channel": "general",
-        "user": "田头助手",
-        "since": 1795190843624,
-        "lastInbound": 1795190903624,
-        "pending": 0,
-        "error": ""
-      },
-      {
-        "id": "feishu",
-        "state": "waiting",
-        "qr": "",
-        "pairCode": "",
-        "channel": "design",
-        "since": 1795193843624,
-        "lastInbound": 1795193903624,
-        "pending": 2,
-        "error": ""
-      },
-      {
-        "id": "qq",
-        "state": "off",
-        "qr": "",
-        "pairCode": "",
-        "since": 1795192943624,
-        "lastInbound": 1795193003624,
-        "pending": 0,
-        "error": ""
-      }
-    ],
-    "machines": [
-      {
-        "id": "local",
-        "name": "Mac Studio",
-        "here": true,
-        "online": true,
-        "joinedAt": 1795021643624
-      }
-    ],
-    "sessions": [
-      {
-        "id": "w1",
-        "role": "worker",
-        "name": "老周",
-        "agent": "laozhou",
-        "runtime": "codex",
-        "brief": "",
-        "repo": "vibevalley",
-        "branch": "issue-18-login",
-        "worktree": "/tmp/vibevalley/.worktrees/i18",
-        "hiredAt": 1795193243624,
-        "runs": 2,
-        "spent": {
-          "tokens": 182400,
-          "cny": 0.42
-        },
-        "issue": "i18",
-        "refining": false,
-        "subagents": {
-          "run": "run-2",
-          "rootThreadId": "main",
-          "threads": [
-            {
-              "threadId": "sub-check",
-              "agentName": "reviewer",
-              "parentThreadId": "main",
-              "turnId": "t-1",
-              "steps": [
-                {
-                  "step": "核对 token 过期时间",
-                  "status": "completed"
-                },
-                {
-                  "step": "补充单元测试",
-                  "status": "inProgress"
-                }
-              ],
-              "task": "检查登录边界与回归用例",
-              "status": "running",
-              "lastActivity": "运行 login.test.ts",
-              "lastAction": "run_command",
-              "updatedAt": 1795194383624
-            },
-            {
-              "threadId": "sub-done",
-              "agentName": "scout",
-              "parentThreadId": "main",
-              "task": "梳理现有鉴权中间件",
-              "status": "completed",
-              "lastAction": "read_file",
-              "updatedAt": 1795194323624
-            }
-          ],
-          "waits": [
-            {
-              "threadId": "main",
-              "callId": "wait-1",
-              "targets": ["sub-check"]
-            }
-          ]
-        },
-        "toolConnections": [
-          {
-            "server": "vibevalley-mcp",
-            "status": "ready"
-          }
-        ],
-        "phase": {
-          "_tag": "working",
-          "since": 1795194263624,
-          "doing": {
-            "action": "edit_file",
-            "label": "session.ts",
-            "actionText": "改文件"
-          }
-        },
-        "phaseText": "在改文件：session.ts"
-      },
-      {
-        "id": "w2",
-        "role": "worker",
-        "name": "小林",
-        "agent": "xiaolin",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "branch": "issue-33-shell",
-        "hiredAt": 1795192043624,
-        "runs": 1,
-        "lastRun": {
-          "outcome": "completed",
-          "summary": "发现两种终端启动方式，需确认默认行为。",
-          "at": 1795194143624,
-          "spent": {
-            "tokens": 64000,
-            "cny": 0.14
-          }
-        },
-        "issue": "i33",
-        "refining": false,
-        "phase": {
-          "_tag": "resting"
-        },
-        "phaseText": "歇着（上一轮做完了）"
-      },
-      {
-        "id": "w3",
-        "role": "worker",
-        "name": "老周",
-        "agent": "laozhou",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "branch": "issue-31-board",
-        "hiredAt": 1795187243624,
-        "runs": 2,
-        "lastRun": {
-          "outcome": "completed",
-          "summary": "补齐看板列表分组与键盘返回测试。",
-          "at": 1795193543624,
-          "spent": {
-            "tokens": 120000,
-            "cny": 0.29
-          }
-        },
-        "issue": "i31",
-        "refining": false,
-        "phase": {
-          "_tag": "done"
-        },
-        "phaseText": "这一轮做完了，等你看"
-      },
-      {
-        "id": "w4",
-        "role": "worker",
-        "name": "阿杰",
-        "agent": "ajie",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "hiredAt": 1795189043624,
-        "runs": 1,
-        "lastRun": {
-          "outcome": "failed",
-          "summary": "测试环境缺少原生字体文件，断言失败。",
-          "at": 1795193723624,
-          "spent": {
-            "tokens": 33000,
-            "cny": 0.06
-          }
-        },
-        "issue": "i34",
-        "refining": false,
-        "phase": {
-          "_tag": "failed"
-        },
-        "phaseText": "这一轮没做成"
-      },
-      {
-        "id": "w5",
-        "role": "worker",
-        "name": "起草员",
-        "agent": "laozhou",
-        "runtime": "claude",
-        "brief": "",
-        "hiredAt": 1795193843624,
-        "runs": 1,
-        "issue": "i21",
-        "refining": true,
-        "phase": {
-          "_tag": "working",
-          "since": 1795194203624,
-          "doing": {
-            "action": "read_file",
-            "label": "App.tsx",
-            "actionText": "读文件"
-          }
-        },
-        "phaseText": "在读文件：App.tsx"
-      },
-      {
-        "id": "w6",
-        "role": "worker",
-        "name": "帮工6",
-        "agent": "laozhou",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "hiredAt": 1795194083624,
-        "runs": 1,
-        "issue": "i-d6",
-        "refining": false,
-        "phase": {
-          "_tag": "working",
-          "since": 1795194083624,
-          "doing": {
-            "action": "run_command",
-            "label": "cargo test module_6",
-            "actionText": "跑命令"
-          }
-        },
-        "phaseText": "在跑命令：cargo test module_6"
-      },
-      {
-        "id": "w7",
-        "role": "worker",
-        "name": "帮工7",
-        "agent": "xiaolin",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "hiredAt": 1795194023624,
-        "runs": 1,
-        "issue": "i-d7",
-        "refining": false,
-        "phase": {
-          "_tag": "working",
-          "since": 1795194023624,
-          "doing": {
-            "action": "run_command",
-            "label": "cargo test module_7",
-            "actionText": "跑命令"
-          }
-        },
-        "phaseText": "在跑命令：cargo test module_7"
-      },
-      {
-        "id": "w8",
-        "role": "worker",
-        "name": "帮工8",
-        "agent": "laozhou",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "hiredAt": 1795193963624,
-        "runs": 1,
-        "issue": "i-d8",
-        "refining": false,
-        "phase": {
-          "_tag": "working",
-          "since": 1795193963624,
-          "doing": {
-            "action": "run_command",
-            "label": "cargo test module_8",
-            "actionText": "跑命令"
-          }
-        },
-        "phaseText": "在跑命令：cargo test module_8"
-      },
-      {
-        "id": "w9",
-        "role": "worker",
-        "name": "帮工9",
-        "agent": "xiaolin",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "hiredAt": 1795193903624,
-        "runs": 1,
-        "issue": "i-d9",
-        "refining": false,
-        "phase": {
-          "_tag": "working",
-          "since": 1795193903624,
-          "doing": {
-            "action": "run_command",
-            "label": "cargo test module_9",
-            "actionText": "跑命令"
-          }
-        },
-        "phaseText": "在跑命令：cargo test module_9"
-      },
-      {
-        "id": "w10",
-        "role": "worker",
-        "name": "帮工10",
-        "agent": "laozhou",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "hiredAt": 1795193843624,
-        "runs": 1,
-        "lastRun": {
-          "outcome": "completed",
-          "summary": "模块 10 测试通过。",
-          "at": 1795193843624,
-          "spent": {
-            "tokens": 20000,
-            "cny": 0.05
-          }
-        },
-        "issue": "i-d10",
-        "refining": false,
-        "phase": {
-          "_tag": "done"
-        },
-        "phaseText": "这一轮做完了，等你看"
-      },
-      {
-        "id": "w11",
-        "role": "worker",
-        "name": "帮工11",
-        "agent": "xiaolin",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "hiredAt": 1795193783624,
-        "runs": 1,
-        "lastRun": {
-          "outcome": "completed",
-          "summary": "模块 11 测试通过。",
-          "at": 1795193783624,
-          "spent": {
-            "tokens": 20000,
-            "cny": 0.05
-          }
-        },
-        "issue": "i-d11",
-        "refining": false,
-        "phase": {
-          "_tag": "done"
-        },
-        "phaseText": "这一轮做完了，等你看"
-      },
-      {
-        "id": "w12",
-        "role": "worker",
-        "name": "帮工12",
-        "agent": "laozhou",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "hiredAt": 1795193723624,
-        "runs": 1,
-        "lastRun": {
-          "outcome": "completed",
-          "summary": "模块 12 测试通过。",
-          "at": 1795193723624,
-          "spent": {
-            "tokens": 20000,
-            "cny": 0.05
-          }
-        },
-        "issue": "i-d12",
-        "refining": false,
-        "phase": {
-          "_tag": "done"
-        },
-        "phaseText": "这一轮做完了，等你看"
-      }
-    ],
-    "crons": [
-      {
-        "id": "c1",
-        "name": "每天站会播报",
-        "text": "巡检：每天站会播报",
-        "channel": "general",
-        "agent": "orchestrator",
-        "repo": "vibevalley",
-        "when": {
-          "kind": "daily",
-          "time": "09:30"
-        },
-        "tz": "Asia/Shanghai",
-        "enabled": true,
-        "created": 1795021643624,
-        "lastRun": 1795025243624,
-        "by": "user",
-        "pending": false,
-        "whenText": "每天 09:30",
-        "nextText": "11/19 09:30"
-      },
-      {
-        "id": "c2",
-        "name": "每周五回归巡检",
-        "text": "巡检：每周五回归巡检",
-        "channel": "general",
-        "agent": "orchestrator",
-        "repo": "vibevalley",
-        "when": {
-          "kind": "weekly",
-          "days": [5],
-          "time": "17:00"
-        },
-        "tz": "Asia/Shanghai",
-        "enabled": true,
-        "created": 1794935243624,
-        "lastRun": 1794938843624,
-        "by": "user",
-        "pending": false,
-        "whenText": "每周五 17:00",
-        "nextText": "11/20 17:00"
-      },
-      {
-        "id": "c3",
-        "name": "定时巡检 #3",
-        "text": "巡检：定时巡检 #3",
-        "channel": "general",
-        "agent": "orchestrator",
-        "repo": "vibevalley",
-        "when": {
-          "kind": "every",
-          "minutes": 45
-        },
-        "tz": "Asia/Shanghai",
-        "enabled": false,
-        "created": 1795183643624,
-        "lastRun": 1795187243624,
-        "by": "user",
-        "pending": false,
-        "whenText": "每 45 分钟",
-        "nextText": "关着"
-      },
-      {
-        "id": "c4",
-        "name": "定时巡检 #4",
-        "text": "巡检：定时巡检 #4",
-        "channel": "general",
-        "agent": "orchestrator",
-        "repo": "vibevalley",
-        "when": {
-          "kind": "every",
-          "minutes": 60
-        },
-        "tz": "Asia/Shanghai",
-        "enabled": true,
-        "created": 1795180043624,
-        "lastRun": 1795183643624,
-        "by": "user",
-        "pending": false,
-        "whenText": "每 1 小时",
-        "nextText": "11/20 23:07"
-      },
-      {
-        "id": "c5",
-        "name": "定时巡检 #5",
-        "text": "巡检：定时巡检 #5",
-        "channel": "general",
-        "agent": "orchestrator",
-        "repo": "vibevalley",
-        "when": {
-          "kind": "every",
-          "minutes": 75
-        },
-        "tz": "Asia/Shanghai",
-        "enabled": false,
-        "created": 1795176443624,
-        "lastRun": 1795180043624,
-        "by": "user",
-        "pending": false,
-        "whenText": "每 75 分钟",
-        "nextText": "关着"
-      },
-      {
-        "id": "c6",
-        "name": "定时巡检 #6",
-        "text": "巡检：定时巡检 #6",
-        "channel": "general",
-        "agent": "orchestrator",
-        "repo": "vibevalley",
-        "when": {
-          "kind": "every",
-          "minutes": 90
-        },
-        "tz": "Asia/Shanghai",
-        "enabled": true,
-        "created": 1795172843624,
-        "lastRun": 1795176443624,
-        "by": "user",
-        "pending": false,
-        "whenText": "每 90 分钟",
-        "nextText": "11/20 21:37"
-      },
-      {
-        "id": "c7",
-        "name": "定时巡检 #7",
-        "text": "巡检：定时巡检 #7",
-        "channel": "general",
-        "agent": "orchestrator",
-        "repo": "vibevalley",
-        "when": {
-          "kind": "every",
-          "minutes": 105
-        },
-        "tz": "Asia/Shanghai",
-        "enabled": false,
-        "created": 1795169243624,
-        "lastRun": 1795172843624,
-        "by": "user",
-        "pending": false,
-        "whenText": "每 105 分钟",
-        "nextText": "关着"
-      },
-      {
-        "id": "c8",
-        "name": "定时巡检 #8",
-        "text": "巡检：定时巡检 #8",
-        "channel": "general",
-        "agent": "orchestrator",
-        "repo": "vibevalley",
-        "when": {
-          "kind": "every",
-          "minutes": 120
-        },
-        "tz": "Asia/Shanghai",
-        "enabled": true,
-        "created": 1795165643624,
-        "lastRun": 1795169243624,
-        "by": "user",
-        "pending": false,
-        "whenText": "每 2 小时",
-        "nextText": "11/20 20:07"
-      },
-      {
-        "id": "c9",
-        "name": "定时巡检 #9",
-        "text": "巡检：定时巡检 #9",
-        "channel": "general",
-        "agent": "orchestrator",
-        "repo": "vibevalley",
-        "when": {
-          "kind": "every",
-          "minutes": 135
-        },
-        "tz": "Asia/Shanghai",
-        "enabled": false,
-        "created": 1795162043624,
-        "lastRun": 1795165643624,
-        "by": "user",
-        "pending": false,
-        "whenText": "每 135 分钟",
-        "nextText": "关着"
-      },
-      {
-        "id": "c10",
-        "name": "定时巡检 #10",
-        "text": "巡检：定时巡检 #10",
-        "channel": "general",
-        "agent": "orchestrator",
-        "repo": "vibevalley",
-        "when": {
-          "kind": "every",
-          "minutes": 150
-        },
-        "tz": "Asia/Shanghai",
-        "enabled": true,
-        "created": 1795158443624,
-        "lastRun": 1795162043624,
-        "by": "user",
-        "pending": false,
-        "whenText": "每 150 分钟",
-        "nextText": "11/20 18:37"
-      }
-    ],
     "boardSummary": {
       "laneCounts": {
         "todo": 17,
@@ -4448,9 +3646,578 @@
         }
       }
     },
-    "mediaSummary": {
-      "activeCount": 0,
-      "activeIds": []
+    "commits": {
+      "total": 42,
+      "repos": []
+    }
+  },
+  "sessions": {
+    "seq": 2,
+    "sessions": [
+      {
+        "id": "w1",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "老周",
+        "profile": "laozhou",
+        "runtime": "codex",
+        "brief": "",
+        "cwd": "/tmp/vibevalley/.worktrees/i18",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "issue-18-login"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i18"
+          }
+        ],
+        "hiredAt": 1795193243624,
+        "runs": 2,
+        "spent": {
+          "tokens": 182400,
+          "cny": 0.42
+        },
+        "subagents": {
+          "run": "run-2",
+          "rootThreadId": "main",
+          "threads": [
+            {
+              "threadId": "sub-check",
+              "agentName": "reviewer",
+              "parentThreadId": "main",
+              "turnId": "t-1",
+              "steps": [
+                {
+                  "step": "核对 token 过期时间",
+                  "status": "completed"
+                },
+                {
+                  "step": "补充单元测试",
+                  "status": "inProgress"
+                }
+              ],
+              "task": "检查登录边界与回归用例",
+              "status": "running",
+              "lastActivity": "运行 login.test.ts",
+              "lastAction": "run_command",
+              "updatedAt": 1795194383624
+            },
+            {
+              "threadId": "sub-done",
+              "agentName": "scout",
+              "parentThreadId": "main",
+              "task": "梳理现有鉴权中间件",
+              "status": "completed",
+              "lastAction": "read_file",
+              "updatedAt": 1795194323624
+            }
+          ],
+          "waits": [
+            {
+              "threadId": "main",
+              "callId": "wait-1",
+              "targets": ["sub-check"]
+            }
+          ]
+        },
+        "toolConnections": [
+          {
+            "server": "vibevalley-mcp",
+            "status": "ready"
+          }
+        ],
+        "phase": {
+          "_tag": "working",
+          "since": 1795194263624,
+          "doing": {
+            "action": "edit_file",
+            "label": "session.ts",
+            "actionText": "改文件"
+          }
+        },
+        "phaseText": "在改文件：session.ts"
+      },
+      {
+        "id": "w2",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "小林",
+        "profile": "xiaolin",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "issue-33-shell"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i33"
+          }
+        ],
+        "hiredAt": 1795192043624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "发现两种终端启动方式，需确认默认行为。",
+          "at": 1795194143624,
+          "spent": {
+            "tokens": 64000,
+            "cny": 0.14
+          }
+        },
+        "phase": {
+          "_tag": "resting"
+        },
+        "phaseText": "歇着（上一轮做完了）"
+      },
+      {
+        "id": "w3",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "老周",
+        "profile": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "issue-31-board"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i31"
+          }
+        ],
+        "hiredAt": 1795187243624,
+        "runs": 2,
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "补齐看板列表分组与键盘返回测试。",
+          "at": 1795193543624,
+          "spent": {
+            "tokens": 120000,
+            "cny": 0.29
+          }
+        },
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "这一轮做完了，等你看"
+      },
+      {
+        "id": "w4",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "阿杰",
+        "profile": "ajie",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i34"
+          }
+        ],
+        "hiredAt": 1795189043624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "failed",
+          "summary": "测试环境缺少原生字体文件，断言失败。",
+          "at": 1795193723624,
+          "spent": {
+            "tokens": 33000,
+            "cny": 0.06
+          }
+        },
+        "phase": {
+          "_tag": "failed"
+        },
+        "phaseText": "这一轮没做成"
+      },
+      {
+        "id": "w5",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "起草员",
+        "profile": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i21",
+            "refining": true
+          }
+        ],
+        "hiredAt": 1795193843624,
+        "runs": 1,
+        "phase": {
+          "_tag": "working",
+          "since": 1795194203624,
+          "doing": {
+            "action": "read_file",
+            "label": "App.tsx",
+            "actionText": "读文件"
+          }
+        },
+        "phaseText": "在读文件：App.tsx"
+      },
+      {
+        "id": "w6",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "帮工6",
+        "profile": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-d6"
+          }
+        ],
+        "hiredAt": 1795194083624,
+        "runs": 1,
+        "phase": {
+          "_tag": "working",
+          "since": 1795194083624,
+          "doing": {
+            "action": "run_command",
+            "label": "cargo test module_6",
+            "actionText": "跑命令"
+          }
+        },
+        "phaseText": "在跑命令：cargo test module_6"
+      },
+      {
+        "id": "w7",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "帮工7",
+        "profile": "xiaolin",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-d7"
+          }
+        ],
+        "hiredAt": 1795194023624,
+        "runs": 1,
+        "phase": {
+          "_tag": "working",
+          "since": 1795194023624,
+          "doing": {
+            "action": "run_command",
+            "label": "cargo test module_7",
+            "actionText": "跑命令"
+          }
+        },
+        "phaseText": "在跑命令：cargo test module_7"
+      },
+      {
+        "id": "w8",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "帮工8",
+        "profile": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-d8"
+          }
+        ],
+        "hiredAt": 1795193963624,
+        "runs": 1,
+        "phase": {
+          "_tag": "working",
+          "since": 1795193963624,
+          "doing": {
+            "action": "run_command",
+            "label": "cargo test module_8",
+            "actionText": "跑命令"
+          }
+        },
+        "phaseText": "在跑命令：cargo test module_8"
+      },
+      {
+        "id": "w9",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "帮工9",
+        "profile": "xiaolin",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-d9"
+          }
+        ],
+        "hiredAt": 1795193903624,
+        "runs": 1,
+        "phase": {
+          "_tag": "working",
+          "since": 1795193903624,
+          "doing": {
+            "action": "run_command",
+            "label": "cargo test module_9",
+            "actionText": "跑命令"
+          }
+        },
+        "phaseText": "在跑命令：cargo test module_9"
+      },
+      {
+        "id": "w10",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "帮工10",
+        "profile": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-d10"
+          }
+        ],
+        "hiredAt": 1795193843624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "模块 10 测试通过。",
+          "at": 1795193843624,
+          "spent": {
+            "tokens": 20000,
+            "cny": 0.05
+          }
+        },
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "这一轮做完了，等你看"
+      },
+      {
+        "id": "w11",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "帮工11",
+        "profile": "xiaolin",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-d11"
+          }
+        ],
+        "hiredAt": 1795193783624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "模块 11 测试通过。",
+          "at": 1795193783624,
+          "spent": {
+            "tokens": 20000,
+            "cny": 0.05
+          }
+        },
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "这一轮做完了，等你看"
+      },
+      {
+        "id": "w12",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "帮工12",
+        "profile": "laozhou",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-d12"
+          }
+        ],
+        "hiredAt": 1795193723624,
+        "runs": 1,
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "模块 12 测试通过。",
+          "at": 1795193723624,
+          "spent": {
+            "tokens": 20000,
+            "cny": 0.05
+          }
+        },
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "这一轮做完了，等你看"
+      }
+    ],
+    "machines": [
+      {
+        "id": "local",
+        "name": "Mac Studio",
+        "here": true,
+        "online": true,
+        "joinedAt": 1795021643624
+      }
+    ]
+  },
+  "collab": {
+    "seq": 2,
+    "chat": {
+      "channels": [
+        {
+          "id": "design",
+          "type": "channel",
+          "default": false,
+          "orchestrator": "orchestrator",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "name": "design",
+          "description": "UI 与设计系统",
+          "subjectKind": null,
+          "replies": 0,
+          "title": "design",
+          "at": 1795190843624
+        },
+        {
+          "id": "dm-laozhou",
+          "type": "direct",
+          "default": false,
+          "peer": "profile:laozhou",
+          "orchestrator": "orchestrator",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "name": "老周",
+          "description": "",
+          "subjectKind": null,
+          "replies": 0,
+          "title": "老周",
+          "at": 1795193843624
+        },
+        {
+          "id": "general",
+          "type": "channel",
+          "default": true,
+          "orchestrator": "orchestrator",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "name": "general",
+          "description": "日常协作与进度同步",
+          "subjectKind": null,
+          "lastNumber": 3,
+          "replies": 0,
+          "unread": 1,
+          "title": "general",
+          "last": {
+            "from": "w1",
+            "name": "老周",
+            "text": "工单 #18 正在收尾。",
+            "at": 1795194323624
+          },
+          "at": 1795194323624
+        },
+        {
+          "id": "t-login",
+          "type": "thread",
+          "default": false,
+          "orchestrator": "orchestrator",
+          "parent": "general",
+          "category": "",
+          "position": 1,
+          "notify": "all",
+          "rootNumber": 1,
+          "description": "",
+          "subjectKind": "issue",
+          "subjectId": "i18",
+          "replies": 4,
+          "title": "登录过期讨论",
+          "at": 1795194143624
+        }
+      ],
+      "userMentions": [
+        {
+          "message": {
+            "id": "m-mention",
+            "number": 3,
+            "channel": "general",
+            "from": "w2",
+            "actor": {
+              "kind": "agent",
+              "id": "xiaolin",
+              "role": "worker",
+              "name": "小林"
+            },
+            "name": "小林",
+            "kind": "chat",
+            "text": "@user 请看一眼 #33 的默认配置选型。",
+            "mentions": [],
+            "outcome": null,
+            "spoken": false,
+            "at": 1795194263624,
+            "revision": 1,
+            "reactions": [],
+            "attachments": [],
+            "embeds": []
+          },
+          "channel": "general",
+          "address": "#general"
+        }
+      ]
     },
     "channelSummary": {
       "unreadTotal": 1,
@@ -4460,465 +4227,684 @@
         "general": 1,
         "t-login": 0
       }
-    }
-  },
-  "inbox": [
-    {
-      "id": "m-mention",
-      "kind": "mention",
-      "from": {
-        "kind": "session",
-        "id": "w2",
-        "name": "小林",
-        "agent": ""
-      },
-      "who": "小林",
-      "text": "@user 请看一眼 #33 的默认配置选型。",
-      "at": 1795194263624,
-      "target": {
-        "kind": "chat",
-        "channel": "general"
-      },
-      "words": {
-        "label": "找你",
-        "title": "小林 叫你",
-        "body": "@user 请看一眼 #33 的默认配置选型。",
-        "tray": ""
-      }
     },
-    {
-      "id": "w2:ask:1",
-      "kind": "ask",
-      "from": {
-        "kind": "session",
-        "id": "w2",
-        "name": "小林",
-        "agent": "xiaolin"
-      },
-      "who": "小林",
-      "text": "新建终端默认启动登录 Shell 还是当前用户配置 Shell？",
-      "at": 1795194143624,
-      "target": {
-        "kind": "session",
-        "id": "w2"
-      },
-      "words": {
-        "label": "有问题问你",
-        "title": "小林 有问题问你",
-        "body": "新建终端默认启动登录 Shell 还是当前用户配置 Shell？",
-        "tray": ""
-      }
-    },
-    {
-      "id": "w10:review:1",
-      "kind": "review",
-      "from": {
-        "kind": "session",
-        "id": "w10",
-        "name": "帮工10",
-        "agent": "laozhou"
-      },
-      "who": "帮工10",
-      "text": "模块 10 测试通过。",
-      "at": 1795193843624,
-      "target": {
-        "kind": "session",
-        "id": "w10"
-      },
-      "words": {
-        "label": "等你看",
-        "title": "帮工10 做完了",
-        "body": "模块 10 测试通过。",
-        "tray": "帮工10 做完了，等你看"
-      }
-    },
-    {
-      "id": "w11:review:1",
-      "kind": "review",
-      "from": {
-        "kind": "session",
-        "id": "w11",
-        "name": "帮工11",
-        "agent": "xiaolin"
-      },
-      "who": "帮工11",
-      "text": "模块 11 测试通过。",
-      "at": 1795193783624,
-      "target": {
-        "kind": "session",
-        "id": "w11"
-      },
-      "words": {
-        "label": "等你看",
-        "title": "帮工11 做完了",
-        "body": "模块 11 测试通过。",
-        "tray": "帮工11 做完了，等你看"
-      }
-    },
-    {
-      "id": "w4:fix:1",
-      "kind": "fix",
-      "from": {
-        "kind": "session",
-        "id": "w4",
-        "name": "阿杰",
-        "agent": "ajie"
-      },
-      "who": "阿杰",
-      "text": "测试环境缺少原生字体文件，断言失败。",
-      "at": 1795193723624,
-      "target": {
-        "kind": "session",
-        "id": "w4"
-      },
-      "words": {
-        "label": "活没做成",
-        "title": "阿杰 没做成",
-        "body": "测试环境缺少原生字体文件，断言失败。",
-        "tray": "阿杰 没做成"
-      }
-    },
-    {
-      "id": "w12:review:1",
-      "kind": "review",
-      "from": {
-        "kind": "session",
-        "id": "w12",
-        "name": "帮工12",
-        "agent": "laozhou"
-      },
-      "who": "帮工12",
-      "text": "模块 12 测试通过。",
-      "at": 1795193723624,
-      "target": {
-        "kind": "session",
-        "id": "w12"
-      },
-      "words": {
-        "label": "等你看",
-        "title": "帮工12 做完了",
-        "body": "模块 12 测试通过。",
-        "tray": "帮工12 做完了，等你看"
-      }
-    },
-    {
-      "id": "w3:review:2",
-      "kind": "review",
-      "from": {
-        "kind": "session",
-        "id": "w3",
-        "name": "老周",
-        "agent": "laozhou"
-      },
-      "who": "老周",
-      "text": "补齐看板列表分组与键盘返回测试。",
-      "at": 1795193543624,
-      "target": {
-        "kind": "session",
-        "id": "w3"
-      },
-      "words": {
-        "label": "等你看",
-        "title": "老周 做完了",
-        "body": "补齐看板列表分组与键盘返回测试。",
-        "tray": "老周 做完了，等你看"
-      }
-    }
-  ],
-  "view": {
-    "level": {
-      "level": 3,
-      "xp": 12,
-      "need": 30
-    },
-    "plots": {
-      "i-d10": {
-        "crop": "carrot",
-        "badge": {
-          "text": "可收获",
-          "tone": "ripe"
-        }
-      },
-      "i-d11": {
-        "crop": "wheat",
-        "badge": {
-          "text": "可收获",
-          "tone": "ripe"
-        }
-      },
-      "i-d12": {
-        "crop": "carrot",
-        "badge": {
-          "text": "可收获",
-          "tone": "ripe"
-        }
-      },
-      "i-d6": {
-        "crop": "sprout"
-      },
-      "i-d7": {
-        "crop": "sprout"
-      },
-      "i-d8": {
-        "crop": "sprout"
-      },
-      "i-d9": {
-        "crop": "sprout"
-      },
-      "i18": {
-        "crop": "sprout"
-      },
-      "i21": {
-        "crop": "sprout"
-      },
-      "i31": {
-        "crop": "flowering",
-        "badge": {
-          "text": "等你验收",
-          "tone": "wait"
-        }
-      },
-      "i33": {
-        "crop": "dry",
-        "badge": {
-          "text": "等你回答",
-          "tone": "wait"
-        }
-      },
-      "i34": {
-        "crop": "withered",
-        "badge": {
-          "text": "有虫",
-          "tone": "bug"
-        }
-      }
-    },
-    "plays": {
-      "w1": {
-        "station": 0,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      },
-      "w10": {
-        "station": -1,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      },
-      "w11": {
-        "station": -1,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      },
-      "w12": {
-        "station": -1,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      },
-      "w2": {
-        "station": 1,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      },
-      "w3": {
-        "station": 2,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      },
-      "w4": {
-        "station": 3,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      },
-      "w5": {
-        "station": 0,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      },
-      "w6": {
-        "station": 4,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      },
-      "w7": {
-        "station": 5,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      },
-      "w8": {
-        "station": -1,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      },
-      "w9": {
-        "station": -1,
-        "toolsThisRun": 0,
-        "counts": {},
-        "files": [],
-        "commands": [],
-        "history": []
-      }
-    },
-    "achievements": [
+    "connectors": [
       {
-        "id": "s_open",
-        "tier": 0,
-        "count": 0,
-        "next": 1
+        "id": "weixin",
+        "state": "connected",
+        "qr": "",
+        "pairCode": "",
+        "channel": "general",
+        "user": "田头助手",
+        "since": 1795190843624,
+        "lastInbound": 1795190903624,
+        "pending": 0,
+        "error": ""
       },
       {
-        "id": "s_hire",
-        "tier": 0,
-        "count": 0,
-        "next": 1
+        "id": "feishu",
+        "state": "waiting",
+        "qr": "",
+        "pairCode": "",
+        "channel": "design",
+        "since": 1795193843624,
+        "lastInbound": 1795193903624,
+        "pending": 2,
+        "error": ""
       },
       {
-        "id": "s_tell",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_review",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_voice",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_split",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "s_call",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "harvests",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "first_try",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "big_graph",
-        "tier": 0,
-        "count": 0,
-        "next": 3
-      },
-      {
-        "id": "farm_level",
-        "tier": 0,
-        "count": 0,
-        "next": 5
-      },
-      {
-        "id": "steady",
-        "tier": 0,
-        "count": 0,
-        "next": 5
-      },
-      {
-        "id": "untangle",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "comeback",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "thrifty",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "every_machine",
-        "tier": 0,
-        "count": 0,
-        "next": 2
-      },
-      {
-        "id": "handoff",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "parallel_graph",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "night_owl",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "weekend",
-        "tier": 0,
-        "count": 0,
-        "next": 1
-      },
-      {
-        "id": "full_house",
-        "tier": 0,
-        "count": 0,
-        "next": 1
+        "id": "qq",
+        "state": "off",
+        "qr": "",
+        "pairCode": "",
+        "since": 1795192943624,
+        "lastInbound": 1795193003624,
+        "pending": 0,
+        "error": ""
       }
     ]
   },
-  "effects": []
+  "inbox": {
+    "seq": 2,
+    "items": [
+      {
+        "id": "m-mention",
+        "kind": "mention",
+        "from": {
+          "kind": "session",
+          "id": "w2",
+          "name": "小林",
+          "agent": ""
+        },
+        "who": "小林",
+        "text": "@user 请看一眼 #33 的默认配置选型。",
+        "at": 1795194263624,
+        "target": {
+          "kind": "chat",
+          "channel": "general"
+        },
+        "words": {
+          "label": "找你",
+          "title": "小林 叫你",
+          "body": "@user 请看一眼 #33 的默认配置选型。",
+          "tray": ""
+        }
+      },
+      {
+        "id": "w2:ask:1",
+        "kind": "ask",
+        "from": {
+          "kind": "session",
+          "id": "w2",
+          "name": "小林",
+          "agent": "xiaolin"
+        },
+        "who": "小林",
+        "text": "新建终端默认启动登录 Shell 还是当前用户配置 Shell？",
+        "at": 1795194143624,
+        "target": {
+          "kind": "session",
+          "id": "w2"
+        },
+        "words": {
+          "label": "有问题问你",
+          "title": "小林 有问题问你",
+          "body": "新建终端默认启动登录 Shell 还是当前用户配置 Shell？",
+          "tray": ""
+        }
+      },
+      {
+        "id": "w10:review:1",
+        "kind": "review",
+        "from": {
+          "kind": "session",
+          "id": "w10",
+          "name": "帮工10",
+          "agent": "laozhou"
+        },
+        "who": "帮工10",
+        "text": "模块 10 测试通过。",
+        "at": 1795193843624,
+        "target": {
+          "kind": "session",
+          "id": "w10"
+        },
+        "words": {
+          "label": "等你看",
+          "title": "帮工10 做完了",
+          "body": "模块 10 测试通过。",
+          "tray": "帮工10 做完了，等你看"
+        }
+      },
+      {
+        "id": "w11:review:1",
+        "kind": "review",
+        "from": {
+          "kind": "session",
+          "id": "w11",
+          "name": "帮工11",
+          "agent": "xiaolin"
+        },
+        "who": "帮工11",
+        "text": "模块 11 测试通过。",
+        "at": 1795193783624,
+        "target": {
+          "kind": "session",
+          "id": "w11"
+        },
+        "words": {
+          "label": "等你看",
+          "title": "帮工11 做完了",
+          "body": "模块 11 测试通过。",
+          "tray": "帮工11 做完了，等你看"
+        }
+      },
+      {
+        "id": "w4:fix:1",
+        "kind": "fix",
+        "from": {
+          "kind": "session",
+          "id": "w4",
+          "name": "阿杰",
+          "agent": "ajie"
+        },
+        "who": "阿杰",
+        "text": "测试环境缺少原生字体文件，断言失败。",
+        "at": 1795193723624,
+        "target": {
+          "kind": "session",
+          "id": "w4"
+        },
+        "words": {
+          "label": "活没做成",
+          "title": "阿杰 没做成",
+          "body": "测试环境缺少原生字体文件，断言失败。",
+          "tray": "阿杰 没做成"
+        }
+      },
+      {
+        "id": "w12:review:1",
+        "kind": "review",
+        "from": {
+          "kind": "session",
+          "id": "w12",
+          "name": "帮工12",
+          "agent": "laozhou"
+        },
+        "who": "帮工12",
+        "text": "模块 12 测试通过。",
+        "at": 1795193723624,
+        "target": {
+          "kind": "session",
+          "id": "w12"
+        },
+        "words": {
+          "label": "等你看",
+          "title": "帮工12 做完了",
+          "body": "模块 12 测试通过。",
+          "tray": "帮工12 做完了，等你看"
+        }
+      },
+      {
+        "id": "w3:review:2",
+        "kind": "review",
+        "from": {
+          "kind": "session",
+          "id": "w3",
+          "name": "老周",
+          "agent": "laozhou"
+        },
+        "who": "老周",
+        "text": "补齐看板列表分组与键盘返回测试。",
+        "at": 1795193543624,
+        "target": {
+          "kind": "session",
+          "id": "w3"
+        },
+        "words": {
+          "label": "等你看",
+          "title": "老周 做完了",
+          "body": "补齐看板列表分组与键盘返回测试。",
+          "tray": "老周 做完了，等你看"
+        }
+      }
+    ],
+    "call": "connecting",
+    "callReason": "正在建立实时语音连接"
+  },
+  "ops": {
+    "seq": 2,
+    "crons": [
+      {
+        "id": "c1",
+        "name": "每天站会播报",
+        "text": "巡检：每天站会播报",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "daily",
+          "time": "09:30"
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1795021643624,
+        "lastRun": 1795025243624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每天 09:30",
+        "nextText": "11/19 09:30"
+      },
+      {
+        "id": "c2",
+        "name": "每周五回归巡检",
+        "text": "巡检：每周五回归巡检",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "weekly",
+          "days": [5],
+          "time": "17:00"
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1794935243624,
+        "lastRun": 1794938843624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每周五 17:00",
+        "nextText": "11/20 17:00"
+      },
+      {
+        "id": "c3",
+        "name": "定时巡检 #3",
+        "text": "巡检：定时巡检 #3",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 45
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": false,
+        "created": 1795183643624,
+        "lastRun": 1795187243624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 45 分钟",
+        "nextText": "关着"
+      },
+      {
+        "id": "c4",
+        "name": "定时巡检 #4",
+        "text": "巡检：定时巡检 #4",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 60
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1795180043624,
+        "lastRun": 1795183643624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 1 小时",
+        "nextText": "11/20 23:07"
+      },
+      {
+        "id": "c5",
+        "name": "定时巡检 #5",
+        "text": "巡检：定时巡检 #5",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 75
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": false,
+        "created": 1795176443624,
+        "lastRun": 1795180043624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 75 分钟",
+        "nextText": "关着"
+      },
+      {
+        "id": "c6",
+        "name": "定时巡检 #6",
+        "text": "巡检：定时巡检 #6",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 90
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1795172843624,
+        "lastRun": 1795176443624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 90 分钟",
+        "nextText": "11/20 21:37"
+      },
+      {
+        "id": "c7",
+        "name": "定时巡检 #7",
+        "text": "巡检：定时巡检 #7",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 105
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": false,
+        "created": 1795169243624,
+        "lastRun": 1795172843624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 105 分钟",
+        "nextText": "关着"
+      },
+      {
+        "id": "c8",
+        "name": "定时巡检 #8",
+        "text": "巡检：定时巡检 #8",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 120
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1795165643624,
+        "lastRun": 1795169243624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 2 小时",
+        "nextText": "11/20 20:07"
+      },
+      {
+        "id": "c9",
+        "name": "定时巡检 #9",
+        "text": "巡检：定时巡检 #9",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 135
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": false,
+        "created": 1795162043624,
+        "lastRun": 1795165643624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 135 分钟",
+        "nextText": "关着"
+      },
+      {
+        "id": "c10",
+        "name": "定时巡检 #10",
+        "text": "巡检：定时巡检 #10",
+        "channel": "general",
+        "agent": "orchestrator",
+        "repo": "vibevalley",
+        "when": {
+          "kind": "every",
+          "minutes": 150
+        },
+        "tz": "Asia/Shanghai",
+        "enabled": true,
+        "created": 1795158443624,
+        "lastRun": 1795162043624,
+        "by": "user",
+        "pending": false,
+        "whenText": "每 150 分钟",
+        "nextText": "11/20 18:37"
+      }
+    ],
+    "media": [
+      {
+        "kind": "image",
+        "id": "job-img-ready",
+        "prompt": "像素风麦田与小木屋",
+        "model": "moss-image-1",
+        "connection": "moss-main",
+        "revision": 1,
+        "source": {
+          "kind": "user"
+        },
+        "usage": {
+          "images": 1,
+          "width": 1024,
+          "height": 1024
+        },
+        "phase": "ready",
+        "phaseText": "已生成",
+        "problem": "",
+        "attachment": {
+          "id": "lib-poster",
+          "name": "farm-poster.png",
+          "type": "image/png",
+          "size": 482113
+        },
+        "canCancel": false,
+        "canRetryDownload": false,
+        "createdAt": 1795192643624,
+        "updatedAt": 1795192703624
+      },
+      {
+        "kind": "speech",
+        "id": "job-speech-ready",
+        "prompt": "今天的回归测试全部通过。",
+        "model": "moss-tts-1.5-flash",
+        "connection": "moss-main",
+        "revision": 1,
+        "source": {
+          "kind": "orchestrator",
+          "agent": "orchestrator",
+          "channel": "general"
+        },
+        "voice": "voice-warm",
+        "format": "wav",
+        "contentType": "audio/wav",
+        "usage": {
+          "inputCharacters": 12
+        },
+        "canResume": false,
+        "canRelease": true,
+        "phase": "ready",
+        "phaseText": "已生成",
+        "problem": "",
+        "attachment": {
+          "id": "lib-speech",
+          "name": "speech.wav",
+          "type": "audio/wav",
+          "size": 115244
+        },
+        "resultInput": null,
+        "canCancel": false,
+        "canRetryDownload": false,
+        "createdAt": 1795193243624,
+        "updatedAt": 1795193303624
+      }
+    ],
+    "mediaSummary": {
+      "activeCount": 0,
+      "activeIds": []
+    }
+  },
+  "farm": {
+    "seq": 2,
+    "view": {
+      "level": {
+        "level": 3,
+        "xp": 12,
+        "need": 30
+      },
+      "plots": {
+        "i-d10": {
+          "crop": "carrot",
+          "badge": {
+            "text": "可收获",
+            "tone": "ripe"
+          }
+        },
+        "i-d11": {
+          "crop": "wheat",
+          "badge": {
+            "text": "可收获",
+            "tone": "ripe"
+          }
+        },
+        "i-d12": {
+          "crop": "carrot",
+          "badge": {
+            "text": "可收获",
+            "tone": "ripe"
+          }
+        },
+        "i-d6": {
+          "crop": "sprout"
+        },
+        "i-d7": {
+          "crop": "sprout"
+        },
+        "i-d8": {
+          "crop": "sprout"
+        },
+        "i-d9": {
+          "crop": "sprout"
+        },
+        "i18": {
+          "crop": "sprout"
+        },
+        "i21": {
+          "crop": "sprout"
+        },
+        "i31": {
+          "crop": "flowering",
+          "badge": {
+            "text": "等你验收",
+            "tone": "wait"
+          }
+        },
+        "i33": {
+          "crop": "dry",
+          "badge": {
+            "text": "等你回答",
+            "tone": "wait"
+          }
+        },
+        "i34": {
+          "crop": "withered",
+          "badge": {
+            "text": "有虫",
+            "tone": "bug"
+          }
+        }
+      },
+      "plays": {
+        "w1": {
+          "station": 0,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        },
+        "w10": {
+          "station": -1,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        },
+        "w11": {
+          "station": -1,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        },
+        "w12": {
+          "station": -1,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        },
+        "w2": {
+          "station": 1,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        },
+        "w3": {
+          "station": 2,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        },
+        "w4": {
+          "station": 3,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        },
+        "w5": {
+          "station": 4,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        },
+        "w6": {
+          "station": 5,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        },
+        "w7": {
+          "station": -1,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        },
+        "w8": {
+          "station": -1,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        },
+        "w9": {
+          "station": -1,
+          "toolsThisRun": 0,
+          "counts": {},
+          "files": [],
+          "commands": [],
+          "history": []
+        }
+      }
+    },
+    "progress": {
+      "coins": 1280,
+      "streak": 4,
+      "bestStreak": 9,
+      "counts": {
+        "harvested": 14,
+        "reviewed": 11
+      },
+      "unlocked": [
+        {
+          "id": "first_harvest",
+          "tier": 1,
+          "at": 1795108043624
+        }
+      ],
+      "title": {
+        "id": "first_harvest",
+        "tier": 1
+      },
+      "agents": {
+        "laozhou": {
+          "hired": 8,
+          "harvested": 6,
+          "failed": 1
+        }
+      },
+      "multiplier": 1.2
+    },
+    "effects": []
+  }
 }

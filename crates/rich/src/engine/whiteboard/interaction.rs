@@ -1103,11 +1103,12 @@ impl WhiteboardController {
                 } else {
                     Rect2::new(raw.x.round(), raw.y.round(), raw.w.max(48.0).round(), raw.h.max(36.0).round())
                 };
-                if let Some(el) = self.build_new_element_in_box(&self.tool.clone(), rect) {
+                let created_tool = self.tool.clone();
+                if let Some(el) = self.build_new_element_in_box(&created_tool, rect) {
                     let created_id = el.id.clone();
                     let res = apply_command(&mut self.doc, Some(&mut self.history), BoardCommand::CreateElements(vec![el]), None, false);
                     self.finish_create(res, &mut effects);
-                    if matches!(self.tool, Tool::Text | Tool::Card | Tool::Sticky | Tool::Callout)
+                    if matches!(created_tool, Tool::Text | Tool::Card | Tool::Sticky | Tool::Callout)
                         && let Some(inline) = self.build_inline_target(&created_id, None)
                     {
                         effects.push(ControllerEffect::OpenInlineEditor(inline));
@@ -1176,11 +1177,15 @@ impl WhiteboardController {
     }
 
     pub fn handle_wheel(&mut self, screen_pos: Point2, delta_x: f64, delta_y: f64, precise: bool, modifiers: Modifiers) -> Vec<ControllerEffect> {
+        if delta_x.abs() < 1e-6 && delta_y.abs() < 1e-6 {
+            return Vec::new();
+        }
         let mut effects = Vec::new();
         self.user_moved_camera = true;
         self.cancel_follow(&mut effects);
         if modifiers.accel {
-            let factor = (-delta_y * 0.004).exp().clamp(0.75, 1.35);
+            let scaled_dy = if precise { delta_y } else { delta_y * 22.0 };
+            let factor = (-scaled_dy * 0.004).exp().clamp(0.75, 1.35);
             self.camera.zoom_at(screen_pos, factor);
         } else {
             let scale = if precise { 1.0 } else { 22.0 };
@@ -1192,6 +1197,9 @@ impl WhiteboardController {
     }
 
     pub fn handle_pinch(&mut self, screen_pos: Point2, delta_fraction: f64) -> Vec<ControllerEffect> {
+        if delta_fraction.abs() < 1e-6 {
+            return Vec::new();
+        }
         let mut effects = Vec::new();
         self.user_moved_camera = true;
         self.cancel_follow(&mut effects);

@@ -1,7 +1,7 @@
 import { Text, View } from "nsh";
 
 import { type ChatMessage, type Phase, type SessionView } from "@vibevalley/protocol";
-import { actorRoleOf, spanText } from "@vibevalley/protocol/rules";
+import { actorRoleOf, sessionProfile, spanText } from "@vibevalley/protocol/rules";
 
 import { AgentFace, OrchestratorFace, UserFace } from "../../../design/domain/Face";
 import { Icon, type IconSize } from "../../../design/Icon";
@@ -86,6 +86,10 @@ export function HelperFace(props: { agent: string; runtime?: string | undefined;
 export function SenderFace(props: { m: ChatMessage; size?: number }) {
   const session = useSession(() => props.m.session ?? props.m.from);
   const size = () => props.size ?? 36;
+  const senderAgent = () => {
+    const s = session();
+    return props.m.agent ?? (s ? sessionProfile(s) : undefined) ?? props.m.from;
+  };
   return (
     <If
       when={props.m.actor.kind === "user"}
@@ -94,7 +98,7 @@ export function SenderFace(props: { m: ChatMessage; size?: number }) {
           when={actorRoleOf(props.m.actor) === "orchestrator"}
           else={
             <If when={actorRoleOf(props.m.actor) === "worker" || props.m.actor.kind === "system"}>
-              <HelperFace agent={props.m.agent ?? session()?.agent ?? props.m.from} runtime={session()?.runtime} size={size()} />
+              <HelperFace agent={senderAgent()} runtime={session()?.runtime} size={size()} />
             </If>
           }
         >

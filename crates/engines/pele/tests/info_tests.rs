@@ -1,5 +1,3 @@
-mod support;
-
 use std::time::Instant;
 
 use vibevalley_pele::detect::DiagramType;
@@ -7,7 +5,7 @@ use vibevalley_pele::diagram::info::parser::parse_info;
 use vibevalley_pele::diagram::info::render::VERSION;
 use vibevalley_pele::{ParseOptions, ParsedModel, RenderOptions, parse, render, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
 
 fn check_both(src: &str, id_prefix: Option<&str>, font_family: Option<&str>) -> bool {
     let opts_css = RenderOptions {

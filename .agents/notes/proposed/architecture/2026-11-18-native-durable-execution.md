@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-Chord 执行治理文档（`/chord/ws`、`space`、`budget.raise`，见 [Chord](crates/server/src/transport/chord/README.md)）、持久执行引擎（`crates/vibevalley-durable`、`crates/vibevalley-durable-codemode`、`crates/runtime/src/agent/generation/`）与 `crates/runtime/src/oar` 的八个 Go 基线外部驱动均已合入 `main` 并通过离线回放回归（现状沉淀见 [核心状态](docs/subsystems/core.md)、[VibeValley 自己的 agent](docs/subsystems/brain.md)、[助手](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)）。
+持久执行引擎（`crates/runtime/src/agent/durable/`、`crates/runtime/src/agent/codemode/`、`crates/runtime/src/agent/generation/`）、运行时告警并入统一 `InboxSlice`（`RuntimeInboxObserver`，原零消费者 `/chord/ws` 已在状态切片重构中退役）与 `crates/runtime/src/oar` 的八个 Go 基线外部驱动均已合入 `main` 并通过离线回放回归（现状沉淀见 [核心状态](docs/subsystems/core.md)、[VibeValley 自己的 agent](docs/subsystems/brain.md)、[助手](docs/subsystems/orchestrator.md)、[帮工](docs/subsystems/session.md)）。
 
 还剩三类未完成的实机与视觉验收缺口：
 

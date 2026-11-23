@@ -11,9 +11,11 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, Weak};
 
+use vibevalley_core::Transition;
 use vibevalley_core::progress::{Folded, catch_up, entries_for, progress_fold, progress_step};
 use vibevalley_protocol::{Fact, FactProgressChanged, FactProgressChangedStation, LedgerEntry, LedgerEntryTitled, ops};
 
+use crate::event_bus::Subscription;
 use crate::{Hub, lock, now};
 
 const COUNT_EVERY: std::time::Duration = std::time::Duration::from_secs(120);
@@ -30,7 +32,17 @@ pub struct Game {
     /// Asks the counting thread for a count soon.
     soon: Mutex<Option<flume::Sender<()>>>,
     thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+    sub: Mutex<Option<Subscription>>,
     asked: std::sync::atomic::AtomicU64,
+}
+
+fn session_is_farm_worker(t: &Transition, id: &str) -> bool {
+    t.after
+        .sessions
+        .iter()
+        .chain(&t.before.sessions)
+        .find(|s| s.id == id)
+        .is_some_and(vibevalley_core::status::is_farm_worker)
 }
 
 /// The ledger's entries that still read as a `LedgerEntry`.
@@ -59,47 +71,56 @@ impl Game {
             wanted: Mutex::new(None),
             soon: Mutex::new(None),
             thread: Mutex::new(None),
+            sub: Mutex::new(None),
             asked: Default::default(),
         });
         for e in hub.read(catch_up) {
             game.record(e);
         }
         let g = Arc::downgrade(&game);
-        hub.watch(Arc::new(move |hub, t| {
+        let sub = hub.subscribe_transitions("game", move |hub, t| {
             let Some(game) = g.upgrade() else { return };
-            if let Fact::ProgressChanged(f) = &t.fact
-                && f.commits.is_none()
-                && f.station.is_none()
-            {
-                return;
-            }
-            if let Fact::SessionChanged(f) = &t.fact
-                && vibevalley_core::status::is_hired(f.session.role)
-            {
-                let wish = lock(&game.wanted).take();
-                if let Some((station, until)) = wish
-                    && until > f.at
-                {
-                    hub.apply(vec![Fact::ProgressChanged(FactProgressChanged {
-                        at: now(),
-                        progress: None,
-                        news: None,
-                        commits: None,
-                        station: Some(FactProgressChangedStation {
-                            id: f.session.id.clone(),
-                            station,
-                        }),
-                    })]);
-                }
-            }
-            if matches!(t.fact, Fact::SessionReported(_)) {
-                game.count_soon();
-            }
-            for e in entries_for(&t.before, &t.fact, &t.after) {
-                game.record(e);
-            }
-        }));
+            game.on_transition(hub, t);
+        });
+        let prev = lock(&game.sub).replace(sub);
+        drop(prev);
         game
+    }
+
+    fn on_transition(&self, hub: &Arc<Hub>, t: &Transition) {
+        match &t.fact {
+            Fact::ProgressChanged(f) if f.commits.is_none() && f.station.is_none() => return,
+            Fact::SessionChanged(f) if !vibevalley_core::status::is_farm_worker(&f.session) => return,
+            Fact::SessionReported(f) if !session_is_farm_worker(t, &f.id) => return,
+            Fact::SessionPhaseChanged(f) if !session_is_farm_worker(t, &f.id) => return,
+            Fact::SessionLeft(f) if !session_is_farm_worker(t, &f.id) => return,
+            _ => {}
+        }
+        if let Fact::SessionChanged(f) = &t.fact
+            && vibevalley_core::status::is_hired(&f.session)
+        {
+            let wish = lock(&self.wanted).take();
+            if let Some((station, until)) = wish
+                && until > f.at
+            {
+                hub.apply(vec![Fact::ProgressChanged(FactProgressChanged {
+                    at: now(),
+                    progress: None,
+                    news: None,
+                    commits: None,
+                    station: Some(FactProgressChangedStation {
+                        id: f.session.id.clone(),
+                        station,
+                    }),
+                })]);
+            }
+        }
+        if matches!(t.fact, Fact::SessionReported(_)) {
+            self.count_soon();
+        }
+        for e in entries_for(&t.before, &t.fact, &t.after) {
+            self.record(e);
+        }
     }
 
     /// `boot`'s counting: the user's commits under the repos counted now,
@@ -147,6 +168,8 @@ impl Game {
     }
 
     pub fn close(&self) {
+        let prev = lock(&self.sub).take();
+        drop(prev);
         let _ = lock(&self.soon).take();
         if let Some(handle) = lock(&self.thread).take()
             && handle.thread().id() != std::thread::current().id()
@@ -236,14 +259,188 @@ impl Game {
 }
 
 pub fn install(hub: &Hub, game: Arc<Game>) {
-    hub.on::<ops::GameAchievementList>(|_, ()| {
-        Ok(vibevalley_core::game::achievements()
+    hub.on::<ops::GameAchievementList>(|ctx, ()| {
+        let items = vibevalley_core::game::achievements()
             .iter()
             .map(vibevalley_core::game::achievement_in_words)
-            .collect())
+            .collect();
+        let standings = ctx.hub.read(|s| vibevalley_core::game::standings_of(s.progress.as_ref()));
+        Ok(vibevalley_protocol::AchievementList { items, standings })
     });
     hub.on::<ops::GameTitleSet>(move |_, req| {
         game.choose_title(req.achievement, req.tier);
         Ok(())
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use vibevalley_core::empty_space_state;
+    use vibevalley_protocol::{
+        ContextRef, Doing, ExecutionPolicy, FactSessionChanged, FactSessionPhaseChanged, FactSessionReported, LedgerEntryHarvested, Outcome, Phase,
+        PhaseWorking, Session, SessionAction, SessionController, SessionPermissionMode,
+    };
+
+    use super::*;
+
+    fn until<T>(what: &str, mut f: impl FnMut() -> Option<T>) -> T {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            if let Some(v) = f() {
+                return v;
+            }
+            assert!(Instant::now() < deadline, "timed out waiting for {what}");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    fn working_phase(since: i64) -> Phase {
+        Phase::Working(PhaseWorking {
+            since,
+            quiet_since: None,
+            retry: None,
+            doing: Doing {
+                action: SessionAction::None,
+                label: String::new(),
+            },
+        })
+    }
+
+    fn workspace_session(id: &str, working: bool) -> Session {
+        let mut s = Session::new(
+            id,
+            SessionController::User,
+            format!("chat-{id}"),
+            "antigravity",
+            ExecutionPolicy::DirectCwd {
+                repo: None,
+                permission_mode: SessionPermissionMode::AcceptEdits,
+            },
+            1,
+        );
+        s.profile = Some("antigravity".into());
+        if working {
+            s.phase = working_phase(1);
+        }
+        s
+    }
+
+    fn issue_worker(id: &str, issue: &str, working: bool) -> Session {
+        let mut s = Session::new(
+            id,
+            SessionController::IssueBoard,
+            format!("worker-{id}"),
+            "scripted",
+            ExecutionPolicy::ManagedWorktree {
+                repo: "demo".into(),
+                branch: None,
+            },
+            1,
+        );
+        s.profile = Some("backend".into());
+        s.attach_binding(ContextRef::Issue {
+            id: issue.into(),
+            refining: None,
+        });
+        if working {
+            s.phase = working_phase(1);
+        }
+        s
+    }
+
+    #[test]
+    fn workspace_sessions_are_filtered_from_station_agents_streak_and_full_house() {
+        let home = tempfile::tempdir().unwrap();
+        let hub = Hub::new(empty_space_state());
+        let game = Game::open(home.path(), &hub);
+
+        // Seed an active streak and a planted station wish.
+        game.record(LedgerEntry::Harvested(LedgerEntryHarvested {
+            at: 0,
+            session: "h0".into(),
+            agent: Some("backend".into()),
+            repo: "demo".into(),
+            runtime: "scripted".into(),
+            commits: 1,
+            cny: None,
+            runs: 1,
+        }));
+        game.want(4);
+
+        // Open 6 working workspace sessions and fail one of them.
+        for i in 1..=6 {
+            let ws = workspace_session(&format!("ws{i}"), true);
+            hub.apply(vec![Fact::SessionChanged(FactSessionChanged { at: now(), session: ws })]);
+        }
+        hub.apply(vec![Fact::SessionReported(FactSessionReported {
+            at: now(),
+            id: "ws1".into(),
+            run: None,
+            outcome: Outcome::Failed,
+            phase: None,
+            summary: "failed workspace chat".into(),
+            runs: 1,
+            spent: None,
+            questions: vec![],
+            checks: vec![],
+            answer: None,
+        })]);
+
+        // Now hire a real issue worker and move it to Working so we have a causal barrier on the bus.
+        let real = issue_worker("w1", "i1", false);
+        hub.apply(vec![Fact::SessionChanged(FactSessionChanged { at: now(), session: real })]);
+        hub.apply(vec![Fact::SessionPhaseChanged(FactSessionPhaseChanged {
+            at: now(),
+            id: "w1".into(),
+            phase: working_phase(now()),
+            channel: None,
+            spent: None,
+            brief: None,
+        })]);
+
+        // The real worker claims the planted station (ws1..ws6 did NOT steal it) and tallies `backend`.
+        until("real worker station & tally", || {
+            hub.read(|s| {
+                let station_ok = s.plays.as_ref().and_then(|p| p.get("w1")).map(|p| p.station) == Some(4);
+                let hired_ok = s.progress.as_ref().and_then(|p| p.agents.get("backend")).is_some_and(|t| t.hired == 1);
+                (station_ok && hired_ok).then_some(())
+            })
+        });
+
+        let progress = hub.read(|s| s.progress.clone().unwrap());
+        assert!(
+            !progress.agents.contains_key("antigravity"),
+            "workspace session leaked into agents: {:?}",
+            progress.agents
+        );
+        assert_eq!(progress.streak, 1, "workspace failure reset streak");
+        assert_eq!(progress.counts.get("full_house"), None, "workspace sessions triggered FULL_HOUSE");
+        assert_eq!(game.asked(), 0, "workspace report triggered commit count");
+
+        // A real worker failure DOES reset streak, tally failed, and bump asked().
+        hub.apply(vec![Fact::SessionReported(FactSessionReported {
+            at: now(),
+            id: "w1".into(),
+            run: None,
+            outcome: Outcome::Failed,
+            phase: None,
+            summary: "failed issue".into(),
+            runs: 1,
+            spent: None,
+            questions: vec![],
+            checks: vec![],
+            answer: None,
+        })]);
+        until("real worker failure resets streak", || {
+            hub.read(|s| {
+                let p = s.progress.as_ref()?;
+                (p.streak == 0 && p.agents.get("backend").is_some_and(|t| t.failed == 1) && game.asked() == 1).then_some(())
+            })
+        });
+
+        game.close();
+        hub.close_bus();
+    }
 }

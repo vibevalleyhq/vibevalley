@@ -70,9 +70,9 @@ sqlc 1.31.1 的内置 JSON 生成器支持 `gen.json.out: ir`。执行 `sqlc gen
 
 12 组查询共 258 条，其中单行查询 61 条、多行查询 59 条、执行语句 131 条、返回影响行数的语句 7 条。在隔离目录读取真实插件输入并重新生成，12 份 Rust 源文件与工作树逐字节一致。[正式配置](sqlc.yaml) · [生成规则](docs/subsystems/foundation.md#契约规则和数据库)
 
-SQLx 对 258 条语句逐一预编译。参数数目、结果列名和类型均与 sqlc 对上。对于 sqlc 标为非空的结果列，SQLx 将 60 处标为可空，另有 1 处无法推断。在普通 SQLite 表中，直接写 SQL 可向未声明 `NOT NULL` 的 `TEXT PRIMARY KEY` 写入空值。生产写入入口要求字符串主键。会话左连接的关联记录缺失时，生成函数读回 `None`。增加关联再回滚后，读数恢复为 `None`。[会话查询](crates/server/src/modules/work/session/sql/queries.sql) · [SQLite 主键约束](https://www.sqlite.org/lang_createtable.html#the_primary_key)
+SQLx 对 258 条语句逐一预编译。参数数目、结果列名和类型均与 sqlc 对上。对于 sqlc 标为非空的结果列，SQLx 将 60 处标为可空，另有 1 处无法推断。在普通 SQLite 表中，直接写 SQL 可向未声明 `NOT NULL` 的 `TEXT PRIMARY KEY` 写入空值。生产写入入口要求字符串主键。会话左连接的关联记录缺失时，生成函数读回 `None`。增加关联再回滚后，读数恢复为 `None`。[会话查询](crates/server/src/db/queries/work_session.sql) · [SQLite 主键约束](https://www.sqlite.org/lang_createtable.html#the_primary_key)
 
-素材库排序曾在 `ORDER BY CASE` 中引用 `sqlc.arg(sort)`。sqlc 1.31.1 会将这个参数原样留在 SQL 中。正式查询在公用表表达式中绑定排序参数。CI 用 SQLite 对导出的 SQL 执行 `EXPLAIN`，按 IR 的参数个数绑定空值，旧写法会在此处失败。[素材库查询](crates/server/src/modules/content/library/sql/queries.sql) · [CI 检查](scripts/release/verify-native-schema.py)
+素材库排序曾在 `ORDER BY CASE` 中引用 `sqlc.arg(sort)`。sqlc 1.31.1 会将这个参数原样留在 SQL 中。正式查询在公用表表达式中绑定排序参数。CI 用 SQLite 对导出的 SQL 执行 `EXPLAIN`，按 IR 的参数个数绑定空值，旧写法会在此处失败。[素材库查询](crates/server/src/db/queries/content_library.sql) · [CI 检查](scripts/release/verify-native-schema.py)
 
 社区插件 `sqlc-gen-rust` 0.1.12 生成的 SQLx 0.8.6 代码在 0.9.1 下出现类型与生命周期错误。项目采用自有插件，沿用 sqlc 的 SQL 分析器。维护者只需维护本项目使用的 SQLite 类型和查询返回方式。[生成器](scripts/gen/sqlc-rust/generate.ts) · [社区插件](https://github.com/tunamaguro/sqlc-gen-rust/tree/v0.1.12)
 
@@ -99,7 +99,7 @@ SQLx 对 258 条语句逐一预编译。参数数目、结果列名和类型均�
 | 工单板与会话 | 工单板分派工单。会话关联输入、轮次、厂商会话和工作目录。根线程报告轮末后，会话才可结算该轮。 | 子线程先结束时，主轮仍可执行。根线程报告完成后，用户仍应能独立判断改动是否已合并。[会话](crates/server/src/modules/work/session/sessions.rs) |
 | oar | 驱动把厂商通知解码成带来源的事件。Codex 自己派出的子线程属于本轮。用户另邀一个帮工档案时，按工单小队模型建会话。 | 厂商子线程不会占用另一个产品帮工的身份。[工单小队提案](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md) |
 | 工单账本与工作目录 | 账本保存业务结算。Git 和文件系统保存外部命令造成的改动。宿主保存窗口布局。 | 查询回复标识可找到对应轮次。查询该轮的工作目录和基线提交可核对磁盘改动。[工单账本](crates/server/src/modules/work/ledger.rs) |
-| 核心状态 | Rust 契约定义动作和状态。核心归约用同一组事实生成工单、收件箱和农场视图。高频命令输出进入工作日志。 | 工作台经进程内桥、CLI 经 HTTP `/api/v1` 读同一张工单。Chord 客户端续订 `space` 后应读到最新的持久执行通知和审批状态。[订阅与执行治理](crates/server/src/transport/chord/README.md) · [系统架构](docs/architecture.md) · [核心状态](docs/subsystems/core.md) |
+| 核心状态 | Rust 契约定义动作和状态。核心归约用同一组事实生成 5 域切片、收件箱和独立农场视图。高频命令输出进入工作日志。 | 工作台经进程内桥、CLI 经 HTTP `/api/v1/slice/{name}` 读同一张工单与切片；持久执行告警经 `RuntimeInboxObserver` 并入 `InboxSlice`。[系统架构](docs/architecture.md) · [核心状态](docs/subsystems/core.md) |
 
 **恢复规则。** 同一条回复应有稳定标识。服务收到重复回复时，应返回原执行记录。不同回复按会话现有的排队或插话规则执行。以下用例从工单串发出回复，使用临时 Git 仓库，并真实终止服务进程。[已有主线测试](crates/server/tests/mainline.rs)
 

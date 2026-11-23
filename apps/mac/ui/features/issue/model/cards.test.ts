@@ -30,15 +30,17 @@ function makeIssue(id: string, state: IssueStageKind): Issue {
 
 const dummySession: Session = {
   id: "s1" as SessionId,
+  controller: "issueBoard",
   role: "worker",
   name: "老周",
-  agent: "laozhou",
+  profile: "laozhou",
   runtime: "claude",
+  policy: { kind: "sandboxDir" },
+  bindings: [],
   phase: { _tag: "resting" },
   hiredAt: 1_000,
   brief: "",
   runs: 1,
-  refining: false,
 };
 
 test("cardUrgencyTone maps user-blocking stages to wheat/berry and non-blocking cards to undefined", () => {

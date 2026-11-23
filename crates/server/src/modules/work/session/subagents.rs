@@ -142,7 +142,7 @@ pub(super) fn observe(session: &Session, run: &str, root: &str, event: &Event) -
         }
         EventKind::ToolCallStarted { name, input, .. } => {
             let id = event.agent_path.last()?;
-            let detail = tool_detail(input, session.worktree.as_deref().unwrap_or_default());
+            let detail = tool_detail(input, session.cwd.as_deref().unwrap_or_default());
             let thread = thread(&mut summary, id, at);
             let action = super::journal::tool_action(name, input);
             thread.last_action = Some(action);

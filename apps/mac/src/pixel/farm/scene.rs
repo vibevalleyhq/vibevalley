@@ -10,12 +10,16 @@ use super::super::draw::{DrawList, Op, rgba};
 use super::super::level::{Box2, Point, pt};
 use super::super::nav::{Facing, Walker, frame_at};
 use super::super::sky::{DayClock, clock_text, flat_light, sky_at};
-use super::frame::{Crop, Frame, Session};
+use super::frame::{Frame, SessionExt};
 use super::hud::{self, Panel};
 use super::phone::Phone;
 use super::world::{
     BEDS, Bed, Goal, GoalInput, PLOT_H, PLOT_W, Pose, PoseHold, REST_SPOTS, Stroll, StrollSpot, VillageHit, VillageWorld, Whereabouts, YARD_PLACES,
     bed_of_station, place_of_action, plot_calls, pose_of, spots_for, village_hit_at,
+};
+use vibevalley_protocol::{
+    AchievementList, BoardSlice, CallState, CollabSlice, Crop, FarmFrame, GameEffect, InboxSlice, IssueStageKind, PhaseView, SessionPlayView, SessionView,
+    SessionsSlice, StuckReason,
 };
 
 const WALK_SPEED: f32 = 42.0;
@@ -194,7 +198,7 @@ pub struct FarmScene {
     pub panel: Option<Panel>,
     pub panel_page: usize,
     pub view_size: (f32, f32),
-    pub achievements: Vec<vibevalley_protocol::Achievement>,
+    pub achievements: AchievementList,
     pub phone: Phone,
     bed_pressed: Option<(usize, f64)>,
     pub toast: Option<(String, f64)>,
@@ -210,7 +214,10 @@ pub struct FarmScene {
     lean: Point,
     pressed: Option<Option<VillageHit>>,
     sounds: Vec<&'static str>,
-    heard_seq: Option<u64>,
+    heard_farm: Option<u64>,
+    heard_board: Option<u64>,
+    heard_sessions: Option<u64>,
+    heard_inbox: Option<u64>,
     rng: u64,
     /// The farm on the page: only this repo's helpers, when set.
     pub repo: Option<String>,
@@ -245,7 +252,7 @@ impl FarmScene {
             panel: None,
             panel_page: 0,
             view_size: (768.0, 512.0),
-            achievements: Vec::new(),
+            achievements: AchievementList::default(),
             phone: Phone::default(),
             bed_pressed: None,
             toast: None,
@@ -259,7 +266,10 @@ impl FarmScene {
             lean: Point::default(),
             pressed: None,
             sounds: Vec::new(),
-            heard_seq: None,
+            heard_farm: None,
+            heard_board: None,
+            heard_sessions: None,
+            heard_inbox: None,
             rng: 0x9e3779b97f4a7c15,
             repo: None,
         }
@@ -269,22 +279,42 @@ impl FarmScene {
         self.sounds.drain(..)
     }
 
-    pub fn apply_frame(&mut self, frame: Frame) {
-        use vibevalley_protocol::{GameEffect, IssueStageKind, StuckReason};
-        if self.heard_seq != Some(frame.seq) {
-            if self.heard_seq.is_some() {
-                for session in &frame.state.sessions {
-                    if !self.frame.state.sessions.iter().any(|s| s.id == session.id) {
-                        self.sounds.push("arrive");
+    fn apply_game_effects(&mut self, effects: &[GameEffect], plays: &std::collections::BTreeMap<String, SessionPlayView>) {
+        for effect in effects {
+            match effect {
+                GameEffect::Reward(r) => {
+                    self.sounds.push("coin");
+                    if let Some(play) = r.session_id.as_ref().and_then(|id| plays.get(id))
+                        && let Some(b) = bed_of_station(play.station as i32)
+                    {
+                        self.life.coin(self.world.plot_at(b.index) + pt(0., -PLOT_H / 2.));
                     }
                 }
-                for issue in &frame.state.issues {
-                    let Some(now) = &issue.stage else {
+                GameEffect::LevelUp(_) => self.sounds.push("levelUp"),
+                GameEffect::Achievement(_) => self.sounds.push("achievement"),
+                GameEffect::Penalty(_) => {}
+            }
+        }
+    }
+
+    pub fn apply_farm(&mut self, farm: FarmFrame) {
+        let seq = farm.seq.max(0) as u64;
+        if self.heard_farm != Some(seq) {
+            self.apply_game_effects(&farm.effects, &farm.view.plays);
+            self.heard_farm = Some(seq);
+        }
+        self.frame.apply_farm(farm);
+    }
+
+    pub fn apply_board(&mut self, board: BoardSlice) {
+        let seq = board.seq.max(0) as u64;
+        if self.heard_board != Some(seq) {
+            if self.heard_board.is_some() {
+                for issue in &board.issues {
+                    let Some(was) = self.frame.issues.iter().find(|i| i.id == issue.id).map(|i| &i.stage) else {
                         continue;
                     };
-                    let Some(was) = self.frame.state.issues.iter().find(|i| i.id == issue.id).and_then(|i| i.stage.as_ref()) else {
-                        continue;
-                    };
+                    let now = &issue.stage;
                     if now.state == IssueStageKind::Reviewing && was.state != now.state {
                         self.sounds.push("ripe");
                     }
@@ -295,30 +325,90 @@ impl FarmScene {
                         self.sounds.push("bug");
                     }
                 }
-                if self.frame.state.call != frame.state.call {
-                    if frame.state.call == "live" {
-                        self.sounds.push("voiceOn");
-                    } else if frame.state.call == "idle" && matches!(self.frame.state.call.as_str(), "live" | "ending") {
-                        self.sounds.push("voiceOff");
+            }
+            self.heard_board = Some(seq);
+        }
+        self.frame.apply_board(board);
+    }
+
+    pub fn apply_sessions(&mut self, sessions: SessionsSlice) {
+        let seq = sessions.seq.max(0) as u64;
+        if self.heard_sessions != Some(seq) {
+            if self.heard_sessions.is_some() {
+                for session in &sessions.sessions {
+                    if !self.frame.sessions.iter().any(|s| s.id == session.id) {
+                        self.sounds.push("arrive");
                     }
                 }
             }
-            for effect in &frame.effects {
-                match effect {
-                    GameEffect::Reward(r) => {
-                        self.sounds.push("coin");
-                        if let Some(s) = r.session_id.as_ref().and_then(|id| frame.state.sessions.iter().find(|s| &s.id == id))
-                            && let Some(b) = bed_of_station(frame.station_of(s))
-                        {
-                            self.life.coin(self.world.plot_at(b.index) + pt(0., -PLOT_H / 2.));
-                        }
-                    }
-                    GameEffect::LevelUp(_) => self.sounds.push("levelUp"),
-                    GameEffect::Achievement(_) => self.sounds.push("achievement"),
-                    GameEffect::Penalty(_) => {}
+            self.heard_sessions = Some(seq);
+        }
+        self.frame.apply_sessions(sessions);
+    }
+
+    pub fn apply_inbox(&mut self, inbox: InboxSlice) {
+        let seq = inbox.seq.max(0) as u64;
+        if self.heard_inbox != Some(seq) {
+            if self.heard_inbox.is_some() && self.frame.call != inbox.call {
+                if inbox.call == CallState::Live {
+                    self.sounds.push("voiceOn");
+                } else if inbox.call == CallState::Idle && matches!(self.frame.call, CallState::Live | CallState::Ending) {
+                    self.sounds.push("voiceOff");
                 }
             }
-            self.heard_seq = Some(frame.seq);
+            self.heard_inbox = Some(seq);
+        }
+        self.frame.apply_inbox(inbox);
+    }
+
+    pub fn apply_collab(&mut self, collab: CollabSlice) {
+        self.frame.apply_collab(collab);
+    }
+
+    pub fn apply_frame(&mut self, frame: Frame) {
+        if self.heard_sessions != Some(frame.seq) {
+            if self.heard_sessions.is_some() {
+                for session in &frame.sessions {
+                    if !self.frame.sessions.iter().any(|s| s.id == session.id) {
+                        self.sounds.push("arrive");
+                    }
+                }
+            }
+            self.heard_sessions = Some(frame.seq);
+        }
+        if self.heard_board != Some(frame.seq) {
+            if self.heard_board.is_some() {
+                for issue in &frame.issues {
+                    let Some(was) = self.frame.issues.iter().find(|i| i.id == issue.id).map(|i| &i.stage) else {
+                        continue;
+                    };
+                    let now = &issue.stage;
+                    if now.state == IssueStageKind::Reviewing && was.state != now.state {
+                        self.sounds.push("ripe");
+                    }
+                    if now.state == IssueStageKind::Stuck
+                        && matches!(now.stuck, Some(StuckReason::Failed | StuckReason::Conflict))
+                        && (was.state != now.state || was.stuck != now.stuck)
+                    {
+                        self.sounds.push("bug");
+                    }
+                }
+            }
+            self.heard_board = Some(frame.seq);
+        }
+        if self.heard_inbox != Some(frame.seq) {
+            if self.heard_inbox.is_some() && self.frame.call != frame.call {
+                if frame.call == CallState::Live {
+                    self.sounds.push("voiceOn");
+                } else if frame.call == CallState::Idle && matches!(self.frame.call, CallState::Live | CallState::Ending) {
+                    self.sounds.push("voiceOff");
+                }
+            }
+            self.heard_inbox = Some(frame.seq);
+        }
+        if self.heard_farm != Some(frame.seq) {
+            self.apply_game_effects(&frame.effects, &frame.view.plays);
+            self.heard_farm = Some(frame.seq);
         }
         self.frame = frame;
     }
@@ -344,20 +434,19 @@ impl FarmScene {
         (self.rng >> 40) as f32 / (1u64 << 24) as f32
     }
 
-    pub(super) fn workers(&self) -> Vec<Session> {
-        let mut v: Vec<Session> = self
+    pub(super) fn workers(&self) -> Vec<SessionView> {
+        let mut v: Vec<SessionView> = self
             .frame
-            .state
             .sessions
             .iter()
-            .filter(|s| s.is_worker() && (self.repo.is_none() || s.repo == self.repo))
+            .filter(|s| s.is_worker() && (self.repo.is_none() || s.repo_name() == self.repo.as_deref()))
             .cloned()
             .collect();
         v.sort_by(|a, b| a.id.cmp(&b.id));
         v
     }
 
-    fn crop_of(&self, s: &Session) -> Crop {
+    fn crop_of(&self, s: &SessionView) -> Crop {
         self.frame.plot_of(s).map(|p| p.crop).unwrap_or(Crop::Sprout)
     }
 
@@ -371,7 +460,7 @@ impl FarmScene {
 
     pub(super) fn crop_of_bed(&self, bed: Bed, leaving: bool) -> Crop {
         if let Some(need) = bed.unlock_level {
-            return if self.frame.view.level.level.round() as u32 >= need {
+            return if self.frame.view.level.level >= i64::from(need) {
                 Crop::Flowering
             } else {
                 Crop::Locked
@@ -384,7 +473,7 @@ impl FarmScene {
         }
     }
 
-    fn place_for(s: &Session, crop: Crop) -> &'static str {
+    fn place_for(s: &SessionView, crop: Crop) -> &'static str {
         if plot_calls(crop) {
             return "plot";
         }
@@ -417,7 +506,7 @@ impl FarmScene {
         self.lean.x += (aim.x * 0.7 + (t * 0.13).sin() * 0.3 - self.lean.x) * k;
         self.lean.y += (aim.y * 0.7 + (t * 0.09 + 1.3).sin() * 0.3 - self.lean.y) * k;
         let dog_random = self.life.random();
-        self.dog.advance(t, self.frame.state.call == "live", dog_random);
+        self.dog.advance(t, self.frame.call == CallState::Live, dog_random);
         self.phone.tick(std::time::Instant::now());
         let move_on = t - self.where_at >= WHERE_TICK;
         if move_on {
@@ -441,11 +530,12 @@ impl FarmScene {
             } else {
                 0
             };
-            let configured_look = self.agent_looks.get(&s.agent).map(|(sp, out)| (sp.as_str(), out.as_str()));
-            let look = cast_prefix(configured_look, &s.agent, &self.atlas);
+            let agent = s.profile_id().unwrap_or("");
+            let configured_look = self.agent_looks.get(agent).map(|(sp, out)| (sp.as_str(), out.as_str()));
+            let look = cast_prefix(configured_look, agent, &self.atlas);
             let place_want = Self::place_for(s, crop);
             let spots = spots_for(s, crop, pose);
-            let working = s.phase.tag == "working";
+            let working = s.is_working();
             let (r1, r2, r3) = (self.random(), self.random(), self.random());
             if let Some(actor) = self.actors.get_mut(&s.id) {
                 if actor.left_at.is_some() {
@@ -645,7 +735,7 @@ impl FarmScene {
         FarmTap::Plot {
             bed,
             session: s.as_ref().map(|s| s.id.clone()),
-            issue: s.and_then(|s| s.issue),
+            issue: s.and_then(|s| s.issue_id().map(String::from)),
         }
     }
 
@@ -654,9 +744,9 @@ impl FarmScene {
     }
 
     fn manager_picture(&self, list: &mut DrawList, id: &str, at: Point) {
-        let pose = self.frame.state.sessions.iter().find(|s| s.role == "orchestrator" && s.agent == id);
+        let pose = self.frame.sessions.iter().find(|s| s.is_orchestrator() && s.profile_id() == Some(id));
         let speaking = pose.is_some_and(|s| s.doing() == Some("speaking_text"));
-        let listening = pose.is_some_and(|s| !matches!(s.phase.tag.as_str(), "working" | "closed"));
+        let listening = pose.is_some_and(|s| !matches!(s.phase, PhaseView::Working(_) | PhaseView::Closed(_)));
         let look = self
             .profiles
             .iter()
@@ -723,7 +813,7 @@ impl FarmScene {
                 self.pressed == Some(Some(VillageHit::Plot(bed.index))) && hot || self.bed_pressed.is_some_and(|(i, until)| i == bed.index && self.t < until);
             l.sprite(
                 &atlas,
-                &format!("plot-{}", crop.name()),
+                &format!("plot-{}", crop.as_str()),
                 at.x,
                 at.y + if pressed {
                     1.
@@ -970,7 +1060,7 @@ impl FarmScene {
             })
             .collect();
         actors.sort_by_key(|v| v["id"].as_str().unwrap_or_default().to_string());
-        let beds: Vec<&str> = BEDS.iter().map(|b| self.crop_of_bed(*b, false).name()).collect();
+        let beds: Vec<&str> = BEDS.iter().map(|b| self.crop_of_bed(*b, false).as_str()).collect();
         serde_json::json!({
             "seq": self.frame.seq, "t": self.t, "captureMotion": self.capture, "clock": clock_text(self.clock.tod), "actors": actors, "beds": beds,
             "hover": format!("{:?}", self.hover), "level": self.frame.view.level.level,

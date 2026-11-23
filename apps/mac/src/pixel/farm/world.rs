@@ -5,7 +5,8 @@ use std::collections::HashMap;
 
 use super::super::level::{Box2, Level, Point, pt};
 use super::super::nav::{Facing, NavMap};
-use super::frame::{Crop, Session};
+use super::frame::SessionExt;
+use vibevalley_protocol::{Crop, PhaseView, SessionView};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Bed {
@@ -425,7 +426,7 @@ impl PoseHold {
 
 const HANDS_ON: [&str; 4] = ["edit_file", "run_command", "mcp", "other"];
 
-pub fn pose_of(s: &Session, crop: Crop) -> Pose {
+pub fn pose_of(s: &SessionView, crop: Crop) -> Pose {
     if is_ripe(crop) {
         return Pose::Cheer;
     }
@@ -453,7 +454,7 @@ pub fn plot_calls(crop: Crop) -> bool {
     is_ripe(crop) || matches!(crop, Crop::Withered | Crop::Dry)
 }
 
-pub fn spots_for(s: &Session, crop: Crop, pose: Pose) -> Vec<StrollSpot> {
+pub fn spots_for(s: &SessionView, crop: Crop, pose: Pose) -> Vec<StrollSpot> {
     use PlotSpot::*;
     use StrollSpot::*;
     if is_ripe(crop) || crop == Crop::Dry {
@@ -462,11 +463,11 @@ pub fn spots_for(s: &Session, crop: Crop, pose: Pose) -> Vec<StrollSpot> {
     if crop == Crop::Withered {
         return vec![Plot(Front), Plot(Left), Plot(Right)];
     }
-    match s.phase.tag.as_str() {
-        "working" if pose == Pose::Work => vec![Plot(Front), Plot(Right), Plot(Left)],
-        "working" => vec![Plot(Left), Plot(Back), Plot(Right)],
-        "resting" => vec![Rest, Rest, Plot(Front), Plot(Back)],
-        _ => vec![Plot(Front)],
+    match s.phase {
+        PhaseView::Working(_) if pose == Pose::Work => vec![Plot(Front), Plot(Right), Plot(Left)],
+        PhaseView::Working(_) => vec![Plot(Left), Plot(Back), Plot(Right)],
+        PhaseView::Resting(_) => vec![Rest, Rest, Plot(Front), Plot(Back)],
+        PhaseView::Done(_) | PhaseView::Failed(_) | PhaseView::Closed(_) => vec![Plot(Front)],
     }
 }
 

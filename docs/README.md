@@ -21,8 +21,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、本地合并、GitHub 检测、提交统计 |
 | [artifact.md](docs/subsystems/artifact.md) | Artifact：结构化多条目作品（`store`，七种 `ArtifactType`）、协作块文档（`blocks`）与单页网页（`html`）；乐观并发、双语指南、全出血原生白板与统一内容中心 |
 | [pkm.md](docs/subsystems/pkm.md) | 笔记：Logseq 式大纲页面，工作台单栏极简编辑（磁盘保留 PARA 目录）；文件是真相，读进内存再写回，块引用、反链、搜索、闪念、剪藏、改写和撤销 |
-| [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、消息和事件、工单串 |
-| [watch.md](docs/subsystems/watch.md) | 观察层：按游标读频道的事件、谁听见、刹车、帮工的串和回执；收件箱：要你处理的事、刚来的、巡查 |
+| [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、消息和事件、工单串、纯受众与环路刹车、持久投递 |
 | [brain.md](docs/subsystems/brain.md) | VibeValley 自己的 agent（`vibevalley-runtime::agent`）：模型请求、循环、对话文件、压缩、工具、技能、记性、自己的任务 |
 | [orchestrator.md](docs/subsystems/orchestrator.md) | 助手：收什么话、现状、工具与 `vv://` 资源读取、谁能让它合并、巡查、评测 |
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
@@ -32,7 +31,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [provider.md](docs/subsystems/provider.md) | AI 服务：供应商连接、模型目录、默认用途、凭据与配置版本 |
 | [media.md](docs/subsystems/media.md) | 媒体和素材库：一个任务机上的生图与语音任务、本机输入、独立下载与安全校验；统一内容中心浏览与原生媒体详情栏 |
 | [game.md](docs/subsystems/game.md) | 游戏：账本、金币和成就、等级、空地和特效 |
-| [core.md](docs/subsystems/core.md) | 核心状态：一份状态只因事实而变、SSE 流和全部路由、接口和能力表、重启 |
+| [core.md](docs/subsystems/core.md) | 核心状态：一份状态只因事实而变、异步 `EventBus`、收件箱与巡查、SSE 流和全部路由、接口和能力表、重启 |
 | [foundation.md](docs/subsystems/foundation.md) | 地基：Cargo 与 pnpm 工作区、深模块、边界一次解码的类型、契约的生成、SQLite 存储、测试分层 |
 | [app.md](docs/subsystems/app.md) | 客户端：原生应用 `apps/mac`（GPUI 窗口、进程里的服务端、页面和服务端之间的桥、nsh TSX 的工作台、宿主能力） |
 | [farm.md](docs/subsystems/farm.md) | 农场的皮：Rust 画的像素村、地里长什么、走路、地图、记忆树、图鉴 |
@@ -128,7 +127,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 媒体库 | library | `Library`（`media_library_item` 表） | 媒体（指这一页时）、素材库（中文界面） |
 | 工作区 | working folder | `Workplace`（`workdir`） | 工作目录（中文界面） |
 | 定时任务 | scheduled task | cron（`Cron`） | 定时（指定时任务时）、schedule（指定时任务时）、recurrence |
-| 收件箱 | inbox | `InboxItem`（`StateFrame.inbox`，服务是 `Inbox`） | 通知（指收件箱时）、来电（农场的皮里用）、Inbox（中文界面，指收件箱时） |
+| 收件箱 | inbox | `InboxItem`（`InboxSlice.items`，服务是 `Inbox`） | 通知（指收件箱时）、来电（农场的皮里用）、Inbox（中文界面，指收件箱时） |
 | 提醒 | notice | `Core.notice`、`NoticeLevel`（事件流里是 `LiveEventNotice`） |  |
 | 巡查 | patrol | `patrolStep`（`Inbox.patrol`） |  |
 | 通话 | call | `VoiceCall`（`voice.call.*`） |  |

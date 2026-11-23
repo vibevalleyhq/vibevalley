@@ -5,7 +5,7 @@ import type { Codec } from "../codec";
 import { SessionId } from "../common/schema";
 import { ConnectorStatus, FactConnectorChanged } from "../connector/schema";
 import { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/schema";
-import { CommitCount, FactProgressChanged, FarmView, GameEffect, Progress, SessionPlay } from "../game/schema";
+import { CommitCount, FactProgressChanged, FarmFrame, Progress, SessionPlay } from "../game/schema";
 import { InboxItem } from "../inbox/schema";
 import { BoardSummary, FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/schema";
 import { MediaJob, MediaSummary, FactMediaChanged } from "../media/schema";
@@ -26,7 +26,7 @@ import {
 import { CallState, FactCallChanged } from "../voice/schema";
 import * as T from "./shapes";
 
-const spaceFields = {
+const SpaceState = z.object({
   call: CallState,
   callReason: z.string(),
   media: z.exactOptional(z.array(MediaJob)),
@@ -36,33 +36,58 @@ const spaceFields = {
   issues: z.array(Issue),
   connectors: z.array(ConnectorStatus),
   machines: z.array(Machine),
-};
-
-const SpaceState = z.object({
-  ...spaceFields,
   sessions: z.array(Session),
   crons: z.array(Cron),
   plays: z.exactOptional(z.record(z.string(), SessionPlay)),
 }) satisfies Codec<T.SpaceState>;
 
-const SpaceView = z.object({
-  ...spaceFields,
-  sessions: z.array(SessionView),
-  crons: z.array(CronView),
-  boardSummary: z.exactOptional(BoardSummary),
-  mediaSummary: z.exactOptional(MediaSummary),
-  channelSummary: z.exactOptional(ChannelSummary),
-}) satisfies Codec<T.SpaceView>;
+export const SliceKind = z.enum(T.SliceKindValues) satisfies Codec<T.SliceKind>;
 
 const NoticeLevel = z.enum(T.NoticeLevelValues) satisfies Codec<T.NoticeLevel>;
 
-export const StateFrame = z.object({
+export const BoardSlice = z.object({
   seq: z.number(),
-  state: SpaceView,
-  inbox: z.array(InboxItem),
-  view: FarmView,
-  effects: z.array(GameEffect),
-}) satisfies Codec<T.StateFrame>;
+  issues: z.array(Issue),
+  boardSummary: z.exactOptional(BoardSummary),
+  commits: z.exactOptional(CommitCount),
+}) satisfies Codec<T.BoardSlice>;
+
+export const SessionsSlice = z.object({
+  seq: z.number(),
+  sessions: z.array(SessionView),
+  machines: z.array(Machine),
+}) satisfies Codec<T.SessionsSlice>;
+
+export const CollabSlice = z.object({
+  seq: z.number(),
+  chat: z.exactOptional(Chat),
+  channelSummary: z.exactOptional(ChannelSummary),
+  connectors: z.array(ConnectorStatus),
+}) satisfies Codec<T.CollabSlice>;
+
+export const InboxSlice = z.object({
+  seq: z.number(),
+  items: z.array(InboxItem),
+  call: CallState,
+  callReason: z.string(),
+}) satisfies Codec<T.InboxSlice>;
+
+export const OpsSlice = z.object({
+  seq: z.number(),
+  crons: z.array(CronView),
+  media: z.exactOptional(z.array(MediaJob)),
+  mediaSummary: z.exactOptional(MediaSummary),
+}) satisfies Codec<T.OpsSlice>;
+
+export const SliceBundle = z.object({
+  seq: z.number(),
+  board: BoardSlice,
+  sessions: SessionsSlice,
+  collab: CollabSlice,
+  inbox: InboxSlice,
+  ops: OpsSlice,
+  farm: FarmFrame,
+}) satisfies Codec<T.SliceBundle>;
 
 export const Health = z.object({
   ok: z.boolean(),

@@ -3,7 +3,12 @@ name = "vibevalley-pele"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+autotests = false
 description = "Pure-Rust Mermaid diagram parser, layered graph layout engine, and resvg-safe SVG renderer"
+
+[[test]]
+name = "suite"
+path = "tests/suite.rs"
 
 [dependencies]
 indexmap = "2.14.2"

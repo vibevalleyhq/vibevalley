@@ -13,9 +13,7 @@ use sqlx::SqliteConnection;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, Attachment, AttachmentFile, AttachmentUpload, BizCode, native_ops, ops};
 
-#[rustfmt::skip]
-#[path = "generated/queries.rs"]
-mod queries;
+use crate::db::generated::content_attachment as queries;
 
 use crate::base::{internal, open_sqlx_db};
 use crate::{Hub, now};
@@ -41,7 +39,7 @@ impl Attachments {
     pub fn open(home: &Path) -> sqlx::Result<Arc<Attachments>> {
         let conn = pollster::block_on(async {
             let mut conn = open_sqlx_db(home).await?;
-            sqlx::raw_sql(include_str!("sql/schema.sql")).execute(&mut conn).await?;
+            sqlx::raw_sql(crate::db::schema::CONTENT_ATTACHMENT).execute(&mut conn).await?;
             Ok::<_, sqlx::Error>(conn)
         })?;
         Ok(Arc::new(Attachments {

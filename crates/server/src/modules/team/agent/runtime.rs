@@ -18,7 +18,10 @@ use vibevalley_protocol::{
 };
 use vibevalley_runtime::oar::{Registry, Runtime};
 
-use super::presets::{Candidate, agent_problems, choose_agent, money_stop, preset_of, quota_of, runtime_ids, runtime_label, session_options, support_of};
+use super::presets::{
+    Candidate, agent_problems, choose_agent, money_stop, preset_of, quota_of, runtime_ids, runtime_label, runtime_reports_model_efforts, session_options,
+    support_of,
+};
 use super::profile::Profiles;
 use crate::{Hub, lock, now};
 
@@ -70,6 +73,7 @@ pub struct Fleet {
     stop: Mutex<Option<flume::Sender<()>>>,
     stop_rx: flume::Receiver<()>,
     usage_thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+    sub: Mutex<Option<crate::event_bus::Subscription>>,
 }
 
 /// Runs `f` on its own thread; none when it takes longer than `limit`.
@@ -127,6 +131,7 @@ impl Fleet {
             stop: Mutex::new(Some(stop_tx)),
             stop_rx: stop_rx.clone(),
             usage_thread: Mutex::new(None),
+            sub: Mutex::new(None),
         });
         if background {
             for id in fleet.ids() {
@@ -150,13 +155,15 @@ impl Fleet {
                 *lock(&fleet.usage_thread) = Some(handle);
             }
             let f = Arc::downgrade(&fleet);
-            hub.watch(Arc::new(move |_, tr| {
+            let sub = hub.subscribe_transitions("runtime-usage", move |_, tr| {
                 let vibevalley_protocol::Fact::SessionReported(r) = &tr.fact else { return };
                 let Some(fleet) = f.upgrade() else { return };
                 if let Some(s) = tr.after.sessions.iter().chain(&tr.before.sessions).find(|s| s.id == r.id) {
                     fleet.usage_soon(&s.runtime);
                 }
-            }));
+            });
+            let prev = lock(&fleet.sub).replace(sub);
+            drop(prev);
         }
         fleet
     }
@@ -209,6 +216,8 @@ impl Fleet {
     /// Stops answering with new probes (`close`).
     pub fn close(&self) {
         self.closed.store(true, Ordering::Relaxed);
+        let prev = lock(&self.sub).take();
+        drop(prev);
         let _ = lock(&self.stop).take();
         if let Some(handle) = lock(&self.usage_thread).take()
             && handle.thread().id() != std::thread::current().id()
@@ -524,8 +533,11 @@ impl Fleet {
             .ok_or_else(|| refused(t("server.runtime.cannotDrive", &[("runtime", runtime_id.into())])))?;
         let settings = self.profiles.settings(runtime_id);
         Self::use_binary(runtime_id, &settings.bin_path);
-        if let Some(obs) = self.held(runtime_id) {
-            match obs.info.installation {
+        let held = self
+            .held(runtime_id)
+            .or_else(|| runtime_id.strip_prefix("acp:").and_then(|wire| self.held(wire)));
+        if let Some(obs) = &held {
+            match &obs.info.installation {
                 Installation::NotFound(_) => {
                     return Err(refused(t(
                         "server.runtime.cannotSend",
@@ -538,22 +550,34 @@ impl Fleet {
                 Installation::Unsupported(u) => {
                     return Err(refused(t(
                         "server.runtime.cannotSend",
-                        &[("name", runtime_label(runtime_id).into()), ("why", u.reason.into())],
+                        &[("name", runtime_label(runtime_id).into()), ("why", u.reason.clone().into())],
                     )));
                 }
                 Installation::Available(_) | Installation::Checking(_) => {}
             }
         }
+        let cached_models = held.and_then(|obs| obs.info.models);
         let model = model
             .map(str::trim)
             .filter(|m| !m.is_empty())
             .map(String::from)
             .unwrap_or_else(|| settings.default_model.clone());
-        let effort = effort
+        let mut effort = effort
             .map(str::trim)
             .filter(|e| !e.is_empty())
             .map(String::from)
             .unwrap_or_else(|| settings.default_effort.clone());
+        if let Some(models) = cached_models.as_deref()
+            && !effort.is_empty()
+            && runtime_reports_model_efforts(models)
+        {
+            let found = models.iter().find(|m| if model.is_empty() { m.is_default } else { m.id == model });
+            if let Some(m) = found
+                && !m.effort_levels.contains(&effort)
+            {
+                effort.clear();
+            }
+        }
         Ok(Resolved {
             runtime,
             bin_path: settings.bin_path,

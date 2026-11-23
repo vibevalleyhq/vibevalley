@@ -1,167 +1,215 @@
 [
- {
-  "id": "w1",
-  "role": "worker",
-  "name": "Helper w1",
-  "agent": "lab",
-  "runtime": "claude",
-  "brief": "work on i1",
-  "repo": "demo",
-  "branch": "vibevalley/issue-1",
-  "worktree": "/tmp/worktrees/demo.1",
-  "hiredAt": 1794500000000,
-  "runs": 0,
-  "issue": "i1",
-  "refining": false,
-  "phase": {
-   "_tag": "working",
-   "since": 1794500000000,
-   "doing": {
-    "action": "run_command",
-    "label": "vp test",
-    "actionText": "跑命令"
-   }
-  },
-  "phaseText": "在跑命令：vp test"
- },
- {
-  "id": "w2",
-  "role": "worker",
-  "name": "Helper w2",
-  "agent": "lab",
-  "runtime": "claude",
-  "brief": "work on i2",
-  "repo": "demo",
-  "branch": "vibevalley/issue-2",
-  "worktree": "/tmp/worktrees/demo.2",
-  "hiredAt": 1794500000000,
-  "runs": 1,
-  "lastRun": {
-   "outcome": "completed",
-   "summary": "Asked about the port",
-   "at": 1794500120000
-  },
-  "issue": "i2",
-  "refining": false,
-  "phase": {
-   "_tag": "done"
-  },
-  "phaseText": "这一轮做完了，等你看"
- },
- {
-  "id": "w3",
-  "role": "worker",
-  "name": "Helper w3",
-  "agent": "lab",
-  "runtime": "claude",
-  "brief": "work on i3",
-  "repo": "demo",
-  "branch": "vibevalley/issue-3",
-  "worktree": "/tmp/worktrees/demo.3",
-  "hiredAt": 1794500000000,
-  "runs": 1,
-  "lastRun": {
-   "outcome": "completed",
-   "summary": "Done; conflicts",
-   "at": 1794500180000
-  },
-  "issue": "i3",
-  "refining": false,
-  "phase": {
-   "_tag": "done"
-  },
-  "phaseText": "这一轮做完了，等你看，合进 main 会冲突（a.ts）"
- },
- {
-  "id": "w4",
-  "role": "worker",
-  "name": "Helper w4",
-  "agent": "lab",
-  "runtime": "claude",
-  "brief": "work on i4",
-  "repo": "demo",
-  "branch": "vibevalley/issue-4",
-  "worktree": "/tmp/worktrees/demo.4",
-  "hiredAt": 1794500000000,
-  "runs": 2,
-  "lastRun": {
-   "outcome": "completed",
-   "summary": "Found it",
-   "at": 1794500240000,
-   "spent": {
-    "tokens": 1200,
-    "cny": 0.37
-   },
-   "answer": {
-    "conclusion": "It is 42.",
-    "evidence": [
-     "a.ts:1"
+  {
+    "bindings": [
+      {
+        "id": "i1",
+        "kind": "issue"
+      }
     ],
-    "unsure": [],
-    "next": [
-     "ship"
-    ]
-   }
+    "brief": "work on i1",
+    "controller": "issueBoard",
+    "cwd": "/tmp/worktrees/demo.1",
+    "hiredAt": 1794500000000,
+    "id": "w1",
+    "name": "Helper w1",
+    "phase": {
+      "_tag": "working",
+      "doing": {
+        "action": "run_command",
+        "actionText": "跑命令",
+        "label": "vp test"
+      },
+      "since": 1794500000000
+    },
+    "phaseText": "在跑命令：vp test",
+    "policy": {
+      "branch": "vibevalley/issue-1",
+      "kind": "managedWorktree",
+      "repo": "demo"
+    },
+    "profile": "lab",
+    "role": "worker",
+    "runs": 0,
+    "runtime": "claude"
   },
-  "issue": "i4",
-  "refining": false,
-  "phase": {
-   "_tag": "done"
+  {
+    "bindings": [
+      {
+        "id": "i2",
+        "kind": "issue"
+      }
+    ],
+    "brief": "work on i2",
+    "controller": "issueBoard",
+    "cwd": "/tmp/worktrees/demo.2",
+    "hiredAt": 1794500000000,
+    "id": "w2",
+    "lastRun": {
+      "at": 1794500120000,
+      "outcome": "completed",
+      "summary": "Asked about the port"
+    },
+    "name": "Helper w2",
+    "phase": {
+      "_tag": "done"
+    },
+    "phaseText": "这一轮做完了，等你看",
+    "policy": {
+      "branch": "vibevalley/issue-2",
+      "kind": "managedWorktree",
+      "repo": "demo"
+    },
+    "profile": "lab",
+    "role": "worker",
+    "runs": 1,
+    "runtime": "claude"
   },
-  "phaseText": "这一轮做完了，等你看"
- },
- {
-  "id": "w5",
-  "role": "worker",
-  "name": "Helper w5",
-  "agent": "lab",
-  "runtime": "claude",
-  "brief": "work on i5",
-  "repo": "demo",
-  "branch": "vibevalley/issue-5",
-  "worktree": "/tmp/worktrees/demo.5",
-  "hiredAt": 1794500000000,
-  "runs": 0,
-  "issue": "i5",
-  "refining": false,
-  "phase": {
-   "_tag": "working",
-   "since": 1794500000000,
-   "quietSince": 1794500300000,
-   "retry": {
-    "attempt": 1,
-    "of": 3
-   },
-   "doing": {
-    "action": "run_command",
-    "label": "vp test",
-    "actionText": "跑命令"
-   }
+  {
+    "bindings": [
+      {
+        "id": "i3",
+        "kind": "issue"
+      }
+    ],
+    "brief": "work on i3",
+    "controller": "issueBoard",
+    "cwd": "/tmp/worktrees/demo.3",
+    "hiredAt": 1794500000000,
+    "id": "w3",
+    "lastRun": {
+      "at": 1794500180000,
+      "outcome": "completed",
+      "summary": "Done; conflicts"
+    },
+    "name": "Helper w3",
+    "phase": {
+      "_tag": "done"
+    },
+    "phaseText": "这一轮做完了，等你看，合进 main 会冲突（a.ts）",
+    "policy": {
+      "branch": "vibevalley/issue-3",
+      "kind": "managedWorktree",
+      "repo": "demo"
+    },
+    "profile": "lab",
+    "role": "worker",
+    "runs": 1,
+    "runtime": "claude"
   },
-  "phaseText": "在跑命令：vp test（已经 {span}没动静了）"
- },
- {
-  "id": "w6",
-  "role": "worker",
-  "name": "Helper w6",
-  "agent": "lab",
-  "runtime": "claude",
-  "brief": "work on i6",
-  "repo": "demo",
-  "branch": "vibevalley/issue-6",
-  "worktree": "/tmp/worktrees/demo.6",
-  "hiredAt": 1794500000000,
-  "runs": 1,
-  "lastRun": {
-   "outcome": "failed",
-   "summary": "Build broke",
-   "at": 1794500300000
+  {
+    "bindings": [
+      {
+        "id": "i4",
+        "kind": "issue"
+      }
+    ],
+    "brief": "work on i4",
+    "controller": "issueBoard",
+    "cwd": "/tmp/worktrees/demo.4",
+    "hiredAt": 1794500000000,
+    "id": "w4",
+    "lastRun": {
+      "answer": {
+        "conclusion": "It is 42.",
+        "evidence": [
+          "a.ts:1"
+        ],
+        "next": [
+          "ship"
+        ],
+        "unsure": []
+      },
+      "at": 1794500240000,
+      "outcome": "completed",
+      "spent": {
+        "cny": 0.37,
+        "tokens": 1200
+      },
+      "summary": "Found it"
+    },
+    "name": "Helper w4",
+    "phase": {
+      "_tag": "done"
+    },
+    "phaseText": "这一轮做完了，等你看",
+    "policy": {
+      "branch": "vibevalley/issue-4",
+      "kind": "managedWorktree",
+      "repo": "demo"
+    },
+    "profile": "lab",
+    "role": "worker",
+    "runs": 2,
+    "runtime": "claude"
   },
-  "issue": "i6",
-  "refining": false,
-  "phase": {
-   "_tag": "failed"
+  {
+    "bindings": [
+      {
+        "id": "i5",
+        "kind": "issue"
+      }
+    ],
+    "brief": "work on i5",
+    "controller": "issueBoard",
+    "cwd": "/tmp/worktrees/demo.5",
+    "hiredAt": 1794500000000,
+    "id": "w5",
+    "name": "Helper w5",
+    "phase": {
+      "_tag": "working",
+      "doing": {
+        "action": "run_command",
+        "actionText": "跑命令",
+        "label": "vp test"
+      },
+      "quietSince": 1794500300000,
+      "retry": {
+        "attempt": 1,
+        "of": 3
+      },
+      "since": 1794500000000
+    },
+    "phaseText": "在跑命令：vp test（已经 {span}没动静了）",
+    "policy": {
+      "branch": "vibevalley/issue-5",
+      "kind": "managedWorktree",
+      "repo": "demo"
+    },
+    "profile": "lab",
+    "role": "worker",
+    "runs": 0,
+    "runtime": "claude"
   },
-  "phaseText": "这一轮没做成"
- }
+  {
+    "bindings": [
+      {
+        "id": "i6",
+        "kind": "issue"
+      }
+    ],
+    "brief": "work on i6",
+    "controller": "issueBoard",
+    "cwd": "/tmp/worktrees/demo.6",
+    "hiredAt": 1794500000000,
+    "id": "w6",
+    "lastRun": {
+      "at": 1794500300000,
+      "outcome": "failed",
+      "summary": "Build broke"
+    },
+    "name": "Helper w6",
+    "phase": {
+      "_tag": "failed"
+    },
+    "phaseText": "这一轮没做成",
+    "policy": {
+      "branch": "vibevalley/issue-6",
+      "kind": "managedWorktree",
+      "repo": "demo"
+    },
+    "profile": "lab",
+    "role": "worker",
+    "runs": 1,
+    "runtime": "claude"
+  }
 ]

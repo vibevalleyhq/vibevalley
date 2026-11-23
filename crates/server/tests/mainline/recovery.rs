@@ -148,8 +148,8 @@ fn regression_replies_and_reports_across_process_exit() {
             call(&url, "issue.status.update", json!({"id": issue["id"],"status":"todo"}));
             let (issue, thread) = issue_thread(&server);
             until(&server, "first report", || (count_notes(&server, &thread, "initial") == 1).then_some(()));
-            // Hold the router before accepting the next chat write, leaving its cursor behind the message.
-            server.watch.close();
+            // Hold the issue dispatcher before accepting the next chat write, leaving its delivery pending in SQLite.
+            server.issue_chat.close();
             comment(&url, &issue, FOLLOW_UP);
             assert!(
                 server
@@ -237,10 +237,10 @@ fn regression_replies_and_reports_across_process_exit() {
     assert_eq!(wire[2]["needsReconciliation"], true);
     let session = call(&url, "session.get", json!({"id": runs[2].session}));
     assert_eq!(session["lastRun"]["needsReconciliation"], true);
-    let frame = server.board.frame();
+    let bundle = server.board.bundle();
     assert!(
-        frame
-            .state
+        bundle
+            .sessions
             .sessions
             .iter()
             .find(|s| s.id == runs[2].session)
@@ -269,7 +269,7 @@ fn regression_replies_and_reports_across_process_exit() {
     assert_eq!(confirmed.spent.as_ref().map(|s| s.tokens), Some(16));
     assert!(runs[2].spent.is_none(), "interrupted before its receipt");
     let session = server.board.session(&runs[2].session).unwrap();
-    let worktree = Path::new(session.worktree.as_deref().unwrap());
+    let worktree = Path::new(session.cwd.as_deref().unwrap());
     assert_eq!(
         std::fs::read_to_string(worktree.join("delivery.txt")).unwrap(),
         format!("initial\n{FOLLOW_UP}\n{UNKNOWN}\n")

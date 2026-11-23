@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
@@ -12,7 +10,7 @@ use vibevalley_pele::diagram::state::types::{ClickStmt, ClickTarget, Stmt};
 use vibevalley_pele::diagram::state::{EdgePattern, StateDb, StateNodeShape};
 use vibevalley_pele::{ErrorCode, LinkInfo, MathSvg, ParseOptions, ParsedModel, detect_type, parse, render, supports};
 
-use support::{
+use crate::support::{
     Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, assert_well_formed, css_options, dark_options, load_fixture, resolved_options,
 };
 
@@ -1282,7 +1280,7 @@ fn state_stress_worst_cases() {
 
     let repeat_fn = |count: usize, f: fn(usize) -> String| -> String { (0..count).map(f).collect() };
 
-    type StressCase = (&'static str, Box<dyn FnOnce()>);
+    type StressCase = (&'static str, Box<dyn FnOnce() + Send>);
     let cases: Vec<StressCase> = vec![
         (
             "the same class statement and transitions 1,500 times",
@@ -1642,10 +1640,17 @@ fn state_stress_worst_cases() {
         ),
     ];
 
-    for (name, run) in cases {
-        let started = Instant::now();
-        run();
-        let elapsed = started.elapsed();
-        assert!(elapsed.as_secs() < 15, "stress case '{name}' took {elapsed:?}");
-    }
+    let queue = std::sync::Mutex::new(cases);
+    std::thread::scope(|scope| {
+        for _ in 0..4 {
+            scope.spawn(|| {
+                while let Some((name, run)) = queue.lock().unwrap().pop() {
+                    let started = Instant::now();
+                    run();
+                    let elapsed = started.elapsed();
+                    assert!(elapsed.as_secs() < 15, "stress case '{name}' took {elapsed:?}");
+                }
+            });
+        }
+    });
 }

@@ -21,7 +21,7 @@
 |---|---|
 | `crates/server/src/modules/skin/game.rs` | `Game`：账本落盘（`ledger.jsonl`）、订阅事实、commit 统计调度（`count_commits`）、称号（`choose_title`）与空地预约（`want`） |
 | `crates/core/src/progress.rs` | 账本条目提取（`entries_for`）、进度折叠纯函数（`progress_fold`、`progress_step`）、金币（`harvest_coins`） |
-| `crates/core/src/game.rs` | 等级（`level_for_commits`）、地块映射（`plot_of`）、帧视图（`view_of`）、特效（`effects_of`）、地块分配（`free_station`、`stationed`）、成就（`achievements`） |
+| `crates/core/src/game.rs` | 等级（`level_for_commits`）、地块映射（`plot_of`）、帧视图（`view_of`）、特效（`effects_of`）、地块分配（`free_station`、`stationed`）、成就目录与进度计算（`achievements`、`standings_of`） |
 | `crates/core/data/seeds.json` | 内置成就定义 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`game.achievement.list`、`game.title.set`）。
@@ -45,7 +45,7 @@
 - **commit 折算等级**：
   - 从 `Lv.n` 升至 `Lv.n+1` 需 `10 × n` 个归属用户的 commit（`level_for_commits`）。
   - 首次启动统计基线只定等级、不弹升级横幅；后续新增 commit 跨级时发出 `levelUp` 特效。
-- **成就静态文案与每帧进度分离**：静态描述经 `game.achievement.list` 一次性读取；每帧 `StateFrame` 只带轻量进度数值。
+- **农场视图独立切片与成就按需查询**：`FarmView` 与 `GameEffect` 通过独立的 `SliceKind::Farm`（`FarmFrame { seq, view, progress, effects }`）推送，不再进入工作台业务切片；`FarmView` 移除了 `achievements` 字段，成就定义与档位进度统一经 `game.achievement.list` 返回 `AchievementList { items, standings }` 按需读取。
 
 ## 怎么走
 

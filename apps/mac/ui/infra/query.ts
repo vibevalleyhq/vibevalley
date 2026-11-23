@@ -2,7 +2,7 @@ import { type ProviderVoiceRequest, VibeValleyApiError } from "@vibevalley/proto
 
 import { api, ApiConnectionError } from "./api";
 import { CursorManifest, SpriteManifest } from "./base/manifests";
-import type { FramesSource } from "./frame";
+import type { SlicesSource } from "./frame";
 import { cursorManifest, loadSpriteManifest } from "./pixelManifests";
 import { defineQuery, type QueryClient } from "./query/cache";
 import { useQuery } from "./query/solid";
@@ -14,10 +14,10 @@ export const retryRead = {
   retryWhen: (error: unknown) =>
     error instanceof ApiConnectionError || error instanceof TypeError || (error instanceof VibeValleyApiError && error.status >= 500),
 };
-export function refetchOnRelink(source: FramesSource, client: QueryClient) {
-  let was = source.get().link;
-  return source.subscribe(() => {
-    const now = source.get().link;
+export function refetchOnRelink(source: SlicesSource, client: QueryClient) {
+  let was = source.link();
+  return source.subscribeLink(() => {
+    const now = source.link();
     if (now === "open" && was === "lost") void client.invalidate();
     was = now;
   });

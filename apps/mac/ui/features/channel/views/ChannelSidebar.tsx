@@ -3,6 +3,7 @@ import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import { type Channel, defaultOrchestrator, type SessionView } from "@vibevalley/protocol";
+import { isFreeUserSession, sessionProfile } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
 import { OrchestratorFace } from "../../../design/domain/Face";
@@ -15,7 +16,7 @@ import { useAgent } from "../../../infra/agents";
 import { api } from "../../../infra/api";
 import { useNow } from "../../../infra/base/dom";
 import { tookText } from "../../../infra/base/format";
-import { orchestratorMood, orchestratorSession, type OrchestratorMood, useCore } from "../../../infra/frame";
+import { orchestratorMood, orchestratorSession, type OrchestratorMood, useCollabSlice, useSessionsSlice } from "../../../infra/frame";
 import { ready, settingsQuery, useAgents, useQuery } from "../../../infra/query";
 import { fixOf } from "../../../infra/readiness";
 import { Link as A, useRouter } from "../../../infra/router";
@@ -66,13 +67,14 @@ export function BarButton(props: {
 }
 
 export function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefined; onNew: () => void; onSearch: () => void; onPick: () => void }) {
-  const core = useCore();
+  const collab = useCollabSlice();
+  const sessionsSlice = useSessionsSlice();
   const router = useRouter();
   const chat = useMarkedChat();
   const channels = () => topsOf(chat());
   const directs = () => directsOf(chat());
   const archived = () => archivedOf(chat());
-  const sessions = () => core()?.sessions ?? [];
+  const sessions = () => (sessionsSlice()?.sessions ?? []).filter((h) => !isFreeUserSession(h));
   const picking = signal(false);
   const go = (c: Channel) => {
     router.navigate(chatPath(c));
@@ -80,7 +82,7 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
   };
   const act = createAct();
   const reorder = createReorder((id, onto) => void act.run(() => api.channel.update({ id, before: onto.id, category: onto.category })));
-  const channelSummary = () => (chat() === core()?.chat ? core()?.channelSummary : undefined);
+  const channelSummary = () => (chat() === collab()?.chat ? collab()?.channelSummary : undefined);
   const totalUnread = () => unreadTotal(chat(), channelSummary());
   const unreadOf = (c: Channel) => unreadUnder(chat(), c, channelSummary());
   const unreadSum = (list: readonly Channel[]) => list.reduce((sum, c) => sum + unreadOf(c), 0);
@@ -355,12 +357,12 @@ function ChannelRow(props: { channel: Channel; here: boolean; unread: number; on
 }
 
 function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channel) => void }) {
-  const core = useCore();
+  const collab = useCollabSlice();
   const now = useNow();
-  const thread = () => sessionThreadOf(core()?.chat, props.h);
+  const thread = () => sessionThreadOf(collab()?.chat, props.h);
   const unread = () => {
     const current = thread();
-    return current ? unreadUnder(core()?.chat, current, core()?.channelSummary) : 0;
+    return current ? unreadUnder(collab()?.chat, current, collab()?.channelSummary) : 0;
   };
   const phase = () => phaseText(props.h, now());
   return (
@@ -380,7 +382,7 @@ function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channe
       </If>
       <View class="min-w-0 flex-1 flex-row items-center gap-2">
         <View class="relative shrink-0">
-          <HelperFace agent={props.h.agent} runtime={props.h.runtime} size={22} />
+          <HelperFace agent={sessionProfile(props.h) ?? ""} runtime={props.h.runtime} size={22} />
           <View class="absolute -right-0.5 -bottom-0.5">
             <Dot tone={phaseDot(props.h.phase)} size={6} />
           </View>
@@ -402,9 +404,9 @@ function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channe
 
 /** The orchestrator that looks after the place open, and what it is doing. */
 function OrchestratorLine(props: { agent: string }) {
-  const core = useCore();
+  const sessions = useSessionsSlice();
   const profile = useAgent(() => props.agent);
-  const now = (): OrchestratorMood => orchestratorMood(core(), props.agent);
+  const now = (): OrchestratorMood => orchestratorMood(sessions()?.sessions, props.agent);
   const settings = useQuery(settingsQuery);
   // Listening is not a promise the orchestrator can keep without its model: then the line says what it lacks, and where that is set.
   const lacks = () => {
@@ -413,7 +415,7 @@ function OrchestratorLine(props: { agent: string }) {
   };
   const clock = useNow();
   const since = () => {
-    const phase = orchestratorSession(core(), props.agent)?.phase;
+    const phase = orchestratorSession(sessions()?.sessions, props.agent)?.phase;
     return phase?._tag === "working" ? phase.since : undefined;
   };
   const dotTone = () => (lacks() ? "berry" : now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf");

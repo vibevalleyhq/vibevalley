@@ -1,28 +1,40 @@
-mod support;
-
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashSet};
 use std::sync::{Arc, LazyLock};
 
+use crate::support::TestHarness;
+use nsh_core::canvas::{CanvasOp, PathOp};
 use nsh_core::element::Root;
 use nsh_core::prelude::*;
+use nsh_core::{EventKind, EventPayload};
 use resvg::tiny_skia;
-use support::TestHarness;
 use vibevalley_protocol::{ArtifactEntry, ArtifactEntryKind};
 use vibevalley_rich::engine::canvas::Canvas;
 use vibevalley_rich::engine::whiteboard::{
-    BoardAction, BoardDoc, ElementId, ElementKind, ElementRecord, InkMode, LayerPaintInput, Modifiers, Point2, PointerButton, PointerInput, Presence,
-    PresenceColor, PresenceKind, PresenceViewport, Rect2, ShapeKind, SnapAxis, SnapGuide, StrokePoint, StrokeStyle, TemplateCopy, TemplateKind, TextAlign,
-    Tool, WbFill, WhiteboardController, build_export_painter, build_template_doc, encode_element_json, export_json, export_json_canvas, export_svg,
-    import_json_canvas, paint_minimap, paint_overlay_layer, paint_static_layer,
+    BoardAction, BoardDoc, Camera, ElementId, ElementKind, ElementRecord, FramePaintInput, GridStyle, InkMode, LayerPaintInput, MilestoneKind, Modifiers,
+    Point2, PointerButton, PointerInput, Presence, PresenceColor, PresenceKind, PresenceViewport, Rect2, ShapeKind, SnapAxis, SnapGuide, StrokePoint,
+    StrokeStyle, TemplateCopy, TemplateKind, TextAlign, TextVariant, TimelineMilestone, Tool, WbFill, WhiteboardController, WhiteboardPalette,
+    build_export_painter, build_template_doc, encode_element_json, export_json, export_json_canvas, export_svg, import_json_canvas, paint_board_frame,
+    paint_grid, paint_minimap, paint_overlay_layer, paint_static_layer,
 };
-use vibevalley_rich::{VvWhiteboardChatEvent, VvWhiteboardCursorEvent, VvWhiteboardExportEvent, VvWhiteboardViewportEvent, vv_whiteboard};
+use vibevalley_rich::{
+    VvWhiteboardBatchEvent, VvWhiteboardChatEvent, VvWhiteboardCursorEvent, VvWhiteboardExportEvent, VvWhiteboardViewportEvent, vv_whiteboard,
+};
 
 static SYSTEM_FONTS: LazyLock<Arc<usvg::fontdb::Database>> = LazyLock::new(|| {
     let mut db = usvg::fontdb::Database::new();
-    db.load_system_fonts();
-    db.load_fonts_dir("/System/Library/Fonts");
-    db.load_fonts_dir("/Library/Fonts");
+    for path in [
+        "/System/Library/Fonts/HelveticaNeue.ttc",
+        "/System/Library/Fonts/Hiragino Sans GB.ttc",
+        "/System/Library/Fonts/STHeiti Medium.ttc",
+        "/System/Library/Fonts/Supplemental/Georgia.ttf",
+        "/System/Library/Fonts/Supplemental/Songti.ttc",
+    ] {
+        let _ = db.load_font_file(path);
+    }
+    if db.is_empty() {
+        db.load_system_fonts();
+    }
     Arc::new(db)
 });
 
@@ -370,6 +382,7 @@ fn json_and_json_canvas_export_validate_and_roundtrip() {
 
 #[derive(Default)]
 struct RecordedWbEvents {
+    batches: Vec<String>,
     exports: Vec<VvWhiteboardExportEvent>,
     chats: Vec<String>,
     cursors: Vec<VvWhiteboardCursorEvent>,
@@ -391,6 +404,9 @@ fn WhiteboardTestRoot() -> impl IntoElement {
         .presences_json(presences_json)
         .title("产品发布时间线")
         .locale("zh")
+        .on_batch(|ev: &VvWhiteboardBatchEvent| {
+            WB_EVENTS.with(|r| r.borrow_mut().batches.push(ev.writes_json.to_string()));
+        })
         .on_export(|ev: &VvWhiteboardExportEvent| {
             WB_EVENTS.with(|r| r.borrow_mut().exports.push(ev.clone()));
         })
@@ -537,5 +553,361 @@ fn vv_whiteboard_presence_follow_banner_and_viewport_callbacks() {
         let last = recorded.viewports.last().unwrap();
         assert!((last.zoom - 1.0).abs() < 1e-4, "final viewport zoom after reset should be 1.0");
         assert!(last.w > 0.0 && last.h > 0.0);
+    });
+}
+
+#[test]
+fn atomic_board_frame_supports_batched_grid_fast_shadows_and_selective_inline_hiding() {
+    let pal = WhiteboardPalette::light();
+    let cam = Camera::default();
+
+    // 1. Batched grid paths: Architectural emits exactly 2 Stroke ops (minor + major),
+    // and Dots emits 1 Fill op with a disconnected MoveTo immediately before every dot Ellipse.
+    let arch_grid = paint_grid(Painter::new(), GridStyle::Architectural, cam, 600.0, 400.0, &pal).finish();
+    let arch_strokes = arch_grid.ops.iter().filter(|op| matches!(op, CanvasOp::Stroke(_))).count();
+    assert_eq!(arch_strokes, 2, "Architectural grid should batch into 1 minor + 1 major stroke");
+
+    let dot_grid = paint_grid(Painter::new(), GridStyle::Dots, cam, 300.0, 200.0, &pal).finish();
+    let dot_fills = dot_grid.ops.iter().filter(|op| matches!(op, CanvasOp::Fill(_, _))).count();
+    assert_eq!(dot_fills, 1, "Dots grid should batch into a single Fill");
+    let mut prev_was_move = false;
+    let mut ellipse_count = 0usize;
+    for op in &dot_grid.ops {
+        if matches!(op, CanvasOp::Path(PathOp::Ellipse { .. })) {
+            assert!(prev_was_move, "each grid dot Ellipse must follow a MoveTo to avoid connecting chords");
+            ellipse_count += 1;
+        }
+        prev_was_move = matches!(op, CanvasOp::Path(PathOp::MoveTo(_, _)));
+    }
+    assert!(ellipse_count > 10, "expected batched dots to emit ellipses (got {ellipse_count})");
+
+    // 2. Atomic single-pass frame with fast_shadows = false vs true + selective text/milestone hiding.
+    let mut doc = BoardDoc::new("Atomic Frame");
+    doc.elements.extend([
+        ElementRecord::new(
+            "card-1",
+            ElementKind::Shape {
+                x: 80.0,
+                y: 80.0,
+                w: 180.0,
+                h: 100.0,
+                shape: ShapeKind::Card,
+                title: "Card Title".to_owned(),
+                body: "Card Body".to_owned(),
+                fill: WbFill::Sun,
+                stroke: None,
+                stroke_style: StrokeStyle::Solid,
+                corner_radius: None,
+                sticker: None,
+                sticker_svg: None,
+                badge: None,
+                align: TextAlign::Center,
+            },
+        ),
+        ElementRecord::new(
+            "callout-1",
+            ElementKind::Text {
+                x: 80.0,
+                y: 220.0,
+                w: 240.0,
+                h: 54.0,
+                variant: TextVariant::Callout,
+                label: "Callout Warning Text".to_owned(),
+                highlight: None,
+                icon: Some("!".to_owned()),
+                align: TextAlign::Left,
+                font_size: None,
+                fill: Some(WbFill::Peach),
+                color: None,
+            },
+        ),
+        ElementRecord::new(
+            "tl-1",
+            ElementKind::Timeline {
+                x: 80.0,
+                y: 340.0,
+                w: 520.0,
+                h: 80.0,
+                fill: WbFill::Peach,
+                points: vec![Point2::new(80.0, 380.0), Point2::new(340.0, 370.0), Point2::new(600.0, 360.0)],
+                milestones: vec![
+                    TimelineMilestone {
+                        t: Some(0.15),
+                        pos: None,
+                        label: "Milestone Alpha".to_owned(),
+                        kind: MilestoneKind::Major,
+                        tone: None,
+                        caption: None,
+                    },
+                    TimelineMilestone {
+                        t: Some(0.85),
+                        pos: None,
+                        label: "Milestone Beta".to_owned(),
+                        kind: MilestoneKind::Major,
+                        tone: None,
+                        caption: None,
+                    },
+                ],
+            },
+        ),
+        ElementRecord::new(
+            "tbl-1",
+            ElementKind::Table {
+                x: 340.0,
+                y: 80.0,
+                w: 260.0,
+                h: 110.0,
+                headers: vec!["Col".to_owned()],
+                rows: vec![vec!["Val".to_owned()]],
+                fill: WbFill::Default,
+            },
+        ),
+    ]);
+    doc.presences.push(Presence {
+        id: "peer-1".to_owned(),
+        name: "Peer".to_owned(),
+        color: PresenceColor::Teal,
+        kind: PresenceKind::Cursor,
+        x: 200.0,
+        y: 160.0,
+        status: Some("zooming".to_owned()),
+        has_cursor: true,
+        ..Presence::default()
+    });
+
+    let mut ctrl = WhiteboardController::new(doc);
+    ctrl.set_viewport_size(900.0, 600.0);
+    ctrl.selection = vec![ElementId::new("card-1")];
+    let hidden = BTreeSet::new();
+    let dismissed = BTreeSet::new();
+
+    let crisp = paint_board_frame(&FramePaintInput {
+        controller: &ctrl,
+        viewport_size: (900.0, 600.0),
+        editing_id: None,
+        editing_milestone: None,
+        dark: false,
+        anim_hidden_ids: &hidden,
+        dismissed_notes: &dismissed,
+        fast_shadows: false,
+    });
+    let fast = paint_board_frame(&FramePaintInput {
+        controller: &ctrl,
+        viewport_size: (900.0, 600.0),
+        editing_id: None,
+        editing_milestone: None,
+        dark: false,
+        anim_hidden_ids: &hidden,
+        dismissed_notes: &dismissed,
+        fast_shadows: true,
+    });
+
+    let crisp_blurs = crisp.ops.iter().filter(|op| matches!(op, CanvasOp::ShadowBlur(b) if b.0 > 0.0)).count();
+    let fast_blurs = fast.ops.iter().filter(|op| matches!(op, CanvasOp::ShadowBlur(b) if b.0 > 0.0)).count();
+    assert!(
+        crisp_blurs >= 4,
+        "crisp mode should emit blur shadows on cards/pills/tables/presences (got {crisp_blurs})"
+    );
+    assert_eq!(fast_blurs, 0, "fast_shadows mode must emit zero blur shadows");
+    assert!(
+        fast.nodes.iter().any(|n| n.test_id.as_deref() == Some("wb-el-card-1")),
+        "atomic frame must emit wb-el-* CanvasNodes"
+    );
+
+    // Editing timeline milestone 0 hides only Milestone Alpha while keeping Milestone Beta rendered.
+    let tl_id = ElementId::new("tl-1");
+    let tl_edit = paint_board_frame(&FramePaintInput {
+        controller: &ctrl,
+        viewport_size: (900.0, 600.0),
+        editing_id: Some(&tl_id),
+        editing_milestone: Some(0),
+        dark: false,
+        anim_hidden_ids: &hidden,
+        dismissed_notes: &dismissed,
+        fast_shadows: false,
+    });
+    let tl_texts: Vec<&str> = tl_edit
+        .ops
+        .iter()
+        .filter_map(|op| match op {
+            CanvasOp::FillText { text, .. } => Some(text.as_ref()),
+            _ => None,
+        })
+        .collect();
+    assert!(!tl_texts.iter().any(|t| t.contains("Milestone Alpha")), "edited milestone 0 text should hide");
+    assert!(
+        tl_texts.iter().any(|t| t.contains("Milestone Beta")),
+        "unedited milestone 1 text should stay visible"
+    );
+
+    // Editing a Callout keeps the warning triangle badge (`!`) while hiding only the callout body text.
+    let callout_id = ElementId::new("callout-1");
+    let callout_edit = paint_board_frame(&FramePaintInput {
+        controller: &ctrl,
+        viewport_size: (900.0, 600.0),
+        editing_id: Some(&callout_id),
+        editing_milestone: None,
+        dark: false,
+        anim_hidden_ids: &hidden,
+        dismissed_notes: &dismissed,
+        fast_shadows: false,
+    });
+    let callout_texts: Vec<&str> = callout_edit
+        .ops
+        .iter()
+        .filter_map(|op| match op {
+            CanvasOp::FillText { text, .. } => Some(text.as_ref()),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        callout_texts.contains(&"!"),
+        "Callout warning badge `!` must remain visible during inline editing"
+    );
+    assert!(
+        !callout_texts.iter().any(|t| t.contains("Callout Warning")),
+        "Callout label text must hide during inline editing"
+    );
+}
+
+#[test]
+fn vv_whiteboard_borderless_inline_editor_commits_on_outside_click_and_cancels_on_escape() {
+    let card = ElementRecord::new(
+        "card-inline",
+        ElementKind::Shape {
+            x: 120.0,
+            y: 120.0,
+            w: 220.0,
+            h: 110.0,
+            shape: ShapeKind::Card,
+            title: "Original Title".to_owned(),
+            body: "Original Body".to_owned(),
+            fill: WbFill::Sun,
+            stroke: None,
+            stroke_style: StrokeStyle::Solid,
+            corner_radius: None,
+            sticker: None,
+            sticker_svg: None,
+            badge: None,
+            align: TextAlign::Center,
+        },
+    );
+    let encoded = encode_element_json(&card);
+    let entries = vec![ArtifactEntry {
+        artifact_id: "art-inline-test".to_owned(),
+        path: "elements/card-inline".to_owned(),
+        kind: ArtifactEntryKind::Json,
+        mime: "application/json".to_owned(),
+        size: encoded.len() as i64,
+        rev: 1,
+        updated_by: "user".to_owned(),
+        updated: 1,
+        value: Some(encoded),
+        attachment_id: None,
+    }];
+    let entries_json = serde_json::to_string(&entries).expect("serialize inline test entry");
+
+    WB_EVENTS.with(|r| *r.borrow_mut() = RecordedWbEvents::default());
+    WB_SEED_JSON.with(|s| *s.borrow_mut() = entries_json);
+    WB_PRESENCES_JSON.with(|s| s.borrow_mut().clear());
+
+    let mut harness = TestHarness::mount(Root::of::<WhiteboardTestRoot>());
+    let stage_id = harness.find_test_id("wb-stage").expect("wb-stage should mount");
+    let root_id = harness.find_test_id("whiteboard-native-root").expect("root should mount");
+    let canvas_id = harness.find_test_id("wb-canvas").expect("wb-canvas should mount");
+
+    // Verify single atomic full-stage board canvas (the 17 toolbar `svg()` icons also mount as 14px Canvas views).
+    let stage_canvases = harness
+        .frames
+        .iter()
+        .filter(|(id, frame)| harness.kinds.get(id) == Some(&nsh_core::ViewKind::Canvas) && frame.size.width.0 > 100.0)
+        .count();
+    assert_eq!(stage_canvases, 1, "VvWhiteboard should mount exactly one full-stage atomic board canvas");
+    assert_eq!(harness.find_all_test_ids("wb-canvas").len(), 1);
+
+    // Locate the card center directly from the canvas's emitted accessibility node bounds.
+    let card_bounds = harness
+        .canvases
+        .get(&canvas_id)
+        .expect("canvas drawing present")
+        .nodes
+        .iter()
+        .find(|n| n.test_id.as_deref() == Some("wb-el-card-inline"))
+        .expect("wb-el-card-inline node present")
+        .bounds;
+    let card_center = point(
+        px(card_bounds.origin.x.0 + card_bounds.size.width.0 * 0.5),
+        px(card_bounds.origin.y.0 + card_bounds.size.height.0 * 0.5),
+    );
+
+    // Double-click card -> opens borderless inline editor (no save/cancel buttons).
+    let dbl_click = PressEvent {
+        position: card_center,
+        page_position: card_center,
+        clicks: 2,
+        ..Default::default()
+    };
+    assert!(harness.core.component_event(stage_id, EventKind::PressDown, &EventPayload::Press(dbl_click)));
+    harness.commit();
+
+    assert!(harness.find_test_id("wb-inline-editor").is_some(), "inline editor should open on double click");
+    assert!(harness.find_test_id("wb-inline-title").is_some(), "inline title input should mount");
+    assert!(
+        harness.find_test_id("wb-inline-save").is_none(),
+        "borderless inline editor must not render wb-inline-save"
+    );
+    assert!(
+        harness.find_test_id("wb-inline-cancel").is_none(),
+        "borderless inline editor must not render wb-inline-cancel"
+    );
+
+    // Pressing Escape cancels inline edit cleanly without emitting a batch write.
+    let mut esc = KeyEvent::default();
+    esc.key = SharedString::from("Escape");
+    assert!(harness.core.component_event(root_id, EventKind::KeyDown, &EventPayload::Key(esc)));
+    harness.commit();
+    assert!(harness.find_test_id("wb-inline-editor").is_none(), "Escape should cancel inline editing");
+    WB_EVENTS.with(|r| assert!(r.borrow().batches.is_empty(), "Escape cancel must not emit a batch"));
+
+    // Double-click again, type updated title, then click outside on the stage -> commits and emits batch.
+    assert!(harness.core.component_event(stage_id, EventKind::PressDown, &EventPayload::Press(dbl_click)));
+    harness.commit();
+    let title_input_id = harness.find_test_id("wb-inline-title").expect("inline title input mounted");
+    assert!(harness.core.component_event(
+        title_input_id,
+        EventKind::ChangeText,
+        &EventPayload::Text {
+            text: "Renamed In Place".to_owned(),
+            count: 1,
+        }
+    ));
+    harness.commit();
+
+    let outside_pos = point(px(10.0), px(10.0));
+    let outside_click = PressEvent {
+        position: outside_pos,
+        page_position: outside_pos,
+        clicks: 1,
+        ..Default::default()
+    };
+    assert!(
+        harness
+            .core
+            .component_event(stage_id, EventKind::PressDown, &EventPayload::Press(outside_click))
+    );
+    harness.commit();
+
+    assert!(
+        harness.find_test_id("wb-inline-editor").is_none(),
+        "outside click should commit and close inline editor"
+    );
+    WB_EVENTS.with(|r| {
+        let batches = &r.borrow().batches;
+        assert_eq!(batches.len(), 1, "outside click should commit inline edit and emit 1 batch");
+        assert!(
+            batches[0].contains("Renamed In Place"),
+            "committed batch should contain updated title, got: {}",
+            batches[0]
+        );
     });
 }

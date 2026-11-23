@@ -10,13 +10,19 @@ use vibevalley_protocol::*;
 use crate::moves::status_moves;
 use crate::rules::{compare_text, is_busy};
 
-/// On duty: an orchestrator's standing session. The others are hired.
-pub fn is_on_duty(role: AgentRole) -> bool {
-    role == AgentRole::Orchestrator
+/// On duty: an orchestrator's standing session.
+pub fn is_on_duty(session: &Session) -> bool {
+    session.is_orchestrator()
 }
 
-pub fn is_hired(role: AgentRole) -> bool {
-    role == AgentRole::Worker
+/// Hired: a session bound to work an issue on the board.
+pub fn is_hired(session: &Session) -> bool {
+    session.is_board_worker()
+}
+
+/// Managed farm helper: board workers and channel talkers, never free user chats or orchestrators.
+pub fn is_farm_worker(session: &Session) -> bool {
+    session.is_board_worker() || session.is_direct_talker()
 }
 
 pub fn session_of<'a>(state: &'a SpaceState, id: &str) -> Option<&'a Session> {
@@ -27,7 +33,7 @@ pub fn session_of<'a>(state: &'a SpaceState, id: &str) -> Option<&'a Session> {
 pub fn session_on_issue<'a>(state: &'a SpaceState, issue: &str) -> Option<&'a Session> {
     let mut on: Option<&Session> = None;
     for h in &state.sessions {
-        if h.issue.as_deref() == Some(issue) && on.is_none_or(|o| h.hired_at >= o.hired_at) {
+        if h.issue_id() == Some(issue) && on.is_none_or(|o| h.hired_at >= o.hired_at) {
             on = Some(h);
         }
     }
@@ -222,10 +228,10 @@ fn lookup_of(state: &SpaceState) -> Lookup<'_> {
     let mut refining = HashMap::new();
     for h in &state.sessions {
         sessions.insert(h.id.as_str(), h);
-        if h.refining
-            && let Some(issue) = &h.issue
+        if h.is_refining()
+            && let Some(issue) = h.issue_id()
         {
-            refining.entry(issue.as_str()).or_insert_with(|| IssueRefining {
+            refining.entry(issue).or_insert_with(|| IssueRefining {
                 session: h.id.clone(),
                 name: h.name.clone(),
             });
@@ -296,7 +302,7 @@ pub fn issue_refining_of(t: &Issue, state: &SpaceState) -> Option<IssueRefining>
     state
         .sessions
         .iter()
-        .find(|h| h.refining && h.issue.as_deref() == Some(&t.id))
+        .find(|h| h.is_refining() && h.issue_id() == Some(&t.id))
         .map(|h| IssueRefining {
             session: h.id.clone(),
             name: h.name.clone(),
@@ -448,14 +454,17 @@ pub fn issue_prompt_of(issue: &Issue) -> Option<IssuePromptKind> {
     }
 }
 
-/// Deterministic board summary folded into `SpaceView`: identical lane counts
+/// Deterministic board summary folded into `BoardSlice`: identical lane counts
 /// for wide and narrow views, active worker slot usage, and per-issue metadata.
 pub fn board_summary(state: &SpaceState) -> BoardSummary {
     let lookup = lookup_of(state);
     let mut on_duty_agents: HashSet<&str> = HashSet::from([DEFAULT_ORCHESTRATOR]);
     for s in &state.sessions {
-        if is_on_duty(s.role) && !s.agent.is_empty() {
-            on_duty_agents.insert(s.agent.as_str());
+        if is_on_duty(s)
+            && let Some(agent) = s.profile_id()
+            && !agent.is_empty()
+        {
+            on_duty_agents.insert(agent);
         }
     }
     if let Some(chat) = &state.chat {
@@ -512,7 +521,7 @@ pub fn board_summary(state: &SpaceState) -> BoardSummary {
         );
     }
 
-    let running_slots = state.sessions.iter().filter(|s| is_hired(s.role) && is_busy(s)).count() as i64;
+    let running_slots = state.sessions.iter().filter(|s| is_hired(s) && is_busy(s)).count() as i64;
 
     BoardSummary {
         lane_counts,

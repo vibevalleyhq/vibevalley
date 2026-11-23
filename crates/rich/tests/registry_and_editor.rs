@@ -1,5 +1,3 @@
-mod support;
-
 use nsh_base::diff_view;
 use nsh_base::editor::{EditorHighlighter, EditorTextEdit, EditorToken, editor};
 use nsh_core::element::{Registry, Root};
@@ -9,7 +7,7 @@ use vibevalley_rich::{
     register_grammar_json, registry, tokenize_scopes, vv_icon,
 };
 
-use support::TestHarness;
+use crate::support::TestHarness;
 
 #[test]
 fn registry_exports_all_components_and_documents_every_export() {

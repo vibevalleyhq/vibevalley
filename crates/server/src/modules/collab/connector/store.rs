@@ -8,9 +8,7 @@ use sqlx::Connection;
 use vibevalley_protocol::ConnectorID;
 
 use super::adapter::Inbound;
-#[rustfmt::skip]
-#[path = "generated/queries.rs"]
-mod q;
+use crate::db::generated::collab_connector as q;
 
 use crate::base::ModuleDb;
 use crate::modules::infra::setting::Secret;
@@ -54,7 +52,7 @@ pub struct Store {
 impl Store {
     pub fn open(home: &Path) -> Kept<Store> {
         Ok(Store {
-            db: ModuleDb::open(home, include_str!("sql/schema.sql"))?,
+            db: ModuleDb::open(home, crate::db::schema::COLLAB_CONNECTOR)?,
         })
     }
 

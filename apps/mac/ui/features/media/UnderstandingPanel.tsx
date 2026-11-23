@@ -17,7 +17,7 @@ import { TextLink } from "../../design/TextLink";
 import { api, reasonOf } from "../../infra/api";
 import { useAttachmentUrl } from "../../infra/attachmentFile";
 import { useTimeout } from "../../infra/base/timer";
-import { useCore } from "../../infra/frame";
+import { useCollabSlice, useOpsSlice } from "../../infra/frame";
 import { providerQuery, ready, useQuery } from "../../infra/query";
 import { FactGrid, JobActions, NoticeBanner, PhasePill, Refusal, SectionHeading, SourceLine } from "./JobFacts";
 import { publicationKey } from "./publication";
@@ -26,14 +26,15 @@ const maximumTokens = 8192;
 
 /** Understanding one kept file (a library item): its bytes are taken as the input on submit, checked as an upload is. */
 export function UnderstandingPanel(props: { file: Attachment }) {
-  const core = useCore();
+  const ops = useOpsSlice();
+  const collab = useCollabSlice();
   const query = useQuery(providerQuery);
   const status = () => ready(query, undefined);
   const thumbUrl = useAttachmentUrl(() => props.file.id);
   const kind = () => fileKind(props.file.type);
   const jobs = () => {
     const file = props.file.id;
-    return (core()?.media ?? []).filter((job): job is MediaUnderstandingJob => job.kind === "understanding" && job.inputs.some((input) => input.hash === file));
+    return (ops()?.media ?? []).filter((job): job is MediaUnderstandingJob => job.kind === "understanding" && job.inputs.some((input) => input.hash === file));
   };
   const prompt = signal("");
   const tokens = signal(512);
@@ -160,7 +161,7 @@ export function UnderstandingPanel(props: { file: Attachment }) {
                   disabled={frozen()}
                   value={channel()}
                   onChange={(v) => channel.set(v)}
-                  options={(core()?.chat?.channels ?? []).map((item) => ({ value: item.id, label: item.name ?? item.id }))}
+                  options={(collab()?.chat?.channels ?? []).map((item) => ({ value: item.id, label: item.name ?? item.id }))}
                 />
               </Field>
             </View>

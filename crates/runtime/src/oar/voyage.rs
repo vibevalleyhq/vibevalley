@@ -60,6 +60,15 @@ fn raw_bytes<S: Serializer>(bytes: &[u8], serializer: S) -> std::result::Result<
 fn decode_raw<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Vec<u8>, D::Error> {
     STANDARD.decode(String::deserialize(d)?).map_err(serde::de::Error::custom)
 }
+pub(crate) fn normalize_trace_id(trace_id: Option<u64>) -> Option<u64> {
+    trace_id.filter(|&id| id != 0)
+}
+fn is_absent_trace_id(trace_id: &Option<u64>) -> bool {
+    matches!(trace_id, None | Some(0))
+}
+fn decode_trace_id<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Option<u64>, D::Error> {
+    Ok(normalize_trace_id(Option::<u64>::deserialize(d)?))
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -72,6 +81,8 @@ pub struct Record {
     pub received_at: u64,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub span_id: String,
+    #[serde(default, skip_serializing_if = "is_absent_trace_id", deserialize_with = "decode_trace_id")]
+    pub trace_id: Option<u64>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub frame_type: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty", serialize_with = "raw_bytes", deserialize_with = "decode_raw")]
@@ -99,7 +110,7 @@ impl Record {
         }
         Ok(())
     }
-    pub(crate) fn new(kind: Kind, session_id: String, at: u64) -> Self {
+    pub fn new(kind: Kind, session_id: String, at: u64) -> Self {
         Self {
             seq: 0,
             kind,
@@ -107,6 +118,7 @@ impl Record {
             agent_path: vec![],
             received_at: at,
             span_id: String::new(),
+            trace_id: None,
             frame_type: String::new(),
             raw: vec![],
             events: vec![],
@@ -115,7 +127,7 @@ impl Record {
             native_events: vec![],
         }
     }
-    pub(crate) fn event(id: String, event: &Event) -> Self {
+    pub fn event(id: String, event: &Event) -> Self {
         let mut rec = Self::new(Kind::Frame, id, event.at_ms);
         rec.agent_path = event.agent_path.clone();
         match &event.kind {

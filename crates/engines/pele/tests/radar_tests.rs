@@ -1,5 +1,3 @@
-mod support;
-
 use std::time::Instant;
 
 use regex::Regex;
@@ -9,7 +7,7 @@ use vibevalley_pele::diagram::radar::parser::parse_radar;
 use vibevalley_pele::diagram::radar::render::{Point, closed_round_curve, relative_radius};
 use vibevalley_pele::{ErrorCode, ParseOptions, ParsedModel, RenderOptions, parse, render, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
 
 const BASIC: &str = "radar-beta\n  axis A, B, C, D\n  curve one[\"First\"]{1,2,3,4}\n  curve two{4,3,2,1}";
 

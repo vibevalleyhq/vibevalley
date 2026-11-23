@@ -3,7 +3,12 @@ name = "vibevalley-rich"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+autotests = false
 description = "Native Rust rich UI set and rendering engines for VibeValley on nsh 0.6.0"
+
+[[test]]
+name = "suite"
+path = "tests/suite.rs"
 
 [dependencies]
 nsh-base = { version = "0.6.0", default-features = false, features = ["editor"] }

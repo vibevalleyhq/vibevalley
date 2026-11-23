@@ -33,6 +33,7 @@ impl Shell {
                     self.last_route = Some(path);
                     self.save_settings(cx);
                 }
+                self.publish_host_debug(cx);
                 cx.notify();
             }
             Action::OpenRoute { path } => self.navigate_workbench(&path, cx),
@@ -48,7 +49,7 @@ impl Shell {
             }
             Action::Call { op, .. } => eprintln!("host call {op} reached the shell without a reply handle"),
             Action::OpenTerminal { cwd, title, command } => {
-                self.open_terminal_at(cwd, title, command, window, cx, |_| {});
+                self.open_terminal_at(PathBuf::from(cwd), title, command, window, cx, |_| {});
             }
             Action::ActivateProject { id } => {
                 if let Some(project) = self.ws.project(id) {
@@ -59,35 +60,28 @@ impl Shell {
                     });
                 }
             }
-            Action::ActivatePath { path } => self.activate_path(path, window, cx, |_, _, _| {}),
-            Action::ActivateTab { path, tab_id } => self.activate_path(path, window, cx, move |s, window, cx| {
+            Action::ActivatePath { path } => self.activate_path(PathBuf::from(path), window, cx, |_, _, _| {}),
+            Action::ActivateTab { path, tab_id } => self.activate_path(PathBuf::from(path), window, cx, move |s, window, cx| {
                 if let Some(p) = s.ws.active_mut() {
                     p.layout.activate(tab_id);
                 }
                 s.layout_changed(window, cx);
             }),
-            Action::CloseTabAt { path, tab_id } => self.activate_path(path, window, cx, move |s, window, cx| s.close_tab(tab_id, window, cx)),
+            Action::CloseTabAt { path, tab_id } => self.activate_path(PathBuf::from(path), window, cx, move |s, window, cx| s.close_tab(tab_id, window, cx)),
             Action::NewTerminalAt { path } => {
-                self.open_terminal_at(path, None, None, window, cx, |_| {});
+                self.open_terminal_at(PathBuf::from(path), None, None, window, cx, |_| {});
             }
             Action::NewChatAt { path, runtime } => {
-                self.open_chat_at(path, runtime, window, cx);
+                self.open_chat_at(PathBuf::from(path), runtime, window, cx);
             }
             Action::OpenFileAdjacent { path, line } => {
-                self.open_file_adjacent(path, line, window, cx);
+                self.open_file_adjacent(PathBuf::from(path), line, window, cx);
             }
             Action::OpenDiffAdjacent { path, staged } => {
-                self.open_diff_adjacent(path, staged, window, cx);
+                self.open_diff_adjacent(path.map(PathBuf::from), staged, window, cx);
             }
-            Action::UpdateChatTab {
-                tab_id,
-                session_id,
-                runtime,
-                title,
-                status,
-                attention,
-            } => {
-                self.update_chat_tab(tab_id, session_id, runtime, title, status, attention, cx);
+            Action::BindChatSession { tab_id, session_id, runtime } => {
+                self.bind_chat_session(tab_id, session_id, runtime, cx);
             }
             Action::AddProject => self.add_project(window, cx),
             Action::CloseProject { id } => self.close_project(id, cx),
@@ -101,17 +95,18 @@ impl Shell {
                 if let Some(id) = active
                     && let Some(pv) = self.projects.get_mut(&id)
                 {
-                    pv.tree.expanded.insert(path);
+                    pv.tree.expanded.insert(PathBuf::from(path));
                     self.load_dirs(id, cx);
                 }
             }
             Action::CollapseDir { path } => {
+                let path = PathBuf::from(path);
                 if let Some(pv) = active.and_then(|id| self.projects.get_mut(&id)) {
                     pv.tree.expanded.remove(&path);
                 }
                 self.push_sidebar(cx);
             }
-            Action::OpenFile { path } => self.open_file(path, None, window, cx),
+            Action::OpenFile { path } => self.open_file(PathBuf::from(path), None, window, cx),
             Action::OpenFarm { repo } => {
                 let props = if repo.is_empty() { json!({}) } else { json!({ "repo": repo }) };
                 self.show_pixel("farm", props, window, cx)
@@ -119,6 +114,7 @@ impl Shell {
             Action::OpenRepoMap => self.show_pixel("map", json!({}), window, cx),
             Action::OpenTree => self.show_pixel("tree", json!({}), window, cx),
             Action::RevealInTerminal { path } => {
+                let path = PathBuf::from(path);
                 let dir = if path.is_dir() {
                     path
                 } else {
@@ -132,7 +128,15 @@ impl Shell {
                 } else {
                     vibevalley_workspace::DiffSpec::Unstaged
                 };
-                self.open_pane(PaneKind::Diff { spec, path, repo: None }, window, cx);
+                self.open_pane(
+                    PaneKind::Diff {
+                        spec,
+                        path: path.map(PathBuf::from),
+                        repo: None,
+                    },
+                    window,
+                    cx,
+                );
             }
             Action::OpenCommit { id } => self.open_pane(
                 PaneKind::Diff {
@@ -143,13 +147,22 @@ impl Shell {
                 window,
                 cx,
             ),
-            Action::Stage { paths } => self.git_op(move |r| r.stage(&paths), cx),
-            Action::Unstage { paths } => self.git_op(move |r| r.unstage(&paths), cx),
-            Action::Discard { paths } => self.git_op(move |r| r.discard(&paths), cx),
+            Action::Stage { paths } => {
+                let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+                self.git_op(move |r| r.stage(&paths), cx);
+            }
+            Action::Unstage { paths } => {
+                let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+                self.git_op(move |r| r.unstage(&paths), cx);
+            }
+            Action::Discard { paths } => {
+                let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+                self.git_op(move |r| r.discard(&paths), cx);
+            }
             Action::Commit { message } => self.git_op(move |r| r.commit(&message).map(|_| ()), cx),
             Action::Checkout { branch } => self.git_op(move |r| r.checkout(&branch), cx),
             Action::AddWorktree { branch } => self.add_worktree(branch, window, cx),
-            Action::RemoveWorktree { path, force } => self.remove_worktree(path, force, window, cx),
+            Action::RemoveWorktree { path, force } => self.remove_worktree(PathBuf::from(path), force, window, cx),
             Action::RefreshGit => {
                 if let Some(id) = active {
                     self.refresh_git(id, cx);
@@ -169,7 +182,7 @@ impl Shell {
                 }
                 self.run_search(regex, case_sensitive, cx);
             }
-            Action::OpenHit { path, line } => self.open_file(path, Some(line), window, cx),
+            Action::OpenHit { path, line } => self.open_file(PathBuf::from(path), Some(line), window, cx),
         }
     }
 
@@ -499,9 +512,15 @@ impl Shell {
             "host.speechState" => Envelope::ok(json!(crate::speech_audio::state(&text("id")))),
             "host.speechStart" => {
                 let id = text("id");
+                let server = cx.try_global::<crate::hosted::BridgeHub>().map(|b| b.0.server().clone());
                 Self::bg(
                     cx,
-                    move || crate::serving::speech().and_then(|speech| crate::speech_audio::start(speech, &id)),
+                    move || {
+                        let speech = server
+                            .and_then(|s| s.speech_streams())
+                            .ok_or_else(|| "the speech service is not ready".to_string())?;
+                        crate::speech_audio::start(speech, &id)
+                    },
                     move |_, result, _| {
                         reply.send(match result {
                             Ok(state) => Envelope::ok(json!(state)),
@@ -515,9 +534,13 @@ impl Shell {
             "host.voiceState" => Envelope::ok(json!(crate::live_voice::state(&text("id")))),
             "host.voiceStart" => {
                 let id = text("id");
+                let server = cx.try_global::<crate::hosted::BridgeHub>().map(|b| b.0.server().clone());
                 Self::bg(
                     cx,
-                    move || crate::serving::voice().and_then(|voice| crate::live_voice::start(voice, id)),
+                    move || {
+                        let voice = server.and_then(|s| s.voice()).ok_or_else(|| "the voice service is not ready".to_string())?;
+                        crate::live_voice::start(voice, id)
+                    },
                     move |_, result, _| {
                         reply.send(match result {
                             Ok(state) => Envelope::ok(json!(state)),

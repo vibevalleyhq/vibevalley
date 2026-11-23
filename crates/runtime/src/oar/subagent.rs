@@ -1,6 +1,6 @@
 use crate::oar::{
-    AgentError, ContentBlock, ControlAction, ControlOutcome, Event, PermissionDecision, Registry, Result, Session, SessionOptions, SessionStatus, core::lock,
-    voyage::Record,
+    AgentError, ContentBlock, ControlAction, ControlOutcome, Event, PermissionDecision, Registry, Result, Session, SessionOptions, SessionStatus, TurnOptions,
+    core::lock, voyage::Record,
 };
 use std::{
     collections::HashMap,
@@ -170,14 +170,23 @@ impl Session for Child {
     fn control(&self, op: ControlAction, arg: &str, id: &str, span: &str) -> Result<ControlOutcome> {
         self.inner.control(op, arg, id, span)
     }
+    fn control_with(&self, op: ControlAction, arg: &str, id: &str, span: &str, opts: TurnOptions) -> Result<ControlOutcome> {
+        self.inner.control_with(op, arg, id, span, opts)
+    }
     fn prompt(&self, c: Vec<ContentBlock>) -> Result<()> {
         self.inner.prompt(c)
+    }
+    fn prompt_with(&self, c: Vec<ContentBlock>, opts: TurnOptions) -> Result<()> {
+        self.inner.prompt_with(c, opts)
     }
     fn steer(&self, c: Vec<ContentBlock>) -> Result<()> {
         self.inner.steer(c)
     }
     fn queue(&self, c: Vec<ContentBlock>) -> Result<()> {
         self.inner.queue(c)
+    }
+    fn queue_with(&self, c: Vec<ContentBlock>, opts: TurnOptions) -> Result<()> {
+        self.inner.queue_with(c, opts)
     }
     fn abort(&self) -> Result<()> {
         self.inner.abort()

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { t } from "@vibevalley/i18n";
 import { userId } from "@vibevalley/protocol";
 import type { ArtifactViewContext, BlockRef, Channel } from "@vibevalley/protocol";
+import { sessionProfile } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
 import { AttachmentTile } from "../../../design/domain/AttachmentTile";
@@ -17,7 +18,7 @@ import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
 import { api } from "../../../infra/api";
 import { typedMarks } from "../../../infra/base/typedMarks";
-import { useCore } from "../../../infra/frame";
+import { useCollabSlice, useSessionsSlice } from "../../../infra/frame";
 import { useRouter } from "../../../infra/router";
 import { useIntents } from "../../../infra/state/intent";
 import { transport } from "../../../infra/transport";
@@ -93,7 +94,8 @@ export function Composer(props: {
   onClearQuote?: (() => void) | undefined;
   onRemoveQuote?: ((blockId: string) => void) | undefined;
 }) {
-  const core = useCore();
+  const collab = useCollabSlice();
+  const sessions = useSessionsSlice();
   const problem = signal<string | undefined>(undefined);
   const emoji = signal(false);
   const focused = signal(false);
@@ -110,7 +112,7 @@ export function Composer(props: {
     selection.set({ start: caret, end: caret });
     placed.set({ start: caret });
   };
-  const box = createComposer(core, place, {
+  const box = createComposer(collab, sessions, place, {
     ...(at ? { initial: untracked(() => draftOf(at).text) } : {}),
     says: useIntents(chatSay),
     target: () => {
@@ -252,7 +254,7 @@ export function Composer(props: {
                     </If>
                   }
                 >
-                  {(s) => <HelperFace agent={s().agent} runtime={s().runtime} size={20} />}
+                  {(s) => <HelperFace agent={sessionProfile(s()) ?? ""} runtime={s().runtime} size={20} />}
                 </If>
                 <Text class="font-mono text-xs text-ink">
                   {n().token}

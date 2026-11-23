@@ -97,6 +97,7 @@ pub struct Shell {
     pub(super) server_ready: bool,
     pub(super) workbench_ready: bool,
     pub(super) island: Option<crate::island::Island>,
+    pub(super) island_client: Option<Arc<vibevalley_server::transport::bridge::Client>>,
     /// VibeValley's opening over the window until the projects are in (`VIBEVALLEY_NO_OPENING=1` skips it).
     pub launch: Option<Entity<crate::pixel::view::PixelView>>,
     pub load_error: Option<String>,
@@ -108,6 +109,7 @@ pub struct Shell {
     pub(crate) terminal_notice: Option<String>,
     pub panes: HashMap<(ProjectId, TabId), PaneSlot>,
     pub chat_statuses: HashMap<(ProjectId, TabId), ChatTabStatus>,
+    pub(super) chat_watches: HashMap<String, (u64, gpui::Task<()>)>,
     pub chat_menu_group: Option<vibevalley_workspace::GroupId>,
     pub sidebar: Entity<HostedView>,
     pub inspector: Entity<HostedView>,
@@ -180,8 +182,9 @@ impl Shell {
             }
         })
         .detach();
-        let quit = cx.on_app_quit(|this: &mut Shell, _| {
+        let quit = cx.on_app_quit(|this: &mut Shell, cx| {
             this.island = None;
+            this.island_client = None;
             crate::live_voice::stop(None);
             crate::speech_audio::stop(None);
             crate::audio::stop_queued();
@@ -191,6 +194,14 @@ impl Shell {
             this.terminals.clear();
             this.panes.clear();
             this.chat_statuses.clear();
+            let watches = std::mem::take(&mut this.chat_watches);
+            if let Some(bridge) = cx.try_global::<crate::hosted::BridgeHub>() {
+                let server = bridge.0.server();
+                for (_, (sub_id, _task)) in watches {
+                    server.unsubscribe(sub_id);
+                }
+            }
+            let running = crate::serving::RunningServer::take_for_shutdown(cx);
             let store = this.store.take();
             async move {
                 let done = std::thread::spawn(move || {
@@ -202,7 +213,9 @@ impl Shell {
                         }
                     }
                     ws.shutdown_all_and_wait();
-                    crate::serving::shutdown();
+                    if let Some(running) = running {
+                        running.shutdown();
+                    }
                 });
                 let _ = done.join();
             }
@@ -224,6 +237,7 @@ impl Shell {
             server_ready: matches!(already_settled, Some(Ok(()))),
             workbench_ready: false,
             island: None,
+            island_client: None,
             launch: (std::env::var_os("VIBEVALLEY_NO_OPENING").is_none()
                 && Ui::get(cx).settings.effective_motion() != MotionChoice::Off
                 && !matches!(already_settled, Some(Err(_))))
@@ -238,6 +252,7 @@ impl Shell {
             terminals: HashMap::new(),
             panes: HashMap::new(),
             chat_statuses: HashMap::new(),
+            chat_watches: HashMap::new(),
             chat_menu_group: None,
             sidebar,
             inspector,
@@ -281,6 +296,7 @@ impl Shell {
                     match result {
                         Ok(()) => {
                             shell.server_ready = true;
+                            shell.sync_chat_watches(cx);
                             shell.finish_opening(true, cx);
                         }
                         Err(error) => {
@@ -297,24 +313,40 @@ impl Shell {
         match crate::island::Island::start() {
             Ok(Some((island, opened))) => {
                 shell.island = Some(island);
-                let frames = cx.global::<crate::hosted::BridgeHub>().0.server().state();
+                struct IslandOutlet(flume::Sender<(String, Value)>);
+                impl vibevalley_server::transport::bridge::Outlet for IslandOutlet {
+                    fn send(&self, event: &str, data: Value) {
+                        let _ = self.0.send((event.to_string(), data));
+                    }
+                }
+                let (tx, rx) = flume::unbounded::<(String, Value)>();
+                let identity = crate::hosted::next_client_identity(vibevalley_server::ClientKind::GpuiShell, "island");
+                let client = Arc::new(cx.global::<crate::hosted::BridgeHub>().0.attach(identity, Arc::new(IslandOutlet(tx))));
+                if let Err(error) = client.watch("slice:board") {
+                    eprintln!("island watch slice:board: {error}");
+                }
+                shell.island_client = Some(client.clone());
                 cx.spawn(async move |this, cx| {
-                    while let Ok(value) = frames.recv_async().await {
-                        let frame = match serde_json::from_value::<vibevalley_protocol::StateFrame>(value) {
-                            Ok(frame) => frame,
+                    while let Ok((event, envelope)) = rx.recv_async().await {
+                        if event != "frame:slice:board" {
+                            continue;
+                        }
+                        let rev = envelope["rev"].as_u64().unwrap_or(0);
+                        let board = match serde_json::from_value::<vibevalley_protocol::BoardSlice>(envelope["data"].clone()) {
+                            Ok(board) => board,
                             Err(error) => {
-                                eprintln!("island frame: {error}");
+                                eprintln!("island board slice: {error}");
+                                client.applied_slice("slice:board", rev);
                                 continue;
                             }
                         };
-                        if this
-                            .update(cx, |shell, _| {
-                                if let Some(island) = &shell.island {
-                                    island.show(&crate::island::glance(&frame));
-                                }
-                            })
-                            .is_err()
-                        {
+                        let alive = this.update(cx, |shell, _| {
+                            if let Some(island) = &shell.island {
+                                island.show(&crate::island::glance(&board));
+                            }
+                        });
+                        client.applied_slice("slice:board", rev);
+                        if alive.is_err() {
                             break;
                         }
                     }
@@ -324,11 +356,8 @@ impl Shell {
                     while let Ok(issue) = opened.recv_async().await {
                         if this
                             .update(cx, |shell, cx| {
-                                shell.native_workspace = false;
-                                shell.native_pixel = None;
-                                shell.workbench.update(cx, |view, cx| view.navigate(&format!("/issues/{issue}"), cx));
+                                shell.navigate_workbench(&format!("/issues/{issue}"), cx);
                                 cx.activate(true);
-                                cx.notify();
                             })
                             .is_err()
                         {
@@ -341,8 +370,70 @@ impl Shell {
             Ok(None) => {}
             Err(error) => eprintln!("island: {error}"),
         }
+        shell.publish_host_debug(cx);
         shell.load(cx);
         shell
+    }
+
+    pub(super) fn publish_host_debug(&self, cx: &gpui::App) {
+        let Some(handle) = cx.try_global::<crate::hosted::ShellDebugHandle>() else {
+            return;
+        };
+        let active_project = self.ws.active_id();
+        let projects: Vec<Value> = self
+            .ws
+            .projects()
+            .iter()
+            .map(|p| {
+                let active_tab = p.layout.active_tab().map(|t| t.id);
+                let tabs: Vec<Value> = p
+                    .layout
+                    .tabs()
+                    .map(|t| {
+                        json!({
+                            "id": t.id,
+                            "active": active_tab == Some(t.id),
+                            "kind": match &t.kind {
+                                PaneKind::Terminal { .. } => "terminal",
+                                PaneKind::Chat { .. } => "chat",
+                                PaneKind::File { .. } => "file",
+                                PaneKind::Diff { .. } => "diff",
+                                PaneKind::Hosted { .. } => "hosted",
+                                PaneKind::Pixel { .. } => "pixel",
+                            },
+                            "title": crate::panes::tab_title(self, t, cx),
+                        })
+                    })
+                    .collect();
+                json!({
+                    "id": p.id(),
+                    "name": p.info.name,
+                    "root": p.root().to_string_lossy(),
+                    "active": active_project == Some(p.id()),
+                    "tabs": tabs,
+                })
+            })
+            .collect();
+        let active_pixel = self.native_pixel.as_ref().map(|slot| {
+            let view = slot.view.read(cx);
+            json!({
+                "kind": view.kind,
+                "framesSeen": view.frames_seen,
+            })
+        });
+        handle.update(json!({
+            "loaded": self.loaded,
+            "route": self.last_route.as_deref().unwrap_or("/issues"),
+            "nativeWorkspace": self.native_workspace,
+            "panel": self.panel.as_str(),
+            "sidebarVisible": self.sidebar_visible,
+            "inspectorOpen": self.inspector_open,
+            "activeProjectId": active_project,
+            "projects": projects,
+            "activePixel": active_pixel,
+            "liveTerminals": self.terminals.len(),
+            "openPanes": self.panes.len(),
+        }));
     }
 
     /// Runs `work` on a background thread, then `then` on the UI thread.
@@ -440,6 +531,7 @@ impl Shell {
                         this.ensure_project_view(id, cx);
                     }
                     this.refresh_summaries(cx);
+                    this.sync_chat_watches(cx);
                     this.push_sidebar(cx);
                     this.finish_opening(true, cx);
                     cx.notify();

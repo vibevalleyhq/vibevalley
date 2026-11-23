@@ -1,176 +1,7 @@
 {
   "seq": 1,
-  "state": {
-    "call": "idle",
-    "callReason": "",
-    "sessions": [
-      {
-        "id": "s-read",
-        "role": "worker",
-        "name": "owl",
-        "agent": "agent-owl",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "branch": "vv/i-101",
-        "hiredAt": 1794499940000,
-        "runs": 1,
-        "phase": {
-          "_tag": "working",
-          "doing": {
-            "action": "read_file",
-            "label": "read_file",
-            "actionText": "read_file"
-          },
-          "since": 1794499940000
-        },
-        "issue": "i-101",
-        "refining": false,
-        "phaseText": "正在干活"
-      },
-      {
-        "id": "s-cmd",
-        "role": "worker",
-        "name": "bear",
-        "agent": "agent-bear",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "branch": "vv/i-102",
-        "hiredAt": 1794499880000,
-        "runs": 1,
-        "phase": {
-          "_tag": "working",
-          "doing": {
-            "action": "run_command",
-            "label": "run_command",
-            "actionText": "run_command"
-          },
-          "since": 1794499880000
-        },
-        "issue": "i-102",
-        "refining": false,
-        "phaseText": "正在干活"
-      },
-      {
-        "id": "s-edit",
-        "role": "worker",
-        "name": "fox",
-        "agent": "agent-fox",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "branch": "vv/i-103",
-        "hiredAt": 1794499820000,
-        "runs": 1,
-        "phase": {
-          "_tag": "working",
-          "doing": {
-            "action": "edit_file",
-            "label": "edit_file",
-            "actionText": "edit_file"
-          },
-          "since": 1794499820000
-        },
-        "issue": "i-103",
-        "refining": false,
-        "phaseText": "正在干活"
-      },
-      {
-        "id": "s-ask",
-        "role": "worker",
-        "name": "cat",
-        "agent": "agent-cat",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "branch": "vv/i-104",
-        "hiredAt": 1794499760000,
-        "runs": 1,
-        "phase": {
-          "_tag": "working",
-          "doing": {
-            "action": "wait",
-            "label": "wait",
-            "actionText": "wait"
-          },
-          "since": 1794499760000
-        },
-        "issue": "i-104",
-        "refining": false,
-        "phaseText": "正在干活"
-      },
-      {
-        "id": "s-ripe",
-        "role": "worker",
-        "name": "rabbit",
-        "agent": "agent-rabbit",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "branch": "vv/i-105",
-        "hiredAt": 1794499700000,
-        "runs": 1,
-        "phase": {
-          "_tag": "done"
-        },
-        "issue": "i-105",
-        "refining": false,
-        "phaseText": "交回了",
-        "lastRun": {
-          "outcome": "completed",
-          "summary": "Completed the work",
-          "at": 1794500000000
-        }
-      },
-      {
-        "id": "s-stuck",
-        "role": "worker",
-        "name": "raccoon",
-        "agent": "agent-raccoon",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "notes",
-        "branch": "vv/i-106",
-        "hiredAt": 1794499640000,
-        "runs": 1,
-        "phase": {
-          "_tag": "failed"
-        },
-        "issue": "i-106",
-        "refining": false,
-        "phaseText": "卡住了",
-        "lastRun": {
-          "outcome": "failed",
-          "summary": "tests failed",
-          "at": 1794500000000
-        }
-      },
-      {
-        "id": "s-queue",
-        "role": "worker",
-        "name": "hedgehog",
-        "agent": "agent-hedgehog",
-        "runtime": "claude",
-        "brief": "",
-        "repo": "vibevalley",
-        "branch": "vv/i-107",
-        "hiredAt": 1794499580000,
-        "runs": 1,
-        "phase": {
-          "_tag": "working",
-          "doing": {
-            "action": "web",
-            "label": "web",
-            "actionText": "web"
-          },
-          "since": 1794499580000
-        },
-        "issue": "i-107",
-        "refining": false,
-        "phaseText": "正在干活"
-      }
-    ],
+  "board": {
+    "seq": 1,
     "issues": [
       {
         "id": "i-101",
@@ -539,18 +370,238 @@
           "acts": []
         }
       }
+    ]
+  },
+  "sessions": {
+    "seq": 1,
+    "sessions": [
+      {
+        "id": "s-read",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "owl",
+        "profile": "agent-owl",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "vv/i-101"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-101"
+          }
+        ],
+        "hiredAt": 1794499940000,
+        "runs": 1,
+        "phase": {
+          "_tag": "working",
+          "doing": {
+            "action": "read_file",
+            "label": "read_file",
+            "actionText": "read_file"
+          },
+          "since": 1794499940000
+        },
+        "phaseText": "正在干活"
+      },
+      {
+        "id": "s-cmd",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "bear",
+        "profile": "agent-bear",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "vv/i-102"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-102"
+          }
+        ],
+        "hiredAt": 1794499880000,
+        "runs": 1,
+        "phase": {
+          "_tag": "working",
+          "doing": {
+            "action": "run_command",
+            "label": "run_command",
+            "actionText": "run_command"
+          },
+          "since": 1794499880000
+        },
+        "phaseText": "正在干活"
+      },
+      {
+        "id": "s-edit",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "fox",
+        "profile": "agent-fox",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "vv/i-103"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-103"
+          }
+        ],
+        "hiredAt": 1794499820000,
+        "runs": 1,
+        "phase": {
+          "_tag": "working",
+          "doing": {
+            "action": "edit_file",
+            "label": "edit_file",
+            "actionText": "edit_file"
+          },
+          "since": 1794499820000
+        },
+        "phaseText": "正在干活"
+      },
+      {
+        "id": "s-ask",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "cat",
+        "profile": "agent-cat",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "vv/i-104"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-104"
+          }
+        ],
+        "hiredAt": 1794499760000,
+        "runs": 1,
+        "phase": {
+          "_tag": "working",
+          "doing": {
+            "action": "wait",
+            "label": "wait",
+            "actionText": "wait"
+          },
+          "since": 1794499760000
+        },
+        "phaseText": "正在干活"
+      },
+      {
+        "id": "s-ripe",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "rabbit",
+        "profile": "agent-rabbit",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "vv/i-105"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-105"
+          }
+        ],
+        "hiredAt": 1794499700000,
+        "runs": 1,
+        "phase": {
+          "_tag": "done"
+        },
+        "phaseText": "交回了",
+        "lastRun": {
+          "outcome": "completed",
+          "summary": "Completed the work",
+          "at": 1794500000000
+        }
+      },
+      {
+        "id": "s-stuck",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "raccoon",
+        "profile": "agent-raccoon",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "notes",
+          "branch": "vv/i-106"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-106"
+          }
+        ],
+        "hiredAt": 1794499640000,
+        "runs": 1,
+        "phase": {
+          "_tag": "failed"
+        },
+        "phaseText": "卡住了",
+        "lastRun": {
+          "outcome": "failed",
+          "summary": "tests failed",
+          "at": 1794500000000
+        }
+      },
+      {
+        "id": "s-queue",
+        "controller": "issueBoard",
+        "role": "worker",
+        "name": "hedgehog",
+        "profile": "agent-hedgehog",
+        "runtime": "claude",
+        "brief": "",
+        "policy": {
+          "kind": "managedWorktree",
+          "repo": "vibevalley",
+          "branch": "vv/i-107"
+        },
+        "bindings": [
+          {
+            "kind": "issue",
+            "id": "i-107"
+          }
+        ],
+        "hiredAt": 1794499580000,
+        "runs": 1,
+        "phase": {
+          "_tag": "working",
+          "doing": {
+            "action": "web",
+            "label": "web",
+            "actionText": "web"
+          },
+          "since": 1794499580000
+        },
+        "phaseText": "正在干活"
+      }
     ],
-    "crons": [],
-    "connectors": [],
-    "machines": [],
-    "progress": {
-      "coins": 240,
-      "streak": 3,
-      "bestStreak": 5,
-      "counts": {},
-      "unlocked": [],
-      "agents": {}
-    },
+    "machines": []
+  },
+  "collab": {
+    "seq": 1,
     "chat": {
       "channels": [
         {
@@ -578,101 +629,121 @@
         }
       ],
       "userMentions": []
-    }
+    },
+    "connectors": []
   },
-  "inbox": [],
-  "effects": [],
-  "view": {
-    "level": {
-      "level": 6,
-      "xp": 23,
-      "need": 60
-    },
-    "plots": {
-      "i-101": {
-        "crop": "sprout"
+  "inbox": {
+    "seq": 1,
+    "items": [],
+    "call": "idle",
+    "callReason": ""
+  },
+  "ops": {
+    "seq": 1,
+    "crons": []
+  },
+  "farm": {
+    "seq": 1,
+    "view": {
+      "level": {
+        "level": 6,
+        "xp": 23,
+        "need": 60
       },
-      "i-102": {
-        "crop": "leafy"
-      },
-      "i-103": {
-        "crop": "flowering"
-      },
-      "i-104": {
-        "crop": "dry",
-        "badge": {
-          "text": "等你回答",
-          "tone": "wait"
+      "plots": {
+        "i-101": {
+          "crop": "sprout"
+        },
+        "i-102": {
+          "crop": "leafy"
+        },
+        "i-103": {
+          "crop": "flowering"
+        },
+        "i-104": {
+          "crop": "dry",
+          "badge": {
+            "text": "等你回答",
+            "tone": "wait"
+          }
+        },
+        "i-105": {
+          "crop": "wheat",
+          "badge": {
+            "text": "可收获",
+            "tone": "ripe"
+          }
+        },
+        "i-106": {
+          "crop": "withered",
+          "badge": {
+            "text": "有虫",
+            "tone": "bug"
+          }
+        },
+        "i-107": {
+          "crop": "seeded"
         }
       },
-      "i-105": {
-        "crop": "wheat",
-        "badge": {
-          "text": "可收获",
-          "tone": "ripe"
+      "plays": {
+        "s-read": {
+          "station": 0,
+          "history": [],
+          "toolsThisRun": 3,
+          "counts": {},
+          "files": [],
+          "commands": []
+        },
+        "s-cmd": {
+          "station": 1,
+          "history": [],
+          "toolsThisRun": 3,
+          "counts": {},
+          "files": [],
+          "commands": []
+        },
+        "s-edit": {
+          "station": 2,
+          "history": [],
+          "toolsThisRun": 3,
+          "counts": {},
+          "files": [],
+          "commands": []
+        },
+        "s-ask": {
+          "station": 3,
+          "history": [],
+          "toolsThisRun": 3,
+          "counts": {},
+          "files": [],
+          "commands": []
+        },
+        "s-ripe": {
+          "station": 4,
+          "history": [],
+          "toolsThisRun": 3,
+          "counts": {},
+          "files": [],
+          "commands": []
+        },
+        "s-stuck": {
+          "station": 5,
+          "history": [],
+          "toolsThisRun": 3,
+          "counts": {},
+          "files": [],
+          "commands": []
         }
-      },
-      "i-106": {
-        "crop": "withered",
-        "badge": {
-          "text": "有虫",
-          "tone": "bug"
-        }
-      },
-      "i-107": {
-        "crop": "seeded"
       }
     },
-    "plays": {
-      "s-read": {
-        "station": 0,
-        "history": [],
-        "toolsThisRun": 3,
-        "counts": {},
-        "files": [],
-        "commands": []
-      },
-      "s-cmd": {
-        "station": 1,
-        "history": [],
-        "toolsThisRun": 3,
-        "counts": {},
-        "files": [],
-        "commands": []
-      },
-      "s-edit": {
-        "station": 2,
-        "history": [],
-        "toolsThisRun": 3,
-        "counts": {},
-        "files": [],
-        "commands": []
-      },
-      "s-ask": {
-        "station": 3,
-        "history": [],
-        "toolsThisRun": 3,
-        "counts": {},
-        "files": [],
-        "commands": []
-      },
-      "s-ripe": {
-        "station": 4,
-        "history": [],
-        "toolsThisRun": 3,
-        "counts": {},
-        "files": [],
-        "commands": []
-      },
-      "s-stuck": {
-        "station": 5,
-        "history": [],
-        "toolsThisRun": 3,
-        "counts": {},
-        "files": [],
-        "commands": []
-      }
+    "progress": {
+      "coins": 240,
+      "streak": 3,
+      "bestStreak": 5,
+      "counts": {},
+      "unlocked": [],
+      "agents": {}
     },
-    "achievements": []
+    "effects": []
   }
 }

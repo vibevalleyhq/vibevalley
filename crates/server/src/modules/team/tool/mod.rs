@@ -84,7 +84,7 @@ impl Farm {
         let found = self.board.read(|s| {
             s.issues.iter().find(|i| i.id == key || i.number.to_string() == k).cloned().or_else(|| {
                 let on = s.sessions.iter().filter(|h| h.id == k || h.name == k).max_by_key(|h| h.hired_at)?;
-                s.issues.iter().find(|i| Some(&i.id) == on.issue.as_ref()).cloned()
+                s.issues.iter().find(|i| Some(i.id.as_str()) == on.issue_id()).cloned()
             })
         });
         found.ok_or_else(|| words::no_issue(key))
@@ -107,19 +107,14 @@ impl Farm {
     }
 
     fn number_of(&self, session: &Session) -> Option<i64> {
-        let issue = session.issue.as_ref()?;
-        self.board.read(|s| s.issues.iter().find(|i| &i.id == issue).map(|i| i.number))
+        let issue = session.issue_id()?;
+        self.board.read(|s| s.issues.iter().find(|i| i.id == issue).map(|i| i.number))
     }
 
     /// Every helper on the farm.
     pub fn roster(&self) -> Vec<Session> {
-        self.board.read(|s| {
-            s.sessions
-                .iter()
-                .filter(|h| h.role == vibevalley_protocol::AgentRole::Worker)
-                .cloned()
-                .collect()
-        })
+        self.board
+            .read(|s| s.sessions.iter().filter(|h| vibevalley_core::status::is_farm_worker(h)).cloned().collect())
     }
 
     pub fn session_line(&self, h: &Session) -> String {

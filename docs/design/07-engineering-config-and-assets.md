@@ -8,7 +8,7 @@
 
 | 模块 | 文件 | 核心机制 |
 | --- | --- | --- |
-| **Solid 2 响应式兼容层** | `apps/mac/ui/infra/solid.ts` | 由于 `nsh` 打包器拒绝直接打入 `solid-js`，`solid.ts` 直接基于 `nsh` 原生 `signal` / `computed` / `effect` / `context` 实现工作台所依赖的 `createSignal`、`createMemo`、`createEffect`（支持 Solid 2 的拆段副作用与 `{ defer: true }` 跳过首次执行）、`onSettled`、`createContext` 与 `useContext`；针对全量 `StateFrame` 更新，`equals: false` 选项通过外包 `{ v }` 盒对象绕过 `nsh` 默认的 `Object.is` 拦截，确保每次新帧推送必然触发下游依赖重算 |
+| **Solid 2 响应式兼容层** | `apps/mac/ui/infra/solid.ts` | 由于 `nsh` 打包器拒绝直接打入 `solid-js`，`solid.ts` 直接基于 `nsh` 原生 `signal` / `computed` / `effect` / `context` 实现工作台所依赖的 `createSignal`、`createMemo`、`createEffect`（支持 Solid 2 的拆段副作用与 `{ defer: true }` 跳过首次执行）、`onSettled`、`createContext` 与 `useContext`；`equals: false` 选项通过外包 `{ v }` 盒对象绕过 `nsh` 默认的 `Object.is` 拦截，确保新切片推送必然触发对应域的下游依赖重算 |
 | **宿主补丁与运行时垫片** | `apps/mac/ui/infra/polyfill.ts` | 为 `nsh` JavaScript 环境补充标准 Web 运行时能力缺口（如路径/正则/全局垫片），在页面与农庄手机入口顶部首个加载 |
 | **条件热读取与双入口打包嵌入** | `apps/mac/build.rs` | 自动寻址 `.tools/bin/nsh`（或 `NSH_BIN` / `PATH`），按双入口分别构建全量工作台 `App.tsx`（`ui/build`）与轻量壳窗格 `ShellApp.tsx`（`ui/build-shell`）及其 `capabilities.json`；在 **Debug** 构建中若产物已存在则直接从磁盘热读取（修改 TSX 无需重新编译 Rust 壳），而在 **Release** 构建或设置 `VIBEVALLEY_EMBED_UI` 时开启 `nsh build --release`，仅单份静态嵌入剥离调试信息的 `bundle.nshc` 字节码（`bundle.js` 置 0 字节 sentinel），运行时由 `apps/mac/src/hosted/mod.rs` 按 `is_workbench_view` 分别缓存与惰性装载 |
 
@@ -18,7 +18,7 @@
 
 - **四条桥接信道（`apps/mac/ui/infra/bridged.ts`）**：
   1. `call(op, payload)`：将结构化 RPC 指令（经 `packages/protocol/src/client.ts` 类型化包装）异步发送至同进程 Rust 服务端并解包 `Envelope`。
-  2. `state(listener)`：初始化读取当前最新 `StateFrame` 后持续监听 `host.on("frame:state")`，推动全局单向状态更新。
+  2. `slice(kind, listener)`：按域订阅 `slice:<kind>`（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）并监听 `host.on("frame:slice:<kind>")`，回发 `applied` 确认修订号，推动按域隔离的单向状态更新。
   3. `live(listener)`：接入实时高频增量流（如会话文本流、实时语音字幕、农机日志行）。
   4. `subscribe(name, payload, on, ended)`：建立按需可取消长订阅信道（终端状态、媒体理解任务、动态增量列表等）。
 - **宿主桌面能力接口（`apps/mac/ui/infra/host.ts`）**：

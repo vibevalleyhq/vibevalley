@@ -2,6 +2,7 @@ import { effect, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Channel, CronView } from "@vibevalley/protocol";
+import { isFreeUserSession, sessionBranch, sessionChannelId, sessionProfile, sessionRepo } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
@@ -9,17 +10,23 @@ import { Icon } from "../../../design/Icon";
 import { Empty } from "../../../design/layout";
 import { api } from "../../../infra/api";
 import { useNow } from "../../../infra/base/dom";
-import { useCore } from "../../../infra/frame";
+import { useCollabSlice, useOpsSlice, useSessionsSlice } from "../../../infra/frame";
 import { useRouter } from "../../../infra/router";
 import { chatPath, sessionThreadOf } from "../model/places";
 import { Dot, HelperFace, PhaseGlyph, phaseDot, phaseText } from "./presence";
 
 /** The sessions arranged in this channel; the general holds those arranged in no channel. */
 export function Sessions(props: { channel: Channel }) {
-  const core = useCore();
+  const sessionsSlice = useSessionsSlice();
+  const collab = useCollabSlice();
   const router = useRouter();
   const now = useNow();
-  const sessions = () => (core()?.sessions ?? []).filter((h) => (h.channel ? h.channel === props.channel.id : props.channel.default));
+  const sessions = () =>
+    (sessionsSlice()?.sessions ?? []).filter((h) => {
+      if (isFreeUserSession(h)) return false;
+      const channelId = sessionChannelId(h);
+      return channelId ? channelId === props.channel.id : props.channel.default;
+    });
   return (
     <If
       when={sessions().length > 0}
@@ -32,12 +39,12 @@ export function Sessions(props: { channel: Channel }) {
       <Scroll class="flex-1" contentClass="gap-2.5 p-4">
         <Each of={sessions()} key={(h) => h.id}>
           {(h) => {
-            const thread = () => sessionThreadOf(core()?.chat, h());
-            const meta = () => [`@${h().id}`, h().repo, h().branch].filter(Boolean).join(" · ");
+            const thread = () => sessionThreadOf(collab()?.chat, h());
+            const meta = () => [`@${h().id}`, sessionRepo(h()), sessionBranch(h())].filter(Boolean).join(" · ");
             return (
               <View testID={`channel-session-${h().id}`} class="flex-row items-center gap-3 rounded-lg border border-line bg-page px-3.5 py-3 hover:bg-hover">
                 <View class="relative shrink-0">
-                  <HelperFace agent={h().agent} runtime={h().runtime} size={36} />
+                  <HelperFace agent={sessionProfile(h()) ?? ""} runtime={h().runtime} size={36} />
                   <View class="absolute -right-0.5 -bottom-0.5">
                     <Dot tone={phaseDot(h().phase)} size={7} />
                   </View>
@@ -72,8 +79,8 @@ export function Sessions(props: { channel: Channel }) {
 }
 
 export function Crons(props: { channel: Channel }) {
-  const core = useCore();
-  const crons = () => (core()?.crons ?? []).filter((s) => s.channel === props.channel.id);
+  const ops = useOpsSlice();
+  const crons = () => (ops()?.crons ?? []).filter((s) => s.channel === props.channel.id);
   return (
     <If
       when={crons().length > 0}

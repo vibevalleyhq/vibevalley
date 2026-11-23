@@ -2,5 +2,4 @@
 
 pub mod api;
 pub mod bridge;
-pub mod chord;
 pub mod http;

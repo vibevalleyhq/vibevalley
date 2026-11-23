@@ -224,10 +224,13 @@ fn the_chat_through_its_endpoints() {
 fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
     use std::os::unix::process::ExitStatusExt;
     use std::process::Command;
+    use vibevalley_server::modules::collab::channel::DeliveryTargetKind;
+
     const CHANNEL_CRASH_HOME: &str = "VV_TEST_CHANNEL_CRASH_HOME";
     let name = "channel::regression_send_key_thread_pages_and_observer_cursor_survive_sigkill";
     if let Some(home) = std::env::var_os(CHANNEL_CRASH_HOME) {
-        let server = start(std::path::Path::new(&home));
+        let home = std::path::Path::new(&home);
+        let server = start(home);
         let call = |op, params| ok(server.hub.call_as(Caller::User, op, params));
         let channel = server.chat.default_channel();
         for text in ["one", "two", "three"] {
@@ -237,13 +240,13 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
         let thread = call("channel.thread.create", json!({"id":root}));
         call("channel.message.send", json!({"id":thread,"text":"first reply","sendKey":"thread-first"}));
         let checkpoint = server.chat.events(0, 100).unwrap().last().unwrap().seq;
-        server.chat.move_cursor("crash-test", checkpoint).unwrap();
-        server.chat.await_reader(|_| {
-            Command::new("kill").args(["-KILL", &std::process::id().to_string()]).status().unwrap();
-            unreachable!("SIGKILL at the committed message, before reader acknowledgement");
-        });
-        call("channel.message.send", json!({"id":thread,"text":"second reply","sendKey":"thread-second"}));
-        panic!("message returned without entering the reader");
+        std::fs::write(home.join("checkpoint"), checkpoint.to_string()).unwrap();
+        call(
+            "channel.message.send",
+            json!({"id":thread,"text":"second reply @助手","sendKey":"thread-second"}),
+        );
+        Command::new("kill").args(["-KILL", &std::process::id().to_string()]).status().unwrap();
+        unreachable!("SIGKILL immediately after message and pending delivery commit");
     }
 
     let dir = tempfile::tempdir().unwrap();
@@ -253,6 +256,7 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
         .status()
         .unwrap();
     assert_eq!(result.signal(), Some(9));
+    let checkpoint: i64 = std::fs::read_to_string(dir.path().join("checkpoint")).unwrap().trim().parse().unwrap();
     let server = start(dir.path());
     let call = |op, params| ok(server.hub.call_as(Caller::User, op, params));
     let channel = server.chat.default_channel();
@@ -262,16 +266,74 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
     assert_eq!(first.len(), 1);
     let thread = call("channel.thread.create", json!({"id":first[0].id})).as_str().unwrap().to_owned();
     let replies = server.chat.history(&thread, None, Some(2)).unwrap();
-    assert_eq!(replies.iter().map(|m| m.text.as_str()).collect::<Vec<_>>(), ["first reply", "second reply"]);
-    let cursor = server.chat.cursor_of("crash-test").unwrap();
-    let unseen = server.chat.events(cursor, 10).unwrap();
+    assert_eq!(
+        replies.iter().map(|m| m.text.as_str()).collect::<Vec<_>>(),
+        ["first reply", "second reply @助手"]
+    );
+    let unseen = server.chat.events(checkpoint, 10).unwrap();
     assert_eq!(unseen.len(), 1);
     assert_eq!(unseen[0].message_id, replies[1].id);
-    call("channel.message.send", json!({"id":thread,"text":"second reply","sendKey":"thread-second"}));
-    assert_eq!(server.chat.events(cursor, 10).unwrap(), unseen);
+    let pending: Vec<_> = server
+        .chat
+        .pending_deliveries(DeliveryTargetKind::Orchestrator)
+        .unwrap()
+        .into_iter()
+        .filter(|d| d.message_id == replies[1].id)
+        .collect();
+    assert_eq!(pending.len(), 1, "durable pending delivery must survive SIGKILL");
+    call(
+        "channel.message.send",
+        json!({"id":thread,"text":"second reply @助手","sendKey":"thread-second"}),
+    );
+    assert_eq!(server.chat.events(checkpoint, 10).unwrap(), unseen);
     assert_eq!(server.chat.history(&thread, None, Some(5)).unwrap().len(), 2);
-    server.chat.move_cursor("crash-test", unseen[0].seq).unwrap();
-    server.chat.move_cursor("crash-test", cursor).unwrap();
-    assert!(server.chat.events(server.chat.cursor_of("crash-test").unwrap(), 10).unwrap().is_empty());
+    let pending_after_retry: Vec<_> = server
+        .chat
+        .pending_deliveries(DeliveryTargetKind::Orchestrator)
+        .unwrap()
+        .into_iter()
+        .filter(|d| d.message_id == replies[1].id)
+        .collect();
+    assert_eq!(pending_after_retry.len(), 1, "sendKey retry must not duplicate deliveries");
+    server.chat.settle_delivery(pending[0].id, true).unwrap();
+    assert!(
+        server
+            .chat
+            .pending_deliveries(DeliveryTargetKind::Orchestrator)
+            .unwrap()
+            .iter()
+            .all(|d| d.message_id != replies[1].id)
+    );
     server.close();
+}
+
+#[test]
+fn regression_deleted_unread_user_mention_clears_inbox_slice() {
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.hub.clone();
+    let gid = started.chat.default_channel();
+
+    let (msg, _) = started
+        .chat
+        .post(vibevalley_server::modules::collab::channel::Posting {
+            from: "orchestrator".into(),
+            channel: gid,
+            text: "请看一下 @用户".into(),
+            ..Default::default()
+        })
+        .unwrap();
+    assert!(
+        hub.inbox_slice().items.iter().any(|item| item.kind == vibevalley_protocol::InboxKind::Mention),
+        "unread @user mention must appear in InboxSlice"
+    );
+
+    ok(hub.call_as(Caller::User, "channel.message.delete", json!({ "id": msg.id })));
+    assert!(
+        hub.inbox_slice().items.iter().all(|item| item.kind != vibevalley_protocol::InboxKind::Mention),
+        "deleting unread @user mention must immediately clear InboxSlice: {:?}",
+        hub.inbox_slice().items
+    );
+    started.close();
 }

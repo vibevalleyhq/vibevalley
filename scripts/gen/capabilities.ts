@@ -32,7 +32,7 @@ const head = `# 能力表
 | 主助手 | 主助手 | 它的工具；Rust 服务端的工具清单在 \`crates/server/assets/tools/orchestrator.json\`，以那份为准 |
 | 执行会话 | 运行中的执行会话 | 经 \`/mcp\` 拿的工具，清单在 \`crates/server/assets/tools/helper.json\` |
 
-\`GET /api/v1/state\`、\`GET /api/v1/events\` 和 \`GET /api/v1/live\` 是 SSE，不在 \`endpoints\` 里：用户和连进来的设备都能读；\`/state\` 给折好的帧，\`/live\` 只给页面要的三种 side event，\`/events\` 留给调试。接口都在 \`/api/v1\` 下；不兼容改动和 v1 的保留见 [接口版本](docs/subsystems/core.md#为什么这样)。
+\`GET /api/v1/slice/{name}\`（\`name\` 为 \`board\`、\`sessions\`、\`collab\`、\`inbox\`、\`ops\` 五个核心切片或独立的 \`farm\` 画面）、\`GET /api/v1/live\` 和 \`GET /api/v1/events\` 不在 \`endpoints\` 里：用户和连进来的设备都能读；\`/slice/{name}\` 带 \`Accept: application/json\` 或 \`?once=1\` 返回当前 JSON 快照，否则是支持 \`Last-Event-ID\`／\`?after=<seq>\` 续读的 SSE，\`/live\`（别名 \`/events\`）只推页面要的三种实时 side event。接口都在 \`/api/v1\` 下；不兼容改动和 v1 的保留见 [接口版本](docs/subsystems/core.md#为什么这样)。
 `;
 
 const groups = new Map<string, typeof endpoints>();

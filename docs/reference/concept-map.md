@@ -11,7 +11,7 @@
 | 概念 | 农场里 | 页面 | 协议 | HTTP |
 |---|---|---|---|---|
 | Host | — | — | 服务端 `ServerConfig` 的 `home`（`$VIBEVALLEY_HOME`，不进协议） | — |
-| 空间 | 大地图（`apps/mac/src/pixel/farm/islands.rs`） | `/repos` | `SpaceState`；目录是服务端 `ServerConfig` 的 `work_root` | `/api/v1/state`、`/api/v1/events` |
+| 空间 | 大地图（`apps/mac/src/pixel/farm/islands.rs`） | `/repos` | `SpaceState`、6 路切片（`SliceKind`）；目录是服务端 `ServerConfig` 的 `work_root` | `/api/v1/slice/{name}`、`/api/v1/live` |
 | 仓库 | 大地图上的一座岛 | `/repos/:repo`（`features/repo`） | `RepoSummary`、`RepoActivity`、`RepoLanguages` | `/api/v1/repo/…` |
 | 助手 | 田头的助手 | `/orchestrator`、`/orchestrator/<档案 id>`（`features/orchestrator`） | `SpaceState.sessions`（`role: "orchestrator"`）、`Channel.orchestrator` | `/api/v1/channel/message/send`、`/api/v1/orchestrator/…` |
 | 档案、技能 | 小动物、技能书 | `/agents`（`features/agent`）、`/settings/skills`（`features/runtime/SkillsPage.tsx`） | `Agent`、`AgentTemplate`、`Skill` | `/api/v1/agent/…`、`/api/v1/skill/…` |
@@ -36,8 +36,8 @@
 | 档案、技能 | `Agents`（`agent/profile.rs`、`presets.rs`） | `config.json`、`agent-templates/` | — |
 | 农机 | `Agents` 的农机部分（`agent/runtime.rs`；接口仍是 `runtime.*`） | `config.json` 农机设置 | `Runtime`、`Registry` |
 | 工单、父子工单 | `Board`（`crates/server/src/modules/work/issue/board.rs`），接口在 `issue/mod.rs` | `server.db`、`issues/` | — |
-| 帮工、一轮 | `Sessions`（`session/sessions.rs`）与 `runs.rs`，农机经 `drivers.rs` 开会话；轨迹在 `session/journal.rs` | `server.db`、`events/` | 一个帮工是一个 oar `Session`，一轮对应一个 turn |
-| 频道、附件 | `Chat`（`channel/mod.rs`）、`Attachments`（`attachment.rs`）；谁听见与投递在 `Watch`（`watch/mod.rs`） | `server.db` 的 `channel*`、`attachment`、`watch_cursor` 表 | 投递成帮工会话里的一段话 |
+| 帮工、一轮 | `Sessions`（`session/sessions.rs`、`mailbox.rs`）与 `runs.rs`，农机经 `drivers.rs` 开会话；轨迹在 `session/journal.rs` | `server.db`（`session*`、`session_mailbox`、`session_event`）、`records/` | 一个帮工是一个 oar `Session`，一轮对应一个 turn |
+| 频道、附件 | `Chat`（`channel/mod.rs`）、`dispatch.rs`（纯受众与刹车）、`Attachments`（`attachment.rs`） | `server.db` 的 `channel*`、`channel_delivery`、`attachment` 表 | 异步投递成帮工会话里的一段话 |
 | Artifact | `Artifacts`（`artifact/mod.rs`） | `server.db` 的 `artifact*` 表 | — |
 | 笔记 | `Pkm`（`pkm/mod.rs`） | `pkm/` 下的 Markdown 页面、`pkm_comment`、`pkm_change` 表 | — |
 | 记性 | `Memories`（`modules/team/memory/`） | `memory` 表 | — |

@@ -1,11 +1,11 @@
 //! Native interactive `VvWhiteboard` `#[component]` backed by pure-Rust `engine::whiteboard`.
 //!
-//! Renders infinite pan/zoom boards using dual-layer [`nsh_core::prelude::canvas`] views (an
-//! LRU-cached static layer and an interactive overlay layer for selection handles, snap guides,
-//! live ink/box previews, and collaborator cursors) with GPUI-native floating docks, inline
-//! editors, minimap, context menu, and collapsible inspector (zero `WKWebView`).
+//! Renders infinite pan/zoom boards in a single atomic [`nsh_core::prelude::canvas`] view (so
+//! background grid, world elements, selection chrome, snap guides, and collaborator cursors
+//! always share the same camera transform) with GPUI-native floating docks, borderless in-place
+//! inline editing, minimap, context menu, and collapsible inspector (zero `WKWebView`).
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::BTreeSet;
 use std::rc::{Rc, Weak};
 use std::time::{Duration, Instant};
@@ -18,11 +18,11 @@ use vibevalley_i18n::t_in;
 use vibevalley_protocol::ArtifactEntry;
 
 use crate::engine::whiteboard::{
-    AlignOp, ArrowCurve, BoardAction, BoardCommand, BoardDoc, DistributeAxis, ElementId, ElementKind, GridStyle, LayerPaintInput, Modifiers as WbModifiers,
-    Point2, PointerButton as WbPointerButton, PointerInput, Presence, PresenceColor, Rect2, STICKERS, ShapeKind, StickerCategory, StrokeStyle, TemplateKind,
-    WhiteboardController, ZOrderDir, apply_command, build_export_painter, decode_board_entries, decode_presences_json, encode_element_json, export_json,
-    export_json_canvas, export_svg, measure_text_span, merge_live_presences, paint_minimap_painter, paint_overlay_layer_painter_filtered,
-    paint_static_layer_painter,
+    AlignOp, ArrowCurve, BoardAction, BoardCommand, BoardDoc, DistributeAxis, ElementId, ElementKind, FramePaintInput, GridStyle, MilestoneKind,
+    Modifiers as WbModifiers, Point2, PointerButton as WbPointerButton, PointerInput, Presence, PresenceColor, Rect2, STICKERS, ShapeKind, StickerCategory,
+    StrokeStyle, TemplateKind, TextAlign, TextVariant, WhiteboardController, WhiteboardPalette, ZOrderDir, apply_command, build_export_painter,
+    decode_board_entries, decode_presences_json, encode_element_json, export_json, export_json_canvas, export_svg, layout_card, measure_text_span,
+    merge_live_presences, paint::parse_hex_hsla, paint_board_frame_painter, paint_minimap_painter, resolve_sticker_svg, route_arrow, sample_polyline,
 };
 use crate::theme::AdaptiveUi;
 
@@ -151,6 +151,7 @@ struct PresenceEmitThrottle {
 
 const PRESENCE_EMIT_MIN_INTERVAL: Duration = Duration::from_millis(80);
 const ANIM_FRAME_INTERVAL: Duration = Duration::from_millis(16);
+const NAV_SETTLE_DELAY: Duration = Duration::from_millis(120);
 
 fn animations_disabled() -> bool {
     if reduce_motion() {
@@ -161,14 +162,9 @@ fn animations_disabled() -> bool {
         .unwrap_or(false)
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct InlineEditState {
     id: ElementId,
-    x: f32,
-    y: f32,
-    w: f32,
-    h: f32,
-    is_shape: bool,
     milestone_index: Option<usize>,
 }
 
@@ -183,7 +179,6 @@ struct ContextMenuState {
 struct WhiteboardUiSnapshot {
     tool: ToolKindTag,
     count: usize,
-    zoom_pct: u32,
     can_undo: bool,
     can_redo: bool,
     grid: GridStyle,
@@ -261,12 +256,13 @@ struct SelectionSummary {
     sticker: Option<String>,
 }
 
-/// Interactive native whiteboard canvas with dual-layer rendering, dock tools, minimap, and inspector.
+/// Interactive native whiteboard canvas with single-pass rendering, dock tools, minimap, and inspector.
 #[component]
 pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> impl IntoElement {
     let controller = Rc::new(RefCell::new(WhiteboardController::default()));
-    let static_tick = signal(0u64);
-    let overlay_tick = signal(0u64);
+    let canvas_tick = signal(0u64);
+    let camera_tick = signal(0u64);
+    let zoom_pct = signal(100u32);
     let ui_tick = signal(0u64);
     let viewport_size = signal((1100.0_f32, 720.0_f32));
     let space_held = signal(false);
@@ -310,16 +306,29 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
     let emit_throttle: Rc<RefCell<PresenceEmitThrottle>> = Rc::new(RefCell::new(PresenceEmitThrottle::default()));
     let anim_timer: Rc<RefCell<Option<Spawned<()>>>> = Rc::new(RefCell::new(None));
     let anim_last_tick: Rc<RefCell<Option<Instant>>> = Rc::new(RefCell::new(None));
+    let navigating: Rc<Cell<bool>> = Rc::new(Cell::new(false));
+    let nav_settle_timer: Rc<RefCell<Option<Spawned<()>>>> = Rc::new(RefCell::new(None));
     let hidden_ids = Rc::new(BTreeSet::<ElementId>::new());
 
     {
         let anim_timer = Rc::clone(&anim_timer);
+        let nav_settle_timer = Rc::clone(&nav_settle_timer);
         cleanup(move || {
             if let Some(handle) = anim_timer.borrow_mut().take() {
                 handle.cancel();
             }
+            if let Some(handle) = nav_settle_timer.borrow_mut().take() {
+                handle.cancel();
+            }
         });
     }
+
+    let update_zoom_pct = move |zoom: f64| {
+        let pct = (zoom * 100.0).round().max(10.0) as u32;
+        if zoom_pct.get_untracked() != pct {
+            zoom_pct.set(pct);
+        }
+    };
 
     let loc_str = move || {
         let l = props.locale.get();
@@ -370,6 +379,31 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
         }
     };
 
+    let mark_navigating = {
+        let navigating = Rc::clone(&navigating);
+        let nav_settle_timer = Rc::clone(&nav_settle_timer);
+        let maybe_emit_viewport = maybe_emit_viewport.clone();
+        move || {
+            if animations_disabled() {
+                return;
+            }
+            navigating.set(true);
+            if let Some(prev) = nav_settle_timer.borrow_mut().take() {
+                prev.cancel();
+            }
+            let nav_inner = Rc::clone(&navigating);
+            let timer_inner = Rc::clone(&nav_settle_timer);
+            let emit_inner = maybe_emit_viewport.clone();
+            let handle = set_timeout(NAV_SETTLE_DELAY, move || {
+                timer_inner.borrow_mut().take();
+                nav_inner.set(false);
+                canvas_tick.set(canvas_tick.get_untracked().wrapping_add(1));
+                emit_inner(true);
+            });
+            *nav_settle_timer.borrow_mut() = Some(handle);
+        }
+    };
+
     let maybe_emit_cursor = {
         let controller = Rc::clone(&controller);
         let emit_throttle = Rc::clone(&emit_throttle);
@@ -416,10 +450,11 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
     let sync_ui_snapshot = {
         let controller = Rc::clone(&controller);
         move || {
-            let snap = {
+            let (snap, cur_zoom) = {
                 let ctrl = controller.borrow();
-                build_ui_snapshot(&ctrl)
+                (build_ui_snapshot(&ctrl), ctrl.camera.zoom)
             };
+            update_zoom_pct(cur_zoom);
             if let Some(first_id) = snap.selection.first().cloned() {
                 let (lbl, bd, js) = {
                     let ctrl = controller.borrow();
@@ -451,21 +486,26 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
         let controller = Rc::clone(&controller);
         let anim_timer = Rc::clone(&anim_timer);
         let anim_last_tick = Rc::clone(&anim_last_tick);
-        let sync_ui_snapshot = sync_ui_snapshot.clone();
+        let navigating = Rc::clone(&navigating);
+        let nav_settle_timer = Rc::clone(&nav_settle_timer);
+        let mark_navigating = mark_navigating.clone();
         let maybe_emit_viewport = maybe_emit_viewport.clone();
         let slot: Rc<RefCell<Weak<dyn Fn()>>> = Rc::new(RefCell::new(Weak::<fn()>::new()));
         let slot_for_cb = Rc::clone(&slot);
         let trigger: Rc<dyn Fn()> = Rc::new(move || {
             let instant = animations_disabled();
             if instant {
-                let step = controller.borrow_mut().step_animations(0.016, true);
+                let (step, zoom) = {
+                    let mut ctrl = controller.borrow_mut();
+                    (ctrl.step_animations(0.016, true), ctrl.camera.zoom)
+                };
                 if step.camera_moved {
-                    static_tick.set(static_tick.get_untracked().wrapping_add(1));
-                    overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
-                    sync_ui_snapshot();
+                    update_zoom_pct(zoom);
+                    camera_tick.set(camera_tick.get_untracked().wrapping_add(1));
+                    canvas_tick.set(canvas_tick.get_untracked().wrapping_add(1));
                     maybe_emit_viewport(true);
                 } else if step.presence_moved {
-                    overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
+                    canvas_tick.set(canvas_tick.get_untracked().wrapping_add(1));
                 }
                 anim_last_tick.borrow_mut().take();
                 return;
@@ -480,7 +520,9 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             let controller = Rc::clone(&controller);
             let anim_timer_inner = Rc::clone(&anim_timer);
             let anim_last_tick_inner = Rc::clone(&anim_last_tick);
-            let sync_ui_snapshot = sync_ui_snapshot.clone();
+            let nav_inner = Rc::clone(&navigating);
+            let nav_timer_inner = Rc::clone(&nav_settle_timer);
+            let mark_nav_inner = mark_navigating.clone();
             let maybe_emit_viewport = maybe_emit_viewport.clone();
             let slot_next = Rc::clone(&slot_for_cb);
             let handle = set_timeout(ANIM_FRAME_INTERVAL, move || {
@@ -490,14 +532,27 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     .borrow_mut()
                     .replace(now)
                     .map_or(0.016, |prev| now.duration_since(prev).as_secs_f64().clamp(0.004, 0.05));
-                let step = controller.borrow_mut().step_animations(dt, animations_disabled());
+                let (step, zoom) = {
+                    let mut ctrl = controller.borrow_mut();
+                    (ctrl.step_animations(dt, animations_disabled()), ctrl.camera.zoom)
+                };
                 if step.camera_moved {
-                    static_tick.set(static_tick.get_untracked().wrapping_add(1));
-                    overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
-                    sync_ui_snapshot();
-                    maybe_emit_viewport(!step.still_animating);
+                    update_zoom_pct(zoom);
+                    camera_tick.set(camera_tick.get_untracked().wrapping_add(1));
+                    if step.still_animating && !animations_disabled() {
+                        mark_nav_inner();
+                        canvas_tick.set(canvas_tick.get_untracked().wrapping_add(1));
+                        maybe_emit_viewport(false);
+                    } else {
+                        if let Some(prev) = nav_timer_inner.borrow_mut().take() {
+                            prev.cancel();
+                        }
+                        nav_inner.set(false);
+                        canvas_tick.set(canvas_tick.get_untracked().wrapping_add(1));
+                        maybe_emit_viewport(true);
+                    }
                 } else if step.presence_moved {
-                    overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
+                    canvas_tick.set(canvas_tick.get_untracked().wrapping_add(1));
                 }
                 if step.still_animating {
                     if let Some(again) = slot_next.borrow().upgrade() {
@@ -517,8 +572,9 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
         let controller = Rc::clone(&controller);
         let sync_ui_snapshot = sync_ui_snapshot.clone();
         let maybe_emit_viewport = maybe_emit_viewport.clone();
+        let mark_navigating = mark_navigating.clone();
         let schedule_anim_frame = Rc::clone(&schedule_anim_frame);
-        move |effects: Vec<crate::engine::whiteboard::ControllerEffect>, doc_mutated: bool| {
+        move |effects: Vec<crate::engine::whiteboard::ControllerEffect>, doc_mutated: bool, continuous_nav: bool| {
             let mut flush_writes = None;
             let mut sel_changed = None;
             let mut open_chat_ids = None;
@@ -542,9 +598,10 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     E::ToolChanged(_) | E::GridChanged(_) | E::HistoryChanged { .. } | E::FollowChanged(_) => {
                         rebuild_ui = true;
                     }
-                    E::ViewportChanged { .. } => {
+                    E::ViewportChanged { zoom } => {
                         viewport_bumped = true;
-                        rebuild_ui = true;
+                        update_zoom_pct(zoom);
+                        camera_tick.set(camera_tick.get_untracked().wrapping_add(1));
                     }
                     E::OpenInlineEditor(target) => {
                         context_menu.set(None);
@@ -552,14 +609,8 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                         template_picker_open.set(false);
                         inline_title.set(target.title);
                         inline_body.set(target.body);
-                        let is_shape = matches!(controller.borrow().doc.element(&target.id).map(|e| &e.kind), Some(ElementKind::Shape { .. }));
                         inline_edit.set(Some(InlineEditState {
                             id: target.id,
-                            x: target.screen_rect.x.max(12.0) as f32,
-                            y: target.screen_rect.y.max(48.0) as f32,
-                            w: target.screen_rect.w.max(200.0) as f32,
-                            h: target.screen_rect.h.max(64.0) as f32,
-                            is_shape,
                             milestone_index: target.milestone_index,
                         }));
                     }
@@ -582,10 +633,10 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 }
             }
 
-            if doc_mutated || viewport_bumped || flush_writes.is_some() {
-                static_tick.set(static_tick.get_untracked().wrapping_add(1));
+            if viewport_bumped && continuous_nav && !animations_disabled() {
+                mark_navigating();
             }
-            overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
+            canvas_tick.set(canvas_tick.get_untracked().wrapping_add(1));
 
             if rebuild_ui {
                 sync_ui_snapshot();
@@ -593,8 +644,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
 
             // Emit external events strictly after all controller borrows are released.
             if viewport_bumped {
-                let is_panning = matches!(controller.borrow().mode, crate::engine::whiteboard::InteractionMode::Panning { .. });
-                maybe_emit_viewport(!is_panning);
+                maybe_emit_viewport(!continuous_nav || animations_disabled());
             }
             if let Some(ids) = sel_changed {
                 let count = ids.len() as u32;
@@ -660,11 +710,11 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     ctrl.apply_live_presences(&store_presences.borrow(), live_presences)
                 };
                 if effs.is_empty() {
-                    overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
+                    canvas_tick.set(canvas_tick.get_untracked().wrapping_add(1));
                     sync_ui_snapshot();
                     schedule_anim_frame();
                 } else {
-                    dispatch_effects(effs, false);
+                    dispatch_effects(effs, false, false);
                 }
                 return;
             }
@@ -680,12 +730,12 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 ctrl.apply_remote_snapshot(next_doc)
             };
             if effs.is_empty() {
-                static_tick.set(static_tick.get_untracked().wrapping_add(1));
-                overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
+                camera_tick.set(camera_tick.get_untracked().wrapping_add(1));
+                canvas_tick.set(canvas_tick.get_untracked().wrapping_add(1));
                 sync_ui_snapshot();
                 schedule_anim_frame();
             } else {
-                dispatch_effects(effs, true);
+                dispatch_effects(effs, true, false);
             }
         });
     }
@@ -708,7 +758,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 ctrl.smooth_animations = !animations_disabled();
                 ctrl.run_action(action)
             };
-            dispatch_effects(effs, doc_mutated);
+            dispatch_effects(effs, doc_mutated, false);
         }
     };
 
@@ -722,7 +772,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             export_menu_open.set(false);
             timer_open.set(false);
             let effs = controller.borrow_mut().set_tool(next_tool);
-            dispatch_effects(effs, false);
+            dispatch_effects(effs, false, false);
         }
     };
 
@@ -737,30 +787,40 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             let title = inline_title.get_untracked();
             let body = inline_body.get_untracked();
             let effs = controller.borrow_mut().commit_inline_edit(&st.id, title, body, st.milestone_index);
-            dispatch_effects(effs, true);
+            dispatch_effects(effs, true, false);
         }
     };
 
-    // Static layer canvas.
-    let static_canvas: CanvasView = {
+    let cancel_inline = move || {
+        if inline_edit.get_untracked().is_some() {
+            inline_edit.set(None);
+            canvas_tick.set(canvas_tick.get_untracked().wrapping_add(1));
+        }
+    };
+
+    // Single atomic canvas painting background, grid, world elements, selection chrome, and presences in one pass.
+    let board_canvas: CanvasView = {
         let paint_ctrl = Rc::clone(&controller);
         let hidden_ids = Rc::clone(&hidden_ids);
+        let navigating = Rc::clone(&navigating);
         let sync_ui_snapshot = sync_ui_snapshot.clone();
         canvas(move || {
-            let _ = static_tick.get();
+            let _ = canvas_tick.get();
+            let active_edit = inline_edit.get();
+            let dismissed = dismissed_notes.get();
             let is_dark = dark();
             let vw_vh = viewport_size.get();
+            let fast_shadows = !animations_disabled() && navigating.get();
             let ctrl = paint_ctrl.borrow();
-            paint_static_layer_painter(&LayerPaintInput {
-                doc: &ctrl.doc,
-                index: &ctrl.spatial,
-                lookup: &ctrl.lookup,
-                camera: ctrl.camera,
+            paint_board_frame_painter(&FramePaintInput {
+                controller: &ctrl,
                 viewport_size: vw_vh,
-                selection: &ctrl.selection,
-                editing_id: None,
+                editing_id: active_edit.as_ref().map(|e| &e.id),
+                editing_milestone: active_edit.as_ref().and_then(|e| e.milestone_index),
                 dark: is_dark,
                 anim_hidden_ids: &hidden_ids,
+                dismissed_notes: &dismissed,
+                fast_shadows,
             })
         })
         .test_id("wb-canvas")
@@ -775,9 +835,14 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 let prev = viewport_size.get_untracked();
                 if (prev.0 - w).abs() > 0.5 || (prev.1 - h).abs() > 0.5 {
                     viewport_size.set((w, h));
-                    controller.borrow_mut().set_viewport_size(f64::from(w), f64::from(h));
-                    static_tick.set(static_tick.get_untracked().wrapping_add(1));
-                    overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
+                    let zoom = {
+                        let mut ctrl = controller.borrow_mut();
+                        ctrl.set_viewport_size(f64::from(w), f64::from(h));
+                        ctrl.camera.zoom
+                    };
+                    update_zoom_pct(zoom);
+                    camera_tick.set(camera_tick.get_untracked().wrapping_add(1));
+                    canvas_tick.set(canvas_tick.get_untracked().wrapping_add(1));
                     sync_ui_snapshot();
                     maybe_emit_viewport(true);
                 }
@@ -785,33 +850,18 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
         })
     };
 
-    // Overlay layer canvas (handles, snap guides, previews, marquee, cursors).
-    let overlay_canvas: CanvasView = {
-        let controller = Rc::clone(&controller);
-        canvas(move || {
-            let _ = overlay_tick.get();
-            let dismissed = dismissed_notes.get();
-            let is_dark = dark();
-            let vw_vh = viewport_size.get();
-            let ctrl = controller.borrow();
-            paint_overlay_layer_painter_filtered(&ctrl, vw_vh, is_dark, &dismissed)
-        })
-        .absolute()
-        .inset(px(0.0))
-        .pointer_events(PointerEvents::None)
-    };
-
-    // Interactive stage wrapping the two canvases.
+    // Interactive stage wrapping the atomic board canvas.
     let stage = view()
+        .test_id("wb-stage")
         .relative()
         .flex_1()
         .h_full()
         .overflow_hidden()
-        .child(static_canvas)
-        .child(overlay_canvas)
+        .child(board_canvas)
         .on_press_down({
             let controller = Rc::clone(&controller);
             let dispatch_effects = dispatch_effects.clone();
+            let commit_inline = commit_inline.clone();
             move |e: &PressEvent| {
                 context_menu.set(None);
                 sticker_picker_open.set(false);
@@ -819,7 +869,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 export_menu_open.set(false);
                 timer_open.set(false);
                 if inline_edit.get_untracked().is_some() {
-                    return;
+                    commit_inline();
                 }
                 let sx = f64::from(e.position.x.0);
                 let sy = f64::from(e.position.y.0);
@@ -843,7 +893,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     let mut next = dismissed_notes.get_untracked();
                     next.insert(pid);
                     dismissed_notes.set(next);
-                    overlay_tick.set(overlay_tick.get_untracked().wrapping_add(1));
+                    canvas_tick.set(canvas_tick.get_untracked().wrapping_add(1));
                     return;
                 }
                 let input = PointerInput {
@@ -862,7 +912,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     return;
                 }
                 let effs = controller.borrow_mut().handle_pointer_down(input);
-                dispatch_effects(effs, false);
+                dispatch_effects(effs, false, false);
             }
         })
         .on_mouse_move({
@@ -870,6 +920,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             let dispatch_effects = dispatch_effects.clone();
             let maybe_emit_cursor = maybe_emit_cursor.clone();
             let maybe_emit_viewport = maybe_emit_viewport.clone();
+            let mark_navigating = mark_navigating.clone();
             move |e: &MouseEvent| {
                 let mut pressure = e.pressure;
                 if pressure <= 0.01 {
@@ -889,7 +940,13 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 );
                 let effs = controller.borrow_mut().handle_pointer_move(input);
                 let is_panning = matches!(controller.borrow().mode, crate::engine::whiteboard::InteractionMode::Panning { .. });
-                dispatch_effects(effs, was_mutating || is_panning);
+                if is_panning {
+                    camera_tick.set(camera_tick.get_untracked().wrapping_add(1));
+                }
+                if (was_mutating || is_panning) && !animations_disabled() {
+                    mark_navigating();
+                }
+                dispatch_effects(effs, false, true);
                 if is_panning {
                     maybe_emit_viewport(false);
                 }
@@ -912,7 +969,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     pressure: e.pressure.max(0.5),
                 };
                 let effs = controller.borrow_mut().handle_pointer_up(input);
-                dispatch_effects(effs, true);
+                dispatch_effects(effs, true, false);
             }
         })
         .on_wheel({
@@ -930,7 +987,9 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     precise,
                     map_mods(&e.modifiers, space_held.get_untracked()),
                 );
-                dispatch_effects(effs, false);
+                if !effs.is_empty() {
+                    dispatch_effects(effs, false, true);
+                }
             }
         })
         .on_pinch({
@@ -940,7 +999,9 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 let effs = controller
                     .borrow_mut()
                     .handle_pinch(Point2::new(f64::from(e.position.x.0), f64::from(e.position.y.0)), f64::from(e.delta.0));
-                dispatch_effects(effs, false);
+                if !effs.is_empty() {
+                    dispatch_effects(effs, false, true);
+                }
             }
         })
         .on_context_menu({
@@ -955,7 +1016,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     pressure: 0.5,
                 };
                 let effs = controller.borrow_mut().handle_pointer_down(input);
-                dispatch_effects(effs, false);
+                dispatch_effects(effs, false, false);
             }
         });
 
@@ -1821,7 +1882,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             let minimap_view = canvas({
                 let controller = Rc::clone(&controller);
                 move || {
-                    let _ = static_tick.get();
+                    let _ = canvas_tick.get();
                     let is_dark = dark();
                     let vw_vh = viewport_size.get();
                     let ctrl = controller.borrow();
@@ -1856,14 +1917,14 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                         out.push(crate::engine::whiteboard::ControllerEffect::ViewportChanged { zoom: ctrl.camera.zoom });
                         out
                     };
-                    dispatch_effects(effs, false);
+                    dispatch_effects(effs, false, false);
                 }
             });
             floating_card().p(px(2.0)).rounded(px(8.0)).child(minimap_view).into_element()
         });
 
         let zoom_bar = dynamic(move || {
-            let snap = ui_snap.get();
+            let cur_zoom_pct = zoom_pct.get();
             let l = loc_str();
             let is_en = l.starts_with("en");
             floating_pill()
@@ -1874,7 +1935,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     })
                     .label(SharedString::from(t_in(l.as_str(), "web.artifact.whiteboard.zoomOut", &[]))),
                 )
-                .child(pill_text_btn("wb-zoom-reset", &format!("{}%", snap.zoom_pct), false, false, {
+                .child(pill_text_btn("wb-zoom-reset", &format!("{cur_zoom_pct}%"), false, false, {
                     let run = run_action.clone();
                     move || run(BoardAction::ResetZoom)
                 }))
@@ -1919,87 +1980,338 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             .child(minimap_panel)
     };
 
-    // Floating inline text editor on double-click / quick-create.
+    // Borderless in-place inline text editor projected directly over the edited element.
     let inline_editor_overlay = {
+        let controller = Rc::clone(&controller);
         let commit_inline = commit_inline.clone();
         dynamic(move || {
             let Some(st) = inline_edit.get() else {
                 return view().into_element();
             };
-            let l = loc_str();
-            let is_en = l.starts_with("en");
-            let mut card = floating_card()
-                .test_id("wb-inline-editor")
-                .p(px(8.0))
-                .w(px(st.w.clamp(220.0, 340.0)))
-                .flex_col()
-                .gap(px(6.0))
-                .child(
-                    input()
+            let _ = camera_tick.get();
+            let _ = viewport_size.get();
+            let is_dark = dark();
+            let pal = WhiteboardPalette::for_mode(is_dark);
+            let is_en = loc_str().starts_with("en");
+
+            let (el_snap, camera, lookup) = {
+                let ctrl = controller.borrow();
+                let Some(el) = ctrl.doc.element(&st.id).cloned() else {
+                    return view().into_element();
+                };
+                (el, ctrl.camera, ctrl.lookup.clone())
+            };
+            let zoom = camera.zoom as f32;
+
+            let apply_align = |inp: Input, align: TextAlign| match align {
+                TextAlign::Left => inp.text_left(),
+                TextAlign::Center => inp.text_center(),
+                TextAlign::Right => inp.text_right(),
+            };
+            let solid_color = |c: Hsla| AdaptiveColor { light: c, dark: c };
+
+            match &el_snap.kind {
+                ElementKind::Shape {
+                    x,
+                    y,
+                    w,
+                    h,
+                    shape,
+                    fill,
+                    sticker,
+                    sticker_svg,
+                    align,
+                    ..
+                } => {
+                    let rect = Rect2::new(*x, *y, *w, *h);
+                    let tone = pal.shape_tone(*shape, fill);
+                    let has_sticker = resolve_sticker_svg(sticker.as_deref(), sticker_svg.as_deref()).is_some();
+                    let is_compact = *h <= 44.0;
+                    let pad_x = if is_compact || *w < 130.0 { 7.0 } else { 12.0 };
+                    let top_pad = if has_sticker { 36.0 } else { 4.0 };
+                    let bottom_pad = if has_sticker { 10.0 } else { 4.0 };
+                    let cur_title = inline_title.get_untracked();
+                    let cur_body = inline_body.get_untracked();
+                    let layout = layout_card(rect, if cur_title.is_empty() { "A" } else { &cur_title }, &cur_body, has_sticker);
+                    let _ = layout.title_y;
+                    let show_body = !is_compact && (*h >= 60.0 || !cur_body.is_empty());
+
+                    let tl = camera.world_to_screen(Point2::new(rect.x + pad_x, rect.y + top_pad));
+                    let inner_w = ((rect.w - pad_x * 2.0).max(32.0) as f32 * zoom).max(40.0);
+                    let inner_h = ((rect.h - top_pad - bottom_pad).max(18.0) as f32 * zoom).max(20.0);
+                    let title_fs = ((if is_compact { 12.5 } else { 13.0 }) * zoom).clamp(9.0, 48.0);
+                    let title_weight = if is_compact {
+                        FontWeight::NORMAL
+                    } else if !show_body {
+                        FontWeight::MEDIUM
+                    } else {
+                        FontWeight::SEMIBOLD
+                    };
+
+                    let title_input = apply_align(
+                        input()
+                            .test_id("wb-inline-title")
+                            .value(move || inline_title.get())
+                            .auto_focus(true)
+                            .w_full()
+                            .border(px(0.0))
+                            .bg(transparent_black())
+                            .p(px(0.0))
+                            .text_size(px(title_fs))
+                            .font_weight(title_weight)
+                            .text_color(solid_color(tone.ink))
+                            .caret_color(tone.ink)
+                            .on_change(move |v: &str| inline_title.set(v.to_owned()))
+                            .on_submit({
+                                let commit = commit_inline.clone();
+                                move |_: &str| commit()
+                            }),
+                        *align,
+                    );
+
+                    let mut box_view = view()
+                        .test_id("wb-inline-editor")
+                        .absolute()
+                        .left(px(tl.x as f32))
+                        .top(px(tl.y as f32))
+                        .w(px(inner_w))
+                        .h(px(inner_h))
+                        .flex_col()
+                        .justify_center()
+                        .gap(px((2.0 * zoom).clamp(1.0, 8.0)))
+                        .child(title_input);
+
+                    if show_body {
+                        let body_fs = (11.5 * zoom).clamp(8.5, 40.0);
+                        let body_ink = Hsla { a: 0.84, ..tone.ink };
+                        let body_input = apply_align(
+                            input()
+                                .test_id("wb-inline-body")
+                                .value(move || inline_body.get())
+                                .multiline(true)
+                                .placeholder(if is_en { "Details…" } else { "补充说明…" })
+                                .placeholder_color(Hsla { a: 0.45, ..tone.ink })
+                                .w_full()
+                                .border(px(0.0))
+                                .bg(transparent_black())
+                                .p(px(0.0))
+                                .text_size(px(body_fs))
+                                .text_color(solid_color(body_ink))
+                                .caret_color(body_ink)
+                                .on_change(move |v: &str| inline_body.set(v.to_owned())),
+                            *align,
+                        );
+                        box_view = box_view.child(body_input);
+                    }
+                    box_view.into_element()
+                }
+                ElementKind::Text {
+                    x,
+                    y,
+                    w,
+                    h,
+                    variant,
+                    align,
+                    font_size,
+                    color,
+                    ..
+                } => {
+                    let ink = color.as_deref().and_then(parse_hex_hsla).unwrap_or(match variant {
+                        TextVariant::Subtitle => pal.muted,
+                        _ => pal.ink,
+                    });
+                    let (ox, oy, ow, fs, weight, multiline, serif) = match variant {
+                        TextVariant::Title => (0.0, 4.0, *w, font_size.unwrap_or(30.0), FontWeight::NORMAL, false, true),
+                        TextVariant::Subtitle => (0.0, 3.0, *w, font_size.unwrap_or(13.5), FontWeight::NORMAL, false, false),
+                        TextVariant::Callout => (28.0, 6.0, (*w - 34.0).max(60.0), font_size.unwrap_or(12.0), FontWeight::MEDIUM, true, false),
+                        TextVariant::Body => (8.0, 6.0, (*w - 16.0).max(48.0), font_size.unwrap_or(13.0), FontWeight::NORMAL, true, false),
+                    };
+                    let tl = camera.world_to_screen(Point2::new(*x + ox, *y + oy));
+                    let sw = (ow as f32 * zoom).max(64.0);
+                    let sh = ((*h - oy).max(f64::from(fs) + 8.0) as f32 * zoom).max(20.0);
+                    let mut field = apply_align(
+                        input()
+                            .test_id("wb-inline-title")
+                            .value(move || inline_title.get())
+                            .auto_focus(true)
+                            .multiline(multiline)
+                            .w_full()
+                            .border(px(0.0))
+                            .bg(transparent_black())
+                            .p(px(0.0))
+                            .text_size(px((fs * zoom).clamp(9.0, 96.0)))
+                            .font_weight(weight)
+                            .text_color(solid_color(ink))
+                            .caret_color(ink)
+                            .on_change(move |v: &str| inline_title.set(v.to_owned()))
+                            .on_submit({
+                                let commit = commit_inline.clone();
+                                move |_: &str| commit()
+                            }),
+                        *align,
+                    );
+                    if serif {
+                        field = field.font_family("Georgia");
+                    }
+                    view()
+                        .test_id("wb-inline-editor")
+                        .absolute()
+                        .left(px(tl.x as f32))
+                        .top(px(tl.y as f32))
+                        .w(px(sw))
+                        .min_h(px(sh))
+                        .child(field)
+                        .into_element()
+                }
+                ElementKind::Container { x, y, w, .. } => {
+                    let tl = camera.world_to_screen(Point2::new(*x + 2.0, *y - 28.0));
+                    let sw = ((*w - 4.0).clamp(120.0, 360.0) as f32 * zoom).max(96.0);
+                    let fs = (12.5 * zoom).clamp(9.0, 36.0);
+                    let field = input()
                         .test_id("wb-inline-title")
                         .value(move || inline_title.get())
                         .auto_focus(true)
-                        .rounded(px(6.0))
-                        .border(px(1.0))
-                        .border_color(AdaptiveUi::ACCENT)
-                        .bg(AdaptiveUi::SIDE)
-                        .px(px(8.0))
-                        .py(px(5.0))
-                        .text_size(px(13.0))
-                        .text_color(AdaptiveUi::INK)
+                        .w_full()
+                        .border(px(0.0))
+                        .bg(transparent_black())
+                        .p(px(0.0))
+                        .text_size(px(fs))
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(solid_color(pal.muted))
+                        .caret_color(pal.muted)
                         .on_change(move |v: &str| inline_title.set(v.to_owned()))
                         .on_submit({
                             let commit = commit_inline.clone();
                             move |_: &str| commit()
-                        }),
-                );
-
-            if st.is_shape {
-                card = card.child(
-                    input()
-                        .test_id("wb-inline-body")
-                        .value(move || inline_body.get())
-                        .multiline(true)
-                        .placeholder(if is_en { "Details…" } else { "补充说明…" })
-                        .rounded(px(6.0))
-                        .border(px(1.0))
-                        .border_color(AdaptiveUi::LINE)
-                        .bg(AdaptiveUi::SIDE)
-                        .px(px(8.0))
-                        .py(px(5.0))
-                        .text_size(px(12.0))
-                        .text_color(AdaptiveUi::INK)
-                        .on_change(move |v: &str| inline_body.set(v.to_owned())),
-                );
-            }
-
-            card = card.child(
-                view()
-                    .flex_row()
-                    .justify_end()
-                    .gap(px(6.0))
-                    .child(pill_text_btn(
-                        "wb-inline-cancel",
-                        if is_en { "Cancel" } else { "取消" },
-                        false,
-                        false,
-                        move || {
-                            inline_edit.set(None);
-                        },
-                    ))
-                    .child(pill_text_btn(
-                        "wb-inline-save",
-                        &t_in(l.as_str(), "web.artifact.whiteboard.save", &[]),
-                        true,
-                        false,
-                        {
+                        });
+                    view()
+                        .test_id("wb-inline-editor")
+                        .absolute()
+                        .left(px(tl.x as f32))
+                        .top(px(tl.y as f32))
+                        .w(px(sw))
+                        .child(field)
+                        .into_element()
+                }
+                ElementKind::Arrow { from, to, bends, curve, .. } => {
+                    let Some(geom) = route_arrow(from, to, bends, *curve, &lookup) else {
+                        return view().into_element();
+                    };
+                    let center = camera.world_to_screen(geom.label_pos);
+                    let cur_text = inline_title.get_untracked();
+                    let pw = (((measure_text_span(&cur_text, 11.5, true) + 28.0).max(80.0)) as f32 * zoom).clamp(72.0, 260.0);
+                    let ph = (24.0 * zoom).max(22.0);
+                    let fs = (11.0 * zoom).clamp(9.0, 28.0);
+                    let field = input()
+                        .test_id("wb-inline-title")
+                        .value(move || inline_title.get())
+                        .auto_focus(true)
+                        .w_full()
+                        .border(px(0.0))
+                        .bg(transparent_black())
+                        .px(px(6.0))
+                        .py(px(2.0))
+                        .text_center()
+                        .text_size(px(fs))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(solid_color(pal.ink))
+                        .caret_color(pal.ink)
+                        .on_change(move |v: &str| inline_title.set(v.to_owned()))
+                        .on_submit({
                             let commit = commit_inline.clone();
-                            move || commit()
-                        },
-                    )),
-            );
-
-            view().absolute().top(px(st.y)).left(px(st.x)).child(card).into_element()
+                            move |_: &str| commit()
+                        });
+                    view()
+                        .test_id("wb-inline-editor")
+                        .absolute()
+                        .left(px(center.x as f32 - pw * 0.5))
+                        .top(px(center.y as f32 - ph * 0.5))
+                        .w(px(pw))
+                        .min_h(px(ph))
+                        .items_center()
+                        .justify_center()
+                        .rounded(px(6.0))
+                        .bg(solid_color(pal.arrow_label_bg))
+                        .border(px(1.0))
+                        .border_color(solid_color(pal.selection))
+                        .child(field)
+                        .into_element()
+                }
+                ElementKind::Timeline {
+                    x,
+                    y,
+                    w,
+                    h,
+                    points,
+                    milestones,
+                    ..
+                } => {
+                    let Some(idx) = st.milestone_index else {
+                        return view().into_element();
+                    };
+                    let Some(m) = milestones.get(idx) else {
+                        return view().into_element();
+                    };
+                    let rect = Rect2::new(*x, *y, *w, *h);
+                    let ribbon_pts: Vec<Point2> = if points.len() >= 2 {
+                        points.clone()
+                    } else {
+                        vec![
+                            Point2::new(rect.x, rect.center().y + 10.0),
+                            Point2::new(rect.center().x, rect.center().y - 4.0),
+                            Point2::new(rect.right(), rect.center().y - 16.0),
+                        ]
+                    };
+                    let total = milestones.len().max(1);
+                    let pt = m
+                        .pos
+                        .unwrap_or_else(|| sample_polyline(&ribbon_pts, m.t.unwrap_or((idx + 1) as f64 / (total + 1) as f64)));
+                    let center = camera.world_to_screen(pt);
+                    let cur_text = inline_title.get_untracked();
+                    let (pw, ph, fs, fg) = match m.kind {
+                        MilestoneKind::Minor => ((44.0 * zoom).max(36.0), (22.0 * zoom).max(20.0), (10.5 * zoom).clamp(9.0, 28.0), pal.muted),
+                        MilestoneKind::Major => {
+                            let w_world = (measure_text_span(&cur_text, 12.0, true) + 26.0).max(56.0) as f32;
+                            (
+                                (w_world * zoom).max(56.0),
+                                (26.0 * zoom).max(22.0),
+                                (12.0 * zoom).clamp(9.0, 32.0),
+                                pal.pill_ink,
+                            )
+                        }
+                    };
+                    let field = input()
+                        .test_id("wb-inline-title")
+                        .value(move || inline_title.get())
+                        .auto_focus(true)
+                        .w_full()
+                        .border(px(0.0))
+                        .bg(transparent_black())
+                        .p(px(0.0))
+                        .text_center()
+                        .text_size(px(fs))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(solid_color(fg))
+                        .caret_color(fg)
+                        .on_change(move |v: &str| inline_title.set(v.to_owned()))
+                        .on_submit({
+                            let commit = commit_inline.clone();
+                            move |_: &str| commit()
+                        });
+                    view()
+                        .test_id("wb-inline-editor")
+                        .absolute()
+                        .left(px(center.x as f32 - pw * 0.5))
+                        .top(px(center.y as f32 - ph * 0.5))
+                        .w(px(pw))
+                        .h(px(ph))
+                        .items_center()
+                        .justify_center()
+                        .child(field)
+                        .into_element()
+                }
+                _ => view().into_element(),
+            }
         })
     };
 
@@ -2444,7 +2756,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                                 let effs = controller
                                     .borrow_mut()
                                     .commit_inline_edit(&el_id, label_draft.get_untracked(), body_draft.get_untracked(), None);
-                                dispatch_effects(effs, true);
+                                dispatch_effects(effs, true, false);
                             }
                         },
                     )))
@@ -2495,7 +2807,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                                                 true,
                                             );
                                             controller.borrow_mut().rebuild_index();
-                                            dispatch_effects(vec![crate::engine::whiteboard::ControllerEffect::FlushBatch(res.writes)], true);
+                                            dispatch_effects(vec![crate::engine::whiteboard::ControllerEffect::FlushBatch(res.writes)], true, false);
                                         }
                                     }
                                 },
@@ -2525,7 +2837,11 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                                 let dispatch_effects = dispatch_effects.clone();
                                 move |_: &PressEvent| {
                                     controller.borrow_mut().selection = vec![row_id.clone()];
-                                    dispatch_effects(vec![crate::engine::whiteboard::ControllerEffect::SelectionChanged(vec![row_id.clone()])], false);
+                                    dispatch_effects(
+                                        vec![crate::engine::whiteboard::ControllerEffect::SelectionChanged(vec![row_id.clone()])],
+                                        false,
+                                        false,
+                                    );
                                 }
                             })
                             .child(
@@ -2586,13 +2902,16 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
         .on_key_down({
             let controller = Rc::clone(&controller);
             let dispatch_effects = dispatch_effects.clone();
+            let commit_inline = commit_inline.clone();
             move |e: &KeyEvent| {
                 if e.key == " " || e.code == "Space" {
                     space_held.set(true);
                 }
                 if inline_edit.get_untracked().is_some() {
                     if e.key == "Escape" {
-                        inline_edit.set(None);
+                        cancel_inline();
+                    } else if (e.modifiers.cmd || e.modifiers.ctrl) && e.key == "Enter" {
+                        commit_inline();
                     }
                     return;
                 }
@@ -2605,7 +2924,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 let effs = controller
                     .borrow_mut()
                     .handle_key_down(e.key.as_str(), map_mods(&e.modifiers, space_held.get_untracked()));
-                dispatch_effects(effs, true);
+                dispatch_effects(effs, true, false);
             }
         })
         .on_key_up(move |e: &KeyEvent| {
@@ -2703,7 +3022,6 @@ fn build_ui_snapshot(ctrl: &WhiteboardController) -> WhiteboardUiSnapshot {
     WhiteboardUiSnapshot {
         tool: ToolKindTag::from_tool(&ctrl.tool),
         count: ctrl.doc.elements.len(),
-        zoom_pct: (ctrl.camera.zoom * 100.0).round().max(10.0) as u32,
         can_undo: ctrl.history.can_undo(),
         can_redo: ctrl.history.can_redo(),
         grid: ctrl.doc.meta.grid,

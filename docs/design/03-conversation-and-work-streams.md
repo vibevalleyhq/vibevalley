@@ -42,7 +42,7 @@
 
 - **总览与四列看板（`IssuesPage.tsx` / `Board.tsx` / `overview.ts` / `cards.ts`）**：
   - 工具栏右侧将 `+ 新工单`（`issue-toolbar-new`）作为主色调（`tone="primary"`）按钮；四段核心列展示 `todo`、`working`、`waiting`、`closed`。
-  - 每张卡片严格展示服务端派发的 `StateFrame` 投影结果（阶段文案、动作提示、负责档案小头像、优先级与标签），页面不重算业务状态机；需要用户响应或阻塞的卡片经 `cardUrgencyTone` 映射在左侧边缘绘制 `3px` 语义高亮条（`asking`/`reviewing` 用 `wheat`，`stuck`/`missing` 用 `berry`），其余三边保持 `1px` `border-line`（选中时为 `border-faint bg-selected`）。
+  - 每张卡片严格展示服务端派发的 `BoardSlice` 投影结果（阶段文案、动作提示、负责档案小头像、优先级与标签），页面不重算业务状态机；需要用户响应或阻塞的卡片经 `cardUrgencyTone` 映射在左侧边缘绘制 `3px` 语义高亮条（`asking`/`reviewing` 用 `wheat`，`stuck`/`missing` 用 `berry`），其余三边保持 `1px` `border-line`（选中时为 `border-faint bg-selected`）。
 - **独立工单详情页（`IssueDetail.tsx`）**：
   - 选中任意工单时整页切换至 `/issues/:id`（而非局部抽屉或弹框覆盖看板），保留左侧或顶部「Issues」返回面包屑栈与 `Escape` 返回路径。
   - 详情页并置展示目标描述、实时工作流/运行日志跳链、当前修改文件列表与 Git 验证检查状态（`verified_merge` 候选文件树与检查命令结果）、快捷终端按钮（`OpenTerminal`）以及交付关闭操作。

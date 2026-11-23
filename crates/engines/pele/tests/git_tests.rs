@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::HashSet;
 use std::time::Instant;
 
@@ -12,7 +10,7 @@ use vibevalley_pele::diagram::git::{
 };
 use vibevalley_pele::{ErrorCode, ParseOptions, ParsedModel, PeleError, RenderOptions, parse, render, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
 
 const FLOW: &str = r#"
   commit id: "init"

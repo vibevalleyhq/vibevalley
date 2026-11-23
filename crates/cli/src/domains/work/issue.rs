@@ -4,9 +4,8 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use clap::{ArgGroup, Args, Subcommand, ValueEnum};
-use serde::Deserialize;
 use vibevalley_protocol::{
-    ActWords, AppliedIssue, Changes, Issue, IssueAction, IssueCommentCreateInput, IssueDeleteInput, IssueDiffGetInput, IssueFilter, IssueGetInput,
+    ActWords, AppliedIssue, BoardSlice, Changes, Issue, IssueAction, IssueCommentCreateInput, IssueDeleteInput, IssueDiffGetInput, IssueFilter, IssueGetInput,
     IssueRequest, IssueReviewInput, IssueStageKind, IssueStatus, IssueStatusUpdateInput, IssueTimelineGetInput, IssueUpdateInput, IssueWatch, Priority,
     ReviewRevision, ops,
 };
@@ -490,33 +489,11 @@ pub fn run(client: &Client, cmd: IssueCmd) -> Done {
     }
 }
 
-#[derive(Deserialize)]
-struct WatchFrame {
-    state: WatchIssues,
-}
-
-#[derive(Deserialize)]
-struct WatchIssues {
-    issues: Vec<WatchBrief>,
-}
-
-#[derive(Deserialize)]
-struct WatchBrief {
-    id: String,
-    status: IssueStatus,
-    stage: WatchStage,
-}
-
-#[derive(Deserialize)]
-struct WatchStage {
-    state: IssueStageKind,
-}
-
 fn wait_for_issue(client: &Client, issue: &Issue, timeout: Option<i64>) -> Done {
     let mut last: Option<(IssueStatus, IssueStageKind)> = None;
-    let res = client.sse("/api/v1/state", timeout.map(|s| Duration::from_secs(s.max(0) as u64)), |data| {
-        let frame: WatchFrame = serde_json::from_str(data).map_err(decode_failure)?;
-        let Some(now) = frame.state.issues.into_iter().find(|i| i.id == issue.id) else {
+    let res = client.sse("/api/v1/slice/board", timeout.map(|s| Duration::from_secs(s.max(0) as u64)), |data| {
+        let slice: BoardSlice = serde_json::from_str(data).map_err(decode_failure)?;
+        let Some(now) = slice.issues.into_iter().find(|i| i.id == issue.id) else {
             return Err(Failure::new(exit::MISSING, "Missing", format!("issue #{} was removed", issue.number)));
         };
         let state = (now.status, now.stage.state);

@@ -1,5 +1,3 @@
-mod support;
-
 use std::cell::RefCell;
 use std::path::Path;
 
@@ -14,7 +12,7 @@ use vibevalley_rich::{
     vv_markdown, vv_markdown_extensions, vv_markdown_options,
 };
 
-use support::TestHarness;
+use crate::support::TestHarness;
 
 #[derive(Default)]
 struct RecordedMarkdownEvents {

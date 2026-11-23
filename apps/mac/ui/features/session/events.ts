@@ -8,7 +8,7 @@ import { SessionLogs } from "./runs";
 
 const eventQuery = defineQuery({
   key: (a: { id: string; read: number }) => ["session-events", a.id, a.read],
-  fetch: (a, context) => api.session.event.list({ id: a.id }, context),
+  fetch: async (a, context) => (await api.session.event.list({ id: a.id }, context)).events,
   gcTime: 0,
   ...retryRead,
 });

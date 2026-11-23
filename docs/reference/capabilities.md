@@ -9,7 +9,7 @@
 | 主助手 | 主助手 | 它的工具；Rust 服务端的工具清单在 `crates/server/assets/tools/orchestrator.json`，以那份为准 |
 | 执行会话 | 运行中的执行会话 | 经 `/mcp` 拿的工具，清单在 `crates/server/assets/tools/helper.json` |
 
-`GET /api/v1/state`、`GET /api/v1/events` 和 `GET /api/v1/live` 是 SSE，不在 `endpoints` 里：用户和连进来的设备都能读；`/state` 给折好的帧，`/live` 只给页面要的三种 side event，`/events` 留给调试。接口都在 `/api/v1` 下；不兼容改动和 v1 的保留见 [接口版本](docs/subsystems/core.md#为什么这样)。
+`GET /api/v1/slice/{name}`（`name` 为 `board`、`sessions`、`collab`、`inbox`、`ops` 五个核心切片或独立的 `farm` 画面）、`GET /api/v1/live` 和 `GET /api/v1/events` 不在 `endpoints` 里：用户和连进来的设备都能读；`/slice/{name}` 带 `Accept: application/json` 或 `?once=1` 返回当前 JSON 快照，否则是支持 `Last-Event-ID`／`?after=<seq>` 续读的 SSE，`/live`（别名 `/events`）只推页面要的三种实时 side event。接口都在 `/api/v1` 下；不兼容改动和 v1 的保留见 [接口版本](docs/subsystems/core.md#为什么这样)。
 
 ## server
 
@@ -189,11 +189,14 @@
 | `session.get` | 看一个执行会话 | `/api/v1/session/get` | ✓ | ✓ |   |   |
 | `session.event.list` | 读一个执行会话的轨迹，从早到晚 | `/api/v1/session/event/list` | ✓ | ✓ |   |   |
 | `session.openWorkspace` | 在工作区目录打开或续接直连对话会话 | `/api/v1/session/openWorkspace` | ✓ | ✓ |   |   |
+| `session.closeWorkspace` | 关闭工作区直连对话会话并回收执行进程 | `/api/v1/session/closeWorkspace` | ✓ | ✓ |   |   |
 | `session.send` | 向直连对话会话发消息（空闲启轮，运行中引导） | `/api/v1/session/send` | ✓ | ✓ |   |   |
 | `session.respondPermission` | 答复会话的工具权限请求 | `/api/v1/session/respondPermission` | ✓ | ✓ |   |   |
 | `session.respondInteraction` | 回复会话的交互式提问 | `/api/v1/session/respondInteraction` | ✓ | ✓ |   |   |
 | `session.setConfig` | 调整工作区会话的模型、推理强度或权限模式 | `/api/v1/session/setConfig` | ✓ | ✓ |   |   |
 | `session.childTranscript` | 读取子代理或协作组员最近的轨迹步骤 | `/api/v1/session/childTranscript` | ✓ | ✓ |   |   |
+| `session.binding.attach` | 给执行会话挂载上下文绑定 | `/api/v1/session/binding/attach` | ✓ | ✓ | ✓ |   |
+| `session.binding.detach` | 从执行会话移除上下文绑定 | `/api/v1/session/binding/detach` | ✓ | ✓ | ✓ |   |
 
 ## artifact
 

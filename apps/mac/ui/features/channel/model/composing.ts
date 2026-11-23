@@ -1,7 +1,15 @@
 import { computed } from "nsh";
 import { z } from "zod";
 
-import { type Attachment, type ChatMessage, type Channel, defaultOrchestrator, type SayRequest, type SpaceView } from "@vibevalley/protocol";
+import {
+  type Attachment,
+  type ChatMessage,
+  type Channel,
+  type CollabSlice,
+  defaultOrchestrator,
+  type SayRequest,
+  type SessionsSlice,
+} from "@vibevalley/protocol";
 import * as S from "@vibevalley/protocol/schema";
 
 import { createAct } from "../../../design/act";
@@ -25,7 +33,7 @@ const arrived = (key: string, messages: readonly Pick<ChatMessage, "sendKey">[])
 
 export const chatSay = defineIntent<Said, void>({
   send: (body, key) => api.channel.message.send({ ...body, sendKey: key }),
-  confirmed: (_frame, intent) => arrived(intent.key, followed.get(intent.input.id).messages),
+  confirmed: (intent) => arrived(intent.key, followed.get(intent.input.id).messages),
   watch: (body, changed) => followed.subscribe(body.id, changed),
   whileLost: "queue",
   timeoutMs: 20_000,
@@ -79,7 +87,12 @@ export interface ComposerKey {
   readonly stopPropagation: () => void;
 }
 
-export function createComposer(core: () => SpaceView | undefined, place: (caret: number) => void, ways: ComposerWays) {
+export function createComposer(
+  collab: () => CollabSlice | undefined,
+  sessions: () => SessionsSlice | undefined,
+  place: (caret: number) => void,
+  ways: ComposerWays,
+) {
   const [text, setText] = createSignal(ways.initial ?? "");
   const [caret, setCaret] = createSignal(0);
   const [active, setActive] = createSignal(0);
@@ -98,7 +111,7 @@ export function createComposer(core: () => SpaceView | undefined, place: (caret:
   const busy = () => sending() || commanding.busy();
   const intent = (): Said => ({ ...ways.target(), text: text().trim() });
   const channelOf = (id: string | undefined): Channel | undefined => {
-    const all = core()?.chat?.channels ?? [];
+    const all = collab()?.chat?.channels ?? [];
     return id ? all.find((c) => c.id === id) : all.find((c) => c.default);
   };
 
@@ -131,7 +144,7 @@ export function createComposer(core: () => SpaceView | undefined, place: (caret:
     const c = commandTyping();
     if (c) return offeredFor(commandNameables(readiness()), c.query);
     const t = typing();
-    return t ? offeredFor(nameables(core()?.sessions ?? [], orchestrators(), here(), Date.now()), t.query) : [];
+    return t ? offeredFor(nameables(sessions()?.sessions ?? [], orchestrators(), here(), Date.now()), t.query) : [];
   });
 
   const edit = (value: string, at: number) => {
@@ -226,7 +239,7 @@ export function createComposer(core: () => SpaceView | undefined, place: (caret:
     focus: () => setMenu((m) => (m._tag === "away" ? { _tag: "open" } : m)),
     canSend: () => (text().trim() !== "" || (ways.target().attachments?.length ?? 0) > 0) && !busy(),
     here,
-    stoppable: () => ["thinking", "speaking"].includes(orchestratorMood(core(), here())),
+    stoppable: () => ["thinking", "speaking"].includes(orchestratorMood(sessions()?.sessions, here())),
   };
 }
 

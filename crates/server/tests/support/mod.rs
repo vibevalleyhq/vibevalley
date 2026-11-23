@@ -171,6 +171,16 @@ impl Session for HookSession {
     ) -> vibevalley_runtime::oar::Result<vibevalley_runtime::oar::ControlOutcome> {
         self.inner.control(action, arg, input_id, span_id)
     }
+    fn control_with(
+        &self,
+        action: vibevalley_runtime::oar::ControlAction,
+        arg: &str,
+        input_id: &str,
+        span_id: &str,
+        opts: vibevalley_runtime::oar::TurnOptions,
+    ) -> vibevalley_runtime::oar::Result<vibevalley_runtime::oar::ControlOutcome> {
+        self.inner.control_with(action, arg, input_id, span_id, opts)
+    }
     fn id(&self) -> String {
         self.inner.id()
     }
@@ -184,6 +194,9 @@ impl Session for HookSession {
         self.inner.events()
     }
     fn prompt(&self, content: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
+        self.prompt_with(content, vibevalley_runtime::oar::TurnOptions::default())
+    }
+    fn prompt_with(&self, content: Vec<ContentBlock>, opts: vibevalley_runtime::oar::TurnOptions) -> vibevalley_runtime::oar::Result<()> {
         let prompt = prompt_text(&content);
         self.prompts.lock().unwrap().push(prompt.clone());
         let index = self.turns.fetch_add(1, Ordering::SeqCst);
@@ -193,7 +206,7 @@ impl Session for HookSession {
             prompt,
             index,
         });
-        self.inner.prompt(content)
+        self.inner.prompt_with(content, opts)
     }
     fn steer(&self, content: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
         self.prompts.lock().unwrap().push(format!("(steer) {}", prompt_text(&content)));
@@ -201,6 +214,9 @@ impl Session for HookSession {
     }
     fn queue(&self, content: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
         self.inner.queue(content)
+    }
+    fn queue_with(&self, content: Vec<ContentBlock>, opts: vibevalley_runtime::oar::TurnOptions) -> vibevalley_runtime::oar::Result<()> {
+        self.inner.queue_with(content, opts)
     }
     fn abort(&self) -> vibevalley_runtime::oar::Result<()> {
         self.inner.abort()

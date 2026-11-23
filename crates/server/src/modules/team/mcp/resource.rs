@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 
 use serde::Deserialize;
 use serde_json::{Value, json};
-use vibevalley_protocol::{AgentRole, Issue, Session};
+use vibevalley_protocol::{Issue, Session};
 
 use crate::lock;
 use crate::modules::collab::channel::Chat;
@@ -188,7 +188,7 @@ impl Resources {
             Some(o) if o >= 0 => o as usize,
             Some(_) => return Err("offset 不能小于 0。".into()),
         };
-        let orchestrator = reader.is_none_or(|s| s.role == AgentRole::Orchestrator);
+        let orchestrator = reader.is_none_or(|s| s.is_orchestrator());
         let key = format!("{}:{uri}", reader.map(|s| s.id.as_str()).unwrap_or("orchestrator"));
         let text: Vec<u16> = if offset == 0 {
             let loaded = self.load(r, reader, orchestrator, &uri)?;
@@ -266,18 +266,18 @@ impl Resources {
     }
 
     fn may_read_channel(&self, s: &Session, channel: &str) -> bool {
-        s.channel.as_deref() == Some(channel) || self.chat.home_of(&s.id).as_deref() == Some(channel)
+        s.channel_id() == Some(channel) || self.chat.home_of(&s.id).as_deref() == Some(channel)
     }
 
     /// Its own issue, the parent, and every issue its own waits on.
     fn may_read_issue(&self, s: &Session, target: &Issue) -> bool {
-        let Some(own) = s.issue.as_ref() else { return false };
-        if own == &target.id {
+        let Some(own) = s.issue_id() else { return false };
+        if own == target.id {
             return true;
         }
         self.board.read(|state| {
             let all: HashMap<&str, &Issue> = state.issues.iter().map(|i| (i.id.as_str(), i)).collect();
-            let Some(mine) = all.get(own.as_str()) else { return false };
+            let Some(mine) = all.get(own) else { return false };
             if mine.parent.as_deref() == Some(target.id.as_str()) {
                 return true;
             }

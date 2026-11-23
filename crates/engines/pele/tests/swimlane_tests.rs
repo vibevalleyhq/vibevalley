@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
@@ -11,7 +9,7 @@ use vibevalley_pele::layout::layered::LayeredOptions;
 use vibevalley_pele::svg::shapes::end_side;
 use vibevalley_pele::{DiagramType, LinkInfo, ParseOptions, RenderOptions, detect_type, parse, render, render_model, supports};
 
-use support::{
+use crate::support::{
     Lcg, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, assert_well_formed, css_options, dark_options, load_fixture, resolved_options,
 };
 

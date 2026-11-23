@@ -1,5 +1,3 @@
-mod support;
-
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::time::Instant;
@@ -21,7 +19,7 @@ use vibevalley_pele::{
     ErrorCode, LinkInfo, METRICS_MEASURER, MathSvg, MonospacePart, ParseOptions, ParsedModel, RenderOptions, detect_type, parse, render, supports,
 };
 
-use support::{
+use crate::support::{
     Lcg, Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, assert_well_formed, css_options, dark_options, load_fixture,
     resolved_options,
 };
@@ -1372,7 +1370,7 @@ fn class_stress_worst_cases_and_default_limit() {
         limit: Some(usize::MAX),
         ..ParseOptions::default()
     };
-    let big_render = RenderOptions {
+    let big_render = || RenderOptions {
         measurer: Some(&METRICS_MEASURER),
         limit: Some(usize::MAX),
         output_limit: Some(usize::MAX),
@@ -1381,9 +1379,8 @@ fn class_stress_worst_cases_and_default_limit() {
     let diagram = |body: String| format!("classDiagram\n{body}");
     let repeat_fn = |count: usize, f: fn(usize) -> String| -> String { (0..count).map(f).collect() };
 
-    type StressCase<'a> = (&'static str, Box<dyn FnOnce() + 'a>);
+    type StressCase<'a> = (&'static str, Box<dyn FnOnce() + Send + 'a>);
     let p = &big_parse;
-    let r = &big_render;
     let cases: Vec<StressCase<'_>> = vec![
         (
             "long line mentioning direction",
@@ -1526,7 +1523,7 @@ fn class_stress_worst_cases_and_default_limit() {
         (
             "namespace name of 3k parts rendered",
             Box::new(move || {
-                let _ = render(&diagram(format!("namespace {}b {{\nclass X\n}}", "a.".repeat(3_000))), r);
+                let _ = render(&diagram(format!("namespace {}b {{\nclass X\n}}", "a.".repeat(3_000))), &big_render());
             }),
         ),
         (
@@ -1544,7 +1541,7 @@ fn class_stress_worst_cases_and_default_limit() {
                         repeat_fn(2_000, |i| format!("namespace n{i} {{\n")),
                         "}\n".repeat(2_000)
                     )),
-                    r,
+                    &big_render(),
                 );
             }),
         ),
@@ -1569,37 +1566,40 @@ fn class_stress_worst_cases_and_default_limit() {
         (
             "5k sibling namespaces",
             Box::new(move || {
-                let _ = render(&diagram(repeat_fn(5_000, |i| format!("namespace n{i} {{\nclass C{i}\n}}\n"))), r);
+                let _ = render(&diagram(repeat_fn(5_000, |i| format!("namespace n{i} {{\nclass C{i}\n}}\n"))), &big_render());
             }),
         ),
         (
             "class with 10k members",
             Box::new(move || {
-                let _ = render(&diagram(format!("class A {{\n{}}}\n", repeat_fn(10_000, |i| format!("+m{i}()\n")))), r);
+                let _ = render(
+                    &diagram(format!("class A {{\n{}}}\n", repeat_fn(10_000, |i| format!("+m{i}()\n")))),
+                    &big_render(),
+                );
             }),
         ),
         (
             "member of opening parens",
             Box::new(move || {
-                let _ = render(&diagram(format!("class A {{\n+a){}\n}}\n", "(".repeat(n))), r);
+                let _ = render(&diagram(format!("class A {{\n+a){}\n}}\n", "(".repeat(n))), &big_render());
             }),
         ),
         (
             "member of nested parens",
             Box::new(move || {
-                let _ = render(&diagram(format!("class A {{\n{}\n}}\n", "(a)".repeat(n / 3))), r);
+                let _ = render(&diagram(format!("class A {{\n{}\n}}\n", "(a)".repeat(n / 3))), &big_render());
             }),
         ),
         (
             "member of tildes",
             Box::new(move || {
-                let _ = render(&diagram(format!("class A {{\n+x {}\n}}\n", "~".repeat(n))), r);
+                let _ = render(&diagram(format!("class A {{\n+x {}\n}}\n", "~".repeat(n))), &big_render());
             }),
         ),
         (
             "member of tildes and commas",
             Box::new(move || {
-                let _ = render(&diagram(format!("class A {{\n+x({})\n}}\n", "~a,".repeat(n / 3))), r);
+                let _ = render(&diagram(format!("class A {{\n+x({})\n}}\n", "~a,".repeat(n / 3))), &big_render());
             }),
         ),
         (
@@ -1617,43 +1617,43 @@ fn class_stress_worst_cases_and_default_limit() {
         (
             "50k char member",
             Box::new(move || {
-                let _ = render(&diagram(format!("class A {{\n+{}\n}}\n", "word ".repeat(n / 5))), r);
+                let _ = render(&diagram(format!("class A {{\n+{}\n}}\n", "word ".repeat(n / 5))), &big_render());
             }),
         ),
         (
             "50k char note",
             Box::new(move || {
-                let _ = render(&diagram(format!("note \"{}\"\n", "word ".repeat(n / 5))), r);
+                let _ = render(&diagram(format!("note \"{}\"\n", "word ".repeat(n / 5))), &big_render());
             }),
         ),
         (
             "note of emphasis and breaks",
             Box::new(move || {
-                let _ = render(&diagram(format!("note \"{}\"\n", "*a _b <br>".repeat(n / 10))), r);
+                let _ = render(&diagram(format!("note \"{}\"\n", "*a _b <br>".repeat(n / 10))), &big_render());
             }),
         ),
         (
             "label of entities",
             Box::new(move || {
-                let _ = render(&diagram(format!("class A[\"{}\"]\n", "#35;&amp;".repeat(n / 9))), r);
+                let _ = render(&diagram(format!("class A[\"{}\"]\n", "#35;&amp;".repeat(n / 9))), &big_render());
             }),
         ),
         (
             "5k classes",
             Box::new(move || {
-                let _ = render(&diagram(repeat_fn(5_000, |i| format!("class C{i}\n"))), r);
+                let _ = render(&diagram(repeat_fn(5_000, |i| format!("class C{i}\n"))), &big_render());
             }),
         ),
         (
             "chain of 4k",
             Box::new(move || {
-                let _ = render(&diagram(repeat_fn(4_000, |i| format!("C{i} <|-- C{}\n", i + 1))), r);
+                let _ = render(&diagram(repeat_fn(4_000, |i| format!("C{i} <|-- C{}\n", i + 1))), &big_render());
             }),
         ),
         (
             "star of 4k with cardinalities",
             Box::new(move || {
-                let _ = render(&diagram(repeat_fn(4_000, |i| format!("Hub \"1\" --> \"{i}\" C{i}\n"))), r);
+                let _ = render(&diagram(repeat_fn(4_000, |i| format!("Hub \"1\" --> \"{i}\" C{i}\n"))), &big_render());
             }),
         ),
         (
@@ -1665,7 +1665,7 @@ fn class_stress_worst_cases_and_default_limit() {
                         "A \"1\" --> \"2\" B : x\n".repeat(2_000),
                         "A \"1\" --> \"2\" A : y\n".repeat(2_000)
                     )),
-                    r,
+                    &big_render(),
                 );
             }),
         ),
@@ -1678,25 +1678,28 @@ fn class_stress_worst_cases_and_default_limit() {
                         s.push_str(&format!("C{i} --> C{j}\n"));
                     }
                 }
-                let _ = render(&diagram(s), r);
+                let _ = render(&diagram(s), &big_render());
             }),
         ),
         (
             "3k lollipop interfaces",
             Box::new(move || {
-                let _ = render(&diagram(repeat_fn(3_000, |i| format!("i{i} ()-- A\n"))), r);
+                let _ = render(&diagram(repeat_fn(3_000, |i| format!("i{i} ()-- A\n"))), &big_render());
             }),
         ),
         (
             "3k notes for one class",
             Box::new(move || {
-                let _ = render(&diagram(format!("class A\n{}", repeat_fn(3_000, |i| format!("note for A \"n{i}\"\n")))), r);
+                let _ = render(
+                    &diagram(format!("class A\n{}", repeat_fn(3_000, |i| format!("note for A \"n{i}\"\n")))),
+                    &big_render(),
+                );
             }),
         ),
         (
             "style with 12k declarations",
             Box::new(move || {
-                let _ = render(&diagram(format!("class A\nstyle A fill:#fff{}\n", ",stroke:#000".repeat(4_000))), r);
+                let _ = render(&diagram(format!("class A\nstyle A fill:#fff{}\n", ",stroke:#000".repeat(4_000))), &big_render());
             }),
         ),
         (
@@ -1708,7 +1711,7 @@ fn class_stress_worst_cases_and_default_limit() {
                         repeat_fn(100, |i| format!("class C{i}:::k\n")),
                         "classDef k fill:#fff\n".repeat(3_000)
                     )),
-                    r,
+                    &big_render(),
                 );
             }),
         ),
@@ -1721,7 +1724,7 @@ fn class_stress_worst_cases_and_default_limit() {
                         repeat_fn(1_600, |i| format!("class C{i}:::k\n")),
                         "classDef k fill:#fff\n".repeat(1_600)
                     )),
-                    r,
+                    &big_render(),
                 );
             }),
         ),
@@ -1734,35 +1737,42 @@ fn class_stress_worst_cases_and_default_limit() {
                         repeat_fn(800, |i| format!("class C{i}:::k\nstyle C{i} x:{i}\n")),
                         repeat_fn(5_000, |i| format!(",a{i}:b"))
                     )),
-                    r,
+                    &big_render(),
                 );
             }),
         ),
         (
             "cssClass with 12k ids",
             Box::new(move || {
-                let _ = render(&diagram(format!("class A\ncssClass \"{}A\" k\n", "A,".repeat(12_000))), r);
+                let _ = render(&diagram(format!("class A\ncssClass \"{}A\" k\n", "A,".repeat(12_000))), &big_render());
             }),
         ),
         (
             "link wrapped in entity encoding",
             Box::new(move || {
-                let _ = render(&diagram(format!("class A\nlink A \"&{}x\"\n", "#38;".repeat(n / 4))), r);
+                let _ = render(&diagram(format!("class A\nlink A \"&{}x\"\n", "#38;".repeat(n / 4))), &big_render());
             }),
         ),
         (
             "4k annotation statements",
             Box::new(move || {
-                let _ = render(&diagram("<<a>> A\n".repeat(4_000)), r);
+                let _ = render(&diagram("<<a>> A\n".repeat(4_000)), &big_render());
             }),
         ),
     ];
 
-    for (name, run) in cases {
-        let started = Instant::now();
-        run();
-        assert!(started.elapsed().as_millis() < 5_000, "stress case `{name}` took {:?}", started.elapsed());
-    }
+    let queue = std::sync::Mutex::new(cases);
+    std::thread::scope(|scope| {
+        for _ in 0..4 {
+            scope.spawn(|| {
+                while let Some((name, run)) = queue.lock().unwrap().pop() {
+                    let started = Instant::now();
+                    run();
+                    assert!(started.elapsed().as_millis() < 5_000, "stress case `{name}` took {:?}", started.elapsed());
+                }
+            });
+        }
+    });
 
     let err = render(&diagram("class A\n".repeat(10_000)), &css_options()).unwrap_err();
     assert_eq!(err.code, ErrorCode::Limit);

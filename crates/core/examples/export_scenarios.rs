@@ -49,8 +49,8 @@ fn main() {
             "wrote {} (seq={}, issues={}, sessions={})",
             target.display(),
             frame.seq,
-            frame.state.issues.len(),
-            frame.state.sessions.len()
+            frame.board.issues.len(),
+            frame.sessions.sessions.len()
         );
     }
 

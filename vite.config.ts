@@ -53,20 +53,38 @@ export default defineConfig({
       // The Rust workspace (crates/, apps/mac): format, clippy, tests. protocol:check fails when packages/protocol's
       // shapes.gen.ts differ from the Rust contract (vp run protocol:ts writes them), or the artifact and pkm goldens from
       // their TS engines (vp run goldens).
-      "rust:check": { command: "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace", cache: false },
+      "rust:check": {
+        command:
+          "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && { if command -v cargo-nextest >/dev/null 2>&1; then cargo nextest run --workspace --no-fail-fast && cargo test --workspace --doc; else cargo test --workspace; fi; }",
+        cache: false,
+      },
+      "rust:changed": { command: "vpx scripts/release/rust-changed.ts", cache: false },
       "protocol:check": {
         command: "cargo test -p vibevalley-protocol --features ts-gen --test typescript && vp run goldens --check",
         cache: false,
       },
-      "sql:check": { command: "sqlc diff && python3 scripts/release/verify-native-schema.py --queries-only", cache: false },
-      "mac:check": {
-        command:
-          "cd apps/mac/ui && ../../../.tools/bin/nsh check && ../../../.tools/bin/nsh build App.tsx -o build && ../../../.tools/bin/nsh build ShellApp.tsx -o build-shell && cd ../../.. && vp lint --deny-warnings apps/mac/ui && vpx scripts/audit/mac-tests.ts",
+      // Inside release:verify, rust:check already runs every vibevalley-core golden test; serialize the ts-gen check
+      // after rust:check so Cargo never contends on .cargo-lock and goldens never run twice.
+      "release:rust": {
+        command: "cargo test -p vibevalley-protocol --features ts-gen --test typescript",
+        dependsOn: ["rust:check"],
         cache: false,
       },
+      "sql:check": { command: "sqlc diff && python3 scripts/release/verify-native-schema.py --queries-only", cache: false },
+      "mac:build-test": {
+        command:
+          'cd apps/mac/ui && ../../../.tools/bin/nsh check && (../../../.tools/bin/nsh build App.tsx -o build & p1=$!; ../../../.tools/bin/nsh build ShellApp.tsx -o build-shell & p2=$!; s=0; wait "$p1" || s=$?; wait "$p2" || s=$?; exit "$s") && cd ../../.. && vpx scripts/audit/mac-tests.ts',
+        cache: false,
+      },
+      "mac:check": {
+        command: "vp lint --deny-warnings apps/mac/ui",
+        dependsOn: ["mac:build-test"],
+        cache: false,
+      },
+      // packages:check already runs type-aware vp check across apps/mac/ui, so release:verify uses mac:build-test to avoid linting twice.
       "release:verify": {
         command: "true",
-        dependsOn: ["rust:check", "protocol:check", "sql:check", "packages:check", "scripts:test", "mac:check", "docs:verify"],
+        dependsOn: ["release:rust", "sql:check", "packages:check", "scripts:test", "mac:build-test", "docs:verify"],
         cache: false,
       },
     },

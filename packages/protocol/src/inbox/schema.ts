@@ -17,7 +17,11 @@ const InboxFromOrchestrator = z.object({
   kind: z.literal("orchestrator"),
 }) satisfies Codec<T.InboxFromOrchestrator>;
 
-const InboxFrom = z.discriminatedUnion("kind", [InboxFromSession, InboxFromOrchestrator]) satisfies Codec<T.InboxFrom>;
+const InboxFromRuntime = z.object({
+  kind: z.literal("runtime"),
+}) satisfies Codec<T.InboxFromRuntime>;
+
+const InboxFrom = z.discriminatedUnion("kind", [InboxFromSession, InboxFromOrchestrator, InboxFromRuntime]) satisfies Codec<T.InboxFrom>;
 
 const InboxTargetSession = z.object({
   kind: z.literal("session"),
@@ -34,7 +38,13 @@ const InboxTargetChat = z.object({
   channel: z.string(),
 }) satisfies Codec<T.InboxTargetChat>;
 
-const InboxTarget = z.discriminatedUnion("kind", [InboxTargetSession, InboxTargetIssue, InboxTargetChat]) satisfies Codec<T.InboxTarget>;
+const InboxTargetRuntime = z.object({
+  kind: z.literal("runtime"),
+  taskId: z.string(),
+  sessionId: z.exactOptional(SessionId),
+}) satisfies Codec<T.InboxTargetRuntime>;
+
+const InboxTarget = z.discriminatedUnion("kind", [InboxTargetSession, InboxTargetIssue, InboxTargetChat, InboxTargetRuntime]) satisfies Codec<T.InboxTarget>;
 
 const InboxWords = z.object({
   label: z.string(),

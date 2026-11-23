@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
@@ -16,7 +14,7 @@ use vibevalley_pele::diagram::usecase::types::{
 };
 use vibevalley_pele::{DiagramType, ErrorCode, METRICS_MEASURER, ParseOptions, RenderOptions, TextMeasurer, TextStyle, detect_type, parse, render, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
 
 fn svg_of(body: &str) -> String {
     render(&format!("usecase-beta\n{body}"), &css_options())
@@ -1653,10 +1651,6 @@ fn usecase_stress_worst_cases_stay_fast() {
         limit: Some(usize::MAX),
         ..ParseOptions::default()
     };
-    let big_render = RenderOptions {
-        limit: Some(usize::MAX),
-        ..resolved_options()
-    };
     let repeat_fn = |count: usize, f: &dyn Fn(usize) -> String| -> String {
         let mut s = String::new();
         for i in 0..count {
@@ -1724,11 +1718,20 @@ fn usecase_stress_worst_cases_stay_fast() {
         ("5k metadata statements", format!("{u}actor A\n{}", "A@{ type: hollow }\n".repeat(5000))),
         ("invalid JSON at end of 50k", format!("{u}json P@{{\"a\":\"{}\",}}", "x".repeat(n))),
     ];
-    for (name, src) in parse_cases {
-        let t0 = Instant::now();
-        let _ = parse(&src, &big_parse);
-        assert!(t0.elapsed().as_secs_f64() < 10.0, "parse {name} took {:?}", t0.elapsed());
-    }
+    let next_parse = std::sync::atomic::AtomicUsize::new(0);
+    std::thread::scope(|scope| {
+        for _ in 0..4 {
+            scope.spawn(|| {
+                loop {
+                    let idx = next_parse.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let Some((name, src)) = parse_cases.get(idx) else { break };
+                    let t0 = Instant::now();
+                    let _ = parse(src, &big_parse);
+                    assert!(t0.elapsed().as_secs_f64() < 10.0, "parse {name} took {:?}", t0.elapsed());
+                }
+            });
+        }
+    });
 
     // Render stress cases.
     let render_cases: Vec<(&str, String)> = vec![
@@ -1803,11 +1806,24 @@ fn usecase_stress_worst_cases_stay_fast() {
             ),
         ),
     ];
-    for (name, src) in render_cases {
-        let t0 = Instant::now();
-        let _ = render(&src, &big_render);
-        assert!(t0.elapsed().as_secs_f64() < 15.0, "render {name} took {:?}", t0.elapsed());
-    }
+    let next_render = std::sync::atomic::AtomicUsize::new(0);
+    std::thread::scope(|scope| {
+        for _ in 0..4 {
+            scope.spawn(|| {
+                let big_render = RenderOptions {
+                    limit: Some(usize::MAX),
+                    ..resolved_options()
+                };
+                loop {
+                    let idx = next_render.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let Some((name, src)) = render_cases.get(idx) else { break };
+                    let t0 = Instant::now();
+                    let _ = render(src, &big_render);
+                    assert!(t0.elapsed().as_secs_f64() < 15.0, "render {name} took {:?}", t0.elapsed());
+                }
+            });
+        }
+    });
 
     // Default 50k character limit.
     let err = render(&format!("{u}{}", "A --> B\n".repeat(8000)), &css_options()).unwrap_err();

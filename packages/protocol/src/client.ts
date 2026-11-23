@@ -406,11 +406,14 @@ export class VibeValleyApi {
   readonly session = {
     /** Stops a session's turn; it stays, and a comment starts the next. */
     stop: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("session.stop", "/api/v1/session/stop", a, options),
-    list: (a: { agent?: string }, options?: { signal?: AbortSignal }): Promise<T.Session[]> =>
+    list: (a: T.SessionListInput, options?: { signal?: AbortSignal }): Promise<T.Session[]> =>
       this.call<T.Session[]>("session.list", "/api/v1/session/list", a, options),
     get: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Session> => this.call<T.Session>("session.get", "/api/v1/session/get", a, options),
     openWorkspace: (a: T.SessionOpenWorkspaceInput, options?: { signal?: AbortSignal }): Promise<T.SessionWorkspace> =>
       this.call<T.SessionWorkspace>("session.openWorkspace", "/api/v1/session/openWorkspace", a, options),
+    /** Closes a direct workspace chat session, aborting any running turn without touching the project directory. */
+    closeWorkspace: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> =>
+      this.call<void>("session.closeWorkspace", "/api/v1/session/closeWorkspace", a, options),
     /** Starts a turn when idle; steers the current turn when working. */
     send: (a: T.SessionSendInput, options?: { signal?: AbortSignal }): Promise<T.Session> =>
       this.call<T.Session>("session.send", "/api/v1/session/send", a, options),
@@ -423,9 +426,15 @@ export class VibeValleyApi {
     childTranscript: (a: T.SessionChildTranscriptInput, options?: { signal?: AbortSignal }): Promise<T.SessionChildTranscript> =>
       this.call<T.SessionChildTranscript>("session.childTranscript", "/api/v1/session/childTranscript", a, options),
     event: {
-      /** Its log, oldest first. run gives one run's only. */
-      list: (a: { id: string; run?: string }, options?: { signal?: AbortSignal }): Promise<T.SessionEvent[]> =>
-        this.call<T.SessionEvent[]>("session.event.list", "/api/v1/session/event/list", a, options),
+      /** Its log, oldest first. `run` narrows to one run; cursor fields page history. */
+      list: (a: T.SessionEventListInput, options?: { signal?: AbortSignal }): Promise<T.SessionEventPage> =>
+        this.call<T.SessionEventPage>("session.event.list", "/api/v1/session/event/list", a, options),
+    },
+    binding: {
+      attach: (a: T.SessionBindingInput, options?: { signal?: AbortSignal }): Promise<T.Session> =>
+        this.call<T.Session>("session.binding.attach", "/api/v1/session/binding/attach", a, options),
+      detach: (a: T.SessionBindingInput, options?: { signal?: AbortSignal }): Promise<T.Session> =>
+        this.call<T.Session>("session.binding.detach", "/api/v1/session/binding/detach", a, options),
     },
   };
 
@@ -549,9 +558,8 @@ export class VibeValleyApi {
 
   readonly game = {
     achievement: {
-      /** Every achievement, as the board has them. */
-      list: (options?: { signal?: AbortSignal }): Promise<T.Achievement[]> =>
-        this.call<T.Achievement[]>("game.achievement.list", "/api/v1/game/achievement/list", undefined, options),
+      list: (options?: { signal?: AbortSignal }): Promise<T.AchievementList> =>
+        this.call<T.AchievementList>("game.achievement.list", "/api/v1/game/achievement/list", undefined, options),
     },
     title: {
       set: (a: T.ChooseTitleRequest, options?: { signal?: AbortSignal }): Promise<void> =>

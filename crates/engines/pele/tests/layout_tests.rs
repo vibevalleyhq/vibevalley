@@ -1,12 +1,10 @@
-mod support;
-
 use std::collections::HashSet;
 
 use vibevalley_pele::layout::components::wrap_components;
 use vibevalley_pele::layout::compound::{CEdge, CNode, Dir, RouteStyle, cedge, cnode, compound_layout, route_crossings};
 use vibevalley_pele::layout::layered::{Groups, Kind, LayeredOptions, layered, ledge, lnode};
 
-use support::Lcg;
+use crate::support::Lcg;
 
 const DIRS: [Dir; 4] = [Dir::TB, Dir::BT, Dir::LR, Dir::RL];
 

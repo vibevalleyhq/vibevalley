@@ -1,6 +1,15 @@
 import { t } from "@vibevalley/i18n";
-import { type Channel, type ChannelSummary, type Chat, type ChatMessage, type Issue, type Session, type SpaceState } from "@vibevalley/protocol";
-import { channelOf, defaultOf } from "@vibevalley/protocol/rules";
+import {
+  defaultOrchestrator,
+  type Channel,
+  type ChannelSummary,
+  type Chat,
+  type ChatMessage,
+  type Issue,
+  type Session,
+  type SessionView,
+} from "@vibevalley/protocol";
+import { channelOf, defaultOf, isOrchestratorSession, sessionChannelId, sessionIssueId, sessionProfile } from "@vibevalley/protocol/rules";
 
 import { compareText, or, spelled } from "../../../infra/base/search";
 
@@ -102,14 +111,15 @@ const findLast = <T>(xs: readonly T[] | undefined, test: (x: T) => boolean) => x
 export const issueThreadOf = (chat: Chat | undefined, issue: string) => findLast(chat?.channels, (c) => c.subjectKind === "issue" && c.subjectId === issue);
 
 export function sessionThreadOf(chat: Chat | undefined, session: Session) {
-  if (session.issue) return issueThreadOf(chat, session.issue);
+  const issueId = sessionIssueId(session);
+  if (issueId) return issueThreadOf(chat, issueId);
   return findLast(chat?.channels, (c) => c.subjectKind === "talk" && c.subjectId === session.id);
 }
 
 export function threadOwnerOf<S extends Session>(thread: Channel, sessions: readonly S[]): S | undefined {
   switch (thread.subjectKind) {
     case "issue":
-      return findLast(sessions, (h) => h.issue === thread.subjectId);
+      return findLast(sessions, (h) => sessionIssueId(h) === thread.subjectId);
     case "talk":
       return sessions.find((h) => h.id === thread.subjectId);
     default:
@@ -184,14 +194,18 @@ export function feedOf(chat: Chat | undefined, said: readonly ChatMessage[], fil
 }
 
 export function orchestratorTyping(
-  state: SpaceState | undefined,
+  sessions: readonly SessionView[] | undefined,
   channel: Channel | undefined,
 ): { readonly agent: string; readonly mood: "thinking" | "speaking"; readonly since?: number } | undefined {
   if (!channel) return undefined;
-  for (const session of state?.sessions ?? []) {
+  for (const session of sessions ?? []) {
     const phase = session.phase;
-    if (session.role === "orchestrator" && session.channel === channel.id && phase._tag === "working")
-      return { agent: session.agent, mood: phase.doing.action === "speaking_text" ? "speaking" : "thinking", since: phase.since };
+    if (isOrchestratorSession(session) && sessionChannelId(session) === channel.id && phase._tag === "working")
+      return {
+        agent: sessionProfile(session) ?? defaultOrchestrator,
+        mood: phase.doing.action === "speaking_text" ? "speaking" : "thinking",
+        since: phase.since,
+      };
   }
   return undefined;
 }

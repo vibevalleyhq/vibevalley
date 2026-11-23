@@ -2,7 +2,7 @@ import { Scroll, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Look, OrchestratorEval } from "@vibevalley/protocol";
-import { oneLine } from "@vibevalley/protocol/rules";
+import { oneLine, sessionIssueId, sessionProfile, sessionRepo } from "@vibevalley/protocol/rules";
 
 import { Button, ButtonLink } from "../../design/Button";
 import { AgentFace, OrchestratorFace } from "../../design/domain/Face";
@@ -16,7 +16,7 @@ import { useOrchestrators } from "../../infra/agents";
 import { api, reasonOf } from "../../infra/api";
 import { Keyed, useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
-import { useCore } from "../../infra/frame";
+import { useBoardSlice, useSessionsSlice } from "../../infra/frame";
 import { defineQuery, ready, retryRead, useAgents, useQuery } from "../../infra/query";
 import { useRouter, useSearch } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
@@ -138,7 +138,7 @@ function entrySubtitle(entry: RunEntry): string {
       return entry.live?.phaseText || entry.agent.duty || t("web.agent.list.orchestratorLine");
     case "worker":
       if (entry.issue) return entry.issue.title;
-      return oneLine(entry.session.brief).trim() || entry.session.repo || "";
+      return oneLine(entry.session.brief).trim() || sessionRepo(entry.session) || "";
   }
 }
 
@@ -159,7 +159,8 @@ function entryTiming(entry: RunEntry, now: number): string {
 }
 
 export function RunsPage() {
-  const core = useCore();
+  const board = useBoardSlice();
+  const sessionsSlice = useSessionsSlice();
   const router = useRouter();
   const search = useSearch();
   const now = useNow();
@@ -182,8 +183,8 @@ export function RunsPage() {
     buildRunEntries({
       orchestrators: orchestrators(),
       sessions: ready(sessions, []),
-      liveSessions: core()?.sessions ?? [],
-      issues: core()?.issues ?? [],
+      liveSessions: sessionsSlice()?.sessions ?? [],
+      issues: board()?.issues ?? [],
     }),
   );
 
@@ -202,7 +203,7 @@ export function RunsPage() {
 
   const hasFilters = () => scope() !== "all" || agentFilter() !== undefined || issueFilter() !== undefined || query().trim().length > 0;
   const agentById = createMemo(() => new Map(ready(agents, []).map((a) => [a.id, a])));
-  const lookOf = (entry: RunEntry): Look | undefined => (entry.kind === "worker" ? agentById().get(entry.session.agent)?.look : undefined);
+  const lookOf = (entry: RunEntry): Look | undefined => (entry.kind === "worker" ? agentById().get(sessionProfile(entry.session) ?? "")?.look : undefined);
 
   const agentFilterName = () => {
     const id = agentFilter();
@@ -213,7 +214,7 @@ export function RunsPage() {
   const issueFilterLabel = () => {
     const id = issueFilter();
     if (!id) return undefined;
-    const found = (core()?.issues ?? []).find((i) => i.id === id);
+    const found = (board()?.issues ?? []).find((i) => i.id === id);
     return found ? `#${found.number} ${found.title}` : id;
   };
 
@@ -378,7 +379,7 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
   const at = () => runActivityAt(props.entry);
   const when = () => (at() > 0 ? ago(at(), props.now) : "");
   const issueNum = () => (props.entry.kind === "worker" && props.entry.issue ? `#${props.entry.issue.number}` : undefined);
-  const repo = () => (props.entry.kind === "worker" ? props.entry.session.repo : undefined);
+  const repo = () => (props.entry.kind === "worker" ? sessionRepo(props.entry.session) : undefined);
   return (
     <View
       role="button"
@@ -397,7 +398,9 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
         <If
           when={props.entry.kind === "orchestrator"}
           else={
-            props.entry.kind === "worker" ? <AgentFace agentId={props.entry.session.agent} name={props.entry.session.name} look={props.look} size={30} /> : null
+            props.entry.kind === "worker" ? (
+              <AgentFace agentId={sessionProfile(props.entry.session) ?? ""} name={props.entry.session.name} look={props.look} size={30} />
+            ) : null
           }
         >
           <OrchestratorFace size={30} agent={props.entry.id} />
@@ -449,11 +452,11 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
     const bg = status().pillBg;
     return bg ? { backgroundColor: bg() } : undefined;
   };
-  const profileId = () => (props.entry.kind === "orchestrator" ? props.entry.agent.id : props.entry.session.agent);
-  const workerIssueId = () => (props.entry.kind === "worker" ? props.entry.session.issue : undefined);
+  const profileId = () => (props.entry.kind === "orchestrator" ? props.entry.agent.id : (sessionProfile(props.entry.session) ?? ""));
+  const workerIssueId = () => (props.entry.kind === "worker" ? sessionIssueId(props.entry.session) : undefined);
   const workerIssueNumber = () => (props.entry.kind === "worker" ? props.entry.issue?.number : undefined);
   const timing = () => entryTiming(props.entry, props.now);
-  const repo = () => (props.entry.kind === "worker" ? props.entry.session.repo : undefined);
+  const repo = () => (props.entry.kind === "worker" ? sessionRepo(props.entry.session) : undefined);
   const subLine = () => {
     const parts: string[] = [];
     if (props.entry.kind === "orchestrator") {
@@ -487,7 +490,7 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
                 else={
                   props.entry.kind === "worker" ? (
                     <AgentFace
-                      agentId={props.entry.session.agent}
+                      agentId={sessionProfile(props.entry.session) ?? ""}
                       name={props.entry.session.name}
                       runtime={props.entry.session.runtime}
                       look={props.look}

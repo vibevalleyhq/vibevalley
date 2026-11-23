@@ -1,0 +1,290 @@
+{
+ "HostPanel": [
+  "files",
+  "git"
+ ],
+ "HostRailRunningState": [
+  "working",
+  "ready",
+  "idle"
+ ],
+ "HostRailWorktree": [
+  {
+   "path": "/tmp/vv",
+   "branch": "main",
+   "main": true
+  },
+  {
+   "path": "/tmp/vv-wt",
+   "main": false
+  }
+ ],
+ "HostRailTab": [
+  {
+   "id": 1,
+   "title": "zsh",
+   "active": true,
+   "kind": "terminal",
+   "running": true,
+   "runningState": "working",
+   "runningAgent": "claude",
+   "runningLabel": "Claude",
+   "attention": false
+  },
+  {
+   "id": 2,
+   "title": "README.md",
+   "active": false,
+   "kind": "file"
+  }
+ ],
+ "HostRailProject": [
+  {
+   "id": 1,
+   "name": "vibevalley",
+   "path": "/tmp/vv",
+   "initials": "VV",
+   "active": true,
+   "attention": false,
+   "terminals": 1,
+   "shortcut": "\u23181",
+   "branch": "main",
+   "mainRoot": "/tmp/vv",
+   "worktrees": [
+    {
+     "path": "/tmp/vv",
+     "branch": "main",
+     "main": true
+    }
+   ],
+   "tabs": [
+    {
+     "id": 1,
+     "title": "zsh",
+     "active": true,
+     "kind": "terminal"
+    }
+   ]
+  }
+ ],
+ "HostRailFrame": [
+  {
+   "projects": [],
+   "panel": "files",
+   "inspectorOpen": true
+  }
+ ],
+ "HostTreeItem": [
+  {
+   "id": "/tmp/vv/src",
+   "label": "src",
+   "tone": "dirty",
+   "hidden": false,
+   "children": [
+    {
+     "id": "/tmp/vv/src/lib.rs",
+     "label": "lib.rs",
+     "tone": "modified",
+     "hidden": false
+    }
+   ]
+  },
+  {
+   "id": "/tmp/vv/empty/\u0000placeholder",
+   "label": "Empty",
+   "tone": "placeholder",
+   "loading": false,
+   "disabled": true
+  }
+ ],
+ "HostFileTreeFrame": [
+  {
+   "root": "/tmp/vv",
+   "name": "vv",
+   "items": [],
+   "expanded": [
+    "/tmp/vv/src"
+   ],
+   "selected": "/tmp/vv/src/lib.rs"
+  },
+  {
+   "items": [],
+   "loading": true
+  }
+ ],
+ "HostGitFileRow": [
+  {
+   "path": "src/lib.rs",
+   "code": "M",
+   "tone": "modified"
+  }
+ ],
+ "HostGitBranch": [
+  {
+   "name": "main",
+   "head": true,
+   "upstream": "origin/main"
+  },
+  {
+   "name": "dev",
+   "head": false
+  }
+ ],
+ "HostGitWorktree": [
+  {
+   "path": "/tmp/vv",
+   "branch": "main",
+   "main": true,
+   "locked": false,
+   "current": true,
+   "changed": 1,
+   "conflicts": 0,
+   "ahead": 2,
+   "behind": 0,
+   "summary": "wip"
+  }
+ ],
+ "HostGitCommit": [
+  {
+   "id": "0123456789",
+   "short": "0123456",
+   "summary": "init",
+   "author": "dev",
+   "time": 100
+  }
+ ],
+ "HostGitPanelFrame": [
+  {
+   "repo": false,
+   "error": "not a repo",
+   "busy": false
+  },
+  {
+   "repo": true,
+   "branch": "main",
+   "head": "01234567",
+   "upstream": "origin/main",
+   "ahead": 1,
+   "behind": 0,
+   "staged": [],
+   "changes": [],
+   "conflicts": [],
+   "branches": [],
+   "worktrees": [],
+   "log": [],
+   "busy": false
+  }
+ ],
+ "HostPaletteMode": [
+  "commands",
+  "files",
+  "search"
+ ],
+ "HostPaletteCommand": [
+  {
+   "id": "nav.issues",
+   "label": "Issues",
+   "detail": "/issues",
+   "group": "Nav",
+   "shortcut": "mod+1"
+  },
+  {
+   "id": "theme.toggle",
+   "label": "Toggle Theme",
+   "group": "Appearance"
+  }
+ ],
+ "HostPaletteFileMatch": [
+  {
+   "id": "file:src/lib.rs",
+   "label": "lib.rs",
+   "detail": "src",
+   "indices": [
+    0,
+    4
+   ]
+  }
+ ],
+ "HostPaletteSearchHit": [
+  {
+   "id": "hit:/tmp/a.rs:10",
+   "label": "fn main()",
+   "detail": "a.rs:10",
+   "ranges": [
+    [
+     0,
+     2
+    ]
+   ]
+  }
+ ],
+ "HostPaletteItem": [
+  {
+   "id": "theme.toggle",
+   "label": "Toggle Theme",
+   "group": "Appearance"
+  },
+  {
+   "id": "file:src/lib.rs",
+   "label": "lib.rs",
+   "detail": "src",
+   "indices": [
+    0
+   ]
+  },
+  {
+   "id": "hit:/tmp/a.rs:10",
+   "label": "fn main()",
+   "detail": "a.rs:10",
+   "ranges": [
+    [
+     0,
+     2
+    ]
+   ]
+  }
+ ],
+ "HostPaletteFrame": [
+  {
+   "mode": "commands",
+   "query": "",
+   "items": [],
+   "loading": false,
+   "note": "empty"
+  }
+ ],
+ "HostAction": [
+  {
+   "type": "ready"
+  },
+  {
+   "type": "applied",
+   "topic": "rail",
+   "rev": 1
+  },
+  {
+   "type": "show_panel",
+   "panel": "git"
+  },
+  {
+   "type": "openFarm",
+   "repo": "demo"
+  },
+  {
+   "type": "openRepoMap"
+  },
+  {
+   "type": "openTree"
+  },
+  {
+   "type": "search",
+   "query": "fn",
+   "regex": true
+  },
+  {
+   "type": "open_hit",
+   "path": "/tmp/a.rs",
+   "line": 12
+  }
+ ]
+}

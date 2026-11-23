@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Instant;
@@ -18,7 +16,7 @@ use vibevalley_pele::diagram::agentflow::types::{DiagnosticId, DiagnosticSeverit
 use vibevalley_pele::util::yaml::YamlValue;
 use vibevalley_pele::{ErrorCode, LinkInfo, METRICS_MEASURER, ParseOptions, ParsedModel, RenderOptions, ThemeMode, detect_type, parse, render, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
 
 fn preview(s: &str) -> String {
     s.chars().take(120).collect()

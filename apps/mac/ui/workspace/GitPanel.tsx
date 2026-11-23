@@ -6,6 +6,8 @@ import { Clipboard, effect, Scroll, signal, Text, View, type TextStyle } from "n
 import { Button, ContextMenu, Input, MenuItem, MenuSeparator } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
+import type { BoardSlice, SessionsSlice } from "@vibevalley/protocol";
+import { sessionIssueId, sessionWorktree } from "@vibevalley/protocol/rules";
 
 import { Button as DesignButton } from "../design/Button";
 import { Icon } from "../design/Icon";
@@ -153,13 +155,6 @@ function FileRow(props: { row: GitRow; staged: boolean }) {
     </View>
   );
 }
-
-type StateWorktreeMeta = {
-  state?: {
-    sessions?: { id: string; name: string; worktree?: string; issue?: string; phase: { _tag: string } }[];
-    issues?: { id: string; number: number; title: string }[];
-  };
-};
 
 function normWtPath(p: string | undefined): string {
   if (!p) return "";
@@ -312,7 +307,8 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
   const addingWt = signal(false);
   const newBranch = signal("");
   const creatingWt = signal(false);
-  const vvState = frame<StateWorktreeMeta>("state");
+  const board = frame<BoardSlice>("slice:board");
+  const sessionsSlice = frame<SessionsSlice>("slice:sessions");
   const activeTab = () => props.tab ?? localTab();
   const f = () => props.frame;
   const isOpen = (key: string) => !folded()[key];
@@ -323,10 +319,11 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
 
   const worktreeMeta = (path: string): { badge: string | null; running: boolean } => {
     const target = normWtPath(path);
-    const sessions = vvState()?.state?.sessions ?? [];
-    const session = sessions.find((s) => s.phase._tag !== "closed" && normWtPath(s.worktree) === target);
+    const sessions = sessionsSlice()?.sessions ?? [];
+    const session = sessions.find((s) => s.phase._tag !== "closed" && normWtPath(sessionWorktree(s)) === target);
     if (!session) return { badge: null, running: false };
-    const issue = session.issue ? (vvState()?.state?.issues ?? []).find((i) => i.id === session.issue) : undefined;
+    const iid = sessionIssueId(session);
+    const issue = iid ? (board()?.issues ?? []).find((i) => i.id === iid) : undefined;
     const running = session.phase._tag === "working";
     const parts = [issue ? `#${issue.number} ${issue.title}` : session.name, running ? t("web.shell.git.wtRunning") : ""].filter(Boolean);
     return { badge: parts.join(" · "), running };

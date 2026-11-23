@@ -158,7 +158,7 @@ const RULES: readonly Rule[] = [
     // The browser's Worker (new Worker, a value typed : Worker) is not the old name.
     pattern:
       /\b(FarmState|SiteFrame|SiteEvent|AgentProfile|WorkStep|ActionStep\w*|CanMerge|Foreman|(?<!new |: |typeof |Object\.defineProperty\(window, ")Worker)\b/u,
-    says: "CoreState, StateFrame, ServerEvent, Agent, Activity, PlayAction (a session play's history), canHarvest, Manager, Session; a Web Worker stays (new Worker)",
+    says: "SpaceState, SliceBundle / *Slice, ServerEvent, Agent, Activity, PlayAction (a session play's history), canHarvest, Orchestrator, Session; a Web Worker stays (new Worker)",
   },
   {
     name: "the old helper agent role",

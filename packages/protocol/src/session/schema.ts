@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { AgentRoleValues } from "../agent/shapes";
 import type { Codec } from "../codec";
-import { IssueId, Outcome, Retry, SessionId, Spent } from "../common/schema";
+import { ArtifactId, IssueId, Outcome, Retry, SessionId, Spent } from "../common/schema";
 import * as T from "./shapes.gen";
 
 const SessionAction = z.enum(T.SessionActionValues) satisfies Codec<T.SessionAction>;
@@ -83,23 +83,61 @@ const SessionSubagents = z.object({
   waits: z.array(z.object({ threadId: z.string(), callId: z.string(), targets: z.array(z.string()) })),
 }) satisfies Codec<T.SessionSubagents>;
 
+export const SessionPermissionMode = z.enum(T.SessionPermissionModeValues) satisfies Codec<T.SessionPermissionMode>;
+
+export const SessionController = z.enum(T.SessionControllerValues) satisfies Codec<T.SessionController>;
+
+export const ExecutionPolicy = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("directCwd"),
+    repo: z.exactOptional(z.string()),
+    permissionMode: SessionPermissionMode,
+  }),
+  z.object({
+    kind: z.literal("managedWorktree"),
+    repo: z.string(),
+    branch: z.exactOptional(z.string()),
+  }),
+  z.object({
+    kind: z.literal("sandboxDir"),
+  }),
+]) satisfies Codec<T.ExecutionPolicy>;
+
+export const ContextRef = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("issue"),
+    id: IssueId,
+    refining: z.exactOptional(z.boolean()),
+  }),
+  z.object({
+    kind: z.literal("channel"),
+    id: z.string(),
+  }),
+  z.object({
+    kind: z.literal("artifact"),
+    id: ArtifactId,
+  }),
+  z.object({
+    kind: z.literal("pkm"),
+    path: z.string(),
+  }),
+]) satisfies Codec<T.ContextRef>;
+
 const sessionFields = {
   id: SessionId,
-  role: z.enum(AgentRoleValues),
+  controller: SessionController,
+  role: z.exactOptional(z.enum(AgentRoleValues)),
   name: z.string(),
-  agent: z.string(),
+  profile: z.exactOptional(z.string()),
   runtime: z.string(),
   brief: z.string(),
-  repo: z.exactOptional(z.string()),
-  branch: z.exactOptional(z.string()),
-  worktree: z.exactOptional(z.string()),
+  cwd: z.exactOptional(z.string()),
+  policy: ExecutionPolicy,
+  bindings: z.array(ContextRef),
   hiredAt: z.number(),
   runs: z.number(),
   lastRun: z.exactOptional(LastRun),
   spent: z.exactOptional(Spent),
-  channel: z.exactOptional(z.string()),
-  issue: z.exactOptional(IssueId),
-  refining: z.boolean(),
   subagents: z.exactOptional(SessionSubagents),
   toolConnections: z.exactOptional(z.array(ToolConnection)),
   machine: z.exactOptional(z.string()),
@@ -126,8 +164,6 @@ const EventTokens = z.object({
   contextUsed: z.exactOptional(z.number()),
   contextWindow: z.exactOptional(z.number()),
 }) satisfies Codec<T.EventTokens>;
-
-export const SessionPermissionMode = z.enum(T.SessionPermissionModeValues) satisfies Codec<T.SessionPermissionMode>;
 
 export const SessionPermissionDecision = z.enum(T.SessionPermissionDecisionValues) satisfies Codec<T.SessionPermissionDecision>;
 
@@ -180,6 +216,18 @@ export const SessionEvent = z.object({
   interaction: z.exactOptional(SessionInteractionRequest),
   interactionResolution: z.exactOptional(SessionInteractionResolution),
 }) satisfies Codec<T.SessionEvent>;
+
+export const SessionEventPage = z.object({
+  events: z.array(SessionEvent),
+  hasMore: z.boolean(),
+  oldestSeq: z.exactOptional(z.number()),
+  newestSeq: z.exactOptional(z.number()),
+}) satisfies Codec<T.SessionEventPage>;
+
+export const SessionBindingInput = z.object({
+  id: z.string(),
+  binding: ContextRef,
+}) satisfies Codec<T.SessionBindingInput>;
 
 export const SessionContextFile = z.object({
   path: z.string(),

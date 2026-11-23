@@ -153,7 +153,7 @@ function ComponentBench() {
     mode: "local",
   });
 
-  const subagentData = scenarios.typical.state.state.sessions.find((s) => s.subagents)?.subagents;
+  const subagentData = scenarios.typical.state.sessions.sessions.find((s) => s.subagents)?.subagents;
 
   return (
     <Scroll testID="component-bench" class="flex-1 bg-page" contentClass="gap-4 p-4">

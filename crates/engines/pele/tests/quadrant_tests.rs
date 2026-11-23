@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::HashSet;
 use std::time::Instant;
 
@@ -9,7 +7,7 @@ use vibevalley_pele::diagram::quadrant::db::{QuadrantText, QuadrantTextKind, par
 use vibevalley_pele::diagram::quadrant::lexer::tokenize;
 use vibevalley_pele::{ErrorCode, METRICS_MEASURER, ParseOptions, ParsedModel, RenderOptions, TextMeasurer, TextStyle, parse, render, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
 
 const CHART: &str = "quadrantChart
   title Reach and engagement

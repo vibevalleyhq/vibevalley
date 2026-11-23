@@ -1,9 +1,16 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
-import type { AgentRole, IssueId, Outcome, Retry, SessionId, Spent } from "../common/shapes.gen";
+import type { AgentRole, ArtifactId, IssueId, Outcome, Retry, SessionId, Spent } from "../common/shapes.gen";
 
 export const SessionActionValues = ["run_command", "read_file", "edit_file", "search", "web", "mcp", "wait", "other", "thinking", "speaking_text", "none"] as const;
 export type SessionAction = (typeof SessionActionValues)[number];
+
+export const SessionControllerValues = ["user", "issueBoard", "channel", "orchestrator"] as const;
+export type SessionController = (typeof SessionControllerValues)[number];
+
+export type ExecutionPolicy = { "kind": "directCwd", repo?: string, permissionMode: SessionPermissionMode, } | { "kind": "managedWorktree", repo: string, branch?: string, } | { "kind": "sandboxDir" };
+
+export type ContextRef = { "kind": "issue", id: IssueId, refining?: boolean, } | { "kind": "channel", id: string, } | { "kind": "artifact", id: ArtifactId, } | { "kind": "pkm", path: string, };
 
 export type Doing = { action: SessionAction, label: string, };
 
@@ -66,7 +73,7 @@ export type SessionSubagents = { run: string, rootThreadId: string, disconnected
 
 export type FactSessionSubagentsChanged = { "type": "sessionSubagentsChanged", at: number, id: SessionId, subagents?: SessionSubagents, };
 
-export type Session = { id: SessionId, role: AgentRole, name: string, agent: string, runtime: string, brief: string, repo?: string, branch?: string, worktree?: string, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, channel?: string, issue?: IssueId, refining: boolean, subagents?: SessionSubagents, toolConnections?: Array<ToolConnection>,
+export type Session = { id: SessionId, controller: SessionController, role?: AgentRole, name: string, profile?: string, runtime: string, brief: string, cwd?: string, policy: ExecutionPolicy, bindings: Array<ContextRef>, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, subagents?: SessionSubagents, toolConnections?: Array<ToolConnection>,
 /**
  * The machine it works on; none for an agent hosted in the server's process.
  */
@@ -75,7 +82,7 @@ machine?: string, phase: Phase, };
 /**
  * reduce never sees these: the words are the frame's (projection/frame.ts).
  */
-export type SessionView = { id: SessionId, role: AgentRole, name: string, agent: string, runtime: string, brief: string, repo?: string, branch?: string, worktree?: string, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, channel?: string, issue?: IssueId, refining: boolean, subagents?: SessionSubagents, toolConnections?: Array<ToolConnection>, machine?: string, phase: PhaseView, phaseText: string, };
+export type SessionView = { id: SessionId, controller: SessionController, role?: AgentRole, name: string, profile?: string, runtime: string, brief: string, cwd?: string, policy: ExecutionPolicy, bindings: Array<ContextRef>, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, subagents?: SessionSubagents, toolConnections?: Array<ToolConnection>, machine?: string, phase: PhaseView, phaseText: string, };
 
 export const SessionEventTypeValues = ["run/start", "user/message", "memory/recalled", "assistant/thinking", "assistant/message", "tool/call", "tool/result", "permission/request", "permission/resolved", "interaction/request", "interaction/resolved", "llm/retry", "llm/usage", "run/error", "run/end"] as const;
 export type SessionEventType = (typeof SessionEventTypeValues)[number];
@@ -152,15 +159,21 @@ export type PhaseRestingOnly = PhaseResting;
 
 export type SessionStopInput = { id: string, };
 
-export type SessionListInput = { agent?: string, };
+export type SessionListInput = { profile?: string, controller?: SessionController, };
 
 export type SessionGetInput = { id: string, };
 
-export type SessionEventListInput = { id: string, run?: string, };
+export type SessionEventListInput = { id: string, run?: string, beforeSeq?: number, afterSeq?: number, limit?: number, };
+
+export type SessionEventPage = { events: Array<SessionEvent>, hasMore: boolean, oldestSeq?: number, newestSeq?: number, };
+
+export type SessionBindingInput = { id: string, binding: ContextRef, };
 
 export type SessionContextFile = { path: string, startLine?: number, endLine?: number, };
 
 export type SessionOpenWorkspaceInput = { sessionId?: string, runtime: string, cwd: string, repo?: string, model?: string, effort?: string, permissionMode?: SessionPermissionMode, title?: string, };
+
+export type SessionCloseWorkspaceInput = { id: string, };
 
 export type SessionWorkspace = { id: SessionId, session: Session, title?: string, model?: string, effort?: string, permissionMode: SessionPermissionMode, };
 

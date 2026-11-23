@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqliteConnection;
 use vibevalley_core::{Applied, Core, Refusal};
 use vibevalley_protocol::{
-    Assignment, Conflict, CriterionCheck, Execution, Fact, Finding, Issue, IssueAnswer, IssueCanceled, Landing, LastRun, Millis, Outcome, Phase, PullRequest,
-    Question, Session, SpaceState, StateFrame as Frame,
+    Assignment, Conflict, CriterionCheck, Execution, ExecutionPolicy, Fact, Finding, Issue, IssueAnswer, IssueCanceled, Landing, LastRun, Millis, Outcome,
+    Phase, PullRequest, Question, Session, SliceBundle, SpaceState,
 };
 use vibevalley_runtime::agent::durable::Sqlite;
 use vibevalley_runtime::oar::PermissionMode;
@@ -145,7 +145,7 @@ pub trait Facts: Send + Sync {
     fn apply(&self, facts: Vec<Fact>) -> Applied;
     /// Calls `f` once with the state now.
     fn read(&self, f: &mut dyn FnMut(&SpaceState));
-    fn frame(&self) -> Frame;
+    fn bundle(&self) -> SliceBundle;
 }
 
 /// What a session's work log is told.
@@ -174,8 +174,8 @@ impl Facts for LocalFacts {
         f(lock(&self.0).state())
     }
 
-    fn frame(&self) -> Frame {
-        lock(&self.0).frame(vec![])
+    fn bundle(&self) -> SliceBundle {
+        lock(&self.0).slice_bundle(vec![])
     }
 }
 
@@ -360,11 +360,14 @@ impl IssueChange {
             }
             IssueChange::Started { session, worker } => {
                 t.queued_at = None;
-                if worker
-                    && t.latest_session_id() != Some(&session)
-                    && let Some(a) = t.assignments.iter_mut().rev().find(|a| a.ended_at.is_none())
-                {
-                    a.executions.push(Execution::Worker { session, started_at: at });
+                if worker {
+                    t.questions.clear();
+                    t.reviewed_at = None;
+                    if t.latest_session_id() != Some(&session)
+                        && let Some(a) = t.assignments.iter_mut().rev().find(|a| a.ended_at.is_none())
+                    {
+                        a.executions.push(Execution::Worker { session, started_at: at });
+                    }
                 }
             }
         }
@@ -392,8 +395,8 @@ pub struct Ledger {
     facts: Arc<dyn Facts>,
     /// Held across every apply and every read-modify-apply of an issue.
     write: Mutex<()>,
-    /// Each subscriber's sender and a receiver to drop a stale frame with.
-    subscribers: Mutex<Vec<(flume::Sender<Frame>, flume::Receiver<Frame>)>>,
+    /// Each subscriber's sender and a receiver to drop a stale bundle with.
+    subscribers: Mutex<Vec<(flume::Sender<SliceBundle>, flume::Receiver<SliceBundle>)>>,
     cron_of_issue: Mutex<Option<CronOfIssue>>,
     pull_of_issue: Mutex<Option<PullOfIssue>>,
 }
@@ -401,6 +404,7 @@ pub struct Ledger {
 fn database(path: &Path) -> Result<SqliteConnection> {
     Ok(pollster::block_on(async {
         let mut db = open_sqlx_db_at(path).await?;
+        sqlx::raw_sql(crate::db::schema::SHARED).execute(&mut db).await?;
         sqlx::raw_sql(issue_db::SCHEMA).execute(&mut db).await?;
         sqlx::raw_sql(session_db::SCHEMA).execute(&mut db).await?;
         Ok::<_, sqlx::Error>(db)
@@ -421,11 +425,11 @@ fn loaded(sessions: Vec<Session>, issues: Vec<Issue>) -> Vec<Fact> {
 impl Ledger {
     /// The board as stored, without taking it: for reading while another
     /// process holds it.
-    pub fn snapshot(path: &Path) -> Result<Frame> {
+    pub fn snapshot(path: &Path) -> Result<SliceBundle> {
         let (sessions, issues) = load(&Sqlite::new(&mut database(path)?))?;
         let facts = LocalFacts::default();
         facts.apply(loaded(sessions, issues));
-        Ok(facts.frame())
+        Ok(facts.bundle())
     }
 
     /// Loads what is stored into `facts`. A working session was interrupted:
@@ -440,13 +444,13 @@ impl Ledger {
         let mut sessions = Vec::new();
         let mut opened = Opened::default();
         for mut session in stored {
-            let lost = session.worktree.as_deref().is_some_and(|w| !Path::new(w).exists());
-            if !lost && session.refining {
+            let lost = matches!(session.policy, ExecutionPolicy::ManagedWorktree { .. }) && session.cwd.as_deref().is_some_and(|w| !Path::new(w).exists());
+            if !lost && session.is_refining() {
                 opened.drafts.push(session.id.clone());
             }
             if session.phase.is_working()
                 && !lost
-                && !session.refining
+                && !session.is_refining()
                 && session.runtime == vibevalley_runtime::agent::runtime::ID
                 && let Some(extra) = extras.get(&session.id)
                 && let (Some(run), Some(vendor)) = (extra.run.as_deref(), extra.agent_session.as_deref())
@@ -486,7 +490,7 @@ impl Ledger {
                 session_db::put(&db, &session, true)?;
             }
             if lost {
-                opened.lost.extend(session.issue);
+                opened.lost.extend(session.issue_id().map(String::from));
             } else {
                 sessions.push(session);
             }
@@ -568,8 +572,8 @@ impl Ledger {
         Ok(query(&Sqlite::new(&mut lock(&self.db)))?)
     }
 
-    pub fn frame(&self) -> Frame {
-        self.facts.frame()
+    pub fn bundle(&self) -> SliceBundle {
+        self.facts.bundle()
     }
 
     /// Reads the state the board's facts went into.
@@ -602,11 +606,11 @@ impl Ledger {
         self.database(|db| session_db::past(db, id)).ok().flatten()
     }
 
-    /// The newest frame after every change; a receiver that falls behind
+    /// The newest slice bundle after every change; a receiver that falls behind
     /// skips to the newest.
-    pub fn subscribe(&self) -> flume::Receiver<Frame> {
+    pub fn subscribe(&self) -> flume::Receiver<SliceBundle> {
         let (tx, rx) = flume::bounded(1);
-        let _ = tx.try_send(self.facts.frame());
+        let _ = tx.try_send(self.facts.bundle());
         lock(&self.subscribers).push((tx, rx.clone()));
         rx
     }
@@ -698,10 +702,10 @@ impl Ledger {
         let applied = self.facts.apply(facts);
         let mut subscribers = lock(&self.subscribers);
         if !applied.transitions.is_empty() && !subscribers.is_empty() {
-            let frame = self.facts.frame();
+            let bundle = self.facts.bundle();
             subscribers.retain(|(tx, stale)| {
                 let _ = stale.try_recv();
-                !matches!(tx.try_send(frame.clone()), Err(flume::TrySendError::Disconnected(_)))
+                !matches!(tx.try_send(bundle.clone()), Err(flume::TrySendError::Disconnected(_)))
             });
         }
     }
@@ -758,12 +762,6 @@ impl Ledger {
     /// The next number of `counter`, above `at_least`.
     pub fn next(&self, counter: &str, at_least: i64) -> Result<i64> {
         let _write = lock(&self.write);
-        self.database(|db| {
-            if counter == "issue" {
-                issue_db::next_number(db, at_least)
-            } else {
-                session_db::next(db, counter, at_least)
-            }
-        })
+        self.database(|db| crate::db::next_seq(db, counter, at_least))
     }
 }

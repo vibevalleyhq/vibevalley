@@ -1,5 +1,3 @@
-mod support;
-
 use std::time::Instant;
 
 use indexmap::IndexMap;
@@ -11,7 +9,7 @@ use vibevalley_pele::diagram::timeline::{TimelineDirection, TimelinePeriod, lexe
 use vibevalley_pele::util::yaml::YamlValue;
 use vibevalley_pele::{METRICS_MEASURER, ParseOptions, ParsedModel, RenderOptions, TextMeasurer, TextStyle, parse, render, supports};
 
-use support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
+use crate::support::{Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, css_options, dark_options, load_fixture, resolved_options};
 
 const SOCIAL: &str = "timeline\n  title History of Social Media\n  2002 : LinkedIn\n  2004 : Facebook : Google\n  2005 : YouTube\n";
 

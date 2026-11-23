@@ -1,10 +1,14 @@
-// Where the reused VibeValley web code's requests and streams go. In
-// VibeValley they are HTTP (`/api/v1/<op>`) and SSE (`/api/v1/state`,
-// `/api/v1/live`); in VibeValley they are the bridge to the Rust server
-// (docs/vibevalley-port.md, "Bridge"): `call(op, payload)` answering
-// VibeValley's envelope, the `state` and `live` frames. Stories and tests
-// set a transport of their own (vv/web/infra/fixtures.ts).
-import type { LiveEvent, StateFrame } from "@vibevalley/protocol";
+import type { BoardSlice, CollabSlice, FarmFrame, InboxSlice, LiveEvent, OpsSlice, SessionsSlice, SliceKind } from "@vibevalley/protocol";
+
+/** Each kind's payload, as the server pushes it. */
+export interface SliceMap {
+  readonly board: BoardSlice;
+  readonly sessions: SessionsSlice;
+  readonly collab: CollabSlice;
+  readonly inbox: InboxSlice;
+  readonly ops: OpsSlice;
+  readonly farm: FarmFrame;
+}
 
 /** VibeValley's response envelope, `{ bizCode, message, data?, error? }`. */
 export interface Envelope {
@@ -17,8 +21,8 @@ export interface Envelope {
 export interface Transport {
   /** `op` as VibeValley names it: `issue.status.update`. */
   readonly call: (op: string, payload: unknown) => Promise<Envelope>;
-  /** Each StateFrame as it comes; returns how to stop. */
-  readonly state: (listener: (frame: StateFrame) => void) => () => void;
+  /** Each frame of `kind` as it comes; returns how to stop. */
+  readonly slice: <K extends SliceKind>(kind: K, listener: (data: SliceMap[K]) => void) => () => void;
   readonly live: (listener: (event: LiveEvent) => void) => () => void;
   /** One of rpc.ts's subscriptions (`channel.follow`, ...): each event as it comes, `ended` once when the server ends
    * or refuses it (null: ended, else the refusal's envelope). Returns how to stop it. */
@@ -28,7 +32,7 @@ export interface Transport {
 /** No server: every call fails as an unreachable one would, no frame comes. */
 const offline: Transport = {
   call: () => Promise.reject(new TypeError("no server")),
-  state: () => () => {},
+  slice: () => () => {},
   live: () => () => {},
   subscribe: (_name, _payload, _on, ended) => {
     queueMicrotask(() => ended({ bizCode: 100009, message: "no server" }));

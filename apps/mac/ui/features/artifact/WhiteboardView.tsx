@@ -3,13 +3,14 @@ import { z } from "zod";
 
 import { currentLocale, t } from "@vibevalley/i18n";
 import { type ArtifactEntry, type ArtifactEntryWriteInput, type ArtifactPresenceKind, userId, type ViewportRect } from "@vibevalley/protocol";
+import { isFreeUserSession, sessionProfile } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { TextInput } from "../../design/Field";
 import { IconButton } from "../../design/IconButton";
 import { toast } from "../../design/toasts";
-import { useCore } from "../../infra/frame";
+import { useSessionsSlice } from "../../infra/frame";
 import {
   richNative,
   type VvWhiteboardBatchEvent,
@@ -95,7 +96,7 @@ function buildHeadlessSvg(title: string, items: readonly FallbackElement[]): str
 export function WhiteboardView(props: StoreViewerProps) {
   const { client, snapshot } = useStoreEntries(() => props.artifact.id);
   const presence = useArtifactPresence(() => props.artifact.id);
-  const core = useCore();
+  const sessionsSlice = useSessionsSlice();
   const act = createAct();
   const selectedIds = signal<readonly string[]>([]);
 
@@ -135,18 +136,21 @@ export function WhiteboardView(props: StoreViewerProps) {
       }
     }
 
-    const sessions = core()?.sessions ?? [];
+    const sessions = sessionsSlice()?.sessions ?? [];
     for (const sess of sessions) {
-      if (sess.phase._tag !== "working" || seen.has(sess.agent)) continue;
-      const ownClaim = claims.find((c) => c.id.includes(sess.agent) || labelOfFallback(c).includes(sess.name));
+      if (isFreeUserSession(sess) || sess.phase._tag !== "working") continue;
+      const id = sessionProfile(sess) ?? sess.id;
+      if (seen.has(id)) continue;
+      const ownClaim = claims.find((c) => c.id.includes(id) || labelOfFallback(c).includes(sess.name));
       out.push({
-        id: sess.agent,
+        id,
         name: sess.name,
         color: "coral",
         kind: "cursor",
         x: ownClaim ? (ownClaim.x ?? 80) + (ownClaim.w ?? 200) - 18 : 120,
         y: ownClaim ? (ownClaim.y ?? 80) + (ownClaim.h ?? 100) - 12 : 120,
       });
+      seen.add(id);
     }
     return out;
   });

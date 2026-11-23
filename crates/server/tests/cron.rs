@@ -67,14 +67,14 @@ fn crons_are_kept_refused_and_run_when_due() {
     assert!(preview["does"][0].as_str().unwrap().contains("早报"));
     assert_eq!(call("cron.delete", json!({ "id": "nope" })).biz_code, BizCode::CronNotFound.code());
 
-    let at = vibevalley_server::now() + 300;
+    let at = vibevalley_server::now() + 120;
     let once = call(
         "cron.create",
         json!({ "name": "say hi", "text": "say hi in notes", "agent": "lab", "repo": "farm", "when": { "kind": "once", "at": at } }),
     );
     let once = once.data.unwrap_or_else(|| panic!("{}", once.message));
     assert_eq!(once["agent"], helper.id.as_str());
-    std::thread::sleep(Duration::from_millis(400));
+    std::thread::sleep(Duration::from_millis(150));
     started.crons.tick();
     let made = started
         .board

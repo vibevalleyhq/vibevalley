@@ -90,6 +90,16 @@ pub struct AchievementStanding {
 }
 
 #[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct AchievementList {
+    pub items: Vec<Achievement>,
+    pub standings: Vec<AchievementStanding>,
+}
+
+#[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
@@ -348,7 +358,18 @@ pub struct FarmView {
     pub plots: BTreeMap<String, PlotView>,
     /// Each session's station and step history, by the session's id; the farm reads only this.
     pub plays: BTreeMap<String, SessionPlayView>,
-    pub achievements: Vec<AchievementStanding>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct FarmFrame {
+    pub seq: i64,
+    pub view: FarmView,
+    pub progress: Option<Progress>,
+    pub effects: Vec<GameEffect>,
 }
 
 #[skip_serializing_none]
@@ -704,6 +725,7 @@ crate::typescript::module! {
     AchievementTier,
     Achievement,
     AchievementStanding,
+    AchievementList,
     PlayAction,
     PlayActionView,
     SessionPlay,
@@ -720,6 +742,7 @@ crate::typescript::module! {
     Badge,
     PlotView,
     FarmView,
+    FarmFrame,
     GameEffectReward,
     GameEffectPenalty,
     GameEffectLevelUp,

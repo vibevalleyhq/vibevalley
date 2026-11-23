@@ -14,13 +14,13 @@ fn regression_failed_batch_changes_neither_database_nor_core() {
         &mut db,
         "create trigger refuse_second before insert on issue when new.id = 'second' begin select raise(abort, 'refused'); end;",
     );
-    let before = ledger.frame();
+    let before = ledger.bundle();
     let result = ledger.apply(vec![
         Fact::issue_changed(1, Issue::new("first", 1, "First", 1)),
         Fact::issue_changed(1, Issue::new("second", 2, "Second", 1)),
     ]);
     assert!(result.is_err());
-    assert_eq!(ledger.frame(), before);
+    assert_eq!(ledger.bundle(), before);
     assert_eq!(
         pollster::block_on(sqlx::query_scalar::<_, i64>("select count(*) from issue").fetch_one(&mut db)).unwrap(),
         0

@@ -1,12 +1,18 @@
-//! Frames: backend state turned into the JSON the TSX views render. Pure
-//! functions, tested here; the shell calls them and pushes the results.
+//! Frames: backend state turned into typed `vibevalley_protocol` host frames
+//! for the TSX views. Pure functions, tested here; the shell calls them and
+//! pushes the serialized values.
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
-use serde_json::{Value, json};
+use serde_json::Value;
 use vibevalley_files::{Entry, EntryKind, FuzzyMatch, SearchHit};
 use vibevalley_git::{Branch, Change, Commit, Status, Worktree};
+pub use vibevalley_protocol::HostPaletteMode as PaletteMode;
+use vibevalley_protocol::{
+    HostFileTreeFrame, HostGitBranch, HostGitCommit, HostGitFileRow, HostGitPanelFrame, HostGitWorktree, HostPaletteCommand, HostPaletteFileMatch,
+    HostPaletteFrame, HostPaletteItem, HostPaletteSearchHit, HostPanel, HostRailFrame, HostRailProject, HostRailTab, HostRailWorktree, HostTreeItem,
+};
 
 pub struct RailProject<'a> {
     pub id: i64,
@@ -15,26 +21,40 @@ pub struct RailProject<'a> {
     pub active: bool,
     pub attention: bool,
     pub terminals: usize,
+    pub branch: Option<String>,
+    pub main_root: Option<String>,
+    pub worktrees: Option<Vec<HostRailWorktree>>,
+    pub tabs: Option<Vec<HostRailTab>>,
 }
 
-pub fn rail(projects: &[RailProject<'_>], panel: &str) -> Value {
-    let items: Vec<Value> = projects
+pub fn rail_frame(projects: &[RailProject<'_>], panel: HostPanel, inspector_open: Option<bool>) -> HostRailFrame {
+    let items: Vec<HostRailProject> = projects
         .iter()
         .enumerate()
-        .map(|(i, p)| {
-            json!({
-                "id": p.id,
-                "name": p.name,
-                "path": p.path.to_string_lossy(),
-                "initials": initials(p.name),
-                "active": p.active,
-                "attention": p.attention,
-                "terminals": p.terminals,
-                "shortcut": (i < 9).then(|| format!("⌘{}", i + 1)),
-            })
+        .map(|(i, p)| HostRailProject {
+            id: p.id,
+            name: p.name.to_string(),
+            path: p.path.to_string_lossy().into_owned(),
+            initials: initials(p.name),
+            active: p.active,
+            attention: p.attention,
+            terminals: u32::try_from(p.terminals).unwrap_or(u32::MAX),
+            shortcut: (i < 9).then(|| format!("⌘{}", i + 1)),
+            branch: p.branch.clone(),
+            main_root: p.main_root.clone(),
+            worktrees: p.worktrees.clone(),
+            tabs: p.tabs.clone(),
         })
         .collect();
-    json!({ "projects": items, "panel": panel })
+    HostRailFrame {
+        projects: items,
+        panel,
+        inspector_open,
+    }
+}
+
+pub fn rail(projects: &[RailProject<'_>], panel: HostPanel, inspector_open: Option<bool>) -> Value {
+    serde_json::to_value(rail_frame(projects, panel, inspector_open)).expect("HostRailFrame serializes")
 }
 
 /// Up to two letters for a project tile: word starts, else the first two.
@@ -134,7 +154,7 @@ impl TreeState {
     }
 }
 
-fn tree_items(state: &TreeState, dir: &Path, tones: &HashMap<PathBuf, &'static str>, depth: usize) -> Vec<Value> {
+fn tree_items(state: &TreeState, dir: &Path, tones: &HashMap<PathBuf, &'static str>, depth: usize) -> Vec<HostTreeItem> {
     let Some(entries) = state.children.get(dir) else { return Vec::new() };
     entries
         .iter()
@@ -145,41 +165,65 @@ fn tree_items(state: &TreeState, dir: &Path, tones: &HashMap<PathBuf, &'static s
             } else {
                 tones.get(&e.path).copied().unwrap_or("clean")
             };
-            let mut item = json!({ "id": id, "label": e.name, "tone": tone, "hidden": e.hidden });
-            if e.kind == EntryKind::Dir {
-                let children = if state.children.contains_key(&e.path) && depth < 64 {
+            let children = if e.kind == EntryKind::Dir {
+                let nested = if state.children.contains_key(&e.path) && depth < 64 {
                     tree_items(state, &e.path, tones, depth + 1)
                 } else {
                     Vec::new()
                 };
                 // nsh's Tree treats an item as a folder only when it has children.
-                let children = if children.is_empty() {
+                if nested.is_empty() {
                     let loaded = state.children.contains_key(&e.path);
-                    vec![json!({
-                        "id": format!("{id}/\u{0}placeholder"),
-                        "label": if loaded { "Empty" } else { "Loading…" },
-                        "tone": "placeholder",
-                        "loading": !loaded,
-                        "disabled": true,
-                    })]
+                    Some(vec![HostTreeItem {
+                        id: format!("{id}/\u{0}placeholder"),
+                        label: if loaded { "Empty" } else { "Loading…" }.to_string(),
+                        tone: "placeholder".to_string(),
+                        hidden: None,
+                        loading: Some(!loaded),
+                        disabled: Some(true),
+                        children: None,
+                    }])
                 } else {
-                    children
-                };
-                item["children"] = Value::Array(children);
+                    Some(nested)
+                }
+            } else {
+                None
+            };
+            HostTreeItem {
+                id,
+                label: e.name.clone(),
+                tone: tone.to_string(),
+                hidden: Some(e.hidden),
+                loading: None,
+                disabled: None,
+                children,
             }
-            item
         })
         .collect()
 }
 
+pub fn file_tree_frame(state: &TreeState, tones: &HashMap<PathBuf, &'static str>) -> HostFileTreeFrame {
+    HostFileTreeFrame {
+        root: Some(state.root.to_string_lossy().into_owned()),
+        name: Some(state.root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()),
+        items: tree_items(state, &state.root, tones, 0),
+        expanded: Some(state.expanded.iter().map(|p| p.to_string_lossy().into_owned()).collect()),
+        selected: state.selected.as_ref().map(|p| p.to_string_lossy().into_owned()),
+        loading: None,
+    }
+}
+
 pub fn file_tree(state: &TreeState, tones: &HashMap<PathBuf, &'static str>) -> Value {
-    json!({
-        "root": state.root.to_string_lossy(),
-        "name": state.root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
-        "items": tree_items(state, &state.root, tones, 0),
-        "expanded": state.expanded.iter().map(|p| p.to_string_lossy()).collect::<Vec<_>>(),
-        "selected": state.selected.as_ref().map(|p| p.to_string_lossy()),
+    serde_json::to_value(file_tree_frame(state, tones)).expect("HostFileTreeFrame serializes")
+}
+
+pub fn empty_file_tree(loading: bool) -> Value {
+    serde_json::to_value(HostFileTreeFrame {
+        items: Vec::new(),
+        loading: Some(loading),
+        ..Default::default()
     })
+    .expect("HostFileTreeFrame serializes")
 }
 
 #[derive(Debug, Clone, Default)]
@@ -202,11 +246,20 @@ pub struct GitView<'a> {
     pub busy: bool,
 }
 
-pub fn git_panel(v: &GitView<'_>) -> Value {
+pub fn git_panel_frame(v: &GitView<'_>) -> HostGitPanelFrame {
     let Some(status) = v.status else {
-        return json!({ "repo": false, "error": v.error, "busy": v.busy });
+        return HostGitPanelFrame {
+            repo: false,
+            error: v.error.map(str::to_string),
+            busy: v.busy,
+            ..Default::default()
+        };
     };
-    let row = |path: &Path, c: Change, t: &str| json!({ "path": path.to_string_lossy(), "code": code(c), "tone": t });
+    let row = |path: &Path, c: Change, t: &str| HostGitFileRow {
+        path: path.to_string_lossy().into_owned(),
+        code: code(c).to_string(),
+        tone: t.to_string(),
+    };
     let mut staged = Vec::new();
     let mut changes = Vec::new();
     let mut conflicts = Vec::new();
@@ -230,58 +283,76 @@ pub fn git_panel(v: &GitView<'_>) -> Value {
             changes.push(row(&e.path, e.worktree, tone(Change::Unmodified, e.worktree)));
         }
     }
-    json!({
-        "repo": true,
-        "branch": status.branch,
-        "head": status.head.as_deref().map(|h| &h[..h.len().min(8)]),
-        "upstream": status.upstream,
-        "ahead": status.ahead,
-        "behind": status.behind,
-        "staged": staged,
-        "changes": changes,
-        "conflicts": conflicts,
-        "branches": v.branches.iter().filter(|b| !b.is_remote).map(|b| json!({
-            "name": b.name, "head": b.is_head, "upstream": b.upstream,
-        })).collect::<Vec<_>>(),
-        "worktrees": v.worktrees.iter().map(|w| {
-            let act = v.worktree_activity.get(&w.path);
-            let current = v.current_root.is_some_and(|cur| cur == w.path);
-            json!({
-                "path": w.path.to_string_lossy(),
-                "branch": w.branch,
-                "main": w.is_main,
-                "locked": w.locked,
-                "current": current,
-                "changed": act.map_or(0, |a| a.changed),
-                "conflicts": act.map_or(0, |a| a.conflicts),
-                "ahead": act.map_or(0, |a| a.ahead),
-                "behind": act.map_or(0, |a| a.behind),
-                "summary": act.and_then(|a| a.summary.as_deref()),
-            })
-        }).collect::<Vec<_>>(),
-        "log": v.log.iter().map(|c| json!({
-            "id": c.id, "short": c.short_id, "summary": c.summary, "author": c.author_name, "time": c.time,
-        })).collect::<Vec<_>>(),
-        "error": v.error,
-        "busy": v.busy,
-    })
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PaletteMode {
-    Commands,
-    Files,
-    Search,
-}
-
-impl PaletteMode {
-    pub fn name(self) -> &'static str {
-        match self {
-            PaletteMode::Commands => "commands",
-            PaletteMode::Files => "files",
-            PaletteMode::Search => "search",
-        }
+    HostGitPanelFrame {
+        repo: true,
+        branch: status.branch.clone(),
+        head: status.head.as_deref().map(|h| h[..h.len().min(8)].to_string()),
+        upstream: status.upstream.clone(),
+        ahead: Some(status.ahead),
+        behind: Some(status.behind),
+        staged: Some(staged),
+        changes: Some(changes),
+        conflicts: Some(conflicts),
+        branches: Some(
+            v.branches
+                .iter()
+                .filter(|b| !b.is_remote)
+                .map(|b| HostGitBranch {
+                    name: b.name.clone(),
+                    head: b.is_head,
+                    upstream: b.upstream.clone(),
+                })
+                .collect(),
+        ),
+        worktrees: Some(
+            v.worktrees
+                .iter()
+                .map(|w| {
+                    let act = v.worktree_activity.get(&w.path);
+                    let current = v.current_root.is_some_and(|cur| cur == w.path);
+                    HostGitWorktree {
+                        path: w.path.to_string_lossy().into_owned(),
+                        branch: w.branch.clone(),
+                        main: w.is_main,
+                        locked: w.locked,
+                        current,
+                        changed: act.map_or(0, |a| u32::try_from(a.changed).unwrap_or(u32::MAX)),
+                        conflicts: act.map_or(0, |a| u32::try_from(a.conflicts).unwrap_or(u32::MAX)),
+                        ahead: act.map_or(0, |a| a.ahead),
+                        behind: act.map_or(0, |a| a.behind),
+                        summary: act.and_then(|a| a.summary.clone()),
+                    }
+                })
+                .collect(),
+        ),
+        log: Some(
+            v.log
+                .iter()
+                .map(|c| HostGitCommit {
+                    id: c.id.clone(),
+                    short: c.short_id.clone(),
+                    summary: c.summary.clone(),
+                    author: c.author_name.clone(),
+                    time: c.time,
+                })
+                .collect(),
+        ),
+        error: v.error.map(str::to_string),
+        busy: v.busy,
     }
+}
+
+pub fn git_panel(v: &GitView<'_>) -> Value {
+    serde_json::to_value(git_panel_frame(v)).expect("HostGitPanelFrame serializes")
+}
+
+pub fn empty_git_panel(busy: bool) -> Value {
+    serde_json::to_value(HostGitPanelFrame {
+        repo: false,
+        busy,
+        ..Default::default()
+    })
+    .expect("HostGitPanelFrame serializes")
 }
 
 /// Commands the palette offers: (id, label, group, shortcut as `keymap` writes it).
@@ -305,18 +376,36 @@ pub const COMMANDS: &[(&str, &str, &str, Option<&str>)] = &[
     ("theme.toggle", "切换深浅色主题", "外观", None),
 ];
 
-pub fn palette_commands() -> Vec<Value> {
+pub fn palette_commands() -> Vec<HostPaletteItem> {
     COMMANDS
         .iter()
-        .map(|(id, label, group, shortcut)| json!({ "id": id, "label": label, "group": group, "shortcut": shortcut }))
+        .map(|(id, label, group, shortcut)| {
+            HostPaletteItem::Command(HostPaletteCommand {
+                id: (*id).to_string(),
+                label: (*label).to_string(),
+                detail: None,
+                group: (*group).to_string(),
+                shortcut: shortcut.map(str::to_string),
+            })
+        })
         .collect()
 }
 
-pub fn palette(mode: PaletteMode, query: &str, items: Vec<Value>, loading: bool, note: Option<&str>) -> Value {
-    json!({ "mode": mode.name(), "query": query, "items": items, "loading": loading, "note": note })
+pub fn palette_frame(mode: PaletteMode, query: &str, items: Vec<HostPaletteItem>, loading: bool, note: Option<&str>) -> HostPaletteFrame {
+    HostPaletteFrame {
+        mode,
+        query: query.to_string(),
+        items,
+        loading,
+        note: note.map(str::to_string),
+    }
 }
 
-pub fn file_matches(matches: &[FuzzyMatch]) -> Vec<Value> {
+pub fn palette(mode: PaletteMode, query: &str, items: Vec<HostPaletteItem>, loading: bool, note: Option<&str>) -> Value {
+    serde_json::to_value(palette_frame(mode, query, items, loading, note)).expect("HostPaletteFrame serializes")
+}
+
+pub fn file_matches(matches: &[FuzzyMatch]) -> Vec<HostPaletteItem> {
     matches
         .iter()
         .map(|m| {
@@ -325,20 +414,29 @@ pub fn file_matches(matches: &[FuzzyMatch]) -> Vec<Value> {
                 Some(i) => (&path[..i], &path[i + 1..]),
                 None => ("", &path[..]),
             };
-            json!({ "id": format!("file:{path}"), "label": name, "detail": dir, "indices": m.indices })
+            HostPaletteItem::FileMatch(HostPaletteFileMatch {
+                id: format!("file:{path}"),
+                label: name.to_string(),
+                detail: dir.to_string(),
+                indices: m.indices.clone(),
+            })
         })
         .collect()
 }
 
-pub fn search_hits(root: &Path, hits: &[SearchHit]) -> Vec<Value> {
+pub fn search_hits(root: &Path, hits: &[SearchHit]) -> Vec<HostPaletteItem> {
     hits.iter()
         .map(|h| {
             let rel = h.path.strip_prefix(root).unwrap_or(&h.path).to_string_lossy();
-            json!({
-                "id": format!("hit:{}:{}", h.path.to_string_lossy(), h.line_no),
-                "label": h.line.trim(),
-                "detail": format!("{rel}:{}", h.line_no),
-                "ranges": h.ranges.iter().map(|r| [r.start, r.end]).collect::<Vec<_>>(),
+            HostPaletteItem::SearchHit(HostPaletteSearchHit {
+                id: format!("hit:{}:{}", h.path.to_string_lossy(), h.line_no),
+                label: h.line.trim().to_string(),
+                detail: format!("{rel}:{}", h.line_no),
+                ranges: h
+                    .ranges
+                    .iter()
+                    .map(|r| [u32::try_from(r.start).unwrap_or(u32::MAX), u32::try_from(r.end).unwrap_or(u32::MAX)])
+                    .collect(),
             })
         })
         .collect()
@@ -348,6 +446,7 @@ pub fn search_hits(root: &Path, hits: &[SearchHit]) -> Vec<Value> {
 mod tests {
     use super::*;
     use vibevalley_git::StatusEntry;
+    use vibevalley_protocol::HostRailRunningState;
 
     fn entry(root: &Path, rel: &str, dir: bool) -> Entry {
         Entry {
@@ -369,7 +468,7 @@ mod tests {
     }
 
     #[test]
-    fn rail_marks_shortcuts_for_first_nine() {
+    fn rail_marks_shortcuts_for_first_nine_and_round_trips() {
         let path = PathBuf::from("/p");
         let ps: Vec<RailProject> = (0..10)
             .map(|i| RailProject {
@@ -379,14 +478,37 @@ mod tests {
                 active: i == 2,
                 attention: false,
                 terminals: 0,
+                branch: (i == 0).then(|| "main".into()),
+                main_root: None,
+                worktrees: Some(vec![HostRailWorktree {
+                    path: "/p".into(),
+                    branch: Some("main".into()),
+                    main: true,
+                }]),
+                tabs: Some(vec![HostRailTab {
+                    id: 1,
+                    title: "zsh".into(),
+                    active: true,
+                    kind: "terminal".into(),
+                    running: Some(false),
+                    running_state: Some(HostRailRunningState::Idle),
+                    running_agent: None,
+                    running_label: None,
+                    attention: Some(false),
+                }]),
             })
             .collect();
-        let v = rail(&ps, "files");
+        let v = rail(&ps, HostPanel::Files, Some(true));
         assert_eq!(v["projects"][0]["shortcut"], "⌘1");
         assert_eq!(v["projects"][8]["shortcut"], "⌘9");
-        assert!(v["projects"][9]["shortcut"].is_null());
+        assert!(v["projects"][9].get("shortcut").is_none());
         assert_eq!(v["projects"][2]["active"], true);
         assert_eq!(v["panel"], "files");
+        assert_eq!(v["inspectorOpen"], true);
+        let decoded: HostRailFrame = serde_json::from_value(v).unwrap();
+        assert_eq!(decoded.projects.len(), 10);
+        assert_eq!(decoded.panel, HostPanel::Files);
+        assert_eq!(decoded.inspector_open, Some(true));
     }
 
     #[test]
@@ -420,7 +542,7 @@ mod tests {
     }
 
     #[test]
-    fn tree_nests_loaded_dirs_and_marks_unloaded_ones() {
+    fn tree_nests_loaded_dirs_marks_unloaded_ones_and_round_trips() {
         let root = PathBuf::from("/r");
         let mut s = TreeState::new(root.clone());
         assert_eq!(s.wanted(), vec![root.clone()]);
@@ -441,6 +563,9 @@ mod tests {
         assert_eq!(items[1]["children"][0]["loading"], true);
         assert!(items[2].get("children").is_none());
         assert_eq!(v["expanded"][0], "/r/src");
+        let decoded: HostFileTreeFrame = serde_json::from_value(v).unwrap();
+        assert_eq!(decoded.items.len(), 3);
+
         s.expanded.insert(root.join("lib"));
         assert_eq!(s.wanted(), vec![root.join("lib")]);
         s.children.insert(root.join("lib"), Vec::new());
@@ -449,10 +574,15 @@ mod tests {
         assert_eq!(v_empty["items"][1]["children"][0]["loading"], false);
         s.invalidate(&root.join("src/main.rs"));
         assert!(s.wanted().contains(&root.join("src")));
+
+        let empty_val = empty_file_tree(true);
+        let decoded_empty: HostFileTreeFrame = serde_json::from_value(empty_val).unwrap();
+        assert_eq!(decoded_empty.loading, Some(true));
+        assert!(decoded_empty.items.is_empty());
     }
 
     #[test]
-    fn git_panel_splits_staged_and_unstaged() {
+    fn git_panel_splits_staged_and_unstaged_and_round_trips() {
         let status = Status {
             branch: Some("main".into()),
             head: Some("0123456789abcdef".into()),
@@ -494,6 +624,10 @@ mod tests {
         assert_eq!(v["changes"].as_array().unwrap().len(), 2);
         assert_eq!(v["changes"][1]["code"], "?");
         assert_eq!(v["conflicts"][0]["path"], "c");
+        let decoded: HostGitPanelFrame = serde_json::from_value(v).unwrap();
+        assert!(decoded.repo);
+        assert_eq!(decoded.head.as_deref(), Some("01234567"));
+
         let none = git_panel(&GitView {
             status: None,
             branches: &[],
@@ -505,18 +639,32 @@ mod tests {
             busy: false,
         });
         assert_eq!(none["repo"], false);
+        let decoded_none: HostGitPanelFrame = serde_json::from_value(none).unwrap();
+        assert!(!decoded_none.repo);
+        assert_eq!(decoded_none.error.as_deref(), Some("not a repo"));
     }
 
     #[test]
-    fn file_matches_split_dir_and_name() {
+    fn palette_and_file_matches_round_trip() {
         let m = vec![FuzzyMatch {
             path: "src/ui/tree.rs".into(),
             score: 1,
             indices: vec![0],
         }];
-        let v = file_matches(&m);
-        assert_eq!(v[0]["label"], "tree.rs");
-        assert_eq!(v[0]["detail"], "src/ui");
-        assert_eq!(v[0]["id"], "file:src/ui/tree.rs");
+        let items = file_matches(&m);
+        let frame = palette(PaletteMode::Files, "tree", items, false, None);
+        assert_eq!(frame["mode"], "files");
+        assert_eq!(frame["items"][0]["label"], "tree.rs");
+        assert_eq!(frame["items"][0]["detail"], "src/ui");
+        assert_eq!(frame["items"][0]["id"], "file:src/ui/tree.rs");
+        let decoded: HostPaletteFrame = serde_json::from_value(frame).unwrap();
+        assert_eq!(decoded.mode, PaletteMode::Files);
+        assert_eq!(decoded.items.len(), 1);
+
+        let cmd_frame = palette(PaletteMode::Commands, "", palette_commands(), false, Some("ready"));
+        let decoded_cmd: HostPaletteFrame = serde_json::from_value(cmd_frame).unwrap();
+        assert_eq!(decoded_cmd.mode, PaletteMode::Commands);
+        assert_eq!(decoded_cmd.items.len(), COMMANDS.len());
+        assert_eq!(decoded_cmd.note.as_deref(), Some("ready"));
     }
 }

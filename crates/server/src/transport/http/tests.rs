@@ -1,8 +1,10 @@
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
+use std::time::Duration;
 
-use crate::transport::bridge::fake::FakeServer;
+use crate::transport::bridge::fake::{FakeServer, empty_bundle};
 use serde_json::{Value, json};
+use vibevalley_protocol::{Issue, SliceKind};
 
 use super::*;
 
@@ -30,6 +32,7 @@ fn commands_reach_the_server_by_op_name_with_vibevalleys_envelope() {
     assert_eq!(status, 200);
     assert_eq!(body, json!({ "bizCode": 0, "message": "ok", "data": [{ "id": "i1" }] }));
     assert_eq!(fake.calls().last().unwrap(), &("issue.list".to_string(), json!({ "closed": true })));
+    assert_eq!(fake.last_client().map(|c| c.kind), Some(ClientKind::HttpLoopback));
 }
 
 #[test]
@@ -45,6 +48,10 @@ fn refusals_carry_their_http_status_and_bad_bodies_are_invalid_input() {
     assert_eq!(body["bizCode"], 100001);
     let res = agent().get(&format!("{}/api/v1/issue/list", l.url())).call().unwrap();
     assert_eq!(res.status().as_u16(), 405);
+    let res = agent().get(&format!("{}/api/v1/state", l.url())).call().unwrap();
+    assert_eq!(res.status().as_u16(), 405, "/api/v1/state GET must be removed");
+    let res = agent().get(&format!("{}/chord/ws", l.url())).call().unwrap();
+    assert_eq!(res.status().as_u16(), 404, "/chord/ws must be removed");
     let res = agent().get(&format!("{}/nowhere", l.url())).call().unwrap();
     assert_eq!(res.status().as_u16(), 404);
 }
@@ -72,38 +79,91 @@ fn another_sites_page_is_refused() {
     assert!(serve(Arc::new(FakeServer::new()), "0.0.0.0:0".parse().unwrap()).is_err());
 }
 
-/// The first `data:` line of an SSE response.
-fn first_event(url: &str) -> Value {
-    let res = agent().get(url).call().unwrap();
+/// The first SSE event `(id, data)`.
+fn first_event_with_id(url: &str, extra_header: Option<(&str, &str)>) -> (Option<String>, Value) {
+    let mut req = agent().get(url);
+    if let Some((k, v)) = extra_header {
+        req = req.header(k, v);
+    }
+    let res = req.call().unwrap();
     assert_eq!(res.headers().get("content-type").unwrap().to_str().unwrap(), "text/event-stream");
     let mut reader = BufReader::new(res.into_body().into_reader());
     let mut line = String::new();
+    let mut id = None;
     loop {
         line.clear();
         reader.read_line(&mut line).unwrap();
-        if let Some(data) = line.strip_prefix("data: ") {
-            return serde_json::from_str(data.trim()).unwrap();
+        if let Some(raw_id) = line.strip_prefix("id:") {
+            id = Some(raw_id.trim().to_string());
+        } else if let Some(data) = line.strip_prefix("data:") {
+            return (id, serde_json::from_str(data.trim()).unwrap());
         }
     }
 }
 
-#[test]
-fn state_streams_frames_and_subscriptions_stream_events() {
-    let (fake, l) = start();
-    let frame = first_event(&format!("{}/api/v1/state", l.url()));
-    assert!(frame.is_object(), "{frame}");
+fn first_event(url: &str) -> Value {
+    first_event_with_id(url, None).1
+}
 
-    let url = format!("{}/api/v1/subscribe/channel.follow?payload=%7B%22id%22%3A%22c1%22%7D", l.url());
-    let reader = std::thread::spawn(move || first_event(&url));
-    // Wait for the subscription to be open, then emit into it.
+#[test]
+fn slice_endpoint_serves_json_snapshots_sse_with_ids_and_resume() {
+    let (fake, l) = start();
+    // 1. Unknown slice -> 404
+    let res = agent().get(&format!("{}/api/v1/slice/unknown?once=1", l.url())).call().unwrap();
+    assert_eq!(res.status().as_u16(), 404);
+
+    // 2. ?once=1 returns JSON snapshot directly
+    let mut res = agent().get(&format!("{}/api/v1/slice/board?once=1", l.url())).call().unwrap();
+    assert_eq!(res.status().as_u16(), 200);
+    assert!(res.headers().get("content-type").unwrap().to_str().unwrap().contains("application/json"));
+    let snap: Value = serde_json::from_str(&res.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(snap["seq"], 0);
+    assert!(snap["issues"].is_array());
+
+    // 3. Accept: application/json returns JSON snapshot directly
+    let mut res = agent()
+        .get(&format!("{}/api/v1/slice/inbox", l.url()))
+        .header("accept", "application/json")
+        .call()
+        .unwrap();
+    assert_eq!(res.status().as_u16(), 200);
+    let inbox_snap: Value = serde_json::from_str(&res.body_mut().read_to_string().unwrap()).unwrap();
+    assert_eq!(inbox_snap["seq"], 0);
+    assert!(inbox_snap["items"].is_array());
+
+    // 4. Default GET streams SSE with `id: <seq>` and `data: <json>`
+    let (id, frame) = first_event_with_id(&format!("{}/api/v1/slice/board", l.url()), None);
+    assert_eq!(id.as_deref(), Some("0"));
+    assert_eq!(frame["seq"], 0);
+
+    // 5. Last-Event-ID / ?after= skips matching initial seq and delivers the next update
+    let url = format!("{}/api/v1/slice/board", l.url());
+    let reader = std::thread::spawn(move || first_event_with_id(&url, Some(("Last-Event-ID", "0"))));
+    for _ in 0..200 {
+        if fake.slice_watchers(SliceKind::Board) > 0 {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let mut next = empty_bundle(3);
+    next.board.issues.push(Issue::new("i3", 3, "Resumed", 3));
+    fake.swap_bundle(next);
+    let (resumed_id, resumed) = reader.join().unwrap();
+    assert_eq!(resumed_id.as_deref(), Some("3"));
+    assert_eq!(resumed["seq"], 3);
+    assert_eq!(resumed["issues"][0]["id"], "i3");
+
+    // 6. Subscriptions still stream events
+    let sub_url = format!("{}/api/v1/subscribe/channel.follow?payload=%7B%22id%22%3A%22c1%22%7D", l.url());
+    let sub_reader = std::thread::spawn(move || first_event(&sub_url));
     for _ in 0..200 {
         if fake.subscriber_count() > 0 {
             break;
         }
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        std::thread::sleep(Duration::from_millis(10));
     }
     fake.emit("channel.follow", json!({ "kind": "message", "text": "你好" }));
-    assert_eq!(reader.join().unwrap(), json!({ "kind": "message", "text": "你好" }));
+    assert_eq!(sub_reader.join().unwrap(), json!({ "kind": "message", "text": "你好" }));
 }
 
 #[test]
@@ -115,7 +175,7 @@ fn issue_watch_streams_the_subscription_and_refusals_are_an_empty_404() {
         if fake.subscriber_count() > 0 {
             break;
         }
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        std::thread::sleep(Duration::from_millis(10));
     }
     fake.emit("issue.watch", json!({ "_tag": "state" }));
     assert_eq!(reader.join().unwrap(), json!({ "_tag": "state" }));
@@ -125,8 +185,11 @@ fn issue_watch_streams_the_subscription_and_refusals_are_an_empty_404() {
         fn call(&self, _: &str, _: Value) -> Envelope {
             Envelope::void()
         }
-        fn state(&self) -> flume::Receiver<Value> {
-            flume::unbounded().1
+        fn slice_snapshot(&self, _: SliceKind) -> Value {
+            json!({ "seq": 0 })
+        }
+        fn watch_slice(&self, _: SliceKind, _: Option<i64>, stop: &flume::Receiver<()>, _: &mut dyn FnMut(i64, &Value)) {
+            let _ = stop.recv();
         }
         fn live(&self) -> flume::Receiver<vibevalley_protocol::LiveEvent> {
             flume::unbounded().1
@@ -196,7 +259,7 @@ fn ops_shaped_like_get_routes_still_reach_the_server() {
         ("artifact/suggestion/accept", "artifact.suggestion.accept"),
         ("issue/watch/x", "issue.watch.x"),
         ("subscribe/thing", "subscribe.thing"),
-        ("state", "state"),
+        ("slice/board", "slice.board"),
         ("events", "events"),
     ] {
         fake.respond(op, json!({ "ok": op }));
@@ -225,8 +288,11 @@ fn events_aliases_live_sse_stream() {
         fn call(&self, _: &str, _: Value) -> Envelope {
             Envelope::void()
         }
-        fn state(&self) -> flume::Receiver<Value> {
-            flume::unbounded().1
+        fn slice_snapshot(&self, _: SliceKind) -> Value {
+            json!({ "seq": 0 })
+        }
+        fn watch_slice(&self, _: SliceKind, _: Option<i64>, stop: &flume::Receiver<()>, _: &mut dyn FnMut(i64, &Value)) {
+            let _ = stop.recv();
         }
         fn live(&self) -> flume::Receiver<vibevalley_protocol::LiveEvent> {
             self.0.clone()

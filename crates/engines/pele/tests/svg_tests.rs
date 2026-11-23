@@ -1,5 +1,3 @@
-mod support;
-
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::time::Instant;
@@ -12,7 +10,7 @@ use vibevalley_pele::svg::theme::{SvgTheme, ThemeMode, ThemePalette, resolve_sty
 use vibevalley_pele::text::label::layout_label;
 use vibevalley_pele::{METRICS_MEASURER, MathSvg, RenderOptions, TextMeasurer, TextStyle, render};
 
-use support::{assert_inert, assert_inert_resolved, assert_resvg_parses, assert_well_formed, css_options, dark_options, resolved_options};
+use crate::support::{assert_inert, assert_inert_resolved, assert_resvg_parses, assert_well_formed, css_options, dark_options, resolved_options};
 
 const ON_LIGHT: &str = "var(--pele-fg-on-light,#1f1f1f)";
 const ON_DARK: &str = "var(--pele-fg-on-dark,#fff)";

@@ -1,7 +1,10 @@
+import type { SliceKind } from "@vibevalley/protocol";
+
 import { reasonOf } from "../api";
 import { createExternal } from "../base/external";
-import { type Frames, frames, type FramesSource, type Link } from "../frame";
+import { type Link, slices, type SlicesSource } from "../frame";
 import { type Accessor, createContext, createEffect, createSignal, getOwner, useContext } from "../solid";
+import type { SliceMap } from "../transport";
 
 /** A value kept in a registry: built on its first read there, then held for the registry's life. */
 export interface Atom<A> {
@@ -156,25 +159,43 @@ export function onPage<A>(kept: Atom<A>): PageAtom<A> {
 /** A value of the page's that lasts until it closes (a dialog the shell and a page both open, the farm's overlays). */
 export const defineAtom = <A>(initial: A): PageAtom<A> => onPage(atom(initial));
 
-const framesSource: Atom<FramesSource> = atom<FramesSource>(frames);
+const slicesSource: Atom<SlicesSource> = atom<SlicesSource>(slices);
 
-/** Whether the state stream is up now, read from its source: subscribing would open and close the stream. */
-export const linkIn = (registry: Registry): Link => registry.get(framesSource).get().link;
+/** Whether the stream link is up now, read from its source: subscribing would open and close a slice stream. */
+export const linkIn = (registry: Registry): Link => registry.get(slicesSource).link();
 
-/** The registry's frames now. */
-export const framesIn = (registry: Registry): Frames => registry.get(framesSource).get();
+/** The registry's latest value for one slice kind. */
+export const sliceIn = <K extends SliceKind>(registry: Registry, kind: K): SliceMap[K] | undefined => registry.get(slicesSource).get(kind);
 
-/** Hears each frame of the registry's source, and follows the source when a test swaps it; the stream stays open meanwhile. */
-export function subscribeFrames(registry: Registry, heard: (frames: Frames) => void): () => void {
+/** Re-subscribes when a test swaps the registry's source, emitting its current value at once. */
+export function subscribeSlice<K extends SliceKind>(registry: Registry, kind: K, heard: (slice: SliceMap[K] | undefined) => void): () => void {
   let off = () => {};
-  const follow = (source: FramesSource) => {
+  const follow = (source: SlicesSource) => {
     off();
-    off = source.subscribe(() => heard(source.get()));
+    off = source.subscribe(kind, () => heard(source.get(kind)));
   };
-  follow(registry.get(framesSource));
-  const unswap = registry.subscribe(framesSource, (source) => {
+  follow(registry.get(slicesSource));
+  const unswap = registry.subscribe(slicesSource, (source) => {
     follow(source);
-    heard(source.get());
+    heard(source.get(kind));
+  });
+  return () => {
+    unswap();
+    off();
+  };
+}
+
+/** Re-subscribes when a test swaps the registry's source, emitting the current link at once. */
+export function subscribeLink(registry: Registry, heard: (link: Link) => void): () => void {
+  let off = () => {};
+  const follow = (source: SlicesSource) => {
+    off();
+    off = source.subscribeLink(() => heard(source.link()));
+  };
+  follow(registry.get(slicesSource));
+  const unswap = registry.subscribe(slicesSource, (source) => {
+    follow(source);
+    heard(source.link());
   });
   return () => {
     unswap();

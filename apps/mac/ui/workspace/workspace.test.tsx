@@ -38,7 +38,7 @@ function workspaceHost(params: Record<string, unknown>, rpcResponses: Record<str
       subscriptions.set(a.id, { name: a.name ?? "", payload: a.payload });
     } else if (a.type === "unsubscribe" && a.id !== undefined) {
       subscriptions.delete(a.id);
-    } else if (!["watch", "applied", "ready"].includes(a.type)) {
+    } else if (!["watch", "unwatch", "applied", "ready"].includes(a.type)) {
       acts.push(a);
     }
     return null;
@@ -95,7 +95,12 @@ test("workspace sidebar renders repos, tabs, collapse toggle, and posts project/
   const app = await open("../App.story.tsx", { width: 280, height: 760, colorScheme: "light", platform: "macos", host: host.options });
   await host.pump(app);
 
-  await host.pushFrame(app, "state", { seq: 1, state: { sessions: [], issues: [] } });
+  await host.pushFrame(app, "slice:board", { seq: 1, issues: [] });
+  await host.pushFrame(app, "slice:sessions", { seq: 1, sessions: [], machines: [] });
+  const repoListCallsAfterFirstState = host.calls.filter((c) => c.op === "repo.list").length;
+  await host.pushFrame(app, "slice:board", { seq: 2, issues: [] });
+  await host.pushFrame(app, "slice:sessions", { seq: 2, sessions: [], machines: [] });
+  expect(host.calls.filter((c) => c.op === "repo.list").length).toBe(repoListCallsAfterFirstState);
   await host.pushFrame(app, "rail", {
     panel: "files",
     projects: [
@@ -377,17 +382,16 @@ test("workspace MarkdownPane renders delayed skeleton, pushed markdown documents
 test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open, interaction_*, mid-turn steer, and telemetry", async () => {
   const baseSession = {
     id: "sess-ws-1",
-    role: "worker",
+    controller: "user" as const,
     name: "Antigravity",
-    agent: "antigravity",
     runtime: "antigravity",
     brief: "Workspace chat",
-    repo: "vibevalley",
-    worktree: "/work/vibevalley",
+    cwd: "/work/vibevalley",
+    policy: { kind: "directCwd" as const, repo: "vibevalley", permissionMode: "acceptEdits" as const },
+    bindings: [],
     hiredAt: 1_700_000_000_000,
     runs: 1,
-    refining: false,
-    phase: { _tag: "working", since: 1_700_000_000_000, doing: { action: "thinking", label: "Analyzing" } },
+    phase: { _tag: "working" as const, since: 1_700_000_000_000, doing: { action: "thinking" as const, label: "Analyzing" } },
   };
   const host = workspaceHost(
     { view: "workspace-chat", tabId: 42, runtime: "antigravity", cwd: "/work/vibevalley", repo: "vibevalley" },
@@ -448,7 +452,7 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
 
   expect(host.calls.some((c) => c.op === "session.openWorkspace")).toBe(true);
   expect(host.calls.some((c) => c.op === "session.send")).toBe(true);
-  expect(host.acts.some((a) => a.type === "update_chat_tab" && a.tab_id === 42 && a.session_id === "sess-ws-1" && a.title === "Inspect acp.rs")).toBe(true);
+  expect(host.acts.some((a) => a.type === "bind_chat_session" && a.tab_id === 42 && a.session_id === "sess-ws-1")).toBe(true);
   expect([...host.subscriptions.values()].some((s) => s.name === "session.watch")).toBe(true);
 
   host.clearActs();
@@ -496,9 +500,7 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
   });
   await host.pump(app);
 
-  expect(host.acts.some((a) => a.type === "update_chat_tab" && a.tab_id === 42 && a.session_id === "sess-ws-1" && a.title === "Upgrade Antigravity ACP")).toBe(
-    true,
-  );
+  expect(host.acts.some((a) => a.type === "update_chat_tab")).toBe(false);
   expect(app.count("id:chat-header-title")).toBe(0);
   expect(app.count("id:chat-permission-mode")).toBe(1);
 
@@ -574,17 +576,16 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
 test("workspace SwarmPanel hides pill when absent, switches Overview/Roster/Board tabs, filters board, and loads child transcripts", async () => {
   const baseSession = {
     id: "sess-swarm-1",
-    role: "worker",
+    controller: "user" as const,
     name: "Antigravity",
-    agent: "antigravity",
     runtime: "antigravity",
     brief: "Swarm run",
-    repo: "vibevalley",
-    worktree: "/work/vibevalley",
+    cwd: "/work/vibevalley",
+    policy: { kind: "directCwd" as const, repo: "vibevalley", permissionMode: "acceptEdits" as const },
+    bindings: [],
     hiredAt: 1_700_000_000_000,
     runs: 1,
-    refining: false,
-    phase: { _tag: "working", since: 1_700_000_000_000, doing: { action: "thinking", label: "Coordinating" } },
+    phase: { _tag: "working" as const, since: 1_700_000_000_000, doing: { action: "thinking" as const, label: "Coordinating" } },
   };
   const host = workspaceHost(
     { view: "workspace-chat", tabId: 50, sessionId: "sess-swarm-1", runtime: "antigravity", cwd: "/work/vibevalley" },
@@ -799,4 +800,91 @@ test("workspace skeletons: 150ms anti-flash gate suppresses fast loads and rende
     items: [{ id: "m1", label: "foo.ts", detail: "src" }],
   });
   expect(pal.count("id:palette-skeleton")).toBe(0);
+});
+
+test("regression: ChatPane hides thought level and omits effort for Orchestrator (Neon) with empty effortLevels", async () => {
+  const baseSession = {
+    id: "sess-orch-1",
+    controller: "user" as const,
+    name: "Antigravity",
+    runtime: "antigravity",
+    brief: "Orchestrator chat",
+    cwd: "/work/vibevalley",
+    policy: { kind: "directCwd" as const, repo: "vibevalley", permissionMode: "acceptEdits" as const },
+    bindings: [],
+    hiredAt: 1_700_000_000_000,
+    runs: 1,
+    phase: { _tag: "resting" as const },
+  };
+  const host = workspaceHost(
+    { view: "workspace-chat", tabId: 44, runtime: "antigravity", cwd: "/work/vibevalley", repo: "vibevalley" },
+    {
+      "runtime.list": [
+        {
+          id: "antigravity",
+          preset: {
+            id: "antigravity",
+            label: "Antigravity",
+            blurb: "ACP",
+            look: { species: null, outfit: null, orchestrator: null, build: "biped", head: "rounded", body: "blue", trim: "navy", hat: "slate", eye: "ink" },
+          },
+          support: { steer: true, refused: {}, capabilities: ["listModels"], inProcess: false, inSessionConfig: true },
+          installation: { status: "available", via: "executable", command: "agy", version: "1.5.14" },
+          models: [
+            { id: "gemini-4-neon", name: "Gemini 4 Neon", effortLevels: ["low", "medium", "high", "xhigh"], defaultEffort: "high", isDefault: true },
+            { id: "gemini-pro-orchestrator-neon", name: "Orchestrator (Neon)", effortLevels: [], isDefault: false },
+          ],
+          usage: null,
+          skills: null,
+          mcpServers: null,
+          tools: null,
+          settings: { enabled: true, binPath: "", defaultModel: "gemini-4-neon", defaultEffort: "high", env: {} },
+          stop: "ok",
+          checkedAt: 1_700_000_000_000,
+        },
+      ] satisfies RuntimeInfo[],
+      "session.openWorkspace": {
+        id: "sess-orch-1",
+        session: baseSession,
+        model: "gemini-pro-orchestrator-neon",
+        permissionMode: "acceptEdits",
+      },
+      "session.send": baseSession,
+      "session.setConfig": {
+        id: "sess-orch-1",
+        session: baseSession,
+        model: "gemini-4-neon",
+        permissionMode: "acceptEdits",
+      },
+    },
+  );
+
+  const app = await open("../App.story.tsx", { width: 820, height: 760, colorScheme: "light", platform: "macos", host: host.options });
+  await host.pump(app);
+
+  expect(app.count("id:chat-thought-level")).toBe(1);
+
+  await app.press("id:chat-model-select");
+  await app.press("id:chat-model-option-gemini-pro-orchestrator-neon");
+  await host.pump(app);
+  expect(app.count("id:chat-thought-level")).toBe(0);
+
+  host.clearCalls();
+  await app.type("id:chat-composer-input", "Plan the rollout");
+  await app.press("id:chat-send");
+  await host.pump(app);
+
+  const openCall = host.calls.find((c) => c.op === "session.openWorkspace");
+  expect(openCall).toBeDefined();
+  const payload = openCall?.payload as Record<string, unknown>;
+  expect(payload.model).toBe("gemini-pro-orchestrator-neon");
+  expect("effort" in payload).toBe(false);
+  expect(app.count("id:chat-thought-level")).toBe(0);
+
+  host.clearCalls();
+  await app.press("id:chat-model-select");
+  await app.press("id:chat-model-option-gemini-4-neon");
+  await host.pump(app);
+  expect(app.count("id:chat-thought-level")).toBe(1);
+  expect(host.calls).toContainEqual({ op: "session.setConfig", payload: { id: "sess-orch-1", model: "gemini-4-neon" } });
 });

@@ -6,11 +6,9 @@ use vibevalley_protocol::{ActorKind, Cron, CronWhen};
 
 use crate::modules::infra::column::{json, read_json, read_word, word};
 
-#[rustfmt::skip]
-#[path = "generated/queries.rs"]
-mod queries;
+use crate::db::generated::work_cron as queries;
 
-pub const SCHEMA: &str = include_str!("sql/schema.sql");
+pub const SCHEMA: &str = crate::db::schema::WORK_CRON;
 
 pub struct StoredCron {
     pub cron: Cron,

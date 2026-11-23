@@ -27,6 +27,14 @@
 | `plainText` | `plain.ts` |  |
 | `githubRepository` | `repo.ts` | Only repository home URLs: never credentials, other git transports or command-line options. |
 | `same` | `same.ts` |  |
+| `sessionIssueId` | `session.ts` |  |
+| `sessionChannelId` | `session.ts` |  |
+| `sessionRepo` | `session.ts` |  |
+| `sessionBranch` | `session.ts` |  |
+| `sessionWorktree` | `session.ts` |  |
+| `sessionProfile` | `session.ts` |  |
+| `isOrchestratorSession` | `session.ts` |  |
+| `isFreeUserSession` | `session.ts` |  |
 | `stageWantsUser` | `stage.ts` | Questions the user for something: the page leads with it, the board flags it. |
 
 ## `apps/mac/ui/infra`
@@ -91,9 +99,9 @@
 | `useTimeout` | `base/timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the reactive owner's end clears it. |
 | `typedMarks` | `base/typedMarks.ts` | The text with the marks just typed before the caret as the syntax they stand for. undefined when there are none. |
 | `call` | `bridge.ts` | One endpoint by name. Never rejects: failures are envelopes with a non-zero bizCode. |
+| `watchSlice` | `bridge.ts` | A listener joining an active topic gets the newest cached frame at once. |
 | `frame` | `bridge.ts` |  |
 | `frameRev` | `bridge.ts` | The frame's revision (reactive): goes up by one per frame this view received. |
-| `onFrame` | `bridge.ts` | Subscribes to each incoming frame payload on `name` (validating the FrameEnvelope wrapper). |
 | `onLive` | `bridge.ts` | Every LiveEvent from now on. Returns how to stop listening. |
 | `subscribe` | `bridge.ts` | One of rpc.ts's subscriptions (`channel.follow`, ...). `ended` gets `null` when the server ended it, |
 | `hostApi` | `bridge.ts` | The host's capabilities (packages/protocol's Host, desktop flavour) and the terminal. |
@@ -109,18 +117,21 @@
 | `replace` | `form/paths.ts` |  |
 | `replace` | `form/paths.ts` |  |
 | `immutable` | `form/paths.ts` |  |
-| `frames` | `frame.ts` |  |
-| `FramesContext` | `frame.ts` |  |
-| `createFrames` | `frame.ts` | The frames above as a reactive object: each read follows the newest frame. |
-| `useFrames` | `frame.ts` | The nearest provided frames, else the app's one stream. |
-| `useCore` | `frame.ts` | The folded state. undefined until the first frame. |
+| `slices` | `frame.ts` |  |
+| `SlicesContext` | `frame.ts` |  |
+| `createSlices` | `frame.ts` | Per-slice reactive signals backed by `source`; each slice subscribes lazily on first use. |
+| `useBoardSlice` | `frame.ts` |  |
+| `useSessionsSlice` | `frame.ts` |  |
+| `useCollabSlice` | `frame.ts` |  |
+| `useInboxSlice` | `frame.ts` |  |
+| `useOpsSlice` | `frame.ts` |  |
+| `useLink` | `frame.ts` |  |
 | `useSessionsMap` | `frame.ts` |  |
 | `useSession` | `frame.ts` |  |
 | `useIssue` | `frame.ts` |  |
 | `useThreadOwner` | `frame.ts` |  |
 | `orchestratorSession` | `frame.ts` |  |
 | `orchestratorMood` | `frame.ts` |  |
-| `rawFrame` | `frame.ts` | The frame as it came: a new object each time. |
 | `subscribeLive` | `frame.ts` | Listens to the live events; returns how to stop. |
 | `followChannel` | `gateway.ts` | What is said in a channel after the message numbered after, then from now on. |
 | `followArtifact` | `gateway.ts` | A blocks artifact's changes after this seq, then each batch from now on. |
@@ -129,6 +140,14 @@
 | `followArtifactPresence` | `gateway.ts` | An artifact's ephemeral live presence peers as a snapshot, then incremental upserts and removals. |
 | `fetchArtifactView` | `gateway.ts` | Fetches a store artifact's rendered HTML viewer document through the native `artifact.view` op. |
 | `currentHost` | `host.ts` |  |
+| `readHostParams` | `hostParams.ts` |  |
+| `readHostLocale` | `hostParams.ts` |  |
+| `readHostMotion` | `hostParams.ts` |  |
+| `readHostViewName` | `hostParams.ts` |  |
+| `hasHostView` | `hostParams.ts` |  |
+| `readChatPaneParams` | `hostParams.ts` |  |
+| `readFarmFormParams` | `hostParams.ts` |  |
+| `readFarmPhoneParams` | `hostParams.ts` |  |
 | `loadSpriteManifest` | `pixelManifests.ts` | Lazily fetches `sprites.json` from Rust on first `useSprites()` call instead of inlining 105 KB into `bundle.js`. |
 | `cursorManifest` | `pixelManifests.ts` |  |
 | `retryRead` | `query.ts` |  |
@@ -205,11 +224,14 @@
 | `useAtom` | `state/atom.ts` | An atom's value as an accessor: subscribed while the component lives, never suspending. |
 | `onPage` | `state/atom.ts` | The atom held for the registry's life, built and subscribed lazily on first access rather than at module import. |
 | `defineAtom` | `state/atom.ts` | A value of the page's that lasts until it closes (a dialog the shell and a page both open, the farm's overlays). |
-| `linkIn` | `state/atom.ts` | Whether the state stream is up now, read from its source: subscribing would open and close the stream. |
-| `framesIn` | `state/atom.ts` | The registry's frames now. |
-| `subscribeFrames` | `state/atom.ts` | Hears each frame of the registry's source, and follows the source when a test swaps it; the stream stays open meanwhile. |
+| `linkIn` | `state/atom.ts` | Whether the stream link is up now, read from its source: subscribing would open and close a slice stream. |
+| `sliceIn` | `state/atom.ts` | The registry's latest value for one slice kind. |
+| `subscribeSlice` | `state/atom.ts` | Re-subscribes when a test swaps the registry's source, emitting its current value at once. |
+| `subscribeLink` | `state/atom.ts` | Re-subscribes when a test swaps the registry's source, emitting the current link at once. |
 | `useLatest` | `state/atom.ts` | The answer to the newest `key()` while the component lives; undefined while there is nothing to ask. |
-| `bySeq` | `state/intent.ts` | A reply that carries the seq of the fold with its change (an issue moved): shown once a frame has caught up. |
+| `bySeq` | `state/intent.ts` | A reply that carries the seq of the fold with its change (an issue moved): shown once the slice has caught up. |
+| `defineIntent` | `state/intent.ts` |  |
+| `defineIntent` | `state/intent.ts` |  |
 | `defineIntent` | `state/intent.ts` |  |
 | `sendReplacing` | `state/intent.ts` | A setting the user changes again before the first change showed (a reaction off and on, a level picked twice). |
 | `useIntents` | `state/intent.ts` | A type's intents in the page's registry, with the list as an accessor. |

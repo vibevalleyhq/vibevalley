@@ -5,7 +5,7 @@
 
 use std::path::PathBuf;
 
-use vibevalley_protocol::{Fact, Issue, Outcome, Phase, Session, SessionAction};
+use vibevalley_protocol::{ContextRef, ExecutionPolicy, Fact, Issue, Outcome, Phase, Session, SessionAction, SessionController};
 use vibevalley_runtime::oar::{SessionOptions, StopReason};
 
 use super::drivers::Persona;
@@ -18,7 +18,7 @@ impl Sessions {
         self.0.ledger.read(|s| {
             s.sessions
                 .iter()
-                .filter(|h| h.issue.is_none() && h.agent == agent && h.channel.as_deref() == Some(channel))
+                .filter(|h| h.is_direct_talker() && h.issue_id().is_none() && h.profile_id() == Some(agent) && h.channel_id() == Some(channel))
                 .max_by_key(|h| h.hired_at)
                 .cloned()
         })
@@ -44,26 +44,38 @@ impl Sessions {
 
     fn open_talk(&self, agent: &str, channel: &str, words: &str, again: Option<Session>) -> Result<String> {
         let drive = self.0.drivers.drive(Some(agent), &Issue::new("", 0, words, now()))?;
+        let resuming = again.is_some();
         let mut session = match again {
             Some(s) => s,
             None => {
                 let number = self.0.ledger.next("session", 0)?;
                 let id = format!("w{number}");
-                let mut s = Session::worker(&id, drive.name.clone(), now());
-                s.agent = drive.agent.clone();
-                s.runtime = drive.runtime_id.clone();
-                s.channel = Some(channel.to_string());
-                s.worktree = Some(self.0.config.data_dir.join("talk").join(&id).to_string_lossy().into_owned());
+                let mut s = Session::new(
+                    &id,
+                    SessionController::Channel,
+                    drive.name.clone(),
+                    drive.runtime_id.clone(),
+                    ExecutionPolicy::SandboxDir,
+                    now(),
+                );
+                s.profile = Some(drive.agent.clone());
+                s.cwd = Some(self.0.config.data_dir.join("talk").join(&id).to_string_lossy().into_owned());
+                s.attach_binding(ContextRef::Channel { id: channel.to_string() });
                 s
             }
         };
         session.brief = vibevalley_core::text::clip(words, 120);
-        let cwd = PathBuf::from(session.worktree.clone().unwrap_or_default());
+        let cwd = PathBuf::from(session.cwd.clone().unwrap_or_default());
         std::fs::create_dir_all(&cwd).map_err(io)?;
+        let resume = if resuming && drive.runtime.capabilities().resume {
+            self.extra(&session.id).agent_session
+        } else {
+            None
+        };
         let rules = self.0.drivers.talk_rules(&cwd.to_string_lossy(), channel, &session.id);
         let (rules, prompt) = match &drive.persona {
             Some(Persona::System(persona)) => (format!("{persona}\n\n{rules}"), words.to_string()),
-            Some(Persona::Prompt(persona)) => (rules, format!("{persona}\n\n---\n\n{words}")),
+            Some(Persona::Prompt(persona)) if resume.is_none() => (rules, format!("{persona}\n\n---\n\n{words}")),
             _ => (rules, words.to_string()),
         };
         let system_prompt = match &drive.persona {
@@ -76,6 +88,7 @@ impl Sessions {
         let opts = SessionOptions {
             cwd,
             model: drive.model.clone(),
+            resume,
             permission_mode: self.0.config.permission,
             append_system_prompt,
             env: drive.env.clone(),

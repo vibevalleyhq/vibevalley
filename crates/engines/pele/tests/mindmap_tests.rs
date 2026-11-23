@@ -1,5 +1,3 @@
-mod support;
-
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -10,7 +8,7 @@ use vibevalley_pele::diagram::mindmap::outline::NodeShape;
 use vibevalley_pele::diagram::mindmap::parser::tokenize;
 use vibevalley_pele::{METRICS_MEASURER, MathSvg, ParseOptions, ParsedModel, RenderOptions, TextMeasurer, TextStyle, parse, render, supports};
 
-use support::{
+use crate::support::{
     Lcg, Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, assert_well_formed, css_options, dark_options, load_fixture,
     resolved_options,
 };

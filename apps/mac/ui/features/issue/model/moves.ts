@@ -17,7 +17,8 @@ export interface IssueMove {
   readonly lane?: Lane;
 }
 
-export const issueMove = defineIntent<IssueMove, AppliedIssue>({
+export const issueMove = defineIntent<IssueMove, AppliedIssue, "board">({
+  slice: "board",
   send: (m, key) => api.issue.status.update(omitUndefined({ id: m.id, status: m.status, text: m.text, edit: m.edit, revision: m.revision, requestKey: key })),
   confirmed: bySeq,
   whileLost: "queue",

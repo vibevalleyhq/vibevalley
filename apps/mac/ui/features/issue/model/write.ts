@@ -37,7 +37,8 @@ export type IssueLabel = keyof IssueLabels;
 
 export type IssueSet = { readonly id: string } & IssueLabels;
 
-export const issueSet = defineIntent<IssueSet, AppliedIssue>({
+export const issueSet = defineIntent<IssueSet, AppliedIssue, "board">({
+  slice: "board",
   // A set: sent twice, it is set once, so it needs no request key.
   send: (p) => api.issue.update(p),
   confirmed: bySeq,
@@ -88,7 +89,8 @@ export interface IssueSaid {
   readonly text: string;
 }
 
-export const issueSay = defineIntent<IssueSaid, Applied>({
+export const issueSay = defineIntent<IssueSaid, Applied, "board">({
+  slice: "board",
   send: (s, key) => api.issue.comment.create({ id: s.id, text: s.text, sendKey: key }),
   confirmed: bySeq,
   whileLost: "queue",

@@ -21,9 +21,10 @@
 | `pnpm-workspace.yaml`、`vite.config.ts` | TS 工作区包列表、依赖版本 catalog、oxfmt 与 oxlint 配置、检查任务（`rust:check`、`docs:verify`…） |
 | `scripts/{gen,audit,docs,release}/` | 工程脚本：`gen/`（生成物写出）、`audit/`（lint 插件、死代码、注释审查）、`docs/`（Note、链接、术语与旧名检查）、`release/`（发版、回归与验收沙箱） |
 | `crates/server/src/lib.rs`、`crates/server/src/start.rs` | `Hub`（状态、端点表、事实）与按序打开各模块的 `start` |
-| `crates/server/src/modules/`、`crates/server/src/transport/` | 按六大域分组的业务模块（`work`、`team`、`collab`、`content`、`skin`、`infra`）与传输层（`api`、`bridge`、`chord`、`http`） |
-| `crates/protocol/src/contract/`、`crates/protocol/tests/typescript.rs`、`crates/protocol/src/home.rs` | 线上类型（`ts-rs` 写出 `packages/protocol` 的 `*.gen.ts`，`vp run protocol:check` 查最新）与家目录约定（`server.json`、语言） |
-| `crates/core/src/` | 纯规则中心：`reduce`、出帧、状态派生、收件箱、依赖、定时任务（`cron/`）、笔记大纲（`pkm/`）、作品引擎（`artifact/`） |
+| `crates/server/src/db/{schema,queries,generated}/` | 服务端 13 组 SQLite 建表语句（含 `shared.sql` 共享 `seq_counter`）、命名查询（`*.sql`）与 sqlc 生成的 SQLx 查询模块（`*.rs`，由边界测试锁死仅限所属域模块调用） |
+| `crates/server/src/modules/`、`crates/server/src/transport/` | 按六大域分组的业务模块（`work`、`team`、`collab`、`content`、`skin`、`infra`）与传输层（`api`、`bridge`、`http`） |
+| `crates/protocol/src/contract/`、`crates/protocol/tests/typescript.rs`、`crates/protocol/src/home.rs` | 线上类型（含 5 域切片、`FarmFrame` 与 `host.rs` 壳协议，`ts-rs` 写出 `packages/protocol` 的 `*.gen.ts`，`vp run protocol:check` 查最新）与家目录约定（`server.json`、语言） |
+| `crates/core/src/` | 纯规则中心：`reduce`、`SliceMask` 与按域切片投影、状态派生、收件箱、依赖、定时任务（`cron/`）、笔记大纲（`pkm/`）、作品引擎（`artifact/`） |
 | `crates/runtime/src/` | `oar/` 驱动与自研 `agent/` 持久对话引擎（`execution.db`） |
 | `crates/rich/`、`crates/engines/{onig,pele,shiki}` | 原生富内容组件与内部引擎（`canvas`、`chart`、`genui`、`pinyin`）及底层正则/高亮/图谱引擎 |
 | `apps/mac/crates/workspace/src/store/mod.rs` | 原生应用外壳的 `state.db`（SQLite）：项目、终端与布局；连同 `pixel`、`terminal` 共 3 个桌面支撑 crate |
@@ -45,7 +46,7 @@
 架构、边界与测试如何共同设计，见[模块设计](docs/style/module-design.md)。
 
 - **深模块**：每个模块对外一个类型和它的几个方法，里面的表、锁和线程不露出去；不靠一个带 `kind` 的入口复用多种操作。
-- **按序启动**：`start`（`crates/server/src/start.rs`）按依赖顺序打开模块，后打开的拿到先打开的（`Arc`）；状态只经 `Hub::apply` 改，模块之间的上行反应经 hub 的 `Watcher`（每条 `Transition`）。
+- **按序启动**：`start`（`crates/server/src/start.rs`）按依赖顺序打开模块，后打开的拿到先打开的（`Arc`）；状态只经 `Hub::apply` 改，模块之间的上行反应经 `Hub` 的异步 `EventBus`（`Hub::subscribe_transitions`）。
 - **操作与发言主体统一用 `Actor`**：`kind` 是 `user`、`agent`、`system`，`agent` 带 `role` 与 `forUser`；HTTP 来的是 `user`，助手的工具是 `agent`（`orchestrator`），`/mcp` 是 `agent`（`worker`），定时任务是 `system`。
 - **同一个家目录只有一个工单板**：工单板在它的数据旁放一个锁文件，别的进程只能读快照（`Board::snapshot`）。
 
@@ -81,7 +82,7 @@
 
 | 层 | 入口 | 位置 |
 |---|---|---|
-| 规则 | 纯函数 | 各 crate 的 `#[cfg(test)]` 与 `src/tests.rs`（如 `crates/core/src/tests.rs`） |
+| 规则 | 纯函数 | 各 crate 的 `#[cfg(test)]`（如 `crates/core/src/core.rs`、`crates/core/src/scenario.rs`） |
 | 模块 | 模块的类型、真 git、脚本农机（`vibevalley-runtime::oar` 的 `scripted`）、脚本模型 | `crates/server/tests/issue_board.rs`、`crates/server/tests/*.rs` |
 | 服务端整体 | 起真的 `vibevalley-server`、经 HTTP | `crates/server/tests/start.rs`、`crates/cli/tests/cli.rs` |
 | 页面 | `nsh/test`，样例的 `Transport` | `apps/mac/ui/app/*.test.tsx`、`apps/mac/ui/features/*/*.test.ts` |

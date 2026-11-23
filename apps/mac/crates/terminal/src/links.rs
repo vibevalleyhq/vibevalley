@@ -1100,7 +1100,7 @@ mod tests {
         let ctx = LinkResolveContext::default();
         let line = concat!(
             "see (https://en.wikipedia.org/wiki/Rust_(programming_language)), ",
-            "http://127.0.0.1:8787/api/v1/state?foo=1&bar=2#top; ",
+            "http://127.0.0.1:8787/api/v1/slice/board?foo=1&bar=2#top; ",
             "[http://[::1]:8080/a[0]]. ",
             "\"https://example.com/path!\""
         );
@@ -1122,7 +1122,7 @@ mod tests {
 
         let local_col = col_of(line, "http://127.0.0.1");
         let local = link_at_rows(&rows, 240, pt(0, local_col + 5), &ctx).expect("local url");
-        assert_eq!(local.target, LinkTarget::Url("http://127.0.0.1:8787/api/v1/state?foo=1&bar=2#top".into()));
+        assert_eq!(local.target, LinkTarget::Url("http://127.0.0.1:8787/api/v1/slice/board?foo=1&bar=2#top".into()));
 
         let ipv6_col = col_of(line, "http://[::1]");
         let ipv6 = link_at_rows(&rows, 240, pt(0, ipv6_col + 4), &ctx).expect("ipv6 url");

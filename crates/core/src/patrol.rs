@@ -23,7 +23,7 @@ pub fn grace(kind: InboxKind) -> Option<Millis> {
         InboxKind::Interrupted => Some(30 * MINUTE),
         InboxKind::Quiet => Some(20 * MINUTE),
         InboxKind::Review | InboxKind::Conflict => Some(2 * HOUR),
-        InboxKind::Fix | InboxKind::CronAsk => None,
+        InboxKind::Fix | InboxKind::CronAsk | InboxKind::BudgetReached => None,
     }
 }
 

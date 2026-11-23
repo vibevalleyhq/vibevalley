@@ -3,6 +3,7 @@ import { DiffView } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import { type ChangedFile, type Changes, type Issue, type IssueAct, type Session, VibeValleyApiError } from "@vibevalley/protocol";
+import { sessionWorktree } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
@@ -15,7 +16,7 @@ import { reasonOf } from "../../../infra/api";
 import { variant } from "../../../infra/base/dom";
 import { ago } from "../../../infra/base/format";
 import { hostApi } from "../../../infra/bridge";
-import { useCore } from "../../../infra/frame";
+import { useIssue } from "../../../infra/frame";
 import { ready } from "../../../infra/query";
 import { linkIn, useRegistry } from "../../../infra/state/atom";
 import { useIntents } from "../../../infra/state/intent";
@@ -51,8 +52,7 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
     mounted = false;
   });
   const registry = useRegistry();
-  const core = useCore();
-  const live = () => core()?.issues.find((i) => i.id === props.issue.id);
+  const live = useIssue(() => props.issue.id);
   const acts = () => (live()?.stage.acts ?? []).map((a) => a.act);
   const working = () => acts().includes("stop");
   const presses = createPresses(() => props.lane);
@@ -252,7 +252,7 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
                     </View>
                     <View class="min-w-0 flex-1">
                       <Text class="text-sm font-semibold text-berry">{t("web.issue.changes.conflict", { base: c().base })}</Text>
-                      <ConflictFiles files={c().conflicts} worktree={props.session?.worktree} />
+                      <ConflictFiles files={c().conflicts} worktree={props.session ? sessionWorktree(props.session) : undefined} />
                       <Text class="mt-2 text-xs leading-relaxed text-muted">{t("web.issue.changes.resolveHow", { base: c().base })}</Text>
                     </View>
                   </View>

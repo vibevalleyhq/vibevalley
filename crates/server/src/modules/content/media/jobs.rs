@@ -523,7 +523,7 @@ pub struct Jobs {
 impl Jobs {
     pub fn open(p: Parts) -> Result<Arc<Jobs>, ApiError> {
         let mut db = block_on(open_sqlx_db(&p.home)).map_err(storage)?;
-        block_on(sqlx::raw_sql(include_str!("sql/jobs.sql")).execute(&mut db)).map_err(storage)?;
+        block_on(sqlx::raw_sql(crate::db::schema::CONTENT_MEDIA).execute(&mut db)).map_err(storage)?;
         let jobs = Arc::new(Jobs {
             db: Mutex::new(db),
             held: Mutex::default(),

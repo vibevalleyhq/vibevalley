@@ -8,7 +8,8 @@ use std::sync::OnceLock;
 use serde::Deserialize;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    AccountUsage, Agent, AgentProblem, AgentProblemLevel, Installation, PersonaMode, RuntimeInfo, RuntimePreset, RuntimeQuota, RuntimeSettings, RuntimeSupport,
+    AccountUsage, Agent, AgentProblem, AgentProblemLevel, Installation, ModelEntry, PersonaMode, RuntimeInfo, RuntimePreset, RuntimeQuota, RuntimeSettings,
+    RuntimeSupport,
 };
 
 #[derive(Deserialize)]
@@ -206,6 +207,13 @@ fn problem(field: &str, level: AgentProblemLevel, text: String) -> AgentProblem 
     }
 }
 
+/// True when at least one model on the runtime advertises effort levels,
+/// distinguishing models that reject `effort` (`effort_levels: []`) from
+/// runtimes whose model list never reports effort levels at all.
+pub(crate) fn runtime_reports_model_efforts(models: &[ModelEntry]) -> bool {
+    models.iter().any(|m| !m.effort_levels.is_empty())
+}
+
 /// `sessionOptions`: both the dispatch check and session opening check
 /// these; availability and spending only gate new work.
 pub fn session_options(agent: &Agent, settings: Option<&RuntimeSettings>, runtime: Option<&RuntimeInfo>) -> Options {
@@ -219,7 +227,8 @@ pub fn session_options(agent: &Agent, settings: Option<&RuntimeSettings>, runtim
         Some(models) if !wanted.is_empty() && !models.iter().any(|m| m.id == wanted) => wanted.clone(),
         _ => String::new(),
     };
-    let effort = if !agent.effort.is_empty() {
+    let inherited_default_effort = agent.effort.is_empty();
+    let mut effort = if !inherited_default_effort {
         agent.effort.clone()
     } else {
         settings.map(|s| s.default_effort.clone()).unwrap_or_default()
@@ -276,32 +285,36 @@ pub fn session_options(agent: &Agent, settings: Option<&RuntimeSettings>, runtim
     }
     if let (Some(r), Some(models)) = (runtime, models)
         && !effort.is_empty()
+        && runtime_reports_model_efforts(models)
     {
         let found = models.iter().find(|m| if model.is_empty() { m.is_default } else { m.id == model });
         if let Some(m) = found
-            && !m.effort_levels.is_empty()
             && !m.effort_levels.contains(&effort)
         {
-            let name = if !agent.model.is_empty() && !model.is_empty() {
-                m.name.clone()
+            if inherited_default_effort || m.effort_levels.is_empty() {
+                effort.clear();
             } else {
-                t(
-                    "server.runtime.runtimeDefault",
-                    &[("runtime", r.id.clone().into()), ("model", m.name.clone().into())],
-                )
-            };
-            problems.push(problem(
-                "effort",
-                Error,
-                t(
-                    "server.runtime.effort",
-                    &[
-                        ("model", name.into()),
-                        ("effort", effort.clone().into()),
-                        ("levels", list(&m.effort_levels).into()),
-                    ],
-                ),
-            ));
+                let name = if !agent.model.is_empty() && !model.is_empty() {
+                    m.name.clone()
+                } else {
+                    t(
+                        "server.runtime.runtimeDefault",
+                        &[("runtime", r.id.clone().into()), ("model", m.name.clone().into())],
+                    )
+                };
+                problems.push(problem(
+                    "effort",
+                    Error,
+                    t(
+                        "server.runtime.effort",
+                        &[
+                            ("model", name.into()),
+                            ("effort", effort.clone().into()),
+                            ("levels", list(&m.effort_levels).into()),
+                        ],
+                    ),
+                ));
+            }
         }
     }
     Options {
@@ -407,5 +420,156 @@ mod tests {
         assert!(ids.iter().all(|id| preset_of(id).id == *id));
         assert_eq!(preset_of("nope").label, "nope");
         assert!(support_of("vibevalley").in_process);
+    }
+
+    #[test]
+    fn session_options_filters_unsupported_effort_against_model_levels() {
+        use vibevalley_protocol::{AgentRole, Build, Head, InstallationAvailable, Look, Via};
+
+        let models = vec![
+            ModelEntry {
+                id: "gemini-4-neon".into(),
+                name: "Gemini 4 Neon".into(),
+                effort_levels: vec!["low".into(), "medium".into(), "high".into()],
+                default_effort: Some("high".into()),
+                is_default: true,
+            },
+            ModelEntry {
+                id: "gemini-pro-orchestrator-neon".into(),
+                name: "Orchestrator (Neon)".into(),
+                effort_levels: vec![],
+                default_effort: None,
+                is_default: false,
+            },
+            ModelEntry {
+                id: "gemini-fast".into(),
+                name: "Gemini Fast".into(),
+                effort_levels: vec!["low".into(), "high".into()],
+                default_effort: Some("low".into()),
+                is_default: false,
+            },
+        ];
+        assert!(runtime_reports_model_efforts(&models));
+        assert!(!runtime_reports_model_efforts(&models[1..2]));
+
+        let settings = RuntimeSettings {
+            default_effort: "medium".into(),
+            ..default_settings()
+        };
+        let runtime = RuntimeInfo {
+            id: "antigravity".into(),
+            preset: preset_of("antigravity"),
+            support: support_of("antigravity"),
+            installation: Installation::Available(InstallationAvailable {
+                via: Via::Executable,
+                command: "agy".into(),
+                version: Some("1.5.14".into()),
+            }),
+            models: Some(models),
+            usage: None,
+            skills: None,
+            mcp_servers: None,
+            tools: None,
+            settings: settings.clone(),
+            spent_today: None,
+            quota: None,
+            stop: String::new(),
+            checked_at: 0,
+        };
+        let base_agent = Agent {
+            id: "a1".into(),
+            name: "Worker".into(),
+            role: AgentRole::Worker,
+            duty: String::new(),
+            enabled: true,
+            runtime: "antigravity".into(),
+            model: String::new(),
+            effort: String::new(),
+            persona: String::new(),
+            persona_mode: PersonaMode::Prompt,
+            skills: vec![],
+            mcp_servers: vec![],
+            disallowed_tools: vec![],
+            env: BTreeMap::new(),
+            workdir: String::new(),
+            worktree: false,
+            tags: vec![],
+            look: Look {
+                species: None,
+                outfit: None,
+                orchestrator: None,
+                build: Build::Biped,
+                head: Head::Rounded,
+                body: String::new(),
+                trim: String::new(),
+                hat: String::new(),
+                eye: String::new(),
+                avatar: None,
+            },
+            from: None,
+        };
+
+        // Inherited runtime default effort is cleared for models with no effort levels.
+        let orch = Agent {
+            model: "gemini-pro-orchestrator-neon".into(),
+            ..base_agent.clone()
+        };
+        let opts = session_options(&orch, Some(&settings), Some(&runtime));
+        assert!(opts.effort.is_empty());
+        assert!(opts.problems.is_empty(), "{:?}", opts.problems);
+
+        // Stale explicit profile effort on a model with no effort levels is cleared cleanly.
+        let orch_explicit = Agent {
+            model: "gemini-pro-orchestrator-neon".into(),
+            effort: "high".into(),
+            ..base_agent.clone()
+        };
+        let opts = session_options(&orch_explicit, Some(&settings), Some(&runtime));
+        assert!(opts.effort.is_empty());
+        assert!(opts.problems.is_empty(), "{:?}", opts.problems);
+
+        // Inherited runtime default effort is cleared when a model offers different levels.
+        let fast_inherited = Agent {
+            model: "gemini-fast".into(),
+            ..base_agent.clone()
+        };
+        let opts = session_options(&fast_inherited, Some(&settings), Some(&runtime));
+        assert!(opts.effort.is_empty());
+        assert!(opts.problems.is_empty(), "{:?}", opts.problems);
+
+        // Explicit profile effort incompatible with a model's advertised levels still reports an error.
+        let fast_explicit = Agent {
+            model: "gemini-fast".into(),
+            effort: "medium".into(),
+            ..base_agent.clone()
+        };
+        let opts = session_options(&fast_explicit, Some(&settings), Some(&runtime));
+        assert_eq!(opts.problems.len(), 1);
+        assert_eq!(opts.problems[0].field, "effort");
+        assert_eq!(opts.problems[0].level, AgentProblemLevel::Error);
+
+        // Supported inherited default effort is preserved.
+        let neon = Agent {
+            model: "gemini-4-neon".into(),
+            ..base_agent.clone()
+        };
+        let opts = session_options(&neon, Some(&settings), Some(&runtime));
+        assert_eq!(opts.effort, "medium");
+        assert!(opts.problems.is_empty());
+
+        // When no model on the runtime reports effort levels, inherited effort is kept untouched.
+        let unadvertised = RuntimeInfo {
+            models: Some(vec![ModelEntry {
+                id: "custom-model".into(),
+                name: "Custom".into(),
+                effort_levels: vec![],
+                default_effort: None,
+                is_default: true,
+            }]),
+            ..runtime
+        };
+        let opts = session_options(&base_agent, Some(&settings), Some(&unadvertised));
+        assert_eq!(opts.effort, "medium");
+        assert!(opts.problems.is_empty());
     }
 }

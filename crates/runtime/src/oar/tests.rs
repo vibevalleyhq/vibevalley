@@ -668,3 +668,168 @@ fn regression_antigravity_external_accounting_uses_gemini_additive_totals_even_w
     assert_eq!(usage.context_used_tokens, Some(12_000));
     assert_eq!(usage.context_window_tokens, Some(1_000_000));
 }
+
+static OBSERVER_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+struct ClearObserverOnDrop;
+impl Drop for ClearObserverOnDrop {
+    fn drop(&mut self) {
+        set_observer(None);
+    }
+}
+
+#[test]
+fn observer_receives_events_outside_session_lock_and_stops_when_cleared() {
+    let _serial = OBSERVER_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let _cleanup = ClearObserverOnDrop;
+    set_observer(None);
+    assert!(!has_observer());
+
+    let mut caps = ScriptedRuntime::new("s", Script::echo()).capabilities();
+    caps.resume = true;
+    let runtime = ScriptedRuntime::new("s", Script::echo()).with_capabilities(caps);
+    let expected_id = format!("observer-test-{}", uuid::Uuid::new_v4());
+    let session = runtime
+        .open(SessionOptions {
+            resume: Some(expected_id.clone()),
+            ..opts()
+        })
+        .unwrap();
+    assert_eq!(session.id(), expected_id);
+    let (obs_tx, obs_rx) = flume::unbounded::<(String, Event)>();
+
+    struct RecordingObserver {
+        target_session: String,
+        session: std::sync::Arc<dyn Session>,
+        tx: flume::Sender<(String, Event)>,
+    }
+    impl OarObserver for RecordingObserver {
+        fn on_event(&self, session_id: &str, event: &Event) {
+            if session_id != self.target_session {
+                return;
+            }
+            // Re-entering session accessors proves the callback runs outside `SessionCore`'s state mutex.
+            let _ = self.session.status();
+            let _ = self.session.records();
+            let _ = self.tx.send((session_id.to_owned(), event.clone()));
+        }
+    }
+
+    set_observer(Some(std::sync::Arc::new(RecordingObserver {
+        target_session: expected_id.clone(),
+        session: session.clone(),
+        tx: obs_tx,
+    })));
+    assert!(has_observer());
+
+    let rx = session.events();
+    session.prompt(text("hello")).unwrap();
+    until(&rx, turn_finished);
+
+    let mut first_batch = Vec::new();
+    loop {
+        let item = obs_rx.recv_timeout(WAIT).expect("observer event before timeout");
+        let done = turn_finished(&item.1.kind);
+        first_batch.push(item);
+        if done {
+            break;
+        }
+    }
+    assert!(first_batch.iter().all(|(sid, _)| sid == &expected_id));
+    assert!(first_batch.iter().any(|(_, e)| matches!(e.kind, EventKind::TurnStarted { .. })));
+    assert!(
+        first_batch
+            .iter()
+            .any(|(_, e)| matches!(&e.kind, EventKind::TextDelta { text } if text == "hello"))
+    );
+    assert!(first_batch.iter().any(|(_, e)| matches!(e.kind, EventKind::TurnFinished { .. })));
+
+    set_observer(None);
+    assert!(!has_observer());
+
+    session.prompt(text("world")).unwrap();
+    until(&rx, turn_finished);
+    session.dispose();
+    until(&rx, |k| matches!(k, EventKind::SessionEnded));
+
+    assert!(obs_rx.try_recv().is_err(), "cleared observer must not receive further events");
+
+    // Regression: dropping an observer that owns the last `Arc<dyn Session>` inside `set_observer(None)` must not self-deadlock on `OBSERVER`.
+    let owned_session = runtime.open(opts()).unwrap();
+    struct SessionOwningObserver(#[allow(dead_code)] std::sync::Arc<dyn Session>);
+    impl OarObserver for SessionOwningObserver {
+        fn on_event(&self, _session_id: &str, _event: &Event) {}
+    }
+    set_observer(Some(std::sync::Arc::new(SessionOwningObserver(owned_session))));
+    set_observer(None);
+    assert!(!has_observer());
+}
+
+#[test]
+fn trace_id_propagates_to_voyage_jsonl_and_omits_none_or_zero() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("traced.jsonl");
+    let runtime = ScriptedRuntime::new("s", Script::new().turn(vec![Step::sleep_ms(50), Step::text("{prompt}")]));
+    let session = runtime
+        .open(SessionOptions {
+            record_to: Some(path.clone()),
+            ..opts()
+        })
+        .unwrap();
+    let rx = session.events();
+
+    session.prompt_with(text("turn-none"), TurnOptions::default()).unwrap();
+    until(&rx, turn_finished);
+
+    session.prompt_with(text("turn-zero"), TurnOptions { trace_id: Some(0) }).unwrap();
+    until(&rx, turn_finished);
+
+    session.prompt_with(text("turn-traced"), TurnOptions { trace_id: Some(777) }).unwrap();
+    session.queue_with(text("turn-queued"), TurnOptions { trace_id: Some(888) }).unwrap();
+    until(&rx, turn_finished);
+    until(&rx, turn_finished);
+
+    session.prompt(text("turn-after")).unwrap();
+    until(&rx, turn_finished);
+    session.dispose();
+    until(&rx, |k| matches!(k, EventKind::SessionEnded));
+
+    let raw_jsonl = std::fs::read_to_string(&path).unwrap();
+    let raw_lines: Vec<Value> = raw_jsonl.lines().skip(1).map(|l| serde_json::from_str(l).unwrap()).collect();
+
+    let mut reader = crate::oar::voyage::Reader::new(std::io::BufReader::new(std::fs::File::open(&path).unwrap())).unwrap();
+    let mut records = Vec::new();
+    while let Some(rec) = reader.read().unwrap() {
+        records.push(rec);
+    }
+    assert_eq!(raw_lines.len(), records.len());
+
+    let line_for_text = |needle: &str| {
+        records
+            .iter()
+            .zip(raw_lines.iter())
+            .find(|(rec, _)| rec.events.iter().any(|e| e["kind"] == "text_delta" && e["text"] == needle))
+            .unwrap_or_else(|| panic!("missing record for {needle}"))
+    };
+
+    for unset in ["turn-none", "turn-zero", "turn-after"] {
+        let (rec, json_line) = line_for_text(unset);
+        assert_eq!(rec.trace_id, None, "{unset}");
+        assert!(json_line.get("traceId").is_none(), "traceId must be omitted for {unset}: {json_line}");
+    }
+
+    for (label, expected) in [("turn-traced", 777_u64), ("turn-queued", 888_u64)] {
+        let (rec, json_line) = line_for_text(label);
+        assert_eq!(rec.trace_id, Some(expected), "{label}");
+        assert_eq!(json_line["traceId"], serde_json::json!(expected), "{label}");
+    }
+
+    let mut zero_rec = crate::oar::voyage::Record::new(crate::oar::voyage::Kind::Frame, "s".into(), 1);
+    zero_rec.trace_id = Some(0);
+    let encoded = serde_json::to_string(&zero_rec).unwrap();
+    assert!(!encoded.contains("traceId"), "Some(0) must be omitted from JSON: {encoded}");
+    let decoded_zero: crate::oar::voyage::Record = serde_json::from_str(r#"{"seq":0,"kind":"frame","sessionId":"s","agentPath":[],"traceId":0}"#).unwrap();
+    assert_eq!(decoded_zero.trace_id, None);
+    let decoded_nonzero: crate::oar::voyage::Record = serde_json::from_str(r#"{"seq":0,"kind":"frame","sessionId":"s","agentPath":[],"traceId":42}"#).unwrap();
+    assert_eq!(decoded_nonzero.trace_id, Some(42));
+}

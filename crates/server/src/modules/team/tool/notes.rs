@@ -69,7 +69,7 @@ pub fn pkm_capture(f: &Farm, who: &Who, a: PkmCaptureArgs) -> Result<String, Str
 
 pub fn pkm_suggest(f: &Farm, who: &Who, req: PkmProposalRequest) -> Result<String, String> {
     let by = match who {
-        Who::Helper(me) => me.agent.as_str(),
+        Who::Helper(me) => me.profile.as_deref().unwrap_or(""),
         Who::Orchestrator(here) => here.agent.as_str(),
     };
     text(&f.pkm.suggest(&req, by).map_err(|e| e.message)?)
@@ -148,9 +148,9 @@ pub fn library_list(f: &Farm, _: &Who, req: LibraryListRequest) -> Result<String
 pub fn library_add(f: &Farm, who: &Who, req: LibraryAddRequest) -> Result<String, String> {
     let by = match who {
         Who::Helper(me) => AddedBy::Agent {
-            agent: me.agent.clone(),
+            agent: me.profile.clone().unwrap_or_default(),
             session: Some(me.id.clone()),
-            dir: me.worktree.as_ref().map(PathBuf::from),
+            dir: me.cwd.as_ref().map(PathBuf::from),
         },
         Who::Orchestrator(here) => AddedBy::Agent {
             agent: here.agent.clone(),
@@ -177,7 +177,7 @@ pub fn artifact_list(f: &Farm, who: &Who, a: ArtifactListArgs) -> Result<String,
         None => None,
     };
     if let (Who::Helper(me), None) = (who, &channel) {
-        issue = me.issue.clone();
+        issue = me.issue_id().map(String::from);
     }
     text(
         &f.artifacts
@@ -210,7 +210,7 @@ fn maker_of(who: &Who) -> Maker {
     match who {
         Who::Helper(me) => Maker {
             from: me.id.clone(),
-            by: me.agent.clone(),
+            by: me.profile.clone().unwrap_or_default(),
             run: None,
         },
         Who::Orchestrator(here) => Maker {
@@ -267,7 +267,7 @@ pub fn artifact_create(f: &Farm, who: &Who, mut a: ArtifactCreateArgs) -> Result
                 a.req.content = Some(content);
             }
             if given(&a.req.issue).is_none() {
-                a.req.issue = me.issue.clone();
+                a.req.issue = me.issue_id().map(String::from);
             }
         }
     }
@@ -285,7 +285,7 @@ pub struct ArtifactVersionArgs {
 fn commit_meta_for_who(who: &Who, summary: Option<String>) -> CommitMeta {
     let at = now();
     match who {
-        Who::Helper(me) => CommitMeta::session(&me.name, &me.agent, &me.id, me.runs.max(1) as u32, summary, at),
+        Who::Helper(me) => CommitMeta::session(&me.name, me.profile.as_deref().unwrap_or(""), &me.id, me.runs.max(1) as u32, summary, at),
         Who::Orchestrator(here) => CommitMeta {
             author: here.agent.clone(),
             agent: Some(here.agent.clone()),
@@ -318,7 +318,7 @@ pub struct BlockCreateArgs {
 
 pub fn block_create(f: &Farm, who: &Who, a: BlockCreateArgs) -> Result<String, String> {
     let actor = match who {
-        Who::Helper(me) => me.agent.as_str(),
+        Who::Helper(me) => me.profile.as_deref().unwrap_or(""),
         Who::Orchestrator(here) => here.agent.as_str(),
     };
     let meta = commit_meta_for_who(who, None);
@@ -335,7 +335,7 @@ pub struct BlockUpdateArgs {
 
 pub fn block_update(f: &Farm, who: &Who, a: BlockUpdateArgs) -> Result<String, String> {
     let actor = match who {
-        Who::Helper(me) => me.agent.as_str(),
+        Who::Helper(me) => me.profile.as_deref().unwrap_or(""),
         Who::Orchestrator(here) => here.agent.as_str(),
     };
     let meta = commit_meta_for_who(who, None);
@@ -352,7 +352,7 @@ pub struct BlockDeleteArgs {
 
 pub fn block_delete(f: &Farm, who: &Who, a: BlockDeleteArgs) -> Result<String, String> {
     let actor = match who {
-        Who::Helper(me) => me.agent.as_str(),
+        Who::Helper(me) => me.profile.as_deref().unwrap_or(""),
         Who::Orchestrator(here) => here.agent.as_str(),
     };
     let meta = commit_meta_for_who(who, None);
@@ -388,7 +388,7 @@ fn read_helper_file(me: &Session, file: &Option<String>) -> Result<Option<String
     let Some(file) = given(file) else {
         return Ok(None);
     };
-    let dir = me.worktree.as_deref().ok_or("你没有工作目录，不能用 file")?;
+    let dir = me.cwd.as_deref().ok_or("你没有工作目录，不能用 file")?;
     let path = inside(Path::new(dir), file)?;
     std::fs::read_to_string(&path).map(Some).map_err(|e| format!("读不了 {file}：{e}"))
 }

@@ -1,16 +1,20 @@
 import "../infra/polyfill";
 import { expect, test } from "nsh/test";
 
-import type { SessionEvent } from "@vibevalley/protocol";
+import type { RuntimeInfo, SessionEvent } from "@vibevalley/protocol";
 
 import {
   asThoughtLevel,
+  clampThoughtLevel,
   computeTelemetry,
+  defaultThoughtLevelFor,
   deriveChatTitle,
   extractToolTarget,
   formatTokens,
   mergeChatSteps,
   parseBoardTokens,
+  preferredModelFor,
+  toWorkspaceRuntime,
   visibleChatSteps,
 } from "./chatSession";
 
@@ -130,4 +134,135 @@ test("deriveChatTitle prefers real session title, then swarm title, then clean c
   expect(deriveChatTitle(undefined, undefined, "\n\n  Refactor   sidebar\t\tmenu\nsecond line")).toBe("Refactor sidebar menu");
   expect(deriveChatTitle(undefined, undefined, "1234567890123456789012345678901234567890")).toBe("12345678901234567890123456789012345…");
   expect(deriveChatTitle(undefined, "  ", "   \n  ")).toBeUndefined();
+});
+
+const makeRuntimeInfo = (overrides: Partial<RuntimeInfo> = {}): RuntimeInfo => ({
+  id: "antigravity",
+  preset: {
+    id: "antigravity",
+    label: "Antigravity",
+    blurb: "ACP",
+    look: { species: null, outfit: null, orchestrator: null, build: "biped", head: "rounded", body: "blue", trim: "navy", hat: "slate", eye: "ink" },
+  },
+  support: { steer: true, refused: {}, capabilities: ["listModels"], inProcess: false, inSessionConfig: true },
+  installation: { status: "available", via: "executable", command: "agy", version: "1.5.14" },
+  models: [],
+  usage: null,
+  skills: null,
+  mcpServers: null,
+  tools: null,
+  settings: { enabled: true, binPath: "", defaultModel: "", defaultEffort: "", env: {} },
+  stop: "ok",
+  checkedAt: 1_700_000_000_000,
+  ...overrides,
+});
+
+test("toWorkspaceRuntime preserves empty effortLevels for models on runtimes that report per-model efforts", () => {
+  const mixed = toWorkspaceRuntime(
+    makeRuntimeInfo({
+      models: [
+        { id: "gemini-4-neon", name: "Gemini 4 Neon", effortLevels: ["low", "medium", "high", "xhigh"], defaultEffort: "high", isDefault: true },
+        { id: "gemini-pro-orchestrator-neon", name: "Orchestrator (Neon)", effortLevels: [], defaultEffort: "medium", isDefault: false },
+      ],
+      settings: { enabled: true, binPath: "", defaultModel: " gemini-pro-orchestrator-neon ", defaultEffort: "high", env: {} },
+    }),
+  );
+
+  expect(mixed.defaultModel).toBe("gemini-pro-orchestrator-neon");
+  expect(mixed.models[0]).toEqual({
+    id: "gemini-4-neon",
+    label: "Gemini 4 Neon",
+    effortLevels: ["low", "medium", "high", "xhigh"],
+    defaultEffort: "high",
+    isDefault: true,
+  });
+  expect(mixed.models[1]).toEqual({
+    id: "gemini-pro-orchestrator-neon",
+    label: "Orchestrator (Neon)",
+    effortLevels: [],
+    defaultEffort: undefined,
+    isDefault: false,
+  });
+
+  const legacy = toWorkspaceRuntime(
+    makeRuntimeInfo({
+      id: "claude",
+      models: [{ id: "sonnet", name: "Sonnet", effortLevels: [], isDefault: true }],
+    }),
+  );
+  expect(legacy.models[0]?.effortLevels).toEqual(["low", "medium", "high"]);
+
+  const refused = toWorkspaceRuntime(
+    makeRuntimeInfo({
+      support: { steer: true, refused: { effort: "not supported" }, capabilities: ["listModels"], inProcess: false, inSessionConfig: true },
+      models: [
+        { id: "m1", name: "Model 1", effortLevels: ["low", "high"], defaultEffort: "high", isDefault: true },
+        { id: "m2", name: "Model 2", effortLevels: [], isDefault: false },
+      ],
+    }),
+  );
+  expect(refused.models.map((m) => m.effortLevels)).toEqual([[], []]);
+  expect(refused.models.map((m) => m.defaultEffort)).toEqual([undefined, undefined]);
+});
+
+test("preferredModelFor, defaultThoughtLevelFor, and clampThoughtLevel select and clamp model effort cleanly", () => {
+  const neon = {
+    id: "gemini-4-neon",
+    label: "Gemini 4 Neon",
+    effortLevels: ["low", "medium", "high", "xhigh"] as const,
+    defaultEffort: "high" as const,
+    isDefault: true,
+  };
+  const orchestrator = {
+    id: "gemini-pro-orchestrator-neon",
+    label: "Orchestrator (Neon)",
+    effortLevels: [] as const,
+    defaultEffort: undefined,
+    isDefault: false,
+  };
+  const fallbackFirst = { id: "plain", label: "Plain", effortLevels: ["low", "xhigh"] as const, defaultEffort: undefined, isDefault: false };
+
+  expect(preferredModelFor(undefined)).toBeUndefined();
+  expect(
+    preferredModelFor({
+      id: "antigravity",
+      name: "Antigravity",
+      available: true,
+      models: [orchestrator, neon],
+      defaultModel: "gemini-pro-orchestrator-neon",
+      supportsSteer: true,
+      supportsConfig: true,
+    })?.id,
+  ).toBe("gemini-pro-orchestrator-neon");
+  expect(
+    preferredModelFor({
+      id: "antigravity",
+      name: "Antigravity",
+      available: true,
+      models: [orchestrator, neon],
+      supportsSteer: true,
+      supportsConfig: true,
+    })?.id,
+  ).toBe("gemini-4-neon");
+  expect(
+    preferredModelFor({
+      id: "antigravity",
+      name: "Antigravity",
+      available: true,
+      models: [orchestrator, fallbackFirst],
+      supportsSteer: true,
+      supportsConfig: true,
+    })?.id,
+  ).toBe("gemini-pro-orchestrator-neon");
+
+  expect(defaultThoughtLevelFor(undefined)).toBeUndefined();
+  expect(defaultThoughtLevelFor(orchestrator)).toBeUndefined();
+  expect(defaultThoughtLevelFor(neon)).toBe("high");
+  expect(defaultThoughtLevelFor(fallbackFirst)).toBe("low");
+
+  expect(clampThoughtLevel(undefined, "high")).toBeUndefined();
+  expect(clampThoughtLevel(orchestrator, "high")).toBeUndefined();
+  expect(clampThoughtLevel(neon, "xhigh")).toBe("xhigh");
+  expect(clampThoughtLevel(neon, "max")).toBe("high");
+  expect(clampThoughtLevel(neon, undefined)).toBe("high");
 });

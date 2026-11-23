@@ -134,14 +134,8 @@ fn a_log_is_kept_read_back_and_only_grows() {
     assert_eq!(&after[..5], &kept[..]);
     assert_eq!(after.len(), 7);
 
-    // A file of an older shape is let go.
-    std::fs::write(
-        home.path().join("events/w3.json"),
-        r#"[{"seq":4,"time":1,"type":"assistant/message","text":"旧"}]"#,
-    )
-    .unwrap();
-    assert!(tr.events("w3", None).is_none());
-    assert!(!home.path().join("events/w3.json").exists());
+    tr.forget("w1");
+    assert!(tr.events("w1", None).is_none());
 }
 
 #[test]
@@ -201,23 +195,22 @@ fn a_sent_issue_is_logged_listed_and_watched() {
 
     call("issue.status.update", json!({ "id": id, "status": "todo" })).data.unwrap();
     let session = until("the session to rest with its run ended", || {
-        let s = started
-            .board
-            .read(|s| s.sessions.iter().find(|x| x.issue.as_deref() == Some(id.as_str())).cloned())?;
-        let events = call("session.event.list", json!({ "id": s.id })).data?;
-        events.as_array()?.iter().any(|e| e["type"] == "run/end").then_some(s)
+        let s = started.board.read(|s| s.sessions.iter().find(|x| x.issue_id() == Some(id.as_str())).cloned())?;
+        let page = call("session.event.list", json!({ "id": s.id })).data?;
+        page["events"].as_array()?.iter().any(|e| e["type"] == "run/end").then_some(s)
     });
-    let events = call("session.event.list", json!({ "id": session.id })).data.unwrap();
-    let types: Vec<&str> = events.as_array().unwrap().iter().map(|e| e["type"].as_str().unwrap()).collect();
+    let page = call("session.event.list", json!({ "id": session.id })).data.unwrap();
+    let events = page["events"].as_array().unwrap();
+    let types: Vec<&str> = events.iter().map(|e| e["type"].as_str().unwrap()).collect();
     assert_eq!(types.first(), Some(&"run/start"));
     assert_eq!(types.get(1), Some(&"user/message"));
     assert!(types.contains(&"assistant/message"), "{types:?}");
     let run = events[0]["run"].as_str().unwrap();
-    assert!(events.as_array().unwrap().iter().all(|e| e["run"] == run));
+    assert!(events.iter().all(|e| e["run"] == run));
 
-    let listed = call("session.list", json!({ "agent": helper.id })).data.unwrap();
+    let listed = call("session.list", json!({ "profile": helper.id })).data.unwrap();
     assert_eq!(listed[0]["id"], session.id.as_str());
-    assert_eq!(call("session.get", json!({ "id": session.id })).data.unwrap()["agent"], helper.id.as_str());
+    assert_eq!(call("session.get", json!({ "id": session.id })).data.unwrap()["profile"], helper.id.as_str());
     let gone = call("session.get", json!({ "id": "w404" }));
     assert_eq!(gone.biz_code, vibevalley_protocol::BizCode::SessionNotFound.code());
 

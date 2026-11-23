@@ -195,8 +195,8 @@ pub struct Room {
 }
 
 pub fn room_left(sessions: &[Session], repo: &str, space: usize, per_repo: usize, except: &str) -> Room {
-    let busy: Vec<&Session> = sessions.iter().filter(|h| is_busy(h) && h.id != except).collect();
-    let in_repo = busy.iter().filter(|h| h.repo.as_deref() == Some(repo)).count();
+    let busy: Vec<&Session> = sessions.iter().filter(|h| h.is_board_worker() && is_busy(h) && h.id != except).collect();
+    let in_repo = busy.iter().filter(|h| h.repo_name() == Some(repo)).count();
     Room {
         farm: space.saturating_sub(busy.len()),
         repo: (per_repo > 0).then(|| per_repo.saturating_sub(in_repo)),
@@ -294,12 +294,12 @@ pub fn phase_words(h: &Session, conflict: Option<&Conflict>) -> String {
 
 /// `farmOf`: each repo has its own farm; sessions without one share one.
 pub fn farm_of(h: &Session) -> &str {
-    h.repo.as_deref().unwrap_or("")
+    h.repo_name().unwrap_or("")
 }
 
 /// `plotKeyOf`: its issue, so a reopened issue keeps its plot.
 pub fn plot_key_of(h: &Session) -> &str {
-    h.issue.as_deref().unwrap_or(&h.id)
+    h.issue_id().unwrap_or(&h.id)
 }
 
 /// `defaultOf`: the channel words go to when none is named.

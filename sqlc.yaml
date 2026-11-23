@@ -13,11 +13,19 @@ sql:
       - plugin: sqlx
         out: apps/mac/crates/workspace/src/store/generated
   - engine: sqlite
-    schema: crates/server/src/modules/content/attachment/sql/schema.sql
-    queries: crates/server/src/modules/content/attachment/sql/queries.sql
+    schema: crates/server/src/db/schema/shared.sql
+    queries: crates/server/src/db/queries/shared.sql
     codegen:
       - plugin: sqlx
-        out: crates/server/src/modules/content/attachment/generated
+        out: crates/server/src/db/generated
+        options: { file: shared.rs }
+  - engine: sqlite
+    schema: crates/server/src/db/schema/content_attachment.sql
+    queries: crates/server/src/db/queries/content_attachment.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/server/src/db/generated
+        options: { file: content_attachment.rs }
   - engine: sqlite
     schema: crates/runtime/src/agent/durable/schema.sql
     queries: crates/runtime/sql/durable
@@ -26,90 +34,90 @@ sql:
         out: crates/runtime/src/agent/durable/generated
         options: { share_table_rows: true }
   - engine: sqlite
-    schema: crates/server/src/modules/work/issue/sql/schema.sql
-    queries: crates/server/src/modules/work/issue/sql/queries.sql
+    schema: crates/server/src/db/schema/work_issue.sql
+    queries: crates/server/src/db/queries/work_issue.sql
     codegen:
       - plugin: sqlx
-        out: crates/server/src/modules/work/issue/generated
-        options: { share_table_rows: true }
+        out: crates/server/src/db/generated
+        options: { file: work_issue.rs, share_table_rows: true }
   - engine: sqlite
     schema:
-      - crates/server/src/modules/work/session/sql/schema.sql
+      - crates/server/src/db/schema/work_session.sql
       - crates/runtime/src/agent/durable/schema.sql
-    queries: crates/server/src/modules/work/session/sql/queries.sql
+    queries: crates/server/src/db/queries/work_session.sql
     codegen:
       - plugin: sqlx
-        out: crates/server/src/modules/work/session/generated
-        options: { share_table_rows: true }
+        out: crates/server/src/db/generated
+        options: { file: work_session.rs, share_table_rows: true }
   - engine: sqlite
-    schema: crates/server/src/modules/team/memory/sql/schema.sql
-    queries: crates/server/src/modules/team/memory/sql/queries.sql
+    schema: crates/server/src/db/schema/team_memory.sql
+    queries: crates/server/src/db/queries/team_memory.sql
     codegen:
       - plugin: sqlx
-        out: crates/server/src/modules/team/memory/generated
-  - engine: sqlite
-    schema:
-      - crates/server/src/modules/content/library/sql/schema.sql
-      - crates/server/src/modules/content/attachment/sql/schema.sql
-    queries: crates/server/src/modules/content/library/sql/queries.sql
-    codegen:
-      - plugin: sqlx
-        out: crates/server/src/modules/content/library/generated
-        options: { share_table_rows: true }
-  - engine: sqlite
-    schema: crates/server/src/modules/collab/connector/sql/schema.sql
-    queries: crates/server/src/modules/collab/connector/sql/queries.sql
-    codegen:
-      - plugin: sqlx
-        out: crates/server/src/modules/collab/connector/generated
-  - engine: sqlite
-    schema: crates/server/src/modules/content/pkm/sql/schema.sql
-    queries: crates/server/src/modules/content/pkm/sql/queries.sql
-    codegen:
-      - plugin: sqlx
-        out: crates/server/src/modules/content/pkm/generated
-        options: { share_table_rows: true }
+        out: crates/server/src/db/generated
+        options: { file: team_memory.rs }
   - engine: sqlite
     schema:
-      - crates/server/src/modules/work/issue/sql/schema.sql
-      - crates/server/src/modules/collab/channel/sql/schema.sql
-      - crates/server/src/modules/content/artifact/sql/schema.sql
-    queries: crates/server/src/modules/content/artifact/sql/queries.sql
+      - crates/server/src/db/schema/content_library.sql
+      - crates/server/src/db/schema/content_attachment.sql
+    queries: crates/server/src/db/queries/content_library.sql
     codegen:
       - plugin: sqlx
-        out: crates/server/src/modules/content/artifact/generated
-        options: { share_table_rows: true }
+        out: crates/server/src/db/generated
+        options: { file: content_library.rs, share_table_rows: true }
+  - engine: sqlite
+    schema: crates/server/src/db/schema/collab_connector.sql
+    queries: crates/server/src/db/queries/collab_connector.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/server/src/db/generated
+        options: { file: collab_connector.rs }
+  - engine: sqlite
+    schema: crates/server/src/db/schema/content_pkm.sql
+    queries: crates/server/src/db/queries/content_pkm.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/server/src/db/generated
+        options: { file: content_pkm.rs, share_table_rows: true }
   - engine: sqlite
     schema:
-      - crates/server/src/modules/content/media/sql/inputs.sql
-      - crates/server/src/modules/content/media/sql/jobs.sql
-    queries: crates/server/src/modules/content/media/sql/queries.sql
+      - crates/server/src/db/schema/work_issue.sql
+      - crates/server/src/db/schema/collab_channel.sql
+      - crates/server/src/db/schema/content_artifact.sql
+    queries: crates/server/src/db/queries/content_artifact.sql
     codegen:
       - plugin: sqlx
-        out: crates/server/src/modules/content/media/generated
-        options: { share_table_rows: true }
+        out: crates/server/src/db/generated
+        options: { file: content_artifact.rs, share_table_rows: true }
   - engine: sqlite
-    schema: crates/server/src/modules/collab/channel/sql/schema.sql
-    queries: crates/server/src/modules/collab/channel/sql/queries.sql
+    schema: crates/server/src/db/schema/content_media.sql
+    queries: crates/server/src/db/queries/content_media.sql
     codegen:
       - plugin: sqlx
-        out: crates/server/src/modules/collab/channel/generated
-        options: { share_table_rows: true }
+        out: crates/server/src/db/generated
+        options: { file: content_media.rs, share_table_rows: true }
+  - engine: sqlite
+    schema: crates/server/src/db/schema/collab_channel.sql
+    queries: crates/server/src/db/queries/collab_channel.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/server/src/db/generated
+        options: { file: collab_channel.rs, share_table_rows: true }
   - engine: sqlite
     schema:
-      - crates/server/src/modules/work/issue/sql/schema.sql
-      - crates/server/src/modules/work/cron/sql/schema.sql
-    queries: crates/server/src/modules/work/cron/sql/queries.sql
+      - crates/server/src/db/schema/work_issue.sql
+      - crates/server/src/db/schema/work_cron.sql
+    queries: crates/server/src/db/queries/work_cron.sql
     codegen:
       - plugin: sqlx
-        out: crates/server/src/modules/work/cron/generated
-        options: { share_table_rows: true }
+        out: crates/server/src/db/generated
+        options: { file: work_cron.rs, share_table_rows: true }
   - engine: sqlite
     schema:
-      - crates/server/src/modules/work/issue/sql/schema.sql
-      - crates/server/src/modules/work/pull/sql/schema.sql
-    queries: crates/server/src/modules/work/pull/sql/queries.sql
+      - crates/server/src/db/schema/work_issue.sql
+      - crates/server/src/db/schema/work_pull.sql
+    queries: crates/server/src/db/queries/work_pull.sql
     codegen:
       - plugin: sqlx
-        out: crates/server/src/modules/work/pull/generated
-        options: { share_table_rows: true }
+        out: crates/server/src/db/generated
+        options: { file: work_pull.rs, share_table_rows: true }

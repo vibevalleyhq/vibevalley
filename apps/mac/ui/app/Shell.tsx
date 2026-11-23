@@ -1,6 +1,7 @@
 import { colorScheme, effect, host, keymap, Scroll, Text, View, windowSize, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
+import { isFreeUserSession } from "@vibevalley/protocol/rules";
 
 import { Button } from "../design/Button";
 import { OrchestratorFace } from "../design/domain/Face";
@@ -18,7 +19,8 @@ import { contentSidebarOpen, openContentSearch, openTemplatePicker, safeLastCont
 import { waitingOnUser } from "../features/inbox";
 import { NotesSearch } from "../features/pkm";
 import { Keyed, variant } from "../infra/base/dom";
-import { useCore, useFrames } from "../infra/frame";
+import { useInboxSlice, useLink, useSessionsSlice } from "../infra/frame";
+import { readHostParams } from "../infra/hostParams";
 import { NavLink, useLocation, useMatches } from "../infra/router";
 import { useUpdates } from "../infra/settings";
 import { catalogPlace, type Place, places, runsPlace, settingsPlace } from "./places";
@@ -88,20 +90,21 @@ const railGroups = ["work", "setup"] as const;
 
 function Rail(props: { here?: Place | undefined; farm: boolean }) {
   const pixelDir = usePixelDir();
-  const core = useCore();
-  const frames = useFrames();
+  const sessions = useSessionsSlice();
+  const inbox = useInboxSlice();
+  const link = useLink();
   const updates = useUpdates();
   const ready = () => {
     const s = updates();
     return s ? variant(s, "_tag", "ready") : undefined;
   };
-  const waiting = () => waitingOnUser(frames.frame?.inbox ?? []);
-  const working = () => core()?.sessions.filter((s) => s.phase._tag === "working").length ?? 0;
+  const waiting = () => waitingOnUser(inbox()?.items ?? []);
+  const working = () => sessions()?.sessions.filter((s) => !isFreeUserSession(s) && s.phase._tag === "working").length ?? 0;
   const onRuns = () => props.here === runsPlace;
   const settings = settingsPlace;
   const atSettings = () => props.here === settings;
   const location = useLocation();
-  const globalShell = host.params.globalShell === true;
+  const globalShell = readHostParams().globalShell;
   const width = () => (globalShell ? (small() ? 68 : 76) : props.farm ? (small() ? 56 : 72) : small() ? 68 : 76);
   if (globalShell) {
     effect(() => host.post("action", { type: "global_rail", rail_width: width() }));
@@ -120,7 +123,7 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
         <Slot
           to="/farm"
           place="farm"
-          label={`${t("web.base.farm")} · ${linkWords[frames.link]}`}
+          label={`${t("web.base.farm")} · ${linkWords[link()]}`}
           name={t("web.base.farmShort")}
           current={props.farm}
           hero
@@ -140,9 +143,9 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
               </View>
               <View
                 testID="link"
-                accessibilityLabel={linkWords[frames.link]}
+                accessibilityLabel={linkWords[link()]}
                 accessible
-                class={`absolute -right-1 -bottom-1 h-3 w-3 rounded-full border-2 border-rail ${frames.link === "open" ? "bg-leaf" : frames.link === "lost" ? "bg-berry" : "bg-faint"}`}
+                class={`absolute -right-1 -bottom-1 h-3 w-3 rounded-full border-2 border-rail ${link() === "open" ? "bg-leaf" : link() === "lost" ? "bg-berry" : "bg-faint"}`}
               />
             </View>
           )}
@@ -209,7 +212,7 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
         >
           <View class="size-3 shrink-0 items-center justify-center rounded-full" style={working() > 0 ? { backgroundColor: mix("leaf", 0.25) } : undefined}>
             <View
-              class={`size-1.5 rounded-full ${working() > 0 ? `bg-leaf ${motionClass("animate-pulse")}` : core()?.call === "live" ? "bg-leaf" : "bg-faint"}`}
+              class={`size-1.5 rounded-full ${working() > 0 ? `bg-leaf ${motionClass("animate-pulse")}` : inbox()?.call === "live" ? "bg-leaf" : "bg-faint"}`}
             />
           </View>
           <If when={working() > 0}>

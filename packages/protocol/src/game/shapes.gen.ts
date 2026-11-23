@@ -13,6 +13,8 @@ export type Achievement = { id: string, category: AchievementCategory, title: st
 
 export type AchievementStanding = { id: string, tier: number, count: number, next?: number, };
 
+export type AchievementList = { items: Array<Achievement>, standings: Array<AchievementStanding>, };
+
 export type PlayAction = { at: number, action: SessionAction, label: string, };
 
 export type PlayActionView = { at: number, action: SessionAction, label: string, actionText: string, };
@@ -53,7 +55,9 @@ plots: { [key in string]: PlotView },
 /**
  * Each session's station and step history, by the session's id; the farm reads only this.
  */
-plays: { [key in string]: SessionPlayView }, achievements: Array<AchievementStanding>, };
+plays: { [key in string]: SessionPlayView }, };
+
+export type FarmFrame = { seq: number, view: FarmView, progress?: Progress, effects: Array<GameEffect>, };
 
 export type GameEffectReward = { "kind": "reward",
 /**

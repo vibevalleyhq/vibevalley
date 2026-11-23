@@ -12,6 +12,7 @@ pub mod core;
 pub mod cron;
 pub mod endpoints;
 pub mod game;
+pub mod host;
 pub mod inbox;
 pub mod issue;
 pub mod media;
@@ -35,6 +36,7 @@ pub use core::*;
 pub use cron::*;
 pub use endpoints::*;
 pub use game::*;
+pub use host::*;
 pub use inbox::*;
 pub use issue::*;
 pub use media::*;
@@ -61,6 +63,7 @@ pub(crate) fn ts_modules(cfg: &ts_rs::Config) -> Vec<crate::typescript::Module> 
         core::ts_module(cfg),
         cron::ts_module(cfg),
         game::ts_module(cfg),
+        host::ts_module(cfg),
         inbox::ts_module(cfg),
         issue::ts_module(cfg),
         media::ts_module(cfg),

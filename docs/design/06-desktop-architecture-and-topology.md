@@ -62,9 +62,9 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 
 ## 6.3 核心状态单向流与显式前端状态机
 
-1. **核心状态单向输入**：`infra/frame.ts` 订阅桥接层推送的全量 `StateFrame`，自动建立 `WeakMap` 级按 ID/工单索引供页面 `O(1)` 读取。页面不维护本地工单或帮工状态镜像。
+1. **核心状态按域单向输入**：`infra/frame.ts` 按域分别订阅桥接层推送的独立切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`），各切片信号相互隔离并建立按 ID/工单索引供页面 `O(1)` 读取。页面不维护本地工单或帮工状态镜像。
 2. **乐观意图四态机制（`state/intent.ts`）**：
-   - `useIntents` 管理写请求从发出到核心状态确认的全周期：`queued`（离线/断连排队）→ `sending`（携带幂等键尝试发送）→ `confirming`（已收到服务端回执 `seq`，等待下一个 `StateFrame` 推进至包含该 `seq`）→ `failed`（附带可区分是否可重试的 `UiFault`）。
+   - `useIntents` 管理写请求从发出到核心状态确认的全周期：`queued`（离线/断连排队）→ `sending`（携带幂等键尝试发送）→ `confirming`（已收到服务端回执 `seq`，等待对应切片推进至 `slice.seq >= reply.seq`）→ `failed`（附带可区分是否可重试的 `UiFault`）。
    - `sendReplacing` 支持同类后续操作（如连续开关切换）自动替换未完成的前置意图。
 3. **关键显式状态机（模型独立于视图）**：
    - **工单草稿提交（`draftSubmit.ts`）**：管理 `NewIssueDraft` 的表单内容、锁防重放、提交中禁用判定（`isSubmittingDraft` / `canSubmitDraft`）与幂等请求键刷新。

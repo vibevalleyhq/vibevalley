@@ -113,6 +113,150 @@ fn every_biz_code_and_its_meta() {
 }
 
 #[test]
-fn the_whole_state_frame() {
-    round_value::<StateFrame>(&golden("state_frame"));
+fn slice_bundle_and_slices_round_trip() {
+    let frame = golden("state_frame");
+    let seq = frame["seq"].clone();
+    let state = &frame["state"];
+
+    let mut view = frame["view"].clone();
+    let standings = view.as_object_mut().unwrap().remove("achievements").unwrap();
+    round_value::<Vec<AchievementStanding>>(&standings);
+
+    let board = serde_json::json!({
+        "seq": seq,
+        "issues": state["issues"],
+    });
+    let sessions = serde_json::json!({
+        "seq": seq,
+        "sessions": state["sessions"],
+        "machines": state["machines"],
+    });
+    let collab = serde_json::json!({
+        "seq": seq,
+        "connectors": state["connectors"],
+    });
+    let inbox = serde_json::json!({
+        "seq": seq,
+        "items": frame["inbox"],
+        "call": state["call"],
+        "callReason": state["callReason"],
+    });
+    let ops = serde_json::json!({
+        "seq": seq,
+        "crons": state["crons"],
+    });
+    let farm = serde_json::json!({
+        "seq": seq,
+        "view": view,
+        "effects": frame["effects"],
+    });
+    let bundle = serde_json::json!({
+        "seq": seq,
+        "board": board,
+        "sessions": sessions,
+        "collab": collab,
+        "inbox": inbox,
+        "ops": ops,
+        "farm": farm,
+    });
+
+    round_value::<BoardSlice>(&board);
+    round_value::<SessionsSlice>(&sessions);
+    round_value::<CollabSlice>(&collab);
+    round_value::<InboxSlice>(&inbox);
+    round_value::<OpsSlice>(&ops);
+    round_value::<FarmFrame>(&farm);
+    round_value::<SliceBundle>(&bundle);
+}
+
+#[test]
+fn host_actions_and_frames_round_trip() {
+    for sample in [
+        serde_json::json!({"type": "activate_project", "id": 3}),
+        serde_json::json!({"type": "activate_path", "path": "/tmp/repo"}),
+        serde_json::json!({"type": "stage", "paths": ["a.rs", "b/c.rs"]}),
+        serde_json::json!({"type": "search", "query": "fn"}),
+        serde_json::json!({"type": "search", "query": "fn", "regex": true, "case_sensitive": true}),
+        serde_json::json!({"type": "applied", "topic": "rail", "rev": 4}),
+        serde_json::json!({"type": "show_panel", "panel": "git"}),
+        serde_json::json!({"type": "openFarm", "repo": "demo"}),
+        serde_json::json!({"type": "openRepoMap"}),
+        serde_json::json!({"type": "openTree"}),
+        serde_json::json!({"type": "new_chat_at", "path": "/tmp/repo", "runtime": "antigravity"}),
+        serde_json::json!({"type": "open_file_adjacent", "path": "src/lib.rs", "line": 42}),
+        serde_json::json!({"type": "open_diff_adjacent", "path": "src/lib.rs", "staged": true}),
+        serde_json::json!({"type": "bind_chat_session", "tab_id": 7, "session_id": "s1", "runtime": "claude"}),
+    ] {
+        round_value::<HostAction>(&sample);
+    }
+
+    assert!(serde_json::from_value::<HostAction>(serde_json::json!({"type": "show_panel", "panel": "unknown"})).is_err());
+
+    let rail = serde_json::json!({
+        "projects": [{
+            "id": 1,
+            "name": "vibevalley",
+            "path": "/tmp/vv",
+            "initials": "VV",
+            "active": true,
+            "attention": false,
+            "terminals": 2,
+            "shortcut": "⌘1",
+            "branch": "main",
+            "mainRoot": "/tmp/vv",
+            "worktrees": [{"path": "/tmp/vv", "branch": "main", "main": true}],
+            "tabs": [{"id": 1, "title": "zsh", "active": true, "kind": "terminal", "running": true, "runningState": "working", "attention": false}]
+        }],
+        "panel": "files",
+        "inspectorOpen": true
+    });
+    round_value::<HostRailFrame>(&rail);
+
+    let tree = serde_json::json!({
+        "root": "/tmp/vv",
+        "name": "vv",
+        "items": [{
+            "id": "/tmp/vv/src",
+            "label": "src",
+            "tone": "dirty",
+            "hidden": false,
+            "children": [{
+                "id": "/tmp/vv/src/lib.rs",
+                "label": "lib.rs",
+                "tone": "modified",
+                "hidden": false
+            }]
+        }],
+        "expanded": ["/tmp/vv/src"],
+        "selected": "/tmp/vv/src/lib.rs"
+    });
+    round_value::<HostFileTreeFrame>(&tree);
+
+    let git = serde_json::json!({
+        "repo": true,
+        "branch": "main",
+        "head": "01234567",
+        "ahead": 1,
+        "behind": 0,
+        "staged": [{"path": "a.rs", "code": "M", "tone": "modified"}],
+        "changes": [{"path": "b.rs", "code": "?", "tone": "untracked"}],
+        "conflicts": [],
+        "branches": [{"name": "main", "head": true, "upstream": "origin/main"}],
+        "worktrees": [{"path": "/tmp/vv", "branch": "main", "main": true, "locked": false, "current": true, "changed": 2, "conflicts": 0, "ahead": 1, "behind": 0}],
+        "log": [{"id": "0123456789", "short": "0123456", "summary": "init", "author": "dev", "time": 100}],
+        "busy": false
+    });
+    round_value::<HostGitPanelFrame>(&git);
+
+    let palette = serde_json::json!({
+        "mode": "commands",
+        "query": "",
+        "items": [
+            {"id": "nav.issues", "label": "Issues", "detail": "/issues", "group": "Nav", "shortcut": "mod+1"},
+            {"id": "file:src/lib.rs", "label": "lib.rs", "detail": "src", "indices": [0, 4]},
+            {"id": "hit:/tmp/a.rs:10", "label": "fn main()", "detail": "a.rs:10", "ranges": [[0, 2]]}
+        ],
+        "loading": false
+    });
+    round_value::<HostPaletteFrame>(&palette);
 }

@@ -9,8 +9,9 @@ use serde::Deserialize;
 use super::super::atlas::Atlas;
 use super::super::draw::{DrawList, HudOp, Op, rgba};
 use super::super::level::{Box2, Point, pt};
-use super::frame::{Frame, Issue, PlotView, Session};
+use super::frame::{Frame, SessionExt};
 use super::scene::cast_prefix;
+use vibevalley_protocol::{BoardSlice, Crop, FarmFrame, Issue, IssueStatus, PhaseView, PlotView, SessionAction, SessionView, SessionsSlice, StuckReason};
 
 /// How many helpers may work on the whole farm at once (`maxRunning`).
 const MAX_RUNNING: i64 = vibevalley_protocol::MAX_RUNNING as i64;
@@ -27,7 +28,7 @@ pub struct RepoSummary {
 #[derive(Debug, Clone)]
 pub enum Spot {
     Taken {
-        session: Box<Session>,
+        session: Box<SessionView>,
         plot: PlotView,
         pose: &'static str,
     },
@@ -45,19 +46,19 @@ pub struct Island {
     pub queued: Vec<Issue>,
 }
 
-fn is_busy(s: &Session) -> bool {
-    s.phase.tag == "working"
+fn is_busy(s: &SessionView) -> bool {
+    s.is_working()
 }
 
 /// Peopled or waited on first, then the newest commit, then by name.
 pub fn islands_of(repos: &[RepoSummary], frame: &Frame) -> Vec<Island> {
-    let sessions: Vec<&Session> = frame.state.sessions.iter().filter(|s| s.is_worker()).collect();
+    let sessions: Vec<&SessionView> = frame.sessions.iter().filter(|s| s.is_worker()).collect();
     let mut names: Vec<String> = repos.iter().map(|r| r.name.clone()).collect();
     for s in &sessions {
-        if let Some(r) = &s.repo
-            && !names.contains(r)
+        if let Some(r) = s.repo_name()
+            && !names.iter().any(|x| x == r)
         {
-            names.push(r.clone());
+            names.push(r.to_string());
         }
     }
     let busy_all = sessions.iter().filter(|s| is_busy(s)).count() as i64;
@@ -65,8 +66,8 @@ pub fn islands_of(repos: &[RepoSummary], frame: &Frame) -> Vec<Island> {
         .into_iter()
         .map(|name| {
             let summary = repos.iter().find(|r| r.name == name).cloned();
-            let mut mine: Vec<&Session> = sessions.iter().copied().filter(|s| s.repo.as_deref() == Some(&name)).collect();
-            mine.sort_by(|a, b| a.hired_at.total_cmp(&b.hired_at));
+            let mut mine: Vec<&SessionView> = sessions.iter().copied().filter(|s| s.repo_name() == Some(&name)).collect();
+            mine.sort_by_key(|a| a.hired_at);
             let working = mine.iter().filter(|s| is_busy(s)).count() as i64;
             let max_sessions = summary.as_ref().map(|s| s.max_sessions.round() as i64).unwrap_or(working);
             let left_repo = if max_sessions > 0 { (max_sessions - working).max(0) } else { i64::MAX };
@@ -79,13 +80,13 @@ pub fn islands_of(repos: &[RepoSummary], frame: &Frame) -> Vec<Island> {
                     session: Box::new((*s).clone()),
                     pose: map_pose(
                         s,
-                        frame.state.issues.iter().any(|i| {
-                            Some(&i.id) == s.issue.as_ref()
-                                && i.stage.as_ref().and_then(|stage| stage.stuck) == Some(vibevalley_protocol::StuckReason::Conflict)
-                        }),
+                        frame
+                            .issues
+                            .iter()
+                            .any(|i| Some(i.id.as_str()) == s.issue_id() && i.stage.stuck == Some(StuckReason::Conflict)),
                     ),
                     plot: frame.plot_of(s).cloned().unwrap_or(PlotView {
-                        crop: super::frame::Crop::Seeded,
+                        crop: Crop::Seeded,
                         badge: None,
                     }),
                 })
@@ -93,13 +94,12 @@ pub fn islands_of(repos: &[RepoSummary], frame: &Frame) -> Vec<Island> {
             spots.extend((0..open).map(|_| Spot::Open));
             spots.extend((0..room - open).map(|_| Spot::Shut));
             let mut queued: Vec<Issue> = frame
-                .state
                 .issues
                 .iter()
-                .filter(|i| i.repo.as_deref() == Some(&name) && i.status == "todo" && i.queued_at.is_some())
+                .filter(|i| i.repo.as_deref() == Some(&name) && i.status == IssueStatus::Todo && i.queued_at.is_some())
                 .cloned()
                 .collect();
-            queued.sort_by(|a, b| a.queued_at.unwrap_or(0.0).total_cmp(&b.queued_at.unwrap_or(0.0)));
+            queued.sort_by_key(|i| i.queued_at.unwrap_or(0));
             Island {
                 repo: name,
                 summary,
@@ -182,16 +182,16 @@ pub fn island_look(repo: &str) -> &'static str {
 }
 
 /// A helper on the map: the pose's sprite suffix.
-fn map_pose(s: &Session, conflict: bool) -> &'static str {
-    match s.phase.tag.as_str() {
-        "failed" => "worry",
-        "done" | "resting" if conflict => "worry",
-        "working" => match s.doing() {
-            Some("thinking") | Some("speaking_text") => "side",
+fn map_pose(s: &SessionView, conflict: bool) -> &'static str {
+    match &s.phase {
+        PhaseView::Failed(_) => "worry",
+        PhaseView::Done(_) | PhaseView::Resting(_) if conflict => "worry",
+        PhaseView::Working(w) => match w.doing.action {
+            SessionAction::Thinking | SessionAction::SpeakingText => "side",
             _ => "work",
         },
-        "done" => "cheer",
-        _ => "down",
+        PhaseView::Done(_) => "cheer",
+        PhaseView::Resting(_) | PhaseView::Closed(_) => "down",
     }
 }
 
@@ -255,6 +255,21 @@ impl MapScene {
 
     pub fn apply_frame(&mut self, frame: Frame) {
         self.frame = frame;
+        self.islands = islands_of(self.repos.as_deref().unwrap_or_default(), &self.frame);
+    }
+
+    pub fn apply_farm(&mut self, farm: FarmFrame) {
+        self.frame.apply_farm(farm);
+        self.islands = islands_of(self.repos.as_deref().unwrap_or_default(), &self.frame);
+    }
+
+    pub fn apply_board(&mut self, board: BoardSlice) {
+        self.frame.apply_board(board);
+        self.islands = islands_of(self.repos.as_deref().unwrap_or_default(), &self.frame);
+    }
+
+    pub fn apply_sessions(&mut self, sessions: SessionsSlice) {
+        self.frame.apply_sessions(sessions);
         self.islands = islands_of(self.repos.as_deref().unwrap_or_default(), &self.frame);
     }
 
@@ -352,9 +367,10 @@ impl MapScene {
             for (spot, foot) in island.spots.iter().zip(plots_in(yard, island.spots.len())) {
                 match spot {
                     Spot::Taken { session, plot, pose } => {
-                        list.sprite(&atlas, &format!("plot-{}", plot.crop.name()), foot.x, foot.y, false, 1.0);
-                        let configured = self.agent_looks.get(&session.agent).map(|(sp, outfit)| (sp.as_str(), outfit.as_str()));
-                        let look = cast_prefix(configured, &session.agent, &atlas);
+                        list.sprite(&atlas, &format!("plot-{}", plot.crop.as_str()), foot.x, foot.y, false, 1.0);
+                        let agent = session.profile_id().unwrap_or("");
+                        let configured = self.agent_looks.get(agent).map(|(sp, outfit)| (sp.as_str(), outfit.as_str()));
+                        let look = cast_prefix(configured, agent, &atlas);
                         let pose = format!("{look}-{pose}");
                         let pose = if atlas.has(&pose) { pose } else { format!("{look}-down") };
                         list.sprite(&atlas, &pose, foot.x, foot.y - 10.0, false, 1.0);
@@ -366,9 +382,9 @@ impl MapScene {
                                 y1: foot.y,
                             },
                             MapHit::Plot {
-                                agent: session.agent.clone(),
-                                worktree: session.worktree.clone(),
-                                issue: session.issue.clone(),
+                                agent: agent.to_string(),
+                                worktree: session.cwd.clone(),
+                                issue: session.issue_id().map(String::from),
                             },
                         ));
                     }

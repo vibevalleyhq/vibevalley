@@ -93,13 +93,22 @@ impl Runtime for MockRuntime {
     }
 
     fn list_models(&self) -> vibevalley_runtime::oar::Result<Vec<ModelInfo>> {
-        Ok(vec![ModelInfo {
-            id: "gemini-4-neon".into(),
-            display_name: "Gemini 4 Neon".into(),
-            effort_levels: vec!["low".into(), "medium".into(), "high".into()],
-            default_effort: Some("high".into()),
-            is_default: true,
-        }])
+        Ok(vec![
+            ModelInfo {
+                id: "gemini-4-neon".into(),
+                display_name: "Gemini 4 Neon".into(),
+                effort_levels: vec!["low".into(), "medium".into(), "high".into()],
+                default_effort: Some("high".into()),
+                is_default: true,
+            },
+            ModelInfo {
+                id: "gemini-pro-orchestrator-neon".into(),
+                display_name: "Orchestrator (Neon)".into(),
+                effort_levels: vec![],
+                default_effort: None,
+                is_default: false,
+            },
+        ])
     }
 
     fn open(&self, opts: SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn Session>> {
@@ -600,9 +609,9 @@ fn workspace_session_full_lifecycle_permissions_interactions_config_steer_stop_a
 
     // Verify `afterSeq` filtering on a second `session.watch` subscription.
     server.trajectories.flush(true);
-    let all_events = call("session.event.list", json!({ "id": sid })).data.unwrap();
-    let all_arr = all_events.as_array().unwrap();
-    assert!(all_arr.len() >= 3, "{all_events}");
+    let all_page = call("session.event.list", json!({ "id": sid })).data.unwrap();
+    let all_arr = all_page["events"].as_array().unwrap();
+    assert!(all_arr.len() >= 3, "{all_page}");
     let cutoff = all_arr[1]["seq"].as_i64().unwrap();
     let (sub2, rx2) = server.hub.subscribe("session.watch", json!({ "id": sid, "afterSeq": cutoff })).unwrap();
     let filtered = rx2.recv_timeout(Duration::from_secs(2)).unwrap();
@@ -843,7 +852,7 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
     let worker_sess = until("issue session starts alongside workspace session", || {
         server
             .board
-            .read(|s| s.sessions.iter().find(|x| x.issue.as_deref() == Some(issue_id.as_str())).cloned())
+            .read(|s| s.sessions.iter().find(|x| x.issue_id() == Some(issue_id.as_str())).cloned())
     });
 
     // Opening an issue session as a workspace chat is refused cleanly.
@@ -1124,5 +1133,197 @@ fn workspace_session_title_updates_dedup_and_persists_across_restart() {
     assert_eq!(state2["kind"], "state");
     assert_eq!(state2["title"], "Refactor Workspace Titles");
     reopened.hub.unsubscribe(sub2);
+    reopened.close();
+}
+
+#[test]
+fn workspace_session_omits_effort_for_models_without_effort_levels_and_clears_on_model_switch() {
+    vibevalley_i18n::set_locale("zh");
+    let home = tempfile::tempdir().unwrap();
+    let repo_dir = home.path().join("effort-repo");
+    std::fs::create_dir_all(&repo_dir).unwrap();
+    let cwd = repo_dir.to_string_lossy().into_owned();
+
+    let (rt, log) = MockRuntime::new("antigravity", vec![]);
+    let server = start_with(home.path(), rt);
+    let call = |op: &str, p: Value| server.hub.call_as(Caller::User, op, p);
+
+    // Populate cached runtime models and set a runtime-wide default effort.
+    let refreshed = call("runtime.refresh", json!({ "id": "antigravity" }));
+    assert_eq!(refreshed.biz_code, 0, "{}", refreshed.message);
+    let updated = call(
+        "runtime.setting.update",
+        json!({
+            "id": "antigravity",
+            "enabled": true,
+            "binPath": "",
+            "defaultModel": "",
+            "defaultEffort": "medium",
+            "env": {}
+        }),
+    );
+    assert_eq!(updated.biz_code, 0, "{}", updated.message);
+
+    // 1. Opening a model with empty `effort_levels` omits inherited runtime default effort.
+    let opened_default = call(
+        "session.openWorkspace",
+        json!({
+            "runtime": "antigravity",
+            "cwd": cwd,
+            "model": "gemini-pro-orchestrator-neon"
+        }),
+    );
+    assert_eq!(opened_default.biz_code, 0, "{}", opened_default.message);
+    let ws_default = opened_default.data.unwrap();
+    assert_eq!(ws_default["model"], "gemini-pro-orchestrator-neon");
+    assert!(ws_default["effort"].is_null(), "expected null effort: {ws_default}");
+    assert_eq!(log.lock().unwrap().opened.last().unwrap().effort, None);
+
+    // 2. Passing a stale effort for a model with empty `effort_levels` also resolves to None.
+    let opened_stale = call(
+        "session.openWorkspace",
+        json!({
+            "runtime": "antigravity",
+            "cwd": cwd,
+            "model": "gemini-pro-orchestrator-neon",
+            "effort": "high"
+        }),
+    );
+    assert_eq!(opened_stale.biz_code, 0, "{}", opened_stale.message);
+    let ws_stale = opened_stale.data.unwrap();
+    assert_eq!(ws_stale["model"], "gemini-pro-orchestrator-neon");
+    assert!(ws_stale["effort"].is_null(), "expected null effort: {ws_stale}");
+    assert_eq!(log.lock().unwrap().opened.last().unwrap().effort, None);
+
+    // 3. Opening a model that supports the runtime default keeps it, and switching models
+    // via `session.setConfig` without passing `effort` clears the stale effort.
+    let opened_neon = call(
+        "session.openWorkspace",
+        json!({
+            "runtime": "antigravity",
+            "cwd": cwd,
+            "model": "gemini-4-neon"
+        }),
+    );
+    assert_eq!(opened_neon.biz_code, 0, "{}", opened_neon.message);
+    let ws_neon = opened_neon.data.unwrap();
+    let sid = ws_neon["id"].as_str().unwrap().to_string();
+    assert_eq!(ws_neon["effort"], "medium");
+    assert_eq!(log.lock().unwrap().opened.last().unwrap().effort.as_deref(), Some("medium"));
+
+    let (sub, rx) = server.hub.subscribe("session.watch", json!({ "id": sid })).unwrap();
+    let _hist = rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    let initial_state = rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    assert_eq!(initial_state["effort"], "medium");
+
+    // Updating only permissionMode keeps the current effort.
+    let perm_only = call("session.setConfig", json!({ "id": sid, "permissionMode": "bypass" }));
+    assert_eq!(perm_only.biz_code, 0, "{}", perm_only.message);
+    assert_eq!(perm_only.data.unwrap()["effort"], "medium");
+
+    // Switching model without passing `effort` clears effort in reply, watch state, and persisted meta.
+    let switched = call("session.setConfig", json!({ "id": sid, "model": "gemini-pro-orchestrator-neon" }));
+    assert_eq!(switched.biz_code, 0, "{}", switched.message);
+    let switched_data = switched.data.unwrap();
+    assert_eq!(switched_data["model"], "gemini-pro-orchestrator-neon");
+    assert!(switched_data["effort"].is_null(), "expected null effort after model switch: {switched_data}");
+    assert_eq!(
+        log.lock().unwrap().configs.last(),
+        Some(&(Some("gemini-pro-orchestrator-neon".into()), None, None))
+    );
+    let switched_state = recv_until(&rx, "model switch clears effort", |v| {
+        v["kind"] == "state" && v["model"] == "gemini-pro-orchestrator-neon"
+    });
+    assert!(switched_state["effort"].is_null(), "watch state retained stale effort: {switched_state}");
+
+    server.hub.unsubscribe(sub);
+    server.close();
+    drop(server);
+
+    // Persisted workspace meta retains the cleared effort across restart.
+    let (rt2, _log2) = MockRuntime::new("antigravity", vec![]);
+    let reopened = start_with(home.path(), rt2);
+    let (sub2, rx2) = reopened.hub.subscribe("session.watch", json!({ "id": sid })).unwrap();
+    let _hist2 = rx2.recv_timeout(Duration::from_secs(2)).unwrap();
+    let state2 = rx2.recv_timeout(Duration::from_secs(2)).unwrap();
+    assert_eq!(state2["kind"], "state");
+    assert_eq!(state2["model"], "gemini-pro-orchestrator-neon");
+    assert!(state2["effort"].is_null(), "persisted state retained stale effort: {state2}");
+    reopened.hub.unsubscribe(sub2);
+    reopened.close();
+}
+
+#[test]
+fn pr2_zero_binding_isolation_and_dynamic_binding_attach_detach() {
+    let home = tempfile::tempdir().unwrap();
+    let repo_dir = home.path().join("demo");
+    std::fs::create_dir_all(&repo_dir).unwrap();
+    let cwd = repo_dir.to_string_lossy().into_owned();
+
+    let (rt, _log) = MockRuntime::new(
+        "antigravity",
+        vec![MockTurn::EchoUsage(Usage {
+            input_tokens: Some(12),
+            output_tokens: Some(4),
+            ..Default::default()
+        })],
+    );
+    let server = start_with(home.path(), rt);
+    let call = |op: &str, p: Value| server.hub.call_as(Caller::User, op, p);
+
+    assert_eq!(call("repo.create", json!({ "name": "demo" })).biz_code, 0);
+    let opened = call("session.openWorkspace", json!({ "runtime": "antigravity", "cwd": cwd, "repo": "demo" }));
+    assert_eq!(opened.biz_code, 0, "{}", opened.message);
+    let sid = opened.data.unwrap()["id"].as_str().unwrap().to_string();
+
+    assert_eq!(call("session.send", json!({ "id": sid, "text": "hello" })).biz_code, 0);
+    until("workspace turn finishes", || {
+        server.board.session(&sid).filter(|s| s.runs >= 1 && !s.phase.is_working())
+    });
+
+    // F1 leak isolation: 0-binding User session never enters board slots, inbox, FarmView plays/agents, memories, or issue_chat.
+    let bundle = server.board.bundle();
+    let room = server.board.read(|s| vibevalley_core::rules::room_left(&s.sessions, "demo", 6, 4, ""));
+    assert_eq!(room.farm, 6);
+    assert_eq!(room.repo, Some(4));
+    assert!(bundle.inbox.items.is_empty());
+    assert!(!bundle.farm.view.plays.contains_key(&sid));
+    assert!(bundle.farm.view.plots.is_empty());
+    assert!(bundle.farm.progress.as_ref().is_none_or(|p| p.agents.is_empty()));
+    assert!(server.memories.list("antigravity").unwrap().is_empty());
+    let general = server.chat.default_channel();
+    let msgs = call("channel.message.list", json!({ "id": general })).data.unwrap();
+    assert!(msgs.as_array().unwrap().iter().all(|m| m["kind"] != "dispatch"));
+
+    // Create an issue and attach a ContextRef::Issue dynamically to the User session.
+    let issue = call("issue.create", json!({ "title": "attach me", "repo": "demo" })).data.unwrap();
+    let issue_id = issue["id"].as_str().unwrap().to_string();
+    let attached = call("session.binding.attach", json!({ "id": sid, "binding": { "kind": "issue", "id": issue_id } }));
+    assert_eq!(attached.biz_code, 0, "{}", attached.message);
+    let attached_data = attached.data.unwrap();
+    assert_eq!(attached_data["controller"], "user");
+    assert_eq!(attached_data["bindings"], json!([{ "kind": "issue", "id": issue_id }]));
+    assert!(server.board.session(&sid).unwrap().is_board_worker());
+    assert_eq!(server.board.session(&sid).unwrap().issue_id(), Some(issue_id.as_str()));
+
+    // Binding persists across server restart; detaching removes it cleanly.
+    server.close();
+    drop(server);
+    let (rt2, _log2) = MockRuntime::new("antigravity", vec![]);
+    let reopened = start_with(home.path(), rt2);
+    let persisted = reopened.board.session(&sid).unwrap();
+    assert_eq!(persisted.issue_id(), Some(issue_id.as_str()));
+    let detached = reopened.hub.call_as(
+        Caller::User,
+        "session.binding.detach",
+        json!({ "id": sid, "binding": { "kind": "issue", "id": issue_id } }),
+    );
+    assert_eq!(detached.biz_code, 0, "{}", detached.message);
+    assert_eq!(detached.data.unwrap()["bindings"], json!([]));
+    assert!(!reopened.board.session(&sid).unwrap().is_board_worker());
+    assert!(vibevalley_server::Server::voice(&*reopened.hub).is_some(), "started hub exposes voice");
+    let closed = reopened.hub.call_as(Caller::User, "session.closeWorkspace", json!({ "id": sid }));
+    assert_eq!(closed.biz_code, 0, "{}", closed.message);
+    assert!(reopened.board.session(&sid).is_none());
     reopened.close();
 }

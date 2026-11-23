@@ -11,6 +11,8 @@ import { applyMotion } from "./design/motion";
 import { FarmForm } from "./farm/FarmForm";
 import { FarmPhone } from "./farm/FarmPhone";
 import { viewName } from "./infra/bridge";
+import { useBridge } from "./infra/bridged";
+import { readHostMotion } from "./infra/hostParams";
 import { BridgeProbe } from "./workspace/BridgeProbe";
 import { WorkspaceChatPane } from "./workspace/ChatPane";
 import { MarkdownPane } from "./workspace/MarkdownPane";
@@ -41,8 +43,9 @@ const views: Record<string, Component> = {
 host.on("locale", (loc) => {
   if (loc === "en" || loc === "zh") setLocale(loc);
 });
-applyMotion(host.params.motion);
+applyMotion(readHostMotion());
 host.on("motion", applyMotion);
+if (host.available()) useBridge();
 
 mount(views[viewName()] ?? Unknown);
 if (host.available()) host.post("action", { type: "ready" });

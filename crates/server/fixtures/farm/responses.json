@@ -236,7 +236,10 @@
       }
     }
   ],
-  "game.achievement.list": [],
+  "game.achievement.list": {
+    "items": [],
+    "standings": []
+  },
   "channel.list": [
     {
       "id": "farm-chat",

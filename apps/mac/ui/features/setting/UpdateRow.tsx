@@ -10,7 +10,7 @@ import { OutLink } from "../../design/IconButton";
 import { toast } from "../../design/toasts";
 import { reasonOf } from "../../infra/api";
 import { variant } from "../../infra/base/dom";
-import { useCore } from "../../infra/frame";
+import { useSessionsSlice } from "../../infra/frame";
 import { currentHost } from "../../infra/host";
 import { type Accessor, createSignal, onSettled } from "../../infra/solid";
 
@@ -33,8 +33,8 @@ function updateWords(state: UpdateState): string {
 
 export function UpdateRow(props: { state: Accessor<UpdateState | undefined>; last?: boolean }) {
   const update = currentHost().update;
-  const core = useCore();
-  const working = () => (core()?.sessions ?? []).filter((s) => s.phase._tag === "working").length;
+  const sessions = useSessionsSlice();
+  const working = () => (sessions()?.sessions ?? []).filter((s) => s.phase._tag === "working").length;
   const check = () => void update?.check().catch((e: unknown) => toast(reasonOf(e), "bad"));
   const install = () => void update?.install().catch((e: unknown) => toast(reasonOf(e), "bad"));
   return (

@@ -1,4 +1,5 @@
 import { type Agent, defaultOrchestrator, type Issue, type Session, type SessionView } from "@vibevalley/protocol";
+import { isOrchestratorSession, sessionIssueId, sessionProfile, sessionRepo } from "@vibevalley/protocol/rules";
 
 export type RunsScope = "all" | "active" | "orchestrator" | "worker";
 
@@ -190,7 +191,7 @@ export function buildRunEntries(input: BuildRunsInput): RunEntry[] {
   const liveOrchByAgent = new Map<string, SessionView>();
   for (const s of input.liveSessions) {
     liveById.set(s.id, s);
-    if (s.role === "orchestrator") liveOrchByAgent.set(s.agent, s);
+    if (isOrchestratorSession(s)) liveOrchByAgent.set(sessionProfile(s) ?? "", s);
   }
   const issueById = new Map<string, Issue>(input.issues.map((i) => [i.id, i]));
 
@@ -209,17 +210,18 @@ export function buildRunEntries(input: BuildRunsInput): RunEntry[] {
 
   const workerMap = new Map<string, Session>();
   for (const s of input.sessions) {
-    if (s.role === "orchestrator") continue;
+    if (isOrchestratorSession(s)) continue;
     workerMap.set(s.id, s);
   }
   for (const s of input.liveSessions) {
-    if (s.role === "orchestrator") continue;
+    if (isOrchestratorSession(s)) continue;
     if (!workerMap.has(s.id)) workerMap.set(s.id, s);
   }
 
   for (const session of workerMap.values()) {
     const live = liveById.get(session.id);
-    const issue = session.issue !== undefined ? issueById.get(session.issue) : undefined;
+    const issueId = sessionIssueId(session);
+    const issue = issueId !== undefined ? issueById.get(issueId) : undefined;
     const phase = live?.phase ?? session.phase;
     entries.push({
       kind: "worker",
@@ -252,7 +254,7 @@ function matchesAgent(entry: RunEntry, agentId: string): boolean {
     case "orchestrator":
       return entry.agent.id === agentId;
     case "worker":
-      return entry.session.agent === agentId;
+      return (sessionProfile(entry.session) ?? "") === agentId;
   }
 }
 
@@ -261,7 +263,7 @@ function matchesIssue(entry: RunEntry, issueId: string): boolean {
     case "orchestrator":
       return false;
     case "worker":
-      return entry.session.issue === issueId;
+      return sessionIssueId(entry.session) === issueId;
   }
 }
 
@@ -273,7 +275,15 @@ function matchesQuery(entry: RunEntry, needle: string): boolean {
     }
     case "worker": {
       const issueParts = entry.issue ? [`#${entry.issue.number}`, entry.issue.title, entry.issue.repo ?? ""] : [];
-      const hay = [entry.id, entry.session.name, entry.session.agent, entry.session.runtime, entry.session.brief, entry.session.repo ?? "", ...issueParts]
+      const hay = [
+        entry.id,
+        entry.session.name,
+        sessionProfile(entry.session) ?? "",
+        entry.session.runtime,
+        entry.session.brief,
+        sessionRepo(entry.session) ?? "",
+        ...issueParts,
+      ]
         .join(" ")
         .toLowerCase();
       return hay.includes(needle);

@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use vibevalley_core::{Move, Refusal, status_move};
 use vibevalley_protocol::{
     Assignment, Deliverable, Fact, Issue, IssueCanceled, IssueConstraints, IssueStageKind as StageKind, IssueStatus, Priority, Run, RunTriggerKind, Session,
-    SpaceState, StateFrame as Frame, StuckReason,
+    SliceBundle, SpaceState, StuckReason,
 };
 use vibevalley_runtime::oar::Registry;
 
@@ -112,7 +112,7 @@ fn pending_delivery(issue: &Issue) -> Option<&vibevalley_protocol::ProjectCheckR
 impl Board {
     /// The board as stored, without taking it: for reading while another
     /// process holds it. Working sessions show as they were last stored.
-    pub fn snapshot(path: &std::path::Path) -> Result<Frame> {
+    pub fn snapshot(path: &std::path::Path) -> Result<SliceBundle> {
         Ledger::snapshot(path)
     }
 
@@ -217,8 +217,8 @@ impl Board {
         &self.0.workplaces
     }
 
-    pub fn frame(&self) -> Frame {
-        self.0.ledger.frame()
+    pub fn bundle(&self) -> SliceBundle {
+        self.0.ledger.bundle()
     }
 
     /// Reads the state the board's facts went into.
@@ -226,9 +226,9 @@ impl Board {
         self.0.ledger.read(f)
     }
 
-    /// The newest frame after every change; a receiver that falls behind
+    /// The newest slice bundle after every change; a receiver that falls behind
     /// skips to the newest.
-    pub fn subscribe(&self) -> flume::Receiver<Frame> {
+    pub fn subscribe(&self) -> flume::Receiver<SliceBundle> {
         self.0.ledger.subscribe()
     }
 
@@ -435,8 +435,10 @@ impl Board {
             IssueStatus::Backlog | IssueStatus::Todo => self.keep_words(&issue.id, words),
             _ => {
                 self.room_for_round(&issue)?;
-                self.change(&issue.id, IssueChange::Answered)?;
-                self.send(&issue.id, Some(words.to_string()), RunTriggerKind::Comment).map(|_| ())
+                if matches!(self.send(&issue.id, Some(words.to_string()), RunTriggerKind::Comment)?, Sent::Queued { .. }) {
+                    self.change(&issue.id, IssueChange::Answered)?;
+                }
+                Ok(())
             }
         }
     }
@@ -454,8 +456,21 @@ impl Board {
             vibevalley_runtime::agent::durable::SubmissionStatus::Unanswered => return Err(BoardError::Other(sub.result.to_string())),
             vibevalley_runtime::agent::durable::SubmissionStatus::Queued => (),
         }
+        let mail_owner = self.on_board(&issue).map(|s| s.id).unwrap_or_else(|| format!("issue:{}", issue.id));
+        let mail_key = format!("issue:{}:{key}", issue.id);
+        let mail_entry = sessions.enqueue_mailbox(
+            &mail_owner,
+            &mail_key,
+            crate::modules::work::session::mailbox::MailboxSource::IssueComment,
+            Some(key),
+            words,
+        )?;
+        if mail_entry.status == crate::modules::work::session::mailbox::MailboxStatus::Withdrawn {
+            return Ok(());
+        }
         if issue.status.is_closed() {
             let e = BoardError::Refused(if issue.was_sent() { Refusal::Reopen } else { Refusal::Revive });
+            let _ = sessions.settle_mailbox(mail_entry.id, false, Some(&e.to_string()));
             sessions.settle_words(&sub.id, false, &serde_json::json!({"error":e.to_string()}))?;
             return Err(e);
         }
@@ -464,9 +479,11 @@ impl Board {
             && sessions.is_live(&session.id)
             && sessions.bind_to_active_run(&session.id, &sub)?
         {
+            let _ = sessions.claim_mailbox_by_key(&mail_key);
             let result = sessions
                 .steer(&session, words)
                 .unwrap_or_else(|| Err(BoardError::Other("the active run ended during handoff".into())));
+            let _ = sessions.settle_mailbox(mail_entry.id, result.is_ok(), result.as_ref().err().map(|e| e.to_string()).as_deref());
             if let Err(e) = &result {
                 sessions.settle_words(&sub.id, false, &serde_json::json!({"error":e.to_string()}))?;
             }
@@ -475,15 +492,20 @@ impl Board {
         if matches!(issue.status, IssueStatus::Backlog | IssueStatus::Todo) {
             return Ok(());
         }
-        self.dispatch_replies(&issue)
+        let _ = sessions.claim_mailbox_by_key(&mail_key);
+        let res = self.dispatch_replies(&issue);
+        let _ = sessions.settle_mailbox(mail_entry.id, res.is_ok(), res.as_ref().err().map(|e| e.to_string()).as_deref());
+        res
     }
 
     fn dispatch_replies(&self, issue: &Issue) -> Result<()> {
         if self.room_for_round(issue).is_err() {
             return Ok(());
         }
-        self.change(&issue.id, IssueChange::Answered)?;
-        self.send(&issue.id, None, RunTriggerKind::Comment).map(|_| ())
+        if matches!(self.send(&issue.id, None, RunTriggerKind::Comment)?, Sent::Queued { .. }) {
+            self.change(&issue.id, IssueChange::Answered)?;
+        }
+        Ok(())
     }
 
     /// Stops the running turn of the issue's session (its drafter's while
@@ -561,7 +583,7 @@ impl Board {
     /// Direct workspace chat sessions do not count toward issue board concurrency limits.
     pub(super) fn room(&self, issue: &Issue, except: &str) -> (usize, usize) {
         let room = self.read(|s| {
-            let board_sessions: Vec<Session> = s.sessions.iter().filter(|h| !crate::modules::work::session::is_workspace(h)).cloned().collect();
+            let board_sessions: Vec<Session> = s.sessions.iter().filter(|h| h.is_board_worker()).cloned().collect();
             vibevalley_core::rules::room_left(
                 &board_sessions,
                 issue.repo.as_deref().unwrap_or(""),
@@ -574,7 +596,7 @@ impl Board {
     }
 
     pub(super) fn keep_words(&self, id: &str, words: &str) -> Result<()> {
-        self.0.ledger.database(|db| super::db::keep_words(db, id, words, now()))
+        self.0.ledger.database(|db| super::db::keep_words(db, id, words))
     }
 
     pub(super) fn take_words(&self, id: &str) -> Result<Option<String>> {
@@ -750,10 +772,10 @@ impl Board {
                 return false;
             }
             let session = issue.latest_session_id().and_then(|id| state.sessions.iter().find(|s| s.id == *id));
-            if let Some(wt) = session.and_then(|s| s.worktree.as_deref()) {
+            if let Some(wt) = session.and_then(|s| s.cwd.as_deref()) {
                 let wt_canon = std::fs::canonicalize(wt).ok();
                 if (wt == cwd || (wt_canon.is_some() && wt_canon == cwd_canon))
-                    && (session.and_then(|s| s.branch.as_deref()) == Some(branch) || crate::modules::work::workplace::issue_branch(issue.number) == branch)
+                    && (session.and_then(|s| s.worktree_branch()) == Some(branch) || crate::modules::work::workplace::issue_branch(issue.number) == branch)
                 {
                     return true;
                 }
@@ -802,7 +824,7 @@ impl Board {
             return Workplace::published_changes(&main, issue.number, revision, receipt, since_tree);
         }
         let base = self.session_base(&issue, &main)?;
-        let worktree = self.on_board(&issue).and_then(|s| s.worktree);
+        let worktree = self.on_board(&issue).and_then(|s| s.cwd);
         let at = OnDisk {
             number: issue.number,
             title: &issue.title,
@@ -863,7 +885,7 @@ impl Board {
             return self.hold_delivery(&issue.id, &last.candidate_commit);
         };
         let session = self.on_board(issue);
-        let worktree = session.as_ref().and_then(|s| s.worktree.as_deref());
+        let worktree = session.as_ref().and_then(|s| s.cwd.as_deref());
         let tree = self
             .0
             .workplaces
@@ -904,7 +926,7 @@ impl Board {
             None => vibevalley_protocol::Landing::None,
             Some(main) => {
                 let has_children = self.state().issues.iter().any(|t| t.parent.as_ref() == Some(&issue.id));
-                let worktree = session.as_ref().and_then(|s| s.worktree.clone());
+                let worktree = session.as_ref().and_then(|s| s.cwd.clone());
                 let at = OnDisk {
                     number: issue.number,
                     title: &issue.title,

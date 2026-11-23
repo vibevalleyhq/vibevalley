@@ -1,5 +1,3 @@
-mod support;
-
 use std::time::Instant;
 
 use indexmap::IndexMap;
@@ -12,7 +10,7 @@ use vibevalley_pele::{
     DiagramConfig, LinkInfo, METRICS_MEASURER, MathSvg, ParseOptions, ParsedModel, RenderOptions, TextMeasurer, TextStyle, parse, render, supports,
 };
 
-use support::{
+use crate::support::{
     Mutator, PAYLOADS, assert_inert, assert_inert_resolved, assert_resvg_parses, assert_well_formed, css_options, dark_options, load_fixture, resolved_options,
 };
 

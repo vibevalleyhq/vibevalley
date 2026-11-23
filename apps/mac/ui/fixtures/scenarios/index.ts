@@ -1,5 +1,5 @@
-import type { ChatMessage, IssueHistory, SessionEvent, StateFrame } from "@vibevalley/protocol";
-import { StateFrame as StateFrameSchema } from "@vibevalley/protocol/schema";
+import type { ChatMessage, IssueHistory, SessionEvent, SessionEventPage, SliceBundle } from "@vibevalley/protocol";
+import { SliceBundle as SliceBundleSchema } from "@vibevalley/protocol/schema";
 
 import workbenchResponsesJson from "../workbench/responses.json";
 import denseRaw from "./dense/state.json";
@@ -16,9 +16,9 @@ export type ScenarioDensity = "empty" | "minimal" | "typical" | "dense" | "extre
 const MIN_MS = 60_000;
 const baseResponses = workbenchResponsesJson as Record<string, unknown>;
 
-function buildHistory(frame: StateFrame): IssueHistory[] {
-  const byId = new Map<string, (typeof frame.state.sessions)[number]>(frame.state.sessions.map((s) => [s.id, s]));
-  return frame.state.issues.map((issue) => {
+function buildHistory(bundle: SliceBundle): IssueHistory[] {
+  const byId = new Map<string, (typeof bundle.sessions.sessions)[number]>(bundle.sessions.sessions.map((s) => [s.id, s]));
+  return bundle.board.issues.map((issue) => {
     const sessions = issue.assignments.flatMap((a) => a.executions.map((e) => byId.get(e.session))).filter((s): s is NonNullable<typeof s> => s !== undefined);
     return { issue, sessions, missingSessions: [] };
   });
@@ -119,7 +119,18 @@ function buildMessages(density: ScenarioDensity, now: number): ChatMessage[] {
   return [...anchored, ...extra];
 }
 
-function responsesFor(density: ScenarioDensity, frame: StateFrame): Record<string, unknown> {
+function eventPage(events: SessionEvent[]): SessionEventPage {
+  const oldestSeq = events[0]?.seq;
+  const newestSeq = events.at(-1)?.seq;
+  return {
+    events,
+    hasMore: false,
+    ...(oldestSeq !== undefined ? { oldestSeq } : {}),
+    ...(newestSeq !== undefined ? { newestSeq } : {}),
+  };
+}
+
+function responsesFor(density: ScenarioDensity, bundle: SliceBundle): Record<string, unknown> {
   const pixelDir = { path: decodeURI(new URL("../../../../../assets/pixel", import.meta.url).pathname) };
   const baseSettings = (baseResponses["setting.get"] as Record<string, unknown> | undefined) ?? {};
   const messages = buildMessages(density, SCENARIO_NOW);
@@ -140,14 +151,14 @@ function responsesFor(density: ScenarioDensity, frame: StateFrame): Record<strin
       "issue.diff.get": { files: [], truncated: false },
       "issue.conversation.get": null,
       "issue.answer": null,
-      "issue.status.update": { seq: frame.seq + 1 },
-      "issue.comment.create": { seq: frame.seq + 1 },
+      "issue.status.update": { seq: bundle.seq + 1 },
+      "issue.comment.create": { seq: bundle.seq + 1 },
       "orchestrator.approval.list": [],
       "channel.message.list": [],
       "channel.pin.list": [],
       "channel.message.search": [],
       "session.list": [],
-      "session.event.list": [],
+      "session.event.list": eventPage([]),
       "artifact.list": [],
       "artifact.suggestion.list": [],
       "library.item.list": [],
@@ -163,7 +174,7 @@ function responsesFor(density: ScenarioDensity, frame: StateFrame): Record<strin
     ...baseResponses,
     "host.pixelDir": pixelDir,
     "orchestrator.approval.list": [],
-    "issue.history.list": buildHistory(frame),
+    "issue.history.list": buildHistory(bundle),
     "issue.timeline.get": {
       milestones: [
         { at: SCENARIO_NOW - 40 * MIN_MS, kind: "opened", text: "写下这张工单" },
@@ -173,12 +184,12 @@ function responsesFor(density: ScenarioDensity, frame: StateFrame): Record<strin
       spent: { tokens: 182_400, cny: 0.42 },
     },
     "issue.answer": null,
-    "issue.status.update": { seq: frame.seq + 1 },
-    "issue.comment.create": { seq: frame.seq + 1 },
+    "issue.status.update": { seq: bundle.seq + 1 },
+    "issue.comment.create": { seq: bundle.seq + 1 },
     "channel.message.list": messages,
     "channel.pin.list": messages.filter((m) => m.pinned !== undefined),
-    "session.list": frame.state.sessions,
-    "session.event.list": buildSessionEvents(SCENARIO_NOW, density !== "minimal", density === "dense"),
+    "session.list": bundle.sessions.sessions,
+    "session.event.list": eventPage(buildSessionEvents(SCENARIO_NOW, density !== "minimal", density === "dense")),
     "library.item.list": [
       {
         attachment: { id: "lib-poster", name: "海报.png", type: "image/png", size: 482_113 },
@@ -196,24 +207,24 @@ function responsesFor(density: ScenarioDensity, frame: StateFrame): Record<strin
   };
 }
 
-function asFrame(raw: unknown): StateFrame {
-  return StateFrameSchema.parse(raw);
+function asBundle(raw: unknown): SliceBundle {
+  return SliceBundleSchema.parse(raw);
 }
 
-const rawFrames: Record<ScenarioDensity, StateFrame> = {
-  empty: asFrame(emptyRaw),
-  minimal: asFrame(minimalRaw),
-  typical: asFrame(typicalRaw),
-  dense: asFrame(denseRaw),
-  extreme: asFrame(extremeRaw),
-  edge: asFrame(edgeRaw),
+const rawBundles: Record<ScenarioDensity, SliceBundle> = {
+  empty: asBundle(emptyRaw),
+  minimal: asBundle(minimalRaw),
+  typical: asBundle(typicalRaw),
+  dense: asBundle(denseRaw),
+  extreme: asBundle(extremeRaw),
+  edge: asBundle(edgeRaw),
 };
 
-export const scenarios: Record<ScenarioDensity, { state: StateFrame; responses: Record<string, unknown> }> = {
-  empty: { state: rawFrames.empty, responses: responsesFor("empty", rawFrames.empty) },
-  minimal: { state: rawFrames.minimal, responses: responsesFor("minimal", rawFrames.minimal) },
-  typical: { state: rawFrames.typical, responses: responsesFor("typical", rawFrames.typical) },
-  dense: { state: rawFrames.dense, responses: responsesFor("dense", rawFrames.dense) },
-  extreme: { state: rawFrames.extreme, responses: responsesFor("extreme", rawFrames.extreme) },
-  edge: { state: rawFrames.edge, responses: responsesFor("edge", rawFrames.edge) },
+export const scenarios: Record<ScenarioDensity, { state: SliceBundle; responses: Record<string, unknown> }> = {
+  empty: { state: rawBundles.empty, responses: responsesFor("empty", rawBundles.empty) },
+  minimal: { state: rawBundles.minimal, responses: responsesFor("minimal", rawBundles.minimal) },
+  typical: { state: rawBundles.typical, responses: responsesFor("typical", rawBundles.typical) },
+  dense: { state: rawBundles.dense, responses: responsesFor("dense", rawBundles.dense) },
+  extreme: { state: rawBundles.extreme, responses: responsesFor("extreme", rawBundles.extreme) },
+  edge: { state: rawBundles.edge, responses: responsesFor("edge", rawBundles.edge) },
 };

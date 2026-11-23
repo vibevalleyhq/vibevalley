@@ -6,7 +6,7 @@ use vibevalley_i18n::t;
 use vibevalley_protocol::*;
 
 use crate::rules::{Need, actor_role_of, clip, cut, default_of, need_of, one_line, slice};
-use crate::status::is_on_duty;
+use crate::status::is_farm_worker;
 
 /// An inbox item with where it belongs and what the patrol says of it.
 /// `channel` `None`: the general channel; `since` `None`: from when the
@@ -126,15 +126,15 @@ fn gathered(state: &SpaceState) -> Vec<Gathered> {
     let session_ids: HashSet<&str> = state.sessions.iter().map(|s| s.id.as_str()).collect();
 
     for h in &state.sessions {
-        if is_on_duty(h.role) {
+        if !is_farm_worker(h) {
             continue;
         }
         let Some(want) = want_of(h, &issues) else { continue };
-        let channel = h.channel.clone().or_else(|| general.clone());
+        let channel = h.channel_id().map(str::to_string).or_else(|| general.clone());
         let from = InboxFrom::Session(InboxFromSession {
             id: h.id.clone(),
             name: h.name.clone(),
-            agent: h.agent.clone(),
+            agent: h.profile.clone().unwrap_or_default(),
         });
         let target = InboxTarget::Session(InboxTargetSession { id: h.id.clone() });
         let at = h.last_run.as_ref().map_or(h.hired_at, |r| r.at);
@@ -177,8 +177,7 @@ fn gathered(state: &SpaceState) -> Vec<Gathered> {
             ),
             Want::Conflict => {
                 let files = h
-                    .issue
-                    .as_deref()
+                    .issue_id()
                     .and_then(|i| issues.get(i))
                     .and_then(|i| i.conflict.as_ref())
                     .map_or(0, |c| c.files.len());
@@ -303,8 +302,7 @@ fn gathered(state: &SpaceState) -> Vec<Gathered> {
 /// `wantOf`: what a session asks of the user; its issue's stage says it.
 fn want_of<'a>(h: &Session, issues: &HashMap<&str, &'a Issue>) -> Option<Want<'a>> {
     let issue = h
-        .issue
-        .as_deref()
+        .issue_id()
         .and_then(|i| issues.get(i).copied())
         .filter(|i| i.latest_session_id().is_some_and(|s| *s == h.id));
     let Some(issue) = issue else {
@@ -334,6 +332,7 @@ fn worded(b: Bare) -> InboxItem {
     let who = match &b.from {
         InboxFrom::Session(s) => s.name.clone(),
         InboxFrom::Orchestrator(_) => t("server.inbox.orchestrator", &[]),
+        InboxFrom::Runtime(_) => "runtime".to_string(),
     };
     let words = inbox_words(b.kind, &who, &clip(&b.text, 140));
     InboxItem {
@@ -400,6 +399,7 @@ fn inbox_words(kind: InboxKind, who: &str, text: &str) -> InboxWords {
             t("server.inbox.item.cron-ask.body", &[("text", text.into())]),
             t("server.inbox.item.cron-ask.tray", &[("text", text.into())]),
         ),
+        InboxKind::BudgetReached => ("budget_reached".to_string(), who.to_string(), text.to_string(), text.to_string()),
     };
     InboxWords { label, title, body, tray }
 }

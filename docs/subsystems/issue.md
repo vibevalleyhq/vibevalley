@@ -26,8 +26,8 @@
 | 工单模型、状态派生、原生父子依赖（`parent` / `blockedBy`）与合法状态流转 | 会话如何跑一轮、轨迹日志记录（[帮工](docs/subsystems/session.md)） |
 | 起草（`refine`）：派帮工只读看代码生成草稿、写回工单、重置 worktree | worktree 创建、重置与清理实现（[仓库](docs/subsystems/repo.md)） |
 | 派活、排队重试、拆分子工单（`split`）、换人、重开与取消 | 档案选择算法（[档案和农机](docs/subsystems/agent.md#模型和不变量)） |
-| 验收、打回意见、问题清理与验收标准自评（`checks`） | 信箱投递、三道刹车与唤醒调度（[帮工的信箱](docs/subsystems/session.md)） |
-| 一件活的路由（[蓄水池和路由](#蓄水池和路由)）：对工单说的话交给它的帮工（`Board::tell`）、派活的队列、每张工单的各轮 | 谁听见频道里的一句话、刹车（[观察层](docs/subsystems/watch.md)） |
+| 验收、打回意见、问题清理与验收标准自评（`checks`） | 频道受众计算、环路刹车与持久投递表（[频道](docs/subsystems/channel.md)） |
+| 一件活的路由（[蓄水池和路由](#蓄水池和路由)）：`issue.comment.create`、工单开串与单轮汇报、`issue.report` 补投、按工单异步投递 `Board::tell_message`、派活队列与每张工单的各轮 | 帮工席位清理、删频道守卫与私聊帮工（[帮工](docs/subsystems/session.md)） |
 | 完成与交付：何时完成、按 `deliver` 走哪条路、子工单要过哪些检查；合并、子工单合入父分支，以及工单上记下的冲突与结局 | 农场地块渲染（[农场的皮](docs/subsystems/farm.md)） |
 | 定时任务（[定时任务](#定时任务)）：规格、到期、补跑与用户点头，每个定时任务固定一张工单 | 帮工的工作目录在谁手里、交接时怎么歇下和放走（[帮工](docs/subsystems/session.md)）；git 实现（[仓库](docs/subsystems/repo.md)）；分支发布与 PR 轮询（[PR 与分支发布](docs/subsystems/pull.md)） |
 
@@ -42,7 +42,7 @@
 | `crates/server/src/modules/work/workplace/mod.rs`、`check.rs` | worktree、合并、冲突与分支清理；合进主分支前跑 `.vibevalley/check`、子工单合进父分支前跑它的检查，失败给末尾 40 行：见 [仓库](docs/subsystems/repo.md) |
 | `crates/core/src/status.rs`、`moves.rs` | 状态派生、展示阶段与可执行动作；合法挪动（`status_move`） |
 | `crates/core/src/deps.rs`、`refine.rs`、`brief.rs`、`pr.rs` | 父子依赖与 DAG、子工单要过的检查；起草的提示与读回；对帮工说的话；PR 的纯规则 |
-| `crates/server/src/modules/work/issue/mod.rs` | `issue.*` 端点：解码入参、调 `Board`、带 `requestKey` 的幂等与拒绝的话 |
+| `crates/server/src/modules/work/issue/mod.rs`、`chat.rs` | `issue.*` 端点（含 `issue.comment.create`）与 `IssueChat`：经异步 `EventBus`（`issue-watch`）开串/续串（`open_threads`、`handed_on`）、单轮贴汇报与 `issue.report` 重放，并按工单串行异步消费 `Chat::dispatches()` 调用 `Board::tell_message` |
 | `crates/server/src/modules/work/cron/`、`crates/core/src/cron/mod.rs` | 定时任务：增删改与到期（`server.db` 的 `cron` 表，`issue_id references issue(id) on delete set null`，经 `Board::use_cron_of_issue` 投影）；时间规格与 `next_run` |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`issue.*`），CLI 命令为 `vibevalley issue ...`。
@@ -50,7 +50,7 @@
 ## 模型和不变量
 
 - **生命周期统一走 `setStatus` 状态机**：用户只能将工单移至 `backlog`、`todo`、`done`、`canceled`；`in_progress` 与 `in_review` 从在场会话实时派生。
-- **核心状态保留活跃与近期工单**：全量工单存 `issue` 表（`PutIssue` 使用 `ON CONFLICT(id) DO UPDATE` 避免清空 `cron`、`pull`、`artifact` 的 `ON DELETE SET NULL` 外键；`Issue.cron` 与 `Issue.pull_request` 由各自模块经 `Board::use_cron_of_issue`、`Board::use_pull_of_issue` 同步投影，不在 `issue` 表存冗余列）；`SpaceState.issues` 保留未关工单及最近关闭的 50 张工单（含子工单，`keepClosedIssues`）。
+- **核心状态保留活跃与近期工单**：全量工单收拢进单张 `issue` 表（内嵌 `delivery_evidence` 与 `queued_words` 列，工单编号走共享 `seq_counter`，建表与查询位于 `crates/server/src/db/{schema,queries,generated}/work_issue.*`；`PutIssue` 使用 `ON CONFLICT(id) DO UPDATE` 避免清空 `cron`、`pull`、`artifact` 的 `ON DELETE SET NULL` 外键；`Issue.cron` 与 `Issue.pull_request` 由各自模块经 `Board::use_cron_of_issue`、`Board::use_pull_of_issue` 同步投影，不在 `issue` 表存冗余列）；`SpaceState.issues` 保留未关工单及最近关闭的 50 张工单（含子工单，`keepClosedIssues`）。
 - **写操作收敛为「挪状态」与「说话」，建单与留言规则内聚在 `Issue`**：流转调 `issue.status.update`，评论调 `issue.comment.create`。`Board::create` 收拢仓库推导、父单继承与派发；端点和工具只做解码与格式化。
 - **看板挪一张工单只写一行**：`edit`（`issue/edits.rs`）在相邻两张未派发工单的 `rank` 之间取中值（排在两端时加减 1024），一次 `UPDATE`、一次发布；间距用完或超出 ±2,000,000,000 时才在一个事务里按 1024 的步长重排全部未派发工单。
 - **引用解析统一在服务内完成**：接口支持传入 `#41`、`41`、工单 UUID 或曾执行该工单的 `Session` ID。
@@ -101,7 +101,7 @@
 
 ### 蓄水池和路由
 
-Rust 版没有 TS 版的蓄水池（`issue_input`）、订阅与触发表：观察层算好听众后经 `Board::tell` 把话直接交给工单的帮工，帮工在干活就插进这一轮，歇着就开下一轮；工单在排队时话随它一起交出。定时任务到期时由 `modules/work/cron` 准备它固定的那张工单并 `tell`。
+Rust 版由频道的纯策略（`modules/collab/channel/dispatch.rs`）在写消息时同步落盘 `channel_delivery`，`IssueChat`（`modules/work/issue/chat.rs`）按工单独立异步消费 `Issue` 与唤醒的 `Session` 投递，连同该会话早前待发消息经 `Board::tell_message` 交给工单的帮工（干活中插进这一轮，歇着就开下一轮；排队中随工单一起交出），成功后结算投递并记 `mark_seen` + 👀。定时任务到期时由 `modules/work/cron` 准备它固定的那张工单并 `tell`。
 
 ### 详情与讨论
 
@@ -114,7 +114,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 ## 和谁打交道
 
 - **帮工（oar 和档案）**：`Sessions` 经 `Drivers`（`crates/server/src/modules/work/session/drivers.rs`，服务端给的是 `crates/server/src/modules/team/agent/drive.rs`）把指派的档案变成农机和参数，在 worktree 里跑一轮；轨迹由 `crates/server/src/modules/work/session/journal.rs` 记。
-- **观察层、助手、工具**：观察层把频道里的话 `tell` 给工单；助手和帮工的工单工具在 `crates/server/src/modules/team/tool/issue.rs`。
+- **频道、助手、工具**：`IssueChat` 订阅频道的 `Chat::dispatches()` 与 `Hub` 的异步 `EventBus`（`issue-watch`）维护工单串、汇报与 `Board::tell_message` 投递；助手和帮工的工单工具在 `crates/server/src/modules/team/tool/issue.rs`。
 - **仓库（`vibevalley-git`）**：改动、冲突预检、合并、分支。
 
 ## 为什么这样
@@ -141,11 +141,11 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 定时任务
 
-定时任务（`Cron`，存在 `server.db` 的 `cron` 表，`issue_id references issue(id) on delete set null` 并建 `cron_by_issue` 索引，经 `Board::use_cron_of_issue` 投影到 `Issue.cron`）是工单的时间触发器：每次到期，更新运行时间，随后准备它固定的那张工单（最近建的那张，或重开，或新建），交给帮工，或在它的频道交给助手。接口见 [capabilities.md](docs/reference/capabilities.md)（`cron.*`，其中 `cron.update` 仅对用户与 `remote` 开放），服务端在 `crates/server/src/modules/work/cron/`（`mod.rs`、`db.rs`、`sql/schema.sql`），时间规则在 `vibevalley-core::cron`。
+定时任务（`Cron`，存在 `server.db` 的 `cron` 表，`issue_id references issue(id) on delete set null` 并建 `cron_by_issue` 索引，经 `Board::use_cron_of_issue` 投影到 `Issue.cron`）是工单的时间触发器：每次到期，更新运行时间，随后准备它固定的那张工单（最近建的那张，或重开，或新建），交给帮工，或在它的频道交给助手。接口见 [capabilities.md](docs/reference/capabilities.md)（`cron.*`，其中 `cron.update` 仅对用户与 `remote` 开放），服务端在 `crates/server/src/modules/work/cron/`（`mod.rs`、`db.rs`）与 `crates/server/src/db/{schema,queries,generated}/work_cron.*`，时间规则在 `vibevalley-core::cron`。
 
 - **五种时间规格（`CronWhen`）**：`once`、`every`、`daily`、`weekly` 与五段式 `cron`（`once` 跑完自动关闭）；每项携带 IANA 时区或偏移量，缺省取本机时区；8 年内无合法触发时刻的表达式（如 2 月 30 日）直接拒绝。
 - **下次运行时间不落库，实时从 `last_run` 推导**：`nextRun` 计算严格晚于 `last_run`（未运行过则取创建时间）的下一个匹配分钟；夏令时跳过的时刻顺延，重复的时刻取第一次；重新开启已关闭的周期任务时将 `last_run` 设为当前时间，不补跑关闭期间的时刻。
-- **助手非当轮授权创建的周期或派工任务须等用户同意（`needsOK`）**：用户创建、或助手在含用户原话的当轮（`Actor.forUser` 为真）创建的任务立即生效；助手在后台回合自行创建时，仅「不派帮工的 `once` 回头看」直接生效；其余存为 `enabled: false, pending: true`，在收件箱（[观察层](docs/subsystems/watch.md#收件箱)）生成 `cron-ask` 待用户点击同意。
+- **助手非当轮授权创建的周期或派工任务须等用户同意（`needsOK`）**：用户创建、或助手在含用户原话的当轮（`Actor.forUser` 为真）创建的任务立即生效；助手在后台回合自行创建时，仅「不派帮工的 `once` 回头看」直接生效；其余存为 `enabled: false, pending: true`，在收件箱（[核心状态](docs/subsystems/core.md#收件箱)）生成 `cron-ask` 待用户点击同意。
 - **一个定时任务固定复用一张工单**：未指定帮工档案时指派给所属频道助手；指定帮工档案时必须同时指定仓库。
 - **扫描与补跑**：开机后定时筛出 `next_run <= now` 的已启用任务（错过多次只合并补跑一次）。
 - **为什么一个定时任务绑定一张工单**：避免高频任务淹没看板，让历次运行记录归集在同一条工单串下；

@@ -45,8 +45,9 @@ pub use ops::{
     apply_remote_entries, make_sticky_or_shape,
 };
 pub use paint::{
-    FillTone, LayerPaintInput, WhiteboardPalette, paint_board_into_painter, paint_grid, paint_minimap, paint_minimap_painter, paint_overlay_layer,
-    paint_overlay_layer_painter, paint_overlay_layer_painter_filtered, paint_presences_into_painter, paint_static_layer, paint_static_layer_painter,
+    FillTone, FramePaintInput, LayerPaintInput, WhiteboardPalette, paint_board_frame, paint_board_frame_painter, paint_board_into_painter,
+    paint_board_into_painter_ex, paint_grid, paint_minimap, paint_minimap_painter, paint_overlay_layer, paint_overlay_layer_painter,
+    paint_overlay_layer_painter_filtered, paint_presences_into_painter, paint_static_layer, paint_static_layer_painter,
 };
 pub use snap::{
     AlignOp, DistributeAxis, SnapAxis, SnapConfig, SnapGuide, compute_align_deltas, compute_distribute_deltas, compute_move_snap, compute_resize_snap,

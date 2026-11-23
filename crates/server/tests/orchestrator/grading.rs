@@ -101,7 +101,7 @@ fn regression_issue_criteria_grade_the_builtin_worker_with_only_its_own_delivery
     drop(requests);
     let runs = s.board.runs(&id).unwrap();
     assert_eq!(runs.len(), 1);
-    let work = std::path::PathBuf::from(s.board.session(&run.session).unwrap().worktree.unwrap());
+    let work = std::path::PathBuf::from(s.board.session(&run.session).unwrap().cwd.unwrap());
     assert_eq!(std::fs::read_to_string(work.join("graded.txt")).unwrap(), "required-content");
     s.close();
 }

@@ -26,10 +26,12 @@ pub enum InboxKind {
     Mention,
     #[serde(rename = "cron-ask")]
     CronAsk,
+    #[serde(rename = "budget_reached")]
+    BudgetReached,
 }
 
 impl InboxKind {
-    pub const ALL: [InboxKind; 8] = [
+    pub const ALL: [InboxKind; 9] = [
         InboxKind::Review,
         InboxKind::Ask,
         InboxKind::Fix,
@@ -38,6 +40,7 @@ impl InboxKind {
         InboxKind::Quiet,
         InboxKind::Mention,
         InboxKind::CronAsk,
+        InboxKind::BudgetReached,
     ];
 
     /// The string on the wire.
@@ -51,6 +54,7 @@ impl InboxKind {
             InboxKind::Quiet => "quiet",
             InboxKind::Mention => "mention",
             InboxKind::CronAsk => "cron-ask",
+            InboxKind::BudgetReached => "budget_reached",
         }
     }
 }
@@ -74,6 +78,13 @@ pub struct InboxFromSession {
 #[serde(rename_all = "camelCase")]
 pub struct InboxFromOrchestrator {}
 
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct InboxFromRuntime {}
+
 /// Told apart by `kind`.
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -85,6 +96,8 @@ pub enum InboxFrom {
     Session(InboxFromSession),
     #[serde(rename = "orchestrator")]
     Orchestrator(InboxFromOrchestrator),
+    #[serde(rename = "runtime")]
+    Runtime(InboxFromRuntime),
 }
 
 #[skip_serializing_none]
@@ -116,6 +129,17 @@ pub struct InboxTargetChat {
     pub channel: String,
 }
 
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct InboxTargetRuntime {
+    pub task_id: String,
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<crate::typescript::SessionId>"))]
+    pub session_id: Option<SessionId>,
+}
+
 /// Told apart by `kind`.
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -129,6 +153,8 @@ pub enum InboxTarget {
     Issue(InboxTargetIssue),
     #[serde(rename = "chat")]
     Chat(InboxTargetChat),
+    #[serde(rename = "runtime")]
+    Runtime(InboxTargetRuntime),
 }
 
 /// What an item says on each route the user hears it on.
@@ -167,10 +193,12 @@ crate::typescript::module! {
     types: [InboxKind,
     InboxFromSession,
     InboxFromOrchestrator,
+    InboxFromRuntime,
     InboxFrom,
     InboxTargetSession,
     InboxTargetIssue,
     InboxTargetChat,
+    InboxTargetRuntime,
     InboxTarget,
     InboxWords,
     InboxItem];

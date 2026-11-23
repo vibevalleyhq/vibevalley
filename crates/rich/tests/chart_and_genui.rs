@@ -1,5 +1,3 @@
-mod support;
-
 use std::cell::RefCell;
 use std::sync::Mutex;
 
@@ -10,7 +8,7 @@ use vibevalley_rich::{
     VvGenUiActionEvent, chart_cache_stats, clear_chart_cache, clear_chart_renderer, clear_genui_renderer, render_chart, vv_chart, vv_gen_ui,
 };
 
-use support::{TestHarness, assert_inline_svg_image};
+use crate::support::{TestHarness, assert_inline_svg_image};
 
 static CHART_GENUI_TEST_LOCK: Mutex<()> = Mutex::new(());
 

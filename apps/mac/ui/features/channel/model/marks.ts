@@ -1,7 +1,7 @@
-import { type Channel, type Chat, type ChatMessage, type Notify, userId, type StateFrame } from "@vibevalley/protocol";
+import { type Channel, type Chat, type ChatMessage, type CollabSlice, type Notify, userId } from "@vibevalley/protocol";
 
 import { api } from "../../../infra/api";
-import { useCore } from "../../../infra/frame";
+import { useCollabSlice } from "../../../infra/frame";
 import { type Accessor, createEffect, createMemo } from "../../../infra/solid";
 import { defineAtom } from "../../../infra/state/atom";
 import { defineIntent, type Intent, type Intents, sendReplacing, useIntents } from "../../../infra/state/intent";
@@ -28,7 +28,7 @@ const reacted = (m: Pick<ChatMessage, "reactions">, emoji: string) => m.reaction
 
 export const reactionSet = defineIntent<ReactionMark, ChatMessage>({
   send: (r) => api.channel.reaction.set({ id: r.id, emoji: r.emoji, on: r.on }),
-  confirmed: (_frame, i) => {
+  confirmed: (i) => {
     const m = copyOf(i.input.channel, i.input.id);
     return m !== undefined && reacted(m, i.input.emoji) === i.input.on;
   },
@@ -40,7 +40,7 @@ export const reactionSet = defineIntent<ReactionMark, ChatMessage>({
 
 export const pinSet = defineIntent<PinMark, ChatMessage>({
   send: (p) => api.channel.pin.set({ id: p.id, on: p.on }),
-  confirmed: (_frame, i) => {
+  confirmed: (i) => {
     const m = copyOf(i.input.channel, i.input.id);
     return m !== undefined && (m.pinned !== undefined) === i.input.on;
   },
@@ -60,7 +60,7 @@ export interface NotifyMark {
   readonly notify: Notify;
 }
 
-const channelIn = (frame: StateFrame | undefined, id: string) => frame?.state.chat?.channels.find((c) => c.id === id);
+const channelIn = (collab: CollabSlice | undefined, id: string) => collab?.chat?.channels.find((c) => c.id === id);
 
 export interface ReadMark {
   readonly channel: string;
@@ -70,16 +70,18 @@ export interface ReadMark {
 /** Server sets read to number - 1 (clamped at 0). */
 const unreadUpTo = (number: number) => Math.max(0, number - 1);
 
-const readMark = defineIntent<ReadMark, void>({
+const readMark = defineIntent<ReadMark, void, "collab">({
+  slice: "collab",
   send: (r) => api.channel.markRead({ id: r.channel, number: r.number }),
-  confirmed: (frame, i) => (channelIn(frame, i.input.channel)?.read ?? 0) >= i.input.number,
+  confirmed: (collab, i) => (channelIn(collab, i.input.channel)?.read ?? 0) >= i.input.number,
   whileLost: "queue",
   timeoutMs: 20_000,
 });
 
-export const unreadMark = defineIntent<ReadMark, void>({
+export const unreadMark = defineIntent<ReadMark, void, "collab">({
+  slice: "collab",
   send: (r) => api.channel.markUnread({ id: r.channel, number: r.number }),
-  confirmed: (frame, i) => (channelIn(frame, i.input.channel)?.read ?? 0) <= unreadUpTo(i.input.number),
+  confirmed: (collab, i) => (channelIn(collab, i.input.channel)?.read ?? 0) <= unreadUpTo(i.input.number),
   whileLost: "queue",
   timeoutMs: 20_000,
 });
@@ -128,19 +130,21 @@ export function useMarkRead(channel: Accessor<Channel | undefined>, say: (reason
   );
 }
 
-export const archiveSet = defineIntent<ArchiveMark, void>({
+export const archiveSet = defineIntent<ArchiveMark, void, "collab">({
+  slice: "collab",
   send: (a) => api.channel.archive.set({ id: a.id, on: a.on }),
-  confirmed: (frame, i) => {
-    const c = channelIn(frame, i.input.id);
+  confirmed: (collab, i) => {
+    const c = channelIn(collab, i.input.id);
     return c !== undefined && (c.archived !== undefined) === i.input.on;
   },
   whileLost: "queue",
   timeoutMs: 20_000,
 });
 
-export const notifySet = defineIntent<NotifyMark, void>({
+export const notifySet = defineIntent<NotifyMark, void, "collab">({
+  slice: "collab",
   send: (n) => api.channel.notify.set({ id: n.id, notify: n.notify }),
-  confirmed: (frame, i) => (channelIn(frame, i.input.id)?.notify ?? "all") === i.input.notify,
+  confirmed: (collab, i) => (channelIn(collab, i.input.id)?.notify ?? "all") === i.input.notify,
   whileLost: "queue",
   timeoutMs: 20_000,
 });
@@ -220,11 +224,11 @@ function markedChat(chat: Chat | undefined, marks: ChannelMarks): Chat | undefin
 }
 
 export function useMarkedChat() {
-  const core = useCore();
+  const collab = useCollabSlice();
   const archives = useIntents(archiveSet);
   const notifies = useIntents(notifySet);
   const unreads = useIntents(unreadMark);
-  return () => markedChat(core()?.chat, { archives: archives.list(), notifies: notifies.list(), unreads: unreads.list() });
+  return () => markedChat(collab()?.chat, { archives: archives.list(), notifies: notifies.list(), unreads: unreads.list() });
 }
 
 export const markState = <I>(intents: readonly Intent<I, unknown>[], is: (input: I) => boolean): "pending" | undefined =>

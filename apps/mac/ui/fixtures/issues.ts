@@ -39,6 +39,10 @@ const runs: Run[] = [
   },
 ];
 
+const sessionEvents = [...finishedRun, ...liveRun];
+const oldestSeq = sessionEvents[0]?.seq;
+const newestSeq = sessionEvents.at(-1)?.seq;
+
 /** `{ op: data }` as vibevalley_bridge::fake reads responses.json. */
 export const responses: Record<string, unknown> = {
   // The sample's first hunk header counts 7 and 11 lines for 2 and 7: corrected, so the review draws it with DiffView.
@@ -49,16 +53,22 @@ export const responses: Record<string, unknown> = {
   "issue.timeline.get": { milestones, spent: { tokens: 182_400, cny: 0.42 } },
   "issue.run.list": runs,
   "issue.conversation.get": null,
-  "session.event.list": [...finishedRun, ...liveRun],
+  "session.event.list": {
+    events: sessionEvents,
+    hasMore: false,
+    ...(oldestSeq !== undefined ? { oldestSeq } : {}),
+    ...(newestSeq !== undefined ? { newestSeq } : {}),
+  },
 };
 
 const lastRun = (outcome: "completed" | "failed" | "interrupted", summary: string) => ({ outcome, summary, at: now - 6 * min });
 
-const at = { repo: "vibevalley", branch: "issue-31-login", worktree: "/Users/me/vibevalley/.worktrees/issue-31-login" };
+const worktree = "/Users/me/vibevalley/.worktrees/issue-31-login";
 const workingSession = sampleSession("w5", "laozhou", working(now - 4 * min), {
   name: "老周",
-  ...at,
-  branch: "issue-32-settings",
+  cwd: worktree,
+  policy: { kind: "managedWorktree", repo: "vibevalley", branch: "issue-32-settings" },
+  bindings: [],
   runtime: "codex",
   subagents: {
     run: "run-2",
@@ -85,7 +95,14 @@ const reviewSession = sampleSession(
   "w4",
   "laozhou",
   { _tag: "resting" },
-  { name: "老周", ...at, runs: 3, lastRun: lastRun("completed", "过期回到登录页，登录页说明原因，加了两条测试。") },
+  {
+    name: "老周",
+    cwd: worktree,
+    policy: { kind: "managedWorktree", repo: "vibevalley", branch: "issue-31-login" },
+    bindings: [],
+    runs: 3,
+    lastRun: lastRun("completed", "过期回到登录页，登录页说明原因，加了两条测试。"),
+  },
 );
 
 // The helpers a profile sent (the trajectories view), by op only: every profile has these.

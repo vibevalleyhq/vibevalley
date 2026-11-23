@@ -70,9 +70,14 @@ fn main() {
         }
         ensure_main_window(cx);
         cx.activate(true);
-        cx.on_app_quit(|_| {
-            serving::shutdown();
-            async {}
+        cx.on_app_quit(|cx| {
+            let running = serving::RunningServer::take_for_shutdown(cx);
+            async move {
+                if let Some(running) = running {
+                    let done = std::thread::spawn(move || running.shutdown());
+                    let _ = done.join();
+                }
+            }
         })
         .detach();
     });

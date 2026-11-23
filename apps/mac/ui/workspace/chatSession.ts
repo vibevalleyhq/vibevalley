@@ -25,24 +25,28 @@ import {
   SessionWorkspace as SessionWorkspaceSchema,
 } from "@vibevalley/protocol/session/schema";
 
-import { call, subscribe } from "../infra/bridge";
+import { computeTelemetry, extractToolTarget, formatTokens, mergeSteps, shownEvents } from "../features/session/runs";
+import { transport } from "../infra/transport";
 
-export type {
-  EventTokens,
-  SessionChildStep,
-  SessionEvent,
-  SessionInteractionRequest,
-  SessionPermissionDecision,
-  SessionPermissionMode,
-  SessionPermissionRequest,
-  SessionSwarmMember,
-  SessionSwarmMemberState,
-  SessionSwarmMessage,
-  SessionSwarmOverview,
-  SessionSwarmState,
-  SessionSwarmThread,
-  SessionWatchEvent,
-  SessionWorkspace,
+export {
+  computeTelemetry,
+  extractToolTarget,
+  formatTokens,
+  type EventTokens,
+  type SessionChildStep,
+  type SessionEvent,
+  type SessionInteractionRequest,
+  type SessionPermissionDecision,
+  type SessionPermissionMode,
+  type SessionPermissionRequest,
+  type SessionSwarmMember,
+  type SessionSwarmMemberState,
+  type SessionSwarmMessage,
+  type SessionSwarmOverview,
+  type SessionSwarmState,
+  type SessionSwarmThread,
+  type SessionWatchEvent,
+  type SessionWorkspace,
 };
 
 export interface ComposerFile {
@@ -64,6 +68,7 @@ export interface RuntimeModelOption {
   readonly label: string;
   readonly effortLevels: readonly ThoughtLevel[];
   readonly defaultEffort?: ThoughtLevel | undefined;
+  readonly isDefault?: boolean | undefined;
 }
 
 export interface WorkspaceRuntimeOption {
@@ -71,31 +76,11 @@ export interface WorkspaceRuntimeOption {
   readonly name: string;
   readonly available: boolean;
   readonly models: readonly RuntimeModelOption[];
+  readonly defaultModel?: string | undefined;
   readonly quotaPct?: number | undefined;
   readonly quotaText?: string | undefined;
   readonly supportsSteer: boolean;
   readonly supportsConfig: boolean;
-}
-
-export interface ToolTarget {
-  readonly path: string;
-  readonly line?: number | undefined;
-  readonly canDiff: boolean;
-}
-
-export interface ChatTelemetry {
-  readonly cachedRead: number;
-  readonly uncachedInput: number;
-  readonly totalInput: number;
-  readonly output: number;
-  readonly reasoning: number;
-  readonly contextUsed: number;
-  readonly contextWindow: number;
-  readonly contextPct: number;
-  readonly cacheHitPct: number;
-  readonly turns: number;
-  readonly toolCount: number;
-  readonly hasData: boolean;
 }
 
 const DEFAULT_EFFORTS: readonly ThoughtLevel[] = ["low", "medium", "high"];
@@ -122,14 +107,21 @@ const FALLBACK_RUNTIMES: readonly WorkspaceRuntimeOption[] = [
 
 const runtimeListSchema = z.array(RuntimeInfoSchema);
 
-function toWorkspaceRuntime(rt: ProtocolRuntimeInfo): WorkspaceRuntimeOption {
-  const models: RuntimeModelOption[] = (rt.models ?? []).map((m) => {
-    const levels = m.effortLevels.map(asThoughtLevel).filter((v): v is ThoughtLevel => v !== undefined);
+export function toWorkspaceRuntime(rt: ProtocolRuntimeInfo): WorkspaceRuntimeOption {
+  const refusedEffort = rt.support.refused.effort !== undefined;
+  const rawModels = rt.models ?? [];
+  const hasPerModelEfforts = rawModels.some((m) => m.effortLevels.some((l) => asThoughtLevel(l) !== undefined));
+  const models: RuntimeModelOption[] = rawModels.map((m) => {
+    const levels = refusedEffort ? [] : m.effortLevels.map(asThoughtLevel).filter((v): v is ThoughtLevel => v !== undefined);
+    const effortLevels: readonly ThoughtLevel[] = levels.length > 0 ? levels : !hasPerModelEfforts && !refusedEffort ? DEFAULT_EFFORTS : [];
+    const parsedDefault = asThoughtLevel(m.defaultEffort);
+    const defaultEffort = parsedDefault !== undefined && effortLevels.includes(parsedDefault) ? parsedDefault : undefined;
     return {
       id: m.id,
       label: m.name || m.id,
-      effortLevels: levels.length > 0 ? levels : DEFAULT_EFFORTS,
-      defaultEffort: asThoughtLevel(m.defaultEffort),
+      effortLevels,
+      defaultEffort,
+      isDefault: m.isDefault,
     };
   });
   const firstWindow = rt.usage?.status === "ok" ? rt.usage.windows[0] : undefined;
@@ -144,6 +136,7 @@ function toWorkspaceRuntime(rt: ProtocolRuntimeInfo): WorkspaceRuntimeOption {
     name: rt.preset.label || runtimeDisplayName(rt.id),
     available: rt.installation.status === "available",
     models,
+    defaultModel: rt.settings.defaultModel.trim() || undefined,
     quotaPct,
     quotaText: rt.quota?.text ?? firstWindow?.label,
     supportsSteer: rt.support.steer,
@@ -151,8 +144,25 @@ function toWorkspaceRuntime(rt: ProtocolRuntimeInfo): WorkspaceRuntimeOption {
   };
 }
 
+export function preferredModelFor(rt: WorkspaceRuntimeOption | undefined): RuntimeModelOption | undefined {
+  if (!rt) return undefined;
+  return rt.models.find((m) => m.id === rt.defaultModel) ?? rt.models.find((m) => m.isDefault === true) ?? rt.models[0];
+}
+
+export function defaultThoughtLevelFor(model: RuntimeModelOption | undefined): ThoughtLevel | undefined {
+  if (!model || model.effortLevels.length === 0) return undefined;
+  if (model.defaultEffort !== undefined && model.effortLevels.includes(model.defaultEffort)) return model.defaultEffort;
+  return model.effortLevels[0];
+}
+
+export function clampThoughtLevel(model: RuntimeModelOption | undefined, current: ThoughtLevel | undefined): ThoughtLevel | undefined {
+  if (!model || model.effortLevels.length === 0) return undefined;
+  if (current !== undefined && model.effortLevels.includes(current)) return current;
+  return defaultThoughtLevelFor(model);
+}
+
 export async function fetchWorkspaceRuntimes(): Promise<readonly WorkspaceRuntimeOption[]> {
-  const env = await call("runtime.list", {});
+  const env = await transport().call("runtime.list", {});
   if (env.bizCode !== 0) return FALLBACK_RUNTIMES;
   const parsed = runtimeListSchema.safeParse(env.data);
   if (!parsed.success || parsed.data.length === 0) return FALLBACK_RUNTIMES;
@@ -188,159 +198,23 @@ export function deriveChatTitle(sessionTitle: string | undefined, swarmTitle: st
   return undefined;
 }
 
+const chatHiddenStepTypes: ReadonlySet<SessionEvent["type"]> = new Set([
+  "tool/result",
+  "run/start",
+  "run/end",
+  "llm/usage",
+  "permission/request",
+  "permission/resolved",
+  "interaction/request",
+]);
+
 export function mergeChatSteps(existing: readonly SessionEvent[], incoming: readonly SessionEvent[]): SessionEvent[] {
-  if (incoming.length === 0) return [...existing];
-  const bySeq = new Map<number, SessionEvent>(existing.map((s) => [s.seq, s]));
-  for (const step of incoming) {
-    const prev = bySeq.get(step.seq);
-    if (!prev || step.revision >= prev.revision) bySeq.set(step.seq, step);
-  }
-  return [...bySeq.values()].toSorted((a, b) => a.seq - b.seq);
+  return mergeSteps([...existing], incoming, { limit: null, replaceSameRevision: true });
 }
 
 /** Joins `tool/call` steps with their matching `tool/result` (`call === seq`) and drops run/usage bounds. */
 export function visibleChatSteps(steps: readonly SessionEvent[]): SessionEvent[] {
-  const results = new Map<number, SessionEvent>();
-  for (const step of steps) {
-    if (step.type === "tool/result" && step.call !== undefined) results.set(step.call, step);
-  }
-  return steps.flatMap((step) => {
-    if (step.type === "tool/call") {
-      const result = results.get(step.seq);
-      if (!result) return [step];
-      return [
-        {
-          ...step,
-          ...(result.output !== undefined ? { output: result.output } : {}),
-          ...(result.ok !== undefined ? { ok: result.ok } : {}),
-        },
-      ];
-    }
-    if (
-      step.type === "tool/result" ||
-      step.type === "run/start" ||
-      step.type === "run/end" ||
-      step.type === "llm/usage" ||
-      step.type === "permission/request" ||
-      step.type === "permission/resolved" ||
-      step.type === "interaction/request"
-    ) {
-      return [];
-    }
-    return [step];
-  });
-}
-
-const toolInputPathKeys = ["path", "file_path", "filePath", "TargetFile", "AbsolutePath", "file"] as const;
-const toolInputLineKeys = ["line", "start_line", "StartLine", "lineNumber", "offset"] as const;
-
-const jsonRecordSchema = z.record(z.string(), z.unknown());
-
-export function extractToolTarget(step: Pick<SessionEvent, "action" | "tool" | "input" | "text">): ToolTarget | undefined {
-  let foundPath: string | undefined;
-  let foundLine: number | undefined;
-  if (step.input !== undefined) {
-    try {
-      const parsed = jsonRecordSchema.safeParse(JSON.parse(step.input));
-      if (parsed.success) {
-        const obj = parsed.data;
-        for (const key of toolInputPathKeys) {
-          const val = obj[key];
-          if (typeof val === "string" && val.trim().length > 0) {
-            foundPath = val.trim();
-            break;
-          }
-        }
-        for (const key of toolInputLineKeys) {
-          const val = obj[key];
-          if (typeof val === "number" && Number.isFinite(val) && val > 0) {
-            foundLine = Math.floor(val);
-            break;
-          }
-        }
-      }
-    } catch {
-      // Non-JSON input; fall back to `step.text`.
-    }
-  }
-  if (!foundPath && (step.action === "read_file" || step.action === "edit_file")) {
-    const token = step.text.trim().split(/\s+/u)[0];
-    if (token && (token.includes("/") || token.includes("."))) {
-      const [rawPath, rawLine] = token.split(":");
-      if (rawPath) foundPath = rawPath;
-      if (rawLine) {
-        const n = Number(rawLine);
-        if (Number.isFinite(n) && n > 0) foundLine = Math.floor(n);
-      }
-    }
-  }
-  if (!foundPath) return undefined;
-  const toolLower = (step.tool ?? "").toLowerCase();
-  const canDiff =
-    step.action === "edit_file" || toolLower.includes("edit") || toolLower.includes("write") || toolLower.includes("replace") || toolLower.includes("patch");
-  return foundLine !== undefined ? { path: foundPath, line: foundLine, canDiff } : { path: foundPath, canDiff };
-}
-
-export function computeTelemetry(steps: readonly SessionEvent[], latestTokens?: EventTokens, defaultWindow = 200_000): ChatTelemetry {
-  let cachedRead = 0;
-  let totalInput = 0;
-  let output = 0;
-  let reasoning = 0;
-  let contextUsed = 0;
-  let contextWindow = defaultWindow;
-  let turns = 0;
-  let toolCount = 0;
-  let hasData = false;
-
-  const fold = (tok: EventTokens) => {
-    hasData = true;
-    cachedRead += Math.max(0, tok.cacheRead);
-    const stepTotalIn = Math.max(tok.input, tok.cacheRead);
-    totalInput += stepTotalIn;
-    output += Math.max(0, tok.output);
-    reasoning += Math.max(0, tok.reasoning ?? 0);
-    if (tok.contextUsed !== undefined && tok.contextUsed > 0) contextUsed = tok.contextUsed;
-    else contextUsed = stepTotalIn;
-    if (tok.contextWindow !== undefined && tok.contextWindow > 0) contextWindow = tok.contextWindow;
-  };
-
-  for (const step of steps) {
-    if (step.type === "user/message" && step.under === undefined) turns += 1;
-    if (step.type === "tool/call") toolCount += 1;
-    if (step.tokens !== undefined) fold(step.tokens);
-  }
-  if (!hasData && latestTokens !== undefined) {
-    fold(latestTokens);
-  } else if (latestTokens !== undefined) {
-    if (latestTokens.contextUsed !== undefined && latestTokens.contextUsed > 0) contextUsed = latestTokens.contextUsed;
-    if (latestTokens.contextWindow !== undefined && latestTokens.contextWindow > 0) contextWindow = latestTokens.contextWindow;
-  }
-
-  const uncachedInput = Math.max(0, totalInput - cachedRead);
-  const effectiveWindow = Math.max(1, contextWindow);
-  const contextPct = Math.min(100, Math.round((contextUsed / effectiveWindow) * 100));
-  const cacheHitPct = totalInput > 0 ? Math.min(100, Math.round((cachedRead / totalInput) * 100)) : 0;
-
-  return {
-    cachedRead,
-    uncachedInput,
-    totalInput,
-    output,
-    reasoning,
-    contextUsed,
-    contextWindow: effectiveWindow,
-    contextPct,
-    cacheHitPct,
-    turns,
-    toolCount,
-    hasData,
-  };
-}
-
-export function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/u, "")}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/u, "")}k`;
-  return String(Math.round(n));
+  return shownEvents(steps, chatHiddenStepTypes);
 }
 
 export interface OpenWorkspaceParams {
@@ -362,7 +236,7 @@ export async function openWorkspaceSession(params: OpenWorkspaceParams): Promise
   if (params.effort) payload.effort = params.effort;
   if (params.permissionMode) payload.permissionMode = params.permissionMode;
   if (params.title) payload.title = params.title;
-  const env = await call("session.openWorkspace", payload);
+  const env = await transport().call("session.openWorkspace", payload);
   if (env.bizCode !== 0) return { ok: false, reason: env.message };
   const parsed = SessionWorkspaceSchema.safeParse(env.data);
   if (!parsed.success) return { ok: false, reason: "invalid session.openWorkspace response" };
@@ -378,7 +252,7 @@ const localPickedFileSchema = z
   .nullable();
 
 export async function pickWorkspaceFile(): Promise<ComposerFile | undefined> {
-  const env = await call("host.pickFile", {});
+  const env = await transport().call("host.pickFile", {});
   if (env.bizCode !== 0) return undefined;
   const parsed = localPickedFileSchema.safeParse(env.data);
   if (!parsed.success || parsed.data === null) return undefined;
@@ -394,7 +268,7 @@ export async function sendWorkspaceMessage(
   if (contextFiles !== undefined && contextFiles.length > 0) {
     payload.contextFiles = contextFiles.map((f) => ({ path: f.path }));
   }
-  const env = await call("session.send", payload);
+  const env = await transport().call("session.send", payload);
   return env.bizCode === 0 ? { ok: true } : { ok: false, reason: env.message };
 }
 
@@ -403,7 +277,7 @@ export async function fetchChildTranscript(
   conversationId: string,
   limit = 25,
 ): Promise<{ ok: true; steps: SessionChildStep[] } | { ok: false; reason: string }> {
-  const env = await call("session.childTranscript", { id, conversationId, limit });
+  const env = await transport().call("session.childTranscript", { id, conversationId, limit });
   if (env.bizCode !== 0) return { ok: false, reason: env.message };
   const parsed = SessionChildTranscriptSchema.safeParse(env.data);
   if (!parsed.success) return { ok: false, reason: "invalid session.childTranscript response" };
@@ -429,7 +303,7 @@ export function parseBoardTokens(text: string): BoardTextToken[] {
 }
 
 export async function stopWorkspaceSession(id: string): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const env = await call("session.stop", { id });
+  const env = await transport().call("session.stop", { id });
   return env.bizCode === 0 ? { ok: true } : { ok: false, reason: env.message };
 }
 
@@ -441,7 +315,7 @@ export async function setWorkspaceConfig(
   if (config.model !== undefined) payload.model = config.model;
   if (config.effort !== undefined) payload.effort = config.effort;
   if (config.permissionMode !== undefined) payload.permissionMode = config.permissionMode;
-  const env = await call("session.setConfig", payload);
+  const env = await transport().call("session.setConfig", payload);
   if (env.bizCode !== 0) return { ok: false, reason: env.message };
   const parsed = SessionWorkspaceSchema.safeParse(env.data);
   return parsed.success ? { ok: true, workspace: parsed.data } : { ok: true };
@@ -464,7 +338,7 @@ export async function respondWorkspaceInteraction(
       payload.cancelled = true;
       break;
   }
-  const env = await call("session.respondInteraction", payload);
+  const env = await transport().call("session.respondInteraction", payload);
   return env.bizCode === 0 ? { ok: true } : { ok: false, reason: env.message };
 }
 
@@ -473,13 +347,18 @@ export async function respondWorkspacePermission(
   requestId: string,
   decision: SessionPermissionDecision,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const env = await call("session.respondPermission", { id, requestId, decision });
+  const env = await transport().call("session.respondPermission", { id, requestId, decision });
   return env.bizCode === 0 ? { ok: true } : { ok: false, reason: env.message };
 }
 
 export function watchWorkspaceSession(id: string, onEvent: (event: SessionWatchEvent) => void, onEnd?: () => void, afterSeq?: number): () => void {
+  const sub = transport().subscribe;
+  if (!sub) {
+    queueMicrotask(() => onEnd?.());
+    return () => {};
+  }
   const payload = afterSeq !== undefined ? { id, afterSeq } : { id };
-  return subscribe(
+  return sub(
     "session.watch",
     payload,
     (raw) => {

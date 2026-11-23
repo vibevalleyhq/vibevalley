@@ -165,8 +165,10 @@ pub struct Started {
     pub game: Arc<modules::skin::game::Game>,
     pub attachments: Arc<modules::content::attachment::Attachments>,
     pub chat: Arc<modules::collab::channel::Chat>,
-    /// Routes the chat to the sessions and opens their threads.
-    pub watch: Arc<modules::collab::watch::Watch>,
+    /// Issue thread lifecycle, reports, and per-issue chat delivery.
+    pub issue_chat: Arc<modules::work::issue::IssueChat>,
+    /// Session seating, channel removal guard, and direct-channel talk delivery.
+    pub session_chat: Arc<modules::work::session::SessionChat>,
     /// The assistants: what the chat and the crons say to them.
     pub orchestrator: Arc<modules::team::orchestrator::Orchestrator>,
     /// Session trajectories on disk and in memory.
@@ -203,9 +205,11 @@ impl Started {
         self.pulls.close();
         self.crons.close();
         self.voice.close();
-        self.watch.close();
+        self.hub.close_bus();
+        self.issue_chat.close();
+        self.session_chat.close();
         self.orchestrator.close();
-        self.hub.space.stop();
+        self.hub.runtime_inbox.stop();
         self.agents.fleet.close();
         self.repos.close();
         self.artifacts.close();
@@ -425,14 +429,27 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     .map_err(|e| failed("durable execution")(&e))?;
     let _ = execution.set(vibevalley_runtime::agent::harness::SharedExecution::new(orchestrator.execution.harness.clone()));
     let _ = hub.execution.set(Arc::downgrade(&orchestrator));
-    hub.space.attach(orchestrator.execution.store()).map_err(|e| failed("durable projection")(&e))?;
+    hub.runtime_inbox
+        .attach(orchestrator.execution.store(), &hub)
+        .map_err(|e| failed("durable projection")(&e))?;
     modules::team::orchestrator::install(&hub, orchestrator.clone());
     board.refresh_queue().map_err(|e| failed("the queue")(&e))?;
     let listening = config.orchestrator_listens.then(|| orchestrator.clone());
+    let issue_chat = modules::work::issue::IssueChat::start(&hub, board.clone(), chat.clone());
+    let session_chat = {
+        let ic = issue_chat.clone();
+        modules::work::session::SessionChat::start(
+            &hub,
+            board.clone(),
+            chat.clone(),
+            agents.clone(),
+            Arc::new(move |session| ic.ensure_session_thread(session)),
+        )
+    };
     if let Some(o) = &listening {
         crons.attach_orchestrator(o);
+        o.listen_chat(chat.clone());
     }
-    let watch = modules::collab::watch::Watch::start_with(&hub, chat.clone(), board.clone(), agents.clone(), listening);
     let voice = modules::collab::voice::Voice::open(modules::collab::voice::Parts {
         hub: Arc::downgrade(&hub),
         setting: setting.clone(),
@@ -444,6 +461,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         pause: None,
     });
     modules::collab::voice::install(&hub, voice.clone());
+    hub.attach_voice(voice.clone());
     let connectors = modules::collab::connector::Connectors::open(&config.home, &hub, chat.clone(), config.connector.clone())
         .map_err(|e| failed("the connectors")(&e.message))?;
     modules::collab::connector::install(&hub, connectors.clone());
@@ -459,7 +477,8 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         game,
         attachments,
         chat,
-        watch,
+        issue_chat,
+        session_chat,
         orchestrator,
         trajectories,
         memories,

@@ -69,7 +69,7 @@ impl Board {
             if s.phase.is_working() {
                 return Err(BoardError::Other("the parent's session is working; split it when it rests".into()));
             }
-            if let Some(wt) = s.worktree.as_deref() {
+            if let Some(wt) = s.cwd.as_deref() {
                 Workplace::commit_leftovers(wt, &format!("Issue #{}: work before the split", parent.number))?;
             }
         }
@@ -155,11 +155,11 @@ impl Board {
             return Ok(());
         }
         let checks = vibevalley_core::child_checks(child, &self.state().issues);
-        let parent_worktree = parent_session.and_then(|s| s.worktree);
+        let parent_worktree = parent_session.and_then(|s| s.cwd);
         let child_at = OnDisk {
             number: child.number,
             title: &child.title,
-            worktree: session.worktree.as_deref(),
+            worktree: session.cwd.as_deref(),
         };
         let parent_at = OnDisk {
             number: parent.number,
