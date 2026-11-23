@@ -55,7 +55,7 @@ flowchart LR
 仓库目录结构见根目录 [AGENTS.md](AGENTS.md#目录)。
 
 - **契约与环境约定（`crates/protocol` → `packages/protocol`）**：服务端与客户端唯一的共享契约，以 Rust 为源：`src/contract/` 一个概念一个文件（含 5 域切片、`FarmFrame`、`debug.rs` 的 `DebugKit` 契约、`remote.rs` 的远程访问与配对契约，以及 GPUI 壳 ↔ 托管界面的强类型 `host.rs`：`Host*` 帧、`HostAction` 与 40 成员封闭 `HostOp`），`typescript.rs` 写出 `packages/protocol/src/<概念>/shapes.gen.ts` 与 `endpoints.gen.ts`（`vp run protocol:ts`）；`home.rs` 约定家目录、`server.json` 与语言；页面在边界解码用的 Zod（`schema.ts`）和带入参出参的端点表（`api.ts`）是手写的，由测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）；`@vibevalley/protocol/remote`（[transport.ts](packages/protocol/src/remote/transport.ts)）导出零平台依赖的纯 Web Fetch `HttpRemoteTransport`（支持 Bearer 鉴权、`Last-Event-ID` SSE 断线续读与 `vibevalley://pair` 深链解析）。
-- **规则（`crates/core`）**：纯函数规则层：`reduce`、`SliceMask` 与按域切片投影（`board_slice`、`sessions_slice`、`collab_slice`、`inbox_slice`、`ops_slice`、`farm_frame`）、任务的状态与阶段和可做的动作、收件箱、简报和起草、农场的画面（[核心状态](docs/subsystems/core.md)），并收拢定时任务规则（`cron/`）、笔记大纲引擎（`pkm/`）与作品引擎（`artifact/`）。
+- **规则（`crates/core`）**：纯函数规则层：`reduce`、`SliceMask` 与按域切片投影（`board_slice`、`sessions_slice`、`collab_slice`、`inbox_slice`、`ops_slice`、`farm_frame`）、任务的状态与阶段和可做的动作、收件箱、简报和起草、农场的画面（[核心状态](docs/subsystems/core.md)），并收拢定时任务规则（`cron/`）与作品引擎（`artifact/`）。
 - **服务与传输（`crates/server`）**：`src/lib.rs` 的 `Hub` 持有核心状态、接口表、异步 `EventBus`、基于 `tokio::sync::watch` 的 6 路 `SliceFeed<T>`、`tokio::sync::broadcast` 实时事件流、`CancellationToken`/`TaskTracker` 生命周期与 `arc-swap` 无锁可插拔脊柱钩子（`CallerContext`/`ClientIdentity`、`InvokeObserver`、`FaultGate`、`HostDebugBridge`、`RemoteAuth`）；`src/modules/` 按 `work`、`team`、`collab`、`content`、`skin`、`infra` 六个业务域分组（其中 `infra/debug/` 提供 `DebugKit`，仅在 `VIBEVALLEY_DEBUG=1` 下挂接四泳道定长环形缓冲、跳过 `debug.*` 的 `FaultGate`、统一脱敏器与纯 Rust ZIP `debug-bundle.zip` 导出；`infra/remote/` 提供默认关闭的远程访问控制、Tailscale 状态探测、5 分钟一次性配对码与 SHA-256 哈希 `vv_dev_*` 设备令牌校验；进程日志经工作区 `tracing` + `tracing-subscriber` 初始化），`src/start.rs` 照依赖次序打开各模块（任务板拆成 `work/issue`、`work/session`、`work/workplace`，都只经 `work/ledger.rs` 写；频道仅做纯受众路由、`channel_delivery` 与穷尽 `ChannelEvent` 广播）；`src/db/{schema,queries,generated}/` 集中管理服务端 SQLite 建表语句（含共享 `seq_counter` 与 `infra_remote.sql`）、命名查询与 sqlc 生成绑定；`src/transport/` 收拢服务接口（`api`）、进程内桥（`bridge`）和跑在共享运行时上的 HTTP 门（`http`：本机回环门与默认关闭的受认证远程监听门、基于 `WatchStream` 的 `/api/v1/slice/{name}`、SSE、`/mcp`）。
 - **运行与引擎（`crates/runtime`、`crates/rich`、`crates/engines`）**：`crates/runtime` 提供进程级共享 Tokio 运行时 `rt`（`vibevalley_runtime::rt::{handle, spawn, block_on}`，工作线程 `vibevalley-io-{n}`），合拢 `oar/`（Claude Code、Codex、ACP、自研 `vibevalley` 与 scripted，含基于 `arc-swap` 的零开销 `OarObserver` 钩子与 `oar-voyage/3` 记录流）与自研 `agent/`（经工作区 `reqwest` 与 `backon` 接 DeepSeek，[自研 agent](docs/subsystems/brain.md)）；`crates/rich` 基于 `crates/engines/{onig,pele,shiki}` 提供原生富内容组件与文本引擎（`engine/{canvas,chart,genui,pinyin,whiteboard}`，其中 `canvas` 专注静态 JSON Canvas 1.0 SVG 渲染，交互白板编辑由 `whiteboard` 承接），[icon.rs](crates/rich/src/icon.rs) 亦作为 97 枚 reicons 矢量路径的单一事实源供 [icons.ts](scripts/gen/icons.ts) 导出给 `<Canvas>` + `Path2D` 回退。
 - **存储（SQLite + 文件）**：服务端 SQLite 表集中定义并生成于 `crates/server/src/db/{schema,queries,generated}/`（`server.db` 按 `create table if not exists` 建表，`seq_counter` 共享序号）；任务（单表 `issue`）、领域无关 `AgentSession`（`session`、`session_run`、`session_mailbox`、`session_event`）、`channel_delivery`、作品/媒体表与远程访问表（`remote_config`、`remote_device`）都在同一个库；没有迁移，形状变了直接改。
@@ -84,7 +84,7 @@ Host：
 | `config.json` | 角色（主助手和执行角色）、技能书、引擎设置 |
 | `agent-templates/<id>/` | 从本机导入的角色模板 |
 | `settings.json` | 钥匙、AI 服务连接（权限 `0600`） |
-| `server.db` | SQLite：任务、领域无关 `AgentSession`（`session`、`session_run`、`session_mailbox`、`session_event`）、定时任务（`cron`）、PR 与事件（`pull`、`pull_event`）、频道与投递队列（`channel*`、`channel_delivery`）、附件、记忆、媒体任务与媒体库、作品（含结构化条目与变更日志）、笔记索引（`pkm_term`）、批注与撤销、远程访问配置与已配对设备哈希表（`remote_config`、`remote_device`） |
+| `server.db` | SQLite：任务、领域无关 `AgentSession`（`session`、`session_run`、`session_mailbox`、`session_event`）、定时任务（`cron`）、PR 与事件（`pull`、`pull_event`）、频道与投递队列（`channel*`、`channel_delivery`）、附件、记忆、媒体任务与媒体库、作品（含结构化条目、Loro 协同快照与变更日志）、远程访问配置与已配对设备哈希表（`remote_config`、`remote_device`） |
 | `issues/` | 任务板进程锁、引擎原始记录与结构化汇报文件 |
 | `ledger.jsonl` | 游戏账本 |
 | `records/` | 执行会话与主助手的 `oar-voyage/3` JSONL 原始记录流（`record_to`） |
@@ -96,7 +96,6 @@ Host：
 Space 下：
 - `repos/`：仓库的 git 仓库。
 - `worktrees/`：任务分支的 git worktree。
-- `pkm/`：笔记库（PARA 目录与日记 Markdown，可通过 `pkm.root` 改到别处，[笔记](docs/subsystems/pkm.md)）。
 
 ## 配置
 

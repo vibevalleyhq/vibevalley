@@ -194,9 +194,7 @@
     "hint": "Type a name; # finds channels and threads, @ direct messages",
     "none": "Nothing found",
     "direct": "Direct message",
-    "newDirect": "New direct message",
-    "note": "Note · {tier}",
-    "searchNotes": "Search notes for “{q}”"
+    "newDirect": "New direct message"
   },
   "farmSearch": {
     "title": "Search everything",

@@ -22,10 +22,10 @@ import { providerQuery, ready, settingsQuery, useQuery, useQueryClient } from ".
 import { Link } from "../../infra/router";
 
 /** The uses an account serves, in the order the uses table shows them: what the account page lists as its models. */
-const adaptedUses = ["image", "understanding", "dictation", "speech", "speakers", "voiceDesign", "transcription", "live", "vision"] as const;
+const adaptedUses = ["image", "understanding", "speech", "speakers", "voiceDesign", "transcription", "live", "vision"] as const;
 
 type Use = (typeof adaptedUses)[number];
-type UseHint = "imageNotice" | "understandingNotice" | "modelHint" | "speechNotice" | "liveHint";
+type UseHint = "imageNotice" | "understandingNotice" | "speechNotice" | "liveHint";
 
 /** The uses a connection serves, in the groups the page shows them in; each one's words where it needs some. */
 const useGroups: readonly { title: "groupImage" | "groupVoice" | "groupLive"; uses: readonly { use: Use; hint?: UseHint }[] }[] = [
@@ -38,13 +38,7 @@ const useGroups: readonly { title: "groupImage" | "groupVoice" | "groupLive"; us
   },
   {
     title: "groupVoice",
-    uses: [
-      { use: "dictation", hint: "modelHint" },
-      { use: "speech", hint: "speechNotice" },
-      { use: "speakers" },
-      { use: "voiceDesign" },
-      { use: "transcription" },
-    ],
+    uses: [{ use: "speech", hint: "speechNotice" }, { use: "speakers" }, { use: "voiceDesign" }, { use: "transcription" }],
   },
   { title: "groupLive", uses: [{ use: "live", hint: "liveHint" }, { use: "vision" }] },
 ];
@@ -52,7 +46,6 @@ const useGroups: readonly { title: "groupImage" | "groupVoice" | "groupLive"; us
 const editable = (status: ProviderStatus): ProviderUpdate => ({
   revision: status.revision,
   connections: status.connections.map(({ key: _key, ...connection }) => connection),
-  dictation: status.dictation,
   image: status.image,
   understanding: status.understanding,
   speech: status.speech,

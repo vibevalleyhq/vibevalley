@@ -267,7 +267,6 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
         link_previews: false,
         offline_media: true,
         orchestrator_listens: false,
-        watch_pkm: false,
         ..ServerConfig::under(&root)
     })
     .unwrap();

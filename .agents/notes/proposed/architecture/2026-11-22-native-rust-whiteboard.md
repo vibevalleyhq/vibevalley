@@ -15,7 +15,7 @@ Status: proposed
 采用「复杂交互组件下沉 `crates/rich`、TSX 只保留数据绑定与页面薄壳」的分层架构，在 `vibevalley/rich` UI 集合中构建零 `WKWebView` 的纯 Rust 原生协作无限白板组件 `VvWhiteboard`：
 
 1. **十四模块纯 Rust 白板引擎（`crates/rich/src/engine/whiteboard/`）**：
-   - `model.rs` / `codec.rs`：进门一次解码 `artifact.entry.*`（`board/meta`、`elements/*`、`presence/*`）为封闭 13 变体 `ElementKind` 与 `BoardDoc`（保留 `ExtraFields` 前向兼容，门内零 `serde_json::Value` 业务分支），支持增量 `patch` 与 `if_rev`，并支持导入标准 JSON Canvas 1.0。
+   - `model.rs` / `codec.rs`：进门一次解码 `artifact.entry.*`（`board/meta`、`elements/*`）与 `artifact.presence.*` 为封闭 13 变体 `ElementKind` 与 `BoardDoc`（保留 `ExtraFields` 前向兼容，门内零 `serde_json::Value` 业务分支），支持增量 `patch` 与 `if_rev`，并支持导入标准 JSON Canvas 1.0。
    - `spatial.rs` / `geometry.rs` / `layout.rs`：256u 网格空间索引与视口裁剪；Catmull-Rom 样条、折线弧长采样与里程碑投影、平滑/正交避障/直线连线路由、旋转 OBB 计算；CJK 与拉丁混排精确测宽与高亮胶囊定位。
    - `stickers.rs` / `templates.rs`：24+ 枚统一手绘粗描边纯矢量贴纸（零 `<text>`，由 `nsh_core::svg::drawing` 解析并 LRU 缓存）与 5 套即用模板（产品发布时间线、系统架构图、用户旅程图、四象限、对比矩阵）。
    - `hit.rs` / `snap.rs` / `ink.rs`：8 向缩放柄、旋转柄、N/E/S/W 锚点端口、连线拐点与时间线里程碑命中，双向框选；边缘/中心对齐与等距间距磁性参考线及对齐/分布/规整排版；压感/速度变宽手绘墨迹轮廓、荧光笔、RDP 简化与橡皮擦相交擦除。

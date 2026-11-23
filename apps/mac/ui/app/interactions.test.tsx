@@ -202,39 +202,96 @@ test("orchestrator trajectory: polled approval can be granted", async () => {
   });
 });
 
-test("pkm: deep links remain readable while bare /pkm redirects to newest outline artifact when present", async () => {
-  const outlineArt: Artifact = {
-    id: "art-outline-1" as ArtifactId,
-    title: "每周复盘大纲",
-    body: "blocks",
-    artifactType: "outline",
-    isDefault: false,
-    by: "user",
-    byName: "用户",
-    version: 0,
-    seq: 1,
-    versions: [],
-    at: SCENARIO_NOW - 10_000,
-    updated: SCENARIO_NOW - 5_000,
-  };
-  const { app, fake } = await mountApp("/pkm/2026-10-14", (f) => {
+test("outline import: picks a .md file or accepts pasted markdown via artifact.outline.import and opens the outline artifact", async () => {
+  const imported: Artifact[] = [];
+  const sampleMd = "---\ntitle: Q4 Launch Roadmap\n---\n- TODO Ship native outline import\n- DONE Retire legacy pkm\n";
+  const sampleB64 = btoa(String.fromCharCode(...new TextEncoder().encode(sampleMd)));
+
+  const { app, fake } = await mountApp("/library", (f) => {
     for (const [op, handler] of Object.entries(artifactResponses)) {
       f.respond(op, handler);
     }
-    f.respond("artifact.list", (p: { artifactType?: string }) => (p?.artifactType === "outline" ? [outlineArt] : [outlineArt]));
-    f.respond("artifact.get", (p: { id?: string }) => (p?.id === "art-outline-1" ? outlineArt : { bizCode: 100004, message: "not found" }));
-    f.respond("artifact.block.list", () => ({ artifact: outlineArt, blocks: [] }));
+    f.respond("host.pickFile", { path: "/tmp/q4-roadmap.md", name: "q4-roadmap.md", type: "text/markdown" });
+    f.respond("host.readFile", { data: sampleB64, name: "q4-roadmap.md", type: "text/markdown" });
+    f.respond("artifact.outline.import", (p: { markdown: string; title?: string; filename?: string }) => {
+      const made: Artifact = {
+        id: `art-outline-imported-${imported.length + 1}` as ArtifactId,
+        title: p.title?.trim() || "Q4 Launch Roadmap",
+        body: "blocks",
+        artifactType: "outline",
+        isDefault: false,
+        by: "user",
+        byName: "用户",
+        version: 0,
+        seq: 1,
+        versions: [],
+        at: SCENARIO_NOW,
+        updated: SCENARIO_NOW,
+      };
+      imported.push(made);
+      return made;
+    });
+    f.respond("artifact.get", (p: { id?: string }) => {
+      const hit = imported.find((a) => a.id === p?.id);
+      if (hit) return hit;
+      const fn = artifactResponses["artifact.get"] as (arg: unknown) => unknown;
+      return fn(p);
+    });
+    f.respond("artifact.block.list", (p: { id?: string }) => {
+      const hit = imported.find((a) => a.id === p?.id);
+      if (hit) return { artifact: hit, blocks: [] };
+      const fn = artifactResponses["artifact.block.list"] as (arg: unknown) => unknown;
+      return fn(p);
+    });
   });
-  expect(app.count("id:pkm-page")).toBe(1);
-  expect(app.count("id:content-sidebar")).toBe(1);
-  expect(app.count("id:content-nav-notes")).toBe(0);
-  expect(app.count("id:content-nav-ai-generate")).toBe(0);
-  expect(app.count("id:content-nav-artifact-outline")).toBe(1);
 
-  await app.host.send("route", "/pkm");
-  await fake.pumpUntil(app, () => app.count("id:artifacts") === 1 && app.count("id:artifact-blocks") === 1);
-  expect(app.count("id:artifact-header")).toBe(1);
-  expect(app.value("id:artifact-title")).toBe("每周复盘大纲");
+  await app.press("id:content-import-outline-btn");
+  await fake.pumpUntil(app, () => app.count("id:outline-import-modal") === 1);
+  expect(app.enabled("id:outline-import-submit")).toBe(false);
+
+  fake.clearCalls();
+  await app.press("id:outline-import-pick-file");
+  await fake.pumpUntil(app, () => app.count("id:outline-import-filename") === 1);
+  expect(app.texts()).toContain("q4-roadmap.md");
+  expect(app.value("id:outline-import-markdown")).toContain("TODO Ship native outline import");
+  expect(app.enabled("id:outline-import-submit")).toBe(true);
+
+  await app.press("id:outline-import-submit");
+  await fake.pumpUntil(app, () => app.count("id:outline-import-modal") === 0 && app.count("id:artifacts") === 1 && app.count("id:artifact-blocks") === 1);
+  const importCall = fake.calls.find((c) => c.op === "artifact.outline.import");
+  expect(importCall?.payload).toEqual({ markdown: sampleMd, filename: "q4-roadmap.md" });
+  expect(app.value("id:artifact-title")).toBe("Q4 Launch Roadmap");
+});
+
+test("regression: genui block inside channel message dispatches onGenUiAction with reactive state and toast feedback", async () => {
+  const genuiMd = [
+    "```genui",
+    '{"op":"title","title":"Release Gate"}',
+    '{"op":"state_init","state":{"approved":false}}',
+    '{"op":"set_node","root":true,"node":{"id":"root","kind":"switch","bind":"approved","label":"Approve release"}}',
+    '{"op":"done"}',
+    "```",
+  ].join("\n");
+
+  const { app, fake, fixture } = await mountApp("/chat");
+  const sampleMsg = (fixture.responses["channel.message.list"] as ChatMessage[] | undefined)?.[0];
+  if (!sampleMsg) throw new Error("typical scenario must provide chat messages");
+
+  await fake.emit(
+    app,
+    "channel.follow",
+    {
+      _tag: "Message",
+      message: { ...sampleMsg, id: "m-genui-1", number: 120, text: genuiMd, at: SCENARIO_NOW },
+    },
+    (p: unknown) => (p as { id?: string }).id === "general",
+  );
+  await fake.pumpUntil(app, () => app.count("id:genui-switch-root") === 1);
+
+  await app.press("id:genui-switch-root");
+  await fake.pumpUntil(app, () => app.texts().includes("approved=true"));
+  expect(app.texts()).toContain("approved=true");
+  expect(app.texts()).toContain("Approve release: on");
 });
 
 test("content hub: binary sidebar, outline template creation via artifact.create, and context memory across places", async () => {
@@ -289,7 +346,6 @@ test("content hub: binary sidebar, outline template creation via artifact.create
   await fake.pumpUntil(app, () => app.count("id:artifacts") === 1 && app.count("id:artifact-blocks") === 1);
   const createCall = fake.calls.find((c) => c.op === "artifact.create");
   expect(createCall?.payload).toMatchObject({ kind: "markdown", artifactType: "outline" });
-  expect(fake.calls.some((c) => c.op === "pkm.page.save")).toBe(false);
 
   fake.clearCalls();
   await app.press("id:content-new-note-btn");

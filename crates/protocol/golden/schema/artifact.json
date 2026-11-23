@@ -1392,12 +1392,18 @@
    "id": "s7177"
   }
  ],
- "ArtifactDemoInput": [
+ "ArtifactOutlineImportRequest": [
   {
-   "id": "s7178"
+   "markdown": "# Roadmap\n- First item",
+   "title": "Roadmap",
+   "filename": "roadmap.md",
+   "channel": "general",
+   "issue": "i1",
+   "announce": false,
+   "note": "imported"
   },
   {
-   "id": "s7179"
+   "markdown": "- Minimal"
   }
  ]
 }

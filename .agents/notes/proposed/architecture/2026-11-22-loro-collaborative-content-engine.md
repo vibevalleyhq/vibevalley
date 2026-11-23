@@ -29,7 +29,7 @@ VibeValley 的状态分为四个职责正交的平面，仅内容平面引入 Lo
 | **控制平面（Control Plane）** | 核心状态（`SpaceState`）、任务流转、角色、设置、频道元信息与进程间协调（`Chord`） | `Core::reduce` + SQLite 强事务（[核心状态](docs/subsystems/core.md)），单点校验所有业务不变量 | **严禁** |
 | **事件流平面（Stream Plane）** | 执行会话轨迹（`SessionEvent`）、频道消息编号（`number`）、只追加变更日志（`seq`） | Append-only 单调序列，写入后不可变 | **严禁** |
 | **代码平面（Code Plane）** | 仓库代码编辑、提交、改动审阅与合入主分支 | Git worktree 与三方合并（[仓库](docs/subsystems/repo.md)） | **严禁** |
-| **内容平面（Content Plane）** | 作品（`whiteboard`、`blocks`、`html`、`slides`、`dashboard`、`motion`、`design`、`design-system`）；未来可选的在线协作笔记（`pkm`） | Loro CRDT 容器（`LoroText`、`LoroTree`、`LoroMap`、`LoroList`）+ 内存态 `EphemeralStore` | **唯一允许** |
+| **内容平面（Content Plane）** | 作品（`outline`、`whiteboard`、`blocks`、`html`、`slides`、`dashboard`、`motion`、`design`、`design-system`） | Loro CRDT 容器（`LoroText`、`LoroTree`、`LoroMap`、`LoroList`）+ 内存态 `EphemeralStore` | **唯一允许** |
 
 ### 统一内存感知层（`EphemeralStore`）
 
@@ -71,7 +71,7 @@ VibeValley 的状态分为四个职责正交的平面，仅内容平面引入 Lo
 
 **继续在现有 `baseRev` / `ifRev` 与 `HtmlAnchor` 上打补丁**：在中心化乐观锁上叠加自定义三方文本合并与字符偏移重算，本质上是在重复造弱化的 OT 引擎，既无法消除 `presence/*` 写放大，也难以支撑树形编组并发与按 `origin` 选择性撤销。
 
-**把笔记（`pkm`）的 `.md` 单一真相源迁入二进制 CRDT**：当前笔记（[笔记子系统](docs/subsystems/pkm.md)）以磁盘可读 `.md` 文件为唯一真相，支持外部编辑器直接读写与 git 托管；若将其改为二进制 CRDT 主存会破坏本地纯文本互操作性。因此 `pkm` 保持 `.md` 为唯一真相，仅在未来明确需要多人在线实时编辑同一笔记时，才以 `.md` 双向投影方式作为可选增量接入。
+（大纲笔记已收口为 `ArtifactType::Outline`，直接复用了 `LoroTree` + `LoroText` 底座，并通过 `artifact.outline.import` 与 Markdown 导出维持外部 `.md` 互通，独立 `pkm` 平行栈已退役。）
 
 ## Acceptance criteria
 

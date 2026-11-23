@@ -52,10 +52,6 @@ impl LateServer {
 }
 
 impl Server for LateServer {
-    fn raise_budget(&self, input: Value) -> Envelope {
-        self.server().raise_budget(input)
-    }
-
     fn call(&self, op: &str, payload: Value) -> Envelope {
         self.server().call(op, payload)
     }

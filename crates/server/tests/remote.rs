@@ -25,7 +25,6 @@ fn start_server(dir: &std::path::Path) -> vibevalley_server::Started {
         orchestrator_listens: false,
         link_previews: false,
         tick_crons: false,
-        watch_pkm: false,
         debug_enabled: true,
         ..vibevalley_server::ServerConfig::under(dir)
     })

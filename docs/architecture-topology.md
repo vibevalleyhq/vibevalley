@@ -185,7 +185,7 @@ flowchart TD
 |---|---|---|---|
 | **命令写（Command）** | 进程内强类型 `Hub::invoke<O: Op>(principal, input)` | 任何跨域写入（工具调用、频道发帖、任务状态迁移、触发媒体/作品动作）；不经 JSON 编解码，统一在 `Hub` 门口校验 `Principal` 与 `ENDPOINTS.can` 并写入 `DebugKit` 轨迹 | 解散 `team/tool::Farm` 持有的 12 个具体模块直调；移除 `work/issue` / `content/media` 直调 `Chat`；移除 `work/cron` 的 2 处 `OnceLock` 晚绑定 |
 | **异步反应（Reaction）** | `EventBus::publish` / `EventBus::subscribe` | 一件事完成后引发的多域联动（频道消息唤醒 `Session` / `Orchestrator` / `library` 入库；会话结束触发 `memory` 沉淀与 `skin/game` 记账；任务流转触发 `pull` 与 `game`） | 移除 `memory` 直挂 `Sessions::on_news` 与 `start.rs` 回调胶水 |
-| **只读查询（Read）** | 读 `Hub` 上的 `SpaceState` 快照、向下导入 `L1` 叶子模块，或单方法只读 Port trait | `content/artifact` 解析 `#编号` 直接读 `SpaceState`；跨 `L2` 读取（记忆召回、引用摘要、会话上下文）改以单方法 `MemoryRecallPort` / `ArtifactQuotePort` / `SessionContextPort` 在启动期注入 | 移除 `content/artifact` 导入 `work/issue::Board`；移除 `team/agent <-> team/memory` 双向导入；移除 `content/pkm` 直接导入 `team/memory::terms_list` |
+| **只读查询（Read）** | 读 `Hub` 上的 `SpaceState` 快照、向下导入 `L1` 叶子模块，或单方法只读 Port trait | `content/artifact` 解析 `#编号` 直接读 `SpaceState`；跨 `L2` 读取（记忆召回、引用摘要、会话上下文）改以单方法 `MemoryRecallPort` / `ArtifactQuotePort` / `SessionContextPort` 在启动期注入 | 移除 `content/artifact` 导入 `work/issue::Board`；移除 `team/agent <-> team/memory` 双向导入 |
 
 #### 3.2.2 收敛前后指标与静态防退化门禁
 
@@ -209,14 +209,14 @@ flowchart TD
 | 子模块 | 分层 | 应负责（Owns） | 不应负责（Does NOT Own） | 当前裂缝与治理动作 |
 |---|---|---|---|---|
 | **`gateway` (`transport/{api,http,bridge}`)** | 接入层 | 统一绑定监听地址；校验三类 `Principal` 令牌；执行 `ENDPOINTS` 与 `SUBSCRIPTIONS` 的 `can` 鉴权；提供零克隆 `Arc<str>` 切片 SSE、`/attachment/{id}` Range 流与 `/mcp` 入口 | 任何业务规则、具体模块导出或直连 SQLite 表 | 修复 `GET /attachment/{id}` 丢弃 `CallerContext` 与 8 条订阅缺少 `can` 校验的问题（`#1`）；将 `bridge-0..3` OS 线程池迁入共享 `rt` |
-| **`spine` (`Hub`, `EventBus`, `SliceFeed`, `ServerDb`)** | `L1` | 唯一状态写入口 `Hub::apply`、进程内命令总线 `Hub::invoke<O>`、异步 `EventBus`、6 路 `SliceFeed`、全局唯一 `ServerDb` 连接池与端口 trait 定义 | 持有具体业务模块（`Orchestrator`、`Voice`）与旁路状态队列 | 删除 0 调用方 `Server::raise_budget` 与 `Hub.execution`；`Voice` 改走 `LiveVoicePort`；`runtime_inbox` 改为 `Fact` 经 `Hub::apply`；15 路连接收拢为单 `ServerDb`；`Started` 只暴露 `hub`、`set_mcp_url`、`close` |
+| **`spine` (`Hub`, `EventBus`, `SliceFeed`, `ServerDb`)** | `L1` | 唯一状态写入口 `Hub::apply`、进程内命令总线 `Hub::invoke<O>`、异步 `EventBus`、6 路 `SliceFeed`、全局唯一 `ServerDb` 连接池与端口 trait 定义 | 持有具体业务模块（`Orchestrator`、`Voice`）与旁路状态队列 | `Voice` 改走 `LiveVoicePort`；`runtime_inbox` 改为 `Fact` 经 `Hub::apply`；15 路连接收拢为单 `ServerDb`；`Started` 只暴露 `hub`、`set_mcp_url`、`close` |
 | **`execution/machine_registry`** | `L1` | 维护在线 `Machine`（`LocalMachine` / `RemoteMachine` / `SandboxMachine`）及其 `Runtime` 清单；推送 `LiveEventRuntime`；将 `Session` 指令路由至目标 `Machine` | 进程启动、Git 命令与网络细节（归各适配器） | 将静态 `Registry` 升级为动态路由表；把具体 `Arc<Workplace>` 收口为 `Machine` 的 `WorkplacePort` 或轻隔离原语 |
 | **`content/attachment`** | `L1` | SHA-256 内容寻址对象存储（支持本机路径导入与远程按 ID 流式拉取）与 `attachment` 表 | 业务路由、聊天规则、媒体编排 | 保持 0 向上导入；新增本地 `importPath` 消除 50 MB 文件 Base64 进 JS 堆 |
 | **`team/agent`** | `L1` | 角色档案（`config.json`）、技能库、模板、`Machine`/`Runtime` 解析 | 主助手多轮逻辑或直接依赖 `team/memory` | 剥离 `memory` 与 `orchestrator::words` 逆向边；按只读 Port 注入记忆召回 |
 | **`infra/{setting,provider,http,auth,debug,text}`** | `L1` | 配置密钥（Keychain / headless `0600`）、供应商目录、公网防 SSRF 下载、统一三类 `Principal` 鉴权、门控 `DebugKit`、共享文案格式 `text` | 导入任何 `L2` / `L3` 业务模块 | `infra/remote` 泛化为通用 `infra/auth`；接管下沉的提示词与分词纯工具 |
 | **`work/{ledger,session,issue,pull}`** | `L2` | 域内单向 `ledger <- session <- issue <- pull`：统一写入与 `Fact` 折叠、会话槽位与邮箱、看板状态机、GitHub/GitLab PR 交付与快照 | 同层互相环状导入；直调 `collab/channel` 或 `orchestrator::words` | 拆 `work/chat` 消解 `session <-> issue`；`reopen` 回调注入 `Ledger::open`；写频道改经 `Hub::invoke`；`pump` 线程迁入 `rt` |
-| **`collab/{channel,connector,voice}`** | `L2` | 域内 `channel <- connector / voice`：纯受众投递与广播、外联平台桥、语音授权与 MOSS Live 桥 | 音频硬件驱动（在 `apps/mac`）；Agora/`cloudflared`/Dictation（Stage 4B `S4` 退场） | 维持 `channel` 零向上依赖；完成 `S4` 清理与 `LiveVoicePort` 隔离 |
-| **`content/{library,media,artifact}`** | `L2` | 素材目录、媒体任务状态机、多版本 HTML / 结构化条目 / Loro 块协作 | 并行笔记栈 `pkm`（Stage 4B `S2` 并入 `ArtifactType::Outline`）；直接导入 `work/issue::Board` 或 `collab/channel` | `artifact` 改从 `SpaceState` 解析 `#编号`；频道素材收集改订阅 `EventBus`；发帖写回改经 `Hub::invoke`；补全 `S1` 与 `S6` |
+| **`collab/{channel,connector,voice}`** | `L2` | 域内 `channel <- connector / voice`：纯受众投递与广播、外联平台桥、MOSS Live 实时通话与 `Voice::speak` | 音频硬件驱动（在 `apps/mac`） | 维持 `channel` 零向上依赖，完成 `LiveVoicePort` 隔离 |
+| **`content/{library,media,artifact}`** | `L2` | 素材目录、媒体任务状态机、多版本 HTML / 结构化条目 / Loro 块协作（含 `ArtifactType::Outline` 与 `.md` 导入） | 直接导入 `work/issue::Board` 或 `collab/channel` | `artifact` 改从 `SpaceState` 解析 `#编号`；频道素材收集改订阅 `EventBus`；发帖写回改经 `Hub::invoke` |
 | **`team/memory`** | `L2` | 记忆表 CRUD、检索打分、`gse` 分词、会话报告沉淀 | 被 `team/agent` 直接反向导入或挂接私有观察器回调 | 通过 `EventBus` 消费会话完成事件，对外通过 `MemoryRecallPort` 提供召回 |
 | **`team/orchestrator`, `team/tool`, `team/mcp`, `work/cron`, `skin/game`** | `L3` | 编排与触发：主助手对话轮次、工具目录分发与 `/mcp` 门、定时触发、游戏账本与成就 | 跨越 `L2` 域直接持有 12 模块结构体 `Farm`，或用 `OnceLock` 晚绑定 | 工具执行统一走 `Hub::invoke<O>`（与 HTTP 共用 `can` 鉴权门）与只读 `vv://` Port；解散 `Farm`，切断 `tool <-> mcp` 与 `tool <-> orchestrator` 环 |
 
@@ -369,12 +369,12 @@ stateDiagram-v2
 
 ### 6.2 分阶段迁移与验收路线
 
-1. **前置收尾（Stage 4A 与 Stage 4B）**
-   - 完成 Stage 4A 零争议减法（Wave 2 三方改动均已自测通过，进入全量验收与合入）及 Stage 4B 产品边界收敛（`S1` / `S2` / `S4` / `S6`）。
+1. **前置收尾（Stage 4A 与 Stage 4B 已完成）**
+   - Stage 4A 零争议减法与 Stage 4B 产品边界收敛（`S1` `genui`/`chart` 闭环、`S2` `.md` 导入 `ArtifactType::Outline`、`S4` 聚焦 MOSS Live + `Voice::speak`、`S6` 补齐 `artifact_block_*` MCP 工具）均已落地。
 2. **第一刀 — 统一总控网关、主体鉴权、逻辑调用收敛与客户端纯协议化**
    - 收口单一 HTTP/WS 网关模型与 `Principal::{Client, Machine, Session}`；在 `crates/protocol` 为 `Subscription` 增加 `can` 并贯通 `CallerContext` 至 `Hub::open_subscription` 与 `/attachment/{id}`（含 Range 流式下载）。
    - 收敛大模块间逻辑调用：为 `Hub` 增加进程内强类型 `Hub::invoke<O>` 命令总线，解散 12 字段上帝结构体 `Farm` 并切断 4 组循环依赖，消除 `start.rs` 7 处后置挂钩，收拢单 `ServerDb` 连接池；在 `scripts/audit/` 启用 `L0–L3` 静态边界检查门禁。
-   - 清理 `Hub` / `Server` 具体模块穿透（`LiveVoicePort`、删除 `raise_budget`、`runtime_inbox` 归入 `Core::apply`），使 `apps/mac` 具备纯粹走协议连接远端总控端的能力；为 `crates/cli` 新增 `auth login` 与持久化 Bearer 凭据，并落地**看板 Issue 前端友好引导**与 `MarkdownPane` / Mobile `nsh` 能力接入。
+   - 清理 `Hub` / `Server` 具体模块穿透（`LiveVoicePort`、`runtime_inbox` 归入 `Core::apply`），使 `apps/mac` 具备纯粹走协议连接远端总控端的能力；为 `crates/cli` 新增 `auth login` 与持久化 Bearer 凭据，并落地**看板 Issue 前端友好引导**与 `MarkdownPane` / Mobile `nsh` 能力接入。
 3. **第二刀 — 拆出 `Machine` + `Runtime` 执行层与双向总线**
    - 定义 `Machine` 与动态 `MachineRegistry`，将现有本地 `Registry` / `Workplace` 封装为内置 `LocalMachine` 适配器。
    - 实现 `Machine Protocol` 反向 WebSocket 服务端网关与 CLI 端 `vibevalley machine up`（含本地 `127.0.0.1/mcp` 代理隧道、断线 `after_seq` 续读、`input_id` 幂等与轻隔离工作区）。

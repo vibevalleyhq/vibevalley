@@ -51,15 +51,13 @@
     "remote": "远程访问",
     "about": "关于与数据",
     "memory": "记忆",
-    "call": "通话线路",
-    "dictation": "听写",
     "chat": "聊天软件",
     "width": "导航的宽窄（拖动，双击回默认）"
   },
   "words": {
     "general": "语言 language 启动 打开 工作台 农场 主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号 动画 无动画 动效 motion animation",
-    "models": "密钥 钥匙 账号 DeepSeek MOSS 声网 Agora API Key 模型 绑定",
-    "voice": "声网 Agora 电话 通话 MOSS Live 实时 视觉 听写 转写 语音",
+    "models": "密钥 钥匙 账号 DeepSeek MOSS API Key 模型 绑定",
+    "voice": "电话 通话 MOSS Live 实时 视觉 转写 语音",
     "connections": "微信 飞书 QQ 连接器 配对 GitHub gh PR 登录",
     "remote": "远程 手机 Tailscale 配对 二维码 设备 iOS Android 监听 令牌",
     "about": "版本 家目录 设置文件 数据 素材图鉴 version catalog"
@@ -119,8 +117,6 @@
     "reposHint": "这个空间的仓库，每个文件夹都是一个 git 仓库",
     "worktrees": "工作树目录",
     "worktreesHint": "执行会话运行时每个任务自己的检出",
-    "pkm": "笔记库",
-    "pkmHint": "这个空间的 PARA 目录和日记",
     "copy": "复制路径",
     "copied": "路径复制好了",
     "reveal": "在访达里显示",
@@ -161,9 +157,7 @@
     "mossAccount": "还没有 MOSS 账号",
     "mossKey": "MOSS 账号还没填钥匙",
     "mossOff": "用到的 MOSS 账号停用了",
-    "binding": "还没选用哪个账号和模型",
-    "agora": "还缺声网的凭据",
-    "dictationUrl": "还没填听写的地址"
+    "binding": "还没选用哪个账号和模型"
   },
   "feature": {
     "orchestrator": "主助手",
@@ -173,7 +167,6 @@
     "speakers": "多人语音",
     "voiceDesign": "音色设计",
     "transcription": "音频转写",
-    "dictation": "听写",
     "live": "MOSS Live",
     "vision": "实时视觉",
     "call": "通话"

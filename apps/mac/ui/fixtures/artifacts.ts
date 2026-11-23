@@ -386,9 +386,6 @@ const initialBoardEntries = (): Map<string, ArtifactEntry> => {
       from: { id: "t-callout", side: "e" },
       to: { id: "c-6", side: "w" },
     }),
-    storeEntry(aid, "presence/orch", { id: "orch", name: "主助手", color: "coral", x: 540, y: 88 }),
-    storeEntry(aid, "presence/helper", { id: "helper", name: "老周", color: "teal", x: 822, y: 74 }),
-    storeEntry(aid, "presence/user", { id: "user", name: "小林", color: "blue", x: 634, y: 454 }),
   ];
   return new Map(rows.map((e) => [e.path, e]));
 };
@@ -503,7 +500,26 @@ export const responses: Record<string, unknown> = {
   "artifact.update": artifacts[0],
   "artifact.delete": null,
   "artifact.html.edit": artifacts[1],
-  "artifact.demo": null,
+  "artifact.outline.import": Object.assign(
+    (p: { title?: string; filename?: string; markdown?: string }) => ({
+      ...artifacts[3],
+      id: id("art-outline-imported"),
+      title: p?.title?.trim() || p?.filename?.replace(/\.(?:outline\.md|md|markdown)$/iu, "") || "导入的大纲",
+      body: "blocks" as const,
+      artifactType: "outline" as const,
+      seq: 1,
+    }),
+    {
+      toJSON: () => ({
+        ...artifacts[3],
+        id: id("art-outline-imported"),
+        title: "导入的大纲",
+        body: "blocks" as const,
+        artifactType: "outline" as const,
+        seq: 1,
+      }),
+    },
+  ),
   "artifact.presence.update": null,
   "artifact.history.list": [],
   "artifact.history.preview": { artifactId: id("art-plan"), body: "blocks", frontiers: "f0", blocks: blocks["art-plan"] ?? [] },

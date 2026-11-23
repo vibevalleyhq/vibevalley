@@ -17,7 +17,7 @@ pub use html::{
     HtmlCheck, HtmlRefusal, InferredArtifactName, artifact_headers, artifact_problem, artifact_suffix_of, html_check, html_edit, html_problem,
     infer_artifact_from_name,
 };
-pub use markdown::{MdBlock, blocks_of_markdown, inline_spans, markdown_of};
+pub use markdown::{ImportedOutline, MdBlock, blocks_of_markdown, import_outline_markdown, inline_spans, markdown_of};
 pub use ops::{Page, Revision, RevisionKind, ordered, wire};
 pub use shell::{motion_recorder_helper, shell_theme_of, with_shell};
 pub use spans::{plain, unmarked};

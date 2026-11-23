@@ -1,7 +1,6 @@
 import { Text, View } from "nsh";
 
 import { hostApi } from "../infra/bridge";
-import { Link as A } from "../infra/router";
 import { Icon, type IconSize } from "./Icon";
 import type { IconName } from "./icons";
 import { motionClass } from "./motion";
@@ -52,19 +51,5 @@ export function OutLink(props: { href: string; label: string }) {
       <Text class="text-xs text-muted group-hover:text-ink">{props.label}</Text>
       <Icon name="open" size={12} tone="muted" />
     </View>
-  );
-}
-
-/** A link that is only its icon, to a page of the workbench. */
-export function IconLink(props: { href: `/${string}`; label: string; icon?: IconName }) {
-  return (
-    <A
-      href={props.href}
-      accessibilityLabel={props.label}
-      tooltip={<Bubble text={props.label} />}
-      class={`size-7 shrink-0 items-center justify-center rounded-md ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
-    >
-      <Icon name={props.icon ?? "open"} size={16} tone="muted" />
-    </A>
   );
 }

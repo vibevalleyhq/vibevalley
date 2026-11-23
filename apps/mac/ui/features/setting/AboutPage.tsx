@@ -66,10 +66,9 @@ export function AboutPage() {
                   { label: t("web.setting.about.settings"), hint: t("web.setting.about.settingsHint"), path: s().file },
                   { label: t("web.setting.about.repos"), hint: t("web.setting.about.reposHint"), path: s().paths.repos },
                   { label: t("web.setting.about.worktrees"), hint: t("web.setting.about.worktreesHint"), path: s().paths.worktrees },
-                  { label: t("web.setting.about.pkm"), hint: t("web.setting.about.pkmHint"), path: s().paths.pkm },
                 ]}
               >
-                {(p, i) => <PathRow label={p().label} hint={p().hint} path={p().path} last={i() === 4} />}
+                {(p, i) => <PathRow label={p().label} hint={p().hint} path={p().path} last={i() === 3} />}
               </Each>
             </SettingsGroup>
           </>

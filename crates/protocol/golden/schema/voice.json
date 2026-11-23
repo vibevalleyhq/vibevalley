@@ -14,249 +14,32 @@
    "agentId": "s3410"
   }
  ],
- "AgoraGrant": [
+ "VoiceGrant": [
   {
-   "appId": "s3411",
    "channel": "s3412",
-   "uid": "s3413",
-   "token": "s3414"
+   "uid": "s3413"
   },
   {
-   "appId": "s3415",
    "channel": "s3416",
-   "uid": "s3417",
-   "token": "s3418"
-  }
- ],
- "AgoraAppID": [
-  {
-   "source": "settings",
-   "value": "s3419"
-  },
-  {
-   "source": null
-  }
- ],
- "Area": [
-  "US",
-  "EU",
-  "AP",
-  "CN"
- ],
- "Language": [
-  "zh-CN",
-  "zh-HK",
-  "zh-TW",
-  "en-US",
-  "ja-JP",
-  "ko-KR"
- ],
- "Model": [
-  "nova-2",
-  "nova-3"
- ],
- "VoiceASR": [
-  {
-   "vendor": "ares"
-  },
-  {
-   "vendor": "deepgram",
-   "model": "nova-3"
-  },
-  {
-   "vendor": "microsoft",
-   "region": "s3420"
-  },
-  {
-   "vendor": "microsoft",
-   "region": "s3421"
-  }
- ],
- "VoiceAnswerAgoraModel": [
-  "gpt-4o-mini",
-  "gpt-4.1-mini",
-  "gpt-5-nano",
-  "gpt-5-mini"
- ],
- "VoiceAnswer": [
-  {
-   "vendor": "orchestrator"
-  },
-  {
-   "vendor": "moss"
-  },
-  {
-   "vendor": "agora",
-   "model": "gpt-5-nano"
-  },
-  {
-   "vendor": "deepseek",
-   "model": "s3422"
-  },
-  {
-   "vendor": "deepseek",
-   "model": "s3423"
-  },
-  {
-   "vendor": "openai",
-   "url": "s3424",
-   "model": "s3425"
-  },
-  {
-   "vendor": "openai",
-   "url": "s3426",
-   "model": "s3427"
-  }
- ],
- "VoiceTTSMinimaxModel": [
-  "speech_2_6_turbo",
-  "speech_2_8_turbo"
- ],
- "Voice": [
-  "alloy",
-  "echo",
-  "fable",
-  "onyx",
-  "nova",
-  "shimmer"
- ],
- "VoiceTTS": [
-  {
-   "vendor": "minimax",
-   "model": "speech_2_6_turbo",
-   "voiceId": "s3428"
-  },
-  {
-   "vendor": "minimax",
-   "model": "speech_2_6_turbo",
-   "voiceId": "s3429"
-  },
-  {
-   "vendor": "openai",
-   "voice": "echo"
-  },
-  {
-   "vendor": "microsoft",
-   "region": "s3430",
-   "voiceName": "s3431"
-  },
-  {
-   "vendor": "microsoft",
-   "region": "s3432",
-   "voiceName": "s3433"
+   "uid": "s3417"
   }
  ],
  "VoiceSettings": [
   {
-   "area": "US",
-   "language": "zh-CN",
-   "asr": {
-    "vendor": "ares"
-   },
-   "answer": {
-    "vendor": "orchestrator"
-   },
-   "tts": {
-    "vendor": "minimax",
-    "model": "speech_2_6_turbo",
-    "voiceId": "s3434"
-   },
    "persona": "s3435",
-   "greeting": "s3436",
-   "failureMessage": "s3437",
-   "silenceMs": 3438,
-   "interruptMs": 3439,
-   "idleSeconds": 3440
+   "greeting": "s3436"
   },
   {
-   "area": "US",
-   "language": "zh-CN",
-   "asr": {
-    "vendor": "ares"
-   },
-   "answer": {
-    "vendor": "orchestrator"
-   },
-   "tts": {
-    "vendor": "minimax",
-    "model": "speech_2_6_turbo",
-    "voiceId": "s3441"
-   },
    "persona": "s3442",
-   "greeting": "s3443",
-   "failureMessage": "s3444",
-   "silenceMs": 3445,
-   "interruptMs": 3446,
-   "idleSeconds": 3447
-  }
- ],
- "DictationVia": [
-  "moss",
-  "own"
- ],
- "Dictation": [
-  {
-   "via": "moss",
-   "url": "s3448",
-   "model": "s3449"
-  },
-  {
-   "via": "moss",
-   "url": "s3450",
-   "model": "s3451"
+   "greeting": "s3443"
   }
  ],
  "SettingsUpdateVoice": [
   {
-   "area": "US",
-   "language": "zh-CN",
-   "asr": {
-    "vendor": "ares"
-   },
-   "answer": {
-    "vendor": "orchestrator"
-   },
-   "tts": {
-    "vendor": "minimax",
-    "model": "speech_2_6_turbo",
-    "voiceId": "s3452"
-   },
    "persona": "s3453",
-   "greeting": "s3454",
-   "failureMessage": "s3455",
-   "silenceMs": 3456,
-   "interruptMs": 3457,
-   "idleSeconds": 3458
+   "greeting": "s3454"
   },
   {}
- ],
- "VoiceGrantRenew": [
-  {
-   "channel": "s3459",
-   "uid": "s3460"
-  },
-  {
-   "channel": "s3461",
-   "uid": "s3462"
-  }
- ],
- "DictateRequest": [
-  {
-   "audio": "s3463",
-   "format": "s3464"
-  },
-  {
-   "audio": "s3465",
-   "format": "s3466"
-  }
- ],
- "Dictated": [
-  {
-   "text": "s3467"
-  },
-  {
-   "text": "s3468"
-  }
  ],
  "VoiceSaid": [
   {

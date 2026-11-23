@@ -1,15 +1,17 @@
-//! Notes, resources, artifacts, the library and media: every tool takes its
+//! Resources, artifacts, the library and media: every tool takes its
 //! typed request directly and reaches the module in process without bouncing
 //! back through the hub.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use vibevalley_core::collab::CommitMeta;
 use vibevalley_protocol::{
-    ArtifactBody, ArtifactEntryBatchRequest, ArtifactEntryGetRequest, ArtifactEntryListRequest, ArtifactKind, ArtifactListRequest, ArtifactRequest,
-    ArtifactType, ArtifactTypeReadRequest, ArtifactVersionRequest, BlockCreate, BlockDelete, BlockUpdate, LibraryAddRequest, LibraryListRequest,
-    MediaImageRequest, MediaSource, MediaSpeakersRequest, MediaSpeechRequest, MediaVoiceDesignRequest, PkmProposalRequest, PkmSearchRequest, Session,
+    ArtifactBody, ArtifactEntryBatchRequest, ArtifactEntryGetRequest, ArtifactEntryListRequest, ArtifactKind, ArtifactListRequest,
+    ArtifactOutlineImportRequest, ArtifactRequest, ArtifactType, ArtifactTypeReadRequest, ArtifactVersionRequest, BlockCreate, BlockDelete, BlockOpResult,
+    BlockOpStatus, BlockUpdate, LibraryAddRequest, LibraryListRequest, MediaImageRequest, MediaSource, MediaSpeakersRequest, MediaSpeechRequest,
+    MediaVoiceDesignRequest, Session,
 };
 
 use super::{Farm, Who, given};
@@ -36,43 +38,6 @@ pub fn resource_read(f: &Farm, who: &Who, a: ResourceReadArgs) -> Result<String,
         Who::Helper(me) => f.resources.read(Some(me), &a),
         Who::Orchestrator(_) => f.resources.read(None, &a),
     }
-}
-
-pub fn pkm_search(f: &Farm, _: &Who, req: PkmSearchRequest) -> Result<String, String> {
-    text(&f.pkm.search(&req).map_err(|e| e.message)?)
-}
-
-#[derive(Deserialize)]
-pub struct PkmPageArgs {
-    #[serde(default)]
-    page: String,
-}
-
-pub fn pkm_page(f: &Farm, _: &Who, a: PkmPageArgs) -> Result<String, String> {
-    text(&f.pkm.page(&a.page).map_err(|e| e.message)?)
-}
-
-#[derive(Deserialize)]
-pub struct PkmCaptureArgs {
-    #[serde(default)]
-    text: String,
-    page: Option<String>,
-}
-
-pub fn pkm_capture(f: &Farm, who: &Who, a: PkmCaptureArgs) -> Result<String, String> {
-    let session = match who {
-        Who::Helper(me) => Some(me.id.as_str()),
-        Who::Orchestrator(_) => None,
-    };
-    text(&f.pkm.capture(&a.text, session, given(&a.page)).map_err(|e| e.message)?)
-}
-
-pub fn pkm_suggest(f: &Farm, who: &Who, req: PkmProposalRequest) -> Result<String, String> {
-    let by = match who {
-        Who::Helper(me) => me.profile.as_deref().unwrap_or(""),
-        Who::Orchestrator(here) => here.agent.as_str(),
-    };
-    text(&f.pkm.suggest(&req, by).map_err(|e| e.message)?)
 }
 
 /// Where the orchestrator makes media from: only with the user's word in this batch.
@@ -221,6 +186,13 @@ fn maker_of(who: &Who) -> Maker {
     }
 }
 
+fn actor_of(who: &Who) -> &str {
+    match who {
+        Who::Helper(me) => me.profile.as_deref().unwrap_or(""),
+        Who::Orchestrator(here) => here.agent.as_str(),
+    }
+}
+
 #[derive(Deserialize)]
 pub struct ArtifactCreateArgs {
     #[serde(flatten)]
@@ -276,6 +248,62 @@ pub fn artifact_create(f: &Farm, who: &Who, mut a: ArtifactCreateArgs) -> Result
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactOutlineImportArgs {
+    markdown: Option<String>,
+    file: Option<String>,
+    title: Option<String>,
+    filename: Option<String>,
+    channel: Option<String>,
+    issue: Option<String>,
+    announce: Option<bool>,
+    note: Option<String>,
+}
+
+pub fn artifact_outline_import(f: &Farm, who: &Who, mut a: ArtifactOutlineImportArgs) -> Result<String, String> {
+    let file = given(&a.file).map(str::to_string);
+    if a.markdown.is_some() && file.is_some() {
+        return Err("markdown 和 file 只能填一个".into());
+    }
+    match who {
+        Who::Orchestrator(here) => {
+            if file.is_some() {
+                return Err("主助手不能用 file，请直接传 markdown".into());
+            }
+            if given(&a.channel).is_none() && !here.channel.is_empty() {
+                a.channel = Some(here.channel.clone());
+            }
+            a.issue = match given(&a.issue) {
+                Some(r) => Some(f.issue(r)?.id),
+                None => None,
+            };
+        }
+        Who::Helper(me) => {
+            if let Some(content) = read_helper_file(me, &a.file)? {
+                a.markdown = Some(content);
+                if given(&a.filename).is_none() {
+                    a.filename = file;
+                }
+            }
+            if given(&a.issue).is_none() {
+                a.issue = me.issue_id().map(String::from);
+            }
+        }
+    }
+    let markdown = a.markdown.ok_or_else(|| "需要提供 markdown（或工作区里的 file）".to_string())?;
+    let req = ArtifactOutlineImportRequest {
+        markdown,
+        title: a.title,
+        filename: a.filename,
+        channel: a.channel,
+        issue: a.issue,
+        announce: a.announce,
+        note: a.note,
+    };
+    text(&f.artifacts.import_outline(&maker_of(who), &req).map_err(|e| e.message)?)
+}
+
+#[derive(Deserialize)]
 pub struct ArtifactVersionArgs {
     #[serde(flatten)]
     req: ArtifactVersionRequest,
@@ -308,6 +336,10 @@ pub fn artifact_version(f: &Farm, who: &Who, mut a: ArtifactVersionArgs) -> Resu
     text(&f.artifacts.version_with_meta(&maker_of(who), &a.req, &meta).map_err(|e| e.message)?)
 }
 
+pub fn block_list(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
+    text(&f.artifacts.snapshot(a.id.trim()).map_err(|e| e.message)?)
+}
+
 #[derive(Deserialize)]
 pub struct BlockCreateArgs {
     #[serde(default)]
@@ -317,12 +349,12 @@ pub struct BlockCreateArgs {
 }
 
 pub fn block_create(f: &Farm, who: &Who, a: BlockCreateArgs) -> Result<String, String> {
-    let actor = match who {
-        Who::Helper(me) => me.profile.as_deref().unwrap_or(""),
-        Who::Orchestrator(here) => here.agent.as_str(),
-    };
     let meta = commit_meta_for_who(who, None);
-    text(&f.artifacts.insert_block_with_meta(&a.id, actor, &a.body, &meta).map_err(|e| e.message)?)
+    text(
+        &f.artifacts
+            .insert_block_with_meta(a.id.trim(), actor_of(who), &a.body, &meta)
+            .map_err(|e| e.message)?,
+    )
 }
 
 #[derive(Deserialize)]
@@ -334,12 +366,12 @@ pub struct BlockUpdateArgs {
 }
 
 pub fn block_update(f: &Farm, who: &Who, a: BlockUpdateArgs) -> Result<String, String> {
-    let actor = match who {
-        Who::Helper(me) => me.profile.as_deref().unwrap_or(""),
-        Who::Orchestrator(here) => here.agent.as_str(),
-    };
     let meta = commit_meta_for_who(who, None);
-    text(&f.artifacts.update_block_with_meta(&a.id, actor, &a.body, &meta).map_err(|e| e.message)?)
+    text(
+        &f.artifacts
+            .update_block_with_meta(a.id.trim(), actor_of(who), &a.body, &meta)
+            .map_err(|e| e.message)?,
+    )
 }
 
 #[derive(Deserialize)]
@@ -351,12 +383,166 @@ pub struct BlockDeleteArgs {
 }
 
 pub fn block_delete(f: &Farm, who: &Who, a: BlockDeleteArgs) -> Result<String, String> {
-    let actor = match who {
-        Who::Helper(me) => me.profile.as_deref().unwrap_or(""),
-        Who::Orchestrator(here) => here.agent.as_str(),
-    };
     let meta = commit_meta_for_who(who, None);
-    text(&f.artifacts.delete_block_with_meta(&a.id, actor, &a.body, &meta).map_err(|e| e.message)?)
+    text(
+        &f.artifacts
+            .delete_block_with_meta(a.id.trim(), actor_of(who), &a.body, &meta)
+            .map_err(|e| e.message)?,
+    )
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "op", rename_all = "lowercase")]
+pub enum BlockBatchOp {
+    #[serde(rename_all = "camelCase")]
+    Create {
+        temp_id: Option<String>,
+        r#type: Option<String>,
+        level: Option<i64>,
+        checked: Option<bool>,
+        language: Option<String>,
+        text: String,
+        after_block: Option<String>,
+        parent_id: Option<String>,
+    },
+    #[serde(rename_all = "camelCase")]
+    Update {
+        block: String,
+        base_rev: i64,
+        text: Option<String>,
+        r#type: Option<String>,
+        level: Option<i64>,
+        checked: Option<bool>,
+        language: Option<String>,
+    },
+    #[serde(rename_all = "camelCase")]
+    Move {
+        block: String,
+        parent_id: Option<String>,
+        after_block: Option<String>,
+    },
+    #[serde(rename_all = "camelCase")]
+    Delete { block: String },
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockBatchArgs {
+    #[serde(default)]
+    id: String,
+    #[serde(default)]
+    ops: Vec<BlockBatchOp>,
+    note: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BlockBatchResponse {
+    artifact_id: String,
+    seq: i64,
+    results: Vec<BlockOpResult>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    created_ids: BTreeMap<String, String>,
+}
+
+pub fn block_batch(f: &Farm, who: &Who, a: BlockBatchArgs) -> Result<String, String> {
+    let artifact_id = a.id.trim().to_string();
+    if a.ops.is_empty() {
+        return Err("ops 不能为空".into());
+    }
+    let actor = actor_of(who);
+    let meta = commit_meta_for_who(who, given(&a.note).map(str::to_string));
+    let mut created_ids: BTreeMap<String, String> = BTreeMap::new();
+    let mut results = Vec::with_capacity(a.ops.len());
+
+    for op in a.ops {
+        let resolve = |raw: &str, ids: &BTreeMap<String, String>| ids.get(raw).cloned().unwrap_or_else(|| raw.to_string());
+        let resolve_opt = |raw: Option<String>, ids: &BTreeMap<String, String>| {
+            raw.map(|s| {
+                let trimmed = s.trim();
+                if trimmed.is_empty() { String::new() } else { resolve(trimmed, ids) }
+            })
+        };
+        let res = match op {
+            BlockBatchOp::Create {
+                temp_id,
+                r#type,
+                level,
+                checked,
+                language,
+                text,
+                after_block,
+                parent_id,
+            } => {
+                let body = BlockCreate {
+                    r#type,
+                    level,
+                    checked,
+                    language,
+                    text,
+                    after_block: resolve_opt(after_block, &created_ids),
+                    parent_id: resolve_opt(parent_id, &created_ids).filter(|p| !p.is_empty()),
+                };
+                let r = f.artifacts.insert_block_with_meta(&artifact_id, actor, &body, &meta).map_err(|e| e.message)?;
+                if r.status == BlockOpStatus::Applied
+                    && let Some(tid) = given(&temp_id)
+                {
+                    created_ids.insert(tid.to_string(), r.block_id.clone());
+                }
+                r
+            }
+            BlockBatchOp::Update {
+                block,
+                base_rev,
+                text,
+                r#type,
+                level,
+                checked,
+                language,
+            } => {
+                let body = BlockUpdate {
+                    block: resolve(block.trim(), &created_ids),
+                    base_rev,
+                    text,
+                    r#type,
+                    level,
+                    checked,
+                    language,
+                };
+                f.artifacts.update_block_with_meta(&artifact_id, actor, &body, &meta).map_err(|e| e.message)?
+            }
+            BlockBatchOp::Move { block, parent_id, after_block } => {
+                let resolved_block = resolve(block.trim(), &created_ids);
+                let resolved_parent = resolve_opt(parent_id, &created_ids).filter(|p| !p.is_empty());
+                let resolved_after = resolve_opt(after_block, &created_ids);
+                f.artifacts
+                    .move_block_with_meta(
+                        &artifact_id,
+                        actor,
+                        &resolved_block,
+                        resolved_parent.as_deref(),
+                        resolved_after.as_deref(),
+                        &meta,
+                    )
+                    .map_err(|e| e.message)?
+            }
+            BlockBatchOp::Delete { block } => {
+                let body = BlockDelete {
+                    block: resolve(block.trim(), &created_ids),
+                };
+                f.artifacts.delete_block_with_meta(&artifact_id, actor, &body, &meta).map_err(|e| e.message)?
+            }
+        };
+        results.push(res);
+    }
+
+    let artifact = f.artifacts.get(&artifact_id).map_err(|e| e.message)?;
+    text(&BlockBatchResponse {
+        artifact_id,
+        seq: artifact.seq,
+        results,
+        created_ids,
+    })
 }
 
 pub fn artifact_type_list(f: &Farm, _: &Who, _: EmptyArgs) -> Result<String, String> {

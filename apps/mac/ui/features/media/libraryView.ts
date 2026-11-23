@@ -20,17 +20,6 @@ export interface PickMode {
 
 export const initialLibrarySelection: LibrarySelection = { kind: "none" };
 
-export function showsNotesInBucket(bucket: ContentBucket): boolean {
-  switch (bucket.kind) {
-    case "recent":
-    case "pinned":
-      return true;
-    case "artifacts":
-    case "media":
-      return false;
-  }
-}
-
 export function showsArtifactsInBucket(bucket: ContentBucket): boolean {
   switch (bucket.kind) {
     case "recent":

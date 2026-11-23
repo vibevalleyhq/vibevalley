@@ -1,12 +1,12 @@
-# Agent Note: Space 核心业务概念模型（Space、Repo、Worktree、Issue、Pkm 与执行体）
+# Agent Note: Space 核心业务概念模型（Space、Repo、Worktree、Issue 与执行体）
 
 Status: proposed
 
 ## Problem
 
-`<space>/{repos,worktrees,pkm}` 目录收敛与 `.vibevalley/{setup,check}` 自举门禁已上线（见 [概念](docs/concepts.md)、[仓库](docs/subsystems/repo.md)），但 `Space` 作为完整隔离单元还剩两处缺口：
+`<space>/{repos,worktrees}` 目录收敛与 `.vibevalley/{setup,check}` 自举门禁已上线（见 [概念](docs/concepts.md)、[仓库](docs/subsystems/repo.md)），但 `Space` 作为完整隔离单元还剩两处缺口：
 
-- **空间状态未随 `Space` 隔离**：切换 `work_root` 时，`repos/`、`worktrees/` 与 `pkm/` 随之切换，但工单、频道、会话与 Artifact 状态仍混在宿主全局库（`$VIBEVALLEY_HOME/server.db`）中，看板与聊天未随空间隔离。
+- **空间状态未随 `Space` 隔离**：切换 `work_root` 时，`repos/` 与 `worktrees/` 随之切换，但工单、频道、会话与 Artifact 状态仍混在宿主全局库（`$VIBEVALLEY_HOME/server.db`）中，看板与聊天未随空间隔离。
 - **仓库仅支持单层短名**：`crates/server/src/modules/repo.rs` 的 `good_name` 仅允许单层目录名（`^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`），同空间克隆不同组织的同名仓库或按 GitHub `<owner>/<repo>` 全名寻址时会冲突。
 
 ## Proposal
@@ -24,7 +24,7 @@ Status: proposed
 
 ## Acceptance criteria
 
-- 切换 `<space>` 时，工单看板、频道、Artifact 与该空间的 `repos/`、`worktrees/`、`pkm/` 同步隔离切换，且密钥与全局设置仍在宿主共享。
+- 切换 `<space>` 时，工单看板、频道、Artifact 与该空间的 `repos/`、`worktrees/` 同步隔离切换，且密钥与全局设置仍在宿主共享。
 - `Repo` 支持 `<owner>/<repo>` 与单层 `<repo>` 两种合法寻址，worktree 路径与之唯一对应，越界路径被拒绝。
 - 更新 [概念](docs/concepts.md)、[架构](docs/architecture.md) 与 [仓库](docs/subsystems/repo.md) 后删除本 Note，`vp run rust:check` 与 `vp run docs:verify` 通过。
 

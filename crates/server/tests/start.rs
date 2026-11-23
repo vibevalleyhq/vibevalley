@@ -145,7 +145,7 @@ fn every_contract_endpoint_and_subscription_is_registered_and_hub_drops_cleanly(
     })
     .unwrap();
 
-    for sub in ["repos", "worktrees", "pkm"] {
+    for sub in ["repos", "worktrees"] {
         assert!(work.join(sub).is_dir(), "{sub}");
     }
     assert!(reqwest::Client::builder().build().is_ok());

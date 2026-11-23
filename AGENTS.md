@@ -7,14 +7,14 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 ```
 crates/protocol/           契约与环境约定（vibevalley-protocol）：src/contract/ 一个概念一个文件，typescript.rs 写出 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts；home.rs 为家目录与 server.json 约定
 crates/i18n/               对用户说的话（vibevalley-i18n）：locales/<语言>/<宿主.模块>.json 的词典，Rust 里 t("key")
-crates/core/               核心状态与纯规则（vibevalley-core）：reduce、SliceMask 与按域切片投影（board/sessions/collab/inbox/ops/farm）、任务状态和阶段、收件箱、巡查、农场画面、简报起草、定时任务（cron/）、笔记大纲（pkm/）与作品引擎（artifact/）
+crates/core/               核心状态与纯规则（vibevalley-core）：reduce、SliceMask 与按域切片投影（board/sessions/collab/inbox/ops/farm）、任务状态和阶段、收件箱、巡查、农场画面、简报起草、定时任务（cron/）与作品引擎（artifact/）
 crates/git/ · files/       仓库 Git 封装（vibevalley-git）与工作区文件搜索和监听（vibevalley-files）
 crates/runtime/            运行时与自研 agent（vibevalley-runtime）：rt（进程共享 Tokio 运行时）、oar/ 驱动（Claude Code、Codex、ACP、scripted；含基于 arc-swap 的零开销 OarObserver 与 oar-voyage/3 记录）与 agent/ 模型请求（DeepSeek，reqwest + backon）、持久执行引擎、工具、对话循环和内置 vibevalley 运行时
 crates/engines/            底层引擎：纯 Rust 正则（onig）、语法高亮（shiki）与图谱渲染（pele），供 crates/rich 使用
 crates/rich/               原生富内容组件与辅助（vibevalley-rich）：Markdown、代码块、图谱、画布、图表、GenUI 与拼音匹配（engine/ 含 canvas、chart、genui、pinyin）
 crates/server/             服务端（二进制 vibevalley-server）：src/modules 按 6 个业务域分组（work：issue、session、workplace、repo、cron、pull、ledger；
                            team：agent、orchestrator、memory、tool、mcp；collab：channel、connector、voice；
-                           content：attachment、library、media、artifact、pkm；skin：game；infra：setting、provider、http、column、debug、remote；
+                           content：attachment、library、media、artifact；skin：game；infra：setting、provider、http、column、debug、remote；
                            任务板拆成 work/issue（状态与交付）、work/session（领域无关 AgentSession、SQLite session_mailbox 与游标轨迹 session_event）、work/workplace（worktree 与合并），都只经 work/ledger 写），
                            src/db/{schema,queries,generated}/ 集中管理 SQLite 建表语句（含 shared.sql 共享 seq_counter 与 infra_remote.sql 远程配置/设备表）、命名查询与 sqlc 生成绑定；
                            src/transport/ 收拢接口契约（api）、进程内桥（bridge）与 HTTP 门（http，含默认关闭的受认证远程监听门）；
@@ -22,7 +22,7 @@ crates/server/             服务端（二进制 vibevalley-server）：src/modu
 crates/cli/                命令行（二进制 vibevalley，clap）：按五大业务域（work/team/collab/content/infra）组织的纯 HTTP 客户端；评测另拆为可选二进制 vibevalley-eval（--features eval）
 apps/mac/                  原生应用（二进制 vibevalley-mac）：src/ 是窗口外壳（src/shell/*）、终端、宿主能力和像素场景（src/pixel：农场、地图、记忆树、开场、图鉴）；
                            crates/ 是桌面独占支撑 crate（pixel、terminal、workspace）；
-                           ui/ 是 nsh 跑的 TSX：app（含 6 项主导航，详见 docs/subsystems/app.md）、workspace（侧栏/Git/文件/命令面板）、design（共享令牌与组件）、features/<概念>（含笔记与作品前端引擎、5 栏设置与远程访问面板）、farm、infra
+                           ui/ 是 nsh 跑的 TSX：app（含 6 项主导航，详见 docs/subsystems/app.md）、workspace（侧栏/Git/文件/命令面板）、design（共享令牌与组件）、features/<概念>（含大纲与作品前端引擎、5 栏设置与远程访问面板）、farm、infra
 apps/mobile/               独立原生移动应用（nsh/mobile，iOS 优先、Android 就绪）：经 @vibevalley/protocol/remote 连接 Mac 远程门，4 标签页（收件箱、频道、会话、任务）与 97 枚 reicons 矢量回退
 apps/island/               刘海上的灵动岛（Swift）：单独的小程序（apps/island/README.md）
 apps/site/                 官网 vibevalley.dev（Vite + Solid 2 静态生成），图和像素字用根目录 assets/ 的
@@ -47,14 +47,14 @@ vp install                                                      # 根目录：�
 vp run nsh:install                                              # 把 nsh 的命令行装到 .tools/bin：打 apps/mac/ui 的包、跑 mac:check 之前
 cargo run -p vibevalley-mac                                     # 原生应用，里面带着服务端；dev 通道默认 127.0.0.1:8790 与 ~/.vibevalley-dev，VIBEVALLEY_HOME、VIBEVALLEY_STORE 改位置
 cargo run -p vibevalley-server                                  # 只跑服务端；按发布通道默认端口（dev 8790 / alpha 8789 / beta 8788 / release 8787），VIBEVALLEY_CHANNEL、VIBEVALLEY_HOME、VIBEVALLEY_WORK_ROOT、VIBEVALLEY_PORT 改位置
-cargo run -p vibevalley-cli -- issue list                       # 命令行：issue、session、repo、cron、agent、orchestrator、runtime、memory、channel、chat、artifact、pkm、library、media、attachment、state、setting、doctor（--json 输出原始 JSON）
+cargo run -p vibevalley-cli -- issue list                       # 命令行：issue、session、repo、cron、agent、orchestrator、runtime、memory、channel、chat、artifact、library、media、attachment、state、setting、doctor（--json 输出原始 JSON）
 vp run rust:check                                               # 改完 crates/ 或 apps/mac/src：cargo fmt、clippy（-D warnings）、cargo test
 vp run rust:changed                                             # 只检查相对 origin/main 改到的 Rust crate 及其反向依赖（fmt、clippy、nextest）
 vp run protocol:ts                                              # 改了 crates/protocol/src/contract：重写 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts
 sqlc generate                                                   # 改完 SQLite 表结构或命名查询：重写 crates/server/src/db/generated/ 与宿主查询绑定
 vp run sql:check                                                # 用 sqlc 1.31.1 对账 Rust 绑定；用 Python 3 的 SQLite 按参数个数预编译每条查询
-vp run goldens                                                  # 改了笔记/作品规则或对照用例：跑 Rust 两个 crate 的 golden 测试
-vp run protocol:check                                           # 生成的 TS 契约和两份 golden 是不是最新，和提交的不同就失败
+vp run goldens                                                  # 改了作品规则或对照用例：跑 Rust 两个 crate 的 golden 测试
+vp run protocol:check                                           # 生成的 TS 契约和 golden 是不是最新，和提交的不同就失败
 vp run mac:check                                                # 改完 apps/mac/ui：nsh 类型检查、打包和工单按钮行为测试
 vp run mobile:check                                             # 改完 apps/mobile：nsh 类型检查、打包、测试与 lint
 vp run icons:gen                                                # 改了 crates/rich/src/icon.rs：重新生成 97 枚 reicons 矢量路径表 iconPaths.gen.ts
@@ -97,7 +97,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **深模块**：每个模块对外一个窄接口；不靠一个带 `kind` 的入口复用多种操作（[模块设计](docs/style/module-design.md)）。
 - **封闭的联合穷尽处理**：Rust 的 `match` 不写吞掉新成员的 `_`；TS 按 `_tag`、`kind`、`type` 分支时 `switch` 覆盖全部成员（`switch-exhaustiveness-check` 查）。
 - **契约改在 Rust**：形状和接口表改 `crates/protocol/src/contract`，TS 的类型由它生成；页面要用的同改手写的 `schema.ts` 与 `api.ts`，它们的测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）。
-- **生成的不手改**：`packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`（`protocol:ts`）、`client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）、`iconPaths.gen.ts`（`icons:gen`）、artifact 与 pkm 的 golden（`goldens`）和生成的参考表由脚本写出，`protocol:check` 和 `docs:verify` 查是不是最新。SQLite 查询绑定由 sqlc 生成，输入和输出见[配置](sqlc.yaml)。
+- **生成的不手改**：`packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`（`protocol:ts`）、`client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）、`iconPaths.gen.ts`（`icons:gen`）、artifact 的 golden（`goldens`）和生成的参考表由脚本写出，`protocol:check` 和 `docs:verify` 查是不是最新。SQLite 查询绑定由 sqlc 生成，输入和输出见[配置](sqlc.yaml)。
 - **内部不留兼容**：改名、改形状、改落盘格式直接改，不写兼容层、旧数据兜底或迁移脚本；对外 HTTP `v1` 是唯一例外（[接口版本](docs/subsystems/core.md)）。
 - **页面不折事实**：页面只读按域推来的切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）并写画面摆法，请求只经 `Transport`；缺数据就补进契约与 `reduce` 或调接口问服务端（[客户端](docs/subsystems/app.md)）。
 - **处理函数要薄**：HTTP 门、桥和页面组件只做转发与展示，规则留在所属模块或纯函数里（[架构](docs/architecture.md)）。

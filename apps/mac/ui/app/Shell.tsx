@@ -17,7 +17,6 @@ import { mix } from "../design/tone";
 import { QuickSwitcher, switcher } from "../features/channel";
 import { contentSidebarOpen, openContentSearch, openTemplatePicker, safeLastContentPath } from "../features/content";
 import { waitingOnUser } from "../features/inbox";
-import { NotesSearch } from "../features/pkm";
 import { Keyed, variant } from "../infra/base/dom";
 import { useInboxSlice, useLink, useSessionsSlice } from "../infra/frame";
 import { readHostParams } from "../infra/hostParams";
@@ -310,7 +309,6 @@ export function Shell(props: { children: JSX.Element }) {
   return (
     <View class="flex-1 flex-row bg-page">
       <QuickSwitcher />
-      <NotesSearch />
       <ShortcutSheet />
       <Rail here={here()} farm={inFarm()} />
       <View class="min-w-0 flex-1">

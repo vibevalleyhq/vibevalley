@@ -56,10 +56,9 @@ pub use highlight::{
 pub use i18n::{VvI18n, translate_json};
 pub use icon::{DEFAULT_ICON_SIZE, ICON_NAMES, IconShape, VvIcon, VvIconElement, VvIconProps, icon_shapes, paint_icon, resolve_icon_color, vv_icon};
 pub use markdown::{
-    BlockRefPayload, CustomNodeKind, PATTERN_BLOCK_REF, PATTERN_EMBED, PATTERN_ISSUE, PATTERN_MENTION, PATTERN_REMARK, PATTERN_TAG, PATTERN_WIKILINK,
-    VvBlockRefPressEvent, VvEmbedPressEvent, VvIssuePressEvent, VvLinkPressEvent, VvMarkdown, VvMarkdownElement, VvMarkdownEvent, VvMarkdownProps,
-    VvMarkdownSize, VvMentionPressEvent, VvTaskPressEvent, VvWikilinkPressEvent, clean_remark_note, is_incremental_streaming_safe, parse_vv_markdown,
-    parse_wikilink_target, vv_markdown, vv_markdown_extensions, vv_markdown_options,
+    CustomNodeKind, PATTERN_ISSUE, PATTERN_MENTION, VvIssuePressEvent, VvLinkPressEvent, VvMarkdown, VvMarkdownElement, VvMarkdownEvent, VvMarkdownProps,
+    VvMarkdownSize, VvMentionPressEvent, VvTaskPressEvent, is_incremental_streaming_safe, parse_vv_markdown, vv_markdown, vv_markdown_extensions,
+    vv_markdown_options,
 };
 pub use pinyin::VvPinyin;
 pub use theme::{

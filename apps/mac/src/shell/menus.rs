@@ -172,7 +172,6 @@ pub(super) fn shell_palette_commands() -> Vec<HostPaletteItem> {
         cmd("nav.chat", "前往对话", "/chat", "导航", None),
         cmd("nav.issues", "前往任务", "/issues", "导航", None),
         cmd("nav.content", "前往内容", "/library", "导航", None),
-        cmd("nav.pkm", "前往笔记", "/pkm", "导航", None),
         cmd("nav.team", "前往团队", "/agents", "导航", None),
         cmd("nav.runtimes", "前往引擎", "/runtimes", "导航", None),
         cmd("nav.repos", "前往仓库", "/repos", "导航", None),

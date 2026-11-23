@@ -134,7 +134,6 @@ fn start(dir: &std::path::Path, backend: Arc<Backend>) -> vibevalley_server::Sta
         tick_crons: false,
         link_previews: false,
         orchestrator_listens: false,
-        watch_pkm: false,
         ..vibevalley_server::ServerConfig::under(dir)
     })
     .unwrap();
@@ -153,7 +152,6 @@ fn start(dir: &std::path::Path, backend: Arc<Backend>) -> vibevalley_server::Sta
                 "voiceDesign": null,
                 "transcription": null,
                 "understanding": null,
-                "dictation": null,
                 "live": null,
                 "vision": null,
             }),

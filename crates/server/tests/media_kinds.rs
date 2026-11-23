@@ -59,7 +59,6 @@ fn start(dir: &std::path::Path, network: &Network) -> vibevalley_server::Started
         tick_crons: false,
         link_previews: false,
         orchestrator_listens: false,
-        watch_pkm: false,
         ..vibevalley_server::ServerConfig::under(dir)
     })
     .unwrap()
@@ -87,7 +86,7 @@ fn bind(s: &vibevalley_server::Started, key: &str) -> i64 {
             "voiceDesign": to("moss-voice-generator-1.0"),
             "transcription": to("moss-transcribe-diarize-pro"),
             "understanding": to("moss-vl-1.0"),
-            "dictation": null, "image": null, "live": null, "vision": null,
+            "image": null, "live": null, "vision": null,
         }),
     );
     status["revision"].as_i64().unwrap()

@@ -460,3 +460,183 @@ fn closing(s: &[char], from: usize, mark: &str, non_empty: bool) -> Option<usize
     }
     None
 }
+
+/// Normalized result of importing a `.md` file into an `ArtifactType::Outline` artifact.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportedOutline {
+    pub title: String,
+    pub markdown: String,
+    pub blocks: Vec<MdBlock>,
+}
+
+static LOGSEQ_PROP_LINE: LazyLock<Regex> = LazyLock::new(|| re(r"^[a-zA-Z][a-zA-Z0-9_-]*::\s*(.*)$"));
+static LOGSEQ_BLOCK_PROP_LINE: LazyLock<Regex> =
+    LazyLock::new(|| re(r"^(?:id|collapsed|completed|deadline|scheduled|render|caption|source-anchor|comment)::\s*.*$"));
+static LOGSEQ_MARKER_LINE: LazyLock<Regex> = LazyLock::new(|| re(r"^([-*+])\s+(TODO|DOING|DONE|NOW|LATER|WAITING|CANCELED)\s+(?:\[#([ABC])\]\s+)?(.*)$"));
+
+fn title_from_filename(filename: &str) -> String {
+    let base = filename.trim().replace('\\', "/");
+    let name = base.rsplit('/').next().unwrap_or(&base).trim();
+    let lower = name.to_ascii_lowercase();
+    let stem = [".outline.md", ".doc.md", ".markdown", ".md"]
+        .into_iter()
+        .find_map(|ext| lower.ends_with(ext).then(|| &name[..name.len() - ext.len()]))
+        .unwrap_or(name);
+    stem.replace("__", "/").trim().to_string()
+}
+
+fn unquote_yaml(raw: &str) -> String {
+    let s = raw.trim();
+    if s.len() >= 2 && ((s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\''))) {
+        s[1..s.len() - 1].trim().to_string()
+    } else {
+        s.to_string()
+    }
+}
+
+/// Normalizes an imported Markdown file (standard Markdown, YAML frontmatter, or
+/// Logseq-style outline Markdown) into a clean outline title, canonical Markdown,
+/// and parsed `MdBlock` list.
+pub fn import_outline_markdown(raw: &str, filename: Option<&str>, title: Option<&str>) -> ImportedOutline {
+    let normalized_nl = raw.replace("\r\n", "\n");
+    let lines: Vec<&str> = normalized_nl.split('\n').collect();
+    let mut i = 0;
+    let mut meta_title: Option<String> = None;
+
+    // Strip optional YAML frontmatter (`---` ... `---`).
+    if lines.first().is_some_and(|l| l.trim() == "---") {
+        let mut j = 1;
+        while j < lines.len() && lines[j].trim() != "---" {
+            if let Some((k, v)) = lines[j].split_once(':')
+                && k.trim().eq_ignore_ascii_case("title")
+            {
+                let parsed = unquote_yaml(v);
+                if !parsed.is_empty() {
+                    meta_title = Some(parsed);
+                }
+            }
+            j += 1;
+        }
+        if j < lines.len() && lines[j].trim() == "---" {
+            i = j + 1;
+            while i < lines.len() && blank(lines[i]) {
+                i += 1;
+            }
+        }
+    }
+
+    // Strip leading Logseq page-level `key:: value` header lines.
+    while i < lines.len() {
+        let line = lines[i];
+        if indent_of(line) == 0
+            && !line.starts_with('\t')
+            && let Some(caps) = LOGSEQ_PROP_LINE.captures(line)
+        {
+            if let Some((k, _)) = line.split_once("::")
+                && k.trim().eq_ignore_ascii_case("title")
+            {
+                let v = group(&caps, 1).trim();
+                if !v.is_empty() && meta_title.is_none() {
+                    meta_title = Some(v.to_string());
+                }
+            }
+            i += 1;
+            continue;
+        }
+        break;
+    }
+
+    // Normalize indentation (tabs -> 2 spaces), drop Logseq block metadata lines,
+    // and map Logseq task markers to standard Markdown checkboxes outside fenced code.
+    let mut body_lines: Vec<String> = Vec::with_capacity(lines.len().saturating_sub(i));
+    let mut in_code_fence = false;
+    for raw_line in &lines[i..] {
+        let expanded = raw_line.replace('\t', "  ");
+        let spaces = indent_of(&expanded);
+        let rest = &expanded[spaces..];
+        if rest.starts_with("```") {
+            in_code_fence = !in_code_fence;
+            body_lines.push(expanded);
+            continue;
+        }
+        if !in_code_fence {
+            if spaces > 0 && LOGSEQ_BLOCK_PROP_LINE.is_match(rest) {
+                continue;
+            }
+            if let Some(caps) = LOGSEQ_MARKER_LINE.captures(rest) {
+                let bullet = group(&caps, 1);
+                let marker = group(&caps, 2);
+                let text = group(&caps, 4);
+                let box_mark = if matches!(marker, "DONE" | "CANCELED") { "x" } else { " " };
+                body_lines.push(format!("{}{bullet} [{box_mark}] {text}", " ".repeat(spaces)));
+                continue;
+            }
+        }
+        body_lines.push(expanded);
+    }
+
+    let markdown = body_lines.join("\n").trim_matches('\n').to_string();
+    let blocks = blocks_of_markdown(&markdown);
+    let h1_title = blocks
+        .iter()
+        .find(|b| b.r#type == BlockType::Heading && b.attrs.level == Some(1))
+        .map(|b| plain(&b.text).trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    let resolved_title = title
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .or(meta_title)
+        .or(h1_title)
+        .or_else(|| filename.map(title_from_filename).filter(|s| !s.is_empty()))
+        .unwrap_or_default();
+
+    ImportedOutline {
+        title: resolved_title,
+        markdown,
+        blocks,
+    }
+}
+
+#[cfg(test)]
+mod import_tests {
+    use super::*;
+
+    #[test]
+    fn imports_standard_markdown_with_frontmatter_and_infers_title() {
+        let raw = "---\ntitle: \"Release Notes\"\ntags: [release]\n---\n\n# Ignored H1\n- First item\n  - Nested bullet\n";
+        let imported = import_outline_markdown(raw, Some("release-notes.md"), None);
+        assert_eq!(imported.title, "Release Notes");
+        assert_eq!(imported.blocks.len(), 3);
+        assert_eq!(imported.blocks[0].r#type, BlockType::Heading);
+        assert_eq!(imported.blocks[1].r#type, BlockType::Bulleted);
+        assert_eq!(imported.blocks[2].depth, 1);
+    }
+
+    #[test]
+    fn imports_logseq_outline_and_strips_block_props() {
+        let raw =
+            "title:: Weekly Plan\npara:: project\n\n- TODO [#A] Ship outline import\n  id:: 65012345-abcd\n  collapsed:: true\n\t- DONE Archive old notes\n";
+        let imported = import_outline_markdown(raw, Some("01_Projects/weekly-plan.md"), None);
+        assert_eq!(imported.title, "Weekly Plan");
+        assert_eq!(imported.blocks.len(), 2);
+        assert_eq!(imported.blocks[0].r#type, BlockType::Todo);
+        assert_eq!(imported.blocks[0].attrs.checked, Some(false));
+        assert_eq!(plain(&imported.blocks[0].text), "Ship outline import");
+        assert_eq!(imported.blocks[1].r#type, BlockType::Todo);
+        assert_eq!(imported.blocks[1].attrs.checked, Some(true));
+        assert_eq!(imported.blocks[1].depth, 1);
+        assert_eq!(plain(&imported.blocks[1].text), "Archive old notes");
+    }
+
+    #[test]
+    fn explicit_title_overrides_frontmatter_h1_and_filename() {
+        let imported = import_outline_markdown("# Heading\n- Point", Some("notes__draft.outline.md"), Some("Custom"));
+        assert_eq!(imported.title, "Custom");
+        let from_file = import_outline_markdown("- Point only", Some("notes__draft.outline.md"), None);
+        assert_eq!(from_file.title, "notes/draft");
+        let from_h1 = import_outline_markdown("# From Heading\n- Point", Some("fallback.md"), None);
+        assert_eq!(from_h1.title, "From Heading");
+    }
+}

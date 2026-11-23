@@ -99,6 +99,7 @@ export {
   ArtifactHtmlEdit,
   ArtifactListRequest,
   ArtifactMarkdown,
+  ArtifactOutlineImportRequest,
   ArtifactPresence,
   ArtifactPresenceEvent,
   ArtifactPresenceFollowRequest,
@@ -129,35 +130,6 @@ export {
   TextSpan,
   ViewportRect,
 } from "./artifact/schema";
-export {
-  PkmCaptureRequest,
-  PkmClip,
-  PkmClipRequest,
-  PkmCluster,
-  PkmClusterRequest,
-  PkmComment,
-  PkmJournalRequest,
-  PkmMarkdown,
-  PkmMoveRequest,
-  PkmMutation,
-  PkmPage,
-  PkmPageRef,
-  PkmPageRequest,
-  PkmPageView,
-  PkmProposal,
-  PkmProposalRequest,
-  PkmRadar,
-  PkmRename,
-  PkmRenameRequest,
-  PkmResolveRequest,
-  PkmScan,
-  PkmSearchHit,
-  PkmSearchRequest,
-  PkmSource,
-  PkmSourceUpdate,
-  PkmUndo,
-  PkmVault,
-} from "./pkm/schema";
 export {
   AppliedIssue,
   BoardIssueSummary,
@@ -264,7 +236,7 @@ export {
 } from "./host/schema";
 export { Attachment, AttachmentUpload } from "./attachment/schema";
 export { ConnectorLogin, ConnectorsChannelRequest, ConnectorStatus, VerifyRequest } from "./connector/schema";
-export { AgoraGrant, Dictated, DictateRequest, SettingsUpdateVoice, VoiceCall, VoiceCallStart, VoiceGrantRenew, VoiceHeard, VoiceSaid } from "./voice/schema";
+export { SettingsUpdateVoice, VoiceCall, VoiceCallStart, VoiceGrant, VoiceHeard, VoiceSaid } from "./voice/schema";
 export { MemorySourceKind, SettingsStatus, SettingsUpdate } from "./setting/schema";
 export { ProviderModelListing, ProviderModelRequest, ProviderStatus, ProviderUpdate, ProviderVoiceListing, ProviderVoiceRequest } from "./provider/schema";
 export {

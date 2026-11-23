@@ -87,7 +87,7 @@ export const Preview = z.object({
 
 export const Applied = z.object({ seq: z.number() }) satisfies Codec<T.Applied>;
 
-export const KeySource = z.enum(T.KeySourceValues) satisfies Codec<T.KeySource>;
+const KeySource = z.enum(T.KeySourceValues) satisfies Codec<T.KeySource>;
 
 export const KeyStatus = z.object({
   source: KeySource.nullable(),

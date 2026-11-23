@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { Codec } from "../codec";
 import { KeyStatus, Locale } from "../common/schema";
-import { AgoraAppID, Dictation, SettingsUpdateVoice, VoiceSettings } from "../voice/schema";
+import { SettingsUpdateVoice, VoiceSettings } from "../voice/schema";
 import * as T from "./shapes.gen";
 
 export const MemorySourceInfo = z.object({
@@ -31,7 +31,6 @@ const MemorySource = z.object({
 const SpacePaths = z.object({
   repos: z.string(),
   worktrees: z.string(),
-  pkm: z.string(),
 }) satisfies Codec<T.SpacePaths>;
 
 const Readiness = z.discriminatedUnion("ready", [
@@ -46,15 +45,8 @@ export const SettingsStatus = z.object({
   version: z.string(),
   locale: Locale,
   deepseekApiKey: KeyStatus,
-  agoraAppId: AgoraAppID,
-  agoraAppCertificate: KeyStatus,
   voice: VoiceSettings,
   voiceDefaults: VoiceSettings,
-  asrKey: KeyStatus,
-  llmKey: KeyStatus,
-  ttsKey: KeyStatus,
-  dictation: Dictation,
-  dictationKey: KeyStatus,
   readiness: z.record(z.enum(T.FeatureValues), Readiness),
   memorySources: z.array(MemorySource),
 }) satisfies Codec<T.SettingsStatus>;
@@ -73,13 +65,6 @@ const MemorySourceUpdate = z.object({
 export const SettingsUpdate = z.object({
   locale: z.exactOptional(Locale),
   deepseekApiKey: z.exactOptional(z.string()),
-  agoraAppId: z.exactOptional(z.string()),
-  agoraAppCertificate: z.exactOptional(z.string()),
   voice: z.exactOptional(SettingsUpdateVoice),
-  asrKey: z.exactOptional(z.string()),
-  llmKey: z.exactOptional(z.string()),
-  ttsKey: z.exactOptional(z.string()),
-  dictation: z.exactOptional(Dictation),
-  dictationKey: z.exactOptional(z.string()),
   memorySources: z.exactOptional(z.array(MemorySourceUpdate)),
 }) satisfies Codec<T.SettingsUpdate>;

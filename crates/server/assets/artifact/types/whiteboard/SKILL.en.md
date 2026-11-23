@@ -14,7 +14,7 @@
   - `path`: `{ "id": "p1", "type": "path", "mode": "pen" | "highlighter", "points": [{ "x": 100, "y": 120, "pressure": 0.7 }, { "x": 160, "y": 140, "pressure": 0.8 }], "stroke": "#a83a2c", "strokeWidth": 3 }`
   - `sticker` / `svg`: `{ "id": "s1", "type": "sticker", "sticker": "truck", "x": 420, "y": 240, "w": 110, "h": 72 }` or `type: "svg"` with `svg` markup.
   - `table`, `html` widgets, and temporary `claim` frames.
-- `presence/<id>` (optional JSON): `{ "id": "orch", "name": "Orchestrator", "color": "coral" | "teal" | "blue" | "leaf" | "wheat" | "lavender", "x": 520, "y": 110, "status": "Drafting" }`.
+- Live collaborator cursors and viewports flow through `artifact.presence.update` / `artifact.presence.follow` (ephemeral in-memory channel, never stored as entries).
 
 Built-in templates cover Timeline, Launch Workshop, Architecture, User Journey, 2x2 Quadrant, and Comparison Table in both English and Chinese.
 

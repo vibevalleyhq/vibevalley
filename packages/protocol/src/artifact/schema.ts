@@ -326,6 +326,16 @@ export const ArtifactMarkdown = z.object({
   markdown: z.string(),
 }) satisfies Codec<T.ArtifactMarkdown>;
 
+export const ArtifactOutlineImportRequest = z.object({
+  markdown: z.string(),
+  title: z.exactOptional(z.string()),
+  filename: z.exactOptional(z.string()),
+  channel: z.exactOptional(z.string()),
+  issue: z.exactOptional(z.string()),
+  announce: z.exactOptional(z.boolean()),
+  note: z.exactOptional(z.string()),
+}) satisfies Codec<T.ArtifactOutlineImportRequest>;
+
 const BlockOpInsertBlock = z.object({
   op: z.literal("insert_block"),
   block: BlockInput,

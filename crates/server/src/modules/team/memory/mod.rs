@@ -27,7 +27,6 @@ mod gse;
 mod rules;
 
 use rules as m;
-pub(crate) use rules::terms_list;
 
 use crate::db::generated::team_memory as queries;
 

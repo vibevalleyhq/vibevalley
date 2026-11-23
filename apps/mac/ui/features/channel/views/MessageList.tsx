@@ -28,7 +28,7 @@ import { chatSay, editingId, pendingLines, setEditingId } from "../model/composi
 import { followed, useMessage } from "../model/follow";
 import { useMarkedFollowed, useMarkRead } from "../model/marks";
 import { feedOf, orchestratorTyping, workbenchClock, messagePath, chatPath, parentAt, unreadIn } from "../model/places";
-import { Attachments, EditBox, Embeds, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
+import { Attachments, EditBox, Embeds, handleChannelGenUiAction, LinkedMessages, MessageBody, MessageTools, Reactions, ReplyQuote } from "./MessageParts";
 import { Dot, PhaseGlyph, SenderFace, ThinkingDots, phaseDot, phaseText, dutyShort, runtimeLabel } from "./presence";
 
 type FeedItem = ReturnType<typeof feedOf>[number];
@@ -440,7 +440,7 @@ function Dispatch(props: { m: ChatMessage }) {
             </If>
           }
         >
-          <Markdown text={props.m.text} mentions />
+          <Markdown text={props.m.text} mentions onGenUiAction={(ev) => handleChannelGenUiAction(props.m, ev)} />
         </If>
       </View>
       <View

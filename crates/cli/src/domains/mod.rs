@@ -64,8 +64,6 @@ pub enum Command {
 
     /// Manage artifacts and structured store entries
     Artifact(content::artifact::ArtifactCmd),
-    /// Capture, search, and manage outline notes
-    Pkm(content::pkm::PkmCmd),
     /// Manage media library items
     Library(content::library::LibraryCmd),
     /// Inspect media jobs and upload binary media inputs
@@ -97,7 +95,6 @@ pub fn run(client: &Client, command: Command) -> Done {
         Command::Chat(cmd) => collab::chat::run(client, cmd),
 
         Command::Artifact(cmd) => content::artifact::run(client, cmd),
-        Command::Pkm(cmd) => content::pkm::run(client, cmd),
         Command::Library(cmd) => content::library::run(client, cmd),
         Command::Media(cmd) => content::media::run(client, cmd),
         Command::Attachment(cmd) => content::attachment::run(client, cmd),

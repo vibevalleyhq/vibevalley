@@ -16,7 +16,6 @@ fn start(dir: &std::path::Path) -> vibevalley_server::Started {
         tick_crons: false,
         link_previews: false,
         orchestrator_listens: false,
-        watch_pkm: false,
         ..vibevalley_server::ServerConfig::under(dir)
     })
     .unwrap()

@@ -1201,16 +1201,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
         can: &[Caller::User, Caller::Remote],
         dry_run: None,
         input: None,
-        result: Some("AgoraGrant"),
-    },
-    Endpoint {
-        op: "voice.grant.renew",
-        module: "voice",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("VoiceGrantRenew"),
-        result: Some("AgoraGrant"),
+        result: Some("VoiceGrant"),
     },
     Endpoint {
         op: "voice.call.start",
@@ -1247,15 +1238,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         dry_run: None,
         input: Some("VoiceSaid"),
         result: None,
-    },
-    Endpoint {
-        op: "voice.dictate",
-        module: "voice",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("DictateRequest"),
-        result: Some("Dictated"),
     },
     Endpoint {
         op: "artifact.list",
@@ -1483,13 +1465,13 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("ArtifactEntryBatchResult"),
     },
     Endpoint {
-        op: "artifact.demo",
+        op: "artifact.outline.import",
         module: "artifact",
-        about: &["id"],
-        can: &[Caller::User],
+        about: &[],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactDemoInput"),
-        result: None,
+        input: Some("ArtifactOutlineImportRequest"),
+        result: Some("Artifact"),
     },
     Endpoint {
         op: "artifact.presence.update",
@@ -1553,186 +1535,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         dry_run: None,
         input: Some("ArtifactHistoryCompactRequest"),
         result: Some("Artifact"),
-    },
-    Endpoint {
-        op: "pkm.page.list",
-        module: "pkm",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: None,
-        result: Some("PkmVault"),
-    },
-    Endpoint {
-        op: "pkm.page.get",
-        module: "pkm",
-        about: &["page"],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: Some("PkmPageRef"),
-        result: Some("PkmPageView"),
-    },
-    Endpoint {
-        op: "pkm.page.save",
-        module: "pkm",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("PkmPageRequest"),
-        result: Some("PkmPage"),
-    },
-    Endpoint {
-        op: "pkm.page.move",
-        module: "pkm",
-        about: &["page"],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("PkmMoveRequest"),
-        result: Some("PkmPage"),
-    },
-    Endpoint {
-        op: "pkm.page.rename",
-        module: "pkm",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("PkmRenameRequest"),
-        result: Some("PkmRename"),
-    },
-    Endpoint {
-        op: "pkm.page.export",
-        module: "pkm",
-        about: &["page"],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("PkmPageRef"),
-        result: Some("PkmMarkdown"),
-    },
-    Endpoint {
-        op: "pkm.block.apply",
-        module: "pkm",
-        about: &["page"],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("PkmMutation"),
-        result: Some("PkmPage"),
-    },
-    Endpoint {
-        op: "pkm.search",
-        module: "pkm",
-        about: &[],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: Some("PkmSearchRequest"),
-        result: Some("Vec<PkmSearchHit>"),
-    },
-    Endpoint {
-        op: "pkm.capture",
-        module: "pkm",
-        about: &[],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: Some("PkmCaptureRequest"),
-        result: Some("PkmPage"),
-    },
-    Endpoint {
-        op: "pkm.source.get",
-        module: "pkm",
-        about: &["page"],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("PkmPageRef"),
-        result: Some("PkmSource"),
-    },
-    Endpoint {
-        op: "pkm.source.update",
-        module: "pkm",
-        about: &["page"],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("PkmSourceUpdate"),
-        result: Some("PkmPage"),
-    },
-    Endpoint {
-        op: "pkm.journal.open",
-        module: "pkm",
-        about: &["day"],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("PkmJournalRequest"),
-        result: Some("PkmPage"),
-    },
-    Endpoint {
-        op: "pkm.radar.get",
-        module: "pkm",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("PkmRadarGetInput"),
-        result: Some("PkmRadar"),
-    },
-    Endpoint {
-        op: "pkm.comment.list",
-        module: "pkm",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("PkmCommentListInput"),
-        result: Some("Vec<PkmComment>"),
-    },
-    Endpoint {
-        op: "pkm.comment.suggest",
-        module: "pkm",
-        about: &["block"],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: Some("PkmProposalRequest"),
-        result: Some("PkmProposal"),
-    },
-    Endpoint {
-        op: "pkm.comment.resolve",
-        module: "pkm",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("PkmResolveRequest"),
-        result: Some("PkmPage"),
-    },
-    Endpoint {
-        op: "pkm.clip.create",
-        module: "pkm",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("PkmClipRequest"),
-        result: Some("PkmClip"),
-    },
-    Endpoint {
-        op: "pkm.cluster.create",
-        module: "pkm",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("PkmClusterRequest"),
-        result: Some("PkmCluster"),
-    },
-    Endpoint {
-        op: "pkm.undo",
-        module: "pkm",
-        about: &[],
-        can: &[Caller::User],
-        dry_run: None,
-        input: None,
-        result: Some("PkmUndo"),
-    },
-    Endpoint {
-        op: "pkm.scan",
-        module: "pkm",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: None,
-        result: Some("PkmScan"),
     },
     Endpoint {
         op: "provider.get",
@@ -2868,13 +2670,7 @@ pub mod ops {
     impl Op for VoiceGrantCreate {
         const NAME: &'static str = "voice.grant.create";
         type Input = ();
-        type Result = t::AgoraGrant;
-    }
-    pub struct VoiceGrantRenew;
-    impl Op for VoiceGrantRenew {
-        const NAME: &'static str = "voice.grant.renew";
-        type Input = t::VoiceGrantRenew;
-        type Result = t::AgoraGrant;
+        type Result = t::VoiceGrant;
     }
     pub struct VoiceCallStart;
     impl Op for VoiceCallStart {
@@ -2899,12 +2695,6 @@ pub mod ops {
         const NAME: &'static str = "voice.call.say";
         type Input = t::VoiceSaid;
         type Result = ();
-    }
-    pub struct VoiceDictate;
-    impl Op for VoiceDictate {
-        const NAME: &'static str = "voice.dictate";
-        type Input = t::DictateRequest;
-        type Result = t::Dictated;
     }
     /// The artifacts announced in a channel or made for an issue, newest change first; every one the farm has when neither is given.
     pub struct ArtifactList;
@@ -3077,13 +2867,12 @@ pub mod ops {
         type Input = t::ArtifactEntryBatchRequest;
         type Result = t::ArtifactEntryBatchResult;
     }
-    /// Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
-    /// one already running is refused.
-    pub struct ArtifactDemo;
-    impl Op for ArtifactDemo {
-        const NAME: &'static str = "artifact.demo";
-        type Input = t::ArtifactDemoInput;
-        type Result = ();
+    /// Imports a `.md` document into a new `ArtifactType::Outline` blocks artifact.
+    pub struct ArtifactOutlineImport;
+    impl Op for ArtifactOutlineImport {
+        const NAME: &'static str = "artifact.outline.import";
+        type Input = t::ArtifactOutlineImportRequest;
+        type Result = t::Artifact;
     }
     /// Ephemeral live presence update (cursor, selection, highlight, viewport); never persisted to SQLite.
     pub struct ArtifactPresenceUpdate;
@@ -3133,140 +2922,6 @@ pub mod ops {
         const NAME: &'static str = "artifact.history.compact";
         type Input = t::ArtifactHistoryCompactRequest;
         type Result = t::Artifact;
-    }
-    /// Every page in the vault, newest first; files changed on disk are read again first.
-    pub struct PkmPageList;
-    impl Op for PkmPageList {
-        const NAME: &'static str = "pkm.page.list";
-        type Input = ();
-        type Result = t::PkmVault;
-    }
-    /// The page with its ((refs)) read out, the blocks linking to it and its open remarks; read again from its file when that changed.
-    pub struct PkmPageGet;
-    impl Op for PkmPageGet {
-        const NAME: &'static str = "pkm.page.get";
-        type Input = t::PkmPageRef;
-        type Result = t::PkmPageView;
-    }
-    /// Makes the page, or sets the props and tier of the one with that title (its file moves to the tier's folder).
-    pub struct PkmPageSave;
-    impl Op for PkmPageSave {
-        const NAME: &'static str = "pkm.page.save";
-        type Input = t::PkmPageRequest;
-        type Result = t::PkmPage;
-    }
-    pub struct PkmPageMove;
-    impl Op for PkmPageMove {
-        const NAME: &'static str = "pkm.page.move";
-        type Input = t::PkmMoveRequest;
-        type Result = t::PkmPage;
-    }
-    pub struct PkmPageRename;
-    impl Op for PkmPageRename {
-        const NAME: &'static str = "pkm.page.rename";
-        type Input = t::PkmRenameRequest;
-        type Result = t::PkmRename;
-    }
-    /// The page as plain Markdown: refs read out, links and remarks taken off.
-    pub struct PkmPageExport;
-    impl Op for PkmPageExport {
-        const NAME: &'static str = "pkm.page.export";
-        type Input = t::PkmPageRef;
-        type Result = t::PkmMarkdown;
-    }
-    /// The ops in order on the page as its file is now, written back once.
-    pub struct PkmBlockApply;
-    impl Op for PkmBlockApply {
-        const NAME: &'static str = "pkm.block.apply";
-        type Input = t::PkmMutation;
-        type Result = t::PkmPage;
-    }
-    pub struct PkmSearch;
-    impl Op for PkmSearch {
-        const NAME: &'static str = "pkm.search";
-        type Input = t::PkmSearchRequest;
-        type Result = Vec<t::PkmSearchHit>;
-    }
-    /// Into today's journal as LATER lines tagged #inbox (an agent's says who noted it), or at the end of a page.
-    pub struct PkmCapture;
-    impl Op for PkmCapture {
-        const NAME: &'static str = "pkm.capture";
-        type Input = t::PkmCaptureRequest;
-        type Result = t::PkmPage;
-    }
-    /// The page's file as written, ids and all, with when it was written.
-    pub struct PkmSourceGet;
-    impl Op for PkmSourceGet {
-        const NAME: &'static str = "pkm.source.get";
-        type Input = t::PkmPageRef;
-        type Result = t::PkmSource;
-    }
-    /// The page written anew from its file's text; refused when the file changed after it was read.
-    pub struct PkmSourceUpdate;
-    impl Op for PkmSourceUpdate {
-        const NAME: &'static str = "pkm.source.update";
-        type Input = t::PkmSourceUpdate;
-        type Result = t::PkmPage;
-    }
-    /// The journal of a day, made empty when it has none yet.
-    pub struct PkmJournalOpen;
-    impl Op for PkmJournalOpen {
-        const NAME: &'static str = "pkm.journal.open";
-        type Input = t::PkmJournalRequest;
-        type Result = t::PkmPage;
-    }
-    pub struct PkmRadarGet;
-    impl Op for PkmRadarGet {
-        const NAME: &'static str = "pkm.radar.get";
-        type Input = t::PkmRadarGetInput;
-        type Result = t::PkmRadar;
-    }
-    pub struct PkmCommentList;
-    impl Op for PkmCommentList {
-        const NAME: &'static str = "pkm.comment.list";
-        type Input = t::PkmCommentListInput;
-        type Result = Vec<t::PkmComment>;
-    }
-    /// A rewrite of a block for the user to accept: it keeps every [[link]] and ((ref)) the block had.
-    pub struct PkmCommentSuggest;
-    impl Op for PkmCommentSuggest {
-        const NAME: &'static str = "pkm.comment.suggest";
-        type Input = t::PkmProposalRequest;
-        type Result = t::PkmProposal;
-    }
-    /// Accepted, the suggested text replaces the block's and its remarks come off; rejected, the block stays.
-    pub struct PkmCommentResolve;
-    impl Op for PkmCommentResolve {
-        const NAME: &'static str = "pkm.comment.resolve";
-        type Input = t::PkmResolveRequest;
-        type Result = t::PkmPage;
-    }
-    pub struct PkmClipCreate;
-    impl Op for PkmClipCreate {
-        const NAME: &'static str = "pkm.clip.create";
-        type Input = t::PkmClipRequest;
-        type Result = t::PkmClip;
-    }
-    /// A resource page of ((refs)) to the inbox, journal and resource blocks about the topic.
-    pub struct PkmClusterCreate;
-    impl Op for PkmClusterCreate {
-        const NAME: &'static str = "pkm.cluster.create";
-        type Input = t::PkmClusterRequest;
-        type Result = t::PkmCluster;
-    }
-    /// Puts back the file the last change wrote.
-    pub struct PkmUndo;
-    impl Op for PkmUndo {
-        const NAME: &'static str = "pkm.undo";
-        type Input = ();
-        type Result = t::PkmUndo;
-    }
-    /// Reads again every file that changed on disk.
-    pub struct PkmScan;
-    impl Op for PkmScan {
-        const NAME: &'static str = "pkm.scan";
-        type Input = ();
-        type Result = t::PkmScan;
     }
     pub struct ProviderGet;
     impl Op for ProviderGet {

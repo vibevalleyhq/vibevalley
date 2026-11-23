@@ -2,8 +2,7 @@
 //!
 //! Strictly avoids `MarkdownPlugin` and `MarkdownExtension::container` so `nsh-base`'s
 //! incremental streaming parser (`incremental.rs`) remains active for every streamed token.
-//! Handles inline `#12` issue references, `@mention`, PKM `![[embed]]`, `[[wikilink]]`,
-//! `((block-ref))`, `==remark==^[note]`, and `#tag` via `MarkdownExtension::pattern`, and
+//! Handles inline `#12` issue references and `@mention` via `MarkdownExtension::pattern`, and
 //! fenced `mermaid`, `canvas`, `chart`, and `genui` blocks via `MarkdownExtension::language`.
 
 use std::fs::File;
@@ -17,8 +16,6 @@ use nsh_base::text_view::{
 use nsh_core::element::{ImageSrc, image_size};
 use nsh_core::keymap::Modifiers;
 use nsh_core::prelude::*;
-use vibevalley_i18n::t;
-use vibevalley_protocol::pkm_slug as slug_of;
 
 use crate::canvas::vv_canvas;
 use crate::chart::vv_chart;
@@ -35,27 +32,12 @@ use crate::theme::{AdaptiveUi, CODE_FONT_MONO, UiPalette};
 pub const PATTERN_ISSUE: &str = r"(^|[\s(（，。,])#(\d+)\b";
 /// Pattern for `@mention` tokens outside code and links (enabled when `mentions = true`).
 pub const PATTERN_MENTION: &str = r"(^|[\s(（，。,])@([\p{L}\p{N}_-]+)";
-/// Pattern for PKM `![[embed]]` transclusions (must precede `PATTERN_WIKILINK`).
-pub const PATTERN_EMBED: &str = r"!\[\[([^\[\]]+?)\]\]";
-/// Pattern for PKM `[[page]]` and `[[page|alias]]` wikilinks.
-pub const PATTERN_WIKILINK: &str = r"\[\[([^\[\]]+?)\]\]";
-/// Pattern for PKM `((block-id))` block references.
-pub const PATTERN_BLOCK_REF: &str = r"\(\(([0-9a-fA-F-]{8,36})\)\)";
-/// Pattern for PKM `==highlighted words==^[remark note]` inline remarks.
-pub const PATTERN_REMARK: &str = r"==([^=]+)==\^\[([^\]]+)\]";
-/// Pattern for PKM `#tag` tokens (starts with a Unicode letter so `#12` issues never collide).
-pub const PATTERN_TAG: &str = r"(^|[\s(（，。,])#([\p{L}][\p{L}\p{N}_/-]*)";
 
 /// Closed set of custom Markdown nodes emitted by [`vv_markdown_extensions`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CustomNodeKind {
     Issue,
     Mention,
-    Embed,
-    Wikilink,
-    BlockRef,
-    Remark,
-    Tag,
     Mermaid,
     Canvas,
     Chart,
@@ -68,11 +50,6 @@ impl CustomNodeKind {
         match self {
             Self::Issue => "vv_issue",
             Self::Mention => "vv_mention",
-            Self::Embed => "vv_embed",
-            Self::Wikilink => "vv_wikilink",
-            Self::BlockRef => "vv_block_ref",
-            Self::Remark => "vv_remark",
-            Self::Tag => "vv_tag",
             Self::Mermaid => "vv_mermaid",
             Self::Canvas => "vv_canvas",
             Self::Chart => "vv_chart",
@@ -85,11 +62,6 @@ impl CustomNodeKind {
         match name {
             "vv_issue" => Some(Self::Issue),
             "vv_mention" => Some(Self::Mention),
-            "vv_embed" => Some(Self::Embed),
-            "vv_wikilink" => Some(Self::Wikilink),
-            "vv_block_ref" => Some(Self::BlockRef),
-            "vv_remark" => Some(Self::Remark),
-            "vv_tag" => Some(Self::Tag),
             "vv_mermaid" => Some(Self::Mermaid),
             "vv_canvas" => Some(Self::Canvas),
             "vv_chart" => Some(Self::Chart),
@@ -358,22 +330,6 @@ pub fn read_local_image_dimensions(path: &Path) -> Option<(f32, f32)> {
     (size.width.0 > 0 && size.height.0 > 0).then_some((size.width.0 as f32, size.height.0 as f32))
 }
 
-/// Resolved PKM block transclusion passed to [`VvMarkdown`] for `((block-ref))` and `![[embed]]`.
-#[derive(Debug, Clone, Default, PartialEq, Eq, JsObject)]
-pub struct BlockRefPayload {
-    /// Referenced block id (or embed target key).
-    pub block: SharedString,
-    /// Resolved body text of the referenced block, if found.
-    pub body: Option<SharedString>,
-    /// Slug of the page owning the block, if known.
-    pub page: Option<SharedString>,
-    /// Human-readable title of the owning page (for tooltip/accessibility hints).
-    pub page_title: Option<SharedString>,
-    /// Whether the referenced block exists in the vault (default true).
-    #[prop(default = true)]
-    pub found: bool,
-}
-
 /// Props of [`VvMarkdown`].
 #[derive(Debug, Clone, Copy, PartialEq, Props)]
 pub struct VvMarkdownProps {
@@ -388,12 +344,6 @@ pub struct VvMarkdownProps {
     /// Enable `@mention` inline parsing (default false).
     #[prop(default)]
     pub mentions: Prop<bool>,
-    /// Enable PKM inline syntax (`![[embed]]`, `[[wikilink]]`, `((block-ref))`, `==remark==^[note]`, `#tag`).
-    #[prop(default)]
-    pub pkm: Prop<bool>,
-    /// Resolved block transclusions used when rendering `((block-ref))` and `![[embed]]` nodes.
-    #[prop(default)]
-    pub refs: Prop<Vec<BlockRefPayload>>,
     /// Stream-repair mode for AI replies still arriving token by token (preserves incremental parsing).
     #[prop(default)]
     pub streaming: Prop<bool>,
@@ -434,31 +384,6 @@ pub struct VvMentionPressEvent {
     pub name: SharedString,
 }
 
-/// Payload for [`VvMarkdownEvent::WikilinkPress`].
-#[derive(Debug, Clone, Default, PartialEq, Eq, JsObject)]
-pub struct VvWikilinkPressEvent {
-    /// Normalized page slug (`vibevalley_protocol::pkm_slug`).
-    pub page: SharedString,
-    /// Display text shown for the wikilink or tag.
-    pub label: SharedString,
-}
-
-/// Payload for [`VvMarkdownEvent::BlockRefPress`].
-#[derive(Debug, Clone, Default, PartialEq, Eq, JsObject)]
-pub struct VvBlockRefPressEvent {
-    /// Block identifier parsed from `((id))`.
-    pub id: SharedString,
-    /// Owning page slug, if supplied in `refs`.
-    pub page: Option<SharedString>,
-}
-
-/// Payload for [`VvMarkdownEvent::EmbedPress`].
-#[derive(Debug, Clone, Default, PartialEq, Eq, JsObject)]
-pub struct VvEmbedPressEvent {
-    /// Raw embed target parsed from `![[target]]`.
-    pub target: SharedString,
-}
-
 /// Payload for [`VvMarkdownEvent::TaskPress`].
 #[derive(Debug, Clone, Default, PartialEq, Eq, JsObject)]
 pub struct VvTaskPressEvent {
@@ -480,15 +405,6 @@ pub enum VvMarkdownEvent {
     /// Fired when an inline `@mention` is pressed.
     #[args(event)]
     MentionPress(VvMentionPressEvent),
-    /// Fired when a PKM `[[wikilink]]` or `#tag` is pressed.
-    #[args(event)]
-    WikilinkPress(VvWikilinkPressEvent),
-    /// Fired when a PKM `((block-ref))` is pressed.
-    #[args(event)]
-    BlockRefPress(VvBlockRefPressEvent),
-    /// Fired when a PKM `![[embed]]` is pressed.
-    #[args(event)]
-    EmbedPress(VvEmbedPressEvent),
     /// Fired when a GFM task list checkbox is toggled.
     #[args(event)]
     TaskPress(VvTaskPressEvent),
@@ -517,19 +433,9 @@ pub fn vv_markdown_options(streaming: bool) -> MarkdownOptions {
 ///
 /// Uses only `MarkdownExtension::pattern` and `MarkdownExtension::language` (never `container`)
 /// so `nsh-base`'s `incremental()` parser predicate remains `true` during streaming.
-pub fn vv_markdown_extensions(mentions: bool, pkm: bool) -> Vec<MarkdownExtension> {
-    let mut exts = Vec::with_capacity(11);
-    if pkm {
-        // `![[embed]]` MUST precede `[[wikilink]]` so embeds capture the leading `!`.
-        exts.push(MarkdownExtension::pattern(CustomNodeKind::Embed.as_name(), PATTERN_EMBED));
-        exts.push(MarkdownExtension::pattern(CustomNodeKind::Wikilink.as_name(), PATTERN_WIKILINK));
-        exts.push(MarkdownExtension::pattern(CustomNodeKind::BlockRef.as_name(), PATTERN_BLOCK_REF));
-        exts.push(MarkdownExtension::pattern(CustomNodeKind::Remark.as_name(), PATTERN_REMARK));
-    }
+pub fn vv_markdown_extensions(mentions: bool) -> Vec<MarkdownExtension> {
+    let mut exts = Vec::with_capacity(6);
     exts.push(MarkdownExtension::pattern(CustomNodeKind::Issue.as_name(), PATTERN_ISSUE));
-    if pkm {
-        exts.push(MarkdownExtension::pattern(CustomNodeKind::Tag.as_name(), PATTERN_TAG));
-    }
     if mentions {
         exts.push(MarkdownExtension::pattern(CustomNodeKind::Mention.as_name(), PATTERN_MENTION));
     }
@@ -549,28 +455,11 @@ pub fn is_incremental_streaming_safe(options: &MarkdownOptions, extensions: &[Ma
 /// Parses Markdown using VibeValley's exact [`vv_markdown_options`] and [`vv_markdown_extensions`].
 ///
 /// Useful for deterministic inspection and unit/integration testing without requiring a UI window.
-pub fn parse_vv_markdown(source: &str, mentions: bool, pkm: bool, streaming: bool) -> Document {
+pub fn parse_vv_markdown(source: &str, mentions: bool, streaming: bool) -> Document {
     Parser::new()
         .options(vv_markdown_options(streaming))
-        .extensions(vv_markdown_extensions(mentions, pkm))
+        .extensions(vv_markdown_extensions(mentions))
         .markdown(source)
-}
-
-/// Splits a wikilink payload (`"Page"` or `"Page|Display Label"`) into `(page_slug, display_label)`.
-pub fn parse_wikilink_target(raw: &str) -> (String, String) {
-    match raw.split_once('|') {
-        Some((page, label)) => {
-            let trimmed_label = label.trim();
-            let display = if trimmed_label.is_empty() { page.trim() } else { trimmed_label };
-            (slug_of(page), display.to_owned())
-        }
-        None => (slug_of(raw), raw.trim().to_owned()),
-    }
-}
-
-/// Strips the leading `💬` prefix from PKM inline remarks, matching `apps/mac/ui/features/pkm/outline.ts`.
-pub fn clean_remark_note(raw: &str) -> String {
-    raw.trim_start().strip_prefix('💬').unwrap_or(raw).trim().to_owned()
 }
 
 const LINE_STRONG_LIGHT: Hsla = rgba(0x1c19_1724).to_hsla();
@@ -882,7 +771,7 @@ fn with_optional_prefix(prefix: &str, token: Text) -> AnyElement {
     }
 }
 
-fn render_custom_node(node: &CustomNode, refs: &[BlockRefPayload], streaming: bool, cx: Scope<VvMarkdownEvent>) -> AnyElement {
+fn render_custom_node(node: &CustomNode, streaming: bool, cx: Scope<VvMarkdownEvent>) -> AnyElement {
     let Some(kind) = CustomNodeKind::parse(&node.name) else {
         return text(node.text.clone()).into_element();
     };
@@ -924,129 +813,6 @@ fn render_custom_node(node: &CustomNode, refs: &[BlockRefPayload], streaming: bo
                 });
             with_optional_prefix(prefix, span)
         }
-        CustomNodeKind::Embed => {
-            let target = node.attributes.get("1").cloned().unwrap_or_default();
-            if target.is_empty() {
-                return text(node.text.clone()).into_element();
-            }
-            let matched = refs.iter().find(|r| r.block.as_str() == target.as_str());
-            let target_shared = SharedString::from(target.clone());
-            let display = matched.and_then(|r| r.body.clone()).unwrap_or_else(|| SharedString::from(target));
-            let missing = matched.is_some_and(|r| !r.found);
-            let hint = matched
-                .and_then(|r| r.page_title.as_ref())
-                .map(|page| SharedString::from(t("web.pkm.page.refFrom", &[("page", page.as_str().into())])));
-
-            text(display)
-                .test_id("vv-embed")
-                .role(AccessibilityRole::Link)
-                .rounded_sm()
-                .px(px(4.0))
-                .bg(AdaptiveUi::SIDE)
-                .text_color(if missing { AdaptiveUi::BERRY } else { AdaptiveUi::WATER })
-                .underline()
-                .cursor_pointer()
-                .when_some(hint, |el, h| el.hint(h))
-                .on_press(move |_: &PressEvent| {
-                    cx.emit(VvMarkdownEvent::EmbedPress(VvEmbedPressEvent { target: target_shared.clone() }));
-                })
-                .into_element()
-        }
-        CustomNodeKind::Wikilink => {
-            let raw = node.attributes.get("1").map(String::as_str).unwrap_or("");
-            if raw.is_empty() {
-                return text(node.text.clone()).into_element();
-            }
-            let (page, label) = parse_wikilink_target(raw);
-            let page_shared = SharedString::from(page);
-            let label_shared = SharedString::from(label.clone());
-            text(label)
-                .test_id("pkm-link")
-                .role(AccessibilityRole::Link)
-                .text_color(AdaptiveUi::WATER)
-                .underline()
-                .text_decoration_color(move || UiPalette::for_mode(dark()).water.opacity(0.35))
-                .cursor_pointer()
-                .on_press(move |_: &PressEvent| {
-                    cx.emit(VvMarkdownEvent::WikilinkPress(VvWikilinkPressEvent {
-                        page: page_shared.clone(),
-                        label: label_shared.clone(),
-                    }));
-                })
-                .into_element()
-        }
-        CustomNodeKind::BlockRef => {
-            let id = node.attributes.get("1").cloned().unwrap_or_default();
-            if id.is_empty() {
-                return text(node.text.clone()).into_element();
-            }
-            let matched = refs.iter().find(|r| r.block.as_str() == id.as_str());
-            let found = matched.is_some_and(|r| r.found);
-            let display = matched
-                .and_then(|r| r.body.clone())
-                .unwrap_or_else(|| SharedString::from(t("web.pkm.page.missingRef", &[])));
-            let hint = matched
-                .and_then(|r| r.page_title.as_ref())
-                .map(|page| SharedString::from(t("web.pkm.page.refFrom", &[("page", page.as_str().into())])));
-            let page = matched.and_then(|r| r.page.clone());
-            let id_shared = SharedString::from(id);
-
-            text(display)
-                .test_id("pkm-ref")
-                .role(AccessibilityRole::Link)
-                .underline()
-                .text_decoration_dotted()
-                .text_decoration_color(move || UiPalette::for_mode(dark()).faint.opacity(0.55))
-                .text_color(if found { AdaptiveUi::INK } else { AdaptiveUi::BERRY })
-                .cursor_pointer()
-                .when_some(hint, |el, h| el.hint(h))
-                .on_press(move |_: &PressEvent| {
-                    cx.emit(VvMarkdownEvent::BlockRefPress(VvBlockRefPressEvent {
-                        id: id_shared.clone(),
-                        page: page.clone(),
-                    }));
-                })
-                .into_element()
-        }
-        CustomNodeKind::Remark => {
-            let words = node.attributes.get("1").cloned().unwrap_or_default();
-            let raw_note = node.attributes.get("2").map(String::as_str).unwrap_or("");
-            let note = clean_remark_note(raw_note);
-            let note_shared = SharedString::from(note);
-            text(words)
-                .test_id("pkm-remark")
-                .text_color(AdaptiveUi::INK)
-                .underline()
-                .text_decoration_color(move || UiPalette::for_mode(dark()).wheat.opacity(0.75))
-                .when(!note_shared.is_empty(), |el| {
-                    let h = note_shared.clone();
-                    el.hint(h.clone()).tooltip(text(h))
-                })
-                .into_element()
-        }
-        CustomNodeKind::Tag => {
-            let prefix = node.attributes.get("1").map(String::as_str).unwrap_or("");
-            let tag = node.attributes.get("2").map(String::as_str).unwrap_or("");
-            if tag.is_empty() {
-                return text(node.text.clone()).into_element();
-            }
-            let page = SharedString::from(slug_of(tag));
-            let label = SharedString::from(format!("#{tag}"));
-            let span = text(label.clone())
-                .test_id("pkm-tag")
-                .role(AccessibilityRole::Link)
-                .text_color(AdaptiveUi::WATER)
-                .underline()
-                .text_decoration_color(move || UiPalette::for_mode(dark()).water.opacity(0.35))
-                .cursor_pointer()
-                .on_press(move |_: &PressEvent| {
-                    cx.emit(VvMarkdownEvent::WikilinkPress(VvWikilinkPressEvent {
-                        page: page.clone(),
-                        label: label.clone(),
-                    }));
-                });
-            with_optional_prefix(prefix, span)
-        }
         CustomNodeKind::Mermaid => vv_diagram().source(node.text.clone()).into_element(),
         CustomNodeKind::Canvas => vv_canvas().data(node.text.clone()).into_element(),
         CustomNodeKind::Chart => vv_chart().spec(node.text.clone()).into_element(),
@@ -1063,16 +829,14 @@ fn render_custom_node(node: &CustomNode, refs: &[BlockRefPayload], streaming: bo
 /// VibeValley's native Markdown renderer wrapping `nsh_base::text_view()`.
 ///
 /// Supports GitHub Flavored Markdown, `ratex` math, GitHub alerts, incremental streaming,
-/// `#12` issue references, `@mentions`, PKM syntax (`![[embed]]`, `[[wikilink]]`, `((block-ref))`,
-/// `==remark==^[note]`, `#tag`), pure-Rust Shiki code blocks, Mermaid diagrams, JSON Canvas,
-/// native SVG Charts, and reactive GenUI surfaces with zero JS string-splicing.
+/// `#12` issue references, `@mentions`, pure-Rust Shiki code blocks, Mermaid diagrams,
+/// JSON Canvas, native SVG Charts, and reactive GenUI surfaces with zero JS string-splicing.
 #[component]
 pub fn VvMarkdown(props: VvMarkdownProps, cx: Scope<VvMarkdownEvent>) -> impl IntoElement {
     provide_context(vv_text_view_parts(props.size));
 
     let options = computed(move || vv_markdown_options(props.streaming.get()));
-    let extensions = computed(move || vv_markdown_extensions(props.mentions.get(), props.pkm.get()));
-    let refs_prop = props.refs;
+    let extensions = computed(move || vv_markdown_extensions(props.mentions.get()));
     let streaming_prop = props.streaming;
     let selectable_prop = props.selectable;
     let size_prop = props.size;
@@ -1094,10 +858,7 @@ pub fn VvMarkdown(props: VvMarkdownProps, cx: Scope<VvMarkdownEvent>) -> impl In
             })
         })
         .render_math(move |math: &TextViewMath| render_math_element(&math.tex, math.display, size_prop.get().body_pt(), selectable_prop.get()))
-        .render_custom(move |node: &CustomNode| {
-            let refs = refs_prop.get();
-            render_custom_node(node, &refs, streaming_prop.get(), cx)
-        })
+        .render_custom(move |node: &CustomNode| render_custom_node(node, streaming_prop.get(), cx))
         .render_code_block(move |block: &CodeBlock| {
             vv_code_block()
                 .code(block.code.clone())

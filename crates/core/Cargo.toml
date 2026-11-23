@@ -3,7 +3,7 @@ name = "vibevalley-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "VibeValley's domain state reduction, frame projection, schedule rules, PKM parser, and artifact engine"
+description = "VibeValley's domain state reduction, frame projection, schedule rules, and artifact engine"
 
 [features]
 default = ["collab"]
@@ -29,6 +29,5 @@ loro = { workspace = true, optional = true }
 regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-sha2 = { workspace = true }
 thiserror = { workspace = true, optional = true }
 url = { workspace = true }

@@ -248,7 +248,10 @@ export type ArtifactSuggestionAcceptInput = { id: ArtifactId, suggestion: Sugges
 
 export type ArtifactMarkdownGetInput = { id: ArtifactId, };
 
-export type ArtifactDemoInput = { id: ArtifactId, };
+/**
+ * Imports a `.md` document into a new `ArtifactType::Outline` blocks artifact.
+ */
+export type ArtifactOutlineImportRequest = { markdown: string, title?: string, filename?: string, channel?: string, issue?: string, announce?: boolean, note?: string, };
 
 export const ArtifactPresenceKindValues = ["cursor", "block_cursor", "selection", "highlight", "viewport"] as const;
 export type ArtifactPresenceKind = (typeof ArtifactPresenceKindValues)[number];

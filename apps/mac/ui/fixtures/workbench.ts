@@ -10,7 +10,6 @@ import { responses as issuesResponses } from "./issues";
 import { mediaJobs, responses as libraryResponses } from "./library";
 import { responses as memoryResponses } from "./memory";
 import { responses as pixelResponses } from "./pixel";
-import { responses as pkmResponses } from "./pkm";
 import { connectors, responses as settingsResponses } from "./settings";
 
 const w = session("w1", "laozhou", working(now - 3 * min), {
@@ -110,7 +109,6 @@ export const responses: Record<string, unknown> = {
   ...settingsResponses,
   ...memoryResponses,
   ...pixelResponses,
-  ...pkmResponses,
   ...artifactsResponses,
   ...libraryResponses,
 };

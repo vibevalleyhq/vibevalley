@@ -281,7 +281,9 @@ export const hostApi = {
   pixelDir: () => call<{ path: string }>("host.pixelDir", {}),
   /** Plays a named UI sound synthesized and cached in Rust. */
   playSound: (name: string) => call<void>("host.playSound", { name }),
-  /** A dropped file's bytes (an absolute path or a file: URL; at most 50 MB). */
+  /** Opens the native file picker and returns the chosen path, or null when canceled. */
+  pickFile: () => call<{ path: string; name: string; type: string } | null>("host.pickFile", {}),
+  /** A dropped or picked file's bytes (an absolute path or a file: URL; at most 50 MB). */
   readFile: (path: string) => call<{ data: string; type: string; name: string }>("host.readFile", { path }),
   cliState: () => call<CommandLineState>("host.cliState"),
   cliInstall: () => call<CommandLineState>("host.cliInstall"),

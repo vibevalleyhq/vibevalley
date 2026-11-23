@@ -21,15 +21,17 @@ use std::sync::{Arc, Weak};
 use parking_lot::{Mutex, MutexGuard};
 use sqlx::{Connection, SqliteConnection};
 use vibevalley_core::artifact::{
-    artifact_headers, artifact_problem, html_check, html_edit, html_problem, infer_artifact_from_name, shell_theme_of, starter_entries_for_type, with_shell,
+    artifact_headers, artifact_problem, html_check, html_edit, html_problem, import_outline_markdown, infer_artifact_from_name, shell_theme_of,
+    starter_entries_for_type, with_shell,
 };
 use vibevalley_core::collab::{CommitMeta, PresenceHub};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, Artifact as Wire, ArtifactBody, ArtifactCard, ArtifactContent, ArtifactDisplay, ArtifactEntryBatchRequest, ArtifactEntryGetRequest,
-    ArtifactEntryKind, ArtifactEntryOp, ArtifactEntryWriteInput, ArtifactHtmlEdit, ArtifactKind, ArtifactListRequest, ArtifactMarkdown, ArtifactPage,
-    ArtifactPageInput, ArtifactPresenceEvent, ArtifactRequest, ArtifactSaid, ArtifactType, ArtifactUpdateRequest, ArtifactVersion, ArtifactVersionRequest,
-    BizCode, BlockAck, BlockCreate, BlockDelete, BlockRef, BlockSnapshot, BlockUpdate, Preview, QuotedBlock, USER_ID, native_ops, ops, subscriptions,
+    ArtifactEntryKind, ArtifactEntryOp, ArtifactEntryWriteInput, ArtifactHtmlEdit, ArtifactKind, ArtifactListRequest, ArtifactMarkdown,
+    ArtifactOutlineImportRequest, ArtifactPage, ArtifactPageInput, ArtifactPresenceEvent, ArtifactRequest, ArtifactSaid, ArtifactType, ArtifactUpdateRequest,
+    ArtifactVersion, ArtifactVersionRequest, BizCode, BlockAck, BlockCreate, BlockDelete, BlockRef, BlockSnapshot, BlockUpdate, Preview, QuotedBlock, USER_ID,
+    native_ops, ops, subscriptions,
 };
 
 pub use blocks::spans_of;
@@ -39,7 +41,6 @@ use entries::EntryChange;
 use crate::base::{LookIn, missing, open_sqlx_db};
 use crate::modules::collab::channel::{Chat, Made, Posting};
 use crate::modules::content::attachment::Attachments;
-use crate::modules::team::agent::Agents;
 use crate::{Hub, now};
 
 /// How many the farm-wide list shows.
@@ -117,12 +118,9 @@ pub struct Artifacts {
     presences: Mutex<HashMap<String, PresenceHub>>,
     presence_extra: Mutex<PresenceExtra>,
     presence_changes: Mutex<Vec<flume::Sender<(String, ArtifactPresenceEvent)>>>,
-    demo_on: AtomicBool,
     closed: AtomicBool,
     stop: Mutex<Option<flume::Sender<()>>>,
     prune_thread: Mutex<Option<std::thread::JoinHandle<()>>>,
-    /// The demo's tick, 1 s (`demoTickMs`); tests shorten it.
-    demo_tick_ms: std::sync::atomic::AtomicU64,
 }
 
 impl Artifacts {
@@ -145,11 +143,9 @@ impl Artifacts {
             presences: Mutex::default(),
             presence_extra: Mutex::default(),
             presence_changes: Mutex::default(),
-            demo_on: AtomicBool::new(false),
             closed: AtomicBool::new(false),
             stop: Mutex::new(Some(stop_tx)),
             prune_thread: Mutex::new(None),
-            demo_tick_ms: std::sync::atomic::AtomicU64::new(blocks::DEMO_TICK_MS),
         });
         if let Some(handle) = prune_daily(Arc::downgrade(&me), stop_rx) {
             *me.prune_thread.lock() = Some(handle);
@@ -157,12 +153,7 @@ impl Artifacts {
         Ok(me)
     }
 
-    /// How long the demo's tick is.
-    pub fn set_demo_tick(&self, ms: u64) {
-        self.demo_tick_ms.store(ms, Ordering::Relaxed);
-    }
-
-    /// Stops the demo and the prune.
+    /// Stops the daily prune thread.
     pub fn close(&self) {
         self.closed.store(true, Ordering::Relaxed);
         let _ = self.stop.lock().take();
@@ -621,6 +612,118 @@ impl Artifacts {
         self.assemble(&mut db, row)
     }
 
+    /// Imports a `.md` document (standard Markdown, YAML frontmatter, or Logseq outline)
+    /// into a new `ArtifactType::Outline` blocks artifact.
+    pub fn import_outline(&self, maker: &Maker, req: &ArtifactOutlineImportRequest) -> Result<Wire, ApiError> {
+        let _rows = self.rows.lock();
+        let imported = import_outline_markdown(&req.markdown, req.filename.as_deref(), req.title.as_deref());
+        let explicit_title = req.title.as_deref().map(str::trim).filter(|s| !s.is_empty());
+        let effective_title = if let Some(explicit) = explicit_title {
+            explicit.to_string()
+        } else if imported.title.trim().is_empty() {
+            t("server.artifact.untitled", &[])
+        } else {
+            imported.title.trim().chars().take(80).collect()
+        };
+        let problem = artifact_problem(Some(&effective_title), Some(ArtifactKind::Markdown.as_str()), Some(req.markdown.trim().len()));
+        if !problem.is_empty() {
+            return Err(refused(problem));
+        }
+
+        let id = new_id();
+        let note = req.note.as_deref().map(str::trim).filter(|n| !n.is_empty());
+        let should_announce = req.announce.unwrap_or_else(|| req.channel.is_some());
+        let mut initial = None;
+
+        if should_announce {
+            let channel = self.chat.place_of(&maker.from, req.channel.as_deref().unwrap_or(""))?;
+            let card = ArtifactCard {
+                id: id.clone(),
+                title: effective_title.clone(),
+                body: ArtifactBody::Blocks,
+                version: 0,
+                note: note.unwrap_or("").into(),
+                display: None,
+                artifact_type: Some(ArtifactType::Outline),
+            };
+            let blocks = imported.blocks;
+            self.chat.post_with(
+                Posting {
+                    from: maker.from.clone(),
+                    channel,
+                    text: Self::words(t("server.artifact.made", &[("title", effective_title.as_str().into())]), note),
+                    made: Some(Made::Card(card)),
+                    run: maker.run.clone(),
+                    ..Posting::default()
+                },
+                |db, said| {
+                    let at = now();
+                    db::add_artifact(
+                        db,
+                        db::NewArtifact {
+                            id: id.clone(),
+                            title: effective_title.clone(),
+                            body: "blocks".into(),
+                            artifact_type: Some(ArtifactType::Outline.as_str().into()),
+                            is_default: 0,
+                            display: None,
+                            channel_id: Some(said.channel.clone()),
+                            issue: req.issue.clone(),
+                            by_id: maker.by.clone(),
+                            by_name: said.name.clone(),
+                            version: 0,
+                            created_at: at,
+                        },
+                    )
+                    .map_err(q)?;
+                    db::artifact_said(db, &id, &said.id).map_err(q)?;
+                    let fill_meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned).or_else(|| Some("import outline".into())), at);
+                    initial = self.fill_md_blocks_with_meta(db, &id, blocks, &maker.by, &fill_meta)?;
+                    Ok(())
+                },
+            )?;
+        } else {
+            let resolved_channel = match req.channel.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
+                Some(c) => Some(self.chat.place_of(&maker.from, c)?),
+                None => None,
+            };
+            let at = now();
+            let by_name = if maker.by == USER_ID {
+                t("server.channel.name.user", &[])
+            } else {
+                maker.by.clone()
+            };
+            let mut conn = self.db();
+            let mut tx = pollster::block_on(conn.begin()).map_err(q)?;
+            db::add_artifact(
+                &mut tx,
+                db::NewArtifact {
+                    id: id.clone(),
+                    title: effective_title,
+                    body: "blocks".into(),
+                    artifact_type: Some(ArtifactType::Outline.as_str().into()),
+                    is_default: 0,
+                    display: None,
+                    channel_id: resolved_channel,
+                    issue: req.issue.clone(),
+                    by_id: maker.by.clone(),
+                    by_name,
+                    version: 0,
+                    created_at: at,
+                },
+            )
+            .map_err(q)?;
+            let fill_meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned).or_else(|| Some("import outline".into())), at);
+            initial = self.fill_md_blocks_with_meta(&mut tx, &id, imported.blocks, &maker.by, &fill_meta)?;
+            pollster::block_on(tx.commit()).map_err(q)?;
+        }
+
+        if let Some(ack) = initial {
+            self.publish_change(&id, &ack);
+        }
+        self.get_now(&id)
+    }
+
     /// An html one's next version; a blocks or store one is refused.
     pub fn version(&self, maker: &Maker, req: &ArtifactVersionRequest) -> Result<Wire, ApiError> {
         let _rows = self.rows.lock();
@@ -952,7 +1055,7 @@ fn issue_id(board: &crate::modules::work::issue::Board, reference: &str) -> Resu
 
 /// Every `artifact.*` endpoint and subscription, as the user calls them
 /// (`gateway/http/handlers/artifact.ts`).
-pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, agents: Arc<Agents>, board: crate::modules::work::issue::Board) {
+pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, board: crate::modules::work::issue::Board) {
     let a = artifacts;
     hub.on::<ops::ArtifactList>({
         let (a, board) = (a.clone(), board.clone());
@@ -974,7 +1077,7 @@ pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, agents: Arc<Agents>, board:
         move |_, r| a.content(&r.id, r.version).map(|(c, _)| c)
     });
     hub.on::<ops::ArtifactCreate>({
-        let a = a.clone();
+        let (a, board) = (a.clone(), board.clone());
         move |_, mut r| {
             if let Some(i) = r.issue.as_deref().filter(|i| !i.is_empty()) {
                 r.issue = Some(issue_id(&board, i)?);
@@ -982,6 +1085,17 @@ pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, agents: Arc<Agents>, board:
                 r.issue = None;
             }
             a.create(&Maker::user(), &r)
+        }
+    });
+    hub.on::<ops::ArtifactOutlineImport>({
+        let a = a.clone();
+        move |_, mut r| {
+            if let Some(i) = r.issue.as_deref().filter(|i| !i.is_empty()) {
+                r.issue = Some(issue_id(&board, i)?);
+            } else {
+                r.issue = None;
+            }
+            a.import_outline(&Maker::user(), &r)
         }
     });
     hub.on::<ops::ArtifactVersionCreate>({
@@ -1099,10 +1213,6 @@ pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, agents: Arc<Agents>, board:
     hub.on::<ops::ArtifactMarkdownGet>({
         let a = a.clone();
         move |_, r| a.markdown(&r.id).map(|markdown| ArtifactMarkdown { markdown })
-    });
-    hub.on::<ops::ArtifactDemo>({
-        let a = a.clone();
-        move |_, r| a.demo(&r.id, &agents.profiles.agents())
     });
     hub.on::<ops::ArtifactPresenceUpdate>({
         let a = a.clone();

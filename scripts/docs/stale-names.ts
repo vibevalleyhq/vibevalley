@@ -122,7 +122,7 @@ const RULES: readonly Rule[] = [
   {
     name: "the word ticket",
     pattern: /[Tt]ickets?/u,
-    says: "issues and the issue board; a voice call's credential is a grant (AgoraGrant)",
+    says: "issues and the issue board; a voice call's credential is a grant (VoiceGrant)",
   },
   {
     name: "ticket in the client",
@@ -363,7 +363,7 @@ const RULES: readonly Rule[] = [
   {
     name: "a voice call under session or agent",
     pattern: /voice[./](session|agent)[./]|\bVoiceAgent(Failed)?\b|\b(StartRequest|RenewRequest)\b/u,
-    says: "a call's token is a grant (voice.grant.create, voice.grant.renew, VoiceGrantRenew); the call is a call (voice.call.*, VoiceCall, VoiceCallStart, VoiceCallFailed)",
+    says: "a call's token is a grant (voice.grant.create, VoiceGrant); the call is a call (voice.call.*, VoiceCall, VoiceCallStart, VoiceCallFailed)",
   },
   {
     name: "validating under the word check",

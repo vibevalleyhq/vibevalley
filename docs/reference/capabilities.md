@@ -170,19 +170,17 @@
 
 ## voice
 
-通话和听写
+MOSS Live 语音通话
 
 | 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
 |---|---|---|---|---|---|---|
 | `voice.hear` | 交上正在通的那通电话里听到的一句 | `/api/v1/voice/hear` | ✓ | ✓ |   |   |
 | `voice.moss.verify` | 试 MOSS 的钥匙能不能用，什么都不说 | `/api/v1/voice/moss/verify` | ✓ |   |   |   |
-| `voice.grant.create` | 拿通话用的声网令牌 | `/api/v1/voice/grant/create` | ✓ | ✓ |   |   |
-| `voice.grant.renew` | 给通话换新的声网令牌 | `/api/v1/voice/grant/renew` | ✓ | ✓ |   |   |
+| `voice.grant.create` | 为 MOSS Live 通话签发频道与会话标识 | `/api/v1/voice/grant/create` | ✓ | ✓ |   |   |
 | `voice.call.start` | 开始和主助手通话 | `/api/v1/voice/call/start` | ✓ | ✓ |   |   |
 | `voice.call.stop` | 挂断通话 | `/api/v1/voice/call/stop` | ✓ | ✓ |   |   |
 | `voice.call.hear` | 交上通话里你说的一句 | `/api/v1/voice/call/hear` | ✓ | ✓ |   |   |
 | `voice.call.say` | 交上通话里主助手说出的话 | `/api/v1/voice/call/say` | ✓ | ✓ |   |   |
-| `voice.dictate` | 听写：把一段录音转成字 | `/api/v1/voice/dictate` | ✓ | ✓ |   |   |
 
 ## issue
 
@@ -259,7 +257,7 @@
 | `artifact.entry.list` | 列出结构化作品的条目（可按路径前缀筛） | `/api/v1/artifact/entry/list` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.entry.get` | 读取结构化作品的一个条目与当前版本号 | `/api/v1/artifact/entry/get` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.entry.batch` | 原子批量增改、合并或删除结构化作品的条目（带版本号校验） | `/api/v1/artifact/entry/batch` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.demo` | 开演示：几个执行会话一起写一篇作品，不花模型的钱 | `/api/v1/artifact/demo` | ✓ |   |   |   |
+| `artifact.outline.import` | 从 Markdown 导入一篇大纲作品 | `/api/v1/artifact/outline/import` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.presence.update` | 更新实时在场状态（光标、选区、高亮区域或视口），仅驻留内存不落库 | `/api/v1/artifact/presence/update` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.history.list` | 列出作品的协作提交时间线，最新的在前 | `/api/v1/artifact/history/list` | ✓ | ✓ |   |   |
 | `artifact.history.preview` | 只读预览指定历史前沿上的作品快照 | `/api/v1/artifact/history/preview` | ✓ | ✓ |   |   |
@@ -340,33 +338,6 @@ GitHub 的检测：gh 装没装、登没登录
 | `skill.update` | 改一个技能 | `/api/v1/skill/update` | ✓ |   |   |   |
 | `skill.delete` | 删掉一个技能 | `/api/v1/skill/delete` | ✓ |   |   |   |
 | `skill.previewDelete` | 试删一个技能：说会删掉什么，不真删 | `/api/v1/skill/previewDelete` | ✓ |   |   |   |
-
-## pkm
-
-笔记：记一句、搜、雷达、日记和页
-
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
-|---|---|---|---|---|---|---|
-| `pkm.page.list` | 列出笔记库里的每一页，新的在前 | `/api/v1/pkm/page/list` | ✓ | ✓ |   |   |
-| `pkm.page.get` | 看一页：引用读出来，带反链和没答的批注 | `/api/v1/pkm/page/get` | ✓ | ✓ | ✓ | ✓ |
-| `pkm.page.save` | 新建一页，或改同名那页的属性和文件夹 | `/api/v1/pkm/page/save` | ✓ | ✓ |   |   |
-| `pkm.page.move` | 把一页挪到 PARA 的另一个文件夹 | `/api/v1/pkm/page/move` | ✓ | ✓ |   |   |
-| `pkm.page.rename` | 给一页改名或并进同名的页，链接跟着改 | `/api/v1/pkm/page/rename` | ✓ | ✓ |   |   |
-| `pkm.page.export` | 把一页导出成干净的 Markdown | `/api/v1/pkm/page/export` | ✓ | ✓ |   |   |
-| `pkm.block.apply` | 对一页按顺序施加块的操作，一次写回 | `/api/v1/pkm/block/apply` | ✓ | ✓ |   |   |
-| `pkm.search` | 搜笔记 | `/api/v1/pkm/search` | ✓ | ✓ | ✓ | ✓ |
-| `pkm.capture` | 在今天的日记里记一句，标上 #inbox | `/api/v1/pkm/capture` | ✓ | ✓ | ✓ | ✓ |
-| `pkm.source.get` | 一页文件的原文（带块的 id）和它上次写的时间 | `/api/v1/pkm/source/get` | ✓ | ✓ |   |   |
-| `pkm.source.update` | 用改过的原文重写一页；这期间文件被改过就不写 | `/api/v1/pkm/source/update` | ✓ | ✓ |   |   |
-| `pkm.journal.open` | 打开某一天的日记，没有就建 | `/api/v1/pkm/journal/open` | ✓ | ✓ |   |   |
-| `pkm.radar.get` | 回顾雷达：收件箱里的、搁着的仓库、过期的块 | `/api/v1/pkm/radar/get` | ✓ | ✓ |   |   |
-| `pkm.comment.list` | 列出批注和改写，可以只看一页的 | `/api/v1/pkm/comment/list` | ✓ | ✓ |   |   |
-| `pkm.comment.suggest` | 对一块提改写，留住它的链接和引用 | `/api/v1/pkm/comment/suggest` | ✓ | ✓ | ✓ | ✓ |
-| `pkm.comment.resolve` | 接受或拒绝一条改写 | `/api/v1/pkm/comment/resolve` | ✓ | ✓ |   |   |
-| `pkm.clip.create` | 把一个网页剪藏成一页资源 | `/api/v1/pkm/clip/create` | ✓ | ✓ |   |   |
-| `pkm.cluster.create` | 把写到一个话题的块聚成一页资源 | `/api/v1/pkm/cluster/create` | ✓ | ✓ |   |   |
-| `pkm.undo` | 撤销笔记的上一次改动 | `/api/v1/pkm/undo` | ✓ |   |   |   |
-| `pkm.scan` | 重读磁盘上改过的笔记文件 | `/api/v1/pkm/scan` | ✓ | ✓ |   |   |
 
 ## memory
 

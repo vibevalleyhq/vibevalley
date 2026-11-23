@@ -182,14 +182,14 @@ impl Issue {
 fn issue_binding(bindings: &[ContextRef]) -> Option<(&str, bool)> {
     bindings.iter().find_map(|b| match b {
         ContextRef::Issue { id, refining } => Some((id.as_str(), refining.unwrap_or(false))),
-        ContextRef::Channel { .. } | ContextRef::Artifact { .. } | ContextRef::Pkm { .. } => None,
+        ContextRef::Channel { .. } | ContextRef::Artifact { .. } => None,
     })
 }
 
 fn channel_binding(bindings: &[ContextRef]) -> Option<&str> {
     bindings.iter().find_map(|b| match b {
         ContextRef::Channel { id } => Some(id.as_str()),
-        ContextRef::Issue { .. } | ContextRef::Artifact { .. } | ContextRef::Pkm { .. } => None,
+        ContextRef::Issue { .. } | ContextRef::Artifact { .. } => None,
     })
 }
 
@@ -213,7 +213,6 @@ fn same_binding_key(a: &ContextRef, b: &ContextRef) -> bool {
         (ContextRef::Issue { id: x, .. }, ContextRef::Issue { id: y, .. }) => x == y,
         (ContextRef::Channel { id: x }, ContextRef::Channel { id: y }) => x == y,
         (ContextRef::Artifact { id: x }, ContextRef::Artifact { id: y }) => x == y,
-        (ContextRef::Pkm { path: x }, ContextRef::Pkm { path: y }) => x == y,
         _ => false,
     }
 }
@@ -416,11 +415,4 @@ impl Default for Deliverable {
     fn default() -> Self {
         Deliverable::Change
     }
-}
-
-/// A PKM page's normalized slug from its title: trimmed, lower case,
-/// whitespace collapsed to `-`, `/` (or `\`) as `__`.
-pub fn pkm_slug(title: &str) -> String {
-    let s = title.trim().replace('\\', "/").replace('/', "__");
-    s.split_whitespace().collect::<Vec<_>>().join("-").to_lowercase()
 }

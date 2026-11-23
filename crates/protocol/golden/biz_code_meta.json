@@ -185,16 +185,6 @@
    "kind": "Refused",
    "retryable": false
   },
-  "600003": {
-   "status": 404,
-   "kind": "Missing",
-   "retryable": false
-  },
-  "600004": {
-   "status": 409,
-   "kind": "Refused",
-   "retryable": false
-  },
   "600005": {
    "status": 404,
    "kind": "Missing",
@@ -229,11 +219,6 @@
    "status": 502,
    "kind": "VoiceCallFailed",
    "retryable": true
-  },
-  "700003": {
-   "status": 409,
-   "kind": "Refused",
-   "retryable": false
   },
   "700004": {
    "status": 404,

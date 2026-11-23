@@ -20,13 +20,12 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [pull.md](docs/subsystems/pull.md) | PR 与分支发布：分支预检与推送、GitHub PR / GitLab.com MR、状态轮询、CI/评审去重与 `vv://github/...` 快照 |
 | [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、工作目录、经 oar 开会话、`/mcp`、规矩和汇报、轨迹、额度和上限 |
 | [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、本地合并、GitHub 检测、提交统计 |
-| [artifact.md](docs/subsystems/artifact.md) | Artifact：结构化多条目作品（`store`，七种 `ArtifactType`）、协作块文档（`blocks`）与单页网页（`html`）；乐观并发、双语指南、全出血原生白板与统一内容中心 |
-| [pkm.md](docs/subsystems/pkm.md) | 笔记：Logseq 式大纲页面，工作台单栏极简编辑（磁盘保留 PARA 目录）；文件是真相，读进内存再写回，块引用、反链、搜索、闪念、剪藏、改写和撤销 |
+| [artifact.md](docs/subsystems/artifact.md) | Artifact：八种 `ArtifactType`（含大纲笔记 `outline` 与 `.md` 导入）、结构化多条目作品（`store`）、协作块文档（`blocks`）与单页网页（`html`）；乐观并发、双语指南、全出血原生白板与统一内容中心 |
 | [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、消息和事件、工单串、纯受众与环路刹车、持久投递 |
 | [brain.md](docs/subsystems/brain.md) | VibeValley 自己的 agent（`vibevalley-runtime::agent`）：模型请求、循环、对话文件、压缩、工具、技能、记性、自己的任务 |
 | [orchestrator.md](docs/subsystems/orchestrator.md) | 助手：收什么话、现状、工具与 `vv://` 资源读取、谁能让它合并、巡查、评测 |
 | [memory.md](docs/subsystems/memory.md) | 记性：想起、记下、主动查、外面的来源 |
-| [voice.md](docs/subsystems/voice.md) | 语音：语音设置、语音合成任务、要守住的约束 |
+| [voice.md](docs/subsystems/voice.md) | 语音：MOSS Live 原生实时通话、`Voice::speak` 与人设设置 |
 | [attachment.md](docs/subsystems/attachment.md) | 附件：农场留下的一份文件，按 SHA-256 内容寻址落盘存一次；消息、媒体结果和素材库都引用它 |
 | [setting.md](docs/subsystems/setting.md) | 设置：settings.json、配置和环境变量、钥匙和打码 |
 | [provider.md](docs/subsystems/provider.md) | AI 服务：供应商连接、模型目录、默认用途、凭据与配置版本 |
@@ -86,7 +85,6 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 引擎 | engine | runtime（`RuntimeInfo`） | harness、runtime（中文界面）、农机（中文界面） |
 | 任务 | ticket | issue（`Issue`） | job、ticket（中文界面）、工单（中文界面） |
 | 作品 | artifact | artifact（`Artifact`，正文 `blocks`、`store` 或 `html`） | 稿子、草稿（指作品时）、产出、文档（指作品时）、doc（指作品时）、Artifact（中文界面） |
-| 笔记 | notes | pkm（`Pkm`，一页 `PkmPage`，一块 `PkmBlock`） |  |
 | 仓库 | repo | repo（`RepoSummary`） | 一块地 |
 | 空间 | space | `SpaceState`；目录是 `work_root`（`VIBEVALLEY_WORK_ROOT`） | 世界、全图 |
 | 宿主 | host | `ServerConfig.home`（`$VIBEVALLEY_HOME`） |  |
@@ -131,7 +129,6 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 收件箱 | inbox | `InboxItem`（`InboxSlice.items`，服务是 `Inbox`） | 通知（指收件箱时）、来电（农场的皮里用）、Inbox（中文界面，指收件箱时） |
 | 提醒 | notice | `Core.notice`、`NoticeLevel`（事件流里是 `LiveEventNotice`） |  |
 | 通话 | call | `VoiceCall`（`voice.call.*`） |  |
-| 听写 | dictation | dictation（`Dictation`） |  |
 | 花费 | spending | `Spent`、`RuntimeQuota` |  |
 
 ### 农场的皮

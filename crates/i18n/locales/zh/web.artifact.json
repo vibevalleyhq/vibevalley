@@ -27,7 +27,6 @@
     "saved": "都存好了",
     "blocks": "{n} 块",
     "helpersWriting": "执行会话在写",
-    "demo": "演示：几个执行会话一起写",
     "append": "在末尾写一段",
     "user": "你",
     "done": "做完了",
@@ -257,5 +256,12 @@
     "waiting": "等待演示页就绪",
     "empty": "没有可演示的页",
     "loadFailure": "演示页未能载入：{reason}"
+  },
+  "outline": {
+    "importTitle": "导入 Markdown 大纲",
+    "importAction": "导入 .md",
+    "pickFile": "选择 .md 文件",
+    "markdownLabel": "Markdown（.md）",
+    "submit": "导入大纲"
   }
 }

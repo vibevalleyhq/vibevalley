@@ -3,8 +3,10 @@ import { expect, test } from "nsh/test";
 
 import { userId } from "@vibevalley/protocol";
 
+import { formatGenUiAction } from "../../infra/rich";
 import { codePointOffset, editSpans, markdownShortcut } from "./blocks";
 import { artifactSuffixOf, inferArtifactFromName, inferDisplayFromContent } from "./html";
+import { decodeBase64Utf8 } from "./OutlineImportModal";
 import { presenceHighlightCommand, selectionOf, shellMessageOf } from "./shell";
 import { storeMessageOf } from "./viewers";
 
@@ -91,4 +93,15 @@ test("presenceHighlightCommand filters local user, scopes by path, and normalize
       { id: "session:3", name: "助手", color: "#2f9d8f", x: 10, y: 20 },
     ],
   });
+});
+
+test("decodes UTF-8 base64 markdown and formats GenUI action payloads cleanly", () => {
+  const md = "# 大纲导入\n- [ ] 验证 UTF-8 编码";
+  const b64 = btoa(String.fromCharCode(...new TextEncoder().encode(md)));
+  expect(decodeBase64Utf8(b64)).toBe(md);
+
+  expect(formatGenUiAction({ action: "state_change", payload: "rate=7.5" })).toBe("rate=7.5");
+  expect(formatGenUiAction({ action: "submit", payload: "approved=true" })).toBe("submit: approved=true");
+  expect(formatGenUiAction({ action: "confirm", payload: "" })).toBe("confirm");
+  expect(formatGenUiAction({ action: "", payload: "fallback" })).toBe("fallback");
 });

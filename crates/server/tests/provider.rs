@@ -9,7 +9,7 @@ use vibevalley_server::modules::infra::provider::{Provider, connections_over};
 use vibevalley_server::modules::infra::setting::{Setting, SettingConfig};
 
 fn empty() -> Value {
-    json!({ "revision": 0, "connections": [], "dictation": null, "image": null, "understanding": null, "speech": null,
+    json!({ "revision": 0, "connections": [], "image": null, "understanding": null, "speech": null,
             "live": null, "speakers": null, "voiceDesign": null, "transcription": null, "vision": null })
 }
 
@@ -54,7 +54,7 @@ fn invalid_connection_changes_are_refused() {
         ("speech", json!({ "connection": "moss", "model": "moss-tts-1.5-flash-2099-01-01" })),
         ("understanding", json!({ "connection": "missing", "model": "moss-vl-1.0" })),
         ("understanding", json!({ "connection": "moss", "model": "moss-image-base-1.0" })),
-        ("dictation", json!({ "connection": "moss", "model": "moss-image" })),
+        ("transcription", json!({ "connection": "moss", "model": "moss-image" })),
         ("image", json!({ "connection": "missing", "model": "moss-image-base-1.0" })),
         ("image", json!({ "connection": "moss", "model": "moss-transcribe-1.0" })),
     ];

@@ -24,7 +24,7 @@ use vibevalley_protocol::{
 };
 
 use super::blocks::relay;
-use super::collab::{apply_legacy_presence_write, commit_meta_for_maker, is_presence_write};
+use super::collab::commit_meta_for_maker;
 use super::{Artifacts, Maker, artifact_type_of, db, q, refused};
 use crate::base::{LookIn, missing};
 use crate::modules::collab::channel::{Made, Posting};
@@ -180,16 +180,10 @@ impl Artifacts {
         let write_lock = self.entry_lock(&req.id);
         let _guard = write_lock.lock();
 
-        let (presence_writes, store_writes): (Vec<&ArtifactEntryWriteInput>, Vec<&ArtifactEntryWriteInput>) =
-            req.writes.iter().partition(|w| is_presence_write(w));
-
         let (row, current_rows) = {
             let mut db = self.db();
             let row = self.found_store(&mut db, &req.id)?;
-            for w in &presence_writes {
-                check_path(&w.path)?;
-            }
-            for w in &store_writes {
+            for w in &req.writes {
                 check_path(&w.path)?;
                 if w.op == ArtifactEntryOp::Copy {
                     let from = w.from.as_deref().unwrap_or("").trim();
@@ -199,13 +193,7 @@ impl Artifacts {
                     check_path(from)?;
                 }
             }
-            // Intercept legacy `presence/*` writes purely into in-memory `PresenceHub`
-            // without touching `artifact_entry` or bumping `artifact.seq`.
-            if store_writes.is_empty() {
-                drop(db);
-                for w in &presence_writes {
-                    apply_legacy_presence_write(self, &req.id, &maker.by, w)?;
-                }
+            if req.writes.is_empty() {
                 return Ok(ArtifactEntryBatchResult {
                     applied: true,
                     seq: row.seq,
@@ -217,14 +205,10 @@ impl Artifacts {
             (row, rows)
         };
 
-        for w in &presence_writes {
-            apply_legacy_presence_write(self, &req.id, &maker.by, w)?;
-        }
-
         // Resolve referenced attachments outside the DB lock to avoid nesting locks across modules.
         let existing_kinds: HashMap<String, ArtifactEntryKind> = current_rows.iter().map(|r| (r.path.clone(), entry_kind_of(&r.kind))).collect();
         let mut resolved_assets: HashMap<String, Attachment> = HashMap::new();
-        for w in &store_writes {
+        for w in &req.writes {
             if w.op != ArtifactEntryOp::Set {
                 continue;
             }
@@ -265,7 +249,7 @@ impl Artifacts {
             // Check optimistic concurrency preconditions before mutating any entry.
             let mut seen_paths: BTreeSet<String> = BTreeSet::new();
             let mut conflicts: Vec<ArtifactEntryConflict> = vec![];
-            for w in &store_writes {
+            for w in &req.writes {
                 let Some(expected_rev) = w.if_rev else { continue };
                 if !seen_paths.insert(w.path.clone()) {
                     continue;
@@ -296,7 +280,7 @@ impl Artifacts {
             let mut deleted_paths: BTreeSet<String> = BTreeSet::new();
             let max_kb = (ENTRY_MAX_BYTES / 1024) as i64;
 
-            for w in &store_writes {
+            for w in &req.writes {
                 match w.op {
                     ArtifactEntryOp::Delete => {
                         if working.remove(&w.path).is_some() {

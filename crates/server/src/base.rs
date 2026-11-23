@@ -118,7 +118,6 @@ pub enum LookIn {
     Channel,
     Artifact,
     Library,
-    Pkm,
 }
 
 impl LookIn {
@@ -135,7 +134,6 @@ impl LookIn {
             LookIn::Channel => ("channel", BizCode::ChannelNotFound, Some(["channel", "list"])),
             LookIn::Artifact => ("artifact", BizCode::ArtifactNotFound, Some(["artifact", "list"])),
             LookIn::Library => ("library", BizCode::LibraryNotFound, None),
-            LookIn::Pkm => ("pkm", BizCode::PkmNotFound, None),
         }
     }
 
@@ -143,7 +141,6 @@ impl LookIn {
         let (key, _, run) = self.parts();
         let run = match self {
             LookIn::Library => Some(vec!["library".into(), "item".into(), "list".into()]),
-            LookIn::Pkm => Some(vec!["pkm".into(), "page".into(), "list".into()]),
             _ => run.map(|r| r.iter().map(|s| s.to_string()).collect()),
         };
         Next {

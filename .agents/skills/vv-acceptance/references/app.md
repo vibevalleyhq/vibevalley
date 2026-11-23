@@ -20,7 +20,7 @@
 
 ## 一键验收画廊（推荐先跑）
 
-需要核对一组固定高频页面（`/issues`、`/chat`、`/runs`、`/agents`、`/pkm`、`/settings`、`/library`、`/workspace` 与 `/farm`，含 Light/Dark 与窄窗）并生成汇总报告时，直接运行：
+需要核对一组固定高频页面（`/issues`、`/chat`、`/runs`、`/agents`、`/settings`、`/library`、`/workspace` 与 `/farm`，含 Light/Dark 与窄窗）并生成汇总报告时，直接运行：
 
 ```bash
 vp run ui:gallery -- --out /tmp/vv-app-gallery
@@ -143,7 +143,7 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
 
 ### 数据库升级和回退
 
-用旧包和候选包分别传给 `python3 scripts/release/verify-native-data.py <旧.app> <新.app>`。脚本限制外部网络，在临时目录运行真实应用及包内 CLI。终端输出证据目录。旧包写入工单、工单目录、消息、记性、笔记、Artifact、媒体和宿主布局。连接器加载[旧版离线存储样本](scripts/release/fixtures/connector-275732ef1.json)。脚本平移样本时间以保留其有效期，并将待发分片关联到本次旧包生成的汇报。
+用旧包和候选包分别传给 `python3 scripts/release/verify-native-data.py <旧.app> <新.app>`。脚本限制外部网络，在临时目录运行真实应用及包内 CLI。终端输出证据目录。旧包写入工单、工单目录、消息、记性、Artifact、媒体和宿主布局。连接器加载[旧版离线存储样本](scripts/release/fixtures/connector-275732ef1.json)。脚本平移样本时间以保留其有效期，并将待发分片关联到本次旧包生成的汇报。
 
 新包应能审查旧工单、合并原改动并结算一次新回复。回退前先归档升级后的完整数据，再将旧包的备份恢复到原绝对路径。查看 `result.json` 的新旧提交、实际 SQLite 版本、宿主与服务库版本和启动耗时。`backup-files.json` 记录冷备份清单。
 

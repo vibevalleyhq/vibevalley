@@ -68,9 +68,6 @@ pub struct ProviderStatus {
     pub connections: Vec<ProviderConnection>,
     #[serialize_always]
     #[cfg_attr(feature = "ts-gen", ts(optional = false))]
-    pub dictation: Option<ProviderBinding>,
-    #[serialize_always]
-    #[cfg_attr(feature = "ts-gen", ts(optional = false))]
     pub image: Option<ProviderBinding>,
     #[serialize_always]
     #[cfg_attr(feature = "ts-gen", ts(optional = false))]
@@ -92,7 +89,6 @@ pub struct ProviderStatus {
     #[cfg_attr(feature = "ts-gen", ts(optional = false))]
     pub vision: Option<ProviderBinding>,
     pub vision_models: Vec<String>,
-    pub dictation_models: Vec<String>,
     pub image_models: Vec<String>,
     #[serialize_always]
     #[cfg_attr(feature = "ts-gen", ts(optional = false))]
@@ -134,9 +130,6 @@ pub struct ProviderUpdate {
     #[serialize_always]
     #[cfg_attr(feature = "ts-gen", ts(optional = false))]
     pub understanding: Option<ProviderBinding>,
-    #[serialize_always]
-    #[cfg_attr(feature = "ts-gen", ts(optional = false))]
-    pub dictation: Option<ProviderBinding>,
     #[serialize_always]
     #[cfg_attr(feature = "ts-gen", ts(optional = false))]
     pub image: Option<ProviderBinding>,

@@ -7,7 +7,7 @@
         "title": "写一句话就能起草工单",
         "priority": "medium",
         "status": "backlog",
-        "createdAt": 1795318985180,
+        "createdAt": 1795388322194,
         "assignments": [],
         "mandate": {
           "strength": "explicit",
@@ -37,13 +37,13 @@
         "title": "看板拖拽的手感",
         "priority": "high",
         "status": "todo",
-        "createdAt": 1795316765180,
+        "createdAt": 1795386102194,
         "assignments": [
           {
             "id": "a22",
             "issue": "i22",
             "agent": "laozhou",
-            "assignedAt": 1795316765180,
+            "assignedAt": 1795386102194,
             "executions": []
           }
         ],
@@ -65,7 +65,7 @@
           "acts": []
         },
         "repo": "vibevalley",
-        "queuedAt": 1795365305180
+        "queuedAt": 1795434642194
       },
       "sessions": [],
       "missingSessions": []
@@ -77,7 +77,7 @@
         "title": "灵动岛的动画",
         "priority": "low",
         "status": "todo",
-        "createdAt": 1795314545180,
+        "createdAt": 1795383882194,
         "assignments": [],
         "mandate": {
           "strength": "explicit",
@@ -107,13 +107,13 @@
         "title": "首页的加载条",
         "priority": "medium",
         "status": "todo",
-        "createdAt": 1795312325180,
+        "createdAt": 1795381662194,
         "assignments": [
           {
             "id": "a24",
             "issue": "i24",
             "agent": "xiaolin",
-            "assignedAt": 1795312325180,
+            "assignedAt": 1795381662194,
             "executions": []
           }
         ],
@@ -146,18 +146,18 @@
         "title": "修好登录",
         "priority": "urgent",
         "status": "in_progress",
-        "createdAt": 1795325645180,
+        "createdAt": 1795394982194,
         "assignments": [
           {
             "id": "a18",
             "issue": "i18",
             "agent": "laozhou",
-            "assignedAt": 1795325645180,
+            "assignedAt": 1795394982194,
             "executions": [
               {
                 "kind": "worker",
                 "session": "w1",
-                "startedAt": 1795364405180
+                "startedAt": 1795433742194
               }
             ]
           }
@@ -200,11 +200,11 @@
               "id": "i18"
             }
           ],
-          "hiredAt": 1795363085180,
+          "hiredAt": 1795432422194,
           "runs": 2,
           "phase": {
             "_tag": "working",
-            "since": 1795365425180,
+            "since": 1795434762194,
             "doing": {
               "action": "edit_file",
               "label": "改 session.ts",
@@ -227,18 +227,18 @@
         "title": "补齐看板的测试",
         "priority": "medium",
         "status": "in_review",
-        "createdAt": 1795327865180,
+        "createdAt": 1795397202194,
         "assignments": [
           {
             "id": "a17",
             "issue": "i17",
             "agent": "xiaolin",
-            "assignedAt": 1795327865180,
+            "assignedAt": 1795397202194,
             "executions": [
               {
                 "kind": "worker",
                 "session": "w2",
-                "startedAt": 1795364405180
+                "startedAt": 1795433742194
               }
             ]
           }
@@ -281,7 +281,7 @@
               "id": "i17"
             }
           ],
-          "hiredAt": 1795363085180,
+          "hiredAt": 1795432422194,
           "runs": 2,
           "phase": {
             "_tag": "resting"
@@ -290,7 +290,7 @@
           "lastRun": {
             "outcome": "completed",
             "summary": "登录过期回到登录页，加了两条测试。",
-            "at": 1795365125180
+            "at": 1795434462194
           }
         }
       ],
@@ -303,18 +303,18 @@
         "title": "设置按用途分组",
         "priority": "medium",
         "status": "done",
-        "createdAt": 1795338965180,
+        "createdAt": 1795408302194,
         "assignments": [
           {
             "id": "a12",
             "issue": "i12",
             "agent": "laozhou",
-            "assignedAt": 1795338965180,
+            "assignedAt": 1795408302194,
             "executions": [
               {
                 "kind": "worker",
                 "session": "w3",
-                "startedAt": 1795364405180
+                "startedAt": 1795433742194
               }
             ]
           }
@@ -337,7 +337,7 @@
           "acts": []
         },
         "repo": "vibevalley",
-        "closedAt": 1795358405180,
+        "closedAt": 1795427742194,
         "delivered": "merged"
       },
       "sessions": [
@@ -359,7 +359,7 @@
               "id": "i12"
             }
           ],
-          "hiredAt": 1795347605180,
+          "hiredAt": 1795416942194,
           "runs": 2,
           "phase": {
             "_tag": "done"
@@ -704,7 +704,7 @@
       "name": "vibevalley",
       "path": "/Users/farmer/code/vibevalley",
       "git": true,
-      "last": 1795354805180,
+      "last": 1795424142194,
       "maxSessions": 3,
       "pullRequest": {
         "available": true,
@@ -715,7 +715,7 @@
       "name": "site",
       "path": "/Users/farmer/code/site",
       "git": true,
-      "last": 1794933605180,
+      "last": 1795002942194,
       "maxSessions": 2,
       "pullRequest": {
         "available": false,
@@ -775,12 +775,12 @@
           {
             "label": "5 小时",
             "usedPercent": 38,
-            "resetsAt": 1795372805180
+            "resetsAt": 1795442142194
           },
           {
             "label": "本周",
             "usedPercent": 61,
-            "resetsAt": 1795545605180
+            "resetsAt": 1795614942194
           }
         ]
       },
@@ -827,7 +827,7 @@
         "defaultEffort": "medium",
         "env": {}
       },
-      "checkedAt": 1795365485180,
+      "checkedAt": 1795434822194,
       "id": "claude",
       "preset": {
         "id": "claude",
@@ -881,7 +881,7 @@
           {
             "label": "5 小时",
             "usedPercent": 94,
-            "resetsAt": 1795366805180
+            "resetsAt": 1795436142194
           }
         ]
       },
@@ -902,7 +902,7 @@
         "defaultEffort": "",
         "env": {}
       },
-      "checkedAt": 1795365485180,
+      "checkedAt": 1795434822194,
       "id": "codex",
       "preset": {
         "id": "codex",
@@ -948,7 +948,7 @@
         "defaultEffort": "",
         "env": {}
       },
-      "checkedAt": 1795365485180,
+      "checkedAt": 1795434822194,
       "id": "opencode",
       "preset": {
         "id": "opencode",
@@ -1004,7 +1004,7 @@
         "env": {},
         "dailyBudget": 5
       },
-      "checkedAt": 1795365485180,
+      "checkedAt": 1795434822194,
       "id": "vibevalley",
       "preset": {
         "id": "vibevalley",
@@ -1036,12 +1036,12 @@
       {
         "hash": "a1b2c3d",
         "subject": "Send an expired session back to the sign-in page",
-        "at": 1795365065180
+        "at": 1795434402194
       },
       {
         "hash": "e4f5a6b",
         "subject": "Test the expiry on both sides of the boundary",
-        "at": 1795365365180
+        "at": 1795434702194
       }
     ],
     "files": [
@@ -1069,24 +1069,24 @@
   "issue.timeline.get": {
     "milestones": [
       {
-        "at": 1795365245180,
+        "at": 1795434582194,
         "kind": "reported",
         "who": "老周",
         "text": "过期回到登录页，登录页说明原因，加了两条测试。"
       },
       {
-        "at": 1795365065180,
+        "at": 1795434402194,
         "kind": "told",
         "text": "再补一条跨过期限的测试。"
       },
       {
-        "at": 1795364405180,
+        "at": 1795433742194,
         "kind": "started",
         "who": "老周",
         "text": "开始做了"
       },
       {
-        "at": 1795363205180,
+        "at": 1795432542194,
         "kind": "opened",
         "text": "写下这张工单"
       }
@@ -1110,7 +1110,7 @@
             "parentThreadId": "main",
             "task": "复查登录提示",
             "status": "completed",
-            "updatedAt": 1795364405180
+            "updatedAt": 1795433742194
           }
         ]
       },
@@ -1118,8 +1118,8 @@
         "kind": "issue"
       },
       "heard": [],
-      "startedAt": 1795364405180,
-      "endedAt": 1795364765180,
+      "startedAt": 1795433742194,
+      "endedAt": 1795434102194,
       "outcome": "completed",
       "summary": "过期回到登录页，加了两条测试。"
     },
@@ -1131,8 +1131,8 @@
         "message": "再补一条跨过期限的测试。"
       },
       "heard": ["再补一条跨过期限的测试。"],
-      "startedAt": 1795365065180,
-      "endedAt": 1795365245180,
+      "startedAt": 1795434402194,
+      "endedAt": 1795434582194,
       "outcome": "completed",
       "summary": "补了跨过期限的测试。"
     }
@@ -1143,7 +1143,7 @@
       {
         "seq": 1,
         "revision": 1,
-        "time": 1795365065181,
+        "time": 1795434402195,
         "type": "run/start",
         "text": "",
         "run": "run-1"
@@ -1151,7 +1151,7 @@
       {
         "seq": 2,
         "revision": 1,
-        "time": 1795365065181,
+        "time": 1795434402195,
         "type": "user/message",
         "text": "修好登录过期：过期就回到登录页，说清楚为什么。",
         "run": "run-1"
@@ -1159,7 +1159,7 @@
       {
         "seq": 3,
         "revision": 1,
-        "time": 1795365066181,
+        "time": 1795434403195,
         "type": "memory/recalled",
         "text": "这个仓库的测试用 vp test；会话的有效期在 session.ts。",
         "run": "run-1"
@@ -1167,7 +1167,7 @@
       {
         "seq": 4,
         "revision": 1,
-        "time": 1795365067181,
+        "time": 1795434404195,
         "type": "assistant/thinking",
         "text": "先看 session.ts 怎么判断过期，再找登录页。",
         "run": "run-1"
@@ -1175,7 +1175,7 @@
       {
         "seq": 5,
         "revision": 1,
-        "time": 1795365069181,
+        "time": 1795434406195,
         "type": "tool/call",
         "text": "",
         "action": "read_file",
@@ -1187,7 +1187,7 @@
       {
         "seq": 6,
         "revision": 1,
-        "time": 1795365070181,
+        "time": 1795434407195,
         "type": "tool/result",
         "text": "",
         "call": 5,
@@ -1198,7 +1198,7 @@
       {
         "seq": 7,
         "revision": 1,
-        "time": 1795365073181,
+        "time": 1795434410195,
         "type": "tool/call",
         "text": "",
         "action": "edit_file",
@@ -1210,7 +1210,7 @@
       {
         "seq": 8,
         "revision": 1,
-        "time": 1795365075181,
+        "time": 1795434412195,
         "type": "tool/result",
         "text": "",
         "call": 7,
@@ -1221,7 +1221,7 @@
       {
         "seq": 9,
         "revision": 1,
-        "time": 1795365079181,
+        "time": 1795434416195,
         "type": "tool/call",
         "text": "",
         "action": "run_command",
@@ -1233,7 +1233,7 @@
       {
         "seq": 10,
         "revision": 1,
-        "time": 1795365100181,
+        "time": 1795434437195,
         "type": "tool/result",
         "text": "",
         "call": 9,
@@ -1244,7 +1244,7 @@
       {
         "seq": 11,
         "revision": 1,
-        "time": 1795365102181,
+        "time": 1795434439195,
         "type": "llm/retry",
         "text": "模型忙，2 秒后再试（第 1 次）",
         "run": "run-1"
@@ -1252,7 +1252,7 @@
       {
         "seq": 12,
         "revision": 1,
-        "time": 1795365107181,
+        "time": 1795434444195,
         "type": "tool/call",
         "text": "",
         "action": "edit_file",
@@ -1264,7 +1264,7 @@
       {
         "seq": 13,
         "revision": 1,
-        "time": 1795365108181,
+        "time": 1795434445195,
         "type": "tool/result",
         "text": "",
         "call": 12,
@@ -1275,7 +1275,7 @@
       {
         "seq": 14,
         "revision": 1,
-        "time": 1795365110181,
+        "time": 1795434447195,
         "type": "tool/call",
         "text": "",
         "action": "run_command",
@@ -1287,7 +1287,7 @@
       {
         "seq": 15,
         "revision": 1,
-        "time": 1795365128181,
+        "time": 1795434465195,
         "type": "tool/result",
         "text": "",
         "call": 14,
@@ -1298,7 +1298,7 @@
       {
         "seq": 16,
         "revision": 1,
-        "time": 1795365129181,
+        "time": 1795434466195,
         "type": "llm/usage",
         "text": "",
         "tokens": {
@@ -1311,7 +1311,7 @@
       {
         "seq": 17,
         "revision": 1,
-        "time": 1795365131181,
+        "time": 1795434468195,
         "type": "assistant/message",
         "text": "改好了：过期回到登录页，登录页说「登录过期了」。加了两条测试，都过了。",
         "run": "run-1"
@@ -1319,7 +1319,7 @@
       {
         "seq": 18,
         "revision": 1,
-        "time": 1795365131181,
+        "time": 1795434468195,
         "type": "run/end",
         "text": "",
         "run": "run-1"
@@ -1327,7 +1327,7 @@
       {
         "seq": 19,
         "revision": 1,
-        "time": 1795365365181,
+        "time": 1795434702195,
         "type": "run/start",
         "text": "",
         "run": "run-2"
@@ -1335,7 +1335,7 @@
       {
         "seq": 20,
         "revision": 1,
-        "time": 1795365365181,
+        "time": 1795434702195,
         "type": "user/message",
         "text": "再补一条跨过期限的测试。",
         "run": "run-2"
@@ -1343,7 +1343,7 @@
       {
         "seq": 21,
         "revision": 1,
-        "time": 1795365367181,
+        "time": 1795434704195,
         "type": "assistant/thinking",
         "text": "在过期前一秒和后一秒各测一次。",
         "run": "run-2"
@@ -1351,7 +1351,7 @@
       {
         "seq": 22,
         "revision": 1,
-        "time": 1795365371181,
+        "time": 1795434708195,
         "type": "tool/call",
         "text": "",
         "action": "run_command",
@@ -1380,11 +1380,11 @@
         "branch": "issue-32-settings"
       },
       "bindings": [],
-      "hiredAt": 1795363085180,
+      "hiredAt": 1795432422194,
       "runs": 2,
       "phase": {
         "_tag": "working",
-        "since": 1795365365180,
+        "since": 1795434702194,
         "doing": {
           "action": "edit_file",
           "label": "改 session.ts",
@@ -1420,14 +1420,14 @@
                 "status": "pending"
               }
             ],
-            "updatedAt": 1795365485180
+            "updatedAt": 1795434822194
           },
           {
             "threadId": "review-groups",
             "parentThreadId": "main",
             "task": "核对分组名称",
             "status": "completed",
-            "updatedAt": 1795365425180
+            "updatedAt": 1795434762194
           }
         ]
       }
@@ -1446,11 +1446,11 @@
         "branch": "issue-31-login"
       },
       "bindings": [],
-      "hiredAt": 1795363085180,
+      "hiredAt": 1795432422194,
       "runs": 3,
       "phase": {
         "_tag": "closed",
-        "at": 1795365305180,
+        "at": 1795434642194,
         "closed": "merged"
       },
       "phaseText": "",
@@ -1458,7 +1458,7 @@
       "lastRun": {
         "outcome": "completed",
         "summary": "过期回到登录页，登录页说明原因，加了两条测试。",
-        "at": 1795365245180
+        "at": 1795434582194
       }
     }
   ],
@@ -1502,7 +1502,7 @@
   ],
   "repo.language.list": {
     "repo": "vibevalley",
-    "at": 1795365005180,
+    "at": 1795434342194,
     "languages": [
       {
         "name": "TypeScript",
@@ -1550,7 +1550,7 @@
   },
   "repo.activity.get": {
     "repo": "vibevalley",
-    "at": 1795365005180,
+    "at": 1795434342194,
     "days": [
       {
         "day": "2026-11-23",
@@ -2540,8 +2540,8 @@
       }
     ],
     "total": 1039,
-    "first": 1759077605180,
-    "last": 1795354805180
+    "first": 1759146942194,
+    "last": 1795424142194
   },
   "channel.message.list": [
     {
@@ -2557,7 +2557,7 @@
       "name": "用户",
       "kind": "chat",
       "text": "登录过期的问题谁来修？",
-      "at": 1795363265181,
+      "at": 1795432602195,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2580,7 +2580,7 @@
       "name": "助手",
       "kind": "chat",
       "text": "派给老周了，在工单 #18 里。",
-      "at": 1795363325181,
+      "at": 1795432662195,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2603,7 +2603,7 @@
       "name": "助手",
       "kind": "chat",
       "text": "他说半小时左右。",
-      "at": 1795363385181,
+      "at": 1795432722195,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2626,7 +2626,7 @@
       "name": "老周",
       "kind": "chat",
       "text": "收到，先看 session.ts。",
-      "at": 1795363445181,
+      "at": 1795432782195,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2658,7 +2658,7 @@
       "name": "老周",
       "kind": "report",
       "text": "改好了：过期回到登录页，加了两条测试。",
-      "at": 1795363505181,
+      "at": 1795432842195,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2687,7 +2687,7 @@
       "name": "老周",
       "kind": "report",
       "text": "测试起不来：缺一个环境变量。",
-      "at": 1795363565181,
+      "at": 1795432902195,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2714,7 +2714,7 @@
       "name": "用户",
       "kind": "chat",
       "text": "设计稿和录屏在这，参考 https://example.com/design",
-      "at": 1795363625181,
+      "at": 1795432962195,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2779,7 +2779,7 @@
       "name": "老周",
       "kind": "chat",
       "text": "## 改了什么\n\n- `session.ts`：过期判断\n- `Login.tsx`：提示文案",
-      "at": 1795363685181,
+      "at": 1795433022195,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2802,14 +2802,14 @@
       "name": "用户",
       "kind": "chat",
       "text": "周五之前合进去。",
-      "at": 1795363745181,
+      "at": 1795433082195,
       "revision": 1,
       "mentions": [],
       "spoken": false,
       "reactions": [],
       "attachments": [],
       "embeds": [],
-      "edited": 1795365485181,
+      "edited": 1795434822195,
       "outcome": null
     },
     {
@@ -2826,14 +2826,14 @@
       "name": "助手",
       "kind": "chat",
       "text": "记下了：周五之前。",
-      "at": 1795363805181,
+      "at": 1795433142195,
       "revision": 1,
       "mentions": [],
       "spoken": false,
       "reactions": [],
       "attachments": [],
       "embeds": [],
-      "pinned": 1795365545181,
+      "pinned": 1795434882195,
       "outcome": null
     },
     {
@@ -2850,7 +2850,7 @@
       "name": "老周",
       "kind": "chat",
       "text": "（这条删了）",
-      "at": 1795363865181,
+      "at": 1795433202195,
       "revision": 1,
       "mentions": [],
       "spoken": false,
@@ -2858,7 +2858,7 @@
       "attachments": [],
       "embeds": [],
       "agent": "laozhou",
-      "deleted": 1795365545181,
+      "deleted": 1795434882195,
       "outcome": null
     }
   ],
@@ -2877,14 +2877,14 @@
       "name": "助手",
       "kind": "chat",
       "text": "记下了：周五之前。",
-      "at": 1795363805181,
+      "at": 1795433142195,
       "revision": 1,
       "mentions": [],
       "spoken": false,
       "reactions": [],
       "attachments": [],
       "embeds": [],
-      "pinned": 1795365545181,
+      "pinned": 1795434882195,
       "outcome": null
     }
   ],
@@ -2896,8 +2896,7 @@
     "home": "~/.vibevalley",
     "paths": {
       "repos": "~/.vibevalley/repos",
-      "worktrees": "~/.vibevalley/worktrees",
-      "pkm": "~/.vibevalley/pkm"
+      "worktrees": "~/.vibevalley/worktrees"
     },
     "version": "0.42.0",
     "locale": "zh",
@@ -2905,70 +2904,13 @@
       "source": "settings",
       "hint": "…3f9a"
     },
-    "agoraAppId": {
-      "source": null
-    },
-    "agoraAppCertificate": {
-      "source": null
-    },
     "voice": {
-      "area": "CN",
-      "language": "zh-CN",
-      "asr": {
-        "vendor": "ares"
-      },
-      "answer": {
-        "vendor": "orchestrator"
-      },
-      "tts": {
-        "vendor": "minimax",
-        "model": "speech_2_6_turbo",
-        "voiceId": "female-shaonv"
-      },
       "persona": "",
-      "greeting": "你好！今天种点什么？",
-      "failureMessage": "",
-      "silenceMs": 800,
-      "interruptMs": 300,
-      "idleSeconds": 60
+      "greeting": "你好！今天种点什么？"
     },
     "voiceDefaults": {
-      "area": "CN",
-      "language": "zh-CN",
-      "asr": {
-        "vendor": "ares"
-      },
-      "answer": {
-        "vendor": "orchestrator"
-      },
-      "tts": {
-        "vendor": "minimax",
-        "model": "speech_2_6_turbo",
-        "voiceId": "female-shaonv"
-      },
       "persona": "",
-      "greeting": "你好！今天种点什么？",
-      "failureMessage": "",
-      "silenceMs": 800,
-      "interruptMs": 300,
-      "idleSeconds": 60
-    },
-    "asrKey": {
-      "source": null
-    },
-    "llmKey": {
-      "source": null
-    },
-    "ttsKey": {
-      "source": null
-    },
-    "dictation": {
-      "via": "moss",
-      "url": "",
-      "model": ""
-    },
-    "dictationKey": {
-      "source": null
+      "greeting": "你好！今天种点什么？"
     },
     "readiness": {
       "orchestrator": {
@@ -2992,9 +2934,6 @@
       "transcription": {
         "ready": true
       },
-      "dictation": {
-        "ready": true
-      },
       "live": {
         "ready": true
       },
@@ -3002,8 +2941,7 @@
         "ready": true
       },
       "call": {
-        "ready": false,
-        "missing": "agora"
+        "ready": true
       }
     },
     "memorySources": [
@@ -3025,8 +2963,7 @@
     "home": "~/.vibevalley",
     "paths": {
       "repos": "~/.vibevalley/repos",
-      "worktrees": "~/.vibevalley/worktrees",
-      "pkm": "~/.vibevalley/pkm"
+      "worktrees": "~/.vibevalley/worktrees"
     },
     "version": "0.42.0",
     "locale": "zh",
@@ -3034,70 +2971,13 @@
       "source": "settings",
       "hint": "…3f9a"
     },
-    "agoraAppId": {
-      "source": null
-    },
-    "agoraAppCertificate": {
-      "source": null
-    },
     "voice": {
-      "area": "CN",
-      "language": "zh-CN",
-      "asr": {
-        "vendor": "ares"
-      },
-      "answer": {
-        "vendor": "orchestrator"
-      },
-      "tts": {
-        "vendor": "minimax",
-        "model": "speech_2_6_turbo",
-        "voiceId": "female-shaonv"
-      },
       "persona": "",
-      "greeting": "你好！今天种点什么？",
-      "failureMessage": "",
-      "silenceMs": 800,
-      "interruptMs": 300,
-      "idleSeconds": 60
+      "greeting": "你好！今天种点什么？"
     },
     "voiceDefaults": {
-      "area": "CN",
-      "language": "zh-CN",
-      "asr": {
-        "vendor": "ares"
-      },
-      "answer": {
-        "vendor": "orchestrator"
-      },
-      "tts": {
-        "vendor": "minimax",
-        "model": "speech_2_6_turbo",
-        "voiceId": "female-shaonv"
-      },
       "persona": "",
-      "greeting": "你好！今天种点什么？",
-      "failureMessage": "",
-      "silenceMs": 800,
-      "interruptMs": 300,
-      "idleSeconds": 60
-    },
-    "asrKey": {
-      "source": null
-    },
-    "llmKey": {
-      "source": null
-    },
-    "ttsKey": {
-      "source": null
-    },
-    "dictation": {
-      "via": "moss",
-      "url": "",
-      "model": ""
-    },
-    "dictationKey": {
-      "source": null
+      "greeting": "你好！今天种点什么？"
     },
     "readiness": {
       "orchestrator": {
@@ -3121,9 +3001,6 @@
       "transcription": {
         "ready": true
       },
-      "dictation": {
-        "ready": true
-      },
       "live": {
         "ready": true
       },
@@ -3131,8 +3008,7 @@
         "ready": true
       },
       "call": {
-        "ready": false,
-        "missing": "agora"
+        "ready": true
       }
     },
     "memorySources": [
@@ -3155,7 +3031,7 @@
     "loggedIn": true,
     "account": "lucas",
     "reason": "",
-    "checkedAt": 1795365605181
+    "checkedAt": 1795434942195
   },
   "github.refresh": {
     "installed": true,
@@ -3163,7 +3039,7 @@
     "loggedIn": true,
     "account": "lucas",
     "reason": "",
-    "checkedAt": 1795365605181
+    "checkedAt": 1795434942195
   },
   "attachment.file": {
     "path": "/Users/farmer/.vibevalley/attachments/login.png",
@@ -3207,11 +3083,6 @@
       "model": "moss-vl"
     },
     "understandingModels": ["moss-vl"],
-    "dictation": {
-      "connection": "moss-main",
-      "model": "moss-asr"
-    },
-    "dictationModels": ["moss-asr", "moss-asr-fast"],
     "speech": null,
     "speechModels": ["moss-tts"],
     "speakers": null,
@@ -3255,11 +3126,6 @@
       "model": "moss-vl"
     },
     "understandingModels": ["moss-vl"],
-    "dictation": {
-      "connection": "moss-main",
-      "model": "moss-asr"
-    },
-    "dictationModels": ["moss-asr", "moss-asr-fast"],
     "speech": null,
     "speechModels": ["moss-tts"],
     "speakers": null,
@@ -3310,8 +3176,8 @@
     "pairCode": "",
     "user": "用户",
     "channel": "general",
-    "since": 1795106405181,
-    "lastInbound": 1795364885181,
+    "since": 1795175742195,
+    "lastInbound": 1795434222195,
     "pending": 2,
     "error": ""
   },
@@ -3322,8 +3188,8 @@
     "pairCode": "",
     "user": "用户",
     "channel": "general",
-    "since": 1795106405181,
-    "lastInbound": 1795364885181,
+    "since": 1795175742195,
+    "lastInbound": 1795434222195,
     "pending": 2,
     "error": ""
   },
@@ -3334,8 +3200,8 @@
     "pairCode": "",
     "user": "用户",
     "channel": "general",
-    "since": 1795106405181,
-    "lastInbound": 1795364885181,
+    "since": 1795175742195,
+    "lastInbound": 1795434222195,
     "pending": 2,
     "error": ""
   },
@@ -3349,7 +3215,7 @@
         "author": "agent",
         "repo": "vibevalley",
         "session": "w3",
-        "at": 1795347605181,
+        "at": 1795416942195,
         "recalled": 0,
         "fading": false
       },
@@ -3360,9 +3226,9 @@
         "text": "这个仓库的测试用 vp test；不要开 next dev。",
         "author": "user",
         "repo": "vibevalley",
-        "at": 1795106405181,
+        "at": 1795175742195,
         "recalled": 4,
-        "recalledAt": 1795279205181,
+        "recalledAt": 1795348542195,
         "fading": false
       },
       {
@@ -3373,7 +3239,7 @@
         "author": "agent",
         "session": "w1",
         "repo": "vibevalley",
-        "at": 1794328805181,
+        "at": 1794398142195,
         "recalled": 0,
         "fading": true
       },
@@ -3383,9 +3249,9 @@
         "kind": "note",
         "text": "提交信息写中文，一句话说清改了什么。",
         "author": "user",
-        "at": 1793637605181,
+        "at": 1793706942195,
         "recalled": 9,
-        "recalledAt": 1795358405181,
+        "recalledAt": 1795427742195,
         "fading": false
       },
       {
@@ -3396,7 +3262,7 @@
         "author": "system",
         "repo": "vibevalley",
         "source": "nowledge",
-        "at": 1794847205181,
+        "at": 1794916542195,
         "recalled": 1,
         "fading": false
       }
@@ -3434,9 +3300,9 @@
     "text": "这个仓库的测试用 vp test；不要开 next dev。",
     "author": "user",
     "repo": "vibevalley",
-    "at": 1795106405181,
+    "at": 1795175742195,
     "recalled": 4,
-    "recalledAt": 1795279205181,
+    "recalledAt": 1795348542195,
     "fading": false
   },
   "memory.delete": null,
@@ -3444,881 +3310,6 @@
     "path": "/Users/lucasay/orca/projects/vibevalley/assets/pixel"
   },
   "host.playSound": null,
-  "pkm.page.list": {
-    "root": "~/notes",
-    "pages": [
-      {
-        "slug": "vibevalley-原生移植",
-        "title": "VibeValley 原生移植",
-        "tier": "project",
-        "file": "projects/vibevalley-原生移植.md",
-        "tldr": "把 VibeValley 的每一页搬到 nsh 上，看起来和原来一样。",
-        "updated": 1795365605181,
-        "open": 3
-      },
-      {
-        "slug": "健康",
-        "title": "健康",
-        "tier": "area",
-        "file": "areas/健康.md",
-        "tldr": "",
-        "updated": 1795362005181,
-        "open": 1
-      },
-      {
-        "slug": "工作",
-        "title": "工作",
-        "tier": "area",
-        "file": "areas/工作.md",
-        "tldr": "",
-        "updated": 1795358405181,
-        "open": 0
-      },
-      {
-        "slug": "rust-笔记",
-        "title": "Rust 笔记",
-        "tier": "resource",
-        "file": "resources/rust-笔记.md",
-        "tldr": "",
-        "updated": 1795354805181,
-        "open": 0
-      },
-      {
-        "slug": "想到的",
-        "title": "想到的",
-        "tier": "inbox",
-        "file": "inboxs/想到的.md",
-        "tldr": "",
-        "updated": 1795351205181,
-        "open": 1
-      },
-      {
-        "slug": "旧的网页壳",
-        "title": "旧的网页壳",
-        "tier": "archive",
-        "file": "archives/旧的网页壳.md",
-        "tldr": "",
-        "updated": 1795347605181,
-        "open": 0
-      },
-      {
-        "slug": "journal-2026-11-23",
-        "title": "2026_11_23",
-        "tier": "journal",
-        "file": "journals/journal-2026-11-23.md",
-        "tldr": "",
-        "updated": 1795344005181,
-        "open": 1,
-        "day": "2026-11-23"
-      },
-      {
-        "slug": "journal-2026-11-22",
-        "title": "2026_11_22",
-        "tier": "journal",
-        "file": "journals/journal-2026-11-22.md",
-        "tldr": "",
-        "updated": 1795340405181,
-        "open": 0,
-        "day": "2026-11-22"
-      },
-      {
-        "slug": "journal-2026-11-20",
-        "title": "2026_11_20",
-        "tier": "journal",
-        "file": "journals/journal-2026-11-20.md",
-        "tldr": "",
-        "updated": 1795336805181,
-        "open": 0,
-        "day": "2026-11-20"
-      }
-    ]
-  },
-  "pkm.page.get": {
-    "page": {
-      "slug": "vibevalley-原生移植",
-      "title": "VibeValley 原生移植",
-      "tier": "project",
-      "file": "projects/vibevalley-原生移植.md",
-      "props": {
-        "status": "active",
-        "deadline": "2026-12-05",
-        "area": "[[工作]]",
-        "tags": "vibevalley, nsh",
-        "owner": "lucas",
-        "started": "2026-11-03"
-      },
-      "tldr": "把 VibeValley 的每一页搬到 nsh 上，看起来和原来一样。",
-      "blocks": [
-        {
-          "id": "vibevalley-原生移植-1",
-          "depth": 0,
-          "body": "## 目标",
-          "props": {},
-          "path": ""
-        },
-        {
-          "id": "6f1d2c3a-90ab",
-          "depth": 1,
-          "body": "VibeValley 整个搬进 VibeValley，页面用 nsh 画，服务端换成 Rust",
-          "props": {},
-          "path": "## 目标",
-          "parent": "vibevalley-原生移植-1"
-        },
-        {
-          "id": "vibevalley-原生移植-2",
-          "depth": 1,
-          "body": "终端是 VibeValley 加的：每个工作树都能开一个",
-          "props": {},
-          "path": "## 目标",
-          "parent": "vibevalley-原生移植-1"
-        },
-        {
-          "id": "vibevalley-原生移植-3",
-          "depth": 0,
-          "body": "## 这周",
-          "props": {},
-          "path": ""
-        },
-        {
-          "id": "vibevalley-原生移植-4",
-          "depth": 1,
-          "body": "笔记页的大纲编辑器",
-          "props": {},
-          "path": "## 这周",
-          "parent": "vibevalley-原生移植-3",
-          "marker": "DOING"
-        },
-        {
-          "id": "vibevalley-原生移植-5",
-          "depth": 2,
-          "body": "Tab 缩进、Alt+↑↓ 挪动、Enter 拆块",
-          "props": {},
-          "path": "## 这周 › 笔记页的大纲编辑器",
-          "parent": "vibevalley-原生移植-4"
-        },
-        {
-          "id": "vibevalley-原生移植-6",
-          "depth": 2,
-          "body": "[[健康]] 这一块先不动",
-          "props": {},
-          "path": "## 这周 › 笔记页的大纲编辑器",
-          "parent": "vibevalley-原生移植-4",
-          "marker": "TODO"
-        },
-        {
-          "id": "vibevalley-原生移植-7",
-          "depth": 1,
-          "body": "素材库和 Artifact 页",
-          "props": {
-            "deadline": "2026-11-26"
-          },
-          "path": "## 这周",
-          "parent": "vibevalley-原生移植-3",
-          "marker": "TODO"
-        },
-        {
-          "id": "vibevalley-原生移植-8",
-          "depth": 1,
-          "body": "图鉴的音效，离线合成成 WAV",
-          "props": {},
-          "path": "## 这周",
-          "parent": "vibevalley-原生移植-3",
-          "marker": "DONE"
-        },
-        {
-          "id": "vibevalley-原生移植-9",
-          "depth": 1,
-          "body": "拖文件进聊天",
-          "props": {},
-          "path": "## 这周",
-          "parent": "vibevalley-原生移植-3",
-          "marker": "WAITING"
-        },
-        {
-          "id": "vibevalley-原生移植-10",
-          "depth": 0,
-          "body": "## 记下的",
-          "props": {},
-          "path": ""
-        },
-        {
-          "id": "vibevalley-原生移植-11",
-          "depth": 1,
-          "body": "nsh 的 Text 不从 View 继承字号，每个字都要自己的 class",
-          "props": {},
-          "path": "## 记下的",
-          "parent": "vibevalley-原生移植-10"
-        },
-        {
-          "id": "vibevalley-原生移植-12",
-          "depth": 1,
-          "body": "像素图按点放大，不要平滑 #nsh",
-          "props": {},
-          "path": "## 记下的",
-          "parent": "vibevalley-原生移植-10"
-        },
-        {
-          "id": "vibevalley-原生移植-13",
-          "depth": 1,
-          "body": "目标写在 ((6f1d2c3a-90ab)) 里",
-          "props": {},
-          "path": "## 记下的",
-          "parent": "vibevalley-原生移植-10"
-        }
-      ],
-      "updated": 1795365605181
-    },
-    "transclusions": [
-      {
-        "block": "6f1d2c3a-90ab",
-        "found": true,
-        "circular": false,
-        "page": "vibevalley-原生移植",
-        "pageTitle": "VibeValley 原生移植",
-        "body": "VibeValley 整个搬进 VibeValley，页面用 nsh 画，服务端换成 Rust"
-      }
-    ],
-    "backlinks": {
-      "projects": [],
-      "journals": [
-        {
-          "block": "journal-2026-11-23-22",
-          "page": "journal-2026-11-23",
-          "pageTitle": "2026_11_23",
-          "tier": "journal",
-          "path": "",
-          "body": "早上看了 [[VibeValley 原生移植]] 的进度"
-        }
-      ],
-      "areas": [],
-      "archives": []
-    },
-    "comments": [
-      {
-        "id": "c1",
-        "page": "vibevalley-原生移植",
-        "block": "6f1d2c3a-90ab",
-        "span": "页面用 nsh 画",
-        "by": "orchestrator",
-        "body": "说清楚是重写，不是包一层网页。",
-        "status": "suggested",
-        "suggested": "VibeValley 整个搬进 VibeValley，页面用 nsh 重写，服务端换成 Rust",
-        "created": 1795358405181
-      }
-    ]
-  },
-  "pkm.journal.open": {
-    "slug": "journal-2026-11-23",
-    "title": "2026_11_23",
-    "tier": "journal",
-    "file": "journals/journal-2026-11-23.md",
-    "props": {},
-    "tldr": "",
-    "blocks": [
-      {
-        "id": "journal-2026-11-23-22",
-        "depth": 0,
-        "body": "早上看了 [[VibeValley 原生移植]] 的进度",
-        "props": {},
-        "path": ""
-      },
-      {
-        "id": "journal-2026-11-23-23",
-        "depth": 0,
-        "body": "下午",
-        "props": {},
-        "path": ""
-      },
-      {
-        "id": "journal-2026-11-23-24",
-        "depth": 1,
-        "body": "大纲的选中和复制",
-        "props": {},
-        "path": "下午",
-        "parent": "journal-2026-11-23-23",
-        "marker": "TODO"
-      },
-      {
-        "id": "journal-2026-11-23-25",
-        "depth": 1,
-        "body": "日历",
-        "props": {},
-        "path": "下午",
-        "parent": "journal-2026-11-23-23",
-        "marker": "DONE"
-      }
-    ],
-    "updated": 1795344005181
-  },
-  "pkm.block.apply": {
-    "slug": "vibevalley-原生移植",
-    "title": "VibeValley 原生移植",
-    "tier": "project",
-    "file": "projects/vibevalley-原生移植.md",
-    "props": {
-      "status": "active",
-      "deadline": "2026-12-05",
-      "area": "[[工作]]",
-      "tags": "vibevalley, nsh",
-      "owner": "lucas",
-      "started": "2026-11-03"
-    },
-    "tldr": "把 VibeValley 的每一页搬到 nsh 上，看起来和原来一样。",
-    "blocks": [
-      {
-        "id": "vibevalley-原生移植-1",
-        "depth": 0,
-        "body": "## 目标",
-        "props": {},
-        "path": ""
-      },
-      {
-        "id": "6f1d2c3a-90ab",
-        "depth": 1,
-        "body": "VibeValley 整个搬进 VibeValley，页面用 nsh 画，服务端换成 Rust",
-        "props": {},
-        "path": "## 目标",
-        "parent": "vibevalley-原生移植-1"
-      },
-      {
-        "id": "vibevalley-原生移植-2",
-        "depth": 1,
-        "body": "终端是 VibeValley 加的：每个工作树都能开一个",
-        "props": {},
-        "path": "## 目标",
-        "parent": "vibevalley-原生移植-1"
-      },
-      {
-        "id": "vibevalley-原生移植-3",
-        "depth": 0,
-        "body": "## 这周",
-        "props": {},
-        "path": ""
-      },
-      {
-        "id": "vibevalley-原生移植-4",
-        "depth": 1,
-        "body": "笔记页的大纲编辑器",
-        "props": {},
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "DOING"
-      },
-      {
-        "id": "vibevalley-原生移植-5",
-        "depth": 2,
-        "body": "Tab 缩进、Alt+↑↓ 挪动、Enter 拆块",
-        "props": {},
-        "path": "## 这周 › 笔记页的大纲编辑器",
-        "parent": "vibevalley-原生移植-4"
-      },
-      {
-        "id": "vibevalley-原生移植-6",
-        "depth": 2,
-        "body": "[[健康]] 这一块先不动",
-        "props": {},
-        "path": "## 这周 › 笔记页的大纲编辑器",
-        "parent": "vibevalley-原生移植-4",
-        "marker": "TODO"
-      },
-      {
-        "id": "vibevalley-原生移植-7",
-        "depth": 1,
-        "body": "素材库和 Artifact 页",
-        "props": {
-          "deadline": "2026-11-26"
-        },
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "TODO"
-      },
-      {
-        "id": "vibevalley-原生移植-8",
-        "depth": 1,
-        "body": "图鉴的音效，离线合成成 WAV",
-        "props": {},
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "DONE"
-      },
-      {
-        "id": "vibevalley-原生移植-9",
-        "depth": 1,
-        "body": "拖文件进聊天",
-        "props": {},
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "WAITING"
-      },
-      {
-        "id": "vibevalley-原生移植-10",
-        "depth": 0,
-        "body": "## 记下的",
-        "props": {},
-        "path": ""
-      },
-      {
-        "id": "vibevalley-原生移植-11",
-        "depth": 1,
-        "body": "nsh 的 Text 不从 View 继承字号，每个字都要自己的 class",
-        "props": {},
-        "path": "## 记下的",
-        "parent": "vibevalley-原生移植-10"
-      },
-      {
-        "id": "vibevalley-原生移植-12",
-        "depth": 1,
-        "body": "像素图按点放大，不要平滑 #nsh",
-        "props": {},
-        "path": "## 记下的",
-        "parent": "vibevalley-原生移植-10"
-      },
-      {
-        "id": "vibevalley-原生移植-13",
-        "depth": 1,
-        "body": "目标写在 ((6f1d2c3a-90ab)) 里",
-        "props": {},
-        "path": "## 记下的",
-        "parent": "vibevalley-原生移植-10"
-      }
-    ],
-    "updated": 1795365605181
-  },
-  "pkm.page.move": {
-    "slug": "vibevalley-原生移植",
-    "title": "VibeValley 原生移植",
-    "tier": "project",
-    "file": "projects/vibevalley-原生移植.md",
-    "props": {
-      "status": "active",
-      "deadline": "2026-12-05",
-      "area": "[[工作]]",
-      "tags": "vibevalley, nsh",
-      "owner": "lucas",
-      "started": "2026-11-03"
-    },
-    "tldr": "把 VibeValley 的每一页搬到 nsh 上，看起来和原来一样。",
-    "blocks": [
-      {
-        "id": "vibevalley-原生移植-1",
-        "depth": 0,
-        "body": "## 目标",
-        "props": {},
-        "path": ""
-      },
-      {
-        "id": "6f1d2c3a-90ab",
-        "depth": 1,
-        "body": "VibeValley 整个搬进 VibeValley，页面用 nsh 画，服务端换成 Rust",
-        "props": {},
-        "path": "## 目标",
-        "parent": "vibevalley-原生移植-1"
-      },
-      {
-        "id": "vibevalley-原生移植-2",
-        "depth": 1,
-        "body": "终端是 VibeValley 加的：每个工作树都能开一个",
-        "props": {},
-        "path": "## 目标",
-        "parent": "vibevalley-原生移植-1"
-      },
-      {
-        "id": "vibevalley-原生移植-3",
-        "depth": 0,
-        "body": "## 这周",
-        "props": {},
-        "path": ""
-      },
-      {
-        "id": "vibevalley-原生移植-4",
-        "depth": 1,
-        "body": "笔记页的大纲编辑器",
-        "props": {},
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "DOING"
-      },
-      {
-        "id": "vibevalley-原生移植-5",
-        "depth": 2,
-        "body": "Tab 缩进、Alt+↑↓ 挪动、Enter 拆块",
-        "props": {},
-        "path": "## 这周 › 笔记页的大纲编辑器",
-        "parent": "vibevalley-原生移植-4"
-      },
-      {
-        "id": "vibevalley-原生移植-6",
-        "depth": 2,
-        "body": "[[健康]] 这一块先不动",
-        "props": {},
-        "path": "## 这周 › 笔记页的大纲编辑器",
-        "parent": "vibevalley-原生移植-4",
-        "marker": "TODO"
-      },
-      {
-        "id": "vibevalley-原生移植-7",
-        "depth": 1,
-        "body": "素材库和 Artifact 页",
-        "props": {
-          "deadline": "2026-11-26"
-        },
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "TODO"
-      },
-      {
-        "id": "vibevalley-原生移植-8",
-        "depth": 1,
-        "body": "图鉴的音效，离线合成成 WAV",
-        "props": {},
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "DONE"
-      },
-      {
-        "id": "vibevalley-原生移植-9",
-        "depth": 1,
-        "body": "拖文件进聊天",
-        "props": {},
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "WAITING"
-      },
-      {
-        "id": "vibevalley-原生移植-10",
-        "depth": 0,
-        "body": "## 记下的",
-        "props": {},
-        "path": ""
-      },
-      {
-        "id": "vibevalley-原生移植-11",
-        "depth": 1,
-        "body": "nsh 的 Text 不从 View 继承字号，每个字都要自己的 class",
-        "props": {},
-        "path": "## 记下的",
-        "parent": "vibevalley-原生移植-10"
-      },
-      {
-        "id": "vibevalley-原生移植-12",
-        "depth": 1,
-        "body": "像素图按点放大，不要平滑 #nsh",
-        "props": {},
-        "path": "## 记下的",
-        "parent": "vibevalley-原生移植-10"
-      },
-      {
-        "id": "vibevalley-原生移植-13",
-        "depth": 1,
-        "body": "目标写在 ((6f1d2c3a-90ab)) 里",
-        "props": {},
-        "path": "## 记下的",
-        "parent": "vibevalley-原生移植-10"
-      }
-    ],
-    "updated": 1795365605181
-  },
-  "pkm.page.save": {
-    "slug": "vibevalley-原生移植",
-    "title": "VibeValley 原生移植",
-    "tier": "project",
-    "file": "projects/vibevalley-原生移植.md",
-    "props": {
-      "status": "active",
-      "deadline": "2026-12-05",
-      "area": "[[工作]]",
-      "tags": "vibevalley, nsh",
-      "owner": "lucas",
-      "started": "2026-11-03"
-    },
-    "tldr": "把 VibeValley 的每一页搬到 nsh 上，看起来和原来一样。",
-    "blocks": [
-      {
-        "id": "vibevalley-原生移植-1",
-        "depth": 0,
-        "body": "## 目标",
-        "props": {},
-        "path": ""
-      },
-      {
-        "id": "6f1d2c3a-90ab",
-        "depth": 1,
-        "body": "VibeValley 整个搬进 VibeValley，页面用 nsh 画，服务端换成 Rust",
-        "props": {},
-        "path": "## 目标",
-        "parent": "vibevalley-原生移植-1"
-      },
-      {
-        "id": "vibevalley-原生移植-2",
-        "depth": 1,
-        "body": "终端是 VibeValley 加的：每个工作树都能开一个",
-        "props": {},
-        "path": "## 目标",
-        "parent": "vibevalley-原生移植-1"
-      },
-      {
-        "id": "vibevalley-原生移植-3",
-        "depth": 0,
-        "body": "## 这周",
-        "props": {},
-        "path": ""
-      },
-      {
-        "id": "vibevalley-原生移植-4",
-        "depth": 1,
-        "body": "笔记页的大纲编辑器",
-        "props": {},
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "DOING"
-      },
-      {
-        "id": "vibevalley-原生移植-5",
-        "depth": 2,
-        "body": "Tab 缩进、Alt+↑↓ 挪动、Enter 拆块",
-        "props": {},
-        "path": "## 这周 › 笔记页的大纲编辑器",
-        "parent": "vibevalley-原生移植-4"
-      },
-      {
-        "id": "vibevalley-原生移植-6",
-        "depth": 2,
-        "body": "[[健康]] 这一块先不动",
-        "props": {},
-        "path": "## 这周 › 笔记页的大纲编辑器",
-        "parent": "vibevalley-原生移植-4",
-        "marker": "TODO"
-      },
-      {
-        "id": "vibevalley-原生移植-7",
-        "depth": 1,
-        "body": "素材库和 Artifact 页",
-        "props": {
-          "deadline": "2026-11-26"
-        },
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "TODO"
-      },
-      {
-        "id": "vibevalley-原生移植-8",
-        "depth": 1,
-        "body": "图鉴的音效，离线合成成 WAV",
-        "props": {},
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "DONE"
-      },
-      {
-        "id": "vibevalley-原生移植-9",
-        "depth": 1,
-        "body": "拖文件进聊天",
-        "props": {},
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "WAITING"
-      },
-      {
-        "id": "vibevalley-原生移植-10",
-        "depth": 0,
-        "body": "## 记下的",
-        "props": {},
-        "path": ""
-      },
-      {
-        "id": "vibevalley-原生移植-11",
-        "depth": 1,
-        "body": "nsh 的 Text 不从 View 继承字号，每个字都要自己的 class",
-        "props": {},
-        "path": "## 记下的",
-        "parent": "vibevalley-原生移植-10"
-      },
-      {
-        "id": "vibevalley-原生移植-12",
-        "depth": 1,
-        "body": "像素图按点放大，不要平滑 #nsh",
-        "props": {},
-        "path": "## 记下的",
-        "parent": "vibevalley-原生移植-10"
-      },
-      {
-        "id": "vibevalley-原生移植-13",
-        "depth": 1,
-        "body": "目标写在 ((6f1d2c3a-90ab)) 里",
-        "props": {},
-        "path": "## 记下的",
-        "parent": "vibevalley-原生移植-10"
-      }
-    ],
-    "updated": 1795365605181
-  },
-  "pkm.page.rename": {
-    "pages": ["vibevalley-原生移植"],
-    "into": "vibevalley-原生移植"
-  },
-  "pkm.page.export": {
-    "markdown": ""
-  },
-  "pkm.radar.get": {
-    "inbox": 2,
-    "stale": [
-      {
-        "slug": "健康",
-        "title": "健康",
-        "days": 18,
-        "todo": 0,
-        "doing": 0,
-        "done": 0
-      }
-    ],
-    "overdue": [
-      {
-        "block": "x1",
-        "page": "vibevalley-原生移植",
-        "body": "素材库和 Artifact 页",
-        "plain": "素材库和 Artifact 页",
-        "deadline": "2026-11-21"
-      }
-    ]
-  },
-  "pkm.search": [],
-  "pkm.comment.resolve": {
-    "slug": "vibevalley-原生移植",
-    "title": "VibeValley 原生移植",
-    "tier": "project",
-    "file": "projects/vibevalley-原生移植.md",
-    "props": {
-      "status": "active",
-      "deadline": "2026-12-05",
-      "area": "[[工作]]",
-      "tags": "vibevalley, nsh",
-      "owner": "lucas",
-      "started": "2026-11-03"
-    },
-    "tldr": "把 VibeValley 的每一页搬到 nsh 上，看起来和原来一样。",
-    "blocks": [
-      {
-        "id": "vibevalley-原生移植-1",
-        "depth": 0,
-        "body": "## 目标",
-        "props": {},
-        "path": ""
-      },
-      {
-        "id": "6f1d2c3a-90ab",
-        "depth": 1,
-        "body": "VibeValley 整个搬进 VibeValley，页面用 nsh 画，服务端换成 Rust",
-        "props": {},
-        "path": "## 目标",
-        "parent": "vibevalley-原生移植-1"
-      },
-      {
-        "id": "vibevalley-原生移植-2",
-        "depth": 1,
-        "body": "终端是 VibeValley 加的：每个工作树都能开一个",
-        "props": {},
-        "path": "## 目标",
-        "parent": "vibevalley-原生移植-1"
-      },
-      {
-        "id": "vibevalley-原生移植-3",
-        "depth": 0,
-        "body": "## 这周",
-        "props": {},
-        "path": ""
-      },
-      {
-        "id": "vibevalley-原生移植-4",
-        "depth": 1,
-        "body": "笔记页的大纲编辑器",
-        "props": {},
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "DOING"
-      },
-      {
-        "id": "vibevalley-原生移植-5",
-        "depth": 2,
-        "body": "Tab 缩进、Alt+↑↓ 挪动、Enter 拆块",
-        "props": {},
-        "path": "## 这周 › 笔记页的大纲编辑器",
-        "parent": "vibevalley-原生移植-4"
-      },
-      {
-        "id": "vibevalley-原生移植-6",
-        "depth": 2,
-        "body": "[[健康]] 这一块先不动",
-        "props": {},
-        "path": "## 这周 › 笔记页的大纲编辑器",
-        "parent": "vibevalley-原生移植-4",
-        "marker": "TODO"
-      },
-      {
-        "id": "vibevalley-原生移植-7",
-        "depth": 1,
-        "body": "素材库和 Artifact 页",
-        "props": {
-          "deadline": "2026-11-26"
-        },
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "TODO"
-      },
-      {
-        "id": "vibevalley-原生移植-8",
-        "depth": 1,
-        "body": "图鉴的音效，离线合成成 WAV",
-        "props": {},
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "DONE"
-      },
-      {
-        "id": "vibevalley-原生移植-9",
-        "depth": 1,
-        "body": "拖文件进聊天",
-        "props": {},
-        "path": "## 这周",
-        "parent": "vibevalley-原生移植-3",
-        "marker": "WAITING"
-      },
-      {
-        "id": "vibevalley-原生移植-10",
-        "depth": 0,
-        "body": "## 记下的",
-        "props": {},
-        "path": ""
-      },
-      {
-        "id": "vibevalley-原生移植-11",
-        "depth": 1,
-        "body": "nsh 的 Text 不从 View 继承字号，每个字都要自己的 class",
-        "props": {},
-        "path": "## 记下的",
-        "parent": "vibevalley-原生移植-10"
-      },
-      {
-        "id": "vibevalley-原生移植-12",
-        "depth": 1,
-        "body": "像素图按点放大，不要平滑 #nsh",
-        "props": {},
-        "path": "## 记下的",
-        "parent": "vibevalley-原生移植-10"
-      },
-      {
-        "id": "vibevalley-原生移植-13",
-        "depth": 1,
-        "body": "目标写在 ((6f1d2c3a-90ab)) 里",
-        "props": {},
-        "path": "## 记下的",
-        "parent": "vibevalley-原生移植-10"
-      }
-    ],
-    "updated": 1795365605181
-  },
-  "pkm.undo": {
-    "undone": false
-  },
   "artifact.list": [
     {
       "id": "art-plan",
@@ -4336,8 +3327,8 @@
       "version": 0,
       "seq": 4,
       "versions": [],
-      "at": 1795360205180,
-      "updated": 1795365245180
+      "at": 1795429542194,
+      "updated": 1795434582194
     },
     {
       "id": "art-login",
@@ -4362,7 +3353,7 @@
           "note": "第一版",
           "by": "w1",
           "byName": "老周",
-          "at": 1795362605180,
+          "at": 1795431942194,
           "channel": "general",
           "number": 2
         },
@@ -4372,13 +3363,13 @@
           "note": "多一条测试",
           "by": "w1",
           "byName": "老周",
-          "at": 1795364405180,
+          "at": 1795433742194,
           "channel": "general",
           "number": 4
         }
       ],
-      "at": 1795362605180,
-      "updated": 1795364405180
+      "at": 1795431942194,
+      "updated": 1795433742194
     },
     {
       "id": "art-deck",
@@ -4398,12 +3389,12 @@
           "note": "周会用",
           "by": "orchestrator",
           "byName": "助手",
-          "at": 1795354805180,
+          "at": 1795424142194,
           "channel": "general"
         }
       ],
-      "at": 1795354805180,
-      "updated": 1795354805180
+      "at": 1795424142194,
+      "updated": 1795424142194
     },
     {
       "id": "art-mine",
@@ -4415,8 +3406,8 @@
       "version": 0,
       "seq": 1,
       "versions": [],
-      "at": 1795272005180,
-      "updated": 1795275605180
+      "at": 1795341342194,
+      "updated": 1795344942194
     },
     {
       "id": "art-launch-board",
@@ -4435,8 +3426,8 @@
       "version": 0,
       "seq": 18,
       "versions": [],
-      "at": 1795363205180,
-      "updated": 1795365485180
+      "at": 1795432542194,
+      "updated": 1795434822194
     }
   ],
   "artifact.get": {
@@ -4455,8 +3446,8 @@
     "version": 0,
     "seq": 4,
     "versions": [],
-    "at": 1795360205180,
-    "updated": 1795365245180
+    "at": 1795429542194,
+    "updated": 1795434582194
   },
   "artifact.content.get": {
     "version": 2,
@@ -4479,8 +3470,8 @@
       "version": 0,
       "seq": 4,
       "versions": [],
-      "at": 1795360205180,
-      "updated": 1795365245180
+      "at": 1795429542194,
+      "updated": 1795434582194
     },
     "blocks": [
       {
@@ -4499,7 +3490,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365545180
+        "updated": 1795434882194
       },
       {
         "id": "art-plan-b2",
@@ -4515,7 +3506,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365485180
+        "updated": 1795434822194
       },
       {
         "id": "art-plan-b3",
@@ -4533,7 +3524,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365425180
+        "updated": 1795434762194
       },
       {
         "id": "art-plan-b4",
@@ -4549,7 +3540,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365365180
+        "updated": 1795434702194
       },
       {
         "id": "art-plan-b5",
@@ -4571,7 +3562,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365305180
+        "updated": 1795434642194
       },
       {
         "id": "art-plan-b6",
@@ -4587,7 +3578,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "user",
-        "updated": 1795365245180
+        "updated": 1795434582194
       },
       {
         "id": "art-plan-b7",
@@ -4605,7 +3596,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365185180
+        "updated": 1795434522194
       },
       {
         "id": "art-plan-b8",
@@ -4623,7 +3614,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365125180
+        "updated": 1795434462194
       },
       {
         "id": "art-plan-b9",
@@ -4641,7 +3632,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365065180
+        "updated": 1795434402194
       },
       {
         "id": "art-plan-b10",
@@ -4657,7 +3648,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "user",
-        "updated": 1795365005180
+        "updated": 1795434342194
       }
     ]
   },
@@ -4679,8 +3670,8 @@
       "version": 0,
       "seq": 18,
       "versions": [],
-      "at": 1795363205180,
-      "updated": 1795365485180
+      "at": 1795432542194,
+      "updated": 1795434822194
     },
     "seq": 18,
     "entries": [
@@ -4692,7 +3683,7 @@
         "size": 46,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"title\":\"产品发布时间线\",\"mode\":\"board\",\"grid\":true}"
       },
       {
@@ -4703,7 +3694,7 @@
         "size": 95,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"t-title\",\"type\":\"text\",\"variant\":\"title\",\"x\":72,\"y\":36,\"w\":680,\"h\":48,\"label\":\"产品发布时间线\"}"
       },
       {
@@ -4714,7 +3705,7 @@
         "size": 133,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"t-sub\",\"type\":\"text\",\"variant\":\"subtitle\",\"x\":72,\"y\":84,\"w\":680,\"h\":28,\"label\":\"从方案锁定到正式交付上线：全链路协同冲刺 12 天\",\"highlight\":\"12 天\"}"
       },
       {
@@ -4725,7 +3716,7 @@
         "size": 576,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"tl-main\",\"type\":\"timeline\",\"x\":72,\"y\":268,\"w\":840,\"h\":96,\"fill\":\"peach\",\"points\":[{\"x\":76,\"y\":356},{\"x\":240,\"y\":350},{\"x\":430,\"y\":312},{\"x\":640,\"y\":306},{\"x\":890,\"y\":264}],\"milestones\":[{\"t\":0.04,\"label\":\"Day 1\",\"kind\":\"major\"},{\"t\":0.16,\"label\":\"Day 2\",\"kind\":\"major\"},{\"t\":0.27,\"label\":\"Day 3\",\"kind\":\"major\"},{\"t\":0.38,\"label\":\"4\",\"kind\":\"minor\"},{\"t\":0.49,\"label\":\"5\",\"kind\":\"minor\",\"caption\":\"联调冲刺 4 天\"},{\"t\":0.6,\"label\":\"6\",\"kind\":\"minor\"},{\"t\":0.72,\"label\":\"Day 7\",\"kind\":\"major\"},{\"t\":0.85,\"label\":\"Day 8\",\"kind\":\"major\"},{\"t\":0.96,\"label\":\"9\",\"kind\":\"minor\"}]}"
       },
       {
@@ -4736,7 +3727,7 @@
         "size": 143,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"c-1\",\"type\":\"shape\",\"shape\":\"card\",\"x\":64,\"y\":174,\"w\":160,\"h\":108,\"title\":\"锁定核心范围\",\"body\":\"核心功能已拍板\",\"fill\":\"sun\",\"sticker\":\"berry-lock\"}"
       },
       {
@@ -4747,7 +3738,7 @@
         "size": 146,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"c-2\",\"type\":\"shape\",\"shape\":\"card\",\"x\":112,\"y\":422,\"w\":168,\"h\":120,\"title\":\"确认发布清单\",\"body\":\"拆解到每天交付物\",\"fill\":\"sun\",\"sticker\":\"chart-board\"}"
       },
       {
@@ -4758,7 +3749,7 @@
         "size": 144,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"c-3\",\"type\":\"shape\",\"shape\":\"card\",\"x\":246,\"y\":146,\"w\":168,\"h\":110,\"title\":\"确定资源预算\",\"body\":\"算力与配额已就位\",\"fill\":\"sun\",\"sticker\":\"price-tag\"}"
       },
       {
@@ -4769,7 +3760,7 @@
         "size": 142,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"c-4\",\"type\":\"shape\",\"shape\":\"card\",\"x\":298,\"y\":372,\"w\":170,\"h\":108,\"title\":\"批产核心模块\",\"body\":\"23 项任务并发推进\",\"fill\":\"sun\",\"sticker\":\"crate\"}"
       },
       {
@@ -4780,7 +3771,7 @@
         "size": 147,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"c-5\",\"type\":\"shape\",\"shape\":\"card\",\"x\":640,\"y\":114,\"w\":176,\"h\":114,\"title\":\"准点抵达验收\",\"body\":\"进入主站发布通道\",\"fill\":\"peach\",\"sticker\":\"storefront\"}"
       },
       {
@@ -4791,7 +3782,7 @@
         "size": 149,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"c-6\",\"type\":\"shape\",\"shape\":\"card\",\"x\":752,\"y\":356,\"w\":176,\"h\":118,\"title\":\"灰度与全量验证\",\"body\":\"先验 12 组，再放量 500\",\"fill\":\"peach\",\"sticker\":\"bowl\"}"
       },
       {
@@ -4802,7 +3793,7 @@
         "size": 97,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"s-truck\",\"type\":\"sticker\",\"sticker\":\"truck\",\"x\":462,\"y\":244,\"w\":112,\"h\":68,\"label\":\"运输交付\"}"
       },
       {
@@ -4813,7 +3804,7 @@
         "size": 95,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"s-mascot\",\"type\":\"sticker\",\"sticker\":\"mascot\",\"x\":752,\"y\":26,\"w\":72,\"h\":72,\"label\":\"老周\"}"
       },
       {
@@ -4824,7 +3815,7 @@
         "size": 118,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"t-callout\",\"type\":\"text\",\"variant\":\"callout\",\"icon\":\"⚠\",\"x\":492,\"y\":404,\"w\":204,\"h\":48,\"label\":\"合包检查需等待终版配置锁定\"}"
       },
       {
@@ -4835,7 +3826,7 @@
         "size": 133,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"a-1\",\"type\":\"arrow\",\"curve\":\"straight\",\"head\":\"none\",\"stroke\":\"#c96e52\",\"from\":{\"id\":\"c-1\",\"side\":\"s\"},\"to\":{\"x\":112,\"y\":354}}"
       },
       {
@@ -4846,7 +3837,7 @@
         "size": 133,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"a-2\",\"type\":\"arrow\",\"curve\":\"straight\",\"head\":\"none\",\"stroke\":\"#c96e52\",\"from\":{\"id\":\"c-2\",\"side\":\"n\"},\"to\":{\"x\":204,\"y\":352}}"
       },
       {
@@ -4857,7 +3848,7 @@
         "size": 133,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"a-3\",\"type\":\"arrow\",\"curve\":\"straight\",\"head\":\"none\",\"stroke\":\"#c96e52\",\"from\":{\"id\":\"c-3\",\"side\":\"s\"},\"to\":{\"x\":298,\"y\":338}}"
       },
       {
@@ -4868,7 +3859,7 @@
         "size": 133,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"a-4\",\"type\":\"arrow\",\"curve\":\"straight\",\"head\":\"none\",\"stroke\":\"#c96e52\",\"from\":{\"id\":\"c-4\",\"side\":\"n\"},\"to\":{\"x\":392,\"y\":320}}"
       },
       {
@@ -4879,7 +3870,7 @@
         "size": 133,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"a-5\",\"type\":\"arrow\",\"curve\":\"straight\",\"head\":\"none\",\"stroke\":\"#c96e52\",\"from\":{\"id\":\"c-5\",\"side\":\"s\"},\"to\":{\"x\":676,\"y\":300}}"
       },
       {
@@ -4890,7 +3881,7 @@
         "size": 133,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"a-6\",\"type\":\"arrow\",\"curve\":\"straight\",\"head\":\"none\",\"stroke\":\"#c96e52\",\"from\":{\"id\":\"c-6\",\"side\":\"n\"},\"to\":{\"x\":780,\"y\":282}}"
       },
       {
@@ -4901,41 +3892,8 @@
         "size": 150,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"a-callout\",\"type\":\"arrow\",\"curve\":\"smooth\",\"head\":\"arrow\",\"stroke\":\"#c96e52\",\"from\":{\"id\":\"t-callout\",\"side\":\"e\"},\"to\":{\"id\":\"c-6\",\"side\":\"w\"}}"
-      },
-      {
-        "artifactId": "art-launch-board",
-        "path": "presence/orch",
-        "kind": "json",
-        "mime": "application/json",
-        "size": 57,
-        "rev": 1,
-        "updatedBy": "orchestrator",
-        "updated": 1795365305180,
-        "value": "{\"id\":\"orch\",\"name\":\"主助手\",\"color\":\"coral\",\"x\":540,\"y\":88}"
-      },
-      {
-        "artifactId": "art-launch-board",
-        "path": "presence/helper",
-        "kind": "json",
-        "mime": "application/json",
-        "size": 57,
-        "rev": 1,
-        "updatedBy": "orchestrator",
-        "updated": 1795365305180,
-        "value": "{\"id\":\"helper\",\"name\":\"老周\",\"color\":\"teal\",\"x\":822,\"y\":74}"
-      },
-      {
-        "artifactId": "art-launch-board",
-        "path": "presence/user",
-        "kind": "json",
-        "mime": "application/json",
-        "size": 56,
-        "rev": 1,
-        "updatedBy": "orchestrator",
-        "updated": 1795365305180,
-        "value": "{\"id\":\"user\",\"name\":\"小林\",\"color\":\"blue\",\"x\":634,\"y\":454}"
       }
     ]
   },
@@ -4947,7 +3905,7 @@
     "size": 143,
     "rev": 1,
     "updatedBy": "orchestrator",
-    "updated": 1795365305180,
+    "updated": 1795434642194,
     "value": "{\"id\":\"c-1\",\"type\":\"shape\",\"shape\":\"card\",\"x\":64,\"y\":174,\"w\":160,\"h\":108,\"title\":\"锁定核心范围\",\"body\":\"核心功能已拍板\",\"fill\":\"sun\",\"sticker\":\"berry-lock\"}"
   },
   "artifact.entry.batch": {
@@ -4962,7 +3920,7 @@
         "size": 143,
         "rev": 1,
         "updatedBy": "orchestrator",
-        "updated": 1795365305180,
+        "updated": 1795434642194,
         "value": "{\"id\":\"c-1\",\"type\":\"shape\",\"shape\":\"card\",\"x\":64,\"y\":174,\"w\":160,\"h\":108,\"title\":\"锁定核心范围\",\"body\":\"核心功能已拍板\",\"fill\":\"sun\",\"sticker\":\"berry-lock\"}"
       }
     ],
@@ -4985,8 +3943,8 @@
     "version": 0,
     "seq": 0,
     "versions": [],
-    "at": 1795272005180,
-    "updated": 1795275605180
+    "at": 1795341342194,
+    "updated": 1795344942194
   },
   "artifact.update": {
     "id": "art-plan",
@@ -5004,8 +3962,8 @@
     "version": 0,
     "seq": 4,
     "versions": [],
-    "at": 1795360205180,
-    "updated": 1795365245180
+    "at": 1795429542194,
+    "updated": 1795434582194
   },
   "artifact.delete": null,
   "artifact.html.edit": {
@@ -5031,7 +3989,7 @@
         "note": "第一版",
         "by": "w1",
         "byName": "老周",
-        "at": 1795362605180,
+        "at": 1795431942194,
         "channel": "general",
         "number": 2
       },
@@ -5041,15 +3999,28 @@
         "note": "多一条测试",
         "by": "w1",
         "byName": "老周",
-        "at": 1795364405180,
+        "at": 1795433742194,
         "channel": "general",
         "number": 4
       }
     ],
-    "at": 1795362605180,
-    "updated": 1795364405180
+    "at": 1795431942194,
+    "updated": 1795433742194
   },
-  "artifact.demo": null,
+  "artifact.outline.import": {
+    "id": "art-outline-imported",
+    "title": "导入的大纲",
+    "body": "blocks",
+    "isDefault": false,
+    "by": "user",
+    "byName": "用户",
+    "version": 0,
+    "seq": 1,
+    "versions": [],
+    "at": 1795341342194,
+    "updated": 1795344942194,
+    "artifactType": "outline"
+  },
   "artifact.presence.update": null,
   "artifact.history.list": [],
   "artifact.history.preview": {
@@ -5073,7 +4044,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365545180
+        "updated": 1795434882194
       },
       {
         "id": "art-plan-b2",
@@ -5089,7 +4060,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365485180
+        "updated": 1795434822194
       },
       {
         "id": "art-plan-b3",
@@ -5107,7 +4078,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365425180
+        "updated": 1795434762194
       },
       {
         "id": "art-plan-b4",
@@ -5123,7 +4094,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365365180
+        "updated": 1795434702194
       },
       {
         "id": "art-plan-b5",
@@ -5145,7 +4116,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365305180
+        "updated": 1795434642194
       },
       {
         "id": "art-plan-b6",
@@ -5161,7 +4132,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "user",
-        "updated": 1795365245180
+        "updated": 1795434582194
       },
       {
         "id": "art-plan-b7",
@@ -5179,7 +4150,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365185180
+        "updated": 1795434522194
       },
       {
         "id": "art-plan-b8",
@@ -5197,7 +4168,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365125180
+        "updated": 1795434462194
       },
       {
         "id": "art-plan-b9",
@@ -5215,7 +4186,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "w1",
-        "updated": 1795365065180
+        "updated": 1795434402194
       },
       {
         "id": "art-plan-b10",
@@ -5231,7 +4202,7 @@
         "artifactId": "art-plan",
         "rev": 1,
         "updatedBy": "user",
-        "updated": 1795365005180
+        "updated": 1795434342194
       }
     ]
   },
@@ -5251,8 +4222,8 @@
     "version": 0,
     "seq": 4,
     "versions": [],
-    "at": 1795360205180,
-    "updated": 1795365245180
+    "at": 1795429542194,
+    "updated": 1795434582194
   },
   "artifact.history.fork": {
     "id": "art-forked",
@@ -5270,8 +4241,8 @@
     "version": 0,
     "seq": 4,
     "versions": [],
-    "at": 1795360205180,
-    "updated": 1795365245180
+    "at": 1795429542194,
+    "updated": 1795434582194
   },
   "artifact.history.undoOrigin": {
     "id": "art-plan",
@@ -5289,8 +4260,8 @@
     "version": 0,
     "seq": 4,
     "versions": [],
-    "at": 1795360205180,
-    "updated": 1795365245180
+    "at": 1795429542194,
+    "updated": 1795434582194
   },
   "artifact.history.compact": {
     "id": "art-plan",
@@ -5308,8 +4279,8 @@
     "version": 0,
     "seq": 4,
     "versions": [],
-    "at": 1795360205180,
-    "updated": 1795365245180
+    "at": 1795429542194,
+    "updated": 1795434582194
   },
   "library.item.add": {
     "attachment": {
@@ -5323,8 +4294,8 @@
       "job": "job-image",
       "jobKind": "image"
     },
-    "addedAt": 1795363805181,
-    "lastAt": 1795363805181
+    "addedAt": 1795433142195,
+    "lastAt": 1795433142195
   },
   "library.item.delete": null,
   "provider.voice.list": {
@@ -5371,8 +4342,8 @@
     },
     "canCancel": false,
     "canRetryDownload": false,
-    "createdAt": 1795363805181,
-    "updatedAt": 1795363825181
+    "createdAt": 1795433142195,
+    "updatedAt": 1795433162195
   },
   "media.speech.create": {
     "kind": "speech",
@@ -5411,8 +4382,8 @@
     "resultInput": null,
     "canCancel": false,
     "canRetryDownload": false,
-    "createdAt": 1795364885181,
-    "updatedAt": 1795364905181
+    "createdAt": 1795434222195,
+    "updatedAt": 1795434242195
   },
   "media.dialogue.create": {
     "model": "moss-speakers",
@@ -5464,8 +4435,8 @@
       ],
       "format": "mp3"
     },
-    "createdAt": 1795364405181,
-    "updatedAt": 1795364425181
+    "createdAt": 1795433742195,
+    "updatedAt": 1795433762195
   },
   "media.job.download": {
     "model": "moss-speakers",
@@ -5517,8 +4488,8 @@
       ],
       "format": "mp3"
     },
-    "createdAt": 1795364405181,
-    "updatedAt": 1795364425181
+    "createdAt": 1795433742195,
+    "updatedAt": 1795433762195
   },
   "media.job.cancel": {
     "kind": "image",
@@ -5537,8 +4508,8 @@
     "problem": "",
     "canCancel": true,
     "canRetryDownload": false,
-    "createdAt": 1795365545181,
-    "updatedAt": 1795365565181
+    "createdAt": 1795434882195,
+    "updatedAt": 1795434902195
   },
   "media.input.adopt": {
     "id": "in-poster",
@@ -5548,8 +4519,8 @@
     "size": 482113,
     "phase": "ready",
     "hash": "2222222222222222222222222222222222222222222222222222222222222222",
-    "createdAt": 1795365605181,
-    "expiresAt": 1795369205181,
+    "createdAt": 1795434942195,
+    "expiresAt": 1795438542195,
     "canDelete": true
   },
   "media.understanding.create": {
@@ -5592,8 +4563,8 @@
     "canCancel": false,
     "canCleanup": false,
     "canRetryDownload": false,
-    "createdAt": 1795364105181,
-    "updatedAt": 1795364125181
+    "createdAt": 1795433442195,
+    "updatedAt": 1795433462195
   },
   "media.transcription.create": {
     "model": "moss-transcribe-diarize-pro",
@@ -5654,7 +4625,7 @@
       "allowUpload": true,
       "diarize": true
     },
-    "createdAt": 1795362905181,
-    "updatedAt": 1795362925181
+    "createdAt": 1795432242195,
+    "updatedAt": 1795432262195
   }
 }

@@ -71,7 +71,6 @@ pub struct SpacePaths {
     pub repos: String,
     /// Named `<repo>.<issue number>`.
     pub worktrees: String,
-    pub pkm: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -87,22 +86,10 @@ pub enum Missing {
     MossOff,
     #[serde(rename = "binding")]
     Binding,
-    #[serde(rename = "agora")]
-    Agora,
-    #[serde(rename = "dictationUrl")]
-    DictationUrl,
 }
 
 impl Missing {
-    pub const ALL: [Missing; 7] = [
-        Missing::DeepseekKey,
-        Missing::MossAccount,
-        Missing::MossKey,
-        Missing::MossOff,
-        Missing::Binding,
-        Missing::Agora,
-        Missing::DictationUrl,
-    ];
+    pub const ALL: [Missing; 5] = [Missing::DeepseekKey, Missing::MossAccount, Missing::MossKey, Missing::MossOff, Missing::Binding];
 
     /// The string on the wire.
     pub fn as_str(self) -> &'static str {
@@ -112,8 +99,6 @@ impl Missing {
             Missing::MossKey => "mossKey",
             Missing::MossOff => "mossOff",
             Missing::Binding => "binding",
-            Missing::Agora => "agora",
-            Missing::DictationUrl => "dictationUrl",
         }
     }
 }
@@ -145,8 +130,6 @@ pub enum Feature {
     VoiceDesign,
     #[serde(rename = "transcription")]
     Transcription,
-    #[serde(rename = "dictation")]
-    Dictation,
     #[serde(rename = "live")]
     Live,
     #[serde(rename = "vision")]
@@ -156,7 +139,7 @@ pub enum Feature {
 }
 
 impl Feature {
-    pub const ALL: [Feature; 11] = [
+    pub const ALL: [Feature; 10] = [
         Feature::Orchestrator,
         Feature::Image,
         Feature::Understanding,
@@ -164,7 +147,6 @@ impl Feature {
         Feature::Speakers,
         Feature::VoiceDesign,
         Feature::Transcription,
-        Feature::Dictation,
         Feature::Live,
         Feature::Vision,
         Feature::Call,
@@ -180,7 +162,6 @@ impl Feature {
             Feature::Speakers => "speakers",
             Feature::VoiceDesign => "voiceDesign",
             Feature::Transcription => "transcription",
-            Feature::Dictation => "dictation",
             Feature::Live => "live",
             Feature::Vision => "vision",
             Feature::Call => "call",
@@ -200,15 +181,8 @@ pub struct SettingsStatus {
     pub version: String,
     pub locale: Locale,
     pub deepseek_api_key: KeyStatus,
-    pub agora_app_id: AgoraAppID,
-    pub agora_app_certificate: KeyStatus,
     pub voice: VoiceSettings,
     pub voice_defaults: VoiceSettings,
-    pub asr_key: KeyStatus,
-    pub llm_key: KeyStatus,
-    pub tts_key: KeyStatus,
-    pub dictation: Dictation,
-    pub dictation_key: KeyStatus,
     /// Local configuration check only; does not probe remote endpoints.
     #[cfg_attr(feature = "ts-gen", ts(type = "Record<Feature, Readiness>"))]
     pub readiness: BTreeMap<Feature, Readiness>,
@@ -239,14 +213,7 @@ pub struct MemorySourceUpdate {
 pub struct SettingsUpdate {
     pub locale: Option<Locale>,
     pub deepseek_api_key: Option<String>,
-    pub agora_app_id: Option<String>,
-    pub agora_app_certificate: Option<String>,
     pub voice: Option<SettingsUpdateVoice>,
-    pub asr_key: Option<String>,
-    pub llm_key: Option<String>,
-    pub tts_key: Option<String>,
-    pub dictation: Option<Dictation>,
-    pub dictation_key: Option<String>,
     pub memory_sources: Option<Vec<MemorySourceUpdate>>,
 }
 

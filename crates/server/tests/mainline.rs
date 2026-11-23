@@ -114,7 +114,6 @@ fn config(home: &Path, model: Arc<Model>) -> ServerConfig {
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
-        watch_pkm: false,
         model_client: Some(model),
         ..ServerConfig::under(home)
     }

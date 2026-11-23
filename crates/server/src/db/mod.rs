@@ -12,7 +12,6 @@ pub mod schema {
     pub const CONTENT_ATTACHMENT: &str = include_str!("schema/content_attachment.sql");
     pub const CONTENT_LIBRARY: &str = include_str!("schema/content_library.sql");
     pub const CONTENT_MEDIA: &str = include_str!("schema/content_media.sql");
-    pub const CONTENT_PKM: &str = include_str!("schema/content_pkm.sql");
     pub const INFRA_REMOTE: &str = include_str!("schema/infra_remote.sql");
     pub const TEAM_MEMORY: &str = include_str!("schema/team_memory.sql");
     pub const WORK_CRON: &str = include_str!("schema/work_cron.sql");

@@ -16,7 +16,6 @@ const ProviderBinding = z.object({ connection: z.string(), model: z.string() }) 
 export const ProviderStatus = z.object({
   revision: z.number().int(),
   connections: z.array(ProviderConnection),
-  dictation: ProviderBinding.nullable(),
   image: ProviderBinding.nullable(),
   live: ProviderBinding.nullable(),
   liveModels: z.array(z.string()),
@@ -28,7 +27,6 @@ export const ProviderStatus = z.object({
   transcriptionModels: z.array(z.string()),
   vision: ProviderBinding.nullable(),
   visionModels: z.array(z.string()),
-  dictationModels: z.array(z.string()),
   imageModels: z.array(z.string()),
   understanding: ProviderBinding.nullable(),
   understandingModels: z.array(z.string()),
@@ -47,7 +45,6 @@ export const ProviderUpdate = z.object({
   revision: z.number().int(),
   connections: z.array(ProviderConnectionUpdate),
   understanding: ProviderBinding.nullable(),
-  dictation: ProviderBinding.nullable(),
   image: ProviderBinding.nullable(),
   live: ProviderBinding.nullable(),
   speakers: ProviderBinding.nullable(),

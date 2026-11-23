@@ -6,8 +6,9 @@ import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../design/Icon";
 import { SkeletonBar, SkeletonLines, useDelayedBusy } from "../design/Skeleton";
+import { toast } from "../design/toasts";
 import { act, frame, hostApi } from "../infra/bridge";
-import { richNative } from "../infra/rich";
+import { formatGenUiAction, richNative, type VvGenUiActionEvent } from "../infra/rich";
 import { startEllipsis } from "./chrome";
 
 type Doc = { path: string; markdown?: string; error?: string };
@@ -112,6 +113,17 @@ export function MarkdownPane() {
     void hostApi.openUrl(trimmed);
   };
 
+  const handleGenUiAction = (event: VvGenUiActionEvent) => {
+    const action = event.action.trim();
+    const payload = event.payload.trim();
+    if (action === "navigate" && payload.startsWith("/")) {
+      act({ type: "open_route", path: payload });
+      return;
+    }
+    const summary = formatGenUiAction(event);
+    if (summary) toast(summary);
+  };
+
   return (
     <View testID="markdown-pane" class="min-h-0 flex-1 bg-page">
       {pathInfo() ? (
@@ -153,6 +165,7 @@ export function MarkdownPane() {
                 baseDir={pathInfo()?.baseDir ?? null}
                 selectable
                 onLinkPress={(e) => handleLinkPress(e.url)}
+                onGenUiAction={handleGenUiAction}
               />
             ) : (
               <TextView markdown={doc()!.markdown} selectable onLinkPress={(e) => handleLinkPress(e.url)} />

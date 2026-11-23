@@ -588,57 +588,18 @@ fn ins_on(call: &dyn Fn(&str, Value) -> Envelope, id: &str, text: &str) -> Value
 }
 
 #[test]
-fn the_demo_writes_three_sections_and_a_message_quotes_blocks() {
+fn a_message_quotes_blocks_as_when_said_and_demo_op_is_retired() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
     let hub = started.hub.clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
-    let a = started.artifacts.clone();
-    a.set_demo_tick(2);
+    assert!(!hub.answers("artifact.demo"));
     let id = ok(call("artifact.create", json!({ "title": "演示", "kind": "markdown" })))["id"]
         .as_str()
         .unwrap()
         .to_string();
     let first = ins_on(&call, &id, "用户先写的");
-
-    let helpers: Vec<vibevalley_protocol::Agent> = ["off", "backend", "tester", "frontend", "docs"]
-        .iter()
-        .map(|name| {
-            let mut x = started.agents.profiles.all()[0].clone();
-            x.id = name.to_string();
-            x.enabled = *name != "off";
-            x
-        })
-        .collect();
-    a.demo(&id, &helpers).unwrap();
-    assert!(a.demo(&id, &helpers).unwrap_err().message.contains("演示正在写"));
-    let deadline = std::time::Instant::now() + Duration::from_secs(20);
-    while a.demo_running() {
-        assert!(std::time::Instant::now() < deadline, "the demo finished");
-        std::thread::sleep(Duration::from_millis(20));
-    }
-    let blocks = blocks_now(&a, &id);
-    assert_eq!(blocks[0].id, str_of(&first["blockId"]));
-    let writers = ["backend", "tester", "frontend"];
-    let mut section: i64 = -1;
-    for b in &blocks[1..] {
-        if b.r#type == vibevalley_protocol::BlockType::Heading {
-            section += 1;
-            assert!(plain_of(b).ends_with("· 演示"));
-            assert_eq!(b.updated_by, writers[section as usize]);
-            continue;
-        }
-        assert_eq!(b.updated_by, writers[section as usize]);
-        let words: Vec<String> = (0..3)
-            .map(|p| vibevalley_i18n::t(&format!("server.artifact.demo.{section}.paragraphs.{p}"), &[]))
-            .collect();
-        assert!(words.contains(&plain_of(b)), "{}", plain_of(b));
-        assert_eq!(b.rev, vibevalley_core::artifact::html::DEMO_PIECES as i64 + 1);
-    }
-    assert_eq!((section, blocks.len()), (2, 1 + 3 * 4));
-    let off: Vec<_> = helpers.into_iter().filter(|h| !h.enabled).collect();
-    assert_eq!(a.demo(&id, &off).unwrap_err().biz_code, BizCode::ArtifactRefused);
 
     // A message quotes a block as it is when said.
     let general = started.chat.default_channel();
@@ -656,6 +617,7 @@ fn the_demo_writes_three_sections_and_a_message_quotes_blocks() {
             { "artifactId": id, "blockId": "gone", "rev": 1, "title": "演示", "deleted": true }
         ])
     );
+    started.close();
 }
 
 #[test]
@@ -1107,7 +1069,7 @@ fn outline_artifact_create_read_edit_type_read_card_and_issue_link() {
 }
 
 #[test]
-fn presence_update_follow_and_legacy_presence_entries_never_write_sqlite() {
+fn presence_update_follow_and_view_highlights_never_write_sqlite() {
     use sqlx::{Connection, Row, SqliteConnection, sqlite::SqliteConnectOptions};
 
     vibevalley_i18n::set_locale("zh");
@@ -1158,27 +1120,24 @@ fn presence_update_follow_and_legacy_presence_entries_never_write_sqlite() {
     assert_eq!(up["peer"]["status"], "构图中");
     assert_eq!(up["peer"]["viewport"]["zoom"], 1.25);
 
-    // 2. Legacy `presence/*` entry batch is intercepted into in-memory `PresenceHub` — zero DB rows, `seq` untouched.
-    let legacy = ok(call(
-        "artifact.entry.batch",
+    // 2. Session peer highlight presence streams via `artifact.presence.update` — zero DB rows, `seq` untouched.
+    ok(call(
+        "artifact.presence.update",
         json!({
             "id": id,
-            "writes": [{
-                "op": "set",
-                "path": "presence/session-w1",
-                "kind": "json",
-                "value": serde_json::to_string(&json!({
-                    "id": "session-w1",
-                    "name": "Planner",
-                    "x": 300,
-                    "y": 400,
-                    "selector": "#hero",
-                    "status": "排版中"
-                })).unwrap()
-            }]
+            "presence": {
+                "id": "session-w1",
+                "name": "Planner",
+                "color": "#22c55e",
+                "kind": "highlight",
+                "x": 300,
+                "y": 400,
+                "selector": "#hero",
+                "status": "排版中",
+                "updatedAt": 0
+            }
         }),
     ));
-    assert_eq!((legacy["applied"].as_bool(), legacy["seq"].as_i64()), (Some(true), Some(1)));
     let up2 = rx.recv_timeout(Duration::from_secs(3)).unwrap();
     assert_eq!(up2["_tag"], "Upsert");
     assert_eq!(up2["peer"]["id"], "session-w1");
@@ -1204,11 +1163,8 @@ fn presence_update_follow_and_legacy_presence_entries_never_write_sqlite() {
     assert!(view_html.contains("#hero"));
     assert!(view["headers"]["content-security-policy"].as_str().unwrap().starts_with("sandbox "));
 
-    // 4. Clearing presence via legacy delete & `presence.update` emits `Remove`.
-    ok(call(
-        "artifact.entry.batch",
-        json!({ "id": id, "writes": [{ "op": "delete", "path": "presence/session-w1" }] }),
-    ));
+    // 4. Clearing presence via `artifact.presence.update` emits `Remove`.
+    ok(call("artifact.presence.update", json!({ "id": id, "peerId": "session-w1" })));
     let rm1 = rx.recv_timeout(Duration::from_secs(3)).unwrap();
     assert_eq!((rm1["_tag"].as_str(), rm1["peerId"].as_str()), (Some("Remove"), Some("session-w1")));
 
@@ -1497,5 +1453,130 @@ fn time_travel_preview_restore_fork_compaction_and_selective_origin_undo() {
     let box1_val: Value = serde_json::from_str(box1["value"].as_str().unwrap()).unwrap();
     assert_eq!(box1_val["color"], "blue");
     assert_eq!(box1_val["x"], 500);
+    started.close();
+}
+
+#[test]
+fn outline_import_parses_markdown_frontmatter_and_logseq_tasks() {
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.hub.clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+    let channel = started.chat.default_channel();
+
+    // 1. Standard Markdown + YAML frontmatter + fenced chart block (unannounced).
+    let before_msgs = ok(call("channel.message.list", json!({ "id": channel }))).as_array().unwrap().len();
+    let yaml_md = "\
+---
+title: Q4 Architecture Plan
+tags: [arch, native]
+---
+- Core goals
+  - Retire PKM stack
+  - Keep Loro collab blocks
+- Throughput chart
+  ```chart
+  {\"type\":\"bar\",\"title\":\"Weekly\",\"categories\":[\"W1\",\"W2\"],\"series\":[{\"name\":\"Done\",\"data\":[4,7]}]}
+  ```
+";
+    let imported = ok(call(
+        "artifact.outline.import",
+        json!({
+            "markdown": yaml_md,
+            "filename": "fallback.md",
+            "announce": false
+        }),
+    ));
+    assert_eq!(imported["title"], "Q4 Architecture Plan");
+    assert_eq!(imported["artifactType"], "outline");
+    assert_eq!(imported["body"], "blocks");
+    assert_eq!(
+        ok(call("channel.message.list", json!({ "id": channel }))).as_array().unwrap().len(),
+        before_msgs,
+        "announce: false must not post a channel card"
+    );
+    let yaml_blocks = ok(call("artifact.block.list", json!({ "id": imported["id"] })))["blocks"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert_eq!(yaml_blocks.len(), 5, "{yaml_blocks:?}");
+    assert!(yaml_blocks[0]["parentId"].is_null());
+    assert_eq!(yaml_blocks[1]["parentId"], yaml_blocks[0]["id"]);
+    assert_eq!(yaml_blocks[2]["parentId"], yaml_blocks[0]["id"]);
+    assert_eq!(yaml_blocks[4]["type"], "code");
+    assert_eq!(yaml_blocks[4]["attrs"]["language"], "chart");
+
+    // 2. Logseq-flavored Markdown with properties, priorities, TODO/DONE/CANCELED, tab nesting, and channel card.
+    let logseq_md = "\
+title:: Launch Checklist
+para:: project
+
+- TODO [#A] Cut parallel stacks
+  id:: 660f1234-abcd-4000-8000-000000000001
+  collapsed:: true
+\t- DONE Retire legacy pkm module
+\t- CANCELED Keep Agora fallback
+- DOING Verify outline import
+";
+    let logseq = ok(call(
+        "artifact.outline.import",
+        json!({
+            "markdown": logseq_md,
+            "channel": channel,
+            "announce": true
+        }),
+    ));
+    assert_eq!(logseq["title"], "Launch Checklist");
+    assert_eq!(logseq["artifactType"], "outline");
+    assert_eq!(logseq["body"], "blocks");
+    let card = last_message(&call, &channel);
+    assert_eq!(card["artifact"]["id"], logseq["id"]);
+    assert_eq!(card["artifact"]["artifactType"], "outline");
+
+    let logseq_blocks = ok(call("artifact.block.list", json!({ "id": logseq["id"] })))["blocks"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert_eq!(logseq_blocks.len(), 4, "{logseq_blocks:?}");
+    assert_eq!(logseq_blocks[0]["type"], "todo");
+    assert_eq!(logseq_blocks[0]["attrs"]["checked"], false);
+    assert_eq!(logseq_blocks[0]["text"][0]["t"], "Cut parallel stacks");
+    assert_eq!(logseq_blocks[1]["parentId"], logseq_blocks[0]["id"]);
+    assert_eq!(logseq_blocks[1]["type"], "todo");
+    assert_eq!(logseq_blocks[1]["attrs"]["checked"], true);
+    assert_eq!(logseq_blocks[1]["text"][0]["t"], "Retire legacy pkm module");
+    assert_eq!(logseq_blocks[2]["parentId"], logseq_blocks[0]["id"]);
+    assert_eq!(logseq_blocks[2]["type"], "todo");
+    assert_eq!(logseq_blocks[2]["attrs"]["checked"], true);
+    assert_eq!(logseq_blocks[2]["text"][0]["t"], "Keep Agora fallback");
+    assert_eq!(logseq_blocks[3]["type"], "todo");
+    assert_eq!(logseq_blocks[3]["attrs"]["checked"], false);
+    assert_eq!(logseq_blocks[3]["text"][0]["t"], "Verify outline import");
+
+    // 3. Explicit title overrides filename & frontmatter; filename fallback strips Logseq `__` and `.outline.md`.
+    let named = ok(call(
+        "artifact.outline.import",
+        json!({
+            "markdown": "- First item",
+            "filename": "notes__sprint.outline.md",
+            "announce": false
+        }),
+    ));
+    assert_eq!(named["title"], "notes/sprint");
+
+    let overridden = ok(call(
+        "artifact.outline.import",
+        json!({
+            "markdown": "---\ntitle: Ignored\n---\n- Item",
+            "title": "Explicit Override",
+            "announce": false
+        }),
+    ));
+    assert_eq!(overridden["title"], "Explicit Override");
+
+    // 4. Empty markdown is refused cleanly.
+    let empty_err = call("artifact.outline.import", json!({ "markdown": "   \n  " }));
+    assert_eq!(code(empty_err), BizCode::ArtifactRefused.code());
     started.close();
 }

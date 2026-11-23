@@ -261,7 +261,6 @@ export const catalogs = {
         saved: "都存好了",
         blocks: "{n} 块",
         helpersWriting: "执行会话在写",
-        demo: "演示：几个执行会话一起写",
         append: "在末尾写一段",
         user: "你",
         done: "做完了",
@@ -481,6 +480,7 @@ export const catalogs = {
         empty: "没有可演示的页",
         loadFailure: "演示页未能载入：{reason}",
       },
+      outline: { importTitle: "导入 Markdown 大纲", importAction: "导入 .md", pickFile: "选择 .md 文件", markdownLabel: "Markdown（.md）", submit: "导入大纲" },
     },
     "web.audio": {
       title: "音频工作台",
@@ -946,8 +946,6 @@ export const catalogs = {
         none: "没有找到",
         direct: "私聊",
         newDirect: "开一个私聊",
-        note: "笔记 · {tier}",
-        searchNotes: "在笔记里搜「{q}」",
       },
       farmSearch: {
         title: "全部搜索",
@@ -1786,11 +1784,9 @@ export const catalogs = {
         unpin: "取消置顶",
         pinnedToast: "已置顶收藏",
         unpinnedToast: "已取消置顶",
-        notes: "大纲笔记",
         newNote: "新建大纲笔记",
         artifacts: "作品",
         media: "素材",
-        notesTodoCount: "{n} 项待办",
         sendArtifact: "发到频道",
         exportArtifact: "导出",
         turnIntoIssue: "转为任务",
@@ -1883,7 +1879,7 @@ export const catalogs = {
             wbWorkE2: "收敛",
           },
         },
-        search: { title: "搜索内容", placeholder: "搜索笔记、作品和素材…", empty: "未找到匹配的笔记、作品或素材", typeNote: "大纲笔记", typeMedia: "素材" },
+        search: { title: "搜索内容", placeholder: "搜索笔记、作品和素材…", empty: "未找到匹配的笔记、作品或素材", typeMedia: "素材" },
       },
     },
     "web.media": {
@@ -2063,68 +2059,12 @@ export const catalogs = {
       },
       approval: { title: "待审批的工具调用", allow: "允许这次调用", deny: "拒绝这次调用", unavailable: "读不到待审批的工具调用：{why}" },
     },
-    "web.pkm": {
-      place: { label: "笔记" },
-      tier: { project: "项目", area: "领域", resource: "资源", inbox: "收件箱", journal: "日记", archive: "归档" },
-      gone: "没有这一页，或者它的文件已经删掉了。",
-      page: {
-        more: "更多",
-        export: "导出成 Markdown（复制）",
-        exported: "复制好了",
-        copyFile: "复制文件路径（{file}）",
-        copiedFile: "文件路径复制好了",
-        undo: "撤销上一次改动",
-        undone: "撤销了：{what}",
-        nothingToUndo: "没有可以撤销的改动",
-        append: "接着写…",
-        collapse: "收起",
-        expand: "展开",
-        edit: "改这一块",
-        missingRef: "找不到这一块",
-        refFrom: "引自「{page}」",
-        notSaved: "没存上：{why}",
-        outline: "大纲",
-        rename: "重命名页面",
-        renamed: "改名成了「{title}」",
-        create: "创建这一页",
-        freshHint: "这一页还没有建，写第一条就会自动保存。",
-        freshPlaceholder: "写下第一条，回车创建…",
-        copyRef: "复制块引用",
-        copiedRef: "块引用复制好了",
-        toIssue: "转为任务",
-        issueMade: "已创建任务",
-      },
-      marker: { TODO: "待办", DOING: "在做", DONE: "做完了", NOW: "现在做", LATER: "以后做", WAITING: "在等", CANCELED: "不做了" },
-      command: {
-        todo: "标成待办",
-        doing: "标成在做",
-        done: "标成做完了",
-        clear: "去掉标记",
-        h1: "大标题",
-        h2: "小标题",
-        code: "代码块",
-        today: "链到今天的日记",
-      },
-      complete: { newPage: "新页面" },
-      search: {
-        title: "搜笔记",
-        placeholder: "搜页面和块",
-        filters: "筛选",
-        all: "全部",
-        todo: "只看待办",
-        linked: "链到这一页的",
-        pages: "页面",
-        none: "没有找到",
-      },
-      backlinks: { title: "链到这里的 · {n}", none: "还没有别的页链到这里", projects: "项目", journals: "日记", areas: "领域和资源", archives: "归档" },
-      comments: { title: "评论 · {n}", count: "{n} 条评论", accept: "采纳", reject: "不要", accepted: "采纳了", rejected: "不要了", on: "「{span}」" },
-    },
     "web.provider": {
       speechNotice:
         "可独立选择 Flash 或 Pro，再到媒体库的「生成」里生成单人语音。完整音频生成后可播放并保存为 WAV 或 MP3，不是流式播放；保存设置不会生成音频。",
       title: "用途",
       intro: "每个功能用哪个账号和模型。账号和钥匙在「账号与钥匙」里填。",
-      words: "供应商 MOSS 连接 模型 密钥 听写 生图 快照 理解 语音 音频 AI",
+      words: "供应商 MOSS 连接 模型 密钥 生图 快照 理解 语音 音频 AI",
       understandingNotice: "配置独立的连接和模型。在媒体库的一张图或视频上点「理解」并明确确认上传；保存配置不会上传文件或发起推理。",
       imageNotice: "保存默认连接和模型后，在「生图」页提交生成任务。保存配置不会发起生图。",
       add: "添加 MOSS 连接",
@@ -2140,9 +2080,8 @@ export const catalogs = {
       saveFirst: "先保存修改，再查询账号可用模型。",
       discoveryHint: "只查询目录，不发推理请求；模型可见不代表推理已验证。",
       noModels: "此账号返回的模型目录为空。",
-      modelHint: "这里只列出产品已适配的普通转写模型；账号权限与实际效果仍需真实调用验证。",
       unbound: "不使用",
-      liveHint: "MOSS Live 使用独立的连接和模型；更改听写模型不会切换实时协议。",
+      liveHint: "MOSS Live 使用独立的连接和模型，用于实时语音通话。",
       bindingHint: "删除、禁用或清除密钥前，先将引用它的用途设为「不使用」。在途请求使用发起时的配置；新请求读取新设置。",
       manage: "管理 AI 服务连接",
       connections: "连接",
@@ -2152,7 +2091,6 @@ export const catalogs = {
       groupVoice: "语音",
       groupLive: "实时",
       use: {
-        dictation: "听写",
         image: "生图",
         understanding: "媒体理解",
         speech: "单人语音",
@@ -2582,15 +2520,13 @@ export const catalogs = {
         remote: "远程访问",
         about: "关于与数据",
         memory: "记忆",
-        call: "通话线路",
-        dictation: "听写",
         chat: "聊天软件",
         width: "导航的宽窄（拖动，双击回默认）",
       },
       words: {
         general: "语言 language 启动 打开 工作台 农场 主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号 动画 无动画 动效 motion animation",
-        models: "密钥 钥匙 账号 DeepSeek MOSS 声网 Agora API Key 模型 绑定",
-        voice: "声网 Agora 电话 通话 MOSS Live 实时 视觉 听写 转写 语音",
+        models: "密钥 钥匙 账号 DeepSeek MOSS API Key 模型 绑定",
+        voice: "电话 通话 MOSS Live 实时 视觉 转写 语音",
         connections: "微信 飞书 QQ 连接器 配对 GitHub gh PR 登录",
         remote: "远程 手机 Tailscale 配对 二维码 设备 iOS Android 监听 令牌",
         about: "版本 家目录 设置文件 数据 素材图鉴 version catalog",
@@ -2631,8 +2567,6 @@ export const catalogs = {
         reposHint: "这个空间的仓库，每个文件夹都是一个 git 仓库",
         worktrees: "工作树目录",
         worktreesHint: "执行会话运行时每个任务自己的检出",
-        pkm: "笔记库",
-        pkmHint: "这个空间的 PARA 目录和日记",
         copy: "复制路径",
         copied: "路径复制好了",
         reveal: "在访达里显示",
@@ -2674,8 +2608,6 @@ export const catalogs = {
         mossKey: "MOSS 账号还没填钥匙",
         mossOff: "用到的 MOSS 账号停用了",
         binding: "还没选用哪个账号和模型",
-        agora: "还缺声网的凭据",
-        dictationUrl: "还没填听写的地址",
       },
       feature: {
         orchestrator: "主助手",
@@ -2685,7 +2617,6 @@ export const catalogs = {
         speakers: "多人语音",
         voiceDesign: "音色设计",
         transcription: "音频转写",
-        dictation: "听写",
         live: "MOSS Live",
         vision: "实时视觉",
         call: "通话",
@@ -2952,109 +2883,18 @@ export const catalogs = {
       voice: {
         section: { label: "声音" },
         noSettings: "问不到服务端的设置（{why}）。",
-        range: "{min} 到 {max}，默认 {fallback}",
         saved: "存好了，下一通电话就用上。",
-        answer: {
-          orchestrator:
-            "频道里那个主助手本人接电话：看得到现状，自己派活，记得你们说过的话。声网经一个公网地址访问本机的一个接口（配置的 voice.line.url，比如 Tailscale Funnel；没配时临时开 cloudflared），只有这一个接口对外，每通电话一把钥匙。",
-          moss: "经本机 WebSocket 直连 MOSS Live 实时语音模型接电话，不需要声网凭据或公网隧道；涉及任务与派活时自动交给主助手。",
-          agora: "声网托管的模型，不用别的 key。",
-          deepseek: "用设置里的 DeepSeek key（{from}）。",
-          noDeepseek: "用设置里的 DeepSeek key，现在还没有：去首页「设置」填。",
-          openai: "任何 OpenAI 兼容的接口：通义、Kimi、自己部署的……",
-        },
-        intro:
-          "主助手用声网的对话式 AI 听你说话、开口回答。这里配线路：凭据、怎么听、谁接电话，都可以用声网托管的（不用别的 key），也可以换成自己的服务。主助手的人设、开场白和音色在",
-        orchestratorPage: "主助手页",
-        period: "。",
-        nextCall: "改了以后，下一通电话生效",
-        credentials: "凭据",
-        console: "声网控制台",
-        hex: "32 位十六进制",
-        area: "区域",
-        areaHint: "Agora 接口的区域，选离服务端近的；中国大陆的仓库选中国大陆。",
-        listen: "听",
-        listenParts: "识别 · VAD 断句",
-        asr: "识别",
-        microsoft: "微软 Azure 语音，用自己的 key。",
-        hosted: "声网托管，不用别的 key。",
-        language: "语言",
-        languageHint: "听哪种话。人设里也写明用这种话回答。",
-        deepgramModel: "Deepgram 模型",
-        azureArea: "Azure 区域",
-        azureAreaHint: "语音资源所在的区域，比如 eastasia、eastus。",
-        asrArea: "识别的 Azure 区域",
-        microsoftKey: "微软语音的 key",
-        think: "想",
-        who: "谁接电话",
-        model: "模型",
-        deepseekModel: "DeepSeek 的模型名。",
-        deepseekModelLabel: "DeepSeek 模型",
-        address: "地址",
-        llmAddress: "OpenAI 兼容的 chat completions 完整地址。",
-        llmAddressLabel: "大模型地址",
-        llmModel: "大模型名",
-        llmKey: "接口的 key",
-        speechServer: "本机的 speech-server",
-        dictationIntro: "转给你填的 OpenAI 兼容地址；用本机的 speech-server，声音不出这台电脑。",
-        dictationAddress: "到 /v1 为止。本机：http://127.0.0.1:8080/v1；OpenAI：https://api.openai.com/v1。空着就不用听写。",
-        dictationAddressLabel: "听写的地址",
-        dictationModel: "本机的 speech-server 填 qwen3；OpenAI 填 gpt-4o-mini-transcribe。",
-        dictationModelLabel: "听写的模型",
-        dictationKey: "凭据（本机可以空着）",
         persona: {
-          intro: "打电话时主助手怎么开口、用什么声音。凭据、怎么听、谁接电话在",
+          intro: "打电话时主助手怎么开口。MOSS Live 连接与测试在",
           page: "页。",
           open: "开口",
           openParts: "人设 · 开场白",
-          ownCall: "电话由主助手自己接：它就是频道里那个主助手，用它自己的提示词，不另设人设。",
           persona: "人设",
           personaHint: "电话里先答话的模型是谁、怎么说话。它看不到现状，派活由本机的主助手做；写明别编进度。",
           greeting: "开场白",
           greetingHint: "接通时先说的一句。",
-          failure: "出错时说",
-          failureHint: "大模型出错时说的一句。",
-          speak: "说",
-          tts: "合成",
-          ttsModel: "合成模型",
-          voice: "音色",
-          openaiVoice: "OpenAI tts-1 的音色。",
-          ttsArea: "合成的 Azure 区域",
-          azureVoice: "Azure 的神经网络音色名，比如 zh-CN-XiaoxiaoNeural。",
-          microsoftVoice: "微软音色",
-          minimaxVoice: "点名字选它，点左边的播放键先听一句；也可以在下面填别的 MiniMax 系统音色 id。",
-          voiceId: "音色 id",
-          sample: "试听：{greeting}",
-          stop: "停下 {name}",
-          play: "试听 {name}",
         },
         moss: { verify: "测一下能不能接通", checking: "在接…", ok: "接通了" },
-        dictationVia: "听写走哪",
-        dictationOwn: "自己的地址",
-        dictationMossIntro: "录音经服务端交给 AI 服务中选定的 MOSS 连接和听写模型。",
-        line: "线路",
-      },
-      choices: {
-        area: { US: "美国", EU: "欧洲", AP: "亚太", CN: "中国大陆" },
-        language: { "zh-CN": "普通话", "zh-HK": "粤语（香港）", "zh-TW": "中文（台湾）", "en-US": "英语（美国）", "ja-JP": "日语", "ko-KR": "韩语" },
-        asr: { ares: "声网 ARES", microsoft: "微软" },
-        answer: { agora: "声网托管", openai: "自己的接口" },
-        minimax: {
-          gentle: "温润青年",
-          qingse: "青涩青年",
-          jingying: "精英青年",
-          badao: "霸道青年",
-          student: "青年大学生",
-          girl: "少女",
-          yujie: "御姐",
-          mature: "成熟女性",
-          sweet: "甜美女性",
-          presenterMale: "男性主持人",
-          presenterFemale: "女性主持人",
-          audiobookMale: "男性有声书",
-          audiobookFemale: "女性有声书",
-        },
-        number: { silenceMs: "停顿多久算说完（毫秒）", interruptMs: "说多久能打断他（毫秒）", idleSeconds: "没人时多久离开（秒）" },
       },
       moss: {
         intro: "直接和 MOSS Live 说话，听它怎么答；连线经本机服务端，key 不出这台电脑。说的话不进默认频道。",
@@ -3064,8 +2904,7 @@ export const catalogs = {
         mute: "静音",
         unmute: "取消静音",
         nativeCall: "MOSS Live 通话",
-        nativeNotice:
-          "先在通话设置中选择 MOSS Live 接话并保存。开始后采集麦克风，音频发送到已配置的 MOSS 账号，可能产生费用；双方最终字幕记进默认频道。离开本页会挂断。",
+        nativeNotice: "开始后采集麦克风，音频发送到已配置的 MOSS 账号，可能产生费用；双方最终字幕记进默认频道。离开本页会挂断。",
       },
     },
   },
@@ -3347,7 +3186,6 @@ export const catalogs = {
         saved: "All saved",
         blocks: "{n, plural, one {# block} other {# blocks}}",
         helpersWriting: "helpers writing",
-        demo: "Demo: several helpers writing at once",
         append: "Write a paragraph at the end",
         user: "You",
         done: "Done",
@@ -3566,6 +3404,13 @@ export const catalogs = {
         waiting: "Waiting for the slide deck",
         empty: "This deck has no slides",
         loadFailure: "Could not load the slide deck: {reason}",
+      },
+      outline: {
+        importTitle: "Import Markdown outline",
+        importAction: "Import .md",
+        pickFile: "Choose .md file",
+        markdownLabel: "Markdown (.md)",
+        submit: "Import outline",
       },
     },
     "web.audio": {
@@ -4051,8 +3896,6 @@ export const catalogs = {
         none: "Nothing found",
         direct: "Direct message",
         newDirect: "New direct message",
-        note: "Note · {tier}",
-        searchNotes: "Search notes for “{q}”",
       },
       farmSearch: {
         title: "Search everything",
@@ -4947,11 +4790,9 @@ export const catalogs = {
         unpin: "Unpin",
         pinnedToast: "Pinned",
         unpinnedToast: "Unpinned",
-        notes: "Outline notes",
         newNote: "New outline note",
         artifacts: "Artifacts",
         media: "Media",
-        notesTodoCount: "{n, plural, one {# todo} other {# todos}}",
         sendArtifact: "Send to channel",
         exportArtifact: "Export",
         turnIntoIssue: "Turn into ticket",
@@ -5051,7 +4892,6 @@ export const catalogs = {
           title: "Search content",
           placeholder: "Search notes, artifacts, and media…",
           empty: "No matching notes, artifacts, or media",
-          typeNote: "Note",
           typeMedia: "Media",
         },
       },
@@ -5246,83 +5086,12 @@ export const catalogs = {
         unavailable: "Could not load pending tool calls: {why}",
       },
     },
-    "web.pkm": {
-      place: { label: "Notes" },
-      tier: { project: "Projects", area: "Areas", resource: "Resources", inbox: "Inbox", journal: "Journals", archive: "Archive" },
-      gone: "There is no such page, or its file was deleted.",
-      page: {
-        more: "More",
-        export: "Export as Markdown (copy)",
-        exported: "Copied",
-        copyFile: "Copy the file's path ({file})",
-        copiedFile: "File path copied",
-        undo: "Undo the last change",
-        undone: "Undone: {what}",
-        nothingToUndo: "Nothing to undo",
-        append: "Keep writing…",
-        collapse: "Collapse",
-        expand: "Expand",
-        edit: "Edit this block",
-        missingRef: "Block not found",
-        refFrom: "From “{page}”",
-        notSaved: "Not saved: {why}",
-        outline: "Outline",
-        rename: "Rename page",
-        renamed: "Renamed to “{title}”",
-        create: "Create this page",
-        freshHint: "This page does not exist yet. Write the first block to create it.",
-        freshPlaceholder: "Write the first block, Enter to create…",
-        copyRef: "Copy block ref",
-        copiedRef: "Block ref copied",
-        toIssue: "Turn into issue",
-        issueMade: "Issue created",
-      },
-      marker: { TODO: "To do", DOING: "Doing", DONE: "Done", NOW: "Now", LATER: "Later", WAITING: "Waiting", CANCELED: "Canceled" },
-      command: {
-        todo: "Mark to do",
-        doing: "Mark doing",
-        done: "Mark done",
-        clear: "Clear the mark",
-        h1: "Heading",
-        h2: "Subheading",
-        code: "Code block",
-        today: "Link today's journal",
-      },
-      complete: { newPage: "New page" },
-      search: {
-        title: "Search notes",
-        placeholder: "Search pages and blocks",
-        filters: "Filters",
-        all: "All",
-        todo: "To do only",
-        linked: "Linking here",
-        pages: "Pages",
-        none: "Nothing found",
-      },
-      backlinks: {
-        title: "Linked here · {n}",
-        none: "No other page links here yet",
-        projects: "Projects",
-        journals: "Journals",
-        areas: "Areas and resources",
-        archives: "Archive",
-      },
-      comments: {
-        title: "Comments · {n}",
-        count: "{n} comments",
-        accept: "Accept",
-        reject: "Dismiss",
-        accepted: "Accepted",
-        rejected: "Dismissed",
-        on: "“{span}”",
-      },
-    },
     "web.provider": {
       speechNotice:
         "Choose a separate Flash or Pro binding, then generate one speaker from Generate in the Library. The completed audio can be played and saved as WAV or MP3; this is not streaming playback. Saving settings does not generate audio.",
       title: "Uses",
       intro: "Which account and model each feature uses. Accounts and keys are set under Accounts and keys.",
-      words: "provider MOSS connection model key dictation image generation snapshot understanding speech audio AI",
+      words: "provider MOSS connection model key image generation snapshot understanding speech audio AI",
       understandingNotice:
         "Configure the independent connection and model. Choose Understand on an image or video in the Library and explicitly approve the upload. Saving this configuration does not upload or run inference.",
       imageNotice: "Save a default connection and model, then submit a task on the Images page. Saving settings does not generate an image.",
@@ -5339,9 +5108,8 @@ export const catalogs = {
       saveFirst: "Save changes before querying the account's available models.",
       discoveryHint: "Catalog only, no inference. A listed model has not been verified by inference.",
       noModels: "This account returned an empty model catalog.",
-      modelHint: "Only integrated transcription models are offered. Account permission and quality still require a real request to verify.",
       unbound: "Not in use",
-      liveHint: "MOSS Live uses its own connection and model. Changing the dictation model does not change the realtime protocol.",
+      liveHint: "MOSS Live uses its own connection and model for realtime voice calls.",
       bindingHint:
         "Unbind uses before deleting, disabling or clearing a connection's key. In-flight requests keep their starting configuration; new requests use the updated settings.",
       manage: "Manage AI service connections",
@@ -5352,7 +5120,6 @@ export const catalogs = {
       groupVoice: "Voice",
       groupLive: "Live",
       use: {
-        dictation: "Dictation",
         image: "Image generation",
         understanding: "Media understanding",
         speech: "Speech",
@@ -5808,15 +5575,13 @@ export const catalogs = {
         remote: "Remote Access",
         about: "About & Data",
         memory: "Memory",
-        call: "Call line",
-        dictation: "Dictation",
         chat: "Chat apps",
         width: "Navigation width (drag; double-click for the default)",
       },
       words: {
         general: "language start workbench farm theme dark light size zoom scale font animation motion reduce",
-        models: "keys accounts DeepSeek MOSS Agora API key models binding",
-        voice: "Agora call phone recognition speech MOSS live realtime vision dictation transcription",
+        models: "keys accounts DeepSeek MOSS API key models binding",
+        voice: "call phone recognition speech MOSS live realtime vision transcription",
         connections: "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
         remote: "remote mobile phone Tailscale pair pairing QR device iOS Android listener token",
         about: "version home folder settings data catalog",
@@ -5857,8 +5622,6 @@ export const catalogs = {
         reposHint: "The space's repos; each folder is a git repository",
         worktrees: "Worktrees",
         worktreesHint: "Each issue's own checkout while a helper works",
-        pkm: "Notes vault",
-        pkmHint: "The space's PARA folders and journals",
         copy: "Copy the path",
         copied: "Path copied",
         reveal: "Show in Finder",
@@ -5900,8 +5663,6 @@ export const catalogs = {
         mossKey: "The MOSS account has no key yet",
         mossOff: "The MOSS account it uses is turned off",
         binding: "No account and model chosen for it yet",
-        agora: "Agora's credentials are missing",
-        dictationUrl: "No dictation address yet",
       },
       feature: {
         orchestrator: "The assistant",
@@ -5911,7 +5672,6 @@ export const catalogs = {
         speakers: "Dialogue",
         voiceDesign: "Voice design",
         transcription: "Transcription",
-        dictation: "Dictation",
         live: "MOSS Live",
         vision: "Live vision",
         call: "Calls",
@@ -6178,117 +5938,19 @@ export const catalogs = {
       voice: {
         section: { label: "Voice" },
         noSettings: "The server's settings cannot be asked ({why}).",
-        range: "{min} to {max}, default {fallback}",
         saved: "Saved: the next call uses it.",
-        answer: {
-          orchestrator:
-            "The channel's assistant itself takes the call: it sees how things are, sends work itself, and remembers what you said. Agora reaches one endpoint on this computer through a public address (voice.line.url in the configuration, such as Tailscale Funnel; cloudflared opened for the call when unset); only that endpoint is exposed, with a key per call.",
-          moss: "MOSS Live takes the call directly over a local WebSocket with your MOSS key — no Agora credentials or tunnel needed — and hands farm work to the assistant.",
-          agora: "A model hosted by Agora, no other key needed.",
-          deepseek: "Uses the DeepSeek key in the settings ({from}).",
-          noDeepseek: "Uses the DeepSeek key in the settings, which is not there yet: fill it in under Settings.",
-          openai: "Any OpenAI-compatible endpoint: Qwen, Kimi, your own deployment…",
-        },
-        intro:
-          "The assistant hears you and answers through Agora's conversational AI. Here you set up the line: the credentials, how it listens and who answers can all be hosted by Agora (no other key), or your own services. The assistant's persona, greeting and voice are on the",
-        orchestratorPage: "assistant page",
-        period: ".",
-        nextCall: "Changes take effect on the next call",
-        credentials: "Credentials",
-        console: "Agora console",
-        hex: "32 hex characters",
-        area: "Region",
-        areaHint: "The region of Agora's endpoints: pick one near the server; repos in mainland China pick Mainland China.",
-        listen: "Listen",
-        listenParts: "Recognition · VAD",
-        asr: "Recognition",
-        microsoft: "Microsoft Azure speech, with your own key.",
-        hosted: "Hosted by Agora, no other key needed.",
-        language: "Language",
-        languageHint: "Which language to hear. The persona should say to answer in it too.",
-        deepgramModel: "Deepgram model",
-        azureArea: "Azure region",
-        azureAreaHint: "The region of the speech resource, such as eastasia or eastus.",
-        asrArea: "Azure region for recognition",
-        microsoftKey: "Microsoft speech key",
-        think: "Think",
-        who: "Who answers",
-        model: "Model",
-        deepseekModel: "DeepSeek's model name.",
-        deepseekModelLabel: "DeepSeek model",
-        address: "Address",
-        llmAddress: "The full address of an OpenAI-compatible chat completions endpoint.",
-        llmAddressLabel: "Model address",
-        llmModel: "Model name",
-        llmKey: "Endpoint key",
-        speechServer: "Local speech-server",
-        dictationIntro: "Sent to the OpenAI-compatible address you fill in; with a local speech-server, the sound stays on this computer.",
-        dictationAddress: "Up to /v1. Local: http://127.0.0.1:8080/v1; OpenAI: https://api.openai.com/v1. Empty turns dictation off.",
-        dictationAddressLabel: "Dictation address",
-        dictationModel: "qwen3 for a local speech-server; gpt-4o-mini-transcribe for OpenAI.",
-        dictationModelLabel: "Dictation model",
-        dictationKey: "Credentials (may be empty locally)",
         persona: {
-          intro: "How the assistant opens a call and what voice it uses. The credentials, how it listens and who answers are on the",
+          intro: "How the assistant opens a call. MOSS Live connection and verification are on the",
           page: "page.",
           open: "Opening",
           openParts: "Persona · greeting",
-          ownCall: "The assistant takes the call itself: it is the channel's assistant, with its own prompt and no separate persona.",
           persona: "Persona",
           personaHint:
             "Who the model that answers first on the call is, and how it speaks. It cannot see how things are; the assistant on this computer sends work. Tell it not to make up progress.",
           greeting: "Greeting",
           greetingHint: "The first thing said when the call connects.",
-          failure: "On a failure, say",
-          failureHint: "What is said when the model fails.",
-          speak: "Speak",
-          tts: "Speech",
-          ttsModel: "Speech model",
-          voice: "Voice",
-          openaiVoice: "An OpenAI tts-1 voice.",
-          ttsArea: "Azure region for speech",
-          azureVoice: "An Azure neural voice name, such as en-US-JennyNeural.",
-          microsoftVoice: "Microsoft voice",
-          minimaxVoice: "Click a name to pick it, the play button on its left to hear it first; or fill in another MiniMax system voice id below.",
-          voiceId: "Voice id",
-          sample: "Listen: {greeting}",
-          stop: "Stop {name}",
-          play: "Listen to {name}",
         },
         moss: { verify: "Check that it connects", checking: "Connecting…", ok: "Connected" },
-        dictationVia: "Dictation goes to",
-        dictationOwn: "Your own address",
-        dictationMossIntro: "The server transcribes recordings using the MOSS connection and dictation model selected in AI services.",
-        line: "Line",
-      },
-      choices: {
-        area: { US: "United States", EU: "Europe", AP: "Asia Pacific", CN: "Mainland China" },
-        language: {
-          "zh-CN": "Mandarin",
-          "zh-HK": "Cantonese (Hong Kong)",
-          "zh-TW": "Chinese (Taiwan)",
-          "en-US": "English (US)",
-          "ja-JP": "Japanese",
-          "ko-KR": "Korean",
-        },
-        asr: { ares: "Agora ARES", microsoft: "Microsoft" },
-        answer: { agora: "Agora hosted", openai: "Your own endpoint" },
-        minimax: {
-          gentle: "Gentle youth",
-          qingse: "Shy youth",
-          jingying: "Elite youth",
-          badao: "Bossy youth",
-          student: "College student",
-          girl: "Young girl",
-          yujie: "Poised woman",
-          mature: "Mature woman",
-          sweet: "Sweet woman",
-          presenterMale: "Male presenter",
-          presenterFemale: "Female presenter",
-          audiobookMale: "Male audiobook",
-          audiobookFemale: "Female audiobook",
-        },
-        number: { silenceMs: "Pause that ends a turn (ms)", interruptMs: "Speech that interrupts it (ms)", idleSeconds: "Leave when nobody is there (s)" },
       },
       moss: {
         intro:
@@ -6300,7 +5962,7 @@ export const catalogs = {
         unmute: "Unmute",
         nativeCall: "MOSS Live call",
         nativeNotice:
-          "Choose MOSS Live as the call answer provider and save the configuration first. Starting captures your microphone and sends audio to the configured MOSS account; charges may apply. Final transcripts are recorded in the chat. Leaving this page hangs up.",
+          "Starting captures your microphone and sends audio to the configured MOSS account; charges may apply. Final transcripts are recorded in the chat. Leaving this page hangs up.",
       },
     },
   },
@@ -6567,7 +6229,6 @@ export interface Messages {
   "web.artifact.blocks.blocks": { readonly n: number };
   "web.artifact.blocks.changed": undefined;
   "web.artifact.blocks.conflict": { readonly why: string | number };
-  "web.artifact.blocks.demo": undefined;
   "web.artifact.blocks.done": undefined;
   "web.artifact.blocks.heading": undefined;
   "web.artifact.blocks.helpersWriting": undefined;
@@ -6644,6 +6305,11 @@ export interface Messages {
   "web.artifact.motion.prevFrame": undefined;
   "web.artifact.motion.time": { readonly at: string | number; readonly duration: string | number };
   "web.artifact.motion.tooLong": undefined;
+  "web.artifact.outline.importAction": undefined;
+  "web.artifact.outline.importTitle": undefined;
+  "web.artifact.outline.markdownLabel": undefined;
+  "web.artifact.outline.pickFile": undefined;
+  "web.artifact.outline.submit": undefined;
   "web.artifact.page.all": undefined;
   "web.artifact.page.delete": undefined;
   "web.artifact.page.deleteAsk": { readonly title: string | number };
@@ -7329,9 +6995,7 @@ export interface Messages {
   "web.channel.switcher.hint": undefined;
   "web.channel.switcher.newDirect": undefined;
   "web.channel.switcher.none": undefined;
-  "web.channel.switcher.note": { readonly tier: string | number };
   "web.channel.switcher.open": undefined;
-  "web.channel.switcher.searchNotes": { readonly q: string | number };
   "web.channel.switcher.title": undefined;
   "web.channel.tab.chat": undefined;
   "web.channel.tab.crons": undefined;
@@ -8119,8 +7783,6 @@ export interface Messages {
   "web.library.content.media": undefined;
   "web.library.content.new": undefined;
   "web.library.content.newNote": undefined;
-  "web.library.content.notes": undefined;
-  "web.library.content.notesTodoCount": { readonly n: number };
   "web.library.content.pin": undefined;
   "web.library.content.pinned": undefined;
   "web.library.content.pinnedToast": undefined;
@@ -8129,7 +7791,6 @@ export interface Messages {
   "web.library.content.search.placeholder": undefined;
   "web.library.content.search.title": undefined;
   "web.library.content.search.typeMedia": undefined;
-  "web.library.content.search.typeNote": undefined;
   "web.library.content.searchAll": undefined;
   "web.library.content.sendArtifact": undefined;
   "web.library.content.sidebarToggle": undefined;
@@ -8448,76 +8109,6 @@ export interface Messages {
   "web.orchestrator.orchestrator.tabs": undefined;
   "web.orchestrator.orchestrator.title": undefined;
   "web.orchestrator.orchestrator.trajectory": undefined;
-  "web.pkm.backlinks.archives": undefined;
-  "web.pkm.backlinks.areas": undefined;
-  "web.pkm.backlinks.journals": undefined;
-  "web.pkm.backlinks.none": undefined;
-  "web.pkm.backlinks.projects": undefined;
-  "web.pkm.backlinks.title": { readonly n: string | number };
-  "web.pkm.command.clear": undefined;
-  "web.pkm.command.code": undefined;
-  "web.pkm.command.doing": undefined;
-  "web.pkm.command.done": undefined;
-  "web.pkm.command.h1": undefined;
-  "web.pkm.command.h2": undefined;
-  "web.pkm.command.today": undefined;
-  "web.pkm.command.todo": undefined;
-  "web.pkm.comments.accept": undefined;
-  "web.pkm.comments.accepted": undefined;
-  "web.pkm.comments.count": { readonly n: string | number };
-  "web.pkm.comments.on": { readonly span: string | number };
-  "web.pkm.comments.reject": undefined;
-  "web.pkm.comments.rejected": undefined;
-  "web.pkm.comments.title": { readonly n: string | number };
-  "web.pkm.complete.newPage": undefined;
-  "web.pkm.gone": undefined;
-  "web.pkm.marker.CANCELED": undefined;
-  "web.pkm.marker.DOING": undefined;
-  "web.pkm.marker.DONE": undefined;
-  "web.pkm.marker.LATER": undefined;
-  "web.pkm.marker.NOW": undefined;
-  "web.pkm.marker.TODO": undefined;
-  "web.pkm.marker.WAITING": undefined;
-  "web.pkm.page.append": undefined;
-  "web.pkm.page.collapse": undefined;
-  "web.pkm.page.copiedFile": undefined;
-  "web.pkm.page.copiedRef": undefined;
-  "web.pkm.page.copyFile": { readonly file: string | number };
-  "web.pkm.page.copyRef": undefined;
-  "web.pkm.page.create": undefined;
-  "web.pkm.page.edit": undefined;
-  "web.pkm.page.expand": undefined;
-  "web.pkm.page.export": undefined;
-  "web.pkm.page.exported": undefined;
-  "web.pkm.page.freshHint": undefined;
-  "web.pkm.page.freshPlaceholder": undefined;
-  "web.pkm.page.issueMade": undefined;
-  "web.pkm.page.missingRef": undefined;
-  "web.pkm.page.more": undefined;
-  "web.pkm.page.notSaved": { readonly why: string | number };
-  "web.pkm.page.nothingToUndo": undefined;
-  "web.pkm.page.outline": undefined;
-  "web.pkm.page.refFrom": { readonly page: string | number };
-  "web.pkm.page.rename": undefined;
-  "web.pkm.page.renamed": { readonly title: string | number };
-  "web.pkm.page.toIssue": undefined;
-  "web.pkm.page.undo": undefined;
-  "web.pkm.page.undone": { readonly what: string | number };
-  "web.pkm.place.label": undefined;
-  "web.pkm.search.all": undefined;
-  "web.pkm.search.filters": undefined;
-  "web.pkm.search.linked": undefined;
-  "web.pkm.search.none": undefined;
-  "web.pkm.search.pages": undefined;
-  "web.pkm.search.placeholder": undefined;
-  "web.pkm.search.title": undefined;
-  "web.pkm.search.todo": undefined;
-  "web.pkm.tier.archive": undefined;
-  "web.pkm.tier.area": undefined;
-  "web.pkm.tier.inbox": undefined;
-  "web.pkm.tier.journal": undefined;
-  "web.pkm.tier.project": undefined;
-  "web.pkm.tier.resource": undefined;
   "web.provider.adapted": undefined;
   "web.provider.add": undefined;
   "web.provider.bindingHint": undefined;
@@ -8536,7 +8127,6 @@ export interface Messages {
   "web.provider.liveHint": undefined;
   "web.provider.manage": undefined;
   "web.provider.modelFor": { readonly use: string | number };
-  "web.provider.modelHint": undefined;
   "web.provider.name": undefined;
   "web.provider.noModels": undefined;
   "web.provider.openSpeechShort": undefined;
@@ -8549,7 +8139,6 @@ export interface Messages {
   "web.provider.title": undefined;
   "web.provider.unbound": undefined;
   "web.provider.understandingNotice": undefined;
-  "web.provider.use.dictation": undefined;
   "web.provider.use.image": undefined;
   "web.provider.use.live": undefined;
   "web.provider.use.speakers": undefined;
@@ -8976,8 +8565,6 @@ export interface Messages {
   "web.setting.about.manual.translocated": { readonly next: string | number };
   "web.setting.about.newFarmQuestion": undefined;
   "web.setting.about.openCatalog": undefined;
-  "web.setting.about.pkm": undefined;
-  "web.setting.about.pkmHint": undefined;
   "web.setting.about.ready": { readonly next: string | number };
   "web.setting.about.readyNewFarm": { readonly next: string | number };
   "web.setting.about.repos": undefined;
@@ -9013,7 +8600,6 @@ export interface Messages {
   "web.setting.appearance.themes.light": undefined;
   "web.setting.appearance.themes.system": undefined;
   "web.setting.feature.call": undefined;
-  "web.setting.feature.dictation": undefined;
   "web.setting.feature.image": undefined;
   "web.setting.feature.live": undefined;
   "web.setting.feature.orchestrator": undefined;
@@ -9044,10 +8630,8 @@ export interface Messages {
   "web.setting.language.title": undefined;
   "web.setting.language.zh": undefined;
   "web.setting.memory.intro": undefined;
-  "web.setting.missing.agora": undefined;
   "web.setting.missing.binding": undefined;
   "web.setting.missing.deepseekKey": undefined;
-  "web.setting.missing.dictationUrl": undefined;
   "web.setting.missing.mossAccount": undefined;
   "web.setting.missing.mossKey": undefined;
   "web.setting.missing.mossOff": undefined;
@@ -9055,10 +8639,8 @@ export interface Messages {
   "web.setting.models.intro": undefined;
   "web.setting.nav.about": undefined;
   "web.setting.nav.appearance": undefined;
-  "web.setting.nav.call": undefined;
   "web.setting.nav.chat": undefined;
   "web.setting.nav.connections": undefined;
-  "web.setting.nav.dictation": undefined;
   "web.setting.nav.general": undefined;
   "web.setting.nav.label": undefined;
   "web.setting.nav.memory": undefined;
@@ -9353,36 +8935,6 @@ export interface Messages {
   "web.ui.pixel.sound.label.weed": undefined;
   "web.ui.pixel.sound.label.woof": undefined;
   "web.ui.pixel.sound.label.yip": undefined;
-  "web.voice.choices.answer.agora": undefined;
-  "web.voice.choices.answer.openai": undefined;
-  "web.voice.choices.area.AP": undefined;
-  "web.voice.choices.area.CN": undefined;
-  "web.voice.choices.area.EU": undefined;
-  "web.voice.choices.area.US": undefined;
-  "web.voice.choices.asr.ares": undefined;
-  "web.voice.choices.asr.microsoft": undefined;
-  "web.voice.choices.language.en-US": undefined;
-  "web.voice.choices.language.ja-JP": undefined;
-  "web.voice.choices.language.ko-KR": undefined;
-  "web.voice.choices.language.zh-CN": undefined;
-  "web.voice.choices.language.zh-HK": undefined;
-  "web.voice.choices.language.zh-TW": undefined;
-  "web.voice.choices.minimax.audiobookFemale": undefined;
-  "web.voice.choices.minimax.audiobookMale": undefined;
-  "web.voice.choices.minimax.badao": undefined;
-  "web.voice.choices.minimax.gentle": undefined;
-  "web.voice.choices.minimax.girl": undefined;
-  "web.voice.choices.minimax.jingying": undefined;
-  "web.voice.choices.minimax.mature": undefined;
-  "web.voice.choices.minimax.presenterFemale": undefined;
-  "web.voice.choices.minimax.presenterMale": undefined;
-  "web.voice.choices.minimax.qingse": undefined;
-  "web.voice.choices.minimax.student": undefined;
-  "web.voice.choices.minimax.sweet": undefined;
-  "web.voice.choices.minimax.yujie": undefined;
-  "web.voice.choices.number.idleSeconds": undefined;
-  "web.voice.choices.number.interruptMs": undefined;
-  "web.voice.choices.number.silenceMs": undefined;
   "web.voice.moss.connecting": undefined;
   "web.voice.moss.hangUp": undefined;
   "web.voice.moss.intro": undefined;
@@ -9391,83 +8943,18 @@ export interface Messages {
   "web.voice.moss.nativeNotice": undefined;
   "web.voice.moss.talk": undefined;
   "web.voice.moss.unmute": undefined;
-  "web.voice.voice.address": undefined;
-  "web.voice.voice.answer.agora": undefined;
-  "web.voice.voice.answer.deepseek": { readonly from: string | number };
-  "web.voice.voice.answer.moss": undefined;
-  "web.voice.voice.answer.noDeepseek": undefined;
-  "web.voice.voice.answer.openai": undefined;
-  "web.voice.voice.answer.orchestrator": undefined;
-  "web.voice.voice.area": undefined;
-  "web.voice.voice.areaHint": undefined;
-  "web.voice.voice.asr": undefined;
-  "web.voice.voice.asrArea": undefined;
-  "web.voice.voice.azureArea": undefined;
-  "web.voice.voice.azureAreaHint": undefined;
-  "web.voice.voice.console": undefined;
-  "web.voice.voice.credentials": undefined;
-  "web.voice.voice.deepgramModel": undefined;
-  "web.voice.voice.deepseekModel": undefined;
-  "web.voice.voice.deepseekModelLabel": undefined;
-  "web.voice.voice.dictationAddress": undefined;
-  "web.voice.voice.dictationAddressLabel": undefined;
-  "web.voice.voice.dictationIntro": undefined;
-  "web.voice.voice.dictationKey": undefined;
-  "web.voice.voice.dictationModel": undefined;
-  "web.voice.voice.dictationModelLabel": undefined;
-  "web.voice.voice.dictationMossIntro": undefined;
-  "web.voice.voice.dictationOwn": undefined;
-  "web.voice.voice.dictationVia": undefined;
-  "web.voice.voice.hex": undefined;
-  "web.voice.voice.hosted": undefined;
-  "web.voice.voice.intro": undefined;
-  "web.voice.voice.language": undefined;
-  "web.voice.voice.languageHint": undefined;
-  "web.voice.voice.line": undefined;
-  "web.voice.voice.listen": undefined;
-  "web.voice.voice.listenParts": undefined;
-  "web.voice.voice.llmAddress": undefined;
-  "web.voice.voice.llmAddressLabel": undefined;
-  "web.voice.voice.llmKey": undefined;
-  "web.voice.voice.llmModel": undefined;
-  "web.voice.voice.microsoft": undefined;
-  "web.voice.voice.microsoftKey": undefined;
-  "web.voice.voice.model": undefined;
   "web.voice.voice.moss.checking": undefined;
   "web.voice.voice.moss.ok": undefined;
   "web.voice.voice.moss.verify": undefined;
-  "web.voice.voice.nextCall": undefined;
   "web.voice.voice.noSettings": { readonly why: string | number };
-  "web.voice.voice.orchestratorPage": undefined;
-  "web.voice.voice.period": undefined;
-  "web.voice.voice.persona.azureVoice": undefined;
-  "web.voice.voice.persona.failure": undefined;
-  "web.voice.voice.persona.failureHint": undefined;
   "web.voice.voice.persona.greeting": undefined;
   "web.voice.voice.persona.greetingHint": undefined;
   "web.voice.voice.persona.intro": undefined;
-  "web.voice.voice.persona.microsoftVoice": undefined;
-  "web.voice.voice.persona.minimaxVoice": undefined;
   "web.voice.voice.persona.open": undefined;
   "web.voice.voice.persona.openParts": undefined;
-  "web.voice.voice.persona.openaiVoice": undefined;
-  "web.voice.voice.persona.ownCall": undefined;
   "web.voice.voice.persona.page": undefined;
   "web.voice.voice.persona.persona": undefined;
   "web.voice.voice.persona.personaHint": undefined;
-  "web.voice.voice.persona.play": { readonly name: string | number };
-  "web.voice.voice.persona.sample": { readonly greeting: string | number };
-  "web.voice.voice.persona.speak": undefined;
-  "web.voice.voice.persona.stop": { readonly name: string | number };
-  "web.voice.voice.persona.tts": undefined;
-  "web.voice.voice.persona.ttsArea": undefined;
-  "web.voice.voice.persona.ttsModel": undefined;
-  "web.voice.voice.persona.voice": undefined;
-  "web.voice.voice.persona.voiceId": undefined;
-  "web.voice.voice.range": { readonly fallback: string | number; readonly max: string | number; readonly min: string | number };
   "web.voice.voice.saved": undefined;
   "web.voice.voice.section.label": undefined;
-  "web.voice.voice.speechServer": undefined;
-  "web.voice.voice.think": undefined;
-  "web.voice.voice.who": undefined;
 }

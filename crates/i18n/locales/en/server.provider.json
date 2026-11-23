@@ -18,8 +18,6 @@
   "name": "Enter a connection name of 1–80 characters.",
   "key": "A replacement key must not be empty, contain whitespace or exceed 4096 characters. Use Clear to remove a key.",
   "bound": "A default binding requires an existing, enabled connection with credentials. Unbind it before deleting, disabling or clearing its key.",
-  "model": "This model is not integrated for dictation. Choose a supported transcription model.",
-  "unbound": "Choose a default dictation connection and model in AI services first.",
   "understandingUnbound": "Choose a media understanding connection and model in AI services first.",
   "understandingModel": "This model or snapshot is not supported for media understanding.",
   "imageUnbound": "Choose a default image generation connection and model in AI services first.",

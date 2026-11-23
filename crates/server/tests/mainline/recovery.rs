@@ -73,7 +73,6 @@ fn launch(home: &Path, window: &str) -> (Started, vibevalley_server::transport::
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         tick_crons: false,
-        watch_pkm: false,
         link_previews: false,
         orchestrator_listens: false,
         ..ServerConfig::under(home)

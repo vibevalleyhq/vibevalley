@@ -185,19 +185,6 @@ export class BlockEditor {
     if (redraw) this.changed();
   }
 
-  async demo() {
-    try {
-      await this.api.artifact.demo({ id: this.artifactId });
-      this.error = undefined;
-      this.heardAt = Date.now();
-      this.armWriting();
-      this.cron();
-    } catch (e) {
-      this.error = this.formatError(e);
-    }
-    this.changed();
-  }
-
   private take(snap: BlockSnapshot, replace: boolean, heard = false) {
     if (snap.artifact.seq < this.seq) return;
     this.artifact = snap.artifact;

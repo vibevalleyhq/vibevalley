@@ -10,7 +10,7 @@ export type SessionController = (typeof SessionControllerValues)[number];
 
 export type ExecutionPolicy = { "kind": "directCwd", repo?: string, permissionMode: SessionPermissionMode, } | { "kind": "managedWorktree", repo: string, branch?: string, } | { "kind": "sandboxDir" };
 
-export type ContextRef = { "kind": "issue", id: IssueId, refining?: boolean, } | { "kind": "channel", id: string, } | { "kind": "artifact", id: ArtifactId, } | { "kind": "pkm", path: string, };
+export type ContextRef = { "kind": "issue", id: IssueId, refining?: boolean, } | { "kind": "channel", id: string, } | { "kind": "artifact", id: ArtifactId, };
 
 export type Doing = { action: SessionAction, label: string, };
 

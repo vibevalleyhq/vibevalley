@@ -37,7 +37,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 优先运行与改动相关的最窄检查（命令总表见 [AGENTS.md](AGENTS.md#命令)）：
 
 - `vp run rust:check`：`cargo fmt --check`、`cargo clippy --workspace --all-targets -D warnings` 与 `cargo test --workspace`（服务端、命令行、核心规则、原生应用）。
-- `vp run protocol:check` 校验 Rust 导出的 TypeScript 契约，并在临时目录生成 artifact 和 pkm 的 golden 与仓库逐个比较。用 `vp run protocol:ts` 和 `vp run goldens` 更新对应产物。
+- `vp run protocol:check` 校验 Rust 导出的 TypeScript 契约，并在临时目录生成 artifact 的 golden 与仓库逐个比较。用 `vp run protocol:ts` 和 `vp run goldens` 更新对应产物。
 - `vp run sql:check` 用 sqlc 1.31.1 校验 Rust 绑定，并用 Python 3 的 SQLite 预编译每条正式查询。
 - `vp run mac:check` 对原生页面运行 nsh 类型检查、打包与虚拟时钟 UI 验收套件。[场景用例](apps/mac/ui/app/scenarios.test.tsx)、[交互用例](apps/mac/ui/app/interactions.test.tsx)、[主题令牌用例](apps/mac/ui/app/theme.test.tsx)与[工作区外壳用例](apps/mac/ui/workspace/workspace.test.tsx)
 - `vp run ui:gallery` 启动隔离原生窗口对典型/边界场景（含工作区与农场）一键截图、校验 `dump.json` 零错误并生成离线 HTML 画廊。
@@ -76,7 +76,7 @@ CI 只在 Linux 上运行：PR 标题与正文、`vp check`、`sql:check`、`doc
 
 - **设计原则**：强类型 `clap`（英文 `--help`），纯 HTTP 客户端（不链接 `vibevalley-runtime`），按服务端五大业务域分目录（`crates/cli/src/domains/{work,team,collab,content,infra}`），路径为 `<资源> [<子资源>] <动词>`，不替服务端做决定；离线轨迹评测独立为可选二进制 `vibevalley-eval`（`cargo run -p vibevalley-cli --features eval --bin vibevalley-eval -- …`）。
 - **工单**：`issue list|show|watch|create|edit|status|comment|review|diff|timeline|delete`。`issue show --watch` 等待直到需要用户决策或结清，`issue watch [--follow]` 流式输出工单与轨迹事件（加 `--json` 输出 JSONL）。
-- **其余**：`work`（`session` 含 `events`、`repo` 含 `pr submit`、`cron`）、`team`（`agent`、`orchestrator open|stop|approval list|resolve`、`runtime`、`memory`）、`collab`（`channel` 含 `create|delete|pin|message`、`chat` 经 HTTP 与频道助手对话）、`content`（`artifact` 含 `entry list|get|set|batch`、`pkm capture|search|undo|journal|page`、`library`、`media job|input`、`attachment`）、`infra`（`state [--watch]`、`setting get|update|validate`、`doctor`）。
+- **其余**：`work`（`session` 含 `events`、`repo` 含 `pr submit`、`cron`）、`team`（`agent`、`orchestrator open|stop|approval list|resolve`、`runtime`、`memory`）、`collab`（`channel` 含 `create|delete|pin|message`、`chat` 经 HTTP 与频道助手对话）、`content`（`artifact` 含 `entry list|get|set|batch` 与大纲导入、`library`、`media job|input`、`attachment`）、`infra`（`state [--watch]`、`setting get|update|validate`、`doctor`）。
 - **输出与试跑**：默认输出单行短文本（首词为后续命令要用的 ID 或编号），全局 `--json` 输出协议原始结构。试跑由协议 `ENDPOINTS` 的 `dry_run` 单源驱动，无试跑的写命令传 `--dry-run` 返回 `NoDryRun`（退出码 `2`）。
 - **错误与退出码**：失败时 stdout 为空，stderr 末行是一行 JSON，退出码按类（`crates/cli/src/client.rs` 的 `exit`）；集成测试在 `crates/cli/tests/cli.rs`，起真的服务端。
 

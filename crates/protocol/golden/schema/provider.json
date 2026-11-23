@@ -58,10 +58,6 @@
      }
     }
    ],
-   "dictation": {
-    "connection": "s4510",
-    "model": "s4511"
-   },
    "image": {
     "connection": "s4512",
     "model": "s4513"
@@ -101,9 +97,6 @@
    "visionModels": [
     "s4528"
    ],
-   "dictationModels": [
-    "s4529"
-   ],
    "imageModels": [
     "s4530"
    ],
@@ -135,7 +128,6 @@
      }
     }
    ],
-   "dictation": null,
    "image": null,
    "live": null,
    "liveModels": [
@@ -156,9 +148,6 @@
    "vision": null,
    "visionModels": [
     "s4545"
-   ],
-   "dictationModels": [
-    "s4546"
    ],
    "imageModels": [
     "s4547"
@@ -208,10 +197,6 @@
     "connection": "s4564",
     "model": "s4565"
    },
-   "dictation": {
-    "connection": "s4566",
-    "model": "s4567"
-   },
    "image": {
     "connection": "s4568",
     "model": "s4569"
@@ -249,7 +234,6 @@
     }
    ],
    "understanding": null,
-   "dictation": null,
    "image": null,
    "live": null,
    "speakers": null,

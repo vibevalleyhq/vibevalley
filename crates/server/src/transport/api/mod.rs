@@ -192,9 +192,6 @@ pub trait Server: Send + Sync {
     #[allow(clippy::result_large_err, reason = "the approved contract returns the refusal envelope itself")]
     fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope>;
     fn unsubscribe(&self, id: u64);
-    fn raise_budget(&self, _input: Value) -> Envelope {
-        refusal(BizCode::Refused, "durable budgets unavailable")
-    }
     /// Optional local binary media transport.
     fn media_inputs(&self) -> Option<media::SharedMediaInputs> {
         None

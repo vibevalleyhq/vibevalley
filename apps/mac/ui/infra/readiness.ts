@@ -8,8 +8,6 @@ const placeOf: Record<Missing, string> = {
   mossKey: "/settings/models",
   mossOff: "/settings/models",
   binding: "/settings/models",
-  agora: "/settings/models",
-  dictationUrl: "/settings/voice/dictation",
 };
 
 /** What a feature lacks, in words, and the settings page that fixes it (SettingsStatus.readiness says what lacks). */

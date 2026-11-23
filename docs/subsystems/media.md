@@ -27,7 +27,7 @@
 | `crates/server/src/modules/infra/http.rs` | 下载与素材导入共用的公网 https 规则与 HTTP 客户端 |
 | `crates/server/src/modules/content/library/mod.rs` | 素材库：`list`、`add`、`remove`、`preview_remove`；听事实记下生成结果与聊天附件 |
 | `crates/server/src/transport/http/media.rs` | 本机二进制上传（`PUT /api/v1/media/input/:id/content`）与带范围的播放、语音流 |
-| `crates/server/src/modules/team/tool/notes.rs` | 助手与帮工的 `media_*`、`library_item_*` 工具 |
+| `crates/server/src/modules/team/tool/content.rs` | 助手与帮工的 `artifact_*`、`media_*`、`library_item_*` 工具 |
 | `crates/server/src/offline.rs` | 测试用的离线 MOSS 与下载 |
 | `crates/protocol/src/contract/media.rs`、`packages/protocol/src/media/` | 媒体任务、输入与素材库的形状和接口（Rust 为源，TS 形状由它生成） |
 | `apps/mac/ui/features/media/` | `/library` 浏览与媒体详情：单行筛选工具条（来源 `SourceFilter`、排序、缩略图档位、上传）、作品（含大纲笔记）/媒体卡片（`Tiles.tsx`）、原生文件详情栏（`Inspector.tsx`）与「生成」对话框；排法、计数、筛选与键盘落点在 `items.ts`、`libraryView.ts` 纯函数 |
@@ -113,7 +113,7 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
 - **谁能给什么**：`library.item.add` 只收一种来源。经 HTTP 来的是用户，只能给已上传的附件；助手的工具只给网址，帮工的给网址或路径。网址只走公网 https（`infra/http.rs`），最大 `attachmentMax`（25 MB），60 秒；路径解析了符号链接以后仍要在工作目录里。
 - **拿掉只删这一条**：`library.item.delete` 不删附件，发过它的消息照样能打开。
 - **进行中任务实时对齐**：在做的生成任务读核心状态的 `media`，排在最前（麦色的虚线格）；完成的任务数一变，页面重读列表。
-- **搜排在服务端与统一弹窗，桶与来源筛选在页面**：`library.item.list` 按 `sort`（`recent`、`name`、`size`）列出素材，跨作品（含 `outline` 大纲笔记）与素材（兼容历史 `pkm` 兜底）的统一检索由 `ContentSearchModal` 承接；页面内单行 `min-h-11` 工具条按正交 `SourceFilter`（全部 / 执行会话交付 / 我创建的）、排序与缩略图档位（`S/M/L`，媒体可见时显示）过滤当前桶（`items.ts`、`libraryView.ts`）。
+- **搜排在服务端与统一弹窗，桶与来源筛选在页面**：`library.item.list` 按 `sort`（`recent`、`name`、`size`）列出素材，跨作品（含 `outline` 大纲笔记）与素材的统一检索由 `ContentSearchModal` 承接；页面内单行 `min-h-11` 工具条按正交 `SourceFilter`（全部 / 执行会话交付 / 我创建的）、排序与缩略图档位（`S/M/L`，媒体可见时显示）过滤当前桶（`items.ts`、`libraryView.ts`）。
 - **原生媒体详情栏**（`Inspector.tsx`）：选中媒体时展开右侧面板，提供系统打开（`openAttachment`）、另存为（`saveFile`）、复制路径、在访达中显示（`hostApi.reveal`）、置顶/取消置顶、音频播放/停止切换（`playAudio` / `hostApi.stopAudio`），以及发到频道、AI 理解和原地确认删除。
 - **缩略图按比例排满一行**（`justify`）：每行缩放到正好占满宽度，最后一行保持目标高度；比例夹在 1:2 到 3:1。缩略图的高度每个看的人自己记（`prefs` 的 `libraryTile`，96–280px）。每格按附件 id 绝对定位，排法变了格子不重建，图不会重载。图、视频的比例和像素、音频和视频的时长在它们加载后从元素上读。
 - **选和键盘**：点一下选一个，⌘/Ctrl 点加减，Shift 点选一段；← → 按顺序走，↑ ↓ 去上下一行中间最近的那格（`neighbor`）；空格全屏看（`Lightbox`，← → 翻）；Delete 在详情栏里原地问一遍再拿掉；Esc 不选。文件拖到页面上即可上传，带作品复合后缀的文件自动建为 Artifact。

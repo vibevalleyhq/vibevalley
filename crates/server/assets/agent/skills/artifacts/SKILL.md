@@ -12,4 +12,4 @@ description: 做数据看板（dashboard）、动态图形短片（motion）、�
    - `whiteboard` 在 `elements/<id>` 放结构化图元（`shape`、`container`、`arrow`、`table`、`svg`、`html`），用户可以继续拖拽连线。
    - `design` 在 `project/*.dc.html` 画多画板界面并用 `data-props` 暴露可调属性杆。
    - `design-system` 在 `"project/tokens.json"` 维护浅色与深色令牌，设为默认后自动注入其他视觉作品。
-3. **增量更新不重来**：用 `artifact_entry_batch` 的 `set`、`patch`、`delete`、`copy`（配合 `ifRev`）只改受影响的条目；一轮修改完成要通知频道时设 `announce: true`。
+3. **增量更新不重来**：块类作品（`docs`/`outline`）先调 `artifact_block_list` 读当前块树与 `rev`，再用 `artifact_block_batch` 批量增改移删（导入工作区 `.md`/Logseq 文件用 `artifact_outline_import`），并可在代码块中嵌入 `language: "chart"` 或 `"genui"` 呈现原生图表与交互面板；条目类作品用 `artifact_entry_batch` 的 `set`、`patch`、`delete`、`copy`（配合 `ifRev`）只改受影响的条目；一轮修改完成要通知频道时设 `announce: true`。

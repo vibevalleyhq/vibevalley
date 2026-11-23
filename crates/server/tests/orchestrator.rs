@@ -417,7 +417,6 @@ fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases(
         registry: Some(Arc::new(vibevalley_runtime::oar::Registry::new())),
         probe_runtimes: false,
         link_previews: false,
-        watch_pkm: false,
         tick_crons: false,
         tool_permissions: Permissions {
             overrides: [("probe__echo".into(), Policy::AlwaysAllow)].into(),
@@ -572,13 +571,6 @@ fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
     assert_eq!(runtime_alert.text, "Budget cap hit");
     let snap = started.hub.slice_snapshot(SliceKind::Inbox);
     assert!(snap["items"].as_array().unwrap().iter().any(|i| i["kind"] == "budget_reached"), "{snap}");
-    let raised = started.hub.raise_budget(json!({
-        "conversationId": first.conversation_id,
-        "taskId": first.task_id,
-        "newMaxCostMicros": 10_000,
-    }));
-    assert_eq!(raised.biz_code, 0, "{raised:?}");
-    assert_eq!(raised.data.unwrap()["maxCostMicros"], 10_000);
     until("assistant's approved round settled", || {
         let messages = started.hub.call_as(Caller::User, "channel.message.list", json!({"id":channel})).data?;
         messages.as_array()?.iter().any(|m| m["text"] == "done").then_some(())

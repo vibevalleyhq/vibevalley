@@ -21,7 +21,6 @@ fn main() {
                     || (include_all_web && stem.starts_with("web."))
                     || stem == "web.base"
                     || stem == "web.artifact"
-                    || stem == "web.pkm"
                     || stem == "web.farm"
                     || stem.starts_with("web.farm."))
             {

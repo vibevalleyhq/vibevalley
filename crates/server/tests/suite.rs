@@ -22,7 +22,6 @@ mod media_kinds;
 mod memory;
 mod module_boundaries;
 mod orchestrator;
-mod pkm;
 mod provider;
 mod remote;
 mod session;

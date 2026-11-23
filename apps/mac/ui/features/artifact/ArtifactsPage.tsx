@@ -26,9 +26,9 @@ import { contentPresenting, contentSidebarOpen, isPinned, openTemplatePicker, to
 import { artifactHref, artifactSuffix, kindLabel, useArtifact, useArtifacts } from "./ArtifactCard";
 import { plainOf } from "./blocks";
 import { BlocksView } from "./BlocksView";
-import type { BlockEditor } from "./editor";
 import { type Frame, withShellQuery } from "./frame";
 import { HtmlFrame } from "./HtmlFrame";
+import { openOutlineImport } from "./OutlineImportModal";
 import { PageWords } from "./PageWords";
 import { exportMarkdownFile, requestArtifactChatFocus, saveTextFile } from "./store";
 import { StoreArtifactView } from "./StoreArtifactView";
@@ -105,9 +105,14 @@ export function ArtifactsPage(props: { rest: string; chat: ArtifactChat }) {
                 <Empty
                   icon="artifacts"
                   action={
-                    <Button icon="add" onPress={() => openTemplatePicker("deliverable")}>
-                      {t("web.artifact.page.new")}
-                    </Button>
+                    <View class="flex-row items-center gap-2">
+                      <Button icon="add" onPress={() => openTemplatePicker("deliverable")}>
+                        {t("web.artifact.page.new")}
+                      </Button>
+                      <Button icon="upload" testID="artifact-import-outline" onPress={() => openOutlineImport()}>
+                        {t("web.artifact.outline.importAction")}
+                      </Button>
+                    </View>
                   }
                 >
                   {t("web.artifact.page.none")}
@@ -276,12 +281,9 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
     });
   };
 
-  let editor: BlockEditor | undefined;
   const more = (): MoreItem[] => [
     { key: "issue", label: t("web.library.content.turnIntoIssue"), icon: "issues", onSelect: () => void turnIntoIssue() },
-    ...(props.artifact.body === "blocks"
-      ? [{ key: "demo", label: t("web.artifact.blocks.demo"), icon: "play" as const, onSelect: () => void editor?.demo() }]
-      : []),
+    { key: "import-outline", label: t("web.artifact.outline.importAction"), icon: "upload", onSelect: () => openOutlineImport() },
     { key: "delete", label: t("web.artifact.page.delete"), icon: "delete", danger: true, onSelect: () => asking.set(true) },
   ];
 
@@ -475,12 +477,7 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
                     <View class="min-h-0 w-full flex-1">
                       <View class={`mx-auto min-h-0 w-full flex-1 gap-2 px-5 py-4 ${isOutline() ? "max-w-2xl" : "max-w-3xl"}`}>
                         <If when={!railOpen() ? suggestions() : undefined}>{(s) => s().draw()}</If>
-                        <BlocksView
-                          id={props.artifact.id}
-                          artifactType={props.artifact.artifactType}
-                          onEditor={(e) => (editor = e)}
-                          onRail={(draw) => setSuggestions({ draw })}
-                        />
+                        <BlocksView id={props.artifact.id} artifactType={props.artifact.artifactType} onRail={(draw) => setSuggestions({ draw })} />
                       </View>
                     </View>
                   </If>

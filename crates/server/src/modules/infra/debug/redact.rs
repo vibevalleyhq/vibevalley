@@ -63,11 +63,6 @@ fn is_sensitive_key_normalized(lower: &str, compact: &str) -> bool {
             | "secretkey"
             | "clientsecret"
             | "deepseekapikey"
-            | "agoraappcertificate"
-            | "asrkey"
-            | "llmkey"
-            | "ttskey"
-            | "dictationkey"
     ) {
         return true;
     }

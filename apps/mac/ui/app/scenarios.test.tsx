@@ -85,9 +85,6 @@ test("empty scenario keeps every major route stable across themes and narrow wid
   await visit(app, fake, "/library", row, () => {
     expect(app.count("id:library-page")).toBe(1);
   });
-  await visit(app, fake, "/pkm", row, () => {
-    expect(app.count("id:pkm")).toBe(1);
-  });
   await visit(app, fake, "/settings/general", row, () => {
     expect(app.count("id:settings-nav")).toBe(1);
   });
@@ -284,9 +281,6 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
   });
   await visit(app, fake, "/library", row, () => {
     expect(app.count("id:library-page")).toBe(1);
-  });
-  await visit(app, fake, "/pkm", row, () => {
-    expect(app.count("id:pkm")).toBe(1);
   });
   await visit(app, fake, "/settings/general", row, () => {
     expect(app.count("id:settings-nav")).toBe(1);

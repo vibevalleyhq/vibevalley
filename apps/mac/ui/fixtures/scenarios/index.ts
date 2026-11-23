@@ -163,9 +163,6 @@ function responsesFor(density: ScenarioDensity, bundle: SliceBundle): Record<str
       "artifact.suggestion.list": [],
       "library.item.list": [],
       "memory.list": { memories: [] },
-      "pkm.page.list": [],
-      "pkm.search": [],
-      "pkm.radar.get": { counts: { inbox: 0, overdue: 0, later: 0 }, inbox: [], overdue: [], projects: [], areas: [], resources: [], archives: [] },
       "setting.get": { ...baseSettings, deepseekApiKey: { source: null } },
     };
   }
