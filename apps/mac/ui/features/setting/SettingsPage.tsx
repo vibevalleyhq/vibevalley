@@ -18,6 +18,7 @@ import { AboutPage } from "./AboutPage";
 import { AppearanceGroups } from "./AppearancePage";
 import { GeneralGroups } from "./GeneralPage";
 import { Readiness } from "./Readiness";
+import { RemoteAccessPage } from "./RemoteAccessPage";
 import { GitHub, SettingsFile, SettingsForm } from "./SettingsForm";
 
 type Group = "main" | "about";
@@ -35,12 +36,18 @@ const sections: readonly Section[] = [
   { id: "general", group: "main", icon: "settings", label: t("web.setting.nav.general"), words: t("web.setting.words.general") },
   { id: "models", group: "main", icon: "plug", label: t("web.setting.nav.models"), words: t("web.setting.words.models") },
   { id: "voice", group: "main", icon: "call", label: t("web.setting.nav.voice"), words: t("web.setting.words.voice") },
-  { id: "connections", group: "main", icon: "chat", label: t("web.setting.nav.connections"), words: t("web.setting.words.connections") },
+  {
+    id: "connections",
+    group: "main",
+    icon: "chat",
+    label: t("web.setting.nav.connections"),
+    words: `${t("web.setting.words.connections")} ${t("web.setting.words.remote")}`,
+  },
   { id: "about", group: "about", icon: "info", label: t("web.setting.nav.about"), words: t("web.setting.words.about") },
 ];
 
 type VoiceTab = "call" | "moss" | "dictation";
-type ConnectionsTab = "chat" | "github";
+type ConnectionsTab = "chat" | "github" | "remote";
 
 function legacyRedirect(rest: string): string | undefined {
   const [first, ...more] = rest.split("/");
@@ -59,6 +66,8 @@ function legacyRedirect(rest: string): string | undefined {
       return tail ? `/settings/connections/chat/${tail}` : "/settings/connections/chat";
     case "github":
       return "/settings/connections/github";
+    case "remote":
+      return "/settings/connections/remote";
     case "skills":
       return tail ? `/team/skills/${tail}` : "/team/skills";
     case "memory":
@@ -93,7 +102,7 @@ function VoiceSettings(props: { sub: string | undefined }) {
 
 function ConnectionsSettings(props: { sub: string | undefined; id: string | undefined }) {
   const router = useRouter();
-  const tab = (): ConnectionsTab => (props.sub === "github" ? "github" : "chat");
+  const tab = (): ConnectionsTab => (props.sub === "github" || props.sub === "remote" ? props.sub : "chat");
   return (
     <View class="gap-4">
       <Segmented
@@ -103,13 +112,20 @@ function ConnectionsSettings(props: { sub: string | undefined; id: string | unde
         options={[
           { value: "chat", label: t("web.setting.nav.chat") },
           { value: "github", label: "GitHub" },
+          { value: "remote", label: t("web.setting.nav.remote") },
         ]}
         onChange={(v) => router.navigate(`/settings/connections/${v}`)}
       />
-      <If when={tab() === "github"} else={<ConnectorsPage id={props.id} basePath="/settings/connections/chat" />}>
+      <If when={tab() === "chat"}>
+        <ConnectorsPage id={props.id} basePath="/settings/connections/chat" />
+      </If>
+      <If when={tab() === "github"}>
         <Page title="GitHub" hint={t("web.setting.github.note")}>
           <GitHub />
         </Page>
+      </If>
+      <If when={tab() === "remote"}>
+        <RemoteAccessPage />
       </If>
     </View>
   );

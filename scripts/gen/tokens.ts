@@ -1,14 +1,9 @@
-import { readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 import { z } from "zod";
 
 const root = resolve(import.meta.dirname, "../..");
-const tokensPath = resolve(root, "design/tokens.json");
-const themeJsonPath = resolve(root, "apps/mac/ui/design/theme.json");
-const nshJsonPath = resolve(root, "apps/mac/ui/nsh.json");
-const themeTokensRsPath = resolve(root, "apps/mac/src/theme_tokens.rs");
-const siteCssPath = resolve(root, "apps/site/src/ui/global.css");
 
 const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{3,8}$/u);
 const ColorValueSchema = z.string().min(1);
@@ -124,10 +119,10 @@ const NshManifestSchema = z
   .object({
     name: z.string(),
     id: z.string(),
-    version: z.string(),
-    build: z.number(),
-    capabilities: z.record(z.string(), z.unknown()),
-    theme: z.string(),
+    version: z.string().optional(),
+    build: z.number().optional(),
+    capabilities: z.record(z.string(), z.unknown()).optional(),
+    theme: z.string().optional(),
     tailwind: z.record(z.string(), z.unknown()).optional(),
   })
   .loose();
@@ -226,9 +221,10 @@ export function renderNshJson(tokens: DesignTokens, currentRaw: string): string 
   const manifest = NshManifestSchema.parse(JSON.parse(currentRaw));
   const currentShadow = typeof manifest.tailwind?.shadow === "object" && manifest.tailwind.shadow !== null ? manifest.tailwind.shadow : {};
   const shadowRecord = Object.fromEntries(Object.entries(currentShadow).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  const { tailwind: _tailwind, ...rest } = manifest;
 
   const updated = {
-    ...manifest,
+    ...rest,
     tailwind: {
       fontSize: tokens.geometry.fontSize,
       radius: tokens.geometry.radius,
@@ -337,15 +333,31 @@ export interface TargetOutput {
   readonly content: string;
 }
 
-export function generateTokenTargets(tokens: DesignTokens): TargetOutput[] {
+export function generateTokenTargets(tokens: DesignTokens, rootDir = root): TargetOutput[] {
+  const themeJsonPath = resolve(rootDir, "apps/mac/ui/design/theme.json");
+  const nshJsonPath = resolve(rootDir, "apps/mac/ui/nsh.json");
+  const themeTokensRsPath = resolve(rootDir, "apps/mac/src/theme_tokens.rs");
+  const siteCssPath = resolve(rootDir, "apps/site/src/ui/global.css");
   const nshRaw = readFileSync(nshJsonPath, "utf8");
   const siteCssRaw = readFileSync(siteCssPath, "utf8");
-  return [
-    { path: themeJsonPath, content: renderThemeJson(tokens) },
+  const themeContent = renderThemeJson(tokens);
+
+  const targets: TargetOutput[] = [
+    { path: themeJsonPath, content: themeContent },
     { path: nshJsonPath, content: renderNshJson(tokens, nshRaw) },
     { path: themeTokensRsPath, content: renderThemeTokensRs(tokens) },
     { path: siteCssPath, content: syncSiteGlobalCss(tokens, siteCssRaw) },
   ];
+
+  const mobileNshJsonPath = resolve(rootDir, "apps/mobile/nsh.json");
+  if (existsSync(mobileNshJsonPath)) {
+    const mobileNshRaw = readFileSync(mobileNshJsonPath, "utf8");
+    targets.push(
+      { path: resolve(rootDir, "apps/mobile/design/theme.json"), content: themeContent },
+      { path: mobileNshJsonPath, content: renderNshJson(tokens, mobileNshRaw) },
+    );
+  }
+  return targets;
 }
 
 function readOptional(path: string): string | undefined {
@@ -357,15 +369,16 @@ function readOptional(path: string): string | undefined {
   }
 }
 
-export function runTokensGen(checkOnly: boolean): string[] {
-  const tokens = parseDesignTokens(readFileSync(tokensPath, "utf8"));
-  const targets = generateTokenTargets(tokens);
+export function runTokensGen(checkOnly: boolean, rootDir = root): string[] {
+  const tokens = parseDesignTokens(readFileSync(resolve(rootDir, "design/tokens.json"), "utf8"));
+  const targets = generateTokenTargets(tokens, rootDir);
   const drifted: string[] = [];
   for (const target of targets) {
     const existing = readOptional(target.path);
     if (existing !== target.content) {
       drifted.push(target.path);
       if (!checkOnly) {
+        mkdirSync(dirname(target.path), { recursive: true });
         writeFileSync(target.path, target.content, "utf8");
       }
     }

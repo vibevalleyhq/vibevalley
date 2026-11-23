@@ -1,0 +1,11 @@
+{
+  "name": "@vibevalley/mobile",
+  "private": true,
+  "description": "iOS-first native mobile remote control app for VibeValley (nsh TSX).",
+  "type": "module",
+  "dependencies": {
+    "@vibevalley/i18n": "workspace:*",
+    "@vibevalley/protocol": "workspace:*",
+    "zod": "catalog:"
+  }
+}

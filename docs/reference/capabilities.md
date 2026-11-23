@@ -35,6 +35,20 @@
 | `debug.override.set` | 更新故障注入与延迟覆盖配置 | `/api/v1/debug/override/set` | ✓ |   |   |   |
 | `debug.bundle.export` | 导出脱敏后的本机诊断包 | `/api/v1/debug/bundle/export` | ✓ |   |   |   |
 
+## remote
+
+远程访问：开关、Tailscale 监听、设备配对与撤销
+
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
+|---|---|---|---|---|---|---|
+| `remote.status` | 查看远程访问状态、Tailscale 信息与已配对设备 | `/api/v1/remote/status` | ✓ |   |   |   |
+| `remote.enable` | 开启远程访问监听（默认绑定 Tailscale IPv4 或指定回环地址） | `/api/v1/remote/enable` | ✓ |   |   |   |
+| `remote.disable` | 关闭远程访问监听 | `/api/v1/remote/disable` | ✓ |   |   |   |
+| `remote.pair.create` | 生成 5 分钟有效的一次性配对码与配对深链 | `/api/v1/remote/pair/create` | ✓ |   |   |   |
+| `remote.pair.exchange` | 用一次性配对码交换持久设备令牌 | `/api/v1/remote/pair/exchange` | ✓ | ✓ |   |   |
+| `remote.device.revoke` | 撤销一台已配对设备的访问令牌 | `/api/v1/remote/device/revoke` | ✓ |   |   |   |
+| `remote.whoami` | 查看当前调用者与已配对设备身份 | `/api/v1/remote/whoami` | ✓ | ✓ |   |   |
+
 ## orchestrator
 
 主助手：上线、停下、评测

@@ -1,0 +1,10 @@
+{
+  "disabled": "Remote access is disabled.",
+  "invalidCode": "The pairing code is invalid or already used.",
+  "expiredCode": "The pairing code has expired. Generate a new one on your Mac.",
+  "rateLimited": "Too many attempts. Try again later.",
+  "revoked": "This device's access has been revoked. Pair it again.",
+  "unauthorized": "Unauthorized remote request. Pair this device first.",
+  "deviceNotFound": "Paired device not found.",
+  "bindFailed": "Could not start the remote listener on {addr}: {why}"
+}

@@ -138,6 +138,23 @@ pub trait Mcp: Send + Sync {
 
 pub type SharedMcp = Arc<dyn Mcp>;
 
+/// Authenticated remote mobile device identity returned by [`RemoteAuth::verify_bearer`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteDeviceIdentity {
+    pub device_id: String,
+    pub name: String,
+    pub scope: String,
+}
+
+/// Remote mobile access gate: reports whether remote access is enabled and
+/// validates Bearer device tokens against paired devices.
+pub trait RemoteAuth: Send + Sync {
+    fn is_enabled(&self) -> bool;
+    fn verify_bearer(&self, token: &str) -> Result<RemoteDeviceIdentity, ApiError>;
+}
+
+pub type SharedRemoteAuth = Arc<dyn RemoteAuth>;
+
 /// What the server provides to the views and transports.
 pub trait Server: Send + Sync {
     /// One endpoint by name (`issue.status.update`, ...). Blocking; never
@@ -196,6 +213,10 @@ pub trait Server: Send + Sync {
     }
     /// Optional voice controller attached by the started server.
     fn voice(&self) -> Option<Arc<crate::modules::collab::voice::Voice>> {
+        None
+    }
+    /// Optional remote device authenticator attached by the started server.
+    fn remote_auth(&self) -> Option<SharedRemoteAuth> {
         None
     }
 }

@@ -31,8 +31,8 @@ use vibevalley_protocol::{
 
 pub mod transport;
 pub use crate::transport::api::{
-    CallerContext, CallerPrincipal, ClientIdentity, ClientKind, FaultGate, HostDebugBridge, InvokeObserver, Server, SharedFaultGate, SharedHostDebug,
-    SharedInvokeObserver, refusal,
+    CallerContext, CallerPrincipal, ClientIdentity, ClientKind, FaultGate, HostDebugBridge, InvokeObserver, RemoteAuth, RemoteDeviceIdentity, Server,
+    SharedFaultGate, SharedHostDebug, SharedInvokeObserver, SharedRemoteAuth, refusal,
 };
 
 pub mod base;
@@ -99,6 +99,7 @@ struct InvokeObserverSlot(SharedInvokeObserver);
 struct FaultGateSlot(SharedFaultGate);
 struct HostDebugSlot(SharedHostDebug);
 struct McpSlot(crate::transport::api::SharedMcp);
+struct RemoteAuthSlot(SharedRemoteAuth);
 struct SpeechStreamsSlot(crate::transport::api::media::SharedSpeechStreams);
 struct MediaInputsSlot(crate::transport::api::media::SharedMediaInputs);
 
@@ -154,6 +155,7 @@ pub struct Hub {
     voice: ArcSwapOption<modules::collab::voice::Voice>,
     media_inputs: ArcSwapOption<MediaInputsSlot>,
     mcp: ArcSwapOption<McpSlot>,
+    remote_auth: ArcSwapOption<RemoteAuthSlot>,
     speech: ArcSwapOption<SpeechStreamsSlot>,
     /// Each fold's dirty slice mask and farm effects, for the feed pump task.
     kicks: flume::Sender<Kick>,
@@ -228,6 +230,11 @@ impl Hub {
         self.voice.store(Some(voice));
     }
 
+    /// Attaches or clears the remote mobile device authenticator.
+    pub fn attach_remote_auth(&self, auth: Option<SharedRemoteAuth>) {
+        self.remote_auth.store(auth.map(|a| Arc::new(RemoteAuthSlot(a))));
+    }
+
     /// A server holding `state`, with no endpoint answered yet. Its feed
     /// pump ends when [`Hub::close`] is called or the last `Arc<Hub>` is dropped.
     pub fn new(state: SpaceState) -> Arc<Hub> {
@@ -268,6 +275,7 @@ impl Hub {
             voice: ArcSwapOption::empty(),
             media_inputs: ArcSwapOption::empty(),
             mcp: ArcSwapOption::empty(),
+            remote_auth: ArcSwapOption::empty(),
             speech: ArcSwapOption::empty(),
             kicks,
         });
@@ -944,6 +952,10 @@ impl Server for Hub {
 
     fn voice(&self) -> Option<Arc<modules::collab::voice::Voice>> {
         self.voice.load_full()
+    }
+
+    fn remote_auth(&self) -> Option<SharedRemoteAuth> {
+        self.remote_auth.load().as_ref().map(|slot| slot.0.clone())
     }
 
     fn call(&self, op: &str, payload: Value) -> Envelope {

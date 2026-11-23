@@ -50,14 +50,26 @@ const HEARTBEAT: Duration = Duration::from_secs(20);
 type Shared = Arc<dyn Server>;
 
 #[derive(Clone)]
-struct HttpState {
-    server: Shared,
-    shutdown: CancellationToken,
+pub(super) struct HttpState {
+    pub(super) server: Shared,
+    pub(super) shutdown: CancellationToken,
+    pub(super) is_remote: bool,
 }
 
 impl FromRef<HttpState> for Shared {
     fn from_ref(state: &HttpState) -> Self {
         state.server.clone()
+    }
+}
+
+/// True for addresses the remote mobile listener is allowed to bind:
+/// loopback (`127.0.0.1` / `::1`), Tailscale CGNAT (`100.64.0.0/10`),
+/// private RFC1918 LAN IPv4, or IPv6 ULA (`fc00::/7`).
+/// Refuses unspecified (`0.0.0.0`, `::`) and public internet addresses.
+pub fn is_allowed_remote_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => v4.is_loopback() || v4.is_private() || (v4.octets()[0] == 100 && (v4.octets()[1] & 0b1100_0000) == 64),
+        std::net::IpAddr::V6(v6) => v6.is_loopback() || (v6.segments()[0] & 0xfe00) == 0xfc00,
     }
 }
 
@@ -91,6 +103,23 @@ pub fn serve(server: Shared, addr: SocketAddr) -> std::io::Result<Listener> {
     if !addr.ip().is_loopback() {
         return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "loopback addresses only"));
     }
+    bind_and_serve(server, addr, false)
+}
+
+/// Serves `server` for remote mobile clients on `addr` (Tailscale CGNAT,
+/// loopback, or private LAN / ULA only). Every request requires a valid
+/// paired-device Bearer token except `POST /api/v1/remote/pair/exchange`.
+pub fn serve_remote(server: Shared, addr: SocketAddr) -> std::io::Result<Listener> {
+    if !is_allowed_remote_ip(addr.ip()) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "remote listener allows loopback, Tailscale, or private LAN addresses only",
+        ));
+    }
+    bind_and_serve(server, addr, true)
+}
+
+fn bind_and_serve(server: Shared, addr: SocketAddr, is_remote: bool) -> std::io::Result<Listener> {
     let std_listener = std::net::TcpListener::bind(addr)?;
     std_listener.set_nonblocking(true)?;
     let addr = std_listener.local_addr()?;
@@ -99,7 +128,7 @@ pub fn serve(server: Shared, addr: SocketAddr) -> std::io::Result<Listener> {
         tokio::net::TcpListener::from_std(std_listener)?
     };
     let shutdown = CancellationToken::new();
-    let app = router_with_shutdown(server, shutdown.clone());
+    let app = router_with_shutdown(server, shutdown.clone(), is_remote);
     let token = shutdown.clone();
     let task = vibevalley_runtime::rt::handle().spawn(async move {
         let _ = axum::serve(listener, app).with_graceful_shutdown(token.cancelled_owned()).await;
@@ -112,11 +141,11 @@ pub fn serve(server: Shared, addr: SocketAddr) -> std::io::Result<Listener> {
 }
 
 pub fn router(server: Shared) -> Router {
-    router_with_shutdown(server, CancellationToken::new())
+    router_with_shutdown(server, CancellationToken::new(), false)
 }
 
-fn router_with_shutdown(server: Shared, shutdown: CancellationToken) -> Router {
-    let state = HttpState { server, shutdown };
+fn router_with_shutdown(server: Shared, shutdown: CancellationToken, is_remote: bool) -> Router {
+    let state = HttpState { server, shutdown, is_remote };
     Router::new()
         // Each GET path also matches ops of the same shape (POST
         // attachment/create, artifact/block/list): those go to `command`.
@@ -206,21 +235,70 @@ async fn not_allowed() -> Response {
     refuse(BizCode::MethodNotAllowed, "use POST")
 }
 
+fn bearer_token(headers: &HeaderMap) -> Option<&str> {
+    let raw = headers.get("authorization")?.to_str().ok()?.trim();
+    if raw.eq_ignore_ascii_case("bearer") {
+        return Some("");
+    }
+    let (scheme, token) = raw.split_once(char::is_whitespace)?;
+    scheme.eq_ignore_ascii_case("bearer").then(|| token.trim())
+}
+
+async fn authenticate(state: &HttpState, headers: &HeaderMap, path: &str) -> Result<CallerContext, ApiError> {
+    if let Some(token) = bearer_token(headers) {
+        let Some(auth) = state.server.remote_auth() else {
+            return Err(ApiError::new(BizCode::Unauthorized, vibevalley_i18n::t("server.remote.unauthorized", &[])));
+        };
+        let token = token.to_string();
+        let verified = tokio::task::spawn_blocking(move || auth.verify_bearer(&token))
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
+        let identity = verified?;
+        return Ok(CallerContext {
+            caller: Caller::Remote,
+            principal: CallerPrincipal::RemoteDevice {
+                device_id: identity.device_id.clone(),
+                scope: identity.scope,
+            },
+            client: Some(ClientIdentity {
+                id: identity.device_id,
+                kind: ClientKind::RemoteDevice,
+                label: identity.name,
+            }),
+            trace_id: 0,
+        });
+    }
+    if path.trim_end_matches('/') == "/api/v1/remote/pair/exchange" && state.server.remote_auth().is_some_and(|a| a.is_enabled()) {
+        return Ok(CallerContext {
+            caller: Caller::Remote,
+            principal: CallerPrincipal::RemoteDevice {
+                device_id: String::new(),
+                scope: String::new(),
+            },
+            client: Some(ClientIdentity {
+                id: "remote-pairing".into(),
+                kind: ClientKind::RemoteDevice,
+                label: "Remote pairing".into(),
+            }),
+            trace_id: 0,
+        });
+    }
+    if !state.is_remote && from_the_farm(headers) {
+        return Ok(http_caller_context(headers));
+    }
+    Err(ApiError::new(BizCode::Forbidden, "forbidden"))
+}
+
 /// A helper's MCP messages (streamable HTTP, answered as plain JSON): one
 /// message or a batch. Notifications alone are answered 202.
-async fn mcp(State(server): State<Shared>, headers: HeaderMap, body: Bytes) -> Response {
-    if !from_the_farm(&headers) {
+async fn mcp(State(state): State<HttpState>, headers: HeaderMap, body: Bytes) -> Response {
+    let token = bearer_token(&headers).unwrap_or("").to_string();
+    if state.is_remote || !from_the_farm(&headers) || token.starts_with("vv_dev_") {
         return refuse(BizCode::Forbidden, "forbidden");
     }
-    let Some(door) = server.mcp() else {
+    let Some(door) = state.server.mcp() else {
         return refuse(BizCode::ServiceUnavailable, "no MCP here");
     };
-    let token = headers
-        .get("authorization")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-        .unwrap_or("")
-        .to_string();
     let Ok(message) = serde_json::from_slice::<Value>(&body) else {
         let error = json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "parse error" } });
         return (StatusCode::BAD_REQUEST, axum::Json(error)).into_response();
@@ -242,10 +320,11 @@ async fn mcp(State(server): State<Shared>, headers: HeaderMap, body: Bytes) -> R
 
 /// The op is read from the URL, not a route parameter: the GET routes
 /// hand their POSTs here too.
-async fn command(State(server): State<Shared>, uri: axum::http::Uri, headers: HeaderMap, body: Bytes) -> Response {
-    if !from_the_farm(&headers) {
-        return refuse(BizCode::Forbidden, "forbidden");
-    }
+async fn command(State(state): State<HttpState>, uri: axum::http::Uri, headers: HeaderMap, body: Bytes) -> Response {
+    let ctx = match authenticate(&state, &headers, uri.path()).await {
+        Ok(ctx) => ctx,
+        Err(err) => return reply(Envelope::failure(&err)),
+    };
     let path = uri.path().strip_prefix("/api/v1/").unwrap_or_default();
     let op = path.trim_matches('/').replace('/', ".");
     if vibevalley_protocol::NATIVE_ENDPOINTS.iter().any(|endpoint| endpoint.op == op) {
@@ -259,7 +338,7 @@ async fn command(State(server): State<Shared>, uri: axum::http::Uri, headers: He
             Err(e) => return refuse(BizCode::InvalidInput, e.to_string()),
         }
     };
-    let ctx = http_caller_context(&headers);
+    let server = state.server;
     match tokio::task::spawn_blocking(move || server.call_with(&ctx, &op, payload)).await {
         Ok(envelope) => reply(envelope),
         Err(e) => refuse(BizCode::InternalError, e.to_string()),
@@ -289,12 +368,13 @@ fn sse<S: Stream<Item = Result<Event, Infallible>> + Send + 'static>(stream: S) 
 /// blocking OS threads per client.
 async fn slice(
     State(state): State<HttpState>,
+    uri: axum::http::Uri,
     Path(name): Path<String>,
     Query(query): Query<std::collections::HashMap<String, String>>,
     headers: HeaderMap,
 ) -> Response {
-    if !from_the_farm(&headers) {
-        return refuse(BizCode::Forbidden, "forbidden");
+    if let Err(err) = authenticate(&state, &headers, uri.path()).await {
+        return reply(Envelope::failure(&err));
     }
     let Some(kind) = SliceKind::from_str(&name) else {
         return refuse(BizCode::RouteNotFound, format!("unknown slice {name}"));
@@ -379,9 +459,9 @@ async fn slice(
     sse(stream)
 }
 
-async fn live(State(state): State<HttpState>, headers: HeaderMap) -> Response {
-    if !from_the_farm(&headers) {
-        return refuse(BizCode::Forbidden, "forbidden");
+async fn live(State(state): State<HttpState>, uri: axum::http::Uri, headers: HeaderMap) -> Response {
+    if let Err(err) = authenticate(&state, &headers, uri.path()).await {
+        return reply(Envelope::failure(&err));
     }
     if let Some(rx) = state.server.subscribe_live() {
         let bstream = BroadcastStream::new(rx);
@@ -422,12 +502,13 @@ impl Drop for Subscription {
 #[allow(clippy::result_large_err, reason = "Server::subscribe's contract returns the refusal envelope itself")]
 async fn subscribe(
     State(state): State<HttpState>,
+    uri: axum::http::Uri,
     Path(name): Path<String>,
     Query(query): Query<std::collections::HashMap<String, String>>,
     headers: HeaderMap,
 ) -> Response {
-    if !from_the_farm(&headers) {
-        return refuse(BizCode::Forbidden, "forbidden");
+    if let Err(err) = authenticate(&state, &headers, uri.path()).await {
+        return reply(Envelope::failure(&err));
     }
     let payload = match serde_json::from_str::<Value>(query.get("payload").map(String::as_str).unwrap_or("{}")) {
         Ok(v) => v,
@@ -451,14 +532,17 @@ fn is_artifact_version(version: &str) -> bool {
 
 /// VibeValley's `artifact/:id/view`: what a structured store artifact's `<iframe src>` loads.
 async fn artifact_view(
-    State(server): State<Shared>,
+    State(state): State<HttpState>,
+    uri: axum::http::Uri,
     Path(id): Path<String>,
     Query(query): Query<std::collections::HashMap<String, String>>,
     headers: HeaderMap,
 ) -> Response {
-    if !from_the_farm(&headers) {
-        return refuse(BizCode::Forbidden, "forbidden");
-    }
+    let ctx = match authenticate(&state, &headers, uri.path()).await {
+        Ok(ctx) => ctx,
+        Err(err) => return reply(Envelope::failure(&err)),
+    };
+    let server = state.server;
     if !is_artifact_id(&id) {
         return StatusCode::NOT_FOUND.into_response();
     }
@@ -480,7 +564,7 @@ async fn artifact_view(
     {
         payload["origin"] = format!("http://{host}").into();
     }
-    let envelope = match tokio::task::spawn_blocking(move || server.call("artifact.view", payload)).await {
+    let envelope = match tokio::task::spawn_blocking(move || server.call_with(&ctx, "artifact.view", payload)).await {
         Ok(envelope) => envelope,
         Err(e) => return refuse(BizCode::InternalError, e.to_string()),
     };
@@ -507,14 +591,17 @@ async fn artifact_view(
 
 /// VibeValley's `artifactContent`: what an `<iframe src>` loads.
 async fn artifact_page(
-    State(server): State<Shared>,
+    State(state): State<HttpState>,
+    uri: axum::http::Uri,
     Path((id, version)): Path<(String, String)>,
     Query(query): Query<std::collections::HashMap<String, String>>,
     headers: HeaderMap,
 ) -> Response {
-    if !from_the_farm(&headers) {
-        return refuse(BizCode::Forbidden, "forbidden");
-    }
+    let ctx = match authenticate(&state, &headers, uri.path()).await {
+        Ok(ctx) => ctx,
+        Err(err) => return reply(Envelope::failure(&err)),
+    };
+    let server = state.server;
     let Some(version) = is_artifact_version(&version).then(|| version.parse::<u64>().ok()).flatten() else {
         return StatusCode::NOT_FOUND.into_response();
     };
@@ -531,7 +618,7 @@ async fn artifact_page(
     if query.get("print").map(String::as_str) == Some("1") {
         payload["print"] = true.into();
     }
-    let envelope = match tokio::task::spawn_blocking(move || server.call("artifact.page", payload)).await {
+    let envelope = match tokio::task::spawn_blocking(move || server.call_with(&ctx, "artifact.page", payload)).await {
         Ok(envelope) => envelope,
         Err(e) => return refuse(BizCode::InternalError, e.to_string()),
     };
@@ -556,10 +643,11 @@ async fn artifact_page(
     response
 }
 
-async fn attachment(State(server): State<Shared>, Path(id): Path<String>, headers: HeaderMap) -> Response {
-    if !from_the_farm(&headers) {
-        return refuse(BizCode::Forbidden, "forbidden");
+async fn attachment(State(state): State<HttpState>, uri: axum::http::Uri, Path(id): Path<String>, headers: HeaderMap) -> Response {
+    if let Err(err) = authenticate(&state, &headers, uri.path()).await {
+        return reply(Envelope::failure(&err));
     }
+    let server = state.server;
     let found = tokio::task::spawn_blocking(move || server.call("attachment.file", serde_json::json!({ "id": id }))).await;
     let envelope = match found {
         Ok(envelope) => envelope,
@@ -590,9 +678,9 @@ async fn attachment(State(server): State<Shared>, Path(id): Path<String>, header
     }
 }
 
-async fn issue_watch(State(state): State<HttpState>, Path(id): Path<String>, headers: HeaderMap) -> Response {
-    if !from_the_farm(&headers) {
-        return refuse(BizCode::Forbidden, "forbidden");
+async fn issue_watch(State(state): State<HttpState>, uri: axum::http::Uri, Path(id): Path<String>, headers: HeaderMap) -> Response {
+    if let Err(err) = authenticate(&state, &headers, uri.path()).await {
+        return reply(Envelope::failure(&err));
     }
     match open(state.server, state.shutdown, "issue.watch".into(), serde_json::json!({ "id": id })).await {
         Ok(Ok(stream)) => stream,

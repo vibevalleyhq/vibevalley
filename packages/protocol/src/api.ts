@@ -14,6 +14,7 @@ import { type MemoryHandlers, memoryEndpoints } from "./memory/api";
 import { type OrchestratorHandlers, orchestratorEndpoints } from "./orchestrator/api";
 import { type PkmHandlers, pkmEndpoints } from "./pkm/api";
 import { type ProviderHandlers, providerEndpoints } from "./provider/api";
+import { type RemoteHandlers, remoteEndpoints } from "./remote/api";
 import { type RepoHandlers, repoEndpoints } from "./repo/api";
 import { type RuntimeHandlers, runtimeEndpoints } from "./runtime/api";
 import { type SessionHandlers, sessionEndpoints } from "./session/api";
@@ -35,6 +36,7 @@ export type { MemoryHandlers } from "./memory/api";
 export type { OrchestratorHandlers } from "./orchestrator/api";
 export type { PkmHandlers } from "./pkm/api";
 export type { ProviderHandlers } from "./provider/api";
+export type { RemoteHandlers } from "./remote/api";
 export type { MediaHandlers } from "./media/api";
 export type { RepoHandlers } from "./repo/api";
 export type { RuntimeHandlers } from "./runtime/api";
@@ -47,6 +49,7 @@ export interface Handlers
   extends
     CoreHandlers,
     DebugHandlers,
+    RemoteHandlers,
     OrchestratorHandlers,
     SettingHandlers,
     ProviderHandlers,
@@ -69,6 +72,7 @@ export interface Handlers
 export const endpoints: readonly Endpoint[] = [
   ...coreEndpoints,
   ...debugEndpoints,
+  ...remoteEndpoints,
   ...orchestratorEndpoints,
   ...settingEndpoints,
   ...providerEndpoints,

@@ -1941,6 +1941,69 @@ pub const ENDPOINTS: &[Endpoint] = &[
         input: None,
         result: Some("DebugBundleResult"),
     },
+    Endpoint {
+        op: "remote.status",
+        module: "remote",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: None,
+        result: Some("RemoteStatus"),
+    },
+    Endpoint {
+        op: "remote.enable",
+        module: "remote",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("RemoteEnableRequest"),
+        result: Some("RemoteStatus"),
+    },
+    Endpoint {
+        op: "remote.disable",
+        module: "remote",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: None,
+        result: Some("RemoteStatus"),
+    },
+    Endpoint {
+        op: "remote.pair.create",
+        module: "remote",
+        about: &[],
+        can: &[Caller::User],
+        dry_run: None,
+        input: None,
+        result: Some("RemotePairCode"),
+    },
+    Endpoint {
+        op: "remote.pair.exchange",
+        module: "remote",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("RemotePairExchangeRequest"),
+        result: Some("RemotePairExchangeResult"),
+    },
+    Endpoint {
+        op: "remote.device.revoke",
+        module: "remote",
+        about: &["id"],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("RemoteDeviceRevokeRequest"),
+        result: None,
+    },
+    Endpoint {
+        op: "remote.whoami",
+        module: "remote",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: None,
+        result: Some("RemoteWhoami"),
+    },
 ];
 
 /// Each endpoint as a type: its name, input and result.
@@ -3352,6 +3415,48 @@ pub mod ops {
         const NAME: &'static str = "debug.bundle.export";
         type Input = ();
         type Result = t::DebugBundleResult;
+    }
+    pub struct RemoteStatus;
+    impl Op for RemoteStatus {
+        const NAME: &'static str = "remote.status";
+        type Input = ();
+        type Result = t::RemoteStatus;
+    }
+    pub struct RemoteEnable;
+    impl Op for RemoteEnable {
+        const NAME: &'static str = "remote.enable";
+        type Input = t::RemoteEnableRequest;
+        type Result = t::RemoteStatus;
+    }
+    pub struct RemoteDisable;
+    impl Op for RemoteDisable {
+        const NAME: &'static str = "remote.disable";
+        type Input = ();
+        type Result = t::RemoteStatus;
+    }
+    pub struct RemotePairCreate;
+    impl Op for RemotePairCreate {
+        const NAME: &'static str = "remote.pair.create";
+        type Input = ();
+        type Result = t::RemotePairCode;
+    }
+    pub struct RemotePairExchange;
+    impl Op for RemotePairExchange {
+        const NAME: &'static str = "remote.pair.exchange";
+        type Input = t::RemotePairExchangeRequest;
+        type Result = t::RemotePairExchangeResult;
+    }
+    pub struct RemoteDeviceRevoke;
+    impl Op for RemoteDeviceRevoke {
+        const NAME: &'static str = "remote.device.revoke";
+        type Input = t::RemoteDeviceRevokeRequest;
+        type Result = ();
+    }
+    pub struct RemoteWhoami;
+    impl Op for RemoteWhoami {
+        const NAME: &'static str = "remote.whoami";
+        type Input = ();
+        type Result = t::RemoteWhoami;
     }
 }
 

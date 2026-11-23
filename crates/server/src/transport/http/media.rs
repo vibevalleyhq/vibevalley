@@ -1,5 +1,5 @@
 //! Local binary inputs: bounded streaming upload and ranged playback.
-use super::{Shared, from_the_farm, refuse, reply};
+use super::{HttpState, from_the_farm, refuse, reply};
 use axum::{
     body::{Body, Bytes},
     extract::{Path, State},
@@ -42,10 +42,11 @@ impl Read for UploadReader {
         }
     }
 }
-pub(super) async fn upload(State(server): State<Shared>, Path(id): Path<String>, headers: HeaderMap, body: Body) -> Response {
-    if !from_the_farm(&headers) {
+pub(super) async fn upload(State(state): State<HttpState>, Path(id): Path<String>, headers: HeaderMap, body: Body) -> Response {
+    if state.is_remote || !from_the_farm(&headers) {
         return refuse(BizCode::Forbidden, "forbidden");
     }
+    let server = state.server;
     if !headers
         .get("content-type")
         .and_then(|v| v.to_str().ok())
@@ -127,10 +128,11 @@ fn range(text: Option<&str>, size: u64) -> Option<(u64, u64)> {
     let end = if !a.is_empty() && !b.is_empty() { number(b)?.min(size - 1) } else { size - 1 };
     (start <= end && start < size).then_some((start, end))
 }
-pub(super) async fn content(State(server): State<Shared>, Path(id): Path<String>, headers: HeaderMap) -> Response {
-    if !from_the_farm(&headers) {
+pub(super) async fn content(State(state): State<HttpState>, Path(id): Path<String>, headers: HeaderMap) -> Response {
+    if state.is_remote || !from_the_farm(&headers) {
         return StatusCode::FORBIDDEN.into_response();
     }
+    let server = state.server;
     if !super::is_artifact_id(&id) {
         return StatusCode::NOT_FOUND.into_response();
     }
@@ -204,10 +206,11 @@ impl Drop for Gone {
 }
 
 /// A streamed speech job's events as NDJSON, one line each, for the one page that claims them.
-pub async fn speech(State(server): State<Shared>, Path(id): Path<String>, headers: HeaderMap) -> Response {
-    if !from_the_farm(&headers) {
+pub async fn speech(State(state): State<HttpState>, Path(id): Path<String>, headers: HeaderMap) -> Response {
+    if state.is_remote || !from_the_farm(&headers) {
         return refuse(BizCode::Forbidden, "forbidden");
     }
+    let server = state.server;
     let Some(streams) = server.speech_streams() else {
         return refuse(BizCode::ServiceUnavailable, "no speech here");
     };

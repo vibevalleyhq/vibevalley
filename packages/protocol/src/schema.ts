@@ -282,6 +282,17 @@ export { AgoraGrant, Dictated, DictateRequest, SettingsUpdateVoice, VoiceCall, V
 export { MemorySourceKind, SettingsStatus, SettingsUpdate } from "./setting/schema";
 export { ProviderModelListing, ProviderModelRequest, ProviderStatus, ProviderUpdate, ProviderVoiceListing, ProviderVoiceRequest } from "./provider/schema";
 export {
+  RemoteDeviceRevokeRequest,
+  RemoteDeviceSummary,
+  RemoteEnableRequest,
+  RemotePairCode,
+  RemotePairExchangeRequest,
+  RemotePairExchangeResult,
+  RemotePlatform,
+  RemoteStatus,
+  RemoteWhoami,
+} from "./remote/schema";
+export {
   MediaImageJob,
   MediaImageRequest,
   MediaImageUsage,

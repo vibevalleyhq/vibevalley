@@ -121,3 +121,10 @@ sql:
       - plugin: sqlx
         out: crates/server/src/db/generated
         options: { file: work_pull.rs, share_table_rows: true }
+  - engine: sqlite
+    schema: crates/server/src/db/schema/infra_remote.sql
+    queries: crates/server/src/db/queries/infra_remote.sql
+    codegen:
+      - plugin: sqlx
+        out: crates/server/src/db/generated
+        options: { file: infra_remote.rs }

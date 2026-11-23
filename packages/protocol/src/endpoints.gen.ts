@@ -216,4 +216,11 @@ export const servedEndpoints = [
   { op: "debug.override.get", can: ["user"], about: [] },
   { op: "debug.override.set", can: ["user"], about: [] },
   { op: "debug.bundle.export", can: ["user"], about: [] },
+  { op: "remote.status", can: ["user"], about: [] },
+  { op: "remote.enable", can: ["user"], about: [] },
+  { op: "remote.disable", can: ["user"], about: [] },
+  { op: "remote.pair.create", can: ["user"], about: [] },
+  { op: "remote.pair.exchange", can: ["user", "remote"], about: [] },
+  { op: "remote.device.revoke", can: ["user"], about: ["id"] },
+  { op: "remote.whoami", can: ["user", "remote"], about: [] },
 ] as const;

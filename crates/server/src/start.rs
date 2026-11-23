@@ -199,6 +199,8 @@ pub struct Started {
     pub connectors: Arc<modules::collab::connector::Connectors>,
     /// DevTools diagnostics kit (`debug.*` endpoints, timeline collector, fault gate).
     pub debug: Arc<modules::infra::debug::DebugKit>,
+    /// Remote mobile access listener, pairing codes, and device tokens.
+    pub remote: Arc<modules::infra::remote::Remote>,
 }
 
 impl Started {
@@ -212,6 +214,8 @@ impl Started {
             self.hub.attach_fault_gate(None);
             vibevalley_runtime::oar::set_observer(None);
         }
+        self.hub.attach_remote_auth(None);
+        self.remote.close();
         self.hub.shutdown_token().cancel();
         self.connectors.close();
         self.pulls.close();
@@ -580,6 +584,11 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         hub.attach_fault_gate(Some(debug.collector()));
         vibevalley_runtime::oar::set_observer(Some(debug.collector()));
     }
+    let remote =
+        modules::infra::remote::Remote::open(&config.home, Arc::downgrade(&hub), config.version.clone()).map_err(|e| failed("remote access")(&e.message))?;
+    hub.attach_remote_auth(Some(remote.clone()));
+    modules::infra::remote::install(&hub, remote.clone());
+    remote.restore_if_enabled();
     Ok(Started {
         hub,
         setting,
@@ -607,5 +616,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         voice,
         connectors,
         debug,
+        remote,
     })
 }

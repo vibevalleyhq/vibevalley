@@ -1,0 +1,117 @@
+{
+ "RemotePlatform": [
+  "ios",
+  "android",
+  "other"
+ ],
+ "RemoteDeviceSummary": [
+  {
+   "id": "dev-1",
+   "name": "Lucas iPhone",
+   "platform": "ios",
+   "scope": "remote:default",
+   "createdAt": 1700000000000,
+   "lastSeenAt": 1700000060000
+  },
+  {
+   "id": "dev-2",
+   "name": "Pixel 9",
+   "platform": "android",
+   "scope": "remote:default",
+   "createdAt": 1700000000000,
+   "revokedAt": 1700000120000
+  }
+ ],
+ "RemoteStatus": [
+  {
+   "enabled": true,
+   "listening": true,
+   "bindAddr": "100.99.221.58",
+   "port": 8890,
+   "tailscaleIp": "100.99.221.58",
+   "tailscaleHost": "macbook.tail1234.ts.net",
+   "tailscaleOnline": true,
+   "url": "http://100.99.221.58:8890",
+   "devices": [
+    {
+     "id": "dev-1",
+     "name": "Lucas iPhone",
+     "platform": "ios",
+     "scope": "remote:default",
+     "createdAt": 1700000000000,
+     "lastSeenAt": 1700000060000
+    }
+   ]
+  },
+  {
+   "enabled": false,
+   "listening": false,
+   "port": 8890,
+   "tailscaleOnline": false,
+   "devices": []
+  }
+ ],
+ "RemoteEnableRequest": [
+  {
+   "bindAddr": "127.0.0.1",
+   "port": 8890
+  },
+  {}
+ ],
+ "RemotePairCode": [
+  {
+   "code": "ABCD-1234",
+   "pairUrl": "vibevalley://pair?url=http%3A%2F%2F100.99.221.58%3A8890&code=ABCD-1234",
+   "url": "http://100.99.221.58:8890",
+   "expiresAt": 1700000300000
+  }
+ ],
+ "RemotePairExchangeRequest": [
+  {
+   "code": "ABCD-1234",
+   "deviceName": "Lucas iPhone",
+   "platform": "ios"
+  }
+ ],
+ "RemotePairExchangeResult": [
+  {
+   "device": {
+    "id": "dev-1",
+    "name": "Lucas iPhone",
+    "platform": "ios",
+    "scope": "remote:default",
+    "createdAt": 1700000000000
+   },
+   "token": "vv_dev_example_token_1234567890",
+   "serverName": "MacBook Pro",
+   "version": "0.1.0"
+  }
+ ],
+ "RemoteDeviceRevokeRequest": [
+  {
+   "id": "dev-1"
+  }
+ ],
+ "RemoteWhoami": [
+  {
+   "device": {
+    "id": "dev-1",
+    "name": "Lucas iPhone",
+    "platform": "ios",
+    "scope": "remote:default",
+    "createdAt": 1700000000000,
+    "lastSeenAt": 1700000060000
+   },
+   "caller": "remote",
+   "serverName": "MacBook Pro",
+   "version": "0.1.0",
+   "channel": "dev"
+  },
+  {
+   "caller": "user",
+   "serverName": "MacBook Pro",
+   "version": "0.1.0",
+   "channel": "dev"
+  }
+ ]
+}

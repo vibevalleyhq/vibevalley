@@ -21,6 +21,7 @@ pub mod memory;
 pub mod orchestrator;
 pub mod pkm;
 pub mod provider;
+pub mod remote;
 pub mod repo;
 pub mod runtime;
 pub mod session;
@@ -46,6 +47,7 @@ pub use memory::*;
 pub use orchestrator::*;
 pub use pkm::*;
 pub use provider::*;
+pub use remote::*;
 pub use repo::*;
 pub use runtime::*;
 pub use session::*;
@@ -74,6 +76,7 @@ pub(crate) fn ts_modules(cfg: &ts_rs::Config) -> Vec<crate::typescript::Module> 
         orchestrator::ts_module(cfg),
         pkm::ts_module(cfg),
         provider::ts_module(cfg),
+        remote::ts_module(cfg),
         repo::ts_module(cfg),
         runtime::ts_module(cfg),
         session::ts_module(cfg),

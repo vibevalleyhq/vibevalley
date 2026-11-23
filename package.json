@@ -9,6 +9,7 @@
     "release": "vpx scripts/release/release.ts",
     "capabilities": "vpx scripts/gen/capabilities.ts",
     "tokens:gen": "vpx scripts/gen/tokens.ts",
+    "icons:gen": "vpx scripts/gen/icons.ts",
     "ui:gallery": "vpx scripts/audit/ui-gallery.ts",
     "api:client": "vpx scripts/gen/api-client.ts",
     "i18n:gen": "vpx scripts/gen/i18n.ts gen",

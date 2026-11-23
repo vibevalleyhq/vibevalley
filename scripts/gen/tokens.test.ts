@@ -1,9 +1,10 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vite-plus/test";
 
-import { flattenPixelTheme, generateTokenTargets, parseDesignTokens, renderNshJson } from "./tokens.ts";
+import { flattenPixelTheme, generateTokenTargets, parseDesignTokens, renderNshJson, runTokensGen } from "./tokens.ts";
 
 const root = resolve(import.meta.dirname, "../..");
 
@@ -32,6 +33,51 @@ describe("design/tokens.json generator", () => {
     expect(rendered.build).toBe(parsedCurrent.build);
     expect(rendered.capabilities).toEqual(parsedCurrent.capabilities);
     expect(rendered.theme).toBe(parsedCurrent.theme);
+  });
+
+  it("syncs apps/mobile/design/theme.json and apps/mobile/nsh.json while preserving mobile fields", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "vv-tokens-mobile-"));
+    try {
+      mkdirSync(join(tempDir, "design"), { recursive: true });
+      mkdirSync(join(tempDir, "apps/mac/ui/design"), { recursive: true });
+      mkdirSync(join(tempDir, "apps/mac/src"), { recursive: true });
+      mkdirSync(join(tempDir, "apps/site/src/ui"), { recursive: true });
+      mkdirSync(join(tempDir, "apps/mobile"), { recursive: true });
+
+      writeFileSync(join(tempDir, "design/tokens.json"), readFileSync(resolve(root, "design/tokens.json"), "utf8"), "utf8");
+      writeFileSync(join(tempDir, "apps/mac/ui/nsh.json"), readFileSync(resolve(root, "apps/mac/ui/nsh.json"), "utf8"), "utf8");
+      writeFileSync(join(tempDir, "apps/site/src/ui/global.css"), readFileSync(resolve(root, "apps/site/src/ui/global.css"), "utf8"), "utf8");
+
+      const mobileManifest = {
+        name: "VibeValley",
+        id: "dev.vibevalley.mobile",
+        version: "0.1.0",
+        build: 1,
+        schemes: ["vibevalley"],
+        capabilities: { network: ["https://*"], notifications: true },
+        ios: { deploymentTarget: "17.0" },
+        android: { minSdk: 28 },
+        theme: "design/theme.json",
+      };
+      writeFileSync(join(tempDir, "apps/mobile/nsh.json"), `${JSON.stringify(mobileManifest, null, 2)}\n`, "utf8");
+
+      const driftedBefore = runTokensGen(false, tempDir);
+      expect(driftedBefore).toContain(join(tempDir, "apps/mobile/design/theme.json"));
+      expect(driftedBefore).toContain(join(tempDir, "apps/mobile/nsh.json"));
+      expect(runTokensGen(true, tempDir)).toEqual([]);
+
+      const updatedMobile = JSON.parse(readFileSync(join(tempDir, "apps/mobile/nsh.json"), "utf8")) as Record<string, unknown>;
+      expect(updatedMobile.id).toBe(mobileManifest.id);
+      expect(updatedMobile.name).toBe(mobileManifest.name);
+      expect(updatedMobile.schemes).toEqual(mobileManifest.schemes);
+      expect(updatedMobile.capabilities).toEqual(mobileManifest.capabilities);
+      expect(updatedMobile.ios).toEqual(mobileManifest.ios);
+      expect(updatedMobile.android).toEqual(mobileManifest.android);
+      expect(updatedMobile.tailwind).toBeDefined();
+      expect(readFileSync(join(tempDir, "apps/mobile/design/theme.json"), "utf8")).toBe(readFileSync(join(tempDir, "apps/mac/ui/design/theme.json"), "utf8"));
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   it("is deterministic and matches all committed targets", () => {

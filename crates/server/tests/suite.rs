@@ -24,6 +24,7 @@ mod module_boundaries;
 mod orchestrator;
 mod pkm;
 mod provider;
+mod remote;
 mod session;
 mod setting;
 mod start;

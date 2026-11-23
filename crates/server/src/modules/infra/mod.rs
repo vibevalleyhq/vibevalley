@@ -6,6 +6,7 @@ pub(crate) mod column;
 pub mod debug;
 pub mod http;
 pub mod provider;
+pub mod remote;
 pub mod setting;
 
 pub fn install_health(hub: &Hub) {

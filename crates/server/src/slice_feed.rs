@@ -173,14 +173,24 @@ impl SliceSubscription {
             strip_initial_effects: bool,
         ) -> std::pin::Pin<Box<dyn Stream<Item = (i64, Value)> + Send>> {
             use futures_util::StreamExt;
-            let initial_seq = rx.borrow().seq;
+            let (initial_seq, initial_gen) = {
+                let initial = rx.borrow();
+                (initial.seq, initial.generation)
+            };
             let skip_initial = after_seq == Some(initial_seq);
             let stream = if skip_initial { WatchStream::from_changes(rx) } else { WatchStream::new(rx) };
+            let mut seen_gen = skip_initial.then_some(initial_gen);
             let mut initial = !skip_initial && after_seq.is_none();
-            Box::pin(stream.map(move |snap| {
-                let strip = initial && strip_initial_effects;
-                initial = false;
-                wire_of(&snap, strip)
+            Box::pin(stream.filter_map(move |snap| {
+                let out = if seen_gen == Some(snap.generation) {
+                    None
+                } else {
+                    seen_gen = Some(snap.generation);
+                    let strip = initial && strip_initial_effects;
+                    initial = false;
+                    Some(wire_of(&snap, strip))
+                };
+                std::future::ready(out)
             }))
         }
         match self {
