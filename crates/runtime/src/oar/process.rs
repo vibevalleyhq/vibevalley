@@ -106,7 +106,7 @@ fn pgid_of(pid: u32) -> Option<Pid> {
     i32::try_from(pid).ok().filter(|&p| p > 0).map(Pid::from_raw)
 }
 
-async fn reap_process_group(child: &mut Child, pid: u32, grace: Duration) -> Option<ExitStatus> {
+pub(crate) async fn reap_process_group(child: &mut Child, pid: u32, grace: Duration) -> Option<ExitStatus> {
     let Some(pgid) = pgid_of(pid) else {
         let _ = child.kill().await;
         return child.wait().await.ok();

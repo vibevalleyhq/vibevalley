@@ -1993,6 +1993,22 @@ impl Runtime for AcpRuntime {
         }
     }
 
+    fn account_usage(&self) -> Result<crate::oar::AccountUsage> {
+        match self.flavor() {
+            AcpFlavor::Antigravity => {
+                let Some(path) = find_binary(&self.spec.command) else {
+                    return Ok(crate::oar::AccountUsage::Unsupported {
+                        reason: "not_installed".into(),
+                    });
+                };
+                antigravity::read_account_usage(&path)
+            }
+            AcpFlavor::Generic => Ok(crate::oar::AccountUsage::Unsupported {
+                reason: "not_supported".into(),
+            }),
+        }
+    }
+
     /// Opens a throwaway session in the temp directory to read the agent's
     /// model list (ACP has no other way to ask).
     fn list_models(&self) -> Result<Vec<ModelInfo>> {
