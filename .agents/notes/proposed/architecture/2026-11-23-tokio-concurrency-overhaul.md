@@ -29,7 +29,9 @@ Status: proposed
 
 采用 **P0 → P1 → P2** 三阶段收敛路线，在不破坏 [architecture-topology.md](docs/architecture-topology.md) 规定的模块边界（`L0`–`L3` DAG 与 `mac-no-server-module-import`）的前提下，先清除线上阻塞与关机竞态，再完成并发原语与端到端异步收敛。
 
-### P0：Wave 4 前置止血（随 Wave 4 落地）
+> 进度：**P0 与 P1 已落地**（`LateServer` 异步就绪快速路径、`watch_session`/`Inputs::list()`/Mac 非阻塞退出与 `TaskTracker` 关机排空；`tokio` `"process"` 与 `run_command_with_timeout`、artifact/connector/media/island/speech 全链路异步化、`JoinSet` + `Semaphore` 有界扇出、`ServerDb` 读写池拆分、`Chat` 无锁读与并行关机）；当前仅 **P2（双轨 `Hub::on_async`、按模块迁出 `rt::block_on`、`durable::SqliteStorage` 合并与移除 `pollster`）** 仍待推进。
+
+### P0：Wave 4 前置止血（已落地）
 
 1. **`LateServer` 异步就绪快速路径与移除转发线程**（[late.rs](apps/mac/src/hosted/late.rs)、[mod.rs](crates/server/src/transport/api/mod.rs)、[hub.rs](crates/server/src/transport/bridge/hub.rs)）
    - 在 `Server` trait 新增带默认空实现的 `ready_async(&self) -> Option<BoxFuture>`（或等价异步就绪通知接口），`LateServer` 内部以 `tokio::sync::watch` / `Notify` 暴露异步就绪状态，并透传 `subscribe_slice()`、`subscribe_live()` 与 `slice_snapshot_json()`。
@@ -51,7 +53,7 @@ Status: proposed
      - `collab/voice`：`Voice::tell` 与 `MossLine::heard` 中的 `orchestrator.brief` 调用（[mod.rs](crates/server/src/modules/collab/voice/mod.rs)）。
    - [start.rs](crates/server/src/start.rs) 的 `Started::close()` 保持 `self.hub.close()` 位于 `self.db.close()` 之前，并为 `Hub::close()` 中的 `tasks.wait()` 设置有界宽限超时，防止异常阻塞任务拖死测试或退出。
 
-### P1：Wave 5 — Tokio 并发模型全面收敛
+### P1：Wave 5 — Tokio 并发模型全面收敛（已落地）
 
 1. **统一异步子进程超时原语**
    - 在根 [Cargo.toml](Cargo.toml) 为 `tokio` 启用 `"process"` feature。
