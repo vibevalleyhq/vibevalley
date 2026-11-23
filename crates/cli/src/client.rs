@@ -1,12 +1,14 @@
-//! Pooled HTTP client, typed protocol RPC (`ask`/`mutate`), SSE streaming, and structured CLI errors.
+//! Pooled HTTP client, target/auth resolution, typed protocol RPC (`ask`/`mutate`), SSE streaming, and structured CLI errors.
 
 use std::io::{BufRead, BufReader, Read};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
-use vibevalley_protocol::{ApiErrorKind, BizCode, Envelope, Next, Op, Preview, SliceKind};
+use vibevalley_protocol::{ApiErrorKind, BizCode, Envelope, Health, Next, Op, Preview, SliceKind, ops};
 
+use crate::auth::{self, AuthConfig, Secret, normalize_server_url_lossy, same_server};
 use crate::output::Output;
 pub use vibevalley_cli::{Done, Failure, exit, no_dry_run};
 
@@ -54,12 +56,14 @@ fn failure_of(status: u16, text: &str) -> Failure {
         .ok()
         .and_then(|env| BizCode::from_code(env.biz_code).map(|biz| (env, biz)));
     let Some((env, biz)) = envelope else {
-        let code = match status {
-            404 => exit::MISSING,
-            400 => exit::USAGE,
-            _ => exit::OTHER,
+        let (code, tag) = match status {
+            404 => (exit::MISSING, "Missing"),
+            400 => (exit::USAGE, "InvalidInput"),
+            401 => (exit::REFUSED, "Unauthorized"),
+            403 => (exit::REFUSED, "Forbidden"),
+            _ => (exit::OTHER, "Server"),
         };
-        let mut failure = Failure::new(code, "Server", text.trim());
+        let mut failure = Failure::new(code, tag, text.trim());
         failure.status = Some(status);
         return failure;
     };
@@ -77,11 +81,6 @@ fn failure_of(status: u16, text: &str) -> Failure {
 /// Default loopback URL for the active release channel when no server announcement exists.
 pub fn fallback_server() -> String {
     format!("http://127.0.0.1:{}", vibevalley_protocol::home::default_port())
-}
-
-/// Server URL from `<home>/server.json`, falling back to the channel's default loopback port.
-fn default_server() -> String {
-    vibevalley_protocol::home::announced(&vibevalley_protocol::home::home()).unwrap_or_else(fallback_server)
 }
 
 const MAX_DOWNLOAD_BYTES: u64 = 512 * 1024 * 1024;
@@ -106,27 +105,230 @@ fn build_http_client(server: &str) -> reqwest::blocking::Client {
     builder.build().expect("reqwest blocking CLI client")
 }
 
+/// Origin of the active server base URL.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ServerSource {
+    Flag,
+    Env,
+    AuthFile,
+    ServerJson,
+    DefaultPort,
+}
+
+impl ServerSource {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Flag => "flag",
+            Self::Env => "env",
+            Self::AuthFile => "auth.json",
+            Self::ServerJson => "server.json",
+            Self::DefaultPort => "default",
+        }
+    }
+}
+
+/// Origin of the active Bearer token (when present).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenSource {
+    Flag,
+    Env,
+    AuthFile,
+    None,
+}
+
+impl TokenSource {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Flag => "flag",
+            Self::Env => "env",
+            Self::AuthFile => "auth.json",
+            Self::None => "none",
+        }
+    }
+}
+
+/// Result of resolving base URL and Bearer token from CLI flags, env vars, `auth.json`, and `server.json`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedTarget {
+    pub server: String,
+    pub server_source: ServerSource,
+    pub token: Option<Secret>,
+    pub token_source: TokenSource,
+}
+
+fn non_empty_string(raw: Option<String>) -> Option<String> {
+    raw.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+}
+
+fn non_empty_secret(raw: Option<Secret>) -> Option<Secret> {
+    raw.and_then(|s| s.trimmed())
+}
+
+/// Resolves target server URL and Bearer token according to precedence rules:
+/// - Server: `--server` > `VIBEVALLEY_SERVER` > `auth.json` > `server.json` > default port.
+/// - Token: `--token` > `VIBEVALLEY_REMOTE_TOKEN` > `auth.json` (only when targeting the same normalized server).
+pub fn resolve_target(
+    flag_server: Option<String>,
+    env_server: Option<String>,
+    flag_token: Option<Secret>,
+    env_token: Option<Secret>,
+    stored_auth: Option<&AuthConfig>,
+    announced_server: Option<String>,
+    fallback: String,
+) -> ResolvedTarget {
+    let flag_server = non_empty_string(flag_server);
+    let env_server = non_empty_string(env_server);
+    let announced_server = non_empty_string(announced_server);
+
+    let (server, server_source) = if let Some(s) = flag_server {
+        (normalize_server_url_lossy(&s), ServerSource::Flag)
+    } else if let Some(s) = env_server {
+        (normalize_server_url_lossy(&s), ServerSource::Env)
+    } else if let Some(cfg) = stored_auth.filter(|c| !c.server.trim().is_empty()) {
+        (normalize_server_url_lossy(&cfg.server), ServerSource::AuthFile)
+    } else if let Some(s) = announced_server {
+        (normalize_server_url_lossy(&s), ServerSource::ServerJson)
+    } else {
+        (normalize_server_url_lossy(&fallback), ServerSource::DefaultPort)
+    };
+
+    let (token, token_source) = if let Some(tok) = non_empty_secret(flag_token) {
+        (Some(tok), TokenSource::Flag)
+    } else if let Some(tok) = non_empty_secret(env_token) {
+        (Some(tok), TokenSource::Env)
+    } else if let Some(cfg) = stored_auth
+        && let Some(tok) = cfg.token.trimmed()
+        && (server_source == ServerSource::AuthFile || same_server(&server, &cfg.server))
+    {
+        (Some(tok), TokenSource::AuthFile)
+    } else {
+        (None, TokenSource::None)
+    };
+
+    ResolvedTarget {
+        server,
+        server_source,
+        token,
+        token_source,
+    }
+}
+
+fn attach_headers(req: reqwest::blocking::RequestBuilder, token: Option<&Secret>) -> reqwest::blocking::RequestBuilder {
+    let req = req.header("x-vibevalley-client", "cli");
+    match token.filter(|t| !t.is_empty()) {
+        Some(secret) => req.header("authorization", format!("Bearer {}", secret.expose())),
+        None => req,
+    }
+}
+
 /// Pooled HTTP client shared across a single CLI invocation.
 pub struct Client {
+    pub home: PathBuf,
     pub server: String,
+    pub server_source: ServerSource,
+    pub token_source: TokenSource,
     pub dry_run: bool,
     pub output: Output,
+    token: Option<Secret>,
+    explicit_server: Option<String>,
+    flag_token: Option<Secret>,
+    env_token: Option<Secret>,
+    stored_auth: Option<AuthConfig>,
     http: reqwest::blocking::Client,
 }
 
 impl Client {
-    pub fn new(server: Option<String>, dry_run: bool, json: bool) -> Self {
-        let server = server
-            .filter(|s| !s.is_empty())
-            .or_else(|| std::env::var("VIBEVALLEY_SERVER").ok().filter(|s| !s.is_empty()))
-            .unwrap_or_else(default_server);
-        let http = build_http_client(&server);
+    pub fn new(server: Option<String>, token: Option<Secret>, dry_run: bool, json: bool) -> Self {
+        let home = vibevalley_protocol::home::home();
+        let env_server = std::env::var("VIBEVALLEY_SERVER").ok();
+        let env_token = std::env::var("VIBEVALLEY_REMOTE_TOKEN").ok().map(Secret::new);
+        let stored_auth = auth::load(&home).ok().flatten();
+        let announced = vibevalley_protocol::home::announced(&home);
+        Self::from_parts(home, server, env_server, token, env_token, stored_auth, announced, dry_run, json)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_parts(
+        home: PathBuf,
+        flag_server: Option<String>,
+        env_server: Option<String>,
+        flag_token: Option<Secret>,
+        env_token: Option<Secret>,
+        stored_auth: Option<AuthConfig>,
+        announced_server: Option<String>,
+        dry_run: bool,
+        json: bool,
+    ) -> Self {
+        let explicit_server = non_empty_string(flag_server.clone()).or_else(|| non_empty_string(env_server.clone()));
+        let flag_token_clean = non_empty_secret(flag_token);
+        let env_token_clean = non_empty_secret(env_token);
+        let resolved = resolve_target(
+            flag_server,
+            env_server,
+            flag_token_clean.clone(),
+            env_token_clean.clone(),
+            stored_auth.as_ref(),
+            announced_server,
+            fallback_server(),
+        );
+        let http = build_http_client(&resolved.server);
         Self {
-            server,
+            home,
+            server: resolved.server,
+            server_source: resolved.server_source,
+            token_source: resolved.token_source,
             dry_run,
             output: Output { json },
+            token: resolved.token,
+            explicit_server,
+            flag_token: flag_token_clean,
+            env_token: env_token_clean,
+            stored_auth,
             http,
         }
+    }
+
+    /// Creates a derived client aimed at an explicit server URL and optional Bearer token
+    /// (used by `auth login` and `auth logout --revoke` to avoid leaking unrelated credentials).
+    pub fn for_target(&self, server: String, token: Option<Secret>) -> Self {
+        let server = normalize_server_url_lossy(&server);
+        let token = non_empty_secret(token);
+        let token_source = if token.is_some() { TokenSource::Flag } else { TokenSource::None };
+        let http = build_http_client(&server);
+        Self {
+            home: self.home.clone(),
+            server,
+            server_source: ServerSource::Flag,
+            token_source,
+            dry_run: self.dry_run,
+            output: self.output,
+            token,
+            explicit_server: None,
+            flag_token: None,
+            env_token: None,
+            stored_auth: None,
+            http,
+        }
+    }
+
+    pub fn token(&self) -> Option<&Secret> {
+        self.token.as_ref()
+    }
+
+    pub fn explicit_server(&self) -> Option<&str> {
+        self.explicit_server.as_deref()
+    }
+
+    pub fn flag_token(&self) -> Option<&Secret> {
+        self.flag_token.as_ref()
+    }
+
+    pub fn env_token(&self) -> Option<&Secret> {
+        self.env_token.as_ref()
+    }
+
+    pub fn stored_auth(&self) -> Option<&AuthConfig> {
+        self.stored_auth.as_ref()
     }
 
     fn url(&self, path: &str) -> String {
@@ -140,14 +342,11 @@ impl Client {
         serde_json::from_value(value).map_err(decode_failure)
     }
 
-    fn ask_raw(&self, op: &str, body: &Value) -> Result<Value, Failure> {
+    /// Calls an op by name with an explicit JSON payload over `POST /api/v1/<op>`.
+    pub fn ask_raw(&self, op: &str, body: &Value) -> Result<Value, Failure> {
         let url = self.url(&format!("/api/v1/{}", op.replace('.', "/")));
         let body = if body.is_null() { json!({}) } else { body.clone() };
-        let response = self
-            .http
-            .post(&url)
-            .header("content-type", "application/json")
-            .header("x-vibevalley-client", "cli")
+        let response = attach_headers(self.http.post(&url).header("content-type", "application/json"), self.token.as_ref())
             .body(body.to_string())
             .send()
             .map_err(|e| unreachable(&self.server, e))?;
@@ -156,14 +355,50 @@ impl Client {
         decode_envelope(status, &text)
     }
 
+    /// Probes `/api/v1/health` first (accepting either raw `Health` JSON or a protocol `Envelope`),
+    /// falling back to `POST /api/v1/server/health/get` when a server does not expose `GET /api/v1/health`.
+    pub fn probe_health(&self) -> Result<Health, Failure> {
+        let url = self.url("/api/v1/health");
+        let response = attach_headers(self.http.get(&url).header("accept", "application/json"), self.token.as_ref())
+            .send()
+            .map_err(|e| unreachable(&self.server, e))?;
+        let status = response.status().as_u16();
+        let text = response.text().map_err(|e| unreachable(&self.server, e))?;
+        if matches!(status, 404 | 405) {
+            return self.ask::<ops::ServerHealthGet>(&());
+        }
+        if status >= 300 {
+            return Err(failure_of(status, &text));
+        }
+        if let Ok(env) = serde_json::from_str::<Envelope>(&text) {
+            if env.biz_code == 0 {
+                if let Some(data) = env.data
+                    && let Ok(health) = serde_json::from_value::<Health>(data)
+                {
+                    return Ok(health);
+                }
+                return Ok(Health {
+                    ok: true,
+                    version: String::new(),
+                });
+            }
+            return Err(failure_of(status, &text));
+        }
+        if let Ok(health) = serde_json::from_str::<Health>(&text) {
+            return Ok(health);
+        }
+        if let Ok(val) = serde_json::from_str::<Value>(&text) {
+            let ok = val.get("ok").and_then(Value::as_bool).unwrap_or(true);
+            let version = val.get("version").and_then(Value::as_str).unwrap_or_default().to_string();
+            return Ok(Health { ok, version });
+        }
+        Err(decode_failure("invalid health response"))
+    }
+
     /// Fetches raw JSON from a `GET` endpoint (e.g. `/api/v1/slice/<name>?once=1`).
     pub fn get_json<T: DeserializeOwned>(&self, path: &str) -> Result<T, Failure> {
         let url = self.url(path);
-        let response = self
-            .http
-            .get(&url)
-            .header("accept", "application/json")
-            .header("x-vibevalley-client", "cli")
+        let response = attach_headers(self.http.get(&url).header("accept", "application/json"), self.token.as_ref())
             .send()
             .map_err(|e| unreachable(&self.server, e))?;
         let status = response.status().as_u16();
@@ -199,7 +434,9 @@ impl Client {
     /// Downloads raw bytes from a `GET` endpoint (e.g. `/api/v1/attachment/{id}`).
     pub fn get_bytes(&self, path: &str) -> Result<(Vec<u8>, Option<String>), Failure> {
         let url = self.url(path);
-        let response = self.http.get(&url).send().map_err(|e| unreachable(&self.server, e))?;
+        let response = attach_headers(self.http.get(&url), self.token.as_ref())
+            .send()
+            .map_err(|e| unreachable(&self.server, e))?;
         let status = response.status().as_u16();
         let content_type = response.headers().get("content-type").and_then(|v| v.to_str().ok()).map(ToString::to_string);
         if status >= 300 {
@@ -220,10 +457,7 @@ impl Client {
     /// Streams binary bytes to a `PUT` endpoint and decodes its JSON `Envelope`.
     pub fn put_bytes<T: DeserializeOwned>(&self, path: &str, content_type: &str, bytes: &[u8]) -> Result<T, Failure> {
         let url = self.url(path);
-        let response = self
-            .http
-            .put(&url)
-            .header("content-type", content_type)
+        let response = attach_headers(self.http.put(&url).header("content-type", content_type), self.token.as_ref())
             .body(bytes.to_vec())
             .send()
             .map_err(|e| unreachable(&self.server, e))?;
@@ -239,8 +473,9 @@ impl Client {
         let (tx, rx) = std::sync::mpsc::channel::<Result<String, Failure>>();
         let server = self.server.clone();
         let http = self.http.clone();
+        let token = self.token.clone();
         std::thread::spawn(move || {
-            let response = http.get(&url).header("accept", "text/event-stream").send();
+            let response = attach_headers(http.get(&url).header("accept", "text/event-stream"), token.as_ref()).send();
             let response = match response {
                 Ok(r) => r,
                 Err(e) => return drop(tx.send(Err(unreachable(&server, e)))),
@@ -297,6 +532,17 @@ fn decode_envelope(status: u16, text: &str) -> Result<Value, Failure> {
 mod tests {
     use super::*;
 
+    fn sample_auth() -> AuthConfig {
+        AuthConfig {
+            server: "http://100.64.0.5:8890".into(),
+            token: Secret::new("vv_dev_stored_token_123456"),
+            device_id: "dev_1".into(),
+            device_name: "laptop".into(),
+            server_name: Some("Mac Studio".into()),
+            scope: Some("remote:default".into()),
+        }
+    }
+
     #[test]
     fn detects_loopback_servers_for_no_proxy() {
         assert!(is_loopback_server("http://127.0.0.1:8790"));
@@ -309,15 +555,85 @@ mod tests {
     }
 
     #[test]
-    fn sse_streams_multiline_events_and_enforces_timeout() {
+    fn target_resolution_precedence_and_token_isolation() {
+        let auth = sample_auth();
+        let fallback = "http://127.0.0.1:8790".to_string();
+
+        // 1. Default: auth.json beats server.json and attaches stored token.
+        let r = resolve_target(None, None, None, None, Some(&auth), Some("http://127.0.0.1:8791".into()), fallback.clone());
+        assert_eq!(r.server, "http://100.64.0.5:8890");
+        assert_eq!(r.server_source, ServerSource::AuthFile);
+        assert_eq!(r.token.as_ref().map(Secret::expose), Some("vv_dev_stored_token_123456"));
+        assert_eq!(r.token_source, TokenSource::AuthFile);
+
+        // 2. Without auth.json: server.json beats default fallback, no token.
+        let r = resolve_target(None, None, None, None, None, Some("http://127.0.0.1:8791".into()), fallback.clone());
+        assert_eq!(r.server, "http://127.0.0.1:8791");
+        assert_eq!(r.server_source, ServerSource::ServerJson);
+        assert_eq!(r.token, None);
+        assert_eq!(r.token_source, TokenSource::None);
+
+        // 3. --server matching normalized auth.json server keeps stored token.
+        let r = resolve_target(Some("HTTP://100.64.0.5:8890/".into()), None, None, None, Some(&auth), None, fallback.clone());
+        assert_eq!(r.server, "http://100.64.0.5:8890");
+        assert_eq!(r.server_source, ServerSource::Flag);
+        assert_eq!(r.token.as_ref().map(Secret::expose), Some("vv_dev_stored_token_123456"));
+        assert_eq!(r.token_source, TokenSource::AuthFile);
+
+        // 4. --server differing from auth.json NEVER leaks stored token!
+        let r = resolve_target(Some("http://127.0.0.1:8790".into()), None, None, None, Some(&auth), None, fallback.clone());
+        assert_eq!(r.server, "http://127.0.0.1:8790");
+        assert_eq!(r.server_source, ServerSource::Flag);
+        assert_eq!(r.token, None);
+        assert_eq!(r.token_source, TokenSource::None);
+
+        // 5. VIBEVALLEY_SERVER differing from auth.json NEVER leaks stored token either!
+        let r = resolve_target(None, Some("https://100.64.0.5:8890".into()), None, None, Some(&auth), None, fallback.clone());
+        assert_eq!(r.server, "https://100.64.0.5:8890");
+        assert_eq!(r.server_source, ServerSource::Env);
+        assert_eq!(r.token, None);
+        assert_eq!(r.token_source, TokenSource::None);
+
+        // 6. --token > VIBEVALLEY_REMOTE_TOKEN > auth.json; explicit token attaches even to a different --server.
+        let r = resolve_target(
+            Some("http://other.host:8890".into()),
+            Some("http://env.host:8890".into()),
+            Some(Secret::new("vv_dev_flag_tok")),
+            Some(Secret::new("vv_dev_env_tok")),
+            Some(&auth),
+            None,
+            fallback.clone(),
+        );
+        assert_eq!(r.server, "http://other.host:8890");
+        assert_eq!(r.server_source, ServerSource::Flag);
+        assert_eq!(r.token.as_ref().map(Secret::expose), Some("vv_dev_flag_tok"));
+        assert_eq!(r.token_source, TokenSource::Flag);
+
+        let r = resolve_target(
+            Some("http://other.host:8890".into()),
+            None,
+            None,
+            Some(Secret::new("vv_dev_env_tok")),
+            Some(&auth),
+            None,
+            fallback,
+        );
+        assert_eq!(r.token.as_ref().map(Secret::expose), Some("vv_dev_env_tok"));
+        assert_eq!(r.token_source, TokenSource::Env);
+    }
+
+    #[test]
+    fn sse_streams_multiline_events_and_enforces_timeout_with_bearer_header() {
         use std::io::{Read as _, Write as _};
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = listener.local_addr().unwrap();
         let (hold_tx, hold_rx) = std::sync::mpsc::channel::<()>();
+        let (req_tx, req_rx) = std::sync::mpsc::channel::<String>();
         let server = std::thread::spawn(move || {
             let (mut conn, _) = listener.accept().unwrap();
-            let mut req = [0u8; 1024];
-            let _ = conn.read(&mut req);
+            let mut req = [0u8; 2048];
+            let n = conn.read(&mut req).unwrap_or(0);
+            let _ = req_tx.send(String::from_utf8_lossy(&req[..n]).to_string());
             let _ = conn.write_all(
                 b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n\
                   1b\r\ndata: line-1\ndata: line-2\n\n\r\n",
@@ -326,7 +642,17 @@ mod tests {
             let _ = hold_rx.recv_timeout(Duration::from_secs(5));
         });
 
-        let client = Client::new(Some(format!("http://{addr}")), false, false);
+        let client = Client::from_parts(
+            PathBuf::from("/tmp"),
+            Some(format!("http://{addr}")),
+            None,
+            Some(Secret::new("vv_dev_sse_token_1234")),
+            None,
+            None,
+            None,
+            false,
+            false,
+        );
         let mut seen = Vec::new();
         let err = client
             .sse("/events", Some(Duration::from_millis(120)), |payload| {
@@ -334,9 +660,72 @@ mod tests {
                 Ok(true)
             })
             .unwrap_err();
+        let captured_req = req_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert!(
+            captured_req.to_ascii_lowercase().contains("authorization: bearer vv_dev_sse_token_1234"),
+            "SSE request missing Bearer header:\n{captured_req}"
+        );
         assert_eq!(seen, vec!["line-1\nline-2"]);
         assert_eq!((err.code, err.tag.as_str()), (exit::OTHER, "Timeout"));
         let _ = hold_tx.send(());
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn api_download_and_upload_attach_bearer_header() {
+        use std::io::{Read as _, Write as _};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (req_tx, req_rx) = std::sync::mpsc::channel::<String>();
+
+        let server = std::thread::spawn(move || {
+            for idx in 0..4 {
+                let (mut conn, _) = listener.accept().unwrap();
+                let mut req = [0u8; 4096];
+                let n = conn.read(&mut req).unwrap_or(0);
+                let _ = req_tx.send(String::from_utf8_lossy(&req[..n]).to_string());
+                let (content_type, body) = match idx {
+                    0 => ("application/json", r#"{"bizCode":0,"message":"ok","data":{"ok":true}}"#),
+                    1 => ("application/json", r#"{"ok":true}"#),
+                    2 => ("application/octet-stream", "hello"),
+                    _ => ("application/json", r#"{"bizCode":0,"message":"ok","data":{"ok":true}}"#),
+                };
+                let resp = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\n\r\n{body}",
+                    body.len()
+                );
+                let _ = conn.write_all(resp.as_bytes());
+                let _ = conn.flush();
+            }
+        });
+
+        let client = Client::from_parts(
+            PathBuf::from("/tmp"),
+            Some(format!("http://{addr}")),
+            None,
+            Some(Secret::new("vv_dev_all_paths_token")),
+            None,
+            None,
+            None,
+            false,
+            false,
+        );
+
+        let _ = client.ask_raw("server.health.get", &json!({})).unwrap();
+        let _: Value = client.get_json("/api/v1/health").unwrap();
+        let (bytes, _) = client.get_bytes("/api/v1/attachment/att-1").unwrap();
+        assert_eq!(bytes, b"hello");
+        let _: Value = client
+            .put_bytes("/api/v1/media/input/in-1/content", "application/octet-stream", b"abc")
+            .unwrap();
+
+        for i in 0..4 {
+            let raw = req_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+            assert!(
+                raw.to_ascii_lowercase().contains("authorization: bearer vv_dev_all_paths_token"),
+                "request #{i} missing Bearer header:\n{raw}"
+            );
+        }
         server.join().unwrap();
     }
 }

@@ -51,7 +51,7 @@ fn run() -> Result<(), String> {
     let addr = format!("127.0.0.1:{port}").parse().map_err(|e| format!("{e}"))?;
     let listener = vibevalley_server::transport::http::serve(started.hub.clone(), addr).map_err(|e| format!("listening on {addr}: {e}"))?;
     let url = listener.url();
-    started.board.sessions().set_mcp_url(format!("{url}/mcp"));
+    started.set_mcp_url(format!("{url}/mcp"));
     let announced = vibevalley_server::home::announce(&home, &url).map_err(|e| format!("server.json: {e}"))?;
     eprintln!("vibevalley: listening on {url}");
     if flags.ready_json {

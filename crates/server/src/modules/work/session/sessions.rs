@@ -7,20 +7,22 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, OnceLock, Weak};
 use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use vibevalley_protocol::{
-    Deliverable, Doing, Fact, Issue, IssueAnswer, Millis, Outcome, Phase, PhaseWorking, Question, RunTrigger, Session, SessionAction, Spent,
+    Caller, Deliverable, Doing, Fact, Issue, IssueAnswer, IssueReportMemoryScope, MemoryCreateInput, Millis, Outcome, Phase, PhaseWorking, Question,
+    RunTrigger, Session, SessionAction, Spent, ops,
 };
 use vibevalley_runtime::oar::{ContentBlock, EventKind, McpServer, PermissionDecision, PermissionMode, SessionOptions, StopReason};
 
 use super::drivers::{Drive, Drivers, HelperPlace, Persona};
 use super::report::{Report, ReportQuestion, ReportStatus};
-use crate::modules::work::ledger::{BoardConfig, BoardError, IssueChange, Ledger, Result, Step, io, now};
+use crate::modules::work::ledger::{BoardConfig, BoardError, IssueChange, Ledger, Result, Step, now};
 use crate::modules::work::workplace::{Leave, Leaving, Workplace};
+use crate::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, Hub};
 
 /// What the board keeps of a session beyond the wire `Session`: the
 /// runtime's own session to resume, and the branch its work forked from.
@@ -97,6 +99,7 @@ pub(super) struct Inner {
     pub drivers: Arc<dyn Drivers>,
     pub workplaces: Arc<Workplace>,
     pub config: Arc<BoardConfig>,
+    pub hub: Option<Weak<Hub>>,
     live: Mutex<HashMap<String, Live>>,
     generation: AtomicU64,
     pub(super) extras: Mutex<HashMap<String, Extra>>,
@@ -116,6 +119,7 @@ impl Sessions {
         drivers: Arc<dyn Drivers>,
         workplaces: Arc<Workplace>,
         config: Arc<BoardConfig>,
+        hub: Option<Weak<Hub>>,
     ) -> Result<Sessions> {
         let extras = ledger.database(super::db::extras)?;
         Ok(Sessions(Arc::new(Inner {
@@ -124,6 +128,7 @@ impl Sessions {
             drivers,
             workplaces,
             config,
+            hub,
             live: Mutex::new(HashMap::new()),
             generation: AtomicU64::new(0),
             extras: Mutex::new(extras),
@@ -434,7 +439,7 @@ impl Sessions {
         if let Some(before) = previous {
             let me = self.clone();
             let session_id = id.clone();
-            if let Err(err) = std::thread::Builder::new().name(format!("vibevalley-read-children-{id}")).spawn(move || {
+            vibevalley_runtime::rt::handle().spawn_blocking(move || {
                 let mut after = before.clone();
                 let changed = super::subagents::read_back(&mut after, |thread, turn| agent.read_subagent(thread, turn), now);
                 if changed
@@ -443,15 +448,12 @@ impl Sessions {
                 {
                     eprintln!("could not reconcile subagents for {session_id}: {err}");
                 }
-            }) {
-                eprintln!("could not start subagent history lookup for {id}: {err}");
-            }
+            });
         }
         let me = self.clone();
-        std::thread::Builder::new()
-            .name(format!("vibevalley-{id}"))
-            .spawn(move || me.pump(&id, generation, events))
-            .map_err(io)?;
+        vibevalley_runtime::rt::handle().spawn(async move {
+            me.pump_async(id, generation, events).await;
+        });
         Ok(())
     }
 
@@ -584,143 +586,168 @@ impl Sessions {
         self.0.live.lock().get(session).is_some_and(|l| l.generation == generation)
     }
 
-    /// Turns the agent's events into facts until the session ends or leaves.
-    fn pump(&self, session_id: &str, generation: u64, events: flume::Receiver<vibevalley_runtime::oar::Event>) {
+    /// Turns the agent's events into facts until the session ends or leaves,
+    /// without pinning an OS thread while idle between agent events.
+    async fn pump_async(&self, session_id: String, generation: u64, events: flume::Receiver<vibevalley_runtime::oar::Event>) {
         let quiet_after = self.0.config.quiet_after;
-        let mut observed_run = None;
-        let mut said = String::new();
-        let mut asked: Vec<Question> = Vec::new();
-        let mut failure = None;
-        let mut last_event = Instant::now();
         let tick = quiet_after.min(Duration::from_secs(5)).max(Duration::from_millis(20));
+        let mut last_event = Instant::now();
+        let mut state = PumpState::default();
         loop {
-            let event = match events.recv_timeout(tick) {
-                Ok(event) => event,
-                Err(flume::RecvTimeoutError::Timeout) => {
-                    if !self.current(session_id, generation) {
+            let event = match tokio::time::timeout(tick, events.recv_async()).await {
+                Ok(Ok(event)) => event,
+                Ok(Err(flume::RecvError::Disconnected)) => break,
+                Err(_) => {
+                    if !self.current(&session_id, generation) {
                         return;
                     }
                     if last_event.elapsed() >= quiet_after {
-                        self.set_quiet(session_id, Some(now()));
+                        let me = self.clone();
+                        let sid = session_id.clone();
+                        let _ = tokio::task::spawn_blocking(move || me.set_quiet(&sid, Some(now()))).await;
                     }
                     continue;
                 }
-                Err(flume::RecvTimeoutError::Disconnected) => break,
             };
-            if !self.current(session_id, generation) {
+            if !self.current(&session_id, generation) {
                 return;
             }
             last_event = Instant::now();
-            self.set_quiet(session_id, None);
-            let root = event.agent_path.is_empty();
-            if root && matches!(event.kind, EventKind::TurnStarted { .. }) {
-                observed_run = self.extra(session_id).run;
+            let me = self.clone();
+            let sid = session_id.clone();
+            let Ok((next_state, ended)) = tokio::task::spawn_blocking(move || {
+                let ended = me.handle_pump_event(&sid, generation, event, &mut state);
+                (state, ended)
+            })
+            .await
+            else {
+                return;
+            };
+            state = next_state;
+            if ended {
+                break;
             }
-            if let Some(run) = observed_run.as_deref()
-                && super::subagents::relevant(&event)
-                && let Err(error) = self.observe_subagents(session_id, generation, run, &event)
-            {
-                eprintln!("could not record subagent progress for {session_id}: {error}");
+        }
+        let me = self.clone();
+        let _ = tokio::task::spawn_blocking(move || {
+            let mut live = me.0.live.lock();
+            let was_current = live.get(&session_id).is_some_and(|l| l.generation == generation);
+            if was_current {
+                live.remove(&session_id);
             }
-            self.record(session_id, Step::Agent(event.clone()));
-            match event.kind {
-                EventKind::SessionStarted { session_id: vendor, model } if root => {
-                    let _ = self.set_extra(session_id, |e| e.agent_session = Some(vendor));
-                    self.on_workspace_session_started(session_id, model);
+            drop(live);
+            if was_current {
+                me.on_workspace_pump_exited(&session_id);
+            }
+        })
+        .await;
+    }
+
+    fn handle_pump_event(&self, session_id: &str, generation: u64, event: vibevalley_runtime::oar::Event, state: &mut PumpState) -> bool {
+        if !self.current(session_id, generation) {
+            return true;
+        }
+        self.set_quiet(session_id, None);
+        let root = event.agent_path.is_empty();
+        if root && matches!(event.kind, EventKind::TurnStarted { .. }) {
+            state.observed_run = self.extra(session_id).run;
+        }
+        if let Some(run) = state.observed_run.as_deref()
+            && super::subagents::relevant(&event)
+            && let Err(error) = self.observe_subagents(session_id, generation, run, &event)
+        {
+            eprintln!("could not record subagent progress for {session_id}: {error}");
+        }
+        self.record(session_id, Step::Agent(event.clone()));
+        match event.kind {
+            EventKind::SessionStarted { session_id: vendor, model } if root => {
+                let _ = self.set_extra(session_id, |e| e.agent_session = Some(vendor));
+                self.on_workspace_session_started(session_id, model);
+            }
+            EventKind::TurnStarted { .. } if root => {
+                state.said.clear();
+                state.asked.clear();
+                state.failure = None;
+                let phase = Phase::working(now(), SessionAction::Thinking, "");
+                let _ = self.0.ledger.apply(vec![self.phase_changed(session_id, phase)]);
+            }
+            EventKind::TextDelta { text } if root => state.said.push_str(&text),
+            EventKind::ToolCallStarted { name, input, .. } if root => {
+                let action = super::journal::tool_action(&name, &input);
+                let detail = super::journal::tool_detail(&input, "");
+                let label = if detail.is_empty() && action == vibevalley_protocol::ToolAction::Other {
+                    name
+                } else {
+                    detail.chars().take(512).collect()
+                };
+                self.set_doing(session_id, Doing { action: action.into(), label });
+            }
+            EventKind::Question { text } if root => {
+                state.asked.push(Question {
+                    question: text,
+                    options: vec![],
+                });
+            }
+            EventKind::PermissionRequested {
+                request_id,
+                tool,
+                input,
+                summary,
+            } => {
+                if self
+                    .session(session_id)
+                    .is_some_and(|s| s.controller == vibevalley_protocol::SessionController::User)
+                {
+                    self.on_workspace_permission_requested(session_id, request_id, tool, input, summary);
+                } else if self.0.config.permission == PermissionMode::Bypass {
+                    let agent = self.0.live.lock().get(session_id).map(|l| l.agent.clone());
+                    if let Some(agent) = agent {
+                        let _ = agent.respond_permission(&request_id, PermissionDecision::AllowOnce);
+                    }
                 }
-                EventKind::TurnStarted { .. } if root => {
-                    said.clear();
-                    asked.clear();
-                    failure = None;
-                    let phase = Phase::working(now(), SessionAction::Thinking, "");
-                    let _ = self.0.ledger.apply(vec![self.phase_changed(session_id, phase)]);
-                }
-                EventKind::TextDelta { text } if root => said.push_str(&text),
-                EventKind::ToolCallStarted { name, input, .. } if root => {
-                    let action = super::journal::tool_action(&name, &input);
-                    let detail = super::journal::tool_detail(&input, "");
-                    let label = if detail.is_empty() && action == vibevalley_protocol::ToolAction::Other {
-                        name
-                    } else {
-                        detail.chars().take(512).collect()
-                    };
-                    self.set_doing(session_id, Doing { action: action.into(), label });
-                }
-                EventKind::Question { text } if root => {
-                    asked.push(Question {
-                        question: text,
-                        options: vec![],
+            }
+            EventKind::PermissionResolved { request_id, .. } => {
+                self.on_workspace_permission_resolved(session_id, &request_id);
+            }
+            EventKind::InteractionRequested {
+                request_id,
+                question,
+                options,
+                allow_custom,
+            } => {
+                if self
+                    .session(session_id)
+                    .is_some_and(|s| s.controller == vibevalley_protocol::SessionController::User)
+                {
+                    self.on_workspace_interaction_requested(session_id, request_id, question, options, allow_custom);
+                } else if root {
+                    state.asked.push(Question {
+                        question,
+                        options: options.into_iter().map(|o| o.label).collect(),
                     });
                 }
-                EventKind::PermissionRequested {
-                    request_id,
-                    tool,
-                    input,
-                    summary,
-                } => {
-                    if self
-                        .session(session_id)
-                        .is_some_and(|s| s.controller == vibevalley_protocol::SessionController::User)
-                    {
-                        self.on_workspace_permission_requested(session_id, request_id, tool, input, summary);
-                    } else if self.0.config.permission == PermissionMode::Bypass {
-                        let agent = self.0.live.lock().get(session_id).map(|l| l.agent.clone());
-                        if let Some(agent) = agent {
-                            let _ = agent.respond_permission(&request_id, PermissionDecision::AllowOnce);
-                        }
-                    }
-                }
-                EventKind::PermissionResolved { request_id, .. } => {
-                    self.on_workspace_permission_resolved(session_id, &request_id);
-                }
-                EventKind::InteractionRequested {
-                    request_id,
-                    question,
-                    options,
-                    allow_custom,
-                } => {
-                    if self
-                        .session(session_id)
-                        .is_some_and(|s| s.controller == vibevalley_protocol::SessionController::User)
-                    {
-                        self.on_workspace_interaction_requested(session_id, request_id, question, options, allow_custom);
-                    } else if root {
-                        asked.push(Question {
-                            question,
-                            options: options.into_iter().map(|o| o.label).collect(),
-                        });
-                    }
-                }
-                EventKind::InteractionResolved { request_id, .. } => {
-                    self.on_workspace_interaction_resolved(session_id, &request_id);
-                }
-                EventKind::Error { message } if root => failure = Some(message),
-                EventKind::TurnFinished { reason, usage } if root => {
-                    observed_run = None;
-                    let is_user = self
-                        .session(session_id)
-                        .is_some_and(|s| s.controller == vibevalley_protocol::SessionController::User);
-                    if is_user {
-                        self.on_workspace_turn_finished(session_id, &usage);
-                    }
-                    self.finish(session_id, reason, reported_spent(&usage), &said, &asked, failure.as_deref());
-                    if !is_user && let Some(rounds) = self.0.rounds.get() {
-                        rounds.after();
-                    }
-                }
-                EventKind::SessionEnded => break,
-                _ => {}
             }
+            EventKind::InteractionResolved { request_id, .. } => {
+                self.on_workspace_interaction_resolved(session_id, &request_id);
+            }
+            EventKind::Error { message } if root => state.failure = Some(message),
+            EventKind::TurnFinished { reason, usage } if root => {
+                state.observed_run = None;
+                let is_user = self
+                    .session(session_id)
+                    .is_some_and(|s| s.controller == vibevalley_protocol::SessionController::User);
+                if is_user {
+                    self.on_workspace_turn_finished(session_id, &usage);
+                }
+                self.finish(session_id, reason, reported_spent(&usage), &state.said, &state.asked, state.failure.as_deref());
+                if !is_user && let Some(rounds) = self.0.rounds.get() {
+                    rounds.after();
+                }
+            }
+            EventKind::SessionEnded => return true,
+            _ => {}
         }
-        let mut live = self.0.live.lock();
-        let was_current = live.get(session_id).is_some_and(|l| l.generation == generation);
-        if was_current {
-            live.remove(session_id);
-        }
-        drop(live);
-        if was_current {
-            self.on_workspace_pump_exited(session_id);
-        }
+        false
     }
 
     fn observe_subagents(&self, session_id: &str, generation: u64, run: &str, event: &vibevalley_runtime::oar::Event) -> Result<()> {
@@ -897,15 +924,46 @@ impl Sessions {
         }
         if let Some(r) = report.as_ref().filter(|r| !r.remember.is_empty())
             && let Some(agent) = session.profile.clone()
+            && let Some(hub) = self.0.hub.as_ref().and_then(Weak::upgrade)
         {
-            self.announce(super::News::Remember {
-                agent,
-                session: session_id.to_string(),
-                repo: session.repo_name().unwrap_or_default().to_string(),
-                memories: r.remember.clone(),
-            });
+            let repo_name = session.repo_name().unwrap_or_default().to_string();
+            let ctx = CallerContext {
+                caller: Caller::Session,
+                principal: CallerPrincipal::LocalOwner,
+                client: Some(ClientIdentity {
+                    id: session_id.to_string(),
+                    kind: ClientKind::Internal,
+                    label: session_id.to_string(),
+                }),
+                trace_id: 0,
+            };
+            for m in &r.remember {
+                let repo = match m.scope {
+                    IssueReportMemoryScope::Repo => (!repo_name.is_empty()).then(|| repo_name.clone()),
+                    IssueReportMemoryScope::All => None,
+                };
+                if let Err(e) = hub.invoke::<ops::MemoryCreate>(
+                    &ctx,
+                    MemoryCreateInput {
+                        agent: agent.clone(),
+                        text: m.text.clone(),
+                        repo,
+                        request_key: None,
+                    },
+                ) {
+                    eprintln!("memory: {session_id}'s report note was not kept: {}", e.message);
+                }
+            }
         }
     }
+}
+
+#[derive(Default)]
+struct PumpState {
+    observed_run: Option<String>,
+    said: String,
+    asked: Vec<Question>,
+    failure: Option<String>,
 }
 
 fn reported_spent(usage: &vibevalley_runtime::oar::Usage) -> Option<Spent> {

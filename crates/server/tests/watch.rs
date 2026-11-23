@@ -39,21 +39,24 @@ fn the_watch_routes_the_chat_to_a_session() {
     })
     .unwrap();
     let hub = started.hub.clone();
-    let chat = started.chat.clone();
+    let chat = started.test_internals().chat.clone();
     let call = |op: &str, p: Value| {
         let e = hub.call_as(Caller::User, op, p);
         assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
         e.data.unwrap_or(Value::Null)
     };
-    let mut helper = started.agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
     helper.runtime = "scripted".into();
-    let helper = started.agents.profiles.save(helper).unwrap();
+    let helper = started.test_internals().agents.profiles.save(helper).unwrap();
     call("repo.create", json!({ "name": "farm" }));
     let issue = call("issue.create", json!({ "title": "say hello", "repo": "farm", "agent": helper.id }));
     let id = issue["id"].as_str().unwrap().to_string();
     call("issue.status.update", json!({ "id": id, "status": "todo" }));
     let session = until("the session", || {
-        started.board.read(|s| s.sessions.iter().find(|x| x.issue_id() == Some(id.as_str())).cloned())
+        started
+            .test_internals()
+            .board
+            .read(|s| s.sessions.iter().find(|x| x.issue_id() == Some(id.as_str())).cloned())
     });
     let runs = |sid: &str| -> usize {
         let events = hub
@@ -193,10 +196,10 @@ fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
         e.data.unwrap_or(Value::Null)
     };
 
-    let mut helper = started.agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
     helper.runtime = "blocking".into();
     helper.name = "慢速帮手".into();
-    started.agents.profiles.save(helper).unwrap();
+    started.test_internals().agents.profiles.save(helper).unwrap();
     let direct = call("channel.direct.create", json!({ "agent": "慢速帮手" })).as_str().unwrap().to_string();
     let other = call("channel.create", json!({ "name": "other" })).as_str().unwrap().to_string();
 
@@ -227,6 +230,7 @@ fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
     // Deleting a message withdraws its pending deliveries immediately.
     assert!(
         started
+            .test_internals()
             .chat
             .pending_deliveries(DeliveryTargetKind::Orchestrator)
             .unwrap()
@@ -236,6 +240,7 @@ fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
     call("channel.message.delete", json!({ "id": fast_id }));
     assert!(
         !started
+            .test_internals()
             .chat
             .pending_deliveries(DeliveryTargetKind::Orchestrator)
             .unwrap()
@@ -249,7 +254,7 @@ fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
         let rows = call("channel.message.list", json!({ "id": direct }));
         rows.as_array()?.iter().any(|m| m["kind"] == "report").then_some(())
     });
-    assert!(started.chat.pending_deliveries(DeliveryTargetKind::Direct).unwrap().is_empty());
+    assert!(started.test_internals().chat.pending_deliveries(DeliveryTargetKind::Direct).unwrap().is_empty());
     started.close();
 }
 
@@ -317,10 +322,10 @@ fn pr2_direct_talk_reopen_passes_resume() {
     };
 
     let s1 = open_server(resumes.clone(), "round-1");
-    let mut helper = s1.agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = s1.test_internals().agents.profiles.install_template("reviewer").unwrap();
     helper.runtime = "resumable".into();
     helper.name = "接续帮手".into();
-    let helper = s1.agents.profiles.save(helper).unwrap();
+    let helper = s1.test_internals().agents.profiles.save(helper).unwrap();
     let direct = s1
         .hub
         .call_as(Caller::User, "channel.direct.create", json!({ "agent": "接续帮手" }))
@@ -336,7 +341,7 @@ fn pr2_direct_talk_reopen_passes_resume() {
         let rows = s1.hub.call_as(Caller::User, "channel.message.list", json!({ "id": direct })).data?;
         rows.as_array()?.iter().any(|m| m["kind"] == "report" && m["text"] == "round-1").then_some(())
     });
-    let session = s1.board.sessions().talker(&helper.id, &direct).expect("talker session");
+    let session = s1.test_internals().board.sessions().talker(&helper.id, &direct).expect("talker session");
     assert_eq!(resumes.lock().unwrap().as_slice(), &[None]);
     s1.close();
     drop(s1);
@@ -390,10 +395,10 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
         e.data.unwrap_or(Value::Null)
     };
 
-    let mut helper = started.agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
     helper.runtime = "blocking".into();
     helper.name = "信箱帮手".into();
-    let helper = started.agents.profiles.save(helper).unwrap();
+    let helper = started.test_internals().agents.profiles.save(helper).unwrap();
     let direct = call("channel.direct.create", json!({ "agent": "信箱帮手" })).as_str().unwrap().to_string();
 
     // First message enters BlockingRuntime::open so the lane thread is busy before second is claimed.
@@ -408,13 +413,13 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
         .to_string();
     let owner = format!("profile:{}", helper.id);
     until("second message queued in mailbox", || {
-        let entries = started.board.sessions().mailbox_entries(&owner).ok()?;
+        let entries = started.test_internals().board.sessions().mailbox_entries(&owner).ok()?;
         entries.into_iter().find(|e| e.payload == "撤回这条" && e.status == MailboxStatus::Pending)
     });
 
     call("channel.message.delete", json!({ "id": msg2_id }));
     until("deleted channel message withdraws pending mailbox entry", || {
-        let entries = started.board.sessions().mailbox_entries(&owner).ok()?;
+        let entries = started.test_internals().board.sessions().mailbox_entries(&owner).ok()?;
         entries.into_iter().find(|e| e.payload == "撤回这条" && e.status == MailboxStatus::Withdrawn)
     });
 
@@ -424,10 +429,10 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
     until("first direct talk report landed and all deliveries cleared", || {
         let rows = call("channel.message.list", json!({ "id": direct }));
         let reports = rows.as_array()?.iter().filter(|m| m["kind"] == "report").count();
-        let pending = started.chat.pending_deliveries(DeliveryTargetKind::Direct).ok()?;
+        let pending = started.test_internals().chat.pending_deliveries(DeliveryTargetKind::Direct).ok()?;
         (reports == 1 && pending.is_empty()).then_some(())
     });
-    let entries = started.board.sessions().mailbox_entries(&owner).unwrap();
+    let entries = started.test_internals().board.sessions().mailbox_entries(&owner).unwrap();
     assert_eq!(entries.iter().find(|e| e.payload == "撤回这条").unwrap().status, MailboxStatus::Withdrawn);
     started.close();
 }
@@ -455,7 +460,7 @@ fn regression_channel_delete_withdraws_pending_mailbox_by_source_message_across_
         e.data.unwrap_or(Value::Null)
     };
 
-    let general = started.chat.default_channel();
+    let general = started.test_internals().chat.default_channel();
     call(
         "channel.message.send",
         json!({ "id": general, "text": "待撤回消息", "sendKey": "multi-withdraw" }),
@@ -466,7 +471,7 @@ fn regression_channel_delete_withdraws_pending_mailbox_by_source_message_across_
         .unwrap()
         .to_string();
 
-    let sessions = started.board.sessions();
+    let sessions = started.test_internals().board.sessions();
     sessions
         .enqueue_mailbox(
             "profile:direct-1",
@@ -535,9 +540,9 @@ fn regression_issue_comment_clears_asking_in_board_slice_before_returning() {
         e.data.unwrap_or(Value::Null)
     };
 
-    let mut helper = started.agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
     helper.runtime = "scripted".into();
-    let helper = started.agents.profiles.save(helper).unwrap();
+    let helper = started.test_internals().agents.profiles.save(helper).unwrap();
     call("repo.create", json!({ "name": "clock" }));
     let issue = call("issue.create", json!({ "title": "Pick port", "repo": "clock", "agent": helper.id }));
     let id = issue["id"].as_str().unwrap().to_string();

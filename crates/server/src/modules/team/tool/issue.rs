@@ -3,12 +3,12 @@
 use serde::Deserialize;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    CriterionCheck, Deliverable, Issue, IssueAnswer, IssueFilter, IssueReportMemory, IssueReviewInput, IssueStatus, IssueTimeline, MandateStrength,
-    SubmitBranch,
+    CriterionCheck, Deliverable, Issue, IssueAnswer, IssueDiffGetInput, IssueFilter, IssueRefineInput, IssueReportMemory, IssueRequest, IssueReviewInput,
+    IssueStatus, IssueStatusUpdateInput, IssueTimeline, IssueUpdateInput, MandateStrength, SessionStopInput, SubmitBranch, ops,
 };
 
-use super::{Farm, Who, given};
-use crate::modules::team::orchestrator::words;
+use super::{ToolBox, Who, given};
+use crate::modules::infra::text;
 use crate::modules::work::issue::ChildDraft;
 use crate::modules::work::session::{Report, ReportQuestion, ReportStatus};
 use crate::now;
@@ -26,9 +26,9 @@ pub struct ListArgs {
     limit: Option<i64>,
 }
 
-pub fn list(f: &Farm, _: &Who, a: ListArgs) -> Result<String, String> {
+pub fn list(f: &ToolBox, who: &Who, a: ListArgs) -> Result<String, String> {
     let status = match given(&a.status) {
-        Some(st) => Some(words::status_named(st).ok_or_else(|| format!("Expected one of: {}", words::STATUS_WORDS))?),
+        Some(st) => Some(text::status_named(st).ok_or_else(|| format!("Expected one of: {}", text::STATUS_WORDS))?),
         None => None,
     };
     let filter = IssueFilter {
@@ -39,7 +39,7 @@ pub fn list(f: &Farm, _: &Who, a: ListArgs) -> Result<String, String> {
         closed: a.closed,
         wants_user: a.wants_user,
     };
-    let found: Vec<Issue> = f.board.read(|s| vibevalley_core::pick_issues(&s.issues, &filter, now()));
+    let found = f.hub()?.invoke::<ops::IssueList>(&f.ctx(who), filter).map_err(|e| e.message)?;
     if found.is_empty() {
         return Ok(if a.wants_user == Some(true) {
             "没有在等用户的工单。"
@@ -50,16 +50,16 @@ pub fn list(f: &Farm, _: &Who, a: ListArgs) -> Result<String, String> {
     }
     let limit = a.limit.filter(|l| *l > 0).map(|l| l as usize).unwrap_or(20);
     let at = now();
-    let mut text = found
+    let mut out = found
         .iter()
         .take(limit)
-        .map(|i| words::issue_line(i, &f.who_of(i), at))
+        .map(|i| text::issue_line(i, &f.who_of(i), at))
         .collect::<Vec<_>>()
         .join("\n");
     if found.len() > limit {
-        text += &format!("\n（还有 {} 张没列）", found.len() - limit);
+        out += &format!("\n（还有 {} 张没列）", found.len() - limit);
     }
-    Ok(text)
+    Ok(out)
 }
 
 #[derive(Deserialize)]
@@ -68,7 +68,7 @@ pub struct IdArgs {
     id: String,
 }
 
-pub fn get(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
+pub fn get(f: &ToolBox, _: &Who, a: IdArgs) -> Result<String, String> {
     let item = match f.issue(&a.id) {
         Ok(i) => i,
         Err(why) => return Ok(why),
@@ -79,28 +79,33 @@ pub fn get(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
         .ok()
         .map(|runs| vibevalley_core::brief::milestones_of(&item, &runs, |s| f.board.session(s).map(|s| s.name)));
     let at = now();
-    let mut lines = vec![words::issue_detail(&item, &f.who_of(&item), timeline.as_ref(), at)];
+    let mut lines = vec![text::issue_detail(&item, &f.who_of(&item), timeline.as_ref(), at)];
     if let Some(w) = f.worker_of(&item) {
-        lines.push(words::session_line(&w, at, Some(item.number)));
+        lines.push(text::session_line(&w, at, Some(item.number)));
         lines.push(format!("目录：{}", w.cwd.clone().unwrap_or_default()));
         let last = w.last_run.as_ref().map(|r| r.summary.clone()).filter(|t| !t.is_empty());
         lines.push(format!(
             "上一轮完整汇报（结尾部分）：\n{}",
-            last.map(|t| words::tail(&t, 2000)).unwrap_or_else(|| "还没有".into())
+            last.map(|t| text::tail(&t, 2000)).unwrap_or_else(|| "还没有".into())
         ));
     }
     Ok(lines.join("\n"))
 }
 
-pub fn diff(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
+pub fn diff(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
     let item = match f.issue(&a.id) {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
-    Ok(match crate::modules::work::issue::changes_of(&f.board, &item, None) {
-        Ok(changes) => words::changes_text(&changes),
-        Err(why) => format!("看不了改动：{}", why.message),
-    })
+    Ok(
+        match f
+            .hub()?
+            .invoke::<ops::IssueDiffGet>(&f.ctx(who), IssueDiffGetInput { id: item.id, since_tree: None })
+        {
+            Ok(changes) => text::changes_text(&changes),
+            Err(why) => format!("看不了改动：{}", why.message),
+        },
+    )
 }
 
 #[derive(Deserialize)]
@@ -120,7 +125,7 @@ pub struct ReviewArgs {
     text: Option<String>,
 }
 
-pub fn review(f: &Farm, _: &Who, a: ReviewArgs) -> Result<String, String> {
+pub fn review(f: &ToolBox, who: &Who, a: ReviewArgs) -> Result<String, String> {
     let item = match f.issue(&a.id) {
         Ok(i) => i,
         Err(why) => return Ok(why),
@@ -136,7 +141,7 @@ pub fn review(f: &Farm, _: &Who, a: ReviewArgs) -> Result<String, String> {
         findings,
         text: a.text,
     };
-    Ok(match crate::modules::work::issue::review(&f.board, input).map_err(|e| e.message) {
+    Ok(match f.hub()?.invoke::<ops::IssueReview>(&f.ctx(who), input).map_err(|e| e.message) {
         Ok(done) if a.pass => format!("#{} 验收过了，等用户点完成", done.number),
         Ok(done) => format!(
             "#{} 没过验收，{} 处要修，已经交回给帮工",
@@ -155,7 +160,7 @@ pub struct CommentArgs {
     text: String,
 }
 
-pub fn comment(f: &Farm, _: &Who, a: CommentArgs) -> Result<String, String> {
+pub fn comment(f: &ToolBox, _: &Who, a: CommentArgs) -> Result<String, String> {
     let item = match f.issue(&a.id) {
         Ok(i) => i,
         Err(why) => return Ok(why),
@@ -163,21 +168,21 @@ pub fn comment(f: &Farm, _: &Who, a: CommentArgs) -> Result<String, String> {
     Ok(match crate::modules::work::issue::comment(&f.board, &item.id, &a.text) {
         Ok(_) => match f.worker_of(&item) {
             Some(w) => format!("已经在 #{} 的工单串里跟 {} 说了", item.number, w.name),
-            None => words::nobody_on(item.number),
+            None => text::nobody_on(item.number),
         },
         Err(why) => format!("没带到：{}", why.message),
     })
 }
 
-pub fn stop(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
+pub fn stop(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
     let item = match f.issue(&a.id) {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
     let Some(w) = f.worker_of(&item) else {
-        return Ok(words::nobody_on(item.number));
+        return Ok(text::nobody_on(item.number));
     };
-    Ok(match crate::modules::work::session::stop(&f.board, &w.id) {
+    Ok(match f.hub()?.invoke::<ops::SessionStop>(&f.ctx(who), SessionStopInput { id: w.id }) {
         Ok(()) => format!("#{} 这一轮叫停了", item.number),
         Err(why) => why.message,
     })
@@ -186,7 +191,7 @@ pub fn stop(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
 #[derive(Deserialize)]
 pub struct Nothing {}
 
-pub fn sessions(f: &Farm, _: &Who, _: Nothing) -> Result<String, String> {
+pub fn sessions(f: &ToolBox, _: &Who, _: Nothing) -> Result<String, String> {
     let all = f.roster();
     Ok(if all.is_empty() {
         "现在没有在场的帮工。".into()
@@ -196,7 +201,7 @@ pub fn sessions(f: &Farm, _: &Who, _: Nothing) -> Result<String, String> {
 }
 
 /// Who the orchestrator's issue goes to: the one it names, else for a start or a draft the best fit.
-fn chosen(f: &Farm, who: &Who, named: Option<&str>, brief: &str, needed: bool) -> Result<Option<String>, String> {
+fn chosen(f: &ToolBox, who: &Who, named: Option<&str>, brief: &str, needed: bool) -> Result<Option<String>, String> {
     let named = named.unwrap_or("");
     if named.is_empty() && !needed {
         return Ok(None);
@@ -207,7 +212,7 @@ fn chosen(f: &Farm, who: &Who, named: Option<&str>, brief: &str, needed: bool) -
     };
     match f.agents.fleet.choose(brief, named, picked) {
         Some(a) => Ok(Some(a.id)),
-        None if named.is_empty() => Err(words::NO_AGENT_TO_DISPATCH.into()),
+        None if named.is_empty() => Err(text::NO_AGENT_TO_DISPATCH.into()),
         None => Err(format!("没有叫 {named} 的帮工档案或 runtime")),
     }
 }
@@ -225,12 +230,12 @@ pub struct UpdateArgs {
     agent: Option<String>,
 }
 
-pub fn update(f: &Farm, _: &Who, a: UpdateArgs) -> Result<String, String> {
+pub fn update(f: &ToolBox, who: &Who, a: UpdateArgs) -> Result<String, String> {
     let item = match f.issue(&a.id) {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
-    let mut req = vibevalley_protocol::IssueUpdateInput {
+    let mut req = IssueUpdateInput {
         id: item.id.clone(),
         title: a.title,
         description: a.description,
@@ -240,21 +245,22 @@ pub fn update(f: &Farm, _: &Who, a: UpdateArgs) -> Result<String, String> {
         ..Default::default()
     };
     if let Some(pr) = given(&a.priority) {
-        let pr = words::priority_named(pr).ok_or(PRIORITIES)?;
+        let pr = text::priority_named(pr).ok_or(PRIORITIES)?;
         req.priority = Some(pr);
     }
     if let Some(name) = given(&a.agent) {
         let Some(profile) = f.agents.profiles.named(name) else {
-            return Ok(words::no_profile_named(name));
+            return Ok(text::no_profile_named(name));
         };
         req.agent = Some(profile.id);
     }
-    Ok(
-        match crate::modules::work::issue::update(&f.board, Some(&f.agents), req).map_err(|e| e.message) {
-            Ok(done) => format!("改好了：{}", words::slice_from(&words::issue_line(&done, &f.who_of(&done), now()), 2)),
-            Err(why) => format!("没改：{why}"),
-        },
-    )
+    Ok(match f.hub()?.invoke::<ops::IssueUpdate>(&f.ctx(who), req).map_err(|e| e.message) {
+        Ok(applied) => {
+            let done = f.issue(&applied.id).unwrap_or(item);
+            format!("改好了：{}", text::slice_from(&text::issue_line(&done, &f.who_of(&done), now()), 2))
+        }
+        Err(why) => format!("没改：{why}"),
+    })
 }
 
 #[derive(Deserialize)]
@@ -267,13 +273,13 @@ pub struct StatusArgs {
     agent: Option<String>,
 }
 
-pub fn status(f: &Farm, who: &Who, a: StatusArgs) -> Result<String, String> {
+pub fn status(f: &ToolBox, who: &Who, a: StatusArgs) -> Result<String, String> {
     let item = match f.issue(&a.id) {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
-    let to = words::status_named(&a.status).ok_or_else(|| format!("Expected one of: {}", words::STATUS_WORDS))?;
-    let mut req = vibevalley_protocol::IssueStatusUpdateInput {
+    let to = text::status_named(&a.status).ok_or_else(|| format!("Expected one of: {}", text::STATUS_WORDS))?;
+    let mut req = IssueStatusUpdateInput {
         revision: None,
         id: item.id.clone(),
         status: to,
@@ -288,13 +294,17 @@ pub fn status(f: &Farm, who: &Who, a: StatusArgs) -> Result<String, String> {
         Ok(None) => {}
         Err(why) => return Ok(format!("没挪：{why}")),
     }
-    Ok(
-        match crate::modules::work::issue::status(&f.board, Some(&f.agents), &req).map_err(|e| e.message) {
-            Ok(done) if to == IssueStatus::Done && done.status == IssueStatus::Done => format!("#{} {}", done.number, words::closed(&done)),
-            Ok(done) => format!("挪好了：{}", words::slice_from(&words::issue_line(&done, &f.who_of(&done), now()), 2)),
-            Err(why) => format!("没挪：{why}"),
-        },
-    )
+    Ok(match f.hub()?.invoke::<ops::IssueStatusUpdate>(&f.ctx(who), req).map_err(|e| e.message) {
+        Ok(applied) => {
+            let done = f.issue(&applied.id).unwrap_or(item);
+            if to == IssueStatus::Done && done.status == IssueStatus::Done {
+                format!("#{} {}", done.number, text::closed(&done))
+            } else {
+                format!("挪好了：{}", text::slice_from(&text::issue_line(&done, &f.who_of(&done), now()), 2))
+            }
+        }
+        Err(why) => format!("没挪：{why}"),
+    })
 }
 
 #[derive(Deserialize)]
@@ -319,7 +329,7 @@ pub struct CreateArgs {
 }
 
 /// `issue_create`: written down, and sent when asked (`start`).
-pub fn create(f: &Farm, who: &Who, a: CreateArgs) -> Result<String, String> {
+pub fn create(f: &ToolBox, who: &Who, a: CreateArgs) -> Result<String, String> {
     if a.start && a.draft {
         return Ok("没记：起草交回来以前开不了工。要马上做就不起草；要起草就先不开工。".into());
     }
@@ -334,7 +344,7 @@ pub fn create(f: &Farm, who: &Who, a: CreateArgs) -> Result<String, String> {
             None => return Ok(format!("没有 {name} 这个频道：先用 channel_list 看看有哪些，或者用 channel_create 开一个。")),
         }
     }
-    let mut req = vibevalley_protocol::IssueRequest {
+    let mut req = IssueRequest {
         title: a.title.clone(),
         description: a.description.clone(),
         deliver: a.deliver,
@@ -350,7 +360,7 @@ pub fn create(f: &Farm, who: &Who, a: CreateArgs) -> Result<String, String> {
         None => {}
     }
     if let Some(pr) = given(&a.priority) {
-        match words::priority_named(pr) {
+        match text::priority_named(pr) {
             Some(pr) => req.priority = Some(pr),
             None => return Ok(PRIORITIES.into()),
         }
@@ -361,27 +371,29 @@ pub fn create(f: &Farm, who: &Who, a: CreateArgs) -> Result<String, String> {
         Ok(None) => {}
         Err(why) => return Ok(format!("没记：{why}")),
     }
-    let item = match crate::modules::work::issue::create(&f.board, Some(&f.agents), &req).map_err(|e| e.message) {
+    let ctx = f.ctx(who);
+    let hub = f.hub()?;
+    let applied = match hub.invoke::<ops::IssueCreate>(&ctx, req).map_err(|e| e.message) {
         Ok(i) => i,
         Err(why) => return Ok(format!("没记下：{why}")),
     };
-    let answer = if item.deliver == Deliverable::Answer {
+    let answer = if applied.deliver == Deliverable::Answer {
         "（只查、交结论，不改代码）"
     } else {
         ""
     };
-    let noted = format!("记下了：#{}「{}」{answer}", item.number, vibevalley_core::rules::short_title(&item.title));
+    let noted = format!("记下了：#{}「{}」{answer}", applied.number, vibevalley_core::rules::short_title(&applied.title));
     if a.draft {
         return Ok(
-            match crate::modules::work::issue::refine(
-                &f.board,
-                Some(&f.chat),
-                &vibevalley_protocol::IssueRefineInput {
-                    id: item.id.clone(),
-                    ..Default::default()
-                },
-            )
-            .map_err(|e| e.message)
+            match hub
+                .invoke::<ops::IssueRefine>(
+                    &ctx,
+                    IssueRefineInput {
+                        id: applied.id.clone(),
+                        ..Default::default()
+                    },
+                )
+                .map_err(|e| e.message)
             {
                 Ok(_) => format!("{noted}，在备选里，帮工在起草"),
                 Err(why) => format!("{noted}，在备选里；起草没开始：{why}"),
@@ -391,26 +403,28 @@ pub fn create(f: &Farm, who: &Who, a: CreateArgs) -> Result<String, String> {
     if !a.start {
         return Ok(format!("{noted}，在备选里，没开工"));
     }
-    if let Err(why) = crate::modules::work::issue::status(
-        &f.board,
-        Some(&f.agents),
-        &vibevalley_protocol::IssueStatusUpdateInput {
-            revision: None,
-            id: item.id.clone(),
-            status: IssueStatus::Todo,
-            text: None,
-            agent: None,
-            edit: None,
-            request_key: None,
-        },
-    )
-    .map_err(|e| e.message)
+    if let Err(why) = hub
+        .invoke::<ops::IssueStatusUpdate>(
+            &ctx,
+            IssueStatusUpdateInput {
+                revision: None,
+                id: applied.id.clone(),
+                status: IssueStatus::Todo,
+                text: None,
+                agent: None,
+                edit: None,
+                request_key: None,
+            },
+        )
+        .map_err(|e| e.message)
     {
         return Ok(format!(
             "{noted}，在备选里；没开工：{why}。要再开工用 issue_status_update 挪到待办，不要再建一张"
         ));
     }
-    let now_item = f.issue(&item.id).unwrap_or(item);
+    let Some(now_item) = f.issue(&applied.id).ok() else {
+        return Ok(format!("{noted}，在 #{} 排进待办：有空位就开工", channel.name));
+    };
     Ok(match f.worker_of(&now_item) {
         Some(h) => format!(
             "{noted}，已在 #{} 派 {}（{}）去 {}{}",
@@ -425,13 +439,13 @@ pub fn create(f: &Farm, who: &Who, a: CreateArgs) -> Result<String, String> {
 }
 
 /// The helper calling, and the issue it works on.
-fn helper_issue(f: &Farm, who: &Who) -> Result<(vibevalley_protocol::Session, Issue), String> {
+fn helper_issue(f: &ToolBox, who: &Who) -> Result<(vibevalley_protocol::Session, Issue), String> {
     let Who::Helper(me) = who else {
         return Err("这个工具只给帮工用".into());
     };
     let id = me.issue_id().ok_or("当前不是正在处理工单的帮工会话")?;
     let issue = f
-        .board
+        .hub()?
         .read(|s| s.issues.iter().find(|i| i.id == id).cloned())
         .ok_or("当前不是正在处理工单的帮工会话")?;
     Ok(((**me).clone(), issue))
@@ -462,7 +476,7 @@ pub struct SplitArgs {
     tasks: Vec<Task>,
 }
 
-pub fn split(f: &Farm, who: &Who, a: SplitArgs) -> Result<String, String> {
+pub fn split(f: &ToolBox, who: &Who, a: SplitArgs) -> Result<String, String> {
     let (_, mut issue) = helper_issue(f, who)?;
     if let Some(title) = given(&a.title) {
         issue = f
@@ -510,7 +524,7 @@ pub struct ReportArgs {
     answer: Option<IssueAnswer>,
 }
 
-pub fn report(f: &Farm, who: &Who, a: ReportArgs) -> Result<String, String> {
+pub fn report(f: &ToolBox, who: &Who, a: ReportArgs) -> Result<String, String> {
     let Ok((me, _)) = helper_issue(f, who) else {
         return Ok("当前不是正在处理工单的帮工会话，不能交回。 ".into());
     };
@@ -534,12 +548,12 @@ pub struct PrArgs {
     summary: Option<String>,
 }
 
-pub fn pr_submit(f: &Farm, who: &Who, a: PrArgs) -> Result<String, String> {
+pub fn pr_submit(f: &ToolBox, who: &Who, a: PrArgs) -> Result<String, String> {
     submit(f, who, a.summary.as_deref()).map(|r| format!("PR 已提交：{r}"))
 }
 
 /// `submitPullRequest`: only on the user's explicit word, on an issue that delivers by pull request.
-fn submit(f: &Farm, who: &Who, summary: Option<&str>) -> Result<String, String> {
+fn submit(f: &ToolBox, who: &Who, summary: Option<&str>) -> Result<String, String> {
     let (me, issue) = helper_issue(f, who).map_err(|_| t("server.issue.prSubmitNotCurrent", &[]))?;
     if issue.mandate.strength != MandateStrength::Explicit || !issue.mandate.auto_submit_pr {
         return Err(t("server.issue.prSubmitNotAllowed", &[]));

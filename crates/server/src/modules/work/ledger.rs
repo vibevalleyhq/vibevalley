@@ -8,22 +8,23 @@
 //! Also here, because all three board modules (issue, session, workplace)
 //! share them: the board's config, its error, and its counters.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::base::open_sqlx_db_at;
-use crate::modules::work::{issue::db as issue_db, session::db as session_db};
+use crate::base::ServerDb;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use sqlx::SqliteConnection;
 use vibevalley_core::{Applied, Core, Refusal};
 use vibevalley_protocol::{
     Assignment, Conflict, CriterionCheck, Execution, ExecutionPolicy, Fact, Finding, Issue, IssueAnswer, IssueCanceled, Landing, LastRun, Millis, Outcome,
-    Phase, PullRequest, Question, Session, SliceBundle, SpaceState,
+    Phase, PullRequest, Question, Run, Session, SessionSubagents, SliceBundle, SpaceState,
 };
 use vibevalley_runtime::agent::durable::Sqlite;
 use vibevalley_runtime::oar::PermissionMode;
+
+pub use crate::ports::Facts;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BoardError {
@@ -137,16 +138,6 @@ pub(crate) fn io(e: std::io::Error) -> BoardError {
 pub(crate) fn find<'a>(issues: &'a [Issue], reference: &str) -> Option<&'a Issue> {
     let r = reference.trim().trim_start_matches('#');
     issues.iter().find(|t| t.id == r || t.number.to_string() == r)
-}
-
-/// Where the board's facts go and its state is read: the server's one
-/// state (`Hub`) or, standing alone, a [`LocalFacts`]. `apply` folds a batch
-/// as one commit (`Core.apply`); neither method may call back into the board.
-pub trait Facts: Send + Sync {
-    fn apply(&self, facts: Vec<Fact>) -> Applied;
-    /// Calls `f` once with the state now.
-    fn read(&self, f: &mut dyn FnMut(&SpaceState));
-    fn bundle(&self) -> SliceBundle;
 }
 
 /// What a session's work log is told.
@@ -387,28 +378,49 @@ pub struct Opened {
 pub type CronOfIssue = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 pub type PullOfIssue = Arc<dyn Fn(&str) -> Option<PullRequest> + Send + Sync>;
 
+/// Result of interrupting a working session's open run when reopening the ledger.
+pub struct ReopenInterrupt {
+    pub run_id: String,
+    pub needs_reconciliation: bool,
+}
+
+/// Narrow SQLite issue persistence port injected by `work/issue` so `work/ledger`
+/// stays strictly below `work/issue` in the module DAG.
+pub trait IssueStore: Send + Sync {
+    fn all(&self, db: &Sqlite<'_>) -> sqlx::Result<Vec<Issue>>;
+    fn put(&self, db: &Sqlite<'_>, issue: &Issue) -> sqlx::Result<()>;
+    fn remove(&self, db: &Sqlite<'_>, id: &str) -> sqlx::Result<()>;
+}
+
+/// Narrow SQLite session persistence & reopen-recovery port injected by
+/// `work/session` so `work/ledger` stays strictly below `work/session`.
+pub trait SessionStore: Send + Sync {
+    fn all(&self, db: &Sqlite<'_>) -> sqlx::Result<Vec<Session>>;
+    fn past(&self, db: &Sqlite<'_>, id: &str) -> sqlx::Result<Option<Session>>;
+    fn put(&self, db: &Sqlite<'_>, s: &Session, departed: bool) -> sqlx::Result<()>;
+    fn put_subagents(&self, db: &Sqlite<'_>, summary: &SessionSubagents) -> sqlx::Result<()>;
+    fn active_run(&self, db: &Sqlite<'_>, session: &str, run: &str, root: &str) -> sqlx::Result<bool>;
+    fn run(&self, db: &Sqlite<'_>, id: &str) -> sqlx::Result<Option<Run>>;
+    fn recoverable_ids(&self, db: &Sqlite<'_>, durable: &vibevalley_runtime::agent::durable::Store, stored: &[Session]) -> Result<HashSet<String>>;
+    fn interrupt_on_reopen(
+        &self,
+        tx: &mut vibevalley_runtime::agent::durable::Tx<'_>,
+        session: &Session,
+        at: Millis,
+        summary: &str,
+    ) -> vibevalley_runtime::agent::durable::Result<Option<ReopenInterrupt>>;
+}
+
 pub struct Ledger {
     pub(crate) durable: vibevalley_runtime::agent::durable::Store,
-    db: Mutex<SqliteConnection>,
+    db: Arc<ServerDb>,
+    issues: Arc<dyn IssueStore>,
+    sessions: Arc<dyn SessionStore>,
     facts: Arc<dyn Facts>,
     /// Held across every apply and every read-modify-apply of an issue.
     write: Mutex<()>,
     cron_of_issue: Mutex<Option<CronOfIssue>>,
     pull_of_issue: Mutex<Option<PullOfIssue>>,
-}
-
-fn database(path: &Path) -> Result<SqliteConnection> {
-    Ok(pollster::block_on(async {
-        let mut db = open_sqlx_db_at(path).await?;
-        sqlx::raw_sql(crate::db::schema::SHARED).execute(&mut db).await?;
-        sqlx::raw_sql(issue_db::SCHEMA).execute(&mut db).await?;
-        sqlx::raw_sql(session_db::SCHEMA).execute(&mut db).await?;
-        Ok::<_, sqlx::Error>(db)
-    })?)
-}
-
-fn load(db: &Sqlite<'_>) -> Result<(Vec<Session>, Vec<Issue>)> {
-    Ok((session_db::all(db)?, issue_db::all(db)?))
 }
 
 fn loaded(sessions: Vec<Session>, issues: Vec<Issue>) -> Vec<Fact> {
@@ -421,22 +433,31 @@ fn loaded(sessions: Vec<Session>, issues: Vec<Issue>) -> Vec<Fact> {
 impl Ledger {
     /// The board as stored, without taking it: for reading while another
     /// process holds it.
-    pub fn snapshot(path: &Path) -> Result<SliceBundle> {
-        let (sessions, issues) = load(&Sqlite::new(&mut database(path)?))?;
+    pub fn snapshot(path: &Path, issues: &dyn IssueStore, sessions: &dyn SessionStore) -> Result<SliceBundle> {
+        let server_db = ServerDb::open_at(path)?;
+        let mut conn = server_db.acquire()?;
+        let db = Sqlite::new(&mut conn);
+        let stored_sessions = sessions.all(&db)?;
+        let stored_issues = issues.all(&db)?;
+        drop(conn);
         let facts = LocalFacts::default();
-        facts.apply(loaded(sessions, issues));
+        facts.apply(loaded(stored_sessions, stored_issues));
         Ok(facts.bundle())
     }
 
     /// Loads what is stored into `facts`. A working session was interrupted:
     /// it rests now, its run counted. A session whose worktree is gone is
     /// dropped and its issue listed as lost.
-    pub fn open(path: &Path, facts: Arc<dyn Facts>) -> Result<(Ledger, Opened)> {
-        let mut conn = database(path)?;
-        let db = Sqlite::new(&mut conn);
-        let durable = vibevalley_runtime::agent::durable::Store::open(path)?;
-        let extras = session_db::extras(&db)?;
-        let (stored, issues) = load(&db)?;
+    pub fn open(db: Arc<ServerDb>, facts: Arc<dyn Facts>, issue_store: Arc<dyn IssueStore>, session_store: Arc<dyn SessionStore>) -> Result<(Ledger, Opened)> {
+        let durable = db.durable()?;
+        let (stored, issues, recoverable_ids) = {
+            let mut conn = db.acquire()?;
+            let sqlite = Sqlite::new(&mut conn);
+            let stored = session_store.all(&sqlite)?;
+            let issues = issue_store.all(&sqlite)?;
+            let recoverable_ids = session_store.recoverable_ids(&sqlite, &durable, &stored)?;
+            (stored, issues, recoverable_ids)
+        };
         let mut sessions = Vec::new();
         let mut opened = Opened::default();
         for mut session in stored {
@@ -444,16 +465,7 @@ impl Ledger {
             if !lost && session.is_refining() {
                 opened.drafts.push(session.id.clone());
             }
-            if session.phase.is_working()
-                && !lost
-                && !session.is_refining()
-                && session.runtime == vibevalley_runtime::agent::runtime::ID
-                && let Some(extra) = extras.get(&session.id)
-                && let (Some(run), Some(vendor)) = (extra.run.as_deref(), extra.agent_session.as_deref())
-                && durable
-                    .read(|tx| tx.submission_by_request(&vibevalley_runtime::agent::harness::worker_conversation(vendor), &format!("work:{run}")))?
-                    .is_some()
-            {
+            if session.phase.is_working() && !lost && !session.is_refining() && recoverable_ids.contains(&session.id) {
                 opened.recoverable.push(session.id.clone());
             } else if session.phase.is_working() {
                 let at = now();
@@ -464,9 +476,9 @@ impl Ledger {
                 session.phase = Phase::resting();
                 session.runs += 1;
                 let run = durable.write(|tx| {
-                    let recovery = crate::modules::work::session::interrupt_on_reopen(tx, &session, extras.get(&session.id), at, summary)?;
+                    let recovery = session_store.interrupt_on_reopen(tx, &session, at, summary)?;
                     session.last_run = Some(LastRun {
-                        needs_reconciliation: recovery.as_ref().is_some_and(|(_, needed)| *needed),
+                        needs_reconciliation: recovery.as_ref().is_some_and(|r| r.needs_reconciliation),
                         outcome: Outcome::Interrupted,
                         summary: summary.into(),
                         at,
@@ -474,16 +486,17 @@ impl Ledger {
                         answer: None,
                     });
                     if let Some(children) = &session.subagents {
-                        session_db::put_subagents(tx.connection(), children)?;
+                        session_store.put_subagents(tx.connection(), children)?;
                     }
-                    session_db::put(tx.connection(), &session, lost)?;
-                    Ok(recovery.map(|(id, _)| id))
+                    session_store.put(tx.connection(), &session, lost)?;
+                    Ok(recovery.map(|r| r.run_id))
                 })?;
                 if let Some(run) = run {
                     opened.interrupted.push((session.id.clone(), run));
                 }
             } else if lost {
-                session_db::put(&db, &session, true)?;
+                let mut conn = db.acquire()?;
+                session_store.put(&Sqlite::new(&mut conn), &session, true)?;
             }
             if lost {
                 opened.lost.extend(session.issue_id().map(String::from));
@@ -494,7 +507,9 @@ impl Ledger {
         facts.apply(loaded(sessions, issues));
         let ledger = Ledger {
             durable,
-            db: Mutex::new(conn),
+            db,
+            issues: issue_store,
+            sessions: session_store,
             facts,
             write: Mutex::new(()),
             cron_of_issue: Mutex::new(None),
@@ -564,7 +579,8 @@ impl Ledger {
     }
 
     pub(crate) fn database<R>(&self, query: impl FnOnce(&Sqlite<'_>) -> sqlx::Result<R>) -> Result<R> {
-        Ok(query(&Sqlite::new(&mut self.db.lock()))?)
+        let mut conn = self.db.acquire()?;
+        Ok(query(&Sqlite::new(&mut conn))?)
     }
 
     pub fn bundle(&self) -> SliceBundle {
@@ -598,7 +614,7 @@ impl Ledger {
 
     /// A session that left the board, as it was when it did.
     pub fn past_session(&self, id: &str) -> Option<Session> {
-        self.database(|db| session_db::past(db, id)).ok().flatten()
+        self.database(|db| self.sessions.past(db, id)).ok().flatten()
     }
 
     /// Stores `facts`, folds them in as one commit.
@@ -648,11 +664,11 @@ impl Ledger {
             let tx = write.connection();
             for fact in &facts {
                 match fact {
-                    Fact::IssueChanged(vibevalley_protocol::FactIssueChanged { issue, .. }) => issue_db::put(tx, issue)?,
-                    Fact::IssueRemoved(vibevalley_protocol::FactIssueRemoved { id, .. }) => issue_db::remove(tx, id)?,
+                    Fact::IssueChanged(vibevalley_protocol::FactIssueChanged { issue, .. }) => self.issues.put(tx, issue)?,
+                    Fact::IssueRemoved(vibevalley_protocol::FactIssueRemoved { id, .. }) => self.issues.remove(tx, id)?,
                     Fact::SessionSubagentsChanged(f) => {
                         if let Some(summary) = &f.subagents {
-                            session_db::put_subagents(tx, summary)?;
+                            self.sessions.put_subagents(tx, summary)?;
                         }
                     }
                     Fact::SessionLeft(vibevalley_protocol::FactSessionLeft { id, closed, at, .. }) => {
@@ -660,7 +676,7 @@ impl Ledger {
                             if let Some(closed) = closed {
                                 past.phase = Phase::Closed(vibevalley_protocol::PhaseClosed { at: *at, closed: *closed });
                             }
-                            session_db::put(tx, &past, true)?;
+                            self.sessions.put(tx, &past, true)?;
                         }
                     }
                     _ => {}
@@ -675,7 +691,7 @@ impl Ledger {
                 if let Some(id) = id
                     && let Some(session) = prospective.sessions.iter().find(|s| &s.id == id)
                 {
-                    session_db::put(tx, session, false)?;
+                    self.sessions.put(tx, session, false)?;
                 }
             }
             Ok(())
@@ -701,9 +717,9 @@ impl Ledger {
         };
         let current = self.durable.write(|tx| {
             let db = tx.connection();
-            let active = session_db::active_run(db, session_id, run, root)?;
+            let active = self.sessions.active_run(db, session_id, run, root)?;
             if active && let Some(summary) = &fact.subagents {
-                session_db::put_subagents(db, summary)?;
+                self.sessions.put_subagents(db, summary)?;
             }
             Ok(active)
         })?;
@@ -720,7 +736,7 @@ impl Ledger {
         after: vibevalley_protocol::SessionSubagents,
     ) -> Result<()> {
         let _write = self.write.lock();
-        let stored = self.database(|db| session_db::run(db, &before.run))?;
+        let stored = self.database(|db| self.sessions.run(db, &before.run))?;
         if !stored.is_some_and(|r| r.session == session && r.subagents.as_ref() == Some(before)) {
             return Ok(());
         }
@@ -732,7 +748,7 @@ impl Ledger {
             };
             self.apply_locked(vec![Fact::SessionSubagentsChanged(fact)], |_| Ok(()))
         } else {
-            self.durable.write(|tx| Ok(session_db::put_subagents(tx.connection(), &after)?))?;
+            self.durable.write(|tx| Ok(self.sessions.put_subagents(tx.connection(), &after)?))?;
             Ok(())
         }
     }

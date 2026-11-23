@@ -16,7 +16,6 @@ mod qq;
 mod store;
 mod weixin;
 
-use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -32,6 +31,7 @@ use vibevalley_protocol::{ApiError, BizCode, ConnectorID, ConnectorLogin, Connec
 use self::adapter::App;
 use self::bridge::{Bridge, Env, Handoff, handoff};
 use self::store::Store;
+use crate::base::ServerDb;
 use crate::modules::collab::channel::{ChannelEvent, Chat, to_message};
 use crate::{Hub, now};
 
@@ -123,8 +123,8 @@ pub struct Connectors {
 
 impl Connectors {
     /// Opens the accounts and goes on with those that are connected.
-    pub fn open(home: &Path, hub: &Arc<Hub>, chat: Arc<Chat>, options: Options) -> Result<Arc<Connectors>, ApiError> {
-        let store = Store::open(home).map_err(|e| ApiError::new(BizCode::InternalError, format!("connector: {}", e.0)))?;
+    pub fn open(db: Arc<ServerDb>, hub: &Arc<Hub>, chat: Arc<Chat>, options: Options) -> Result<Arc<Connectors>, ApiError> {
+        let store = Store::open(db);
         let env = Arc::new(Env {
             store,
             chat: chat.clone(),

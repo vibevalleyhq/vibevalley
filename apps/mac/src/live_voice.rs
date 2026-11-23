@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio_tungstenite::tungstenite::{Message, client::IntoClientRequest};
 use tokio_util::sync::CancellationToken;
-use vibevalley_server::modules::collab::voice::Voice;
+use vibevalley_server::transport::api::SharedLiveVoice;
 
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -47,7 +47,7 @@ pub fn state(owner: &str) -> State {
     if current.owner == owner { current.state.clone() } else { State::default() }
 }
 
-pub fn start(voice: Arc<Voice>, owner: String) -> Result<State, String> {
+pub fn start(voice: SharedLiveVoice, owner: String) -> Result<State, String> {
     if owner.is_empty() || owner.len() > 128 {
         return Err("voice call requires an owner ID".into());
     }
@@ -171,7 +171,7 @@ impl Audio for NativeAudio {
     }
 }
 
-async fn run(voice: Arc<Voice>, cancel: CancellationToken) -> Result<(), String> {
+async fn run(voice: SharedLiveVoice, cancel: CancellationToken) -> Result<(), String> {
     if cancel.is_cancelled() {
         return Ok(());
     }
@@ -187,7 +187,7 @@ async fn run(voice: Arc<Voice>, cancel: CancellationToken) -> Result<(), String>
         }
         let grant = setup_voice.grant().map_err(|e| e.message)?;
         let line = setup_voice.moss_line().map_err(|e| e.message)?;
-        let voice_call = setup_voice.start(&grant.channel, &grant.uid, None).map_err(|e| e.message)?;
+        let voice_call = setup_voice.start(&grant.channel, &grant.uid).map_err(|e| e.message)?;
         Ok(Some((audio, line, voice_call)))
     })
     .await
@@ -199,10 +199,10 @@ async fn run(voice: Arc<Voice>, cancel: CancellationToken) -> Result<(), String>
         if cancel.is_cancelled() {
             return Ok(());
         }
-        let mut request = line.url.as_str().into_client_request().map_err(|_| "invalid MOSS address")?;
+        let mut request = line.url().into_client_request().map_err(|_| "invalid MOSS address")?;
         request.headers_mut().insert(
             "Authorization",
-            format!("Bearer {}", line.key.expose()).parse().map_err(|_| "invalid MOSS credentials")?,
+            format!("Bearer {}", line.bearer_token()).parse().map_err(|_| "invalid MOSS credentials")?,
         );
         let (socket, _) = tokio::select! {
             biased;
@@ -215,7 +215,7 @@ async fn run(voice: Arc<Voice>, cancel: CancellationToken) -> Result<(), String>
             socket,
             SessionMessages {
                 update: line.session_update(),
-                outgoing: line.outgoing.clone(),
+                outgoing: line.outgoing(),
                 cancel: cancel.clone(),
             },
             NativeAudio { _lease: audio },
@@ -224,7 +224,7 @@ async fn run(voice: Arc<Voice>, cancel: CancellationToken) -> Result<(), String>
                 match event {
                     Event::InputTranscript { data } => {
                         voice
-                            .heard(&voice_call.agent_id, &data.text, None, (!data.turn.is_empty()).then_some(data.turn.as_str()))
+                            .heard(&voice_call.agent_id, &data.text, (!data.turn.is_empty()).then_some(data.turn.as_str()))
                             .map_err(|e| e.message)?;
                         call().lock().state.heard = data.text.clone();
                     }
@@ -479,6 +479,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
     #[derive(Default)]

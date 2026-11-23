@@ -10296,6 +10296,8 @@ dependencies = [
  "sha2 0.11.1",
  "smallvec",
  "thiserror 2.0.21",
+ "tokio",
+ "tokio-stream",
  "tracing",
  "url",
 ]
@@ -10332,6 +10334,7 @@ dependencies = [
  "sqlx-core",
  "sqlx-sqlite",
  "syn 2.0.119",
+ "tokio",
  "url",
 ]
 
@@ -11731,6 +11734,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "url",
  "vibevalley-core",
  "vibevalley-protocol",
  "vibevalley-runtime",

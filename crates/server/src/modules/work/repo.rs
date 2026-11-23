@@ -298,7 +298,7 @@ pub struct Repos {
     /// One change at a time per repo name; names being made are not listed.
     pending: Mutex<std::collections::HashSet<String>>,
     closed: AtomicBool,
-    probe: Mutex<Option<std::thread::JoinHandle<()>>>,
+    probe: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
 impl Repos {
@@ -320,20 +320,19 @@ impl Repos {
 
     pub fn probe_in_background(self: &Arc<Repos>) {
         let weak = Arc::downgrade(self);
-        if let Ok(handle) = std::thread::Builder::new().name("vibevalley-github-probe".into()).spawn(move || {
+        let handle = vibevalley_runtime::rt::handle().spawn_blocking(move || {
             let Some(repos) = weak.upgrade() else { return };
             if !repos.closed.load(Ordering::Relaxed) {
                 repos.refresh_github();
             }
-        }) {
-            *self.probe.lock() = Some(handle);
-        }
+        });
+        *self.probe.lock() = Some(handle);
     }
 
     pub fn close(&self) {
         self.closed.store(true, Ordering::Relaxed);
         if let Some(handle) = self.probe.lock().take() {
-            let _ = handle.join();
+            let _ = vibevalley_runtime::rt::block_on(handle);
         }
     }
 
@@ -931,13 +930,13 @@ impl Repos {
 
 /// `repo.template.list` (`issue.templates`): the stack, the titles last
 /// sent there, and the catalog filled with its commands.
-pub fn install_templates(hub: &Hub, repos: Arc<Repos>, board: super::issue::Board, agents: Arc<crate::modules::team::agent::Agents>) {
-    hub.on::<ops::RepoTemplateList>(move |_, input| {
+pub fn install_templates(hub: &Hub, repos: Arc<Repos>, agents: Arc<crate::modules::team::agent::Agents>) {
+    hub.on::<ops::RepoTemplateList>(move |ctx, input| {
         let name = input.id;
         let stack = repos
             .stack(&name)
             .ok_or_else(|| missing(t("server.issue.repoRef", &[("name", name.clone().into())]), LookIn::Repo))?;
-        let mut mine: Vec<vibevalley_protocol::Issue> = board.read(|s| {
+        let mut mine: Vec<vibevalley_protocol::Issue> = ctx.hub.read(|s| {
             s.issues
                 .iter()
                 .filter(|i| {

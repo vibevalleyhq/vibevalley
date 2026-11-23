@@ -6,7 +6,7 @@ use std::time::Duration;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use tokio::sync::{Notify, broadcast};
+use tokio::sync::{Notify, Semaphore, broadcast};
 use tokio_util::sync::CancellationToken;
 
 use crate::transport::bridge::{BizCode, Caller, CallerContext, CallerPrincipal, ClientIdentity, Envelope, Server, SliceKind, refusal};
@@ -25,8 +25,6 @@ pub struct ClientSnapshot {
     pub subscriptions: Vec<String>,
 }
 
-type Job = Box<dyn FnOnce() + Send>;
-
 struct ClientRecord {
     identity: ClientIdentity,
     inner: Weak<Mutex<Inner>>,
@@ -36,29 +34,17 @@ struct ClientRecord {
 #[derive(Clone)]
 pub struct Hub {
     server: Arc<dyn Server>,
-    jobs: flume::Sender<Job>,
+    permits: Arc<Semaphore>,
     clients: Arc<Mutex<HashMap<u64, ClientRecord>>>,
     next_client: Arc<AtomicU64>,
 }
 
 impl Hub {
-    /// `workers` threads run blocking calls.
+    /// Limits concurrent blocking calls to `workers` on the shared `vibevalley-io` runtime.
     pub fn new(server: Arc<dyn Server>, workers: usize) -> Hub {
-        let (jobs, rx) = flume::unbounded::<Job>();
-        for i in 0..workers.max(1) {
-            let rx = rx.clone();
-            std::thread::Builder::new()
-                .name(format!("bridge-{i}"))
-                .spawn(move || {
-                    while let Ok(job) = rx.recv() {
-                        job();
-                    }
-                })
-                .expect("bridge worker thread");
-        }
         Hub {
             server,
-            jobs,
+            permits: Arc::new(Semaphore::new(workers.max(1))),
             clients: Arc::new(Mutex::new(HashMap::new())),
             next_client: Arc::new(AtomicU64::new(0)),
         }
@@ -68,10 +54,14 @@ impl Hub {
         &self.server
     }
 
-    /// Runs `op` on a worker with explicit caller context and hands its envelope to `reply` there.
+    /// Runs `op` on the shared runtime blocking pool with explicit caller context and hands its envelope to `reply`.
     pub fn call_with(&self, ctx: CallerContext, op: String, payload: Value, reply: impl FnOnce(Envelope) + Send + 'static) {
         let server = self.server.clone();
-        let _ = self.jobs.send(Box::new(move || reply(server.call_with(&ctx, &op, payload))));
+        let permits = self.permits.clone();
+        vibevalley_runtime::rt::handle().spawn(async move {
+            let Ok(_permit) = permits.acquire_owned().await else { return };
+            let _ = tokio::task::spawn_blocking(move || reply(server.call_with(&ctx, &op, payload))).await;
+        });
     }
 
     /// Runs `op` on a worker and hands its envelope to `reply` there.
@@ -385,7 +375,13 @@ impl Client {
             self.outlet.send(&event_name, json!({ "end": e }));
             return;
         }
-        match self.hub.server.subscribe(name, payload) {
+        let ctx = CallerContext {
+            caller: Caller::User,
+            principal: CallerPrincipal::LocalOwner,
+            client: Some(self.identity.clone()),
+            trace_id: 0,
+        };
+        match self.hub.server.subscribe_with(&ctx, name, payload) {
             Ok((server_id, rx)) => {
                 let outlet = self.outlet.clone();
                 let each_name = event_name.clone();

@@ -2,13 +2,23 @@ use std::sync::Arc;
 
 use crate::support::{execute_sql, inspect_db};
 use vibevalley_protocol::{Fact, Issue};
+use vibevalley_server::base::ServerDb;
+use vibevalley_server::modules::work::issue::SqliteIssueStore;
 use vibevalley_server::modules::work::ledger::{Ledger, LocalFacts};
+use vibevalley_server::modules::work::session::SqliteSessionStore;
 
 #[test]
 fn regression_failed_batch_changes_neither_database_nor_core() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("server.db");
-    let (ledger, _) = Ledger::open(&path, Arc::new(LocalFacts::default())).unwrap();
+    let server_db = ServerDb::open_at(&path).unwrap();
+    let (ledger, _) = Ledger::open(
+        server_db,
+        Arc::new(LocalFacts::default()),
+        Arc::new(SqliteIssueStore),
+        Arc::new(SqliteSessionStore),
+    )
+    .unwrap();
     let mut db = inspect_db(&path);
     execute_sql(
         &mut db,
@@ -31,10 +41,25 @@ fn regression_failed_batch_changes_neither_database_nor_core() {
 fn regression_invalid_stored_enum_fails_open_instead_of_losing_the_issue() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("server.db");
-    let (ledger, _) = Ledger::open(&path, Arc::new(LocalFacts::default())).unwrap();
+    let server_db = ServerDb::open_at(&path).unwrap();
+    let (ledger, _) = Ledger::open(
+        server_db.clone(),
+        Arc::new(LocalFacts::default()),
+        Arc::new(SqliteIssueStore),
+        Arc::new(SqliteSessionStore),
+    )
+    .unwrap();
     ledger.apply(vec![Fact::issue_changed(1, Issue::new("first", 1, "First", 1))]).unwrap();
     let mut db = inspect_db(&path);
     execute_sql(&mut db, "update issue set priority = 'unknown'");
-    assert!(Ledger::snapshot(&path).is_err());
-    assert!(Ledger::open(&path, Arc::new(LocalFacts::default())).is_err());
+    assert!(Ledger::snapshot(&path, &SqliteIssueStore, &SqliteSessionStore).is_err());
+    assert!(
+        Ledger::open(
+            server_db,
+            Arc::new(LocalFacts::default()),
+            Arc::new(SqliteIssueStore),
+            Arc::new(SqliteSessionStore),
+        )
+        .is_err()
+    );
 }

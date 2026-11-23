@@ -39,3 +39,5 @@ export type InboxItem = { id: string, kind: InboxKind, from: InboxFrom,
  * Who it is from, as the routes say it: the helper's name, or the orchestrator.
  */
 who: string, text: string, at: number, target: InboxTarget, words: InboxWords, };
+
+export type FactRuntimeInboxChanged = { "type": "runtimeInboxChanged", at: number, items: Array<InboxItem>, };

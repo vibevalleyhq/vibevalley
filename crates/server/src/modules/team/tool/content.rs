@@ -1,6 +1,6 @@
-//! Resources, artifacts, the library and media: every tool takes its
-//! typed request directly and reaches the module in process without bouncing
-//! back through the hub.
+//! Resources, artifacts, the library and media: read/list/lifecycle calls route
+//! through `Hub::invoke` or `ResourcePort` (`vv://`), keeping actor-scoped
+//! artifact/media writes strongly typed without importing L3 `team/mcp` or L2 `content/library`.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -8,16 +8,14 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use vibevalley_core::collab::CommitMeta;
 use vibevalley_protocol::{
-    ArtifactBody, ArtifactEntryBatchRequest, ArtifactEntryGetRequest, ArtifactEntryListRequest, ArtifactKind, ArtifactListRequest,
-    ArtifactOutlineImportRequest, ArtifactRequest, ArtifactType, ArtifactTypeReadRequest, ArtifactVersionRequest, BlockCreate, BlockDelete, BlockOpResult,
-    BlockOpStatus, BlockUpdate, LibraryAddRequest, LibraryListRequest, MediaImageRequest, MediaSource, MediaSpeakersRequest, MediaSpeechRequest,
-    MediaVoiceDesignRequest, Session,
+    ArtifactBody, ArtifactEntryBatchRequest, ArtifactEntryGetRequest, ArtifactEntryListRequest, ArtifactGetInput, ArtifactKind, ArtifactListRequest,
+    ArtifactOutlineImportRequest, ArtifactReadRequest, ArtifactRequest, ArtifactType, ArtifactTypeReadRequest, ArtifactVersionRequest, BlockCreate,
+    BlockDelete, BlockOpResult, BlockOpStatus, BlockUpdate, LibraryAddRequest, LibraryListRequest, MediaImageRequest, MediaJobRequest, MediaSource,
+    MediaSpeakersRequest, MediaSpeechRequest, MediaVoiceDesignRequest, Session, ops,
 };
 
-use super::{Farm, Who, given};
+use super::{ToolBox, Who, given};
 use crate::modules::content::artifact::Maker;
-use crate::modules::content::library::AddedBy;
-use crate::modules::team::mcp::ResourceReadArgs;
 use crate::now;
 
 fn text<T: serde::Serialize>(v: &T) -> Result<String, String> {
@@ -33,10 +31,17 @@ pub struct IdArgs {
 #[derive(Deserialize)]
 pub struct EmptyArgs {}
 
-pub fn resource_read(f: &Farm, who: &Who, a: ResourceReadArgs) -> Result<String, String> {
+#[derive(Deserialize)]
+pub struct ResourceReadArgs {
+    pub uri: String,
+    pub offset: Option<i64>,
+    pub limit: Option<i64>,
+}
+
+pub fn resource_read(f: &ToolBox, who: &Who, a: ResourceReadArgs) -> Result<String, String> {
     match who {
-        Who::Helper(me) => f.resources.read(Some(me), &a),
-        Who::Orchestrator(_) => f.resources.read(None, &a),
+        Who::Helper(me) => f.resources.read(Some(me), &a.uri, a.offset, a.limit),
+        Who::Orchestrator(_) => f.resources.read(None, &a.uri, a.offset, a.limit),
     }
 }
 
@@ -52,7 +57,7 @@ fn mandate(who: &Who) -> Result<MediaSource, String> {
 }
 
 /// An image only when the user asked for it in this batch.
-pub fn image(f: &Farm, who: &Who, req: MediaImageRequest) -> Result<String, String> {
+pub fn image(f: &ToolBox, who: &Who, req: MediaImageRequest) -> Result<String, String> {
     let Who::Orchestrator(here) = who else {
         return Err("帮工不能出图".into());
     };
@@ -66,64 +71,67 @@ pub fn image(f: &Farm, who: &Who, req: MediaImageRequest) -> Result<String, Stri
     text(&f.media.image(req, source).map_err(|e| e.message)?)
 }
 
-pub fn speech(f: &Farm, who: &Who, req: MediaSpeechRequest) -> Result<String, String> {
+pub fn speech(f: &ToolBox, who: &Who, req: MediaSpeechRequest) -> Result<String, String> {
     text(&f.media.speech(req, mandate(who)?).map_err(|e| e.message)?)
 }
 
-pub fn dialogue(f: &Farm, who: &Who, req: MediaSpeakersRequest) -> Result<String, String> {
+pub fn dialogue(f: &ToolBox, who: &Who, req: MediaSpeakersRequest) -> Result<String, String> {
     text(&f.media.speakers(req, mandate(who)?).map_err(|e| e.message)?)
 }
 
-pub fn voice_design(f: &Farm, who: &Who, req: MediaVoiceDesignRequest) -> Result<String, String> {
+pub fn voice_design(f: &ToolBox, who: &Who, req: MediaVoiceDesignRequest) -> Result<String, String> {
     text(&f.media.voice_design(req, mandate(who)?).map_err(|e| e.message)?)
 }
 
 /// Understanding the user approved for this channel, started for them.
-pub fn understand(f: &Farm, who: &Who, a: IdArgs) -> Result<String, String> {
+pub fn understand(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
     let MediaSource::Orchestrator { agent, channel } = mandate(who)? else {
         return Err(vibevalley_i18n::t("server.media.userRequired", &[]));
     };
     text(&f.media.start_understanding(&a.id, &agent, &channel).map_err(|e| e.message)?)
 }
 
-pub fn job_get(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
-    text(&f.media.get(&a.id).map_err(|e| e.message)?)
+pub fn job_get(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
+    text(
+        &f.hub()?
+            .invoke::<ops::MediaJobGet>(&f.ctx(who), MediaJobRequest { id: a.id })
+            .map_err(|e| e.message)?,
+    )
 }
 
-pub fn job_list(f: &Farm, _: &Who, _: EmptyArgs) -> Result<String, String> {
-    text(&f.media.list().map_err(|e| e.message)?)
+pub fn job_list(f: &ToolBox, who: &Who, _: EmptyArgs) -> Result<String, String> {
+    text(&f.hub()?.invoke::<ops::MediaJobList>(&f.ctx(who), ()).map_err(|e| e.message)?)
 }
 
-pub fn job_cancel(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
-    text(&f.media.cancel(&a.id).map_err(|e| e.message)?)
+pub fn job_cancel(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
+    text(
+        &f.hub()?
+            .invoke::<ops::MediaJobCancel>(&f.ctx(who), MediaJobRequest { id: a.id })
+            .map_err(|e| e.message)?,
+    )
 }
 
-pub fn job_download(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
-    text(&f.media.retry_download(&a.id).map_err(|e| e.message)?)
+pub fn job_download(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
+    text(
+        &f.hub()?
+            .invoke::<ops::MediaJobDownload>(&f.ctx(who), MediaJobRequest { id: a.id })
+            .map_err(|e| e.message)?,
+    )
 }
 
-pub fn library_list(f: &Farm, _: &Who, req: LibraryListRequest) -> Result<String, String> {
-    let items = f.library.list(&req).map_err(|e| e.message)?;
+pub fn library_list(f: &ToolBox, who: &Who, req: LibraryListRequest) -> Result<String, String> {
+    let items = f.hub()?.invoke::<ops::LibraryItemList>(&f.ctx(who), req).map_err(|e| e.message)?;
     if items.is_empty() {
         return Ok("素材库里没有这样的文件。".into());
     }
     text(&items)
 }
 
-pub fn library_add(f: &Farm, who: &Who, req: LibraryAddRequest) -> Result<String, String> {
-    let by = match who {
-        Who::Helper(me) => AddedBy::Agent {
-            agent: me.profile.clone().unwrap_or_default(),
-            session: Some(me.id.clone()),
-            dir: me.cwd.as_ref().map(PathBuf::from),
-        },
-        Who::Orchestrator(here) => AddedBy::Agent {
-            agent: here.agent.clone(),
-            session: None,
-            dir: None,
-        },
-    };
-    let item = f.library.add(&req, &by).map_err(|e| format!("没成：{}", e.message))?;
+pub fn library_add(f: &ToolBox, who: &Who, req: LibraryAddRequest) -> Result<String, String> {
+    let item = f
+        .hub()?
+        .invoke::<ops::LibraryItemAdd>(&f.ctx(who), req)
+        .map_err(|e| format!("没成：{}", e.message))?;
     Ok(format!("放进素材库了：「{}」，id={}。", item.attachment.name, item.attachment.id))
 }
 
@@ -135,7 +143,7 @@ pub struct ArtifactListArgs {
     artifact_type: Option<ArtifactType>,
 }
 
-pub fn artifact_list(f: &Farm, who: &Who, a: ArtifactListArgs) -> Result<String, String> {
+pub fn artifact_list(f: &ToolBox, who: &Who, a: ArtifactListArgs) -> Result<String, String> {
     let channel = given(&a.channel).map(String::from);
     let mut issue = match given(&a.issue) {
         Some(r) => Some(f.issue(r)?.id),
@@ -145,18 +153,25 @@ pub fn artifact_list(f: &Farm, who: &Who, a: ArtifactListArgs) -> Result<String,
         issue = me.issue_id().map(String::from);
     }
     text(
-        &f.artifacts
-            .list(&ArtifactListRequest {
-                channel,
-                issue,
-                artifact_type: a.artifact_type,
-            })
+        &f.hub()?
+            .invoke::<ops::ArtifactList>(
+                &f.ctx(who),
+                ArtifactListRequest {
+                    channel,
+                    issue,
+                    artifact_type: a.artifact_type,
+                },
+            )
             .map_err(|e| e.message)?,
     )
 }
 
-pub fn artifact_get(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
-    text(&f.artifacts.get(&a.id).map_err(|e| e.message)?)
+pub fn artifact_get(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
+    text(
+        &f.hub()?
+            .invoke::<ops::ArtifactGet>(&f.ctx(who), ArtifactGetInput { id: a.id })
+            .map_err(|e| e.message)?,
+    )
 }
 
 #[derive(Deserialize)]
@@ -166,8 +181,11 @@ pub struct ArtifactContentArgs {
     version: Option<i64>,
 }
 
-pub fn artifact_content(f: &Farm, _: &Who, a: ArtifactContentArgs) -> Result<String, String> {
-    let (content, _) = f.artifacts.content(&a.id, a.version).map_err(|e| e.message)?;
+pub fn artifact_content(f: &ToolBox, who: &Who, a: ArtifactContentArgs) -> Result<String, String> {
+    let content = f
+        .hub()?
+        .invoke::<ops::ArtifactContentGet>(&f.ctx(who), ArtifactReadRequest { id: a.id, version: a.version })
+        .map_err(|e| e.message)?;
     text(&content)
 }
 
@@ -219,7 +237,7 @@ fn prepare_artifact_create(req: &mut ArtifactRequest, file: Option<&str>) {
     }
 }
 
-pub fn artifact_create(f: &Farm, who: &Who, mut a: ArtifactCreateArgs) -> Result<String, String> {
+pub fn artifact_create(f: &ToolBox, who: &Who, mut a: ArtifactCreateArgs) -> Result<String, String> {
     let file = given(&a.file).map(str::to_string);
     if a.req.content.is_some() && file.is_some() {
         return Err("content 和 file 只能填一个".into());
@@ -260,7 +278,7 @@ pub struct ArtifactOutlineImportArgs {
     note: Option<String>,
 }
 
-pub fn artifact_outline_import(f: &Farm, who: &Who, mut a: ArtifactOutlineImportArgs) -> Result<String, String> {
+pub fn artifact_outline_import(f: &ToolBox, who: &Who, mut a: ArtifactOutlineImportArgs) -> Result<String, String> {
     let file = given(&a.file).map(str::to_string);
     if a.markdown.is_some() && file.is_some() {
         return Err("markdown 和 file 只能填一个".into());
@@ -326,7 +344,7 @@ fn commit_meta_for_who(who: &Who, summary: Option<String>) -> CommitMeta {
     }
 }
 
-pub fn artifact_version(f: &Farm, who: &Who, mut a: ArtifactVersionArgs) -> Result<String, String> {
+pub fn artifact_version(f: &ToolBox, who: &Who, mut a: ArtifactVersionArgs) -> Result<String, String> {
     if let Who::Helper(me) = who
         && let Some(content) = read_helper_file(me, &a.file)?
     {
@@ -336,7 +354,7 @@ pub fn artifact_version(f: &Farm, who: &Who, mut a: ArtifactVersionArgs) -> Resu
     text(&f.artifacts.version_with_meta(&maker_of(who), &a.req, &meta).map_err(|e| e.message)?)
 }
 
-pub fn block_list(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
+pub fn block_list(f: &ToolBox, _: &Who, a: IdArgs) -> Result<String, String> {
     text(&f.artifacts.snapshot(a.id.trim()).map_err(|e| e.message)?)
 }
 
@@ -348,7 +366,7 @@ pub struct BlockCreateArgs {
     body: BlockCreate,
 }
 
-pub fn block_create(f: &Farm, who: &Who, a: BlockCreateArgs) -> Result<String, String> {
+pub fn block_create(f: &ToolBox, who: &Who, a: BlockCreateArgs) -> Result<String, String> {
     let meta = commit_meta_for_who(who, None);
     text(
         &f.artifacts
@@ -365,7 +383,7 @@ pub struct BlockUpdateArgs {
     body: BlockUpdate,
 }
 
-pub fn block_update(f: &Farm, who: &Who, a: BlockUpdateArgs) -> Result<String, String> {
+pub fn block_update(f: &ToolBox, who: &Who, a: BlockUpdateArgs) -> Result<String, String> {
     let meta = commit_meta_for_who(who, None);
     text(
         &f.artifacts
@@ -382,7 +400,7 @@ pub struct BlockDeleteArgs {
     body: BlockDelete,
 }
 
-pub fn block_delete(f: &Farm, who: &Who, a: BlockDeleteArgs) -> Result<String, String> {
+pub fn block_delete(f: &ToolBox, who: &Who, a: BlockDeleteArgs) -> Result<String, String> {
     let meta = commit_meta_for_who(who, None);
     text(
         &f.artifacts
@@ -445,7 +463,7 @@ struct BlockBatchResponse {
     created_ids: BTreeMap<String, String>,
 }
 
-pub fn block_batch(f: &Farm, who: &Who, a: BlockBatchArgs) -> Result<String, String> {
+pub fn block_batch(f: &ToolBox, who: &Who, a: BlockBatchArgs) -> Result<String, String> {
     let artifact_id = a.id.trim().to_string();
     if a.ops.is_empty() {
         return Err("ops 不能为空".into());
@@ -545,25 +563,25 @@ pub fn block_batch(f: &Farm, who: &Who, a: BlockBatchArgs) -> Result<String, Str
     })
 }
 
-pub fn artifact_type_list(f: &Farm, _: &Who, _: EmptyArgs) -> Result<String, String> {
-    text(&f.artifacts.list_types().map_err(|e| e.message)?)
+pub fn artifact_type_list(f: &ToolBox, who: &Who, _: EmptyArgs) -> Result<String, String> {
+    text(&f.hub()?.invoke::<ops::ArtifactTypeList>(&f.ctx(who), ()).map_err(|e| e.message)?)
 }
 
-pub fn artifact_type_read(f: &Farm, _: &Who, req: ArtifactTypeReadRequest) -> Result<String, String> {
-    text(&f.artifacts.read_type(&req).map_err(|e| e.message)?)
+pub fn artifact_type_read(f: &ToolBox, who: &Who, req: ArtifactTypeReadRequest) -> Result<String, String> {
+    text(&f.hub()?.invoke::<ops::ArtifactTypeRead>(&f.ctx(who), req).map_err(|e| e.message)?)
 }
 
-pub fn artifact_entry_list(f: &Farm, _: &Who, mut req: ArtifactEntryListRequest) -> Result<String, String> {
+pub fn artifact_entry_list(f: &ToolBox, who: &Who, mut req: ArtifactEntryListRequest) -> Result<String, String> {
     req.id = req.id.trim().to_string();
-    text(&f.artifacts.list_entries(&req).map_err(|e| e.message)?)
+    text(&f.hub()?.invoke::<ops::ArtifactEntryList>(&f.ctx(who), req).map_err(|e| e.message)?)
 }
 
-pub fn artifact_entry_get(f: &Farm, _: &Who, mut req: ArtifactEntryGetRequest) -> Result<String, String> {
+pub fn artifact_entry_get(f: &ToolBox, who: &Who, mut req: ArtifactEntryGetRequest) -> Result<String, String> {
     req.id = req.id.trim().to_string();
-    text(&f.artifacts.get_entry(&req).map_err(|e| e.message)?)
+    text(&f.hub()?.invoke::<ops::ArtifactEntryGet>(&f.ctx(who), req).map_err(|e| e.message)?)
 }
 
-pub fn artifact_entry_batch(f: &Farm, who: &Who, mut req: ArtifactEntryBatchRequest) -> Result<String, String> {
+pub fn artifact_entry_batch(f: &ToolBox, who: &Who, mut req: ArtifactEntryBatchRequest) -> Result<String, String> {
     req.id = req.id.trim().to_string();
     let meta = commit_meta_for_who(who, req.note.clone());
     text(&f.artifacts.batch_entries_with_meta(&maker_of(who), &req, &meta).map_err(|e| e.message)?)

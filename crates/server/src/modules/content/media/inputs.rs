@@ -3,12 +3,11 @@
 use super::{q, validate};
 use crate::{
     Hub,
-    base::{Ticker, open_sqlx_db},
+    base::{ServerDb, Ticker},
     modules::content::attachment::Attachments,
     now,
 };
 use parking_lot::{Mutex, MutexGuard};
-use pollster::block_on;
 use sha2::{Digest, Sha256};
 use sqlx::{Connection, SqliteConnection};
 use std::{
@@ -20,6 +19,7 @@ use std::{
 };
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, AttachmentFile, BizCode, MediaInput, MediaInputKind, MediaInputPhase, MediaInputRequest, Preview, native_ops, ops};
+use vibevalley_runtime::rt::block_on;
 
 const LIFETIME: i64 = 86_400_000;
 const QUOTA: i64 = 2 * 1024 * 1024 * 1024;
@@ -30,10 +30,10 @@ fn storage(_: impl std::fmt::Display) -> ApiError {
     refused("inputStorage")
 }
 struct Inner {
-    db: SqliteConnection,
     uploading: HashSet<String>,
 }
 pub struct Inputs {
+    db: Arc<ServerDb>,
     inner: Mutex<Inner>,
     files: Arc<Attachments>,
     staging: PathBuf,
@@ -67,32 +67,34 @@ async fn find_db(db: &mut SqliteConnection, id: &str) -> Result<Option<MediaInpu
     let free = q::get_pin(db, q::GetPinParams { input_id: id.into() }).await.map_err(storage)?.pinned == 0;
     input(row, free).map(Some)
 }
-fn find(inner: &mut Inner, id: &str) -> Result<Option<MediaInput>, ApiError> {
-    let mut record = block_on(find_db(&mut inner.db, id))?;
+fn find(db: &ServerDb, inner: &Inner, id: &str) -> Result<Option<MediaInput>, ApiError> {
+    let mut record = db.run_api(async |c| find_db(c, id).await)?;
     if let Some(r) = &mut record {
         r.can_delete &= !inner.uploading.contains(id);
     }
     Ok(record)
 }
-fn found(inner: &mut Inner, id: &str) -> Result<MediaInput, ApiError> {
-    find(inner, id)?.ok_or_else(|| refused("inputMissing"))
+fn found(db: &ServerDb, inner: &Inner, id: &str) -> Result<MediaInput, ApiError> {
+    find(db, inner, id)?.ok_or_else(|| refused("inputMissing"))
 }
-fn phase(inner: &mut Inner, id: &str, p: &str) -> Result<(), ApiError> {
-    block_on(q::set_input_phase(
-        &mut inner.db,
-        q::SetInputPhaseParams {
-            id: id.into(),
-            phase: p.into(),
-        },
-    ))
+fn phase(db: &ServerDb, id: &str, p: &str) -> Result<(), ApiError> {
+    db.run(async |c| {
+        q::set_input_phase(
+            c,
+            q::SetInputPhaseParams {
+                id: id.into(),
+                phase: p.into(),
+            },
+        )
+        .await
+    })
     .map_err(storage)
 }
 impl Inputs {
-    pub fn open(home: &Path, files: Arc<Attachments>) -> Result<Arc<Self>, ApiError> {
-        let mut db = block_on(open_sqlx_db(home)).map_err(storage)?;
-        block_on(sqlx::raw_sql(crate::db::schema::CONTENT_MEDIA).execute(&mut db)).map_err(storage)?;
+    pub fn open(home: &Path, db: Arc<ServerDb>, files: Arc<Attachments>) -> Result<Arc<Self>, ApiError> {
         let inputs = Arc::new(Self {
-            inner: Mutex::new(Inner { db, uploading: HashSet::new() }),
+            db,
+            inner: Mutex::new(Inner { uploading: HashSet::new() }),
             files,
             staging: home.join("attachments/.staging/media"),
             sweeper: Mutex::new(None),
@@ -120,18 +122,20 @@ impl Inputs {
         self.inner.lock()
     }
     pub fn get(&self, id: &str) -> Result<MediaInput, ApiError> {
-        found(&mut self.inner(), id)
+        found(&self.db, &self.inner(), id)
     }
     pub fn list(&self) -> Result<Vec<MediaInput>, ApiError> {
-        let mut inner = self.inner();
-        let (rows, pins) = block_on(async {
-            let mut tx = inner.db.begin().await?;
-            let rows = q::list_inputs(&mut *tx).await?;
-            let pins = q::pinned_inputs(&mut *tx).await?;
-            tx.commit().await?;
-            Ok::<_, sqlx::Error>((rows, pins))
-        })
-        .map_err(storage)?;
+        let inner = self.inner();
+        let (rows, pins) = self
+            .db
+            .run(async |c| {
+                let mut tx = c.begin_with("BEGIN IMMEDIATE").await?;
+                let rows = q::list_inputs(&mut *tx).await?;
+                let pins = q::pinned_inputs(&mut *tx).await?;
+                tx.commit().await?;
+                Ok((rows, pins))
+            })
+            .map_err(storage)?;
         let pinned: HashSet<_> = pins.into_iter().map(|r| r.input_id).collect();
         rows.into_iter()
             .map(|row| {
@@ -164,27 +168,34 @@ impl Inputs {
             block_on(find_db(db, &id))?.ok_or_else(|| refused("inputMissing"))
         })
     }
-    fn remove(&self, inner: &mut Inner, r: &MediaInput) -> Result<(), ApiError> {
+    fn remove(&self, r: &MediaInput) -> Result<(), ApiError> {
         if !r.can_delete {
             return Err(refused("inputBusy"));
         }
-        if block_on(q::mark_input_deleting(&mut inner.db, q::MarkInputDeletingParams { id: r.id.clone() })).map_err(storage)? == 0 {
+        if self
+            .db
+            .run(async |c| q::mark_input_deleting(c, q::MarkInputDeletingParams { id: r.id.clone() }).await)
+            .map_err(storage)?
+            == 0
+        {
             return Err(refused("inputBusy"));
         }
         remove_dir(&self.staging.join(&r.id))?;
-        block_on(q::forget_input(&mut inner.db, q::ForgetInputParams { id: r.id.clone() })).map_err(storage)?;
+        self.db
+            .run(async |c| q::forget_input(c, q::ForgetInputParams { id: r.id.clone() }).await)
+            .map_err(storage)?;
         Ok(())
     }
     pub fn delete(&self, id: &str) -> Result<(), ApiError> {
-        let mut inner = self.inner();
-        if let Some(r) = find(&mut inner, id)? {
-            self.remove(&mut inner, &r)?;
+        let inner = self.inner();
+        if let Some(r) = find(&self.db, &inner, id)? {
+            self.remove(&r)?;
         }
         Ok(())
     }
     pub fn preview_delete(&self, id: &str) -> Result<Preview, ApiError> {
-        let mut inner = self.inner();
-        let Some(r) = find(&mut inner, id)? else {
+        let inner = self.inner();
+        let Some(r) = find(&self.db, &inner, id)? else {
             return Ok(Preview { does: vec![] });
         };
         if !r.can_delete {
@@ -195,13 +206,16 @@ impl Inputs {
         })
     }
     pub fn sweep(&self) -> Result<(), ApiError> {
-        let mut inner = self.inner();
-        let ids = block_on(q::expired_inputs(&mut inner.db, q::ExpiredInputsParams { expires_at: now() })).map_err(storage)?;
+        let inner = self.inner();
+        let ids = self
+            .db
+            .run(async |c| q::expired_inputs(c, q::ExpiredInputsParams { expires_at: now() }).await)
+            .map_err(storage)?;
         for row in ids {
             let id = row.id;
-            let r = found(&mut inner, &id)?;
+            let r = found(&self.db, &inner, &id)?;
             if r.can_delete
-                && let Err(error) = self.remove(&mut inner, &r)
+                && let Err(error) = self.remove(&r)
             {
                 eprintln!("media input cleanup pending for {id}: {}", error.message);
             }
@@ -209,13 +223,13 @@ impl Inputs {
         Ok(())
     }
     fn restore(&self) -> Result<(), ApiError> {
-        let mut inner = self.inner();
+        let _inner = self.inner();
         remove_dir(&self.staging)?;
-        block_on(q::interrupt_uploads(&mut inner.db)).map_err(storage)?;
-        for row in block_on(q::list_inputs(&mut inner.db)).map_err(storage)? {
+        self.db.run(async |c| q::interrupt_uploads(c).await).map_err(storage)?;
+        for row in self.db.run(async |c| q::list_inputs(c).await).map_err(storage)? {
             let r = input(row, false)?;
             if r.phase == MediaInputPhase::Ready && !r.hash.as_ref().is_some_and(|h| self.files.path_of(h).is_file()) {
-                phase(&mut inner, &r.id, "failed")?;
+                phase(&self.db, &r.id, "failed")?;
             }
         }
         Ok(())
@@ -225,7 +239,7 @@ impl Inputs {
     pub fn upload(&self, id: &str, source: impl Read) -> Result<MediaInput, ApiError> {
         let r = {
             let mut inner = self.inner();
-            let r = found(&mut inner, id)?;
+            let r = found(&self.db, &inner, id)?;
             if r.phase == MediaInputPhase::Ready {
                 return Ok(r);
             }
@@ -233,7 +247,7 @@ impl Inputs {
                 return Err(refused("inputBusy"));
             }
             remove_dir(&self.staging.join(id))?;
-            phase(&mut inner, id, "uploading")?;
+            phase(&self.db, id, "uploading")?;
             inner.uploading.insert(id.to_owned());
             r
         };
@@ -243,13 +257,13 @@ impl Inputs {
         let mut inner = self.inner();
         inner.uploading.remove(id);
         if result.is_err() {
-            phase(&mut inner, id, "failed")?;
+            phase(&self.db, id, "failed")?;
         }
         result?;
         if let Err(error) = cleanup {
             eprintln!("media staging cleanup: {}", error.message);
         }
-        found(&mut inner, id)
+        found(&self.db, &inner, id)
     }
     fn upload_inner(&self, r: &MediaInput, mut source: impl Read) -> Result<(), ApiError> {
         let directory = self.staging.join(&r.id);
@@ -306,25 +320,36 @@ impl Inputs {
             return Err(refused("inputChanged"));
         }
         {
-            let mut inner = self.inner();
-            block_on(q::save_input_hash(
-                &mut inner.db,
-                q::SaveInputHashParams {
-                    id: r.id.clone(),
-                    hash: Some(hash.clone()),
-                },
-            ))
-            .map_err(storage)?;
+            let _inner = self.inner();
+            self.db
+                .run(async |c| {
+                    q::save_input_hash(
+                        c,
+                        q::SaveInputHashParams {
+                            id: r.id.clone(),
+                            hash: Some(hash.clone()),
+                        },
+                    )
+                    .await
+                })
+                .map_err(storage)?;
         }
         self.files.keep_staged(&path, &hash, r.size, &r.name, &r.mime)?;
-        block_on(q::input_ready(
-            &mut self.inner().db,
-            q::InputReadyParams {
-                id: r.id.clone(),
-                expires_at: now() + LIFETIME,
-            },
-        ))
-        .map_err(storage)?;
+        {
+            let _inner = self.inner();
+            self.db
+                .run(async |c| {
+                    q::input_ready(
+                        c,
+                        q::InputReadyParams {
+                            id: r.id.clone(),
+                            expires_at: now() + LIFETIME,
+                        },
+                    )
+                    .await
+                })
+                .map_err(storage)?;
+        }
         Ok(())
     }
     pub fn adopt(&self, id: &str) -> Result<MediaInput, ApiError> {
@@ -387,8 +412,9 @@ impl Inputs {
         })
     }
     fn transaction<T>(&self, write: impl FnOnce(&mut SqliteConnection) -> Result<T, ApiError>) -> Result<T, ApiError> {
-        let mut inner = self.inner();
-        let mut tx = block_on(inner.db.begin_with("BEGIN IMMEDIATE")).map_err(storage)?;
+        let _inner = self.inner();
+        let mut conn = self.db.acquire().map_err(storage)?;
+        let mut tx = block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(storage)?;
         let value = write(&mut tx)?;
         block_on(tx.commit()).map_err(storage)?;
         Ok(value)
@@ -420,7 +446,10 @@ impl Inputs {
         self.transaction(|db| self.pin_in(db, ids, holder))
     }
     pub fn release(&self, holder: &str) -> Result<(), ApiError> {
-        block_on(q::release_pins(&mut self.inner().db, q::ReleasePinsParams { holder: holder.into() })).map_err(storage)
+        let _inner = self.inner();
+        self.db
+            .run(async |c| q::release_pins(c, q::ReleasePinsParams { holder: holder.into() }).await)
+            .map_err(storage)
     }
 }
 fn remove_dir(path: &Path) -> Result<(), ApiError> {

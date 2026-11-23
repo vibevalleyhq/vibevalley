@@ -5,14 +5,13 @@
 //! VibeValley's words and codes.
 
 mod board;
-mod chat;
 pub(crate) mod db;
 mod edits;
 mod family;
 mod refine;
 
 pub use board::{Board, NewIssue, Sent};
-pub use chat::IssueChat;
+pub use db::SqliteIssueStore;
 pub use family::{ChildDraft, MAX_CHILDREN};
 
 use std::path::PathBuf;
@@ -618,12 +617,12 @@ pub fn install_reviewed(hub: &Hub, board: Board, on_reviewed: Arc<dyn Fn(&str) +
 
 /// `issue.conversation.get`: the issue's thread in the chat, if one was
 /// opened.
-pub fn install_conversation(hub: &Hub, board: Board, chat: Arc<crate::modules::collab::channel::Chat>) {
-    let (b, c) = (board.clone(), chat.clone());
+pub fn install_conversation(hub: &Hub, board: Board, channel: Arc<dyn crate::ports::ChannelAnnouncePort>) {
+    let (b, c) = (board.clone(), channel.clone());
     hub.on::<ops::IssueConversationGet>(move |_, input| Ok(c.issue_thread_id(&get(&b, &input.id)?.id)));
     // refinement.ts `draft`: the issue's thread is opened, the user's words go in it, and what was said there is the
     // draft's discussion.
-    hub.on::<ops::IssueRefine>(move |_, input| refine(&board, Some(&chat), &input));
+    hub.on::<ops::IssueRefine>(move |_, input| refine(&board, Some(channel.as_ref()), &input));
 }
 
 fn edit_rewords(edit: &IssueUpdate) -> bool {
@@ -760,7 +759,7 @@ pub(crate) fn status(board: &Board, profiles: Option<&Agents>, input: &vibevalle
 
 pub(crate) fn refine(
     board: &Board,
-    chat: Option<&crate::modules::collab::channel::Chat>,
+    channel: Option<&dyn crate::ports::ChannelAnnouncePort>,
     input: &vibevalley_protocol::IssueRefineInput,
 ) -> Result<Issue, ApiError> {
     let mut item = get(board, &input.id)?;
@@ -774,20 +773,11 @@ pub(crate) fn refine(
         return Err(refused("server.issue.refinement.drafting", &[("name", r.name.clone().into())]));
     }
     let said = input.text.as_deref().unwrap_or("").trim().to_string();
-    let discussion = if let Some(chat) = chat {
-        let thread = chat.issue_thread(&item.id, &item.title, None)?;
-        let discussion = chat
-            .history(&thread, None, Some(40))?
-            .into_iter()
-            .map(|m| m.text)
-            .collect::<Vec<_>>()
-            .join("\n\n");
+    let discussion = if let Some(channel) = channel {
+        let thread = channel.issue_thread(&item.id, &item.title, None)?;
+        let discussion = channel.history(&thread, 40)?.into_iter().map(|m| m.text).collect::<Vec<_>>().join("\n\n");
         if !said.is_empty() {
-            chat.say(crate::modules::collab::channel::Saying {
-                text: said.clone(),
-                channel: Some(thread),
-                ..Default::default()
-            })?;
+            channel.say_in(&thread, &said, String::new())?;
         }
         discussion
     } else {

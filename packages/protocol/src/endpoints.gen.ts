@@ -202,3 +202,14 @@ export const servedEndpoints = [
   { op: "remote.device.revoke", can: ["user"], about: ["id"] },
   { op: "remote.whoami", can: ["user", "remote"], about: [] },
 ] as const;
+
+export const servedSubscriptions = [
+  { name: "channel.follow", can: ["user", "remote"] },
+  { name: "channel.reports", can: ["user", "remote"] },
+  { name: "artifact.follow", can: ["user", "remote"] },
+  { name: "artifact.entry.follow", can: ["user", "remote"] },
+  { name: "artifact.suggestion.follow", can: ["user", "remote"] },
+  { name: "artifact.presence.follow", can: ["user", "remote"] },
+  { name: "session.watch", can: ["user", "remote"] },
+  { name: "issue.watch", can: ["user", "remote"] },
+] as const;

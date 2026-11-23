@@ -10,21 +10,24 @@ mod issue;
 mod memory;
 mod plan;
 
-use std::sync::{Arc, LazyLock};
+use std::path::PathBuf;
+use std::sync::{Arc, LazyLock, Weak};
 
 use parking_lot::Mutex;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
-use vibevalley_protocol::{Issue, Session};
+use vibevalley_protocol::{Caller, Issue, Session};
 
 use crate::modules::collab::channel::Chat;
+use crate::modules::content::artifact::Artifacts;
+use crate::modules::content::media::jobs::Jobs as MediaJobs;
+use crate::modules::infra::text;
 use crate::modules::team::agent::Agents;
-use crate::modules::team::orchestrator::words;
-use crate::modules::work::cron::Crons;
 use crate::modules::work::issue::Board;
 use crate::modules::work::pull::Pulls;
-use crate::modules::work::repo::Repos;
+use crate::ports::{ResourcePort, ToolDispatchPort, ToolSpecWire};
+use crate::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, Hub};
 
 /// A tool as the model sees it.
 #[derive(Deserialize, Clone)]
@@ -61,38 +64,67 @@ pub enum Who {
     Helper(Box<Session>),
 }
 
-/// What the tools reach.
-pub struct Farm {
+/// Dissolved tool dispatcher: routes cross-domain RPCs through `Hub::invoke`,
+/// reads `vv://` resources through `ResourcePort`, and keeps only the narrow
+/// L1/L2 handles needed for non-RPC actor-scoped operations (zero L3 imports).
+pub struct ToolBox {
+    pub hub: Weak<Hub>,
+    pub resources: Arc<dyn ResourcePort>,
+    pub agents: Arc<Agents>,
     pub board: Board,
     pub chat: Arc<Chat>,
-    pub agents: Arc<Agents>,
-    pub repos: Arc<Repos>,
     pub pulls: Arc<Pulls>,
-    pub crons: Arc<Crons>,
-    pub memories: Arc<crate::modules::team::memory::Memories>,
-    pub media: Arc<crate::modules::content::media::jobs::Jobs>,
-    pub artifacts: Arc<crate::modules::content::artifact::Artifacts>,
-    pub library: Arc<crate::modules::content::library::Library>,
-    pub resources: Arc<crate::modules::team::mcp::Resources>,
+    pub media: Arc<MediaJobs>,
+    pub artifacts: Arc<Artifacts>,
+    pub repos_root: PathBuf,
 }
 
-impl Farm {
+impl ToolBox {
+    pub(crate) fn hub(&self) -> Result<Arc<Hub>, String> {
+        self.hub.upgrade().ok_or_else(|| "server closed".to_string())
+    }
+    /// Builds the authenticated internal `CallerContext` for a tool invocation.
+    pub(crate) fn ctx(&self, who: &Who) -> CallerContext {
+        match who {
+            Who::Orchestrator(r) => CallerContext {
+                caller: Caller::Orchestrator,
+                principal: CallerPrincipal::LocalOwner,
+                client: Some(ClientIdentity {
+                    id: r.agent.clone(),
+                    kind: ClientKind::Internal,
+                    label: r.channel.clone(),
+                }),
+                trace_id: 0,
+            },
+            Who::Helper(h) => CallerContext {
+                caller: Caller::Session,
+                principal: CallerPrincipal::LocalOwner,
+                client: Some(ClientIdentity {
+                    id: h.id.clone(),
+                    kind: ClientKind::Internal,
+                    label: h.name.clone(),
+                }),
+                trace_id: 0,
+            },
+        }
+    }
+
     /// An issue by id, `#n`, number, or the id or name of a helper on it.
     fn issue(&self, key: &str) -> Result<Issue, String> {
         let key = key.trim();
         let k = key.trim_start_matches('#');
-        let found = self.board.read(|s| {
+        let found = self.hub()?.read(|s| {
             s.issues.iter().find(|i| i.id == key || i.number.to_string() == k).cloned().or_else(|| {
                 let on = s.sessions.iter().filter(|h| h.id == k || h.name == k).max_by_key(|h| h.hired_at)?;
                 s.issues.iter().find(|i| Some(i.id.as_str()) == on.issue_id()).cloned()
             })
         });
-        found.ok_or_else(|| words::no_issue(key))
+        found.ok_or_else(|| text::no_issue(key))
     }
 
     fn worker_of(&self, issue: &Issue) -> Option<Session> {
         let last = issue.latest_session_id()?;
-        self.board.read(|s| s.sessions.iter().find(|h| &h.id == last).cloned())
+        self.hub.upgrade()?.read(|s| s.sessions.iter().find(|h| &h.id == last).cloned())
     }
 
     fn who_of(&self, issue: &Issue) -> String {
@@ -108,17 +140,43 @@ impl Farm {
 
     fn number_of(&self, session: &Session) -> Option<i64> {
         let issue = session.issue_id()?;
-        self.board.read(|s| s.issues.iter().find(|i| i.id == issue).map(|i| i.number))
+        self.hub.upgrade()?.read(|s| s.issues.iter().find(|i| i.id == issue).map(|i| i.number))
     }
 
     /// Every helper on the farm.
     pub fn roster(&self) -> Vec<Session> {
-        self.board
-            .read(|s| s.sessions.iter().filter(|h| vibevalley_core::status::is_farm_worker(h)).cloned().collect())
+        let Some(hub) = self.hub.upgrade() else { return vec![] };
+        hub.read(|s| s.sessions.iter().filter(|h| vibevalley_core::status::is_farm_worker(h)).cloned().collect())
     }
 
     pub fn session_line(&self, h: &Session) -> String {
-        words::session_line(h, crate::now(), self.number_of(h))
+        text::session_line(h, crate::now(), self.number_of(h))
+    }
+}
+
+impl ToolDispatchPort for ToolBox {
+    fn helper_tools(&self) -> Vec<ToolSpecWire> {
+        helper()
+            .into_iter()
+            .map(|t| ToolSpecWire {
+                name: t.words.name,
+                description: t.words.description,
+                parameters: t.words.parameters,
+            })
+            .collect()
+    }
+
+    fn session_for_token(&self, token: &str) -> Option<Session> {
+        let id = self.board.sessions().who(token)?;
+        self.board.session(&id)
+    }
+
+    fn call_helper(&self, session: Session, name: &str, args: &Value) -> Result<String, String> {
+        let tools = helper();
+        match tools.iter().find(|t| t.words.name == name) {
+            Some(t) => t.run(self, &Who::Helper(Box::new(session)), args),
+            None => Err(format!("没成：没有 {name} 这个工具")),
+        }
     }
 }
 
@@ -173,7 +231,7 @@ fn coerce(schema: &Value, v: &Value) -> Value {
 }
 
 /// What a tool does with typed arguments.
-type Run = fn(&Farm, &Who, &Words, &Value) -> Result<String, String>;
+type Run = fn(&ToolBox, &Who, &Words, &Value) -> Result<String, String>;
 
 /// A tool as one caller holds it.
 #[derive(Clone)]
@@ -185,7 +243,7 @@ pub struct Tool {
 /// `run` for a tool whose arguments read as `A`.
 macro_rules! typed {
     ($f:path) => {
-        |farm: &Farm, who: &Who, words: &Words, raw: &Value| $f(farm, who, $crate::modules::team::tool::args(&words.parameters, raw)?)
+        |tools: &ToolBox, who: &Who, words: &Words, raw: &Value| $f(tools, who, $crate::modules::team::tool::args(&words.parameters, raw)?)
     };
 }
 
@@ -280,8 +338,8 @@ pub fn unrun() -> Vec<String> {
 
 impl Tool {
     /// The tool run as `who`: its answer, or its refusal in words for the model.
-    pub fn run(&self, farm: &Farm, who: &Who, raw: &Value) -> Result<String, String> {
-        (self.run)(farm, who, &self.words, raw)
+    pub fn run(&self, tools: &ToolBox, who: &Who, raw: &Value) -> Result<String, String> {
+        (self.run)(tools, who, &self.words, raw)
     }
 
     /// Reads only: safe to run again if the process died while it ran.
@@ -294,7 +352,7 @@ impl Tool {
 /// The orchestrator's tool in its loop: run as it is answering now.
 pub struct Held {
     pub tool: Tool,
-    pub farm: Arc<Farm>,
+    pub tools: Arc<ToolBox>,
     pub route: Arc<Mutex<Route>>,
 }
 
@@ -313,7 +371,7 @@ impl vibevalley_runtime::agent::Tool for Held {
 
     fn execute(&self, args: &Value) -> vibevalley_runtime::agent::ToolOutput {
         let route = self.route.lock().clone();
-        match self.tool.run(&self.farm, &Who::Orchestrator(route), args) {
+        match self.tool.run(&self.tools, &Who::Orchestrator(route), args) {
             Ok(text) => vibevalley_runtime::agent::ToolOutput::ok(text),
             Err(why) => vibevalley_runtime::agent::ToolOutput::error(why),
         }
@@ -321,13 +379,13 @@ impl vibevalley_runtime::agent::Tool for Held {
 }
 
 /// The orchestrator's tools for its loop.
-pub fn held(farm: &Arc<Farm>, route: &Arc<Mutex<Route>>) -> Vec<Box<dyn vibevalley_runtime::agent::Tool>> {
+pub fn held(tools: &Arc<ToolBox>, route: &Arc<Mutex<Route>>) -> Vec<Box<dyn vibevalley_runtime::agent::Tool>> {
     orchestrator()
         .into_iter()
         .map(|tool| {
             Box::new(Held {
                 tool,
-                farm: farm.clone(),
+                tools: tools.clone(),
                 route: route.clone(),
             }) as Box<dyn vibevalley_runtime::agent::Tool>
         })

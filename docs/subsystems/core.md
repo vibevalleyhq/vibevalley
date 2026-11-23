@@ -16,13 +16,13 @@
 | 位置 | 职责 |
 |---|---|
 | `crates/core/src/core.rs`、`inbox.rs` | `Core`：`reduce`、`SliceMask`、6 路切片投影（`board_slice`、`sessions_slice`、`collab_slice`、`inbox_slice`、`ops_slice`、`farm_frame`）与离线 `slice_bundle`、`Transition`；收件箱纯计算（`inbox`） |
-| `crates/server/src/lib.rs`、`event_bus.rs`、`slice_feed.rs`、`runtime_inbox.rs` | `Hub`、有界异步 `EventBus`、基于 `tokio::sync::watch` 的 6 路脏合并 `SliceFeed<T>` 与 `RuntimeInboxObserver`：持有 `Core`、端点表、订阅表、`tokio::sync::broadcast` 实时事件流与 `CancellationToken`/`TaskTracker` 停机作用域，按 `Applied.dirty: SliceMask` 仅推送变脏切片（`effects` 仅进 `farm`），将持久 `pi.inbox` 运行时告警实时并入 `InboxSlice`；经 `arc-swap` 无锁挂接 `CallerContext`/`ClientIdentity` 与 `InvokeObserver`/`FaultGate`/`HostDebugBridge`/`RemoteAuth` 插槽 |
-| `crates/server/src/start.rs` | `start`：按序打开设置、档案、仓库、工单板、频道、媒体、助手、`DebugKit`（[debug/mod.rs](crates/server/src/modules/infra/debug/mod.rs)）与远程访问控制（`crates/server/src/modules/infra/remote/`），接线 `IssueChat`、`SessionChat`、助手频道订阅与 `RuntimeInboxObserver`，注册所有端点；仅在 `VIBEVALLEY_DEBUG=1` 时挂接观察器、`FaultGate` 与 `OarObserver`，`Started::close` 停机并卸载全局观察器与远程监听 |
+| `crates/server/src/lib.rs`、`base.rs`、`event_bus.rs`、`slice_feed.rs`、`runtime_inbox.rs` | `Hub`、单一 `ServerDb` 连接池、有界异步 `EventBus`、预编码共享 `Arc<str>` 的 6 路脏合并 `SliceFeed<T>` 与 `RuntimeInboxObserver`：持有 `Core`、端点表、强类型进程内命令总线 `Hub::invoke`、带 `Subscription::CAN` 权限校验的订阅表、`tokio::sync::broadcast` 实时事件流与 `CancellationToken`/`TaskTracker` 停机作用域，按 `Applied.dirty: SliceMask` 仅推送变脏切片（`effects` 仅进 `farm`），经 `Fact::RuntimeInboxChanged` 将持久 `pi.inbox` 运行时告警折入 `SpaceState`；经 `arc-swap` 与 `OnceLock` 挂接 `CallerContext`/`ClientIdentity` 与 `InvokeObserver`/`FaultGate`/`HostDebugBridge`/`RemoteAuth`/`LiveVoicePort` 窄端口，脊柱本身零 `crate::modules::*` 导入 |
+| `crates/server/src/start.rs` | `start`：经单一 `ServerDb` 连接池按 `L0` → `L1` → `L2` → `L3` 依赖次序一次性不可变打开并注入全部模块，注册端点、订阅与 `LiveVoicePort`；仅在 `VIBEVALLEY_DEBUG=1` 时挂接观察器、`FaultGate` 与 `OarObserver`；对外 `Started` 仅暴露 `hub`、`set_mcp_url` 与 `close` |
 | `crates/server/src/main.rs` | 二进制 `vibevalley-server`：初始化工作区 `tracing_subscriber`（`VIBEVALLEY_LOG`/`RUST_LOG`，`VIBEVALLEY_DEBUG=1` 默认 `info` 否则 `warn`），支持 `--web`、`--ready-json`，读环境变量，写 `server.json` |
-| `crates/protocol/src/contract/` | `SpaceState`、`Fact`、`SliceKind`、5 域切片、`FarmFrame`、`SliceBundle`、`LiveEvent`、`DebugKit`（`debug.rs`）、远程访问契约（[remote.rs](crates/protocol/src/contract/remote.rs)）、GPUI 壳强类型协议（`host.rs`：`Host*` 帧、`HostAction` 与 `HostOp`）与接口表 `ENDPOINTS`（`endpoints.rs`），手写的源头，TS 由它生成 |
+| `crates/protocol/src/contract/` | `SpaceState`、`Fact`（含 `RuntimeInboxChanged`）、`SliceKind`、5 域切片、`FarmFrame`、`SliceBundle`、`LiveEvent`、`DebugKit`（`debug.rs`）、远程访问契约（[remote.rs](crates/protocol/src/contract/remote.rs)，含 6 类 `RemotePlatform` 与 `scope` 常量）、GPUI 壳强类型协议（`host.rs`：`Host*` 帧、`HostAction` 与 `HostOp`）、接口表 `ENDPOINTS` 与带 `CAN` 权限表的 `SUBSCRIPTIONS`（`endpoints.rs`），手写的源头，TS 由它生成 |
 | `crates/protocol/src/envelope.rs` | 全信封、`BizCode`、`ApiError` |
-| `crates/server/src/transport/http/mod.rs` | axum 路由：命令接口、`/api/v1/slice/{name}`、`/live`、订阅流、工单观察流、附件、网页 Artifact、`/mcp`；本机门来源校验 `from_the_farm` 与独立受认证远程监听门（`serve_remote`）；`media.rs` 媒体输入与语音流 |
-| `crates/cli/src/` | 命令行 `vibevalley`：`main.rs` 入口、`client.rs` HTTP/SSE 客户端（`Client::slice`）与退出码、`output.rs` 输出格式化、`domains/` 按五大业务域组织的强类型子命令 |
+| `crates/server/src/transport/http/mod.rs` | axum 路由：命令接口、预编码 `Arc<str>` 零克隆推送的 `/api/v1/slice/{name}`、`/live`、透传 `CallerContext` 校验 `Subscription::CAN` 的订阅流、工单观察流、带鉴权与 HTTP `Range` 流式读取的 `/api/v1/attachment/{id}`、网页 Artifact、`/mcp`；本机门来源校验 `from_the_farm` 与独立受认证远程监听门（`serve_remote`）；`media.rs` 媒体输入与语音流 |
+| `crates/cli/src/` | 命令行 `vibevalley`：`main.rs` 入口（含全局 `--server` / `--token`）、`client.rs` HTTP/SSE 客户端（支持 `auth.json` 与 Bearer 鉴权、`Client::slice`）与退出码、`output.rs` 输出格式化、`domains/` 按五大业务域组织的强类型子命令（含 `infra` 域下的 `auth` 与 `remote`） |
 
 全部接口与权限矩阵见生成的 [capabilities.md](docs/reference/capabilities.md)。
 
@@ -55,7 +55,7 @@
 | `cron-ask` | 助手创建的定时任务处于 `pending` 等待用户同意 |
 | `budget_reached` | 持久执行引擎（`pi.inbox`）触发预算上限告警（`InboxFrom::Runtime` / `InboxTarget::Runtime { task_id, session_id }`） |
 
-- **纯函数现算并合流运行时告警**：`inbox_slice(state, seq, extra_items)` 由 `inbox(state)` 从 `SpaceState` 直接算出 `InboxItem[]`，并与 `RuntimeInboxObserver`（`crates/server/src/runtime_inbox.rs`）订阅持久 `pi.inbox` 文档投影出的运行时告警合并排序后放进 `InboxSlice.items`（变更时立即递增 `seq` 并标脏 `SliceMask::INBOX`）；每条有稳定的 id，带 `who` 和预填好的文案 `words`（`label`、`title`、`body`、`tray`）。原生子工单成功完成后自动合入父分支，不单独产生 `review`。
+- **纯函数现算并经事实合流运行时告警**：`RuntimeInboxObserver`（`crates/server/src/runtime_inbox.rs`）订阅持久 `pi.inbox` 文档并通过 `Hub::apply` 施加 `Fact::RuntimeInboxChanged`，由 `reduce` 折叠进 `SpaceState.runtime_inbox_items` 并仅在变化时标脏 `SliceMask::INBOX`；`inbox_slice(state, seq)` 由 `inbox(state)` 直接合并算出 `InboxSlice.items`，每条有稳定的 id，带 `who` 和预填好的文案 `words`（`label`、`title`、`body`、`tray`）。原生子工单成功完成后自动合入父分支，不单独产生 `review`。
 - **首次打开已有的不响铃（`freshOf`）**：页面首次打开经 `packages/protocol/src/rules/inbox.ts` 的 `freshOf` 记下存量 id，之后新出现的 id 才响铃和通知，同一个只响一次。
 
 ### 切片、SSE 流和其余路由
@@ -65,13 +65,13 @@
 | `GET /api/v1/slice/{name}`（`name` ∈ `board` \| `sessions` \| `collab` \| `inbox` \| `ops` \| `farm`） | `BoardSlice` / `SessionsSlice` / `CollabSlice` / `InboxSlice` / `OpsSlice` / `FarmFrame` | 带 `Accept: application/json` 或 `?once=1` 直接返回当前 JSON 快照；SSE 首帧推送最新切片（支持 `Last-Event-ID` 或 `?after=<seq>` 续读跳过已收序号） | 经 `SliceFeed<T>`（`tokio::sync::watch` + `WatchStream`）脏合并推送（`id: <seq>\ndata: <json>\n\n`），无阻塞线程开销；`farm` 携带窗口内有序 `effects` | HTTP 客户端、CLI |
 | `GET /api/v1/live`（别名 `/api/v1/events`） | `LiveEvent` | 无 | 经 `Hub::subscribe_live()`（有界 `tokio::sync::broadcast`）推送 `SessionEvent`、`Notice`、`Runtime` | 页面 |
 | `GET /api/v1/issue/watch/:id` | `IssueWatch` | 工单状态与保留的轨迹 | 状态、轨迹和缺口（[观察执行](docs/subsystems/issue.md#观察执行)） | `issue watch` |
-| `GET /api/v1/subscribe/<名字>?payload=<JSON>` | 各订阅的 `event`（`packages/protocol/src/rpc.ts` 定义） | 补齐 `after` 之后的变化 | 之后的每次变化 | 页面：`channel.follow`、`channel.reports`、`artifact.follow`、`artifact.suggestion.follow` |
+| `GET /api/v1/subscribe/<名字>?payload=<JSON>` | 各订阅的 `event`（`SUBSCRIPTIONS` 与 `packages/protocol/src/rpc.ts` 定义，均声明 `Subscription::CAN`） | 经 `Server::subscribe_with` 校验 `CallerContext` 与 `CAN`，通过后补齐 `after` 之后的变化 | 之后的每次变化 | 页面与远程客户端：`channel.follow`、`channel.reports`、`artifact.follow`、`artifact.entry.follow`、`artifact.suggestion.follow`、`artifact.presence.follow`、`session.watch`、`issue.watch` |
 
-订阅流的入参解不开、或第一条事件之前就被拒绝（没有这个频道……），回的是普通的 JSON 错误信封，不是流；开始推送以后出错只结束流。
+订阅流的调用方无权（不满足 `Subscription::CAN`）返回 `403`（`BizCode::Forbidden`），入参解不开或第一条事件之前被拒绝回普通 JSON 错误信封，不是流；开始推送以后出错只结束流。
 
 SSE 以外的路由：
 
-- `GET /api/v1/attachment/<id>`：附件；`GET /api/v1/artifact/<id>/<version>` 与 `GET /api/v1/artifact/<id>/view`：网页与结构化 Artifact 沙箱视图。
+- `GET /api/v1/attachment/<id>`：附件流式下载（校验 `CallerContext` 与 `attachment.file` 权限，接受 `Authorization: Bearer` 或 `?token=`，以 `tokio::fs::File` 支持 HTTP `Range` 分块读取）；`GET /api/v1/artifact/<id>/<version>` 与 `GET /api/v1/artifact/<id>/view`：网页与结构化 Artifact 沙箱视图。
 - `PUT`、`GET /api/v1/media/input/<id>/content`：上传和读取媒体输入；`GET /api/v1/media/speech/<id>/stream`：合成语音的流（[媒体](docs/subsystems/media.md)）。
 - `/mcp`：帮工的工具（[频道](docs/subsystems/channel.md)）。
 
@@ -88,14 +88,14 @@ SSE 以外的路由：
 - **开关写成幂等设值**：回应、置顶、归档定义为带 `on: boolean` 的 `*.set` 接口，重复设置相同值不产生副作用。
 - **破坏性操作配对试跑 `dryRun`**：删除、合并、关单接口在 `endpoints` 中指向对应的 `preview<动词>` 接口。试跑与真做共用同一套前置判断函数，试跑不写库、不碰 git。
 - **拒绝响应附带下一步 `next`**：业务拒绝与未找到错误在 `error.next` 中携带 `{ say, run? }[]`，给出可直接运行的 CLI 命令或指引。
-- **CLI 是纯 HTTP 客户端**：`crates/cli` 不载入服务端、不直连数据库，通过 `--server`、`VIBEVALLEY_SERVER` 或当前发布通道家目录的 `server.json`（未记录时回落到当前通道默认端口，见 `crates/protocol/src/home.rs`）连接服务端；失败时 stderr 打一行 JSON，退出码同 TS 版。
-- **拥有者负责协调与身份分配**：处理器只传业务意图，由拥有者模块协调内部步骤并在锁内分配新实体 ID；查询缺失关联时列入 `missingSessions`，不伪造缺省对象。
+- **CLI 是纯 HTTP 客户端**：`crates/cli` 不载入服务端、不直连数据库；目标地址按 `--server` / `VIBEVALLEY_SERVER` > `$VIBEVALLEY_HOME/auth.json` > 当前发布通道家目录 `server.json`（未记录时回落通道默认端口，见 `crates/protocol/src/home.rs`）依次解析，Bearer 令牌按 `--token` / `VIBEVALLEY_REMOTE_TOKEN` > 与目标地址匹配的 `auth.json`（`0600`）附带 `Authorization: Bearer`；提供 `vibevalley auth`（`login` / `whoami` / `status` / `logout`）与 `vibevalley remote`（`status` / `enable` / `disable` / `code` / `revoke`），失败时 stderr 打一行 JSON，退出码同 TS 版。
+- **拥有者负责协调与身份分配**：处理器只传业务意图，跨域写入统一走强类型进程内命令总线 `Hub::invoke<O>`（与 HTTP 共用 `O::CAN`、`InvokeObserver` 与 `FaultGate`），由拥有者模块协调内部步骤并在锁内分配新实体 ID；查询缺失关联时列入 `missingSessions`，不伪造缺省对象。
 
 ### 受控远程访问
 
-- **默认关闭与绑定约束**：`crates/server/src/modules/infra/remote/` 默认关闭远程监听；仅本机 `Caller::User` 调用 `remote.enable` 时，服务端按显式 `bindAddr` → 在线 Tailscale IPv4（`100.64.0.0/10`）→ `127.0.0.1`（供 iOS Simulator 或本地联调）的优先级选取监听地址，在独立端口（通道默认端口 `+ 100`，如 dev `8890` / release `8887`）启动 `serve_remote`，拒绝绑定通配或公网地址；`remote.disable` 立即停机并持久化关闭状态。
-- **一次性配对码与 SHA-256 哈希令牌**：`remote.pair.create`（仅 `Caller::User`）在远程开启时生成 5 分钟有效、单次使用的高熵配对码与 `vibevalley://pair?url=<encoded>&code=<code>` 深链；`remote.pair.exchange` 受失败速率限制保护，核验后立即作废配对码并签发 `vv_dev_*` 持久 Bearer 令牌，数据库（`remote_device`）只存 SHA-256 哈希，线缆类型 `RemoteDeviceSummary` 永不返回 `token_hash`。
-- **`RemoteAuth` 插槽与最小权限边界**：`Hub` 通过无锁 `ArcSwapOption` 挂载 `RemoteAuth`；远程监听门除 `remote.pair.exchange` 外强制校验 `Authorization: Bearer <token>`，认证通过后构造 `Caller::Remote` 与 `CallerPrincipal::RemoteDevice { device_id, scope }` 并更新 `last_seen_at`，已撤销（`remote.device.revoke`）或未知令牌立即返回 `401`（`BizCode::Unauthorized`）。远程门开放已认证设备访问 `GET /api/v1/slice/{name}`（支持 `Last-Event-ID` 续读）、`/live`、`/subscribe/{name}` 与 `can` 包含 `remote` 的业务端点，严格拦截 `debug.*`、`/mcp` 及全部 `Caller::User` 专属管理端点（`remote.{status,enable,disable,pair.create,device.revoke}`、`setting.update`、`agent.{create,update,delete}`、`provider.*`、`connector.{login,verify,logout,channel.set}`、`repo.pr.submit`）。
+- **默认关闭与绑定约束**：`crates/server/src/modules/infra/remote/` 默认关闭远程监听；仅本机 `Caller::User` 调用 `remote.enable` 时，服务端按显式 `bindAddr` / `VIBEVALLEY_REMOTE_BIND` → 在线 Tailscale IPv4（`100.64.0.0/10`）→ `127.0.0.1`（供 iOS Simulator 或本地联调）的优先级选取监听地址，在独立端口（通道默认端口 `+ 100`，如 dev `8890` / release `8887`）启动 `serve_remote`，默认拒绝绑定通配或公网地址（显式设置 `VIBEVALLEY_REMOTE_ALLOW_ALL=1` 可用于局域网或反向代理部署）；`remote.disable` 立即停机并持久化关闭状态。
+- **一次性配对码、平台分类与作用域**：`remote.pair.create`（仅 `Caller::User`）在远程开启时生成 5 分钟有效、单次使用的高熵配对码与 `vibevalley://pair?url=<encoded>&code=<code>` 深链，支持可选 `scope`（`SCOPE_REMOTE_CLIENT = "remote:default"`、`SCOPE_REMOTE_MACHINE = "remote:runtime"`）；`remote.pair.exchange` 接受 6 类 `RemotePlatform`（`ios`、`android`、`cli`、`machine`、`sandbox`、`other`）并受失败速率限制保护，核验后立即作废配对码、持久化 `scope` 并签发 `vv_dev_*` 持久 Bearer 令牌，数据库（`remote_device`）只存 SHA-256 哈希，线缆类型 `RemoteDeviceSummary` 永不返回 `token_hash`。
+- **`RemoteAuth` 插槽与最小权限边界**：`Hub` 通过无锁 `ArcSwapOption` 挂载 `RemoteAuth`；远程监听门除 `remote.pair.exchange` 外强制校验 `Authorization: Bearer <token>`（`GET /api/v1/attachment/{id}` 同时支持 `?token=` 供媒体标签读取），认证通过后构造 `Caller::Remote` 与 `CallerPrincipal::RemoteDevice { device_id, scope }` 并更新 `last_seen_at`，已撤销（`remote.device.revoke`）或未知令牌立即返回 `401`（`BizCode::Unauthorized`）。远程门开放已认证设备访问 `GET /api/v1/slice/{name}`（支持 `Last-Event-ID` 续读）、`/live`、经 `Subscription::CAN` 放行的 `/subscribe/{name}`、`GET /api/v1/attachment/{id}`（`attachment.file` 授权 `Caller::User` 与 `Caller::Remote`）及 `can` 包含 `remote` 的业务端点，严格拦截 `debug.*`、`/mcp` 及全部 `Caller::User` 专属管理端点（`remote.{status,enable,disable,pair.create,device.revoke}`、`setting.update`、`agent.{create,update,delete}`、`provider.*`、`connector.{login,verify,logout,channel.set}`、`repo.pr.submit`）。
 
 ## 怎么走
 

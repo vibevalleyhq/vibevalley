@@ -1,11 +1,11 @@
 //! SQLite persistence for remote access configuration and paired device tokens.
 
-use std::path::Path;
+use std::sync::Arc;
 
 use sqlx::Connection;
 use vibevalley_protocol::{ApiError, Millis, RemoteDeviceSummary, RemotePlatform};
 
-use crate::base::{ModuleDb, internal};
+use crate::base::{ServerDb, internal};
 use crate::db::generated::infra_remote as q;
 use crate::modules::infra::column::optional;
 
@@ -18,15 +18,11 @@ pub(crate) struct StoredConfig {
 }
 
 pub(crate) struct RemoteDb {
-    db: ModuleDb,
+    db: Arc<ServerDb>,
 }
 
 fn parse_platform(raw: &str) -> RemotePlatform {
-    match raw {
-        "ios" => RemotePlatform::Ios,
-        "android" => RemotePlatform::Android,
-        _ => RemotePlatform::Other,
-    }
+    RemotePlatform::from_str(raw).unwrap_or(RemotePlatform::Other)
 }
 
 fn summary_from(
@@ -50,9 +46,8 @@ fn summary_from(
 }
 
 impl RemoteDb {
-    pub(crate) fn open(home: &Path) -> Result<Self, ApiError> {
-        let db = ModuleDb::open(home, crate::db::schema::INFRA_REMOTE).map_err(internal)?;
-        Ok(Self { db })
+    pub(crate) fn new(db: Arc<ServerDb>) -> Self {
+        Self { db }
     }
 
     pub(crate) fn get_config(&self) -> Result<Option<StoredConfig>, ApiError> {

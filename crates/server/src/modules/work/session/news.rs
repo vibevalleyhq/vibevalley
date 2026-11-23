@@ -1,23 +1,11 @@
 use std::sync::Arc;
 
-use vibevalley_protocol::IssueReportMemory;
-
 use super::Sessions;
 use crate::modules::work::ledger::Step;
 
 #[derive(Clone)]
 pub enum News {
-    Step {
-        session: String,
-        cwd: String,
-        step: Step,
-    },
-    Remember {
-        agent: String,
-        session: String,
-        repo: String,
-        memories: Vec<IssueReportMemory>,
-    },
+    Step { session: String, cwd: String, step: Step },
 }
 
 pub(super) type Listener = Arc<dyn Fn(&News) + Send + Sync>;

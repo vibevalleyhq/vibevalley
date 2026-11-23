@@ -13,13 +13,20 @@ fn database(root: &Path) -> sqlx::SqliteConnection {
     pollster::block_on(sqlx::sqlite::SqliteConnectOptions::new().filename(root.join("server.db")).connect()).unwrap()
 }
 
-fn setup() -> (tempfile::TempDir, Arc<Inputs>, Arc<Attachments>, Arc<Hub>) {
+fn setup() -> (
+    tempfile::TempDir,
+    Arc<vibevalley_server::base::ServerDb>,
+    Arc<Inputs>,
+    Arc<Attachments>,
+    Arc<Hub>,
+) {
     let dir = tempfile::tempdir().unwrap();
-    let files = Attachments::open(dir.path()).unwrap();
-    let inputs = Inputs::open(dir.path(), files.clone()).unwrap();
+    let db = vibevalley_server::base::ServerDb::open(dir.path()).unwrap();
+    let files = Attachments::open(dir.path(), db.clone());
+    let inputs = Inputs::open(dir.path(), db.clone(), files.clone()).unwrap();
     let hub = Hub::new(vibevalley_core::empty_space_state());
     inputs::install(&hub, inputs.clone());
-    (dir, inputs, files, hub)
+    (dir, db, inputs, files, hub)
 }
 fn request() -> MediaInputRequest {
     serde_json::from_value(json!({"kind":"image","mime":"image/png","name":"猫.png","size":24})).unwrap()
@@ -36,7 +43,7 @@ fn ok(h: &Hub, op: &str, p: Value) -> Value {
 }
 #[test]
 fn protocol_adopts_a_kept_attachment_and_delete_preserves_its_bytes() {
-    let (_dir, inputs, files, hub) = setup();
+    let (_dir, _db, inputs, files, hub) = setup();
     let file = files.keep(&png(), "猫.png", "image/png").unwrap();
     let r = ok(&hub, "media.input.adopt", json!({"attachment":file.id}));
     assert_eq!(r["phase"], "ready");
@@ -58,7 +65,7 @@ fn protocol_adopts_a_kept_attachment_and_delete_preserves_its_bytes() {
 }
 #[test]
 fn invalid_metadata_sizes_and_disguised_files_are_refused_and_upload_can_retry() {
-    let (_dir, inputs, _, hub) = setup();
+    let (_dir, _db, inputs, _, hub) = setup();
     for (field, value) in [
         ("size", json!(15)),
         ("size", json!(30_000_001)),
@@ -82,7 +89,7 @@ fn invalid_metadata_sizes_and_disguised_files_are_refused_and_upload_can_retry()
 }
 #[test]
 fn pins_admission_rollback_expiry_and_restart() {
-    let (dir, inputs, files, _) = setup();
+    let (dir, db, inputs, files, _) = setup();
     let r = inputs.create(&request()).unwrap();
     inputs.upload(&r.id, Cursor::new(png())).unwrap();
     let bad = inputs.pin(&[r.id.clone(), "missing".into()], "job");
@@ -91,11 +98,11 @@ fn pins_admission_rollback_expiry_and_restart() {
     inputs.pin(&[r.id.clone(), r.id.clone()], "job").unwrap();
     assert!(!inputs.get(&r.id).unwrap().can_delete);
     assert!(inputs.delete(&r.id).is_err());
-    let mut db = database(dir.path());
-    pollster::block_on(sqlx::query("update media_input set expires_at=0").execute(&mut db)).unwrap();
+    let mut conn = database(dir.path());
+    pollster::block_on(sqlx::query("update media_input set expires_at=0").execute(&mut conn)).unwrap();
     inputs.sweep().unwrap();
     assert!(inputs.content(&r.id).is_ok());
-    let restored = Inputs::open(dir.path(), files.clone()).unwrap();
+    let restored = Inputs::open(dir.path(), db.clone(), files.clone()).unwrap();
     assert!(!restored.get(&r.id).unwrap().can_delete);
     restored.release("job").unwrap();
     assert!(restored.content(&r.id).is_err());
@@ -105,15 +112,15 @@ fn pins_admission_rollback_expiry_and_restart() {
     pollster::block_on(
         sqlx::query("update media_input set phase='uploading' where id=?1")
             .bind(&interrupted.id)
-            .execute(&mut db),
+            .execute(&mut conn),
     )
     .unwrap();
-    let reopened = Inputs::open(dir.path(), files).unwrap();
+    let reopened = Inputs::open(dir.path(), db, files).unwrap();
     assert_eq!(reopened.get(&interrupted.id).unwrap().phase, MediaInputPhase::Failed);
 }
 #[test]
 fn quota_and_corrupted_content() {
-    let (dir, inputs, files, _) = setup();
+    let (dir, _db, inputs, files, _) = setup();
     let mut r = request();
     r.kind = vibevalley_protocol::MediaInputKind::Audio;
     r.mime = "audio/wav".into();
@@ -136,7 +143,7 @@ fn quota_and_corrupted_content() {
 }
 #[test]
 fn active_upload_cannot_be_deleted_or_pinned() {
-    let (_dir, inputs, _, _) = setup();
+    let (_dir, _db, inputs, _, _) = setup();
     let r = inputs.create(&request()).unwrap();
     struct Paused {
         entered: std::sync::mpsc::Sender<()>,
@@ -178,7 +185,7 @@ fn active_upload_cannot_be_deleted_or_pinned() {
 }
 #[test]
 fn audio_requires_more_than_a_container_header() {
-    let (_dir, inputs, _, _) = setup();
+    let (_dir, _db, inputs, _, _) = setup();
     let mut r = request();
     r.kind = vibevalley_protocol::MediaInputKind::Audio;
     r.mime = "audio/wav".into();
@@ -214,7 +221,7 @@ fn audio_requires_more_than_a_container_header() {
 #[test]
 fn real_http_upload_preview_ranges_and_origin_checks() {
     let _ = rustls::crypto::ring::default_provider().install_default();
-    let (_dir, inputs, _, hub) = setup();
+    let (_dir, _db, inputs, _, hub) = setup();
     let listener = vibevalley_server::transport::http::serve(hub, "127.0.0.1:0".parse().unwrap()).unwrap();
     let client = reqwest::blocking::Client::builder().no_proxy().build().unwrap();
     let r = inputs.create(&request()).unwrap();
@@ -279,7 +286,7 @@ fn real_http_upload_preview_ranges_and_origin_checks() {
 
 #[test]
 fn failed_promotion_keeps_hash_and_refuses_changed_retry() {
-    let (dir, inputs, _, _) = setup();
+    let (dir, _db, inputs, _, _) = setup();
     let r = inputs.create(&request()).unwrap();
     let mut db = database(dir.path());
     pollster::block_on(
@@ -299,7 +306,7 @@ fn failed_promotion_keeps_hash_and_refuses_changed_retry() {
 
 #[test]
 fn regression_native_media_paths_stream_validated_files_and_refuse_other_callers() {
-    let (dir, inputs, _, hub) = setup();
+    let (dir, _db, inputs, _, hub) = setup();
     let file = dir.path().join("sample.png");
     std::fs::write(&file, png()).unwrap();
     let reserved = inputs.create(&request()).unwrap();

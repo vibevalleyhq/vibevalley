@@ -273,3 +273,58 @@ fn host_actions_and_frames_round_trip() {
     });
     round_value::<HostPaletteFrame>(&palette);
 }
+
+#[test]
+fn subscription_specs_and_native_attachment_permissions_stay_consistent() {
+    use std::collections::BTreeSet;
+
+    let mut names = BTreeSet::new();
+    for spec in SUBSCRIPTIONS {
+        assert!(names.insert(spec.name), "duplicate subscription {}", spec.name);
+        assert!(!spec.can.is_empty(), "subscription {} has empty can", spec.name);
+        assert_eq!(subscription(spec.name), Some(spec));
+    }
+    assert!(subscription("unknown.stream").is_none());
+
+    fn assert_sub<S: Subscription>() {
+        let spec = subscription(S::NAME).unwrap_or_else(|| panic!("missing SUBSCRIPTIONS entry for {}", S::NAME));
+        assert_eq!(spec.can, S::CAN, "CAN mismatch for {}", S::NAME);
+    }
+
+    assert_sub::<subscriptions::ChannelFollow>();
+    assert_sub::<subscriptions::ChannelReports>();
+    assert_sub::<subscriptions::ArtifactFollow>();
+    assert_sub::<subscriptions::ArtifactEntryFollow>();
+    assert_sub::<subscriptions::ArtifactSuggestionFollow>();
+    assert_sub::<subscriptions::ArtifactPresenceFollow>();
+    assert_sub::<subscriptions::SessionWatch>();
+    assert_sub::<subscriptions::IssueWatch>();
+    assert_eq!(SUBSCRIPTIONS.len(), 8);
+
+    let att = endpoint("attachment.file").expect("attachment.file");
+    assert_eq!(att.can, &[Caller::User, Caller::Remote]);
+    assert_eq!(endpoint("media.input.file").expect("media.input.file").can, &[Caller::User]);
+    assert_eq!(endpoint("media.input.uploadFile").expect("media.input.uploadFile").can, &[Caller::User]);
+}
+
+#[test]
+fn remote_platforms_scopes_and_runtime_inbox_fact_round_trip() {
+    assert_eq!(SCOPE_REMOTE_CLIENT, "remote:default");
+    assert_eq!(SCOPE_REMOTE_MACHINE, "remote:runtime");
+    assert_eq!(
+        RemotePlatform::ALL.map(RemotePlatform::as_str),
+        ["ios", "android", "cli", "machine", "sandbox", "other"]
+    );
+    for platform in RemotePlatform::ALL {
+        assert_eq!(platform.as_str().parse::<RemotePlatform>(), Ok(platform));
+    }
+    assert!("invalid".parse::<RemotePlatform>().is_err());
+
+    let fact = Fact::runtime_inbox_changed(42, vec![]);
+    assert_eq!(fact.at(), 42);
+    round_value::<Fact>(&serde_json::json!({
+        "type": "runtimeInboxChanged",
+        "at": 42,
+        "items": [],
+    }));
+}

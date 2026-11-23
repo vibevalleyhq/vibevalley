@@ -1,4 +1,3 @@
-use sqlx::SqliteConnection;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
     ApiError, Attachment, CallState, ChatMessage, Fact, FactCallChanged, MessageHit, MessageKind, NoticeLevel, Preview, SubjectKind, USER_ID,
@@ -11,7 +10,7 @@ use super::types::{
     reactions_of, reactions_text, to_message,
 };
 use super::words::{self, Has};
-use super::{BeforePost, Chat, HELD_SHOWN, LAST_MAX, NO_NUMBER, RETRY_WINDOW_MS, SEARCH_MAX, SEND_KEY_MAX, no_channel, refused};
+use super::{Chat, HELD_SHOWN, LAST_MAX, NO_NUMBER, RETRY_WINDOW_MS, SEARCH_MAX, SEND_KEY_MAX, no_channel, refused};
 use crate::base::{LookIn, missing};
 use crate::now;
 
@@ -179,19 +178,6 @@ impl Chat {
     /// `post`: words written as `from` into a place; the speaker has read
     /// the place up to them.
     pub fn post(&self, p: Posting) -> Result<(ChatMessage, bool), ApiError> {
-        self.post_storing(p, None)
-    }
-
-    /// A new card and its owner row share this connection until commit. A repeated send key skips the callback.
-    pub(crate) fn post_with(
-        &self,
-        p: Posting,
-        persist: impl FnOnce(&mut SqliteConnection, &ChatMessage) -> Result<(), ApiError>,
-    ) -> Result<(ChatMessage, bool), ApiError> {
-        self.post_storing(p, Some(Box::new(persist)))
-    }
-
-    fn post_storing(&self, p: Posting, persist: Option<BeforePost<'_>>) -> Result<(ChatMessage, bool), ApiError> {
         let written = {
             let mut inner = self.locked();
             if p.send_key.encode_utf16().count() > SEND_KEY_MAX {
@@ -222,7 +208,7 @@ impl Chat {
                 Some(Made::Attachments(ids)) => meta.attachments = Some(self.files.of(ids)?),
                 None => {}
             }
-            self.write_with(
+            self.write(
                 &mut inner,
                 Write {
                     meta: Some(meta),
@@ -230,7 +216,6 @@ impl Chat {
                     read_by: Some(p.from.clone()),
                     ..Write::new(&place, &p.from, MessageKind::Chat, p.text.trim())
                 },
-                persist,
             )?
         };
         Ok((to_message(&written.row), written.again))

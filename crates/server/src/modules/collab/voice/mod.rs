@@ -10,8 +10,8 @@ pub mod moss;
 pub mod prompts;
 
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 use parking_lot::Mutex;
@@ -23,7 +23,8 @@ use crate::modules::collab::channel::{Chat, Picked, Posting, Saying};
 use crate::modules::infra::http::Fetch;
 use crate::modules::infra::provider::Use;
 use crate::modules::infra::setting::{Secret, Setting};
-use crate::modules::team::orchestrator::Orchestrator;
+use crate::ports::VoiceOrchestratorPort;
+use crate::transport::api::{LiveVoiceLine, LiveVoicePort};
 use crate::{Hub, now};
 
 /// How long an unused grant stays valid before expiring.
@@ -51,10 +52,10 @@ fn failed(reason: impl Into<String>) -> ApiError {
 
 /// What the voice controller is built with.
 pub struct Parts {
-    pub hub: std::sync::Weak<Hub>,
+    pub hub: Weak<Hub>,
     pub setting: Arc<Setting>,
     pub chat: Arc<Chat>,
-    pub orchestrator: Arc<Orchestrator>,
+    pub orchestrator: Arc<dyn VoiceOrchestratorPort>,
     /// How MOSS Live verification reaches the network.
     pub fetch: Arc<dyn Fetch>,
     /// Optional MOSS Live key probe override (tests).
@@ -117,10 +118,11 @@ struct State {
 }
 
 pub struct Voice {
-    hub: std::sync::Weak<Hub>,
+    me: Weak<Voice>,
+    hub: Weak<Hub>,
     setting: Arc<Setting>,
     chat: Arc<Chat>,
-    orchestrator: Arc<Orchestrator>,
+    orchestrator: Arc<dyn VoiceOrchestratorPort>,
     realtime: Arc<dyn Realtime>,
     state: Mutex<State>,
     commentary: AtomicU64,
@@ -143,7 +145,8 @@ fn new_uid() -> String {
 
 impl Voice {
     pub fn open(p: Parts) -> Arc<Voice> {
-        Arc::new(Voice {
+        Arc::new_cyclic(|me| Voice {
+            me: me.clone(),
             hub: p.hub,
             setting: p.setting,
             chat: p.chat,
@@ -398,9 +401,8 @@ impl Voice {
     /// Has the orchestrator answer `line` and reads its answer out on the call.
     fn tell(self: &Arc<Self>, agent: String, line: String) {
         let voice = self.clone();
-        let _ = std::thread::Builder::new().name("vibevalley-voice-tell".into()).spawn(move || {
-            let Some(reply) = voice.orchestrator.brief(line) else { return };
-            let said = reply.whole(ANSWER_WAIT);
+        vibevalley_runtime::rt::handle().spawn_blocking(move || {
+            let Some(said) = voice.orchestrator.brief(line, ANSWER_WAIT) else { return };
             if !said.is_empty() {
                 voice.speak_on(&agent, &said);
             }
@@ -540,8 +542,8 @@ impl MossLine {
                 tools.in_flight += 1;
             }
             let (voice, shared, tools, out) = (self.voice.clone(), self.shared.clone(), self.tools.clone(), self.out.clone());
-            let _ = std::thread::Builder::new().name("vibevalley-voice-ask".into()).spawn(move || {
-                let answer = voice.orchestrator.brief(call.question).map(|r| r.whole(ANSWER_WAIT)).unwrap_or_default();
+            vibevalley_runtime::rt::handle().spawn_blocking(move || {
+                let answer = voice.orchestrator.brief(call.question, ANSWER_WAIT).unwrap_or_default();
                 let answer = if answer.is_empty() { t("server.voice.moss.toolFailed", &[]) } else { answer };
                 let mut tools = tools.lock();
                 tools.in_flight -= 1;
@@ -582,6 +584,56 @@ impl Drop for MossLine {
         for call in ended {
             call.hung_up.store(true, Ordering::SeqCst);
         }
+    }
+}
+
+impl LiveVoiceLine for MossLine {
+    fn url(&self) -> &str {
+        &self.url
+    }
+
+    fn bearer_token(&self) -> &str {
+        self.key.expose()
+    }
+
+    fn session_update(&self) -> String {
+        MossLine::session_update(self)
+    }
+
+    fn outgoing(&self) -> flume::Receiver<String> {
+        self.outgoing.clone()
+    }
+
+    fn heard(&self, raw: &str) {
+        MossLine::heard(self, raw)
+    }
+}
+
+impl LiveVoicePort for Voice {
+    fn grant(&self) -> Result<VoiceGrant, ApiError> {
+        Voice::grant(self)
+    }
+
+    fn moss_line(&self) -> Result<Box<dyn LiveVoiceLine>, ApiError> {
+        let me = self.me.upgrade().ok_or_else(Voice::stopped)?;
+        Ok(Box::new(Voice::moss_line(&me)?))
+    }
+
+    fn start(&self, channel: &str, uid: &str) -> Result<VoiceCall, ApiError> {
+        let me = self.me.upgrade().ok_or_else(Voice::stopped)?;
+        Voice::start(&me, channel, uid, None)
+    }
+
+    fn heard(&self, agent_id: &str, text: &str, turn: Option<&str>) -> Result<(), ApiError> {
+        Voice::heard(self, agent_id, text, None, turn)
+    }
+
+    fn said(&self, agent_id: &str, text: &str) -> Result<(), ApiError> {
+        Voice::said(self, agent_id, text)
+    }
+
+    fn stop(&self, agent_id: &str) {
+        let _ = Voice::stop(self, agent_id);
     }
 }
 

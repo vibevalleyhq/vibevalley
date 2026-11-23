@@ -2,15 +2,14 @@
 //! (`connector_account`), what it handed over (`connector_inbound`) and
 //! what goes out to it (`connector_outbox`).
 
-use std::path::Path;
+use std::sync::Arc;
 
 use sqlx::Connection;
 use vibevalley_protocol::ConnectorID;
 
 use super::adapter::Inbound;
+use crate::base::ServerDb;
 use crate::db::generated::collab_connector as q;
-
-use crate::base::ModuleDb;
 use crate::modules::infra::setting::Secret;
 
 /// The database did not take a step: said as the status's error.
@@ -46,14 +45,12 @@ pub struct Outgoing {
 }
 
 pub struct Store {
-    db: ModuleDb,
+    db: Arc<ServerDb>,
 }
 
 impl Store {
-    pub fn open(home: &Path) -> Kept<Store> {
-        Ok(Store {
-            db: ModuleDb::open(home, crate::db::schema::COLLAB_CONNECTOR)?,
-        })
+    pub fn open(db: Arc<ServerDb>) -> Store {
+        Store { db }
     }
 
     pub fn account(&self, id: ConnectorID) -> Kept<Option<Account>> {

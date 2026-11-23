@@ -1,54 +1,154 @@
 //! Shared refusals (`base/errors.ts`), idempotent request keys, and the
-//! server's shared SQLite door (`server.db`).
+//! server's single shared SQLite connection pool (`ServerDb`).
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
+use parking_lot::Mutex;
+use sqlx::pool::PoolConnection;
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
+use sqlx::{Sqlite, SqliteConnection, SqlitePool};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, Next};
 
-pub(crate) async fn open_sqlx_db(home: &Path) -> sqlx::Result<sqlx::SqliteConnection> {
-    open_sqlx_db_at(&home.join("server.db")).await
+const ALL_SCHEMAS: [&str; 13] = [
+    crate::db::schema::SHARED,
+    crate::db::schema::COLLAB_CHANNEL,
+    crate::db::schema::COLLAB_CONNECTOR,
+    crate::db::schema::CONTENT_ARTIFACT,
+    crate::db::schema::CONTENT_ATTACHMENT,
+    crate::db::schema::CONTENT_LIBRARY,
+    crate::db::schema::CONTENT_MEDIA,
+    crate::db::schema::INFRA_REMOTE,
+    crate::db::schema::TEAM_MEMORY,
+    crate::db::schema::WORK_CRON,
+    crate::db::schema::WORK_ISSUE,
+    crate::db::schema::WORK_PULL,
+    crate::db::schema::WORK_SESSION,
+];
+
+/// Pooled SQLite connection guard that enters the shared Tokio runtime context
+/// before returning the underlying `PoolConnection` to `SqlitePool` on drop, so
+/// synchronous callers on non-Tokio threads never panic.
+pub(crate) struct DbConn(Option<PoolConnection<Sqlite>>);
+
+impl std::ops::Deref for DbConn {
+    type Target = SqliteConnection;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref().expect("DbConn live before Drop")
+    }
 }
 
-pub(crate) async fn open_sqlx_db_at(path: &Path) -> sqlx::Result<sqlx::SqliteConnection> {
-    use sqlx::ConnectOptions;
-    use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
-    SqliteConnectOptions::new()
-        .filename(path)
-        .create_if_missing(true)
-        .busy_timeout(Duration::from_secs(5))
-        .journal_mode(SqliteJournalMode::Wal)
-        .synchronous(SqliteSynchronous::Normal)
-        .foreign_keys(true)
-        .connect()
-        .await
+impl std::ops::DerefMut for DbConn {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.as_mut().expect("DbConn live before Drop")
+    }
 }
 
-pub(crate) struct ModuleDb(parking_lot::Mutex<sqlx::SqliteConnection>);
+impl Drop for DbConn {
+    fn drop(&mut self) {
+        if let Some(conn) = self.0.take() {
+            let _guard = vibevalley_runtime::rt::handle().enter();
+            drop(conn);
+        }
+    }
+}
 
-impl ModuleDb {
-    pub(crate) fn open(home: &Path, schema: &'static str) -> sqlx::Result<Self> {
-        pollster::block_on(async {
-            let mut connection = open_sqlx_db(home).await?;
-            sqlx::raw_sql(schema).execute(&mut connection).await?;
-            Ok(Self(parking_lot::Mutex::new(connection)))
+/// Single shared SQLite door for `server.db`: one WAL-mode `SqlitePool`
+/// initialized once with every module schema, plus the single shared
+/// durable runtime `Store` and coordinated shutdown checkpoint.
+pub struct ServerDb {
+    path: PathBuf,
+    pool: SqlitePool,
+    durable: Mutex<Option<vibevalley_runtime::agent::durable::Store>>,
+}
+
+impl ServerDb {
+    /// Opens `<home>/server.db` with the unified pool and initializes all schemas once.
+    pub fn open(home: &Path) -> sqlx::Result<Arc<Self>> {
+        Self::open_at(&home.join("server.db"))
+    }
+
+    /// Opens `path` with the unified pool and initializes all schemas once.
+    pub fn open_at(path: &Path) -> sqlx::Result<Arc<Self>> {
+        if let Some(parent) = path.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let path_buf = path.to_path_buf();
+        let pool = vibevalley_runtime::rt::block_on(async {
+            let options = SqliteConnectOptions::new()
+                .filename(&path_buf)
+                .create_if_missing(true)
+                .busy_timeout(Duration::from_secs(5))
+                .journal_mode(SqliteJournalMode::Wal)
+                .synchronous(SqliteSynchronous::Normal)
+                .foreign_keys(true);
+            let pool = SqlitePoolOptions::new().max_connections(8).min_connections(1).connect_with(options).await?;
+            let mut conn = pool.acquire().await?;
+            for schema in ALL_SCHEMAS {
+                sqlx::raw_sql(schema).execute(&mut *conn).await?;
+            }
+            drop(conn);
+            Ok::<_, sqlx::Error>(pool)
+        })?;
+        Ok(Arc::new(Self {
+            path: path_buf,
+            pool,
+            durable: Mutex::new(None),
+        }))
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn pool(&self) -> &SqlitePool {
+        &self.pool
+    }
+
+    pub(crate) fn acquire(&self) -> sqlx::Result<DbConn> {
+        vibevalley_runtime::rt::block_on(self.pool.acquire()).map(|conn| DbConn(Some(conn)))
+    }
+
+    pub(crate) fn run<T>(&self, query: impl AsyncFnOnce(&mut SqliteConnection) -> sqlx::Result<T>) -> sqlx::Result<T> {
+        vibevalley_runtime::rt::block_on(async {
+            let mut conn = self.pool.acquire().await?;
+            query(&mut conn).await
         })
     }
 
-    pub(crate) fn run<T>(&self, query: impl AsyncFnOnce(&mut sqlx::SqliteConnection) -> sqlx::Result<T>) -> sqlx::Result<T> {
-        let mut connection = self.0.lock();
-        pollster::block_on(query(&mut connection))
+    pub(crate) fn run_api<T>(&self, query: impl AsyncFnOnce(&mut SqliteConnection) -> Result<T, ApiError>) -> Result<T, ApiError> {
+        vibevalley_runtime::rt::block_on(async {
+            let mut conn = self.pool.acquire().await.map_err(internal)?;
+            query(&mut conn).await
+        })
     }
 
-    pub(crate) fn run_api<T>(&self, query: impl AsyncFnOnce(&mut sqlx::SqliteConnection) -> Result<T, ApiError>) -> Result<T, ApiError> {
-        let mut connection = self.0.lock();
-        pollster::block_on(query(&mut connection))
+    /// Returns the process-wide `durable::Store` handle backed by this same `server.db`.
+    pub(crate) fn durable(&self) -> vibevalley_runtime::agent::durable::Result<vibevalley_runtime::agent::durable::Store> {
+        let mut slot = self.durable.lock();
+        if let Some(store) = slot.as_ref() {
+            return Ok(store.clone());
+        }
+        let store = vibevalley_runtime::agent::durable::Store::open(&self.path)?;
+        *slot = Some(store.clone());
+        Ok(store)
     }
 
-    pub(crate) fn sync<T>(&self, query: impl FnOnce(&mut sqlx::SqliteConnection) -> T) -> T {
-        let mut connection = self.0.lock();
-        query(&mut connection)
+    /// Coordinated SQLite shutdown: drops the durable store handle, runs a
+    /// passive WAL checkpoint and `PRAGMA optimize`, and closes the pool.
+    pub fn close(&self) {
+        self.durable.lock().take();
+        vibevalley_runtime::rt::block_on(async {
+            if let Ok(mut conn) = self.pool.acquire().await {
+                let _ = sqlx::raw_sql("PRAGMA wal_checkpoint(PASSIVE); PRAGMA optimize;").execute(&mut *conn).await;
+            }
+            self.pool.close().await;
+        });
     }
 }
 
@@ -170,7 +270,7 @@ const REQUEST_KEY_TTL_MS: i64 = 5 * 60_000;
 /// `requestKeys`: a retry with the same key gets the first answer for five
 /// minutes; a failure is forgotten.
 pub struct RequestKeys<T> {
-    seen: parking_lot::Mutex<Answered<T>>,
+    seen: Mutex<Answered<T>>,
 }
 
 /// The keys oldest first, and each key's expiry and answer.
@@ -178,9 +278,7 @@ type Answered<T> = (Vec<String>, std::collections::HashMap<String, (i64, T)>);
 
 impl<T> Default for RequestKeys<T> {
     fn default() -> Self {
-        RequestKeys {
-            seen: parking_lot::Mutex::default(),
-        }
+        RequestKeys { seen: Mutex::default() }
     }
 }
 

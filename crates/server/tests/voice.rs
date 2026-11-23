@@ -98,7 +98,7 @@ impl Farm {
     }
 
     fn messages(&self) -> Vec<Value> {
-        let general = self.started.chat.default_channel();
+        let general = self.started.test_internals().chat.default_channel();
         self.ok("channel.message.list", json!({ "id": general }))
             .as_array()
             .cloned()
@@ -138,9 +138,9 @@ fn farm(answers: &[&'static str]) -> Farm {
     let live = Arc::new(Live(Mutex::new(Verdict::Ok)));
     let voice = Voice::open(voice::Parts {
         hub: Arc::downgrade(&started.hub),
-        setting: started.setting.clone(),
-        chat: started.chat.clone(),
-        orchestrator: started.orchestrator.clone(),
+        setting: started.test_internals().setting.clone(),
+        chat: started.test_internals().chat.clone(),
+        orchestrator: started.test_internals().orchestrator.clone(),
         fetch: Arc::new(UnusedFetch),
         realtime: Some(live.clone()),
     });

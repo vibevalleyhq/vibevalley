@@ -1,45 +1,30 @@
 //! `session.*` and the `issue.watch` stream: the board's sessions, their
-//! work logs, and one issue followed with its sessions' steps. Ported from
-//! VibeValley `gateway/http/handlers/session.ts`, `modules/session/journal.ts`
-//! and `modules/issue/watch.ts`.
+//! work logs, and one issue followed with its sessions' steps.
 
-use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Weak};
-use std::thread::JoinHandle;
+use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::Duration;
 
-use parking_lot::Mutex;
 use tokio::sync::broadcast;
-use tokio::task::JoinHandle as TaskHandle;
 use tokio_util::sync::CancellationToken;
-use vibevalley_core::Transition;
 use vibevalley_core::rules::{session_ids_of, stage_wants_user};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, BizCode, ChannelType, Fact, FactSessionReported, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, MessageKind, Outcome, Session,
-    SessionId, SessionWatchEvent, SliceKind, Subscription, ops, subscriptions,
+    ApiError, BizCode, Issue, IssueStageKind, IssueWatch, LiveEvent, Session, SessionId, SessionWatchEvent, SliceKind, ops, subscriptions,
 };
 
 use crate::base::{LookIn, missing};
-use crate::event_bus::Subscription as BusSubscription;
-use crate::modules::collab::channel::{
-    ChannelDispatched, ChannelEvent, Chat, Committed, DeliveryTargetKind, Meta, Note, Noticing, QueuedDelivery, Seat, meta_of, profile_id,
-};
 use crate::modules::content::attachment::Attachments;
-use crate::modules::team::agent::Agents;
-use crate::modules::work::issue::Board;
-use crate::modules::work::ledger::BoardError;
+use crate::modules::work::ledger::{BoardError, find};
 use crate::slice_feed::SliceSubscription;
 use crate::{Hub, Sink};
 
 pub(crate) mod db;
 mod delivery;
-pub(crate) use delivery::interrupt_on_reopen;
 mod drivers;
-mod news;
-pub use news::News;
 pub mod journal;
+pub mod mailbox;
+mod news;
 mod report;
 mod runs;
 mod sessions;
@@ -47,9 +32,10 @@ mod subagents;
 mod talk;
 mod workspace;
 
-pub use drivers::{Drive, Drivers, HelperPlace, Persona, RuntimeDrivers};
+pub use db::SqliteSessionStore;
+pub use drivers::{AgentDrivers, Drive, Drivers, HelperPlace, Persona, RuntimeDrivers};
 pub use journal::{Journal, Trajectories};
-pub mod mailbox;
+pub use news::News;
 pub use report::{ANSWER_ONLY, Report, ReportQuestion, ReportStatus};
 pub use runs::trigger_of;
 pub use sessions::{DraftEnd, Hire, Rounds, Sessions};
@@ -75,17 +61,7 @@ fn session_error(e: BoardError) -> ApiError {
     }
 }
 
-/// `issue.watch` (an SSE route in VibeValley, `/api/v1/issue/watch/:id`):
-/// here a subscription with `{ id }`.
-pub struct IssueWatchStream;
-
-impl Subscription for IssueWatchStream {
-    const NAME: &'static str = "issue.watch";
-    type Payload = IssueGetInput;
-    type Event = IssueWatch;
-}
-
-pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>, attachments: Option<Arc<Attachments>>) {
+pub fn install(hub: &Arc<Hub>, sessions: Sessions, trajectories: Arc<Trajectories>, attachments: Option<Arc<Attachments>>) {
     hub.on::<ops::SessionList>(move |ctx, input| {
         let profile = input.profile.unwrap_or_default();
         let controller = input.controller;
@@ -106,44 +82,44 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>, at
     });
     let tr = trajectories.clone();
     hub.on::<ops::SessionEventList>(move |_, input| Ok(tr.events_page(&input).unwrap_or_default()));
-    let b = board.clone();
-    hub.on::<ops::SessionStop>(move |_, input| stop(&b, &input.id));
+    let s = sessions.clone();
+    hub.on::<ops::SessionStop>(move |_, input| stop(&s, &input.id));
 
-    let b = board.clone();
-    hub.on::<ops::SessionOpenWorkspace>(move |_, input| b.sessions().open_workspace(input).map_err(session_error));
-    let b = board.clone();
+    let s = sessions.clone();
+    hub.on::<ops::SessionOpenWorkspace>(move |_, input| s.open_workspace(input).map_err(session_error));
+    let s = sessions.clone();
     hub.on::<ops::SessionCloseWorkspace>(move |_, input| {
-        b.sessions().close_workspace(&input.id);
+        s.close_workspace(&input.id);
         Ok(())
     });
-    let b = board.clone();
+    let s = sessions.clone();
     let att = attachments;
     hub.on::<ops::SessionSend>(move |ctx, input| {
         let trace_id = (ctx.trace_id != 0).then_some(ctx.trace_id);
-        b.sessions().send_workspace_with_trace(input, att.as_deref(), trace_id).map_err(session_error)
+        s.send_workspace_with_trace(input, att.as_deref(), trace_id).map_err(session_error)
     });
-    let b = board.clone();
-    hub.on::<ops::SessionRespondPermission>(move |_, input| b.sessions().respond_permission(input).map_err(session_error));
-    let b = board.clone();
-    hub.on::<ops::SessionRespondInteraction>(move |_, input| b.sessions().respond_interaction(input).map_err(session_error));
-    let b = board.clone();
-    hub.on::<ops::SessionSetConfig>(move |_, input| b.sessions().set_workspace_config(input).map_err(session_error));
-    let b = board.clone();
-    hub.on::<ops::SessionChildTranscript>(move |_, input| b.sessions().read_child_transcript(input).map_err(session_error));
-    let b = board.clone();
-    hub.on::<ops::SessionBindingAttach>(move |_, input| b.sessions().attach_binding(input).map_err(session_error));
-    let b = board.clone();
-    hub.on::<ops::SessionBindingDetach>(move |_, input| b.sessions().detach_binding(input).map_err(session_error));
+    let s = sessions.clone();
+    hub.on::<ops::SessionRespondPermission>(move |_, input| s.respond_permission(input).map_err(session_error));
+    let s = sessions.clone();
+    hub.on::<ops::SessionRespondInteraction>(move |_, input| s.respond_interaction(input).map_err(session_error));
+    let s = sessions.clone();
+    hub.on::<ops::SessionSetConfig>(move |_, input| s.set_workspace_config(input).map_err(session_error));
+    let s = sessions.clone();
+    hub.on::<ops::SessionChildTranscript>(move |_, input| s.read_child_transcript(input).map_err(session_error));
+    let s = sessions.clone();
+    hub.on::<ops::SessionBindingAttach>(move |_, input| s.attach_binding(input).map_err(session_error));
+    let s = sessions.clone();
+    hub.on::<ops::SessionBindingDetach>(move |_, input| s.detach_binding(input).map_err(session_error));
 
-    let b = board.clone();
+    let s = sessions;
     let tr = trajectories.clone();
     let me = Arc::downgrade(hub);
     hub.on_subscription::<subscriptions::SessionWatch>(move |hub, input, sink| {
-        let initial = b.session(&input.id).ok_or_else(|| helper_ref(&input.id))?;
+        let initial = s.session(&input.id).ok_or_else(|| helper_ref(&input.id))?;
         let live = hub.subscribe_live();
         let sessions_sub = hub.subscribe_slice_feed(SliceKind::Sessions);
-        let workspace_updates = b.sessions().watch_workspace(&initial.id);
-        let sessions = b.sessions().clone();
+        let workspace_updates = s.watch_workspace(&initial.id);
+        let sessions = s.clone();
         let tr = tr.clone();
         let hub_weak = me.clone();
         let cancel = hub.child_token();
@@ -163,12 +139,11 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>, at
         Ok(())
     });
 
-    let b = board.clone();
     let tr = trajectories;
     let me = Arc::downgrade(hub);
-    hub.on_subscription::<IssueWatchStream>(move |hub, input, sink| {
-        let initial = b
-            .issue(&input.id)
+    hub.on_subscription::<subscriptions::IssueWatch>(move |hub, input, sink| {
+        let initial = hub
+            .read(|st| find(&st.issues, &input.id).cloned())
             .ok_or_else(|| missing(t("server.issue.issueRef", &[("ref", input.id.clone().into())]), LookIn::Issue))?;
         let live = hub.subscribe_live();
         let board_sub = hub.subscribe_slice_feed(SliceKind::Board);
@@ -182,17 +157,12 @@ pub fn install(hub: &Arc<Hub>, board: Board, trajectories: Arc<Trajectories>, at
 }
 
 /// `session.stop`: the working round of a helper this process drives stops.
-pub(crate) fn stop(board: &Board, id: &str) -> Result<(), ApiError> {
-    let Some(session) = board.session(id).filter(|s| board.sessions().is_live(&s.id)) else {
+pub(crate) fn stop(sessions: &Sessions, id: &str) -> Result<(), ApiError> {
+    let Some(session) = sessions.session(id).filter(|s| sessions.is_live(&s.id)) else {
         return Err(helper_ref(id));
     };
     if session.phase.is_working() {
-        if let Some(issue) = session.issue_id() {
-            // A stop that is not taken is not a refusal.
-            let _ = board.stop(issue);
-        } else {
-            let _ = board.sessions().stop(&session.id);
-        }
+        let _ = sessions.stop(&session.id);
     }
     Ok(())
 }
@@ -450,451 +420,5 @@ async fn watch_issue(
                 }
             }
         }
-    }
-}
-
-const REPORT_MAX: usize = 1500;
-
-fn clip_utf16(s: &str, n: usize) -> String {
-    let mut out = String::new();
-    let mut len = 0;
-    for ch in s.chars() {
-        len += ch.len_utf16();
-        if len > n {
-            break;
-        }
-        out.push(ch);
-    }
-    out
-}
-
-#[derive(Clone)]
-struct DirectWake {
-    delivery: QueuedDelivery,
-    committed: Option<Arc<Committed>>,
-}
-
-/// Bridges session seating, channel removal guard, direct-talk reports, and
-/// asynchronous per-target direct-channel talk onto `Chat`.
-pub struct SessionChat {
-    hub: Weak<Hub>,
-    board: Board,
-    chat: Arc<Chat>,
-    agents: Arc<Agents>,
-    closed: AtomicBool,
-    sub: Mutex<Option<BusSubscription>>,
-    coordinator: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
-    lanes: Mutex<HashMap<String, flume::Sender<DirectWake>>>,
-    lane_handles: Mutex<Vec<JoinHandle<()>>>,
-}
-
-impl SessionChat {
-    pub fn start(hub: &Arc<Hub>, board: Board, chat: Arc<Chat>, agents: Arc<Agents>, ensure_issue_thread: Arc<dyn Fn(&Session) + Send + Sync>) -> Arc<Self> {
-        let dispatches = chat.dispatches();
-        let mut events = chat.subscribe_events();
-        let sc = Arc::new(Self {
-            hub: Arc::downgrade(hub),
-            board,
-            chat: chat.clone(),
-            agents,
-            closed: AtomicBool::new(false),
-            sub: Mutex::new(None),
-            coordinator: Mutex::new(None),
-            lanes: Mutex::new(HashMap::new()),
-            lane_handles: Mutex::new(Vec::new()),
-        });
-
-        {
-            let h = Arc::downgrade(hub);
-            chat.guard_removal(move |id| {
-                let there = h.upgrade().is_some_and(|h| {
-                    h.read(|s| {
-                        s.sessions
-                            .iter()
-                            .any(|x| (x.is_board_worker() || x.is_direct_talker()) && x.channel_id() == Some(id))
-                    })
-                });
-                if there { vec![t("server.channel.helpersThere", &[])] } else { vec![] }
-            });
-        }
-
-        {
-            let h = Arc::downgrade(hub);
-            let c = chat.clone();
-            chat.ensure_seated(move |who| {
-                let Some(hub) = h.upgrade() else { return };
-                if c.home_of(who).is_some() {
-                    return;
-                }
-                let Some(session) = hub.read(|s| {
-                    s.sessions
-                        .iter()
-                        .find(|x| x.id == who && (x.is_board_worker() || x.is_direct_talker()))
-                        .cloned()
-                }) else {
-                    return;
-                };
-                if session.issue_id().is_some() {
-                    ensure_issue_thread(&session);
-                } else {
-                    seat_direct_session(&c, &session);
-                }
-            });
-        }
-
-        let w = Arc::downgrade(&sc);
-        let sub = hub.subscribe_transitions("session-chat", move |hub, tr: &Transition| {
-            let Some(sc) = w.upgrade() else { return };
-            sc.on_transition(hub, tr);
-        });
-        *sc.sub.lock() = Some(sub);
-
-        let w = Arc::downgrade(&sc);
-        let cancel = hub.child_token();
-        let task_cancel = cancel.clone();
-        let coordinator = hub.spawn_task(async move {
-            enum CoordinatorEvent {
-                Dispatched(ChannelDispatched),
-                Removed(String),
-                Ignore,
-                Stop,
-            }
-            let Some(boot_sc) = w.upgrade() else { return };
-            let _ = tokio::task::spawn_blocking(move || boot_sc.boot()).await;
-            loop {
-                let event = tokio::select! {
-                    biased;
-                    _ = task_cancel.cancelled() => CoordinatorEvent::Stop,
-                    res = dispatches.recv_async() => match res {
-                        Ok(dispatched) => CoordinatorEvent::Dispatched(dispatched),
-                        Err(_) => CoordinatorEvent::Stop,
-                    },
-                    res = events.recv() => match res {
-                        Ok(ChannelEvent::Removed { event, .. }) => CoordinatorEvent::Removed(event.message_id),
-                        Ok(
-                            ChannelEvent::Posted(_)
-                            | ChannelEvent::Edited(_)
-                            | ChannelEvent::Reacted(_)
-                            | ChannelEvent::Pinned(_)
-                            | ChannelEvent::UserRead { .. },
-                        ) => CoordinatorEvent::Ignore,
-                        Err(broadcast::error::RecvError::Lagged(_)) => CoordinatorEvent::Ignore,
-                        Err(broadcast::error::RecvError::Closed) => CoordinatorEvent::Stop,
-                    },
-                };
-                let Some(sc) = w.upgrade() else { return };
-                if sc.closed.load(Ordering::Acquire) {
-                    return;
-                }
-                match event {
-                    CoordinatorEvent::Dispatched(dispatched) => {
-                        let _ = tokio::task::spawn_blocking(move || sc.route_dispatched(dispatched)).await;
-                    }
-                    CoordinatorEvent::Removed(message_id) => {
-                        let _ = tokio::task::spawn_blocking(move || sc.withdraw_message_mailbox(&message_id)).await;
-                    }
-                    CoordinatorEvent::Ignore => {}
-                    CoordinatorEvent::Stop => return,
-                }
-            }
-        });
-        *sc.coordinator.lock() = Some((cancel, coordinator));
-
-        sc
-    }
-
-    pub fn close(&self) {
-        self.closed.store(true, Ordering::Release);
-        if let Some(sub) = self.sub.lock().take() {
-            sub.close();
-        }
-        if let Some((cancel, handle)) = self.coordinator.lock().take() {
-            cancel.cancel();
-            let _ = vibevalley_runtime::rt::block_on(handle);
-        }
-        let me = std::thread::current().id();
-        self.lanes.lock().clear();
-        let handles: Vec<_> = self.lane_handles.lock().drain(..).collect();
-        for handle in handles {
-            if handle.thread().id() != me {
-                let _ = handle.join();
-            }
-        }
-    }
-
-    fn boot(self: &Arc<Self>) {
-        if let Some(hub) = self.hub.upgrade() {
-            let talks: Vec<Session> = hub.read(|s| s.sessions.iter().filter(|x| x.is_direct_talker() && x.issue_id().is_none()).cloned().collect());
-            for h in &talks {
-                seat_direct_session(&self.chat, h);
-            }
-            sessions_left(&hub, &self.chat);
-        }
-        if let Ok(pending) = self.chat.pending_deliveries(DeliveryTargetKind::Direct) {
-            for d in pending {
-                self.enqueue_lane(d.recipient_id.clone(), DirectWake { delivery: d, committed: None });
-            }
-        }
-    }
-
-    fn withdraw_message_mailbox(&self, message_id: &str) {
-        let _ = self.board.sessions().withdraw_mailbox_by_message(message_id);
-    }
-
-    fn on_transition(&self, hub: &Arc<Hub>, tr: &Transition) {
-        if self.closed.load(Ordering::Acquire) {
-            return;
-        }
-        match &tr.fact {
-            Fact::SessionChanged(f)
-                if f.session.is_direct_talker() && f.session.issue_id().is_none() && !tr.before.sessions.iter().any(|s| s.id == f.session.id) =>
-            {
-                seat_direct_session(&self.chat, &f.session);
-            }
-            Fact::SessionLeft(f) => {
-                if let Err(e) = self.chat.leave(&f.id) {
-                    eprintln!("vibevalley-server: session-chat: leave {}: {}", f.id, e.message);
-                }
-                sessions_left(hub, &self.chat);
-            }
-            Fact::SessionReported(f) => {
-                let Some(s) = tr
-                    .after
-                    .sessions
-                    .iter()
-                    .chain(&tr.before.sessions)
-                    .find(|s| s.id == f.id && s.is_direct_talker() && s.issue_id().is_none())
-                else {
-                    return;
-                };
-                post_talk_report(&self.chat, s, f);
-            }
-            _ => {}
-        }
-    }
-
-    fn route_dispatched(self: &Arc<Self>, dispatched: ChannelDispatched) {
-        let sessions = self.board.sessions();
-        for d in dispatched.deliveries {
-            if d.recipient_kind == DeliveryTargetKind::Direct {
-                let mailbox_owner = sessions
-                    .talker(&d.recipient_id, &d.channel_id)
-                    .map(|s| s.id)
-                    .unwrap_or_else(|| format!("profile:{}", d.recipient_id));
-                let key = direct_mail_key(&d.recipient_id, &d.message_id);
-                let _ = sessions.enqueue_mailbox(
-                    &mailbox_owner,
-                    &key,
-                    mailbox::MailboxSource::ChannelDirect,
-                    Some(&d.message_id),
-                    &dispatched.committed.row.body,
-                );
-                self.enqueue_lane(
-                    d.recipient_id.clone(),
-                    DirectWake {
-                        delivery: d,
-                        committed: Some(dispatched.committed.clone()),
-                    },
-                );
-            }
-        }
-    }
-
-    fn enqueue_lane(self: &Arc<Self>, agent_id: String, wake: DirectWake) {
-        if self.closed.load(Ordering::Acquire) {
-            return;
-        }
-        let mut lanes = self.lanes.lock();
-        if let Some(tx) = lanes.get(&agent_id)
-            && tx.send(wake.clone()).is_ok()
-        {
-            return;
-        }
-        let (tx, rx) = flume::unbounded::<DirectWake>();
-        let _ = tx.send(wake);
-        lanes.insert(agent_id.clone(), tx);
-        let sc = Arc::downgrade(self);
-        let key = agent_id.clone();
-        let handle = std::thread::Builder::new()
-            .name(format!("vibevalley-direct-lane-{agent_id}"))
-            .spawn(move || {
-                loop {
-                    let item = match rx.try_recv() {
-                        Ok(item) => item,
-                        Err(flume::TryRecvError::Empty) => {
-                            let Some(sc) = sc.upgrade() else { return };
-                            let mut lanes = sc.lanes.lock();
-                            match rx.try_recv() {
-                                Ok(item) => item,
-                                Err(_) => {
-                                    lanes.remove(&key);
-                                    return;
-                                }
-                            }
-                        }
-                        Err(flume::TryRecvError::Disconnected) => return,
-                    };
-                    let Some(sc) = sc.upgrade() else { return };
-                    if sc.closed.load(Ordering::Acquire) {
-                        return;
-                    }
-                    sc.on_direct(item);
-                }
-            })
-            .expect("direct talk lane thread");
-        drop(lanes);
-        let mut handles = self.lane_handles.lock();
-        handles.retain(|h| !h.is_finished());
-        handles.push(handle);
-    }
-
-    fn on_direct(&self, wake: DirectWake) {
-        let d = wake.delivery;
-        let mail_key = direct_mail_key(&d.recipient_id, &d.message_id);
-        let sessions = self.board.sessions();
-        if !self.chat.delivery_is_pending(d.id).unwrap_or(false) {
-            let _ = sessions.withdraw_mailbox(&mail_key);
-            return;
-        }
-        let Some(c) = wake.committed.or_else(|| self.chat.committed_of(&d.message_id).ok().flatten().map(Arc::new)) else {
-            let _ = sessions.withdraw_mailbox(&mail_key);
-            let _ = self.chat.withdraw_delivery(d.id);
-            return;
-        };
-        if c.row.deleted_at.is_some() {
-            let _ = sessions.withdraw_mailbox(&mail_key);
-            let _ = self.chat.withdraw_delivery(d.id);
-            return;
-        }
-        let mailbox_owner = sessions
-            .talker(&d.recipient_id, &d.channel_id)
-            .map(|s| s.id)
-            .unwrap_or_else(|| format!("profile:{}", d.recipient_id));
-        let mail_entry = sessions
-            .enqueue_mailbox(
-                &mailbox_owner,
-                &mail_key,
-                mailbox::MailboxSource::ChannelDirect,
-                Some(&d.message_id),
-                &c.row.body,
-            )
-            .ok();
-        let claimed = sessions.claim_mailbox_by_key(&mail_key).unwrap_or(false);
-        if !claimed
-            && mail_entry.as_ref().is_some_and(|e| {
-                matches!(
-                    e.status,
-                    mailbox::MailboxStatus::Withdrawn | mailbox::MailboxStatus::Done | mailbox::MailboxStatus::Claimed
-                )
-            })
-        {
-            return;
-        }
-        let settle_id = mail_entry.as_ref().map(|e| e.id);
-        let words = match meta_of(c.row.meta.as_deref()).view_context {
-            Some(vc) => format!(
-                "{}\n{}",
-                crate::modules::team::orchestrator::words::format_artifact_view_context(&vc),
-                c.row.body
-            ),
-            None => c.row.body.clone(),
-        };
-        let why = match self.agents.profiles.agent(&d.recipient_id) {
-            Some(a) if !a.enabled => t("server.channel.profileDisabled", &[("name", a.name.into())]),
-            _ => match sessions.talk(&d.recipient_id, &d.channel_id, &words) {
-                Ok(sid) => {
-                    if let Some(id) = settle_id {
-                        let _ = sessions.settle_mailbox(id, true, Some(&sid));
-                    }
-                    let _ = self.chat.settle_delivery(d.id, true);
-                    return;
-                }
-                Err(e) => e.to_string(),
-            },
-        };
-        if let Some(id) = settle_id {
-            let _ = sessions.settle_mailbox(id, false, Some(&why));
-        }
-        let _ = self.chat.settle_delivery(d.id, false);
-        self.chat.notice(Noticing {
-            channel: d.channel_id,
-            text: t("server.channel.talkFailed", &[("why", why.into())]),
-            code: "talk_refused".into(),
-            ..Noticing::default()
-        });
-    }
-}
-
-fn direct_mail_key(agent_id: &str, message_id: &str) -> String {
-    format!("direct:{agent_id}:{message_id}")
-}
-
-fn direct_of_session(chat: &Chat, h: &Session) -> Option<String> {
-    let place = chat.place(h.channel_id()?)?;
-    let profile = h.profile_id()?;
-    (h.is_direct_talker() && h.issue_id().is_none() && place.r#type == ChannelType::Direct && place.peer == Some(profile_id(profile))).then_some(place.id)
-}
-
-fn seat_direct_session(chat: &Chat, h: &Session) {
-    let Some(direct) = direct_of_session(chat, h) else { return };
-    if let Err(e) = chat.seat(&Seat {
-        id: h.id.clone(),
-        name: h.name.clone(),
-        agent: h.profile.clone(),
-        home: Some(direct.clone()),
-    }) {
-        eprintln!("vibevalley-server: session-chat: seat {}: {}", h.id, e.message);
-        return;
-    }
-    if !chat.members_of(&direct).contains(&h.id)
-        && let Err(e) = chat.add_follower(&direct, &h.id)
-    {
-        eprintln!("vibevalley-server: session-chat: follower {}: {}", h.id, e.message);
-    }
-}
-
-fn sessions_left(hub: &Hub, chat: &Chat) {
-    let on: Vec<String> = hub.read(|s| {
-        s.sessions
-            .iter()
-            .filter(|h| h.is_board_worker() || h.is_direct_talker())
-            .map(|h| h.id.clone())
-            .collect()
-    });
-    for p in chat.participants() {
-        let Some(agent) = p.agent_id.as_deref() else { continue };
-        if p.id == profile_id(agent) || p.left_at.is_some() || on.contains(&p.id) {
-            continue;
-        }
-        if let Err(e) = chat.leave(&p.id) {
-            eprintln!("vibevalley-server: session-chat: leave {}: {}", p.id, e.message);
-        }
-    }
-}
-
-fn post_talk_report(chat: &Chat, h: &Session, f: &FactSessionReported) {
-    if f.outcome == Outcome::Interrupted {
-        return;
-    }
-    let Some(channel) = chat.home_of(&h.id).or_else(|| direct_of_session(chat, h)) else {
-        return;
-    };
-    let note = Note {
-        channel,
-        from: h.id.clone(),
-        kind: MessageKind::Report,
-        text: clip_utf16(&f.summary, REPORT_MAX),
-        meta: Meta {
-            outcome: Some(f.outcome),
-            spent: f.spent.clone(),
-            run: f.run.clone(),
-            ..Meta::default()
-        },
-        topic: None,
-        member: None,
-        seat: None,
-    };
-    if let Err(e) = chat.note_once(note, f.run.as_ref().map(|id| format!("report:{id}"))) {
-        eprintln!("vibevalley-server: session-chat: talk report {}: {}", h.id, e.message);
     }
 }

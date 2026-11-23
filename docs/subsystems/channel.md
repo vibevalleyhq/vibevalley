@@ -83,7 +83,7 @@
 2. 提交后施加 `messageChanged`、`channelChanged`、`userMentionsChanged` 事实，非阻塞广播 `ChannelEvent`（供 `channel.follow`、素材库、`SessionChat` 与连接器订阅）并推送 `Chat::dispatches()`（若触发 `hop_limit` 则紧跟写出通知）后立即返回。
 3. 各领域消费方按目标类型异步消费 `Chat::dispatches`（重启时先补读 SQLite 中的 `pending` 投递）：`work/issue` 按工单串行投递至 `Board::tell_message`、`work/session` 按目标档案异步拉起私聊 `Sessions::talk`、`team/orchestrator` 交由 `Orchestrator::hear`/`overhear`；消费完成后结算 `channel_delivery`、记 `mark_seen` 并贴 👀。
 
-派活开串、单轮汇报与 `issue.report` 补投归[工单](docs/subsystems/issue.md)（`work/issue/chat.rs`），席位清理、删频道守卫与私聊帮工归[帮工](docs/subsystems/session.md)（`work/session/mod.rs`），频道只提供 `note`、`seat`、`leave`、`thread_about` 与 `channel_delivery` 原语。
+派活开串、单轮汇报与 `issue.report` 补投归[工单](docs/subsystems/issue.md)（`work/chat.rs`），席位清理、删频道守卫与私聊帮工归[帮工](docs/subsystems/session.md)（`work/session/mod.rs`），频道只提供 `note`、`seat`、`leave`、`thread_about` 与 `channel_delivery` 原语。
 
 ## 和谁打交道
 

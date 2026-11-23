@@ -15,8 +15,8 @@
 | 位置 | 职责 |
 |---|---|
 | [附件查询](crates/server/src/db/queries/content_attachment.sql) | sqlc 为 SQLx 生成按哈希读取和首次写入元数据的接口。相同哈希保留首次记录的名字和类型。 |
-| `crates/server/src/modules/content/attachment/mod.rs` | `Attachments`：`attach`（上传）、`keep`（这里做出来的字节）、`keep_staged`（媒体输入写在暂存目录、已算好哈希的大文件）、`of`（一组 id 的附件，缺一个就拒绝）、`file`、`path_of`；`open_sqlx_db` 打开各模块共用的 `server.db` |
-| `crates/server/src/transport/http/media.rs`、`crates/server/src/transport/http/mod.rs` | `GET /api/v1/attachment/<id>`（经 `attachment.file` 取路径）；`attachment.create` 走通用的命令入口 |
+| `crates/server/src/modules/content/attachment/mod.rs` | `Attachments`：`attach`（上传）、`keep`（这里做出来的字节）、`keep_staged`（媒体输入写在暂存目录、已算好哈希的大文件）、`of`（一组 id 的附件，缺一个就拒绝）、`file`、`path_of`；复用全局唯一 `ServerDb` 连接池（`crates/server/src/base.rs`）读写 `server.db` |
+| `crates/server/src/transport/http/media.rs`、`crates/server/src/transport/http/mod.rs` | `GET /api/v1/attachment/<id>`（透传 `CallerContext` 经 `attachment.file` 鉴权并取路径，支持 `Authorization: Bearer` 与 `?token=`，以 `tokio::fs::File` 按 HTTP `Range` 分块流式返回）；`attachment.create` 走通用的命令入口 |
 | `crates/protocol/src/contract/attachment.rs`、`packages/protocol/src/attachment/` | `Attachment`、`AttachmentUpload`、`attachmentPath`、`attachmentMax`（Rust 为源，TS 形状由它生成） |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`attachment.*`）。
@@ -27,7 +27,7 @@
 - **上限**：经 `attachment.create` 上传的单个 25MB（`attachmentMax`），以 Base64 走请求体。用它的模块自己守自己的上限：网页 Artifact 一稿 5MB；媒体的输入写进 `attachments/.staging/media/`、记在媒体的配额里，最大 512MB，写完经 `keep_staged` 放进来。
 - **放进来时核对**：`keep_staged` 遇到同名的文件先算它的哈希，对不上（磁盘上被改过）就用新写的替换，不信任坏掉的那份。
 - **`path_of` 隔离本机路径假设**：HTTP 的文件响应、给帮工的信封、上传给厂商需要本机路径时统一调 `Attachments::path_of`；换存储后端只改 `attachment.rs`，上层模块不动。
-- **读回带沙箱**：图、音频、视频和 PDF 在页面里显示，其余的下载；不是 PDF 的都带 `content-security-policy: sandbox`，不当农场自己的页面跑。按内容寻址，永久缓存。
+- **鉴权、流式 `Range` 与读回沙箱**：`GET /api/v1/attachment/<id>` 经 `call_with(&ctx, "attachment.file", ...)` 校验调用方权限（允许本机 `Caller::User` 与已认证 `Caller::Remote`，远程请求可带 `Authorization: Bearer` 头或 `?token=` 查询参数），以 `tokio::fs::File` 流式发送字节并支持 HTTP `Range`（`Accept-Ranges: bytes`、`206 Partial Content`、`Content-Range`、越界回 `416 Range Not Satisfiable`）。图、音频、视频和 PDF 在页面里显示，其余的下载；不是 PDF 的都带 `content-security-policy: sandbox`，不当农场自己的页面跑。按内容寻址，永久缓存。
 - **只增不改**：附件不随消息、任务、Artifact 或素材删除而删。现在没有回收：没人引用的附件留在磁盘上，要回收得先数清所有引用它的地方（消息、媒体的输入和结果、Artifact 的稿、素材）。
 
 ## 和谁打交道

@@ -1,13 +1,12 @@
 //! SQLite storage and synchronous in-memory index for tracked pull requests.
 
 use std::collections::HashMap;
-use std::path::Path;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
 use vibevalley_protocol::{ApiError, PublishPlatform, PullRequest, PullRequestState};
 
-use crate::base::{ModuleDb, internal};
+use crate::base::{ServerDb, internal};
 use crate::modules::infra::column::{read_word, word};
 
 use crate::db::generated::work_pull as queries;
@@ -159,13 +158,12 @@ impl PullIndex {
 }
 
 pub struct PullStore {
-    db: ModuleDb,
+    db: Arc<ServerDb>,
     index: Arc<Mutex<PullIndex>>,
 }
 
 impl PullStore {
-    pub fn open(home: &Path) -> Result<PullStore, ApiError> {
-        let db = ModuleDb::open(home, SCHEMA).map_err(internal)?;
+    pub fn open(db: Arc<ServerDb>) -> Result<PullStore, ApiError> {
         let rows: Vec<PullRecord> = db
             .run(async |conn| queries::list_pulls(conn).await)
             .map_err(internal)?

@@ -271,7 +271,7 @@ impl BridgeHub {
                             Ok(listener) => {
                                 let url = listener.url();
                                 host_debug_for_boot.set_boot_info(url.clone(), boot_started.elapsed().as_millis() as u64);
-                                started.board.sessions().set_mcp_url(format!("{url}/mcp"));
+                                started.set_mcp_url(format!("{url}/mcp"));
                                 match vibevalley_server::home::announce(&home, &url) {
                                     Ok(announced) => {
                                         let _ = ready.send_replace(Some(Ok(())));
@@ -1045,6 +1045,7 @@ mod tests {
             sessions: vec![],
             crons: vec![],
             plays: None,
+            runtime_inbox_items: vec![],
         });
         let handle = ShellDebugHandle::new();
         hub.attach_host_debug(Some(Arc::new(handle.clone())));

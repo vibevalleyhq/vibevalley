@@ -15,6 +15,7 @@ pub mod presets;
 pub mod profile;
 pub mod runtime;
 
+pub use drive::instructions;
 pub use profile::Profiles;
 pub use runtime::Fleet;
 
@@ -22,30 +23,16 @@ pub use runtime::Fleet;
 pub struct Agents {
     pub profiles: Arc<Profiles>,
     pub fleet: Arc<Fleet>,
-    memories: std::sync::OnceLock<std::sync::Weak<crate::modules::team::memory::Memories>>,
 }
 
 impl Agents {
-    /// What the profiles remember: recalled at the start of each round.
-    pub fn attach_memories(&self, memories: &Arc<crate::modules::team::memory::Memories>) {
-        let _ = self.memories.set(Arc::downgrade(memories));
-    }
-
-    pub(crate) fn memories(&self) -> Option<Arc<crate::modules::team::memory::Memories>> {
-        self.memories.get().and_then(std::sync::Weak::upgrade)
-    }
-
     /// `makeAgent`: the profiles under `home` (a new farm gets the default
     /// orchestrator and the `starters`), the runtimes in `registry`,
     /// probed in the background when `background`.
     pub fn open(hub: &Arc<Hub>, home: &Path, starters: &[String], registry: Arc<Registry>, background: bool) -> std::io::Result<Arc<Agents>> {
         let profiles = Profiles::open(home, starters)?;
         let fleet = Fleet::new(registry, profiles.clone(), hub, background);
-        Ok(Arc::new(Agents {
-            profiles,
-            fleet,
-            memories: Default::default(),
-        }))
+        Ok(Arc::new(Agents { profiles, fleet }))
     }
 }
 

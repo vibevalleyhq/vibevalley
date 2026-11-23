@@ -376,6 +376,10 @@ impl Fact {
         })
     }
 
+    pub fn runtime_inbox_changed(at: Millis, items: Vec<InboxItem>) -> Fact {
+        Fact::RuntimeInboxChanged(FactRuntimeInboxChanged { at, items })
+    }
+
     /// When it happened.
     pub fn at(&self) -> Millis {
         match self {
@@ -399,6 +403,7 @@ impl Fact {
             Fact::ConnectorChanged(f) => f.at,
             Fact::MachineChanged(f) => f.at,
             Fact::MediaChanged(f) => f.at,
+            Fact::RuntimeInboxChanged(f) => f.at,
         }
     }
 }

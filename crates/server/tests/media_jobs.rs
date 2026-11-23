@@ -198,7 +198,7 @@ fn generation_is_idempotent_download_retries_without_generating_again_and_librar
     assert_eq!(backend.generations.load(Ordering::SeqCst), 1);
     assert_eq!(backend.downloads.load(Ordering::SeqCst), 2);
     assert_eq!(
-        std::fs::read(s.attachments.file(ready["attachment"]["id"].as_str().unwrap()).unwrap().path).unwrap(),
+        std::fs::read(s.test_internals().attachments.file(ready["attachment"]["id"].as_str().unwrap()).unwrap().path).unwrap(),
         png()
     );
     let deadline = Instant::now() + Duration::from_secs(3);
@@ -310,13 +310,13 @@ fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() 
     let dir = tempfile::tempdir().unwrap();
     let backend = Backend::new("ok");
     let s = start(dir.path(), backend);
-    let channel = s.chat.default_channel();
+    let channel = s.test_internals().chat.default_channel();
     let route = Arc::new(Mutex::new(Route {
         agent: "orchestrator".into(),
         channel: channel.clone(),
         ..Route::default()
     }));
-    let tools = held(&s.farm, &route);
+    let tools = held(s.test_internals().tools, &route);
     let tool = tools.iter().find(|t| t.spec().name == "media_image_create").unwrap();
     assert!(tool.execute(&request("asked")).is_error);
     assert_eq!(ok(&s, "media.job.list", Value::Null), json!([]));

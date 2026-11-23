@@ -31,6 +31,10 @@ pub struct SpaceState {
     pub crons: Vec<Cron>,
     /// The farm's pixel-only station and step history, by session; no business rule reads it.
     pub plays: Option<BTreeMap<String, SessionPlay>>,
+    /// Durable runtime inbox alerts projected into `InboxSlice` via `Fact::RuntimeInboxChanged`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<InboxItem>>"))]
+    pub runtime_inbox_items: Vec<InboxItem>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -245,6 +249,8 @@ pub enum Fact {
     MachineChanged(FactMachineChanged),
     #[serde(rename = "mediaChanged")]
     MediaChanged(FactMediaChanged),
+    #[serde(rename = "runtimeInboxChanged")]
+    RuntimeInboxChanged(FactRuntimeInboxChanged),
 }
 
 #[skip_serializing_none]
@@ -352,6 +358,8 @@ pub enum ServerEvent {
     MachineChanged(FactMachineChanged),
     #[serde(rename = "mediaChanged")]
     MediaChanged(FactMediaChanged),
+    #[serde(rename = "runtimeInboxChanged")]
+    RuntimeInboxChanged(FactRuntimeInboxChanged),
     #[serde(rename = "snapshot")]
     Snapshot(ServerEventSnapshot),
     #[serde(rename = "event")]

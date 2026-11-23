@@ -15,10 +15,11 @@ mod types;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Weak};
+use std::time::Duration;
 
-use parking_lot::{Mutex, MutexGuard};
+use parking_lot::Mutex;
 use sqlx::{Connection, SqliteConnection};
 use vibevalley_core::artifact::{
     artifact_headers, artifact_problem, html_check, html_edit, html_problem, import_outline_markdown, infer_artifact_from_name, shell_theme_of,
@@ -38,9 +39,9 @@ pub use blocks::spans_of;
 use db::ArtifactRow;
 use entries::EntryChange;
 
-use crate::base::{LookIn, missing, open_sqlx_db};
-use crate::modules::collab::channel::{Chat, Made, Posting};
+use crate::base::{LookIn, ServerDb, Ticker, missing};
 use crate::modules::content::attachment::Attachments;
+use crate::ports::{ChannelAnnouncePort, ChannelQuotePort};
 use crate::{Hub, now};
 
 /// How many the farm-wide list shows.
@@ -100,8 +101,59 @@ struct Change {
 type SuggestionsNow = (String, Vec<vibevalley_protocol::Suggestion>);
 type PresenceExtra = HashMap<(String, String), (Option<String>, Option<String>)>;
 
+/// Read-only artifact block quoter backed directly by [`ServerDb`], enabling
+/// bottom-up construction of `collab/channel::Chat` before `Artifacts` with
+/// zero post-init cycle-breaking hooks.
+pub struct BlockQuoter {
+    db: Arc<ServerDb>,
+}
+
+impl BlockQuoter {
+    pub fn new(db: Arc<ServerDb>) -> Self {
+        Self { db }
+    }
+}
+
+impl ChannelQuotePort for BlockQuoter {
+    fn quote(&self, refs: &[BlockRef]) -> Vec<QuotedBlock> {
+        let Ok(mut conn) = self.db.acquire() else {
+            return vec![];
+        };
+        let mut out = vec![];
+        for r in refs {
+            let row = match db::artifact(&mut conn, &r.artifact_id) {
+                Ok(Some(row)) => row,
+                Ok(None) => continue,
+                Err(e) => {
+                    eprintln!("vibevalley-server: quoting a block failed: {e}");
+                    continue;
+                }
+            };
+            let blocks = match db::blocks(&mut conn, &r.artifact_id) {
+                Ok(b) => b,
+                Err(e) => {
+                    eprintln!("vibevalley-server: quoting a block failed: {e}");
+                    continue;
+                }
+            };
+            let b = blocks.iter().find(|b| b.id == r.block_id && b.deleted.is_none());
+            out.push(QuotedBlock {
+                artifact_id: r.artifact_id.clone(),
+                block_id: r.block_id.clone(),
+                rev: r.rev,
+                title: row.title,
+                r#type: b.and_then(|b| serde_json::to_value(b.r#type).ok()?.as_str().map(str::to_string)),
+                text: b.map(|b| vibevalley_core::artifact::plain(&b.text)),
+                now_rev: b.map(|b| b.rev),
+                deleted: b.is_none().then_some(true),
+            });
+        }
+        out
+    }
+}
+
 pub struct Artifacts {
-    db: Mutex<SqliteConnection>,
+    db: Arc<ServerDb>,
     /// One change of an artifact's row at a time: a version's number is the
     /// latest's plus one.
     rows: Mutex<()>,
@@ -110,7 +162,7 @@ pub struct Artifacts {
     /// Per-artifact write lock for structured entry store batches.
     entry_locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
     files: Arc<Attachments>,
-    chat: Arc<Chat>,
+    channel: Arc<dyn ChannelAnnouncePort>,
     changes: Mutex<Vec<flume::Sender<Change>>>,
     entry_changes: Mutex<Vec<flume::Sender<EntryChange>>>,
     suggestion_changes: Mutex<Vec<flume::Sender<SuggestionsNow>>>,
@@ -119,24 +171,19 @@ pub struct Artifacts {
     presence_extra: Mutex<PresenceExtra>,
     presence_changes: Mutex<Vec<flume::Sender<(String, ArtifactPresenceEvent)>>>,
     closed: AtomicBool,
-    stop: Mutex<Option<flume::Sender<()>>>,
-    prune_thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+    prune_ticker: Mutex<Option<Ticker>>,
 }
 
 impl Artifacts {
-    /// The tables in `<home>/server.db`, and the daily prune of old batches
-    /// and texts. Open it after the chat: its messages are joined.
-    pub fn open(home: &std::path::Path, files: Arc<Attachments>, chat: Arc<Chat>) -> Result<Arc<Artifacts>, ApiError> {
-        let mut conn = pollster::block_on(open_sqlx_db(home)).map_err(q)?;
-        pollster::block_on(sqlx::raw_sql(db::SCHEMA).execute(&mut conn)).map_err(q)?;
-        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
+    /// Opens artifacts on the shared [`ServerDb`] and schedules the daily prune ticker.
+    pub fn open(db: Arc<ServerDb>, files: Arc<Attachments>, channel: Arc<dyn ChannelAnnouncePort>) -> Arc<Artifacts> {
         let me = Arc::new(Artifacts {
-            db: Mutex::new(conn),
+            db,
             rows: Mutex::default(),
             batches: Mutex::default(),
             entry_locks: Mutex::default(),
             files,
-            chat,
+            channel,
             changes: Mutex::default(),
             entry_changes: Mutex::default(),
             suggestion_changes: Mutex::default(),
@@ -144,28 +191,34 @@ impl Artifacts {
             presence_extra: Mutex::default(),
             presence_changes: Mutex::default(),
             closed: AtomicBool::new(false),
-            stop: Mutex::new(Some(stop_tx)),
-            prune_thread: Mutex::new(None),
+            prune_ticker: Mutex::new(None),
         });
-        if let Some(handle) = prune_daily(Arc::downgrade(&me), stop_rx) {
-            *me.prune_thread.lock() = Some(handle);
-        }
-        Ok(me)
+        let weak = Arc::downgrade(&me);
+        let ticker = Ticker::spawn_detached(Duration::from_millis(blocks::DAY_MS as u64), true, move || {
+            let Some(a) = weak.upgrade() else { return false };
+            if a.closed.load(Ordering::Relaxed) {
+                return false;
+            }
+            let before = now() - blocks::KEPT_DAYS * blocks::DAY_MS;
+            if let Err(e) = db::prune(&mut a.db(), before) {
+                eprintln!("vibevalley-server: artifact.prune failed: {e}");
+            }
+            true
+        });
+        *me.prune_ticker.lock() = Some(ticker);
+        me
     }
 
-    /// Stops the daily prune thread.
+    /// Stops the daily prune ticker.
     pub fn close(&self) {
         self.closed.store(true, Ordering::Relaxed);
-        let _ = self.stop.lock().take();
-        if let Some(handle) = self.prune_thread.lock().take()
-            && handle.thread().id() != std::thread::current().id()
-        {
-            let _ = handle.join();
+        if let Some(ticker) = self.prune_ticker.lock().take() {
+            ticker.stop();
         }
     }
 
-    fn db(&self) -> MutexGuard<'_, SqliteConnection> {
-        self.db.lock()
+    fn db(&self) -> crate::base::DbConn {
+        self.db.acquire().expect("server db pool open")
     }
 
     fn found(&self, db: &mut SqliteConnection, id: &str) -> Result<ArtifactRow, ApiError> {
@@ -369,7 +422,7 @@ impl Artifacts {
                 return Err(refused(t("server.artifact.displayHtmlOnly", &[])));
             }
             let channel = match req.channel.as_deref() {
-                Some(c) => Some(self.chat.place_of(&maker.from, c)?),
+                Some(c) => Some(self.channel.place_of(&maker.from, c)?),
                 None => None,
             };
             return self.start_blocks(maker, &effective_title, docs_type, channel, req.issue.clone());
@@ -395,7 +448,7 @@ impl Artifacts {
                 .unwrap_or(ArtifactDisplay::Page)
         });
         let final_type = if html { None } else { docs_type };
-        let channel = self.chat.place_of(&maker.from, req.channel.as_deref().unwrap_or(""))?;
+        let channel = self.channel.place_of(&maker.from, req.channel.as_deref().unwrap_or(""))?;
         let file = if html { self.keep(bytes, &effective_title)? } else { String::new() };
         let id = new_id();
         let note = req.note.as_deref().map(str::trim).filter(|n| !n.is_empty());
@@ -409,65 +462,75 @@ impl Artifacts {
             display,
             artifact_type: final_type,
         };
-        let mut initial = None;
-        self.chat.post_with(
-            Posting {
-                from: maker.from.clone(),
-                channel,
-                text: Self::words(t("server.artifact.made", &[("title", effective_title.as_str().into())]), note),
-                made: Some(Made::Card(card)),
-                run: maker.run.clone(),
-                ..Posting::default()
-            },
-            |db, said| {
-                let at = now();
-                db::add_artifact(
-                    db,
-                    db::NewArtifact {
-                        id: id.clone(),
-                        title: effective_title.clone(),
-                        body: if html { "html" } else { "blocks" }.into(),
-                        artifact_type: final_type.map(|ty| ty.as_str().into()),
-                        is_default: 0,
-                        display: display.map(|d| d.as_str().into()),
-                        channel_id: Some(said.channel.clone()),
-                        issue: req.issue.clone(),
+        let by_name = if maker.by == USER_ID {
+            t("server.channel.name.user", &[])
+        } else {
+            maker.by.clone()
+        };
+        let initial = {
+            let at = now();
+            let mut conn = self.db();
+            let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
+            db::add_artifact(
+                &mut tx,
+                db::NewArtifact {
+                    id: id.clone(),
+                    title: effective_title.clone(),
+                    body: if html { "html" } else { "blocks" }.into(),
+                    artifact_type: final_type.map(|ty| ty.as_str().into()),
+                    is_default: 0,
+                    display: display.map(|d| d.as_str().into()),
+                    channel_id: Some(channel.clone()),
+                    issue: req.issue.clone(),
+                    by_id: maker.by.clone(),
+                    by_name: by_name.clone(),
+                    version,
+                    created_at: at,
+                },
+            )
+            .map_err(q)?;
+            if html {
+                db::add_version(
+                    &mut tx,
+                    db::NewVersion {
+                        artifact_id: id.clone(),
+                        version: 1,
+                        attachment_id: file.clone(),
+                        size: bytes.len() as i64,
+                        note: note.map(str::to_owned),
                         by_id: maker.by.clone(),
-                        by_name: said.name.clone(),
-                        version,
+                        by_name,
                         created_at: at,
                     },
                 )
                 .map_err(q)?;
-                db::artifact_said(db, &id, &said.id).map_err(q)?;
-                if html {
-                    db::add_version(
-                        db,
-                        db::NewVersion {
-                            artifact_id: id.clone(),
-                            version: 1,
-                            attachment_id: file.clone(),
-                            size: bytes.len() as i64,
-                            note: note.map(str::to_owned),
-                            by_id: maker.by.clone(),
-                            by_name: said.name.clone(),
-                            created_at: at,
-                        },
-                    )
-                    .map_err(q)?;
-                    db::version_announced(db, &id, 1, &said.id).map_err(q)?;
-                    let meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned), at);
-                    self.sync_html_to_collab(db, &id, None, content, &meta)?;
-                }
-                let fill_meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned), at);
-                initial = if html {
-                    None
-                } else {
-                    self.fill_with_meta(db, &id, content, &maker.by, &fill_meta)?
-                };
-                Ok(())
-            },
-        )?;
+                let meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned), at);
+                self.sync_html_to_collab(&mut tx, &id, None, content, &meta)?;
+            }
+            let fill_meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned), at);
+            let ack = if html {
+                None
+            } else {
+                self.fill_with_meta(&mut tx, &id, content, &maker.by, &fill_meta)?
+            };
+            vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
+            ack
+        };
+        let text = Self::words(t("server.artifact.made", &[("title", effective_title.as_str().into())]), note);
+        let said = match self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new()) {
+            Ok(msg) => msg,
+            Err(err) => {
+                let _ = db::delete_artifact(&mut self.db(), &id);
+                return Err(err);
+            }
+        };
+        {
+            let mut db = self.db();
+            db::artifact_said(&mut db, &id, &said.id).map_err(q)?;
+            if html {
+                db::version_announced(&mut db, &id, 1, &said.id).map_err(q)?;
+            }
+        }
         if let Some(ack) = initial {
             self.publish_change(&id, &ack);
         }
@@ -491,7 +554,7 @@ impl Artifacts {
         let has_entries = req.entries.as_ref().is_some_and(|e| !e.is_empty());
         let should_announce = req.announce.unwrap_or_else(|| (maker.by != USER_ID && has_entries) || req.channel.is_some());
         let resolved_channel = if should_announce || req.channel.is_some() || maker.by != USER_ID {
-            Some(self.chat.place_of(&maker.from, req.channel.as_deref().unwrap_or(""))?)
+            Some(self.channel.place_of(&maker.from, req.channel.as_deref().unwrap_or(""))?)
         } else {
             None
         };
@@ -506,7 +569,7 @@ impl Artifacts {
 
         {
             let mut db = self.db();
-            let mut tx = pollster::block_on(db.begin()).map_err(q)?;
+            let mut tx = vibevalley_runtime::rt::block_on(db.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
             if is_default {
                 db::clear_default_design_system(&mut tx, at).map_err(q)?;
             }
@@ -528,7 +591,7 @@ impl Artifacts {
                 },
             )
             .map_err(q)?;
-            pollster::block_on(tx.commit()).map_err(q)?;
+            vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
         }
 
         let mut seq = 0;
@@ -560,14 +623,8 @@ impl Artifacts {
                 display: None,
                 artifact_type,
             };
-            let (said, _) = self.chat.post(Posting {
-                from: maker.from.clone(),
-                channel,
-                text: Self::words(t("server.artifact.made", &[("title", title.into())]), note),
-                made: Some(Made::Card(card)),
-                run: maker.run.clone(),
-                ..Posting::default()
-            })?;
+            let text = Self::words(t("server.artifact.made", &[("title", title.into())]), note);
+            let said = self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new())?;
             db::artifact_said(&mut self.db(), &id, &said.id).map_err(q)?;
         }
 
@@ -633,78 +690,33 @@ impl Artifacts {
         let id = new_id();
         let note = req.note.as_deref().map(str::trim).filter(|n| !n.is_empty());
         let should_announce = req.announce.unwrap_or_else(|| req.channel.is_some());
-        let mut initial = None;
-
-        if should_announce {
-            let channel = self.chat.place_of(&maker.from, req.channel.as_deref().unwrap_or(""))?;
-            let card = ArtifactCard {
-                id: id.clone(),
-                title: effective_title.clone(),
-                body: ArtifactBody::Blocks,
-                version: 0,
-                note: note.unwrap_or("").into(),
-                display: None,
-                artifact_type: Some(ArtifactType::Outline),
-            };
-            let blocks = imported.blocks;
-            self.chat.post_with(
-                Posting {
-                    from: maker.from.clone(),
-                    channel,
-                    text: Self::words(t("server.artifact.made", &[("title", effective_title.as_str().into())]), note),
-                    made: Some(Made::Card(card)),
-                    run: maker.run.clone(),
-                    ..Posting::default()
-                },
-                |db, said| {
-                    let at = now();
-                    db::add_artifact(
-                        db,
-                        db::NewArtifact {
-                            id: id.clone(),
-                            title: effective_title.clone(),
-                            body: "blocks".into(),
-                            artifact_type: Some(ArtifactType::Outline.as_str().into()),
-                            is_default: 0,
-                            display: None,
-                            channel_id: Some(said.channel.clone()),
-                            issue: req.issue.clone(),
-                            by_id: maker.by.clone(),
-                            by_name: said.name.clone(),
-                            version: 0,
-                            created_at: at,
-                        },
-                    )
-                    .map_err(q)?;
-                    db::artifact_said(db, &id, &said.id).map_err(q)?;
-                    let fill_meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned).or_else(|| Some("import outline".into())), at);
-                    initial = self.fill_md_blocks_with_meta(db, &id, blocks, &maker.by, &fill_meta)?;
-                    Ok(())
-                },
-            )?;
+        let resolved_channel = if should_announce {
+            Some(self.channel.place_of(&maker.from, req.channel.as_deref().unwrap_or(""))?)
         } else {
-            let resolved_channel = match req.channel.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
-                Some(c) => Some(self.chat.place_of(&maker.from, c)?),
+            match req.channel.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
+                Some(c) => Some(self.channel.place_of(&maker.from, c)?),
                 None => None,
-            };
-            let at = now();
-            let by_name = if maker.by == USER_ID {
-                t("server.channel.name.user", &[])
-            } else {
-                maker.by.clone()
-            };
+            }
+        };
+        let at = now();
+        let by_name = if maker.by == USER_ID {
+            t("server.channel.name.user", &[])
+        } else {
+            maker.by.clone()
+        };
+        let initial = {
             let mut conn = self.db();
-            let mut tx = pollster::block_on(conn.begin()).map_err(q)?;
+            let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
             db::add_artifact(
                 &mut tx,
                 db::NewArtifact {
                     id: id.clone(),
-                    title: effective_title,
+                    title: effective_title.clone(),
                     body: "blocks".into(),
                     artifact_type: Some(ArtifactType::Outline.as_str().into()),
                     is_default: 0,
                     display: None,
-                    channel_id: resolved_channel,
+                    channel_id: resolved_channel.clone(),
                     issue: req.issue.clone(),
                     by_id: maker.by.clone(),
                     by_name,
@@ -714,8 +726,29 @@ impl Artifacts {
             )
             .map_err(q)?;
             let fill_meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned).or_else(|| Some("import outline".into())), at);
-            initial = self.fill_md_blocks_with_meta(&mut tx, &id, imported.blocks, &maker.by, &fill_meta)?;
-            pollster::block_on(tx.commit()).map_err(q)?;
+            let ack = self.fill_md_blocks_with_meta(&mut tx, &id, imported.blocks, &maker.by, &fill_meta)?;
+            vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
+            ack
+        };
+        if should_announce && let Some(channel) = resolved_channel {
+            let card = ArtifactCard {
+                id: id.clone(),
+                title: effective_title.clone(),
+                body: ArtifactBody::Blocks,
+                version: 0,
+                note: note.unwrap_or("").into(),
+                display: None,
+                artifact_type: Some(ArtifactType::Outline),
+            };
+            let text = Self::words(t("server.artifact.made", &[("title", effective_title.as_str().into())]), note);
+            let said = match self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new()) {
+                Ok(msg) => msg,
+                Err(err) => {
+                    let _ = db::delete_artifact(&mut self.db(), &id);
+                    return Err(err);
+                }
+            };
+            db::artifact_said(&mut self.db(), &id, &said.id).map_err(q)?;
         }
 
         if let Some(ack) = initial {
@@ -769,43 +802,49 @@ impl Artifacts {
             display: row.display.as_deref().and_then(display_of),
             artifact_type: None,
         };
-        self.chat.post_with(
-            Posting {
-                from: maker.from.clone(),
-                channel: row.channel_id.clone().unwrap_or_default(),
-                text: Self::words(
-                    t("server.artifact.versioned", &[("title", row.title.as_str().into()), ("version", next.into())]),
-                    note,
-                ),
-                made: Some(Made::Card(card)),
-                run: maker.run.clone(),
-                ..Posting::default()
-            },
-            |db, said| {
-                let at = now();
-                db::add_version(
-                    db,
-                    db::NewVersion {
-                        artifact_id: row.id.clone(),
-                        version: next,
-                        attachment_id: file.clone(),
-                        size: bytes.len() as i64,
-                        note: note.map(str::to_owned),
-                        by_id: maker.by.clone(),
-                        by_name: said.name.clone(),
-                        created_at: at,
-                    },
-                )
-                .map_err(q)?;
-                db::version_announced(db, &row.id, next, &said.id).map_err(q)?;
-                db::artifact_versioned(db, &row.id, next, at).map_err(q)?;
-                let meta = explicit_meta
-                    .cloned()
-                    .unwrap_or_else(|| collab::commit_meta_for_maker(maker, note.map(str::to_owned), at));
-                self.sync_html_to_collab(db, &row.id, prior_html.as_deref(), &req.content, &meta)?;
-                Ok(())
-            },
+        let by_name = if maker.by == USER_ID {
+            t("server.channel.name.user", &[])
+        } else {
+            maker.by.clone()
+        };
+        {
+            let at = now();
+            let mut conn = self.db();
+            let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
+            db::add_version(
+                &mut tx,
+                db::NewVersion {
+                    artifact_id: row.id.clone(),
+                    version: next,
+                    attachment_id: file.clone(),
+                    size: bytes.len() as i64,
+                    note: note.map(str::to_owned),
+                    by_id: maker.by.clone(),
+                    by_name,
+                    created_at: at,
+                },
+            )
+            .map_err(q)?;
+            db::artifact_versioned(&mut tx, &row.id, next, at).map_err(q)?;
+            let meta = explicit_meta
+                .cloned()
+                .unwrap_or_else(|| collab::commit_meta_for_maker(maker, note.map(str::to_owned), at));
+            self.sync_html_to_collab(&mut tx, &row.id, prior_html.as_deref(), &req.content, &meta)?;
+            vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
+        }
+        let text = Self::words(
+            t("server.artifact.versioned", &[("title", row.title.as_str().into()), ("version", next.into())]),
+            note,
+        );
+        let said = self.channel.post_card(
+            &maker.from,
+            row.channel_id.as_deref().unwrap_or(""),
+            &text,
+            card,
+            maker.run.clone(),
+            String::new(),
         )?;
+        db::version_announced(&mut self.db(), &row.id, next, &said.id).map_err(q)?;
         self.get_now(&row.id)
     }
 
@@ -891,7 +930,7 @@ impl Artifacts {
             return Err(refused(t("server.artifact.defaultDesignSystemOnly", &[])));
         }
         let at = now();
-        let mut tx = pollster::block_on(db.begin()).map_err(q)?;
+        let mut tx = vibevalley_runtime::rt::block_on(db.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
         if let Some(title) = &req.title {
             db::artifact_renamed(&mut tx, &req.id, title.trim(), at).map_err(q)?;
         }
@@ -904,7 +943,7 @@ impl Artifacts {
             }
             db::set_artifact_default(&mut tx, &req.id, is_default, at).map_err(q)?;
         }
-        pollster::block_on(tx.commit()).map_err(q)?;
+        vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
         let row = self.found(&mut db, &req.id)?;
         self.assemble(&mut db, row)
     }
@@ -1012,42 +1051,17 @@ pub(super) fn artifact_type_of(s: &str) -> Option<ArtifactType> {
     ArtifactType::ALL.into_iter().find(|ty| ty.as_str() == s)
 }
 
-fn prune_daily(me: Weak<Artifacts>, stop_rx: flume::Receiver<()>) -> Option<std::thread::JoinHandle<()>> {
-    std::thread::Builder::new()
-        .name("vibevalley-artifact-prune".into())
-        .spawn(move || {
-            let day = std::time::Duration::from_millis(blocks::DAY_MS as u64);
-            loop {
-                {
-                    let Some(a) = me.upgrade() else { return };
-                    if a.closed.load(Ordering::Relaxed) {
-                        return;
-                    }
-                    let before = now() - blocks::KEPT_DAYS * blocks::DAY_MS;
-                    if let Err(e) = db::prune(&mut a.db(), before) {
-                        eprintln!("vibevalley-server: artifact.prune failed: {e}");
-                    }
-                }
-                if !matches!(stop_rx.recv_timeout(day), Err(flume::RecvTimeoutError::Timeout)) {
-                    return;
-                }
-            }
-        })
-        .ok()
-}
-
 /// `idOf`: an issue by number (refused when there is none), by session, or
-/// the reference as given.
-fn issue_id(board: &crate::modules::work::issue::Board, reference: &str) -> Result<String, ApiError> {
+/// the reference as given — read straight from `Hub`'s `SpaceState`.
+fn issue_id(hub: &Hub, reference: &str) -> Result<String, ApiError> {
     let r = reference.trim();
     let number = r.strip_prefix('#').unwrap_or(r);
     if !number.is_empty() && number.chars().all(|c| c.is_ascii_digit()) {
-        return board
-            .issue(number)
-            .map(|i| i.id)
+        return hub
+            .read(|s| s.issues.iter().find(|i| i.number.to_string() == number).map(|i| i.id.clone()))
             .ok_or_else(|| missing(t("server.issue.issueNumbered", &[("n", number.into())]), LookIn::Issue));
     }
-    if let Some(issue) = board.session(r).and_then(|s| s.issue_id().map(String::from)) {
+    if let Some(issue) = hub.read(|s| s.sessions.iter().find(|x| x.id == r).and_then(|x| x.issue_id().map(String::from))) {
         return Ok(issue);
     }
     Ok(r.to_string())
@@ -1055,12 +1069,12 @@ fn issue_id(board: &crate::modules::work::issue::Board, reference: &str) -> Resu
 
 /// Every `artifact.*` endpoint and subscription, as the user calls them
 /// (`gateway/http/handlers/artifact.ts`).
-pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, board: crate::modules::work::issue::Board) {
+pub fn install(hub: &Hub, artifacts: Arc<Artifacts>) {
     let a = artifacts;
     hub.on::<ops::ArtifactList>({
-        let (a, board) = (a.clone(), board.clone());
-        move |_, r| {
-            let issue = r.issue.as_deref().filter(|i| !i.is_empty()).map(|i| issue_id(&board, i)).transpose()?;
+        let a = a.clone();
+        move |ctx, r| {
+            let issue = r.issue.as_deref().filter(|i| !i.is_empty()).map(|i| issue_id(ctx.hub, i)).transpose()?;
             a.list(&ArtifactListRequest {
                 channel: r.channel.filter(|c| !c.is_empty()),
                 issue,
@@ -1077,10 +1091,10 @@ pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, board: crate::modules::work
         move |_, r| a.content(&r.id, r.version).map(|(c, _)| c)
     });
     hub.on::<ops::ArtifactCreate>({
-        let (a, board) = (a.clone(), board.clone());
-        move |_, mut r| {
+        let a = a.clone();
+        move |ctx, mut r| {
             if let Some(i) = r.issue.as_deref().filter(|i| !i.is_empty()) {
-                r.issue = Some(issue_id(&board, i)?);
+                r.issue = Some(issue_id(ctx.hub, i)?);
             } else {
                 r.issue = None;
             }
@@ -1089,9 +1103,9 @@ pub fn install(hub: &Hub, artifacts: Arc<Artifacts>, board: crate::modules::work
     });
     hub.on::<ops::ArtifactOutlineImport>({
         let a = a.clone();
-        move |_, mut r| {
+        move |ctx, mut r| {
             if let Some(i) = r.issue.as_deref().filter(|i| !i.is_empty()) {
-                r.issue = Some(issue_id(&board, i)?);
+                r.issue = Some(issue_id(ctx.hub, i)?);
             } else {
                 r.issue = None;
             }

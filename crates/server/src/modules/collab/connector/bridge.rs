@@ -225,12 +225,24 @@ impl Bridge {
     }
 
     fn reload(&self) -> Result<(), StoreFailed> {
+        self.reload_with_err(None)
+    }
+
+    /// Updates account and error under one lock so observers never see a torn status (e.g. `paused` with empty `error`).
+    fn reload_with_err(&self, err: Option<String>) -> Result<(), StoreFailed> {
         let account = self.env.store.account(self.id())?;
         let unread = account.as_ref().is_some_and(|a| !self.app.reads(&a.keys));
-        self.shown.lock().account = account;
+        {
+            let mut s = self.shown.lock();
+            s.account = account;
+            if unread {
+                s.error = t("server.connector.unreadSecrets", &[]);
+            } else if let Some(err) = err {
+                s.error = err;
+            }
+        }
         if unread {
             eprintln!("vibevalley-server: connector: {}: the saved secrets cannot be read", self.id().as_str());
-            self.set_err(t("server.connector.unreadSecrets", &[]));
         }
         self.tell();
         Ok(())
@@ -238,11 +250,13 @@ impl Bridge {
 
     /// Whether the pause was kept.
     fn pause(&self) -> bool {
-        match self.env.store.pause(self.id(), Some(now() + STALE_PAUSE_MS)).and_then(|()| self.reload()) {
-            Ok(()) => {
-                self.set_err(t("server.connector.expired", &[]));
-                true
-            }
+        match self
+            .env
+            .store
+            .pause(self.id(), Some(now() + STALE_PAUSE_MS))
+            .and_then(|()| self.reload_with_err(Some(t("server.connector.expired", &[]))))
+        {
+            Ok(()) => true,
             Err(e) => {
                 self.set_err(e.0);
                 false

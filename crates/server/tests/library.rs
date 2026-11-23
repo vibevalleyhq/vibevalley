@@ -148,7 +148,7 @@ fn takes_an_item_out_but_keeps_the_file() {
 fn refuses_what_does_not_name_one_public_source_or_is_not_the_callers_to_give() {
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
-    let library = &started.library;
+    let library = &started.test_internals().library;
     let helper = AddedBy::Agent {
         agent: "lab".into(),
         session: Some("w1".into()),
@@ -240,7 +240,7 @@ fn regression_library_sort_filter_and_attachment_identity_survive_reopen() {
     assert!(list(json!({"origin":"generated"})).is_empty());
     ok(s.hub.call_as(Caller::User, "library.item.delete", json!({"id":ids[1]})));
     assert!(list(json!({"text":"Alpha"})).is_empty());
-    assert_eq!(std::fs::read(s.attachments.file(&ids[1]).unwrap().path).unwrap(), b"a");
+    assert_eq!(std::fs::read(s.test_internals().attachments.file(&ids[1]).unwrap().path).unwrap(), b"a");
     s.close();
 }
 

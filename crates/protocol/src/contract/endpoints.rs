@@ -1,4 +1,4 @@
-use crate::wire::{Caller, Endpoint};
+use crate::wire::{Caller, Endpoint, SubscriptionSpec};
 
 mod t {
     pub use crate::contract::*;
@@ -3115,50 +3115,125 @@ pub mod ops {
     }
 }
 
-/// rpc.ts' subscriptions: each one's payload and event.
+/// Every server subscription, naming who may subscribe (`can`) and its wire payload/event types.
+pub const SUBSCRIPTIONS: &[SubscriptionSpec] = &[
+    SubscriptionSpec {
+        name: "channel.follow",
+        module: "channel",
+        can: &[Caller::User, Caller::Remote],
+        payload: "ChannelFollowPayload",
+        event: "ChannelEvent",
+    },
+    SubscriptionSpec {
+        name: "channel.reports",
+        module: "channel",
+        can: &[Caller::User, Caller::Remote],
+        payload: "ChannelReportsPayload",
+        event: "ChannelEvent",
+    },
+    SubscriptionSpec {
+        name: "artifact.follow",
+        module: "artifact",
+        can: &[Caller::User, Caller::Remote],
+        payload: "ArtifactFollowPayload",
+        event: "ArtifactEvent",
+    },
+    SubscriptionSpec {
+        name: "artifact.entry.follow",
+        module: "artifact",
+        can: &[Caller::User, Caller::Remote],
+        payload: "ArtifactFollowPayload",
+        event: "ArtifactEntryEvent",
+    },
+    SubscriptionSpec {
+        name: "artifact.suggestion.follow",
+        module: "artifact",
+        can: &[Caller::User, Caller::Remote],
+        payload: "ArtifactSuggestionFollowPayload",
+        event: "SuggestionEvent",
+    },
+    SubscriptionSpec {
+        name: "artifact.presence.follow",
+        module: "artifact",
+        can: &[Caller::User, Caller::Remote],
+        payload: "ArtifactPresenceFollowRequest",
+        event: "ArtifactPresenceEvent",
+    },
+    SubscriptionSpec {
+        name: "session.watch",
+        module: "session",
+        can: &[Caller::User, Caller::Remote],
+        payload: "SessionWatchPayload",
+        event: "SessionWatchEvent",
+    },
+    SubscriptionSpec {
+        name: "issue.watch",
+        module: "issue",
+        can: &[Caller::User, Caller::Remote],
+        payload: "IssueGetInput",
+        event: "IssueWatch",
+    },
+];
+
+/// Subscriptions as types: each one's name, allowed callers, payload, and event.
 pub mod subscriptions {
     use super::t;
-    use crate::wire::Subscription;
+    use crate::wire::{Caller, Subscription};
+
     pub struct ChannelFollow;
     impl Subscription for ChannelFollow {
         const NAME: &'static str = "channel.follow";
+        const CAN: &'static [Caller] = &[Caller::User, Caller::Remote];
         type Payload = t::ChannelFollowPayload;
         type Event = t::ChannelEvent;
     }
     pub struct ChannelReports;
     impl Subscription for ChannelReports {
         const NAME: &'static str = "channel.reports";
+        const CAN: &'static [Caller] = &[Caller::User, Caller::Remote];
         type Payload = t::ChannelReportsPayload;
         type Event = t::ChannelEvent;
     }
     pub struct ArtifactFollow;
     impl Subscription for ArtifactFollow {
         const NAME: &'static str = "artifact.follow";
+        const CAN: &'static [Caller] = &[Caller::User, Caller::Remote];
         type Payload = t::ArtifactFollowPayload;
         type Event = t::ArtifactEvent;
     }
     pub struct ArtifactEntryFollow;
     impl Subscription for ArtifactEntryFollow {
         const NAME: &'static str = "artifact.entry.follow";
+        const CAN: &'static [Caller] = &[Caller::User, Caller::Remote];
         type Payload = t::ArtifactFollowPayload;
         type Event = t::ArtifactEntryEvent;
     }
     pub struct ArtifactSuggestionFollow;
     impl Subscription for ArtifactSuggestionFollow {
         const NAME: &'static str = "artifact.suggestion.follow";
+        const CAN: &'static [Caller] = &[Caller::User, Caller::Remote];
         type Payload = t::ArtifactSuggestionFollowPayload;
         type Event = t::SuggestionEvent;
     }
     pub struct ArtifactPresenceFollow;
     impl Subscription for ArtifactPresenceFollow {
         const NAME: &'static str = "artifact.presence.follow";
+        const CAN: &'static [Caller] = &[Caller::User, Caller::Remote];
         type Payload = t::ArtifactPresenceFollowRequest;
         type Event = t::ArtifactPresenceEvent;
     }
     pub struct SessionWatch;
     impl Subscription for SessionWatch {
         const NAME: &'static str = "session.watch";
+        const CAN: &'static [Caller] = &[Caller::User, Caller::Remote];
         type Payload = t::SessionWatchPayload;
         type Event = t::SessionWatchEvent;
+    }
+    pub struct IssueWatch;
+    impl Subscription for IssueWatch {
+        const NAME: &'static str = "issue.watch";
+        const CAN: &'static [Caller] = &[Caller::User, Caller::Remote];
+        type Payload = t::IssueGetInput;
+        type Event = t::IssueWatch;
     }
 }

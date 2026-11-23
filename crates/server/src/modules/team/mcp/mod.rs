@@ -1,16 +1,17 @@
 //! The helpers' MCP door (`gateway/mcp`): JSON-RPC over `POST /mcp`. Each
 //! helper's token, minted by the board when it starts the helper, names it;
-//! its tools are the farm's helper tools.
+//! its tools are served via `crate::ports::ToolDispatchPort` (zero concrete
+//! dependency on `team/tool`).
 
 pub mod resource;
 
 use std::sync::Arc;
 
-use crate::transport::api::Mcp;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-use crate::modules::team::tool::{self, Farm, Tool, Who};
+use crate::ports::{ToolDispatchPort, ToolSpecWire};
+use crate::transport::api::Mcp;
 
 pub use resource::{ResourceReadArgs, Resources};
 
@@ -43,18 +44,15 @@ struct ToolCallParams {
 }
 
 pub struct Door {
-    pub farm: Arc<Farm>,
-    pub tools: Vec<Tool>,
-    pub version: String,
+    dispatch: Arc<dyn ToolDispatchPort>,
+    tools: Vec<ToolSpecWire>,
+    version: String,
 }
 
 impl Door {
-    pub fn new(farm: Arc<Farm>, version: String) -> Arc<Door> {
-        Arc::new(Door {
-            farm,
-            tools: tool::helper(),
-            version,
-        })
+    pub fn new(dispatch: Arc<dyn ToolDispatchPort>, version: String) -> Arc<Door> {
+        let tools = dispatch.helper_tools();
+        Arc::new(Door { dispatch, tools, version })
     }
 
     fn result(&self, token: &str, method: &str, params: Value) -> Result<Value, (i64, String)> {
@@ -75,15 +73,15 @@ impl Door {
                     .tools
                     .iter()
                     .map(|t| {
-                        let mut schema = t.words.parameters.clone();
+                        let mut schema = t.parameters.clone();
                         schema["type"] = json!("object");
-                        json!({ "name": t.words.name, "description": t.words.description, "inputSchema": schema })
+                        json!({ "name": t.name, "description": t.description, "inputSchema": schema })
                     })
                     .collect();
                 Ok(json!({ "tools": tools }))
             }
             "tools/call" => {
-                let Some(me) = self.caller(token) else {
+                let Some(me) = self.dispatch.session_for_token(token) else {
                     return Ok(json!({ "content": [{ "type": "text", "text": UNKNOWN_CALLER }], "isError": true }));
                 };
                 let call: ToolCallParams = serde_json::from_value(params).unwrap_or_default();
@@ -91,10 +89,7 @@ impl Door {
                     Value::Object(map) => Value::Object(map),
                     _ => Value::Object(Map::new()),
                 };
-                let called = match self.tools.iter().find(|t| t.words.name == call.name) {
-                    Some(t) => t.run(&self.farm, &Who::Helper(Box::new(me)), &args),
-                    None => Err(format!("没成：没有 {} 这个工具", call.name)),
-                };
+                let called = self.dispatch.call_helper(me, &call.name, &args);
                 let (text, error) = match called {
                     Ok(text) => (text, false),
                     Err(why) if why.starts_with("没成：") => (why, true),
@@ -105,10 +100,6 @@ impl Door {
             }
             other => Err((-32601, format!("method not found: {other}"))),
         }
-    }
-
-    fn caller(&self, token: &str) -> Option<vibevalley_protocol::Session> {
-        self.farm.board.session(&self.farm.board.sessions().who(token)?)
     }
 }
 

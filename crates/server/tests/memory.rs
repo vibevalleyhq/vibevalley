@@ -41,9 +41,9 @@ fn notes_are_kept_searched_recalled_and_forgotten() {
         assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
         e.data.unwrap_or(Value::Null)
     };
-    let mut helper = started.agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
     helper.runtime = "scripted".into();
-    let helper = started.agents.profiles.save(helper).unwrap();
+    let helper = started.test_internals().agents.profiles.save(helper).unwrap();
     let a = helper.id.as_str();
 
     let empty = call("memory.create", json!({ "agent": a, "text": "   " }));
@@ -74,7 +74,10 @@ fn notes_are_kept_searched_recalled_and_forgotten() {
     let id = issue["id"].as_str().unwrap().to_string();
     ok("issue.status.update", json!({ "id": id, "status": "todo" }));
     let session = until("the session", || {
-        started.board.read(|s| s.sessions.iter().find(|x| x.issue_id() == Some(id.as_str())).cloned())
+        started
+            .test_internals()
+            .board
+            .read(|s| s.sessions.iter().find(|x| x.issue_id() == Some(id.as_str())).cloned())
     });
     let asked = until("the first words", || {
         let events = ok("session.event.list", json!({ "id": session.id }));
@@ -93,7 +96,7 @@ fn notes_are_kept_searched_recalled_and_forgotten() {
     ok("memory.delete", json!({ "agent": a, "memory": mid }));
     let gone = call("memory.delete", json!({ "agent": a, "memory": mid }));
     assert_eq!(gone.biz_code, BizCode::MemoryNotFound.code());
-    started.board.close();
+    started.test_internals().board.close();
 }
 
 #[test]
@@ -107,7 +110,7 @@ fn regression_replacing_an_agents_notes_rolls_back_the_entire_set() {
         ..vibevalley_server::ServerConfig::under(home.path())
     })
     .unwrap();
-    let notes = &server.memories;
+    let notes = &server.test_internals().memories;
     for (text, by) in [("Keep my preference", By::User), ("Previous note", By::Orchestrator)] {
         notes
             .write(&Note {

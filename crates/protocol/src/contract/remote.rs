@@ -5,25 +5,64 @@ use ts_rs::TS;
 
 use crate::Millis;
 
+/// Default bearer token scope for remote interactive clients (mobile, CLI, remote GUI).
+pub const SCOPE_REMOTE_CLIENT: &str = "remote:default";
+/// Bearer token scope for remote execution machines and ephemeral sandboxes.
+pub const SCOPE_REMOTE_MACHINE: &str = "remote:runtime";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[serde(rename_all = "snake_case")]
 pub enum RemotePlatform {
     Ios,
     Android,
+    Cli,
+    Machine,
+    Sandbox,
     Other,
 }
 
 impl RemotePlatform {
-    pub const ALL: [RemotePlatform; 3] = [RemotePlatform::Ios, RemotePlatform::Android, RemotePlatform::Other];
+    pub const ALL: [RemotePlatform; 6] = [
+        RemotePlatform::Ios,
+        RemotePlatform::Android,
+        RemotePlatform::Cli,
+        RemotePlatform::Machine,
+        RemotePlatform::Sandbox,
+        RemotePlatform::Other,
+    ];
 
     /// The string on the wire.
     pub fn as_str(self) -> &'static str {
         match self {
             RemotePlatform::Ios => "ios",
             RemotePlatform::Android => "android",
+            RemotePlatform::Cli => "cli",
+            RemotePlatform::Machine => "machine",
+            RemotePlatform::Sandbox => "sandbox",
             RemotePlatform::Other => "other",
         }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Option<RemotePlatform> {
+        match s {
+            "ios" => Some(RemotePlatform::Ios),
+            "android" => Some(RemotePlatform::Android),
+            "cli" => Some(RemotePlatform::Cli),
+            "machine" => Some(RemotePlatform::Machine),
+            "sandbox" => Some(RemotePlatform::Sandbox),
+            "other" => Some(RemotePlatform::Other),
+            _ => None,
+        }
+    }
+}
+
+impl std::str::FromStr for RemotePlatform {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        RemotePlatform::from_str(s).ok_or(())
     }
 }
 
@@ -70,23 +109,29 @@ pub struct RemoteEnableRequest {
     pub port: Option<u16>,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct RemotePairCode {
     pub code: String,
     pub pair_url: String,
     pub url: String,
     pub expires_at: Millis,
+    pub scope: Option<String>,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct RemotePairExchangeRequest {
     pub code: String,
     pub device_name: String,
     pub platform: RemotePlatform,
+    pub scope: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

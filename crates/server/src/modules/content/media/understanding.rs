@@ -82,7 +82,7 @@ impl Jobs {
 
     /// `media.understanding.authorize`: the user approves the upload for an orchestrator in `channel` to start.
     pub fn authorize_understanding(&self, r: MediaUnderstandingAuthorizationRequest) -> Result<MediaUnderstandingJob, ApiError> {
-        if self.chat.place(&r.channel).is_none() {
+        if !self.channel.place_exists(&r.channel) {
             return Err(invalid());
         }
         let request = MediaUnderstandingRequest {
@@ -202,7 +202,7 @@ impl Jobs {
             .as_ref()
             .map(|a| a.channel.clone())
             .ok_or_else(|| refused("authorizationRequired"))?;
-        let agent = self.chat.orchestrator_in(&channel);
+        let agent = self.channel.orchestrator_in(&channel);
         self.start_understanding(id, &agent, &channel)
     }
 

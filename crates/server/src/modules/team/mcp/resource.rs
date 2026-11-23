@@ -296,6 +296,20 @@ impl Resources {
     }
 }
 
+impl crate::ports::ResourcePort for Resources {
+    fn read(&self, reader: Option<&Session>, uri: &str, offset: Option<i64>, limit: Option<i64>) -> Result<String, String> {
+        Resources::read(
+            self,
+            reader,
+            &ResourceReadArgs {
+                uri: uri.to_string(),
+                offset,
+                limit,
+            },
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

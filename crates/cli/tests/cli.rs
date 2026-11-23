@@ -58,7 +58,7 @@ fn spawn_server() -> TestServer {
     .unwrap();
     let listener = vibevalley_server::transport::http::serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let url = listener.url();
-    started.board.sessions().set_mcp_url(format!("{url}/mcp"));
+    started.set_mcp_url(format!("{url}/mcp"));
     TestServer {
         url,
         dir,
@@ -89,6 +89,7 @@ fn cli(home: &std::path::Path, args: &[&str], env: &[(&str, &str)]) -> Ran {
         .args(args)
         .env("VIBEVALLEY_HOME", home)
         .env_remove("VIBEVALLEY_SERVER")
+        .env_remove("VIBEVALLEY_REMOTE_TOKEN")
         .env_remove("DEEPSEEK_API_KEY")
         .envs(env.iter().copied())
         .output()
@@ -131,6 +132,10 @@ const COMMANDS: &[&str] = &[
     "artifact update",
     "attachment get",
     "attachment upload",
+    "auth login",
+    "auth logout",
+    "auth status",
+    "auth whoami",
     "channel create",
     "channel delete",
     "channel list",
@@ -174,6 +179,11 @@ const COMMANDS: &[&str] = &[
     "orchestrator approval resolve",
     "orchestrator open",
     "orchestrator stop",
+    "remote code",
+    "remote disable",
+    "remote enable",
+    "remote revoke",
+    "remote status",
     "repo create",
     "repo list",
     "repo pr submit",

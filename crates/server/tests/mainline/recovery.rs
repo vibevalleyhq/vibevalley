@@ -79,18 +79,19 @@ fn launch(home: &Path, window: &str) -> (Started, vibevalley_server::transport::
     })
     .unwrap();
     let listener = vibevalley_server::transport::http::serve(server.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
-    server.board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));
+    server.test_internals().board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));
     (server, listener)
 }
 
 fn issue_thread(server: &Started) -> (String, String) {
-    let issue = server.board.issue("1").unwrap();
-    let thread = until(server, "issue thread", || server.chat.issue_thread_id(&issue.id));
+    let issue = server.test_internals().board.issue("1").unwrap();
+    let thread = until(server, "issue thread", || server.test_internals().chat.issue_thread_id(&issue.id));
     (issue.id, thread)
 }
 
 fn count_notes(server: &Started, thread: &str, summary: &str) -> usize {
     server
+        .test_internals()
         .chat
         .history(thread, None, None)
         .unwrap()
@@ -100,7 +101,7 @@ fn count_notes(server: &Started, thread: &str, summary: &str) -> usize {
 }
 
 fn reply_id(server: &Started, thread: &str, key: &str) -> String {
-    let messages = server.chat.history(thread, None, None).unwrap();
+    let messages = server.test_internals().chat.history(thread, None, None).unwrap();
     let mut matches = messages.iter().filter(|m| m.send_key.as_deref() == Some(key));
     let id = matches.next().expect("reply persisted").id.clone();
     assert!(matches.next().is_none(), "duplicate chat reply: {key}");
@@ -139,33 +140,34 @@ fn regression_replies_and_reports_across_process_exit() {
         let url = listener.url();
         if window == "message" {
             call(&url, "repo.create", json!({"name":"demo"}));
-            let mut profile = server.agents.profiles.install_template("reviewer").unwrap();
+            let mut profile = server.test_internals().agents.profiles.install_template("reviewer").unwrap();
             profile.runtime = "scripted".into();
             profile.name = "Worker".into();
-            server.agents.profiles.save(profile).unwrap();
+            server.test_internals().agents.profiles.save(profile).unwrap();
             let issue = call(&url, "issue.create", json!({"title":"Write a file","repo":"demo","agent":"Worker"}));
             call(&url, "issue.status.update", json!({"id": issue["id"],"status":"todo"}));
             let (issue, thread) = issue_thread(&server);
             until(&server, "first report", || (count_notes(&server, &thread, "initial") == 1).then_some(()));
             // Hold the issue dispatcher before accepting the next chat write, leaving its delivery pending in SQLite.
-            server.issue_chat.close();
+            server.test_internals().issue_chat.close();
             comment(&url, &issue, FOLLOW_UP);
             assert!(
                 server
+                    .test_internals()
                     .chat
                     .history(&thread, None, None)
                     .unwrap()
                     .iter()
                     .any(|m| m.send_key.as_deref() == Some(FOLLOW_UP))
             );
-            assert_eq!(server.board.runs(&issue).unwrap().len(), 1);
+            assert_eq!(server.test_internals().board.runs(&issue).unwrap().len(), 1);
             std::process::exit(81);
         }
         let (issue, thread) = issue_thread(&server);
-        let store = server.board.sessions().durable_store();
+        let store = server.test_internals().board.sessions().durable_store();
         if matches!(window.as_str(), "report" | "posted") {
             let run = until(&server, "settled reply", || {
-                server.board.runs(&issue).unwrap().into_iter().find(|r| r.summary == FOLLOW_UP)
+                server.test_internals().board.runs(&issue).unwrap().into_iter().find(|r| r.summary == FOLLOW_UP)
             });
             assert_eq!(run.outcome, Some(Outcome::Completed));
             let request = reply_id(&server, &thread, FOLLOW_UP);
@@ -186,7 +188,7 @@ fn regression_replies_and_reports_across_process_exit() {
         assert_eq!(window, "git");
         until(&server, "replayed report", || (count_notes(&server, &thread, FOLLOW_UP) == 1).then_some(()));
         comment(&url, &issue, FOLLOW_UP);
-        assert_eq!(server.board.runs(&issue).unwrap().len(), 2);
+        assert_eq!(server.test_internals().board.runs(&issue).unwrap().len(), 2);
         comment(&url, &issue, UNKNOWN);
         until(&server, "scripted helper exits after the Git commit", || None::<()>);
     }
@@ -227,7 +229,7 @@ fn regression_replies_and_reports_across_process_exit() {
         comment(&url, &issue, text);
         reply_id(&server, &thread, text);
     }
-    let runs = server.board.runs(&issue).unwrap();
+    let runs = server.test_internals().board.runs(&issue).unwrap();
     assert_eq!(runs.len(), 3);
     assert_eq!(runs[2].outcome, Some(Outcome::Interrupted));
     let wire = call(&url, "issue.run.list", json!({"id":issue}));
@@ -236,7 +238,7 @@ fn regression_replies_and_reports_across_process_exit() {
     assert_eq!(wire[2]["needsReconciliation"], true);
     let session = call(&url, "session.get", json!({"id": runs[2].session}));
     assert_eq!(session["lastRun"]["needsReconciliation"], true);
-    let bundle = server.board.bundle();
+    let bundle = server.test_internals().board.bundle();
     assert!(
         bundle
             .sessions
@@ -253,6 +255,7 @@ fn regression_replies_and_reports_across_process_exit() {
     let request = reply_id(&server, &thread, UNKNOWN);
     assert!(runs[2].heard.contains(&request));
     let unknown = server
+        .test_internals()
         .board
         .sessions()
         .durable_store()
@@ -263,11 +266,11 @@ fn regression_replies_and_reports_across_process_exit() {
     assert_eq!(unknown.result["runId"], runs[2].id);
     assert_eq!(count_notes(&server, &thread, FOLLOW_UP), 1);
     assert_eq!(count_notes(&server, &thread, UNKNOWN), 0);
-    let history = server.chat.history(&thread, None, None).unwrap();
+    let history = server.test_internals().chat.history(&thread, None, None).unwrap();
     let confirmed = history.iter().find(|m| m.kind == MessageKind::Report && m.text == FOLLOW_UP).unwrap();
     assert_eq!(confirmed.spent.as_ref().map(|s| s.tokens), Some(16));
     assert!(runs[2].spent.is_none(), "interrupted before its receipt");
-    let session = server.board.session(&runs[2].session).unwrap();
+    let session = server.test_internals().board.session(&runs[2].session).unwrap();
     let worktree = Path::new(session.cwd.as_deref().unwrap());
     assert_eq!(
         std::fs::read_to_string(worktree.join("delivery.txt")).unwrap(),

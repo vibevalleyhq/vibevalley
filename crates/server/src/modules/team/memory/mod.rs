@@ -8,19 +8,19 @@
 //! are not ported, so `sources` lists `local` alone.
 
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
 use sqlx::{Connection, SqliteConnection};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ActorKind, ApiError, BizCode, Fact, Memory, MemoryFound, MemoryKind, MemoryList, MemoryScope, MemorySearch, MemorySourceInfo, Outcome, Preview,
+    ActorKind, ApiError, BizCode, Caller, Fact, Memory, MemoryFound, MemoryKind, MemoryList, MemoryScope, MemorySearch, MemorySourceInfo, Outcome, Preview,
     RecallPreview, ops,
 };
 
-use crate::base::{ModuleDb, RequestKeys};
+use crate::base::{RequestKeys, ServerDb};
 use crate::modules::team::agent::Agents;
+use crate::ports::MemoryRecallPort;
 use crate::{Hub, now};
 
 mod gse;
@@ -72,7 +72,7 @@ pub struct FinishedRun {
 }
 
 pub struct Memories {
-    db: ModuleDb,
+    db: Arc<ServerDb>,
     agents: Arc<Agents>,
     sub: Mutex<Option<crate::event_bus::Subscription>>,
 }
@@ -102,46 +102,17 @@ fn to_wire(x: m::Memory) -> Memory {
 }
 
 impl Memories {
-    pub fn open(home: &Path, agents: Arc<Agents>) -> Result<Arc<Memories>, ApiError> {
-        let db = ModuleDb::open(home, crate::db::schema::TEAM_MEMORY).map_err(db_failed)?;
-        Ok(Arc::new(Memories {
+    pub fn open(db: Arc<ServerDb>, agents: Arc<Agents>) -> Arc<Memories> {
+        Arc::new(Memories {
             db,
             agents,
             sub: Mutex::new(None),
-        }))
+        })
     }
 
     pub fn close(&self) {
         let prev = self.sub.lock().take();
         drop(prev);
-    }
-
-    pub fn observe_sessions(self: &Arc<Self>, sessions: &crate::modules::work::session::Sessions) {
-        let memories = self.clone();
-        sessions.on_news(move |news| {
-            if let crate::modules::work::session::News::Remember {
-                agent,
-                session,
-                repo,
-                memories: notes,
-            } = news
-            {
-                for m in notes {
-                    let note = Note {
-                        agent: agent.clone(),
-                        text: m.text.clone(),
-                        repo: match m.scope {
-                            vibevalley_protocol::IssueReportMemoryScope::Repo => repo.clone(),
-                            vibevalley_protocol::IssueReportMemoryScope::All => String::new(),
-                        },
-                        by: By::Session(session.clone()),
-                    };
-                    if let Err(e) = memories.write(&note) {
-                        eprintln!("memory: {session}'s report note was not kept: {}", e.message);
-                    }
-                }
-            }
-        });
     }
 
     /// An agent's own memories, newest first.
@@ -252,7 +223,7 @@ impl Memories {
     /// `rewrite`: the agent's own notes replaced; the user's stay.
     pub fn rewrite(&self, agent: &str, texts: &[String], by: By) -> Result<usize, ApiError> {
         self.db.run_api(async |db| {
-            let mut tx = db.begin().await.map_err(db_failed)?;
+            let mut tx = db.begin_with("BEGIN IMMEDIATE").await.map_err(db_failed)?;
             queries::clear_agent_notes(&mut *tx, queries::ClearAgentNotesParams { agent: agent.into() })
                 .await
                 .map_err(db_failed)?;
@@ -360,7 +331,7 @@ impl Memories {
             return;
         }
         let saved = self.db.run(async |db| {
-            let mut tx = db.begin().await?;
+            let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
             if run.issue.is_some() {
                 let text = m::issue_memory_text(&run.brief, &run.summary, run.outcome == Outcome::Failed);
                 queries::keep_issue(
@@ -447,6 +418,12 @@ impl Memories {
             agent: agent.into(),
             by,
         })
+    }
+}
+
+impl MemoryRecallPort for Memories {
+    fn recall_text(&self, agent: &str, session: Option<&str>, repo: &str, query: &str) -> String {
+        self.recalled_text(agent, session, repo, query)
     }
 }
 
@@ -571,13 +548,18 @@ pub fn install(hub: &Arc<Hub>, memories: Arc<Memories>) {
     });
     let s = memories.clone();
     let keys = Arc::new(RequestKeys::<Memory>::default());
-    hub.on::<ops::MemoryCreate>(move |_, input| {
+    hub.on::<ops::MemoryCreate>(move |ctx, input| {
+        let by = match ctx.caller {
+            Caller::Session => By::Session(ctx.client.as_ref().map(|c| c.id.clone()).unwrap_or_default()),
+            Caller::Orchestrator => By::Orchestrator,
+            Caller::User | Caller::Remote => By::User,
+        };
         keys.once(input.request_key.as_deref(), || {
             s.write(&Note {
                 agent: input.agent.clone(),
                 text: input.text.clone(),
                 repo: input.repo.clone().unwrap_or_default(),
-                by: By::User,
+                by: by.clone(),
             })
         })
     });
@@ -638,10 +620,11 @@ mod tests {
     #[test]
     fn session_reported_keeps_issue_worker_and_skips_workspace_sessions() {
         let home = tempfile::tempdir().unwrap();
+        let db = ServerDb::open(home.path()).unwrap();
         let hub = Hub::new(empty_space_state());
         let registry = Arc::new(vibevalley_runtime::oar::Registry::new());
         let agents = Agents::open(&hub, home.path(), &[], registry, false).unwrap();
-        let memories = Memories::open(home.path(), agents).unwrap();
+        let memories = Memories::open(db, agents);
         install(&hub, memories.clone());
 
         // Workspace chat session reports: must be skipped cleanly.

@@ -1,12 +1,70 @@
 use super::sessions::Extra;
 use crate::modules::infra::column::{json, optional, read_json, read_word, word};
-use std::collections::HashMap;
-use vibevalley_protocol::{Run, Session, SessionEvent, SessionPermissionMode, SessionSubagents};
-use vibevalley_runtime::agent::durable::Sqlite;
+use crate::modules::work::ledger::{ReopenInterrupt, Result as LedgerResult, SessionStore};
+use std::collections::{HashMap, HashSet};
+use vibevalley_protocol::{Millis, Run, Session, SessionEvent, SessionPermissionMode, SessionSubagents};
+use vibevalley_runtime::agent::durable::{Sqlite, Store as DurableStore, Tx};
 
 use crate::db::generated::work_session as queries;
 
-pub const SCHEMA: &str = crate::db::schema::WORK_SESSION;
+pub struct SqliteSessionStore;
+
+impl SessionStore for SqliteSessionStore {
+    fn all(&self, db: &Sqlite<'_>) -> sqlx::Result<Vec<Session>> {
+        all(db)
+    }
+
+    fn past(&self, db: &Sqlite<'_>, id: &str) -> sqlx::Result<Option<Session>> {
+        past(db, id)
+    }
+
+    fn put(&self, db: &Sqlite<'_>, s: &Session, departed: bool) -> sqlx::Result<()> {
+        put(db, s, departed)
+    }
+
+    fn put_subagents(&self, db: &Sqlite<'_>, summary: &SessionSubagents) -> sqlx::Result<()> {
+        put_subagents(db, summary)
+    }
+
+    fn active_run(&self, db: &Sqlite<'_>, session: &str, run: &str, root: &str) -> sqlx::Result<bool> {
+        active_run(db, session, run, root)
+    }
+
+    fn run(&self, db: &Sqlite<'_>, id: &str) -> sqlx::Result<Option<Run>> {
+        run(db, id)
+    }
+
+    fn recoverable_ids(&self, db: &Sqlite<'_>, durable: &DurableStore, stored: &[Session]) -> LedgerResult<HashSet<String>> {
+        let all_extras = extras(db)?;
+        let mut out = HashSet::new();
+        for session in stored {
+            if session.phase.is_working()
+                && !session.is_refining()
+                && session.runtime == vibevalley_runtime::agent::runtime::ID
+                && let Some(extra) = all_extras.get(&session.id)
+                && let (Some(run_id), Some(vendor)) = (extra.run.as_deref(), extra.agent_session.as_deref())
+                && durable
+                    .read(|tx| tx.submission_by_request(&vibevalley_runtime::agent::harness::worker_conversation(vendor), &format!("work:{run_id}")))?
+                    .is_some()
+            {
+                out.insert(session.id.clone());
+            }
+        }
+        Ok(out)
+    }
+
+    fn interrupt_on_reopen(
+        &self,
+        tx: &mut Tx<'_>,
+        session: &Session,
+        at: Millis,
+        summary: &str,
+    ) -> vibevalley_runtime::agent::durable::Result<Option<ReopenInterrupt>> {
+        let all_extras = extras(tx.connection())?;
+        Ok(super::delivery::interrupt_on_reopen(tx, session, all_extras.get(&session.id), at, summary)?
+            .map(|(run_id, needs_reconciliation)| ReopenInterrupt { run_id, needs_reconciliation }))
+    }
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SessionConfig {

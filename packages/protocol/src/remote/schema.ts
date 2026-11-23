@@ -37,12 +37,14 @@ export const RemotePairCode = z.object({
   pairUrl: z.string(),
   url: z.string(),
   expiresAt: z.number(),
+  scope: z.exactOptional(z.string()),
 }) satisfies Codec<T.RemotePairCode>;
 
 export const RemotePairExchangeRequest = z.object({
   code: z.string(),
   deviceName: z.string(),
   platform: RemotePlatform,
+  scope: z.exactOptional(z.string()),
 }) satisfies Codec<T.RemotePairExchangeRequest>;
 
 export const RemotePairExchangeResult = z.object({

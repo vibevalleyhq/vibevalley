@@ -2,6 +2,9 @@
  "RemotePlatform": [
   "ios",
   "android",
+  "cli",
+  "machine",
+  "sandbox",
   "other"
  ],
  "RemoteDeviceSummary": [
@@ -20,6 +23,13 @@
    "scope": "remote:default",
    "createdAt": 1700000000000,
    "revokedAt": 1700000120000
+  },
+  {
+   "id": "dev-3",
+   "name": "Linux GPU Box",
+   "platform": "machine",
+   "scope": "remote:runtime",
+   "createdAt": 1700000000000
   }
  ],
  "RemoteStatus": [
@@ -64,6 +74,13 @@
    "pairUrl": "vibevalley://pair?url=http%3A%2F%2F100.99.221.58%3A8890&code=ABCD-1234",
    "url": "http://100.99.221.58:8890",
    "expiresAt": 1700000300000
+  },
+  {
+   "code": "WXYZ-5678",
+   "pairUrl": "vibevalley://pair?url=http%3A%2F%2F100.99.221.58%3A8890&code=WXYZ-5678",
+   "url": "http://100.99.221.58:8890",
+   "expiresAt": 1700000300000,
+   "scope": "remote:runtime"
   }
  ],
  "RemotePairExchangeRequest": [
@@ -71,6 +88,18 @@
    "code": "ABCD-1234",
    "deviceName": "Lucas iPhone",
    "platform": "ios"
+  },
+  {
+   "code": "EFGH-4321",
+   "deviceName": "MacBook CLI",
+   "platform": "cli",
+   "scope": "remote:default"
+  },
+  {
+   "code": "WXYZ-5678",
+   "deviceName": "Linux GPU Box",
+   "platform": "machine",
+   "scope": "remote:runtime"
   }
  ],
  "RemotePairExchangeResult": [

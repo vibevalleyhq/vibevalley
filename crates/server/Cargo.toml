@@ -34,7 +34,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_path_to_error = "0.1.20"
 sha2 = { workspace = true }
-sqlx = { workspace = true }
+sqlx = { workspace = true, features = ["runtime-tokio"] }
 symphonia = { version = "0.6.1", default-features = false, features = ["wav", "mp3", "isomp4", "flac", "ogg", "mkv"] }
 thiserror = { workspace = true }
 tokio = { workspace = true }

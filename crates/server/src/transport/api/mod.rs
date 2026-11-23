@@ -155,6 +155,28 @@ pub trait RemoteAuth: Send + Sync {
 
 pub type SharedRemoteAuth = Arc<dyn RemoteAuth>;
 
+/// Live MOSS realtime line handle consumed by the desktop host audio pipeline.
+pub trait LiveVoiceLine: Send + Sync {
+    fn url(&self) -> &str;
+    fn bearer_token(&self) -> &str;
+    fn session_update(&self) -> String;
+    fn outgoing(&self) -> flume::Receiver<String>;
+    fn heard(&self, raw: &str);
+}
+
+/// Narrow live voice controller port consumed by the desktop host without
+/// importing `modules::collab::voice`.
+pub trait LiveVoicePort: Send + Sync {
+    fn grant(&self) -> Result<vibevalley_protocol::VoiceGrant, ApiError>;
+    fn moss_line(&self) -> Result<Box<dyn LiveVoiceLine>, ApiError>;
+    fn start(&self, channel: &str, uid: &str) -> Result<vibevalley_protocol::VoiceCall, ApiError>;
+    fn heard(&self, agent_id: &str, text: &str, turn: Option<&str>) -> Result<(), ApiError>;
+    fn said(&self, agent_id: &str, text: &str) -> Result<(), ApiError>;
+    fn stop(&self, agent_id: &str);
+}
+
+pub type SharedLiveVoice = Arc<dyn LiveVoicePort>;
+
 /// What the server provides to the views and transports.
 pub trait Server: Send + Sync {
     /// One endpoint by name (`issue.status.update`, ...). Blocking; never
@@ -167,6 +189,10 @@ pub trait Server: Send + Sync {
     }
     /// Current JSON snapshot for one domain slice.
     fn slice_snapshot(&self, slice: SliceKind) -> Value;
+    /// Current pre-encoded UTF-8 JSON snapshot for one domain slice.
+    fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
+        Arc::<str>::from(serde_json::to_string(&self.slice_snapshot(slice)).unwrap_or_else(|_| "null".into()))
+    }
     /// Watches one domain slice with Bounded-1 coalescing.
     /// If `after_seq == Some(latest_seq)`, skips the initial send; otherwise
     /// delivers the latest snapshot immediately. Blocks until `stop` disconnects.
@@ -191,6 +217,12 @@ pub trait Server: Send + Sync {
     /// event. The stream ends when the server drops its sender.
     #[allow(clippy::result_large_err, reason = "the approved contract returns the refusal envelope itself")]
     fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope>;
+    /// Subscription invocation carrying caller identity and principal for `can` RBAC enforcement.
+    #[allow(clippy::result_large_err, reason = "the approved contract returns the refusal envelope itself")]
+    fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        let _ = ctx;
+        self.subscribe(name, payload)
+    }
     fn unsubscribe(&self, id: u64);
     /// Optional local binary media transport.
     fn media_inputs(&self) -> Option<media::SharedMediaInputs> {
@@ -208,8 +240,8 @@ pub trait Server: Send + Sync {
     fn host_debug(&self) -> Option<SharedHostDebug> {
         None
     }
-    /// Optional voice controller attached by the started server.
-    fn voice(&self) -> Option<Arc<crate::modules::collab::voice::Voice>> {
+    /// Optional live voice controller port attached by the started server.
+    fn voice(&self) -> Option<SharedLiveVoice> {
         None
     }
     /// Optional remote device authenticator attached by the started server.

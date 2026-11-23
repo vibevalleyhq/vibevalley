@@ -15,7 +15,7 @@ use parking_lot::Mutex;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, BranchPublication, Caller, PublishPlatform, PullRequest, PullRequestState, SubmitBranch, ops};
 
-use crate::base::{Ticker, refused as refuse};
+use crate::base::{ServerDb, Ticker, refused as refuse};
 use crate::modules::work::issue::Board;
 use crate::modules::work::repo::Repos;
 use crate::{Hub, now};
@@ -40,17 +40,17 @@ pub struct Pulls {
 }
 
 impl Pulls {
-    /// Opens `pull` and `pull_event` in `<home>/server.db` and wires
+    /// Opens `pull` and `pull_event` on the shared `ServerDb` and wires
     /// `Issue.pull_request` projection onto `board` when present.
     pub fn open(
-        home: &Path,
+        db: Arc<ServerDb>,
         publisher: Arc<Publisher>,
         repos: Option<Arc<Repos>>,
         board: Option<Board>,
         gh: Option<HostRun>,
         glab: Option<HostRun>,
     ) -> Result<Arc<Pulls>, ApiError> {
-        let store = PullStore::open(home)?;
+        let store = PullStore::open(db)?;
         if let Some(board) = &board {
             let idx = store.index();
             board.use_pull_of_issue(Arc::new(move |issue_id| idx.lock().of_issue(issue_id)));
@@ -375,7 +375,8 @@ mod tests {
             }
         });
 
-        let pulls = Pulls::open(dir.path(), Arc::new(Publisher::default()), None, Some(board.clone()), Some(gh.clone()), None).unwrap();
+        let db = ServerDb::open(dir.path()).unwrap();
+        let pulls = Pulls::open(db.clone(), Arc::new(Publisher::default()), None, Some(board.clone()), Some(gh.clone()), None).unwrap();
 
         // Upsert linked PR and standalone PR (issue_id = None)
         let linked = pulls
@@ -412,13 +413,13 @@ mod tests {
 
         // Updating the issue MUST NOT null pull.issue_id (regression test for PutIssue ON CONFLICT DO UPDATE)
         board.move_to(&issue.id, IssueStatus::Todo, None).unwrap();
-        let reopened_store = PullStore::open(dir.path()).unwrap();
+        let reopened_store = PullStore::open(db.clone()).unwrap();
         assert_eq!(reopened_store.find("acme/demo", 9).unwrap().issue_id.as_deref(), Some(issue.id.as_str()));
 
         // Snapshot via MCP resource_read (`vv://github/acme/demo/pulls/9` and `/checks`)
-        let attachments = crate::modules::content::attachment::Attachments::open(dir.path()).unwrap();
-        let chat = crate::modules::collab::channel::Chat::open(dir.path(), &hub, attachments, false).unwrap();
-        let trajectories = Trajectories::open(dir.path(), &hub);
+        let attachments = crate::modules::content::attachment::Attachments::open(dir.path(), db.clone());
+        let chat = crate::modules::collab::channel::Chat::open(db.clone(), &hub, attachments, None, false).unwrap();
+        let trajectories = Trajectories::open(db, &hub);
         let resources = Resources::with_pulls(board.clone(), chat, trajectories, pulls.clone());
         let page = resources
             .read(

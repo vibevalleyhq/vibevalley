@@ -98,6 +98,7 @@ pub fn empty_space_state() -> SpaceState {
         sessions: vec![],
         crons: vec![],
         plays: Some(BTreeMap::new()),
+        runtime_inbox_items: vec![],
     }
 }
 
@@ -415,6 +416,13 @@ fn fold(state: &mut SpaceState, f: &Fact) -> (SliceMask, bool) {
             }
             (SliceMask::SESSIONS, false)
         }
+        Fact::RuntimeInboxChanged(f) => {
+            if state.runtime_inbox_items == f.items {
+                return (SliceMask::NONE, false);
+            }
+            state.runtime_inbox_items = f.items.clone();
+            (SliceMask::INBOX, false)
+        }
     }
 }
 
@@ -449,15 +457,10 @@ pub fn collab_slice(state: &SpaceState, seq: i64) -> CollabSlice {
     }
 }
 
-pub fn inbox_slice(state: &SpaceState, seq: i64, extra_items: &[InboxItem]) -> InboxSlice {
-    let mut items = inbox(state);
-    if !extra_items.is_empty() {
-        items.extend(extra_items.iter().cloned());
-        items.sort_by_key(|i| std::cmp::Reverse(i.at));
-    }
+pub fn inbox_slice(state: &SpaceState, seq: i64) -> InboxSlice {
     InboxSlice {
         seq,
-        items,
+        items: inbox(state),
         call: state.call,
         call_reason: state.call_reason.clone(),
     }
@@ -488,7 +491,7 @@ pub fn slice_bundle(state: &SpaceState, effects: Vec<GameEffect>, seq: i64) -> S
         board: board_slice(state, seq),
         sessions: sessions_slice(state, seq),
         collab: collab_slice(state, seq),
-        inbox: inbox_slice(state, seq, &[]),
+        inbox: inbox_slice(state, seq),
         ops: ops_slice(state, seq),
         farm: farm_frame(state, effects, seq),
     }
@@ -787,8 +790,8 @@ impl Core {
         collab_slice(&self.state, self.seq)
     }
 
-    pub fn inbox_slice(&self, extra_items: &[InboxItem]) -> InboxSlice {
-        inbox_slice(&self.state, self.seq, extra_items)
+    pub fn inbox_slice(&self) -> InboxSlice {
+        inbox_slice(&self.state, self.seq)
     }
 
     pub fn ops_slice(&self) -> OpsSlice {
@@ -1152,7 +1155,7 @@ mod tests {
     }
 
     #[test]
-    fn inbox_slice_merges_and_sorts_extra_runtime_items() {
+    fn runtime_inbox_changed_folds_into_inbox_slice_and_deduplicates_no_ops() {
         let mut core = Core::default();
         let mut s = Session::new("w1", SessionController::IssueBoard, "Lab", "claude", ExecutionPolicy::SandboxDir, 100);
         s.phase = Phase::done();
@@ -1165,6 +1168,13 @@ mod tests {
             answer: None,
         });
         core.apply(vec![Fact::session_changed(200, s)]);
+        let seq_before = core.seq();
+
+        // Empty -> empty is a no-op.
+        let empty_noop = core.apply(vec![Fact::runtime_inbox_changed(250, vec![])]);
+        assert_eq!(empty_noop.dirty, SliceMask::NONE);
+        assert!(empty_noop.transitions.is_empty());
+        assert_eq!(core.seq(), seq_before);
 
         let runtime_item = InboxItem {
             id: "durable:budget_reached:t1:300:0".into(),
@@ -1184,11 +1194,31 @@ mod tests {
                 tray: "Budget limit reached".into(),
             },
         };
-        let slice = core.inbox_slice(std::slice::from_ref(&runtime_item));
+        let applied = core.apply(vec![Fact::runtime_inbox_changed(300, vec![runtime_item.clone()])]);
+        assert_eq!(applied.dirty, SliceMask::INBOX);
+        assert_eq!(applied.transitions.len(), 1);
+        assert!(applied.effects.is_empty());
+        assert_eq!(core.seq(), seq_before + 1);
+
+        let slice = core.inbox_slice();
         assert_eq!(slice.seq, core.seq());
         assert_eq!(slice.items.len(), 2);
         assert_eq!(slice.items[0], runtime_item);
         assert_eq!(slice.items[1].kind, InboxKind::Review);
+
+        // Identical items produce a no-op without advancing seq.
+        let repeat_noop = core.apply(vec![Fact::runtime_inbox_changed(301, vec![runtime_item])]);
+        assert_eq!(repeat_noop.dirty, SliceMask::NONE);
+        assert!(repeat_noop.transitions.is_empty());
+        assert_eq!(core.seq(), seq_before + 1);
+
+        // Clearing runtime inbox items dirties INBOX and removes them.
+        let cleared = core.apply(vec![Fact::runtime_inbox_changed(302, vec![])]);
+        assert_eq!(cleared.dirty, SliceMask::INBOX);
+        assert_eq!(core.seq(), seq_before + 2);
+        let after_clear = core.inbox_slice();
+        assert_eq!(after_clear.items.len(), 1);
+        assert_eq!(after_clear.items[0].kind, InboxKind::Review);
     }
 
     #[test]
@@ -1235,7 +1265,7 @@ mod tests {
         let before_fail = core.state().clone();
         let applied = core.apply(vec![fail_fact.clone()]);
         assert!(applied.effects.is_empty());
-        assert!(core.inbox_slice(&[]).items.is_empty());
+        assert!(core.inbox_slice().items.is_empty());
         assert!(crate::progress::entries_for(&before_fail, &fail_fact, core.state()).is_empty());
     }
 }

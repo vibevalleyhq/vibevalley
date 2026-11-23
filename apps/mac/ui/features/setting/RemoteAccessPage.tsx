@@ -7,6 +7,7 @@ import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { SettingRow, SettingsGroup, SettingsPage } from "../../design/domain/settings";
 import { Icon } from "../../design/Icon";
+import type { IconName } from "../../design/icons";
 import { Banner, Quiet } from "../../design/layout";
 import { Qr } from "../../design/Qr";
 import { Tag } from "../../design/Tag";
@@ -21,8 +22,30 @@ function platformLabel(platform: RemotePlatform): string {
       return t("web.remote.devices.platform.ios");
     case "android":
       return t("web.remote.devices.platform.android");
+    case "cli":
+      return t("web.remote.devices.platform.cli");
+    case "machine":
+      return t("web.remote.devices.platform.machine");
+    case "sandbox":
+      return t("web.remote.devices.platform.sandbox");
     case "other":
       return t("web.remote.devices.platform.other");
+  }
+}
+
+function platformIcon(platform: RemotePlatform): IconName {
+  switch (platform) {
+    case "ios":
+    case "android":
+      return "devices";
+    case "cli":
+      return "terminal";
+    case "machine":
+      return "runtimes";
+    case "sandbox":
+      return "lock";
+    case "other":
+      return "devices";
   }
 }
 
@@ -263,7 +286,7 @@ export function RemoteAccessPage() {
                       >
                         <View class="min-w-0 flex-1 gap-1">
                           <View class="flex-row items-center gap-2">
-                            <Icon name="devices" size={14} tone="muted" />
+                            <Icon name={platformIcon(device().platform)} size={14} tone="muted" />
                             <Text class="min-w-0 truncate text-sm font-medium text-ink">{device().name}</Text>
                             <Tag tone="info" label={platformLabel(device().platform)} />
                           </View>

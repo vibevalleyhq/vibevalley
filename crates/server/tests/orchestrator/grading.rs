@@ -39,14 +39,14 @@ fn graded_issue(
     );
     let server = vibevalley_server::start(config).unwrap();
     let listener = vibevalley_server::transport::http::serve(server.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
-    server.board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));
+    server.test_internals().board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));
     let user = |op: &str, req| via_http(&listener, op, req);
     user("repo.create", json!({"name":"r"}));
     user("artifact.create", json!({"title":"unrelated artifact private marker","kind":"markdown"}));
-    let mut helper = server.agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = server.test_internals().agents.profiles.install_template("reviewer").unwrap();
     helper.name = "Checked".into();
     helper.runtime = "vibevalley".into();
-    server.agents.profiles.save(helper).unwrap();
+    server.test_internals().agents.profiles.save(helper).unwrap();
     let issue = user(
         "issue.create",
         json!({"title":"Deliver the requested file","description":"Local grading example","agent":"Checked","repo":"r","criteria":criteria}),
@@ -100,9 +100,9 @@ fn regression_issue_criteria_grade_the_builtin_worker_with_only_its_own_delivery
     }
     assert!(json!(requests[3].messages).to_string().contains("use the required content"));
     drop(requests);
-    let runs = s.board.runs(&id).unwrap();
+    let runs = s.test_internals().board.runs(&id).unwrap();
     assert_eq!(runs.len(), 1);
-    let work = std::path::PathBuf::from(s.board.session(&run.session).unwrap().cwd.unwrap());
+    let work = std::path::PathBuf::from(s.test_internals().board.session(&run.session).unwrap().cwd.unwrap());
     assert_eq!(std::fs::read_to_string(work.join("graded.txt")).unwrap(), "required-content");
     s.close();
 }
@@ -136,7 +136,7 @@ fn regression_worker_question_waits_for_user_before_grading() {
         &["provide the chosen version"],
     );
     let _run = terminal_worker_run(&listener, &id);
-    let issue = s.board.issue(&id).unwrap();
+    let issue = s.test_internals().board.issue(&id).unwrap();
     assert_eq!(issue.questions[0].question, "Which version?");
     let requests = model.seen.lock().unwrap();
     assert_eq!(requests.len(), 2);
