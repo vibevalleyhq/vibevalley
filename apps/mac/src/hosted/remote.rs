@@ -14,7 +14,7 @@ use parking_lot::Mutex;
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
 use vibevalley_protocol::{BizCode, Envelope, LiveEvent, SliceKind};
-use vibevalley_server::transport::api::{Server, refusal};
+use vibevalley_server::transport::api::{BoxFuture, CallerContext, Server, refusal};
 
 use crate::hosted::connection::{Secret, is_loopback_url, normalize_url};
 
@@ -202,6 +202,22 @@ impl RemoteServer {
             shutdown: CancellationToken::new(),
         })
     }
+
+    async fn call_http(&self, op: &str, payload: Value) -> Envelope {
+        let url = op_url(&self.base_url, op);
+        let body = if payload.is_null() { Value::Object(Default::default()) } else { payload };
+        let req = attach_headers(self.client.post(&url).timeout(CALL_TIMEOUT).json(&body), &self.token);
+        let response = match req.send().await {
+            Ok(res) => res,
+            Err(err) => return refusal(BizCode::ServiceUnavailable, format!("remote control plane unreachable: {err}")),
+        };
+        let status = response.status();
+        let text = match response.text().await {
+            Ok(text) => text,
+            Err(err) => return refusal(BizCode::ServiceUnavailable, format!("failed reading remote response: {err}")),
+        };
+        parse_envelope_or_fallback(status, &text)
+    }
 }
 
 impl Drop for RemoteServer {
@@ -216,24 +232,11 @@ impl Drop for RemoteServer {
 
 impl Server for RemoteServer {
     fn call(&self, op: &str, payload: Value) -> Envelope {
-        let url = op_url(&self.base_url, op);
-        let client = self.client.clone();
-        let token = self.token.clone();
-        let body = if payload.is_null() { Value::Object(Default::default()) } else { payload };
+        vibevalley_runtime::rt::block_on(self.call_http(op, payload))
+    }
 
-        vibevalley_runtime::rt::block_on(async move {
-            let req = attach_headers(client.post(&url).timeout(CALL_TIMEOUT).json(&body), &token);
-            let response = match req.send().await {
-                Ok(res) => res,
-                Err(err) => return refusal(BizCode::ServiceUnavailable, format!("remote control plane unreachable: {err}")),
-            };
-            let status = response.status();
-            let text = match response.text().await {
-                Ok(text) => text,
-                Err(err) => return refusal(BizCode::ServiceUnavailable, format!("failed reading remote response: {err}")),
-            };
-            parse_envelope_or_fallback(status, &text)
-        })
+    fn call_with_async(self: Arc<Self>, _ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
+        Box::pin(async move { self.call_http(&op, payload).await })
     }
 
     fn slice_snapshot(&self, slice: SliceKind) -> Value {
@@ -720,11 +723,17 @@ mod tests {
         let wrong = RemoteServer::new(base_url.clone(), Secret::new("vv_dev_wrong_token"), None).unwrap();
         assert_eq!(wrong.call("machine.list", json!({})).biz_code, BizCode::Unauthorized.code());
 
-        // 3. Authorized RPC call & slice_snapshot round-trip.
-        let remote = RemoteServer::new(base_url, Secret::new(token), Some("Studio Mac".into())).unwrap();
+        // 3. Authorized RPC call (sync + async) & slice_snapshot round-trip.
+        let remote = Arc::new(RemoteServer::new(base_url, Secret::new(token), Some("Studio Mac".into())).unwrap());
         let res = remote.call("machine.list", json!({}));
         assert_eq!(res.biz_code, 0);
         assert_eq!(res.data.unwrap()[0]["name"], "Studio");
+
+        let async_remote = remote.clone();
+        let async_res =
+            vibevalley_runtime::rt::block_on(async move { async_remote.call_with_async(CallerContext::local(), "machine.list".into(), json!({})).await });
+        assert_eq!(async_res.biz_code, 0);
+        assert_eq!(async_res.data.unwrap()[0]["name"], "Studio");
 
         let snap = remote.slice_snapshot(SliceKind::Board);
         assert_eq!(snap["seq"], 1);

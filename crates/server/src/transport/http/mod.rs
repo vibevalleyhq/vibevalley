@@ -265,11 +265,7 @@ async fn authenticate_with_token(state: &HttpState, headers: &HeaderMap, query_t
         let Some(auth) = state.server.remote_auth() else {
             return Err(ApiError::new(BizCode::Unauthorized, vibevalley_i18n::t("server.remote.unauthorized", &[])));
         };
-        let token = token.to_string();
-        let verified = tokio::task::spawn_blocking(move || auth.verify_bearer(&token))
-            .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
-        let identity = verified?;
+        let identity = auth.verify_bearer_async(token.to_string()).await?;
         return Ok(CallerContext {
             caller: Caller::Remote,
             principal: CallerPrincipal::RemoteDevice {
@@ -354,11 +350,7 @@ async fn command(State(state): State<HttpState>, uri: axum::http::Uri, headers: 
             Err(e) => return refuse(BizCode::InvalidInput, e.to_string()),
         }
     };
-    let server = state.server;
-    match tokio::task::spawn_blocking(move || server.call_with(&ctx, &op, payload)).await {
-        Ok(envelope) => reply(envelope),
-        Err(e) => refuse(BizCode::InternalError, e.to_string()),
-    }
+    reply(state.server.call_with_async(ctx, op, payload).await)
 }
 
 /// A flume receiver as an SSE stream of `data:` lines, ending on `shutdown`.
@@ -579,10 +571,7 @@ async fn artifact_view(
     {
         payload["origin"] = format!("http://{host}").into();
     }
-    let envelope = match tokio::task::spawn_blocking(move || server.call_with(&ctx, "artifact.view", payload)).await {
-        Ok(envelope) => envelope,
-        Err(e) => return refuse(BizCode::InternalError, e.to_string()),
-    };
+    let envelope = server.call_with_async(ctx, "artifact.view".into(), payload).await;
     if envelope.biz_code == BizCode::ArtifactNotFound.code() || envelope.biz_code == BizCode::ArtifactRefused.code() {
         return StatusCode::NOT_FOUND.into_response();
     }
@@ -633,10 +622,7 @@ async fn artifact_page(
     if query.get("print").map(String::as_str) == Some("1") {
         payload["print"] = true.into();
     }
-    let envelope = match tokio::task::spawn_blocking(move || server.call_with(&ctx, "artifact.page", payload)).await {
-        Ok(envelope) => envelope,
-        Err(e) => return refuse(BizCode::InternalError, e.to_string()),
-    };
+    let envelope = server.call_with_async(ctx, "artifact.page".into(), payload).await;
     if envelope.biz_code == BizCode::ArtifactNotFound.code() {
         return StatusCode::NOT_FOUND.into_response();
     }
@@ -696,11 +682,7 @@ async fn attachment(
         Err(err) => return reply(Envelope::failure(&err)),
     };
     let server = state.server;
-    let found = tokio::task::spawn_blocking(move || server.call_with(&ctx, "attachment.file", serde_json::json!({ "id": id }))).await;
-    let envelope = match found {
-        Ok(envelope) => envelope,
-        Err(e) => return refuse(BizCode::InternalError, e.to_string()),
-    };
+    let envelope = server.call_with_async(ctx, "attachment.file".into(), serde_json::json!({ "id": id })).await;
     if envelope.biz_code != 0 {
         return reply(envelope);
     }

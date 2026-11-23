@@ -143,6 +143,16 @@ impl ServerDb {
         &self.write_pool
     }
 
+    #[allow(dead_code)]
+    pub(crate) async fn acquire_write(&self) -> sqlx::Result<PoolConnection<Sqlite>> {
+        self.write_pool.acquire().await
+    }
+
+    #[allow(dead_code)]
+    pub(crate) async fn acquire_read_async(&self) -> sqlx::Result<PoolConnection<Sqlite>> {
+        self.read_pool.acquire().await
+    }
+
     pub(crate) fn acquire(&self) -> sqlx::Result<DbConn> {
         vibevalley_runtime::rt::block_on(self.write_pool.acquire()).map(|conn| DbConn(Some(conn)))
     }
@@ -464,5 +474,32 @@ mod tests {
         done_rx.recv_timeout(Duration::from_secs(2)).expect("ticker fired 3 times");
         ticker.stop();
         assert!(count.load(Ordering::SeqCst) >= 3);
+    }
+
+    #[test]
+    fn async_acquire_write_and_read_helpers_work_inside_send_futures() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = ServerDb::open(dir.path()).unwrap();
+        let db_task = db.clone();
+        let count = vibevalley_runtime::rt::block_on(async move {
+            vibevalley_runtime::rt::spawn(async move {
+                let mut writer = db_task.acquire_write().await?;
+                sqlx::raw_sql("INSERT INTO channel (id, type, is_default, name, created_at) VALUES ('async-c1', 'channel', 0, 'async', 100);")
+                    .execute(&mut *writer)
+                    .await?;
+                drop(writer);
+
+                let mut reader = db_task.acquire_read_async().await?;
+                let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM channel WHERE id = 'async-c1'")
+                    .fetch_one(&mut *reader)
+                    .await?;
+                Ok::<_, sqlx::Error>(count)
+            })
+            .await
+            .unwrap()
+        })
+        .unwrap();
+        assert_eq!(count, 1);
+        db.close();
     }
 }

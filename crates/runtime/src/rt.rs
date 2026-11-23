@@ -6,12 +6,26 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio::runtime::{Handle, Runtime, RuntimeFlavor};
 
+fn resolve_io_workers(env_val: Option<&str>, available: Option<usize>) -> usize {
+    if let Some(parsed) = env_val.and_then(|raw| raw.trim().parse::<usize>().ok()) {
+        return parsed.clamp(1, 16);
+    }
+    available.map(|n| n.clamp(2, 4)).unwrap_or(4)
+}
+
+fn io_workers() -> usize {
+    let env_val = std::env::var("VIBEVALLEY_IO_WORKERS").ok();
+    let available = std::thread::available_parallelism().ok().map(std::num::NonZeroUsize::get);
+    resolve_io_workers(env_val.as_deref(), available)
+}
+
 fn runtime() -> &'static Runtime {
     static RUNTIME: OnceLock<Runtime> = OnceLock::new();
     RUNTIME.get_or_init(|| {
         let _ = rustls::crypto::ring::default_provider().install_default();
         let next = AtomicUsize::new(0);
         tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(io_workers())
             .enable_all()
             .thread_name_fn(move || {
                 let n = next.fetch_add(1, Ordering::Relaxed);
@@ -77,5 +91,17 @@ mod tests {
             })
         });
         assert_eq!(from_current_thread, 99);
+    }
+
+    #[test]
+    fn io_worker_quota_respects_env_override_and_clamps_defaults() {
+        assert_eq!(resolve_io_workers(None, None), 4);
+        assert_eq!(resolve_io_workers(None, Some(1)), 2);
+        assert_eq!(resolve_io_workers(None, Some(3)), 3);
+        assert_eq!(resolve_io_workers(None, Some(16)), 4);
+        assert_eq!(resolve_io_workers(Some("0"), Some(16)), 1);
+        assert_eq!(resolve_io_workers(Some("8"), Some(16)), 8);
+        assert_eq!(resolve_io_workers(Some("64"), Some(16)), 16);
+        assert_eq!(resolve_io_workers(Some("invalid"), Some(12)), 4);
     }
 }

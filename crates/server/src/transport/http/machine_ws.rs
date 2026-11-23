@@ -49,12 +49,7 @@ pub(super) async fn upgrade(
         return refuse(BizCode::Unauthorized, vibevalley_i18n::t("server.remote.unauthorized", &[]));
     };
 
-    let token_owned = token.to_string();
-    let verified = match tokio::task::spawn_blocking(move || auth.verify_bearer(&token_owned)).await {
-        Ok(res) => res,
-        Err(err) => return refuse(BizCode::InternalError, err.to_string()),
-    };
-    let identity = match verified {
+    let identity = match auth.verify_bearer_async(token.to_string()).await {
         Ok(id) => id,
         Err(err) => return reply(vibevalley_protocol::Envelope::failure(&err)),
     };

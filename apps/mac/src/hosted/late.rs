@@ -12,7 +12,8 @@ use parking_lot::Mutex;
 use serde_json::Value;
 use tokio::sync::{broadcast, watch};
 use vibevalley_server::slice_feed::SliceSubscription;
-use vibevalley_server::transport::bridge::{CallerContext, Envelope, LiveEvent, Server, SliceKind};
+use vibevalley_server::transport::api::{BoxFuture, refusal};
+use vibevalley_server::transport::bridge::{BizCode, CallerContext, Envelope, LiveEvent, Server, SliceKind};
 
 #[derive(Clone)]
 pub struct LateServer {
@@ -79,6 +80,20 @@ impl Server for LateServer {
 
     fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
         self.server().call_with(ctx, op, payload)
+    }
+
+    fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
+        if let Some(inner) = self.cell.get() {
+            return Arc::clone(inner).call_with_async(ctx, op, payload);
+        }
+        Box::pin(async move {
+            let mut ready = self.ready.clone();
+            let _ = ready.wait_for(|is_ready| *is_ready).await;
+            match self.cell.get() {
+                Some(inner) => Arc::clone(inner).call_with_async(ctx, op, payload).await,
+                None => refusal(BizCode::ServiceUnavailable, "server unavailable before startup completed"),
+            }
+        })
     }
 
     fn slice_snapshot(&self, slice: SliceKind) -> Value {
@@ -406,5 +421,82 @@ mod tests {
 
         assert!(cancelled_rec.named("frame:slice:board").is_empty());
         assert!(cancelled_rec.named("frame:live").is_empty());
+    }
+
+    /// Panics if sync `call` / `call_with` is used instead of `call_with_async`.
+    struct AsyncCallOnlyServer(Arc<FakeServer>);
+
+    impl Server for AsyncCallOnlyServer {
+        fn call(&self, _op: &str, _payload: Value) -> Envelope {
+            panic!("sync Server::call must not be used when call_with_async is called");
+        }
+
+        fn call_with(&self, _ctx: &CallerContext, _op: &str, _payload: Value) -> Envelope {
+            panic!("sync Server::call_with must not be used when call_with_async is called");
+        }
+
+        fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
+            Box::pin(async move { self.0.call_with(&ctx, &op, payload) })
+        }
+
+        fn slice_snapshot(&self, slice: SliceKind) -> Value {
+            self.0.slice_snapshot(slice)
+        }
+
+        fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+            self.0.watch_slice(slice, after_seq, stop, receive);
+        }
+
+        fn live(&self) -> flume::Receiver<LiveEvent> {
+            self.0.live()
+        }
+
+        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+            self.0.subscribe(name, payload)
+        }
+
+        fn unsubscribe(&self, id: u64) {
+            self.0.unsubscribe(id);
+        }
+    }
+
+    #[test]
+    fn call_with_async_waits_pre_attach_and_delegates_directly_post_attach() {
+        vibevalley_runtime::rt::block_on(async {
+            let late = Arc::new(LateServer::new());
+            let fake = Arc::new(FakeServer::new());
+            fake.respond("issue.list", json!([{ "id": "i1" }]));
+
+            let pre_late = late.clone();
+            let pre_task = vibevalley_runtime::rt::spawn(async move {
+                let mut ctx = CallerContext::local();
+                ctx.client = Some(test_identity("pre-async"));
+                pre_late.call_with_async(ctx, "issue.list".into(), json!({})).await
+            });
+
+            // Yield briefly to confirm pre-attach call stays pending until attach().
+            tokio::time::sleep(Duration::from_millis(15)).await;
+            assert!(!pre_task.is_finished(), "pre-attach call_with_async should await readiness");
+
+            late.attach(Arc::new(AsyncCallOnlyServer(fake.clone())));
+            let pre_env = pre_task.await.unwrap();
+            assert_eq!(pre_env.biz_code, 0);
+            assert_eq!(pre_env.data, Some(json!([{ "id": "i1" }])));
+            assert_eq!(fake.last_client().as_ref().map(|c| c.id.as_str()), Some("pre-async"));
+
+            // Post-attach call_with_async delegates immediately without hitting sync call_with.
+            let mut post_ctx = CallerContext::local();
+            post_ctx.client = Some(test_identity("post-async"));
+            let post_env = late.call_with_async(post_ctx, "issue.list".into(), json!({})).await;
+            assert_eq!(post_env.biz_code, 0);
+            assert_eq!(post_env.data, Some(json!([{ "id": "i1" }])));
+            assert_eq!(fake.last_client().as_ref().map(|c| c.id.as_str()), Some("post-async"));
+
+            // If startup fails and drops ready_tx before attach, call_with_async refuses cleanly.
+            let unattached = Arc::new(LateServer::new());
+            unattached.ready_tx.lock().take();
+            let failed_env = unattached.call_with_async(CallerContext::local(), "issue.list".into(), json!({})).await;
+            assert_eq!(failed_env.biz_code, BizCode::ServiceUnavailable.code());
+        });
     }
 }
