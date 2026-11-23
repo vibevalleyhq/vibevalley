@@ -7,11 +7,13 @@
 //! with symlink and inode verification and fails closed (`None`) on any schema,
 //! lock, or I/O discrepancy.
 
+use std::collections::HashMap;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::Duration;
 
+use parking_lot::Mutex;
 use pollster::block_on;
 use regex::Regex;
 use sqlx::sqlite::SqliteConnectOptions;
@@ -20,6 +22,7 @@ use sqlx::{ConnectOptions, Row, SqliteConnection};
 pub(crate) const STEP_TYPE_ERROR_MESSAGE: i64 = 17;
 pub(crate) const STEP_TYPE_INVOKE_SUBAGENT: i64 = 127;
 pub(crate) const MAX_CHILDREN: usize = 16;
+const MAX_CACHED_CONNS: usize = 16;
 const PAYLOAD_SCAN_LIMIT: usize = 16 * 1024;
 const SUBAGENT_PAYLOAD_LIMIT: usize = 32 * 1024;
 const SUBAGENT_TEXT_CAP: usize = 4_000;
@@ -113,8 +116,56 @@ fn safe_db_identity(path: &Path) -> Option<(u64, u64)> {
     Some((meta.dev(), meta.ino()))
 }
 
+struct CachedConn {
+    identity: (u64, u64),
+    conn: SqliteConnection,
+    last_used: u64,
+}
+
+#[derive(Default)]
+struct ConnCache {
+    entries: HashMap<PathBuf, CachedConn>,
+    clock: u64,
+}
+
+impl ConnCache {
+    fn take(&mut self, path: &Path, identity: (u64, u64)) -> Option<SqliteConnection> {
+        let entry = self.entries.remove(path)?;
+        (entry.identity == identity).then_some(entry.conn)
+    }
+
+    fn put(&mut self, path: PathBuf, identity: (u64, u64), conn: SqliteConnection) {
+        self.clock = self.clock.wrapping_add(1);
+        let stamp = self.clock;
+        if !self.entries.contains_key(&path)
+            && self.entries.len() >= MAX_CACHED_CONNS
+            && let Some(oldest_key) = self.entries.iter().min_by_key(|(_, v)| v.last_used).map(|(k, _)| k.clone())
+        {
+            self.entries.remove(&oldest_key);
+        }
+        self.entries.insert(
+            path,
+            CachedConn {
+                identity,
+                conn,
+                last_used: stamp,
+            },
+        );
+    }
+}
+
+fn conn_cache() -> &'static Mutex<ConnCache> {
+    static CACHE: OnceLock<Mutex<ConnCache>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(ConnCache::default()))
+}
+
+#[cfg(test)]
+static READONLY_OPEN_COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
 fn open_readonly(path: &Path) -> Option<(SqliteConnection, (u64, u64))> {
     let before = safe_db_identity(path)?;
+    #[cfg(test)]
+    READONLY_OPEN_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let options = SqliteConnectOptions::new().filename(path).read_only(true).busy_timeout(BUSY_TIMEOUT);
     let conn = block_on(options.connect()).ok()?;
     let after = safe_db_identity(path)?;
@@ -124,10 +175,44 @@ fn open_readonly(path: &Path) -> Option<(SqliteConnection, (u64, u64))> {
     Some((conn, before))
 }
 
+fn with_readonly_conn<T>(path: &Path, mut query: impl FnMut(&mut SqliteConnection) -> Result<T, sqlx::Error>) -> Option<T> {
+    let identity = safe_db_identity(path)?;
+    let (mut conn, identity, from_cache) = match conn_cache().lock().take(path, identity) {
+        Some(conn) => (conn, identity, true),
+        None => {
+            let (conn, opened_id) = open_readonly(path)?;
+            (conn, opened_id, false)
+        }
+    };
+
+    match query(&mut conn) {
+        Ok(value) => {
+            if safe_db_identity(path) != Some(identity) {
+                return None;
+            }
+            conn_cache().lock().put(path.to_path_buf(), identity, conn);
+            Some(value)
+        }
+        Err(_) => {
+            drop(conn);
+            if !from_cache {
+                return None;
+            }
+            let (mut fresh, fresh_id) = open_readonly(path)?;
+            let value = query(&mut fresh).ok()?;
+            if safe_db_identity(path) != Some(fresh_id) {
+                return None;
+            }
+            conn_cache().lock().put(path.to_path_buf(), fresh_id, fresh);
+            Some(value)
+        }
+    }
+}
+
 pub(crate) fn latest_step_index(path: &Path) -> Option<i64> {
-    let (mut conn, identity) = open_readonly(path)?;
-    let idx = block_on(sqlx::query_scalar::<_, i64>("SELECT COALESCE(MAX(idx), -1) FROM steps").fetch_one(&mut conn)).ok()?;
-    (safe_db_identity(path) == Some(identity)).then_some(idx)
+    with_readonly_conn(path, |conn| {
+        block_on(sqlx::query_scalar::<_, i64>("SELECT COALESCE(MAX(idx), -1) FROM steps").fetch_one(conn))
+    })
 }
 
 fn read_blob_or_text(row: &sqlx::sqlite::SqliteRow, column: &str) -> Option<Vec<u8>> {
@@ -141,16 +226,13 @@ fn read_blob_or_text(row: &sqlx::sqlite::SqliteRow, column: &str) -> Option<Vec<
 }
 
 pub(crate) fn detect_silent_error(path: &Path, after_idx: i64) -> Option<SilentError> {
-    let (mut conn, identity) = open_readonly(path)?;
-    let row = block_on(
-        sqlx::query("SELECT step_type, step_payload, error_details FROM steps WHERE idx > ?1 ORDER BY idx DESC LIMIT 1")
-            .bind(after_idx)
-            .fetch_optional(&mut conn),
-    )
-    .ok()??;
-    if safe_db_identity(path) != Some(identity) {
-        return None;
-    }
+    let row = with_readonly_conn(path, |conn| {
+        block_on(
+            sqlx::query("SELECT step_type, step_payload, error_details FROM steps WHERE idx > ?1 ORDER BY idx DESC LIMIT 1")
+                .bind(after_idx)
+                .fetch_optional(conn),
+        )
+    })??;
     let step_type: i64 = row.try_get("step_type").ok()?;
     if step_type != STEP_TYPE_ERROR_MESSAGE {
         return None;
@@ -525,21 +607,16 @@ pub(crate) fn parse_subagent_payload(step_idx: i64, status: i64, payload: &[u8])
 /// or schema drift.
 pub(crate) fn list_invoked_subagents(path: &Path, limit: usize) -> Vec<InvokedSubagent> {
     let cap = if limit == 0 { MAX_CHILDREN } else { limit.min(MAX_CHILDREN) } as i64;
-    let Some((mut conn, identity)) = open_readonly(path) else {
+    let Some(rows) = with_readonly_conn(path, |conn| {
+        block_on(
+            sqlx::query("SELECT idx, status, step_payload FROM steps WHERE step_type = ?1 ORDER BY idx DESC LIMIT ?2")
+                .bind(STEP_TYPE_INVOKE_SUBAGENT)
+                .bind(cap)
+                .fetch_all(conn),
+        )
+    }) else {
         return Vec::new();
     };
-    let rows = match block_on(
-        sqlx::query("SELECT idx, status, step_payload FROM steps WHERE step_type = ?1 ORDER BY idx DESC LIMIT ?2")
-            .bind(STEP_TYPE_INVOKE_SUBAGENT)
-            .bind(cap)
-            .fetch_all(&mut conn),
-    ) {
-        Ok(rows) => rows,
-        Err(_) => return Vec::new(),
-    };
-    if safe_db_identity(path) != Some(identity) {
-        return Vec::new();
-    }
     let mut out = Vec::new();
     for row in rows {
         let Ok(idx) = row.try_get::<i64, _>("idx") else { continue };
@@ -751,5 +828,41 @@ mod tests {
         let mut conn = block_on(options.connect()).unwrap();
         block_on(conn.execute("CREATE TABLE other_table (id integer PRIMARY KEY);")).unwrap();
         assert!(list_invoked_subagents(&drift_db, 16).is_empty());
+    }
+
+    #[test]
+    fn reuses_cached_readonly_connection_and_invalidates_on_inode_change() {
+        let dir = tempfile::tempdir().unwrap();
+        let conv = dir.path().join("conversations");
+        std::fs::create_dir_all(&conv).unwrap();
+        let db = conv.join("sess-cached.db");
+        create_steps_db(&db);
+        insert_step(&db, 1, 5, Some(b"first"), None);
+
+        // Prime cache with the first read.
+        assert_eq!(latest_step_index(&db), Some(1));
+        let opens_after_first = READONLY_OPEN_COUNT.load(std::sync::atomic::Ordering::Relaxed);
+
+        // Subsequent reads against the same inode hit the cached connection without reopening.
+        insert_step(&db, 2, 5, Some(b"second"), None);
+        assert_eq!(latest_step_index(&db), Some(2));
+        assert_eq!(detect_silent_error(&db, 0), None);
+        assert!(list_invoked_subagents(&db, 4).is_empty());
+        assert_eq!(
+            READONLY_OPEN_COUNT.load(std::sync::atomic::Ordering::Relaxed),
+            opens_after_first,
+            "repeated polls on unchanged inode should reuse cached sqlite connection"
+        );
+
+        // Replacing the file with a new inode invalidates the cached handle and reads fresh state.
+        let replacement = conv.join("sess-replacement.db");
+        create_steps_db(&replacement);
+        insert_step(&replacement, 99, 5, Some(b"replaced"), None);
+        std::fs::rename(&replacement, &db).unwrap();
+        assert_eq!(latest_step_index(&db), Some(99));
+        assert!(
+            READONLY_OPEN_COUNT.load(std::sync::atomic::Ordering::Relaxed) > opens_after_first,
+            "inode change must invalidate cached handle and reopen"
+        );
     }
 }

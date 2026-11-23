@@ -52,6 +52,8 @@ pub fn ensure_main_window(cx: &mut App) {
 
 fn init_tracing() {
     use tracing_subscriber::EnvFilter;
+    use tracing_subscriber::layer::SubscriberExt as _;
+    use tracing_subscriber::util::SubscriberInitExt as _;
 
     let filter = std::env::var("VIBEVALLEY_LOG")
         .ok()
@@ -59,7 +61,11 @@ fn init_tracing() {
         .or_else(|| std::env::var("RUST_LOG").ok().filter(|s| !s.trim().is_empty()))
         .and_then(|raw| EnvFilter::try_new(raw).ok())
         .unwrap_or_else(|| EnvFilter::new(if shell::devtools_enabled() { "info" } else { "warn" }));
-    let _ = tracing_subscriber::fmt().with_env_filter(filter).with_target(true).try_init();
+    let _ = tracing_subscriber::registry()
+        .with(filter)
+        .with(tracing_subscriber::fmt::layer().with_target(true))
+        .with(host::OsLogLayer::new())
+        .try_init();
 }
 
 fn main() {

@@ -318,7 +318,9 @@ impl BridgeHub {
                                         (None, None)
                                     }
                                 };
-                                let running = crate::serving::Running::new(started, listener, announced);
+                                let wake_hub = started.hub.clone();
+                                let wake_observer = crate::host::observe_system_wake(move || wake_hub.on_system_wake());
+                                let running = crate::serving::Running::new(started, listener, announced, Some(wake_observer));
                                 if let Err(flume::SendError(running)) = running_tx.send(running) {
                                     running.shutdown();
                                 }

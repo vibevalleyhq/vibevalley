@@ -1,17 +1,20 @@
-use std::io::Read;
-use std::os::unix::process::CommandExt;
-use std::process::{Command, ExitStatus, Stdio};
-use std::time::{Duration, Instant};
+use std::process::{ExitStatus, Stdio};
+use std::time::Duration;
 
+use nix::errno::Errno;
+use nix::sys::signal::{Signal, killpg};
+use nix::unistd::Pid;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use tokio::io::AsyncReadExt as _;
+use tokio::process::Command;
 
 use super::truncate::{DEFAULT_MAX_BYTES, truncate_bytes};
 use super::workspace::Workspace;
 use super::{ReplayPolicy, ToolContext, ToolUpdate, TypedTool, TypedToolOutput};
 
-const CANCEL_POLL_INTERVAL: Duration = Duration::from_millis(20);
 const MAX_CAPTURE_BYTES: usize = 4 * 1024 * 1024;
+const KILL_GRACE: Duration = Duration::from_millis(150);
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct BashArgs {
@@ -34,6 +37,37 @@ enum WaitOutcome {
     Exited(ExitStatus),
     TimedOut,
     Cancelled,
+}
+
+/// Ensures the spawned process group is reaped if the async future is dropped or unwinds early.
+struct ProcessGroupGuard {
+    pgid: Option<Pid>,
+}
+
+impl ProcessGroupGuard {
+    fn new(pid: Option<u32>) -> Self {
+        let pgid = pid.and_then(|p| i32::try_from(p).ok()).filter(|&p| p > 0).map(Pid::from_raw);
+        Self { pgid }
+    }
+
+    fn disarm(&mut self) {
+        self.pgid = None;
+    }
+}
+
+impl Drop for ProcessGroupGuard {
+    fn drop(&mut self) {
+        let Some(pgid) = self.pgid.take() else {
+            return;
+        };
+        let _ = killpg(pgid, Signal::SIGTERM);
+        crate::rt::spawn(async move {
+            tokio::time::sleep(KILL_GRACE).await;
+            if killpg(pgid, None) != Err(Errno::ESRCH) {
+                let _ = killpg(pgid, Signal::SIGKILL);
+            }
+        });
+    }
 }
 
 pub struct Bash(pub Workspace);
@@ -59,51 +93,60 @@ impl TypedTool for Bash {
             return Err("aborted by the user".into());
         }
         let timeout = args.timeout_secs.map(Duration::from_secs).unwrap_or(self.0.bash_timeout);
-        let mut child = Command::new("/bin/bash")
-            .arg("-c")
-            // Merge stderr into stdout for the entire script, not just the final command.
-            .arg(format!("exec 2>&1\n{}", args.command))
-            .current_dir(&self.0.cwd)
-            .envs(self.0.env.iter().cloned())
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .process_group(0)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-
-        let pid = child.id();
-        let stdout = child.stdout.take();
+        let cwd = self.0.cwd.clone();
+        let env = self.0.env.clone();
+        let command = args.command;
+        let cancel = ctx.cancel.clone();
         let on_update = ctx.on_update.clone();
-        let reader = std::thread::spawn(move || read_stream(stdout, on_update));
 
-        let deadline = Instant::now() + timeout;
-        let outcome = loop {
-            if ctx.cancel.is_cancelled() {
-                kill_process_group(pid);
-                let _ = child.wait();
-                break WaitOutcome::Cancelled;
-            }
-            match child.try_wait() {
-                Ok(Some(status)) => break WaitOutcome::Exited(status),
-                Ok(None) => {
-                    if Instant::now() >= deadline {
-                        kill_process_group(pid);
-                        let _ = child.wait();
-                        break WaitOutcome::TimedOut;
+        let (outcome, captured) = crate::rt::block_on(async move {
+            let mut child = Command::new("/bin/bash")
+                .arg("-c")
+                // Merge stderr into stdout for the entire script, not just the final command.
+                .arg(format!("exec 2>&1\n{command}"))
+                .current_dir(&cwd)
+                .envs(env)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .process_group(0)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+
+            let pid = child.id();
+            let mut guard = ProcessGroupGuard::new(pid);
+            let stdout = child.stdout.take();
+            let reader = crate::rt::spawn(read_stream(stdout, on_update));
+
+            let outcome = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => {
+                    reap_process_group(&mut child, pid, KILL_GRACE).await;
+                    guard.disarm();
+                    WaitOutcome::Cancelled
+                }
+                status = child.wait() => {
+                    guard.disarm();
+                    match status {
+                        Ok(status) => WaitOutcome::Exited(status),
+                        Err(e) => {
+                            reap_process_group(&mut child, pid, KILL_GRACE).await;
+                            let _ = reader.await;
+                            return Err(e.to_string());
+                        }
                     }
-                    std::thread::sleep(CANCEL_POLL_INTERVAL);
                 }
-                Err(e) => {
-                    kill_process_group(pid);
-                    let _ = child.wait();
-                    let _ = reader.join();
-                    return Err(e.to_string());
+                _ = tokio::time::sleep(timeout) => {
+                    reap_process_group(&mut child, pid, KILL_GRACE).await;
+                    guard.disarm();
+                    WaitOutcome::TimedOut
                 }
-            }
-        };
+            };
 
-        let captured = reader.join().unwrap_or_default();
+            let captured = reader.await.unwrap_or_default();
+            Ok::<_, String>((outcome, captured))
+        })?;
+
         if matches!(outcome, WaitOutcome::Cancelled) {
             return Err("aborted by the user".into());
         }
@@ -144,7 +187,7 @@ impl TypedTool for Bash {
     }
 }
 
-fn read_stream(mut stdout: Option<std::process::ChildStdout>, on_update: Option<std::sync::Arc<dyn Fn(ToolUpdate) + Send + Sync>>) -> String {
+async fn read_stream(mut stdout: Option<tokio::process::ChildStdout>, on_update: Option<std::sync::Arc<dyn Fn(ToolUpdate) + Send + Sync>>) -> String {
     let Some(out) = stdout.as_mut() else {
         return String::new();
     };
@@ -153,7 +196,7 @@ fn read_stream(mut stdout: Option<std::process::ChildStdout>, on_update: Option<
     let mut buf = [0u8; 4096];
 
     loop {
-        match out.read(&mut buf) {
+        match out.read(&mut buf).await {
             Ok(0) | Err(_) => break,
             Ok(n) => {
                 let slice = &buf[..n];
@@ -212,7 +255,63 @@ fn emit_valid_utf8(pending: &mut Vec<u8>, cb: &(dyn Fn(ToolUpdate) + Send + Sync
     }
 }
 
-fn kill_process_group(pid: u32) {
-    // Kill the entire group (-pgid) so subshells and pipelines terminate immediately.
-    let _ = Command::new("/bin/kill").args(["-KILL", &format!("-{pid}")]).status();
+async fn reap_process_group(child: &mut tokio::process::Child, pid: Option<u32>, grace: Duration) {
+    let Some(pgid) = pid.and_then(|p| i32::try_from(p).ok()).filter(|&p| p > 0).map(Pid::from_raw) else {
+        let _ = child.kill().await;
+        let _ = child.wait().await;
+        return;
+    };
+    let _ = killpg(pgid, Signal::SIGTERM);
+    let exited = tokio::time::timeout(grace, child.wait()).await.is_ok();
+    if exited && killpg(pgid, None) == Err(Errno::ESRCH) {
+        return;
+    }
+    if exited {
+        // Give grandchildren a brief window to react to SIGTERM before escalating.
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    if !exited || killpg(pgid, None) != Err(Errno::ESRCH) {
+        let _ = killpg(pgid, Signal::SIGKILL);
+        if !exited {
+            let _ = child.wait().await;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timeout_reaps_sigterm_ignoring_grandchild_in_process_group() {
+        let dir = tempfile::tempdir().unwrap();
+        let pid_file = dir.path().join("grandchild.pid");
+        let ws = Workspace {
+            bash_timeout: Duration::from_millis(200),
+            ..Workspace::new(dir.path())
+        };
+        let tool = Bash(ws);
+        let cmd = format!("trap '' TERM; (trap '' TERM; sleep 30) & echo $! > {}; wait", pid_file.display());
+        let out = tool
+            .execute(
+                BashArgs {
+                    command: cmd,
+                    timeout_secs: None,
+                },
+                &ToolContext::background(),
+            )
+            .unwrap();
+        assert!(out.is_error);
+        assert!(out.details.unwrap().timed_out);
+        let pid: i32 = std::fs::read_to_string(&pid_file).unwrap().trim().parse().unwrap();
+        // Wait briefly for the kernel to complete SIGKILL teardown on the grandchild.
+        let deadline = std::time::Instant::now() + Duration::from_secs(1);
+        loop {
+            if nix::sys::signal::kill(Pid::from_raw(pid), None) == Err(Errno::ESRCH) {
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline, "grandchild {pid} survived PGID reap");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
 }

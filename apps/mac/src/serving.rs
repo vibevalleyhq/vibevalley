@@ -33,6 +33,7 @@ pub struct Running {
     started: vibevalley_server::Started,
     listener: Option<vibevalley_server::transport::http::Listener>,
     announced: Option<vibevalley_server::home::Announced>,
+    wake_observer: Option<crate::host::SystemObserver>,
 }
 
 impl Running {
@@ -40,12 +41,19 @@ impl Running {
         started: vibevalley_server::Started,
         listener: Option<vibevalley_server::transport::http::Listener>,
         announced: Option<vibevalley_server::home::Announced>,
+        wake_observer: Option<crate::host::SystemObserver>,
     ) -> Self {
-        Self { started, listener, announced }
+        Self {
+            started,
+            listener,
+            announced,
+            wake_observer,
+        }
     }
 
     /// Removes `server.json`, stops the loopback HTTP listener, and closes background workers.
     pub fn shutdown(self) {
+        drop(self.wake_observer);
         drop(self.announced);
         drop(self.listener);
         self.started.close();
