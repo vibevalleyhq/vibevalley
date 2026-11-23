@@ -207,21 +207,23 @@ impl Shell {
             }
             let running = crate::serving::RunningServer::take_for_shutdown(cx);
             let store = this.store.take();
+            let background = cx.background_executor().clone();
             async move {
-                let done = std::thread::spawn(move || {
-                    if let Some(store) = store {
-                        for job in jobs {
-                            if let Err(e) = job.run(&*store) {
-                                eprintln!("save on quit: {e}");
+                background
+                    .spawn(async move {
+                        if let Some(store) = store {
+                            for job in jobs {
+                                if let Err(e) = job.run(&*store) {
+                                    eprintln!("save on quit: {e}");
+                                }
                             }
                         }
-                    }
-                    ws.shutdown_all_and_wait();
-                    if let Some(running) = running {
-                        running.shutdown();
-                    }
-                });
-                let _ = done.join();
+                        ws.shutdown_all_and_wait();
+                        if let Some(running) = running {
+                            running.shutdown();
+                        }
+                    })
+                    .await;
             }
         });
         let appearance_sub = cx.observe_window_appearance(window, |this, _, cx| {

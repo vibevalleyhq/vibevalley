@@ -197,6 +197,13 @@ pub trait Server: Send + Sync {
     /// If `after_seq == Some(latest_seq)`, skips the initial send; otherwise
     /// delivers the latest snapshot immediately. Blocks until `stop` disconnects.
     fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value));
+    /// Optional asynchronous readiness hook for proxies that finish startup
+    /// off-thread (such as desktop `LateServer`). Returning `None` indicates
+    /// the server is immediately ready for [`Self::subscribe_slice`] and
+    /// [`Self::subscribe_live`].
+    fn ready_async(&self) -> Option<std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>> {
+        None
+    }
     /// Direct `tokio::sync::watch` subscription for a domain slice when backed
     /// by [`crate::slice_feed::SliceFeed`], avoiding blocking threads on SSE and bridge pumps.
     fn subscribe_slice(&self, _slice: SliceKind) -> Option<crate::slice_feed::SliceSubscription> {

@@ -184,6 +184,10 @@ fn workspace_state_event(session: Session, sessions: &Sessions) -> SessionWatchE
     }
 }
 
+async fn load_workspace_state_event(session: Session, sessions: Sessions) -> Option<SessionWatchEvent> {
+    tokio::task::spawn_blocking(move || workspace_state_event(session, &sessions)).await.ok()
+}
+
 #[allow(clippy::too_many_arguments, reason = "watch task carries hub, session streams, cancel token, and sink")]
 async fn watch_session(
     initial: Session,
@@ -214,8 +218,10 @@ async fn watch_session(
     }) {
         return;
     }
-    let first_state = workspace_state_event(initial, &sessions);
-    if !sink.send(&first_state) {
+    let Some(first_state) = load_workspace_state_event(initial, sessions.clone()).await else {
+        return;
+    };
+    if sink.stopped() || cancel.is_cancelled() || !sink.send(&first_state) {
         return;
     }
     let mut previous: Option<SessionWatchEvent> = Some(first_state);
@@ -276,7 +282,12 @@ async fn watch_session(
                     }
                     continue;
                 };
-                let state = workspace_state_event(session, &sessions);
+                let Some(state) = load_workspace_state_event(session, sessions.clone()).await else {
+                    return;
+                };
+                if sink.stopped() || cancel.is_cancelled() {
+                    return;
+                }
                 if previous.as_ref() == Some(&state) {
                     continue;
                 }

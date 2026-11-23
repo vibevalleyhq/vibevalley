@@ -324,7 +324,14 @@ impl Orchestrator {
         all.insert(id.to_string(), me.clone());
         let o = Arc::downgrade(self);
         let i = me.clone();
-        vibevalley_runtime::rt::handle().spawn(async move { Self::work_async(o, i).await });
+        let hub = self.hub();
+        let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
+        let fut = async move { Self::work_async(o, i, cancel).await };
+        if let Some(hub) = hub {
+            hub.spawn_task(fut);
+        } else {
+            vibevalley_runtime::rt::handle().spawn(fut);
+        }
         me
     }
 
@@ -412,9 +419,10 @@ impl Orchestrator {
         let dispatches = self.chat.dispatches();
         let o = Arc::downgrade(self);
         let chat = self.chat.clone();
-        let cancel = self.hub().map(|h| h.child_token()).unwrap_or_default();
+        let hub = self.hub();
+        let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
         let task_cancel = cancel.clone();
-        let handle = vibevalley_runtime::rt::handle().spawn(async move {
+        let fut = async move {
             let boot_o = o.clone();
             let boot_chat = chat.clone();
             let _ = tokio::task::spawn_blocking(move || {
@@ -453,7 +461,12 @@ impl Orchestrator {
                 })
                 .await;
             }
-        });
+        };
+        let handle = if let Some(hub) = hub {
+            hub.spawn_task(fut)
+        } else {
+            vibevalley_runtime::rt::handle().spawn(fut)
+        };
         let prev = self.chat_listener.lock().replace((cancel, handle));
         if let Some((old_cancel, old_handle)) = prev {
             old_cancel.cancel();
@@ -575,6 +588,7 @@ impl Orchestrator {
         }
         self.execution.close();
         self.mcp.close();
+        self.ports.lock().clear();
         for me in self.instances.lock().values() {
             me.more.notify_waiters();
         }
@@ -734,14 +748,19 @@ impl Orchestrator {
         brain
     }
 
-    async fn work_async(o: Weak<Orchestrator>, me: Arc<Instance>) {
+    async fn work_async(o: Weak<Orchestrator>, me: Arc<Instance>, cancel: CancellationToken) {
         loop {
             let ready = loop {
+                if cancel.is_cancelled() {
+                    return;
+                }
                 let Some(orch) = o.upgrade() else { return };
                 if orch.closed.load(Ordering::Relaxed) {
                     return;
                 }
                 let notified = me.more.notified();
+                tokio::pin!(notified);
+                notified.as_mut().enable();
                 {
                     let mut q = me.queue.lock();
                     if !q.is_empty() {
@@ -758,14 +777,24 @@ impl Orchestrator {
                 if saved {
                     break true;
                 }
-                let _ = tokio::time::timeout(std::time::Duration::from_secs(1), notified).await;
+                tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => return,
+                    _ = tokio::time::timeout(std::time::Duration::from_secs(1), notified) => {}
+                }
             };
-            if !ready {
+            if !ready || cancel.is_cancelled() {
                 return;
             }
             let Some(orch) = o.upgrade() else { return };
+            if orch.closed.load(Ordering::Relaxed) {
+                return;
+            }
             let inst = me.clone();
             let keep_going = tokio::task::spawn_blocking(move || {
+                if orch.closed.load(Ordering::Acquire) {
+                    return false;
+                }
                 let batch = match orch.execution.batch(&inst.id) {
                     Ok(b) => b,
                     Err(e) => {

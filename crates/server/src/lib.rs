@@ -51,6 +51,7 @@ pub mod testing;
 pub use start::{ServerConfig, StartError, Started, start};
 
 const LIVE_CAPACITY: usize = 512;
+const HUB_SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 
 /// Installs the process-wide `ring` TLS provider once (`reqwest` and `tokio-tungstenite`).
 pub fn install_tls() {
@@ -189,13 +190,28 @@ impl Hub {
         self.tasks.spawn_on(future, vibevalley_runtime::rt::handle())
     }
 
-    /// Cancels the hub's shutdown token, stops the event bus, and waits for all
-    /// tracked background tasks to finish.
+    /// Spawns a tracked blocking task on the shared `vibevalley-io` Tokio runtime.
+    pub fn spawn_blocking_task<F, R>(&self, func: F) -> tokio::task::JoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        self.tasks.spawn_blocking_on(func, vibevalley_runtime::rt::handle())
+    }
+
+    /// Cancels the hub's shutdown token, stops the event bus, and waits up to
+    /// [`HUB_SHUTDOWN_GRACE`] for all tracked background tasks to finish.
     pub fn close(&self) {
         self.shutdown.cancel();
         self.bus.close();
         self.tasks.close();
-        vibevalley_runtime::rt::block_on(self.tasks.wait());
+        if vibevalley_runtime::rt::block_on(async { tokio::time::timeout(HUB_SHUTDOWN_GRACE, self.tasks.wait()).await }).is_err() {
+            tracing::warn!(
+                remaining = self.tasks.len(),
+                timeout_secs = HUB_SHUTDOWN_GRACE.as_secs(),
+                "hub.close timed out waiting for tracked background tasks"
+            );
+        }
     }
 
     /// Streamed speech (`modules::content::media::jobs::Jobs`).
@@ -1130,5 +1146,46 @@ impl Server for Hub {
 
     fn unsubscribe(&self, id: u64) {
         self.subscriptions.lock().remove(&id);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::Duration;
+
+    use super::Hub;
+
+    #[test]
+    fn close_drains_tracked_async_and_blocking_tasks_before_returning() {
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let async_done = Arc::new(AtomicBool::new(false));
+        let blocking_done = Arc::new(AtomicBool::new(false));
+
+        let cancel = hub.child_token();
+        let flag = async_done.clone();
+        hub.spawn_task(async move {
+            cancel.cancelled().await;
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            flag.store(true, Ordering::Release);
+        });
+
+        let flag = blocking_done.clone();
+        let (entered_tx, entered_rx) = flume::bounded::<()>(1);
+        let cancel = hub.child_token();
+        hub.spawn_blocking_task(move || {
+            let _ = entered_tx.send(());
+            while !cancel.is_cancelled() {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            std::thread::sleep(Duration::from_millis(20));
+            flag.store(true, Ordering::Release);
+        });
+        entered_rx.recv_timeout(Duration::from_secs(2)).expect("blocking task entered");
+
+        hub.close();
+        assert!(async_done.load(Ordering::Acquire), "Hub::close must drain tracked async tasks");
+        assert!(blocking_done.load(Ordering::Acquire), "Hub::close must drain tracked blocking tasks");
     }
 }

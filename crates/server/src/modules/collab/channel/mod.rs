@@ -473,8 +473,21 @@ impl Chat {
         }
         let me = self.me.clone();
         let row = row.clone();
-        vibevalley_runtime::rt::handle().spawn_blocking(move || {
-            let found: Vec<Embed> = links.iter().filter_map(|l| words::read_embed(l)).collect();
+        let hub = self.hub.upgrade();
+        let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
+        let task = move || {
+            let mut found: Vec<Embed> = Vec::new();
+            for link in &links {
+                if cancel.is_cancelled() {
+                    return;
+                }
+                if let Some(embed) = words::read_embed(link) {
+                    found.push(embed);
+                }
+            }
+            if cancel.is_cancelled() {
+                return;
+            }
             let Some(chat) = me.upgrade() else { return };
             let mut inner = chat.locked();
             let Ok(Some(current)) = db::message_by_id(&inner.db, &row.id) else { return };
@@ -491,7 +504,12 @@ impl Chat {
             if let Ok(message) = chat.change(&mut inner, &current, |db, revision, _| db::set_meta(db, &current.id, text.as_deref(), revision)) {
                 chat.emit_event(ChannelEvent::Edited(message));
             }
-        });
+        };
+        if let Some(hub) = hub {
+            hub.spawn_blocking_task(task);
+        } else {
+            vibevalley_runtime::rt::handle().spawn_blocking(task);
+        }
     }
 
     fn quoted(&self, refs: &[vibevalley_protocol::BlockRef]) -> Vec<QuotedBlock> {
