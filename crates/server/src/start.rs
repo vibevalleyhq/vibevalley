@@ -519,7 +519,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     });
     modules::skin::game::install(&hub, game.clone());
 
-    // L2: team/memory, collab/channel, content/{artifact,library,media}, work/{repo,session,issue,pull,chat}
+    // L2: team/memory, collab/channel, content/{artifact,library,media}, work/{repo,session,issue,pull}
     let memories = modules::team::memory::Memories::open(db.clone(), agents.clone());
     modules::team::memory::install(&hub, memories.clone());
 
@@ -633,6 +633,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     });
     modules::work::pull::install(&hub, pulls.clone(), config.poll_pulls);
 
+    // L3: work/chat, team/mcp, team/tool, team/orchestrator, work/cron + collab/voice & collab/connector
     let issue_chat = modules::work::chat::IssueChat::start(&hub, board.clone(), chat.clone());
     shutdown.push_concurrent("issue_chat", {
         let ic = issue_chat.clone();
@@ -653,7 +654,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         move || sc.close()
     });
 
-    // L3: team/mcp, team/tool, team/orchestrator, work/cron + collab/voice & collab/connector
     let resources = modules::team::mcp::Resources::with_pulls(board.clone(), chat.clone(), trajectories.clone(), pulls.clone());
     let tools = Arc::new(modules::team::tool::ToolBox {
         hub: Arc::downgrade(&hub),

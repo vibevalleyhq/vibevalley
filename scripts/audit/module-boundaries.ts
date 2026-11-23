@@ -48,7 +48,7 @@ interface EdgeOccurrence {
 
 const KNOWN_DOMAINS = new Set(["work", "team", "collab", "content", "skin", "infra"]);
 const INFRA_DOMAIN_ITEMS = new Set(["install_health", "install_health_version"]);
-const L3_MODULES = new Set(["team/orchestrator", "team/tool", "team/mcp", "work/cron"]);
+const L3_MODULES = new Set(["team/orchestrator", "team/tool", "team/mcp", "work/cron", "work/chat"]);
 
 export function classifyServerModule(moduleId: string): ModuleClassification | undefined {
   const slash = moduleId.indexOf("/");
@@ -58,7 +58,7 @@ export function classifyServerModule(moduleId: string): ModuleClassification | u
   if (domain === "infra") return { layer: "L1" };
   if (moduleId === "content/attachment" || moduleId === "team/agent") return { layer: "L1" };
   if (L3_MODULES.has(moduleId) || domain === "skin") return { layer: "L3" };
-  if (domain === "work" && name !== "cron") return { layer: "L2", peerDomain: "work" };
+  if (domain === "work") return { layer: "L2", peerDomain: "work" };
   if (domain === "collab") return { layer: "L2", peerDomain: "collab" };
   if (domain === "content" && name !== "attachment") return { layer: "L2", peerDomain: "content" };
   if (moduleId === "team/memory") return { layer: "L2", peerDomain: "team/memory" };

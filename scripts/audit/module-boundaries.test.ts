@@ -55,6 +55,7 @@ describe("classifyServerModule", () => {
     expect(classifyServerModule("team/tool")).toEqual({ layer: "L3" });
     expect(classifyServerModule("team/mcp")).toEqual({ layer: "L3" });
     expect(classifyServerModule("work/cron")).toEqual({ layer: "L3" });
+    expect(classifyServerModule("work/chat")).toEqual({ layer: "L3" });
     expect(classifyServerModule("skin/game")).toEqual({ layer: "L3" });
   });
 });
@@ -267,6 +268,10 @@ describe("server-layer-dag", () => {
       {
         path: "crates/server/src/modules/work/cron/mod.rs",
         content: "use crate::modules::work::issue::Board;\n",
+      },
+      {
+        path: "crates/server/src/modules/work/chat.rs",
+        content: "use crate::modules::collab::channel::Chat;\nuse crate::modules::work::issue::Board;\n",
       },
     ];
 
