@@ -32,9 +32,11 @@
 | 来源 | 用途 | 默认值 |
 |---|---|---|
 | `VIBEVALLEY_CHANNEL` | 覆盖发布通道（`release`/`final`/`stable`、`beta`、`alpha`、`dev`，不区分大小写） | 见下表判定顺序 |
-| `VIBEVALLEY_HOME` | 家目录：`settings.json`、`config.json`、`server.db`、`server.json`、附件 | 按通道（`~/.vibevalley{,-beta,-alpha,-dev}`） |
+| `VIBEVALLEY_HOME` | 家目录：`settings.json`、`config.json`、`server.db`、`server.json`、`auth.json`、附件 | 按通道（`~/.vibevalley{,-beta,-alpha,-dev}`） |
 | `VIBEVALLEY_WORK_ROOT` | 空间：`repos/`、`worktrees/` 的根，开机时建好 | `~/vibevalley-dev` |
 | `VIBEVALLEY_PORT` | 主 HTTP 与 `/mcp` 的端口（只绑 `127.0.0.1`，`0` 随机）；显式非零端口冲突或非法值拒绝开机 | 按通道（`8787` / `8788` / `8789` / `8790`） |
+| `VIBEVALLEY_REMOTE_BIND` | 受认证远程监听门的绑定地址覆盖（默认按 Tailscale IPv4 → `127.0.0.1` 自动选取） | 无 |
+| `VIBEVALLEY_REMOTE_ALLOW_ALL` | 设为 `1` 允许远程监听门绑定非 Tailscale / 非回环地址（用于局域网或反向代理） | 关 |
 | `VIBEVALLEY_STORE` | 原生应用宿主库 `state.db` 路径（覆盖按通道默认路径） | 按通道（`~/Library/Application Support/VibeValley{,-beta,-alpha,-dev}/state.db`） |
 | `VIBEVALLEY_AGENT_STARTERS` | 新农场装在助手旁边的内置模板 ID，逗号分隔 | 空 |
 | `VIBEVALLEY_TEST_RUNTIMES=1` | 页面测试用：只有替身农机、媒体离线、不探测农机、不抓链接预览 | 关 |

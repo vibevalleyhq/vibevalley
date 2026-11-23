@@ -144,6 +144,7 @@ fn the_chat_through_its_endpoints() {
 
     // Reads: what the orchestrator says is unread until read.
     started
+        .test_internals()
         .chat
         .post(vibevalley_server::modules::collab::channel::Posting {
             from: "orchestrator".into(),
@@ -197,9 +198,9 @@ fn the_chat_through_its_endpoints() {
     assert!(chat.channels.iter().all(|c| c.id != gid && c.id != thread));
 
     // A direct channel with a helper profile.
-    let mut helper = started.agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
     helper.name = "小帮手".into();
-    let helper = started.agents.profiles.save(helper).unwrap();
+    let helper = started.test_internals().agents.profiles.save(helper).unwrap();
     let direct = ok(call("channel.direct.create", json!({ "agent": "小帮手" })));
     let listed = ok(call("channel.list", json!(null)));
     let d = listed.as_array().unwrap().iter().find(|c| c["id"] == direct).unwrap();
@@ -210,8 +211,9 @@ fn the_chat_through_its_endpoints() {
 
     // Everything is there when the chat opens again.
     let hub2 = vibevalley_server::Hub::new(vibevalley_core::empty_space_state());
-    let files = vibevalley_server::modules::content::attachment::Attachments::open(dir.path()).unwrap();
-    let chat = vibevalley_server::modules::collab::channel::Chat::open(dir.path(), &hub2, files, false).unwrap();
+    let db2 = vibevalley_server::base::ServerDb::open(dir.path()).unwrap();
+    let files = vibevalley_server::modules::content::attachment::Attachments::open(dir.path(), db2.clone());
+    let chat = vibevalley_server::modules::collab::channel::Chat::open(db2, &hub2, files, None, false).unwrap();
     let list = chat.list().unwrap();
     assert_eq!(list[0].id, dev);
     assert_eq!(chat.history(&dev, None, None).unwrap().len(), 1);
@@ -232,14 +234,14 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
         let home = std::path::Path::new(&home);
         let server = start(home);
         let call = |op, params| ok(server.hub.call_as(Caller::User, op, params));
-        let channel = server.chat.default_channel();
+        let channel = server.test_internals().chat.default_channel();
         for text in ["one", "two", "three"] {
             call("channel.message.send", json!({"id":channel,"text":text,"sendKey":text}));
         }
-        let root = server.chat.history(&channel, None, None).unwrap()[0].id.clone();
+        let root = server.test_internals().chat.history(&channel, None, None).unwrap()[0].id.clone();
         let thread = call("channel.thread.create", json!({"id":root}));
         call("channel.message.send", json!({"id":thread,"text":"first reply","sendKey":"thread-first"}));
-        let checkpoint = server.chat.events(0, 100).unwrap().last().unwrap().seq;
+        let checkpoint = server.test_internals().chat.events(0, 100).unwrap().last().unwrap().seq;
         std::fs::write(home.join("checkpoint"), checkpoint.to_string()).unwrap();
         call(
             "channel.message.send",
@@ -259,21 +261,22 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
     let checkpoint: i64 = std::fs::read_to_string(dir.path().join("checkpoint")).unwrap().trim().parse().unwrap();
     let server = start(dir.path());
     let call = |op, params| ok(server.hub.call_as(Caller::User, op, params));
-    let channel = server.chat.default_channel();
-    let last_two = server.chat.history(&channel, None, Some(2)).unwrap();
+    let channel = server.test_internals().chat.default_channel();
+    let last_two = server.test_internals().chat.history(&channel, None, Some(2)).unwrap();
     assert_eq!(last_two.iter().map(|m| m.number).collect::<Vec<_>>(), [2, 3]);
-    let first = server.chat.history(&channel, Some(2), Some(2)).unwrap();
+    let first = server.test_internals().chat.history(&channel, Some(2), Some(2)).unwrap();
     assert_eq!(first.len(), 1);
     let thread = call("channel.thread.create", json!({"id":first[0].id})).as_str().unwrap().to_owned();
-    let replies = server.chat.history(&thread, None, Some(2)).unwrap();
+    let replies = server.test_internals().chat.history(&thread, None, Some(2)).unwrap();
     assert_eq!(
         replies.iter().map(|m| m.text.as_str()).collect::<Vec<_>>(),
         ["first reply", "second reply @助手"]
     );
-    let unseen = server.chat.events(checkpoint, 10).unwrap();
+    let unseen = server.test_internals().chat.events(checkpoint, 10).unwrap();
     assert_eq!(unseen.len(), 1);
     assert_eq!(unseen[0].message_id, replies[1].id);
     let pending: Vec<_> = server
+        .test_internals()
         .chat
         .pending_deliveries(DeliveryTargetKind::Orchestrator)
         .unwrap()
@@ -285,9 +288,10 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
         "channel.message.send",
         json!({"id":thread,"text":"second reply @助手","sendKey":"thread-second"}),
     );
-    assert_eq!(server.chat.events(checkpoint, 10).unwrap(), unseen);
-    assert_eq!(server.chat.history(&thread, None, Some(5)).unwrap().len(), 2);
+    assert_eq!(server.test_internals().chat.events(checkpoint, 10).unwrap(), unseen);
+    assert_eq!(server.test_internals().chat.history(&thread, None, Some(5)).unwrap().len(), 2);
     let pending_after_retry: Vec<_> = server
+        .test_internals()
         .chat
         .pending_deliveries(DeliveryTargetKind::Orchestrator)
         .unwrap()
@@ -295,9 +299,10 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
         .filter(|d| d.message_id == replies[1].id)
         .collect();
     assert_eq!(pending_after_retry.len(), 1, "sendKey retry must not duplicate deliveries");
-    server.chat.settle_delivery(pending[0].id, true).unwrap();
+    server.test_internals().chat.settle_delivery(pending[0].id, true).unwrap();
     assert!(
         server
+            .test_internals()
             .chat
             .pending_deliveries(DeliveryTargetKind::Orchestrator)
             .unwrap()
@@ -313,9 +318,10 @@ fn regression_deleted_unread_user_mention_clears_inbox_slice() {
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
     let hub = started.hub.clone();
-    let gid = started.chat.default_channel();
+    let gid = started.test_internals().chat.default_channel();
 
     let (msg, _) = started
+        .test_internals()
         .chat
         .post(vibevalley_server::modules::collab::channel::Posting {
             from: "orchestrator".into(),

@@ -27,7 +27,6 @@ use super::blocks::relay;
 use super::collab::commit_meta_for_maker;
 use super::{Artifacts, Maker, artifact_type_of, db, q, refused};
 use crate::base::{LookIn, missing};
-use crate::modules::collab::channel::{Made, Posting};
 use crate::{Sink, now};
 
 const CATCH_UP_MAX: usize = 200;
@@ -241,7 +240,7 @@ impl Artifacts {
 
         let (result, change) = {
             let mut db = self.db();
-            let mut tx = pollster::block_on(db.begin()).map_err(q)?;
+            let mut tx = vibevalley_runtime::rt::block_on(db.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
 
             let collab_doc = self.load_or_bootstrap_store_doc(&mut tx, &row, &current_rows)?;
             let mut working: BTreeMap<String, db::EntryRow> = current_rows.into_iter().map(|r| (r.path.clone(), r)).collect();
@@ -266,7 +265,7 @@ impl Artifacts {
                 }
             }
             if !conflicts.is_empty() {
-                pollster::block_on(tx.rollback()).map_err(q)?;
+                vibevalley_runtime::rt::block_on(tx.rollback()).map_err(q)?;
                 return Ok(ArtifactEntryBatchResult {
                     applied: false,
                     seq: row.seq,
@@ -504,7 +503,7 @@ impl Artifacts {
                 return Err(refused(t("server.artifact.entry.tooMany", &[("max", (ENTRY_MAX_COUNT as i64).into())])));
             }
             if upserted_paths.is_empty() && deleted_paths.is_empty() {
-                pollster::block_on(tx.rollback()).map_err(q)?;
+                vibevalley_runtime::rt::block_on(tx.rollback()).map_err(q)?;
                 return Ok(ArtifactEntryBatchResult {
                     applied: true,
                     seq: row.seq,
@@ -545,7 +544,7 @@ impl Artifacts {
             db::artifact_accepted(&mut tx, &req.id, seq, at).map_err(q)?;
             let meta = explicit_meta.cloned().unwrap_or_else(|| commit_meta_for_maker(maker, req.note.clone(), at));
             Self::sync_store_to_collab(&mut tx, &row.id, &collab_doc, &working, &changed_paths, &removed_paths, &meta)?;
-            pollster::block_on(tx.commit()).map_err(q)?;
+            vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
 
             let full_entries: Vec<ArtifactEntry> = changed_paths.iter().filter_map(|p| working.get(p).map(|r| entry_of(r, true))).collect();
             let event_entries: Vec<ArtifactEntry> = changed_paths
@@ -572,7 +571,7 @@ impl Artifacts {
         let seq = change.seq;
         self.entry_changes.lock().retain(|tx| tx.send(change.clone()).is_ok());
         if req.announce == Some(true) {
-            let channel = self.chat.place_of(&maker.from, row.channel_id.as_deref().unwrap_or(""))?;
+            let channel = self.channel.place_of(&maker.from, row.channel_id.as_deref().unwrap_or(""))?;
             let note = req.note.as_deref().map(str::trim).filter(|n| !n.is_empty());
             let card = ArtifactCard {
                 id: row.id.clone(),
@@ -583,17 +582,11 @@ impl Artifacts {
                 display: None,
                 artifact_type,
             };
-            let (said, _) = self.chat.post(Posting {
-                from: maker.from.clone(),
-                channel,
-                text: Self::words(
-                    t("server.artifact.entry.updated", &[("title", row.title.as_str().into()), ("seq", seq.into())]),
-                    note,
-                ),
-                made: Some(Made::Card(card)),
-                run: maker.run.clone(),
-                ..Posting::default()
-            })?;
+            let text = Self::words(
+                t("server.artifact.entry.updated", &[("title", row.title.as_str().into()), ("seq", seq.into())]),
+                note,
+            );
+            let said = self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new())?;
             if row.message_id.is_none() {
                 db::artifact_said(&mut self.db(), &row.id, &said.id).map_err(q)?;
             }
@@ -790,13 +783,11 @@ mod tests {
     fn test_artifacts() -> (tempfile::TempDir, Arc<Artifacts>) {
         vibevalley_i18n::set_locale("zh");
         let dir = tempfile::tempdir().unwrap();
-        let mut conn = pollster::block_on(crate::base::open_sqlx_db(dir.path())).unwrap();
-        pollster::block_on(sqlx::raw_sql("CREATE TABLE IF NOT EXISTS issue (id TEXT PRIMARY KEY)").execute(&mut conn)).unwrap();
-        drop(conn);
+        let db = crate::base::ServerDb::open(dir.path()).unwrap();
         let hub = crate::Hub::new(vibevalley_core::empty_space_state());
-        let files = Attachments::open(dir.path()).unwrap();
-        let chat = Chat::open(dir.path(), &hub, files.clone(), false).unwrap();
-        let artifacts = Artifacts::open(dir.path(), files, chat).unwrap();
+        let files = Attachments::open(dir.path(), db.clone());
+        let chat = Chat::open(db.clone(), &hub, files.clone(), None, false).unwrap();
+        let artifacts = Artifacts::open(db, files, chat);
         (dir, artifacts)
     }
 

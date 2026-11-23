@@ -574,6 +574,7 @@ fn fact_kind(fact: &Fact) -> &'static str {
         Fact::ConnectorChanged(_) => "connectorChanged",
         Fact::MachineChanged(_) => "machineChanged",
         Fact::MediaChanged(_) => "mediaChanged",
+        Fact::RuntimeInboxChanged(_) => "runtimeInboxChanged",
     }
 }
 

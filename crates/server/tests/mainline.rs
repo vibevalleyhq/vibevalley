@@ -127,24 +127,25 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     let server = vibevalley_server::start(config(dir.path(), model.clone())).unwrap();
     let listener = vibevalley_server::transport::http::serve(server.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let url = listener.url();
-    server.board.sessions().set_mcp_url(format!("{url}/mcp"));
+    server.test_internals().board.sessions().set_mcp_url(format!("{url}/mcp"));
     call(&url, "repo.create", json!({ "name": "demo" }));
-    let mut helper = server.agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = server.test_internals().agents.profiles.install_template("reviewer").unwrap();
     helper.runtime = "scripted".into();
     helper.name = "Worker".into();
-    server.agents.profiles.save(helper).unwrap();
+    server.test_internals().agents.profiles.save(helper).unwrap();
     let issue = call(&url, "issue.create", json!({ "title": "Write a file", "repo": "demo", "agent": "Worker" }));
     let id = issue["id"].as_str().unwrap().to_string();
     call(&url, "issue.status.update", json!({ "id": id, "status": "todo" }));
     let first = until(&server, "first report", || {
-        server.board.issue(&id).filter(|i| i.stage.state == IssueStageKind::Reviewing)
+        server.test_internals().board.issue(&id).filter(|i| i.stage.state == IssueStageKind::Reviewing)
     });
     let session = first.latest_session_id().unwrap().clone();
-    let worker = server.board.session(&session).unwrap();
+    let worker = server.test_internals().board.session(&session).unwrap();
     assert!(Path::new(worker.cwd.as_ref().unwrap()).starts_with(dir.path().join("worktrees")));
-    let thread = until(&server, "issue thread", || server.chat.issue_thread_id(&id));
+    let thread = until(&server, "issue thread", || server.test_internals().chat.issue_thread_id(&id));
     until(&server, "report in issue thread", || {
         server
+            .test_internals()
             .chat
             .history(&thread, None, None)
             .unwrap()
@@ -154,6 +155,7 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     });
     until(&server, "report memory stored", || {
         server
+            .test_internals()
             .memories
             .list(worker.profile.as_deref().unwrap())
             .unwrap()
@@ -167,7 +169,7 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
         json!({ "id": thread, "text": "Add the second file", "sendKey": "follow-up" }),
     );
     until(&server, "second report", || {
-        server.board.session(&session).filter(|s| s.runs >= 2 && !s.phase.is_working())
+        server.test_internals().board.session(&session).filter(|s| s.runs >= 2 && !s.phase.is_working())
     });
     let runs = call(&url, "issue.run.list", json!({ "id": id }));
     assert_eq!(runs.as_array().unwrap().len(), 2, "{runs}");
@@ -183,7 +185,7 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     let changes = call(&url, "issue.diff.get", json!({ "id": id }));
     assert!(changes.to_string().contains("round-2.txt"), "{changes}");
     call(&url, "issue.status.update", json!({ "id": id, "status": "done" }));
-    assert_eq!(server.board.issue(&id).unwrap().status, IssueStatus::Done);
+    assert_eq!(server.test_internals().board.issue(&id).unwrap().status, IssueStatus::Done);
     assert!(dir.path().join("repos/demo/round-2.txt").exists());
     assert!(git(&dir.path().join("repos/demo"), &["log", "--oneline", "main"]).contains("round-2.txt"));
 
@@ -198,13 +200,18 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     let allowed = server.hub.call_as(Caller::Orchestrator, "issue.refine", json!({ "id": draft["id"] }));
     assert_eq!(allowed.biz_code, 0, "{allowed:?}");
     until(&server, "assistant draft finished", || {
-        server.board.issue(draft["id"].as_str().unwrap()).filter(|i| i.refining.is_none())
+        server
+            .test_internals()
+            .board
+            .issue(draft["id"].as_str().unwrap())
+            .filter(|i| i.refining.is_none())
     });
 
     let draft_id = draft["id"].as_str().unwrap();
-    let run = server.board.runs(draft_id).unwrap().pop().unwrap();
+    let run = server.test_internals().board.runs(draft_id).unwrap().pop().unwrap();
     assert!(run.heard.is_empty());
     let queued = server
+        .test_internals()
         .board
         .sessions()
         .durable_store()
@@ -230,15 +237,20 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     call(
         &url,
         "channel.message.send",
-        json!({ "id": server.chat.default_channel(), "text": "Please dispatch the assistant task", "sendKey": "dispatch" }),
+        json!({ "id": server.test_internals().chat.default_channel(), "text": "Please dispatch the assistant task", "sendKey": "dispatch" }),
     );
     let assistant_issue = until(&server, "assistant dispatched", || {
         server
+            .test_internals()
             .board
             .read(|s| s.issues.iter().find(|i| i.title == "Assistant task" && i.was_sent()).cloned())
     });
     until(&server, "assistant task reported", || {
-        server.board.issue(&assistant_issue.id).filter(|i| i.stage.state == IssueStageKind::Reviewing)
+        server
+            .test_internals()
+            .board
+            .issue(&assistant_issue.id)
+            .filter(|i| i.stage.state == IssueStageKind::Reviewing)
     });
     let cron = call(
         &url,
@@ -246,41 +258,51 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
         json!({ "name": "Scheduled task", "text": "Write a scheduled file", "agent": "Worker", "repo": "demo", "when": { "kind": "once", "at": vibevalley_server::now() + 100 } }),
     );
     let scheduled = until(&server, "cron dispatched", || {
-        server.crons.tick();
+        server.test_internals().crons.tick();
         server
+            .test_internals()
             .board
             .read(|s| s.issues.iter().find(|i| i.cron.as_deref() == cron["id"].as_str() && i.was_sent()).cloned())
     });
     until(&server, "cron reported", || {
-        server.board.issue(&scheduled.id).filter(|i| i.stage.state == IssueStageKind::Reviewing)
+        server
+            .test_internals()
+            .board
+            .issue(&scheduled.id)
+            .filter(|i| i.stage.state == IssueStageKind::Reviewing)
     });
-    server.crons.tick();
-    assert_eq!(server.board.read(|s| s.issues.iter().filter(|i| i.cron.is_some()).count()), 1);
+    server.test_internals().crons.tick();
+    assert_eq!(server.test_internals().board.read(|s| s.issues.iter().filter(|i| i.cron.is_some()).count()), 1);
     server.close();
     drop(listener);
     drop(server);
 
     let reopened = vibevalley_server::start(config(dir.path(), model)).unwrap();
-    assert_eq!(reopened.board.issue(&id).unwrap().status, IssueStatus::Done);
-    assert_eq!(reopened.board.runs(&id).unwrap().len(), 2);
+    assert_eq!(reopened.test_internals().board.issue(&id).unwrap().status, IssueStatus::Done);
+    assert_eq!(reopened.test_internals().board.runs(&id).unwrap().len(), 2);
     assert!(
         reopened
+            .test_internals()
             .memories
             .list(worker.profile.as_deref().unwrap())
             .unwrap()
             .iter()
             .any(|m| m.text == "The mainline uses real git")
     );
-    assert!(reopened.board.past_session(&session).is_some());
+    assert!(reopened.test_internals().board.past_session(&session).is_some());
     assert!(
         reopened
+            .test_internals()
             .chat
             .history(&thread, None, None)
             .unwrap()
             .iter()
             .any(|m| m.text == "Add the second file")
     );
-    assert_eq!(reopened.board.issue(&scheduled.id).unwrap().stage.state, IssueStageKind::Reviewing);
+    assert_eq!(
+        reopened.test_internals().board.issue(&scheduled.id).unwrap().stage.state,
+        IssueStageKind::Reviewing
+    );
     reopened.close();
 }
 

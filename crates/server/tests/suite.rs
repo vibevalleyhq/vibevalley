@@ -26,6 +26,7 @@ mod provider;
 mod remote;
 mod session;
 mod setting;
+mod spine_and_gateway;
 mod start;
 mod voice;
 mod watch;

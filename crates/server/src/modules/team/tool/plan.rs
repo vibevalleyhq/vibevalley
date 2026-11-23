@@ -1,18 +1,19 @@
-//! Repos and timers.
+//! Repos and timers (routed via `Hub::invoke` with zero `work/repo` or `work/cron` imports).
 
 use serde::Deserialize;
-use vibevalley_protocol::{ActorKind, CronRequest, CronWhen, CronWhenDaily, CronWhenEvery, CronWhenExpr, CronWhenOnce, CronWhenWeekly};
+use vibevalley_protocol::{Caller, CronDeleteInput, CronRequest, CronWhen, CronWhenDaily, CronWhenEvery, CronWhenExpr, CronWhenOnce, CronWhenWeekly, ops};
 
-use super::{Farm, Who, given};
-use crate::modules::team::orchestrator::words;
+use super::{ToolBox, Who, given};
+use crate::CallerContext;
+use crate::modules::infra::text;
 
 #[derive(Deserialize)]
 pub struct Nothing {}
 
-pub fn repos(f: &Farm, _: &Who, _: Nothing) -> Result<String, String> {
-    let all = f.repos.list();
+pub fn repos(f: &ToolBox, who: &Who, _: Nothing) -> Result<String, String> {
+    let all = f.hub()?.invoke::<ops::RepoList>(&f.ctx(who), ()).map_err(|e| e.message)?;
     if all.is_empty() {
-        return Ok(format!("工作目录（{}）下还没有仓库。", f.repos.root().display()));
+        return Ok(format!("工作目录（{}）下还没有仓库。", f.repos_root.display()));
     }
     Ok(all
         .iter()
@@ -21,15 +22,15 @@ pub fn repos(f: &Farm, _: &Who, _: Nothing) -> Result<String, String> {
         .join("\n"))
 }
 
-pub fn cron_list(f: &Farm, _: &Who, _: Nothing) -> Result<String, String> {
-    let all = f.crons.list();
+pub fn cron_list(f: &ToolBox, who: &Who, _: Nothing) -> Result<String, String> {
+    let all = f.hub()?.invoke::<ops::CronList>(&f.ctx(who), ()).map_err(|e| e.message)?;
     if all.is_empty() {
         return Ok("没有定时。".into());
     }
     let names: std::collections::HashMap<String, String> = f.chat.channels().into_iter().map(|c| (c.id, c.name)).collect();
     Ok(all
         .iter()
-        .map(|c| words::cron_line(c, names.get(&c.channel).map(String::as_str).unwrap_or("?")))
+        .map(|c| text::cron_line(c, names.get(&c.channel).map(String::as_str).unwrap_or("?")))
         .collect::<Vec<_>>()
         .join("\n"))
 }
@@ -40,10 +41,13 @@ pub struct IdArgs {
     id: String,
 }
 
-pub fn cron_delete(f: &Farm, _: &Who, a: IdArgs) -> Result<String, String> {
-    Ok(match f.crons.remove(a.id.trim()) {
-        Ok(c) => format!("删掉了「{}」。", c.name),
-        Err(e) => words::failed(&e.message),
+pub fn cron_delete(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
+    let id = a.id.trim().to_string();
+    let hub = f.hub()?;
+    let name = hub.read(|s| s.crons.iter().find(|c| c.id == id).map(|c| c.name.clone()));
+    Ok(match hub.invoke::<ops::CronDelete>(&f.ctx(who), CronDeleteInput { id: id.clone() }) {
+        Ok(()) => format!("删掉了「{}」。", name.unwrap_or(id)),
+        Err(e) => text::failed(&e.message),
     })
 }
 
@@ -88,11 +92,11 @@ pub struct CronArgs {
     tz: Option<String>,
 }
 
-pub fn cron_create(f: &Farm, who: &Who, a: CronArgs) -> Result<String, String> {
-    create(f, who, a).or_else(|why| Ok(words::failed(&why)))
+pub fn cron_create(f: &ToolBox, who: &Who, a: CronArgs) -> Result<String, String> {
+    create(f, who, a).or_else(|why| Ok(text::failed(&why)))
 }
 
-fn create(f: &Farm, who: &Who, a: CronArgs) -> Result<String, String> {
+fn create(f: &ToolBox, who: &Who, a: CronArgs) -> Result<String, String> {
     let Who::Orchestrator(here) = who else {
         return Err("定时只有助手能定".into());
     };
@@ -127,9 +131,16 @@ fn create(f: &Farm, who: &Who, a: CronArgs) -> Result<String, String> {
         when,
         tz: given(&a.tz).map(Into::into),
     };
-    let by = if here.user { ActorKind::User } else { ActorKind::Agent };
-    let made = f.crons.add(req, by).map_err(|e| e.message)?;
-    let line = words::cron_line(&made, &channel.name);
+    let ctx = if here.user {
+        CallerContext {
+            caller: Caller::User,
+            ..f.ctx(who)
+        }
+    } else {
+        f.ctx(who)
+    };
+    let made = f.hub()?.invoke::<ops::CronCreate>(&ctx, req).map_err(|e| e.message)?;
+    let line = text::cron_line(&made, &channel.name);
     Ok(if made.pending {
         format!(
             "定好了，等用户同意才生效：\n{line}\n这一轮不是用户叫你定的，而它会反复来或直接派帮工：用户在定时任务列表里点「同意」才开始。跟用户说一声它是做什么的。"

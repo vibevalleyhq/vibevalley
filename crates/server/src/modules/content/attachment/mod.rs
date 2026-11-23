@@ -8,15 +8,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use base64::Engine;
-use parking_lot::{Mutex, MutexGuard};
 use sha2::{Digest, Sha256};
-use sqlx::SqliteConnection;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, Attachment, AttachmentFile, AttachmentUpload, BizCode, native_ops, ops};
 
+use crate::base::{ServerDb, internal};
 use crate::db::generated::content_attachment as queries;
-
-use crate::base::{internal, open_sqlx_db};
 use crate::{Hub, now};
 
 /// `attachmentMax`: 25 MB.
@@ -24,7 +21,7 @@ pub const ATTACHMENT_MAX: usize = 25 * 1024 * 1024;
 
 pub struct Attachments {
     root: PathBuf,
-    db: Mutex<SqliteConnection>,
+    db: Arc<ServerDb>,
 }
 
 fn refused(text: String) -> ApiError {
@@ -37,25 +34,16 @@ fn no_attachment(id: &str) -> ApiError {
 }
 
 impl Attachments {
-    pub fn open(home: &Path) -> sqlx::Result<Arc<Attachments>> {
-        let conn = pollster::block_on(async {
-            let mut conn = open_sqlx_db(home).await?;
-            sqlx::raw_sql(crate::db::schema::CONTENT_ATTACHMENT).execute(&mut conn).await?;
-            Ok::<_, sqlx::Error>(conn)
-        })?;
-        Ok(Arc::new(Attachments {
+    pub fn open(home: &Path, db: Arc<ServerDb>) -> Arc<Attachments> {
+        Arc::new(Attachments {
             root: home.join("attachments"),
-            db: Mutex::new(conn),
-        }))
+            db,
+        })
     }
 
     /// `pathOf`: where an attachment's bytes are (or would be).
     pub fn path_of(&self, id: &str) -> PathBuf {
         self.root.join(id)
-    }
-
-    fn db(&self) -> MutexGuard<'_, SqliteConnection> {
-        self.db.lock()
     }
 
     /// `attach`: an upload, as base64, kept.
@@ -115,17 +103,21 @@ impl Attachments {
         } else {
             given_type.trim()
         };
-        pollster::block_on(queries::keep_attachment(
-            &mut *self.db(),
-            queries::KeepAttachmentParams {
-                id: id.into(),
-                name: name.into(),
-                r#type: kind.into(),
-                size,
-                created_at: now(),
-            },
-        ))
-        .map_err(internal)?;
+        self.db
+            .run(async |c| {
+                queries::keep_attachment(
+                    c,
+                    queries::KeepAttachmentParams {
+                        id: id.into(),
+                        name: name.into(),
+                        r#type: kind.into(),
+                        size,
+                        created_at: now(),
+                    },
+                )
+                .await
+            })
+            .map_err(internal)?;
         Ok(Attachment {
             id: id.into(),
             name: name.into(),
@@ -135,7 +127,10 @@ impl Attachments {
     }
 
     fn by_id(&self, id: &str) -> Result<Option<Attachment>, ApiError> {
-        match pollster::block_on(queries::get_attachment(&mut *self.db(), queries::GetAttachmentParams { id: id.into() })) {
+        match self
+            .db
+            .run(async |c| queries::get_attachment(c, queries::GetAttachmentParams { id: id.into() }).await)
+        {
             Ok(row) => Ok(Some(Attachment {
                 id: row.id,
                 name: row.name,

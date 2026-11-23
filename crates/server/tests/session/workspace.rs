@@ -550,7 +550,7 @@ fn workspace_session_full_lifecycle_permissions_interactions_config_steer_stop_a
     assert_eq!(ws["session"]["phase"]["_tag"], "resting");
 
     // Watch must NOT spam the default channel with dispatch messages for workspace sessions.
-    let general = server.chat.default_channel();
+    let general = server.test_internals().chat.default_channel();
     let msgs = call("channel.message.list", json!({ "id": general })).data.unwrap();
     assert!(
         msgs.as_array().unwrap().iter().all(|m| m["kind"] != "dispatch"),
@@ -607,7 +607,7 @@ fn workspace_session_full_lifecycle_permissions_interactions_config_steer_stop_a
     }
 
     // Verify `afterSeq` filtering on a second `session.watch` subscription.
-    server.trajectories.flush(true);
+    server.test_internals().trajectories.flush(true);
     let all_page = call("session.event.list", json!({ "id": sid })).data.unwrap();
     let all_arr = all_page["events"].as_array().unwrap();
     assert!(all_arr.len() >= 3, "{all_page}");
@@ -689,7 +689,9 @@ fn workspace_session_full_lifecycle_permissions_interactions_config_steer_stop_a
     // 8. In-turn `steer` when working, followed by `session.stop`.
     let sent4 = call("session.send", json!({ "id": sid, "text": "long task" }));
     assert_eq!(sent4.biz_code, 0, "{}", sent4.message);
-    until("workspace session working", || server.board.session(&sid).filter(|s| s.phase.is_working()));
+    until("workspace session working", || {
+        server.test_internals().board.session(&sid).filter(|s| s.phase.is_working())
+    });
     let steered = call("session.send", json!({ "id": sid, "text": "focus on tests" }));
     assert_eq!(steered.biz_code, 0, "{}", steered.message);
     assert_eq!(log.lock().unwrap().steers.len(), 1);
@@ -836,11 +838,13 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
 
     // Turn 3: hold working while an issue dispatches in the same farm without being blocked.
     assert_eq!(call("session.send", json!({ "id": sid, "text": "hold" })).biz_code, 0);
-    until("workspace working", || server.board.session(&sid).filter(|s| s.phase.is_working()));
+    until("workspace working", || {
+        server.test_internals().board.session(&sid).filter(|s| s.phase.is_working())
+    });
 
-    let mut helper = server.agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = server.test_internals().agents.profiles.install_template("reviewer").unwrap();
     helper.runtime = "scripted".into();
-    let helper = server.agents.profiles.save(helper).unwrap();
+    let helper = server.test_internals().agents.profiles.save(helper).unwrap();
     assert_eq!(call("repo.create", json!({ "name": "farm" })).biz_code, 0);
     let issue = call("issue.create", json!({ "title": "parallel work", "repo": "farm", "agent": helper.id }))
         .data
@@ -849,6 +853,7 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
     assert_eq!(call("issue.status.update", json!({ "id": issue_id, "status": "todo" })).biz_code, 0);
     let worker_sess = until("issue session starts alongside workspace session", || {
         server
+            .test_internals()
             .board
             .read(|s| s.sessions.iter().find(|x| x.issue_id() == Some(issue_id.as_str())).cloned())
     });
@@ -862,6 +867,7 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
 
     // Dismissing the workspace session emits `missing` to `session.watch`.
     server
+        .test_internals()
         .board
         .sessions()
         .dismiss(&sid, vibevalley_server::modules::work::workplace::Leave::Keep)
@@ -1276,20 +1282,23 @@ fn pr2_zero_binding_isolation_and_dynamic_binding_attach_detach() {
 
     assert_eq!(call("session.send", json!({ "id": sid, "text": "hello" })).biz_code, 0);
     until("workspace turn finishes", || {
-        server.board.session(&sid).filter(|s| s.runs >= 1 && !s.phase.is_working())
+        server.test_internals().board.session(&sid).filter(|s| s.runs >= 1 && !s.phase.is_working())
     });
 
     // F1 leak isolation: 0-binding User session never enters board slots, inbox, FarmView plays/agents, memories, or issue_chat.
-    let bundle = server.board.bundle();
-    let room = server.board.read(|s| vibevalley_core::rules::room_left(&s.sessions, "demo", 6, 4, ""));
+    let bundle = server.test_internals().board.bundle();
+    let room = server
+        .test_internals()
+        .board
+        .read(|s| vibevalley_core::rules::room_left(&s.sessions, "demo", 6, 4, ""));
     assert_eq!(room.farm, 6);
     assert_eq!(room.repo, Some(4));
     assert!(bundle.inbox.items.is_empty());
     assert!(!bundle.farm.view.plays.contains_key(&sid));
     assert!(bundle.farm.view.plots.is_empty());
     assert!(bundle.farm.progress.as_ref().is_none_or(|p| p.agents.is_empty()));
-    assert!(server.memories.list("antigravity").unwrap().is_empty());
-    let general = server.chat.default_channel();
+    assert!(server.test_internals().memories.list("antigravity").unwrap().is_empty());
+    let general = server.test_internals().chat.default_channel();
     let msgs = call("channel.message.list", json!({ "id": general })).data.unwrap();
     assert!(msgs.as_array().unwrap().iter().all(|m| m["kind"] != "dispatch"));
 
@@ -1301,15 +1310,15 @@ fn pr2_zero_binding_isolation_and_dynamic_binding_attach_detach() {
     let attached_data = attached.data.unwrap();
     assert_eq!(attached_data["controller"], "user");
     assert_eq!(attached_data["bindings"], json!([{ "kind": "issue", "id": issue_id }]));
-    assert!(server.board.session(&sid).unwrap().is_board_worker());
-    assert_eq!(server.board.session(&sid).unwrap().issue_id(), Some(issue_id.as_str()));
+    assert!(server.test_internals().board.session(&sid).unwrap().is_board_worker());
+    assert_eq!(server.test_internals().board.session(&sid).unwrap().issue_id(), Some(issue_id.as_str()));
 
     // Binding persists across server restart; detaching removes it cleanly.
     server.close();
     drop(server);
     let (rt2, _log2) = MockRuntime::new("antigravity", vec![]);
     let reopened = start_with(home.path(), rt2);
-    let persisted = reopened.board.session(&sid).unwrap();
+    let persisted = reopened.test_internals().board.session(&sid).unwrap();
     assert_eq!(persisted.issue_id(), Some(issue_id.as_str()));
     let detached = reopened.hub.call_as(
         Caller::User,
@@ -1318,10 +1327,10 @@ fn pr2_zero_binding_isolation_and_dynamic_binding_attach_detach() {
     );
     assert_eq!(detached.biz_code, 0, "{}", detached.message);
     assert_eq!(detached.data.unwrap()["bindings"], json!([]));
-    assert!(!reopened.board.session(&sid).unwrap().is_board_worker());
+    assert!(!reopened.test_internals().board.session(&sid).unwrap().is_board_worker());
     assert!(vibevalley_server::Server::voice(&*reopened.hub).is_some(), "started hub exposes voice");
     let closed = reopened.hub.call_as(Caller::User, "session.closeWorkspace", json!({ "id": sid }));
     assert_eq!(closed.biz_code, 0, "{}", closed.message);
-    assert!(reopened.board.session(&sid).is_none());
+    assert!(reopened.test_internals().board.session(&sid).is_none());
     reopened.close();
 }

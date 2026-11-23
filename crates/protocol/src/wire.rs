@@ -150,9 +150,21 @@ pub trait Op {
     type Result: DeserializeOwned + Serialize;
 }
 
+/// One row of the subscription table (`SUBSCRIPTIONS`), naming its payload,
+/// event, and callers allowed to subscribe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SubscriptionSpec {
+    pub name: &'static str,
+    pub module: &'static str,
+    pub can: &'static [Caller],
+    pub payload: &'static str,
+    pub event: &'static str,
+}
+
 /// One of `rpc.ts`'s subscriptions as a type.
 pub trait Subscription {
     const NAME: &'static str;
+    const CAN: &'static [Caller];
     type Payload: DeserializeOwned + Serialize;
     type Event: DeserializeOwned + Serialize;
 }
@@ -160,4 +172,9 @@ pub trait Subscription {
 /// The endpoint named `op`.
 pub fn endpoint(op: &str) -> Option<&'static Endpoint> {
     crate::contract::ENDPOINTS.iter().chain(crate::NATIVE_ENDPOINTS).find(|e| e.op == op)
+}
+
+/// The subscription named `name`.
+pub fn subscription(name: &str) -> Option<&'static SubscriptionSpec> {
+    crate::contract::SUBSCRIPTIONS.iter().find(|s| s.name == name)
 }

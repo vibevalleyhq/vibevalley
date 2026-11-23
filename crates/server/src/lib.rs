@@ -10,10 +10,11 @@
 //! [`Hub::on_subscription`]; they change the state only through
 //! [`Hub::apply`].
 
+use std::any::Any;
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
 use arc_swap::ArcSwapOption;
@@ -24,15 +25,15 @@ use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use vibevalley_core::{Applied, Core, SliceMask, Transition};
 use vibevalley_protocol::{
-    ApiError, BizCode, BoardSlice, Caller, CollabSlice, Envelope, Fact, FarmFrame, GameEffect, InboxItem, InboxSlice, LiveEvent, LiveEventNotice,
-    LiveEventRuntime, LiveEventSession, Millis, NoticeLevel, Op, OpsSlice, RuntimeInfo, STATE_EVERY_MS, SessionEvent, SessionsSlice, SliceBundle, SliceKind,
-    SpaceState, Subscription, endpoint,
+    ApiError, BizCode, BoardSlice, Caller, CollabSlice, Envelope, Fact, FarmFrame, GameEffect, InboxSlice, LiveEvent, LiveEventNotice, LiveEventRuntime,
+    LiveEventSession, Millis, NoticeLevel, Op, OpsSlice, RuntimeInfo, STATE_EVERY_MS, SessionEvent, SessionsSlice, SliceBundle, SliceKind, SpaceState,
+    Subscription, endpoint,
 };
 
 pub mod transport;
 pub use crate::transport::api::{
-    CallerContext, CallerPrincipal, ClientIdentity, ClientKind, FaultGate, HostDebugBridge, InvokeObserver, RemoteAuth, RemoteDeviceIdentity, Server,
-    SharedFaultGate, SharedHostDebug, SharedInvokeObserver, SharedRemoteAuth, refusal,
+    CallerContext, CallerPrincipal, ClientIdentity, ClientKind, FaultGate, HostDebugBridge, InvokeObserver, LiveVoiceLine, LiveVoicePort, RemoteAuth,
+    RemoteDeviceIdentity, Server, SharedFaultGate, SharedHostDebug, SharedInvokeObserver, SharedLiveVoice, SharedRemoteAuth, refusal,
 };
 
 pub mod base;
@@ -41,6 +42,7 @@ pub mod event_bus;
 pub use vibevalley_protocol::home;
 pub mod modules;
 pub mod offline;
+pub mod ports;
 mod runtime_inbox;
 pub mod slice_feed;
 mod start;
@@ -73,6 +75,7 @@ pub struct Ctx<'a> {
 }
 
 type Handler = Arc<dyn Fn(&Ctx, Value) -> Result<Value, ApiError> + Send + Sync>;
+type TypedHandler<O> = Arc<dyn Fn(&Ctx, <O as Op>::Input) -> Result<<O as Op>::Result, ApiError> + Send + Sync>;
 
 /// Where a subscription's events go; it ends when the subscriber stops
 /// (`stopped`) or the opener drops it.
@@ -136,14 +139,14 @@ pub struct Hub {
     core: Mutex<Core>,
     seq: AtomicI64,
     dirty_seqs: [AtomicI64; 6],
-    runtime_inbox_items: RwLock<Vec<InboxItem>>,
     pub(crate) runtime_inbox: runtime_inbox::RuntimeInboxObserver,
     feeds: SliceFeeds,
     bus: event_bus::EventBus,
     shutdown: CancellationToken,
     tasks: TaskTracker,
     handlers: RwLock<HashMap<&'static str, Handler>>,
-    openers: RwLock<HashMap<&'static str, Opener>>,
+    typed_handlers: RwLock<HashMap<&'static str, Arc<dyn Any + Send + Sync>>>,
+    openers: RwLock<HashMap<&'static str, (&'static [Caller], Opener)>>,
     live: broadcast::Sender<LiveEvent>,
     subscriptions: Mutex<HashMap<u64, flume::Sender<()>>>,
     next_id: AtomicU64,
@@ -151,7 +154,7 @@ pub struct Hub {
     observer: ArcSwapOption<InvokeObserverSlot>,
     fault_gate: ArcSwapOption<FaultGateSlot>,
     host_debug: ArcSwapOption<HostDebugSlot>,
-    voice: ArcSwapOption<modules::collab::voice::Voice>,
+    voice: OnceLock<SharedLiveVoice>,
     media_inputs: ArcSwapOption<MediaInputsSlot>,
     mcp: ArcSwapOption<McpSlot>,
     remote_auth: ArcSwapOption<RemoteAuthSlot>,
@@ -224,9 +227,9 @@ impl Hub {
         self.host_debug.store(bridge.map(|b| Arc::new(HostDebugSlot(b))));
     }
 
-    /// Attaches the started voice controller so desktop callers read it from [`Server::voice`].
-    pub fn attach_voice(&self, voice: Arc<modules::collab::voice::Voice>) {
-        self.voice.store(Some(voice));
+    /// Attaches the started voice controller port so desktop callers read it from [`Server::voice`].
+    pub fn attach_voice(&self, voice: SharedLiveVoice) {
+        let _ = self.voice.set(voice);
     }
 
     /// Attaches or clears the remote mobile device authenticator.
@@ -245,7 +248,7 @@ impl Hub {
             board: slice_feed::SliceFeed::new("slice:board", core.board_slice()),
             sessions: slice_feed::SliceFeed::new("slice:sessions", core.sessions_slice()),
             collab: slice_feed::SliceFeed::new("slice:collab", core.collab_slice()),
-            inbox: slice_feed::SliceFeed::new("slice:inbox", core.inbox_slice(&[])),
+            inbox: slice_feed::SliceFeed::new("slice:inbox", core.inbox_slice()),
             ops: slice_feed::SliceFeed::new("slice:ops", core.ops_slice()),
             farm: slice_feed::SliceFeed::new("slice:farm", core.farm_frame(vec![])),
         };
@@ -255,13 +258,13 @@ impl Hub {
             core: Mutex::new(core),
             seq: AtomicI64::new(seq),
             dirty_seqs: std::array::from_fn(|_| AtomicI64::new(seq)),
-            runtime_inbox_items: RwLock::new(vec![]),
             runtime_inbox: runtime_inbox::RuntimeInboxObserver::new(),
             feeds,
             bus,
             shutdown,
             tasks: TaskTracker::new(),
             handlers: RwLock::default(),
+            typed_handlers: RwLock::default(),
             openers: RwLock::default(),
             live,
             subscriptions: Mutex::default(),
@@ -270,7 +273,7 @@ impl Hub {
             observer: ArcSwapOption::empty(),
             fault_gate: ArcSwapOption::empty(),
             host_debug: ArcSwapOption::empty(),
-            voice: ArcSwapOption::empty(),
+            voice: OnceLock::new(),
             media_inputs: ArcSwapOption::empty(),
             mcp: ArcSwapOption::empty(),
             remote_auth: ArcSwapOption::empty(),
@@ -368,8 +371,7 @@ impl Hub {
 
     pub fn inbox_slice(&self) -> InboxSlice {
         let core = self.core.lock();
-        let extra = self.runtime_inbox_items.read();
-        vibevalley_core::inbox_slice(core.state(), self.dirty_seq(SliceKind::Inbox), &extra)
+        vibevalley_core::inbox_slice(core.state(), self.dirty_seq(SliceKind::Inbox))
     }
 
     pub fn ops_slice(&self) -> OpsSlice {
@@ -384,7 +386,6 @@ impl Hub {
 
     pub fn slice_bundle(&self) -> SliceBundle {
         let core = self.core.lock();
-        let extra = self.runtime_inbox_items.read();
         let state = core.state();
         let seq = self.seq.load(Ordering::Acquire);
         SliceBundle {
@@ -392,32 +393,10 @@ impl Hub {
             board: vibevalley_core::board_slice(state, self.dirty_seq(SliceKind::Board)),
             sessions: vibevalley_core::sessions_slice(state, self.dirty_seq(SliceKind::Sessions)),
             collab: vibevalley_core::collab_slice(state, self.dirty_seq(SliceKind::Collab)),
-            inbox: vibevalley_core::inbox_slice(state, self.dirty_seq(SliceKind::Inbox), &extra),
+            inbox: vibevalley_core::inbox_slice(state, self.dirty_seq(SliceKind::Inbox)),
             ops: vibevalley_core::ops_slice(state, self.dirty_seq(SliceKind::Ops)),
             farm: vibevalley_core::farm_frame(state, vec![], self.dirty_seq(SliceKind::Farm)),
         }
-    }
-
-    /// Replaces runtime-projected durable inbox items and kicks `SliceMask::INBOX` immediately if changed.
-    pub(crate) fn set_runtime_inbox(&self, items: Vec<InboxItem>) {
-        let changed = {
-            let mut slot = self.runtime_inbox_items.write();
-            if *slot == items {
-                false
-            } else {
-                *slot = items;
-                true
-            }
-        };
-        if !changed {
-            return;
-        }
-        let seq = self.seq.fetch_add(1, Ordering::AcqRel) + 1;
-        self.dirty_seqs[slice_index(SliceKind::Inbox)].store(seq, Ordering::Release);
-        let _ = self.kicks.send(Kick {
-            dirty: SliceMask::INBOX,
-            effects: vec![],
-        });
     }
 
     fn sync_slice(&self, kind: SliceKind) {
@@ -466,11 +445,10 @@ impl Hub {
                     return;
                 }
                 let core = self.core.lock();
-                let extra = self.runtime_inbox_items.read();
                 let target = self.dirty_seq(SliceKind::Inbox);
                 let snap = self.feeds.inbox.snapshot();
                 if snap.seq < target || snap.locale != locale {
-                    self.feeds.inbox.replace_if_newer(vibevalley_core::inbox_slice(core.state(), target, &extra));
+                    self.feeds.inbox.replace_if_newer(vibevalley_core::inbox_slice(core.state(), target));
                 }
             }
             SliceKind::Ops => {
@@ -654,13 +632,120 @@ impl Hub {
     }
 
     /// Answers `O` with `handler`, replacing any earlier one.
-    pub fn on<O: Op>(&self, handler: impl Fn(&Ctx, O::Input) -> Result<O::Result, ApiError> + Send + Sync + 'static) {
+    pub fn on<O: Op>(&self, handler: impl Fn(&Ctx, O::Input) -> Result<O::Result, ApiError> + Send + Sync + 'static)
+    where
+        O::Input: 'static,
+        O::Result: 'static,
+    {
+        let typed: TypedHandler<O> = Arc::new(handler);
+        let json_typed = typed.clone();
         let h: Handler = Arc::new(move |ctx, payload| {
             let input: O::Input = decode(payload)?;
-            let out = handler(ctx, input)?;
+            let out = json_typed(ctx, input)?;
             serde_json::to_value(out).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
         });
+        self.typed_handlers.write().insert(O::NAME, Arc::new(typed));
         self.handlers.write().insert(O::NAME, h);
+    }
+
+    /// Invokes endpoint `O` directly in-process with zero JSON round-trip while
+    /// enforcing `endpoint(O::NAME).can`, [`InvokeObserver`], and [`FaultGate`].
+    pub fn invoke<O: Op>(&self, caller_ctx: &CallerContext, input: O::Input) -> Result<O::Result, ApiError>
+    where
+        O::Input: 'static,
+        O::Result: 'static,
+    {
+        let op = O::NAME;
+        let is_debug_op = op.starts_with("debug.");
+        let observer = if is_debug_op { None } else { self.current_observer() };
+        let trace_debug = tracing::enabled!(tracing::Level::DEBUG);
+        let (started, effective_ctx_owned);
+        let effective_ctx = if let Some(obs) = &observer {
+            let trace_id = if caller_ctx.trace_id != 0 {
+                caller_ctx.trace_id
+            } else {
+                self.next_trace_id.fetch_add(1, Ordering::Relaxed)
+            };
+            effective_ctx_owned = CallerContext {
+                caller: caller_ctx.caller,
+                principal: caller_ctx.principal.clone(),
+                client: caller_ctx.client.clone(),
+                trace_id,
+            };
+            let payload = serde_json::to_value(&input).unwrap_or(Value::Null);
+            obs.on_call_start(&effective_ctx_owned, op, &payload);
+            started = Some(Instant::now());
+            &effective_ctx_owned
+        } else {
+            started = trace_debug.then(Instant::now);
+            caller_ctx
+        };
+
+        if !is_debug_op && let Some(gate) = self.current_fault_gate() {
+            let delay = gate.delay_ms(op);
+            if delay > 0 {
+                std::thread::sleep(Duration::from_millis(delay));
+            }
+        }
+
+        let result = self.dispatch_typed::<O>(effective_ctx, input);
+        let biz_code = match &result {
+            Ok(_) => 0,
+            Err(err) => err.biz_code.code(),
+        };
+        let duration_us = started.map(|t0| t0.elapsed().as_micros() as u64);
+        if let (Some(obs), Some(us)) = (observer, duration_us) {
+            obs.on_call_end(effective_ctx, op, biz_code, us);
+        }
+        if trace_debug {
+            tracing::debug!(
+                op,
+                biz_code,
+                trace_id = effective_ctx.trace_id,
+                duration_us = duration_us.unwrap_or(0),
+                "hub.invoke"
+            );
+        }
+        result
+    }
+
+    /// Convenience typed invocation as `caller`.
+    pub fn invoke_as<O: Op>(&self, caller: Caller, input: O::Input) -> Result<O::Result, ApiError>
+    where
+        O::Input: 'static,
+        O::Result: 'static,
+    {
+        self.invoke::<O>(&CallerContext::from_caller(caller), input)
+    }
+
+    fn dispatch_typed<O: Op>(&self, caller_ctx: &CallerContext, input: O::Input) -> Result<O::Result, ApiError>
+    where
+        O::Input: 'static,
+        O::Result: 'static,
+    {
+        let op = O::NAME;
+        let Some(e) = endpoint(op) else {
+            return Err(ApiError::new(BizCode::RouteNotFound, format!("no endpoint {op}")));
+        };
+        if caller_ctx.caller != Caller::User && !e.can.contains(&caller_ctx.caller) {
+            return Err(ApiError::new(BizCode::Forbidden, format!("{op} is not for the {:?}", caller_ctx.caller)));
+        }
+        let handler = self
+            .typed_handlers
+            .read()
+            .get(op)
+            .and_then(|any| any.downcast_ref::<TypedHandler<O>>().cloned());
+        let Some(handler) = handler else {
+            return Err(ApiError::new(BizCode::ServiceUnavailable, format!("{op} is not served by VibeValley yet")));
+        };
+        let ctx = Ctx {
+            caller: caller_ctx.caller,
+            principal: caller_ctx.principal.clone(),
+            client: caller_ctx.client.clone(),
+            trace_id: caller_ctx.trace_id,
+            hub: self,
+        };
+        handler(&ctx, input)
     }
 
     /// Whether some module answers `op`.
@@ -768,14 +853,17 @@ impl Hub {
     /// event.
     pub fn on_subscription<S: Subscription>(&self, open: impl Fn(&Hub, S::Payload, Sink) -> Result<(), ApiError> + Send + Sync + 'static) {
         let o: Opener = Arc::new(move |hub, payload, sink| open(hub, decode(payload)?, sink));
-        self.openers.write().insert(S::NAME, o);
+        self.openers.write().insert(S::NAME, (S::CAN, o));
     }
 
     #[allow(clippy::result_large_err, reason = "the contract's refusal is an envelope")]
-    fn open_subscription(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
-        let Some(open) = self.openers.read().get(name).cloned() else {
+    fn open_subscription(&self, caller_ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        let Some((can, open)) = self.openers.read().get(name).cloned() else {
             return Err(refusal(BizCode::RouteNotFound, format!("no subscription {name}")));
         };
+        if caller_ctx.caller != Caller::User && !can.contains(&caller_ctx.caller) {
+            return Err(refusal(BizCode::Forbidden, format!("{name} is not for the {:?}", caller_ctx.caller)));
+        }
         let (events, rx) = flume::unbounded();
         let (stop_tx, stop) = flume::bounded(1);
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
@@ -887,7 +975,7 @@ async fn pump_slices(hub: std::sync::Weak<Hub>, kicked: flume::Receiver<Kick>, c
 }
 
 /// The board's facts go into the server's one state.
-impl modules::work::ledger::Facts for Hub {
+impl ports::Facts for Hub {
     fn apply(&self, facts: Vec<Fact>) -> Applied {
         Hub::apply(self, facts)
     }
@@ -901,7 +989,7 @@ impl modules::work::ledger::Facts for Hub {
     }
 }
 
-impl modules::work::ledger::Facts for std::sync::Weak<Hub> {
+impl ports::Facts for std::sync::Weak<Hub> {
     fn apply(&self, facts: Vec<Fact>) -> Applied {
         match self.upgrade() {
             Some(hub) => Hub::apply(&hub, facts),
@@ -941,8 +1029,8 @@ impl Server for Hub {
         self.host_debug.load().as_ref().map(|slot| slot.0.clone())
     }
 
-    fn voice(&self) -> Option<Arc<modules::collab::voice::Voice>> {
-        self.voice.load_full()
+    fn voice(&self) -> Option<SharedLiveVoice> {
+        self.voice.get().cloned()
     }
 
     fn remote_auth(&self) -> Option<SharedRemoteAuth> {
@@ -968,6 +1056,21 @@ impl Server for Hub {
             SliceKind::Collab => self.feeds.collab.snapshot().wire().clone(),
             SliceKind::Inbox => self.feeds.inbox.snapshot().wire().clone(),
             SliceKind::Ops => self.feeds.ops.snapshot().wire().clone(),
+            SliceKind::Farm => unreachable!(),
+        }
+    }
+
+    fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
+        if slice == SliceKind::Farm {
+            return Arc::<str>::from(serde_json::to_string(&self.farm_frame()).expect("farm frame serializes"));
+        }
+        self.sync_slice(slice);
+        match slice {
+            SliceKind::Board => self.feeds.board.snapshot().json(),
+            SliceKind::Sessions => self.feeds.sessions.snapshot().json(),
+            SliceKind::Collab => self.feeds.collab.snapshot().json(),
+            SliceKind::Inbox => self.feeds.inbox.snapshot().json(),
+            SliceKind::Ops => self.feeds.ops.snapshot().json(),
             SliceKind::Farm => unreachable!(),
         }
     }
@@ -1018,7 +1121,11 @@ impl Server for Hub {
     }
 
     fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
-        self.open_subscription(name, payload)
+        self.open_subscription(&CallerContext::local(), name, payload)
+    }
+
+    fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        self.open_subscription(ctx, name, payload)
     }
 
     fn unsubscribe(&self, id: u64) {

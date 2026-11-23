@@ -84,9 +84,9 @@ fn call(server: &Started, op: &str, body: Value) -> Value {
 fn regression_child_progress_outlives_log_retention_and_reopen() {
     let home = tempfile::tempdir().unwrap();
     let server = open(home.path());
-    let mut worker = server.agents.profiles.install_template("reviewer").unwrap();
+    let mut worker = server.test_internals().agents.profiles.install_template("reviewer").unwrap();
     worker.runtime = "scripted".into();
-    let worker = server.agents.profiles.save(worker).unwrap();
+    let worker = server.test_internals().agents.profiles.save(worker).unwrap();
     call(&server, "repo.create", json!({"name":"progress"}));
     let issue = call(&server, "issue.create", json!({"repo":"progress","agent":worker.id,"title":"Run checks"}));
     let id = issue["id"].as_str().unwrap();
@@ -94,6 +94,7 @@ fn regression_child_progress_outlives_log_retention_and_reopen() {
 
     let session = until("completed business round", || {
         server
+            .test_internals()
             .board
             .read(|s| s.sessions.iter().find(|s| s.issue_id() == Some(id) && s.last_run.is_some()).cloned())
     });

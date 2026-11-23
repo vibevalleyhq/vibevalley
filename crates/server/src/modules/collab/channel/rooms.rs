@@ -557,6 +557,15 @@ impl Chat {
         let topics = db::topic_threads_in(&inner.db, id).q()?;
         let guards = self.guards.read().clone();
         let mut why: Vec<String> = guards.iter().flat_map(|g| g(id)).collect();
+        if self.hub.upgrade().is_some_and(|h| {
+            h.read(|s| {
+                s.sessions
+                    .iter()
+                    .any(|x| (x.is_board_worker() || x.is_direct_talker()) && x.channel_id() == Some(id))
+            })
+        }) {
+            why.push(t("server.channel.helpersThere", &[]));
+        }
         if topics != 0 {
             why.push(t("server.channel.issuesThere", &[("n", topics.into())]));
         }

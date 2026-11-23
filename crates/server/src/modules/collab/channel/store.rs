@@ -44,20 +44,22 @@ pub(super) fn tx<T>(inner: &mut Inner, work: impl FnOnce(&mut Inner) -> Result<T
     impl Drop for Savepoint<'_> {
         fn drop(&mut self) {
             self.inner.transaction_depth -= 1;
+            let release = self.inner.transaction_depth == 0;
             if let Some((previous_model, previous_reach)) = self.previous.take() {
-                let _ = db::control(&self.inner.db, self.undo);
+                let _ = self.inner.db.end_tx(self.undo, release);
                 self.inner.model = previous_model;
                 self.inner.reach = previous_reach;
             }
         }
     }
-    let (begin, commit, undo) = if inner.transaction_depth == 0 {
+    let is_outer = inner.transaction_depth == 0;
+    let (begin, commit, undo) = if is_outer {
         ("begin immediate", "commit", "rollback")
     } else {
         ("savepoint chat", "release chat", "rollback to chat; release chat")
     };
     let previous = (inner.model.clone(), inner.reach.clone());
-    db::control(&inner.db, begin).q()?;
+    inner.db.begin_tx(begin, is_outer).q()?;
     inner.transaction_depth += 1;
     let mut guard = Savepoint {
         inner,
@@ -65,7 +67,7 @@ pub(super) fn tx<T>(inner: &mut Inner, work: impl FnOnce(&mut Inner) -> Result<T
         undo,
     };
     let value = work(guard.inner)?;
-    db::control(&guard.inner.db, commit).q()?;
+    guard.inner.db.end_tx(commit, is_outer).q()?;
     guard.previous = None;
     Ok(value)
 }

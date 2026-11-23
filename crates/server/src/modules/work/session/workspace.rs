@@ -1088,13 +1088,26 @@ mod tests {
         }
     }
 
+    struct NoopIssueStore;
+    impl crate::modules::work::ledger::IssueStore for NoopIssueStore {
+        fn all(&self, _db: &vibevalley_runtime::agent::durable::Sqlite<'_>) -> sqlx::Result<Vec<vibevalley_protocol::Issue>> {
+            Ok(vec![])
+        }
+        fn put(&self, _db: &vibevalley_runtime::agent::durable::Sqlite<'_>, _issue: &vibevalley_protocol::Issue) -> sqlx::Result<()> {
+            Ok(())
+        }
+        fn remove(&self, _db: &vibevalley_runtime::agent::durable::Sqlite<'_>, _id: &str) -> sqlx::Result<()> {
+            Ok(())
+        }
+    }
+
     #[test]
     fn sqlite_session_config_persists_without_workspace_json_files() {
         let dir = tempfile::tempdir().unwrap();
-        let db_path = dir.path().join("server.db");
+        let db = crate::base::ServerDb::open(dir.path()).unwrap();
         let facts = Arc::new(RecordingFacts::default());
-        let (ledger, _) = Ledger::open(&db_path, facts).unwrap();
-        let durable = vibevalley_runtime::agent::durable::Store::open(&db_path).unwrap();
+        let (ledger, _) = Ledger::open(db.clone(), facts, Arc::new(NoopIssueStore), Arc::new(super::super::db::SqliteSessionStore)).unwrap();
+        let durable = db.durable().unwrap();
         let config = Arc::new(BoardConfig::under(dir.path()));
         let workplaces = Arc::new(Workplace::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
         let mut registry = Registry::new();
@@ -1106,7 +1119,7 @@ mod tests {
             registry: Arc::new(registry),
             model: None,
         });
-        let sessions = Sessions::new(durable, Arc::new(ledger), drivers, workplaces, config.clone()).unwrap();
+        let sessions = Sessions::new(durable, Arc::new(ledger), drivers, workplaces, config.clone(), None).unwrap();
 
         let session = Session::new(
             "u1",
@@ -1145,10 +1158,16 @@ mod tests {
         let sentinel = project_dir.join("keep.txt");
         std::fs::write(&sentinel, "precious").unwrap();
 
-        let db_path = dir.path().join("server.db");
+        let db = crate::base::ServerDb::open(dir.path()).unwrap();
         let facts = Arc::new(RecordingFacts::default());
-        let (ledger, _) = Ledger::open(&db_path, facts.clone()).unwrap();
-        let durable = vibevalley_runtime::agent::durable::Store::open(&db_path).unwrap();
+        let (ledger, _) = Ledger::open(
+            db.clone(),
+            facts.clone(),
+            Arc::new(NoopIssueStore),
+            Arc::new(super::super::db::SqliteSessionStore),
+        )
+        .unwrap();
+        let durable = db.durable().unwrap();
         let config = Arc::new(BoardConfig::under(dir.path()));
         let workplaces = Arc::new(Workplace::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
 
@@ -1163,7 +1182,7 @@ mod tests {
             registry: Arc::new(registry),
             model: None,
         });
-        let sessions = Sessions::new(durable, Arc::new(ledger), drivers, workplaces, config.clone()).unwrap();
+        let sessions = Sessions::new(durable, Arc::new(ledger), drivers, workplaces, config.clone(), None).unwrap();
 
         let opened = sessions
             .open_workspace(SessionOpenWorkspaceInput {

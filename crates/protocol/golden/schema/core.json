@@ -1058,6 +1058,33 @@
     }
    ],
    "type": "mediaChanged"
+  },
+  {
+   "at": 6052,
+   "items": [
+    {
+     "at": 6053,
+     "from": {
+      "kind": "runtime"
+     },
+     "id": "durable:budget_reached:t1:6053:0",
+     "kind": "budget_reached",
+     "target": {
+      "kind": "runtime",
+      "sessionId": "w1",
+      "taskId": "t1"
+     },
+     "text": "Budget reached",
+     "who": "runtime",
+     "words": {
+      "body": "Budget reached",
+      "label": "budget_reached",
+      "title": "Budget reached",
+      "tray": "Budget reached"
+     }
+    }
+   ],
+   "type": "runtimeInboxChanged"
   }
  ],
  "Health": [
@@ -2299,6 +2326,11 @@
     }
    ],
    "type": "mediaChanged"
+  },
+  {
+   "at": 6612,
+   "items": [],
+   "type": "runtimeInboxChanged"
   },
   {
    "at": 6613,

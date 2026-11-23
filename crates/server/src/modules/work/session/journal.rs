@@ -3,11 +3,13 @@
 //! (`session_event`) every 1.5 s while they change.
 
 use std::collections::HashMap;
-use std::path::Path;
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
+use tokio::sync::Notify;
+use tokio::task::JoinHandle as TaskHandle;
+use tokio_util::sync::CancellationToken;
 use vibevalley_core::rules::cut;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
@@ -535,75 +537,68 @@ fn known_id(id: &str) -> bool {
 /// Every session's log (`Trajectories`): hot drafts in memory, full durable
 /// history in SQLite `session_event` with cursor pagination.
 pub struct Trajectories {
-    db: crate::base::ModuleDb,
+    db: Arc<crate::base::ServerDb>,
     open: Mutex<HashMap<String, Journal>>,
     hub: Weak<Hub>,
-    wake: flume::Sender<()>,
-    stop: Mutex<Option<flume::Sender<()>>>,
-    thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+    wake: Arc<Notify>,
+    worker: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
 }
 
 impl Trajectories {
-    /// Opens SQLite `session_event` under `home` and starts the event-driven pusher/flusher thread.
-    pub fn open(home: &Path, hub: &Arc<Hub>) -> Arc<Trajectories> {
-        let _ = std::fs::create_dir_all(home);
-        let db = crate::base::ModuleDb::open(home, super::db::SCHEMA).expect("trajectories db");
-        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
-        let (wake_tx, wake_rx) = flume::bounded::<()>(1);
+    /// Opens SQLite `session_event` on the shared `ServerDb` and starts the event-driven pusher/flusher task.
+    pub fn open(db: Arc<crate::base::ServerDb>, hub: &Arc<Hub>) -> Arc<Trajectories> {
+        let wake = Arc::new(Notify::new());
         let t = Arc::new(Trajectories {
             db,
             open: Mutex::default(),
             hub: Arc::downgrade(hub),
-            wake: wake_tx,
-            stop: Mutex::new(Some(stop_tx)),
-            thread: Mutex::new(None),
+            wake: wake.clone(),
+            worker: Mutex::new(None),
         });
         let weak = Arc::downgrade(&t);
-        if let Ok(handle) = std::thread::Builder::new().name("vibevalley-journal".into()).spawn(move || {
-            enum Wake {
-                Stop,
-                Dirty,
-            }
+        let cancel = hub.child_token();
+        let task_cancel = cancel.clone();
+        let handle = hub.spawn_task(async move {
             loop {
-                if !matches!(stop_rx.try_recv(), Err(flume::TryRecvError::Empty)) {
+                if task_cancel.is_cancelled() {
                     if let Some(t) = weak.upgrade() {
-                        t.finish_all();
+                        let _ = tokio::task::spawn_blocking(move || t.finish_all()).await;
                     }
                     return;
                 }
                 let deadline = {
                     let Some(t) = weak.upgrade() else { return };
                     if t.hub.strong_count() == 0 {
-                        t.finish_all();
+                        let _ = tokio::task::spawn_blocking(move || t.finish_all()).await;
                         return;
                     }
                     t.next_deadline()
                 };
-                let woke = match deadline {
-                    None => flume::Selector::new()
-                        .recv(&stop_rx, |_| Wake::Stop)
-                        .recv(&wake_rx, |r| if r.is_ok() { Wake::Dirty } else { Wake::Stop })
-                        .wait(),
+                let stop = match deadline {
+                    None => tokio::select! {
+                        biased;
+                        _ = task_cancel.cancelled() => true,
+                        _ = wake.notified() => false,
+                    },
                     Some(at) => match at.checked_duration_since(Instant::now()) {
-                        None => Wake::Dirty,
-                        Some(wait) => flume::Selector::new()
-                            .recv(&stop_rx, |_| Wake::Stop)
-                            .recv(&wake_rx, |r| if r.is_ok() { Wake::Dirty } else { Wake::Stop })
-                            .wait_timeout(wait)
-                            .unwrap_or(Wake::Dirty),
+                        None => false,
+                        Some(wait) => tokio::select! {
+                            biased;
+                            _ = task_cancel.cancelled() => true,
+                            _ = wake.notified() => false,
+                            _ = tokio::time::sleep(wait) => false,
+                        },
                     },
                 };
                 let Some(t) = weak.upgrade() else { return };
-                if matches!(woke, Wake::Stop) || t.hub.strong_count() == 0 {
-                    t.finish_all();
+                if stop || t.hub.strong_count() == 0 {
+                    let _ = tokio::task::spawn_blocking(move || t.finish_all()).await;
                     return;
                 }
-                while wake_rx.try_recv().is_ok() {}
-                t.flush(false);
+                let _ = tokio::task::spawn_blocking(move || t.flush(false)).await;
             }
-        }) {
-            *t.thread.lock() = Some(handle);
-        }
+        });
+        *t.worker.lock() = Some((cancel, handle));
         t
     }
 
@@ -612,7 +607,7 @@ impl Trajectories {
     }
 
     fn notify_worker(&self) {
-        let _ = self.wake.try_send(());
+        self.wake.notify_one();
     }
 
     fn load_tail(&self, id: &str) -> Vec<SessionEvent> {
@@ -627,7 +622,7 @@ impl Trajectories {
         }
         if let Err(e) = self.db.run(async |c| {
             use sqlx::Connection as _;
-            let mut tx = c.begin().await?;
+            let mut tx = c.begin_with("BEGIN IMMEDIATE").await?;
             for (id, events) in writes {
                 super::db::upsert_events(&mut tx, &id, &events).await?;
             }
@@ -775,11 +770,9 @@ impl Trajectories {
 
     /// Seals and flushes every open log.
     pub fn close(&self) {
-        let _ = self.stop.lock().take();
-        if let Some(handle) = self.thread.lock().take()
-            && handle.thread().id() != std::thread::current().id()
-        {
-            let _ = handle.join();
+        if let Some((cancel, handle)) = self.worker.lock().take() {
+            cancel.cancel();
+            let _ = vibevalley_runtime::rt::block_on(handle);
         }
         self.finish_all();
     }
@@ -956,16 +949,17 @@ mod tests {
     #[test]
     fn trajectories_event_driven_worker_wakes_flushes_and_closes_when_idle() {
         let home = tempfile::tempdir().unwrap();
+        let db = crate::base::ServerDb::open(home.path()).unwrap();
         let hub = Hub::new(vibevalley_core::Core::default().state().clone());
 
         // Idle close returns immediately without polling delay.
-        let idle = Trajectories::open(home.path(), &hub);
+        let idle = Trajectories::open(db.clone(), &hub);
         assert!(idle.next_deadline().is_none());
         let start = Instant::now();
         idle.close();
         assert!(start.elapsed() < Duration::from_secs(1));
 
-        let tr = Trajectories::open(home.path(), &hub);
+        let tr = Trajectories::open(db.clone(), &hub);
         let live = hub.live();
         tr.step("w1", "", Step::Asked { text: "hello".into() });
         assert!(tr.next_deadline().is_some());
@@ -989,7 +983,7 @@ mod tests {
         assert!(!home.path().join("events").exists());
 
         // Cursor pagination beyond the hot RAM window (KEEP_EVENTS = 240).
-        let tr2 = Trajectories::open(home.path(), &hub);
+        let tr2 = Trajectories::open(db.clone(), &hub);
         for i in 1..=260 {
             tr2.step("w-long", "", Step::Asked { text: format!("step-{i}") });
         }
@@ -1023,12 +1017,12 @@ mod tests {
         tr2.close();
 
         // Evicted burst (>240 steps closed directly without prior flush) still persists completely to SQLite.
-        let tr3 = Trajectories::open(home.path(), &hub);
+        let tr3 = Trajectories::open(db.clone(), &hub);
         for i in 0..265 {
             tr3.step("w-burst", "", Step::Asked { text: format!("burst-{i}") });
         }
         tr3.close();
-        let tr4 = Trajectories::open(home.path(), &hub);
+        let tr4 = Trajectories::open(db, &hub);
         let burst = tr4
             .events_page(&vibevalley_protocol::SessionEventListInput {
                 id: "w-burst".into(),

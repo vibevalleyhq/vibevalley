@@ -100,7 +100,8 @@ fn a_log_is_kept_read_back_and_only_grows() {
     vibevalley_i18n::set_locale("zh");
     let home = tempfile::tempdir().unwrap();
     let hub = Hub::new(empty_space_state());
-    let tr = Trajectories::open(home.path(), &hub);
+    let db = vibevalley_server::base::ServerDb::open(home.path()).unwrap();
+    let tr = Trajectories::open(db, &hub);
     tr.with_log("w1", |j| {
         j.run_started("r7");
         j.asked("加分页", &[]);
@@ -143,7 +144,8 @@ fn a_grown_step_is_pushed_once() {
     let home = tempfile::tempdir().unwrap();
     let hub = Hub::new(empty_space_state());
     let live = hub.live();
-    let tr = Trajectories::open(home.path(), &hub);
+    let db = vibevalley_server::base::ServerDb::open(home.path()).unwrap();
+    let tr = Trajectories::open(db, &hub);
     tr.with_log("w9", |j| {
         j.said("好", &[]);
         j.said("的", &[]);
@@ -179,9 +181,9 @@ fn a_sent_issue_is_logged_listed_and_watched() {
     .unwrap();
     let hub = started.hub.clone();
     let call = |op: &str, p| hub.call_as(Caller::User, op, p);
-    let mut helper = started.agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
     helper.runtime = "scripted".into();
-    let helper = started.agents.profiles.save(helper).unwrap();
+    let helper = started.test_internals().agents.profiles.save(helper).unwrap();
     call("repo.create", json!({ "name": "farm" })).data.unwrap();
     let issue = call("issue.create", json!({ "title": "say hello", "repo": "farm", "agent": helper.id }))
         .data
@@ -195,7 +197,10 @@ fn a_sent_issue_is_logged_listed_and_watched() {
 
     call("issue.status.update", json!({ "id": id, "status": "todo" })).data.unwrap();
     let session = until("the session to rest with its run ended", || {
-        let s = started.board.read(|s| s.sessions.iter().find(|x| x.issue_id() == Some(id.as_str())).cloned())?;
+        let s = started
+            .test_internals()
+            .board
+            .read(|s| s.sessions.iter().find(|x| x.issue_id() == Some(id.as_str())).cloned())?;
         let page = call("session.event.list", json!({ "id": s.id })).data?;
         page["events"].as_array()?.iter().any(|e| e["type"] == "run/end").then_some(s)
     });
@@ -226,7 +231,7 @@ fn a_sent_issue_is_logged_listed_and_watched() {
     hub.unsubscribe(sub);
     let missing = hub.subscribe("issue.watch", json!({ "id": "i999" }));
     assert_eq!(missing.err().unwrap().biz_code, vibevalley_protocol::BizCode::IssueNotFound.code());
-    started.board.close();
+    started.test_internals().board.close();
 }
 
 #[path = "session/subagent_progress.rs"]

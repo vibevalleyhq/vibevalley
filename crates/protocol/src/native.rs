@@ -24,11 +24,13 @@ pub const NATIVE_ENDPOINTS: &[Endpoint] = &[
         input: Some("MediaInputUploadFileInput"),
         result: Some("MediaInput"),
     },
+    // POST /api/v1/attachment/file stays blocked as a native endpoint; GET /api/v1/attachment/{id}
+    // authorizes authenticated remote read-only downloads through this spec.
     Endpoint {
         op: "attachment.file",
         module: "attachment",
         about: &[],
-        can: &[Caller::User],
+        can: &[Caller::User, Caller::Remote],
         dry_run: None,
         input: Some("AttachmentFileInput"),
         result: Some("AttachmentFile"),

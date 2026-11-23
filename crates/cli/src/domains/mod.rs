@@ -8,6 +8,7 @@ pub mod work;
 
 use clap::{Parser, Subcommand};
 
+use crate::auth::Secret;
 use crate::client::{Client, Done};
 
 /// Local CLI for the VibeValley workbench server.
@@ -21,9 +22,13 @@ use crate::client::{Client, Done};
     disable_help_subcommand = true
 )]
 pub struct Cli {
-    /// Server base URL (defaults to VIBEVALLEY_SERVER, <home>/server.json, or the channel port)
+    /// Server base URL (defaults to VIBEVALLEY_SERVER, <home>/auth.json, <home>/server.json, or the channel port)
     #[arg(long, global = true, value_name = "URL")]
     pub server: Option<String>,
+
+    /// Bearer token for remote authentication (defaults to VIBEVALLEY_REMOTE_TOKEN or <home>/auth.json)
+    #[arg(long, global = true, value_name = "TOKEN")]
+    pub token: Option<Secret>,
 
     /// Preview what a mutating command would do without changing state
     #[arg(long, global = true)]
@@ -75,6 +80,10 @@ pub enum Command {
     State(infra::state::StateCmd),
     /// Read, validate, and update server settings
     Setting(infra::setting::SettingCmd),
+    /// Manage CLI authentication credentials and active server identity
+    Auth(infra::auth::AuthCmd),
+    /// Manage remote access listener, pairing codes, and paired devices
+    Remote(infra::remote::RemoteCmd),
     /// Verify home, server, SSE slice stream, runtimes, and model key
     Doctor(infra::doctor::DoctorCmd),
 }
@@ -101,6 +110,8 @@ pub fn run(client: &Client, command: Command) -> Done {
 
         Command::State(cmd) => infra::state::run(client, cmd),
         Command::Setting(cmd) => infra::setting::run(client, cmd),
+        Command::Auth(cmd) => infra::auth::run(client, cmd),
+        Command::Remote(cmd) => infra::remote::run(client, cmd),
         Command::Doctor(cmd) => infra::doctor::run(client, cmd),
     }
 }

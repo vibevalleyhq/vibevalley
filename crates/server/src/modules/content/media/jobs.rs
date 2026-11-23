@@ -16,7 +16,6 @@ use std::sync::{Arc, OnceLock, Weak};
 use std::time::Duration;
 
 use parking_lot::{Mutex, MutexGuard};
-use pollster::block_on;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::{Connection, SqliteConnection};
@@ -34,14 +33,14 @@ use super::understanding::Authorization;
 use super::vendor::{self, Account, Moss, Outcome, Task, TaskKind};
 use super::{Stop, q};
 use crate::Hub;
-use crate::base::open_sqlx_db;
-use crate::modules::collab::channel::{Chat, Made, Posting};
+use crate::base::ServerDb;
 use crate::modules::content::attachment::{ATTACHMENT_MAX, Attachments};
 use crate::modules::content::media::inputs::Inputs;
 use crate::modules::infra::http::{Fetch, Request, public_https};
 use crate::modules::infra::provider::{IMAGE_MODELS, Use};
 use crate::modules::infra::setting::Setting;
 use crate::now;
+use crate::ports::ChannelAnnouncePort;
 
 /// Jobs active at once, every kind together.
 const ADMITTED: i64 = 8;
@@ -490,18 +489,18 @@ struct Running {
 
 /// What the machine reaches.
 pub struct Parts {
-    pub home: std::path::PathBuf,
+    pub db: Arc<ServerDb>,
     pub hub: Weak<Hub>,
     pub setting: Arc<Setting>,
     pub files: Arc<Attachments>,
     pub inputs: Arc<Inputs>,
-    pub chat: Arc<Chat>,
+    pub channel: Arc<dyn ChannelAnnouncePort>,
     pub vendor: Arc<dyn Fetch>,
     pub download: Download,
 }
 
 pub struct Jobs {
-    db: Mutex<SqliteConnection>,
+    db: Arc<ServerDb>,
     held: Mutex<HashMap<String, Held>>,
     runs: Mutex<HashMap<String, Running>>,
     /// One schedule at a time, so a waiting job starts once.
@@ -513,7 +512,7 @@ pub struct Jobs {
     setting: Arc<Setting>,
     files: Arc<Attachments>,
     pub(super) inputs: Arc<Inputs>,
-    pub(super) chat: Arc<Chat>,
+    pub(super) channel: Arc<dyn ChannelAnnouncePort>,
     hub: Weak<Hub>,
     closed: AtomicBool,
     me: OnceLock<Weak<Jobs>>,
@@ -524,11 +523,9 @@ pub struct Jobs {
 
 impl Jobs {
     pub fn open(p: Parts) -> Result<Arc<Jobs>, ApiError> {
-        let mut db = block_on(open_sqlx_db(&p.home)).map_err(storage)?;
-        block_on(sqlx::raw_sql(crate::db::schema::CONTENT_MEDIA).execute(&mut db)).map_err(storage)?;
         let cancel = p.hub.upgrade().map(|h| h.child_token()).unwrap_or_default();
         let jobs = Arc::new(Jobs {
-            db: Mutex::new(db),
+            db: p.db,
             held: Mutex::default(),
             runs: Mutex::default(),
             scheduling: Mutex::default(),
@@ -538,7 +535,7 @@ impl Jobs {
             setting: p.setting,
             files: p.files,
             inputs: p.inputs,
-            chat: p.chat,
+            channel: p.channel,
             hub: p.hub,
             closed: AtomicBool::new(false),
             me: OnceLock::new(),
@@ -573,8 +570,8 @@ impl Jobs {
         });
     }
 
-    fn db(&self) -> MutexGuard<'_, SqliteConnection> {
-        self.db.lock()
+    fn db(&self) -> Result<crate::base::DbConn, ApiError> {
+        self.db.acquire().map_err(storage)
     }
 
     fn runs(&self) -> MutexGuard<'_, HashMap<String, Running>> {
@@ -582,7 +579,7 @@ impl Jobs {
     }
 
     fn read(db: &mut SqliteConnection, id: &str) -> Result<Option<Record>, ApiError> {
-        match block_on(q::get_job(db, q::GetJobParams { id: id.into() })) {
+        match vibevalley_runtime::rt::block_on(q::get_job(db, q::GetJobParams { id: id.into() })) {
             Ok(row) => serde_json::from_str(&row.data).map(Some).map_err(storage),
             Err(sqlx::Error::RowNotFound) => Ok(None),
             Err(error) => Err(storage(error)),
@@ -590,11 +587,13 @@ impl Jobs {
     }
 
     pub(super) fn found(&self, id: &str) -> Result<Record, ApiError> {
-        Self::read(&mut self.db(), id)?.ok_or_else(|| refused("missing"))
+        let mut db = self.db()?;
+        Self::read(&mut db, id)?.ok_or_else(|| refused("missing"))
     }
 
     pub(super) fn rows(&self, query: impl AsyncFnOnce(&mut SqliteConnection) -> sqlx::Result<Vec<q::GetJobRow>>) -> Result<Vec<Record>, ApiError> {
-        block_on(query(&mut self.db()))
+        self.db
+            .run(query)
             .map_err(storage)?
             .into_iter()
             .map(|row| serde_json::from_str(&row.data).map_err(storage))
@@ -607,7 +606,7 @@ impl Jobs {
 
     fn save(db: &mut SqliteConnection, r: &mut Record) -> Result<(), ApiError> {
         r.updated_at = now();
-        block_on(q::save_job(
+        vibevalley_runtime::rt::block_on(q::save_job(
             db,
             q::SaveJobParams {
                 id: r.id().into(),
@@ -622,7 +621,7 @@ impl Jobs {
     }
 
     fn require_capacity(db: &mut SqliteConnection) -> Result<(), ApiError> {
-        let count = block_on(q::active_count(db)).map_err(storage)?.total;
+        let count = vibevalley_runtime::rt::block_on(q::active_count(db)).map_err(storage)?.total;
         if count >= ADMITTED {
             return Err(refused("busy"));
         }
@@ -648,8 +647,8 @@ impl Jobs {
             return Ok(false);
         }
         {
-            let mut db = self.db();
-            let mut tx = block_on(db.begin_with("BEGIN IMMEDIATE")).map_err(storage)?;
+            let mut db = self.db()?;
+            let mut tx = vibevalley_runtime::rt::block_on(db.begin_with("BEGIN IMMEDIATE")).map_err(storage)?;
             let Some(mut r) = Self::read(&mut tx, id)? else { return Ok(false) };
             if !before.contains(&r.phase) {
                 return Ok(false);
@@ -660,7 +659,7 @@ impl Jobs {
                 Self::require_capacity(&mut tx)?;
             }
             Self::save(&mut tx, &mut r)?;
-            block_on(tx.commit()).map_err(storage)?;
+            vibevalley_runtime::rt::block_on(tx.commit()).map_err(storage)?;
         }
         self.publish();
         Ok(true)
@@ -680,7 +679,8 @@ impl Jobs {
 
     /// The job already under this ask's id, refused when it was asked otherwise.
     pub(super) fn known(&self, ask: &Ask, alike: impl FnOnce(&Record) -> bool) -> Result<Option<Record>, ApiError> {
-        match Self::read(&mut self.db(), ask.id())? {
+        let mut db = self.db()?;
+        match Self::read(&mut db, ask.id())? {
             Some(old) if old.ask != *ask || !alike(&old) => Err(refused("reusedId")),
             old => Ok(old),
         }
@@ -692,8 +692,8 @@ impl Jobs {
         {
             // Another worker may scan queued jobs as soon as the transaction commits.
             let _schedule = self.scheduling.lock();
-            let mut db = self.db();
-            let mut tx = block_on(db.begin_with("BEGIN IMMEDIATE")).map_err(storage)?;
+            let mut db = self.db()?;
+            let mut tx = vibevalley_runtime::rt::block_on(db.begin_with("BEGIN IMMEDIATE")).map_err(storage)?;
             if let Some(old) = Self::read(&mut tx, r.id())? {
                 if old.ask != r.ask || old.source != r.source || old.authorization.as_ref().map(|a| &a.channel) != r.authorization.as_ref().map(|a| &a.channel)
                 {
@@ -707,7 +707,7 @@ impl Jobs {
                 self.inputs.pin_in(&mut tx, &ids, r.id())?;
             }
             Self::save(&mut tx, &mut r)?;
-            block_on(tx.commit()).map_err(storage)?;
+            vibevalley_runtime::rt::block_on(tx.commit()).map_err(storage)?;
             if let Some(held) = held {
                 self.hold(r.id(), held);
             }
@@ -731,7 +731,7 @@ impl Jobs {
         }
         self.open_for_work()?;
         let ask = Ask::Image(request);
-        if let Some(old) = Self::read(&mut self.db(), ask.id())? {
+        if let Some(old) = Self::read(&mut *self.db()?, ask.id())? {
             if old.ask != ask || old.source != source {
                 return Err(refused("reusedId"));
             }
@@ -797,7 +797,7 @@ impl Jobs {
             return Err(refused("speechInvalid"));
         }
         let ask = Ask::Speech(request.clone());
-        if let Some(old) = Self::read(&mut self.db(), &request.id)? {
+        if let Some(old) = Self::read(&mut *self.db()?, &request.id)? {
             if old.ask != ask || old.source != source {
                 return Err(refused("reusedId"));
             }
@@ -1390,17 +1390,14 @@ impl Jobs {
         else {
             return;
         };
-        if let Err(e) = self.chat.post(Posting {
-            from: agent.clone(),
-            channel: channel.clone(),
-            text: t(
-                "server.media.imageMade",
-                &[("prompt", request.prompt.chars().take(80).collect::<String>().into())],
-            ),
-            send_key: format!("media:{}", r.id()),
-            made: Some(Made::Attachments(vec![attachment.id.clone()])),
-            ..Posting::default()
-        }) {
+        let text = t(
+            "server.media.imageMade",
+            &[("prompt", request.prompt.chars().take(80).collect::<String>().into())],
+        );
+        if let Err(e) = self
+            .channel
+            .post_attachments(agent, channel, &text, vec![attachment.id.clone()], format!("media:{}", r.id()))
+        {
             eprintln!("media image post: {}", e.message);
         }
     }

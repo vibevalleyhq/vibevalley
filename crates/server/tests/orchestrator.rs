@@ -112,7 +112,7 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
     let on_duty = hub.read(|s| s.sessions.iter().find(|h| h.id == "orchestrator").cloned()).expect("on duty");
     assert_eq!(serde_json::to_value(on_duty.role).unwrap(), "orchestrator");
 
-    let general = started.chat.default_channel();
+    let general = started.test_internals().chat.default_channel();
     user(
         "channel.message.send",
         json!({ "id": general, "text": "帮我在 demo 里把 README 写了", "sendKey": "ask" }),
@@ -204,14 +204,14 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
         json!({ "name": "早会", "text": "看看昨天的活", "when": { "kind": "once", "at": at } }),
     );
     std::thread::sleep(Duration::from_millis(150));
-    started.crons.tick();
+    started.test_internals().crons.tick();
     until("the cron's turn", || {
         let seen = model.seen.lock().unwrap();
         seen.iter()
             .any(|r| r.messages.last().and_then(|m| m.content.clone()).is_some_and(|c| c.contains("[来源：定时]")))
             .then_some(())
     });
-    started.board.close();
+    started.test_internals().board.close();
 }
 
 fn approval_fixture(home: &std::path::Path) -> (Arc<Scripted>, vibevalley_server::ServerConfig) {
@@ -232,7 +232,7 @@ fn approval_fixture(home: &std::path::Path) -> (Arc<Scripted>, vibevalley_server
 }
 
 fn ask_to_create_issue(started: &vibevalley_server::Started) -> String {
-    let channel = started.chat.default_channel();
+    let channel = started.test_internals().chat.default_channel();
     let sent = started.hub.call_as(
         Caller::User,
         "channel.message.send",
@@ -333,7 +333,7 @@ fn crash_restores_the_builtin_worker_in_the_same_issue_run() {
         })
         .unwrap();
         let listen = vibevalley_server::transport::http::serve(server.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
-        server.board.sessions().set_mcp_url(format!("{}/mcp", listen.url()));
+        server.test_internals().board.sessions().set_mcp_url(format!("{}/mcp", listen.url()));
         (server, listen)
     }
     if let Some(home) = std::env::var_os(CHILD) {
@@ -350,11 +350,11 @@ fn crash_restores_the_builtin_worker_in_the_same_issue_run() {
             e.data.unwrap_or(Value::Null)
         };
         call("repo.create", json!({"name":"demo"}));
-        let mut helper = start.agents.profiles.install_template("reviewer").unwrap();
+        let mut helper = start.test_internals().agents.profiles.install_template("reviewer").unwrap();
         helper.runtime = "vibevalley".into();
         helper.model = "deepseek-flash".into();
         helper.name = "Durable worker".into();
-        start.agents.profiles.save(helper).unwrap();
+        start.test_internals().agents.profiles.save(helper).unwrap();
         let issue = call("issue.create", json!({"title":"Record one line","repo":"demo","agent":"Durable worker"}));
         call("issue.status.update", json!({"id":issue["id"],"status":"todo"}));
         until("process exit", || None::<()>);
@@ -383,14 +383,14 @@ fn crash_restores_the_builtin_worker_in_the_same_issue_run() {
     });
     let (start, _listen) = launch(home.path(), model.clone());
     let issue = until("worker recovered", || {
-        start.board.issue("1").filter(|i| i.stage.state == IssueStageKind::Reviewing)
+        start.test_internals().board.issue("1").filter(|i| i.stage.state == IssueStageKind::Reviewing)
     });
-    let session = start.board.session(issue.latest_session_id().unwrap()).unwrap();
+    let session = start.test_internals().board.session(issue.latest_session_id().unwrap()).unwrap();
     assert_eq!(
         std::fs::read(std::path::Path::new(session.cwd.as_deref().unwrap()).join("durable-count.txt")).unwrap(),
         b"x"
     );
-    let runs = start.board.runs(&issue.id).unwrap();
+    let runs = start.test_internals().board.runs(&issue.id).unwrap();
     assert_eq!(runs.len(), 1);
     assert_eq!(runs[0].summary, "recovered same worker");
     assert_eq!(session.runs, 1);
@@ -426,7 +426,7 @@ fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases(
         ..vibevalley_server::ServerConfig::under(dir.path())
     })
     .unwrap();
-    let mut profile = started.agents.profiles.agent("orchestrator").unwrap();
+    let mut profile = started.test_internals().agents.profiles.agent("orchestrator").unwrap();
     profile.mcp_servers.push(MCPServer::Stdio(MCPServerStdio {
         name: "probe".into(),
         command: "python3".into(),
@@ -440,12 +440,12 @@ fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases(
         env: Default::default(),
     }));
     profile.disallowed_tools.push("probe__fail".into());
-    started.agents.profiles.save(profile.clone()).unwrap();
+    started.test_internals().agents.profiles.save(profile.clone()).unwrap();
     let send = |key: &str| {
         let res = started.hub.call_as(
             Caller::User,
             "channel.message.send",
-            json!({"id":started.chat.default_channel(),"text":key,"sendKey":key}),
+            json!({"id":started.test_internals().chat.default_channel(),"text":key,"sendKey":key}),
         );
         assert_eq!(res.biz_code, 0, "{res:?}");
     };
@@ -473,7 +473,7 @@ fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases(
     }
     assert_eq!(std::fs::read_to_string(starts).unwrap(), "start\n");
     profile.mcp_servers.clear();
-    started.agents.profiles.save(profile).unwrap();
+    started.test_internals().agents.profiles.save(profile).unwrap();
     send("after removing the server");
     until("the removed profile tool disappears", || {
         model
@@ -539,6 +539,7 @@ fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
 
     // Emit a durable pi.inbox budget_reached alert and verify it lands immediately in InboxSlice & slice_snapshot.
     started
+        .test_internals()
         .orchestrator
         .execution
         .store()

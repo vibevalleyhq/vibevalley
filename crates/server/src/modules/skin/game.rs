@@ -12,6 +12,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 
 use parking_lot::Mutex;
+use tokio::sync::Notify;
+use tokio::task::JoinHandle as TaskHandle;
+use tokio_util::sync::CancellationToken;
 use vibevalley_core::Transition;
 use vibevalley_core::progress::{Folded, catch_up, entries_for, progress_fold, progress_step};
 use vibevalley_protocol::{Fact, FactProgressChanged, FactProgressChangedStation, LedgerEntry, LedgerEntryTitled, ops};
@@ -30,9 +33,9 @@ pub struct Game {
     hub: Weak<Hub>,
     folded: Mutex<Folded>,
     wanted: Mutex<Option<(i64, i64)>>,
-    /// Asks the counting thread for a count soon.
-    soon: Mutex<Option<flume::Sender<()>>>,
-    thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+    /// Asks the counting task for a count soon.
+    soon: Arc<Notify>,
+    counter: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
     sub: Mutex<Option<Subscription>>,
     asked: std::sync::atomic::AtomicU64,
 }
@@ -70,8 +73,8 @@ impl Game {
             hub: Arc::downgrade(hub),
             folded: Mutex::new(folded),
             wanted: Mutex::new(None),
-            soon: Mutex::new(None),
-            thread: Mutex::new(None),
+            soon: Arc::new(Notify::new()),
+            counter: Mutex::new(None),
             sub: Mutex::new(None),
             asked: Default::default(),
         });
@@ -126,56 +129,74 @@ impl Game {
 
     /// `boot`'s counting: the user's commits under the repos counted now,
     /// every two minutes, and once 15 s after runs report (several runs
-    /// share one count). One thread counts, so an older count never lands
+    /// share one count). One task counts, so an older count never lands
     /// after a newer one.
     pub fn count_commits(self: &Arc<Game>, repos: Arc<crate::modules::work::repo::Repos>, git_emails: Vec<String>) {
-        let (tx, rx) = flume::unbounded::<()>();
-        *self.soon.lock() = Some(tx);
+        let Some(hub) = self.hub.upgrade() else { return };
+        let cancel = hub.child_token();
+        let task_cancel = cancel.clone();
+        let soon = self.soon.clone();
         let g = Arc::downgrade(self);
-        let refresh = move || {
-            let Some(game) = g.upgrade() else { return false };
-            game.set_commits(&repos.contributions(&git_emails));
-            true
-        };
-        let spawned = std::thread::Builder::new().name("vibevalley-game-count".into()).spawn(move || {
-            if !refresh() {
+        let handle = hub.spawn_task(async move {
+            let run_once = |g: &Weak<Game>, repos: &Arc<crate::modules::work::repo::Repos>, emails: &[String]| {
+                let g = g.clone();
+                let repos = repos.clone();
+                let emails = emails.to_vec();
+                async move {
+                    tokio::task::spawn_blocking(move || {
+                        let Some(game) = g.upgrade() else { return false };
+                        game.set_commits(&repos.contributions(&emails));
+                        true
+                    })
+                    .await
+                    .unwrap_or(false)
+                }
+            };
+            if !run_once(&g, &repos, &git_emails).await {
                 return;
             }
-            let mut next = std::time::Instant::now() + COUNT_EVERY;
+            let mut next = tokio::time::Instant::now() + COUNT_EVERY;
             loop {
-                match rx.recv_deadline(next) {
-                    Ok(()) => {
-                        let debounce = std::time::Instant::now() + COUNT_AFTER_RUN;
+                enum Wake {
+                    Soon,
+                    Periodic,
+                    Stop,
+                }
+                let woke = tokio::select! {
+                    biased;
+                    _ = task_cancel.cancelled() => Wake::Stop,
+                    _ = soon.notified() => Wake::Soon,
+                    _ = tokio::time::sleep_until(next) => Wake::Periodic,
+                };
+                match woke {
+                    Wake::Stop => return,
+                    Wake::Soon => {
+                        let debounce = tokio::time::Instant::now() + COUNT_AFTER_RUN;
                         loop {
-                            match rx.recv_deadline(debounce) {
-                                Ok(()) => continue,
-                                Err(flume::RecvTimeoutError::Timeout) => break,
-                                Err(flume::RecvTimeoutError::Disconnected) => return,
+                            tokio::select! {
+                                biased;
+                                _ = task_cancel.cancelled() => return,
+                                _ = soon.notified() => continue,
+                                _ = tokio::time::sleep_until(debounce) => break,
                             }
                         }
                     }
-                    Err(flume::RecvTimeoutError::Timeout) => next = std::time::Instant::now() + COUNT_EVERY,
-                    Err(flume::RecvTimeoutError::Disconnected) => return,
+                    Wake::Periodic => next = tokio::time::Instant::now() + COUNT_EVERY,
                 }
-                if !refresh() {
+                if !run_once(&g, &repos, &git_emails).await {
                     return;
                 }
             }
         });
-        match spawned {
-            Ok(handle) => *self.thread.lock() = Some(handle),
-            Err(e) => eprintln!("vibevalley-server: game: the counting thread: {e}"),
-        }
+        *self.counter.lock() = Some((cancel, handle));
     }
 
     pub fn close(&self) {
         let prev = self.sub.lock().take();
         drop(prev);
-        let _ = self.soon.lock().take();
-        if let Some(handle) = self.thread.lock().take()
-            && handle.thread().id() != std::thread::current().id()
-        {
-            let _ = handle.join();
+        if let Some((cancel, handle)) = self.counter.lock().take() {
+            cancel.cancel();
+            let _ = vibevalley_runtime::rt::block_on(handle);
         }
     }
 
@@ -183,11 +204,18 @@ impl Game {
     pub fn set_commits(&self, repos: &[vibevalley_protocol::Repo]) {
         let Some(hub) = self.hub.upgrade() else { return };
         let total = repos.iter().map(|r| r.commits).sum();
+        let next = vibevalley_protocol::CommitCount { total, repos: repos.to_vec() };
+        if hub.read(|s| match &s.commits {
+            None => repos.is_empty(),
+            Some(prev) => prev == &next,
+        }) {
+            return;
+        }
         hub.apply(vec![Fact::ProgressChanged(FactProgressChanged {
             at: now(),
             progress: None,
             news: None,
-            commits: Some(vibevalley_protocol::CommitCount { total, repos: repos.to_vec() }),
+            commits: Some(next),
             station: None,
         })]);
     }
@@ -199,9 +227,7 @@ impl Game {
 
     fn count_soon(&self) {
         self.asked.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        if let Some(tx) = self.soon.lock().as_ref() {
-            let _ = tx.send(());
-        }
+        self.soon.notify_one();
     }
 
     /// Keeps one entry (stamped now) and folds it in; one that is not kept

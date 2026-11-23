@@ -1,6 +1,6 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
-export const RemotePlatformValues = ["ios", "android", "other"] as const;
+export const RemotePlatformValues = ["ios", "android", "cli", "machine", "sandbox", "other"] as const;
 export type RemotePlatform = (typeof RemotePlatformValues)[number];
 
 /**
@@ -12,9 +12,9 @@ export type RemoteStatus = { enabled: boolean, listening: boolean, bindAddr?: st
 
 export type RemoteEnableRequest = { bindAddr?: string, port?: number, };
 
-export type RemotePairCode = { code: string, pairUrl: string, url: string, expiresAt: number, };
+export type RemotePairCode = { code: string, pairUrl: string, url: string, expiresAt: number, scope?: string, };
 
-export type RemotePairExchangeRequest = { code: string, deviceName: string, platform: RemotePlatform, };
+export type RemotePairExchangeRequest = { code: string, deviceName: string, platform: RemotePlatform, scope?: string, };
 
 export type RemotePairExchangeResult = { device: RemoteDeviceSummary, token: string, serverName: string, version: string, };
 

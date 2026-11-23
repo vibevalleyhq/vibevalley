@@ -101,7 +101,7 @@
 
 ### 蓄水池和路由
 
-Rust 版由频道的纯策略（`modules/collab/channel/dispatch.rs`）在写消息时同步落盘 `channel_delivery`，`IssueChat`（`modules/work/issue/chat.rs`）按工单独立异步消费 `Issue` 与唤醒的 `Session` 投递，连同该会话早前待发消息经 `Board::tell_message` 交给工单的帮工（干活中插进这一轮，歇着就开下一轮；排队中随工单一起交出），成功后结算投递并记 `mark_seen` + 👀。定时任务到期时由 `modules/work/cron` 准备它固定的那张工单并 `tell`。
+Rust 版由频道的纯策略（`modules/collab/channel/dispatch.rs`）在写消息时同步落盘 `channel_delivery`，`IssueChat`（`modules/work/chat.rs`）按工单独立异步消费 `Issue` 与唤醒的 `Session` 投递，连同该会话早前待发消息经 `Board::tell_message` 交给工单的帮工（干活中插进这一轮，歇着就开下一轮；排队中随工单一起交出），成功后结算投递并记 `mark_seen` + 👀。定时任务到期时由 `modules/work/cron` 准备它固定的那张工单并 `tell`。
 
 ### 详情与讨论
 

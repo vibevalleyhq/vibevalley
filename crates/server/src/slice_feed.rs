@@ -60,6 +60,7 @@ pub struct SliceSnapshot<T> {
     pub slice: Arc<T>,
     pub locale: String,
     wire: OnceLock<Value>,
+    json: OnceLock<Arc<str>>,
 }
 
 impl<T: Serialize> SliceSnapshot<T> {
@@ -70,6 +71,7 @@ impl<T: Serialize> SliceSnapshot<T> {
             slice: Arc::new(slice),
             locale: vibevalley_i18n::locale(),
             wire: OnceLock::new(),
+            json: OnceLock::new(),
         }
     }
 
@@ -79,6 +81,13 @@ impl<T: Serialize> SliceSnapshot<T> {
 
     pub fn wire(&self) -> &Value {
         self.wire.get_or_init(|| serde_json::to_value(self.slice.as_ref()).expect("slice serializes"))
+    }
+
+    /// Cached UTF-8 JSON representation shared across all SSE and snapshot readers.
+    pub fn json(&self) -> Arc<str> {
+        self.json
+            .get_or_init(|| Arc::<str>::from(serde_json::to_string(self.slice.as_ref()).expect("slice serializes")))
+            .clone()
     }
 }
 
@@ -200,6 +209,76 @@ impl SliceSubscription {
             SliceSubscription::Inbox(rx) => wrap(rx, after_seq, false),
             SliceSubscription::Ops(rx) => wrap(rx, after_seq, false),
             SliceSubscription::Farm { rx, strip_initial_effects } => wrap(rx, after_seq, strip_initial_effects),
+        }
+    }
+
+    /// Converts this subscription into a `WatchStream`-backed stream of `(seq, json_str)`
+    /// frames reusing each snapshot's cached `Arc<str>` without per-client serialization.
+    pub fn into_json_watch_stream(self, after_seq: Option<i64>) -> std::pin::Pin<Box<dyn Stream<Item = (i64, Arc<str>)> + Send>> {
+        fn wrap_json<T: Sequenced + Serialize + Send + Sync + 'static>(
+            rx: watch::Receiver<Arc<SliceSnapshot<T>>>,
+            after_seq: Option<i64>,
+        ) -> std::pin::Pin<Box<dyn Stream<Item = (i64, Arc<str>)> + Send>> {
+            use futures_util::StreamExt;
+            let (initial_seq, initial_gen) = {
+                let initial = rx.borrow();
+                (initial.seq, initial.generation)
+            };
+            let skip_initial = after_seq == Some(initial_seq);
+            let stream = if skip_initial { WatchStream::from_changes(rx) } else { WatchStream::new(rx) };
+            let mut seen_gen = skip_initial.then_some(initial_gen);
+            Box::pin(stream.filter_map(move |snap| {
+                let out = if seen_gen == Some(snap.generation) {
+                    None
+                } else {
+                    seen_gen = Some(snap.generation);
+                    Some((snap.seq, snap.json()))
+                };
+                std::future::ready(out)
+            }))
+        }
+
+        fn wrap_farm_json(
+            rx: watch::Receiver<Arc<SliceSnapshot<FarmFrame>>>,
+            after_seq: Option<i64>,
+            strip_initial_effects: bool,
+        ) -> std::pin::Pin<Box<dyn Stream<Item = (i64, Arc<str>)> + Send>> {
+            use futures_util::StreamExt;
+            let (initial_seq, initial_gen) = {
+                let initial = rx.borrow();
+                (initial.seq, initial.generation)
+            };
+            let skip_initial = after_seq == Some(initial_seq);
+            let stream = if skip_initial { WatchStream::from_changes(rx) } else { WatchStream::new(rx) };
+            let mut seen_gen = skip_initial.then_some(initial_gen);
+            let mut initial = !skip_initial && after_seq.is_none();
+            Box::pin(stream.filter_map(move |snap| {
+                let out = if seen_gen == Some(snap.generation) {
+                    None
+                } else {
+                    seen_gen = Some(snap.generation);
+                    let strip = initial && strip_initial_effects;
+                    initial = false;
+                    let json = if strip && !snap.slice.effects.is_empty() {
+                        let mut clean = snap.slice.as_ref().clone();
+                        clean.effects.clear();
+                        Arc::<str>::from(serde_json::to_string(&clean).expect("farm frame serializes"))
+                    } else {
+                        snap.json()
+                    };
+                    Some((snap.seq, json))
+                };
+                std::future::ready(out)
+            }))
+        }
+
+        match self {
+            SliceSubscription::Board(rx) => wrap_json(rx, after_seq),
+            SliceSubscription::Sessions(rx) => wrap_json(rx, after_seq),
+            SliceSubscription::Collab(rx) => wrap_json(rx, after_seq),
+            SliceSubscription::Inbox(rx) => wrap_json(rx, after_seq),
+            SliceSubscription::Ops(rx) => wrap_json(rx, after_seq),
+            SliceSubscription::Farm { rx, strip_initial_effects } => wrap_farm_json(rx, after_seq, strip_initial_effects),
         }
     }
 }

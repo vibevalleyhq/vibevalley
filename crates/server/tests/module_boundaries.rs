@@ -104,3 +104,23 @@ fn server_db_generated_queries_are_private_to_their_owning_module() {
 
     assert!(violations.is_empty(), "server db::generated privacy violations:\n{}", violations.join("\n"));
 }
+
+#[test]
+fn server_spine_and_transport_never_import_domain_modules() {
+    let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut files = vec![src_dir.join("lib.rs"), src_dir.join("ports.rs")];
+    files.extend(rs_files(&src_dir.join("transport")));
+    let mut violations = Vec::new();
+
+    for path in files {
+        let rel = path.strip_prefix(&src_dir).unwrap().to_string_lossy().replace('\\', "/");
+        let text = std::fs::read_to_string(&path).unwrap();
+        for (line_no, line) in prod_lines(&text) {
+            if line.contains("crate::modules::") {
+                violations.push(format!("{rel}:{line_no} references `crate::modules::` from L0 spine/transport"));
+            }
+        }
+    }
+
+    assert!(violations.is_empty(), "server spine boundary violations:\n{}", violations.join("\n"));
+}

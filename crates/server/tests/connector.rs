@@ -556,7 +556,11 @@ fn start(dir: &std::path::Path, world: &World) -> Started {
     })
     .unwrap();
     // The orchestrator, played: it answers each of the user's words where they were said.
-    let (mut events, chat, cancel) = (started.chat.subscribe_events(), started.chat.clone(), started.hub.child_token());
+    let (mut events, chat, cancel) = (
+        started.test_internals().chat.subscribe_events(),
+        started.test_internals().chat.clone(),
+        started.hub.child_token(),
+    );
     started.hub.spawn_task(async move {
         loop {
             let event = tokio::select! {
@@ -682,7 +686,7 @@ fn weixin_is_scanned_and_verified_and_the_users_words_reach_the_default_channel_
         (answer.to.as_str(), answer.text.as_str(), answer.reply.as_str()),
         (USER, "【主助手】\n收到：帮我看看打卡页", "ctx-a")
     );
-    let general = s.chat.default_channel();
+    let general = s.test_internals().chat.default_channel();
     assert_eq!(said_in(&s, &general), vec!["帮我看看打卡页"]);
     let after = status_is(&s, "weixin", "nothing pending", |st| st["pending"] == 0);
     assert!(after["lastInbound"].is_i64());
@@ -695,7 +699,7 @@ fn weixin_is_tied_to_another_channel_and_a_quoted_reply_goes_to_its_thread() {
     let world = World::new();
     let s = start(dir.path(), &world);
     weixin_connected(&s, &world);
-    let general = s.chat.default_channel();
+    let general = s.test_internals().chat.default_channel();
     let clock_in = call(&s, "channel.create", json!({ "name": "#clock-in" })).as_str().unwrap().to_string();
     let tied = call(&s, "connector.channel.set", json!({ "id": "weixin", "channel": "#clock-in" }));
     assert_eq!(tied["channel"], "clock-in");
@@ -705,7 +709,8 @@ fn weixin_is_tied_to_another_channel_and_a_quoted_reply_goes_to_its_thread() {
     assert_ne!(s.hub.call("channel.delete", json!({ "id": clock_in })).biz_code, 0);
 
     let post = |channel: &str, text: &str| {
-        s.chat
+        s.test_internals()
+            .chat
             .post(Posting {
                 from: "orchestrator".into(),
                 channel: channel.into(),
@@ -730,7 +735,7 @@ fn weixin_is_tied_to_another_channel_and_a_quoted_reply_goes_to_its_thread() {
         .as_str()
         .unwrap()
         .to_string();
-    let thread = s.chat.thread_under(&root).unwrap();
+    let thread = s.test_internals().chat.thread_under(&root).unwrap();
     post(&thread, "串里的话");
     let threaded = nth(&world, "weixin", 1);
     assert_eq!(threaded.text, "【主助手 · 在任务话题里】\n串里的话");
@@ -755,7 +760,7 @@ fn what_weixin_refuses_waits_then_goes_out_later_or_is_withdrawn() {
     let world = World::new();
     let s = start(dir.path(), &world);
     weixin_connected(&s, &world);
-    let general = s.chat.default_channel();
+    let general = s.test_internals().chat.default_channel();
     let pending = |n: i64, what: &str| status_is(&s, "weixin", what, |st| st["pending"] == n);
 
     // Held, it is sent by itself later.
@@ -771,6 +776,7 @@ fn what_weixin_refuses_waits_then_goes_out_later_or_is_withdrawn() {
     // A read in the workbench withdraws what has not gone out.
     world.restricted.store(true, Ordering::SeqCst);
     let (said, _) = s
+        .test_internals()
         .chat
         .post(Posting {
             from: "orchestrator".into(),
@@ -891,7 +897,7 @@ fn qq_pairs_by_its_code_takes_only_the_users_words_and_listens_again_after_the_g
         (answer.to.as_str(), answer.text.as_str(), answer.reply.as_str()),
         ("user-openid", "【主助手】\n收到：跑一下测试", last.as_str())
     );
-    let general = s.chat.default_channel();
+    let general = s.test_internals().chat.default_channel();
     assert_eq!(said_in(&s, &general), vec!["跑一下测试"]);
     // Each reply to a message has the next number of that message.
     assert_eq!(*world.qq_seqs.lock().unwrap(), vec![(word, 1), (last, 1)]);
@@ -968,15 +974,16 @@ fn the_feishu_bot_is_made_by_a_scan_and_takes_only_the_users_direct_words() {
         (answer.to.as_str(), answer.text.as_str(), answer.reply.as_str()),
         ("ou_user", "【主助手】\n收到：看看日志", "")
     );
-    assert_eq!(said_in(&s, &s.chat.default_channel()), vec!["看看日志"]);
+    assert_eq!(said_in(&s, &s.test_internals().chat.default_channel()), vec!["看看日志"]);
     // Every event is acknowledged, taken or not.
     until("three acknowledgements", || (world.feishu_acks.load(Ordering::SeqCst) >= 3).then_some(()));
 
     // What the farm says for the user goes out without the user asking.
-    s.chat
+    s.test_internals()
+        .chat
         .post(Posting {
             from: "orchestrator".into(),
-            channel: s.chat.default_channel(),
+            channel: s.test_internals().chat.default_channel(),
             text: "部署好了".into(),
             ..Posting::default()
         })

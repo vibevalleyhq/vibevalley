@@ -8,9 +8,13 @@ use vibevalley_protocol::*;
 use crate::rules::{Need, actor_role_of, clip, cut, need_of};
 use crate::status::is_farm_worker;
 
-/// `inbox`: newest first; items of the same moment in the order gathered.
+/// `inbox`: newest first; items of the same moment in the order gathered,
+/// followed by durable runtime alerts folded via `Fact::RuntimeInboxChanged`.
 pub(crate) fn inbox(state: &SpaceState) -> Vec<InboxItem> {
     let mut items: Vec<InboxItem> = gathered(state).into_iter().map(worded).collect();
+    if !state.runtime_inbox_items.is_empty() {
+        items.extend(state.runtime_inbox_items.iter().cloned());
+    }
     items.sort_by_key(|i| std::cmp::Reverse(i.at));
     items
 }

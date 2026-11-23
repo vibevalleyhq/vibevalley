@@ -22,12 +22,13 @@
 //!   sent) equal to it, `Sec-Fetch-Site` same-origin or none (`from_the_farm`).
 
 use std::convert::Infallible;
+use std::io::{self, SeekFrom};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use axum::Router;
-use axum::body::Bytes;
+use axum::body::{Body, Bytes};
 use axum::extract::{FromRef, Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
@@ -35,6 +36,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use futures_util::{Stream, StreamExt};
 use serde_json::{Value, json};
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
@@ -62,10 +64,17 @@ impl FromRef<HttpState> for Shared {
     }
 }
 
-/// True for addresses the remote mobile listener is allowed to bind:
+/// True when explicit `VIBEVALLEY_REMOTE_ALLOW_ALL=1` permits binding any IP
+/// (e.g., `0.0.0.0` behind an explicit reverse proxy or LAN deployment).
+pub fn is_remote_allow_all() -> bool {
+    std::env::var("VIBEVALLEY_REMOTE_ALLOW_ALL").ok().as_deref() == Some("1")
+}
+
+/// True for addresses the remote listener is allowed to bind:
 /// loopback (`127.0.0.1` / `::1`), Tailscale CGNAT (`100.64.0.0/10`),
 /// private RFC1918 LAN IPv4, or IPv6 ULA (`fc00::/7`).
-/// Refuses unspecified (`0.0.0.0`, `::`) and public internet addresses.
+/// Refuses unspecified (`0.0.0.0`, `::`) and public internet addresses unless
+/// `VIBEVALLEY_REMOTE_ALLOW_ALL=1` is set explicitly.
 pub fn is_allowed_remote_ip(ip: std::net::IpAddr) -> bool {
     match ip {
         std::net::IpAddr::V4(v4) => v4.is_loopback() || v4.is_private() || (v4.octets()[0] == 100 && (v4.octets()[1] & 0b1100_0000) == 64),
@@ -106,11 +115,11 @@ pub fn serve(server: Shared, addr: SocketAddr) -> std::io::Result<Listener> {
     bind_and_serve(server, addr, false)
 }
 
-/// Serves `server` for remote mobile clients on `addr` (Tailscale CGNAT,
-/// loopback, or private LAN / ULA only). Every request requires a valid
-/// paired-device Bearer token except `POST /api/v1/remote/pair/exchange`.
+/// Serves `server` for remote clients on `addr` (Tailscale CGNAT, loopback,
+/// or private LAN / ULA by default; any address when `VIBEVALLEY_REMOTE_ALLOW_ALL=1`).
+/// Every request requires a valid paired-device Bearer token except `POST /api/v1/remote/pair/exchange`.
 pub fn serve_remote(server: Shared, addr: SocketAddr) -> std::io::Result<Listener> {
-    if !is_allowed_remote_ip(addr.ip()) {
+    if !is_allowed_remote_ip(addr.ip()) && !is_remote_allow_all() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             "remote listener allows loopback, Tailscale, or private LAN addresses only",
@@ -245,7 +254,12 @@ fn bearer_token(headers: &HeaderMap) -> Option<&str> {
 }
 
 async fn authenticate(state: &HttpState, headers: &HeaderMap, path: &str) -> Result<CallerContext, ApiError> {
-    if let Some(token) = bearer_token(headers) {
+    authenticate_with_token(state, headers, None, path).await
+}
+
+async fn authenticate_with_token(state: &HttpState, headers: &HeaderMap, query_token: Option<&str>, path: &str) -> Result<CallerContext, ApiError> {
+    let token = bearer_token(headers).or_else(|| query_token.map(str::trim).filter(|t| !t.is_empty()));
+    if let Some(token) = token {
         let Some(auth) = state.server.remote_auth() else {
             return Err(ApiError::new(BizCode::Unauthorized, vibevalley_i18n::t("server.remote.unauthorized", &[])));
         };
@@ -386,12 +400,11 @@ async fn slice(
             .is_some_and(|accept| accept.contains("application/json"));
     if wants_json {
         let server = state.server.clone();
-        let snapshot = match tokio::task::spawn_blocking(move || server.slice_snapshot(kind)).await {
+        let json = match tokio::task::spawn_blocking(move || server.slice_snapshot_json(kind)).await {
             Ok(v) => v,
             Err(e) => return refuse(BizCode::InternalError, e.to_string()),
         };
-        let body = serde_json::to_vec(&snapshot).unwrap_or_default();
-        return (StatusCode::OK, [("content-type", "application/json; charset=utf-8")], body).into_response();
+        return (StatusCode::OK, [("content-type", "application/json; charset=utf-8")], json.as_bytes().to_vec()).into_response();
     }
     let after_seq = query.get("after").and_then(|v| v.trim().parse::<i64>().ok()).or_else(|| {
         headers
@@ -407,11 +420,11 @@ async fn slice(
     };
     if let Some(sub) = subscribed {
         let topic = sub.topic();
-        let watch_stream = sub.into_watch_stream(after_seq);
+        let watch_stream = sub.into_json_watch_stream(after_seq);
         let server = state.server;
         let shutdown = state.shutdown;
         let stream = futures_util::stream::unfold((watch_stream, server, shutdown), move |(mut watch_stream, server, shutdown)| async move {
-            let (seq, value) = tokio::select! {
+            let (seq, json_str) = tokio::select! {
                 biased;
                 _ = shutdown.cancelled() => return None,
                 item = watch_stream.next() => item?,
@@ -429,8 +442,7 @@ async fn slice(
                     }
                 }
             }
-            let data = serde_json::to_string(&value).unwrap_or_else(|_| "null".into());
-            let event = Event::default().id(seq.to_string()).data(data);
+            let event = Event::default().id(seq.to_string()).data(&*json_str);
             Some((Ok::<_, Infallible>(event), (watch_stream, server, shutdown)))
         });
         return sse(stream);
@@ -507,14 +519,15 @@ async fn subscribe(
     Query(query): Query<std::collections::HashMap<String, String>>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(err) = authenticate(&state, &headers, uri.path()).await {
-        return reply(Envelope::failure(&err));
-    }
+    let ctx = match authenticate(&state, &headers, uri.path()).await {
+        Ok(ctx) => ctx,
+        Err(err) => return reply(Envelope::failure(&err)),
+    };
     let payload = match serde_json::from_str::<Value>(query.get("payload").map(String::as_str).unwrap_or("{}")) {
         Ok(v) => v,
         Err(e) => return refuse(BizCode::InvalidInput, e.to_string()),
     };
-    match open(state.server, state.shutdown, name, payload).await {
+    match open(state.server, state.shutdown, ctx, name, payload).await {
         Ok(Ok(stream)) => stream,
         Ok(Err(envelope)) => reply(envelope),
         Err(e) => refuse(BizCode::InternalError, e.to_string()),
@@ -643,12 +656,45 @@ async fn artifact_page(
     response
 }
 
-async fn attachment(State(state): State<HttpState>, uri: axum::http::Uri, Path(id): Path<String>, headers: HeaderMap) -> Response {
-    if let Err(err) = authenticate(&state, &headers, uri.path()).await {
-        return reply(Envelope::failure(&err));
+fn parse_byte_range(text: &str, size: u64) -> Option<(u64, u64)> {
+    if size == 0 {
+        return None;
     }
+    let (a, b) = text.trim().strip_prefix("bytes=")?.split_once('-')?;
+    let parse_u64 = |s: &str| {
+        if !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()) {
+            s.parse::<u64>().ok()
+        } else {
+            None
+        }
+    };
+    let (start, end) = if a.is_empty() {
+        let suffix = parse_u64(b)?;
+        if suffix == 0 {
+            return None;
+        }
+        (size.saturating_sub(suffix), size - 1)
+    } else {
+        let start = parse_u64(a)?;
+        let end = if b.is_empty() { size - 1 } else { parse_u64(b)?.min(size - 1) };
+        (start, end)
+    };
+    (start <= end && start < size).then_some((start, end))
+}
+
+async fn attachment(
+    State(state): State<HttpState>,
+    uri: axum::http::Uri,
+    Path(id): Path<String>,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+    headers: HeaderMap,
+) -> Response {
+    let ctx = match authenticate_with_token(&state, &headers, query.get("token").map(String::as_str), uri.path()).await {
+        Ok(ctx) => ctx,
+        Err(err) => return reply(Envelope::failure(&err)),
+    };
     let server = state.server;
-    let found = tokio::task::spawn_blocking(move || server.call("attachment.file", serde_json::json!({ "id": id }))).await;
+    let found = tokio::task::spawn_blocking(move || server.call_with(&ctx, "attachment.file", serde_json::json!({ "id": id }))).await;
     let envelope = match found {
         Ok(envelope) => envelope,
         Err(e) => return refuse(BizCode::InternalError, e.to_string()),
@@ -660,42 +706,98 @@ async fn attachment(State(state): State<HttpState>, uri: axum::http::Uri, Path(i
     let (Some(path), kind) = (data["path"].as_str(), data["type"].as_str().unwrap_or("application/octet-stream")) else {
         return refuse(BizCode::InternalError, "attachment.file answered no path");
     };
-    match tokio::fs::read(path).await {
-        Ok(bytes) => {
-            let name = data["name"].as_str().unwrap_or_default().replace(['"', '\\', '\r', '\n'], "_");
-            (
-                StatusCode::OK,
-                [
-                    ("content-type", kind.to_string()),
-                    ("content-disposition", format!("inline; filename=\"{name}\"")),
-                    ("cache-control", "private, max-age=31536000, immutable".to_string()),
-                ],
-                bytes,
-            )
-                .into_response()
+    let mut file = match tokio::fs::File::open(path).await {
+        Ok(file) => file,
+        Err(e) => return refuse(BizCode::NotFound, e.to_string()),
+    };
+    let size = match file.metadata().await {
+        Ok(meta) => meta.len(),
+        Err(e) => return refuse(BizCode::NotFound, e.to_string()),
+    };
+    let name = data["name"].as_str().unwrap_or_default().replace(['"', '\\', '\r', '\n'], "_");
+    let range_header = headers.get("range");
+    if size == 0 {
+        if range_header.is_some() {
+            return (StatusCode::RANGE_NOT_SATISFIABLE, [("content-range", "bytes */0")]).into_response();
         }
-        Err(e) => refuse(BizCode::NotFound, e.to_string()),
+        return Response::builder()
+            .status(StatusCode::OK)
+            .header("content-type", kind)
+            .header("content-length", 0)
+            .header("accept-ranges", "bytes")
+            .header("content-disposition", format!("inline; filename=\"{name}\""))
+            .header("cache-control", "private, max-age=31536000, immutable")
+            .body(Body::empty())
+            .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response());
     }
+    let (status, start, end) = match range_header {
+        Some(value) => {
+            let Some((start, end)) = value.to_str().ok().and_then(|s| parse_byte_range(s, size)) else {
+                return (StatusCode::RANGE_NOT_SATISFIABLE, [("content-range", format!("bytes */{size}"))]).into_response();
+            };
+            (StatusCode::PARTIAL_CONTENT, start, end)
+        }
+        None => (StatusCode::OK, 0, size - 1),
+    };
+    if start > 0
+        && let Err(e) = file.seek(SeekFrom::Start(start)).await
+    {
+        return refuse(BizCode::InternalError, e.to_string());
+    }
+    let length = end - start + 1;
+    let stream = futures_util::stream::try_unfold((file, length), |(mut file, left)| async move {
+        if left == 0 {
+            return Ok::<_, io::Error>(None);
+        }
+        let mut buf = vec![0u8; left.min(64 * 1024) as usize];
+        let n = file.read(&mut buf).await?;
+        if n == 0 {
+            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "attachment truncated"));
+        }
+        buf.truncate(n);
+        Ok(Some((Bytes::from(buf), (file, left - n as u64))))
+    });
+    let mut response = Response::builder()
+        .status(status)
+        .header("content-type", kind)
+        .header("content-length", length)
+        .header("accept-ranges", "bytes")
+        .header("content-disposition", format!("inline; filename=\"{name}\""))
+        .header("cache-control", "private, max-age=31536000, immutable");
+    if status == StatusCode::PARTIAL_CONTENT {
+        response = response.header("content-range", format!("bytes {start}-{end}/{size}"));
+    }
+    response
+        .body(Body::from_stream(stream))
+        .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
 async fn issue_watch(State(state): State<HttpState>, uri: axum::http::Uri, Path(id): Path<String>, headers: HeaderMap) -> Response {
-    if let Err(err) = authenticate(&state, &headers, uri.path()).await {
-        return reply(Envelope::failure(&err));
-    }
-    match open(state.server, state.shutdown, "issue.watch".into(), serde_json::json!({ "id": id })).await {
+    let ctx = match authenticate(&state, &headers, uri.path()).await {
+        Ok(ctx) => ctx,
+        Err(err) => return reply(Envelope::failure(&err)),
+    };
+    match open(state.server, state.shutdown, ctx, "issue.watch".into(), serde_json::json!({ "id": id })).await {
         Ok(Ok(stream)) => stream,
+        Ok(Err(envelope)) if envelope.biz_code == BizCode::Forbidden.code() || envelope.biz_code == BizCode::Unauthorized.code() => reply(envelope),
         Ok(Err(_)) => StatusCode::NOT_FOUND.into_response(),
         Err(e) => refuse(BizCode::InternalError, e.to_string()),
     }
 }
 
-/// Opens `name` off the async runtime; `Ok(Ok)` is the event stream, which
-/// unsubscribes when the client goes away.
+/// Opens `name` off the async runtime with `ctx`; `Ok(Ok)` is the event stream,
+/// which unsubscribes when the client goes away.
 #[allow(clippy::result_large_err, reason = "Server::subscribe's contract returns the refusal envelope itself")]
-async fn open(server: Shared, shutdown: CancellationToken, name: String, payload: Value) -> Result<Result<Response, Envelope>, tokio::task::JoinError> {
+async fn open(
+    server: Shared,
+    shutdown: CancellationToken,
+    ctx: CallerContext,
+    name: String,
+    payload: Value,
+) -> Result<Result<Response, Envelope>, tokio::task::JoinError> {
     let opened = {
         let server = server.clone();
-        tokio::task::spawn_blocking(move || server.subscribe(&name, payload)).await?
+        tokio::task::spawn_blocking(move || server.subscribe_with(&ctx, &name, payload)).await?
     };
     Ok(match opened {
         Ok((id, rx)) => {

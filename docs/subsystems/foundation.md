@@ -19,8 +19,8 @@
 |---|---|
 | `Cargo.toml`、`rust-toolchain.toml`、`rustfmt.toml` | Rust 工作区成员、工具链与格式 |
 | `pnpm-workspace.yaml`、`vite.config.ts` | TS 工作区包列表、依赖版本 catalog、oxfmt 与 oxlint 配置、检查任务（`rust:check`、`docs:verify`…） |
-| `scripts/{gen,audit,docs,release}/` | 工程脚本：`gen/`（契约、词典、令牌、97 枚 reicons 矢量路径 [icons.ts](scripts/gen/icons.ts) 与 sqlc 生成）、`audit/`（lint 插件、死代码、注释审查）、`docs/`（Note、链接、术语与旧名检查）、`release/`（发版、回归与验收沙箱） |
-| `crates/server/src/lib.rs`、`crates/server/src/start.rs` | `Hub`（状态、端点表、事实与可插拔插槽）与按序打开各模块的 `start` |
+| `scripts/{gen,audit,docs,release}/` | 工程脚本：`gen/`（契约、词典、令牌、97 枚 reicons 矢量路径 [icons.ts](scripts/gen/icons.ts) 与 sqlc 生成）、`audit/`（lint 插件、死代码、注释审查、Rust 静态模块边界门禁 [module-boundaries.ts](scripts/audit/module-boundaries.ts)）、`docs/`（Note、链接、术语与旧名检查）、`release/`（发版、回归与验收沙箱） |
+| `crates/server/src/lib.rs`、`crates/server/src/base.rs`、`crates/server/src/start.rs` | `Hub`（核心状态、端点表、`Hub::invoke` 命令总线、事实与可插拔插槽）、单一 `ServerDb` 连接池与按 `L0`–`L3` 顺序一次性不可变组装的 `start` |
 | `crates/server/src/db/{schema,queries,generated}/` | 服务端 SQLite 建表语句（含 `shared.sql` 共享 `seq_counter` 与 `infra_remote.sql` 远程配置/设备表）、命名查询（`*.sql`）与 sqlc 生成的 SQLx 查询模块（`*.rs`，由边界测试锁死仅限所属域模块调用） |
 | `crates/server/src/modules/`、`crates/server/src/transport/` | 按六大域分组的业务模块（`work`、`team`、`collab`、`content`、`skin`、`infra`，含 `infra/debug/` `DebugKit` 与 `infra/remote/` 远程访问控制）与传输层（`api`、`bridge`、`http`） |
 | `crates/protocol/src/contract/`、`crates/protocol/tests/typescript.rs`、`crates/protocol/src/home.rs` | 线上类型（含 5 域切片、`FarmFrame`、`debug.rs` 的 `DebugKit`、[remote.rs](crates/protocol/src/contract/remote.rs) 的远程访问契约与 `host.rs` 的 `Host*` 帧/`HostAction`/`HostOp` 壳协议，`ts-rs` 写出 `packages/protocol` 的 `*.gen.ts`，`vp run protocol:check` 查最新）与家目录约定（`server.json`、语言） |
@@ -45,8 +45,8 @@
 
 架构、边界与测试如何共同设计，见[模块设计](docs/style/module-design.md)。
 
-- **深模块**：每个模块对外一个类型和它的几个方法，里面的表、锁和线程不露出去；不靠一个带 `kind` 的入口复用多种操作。
-- **按序启动**：`start`（`crates/server/src/start.rs`）按依赖顺序打开模块，后打开的拿到先打开的（`Arc`）；状态只经 `Hub::apply` 改，模块之间的上行反应经 `Hub` 的异步 `EventBus`（`Hub::subscribe_transitions`）。
+- **深模块与严格 `L0`–`L3` 无环 DAG**：每个模块对外一个类型和它的几个方法，里面的表、锁和线程不露出去；不靠一个带 `kind` 的入口复用多种操作。服务端模块收敛为 4 层无环 DAG（`L0` 共享契约与纯规则、`L1` 基础叶子模块、`L2` 四个互不直调的同级业务域 `work` / `collab` / `content` / `team/memory`、`L3` 编排与触发层），跨域写入走强类型 `Hub::invoke`，异步反应走 `EventBus`，只读跨层依赖走窄 Port trait，脊柱与 `apps/mac/src/` 禁止导入具体业务模块；四条硬边界由 `vp run audit:boundaries`（[module-boundaries.ts](scripts/audit/module-boundaries.ts)）在 CI 与 `release:verify` 中强制拦截（详见 [目标架构与部署拓扑](docs/architecture-topology.md#32-总控端内部子模块与调用收敛control-plane)）。
+- **按序不可变启动**：`start`（`crates/server/src/start.rs`）按 `L0` → `L1` → `L2` → `L3` 次序一次性打开模块并注入窄 Port，不留启动后置挂钩；状态只经 `Hub::apply` 改，模块之间的上行反应经 `Hub` 的异步 `EventBus`（`Hub::subscribe_transitions`）。
 - **操作与发言主体统一用 `Actor`**：`kind` 是 `user`、`agent`、`system`，`agent` 带 `role` 与 `forUser`；HTTP 来的是 `user`，助手的工具是 `agent`（`orchestrator`），`/mcp` 是 `agent`（`worker`），定时任务是 `system`。
 - **同一个家目录只有一个工单板**：工单板在它的数据旁放一个锁文件，别的进程只能读快照（`Board::snapshot`）。
 
@@ -62,7 +62,7 @@
 
 - **契约以 Rust 为源，生成 TS**：`crates/protocol/src/contract/` 的类型是数据源，`vp run protocol:ts` 写出 `packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`，`cargo test` 里的 `tests/typescript.rs` 查最新；页面在边界解码用的 Zod Schema 与 `api.ts` 手写，由 `schema.test.ts`、`api.test.ts` 对着生成物查。词典在 `crates/i18n/locales/`，`vp run i18n:gen` 写出 TS 目录。
 - **生成文件不手改**：`packages/protocol` 的 `*.gen.ts`、`packages/protocol/src/client.ts`、`packages/i18n/src/catalogs.ts`、`iconPaths.gen.ts`（`vp run icons:gen`）、[capabilities.md](docs/reference/capabilities.md) 由脚本生成并有检查。
-- **SQLite 按连接范围分工。** 宿主 `state.db` 保存项目、布局、终端和设置。服务端业务模块共用 `server.db`。各模块用同一份 SQL 定义运行时表结构和查询生成时的输入。[sqlc 配置](sqlc.yaml)
+- **SQLite 单连接池分工。** 宿主 `state.db` 保存项目、布局、终端和设置。服务端全部 SQLite 模块与工单账本共用唯一的 `ServerDb` 连接池（`crates/server/src/base.rs`，单一 `sqlx::SqlitePool` 持有 `server.db`，启用 WAL、外键约束与 `busy_timeout`，启动时统一建表，停机时协调执行 `PRAGMA wal_checkpoint(PASSIVE)` 与 `PRAGMA optimize`）。各模块用同一份 SQL 定义运行时表结构和查询生成时的输入。[sqlc 配置](sqlc.yaml)
 - **sqlc 检查 SQL，SQLx 执行查询。** sqlc 通过标准输入把命名查询的 JSON 发给本仓库的进程插件。插件按参数编号绑定值，并用 sqlc 标注的列名、类型和可空性生成 Rust 行类型。SQLite 的 `INTEGER`、`TEXT`、`REAL`、`BLOB` 分别映射为 `i64`、`String`、`f64`、`Vec<u8>`。可空列使用 `Option<T>`。不支持的类型或命令使生成失败。[生成器](scripts/gen/sqlc-rust/generate.ts) · [官方插件协议](https://docs.sqlc.dev/en/latest/guides/plugins.html)
 - **调用方持有事务。** 生成函数接受 SQLx 连接池或调用方的连接。`:one` 查不到记录时返回 `RowNotFound`，`:many` 返回列表，`:exec` 成功时返回 `()`，`:execrows` 返回受影响行数。领域模块决定何时提交，并将数据库行转换为业务类型。[宿主调用点](apps/mac/crates/workspace/src/store/mod.rs) · [事务回归](scripts/gen/sqlc-rust/smoke.rs)
 - **工单结算与持久执行共用写连接**：账本把工单事实、轮次和待投递结果写入调用方的 SQLx 事务。一次业务写入占用一个保存点。外层批次提交成功后，服务才发布订阅通知。保存点回滚只撤销这一次写入。磁盘库用独立的只读连接查询已提交快照。[事务](crates/runtime/src/agent/durable/store.rs) · [工单账本](crates/server/src/modules/work/ledger.rs)
@@ -119,6 +119,7 @@
 ## 怎么验证
 
 - `vp run rust:check`：格式、clippy 与全部 Rust 测试。
+- `vp run audit:boundaries`：静态校验脊柱、桌面宿主与服务端 `L0`–`L3` 分层边界及零循环依赖（纳入 `release:verify`）。
 - `vp run protocol:check`：生成的线上类型与 golden 是最新的。
 - `vp check`、`vp run packages:check`、`vp run mac:check`、`vp run mobile:check`：TS 与原生页面（桌面与移动端）。
 - `vp run docs:verify`：生成物（含 `icons.ts --check`）、词典、旧名字与文档链接。

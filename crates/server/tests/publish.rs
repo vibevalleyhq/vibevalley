@@ -218,7 +218,8 @@ fn the_repos_check_runs_before_the_push() {
 fn only_the_user_publishes() {
     let dir = tempfile::tempdir().unwrap();
     let hub = vibevalley_server::Hub::new(vibevalley_core::empty_space_state());
-    let pulls = vibevalley_server::modules::work::pull::Pulls::open(dir.path(), Arc::new(farm().publisher), None, None, None, None).unwrap();
+    let db = vibevalley_server::base::ServerDb::open(dir.path()).unwrap();
+    let pulls = vibevalley_server::modules::work::pull::Pulls::open(db, Arc::new(farm().publisher), None, None, None, None).unwrap();
     vibevalley_server::modules::work::pull::install(&hub, pulls, None);
     let asked = json!({ "cwd": "/tmp", "branch": "fix", "sha": "0", "base": "main", "title": "t", "body": "" });
     let e = hub.call_as(Caller::Remote, "repo.pr.submit", asked);
@@ -282,10 +283,10 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
     git(&repo_dir, &["push", "-q", bare.to_str().unwrap(), "main"]);
     git(&repo_dir, &["remote", "add", "origin", "https://github.com/acme/farm.git"]);
 
-    let mut coder = started.agents.profiles.install_template("reviewer").unwrap();
+    let mut coder = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
     coder.runtime = "scripted".into();
     coder.name = "Coder".into();
-    let coder = started.agents.profiles.save(coder).unwrap();
+    let coder = started.test_internals().agents.profiles.save(coder).unwrap();
     let agent_id = coder.id.as_str();
 
     let created = started
@@ -349,7 +350,7 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
     );
     assert_eq!(pubbed.biz_code, 0, "{}", pubbed.message);
 
-    let recorded = started.board.issue(&issue_id).unwrap();
+    let recorded = started.test_internals().board.issue(&issue_id).unwrap();
     assert_eq!(
         recorded.pull_request,
         Some(PullRequest {
@@ -365,7 +366,7 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
 
     let done = started.hub.call("issue.status.update", json!({ "id": &issue_id, "status": "done" }));
     assert_eq!(done.biz_code, 0, "{}", done.message);
-    let finished = started.board.issue(&issue_id).unwrap();
+    let finished = started.test_internals().board.issue(&issue_id).unwrap();
     assert_eq!(finished.delivered, Some(Landing::Submitted));
     assert_eq!(git(&repo_dir, &["rev-parse", &format!("refs/heads/{branch}")]), sha);
 
@@ -385,6 +386,7 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
         .unwrap();
     let change_id = change_issue["id"].as_str().unwrap();
     started
+        .test_internals()
         .pulls
         .store()
         .upsert(vibevalley_server::modules::work::pull::UpsertPullInput {
@@ -399,7 +401,12 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
             at: 1000,
         })
         .unwrap();
-    let merged = started.board.settle_pull(change_id, PullRequestState::Merged).unwrap().unwrap();
+    let merged = started
+        .test_internals()
+        .board
+        .settle_pull(change_id, PullRequestState::Merged)
+        .unwrap()
+        .unwrap();
     assert_eq!(merged.delivered, Some(Landing::PullRequest));
 
     started.close();

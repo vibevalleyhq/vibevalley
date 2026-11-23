@@ -2120,7 +2120,7 @@ export const catalogs = {
       },
       devices: {
         title: "已配对设备",
-        platform: { ios: "iOS", android: "Android", other: "其他设备" },
+        platform: { ios: "iOS", android: "Android", cli: "命令行", machine: "执行机", sandbox: "沙箱", other: "其他设备" },
         lastSeen: "最近活跃：{time}",
         revoke: "撤销",
         empty: "还没有配对过设备。",
@@ -2528,7 +2528,7 @@ export const catalogs = {
         models: "密钥 钥匙 账号 DeepSeek MOSS API Key 模型 绑定",
         voice: "电话 通话 MOSS Live 实时 视觉 转写 语音",
         connections: "微信 飞书 QQ 连接器 配对 GitHub gh PR 登录",
-        remote: "远程 手机 Tailscale 配对 二维码 设备 iOS Android 监听 令牌",
+        remote: "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌",
         about: "版本 家目录 设置文件 数据 素材图鉴 version catalog",
       },
       scope: { farm: "对整个 VibeValley", device: "只对这台设备" },
@@ -5149,7 +5149,7 @@ export const catalogs = {
       },
       devices: {
         title: "Paired devices",
-        platform: { ios: "iOS", android: "Android", other: "Other" },
+        platform: { ios: "iOS", android: "Android", cli: "CLI", machine: "Machine", sandbox: "Sandbox", other: "Other" },
         lastSeen: "Last active: {time}",
         revoke: "Revoke",
         empty: "No paired devices yet.",
@@ -5583,7 +5583,7 @@ export const catalogs = {
         models: "keys accounts DeepSeek MOSS API key models binding",
         voice: "call phone recognition speech MOSS live realtime vision transcription",
         connections: "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
-        remote: "remote mobile phone Tailscale pair pairing QR device iOS Android listener token",
+        remote: "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token",
         about: "version home folder settings data catalog",
       },
       scope: { farm: "For all of VibeValley", device: "This device only" },
@@ -8156,8 +8156,11 @@ export interface Messages {
   "web.remote.devices.empty": undefined;
   "web.remote.devices.lastSeen": { readonly time: string | number };
   "web.remote.devices.platform.android": undefined;
+  "web.remote.devices.platform.cli": undefined;
   "web.remote.devices.platform.ios": undefined;
+  "web.remote.devices.platform.machine": undefined;
   "web.remote.devices.platform.other": undefined;
+  "web.remote.devices.platform.sandbox": undefined;
   "web.remote.devices.revoke": undefined;
   "web.remote.devices.title": undefined;
   "web.remote.inbox.answer": undefined;

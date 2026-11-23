@@ -1,14 +1,11 @@
 //! SQLite storage for `cron` rows in `server.db`.
 
-use pollster::block_on;
 use sqlx::SqliteConnection;
 use vibevalley_protocol::{ActorKind, Cron, CronWhen};
 
 use crate::modules::infra::column::{json, read_json, read_word, word};
 
 use crate::db::generated::work_cron as queries;
-
-pub const SCHEMA: &str = crate::db::schema::WORK_CRON;
 
 pub struct StoredCron {
     pub cron: Cron,
@@ -38,11 +35,11 @@ fn read(r: queries::ListCronsRow) -> sqlx::Result<StoredCron> {
     })
 }
 
-pub fn list(db: &mut SqliteConnection) -> sqlx::Result<Vec<StoredCron>> {
-    block_on(queries::list_crons(db))?.into_iter().map(read).collect()
+pub async fn list(db: &mut SqliteConnection) -> sqlx::Result<Vec<StoredCron>> {
+    queries::list_crons(db).await?.into_iter().map(read).collect()
 }
 
-pub fn upsert(db: &mut SqliteConnection, cron: &Cron, issue_id: Option<&str>) -> sqlx::Result<()> {
+pub async fn upsert(db: &mut SqliteConnection, cron: &Cron, issue_id: Option<&str>) -> sqlx::Result<()> {
     let params = queries::UpsertCronParams {
         id: cron.id.clone(),
         name: cron.name.clone(),
@@ -59,19 +56,20 @@ pub fn upsert(db: &mut SqliteConnection, cron: &Cron, issue_id: Option<&str>) ->
         set_by: word(&cron.by)?,
         pending: i64::from(cron.pending),
     };
-    block_on(queries::upsert_cron(db, params))
+    queries::upsert_cron(db, params).await
 }
 
-pub fn set_issue(db: &mut SqliteConnection, id: &str, issue_id: Option<&str>) -> sqlx::Result<()> {
-    block_on(queries::set_cron_issue(
+pub async fn set_issue(db: &mut SqliteConnection, id: &str, issue_id: Option<&str>) -> sqlx::Result<()> {
+    queries::set_cron_issue(
         db,
         queries::SetCronIssueParams {
             id: id.into(),
             issue_id: issue_id.map(str::to_owned),
         },
-    ))
+    )
+    .await
 }
 
-pub fn remove(db: &mut SqliteConnection, id: &str) -> sqlx::Result<()> {
-    block_on(queries::remove_cron(db, queries::RemoveCronParams { id: id.into() }))
+pub async fn remove(db: &mut SqliteConnection, id: &str) -> sqlx::Result<()> {
+    queries::remove_cron(db, queries::RemoveCronParams { id: id.into() }).await
 }

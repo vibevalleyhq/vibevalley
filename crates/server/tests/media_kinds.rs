@@ -94,7 +94,7 @@ fn bind(s: &vibevalley_server::Started, key: &str) -> i64 {
 fn input(s: &vibevalley_server::Started, kind: &str, mime: &str, name: &str, bytes: Vec<u8>) -> String {
     let made = ok(s, "media.input.create", json!({"kind":kind,"mime":mime,"name":name,"size":bytes.len()}));
     let id = made["id"].as_str().unwrap().to_string();
-    s.media_inputs.upload(&id, Cursor::new(bytes)).unwrap();
+    s.test_internals().media_inputs.upload(&id, Cursor::new(bytes)).unwrap();
     id
 }
 fn sample(s: &vibevalley_server::Started) -> String {
@@ -149,7 +149,7 @@ fn tools(s: &vibevalley_server::Started, channel: &str) -> Tools {
         channel: channel.into(),
         ..Route::default()
     }));
-    (held(&s.farm, &route), route)
+    (held(s.test_internals().tools, &route), route)
 }
 
 #[test]
@@ -166,7 +166,7 @@ fn a_dialogue_and_a_designed_voice_are_followed_kept_and_released() {
     let ready = wait(&s, "talk", "ready");
     assert_eq!((&ready["format"], &ready["contentType"]), (&json!("wav"), &json!("audio/wav")));
     assert_eq!(ready["metadata"]["sampleRate"].as_f64(), Some(24000.0));
-    assert!(s.attachments.file(ready["attachment"]["id"].as_str().unwrap()).is_ok());
+    assert!(s.test_internals().attachments.file(ready["attachment"]["id"].as_str().unwrap()).is_ok());
     // The same request is the same job; another under its id is refused; nothing is asked of the vendor twice.
     assert_eq!(ok(&s, "media.dialogue.create", dialogue("talk", revision, "Hello there."))["phase"], "ready");
     refused(&s, "media.dialogue.create", dialogue("talk", revision, "Something else."));
@@ -437,7 +437,7 @@ fn understanding_cut_by_a_restart_is_unknown_and_cleans_when_asked() {
     network.until("POST /responses", 1);
     assert_eq!(ok(&s, "media.job.get", json!({"id":"cut"}))["phase"], "generating");
     refused(&s, "media.understanding.cleanup", json!({"id":"cut"}));
-    let channel = s.chat.default_channel();
+    let channel = s.test_internals().chat.default_channel();
     let mut approved = understanding("waiting", revision, &image, "Describe.");
     approved["channel"] = json!(channel);
     assert_eq!(ok(&s, "media.understanding.authorize", approved)["phase"], "authorized");
@@ -460,7 +460,7 @@ fn an_orchestrator_makes_audio_and_starts_understanding_only_with_the_users_word
     let s = start(dir.path(), &network);
     let revision = bind(&s, "test-understanding");
     let image = picture(&s);
-    let channel = s.chat.default_channel();
+    let channel = s.test_internals().chat.default_channel();
     let mut approved = understanding("look", revision, &image, "What is this?");
     approved["channel"] = json!("no-such-channel");
     refused(&s, "media.understanding.authorize", approved.clone());
@@ -522,7 +522,7 @@ fn regression_job_admission_rolls_back_input_pins_without_a_second_write() {
     let revision = bind(&s, "test-understanding");
     let image = picture(&s);
     let mut approved = understanding("atomic", revision, &image, "Describe");
-    approved["channel"] = json!(s.chat.default_channel());
+    approved["channel"] = json!(s.test_internals().chat.default_channel());
     let mut db = pollster::block_on(sqlx::sqlite::SqliteConnectOptions::new().filename(dir.path().join("server.db")).connect()).unwrap();
     pollster::block_on(
         sqlx::raw_sql(

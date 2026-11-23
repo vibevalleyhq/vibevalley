@@ -1,11 +1,45 @@
 //! Channels and threads.
 
 use serde::Deserialize;
-use vibevalley_protocol::ChannelUpdate;
+use vibevalley_protocol::{Actor, AgentRole, ChannelRequest, ChannelUpdateInput, ops};
 
-use super::{Farm, Who, given};
-use crate::modules::collab::channel::{ReadOptions, Speaking, Spoken};
-use crate::modules::team::orchestrator::words;
+use super::{ToolBox, Who, given};
+use crate::modules::collab::channel::{AddressedMessage, ReadOptions, Speaking, Spoken};
+use crate::modules::infra::text;
+
+fn message_line(m: &AddressedMessage) -> String {
+    let from = match &m.actor {
+        Actor::Agent { role: AgentRole::Worker, .. } => format!("{} {}", m.from, m.name),
+        _ => m.name.clone(),
+    };
+    let head = if m.number == 0 {
+        format!("[input={} from={from}]", m.id)
+    } else {
+        let reply = m.reply_to.map(|n| format!(" reply={n}")).unwrap_or_default();
+        format!("[target={} msg={}{reply} from={from}]", m.target, m.number)
+    };
+    if m.deleted == Some(true) {
+        return format!("{head} （这条已删除）");
+    }
+    let files: String = m.attachments.iter().flatten().map(|a| format!("\n  │ [附件 {}：{}]", a.name, a.path)).collect();
+    let made = m
+        .artifact
+        .as_ref()
+        .map(|a| {
+            format!(
+                "\n  │ [Artifact「{}」第 {} 稿：id={}，原文用 artifact_content_get 读]",
+                a.title, a.version, a.id
+            )
+        })
+        .unwrap_or_default();
+    let view = m
+        .view_context
+        .as_ref()
+        .map(|vc| format!("\n  │ {}", text::format_artifact_view_context(vc).replace('\n', "\n  │ ")))
+        .unwrap_or_default();
+    let edited = if m.edited == Some(true) { "（改过）" } else { "" };
+    format!("{head}{edited} {}{files}{made}{view}", m.text.trim().replace('\n', "\n  │ "))
+}
 
 #[derive(Deserialize)]
 pub struct ReadArgs {
@@ -16,7 +50,7 @@ pub struct ReadArgs {
     limit: Option<i64>,
 }
 
-pub fn read(f: &Farm, who: &Who, a: ReadArgs) -> Result<String, String> {
+pub fn read(f: &ToolBox, who: &Who, a: ReadArgs) -> Result<String, String> {
     let (me, target) = match who {
         Who::Orchestrator(r) => {
             let target = given(&a.id).map(String::from).unwrap_or_else(|| f.chat.address_of(&r.channel).1);
@@ -40,7 +74,7 @@ pub fn read(f: &Farm, who: &Who, a: ReadArgs) -> Result<String, String> {
                 } else {
                     String::new()
                 };
-                let lines: Vec<String> = r.messages.iter().map(words::message_line).collect();
+                let lines: Vec<String> = r.messages.iter().map(message_line).collect();
                 format!("{}{older}：\n{}", r.target, lines.join("\n"))
             }
         },
@@ -61,7 +95,7 @@ pub struct SendArgs {
     reply_to: Option<i64>,
 }
 
-pub fn send(f: &Farm, who: &Who, a: SendArgs) -> Result<String, String> {
+pub fn send(f: &ToolBox, who: &Who, a: SendArgs) -> Result<String, String> {
     let Who::Helper(me) = who else {
         return Err("助手的话就是它的回答，不用这个工具发".into());
     };
@@ -83,7 +117,7 @@ pub fn send(f: &Farm, who: &Who, a: SendArgs) -> Result<String, String> {
 #[derive(Deserialize)]
 pub struct Nothing {}
 
-pub fn unread(f: &Farm, who: &Who, _: Nothing) -> Result<String, String> {
+pub fn unread(f: &ToolBox, who: &Who, _: Nothing) -> Result<String, String> {
     let me = match who {
         Who::Orchestrator(r) => f.chat.orchestrator_in(&r.channel),
         Who::Helper(h) => h.id.clone(),
@@ -109,11 +143,16 @@ pub fn unread(f: &Farm, who: &Who, _: Nothing) -> Result<String, String> {
     Ok(lines.join("\n"))
 }
 
-pub fn channels(f: &Farm, _: &Who, _: Nothing) -> Result<String, String> {
-    Ok(f.chat
-        .channels()
+pub fn channels(f: &ToolBox, who: &Who, _: Nothing) -> Result<String, String> {
+    let list = f.hub()?.invoke::<ops::ChannelList>(&f.ctx(who), ()).map_err(|e| e.message)?;
+    Ok(list
         .iter()
-        .map(|c| format!("- {}", words::channel_line(&c.name, c.default, &c.description, &c.repo)))
+        .map(|c| {
+            format!(
+                "- {}",
+                text::channel_line(c.name.as_deref().unwrap_or(""), c.default, &c.description, c.repo.as_deref().unwrap_or(""),)
+            )
+        })
         .collect::<Vec<_>>()
         .join("\n"))
 }
@@ -128,14 +167,27 @@ pub struct OpenArgs {
     repo: String,
 }
 
-pub fn open(f: &Farm, _: &Who, a: OpenArgs) -> Result<String, String> {
-    let c = f.chat.open_channel(a.name.trim(), a.description.trim(), a.repo.trim()).map_err(|e| e.message)?;
-    let repo = if c.repo.is_empty() {
+pub fn open(f: &ToolBox, who: &Who, a: OpenArgs) -> Result<String, String> {
+    let id = f
+        .hub()?
+        .invoke::<ops::ChannelCreate>(
+            &f.ctx(who),
+            ChannelRequest {
+                name: a.name.trim().to_string(),
+                description: (!a.description.trim().is_empty()).then(|| a.description.trim().to_string()),
+                repo: (!a.repo.trim().is_empty()).then(|| a.repo.trim().to_string()),
+            },
+        )
+        .map_err(|e| e.message)?;
+    let found = f.chat.channels().into_iter().find(|c| c.id == id);
+    let name = found.as_ref().map(|c| c.name.as_str()).unwrap_or(a.name.trim());
+    let repo_val = found.as_ref().map(|c| c.repo.as_str()).unwrap_or(a.repo.trim());
+    let repo = if repo_val.is_empty() {
         String::new()
     } else {
-        format!("，默认仓库 {}", c.repo)
+        format!("，默认仓库 {repo_val}")
     };
-    Ok(format!("开好了 #{}{repo}。", c.name))
+    Ok(format!("开好了 #{name}{repo}。"))
 }
 
 #[derive(Deserialize)]
@@ -146,17 +198,18 @@ pub struct UpdateArgs {
     repo: Option<String>,
 }
 
-pub fn update(f: &Farm, _: &Who, a: UpdateArgs) -> Result<String, String> {
+pub fn update(f: &ToolBox, who: &Who, a: UpdateArgs) -> Result<String, String> {
     let id = a.id.trim();
     let c = f
         .chat
         .channel_by_name(id)
         .or_else(|| f.chat.channels().into_iter().find(|c| c.id == id))
         .ok_or_else(|| format!("没有 {id} 这个频道"))?;
-    f.chat
-        .update_channel(
-            &c.id,
-            ChannelUpdate {
+    f.hub()?
+        .invoke::<ops::ChannelUpdate>(
+            &f.ctx(who),
+            ChannelUpdateInput {
+                id: c.id.clone(),
                 description: a.description,
                 repo: a.repo,
                 name: None,
@@ -172,7 +225,7 @@ pub fn update(f: &Farm, _: &Who, a: UpdateArgs) -> Result<String, String> {
 fn spoken_text(spoken: &Spoken) -> String {
     match spoken {
         Spoken::Held { target, shown, more } => {
-            let lines: Vec<String> = shown.iter().map(words::message_line).collect();
+            let lines: Vec<String> = shown.iter().map(message_line).collect();
             let latest = if *more > 0 {
                 format!("（这里是最新的 {} 条）", shown.len())
             } else {

@@ -1,17 +1,15 @@
 //! Storage for artifacts and their references to optional channel messages.
 
 use crate::modules::infra::column::{json, optional, read_json, read_word, word};
-use pollster::block_on;
 use sqlx::{Result as Q, SqliteConnection};
 use vibevalley_protocol::{Block, BlockOpResult, Suggestion, TextSpan};
+use vibevalley_runtime::rt::block_on;
 
 use crate::db::generated::content_artifact as queries;
 pub use queries::{
     AddArtifactParams as NewArtifact, AddVersionParams as NewVersion, ArtifactEntriesRow as EntryRow, ArtifactRow, UpsertArtifactEntryParams as UpsertEntry,
     VersionRow,
 };
-
-pub const SCHEMA: &str = crate::db::schema::CONTENT_ARTIFACT;
 
 pub fn artifact(db: &mut SqliteConnection, id: &str) -> Q<Option<ArtifactRow>> {
     optional(block_on(queries::artifact(db, queries::ArtifactParams { id: id.into() })))
@@ -225,7 +223,7 @@ pub fn revision(db: &mut SqliteConnection, block: &str, rev: i64) -> Q<Option<Ve
 pub fn prune(db: &mut SqliteConnection, before: i64) -> Q<()> {
     block_on(async {
         use sqlx::Connection;
-        let mut tx = db.begin().await?;
+        let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
         queries::prune_changes(&mut *tx, queries::PruneChangesParams { created_at: before }).await?;
         queries::prune_revisions(&mut *tx, queries::PruneRevisionsParams { created_at: before }).await?;
         tx.commit().await

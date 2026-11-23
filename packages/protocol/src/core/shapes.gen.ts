@@ -5,7 +5,7 @@ import type { SessionId } from "../common/shapes.gen";
 import type { ConnectorStatus, FactConnectorChanged } from "../connector/shapes.gen";
 import type { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/shapes.gen";
 import type { CommitCount, FactProgressChanged, FarmFrame, Progress, SessionPlay } from "../game/shapes.gen";
-import type { InboxItem } from "../inbox/shapes.gen";
+import type { FactRuntimeInboxChanged, InboxItem } from "../inbox/shapes.gen";
 import type { BoardSummary, FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/shapes.gen";
 import type { FactMediaChanged, MediaJob, MediaSummary } from "../media/shapes.gen";
 import type { RuntimeInfo } from "../runtime/shapes.gen";
@@ -28,7 +28,11 @@ sessions: Array<Session>, crons: Array<Cron>,
 /**
  * The farm's pixel-only station and step history, by session; no business rule reads it.
  */
-plays?: { [key in string]: SessionPlay }, };
+plays?: { [key in string]: SessionPlay },
+/**
+ * Durable runtime inbox alerts projected into `InboxSlice` via `Fact::RuntimeInboxChanged`.
+ */
+runtimeInboxItems?: Array<InboxItem>, };
 
 export const SliceKindValues = ["board", "sessions", "collab", "inbox", "ops", "farm"] as const;
 export type SliceKind = (typeof SliceKindValues)[number];
@@ -56,7 +60,7 @@ export type Health = { ok: boolean, version: string, };
 /**
  * Told apart by `type`.
  */
-export type Fact = FactCallChanged | FactSessionToolChanged | FactSessionToolsReset | FactSessionSubagentsChanged | FactSessionPhaseChanged | FactMessageChanged | FactChannelChanged | FactUserMentionsChanged | FactSessionChanged | FactSessionReported | FactSessionLeft | FactProgressChanged | FactIssueChanged | FactIssueRemoved | FactChannelRemoved | FactCronChanged | FactCronRemoved | FactConnectorChanged | FactMachineChanged | FactMediaChanged;
+export type Fact = FactCallChanged | FactSessionToolChanged | FactSessionToolsReset | FactSessionSubagentsChanged | FactSessionPhaseChanged | FactMessageChanged | FactChannelChanged | FactUserMentionsChanged | FactSessionChanged | FactSessionReported | FactSessionLeft | FactProgressChanged | FactIssueChanged | FactIssueRemoved | FactChannelRemoved | FactCronChanged | FactCronRemoved | FactConnectorChanged | FactMachineChanged | FactMediaChanged | FactRuntimeInboxChanged;
 
 export type ServerEventSnapshot = { "type": "snapshot", at: number, state: SpaceState, };
 
@@ -74,7 +78,7 @@ export type LiveEvent = LiveEventSession | LiveEventNotice | LiveEventRuntime;
 /**
  * Told apart by `type`.
  */
-export type ServerEvent = FactCallChanged | FactSessionToolChanged | FactSessionToolsReset | FactSessionSubagentsChanged | FactSessionPhaseChanged | FactMessageChanged | FactChannelChanged | FactUserMentionsChanged | FactSessionChanged | FactSessionReported | FactSessionLeft | FactProgressChanged | FactIssueChanged | FactIssueRemoved | FactChannelRemoved | FactCronChanged | FactCronRemoved | FactConnectorChanged | FactMachineChanged | FactMediaChanged | ServerEventSnapshot | LiveEventSession | LiveEventNotice | LiveEventRuntime;
+export type ServerEvent = FactCallChanged | FactSessionToolChanged | FactSessionToolsReset | FactSessionSubagentsChanged | FactSessionPhaseChanged | FactMessageChanged | FactChannelChanged | FactUserMentionsChanged | FactSessionChanged | FactSessionReported | FactSessionLeft | FactProgressChanged | FactIssueChanged | FactIssueRemoved | FactChannelRemoved | FactCronChanged | FactCronRemoved | FactConnectorChanged | FactMachineChanged | FactMediaChanged | FactRuntimeInboxChanged | ServerEventSnapshot | LiveEventSession | LiveEventNotice | LiveEventRuntime;
 
 export type ChannelFollowPayload = { id: string, after: number, };
 

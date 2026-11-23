@@ -149,6 +149,11 @@ fn endpoint_table() -> String {
         let dry = e.dry_run.map_or(String::new(), |d| format!(", dryRun: {}", quote(d)));
         out.push_str(&format!("  {{ op: {}, can: {can}, about: {about}{dry} }},\n", quote(e.op)));
     }
+    out.push_str("] as const;\n\nexport const servedSubscriptions = [\n");
+    for s in crate::contract::SUBSCRIPTIONS {
+        let can = list(s.can.iter().map(|c| quote(c.as_str())).collect());
+        out.push_str(&format!("  {{ name: {}, can: {can} }},\n", quote(s.name)));
+    }
     out.push_str("] as const;\n");
     out
 }

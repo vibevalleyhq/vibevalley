@@ -26,6 +26,9 @@
     "platform": {
       "ios": "iOS",
       "android": "Android",
+      "cli": "CLI",
+      "machine": "Machine",
+      "sandbox": "Sandbox",
       "other": "Other"
     },
     "lastSeen": "Last active: {time}",

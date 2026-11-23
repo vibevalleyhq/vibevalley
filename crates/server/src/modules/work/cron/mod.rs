@@ -6,17 +6,21 @@
 mod db;
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 use parking_lot::Mutex;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ActorKind, ApiError, BizCode, Cron, CronRequest, Fact, FactCronChanged, FactCronRemoved, IssueStatus, NoticeLevel, Preview, ops};
+use vibevalley_protocol::{
+    ActorKind, ApiError, BizCode, Caller, Cron, CronRequest, Fact, FactCronChanged, FactCronRemoved, IssueStatus, NoticeLevel, Preview, ops,
+};
 
-use crate::base::{LookIn, ModuleDb, Ticker, internal, missing};
+use crate::base::{LookIn, ServerDb, Ticker, internal, missing};
+use crate::modules::collab::channel::{Chat, Noticing};
 use crate::modules::team::agent::Agents;
 use crate::modules::work::issue::{Board, NewIssue};
+use crate::ports::CronOrchestratorPort;
 use crate::{Hub, now};
 
 pub const DEFAULT_CHANNEL: &str = "general";
@@ -58,25 +62,32 @@ impl CronLinks {
 }
 
 pub struct Crons {
-    db: ModuleDb,
+    db: Arc<ServerDb>,
     links: Arc<Mutex<CronLinks>>,
     hub: Weak<Hub>,
     board: Board,
     agents: Arc<Agents>,
     /// The ticker, the endpoints and the tools all change the list.
     lock: Mutex<()>,
-    chat: std::sync::OnceLock<Weak<crate::modules::collab::channel::Chat>>,
-    orchestrator: std::sync::OnceLock<Weak<crate::modules::team::orchestrator::Orchestrator>>,
+    chat: Option<Arc<Chat>>,
+    orchestrator: Option<Arc<dyn CronOrchestratorPort>>,
     closed: std::sync::atomic::AtomicBool,
     ticker: Mutex<Option<Ticker>>,
 }
 
 impl Crons {
-    /// Opens `cron` in `<home>/server.db`, puts stored crons into the hub's
-    /// state, and registers `Issue.cron` projection on `board`.
-    pub fn open(home: &Path, hub: &Arc<Hub>, board: Board, agents: Arc<Agents>) -> Result<Arc<Crons>, ApiError> {
-        let db = ModuleDb::open(home, db::SCHEMA).map_err(internal)?;
-        let stored = db.sync(db::list).map_err(internal)?;
+    /// Opens `cron` on the shared `ServerDb`, puts stored crons into the hub's
+    /// state, and registers `Issue.cron` projection on `board`. Constructed
+    /// bottom-up with `chat` and `orchestrator` directly (zero late bindings).
+    pub fn open(
+        db: Arc<ServerDb>,
+        hub: &Arc<Hub>,
+        board: Board,
+        agents: Arc<Agents>,
+        chat: Option<Arc<Chat>>,
+        orchestrator: Option<Arc<dyn CronOrchestratorPort>>,
+    ) -> Result<Arc<Crons>, ApiError> {
+        let stored = db.run(async |conn| db::list(conn).await).map_err(internal)?;
         let links = Arc::new(Mutex::new(CronLinks::default()));
         let at = now();
         let mut facts = Vec::with_capacity(stored.len());
@@ -101,8 +112,8 @@ impl Crons {
             board,
             agents,
             lock: Mutex::new(()),
-            chat: Default::default(),
-            orchestrator: Default::default(),
+            chat,
+            orchestrator,
             closed: Default::default(),
             ticker: Mutex::new(None),
         }))
@@ -114,16 +125,6 @@ impl Crons {
         if let Some(ticker) = self.ticker.lock().take() {
             ticker.stop();
         }
-    }
-
-    /// The chat a cron's channel is found in.
-    pub fn attach_chat(&self, chat: &Arc<crate::modules::collab::channel::Chat>) {
-        let _ = self.chat.set(Arc::downgrade(chat));
-    }
-
-    /// Who a cron for no profile goes to.
-    pub fn attach_orchestrator(&self, o: &Arc<crate::modules::team::orchestrator::Orchestrator>) {
-        let _ = self.orchestrator.set(Arc::downgrade(o));
     }
 
     fn hub(&self) -> Option<Arc<Hub>> {
@@ -145,7 +146,7 @@ impl Crons {
     /// Persists `cron` (keeping its linked issue, if any) and tells the state.
     fn put(&self, cron: Cron) -> Result<(), ApiError> {
         let issue_id = self.issue_of(&cron.id);
-        self.db.sync(|conn| db::upsert(conn, &cron, issue_id.as_deref())).map_err(internal)?;
+        self.db.run(async |conn| db::upsert(conn, &cron, issue_id.as_deref()).await).map_err(internal)?;
         if let Some(hub) = self.hub() {
             hub.apply(vec![Fact::CronChanged(FactCronChanged { at: now(), cron })]);
         }
@@ -153,7 +154,7 @@ impl Crons {
     }
 
     fn link_issue(&self, cron_id: &str, issue_id: Option<&str>) -> Result<(), ApiError> {
-        self.db.sync(|conn| db::set_issue(conn, cron_id, issue_id)).map_err(internal)?;
+        self.db.run(async |conn| db::set_issue(conn, cron_id, issue_id).await).map_err(internal)?;
         let prev = self.links.lock().link(cron_id, issue_id);
         if let Some(prev_id) = prev
             && prev_id.as_str() != issue_id.unwrap_or("")
@@ -182,7 +183,7 @@ impl Crons {
         if !problem.is_empty() {
             return Err(refused(problem));
         }
-        let (channel, channel_name, channel_repo) = match self.chat.get().and_then(Weak::upgrade) {
+        let (channel, channel_name, channel_repo) = match &self.chat {
             // A channel as the user names it (general, #general) as well as by id.
             Some(chat) => {
                 let want = match req.channel.as_deref() {
@@ -257,7 +258,7 @@ impl Crons {
     pub fn remove(&self, id: &str) -> Result<Cron, ApiError> {
         let _l = self.lock.lock();
         let was = self.find(id)?;
-        self.db.sync(|conn| db::remove(conn, id)).map_err(internal)?;
+        self.db.run(async |conn| db::remove(conn, id).await).map_err(internal)?;
         let prev_issue = self.links.lock().link(id, None);
         if let Some(hub) = self.hub() {
             hub.apply(vec![Fact::CronRemoved(FactCronRemoved { at: now(), id: id.into() })]);
@@ -308,34 +309,24 @@ impl Crons {
     }
 
     /// A cron for no profile: its words said in its channel and handed to
-    /// the channel's orchestrator.
+    /// the channel's orchestrator via `CronOrchestratorPort`.
     fn to_orchestrator(&self, cron: &Cron, words: &str) -> Result<(), ApiError> {
-        use crate::modules::team::orchestrator::{Input, words::Source};
         let unserved = || ApiError::new(BizCode::ServiceUnavailable, "no orchestrator takes scheduled tasks".to_string());
-        let o = self.orchestrator.get().and_then(Weak::upgrade).ok_or_else(unserved)?;
-        let chat = self.chat.get().and_then(Weak::upgrade).ok_or_else(unserved)?;
+        let o = self.orchestrator.as_ref().ok_or_else(unserved)?;
+        let chat = self.chat.as_ref().ok_or_else(unserved)?;
         let channel = if chat.place(&cron.channel).is_some() {
             cron.channel.clone()
         } else {
             chat.default_channel()
         };
-        chat.notice(crate::modules::collab::channel::Noticing {
+        chat.notice(Noticing {
             channel: channel.clone(),
             text: words.to_string(),
             code: "cron".into(),
             ..Default::default()
         });
-        let input = Input {
-            agent: Some(chat.orchestrator_in(&channel)),
-            channel,
-            source: Source::Cron,
-            line: words.to_string(),
-            user: false,
-            picked: None,
-            messages: vec![],
-            port: None,
-        };
-        if o.hear(input) { Ok(()) } else { Err(unserved()) }
+        let agent = chat.orchestrator_in(&channel);
+        if o.hear_cron(&agent, &channel, words) { Ok(()) } else { Err(unserved()) }
     }
 
     /// `scheduled`: the issue the cron owns, started, reopened or told;
@@ -377,7 +368,13 @@ impl Crons {
 /// Every `cron.*` endpoint, and the ticker every 20 s until the hub goes.
 pub fn install(hub: &Arc<Hub>, crons: Arc<Crons>, tick: bool) {
     let c = crons.clone();
-    hub.on::<ops::CronCreate>(move |_, req| c.add(req, ActorKind::User));
+    hub.on::<ops::CronCreate>(move |ctx, req| {
+        let by = match ctx.caller {
+            Caller::User | Caller::Remote => ActorKind::User,
+            Caller::Orchestrator | Caller::Session => ActorKind::Agent,
+        };
+        c.add(req, by)
+    });
     let c = crons.clone();
     hub.on::<ops::CronList>(move |_, ()| Ok(c.list()));
     let c = crons.clone();

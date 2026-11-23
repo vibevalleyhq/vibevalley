@@ -20,7 +20,8 @@ pub mod fake;
 mod hub;
 
 pub use crate::transport::api::{
-    ApiError, BizCode, Caller, CallerContext, CallerPrincipal, ClientIdentity, ClientKind, Envelope, LiveEvent, Server, SliceKind, refusal,
+    ApiError, BizCode, Caller, CallerContext, CallerPrincipal, ClientIdentity, ClientKind, Envelope, LiveEvent, LiveVoiceLine, LiveVoicePort, Server,
+    SharedLiveVoice, SliceKind, refusal,
 };
 pub use hub::{Client, ClientSnapshot, Hub, Outlet};
 

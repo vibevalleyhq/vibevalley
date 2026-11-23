@@ -220,9 +220,9 @@ impl Artifacts {
         let (ack, fresh) = {
             let mut conn = self.db();
             use sqlx::Connection;
-            let mut tx = pollster::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
+            let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
             let result = self.apply_batch(&mut tx, id, actor, batch_id, &ops, meta)?;
-            pollster::block_on(tx.commit()).map_err(q)?;
+            vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
             result
         };
         if fresh {

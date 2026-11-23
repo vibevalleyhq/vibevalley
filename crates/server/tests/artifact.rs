@@ -65,7 +65,7 @@ fn html_and_markdown_hand_ins_their_versions_and_refusals() {
     let started = start(dir.path());
     let hub = started.hub.clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
-    let general = started.chat.default_channel();
+    let general = started.test_internals().chat.default_channel();
 
     // Announced with its card where it belongs; a new version keeps the old ones readable.
     let made = ok(call(
@@ -119,6 +119,7 @@ fn html_and_markdown_hand_ins_their_versions_and_refusals() {
     std::thread::sleep(Duration::from_millis(3));
     let linked_issue = ok(call("issue.create", json!({ "title": "关联工单" })))["id"].as_str().unwrap().to_string();
     let notes = started
+        .test_internals()
         .artifacts
         .create(
             &Maker {
@@ -223,7 +224,7 @@ fn html_edits_and_removal_keep_the_pages_once() {
     let started = start(dir.path());
     let hub = started.hub.clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
-    let general = started.chat.default_channel();
+    let general = started.test_internals().chat.default_channel();
 
     let source = "<h1>Launch</h1>\n<p>Ship on Friday.</p>\n<script>document.title = 'Friday'</script>";
     let made = ok(call("artifact.create", json!({ "title": "上线", "kind": "html", "content": source })));
@@ -283,7 +284,7 @@ fn blocks_are_written_together() {
     let started = start(dir.path());
     let hub = started.hub.clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
-    let a = started.artifacts.clone();
+    let a = started.test_internals().artifacts.clone();
     let new = |title: &str| {
         ok(call("artifact.create", json!({ "title": title, "kind": "markdown" })))["id"]
             .as_str()
@@ -574,7 +575,8 @@ fn blocks_are_written_together() {
     assert_eq!(mine.unwrap().status, vibevalley_protocol::BlockOpStatus::Applied);
 
     // What was written is there for a fresh reader of the same database.
-    let reopened = Artifacts::open(dir.path(), started.attachments.clone(), started.chat.clone()).unwrap();
+    let fresh_db = vibevalley_server::base::ServerDb::open(dir.path()).unwrap();
+    let reopened = Artifacts::open(fresh_db, started.test_internals().attachments.clone(), started.test_internals().chat.clone());
     assert_eq!(reopened.suggestions(&id).unwrap().len(), 4);
     assert_eq!(reopened.markdown(&id).unwrap(), "用户的字\n\n帮工改自己的\n");
 }
@@ -602,7 +604,7 @@ fn a_message_quotes_blocks_as_when_said_and_demo_op_is_retired() {
     let first = ins_on(&call, &id, "用户先写的");
 
     // A message quotes a block as it is when said.
-    let general = started.chat.default_channel();
+    let general = started.test_internals().chat.default_channel();
     let quoted = json!([{ "artifactId": id, "blockId": first["blockId"], "rev": 1 }, { "artifactId": id, "blockId": "gone", "rev": 1 }]);
     ok(call("channel.message.send", json!({ "id": general, "text": "看这段", "blocks": quoted })));
     ok(call(
@@ -626,11 +628,11 @@ fn regression_a_failed_artifact_version_never_publishes_its_channel_card() {
     let dir = tempfile::tempdir().unwrap();
     let server = start(dir.path());
     let call = |op: &str, p: Value| server.hub.call_as(Caller::User, op, p);
-    let channel = server.chat.default_channel();
+    let channel = server.test_internals().chat.default_channel();
     let created = ok(call("artifact.create", json!({"title":"Proposal","kind":"html","content":page("v1")})));
     let before = ok(call("channel.message.list", json!({"id":channel})));
     let first_card = last_message(&call, &channel);
-    let mut events = server.chat.subscribe_events();
+    let mut events = server.test_internals().chat.subscribe_events();
     let opts = SqliteConnectOptions::new().filename(dir.path().join("server.db"));
     let mut inspect = pollster::block_on(SqliteConnection::connect_with(&opts)).unwrap();
     pollster::block_on(
@@ -767,7 +769,11 @@ fn store_entry_batch_ops_optimistic_concurrency_and_sanitization() {
     let hub = started.hub.clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
 
-    let png = started.attachments.keep(&[0x89, 0x50, 0x4e, 0x47], "logo.png", "image/png").unwrap();
+    let png = started
+        .test_internals()
+        .attachments
+        .keep(&[0x89, 0x50, 0x4e, 0x47], "logo.png", "image/png")
+        .unwrap();
     let board = ok(call(
         "artifact.create",
         json!({
@@ -1014,7 +1020,7 @@ fn outline_artifact_create_read_edit_type_read_card_and_issue_link() {
     let started = start(dir.path());
     let hub = started.hub.clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
-    let general = started.chat.default_channel();
+    let general = started.test_internals().chat.default_channel();
 
     // Bilingual guide for `outline`.
     let guide_zh = ok(call("artifact.type.read", json!({ "type": "outline" })));
@@ -1184,7 +1190,7 @@ fn persistent_cursor_suggestion_survives_upstream_edit_and_coalesces_same_origin
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
     let hub = started.hub.clone();
-    let a = started.artifacts.clone();
+    let a = started.test_internals().artifacts.clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
 
     let doc = ok(call("artifact.create", json!({ "title": "共编文档", "artifactType": "docs" })));
@@ -1265,7 +1271,7 @@ fn time_travel_preview_restore_fork_compaction_and_selective_origin_undo() {
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
     let hub = started.hub.clone();
-    let a = started.artifacts.clone();
+    let a = started.test_internals().artifacts.clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
 
     // 1. Interleaved block history: user + session A + session B.
@@ -1463,7 +1469,7 @@ fn outline_import_parses_markdown_frontmatter_and_logseq_tasks() {
     let started = start(dir.path());
     let hub = started.hub.clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
-    let channel = started.chat.default_channel();
+    let channel = started.test_internals().chat.default_channel();
 
     // 1. Standard Markdown + YAML frontmatter + fenced chart block (unannounced).
     let before_msgs = ok(call("channel.message.list", json!({ "id": channel }))).as_array().unwrap().len();

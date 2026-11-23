@@ -1,17 +1,87 @@
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 
-use pollster::block_on;
 use sqlx::SqliteConnection;
+use vibevalley_runtime::rt::block_on;
 
 use super::queries;
+use crate::base::{DbConn, ServerDb};
 
 pub type Sql<T> = sqlx::Result<T>;
-// Inner serializes access; a read borrows mutably only while the SQLx worker executes its statement.
-pub type Connection = RefCell<SqliteConnection>;
 pub const SCHEMA: &str = crate::db::schema::COLLAB_CHANNEL;
 
-pub(super) fn control(db: &Connection, statement: &'static str) -> Sql<()> {
-    block_on(sqlx::raw_sql(statement).execute(&mut *db.borrow_mut())).map(|_| ())
+/// Pooled channel connection handle: borrows from `ServerDb` per query when
+/// outside a transaction, and holds one checked-out `DbConn` across
+/// nested `BEGIN IMMEDIATE` / `SAVEPOINT chat` scopes.
+pub struct Connection {
+    pool: Arc<ServerDb>,
+    tx: RefCell<Option<DbConn>>,
+}
+
+pub(super) enum ConnGuard<'a> {
+    Tx(RefMut<'a, Option<DbConn>>),
+    Pooled(DbConn),
+}
+
+impl Deref for ConnGuard<'_> {
+    type Target = SqliteConnection;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            ConnGuard::Tx(slot) => slot.as_ref().expect("active channel tx"),
+            ConnGuard::Pooled(conn) => conn,
+        }
+    }
+}
+
+impl DerefMut for ConnGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            ConnGuard::Tx(slot) => slot.as_mut().expect("active channel tx"),
+            ConnGuard::Pooled(conn) => conn,
+        }
+    }
+}
+
+impl Connection {
+    pub fn new(pool: Arc<ServerDb>) -> Self {
+        Self { pool, tx: RefCell::new(None) }
+    }
+
+    pub(super) fn borrow_mut(&self) -> ConnGuard<'_> {
+        if self.tx.borrow().is_some() {
+            ConnGuard::Tx(self.tx.borrow_mut())
+        } else {
+            ConnGuard::Pooled(self.pool.acquire().expect("server db pool open"))
+        }
+    }
+
+    pub(super) fn begin_tx(&self, statement: &'static str, is_outer: bool) -> Sql<()> {
+        let mut slot = self.tx.borrow_mut();
+        if is_outer {
+            *slot = Some(self.pool.acquire()?);
+        }
+        let conn = slot.as_mut().expect("active channel tx");
+        let res = block_on(sqlx::raw_sql(statement).execute(&mut **conn)).map(|_| ());
+        if is_outer && res.is_err() {
+            *slot = None;
+        }
+        res
+    }
+
+    pub(super) fn end_tx(&self, statement: &'static str, release: bool) -> Sql<()> {
+        let mut slot = self.tx.borrow_mut();
+        let res = if let Some(conn) = slot.as_mut() {
+            block_on(sqlx::raw_sql(statement).execute(&mut **conn)).map(|_| ())
+        } else {
+            Ok(())
+        };
+        if release {
+            *slot = None;
+        }
+        res
+    }
 }
 
 fn optional<T>(result: Sql<T>) -> Sql<Option<T>> {

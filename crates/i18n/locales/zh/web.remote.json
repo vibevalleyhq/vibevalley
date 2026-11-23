@@ -26,6 +26,9 @@
     "platform": {
       "ios": "iOS",
       "android": "Android",
+      "cli": "命令行",
+      "machine": "执行机",
+      "sandbox": "沙箱",
       "other": "其他设备"
     },
     "lastSeen": "最近活跃：{time}",

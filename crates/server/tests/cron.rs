@@ -26,10 +26,10 @@ fn crons_are_kept_refused_and_run_when_due() {
     let started = server(dir.path());
     let hub = started.hub.clone();
     let call = |op: &str, p| hub.call_as(Caller::User, op, p);
-    let mut helper = started.agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
     helper.runtime = "scripted".into();
     helper.name = "lab".into();
-    let helper = started.agents.profiles.save(helper).unwrap();
+    let helper = started.test_internals().agents.profiles.save(helper).unwrap();
     call("repo.create", json!({ "name": "farm" })).data.unwrap();
 
     let past = call("cron.create", json!({ "name": "x", "text": "y", "when": { "kind": "once", "at": 1 } }));
@@ -50,7 +50,7 @@ fn crons_are_kept_refused_and_run_when_due() {
         json!({ "name": "早报", "text": "写早报", "when": { "kind": "daily", "time": "09:00" }, "tz": "Asia/Shanghai" }),
     );
     let daily = daily.data.unwrap_or_else(|| panic!("{}", daily.message));
-    let general = started.chat.default_channel();
+    let general = started.test_internals().chat.default_channel();
     assert_eq!(
         (daily["enabled"].as_bool(), daily["pending"].as_bool(), daily["channel"].as_str()),
         (Some(true), Some(false), Some(general.as_str()))
@@ -75,8 +75,9 @@ fn crons_are_kept_refused_and_run_when_due() {
     let once = once.data.unwrap_or_else(|| panic!("{}", once.message));
     assert_eq!(once["agent"], helper.id.as_str());
     std::thread::sleep(Duration::from_millis(150));
-    started.crons.tick();
+    started.test_internals().crons.tick();
     let made = started
+        .test_internals()
         .board
         .read(|s| s.issues.iter().find(|i| i.cron.as_deref() == once["id"].as_str()).cloned())
         .unwrap();
@@ -85,12 +86,13 @@ fn crons_are_kept_refused_and_run_when_due() {
     let after = hub.read(|s| s.crons.iter().find(|c| c.id == once["id"].as_str().unwrap()).cloned()).unwrap();
     assert!(!after.enabled && after.last_run.is_some());
     // Run once: the next tick makes nothing new.
-    started.crons.tick();
-    assert_eq!(started.board.read(|s| s.issues.iter().filter(|i| i.cron.is_some()).count()), 1);
+    started.test_internals().crons.tick();
+    assert_eq!(started.test_internals().board.read(|s| s.issues.iter().filter(|i| i.cron.is_some()).count()), 1);
     assert!(!dir.path().join("crons.json").exists(), "crons must live in server.db, not crons.json");
 
     // Updating the issue preserves cron.issue_id (PutIssue ON CONFLICT DO UPDATE, not INSERT OR REPLACE).
     started
+        .test_internals()
         .board
         .edit(
             &made.id,
@@ -100,10 +102,13 @@ fn crons_are_kept_refused_and_run_when_due() {
             },
         )
         .unwrap();
-    assert_eq!(started.crons.issue_of(once["id"].as_str().unwrap()).as_deref(), Some(made.id.as_str()));
+    assert_eq!(
+        started.test_internals().crons.issue_of(once["id"].as_str().unwrap()).as_deref(),
+        Some(made.id.as_str())
+    );
 
     call("cron.delete", json!({ "id": id })).data.unwrap_or_default();
-    started.board.close();
+    started.test_internals().board.close();
     drop(started);
 
     // Kept through a restart, including Issue.cron projected from cron.issue_id.
@@ -111,10 +116,10 @@ fn crons_are_kept_refused_and_run_when_due() {
     let crons = again.hub.read(|s| s.crons.clone());
     assert_eq!(crons.len(), 1);
     assert_eq!(crons[0].name, "say hi");
-    let reloaded = again.board.issue(&made.id).unwrap();
+    let reloaded = again.test_internals().board.issue(&made.id).unwrap();
     assert_eq!(reloaded.cron.as_deref(), once["id"].as_str());
     // Deleting the cron clears Issue.cron on the linked issue.
-    again.crons.remove(once["id"].as_str().unwrap()).unwrap();
-    assert_eq!(again.board.issue(&made.id).unwrap().cron, None);
-    again.board.close();
+    again.test_internals().crons.remove(once["id"].as_str().unwrap()).unwrap();
+    assert_eq!(again.test_internals().board.issue(&made.id).unwrap().cron, None);
+    again.test_internals().board.close();
 }

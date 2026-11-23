@@ -8,6 +8,7 @@ pub mod http;
 pub mod provider;
 pub mod remote;
 pub mod setting;
+pub mod text;
 
 pub fn install_health(hub: &Hub) {
     install_health_version(hub, env!("CARGO_PKG_VERSION"));

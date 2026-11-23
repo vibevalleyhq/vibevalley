@@ -1,11 +1,26 @@
 //! Derived status and stage are rebuilt from issues and sessions, never persisted.
 use crate::modules::infra::column::{json, optional, read_json, read_word, word};
+use crate::modules::work::ledger::IssueStore;
 use vibevalley_protocol::Issue;
 use vibevalley_runtime::agent::durable::Sqlite;
 
 use crate::db::generated::work_issue as queries;
 
-pub const SCHEMA: &str = crate::db::schema::WORK_ISSUE;
+pub struct SqliteIssueStore;
+
+impl IssueStore for SqliteIssueStore {
+    fn all(&self, db: &Sqlite<'_>) -> sqlx::Result<Vec<Issue>> {
+        all(db)
+    }
+
+    fn put(&self, db: &Sqlite<'_>, issue: &Issue) -> sqlx::Result<()> {
+        put(db, issue)
+    }
+
+    fn remove(&self, db: &Sqlite<'_>, id: &str) -> sqlx::Result<()> {
+        remove(db, id)
+    }
+}
 
 fn read(r: queries::ListIssuesRow) -> sqlx::Result<Issue> {
     let mut issue = Issue::new(r.id, r.number, r.title, r.created_at);

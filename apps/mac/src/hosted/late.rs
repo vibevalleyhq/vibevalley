@@ -83,6 +83,10 @@ impl Server for LateServer {
         self.server().subscribe(name, payload)
     }
 
+    fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        self.server().subscribe_with(ctx, name, payload)
+    }
+
     fn unsubscribe(&self, id: u64) {
         if let Some(server) = self.cell.get() {
             server.unsubscribe(id);
@@ -109,8 +113,12 @@ impl Server for LateServer {
         self.cell.get().and_then(|s| s.fault_gate())
     }
 
-    fn voice(&self) -> Option<Arc<vibevalley_server::modules::collab::voice::Voice>> {
+    fn voice(&self) -> Option<vibevalley_server::transport::api::SharedLiveVoice> {
         self.cell.get().and_then(|s| s.voice())
+    }
+
+    fn remote_auth(&self) -> Option<vibevalley_server::transport::api::SharedRemoteAuth> {
+        self.cell.get().and_then(|s| s.remote_auth())
     }
 }
 

@@ -7,7 +7,7 @@ use clap::Args;
 use serde::Serialize;
 use vibevalley_protocol::{BoardSlice, Installation, KeySource, Next, ops};
 
-use crate::client::{Client, Done, Failure, decode_failure, exit, fallback_server};
+use crate::client::{Client, Done, Failure, ServerSource, decode_failure, exit};
 use crate::output::line;
 
 #[derive(Debug, Args)]
@@ -93,13 +93,12 @@ fn failed(check: &'static str, why: String, next: Vec<Next>) -> DoctorCheck {
 
 pub fn run(client: &Client, cmd: DoctorCmd) -> Done {
     let channel = vibevalley_protocol::home::current_channel().as_str();
-    let home = vibevalley_protocol::home::home();
-    let from = if vibevalley_protocol::home::announced(&home).as_deref() == Some(client.server.as_str()) {
-        "server.json"
-    } else if client.server == fallback_server() {
-        "default"
-    } else {
-        "override"
+    let home = client.home.clone();
+    let from = match client.server_source {
+        ServerSource::ServerJson => "server.json",
+        ServerSource::AuthFile => "auth.json",
+        ServerSource::DefaultPort => "default",
+        ServerSource::Flag | ServerSource::Env => "override",
     };
     let mut checks = vec![DoctorCheck::Home {
         check: "home",

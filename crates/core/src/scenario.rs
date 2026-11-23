@@ -1149,15 +1149,6 @@ fn build_edge(b: &mut ScenarioBuilder) -> SliceBundle {
         facts.push(Fact::IssueChanged(FactIssueChanged { at: now, issue: item }));
     }
 
-    b.apply(facts);
-
-    // Exercise the defensive wire case where a stuck stage carries no stuck reason (IssuePromptKind::StuckUnknown).
-    let mut state = b.core.state().clone();
-    if let Some(unknown) = state.issues.iter_mut().find(|i| i.id == "i-edge-stuck-unknown") {
-        unknown.stage.state = IssueStageKind::Stuck;
-        unknown.stage.stuck = None;
-    }
-    let seq = b.core.seq();
     let budget_alert = InboxItem {
         id: "durable:budget_reached:task-edge-budget:1795194383624:0".into(),
         kind: InboxKind::BudgetReached,
@@ -1176,9 +1167,18 @@ fn build_edge(b: &mut ScenarioBuilder) -> SliceBundle {
             tray: "运行预算已达上限".into(),
         },
     };
-    let mut bundle = crate::slice_bundle(&state, b.effects.clone(), seq);
-    bundle.inbox = crate::inbox_slice(&state, seq, &[budget_alert]);
-    bundle
+    facts.push(Fact::runtime_inbox_changed(now - MIN_MS, vec![budget_alert]));
+
+    b.apply(facts);
+
+    // Exercise the defensive wire case where a stuck stage carries no stuck reason (IssuePromptKind::StuckUnknown).
+    let mut state = b.core.state().clone();
+    if let Some(unknown) = state.issues.iter_mut().find(|i| i.id == "i-edge-stuck-unknown") {
+        unknown.stage.state = IssueStageKind::Stuck;
+        unknown.stage.stuck = None;
+    }
+    let seq = b.core.seq();
+    crate::slice_bundle(&state, b.effects.clone(), seq)
 }
 
 fn edge_image_job(id: &str, phase: MediaPhase, problem: &str, now: Millis) -> MediaJob {

@@ -27,6 +27,27 @@ const sampleDevices: readonly RemoteDeviceSummary[] = [
     createdAt: SCENARIO_NOW - 7_200_000,
   },
   {
+    id: "dev-cli",
+    name: "MacBook CLI",
+    platform: "cli",
+    scope: "remote:default",
+    createdAt: SCENARIO_NOW - 7_800_000,
+  },
+  {
+    id: "dev-machine",
+    name: "GPU Node",
+    platform: "machine",
+    scope: "remote:runtime",
+    createdAt: SCENARIO_NOW - 8_200_000,
+  },
+  {
+    id: "dev-sandbox",
+    name: "CI Container",
+    platform: "sandbox",
+    scope: "remote:runtime",
+    createdAt: SCENARIO_NOW - 8_600_000,
+  },
+  {
     id: "dev-other",
     name: "iPad Browser",
     platform: "other",
@@ -130,10 +151,16 @@ test("RemoteAccessPage: disabled -> enable -> pair/QR/copy -> revoke device -> d
   expect(app.count("id:remote-devices-empty")).toBe(0);
   expect(app.count("id:remote-device-dev-ios")).toBe(1);
   expect(app.count("id:remote-device-dev-android")).toBe(1);
+  expect(app.count("id:remote-device-dev-cli")).toBe(1);
+  expect(app.count("id:remote-device-dev-machine")).toBe(1);
+  expect(app.count("id:remote-device-dev-sandbox")).toBe(1);
   expect(app.count("id:remote-device-dev-other")).toBe(1);
   expect(app.texts()).toContain("Lucas iPhone");
   expect(app.texts()).toContain(t("web.remote.devices.platform.ios"));
   expect(app.texts()).toContain(t("web.remote.devices.platform.android"));
+  expect(app.texts()).toContain(t("web.remote.devices.platform.cli"));
+  expect(app.texts()).toContain(t("web.remote.devices.platform.machine"));
+  expect(app.texts()).toContain(t("web.remote.devices.platform.sandbox"));
   expect(app.texts()).toContain(t("web.remote.devices.platform.other"));
   expect(app.texts()).toContain(t("web.remote.devices.lastSeen", { time: shortMomentText(SCENARIO_NOW - 120_000, SCENARIO_NOW) }));
 

@@ -409,7 +409,8 @@ pub fn entries_for(before: &SpaceState, fact: &Fact, after: &SpaceState) -> Vec<
         | Fact::CronChanged(_)
         | Fact::CronRemoved(_)
         | Fact::MachineChanged(_)
-        | Fact::ConnectorChanged(_) => {}
+        | Fact::ConnectorChanged(_)
+        | Fact::RuntimeInboxChanged(_) => {}
     }
     if working(before) < FULL_HOUSE && working(after) >= FULL_HOUSE {
         out.push(LedgerEntry::Busy6(LedgerEntryMoment { at: 0 }));

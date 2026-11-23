@@ -19,7 +19,10 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
-use parking_lot::{Condvar, Mutex};
+use parking_lot::Mutex;
+use tokio::sync::Notify;
+use tokio::task::JoinHandle as TaskHandle;
+use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     Actor, AgentRole, ApiError, BizCode, ChannelType, Doing, ExecutionPolicy, Fact, FactSessionChanged, FactSessionPhaseChanged, NoticeLevel,
@@ -34,10 +37,16 @@ use self::words::Source;
 use crate::Hub;
 use crate::base::{LookIn, missing, refused};
 use crate::modules::collab::channel::{Chat, Committed, DeliveryTargetKind, Picked, Posting, QueuedDelivery, actor_of, meta_of};
-use crate::modules::team::tool::{Farm, Route, held};
+use crate::modules::content::artifact::Artifacts;
+use crate::modules::team::agent::Agents;
+use crate::modules::team::memory::Memories;
+use crate::modules::team::tool::{Route, ToolBox, held};
+use crate::modules::work::issue::Board;
 use crate::modules::work::ledger::Step;
+use crate::modules::work::repo::Repos;
 use crate::modules::work::session::Trajectories;
 use crate::now;
+use crate::ports::{CronOrchestratorPort, VoiceOrchestratorPort};
 
 const DEFAULT_MODEL: &str = "deepseek-flash";
 /// `quotaLow`: a runtime with less left than this is nearly used up.
@@ -103,7 +112,7 @@ struct Waiting {
 struct Instance {
     id: String,
     queue: Mutex<VecDeque<()>>,
-    more: Condvar,
+    more: Arc<Notify>,
     route: Arc<Mutex<Route>>,
     /// The situation it was last shown whole; "" shows it whole again.
     shown: Mutex<String>,
@@ -113,8 +122,15 @@ struct Instance {
 }
 
 pub struct Orchestrator {
+    me: Weak<Orchestrator>,
     hub: Weak<Hub>,
-    farm: Arc<Farm>,
+    tools: Arc<ToolBox>,
+    agents: Arc<Agents>,
+    pub(super) chat: Arc<Chat>,
+    pub(super) board: Board,
+    repos: Arc<Repos>,
+    memories: Arc<Memories>,
+    pub(super) artifacts: Arc<Artifacts>,
     home: PathBuf,
     trajectories: Arc<Trajectories>,
     key: Arc<dyn Fn() -> Option<String> + Send + Sync>,
@@ -124,7 +140,7 @@ pub struct Orchestrator {
     mcp: mcp::ProfileServers,
     /// The live answers not yet taken by a turn.
     ports: Mutex<HashMap<String, flume::Sender<String>>>,
-    chat_listener: Mutex<Option<(flume::Sender<()>, std::thread::JoinHandle<()>)>>,
+    chat_listener: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
     closed: AtomicBool,
 }
 
@@ -170,22 +186,38 @@ fn message_of_turn(entry: &execution::EvalEntry) -> Option<Option<Message>> {
 pub struct Parts {
     pub permissions: Permissions,
     pub hub: Weak<Hub>,
-    pub farm: Arc<Farm>,
+    pub tools: Arc<ToolBox>,
+    pub agents: Arc<Agents>,
+    pub chat: Arc<Chat>,
+    pub board: Board,
+    pub repos: Arc<Repos>,
+    pub memories: Arc<Memories>,
+    pub artifacts: Arc<Artifacts>,
     pub home: PathBuf,
     pub trajectories: Arc<Trajectories>,
     /// The DeepSeek key, read at each turn.
     pub key: Arc<dyn Fn() -> Option<String> + Send + Sync>,
     /// Talks to this model instead of DeepSeek (tests).
     pub client: Option<Arc<dyn ModelClient>>,
+    /// Whether to start listening to orchestrator-targeted dispatches from `chat` on open.
+    pub listen_chat: bool,
 }
 
 impl Orchestrator {
     pub fn open(p: Parts) -> vibevalley_runtime::agent::durable::Result<Arc<Orchestrator>> {
-        let store = p.farm.board.sessions().durable_store().clone();
+        let store = p.board.sessions().durable_store().clone();
+        let listen_chat = p.listen_chat;
         let o = Arc::new_cyclic(|weak| Orchestrator {
+            me: weak.clone(),
             execution: Execution::new(store, weak.clone(), p.permissions),
             hub: p.hub,
-            farm: p.farm,
+            tools: p.tools,
+            agents: p.agents,
+            chat: p.chat,
+            board: p.board,
+            repos: p.repos,
+            memories: p.memories,
+            artifacts: p.artifacts,
             home: p.home,
             trajectories: p.trajectories,
             key: p.key,
@@ -196,11 +228,11 @@ impl Orchestrator {
             mcp: Default::default(),
             closed: AtomicBool::new(false),
         });
-        for a in o.farm.agents.profiles.orchestrators() {
+        for a in o.agents.profiles.orchestrators() {
             o.keep_on_duty(&a);
         }
         let weak = Arc::downgrade(&o);
-        o.farm.agents.profiles.when_kept(Arc::new(move |a: &vibevalley_protocol::Agent| {
+        o.agents.profiles.when_kept(Arc::new(move |a: &vibevalley_protocol::Agent| {
             if let Some(o) = weak.upgrade()
                 && a.role == AgentRole::Orchestrator
             {
@@ -211,10 +243,13 @@ impl Orchestrator {
         }));
         // A turn the last process left unfinished is finished now.
         o.execution.scheduler.recover()?;
-        for a in o.farm.agents.profiles.orchestrators() {
+        for a in o.agents.profiles.orchestrators() {
             if o.execution.has_inputs(&a.id)? {
                 o.instance(&a.id);
             }
+        }
+        if listen_chat {
+            o.start_chat_listener();
         }
         Ok(o)
     }
@@ -224,7 +259,7 @@ impl Orchestrator {
     }
 
     pub fn ensure_open(&self) {
-        for a in self.farm.agents.profiles.orchestrators() {
+        for a in self.agents.profiles.orchestrators() {
             self.keep_on_duty(&a);
         }
     }
@@ -264,7 +299,7 @@ impl Orchestrator {
     /// The orchestrator `agent` names, or the default one.
     fn target(&self, agent: Option<&str>) -> String {
         match agent {
-            Some(a) if self.farm.agents.profiles.is_orchestrator(a) => a.to_string(),
+            Some(a) if self.agents.profiles.is_orchestrator(a) => a.to_string(),
             _ => vibevalley_protocol::DEFAULT_ORCHESTRATOR.to_string(),
         }
     }
@@ -277,9 +312,9 @@ impl Orchestrator {
         let me = Arc::new(Instance {
             id: id.to_string(),
             queue: Default::default(),
-            more: Condvar::new(),
+            more: Arc::new(Notify::new()),
             route: Arc::new(Mutex::new(Route {
-                channel: self.farm.chat.default_channel(),
+                channel: self.chat.default_channel(),
                 ..Route::default()
             })),
             shown: Default::default(),
@@ -289,9 +324,7 @@ impl Orchestrator {
         all.insert(id.to_string(), me.clone());
         let o = Arc::downgrade(self);
         let i = me.clone();
-        let _ = std::thread::Builder::new()
-            .name(format!("vibevalley-orchestrator-{id}"))
-            .spawn(move || Self::work(o, i));
+        vibevalley_runtime::rt::handle().spawn(async move { Self::work_async(o, i).await });
         me
     }
 
@@ -311,7 +344,7 @@ impl Orchestrator {
         }
         queue.push_back(());
         drop(queue);
-        me.more.notify_all();
+        me.more.notify_one();
         true
     }
 
@@ -330,7 +363,7 @@ impl Orchestrator {
     /// of theirs do, and the turn they wake is answered here as well.
     pub fn answer(self: &Arc<Self>, text: &str) -> Result<Reply, vibevalley_protocol::ApiError> {
         let reply = self.open_port();
-        self.farm.chat.say(crate::modules::collab::channel::Saying {
+        self.chat.say(crate::modules::collab::channel::Saying {
             text: text.into(),
             send_key: uuid::Uuid::new_v4().to_string(),
             source: Some("voice".into()),
@@ -348,7 +381,7 @@ impl Orchestrator {
         let reply = self.open_port();
         self.hear(Input {
             agent: None,
-            channel: self.farm.chat.default_channel(),
+            channel: self.chat.default_channel(),
             source: Source::Call,
             line,
             user: false,
@@ -373,46 +406,58 @@ impl Orchestrator {
         let _ = self.execution.stop(&id);
     }
 
-    /// Subscribes to orchestrator-targeted deliveries from `chat` asynchronously
+    /// Subscribes to orchestrator-targeted deliveries from `self.chat` on the shared runtime
     /// (plus replays any pending deliveries left from a prior process).
-    pub fn listen_chat(self: &Arc<Self>, chat: Arc<Chat>) {
-        let dispatches = chat.dispatches();
-        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
+    fn start_chat_listener(self: &Arc<Self>) {
+        let dispatches = self.chat.dispatches();
         let o = Arc::downgrade(self);
-        let handle = std::thread::Builder::new()
-            .name("vibevalley-orchestrator-dispatch".into())
-            .spawn(move || {
-                if let Some(o) = o.upgrade()
-                    && let Ok(pending) = chat.pending_deliveries(DeliveryTargetKind::Orchestrator)
+        let chat = self.chat.clone();
+        let cancel = self.hub().map(|h| h.child_token()).unwrap_or_default();
+        let task_cancel = cancel.clone();
+        let handle = vibevalley_runtime::rt::handle().spawn(async move {
+            let boot_o = o.clone();
+            let boot_chat = chat.clone();
+            let _ = tokio::task::spawn_blocking(move || {
+                if let Some(o) = boot_o.upgrade()
+                    && let Ok(pending) = boot_chat.pending_deliveries(DeliveryTargetKind::Orchestrator)
                 {
                     for d in pending {
                         if o.closed.load(Ordering::Acquire) {
                             return;
                         }
-                        o.handle_chat_delivery(&chat, &d, None);
-                    }
-                }
-                loop {
-                    let dispatched = flume::Selector::new().recv(&dispatches, |r| r.ok()).recv(&stop_rx, |_| None).wait();
-                    let Some(dispatched) = dispatched else { return };
-                    let Some(o) = o.upgrade() else { return };
-                    if o.closed.load(Ordering::Acquire) {
-                        return;
-                    }
-                    for d in &dispatched.deliveries {
-                        if d.recipient_kind == DeliveryTargetKind::Orchestrator {
-                            o.handle_chat_delivery(&chat, d, Some(&dispatched.committed));
-                        }
+                        o.handle_chat_delivery(&boot_chat, &d, None);
                     }
                 }
             })
-            .expect("orchestrator dispatch thread");
-        let prev = self.chat_listener.lock().replace((stop_tx, handle));
-        if let Some((old_stop, old_handle)) = prev {
-            drop(old_stop);
-            if old_handle.thread().id() != std::thread::current().id() {
-                let _ = old_handle.join();
+            .await;
+            loop {
+                let dispatched = tokio::select! {
+                    biased;
+                    _ = task_cancel.cancelled() => return,
+                    res = dispatches.recv_async() => match res {
+                        Ok(dispatched) => dispatched,
+                        Err(_) => return,
+                    },
+                };
+                let Some(o) = o.upgrade() else { return };
+                if o.closed.load(Ordering::Acquire) {
+                    return;
+                }
+                let chat_c = chat.clone();
+                let _ = tokio::task::spawn_blocking(move || {
+                    for d in &dispatched.deliveries {
+                        if d.recipient_kind == DeliveryTargetKind::Orchestrator {
+                            o.handle_chat_delivery(&chat_c, d, Some(&dispatched.committed));
+                        }
+                    }
+                })
+                .await;
             }
+        });
+        let prev = self.chat_listener.lock().replace((cancel, handle));
+        if let Some((old_cancel, old_handle)) = prev {
+            old_cancel.cancel();
+            let _ = vibevalley_runtime::rt::block_on(old_handle);
         }
     }
 
@@ -420,12 +465,12 @@ impl Orchestrator {
         use crate::modules::work::session::mailbox::{MailboxSource, MailboxStatus};
 
         const HANDED_EMOJI: &str = "👀";
-        let sessions = self.farm.board.sessions();
+        let sessions = self.board.sessions();
         if !chat.delivery_is_pending(d.id).unwrap_or(false) {
             let _ = sessions.withdraw_mailbox_by_message(&d.message_id);
             return;
         }
-        if !self.farm.agents.profiles.is_orchestrator(&d.recipient_id) {
+        if !self.agents.profiles.is_orchestrator(&d.recipient_id) {
             let _ = chat.settle_delivery(d.id, false);
             return;
         }
@@ -474,7 +519,7 @@ impl Orchestrator {
         let from_user = matches!(actor, Actor::User { .. });
         let mut picked_note = String::new();
         if let Some(p) = &meta.picked {
-            if let Some(a) = p.agent.as_deref().and_then(|a| self.farm.agents.profiles.agent(a)) {
+            if let Some(a) = p.agent.as_deref().and_then(|a| self.agents.profiles.agent(a)) {
                 picked_note += &words::picked_agent(&a.name);
             }
             if let Some(r) = &p.repo {
@@ -524,21 +569,19 @@ impl Orchestrator {
 
     pub fn close(&self) {
         self.closed.store(true, Ordering::Release);
-        if let Some((stop, handle)) = self.chat_listener.lock().take() {
-            drop(stop);
-            if handle.thread().id() != std::thread::current().id() {
-                let _ = handle.join();
-            }
+        if let Some((cancel, handle)) = self.chat_listener.lock().take() {
+            cancel.cancel();
+            let _ = vibevalley_runtime::rt::block_on(handle);
         }
         self.execution.close();
         self.mcp.close();
         for me in self.instances.lock().values() {
-            me.more.notify_all();
+            me.more.notify_waiters();
         }
     }
 
     fn model_of(&self, id: &str) -> Result<String, String> {
-        let configured = self.farm.agents.profiles.agent(id).map(|a| a.model.trim().to_string()).unwrap_or_default();
+        let configured = self.agents.profiles.agent(id).map(|a| a.model.trim().to_string()).unwrap_or_default();
         if configured.is_empty() {
             return Ok(DEFAULT_MODEL.into());
         }
@@ -558,13 +601,13 @@ impl Orchestrator {
 
     pub(crate) fn system_prompt_snapshot(&self, id: &str) -> String {
         let home = self.home.join("agent").join(id);
-        let memory = self.farm.memories.port(id, crate::modules::team::memory::By::Orchestrator);
+        let memory = self.memories.port(id, crate::modules::team::memory::By::Orchestrator);
         self.system_prompt(id, &home, memory.as_ref())
     }
 
     fn system_prompt(&self, id: &str, home: &std::path::Path, memory: &dyn MemoryPort) -> String {
         let p = &*words::PROMPTS;
-        let profile = self.farm.agents.profiles.agent(id);
+        let profile = self.agents.profiles.agent(id);
         let mut s = p.system.clone() + &p.agent;
         if id != vibevalley_protocol::DEFAULT_ORCHESTRATOR
             && let Some(a) = &profile
@@ -573,7 +616,7 @@ impl Orchestrator {
         }
         s = s.trim().to_string();
         s += "\n\n";
-        s += &p.env.replace("{cwd}", &self.farm.repos.root().display().to_string());
+        s += &p.env.replace("{cwd}", &self.repos.root().display().to_string());
         let skills = scan_skills(&[home.join("skills")]);
         if !skills.is_empty() {
             s += "\n\n";
@@ -593,8 +636,8 @@ impl Orchestrator {
     }
 
     fn tools_for(&self, id: &str, route: &Arc<Mutex<Route>>, skills_dir: PathBuf, memory: Arc<dyn MemoryPort>) -> Vec<Box<dyn Tool>> {
-        let mut tools = held(&self.farm, route);
-        if let Some(profile) = self.farm.agents.profiles.agent(id) {
+        let mut tools = held(&self.tools, route);
+        if let Some(profile) = self.agents.profiles.agent(id) {
             tools.extend(self.mcp.tools(&profile));
         }
         let dirs = vec![skills_dir];
@@ -614,7 +657,7 @@ impl Orchestrator {
             return Err(refused(BizCode::Refused, t("server.session.host.markNeedsWords", &[])));
         }
         let id = self.target(agent);
-        let label = self.farm.agents.profiles.agent(&id).map(|a| a.name).unwrap_or_else(|| id.clone());
+        let label = self.agents.profiles.agent(&id).map(|a| a.name).unwrap_or_else(|| id.clone());
         let log = self.trajectories.events(&id, None).unwrap_or_default();
         let Some(asked) = log.iter().find(|e| e.seq == on) else {
             return Err(missing(
@@ -646,7 +689,7 @@ impl Orchestrator {
         };
         let model = self.model_of(&id).map_err(|e| refused(BizCode::Refused, e))?;
         let me = self.instance(&id);
-        let memory = self.farm.memories.port(&id, crate::modules::team::memory::By::Orchestrator);
+        let memory = self.memories.port(&id, crate::modules::team::memory::By::Orchestrator);
         let case = EvalCase {
             id: uuid::Uuid::now_v7().to_string(),
             created_at: now(),
@@ -685,58 +728,71 @@ impl Orchestrator {
             let _ = std::fs::create_dir_all(&skills_dir);
             let _ = SKILLS.extract(&skills_dir);
         }
-        let memory = self.farm.memories.port(id, crate::modules::team::memory::By::Orchestrator);
+        let memory = self.memories.port(id, crate::modules::team::memory::By::Orchestrator);
         let mut brain = Brain::new(self.client(), model, self.system_prompt(id, &home, memory.as_ref()));
         brain.tools = self.tools_for(id, route, skills_dir, memory);
         brain
     }
 
-    fn work(o: Weak<Orchestrator>, me: Arc<Instance>) {
+    async fn work_async(o: Weak<Orchestrator>, me: Arc<Instance>) {
         loop {
-            {
-                let mut q = me.queue.lock();
-                loop {
-                    let Some(o) = o.upgrade() else { return };
-                    if o.closed.load(Ordering::Relaxed) {
-                        return;
-                    }
-                    let saved = o.execution.has_inputs(&me.id).unwrap_or(false);
-                    drop(o);
+            let ready = loop {
+                let Some(orch) = o.upgrade() else { return };
+                if orch.closed.load(Ordering::Relaxed) {
+                    return;
+                }
+                let notified = me.more.notified();
+                {
+                    let mut q = me.queue.lock();
                     if !q.is_empty() {
                         q.clear();
-                        break;
+                        break true;
                     }
-                    // Includes inputs durably accepted before the previous process stopped.
-                    if saved {
-                        break;
-                    }
-                    me.more.wait_for(&mut q, std::time::Duration::from_secs(1));
                 }
+                let check_o = orch.clone();
+                let check_id = me.id.clone();
+                let saved = tokio::task::spawn_blocking(move || check_o.execution.has_inputs(&check_id).unwrap_or(false))
+                    .await
+                    .unwrap_or(false);
+                drop(orch);
+                if saved {
+                    break true;
+                }
+                let _ = tokio::time::timeout(std::time::Duration::from_secs(1), notified).await;
             };
-            let Some(o) = o.upgrade() else { return };
-            {
-                let batch = match o.execution.batch(&me.id) {
+            if !ready {
+                return;
+            }
+            let Some(orch) = o.upgrade() else { return };
+            let inst = me.clone();
+            let keep_going = tokio::task::spawn_blocking(move || {
+                let batch = match orch.execution.batch(&inst.id) {
                     Ok(b) => b,
                     Err(e) => {
-                        if let Some(hub) = o.hub() {
+                        if let Some(hub) = orch.hub() {
                             hub.notice(NoticeLevel::Error, e.to_string());
                         }
-                        return;
+                        return false;
                     }
                 };
                 if !batch.is_empty() {
-                    o.turn(&me, batch);
+                    orch.turn(&inst, batch);
                 }
+                true
+            })
+            .await
+            .unwrap_or(false);
+            if !keep_going {
+                return;
             }
         }
     }
 
     /// The farm as it is shown before an input (`situation`).
     fn situation(&self, channel: &str) -> String {
-        let f = &self.farm;
         let mut agents = vec![];
-        for a in f.agents.profiles.agents() {
-            let assessed = f.agents.fleet.assess(&a);
+        for a in self.agents.profiles.agents() {
+            let assessed = self.agents.fleet.assess(&a);
             let p = &assessed.agent;
             let mut traits = vec![];
             if !p.duty.is_empty() {
@@ -760,9 +816,9 @@ impl Orchestrator {
             }
             agents.push(line);
         }
-        let roster = f.roster();
-        let default = f.chat.default_channel();
-        let by_channel: Vec<String> = f
+        let roster = self.tools.roster();
+        let default = self.chat.default_channel();
+        let by_channel: Vec<String> = self
             .chat
             .channels()
             .iter()
@@ -770,7 +826,7 @@ impl Orchestrator {
                 let theirs: Vec<String> = roster
                     .iter()
                     .filter(|h| h.channel_id().unwrap_or(default.as_str()) == c.id)
-                    .map(|h| f.session_line(h))
+                    .map(|h| self.tools.session_line(h))
                     .collect();
                 let head = words::channel_line(&c.name, c.default, &c.description, &c.repo);
                 format!(
@@ -783,15 +839,15 @@ impl Orchestrator {
                 )
             })
             .collect();
-        let repos = f.repos.list();
+        let repos = self.repos.list();
         let folders = if repos.is_empty() {
             words::NO_REPOS.to_string()
         } else {
             repos.iter().map(|r| r.name.as_str()).collect::<Vec<_>>().join("、")
         };
-        let (direct, target) = f.chat.address_of(channel);
+        let (direct, target) = self.chat.address_of(channel);
         words::whole(
-            &f.repos.root().display().to_string(),
+            &self.repos.root().display().to_string(),
             &folders,
             &agents.join("\n"),
             &by_channel.join("\n"),
@@ -861,7 +917,7 @@ impl Orchestrator {
             let mut said = me.cannot.lock();
             if said.get(&route.channel) != Some(&why) {
                 said.insert(route.channel.clone(), why.clone());
-                let _ = self.farm.chat.post(Posting {
+                let _ = self.chat.post(Posting {
                     from: me.id.clone(),
                     channel: route.channel.clone(),
                     text: why,
@@ -896,8 +952,32 @@ impl Orchestrator {
         }
         run.finish(outcome);
         for id in batch.iter().flat_map(|i| &i.messages) {
-            let _ = self.farm.chat.mark_seen(&me.id, id);
+            let _ = self.chat.mark_seen(&me.id, id);
         }
+    }
+}
+
+impl VoiceOrchestratorPort for Orchestrator {
+    fn brief(&self, line: String, wait: std::time::Duration) -> Option<String> {
+        let me = self.me.upgrade()?;
+        let reply = me.brief(line)?;
+        if wait.is_zero() { Some(String::new()) } else { Some(reply.whole(wait)) }
+    }
+}
+
+impl CronOrchestratorPort for Orchestrator {
+    fn hear_cron(&self, agent: &str, channel: &str, line: &str) -> bool {
+        let Some(me) = self.me.upgrade() else { return false };
+        me.hear(Input {
+            agent: Some(agent.to_string()),
+            channel: channel.to_string(),
+            source: Source::Cron,
+            line: line.to_string(),
+            user: false,
+            picked: None,
+            messages: vec![],
+            port: None,
+        })
     }
 }
 
@@ -927,7 +1007,7 @@ impl<'a> Run<'a> {
         std::fs::create_dir_all(&dir).ok()?;
         let path = dir.join(format!("{id}.jsonl"));
         let file = vibevalley_runtime::oar::record::open_file(Some(&path)).ok()??;
-        vibevalley_runtime::oar::record::Recorder::start(Some(file), ORCHESTRATOR_RUNTIME, id, o.farm.repos.root(), model)
+        vibevalley_runtime::oar::record::Recorder::start(Some(file), ORCHESTRATOR_RUNTIME, id, o.repos.root(), model)
     }
 
     fn start(o: &'a Orchestrator, me: &'a Instance, route: &'a Route, run: String, model: Option<&str>) -> Self {
@@ -1037,7 +1117,7 @@ impl<'a> Run<'a> {
         if self.durable {
             return;
         }
-        if let Err(e) = self.o.farm.chat.post(Posting {
+        if let Err(e) = self.o.chat.post(Posting {
             from: self.me.id.clone(),
             channel: self.route.channel.clone(),
             text,
@@ -1098,14 +1178,7 @@ impl<'a> Run<'a> {
             Ok(_) => Outcome::Failed,
             Err(e) => {
                 if let Some(hub) = self.o.hub() {
-                    let label = self
-                        .o
-                        .farm
-                        .agents
-                        .profiles
-                        .agent(&self.me.id)
-                        .map(|a| a.name)
-                        .unwrap_or_else(|| self.me.id.clone());
+                    let label = self.o.agents.profiles.agent(&self.me.id).map(|a| a.name).unwrap_or_else(|| self.me.id.clone());
                     hub.notice(
                         NoticeLevel::Error,
                         t("server.session.host.failed", &[("label", label.into()), ("why", e.to_string().into())]),

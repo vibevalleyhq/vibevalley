@@ -5,250 +5,37 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, BizCode, KeySource, LitFalse, LitTrue, Missing, ProviderBinding, ProviderConnection, ProviderConnectionAdapter, ProviderModel,
-    ProviderModelListing, ProviderStatus, ProviderUpdate, ProviderVoiceListing, ProviderVoiceListingVoices, Readiness, ops,
+    ApiError, BizCode, ProviderModel, ProviderModelListing, ProviderStatus, ProviderUpdate, ProviderVoiceListing, ProviderVoiceListingVoices, ops,
 };
 
 use super::http::{Fetch, FetchError, Request, read_max};
+pub use super::setting::{
+    Account, Connection, IMAGE_MODELS, LIVE_MODELS, MOSS, Providers, SPEAKERS_MODELS, SPEECH_MODELS, TRANSCRIPTION_MODELS, UNDERSTANDING_MODELS, Use,
+    VISION_MODELS, VOICE_DESIGN_MODELS,
+};
 use super::setting::{Secret, Setting};
 use crate::Hub;
 
-pub const MOSS: &str = "https://api.mosi.cn/v1";
-
-pub const IMAGE_MODELS: [&str; 4] = [
-    "moss-image-base-1.0",
-    "moss-image-sft-1.0",
-    "moss-image-base-1.0-2026-10-09",
-    "moss-image-sft-1.0-2026-10-09",
-];
-pub const LIVE_MODELS: [&str; 2] = ["moss-live-1.0", "moss-live-1.0-2026-11-02"];
-pub const SPEAKERS_MODELS: [&str; 2] = ["moss-ttsd-1.0", "moss-ttsd-1.0-2026-03-20"];
-pub const SPEECH_MODELS: [&str; 4] = [
-    "moss-tts-1.5-flash",
-    "moss-tts-1.5-flash-2026-06-26",
-    "moss-tts-1.0-pro",
-    "moss-tts-1.0-pro-2026-02-07",
-];
-pub const TRANSCRIPTION_MODELS: [&str; 4] = [
-    "moss-transcribe-1.0",
-    "moss-transcribe-1.0-2026-07-22",
-    "moss-transcribe-diarize-pro",
-    "moss-transcribe-diarize-pro-2026-07-03",
-];
-pub const UNDERSTANDING_MODELS: [&str; 2] = ["moss-vl-1.0", "moss-vl-1.0-2026-07-08"];
-pub const VISION_MODELS: [&str; 2] = ["moss-vl-realtime-1.0", "moss-vl-realtime-1.0-2026-09-09"];
-pub const VOICE_DESIGN_MODELS: [&str; 2] = ["moss-voice-generator-1.0", "moss-voice-generator-1.0-2026-07-22"];
-
-/// What a MOSS account is bound to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Use {
-    Image,
-    Understanding,
-    Speech,
-    Live,
-    Speakers,
-    VoiceDesign,
-    Transcription,
-    Vision,
-}
-
-impl Use {
-    pub const ALL: [Use; 8] = [
-        Use::Image,
-        Use::Understanding,
-        Use::Speech,
-        Use::Live,
-        Use::Speakers,
-        Use::VoiceDesign,
-        Use::Transcription,
-        Use::Vision,
-    ];
-
-    pub fn name(self) -> &'static str {
-        match self {
-            Use::Image => "image",
-            Use::Understanding => "understanding",
-            Use::Speech => "speech",
-            Use::Live => "live",
-            Use::Speakers => "speakers",
-            Use::VoiceDesign => "voiceDesign",
-            Use::Transcription => "transcription",
-            Use::Vision => "vision",
-        }
-    }
-
-    pub fn models(self) -> &'static [&'static str] {
-        match self {
-            Use::Transcription => &TRANSCRIPTION_MODELS,
-            Use::Image => &IMAGE_MODELS,
-            Use::Understanding => &UNDERSTANDING_MODELS,
-            Use::Speech => &SPEECH_MODELS,
-            Use::Live => &LIVE_MODELS,
-            Use::Speakers => &SPEAKERS_MODELS,
-            Use::VoiceDesign => &VOICE_DESIGN_MODELS,
-            Use::Vision => &VISION_MODELS,
-        }
-    }
-
-    /// The refusal for a model this use does not run.
-    fn wrong_model(self) -> ApiError {
-        match self {
-            Use::Image => refuse("server.provider.imageModel"),
-            Use::Understanding => refuse("server.provider.understandingModel"),
-            Use::Speech => refuse("server.provider.speechModel"),
-            Use::Live | Use::Speakers | Use::VoiceDesign | Use::Transcription | Use::Vision => {
-                let capability = t(&format!("server.provider.use.{}", self.name()), &[]);
-                ApiError::new(
-                    BizCode::ProviderRefused,
-                    t("server.provider.capabilityModel", &[("capability", capability.into())]),
-                )
-            }
-        }
-    }
-}
-
-/// A MOSS account as `settings.json` keeps it.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Connection {
-    pub id: String,
-    pub name: String,
-    pub adapter: ProviderConnectionAdapter,
-    #[serde(default)]
-    pub enabled: bool,
-    #[serde(default)]
-    pub key: Secret,
-}
-
-/// The MOSS accounts and what each use is bound to (`ProviderSettings`).
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Providers {
-    #[serde(default)]
-    pub revision: i64,
-    #[serde(default)]
-    pub connections: Vec<Connection>,
-    pub image: Option<ProviderBinding>,
-    pub understanding: Option<ProviderBinding>,
-    pub speech: Option<ProviderBinding>,
-    pub live: Option<ProviderBinding>,
-    pub speakers: Option<ProviderBinding>,
-    pub voice_design: Option<ProviderBinding>,
-    pub transcription: Option<ProviderBinding>,
-    pub vision: Option<ProviderBinding>,
-}
-
-/// One use's account: the connection, its model and key.
-#[derive(Debug, Clone)]
-pub struct Account {
-    pub connection: String,
-    pub revision: i64,
-    pub model: String,
-    pub key: Secret,
-}
-
-impl Providers {
-    pub fn binding(&self, u: Use) -> Option<&ProviderBinding> {
-        match u {
-            Use::Image => self.image.as_ref(),
-            Use::Understanding => self.understanding.as_ref(),
-            Use::Speech => self.speech.as_ref(),
-            Use::Live => self.live.as_ref(),
-            Use::Speakers => self.speakers.as_ref(),
-            Use::VoiceDesign => self.voice_design.as_ref(),
-            Use::Transcription => self.transcription.as_ref(),
-            Use::Vision => self.vision.as_ref(),
-        }
-    }
-
-    /// `boundConnection`: the connection named, on and with a key.
-    fn usable(&self, id: &str) -> Option<&Connection> {
-        self.connections.iter().find(|c| c.id == id && c.enabled && !c.key.is_empty())
-    }
-
-    /// The account bound to `u`, ready to call.
-    pub fn account(&self, u: Use) -> Option<Account> {
-        let b = self.binding(u)?;
-        let c = self.usable(&b.connection)?;
-        Some(Account {
-            connection: c.id.clone(),
-            revision: self.revision,
-            model: b.model.clone(),
-            key: c.key.clone(),
-        })
-    }
-
-    /// A usable connection's account, whatever is bound to it now: a job goes on with the account it was asked with.
-    pub fn account_on(&self, connection: &str, model: &str) -> Option<Account> {
-        let c = self.usable(connection)?;
-        Some(Account {
-            connection: c.id.clone(),
-            revision: self.revision,
-            model: model.into(),
-            key: c.key.clone(),
-        })
-    }
-
-    /// `bindingOf`: whether `u` can run, and what it lacks.
-    pub fn readiness(&self, u: Use) -> Readiness {
-        let lacks = |missing| Readiness::False { ready: LitFalse, missing };
-        if self.connections.is_empty() {
-            return lacks(Missing::MossAccount);
-        }
-        let Some(c) = self.binding(u).and_then(|b| self.connections.iter().find(|c| c.id == b.connection)) else {
-            return lacks(Missing::Binding);
-        };
-        if !c.enabled {
-            return lacks(Missing::MossOff);
-        }
-        if c.key.is_empty() {
-            return lacks(Missing::MossKey);
-        }
-        Readiness::True { ready: LitTrue }
-    }
-
-    /// `providerStatus`: the providers with each key as a hint.
-    pub fn status(&self) -> ProviderStatus {
-        let models = |m: &[&str]| m.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        ProviderStatus {
-            revision: self.revision,
-            connections: self
-                .connections
-                .iter()
-                .map(|c| ProviderConnection {
-                    id: c.id.clone(),
-                    name: c.name.clone(),
-                    adapter: c.adapter,
-                    enabled: c.enabled,
-                    key: c.key.status(KeySource::Settings),
-                })
-                .collect(),
-            image: self.image.clone(),
-            live: self.live.clone(),
-            live_models: models(&LIVE_MODELS),
-            speakers: self.speakers.clone(),
-            speakers_models: models(&SPEAKERS_MODELS),
-            voice_design: self.voice_design.clone(),
-            voice_design_models: models(&VOICE_DESIGN_MODELS),
-            transcription: self.transcription.clone(),
-            transcription_models: models(&TRANSCRIPTION_MODELS),
-            vision: self.vision.clone(),
-            vision_models: models(&VISION_MODELS),
-            image_models: models(&IMAGE_MODELS),
-            understanding: self.understanding.clone(),
-            understanding_models: models(&UNDERSTANDING_MODELS),
-            speech: self.speech.clone(),
-            speech_models: models(&SPEECH_MODELS),
-        }
-    }
-}
-
 fn refuse(key: &str) -> ApiError {
     ApiError::new(BizCode::ProviderRefused, t(key, &[]))
+}
+
+fn wrong_model(u: Use) -> ApiError {
+    match u {
+        Use::Image => refuse("server.provider.imageModel"),
+        Use::Understanding => refuse("server.provider.understandingModel"),
+        Use::Speech => refuse("server.provider.speechModel"),
+        Use::Live | Use::Speakers | Use::VoiceDesign | Use::Transcription | Use::Vision => {
+            let capability = t(&format!("server.provider.use.{}", u.name()), &[]);
+            ApiError::new(
+                BizCode::ProviderRefused,
+                t("server.provider.capabilityModel", &[("capability", capability.into())]),
+            )
+        }
+    }
 }
 
 fn good_connection_id(id: &str) -> bool {
@@ -314,7 +101,7 @@ pub fn connections_over(current: &Providers, update: &ProviderUpdate) -> Result<
         if let Some(b) = next.binding(u)
             && !u.models().contains(&b.model.as_str())
         {
-            return Err(u.wrong_model());
+            return Err(wrong_model(u));
         }
     }
     Ok(next)

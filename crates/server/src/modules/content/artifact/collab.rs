@@ -894,7 +894,7 @@ impl Artifacts {
             "blocks" => {
                 let ack = {
                     let mut conn = self.db();
-                    let mut tx = pollster::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
+                    let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
                     let current_row = self.found_blocks(&mut tx, &row.id)?;
                     let existing = db::blocks(&mut tx, &row.id).map_err(q)?;
                     let existing_by_id: HashMap<String, Block> = existing.iter().cloned().map(|b| (b.id.clone(), b)).collect();
@@ -942,7 +942,7 @@ impl Artifacts {
                     .map_err(q)?;
                     db::artifact_accepted(&mut tx, &row.id, seq, at).map_err(q)?;
                     db::upsert_artifact_collab(&mut tx, &row.id, &bytes, at).map_err(q)?;
-                    pollster::block_on(tx.commit()).map_err(q)?;
+                    vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
                     BlockAck {
                         batch_id,
                         seq,
@@ -956,7 +956,7 @@ impl Artifacts {
             "store" => {
                 let change = {
                     let mut conn = self.db();
-                    let mut tx = pollster::block_on(conn.begin()).map_err(q)?;
+                    let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
                     let current_row = self.found(&mut tx, &row.id)?;
                     let existing = db::entries(&mut tx, &row.id).map_err(q)?;
                     let prev_rev_by_path: HashMap<String, i64> = existing.iter().map(|r| (r.path.clone(), r.rev)).collect();
@@ -1001,7 +1001,7 @@ impl Artifacts {
                     db::add_entry_change(&mut tx, &row.id, seq, actor, &changed_paths, &deleted_paths, at).map_err(q)?;
                     db::artifact_accepted(&mut tx, &row.id, seq, at).map_err(q)?;
                     db::upsert_artifact_collab(&mut tx, &row.id, &bytes, at).map_err(q)?;
-                    pollster::block_on(tx.commit()).map_err(q)?;
+                    vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
                     EntryChange {
                         artifact: row.id.clone(),
                         seq,
@@ -1016,7 +1016,7 @@ impl Artifacts {
                 let html = snap.html.unwrap_or_default();
                 let file = self.keep(html.as_bytes(), &row.title)?;
                 let mut conn = self.db();
-                let mut tx = pollster::block_on(conn.begin()).map_err(q)?;
+                let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
                 let current_row = self.found(&mut tx, &row.id)?;
                 let next = current_row.version + 1;
                 db::add_version(
@@ -1039,7 +1039,7 @@ impl Artifacts {
                 .map_err(q)?;
                 db::artifact_versioned(&mut tx, &row.id, next, at).map_err(q)?;
                 db::upsert_artifact_collab(&mut tx, &row.id, &bytes, at).map_err(q)?;
-                pollster::block_on(tx.commit()).map_err(q)?;
+                vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
                 drop(conn);
                 self.get_now(&row.id)
             }
@@ -1184,7 +1184,7 @@ impl Artifacts {
             .map(str::to_string)
             .unwrap_or_else(|| format!("{} (fork)", row.title));
         let channel = match req.channel.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-            Some(c) => Some(self.chat.place_of(USER_ID, c)?),
+            Some(c) => Some(self.channel.place_of(USER_ID, c)?),
             None => row.channel_id.clone(),
         };
         let artifact_type = row.artifact_type.as_deref().and_then(artifact_type_of);
@@ -1241,7 +1241,7 @@ impl Artifacts {
                 let collab_bytes = remapped_doc.export_snapshot().map_err(collab_err)?;
                 let seq = i64::from(!new_blocks.is_empty());
                 let mut conn = self.db();
-                let mut tx = pollster::block_on(conn.begin()).map_err(q)?;
+                let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
                 db::add_artifact(
                     &mut tx,
                     db::NewArtifact {
@@ -1268,7 +1268,7 @@ impl Artifacts {
                     db::artifact_accepted(&mut tx, &new_art_id, seq, at).map_err(q)?;
                 }
                 db::upsert_artifact_collab(&mut tx, &new_art_id, &collab_bytes, at).map_err(q)?;
-                pollster::block_on(tx.commit()).map_err(q)?;
+                vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
                 drop(conn);
                 self.get_now(&new_art_id)
             }
@@ -1277,7 +1277,7 @@ impl Artifacts {
                 let collab_bytes = forked_doc.export_snapshot().map_err(collab_err)?;
                 let seq = i64::from(!entries.is_empty());
                 let mut conn = self.db();
-                let mut tx = pollster::block_on(conn.begin()).map_err(q)?;
+                let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
                 db::add_artifact(
                     &mut tx,
                     db::NewArtifact {
@@ -1321,7 +1321,7 @@ impl Artifacts {
                     db::artifact_accepted(&mut tx, &new_art_id, seq, at).map_err(q)?;
                 }
                 db::upsert_artifact_collab(&mut tx, &new_art_id, &collab_bytes, at).map_err(q)?;
-                pollster::block_on(tx.commit()).map_err(q)?;
+                vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
                 drop(conn);
                 self.get_now(&new_art_id)
             }
@@ -1330,7 +1330,7 @@ impl Artifacts {
                 let file = self.keep(html.as_bytes(), &title)?;
                 let collab_bytes = forked_doc.export_snapshot().map_err(collab_err)?;
                 let mut conn = self.db();
-                let mut tx = pollster::block_on(conn.begin()).map_err(q)?;
+                let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
                 db::add_artifact(
                     &mut tx,
                     db::NewArtifact {
@@ -1364,7 +1364,7 @@ impl Artifacts {
                 )
                 .map_err(q)?;
                 db::upsert_artifact_collab(&mut tx, &new_art_id, &collab_bytes, at).map_err(q)?;
-                pollster::block_on(tx.commit()).map_err(q)?;
+                vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
                 drop(conn);
                 self.get_now(&new_art_id)
             }

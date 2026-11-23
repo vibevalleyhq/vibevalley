@@ -1,10 +1,10 @@
-//! What the helpers' profiles remember.
+//! What the helpers' profiles remember (routed via `Hub::invoke` with zero `team/memory` import).
 
 use serde::Deserialize;
+use vibevalley_protocol::{MemoryCreateInput, MemorySearchInput, ops};
 
-use super::{Farm, Who, given};
-use crate::modules::team::memory::{By, Note, found_text};
-use crate::modules::team::orchestrator::words;
+use super::{ToolBox, Who, given};
+use crate::modules::infra::text;
 
 #[derive(Deserialize)]
 pub struct Args {
@@ -17,7 +17,7 @@ pub struct Args {
 /// The profile and repo scope a call reads or writes: a helper's own profile
 /// and, unless it names one, the repo it works in; the orchestrator names
 /// a helper profile, and its own notes are `remember`'s.
-fn scope(f: &Farm, who: &Who, a: &Args, needed: bool) -> Result<(String, String), String> {
+fn scope(f: &ToolBox, who: &Who, a: &Args, needed: bool) -> Result<(String, String), String> {
     match who {
         Who::Helper(me) => {
             let repo = match &a.repo {
@@ -37,7 +37,7 @@ fn scope(f: &Farm, who: &Who, a: &Args, needed: bool) -> Result<(String, String)
     }
 }
 
-fn profile(f: &Farm, key: &str) -> Result<String, String> {
+fn profile(f: &ToolBox, key: &str) -> Result<String, String> {
     const OWN: &str = "你自己的记性在系统提示里：要记用 remember";
     let k = key.trim();
     if k == "助手" {
@@ -51,38 +51,46 @@ fn profile(f: &Farm, key: &str) -> Result<String, String> {
     match a {
         Some(a) if profiles.is_orchestrator(&a.id) => Err(OWN.into()),
         Some(a) => Ok(a.id),
-        None => Err(words::no_profile_named(k)),
+        None => Err(text::no_profile_named(k)),
     }
 }
 
-pub fn search(f: &Farm, who: &Who, a: Args) -> Result<String, String> {
+pub fn search(f: &ToolBox, who: &Who, a: Args) -> Result<String, String> {
     let (agent, repo) = match scope(f, who, &a, false) {
         Ok(s) => s,
-        Err(why) => return Ok(words::failed(&why)),
+        Err(why) => return Ok(text::failed(&why)),
     };
-    let found = f.memories.search(&agent, &repo, &a.text, 0);
-    Ok(found_text(&found, &agent, &repo, &a.text))
+    let found = f
+        .hub()?
+        .invoke::<ops::MemorySearch>(
+            &f.ctx(who),
+            MemorySearchInput {
+                agent: (!agent.is_empty()).then(|| agent.clone()),
+                repo: (!repo.is_empty()).then(|| repo.clone()),
+                text: (!a.text.is_empty()).then(|| a.text.clone()),
+            },
+        )
+        .map_err(|e| e.message)?;
+    Ok(text::memory_found_text(&found, &agent, &repo, &a.text))
 }
 
-pub fn create(f: &Farm, who: &Who, a: Args) -> Result<String, String> {
+pub fn create(f: &ToolBox, who: &Who, a: Args) -> Result<String, String> {
     let (agent, repo) = match scope(f, who, &a, true) {
         Ok(s) => s,
-        Err(why) => return Ok(words::failed(&why)),
+        Err(why) => return Ok(text::failed(&why)),
     };
-    let by = match who {
-        Who::Helper(me) => By::Session(me.id.clone()),
-        Who::Orchestrator(_) => By::Orchestrator,
-    };
-    let note = Note {
-        agent: agent.clone(),
-        text: a.text,
-        repo,
-        by,
-    };
-    let m = match f.memories.write(&note) {
+    let m = match f.hub()?.invoke::<ops::MemoryCreate>(
+        &f.ctx(who),
+        MemoryCreateInput {
+            agent: agent.clone(),
+            text: a.text,
+            repo: (!repo.is_empty()).then_some(repo),
+            request_key: None,
+        },
+    ) {
         Ok(m) => m,
         Err(e) if matches!(who, Who::Helper(_)) => return Err(e.message),
-        Err(e) => return Ok(words::failed(&e.message)),
+        Err(e) => return Ok(text::failed(&e.message)),
     };
     let place = m.repo.as_deref().map(|r| format!("仓库 {r}")).unwrap_or_else(|| "所有仓库".into());
     Ok(match who {

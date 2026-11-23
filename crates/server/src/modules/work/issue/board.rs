@@ -22,8 +22,10 @@ use vibevalley_protocol::{
 };
 use vibevalley_runtime::oar::Registry;
 
+use crate::Hub;
+use crate::base::ServerDb;
 use crate::modules::work::ledger::{BoardConfig, BoardError, Facts, IssueChange, Ledger, LocalFacts, Result, Undelivered, find, io, now};
-use crate::modules::work::session::{DraftEnd, Drivers, Hire, Rounds, RuntimeDrivers, Sessions, trigger_of};
+use crate::modules::work::session::{DraftEnd, Drivers, Hire, Rounds, RuntimeDrivers, Sessions, SqliteSessionStore, trigger_of};
 use crate::modules::work::workplace::{Changes, Landed, Leave, OnDisk, Workplace};
 
 /// What the user writes down.
@@ -114,7 +116,7 @@ impl Board {
     /// The board as stored, without taking it: for reading while another
     /// process holds it. Working sessions show as they were last stored.
     pub fn snapshot(path: &std::path::Path) -> Result<SliceBundle> {
-        Ledger::snapshot(path)
+        Ledger::snapshot(path, &super::db::SqliteIssueStore, &SqliteSessionStore)
     }
 
     /// Takes the board and loads it, standing alone with an agent named by
@@ -126,11 +128,12 @@ impl Board {
     /// `open`, with the board's issues and sessions in `facts` (the server's
     /// state).
     pub fn open_on(path: &std::path::Path, registry: Arc<Registry>, config: BoardConfig, facts: Arc<dyn Facts>) -> Result<Board> {
+        let db = ServerDb::open_at(path)?;
         let drivers = Arc::new(RuntimeDrivers {
             registry,
             model: config.model.clone(),
         });
-        Board::open_with(path, drivers, config, facts, |_| {})
+        Board::open_with(db, drivers, config, facts, None, |_| {})
     }
 
     /// Takes the board and loads it into `facts`, issues' agents run by
@@ -139,10 +142,11 @@ impl Board {
     /// A session whose worktree is gone leaves, and its open issue is
     /// canceled as lost. Call `refresh_queue` afterwards to send what waits.
     pub fn open_with(
-        path: &std::path::Path,
+        db: Arc<ServerDb>,
         drivers: Arc<dyn Drivers>,
         config: BoardConfig,
         facts: Arc<dyn Facts>,
+        hub: Option<Weak<Hub>>,
         observe: impl FnOnce(&Sessions),
     ) -> Result<Board> {
         std::fs::create_dir_all(config.data_dir.join("reports")).map_err(io)?;
@@ -159,10 +163,10 @@ impl Board {
             std::thread::sleep(Duration::from_millis(50));
         }
         let config = Arc::new(config);
-        let (ledger, opened) = Ledger::open(path, facts)?;
+        let (ledger, opened) = Ledger::open(db, facts, Arc::new(super::db::SqliteIssueStore), Arc::new(SqliteSessionStore))?;
         let ledger = Arc::new(ledger);
         let workplaces = Arc::new(Workplace::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
-        let sessions = Sessions::new(ledger.durable.clone(), ledger.clone(), drivers.clone(), workplaces.clone(), config.clone())?;
+        let sessions = Sessions::new(ledger.durable.clone(), ledger.clone(), drivers.clone(), workplaces.clone(), config.clone(), hub)?;
         let board = Board(Arc::new(Inner {
             ledger,
             sessions,

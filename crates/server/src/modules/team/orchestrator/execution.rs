@@ -38,7 +38,7 @@ impl BrainProvider for Bound {
         let route = self.store.read(|tx| Ok(tx.document("conversation", conv, "pi.route")?.map(|d| d.state)))?;
         let route: Route = route.map(serde_json::from_value).transpose()?.unwrap_or_else(|| Route {
             agent: conv.into(),
-            channel: o.farm.chat.default_channel(),
+            channel: o.chat.default_channel(),
             ..Default::default()
         });
         Ok(Some(Arc::new(o.brain_at(conv, &Arc::new(Mutex::new(route)), provider))))
@@ -58,7 +58,6 @@ impl ReviewProvider for Bound {
         };
         let o = self.orchestrator.upgrade().ok_or(Error::Closed)?;
         let Some((issue, report)) = o
-            .farm
             .board
             .sessions()
             .review_work(vendor, run, request.candidate)
@@ -67,13 +66,12 @@ impl ReviewProvider for Bound {
             return Ok(None);
         };
         let changes = if issue.repo.is_some() {
-            let diff = crate::modules::work::issue::changes_of(&o.farm.board, &issue, None).map_err(|e| Error::Invalid(e.message))?;
+            let diff = crate::modules::work::issue::changes_of(&o.board, &issue, None).map_err(|e| Error::Invalid(e.message))?;
             Some(json!({"files":diff.files,"uncommitted":diff.uncommitted,"revision":diff.revision}))
         } else {
             None
         };
         let artifacts = o
-            .farm
             .artifacts
             .list(&vibevalley_protocol::ArtifactListRequest {
                 channel: None,
@@ -388,7 +386,6 @@ impl Execution {
                 continue;
             };
             run.o
-                .farm
                 .chat
                 .post(Posting {
                     from: run.me.id.clone(),

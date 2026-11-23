@@ -113,7 +113,7 @@ fn disabled_by_default_refuses_all_nine_endpoints_and_leaves_hub_unobserved() {
     let dir = tempfile::tempdir().unwrap();
     let started = start_server(dir.path(), false, "");
 
-    assert!(!started.debug.is_enabled());
+    assert!(!started.test_internals().debug.is_enabled());
     assert!(!started.hub.has_observer(), "disabled server must not attach observer");
     assert!(!started.hub.has_fault_gate(), "disabled server must not attach fault gate");
     assert!(!vibevalley_runtime::oar::has_observer(), "disabled server must not attach global oar observer");
@@ -159,7 +159,7 @@ fn redaction_scrubs_secrets_across_rpc_timeline_trajectories_and_exported_zip() 
     let live_secret = "live-deepseek-secret-xyz987654";
     let started = start_server(dir.path(), true, live_secret);
 
-    assert!(started.debug.is_enabled());
+    assert!(started.test_internals().debug.is_enabled());
     assert!(started.hub.has_observer());
     assert!(started.hub.has_fault_gate());
     assert!(vibevalley_runtime::oar::has_observer());
@@ -218,7 +218,7 @@ fn redaction_scrubs_secrets_across_rpc_timeline_trajectories_and_exported_zip() 
     );
     assert_eq!(created.biz_code, 0, "{}", created.message);
 
-    let collector = started.debug.collector();
+    let collector = started.test_internals().debug.collector();
     collector.on_call_start(&call_ctx, "setting.update", &json!({ "apiKey": plain_api_key, "authorization": bearer_token }));
     collector.on_call_end(&call_ctx, "setting.update", 0, 1_250);
     collector.on_event(
@@ -233,14 +233,14 @@ fn redaction_scrubs_secrets_across_rpc_timeline_trajectories_and_exported_zip() 
         },
     );
 
-    started.trajectories.step(
+    started.test_internals().trajectories.step(
         "sess-secret",
         "",
         Step::Asked {
             text: format!("Use {live_secret} and {sk_token} with {bearer_token}"),
         },
     );
-    started.trajectories.flush(true);
+    started.test_internals().trajectories.flush(true);
     let mut vrec = VoyageRecord::new(VoyageKind::Frame, "sess-secret".into(), 1_732_000_000_700);
     vrec.seq = 0;
     vrec.frame_type = "text_delta".into();
@@ -336,7 +336,7 @@ fn ring_buffer_bounds_each_lane_at_512_and_truncates_oversized_payloads() {
     let _guard = DEBUG_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let dir = tempfile::tempdir().unwrap();
     let started = start_server(dir.path(), true, "");
-    let collector = started.debug.collector();
+    let collector = started.test_internals().debug.collector();
 
     const PER_LANE: usize = 2000;
     let oversized = "x".repeat(8192);
@@ -465,7 +465,7 @@ fn fault_gate_delays_normal_ops_without_delaying_or_recording_debug_ops() {
         rpc_page.events
     );
 
-    let gate = started.debug.collector();
+    let gate = started.test_internals().debug.collector();
     assert_eq!(gate.delay_ms("slice:board"), 60);
     assert_eq!(gate.delay_ms("debug.snapshot"), 0);
     assert!(gate.should_disconnect("slice:board"));
@@ -540,15 +540,18 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
         Fact::session_changed(1_732_000_000_200, ws_session),
     ]);
 
-    started.trajectories.step("sess-issue-1", "", Step::RunStarted { run: "run-1".into() });
-    started.trajectories.step(
+    started
+        .test_internals()
+        .trajectories
+        .step("sess-issue-1", "", Step::RunStarted { run: "run-1".into() });
+    started.test_internals().trajectories.step(
         "sess-issue-1",
         "",
         Step::Asked {
             text: "Fix the silent failure".into(),
         },
     );
-    started.trajectories.with_log("sess-issue-1", |j| {
+    started.test_internals().trajectories.with_log("sess-issue-1", |j| {
         j.said("Checking logs...", &[]);
         j.usage(
             EventTokens {
@@ -563,7 +566,7 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
             &[],
         );
     });
-    started.trajectories.flush(true);
+    started.test_internals().trajectories.flush(true);
 
     let big_raw = format!(r#"{{"step_type":17,"code":"QUOTA_EXHAUSTED","pad":"{}"}}"#, "z".repeat(5000));
     let mut r0 = VoyageRecord::new(VoyageKind::Frame, "sess-issue-1".into(), 1_732_000_000_150);
@@ -574,14 +577,14 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
     r0.raw = big_raw.into_bytes();
     write_voyage_file(&dir.path().join("issues/records/sess-issue-1.jsonl"), "claude", "sess-issue-1", &[r0]);
 
-    started.trajectories.step(
+    started.test_internals().trajectories.step(
         "sess-ws-1",
         "",
         Step::Asked {
             text: "Explain this diff".into(),
         },
     );
-    started.trajectories.flush(true);
+    started.test_internals().trajectories.flush(true);
     let mut ws_rec = VoyageRecord::new(VoyageKind::Frame, "sess-ws-1".into(), 1_732_000_000_250);
     ws_rec.seq = 0;
     ws_rec.frame_type = "error".into();

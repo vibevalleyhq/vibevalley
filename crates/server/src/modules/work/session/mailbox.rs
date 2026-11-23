@@ -255,14 +255,13 @@ impl super::sessions::Sessions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::base::{ModuleDb, open_sqlx_db_at};
-    use crate::modules::work::session::db::SCHEMA;
+    use crate::base::ServerDb;
 
     #[test]
     fn mailbox_enqueue_idempotency_single_claim_and_withdraw_semantics() {
         let dir = tempfile::tempdir().unwrap();
-        drop(ModuleDb::open(dir.path(), SCHEMA).unwrap());
-        let mut conn = pollster::block_on(open_sqlx_db_at(&dir.path().join("server.db"))).unwrap();
+        let server_db = ServerDb::open(dir.path()).unwrap();
+        let mut conn = server_db.acquire().unwrap();
         let db = Sqlite::new(&mut conn);
 
         let a = SessionMailbox::enqueue(&db, "s1", "k1", MailboxSource::WorkspaceUser, None, "hello", 10).unwrap();

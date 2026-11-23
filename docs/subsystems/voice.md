@@ -6,12 +6,13 @@
 
 | 位置 | 是什么 |
 |---|---|
-| `crates/server/src/modules/collab/voice/mod.rs` | `Voice`：凭据（`grant`，返回 `VoiceGrant { channel, uid }`）、通话（`start`、`stop`、`heard`、`said`、`speak`）、验 MOSS 的 Key（`verify_moss`），以及给宿主的 `moss_line` |
+| `crates/server/src/transport/api/mod.rs` | `LiveVoicePort`、`LiveVoiceLine` 与 `SharedLiveVoice` 窄端口 trait：隔离开服务端具体 `Voice` 实现与桌面宿主 |
+| `crates/server/src/modules/collab/voice/mod.rs` | `Voice`（实现 `LiveVoicePort`）：凭据（`grant`，返回 `VoiceGrant { channel, uid }`）、通话（`start`、`stop`、`heard`、`said`、`speak`）、验 MOSS 的 Key（`verify_moss`），以及给宿主的 `moss_line`（实现 `LiveVoiceLine`） |
 | `crates/server/src/modules/collab/voice/moss.rs` | MOSS Live 的文字帧：`ask_orchestrator` 这个工具、会话设置、旁白（`commentary`）、验 Key |
 | `crates/server/src/modules/collab/voice/prompts.rs` | 通话里对模型说的话 |
-| `crates/server/src/modules/team/orchestrator/mod.rs` 的 `answer`、`brief` | 助手这一轮的话除了写进群聊，也交给等着它的那通电话（`Reply`） |
+| `crates/server/src/modules/team/orchestrator/mod.rs` 的 `answer`、`brief` | 助手这一轮的话除了写进群聊，也通过窄端口交给等着它的那通电话（`Reply`） |
 | `crates/server/src/modules/infra/setting.rs` | `settings.json` 里的语音人设与开场白（`VoiceSettings { persona, greeting }`） |
-| `apps/mac/src/live_voice.rs`、`apps/mac/src/audio.m` | 原生 MOSS Live WebSocket 驱动与 AVAudioEngine 采集/播放 |
+| `apps/mac/src/live_voice.rs`、`apps/mac/src/audio.m` | 经 `Server::voice() -> Option<SharedLiveVoice>` 消费 `LiveVoicePort` 的原生 MOSS Live WebSocket 驱动与 AVAudioEngine 采集/播放（不导入 `vibevalley_server::modules::*`） |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`voice.*`）。
 
