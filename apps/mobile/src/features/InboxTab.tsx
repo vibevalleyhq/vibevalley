@@ -1,16 +1,28 @@
-import { effect, Scroll, signal, Text, View } from "nsh";
+import { effect, List, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { InboxItem, SessionPermissionDecision } from "@vibevalley/protocol";
 
 import type { MobileLayout } from "../design/layout";
-import { EmptyPanel, FieldInput, PillButton, SectionCard, SplitPane, StatusTag, TopBar, type TagTone } from "../design/ui";
+import { EmptyPanel, FieldInput, MarkdownText, PillButton, SectionCard, SplitPane, StatusTag, TopBar, type TagTone } from "../design/ui";
 import { hapticImpact, hapticNotification, type PendingInteractionItem, type PendingPermissionItem, type RemoteSession } from "../infra/session";
 
 type InboxEntry =
   | { readonly kind: "permission"; readonly key: string; readonly item: PendingPermissionItem }
   | { readonly kind: "interaction"; readonly key: string; readonly item: PendingInteractionItem }
   | { readonly kind: "inbox"; readonly key: string; readonly item: InboxItem };
+
+function permissionOf(entry: InboxEntry): PendingPermissionItem | undefined {
+  return entry.kind === "permission" ? entry.item : undefined;
+}
+
+function interactionOf(entry: InboxEntry): PendingInteractionItem | undefined {
+  return entry.kind === "interaction" ? entry.item : undefined;
+}
+
+function inboxItemOf(entry: InboxEntry): InboxItem | undefined {
+  return entry.kind === "inbox" ? entry.item : undefined;
+}
 
 function inboxKindTone(kind: InboxItem["kind"]): TagTone {
   switch (kind) {
@@ -256,91 +268,103 @@ export function InboxTab(props: {
         <If
           when={isDual()}
           else={
-            <Scroll class="flex-1" contentClass="gap-3 p-4">
-              <Each of={permissions()} key={(entry) => `${entry.sessionId}:${entry.request.requestId}`}>
-                {(entry) => renderPermissionCard(entry)}
-              </Each>
-              <Each of={interactions()} key={(entry) => `${entry.sessionId}:${entry.request.requestId}`}>
-                {(entry) => renderInteractionCard(entry)}
-              </Each>
-              <Each of={items()} key={(item) => item.id}>
-                {(item) => (
-                  <SectionCard
-                    testID={`inbox-item-${item().id}`}
-                    onPress={() => {
-                      hapticImpact("light");
-                      props.onNavigateTarget(item().target);
-                    }}
-                    class="gap-2"
-                  >
-                    <View class="flex-row items-center justify-between gap-2">
-                      <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{item().words.title || item().who}</Text>
-                      <StatusTag label={item().words.label || item().kind} tone={inboxKindTone(item().kind)} />
-                    </View>
-                    <Text class="text-xs text-muted">{item().words.body || item().text}</Text>
-                  </SectionCard>
-                )}
-              </Each>
-            </Scroll>
+            <List
+              testID="inbox-list"
+              each={entries()}
+              keyExtractor={(entry) => entry.key}
+              estimatedItemSize={120}
+              class="min-h-0 flex-1"
+              contentClass="gap-3 p-4"
+            >
+              {(entry) => (
+                <View>
+                  <If when={permissionOf(entry())}>{(item) => renderPermissionCard(item)}</If>
+                  <If when={interactionOf(entry())}>{(item) => renderInteractionCard(item)}</If>
+                  <If when={inboxItemOf(entry())}>
+                    {(item) => (
+                      <SectionCard
+                        testID={`inbox-item-${item().id}`}
+                        onPress={() => {
+                          hapticImpact("light");
+                          props.onNavigateTarget(item().target);
+                        }}
+                        class="gap-2"
+                      >
+                        <View class="flex-row items-center justify-between gap-2">
+                          <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{item().words.title || item().who}</Text>
+                          <StatusTag label={item().words.label || item().kind} tone={inboxKindTone(item().kind)} />
+                        </View>
+                        <Text class="text-xs text-muted">{item().words.body || item().text}</Text>
+                      </SectionCard>
+                    )}
+                  </If>
+                </View>
+              )}
+            </List>
           }
         >
-          <Scroll class="flex-1" contentClass="gap-2.5 p-3">
-            <Each of={entries()} key={(entry) => entry.key}>
-              {(entry) => {
-                const selected = () => props.selectedKey() === entry().key;
-                const title = () => {
-                  const current = entry();
-                  switch (current.kind) {
-                    case "permission":
-                    case "interaction":
-                      return current.item.sessionName;
-                    case "inbox":
-                      return current.item.words.title || current.item.who;
-                  }
-                };
-                const subtitle = () => {
-                  const current = entry();
-                  switch (current.kind) {
-                    case "permission":
-                      return current.item.request.summary;
-                    case "interaction":
-                      return current.item.request.question;
-                    case "inbox":
-                      return current.item.words.body || current.item.text;
-                  }
-                };
-                const badge = (): { readonly label: string; readonly tone: TagTone } => {
-                  const current = entry();
-                  switch (current.kind) {
-                    case "permission":
-                      return { label: current.item.request.tool, tone: "wait" };
-                    case "interaction":
-                      return { label: t("web.remote.inbox.answer"), tone: "info" };
-                    case "inbox":
-                      return { label: current.item.words.label || current.item.kind, tone: inboxKindTone(current.item.kind) };
-                  }
-                };
+          <List
+            testID="inbox-list"
+            each={entries()}
+            keyExtractor={(entry) => entry.key}
+            estimatedItemSize={76}
+            class="min-h-0 flex-1"
+            contentClass="gap-2.5 p-3"
+          >
+            {(entry) => {
+              const selected = () => props.selectedKey() === entry().key;
+              const title = () => {
+                const current = entry();
+                switch (current.kind) {
+                  case "permission":
+                  case "interaction":
+                    return current.item.sessionName;
+                  case "inbox":
+                    return current.item.words.title || current.item.who;
+                }
+              };
+              const subtitle = () => {
+                const current = entry();
+                switch (current.kind) {
+                  case "permission":
+                    return current.item.request.summary;
+                  case "interaction":
+                    return current.item.request.question;
+                  case "inbox":
+                    return current.item.words.body || current.item.text;
+                }
+              };
+              const badge = (): { readonly label: string; readonly tone: TagTone } => {
+                const current = entry();
+                switch (current.kind) {
+                  case "permission":
+                    return { label: current.item.request.tool, tone: "wait" };
+                  case "interaction":
+                    return { label: t("web.remote.inbox.answer"), tone: "info" };
+                  case "inbox":
+                    return { label: current.item.words.label || current.item.kind, tone: inboxKindTone(current.item.kind) };
+                }
+              };
 
-                return (
-                  <SectionCard
-                    testID={`inbox-row-${entry().key}`}
-                    onPress={() => {
-                      hapticImpact("light");
-                      userPicked = true;
-                      props.onSelectKey(entry().key);
-                    }}
-                    class={`gap-1.5 ${selected() ? "border-focus bg-selected" : ""}`}
-                  >
-                    <View class="flex-row items-center justify-between gap-2">
-                      <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{title()}</Text>
-                      <StatusTag label={badge().label} tone={badge().tone} />
-                    </View>
-                    <Text class="truncate text-xs text-muted">{subtitle()}</Text>
-                  </SectionCard>
-                );
-              }}
-            </Each>
-          </Scroll>
+              return (
+                <SectionCard
+                  testID={`inbox-row-${entry().key}`}
+                  onPress={() => {
+                    hapticImpact("light");
+                    userPicked = true;
+                    props.onSelectKey(entry().key);
+                  }}
+                  class={`gap-1.5 ${selected() ? "border-focus bg-selected" : ""}`}
+                >
+                  <View class="flex-row items-center justify-between gap-2">
+                    <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{title()}</Text>
+                    <StatusTag label={badge().label} tone={badge().tone} />
+                  </View>
+                  <Text class="truncate text-xs text-muted">{subtitle()}</Text>
+                </SectionCard>
+              );
+            }}
+          </List>
         </If>
       </If>
     </View>
@@ -385,7 +409,7 @@ export function InboxTab(props: {
                       <Text class="min-w-0 flex-1 text-base font-semibold text-ink">{item().words.title || item().who}</Text>
                       <StatusTag label={item().words.label || item().kind} tone={inboxKindTone(item().kind)} />
                     </View>
-                    <Text class="text-sm text-ink">{item().words.body || item().text}</Text>
+                    <MarkdownText testID={`inbox-detail-body-${item().id}`} text={item().words.body || item().text} size="sm" />
                     <PillButton
                       testID={`inbox-jump-${item().id}`}
                       tone="primary"
