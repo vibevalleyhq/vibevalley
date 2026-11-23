@@ -101,3 +101,5 @@ Space 下：
 ## 配置
 
 配置的来源、优先级、校验和配置键说明见[设置和配置](docs/subsystems/setting.md#模型和不变量)。启动流程见[客户端](docs/subsystems/app.md#怎么走)。原生应用外壳自己的项目、布局和设置另存在 `~/Library/Application Support/VibeValley/state.db`。
+
+演进至多端分布式部署的目标逻辑架构、物理部署拓扑、模块边界收敛规范与迁移路线见[目标架构与部署拓扑](docs/architecture-topology.md)。
