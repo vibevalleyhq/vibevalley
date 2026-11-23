@@ -10,6 +10,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [development.md](docs/development.md) | 教程：本机跑起来（原生应用、单独的服务端、命令行），检查和测试，改形状、规则和表，发版 |
 | [concepts.md](docs/concepts.md) | 概念：实际是什么，农场怎么画它们 |
 | [architecture.md](docs/architecture.md) | 架构：分层、核心状态、事件流、接口和存储。改 `crates/`、`apps/`、`packages/` 之前读 |
+| [architecture-topology.md](docs/architecture-topology.md) | 目标架构与部署拓扑：四平面解耦、单机合体与分布式拓扑、`L0`–`L3` 模块收敛边界、三类主体鉴权与迁移路径 |
 
 子系统（`subsystems/`，从架构的角度写一个子系统沉淀下来的样子，[怎么写](docs/subsystems/README.md)）：
 
