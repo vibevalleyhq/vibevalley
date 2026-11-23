@@ -157,10 +157,6 @@ impl ServerDb {
         vibevalley_runtime::rt::block_on(self.write_pool.acquire()).map(|conn| DbConn(Some(conn)))
     }
 
-    pub(crate) fn acquire_read(&self) -> sqlx::Result<DbConn> {
-        vibevalley_runtime::rt::block_on(self.read_pool.acquire()).map(|conn| DbConn(Some(conn)))
-    }
-
     pub(crate) fn run<T>(&self, query: impl AsyncFnOnce(&mut SqliteConnection) -> sqlx::Result<T>) -> sqlx::Result<T> {
         vibevalley_runtime::rt::block_on(async {
             let mut conn = self.write_pool.acquire().await?;

@@ -29,7 +29,7 @@ Status: proposed
 
 采用 **P0 → P1 → P2** 三阶段收敛路线，在不破坏 [architecture-topology.md](docs/architecture-topology.md) 规定的模块边界（`L0`–`L3` DAG 与 `mac-no-server-module-import`）的前提下，先清除线上阻塞与关机竞态，再完成并发原语与端到端异步收敛。
 
-> 进度：**P0 与 P1 已落地**（`LateServer` 异步就绪快速路径、`watch_session`/`Inputs::list()`/Mac 非阻塞退出与 `TaskTracker` 关机排空；`tokio` `"process"` 与 `run_command_with_timeout`、artifact/connector/media/island/speech 全链路异步化、`JoinSet` + `Semaphore` 有界扇出、`ServerDb` 读写池拆分、`Chat` 无锁读与并行关机）；当前仅 **P2（双轨 `Hub::on_async`、按模块迁出 `rt::block_on`、`durable::SqliteStorage` 合并与移除 `pollster`）** 仍待推进。
+> 进度：**P0、P1 与 P2 已全部落地**（`LateServer` 异步就绪快速路径、`watch_session`/`Inputs::list()`/Mac 非阻塞退出与 `TaskTracker` 关机排空；`tokio` `"process"` 与 `run_command_with_timeout`、artifact/connector/media/island/speech 全链路异步化、`JoinSet` + `Semaphore` 有界扇出、`ServerDb` 读写池拆分、`Chat` 无锁读与并行关机；双轨 `Hub::on_async` / `Server::call_with_async`、热点 I/O 模块异步化、`durable::SqliteStorage` 统一接入 `ServerDb` 连接池与移除 `pollster`）。
 
 ### P0：Wave 4 前置止血（已落地）
 
@@ -71,7 +71,7 @@ Status: proposed
    - 为 [chat.rs](crates/server/src/modules/work/chat.rs) 的 `await_comment_delivery` 补充硬超时上限，防止投递异常导致调用方无限等待。
    - 用层级 `CancellationToken` 与 `TaskTracker` 并行关机替换全仓 25 处 `AtomicBool` 停止标志及自定义 `flume` 取消令牌（[stream.rs](crates/runtime/src/agent/ai/stream.rs)、[scheduler.rs](crates/runtime/src/agent/durable/scheduler.rs)）。
 
-### P2：渐进式端到端异步化
+### P2：渐进式端到端异步化（已落地）
 
 - **双轨端点派发**：在 `Hub` 新增 `Hub::on_async<O: Op>` 并在 `Server` trait 新增 `call_async`，HTTP 与桌面桥接优先走异步路径；纯内存处理器（只读 `Core` 或极短内存计算）保留同步 `Hub::on`，避免无意义的 `BoxFuture` 分配。
 - **按热点模块渐进迁出 `rt::block_on`**：优先将数据库与网络 I/O 密集的模块（`channel`、`artifact`、`media`、`remote`、`pull`、`infra/http`）改为原生 `async fn`，逐步清零 `rt::block_on`。
