@@ -300,7 +300,8 @@ impl Ui {
 #[cfg(test)]
 mod tests {
     use std::ffi::OsString;
-    use std::sync::Mutex;
+
+    use parking_lot::Mutex;
 
     use super::*;
 
@@ -358,7 +359,7 @@ mod tests {
 
     #[test]
     fn effective_motion_respects_env_no_animation_override() {
-        let _lock = ENV_LOCK.lock().expect("lock env");
+        let _lock = ENV_LOCK.lock();
         let on = Settings {
             motion: MotionChoice::On,
             ..Settings::default()

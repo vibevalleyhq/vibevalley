@@ -3,11 +3,14 @@
 //! what goes out, both ended before the account is replaced.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
+use backon::{BackoffBuilder, ExponentialBackoff, ExponentialBuilder};
+use parking_lot::Mutex;
 use sha2::{Digest, Sha256};
+use tokio::sync::{Mutex as AsyncMutex, Notify};
 use vibevalley_core::channel::for_user;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus, Fact, FactConnectorChanged};
@@ -16,7 +19,7 @@ use super::adapter::{App, AppFailed, FailedKind, Inbound, LoginIo, Progress, Rec
 use super::digest::{DIGEST_OVER, digest, is_pairing, short_id, split_text, user_line};
 use super::store::{Account, Store, StoreFailed};
 use crate::modules::collab::channel::{Chat, Saying};
-use crate::{Hub, lock, now};
+use crate::{Hub, now};
 
 /// WeChat's official client rests this long too.
 const STALE_PAUSE_MS: i64 = 60 * 60_000;
@@ -36,6 +39,17 @@ pub struct Env {
     /// A login's answer waits this long for the code to show.
     pub moment: Duration,
     pub closing: AtomicBool,
+}
+
+impl Env {
+    fn retry_backoff(&self) -> ExponentialBackoff {
+        ExponentialBuilder::new()
+            .with_factor(2.0)
+            .with_min_delay(self.retry_first.min(self.retry_most))
+            .with_max_delay(self.retry_most)
+            .without_max_times()
+            .build()
+    }
 }
 
 /// Why a step did not go through: the database's or the farm's words.
@@ -95,10 +109,10 @@ pub struct Bridge {
     app: Arc<dyn App>,
     env: Arc<Env>,
     shown: Mutex<Shown>,
-    progressed: Condvar,
+    progressed: Notify,
     /// One command at a time; only its holder replaces the generation.
-    commands: Mutex<Option<Generation>>,
-    wake: (flume::Sender<()>, flume::Receiver<()>),
+    commands: AsyncMutex<Option<Generation>>,
+    wake: Notify,
     told: Mutex<Option<ConnectorStatus>>,
 }
 
@@ -121,9 +135,9 @@ impl Bridge {
             app,
             env,
             shown: Mutex::default(),
-            progressed: Condvar::new(),
-            commands: Mutex::new(None),
-            wake: flume::bounded(1),
+            progressed: Notify::new(),
+            commands: AsyncMutex::new(None),
+            wake: Notify::new(),
             told: Mutex::new(None),
         })
     }
@@ -133,7 +147,7 @@ impl Bridge {
     }
 
     fn snapshot(&self) -> Option<Account> {
-        lock(&self.shown).account.clone()
+        self.shown.lock().account.clone()
     }
 
     fn closing(&self) -> bool {
@@ -142,7 +156,7 @@ impl Bridge {
 
     pub fn status(&self) -> ConnectorStatus {
         let (account, progress, error) = {
-            let s = lock(&self.shown);
+            let s = self.shown.lock();
             (s.account.clone(), s.signing_in.as_ref().map(|x| x.progress.clone()), s.error.clone())
         };
         let mut status = ConnectorStatus {
@@ -189,7 +203,7 @@ impl Bridge {
     /// Says the status to the core when a part of it changed.
     fn tell(&self) {
         let Some(hub) = self.env.hub.upgrade() else { return };
-        let mut told = lock(&self.told);
+        let mut told = self.told.lock();
         let status = self.status();
         if told.as_ref() == Some(&status) {
             return;
@@ -201,7 +215,7 @@ impl Bridge {
     fn set_err(&self, e: impl Into<String>) {
         let e = e.into();
         {
-            let mut s = lock(&self.shown);
+            let mut s = self.shown.lock();
             if s.error == e {
                 return;
             }
@@ -213,7 +227,7 @@ impl Bridge {
     fn reload(&self) -> Result<(), StoreFailed> {
         let account = self.env.store.account(self.id())?;
         let unread = account.as_ref().is_some_and(|a| !self.app.reads(&a.keys));
-        lock(&self.shown).account = account;
+        self.shown.lock().account = account;
         if unread {
             eprintln!("vibevalley-server: connector: {}: the saved secrets cannot be read", self.id().as_str());
             self.set_err(t("server.connector.unreadSecrets", &[]));
@@ -237,7 +251,7 @@ impl Bridge {
     }
 
     fn wake(&self) {
-        let _ = self.wake.0.try_send(());
+        self.wake.notify_waiters();
     }
 
     /// Something that decides what still goes out changed (a read, newer words): the worker looks again.
@@ -363,7 +377,7 @@ impl Bridge {
                 return Ok(None);
             }
             self.env.store.paired(id, m, now())?;
-            lock(&self.shown).account = self.env.store.account(id)?;
+            self.shown.lock().account = self.env.store.account(id)?;
             // Told once the user has the word: the status is not paired before the app's confirmation went out.
             if let Err(e) = self.app.send(&a.keys, &m.from, &t("server.connector.paired", &[]), &m.reply) {
                 eprintln!(
@@ -419,8 +433,12 @@ impl Bridge {
 
     /// The worker: what came in goes to the farm in order, then what waits goes out; what is held is tried again.
     fn work(&self, stop: &Stop) {
-        let mut delay = self.env.retry_first;
+        let mut backoff = self.env.retry_backoff();
+        let mut current_delay: Option<Duration> = None;
         while !stop.is_set() {
+            let notified = self.wake.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
             let taken = match self.drain_inbox(stop) {
                 Ok(()) => true,
                 Err(e) => {
@@ -430,11 +448,34 @@ impl Bridge {
             };
             let held = !self.drain(false) || !taken;
             if !held {
-                delay = self.env.retry_first;
+                backoff = self.env.retry_backoff();
+                current_delay = None;
             }
-            let woke = self.wake.1.recv_timeout(if held { delay } else { IDLE }).is_ok();
-            if held && !woke {
-                delay = (delay * 2).min(self.env.retry_most);
+            let wait_for = if held {
+                *current_delay.get_or_insert_with(|| backoff.next().unwrap_or(self.env.retry_most))
+            } else {
+                IDLE
+            };
+            enum Step {
+                Stopped,
+                Woke,
+                TimedOut,
+            }
+            let step = vibevalley_runtime::rt::block_on(async {
+                tokio::select! {
+                    biased;
+                    _ = stop.stopped() => Step::Stopped,
+                    _ = notified => Step::Woke,
+                    _ = tokio::time::sleep(wait_for) => Step::TimedOut,
+                }
+            });
+            match step {
+                Step::Stopped => break,
+                Step::Woke => {}
+                Step::TimedOut if held => {
+                    current_delay = Some(backoff.next().unwrap_or(self.env.retry_most));
+                }
+                Step::TimedOut => {}
             }
         }
     }
@@ -523,12 +564,9 @@ impl Bridge {
     fn stop_generation(&self, current: &mut Option<Generation>) {
         let Some(g) = current.take() else { return };
         g.stop.set();
-        self.wake();
         for thread in g.threads {
             let _ = thread.join();
         }
-        // The wake that stopped the worker may still lie there.
-        let _ = self.wake.1.try_recv();
     }
 
     fn connected(self: &Arc<Self>) -> Option<Generation> {
@@ -553,17 +591,17 @@ impl Bridge {
         let login = spawn(format!("vibevalley-connector-{}-login", self.id().as_str()), move || {
             let progress = |p: Progress| {
                 {
-                    let mut shown = lock(&b.shown);
+                    let mut shown = b.shown.lock();
                     if shown.login_try != attempt {
                         return;
                     }
                     let code = shown.signing_in.take().map(|x| x.code).unwrap_or_default();
                     shown.signing_in = Some(SigningIn { progress: p, code });
                 }
-                b.progressed.notify_all();
+                b.progressed.notify_waiters();
                 b.tell();
             };
-            let code = || lock(&b.shown).signing_in.as_ref().map(|x| x.code.clone()).unwrap_or_default();
+            let code = || b.shown.lock().signing_in.as_ref().map(|x| x.code.clone()).unwrap_or_default();
             let io = LoginIo {
                 progress: &progress,
                 code: &code,
@@ -577,15 +615,14 @@ impl Bridge {
 
     /// The login's answer, taken as a command by the login's own thread: a newer command that stops it first wins.
     fn logged_in(self: &Arc<Self>, stop: &Stop, result: Result<super::adapter::Linked<crate::modules::infra::setting::Secret>, AppFailed>) {
-        let mut current = loop {
-            if stop.is_set() {
-                return;
+        let Some(mut current) = vibevalley_runtime::rt::block_on(async {
+            tokio::select! {
+                biased;
+                _ = stop.stopped() => None,
+                guard = self.commands.lock() => Some(guard),
             }
-            match self.commands.try_lock() {
-                Ok(c) => break c,
-                Err(std::sync::TryLockError::Poisoned(e)) => break e.into_inner(),
-                Err(std::sync::TryLockError::WouldBlock) => std::thread::sleep(Duration::from_millis(5)),
-            }
+        }) else {
+            return;
         };
         if stop.is_set() {
             return;
@@ -613,11 +650,11 @@ impl Bridge {
             }
         };
         {
-            let mut shown = lock(&self.shown);
+            let mut shown = self.shown.lock();
             shown.error = failure.unwrap_or_default();
             shown.signing_in = None;
         }
-        self.progressed.notify_all();
+        self.progressed.notify_waiters();
         *current = self.connected();
         drop(current);
         self.tell();
@@ -631,7 +668,7 @@ impl Bridge {
 
     /// Goes on with the account there is.
     pub fn resume(self: &Arc<Self>) {
-        let mut current = lock(&self.commands);
+        let mut current = vibevalley_runtime::rt::block_on(self.commands.lock());
         if current.is_none() {
             *current = self.connected();
         }
@@ -639,14 +676,14 @@ impl Bridge {
 
     pub fn login(self: &Arc<Self>, input: ConnectorLogin) -> ConnectorStatus {
         let started = {
-            let mut current = lock(&self.commands);
-            let going = lock(&self.shown).signing_in.is_some();
+            let mut current = vibevalley_runtime::rt::block_on(self.commands.lock());
+            let going = self.shown.lock().signing_in.is_some();
             if going && input.force != Some(true) {
-                lock(&self.shown).login_try
+                self.shown.lock().login_try
             } else {
                 self.stop_generation(&mut current);
                 let attempt = {
-                    let mut shown = lock(&self.shown);
+                    let mut shown = self.shown.lock();
                     shown.login_try += 1;
                     shown.error.clear();
                     shown.signing_in = Some(SigningIn {
@@ -665,21 +702,27 @@ impl Bridge {
         self.tell();
         // The answer carries the code when it shows within a moment.
         let deadline = Instant::now() + self.env.moment;
-        let mut shown = lock(&self.shown);
         loop {
-            let there = shown.login_try != started || shown.signing_in.as_ref().is_none_or(|x| !x.progress.qr.is_empty());
+            let notified = self.progressed.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            let there = {
+                let shown = self.shown.lock();
+                shown.login_try != started || shown.signing_in.as_ref().is_none_or(|x| !x.progress.qr.is_empty())
+            };
             let Some(left) = deadline.checked_duration_since(Instant::now()).filter(|_| !there) else {
                 break;
             };
-            shown = self.progressed.wait_timeout(shown, left).unwrap_or_else(|e| e.into_inner()).0;
+            vibevalley_runtime::rt::block_on(async {
+                let _ = tokio::time::timeout(left, notified).await;
+            });
         }
-        drop(shown);
         self.status()
     }
 
     /// The code the user typed for the login going on; with none going on it is for none.
     pub fn verify(&self, code: &str) -> ConnectorStatus {
-        if let Some(signing) = lock(&self.shown).signing_in.as_mut() {
+        if let Some(signing) = self.shown.lock().signing_in.as_mut() {
             if signing.progress.state == ConnectorState::Verify {
                 signing.progress.state = ConnectorState::Scanned;
             }
@@ -691,11 +734,11 @@ impl Bridge {
 
     pub fn logout(self: &Arc<Self>) -> ConnectorStatus {
         {
-            let mut current = lock(&self.commands);
+            let mut current = vibevalley_runtime::rt::block_on(self.commands.lock());
             self.stop_generation(&mut current);
             let gone = self.env.store.disconnect(self.id(), &t("server.connector.disconnected", &[]));
             {
-                let mut shown = lock(&self.shown);
+                let mut shown = self.shown.lock();
                 shown.signing_in = None;
                 shown.login_try += 1;
                 match &gone {
@@ -706,7 +749,7 @@ impl Bridge {
                     Err(e) => shown.error = e.0.clone(),
                 }
             }
-            self.progressed.notify_all();
+            self.progressed.notify_waiters();
             if gone.is_err() {
                 *current = self.connected();
             }
@@ -726,7 +769,7 @@ impl Bridge {
     }
 
     pub fn stop(&self) {
-        let mut current = lock(&self.commands);
+        let mut current = vibevalley_runtime::rt::block_on(self.commands.lock());
         self.stop_generation(&mut current);
     }
 }

@@ -4,9 +4,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use include_dir::{Dir, include_dir};
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vibevalley_i18n::{list, t};
@@ -17,7 +18,6 @@ use vibevalley_protocol::{
 
 use super::presets::default_settings;
 use crate::base::{LookIn, missing};
-use crate::lock;
 
 static BUILT_IN: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/assets/agent");
 
@@ -450,7 +450,7 @@ impl Profiles {
             keeps: Mutex::default(),
         };
         profiles.write(&s)?;
-        *lock(&profiles.stored) = s;
+        *profiles.stored.lock() = s;
         Ok(Arc::new(profiles))
     }
 
@@ -463,7 +463,7 @@ impl Profiles {
 
     /// A change is kept only once it is on disk.
     fn change<R>(&self, f: impl FnOnce(&mut Stored) -> Result<R, ApiError>) -> Result<R, ApiError> {
-        let mut guard = lock(&self.stored);
+        let mut guard = self.stored.lock();
         let mut next = guard.clone();
         let out = f(&mut next)?;
         self.write(&next).map_err(|e| {
@@ -477,7 +477,7 @@ impl Profiles {
     }
 
     fn saved(&self, agent: Agent) -> Result<Agent, ApiError> {
-        let keeps = lock(&self.keeps).clone();
+        let keeps = self.keeps.lock().clone();
         for keep in keeps {
             keep(&agent)?;
         }
@@ -485,11 +485,11 @@ impl Profiles {
     }
 
     pub fn when_kept(&self, keep: Keep) {
-        lock(&self.keeps).push(keep);
+        self.keeps.lock().push(keep);
     }
 
     pub fn all(&self) -> Vec<Agent> {
-        lock(&self.stored).agents.clone()
+        self.stored.lock().agents.clone()
     }
 
     /// Helper profiles only: the ones work is sent to.
@@ -502,11 +502,11 @@ impl Profiles {
     }
 
     pub fn is_orchestrator(&self, id: &str) -> bool {
-        lock(&self.stored).agents.iter().any(|a| a.id == id && a.role == AgentRole::Orchestrator)
+        self.stored.lock().agents.iter().any(|a| a.id == id && a.role == AgentRole::Orchestrator)
     }
 
     pub fn agent(&self, id: &str) -> Option<Agent> {
-        lock(&self.stored).agents.iter().find(|a| a.id == id).cloned()
+        self.stored.lock().agents.iter().find(|a| a.id == id).cloned()
     }
 
     /// A helper by id, else by name.
@@ -520,12 +520,12 @@ impl Profiles {
     pub fn skills(&self) -> Vec<Skill> {
         let own = built_in_skills();
         let mut out = own.clone();
-        out.extend(lock(&self.stored).skills.iter().filter(|k| !own.iter().any(|o| o.id == k.id)).cloned());
+        out.extend(self.stored.lock().skills.iter().filter(|k| !own.iter().any(|o| o.id == k.id)).cloned());
         out
     }
 
     pub fn settings(&self, runtime: &str) -> RuntimeSettings {
-        lock(&self.stored).settings.get(runtime).cloned().unwrap_or_else(default_settings)
+        self.stored.lock().settings.get(runtime).cloned().unwrap_or_else(default_settings)
     }
 
     pub fn save_settings(&self, runtime: &str, settings: RuntimeSettings) -> Result<RuntimeSettings, ApiError> {
@@ -612,7 +612,8 @@ impl Profiles {
 
     fn deletable_skill(&self, id: &str) -> Result<Skill, ApiError> {
         Self::not_built_in(id)?;
-        lock(&self.stored)
+        self.stored
+            .lock()
             .skills
             .iter()
             .find(|k| k.id == id)
@@ -672,7 +673,9 @@ impl Profiles {
 
     pub fn preview_remove_skill(&self, id: &str) -> Result<Preview, ApiError> {
         let k = self.deletable_skill(id)?;
-        let holders: Vec<String> = lock(&self.stored)
+        let holders: Vec<String> = self
+            .stored
+            .lock()
             .agents
             .iter()
             .filter(|a| a.skills.iter().any(|s| s == id))

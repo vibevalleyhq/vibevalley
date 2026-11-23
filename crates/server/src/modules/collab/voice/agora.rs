@@ -574,8 +574,7 @@ pub fn speak_pieces(text: &str, max: usize) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
-
+    use parking_lot::Mutex;
     use serde_json::Value;
 
     use super::*;
@@ -626,8 +625,8 @@ mod tests {
                 std::io::Read::read_to_string(&mut b, &mut body).unwrap();
             }
             let auth = r.headers.iter().find(|(k, _)| k == "authorization").map(|(_, v)| v.clone()).unwrap_or_default();
-            s.lock().unwrap().push((format!("{} {}", r.method, r.url), auth, body));
-            let (status, headers, text) = left.lock().unwrap().pop_front().unwrap_or((200, vec![], r#"{"agent_id":"parity-agent"}"#));
+            s.lock().push((format!("{} {}", r.method, r.url), auth, body));
+            let (status, headers, text) = left.lock().pop_front().unwrap_or((200, vec![], r#"{"agent_id":"parity-agent"}"#));
             Ok(Response {
                 status,
                 headers: headers.into_iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
@@ -645,7 +644,7 @@ mod tests {
                 certificate: Secret::new("22222222222222222222222222222222"),
             },
             area,
-            pause: Arc::new(move |d| waits.lock().unwrap().push(d)),
+            pause: Arc::new(move |d| waits.lock().push(d)),
         }
     }
 
@@ -680,7 +679,7 @@ mod tests {
             let (fetch, seen) = answering(vec![]);
             let agent = client(fetch, c.voice.area, Arc::default()).start(&request).unwrap();
             assert_eq!(agent, "parity-agent");
-            let seen = seen.lock().unwrap();
+            let seen = seen.lock();
             assert_eq!(seen[0].0, format!("POST {}", c.request_url), "{}", c.name);
             assert!(seen[0].1.starts_with("agora token=007"), "{}", c.name);
             assert_eq!(serde_json::from_str::<Value>(&seen[0].2).unwrap(), c.request, "{}", c.name);
@@ -720,23 +719,23 @@ mod tests {
         let waits = Arc::new(Mutex::new(vec![]));
         let (fetch, seen) = answering(vec![(503, vec![], "{}"), (502, vec![], "{}"), (200, vec![], "{}")]);
         client(fetch, Area::US, waits.clone()).speak("c", "a1", "hi").unwrap();
-        assert_eq!(*waits.lock().unwrap(), [Duration::from_secs(1), Duration::from_secs(2)]);
-        assert_eq!(seen.lock().unwrap().len(), 3);
-        assert!(seen.lock().unwrap()[0].0.ends_with("/agents/a1/speak"));
-        assert_eq!(seen.lock().unwrap()[0].2, r#"{"text":"hi","priority":"APPEND","interruptable":true}"#);
+        assert_eq!(*waits.lock(), [Duration::from_secs(1), Duration::from_secs(2)]);
+        assert_eq!(seen.lock().len(), 3);
+        assert!(seen.lock()[0].0.ends_with("/agents/a1/speak"));
+        assert_eq!(seen.lock()[0].2, r#"{"text":"hi","priority":"APPEND","interruptable":true}"#);
 
-        waits.lock().unwrap().clear();
+        waits.lock().clear();
         let (fetch, _) = answering(vec![(429, vec![("Retry-After", "5")], "{}"), (200, vec![], "{}")]);
         client(fetch, Area::US, waits.clone()).speak("c", "a1", "hi").unwrap();
-        assert_eq!(*waits.lock().unwrap(), [Duration::from_secs(5)]);
+        assert_eq!(*waits.lock(), [Duration::from_secs(5)]);
 
         let (fetch, seen) = answering(vec![(400, vec![], r#"{"detail":"boom"}"#)]);
         let refused = client(fetch, Area::US, waits.clone()).speak("c", "a1", "hi").unwrap_err();
-        assert_eq!((refused.status, refused.message.as_str(), seen.lock().unwrap().len()), (Some(400), "boom", 1));
+        assert_eq!((refused.status, refused.message.as_str(), seen.lock().len()), (Some(400), "boom", 1));
 
         let (fetch, seen) = answering(vec![(500, vec![], "{}"), (500, vec![], "{}"), (500, vec![], "down")]);
         let down = client(fetch, Area::US, waits).speak("c", "a1", "hi").unwrap_err();
-        assert_eq!((down.status, down.message.as_str(), seen.lock().unwrap().len()), (Some(500), "down", 3));
+        assert_eq!((down.status, down.message.as_str(), seen.lock().len()), (Some(500), "down", 3));
     }
 
     #[test]
@@ -751,7 +750,7 @@ mod tests {
         assert_eq!(c.stop("a1"), Ok(()));
         assert_eq!(c.stop("a1").unwrap_err().status, Some(403));
         assert_eq!(
-            seen.lock().unwrap()[0].0,
+            seen.lock()[0].0,
             "POST https://api-cn-east-1.sd-rtn.com/cn/api/conversational-ai-agent/v2/projects/11111111111111111111111111111111/agents/a1/leave"
         );
     }

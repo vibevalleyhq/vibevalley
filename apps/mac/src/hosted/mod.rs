@@ -29,7 +29,7 @@ impl gpui::Global for ServerStartup {}
 /// Lightweight GPUI shell state snapshot exposed to `Hub::host_debug()`.
 #[derive(Clone)]
 pub struct ShellDebugHandle {
-    snapshot: std::sync::Arc<std::sync::RwLock<Value>>,
+    snapshot: std::sync::Arc<parking_lot::RwLock<Value>>,
 }
 
 impl gpui::Global for ShellDebugHandle {}
@@ -43,18 +43,18 @@ impl Default for ShellDebugHandle {
 impl ShellDebugHandle {
     pub fn new() -> Self {
         Self {
-            snapshot: std::sync::Arc::new(std::sync::RwLock::new(json!({}))),
+            snapshot: std::sync::Arc::new(parking_lot::RwLock::new(json!({}))),
         }
     }
 
     pub fn update(&self, value: Value) {
-        *self.snapshot.write().unwrap_or_else(|e| e.into_inner()) = value;
+        *self.snapshot.write() = value;
     }
 }
 
 impl vibevalley_server::HostDebugBridge for ShellDebugHandle {
     fn snapshot(&self) -> Value {
-        self.snapshot.read().unwrap_or_else(|e| e.into_inner()).clone()
+        self.snapshot.read().clone()
     }
 }
 
@@ -745,7 +745,8 @@ mod tests {
 
     #[test]
     fn route_to_bridge_watches_slices_forwards_applied_slice_and_unwatches() {
-        use std::sync::{Arc, Mutex};
+        use parking_lot::Mutex;
+        use std::sync::Arc;
         use std::time::{Duration, Instant};
         use vibevalley_server::transport::bridge::fake::{FakeServer, empty_bundle};
         use vibevalley_server::transport::bridge::{Hub, Outlet, SliceKind};
@@ -754,12 +755,12 @@ mod tests {
         struct Recorder(Mutex<Vec<(String, Value)>>);
         impl Outlet for Recorder {
             fn send(&self, event: &str, data: Value) {
-                self.0.lock().unwrap().push((event.to_string(), data));
+                self.0.lock().push((event.to_string(), data));
             }
         }
         impl Recorder {
             fn named(&self, name: &str) -> Vec<Value> {
-                self.0.lock().unwrap().iter().filter(|(n, _)| n == name).map(|(_, d)| d.clone()).collect()
+                self.0.lock().iter().filter(|(n, _)| n == name).map(|(_, d)| d.clone()).collect()
             }
         }
 

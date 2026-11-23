@@ -8,16 +8,19 @@ pub mod snapshot;
 pub mod store;
 
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
+use parking_lot::Mutex;
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, BranchPublication, Caller, PublishPlatform, PullRequest, PullRequestState, SubmitBranch, ops};
 
 use crate::base::refused as refuse;
 use crate::modules::work::issue::Board;
 use crate::modules::work::repo::Repos;
-use crate::{Hub, lock, now};
+use crate::{Hub, now};
 
 pub use publish::{Answer, HostRun, HostedRepo, Network, Publisher, hosted_origin, pull_request_of};
 pub use snapshot::{GitHubCheck, GitHubComment, GitHubPullSnapshot, GitHubReview, actions_job_of, checks_fingerprint, checks_verdict};
@@ -35,8 +38,7 @@ pub struct Pulls {
     pub(crate) refresh_lock: Mutex<()>,
     pub(crate) poll_lock: Mutex<()>,
     closed: std::sync::atomic::AtomicBool,
-    stop: Mutex<Option<flume::Sender<()>>>,
-    thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+    poller: Mutex<Option<(CancellationToken, JoinHandle<()>)>>,
 }
 
 impl Pulls {
@@ -53,7 +55,7 @@ impl Pulls {
         let store = PullStore::open(home)?;
         if let Some(board) = &board {
             let idx = store.index();
-            board.use_pull_of_issue(Arc::new(move |issue_id| lock(&idx).of_issue(issue_id)));
+            board.use_pull_of_issue(Arc::new(move |issue_id| idx.lock().of_issue(issue_id)));
         }
         Ok(Arc::new(Pulls {
             store,
@@ -65,18 +67,15 @@ impl Pulls {
             refresh_lock: Mutex::new(()),
             poll_lock: Mutex::new(()),
             closed: Default::default(),
-            stop: Mutex::new(None),
-            thread: Mutex::new(None),
+            poller: Mutex::new(None),
         }))
     }
 
     pub fn close(&self) {
         self.closed.store(true, std::sync::atomic::Ordering::Relaxed);
-        let _ = lock(&self.stop).take();
-        if let Some(handle) = lock(&self.thread).take()
-            && handle.thread().id() != std::thread::current().id()
-        {
-            let _ = handle.join();
+        if let Some((cancel, handle)) = self.poller.lock().take() {
+            cancel.cancel();
+            let _ = vibevalley_runtime::rt::block_on(handle);
         }
     }
 
@@ -212,24 +211,28 @@ pub fn install(hub: &Hub, pulls: Arc<Pulls>, poll_seconds: Option<u64>) {
 
     if let Some(secs) = poll_seconds {
         let interval = Duration::from_secs(if secs > 0 { secs } else { DEFAULT_POLL_SECONDS });
-        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
-        *lock(&pulls.stop) = Some(stop_tx);
+        let cancel = hub.child_token();
+        let task_cancel = cancel.clone();
         let weak = Arc::downgrade(&pulls);
-        if let Ok(handle) = std::thread::Builder::new().name("vibevalley-pull".into()).spawn(move || {
+        let handle = hub.spawn_task(async move {
             loop {
-                if !matches!(stop_rx.recv_timeout(interval), Err(flume::RecvTimeoutError::Timeout)) {
-                    return;
+                tokio::select! {
+                    biased;
+                    _ = task_cancel.cancelled() => return,
+                    _ = tokio::time::sleep(interval) => {}
                 }
                 let Some(p) = weak.upgrade() else { return };
                 if p.closed.load(std::sync::atomic::Ordering::Relaxed) {
                     return;
                 }
-                p.refresh();
-                p.poll();
+                let _ = tokio::task::spawn_blocking(move || {
+                    p.refresh();
+                    p.poll();
+                })
+                .await;
             }
-        }) {
-            *lock(&pulls.thread) = Some(handle);
-        }
+        });
+        *pulls.poller.lock() = Some((cancel, handle));
     }
 }
 
@@ -333,7 +336,7 @@ mod tests {
             if joined.starts_with("pr view ") && joined.contains("--json state") && !joined.contains("headRefOid") {
                 return Answer {
                     ok: true,
-                    out: format!(r#"{{"state":"{}"}}"#, lock(&pr_state_gh)),
+                    out: format!(r#"{{"state":"{}"}}"#, pr_state_gh.lock()),
                     missing: false,
                 };
             }
@@ -462,7 +465,7 @@ mod tests {
         assert_eq!(pulls.find("acme/demo", 9).unwrap().check_revision, 1);
 
         // Refresh transitions PR to MERGED -> settles issue as Landing::PullRequest
-        *lock(&pr_state) = "MERGED".into();
+        *pr_state.lock() = "MERGED".into();
         pulls.refresh();
         assert_eq!(pulls.find("acme/demo", 9).unwrap().state, PullRequestState::Merged);
         let settled = board.issue(&issue.id).unwrap();
@@ -493,7 +496,7 @@ mod tests {
             })
             .unwrap();
         board.refresh_issue(&issue2.id);
-        *lock(&pr_state) = "CLOSED".into();
+        *pr_state.lock() = "CLOSED".into();
         pulls.refresh();
         assert_eq!(board.issue(&issue2.id).unwrap().canceled, Some(IssueCanceled::Dismissed));
 

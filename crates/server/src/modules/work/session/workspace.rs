@@ -23,7 +23,7 @@ use super::mailbox::{MailboxSource, SessionMailbox};
 use super::sessions::Sessions;
 use crate::base::{LookIn, missing};
 use crate::modules::content::attachment::Attachments;
-use crate::modules::work::ledger::{BoardError, Result, Step, lock, now};
+use crate::modules::work::ledger::{BoardError, Result, Step, now};
 
 pub(super) fn to_oar_permission(mode: SessionPermissionMode) -> PermissionMode {
     match mode {
@@ -143,7 +143,7 @@ impl Sessions {
     }
 
     pub(super) fn remove_workspace_meta(&self, session_id: &str) {
-        lock(&self.0.workspaces).remove(session_id);
+        self.0.workspaces.lock().remove(session_id);
     }
 
     /// Aborts and disposes a user session when its tab closes, ending
@@ -177,7 +177,7 @@ impl Sessions {
     }
 
     pub(super) fn notify_workspace(&self, session_id: &str) {
-        let mut map = lock(&self.0.workspaces);
+        let mut map = self.0.workspaces.lock();
         let Some(ws) = map.get_mut(session_id) else { return };
         ws.watchers.retain(|tx| !matches!(tx.try_send(()), Err(flume::TrySendError::Disconnected(_))));
     }
@@ -186,7 +186,7 @@ impl Sessions {
     /// pending interactions, live config, and latest token telemetry).
     pub fn watch_workspace(&self, session_id: &str) -> flume::Receiver<()> {
         let (tx, rx) = flume::bounded(1);
-        let mut map = lock(&self.0.workspaces);
+        let mut map = self.0.workspaces.lock();
         let ws = self.ensure_workspace_entry(&mut map, session_id);
         ws.watchers.push(tx);
         rx
@@ -194,7 +194,7 @@ impl Sessions {
 
     /// Reads the current workspace-specific state for `session_id`.
     pub fn workspace_snapshot(&self, session_id: &str) -> WorkspaceSnapshot {
-        let mut map = lock(&self.0.workspaces);
+        let mut map = self.0.workspaces.lock();
         let ws = self.ensure_workspace_entry(&mut map, session_id);
         WorkspaceSnapshot {
             title: ws.meta.title.clone(),
@@ -332,7 +332,7 @@ impl Sessions {
             .filter(|t| !t.is_empty());
         let mut updated = None;
         let resolved = {
-            let mut map = lock(&self.0.workspaces);
+            let mut map = self.0.workspaces.lock();
             let ws = self.ensure_workspace_entry(&mut map, session_id);
             if let Some(title) = live {
                 if ws.meta.title.as_deref() != Some(title.as_str()) {
@@ -489,7 +489,7 @@ impl Sessions {
 
     fn set_workspace_meta(&self, session_id: &str, meta: WorkspaceMeta) {
         self.save_workspace_meta(session_id, &meta);
-        let mut map = lock(&self.0.workspaces);
+        let mut map = self.0.workspaces.lock();
         let ws = self.ensure_workspace_entry(&mut map, session_id);
         ws.meta = meta;
     }
@@ -755,7 +755,7 @@ impl Sessions {
         }
         let mut updated = None;
         {
-            let mut map = lock(&self.0.workspaces);
+            let mut map = self.0.workspaces.lock();
             let ws = self.ensure_workspace_entry(&mut map, session_id);
             if ws.meta.model.is_none() {
                 ws.meta.model = Some(model);
@@ -786,7 +786,7 @@ impl Sessions {
             input: clip_json_input(&input),
         };
         {
-            let mut map = lock(&self.0.workspaces);
+            let mut map = self.0.workspaces.lock();
             let ws = self.ensure_workspace_entry(&mut map, session_id);
             ws.pending_permissions.retain(|p| p.request_id != request_id);
             ws.pending_permissions.push(req);
@@ -796,7 +796,7 @@ impl Sessions {
 
     pub(super) fn on_workspace_permission_resolved(&self, session_id: &str, request_id: &str) {
         let changed = {
-            let mut map = lock(&self.0.workspaces);
+            let mut map = self.0.workspaces.lock();
             if let Some(ws) = map.get_mut(session_id) {
                 let before = ws.pending_permissions.len();
                 ws.pending_permissions.retain(|p| p.request_id != request_id);
@@ -827,7 +827,7 @@ impl Sessions {
             allow_custom,
         };
         {
-            let mut map = lock(&self.0.workspaces);
+            let mut map = self.0.workspaces.lock();
             let ws = self.ensure_workspace_entry(&mut map, session_id);
             ws.pending_interactions.retain(|i| i.request_id != request_id);
             ws.pending_interactions.push(req);
@@ -837,7 +837,7 @@ impl Sessions {
 
     pub(super) fn on_workspace_interaction_resolved(&self, session_id: &str, request_id: &str) {
         let changed = {
-            let mut map = lock(&self.0.workspaces);
+            let mut map = self.0.workspaces.lock();
             if let Some(ws) = map.get_mut(session_id) {
                 let before = ws.pending_interactions.len();
                 ws.pending_interactions.retain(|i| i.request_id != request_id);
@@ -857,7 +857,7 @@ impl Sessions {
         }
         let tokens = super::journal::event_tokens_of(usage);
         {
-            let mut map = lock(&self.0.workspaces);
+            let mut map = self.0.workspaces.lock();
             let ws = self.ensure_workspace_entry(&mut map, session_id);
             ws.pending_permissions.clear();
             ws.pending_interactions.clear();
@@ -910,7 +910,7 @@ impl Sessions {
             return;
         };
         let had_pending = {
-            let mut map = lock(&self.0.workspaces);
+            let mut map = self.0.workspaces.lock();
             if let Some(ws) = map.get_mut(session_id) {
                 let any = !ws.pending_permissions.is_empty() || !ws.pending_interactions.is_empty();
                 ws.pending_permissions.clear();
@@ -931,9 +931,10 @@ impl Sessions {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{Arc, Mutex};
 
+    use parking_lot::Mutex;
     use vibevalley_core::Applied;
     use vibevalley_protocol::{
         ContextRef, ExecutionPolicy, Fact, Outcome, Session, SessionController, SessionOpenWorkspaceInput, SessionSendInput, SliceBundle, SpaceState,
@@ -956,7 +957,7 @@ mod tests {
 
     impl Facts for RecordingFacts {
         fn apply(&self, facts: Vec<Fact>) -> Applied {
-            self.applied.lock().unwrap().extend(facts.iter().cloned());
+            self.applied.lock().extend(facts.iter().cloned());
             self.inner.apply(facts)
         }
 
@@ -1211,10 +1212,10 @@ mod tests {
         assert_eq!(disposes.load(Ordering::SeqCst), 1);
         assert!(!sessions.is_live(&sid));
         assert!(sessions.session(&sid).is_none());
-        assert!(!lock(&sessions.0.workspaces).contains_key(&sid));
+        assert!(!sessions.0.workspaces.lock().contains_key(&sid));
         assert_eq!(std::fs::read_to_string(&sentinel).unwrap(), "precious");
 
-        let applied = facts.applied.lock().unwrap();
+        let applied = facts.applied.lock();
         assert!(
             applied
                 .iter()

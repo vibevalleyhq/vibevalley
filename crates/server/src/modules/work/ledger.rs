@@ -9,11 +9,12 @@
 //! share them: the board's config, its error, and its counters.
 
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::base::open_sqlx_db_at;
 use crate::modules::work::{issue::db as issue_db, session::db as session_db};
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use sqlx::SqliteConnection;
 use vibevalley_core::{Applied, Core, Refusal};
@@ -126,7 +127,7 @@ impl BoardConfig {
     }
 }
 
-pub(crate) use crate::{lock, now};
+pub(crate) use crate::now;
 
 pub(crate) fn io(e: std::io::Error) -> BoardError {
     BoardError::Other(e.to_string())
@@ -167,15 +168,15 @@ pub struct LocalFacts(Mutex<Core>);
 
 impl Facts for LocalFacts {
     fn apply(&self, facts: Vec<Fact>) -> Applied {
-        lock(&self.0).apply(facts)
+        self.0.lock().apply(facts)
     }
 
     fn read(&self, f: &mut dyn FnMut(&SpaceState)) {
-        f(lock(&self.0).state())
+        f(self.0.lock().state())
     }
 
     fn bundle(&self) -> SliceBundle {
-        lock(&self.0).slice_bundle(vec![])
+        self.0.lock().slice_bundle(vec![])
     }
 }
 
@@ -510,8 +511,8 @@ impl Ledger {
 
     /// Registers the owner-backed `Issue.cron` projection and syncs current issues.
     pub fn use_cron_of_issue(&self, lookup: CronOfIssue) {
-        let _write = lock(&self.write);
-        *lock(&self.cron_of_issue) = Some(lookup.clone());
+        let _write = self.write.lock();
+        *self.cron_of_issue.lock() = Some(lookup.clone());
         let at = now();
         let mut facts = Vec::new();
         for mut issue in self.state().issues {
@@ -528,8 +529,8 @@ impl Ledger {
 
     /// Registers the owner-backed `Issue.pull_request` projection and syncs current issues.
     pub fn use_pull_of_issue(&self, lookup: PullOfIssue) {
-        let _write = lock(&self.write);
-        *lock(&self.pull_of_issue) = Some(lookup.clone());
+        let _write = self.write.lock();
+        *self.pull_of_issue.lock() = Some(lookup.clone());
         let at = now();
         let mut facts = Vec::new();
         for mut issue in self.state().issues {
@@ -546,17 +547,17 @@ impl Ledger {
 
     /// Re-projects `cron` and `pull_request` onto `id` from their owners without touching SQLite.
     pub fn refresh_issue(&self, id: &str) {
-        let _write = lock(&self.write);
+        let _write = self.write.lock();
         let Some(mut issue) = self.issue(id) else { return };
         let mut changed = false;
-        if let Some(lookup) = lock(&self.cron_of_issue).clone() {
+        if let Some(lookup) = self.cron_of_issue.lock().clone() {
             let next = lookup(&issue.id);
             if issue.cron != next {
                 issue.cron = next;
                 changed = true;
             }
         }
-        if let Some(lookup) = lock(&self.pull_of_issue).clone() {
+        if let Some(lookup) = self.pull_of_issue.lock().clone() {
             let next = lookup(&issue.id);
             if issue.pull_request != next {
                 issue.pull_request = next;
@@ -569,7 +570,7 @@ impl Ledger {
     }
 
     pub(crate) fn database<R>(&self, query: impl FnOnce(&Sqlite<'_>) -> sqlx::Result<R>) -> Result<R> {
-        Ok(query(&Sqlite::new(&mut lock(&self.db)))?)
+        Ok(query(&Sqlite::new(&mut self.db.lock()))?)
     }
 
     pub fn bundle(&self) -> SliceBundle {
@@ -611,13 +612,13 @@ impl Ledger {
     pub fn subscribe(&self) -> flume::Receiver<SliceBundle> {
         let (tx, rx) = flume::bounded(1);
         let _ = tx.try_send(self.facts.bundle());
-        lock(&self.subscribers).push((tx, rx.clone()));
+        self.subscribers.lock().push((tx, rx.clone()));
         rx
     }
 
     /// Stores `facts`, folds them in as one commit and tells the subscribers.
     pub fn apply(&self, facts: Vec<Fact>) -> Result<()> {
-        let _write = lock(&self.write);
+        let _write = self.write.lock();
         self.apply_locked(facts, |_| Ok(()))
     }
 
@@ -640,7 +641,7 @@ impl Ledger {
         also: impl FnOnce(&mut vibevalley_runtime::agent::durable::Tx<'_>) -> vibevalley_runtime::agent::durable::Result<()>,
     ) -> Result<Issue> {
         let id = {
-            let _write = lock(&self.write);
+            let _write = self.write.lock();
             let mut issue = self.issue(id).ok_or_else(|| BoardError::NoIssue(id.into()))?;
             let at = now();
             change.fold(&mut issue, at);
@@ -700,7 +701,7 @@ impl Ledger {
 
     fn publish(&self, facts: Vec<Fact>) {
         let applied = self.facts.apply(facts);
-        let mut subscribers = lock(&self.subscribers);
+        let mut subscribers = self.subscribers.lock();
         if !applied.transitions.is_empty() && !subscribers.is_empty() {
             let bundle = self.facts.bundle();
             subscribers.retain(|(tx, stale)| {
@@ -717,7 +718,7 @@ impl Ledger {
         root: &str,
         observe: impl FnOnce(&Session) -> Option<vibevalley_protocol::FactSessionSubagentsChanged>,
     ) -> Result<()> {
-        let _write = lock(&self.write);
+        let _write = self.write.lock();
         let Some(fact) = self.session(session_id).as_ref().and_then(observe) else {
             return Ok(());
         };
@@ -741,7 +742,7 @@ impl Ledger {
         before: &vibevalley_protocol::SessionSubagents,
         after: vibevalley_protocol::SessionSubagents,
     ) -> Result<()> {
-        let _write = lock(&self.write);
+        let _write = self.write.lock();
         let stored = self.database(|db| session_db::run(db, &before.run))?;
         if !stored.is_some_and(|r| r.session == session && r.subagents.as_ref() == Some(before)) {
             return Ok(());
@@ -761,7 +762,7 @@ impl Ledger {
 
     /// The next number of `counter`, above `at_least`.
     pub fn next(&self, counter: &str, at_least: i64) -> Result<i64> {
-        let _write = lock(&self.write);
+        let _write = self.write.lock();
         self.database(|db| crate::db::next_seq(db, counter, at_least))
     }
 }

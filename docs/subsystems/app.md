@@ -130,7 +130,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 
 ## 和谁打交道
 
-- **服务端与运行时（`crates/server`、`crates/runtime`）**：进程内经 `Server` 调接口、读帧和事件；同一个 `Hub` 也挂在 `transport/http` 门上。`crates/runtime` 的 `ureq` 通过 `rustls-no-provider` + `platform-verifier`（`rustls-platform-verifier`）复用系统根证书，避免额外拉入重复 `webpki-roots`。
+- **服务端与运行时（`crates/server`、`crates/runtime`）**：进程内经 `Server` 调接口、读帧和事件；同一个 `Hub` 也挂在 `transport/http` 门上。`crates/runtime`、`crates/server` 与 `crates/cli` 统一经工作区 `reqwest`（`rustls-no-provider` + `rustls-platform-verifier` + `ring`）复用系统根证书，避免额外拉入重复 `webpki-roots`；原生实时语音等异步流共用 `vibevalley_runtime::rt` 共享运行时。
 - **命令行（`crates/cli`）**：经 `server.json` 找到应用里的服务端；`crates/core` 的 Loro 内容协同引擎收到可选特性 `collab` 下，纯 HTTP `vibevalley-cli` 关闭该特性从而彻底脱钩 Loro。
 
 ## 为什么这样

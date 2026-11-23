@@ -15,10 +15,11 @@ pub mod prompts;
 pub mod token;
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use parking_lot::Mutex;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     AgoraGrant, ApiError, DEFAULT_ORCHESTRATOR, Dictated, Millis, NoticeLevel, Validation, VoiceAnswer, VoiceCall, VoiceFix, VoiceSettings, ops,
@@ -33,7 +34,7 @@ use crate::modules::infra::http::Fetch;
 use crate::modules::infra::provider::Use;
 use crate::modules::infra::setting::{Secret, Setting};
 use crate::modules::team::orchestrator::Orchestrator;
-use crate::{Hub, lock, now};
+use crate::{Hub, now};
 
 /// How long a turn of the orchestrator is waited for before a call gives up on it.
 const ANSWER_WAIT: Duration = Duration::from_secs(120);
@@ -264,7 +265,7 @@ impl Voice {
             let issued = self.sign(&credentials, &channel, &uid)?;
             (GrantKind::Agora(credentials), issued)
         };
-        let mut state = lock(&self.state);
+        let mut state = self.state.lock();
         if state.stopped {
             return Err(Self::stopped());
         }
@@ -283,7 +284,7 @@ impl Voice {
     /// `voice.grant.renew`: a new token for the same channel and uid, signed
     /// with the credentials the grant was issued with.
     pub fn renew(&self, channel: &str, uid: &str) -> Result<AgoraGrant, ApiError> {
-        let mut state = lock(&self.state);
+        let mut state = self.state.lock();
         Self::prune(&mut state);
         let grant = state
             .grants
@@ -302,7 +303,7 @@ impl Voice {
     pub fn start(self: &Arc<Self>, channel: &str, uid: &str, about: Option<&str>) -> Result<VoiceCall, ApiError> {
         let key = (channel.to_string(), uid.to_string());
         let kind = {
-            let mut state = lock(&self.state);
+            let mut state = self.state.lock();
             Self::prune(&mut state);
             let grant = state.grants.get_mut(&key).ok_or_else(|| unavailable(t("server.voice.grantGone", &[]), None))?;
             if grant.phase != GrantPhase::Issued {
@@ -319,7 +320,7 @@ impl Voice {
         let agent = match started {
             Ok(agent) => agent,
             Err(e) => {
-                lock(&self.state).grants.remove(&key);
+                self.state.lock().grants.remove(&key);
                 return Err(e);
             }
         };
@@ -330,7 +331,7 @@ impl Voice {
     }
 
     fn commit(&self, key: &GrantKey, agent: &str, call: Call) -> Result<(), ApiError> {
-        let mut state = lock(&self.state);
+        let mut state = self.state.lock();
         // The farm stopped, or the grant went, while the call was starting.
         let Some(grant) = state.grants.get_mut(key) else {
             return Err(Self::stopped());
@@ -345,7 +346,7 @@ impl Voice {
         let voice = self.setting.voice();
         let agent = format!("moss-{}", key.0);
         let shared = {
-            let mut state = lock(&self.state);
+            let mut state = self.state.lock();
             if state.stopped {
                 return Err(Self::stopped());
             }
@@ -460,8 +461,8 @@ impl Voice {
                 }
             }
             CallKind::Moss(shared) => {
-                *lock(&shared.phase) = MossPhase::Closed;
-                let mut state = lock(&self.state);
+                *shared.phase.lock() = MossPhase::Closed;
+                let mut state = self.state.lock();
                 if state.moss.as_ref().is_some_and(|m| Arc::ptr_eq(m, shared)) {
                     state.moss = None;
                 }
@@ -473,7 +474,7 @@ impl Voice {
     /// (a call of an earlier run) is asked to leave all the same.
     pub fn stop(&self, agent: &str) -> Result<(), ApiError> {
         let call = {
-            let mut state = lock(&self.state);
+            let mut state = self.state.lock();
             let call = state.calls.remove(agent);
             if let Some(c) = &call {
                 state.grants.remove(&c.grant);
@@ -496,7 +497,8 @@ impl Voice {
     }
 
     fn call(&self, agent: &str) -> Result<Arc<Call>, ApiError> {
-        lock(&self.state)
+        self.state
+            .lock()
             .calls
             .get(agent)
             .filter(|c| !c.hung_up.load(Ordering::SeqCst))
@@ -555,7 +557,7 @@ impl Voice {
     }
 
     fn live_calls(&self) -> Vec<String> {
-        let state = lock(&self.state);
+        let state = self.state.lock();
         state
             .calls
             .iter()
@@ -569,7 +571,7 @@ impl Voice {
         match &call.kind {
             CallKind::Agora { client, channel, .. } => client.speak(channel, agent, piece).map_err(|e| e.to_string()),
             CallKind::Moss(shared) => {
-                let mut phase = lock(&shared.phase);
+                let mut phase = shared.phase.lock();
                 let full = || "MOSS commentary unavailable or full".to_string();
                 if piece.encode_utf16().count() > MOSS_PIECE_MAX {
                     return Err(full());
@@ -600,7 +602,7 @@ impl Voice {
         let Ok(call) = self.call(agent) else { return false };
         for piece in agora::speak_pieces(text, SPEAK_BYTES) {
             // Hung up between pieces: no later piece is sent.
-            let still = lock(&self.state).calls.get(agent).is_some_and(|c| Arc::ptr_eq(c, &call));
+            let still = self.state.lock().calls.get(agent).is_some_and(|c| Arc::ptr_eq(c, &call));
             if !still || call.hung_up.load(Ordering::SeqCst) {
                 return false;
             }
@@ -663,7 +665,7 @@ impl Voice {
         let account = self.live_account()?;
         let (out, outgoing) = flume::unbounded();
         let shared = {
-            let mut state = lock(&self.state);
+            let mut state = self.state.lock();
             if state.stopped {
                 return Err(Self::stopped());
             }
@@ -673,7 +675,7 @@ impl Voice {
             state.live_line = true;
             state.moss.get_or_insert_with(Arc::default).clone()
         };
-        if let MossPhase::Waiting { out: slot, .. } = &mut *lock(&shared.phase) {
+        if let MossPhase::Waiting { out: slot, .. } = &mut *shared.phase.lock() {
             *slot = Some(out.clone());
         }
         Ok(MossLine {
@@ -694,7 +696,7 @@ impl Voice {
     /// Every call is hung up and the line with its tunnel closed.
     pub fn close(&self) {
         let calls: Vec<Arc<Call>> = {
-            let mut state = lock(&self.state);
+            let mut state = self.state.lock();
             state.stopped = true;
             state.grants.clear();
             state.moss = None;
@@ -735,12 +737,12 @@ impl MossLine {
     /// the tool that asks the orchestrator.
     pub fn session_update(&self) -> String {
         let voice = self.voice.setting.voice();
-        lock(&self.tools).enabled = true;
+        self.tools.lock().enabled = true;
         moss::session_update(&voice.persona, &voice.greeting)
     }
 
     pub fn closed(&self) -> bool {
-        matches!(*lock(&self.shared.phase), MossPhase::Closed)
+        matches!(*self.shared.phase.lock(), MossPhase::Closed)
     }
 
     /// A text frame from MOSS: settings taken let the waiting commentary
@@ -748,7 +750,7 @@ impl MossLine {
     /// MOSS has taken lets its model go on.
     pub fn heard(&self, raw: &str) {
         if moss::session_updated(raw) {
-            let mut phase = lock(&self.shared.phase);
+            let mut phase = self.shared.phase.lock();
             if let MossPhase::Waiting { pending, .. } = &mut *phase {
                 for piece in std::mem::take(pending) {
                     self.voice.deliver(&piece, &self.out);
@@ -757,18 +759,18 @@ impl MossLine {
             }
         }
         if let Some(call) = moss::tool_ack(raw)
-            && lock(&self.tools).awaiting_ack.remove(&call)
+            && self.tools.lock().awaiting_ack.remove(&call)
         {
             let _ = self.out.send(moss::response_create(&call));
         }
         for call in moss::tool_calls(raw) {
             {
-                let mut tools = lock(&self.tools);
+                let mut tools = self.tools.lock();
                 if self.closed() || !tools.enabled || tools.executed.contains(&call.call_id) {
                     continue;
                 }
                 if tools.executed.len() >= MOSS_TOOL_CALLS || tools.in_flight >= MOSS_TOOLS_AT_ONCE {
-                    *lock(&self.shared.phase) = MossPhase::Closed;
+                    *self.shared.phase.lock() = MossPhase::Closed;
                     return;
                 }
                 tools.executed.insert(call.call_id.clone());
@@ -778,9 +780,9 @@ impl MossLine {
             let _ = std::thread::Builder::new().name("vibevalley-voice-ask".into()).spawn(move || {
                 let answer = voice.orchestrator.brief(call.question).map(|r| r.whole(ANSWER_WAIT)).unwrap_or_default();
                 let answer = if answer.is_empty() { t("server.voice.moss.toolFailed", &[]) } else { answer };
-                let mut tools = lock(&tools);
+                let mut tools = tools.lock();
                 tools.in_flight -= 1;
-                if matches!(*lock(&shared.phase), MossPhase::Closed) {
+                if matches!(*shared.phase.lock(), MossPhase::Closed) {
                     return;
                 }
                 tools.awaiting_ack.insert(call.call_id.clone());
@@ -793,9 +795,9 @@ impl MossLine {
 impl Drop for MossLine {
     /// The line ended (the host's socket closed): its calls end with it.
     fn drop(&mut self) {
-        *lock(&self.shared.phase) = MossPhase::Closed;
+        *self.shared.phase.lock() = MossPhase::Closed;
         let ended: Vec<Arc<Call>> = {
-            let mut state = lock(&self.voice.state);
+            let mut state = self.voice.state.lock();
             state.live_line = false;
             if state.moss.as_ref().is_some_and(|m| Arc::ptr_eq(m, &self.shared)) {
                 state.moss = None;

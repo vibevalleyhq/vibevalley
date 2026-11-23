@@ -201,6 +201,7 @@ impl Started {
     /// board's agents stop and its lock is released. The hub stays usable
     /// for reads; it serves nothing that needs the board afterwards.
     pub fn close(&self) {
+        self.hub.shutdown_token().cancel();
         self.connectors.close();
         self.pulls.close();
         self.crons.close();
@@ -220,6 +221,7 @@ impl Started {
         self.game.close();
         self.board.close();
         self.trajectories.close();
+        self.hub.close();
     }
 }
 
@@ -354,7 +356,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     let chat =
         modules::collab::channel::Chat::open(&config.home, &hub, attachments.clone(), config.link_previews).map_err(|e| failed("the chat")(&e.message))?;
     let library = modules::content::library::Library::open(&config.home, attachments.clone()).map_err(|e| failed("the library")(&e.message))?;
-    modules::content::library::install(&hub, library.clone());
+    modules::content::library::install(&hub, library.clone(), &chat);
     let media = modules::content::media::jobs::Jobs::open(modules::content::media::jobs::Parts {
         home: config.home.clone(),
         hub: Arc::downgrade(&hub),

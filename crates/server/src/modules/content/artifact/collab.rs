@@ -31,7 +31,7 @@ use super::blocks::spans_of;
 use super::db::{self, ArtifactRow, StoredSuggestion};
 use super::entries::EntryChange;
 use super::{Artifacts, Maker, artifact_type_of, new_id, q, refused};
-use crate::{Sink, lock, now};
+use crate::{Sink, now};
 
 const DEFAULT_PRESENCE_COLORS: [&str; 6] = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
 const PRESENCE_EVICT_INTERVAL: Duration = Duration::from_secs(2);
@@ -399,22 +399,24 @@ impl Artifacts {
     // ---- Phase A: Pure in-memory PresenceHub --------------------------------
 
     fn presence_hub(&self, artifact_id: &str) -> PresenceHub {
-        let mut map = lock(&self.presences);
+        let mut map = self.presences.lock();
         map.entry(artifact_id.to_string()).or_default().clone()
     }
 
     pub(super) fn drop_presence_state(&self, artifact_id: &str) {
-        lock(&self.presences).remove(artifact_id);
-        lock(&self.presence_extra).retain(|(aid, _), _| aid != artifact_id);
+        self.presences.lock().remove(artifact_id);
+        self.presence_extra.lock().retain(|(aid, _), _| aid != artifact_id);
     }
 
     fn publish_presence_event(&self, artifact_id: &str, event: ArtifactPresenceEvent) {
-        lock(&self.presence_changes).retain(|tx| tx.send((artifact_id.to_string(), event.clone())).is_ok());
+        self.presence_changes
+            .lock()
+            .retain(|tx| tx.send((artifact_id.to_string(), event.clone())).is_ok());
     }
 
     pub(super) fn evict_expired_presence(&self, artifact_id: &str) {
         let hub = {
-            let map = lock(&self.presences);
+            let map = self.presences.lock();
             let Some(hub) = map.get(artifact_id) else { return };
             hub.clone()
         };
@@ -423,7 +425,7 @@ impl Artifacts {
             return;
         }
         {
-            let mut extra = lock(&self.presence_extra);
+            let mut extra = self.presence_extra.lock();
             for peer_id in &evicted {
                 extra.remove(&(artifact_id.to_string(), peer_id.clone()));
             }
@@ -436,14 +438,14 @@ impl Artifacts {
     pub(super) fn presence_snapshot(&self, artifact_id: &str) -> Vec<ArtifactPresence> {
         self.evict_expired_presence(artifact_id);
         let hub = {
-            let map = lock(&self.presences);
+            let map = self.presences.lock();
             let Some(hub) = map.get(artifact_id) else {
                 return Vec::new();
             };
             hub.clone()
         };
         let payloads = hub.snapshot();
-        let extra = lock(&self.presence_extra);
+        let extra = self.presence_extra.lock();
         payloads
             .into_iter()
             .map(|p| {
@@ -455,7 +457,7 @@ impl Artifacts {
 
     pub(super) fn presence_payloads(&self, artifact_id: &str) -> Vec<PresencePayload> {
         self.evict_expired_presence(artifact_id);
-        let map = lock(&self.presences);
+        let map = self.presences.lock();
         map.get(artifact_id).map_or_else(Vec::new, PresenceHub::snapshot)
     }
 
@@ -471,7 +473,7 @@ impl Artifacts {
         let payload = presence_to_payload(&presence);
         hub.upsert(payload).map_err(collab_err)?;
         {
-            let mut extra = lock(&self.presence_extra);
+            let mut extra = self.presence_extra.lock();
             if presence.path.is_some() || presence.session_id.is_some() {
                 extra.insert(
                     (artifact_id.to_string(), presence.id.clone()),
@@ -488,13 +490,13 @@ impl Artifacts {
     /// Removes one live presence record purely in memory and broadcasts `Remove`.
     pub(super) fn remove_presence_entry(&self, artifact_id: &str, peer_id: &str) {
         let hub = {
-            let map = lock(&self.presences);
+            let map = self.presences.lock();
             map.get(artifact_id).cloned()
         };
         if let Some(hub) = hub {
             let _ = hub.remove(peer_id);
         }
-        lock(&self.presence_extra).remove(&(artifact_id.to_string(), peer_id.to_string()));
+        self.presence_extra.lock().remove(&(artifact_id.to_string(), peer_id.to_string()));
         self.publish_presence_event(artifact_id, ArtifactPresenceEvent::Remove { peer_id: peer_id.to_string() });
     }
 
@@ -525,7 +527,7 @@ impl Artifacts {
     pub fn follow_presence(self: &Arc<Self>, id: &str, sink: Sink) -> Result<(), ApiError> {
         self.found(&mut self.db(), id)?;
         let (tx, rx) = flume::unbounded();
-        lock(&self.presence_changes).push(tx);
+        self.presence_changes.lock().push(tx);
         let initial = self.presence_snapshot(id);
         let weak = Arc::downgrade(self);
         let artifact_id = id.to_string();
@@ -1062,7 +1064,7 @@ impl Artifacts {
                         deleted: deleted_paths,
                     }
                 };
-                lock(&self.entry_changes).retain(|tx| tx.send(change.clone()).is_ok());
+                self.entry_changes.lock().retain(|tx| tx.send(change.clone()).is_ok());
                 self.get_now(&row.id)
             }
             _ => {
@@ -1167,16 +1169,16 @@ impl Artifacts {
         };
         match row.body.as_str() {
             "blocks" => {
-                let _g = lock(&self.batches);
+                let _g = self.batches.lock();
                 apply(self)
             }
             "store" => {
                 let wl = self.entry_lock(&row.id);
-                let _g = lock(&wl);
+                let _g = wl.lock();
                 apply(self)
             }
             _ => {
-                let _g = lock(&self.rows);
+                let _g = self.rows.lock();
                 apply(self)
             }
         }
@@ -1204,16 +1206,16 @@ impl Artifacts {
         };
         match row.body.as_str() {
             "blocks" => {
-                let _g = lock(&self.batches);
+                let _g = self.batches.lock();
                 apply(self)
             }
             "store" => {
                 let wl = self.entry_lock(&row.id);
-                let _g = lock(&wl);
+                let _g = wl.lock();
                 apply(self)
             }
             _ => {
-                let _g = lock(&self.rows);
+                let _g = self.rows.lock();
                 apply(self)
             }
         }
@@ -1231,16 +1233,16 @@ impl Artifacts {
         };
         match row.body.as_str() {
             "blocks" => {
-                let _g = lock(&self.batches);
+                let _g = self.batches.lock();
                 compact(self)
             }
             "store" => {
                 let wl = self.entry_lock(&row.id);
-                let _g = lock(&wl);
+                let _g = wl.lock();
                 compact(self)
             }
             _ => {
-                let _g = lock(&self.rows);
+                let _g = self.rows.lock();
                 compact(self)
             }
         }

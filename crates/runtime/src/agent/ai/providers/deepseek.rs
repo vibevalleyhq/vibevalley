@@ -1,12 +1,10 @@
-use std::io::BufReader;
-use std::sync::Arc;
 use std::time::Duration;
 
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Value, json};
 
-use crate::agent::ai::retry::{RetryPolicy, parse_retry_after, sleep_interruptible};
-use crate::agent::ai::stream::{CancelToken, fold_stream};
+use crate::agent::ai::retry::{RetryPolicy, parse_retry_after, sleep_interruptible_async};
+use crate::agent::ai::stream::{CancelToken, SseFold};
 use crate::agent::ai::types::{ChatRequest, Completion, Delta, Message, ModelClient};
 use crate::agent::{BrainError, Result};
 
@@ -50,7 +48,7 @@ pub struct OpenAiClient {
     pub base_url: String,
     pub key: Box<dyn Fn() -> Option<String> + Send + Sync>,
     pub retry: RetryPolicy,
-    agent: ureq::Agent,
+    client: reqwest::Client,
 }
 
 impl OpenAiClient {
@@ -64,23 +62,17 @@ impl OpenAiClient {
     }
 
     pub fn new(base_url: impl Into<String>, key: impl Fn() -> Option<String> + Send + Sync + 'static) -> OpenAiClient {
-        // Explicit ring provider + OS platform verifier avoids ureq's default webpki-roots bundle
-        // while preserving HTTPS for production endpoints like https://api.deepseek.com.
-        let tls = ureq::tls::TlsConfig::builder()
-            .root_certs(ureq::tls::RootCerts::PlatformVerifier)
-            .unversioned_rustls_crypto_provider(Arc::new(rustls::crypto::ring::default_provider()))
-            .build();
-        let agent: ureq::Agent = ureq::Agent::config_builder()
-            .tls_config(tls)
-            .timeout_global(Some(Duration::from_secs(600)))
-            .http_status_as_error(false)
+        // Install ring before building reqwest so rustls-no-provider + platform verifier works without webpki-roots.
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(600))
             .build()
-            .into();
+            .expect("reqwest OpenAiClient");
         OpenAiClient {
             base_url: base_url.into().trim_end_matches('/').to_string(),
             key: Box::new(key),
             retry: RetryPolicy::default(),
-            agent,
+            client,
         }
     }
 
@@ -92,34 +84,39 @@ impl OpenAiClient {
     pub fn fetch_balance(&self) -> Result<AccountBalance> {
         let key = (self.key)().filter(|k| !k.trim().is_empty()).ok_or(BrainError::NoKey)?;
         let url = format!("{}/user/balance", self.base_url);
-        for attempt in 0..=self.retry.max_retries {
-            match self.agent.get(&url).header("Authorization", format!("Bearer {key}")).call() {
-                Ok(response) => {
-                    let status = response.status().as_u16();
-                    let retry_after = response.headers().get("retry-after").and_then(|v| v.to_str().ok()).and_then(parse_retry_after);
-                    let mut body = response.into_body();
-                    let text = body.read_to_string().map_err(|e| BrainError::Network(e.to_string()))?;
-                    if status >= 400 {
-                        if RetryPolicy::is_retryable_status(status) && attempt < self.retry.max_retries {
-                            let delay = self.retry.delay_for(attempt, retry_after);
-                            std::thread::sleep(delay);
+        let client = self.client.clone();
+        let retry = self.retry;
+        crate::rt::block_on(async move {
+            let mut backoff = retry.backoff();
+            loop {
+                match client.get(&url).header("Authorization", format!("Bearer {key}")).send().await {
+                    Ok(response) => {
+                        let status = response.status().as_u16();
+                        let retry_after = response.headers().get("retry-after").and_then(|v| v.to_str().ok()).and_then(parse_retry_after);
+                        let text = response.text().await.map_err(|e| BrainError::Network(e.to_string()))?;
+                        if status >= 400 {
+                            if RetryPolicy::is_retryable_status(status)
+                                && let Some(default_delay) = backoff.next()
+                            {
+                                tokio::time::sleep(RetryPolicy::resolve_delay(default_delay, retry_after)).await;
+                                continue;
+                            }
+                            return Err(BrainError::Model(format!("HTTP {status}: {}", error_message(&text))));
+                        }
+                        return serde_json::from_str(&text).map_err(|e| BrainError::Model(format!("invalid balance response: {e}")));
+                    }
+                    Err(err) => {
+                        if RetryPolicy::is_retryable_error(&err)
+                            && let Some(delay) = backoff.next()
+                        {
+                            tokio::time::sleep(delay).await;
                             continue;
                         }
-                        return Err(BrainError::Model(format!("HTTP {status}: {}", error_message(&text))));
+                        return Err(BrainError::Network(err.to_string()));
                     }
-                    return serde_json::from_str(&text).map_err(|e| BrainError::Model(format!("invalid balance response: {e}")));
-                }
-                Err(err) => {
-                    if RetryPolicy::is_retryable_error(&err) && attempt < self.retry.max_retries {
-                        let delay = self.retry.delay_for(attempt, None);
-                        std::thread::sleep(delay);
-                        continue;
-                    }
-                    return Err(BrainError::Network(err.to_string()));
                 }
             }
-        }
-        unreachable!()
+        })
     }
 }
 
@@ -156,16 +153,6 @@ pub fn request_body(request: &ChatRequest) -> Value {
     body
 }
 
-enum AttemptOutcome {
-    Complete(Result<Completion>),
-    Retry { delay: Duration, fallback: BrainError },
-}
-
-enum StreamMsg {
-    Delta(Delta),
-    Finished(AttemptOutcome),
-}
-
 fn error_message(text: &str) -> String {
     serde_json::from_str::<Value>(text)
         .ok()
@@ -184,97 +171,41 @@ fn classify_http_error(status: u16, text: &str) -> BrainError {
     }
 }
 
-struct AttemptCall<'a> {
-    agent: &'a ureq::Agent,
-    url: &'a str,
-    key: &'a str,
-    body: &'a Value,
-    policy: RetryPolicy,
-}
-
-fn send_attempt(call: &AttemptCall<'_>, attempt: usize, cancel: &CancelToken, on: &mut dyn FnMut(Delta)) -> AttemptOutcome {
-    if cancel.is_cancelled() {
-        return AttemptOutcome::Complete(Err(BrainError::Cancelled));
-    }
-    let response = match call
-        .agent
-        .post(call.url)
-        .header("Authorization", format!("Bearer {}", call.key))
-        .header("Accept", "text/event-stream")
-        .send_json(call.body)
-    {
-        Ok(r) => r,
-        Err(err) => {
-            let network = BrainError::Network(err.to_string());
-            if RetryPolicy::is_retryable_error(&err) && attempt < call.policy.max_retries {
-                return AttemptOutcome::Retry {
-                    delay: call.policy.delay_for(attempt, None),
-                    fallback: network,
-                };
-            }
-            return AttemptOutcome::Complete(Err(network));
-        }
-    };
-    let status = response.status().as_u16();
-    let retry_after = response.headers().get("retry-after").and_then(|v| v.to_str().ok()).and_then(parse_retry_after);
-    let mut body = response.into_body();
-    if status >= 400 {
-        let text = body.read_to_string().unwrap_or_default();
-        let err = classify_http_error(status, &text);
-        if RetryPolicy::is_retryable_status(status) && attempt < call.policy.max_retries {
-            return AttemptOutcome::Retry {
-                delay: call.policy.delay_for(attempt, retry_after),
-                fallback: err,
-            };
-        }
-        return AttemptOutcome::Complete(Err(err));
-    }
-    AttemptOutcome::Complete(fold_stream(BufReader::new(body.into_reader()), cancel, on))
-}
-
-fn send_attempt_cancellable(call: &AttemptCall<'_>, attempt: usize, cancel: &CancelToken, on: &mut dyn FnMut(Delta)) -> AttemptOutcome {
-    let Some(cancel_rx) = cancel.receiver() else {
-        return send_attempt(call, attempt, cancel, on);
-    };
-    if cancel.is_cancelled() {
-        return AttemptOutcome::Complete(Err(BrainError::Cancelled));
-    }
-    let (tx, rx) = flume::unbounded::<StreamMsg>();
-    let agent = call.agent.clone();
-    let url = call.url.to_string();
-    let key = call.key.to_string();
-    let body = call.body.clone();
-    let policy = call.policy;
-    let cancel_worker = cancel.clone();
-    std::thread::spawn(move || {
-        let owned = AttemptCall {
-            agent: &agent,
-            url: &url,
-            key: &key,
-            body: &body,
-            policy,
-        };
-        let outcome = send_attempt(&owned, attempt, &cancel_worker, &mut |d| {
-            let _ = tx.send(StreamMsg::Delta(d));
-        });
-        let _ = tx.send(StreamMsg::Finished(outcome));
-    });
-    enum Pick {
-        Msg(Result<StreamMsg>),
-        Cancelled,
-    }
+async fn fold_sse_response(mut response: reqwest::Response, cancel: &CancelToken, on: &mut dyn FnMut(Delta)) -> Result<Completion> {
+    let mut fold = SseFold::new();
+    let mut buf = Vec::new();
     loop {
-        let pick = flume::Selector::new()
-            .recv(&rx, |r| Pick::Msg(r.map_err(|_| BrainError::Network("stream worker exited".into()))))
-            .recv(cancel_rx, |_| Pick::Cancelled)
-            .wait();
-        match pick {
-            Pick::Cancelled => return AttemptOutcome::Complete(Err(BrainError::Cancelled)),
-            Pick::Msg(Ok(StreamMsg::Delta(delta))) => on(delta),
-            Pick::Msg(Ok(StreamMsg::Finished(outcome))) => return outcome,
-            Pick::Msg(Err(err)) => return AttemptOutcome::Complete(Err(err)),
+        if cancel.is_cancelled() {
+            return Err(BrainError::Cancelled);
+        }
+        let next = tokio::select! {
+            biased;
+            () = cancel.cancelled() => return Err(BrainError::Cancelled),
+            chunk = response.chunk() => chunk,
+        };
+        let Some(chunk) = next.map_err(|e| BrainError::Network(e.to_string()))? else {
+            break;
+        };
+        buf.extend_from_slice(&chunk);
+        while let Some(pos) = buf.iter().position(|&b| b == b'\n') {
+            let raw_line: Vec<u8> = buf.drain(..=pos).collect();
+            let line = String::from_utf8_lossy(&raw_line);
+            if fold.push_line(&line, on)? {
+                return Ok(fold.finish());
+            }
+            if cancel.is_cancelled() {
+                return Err(BrainError::Cancelled);
+            }
         }
     }
+    if !buf.is_empty() {
+        if cancel.is_cancelled() {
+            return Err(BrainError::Cancelled);
+        }
+        let line = String::from_utf8_lossy(&buf);
+        let _ = fold.push_line(&line, on)?;
+    }
+    Ok(fold.finish())
 }
 
 impl ModelClient for OpenAiClient {
@@ -289,26 +220,61 @@ impl ModelClient for OpenAiClient {
         let key = (self.key)().filter(|k| !k.trim().is_empty()).ok_or(BrainError::NoKey)?;
         let url = format!("{}/chat/completions", self.base_url);
         let body = request_body(request);
-        let call = AttemptCall {
-            agent: &self.agent,
-            url: &url,
-            key: &key,
-            body: &body,
-            policy: self.retry,
-        };
-        for attempt in 0..=self.retry.max_retries {
-            match send_attempt_cancellable(&call, attempt, cancel, on) {
-                AttemptOutcome::Complete(result) => return result,
-                AttemptOutcome::Retry { delay, fallback } => {
-                    if !sleep_interruptible(delay, cancel) {
-                        return Err(BrainError::Cancelled);
-                    }
-                    if attempt == self.retry.max_retries {
-                        return Err(fallback);
-                    }
+        let client = &self.client;
+        let retry = self.retry;
+        crate::rt::block_on(async {
+            let mut backoff = retry.backoff();
+            loop {
+                if cancel.is_cancelled() {
+                    return Err(BrainError::Cancelled);
                 }
+                let sent = tokio::select! {
+                    biased;
+                    () = cancel.cancelled() => return Err(BrainError::Cancelled),
+                    res = client
+                        .post(&url)
+                        .header("Authorization", format!("Bearer {key}"))
+                        .header("Accept", "text/event-stream")
+                        .json(&body)
+                        .send() => res,
+                };
+                let response = match sent {
+                    Ok(r) => r,
+                    Err(err) => {
+                        let network = BrainError::Network(err.to_string());
+                        if RetryPolicy::is_retryable_error(&err)
+                            && let Some(delay) = backoff.next()
+                        {
+                            if !sleep_interruptible_async(delay, cancel).await {
+                                return Err(BrainError::Cancelled);
+                            }
+                            continue;
+                        }
+                        return Err(network);
+                    }
+                };
+                let status = response.status().as_u16();
+                let retry_after = response.headers().get("retry-after").and_then(|v| v.to_str().ok()).and_then(parse_retry_after);
+                if status >= 400 {
+                    let text = tokio::select! {
+                        biased;
+                        () = cancel.cancelled() => return Err(BrainError::Cancelled),
+                        res = response.text() => res.unwrap_or_default(),
+                    };
+                    let err = classify_http_error(status, &text);
+                    if RetryPolicy::is_retryable_status(status)
+                        && let Some(default_delay) = backoff.next()
+                    {
+                        let delay = RetryPolicy::resolve_delay(default_delay, retry_after);
+                        if !sleep_interruptible_async(delay, cancel).await {
+                            return Err(BrainError::Cancelled);
+                        }
+                        continue;
+                    }
+                    return Err(err);
+                }
+                return fold_sse_response(response, cancel, on).await;
             }
-        }
-        unreachable!()
+        })
     }
 }

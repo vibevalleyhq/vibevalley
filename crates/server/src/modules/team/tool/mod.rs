@@ -10,8 +10,9 @@ mod memory;
 mod notes;
 mod plan;
 
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{Arc, LazyLock};
 
+use parking_lot::Mutex;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
@@ -313,7 +314,7 @@ impl vibevalley_runtime::agent::Tool for Held {
     }
 
     fn execute(&self, args: &Value) -> vibevalley_runtime::agent::ToolOutput {
-        let route = self.route.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let route = self.route.lock().clone();
         match self.tool.run(&self.farm, &Who::Orchestrator(route), args) {
             Ok(text) => vibevalley_runtime::agent::ToolOutput::ok(text),
             Err(why) => vibevalley_runtime::agent::ToolOutput::error(why),

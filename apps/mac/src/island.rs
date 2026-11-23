@@ -65,7 +65,7 @@ pub fn glance(board: &BoardSlice) -> Glance {
 }
 
 struct LatestFrame {
-    pending: std::sync::Arc<std::sync::Mutex<Option<String>>>,
+    pending: std::sync::Arc<parking_lot::Mutex<Option<String>>>,
     wake: flume::Sender<()>,
 }
 
@@ -81,7 +81,7 @@ impl LatestFrame {
         )
     }
     fn send(&self, frame: String) {
-        *self.pending.lock().unwrap_or_else(|e| e.into_inner()) = Some(frame);
+        *self.pending.lock() = Some(frame);
         let _ = self.wake.try_send(());
     }
 }
@@ -118,7 +118,7 @@ impl Island {
         let pending = frames.pending.clone();
         std::thread::spawn(move || {
             for () in incoming {
-                let Some(frame) = pending.lock().unwrap_or_else(|e| e.into_inner()).take() else {
+                let Some(frame) = pending.lock().take() else {
                     continue;
                 };
                 if writeln!(stdin, "{frame}").and_then(|_| stdin.flush()).is_err() {
@@ -170,7 +170,7 @@ mod tests {
         frames.send("waiting".into());
         frames.send("done".into());
         wake.recv().unwrap();
-        assert_eq!(frames.pending.lock().unwrap().take().as_deref(), Some("done"));
+        assert_eq!(frames.pending.lock().take().as_deref(), Some("done"));
         assert!(wake.try_recv().is_err());
     }
 

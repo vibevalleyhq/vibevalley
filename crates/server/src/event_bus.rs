@@ -1,17 +1,22 @@
 //! Bounded asynchronous transition bus for [`Hub`](crate::Hub).
 //!
-//! Each subscriber runs on its own worker thread (`vibevalley-bus-{name}`) fed
-//! by a bounded channel (`CHANNEL_CAPACITY = 1024`), so [`Hub::apply`] never
-//! runs subscriber logic synchronously and slow subscribers never block other
-//! subscribers or state commits.
+//! Each subscriber runs as a lightweight Tokio task fed by a bounded
+//! `tokio::sync::mpsc` channel (`CHANNEL_CAPACITY = 1024`) and executes its
+//! synchronous handler via `tokio::task::spawn_blocking`, so [`Hub::apply`]
+//! never runs subscriber logic synchronously and slow subscribers never block
+//! other subscribers, async I/O workers, or state commits.
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock, Weak};
-use std::thread::JoinHandle;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, OnceLock, Weak};
+use std::thread::ThreadId;
 
+use parking_lot::Mutex;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use vibevalley_core::Transition;
 
-use crate::{Hub, lock};
+use crate::Hub;
 
 /// Bounded per-subscriber transition queue depth.
 pub const CHANNEL_CAPACITY: usize = 1024;
@@ -19,24 +24,24 @@ pub const CHANNEL_CAPACITY: usize = 1024;
 struct Subscriber {
     id: u64,
     name: &'static str,
-    tx: Mutex<Option<flume::Sender<Arc<Transition>>>>,
-    stop_flag: Arc<AtomicBool>,
-    stop_tx: Mutex<Option<flume::Sender<()>>>,
+    tx: Mutex<Option<mpsc::Sender<Arc<Transition>>>>,
+    cancel: CancellationToken,
+    running_thread: Arc<Mutex<Option<ThreadId>>>,
     handle: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl Subscriber {
     fn signal_stop(&self) {
-        self.stop_flag.store(true, Ordering::Release);
-        let _ = lock(&self.tx).take();
-        let _ = lock(&self.stop_tx).take();
+        self.cancel.cancel();
+        let _ = self.tx.lock().take();
     }
 
     fn join(&self) {
-        if let Some(handle) = lock(&self.handle).take()
-            && handle.thread().id() != std::thread::current().id()
-        {
-            let _ = handle.join();
+        if *self.running_thread.lock() == Some(std::thread::current().id()) {
+            return;
+        }
+        if let Some(handle) = self.handle.lock().take() {
+            let _ = vibevalley_runtime::rt::block_on(handle);
         }
     }
 
@@ -54,6 +59,7 @@ struct BusState {
 /// Asynchronous fan-out bus publishing folded [`Transition`]s to subscribers.
 pub struct EventBus {
     hub: OnceLock<Weak<Hub>>,
+    cancel: CancellationToken,
     next_id: AtomicU64,
     state: Arc<Mutex<BusState>>,
 }
@@ -61,7 +67,7 @@ pub struct EventBus {
 /// Handle for an active [`EventBus`] subscription.
 ///
 /// Calling [`Subscription::close`] or dropping the handle unsubscribes and
-/// cooperatively stops and joins the subscriber's worker thread.
+/// cooperatively stops and awaits the subscriber task.
 pub struct Subscription {
     state: Weak<Mutex<BusState>>,
     sub: Option<Arc<Subscriber>>,
@@ -72,11 +78,11 @@ impl Subscription {
         Self { state: Weak::new(), sub: None }
     }
 
-    /// Unsubscribes and cooperatively stops and joins the worker thread.
+    /// Unsubscribes and cooperatively stops and awaits the subscriber task.
     pub fn close(&self) {
         let Some(sub) = &self.sub else { return };
         if let Some(state) = self.state.upgrade() {
-            lock(&state).subscribers.retain(|s| s.id != sub.id);
+            state.lock().subscribers.retain(|s| s.id != sub.id);
         }
         sub.close();
     }
@@ -89,9 +95,10 @@ impl Drop for Subscription {
 }
 
 impl EventBus {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(cancel: CancellationToken) -> Self {
         Self {
             hub: OnceLock::new(),
+            cancel,
             next_id: AtomicU64::new(1),
             state: Arc::new(Mutex::new(BusState {
                 closed: false,
@@ -105,51 +112,63 @@ impl EventBus {
     }
 
     /// Registers an asynchronous transition subscriber backed by a bounded
-    /// channel (`CHANNEL_CAPACITY`) and worker thread `vibevalley-bus-{name}`.
+    /// `tokio::sync::mpsc` channel (`CHANNEL_CAPACITY`) and cooperative
+    /// `CancellationToken`.
     pub fn subscribe(&self, name: &'static str, handler: impl Fn(&Arc<Hub>, &Transition) + Send + Sync + 'static) -> Subscription {
-        if lock(&self.state).closed {
+        if self.state.lock().closed {
             return Subscription::closed();
         }
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
-        let (tx, rx) = flume::bounded::<Arc<Transition>>(CHANNEL_CAPACITY);
-        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
-        let stop_flag = Arc::new(AtomicBool::new(false));
-        let worker_stop = stop_flag.clone();
+        let (tx, mut rx) = mpsc::channel::<Arc<Transition>>(CHANNEL_CAPACITY);
+        let cancel = self.cancel.child_token();
+        let worker_cancel = cancel.clone();
         let hub_weak = self.hub.get().cloned().unwrap_or_default();
+        let running_thread: Arc<Mutex<Option<ThreadId>>> = Arc::new(Mutex::new(None));
+        let worker_thread = running_thread.clone();
+        let handler = Arc::new(handler);
 
-        let spawned = std::thread::Builder::new().name(format!("vibevalley-bus-{name}")).spawn(move || {
+        let handle = vibevalley_runtime::rt::handle().spawn(async move {
             loop {
-                if worker_stop.load(Ordering::Acquire) {
+                let tr = tokio::select! {
+                    biased;
+                    _ = worker_cancel.cancelled() => return,
+                    item = rx.recv() => match item {
+                        Some(tr) => tr,
+                        None => return,
+                    },
+                };
+                if worker_cancel.is_cancelled() {
                     return;
                 }
-                let next = flume::Selector::new().recv(&rx, |r| r.ok()).recv(&stop_rx, |_| None).wait();
-                if worker_stop.load(Ordering::Acquire) {
-                    return;
-                }
-                let Some(tr) = next else { return };
                 let Some(hub) = hub_weak.upgrade() else { return };
-                handler(&hub, &tr);
+                let handler = handler.clone();
+                let worker_thread = worker_thread.clone();
+                let _ = tokio::task::spawn_blocking(move || {
+                    struct ThreadGuard(Arc<Mutex<Option<ThreadId>>>);
+                    impl Drop for ThreadGuard {
+                        fn drop(&mut self) {
+                            *self.0.lock() = None;
+                        }
+                    }
+                    *worker_thread.lock() = Some(std::thread::current().id());
+                    let _guard = ThreadGuard(worker_thread);
+                    handler(&hub, &tr);
+                })
+                .await;
             }
         });
-        let handle = match spawned {
-            Ok(handle) => handle,
-            Err(e) => {
-                eprintln!("vibevalley-server: event_bus: failed to spawn subscriber '{name}': {e}");
-                return Subscription::closed();
-            }
-        };
 
         let sub = Arc::new(Subscriber {
             id,
             name,
             tx: Mutex::new(Some(tx)),
-            stop_flag,
-            stop_tx: Mutex::new(Some(stop_tx)),
+            cancel,
+            running_thread,
             handle: Mutex::new(Some(handle)),
         });
 
         let accepted = {
-            let mut st = lock(&self.state);
+            let mut st = self.state.lock();
             if st.closed {
                 false
             } else {
@@ -173,12 +192,12 @@ impl EventBus {
         if transitions.is_empty() {
             return;
         }
-        let targets: Vec<(&'static str, flume::Sender<Arc<Transition>>, u64)> = {
-            let st = lock(&self.state);
+        let targets: Vec<(&'static str, mpsc::Sender<Arc<Transition>>, u64)> = {
+            let st = self.state.lock();
             if st.closed || st.subscribers.is_empty() {
                 return;
             }
-            st.subscribers.iter().filter_map(|s| lock(&s.tx).clone().map(|tx| (s.name, tx, s.id))).collect()
+            st.subscribers.iter().filter_map(|s| s.tx.lock().clone().map(|tx| (s.name, tx, s.id))).collect()
         };
         if targets.is_empty() {
             return;
@@ -189,24 +208,25 @@ impl EventBus {
             for (name, tx, id) in &targets {
                 match tx.try_send(tr.clone()) {
                     Ok(()) => {}
-                    Err(flume::TrySendError::Full(_)) => {
+                    Err(mpsc::error::TrySendError::Full(_)) => {
                         eprintln!("vibevalley-server: event_bus: subscriber '{name}' queue full ({CHANNEL_CAPACITY}); dropping transition");
                     }
-                    Err(flume::TrySendError::Disconnected(_)) => {
+                    Err(mpsc::error::TrySendError::Closed(_)) => {
                         disconnected.push(*id);
                     }
                 }
             }
         }
         if !disconnected.is_empty() {
-            lock(&self.state).subscribers.retain(|s| !disconnected.contains(&s.id));
+            self.state.lock().subscribers.retain(|s| !disconnected.contains(&s.id));
         }
     }
 
-    /// Cooperatively signals and joins every registered subscriber thread.
+    /// Cooperatively signals and awaits every registered subscriber task.
     pub fn close(&self) {
+        self.cancel.cancel();
         let subs = {
-            let mut st = lock(&self.state);
+            let mut st = self.state.lock();
             st.closed = true;
             std::mem::take(&mut st.subscribers)
         };
@@ -280,7 +300,11 @@ mod tests {
         let first = fast_rx.recv_timeout(Duration::from_secs(2)).expect("first fast event");
         let second = fast_rx.recv_timeout(Duration::from_secs(2)).expect("re-applied fast event");
         assert_ne!(first.0, caller_tid);
-        assert_eq!(first.1.as_deref(), Some("vibevalley-bus-fast"));
+        assert!(
+            first.1.as_deref().is_some_and(|n| n.starts_with("vibevalley-io-")),
+            "expected shared vibevalley-io worker, got {:?}",
+            first.1
+        );
         assert_eq!((first.2, second.2), (1, 2));
 
         // Even exceeding CHANNEL_CAPACITY against a blocked subscriber never stalls Hub::apply.
@@ -316,7 +340,7 @@ mod tests {
         assert!(hit_rx.recv_timeout(Duration::from_millis(80)).is_err());
         assert_eq!(seen.load(Ordering::SeqCst), before);
 
-        // Calling close_bus from inside a subscriber thread must not panic with self-join.
+        // Calling close_bus from inside a subscriber thread must not deadlock or panic.
         let (done_tx, done_rx) = flume::bounded::<()>(1);
         let _self_closer = hub.subscribe_transitions("self-closer", move |hub, _| {
             hub.close_bus();

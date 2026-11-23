@@ -1,7 +1,8 @@
-use std::sync::{Mutex, OnceLock};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use base64::Engine as _;
+use parking_lot::Mutex;
 use serde::Serialize;
 use vibevalley_protocol::MediaSpeechEvent;
 use vibevalley_server::transport::api::media::{SharedSpeechStreams, SpeechClaim};
@@ -32,7 +33,7 @@ fn playback() -> &'static Mutex<Playback> {
     PLAYBACK.get_or_init(Default::default)
 }
 pub fn state(owner: &str) -> State {
-    let current = playback().lock().unwrap_or_else(|e| e.into_inner());
+    let current = playback().lock();
     if current.owner == owner { current.state.clone() } else { State::default() }
 }
 
@@ -45,7 +46,7 @@ impl Drop for Claim {
 }
 
 pub fn start(streams: SharedSpeechStreams, id: &str) -> Result<State, String> {
-    let mut current = playback().lock().unwrap_or_else(|e| e.into_inner());
+    let mut current = playback().lock();
     if current.state.phase != Phase::Idle {
         if current.owner == id {
             return Ok(current.state.clone());
@@ -66,10 +67,10 @@ pub fn start(streams: SharedSpeechStreams, id: &str) -> Result<State, String> {
             let result = crate::audio::reserve_for_call().and_then(|lease| {
                 let _lease = lease;
                 play(claim, stopped, &mut Native, || {
-                    playback().lock().unwrap_or_else(|e| e.into_inner()).state.phase = Phase::Draining;
+                    playback().lock().state.phase = Phase::Draining;
                 })
             });
-            let mut current = playback().lock().unwrap_or_else(|e| e.into_inner());
+            let mut current = playback().lock();
             current.stop = None;
             current.state = State {
                 phase: Phase::Idle,
@@ -85,7 +86,7 @@ pub fn start(streams: SharedSpeechStreams, id: &str) -> Result<State, String> {
 }
 
 pub fn stop(owner: Option<&str>) -> State {
-    let mut playback = playback().lock().unwrap_or_else(|e| e.into_inner());
+    let mut playback = playback().lock();
     if owner.is_some_and(|id| id != playback.owner) {
         return State::default();
     }

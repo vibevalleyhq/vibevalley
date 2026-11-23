@@ -1,14 +1,17 @@
 //! Bounded-1 coalescing feed for a single state slice (`board`, `sessions`,
-//! `collab`, `inbox`, `ops`, `farm`).
+//! `collab`, `inbox`, `ops`, `farm`), backed by `tokio::sync::watch`.
 
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
+use parking_lot::Mutex;
 use serde::Serialize;
 use serde_json::Value;
+use tokio::sync::watch;
+use tokio_stream::Stream;
+use tokio_stream::wrappers::WatchStream;
 use vibevalley_protocol::{BoardSlice, CollabSlice, FarmFrame, InboxSlice, OpsSlice, STATE_EVERY_MS, SessionsSlice};
 
-use crate::lock;
 use crate::transport::api::FaultGate;
 
 pub trait Sequenced {
@@ -70,20 +73,136 @@ impl<T: Serialize> SliceSnapshot<T> {
         }
     }
 
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
     pub fn wire(&self) -> &Value {
         self.wire.get_or_init(|| serde_json::to_value(self.slice.as_ref()).expect("slice serializes"))
     }
 }
 
-pub struct SliceFeed<T> {
-    topic: &'static str,
-    inner: Mutex<Published<T>>,
+/// Typed `watch::Receiver` handle for any one of the six domain slices.
+pub enum SliceSubscription {
+    Board(watch::Receiver<Arc<SliceSnapshot<BoardSlice>>>),
+    Sessions(watch::Receiver<Arc<SliceSnapshot<SessionsSlice>>>),
+    Collab(watch::Receiver<Arc<SliceSnapshot<CollabSlice>>>),
+    Inbox(watch::Receiver<Arc<SliceSnapshot<InboxSlice>>>),
+    Ops(watch::Receiver<Arc<SliceSnapshot<OpsSlice>>>),
+    Farm {
+        rx: watch::Receiver<Arc<SliceSnapshot<FarmFrame>>>,
+        strip_initial_effects: bool,
+    },
 }
 
-struct Published<T> {
+fn wire_of<T: Serialize>(snap: &SliceSnapshot<T>, strip_effects: bool) -> (i64, Value) {
+    let val = snap.wire();
+    if strip_effects && val.get("effects").and_then(Value::as_array).is_some_and(|a| !a.is_empty()) {
+        let mut clean = val.clone();
+        clean["effects"] = Value::Array(vec![]);
+        return (snap.seq, clean);
+    }
+    (snap.seq, val.clone())
+}
+
+impl SliceSubscription {
+    pub fn topic(&self) -> &'static str {
+        match self {
+            SliceSubscription::Board(_) => "slice:board",
+            SliceSubscription::Sessions(_) => "slice:sessions",
+            SliceSubscription::Collab(_) => "slice:collab",
+            SliceSubscription::Inbox(_) => "slice:inbox",
+            SliceSubscription::Ops(_) => "slice:ops",
+            SliceSubscription::Farm { .. } => "slice:farm",
+        }
+    }
+
+    /// Reads the current snapshot, marks it seen, and returns `(seq, generation, wire)`.
+    pub fn borrow_and_update(&mut self, is_initial: bool) -> (i64, u64, Value) {
+        match self {
+            SliceSubscription::Board(rx) => {
+                let snap = rx.borrow_and_update().clone();
+                let (seq, val) = wire_of(&snap, false);
+                (seq, snap.generation, val)
+            }
+            SliceSubscription::Sessions(rx) => {
+                let snap = rx.borrow_and_update().clone();
+                let (seq, val) = wire_of(&snap, false);
+                (seq, snap.generation, val)
+            }
+            SliceSubscription::Collab(rx) => {
+                let snap = rx.borrow_and_update().clone();
+                let (seq, val) = wire_of(&snap, false);
+                (seq, snap.generation, val)
+            }
+            SliceSubscription::Inbox(rx) => {
+                let snap = rx.borrow_and_update().clone();
+                let (seq, val) = wire_of(&snap, false);
+                (seq, snap.generation, val)
+            }
+            SliceSubscription::Ops(rx) => {
+                let snap = rx.borrow_and_update().clone();
+                let (seq, val) = wire_of(&snap, false);
+                (seq, snap.generation, val)
+            }
+            SliceSubscription::Farm { rx, strip_initial_effects } => {
+                let snap = rx.borrow_and_update().clone();
+                let (seq, val) = wire_of(&snap, is_initial && *strip_initial_effects);
+                (seq, snap.generation, val)
+            }
+        }
+    }
+
+    /// Awaits the next published snapshot update; returns `false` when the feed drops.
+    pub async fn changed(&mut self) -> bool {
+        match self {
+            SliceSubscription::Board(rx) => rx.changed().await.is_ok(),
+            SliceSubscription::Sessions(rx) => rx.changed().await.is_ok(),
+            SliceSubscription::Collab(rx) => rx.changed().await.is_ok(),
+            SliceSubscription::Inbox(rx) => rx.changed().await.is_ok(),
+            SliceSubscription::Ops(rx) => rx.changed().await.is_ok(),
+            SliceSubscription::Farm { rx, .. } => rx.changed().await.is_ok(),
+        }
+    }
+
+    /// Converts this subscription into a `WatchStream`-backed stream of `(seq, json_value)` frames.
+    pub fn into_watch_stream(self, after_seq: Option<i64>) -> std::pin::Pin<Box<dyn Stream<Item = (i64, Value)> + Send>> {
+        fn wrap<T: Sequenced + Serialize + Send + Sync + 'static>(
+            rx: watch::Receiver<Arc<SliceSnapshot<T>>>,
+            after_seq: Option<i64>,
+            strip_initial_effects: bool,
+        ) -> std::pin::Pin<Box<dyn Stream<Item = (i64, Value)> + Send>> {
+            use futures_util::StreamExt;
+            let initial_seq = rx.borrow().seq;
+            let skip_initial = after_seq == Some(initial_seq);
+            let stream = if skip_initial { WatchStream::from_changes(rx) } else { WatchStream::new(rx) };
+            let mut initial = !skip_initial && after_seq.is_none();
+            Box::pin(stream.map(move |snap| {
+                let strip = initial && strip_initial_effects;
+                initial = false;
+                wire_of(&snap, strip)
+            }))
+        }
+        match self {
+            SliceSubscription::Board(rx) => wrap(rx, after_seq, false),
+            SliceSubscription::Sessions(rx) => wrap(rx, after_seq, false),
+            SliceSubscription::Collab(rx) => wrap(rx, after_seq, false),
+            SliceSubscription::Inbox(rx) => wrap(rx, after_seq, false),
+            SliceSubscription::Ops(rx) => wrap(rx, after_seq, false),
+            SliceSubscription::Farm { rx, strip_initial_effects } => wrap(rx, after_seq, strip_initial_effects),
+        }
+    }
+}
+
+pub struct SliceFeed<T> {
+    topic: &'static str,
+    tx: watch::Sender<Arc<SliceSnapshot<T>>>,
+    meta: Mutex<FeedMeta<T>>,
+}
+
+struct FeedMeta<T> {
     latest: Arc<SliceSnapshot<T>>,
     generation: u64,
-    watchers: Vec<flume::Sender<()>>,
     last: Option<(u64, Instant)>,
 }
 
@@ -104,12 +223,14 @@ fn apply_fault_gate(fault_gate: Option<&Arc<dyn FaultGate>>, topic: &str, stop: 
 impl<T: Sequenced + Serialize + Send + Sync + 'static> SliceFeed<T> {
     pub fn new(topic: &'static str, initial: T) -> Self {
         let seq = initial.seq();
+        let initial = Arc::new(SliceSnapshot::new(seq, 0, initial));
+        let (tx, _rx) = watch::channel(initial.clone());
         Self {
             topic,
-            inner: Mutex::new(Published {
-                latest: Arc::new(SliceSnapshot::new(seq, 0, initial)),
+            tx,
+            meta: Mutex::new(FeedMeta {
+                latest: initial,
                 generation: 0,
-                watchers: vec![],
                 last: None,
             }),
         }
@@ -120,28 +241,24 @@ impl<T: Sequenced + Serialize + Send + Sync + 'static> SliceFeed<T> {
     }
 
     pub fn has_watchers(&self) -> bool {
-        let mut current = lock(&self.inner);
-        current.watchers.retain(|tx| !tx.is_disconnected());
-        !current.watchers.is_empty()
+        self.tx.receiver_count() > 0
     }
 
     pub fn watcher_count(&self) -> usize {
-        let mut current = lock(&self.inner);
-        current.watchers.retain(|tx| !tx.is_disconnected());
-        current.watchers.len()
+        self.tx.receiver_count()
     }
 
     pub fn should_publish(&self, target_seq: i64, leading: bool) -> bool {
-        let current = lock(&self.inner);
-        if current.watchers.is_empty() {
+        if self.tx.receiver_count() == 0 {
             return false;
         }
+        let meta = self.meta.lock();
         let now = Instant::now();
         let locale = vibevalley_i18n::locale();
-        let stale_locale = current.latest.locale != locale;
-        let already_latest = current.latest.seq >= target_seq && !stale_locale;
-        let recently_sent = current.last.is_some_and(|(sent, time)| {
-            (already_latest && sent == current.generation) || (leading && now.duration_since(time) < Duration::from_millis(STATE_EVERY_MS))
+        let stale_locale = meta.latest.locale != locale;
+        let already_latest = meta.latest.seq >= target_seq && !stale_locale;
+        let recently_sent = meta.last.is_some_and(|(sent, time)| {
+            (already_latest && sent == meta.generation) || (leading && now.duration_since(time) < Duration::from_millis(STATE_EVERY_MS))
         });
         !recently_sent
     }
@@ -149,62 +266,70 @@ impl<T: Sequenced + Serialize + Send + Sync + 'static> SliceFeed<T> {
     pub fn replace_if_newer(&self, slice: T) {
         let seq = slice.seq();
         let locale = vibevalley_i18n::locale();
-        let mut current = lock(&self.inner);
-        if current.latest.seq < seq || (current.latest.seq == seq && current.latest.locale != locale) {
-            current.generation += 1;
-            let rev = current.generation;
-            current.latest = Arc::new(SliceSnapshot::new(seq, rev, slice));
+        let mut meta = self.meta.lock();
+        if meta.latest.seq < seq || (meta.latest.seq == seq && meta.latest.locale != locale) {
+            meta.generation += 1;
+            let rev = meta.generation;
+            let snap = Arc::new(SliceSnapshot::new(seq, rev, slice));
+            meta.latest = snap.clone();
+            if self.tx.receiver_count() == 0 {
+                self.tx.send_replace(snap);
+            }
         }
     }
 
     /// Unconditionally replaces the cached snapshot (used for live effects and fixture swaps).
     pub fn replace(&self, slice: T) {
         let seq = slice.seq();
-        let mut current = lock(&self.inner);
-        current.generation += 1;
-        let rev = current.generation;
-        current.latest = Arc::new(SliceSnapshot::new(seq, rev, slice));
+        let mut meta = self.meta.lock();
+        meta.generation += 1;
+        let rev = meta.generation;
+        let snap = Arc::new(SliceSnapshot::new(seq, rev, slice));
+        meta.latest = snap.clone();
+        if self.tx.receiver_count() == 0 {
+            self.tx.send_replace(snap);
+        }
     }
 
     pub fn snapshot(&self) -> Arc<SliceSnapshot<T>> {
-        lock(&self.inner).latest.clone()
+        self.meta.lock().latest.clone()
     }
 
     pub fn publish(&self, leading: bool) {
-        let mut current = lock(&self.inner);
-        let now = Instant::now();
-        let rev = current.generation;
-        if current.watchers.is_empty()
-            || current
-                .last
-                .is_some_and(|(sent, time)| sent == rev || (leading && now.duration_since(time) < Duration::from_millis(STATE_EVERY_MS)))
-        {
+        if self.tx.receiver_count() == 0 {
             return;
         }
-        current.last = Some((rev, now));
-        current
-            .watchers
-            .retain(|tx| !matches!(tx.try_send(()), Err(flume::TrySendError::Disconnected(_))));
+        let snap = {
+            let mut meta = self.meta.lock();
+            let now = Instant::now();
+            let rev = meta.generation;
+            if meta
+                .last
+                .is_some_and(|(sent, time)| sent == rev || (leading && now.duration_since(time) < Duration::from_millis(STATE_EVERY_MS)))
+            {
+                return;
+            }
+            meta.last = Some((rev, now));
+            meta.latest.clone()
+        };
+        self.tx.send_replace(snap);
     }
 
     /// Wakes every watcher immediately without rate-limiting (used by fixture swaps).
     pub fn publish_forced(&self) -> usize {
-        let mut current = lock(&self.inner);
-        current.last = Some((current.generation, Instant::now()));
-        current
-            .watchers
-            .retain(|tx| !matches!(tx.try_send(()), Err(flume::TrySendError::Disconnected(_))));
-        current.watchers.len()
+        let snap = {
+            let mut meta = self.meta.lock();
+            meta.last = Some((meta.generation, Instant::now()));
+            meta.latest.clone()
+        };
+        self.tx.send_replace(snap);
+        self.tx.receiver_count()
     }
 
-    /// Registers a bounded-1 wakeup signal channel for internal observers.
-    pub fn subscribe_signal(&self, initial: bool) -> flume::Receiver<()> {
-        let (tx, rx) = flume::bounded(1);
-        if initial {
-            let _ = tx.try_send(());
-        }
-        lock(&self.inner).watchers.push(tx);
-        rx
+    /// Direct `watch::Receiver` subscription with built-in Bounded-1 coalescing
+    /// and automatic disconnect cleanup on drop.
+    pub fn subscribe(&self) -> watch::Receiver<Arc<SliceSnapshot<T>>> {
+        self.tx.subscribe()
     }
 
     /// Blocks until `stop` disconnects (or `fault_gate` disconnects).
@@ -216,26 +341,28 @@ impl<T: Sequenced + Serialize + Send + Sync + 'static> SliceFeed<T> {
         stop: &flume::Receiver<()>,
         receive: &mut dyn FnMut(i64, &Value),
     ) {
-        let (tx, rx) = flume::bounded(1);
-        let first = {
-            let mut current = lock(&self.inner);
-            current.watchers.push(tx.clone());
-            current.latest.clone()
-        };
+        let mut rx = self.subscribe();
+        let first = rx.borrow_and_update().clone();
         let mut seen_gen = first.generation;
         if after_seq != Some(first.seq) {
             if !apply_fault_gate(fault_gate, self.topic, stop) {
-                lock(&self.inner).watchers.retain(|w| !w.same_channel(&tx));
                 return;
             }
             receive(first.seq, first.wire());
         }
         drop(first);
-        while !stop.is_disconnected() && flume::Selector::new().recv(stop, |_| false).recv(&rx, |r| r.is_ok()).wait() {
-            if stop.is_disconnected() {
+        while !stop.is_disconnected() {
+            let changed = vibevalley_runtime::rt::block_on(async {
+                tokio::select! {
+                    biased;
+                    _ = stop.recv_async() => false,
+                    res = rx.changed() => res.is_ok(),
+                }
+            });
+            if !changed || stop.is_disconnected() {
                 break;
             }
-            let latest = self.snapshot();
+            let latest = rx.borrow_and_update().clone();
             if latest.generation != seen_gen {
                 if !apply_fault_gate(fault_gate, self.topic, stop) {
                     break;
@@ -244,7 +371,6 @@ impl<T: Sequenced + Serialize + Send + Sync + 'static> SliceFeed<T> {
                 receive(latest.seq, latest.wire());
             }
         }
-        lock(&self.inner).watchers.retain(|w| !w.same_channel(&tx));
     }
 
     pub fn watch(&self, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
@@ -284,16 +410,12 @@ mod tests {
             feed.replace_if_newer(BoardSlice { seq, ..slice.clone() });
             feed.publish(false);
         }
-        {
-            let state = lock(&feed.inner);
-            assert_eq!(state.watchers[0].capacity(), Some(1));
-            assert_eq!(state.watchers[0].len(), 1);
-        }
+        assert_eq!(feed.watcher_count(), 1);
         release.send(()).unwrap();
         assert_eq!(received.recv_timeout(Duration::from_secs(2)).unwrap(), 512);
         drop(stop);
         watch.join().unwrap();
-        assert!(lock(&feed.inner).watchers.is_empty());
+        assert_eq!(feed.watcher_count(), 0);
     }
 
     #[test]

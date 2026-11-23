@@ -154,8 +154,22 @@ pub trait Server: Send + Sync {
     /// If `after_seq == Some(latest_seq)`, skips the initial send; otherwise
     /// delivers the latest snapshot immediately. Blocks until `stop` disconnects.
     fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value));
+    /// Direct `tokio::sync::watch` subscription for a domain slice when backed
+    /// by [`crate::slice_feed::SliceFeed`], avoiding blocking threads on SSE and bridge pumps.
+    fn subscribe_slice(&self, _slice: SliceKind) -> Option<crate::slice_feed::SliceSubscription> {
+        None
+    }
+    /// Current fault-injection gate, if attached.
+    fn fault_gate(&self) -> Option<SharedFaultGate> {
+        None
+    }
     /// `LiveEvent`s from now on; a new receiver per call.
     fn live(&self) -> flume::Receiver<LiveEvent>;
+    /// Broadcast subscription for `LiveEvent`s when backed by a broadcast ring
+    /// buffer, allowing SSE and bridge consumers to stream directly.
+    fn subscribe_live(&self) -> Option<tokio::sync::broadcast::Receiver<LiveEvent>> {
+        None
+    }
     /// One of `rpc.ts`'s subscriptions. `Err` is a refusal before the first
     /// event. The stream ends when the server drops its sender.
     #[allow(clippy::result_large_err, reason = "the approved contract returns the refusal envelope itself")]

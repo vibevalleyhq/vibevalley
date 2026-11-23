@@ -669,7 +669,7 @@ fn regression_antigravity_external_accounting_uses_gemini_additive_totals_even_w
     assert_eq!(usage.context_window_tokens, Some(1_000_000));
 }
 
-static OBSERVER_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static OBSERVER_TEST_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
 
 struct ClearObserverOnDrop;
 impl Drop for ClearObserverOnDrop {
@@ -680,7 +680,7 @@ impl Drop for ClearObserverOnDrop {
 
 #[test]
 fn observer_receives_events_outside_session_lock_and_stops_when_cleared() {
-    let _serial = OBSERVER_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let _serial = OBSERVER_TEST_LOCK.lock();
     let _cleanup = ClearObserverOnDrop;
     set_observer(None);
     assert!(!has_observer());

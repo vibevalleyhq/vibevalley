@@ -4,9 +4,10 @@
 //! scene can be checked as a PNG without a screen.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 
 use image::{Rgba, RgbaImage};
+use parking_lot::Mutex;
 
 use super::atlas::Atlas;
 
@@ -262,14 +263,14 @@ pub fn cached_glow_image(size: u32, color: Color) -> Arc<RgbaImage> {
     let q = color.map(|c| (c.clamp(0.0, 1.0) * 255.0).round() as u8);
     let key = (size, q);
     {
-        let guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+        let guard = cache.lock();
         if let Some(hit) = guard.get(&key) {
             return Arc::clone(hit);
         }
     }
     let quantized = q.map(|b| b as f32 / 255.0);
     let img = Arc::new(glow_image(size, quantized));
-    let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+    let mut guard = cache.lock();
     if guard.len() >= GLOW_CACHE_CAP {
         guard.clear();
     }

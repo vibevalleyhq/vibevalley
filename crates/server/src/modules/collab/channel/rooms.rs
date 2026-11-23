@@ -1,19 +1,23 @@
 use std::sync::Arc;
 
+use tokio::sync::broadcast;
+use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    ApiError, Channel, ChannelEvent, ChannelUnread, ChannelUpdate, ChatMessage, DEFAULT_ORCHESTRATOR, Fact, FactChannelRemoved, MessageKind, Notify, Preview,
-    SubjectKind, USER_ID,
+    ApiError, Channel, ChannelEvent as ProtocolChannelEvent, ChannelUnread, ChannelUpdate, ChatMessage, DEFAULT_ORCHESTRATOR, Fact, FactChannelRemoved,
+    MessageKind, Notify, Preview, SubjectKind, USER_ID,
 };
 
 use super::db::{self, ChannelRow, DeliveryRow, EventRow, MsgRow, ParticipantRow};
 use super::dispatch::{ChannelDispatched, DeliveryTargetKind, HeldBy, QueuedDelivery, Reason};
 use super::store::{Inner, Q, tx};
-use super::types::{AddressedMessage, Committed, Info, Place, ReadOptions, ReadResult, Seat, Told, head, info_of, new_id, notify_of, optional, to_message};
+use super::types::{
+    AddressedMessage, ChannelEvent, Committed, Info, Place, ReadOptions, ReadResult, Seat, head, info_of, new_id, notify_of, optional, to_message,
+};
 use super::words;
 use super::{CATCH_UP_MAX, Chat, FIRST_CHANNEL, LOG_KEEP, NO_NUMBER, READ_LIMIT, THREAD_TITLE_MAX, no_channel, refused};
-use crate::base::{LookIn, internal, missing};
-use crate::{Sink, lock, now};
+use crate::base::{LookIn, missing};
+use crate::{Sink, now};
 
 impl Chat {
     /// `placeOf`: a place's id, or an address as `from` would say it.
@@ -123,11 +127,9 @@ impl Chat {
         self.publish_channel(&inner, channel)
     }
 
-    /// Each read of the user's from now on: (channel, number, at).
-    pub fn user_reads(&self) -> flume::Receiver<(String, i64, i64)> {
-        let (tx, rx) = flume::unbounded();
-        lock(&self.user_reads).push(tx);
-        rx
+    /// Unified broadcast subscription for committed channel events.
+    pub fn subscribe_events(&self) -> broadcast::Receiver<ChannelEvent> {
+        self.events.subscribe()
     }
 
     /// `messageLocation`: a message's place and the channel it is in.
@@ -165,13 +167,6 @@ impl Chat {
         self.locked().home_of(participant)
     }
 
-    /// Each event committed from now on, in order.
-    pub fn committed(&self) -> flume::Receiver<Told> {
-        let (tx, rx) = flume::unbounded();
-        lock(&self.told).push(tx);
-        rx
-    }
-
     /// The events after `after`, oldest first, at most n.
     pub fn events(&self, after: i64, n: i64) -> Result<Vec<EventRow>, ApiError> {
         db::events_after(&self.locked().db, after, n).q()
@@ -191,7 +186,7 @@ impl Chat {
     /// Non-blocking stream of committed messages with their pending deliveries.
     pub fn dispatches(&self) -> flume::Receiver<ChannelDispatched> {
         let (tx, rx) = flume::unbounded();
-        lock(&self.dispatches).push(tx);
+        self.dispatches.lock().push(tx);
         rx
     }
 
@@ -226,14 +221,14 @@ impl Chat {
 
     /// Ensures a session's thread is opened and seated before it speaks or reads.
     pub fn ensure_seated(&self, seater: impl Fn(&str) + Send + Sync + 'static) {
-        self.seaters.write().unwrap_or_else(|e| e.into_inner()).push(Arc::new(seater));
+        self.seaters.write().push(Arc::new(seater));
     }
 
     pub(super) fn prepare_seat(&self, who: &str) {
         if who == USER_ID || who == DEFAULT_ORCHESTRATOR || who == "system" || self.home_of(who).is_some() {
             return;
         }
-        for f in self.seaters.read().unwrap_or_else(|e| e.into_inner()).iter() {
+        for f in self.seaters.read().iter() {
             f(who);
         }
     }
@@ -337,7 +332,7 @@ impl Chat {
 
     /// A refusal of removals: what still points at a channel.
     pub fn guard_removal(&self, guard: impl Fn(&str) -> Vec<String> + Send + Sync + 'static) {
-        self.guards.write().unwrap_or_else(|e| e.into_inner()).push(Arc::new(guard));
+        self.guards.write().push(Arc::new(guard));
     }
 
     pub fn channels(&self) -> Vec<Info> {
@@ -560,7 +555,7 @@ impl Chat {
             return Err(refused(t("server.channel.defaultStays", &[])));
         }
         let topics = db::topic_threads_in(&inner.db, id).q()?;
-        let guards = self.guards.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let guards = self.guards.read().clone();
         let mut why: Vec<String> = guards.iter().flat_map(|g| g(id)).collect();
         if topics != 0 {
             why.push(t("server.channel.issuesThere", &[("n", topics.into())]));
@@ -689,12 +684,6 @@ impl Chat {
         self.publish_channel(&inner, id)
     }
 
-    fn said(&self) -> flume::Receiver<ChatMessage> {
-        let (tx, rx) = flume::unbounded();
-        lock(&self.said).push(tx);
-        rx
-    }
-
     /// `follow`: what changed in a channel after revision `after`, then each
     /// change from now on; `Reset` when too far behind.
     pub fn follow(&self, channel: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
@@ -704,26 +693,24 @@ impl Chat {
                 return Err(refused(t("server.channel.channelGone", &[])));
             }
             // Subscribed before the missed ones are read: nothing falls in between.
-            let live = self.said();
+            let live = self.subscribe_events();
             (live, db::messages_changed_after(&inner.db, channel, after, CATCH_UP_MAX as i64 + 1).q()?)
         };
         let channel = channel.to_string();
-        std::thread::Builder::new()
-            .name("vibevalley-chat-follow".into())
-            .spawn(move || {
-                if missed.len() > CATCH_UP_MAX {
-                    sink.send(&ChannelEvent::Reset {});
+        let cancel = self.hub.upgrade().map(|h| h.child_token()).unwrap_or_default();
+        vibevalley_runtime::rt::handle().spawn(async move {
+            if missed.len() > CATCH_UP_MAX {
+                sink.send(&ProtocolChannelEvent::Reset {});
+                return;
+            }
+            let upto = missed.last().map_or(after, |m| m.revision);
+            for m in &missed {
+                if !sink.send(&ProtocolChannelEvent::Message { message: to_message(m) }) {
                     return;
                 }
-                let upto = missed.last().map_or(after, |m| m.revision);
-                for m in &missed {
-                    if !sink.send(&ChannelEvent::Message { message: to_message(m) }) {
-                        return;
-                    }
-                }
-                relay(live, &sink, |m| m.channel == channel && m.revision > upto);
-            })
-            .map_err(internal)?;
+            }
+            relay(live, cancel, &sink, |m| m.channel == channel && m.revision > upto).await;
+        });
         Ok(())
     }
 
@@ -732,7 +719,7 @@ impl Chat {
     pub fn reports(&self, after: Option<String>, sink: Sink) -> Result<(), ApiError> {
         let (live, missed) = {
             let inner = self.locked();
-            let live = self.said();
+            let live = self.subscribe_events();
             let missed = match &after {
                 None => {
                     let mut rows = db::recent_reports(&inner.db, LOG_KEEP).q()?;
@@ -743,22 +730,20 @@ impl Chat {
             };
             (live, missed)
         };
-        std::thread::Builder::new()
-            .name("vibevalley-chat-reports".into())
-            .spawn(move || {
-                if missed.len() > CATCH_UP_MAX {
-                    sink.send(&ChannelEvent::Reset {});
+        let cancel = self.hub.upgrade().map(|h| h.child_token()).unwrap_or_default();
+        vibevalley_runtime::rt::handle().spawn(async move {
+            if missed.len() > CATCH_UP_MAX {
+                sink.send(&ProtocolChannelEvent::Reset {});
+                return;
+            }
+            let upto = missed.last().map(|m| m.id.clone()).or(after).unwrap_or_default();
+            for m in &missed {
+                if !sink.send(&ProtocolChannelEvent::Message { message: to_message(m) }) {
                     return;
                 }
-                let upto = missed.last().map(|m| m.id.clone()).or(after).unwrap_or_default();
-                for m in &missed {
-                    if !sink.send(&ChannelEvent::Message { message: to_message(m) }) {
-                        return;
-                    }
-                }
-                relay(live, &sink, |m| m.kind == MessageKind::Report && m.id > upto);
-            })
-            .map_err(internal)?;
+            }
+            relay(live, cancel, &sink, |m| m.kind == MessageKind::Report && m.id > upto).await;
+        });
         Ok(())
     }
 }
@@ -776,20 +761,40 @@ fn queued_from_row(r: DeliveryRow) -> QueuedDelivery {
     }
 }
 
-/// Each message said that `keep` keeps, until the subscriber stops.
-fn relay(live: flume::Receiver<ChatMessage>, sink: &Sink, keep: impl Fn(&ChatMessage) -> bool) {
+fn message_of(event: ChannelEvent) -> Option<ChatMessage> {
+    match event {
+        ChannelEvent::Posted(c) => Some(to_message(&c.row)),
+        ChannelEvent::Edited(m) | ChannelEvent::Removed { message: m, .. } | ChannelEvent::Reacted(m) | ChannelEvent::Pinned(m) => Some(m),
+        ChannelEvent::UserRead { .. } => None,
+    }
+}
+
+/// Each message change that `keep` keeps, until the subscriber stops or the hub shuts down.
+async fn relay(mut live: broadcast::Receiver<ChannelEvent>, cancel: CancellationToken, sink: &Sink, keep: impl Fn(&ChatMessage) -> bool) {
     loop {
         if sink.stopped() {
             return;
         }
-        match live.recv_timeout(std::time::Duration::from_millis(500)) {
-            Ok(m) if keep(&m) => {
-                if !sink.send(&ChannelEvent::Message { message: m }) {
+        let next = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return,
+            _ = sink.stop.recv_async() => return,
+            res = live.recv() => res,
+        };
+        match next {
+            Ok(ev) => {
+                if let Some(m) = message_of(ev)
+                    && keep(&m)
+                    && !sink.send(&ProtocolChannelEvent::Message { message: m })
+                {
                     return;
                 }
             }
-            Ok(_) | Err(flume::RecvTimeoutError::Timeout) => {}
-            Err(flume::RecvTimeoutError::Disconnected) => return,
+            Err(broadcast::error::RecvError::Lagged(_)) => {
+                let _ = sink.send(&ProtocolChannelEvent::Reset {});
+                return;
+            }
+            Err(broadcast::error::RecvError::Closed) => return,
         }
     }
 }

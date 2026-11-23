@@ -10,9 +10,10 @@
 
 use std::fs::File;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use vibevalley_core::{Move, Refusal, status_move};
 use vibevalley_protocol::{
@@ -21,7 +22,7 @@ use vibevalley_protocol::{
 };
 use vibevalley_runtime::oar::Registry;
 
-use crate::modules::work::ledger::{BoardConfig, BoardError, Facts, IssueChange, Ledger, LocalFacts, Result, Undelivered, find, io, lock, now};
+use crate::modules::work::ledger::{BoardConfig, BoardError, Facts, IssueChange, Ledger, LocalFacts, Result, Undelivered, find, io, now};
 use crate::modules::work::session::{DraftEnd, Drivers, Hire, Rounds, RuntimeDrivers, Sessions, trigger_of};
 use crate::modules::work::workplace::{Changes, Landed, Leave, OnDisk, Workplace};
 
@@ -176,7 +177,7 @@ impl Board {
         board.0.sessions.recover_on_connect(opened.recoverable);
         board.0.sessions.record_interrupted(opened.interrupted);
         {
-            let _work = lock(&board.0.work);
+            let _work = board.0.work.lock();
             board.recover_published_deliveries()?;
             for id in opened.lost {
                 if let Ok(issue) = board.stored(&id)
@@ -200,7 +201,7 @@ impl Board {
     /// is released.
     pub fn close(&self) {
         self.0.sessions.close();
-        lock(&self.0.lock).take();
+        self.0.lock.lock().take();
     }
 
     pub fn config(&self) -> &BoardConfig {
@@ -264,7 +265,7 @@ impl Board {
     }
 
     pub fn create(&self, new: NewIssue) -> Result<Issue> {
-        let _work = lock(&self.0.work);
+        let _work = self.0.work.lock();
         let repo = match &new.repo {
             Some(path) => Some(self.0.workplaces.ensure_repo(self.0.workplaces.repo_dir(&path.to_string_lossy()))?),
             None => None,
@@ -357,7 +358,7 @@ impl Board {
     }
 
     pub fn move_reviewed(&self, reference: &str, to: IssueStatus, words: Option<&str>, seen: Option<&vibevalley_protocol::ReviewRevision>) -> Result<Move> {
-        let _work = lock(&self.0.work);
+        let _work = self.0.work.lock();
         let issue = self.stored(reference)?;
         Self::verify_approval(&issue, to, seen)?;
         let mv = status_move(&issue, to).map_err(BoardError::Refused)?;
@@ -423,7 +424,7 @@ impl Board {
         if words.is_empty() {
             return Err(BoardError::WordsRequired);
         }
-        let _work = lock(&self.0.work);
+        let _work = self.0.work.lock();
         let issue = self.stored(reference)?;
         if issue.status.is_closed() {
             return Err(BoardError::Refused(if issue.was_sent() { Refusal::Reopen } else { Refusal::Revive }));
@@ -447,7 +448,7 @@ impl Board {
         if key.trim().is_empty() || words.trim().is_empty() {
             return Err(BoardError::WordsRequired);
         }
-        let _work = lock(&self.0.work);
+        let _work = self.0.work.lock();
         let issue = self.stored(reference)?;
         let sessions = &self.0.sessions;
         let sub = sessions.submit_words(&issue.id, key, words)?;
@@ -520,7 +521,7 @@ impl Board {
     /// Sends queued issues while there is room, in board order. Children in
     /// review are merged into their parents first.
     pub fn refresh_queue(&self) -> Result<()> {
-        let _work = lock(&self.0.work);
+        let _work = self.0.work.lock();
         self.join_children()?;
         self.refresh_queue_locked();
         self.retry_replies();
@@ -547,7 +548,7 @@ impl Board {
     /// After every round: children in review merge into their parents,
     /// then what waits is sent.
     fn after_round(&self) {
-        let _work = lock(&self.0.work);
+        let _work = self.0.work.lock();
         if let Err(e) = self.join_children() {
             eprintln!("vibevalley: child issues could not be merged: {e}");
         }
@@ -709,7 +710,7 @@ impl Board {
 
     /// Settles `reference` after its tracked pull request transitions to `merged` or `closed`.
     pub fn settle_pull(&self, reference: &str, state: vibevalley_protocol::PullRequestState) -> Result<Option<Issue>> {
-        let _work = lock(&self.0.work);
+        let _work = self.0.work.lock();
         let Some(issue) = self.issue(reference) else {
             return Ok(None);
         };
@@ -740,7 +741,7 @@ impl Board {
     /// When a followed PR merges on an issue that finishes with its PR, the
     /// issue completes as `Landing::PullRequest`.
     pub fn record_pull_request(&self, reference: &str, pr: vibevalley_protocol::PullRequest) -> Result<Issue> {
-        let _work = lock(&self.0.work);
+        let _work = self.0.work.lock();
         let issue = self.stored(reference)?;
         let merged = pr.state == vibevalley_protocol::PullRequestState::Merged;
         let updated = self.change(&issue.id, IssueChange::PullRequest(pr))?;

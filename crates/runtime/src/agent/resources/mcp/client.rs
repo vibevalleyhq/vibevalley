@@ -1,6 +1,5 @@
 use std::future::Future;
 use std::process::Stdio;
-use std::sync::OnceLock;
 use std::time::Duration;
 
 use rmcp::model::{CallToolRequestParams, CallToolResult, ClientConfig, Implementation, JsonObject, PaginatedRequestParams, ProtocolVersion, Tool};
@@ -8,33 +7,18 @@ use rmcp::service::RunningService;
 use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
 use rmcp::transport::{StreamableHttpClientTransport, TokioChildProcess};
 use rmcp::{RoleClient, ServiceExt};
-use tokio::runtime::Runtime;
 
 use super::McpServerConfig;
 use crate::agent::ai::CancelToken;
 
 const CALL_TIMEOUT: Duration = Duration::from_secs(120);
 
-fn runtime() -> Result<&'static Runtime, String> {
-    static MCP: OnceLock<Result<Runtime, String>> = OnceLock::new();
-    MCP.get_or_init(|| {
-        tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(2)
-            .thread_name("vibevalley-mcp")
-            .enable_all()
-            .build()
-            .map_err(|e| e.to_string())
-    })
-    .as_ref()
-    .map_err(Clone::clone)
-}
-
 fn request<T: Send + 'static>(future: impl Future<Output = Result<T, String>> + Send + 'static, cancel: &CancelToken) -> Result<T, String> {
     if cancel.is_cancelled() {
         return Err("aborted by the user".into());
     }
     let (tx, rx) = flume::bounded(1);
-    let task = runtime()?.spawn(async move {
+    let task = crate::rt::handle().spawn(async move {
         let result = tokio::time::timeout(CALL_TIMEOUT, future).await.unwrap_or_else(|_| Err("timed out".into()));
         let _ = tx.send(result);
     });

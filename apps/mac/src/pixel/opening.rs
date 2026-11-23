@@ -4,9 +4,10 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 
 use image::RgbaImage;
+use parking_lot::Mutex;
 
 use super::draw::{DrawList, HudOp, Op, rgba};
 use super::nav::frame_at;
@@ -83,7 +84,7 @@ impl OpeningScene {
         let which = which.unwrap_or_else(|| scene_of_hour(local_hour()));
         let dir = super::assets_dir().join("brand");
         let key = (dir.clone(), which);
-        if let Some(art) = opening_art_cache().lock().ok().and_then(|map| map.get(&key).cloned()) {
+        if let Some(art) = opening_art_cache().lock().get(&key).cloned() {
             return OpeningScene {
                 fade: art.fade,
                 scene: art.scene,
@@ -118,16 +119,14 @@ impl OpeningScene {
             };
             image::Rgba([0x15, 0x14, 0x13, a as u8])
         }));
-        if let Ok(mut map) = opening_art_cache().lock() {
-            map.insert(
-                key,
-                OpeningArt {
-                    scene: scene.clone(),
-                    frames: frames.clone(),
-                    fade: fade.clone(),
-                },
-            );
-        }
+        opening_art_cache().lock().insert(
+            key,
+            OpeningArt {
+                scene: scene.clone(),
+                frames: frames.clone(),
+                fade: fade.clone(),
+            },
+        );
         OpeningScene {
             fade,
             scene,

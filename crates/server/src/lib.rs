@@ -11,11 +11,17 @@
 //! [`Hub::apply`].
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard, RwLock};
+use std::future::Future;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
+use arc_swap::ArcSwapOption;
+use parking_lot::{Mutex, RwLock};
 use serde_json::Value;
+use tokio::sync::broadcast;
+use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
 use vibevalley_core::{Applied, Core, SliceMask, Transition};
 use vibevalley_protocol::{
     ApiError, BizCode, BoardSlice, Caller, CollabSlice, Envelope, Fact, FarmFrame, GameEffect, InboxItem, InboxSlice, LiveEvent, LiveEventNotice,
@@ -41,6 +47,8 @@ mod start;
 pub mod testing;
 
 pub use start::{ServerConfig, StartError, Started, start};
+
+const LIVE_CAPACITY: usize = 512;
 
 /// Installs the process-wide `ring` TLS provider once (`reqwest` and `tokio-tungstenite`).
 pub fn install_tls() {
@@ -87,10 +95,12 @@ impl Sink {
 
 type Opener = Arc<dyn Fn(&Hub, Value, Sink) -> Result<(), ApiError> + Send + Sync>;
 
-#[derive(Default)]
-struct Streams {
-    live: Vec<flume::Sender<LiveEvent>>,
-}
+struct InvokeObserverSlot(SharedInvokeObserver);
+struct FaultGateSlot(SharedFaultGate);
+struct HostDebugSlot(SharedHostDebug);
+struct McpSlot(crate::transport::api::SharedMcp);
+struct SpeechStreamsSlot(crate::transport::api::media::SharedSpeechStreams);
+struct MediaInputsSlot(crate::transport::api::media::SharedMediaInputs);
 
 struct Kick {
     dirty: SliceMask,
@@ -129,87 +139,100 @@ pub struct Hub {
     pub(crate) runtime_inbox: runtime_inbox::RuntimeInboxObserver,
     feeds: SliceFeeds,
     bus: event_bus::EventBus,
+    shutdown: CancellationToken,
+    tasks: TaskTracker,
     execution: std::sync::OnceLock<std::sync::Weak<modules::team::orchestrator::Orchestrator>>,
     handlers: RwLock<HashMap<&'static str, Handler>>,
     openers: RwLock<HashMap<&'static str, Opener>>,
-    streams: Mutex<Streams>,
+    live: broadcast::Sender<LiveEvent>,
     subscriptions: Mutex<HashMap<u64, flume::Sender<()>>>,
     next_id: AtomicU64,
     next_trace_id: AtomicU64,
-    has_observer: AtomicBool,
-    observer: RwLock<Option<SharedInvokeObserver>>,
-    has_fault_gate: AtomicBool,
-    fault_gate: RwLock<Option<SharedFaultGate>>,
-    host_debug: RwLock<Option<SharedHostDebug>>,
-    voice: RwLock<Option<Arc<modules::collab::voice::Voice>>>,
-    media_inputs: RwLock<Option<crate::transport::api::media::SharedMediaInputs>>,
-    mcp: RwLock<Option<crate::transport::api::SharedMcp>>,
-    speech: RwLock<Option<crate::transport::api::media::SharedSpeechStreams>>,
-    /// Each fold's dirty slice mask and farm effects, for the feed thread.
+    observer: ArcSwapOption<InvokeObserverSlot>,
+    fault_gate: ArcSwapOption<FaultGateSlot>,
+    host_debug: ArcSwapOption<HostDebugSlot>,
+    voice: ArcSwapOption<modules::collab::voice::Voice>,
+    media_inputs: ArcSwapOption<MediaInputsSlot>,
+    mcp: ArcSwapOption<McpSlot>,
+    speech: ArcSwapOption<SpeechStreamsSlot>,
+    /// Each fold's dirty slice mask and farm effects, for the feed pump task.
     kicks: flume::Sender<Kick>,
 }
 
-pub(crate) fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
+impl Drop for Hub {
+    fn drop(&mut self) {
+        self.shutdown.cancel();
+    }
 }
 
 impl Hub {
+    /// Root shutdown token for this hub.
+    pub fn shutdown_token(&self) -> CancellationToken {
+        self.shutdown.clone()
+    }
+
+    /// Child shutdown token cancelled automatically when the hub closes or drops.
+    pub fn child_token(&self) -> CancellationToken {
+        self.shutdown.child_token()
+    }
+
+    /// Spawns a tracked background task on the shared `vibevalley-io` Tokio runtime.
+    pub fn spawn_task<F>(&self, future: F) -> tokio::task::JoinHandle<F::Output>
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        self.tasks.spawn_on(future, vibevalley_runtime::rt::handle())
+    }
+
+    /// Cancels the hub's shutdown token, stops the event bus, and waits for all
+    /// tracked background tasks to finish.
+    pub fn close(&self) {
+        self.shutdown.cancel();
+        self.bus.close();
+        self.tasks.close();
+        vibevalley_runtime::rt::block_on(self.tasks.wait());
+    }
+
     /// Streamed speech (`modules::content::media::jobs::Jobs`).
     pub fn attach_speech_streams(&self, streams: crate::transport::api::media::SharedSpeechStreams) {
-        *self.speech.write().unwrap_or_else(|e| e.into_inner()) = Some(streams);
+        self.speech.store(Some(Arc::new(SpeechStreamsSlot(streams))));
     }
 
     /// The helpers' MCP door (`modules::team::mcp::Door`).
     pub fn attach_mcp(&self, door: crate::transport::api::SharedMcp) {
-        *self.mcp.write().unwrap_or_else(|e| e.into_inner()) = Some(door);
+        self.mcp.store(Some(Arc::new(McpSlot(door))));
     }
 
     pub fn attach_media_inputs(&self, inputs: crate::transport::api::media::SharedMediaInputs) {
-        *self.media_inputs.write().unwrap_or_else(|e| e.into_inner()) = Some(inputs);
+        self.media_inputs.store(Some(Arc::new(MediaInputsSlot(inputs))));
     }
 
     /// Attaches or clears the zero-overhead RPC / `Core::apply` observer.
     pub fn attach_observer(&self, observer: Option<SharedInvokeObserver>) {
-        let enabled = observer.is_some();
-        let previous = {
-            let mut slot = self.observer.write().unwrap_or_else(|e| e.into_inner());
-            let prev = std::mem::replace(&mut *slot, observer);
-            self.has_observer.store(enabled, Ordering::Release);
-            prev
-        };
-        drop(previous);
+        self.observer.store(observer.map(|o| Arc::new(InvokeObserverSlot(o))));
     }
 
     /// Attaches or clears the fault-injection gate for DevTools Lab & Overrides.
     pub fn attach_fault_gate(&self, gate: Option<SharedFaultGate>) {
-        let enabled = gate.is_some();
-        let previous = {
-            let mut slot = self.fault_gate.write().unwrap_or_else(|e| e.into_inner());
-            let prev = std::mem::replace(&mut *slot, gate);
-            self.has_fault_gate.store(enabled, Ordering::Release);
-            prev
-        };
-        drop(previous);
+        self.fault_gate.store(gate.map(|g| Arc::new(FaultGateSlot(g))));
     }
 
     /// Attaches or clears the desktop host shell debug bridge.
     pub fn attach_host_debug(&self, bridge: Option<SharedHostDebug>) {
-        let previous = {
-            let mut slot = self.host_debug.write().unwrap_or_else(|e| e.into_inner());
-            std::mem::replace(&mut *slot, bridge)
-        };
-        drop(previous);
+        self.host_debug.store(bridge.map(|b| Arc::new(HostDebugSlot(b))));
     }
 
     /// Attaches the started voice controller so desktop callers read it from [`Server::voice`].
     pub fn attach_voice(&self, voice: Arc<modules::collab::voice::Voice>) {
-        *self.voice.write().unwrap_or_else(|e| e.into_inner()) = Some(voice);
+        self.voice.store(Some(voice));
     }
 
     /// A server holding `state`, with no endpoint answered yet. Its feed
-    /// thread ends when the last `Arc<Hub>` is dropped.
+    /// pump ends when [`Hub::close`] is called or the last `Arc<Hub>` is dropped.
     pub fn new(state: SpaceState) -> Arc<Hub> {
         let (kicks, kicked) = flume::unbounded();
+        let (live, _live_rx) = broadcast::channel(LIVE_CAPACITY);
         let core = Core::new(state);
         let seq = core.seq();
         let feeds = SliceFeeds {
@@ -220,6 +243,8 @@ impl Hub {
             ops: slice_feed::SliceFeed::new("slice:ops", core.ops_slice()),
             farm: slice_feed::SliceFeed::new("slice:farm", core.farm_frame(vec![])),
         };
+        let shutdown = CancellationToken::new();
+        let bus = event_bus::EventBus::new(shutdown.child_token());
         let hub = Arc::new(Hub {
             core: Mutex::new(core),
             seq: AtomicI64::new(seq),
@@ -227,56 +252,48 @@ impl Hub {
             runtime_inbox_items: RwLock::new(vec![]),
             runtime_inbox: runtime_inbox::RuntimeInboxObserver::new(),
             feeds,
-            bus: event_bus::EventBus::new(),
+            bus,
+            shutdown,
+            tasks: TaskTracker::new(),
             execution: std::sync::OnceLock::new(),
             handlers: RwLock::default(),
             openers: RwLock::default(),
-            streams: Mutex::default(),
+            live,
             subscriptions: Mutex::default(),
             next_id: AtomicU64::new(1),
             next_trace_id: AtomicU64::new(1),
-            has_observer: AtomicBool::new(false),
-            observer: RwLock::new(None),
-            has_fault_gate: AtomicBool::new(false),
-            fault_gate: RwLock::new(None),
-            host_debug: RwLock::new(None),
-            voice: RwLock::new(None),
-            media_inputs: RwLock::new(None),
-            mcp: RwLock::new(None),
-            speech: RwLock::new(None),
+            observer: ArcSwapOption::empty(),
+            fault_gate: ArcSwapOption::empty(),
+            host_debug: ArcSwapOption::empty(),
+            voice: ArcSwapOption::empty(),
+            media_inputs: ArcSwapOption::empty(),
+            mcp: ArcSwapOption::empty(),
+            speech: ArcSwapOption::empty(),
             kicks,
         });
         hub.bus.attach_hub(Arc::downgrade(&hub));
         let weak = Arc::downgrade(&hub);
-        std::thread::Builder::new()
-            .name("vibevalley-server-slices".into())
-            .spawn(move || pump_slices(weak, kicked))
-            .expect("a thread for the slice feeds");
+        let cancel = hub.child_token();
+        hub.spawn_task(pump_slices(weak, kicked, cancel));
         hub
     }
 
     fn current_observer(&self) -> Option<SharedInvokeObserver> {
-        if !self.has_observer.load(Ordering::Relaxed) {
-            return None;
-        }
-        self.observer.read().unwrap_or_else(|e| e.into_inner()).clone()
+        self.observer.load().as_ref().map(|slot| slot.0.clone())
     }
 
     fn current_fault_gate(&self) -> Option<SharedFaultGate> {
-        if !self.has_fault_gate.load(Ordering::Relaxed) {
-            return None;
-        }
-        self.fault_gate.read().unwrap_or_else(|e| e.into_inner()).clone()
+        self.fault_gate.load().as_ref().map(|slot| slot.0.clone())
     }
 
     /// The state now.
     pub fn state_now(&self) -> SpaceState {
-        lock(&self.core).state().clone()
+        self.core.lock().state().clone()
     }
 
     /// Reads the state without copying it.
     pub fn read<R>(&self, f: impl FnOnce(&SpaceState) -> R) -> R {
-        f(lock(&self.core).state())
+        f(self.core.lock().state())
     }
 
     pub fn seq(&self) -> i64 {
@@ -288,39 +305,39 @@ impl Hub {
     }
 
     pub fn board_slice(&self) -> BoardSlice {
-        let core = lock(&self.core);
+        let core = self.core.lock();
         vibevalley_core::board_slice(core.state(), self.dirty_seq(SliceKind::Board))
     }
 
     pub fn sessions_slice(&self) -> SessionsSlice {
-        let core = lock(&self.core);
+        let core = self.core.lock();
         vibevalley_core::sessions_slice(core.state(), self.dirty_seq(SliceKind::Sessions))
     }
 
     pub fn collab_slice(&self) -> CollabSlice {
-        let core = lock(&self.core);
+        let core = self.core.lock();
         vibevalley_core::collab_slice(core.state(), self.dirty_seq(SliceKind::Collab))
     }
 
     pub fn inbox_slice(&self) -> InboxSlice {
-        let core = lock(&self.core);
-        let extra = self.runtime_inbox_items.read().unwrap_or_else(|e| e.into_inner());
+        let core = self.core.lock();
+        let extra = self.runtime_inbox_items.read();
         vibevalley_core::inbox_slice(core.state(), self.dirty_seq(SliceKind::Inbox), &extra)
     }
 
     pub fn ops_slice(&self) -> OpsSlice {
-        let core = lock(&self.core);
+        let core = self.core.lock();
         vibevalley_core::ops_slice(core.state(), self.dirty_seq(SliceKind::Ops))
     }
 
     pub fn farm_frame(&self) -> FarmFrame {
-        let core = lock(&self.core);
+        let core = self.core.lock();
         vibevalley_core::farm_frame(core.state(), vec![], self.dirty_seq(SliceKind::Farm))
     }
 
     pub fn slice_bundle(&self) -> SliceBundle {
-        let core = lock(&self.core);
-        let extra = self.runtime_inbox_items.read().unwrap_or_else(|e| e.into_inner());
+        let core = self.core.lock();
+        let extra = self.runtime_inbox_items.read();
         let state = core.state();
         let seq = self.seq.load(Ordering::Acquire);
         SliceBundle {
@@ -337,7 +354,7 @@ impl Hub {
     /// Replaces runtime-projected durable inbox items and kicks `SliceMask::INBOX` immediately if changed.
     pub(crate) fn set_runtime_inbox(&self, items: Vec<InboxItem>) {
         let changed = {
-            let mut slot = self.runtime_inbox_items.write().unwrap_or_else(|e| e.into_inner());
+            let mut slot = self.runtime_inbox_items.write();
             if *slot == items {
                 false
             } else {
@@ -365,7 +382,7 @@ impl Hub {
                 if snap.seq >= target && snap.locale == locale {
                     return;
                 }
-                let core = lock(&self.core);
+                let core = self.core.lock();
                 let target = self.dirty_seq(SliceKind::Board);
                 let snap = self.feeds.board.snapshot();
                 if snap.seq < target || snap.locale != locale {
@@ -377,7 +394,7 @@ impl Hub {
                 if snap.seq >= target && snap.locale == locale {
                     return;
                 }
-                let core = lock(&self.core);
+                let core = self.core.lock();
                 let target = self.dirty_seq(SliceKind::Sessions);
                 let snap = self.feeds.sessions.snapshot();
                 if snap.seq < target || snap.locale != locale {
@@ -389,7 +406,7 @@ impl Hub {
                 if snap.seq >= target && snap.locale == locale {
                     return;
                 }
-                let core = lock(&self.core);
+                let core = self.core.lock();
                 let target = self.dirty_seq(SliceKind::Collab);
                 let snap = self.feeds.collab.snapshot();
                 if snap.seq < target || snap.locale != locale {
@@ -401,8 +418,8 @@ impl Hub {
                 if snap.seq >= target && snap.locale == locale {
                     return;
                 }
-                let core = lock(&self.core);
-                let extra = self.runtime_inbox_items.read().unwrap_or_else(|e| e.into_inner());
+                let core = self.core.lock();
+                let extra = self.runtime_inbox_items.read();
                 let target = self.dirty_seq(SliceKind::Inbox);
                 let snap = self.feeds.inbox.snapshot();
                 if snap.seq < target || snap.locale != locale {
@@ -414,7 +431,7 @@ impl Hub {
                 if snap.seq >= target && snap.locale == locale {
                     return;
                 }
-                let core = lock(&self.core);
+                let core = self.core.lock();
                 let target = self.dirty_seq(SliceKind::Ops);
                 let snap = self.feeds.ops.snapshot();
                 if snap.seq < target || snap.locale != locale {
@@ -426,7 +443,7 @@ impl Hub {
                 if snap.seq >= target && snap.locale == locale {
                     return;
                 }
-                let core = lock(&self.core);
+                let core = self.core.lock();
                 let target = self.dirty_seq(SliceKind::Farm);
                 let snap = self.feeds.farm.snapshot();
                 if snap.seq < target || snap.locale != locale {
@@ -437,7 +454,7 @@ impl Hub {
     }
 
     fn sync_farm_with_effects(&self, effects: Vec<GameEffect>) {
-        let core = lock(&self.core);
+        let core = self.core.lock();
         let target = self.dirty_seq(SliceKind::Farm);
         let frame = vibevalley_core::farm_frame(core.state(), effects, target);
         if frame.effects.is_empty() {
@@ -480,16 +497,25 @@ impl Hub {
         }
     }
 
-    /// Registers a bounded-1 wakeup receiver on one slice feed for internal observers (`watch_session`, `watch_issue`).
-    pub fn watch_slice_signal(&self, slice: SliceKind, initial: bool) -> flume::Receiver<()> {
+    /// Direct `watch::Receiver` subscription for one domain slice.
+    pub fn subscribe_slice_feed(&self, slice: SliceKind) -> slice_feed::SliceSubscription {
+        self.sync_slice(slice);
         match slice {
-            SliceKind::Board => self.feeds.board.subscribe_signal(initial),
-            SliceKind::Sessions => self.feeds.sessions.subscribe_signal(initial),
-            SliceKind::Collab => self.feeds.collab.subscribe_signal(initial),
-            SliceKind::Inbox => self.feeds.inbox.subscribe_signal(initial),
-            SliceKind::Ops => self.feeds.ops.subscribe_signal(initial),
-            SliceKind::Farm => self.feeds.farm.subscribe_signal(initial),
+            SliceKind::Board => slice_feed::SliceSubscription::Board(self.feeds.board.subscribe()),
+            SliceKind::Sessions => slice_feed::SliceSubscription::Sessions(self.feeds.sessions.subscribe()),
+            SliceKind::Collab => slice_feed::SliceSubscription::Collab(self.feeds.collab.subscribe()),
+            SliceKind::Inbox => slice_feed::SliceSubscription::Inbox(self.feeds.inbox.subscribe()),
+            SliceKind::Ops => slice_feed::SliceSubscription::Ops(self.feeds.ops.subscribe()),
+            SliceKind::Farm => slice_feed::SliceSubscription::Farm {
+                rx: self.feeds.farm.subscribe(),
+                strip_initial_effects: true,
+            },
         }
+    }
+
+    /// Broadcast receiver for [`LiveEvent`]s (bounded ring buffer, automatic disconnect cleanup).
+    pub fn subscribe_live(&self) -> broadcast::Receiver<LiveEvent> {
+        self.live.subscribe()
     }
 
     /// Folds `facts` in as one commit (`Core.apply`): publishes transitions
@@ -499,7 +525,7 @@ impl Hub {
         let observer = self.current_observer();
         let started = observer.as_ref().map(|_| Instant::now());
         let (applied, seq) = {
-            let mut core = lock(&self.core);
+            let mut core = self.core.lock();
             let changes = core.apply(facts);
             let seq = if !changes.transitions.is_empty() {
                 let seq = self.seq.fetch_add(1, Ordering::AcqRel) + 1;
@@ -531,7 +557,7 @@ impl Hub {
     }
 
     /// Subscribes to folded transitions on a dedicated bounded async worker
-    /// thread (`vibevalley-bus-{name}`).
+    /// task (`EventBus`).
     pub fn subscribe_transitions(
         &self,
         name: &'static str,
@@ -540,13 +566,13 @@ impl Hub {
         self.bus.subscribe(name, handler)
     }
 
-    /// Cooperatively signals and joins all registered event bus subscribers.
+    /// Cooperatively signals and awaits all registered event bus subscribers.
     pub fn close_bus(&self) {
         self.bus.close();
     }
 
     fn publish_live(&self, event: LiveEvent) {
-        lock(&self.streams).live.retain(|tx| tx.send(event.clone()).is_ok());
+        let _ = self.live.send(event);
     }
 
     pub fn session_event(&self, id: &str, activity: SessionEvent) {
@@ -576,17 +602,17 @@ impl Hub {
             let out = handler(ctx, input)?;
             serde_json::to_value(out).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
         });
-        self.handlers.write().unwrap_or_else(|e| e.into_inner()).insert(O::NAME, h);
+        self.handlers.write().insert(O::NAME, h);
     }
 
     /// Whether some module answers `op`.
     pub fn answers(&self, op: &str) -> bool {
-        self.handlers.read().unwrap_or_else(|e| e.into_inner()).contains_key(op)
+        self.handlers.read().contains_key(op)
     }
 
     /// Whether some module opens subscription `name`.
     pub fn answers_subscription(&self, name: &str) -> bool {
-        self.openers.read().unwrap_or_else(|e| e.into_inner()).contains_key(name)
+        self.openers.read().contains_key(name)
     }
 
     /// Invokes one endpoint with caller identity, principal, and optional trace id.
@@ -634,7 +660,7 @@ impl Hub {
         if caller_ctx.caller != Caller::User && !e.can.contains(&caller_ctx.caller) {
             return refusal(BizCode::Forbidden, format!("{op} is not for the {:?}", caller_ctx.caller));
         }
-        let handler = self.handlers.read().unwrap_or_else(|e| e.into_inner()).get(op).cloned();
+        let handler = self.handlers.read().get(op).cloned();
         let Some(handler) = handler else {
             return refusal(BizCode::ServiceUnavailable, format!("{op} is not served by VibeValley yet"));
         };
@@ -672,12 +698,12 @@ impl Hub {
     /// event.
     pub fn on_subscription<S: Subscription>(&self, open: impl Fn(&Hub, S::Payload, Sink) -> Result<(), ApiError> + Send + Sync + 'static) {
         let o: Opener = Arc::new(move |hub, payload, sink| open(hub, decode(payload)?, sink));
-        self.openers.write().unwrap_or_else(|e| e.into_inner()).insert(S::NAME, o);
+        self.openers.write().insert(S::NAME, o);
     }
 
     #[allow(clippy::result_large_err, reason = "the contract's refusal is an envelope")]
     fn open_subscription(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
-        let Some(open) = self.openers.read().unwrap_or_else(|e| e.into_inner()).get(name).cloned() else {
+        let Some(open) = self.openers.read().get(name).cloned() else {
             return Err(refusal(BizCode::RouteNotFound, format!("no subscription {name}")));
         };
         let (events, rx) = flume::unbounded();
@@ -685,9 +711,38 @@ impl Hub {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let payload = if payload.is_null() { Value::Object(Default::default()) } else { payload };
         open(self, payload, Sink { events, stop }).map_err(|e| Envelope::failure(&e))?;
-        lock(&self.subscriptions).insert(id, stop_tx);
+        self.subscriptions.lock().insert(id, stop_tx);
         Ok((id, rx))
     }
+}
+
+/// Bridges a `broadcast::Receiver<LiveEvent>` into a `flume::Receiver<LiveEvent>`
+/// for legacy sync callers (`Server::live`).
+pub(crate) fn bridge_live_receiver(mut rx: broadcast::Receiver<LiveEvent>, shutdown: CancellationToken) -> flume::Receiver<LiveEvent> {
+    let (tx, out) = flume::unbounded();
+    vibevalley_runtime::rt::spawn(async move {
+        loop {
+            tokio::select! {
+                biased;
+                _ = shutdown.cancelled() => break,
+                res = rx.recv() => match res {
+                    Ok(event) => {
+                        if tx.send(event).is_err() {
+                            break;
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(broadcast::error::RecvError::Closed) => break,
+                },
+                _ = tokio::time::sleep(Duration::from_secs(30)) => {
+                    if tx.is_disconnected() {
+                        break;
+                    }
+                }
+            }
+        }
+    });
+    out
 }
 
 /// Reads `payload` as `T`; where it does not fit is said as zod's
@@ -708,14 +763,22 @@ pub fn decode<T: serde::de::DeserializeOwned>(payload: Value) -> Result<T, ApiEr
 /// The slice feed pump: leading-edge delivery for workbench slices when idle,
 /// and coalesced trailing-edge delivery after `STATE_EVERY_MS` for dirty slices
 /// plus accumulated farm effects on `SliceKind::Farm`.
-fn pump_slices(hub: std::sync::Weak<Hub>, kicked: flume::Receiver<Kick>) {
-    while let Ok(first) = kicked.recv() {
+async fn pump_slices(hub: std::sync::Weak<Hub>, kicked: flume::Receiver<Kick>, cancel: CancellationToken) {
+    loop {
+        let first = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return,
+            res = kicked.recv_async() => match res {
+                Ok(kick) => kick,
+                Err(_) => return,
+            },
+        };
         let mut dirty = first.dirty;
         let mut effects = first.effects;
         if !effects.is_empty() {
             dirty |= SliceMask::FARM;
         }
-        let deadline = Instant::now() + Duration::from_millis(STATE_EVERY_MS);
+        let deadline = tokio::time::Instant::now() + Duration::from_millis(STATE_EVERY_MS);
         let Some(leading) = hub.upgrade() else { return };
         for kind in WORKBENCH_SLICES {
             if dirty.contains(SliceMask::from_kind(kind)) {
@@ -727,7 +790,11 @@ fn pump_slices(hub: std::sync::Weak<Hub>, kicked: flume::Receiver<Kick>) {
             }
         }
         drop(leading);
-        std::thread::sleep(deadline.saturating_duration_since(Instant::now()));
+        tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return,
+            _ = tokio::time::sleep_until(deadline) => {}
+        }
         for more in kicked.drain() {
             dirty |= more.dirty;
             effects.extend(more.effects);
@@ -756,7 +823,7 @@ impl modules::work::ledger::Facts for Hub {
     }
 
     fn read(&self, f: &mut dyn FnMut(&SpaceState)) {
-        f(lock(&self.core).state())
+        f(self.core.lock().state())
     }
 
     fn bundle(&self) -> SliceBundle {
@@ -774,7 +841,7 @@ impl modules::work::ledger::Facts for std::sync::Weak<Hub> {
 
     fn read(&self, f: &mut dyn FnMut(&SpaceState)) {
         match self.upgrade() {
-            Some(hub) => f(lock(&hub.core).state()),
+            Some(hub) => f(hub.core.lock().state()),
             None => f(&vibevalley_core::empty_space_state()),
         }
     }
@@ -796,23 +863,23 @@ impl Server for Hub {
     }
 
     fn speech_streams(&self) -> Option<crate::transport::api::media::SharedSpeechStreams> {
-        self.speech.read().unwrap_or_else(|e| e.into_inner()).clone()
+        self.speech.load().as_ref().map(|slot| slot.0.clone())
     }
 
     fn mcp(&self) -> Option<crate::transport::api::SharedMcp> {
-        self.mcp.read().unwrap_or_else(|e| e.into_inner()).clone()
+        self.mcp.load().as_ref().map(|slot| slot.0.clone())
     }
 
     fn media_inputs(&self) -> Option<crate::transport::api::media::SharedMediaInputs> {
-        self.media_inputs.read().unwrap_or_else(|e| e.into_inner()).clone()
+        self.media_inputs.load().as_ref().map(|slot| slot.0.clone())
     }
 
     fn host_debug(&self) -> Option<SharedHostDebug> {
-        self.host_debug.read().unwrap_or_else(|e| e.into_inner()).clone()
+        self.host_debug.load().as_ref().map(|slot| slot.0.clone())
     }
 
     fn voice(&self) -> Option<Arc<modules::collab::voice::Voice>> {
-        self.voice.read().unwrap_or_else(|e| e.into_inner()).clone()
+        self.voice.load_full()
     }
 
     fn call(&self, op: &str, payload: Value) -> Envelope {
@@ -867,10 +934,20 @@ impl Server for Hub {
         }
     }
 
+    fn subscribe_slice(&self, slice: SliceKind) -> Option<slice_feed::SliceSubscription> {
+        Some(self.subscribe_slice_feed(slice))
+    }
+
+    fn fault_gate(&self) -> Option<SharedFaultGate> {
+        self.current_fault_gate()
+    }
+
     fn live(&self) -> flume::Receiver<LiveEvent> {
-        let (tx, rx) = flume::unbounded();
-        lock(&self.streams).live.push(tx);
-        rx
+        bridge_live_receiver(self.live.subscribe(), self.shutdown.clone())
+    }
+
+    fn subscribe_live(&self) -> Option<broadcast::Receiver<LiveEvent>> {
+        Some(self.live.subscribe())
     }
 
     fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
@@ -878,6 +955,6 @@ impl Server for Hub {
     }
 
     fn unsubscribe(&self, id: u64) {
-        lock(&self.subscriptions).remove(&id);
+        self.subscriptions.lock().remove(&id);
     }
 }

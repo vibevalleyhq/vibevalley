@@ -17,11 +17,14 @@ mod store;
 mod weixin;
 
 use std::path::Path;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
-use std::thread::JoinHandle;
 use std::time::Duration;
 
+use parking_lot::Mutex;
+use tokio::sync::broadcast;
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use vibevalley_core::channel::for_user;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, ConnectorID, ConnectorLogin, ConnectorStatus, ops};
@@ -29,7 +32,7 @@ use vibevalley_protocol::{ApiError, BizCode, ConnectorID, ConnectorLogin, Connec
 use self::adapter::App;
 use self::bridge::{Bridge, Env, Handoff, handoff};
 use self::store::Store;
-use crate::modules::collab::channel::{Chat, Told, to_message};
+use crate::modules::collab::channel::{ChannelEvent, Chat, to_message};
 use crate::{Hub, now};
 
 /// How long a message in or out is kept after it went through, for a reply to point at.
@@ -114,8 +117,8 @@ fn refused(text: String) -> ApiError {
 pub struct Connectors {
     env: Arc<Env>,
     bridges: Vec<Arc<Bridge>>,
-    /// Dropped to end the feed.
-    feed: Mutex<Option<(flume::Sender<()>, JoinHandle<()>)>>,
+    /// Cancelled and awaited on close to end the feed task.
+    feed: Mutex<Option<(CancellationToken, JoinHandle<()>)>>,
 }
 
 impl Connectors {
@@ -143,15 +146,11 @@ impl Connectors {
         for b in &bridges {
             b.load();
         }
-        let (stop, stopped) = flume::bounded::<()>(0);
-        let feed = {
-            let (bridges, env) = (bridges.clone(), env.clone());
-            let (told, reads) = (chat.committed(), chat.user_reads());
-            std::thread::Builder::new()
-                .name("vibevalley-connector-feed".into())
-                .spawn(move || feed(&env, &bridges, &told, &reads, &stopped))
-                .expect("the connectors' thread")
-        };
+        let cancel = hub.child_token();
+        let feed_cancel = cancel.clone();
+        let events = chat.subscribe_events();
+        let (feed_bridges, feed_env) = (bridges.clone(), env.clone());
+        let handle = hub.spawn_task(feed(feed_env, feed_bridges, events, feed_cancel));
         for b in &bridges {
             if b.has_account() {
                 b.resume();
@@ -160,7 +159,7 @@ impl Connectors {
         Ok(Arc::new(Connectors {
             env,
             bridges,
-            feed: Mutex::new(Some((stop, feed))),
+            feed: Mutex::new(Some((cancel, handle))),
         }))
     }
 
@@ -202,52 +201,88 @@ impl Connectors {
         for b in &self.bridges {
             b.stop();
         }
-        let feed = self.feed.lock().unwrap_or_else(|e| e.into_inner()).take();
-        if let Some((stop, thread)) = feed {
-            drop(stop);
-            let _ = thread.join();
+        if let Some((cancel, handle)) = self.feed.lock().take() {
+            cancel.cancel();
+            let _ = vibevalley_runtime::rt::block_on(handle);
         }
     }
 }
 
-enum Fed {
-    Said(Told),
-    Read,
-    Day,
-    Over,
-}
-
 /// What the farm says for the user goes to every app (each checks it is its channel's); a read or newer words
 /// make them look again at what waits; what went through long ago is dropped, at start and daily.
-fn feed(env: &Env, bridges: &[Arc<Bridge>], told: &flume::Receiver<Told>, reads: &flume::Receiver<(String, i64, i64)>, stopped: &flume::Receiver<()>) {
+async fn feed(env: Arc<Env>, bridges: Vec<Arc<Bridge>>, mut events: broadcast::Receiver<ChannelEvent>, cancel: CancellationToken) {
     loop {
-        if let Err(e) = env.store.prune(now() - KEPT_MS) {
-            eprintln!("vibevalley-server: connector: history was not pruned: {}", e.0);
-        }
+        let prune_env = env.clone();
+        let _ = tokio::task::spawn_blocking(move || {
+            if let Err(e) = prune_env.store.prune(now() - KEPT_MS) {
+                eprintln!("vibevalley-server: connector: history was not pruned: {}", e.0);
+            }
+        })
+        .await;
+        let day = tokio::time::sleep(DAY);
+        tokio::pin!(day);
         loop {
-            let fed = flume::Selector::new()
-                .recv(told, |t| t.map_or(Fed::Over, Fed::Said))
-                .recv(reads, |r| r.map_or(Fed::Over, |_| Fed::Read))
-                .recv(stopped, |_| Fed::Over)
-                .wait_timeout(DAY)
-                .unwrap_or(Fed::Day);
+            enum Fed {
+                Event(Box<ChannelEvent>),
+                Lagged,
+                Day,
+                Over,
+            }
+            let fed = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => Fed::Over,
+                res = events.recv() => match res {
+                    Ok(ev) => Fed::Event(Box::new(ev)),
+                    Err(broadcast::error::RecvError::Lagged(_)) => Fed::Lagged,
+                    Err(broadcast::error::RecvError::Closed) => Fed::Over,
+                },
+                _ = &mut day => Fed::Day,
+            };
             match fed {
-                Fed::Said(Told::Posted(c)) => {
-                    let m = to_message(&c.row);
-                    if for_user(&m, env.chat.notify_of(&m.channel)) && matches!(handoff(&env.chat, &m.id), Ok(Handoff::Unseen)) {
-                        for b in bridges {
-                            b.offer(&m);
+                Fed::Event(event) => {
+                    let wake = match *event {
+                        ChannelEvent::Posted(c) => {
+                            let env = env.clone();
+                            let bridges = bridges.clone();
+                            let _ = tokio::task::spawn_blocking(move || {
+                                let m = to_message(&c.row);
+                                if for_user(&m, env.chat.notify_of(&m.channel)) && matches!(handoff(&env.chat, &m.id), Ok(Handoff::Unseen)) {
+                                    for b in &bridges {
+                                        b.offer(&m);
+                                    }
+                                }
+                            })
+                            .await;
+                            true
                         }
+                        ChannelEvent::Removed { .. } | ChannelEvent::UserRead { .. } => true,
+                        ChannelEvent::Edited(_) | ChannelEvent::Reacted(_) | ChannelEvent::Pinned(_) => false,
+                    };
+                    if wake {
+                        let bridges = bridges.clone();
+                        let _ = tokio::task::spawn_blocking(move || {
+                            for b in &bridges {
+                                if b.has_account() {
+                                    b.changed();
+                                }
+                            }
+                        })
+                        .await;
                     }
                 }
-                Fed::Said(Told::Removed(_)) | Fed::Read => {}
+                Fed::Lagged => {
+                    let bridges = bridges.clone();
+                    let _ = tokio::task::spawn_blocking(move || {
+                        for b in &bridges {
+                            if b.has_account() {
+                                b.changed();
+                            }
+                        }
+                    })
+                    .await;
+                }
                 Fed::Day => break,
                 Fed::Over => return,
-            }
-            for b in bridges {
-                if b.has_account() {
-                    b.changed();
-                }
             }
         }
     }

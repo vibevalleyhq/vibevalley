@@ -2,14 +2,14 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+use parking_lot::Mutex;
 use pollster::block_on;
 use sqlx::SqliteConnection;
 use vibevalley_protocol::{ApiError, PublishPlatform, PullRequest, PullRequestState};
 
 use crate::base::{internal, open_sqlx_db};
-use crate::lock;
 use crate::modules::infra::column::{read_word, word};
 
 use crate::db::generated::work_pull as queries;
@@ -192,19 +192,19 @@ impl PullStore {
     }
 
     pub fn of_issue(&self, issue_id: &str) -> Option<PullRequest> {
-        lock(&self.index).of_issue(issue_id)
+        self.index.lock().of_issue(issue_id)
     }
 
     pub fn find(&self, repo: &str, number: i64) -> Option<PullRecord> {
-        lock(&self.index).find(repo, number)
+        self.index.lock().find(repo, number)
     }
 
     pub fn all(&self) -> Vec<PullRecord> {
-        lock(&self.index).all()
+        self.index.lock().all()
     }
 
     pub fn open_pulls(&self) -> Vec<PullRecord> {
-        lock(&self.index).open()
+        self.index.lock().open()
     }
 
     pub fn upsert(&self, input: UpsertPullInput) -> Result<PullRecord, ApiError> {
@@ -221,10 +221,10 @@ impl PullStore {
             created_at: input.at,
             updated_at: input.at,
         };
-        let saved = block_on(queries::upsert_pull(&mut *lock(&self.db), params))
+        let saved = block_on(queries::upsert_pull(&mut *self.db.lock(), params))
             .and_then(record_of)
             .map_err(internal)?;
-        Ok(lock(&self.index).put(saved))
+        Ok(self.index.lock().put(saved))
     }
 
     pub fn set_state(&self, id: &str, state: PullRequestState, at: i64) -> Result<PullRecord, ApiError> {
@@ -233,10 +233,10 @@ impl PullStore {
             state: word(&state).map_err(internal)?,
             updated_at: at,
         };
-        let saved = block_on(queries::set_pull_state(&mut *lock(&self.db), params))
+        let saved = block_on(queries::set_pull_state(&mut *self.db.lock(), params))
             .and_then(record_of)
             .map_err(internal)?;
-        Ok(lock(&self.index).put(saved))
+        Ok(self.index.lock().put(saved))
     }
 
     pub fn observe_checks(&self, id: &str, fingerprint: &str, revision: i64, at: i64) -> Result<PullRecord, ApiError> {
@@ -246,15 +246,15 @@ impl PullStore {
             check_revision: revision,
             updated_at: at,
         };
-        let saved = block_on(queries::observe_pull_checks(&mut *lock(&self.db), params))
+        let saved = block_on(queries::observe_pull_checks(&mut *self.db.lock(), params))
             .and_then(record_of)
             .map_err(internal)?;
-        Ok(lock(&self.index).put(saved))
+        Ok(self.index.lock().put(saved))
     }
 
     pub fn known_events(&self, pull_id: &str) -> Result<Vec<KnownPullEvent>, ApiError> {
         let rows = block_on(queries::known_pull_events(
-            &mut *lock(&self.db),
+            &mut *self.db.lock(),
             queries::KnownPullEventsParams { pull_id: pull_id.into() },
         ))
         .map_err(internal)?;
@@ -270,7 +270,7 @@ impl PullStore {
 
     pub fn keep_event(&self, pull_id: &str, key: &str, bot_round_key: Option<&str>, bot_round: Option<i64>) -> Result<(), ApiError> {
         block_on(queries::keep_pull_event(
-            &mut *lock(&self.db),
+            &mut *self.db.lock(),
             queries::KeepPullEventParams {
                 pull_id: pull_id.into(),
                 key: key.into(),

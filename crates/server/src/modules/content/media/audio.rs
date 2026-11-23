@@ -342,7 +342,7 @@ impl Jobs {
     /// An ended audio job lets go of what it sent to the vendor, and of the input it made nothing of; a result keeps
     /// its source until the user releases the job. A cleanup that fails is said on the job and can be asked again.
     pub(super) fn tidy_audio(&self, id: &str) {
-        let _one = self.cleaning.lock().unwrap_or_else(|e| e.into_inner());
+        let _one = self.cleaning.lock();
         let Ok(r) = self.found(id) else { return };
         let ended = matches!(r.phase, Phase::Ready | Phase::Failed) || (r.phase == Phase::Canceled && r.remote_task.is_none());
         if !ended || r.remote.iter().any(|f| f.unresolved()) {

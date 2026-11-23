@@ -2,6 +2,7 @@
 //! protects admission and pins, never a streaming read or attachment write.
 use super::{q, validate};
 use crate::{Hub, base::open_sqlx_db, modules::content::attachment::Attachments, now};
+use parking_lot::{Mutex, MutexGuard};
 use pollster::block_on;
 use sha2::{Digest, Sha256};
 use sqlx::{Connection, SqliteConnection};
@@ -9,9 +10,10 @@ use std::{
     collections::HashSet,
     io::{Read, Write},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex, MutexGuard},
+    sync::Arc,
     time::{Duration, Instant},
 };
+use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, AttachmentFile, BizCode, MediaInput, MediaInputKind, MediaInputPhase, MediaInputRequest, Preview, native_ops, ops};
 
@@ -31,7 +33,7 @@ pub struct Inputs {
     inner: Mutex<Inner>,
     files: Arc<Attachments>,
     staging: PathBuf,
-    stop: Mutex<Option<flume::Sender<()>>>,
+    cancel: CancellationToken,
 }
 fn input(row: q::GetInputRow, can_delete: bool) -> Result<MediaInput, ApiError> {
     let m: MediaInputRequest = serde_json::from_str(&row.metadata).map_err(storage)?;
@@ -85,36 +87,40 @@ impl Inputs {
     pub fn open(home: &Path, files: Arc<Attachments>) -> Result<Arc<Self>, ApiError> {
         let mut db = block_on(open_sqlx_db(home)).map_err(storage)?;
         block_on(sqlx::raw_sql(crate::db::schema::CONTENT_MEDIA).execute(&mut db)).map_err(storage)?;
+        let cancel = CancellationToken::new();
         let inputs = Arc::new(Self {
             inner: Mutex::new(Inner { db, uploading: HashSet::new() }),
             files,
             staging: home.join("attachments/.staging/media"),
-            stop: Mutex::new(None),
+            cancel: cancel.clone(),
         });
         inputs.restore()?;
         inputs.sweep()?;
-        let (stop, stopped) = flume::bounded(1);
-        *inputs.stop.lock().unwrap_or_else(|e| e.into_inner()) = Some(stop);
         let weak = Arc::downgrade(&inputs);
-        std::thread::Builder::new()
-            .name("media-input-sweep".into())
-            .spawn(move || {
-                while matches!(stopped.recv_timeout(Duration::from_secs(60)), Err(flume::RecvTimeoutError::Timeout)) {
-                    let Some(inputs) = weak.upgrade() else { break };
-                    // Tombstones survive storage failures and are retried next tick.
+        vibevalley_runtime::rt::handle().spawn(async move {
+            loop {
+                tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => break,
+                    _ = tokio::time::sleep(Duration::from_secs(60)) => {}
+                }
+                let Some(inputs) = weak.upgrade() else { break };
+                // Tombstones survive storage failures and are retried next tick.
+                let _ = tokio::task::spawn_blocking(move || {
                     if let Err(error) = inputs.sweep() {
                         eprintln!("media input cleanup: {}", error.message);
                     }
-                }
-            })
-            .map_err(storage)?;
+                })
+                .await;
+            }
+        });
         Ok(inputs)
     }
     pub fn close(&self) {
-        self.stop.lock().unwrap_or_else(|e| e.into_inner()).take();
+        self.cancel.cancel();
     }
     fn inner(&self) -> MutexGuard<'_, Inner> {
-        self.inner.lock().unwrap_or_else(|e| e.into_inner())
+        self.inner.lock()
     }
     pub fn get(&self, id: &str) -> Result<MediaInput, ApiError> {
         found(&mut self.inner(), id)

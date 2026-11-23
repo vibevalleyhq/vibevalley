@@ -50,8 +50,7 @@ fn run() -> Result<(), String> {
     if flags.ready_json {
         println!("{}", serde_json::json!({ "url": url, "pid": std::process::id() }));
     }
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().map_err(|e| e.to_string())?;
-    runtime.block_on(async {
+    vibevalley_runtime::rt::block_on(async {
         use tokio::signal::unix::{SignalKind, signal};
         let (Ok(mut term), Ok(mut int)) = (signal(SignalKind::terminate()), signal(SignalKind::interrupt())) else {
             return std::future::pending::<()>().await;

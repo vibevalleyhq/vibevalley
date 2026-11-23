@@ -189,9 +189,9 @@ fn turn(ask: &TurnAsk) -> Result<Vec<Step>, String> {
         }
     }
     // Its brief as an agent remembers it: an answer later in the session is still checked against its criteria.
-    static BRIEFS: std::sync::Mutex<Option<std::collections::HashMap<std::path::PathBuf, String>>> = std::sync::Mutex::new(None);
+    static BRIEFS: parking_lot::Mutex<Option<std::collections::HashMap<std::path::PathBuf, String>>> = parking_lot::Mutex::new(None);
     let brief = {
-        let mut briefs = BRIEFS.lock().unwrap_or_else(|e| e.into_inner());
+        let mut briefs = BRIEFS.lock();
         let briefs = briefs.get_or_insert_with(Default::default);
         if ask.prompt.contains(CRITERIA_HEAD) {
             briefs.insert(ask.cwd.clone(), ask.prompt.clone());
@@ -280,7 +280,7 @@ mod tests {
 /// fails its first download, and anything else is a PNG of the asked size.
 pub struct OfflineImages {
     pub real: crate::modules::content::media::image_provider::Moss,
-    failing: std::sync::Mutex<std::collections::HashSet<String>>,
+    failing: parking_lot::Mutex<std::collections::HashSet<String>>,
     next: std::sync::atomic::AtomicUsize,
 }
 
@@ -321,7 +321,7 @@ impl crate::modules::content::media::image_provider::ImageBackend for OfflineIma
             let n = self.next.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
             let url = format!("https://media.example.com/{n}-{width}x{height}.png");
             if prompt.contains("[media:download-failure]") {
-                self.failing.lock().unwrap_or_else(|e| e.into_inner()).insert(url.clone());
+                self.failing.lock().insert(url.clone());
             }
             Ok(Generated {
                 url,
@@ -333,7 +333,7 @@ impl crate::modules::content::media::image_provider::ImageBackend for OfflineIma
     fn download<'a>(&'a self, url: &'a str, width: i64, height: i64) -> crate::modules::content::media::image_provider::Work<'a, Vec<u8>> {
         use crate::modules::content::media::image_provider::Failure;
         Box::pin(async move {
-            if self.failing.lock().unwrap_or_else(|e| e.into_inner()).remove(url) {
+            if self.failing.lock().remove(url) {
                 return Err(Failure::Unknown);
             }
             Ok(png(width as u32, height as u32))

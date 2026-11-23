@@ -141,11 +141,11 @@ fn understanding(id: &str, revision: i64, input: &str, prompt: &str) -> Value {
 }
 type Tools = (
     Vec<Box<dyn vibevalley_runtime::agent::Tool>>,
-    Arc<Mutex<vibevalley_server::modules::team::tool::Route>>,
+    Arc<parking_lot::Mutex<vibevalley_server::modules::team::tool::Route>>,
 );
 fn tools(s: &vibevalley_server::Started, channel: &str) -> Tools {
     use vibevalley_server::modules::team::tool::{Route, held};
-    let route = Arc::new(Mutex::new(Route {
+    let route = Arc::new(parking_lot::Mutex::new(Route {
         agent: "orchestrator".into(),
         channel: channel.into(),
         ..Route::default()
@@ -480,10 +480,10 @@ fn an_orchestrator_makes_audio_and_starts_understanding_only_with_the_users_word
     let tool = |name: &str| tools.iter().find(|t| t.spec().name == name).unwrap();
     let start = tool("media_understanding_start");
     assert!(start.execute(&json!({"id":"look"})).is_error);
-    route.lock().unwrap().user = true;
+    route.lock().user = true;
     assert!(start.execute(&json!({"id":"look"})).is_error);
     assert_eq!(ok(&s, "media.job.get", json!({"id":"look"}))["phase"], "authorized");
-    route.lock().unwrap().channel = channel.clone();
+    route.lock().channel = channel.clone();
     let started = start.execute(&json!({"id":"look"}));
     assert!(!started.is_error, "{}", started.text);
     let done = until(&s, "look", "ready and cleaned", |j| j["phase"] == "ready" && j["cleanup"] == "done");
@@ -502,9 +502,9 @@ fn an_orchestrator_makes_audio_and_starts_understanding_only_with_the_users_word
     assert_eq!(ok(&s, "media.job.get", json!({"id":"withdrawn"}))["phase"], "canceled");
 
     let talk = tool("media_dialogue_create");
-    route.lock().unwrap().user = false;
+    route.lock().user = false;
     assert!(talk.execute(&dialogue("talk", revision, "Hello there.")).is_error);
-    route.lock().unwrap().user = true;
+    route.lock().user = true;
     let asked = talk.execute(&dialogue("talk", revision, "Hello there."));
     assert!(!asked.is_error, "{}", asked.text);
     assert_eq!(wait(&s, "talk", "ready")["source"]["kind"], "orchestrator");

@@ -7,18 +7,21 @@ mod db;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 
+use parking_lot::Mutex;
 use pollster::block_on;
 use sqlx::SqliteConnection;
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ActorKind, ApiError, BizCode, Cron, CronRequest, Fact, FactCronChanged, FactCronRemoved, IssueStatus, NoticeLevel, Preview, ops};
 
 use crate::base::{LookIn, internal, missing, open_sqlx_db};
 use crate::modules::team::agent::Agents;
 use crate::modules::work::issue::{Board, NewIssue};
-use crate::{Hub, lock, now};
+use crate::{Hub, now};
 
 pub const DEFAULT_CHANNEL: &str = "general";
 const TICK: Duration = Duration::from_secs(20);
@@ -69,8 +72,7 @@ pub struct Crons {
     chat: std::sync::OnceLock<Weak<crate::modules::collab::channel::Chat>>,
     orchestrator: std::sync::OnceLock<Weak<crate::modules::team::orchestrator::Orchestrator>>,
     closed: std::sync::atomic::AtomicBool,
-    stop: Mutex<Option<flume::Sender<()>>>,
-    thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+    ticker: Mutex<Option<(CancellationToken, JoinHandle<()>)>>,
 }
 
 impl Crons {
@@ -88,7 +90,7 @@ impl Crons {
         let at = now();
         let mut facts = Vec::with_capacity(stored.len());
         {
-            let mut map = lock(&links);
+            let mut map = links.lock();
             for item in stored {
                 if let Some(issue_id) = item.issue_id.as_deref() {
                     map.link(&item.cron.id, Some(issue_id));
@@ -100,7 +102,7 @@ impl Crons {
             hub.apply(facts);
         }
         let lookup_links = links.clone();
-        board.use_cron_of_issue(Arc::new(move |issue_id| lock(&lookup_links).cron_of_issue.get(issue_id).cloned()));
+        board.use_cron_of_issue(Arc::new(move |issue_id| lookup_links.lock().cron_of_issue.get(issue_id).cloned()));
         Ok(Arc::new(Crons {
             db: Mutex::new(conn),
             links,
@@ -111,19 +113,16 @@ impl Crons {
             chat: Default::default(),
             orchestrator: Default::default(),
             closed: Default::default(),
-            stop: Mutex::new(None),
-            thread: Mutex::new(None),
+            ticker: Mutex::new(None),
         }))
     }
 
     /// Stops the ticker.
     pub fn close(&self) {
         self.closed.store(true, std::sync::atomic::Ordering::Relaxed);
-        let _ = lock(&self.stop).take();
-        if let Some(handle) = lock(&self.thread).take()
-            && handle.thread().id() != std::thread::current().id()
-        {
-            let _ = handle.join();
+        if let Some((cancel, handle)) = self.ticker.lock().take() {
+            cancel.cancel();
+            let _ = vibevalley_runtime::rt::block_on(handle);
         }
     }
 
@@ -146,17 +145,17 @@ impl Crons {
     }
 
     pub fn issue_of(&self, cron_id: &str) -> Option<String> {
-        lock(&self.links).issue_of_cron.get(cron_id).cloned()
+        self.links.lock().issue_of_cron.get(cron_id).cloned()
     }
 
     pub fn cron_of(&self, issue_id: &str) -> Option<String> {
-        lock(&self.links).cron_of_issue.get(issue_id).cloned()
+        self.links.lock().cron_of_issue.get(issue_id).cloned()
     }
 
     /// Persists `cron` (keeping its linked issue, if any) and tells the state.
     fn put(&self, cron: Cron) -> Result<(), ApiError> {
         let issue_id = self.issue_of(&cron.id);
-        db::upsert(&mut lock(&self.db), &cron, issue_id.as_deref()).map_err(internal)?;
+        db::upsert(&mut self.db.lock(), &cron, issue_id.as_deref()).map_err(internal)?;
         if let Some(hub) = self.hub() {
             hub.apply(vec![Fact::CronChanged(FactCronChanged { at: now(), cron })]);
         }
@@ -164,8 +163,8 @@ impl Crons {
     }
 
     fn link_issue(&self, cron_id: &str, issue_id: Option<&str>) -> Result<(), ApiError> {
-        db::set_issue(&mut lock(&self.db), cron_id, issue_id).map_err(internal)?;
-        let prev = lock(&self.links).link(cron_id, issue_id);
+        db::set_issue(&mut self.db.lock(), cron_id, issue_id).map_err(internal)?;
+        let prev = self.links.lock().link(cron_id, issue_id);
         if let Some(prev_id) = prev
             && prev_id.as_str() != issue_id.unwrap_or("")
         {
@@ -186,7 +185,7 @@ impl Crons {
 
     /// `add`: `by` is who asks, and on whose word (`needsOK`).
     pub fn add(&self, req: CronRequest, by: ActorKind) -> Result<Cron, ApiError> {
-        let _l = lock(&self.lock);
+        let _l = self.lock.lock();
         let at = now();
         let rules = vibevalley_core::cron_request_to_rules(&req);
         let problem = vibevalley_core::cron::cron_problem(&rules, at);
@@ -251,7 +250,7 @@ impl Crons {
 
     /// Turned on is the user's yes; switched back on, it counts from now.
     pub fn set_enabled(&self, id: &str, enabled: bool) -> Result<Cron, ApiError> {
-        let _l = lock(&self.lock);
+        let _l = self.lock.lock();
         let was = self.find(id)?;
         let mut cron = Cron {
             enabled,
@@ -266,10 +265,10 @@ impl Crons {
     }
 
     pub fn remove(&self, id: &str) -> Result<Cron, ApiError> {
-        let _l = lock(&self.lock);
+        let _l = self.lock.lock();
         let was = self.find(id)?;
-        db::remove(&mut lock(&self.db), id).map_err(internal)?;
-        let prev_issue = lock(&self.links).link(id, None);
+        db::remove(&mut self.db.lock(), id).map_err(internal)?;
+        let prev_issue = self.links.lock().link(id, None);
         if let Some(hub) = self.hub() {
             hub.apply(vec![Fact::CronRemoved(FactCronRemoved { at: now(), id: id.into() })]);
         }
@@ -295,7 +294,7 @@ impl Crons {
 
     /// Runs every cron due now, each once however many runs it missed.
     pub fn tick(&self) {
-        let _l = lock(&self.lock);
+        let _l = self.lock.lock();
         let at = now();
         let all = self.list();
         let rules: Vec<vibevalley_core::cron::Cron> = all.iter().map(vibevalley_core::cron_to_rules).collect();
@@ -408,23 +407,23 @@ pub fn install(hub: &Arc<Hub>, crons: Arc<Crons>, tick: bool) {
     let c = crons.clone();
     hub.on::<ops::CronPreviewDelete>(move |_, input| c.preview_remove(&input.id));
     if tick {
-        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
-        *lock(&crons.stop) = Some(stop_tx);
+        let cancel = hub.child_token();
+        let task_cancel = cancel.clone();
         let weak = Arc::downgrade(&crons);
-        if let Ok(handle) = std::thread::Builder::new().name("vibevalley-cron".into()).spawn(move || {
+        let handle = hub.spawn_task(async move {
             loop {
                 let Some(c) = weak.upgrade() else { return };
-                if c.hub.strong_count() == 0 || c.closed.load(std::sync::atomic::Ordering::Relaxed) {
+                if c.hub.strong_count() == 0 || c.closed.load(std::sync::atomic::Ordering::Relaxed) || task_cancel.is_cancelled() {
                     return;
                 }
-                c.tick();
-                drop(c);
-                if !matches!(stop_rx.recv_timeout(TICK), Err(flume::RecvTimeoutError::Timeout)) {
-                    return;
+                let _ = tokio::task::spawn_blocking(move || c.tick()).await;
+                tokio::select! {
+                    biased;
+                    _ = task_cancel.cancelled() => return,
+                    _ = tokio::time::sleep(TICK) => {}
                 }
             }
-        }) {
-            *lock(&crons.thread) = Some(handle);
-        }
+        });
+        *crons.ticker.lock() = Some((cancel, handle));
     }
 }

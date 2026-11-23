@@ -15,7 +15,9 @@ name = "publish"
 path = "tests/publish.rs"
 
 [dependencies]
+arc-swap = { workspace = true }
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "query", "tokio"] }
+backon = { workspace = true }
 base64 = { workspace = true }
 crc32fast = "1.5.5"
 flate2 = "1.1.11"
@@ -23,6 +25,7 @@ flume = { workspace = true }
 futures-util = { workspace = true }
 include_dir = "0.7.4"
 jiff = { workspace = true }
+parking_lot = { workspace = true }
 pollster = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
@@ -35,8 +38,9 @@ sqlx = { workspace = true }
 symphonia = { version = "0.6.1", default-features = false, features = ["wav", "mp3", "isomp4", "flac", "ogg", "mkv"] }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+tokio-stream = { workspace = true }
 tokio-tungstenite = { workspace = true }
-tokio-util = { version = "0.7.20", features = ["rt"] }
+tokio-util = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
 vibevalley-core = { version = "0.1.0", path = "../core", features = ["collab"] }

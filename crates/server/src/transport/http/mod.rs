@@ -28,13 +28,17 @@ use std::time::Duration;
 
 use axum::Router;
 use axum::body::Bytes;
-use axum::extract::{Path, Query, State};
+use axum::extract::{FromRef, Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use futures_util::Stream;
+use futures_util::{Stream, StreamExt};
 use serde_json::{Value, json};
+use tokio::task::JoinHandle;
+use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
+use tokio_util::sync::CancellationToken;
 use vibevalley_protocol::{ApiError, BizCode, Caller, Envelope, SliceKind};
 
 use crate::transport::api::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, Server};
@@ -45,11 +49,24 @@ const HEARTBEAT: Duration = Duration::from_secs(20);
 
 type Shared = Arc<dyn Server>;
 
-/// A running listener. Dropping it stops it.
+#[derive(Clone)]
+struct HttpState {
+    server: Shared,
+    shutdown: CancellationToken,
+}
+
+impl FromRef<HttpState> for Shared {
+    fn from_ref(state: &HttpState) -> Self {
+        state.server.clone()
+    }
+}
+
+/// A running listener on the shared `vibevalley-io` runtime. Dropping it
+/// gracefully stops the server task and ends active SSE streams.
 pub struct Listener {
     pub addr: SocketAddr,
-    stop: Option<tokio::sync::oneshot::Sender<()>>,
-    thread: Option<std::thread::JoinHandle<()>>,
+    shutdown: CancellationToken,
+    task: Option<JoinHandle<()>>,
 }
 
 impl Listener {
@@ -60,18 +77,16 @@ impl Listener {
 
 impl Drop for Listener {
     fn drop(&mut self) {
-        if let Some(stop) = self.stop.take() {
-            let _ = stop.send(());
-        }
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
+        self.shutdown.cancel();
+        if let Some(task) = self.task.take() {
+            let _ = vibevalley_runtime::rt::block_on(task);
         }
     }
 }
 
-/// Serves `server` on `addr` (use port 0 for any free port) on a thread of
-/// its own. Only loopback addresses are accepted: this is not a network
-/// service.
+/// Serves `server` on `addr` (use port 0 for any free port) as a task on the
+/// shared `vibevalley-io` runtime. Only loopback addresses are accepted: this
+/// is not a network service.
 pub fn serve(server: Shared, addr: SocketAddr) -> std::io::Result<Listener> {
     if !addr.ip().is_loopback() {
         return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "loopback addresses only"));
@@ -79,29 +94,29 @@ pub fn serve(server: Shared, addr: SocketAddr) -> std::io::Result<Listener> {
     let std_listener = std::net::TcpListener::bind(addr)?;
     std_listener.set_nonblocking(true)?;
     let addr = std_listener.local_addr()?;
-    let (stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
-    let thread = std::thread::Builder::new().name("vibevalley-http".into()).spawn(move || {
-        let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build();
-        let Ok(runtime) = runtime else { return };
-        runtime.block_on(async move {
-            let Ok(listener) = tokio::net::TcpListener::from_std(std_listener) else {
-                return;
-            };
-            let _ = axum::serve(listener, router(server))
-                .with_graceful_shutdown(async {
-                    let _ = stop_rx.await;
-                })
-                .await;
-        });
-    })?;
+    let listener = {
+        let _guard = vibevalley_runtime::rt::handle().enter();
+        tokio::net::TcpListener::from_std(std_listener)?
+    };
+    let shutdown = CancellationToken::new();
+    let app = router_with_shutdown(server, shutdown.clone());
+    let token = shutdown.clone();
+    let task = vibevalley_runtime::rt::handle().spawn(async move {
+        let _ = axum::serve(listener, app).with_graceful_shutdown(token.cancelled_owned()).await;
+    });
     Ok(Listener {
         addr,
-        stop: Some(stop_tx),
-        thread: Some(thread),
+        shutdown,
+        task: Some(task),
     })
 }
 
 pub fn router(server: Shared) -> Router {
+    router_with_shutdown(server, CancellationToken::new())
+}
+
+fn router_with_shutdown(server: Shared, shutdown: CancellationToken) -> Router {
+    let state = HttpState { server, shutdown };
     Router::new()
         // Each GET path also matches ops of the same shape (POST
         // attachment/create, artifact/block/list): those go to `command`.
@@ -118,7 +133,7 @@ pub fn router(server: Shared) -> Router {
         .route("/api/v1/{*path}", post(command).get(not_allowed))
         .route("/mcp", post(mcp).get(not_allowed))
         .fallback(not_found)
-        .with_state(server)
+        .with_state(state)
 }
 
 fn is_loopback(host: &str) -> bool {
@@ -251,12 +266,16 @@ async fn command(State(server): State<Shared>, uri: axum::http::Uri, headers: He
     }
 }
 
-/// A flume receiver as an SSE stream of `data:` lines.
-fn events<T: serde::Serialize + Send + 'static>(rx: flume::Receiver<T>) -> impl Stream<Item = Result<Event, Infallible>> {
-    futures_util::stream::unfold(rx, |rx| async move {
-        let item = rx.recv_async().await.ok()?;
+/// A flume receiver as an SSE stream of `data:` lines, ending on `shutdown`.
+fn events<T: serde::Serialize + Send + 'static>(rx: flume::Receiver<T>, shutdown: CancellationToken) -> impl Stream<Item = Result<Event, Infallible>> {
+    futures_util::stream::unfold((rx, shutdown), |(rx, shutdown)| async move {
+        let item = tokio::select! {
+            biased;
+            _ = shutdown.cancelled() => return None,
+            res = rx.recv_async() => res.ok()?,
+        };
         let data = serde_json::to_string(&item).unwrap_or_else(|_| "null".into());
-        Some((Ok(Event::default().data(data)), rx))
+        Some((Ok(Event::default().data(data)), (rx, shutdown)))
     })
 }
 
@@ -266,9 +285,10 @@ fn sse<S: Stream<Item = Result<Event, Infallible>> + Send + 'static>(stream: S) 
 
 /// `GET /api/v1/slice/{name}`: JSON snapshot when `Accept` contains
 /// `application/json` or `?once=1`; otherwise SSE (`id: <seq>\ndata: <json>\n\n`)
-/// honoring `Last-Event-ID` or `?after=<seq>`.
+/// honoring `Last-Event-ID` or `?after=<seq>` over `WatchStream` with zero
+/// blocking OS threads per client.
 async fn slice(
-    State(server): State<Shared>,
+    State(state): State<HttpState>,
     Path(name): Path<String>,
     Query(query): Query<std::collections::HashMap<String, String>>,
     headers: HeaderMap,
@@ -285,6 +305,7 @@ async fn slice(
             .and_then(|v| v.to_str().ok())
             .is_some_and(|accept| accept.contains("application/json"));
     if wants_json {
+        let server = state.server.clone();
         let snapshot = match tokio::task::spawn_blocking(move || server.slice_snapshot(kind)).await {
             Ok(v) => v,
             Err(e) => return refuse(BizCode::InternalError, e.to_string()),
@@ -299,33 +320,91 @@ async fn slice(
             .and_then(|v| v.trim().parse::<i64>().ok())
     });
 
+    let server = state.server.clone();
+    let subscribed = match tokio::task::spawn_blocking(move || server.subscribe_slice(kind)).await {
+        Ok(sub) => sub,
+        Err(e) => return refuse(BizCode::InternalError, e.to_string()),
+    };
+    if let Some(sub) = subscribed {
+        let topic = sub.topic();
+        let watch_stream = sub.into_watch_stream(after_seq);
+        let server = state.server;
+        let shutdown = state.shutdown;
+        let stream = futures_util::stream::unfold((watch_stream, server, shutdown), move |(mut watch_stream, server, shutdown)| async move {
+            let (seq, value) = tokio::select! {
+                biased;
+                _ = shutdown.cancelled() => return None,
+                item = watch_stream.next() => item?,
+            };
+            if let Some(gate) = server.fault_gate() {
+                if gate.should_disconnect(topic) {
+                    return None;
+                }
+                let delay = gate.delay_ms(topic);
+                if delay > 0 {
+                    tokio::select! {
+                        biased;
+                        _ = shutdown.cancelled() => return None,
+                        _ = tokio::time::sleep(Duration::from_millis(delay)) => {}
+                    }
+                }
+            }
+            let data = serde_json::to_string(&value).unwrap_or_else(|_| "null".into());
+            let event = Event::default().id(seq.to_string()).data(data);
+            Some((Ok::<_, Infallible>(event), (watch_stream, server, shutdown)))
+        });
+        return sse(stream);
+    }
+
+    // Fallback for custom `Server` implementations without a `SliceFeed` (e.g. test doubles).
     let (stop_tx, stop_rx) = flume::bounded::<()>(0);
     let (tx, rx) = flume::bounded::<(i64, String)>(1);
-    let watch_server = server.clone();
-    let spawned = std::thread::Builder::new()
-        .name(format!("vibevalley-http-slice-{}", kind.as_str()))
-        .spawn(move || {
-            watch_server.watch_slice(kind, after_seq, &stop_rx, &mut |seq, value| {
-                let data = serde_json::to_string(value).unwrap_or_else(|_| "null".into());
-                flume::Selector::new().send(&tx, (seq, data), |_| ()).recv(&stop_rx, |_| ()).wait();
-            });
+    let watch_server = state.server;
+    tokio::task::spawn_blocking(move || {
+        watch_server.watch_slice(kind, after_seq, &stop_rx, &mut |seq, value| {
+            let data = serde_json::to_string(value).unwrap_or_else(|_| "null".into());
+            flume::Selector::new().send(&tx, (seq, data), |_| ()).recv(&stop_rx, |_| ()).wait();
         });
-    if let Err(e) = spawned {
-        return refuse(BizCode::InternalError, e.to_string());
-    }
-    let stream = futures_util::stream::unfold((rx, stop_tx), |(rx, stop_tx)| async move {
-        let (seq, data) = rx.recv_async().await.ok()?;
+    });
+    let shutdown = state.shutdown;
+    let stream = futures_util::stream::unfold((rx, stop_tx, shutdown), |(rx, stop_tx, shutdown)| async move {
+        let (seq, data) = tokio::select! {
+            biased;
+            _ = shutdown.cancelled() => return None,
+            res = rx.recv_async() => res.ok()?,
+        };
         let event = Event::default().id(seq.to_string()).data(data);
-        Some((Ok::<_, Infallible>(event), (rx, stop_tx)))
+        Some((Ok::<_, Infallible>(event), (rx, stop_tx, shutdown)))
     });
     sse(stream)
 }
 
-async fn live(State(server): State<Shared>, headers: HeaderMap) -> Response {
+async fn live(State(state): State<HttpState>, headers: HeaderMap) -> Response {
     if !from_the_farm(&headers) {
         return refuse(BizCode::Forbidden, "forbidden");
     }
-    sse(events(server.live()))
+    if let Some(rx) = state.server.subscribe_live() {
+        let bstream = BroadcastStream::new(rx);
+        let shutdown = state.shutdown;
+        let stream = futures_util::stream::unfold((bstream, shutdown), |(mut bstream, shutdown)| async move {
+            loop {
+                let next = tokio::select! {
+                    biased;
+                    _ = shutdown.cancelled() => return None,
+                    item = bstream.next() => item?,
+                };
+                match next {
+                    Ok(ev) => {
+                        let data = serde_json::to_string(&ev).unwrap_or_else(|_| "null".into());
+                        return Some((Ok::<_, Infallible>(Event::default().data(data)), (bstream, shutdown)));
+                    }
+                    Err(BroadcastStreamRecvError::Lagged(_)) => continue,
+                }
+            }
+        });
+        return sse(stream);
+    }
+    sse(events(state.server.live(), state.shutdown))
 }
 
 /// Unsubscribes when the client goes away (the stream is dropped).
@@ -342,7 +421,7 @@ impl Drop for Subscription {
 
 #[allow(clippy::result_large_err, reason = "Server::subscribe's contract returns the refusal envelope itself")]
 async fn subscribe(
-    State(server): State<Shared>,
+    State(state): State<HttpState>,
     Path(name): Path<String>,
     Query(query): Query<std::collections::HashMap<String, String>>,
     headers: HeaderMap,
@@ -354,7 +433,7 @@ async fn subscribe(
         Ok(v) => v,
         Err(e) => return refuse(BizCode::InvalidInput, e.to_string()),
     };
-    match open(server, name, payload).await {
+    match open(state.server, state.shutdown, name, payload).await {
         Ok(Ok(stream)) => stream,
         Ok(Err(envelope)) => reply(envelope),
         Err(e) => refuse(BizCode::InternalError, e.to_string()),
@@ -511,11 +590,11 @@ async fn attachment(State(server): State<Shared>, Path(id): Path<String>, header
     }
 }
 
-async fn issue_watch(State(server): State<Shared>, Path(id): Path<String>, headers: HeaderMap) -> Response {
+async fn issue_watch(State(state): State<HttpState>, Path(id): Path<String>, headers: HeaderMap) -> Response {
     if !from_the_farm(&headers) {
         return refuse(BizCode::Forbidden, "forbidden");
     }
-    match open(server, "issue.watch".into(), serde_json::json!({ "id": id })).await {
+    match open(state.server, state.shutdown, "issue.watch".into(), serde_json::json!({ "id": id })).await {
         Ok(Ok(stream)) => stream,
         Ok(Err(_)) => StatusCode::NOT_FOUND.into_response(),
         Err(e) => refuse(BizCode::InternalError, e.to_string()),
@@ -525,7 +604,7 @@ async fn issue_watch(State(server): State<Shared>, Path(id): Path<String>, heade
 /// Opens `name` off the async runtime; `Ok(Ok)` is the event stream, which
 /// unsubscribes when the client goes away.
 #[allow(clippy::result_large_err, reason = "Server::subscribe's contract returns the refusal envelope itself")]
-async fn open(server: Shared, name: String, payload: Value) -> Result<Result<Response, Envelope>, tokio::task::JoinError> {
+async fn open(server: Shared, shutdown: CancellationToken, name: String, payload: Value) -> Result<Result<Response, Envelope>, tokio::task::JoinError> {
     let opened = {
         let server = server.clone();
         tokio::task::spawn_blocking(move || server.subscribe(&name, payload)).await?
@@ -533,10 +612,14 @@ async fn open(server: Shared, name: String, payload: Value) -> Result<Result<Res
     Ok(match opened {
         Ok((id, rx)) => {
             let guard = Subscription { server, id };
-            let stream = futures_util::stream::unfold((rx, guard), |(rx, guard)| async move {
-                let item = rx.recv_async().await.ok()?;
+            let stream = futures_util::stream::unfold((rx, guard, shutdown), |(rx, guard, shutdown)| async move {
+                let item = tokio::select! {
+                    biased;
+                    _ = shutdown.cancelled() => return None,
+                    res = rx.recv_async() => res.ok()?,
+                };
                 let data = serde_json::to_string(&item).unwrap_or_else(|_| "null".into());
-                Some((Ok::<_, Infallible>(Event::default().data(data)), (rx, guard)))
+                Some((Ok::<_, Infallible>(Event::default().data(data)), (rx, guard, shutdown)))
             });
             Ok(sse(stream))
         }

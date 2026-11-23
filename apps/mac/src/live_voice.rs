@@ -1,11 +1,13 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio_tungstenite::tungstenite::{Message, client::IntoClientRequest};
+use tokio_util::sync::CancellationToken;
 use vibevalley_server::modules::collab::voice::Voice;
 
 #[derive(Clone, Default, Serialize)]
@@ -31,7 +33,7 @@ enum Phase {
 #[derive(Default)]
 struct Call {
     state: State,
-    stop: Option<flume::Sender<()>>,
+    stop: Option<CancellationToken>,
     owner: String,
 }
 
@@ -39,70 +41,62 @@ fn call() -> &'static Mutex<Call> {
     static CALL: OnceLock<Mutex<Call>> = OnceLock::new();
     CALL.get_or_init(Default::default)
 }
-fn lock() -> MutexGuard<'static, Call> {
-    call().lock().unwrap_or_else(|e| e.into_inner())
-}
 
 pub fn state(owner: &str) -> State {
-    let call = lock();
-    if call.owner == owner { call.state.clone() } else { State::default() }
+    let current = call().lock();
+    if current.owner == owner { current.state.clone() } else { State::default() }
 }
 
 pub fn start(voice: Arc<Voice>, owner: String) -> Result<State, String> {
     if owner.is_empty() || owner.len() > 128 {
         return Err("voice call requires an owner ID".into());
     }
-    let mut call = lock();
-    if call.state.phase != Phase::Idle {
-        if call.owner == owner {
-            return Ok(call.state.clone());
+    let mut current = call().lock();
+    if current.state.phase != Phase::Idle {
+        if current.owner == owner {
+            return Ok(current.state.clone());
         }
         return Err("a voice call is already open".into());
     }
-    let (stop, stopped) = flume::bounded(1);
-    call.state = State {
+    let cancel = CancellationToken::new();
+    current.state = State {
         phase: Phase::Connecting,
         ..State::default()
     };
-    call.stop = Some(stop);
-    call.owner = owner;
-    std::thread::Builder::new()
-        .name("moss-live".into())
-        .spawn(move || {
-            let result = crate::audio::reserve_for_call().and_then(|audio| run(voice, stopped, audio));
-            let mut call = lock();
-            call.state.phase = Phase::Idle;
-            call.state.muted = false;
-            call.state.problem = result.err();
-            call.stop = None;
-        })
-        .map_err(|e| {
-            call.stop = None;
-            call.state.phase = Phase::Idle;
-            e.to_string()
-        })?;
-    Ok(call.state.clone())
+    current.stop = Some(cancel.clone());
+    current.owner = owner;
+    let state = current.state.clone();
+    drop(current);
+    vibevalley_runtime::rt::handle().spawn(async move {
+        let result = run(voice, cancel).await;
+        let mut current = call().lock();
+        current.state.phase = Phase::Idle;
+        current.state.muted = false;
+        current.state.problem = result.err();
+        current.stop = None;
+    });
+    Ok(state)
 }
 
 pub fn stop(owner: Option<&str>) -> State {
-    let mut call = lock();
-    if owner.is_some_and(|id| id != call.owner) {
+    let mut current = call().lock();
+    if owner.is_some_and(|id| id != current.owner) {
         return State::default();
     }
-    if let Some(stop) = call.stop.take() {
-        call.state.phase = Phase::Stopping;
-        drop(stop);
+    if let Some(stop) = current.stop.take() {
+        current.state.phase = Phase::Stopping;
+        stop.cancel();
     }
-    call.state.clone()
+    current.state.clone()
 }
 
 pub fn mute(owner: &str, muted: bool) -> State {
-    let mut call = lock();
-    if call.owner != owner {
+    let mut current = call().lock();
+    if current.owner != owner {
         return State::default();
     }
-    call.state.muted = muted;
-    call.state.clone()
+    current.state.muted = muted;
+    current.state.clone()
 }
 
 trait Audio {
@@ -177,38 +171,84 @@ impl Audio for NativeAudio {
     }
 }
 
-fn run(voice: Arc<Voice>, stopped: flume::Receiver<()>, audio: crate::audio::CallAudio) -> Result<(), String> {
-    let grant = voice.grant().map_err(|e| e.message)?;
-    if grant.app_id != "moss" {
-        return Err("select MOSS Live as the call's answer provider first".into());
+async fn run(voice: Arc<Voice>, cancel: CancellationToken) -> Result<(), String> {
+    if cancel.is_cancelled() {
+        return Ok(());
     }
-    let line = voice.moss_line().map_err(|e| e.message)?;
-    let call = voice.start(&grant.channel, &grant.uid, None).map_err(|e| e.message)?;
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().map_err(|e| e.to_string())?;
-    let result = runtime.block_on(async {
+    let setup_voice = voice.clone();
+    let setup_cancel = cancel.clone();
+    let Some((audio, line, voice_call)) = tokio::task::spawn_blocking(move || -> Result<_, String> {
+        if setup_cancel.is_cancelled() {
+            return Ok(None);
+        }
+        let audio = crate::audio::reserve_for_call()?;
+        if setup_cancel.is_cancelled() {
+            return Ok(None);
+        }
+        let grant = setup_voice.grant().map_err(|e| e.message)?;
+        if grant.app_id != "moss" {
+            return Err("select MOSS Live as the call's answer provider first".into());
+        }
+        let line = setup_voice.moss_line().map_err(|e| e.message)?;
+        let voice_call = setup_voice.start(&grant.channel, &grant.uid, None).map_err(|e| e.message)?;
+        Ok(Some((audio, line, voice_call)))
+    })
+    .await
+    .map_err(|e| format!("MOSS voice setup task panicked: {e}"))??
+    else {
+        return Ok(());
+    };
+    let result: Result<(), WireError> = async {
+        if cancel.is_cancelled() {
+            return Ok(());
+        }
         let mut request = line.url.as_str().into_client_request().map_err(|_| "invalid MOSS address")?;
-        request.headers_mut().insert("Authorization", format!("Bearer {}", line.key.expose()).parse().map_err(|_| "invalid MOSS credentials")?);
+        request.headers_mut().insert(
+            "Authorization",
+            format!("Bearer {}", line.key.expose()).parse().map_err(|_| "invalid MOSS credentials")?,
+        );
         let (socket, _) = tokio::select! {
-            _ = stopped.recv_async() => return Ok(()),
-            result = tokio::time::timeout(Duration::from_secs(20), tokio_tungstenite::connect_async(request)) => result.map_err(|_| "MOSS connection timed out")?.map_err(|_| "MOSS connection failed")?,
-        };
-        session(socket, SessionMessages { update: line.session_update(), outgoing: line.outgoing.clone(), stopped }, NativeAudio { _lease: audio }, |raw, event| {
-            line.heard(raw);
-            match event {
-                Event::InputTranscript { data } => {
-                    voice.heard(&call.agent_id, &data.text, None, (!data.turn.is_empty()).then_some(data.turn.as_str())).map_err(|e| e.message)?;
-                    lock().state.heard = data.text.clone();
-                }
-                Event::OutputTranscript { data } => {
-                    voice.said(&call.agent_id, &data.text).map_err(|e| e.message)?;
-                    lock().state.said = data.text.clone();
-                }
-                _ => {}
+            biased;
+            () = cancel.cancelled() => return Ok(()),
+            result = tokio::time::timeout(Duration::from_secs(20), tokio_tungstenite::connect_async(request)) => {
+                result.map_err(|_| "MOSS connection timed out")?.map_err(|_| "MOSS connection failed")?
             }
-            Ok(())
-        }, || lock().state.muted, || { lock().state.phase = Phase::Live; }).await
-    });
-    let _ = voice.stop(&call.agent_id);
+        };
+        session(
+            socket,
+            SessionMessages {
+                update: line.session_update(),
+                outgoing: line.outgoing.clone(),
+                cancel: cancel.clone(),
+            },
+            NativeAudio { _lease: audio },
+            |raw, event| {
+                line.heard(raw);
+                match event {
+                    Event::InputTranscript { data } => {
+                        voice
+                            .heard(&voice_call.agent_id, &data.text, None, (!data.turn.is_empty()).then_some(data.turn.as_str()))
+                            .map_err(|e| e.message)?;
+                        call().lock().state.heard = data.text.clone();
+                    }
+                    Event::OutputTranscript { data } => {
+                        voice.said(&voice_call.agent_id, &data.text).map_err(|e| e.message)?;
+                        call().lock().state.said = data.text.clone();
+                    }
+                    _ => {}
+                }
+                Ok(())
+            },
+            || call().lock().state.muted,
+            || {
+                call().lock().state.phase = Phase::Live;
+            },
+        )
+        .await
+    }
+    .await;
+    let agent_id = voice_call.agent_id;
+    let _ = tokio::task::spawn_blocking(move || voice.stop(&agent_id)).await;
     match result {
         Ok(()) | Err(WireError::Cancelled) => Ok(()),
         Err(WireError::Failed(error)) => Err(error),
@@ -285,7 +325,7 @@ struct Playing {
 struct SessionMessages {
     update: String,
     outgoing: flume::Receiver<String>,
-    stopped: flume::Receiver<()>,
+    cancel: CancellationToken,
 }
 
 async fn session<S, A: Audio>(
@@ -302,21 +342,21 @@ where
         + Unpin,
 {
     let mut audio = HeldAudio(audio);
-    let SessionMessages { update, outgoing, stopped } = messages;
+    let SessionMessages { update, outgoing, cancel } = messages;
     let (mut writer, mut reader) = socket.split();
-    async fn send<S>(writer: &mut S, stopped: &flume::Receiver<()>, message: Message) -> Result<(), WireError>
+    async fn send<S>(writer: &mut S, cancel: &CancellationToken, message: Message) -> Result<(), WireError>
     where
         S: futures_util::Sink<Message, Error = tokio_tungstenite::tungstenite::Error> + Unpin,
     {
         tokio::select! {
             biased;
-            _ = stopped.recv_async() => Err(WireError::Cancelled),
+            () = cancel.cancelled() => Err(WireError::Cancelled),
             result = tokio::time::timeout(Duration::from_secs(5), writer.send(message)) => {
                 result.map_err(|_| "MOSS send timed out")?.map_err(|_| WireError::Failed("MOSS connection ended".into()))
             }
         }
     }
-    send(&mut writer, &stopped, Message::text(r#"{"action":"attach_session","memory_scope":"session"}"#)).await?;
+    send(&mut writer, &cancel, Message::text(r#"{"action":"attach_session","memory_scope":"session"}"#)).await?;
     let mut handshake = Handshake::Attaching;
     let deadline = tokio::time::sleep(Duration::from_secs(20));
     tokio::pin!(deadline);
@@ -334,7 +374,7 @@ where
     loop {
         tokio::select! {
             biased;
-            _ = stopped.recv_async() => { audio.stop(); let _ = tokio::time::timeout(Duration::from_millis(500), writer.close()).await; return Ok(()); }
+            () = cancel.cancelled() => { audio.stop(); let _ = tokio::time::timeout(Duration::from_millis(500), writer.close()).await; return Ok(()); }
             _ = &mut deadline, if handshake != Handshake::Live => return Err("MOSS session setup timed out".into()),
             next = reader.next() => match next {
                 Some(Ok(Message::Text(raw))) => {
@@ -346,14 +386,14 @@ where
                                 return Err("MOSS session options were refused".into());
                             }
                             handshake = Handshake::Configuring;
-                            send(&mut writer, &stopped, Message::text(update.clone())).await?;
+                            send(&mut writer, &cancel, Message::text(update.clone())).await?;
                         }
                         Event::Updated { data } => {
                             if handshake != Handshake::Configuring || !data.error.is_empty() { return Err("MOSS configuration was refused".into()); }
-                            send(&mut writer, &stopped, Message::text(r#"{"action":"media.mode","binary_protocol":"tagged-v1"}"#)).await?;
+                            send(&mut writer, &cancel, Message::text(r#"{"action":"media.mode","binary_protocol":"tagged-v1"}"#)).await?;
                             audio.start()?;
-                            if stopped.is_disconnected() { return Ok(()); }
-                            send(&mut writer, &stopped, Message::text(r#"{"action":"mic_state","enabled":true}"#)).await?;
+                            if cancel.is_cancelled() { return Ok(()); }
+                            send(&mut writer, &cancel, Message::text(r#"{"action":"mic_state","enabled":true}"#)).await?;
                             handshake = Handshake::Live;
                             ready();
                         }
@@ -385,7 +425,7 @@ where
                             queued = 0;
                             playing.clear();
                             finished.clear();
-                            send(&mut writer, &stopped, Message::text(json!({"action":"playback.stopped","run_id":run,"turn_id":turn,"played_audio_ms":0}).to_string())).await?;
+                            send(&mut writer, &cancel, Message::text(json!({"action":"playback.stopped","run_id":run,"turn_id":turn,"played_audio_ms":0}).to_string())).await?;
                         }
                         Event::Closing => return Ok(()),
                         Event::Error => return Err("MOSS refused the voice session".into()),
@@ -402,37 +442,37 @@ where
                     queued += (bytes.len() / 2) as u64;
                     playing.push_back(Playing { piece: context, end: queued });
                 }
-                Some(Ok(Message::Ping(bytes))) => send(&mut writer, &stopped, Message::Pong(bytes)).await?,
+                Some(Ok(Message::Ping(bytes))) => send(&mut writer, &cancel, Message::Pong(bytes)).await?,
                 Some(Ok(Message::Pong(_) | Message::Frame(_))) => {},
                 Some(Ok(Message::Binary(_))) => return Err("MOSS audio arrived before setup".into()),
                 Some(Ok(Message::Close(_))) | None => return Ok(()),
                 Some(Err(_)) => return Err("MOSS connection failed".into()),
             },
             frame = outgoing.recv_async(), if handshake == Handshake::Live => {
-                if let Ok(frame) = frame { send(&mut writer, &stopped, Message::text(frame)).await?; }
+                if let Ok(frame) = frame { send(&mut writer, &cancel, Message::text(frame)).await?; }
             }
             _ = tick.tick(), if handshake == Handshake::Live => {
                 let is_muted = muted();
                 if is_muted != was_muted {
-                    send(&mut writer, &stopped, Message::text(json!({"action":"mic_state","enabled":!is_muted}).to_string())).await?;
+                    send(&mut writer, &cancel, Message::text(json!({"action":"mic_state","enabled":!is_muted}).to_string())).await?;
                     was_muted = is_muted;
                 }
                 for frame in audio.microphone()?.as_chunks::<640>().0 {
                     let mut tagged = vec![0u8; 641];
                     if !is_muted { tagged[1..].copy_from_slice(frame); }
-                    send(&mut writer, &stopped, Message::Binary(tagged.into())).await?;
+                    send(&mut writer, &cancel, Message::Binary(tagged.into())).await?;
                 }
                 let completed = audio.completed();
                 while playing.front().is_some_and(|p| p.end <= completed) {
                     let p = playing.pop_front().unwrap().piece;
-                    send(&mut writer, &stopped, Message::text(json!({"action":"playback.chunk.completed","chunk_id":p.chunk_id,"run_id":p.run_id,"turn_id":p.turn_id}).to_string())).await?;
+                    send(&mut writer, &cancel, Message::text(json!({"action":"playback.chunk.completed","chunk_id":p.chunk_id,"run_id":p.run_id,"turn_id":p.turn_id}).to_string())).await?;
                 }
                 let done: Vec<_> = finished.keys().filter(|run| !playing.iter().any(|p| &p.piece.run_id == *run)).cloned().collect();
                 for run in done {
                     let turn = finished.remove(&run).unwrap();
                     ended.insert(run.clone());
                     active = None;
-                    send(&mut writer, &stopped, Message::text(json!({"action":"playback.completed","run_id":run,"turn_id":turn}).to_string())).await?;
+                    send(&mut writer, &cancel, Message::text(json!({"action":"playback.completed","run_id":run,"turn_id":turn}).to_string())).await?;
                 }
             }
         }
@@ -549,14 +589,14 @@ mod tests {
             socket.send(Message::text(r#"{"action":"session.closing"}"#)).await.unwrap();
         });
         let (socket, _) = tokio_tungstenite::connect_async(format!("ws://{address}")).await.unwrap();
-        let (_stop, stopped) = flume::bounded(1);
+        let cancel = CancellationToken::new();
         let (_out, outgoing) = flume::bounded(1);
         session(
             socket,
             SessionMessages {
                 update: r#"{"action":"session.update"}"#.into(),
                 outgoing,
-                stopped,
+                cancel,
             },
             SyntheticAudio {
                 probe: probe.clone(),
@@ -589,7 +629,7 @@ mod tests {
                 .unwrap();
         });
         let (socket, _) = tokio_tungstenite::connect_async(format!("ws://{address}")).await.unwrap();
-        let (_stop, stopped) = flume::bounded(1);
+        let cancel = CancellationToken::new();
         let (_out, outgoing) = flume::bounded(1);
         let probe = Arc::new(Probe::default());
         let result = session(
@@ -597,7 +637,7 @@ mod tests {
             SessionMessages {
                 update: String::new(),
                 outgoing,
-                stopped,
+                cancel,
             },
             SyntheticAudio {
                 probe: probe.clone(),
@@ -659,7 +699,7 @@ mod tests {
             socket.send(Message::text(r#"{"action":"session.closing"}"#)).await.unwrap();
         });
         let (socket, _) = tokio_tungstenite::connect_async(format!("ws://{address}")).await.unwrap();
-        let (_stop, stopped) = flume::bounded(1);
+        let cancel = CancellationToken::new();
         let (_out, outgoing) = flume::bounded(1);
         let probe = Arc::new(Probe::default());
         session(
@@ -667,7 +707,7 @@ mod tests {
             SessionMessages {
                 update: String::new(),
                 outgoing,
-                stopped,
+                cancel,
             },
             SyntheticAudio {
                 probe: probe.clone(),
@@ -721,7 +761,7 @@ mod tests {
     #[tokio::test]
     async fn regression_hangup_interrupts_a_blocked_microphone_send_and_stops_capture() {
         let (blocked, waiting) = flume::bounded(1);
-        let (stop, stopped) = flume::bounded(1);
+        let cancel = CancellationToken::new();
         let (_out, outgoing) = flume::bounded(1);
         let probe = Arc::new(Probe::default());
         let socket = SlowSocket {
@@ -733,13 +773,14 @@ mod tests {
             blocked,
         };
         let worker_probe = probe.clone();
-        let worker = tokio::spawn(async move {
+        let worker_cancel = cancel.clone();
+        let worker = vibevalley_runtime::rt::handle().spawn(async move {
             session(
                 socket,
                 SessionMessages {
                     update: String::new(),
                     outgoing,
-                    stopped,
+                    cancel: worker_cancel,
                 },
                 SyntheticAudio {
                     probe: worker_probe,
@@ -753,7 +794,7 @@ mod tests {
         });
         tokio::time::timeout(Duration::from_secs(5), waiting.recv_async()).await.unwrap().unwrap();
         assert!(probe.started.load(Ordering::SeqCst));
-        drop(stop);
+        cancel.cancel();
         let result = tokio::time::timeout(Duration::from_secs(1), worker).await.unwrap().unwrap();
         assert!(matches!(result, Err(WireError::Cancelled)));
         assert!(!probe.started.load(Ordering::SeqCst));

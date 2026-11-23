@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use tokio_tungstenite::tungstenite::{self, Message};
-use vibevalley_server::modules::collab::channel::{Posting, Told};
+use vibevalley_server::modules::collab::channel::{ChannelEvent, Posting};
 use vibevalley_server::modules::collab::connector::{Options, Vendors};
 use vibevalley_server::{Server, Started};
 
@@ -557,10 +557,18 @@ fn start(dir: &std::path::Path, world: &World) -> Started {
     })
     .unwrap();
     // The orchestrator, played: it answers each of the user's words where they were said.
-    let (said, chat) = (started.chat.committed(), started.chat.clone());
-    std::thread::spawn(move || {
-        for told in said.iter() {
-            if let Told::Posted(c) = told
+    let (mut events, chat, cancel) = (started.chat.subscribe_events(), started.chat.clone(), started.hub.child_token());
+    started.hub.spawn_task(async move {
+        loop {
+            let event = tokio::select! {
+                _ = cancel.cancelled() => return,
+                res = events.recv() => match res {
+                    Ok(ev) => ev,
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
+                },
+            };
+            if let ChannelEvent::Posted(c) = event
                 && c.row.sender_id == "user"
             {
                 let _ = chat.post(Posting {

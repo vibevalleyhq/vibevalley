@@ -1,11 +1,10 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 
+use parking_lot::Mutex;
 use vibevalley_protocol::{Agent, MCPServer};
 use vibevalley_runtime::agent::Tool;
 use vibevalley_runtime::agent::resources::mcp::{McpConfig, McpHub, McpServerConfig};
-
-use crate::lock;
 
 #[derive(Default)]
 pub(super) struct ProfileServers(Mutex<HashMap<String, Arc<Connection>>>);
@@ -18,7 +17,7 @@ struct Connection {
 impl ProfileServers {
     pub(super) fn tools(&self, profile: &Agent) -> Vec<Box<dyn Tool>> {
         let connection = {
-            let mut all = lock(&self.0);
+            let mut all = self.0.lock();
             if profile.mcp_servers.is_empty() {
                 all.remove(&profile.id);
                 return vec![];
@@ -72,10 +71,10 @@ impl ProfileServers {
     }
 
     pub(super) fn forget(&self, id: &str) {
-        lock(&self.0).remove(id);
+        self.0.lock().remove(id);
     }
 
     pub(super) fn close(&self) {
-        lock(&self.0).clear();
+        self.0.lock().clear();
     }
 }

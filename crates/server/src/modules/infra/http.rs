@@ -57,7 +57,7 @@ impl Fetch for Http {
         let client = no_redirect_client().map_err(FetchError::Network)?.clone();
         let method = reqwest::Method::from_bytes(r.method.as_bytes()).map_err(|e| FetchError::Network(e.to_string()))?;
         let (head_tx, head_rx) = flume::bounded::<Result<Response, FetchError>>(1);
-        http_runtime().spawn(async move {
+        vibevalley_runtime::rt::handle().spawn(async move {
             let mut req = client.request(method, &r.url).timeout(r.timeout);
             for (k, v) in &r.headers {
                 req = req.header(k.as_str(), v.as_str());
@@ -168,20 +168,6 @@ pub fn read_max(body: &mut dyn Read, max: usize) -> Result<Vec<u8>, ReadError> {
     read_max_until(body, max, || false)
 }
 
-/// Shared tokio runtime for outbound `reqwest` calls from synchronous handlers and workers.
-pub(crate) fn http_runtime() -> &'static tokio::runtime::Runtime {
-    static RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
-    RT.get_or_init(|| {
-        crate::install_tls();
-        tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(2)
-            .thread_name("vibevalley-http-client")
-            .enable_all()
-            .build()
-            .expect("http client runtime")
-    })
-}
-
 /// Shared no-redirect `reqwest::Client` so outbound calls never leak credentials across redirects.
 pub(crate) fn no_redirect_client() -> Result<&'static reqwest::Client, String> {
     static CLIENT: OnceLock<Result<reqwest::Client, String>> = OnceLock::new();
@@ -198,11 +184,7 @@ pub(crate) fn no_redirect_client() -> Result<&'static reqwest::Client, String> {
 }
 
 pub(crate) fn run_http<T: Send + 'static>(work: impl Future<Output = T> + Send + 'static) -> T {
-    let (tx, rx) = flume::bounded(1);
-    http_runtime().spawn(async move {
-        let _ = tx.send(work.await);
-    });
-    rx.recv().expect("http client task completed")
+    vibevalley_runtime::rt::block_on(work)
 }
 
 /// Adapts a chunk channel from an async `reqwest::Response` into a synchronous [`Read`].

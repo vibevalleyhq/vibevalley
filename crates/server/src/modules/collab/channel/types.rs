@@ -304,11 +304,15 @@ pub struct Committed {
     pub topic: Option<(SubjectKind, String)>,
 }
 
-/// One committed event as a reader of the chat is told it.
+/// Unified channel event broadcast after commit.
 #[derive(Debug, Clone)]
-pub enum Told {
+pub enum ChannelEvent {
     Posted(Box<Committed>),
-    Removed(EventRow),
+    Edited(ChatMessage),
+    Removed { event: EventRow, message: ChatMessage },
+    Reacted(ChatMessage),
+    Pinned(ChatMessage),
+    UserRead { channel: String, upto: i64, at: i64 },
 }
 
 /// The user's words.

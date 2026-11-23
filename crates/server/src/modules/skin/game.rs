@@ -9,14 +9,15 @@
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 
+use parking_lot::Mutex;
 use vibevalley_core::Transition;
 use vibevalley_core::progress::{Folded, catch_up, entries_for, progress_fold, progress_step};
 use vibevalley_protocol::{Fact, FactProgressChanged, FactProgressChangedStation, LedgerEntry, LedgerEntryTitled, ops};
 
 use crate::event_bus::Subscription;
-use crate::{Hub, lock, now};
+use crate::{Hub, now};
 
 const COUNT_EVERY: std::time::Duration = std::time::Duration::from_secs(120);
 const COUNT_AFTER_RUN: std::time::Duration = std::time::Duration::from_secs(15);
@@ -82,7 +83,7 @@ impl Game {
             let Some(game) = g.upgrade() else { return };
             game.on_transition(hub, t);
         });
-        let prev = lock(&game.sub).replace(sub);
+        let prev = game.sub.lock().replace(sub);
         drop(prev);
         game
     }
@@ -99,7 +100,7 @@ impl Game {
         if let Fact::SessionChanged(f) = &t.fact
             && vibevalley_core::status::is_hired(&f.session)
         {
-            let wish = lock(&self.wanted).take();
+            let wish = self.wanted.lock().take();
             if let Some((station, until)) = wish
                 && until > f.at
             {
@@ -129,7 +130,7 @@ impl Game {
     /// after a newer one.
     pub fn count_commits(self: &Arc<Game>, repos: Arc<crate::modules::work::repo::Repos>, git_emails: Vec<String>) {
         let (tx, rx) = flume::unbounded::<()>();
-        *lock(&self.soon) = Some(tx);
+        *self.soon.lock() = Some(tx);
         let g = Arc::downgrade(self);
         let refresh = move || {
             let Some(game) = g.upgrade() else { return false };
@@ -162,16 +163,16 @@ impl Game {
             }
         });
         match spawned {
-            Ok(handle) => *lock(&self.thread) = Some(handle),
+            Ok(handle) => *self.thread.lock() = Some(handle),
             Err(e) => eprintln!("vibevalley-server: game: the counting thread: {e}"),
         }
     }
 
     pub fn close(&self) {
-        let prev = lock(&self.sub).take();
+        let prev = self.sub.lock().take();
         drop(prev);
-        let _ = lock(&self.soon).take();
-        if let Some(handle) = lock(&self.thread).take()
+        let _ = self.soon.lock().take();
+        if let Some(handle) = self.thread.lock().take()
             && handle.thread().id() != std::thread::current().id()
         {
             let _ = handle.join();
@@ -198,7 +199,7 @@ impl Game {
 
     fn count_soon(&self) {
         self.asked.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        if let Some(tx) = lock(&self.soon).as_ref() {
+        if let Some(tx) = self.soon.lock().as_ref() {
             let _ = tx.send(());
         }
     }
@@ -209,7 +210,7 @@ impl Game {
         let entry = entry.with_at(now());
         let Ok(line) = serde_json::to_string(&entry) else { return };
         let fact = {
-            let mut folded = lock(&self.folded);
+            let mut folded = self.folded.lock();
             let kept = std::fs::OpenOptions::new()
                 .create(true)
                 .append(true)
@@ -254,7 +255,7 @@ impl Game {
 
     /// The next session hired within ten seconds goes to `station`.
     pub fn want(&self, station: i64) {
-        *lock(&self.wanted) = Some((station, now() + WANT_STATION_FOR_MS));
+        *self.wanted.lock() = Some((station, now() + WANT_STATION_FOR_MS));
     }
 }
 

@@ -16,8 +16,9 @@ mod types;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard, Weak};
+use std::sync::{Arc, Weak};
 
+use parking_lot::{Mutex, MutexGuard};
 use sqlx::{Connection, SqliteConnection};
 use vibevalley_core::artifact::{
     artifact_headers, artifact_problem, html_check, html_edit, html_problem, infer_artifact_from_name, shell_theme_of, starter_entries_for_type, with_shell,
@@ -39,7 +40,7 @@ use crate::base::{LookIn, missing, open_sqlx_db};
 use crate::modules::collab::channel::{Chat, Made, Posting};
 use crate::modules::content::attachment::Attachments;
 use crate::modules::team::agent::Agents;
-use crate::{Hub, lock, now};
+use crate::{Hub, now};
 
 /// How many the farm-wide list shows.
 const LISTED_MAX: i64 = 200;
@@ -151,7 +152,7 @@ impl Artifacts {
             demo_tick_ms: std::sync::atomic::AtomicU64::new(blocks::DEMO_TICK_MS),
         });
         if let Some(handle) = prune_daily(Arc::downgrade(&me), stop_rx) {
-            *lock(&me.prune_thread) = Some(handle);
+            *me.prune_thread.lock() = Some(handle);
         }
         Ok(me)
     }
@@ -164,8 +165,8 @@ impl Artifacts {
     /// Stops the demo and the prune.
     pub fn close(&self) {
         self.closed.store(true, Ordering::Relaxed);
-        let _ = lock(&self.stop).take();
-        if let Some(handle) = lock(&self.prune_thread).take()
+        let _ = self.stop.lock().take();
+        if let Some(handle) = self.prune_thread.lock().take()
             && handle.thread().id() != std::thread::current().id()
         {
             let _ = handle.join();
@@ -173,7 +174,7 @@ impl Artifacts {
     }
 
     fn db(&self) -> MutexGuard<'_, SqliteConnection> {
-        lock(&self.db)
+        self.db.lock()
     }
 
     fn found(&self, db: &mut SqliteConnection, id: &str) -> Result<ArtifactRow, ApiError> {
@@ -334,7 +335,7 @@ impl Artifacts {
     /// hand-in: html kept whole, Markdown read into blocks, or store entries
     /// committed, announced when appropriate.
     pub fn create(&self, maker: &Maker, req: &ArtifactRequest) -> Result<Wire, ApiError> {
-        let _rows = lock(&self.rows);
+        let _rows = self.rows.lock();
         let trimmed = req.title.trim();
         let inferred = (req.kind.is_none() && req.artifact_type.is_none() && !trimmed.is_empty())
             .then(|| infer_artifact_from_name(trimmed, req.content.as_deref()))
@@ -622,12 +623,12 @@ impl Artifacts {
 
     /// An html one's next version; a blocks or store one is refused.
     pub fn version(&self, maker: &Maker, req: &ArtifactVersionRequest) -> Result<Wire, ApiError> {
-        let _rows = lock(&self.rows);
+        let _rows = self.rows.lock();
         self.version_locked(maker, req, None)
     }
 
     pub fn version_with_meta(&self, maker: &Maker, req: &ArtifactVersionRequest, meta: &CommitMeta) -> Result<Wire, ApiError> {
-        let _rows = lock(&self.rows);
+        let _rows = self.rows.lock();
         self.version_locked(maker, req, Some(meta))
     }
 
@@ -740,7 +741,7 @@ impl Artifacts {
             }
             return self.get_now(&req.id);
         }
-        let _rows = lock(&self.rows);
+        let _rows = self.rows.lock();
         let (row, v) = self.version_of(&mut self.db(), &req.id, Some(req.version))?;
         if row.body != "html" {
             return Err(refused(t("server.artifact.notHtml", &[("title", row.title.as_str().into())])));
@@ -771,7 +772,7 @@ impl Artifacts {
 
     /// Its title, how an html one is shown, or whether a design-system is the farm's default.
     pub fn update(&self, req: &ArtifactUpdateRequest) -> Result<Wire, ApiError> {
-        let _rows = lock(&self.rows);
+        let _rows = self.rows.lock();
         let mut db = self.db();
         let row = self.found(&mut db, &req.id)?;
         if let Some(title) = &req.title {
@@ -831,7 +832,7 @@ impl Artifacts {
 
     /// It and its versions, blocks, or entries go; the versions' attachments stay.
     pub fn remove(&self, id: &str) -> Result<(), ApiError> {
-        let _rows = lock(&self.rows);
+        let _rows = self.rows.lock();
         let mut db = self.db();
         self.found(&mut db, id)?;
         db::delete_artifact(&mut db, id).map_err(q)?;

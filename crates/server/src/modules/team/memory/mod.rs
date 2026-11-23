@@ -9,8 +9,9 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+use parking_lot::Mutex;
 use sqlx::{Connection, SqliteConnection};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
@@ -20,7 +21,7 @@ use vibevalley_protocol::{
 
 use crate::base::{RequestKeys, open_sqlx_db};
 use crate::modules::team::agent::Agents;
-use crate::{Hub, lock, now};
+use crate::{Hub, now};
 
 mod gse;
 mod rules;
@@ -134,7 +135,7 @@ impl Memories {
     }
 
     pub fn close(&self) {
-        let prev = lock(&self.sub).take();
+        let prev = self.sub.lock().take();
         drop(prev);
     }
 
@@ -168,7 +169,7 @@ impl Memories {
 
     /// An agent's own memories, newest first.
     pub fn list(&self, agent: &str) -> Result<Vec<m::Memory>, ApiError> {
-        pollster::block_on(Self::read_for(&mut lock(&self.db), agent)).map_err(db_failed)
+        pollster::block_on(Self::read_for(&mut self.db.lock(), agent)).map_err(db_failed)
     }
 
     async fn read_for(db: &mut SqliteConnection, agent: &str) -> sqlx::Result<Vec<m::Memory>> {
@@ -225,7 +226,7 @@ impl Memories {
     }
 
     pub fn write(&self, n: &Note) -> Result<Memory, ApiError> {
-        pollster::block_on(Self::insert_note(&mut lock(&self.db), n))
+        pollster::block_on(Self::insert_note(&mut self.db.lock(), n))
     }
 
     async fn insert_note(db: &mut SqliteConnection, n: &Note) -> Result<Memory, ApiError> {
@@ -275,7 +276,7 @@ impl Memories {
 
     /// `rewrite`: the agent's own notes replaced; the user's stay.
     pub fn rewrite(&self, agent: &str, texts: &[String], by: By) -> Result<usize, ApiError> {
-        let mut db = lock(&self.db);
+        let mut db = self.db.lock();
         pollster::block_on(async {
             let mut tx = db.begin().await.map_err(db_failed)?;
             queries::clear_agent_notes(&mut *tx, queries::ClearAgentNotesParams { agent: agent.into() })
@@ -314,7 +315,7 @@ impl Memories {
     pub fn forget(&self, agent: &str, id: &str) -> Result<(), ApiError> {
         self.forgettable(agent, id)?;
         pollster::block_on(queries::forget(
-            &mut *lock(&self.db),
+            &mut *self.db.lock(),
             queries::ForgetParams {
                 agent: agent.into(),
                 id: id.into(),
@@ -349,7 +350,7 @@ impl Memories {
         let picked = m::pick(&all, &cue);
         if !peek {
             let at = now();
-            let mut db = lock(&self.db);
+            let mut db = self.db.lock();
             for x in &picked {
                 let _ = pollster::block_on(queries::count_recall(
                     &mut *db,
@@ -377,7 +378,7 @@ impl Memories {
         if run.outcome == Outcome::Interrupted {
             return;
         }
-        let mut db = lock(&self.db);
+        let mut db = self.db.lock();
         let saved = pollster::block_on(async {
             let mut tx = db.begin().await?;
             if run.issue.is_some() {
@@ -644,7 +645,7 @@ pub fn install(hub: &Arc<Hub>, memories: Arc<Memories>) {
         };
         store.keep(&run);
     });
-    let prev = lock(&memories.sub).replace(sub);
+    let prev = memories.sub.lock().replace(sub);
     drop(prev);
 }
 

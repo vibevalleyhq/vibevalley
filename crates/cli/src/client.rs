@@ -1,6 +1,6 @@
 //! Pooled HTTP client, typed protocol RPC (`ask`/`mutate`), SSE streaming, and structured CLI errors.
 
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::time::Duration;
 
 use serde::de::DeserializeOwned;
@@ -141,12 +141,34 @@ pub fn default_server() -> String {
     vibevalley_protocol::home::announced(&vibevalley_protocol::home::home()).unwrap_or_else(fallback_server)
 }
 
+const MAX_DOWNLOAD_BYTES: u64 = 512 * 1024 * 1024;
+
+fn is_loopback_server(server: &str) -> bool {
+    let rest = server.strip_prefix("http://").or_else(|| server.strip_prefix("https://")).unwrap_or(server);
+    let authority = rest.split('/').next().unwrap_or("");
+    let host = if let Some(bracketed) = authority.strip_prefix('[') {
+        bracketed.split(']').next().unwrap_or("")
+    } else {
+        authority.split(':').next().unwrap_or("")
+    };
+    host.eq_ignore_ascii_case("localhost") || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback())
+}
+
+fn build_http_client(server: &str) -> reqwest::blocking::Client {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let mut builder = reqwest::blocking::Client::builder().connect_timeout(Duration::from_secs(5));
+    if is_loopback_server(server) {
+        builder = builder.no_proxy();
+    }
+    builder.build().expect("reqwest blocking CLI client")
+}
+
 /// Pooled HTTP client shared across a single CLI invocation.
 pub struct Client {
     pub server: String,
     pub dry_run: bool,
     pub output: Output,
-    http: ureq::Agent,
+    http: reqwest::blocking::Client,
 }
 
 impl Client {
@@ -155,11 +177,7 @@ impl Client {
             .filter(|s| !s.is_empty())
             .or_else(|| std::env::var("VIBEVALLEY_SERVER").ok().filter(|s| !s.is_empty()))
             .unwrap_or_else(default_server);
-        let http = ureq::Agent::config_builder()
-            .http_status_as_error(false)
-            .timeout_connect(Some(Duration::from_secs(5)))
-            .build()
-            .into();
+        let http = build_http_client(&server);
         Self {
             server,
             dry_run,
@@ -182,30 +200,31 @@ impl Client {
     fn ask_raw(&self, op: &str, body: &Value) -> Result<Value, Failure> {
         let url = self.url(&format!("/api/v1/{}", op.replace('.', "/")));
         let body = if body.is_null() { json!({}) } else { body.clone() };
-        let mut response = self
+        let response = self
             .http
             .post(&url)
             .header("content-type", "application/json")
             .header("x-vibevalley-client", "cli")
-            .send(body.to_string())
+            .body(body.to_string())
+            .send()
             .map_err(|e| unreachable(&self.server, e))?;
         let status = response.status().as_u16();
-        let text = response.body_mut().read_to_string().map_err(|e| unreachable(&self.server, e))?;
+        let text = response.text().map_err(|e| unreachable(&self.server, e))?;
         decode_envelope(status, &text)
     }
 
     /// Fetches raw JSON from a `GET` endpoint (e.g. `/api/v1/slice/<name>?once=1`).
     pub fn get_json<T: DeserializeOwned>(&self, path: &str) -> Result<T, Failure> {
         let url = self.url(path);
-        let mut response = self
+        let response = self
             .http
             .get(&url)
             .header("accept", "application/json")
             .header("x-vibevalley-client", "cli")
-            .call()
+            .send()
             .map_err(|e| unreachable(&self.server, e))?;
         let status = response.status().as_u16();
-        let text = response.body_mut().read_to_string().map_err(|e| unreachable(&self.server, e))?;
+        let text = response.text().map_err(|e| unreachable(&self.server, e))?;
         if status >= 300 {
             return Err(failure_of(status, &text));
         }
@@ -237,33 +256,36 @@ impl Client {
     /// Downloads raw bytes from a `GET` endpoint (e.g. `/api/v1/attachment/{id}`).
     pub fn get_bytes(&self, path: &str) -> Result<(Vec<u8>, Option<String>), Failure> {
         let url = self.url(path);
-        let mut response = self.http.get(&url).call().map_err(|e| unreachable(&self.server, e))?;
+        let response = self.http.get(&url).send().map_err(|e| unreachable(&self.server, e))?;
         let status = response.status().as_u16();
         let content_type = response.headers().get("content-type").and_then(|v| v.to_str().ok()).map(ToString::to_string);
         if status >= 300 {
-            let text = response.body_mut().read_to_string().unwrap_or_default();
+            let text = response.text().unwrap_or_default();
             return Err(failure_of(status, &text));
         }
-        let bytes = response
-            .body_mut()
-            .with_config()
-            .limit(512 * 1024 * 1024)
-            .read_to_vec()
+        let mut bytes = Vec::new();
+        response
+            .take(MAX_DOWNLOAD_BYTES + 1)
+            .read_to_end(&mut bytes)
             .map_err(|e| unreachable(&self.server, e))?;
+        if bytes.len() as u64 > MAX_DOWNLOAD_BYTES {
+            return Err(unreachable(&self.server, "response body exceeded 512 MiB limit"));
+        }
         Ok((bytes, content_type))
     }
 
     /// Streams binary bytes to a `PUT` endpoint and decodes its JSON `Envelope`.
     pub fn put_bytes<T: DeserializeOwned>(&self, path: &str, content_type: &str, bytes: &[u8]) -> Result<T, Failure> {
         let url = self.url(path);
-        let mut response = self
+        let response = self
             .http
             .put(&url)
             .header("content-type", content_type)
-            .send(bytes)
+            .body(bytes.to_vec())
+            .send()
             .map_err(|e| unreachable(&self.server, e))?;
         let status = response.status().as_u16();
-        let text = response.body_mut().read_to_string().map_err(|e| unreachable(&self.server, e))?;
+        let text = response.text().map_err(|e| unreachable(&self.server, e))?;
         let data = decode_envelope(status, &text)?;
         serde_json::from_value(data).map_err(decode_failure)
     }
@@ -273,26 +295,20 @@ impl Client {
         let url = self.url(path);
         let (tx, rx) = std::sync::mpsc::channel::<Result<String, Failure>>();
         let server = self.server.clone();
+        let http = self.http.clone();
         std::thread::spawn(move || {
-            let response = ureq::Agent::config_builder()
-                .http_status_as_error(false)
-                .timeout_connect(Some(Duration::from_secs(5)))
-                .build()
-                .new_agent()
-                .get(&url)
-                .header("accept", "text/event-stream")
-                .call();
-            let mut response = match response {
+            let response = http.get(&url).header("accept", "text/event-stream").send();
+            let response = match response {
                 Ok(r) => r,
                 Err(e) => return drop(tx.send(Err(unreachable(&server, e)))),
             };
             let status = response.status().as_u16();
             if status != 200 {
-                let text = response.body_mut().read_to_string().unwrap_or_default();
+                let text = response.text().unwrap_or_default();
                 return drop(tx.send(Err(failure_of(status, &text))));
             }
             let mut data = String::new();
-            for line in BufReader::new(response.into_body().into_reader()).lines() {
+            for line in BufReader::new(response).lines() {
                 let Ok(line) = line else {
                     return drop(tx.send(Err(unreachable(&server, "stream ended"))));
                 };
@@ -331,5 +347,53 @@ fn decode_envelope(status: u16, text: &str) -> Result<Value, Failure> {
     match serde_json::from_str::<Envelope>(text) {
         Ok(env) if env.biz_code == 0 && status < 300 => Ok(env.data.unwrap_or(Value::Null)),
         _ => Err(failure_of(status, text)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detects_loopback_servers_for_no_proxy() {
+        assert!(is_loopback_server("http://127.0.0.1:8790"));
+        assert!(is_loopback_server("http://127.0.0.1:8790/"));
+        assert!(is_loopback_server("http://localhost:8790"));
+        assert!(is_loopback_server("http://LOCALHOST:8790"));
+        assert!(is_loopback_server("http://[::1]:8790"));
+        assert!(!is_loopback_server("https://api.example.com"));
+        assert!(!is_loopback_server("http://192.168.1.5:8790"));
+    }
+
+    #[test]
+    fn sse_streams_multiline_events_and_enforces_timeout() {
+        use std::io::{Read as _, Write as _};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (hold_tx, hold_rx) = std::sync::mpsc::channel::<()>();
+        let server = std::thread::spawn(move || {
+            let (mut conn, _) = listener.accept().unwrap();
+            let mut req = [0u8; 1024];
+            let _ = conn.read(&mut req);
+            let _ = conn.write_all(
+                b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n\
+                  1b\r\ndata: line-1\ndata: line-2\n\n\r\n",
+            );
+            let _ = conn.flush();
+            let _ = hold_rx.recv_timeout(Duration::from_secs(5));
+        });
+
+        let client = Client::new(Some(format!("http://{addr}")), false, false);
+        let mut seen = Vec::new();
+        let err = client
+            .sse("/events", Some(Duration::from_millis(120)), |payload| {
+                seen.push(payload.to_string());
+                Ok(true)
+            })
+            .unwrap_err();
+        assert_eq!(seen, vec!["line-1\nline-2"]);
+        assert_eq!((err.code, err.tag.as_str()), (exit::OTHER, "Timeout"));
+        let _ = hold_tx.send(());
+        server.join().unwrap();
     }
 }

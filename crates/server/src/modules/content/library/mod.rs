@@ -8,9 +8,13 @@
 
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
+use parking_lot::Mutex;
+use tokio::sync::broadcast;
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     Actor, ApiError, Attachment, BizCode, Fact, JobKind, LibraryAddRequest, LibraryItem, LibraryListRequest, LibraryOrigin, LibraryOriginFetchedFrom,
@@ -20,9 +24,10 @@ use vibevalley_protocol::{
 use crate::db::generated::content_library as q;
 
 use crate::base::{LookIn, ModuleDb, missing};
+use crate::modules::collab::channel::{ChannelEvent, Chat, to_message};
 use crate::modules::content::attachment::{ATTACHMENT_MAX, Attachments};
 use crate::modules::infra::http::{no_redirect_client, public_https, public_v4, run_http};
-use crate::{Hub, lock, now};
+use crate::{Hub, now};
 
 const LIST_MAX: i64 = 500;
 const DOWNLOAD: Duration = Duration::from_secs(60);
@@ -119,6 +124,7 @@ pub struct Library {
     db: ModuleDb,
     files: Arc<Attachments>,
     sub: Mutex<Option<crate::event_bus::Subscription>>,
+    chat_observer: Mutex<Option<(CancellationToken, JoinHandle<()>)>>,
 }
 
 impl Library {
@@ -127,12 +133,17 @@ impl Library {
             db: ModuleDb::open(home, crate::db::schema::CONTENT_LIBRARY).map_err(db_failed)?,
             files,
             sub: Mutex::new(None),
+            chat_observer: Mutex::new(None),
         }))
     }
 
     pub fn close(&self) {
-        let prev = lock(&self.sub).take();
+        let prev = self.sub.lock().take();
         drop(prev);
+        if let Some((cancel, handle)) = self.chat_observer.lock().take() {
+            cancel.cancel();
+            let _ = vibevalley_runtime::rt::block_on(handle);
+        }
     }
 
     fn found(&self, id: &str) -> Result<LibraryItem, ApiError> {
@@ -191,12 +202,13 @@ impl Library {
         if !matches!(message.actor, Actor::User { .. }) || message.kind != MessageKind::Chat {
             return Ok(());
         }
+        let at = message.edited.unwrap_or(message.at);
         for a in &message.attachments {
             let origin = LibraryOrigin::Uploaded {
                 channel: Some(message.channel.clone()),
                 message: Some(message.id.clone()),
             };
-            self.keep(&a.id, &origin, message.at)?;
+            self.keep(&a.id, &origin, at)?;
         }
         Ok(())
     }
@@ -442,8 +454,9 @@ fn ready_made(job: &MediaJob) -> Option<(&str, JobKind, &str, i64)> {
 }
 
 /// The `library.item.*` endpoints (the user's), and the recording of what
-/// the farm hears.
-pub fn install(hub: &Hub, library: Arc<Library>) {
+/// the farm hears (media jobs via [`EventBus`] and posted/edited chat
+/// attachments via [`Chat::subscribe_events`]).
+pub fn install(hub: &Hub, library: Arc<Library>, chat: &Chat) {
     let l = library.clone();
     hub.on::<ops::LibraryItemList>(move |_, r| l.list(&r));
     let l = library.clone();
@@ -456,17 +469,47 @@ pub fn install(hub: &Hub, library: Arc<Library>) {
     let weak = Arc::downgrade(&library);
     let sub = hub.subscribe_transitions("library", move |_, tr| {
         let Some(l) = weak.upgrade() else { return };
-        let done = match &tr.fact {
-            Fact::MediaChanged(m) => l.record_made(&m.jobs),
-            Fact::MessageChanged(m) => l.record_said(&m.message),
-            _ => return,
-        };
-        if let Err(e) = done {
+        let Fact::MediaChanged(m) = &tr.fact else { return };
+        if let Err(e) = l.record_made(&m.jobs) {
             eprintln!("vibevalley-server: library: recording: {}", e.message);
         }
     });
-    let prev = lock(&library.sub).replace(sub);
+    let prev = library.sub.lock().replace(sub);
     drop(prev);
+
+    let weak = Arc::downgrade(&library);
+    let mut events = chat.subscribe_events();
+    let cancel = hub.child_token();
+    let task_cancel = cancel.clone();
+    let handle = hub.spawn_task(async move {
+        loop {
+            let event = tokio::select! {
+                biased;
+                _ = task_cancel.cancelled() => return,
+                res = events.recv() => match res {
+                    Ok(ev) => ev,
+                    Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(broadcast::error::RecvError::Closed) => return,
+                },
+            };
+            let msg = match event {
+                ChannelEvent::Posted(c) => to_message(&c.row),
+                ChannelEvent::Edited(msg) => msg,
+                ChannelEvent::Removed { .. } | ChannelEvent::Reacted(_) | ChannelEvent::Pinned(_) | ChannelEvent::UserRead { .. } => continue,
+            };
+            let Some(l) = weak.upgrade() else { return };
+            let _ = tokio::task::spawn_blocking(move || {
+                if let Err(e) = l.record_said(&msg) {
+                    eprintln!("vibevalley-server: library: recording: {}", e.message);
+                }
+            })
+            .await;
+        }
+    });
+    if let Some((old_cancel, old_handle)) = library.chat_observer.lock().replace((cancel, handle)) {
+        old_cancel.cancel();
+        let _ = vibevalley_runtime::rt::block_on(old_handle);
+    }
 }
 
 #[cfg(test)]

@@ -3,10 +3,11 @@ pub mod releases;
 mod fetch;
 
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use gpui::App;
+use parking_lot::Mutex;
 use serde_json::{Value, json};
 
 use releases::{Manual, Release, Stage};
@@ -93,10 +94,6 @@ fi
 if [ "$reopen" = 1 ]; then open "$current"; fi
 "#;
 
-fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
-}
-
 fn writable(dir: &Path) -> bool {
     let probe = dir.join(format!(".vibevalley-update-{}", std::process::id()));
     let made = std::fs::OpenOptions::new().write(true).create_new(true).open(&probe).is_ok();
@@ -133,11 +130,11 @@ impl Updater {
     }
 
     fn state(&self) -> Value {
-        lock(&self.state).json(&self.version)
+        self.state.lock().json(&self.version)
     }
 
     fn set(&self, next: State) {
-        let mut state = lock(&self.state);
+        let mut state = self.state.lock();
         if *state != next {
             // One line a change, for whoever drives the app from outside (scripts/release/update-check.ts).
             eprintln!("update: {}", next.json(&self.version));
@@ -165,7 +162,7 @@ impl Updater {
     /// Asks once; blocks while it downloads. Does nothing while a check runs or an update is ready.
     fn check(&self) {
         {
-            let mut state = lock(&self.state);
+            let mut state = self.state.lock();
             if state.busy() || self.feed == Feed::Off {
                 return;
             }
@@ -214,7 +211,7 @@ impl Updater {
                 percent,
             });
         })?;
-        *lock(&self.staged) = Some(Staged { app, bundle: bundle.clone() });
+        *self.staged.lock() = Some(Staged { app, bundle: bundle.clone() });
         Ok(State::Ready {
             next: release.version,
             notes: release.notes,
@@ -224,7 +221,7 @@ impl Updater {
 
     /// Hands the staged app to the swap script, which waits for this process to go.
     fn swap(&self, reopen: bool) -> bool {
-        let mut pending = lock(&self.staged);
+        let mut pending = self.staged.lock();
         let Some(staged) = pending.as_ref() else { return false };
         let Some(parent) = staged.bundle.parent() else { return false };
         let next = parent.join(format!(".VibeValley-update-{}.app", std::process::id()));
@@ -387,7 +384,7 @@ pub fn install(cx: &mut App) {
 }
 
 pub fn ready() -> bool {
-    matches!(*lock(&updater().state), State::Ready { .. })
+    matches!(*updater().state.lock(), State::Ready { .. })
 }
 
 pub fn host_call(op: &str, reply: crate::hosted::Replier, cx: &mut App) {

@@ -4,8 +4,9 @@
 //! HTML viewer rendering (`artifact.view`).
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+use parking_lot::Mutex;
 use serde_json::Value;
 use sqlx::{Connection, SqliteConnection};
 use vibevalley_core::artifact::{
@@ -27,7 +28,7 @@ use super::collab::{apply_legacy_presence_write, commit_meta_for_maker, is_prese
 use super::{Artifacts, Maker, artifact_type_of, db, q, refused};
 use crate::base::{LookIn, missing};
 use crate::modules::collab::channel::{Made, Posting};
-use crate::{Sink, lock, now};
+use crate::{Sink, now};
 
 const CATCH_UP_MAX: usize = 200;
 
@@ -107,7 +108,7 @@ fn sanitize_whiteboard_element_json(artifact_type: Option<ArtifactType>, path: &
 
 impl Artifacts {
     pub(super) fn entry_lock(&self, id: &str) -> Arc<Mutex<()>> {
-        let mut map = lock(&self.entry_locks);
+        let mut map = self.entry_locks.lock();
         map.entry(id.to_string()).or_insert_with(|| Arc::new(Mutex::new(()))).clone()
     }
 
@@ -201,7 +202,7 @@ impl Artifacts {
         explicit_meta: Option<&CommitMeta>,
     ) -> Result<ArtifactEntryBatchResult, ApiError> {
         let write_lock = self.entry_lock(&req.id);
-        let _guard = lock(&write_lock);
+        let _guard = write_lock.lock();
 
         let (presence_writes, store_writes): (Vec<&ArtifactEntryWriteInput>, Vec<&ArtifactEntryWriteInput>) =
             req.writes.iter().partition(|w| is_presence_write(w));
@@ -609,7 +610,7 @@ impl Artifacts {
         };
 
         let seq = change.seq;
-        lock(&self.entry_changes).retain(|tx| tx.send(change.clone()).is_ok());
+        self.entry_changes.lock().retain(|tx| tx.send(change.clone()).is_ok());
         if req.announce == Some(true) {
             let channel = self.chat.place_of(&maker.from, row.channel_id.as_deref().unwrap_or(""))?;
             let note = req.note.as_deref().map(str::trim).filter(|n| !n.is_empty());
@@ -647,7 +648,7 @@ impl Artifacts {
             self.found_store(&mut db, id)?;
             // Subscribe before reading catch-up; live events are deduplicated by seq.
             let (tx, rx) = flume::unbounded();
-            lock(&self.entry_changes).push(tx);
+            self.entry_changes.lock().push(tx);
             let missed = db::entry_changes_after(&mut db, id, after, CATCH_UP_MAX as i64 + 1).map_err(q)?;
             let current: HashMap<String, db::EntryRow> = db::entries(&mut db, id).map_err(q)?.into_iter().map(|r| (r.path.clone(), r)).collect();
             (rx, missed, current)

@@ -12,8 +12,9 @@ mod db;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, OnceLock};
 
+use parking_lot::{Mutex, MutexGuard};
 use regex::Regex;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -565,7 +566,7 @@ impl Pkm {
     }
 
     fn lock(&self) -> MutexGuard<'_, Inner> {
-        self.inner.lock().unwrap_or_else(|e| e.into_inner())
+        self.inner.lock()
     }
 
     /// Rescans when a Markdown file under the vault changes (VibeValley's own;
@@ -588,14 +589,14 @@ impl Pkm {
             }
         });
         match watcher {
-            Ok(w) => *self.watcher.lock().unwrap_or_else(|e| e.into_inner()) = Some(w),
+            Ok(w) => *self.watcher.lock() = Some(w),
             Err(e) => eprintln!("vibevalley-server: pkm: the vault is not watched: {e}"),
         }
     }
 
     /// Stops watching the vault.
     pub fn close(&self) {
-        self.watcher.lock().unwrap_or_else(|e| e.into_inner()).take();
+        self.watcher.lock().take();
     }
 
     pub fn list(&self) -> Result<PkmVault, ApiError> {

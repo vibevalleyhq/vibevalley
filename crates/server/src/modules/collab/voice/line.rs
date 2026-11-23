@@ -8,15 +8,15 @@
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use vibevalley_i18n::t;
 
 use super::agora::{CallLine, ORCHESTRATOR_MODEL, Pause};
-use crate::lock;
 use crate::modules::infra::http::{Fetch, Request};
 use crate::modules::infra::setting::Secret;
 
@@ -256,7 +256,7 @@ fn serve(served: &Served, stream: TcpStream) {
         return respond(&mut out, 404, "Not Found", "text/plain", b"");
     };
     // A call's own key on its own path; anything else is not let in.
-    let key = lock(&served.keys).get(call).cloned();
+    let key = served.keys.lock().get(call).cloned();
     if !key.is_some_and(|k| head.authorization == format!("Bearer {}", k.expose())) {
         return refuse(&mut out, 401, "Unauthorized", None, "unauthorized");
     }
@@ -355,7 +355,7 @@ impl Line {
     }
 
     fn listen(&self) -> Result<u16, String> {
-        let mut listening = lock(&self.listening);
+        let mut listening = self.listening.lock();
         if let Some(known) = &*listening {
             return known.clone();
         }
@@ -384,7 +384,7 @@ impl Line {
 
     /// The port it listens on, once a call opened it.
     pub fn port(&self) -> Option<u16> {
-        lock(&self.listening).clone().and_then(Result::ok)
+        self.listening.lock().clone().and_then(Result::ok)
     }
 
     /// A call's own line; why there is none to be had.
@@ -395,7 +395,7 @@ impl Line {
         }
         let port = self.listen()?;
         let base = if self.url.is_empty() {
-            let mut base = lock(&self.base);
+            let mut base = self.base.lock();
             if let Base::None = &*base {
                 *base = Base::Tunnel((self.open_tunnel)(port)?);
             }
@@ -411,7 +411,7 @@ impl Line {
         }
         let id = uuid::Uuid::new_v4().simple().to_string()[..16].to_string();
         let key = Secret::new(format!("{}{}", uuid::Uuid::new_v4().simple(), uuid::Uuid::new_v4().simple()));
-        lock(&self.served.keys).insert(id.clone(), key.clone());
+        self.served.keys.lock().insert(id.clone(), key.clone());
         Ok(CallLine {
             url: format!("{base}/llm/{id}/chat/completions"),
             id,
@@ -421,18 +421,18 @@ impl Line {
 
     /// The call's key stops opening anything.
     pub fn close(&self, id: &str) {
-        lock(&self.served.keys).remove(id);
+        self.served.keys.lock().remove(id);
     }
 
     pub fn lines(&self) -> usize {
-        lock(&self.served.keys).len()
+        self.served.keys.lock().len()
     }
 
     /// Every key goes, the tunnel closes and the listener stops.
     pub fn stop(&self) {
         self.served.stopped.store(true, Ordering::SeqCst);
-        lock(&self.served.keys).clear();
-        if let Base::Tunnel(tunnel) = std::mem::replace(&mut *lock(&self.base), Base::None) {
+        self.served.keys.lock().clear();
+        if let Base::Tunnel(tunnel) = std::mem::replace(&mut *self.base.lock(), Base::None) {
             (tunnel.close)();
         }
         // The accept loop reads the flag at its next connection: this is it.
@@ -487,7 +487,7 @@ pub fn cloudflared(port: u16) -> Result<Tunnel, String> {
     let kill = {
         let child = child.clone();
         move || {
-            let mut child = lock(&child);
+            let mut child = child.lock();
             let _ = child.kill();
             let _ = child.wait();
         }
@@ -634,11 +634,11 @@ mod tests {
     fn a_new_tunnel_is_asked_every_2_s_until_it_refuses_a_keyless_request() {
         let waits = Arc::new(Mutex::new(0u64));
         let w = waits.clone();
-        let pause: Pause = Arc::new(move |d| *w.lock().unwrap() += d.as_secs());
+        let pause: Pause = Arc::new(move |d| *w.lock() += d.as_secs());
         let asked = Mutex::new(0);
         let late = move |r: Request| -> Result<Response, FetchError> {
             assert_eq!(r.url, "https://line.example/llm/ready/chat/completions");
-            let mut n = asked.lock().unwrap();
+            let mut n = asked.lock();
             *n += 1;
             Ok(Response {
                 status: if *n < 3 { 502 } else { 401 },
@@ -647,10 +647,10 @@ mod tests {
             })
         };
         assert!(tunnel_answers(&late, "https://line.example", &pause));
-        assert_eq!(*waits.lock().unwrap(), 4);
-        *waits.lock().unwrap() = 0;
+        assert_eq!(*waits.lock(), 4);
+        *waits.lock() = 0;
         let never = |_: Request| -> Result<Response, FetchError> { Err(FetchError::Network("down".into())) };
         assert!(!tunnel_answers(&never, "https://line.example", &pause));
-        assert_eq!(*waits.lock().unwrap(), 58);
+        assert_eq!(*waits.lock(), 58);
     }
 }

@@ -15,7 +15,7 @@ pub(crate) mod antigravity_swarm;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use agent_client_protocol::schema::ProtocolVersion;
@@ -25,9 +25,10 @@ use agent_client_protocol::v1::schema::{
 };
 use agent_client_protocol::{Agent, Builder, Client, ConnectionTo, Lines, Responder, UntypedMessage};
 use base64::Engine;
+use parking_lot::Mutex;
 use serde_json::{Map, Value, json};
 
-use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, lock, rejected, rejection};
+use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, rejected, rejection};
 use crate::oar::process::{LineChild, Spawn, find_binary, run_capture};
 use crate::oar::record::{self, Recorder};
 use crate::oar::{
@@ -573,7 +574,7 @@ impl Shared {
             .pointer("/_meta/opencode~1child-session")
             .or_else(|| params.pointer("/update/_meta/opencode~1child-session"));
         let mut id = str_of(params, "sessionId").unwrap_or(root);
-        let mut paths = lock(&self.children);
+        let mut paths = self.children.lock();
         if let Some(meta) = meta
             && let Some(child) = meta
                 .as_str()
@@ -598,7 +599,9 @@ impl Shared {
     }
 
     fn on_update(&self, params: &Value) {
-        let line = lock(&self.updates)
+        let line = self
+            .updates
+            .lock()
             .pop_front()
             .unwrap_or_else(|| json!({"jsonrpc":"2.0","method":"session/update","params":params}).to_string());
         if let Some(update) = params.get("update")
@@ -606,7 +609,7 @@ impl Shared {
             && str_of(params, "sessionId").is_none_or(|id| self.acp_session.get().is_none_or(|root| root == id))
             && let Some(title) = str_of(update, "title").map(str::trim).filter(|t| !t.is_empty())
         {
-            *lock(&self.session_title) = Some(title.to_string());
+            *self.session_title.lock() = Some(title.to_string());
         }
         if self.replaying.load(Ordering::SeqCst) {
             return;
@@ -624,9 +627,9 @@ impl Shared {
             let title = str_of(update, "title").unwrap_or_default();
             let kind = str_of(update, "kind").unwrap_or_default();
             let status = str_of(update, "status").unwrap_or_default();
-            lock(&self.background).on_tool_update(tool_id, title, kind, update.get("rawInput"), status);
+            self.background.lock().on_tool_update(tool_id, title, kind, update.get("rawInput"), status);
             let parent_id = self.acp_session.get().map(String::as_str).unwrap_or_default();
-            let (matched, mapped) = lock(&self.child_activity).on_tool_update(parent_id, update);
+            let (matched, mapped) = self.child_activity.lock().on_tool_update(parent_id, update);
             if matched {
                 self.has_child_activity.store(true, Ordering::SeqCst);
                 child_events = mapped;
@@ -634,7 +637,7 @@ impl Shared {
         }
         let frame_type = format!("session/update/{update_kind}");
         let _frame = core.record_raw(&frame_type, path.clone(), &line, params);
-        let events = lock(&self.projector).update(update);
+        let events = self.projector.lock().update(update);
         for kind in events.into_iter().chain(child_events) {
             core.emit(path.clone(), kind);
         }
@@ -644,14 +647,14 @@ impl Shared {
             && self.in_flight_prompts.load(Ordering::SeqCst) == 0
             && self.detached_continuation.swap(false, Ordering::SeqCst)
         {
-            lock(&self.background).clear();
+            self.background.lock().clear();
             let (reason, error) = self.check_silent_error(StopReason::Completed, None);
             self.turn_finished(reason, error);
         }
     }
 
     fn auto_allow(&self, tool_kind: Option<&str>) -> bool {
-        let mode = *lock(&self.permission_mode);
+        let mode = *self.permission_mode.lock();
         match self.flavor {
             AcpFlavor::Antigravity => antigravity::client_auto_allow(mode, tool_kind),
             AcpFlavor::Generic => match mode {
@@ -677,7 +680,7 @@ impl Shared {
         if self.flavor == AcpFlavor::Antigravity && antigravity::is_interaction_request(&tool_call) {
             let (question, options, allow_custom) = antigravity::parse_interaction(&tool_call, options_val);
             let request_id = format!("int-{}", self.next_permission.fetch_add(1, Ordering::SeqCst));
-            lock(&self.pending_interactions).insert(
+            self.pending_interactions.lock().insert(
                 request_id.clone(),
                 PendingInteraction {
                     responder,
@@ -698,7 +701,7 @@ impl Shared {
         }
 
         let options = OptionSet::from_json(options_val);
-        for kind in lock(&self.projector).permission_tool(&tool_call) {
+        for kind in self.projector.lock().permission_tool(&tool_call) {
             core.emit(path.clone(), kind);
         }
         if self.auto_allow(str_of(&tool_call, "kind"))
@@ -731,7 +734,7 @@ impl Shared {
                 summary = format!("{summary} [warning: {}]", warnings.join("; "));
             }
         }
-        lock(&self.pending).insert(request_id.clone(), PendingPermission { responder, options });
+        self.pending.lock().insert(request_id.clone(), PendingPermission { responder, options });
         core.emit(
             path,
             EventKind::PermissionRequested {
@@ -746,7 +749,7 @@ impl Shared {
     /// ACP requires every open permission / interaction request to be answered
     /// `cancelled` once the turn is cancelled.
     fn cancel_pending(&self) {
-        let pending: Vec<(String, PendingPermission)> = lock(&self.pending).drain().collect();
+        let pending: Vec<(String, PendingPermission)> = self.pending.lock().drain().collect();
         for (request_id, pending) in pending {
             let _ = pending.responder.respond(RequestPermissionResponse::new(RequestPermissionOutcome::Cancelled));
             if let Some(core) = self.core.get() {
@@ -758,7 +761,7 @@ impl Shared {
                 });
             }
         }
-        let interactions: Vec<(String, PendingInteraction)> = lock(&self.pending_interactions).drain().collect();
+        let interactions: Vec<(String, PendingInteraction)> = self.pending_interactions.lock().drain().collect();
         for (request_id, pending) in interactions {
             let _ = pending.responder.respond(RequestPermissionResponse::new(RequestPermissionOutcome::Cancelled));
             if let Some(core) = self.core.get() {
@@ -774,7 +777,7 @@ impl Shared {
         if self.flavor != AcpFlavor::Antigravity {
             return (reason, error);
         }
-        let start_idx = lock(&self.turn_start_step_idx).take();
+        let start_idx = self.turn_start_step_idx.lock().take();
         let (Some(path), Some(after_idx)) = (self.db_path.get(), start_idx) else {
             return (reason, error);
         };
@@ -793,7 +796,7 @@ impl Shared {
         if self.flavor != AcpFlavor::Antigravity {
             return None;
         }
-        let mut guard = lock(&self.swarm_reader);
+        let mut guard = self.swarm_reader.lock();
         let reader = guard.as_mut()?;
         // Avoid parsing swarm files on single-agent chats until either a swarm/subagent
         // tool fires or `swarm.json` appears on disk (e.g. `/swarm` or resumed session).
@@ -1330,7 +1333,7 @@ fn dispatch_prompt(
         let prev = shared.in_flight_prompts.fetch_add(1, Ordering::SeqCst);
         if prev == 0 {
             let start_idx = shared.db_path.get().and_then(|p| antigravity_db::latest_step_index(p));
-            *lock(&shared.turn_start_step_idx) = start_idx;
+            *shared.turn_start_step_idx.lock() = start_idx;
         }
     }
     let request = UntypedMessage::new("session/prompt", json!({ "sessionId": session_id, "prompt": blocks }))?;
@@ -1358,7 +1361,7 @@ fn dispatch_prompt(
                         if matches!(raw_stop.as_deref(), Some("end_turn" | "refusal")) {
                             (reason, error) = shared.check_silent_error(reason, error);
                         }
-                        if reason == StopReason::Completed && lock(&shared.background).has_open() && !shared.abort_wanted.load(Ordering::SeqCst) {
+                        if reason == StopReason::Completed && shared.background.lock().has_open() && !shared.abort_wanted.load(Ordering::SeqCst) {
                             shared.detached_continuation.store(true, Ordering::SeqCst);
                             return Ok(());
                         }
@@ -1395,7 +1398,7 @@ async fn apply_live_config(
     effort: Option<String>,
     permission_mode: Option<PermissionMode>,
 ) -> Result<()> {
-    let mut config_options = lock(&shared.config_options).clone();
+    let mut config_options = shared.config_options.lock().clone();
     if let Some(wanted) = model {
         match config_option_in(&config_options, "model").and_then(|o| str_of(o, "id")).map(str::to_string) {
             Some(config_id) => {
@@ -1432,11 +1435,11 @@ async fn apply_live_config(
             config_options = updated;
         }
     }
-    *lock(&shared.config_options) = config_options.clone();
+    *shared.config_options.lock() = config_options.clone();
 
     if let Some(wanted_mode) = permission_mode {
-        let prev_mode = *lock(&shared.permission_mode);
-        let available = lock(&shared.available_modes).clone();
+        let prev_mode = *shared.permission_mode.lock();
+        let available = shared.available_modes.lock().clone();
         let mode_option = config_option_in(&config_options, "mode");
         match shared.flavor {
             AcpFlavor::Antigravity => {
@@ -1459,7 +1462,7 @@ async fn apply_live_config(
                 }
             }
         }
-        *lock(&shared.permission_mode) = wanted_mode;
+        *shared.permission_mode.lock() = wanted_mode;
     }
     Ok(())
 }
@@ -1482,13 +1485,13 @@ async fn serve(
     let session_id = opened.session_id.clone();
     let _ = shared.acp_session.set(session_id.clone());
     if let Some(title) = opened.title.clone() {
-        let mut slot = lock(&shared.session_title);
+        let mut slot = shared.session_title.lock();
         if slot.is_none() {
             *slot = Some(title);
         }
     }
-    *lock(&shared.available_modes) = opened.available_modes.clone();
-    *lock(&shared.config_options) = opened.config_options.clone();
+    *shared.available_modes.lock() = opened.available_modes.clone();
+    *shared.config_options.lock() = opened.config_options.clone();
     shared.image_input.store(opened.image_input, Ordering::SeqCst);
     if ready.send(Ok(opened)).is_err() {
         return Ok(());
@@ -1517,7 +1520,7 @@ async fn serve(
             }
             Command::Cancel => {
                 shared.cancel_pending();
-                lock(&shared.background).clear();
+                shared.background.lock().clear();
                 let was_detached = shared.detached_continuation.swap(false, Ordering::SeqCst);
                 cx.send_notification(CancelNotification::new(session_id.clone()))?;
                 if was_detached && shared.in_flight_prompts.load(Ordering::SeqCst) == 0 {
@@ -1669,7 +1672,7 @@ impl Driver for AcpDriver {
     }
 
     fn session_title(&self) -> Option<String> {
-        lock(&self.shared.session_title).clone()
+        self.shared.session_title.lock().clone()
     }
 
     fn check_content(&self, content: &[ContentBlock]) -> Result<()> {
@@ -1709,7 +1712,7 @@ impl Driver for AcpDriver {
     /// ACP answers with one of the agent's own options; a denial's message
     /// has no field to travel in and is not delivered.
     fn respond_permission(&self, request_id: &str, decision: &PermissionDecision) -> Result<()> {
-        let mut pending = lock(&self.shared.pending);
+        let mut pending = self.shared.pending.lock();
         let Some(entry) = pending.get(request_id) else {
             return Err(rejected(rejection::UNKNOWN_REQUEST, format!("the agent no longer waits on `{request_id}`")));
         };
@@ -1726,7 +1729,7 @@ impl Driver for AcpDriver {
     }
 
     fn respond_interaction(&self, request_id: &str, decision: &InteractionDecision) -> Result<()> {
-        let mut pending = lock(&self.shared.pending_interactions);
+        let mut pending = self.shared.pending_interactions.lock();
         let Some(entry) = pending.get(request_id) else {
             return Err(rejected(
                 rejection::UNKNOWN_REQUEST,
@@ -1884,7 +1887,7 @@ impl AcpRuntime {
                 if let Ok(v) = serde_json::from_str::<Value>(line)
                     && v["method"] == "session/update"
                 {
-                    lock(&shared.updates).push_back(line.to_string());
+                    shared.updates.lock().push_back(line.to_string());
                 }
                 let _ = incoming.send(Some(Ok(line.to_string())));
             }
@@ -1929,7 +1932,7 @@ impl AcpRuntime {
                         if reader.has_swarm_file() {
                             shared.has_child_activity.store(true, Ordering::SeqCst);
                         }
-                        *lock(&shared.swarm_reader) = Some(reader);
+                        *shared.swarm_reader.lock() = Some(reader);
                         let _ = shared.base_dir.set(base);
                     }
                     if let Some(path) = antigravity_db::conversation_db_path(&opened.session_id, &gemini_dir, &app_data_dir) {

@@ -12,7 +12,7 @@ use crate::now;
 
 /// Polls every tracked `open` PR's remote state; settles linked issues on `merged` / `closed`.
 pub fn refresh(pulls: &Pulls) {
-    let _guard = crate::lock(&pulls.refresh_lock);
+    let _guard = pulls.refresh_lock.lock();
     for row in pulls.store.open_pulls() {
         let Ok(state) = pulls.pull_request_state(&row.repo, row.number, Some(row.platform)) else {
             continue;
@@ -40,7 +40,7 @@ struct PollEvent {
 
 /// Polls GitHub CI checks, reviews, and comments for every tracked `open` GitHub PR.
 pub fn poll(pulls: &Pulls) {
-    let _guard = crate::lock(&pulls.poll_lock);
+    let _guard = pulls.poll_lock.lock();
     for row in pulls.store.open_pulls() {
         if row.platform != PublishPlatform::Github {
             continue;

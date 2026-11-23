@@ -668,7 +668,7 @@ fn regression_a_failed_artifact_version_never_publishes_its_channel_card() {
     let created = ok(call("artifact.create", json!({"title":"Proposal","kind":"html","content":page("v1")})));
     let before = ok(call("channel.message.list", json!({"id":channel})));
     let first_card = last_message(&call, &channel);
-    let events = server.chat.committed();
+    let mut events = server.chat.subscribe_events();
     let opts = SqliteConnectOptions::new().filename(dir.path().join("server.db"));
     let mut inspect = pollster::block_on(SqliteConnection::connect_with(&opts)).unwrap();
     pollster::block_on(

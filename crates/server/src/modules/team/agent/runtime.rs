@@ -8,9 +8,12 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 
+use parking_lot::Mutex;
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     Agent, AgentProblem, AgentProblemLevel, ApiError, BizCode, Installation, InstallationAvailable, InstallationChecking, InstallationNotFound,
@@ -23,7 +26,7 @@ use super::presets::{
     support_of,
 };
 use super::profile::Profiles;
-use crate::{Hub, lock, now};
+use crate::{Hub, now};
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -70,9 +73,8 @@ pub struct Fleet {
     probing: Mutex<HashSet<String>>,
     reads: AtomicU64,
     closed: AtomicBool,
-    stop: Mutex<Option<flume::Sender<()>>>,
-    stop_rx: flume::Receiver<()>,
-    usage_thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+    cancel: CancellationToken,
+    usage_task: Mutex<Option<JoinHandle<()>>>,
     sub: Mutex<Option<crate::event_bus::Subscription>>,
 }
 
@@ -119,7 +121,7 @@ impl Fleet {
     /// The fleet over `registry`. With `background`, every runtime is
     /// probed now, off the caller's thread.
     pub fn new(registry: Arc<Registry>, profiles: Arc<Profiles>, hub: &Arc<Hub>, background: bool) -> Arc<Fleet> {
-        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
+        let cancel = hub.child_token();
         let fleet = Arc::new(Fleet {
             registry,
             profiles,
@@ -128,9 +130,8 @@ impl Fleet {
             probing: Mutex::default(),
             reads: AtomicU64::new(0),
             closed: AtomicBool::new(false),
-            stop: Mutex::new(Some(stop_tx)),
-            stop_rx: stop_rx.clone(),
-            usage_thread: Mutex::new(None),
+            cancel: cancel.clone(),
+            usage_task: Mutex::new(None),
             sub: Mutex::new(None),
         });
         if background {
@@ -138,22 +139,27 @@ impl Fleet {
                 fleet.probe_later(&id);
             }
             let f = Arc::downgrade(&fleet);
-            if let Ok(handle) = std::thread::Builder::new().name("vibevalley-runtime-usage".into()).spawn(move || {
+            let task_cancel = cancel;
+            let handle = hub.spawn_task(async move {
                 loop {
-                    if !matches!(stop_rx.recv_timeout(USAGE_EVERY), Err(flume::RecvTimeoutError::Timeout)) {
-                        return;
+                    tokio::select! {
+                        biased;
+                        _ = task_cancel.cancelled() => return,
+                        _ = tokio::time::sleep(USAGE_EVERY) => {}
                     }
                     let Some(fleet) = f.upgrade() else { return };
                     if fleet.closed.load(Ordering::Relaxed) {
                         return;
                     }
-                    for id in fleet.ids() {
-                        fleet.refresh_usage(&id);
-                    }
+                    let _ = tokio::task::spawn_blocking(move || {
+                        for id in fleet.ids() {
+                            fleet.refresh_usage(&id);
+                        }
+                    })
+                    .await;
                 }
-            }) {
-                *lock(&fleet.usage_thread) = Some(handle);
-            }
+            });
+            *fleet.usage_task.lock() = Some(handle);
             let f = Arc::downgrade(&fleet);
             let sub = hub.subscribe_transitions("runtime-usage", move |_, tr| {
                 let vibevalley_protocol::Fact::SessionReported(r) = &tr.fact else { return };
@@ -162,7 +168,7 @@ impl Fleet {
                     fleet.usage_soon(&s.runtime);
                 }
             });
-            let prev = lock(&fleet.sub).replace(sub);
+            let prev = fleet.sub.lock().replace(sub);
             drop(prev);
         }
         fleet
@@ -172,18 +178,22 @@ impl Fleet {
     /// runs share one read).
     pub fn usage_soon(self: &Arc<Self>, id: &str) {
         let key = format!("usage:{id}");
-        if self.closed.load(Ordering::Relaxed) || !lock(&self.probing).insert(key.clone()) {
+        if self.closed.load(Ordering::Relaxed) || !self.probing.lock().insert(key.clone()) {
             return;
         }
         let fleet = Arc::downgrade(self);
-        let stop_rx = self.stop_rx.clone();
+        let cancel = self.cancel.clone();
         let id = id.to_string();
-        let _ = std::thread::Builder::new().name(format!("vibevalley-usage-{id}")).spawn(move || {
-            let stopped = !matches!(stop_rx.recv_timeout(USAGE_AFTER_RUN), Err(flume::RecvTimeoutError::Timeout));
+        vibevalley_runtime::rt::handle().spawn(async move {
+            let stopped = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => true,
+                _ = tokio::time::sleep(USAGE_AFTER_RUN) => false,
+            };
             let Some(fleet) = fleet.upgrade() else { return };
-            lock(&fleet.probing).remove(&key);
+            fleet.probing.lock().remove(&key);
             if !stopped {
-                fleet.refresh_usage(&id);
+                let _ = tokio::task::spawn_blocking(move || fleet.refresh_usage(&id)).await;
             }
         });
     }
@@ -199,7 +209,7 @@ impl Fleet {
         let Some(usage) = within(PROBE_TIMEOUT, move || runtime.account_usage()).and_then(Result::ok).map(usage_from_oar) else {
             return;
         };
-        let mut held = lock(&self.held);
+        let mut held = self.held.lock();
         let Some(now_held) = held.get_mut(id) else { return };
         if now_held.read != before.read || now_held.info.usage.as_ref() == Some(&usage) {
             return;
@@ -216,13 +226,11 @@ impl Fleet {
     /// Stops answering with new probes (`close`).
     pub fn close(&self) {
         self.closed.store(true, Ordering::Relaxed);
-        let prev = lock(&self.sub).take();
+        self.cancel.cancel();
+        let prev = self.sub.lock().take();
         drop(prev);
-        let _ = lock(&self.stop).take();
-        if let Some(handle) = lock(&self.usage_thread).take()
-            && handle.thread().id() != std::thread::current().id()
-        {
-            let _ = handle.join();
+        if let Some(handle) = self.usage_task.lock().take() {
+            let _ = vibevalley_runtime::rt::block_on(handle);
         }
     }
 
@@ -351,7 +359,7 @@ impl Fleet {
     fn lookup(&self, id: &str) -> RuntimeInfo {
         let read = self.reads.fetch_add(1, Ordering::Relaxed) + 1;
         let info = Self::shown(self.probe(id));
-        let mut held = lock(&self.held);
+        let mut held = self.held.lock();
         // A slower older lookup does not overwrite a newer one.
         if held.get(id).is_none_or(|o| o.read < read) {
             held.insert(
@@ -371,19 +379,19 @@ impl Fleet {
     }
 
     fn probe_later(self: &Arc<Self>, id: &str) {
-        if self.closed.load(Ordering::Relaxed) || !lock(&self.probing).insert(id.to_string()) {
+        if self.closed.load(Ordering::Relaxed) || !self.probing.lock().insert(id.to_string()) {
             return;
         }
         let fleet = self.clone();
         let id = id.to_string();
         let _ = std::thread::Builder::new().name(format!("vibevalley-runtime-{id}")).spawn(move || {
             fleet.lookup(&id);
-            lock(&fleet.probing).remove(&id);
+            fleet.probing.lock().remove(&id);
         });
     }
 
     fn held(&self, id: &str) -> Option<Observation> {
-        lock(&self.held).get(id).cloned()
+        self.held.lock().get(id).cloned()
     }
 
     /// Active (available and enabled) runtimes sort ahead of disabled or

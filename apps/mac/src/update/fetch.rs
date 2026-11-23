@@ -23,7 +23,11 @@ fn transfer(url: &str) -> Command {
     command
 }
 
-pub fn text(url: &str) -> Result<(u16, String), String> {
+fn is_retryable_status(status: u16) -> bool {
+    matches!(status, 408 | 429 | 500 | 502 | 503 | 504)
+}
+
+fn text_once(url: &str) -> Result<(u16, String), String> {
     let out = transfer(url)
         .args(["-sSL", "--connect-timeout", "20", "--max-time", "60", "--max-filesize", "1048576"])
         .args(["-H", "accept: application/json, application/vnd.github+json", "-w", "\n%{http_code}", "--"])
@@ -37,6 +41,31 @@ pub fn text(url: &str) -> Result<(u16, String), String> {
     let body = String::from_utf8_lossy(&out.stdout);
     let (body, status) = body.rsplit_once('\n').ok_or("curl: no status")?;
     Ok((status.trim().parse().map_err(|_| "curl: no status")?, body.to_string()))
+}
+
+pub fn text(url: &str) -> Result<(u16, String), String> {
+    use backon::BackoffBuilder as _;
+    text_with_backoff(
+        url,
+        backon::ExponentialBuilder::new()
+            .with_min_delay(Duration::from_millis(250))
+            .with_max_delay(Duration::from_secs(2))
+            .with_max_times(2)
+            .build(),
+    )
+}
+
+fn text_with_backoff(url: &str, mut backoff: impl Iterator<Item = Duration>) -> Result<(u16, String), String> {
+    loop {
+        let (status, body) = text_once(url)?;
+        if is_retryable_status(status)
+            && let Some(delay) = backoff.next()
+        {
+            std::thread::sleep(delay);
+            continue;
+        }
+        return Ok((status, body));
+    }
 }
 
 fn download(url: &str, to: &Path, size: u64, mut percent: impl FnMut(u8)) -> Result<(), String> {
@@ -194,5 +223,32 @@ mod tests {
             hex,
             "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"
         );
+    }
+
+    #[test]
+    fn text_retries_transient_server_errors_with_backon() {
+        use backon::BackoffBuilder as _;
+        use std::io::Write as _;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            for response in [
+                "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 4\r\nConnection: close\r\n\r\nbusy",
+                "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
+            ] {
+                let (mut connection, _) = listener.accept().unwrap();
+                let mut request = [0u8; 2048];
+                assert!(connection.read(&mut request).unwrap() > 0);
+                connection.write_all(response.as_bytes()).unwrap();
+            }
+        });
+        let backoff = backon::ExponentialBuilder::new()
+            .with_min_delay(Duration::from_millis(1))
+            .with_max_delay(Duration::from_millis(5))
+            .with_max_times(2)
+            .build();
+        let (status, body) = text_with_backoff(&format!("http://{address}/release.json"), backoff).unwrap();
+        assert_eq!((status, body.as_str()), (200, "{}"));
+        server.join().unwrap();
     }
 }

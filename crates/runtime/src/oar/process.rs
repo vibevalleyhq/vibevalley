@@ -7,10 +7,11 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use parking_lot::Mutex;
 use serde_json::json;
 
 use crate::oar::{AgentError, Installation, Result};
@@ -62,7 +63,7 @@ fn overrides() -> &'static Mutex<std::collections::HashMap<String, PathBuf>> {
 }
 
 pub(crate) fn set_binary(command: &str, path: Option<PathBuf>) {
-    let mut map = overrides().lock().unwrap_or_else(|e| e.into_inner());
+    let mut map = overrides().lock();
     match path {
         Some(p) => map.insert(command.to_string(), p),
         None => map.remove(command),
@@ -76,7 +77,7 @@ fn env_override(name: &str) -> Option<PathBuf> {
 }
 
 pub(crate) fn find_binary(name: &str) -> Option<PathBuf> {
-    let chosen = overrides().lock().ok().and_then(|m| m.get(name).cloned()).or_else(|| env_override(name));
+    let chosen = overrides().lock().get(name).cloned().or_else(|| env_override(name));
     if let Some(path) = chosen {
         return is_executable(&path).then_some(path);
     }
@@ -204,7 +205,7 @@ impl Trace {
     pub(crate) fn log(&self, direction: &str, line: &str) {
         if let Some(file) = &self.file {
             let parsed = serde_json::from_str::<serde_json::Value>(line).unwrap_or_else(|_| json!(line));
-            let mut file = file.lock().unwrap_or_else(|p| p.into_inner());
+            let mut file = file.lock();
             let _ = writeln!(file, "{}", json!({ "dir": direction, "line": parsed }));
         }
     }
@@ -282,7 +283,7 @@ impl LineChild {
         let stderr_thread = stderr.map(|stderr| {
             std::thread::spawn(move || {
                 for line in BufReader::new(stderr).lines().map_while(|l| l.ok()) {
-                    let mut tail = stderr_tail.lock().unwrap_or_else(|p| p.into_inner());
+                    let mut tail = stderr_tail.lock();
                     if tail.len() == 40 {
                         tail.pop_front();
                     }
@@ -326,7 +327,7 @@ impl LineChild {
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
             {
-                let mut child = self.child.lock().unwrap_or_else(|p| p.into_inner());
+                let mut child = self.child.lock();
                 match child.try_wait() {
                     Ok(Some(status)) => return status.code(),
                     Ok(None) if Instant::now() > deadline => {
@@ -342,7 +343,7 @@ impl LineChild {
     }
 
     pub(crate) fn write_line(&self, line: &str) -> Result<()> {
-        let mut stdin = self.stdin.lock().unwrap_or_else(|p| p.into_inner());
+        let mut stdin = self.stdin.lock();
         let Some(pipe) = stdin.as_mut() else {
             return Err(AgentError::Io("the runtime's stdin is closed".into()));
         };
@@ -358,14 +359,14 @@ impl LineChild {
     }
 
     pub(crate) fn stderr_text(&self) -> String {
-        let tail = self.stderr_tail.lock().unwrap_or_else(|p| p.into_inner());
+        let tail = self.stderr_tail.lock();
         tail.iter().cloned().collect::<Vec<_>>().join("\n")
     }
 
     /// The group may outlive its leader while a tool still has our pipes open.
     pub(crate) fn status(&self) -> Option<(i32, String)> {
         use std::os::unix::process::ExitStatusExt;
-        let status = self.child.lock().unwrap_or_else(|p| p.into_inner()).try_wait().ok()??;
+        let status = self.child.lock().try_wait().ok()??;
         let signal = status.signal().unwrap_or(0);
         let reason = match signal {
             0 => String::new(),
@@ -385,10 +386,10 @@ impl LineChild {
         }
         let group = Pid::from_raw(self.pid as i32);
         let _ = killpg(group, Signal::SIGTERM);
-        self.stdin.lock().unwrap_or_else(|p| p.into_inner()).take();
+        self.stdin.lock().take();
         let deadline = Instant::now() + Duration::from_secs(2);
         loop {
-            let _ = self.child.lock().unwrap_or_else(|p| p.into_inner()).try_wait();
+            let _ = self.child.lock().try_wait();
             if killpg(group, None) == Err(nix::errno::Errno::ESRCH) {
                 return;
             }
@@ -398,6 +399,6 @@ impl LineChild {
             std::thread::sleep(Duration::from_millis(10));
         }
         let _ = killpg(group, Signal::SIGKILL);
-        let _ = self.child.lock().unwrap_or_else(|p| p.into_inner()).wait();
+        let _ = self.child.lock().wait();
     }
 }

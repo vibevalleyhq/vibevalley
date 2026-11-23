@@ -7,11 +7,11 @@ use vibevalley_protocol::{
 use super::db::{self, EventRow, MsgRow};
 use super::store::{Q, tx};
 use super::types::{
-    AddressedMessage, Made, Meta, Note, Noticing, Picked, Posting, Saying, Speaking, Spoken, ThreadSubject, Told, Write, line_of, meta_of, meta_text,
+    AddressedMessage, ChannelEvent, Made, Meta, Note, Noticing, Picked, Posting, Saying, Speaking, Spoken, ThreadSubject, Write, line_of, meta_of, meta_text,
     reactions_of, reactions_text, to_message,
 };
 use super::words::{self, Has};
-use super::{BeforePost, Chat, HELD_SHOWN, LAST_MAX, NO_NUMBER, RETRY_WINDOW_MS, SEARCH_MAX, SEND_KEY_MAX, no_channel, publish, refused};
+use super::{BeforePost, Chat, HELD_SHOWN, LAST_MAX, NO_NUMBER, RETRY_WINDOW_MS, SEARCH_MAX, SEND_KEY_MAX, no_channel, refused};
 use crate::base::{LookIn, missing};
 use crate::now;
 
@@ -323,6 +323,7 @@ impl Chat {
             }
             Ok(())
         })?;
+        self.emit_event(ChannelEvent::Edited(changed.clone()));
         if words != row.body {
             self.embed_later(&MsgRow { body: words.clone(), ..row });
         }
@@ -338,7 +339,7 @@ impl Chat {
         }
         let mut seq = 0;
         let mut at = 0;
-        self.change(&mut inner, &row, |db, revision, now| {
+        let message = self.change(&mut inner, &row, |db, revision, now| {
             db::delete_message(db, id, now, revision)?;
             db::delete_mentions_for_message(db, id)?;
             db::withdraw_deliveries_for_message(db, id, now)?;
@@ -354,7 +355,7 @@ impl Chat {
             message_id: id.into(),
             at,
         };
-        publish(&self.told, &Told::Removed(event));
+        self.emit_event(ChannelEvent::Removed { event, message });
         Ok(())
     }
 
@@ -409,7 +410,9 @@ impl Chat {
             None => r.push((e.to_string(), next)),
         }
         let text = reactions_text(&r);
-        self.change(&mut inner, &row, |db, revision, _| db::set_reactions(db, id, text.as_deref(), revision))
+        let message = self.change(&mut inner, &row, |db, revision, _| db::set_reactions(db, id, text.as_deref(), revision))?;
+        self.emit_event(ChannelEvent::Reacted(message.clone()));
+        Ok(message)
     }
 
     pub fn pin(&self, id: &str, on: bool) -> Result<ChatMessage, ApiError> {
@@ -421,7 +424,9 @@ impl Chat {
         if row.pinned_at.is_some() == on {
             return Ok(to_message(&row));
         }
-        self.change(&mut inner, &row, |db, revision, at| db::set_pinned(db, id, on.then_some(at), revision))
+        let message = self.change(&mut inner, &row, |db, revision, at| db::set_pinned(db, id, on.then_some(at), revision))?;
+        self.emit_event(ChannelEvent::Pinned(message.clone()));
+        Ok(message)
     }
 
     pub fn pins(&self, channel: &str) -> Result<Vec<ChatMessage>, ApiError> {
