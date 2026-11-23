@@ -553,6 +553,7 @@ struct Shared {
     abort_wanted: AtomicBool,
     abort_killed: AtomicBool,
     turns_finished: AtomicU64,
+    turn_done: tokio::sync::Notify,
     image_input: AtomicBool,
     in_flight_prompts: AtomicU64,
     background: Mutex<antigravity::BackgroundTracker>,
@@ -892,6 +893,7 @@ impl Shared {
         self.abort_wanted.store(false, Ordering::SeqCst);
         self.detached_continuation.store(false, Ordering::SeqCst);
         self.turns_finished.fetch_add(1, Ordering::SeqCst);
+        self.turn_done.notify_waiters();
         let Some(core) = self.core.get() else { return };
         if let Some(message) = error {
             core.emit_root(EventKind::Error { message });
@@ -1605,6 +1607,7 @@ fn connection_thread(
             core.finish(Some(message));
         }
     }
+    shared.turn_done.notify_waiters();
 }
 
 fn prompt_blocks(cwd: &Path, image_input: bool, content: &[ContentBlock]) -> Result<Vec<Value>> {
@@ -1692,18 +1695,31 @@ impl Driver for AcpDriver {
         self.send(Command::Cancel)?;
         let shared = self.shared.clone();
         let turn = shared.turns_finished.load(Ordering::SeqCst);
-        std::thread::spawn(move || {
-            let deadline = std::time::Instant::now() + ABORT_GRACE;
-            while std::time::Instant::now() < deadline {
+        crate::rt::handle().spawn(async move {
+            let deadline = tokio::time::Instant::now() + ABORT_GRACE;
+            loop {
+                let notified = shared.turn_done.notified();
+                tokio::pin!(notified);
+                notified.as_mut().enable();
                 let active = shared.core.get().is_some_and(|core| core.turn_active());
                 if shared.turns_finished.load(Ordering::SeqCst) != turn || !active {
                     return;
                 }
-                std::thread::sleep(Duration::from_millis(100));
-            }
-            shared.abort_killed.store(true, Ordering::SeqCst);
-            if let Some(child) = shared.child.get() {
-                child.kill();
+                tokio::select! {
+                    biased;
+                    _ = notified => {}
+                    _ = tokio::time::sleep_until(deadline) => {
+                        let active = shared.core.get().is_some_and(|core| core.turn_active());
+                        if shared.turns_finished.load(Ordering::SeqCst) != turn || !active {
+                            return;
+                        }
+                        shared.abort_killed.store(true, Ordering::SeqCst);
+                        if let Some(child) = shared.child.get() {
+                            child.kill_async().await;
+                        }
+                        return;
+                    }
+                }
             }
         });
         Ok(())
@@ -1795,6 +1811,7 @@ impl Driver for AcpDriver {
                 core.observe_exit(child.status());
             }
         }
+        self.shared.turn_done.notify_waiters();
     }
 }
 
@@ -1853,6 +1870,7 @@ impl AcpRuntime {
             abort_wanted: AtomicBool::new(false),
             abort_killed: AtomicBool::new(false),
             turns_finished: AtomicU64::new(0),
+            turn_done: tokio::sync::Notify::new(),
             image_input: AtomicBool::new(false),
             in_flight_prompts: AtomicU64::new(0),
             background: Mutex::new(antigravity::BackgroundTracker::default()),

@@ -129,6 +129,147 @@ pub(crate) async fn reap_process_group(child: &mut Child, pid: u32, grace: Durat
     child.wait().await.ok()
 }
 
+/// Captured output of a bounded-timeout subprocess run.
+#[derive(Debug, Clone)]
+pub struct CommandOutput {
+    pub status: Option<ExitStatus>,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+    pub stdout_truncated: bool,
+    pub stderr_truncated: bool,
+    pub timed_out: bool,
+}
+
+impl CommandOutput {
+    pub fn code(&self) -> Option<i32> {
+        self.status.and_then(|s| s.code())
+    }
+
+    pub fn success(&self) -> bool {
+        !self.timed_out && self.status.is_some_and(|s| s.success())
+    }
+
+    pub fn stdout_lossy(&self) -> String {
+        let mut text = String::from_utf8_lossy(&self.stdout).into_owned();
+        if self.stdout_truncated {
+            text.push_str("\n[truncated]");
+        }
+        text
+    }
+
+    pub fn stderr_lossy(&self) -> String {
+        let mut text = String::from_utf8_lossy(&self.stderr).into_owned();
+        if self.stderr_truncated {
+            text.push_str("\n[truncated]");
+        }
+        text
+    }
+}
+
+async fn read_pipe_bounded<R: tokio::io::AsyncRead + Unpin>(mut pipe: R, max_bytes: Option<usize>) -> (Vec<u8>, bool) {
+    let mut buf = Vec::new();
+    let mut chunk = [0u8; 4096];
+    let mut truncated = false;
+    loop {
+        match pipe.read(&mut chunk).await {
+            Ok(0) | Err(_) => break,
+            Ok(n) => match max_bytes {
+                Some(cap) => {
+                    let remaining = cap.saturating_sub(buf.len());
+                    if remaining > 0 {
+                        buf.extend_from_slice(&chunk[..n.min(remaining)]);
+                    }
+                    if n > remaining {
+                        truncated = true;
+                    }
+                }
+                None => buf.extend_from_slice(&chunk[..n]),
+            },
+        }
+    }
+    (buf, truncated)
+}
+
+async fn drain_pipe_task(mut task: tokio::task::JoinHandle<(Vec<u8>, bool)>, deadline: tokio::time::Instant) -> (Vec<u8>, bool) {
+    match tokio::time::timeout_at(deadline, &mut task).await {
+        Ok(Ok(res)) => res,
+        _ => {
+            task.abort();
+            (Vec::new(), false)
+        }
+    }
+}
+
+/// Runs `command` in its own process group (`process_group(0)`) with a hard `timeout`,
+/// capturing stdout and stderr asynchronously (optionally capped at `max_bytes` per stream)
+/// and reaping the entire process group via [`reap_process_group`] on timeout.
+///
+/// Returns `Err(io::Error)` only when spawning or waiting fails (preserving `ErrorKind::NotFound`).
+pub async fn run_output_with_timeout(mut command: Command, timeout: Duration, max_bytes: Option<usize>) -> std::io::Result<CommandOutput> {
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .process_group(0)
+        .kill_on_drop(true);
+    let mut child = command.spawn()?;
+    let pid = child.id().unwrap_or(0);
+    let stdout_task = child.stdout.take().map(|out| tokio::spawn(read_pipe_bounded(out, max_bytes)));
+    let stderr_task = child.stderr.take().map(|err| tokio::spawn(read_pipe_bounded(err, max_bytes)));
+
+    let deadline = tokio::time::Instant::now() + timeout;
+    match tokio::time::timeout_at(deadline, child.wait()).await {
+        Ok(Ok(status)) => {
+            let drain_deadline = deadline.max(tokio::time::Instant::now() + CAPTURE_KILL_GRACE);
+            let (stdout, stdout_truncated) = match stdout_task {
+                Some(task) => drain_pipe_task(task, drain_deadline).await,
+                None => (Vec::new(), false),
+            };
+            let (stderr, stderr_truncated) = match stderr_task {
+                Some(task) => drain_pipe_task(task, drain_deadline).await,
+                None => (Vec::new(), false),
+            };
+            Ok(CommandOutput {
+                status: Some(status),
+                stdout,
+                stderr,
+                stdout_truncated,
+                stderr_truncated,
+                timed_out: false,
+            })
+        }
+        Ok(Err(err)) => {
+            if let Some(task) = stdout_task {
+                task.abort();
+            }
+            if let Some(task) = stderr_task {
+                task.abort();
+            }
+            Err(err)
+        }
+        Err(_) => {
+            let _ = reap_process_group(&mut child, pid, CAPTURE_KILL_GRACE).await;
+            let drain_deadline = tokio::time::Instant::now() + CAPTURE_KILL_GRACE;
+            let (stdout, stdout_truncated) = match stdout_task {
+                Some(task) => drain_pipe_task(task, drain_deadline).await,
+                None => (Vec::new(), false),
+            };
+            let (stderr, stderr_truncated) = match stderr_task {
+                Some(task) => drain_pipe_task(task, drain_deadline).await,
+                None => (Vec::new(), false),
+            };
+            Ok(CommandOutput {
+                status: None,
+                stdout,
+                stderr,
+                stdout_truncated,
+                stderr_truncated,
+                timed_out: true,
+            })
+        }
+    }
+}
+
 /// Runs a short command and returns its stdout; `None` on failure or timeout.
 pub(crate) fn run_capture(binary: &Path, args: &[&str], timeout: Duration) -> Option<String> {
     run_capture_streams(binary, args, timeout, false).and_then(|(ok, text)| ok.then_some(text))
@@ -137,54 +278,17 @@ pub(crate) fn run_capture(binary: &Path, args: &[&str], timeout: Duration) -> Op
 /// Exit status and output; `with_stderr` appends stderr (some CLIs print
 /// their status there). `None` when it could not run or timed out.
 pub(crate) fn run_capture_streams(binary: &Path, args: &[&str], timeout: Duration, with_stderr: bool) -> Option<(bool, String)> {
-    let binary = binary.to_path_buf();
-    let owned_args: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
-    crate::rt::block_on(async move {
-        let mut child = Command::new(&binary)
-            .args(&owned_args)
-            .env("PATH", child_path())
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(if with_stderr { Stdio::piped() } else { Stdio::null() })
-            .process_group(0)
-            .spawn()
-            .ok()?;
-        let pid = child.id().unwrap_or(0);
-        let mut stdout = child.stdout.take()?;
-        let stderr = child.stderr.take();
-
-        let stdout_task = crate::rt::spawn(async move {
-            let mut bytes = Vec::new();
-            let _ = stdout.read_to_end(&mut bytes).await;
-            String::from_utf8_lossy(&bytes).into_owned()
-        });
-        let stderr_task = stderr.map(|mut err| {
-            crate::rt::spawn(async move {
-                let mut bytes = Vec::new();
-                let _ = err.read_to_end(&mut bytes).await;
-                String::from_utf8_lossy(&bytes).into_owned()
-            })
-        });
-
-        let wait_result = tokio::time::timeout(timeout, child.wait()).await;
-        match wait_result {
-            Ok(Ok(status)) => {
-                let mut text = stdout_task.await.ok()?;
-                if let Some(err_task) = stderr_task {
-                    text.push_str(&err_task.await.unwrap_or_default());
-                }
-                Some((status.success(), text))
-            }
-            _ => {
-                let _ = reap_process_group(&mut child, pid, CAPTURE_KILL_GRACE).await;
-                stdout_task.abort();
-                if let Some(err_task) = stderr_task {
-                    err_task.abort();
-                }
-                None
-            }
-        }
-    })
+    let mut cmd = Command::new(binary);
+    cmd.args(args).env("PATH", child_path());
+    let output = crate::rt::block_on(run_output_with_timeout(cmd, timeout, None)).ok()?;
+    if output.timed_out {
+        return None;
+    }
+    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
+    if with_stderr {
+        text.push_str(&String::from_utf8_lossy(&output.stderr));
+    }
+    Some((output.success(), text))
 }
 
 /// `--version` probe shared by the CLI runtimes.
@@ -519,6 +623,15 @@ impl LineChild {
             let _ = rx.wait_for(Option::is_some).await;
         });
     }
+
+    pub(crate) async fn kill_async(self: &Arc<Self>) {
+        if self.inner.killed.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        self.inner.signal_kill();
+        let mut rx = self.inner.exit_rx.clone();
+        let _ = rx.wait_for(Option::is_some).await;
+    }
 }
 
 #[cfg(test)]
@@ -630,5 +743,46 @@ mod tests {
         {
             wait_until_dead(pid, Duration::from_secs(2));
         }
+    }
+
+    #[test]
+    fn run_output_with_timeout_captures_truncates_and_reaps_pgid() {
+        let mut ok_cmd = Command::new("/bin/sh");
+        ok_cmd.args(["-c", "printf 'hello-out'; printf 'hello-err' >&2; exit 3"]);
+        let out = crate::rt::block_on(run_output_with_timeout(ok_cmd, Duration::from_secs(5), None)).unwrap();
+        assert!(!out.timed_out);
+        assert!(!out.success());
+        assert_eq!(out.code(), Some(3));
+        assert_eq!(out.stdout_lossy(), "hello-out");
+        assert_eq!(out.stderr_lossy(), "hello-err");
+
+        let mut trunc_cmd = Command::new("/bin/sh");
+        trunc_cmd.args(["-c", "printf '0123456789abcdef'"]);
+        let trunc = crate::rt::block_on(run_output_with_timeout(trunc_cmd, Duration::from_secs(5), Some(6))).unwrap();
+        assert!(trunc.success());
+        assert!(trunc.stdout_truncated);
+        assert_eq!(trunc.stdout_lossy(), "012345\n[truncated]");
+
+        let dir = tempfile::tempdir().unwrap();
+        let pid_file = dir.path().join("child.pid");
+        let mut timeout_cmd = Command::new("/bin/sh");
+        timeout_cmd.args(["-c", &format!("echo partial; sleep 30 & echo $! > {}; wait", pid_file.display())]);
+        let timed = crate::rt::block_on(run_output_with_timeout(timeout_cmd, Duration::from_millis(150), Some(1024))).unwrap();
+        assert!(timed.timed_out);
+        assert!(!timed.success());
+        assert!(timed.stdout_lossy().contains("partial"), "{}", timed.stdout_lossy());
+        if let Ok(raw) = std::fs::read_to_string(&pid_file)
+            && let Ok(pid) = raw.trim().parse::<i32>()
+        {
+            wait_until_dead(pid, Duration::from_secs(2));
+        }
+
+        let missing = crate::rt::block_on(run_output_with_timeout(
+            Command::new("/definitely/missing/vibevalley-binary"),
+            Duration::from_secs(1),
+            None,
+        ))
+        .unwrap_err();
+        assert_eq!(missing.kind(), std::io::ErrorKind::NotFound);
     }
 }

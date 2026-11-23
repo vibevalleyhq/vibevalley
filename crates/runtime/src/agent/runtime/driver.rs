@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use crate::oar::core::{CoreSession, Driver, SessionCore, render_text};
 use crate::oar::{
     AgentError, Capabilities, ContentBlock, EventKind, FileChangeKind, PermissionDecision, PermissionMode, Result, Session, StopReason, SubagentStatus, Usage,
 };
 use serde_json::Value;
+use tokio_util::sync::CancellationToken;
 
 use crate::agent::ai::models::{charge_usd, deepseek_price};
 use crate::agent::core::doc::{CONVERSATION_SCOPE, GovernanceDoc, OarSessionDoc, OarSessionState, read_doc_opt, write_doc};
@@ -24,6 +24,13 @@ pub(crate) struct WorkerDriver {
     brain: Arc<Brain>,
     core: Arc<SessionCore>,
     active: Arc<Mutex<Option<String>>>,
+    cancel: CancellationToken,
+}
+
+impl Drop for WorkerDriver {
+    fn drop(&mut self) {
+        self.cancel.cancel();
+    }
 }
 
 impl WorkerDriver {
@@ -187,6 +194,7 @@ impl WorkerDriver {
             brain,
             core,
             active: Default::default(),
+            cancel: CancellationToken::new(),
         };
         if let Some(task) = unfinished {
             driver.follow(task)?;
@@ -199,87 +207,92 @@ impl WorkerDriver {
         let core = self.core.clone();
         let active = self.active.clone();
         let model = self.brain.model.clone();
+        let cancel = self.cancel.child_token();
         *active.lock().unwrap() = Some(task.id.clone());
-        std::thread::Builder::new()
-            .name(format!("oar-{}", task.id))
-            .spawn(move || {
-                let result = shared.scheduler.wait(&task.id, Duration::from_secs(60 * 60 * 24 * 365));
+        crate::rt::spawn(async move {
+            let result = shared.scheduler.wait_until_done(&task.id, &cancel).await;
+            {
                 let mut guard = active.lock().unwrap();
                 if guard.as_deref() != Some(&task.id) {
                     return;
                 }
                 *guard = None;
-                drop(guard);
-                let result = match result {
-                    Ok(done) => done,
-                    Err(StoreError::Closed) => return,
-                    Err(e) => {
-                        core.emit_root(EventKind::Error { message: e.to_string() });
-                        core.emit_root(EventKind::TurnFinished {
-                            reason: StopReason::Error,
-                            usage: Usage::default(),
-                        });
-                        return;
-                    }
-                };
-                if result.terminal_reason == "completed" {
-                    let usage: crate::agent::ai::types::Usage = serde_json::from_value(result.result["usage"].clone()).unwrap_or_default();
-                    let reason = if result.result["maxIterationsReached"] == true {
-                        let verdict = &result.result["rubricVerdict"];
-                        let unmet = verdict["unmetItems"]
-                            .as_array()
-                            .into_iter()
-                            .flatten()
-                            .filter_map(Value::as_str)
-                            .collect::<Vec<_>>()
-                            .join(", ");
-                        core.emit_root(EventKind::Error {
-                            message: format!(
-                                "{}{}{}",
-                                verdict["summary"].as_str().unwrap_or_default(),
-                                if unmet.is_empty() { "" } else { ": " },
-                                unmet
-                            ),
-                        });
-                        StopReason::MaxTurns
-                    } else {
-                        StopReason::Completed
-                    };
+            }
+            let result = match result {
+                Ok(done) => done,
+                Err(StoreError::Closed) => return,
+                Err(e) => {
+                    core.emit_root(EventKind::Error { message: e.to_string() });
                     core.emit_root(EventKind::TurnFinished {
-                        reason,
-                        usage: Usage {
-                            input_tokens: Some(usage.input),
-                            output_tokens: Some(usage.output),
-                            cost_usd: deepseek_price(&model).map(|p| charge_usd(p, usage)),
-                            ..Default::default()
-                        },
-                    });
-                } else {
-                    if !result.error_text.is_empty() {
-                        core.emit_root(EventKind::Error {
-                            message: result.error_text.clone(),
-                        });
-                    }
-                    if let Some(sub) = task.checkpoint["submission"].as_str() {
-                        let _ = shared.store().write(|tx| {
-                            tx.settle(
-                                sub,
-                                SubmissionStatus::Unanswered,
-                                &serde_json::json!({ "reason": result.terminal_reason, "error": result.error_text }),
-                            )
-                        });
-                    }
-                    core.emit_root(EventKind::TurnFinished {
-                        reason: if result.terminal_reason == "aborted" {
-                            StopReason::Aborted
-                        } else {
-                            StopReason::Error
-                        },
+                        reason: StopReason::Error,
                         usage: Usage::default(),
                     });
+                    return;
                 }
-            })
-            .map_err(|e| AgentError::Io(e.to_string()))?;
+            };
+            if result.terminal_reason == "completed" {
+                let usage: crate::agent::ai::types::Usage = serde_json::from_value(result.result["usage"].clone()).unwrap_or_default();
+                let reason = if result.result["maxIterationsReached"] == true {
+                    let verdict = &result.result["rubricVerdict"];
+                    let unmet = verdict["unmetItems"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(Value::as_str)
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    core.emit_root(EventKind::Error {
+                        message: format!(
+                            "{}{}{}",
+                            verdict["summary"].as_str().unwrap_or_default(),
+                            if unmet.is_empty() { "" } else { ": " },
+                            unmet
+                        ),
+                    });
+                    StopReason::MaxTurns
+                } else {
+                    StopReason::Completed
+                };
+                core.emit_root(EventKind::TurnFinished {
+                    reason,
+                    usage: Usage {
+                        input_tokens: Some(usage.input),
+                        output_tokens: Some(usage.output),
+                        cost_usd: deepseek_price(&model).map(|p| charge_usd(p, usage)),
+                        ..Default::default()
+                    },
+                });
+            } else {
+                if !result.error_text.is_empty() {
+                    core.emit_root(EventKind::Error {
+                        message: result.error_text.clone(),
+                    });
+                }
+                if let Some(sub) = task.checkpoint["submission"].as_str().map(str::to_owned) {
+                    let store = shared.store().clone();
+                    let terminal_reason = result.terminal_reason.clone();
+                    let error_text = result.error_text.clone();
+                    let _ = tokio::task::spawn_blocking(move || {
+                        let _ = store.write(|tx| {
+                            tx.settle(
+                                &sub,
+                                SubmissionStatus::Unanswered,
+                                &serde_json::json!({ "reason": terminal_reason, "error": error_text }),
+                            )
+                        });
+                    })
+                    .await;
+                }
+                core.emit_root(EventKind::TurnFinished {
+                    reason: if result.terminal_reason == "aborted" {
+                        StopReason::Aborted
+                    } else {
+                        StopReason::Error
+                    },
+                    usage: Usage::default(),
+                });
+            }
+        });
         Ok(())
     }
 }
@@ -354,6 +367,7 @@ impl Driver for WorkerDriver {
 
     fn dispose(&self) {
         let _ = self.abort();
+        self.cancel.cancel();
         self.execution.workers().detach(&self.conversation);
     }
 }

@@ -7,11 +7,13 @@
 //! are listed after them under their own ids.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 use parking_lot::Mutex;
+use tokio::sync::Semaphore;
+use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
@@ -30,6 +32,7 @@ use crate::base::Ticker;
 use crate::{Hub, now};
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
+const PROBE_CONCURRENCY: usize = 4;
 
 fn refused(text: String) -> ApiError {
     ApiError::new(BizCode::RuntimeRefused, text)
@@ -118,22 +121,23 @@ pub struct Fleet {
     spend: Mutex<DailySpend>,
     probing: Mutex<HashSet<String>>,
     reads: AtomicU64,
-    closed: AtomicBool,
     cancel: CancellationToken,
     usage_task: Mutex<Option<Ticker>>,
     sub: Mutex<Option<crate::event_bus::Subscription>>,
 }
 
-/// Runs `f` on its own thread; none when it takes longer than `limit`.
-fn within<T: Send + 'static>(limit: Duration, f: impl FnOnce() -> T + Send + 'static) -> Option<T> {
-    let (tx, rx) = flume::bounded(1);
-    std::thread::Builder::new()
-        .name("vibevalley-runtime-probe".into())
-        .spawn(move || {
-            let _ = tx.send(f());
-        })
-        .ok()?;
-    rx.recv_timeout(limit).ok()
+/// Runs a blocking OAR trait probe on Tokio's blocking pool with a hard `PROBE_TIMEOUT`
+/// and immediate wakeup on `cancel`.
+async fn probe_with_timeout<T: Send + 'static>(cancel: &CancellationToken, f: impl FnOnce() -> T + Send + 'static) -> Option<T> {
+    if cancel.is_cancelled() {
+        return None;
+    }
+    let handle = vibevalley_runtime::rt::handle().spawn_blocking(f);
+    tokio::select! {
+        biased;
+        _ = cancel.cancelled() => None,
+        res = tokio::time::timeout(PROBE_TIMEOUT, handle) => res.ok().and_then(Result::ok),
+    }
 }
 
 /// A runtime's usage is read again this often, and this long after a
@@ -183,7 +187,6 @@ impl Fleet {
             spend: Mutex::new(DailySpend::new()),
             probing: Mutex::default(),
             reads: AtomicU64::new(0),
-            closed: AtomicBool::new(false),
             cancel,
             usage_task: Mutex::new(None),
             sub: Mutex::new(None),
@@ -209,23 +212,50 @@ impl Fleet {
             drop(prev);
         }
         if background {
-            for id in fleet.ids() {
-                fleet.probe_later(&id);
-            }
+            let ids = fleet.ids();
+            let startup_fleet = Arc::downgrade(&fleet);
+            hub.spawn_task(async move {
+                let Some(fleet) = startup_fleet.upgrade() else { return };
+                fleet.probe_all_async(ids).await;
+            });
             let f = Arc::downgrade(&fleet);
             let ticker = Ticker::spawn_on(hub, USAGE_EVERY, false, move || {
                 let Some(fleet) = f.upgrade() else { return false };
-                if fleet.closed.load(Ordering::Relaxed) {
+                if fleet.cancel.is_cancelled() {
                     return false;
                 }
-                for id in fleet.ids() {
-                    fleet.refresh_usage(&id);
-                }
+                fleet.refresh_all_usage();
                 true
             });
             *fleet.usage_task.lock() = Some(ticker);
         }
         fleet
+    }
+
+    async fn probe_all_async(self: &Arc<Self>, ids: Vec<String>) {
+        let sem = Arc::new(Semaphore::new(PROBE_CONCURRENCY));
+        let mut set = JoinSet::new();
+        for id in ids {
+            if self.cancel.is_cancelled() || !self.probing.lock().insert(id.clone()) {
+                continue;
+            }
+            let fleet = self.clone();
+            let sem = sem.clone();
+            set.spawn(async move {
+                let permit = tokio::select! {
+                    biased;
+                    _ = fleet.cancel.cancelled() => None,
+                    p = sem.acquire_owned() => p.ok(),
+                };
+                if let Some(_permit) = permit
+                    && !fleet.cancel.is_cancelled()
+                {
+                    fleet.lookup_async(&id).await;
+                }
+                fleet.probing.lock().remove(&id);
+            });
+        }
+        while set.join_next().await.is_some() {}
     }
 
     fn record_spend(&self, runtime: &str, cny: f64) {
@@ -244,13 +274,17 @@ impl Fleet {
     /// runs share one read).
     pub fn usage_soon(self: &Arc<Self>, id: &str) {
         let key = format!("usage:{id}");
-        if self.closed.load(Ordering::Relaxed) || !self.probing.lock().insert(key.clone()) {
+        if self.cancel.is_cancelled() || !self.probing.lock().insert(key.clone()) {
             return;
         }
+        let Some(hub) = self.hub.upgrade() else {
+            self.probing.lock().remove(&key);
+            return;
+        };
         let fleet = Arc::downgrade(self);
         let cancel = self.cancel.clone();
         let id = id.to_string();
-        vibevalley_runtime::rt::handle().spawn(async move {
+        hub.spawn_task(async move {
             let stopped = tokio::select! {
                 biased;
                 _ = cancel.cancelled() => true,
@@ -259,20 +293,22 @@ impl Fleet {
             let Some(fleet) = fleet.upgrade() else { return };
             fleet.probing.lock().remove(&key);
             if !stopped {
-                let _ = tokio::task::spawn_blocking(move || fleet.refresh_usage(&id)).await;
+                fleet.refresh_usage_async(&id).await;
             }
         });
     }
 
-    /// `refreshUsage` (blocking): a runtime found available has its usage
-    /// read again; kept and told when it changed and no newer probe landed.
-    pub fn refresh_usage(&self, id: &str) {
+    async fn refresh_usage_async(&self, id: &str) {
         let Some(before) = self.held(id) else { return };
-        if !matches!(before.info.installation, Installation::Available(_)) || self.closed.load(Ordering::Relaxed) {
+        if !matches!(before.info.installation, Installation::Available(_)) || self.cancel.is_cancelled() {
             return;
         }
         let Some(runtime) = self.runtime(id) else { return };
-        let Some(usage) = within(PROBE_TIMEOUT, move || runtime.account_usage()).and_then(Result::ok).map(usage_from_oar) else {
+        let Some(usage) = probe_with_timeout(&self.cancel, move || runtime.account_usage())
+            .await
+            .and_then(Result::ok)
+            .map(usage_from_oar)
+        else {
             return;
         };
         let mut held = self.held.lock();
@@ -289,9 +325,44 @@ impl Fleet {
         }
     }
 
+    /// `refreshUsage` (blocking): a runtime found available has its usage
+    /// read again; kept and told when it changed and no newer probe landed.
+    pub fn refresh_usage(&self, id: &str) {
+        vibevalley_runtime::rt::block_on(self.refresh_usage_async(id));
+    }
+
+    /// Refreshes usage across all available runtimes in parallel with bounded concurrency.
+    fn refresh_all_usage(self: &Arc<Self>) {
+        let ids = self.ids();
+        let fleet = self.clone();
+        vibevalley_runtime::rt::block_on(async move {
+            let sem = Arc::new(Semaphore::new(PROBE_CONCURRENCY));
+            let mut set = JoinSet::new();
+            for id in ids {
+                if fleet.cancel.is_cancelled() {
+                    break;
+                }
+                let fleet = fleet.clone();
+                let sem = sem.clone();
+                set.spawn(async move {
+                    let permit = tokio::select! {
+                        biased;
+                        _ = fleet.cancel.cancelled() => return,
+                        p = sem.acquire_owned() => match p {
+                            Ok(p) => p,
+                            Err(_) => return,
+                        },
+                    };
+                    let _permit = permit;
+                    fleet.refresh_usage_async(&id).await;
+                });
+            }
+            while set.join_next().await.is_some() {}
+        });
+    }
+
     /// Stops answering with new probes (`close`).
     pub fn close(&self) {
-        self.closed.store(true, Ordering::Relaxed);
         self.cancel.cancel();
         let prev = self.sub.lock().take();
         drop(prev);
@@ -360,8 +431,8 @@ impl Fleet {
         vibevalley_runtime::oar::set_binary(command, path);
     }
 
-    /// One probe of the machine (blocking).
-    fn probe(&self, id: &str) -> RuntimeInfo {
+    /// One probe of the machine (async; probes models and account usage in parallel).
+    async fn probe_async(&self, id: &str) -> RuntimeInfo {
         let mut info = self.placeholder(id, now());
         Self::use_binary(id, &info.settings.bin_path);
         let Some(runtime) = self.runtime(id) else {
@@ -374,9 +445,12 @@ impl Fleet {
             return info;
         };
         let probed = runtime.clone();
-        let installation = within(PROBE_TIMEOUT, move || probed.installation()).unwrap_or_else(|| vibevalley_runtime::oar::Installation::Unusable {
-            reason: t("server.runtime.probeTimeout", &[]),
-        });
+        let installation =
+            probe_with_timeout(&self.cancel, move || probed.installation())
+                .await
+                .unwrap_or_else(|| vibevalley_runtime::oar::Installation::Unusable {
+                    reason: t("server.runtime.probeTimeout", &[]),
+                });
         info.installation = match installation {
             vibevalley_runtime::oar::Installation::LoginRequired { path } => Installation::Unsupported(InstallationUnsupported {
                 reason: t("server.runtime.signInRequired", &[("runtime", info.preset.label.clone().into())]),
@@ -404,7 +478,12 @@ impl Fleet {
             return info;
         }
         let listed = runtime.clone();
-        info.models = within(PROBE_TIMEOUT, move || listed.list_models()).and_then(Result::ok).map(|models| {
+        let read = runtime.clone();
+        let (models_res, usage_res) = tokio::join!(
+            probe_with_timeout(&self.cancel, move || listed.list_models()),
+            probe_with_timeout(&self.cancel, move || read.account_usage()),
+        );
+        info.models = models_res.and_then(Result::ok).map(|models| {
             models
                 .into_iter()
                 .map(|m| ModelEntry {
@@ -416,15 +495,14 @@ impl Fleet {
                 })
                 .collect()
         });
-        let read = runtime.clone();
-        info.usage = within(PROBE_TIMEOUT, move || read.account_usage()).and_then(Result::ok).map(usage_from_oar);
+        info.usage = usage_res.and_then(Result::ok).map(usage_from_oar);
         info
     }
 
     /// A new lookup, kept and told on the live stream.
-    fn lookup(&self, id: &str) -> RuntimeInfo {
+    async fn lookup_async(&self, id: &str) -> RuntimeInfo {
         let read = self.reads.fetch_add(1, Ordering::Relaxed) + 1;
-        let info = self.shown(self.probe(id));
+        let info = self.shown(self.probe_async(id).await);
         let mut held = self.held.lock();
         // A slower older lookup does not overwrite a newer one.
         if held.get(id).is_none_or(|o| o.read < read) {
@@ -444,14 +522,22 @@ impl Fleet {
         info
     }
 
+    fn lookup(&self, id: &str) -> RuntimeInfo {
+        vibevalley_runtime::rt::block_on(self.lookup_async(id))
+    }
+
     fn probe_later(self: &Arc<Self>, id: &str) {
-        if self.closed.load(Ordering::Relaxed) || !self.probing.lock().insert(id.to_string()) {
+        if self.cancel.is_cancelled() || !self.probing.lock().insert(id.to_string()) {
             return;
         }
+        let Some(hub) = self.hub.upgrade() else {
+            self.probing.lock().remove(id);
+            return;
+        };
         let fleet = self.clone();
         let id = id.to_string();
-        let _ = std::thread::Builder::new().name(format!("vibevalley-runtime-{id}")).spawn(move || {
-            fleet.lookup(&id);
+        hub.spawn_task(async move {
+            fleet.lookup_async(&id).await;
             fleet.probing.lock().remove(&id);
         });
     }
@@ -514,7 +600,7 @@ impl Fleet {
 
     /// `refresh` (blocking): none for a runtime the farm does not know.
     pub fn refresh(&self, id: &str) -> Option<RuntimeInfo> {
-        if !self.known(id) || self.closed.load(Ordering::Relaxed) {
+        if !self.known(id) || self.cancel.is_cancelled() {
             return None;
         }
         Some(self.lookup(id))

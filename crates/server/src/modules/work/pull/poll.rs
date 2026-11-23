@@ -2,21 +2,67 @@
 //! CI/review/comment polling with bot-round deduplication.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
+use tokio::sync::Semaphore;
+use tokio::task::JoinSet;
 use vibevalley_protocol::{PublishPlatform, PullRequestState};
 
 use crate::modules::work::pull::Pulls;
-use crate::modules::work::pull::snapshot::{checks_fingerprint, checks_verdict, failed_job_log};
+use crate::modules::work::pull::publish::{HostRun, HostedRepo, remote_pull_state};
+use crate::modules::work::pull::snapshot::{GitHubCheck, GitHubPullSnapshot, checks_fingerprint, checks_verdict, failed_job_log, fetch_snapshot};
 use crate::modules::work::pull::store::PullRecord;
 use crate::now;
 
-/// Polls every tracked `open` PR's remote state; settles linked issues on `merged` / `closed`.
+const POLL_CONCURRENCY: usize = 4;
+
+/// Polls every tracked `open` PR's remote state in parallel (bounded); settles linked issues on `merged` / `closed`.
 pub fn refresh(pulls: &Pulls) {
     let _guard = pulls.refresh_lock.lock();
-    for row in pulls.store.open_pulls() {
-        let Ok(state) = pulls.pull_request_state(&row.repo, row.number, Some(row.platform)) else {
-            continue;
-        };
+    let targets: Vec<(usize, PullRecord, HostedRepo, HostRun)> = pulls
+        .store
+        .open_pulls()
+        .into_iter()
+        .enumerate()
+        .filter_map(|(idx, row)| {
+            let hosted = pulls.hosted_repo_of(&row.repo, Some(row.platform)).ok()?;
+            let runner = match hosted.platform {
+                PublishPlatform::Github => pulls.gh.clone(),
+                PublishPlatform::Gitlab => pulls.glab.clone(),
+            };
+            Some((idx, row, hosted, runner))
+        })
+        .collect();
+    if targets.is_empty() {
+        return;
+    }
+
+    let mut settled = vibevalley_runtime::rt::block_on(async move {
+        let sem = Arc::new(Semaphore::new(POLL_CONCURRENCY));
+        let mut set = JoinSet::new();
+        for (idx, row, hosted, runner) in targets {
+            let sem = sem.clone();
+            set.spawn(async move {
+                let Ok(_permit) = sem.acquire_owned().await else { return None };
+                let number = row.number;
+                let state = tokio::task::spawn_blocking(move || remote_pull_state(&hosted, number, &runner))
+                    .await
+                    .ok()?
+                    .ok()?;
+                Some((idx, row, state))
+            });
+        }
+        let mut out = Vec::new();
+        while let Some(joined) = set.join_next().await {
+            if let Ok(Some(item)) = joined {
+                out.push(item);
+            }
+        }
+        out
+    });
+    settled.sort_by_key(|(idx, _, _)| *idx);
+
+    for (_, row, state) in settled {
         if state == PullRequestState::Open {
             continue;
         }
@@ -41,18 +87,91 @@ struct PollEvent {
 /// Polls GitHub CI checks, reviews, and comments for every tracked `open` GitHub PR.
 pub fn poll(pulls: &Pulls) {
     let _guard = pulls.poll_lock.lock();
-    for row in pulls.store.open_pulls() {
-        if row.platform != PublishPlatform::Github {
-            continue;
+    let targets: Vec<(usize, PullRecord, String)> = pulls
+        .store
+        .open_pulls()
+        .into_iter()
+        .filter(|row| row.platform == PublishPlatform::Github)
+        .enumerate()
+        .filter_map(|(idx, row)| {
+            let remote = pulls.github_remote(&row.repo).ok()?;
+            Some((idx, row, remote))
+        })
+        .collect();
+    if targets.is_empty() {
+        return;
+    }
+
+    let gh = pulls.gh.clone();
+    let mut snapshots = vibevalley_runtime::rt::block_on(async move {
+        let sem = Arc::new(Semaphore::new(POLL_CONCURRENCY));
+        let mut set = JoinSet::new();
+        for (idx, row, remote) in targets {
+            let sem = sem.clone();
+            let gh = gh.clone();
+            set.spawn(async move {
+                let Ok(_permit) = sem.acquire_owned().await else { return None };
+                let number = row.number;
+                let remote_for_fetch = remote.clone();
+                let snapshot = tokio::task::spawn_blocking(move || fetch_snapshot(&gh, &remote_for_fetch, number))
+                    .await
+                    .ok()?
+                    .ok()?;
+                Some((idx, row, remote, snapshot))
+            });
         }
-        poll_one(pulls, &row);
+        let mut out = Vec::new();
+        while let Some(joined) = set.join_next().await {
+            if let Ok(Some(item)) = joined {
+                out.push(item);
+            }
+        }
+        out
+    });
+    snapshots.sort_by_key(|(idx, _, _, _)| *idx);
+
+    for (_, row, remote, current) in snapshots {
+        poll_one(pulls, &row, &remote, current);
     }
 }
 
-fn poll_one(pulls: &Pulls, row: &PullRecord) {
-    let Ok(current) = pulls.snapshot(&row.repo, row.number) else {
-        return;
-    };
+fn fetch_failed_job_logs(gh: &HostRun, remote: &str, failed: &[&GitHubCheck]) -> Vec<String> {
+    if failed.len() <= 1 {
+        return failed.iter().map(|check| failed_job_log(gh, remote, &check.url)).collect();
+    }
+    let items: Vec<(usize, String)> = failed.iter().enumerate().map(|(idx, check)| (idx, check.url.clone())).collect();
+    let gh = gh.clone();
+    let remote = remote.to_string();
+    let mut logs = vibevalley_runtime::rt::block_on(async move {
+        let sem = Arc::new(Semaphore::new(POLL_CONCURRENCY));
+        let mut set = JoinSet::new();
+        for (idx, url) in items {
+            let sem = sem.clone();
+            let gh = gh.clone();
+            let remote = remote.clone();
+            set.spawn(async move {
+                let Ok(_permit) = sem.acquire_owned().await else {
+                    return (idx, String::new());
+                };
+                let log = tokio::task::spawn_blocking(move || failed_job_log(&gh, &remote, &url))
+                    .await
+                    .unwrap_or_default();
+                (idx, log)
+            });
+        }
+        let mut out = Vec::new();
+        while let Some(joined) = set.join_next().await {
+            if let Ok(item) = joined {
+                out.push(item);
+            }
+        }
+        out
+    });
+    logs.sort_by_key(|(idx, _)| *idx);
+    logs.into_iter().map(|(_, log)| log).collect()
+}
+
+fn poll_one(pulls: &Pulls, row: &PullRecord, remote: &str, current: GitHubPullSnapshot) {
     let at = now();
     let linked_open = row
         .issue_id
@@ -69,16 +188,16 @@ fn poll_one(pulls: &Pulls, row: &PullRecord) {
             && (!failed.is_empty() || finished)
         {
             let text = if !failed.is_empty() {
-                let remote = pulls.github_remote(&row.repo).unwrap_or_else(|_| row.repo.clone());
+                let logs = fetch_failed_job_logs(&pulls.gh, remote, &failed);
                 failed
                     .iter()
-                    .map(|check| {
+                    .zip(logs)
+                    .map(|(check, log)| {
                         let status = if check.conclusion.is_empty() {
                             check.status.as_str()
                         } else {
                             check.conclusion.as_str()
                         };
-                        let log = failed_job_log(&pulls.gh, &remote, &check.url);
                         if log.is_empty() {
                             format!("{}: {status}", check.name)
                         } else {
