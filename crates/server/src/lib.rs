@@ -14,14 +14,14 @@ use std::any::Any;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
-use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
 use std::time::{Duration, Instant};
 
 use arc_swap::ArcSwapOption;
 use parking_lot::{Mutex, RwLock};
 use serde_json::Value;
-use tokio::sync::{broadcast, watch};
+use tokio::sync::{Notify, broadcast, watch};
 use tokio_util::sync::{CancellationToken, DropGuard};
 use tokio_util::task::TaskTracker;
 use tracing::Instrument as _;
@@ -44,11 +44,13 @@ pub mod base;
 pub(crate) mod db;
 pub mod event_bus;
 pub use vibevalley_protocol::home;
+pub(crate) mod loom_sync;
 pub mod modules;
 pub mod offline;
 pub mod ports;
 mod runtime_inbox;
 pub mod slice_feed;
+mod slice_wake;
 mod start;
 pub mod testing;
 
@@ -195,11 +197,6 @@ impl<T: ?Sized> Slot<T> {
     }
 }
 
-struct Kick {
-    dirty: SliceMask,
-    effects: Vec<GameEffect>,
-}
-
 struct SliceFeeds {
     board: slice_feed::SliceFeed<BoardSlice>,
     sessions: slice_feed::SliceFeed<SessionsSlice>,
@@ -227,12 +224,11 @@ const fn slice_index(kind: SliceKind) -> usize {
 pub struct Hub {
     self_weak: OnceLock<Weak<Hub>>,
     core: Mutex<Core>,
-    seq: AtomicI64,
-    dirty_seqs: [AtomicI64; 6],
+    slice_gate: slice_wake::SliceWakeGate,
     pub(crate) runtime_inbox: runtime_inbox::RuntimeInboxObserver,
     feeds: SliceFeeds,
     shutdown: CancellationToken,
-    // Dropped before `bus` and `kicks` so child tokens cancel before subscriber shutdown.
+    // Dropped before `bus` and `slice_notify` so child tokens cancel before subscriber shutdown.
     _shutdown_guard: DropGuard,
     bus: event_bus::EventBus,
     tasks: TaskTracker,
@@ -253,8 +249,10 @@ pub struct Hub {
     machine_bus: Slot<dyn MachineBus>,
     speech: Slot<dyn crate::transport::api::media::SpeechStreams>,
     wake: watch::Sender<u64>,
-    /// Each fold's dirty slice mask and farm effects, for the feed pump task.
-    kicks: flume::Sender<Kick>,
+    /// Farm effects accumulated between pump ticks.
+    pending_effects: Mutex<Vec<GameEffect>>,
+    /// Coalesced wakeup notifier for the slice feed pump task.
+    slice_notify: Arc<Notify>,
 }
 
 impl Hub {
@@ -384,7 +382,7 @@ impl Hub {
     /// A server holding `state`, with no endpoint answered yet. Its feed
     /// pump ends when [`Hub::close`] is called or the last `Arc<Hub>` is dropped.
     pub fn new(state: SpaceState) -> Arc<Hub> {
-        let (kicks, kicked) = flume::unbounded();
+        let slice_notify = Arc::new(Notify::new());
         let (live, _live_rx) = broadcast::channel(LIVE_CAPACITY);
         let core = Core::new(state);
         let seq = core.seq();
@@ -403,8 +401,7 @@ impl Hub {
         let hub = Arc::new(Hub {
             self_weak: OnceLock::new(),
             core: Mutex::new(core),
-            seq: AtomicI64::new(seq),
-            dirty_seqs: std::array::from_fn(|_| AtomicI64::new(seq)),
+            slice_gate: slice_wake::SliceWakeGate::new(seq),
             runtime_inbox: runtime_inbox::RuntimeInboxObserver::new(),
             feeds,
             shutdown,
@@ -428,13 +425,14 @@ impl Hub {
             machine_bus: Slot::empty(),
             speech: Slot::empty(),
             wake,
-            kicks,
+            pending_effects: Mutex::new(Vec::new()),
+            slice_notify: slice_notify.clone(),
         });
         let _ = hub.self_weak.set(Arc::downgrade(&hub));
         hub.bus.attach_hub(Arc::downgrade(&hub));
         let weak = Arc::downgrade(&hub);
         let cancel = hub.child_token();
-        hub.spawn_task(pump_slices(weak, kicked, cancel));
+        hub.spawn_task(pump_slices(weak, slice_notify, cancel));
         hub
     }
 
@@ -506,11 +504,15 @@ impl Hub {
     }
 
     pub fn seq(&self) -> i64 {
-        self.seq.load(Ordering::Acquire)
+        self.slice_gate.seq()
     }
 
     fn dirty_seq(&self, kind: SliceKind) -> i64 {
-        self.dirty_seqs[slice_index(kind)].load(Ordering::Acquire)
+        self.slice_gate.dirty_seq(slice_index(kind))
+    }
+
+    fn take_pending_effects(&self) -> Vec<GameEffect> {
+        std::mem::take(&mut *self.pending_effects.lock())
     }
 
     pub fn board_slice(&self) -> BoardSlice {
@@ -546,7 +548,7 @@ impl Hub {
     pub fn slice_bundle(&self) -> SliceBundle {
         let core = self.core.lock();
         let state = core.state();
-        let seq = self.seq.load(Ordering::Acquire);
+        let seq = self.slice_gate.seq();
         SliceBundle {
             seq,
             board: vibevalley_core::board_slice(state, self.dirty_seq(SliceKind::Board)),
@@ -659,23 +661,21 @@ impl Hub {
         let observer = self.current_observer();
         let trace_debug = tracing::enabled!(tracing::Level::DEBUG);
         let started = (observer.is_some() || trace_debug).then(Instant::now);
-        let (applied, seq) = {
+        let (applied, seq, should_wake) = {
             let mut core = self.core.lock();
             let changes = core.apply(facts);
-            let seq = if !changes.transitions.is_empty() {
-                let seq = self.seq.fetch_add(1, Ordering::AcqRel) + 1;
+            if !changes.transitions.is_empty() {
                 let mut dirty = changes.dirty;
                 if !changes.effects.is_empty() {
                     dirty |= SliceMask::FARM;
+                    self.pending_effects.lock().extend(changes.effects.iter().cloned());
                 }
-                for kind in dirty.kinds() {
-                    self.dirty_seqs[slice_index(kind)].store(seq, Ordering::Release);
-                }
-                seq
+                let (seq, should_wake) = self.slice_gate.record_commit(dirty.bits());
+                (changes, seq, should_wake)
             } else {
-                self.seq.load(Ordering::Acquire)
-            };
-            (changes, seq)
+                let seq = self.slice_gate.seq();
+                (changes, seq, false)
+            }
         };
         if applied.transitions.is_empty() {
             return applied;
@@ -694,10 +694,9 @@ impl Hub {
             );
         }
         self.bus.publish(&applied.transitions);
-        let _ = self.kicks.send(Kick {
-            dirty: applied.dirty,
-            effects: applied.effects.clone(),
-        });
+        if should_wake {
+            self.slice_notify.notify_one();
+        }
         applied
     }
 
@@ -1357,25 +1356,24 @@ pub fn decode<T: serde::de::DeserializeOwned>(payload: Value) -> Result<T, ApiEr
 /// The slice feed pump: leading-edge delivery for workbench slices when idle,
 /// and coalesced trailing-edge delivery after `STATE_EVERY_MS` for dirty slices
 /// plus accumulated farm effects on `SliceKind::Farm`.
-async fn pump_slices(hub: std::sync::Weak<Hub>, kicked: flume::Receiver<Kick>, cancel: CancellationToken) {
+async fn pump_slices(hub: std::sync::Weak<Hub>, notify: Arc<Notify>, cancel: CancellationToken) {
     loop {
-        let first = tokio::select! {
-            biased;
-            _ = cancel.cancelled() => return,
-            res = kicked.recv_async() => match res {
-                Ok(kick) => kick,
-                Err(_) => return,
-            },
+        let first_bits = {
+            let Some(h) = hub.upgrade() else { return };
+            h.slice_gate.take_pending()
         };
-        let mut dirty = first.dirty;
-        let mut effects = first.effects;
-        if !effects.is_empty() {
-            dirty |= SliceMask::FARM;
+        if first_bits == 0 {
+            tokio::select! {
+                biased;
+                _ = cancel.cancelled() => return,
+                _ = notify.notified() => continue,
+            }
         }
+        let mut dirty_bits = first_bits;
         let deadline = tokio::time::Instant::now() + Duration::from_millis(STATE_EVERY_MS);
         let Some(leading) = hub.upgrade() else { return };
         for kind in WORKBENCH_SLICES {
-            if dirty.contains(SliceMask::from_kind(kind)) {
+            if (dirty_bits & SliceMask::from_kind(kind).bits()) != 0 {
                 let target = leading.dirty_seq(kind);
                 if leading.should_publish_slice(kind, target, true) {
                     leading.sync_slice(kind);
@@ -1389,23 +1387,20 @@ async fn pump_slices(hub: std::sync::Weak<Hub>, kicked: flume::Receiver<Kick>, c
             _ = cancel.cancelled() => return,
             _ = tokio::time::sleep_until(deadline) => {}
         }
-        for more in kicked.drain() {
-            dirty |= more.dirty;
-            effects.extend(more.effects);
-        }
-        if !effects.is_empty() {
-            dirty |= SliceMask::FARM;
-        }
         let Some(hub) = hub.upgrade() else { return };
+        dirty_bits |= hub.slice_gate.take_pending();
         for kind in WORKBENCH_SLICES {
-            if dirty.contains(SliceMask::from_kind(kind)) && hub.slice_has_watchers(kind) {
+            if (dirty_bits & SliceMask::from_kind(kind).bits()) != 0 && hub.slice_has_watchers(kind) {
                 hub.sync_slice(kind);
                 hub.publish_slice(kind, false);
             }
         }
-        if dirty.contains(SliceMask::FARM) && hub.slice_has_watchers(SliceKind::Farm) {
-            hub.sync_farm_with_effects(effects);
-            hub.publish_slice(SliceKind::Farm, false);
+        if (dirty_bits & SliceMask::FARM.bits()) != 0 {
+            let effects = hub.take_pending_effects();
+            if hub.slice_has_watchers(SliceKind::Farm) {
+                hub.sync_farm_with_effects(effects);
+                hub.publish_slice(SliceKind::Farm, false);
+            }
         }
     }
 }

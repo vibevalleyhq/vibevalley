@@ -11967,6 +11967,7 @@ dependencies = [
  "futures-util",
  "include_dir",
  "jiff 1.0.1",
+ "loom",
  "parking_lot",
  "regex",
  "reqwest",
