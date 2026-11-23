@@ -513,7 +513,10 @@ test("all 4 tabs exercise Inbox approve/deny/answer, Channels history+follow+sen
   await app.press("id:channel-reply-send");
   await app.waitUntil(() => app.requests().some((r) => r.url === `${BASE}/api/v1/channel/message/send`));
   const sendMsgReq = app.requests().find((r) => r.url === `${BASE}/api/v1/channel/message/send`);
-  expect(JSON.parse(sendMsgReq?.body ?? "{}")).toEqual({ id: "ch-1", text: "Looks great from mobile!" });
+  const sendMsgBody = JSON.parse(sendMsgReq?.body ?? "{}") as { id?: string; text?: string; sendKey?: string };
+  expect(sendMsgBody).toMatchObject({ id: "ch-1", text: "Looks great from mobile!" });
+  expect(typeof sendMsgBody.sendKey).toBe("string");
+  expect((sendMsgBody.sendKey ?? "").length).toBeGreaterThan(0);
 
   await app.press("id:channel-back");
   await app.waitFor("id:channel-row-ch-1");

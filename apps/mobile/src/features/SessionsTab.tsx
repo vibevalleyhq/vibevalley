@@ -1,4 +1,4 @@
-import { effect, List, signal, Text, View } from "nsh";
+import { computed, effect, List, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { PhaseView, SessionEvent, SessionPermissionDecision, SessionView } from "@vibevalley/protocol";
@@ -8,6 +8,12 @@ import { Icon } from "../design/Icon";
 import type { MobileLayout } from "../design/layout";
 import { EmptyPanel, FieldInput, MarkdownText, PillButton, SectionCard, SplitPane, StatusTag, TopBar, type TagTone } from "../design/ui";
 import { hapticImpact, hapticNotification, type RemoteSession } from "../infra/session";
+
+interface OptimisticSessionEvent {
+  readonly sessionId: string;
+  readonly knownSeqs: ReadonlySet<number>;
+  readonly event: SessionEvent;
+}
 
 function phaseTone(phase: PhaseView): TagTone {
   switch (phase._tag) {
@@ -74,19 +80,23 @@ export function SessionsTab(props: {
   const busyAction = signal<string | undefined>(undefined);
   const interactionDrafts = signal<Readonly<Record<string, string>>>({});
   const actionError = signal<string | undefined>(undefined);
-  const isDual = () => props.layout().mode === "dual_pane";
+  const pendingEvents = signal<readonly OptimisticSessionEvent[]>([]);
+  const confirmedSeqs = new Set<number>();
+  let localEventSeq = 0;
 
-  const sessionList = () => props.session.sessions()?.sessions ?? [];
+  const isDual = computed(() => props.layout().mode === "dual_pane");
+
+  const sessionList = computed(() => props.session.sessions()?.sessions ?? []);
+  const machineNames = computed(() => new Map((props.session.sessions()?.machines ?? []).map((m) => [m.id, m.name] as const)));
   const machineLabelOf = (machineId: string | undefined): string | undefined => {
     if (machineId === undefined || machineId === "") return undefined;
-    const found = (props.session.sessions()?.machines ?? []).find((m) => m.id === machineId);
-    return found ? found.name : machineId;
+    return machineNames().get(machineId) ?? machineId;
   };
-  const selectedView = () => {
+  const selectedView = computed(() => {
     const id = props.selectedSessionId();
     if (id === undefined) return undefined;
     return sessionList().find((s) => s.id === id);
-  };
+  });
 
   effect(() => {
     if (!isDual()) return;
@@ -105,32 +115,112 @@ export function SessionsTab(props: {
     return props.session.ensureSessionWatch(id);
   });
 
-  const watchState = () => {
+  const watchState = computed(() => {
     const id = props.selectedSessionId();
     return id !== undefined ? props.session.sessionWatchState(id) : undefined;
-  };
+  });
 
-  const isWorking = () => {
+  const isWorking = computed(() => {
     const livePhase = watchState()?.session?.phase._tag;
     if (livePhase !== undefined) return livePhase === "working";
     return selectedView()?.phase._tag === "working";
-  };
+  });
+
+  const pendingPermissions = computed(() => watchState()?.pendingPermissions ?? []);
+  const pendingInteractions = computed(() => watchState()?.pendingInteractions ?? []);
+
+  effect(() => {
+    const id = props.selectedSessionId();
+    const canonical = watchState()?.events ?? [];
+    if (id === undefined || canonical.length === 0) return;
+    const currentPending = untracked(pendingEvents);
+    if (!currentPending.some((item) => item.sessionId === id)) return;
+    const consumedSeqs = new Set<number>();
+    const next = currentPending.filter((item) => {
+      if (item.sessionId !== id) return true;
+      const match = canonical.find(
+        (ev) =>
+          !confirmedSeqs.has(ev.seq) && !consumedSeqs.has(ev.seq) && !item.knownSeqs.has(ev.seq) && ev.type === "user/message" && ev.text === item.event.text,
+      );
+      if (match) {
+        consumedSeqs.add(match.seq);
+        confirmedSeqs.add(match.seq);
+        return false;
+      }
+      return true;
+    });
+    if (next.length !== currentPending.length) {
+      pendingEvents.set(next);
+    }
+  });
+
+  const displayedEvents = computed((): readonly SessionEvent[] => {
+    const id = props.selectedSessionId();
+    const canonical = watchState()?.events ?? [];
+    if (id === undefined) return canonical;
+    const pendingForSession = pendingEvents().filter((item) => item.sessionId === id);
+    if (pendingForSession.length === 0) return canonical;
+
+    const consumedSeqs = new Set<number>();
+    const remaining: SessionEvent[] = [];
+    for (const opt of pendingForSession) {
+      const match = canonical.find(
+        (ev) =>
+          !confirmedSeqs.has(ev.seq) && !consumedSeqs.has(ev.seq) && !opt.knownSeqs.has(ev.seq) && ev.type === "user/message" && ev.text === opt.event.text,
+      );
+      if (match) {
+        consumedSeqs.add(match.seq);
+      } else {
+        remaining.push(opt.event);
+      }
+    }
+    if (remaining.length === 0) return canonical;
+    return [...canonical, ...remaining];
+  });
+
+  const hasPromptDraft = computed(() => promptDraft().trim() !== "");
+  const canSend = computed(() => props.selectedSessionId() !== undefined && !sending() && hasPromptDraft());
+  const detailTitle = computed(() => selectedView()?.name ?? watchState()?.session?.name ?? props.selectedSessionId() ?? "");
+  const detailSubtitle = computed(() => selectedView()?.runtime ?? watchState()?.session?.runtime);
+  const detailMachine = computed(() => machineLabelOf(selectedView()?.machine ?? watchState()?.session?.machine));
 
   const sendPrompt = async () => {
-    const id = props.selectedSessionId();
-    const text = promptDraft().trim();
-    if (id === undefined || text === "" || sending()) return;
+    const id = untracked(props.selectedSessionId);
+    const text = untracked(promptDraft).trim();
+    if (id === undefined || text === "" || untracked(sending)) return;
+
+    const canonical = untracked(watchState)?.events ?? [];
+    const knownSeqs = new Set(canonical.map((ev) => ev.seq));
+    const seq = --localEventSeq;
+    const optEvent: SessionEvent = {
+      seq,
+      revision: 1,
+      time: Date.now(),
+      type: "user/message",
+      text,
+    };
+
+    promptDraft.set("");
     sending.set(true);
     actionError.set(undefined);
+    pendingEvents.update((prev) => [...prev, { sessionId: id, knownSeqs, event: optEvent }]);
+
+    const rollback = (message: string) => {
+      pendingEvents.update((prev) => prev.filter((item) => item.event.seq !== seq));
+      actionError.set(message);
+      hapticNotification("error");
+      if (untracked(promptDraft) === "") promptDraft.set(text);
+    };
+
     try {
       const env = await props.session.call("session.send", { id, text });
       if (env.bizCode !== 0) {
-        actionError.set(env.message);
-        hapticNotification("error");
+        rollback(env.message);
       } else {
-        promptDraft.set("");
         hapticImpact("light");
       }
+    } catch (err: unknown) {
+      rollback(err instanceof Error ? err.message : String(err));
     } finally {
       sending.set(false);
     }
@@ -228,7 +318,7 @@ export function SessionsTab(props: {
 
   const renderTrajectoryHeader = () => (
     <View class="gap-3 pb-1">
-      <If when={machineLabelOf(selectedView()?.machine ?? watchState()?.session?.machine)}>
+      <If when={detailMachine()}>
         {(label) => (
           <View class="flex-row items-center gap-2">
             <StatusTag testID="session-detail-machine" label={label()} icon="devices" tone="info" />
@@ -236,7 +326,7 @@ export function SessionsTab(props: {
         )}
       </If>
 
-      <Each of={watchState()?.pendingPermissions ?? []} key={(req) => req.requestId}>
+      <Each of={pendingPermissions()} key={(req) => req.requestId}>
         {(req) => (
           <SectionCard testID={`session-permission-${req().requestId}`} class="gap-2.5">
             <View class="flex-row items-center justify-between gap-2">
@@ -274,9 +364,10 @@ export function SessionsTab(props: {
         )}
       </Each>
 
-      <Each of={watchState()?.pendingInteractions ?? []} key={(req) => req.requestId}>
+      <Each of={pendingInteractions()} key={(req) => req.requestId}>
         {(req) => {
-          const draft = () => interactionDrafts()[req().requestId] ?? "";
+          const draft = computed(() => interactionDrafts()[req().requestId] ?? "");
+          const canAnswer = computed(() => busyAction() !== req().requestId && draft().trim() !== "");
           return (
             <SectionCard testID={`session-interaction-${req().requestId}`} class="gap-2.5">
               <Text class="text-sm font-medium text-ink">{req().question}</Text>
@@ -312,7 +403,7 @@ export function SessionsTab(props: {
                     tone="primary"
                     size="sm"
                     label={t("web.remote.inbox.answer")}
-                    disabled={busyAction() === req().requestId || draft().trim() === ""}
+                    disabled={!canAnswer()}
                     onPress={() => {
                       void respondInteraction(req().requestId, { text: draft().trim() });
                     }}
@@ -333,8 +424,8 @@ export function SessionsTab(props: {
       <TopBar
         testID="session-detail-bar"
         backTestID="session-back"
-        title={selectedView()?.name ?? watchState()?.session?.name ?? props.selectedSessionId() ?? ""}
-        subtitle={selectedView()?.runtime ?? watchState()?.session?.runtime}
+        title={detailTitle()}
+        subtitle={detailSubtitle()}
         onBack={isDual() ? undefined : () => props.onSelectSession(undefined)}
         right={
           <If when={isWorking()}>
@@ -363,7 +454,7 @@ export function SessionsTab(props: {
 
       <List
         testID="session-events-list"
-        each={watchState()?.events ?? []}
+        each={displayedEvents()}
         keyExtractor={(ev) => String(ev.seq)}
         estimatedItemSize={96}
         maintainVisibleContentPosition={{ autoscrollToBottomThreshold: 64 }}
@@ -407,7 +498,6 @@ export function SessionsTab(props: {
           onSubmit={() => {
             void sendPrompt();
           }}
-          disabled={sending()}
           class="min-w-0 flex-1"
         />
         <PillButton
@@ -416,7 +506,7 @@ export function SessionsTab(props: {
           size="sm"
           icon="send"
           label={t("web.remote.session.send")}
-          disabled={sending() || promptDraft().trim() === ""}
+          disabled={!canSend()}
           onPress={() => {
             void sendPrompt();
           }}
