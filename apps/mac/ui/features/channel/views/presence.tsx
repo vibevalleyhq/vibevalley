@@ -115,7 +115,9 @@ export function ThinkingDots() {
   const now = useNow(300);
   return (
     <View class="flex-row items-center gap-1" accessible={false}>
-      <Each of={[0, 1, 2]}>{(d) => <View class="h-1.5 w-1.5 rounded-full bg-faint" style={{ opacity: Math.floor(now() / 300) % 3 === d() ? 1 : 0.4 }} />}</Each>
+      <Each of={[0, 1, 2]} key={(d) => d}>
+        {(d) => <View class="h-1.5 w-1.5 rounded-full bg-faint" style={{ opacity: Math.floor(now() / 300) % 3 === d() ? 1 : 0.4 }} />}
+      </Each>
     </View>
   );
 }

@@ -100,18 +100,20 @@ export function SectionHead(props: {
   };
   const labelRow = () => (
     <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
-      {props.collapsible === true ? (
+      <If when={props.collapsible === true}>
         <View
           class={`size-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
           style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}
         >
           <Icon name="expand" size={10} tone={hovered() ? "ink" : "muted"} />
         </View>
-      ) : null}
+      </If>
       <Text role="header" class={`truncate text-2xs font-semibold tracking-wide ${titleClass()}`}>
         {props.title}
       </Text>
-      {props.count !== undefined ? <SectionCountBadge count={props.count} tone={props.tone} /> : null}
+      <If when={props.count !== undefined}>
+        <SectionCountBadge count={props.count ?? 0} tone={props.tone} />
+      </If>
     </View>
   );
 
@@ -119,7 +121,7 @@ export function SectionHead(props: {
     <View
       class={`h-7.5 flex-row items-center gap-1.5 pr-2 pl-3 ${props.borderTop === true ? "border-t border-line" : ""} ${props.borderBottom === true ? "border-b border-line" : ""}`}
     >
-      {props.collapsible === true ? (
+      <If when={props.collapsible === true} else={labelRow()}>
         <Button
           onPress={() => props.onToggle?.()}
           onMouseEnter={() => hovered.set(true)}
@@ -129,10 +131,8 @@ export function SectionHead(props: {
         >
           {labelRow()}
         </Button>
-      ) : (
-        labelRow()
-      )}
-      {props.right !== undefined ? <View class="shrink-0 flex-row items-center gap-0.5">{props.right}</View> : null}
+      </If>
+      <If when={props.right}>{(right) => <View class="shrink-0 flex-row items-center gap-0.5">{right()}</View>}</If>
     </View>
   );
 }

@@ -30,7 +30,7 @@ export function ConfirmButton(props: {
           tone={props.tone === "danger" ? "danger" : "plain"}
           icon={props.icon}
           accessibilityLabel={props.title}
-          tooltip={props.title ? <Bubble text={props.title} /> : undefined}
+          tooltip={<If when={props.title}>{(title) => <Bubble text={title()} />}</If>}
           disabled={props.disabled}
           testID={props.testid}
           onPress={() => armed.set(true)}

@@ -1,4 +1,4 @@
-import { effect, Scroll, signal, Text, untracked, View } from "nsh";
+import { computed, effect, Scroll, signal, Text, untracked, View } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -97,29 +97,37 @@ function ThreadCard(props: {
   );
 }
 
+function BoardToken(props: { item: ReturnType<typeof parseBoardTokens>[number] }) {
+  const isStall = () => props.item.value === "[stall]";
+  return (
+    <If
+      when={props.item.kind === "mention"}
+      else={
+        <If
+          when={props.item.kind === "seq"}
+          else={
+            <If when={props.item.kind === "tag"} else={<Text class="text-xs text-ink select-text">{props.item.value}</Text>}>
+              <View class={`rounded-sm px-1 py-px ${isStall() ? "bg-warn-soft" : "bg-ok-soft"}`}>
+                <Text class={`font-mono text-2xs font-semibold ${isStall() ? "text-warn-ink" : "text-ok-ink"}`}>{props.item.value}</Text>
+              </View>
+            </If>
+          }
+        >
+          <Text class="font-mono text-xs font-medium text-ink">{props.item.value}</Text>
+        </If>
+      }
+    >
+      <Text class="font-mono text-xs font-medium text-water">{props.item.value}</Text>
+    </If>
+  );
+}
+
 function BoardMessageBody(props: { text: string }) {
-  const tokens = () => parseBoardTokens(props.text);
+  const tokens = computed(() => parseBoardTokens(props.text));
   return (
     <View class="flex-row flex-wrap items-center gap-x-1 gap-y-0.5">
-      <Each of={tokens()} key={(_, idx) => idx}>
-        {(tok) => {
-          const item = tok();
-          if (item.kind === "mention") {
-            return <Text class="font-mono text-xs font-medium text-water">{item.value}</Text>;
-          }
-          if (item.kind === "seq") {
-            return <Text class="font-mono text-xs font-medium text-ink">{item.value}</Text>;
-          }
-          if (item.kind === "tag") {
-            const isStall = item.value === "[stall]";
-            return (
-              <View class={`rounded-sm px-1 py-px ${isStall ? "bg-warn-soft" : "bg-ok-soft"}`}>
-                <Text class={`font-mono text-2xs font-semibold ${isStall ? "text-warn-ink" : "text-ok-ink"}`}>{item.value}</Text>
-              </View>
-            );
-          }
-          return <Text class="text-xs text-ink select-text">{item.value}</Text>;
-        }}
+      <Each of={tokens()} key="index">
+        {(tok) => <BoardToken item={tok()} />}
       </Each>
     </View>
   );
@@ -184,12 +192,12 @@ export function SwarmPanel(props: SwarmPanelProps) {
   const showTranscriptSkeleton = useDelayedBusy(() => transcriptLoading());
   let transcriptGen = 0;
 
-  const sortedMembers = (): readonly SessionSwarmMember[] => {
+  const sortedMembers = computed((): readonly SessionSwarmMember[] => {
     const list = props.swarm.members;
     return [...list.filter((m) => m.role === "coordinator"), ...list.filter((m) => m.role !== "coordinator")];
-  };
+  });
 
-  const memberMap = (): ReadonlyMap<string, SessionSwarmMember> => new Map(props.swarm.members.map((m) => [m.name, m]));
+  const memberMap = computed((): ReadonlyMap<string, SessionSwarmMember> => new Map(props.swarm.members.map((m) => [m.name, m])));
 
   const activeMember = (): SessionSwarmMember | undefined => {
     const name = selectedMemberName();
@@ -233,7 +241,7 @@ export function SwarmPanel(props: SwarmPanelProps) {
     }
   });
 
-  const boardAgents = (): readonly string[] => {
+  const boardAgents = computed((): readonly string[] => {
     const seen = new Set<string>();
     const out: string[] = [];
     for (const m of props.swarm.members) {
@@ -249,9 +257,9 @@ export function SwarmPanel(props: SwarmPanelProps) {
       }
     }
     return out;
-  };
+  });
 
-  const filteredMessages = (): readonly SessionSwarmMessage[] => {
+  const filteredMessages = computed((): readonly SessionSwarmMessage[] => {
     const agent = boardAgentFilter();
     const q = boardQuery().trim().toLowerCase();
     const list = props.swarm.messages.filter((m) => {
@@ -260,7 +268,7 @@ export function SwarmPanel(props: SwarmPanelProps) {
       return true;
     });
     return boardReversed() ? [...list].toReversed() : list;
-  };
+  });
 
   const tabs: readonly { id: SwarmTab; label: string; count?: () => number }[] = [
     { id: "overview", label: t("web.shell.swarm.tabOverview") },
@@ -280,25 +288,28 @@ export function SwarmPanel(props: SwarmPanelProps) {
           <Icon name="agents" size={13} tone="muted" />
           <Text class="min-w-0 shrink truncate text-xs font-semibold text-ink">{props.swarm.title ?? "Swarm"}</Text>
           <View role="tablist" class="shrink-0 flex-row items-center gap-0.5">
-            {tabs.map((item) => {
-              const active = () => tab() === item.id;
-              return (
-                <View
-                  role="tab"
-                  testID={`swarm-tab-${item.id}`}
-                  accessibilityState={{ selected: active() }}
-                  onPress={() => tab.set(item.id)}
-                  class={`h-6 flex-row items-center gap-1 rounded-md px-2 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus ${
-                    active() ? "bg-selected" : ""
-                  }`}
-                >
-                  <Text class={`text-xs font-medium ${active() ? "text-ink" : "text-muted"}`}>{item.label}</Text>
-                  <If when={item.count !== undefined && item.count() > 0}>
-                    <Text class="font-mono text-2xs text-faint tabular-nums">{String(item.count?.() ?? 0)}</Text>
-                  </If>
-                </View>
-              );
-            })}
+            <Each of={tabs} key={(item) => item.id}>
+              {(item) => {
+                const active = () => tab() === item().id;
+                const badgeCount = () => item().count?.() ?? 0;
+                return (
+                  <View
+                    role="tab"
+                    testID={`swarm-tab-${item().id}`}
+                    accessibilityState={{ selected: active() }}
+                    onPress={() => tab.set(item().id)}
+                    class={`h-6 flex-row items-center gap-1 rounded-md px-2 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus ${
+                      active() ? "bg-selected" : ""
+                    }`}
+                  >
+                    <Text class={`text-xs font-medium ${active() ? "text-ink" : "text-muted"}`}>{item().label}</Text>
+                    <If when={badgeCount() > 0}>
+                      <Text class="font-mono text-2xs text-faint tabular-nums">{String(badgeCount())}</Text>
+                    </If>
+                  </View>
+                );
+              }}
+            </Each>
           </View>
         </View>
         <ShellIconButton compact icon="close" size={11} label={t("web.shell.swarm.closeDrawer")} onPress={props.onClose} />

@@ -205,7 +205,14 @@ function ChannelMain(props: {
           <Text class="font-mono text-xs font-semibold text-muted">{markOf(props.channel)}</Text>
         </View>
         <View class="min-w-0 flex-1 flex-row items-center gap-2 overflow-hidden">
-          <View class="shrink-0" tooltip={props.channel?.default === true ? <Bubble text={t("web.channel.defaultHint")} /> : undefined}>
+          <View
+            class="shrink-0"
+            tooltip={
+              <If when={props.channel?.default === true}>
+                <Bubble text={t("web.channel.defaultHint")} />
+              </If>
+            }
+          >
             <Text role="header" class="truncate text-sm font-semibold text-ink">
               {name()}
             </Text>

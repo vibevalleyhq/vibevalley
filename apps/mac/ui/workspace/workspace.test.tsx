@@ -888,3 +888,157 @@ test("regression: ChatPane hides thought level and omits effort for Orchestrator
   expect(app.count("id:chat-thought-level")).toBe(1);
   expect(host.calls).toContainEqual({ op: "session.setConfig", payload: { id: "sess-orch-1", model: "gemini-4-neon" } });
 });
+
+test("regression: FileTree stays mounted across rail and files frame updates without losing open state", async () => {
+  const host = workspaceHost({ view: "sidebar", role: "inspector" });
+  const app = await open("../ShellApp.story.tsx", {
+    width: 320,
+    height: 760,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: 1_700_000_000_000 },
+    host: host.options,
+  });
+  await host.pump(app);
+
+  await host.pushFrame(app, "rail", {
+    panel: "files",
+    projects: [{ id: 1, name: "app", path: "/work/app", initials: "AP", active: true, attention: false, terminals: 0, tabs: [] }],
+  });
+  await host.pushFrame(app, "files", {
+    root: "/work/app",
+    name: "app",
+    expanded: ["/work/app/src"],
+    selected: "/work/app/src/index.ts",
+    items: [
+      {
+        id: "/work/app/src",
+        label: "src",
+        tone: "dirty",
+        children: [{ id: "/work/app/src/index.ts", label: "index.ts", tone: "modified" }],
+      },
+      { id: "/work/app/lib", label: "lib", tone: "clean", children: [{ id: "/work/app/lib/__loading", label: "…", tone: "placeholder" }] },
+    ],
+  } satisfies FilesFrame);
+
+  expect(app.texts()).toContain("index.ts");
+  await app.rightClick("text:index.ts");
+  expect(app.shows(`text:${t("web.shell.fileTree.copyRelPath")}`)).toBe(true);
+
+  // Rail updates while panel stays "files" must keep FileTree and its open context menu mounted.
+  await host.pushFrame(app, "rail", {
+    panel: "files",
+    projects: [
+      {
+        id: 1,
+        name: "app",
+        path: "/work/app",
+        initials: "AP",
+        active: true,
+        attention: true,
+        terminals: 1,
+        tabs: [{ id: 7, title: "zsh", active: true, kind: "terminal", running: true, runningState: "working" }],
+      },
+    ],
+  });
+  expect(app.shows(`text:${t("web.shell.fileTree.copyRelPath")}`)).toBe(true);
+  expect(app.count("id:file-tree-skeleton")).toBe(0);
+
+  // Expanding another folder pushes a new files frame; Tree stays mounted and displays both expanded folders.
+  await host.pushFrame(app, "files", {
+    root: "/work/app",
+    name: "app",
+    expanded: ["/work/app/src", "/work/app/lib"],
+    selected: "/work/app/src/index.ts",
+    items: [
+      {
+        id: "/work/app/src",
+        label: "src",
+        tone: "dirty",
+        children: [{ id: "/work/app/src/index.ts", label: "index.ts", tone: "modified" }],
+      },
+      {
+        id: "/work/app/lib",
+        label: "lib",
+        tone: "clean",
+        children: [{ id: "/work/app/lib/helper.ts", label: "helper.ts", tone: "added" }],
+      },
+    ],
+  } satisfies FilesFrame);
+  expect(app.texts()).toContain("index.ts");
+  expect(app.texts()).toContain("helper.ts");
+  expect(app.count("id:file-tree-skeleton")).toBe(0);
+});
+
+test("regression: GitPanel preserves commit draft across rail and git frame updates and auto-clears notices", async () => {
+  const host = workspaceHost({ view: "sidebar", role: "inspector" });
+  const app = await open("../ShellApp.story.tsx", {
+    width: 340,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: 1_700_000_000_000 },
+    host: host.options,
+  });
+  const clock = app.clock;
+  if (!clock) throw new Error("GitPanel reactivity test requires a manual virtual clock");
+  await host.pump(app);
+
+  const baseGit: GitFrame = {
+    repo: true,
+    busy: false,
+    branch: "main",
+    ahead: 0,
+    behind: 0,
+    conflicts: [],
+    staged: [{ path: "src/staged.rs", code: "M", tone: "modified" }],
+    changes: [{ path: "src/dirty.rs", code: "M", tone: "modified" }],
+    branches: [{ name: "main", head: true, upstream: "origin/main" }],
+    log: [],
+  };
+  await host.pushFrame(app, "rail", {
+    panel: "git",
+    projects: [{ id: 1, name: "app", path: "/work/app", initials: "AP", active: true, attention: false, terminals: 0, tabs: [] }],
+  });
+  await host.pushFrame(app, "git", baseGit);
+
+  await app.type(`text:${t("web.shell.git.commitPlaceholder")}`, "Keep draft across frames");
+
+  // Push both rail and git frame updates while panel stays "git"; GitPanel and its commit draft must survive.
+  await host.pushFrame(app, "rail", {
+    panel: "git",
+    projects: [
+      {
+        id: 1,
+        name: "app",
+        path: "/work/app",
+        initials: "AP",
+        active: true,
+        attention: true,
+        terminals: 1,
+        tabs: [{ id: 8, title: "zsh", active: true, kind: "terminal", running: true, runningState: "working" }],
+      },
+    ],
+  });
+  await host.pushFrame(app, "git", {
+    ...baseGit,
+    changes: [
+      { path: "src/dirty.rs", code: "M", tone: "modified" },
+      { path: "src/extra.rs", code: "A", tone: "added" },
+    ],
+  } satisfies GitFrame);
+  expect(app.texts()).toContain("extra.rs");
+
+  host.clearActs();
+  await app.press(`text:${t("web.shell.git.commitStaged", { count: 1 })}`);
+  expect(host.acts).toContainEqual({ type: "commit", message: "Keep draft across frames" });
+
+  // Commit completion shows notice and auto-clears after 2500ms (proves timer effect is not self-cancelling).
+  await host.pushFrame(app, "git", { ...baseGit, busy: true } satisfies GitFrame);
+  await host.pushFrame(app, "git", { ...baseGit, busy: false, staged: [] } satisfies GitFrame);
+  expect(app.texts()).toContain(t("web.shell.git.commitSuccess"));
+
+  await clock.fastForward(2600);
+  await host.pump(app);
+  expect(app.texts()).not.toContain(t("web.shell.git.commitSuccess"));
+});

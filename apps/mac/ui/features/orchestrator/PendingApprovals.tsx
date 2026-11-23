@@ -21,11 +21,9 @@ const approvalsQuery = defineQuery({
 });
 
 export function PendingApprovals(props: { conversationId: string }) {
-  const conversationId = props.conversationId;
   const client = useQueryClient();
-  const descriptor = approvalsQuery(conversationId);
-  const query = useQuery(() => descriptor, { interval: () => 3_000 });
-  const pending = () => query.data()?.filter((approval) => approval.conversationId === conversationId) ?? [];
+  const query = useQuery(() => approvalsQuery(props.conversationId), { interval: () => 3_000 });
+  const pending = () => query.data()?.filter((approval) => approval.conversationId === props.conversationId) ?? [];
   const act = createAct();
   const decide = async (approval: OrchestratorApproval, approved: boolean) => {
     if (act.busy()) return;
@@ -34,7 +32,7 @@ export function PendingApprovals(props: { conversationId: string }) {
       try {
         await api.orchestrator.approval.resolve({ conversationId, taskId, toolCallId, approved });
       } finally {
-        await client.invalidate({ key: descriptor.key });
+        await client.invalidate({ key: approvalsQuery(conversationId).key });
       }
     });
   };

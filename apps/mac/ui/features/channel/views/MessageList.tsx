@@ -360,13 +360,20 @@ function Frame(props: {
   name: string;
   meta: string;
   continues?: boolean;
+  /** Resets local hover state when a recycled `<List>` cell binds to another item. */
+  resetKey?: string | undefined;
   /** The message it answers, quoted above it. */
   quote?: { channel: string; number: number } | undefined;
-  /** The row's tools, given whether the pointer is over the row. */
-  tools?: (hovered: boolean) => JSX.Element;
+  /** The row's tools, given an accessor for whether the pointer is over the row so menus survive mouse-out. */
+  tools?: (hovered: () => boolean) => JSX.Element;
   children: JSX.Element;
 }) {
   const hovered = signal(false);
+  createEffect(
+    () => props.resetKey,
+    () => hovered.set(false),
+    { defer: true },
+  );
   return (
     <View
       onMouseEnter={() => hovered.set(true)}
@@ -401,7 +408,7 @@ function Frame(props: {
           {props.children}
         </View>
       </View>
-      {props.tools?.(hovered())}
+      {props.tools?.(() => hovered())}
     </View>
   );
 }
@@ -409,6 +416,11 @@ function Frame(props: {
 /** A dispatch said as what it is for the user: who went to which issue; one line until it is opened, then the whole task. */
 function Dispatch(props: { m: ChatMessage }) {
   const open = signal(false);
+  createEffect(
+    () => props.m.id,
+    () => open.set(false),
+    { defer: true },
+  );
   const sent = useSession(() => props.m.session);
   const issue = useIssue(() => {
     const s = sent();
@@ -497,18 +509,19 @@ function MessageRow(props: {
       name={props.m.actor.kind === "user" ? t("web.channel.messages.user") : props.m.name}
       meta={`${who() ? `${who()}  ` : ""}${workbenchClock(props.m.at)}${meta() ? `  ${meta()}` : ""}`}
       continues={props.continues}
+      resetKey={props.m.id}
       quote={props.m.replyTo !== undefined ? { channel: props.m.channel, number: props.m.replyTo } : undefined}
       tools={(hovered) => (
         <If
           when={props.onJump}
           else={
             <If when={props.m.deleted === undefined && !props.where}>
-              <MessageTools m={props.m} inChannel={props.inChannel === true} onEdit={() => setEditing(true)} shown={hovered} />
+              <MessageTools m={props.m} inChannel={props.inChannel === true} onEdit={() => setEditing(true)} shown={hovered()} />
             </If>
           }
         >
           {(jump) => (
-            <If when={hovered}>
+            <If when={hovered()}>
               <View
                 role="button"
                 testID="message-jump"

@@ -228,7 +228,7 @@ export function DesignSystemView(props: StoreViewerProps) {
       <If when={tab() === "colors"}>
         <Scroll class="min-h-0 flex-1" contentClass="p-4 gap-5">
           <View testID="ds-colors-grid" class="flex-row flex-wrap gap-3">
-            <Each of={parsedTokens().colors}>
+            <Each of={parsedTokens().colors} key={(c) => c.id}>
               {(item) => {
                 const c = () => item();
                 const ratio = () => (previewTheme() === "dark" ? c().contrastDark : c().contrastLight);
@@ -278,7 +278,7 @@ export function DesignSystemView(props: StoreViewerProps) {
                 <View class="gap-2">
                   <Text class="text-xs font-semibold text-muted">Spacing</Text>
                   <View class="flex-row flex-wrap gap-2">
-                    <Each of={parsedTokens().space}>
+                    <Each of={parsedTokens().space} key={(sp) => sp.id}>
                       {(sp) => (
                         <View class="flex-row items-center gap-2.5 rounded-md border border-line bg-side px-3 py-2">
                           <Text class="font-mono text-xs font-semibold text-ink">{`--space-${sp().id}`}</Text>
@@ -294,7 +294,7 @@ export function DesignSystemView(props: StoreViewerProps) {
                 <View class="gap-2">
                   <Text class="text-xs font-semibold text-muted">Radius</Text>
                   <View class="flex-row flex-wrap gap-2">
-                    <Each of={parsedTokens().radius}>
+                    <Each of={parsedTokens().radius} key={(rad) => rad.id}>
                       {(rad) => (
                         <View class="flex-row items-center gap-2.5 rounded-md border border-line bg-side px-3 py-2">
                           <View class="size-7 border border-accent bg-page" style={{ borderRadius: parsePx(rad().value, 6, 0, 24) }} />
@@ -317,7 +317,7 @@ export function DesignSystemView(props: StoreViewerProps) {
         <Scroll class="min-h-0 flex-1" contentClass="p-4 gap-4">
           <View testID="ds-typography" class="gap-4">
             <View class="flex-row flex-wrap gap-3">
-              <Each of={parsedTokens().families}>
+              <Each of={parsedTokens().families} key={(f) => f.id}>
                 {(f) => (
                   <View class="min-w-64 flex-1 gap-1 rounded-lg border border-line bg-side p-3">
                     <Text class="font-mono text-xs font-semibold text-muted">{`--font-${f().id}`}</Text>
@@ -332,7 +332,7 @@ export function DesignSystemView(props: StoreViewerProps) {
 
             <If when={parsedTokens().scale.length > 0}>
               <View class="flex-row flex-wrap gap-2">
-                <Each of={parsedTokens().scale}>
+                <Each of={parsedTokens().scale} key={(sc) => sc.id}>
                   {(sc) => (
                     <View class="flex-row items-center gap-2 rounded-md border border-line bg-side px-2.5 py-1.5">
                       <Text class="font-mono text-xs font-semibold text-ink">{`--text-${sc().id}`}</Text>
@@ -344,7 +344,7 @@ export function DesignSystemView(props: StoreViewerProps) {
             </If>
 
             <View class="gap-3">
-              <Each of={parsedTokens().styles}>
+              <Each of={parsedTokens().styles} key={(st) => st.id}>
                 {(st) => {
                   const pxSize = () => parsePx(st().size, 14, 11, 48);
                   return (
@@ -368,7 +368,7 @@ export function DesignSystemView(props: StoreViewerProps) {
       <If when={tab() === "components"}>
         <View testID="ds-components" class="min-h-0 flex-1 flex-row gap-3 p-4">
           <Scroll class="w-48 shrink-0" contentClass="gap-1">
-            <Each of={components()}>
+            <Each of={components()} key={(comp) => comp.id}>
               {(comp) => {
                 const selected = () => comp().id === activeComponent()?.id;
                 return (

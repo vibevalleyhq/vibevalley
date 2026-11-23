@@ -145,12 +145,15 @@ export function TrajectoryLog(props: {
     () => true,
   );
   const now = useNow();
-  const head = () =>
-    props.title ? (
-      <View tooltip={props.about ? <Bubble text={props.about} /> : undefined}>
-        <Text class="truncate text-sm font-semibold text-ink">{props.title}</Text>
-      </View>
-    ) : undefined;
+  const head = () => (
+    <If when={props.title}>
+      {(title) => (
+        <View tooltip={<If when={props.about}>{(about) => <Bubble text={about()} />}</If>}>
+          <Text class="truncate text-sm font-semibold text-ink">{title()}</Text>
+        </View>
+      )}
+    </If>
+  );
   return (
     <View class="min-h-0 flex-1">
       <If when={props.subagents}>{(progress) => <SubagentProgress session={props.id} progress={progress()} now={now()} />}</If>
@@ -597,7 +600,7 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
   return (
     <View testID="waterfall" class="flex-row items-center rounded-md border border-line bg-side px-2 py-2">
       <View class="w-12 shrink-0 justify-between" style={{ height: lane * 3 + gap * 2 }}>
-        <Each of={lanes}>
+        <Each of={lanes} key={(l) => l}>
           {(l) => (
             <Text class="text-2xs font-medium text-muted" style={{ lineHeight: lane }}>
               {laneNames[l()]}
@@ -606,7 +609,9 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
         </Each>
       </View>
       <View onLayout={(e) => width.set(e.bounds.size.width)} class="min-w-0 flex-1 overflow-hidden" style={{ height: lane * 3 + gap * 2 }}>
-        <Each of={[0, 1, 2]}>{(i) => <View class="absolute inset-x-0 h-3 rounded-xs bg-hover" style={{ top: i() * (lane + gap) }} />}</Each>
+        <Each of={[0, 1, 2]} key={(i) => i}>
+          {(i) => <View class="absolute inset-x-0 h-3 rounded-xs bg-hover" style={{ top: i() * (lane + gap) }} />}
+        </Each>
         <Each of={bars()} key="index">
           {(b) => (
             <View

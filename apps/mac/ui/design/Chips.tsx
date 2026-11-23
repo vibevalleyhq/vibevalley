@@ -24,7 +24,7 @@ export function ChipsInput(props: { value: readonly string[]; onChange: (v: stri
         props.disabled === true ? "bg-side opacity-50" : "hover:border-faint focus-within:border-focus",
       ].join(" ")}
     >
-      <Each of={props.value}>
+      <Each of={props.value} key={(v) => v}>
         {(v) => (
           <View class="h-6 flex-row items-center gap-1 rounded-sm bg-hover pr-0.5 pl-1.5">
             <Text class="text-xs font-medium text-ink">{v()}</Text>

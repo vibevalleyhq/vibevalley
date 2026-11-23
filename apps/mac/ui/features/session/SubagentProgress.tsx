@@ -164,7 +164,7 @@ export function SubagentProgress(props: { session: string; progress: SubagentSum
                         <Text class="text-xs font-semibold text-muted">{t("web.session.subagents.steps.title")}</Text>
                         <Text class="font-mono text-2xs text-faint tabular-nums">{`${stepsDone()}/${stepsCount()}`}</Text>
                       </View>
-                      <Each of={thread().steps ?? []}>
+                      <Each of={thread().steps ?? []} key="index">
                         {(item) => (
                           <View class="flex-row items-start gap-2 py-0.5">
                             <View class="mt-0.5 h-3.5 w-3.5 shrink-0 items-center justify-center">
