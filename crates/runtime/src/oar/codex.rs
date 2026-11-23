@@ -27,7 +27,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, rejected, rejection};
-use crate::oar::process::{LineChild, LoginCheck, LoginStatus, Spawn, probe_installation_with, require_binary};
+use crate::oar::process::{AbortWatchdog, LineChild, LoginCheck, LoginStatus, Spawn, probe_installation_with, require_binary};
 use crate::oar::record::{self, Recorder};
 use crate::oar::{
     AccountUsage, AgentError, Capabilities, ContentBlock, EventKind, FileChangeKind, Installation, McpServer, ModelInfo, PermissionDecision, PermissionMode,
@@ -602,8 +602,7 @@ struct SessionState {
     session_title: Mutex<Option<String>>,
     turn_id: Mutex<Option<String>>,
     abort_wanted: AtomicBool,
-    abort_killed: AtomicBool,
-    turns_finished: AtomicU64,
+    watchdog: Arc<AbortWatchdog>,
     approvals: Mutex<HashMap<String, PendingApproval>>,
     cwd: PathBuf,
     output_schema: Option<Value>,
@@ -745,7 +744,7 @@ impl Shared {
             if path.is_empty() && matches!(kind, EventKind::TurnFinished { .. }) {
                 *session.turn_id.lock() = None;
                 session.abort_wanted.store(false, Ordering::SeqCst);
-                session.turns_finished.fetch_add(1, Ordering::SeqCst);
+                session.watchdog.on_turn_finished();
                 session.approvals.lock().clear();
             }
             session.core.emit(path, kind);
@@ -827,20 +826,8 @@ impl Shared {
         }
         *self.exit.lock() = Some(message.clone());
         if let Some(session) = self.session.get() {
-            finish(session, message);
+            session.watchdog.finish_on_exit(&session.core, message);
         }
-    }
-}
-
-fn finish(session: &SessionState, message: String) {
-    if session.abort_killed.load(Ordering::SeqCst) && session.core.turn_active() {
-        session.core.emit_root(EventKind::TurnFinished {
-            reason: StopReason::Aborted,
-            usage: Usage::default(),
-        });
-        session.core.finish(None);
-    } else {
-        session.core.finish(Some(message));
     }
 }
 
@@ -950,22 +937,9 @@ impl Driver for CodexDriver {
         if let Some(turn_id) = session.turn_id.lock().clone() {
             self.shared.interrupt(session, &turn_id);
         }
-        let shared = self.shared.clone();
-        let turn = session.turns_finished.load(Ordering::SeqCst);
-        std::thread::spawn(move || {
-            let Some(session) = shared.session.get() else { return };
-            let deadline = std::time::Instant::now() + ABORT_GRACE;
-            while std::time::Instant::now() < deadline {
-                if session.turns_finished.load(Ordering::SeqCst) != turn || !session.core.turn_active() {
-                    return;
-                }
-                std::thread::sleep(Duration::from_millis(100));
-            }
-            session.abort_killed.store(true, Ordering::SeqCst);
-            if let Some(child) = shared.child.get() {
-                child.kill();
-            }
-        });
+        if let Some(child) = self.shared.child.get() {
+            session.watchdog.arm(ABORT_GRACE, session.core.clone(), child.clone());
+        }
         Ok(())
     }
 
@@ -989,6 +963,7 @@ impl Driver for CodexDriver {
             child.kill();
             self.session().core.observe_exit(child.status());
         }
+        self.session().watchdog.wake();
     }
 }
 
@@ -1286,8 +1261,7 @@ impl Runtime for CodexRuntime {
             session_title: Mutex::new(initial_title),
             turn_id: Mutex::new(None),
             abort_wanted: AtomicBool::new(false),
-            abort_killed: AtomicBool::new(false),
-            turns_finished: AtomicU64::new(0),
+            watchdog: AbortWatchdog::new(),
             approvals: Mutex::new(HashMap::new()),
             cwd: opts.cwd.clone(),
             output_schema: opts.output_schema.clone(),
@@ -1300,7 +1274,7 @@ impl Runtime for CodexRuntime {
             }
             let exited = shared.exit.lock().clone();
             if let Some(message) = exited {
-                finish(session, message);
+                session.watchdog.finish_on_exit(&session.core, message);
             }
         }
         Ok(CoreSession::new(core, CodexDriver { shared }, self.capabilities()))

@@ -7,7 +7,7 @@ use crate::oar::{
     AgentError, Capabilities, ContentBlock, EventKind, FileChangeKind, PermissionDecision, PermissionMode, Result, Session, StopReason, SubagentStatus, Usage,
 };
 use serde_json::Value;
-use tokio_util::sync::CancellationToken;
+use tokio_util::sync::{CancellationToken, DropGuard};
 
 use crate::agent::ai::models::{charge_usd, deepseek_price};
 use crate::agent::core::doc::{CONVERSATION_SCOPE, GovernanceDoc, OarSessionDoc, OarSessionState, read_doc_opt, write_doc};
@@ -25,12 +25,7 @@ pub(crate) struct WorkerDriver {
     core: Arc<SessionCore>,
     active: Arc<Mutex<Option<String>>>,
     cancel: CancellationToken,
-}
-
-impl Drop for WorkerDriver {
-    fn drop(&mut self) {
-        self.cancel.cancel();
-    }
+    _cancel_guard: DropGuard,
 }
 
 impl WorkerDriver {
@@ -188,13 +183,15 @@ impl WorkerDriver {
             .attach_worker(&conversation, brain.clone(), Arc::new(move |e| observer.lock().unwrap()(e)))
             .map_err(failed)?;
 
+        let cancel = CancellationToken::new();
         let driver = Self {
             execution,
             conversation,
             brain,
             core,
             active: Default::default(),
-            cancel: CancellationToken::new(),
+            _cancel_guard: cancel.clone().drop_guard(),
+            cancel,
         };
         if let Some(task) = unfinished {
             driver.follow(task)?;

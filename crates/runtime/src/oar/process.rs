@@ -7,7 +7,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use nix::errno::Errno;
@@ -19,7 +19,87 @@ use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, Buf
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::{Mutex as AsyncMutex, Notify, oneshot, watch};
 
-use crate::oar::{AgentError, Installation, Result};
+use crate::oar::core::SessionCore;
+use crate::oar::{AgentError, EventKind, Installation, Result, StopReason, Usage};
+
+pub(crate) fn task_handle() -> tokio::runtime::Handle {
+    tokio::runtime::Handle::try_current().unwrap_or_else(|_| crate::rt::handle().clone())
+}
+
+/// Shared abort-grace watchdog across subprocess-backed `oar` drivers.
+/// Disarms immediately when the active turn finishes or the session exits;
+/// otherwise kills the child process after `grace` and marks the exit as aborted.
+#[derive(Default)]
+pub(crate) struct AbortWatchdog {
+    turns_finished: AtomicU64,
+    abort_killed: AtomicBool,
+    turn_done: Notify,
+}
+
+impl AbortWatchdog {
+    pub(crate) fn new() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    pub(crate) fn on_turn_finished(&self) {
+        self.turns_finished.fetch_add(1, Ordering::SeqCst);
+        self.turn_done.notify_waiters();
+    }
+
+    pub(crate) fn wake(&self) {
+        self.turn_done.notify_waiters();
+    }
+
+    pub(crate) fn arm(self: &Arc<Self>, grace: Duration, core: Arc<SessionCore>, child: Arc<LineChild>) {
+        self.arm_with(grace, core, async move {
+            child.kill_async().await;
+        });
+    }
+
+    fn arm_with<F>(self: &Arc<Self>, grace: Duration, core: Arc<SessionCore>, on_timeout: F) -> tokio::task::JoinHandle<()>
+    where
+        F: std::future::Future<Output = ()> + Send + 'static,
+    {
+        let this = Arc::clone(self);
+        let turn = this.turns_finished.load(Ordering::SeqCst);
+        task_handle().spawn(async move {
+            let deadline = tokio::time::Instant::now() + grace;
+            loop {
+                let notified = this.turn_done.notified();
+                tokio::pin!(notified);
+                notified.as_mut().enable();
+                if this.turns_finished.load(Ordering::SeqCst) != turn || !core.turn_active() {
+                    return;
+                }
+                tokio::select! {
+                    biased;
+                    _ = notified => {}
+                    _ = tokio::time::sleep_until(deadline) => {
+                        if this.turns_finished.load(Ordering::SeqCst) != turn || !core.turn_active() {
+                            return;
+                        }
+                        this.abort_killed.store(true, Ordering::SeqCst);
+                        on_timeout.await;
+                        return;
+                    }
+                }
+            }
+        })
+    }
+
+    pub(crate) fn finish_on_exit(&self, core: &SessionCore, message: String) {
+        if self.abort_killed.load(Ordering::SeqCst) && core.turn_active() {
+            core.emit_root(EventKind::TurnFinished {
+                reason: StopReason::Aborted,
+                usage: Usage::default(),
+            });
+            core.finish(None);
+        } else {
+            core.finish(Some(message));
+        }
+        self.turn_done.notify_waiters();
+    }
+}
 
 const KILL_GRACE: Duration = Duration::from_secs(2);
 const STDOUT_EOF_EXIT_GRACE: Duration = Duration::from_secs(5);
@@ -570,24 +650,23 @@ impl LineChild {
         Ok(this)
     }
 
+    pub(crate) async fn write_line_async(&self, line: &str) -> Result<()> {
+        let mut stdin = self.inner.stdin.lock().await;
+        let Some(pipe) = stdin.as_mut() else {
+            return Err(AgentError::Io("the runtime's stdin is closed".into()));
+        };
+        self.trace.log("send", line);
+        pipe.write_all(line.as_bytes())
+            .await
+            .map_err(|e| AgentError::Io(format!("write to runtime failed: {e}")))?;
+        pipe.write_all(b"\n")
+            .await
+            .map_err(|e| AgentError::Io(format!("write to runtime failed: {e}")))?;
+        pipe.flush().await.map_err(|e| AgentError::Io(format!("write to runtime failed: {e}")))
+    }
+
     pub(crate) fn write_line(&self, line: &str) -> Result<()> {
-        let inner = self.inner.clone();
-        let trace = self.trace.clone();
-        let owned = line.to_string();
-        crate::rt::block_on(async move {
-            let mut stdin = inner.stdin.lock().await;
-            let Some(pipe) = stdin.as_mut() else {
-                return Err(AgentError::Io("the runtime's stdin is closed".into()));
-            };
-            trace.log("send", &owned);
-            pipe.write_all(owned.as_bytes())
-                .await
-                .map_err(|e| AgentError::Io(format!("write to runtime failed: {e}")))?;
-            pipe.write_all(b"\n")
-                .await
-                .map_err(|e| AgentError::Io(format!("write to runtime failed: {e}")))?;
-            pipe.flush().await.map_err(|e| AgentError::Io(format!("write to runtime failed: {e}")))
-        })
+        crate::rt::block_on(self.write_line_async(line))
     }
 
     pub(crate) fn write_json(&self, value: &serde_json::Value) -> Result<()> {
@@ -784,5 +863,88 @@ mod tests {
         ))
         .unwrap_err();
         assert_eq!(missing.kind(), std::io::ErrorKind::NotFound);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn abort_watchdog_kills_after_grace_and_marks_exit_aborted() {
+        let wall = std::time::Instant::now();
+        let core = SessionCore::new("claude", "wd-timeout", None);
+        let events = core.subscribe(true);
+        core.begin_turn("slow work").unwrap();
+
+        let watchdog = AbortWatchdog::new();
+        let killed = Arc::new(AtomicBool::new(false));
+        let killed_flag = Arc::clone(&killed);
+        let handle = watchdog.arm_with(Duration::from_secs(10), core.clone(), async move {
+            killed_flag.store(true, Ordering::SeqCst);
+        });
+
+        tokio::time::advance(Duration::from_secs(9)).await;
+        tokio::task::yield_now().await;
+        assert!(!killed.load(Ordering::SeqCst), "watchdog fired before grace elapsed");
+
+        tokio::time::advance(Duration::from_secs(1)).await;
+        handle.await.unwrap();
+        assert!(killed.load(Ordering::SeqCst), "watchdog should fire once grace expires");
+
+        watchdog.finish_on_exit(&core, "process exited with status 143".into());
+        let collected: Vec<_> = events.try_iter().collect();
+        assert!(
+            collected.iter().any(|e| matches!(
+                e.kind,
+                EventKind::TurnFinished {
+                    reason: StopReason::Aborted,
+                    ..
+                }
+            )),
+            "expected Aborted TurnFinished, got: {collected:?}"
+        );
+        assert!(
+            !collected.iter().any(|e| matches!(e.kind, EventKind::Error { .. })),
+            "abort-killed exit should not emit Error: {collected:?}"
+        );
+        assert!(
+            collected.iter().any(|e| matches!(e.kind, EventKind::SessionEnded)),
+            "expected SessionEnded, got: {collected:?}"
+        );
+        assert!(wall.elapsed() < Duration::from_secs(1), "virtual clock took {:?}", wall.elapsed());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn abort_watchdog_disarms_when_turn_finishes_within_grace() {
+        let wall = std::time::Instant::now();
+        let core = SessionCore::new("codex", "wd-disarm", None);
+        let events = core.subscribe(true);
+        core.begin_turn("interruptible work").unwrap();
+
+        let watchdog = AbortWatchdog::new();
+        let killed = Arc::new(AtomicBool::new(false));
+        let killed_flag = Arc::clone(&killed);
+        let handle = watchdog.arm_with(Duration::from_secs(10), core.clone(), async move {
+            killed_flag.store(true, Ordering::SeqCst);
+        });
+
+        tokio::time::advance(Duration::from_secs(4)).await;
+        tokio::task::yield_now().await;
+        watchdog.on_turn_finished();
+        core.emit_root(EventKind::TurnFinished {
+            reason: StopReason::Aborted,
+            usage: Usage::default(),
+        });
+
+        handle.await.unwrap();
+        tokio::time::advance(Duration::from_secs(20)).await;
+        tokio::task::yield_now().await;
+        assert!(!killed.load(Ordering::SeqCst), "disarmed watchdog must not kill child");
+
+        watchdog.finish_on_exit(&core, "unexpected crash".into());
+        let collected: Vec<_> = events.try_iter().collect();
+        assert!(
+            collected
+                .iter()
+                .any(|e| matches!(&e.kind, EventKind::Error { message } if message == "unexpected crash")),
+            "non-abort-killed exit should emit Error: {collected:?}"
+        );
+        assert!(wall.elapsed() < Duration::from_secs(1), "virtual clock took {:?}", wall.elapsed());
     }
 }

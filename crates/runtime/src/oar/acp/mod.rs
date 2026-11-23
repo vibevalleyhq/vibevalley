@@ -29,7 +29,7 @@ use parking_lot::Mutex;
 use serde_json::{Map, Value, json};
 
 use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, rejected, rejection};
-use crate::oar::process::{LineChild, Spawn, find_binary, run_capture};
+use crate::oar::process::{AbortWatchdog, LineChild, Spawn, find_binary, run_capture, task_handle};
 use crate::oar::record::{self, Recorder};
 use crate::oar::{
     AgentError, Capabilities, ChildTranscriptStep, ContentBlock, EventKind, FileChangeKind, Installation, InteractionDecision, InteractionOption, ModelInfo,
@@ -551,9 +551,7 @@ struct Shared {
     /// `session/load` replays the old conversation; that is not new output.
     replaying: AtomicBool,
     abort_wanted: AtomicBool,
-    abort_killed: AtomicBool,
-    turns_finished: AtomicU64,
-    turn_done: tokio::sync::Notify,
+    watchdog: Arc<AbortWatchdog>,
     image_input: AtomicBool,
     in_flight_prompts: AtomicU64,
     background: Mutex<antigravity::BackgroundTracker>,
@@ -892,8 +890,7 @@ impl Shared {
         self.cancel_pending();
         self.abort_wanted.store(false, Ordering::SeqCst);
         self.detached_continuation.store(false, Ordering::SeqCst);
-        self.turns_finished.fetch_add(1, Ordering::SeqCst);
-        self.turn_done.notify_waiters();
+        self.watchdog.on_turn_finished();
         let Some(core) = self.core.get() else { return };
         if let Some(message) = error {
             core.emit_root(EventKind::Error { message });
@@ -1535,7 +1532,7 @@ async fn serve(
     Ok(())
 }
 
-fn connection_thread(
+async fn run_connection(
     shared: Arc<Shared>,
     child: Arc<LineChild>,
     incoming: flume::Receiver<Option<std::io::Result<String>>>,
@@ -1548,14 +1545,14 @@ fn connection_thread(
         rx.recv_async().await.ok().flatten().map(|line| (line, rx))
     }));
     let outgoing = Box::pin(futures_util::sink::unfold(child, |child, line: String| async move {
-        child.write_line(&line).map_err(|e| std::io::Error::other(e.to_string()))?;
+        child.write_line_async(&line).await.map_err(|e| std::io::Error::other(e.to_string()))?;
         Ok::<_, std::io::Error>(child)
     }));
     let updates = shared.clone();
     let permissions = shared.clone();
     let serving = shared.clone();
     let ready_failed = ready.clone();
-    let connection = Builder::new(Client)
+    let result = Builder::new(Client)
         .name("vibevalley")
         .on_receive_notification(
             async move |notification: UntypedMessage, _cx| {
@@ -1575,8 +1572,8 @@ fn connection_thread(
         )
         .connect_with(Lines::new(outgoing, incoming), |cx: ConnectionTo<Agent>| {
             serve(cx, serving, opts, probe_models, commands, ready)
-        });
-    let result = crate::rt::block_on(connection);
+        })
+        .await;
     let child_error = shared.child.get().map(|c| c.stderr_text()).unwrap_or_default();
     let mut message = match &result {
         Ok(()) => format!("{} closed the connection", shared.runtime_id),
@@ -1593,21 +1590,14 @@ fn connection_thread(
         let _ = ready_failed.send(Err(AgentError::Protocol(message.clone())));
     }
     if let Some(child) = shared.child.get() {
-        child.kill();
+        child.kill_async().await;
     }
     if let Some(core) = shared.core.get() {
         core.observe_exit(shared.child.get().and_then(|c| c.status()));
-        if shared.abort_killed.load(Ordering::SeqCst) && core.turn_active() {
-            core.emit_root(EventKind::TurnFinished {
-                reason: StopReason::Aborted,
-                usage: Usage::default(),
-            });
-            core.finish(None);
-        } else {
-            core.finish(Some(message));
-        }
+        shared.watchdog.finish_on_exit(core, message);
+    } else {
+        shared.watchdog.wake();
     }
-    shared.turn_done.notify_waiters();
 }
 
 fn prompt_blocks(cwd: &Path, image_input: bool, content: &[ContentBlock]) -> Result<Vec<Value>> {
@@ -1693,35 +1683,9 @@ impl Driver for AcpDriver {
     fn abort(&self) -> Result<()> {
         self.shared.abort_wanted.store(true, Ordering::SeqCst);
         self.send(Command::Cancel)?;
-        let shared = self.shared.clone();
-        let turn = shared.turns_finished.load(Ordering::SeqCst);
-        crate::rt::handle().spawn(async move {
-            let deadline = tokio::time::Instant::now() + ABORT_GRACE;
-            loop {
-                let notified = shared.turn_done.notified();
-                tokio::pin!(notified);
-                notified.as_mut().enable();
-                let active = shared.core.get().is_some_and(|core| core.turn_active());
-                if shared.turns_finished.load(Ordering::SeqCst) != turn || !active {
-                    return;
-                }
-                tokio::select! {
-                    biased;
-                    _ = notified => {}
-                    _ = tokio::time::sleep_until(deadline) => {
-                        let active = shared.core.get().is_some_and(|core| core.turn_active());
-                        if shared.turns_finished.load(Ordering::SeqCst) != turn || !active {
-                            return;
-                        }
-                        shared.abort_killed.store(true, Ordering::SeqCst);
-                        if let Some(child) = shared.child.get() {
-                            child.kill_async().await;
-                        }
-                        return;
-                    }
-                }
-            }
-        });
+        if let (Some(core), Some(child)) = (self.shared.core.get(), self.shared.child.get()) {
+            self.shared.watchdog.arm(ABORT_GRACE, core.clone(), child.clone());
+        }
         Ok(())
     }
 
@@ -1811,7 +1775,7 @@ impl Driver for AcpDriver {
                 core.observe_exit(child.status());
             }
         }
-        self.shared.turn_done.notify_waiters();
+        self.shared.watchdog.wake();
     }
 }
 
@@ -1868,9 +1832,7 @@ impl AcpRuntime {
             config_options: Mutex::new(Vec::new()),
             replaying: AtomicBool::new(false),
             abort_wanted: AtomicBool::new(false),
-            abort_killed: AtomicBool::new(false),
-            turns_finished: AtomicU64::new(0),
-            turn_done: tokio::sync::Notify::new(),
+            watchdog: AbortWatchdog::new(),
             image_input: AtomicBool::new(false),
             in_flight_prompts: AtomicU64::new(0),
             background: Mutex::new(antigravity::BackgroundTracker::default()),
@@ -1928,18 +1890,15 @@ impl AcpRuntime {
             on_exit,
         )?;
         let _ = shared.child.set(child.clone());
-        let thread = {
-            let shared = shared.clone();
-            let child = child.clone();
-            let opts = opts.clone();
-            std::thread::Builder::new()
-                .name(format!("vibevalley-agent-{}", self.spec.id))
-                .spawn(move || connection_thread(shared, child, incoming_rx, opts, probe_models, commands_rx, ready_tx))
-        };
-        if let Err(error) = thread {
-            child.kill();
-            return Err(AgentError::Io(format!("cannot start the ACP thread: {error}")));
-        }
+        task_handle().spawn(run_connection(
+            shared.clone(),
+            child.clone(),
+            incoming_rx,
+            opts.clone(),
+            probe_models,
+            commands_rx,
+            ready_tx,
+        ));
         match ready_rx.recv_timeout(opts.request_timeout.unwrap_or(OPEN_TIMEOUT)) {
             Ok(Ok(opened)) => {
                 if flavor == AcpFlavor::Antigravity
