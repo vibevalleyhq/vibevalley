@@ -4,14 +4,16 @@
 //! and dispatches per-issue / per-target lanes on `vibevalley_runtime::rt`.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
+use std::time::Duration;
 
 use parking_lot::Mutex;
 use serde::Serialize;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle as TaskHandle;
 use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
 use vibevalley_core::Transition;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, ChannelType, Fact, FactSessionReported, MessageKind, NoticeLevel, Outcome, Session, Spent, SubjectKind, ops};
@@ -29,6 +31,8 @@ use crate::ports::{
 
 const HANDED_EMOJI: &str = "👀";
 const REPORT_MAX: usize = 1500;
+const COMMENT_DELIVERY_TIMEOUT: Duration = Duration::from_secs(10);
+const CHAT_CLOSE_GRACE: Duration = Duration::from_secs(5);
 
 fn warn(what: &str, e: &ApiError) {
     eprintln!("vibevalley-server: issue-chat: {what}: {}", e.message);
@@ -100,6 +104,8 @@ enum IssueWake {
     },
 }
 
+type DeliveryWaiter = (u64, flume::Sender<()>);
+
 /// Bridges `Hub` session transitions and `ChannelDispatchPort` deliveries onto
 /// issue threads and `Board::tell_message` asynchronously per issue.
 pub struct IssueChat {
@@ -107,27 +113,30 @@ pub struct IssueChat {
     board: Board,
     channel: Arc<dyn ChannelDispatchPort>,
     opening: Mutex<()>,
-    closed: AtomicBool,
+    cancel: CancellationToken,
     sub: Mutex<Option<Subscription>>,
-    coordinator: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
+    coordinator: Mutex<Option<TaskHandle<()>>>,
     lanes: Mutex<HashMap<String, flume::Sender<IssueWake>>>,
-    lane_handles: Mutex<Vec<TaskHandle<()>>>,
-    delivery_waiters: Mutex<HashMap<String, Vec<flume::Sender<()>>>>,
+    lane_tasks: TaskTracker,
+    next_waiter_id: AtomicU64,
+    delivery_waiters: Mutex<HashMap<String, Vec<DeliveryWaiter>>>,
 }
 
 impl IssueChat {
     pub fn start(hub: &Arc<Hub>, board: Board, channel: Arc<dyn ChannelDispatchPort>) -> Arc<Self> {
         let dispatches = channel.dispatches();
+        let cancel = hub.child_token();
         let ic = Arc::new(Self {
             hub: Arc::downgrade(hub),
             board,
             channel,
             opening: Mutex::new(()),
-            closed: AtomicBool::new(false),
+            cancel: cancel.clone(),
             sub: Mutex::new(None),
             coordinator: Mutex::new(None),
             lanes: Mutex::new(HashMap::new()),
-            lane_handles: Mutex::new(Vec::new()),
+            lane_tasks: TaskTracker::new(),
+            next_waiter_id: AtomicU64::new(1),
             delivery_waiters: Mutex::new(HashMap::new()),
         });
 
@@ -139,8 +148,7 @@ impl IssueChat {
         *ic.sub.lock() = Some(sub);
 
         let w = Arc::downgrade(&ic);
-        let cancel = hub.child_token();
-        let task_cancel = cancel.clone();
+        let task_cancel = cancel;
         let coordinator = hub.spawn_task(async move {
             let Some(boot_ic) = w.upgrade() else { return };
             let _ = tokio::task::spawn_blocking(move || {
@@ -159,13 +167,13 @@ impl IssueChat {
                     },
                 };
                 let Some(ic) = w.upgrade() else { return };
-                if ic.closed.load(Ordering::Acquire) {
+                if ic.cancel.is_cancelled() {
                     return;
                 }
                 let _ = tokio::task::spawn_blocking(move || ic.route_dispatched(dispatched)).await;
             }
         });
-        *ic.coordinator.lock() = Some((cancel, coordinator));
+        *ic.coordinator.lock() = Some(coordinator);
 
         let c = ic.clone();
         hub.on::<ops::IssueCommentCreate>(move |ctx, input| {
@@ -177,19 +185,31 @@ impl IssueChat {
     }
 
     pub fn close(&self) {
-        self.closed.store(true, Ordering::Release);
+        self.cancel.cancel();
         self.delivery_waiters.lock().clear();
         if let Some(sub) = self.sub.lock().take() {
             sub.close();
         }
-        if let Some((cancel, handle)) = self.coordinator.lock().take() {
-            cancel.cancel();
-            let _ = vibevalley_runtime::rt::block_on(handle);
-        }
         self.lanes.lock().clear();
-        let handles: Vec<_> = self.lane_handles.lock().drain(..).collect();
-        for handle in handles {
-            let _ = vibevalley_runtime::rt::block_on(handle);
+        let coordinator = self.coordinator.lock().take();
+        let timed_out = vibevalley_runtime::rt::block_on(async {
+            tokio::time::timeout(CHAT_CLOSE_GRACE, async {
+                if let Some(handle) = coordinator {
+                    let _ = handle.await;
+                }
+                self.lanes.lock().clear();
+                self.lane_tasks.close();
+                self.lane_tasks.wait().await;
+            })
+            .await
+            .is_err()
+        });
+        if timed_out {
+            tracing::warn!(
+                remaining = self.lane_tasks.len(),
+                timeout_secs = CHAT_CLOSE_GRACE.as_secs(),
+                "issue-chat close timed out waiting for lane tasks"
+            );
         }
     }
 
@@ -225,32 +245,60 @@ impl IssueChat {
     }
 
     fn await_comment_delivery(&self, issue_id: &str, message_id: &str) {
-        if self.closed.load(Ordering::Acquire) {
-            return;
+        self.await_comment_delivery_for(issue_id, message_id, COMMENT_DELIVERY_TIMEOUT);
+    }
+
+    fn await_comment_delivery_for(&self, issue_id: &str, message_id: &str, timeout: Duration) -> bool {
+        if self.cancel.is_cancelled() {
+            return true;
         }
-        let rx = {
+        let waiter_id = self.next_waiter_id.fetch_add(1, Ordering::Relaxed);
+        let (tx, rx) = flume::bounded(1);
+        {
             let mut waiters = self.delivery_waiters.lock();
-            if self.closed.load(Ordering::Acquire) {
-                return;
+            if self.cancel.is_cancelled() {
+                return true;
             }
-            let pending = self
-                .channel
-                .pending_deliveries(ChannelDeliveryKind::Issue)
-                .map(|rows| rows.iter().any(|d| d.recipient_id == issue_id && d.message_id == message_id))
-                .unwrap_or(false);
-            if !pending {
-                return;
+            waiters.entry(message_id.to_string()).or_default().push((waiter_id, tx));
+        }
+        // Check DB outside `delivery_waiters` lock so SQLite I/O never stalls settling lanes.
+        let pending = self
+            .channel
+            .pending_deliveries(ChannelDeliveryKind::Issue)
+            .map(|rows| rows.iter().any(|d| d.recipient_id == issue_id && d.message_id == message_id))
+            .unwrap_or(false);
+        if !pending {
+            self.remove_waiter(message_id, waiter_id);
+            return true;
+        }
+        match rx.recv_timeout(timeout) {
+            Ok(()) | Err(flume::RecvTimeoutError::Disconnected) => true,
+            Err(flume::RecvTimeoutError::Timeout) => {
+                self.remove_waiter(message_id, waiter_id);
+                tracing::warn!(
+                    issue_id,
+                    message_id,
+                    timeout_ms = timeout.as_millis() as u64,
+                    "issue-chat timed out waiting for comment delivery"
+                );
+                false
             }
-            let (tx, rx) = flume::bounded(1);
-            waiters.entry(message_id.to_string()).or_default().push(tx);
-            rx
-        };
-        let _ = rx.recv();
+        }
+    }
+
+    fn remove_waiter(&self, message_id: &str, waiter_id: u64) {
+        let mut waiters = self.delivery_waiters.lock();
+        if let Some(list) = waiters.get_mut(message_id) {
+            list.retain(|(id, _)| *id != waiter_id);
+            if list.is_empty() {
+                waiters.remove(message_id);
+            }
+        }
     }
 
     fn notify_delivery_settled(&self, message_id: &str) {
         if let Some(waiters) = self.delivery_waiters.lock().remove(message_id) {
-            for tx in waiters {
+            for (_, tx) in waiters {
                 let _ = tx.send(());
             }
         }
@@ -270,7 +318,7 @@ impl IssueChat {
     }
 
     fn on_transition(&self, tr: &Transition) {
-        if self.closed.load(Ordering::Acquire) {
+        if self.cancel.is_cancelled() {
             return;
         }
         match &tr.fact {
@@ -594,7 +642,7 @@ impl IssueChat {
     }
 
     fn enqueue_lane(self: &Arc<Self>, issue_id: String, wake: IssueWake) {
-        if self.closed.load(Ordering::Acquire) {
+        if self.cancel.is_cancelled() {
             return;
         }
         let mut lanes = self.lanes.lock();
@@ -608,34 +656,37 @@ impl IssueChat {
         lanes.insert(issue_id.clone(), tx);
         let ic = Arc::downgrade(self);
         let id_for_task = issue_id;
-        let handle = vibevalley_runtime::rt::handle().spawn(async move {
-            loop {
-                let item = match rx.try_recv() {
-                    Ok(item) => item,
-                    Err(flume::TryRecvError::Empty) => {
-                        let Some(ic) = ic.upgrade() else { return };
-                        let mut lanes = ic.lanes.lock();
-                        match rx.try_recv() {
-                            Ok(item) => item,
-                            Err(_) => {
-                                lanes.remove(&id_for_task);
-                                return;
+        let cancel = self.cancel.clone();
+        self.lane_tasks.spawn_on(
+            async move {
+                loop {
+                    if cancel.is_cancelled() {
+                        return;
+                    }
+                    let item = match rx.try_recv() {
+                        Ok(item) => item,
+                        Err(flume::TryRecvError::Empty) => {
+                            let Some(ic) = ic.upgrade() else { return };
+                            let mut lanes = ic.lanes.lock();
+                            match rx.try_recv() {
+                                Ok(item) => item,
+                                Err(_) => {
+                                    lanes.remove(&id_for_task);
+                                    return;
+                                }
                             }
                         }
+                        Err(flume::TryRecvError::Disconnected) => return,
+                    };
+                    let Some(ic) = ic.upgrade() else { return };
+                    if ic.cancel.is_cancelled() {
+                        return;
                     }
-                    Err(flume::TryRecvError::Disconnected) => return,
-                };
-                let Some(ic) = ic.upgrade() else { return };
-                if ic.closed.load(Ordering::Acquire) {
-                    return;
+                    let _ = tokio::task::spawn_blocking(move || ic.handle_wake(item)).await;
                 }
-                let _ = tokio::task::spawn_blocking(move || ic.handle_wake(item)).await;
-            }
-        });
-        drop(lanes);
-        let mut handles = self.lane_handles.lock();
-        handles.retain(|h| !h.is_finished());
-        handles.push(handle);
+            },
+            vibevalley_runtime::rt::handle(),
+        );
     }
 
     fn handle_wake(&self, wake: IssueWake) {
@@ -791,11 +842,11 @@ pub struct SessionChat {
     board: Board,
     channel: Arc<dyn ChannelDispatchPort>,
     agents: Arc<Agents>,
-    closed: AtomicBool,
+    cancel: CancellationToken,
     sub: Mutex<Option<Subscription>>,
-    coordinator: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
+    coordinator: Mutex<Option<TaskHandle<()>>>,
     lanes: Mutex<HashMap<String, flume::Sender<DirectWake>>>,
-    lane_handles: Mutex<Vec<TaskHandle<()>>>,
+    lane_tasks: TaskTracker,
 }
 
 impl SessionChat {
@@ -808,16 +859,17 @@ impl SessionChat {
     ) -> Arc<Self> {
         let dispatches = channel.dispatches();
         let mut removals = channel.subscribe_removals();
+        let cancel = hub.child_token();
         let sc = Arc::new(Self {
             hub: Arc::downgrade(hub),
             board,
             channel: channel.clone(),
             agents,
-            closed: AtomicBool::new(false),
+            cancel: cancel.clone(),
             sub: Mutex::new(None),
             coordinator: Mutex::new(None),
             lanes: Mutex::new(HashMap::new()),
-            lane_handles: Mutex::new(Vec::new()),
+            lane_tasks: TaskTracker::new(),
         });
 
         {
@@ -852,8 +904,7 @@ impl SessionChat {
         *sc.sub.lock() = Some(sub);
 
         let w = Arc::downgrade(&sc);
-        let cancel = hub.child_token();
-        let task_cancel = cancel.clone();
+        let task_cancel = cancel;
         let coordinator = hub.spawn_task(async move {
             enum CoordinatorEvent {
                 Dispatched(ChannelDispatchedBatch),
@@ -878,7 +929,7 @@ impl SessionChat {
                     },
                 };
                 let Some(sc) = w.upgrade() else { return };
-                if sc.closed.load(Ordering::Acquire) {
+                if sc.cancel.is_cancelled() {
                     return;
                 }
                 match event {
@@ -893,24 +944,36 @@ impl SessionChat {
                 }
             }
         });
-        *sc.coordinator.lock() = Some((cancel, coordinator));
+        *sc.coordinator.lock() = Some(coordinator);
 
         sc
     }
 
     pub fn close(&self) {
-        self.closed.store(true, Ordering::Release);
+        self.cancel.cancel();
         if let Some(sub) = self.sub.lock().take() {
             sub.close();
         }
-        if let Some((cancel, handle)) = self.coordinator.lock().take() {
-            cancel.cancel();
-            let _ = vibevalley_runtime::rt::block_on(handle);
-        }
         self.lanes.lock().clear();
-        let handles: Vec<_> = self.lane_handles.lock().drain(..).collect();
-        for handle in handles {
-            let _ = vibevalley_runtime::rt::block_on(handle);
+        let coordinator = self.coordinator.lock().take();
+        let timed_out = vibevalley_runtime::rt::block_on(async {
+            tokio::time::timeout(CHAT_CLOSE_GRACE, async {
+                if let Some(handle) = coordinator {
+                    let _ = handle.await;
+                }
+                self.lanes.lock().clear();
+                self.lane_tasks.close();
+                self.lane_tasks.wait().await;
+            })
+            .await
+            .is_err()
+        });
+        if timed_out {
+            tracing::warn!(
+                remaining = self.lane_tasks.len(),
+                timeout_secs = CHAT_CLOSE_GRACE.as_secs(),
+                "session-chat close timed out waiting for lane tasks"
+            );
         }
     }
 
@@ -934,7 +997,7 @@ impl SessionChat {
     }
 
     fn on_transition(&self, hub: &Arc<Hub>, tr: &Transition) {
-        if self.closed.load(Ordering::Acquire) {
+        if self.cancel.is_cancelled() {
             return;
         }
         match &tr.fact {
@@ -993,7 +1056,7 @@ impl SessionChat {
     }
 
     fn enqueue_lane(self: &Arc<Self>, agent_id: String, wake: DirectWake) {
-        if self.closed.load(Ordering::Acquire) {
+        if self.cancel.is_cancelled() {
             return;
         }
         let mut lanes = self.lanes.lock();
@@ -1007,34 +1070,37 @@ impl SessionChat {
         lanes.insert(agent_id.clone(), tx);
         let sc = Arc::downgrade(self);
         let key = agent_id;
-        let handle = vibevalley_runtime::rt::handle().spawn(async move {
-            loop {
-                let item = match rx.try_recv() {
-                    Ok(item) => item,
-                    Err(flume::TryRecvError::Empty) => {
-                        let Some(sc) = sc.upgrade() else { return };
-                        let mut lanes = sc.lanes.lock();
-                        match rx.try_recv() {
-                            Ok(item) => item,
-                            Err(_) => {
-                                lanes.remove(&key);
-                                return;
+        let cancel = self.cancel.clone();
+        self.lane_tasks.spawn_on(
+            async move {
+                loop {
+                    if cancel.is_cancelled() {
+                        return;
+                    }
+                    let item = match rx.try_recv() {
+                        Ok(item) => item,
+                        Err(flume::TryRecvError::Empty) => {
+                            let Some(sc) = sc.upgrade() else { return };
+                            let mut lanes = sc.lanes.lock();
+                            match rx.try_recv() {
+                                Ok(item) => item,
+                                Err(_) => {
+                                    lanes.remove(&key);
+                                    return;
+                                }
                             }
                         }
+                        Err(flume::TryRecvError::Disconnected) => return,
+                    };
+                    let Some(sc) = sc.upgrade() else { return };
+                    if sc.cancel.is_cancelled() {
+                        return;
                     }
-                    Err(flume::TryRecvError::Disconnected) => return,
-                };
-                let Some(sc) = sc.upgrade() else { return };
-                if sc.closed.load(Ordering::Acquire) {
-                    return;
+                    let _ = tokio::task::spawn_blocking(move || sc.on_direct(item)).await;
                 }
-                let _ = tokio::task::spawn_blocking(move || sc.on_direct(item)).await;
-            }
-        });
-        drop(lanes);
-        let mut handles = self.lane_handles.lock();
-        handles.retain(|h| !h.is_finished());
-        handles.push(handle);
+            },
+            vibevalley_runtime::rt::handle(),
+        );
     }
 
     fn on_direct(&self, wake: DirectWake) {
@@ -1172,5 +1238,199 @@ fn post_talk_report(channel: &dyn ChannelDispatchPort, h: &Session, f: &FactSess
     };
     if let Err(e) = channel.note_once(note, f.run.as_ref().map(|id| format!("report:{id}"))) {
         eprintln!("vibevalley-server: session-chat: talk report {}: {}", h.id, e.message);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use super::*;
+    use crate::base::ServerDb;
+    use crate::modules::work::ledger::BoardConfig;
+    use crate::modules::work::session::RuntimeDrivers;
+    use crate::ports::{ChannelParticipant, ChannelPlace};
+    use vibevalley_protocol::ChatMessage;
+
+    struct StubChannel {
+        entered_pending: Option<flume::Sender<()>>,
+        release_pending: Option<flume::Receiver<()>>,
+        pending: Vec<ChannelDelivery>,
+        removals: broadcast::Sender<String>,
+    }
+
+    impl ChannelDispatchPort for StubChannel {
+        fn dispatches(&self) -> flume::Receiver<ChannelDispatchedBatch> {
+            let (_tx, rx) = flume::unbounded();
+            rx
+        }
+        fn subscribe_removals(&self) -> broadcast::Receiver<String> {
+            self.removals.subscribe()
+        }
+        fn pending_deliveries(&self, _kind: ChannelDeliveryKind) -> Result<Vec<ChannelDelivery>, ApiError> {
+            if let Some(tx) = &self.entered_pending {
+                let _ = tx.try_send(());
+            }
+            if let Some(rx) = &self.release_pending {
+                let _ = rx.recv_timeout(Duration::from_secs(2));
+            }
+            Ok(self.pending.clone())
+        }
+        fn pending_deliveries_for(&self, _: ChannelDeliveryKind, _: &str, _: i64) -> Result<Vec<ChannelDelivery>, ApiError> {
+            Ok(vec![])
+        }
+        fn delivery_is_pending(&self, _: i64) -> Result<bool, ApiError> {
+            Ok(false)
+        }
+        fn committed_of(&self, _: &str) -> Result<Option<ChannelPostedMessage>, ApiError> {
+            Ok(None)
+        }
+        fn settle_delivery(&self, _: i64, _: bool) -> Result<(), ApiError> {
+            Ok(())
+        }
+        fn withdraw_delivery(&self, _: i64) -> Result<(), ApiError> {
+            Ok(())
+        }
+        fn mark_seen(&self, _: &str, _: &str) -> Result<(), ApiError> {
+            Ok(())
+        }
+        fn react(&self, _: &str, _: &str, _: &str, _: bool) -> Result<ChatMessage, ApiError> {
+            unreachable!()
+        }
+        fn note(&self, _: ChannelNoteRequest) -> Result<String, ApiError> {
+            Ok(String::new())
+        }
+        fn note_once(&self, _: ChannelNoteRequest, _: Option<String>) -> Result<String, ApiError> {
+            Ok(String::new())
+        }
+        fn notice(&self, _: ChannelNoticeRequest) {}
+        fn seat(&self, _: ChannelSeat) -> Result<(), ApiError> {
+            Ok(())
+        }
+        fn leave(&self, _: &str) -> Result<(), ApiError> {
+            Ok(())
+        }
+        fn add_follower(&self, _: &str, _: &str) -> Result<(), ApiError> {
+            Ok(())
+        }
+        fn members_of(&self, _: &str) -> Vec<String> {
+            vec![]
+        }
+        fn participants(&self) -> Vec<ChannelParticipant> {
+            vec![]
+        }
+        fn home_of(&self, _: &str) -> Option<String> {
+            None
+        }
+        fn place(&self, _: &str) -> Option<ChannelPlace> {
+            None
+        }
+        fn default_channel(&self) -> String {
+            "general".into()
+        }
+        fn orchestrator_in(&self, _: &str) -> String {
+            "orchestrator".into()
+        }
+        fn target_of(&self, _: &str) -> Option<String> {
+            None
+        }
+        fn thread_about(&self, _: SubjectKind, _: &str) -> Option<String> {
+            None
+        }
+        fn latest(&self, _: &str) -> Result<i64, ApiError> {
+            Ok(0)
+        }
+        fn read_up_to(&self, _: &str, _: &str, _: i64) -> Result<(), ApiError> {
+            Ok(())
+        }
+        fn dispatch_count(&self, _: &str) -> Result<i64, ApiError> {
+            Ok(0)
+        }
+        fn issue_thread(&self, _: &str, _: &str, _: Option<&str>) -> Result<String, ApiError> {
+            Ok(String::new())
+        }
+        fn issue_thread_id(&self, _: &str) -> Option<String> {
+            None
+        }
+        fn say_in(&self, _: &str, _: &str, _: String) -> Result<ChatMessage, ApiError> {
+            unreachable!()
+        }
+        fn ensure_seated(&self, _: Arc<dyn Fn(&str) + Send + Sync>) {}
+    }
+
+    #[test]
+    fn await_comment_delivery_bounds_wait_and_releases_lock_during_db_check() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = ServerDb::open(dir.path()).unwrap();
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let board = Board::open_with(
+            db.clone(),
+            Arc::new(RuntimeDrivers {
+                registry: Arc::new(vibevalley_runtime::oar::Registry::new()),
+                model: None,
+            }),
+            BoardConfig::under(dir.path()),
+            Arc::new(Arc::downgrade(&hub)),
+            Some(Arc::downgrade(&hub)),
+            |_| {},
+        )
+        .unwrap();
+
+        let (entered_tx, entered_rx) = flume::bounded(1);
+        let (release_tx, release_rx) = flume::bounded(1);
+        let (removals, _) = broadcast::channel(8);
+        let pending_row = ChannelDelivery {
+            id: 1,
+            message_id: "m-stuck".into(),
+            channel_id: "c-1".into(),
+            recipient_kind: ChannelDeliveryKind::Issue,
+            recipient_id: "i-1".into(),
+            reason: "thread".into(),
+            wakes: true,
+        };
+        let channel = Arc::new(StubChannel {
+            entered_pending: Some(entered_tx),
+            release_pending: Some(release_rx),
+            pending: vec![pending_row],
+            removals,
+        });
+        let ic = Arc::new(IssueChat {
+            hub: Arc::downgrade(&hub),
+            board: board.clone(),
+            channel,
+            opening: Mutex::new(()),
+            cancel: hub.child_token(),
+            sub: Mutex::new(None),
+            coordinator: Mutex::new(None),
+            lanes: Mutex::new(HashMap::new()),
+            lane_tasks: TaskTracker::new(),
+            next_waiter_id: AtomicU64::new(1),
+            delivery_waiters: Mutex::new(HashMap::new()),
+        });
+
+        // Spawn waiter that enters `pending_deliveries` and verify `notify_delivery_settled`
+        // can run without blocking on `delivery_waiters.lock()` during the DB call.
+        let waiter_ic = ic.clone();
+        let waiter = std::thread::spawn(move || waiter_ic.await_comment_delivery_for("i-1", "m-stuck", Duration::from_millis(80)));
+        entered_rx.recv_timeout(Duration::from_secs(2)).expect("entered pending_deliveries");
+
+        // Must NOT deadlock while `pending_deliveries` is in flight:
+        ic.notify_delivery_settled("m-other");
+        drop(release_tx);
+
+        // Unsettled delivery must time out within the bound and clean up the waiter entry.
+        let started = Instant::now();
+        let settled = waiter.join().unwrap();
+        assert!(!settled, "unsettled pending delivery must time out");
+        assert!(started.elapsed() < Duration::from_secs(1));
+        assert!(
+            !ic.delivery_waiters.lock().contains_key("m-stuck"),
+            "timed-out waiter must be cleaned up from delivery_waiters"
+        );
+
+        ic.close();
+        board.close();
+        hub.close();
+        db.close();
     }
 }

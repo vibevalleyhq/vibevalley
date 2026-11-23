@@ -56,22 +56,29 @@ impl Drop for DbConn {
     }
 }
 
-/// Single shared SQLite door for `server.db`: one WAL-mode `SqlitePool`
-/// initialized once with every module schema, plus the single shared
-/// durable runtime `Store` and coordinated shutdown checkpoint.
+const READ_POOL_MAX_CONNECTIONS: u32 = 6;
+const WRITE_POOL_MAX_CONNECTIONS: u32 = 1;
+
+/// Single shared SQLite door for `server.db`: split WAL-mode pools with a
+/// multi-connection read-only pool (`read_pool`) for lock-free concurrent WAL
+/// reads and a single-connection writer pool (`write_pool`) that serializes
+/// writes cleanly in Tokio's async queue instead of hitting SQLite busy sleeps,
+/// plus the single shared durable runtime `Store` and coordinated shutdown
+/// checkpoint.
 pub struct ServerDb {
     path: PathBuf,
-    pool: SqlitePool,
+    read_pool: SqlitePool,
+    write_pool: SqlitePool,
     durable: Mutex<Option<vibevalley_runtime::agent::durable::Store>>,
 }
 
 impl ServerDb {
-    /// Opens `<home>/server.db` with the unified pool and initializes all schemas once.
+    /// Opens `<home>/server.db` with split read/write pools and initializes all schemas once.
     pub fn open(home: &Path) -> sqlx::Result<Arc<Self>> {
         Self::open_at(&home.join("server.db"))
     }
 
-    /// Opens `path` with the unified pool and initializes all schemas once.
+    /// Opens `path` with split read/write pools and initializes all schemas once.
     pub fn open_at(path: &Path) -> sqlx::Result<Arc<Self>> {
         if let Some(parent) = path.parent()
             && !parent.as_os_str().is_empty()
@@ -79,25 +86,40 @@ impl ServerDb {
             let _ = std::fs::create_dir_all(parent);
         }
         let path_buf = path.to_path_buf();
-        let pool = vibevalley_runtime::rt::block_on(async {
-            let options = SqliteConnectOptions::new()
+        let (read_pool, write_pool) = vibevalley_runtime::rt::block_on(async {
+            let write_options = SqliteConnectOptions::new()
                 .filename(&path_buf)
                 .create_if_missing(true)
                 .busy_timeout(Duration::from_secs(5))
                 .journal_mode(SqliteJournalMode::Wal)
                 .synchronous(SqliteSynchronous::Normal)
                 .foreign_keys(true);
-            let pool = SqlitePoolOptions::new().max_connections(8).min_connections(1).connect_with(options).await?;
-            let mut conn = pool.acquire().await?;
+            let write_pool = SqlitePoolOptions::new()
+                .max_connections(WRITE_POOL_MAX_CONNECTIONS)
+                .min_connections(1)
+                .connect_with(write_options)
+                .await?;
+            let mut conn = write_pool.acquire().await?;
             for schema in ALL_SCHEMAS {
                 sqlx::raw_sql(schema).execute(&mut *conn).await?;
             }
             drop(conn);
-            Ok::<_, sqlx::Error>(pool)
+
+            let read_options = SqliteConnectOptions::new()
+                .filename(&path_buf)
+                .read_only(true)
+                .busy_timeout(Duration::from_secs(5));
+            let read_pool = SqlitePoolOptions::new()
+                .max_connections(READ_POOL_MAX_CONNECTIONS)
+                .min_connections(1)
+                .connect_with(read_options)
+                .await?;
+            Ok::<_, sqlx::Error>((read_pool, write_pool))
         })?;
         Ok(Arc::new(Self {
             path: path_buf,
-            pool,
+            read_pool,
+            write_pool,
             durable: Mutex::new(None),
         }))
     }
@@ -106,24 +128,55 @@ impl ServerDb {
         &self.path
     }
 
+    /// Writer pool (backward-compatible default pool accessor).
     pub fn pool(&self) -> &SqlitePool {
-        &self.pool
+        &self.write_pool
+    }
+
+    /// Multi-connection read-only WAL pool for concurrent pure read queries.
+    pub fn read_pool(&self) -> &SqlitePool {
+        &self.read_pool
+    }
+
+    /// Single-connection read-write pool serializing SQLite mutations.
+    pub fn write_pool(&self) -> &SqlitePool {
+        &self.write_pool
     }
 
     pub(crate) fn acquire(&self) -> sqlx::Result<DbConn> {
-        vibevalley_runtime::rt::block_on(self.pool.acquire()).map(|conn| DbConn(Some(conn)))
+        vibevalley_runtime::rt::block_on(self.write_pool.acquire()).map(|conn| DbConn(Some(conn)))
+    }
+
+    pub(crate) fn acquire_read(&self) -> sqlx::Result<DbConn> {
+        vibevalley_runtime::rt::block_on(self.read_pool.acquire()).map(|conn| DbConn(Some(conn)))
     }
 
     pub(crate) fn run<T>(&self, query: impl AsyncFnOnce(&mut SqliteConnection) -> sqlx::Result<T>) -> sqlx::Result<T> {
         vibevalley_runtime::rt::block_on(async {
-            let mut conn = self.pool.acquire().await?;
+            let mut conn = self.write_pool.acquire().await?;
             query(&mut conn).await
         })
     }
 
     pub(crate) fn run_api<T>(&self, query: impl AsyncFnOnce(&mut SqliteConnection) -> Result<T, ApiError>) -> Result<T, ApiError> {
         vibevalley_runtime::rt::block_on(async {
-            let mut conn = self.pool.acquire().await.map_err(internal)?;
+            let mut conn = self.write_pool.acquire().await.map_err(internal)?;
+            query(&mut conn).await
+        })
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn read<T>(&self, query: impl AsyncFnOnce(&mut SqliteConnection) -> sqlx::Result<T>) -> sqlx::Result<T> {
+        vibevalley_runtime::rt::block_on(async {
+            let mut conn = self.read_pool.acquire().await?;
+            query(&mut conn).await
+        })
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn read_api<T>(&self, query: impl AsyncFnOnce(&mut SqliteConnection) -> Result<T, ApiError>) -> Result<T, ApiError> {
+        vibevalley_runtime::rt::block_on(async {
+            let mut conn = self.read_pool.acquire().await.map_err(internal)?;
             query(&mut conn).await
         })
     }
@@ -139,15 +192,17 @@ impl ServerDb {
         Ok(store)
     }
 
-    /// Coordinated SQLite shutdown: drops the durable store handle, runs a
-    /// passive WAL checkpoint and `PRAGMA optimize`, and closes the pool.
+    /// Coordinated SQLite shutdown: drops the durable store handle, closes the
+    /// read pool first so no reader holds WAL frames, checkpoints WAL with
+    /// `TRUNCATE` + `PRAGMA optimize`, and closes the write pool.
     pub fn close(&self) {
         self.durable.lock().take();
         vibevalley_runtime::rt::block_on(async {
-            if let Ok(mut conn) = self.pool.acquire().await {
-                let _ = sqlx::raw_sql("PRAGMA wal_checkpoint(PASSIVE); PRAGMA optimize;").execute(&mut *conn).await;
+            self.read_pool.close().await;
+            if let Ok(mut conn) = self.write_pool.acquire().await {
+                let _ = sqlx::raw_sql("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA optimize;").execute(&mut *conn).await;
             }
-            self.pool.close().await;
+            self.write_pool.close().await;
         });
     }
 }
@@ -159,14 +214,19 @@ pub(crate) struct Ticker {
 }
 
 async fn run_ticker(cancel: tokio_util::sync::CancellationToken, interval: Duration, immediate: bool, mut tick: impl FnMut() -> bool + Send + 'static) {
-    if !immediate {
+    let period = if interval.is_zero() { Duration::from_millis(1) } else { interval };
+    let mut timer = if immediate {
+        tokio::time::interval(period)
+    } else {
+        tokio::time::interval_at(tokio::time::Instant::now() + period, period)
+    };
+    timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
         tokio::select! {
             biased;
             _ = cancel.cancelled() => return,
-            _ = tokio::time::sleep(interval) => {}
+            _ = timer.tick() => {}
         }
-    }
-    loop {
         if cancel.is_cancelled() {
             return;
         }
@@ -177,11 +237,6 @@ async fn run_ticker(cancel: tokio_util::sync::CancellationToken, interval: Durat
         .await;
         let Ok((returned, true)) = result else { return };
         tick = returned;
-        tokio::select! {
-            biased;
-            _ = cancel.cancelled() => return,
-            _ = tokio::time::sleep(interval) => {}
-        }
     }
 }
 
@@ -307,5 +362,107 @@ impl<T: Clone> RequestKeys<T> {
             seen.1.remove(&old);
         }
         Ok(done)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::{Duration, Instant};
+
+    use super::*;
+
+    #[test]
+    fn concurrent_reads_succeed_immediately_while_write_pool_holds_begin_immediate() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = ServerDb::open(dir.path()).unwrap();
+
+        db.run(async |conn| {
+            sqlx::raw_sql("INSERT INTO channel (id, type, is_default, name, created_at) VALUES ('c1', 'channel', 1, 'general', 100);")
+                .execute(&mut *conn)
+                .await
+        })
+        .unwrap();
+
+        // Hold an open BEGIN IMMEDIATE write transaction with an uncommitted row.
+        let mut writer = db.acquire().unwrap();
+        vibevalley_runtime::rt::block_on(async {
+            sqlx::raw_sql("BEGIN IMMEDIATE;").execute(&mut *writer).await.unwrap();
+            sqlx::raw_sql("INSERT INTO channel (id, type, is_default, name, created_at) VALUES ('c2', 'channel', 0, 'pending', 200);")
+                .execute(&mut *writer)
+                .await
+                .unwrap();
+        });
+
+        // Multiple concurrent read() calls must succeed immediately against the WAL snapshot
+        // without blocking on the active write transaction or hitting SQLite busy_timeout.
+        let started = Instant::now();
+        let mut threads = Vec::new();
+        for _ in 0..6 {
+            let db = db.clone();
+            threads.push(std::thread::spawn(move || {
+                db.read(async |conn| {
+                    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM channel").fetch_one(&mut *conn).await?;
+                    Ok(count)
+                })
+                .unwrap()
+            }));
+        }
+        let counts: Vec<i64> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+        let elapsed = started.elapsed();
+        assert_eq!(counts, vec![1; 6], "readers must see committed WAL snapshot while writer holds BEGIN IMMEDIATE");
+        assert!(
+            elapsed < Duration::from_secs(1),
+            "concurrent read_pool queries took too long while write tx open: {elapsed:?}"
+        );
+
+        // Verify read_pool enforces read_only(true).
+        let write_on_read_pool = db.read(async |conn| {
+            sqlx::raw_sql("INSERT INTO channel (id, type, is_default, name, created_at) VALUES ('c3', 'channel', 0, 'illegal', 300);")
+                .execute(&mut *conn)
+                .await
+        });
+        assert!(write_on_read_pool.is_err(), "read_pool must reject writes");
+
+        // Commit the write transaction and release the write connection.
+        vibevalley_runtime::rt::block_on(async {
+            sqlx::raw_sql("COMMIT;").execute(&mut *writer).await.unwrap();
+        });
+        drop(writer);
+
+        // New reads immediately see the committed write.
+        let after: i64 = db
+            .read(async |conn| sqlx::query_scalar("SELECT COUNT(*) FROM channel").fetch_one(&mut *conn).await)
+            .unwrap();
+        assert_eq!(after, 2);
+
+        // Coordinated shutdown closes read_pool first, checkpoints WAL (TRUNCATE), and closes write_pool.
+        db.close();
+        drop(db);
+
+        let reopened = ServerDb::open(dir.path()).unwrap();
+        let persisted: i64 = reopened
+            .read(async |conn| sqlx::query_scalar("SELECT COUNT(*) FROM channel").fetch_one(&mut *conn).await)
+            .unwrap();
+        assert_eq!(persisted, 2);
+        reopened.close();
+    }
+
+    #[test]
+    fn ticker_runs_on_interval_and_cancels_cleanly() {
+        let count = Arc::new(AtomicUsize::new(0));
+        let (done_tx, done_rx) = flume::bounded(1);
+        let c = count.clone();
+        let ticker = Ticker::spawn_detached(Duration::from_millis(15), true, move || {
+            let n = c.fetch_add(1, Ordering::SeqCst) + 1;
+            if n >= 3 {
+                let _ = done_tx.try_send(());
+                return false;
+            }
+            true
+        });
+        done_rx.recv_timeout(Duration::from_secs(2)).expect("ticker fired 3 times");
+        ticker.stop();
+        assert!(count.load(Ordering::SeqCst) >= 3);
     }
 }

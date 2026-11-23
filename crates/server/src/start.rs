@@ -235,37 +235,71 @@ impl Started {
     }
 
     /// Lets the farm go, so `start()` can open the same home again in this
-    /// process: the tickers, probes, assistants and watcher stop, the
-    /// board's agents stop and its lock is released, and the shared `ServerDb`
-    /// checkpoints WAL + optimizes before closing.
+    /// process: cancels the root shutdown token immediately, drains modules
+    /// concurrently (bounded by a grace timeout), flushes trajectories and
+    /// tracked hub tasks, and checkpoints WAL (`TRUNCATE`) + optimizes before
+    /// closing the shared `ServerDb`.
     pub fn close(&self) {
+        const SHUTDOWN_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
+
+        self.hub.shutdown_token().cancel();
         if self.debug.is_enabled() {
             self.hub.attach_observer(None);
             self.hub.attach_fault_gate(None);
             vibevalley_runtime::oar::set_observer(None);
         }
         self.hub.attach_machine_bus(None);
-        self.machines.close();
         self.hub.attach_remote_auth(None);
-        self.remote.close();
-        self.hub.shutdown_token().cancel();
-        self.connectors.close();
-        self.pulls.close();
-        self.crons.close();
-        self.voice.close();
-        self.hub.close_bus();
-        self.issue_chat.close();
-        self.session_chat.close();
-        self.orchestrator.close();
-        self.hub.runtime_inbox.stop();
-        self.agents.fleet.close();
-        self.repos.close();
-        self.artifacts.close();
-        self.media.close();
-        self.media_inputs.close();
-        self.library.close();
-        self.game.close();
-        self.board.close();
+
+        let machines = self.machines.clone();
+        let remote = self.remote.clone();
+        let connectors = self.connectors.clone();
+        let pulls = self.pulls.clone();
+        let crons = self.crons.clone();
+        let voice = self.voice.clone();
+        let hub_bus = self.hub.clone();
+        let issue_chat = self.issue_chat.clone();
+        let session_chat = self.session_chat.clone();
+        let orchestrator = self.orchestrator.clone();
+        let hub_inbox = self.hub.clone();
+        let agents = self.agents.clone();
+        let repos = self.repos.clone();
+        let artifacts = self.artifacts.clone();
+        let media = self.media.clone();
+        let media_inputs = self.media_inputs.clone();
+        let library = self.library.clone();
+        let game = self.game.clone();
+        let board = self.board.clone();
+
+        let timed_out = vibevalley_runtime::rt::block_on(async {
+            let mut set = tokio::task::JoinSet::new();
+            set.spawn_blocking(move || machines.close());
+            set.spawn_blocking(move || remote.close());
+            set.spawn_blocking(move || connectors.close());
+            set.spawn_blocking(move || pulls.close());
+            set.spawn_blocking(move || crons.close());
+            set.spawn_blocking(move || voice.close());
+            set.spawn_blocking(move || hub_bus.close_bus());
+            set.spawn_blocking(move || issue_chat.close());
+            set.spawn_blocking(move || session_chat.close());
+            set.spawn_blocking(move || orchestrator.close());
+            set.spawn_blocking(move || hub_inbox.runtime_inbox.stop());
+            set.spawn_blocking(move || agents.fleet.close());
+            set.spawn_blocking(move || repos.close());
+            set.spawn_blocking(move || artifacts.close());
+            set.spawn_blocking(move || media.close());
+            set.spawn_blocking(move || media_inputs.close());
+            set.spawn_blocking(move || library.close());
+            set.spawn_blocking(move || game.close());
+            set.spawn_blocking(move || board.close());
+            tokio::time::timeout(SHUTDOWN_GRACE, async { while set.join_next().await.is_some() {} })
+                .await
+                .is_err()
+        });
+        if timed_out {
+            tracing::warn!(timeout_secs = SHUTDOWN_GRACE.as_secs(), "server.close timed out waiting for modules to drain");
+        }
+
         self.trajectories.close();
         self.hub.close();
         self.db.close();
