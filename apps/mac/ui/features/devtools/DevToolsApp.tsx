@@ -1,4 +1,4 @@
-import { signal, Text, View, type JSX } from "nsh";
+import { computed, effect, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { DebugOverrideConfig, DebugSnapshot } from "@vibevalley/protocol";
@@ -12,7 +12,7 @@ import { Tag } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
 import { api, reasonOf } from "../../infra/api";
 import { useInterval } from "../../infra/base/timer";
-import { act } from "../../infra/bridge";
+import { act, frame } from "../../infra/bridge";
 import { readDevToolsParams } from "../../infra/hostParams";
 import { onSettled } from "../../infra/solid";
 import { DEVTOOLS_TABS, type DevToolsTab, formatFrameMs, isDisabledError } from "./format";
@@ -49,8 +49,11 @@ export function DevToolsApp() {
   const error = signal<string | undefined>(undefined);
   const autoRefresh = signal(true);
   const refreshTick = signal(0);
+  const visibleFrame = frame<{ visible?: boolean }>("devtools_visible");
+  const visible = computed(() => visibleFrame()?.visible !== false);
 
   let inFlight = false;
+  let wasVisible = true;
 
   const refresh = async () => {
     if (inFlight) return;
@@ -62,7 +65,7 @@ export function DevToolsApp() {
       disabled.set(false);
       error.set(undefined);
       snapshot.set(snap);
-      refreshTick.set(refreshTick() + 1);
+      refreshTick.update((n) => n + 1);
     } catch (e) {
       inFlight = false;
       loading.set(false);
@@ -76,33 +79,27 @@ export function DevToolsApp() {
   };
 
   onSettled(() => {
-    void refresh();
+    if (visible()) void refresh();
+  });
+
+  effect(() => {
+    const nowVisible = visible();
+    const becameVisible = !wasVisible && nowVisible;
+    wasVisible = nowVisible;
+    if (becameVisible && !untracked(disabled)) {
+      untracked(() => {
+        void refresh();
+      });
+    }
   });
 
   useInterval(() => {
-    if (autoRefresh() && !disabled()) void refresh();
+    if (visible() && autoRefresh() && !disabled()) void refresh();
   }, 2000);
 
   const onOverridesUpdated = (next: DebugOverrideConfig) => {
     const current = snapshot();
     if (current) snapshot.set({ ...current, overrides: next });
-  };
-
-  const renderActiveTab = (snap: () => DebugSnapshot): JSX.Element => {
-    switch (activeTab()) {
-      case "overview":
-        return <OverviewTab overview={snap().overview} graph={snap().graph} />;
-      case "routes":
-        return <RoutesTab routes={snap().routes} />;
-      case "timeline":
-        return <TimelineTab fallbackEvents={snap().recentTimeline} refreshTick={refreshTick()} onCleared={() => void refresh()} />;
-      case "trajectory":
-        return <TrajectoryTab refreshTick={refreshTick()} />;
-      case "state":
-        return <StateCacheTab stateCache={snap().stateCache} />;
-      case "lab":
-        return <LabOverridesTab overrides={snap().overrides} onUpdated={onOverridesUpdated} />;
-    }
   };
 
   return (
@@ -113,16 +110,14 @@ export function DevToolsApp() {
           <Text role="header" class="text-sm font-semibold text-ink">
             {t("web.devtools.title")}
           </Text>
-          <If when={snapshot()}>
-            {(snap) => (
-              <View testID="devtools-status-badge" class="flex-row items-center gap-1.5">
-                <Tag tone="info" label={snap().overview.channel} />
-                <Tag tone="neutral" label={`seq ${snap().overview.latestSeq}`} />
-                <If when={snap().overview.lastFrameMs !== undefined}>
-                  <Tag tone={(snap().overview.lastFrameMs ?? 0) >= 16 ? "wait" : "ok"} label={formatFrameMs(snap().overview.lastFrameMs)} />
-                </If>
-              </View>
-            )}
+          <If when={snapshot() !== undefined}>
+            <View testID="devtools-status-badge" class="flex-row items-center gap-1.5">
+              <Tag tone="info" label={snapshot()!.overview.channel} />
+              <Tag tone="neutral" label={`seq ${snapshot()!.overview.latestSeq}`} />
+              <If when={snapshot()!.overview.lastFrameMs !== undefined}>
+                <Tag tone={(snapshot()!.overview.lastFrameMs ?? 0) >= 16 ? "wait" : "ok"} label={formatFrameMs(snapshot()!.overview.lastFrameMs)} />
+              </If>
+            </View>
           </If>
         </View>
 
@@ -191,15 +186,13 @@ export function DevToolsApp() {
               </Empty>
             }
           >
-            <If when={error()}>
-              {(reason) => (
-                <Banner tone="bad" edge testID="devtools-error">
-                  {t("web.devtools.status.error", { reason: reason() })}
-                </Banner>
-              )}
+            <If when={error() !== undefined}>
+              <Banner tone="bad" edge testID="devtools-error">
+                {t("web.devtools.status.error", { reason: error() ?? "" })}
+              </Banner>
             </If>
             <If
-              when={snapshot()}
+              when={snapshot() !== undefined}
               else={
                 <If when={loading()}>
                   <View testID="devtools-loading" class="flex-1 items-center justify-center p-6">
@@ -208,7 +201,26 @@ export function DevToolsApp() {
                 </If>
               }
             >
-              {(snap) => <View class="min-h-0 flex-1">{renderActiveTab(snap)}</View>}
+              <View class="min-h-0 flex-1">
+                <If when={activeTab() === "overview"}>
+                  <OverviewTab overview={() => snapshot()!.overview} graph={() => snapshot()!.graph} />
+                </If>
+                <If when={activeTab() === "routes"}>
+                  <RoutesTab routes={() => snapshot()!.routes} />
+                </If>
+                <If when={activeTab() === "timeline"}>
+                  <TimelineTab fallbackEvents={() => snapshot()!.recentTimeline} refreshTick={refreshTick} onCleared={() => void refresh()} />
+                </If>
+                <If when={activeTab() === "trajectory"}>
+                  <TrajectoryTab refreshTick={refreshTick} />
+                </If>
+                <If when={activeTab() === "state"}>
+                  <StateCacheTab stateCache={() => snapshot()!.stateCache} />
+                </If>
+                <If when={activeTab() === "lab"}>
+                  <LabOverridesTab overrides={() => snapshot()!.overrides} onUpdated={onOverridesUpdated} />
+                </If>
+              </View>
             </If>
           </If>
         </View>

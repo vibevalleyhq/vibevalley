@@ -2,6 +2,7 @@
 //! key names, and common credential token prefixes before anything leaves the
 //! server or is written into a debug bundle.
 
+use std::borrow::Cow;
 use std::sync::LazyLock;
 
 use regex::{Captures, Regex};
@@ -31,16 +32,19 @@ static UNQUOTED_KV_RE: LazyLock<Regex> = LazyLock::new(|| {
         .expect("valid unquoted kv regex")
 });
 
-/// Returns true when a JSON object key name denotes a secret or credential.
-/// Intentionally excludes LLM token-count keys (`tokens`, `inputTokens`, ...).
-pub fn is_sensitive_key(key: &str) -> bool {
-    let lower = key.to_ascii_lowercase();
-    let compact: String = lower.chars().filter(|c| *c != '_' && *c != '-').collect();
+pub(crate) fn contains_ascii_ci(haystack: &[u8], needle: &[u8]) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    haystack.windows(needle.len()).any(|w| w.eq_ignore_ascii_case(needle))
+}
+
+fn is_sensitive_key_normalized(lower: &str, compact: &str) -> bool {
     if compact == "tokens" || compact.ends_with("tokens") {
         return false;
     }
     if matches!(
-        compact.as_str(),
+        compact,
         "apikey"
             | "token"
             | "secret"
@@ -80,6 +84,30 @@ pub fn is_sensitive_key(key: &str) -> bool {
         || lower.ends_with("-token")
 }
 
+/// Returns true when a JSON object key name denotes a secret or credential.
+/// Intentionally excludes LLM token-count keys (`tokens`, `inputTokens`, ...).
+pub fn is_sensitive_key(key: &str) -> bool {
+    if key.len() <= 64 && key.is_ascii() {
+        let mut lower_buf = [0u8; 64];
+        let mut compact_buf = [0u8; 64];
+        let mut compact_len = 0usize;
+        for (i, &b) in key.as_bytes().iter().enumerate() {
+            let lb = b.to_ascii_lowercase();
+            lower_buf[i] = lb;
+            if lb != b'_' && lb != b'-' {
+                compact_buf[compact_len] = lb;
+                compact_len += 1;
+            }
+        }
+        let lower = std::str::from_utf8(&lower_buf[..key.len()]).unwrap_or("");
+        let compact = std::str::from_utf8(&compact_buf[..compact_len]).unwrap_or("");
+        return is_sensitive_key_normalized(lower, compact);
+    }
+    let lower = key.to_ascii_lowercase();
+    let compact: String = lower.chars().filter(|c| *c != '_' && *c != '-').collect();
+    is_sensitive_key_normalized(&lower, &compact)
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Redactor {
     secrets: Vec<String>,
@@ -104,61 +132,89 @@ impl Redactor {
         Self { secrets }
     }
 
-    pub fn redact_str(&self, input: &str, count: &mut u32) -> String {
+    pub fn redact_cow<'a>(&self, input: &'a str, count: &mut u32) -> Cow<'a, str> {
         if input.is_empty() {
-            return String::new();
+            return Cow::Borrowed(input);
         }
-        let mut text = input.to_string();
+        let mut text = Cow::Borrowed(input);
         for secret in &self.secrets {
-            let hits = text.match_indices(secret.as_str()).count();
-            if hits > 0 {
-                text = text.replace(secret.as_str(), REDACTED);
+            if text.contains(secret.as_str()) {
+                let hits = text.match_indices(secret.as_str()).count();
+                text = Cow::Owned(text.replace(secret.as_str(), REDACTED));
                 *count = count.saturating_add(hits as u32);
             }
         }
-        text = BEARER_RE
-            .replace_all(&text, |caps: &Captures<'_>| {
+        if text.len() >= 11 && (!text.is_ascii() || contains_ascii_ci(text.as_bytes(), b"bearer")) {
+            let mut changed = false;
+            let replaced = BEARER_RE.replace_all(&text, |caps: &Captures<'_>| {
                 let matched = &caps[0];
                 if matched.ends_with(REDACTED) {
                     matched.to_string()
                 } else {
+                    changed = true;
                     *count = count.saturating_add(1);
                     REDACTED.to_string()
                 }
-            })
-            .into_owned();
-        text = TOKEN_PREFIX_RE
-            .replace_all(&text, |_caps: &Captures<'_>| {
+            });
+            if changed && let Cow::Owned(next) = replaced {
+                text = Cow::Owned(next);
+            }
+        }
+        if text.len() >= 7
+            && let Cow::Owned(next) = TOKEN_PREFIX_RE.replace_all(&text, |_caps: &Captures<'_>| {
                 *count = count.saturating_add(1);
                 REDACTED
             })
-            .into_owned();
-        text = QUOTED_KV_RE
-            .replace_all(&text, |caps: &Captures<'_>| {
+        {
+            text = Cow::Owned(next);
+        }
+        if text.len() >= 10 && text.as_bytes().iter().any(|&b| b == b':' || b == b'=') && text.as_bytes().iter().any(|&b| b == b'"' || b == b'\'') {
+            let mut changed = false;
+            let replaced = QUOTED_KV_RE.replace_all(&text, |caps: &Captures<'_>| {
                 if &caps[2] == REDACTED {
                     caps[0].to_string()
                 } else {
+                    changed = true;
                     *count = count.saturating_add(1);
                     format!("{}{REDACTED}{}", &caps[1], &caps[3])
                 }
-            })
-            .into_owned();
-        text = UNQUOTED_KV_RE
-            .replace_all(&text, |caps: &Captures<'_>| {
+            });
+            if changed && let Cow::Owned(next) = replaced {
+                text = Cow::Owned(next);
+            }
+        }
+        if text.len() >= 8 && text.as_bytes().contains(&b'=') {
+            let mut changed = false;
+            let replaced = UNQUOTED_KV_RE.replace_all(&text, |caps: &Captures<'_>| {
                 let val = &caps[2];
                 if val == REDACTED || val.starts_with('"') || val.starts_with('\'') {
                     caps[0].to_string()
                 } else {
+                    changed = true;
                     *count = count.saturating_add(1);
                     format!("{}={REDACTED}", &caps[1])
                 }
-            })
-            .into_owned();
+            });
+            if changed && let Cow::Owned(next) = replaced {
+                text = Cow::Owned(next);
+            }
+        }
         text
     }
 
+    pub fn redact_owned(&self, input: String, count: &mut u32) -> String {
+        match self.redact_cow(&input, count) {
+            Cow::Borrowed(_) => input,
+            Cow::Owned(clean) => clean,
+        }
+    }
+
+    pub fn redact_str(&self, input: &str, count: &mut u32) -> String {
+        self.redact_cow(input, count).into_owned()
+    }
+
     pub fn redact_opt_str(&self, input: Option<String>, count: &mut u32) -> Option<String> {
-        input.map(|s| self.redact_str(&s, count))
+        input.map(|s| self.redact_owned(s, count))
     }
 
     fn redact_sensitive_value(&self, value: Value, count: &mut u32) -> Value {
@@ -172,8 +228,20 @@ impl Redactor {
                     Value::String(REDACTED.to_string())
                 }
             }
-            Value::Array(items) => Value::Array(items.into_iter().map(|v| self.redact_sensitive_value(v, count)).collect()),
-            Value::Object(map) => Value::Object(map.into_iter().map(|(k, v)| (k, self.redact_sensitive_value(v, count))).collect()),
+            Value::Array(mut items) => {
+                for item in &mut items {
+                    let orig = std::mem::replace(item, Value::Null);
+                    *item = self.redact_sensitive_value(orig, count);
+                }
+                Value::Array(items)
+            }
+            Value::Object(mut map) => {
+                for (_, v) in &mut map {
+                    let orig = std::mem::replace(v, Value::Null);
+                    *v = self.redact_sensitive_value(orig, count);
+                }
+                Value::Object(map)
+            }
             Value::Bool(_) | Value::Number(_) => {
                 *count = count.saturating_add(1);
                 Value::String(REDACTED.to_string())
@@ -184,35 +252,40 @@ impl Redactor {
     pub fn redact_value(&self, value: Value, count: &mut u32) -> Value {
         match value {
             Value::Null | Value::Bool(_) | Value::Number(_) => value,
-            Value::String(s) => Value::String(self.redact_str(&s, count)),
-            Value::Array(items) => Value::Array(items.into_iter().map(|v| self.redact_value(v, count)).collect()),
-            Value::Object(map) => Value::Object(
-                map.into_iter()
-                    .map(|(k, v)| {
-                        let clean = if is_sensitive_key(&k) {
-                            self.redact_sensitive_value(v, count)
-                        } else {
-                            self.redact_value(v, count)
-                        };
-                        (k, clean)
-                    })
-                    .collect(),
-            ),
+            Value::String(s) => Value::String(self.redact_owned(s, count)),
+            Value::Array(mut items) => {
+                for item in &mut items {
+                    let orig = std::mem::replace(item, Value::Null);
+                    *item = self.redact_value(orig, count);
+                }
+                Value::Array(items)
+            }
+            Value::Object(mut map) => {
+                for (k, v) in &mut map {
+                    let orig = std::mem::replace(v, Value::Null);
+                    *v = if is_sensitive_key(k) {
+                        self.redact_sensitive_value(orig, count)
+                    } else {
+                        self.redact_value(orig, count)
+                    };
+                }
+                Value::Object(map)
+            }
         }
     }
 
     pub fn redact_session_event(&self, mut ev: SessionEvent, count: &mut u32) -> SessionEvent {
-        ev.text = self.redact_str(&ev.text, count);
+        ev.text = self.redact_owned(ev.text, count);
         ev.input = self.redact_opt_str(ev.input, count);
         ev.output = self.redact_opt_str(ev.output, count);
         if let Some(perm) = &mut ev.permission {
-            perm.summary = self.redact_str(&perm.summary, count);
+            perm.summary = self.redact_owned(std::mem::take(&mut perm.summary), count);
             perm.input = self.redact_opt_str(perm.input.take(), count);
         }
         if let Some(interaction) = &mut ev.interaction {
-            interaction.question = self.redact_str(&interaction.question, count);
+            interaction.question = self.redact_owned(std::mem::take(&mut interaction.question), count);
             for opt in &mut interaction.options {
-                opt.label = self.redact_str(&opt.label, count);
+                opt.label = self.redact_owned(std::mem::take(&mut opt.label), count);
                 opt.description = self.redact_opt_str(opt.description.take(), count);
             }
         }
@@ -303,5 +376,18 @@ mod tests {
             assert!(!val.to_string().contains(secret), "secret leaked: {secret}");
         }
         assert!(redactor.contains_leak(val.to_string().as_bytes()).is_none());
+    }
+
+    #[test]
+    fn empty_secrets_and_clean_input_borrows_without_allocating() {
+        let redactor = Redactor::default();
+        let mut count = 0;
+        let clean = redactor.redact_cow("GET /issues/42 -> 0 (1.2ms)", &mut count);
+        assert!(matches!(clean, Cow::Borrowed(_)));
+        assert_eq!(count, 0);
+
+        let already = redactor.redact_cow("Authorization: Bearer [REDACTED]", &mut count);
+        assert!(matches!(already, Cow::Borrowed(_)));
+        assert_eq!(count, 0);
     }
 }

@@ -229,24 +229,29 @@ const sampleBundleResult: DebugBundleResult = {
   redactedCount: 7,
 };
 
-function createDevToolsHost(params: Record<string, unknown> = {}, initialResponses: Record<string, unknown> = {}) {
+function createDevToolsHost(params: Record<string, unknown> = {}, initialResponses: Record<string, unknown> = {}, deferOps: readonly string[] = []) {
   const queue: [string, unknown][] = [];
+  const heldReplies: [string, unknown][] = [];
   const calls: { op: string; payload: unknown }[] = [];
   const responses: Record<string, unknown> = { ...initialResponses };
+  let rev = 0;
 
   const action = (data: unknown) => {
     const a = data as { type: string; id?: string; op?: string; payload?: unknown };
     if (a.type === "call") {
       const op = a.op ?? "";
       calls.push({ op, payload: a.payload });
+      let reply: [string, unknown];
       if (!(op in responses)) {
-        queue.push([`reply:${a.id}`, { bizCode: BizCode.RouteNotFound, message: `unmocked ${op}` }]);
+        reply = [`reply:${a.id}`, { bizCode: BizCode.RouteNotFound, message: `unmocked ${op}` }];
       } else {
         const answer = responses[op];
         const value = typeof answer === "function" ? (answer as (p: unknown) => unknown)(a.payload) : answer;
         const env = value !== null && typeof value === "object" && "bizCode" in value ? value : { bizCode: 0, message: "ok", data: value };
-        queue.push([`reply:${a.id}`, env]);
+        reply = [`reply:${a.id}`, env];
       }
+      if (deferOps.includes(op)) heldReplies.push(reply);
+      else queue.push(reply);
     }
     return null;
   };
@@ -255,6 +260,11 @@ function createDevToolsHost(params: Record<string, unknown> = {}, initialRespons
     for (let round = 0; round < 50 && queue.length > 0; round++) {
       for (const [name, data] of queue.splice(0)) await app.host.send(name, data);
     }
+  };
+
+  const releaseDeferred = async (app: App) => {
+    queue.push(...heldReplies.splice(0));
+    await pump(app);
   };
 
   const pumpUntil = async (app: App, done: () => boolean, timeoutMs = 5_000) => {
@@ -272,6 +282,11 @@ function createDevToolsHost(params: Record<string, unknown> = {}, initialRespons
     await pump(app);
   };
 
+  const pushFrame = async (app: App, topic: string, data: unknown) => {
+    await app.host.send(`frame:${topic}`, { rev: ++rev, data });
+    await pump(app);
+  };
+
   return {
     options: { params: { view: "devtools", locale: "en", detached: false, ...params }, handlers: { action, ready: null } },
     calls,
@@ -280,6 +295,8 @@ function createDevToolsHost(params: Record<string, unknown> = {}, initialRespons
     },
     pump,
     pumpUntil,
+    releaseDeferred,
+    pushFrame,
   };
 }
 
@@ -316,7 +333,7 @@ test("DevTools renders all 6 tabs, filters timeline, inspects trajectory, applie
     },
   );
 
-  const app = await open("../../App.story.tsx", {
+  const app = await open("../../ShellApp.story.tsx", {
     width: 1100,
     height: 760,
     colorScheme: "light",
@@ -462,7 +479,7 @@ test("DevTools auto-refresh polls on interval and pauses cleanly", async () => {
     },
   );
 
-  const app = await open("../../App.story.tsx", {
+  const app = await open("../../ShellApp.story.tsx", {
     width: 960,
     height: 640,
     colorScheme: "light",
@@ -497,7 +514,7 @@ test("DevTools hides detach button when detached and shows disabled refusal stat
     },
   );
 
-  const app = await open("../../App.story.tsx", {
+  const app = await open("../../ShellApp.story.tsx", {
     width: 960,
     height: 640,
     colorScheme: "dark",
@@ -510,4 +527,136 @@ test("DevTools hides detach button when detached and shows disabled refusal stat
   expect(app.count("id:devtools-detach")).toBe(0);
   expect(app.count("id:devtools-disabled")).toBe(1);
   expect(app.texts()).toContain(t("web.devtools.status.disabled"));
+});
+
+test("regression: auto-refresh preserves tab state without remounting, timeline searches locally with limit 60, and devtools_visible pauses/resumes polling", async () => {
+  setLocale("en");
+  let seq = 18;
+  const host = createDevToolsHost(
+    { detached: false },
+    {
+      "debug.snapshot": (): DebugSnapshot => ({
+        ...sampleSnapshot,
+        overview: { ...sampleSnapshot.overview, latestSeq: seq },
+        stateCache: { ...sampleSnapshot.stateCache, seq },
+      }),
+      "debug.timeline.list": (payload: unknown): DebugTimelinePage => {
+        const q = (payload ?? {}) as DebugTimelineQuery;
+        const filtered = sampleTimelineEvents.filter((ev) => q.lane === undefined || ev.lane === q.lane);
+        return { events: filtered, latestId: 3, dropped: 0 };
+      },
+    },
+  );
+
+  const app = await open("../../ShellApp.story.tsx", {
+    width: 1100,
+    height: 760,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: NOW },
+    host: host.options,
+  });
+  const clock = app.clock;
+  if (!clock) throw new Error("virtual clock required");
+
+  const snapshotCalls = () => host.calls.filter((c) => c.op === "debug.snapshot").length;
+  const timelineCalls = () => host.calls.filter((c) => c.op === "debug.timeline.list");
+
+  await host.pumpUntil(app, () => app.count("id:devtools-overview") === 1);
+  expect(snapshotCalls()).toBe(1);
+  expect(app.texts()).toContain("seq 18");
+
+  await app.press("id:devtools-tab-timeline");
+  await host.pumpUntil(app, () => timelineCalls().length === 1 && app.count("id:timeline-row-2") === 1);
+  expect((timelineCalls()[0]?.payload as DebugTimelineQuery | undefined)?.limit).toBe(60);
+
+  await app.press("id:timeline-row-2");
+  expect(app.count("id:timeline-detail-2")).toBe(1);
+
+  const timelineCallsBeforeSearch = timelineCalls().length;
+  await app.type("id:timeline-search", "bridge");
+  expect(app.count("id:timeline-row-2")).toBe(1);
+  expect(app.count("id:timeline-row-1")).toBe(0);
+  expect(timelineCalls().length).toBe(timelineCallsBeforeSearch);
+
+  seq = 19;
+  await clock.fastForward(2_100);
+  await host.pumpUntil(app, () => snapshotCalls() === 2 && app.texts().includes("seq 19"));
+  expect(app.count("id:timeline-detail-2")).toBe(1);
+  expect(app.count("id:timeline-row-1")).toBe(0);
+
+  await app.press("id:devtools-tab-state");
+  expect(app.count("id:devtools-state")).toBe(1);
+  await app.press("id:state-slice-farm");
+  expect(app.texts().some((s) => s.includes('"slice": "farm"') && s.includes('"globalSeq": 19'))).toBe(true);
+
+  seq = 20;
+  await clock.fastForward(2_100);
+  await host.pumpUntil(app, () => snapshotCalls() === 3 && app.texts().includes("seq 20"));
+  expect(app.texts().some((s) => s.includes('"slice": "farm"') && s.includes('"globalSeq": 20'))).toBe(true);
+
+  const callsBeforeHide = snapshotCalls();
+  await host.pushFrame(app, "devtools_visible", { visible: false });
+  await clock.fastForward(6_500);
+  await host.pump(app);
+  expect(snapshotCalls()).toBe(callsBeforeHide);
+
+  seq = 21;
+  await host.pushFrame(app, "devtools_visible", { visible: true });
+  await host.pumpUntil(app, () => snapshotCalls() === callsBeforeHide + 1 && app.texts().includes("seq 21"));
+  expect(app.texts().some((s) => s.includes('"slice": "farm"') && s.includes('"globalSeq": 21'))).toBe(true);
+
+  seq = 22;
+  await clock.fastForward(2_100);
+  await host.pumpUntil(app, () => snapshotCalls() === callsBeforeHide + 2 && app.texts().includes("seq 22"));
+});
+
+test("regression: timeline and trajectory tabs do not overlap duplicate in-flight fetches on refresh", async () => {
+  setLocale("en");
+  const host = createDevToolsHost(
+    { detached: false },
+    {
+      "debug.snapshot": () => sampleSnapshot,
+      "debug.timeline.list": (): DebugTimelinePage => ({ events: sampleTimelineEvents, latestId: 3, dropped: 0 }),
+      "debug.trajectory.list": () => sampleTrajectories,
+    },
+    ["debug.timeline.list", "debug.trajectory.list"],
+  );
+
+  const app = await open("../../ShellApp.story.tsx", {
+    width: 1100,
+    height: 760,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: NOW },
+    host: host.options,
+  });
+  const clock = app.clock;
+  if (!clock) throw new Error("virtual clock required");
+
+  const countOp = (op: string) => host.calls.filter((c) => c.op === op).length;
+
+  await host.pumpUntil(app, () => app.count("id:devtools-overview") === 1);
+
+  await app.press("id:devtools-tab-timeline");
+  await host.pumpUntil(app, () => countOp("debug.timeline.list") === 1);
+
+  await clock.fastForward(2_100);
+  await host.pumpUntil(app, () => countOp("debug.snapshot") === 2);
+  expect(countOp("debug.timeline.list")).toBe(1);
+
+  await host.releaseDeferred(app);
+  await clock.fastForward(2_100);
+  await host.pumpUntil(app, () => countOp("debug.snapshot") === 3 && countOp("debug.timeline.list") === 2);
+  await host.releaseDeferred(app);
+
+  await app.press("id:devtools-tab-trajectory");
+  await host.pumpUntil(app, () => countOp("debug.trajectory.list") === 1);
+
+  await clock.fastForward(2_100);
+  await host.pumpUntil(app, () => countOp("debug.snapshot") === 4);
+  expect(countOp("debug.trajectory.list")).toBe(1);
+
+  await host.releaseDeferred(app);
+  await host.pumpUntil(app, () => app.count("id:trajectory-item-sess-1") === 1);
 });

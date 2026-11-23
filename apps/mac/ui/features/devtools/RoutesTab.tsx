@@ -11,9 +11,9 @@ import { act } from "../../infra/bridge";
 import { parseRouteState, QUICK_ROUTES } from "./format";
 import { SectionHeader } from "./shared";
 
-export function RoutesTab(props: { routes: unknown }) {
+export function RoutesTab(props: { routes: () => unknown }) {
   const query = signal("");
-  const routeState = computed(() => parseRouteState(props.routes));
+  const routeState = computed(() => parseRouteState(props.routes()));
   const needle = () => query().trim().toLowerCase();
 
   const quickRoutes = computed(() => {
@@ -68,72 +68,80 @@ export function RoutesTab(props: { routes: unknown }) {
       </View>
 
       <If
-        when={routeState()}
+        when={routeState() !== undefined}
         else={
           <Empty compact icon="branch" testid="routes-empty">
             {t("web.devtools.routes.empty")}
           </Empty>
         }
       >
-        {(state) => (
-          <View class="gap-3">
-            <View class="flex-row flex-wrap items-center gap-2 rounded-md border border-line bg-page px-3 py-2">
-              <Icon name="branch" size={14} tone="muted" />
-              <Text testID="routes-current" class="font-mono text-xs font-medium text-ink">
-                {state().current ?? "/"}
-              </Text>
-              <If when={state().nativeWorkspace !== undefined}>
-                <Tag tone={state().nativeWorkspace === true ? "ok" : "neutral"} label={`nativeWorkspace:${String(state().nativeWorkspace)}`} />
-              </If>
-              <If when={state().panel}>{(panel) => <Tag tone="info" label={`panel:${panel()}`} />}</If>
-              <If when={state().inspectorOpen !== undefined}>
-                <Tag tone={state().inspectorOpen === true ? "wait" : "neutral"} label={`inspector:${String(state().inspectorOpen)}`} />
-              </If>
-            </View>
-
-            <If when={projects().length > 0}>
-              <View class="gap-2">
-                <Each of={projects()}>
-                  {(project) => (
-                    <View class="gap-1.5 rounded-md border border-line bg-page p-2.5">
-                      <View class="flex-row items-center justify-between gap-2">
-                        <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
-                          <Icon name="folder" size={14} tone={project().active === true ? "accent" : "muted"} />
-                          <Text class="truncate text-xs font-semibold text-ink">{project().name ?? project().path ?? "—"}</Text>
-                          <If when={project().branch}>{(br) => <Tag tone="neutral" label={br()} />}</If>
-                        </View>
-                        <If when={project().active === true}>
-                          <Tag tone="ok" label="active" />
-                        </If>
-                      </View>
-                      <If when={project().path}>{(p) => <Text class="truncate font-mono text-2xs text-faint">{p()}</Text>}</If>
-                      <If when={(project().tabs ?? []).length > 0}>
-                        <View class="gap-1 pt-1">
-                          <Each of={project().tabs ?? []}>
-                            {(tab) => (
-                              <View class="flex-row items-center justify-between gap-2 rounded-sm border border-line bg-side px-2 py-1">
-                                <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
-                                  <Text class="truncate text-xs text-ink">{tab().title ?? "—"}</Text>
-                                  <If when={tab().kind}>{(kind) => <Tag tone="neutral" label={kind()} />}</If>
-                                </View>
-                                <View class="flex-row items-center gap-1">
-                                  <If when={tab().runningState}>{(rs) => <Tag tone="info" label={rs()} />}</If>
-                                  <If when={tab().active === true}>
-                                    <Tag tone="ok" label="active" />
-                                  </If>
-                                </View>
-                              </View>
-                            )}
-                          </Each>
-                        </View>
-                      </If>
-                    </View>
-                  )}
-                </Each>
-              </View>
+        <View class="gap-3">
+          <View class="flex-row flex-wrap items-center gap-2 rounded-md border border-line bg-page px-3 py-2">
+            <Icon name="branch" size={14} tone="muted" />
+            <Text testID="routes-current" class="font-mono text-xs font-medium text-ink">
+              {routeState()?.current ?? "/"}
+            </Text>
+            <If when={routeState()?.nativeWorkspace !== undefined}>
+              <Tag tone={routeState()?.nativeWorkspace === true ? "ok" : "neutral"} label={`nativeWorkspace:${String(routeState()?.nativeWorkspace)}`} />
+            </If>
+            <If when={Boolean(routeState()?.panel)}>
+              <Tag tone="info" label={`panel:${routeState()?.panel ?? ""}`} />
+            </If>
+            <If when={routeState()?.inspectorOpen !== undefined}>
+              <Tag tone={routeState()?.inspectorOpen === true ? "wait" : "neutral"} label={`inspector:${String(routeState()?.inspectorOpen)}`} />
             </If>
           </View>
-        )}
+
+          <If when={projects().length > 0}>
+            <View class="gap-2">
+              <Each of={projects()} key={(project, idx) => project.id ?? project.path ?? idx}>
+                {(project) => (
+                  <View class="gap-1.5 rounded-md border border-line bg-page p-2.5">
+                    <View class="flex-row items-center justify-between gap-2">
+                      <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
+                        <Icon name="folder" size={14} tone={project().active === true ? "accent" : "muted"} />
+                        <Text class="truncate text-xs font-semibold text-ink">{project().name ?? project().path ?? "—"}</Text>
+                        <If when={Boolean(project().branch)}>
+                          <Tag tone="neutral" label={project().branch ?? ""} />
+                        </If>
+                      </View>
+                      <If when={project().active === true}>
+                        <Tag tone="ok" label="active" />
+                      </If>
+                    </View>
+                    <If when={Boolean(project().path)}>
+                      <Text class="truncate font-mono text-2xs text-faint">{project().path}</Text>
+                    </If>
+                    <If when={(project().tabs ?? []).length > 0}>
+                      <View class="gap-1 pt-1">
+                        <Each of={project().tabs ?? []} key={(tab, idx) => tab.id ?? `${tab.kind ?? ""}:${tab.title ?? idx}`}>
+                          {(tab) => (
+                            <View class="flex-row items-center justify-between gap-2 rounded-sm border border-line bg-side px-2 py-1">
+                              <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
+                                <Text class="truncate text-xs text-ink">{tab().title ?? "—"}</Text>
+                                <If when={Boolean(tab().kind)}>
+                                  <Tag tone="neutral" label={tab().kind ?? ""} />
+                                </If>
+                              </View>
+                              <View class="flex-row items-center gap-1">
+                                <If when={Boolean(tab().runningState)}>
+                                  <Tag tone="info" label={tab().runningState ?? ""} />
+                                </If>
+                                <If when={tab().active === true}>
+                                  <Tag tone="ok" label="active" />
+                                </If>
+                              </View>
+                            </View>
+                          )}
+                        </Each>
+                      </View>
+                    </If>
+                  </View>
+                )}
+              </Each>
+            </View>
+          </If>
+        </View>
       </If>
     </Scroll>
   );

@@ -13,6 +13,8 @@ use crate::theme::Ui;
 use super::Shell;
 use super::menus::{CloseWindow, ToggleDevtools};
 
+pub const DEVTOOLS_VISIBLE_TOPIC: &str = "devtools_visible";
+
 pub fn devtools_enabled_from(raw: Option<&str>) -> bool {
     raw.map(str::trim) == Some("1")
 }
@@ -63,6 +65,18 @@ impl DevtoolsState {
 
     pub fn is_overlay_open(&self) -> bool {
         self.enabled && self.open && !self.detached
+    }
+
+    pub fn overlay_visibility_frame(&self) -> serde_json::Value {
+        json!({ "visible": self.is_overlay_open() })
+    }
+
+    pub fn should_record_frame(&self, duration_us: u64) -> bool {
+        self.enabled && (self.open || duration_us >= crate::hosted::SLOW_FRAME_US)
+    }
+
+    pub fn should_publish_periodic_host_debug(&self) -> bool {
+        self.enabled && self.open
     }
 
     pub fn toggle(&mut self) -> bool {
@@ -219,7 +233,9 @@ impl Shell {
                     shell.devtools.state.capsule.active_sessions = active_sessions;
                     shell.devtools.state.capsule.active_subs = active_subs;
                     shell.devtools.state.capsule.latest_seq = latest_seq;
-                    shell.publish_host_debug(cx);
+                    if shell.devtools.state.should_publish_periodic_host_debug() {
+                        shell.publish_host_debug(cx);
+                    }
                     if shell.devtools.state.capsule != prev {
                         cx.notify();
                     }
@@ -239,6 +255,13 @@ impl Shell {
         self.devtools.state.capsule.route = if route.is_empty() { "/issues".to_string() } else { route.to_string() };
     }
 
+    fn push_devtools_overlay_visibility(&self, cx: &mut Context<Self>) {
+        if let Some((view, _)) = &self.devtools.overlay {
+            let frame = self.devtools.state.overlay_visibility_frame();
+            view.update(cx, |v, cx| v.push(DEVTOOLS_VISIBLE_TOPIC, frame, cx));
+        }
+    }
+
     pub fn toggle_devtools(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.devtools.state.enabled {
             return;
@@ -246,10 +269,12 @@ impl Shell {
         let was_detached = self.devtools.state.detached;
         self.devtools.state.toggle();
         if was_detached || !self.devtools.state.open {
-            self.devtools.overlay = None;
             self.close_detached_devtools_window(cx);
+            self.push_devtools_overlay_visibility(cx);
         } else {
+            self.publish_host_debug(cx);
             self.ensure_devtools_overlay(window, cx);
+            self.push_devtools_overlay_visibility(cx);
         }
         cx.notify();
     }
@@ -259,8 +284,8 @@ impl Shell {
             return;
         }
         self.devtools.state.close();
-        self.devtools.overlay = None;
         self.close_detached_devtools_window(cx);
+        self.push_devtools_overlay_visibility(cx);
         cx.notify();
     }
 
@@ -270,6 +295,7 @@ impl Shell {
         }
         self.devtools.state.detach();
         self.devtools.overlay = None;
+        self.publish_host_debug(cx);
         if let Some(handle) = self.devtools.detached_window {
             let active = handle.update(cx, |_, win, cx| {
                 win.activate_window();
@@ -385,9 +411,10 @@ impl Shell {
         let sub = cx.subscribe_in(&view, window, |this, _, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(action) => this.on_action(action.clone(), window, cx),
             HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
-            HostedEvent::Ready => {}
+            HostedEvent::Ready => this.push_devtools_overlay_visibility(cx),
         });
         self.devtools.overlay = Some((view, sub));
+        self.push_devtools_overlay_visibility(cx);
     }
 
     pub(super) fn devtools_for_each_view(&self, cx: &mut Context<Self>, mut f: impl FnMut(&mut HostedView, &mut Context<HostedView>)) {
@@ -556,5 +583,84 @@ mod tests {
         assert!(text.contains("3s/7sub"), "missing sessions/subs in {text}");
         assert!(text.contains("seq 142"), "missing seq in {text}");
         assert!(text.contains("4.2ms") || text.contains("4.3ms"), "missing frame ms in {text}");
+    }
+
+    #[test]
+    fn cached_overlay_visibility_frame_tracks_open_close_reopen_and_ready_reset() {
+        let mut state = DevtoolsState::new(true, "dev", 8790);
+        let mut outbox = crate::hosted::Outbox::default();
+
+        assert!(state.toggle());
+        let (event, env) = outbox
+            .envelope(DEVTOOLS_VISIBLE_TOPIC, state.overlay_visibility_frame())
+            .expect("initial open pushes devtools_visible frame");
+        assert_eq!(event, "frame:devtools_visible");
+        assert_eq!(env["rev"], 1);
+        assert_eq!(env["data"], json!({ "visible": true }));
+
+        assert!(
+            outbox.envelope(DEVTOOLS_VISIBLE_TOPIC, state.overlay_visibility_frame()).is_none(),
+            "unchanged visibility is deduplicated"
+        );
+
+        outbox.reset();
+        let (_, ready_env) = outbox
+            .envelope(DEVTOOLS_VISIBLE_TOPIC, state.overlay_visibility_frame())
+            .expect("Ready re-pushes current visibility");
+        assert_eq!(ready_env["rev"], 1);
+        assert_eq!(ready_env["data"], json!({ "visible": true }));
+
+        assert!(state.close());
+        let (_, hidden_env) = outbox
+            .envelope(DEVTOOLS_VISIBLE_TOPIC, state.overlay_visibility_frame())
+            .expect("closing pushes visible=false");
+        assert_eq!(hidden_env["rev"], 2);
+        assert_eq!(hidden_env["data"], json!({ "visible": false }));
+
+        assert!(state.toggle());
+        let (_, reopened_env) = outbox
+            .envelope(DEVTOOLS_VISIBLE_TOPIC, state.overlay_visibility_frame())
+            .expect("reopening cached overlay pushes visible=true");
+        assert_eq!(reopened_env["rev"], 3);
+        assert_eq!(reopened_env["data"], json!({ "visible": true }));
+
+        assert!(state.toggle());
+        assert!(!state.is_overlay_open());
+        outbox.reset();
+        let (_, closed_ready_env) = outbox
+            .envelope(DEVTOOLS_VISIBLE_TOPIC, state.overlay_visibility_frame())
+            .expect("Ready after close pushes visible=false");
+        assert_eq!(closed_ready_env["rev"], 1);
+        assert_eq!(closed_ready_env["data"], json!({ "visible": false }));
+    }
+
+    #[test]
+    fn frame_recording_and_periodic_host_debug_gate_on_open_or_slow_frame() {
+        let disabled = DevtoolsState::new(false, "dev", 8790);
+        assert!(!disabled.should_record_frame(1_000));
+        assert!(!disabled.should_record_frame(crate::hosted::SLOW_FRAME_US));
+        assert!(!disabled.should_publish_periodic_host_debug());
+
+        let mut state = DevtoolsState::new(true, "dev", 8790);
+        assert!(!state.should_record_frame(4_200));
+        assert!(!state.should_record_frame(crate::hosted::SLOW_FRAME_US - 1));
+        assert!(state.should_record_frame(crate::hosted::SLOW_FRAME_US));
+        assert!(state.should_record_frame(42_000));
+        assert!(!state.should_publish_periodic_host_debug());
+
+        assert!(state.toggle());
+        assert!(state.should_record_frame(1_000));
+        assert!(state.should_record_frame(crate::hosted::SLOW_FRAME_US));
+        assert!(state.should_publish_periodic_host_debug());
+
+        assert!(state.detach());
+        assert!(!state.is_overlay_open());
+        assert!(state.should_record_frame(1_000));
+        assert!(state.should_publish_periodic_host_debug());
+
+        assert!(state.on_detached_closed());
+        assert!(!state.should_record_frame(4_200));
+        assert!(state.should_record_frame(crate::hosted::SLOW_FRAME_US));
+        assert!(!state.should_publish_periodic_host_debug());
     }
 }

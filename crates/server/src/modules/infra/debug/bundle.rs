@@ -79,8 +79,10 @@ pub(crate) fn write_zip_store(entries: &[(&str, &[u8])]) -> Vec<u8> {
     const DOS_DATE: u16 = ((2026 - 1980) << 9) | (1 << 5) | 1;
     const UTF8_FLAG: u16 = 0x0800;
 
-    let mut out = Vec::new();
-    let mut central = Vec::new();
+    let total_data: usize = entries.iter().map(|(n, d)| 30 + n.len() + d.len()).sum();
+    let total_cd: usize = entries.iter().map(|(n, _)| 46 + n.len()).sum();
+    let mut out = Vec::with_capacity(total_data + total_cd + 22);
+    let mut central = Vec::with_capacity(total_cd);
 
     for &(name, data) in entries {
         let name_bytes = name.as_bytes();

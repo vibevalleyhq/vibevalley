@@ -264,7 +264,9 @@ impl Render for Shell {
             let duration_us = started.elapsed().as_micros() as u64;
             let ms = duration_us as f64 / 1000.0;
             self.devtools.state.record_frame_ms(ms);
-            if let Some(handle) = cx.try_global::<crate::hosted::ShellDebugHandle>() {
+            if self.devtools.state.should_record_frame(duration_us)
+                && let Some(handle) = cx.try_global::<crate::hosted::ShellDebugHandle>()
+            {
                 handle.record_frame(duration_us, "Shell::render");
             }
         }

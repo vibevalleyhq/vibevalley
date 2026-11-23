@@ -396,7 +396,7 @@ pub fn workbench_bundle_mode() -> &'static str {
 }
 
 fn is_workbench_view(view: &str) -> bool {
-    matches!(view, "vv" | "vibevalley" | "farm-form" | "farm-phone" | "devtools")
+    matches!(view, "vv" | "vibevalley" | "farm-form" | "farm-phone")
 }
 
 fn dir_has_bundle(dir: &std::path::Path) -> bool {
@@ -483,8 +483,9 @@ fn load_bundle_slot(workbench: bool, bytecode: &[u8], js: &str, fallback_caps: &
     build_embedded_bundle(bytecode, js, &caps_json)
 }
 
-/// Full workbench bundle for `"vv"`/`"vibevalley"`/`"devtools"`, lightweight shell bundle for
-/// all other hosted surfaces, cached process-wide so views share one load.
+/// Full workbench bundle for `"vv"`/`"vibevalley"` and pixel farm overlays, lightweight shell
+/// bundle for all other hosted surfaces (including `"devtools"`), cached process-wide so views
+/// share one load.
 fn bundle_for(view: &str) -> Bundle {
     if is_workbench_view(view) {
         static WORKBENCH: OnceLock<Bundle> = OnceLock::new();
@@ -874,10 +875,10 @@ mod tests {
 
     #[test]
     fn is_workbench_view_routes_workbench_and_farm_views() {
-        for view in ["vv", "vibevalley", "farm-form", "farm-phone", "devtools"] {
+        for view in ["vv", "vibevalley", "farm-form", "farm-phone"] {
             assert!(is_workbench_view(view), "{view} should use the full workbench bundle");
         }
-        for view in ["sidebar", "palette", "markdown", "workspace-chat", "probe"] {
+        for view in ["sidebar", "palette", "markdown", "workspace-chat", "probe", "devtools"] {
             assert!(!is_workbench_view(view), "{view} should use the lightweight shell bundle");
         }
     }

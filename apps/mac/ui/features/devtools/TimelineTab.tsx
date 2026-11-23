@@ -1,4 +1,4 @@
-import { computed, effect, Scroll, signal, Text, View } from "nsh";
+import { computed, effect, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { DebugTimelineEvent, DebugTimelinePage } from "@vibevalley/protocol";
@@ -12,7 +12,9 @@ import { wallClockText } from "../../infra/base/format";
 import { formatJson, isSlowEvent, laneLabel, laneTone, slowBadgeTone, TIMELINE_LANES, type TimelineLaneFilter } from "./format";
 import { JsonPreview } from "./shared";
 
-export function TimelineTab(props: { fallbackEvents: readonly DebugTimelineEvent[]; refreshTick: number; onCleared?: () => void }) {
+const TIMELINE_LIMIT = 60;
+
+export function TimelineTab(props: { fallbackEvents: () => readonly DebugTimelineEvent[]; refreshTick: () => number; onCleared?: () => void }) {
   const lane = signal<TimelineLaneFilter>("all");
   const search = signal("");
   const slowOnly = signal(false);
@@ -21,30 +23,56 @@ export function TimelineTab(props: { fallbackEvents: readonly DebugTimelineEvent
   const expandedId = signal<number | undefined>(undefined);
   const clearing = signal(false);
 
-  const load = async (currentLane: TimelineLaneFilter, currentSearch: string) => {
+  let inFlight = false;
+  let activeLane: TimelineLaneFilter | undefined;
+  let pendingLane: TimelineLaneFilter | undefined;
+  let loadSeq = 0;
+
+  const load = async (targetLane: TimelineLaneFilter, force = false) => {
+    if (inFlight) {
+      if (force || pendingLane !== undefined || targetLane !== activeLane) {
+        pendingLane = targetLane;
+      }
+      return;
+    }
+    let nextLane: TimelineLaneFilter | undefined = targetLane;
+    inFlight = true;
     try {
-      const trimmed = currentSearch.trim();
-      const res = await api.debug.timeline.list({
-        ...(currentLane !== "all" ? { lane: currentLane } : {}),
-        ...(trimmed ? { search: trimmed } : {}),
-        limit: 200,
-      });
-      page.set(res);
-      error.set(undefined);
-    } catch (e) {
-      error.set(reasonOf(e));
+      while (nextLane !== undefined) {
+        const current = nextLane;
+        activeLane = current;
+        pendingLane = undefined;
+        const seq = ++loadSeq;
+        try {
+          const res = await api.debug.timeline.list({
+            ...(current !== "all" ? { lane: current } : {}),
+            limit: TIMELINE_LIMIT,
+          });
+          if (seq === loadSeq) {
+            page.set(res);
+            error.set(undefined);
+          }
+        } catch (e) {
+          if (seq === loadSeq) error.set(reasonOf(e));
+        }
+        nextLane = pendingLane;
+      }
+    } finally {
+      inFlight = false;
+      activeLane = undefined;
     }
   };
 
   effect(() => {
     const currentLane = lane();
-    const currentSearch = search();
-    void props.refreshTick;
-    void load(currentLane, currentSearch);
+    void props.refreshTick();
+    untracked(() => {
+      void load(currentLane);
+    });
   });
 
   const visibleEvents = computed(() => {
-    const raw = page()?.events ?? props.fallbackEvents;
+    const raw = page()?.events ?? props.fallbackEvents();
     const currentLane = lane();
     const q = search().trim().toLowerCase();
     const onlySlow = slowOnly();
@@ -63,8 +91,10 @@ export function TimelineTab(props: { fallbackEvents: readonly DebugTimelineEvent
     clearing.set(true);
     try {
       await api.debug.timeline.clear();
+      loadSeq += 1;
       expandedId.set(undefined);
-      await load(lane(), search());
+      page.set({ events: [], latestId: 0, dropped: 0 });
+      await load(lane(), true);
       props.onCleared?.();
     } catch (e) {
       error.set(reasonOf(e));
@@ -118,12 +148,10 @@ export function TimelineTab(props: { fallbackEvents: readonly DebugTimelineEvent
         </View>
       </View>
 
-      <If when={error()}>
-        {(reason) => (
-          <Banner tone="bad" edge>
-            {t("web.devtools.status.error", { reason: reason() })}
-          </Banner>
-        )}
+      <If when={error() !== undefined}>
+        <Banner tone="bad" edge>
+          {t("web.devtools.status.error", { reason: error() ?? "" })}
+        </Banner>
       </If>
 
       <Scroll class="min-h-0 flex-1" contentClass="gap-1.5 p-3">

@@ -2,7 +2,7 @@
 //! Orchestrator trajectories, joining SQLite `session_event` rows, live
 //! `SpaceState`, and on-disk `oar-voyage/3` JSONL records.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -10,14 +10,14 @@ use std::path::{Path, PathBuf};
 use serde_json::{Value, json};
 use vibevalley_protocol::{
     ApiError, BizCode, DebugTrajectoryDetail, DebugTrajectoryGetRequest, DebugTrajectoryKind, DebugTrajectoryRawEntry, DebugTrajectorySummary,
-    DebugTrajectoryTurn, EventTokens, Issue, ORCHESTRATOR_RUNTIME, Phase, Session, SessionController, SessionEvent, SessionEventType, SpaceState,
+    DebugTrajectoryTurn, EventTokens, ORCHESTRATOR_RUNTIME, Phase, Session, SessionController, SessionEvent, SessionEventType, SpaceState,
 };
 use vibevalley_runtime::oar::voyage::{Header as VoyageHeader, Kind as VoyageKind, Reader as VoyageReader, Record as VoyageRecord};
 use vibevalley_runtime::oar::{EventKind as OarEventKind, StopReason, Usage as OarUsage};
 
 use super::DebugDataSource;
 use super::collector::clip_utf8;
-use super::redact::Redactor;
+use super::redact::{Redactor, contains_ascii_ci};
 
 const RAW_PAYLOAD_MAX_BYTES: usize = 4096;
 const SILENT_ERROR_MARKERS: [&str; 6] = [
@@ -29,7 +29,27 @@ const SILENT_ERROR_MARKERS: [&str; 6] = [
     "CONTEXT_LENGTH_EXCEEDED",
 ];
 
-fn is_safe_id(id: &str) -> bool {
+/// Minimal per-session metadata extracted under a brief `Hub::read` lock so
+/// disk/JSONL and SQLite I/O run strictly outside the `Core` lock.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct SessionStateMeta {
+    pub exists: bool,
+    pub is_orchestrator: bool,
+    pub is_issue_session: bool,
+    pub in_issue_history: bool,
+    pub runtime: Option<String>,
+    pub status: Option<&'static str>,
+    pub updated_at: i64,
+    pub title: Option<String>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct StateTrajectoryIndex {
+    pub sessions: HashMap<String, SessionStateMeta>,
+    pub known_ids: BTreeSet<String>,
+}
+
+pub(crate) fn is_safe_id(id: &str) -> bool {
     !id.is_empty() && !id.contains('/') && !id.contains('\\') && !id.contains("..") && id != "."
 }
 
@@ -43,23 +63,110 @@ pub(crate) fn phase_status_str(phase: &Phase) -> &'static str {
     }
 }
 
-pub(crate) fn classify_session(
-    id: &str,
-    session: Option<&Session>,
-    issues: &[Issue],
-    orchestrator_ids: &[String],
-    voyage_header: Option<&VoyageHeader>,
-) -> DebugTrajectoryKind {
-    if session.is_some_and(|s| s.is_orchestrator() || s.controller == SessionController::Orchestrator)
-        || orchestrator_ids.iter().any(|o| o == id)
-        || voyage_header.is_some_and(|h| h.runtime == ORCHESTRATOR_RUNTIME)
-    {
+pub(crate) fn classify_live_session(session: &Session, orchestrator_ids: &[String], in_issue_history: bool) -> DebugTrajectoryKind {
+    if session.is_orchestrator() || session.controller == SessionController::Orchestrator || orchestrator_ids.iter().any(|o| o == &session.id) {
         return DebugTrajectoryKind::Orchestrator;
     }
-    if session.is_some_and(|s| s.is_board_worker() || s.issue_id().is_some()) || issues.iter().any(|i| i.executions().any(|e| e.session() == id)) {
+    if session.is_board_worker() || session.issue_id().is_some() || in_issue_history {
         return DebugTrajectoryKind::IssueSession;
     }
     DebugTrajectoryKind::WorkspaceChat
+}
+
+fn classify_meta(id: &str, meta: Option<&SessionStateMeta>, orchestrator_ids: &[String], voyage_header: Option<&VoyageHeader>) -> DebugTrajectoryKind {
+    if meta.is_some_and(|m| m.is_orchestrator) || orchestrator_ids.iter().any(|o| o == id) || voyage_header.is_some_and(|h| h.runtime == ORCHESTRATOR_RUNTIME) {
+        return DebugTrajectoryKind::Orchestrator;
+    }
+    if meta.is_some_and(|m| m.is_issue_session || m.in_issue_history) {
+        return DebugTrajectoryKind::IssueSession;
+    }
+    DebugTrajectoryKind::WorkspaceChat
+}
+
+pub(crate) fn extract_session_meta(state: &SpaceState, id: &str) -> Option<SessionStateMeta> {
+    let session = state.sessions.iter().find(|s| s.id == id);
+    let exec_issue = state.issues.iter().find(|i| i.executions().any(|e| e.session() == id));
+    if session.is_none() && exec_issue.is_none() {
+        return None;
+    }
+    let title = if let Some(s) = session {
+        if let Some(issue_id) = s.issue_id()
+            && let Some(issue) = state.issues.iter().find(|i| i.id == issue_id)
+        {
+            Some(format!("#{} {}", issue.number, issue.title))
+        } else if !s.name.trim().is_empty() {
+            Some(s.name.clone())
+        } else {
+            exec_issue.map(|i| format!("#{} {}", i.number, i.title))
+        }
+    } else {
+        exec_issue.map(|i| format!("#{} {}", i.number, i.title))
+    };
+    Some(SessionStateMeta {
+        exists: session.is_some(),
+        is_orchestrator: session.is_some_and(|s| s.is_orchestrator() || s.controller == SessionController::Orchestrator),
+        is_issue_session: session.is_some_and(|s| s.is_board_worker() || s.issue_id().is_some()),
+        in_issue_history: exec_issue.is_some(),
+        runtime: session.map(|s| s.runtime.clone()),
+        status: session.map(|s| phase_status_str(&s.phase)),
+        updated_at: session.map(|s| s.last_run.as_ref().map_or(s.hired_at, |r| r.at.max(s.hired_at))).unwrap_or(0),
+        title,
+    })
+}
+
+pub(crate) fn extract_trajectory_index(state: &SpaceState) -> StateTrajectoryIndex {
+    let mut index = StateTrajectoryIndex::default();
+    let issue_by_id: HashMap<&str, (i64, &str)> = state.issues.iter().map(|i| (i.id.as_str(), (i.number, i.title.as_str()))).collect();
+    let mut exec_issue: HashMap<&str, (i64, &str)> = HashMap::new();
+    for issue in &state.issues {
+        for exec in issue.executions() {
+            let sid = exec.session();
+            exec_issue.entry(sid).or_insert((issue.number, issue.title.as_str()));
+            index.known_ids.insert(sid.to_string());
+        }
+    }
+
+    for s in &state.sessions {
+        index.known_ids.insert(s.id.clone());
+        let linked_exec = exec_issue.get(s.id.as_str()).copied();
+        let title = if let Some(issue_id) = s.issue_id()
+            && let Some((num, t)) = issue_by_id.get(issue_id).copied()
+        {
+            Some(format!("#{num} {t}"))
+        } else if !s.name.trim().is_empty() {
+            Some(s.name.clone())
+        } else {
+            linked_exec.map(|(num, t)| format!("#{num} {t}"))
+        };
+        index.sessions.insert(
+            s.id.clone(),
+            SessionStateMeta {
+                exists: true,
+                is_orchestrator: s.is_orchestrator() || s.controller == SessionController::Orchestrator,
+                is_issue_session: s.is_board_worker() || s.issue_id().is_some(),
+                in_issue_history: linked_exec.is_some(),
+                runtime: Some(s.runtime.clone()),
+                status: Some(phase_status_str(&s.phase)),
+                updated_at: s.last_run.as_ref().map_or(s.hired_at, |r| r.at.max(s.hired_at)),
+                title,
+            },
+        );
+    }
+
+    for (sid, (num, t)) in exec_issue {
+        index.sessions.entry(sid.to_string()).or_insert_with(|| SessionStateMeta {
+            exists: false,
+            is_orchestrator: false,
+            is_issue_session: false,
+            in_issue_history: true,
+            runtime: None,
+            status: None,
+            updated_at: 0,
+            title: Some(format!("#{num} {t}")),
+        });
+    }
+
+    index
 }
 
 fn voyage_record_path(home: &Path, id: &str) -> Option<PathBuf> {
@@ -202,20 +309,51 @@ fn push_unique_error(errors: &mut Vec<String>, msg: String) {
     }
 }
 
+fn detect_redacted_text_silent_errors(clean: &str, out: &mut Vec<String>) {
+    if clean.is_empty() {
+        return;
+    }
+    if contains_step_type_17(clean) {
+        push_unique_error(out, "step_type=17 error step detected".into());
+    }
+    let bytes = clean.as_bytes();
+    for marker in SILENT_ERROR_MARKERS {
+        if contains_ascii_ci(bytes, marker.as_bytes()) {
+            let (snippet, _) = clip_utf8(clean, 160);
+            push_unique_error(out, format!("{marker}: {snippet}"));
+        }
+    }
+}
+
 fn detect_text_silent_errors(text: &str, redactor: &Redactor, count: &mut u32, out: &mut Vec<String>) {
     if text.is_empty() {
         return;
     }
-    let clean = redactor.redact_str(text, count);
-    if contains_step_type_17(&clean) {
-        push_unique_error(out, "step_type=17 error step detected".into());
+    let clean = redactor.redact_cow(text, count);
+    detect_redacted_text_silent_errors(&clean, out);
+}
+
+fn text_has_silent_error(text: &str) -> bool {
+    if text.is_empty() {
+        return false;
     }
-    let upper = clean.to_ascii_uppercase();
-    for marker in SILENT_ERROR_MARKERS {
-        if upper.contains(marker) {
-            let (snippet, _) = clip_utf8(&clean, 160);
-            push_unique_error(out, format!("{marker}: {snippet}"));
-        }
+    if contains_step_type_17(text) {
+        return true;
+    }
+    let bytes = text.as_bytes();
+    SILENT_ERROR_MARKERS.iter().any(|marker| contains_ascii_ci(bytes, marker.as_bytes()))
+}
+
+fn raw_may_contain_step_type(text: &str) -> bool {
+    text.contains("step_type") || text.contains("stepType") || text.contains("CORTEX_STEP_TYPE_ERROR_MESSAGE")
+}
+
+fn value_has_silent_error_text(val: &Value) -> bool {
+    match val {
+        Value::String(s) => text_has_silent_error(s),
+        Value::Array(items) => items.iter().any(value_has_silent_error_text),
+        Value::Object(map) => map.iter().any(|(k, v)| text_has_silent_error(k) || value_has_silent_error_text(v)),
+        Value::Null | Value::Bool(_) | Value::Number(_) => false,
     }
 }
 
@@ -249,13 +387,13 @@ fn value_has_step_type_17(val: &Value) -> bool {
     }
 }
 
-fn detect_session_event_errors(ev: &SessionEvent, redactor: &Redactor, count: &mut u32, out: &mut Vec<String>) {
+fn detect_redacted_session_event_errors(ev: &SessionEvent, out: &mut Vec<String>) {
     match ev.r#type {
         SessionEventType::RunError => {
             let msg = if ev.text.trim().is_empty() {
                 "run/error".to_string()
             } else {
-                redactor.redact_str(&ev.text, count)
+                ev.text.clone()
             };
             push_unique_error(out, msg);
         }
@@ -277,13 +415,34 @@ fn detect_session_event_errors(ev: &SessionEvent, redactor: &Redactor, count: &m
         | SessionEventType::LlmUsage
         | SessionEventType::RunEnd => {}
     }
-    detect_text_silent_errors(&ev.text, redactor, count, out);
+    detect_redacted_text_silent_errors(&ev.text, out);
     if let Some(output) = &ev.output {
-        detect_text_silent_errors(output, redactor, count, out);
+        detect_redacted_text_silent_errors(output, out);
     }
 }
 
-fn detect_voyage_record_errors(rec: &VoyageRecord, redactor: &Redactor, count: &mut u32, out: &mut Vec<String>) {
+fn session_event_has_silent_error(ev: &SessionEvent) -> bool {
+    let is_error_type = match ev.r#type {
+        SessionEventType::RunError => true,
+        SessionEventType::RunEnd => ev.text.eq_ignore_ascii_case("failed"),
+        SessionEventType::RunStart
+        | SessionEventType::UserMessage
+        | SessionEventType::MemoryRecalled
+        | SessionEventType::AssistantThinking
+        | SessionEventType::AssistantMessage
+        | SessionEventType::ToolCall
+        | SessionEventType::ToolResult
+        | SessionEventType::PermissionRequest
+        | SessionEventType::PermissionResolved
+        | SessionEventType::InteractionRequest
+        | SessionEventType::InteractionResolved
+        | SessionEventType::LlmRetry
+        | SessionEventType::LlmUsage => false,
+    };
+    is_error_type || text_has_silent_error(&ev.text) || ev.output.as_deref().is_some_and(text_has_silent_error)
+}
+
+fn detect_voyage_record_errors(rec: &VoyageRecord, clean_raw: Option<&str>, redactor: &Redactor, count: &mut u32, out: &mut Vec<String>) {
     for native in &rec.native_events {
         match &native.kind {
             OarEventKind::Error { message } => push_unique_error(out, redactor.redact_str(message, count)),
@@ -325,7 +484,9 @@ fn detect_voyage_record_errors(rec: &VoyageRecord, redactor: &Redactor, count: &
             let reason = ev.pointer("/outcome/reason").and_then(Value::as_str).unwrap_or("turn_ended: failed");
             push_unique_error(out, redactor.redact_str(reason, count));
         }
-        detect_text_silent_errors(&ev.to_string(), redactor, count, out);
+        if value_has_silent_error_text(ev) {
+            detect_text_silent_errors(&ev.to_string(), redactor, count, out);
+        }
     }
     if let Some(marker) = &rec.marker {
         if value_has_step_type_17(marker) {
@@ -335,15 +496,88 @@ fn detect_voyage_record_errors(rec: &VoyageRecord, redactor: &Redactor, count: &
             push_unique_error(out, redactor.redact_str(&marker.to_string(), count));
         }
     }
-    if !rec.raw.is_empty() {
-        let raw_text = String::from_utf8_lossy(&rec.raw);
-        if let Ok(parsed) = serde_json::from_str::<Value>(&raw_text)
+    if let Some(clean) = clean_raw {
+        if raw_may_contain_step_type(clean)
+            && let Ok(parsed) = serde_json::from_str::<Value>(clean)
             && value_has_step_type_17(&parsed)
         {
             push_unique_error(out, "step_type=17 error frame detected".into());
         }
-        detect_text_silent_errors(&raw_text, redactor, count, out);
+        detect_redacted_text_silent_errors(clean, out);
     }
+}
+
+fn voyage_record_has_silent_error(rec: &VoyageRecord) -> bool {
+    for native in &rec.native_events {
+        let is_err = match &native.kind {
+            OarEventKind::Error { message } => !message.trim().is_empty(),
+            OarEventKind::TurnFinished { reason: StopReason::Error, .. } => true,
+            OarEventKind::SessionStarted { .. }
+            | OarEventKind::TurnStarted { .. }
+            | OarEventKind::TextDelta { .. }
+            | OarEventKind::ThinkingDelta { .. }
+            | OarEventKind::ToolCallStarted { .. }
+            | OarEventKind::ToolCallFinished { .. }
+            | OarEventKind::SubagentSpawned { .. }
+            | OarEventKind::SubagentWait { .. }
+            | OarEventKind::SubagentMessage { .. }
+            | OarEventKind::SubagentPlanUpdated { .. }
+            | OarEventKind::SubagentStatusChanged { .. }
+            | OarEventKind::FileChanged { .. }
+            | OarEventKind::PermissionRequested { .. }
+            | OarEventKind::PermissionResolved { .. }
+            | OarEventKind::InteractionRequested { .. }
+            | OarEventKind::InteractionResolved { .. }
+            | OarEventKind::Question { .. }
+            | OarEventKind::TurnFinished { .. }
+            | OarEventKind::SessionEnded => false,
+        };
+        if is_err {
+            return true;
+        }
+    }
+    for ev in &rec.events {
+        if value_has_step_type_17(ev) {
+            return true;
+        }
+        if ev.get("kind").and_then(Value::as_str) == Some("error") {
+            let msg = ev
+                .get("message")
+                .or_else(|| ev.get("error"))
+                .and_then(Value::as_str)
+                .unwrap_or("voyage error event");
+            if !msg.trim().is_empty() {
+                return true;
+            }
+        }
+        if ev.get("kind").and_then(Value::as_str) == Some("turn_ended") && ev.pointer("/outcome/kind").and_then(Value::as_str) == Some("failed") {
+            let reason = ev.pointer("/outcome/reason").and_then(Value::as_str).unwrap_or("turn_ended: failed");
+            if !reason.trim().is_empty() {
+                return true;
+            }
+        }
+        if value_has_silent_error_text(ev) {
+            return true;
+        }
+    }
+    if let Some(marker) = &rec.marker
+        && (value_has_step_type_17(marker) || matches!(marker.get("name").and_then(Value::as_str), Some("error" | "silent_error")))
+    {
+        return true;
+    }
+    if !rec.raw.is_empty() {
+        let raw_text = String::from_utf8_lossy(&rec.raw);
+        if text_has_silent_error(&raw_text) {
+            return true;
+        }
+        if raw_may_contain_step_type(&raw_text)
+            && let Ok(parsed) = serde_json::from_str::<Value>(&raw_text)
+            && value_has_step_type_17(&parsed)
+        {
+            return true;
+        }
+    }
+    false
 }
 
 fn voyage_kind_str(kind: VoyageKind) -> &'static str {
@@ -354,9 +588,17 @@ fn voyage_kind_str(kind: VoyageKind) -> &'static str {
     }
 }
 
-fn raw_entry_of(rec: &VoyageRecord, redactor: &Redactor, count: &mut u32) -> DebugTrajectoryRawEntry {
-    let raw_payload = if !rec.raw.is_empty() {
-        Some(String::from_utf8_lossy(&rec.raw).into_owned())
+fn redacted_raw_text(rec: &VoyageRecord, redactor: &Redactor, count: &mut u32) -> Option<String> {
+    if rec.raw.is_empty() {
+        return None;
+    }
+    let lossy = String::from_utf8_lossy(&rec.raw);
+    Some(redactor.redact_str(&lossy, count))
+}
+
+fn raw_entry_of(rec: &VoyageRecord, clean_raw: Option<String>, redactor: &Redactor, count: &mut u32) -> DebugTrajectoryRawEntry {
+    let clean_payload = if clean_raw.is_some() {
+        clean_raw
     } else if !rec.events.is_empty() || rec.control.is_some() || rec.marker.is_some() {
         let mut obj = serde_json::Map::new();
         if !rec.events.is_empty() {
@@ -368,17 +610,17 @@ fn raw_entry_of(rec: &VoyageRecord, redactor: &Redactor, count: &mut u32) -> Deb
         if let Some(marker) = &rec.marker {
             obj.insert("marker".into(), marker.clone());
         }
-        serde_json::to_string(&Value::Object(obj)).ok()
+        serde_json::to_string(&Value::Object(obj)).ok().map(|s| redactor.redact_owned(s, count))
     } else {
         None
     };
 
-    let (payload, original_bytes, truncated) = match raw_payload {
-        Some(raw) => {
-            let clean = redactor.redact_str(&raw, count);
+    let (payload, original_bytes, truncated) = match clean_payload {
+        Some(clean) => {
             let original_bytes = u32::try_from(clean.len()).unwrap_or(u32::MAX);
             let (clipped, truncated) = clip_utf8(&clean, RAW_PAYLOAD_MAX_BYTES);
-            (Some(clipped.to_string()), original_bytes, truncated)
+            let payload = if truncated { clipped.to_string() } else { clean };
+            (Some(payload), original_bytes, truncated)
         }
         None => (None, 0, false),
     };
@@ -527,7 +769,7 @@ fn build_turns(events: Vec<SessionEvent>, voyage: Option<&LoadedVoyage>, redacto
                 if let Some(tokens) = &ev.tokens {
                     merge_tokens(&mut cur.tokens, tokens);
                 }
-                detect_session_event_errors(&ev, redactor, count, &mut cur.silent_errors);
+                detect_redacted_session_event_errors(&ev, &mut cur.silent_errors);
                 cur.events.push(ev);
             }
         }
@@ -541,7 +783,7 @@ fn build_turns(events: Vec<SessionEvent>, voyage: Option<&LoadedVoyage>, redacto
                 if !rec.agent_path.is_empty() {
                     subagent_paths.insert(redactor.redact_str(&rec.agent_path.join("/"), count));
                 }
-                let prompt = voyage_turn_prompt(rec).map(|p| redactor.redact_str(&p, count));
+                let prompt = voyage_turn_prompt(rec).map(|p| redactor.redact_owned(p, count));
                 let span_changed = !rec.span_id.is_empty() && active_span.as_deref().is_some_and(|s| s != rec.span_id);
                 let start_new = turns.is_empty() || prompt.is_some() || span_changed;
                 if start_new {
@@ -569,8 +811,9 @@ fn build_turns(events: Vec<SessionEvent>, voyage: Option<&LoadedVoyage>, redacto
                     if let Some(tokens) = tokens_from_voyage_record(rec) {
                         merge_tokens(&mut cur.tokens, &tokens);
                     }
-                    detect_voyage_record_errors(rec, redactor, count, &mut cur.silent_errors);
-                    cur.raw_entries.push(raw_entry_of(rec, redactor, count));
+                    let clean_raw = redacted_raw_text(rec, redactor, count);
+                    detect_voyage_record_errors(rec, clean_raw.as_deref(), redactor, count, &mut cur.silent_errors);
+                    cur.raw_entries.push(raw_entry_of(rec, clean_raw, redactor, count));
                 }
             }
         } else {
@@ -593,8 +836,9 @@ fn build_turns(events: Vec<SessionEvent>, voyage: Option<&LoadedVoyage>, redacto
                     {
                         merge_tokens(&mut cur.tokens, &tokens);
                     }
-                    detect_voyage_record_errors(rec, redactor, count, &mut cur.silent_errors);
-                    cur.raw_entries.push(raw_entry_of(rec, redactor, count));
+                    let clean_raw = redacted_raw_text(rec, redactor, count);
+                    detect_voyage_record_errors(rec, clean_raw.as_deref(), redactor, count, &mut cur.silent_errors);
+                    cur.raw_entries.push(raw_entry_of(rec, clean_raw, redactor, count));
                 }
             }
         }
@@ -606,26 +850,9 @@ fn build_turns(events: Vec<SessionEvent>, voyage: Option<&LoadedVoyage>, redacto
     (turns, subagent_paths)
 }
 
-fn title_for(id: &str, session: Option<&Session>, issues: &[Issue]) -> String {
-    if let Some(s) = session {
-        if let Some(issue_id) = s.issue_id()
-            && let Some(issue) = issues.iter().find(|i| i.id == issue_id)
-        {
-            return format!("#{} {}", issue.number, issue.title);
-        }
-        if !s.name.trim().is_empty() {
-            return s.name.clone();
-        }
-    }
-    if let Some(issue) = issues.iter().find(|i| i.executions().any(|e| e.session() == id)) {
-        return format!("#{} {}", issue.number, issue.title);
-    }
-    id.to_string()
-}
-
-pub fn build_detail(
+pub(crate) fn build_detail(
     home: &Path,
-    state: &SpaceState,
+    meta: Option<&SessionStateMeta>,
     sources: &dyn DebugDataSource,
     redactor: &Redactor,
     req: &DebugTrajectoryGetRequest,
@@ -636,18 +863,17 @@ pub fn build_detail(
     if !is_safe_id(id) {
         return Err(ApiError::new(BizCode::InvalidInput, "invalid trajectory id"));
     }
-    let session = state.sessions.iter().find(|s| s.id == id);
     let events = sources.trajectory_events(id);
     let voyage = load_voyage(home, id);
+    let exists_in_state = meta.is_some_and(|m| m.exists || m.in_issue_history);
     let is_orchestrator_profile = orchestrator_ids.iter().any(|o| o == id);
-    let in_issue_history = state.issues.iter().any(|i| i.executions().any(|e| e.session() == id));
-    if session.is_none() && events.is_empty() && voyage.is_none() && !is_orchestrator_profile && !in_issue_history {
+    if !exists_in_state && events.is_empty() && voyage.is_none() && !is_orchestrator_profile {
         return Err(ApiError::new(BizCode::SessionNotFound, format!("trajectory not found: {id}")));
     }
 
     let kind = req
         .kind
-        .unwrap_or_else(|| classify_session(id, session, &state.issues, orchestrator_ids, voyage.as_ref().map(|v| &v.header)));
+        .unwrap_or_else(|| classify_meta(id, meta, orchestrator_ids, voyage.as_ref().map(|v| &v.header)));
     let event_count = events.len() as u32;
     let voyage_record_count = voyage.as_ref().map(|v| v.records.len() as u32).unwrap_or(0);
     let has_voyage_record = voyage.is_some();
@@ -660,7 +886,7 @@ pub fn build_detail(
     let (turns, subagent_set) = build_turns(events, voyage.as_ref(), redactor, redacted_count);
 
     let mut total_tokens: Option<EventTokens> = None;
-    let mut updated_at = session.map(|s| s.last_run.as_ref().map_or(s.hired_at, |r| r.at.max(s.hired_at))).unwrap_or(0);
+    let mut updated_at = meta.map_or(0, |m| m.updated_at);
     for turn in &turns {
         if let Some(tokens) = &turn.tokens {
             merge_tokens(&mut total_tokens, tokens);
@@ -674,8 +900,8 @@ pub fn build_detail(
         }
     }
 
-    let runtime = session
-        .map(|s| s.runtime.clone())
+    let runtime = meta
+        .and_then(|m| m.runtime.clone())
         .or_else(|| voyage.as_ref().map(|v| v.header.runtime.clone()).filter(|r| !r.is_empty()))
         .unwrap_or_else(|| {
             if kind == DebugTrajectoryKind::Orchestrator {
@@ -684,8 +910,9 @@ pub fn build_detail(
                 "unknown".to_string()
             }
         });
-    let status = session.map(|s| phase_status_str(&s.phase)).unwrap_or("recorded").to_string();
-    let title = redactor.redact_str(&title_for(id, session, &state.issues), redacted_count);
+    let status = meta.and_then(|m| m.status).unwrap_or("recorded").to_string();
+    let raw_title = meta.and_then(|m| m.title.as_deref()).unwrap_or(id);
+    let title = redactor.redact_str(raw_title, redacted_count);
     let has_silent_error = turns.iter().any(|t| !t.silent_errors.is_empty());
 
     Ok(DebugTrajectoryDetail {
@@ -708,23 +935,176 @@ pub fn build_detail(
     })
 }
 
-pub fn list_summaries(
+fn build_summary(
     home: &Path,
-    state: &SpaceState,
+    id: &str,
+    meta: Option<&SessionStateMeta>,
+    sources: &dyn DebugDataSource,
+    redactor: &Redactor,
+    orchestrator_ids: &[String],
+    redacted_count: &mut u32,
+) -> Option<DebugTrajectorySummary> {
+    if !is_safe_id(id) {
+        return None;
+    }
+    let events = sources.trajectory_events(id);
+    let voyage = load_voyage(home, id);
+    let exists_in_state = meta.is_some_and(|m| m.exists || m.in_issue_history);
+    let is_orchestrator_profile = orchestrator_ids.iter().any(|o| o == id);
+    if !exists_in_state && events.is_empty() && voyage.is_none() && !is_orchestrator_profile {
+        return None;
+    }
+
+    let kind = classify_meta(id, meta, orchestrator_ids, voyage.as_ref().map(|v| &v.header));
+    let event_count = events.len() as u32;
+    let voyage_record_count = voyage.as_ref().map(|v| v.records.len() as u32).unwrap_or(0);
+    let has_voyage_record = voyage.is_some();
+
+    let mut total_tokens: Option<EventTokens> = None;
+    let mut updated_at = meta.map_or(0, |m| m.updated_at);
+    let mut has_silent_error = false;
+
+    if !events.is_empty() {
+        struct TurnMeta {
+            started_at: i64,
+            run: Option<String>,
+            has_prompt: bool,
+            has_run_end: bool,
+            has_non_preamble: bool,
+            has_tokens: bool,
+        }
+        let mut turns: Vec<TurnMeta> = Vec::new();
+        for ev in &events {
+            let start_new = match ev.r#type {
+                SessionEventType::RunStart => turns.is_empty() || turns.last().is_some_and(|t| t.has_prompt || t.has_run_end),
+                SessionEventType::UserMessage => turns.is_empty() || turns.last().is_some_and(|t| t.has_prompt || t.has_non_preamble),
+                SessionEventType::MemoryRecalled
+                | SessionEventType::AssistantThinking
+                | SessionEventType::AssistantMessage
+                | SessionEventType::ToolCall
+                | SessionEventType::ToolResult
+                | SessionEventType::PermissionRequest
+                | SessionEventType::PermissionResolved
+                | SessionEventType::InteractionRequest
+                | SessionEventType::InteractionResolved
+                | SessionEventType::LlmRetry
+                | SessionEventType::LlmUsage
+                | SessionEventType::RunError
+                | SessionEventType::RunEnd => turns.is_empty(),
+            };
+            if start_new {
+                turns.push(TurnMeta {
+                    started_at: ev.time,
+                    run: ev.run.clone(),
+                    has_prompt: ev.r#type == SessionEventType::UserMessage,
+                    has_run_end: false,
+                    has_non_preamble: false,
+                    has_tokens: false,
+                });
+            } else if ev.r#type == SessionEventType::UserMessage
+                && let Some(cur) = turns.last_mut()
+                && !cur.has_prompt
+            {
+                cur.has_prompt = true;
+            }
+            if let Some(cur) = turns.last_mut() {
+                if cur.run.is_none() && ev.run.is_some() {
+                    cur.run = ev.run.clone();
+                }
+                if ev.r#type == SessionEventType::RunEnd {
+                    cur.has_run_end = true;
+                }
+                if !matches!(ev.r#type, SessionEventType::RunStart | SessionEventType::MemoryRecalled) {
+                    cur.has_non_preamble = true;
+                }
+                updated_at = updated_at.max(ev.time);
+                if let Some(tokens) = &ev.tokens {
+                    merge_tokens(&mut total_tokens, tokens);
+                    cur.has_tokens = true;
+                }
+            }
+            if !has_silent_error && session_event_has_silent_error(ev) {
+                has_silent_error = true;
+            }
+        }
+        if let Some(loaded) = &voyage {
+            for rec in &loaded.records {
+                let idx = if !rec.span_id.is_empty()
+                    && let Some(pos) = turns.iter().rposition(|t| t.run.as_deref() == Some(rec.span_id.as_str()))
+                {
+                    pos
+                } else {
+                    let ts = rec.received_at as i64;
+                    turns.iter().rposition(|t| t.started_at <= ts).unwrap_or(0)
+                };
+                if let Some(cur) = turns.get_mut(idx)
+                    && !cur.has_tokens
+                    && let Some(tokens) = tokens_from_voyage_record(rec)
+                {
+                    merge_tokens(&mut total_tokens, &tokens);
+                    cur.has_tokens = true;
+                }
+                if !has_silent_error && voyage_record_has_silent_error(rec) {
+                    has_silent_error = true;
+                }
+            }
+        }
+    } else if let Some(loaded) = &voyage {
+        for rec in &loaded.records {
+            updated_at = updated_at.max(rec.received_at as i64);
+            if let Some(tokens) = tokens_from_voyage_record(rec) {
+                merge_tokens(&mut total_tokens, &tokens);
+            }
+            if !has_silent_error && voyage_record_has_silent_error(rec) {
+                has_silent_error = true;
+            }
+        }
+    }
+
+    if let Some(loaded) = &voyage {
+        updated_at = updated_at.max(loaded.header.created_at as i64);
+        if let Some(last) = loaded.records.last() {
+            updated_at = updated_at.max(last.received_at as i64);
+        }
+    }
+
+    let runtime = meta
+        .and_then(|m| m.runtime.clone())
+        .or_else(|| voyage.as_ref().map(|v| v.header.runtime.clone()).filter(|r| !r.is_empty()))
+        .unwrap_or_else(|| {
+            if kind == DebugTrajectoryKind::Orchestrator {
+                ORCHESTRATOR_RUNTIME.to_string()
+            } else {
+                "unknown".to_string()
+            }
+        });
+    let status = meta.and_then(|m| m.status).unwrap_or("recorded").to_string();
+    let raw_title = meta.and_then(|m| m.title.as_deref()).unwrap_or(id);
+    let title = redactor.redact_str(raw_title, redacted_count);
+
+    Some(DebugTrajectorySummary {
+        id: id.to_string(),
+        kind,
+        title,
+        runtime,
+        status,
+        updated_at,
+        event_count: event_count.max(voyage_record_count),
+        has_voyage_record,
+        has_silent_error,
+        tokens: total_tokens,
+    })
+}
+
+pub(crate) fn list_summaries(
+    home: &Path,
+    index: &StateTrajectoryIndex,
     sources: &dyn DebugDataSource,
     redactor: &Redactor,
     orchestrator_ids: &[String],
     redacted_count: &mut u32,
 ) -> Vec<DebugTrajectorySummary> {
-    let mut ids = BTreeSet::new();
-    for s in &state.sessions {
-        ids.insert(s.id.clone());
-    }
-    for issue in &state.issues {
-        for exec in issue.executions() {
-            ids.insert(exec.session().to_string());
-        }
-    }
+    let mut ids = index.known_ids.clone();
     for id in orchestrator_ids {
         ids.insert(id.clone());
     }
@@ -735,33 +1115,34 @@ pub fn list_summaries(
         ids.insert(id);
     }
 
-    let mut out = Vec::new();
+    let mut out = Vec::with_capacity(ids.len());
     for id in ids {
-        let req = DebugTrajectoryGetRequest { id, kind: None };
-        if let Ok(detail) = build_detail(home, state, sources, redactor, &req, orchestrator_ids, redacted_count) {
-            out.push(detail.summary);
+        let meta = index.sessions.get(&id);
+        if let Some(summary) = build_summary(home, &id, meta, sources, redactor, orchestrator_ids, redacted_count) {
+            out.push(summary);
         }
     }
     out.sort_by(|a, b| b.updated_at.cmp(&a.updated_at).then_with(|| a.id.cmp(&b.id)));
     out
 }
 
-pub fn export_snapshot(
+pub(crate) fn export_snapshot(
     home: &Path,
-    state: &SpaceState,
+    index: &StateTrajectoryIndex,
     sources: &dyn DebugDataSource,
     redactor: &Redactor,
     orchestrator_ids: &[String],
     redacted_count: &mut u32,
 ) -> Value {
-    let summaries = list_summaries(home, state, sources, redactor, orchestrator_ids, redacted_count);
+    let summaries = list_summaries(home, index, sources, redactor, orchestrator_ids, redacted_count);
     let mut details = BTreeMap::new();
     for summary in summaries.iter().take(20) {
         let req = DebugTrajectoryGetRequest {
             id: summary.id.clone(),
             kind: Some(summary.kind),
         };
-        if let Ok(detail) = build_detail(home, state, sources, redactor, &req, orchestrator_ids, redacted_count) {
+        let meta = index.sessions.get(&summary.id);
+        if let Ok(detail) = build_detail(home, meta, sources, redactor, &req, orchestrator_ids, redacted_count) {
             details.insert(summary.id.clone(), detail);
         }
     }

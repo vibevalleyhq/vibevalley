@@ -7,9 +7,9 @@ import { Tag } from "../../design/Tag";
 import { formatDurationMs, formatFrameMs, trajectoryKindLabel, trajectoryKindTone } from "./format";
 import { MetricTile, SectionHeader } from "./shared";
 
-export function OverviewTab(props: { overview: DebugOverview; graph: DebugGraph }) {
-  const o = () => props.overview;
-  const g = () => props.graph;
+export function OverviewTab(props: { overview: () => DebugOverview; graph: () => DebugGraph }) {
+  const o = () => props.overview();
+  const g = () => props.graph();
   return (
     <Scroll testID="devtools-overview" class="min-h-0 flex-1" contentClass="gap-4 p-3">
       <View class="gap-2">
@@ -51,7 +51,9 @@ export function OverviewTab(props: { overview: DebugOverview; graph: DebugGraph 
                   <View class="min-w-0 flex-1 flex-row items-center gap-2">
                     <Text class="truncate text-xs font-medium text-ink">{rt().name}</Text>
                     <Text class="font-mono text-2xs text-faint">{rt().id}</Text>
-                    <If when={rt().version}>{(v) => <Text class="font-mono text-2xs text-muted">{v()}</Text>}</If>
+                    <If when={Boolean(rt().version)}>
+                      <Text class="font-mono text-2xs text-muted">{rt().version}</Text>
+                    </If>
                   </View>
                   <Tag
                     tone={rt().installed ? "ok" : "neutral"}
@@ -129,7 +131,9 @@ export function OverviewTab(props: { overview: DebugOverview; graph: DebugGraph 
                           <Text class="font-mono text-2xs text-faint">#{sess().issueId}</Text>
                         </If>
                       </View>
-                      <If when={sess().worktree}>{(wt) => <Text class="truncate font-mono text-2xs text-faint">{wt()}</Text>}</If>
+                      <If when={Boolean(sess().worktree)}>
+                        <Text class="truncate font-mono text-2xs text-faint">{sess().worktree}</Text>
+                      </If>
                     </View>
                   )}
                 </Each>

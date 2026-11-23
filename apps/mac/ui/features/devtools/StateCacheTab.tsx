@@ -7,25 +7,26 @@ import { Tag } from "../../design/Tag";
 import { formatJson, SLICE_NAMES } from "./format";
 import { JsonPreview, MetricTile, SectionHeader } from "./shared";
 
-export function StateCacheTab(props: { stateCache: DebugStateCache }) {
+export function StateCacheTab(props: { stateCache: () => DebugStateCache }) {
+  const sc = () => props.stateCache();
   const selectedSlice = signal<string>(SLICE_NAMES[0]);
 
   const sliceRows = computed(() => {
-    const sc = props.stateCache;
+    const current = sc();
     const known = new Set<string>(SLICE_NAMES);
-    const extras = Object.keys(sc.sliceSeqs)
-      .concat(Object.keys(sc.sliceWatchers))
+    const extras = Object.keys(current.sliceSeqs)
+      .concat(Object.keys(current.sliceWatchers))
       .filter((k) => !known.has(k));
     const ordered = [...SLICE_NAMES, ...Array.from(new Set(extras)).toSorted()];
     return ordered.map((name) => ({
       name,
-      seq: sc.sliceSeqs[name] ?? 0,
-      watchers: sc.sliceWatchers[name] ?? 0,
+      seq: current.sliceSeqs[name] ?? 0,
+      watchers: current.sliceWatchers[name] ?? 0,
     }));
   });
 
   const entityCounts = computed(() => {
-    const c = props.stateCache.counts;
+    const c = sc().counts;
     return [
       { key: "issues", label: t("web.devtools.state.issues"), value: c.issues },
       { key: "sessions", label: t("web.devtools.state.sessions"), value: c.sessions },
@@ -39,21 +40,21 @@ export function StateCacheTab(props: { stateCache: DebugStateCache }) {
   });
 
   const slicePreviewJson = computed(() => {
-    const sc = props.stateCache;
+    const current = sc();
     const name = selectedSlice();
     return formatJson({
       slice: name,
-      globalSeq: sc.seq,
-      seq: sc.sliceSeqs[name] ?? 0,
-      watchers: sc.sliceWatchers[name] ?? 0,
-      counts: sc.counts,
+      globalSeq: current.seq,
+      seq: current.sliceSeqs[name] ?? 0,
+      watchers: current.sliceWatchers[name] ?? 0,
+      counts: current.counts,
     });
   });
 
   return (
     <Scroll testID="devtools-state" class="min-h-0 flex-1" contentClass="gap-4 p-3">
       <View class="flex-row flex-wrap gap-2">
-        <MetricTile label={t("web.devtools.state.seq")} value={String(props.stateCache.seq)} testID="state-global-seq" />
+        <MetricTile label={t("web.devtools.state.seq")} value={String(sc().seq)} testID="state-global-seq" />
       </View>
 
       <View class="gap-2">
@@ -96,9 +97,9 @@ export function StateCacheTab(props: { stateCache: DebugStateCache }) {
       </View>
 
       <View class="gap-2">
-        <SectionHeader title={t("web.devtools.state.caches")} count={props.stateCache.caches.length} />
+        <SectionHeader title={t("web.devtools.state.caches")} count={sc().caches.length} />
         <If
-          when={props.stateCache.caches.length > 0}
+          when={sc().caches.length > 0}
           else={
             <View class="rounded-md border border-line bg-side px-3 py-2.5">
               <Text class="text-xs text-muted">{t("web.devtools.state.emptyCaches")}</Text>
@@ -106,12 +107,14 @@ export function StateCacheTab(props: { stateCache: DebugStateCache }) {
           }
         >
           <View class="overflow-hidden rounded-md border border-line bg-page">
-            <Each of={props.stateCache.caches} key={(c) => c.name}>
+            <Each of={sc().caches} key={(c) => c.name}>
               {(cache, idx) => (
                 <View class={`flex-row items-center justify-between gap-2 px-3 py-2 ${idx() > 0 ? "border-t border-line" : ""}`}>
                   <View class="min-w-0 flex-1 gap-0.5">
                     <Text class="truncate font-mono text-xs font-medium text-ink">{cache().name}</Text>
-                    <If when={cache().detail}>{(detail) => <Text class="truncate text-2xs text-muted">{detail()}</Text>}</If>
+                    <If when={Boolean(cache().detail)}>
+                      <Text class="truncate text-2xs text-muted">{cache().detail}</Text>
+                    </If>
                   </View>
                   <Tag tone="neutral" label={t("web.devtools.state.entries", { count: cache().entries })} />
                 </View>

@@ -1,4 +1,4 @@
-import { effect, Scroll, signal, Text, View } from "nsh";
+import { effect, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { DebugBundleResult, DebugOverrideConfig } from "@vibevalley/protocol";
@@ -11,22 +11,27 @@ import { api, reasonOf } from "../../infra/api";
 import { DISCONNECT_TOPICS, formatBytes, LATENCY_PRESETS_MS } from "./format";
 import { CopyButton, SectionHeader } from "./shared";
 
-export function LabOverridesTab(props: { overrides: DebugOverrideConfig; onUpdated: (next: DebugOverrideConfig) => void }) {
-  const rpcDelayMs = signal(props.overrides.rpcDelayMs);
-  const sliceDelayMs = signal(props.overrides.sliceDelayMs);
-  const targetFilter = signal(props.overrides.targetFilter ?? "");
-  const disconnectTopic = signal(props.overrides.disconnectTopic ?? "");
+function overrideKey(o: DebugOverrideConfig): string {
+  return `${o.rpcDelayMs}|${o.sliceDelayMs}|${o.targetFilter ?? ""}|${o.disconnectTopic ?? ""}`;
+}
+
+export function LabOverridesTab(props: { overrides: () => DebugOverrideConfig; onUpdated: (next: DebugOverrideConfig) => void }) {
+  const initial = untracked(() => props.overrides());
+  const rpcDelayMs = signal(initial.rpcDelayMs);
+  const sliceDelayMs = signal(initial.sliceDelayMs);
+  const targetFilter = signal(initial.targetFilter ?? "");
+  const disconnectTopic = signal(initial.disconnectTopic ?? "");
   const saving = signal(false);
   const feedback = signal<{ tone: "ok" | "bad"; text: string } | undefined>(undefined);
   const exporting = signal(false);
   const bundleResult = signal<DebugBundleResult | undefined>(undefined);
   const bundleError = signal<string | undefined>(undefined);
 
-  let lastSyncedKey = "";
+  let lastSyncedKey = overrideKey(initial);
 
   effect(() => {
-    const o = props.overrides;
-    const key = `${o.rpcDelayMs}|${o.sliceDelayMs}|${o.targetFilter ?? ""}|${o.disconnectTopic ?? ""}`;
+    const o = props.overrides();
+    const key = overrideKey(o);
     if (key === lastSyncedKey) return;
     lastSyncedKey = key;
     rpcDelayMs.set(o.rpcDelayMs);
@@ -40,6 +45,7 @@ export function LabOverridesTab(props: { overrides: DebugOverrideConfig; onUpdat
     feedback.set(undefined);
     try {
       const saved = await api.debug.override.set(next);
+      lastSyncedKey = overrideKey(saved);
       rpcDelayMs.set(saved.rpcDelayMs);
       sliceDelayMs.set(saved.sliceDelayMs);
       targetFilter.set(saved.targetFilter ?? "");
@@ -201,12 +207,10 @@ export function LabOverridesTab(props: { overrides: DebugOverrideConfig; onUpdat
           </Button>
         </View>
 
-        <If when={feedback()}>
-          {(fb) => (
-            <Banner tone={fb().tone} size="sm" testID="lab-feedback">
-              {fb().text}
-            </Banner>
-          )}
+        <If when={feedback() !== undefined}>
+          <Banner tone={feedback()?.tone ?? "ok"} size="sm" testID="lab-feedback">
+            {feedback()?.text ?? ""}
+          </Banner>
         </If>
       </View>
 
@@ -220,29 +224,28 @@ export function LabOverridesTab(props: { overrides: DebugOverrideConfig; onUpdat
           }
         />
 
-        <If when={bundleError()}>
-          {(err) => (
-            <Banner tone="bad" size="sm">
-              {err()}
-            </Banner>
-          )}
+        <If when={bundleError() !== undefined}>
+          <Banner tone="bad" size="sm">
+            {bundleError() ?? ""}
+          </Banner>
         </If>
 
-        <If when={bundleResult()}>
-          {(res) => (
-            <View testID="lab-bundle-result" class="gap-2 rounded-sm border border-line bg-side p-2.5">
-              <Banner tone="ok" size="sm">
-                {t("web.devtools.overview.bundleExported", { path: res().path, redacted: res().redactedCount })}
-              </Banner>
-              <View class="flex-row flex-wrap items-center justify-between gap-2">
-                <View class="flex-row items-center gap-2">
-                  <Tag tone="info" label={formatBytes(res().sizeBytes)} />
-                  <Text class="font-mono text-2xs text-muted">{res().files.join(", ")}</Text>
-                </View>
-                <CopyButton text={res().path} testID="lab-bundle-copy" />
+        <If when={bundleResult() !== undefined}>
+          <View testID="lab-bundle-result" class="gap-2 rounded-sm border border-line bg-side p-2.5">
+            <Banner tone="ok" size="sm">
+              {t("web.devtools.overview.bundleExported", {
+                path: bundleResult()?.path ?? "",
+                redacted: bundleResult()?.redactedCount ?? 0,
+              })}
+            </Banner>
+            <View class="flex-row flex-wrap items-center justify-between gap-2">
+              <View class="flex-row items-center gap-2">
+                <Tag tone="info" label={formatBytes(bundleResult()?.sizeBytes ?? 0)} />
+                <Text class="font-mono text-2xs text-muted">{(bundleResult()?.files ?? []).join(", ")}</Text>
               </View>
+              <CopyButton text={bundleResult()?.path ?? ""} testID="lab-bundle-copy" />
             </View>
-          )}
+          </View>
         </If>
       </View>
     </Scroll>

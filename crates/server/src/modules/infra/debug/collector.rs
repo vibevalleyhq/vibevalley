@@ -11,7 +11,7 @@ use vibevalley_core::{SliceMask, Transition};
 use vibevalley_protocol::{DebugCacheStat, DebugOverrideConfig, DebugTimelineEvent, DebugTimelineLane, DebugTimelinePage, DebugTimelineQuery, Fact};
 use vibevalley_runtime::oar::{Event as OarEvent, EventKind as OarEventKind, OarObserver};
 
-use super::redact::Redactor;
+use super::redact::{Redactor, contains_ascii_ci};
 use crate::modules::infra::setting::Setting;
 use crate::now;
 use crate::transport::api::{CallerContext, FaultGate, InvokeObserver};
@@ -97,36 +97,58 @@ impl DebugCollector {
     }
 
     pub fn push(&self, mut event: DebugTimelineEvent) {
-        event.id = self.next_event_id();
         if let Some(detail) = event.detail.take() {
             event.detail = Some(cap_json_bytes(detail, MAX_PAYLOAD_BYTES));
         }
-        self.lanes.lock().ring_mut(event.lane).push(event);
+        // Assign the id under the lane lock so every ring remains strictly sorted by id.
+        let mut state = self.lanes.lock();
+        event.id = self.next_event_id();
+        state.ring_mut(event.lane).push(event);
     }
 
     /// Ingests GPUI frame samples published by `apps/mac`'s `ShellDebugHandle`,
     /// deduplicating strictly by monotonic `seq`.
     pub fn ingest_host_frames(&self, host_snapshot: &Value) {
+        let mut count = 0u32;
+        self.ingest_host_frames_inner(host_snapshot, None, &mut count);
+    }
+
+    pub(crate) fn ingest_host_frames_with(&self, host_snapshot: &Value, redactor: &Redactor, count: &mut u32) {
+        self.ingest_host_frames_inner(host_snapshot, Some(redactor), count);
+    }
+
+    fn ingest_host_frames_inner(&self, host_snapshot: &Value, shared_redactor: Option<&Redactor>, count: &mut u32) {
         let Some(frames) = host_snapshot.get("frames").and_then(Value::as_array) else {
             return;
         };
         if frames.is_empty() {
             return;
         }
-        let redactor = Redactor::from_setting(&self.setting);
-        let mut count = 0u32;
-        let mut state = self.lanes.lock();
+        let last_seq = self.lanes.lock().last_host_frame_seq;
         let mut items: Vec<(u64, &Value)> = frames
             .iter()
             .filter_map(|item| item.get("seq").and_then(Value::as_u64).map(|seq| (seq, item)))
-            .filter(|(seq, _)| *seq > state.last_host_frame_seq)
+            .filter(|(seq, _)| *seq > last_seq)
             .collect();
+        if items.is_empty() {
+            return;
+        }
         items.sort_by_key(|(seq, _)| *seq);
+
+        let owned_redactor = if shared_redactor.is_none() {
+            Some(Redactor::from_setting(&self.setting))
+        } else {
+            None
+        };
+        let redactor = shared_redactor.or(owned_redactor.as_ref()).expect("redactor initialized");
+
+        let mut prepared = Vec::with_capacity(items.len());
+        let mut prev_seq = last_seq;
         for (seq, frame) in items {
-            if seq <= state.last_host_frame_seq {
+            if seq <= prev_seq {
                 continue;
             }
-            state.last_host_frame_seq = seq;
+            prev_seq = seq;
             let time = frame.get("time").and_then(Value::as_i64).unwrap_or_else(now);
             let duration_us = frame.get("durationUs").and_then(Value::as_i64);
             let slow = frame
@@ -134,7 +156,7 @@ impl DebugCollector {
                 .and_then(Value::as_bool)
                 .or_else(|| duration_us.map(|us| us >= SLOW_FRAME_US as i64));
             let raw_summary = frame.get("summary").and_then(Value::as_str).unwrap_or("Shell::render");
-            let summary = redactor.redact_str(raw_summary, &mut count);
+            let summary = redactor.redact_str(raw_summary, count);
             let detail = cap_json_bytes(
                 json!({
                     "seq": seq,
@@ -144,54 +166,87 @@ impl DebugCollector {
                 }),
                 MAX_PAYLOAD_BYTES,
             );
-            let id = self.next_event_id();
-            state.gpui_frame.push(DebugTimelineEvent {
-                id,
-                time,
-                lane: DebugTimelineLane::GpuiFrame,
-                kind: "gpui_frame".into(),
-                trace_id: None,
-                duration_us,
-                summary,
-                detail: Some(detail),
-                slow,
-            });
+            prepared.push((
+                seq,
+                DebugTimelineEvent {
+                    id: 0,
+                    time,
+                    lane: DebugTimelineLane::GpuiFrame,
+                    kind: "gpui_frame".into(),
+                    trace_id: None,
+                    duration_us,
+                    summary,
+                    detail: Some(detail),
+                    slow,
+                },
+            ));
+        }
+
+        let mut state = self.lanes.lock();
+        for (seq, mut ev) in prepared {
+            if seq <= state.last_host_frame_seq {
+                continue;
+            }
+            state.last_host_frame_seq = seq;
+            ev.id = self.next_event_id();
+            state.gpui_frame.push(ev);
         }
     }
 
     pub fn query(&self, q: &DebugTimelineQuery) -> DebugTimelinePage {
-        let state = self.lanes.lock();
         let search = q.search.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(str::to_ascii_lowercase);
         let lanes: &[DebugTimelineLane] = match &q.lane {
             Some(lane) => std::slice::from_ref(lane),
             None => &DebugTimelineLane::ALL,
         };
-        let mut events = Vec::new();
-        let mut dropped = 0i64;
-        for &lane in lanes {
-            let ring = state.ring(lane);
-            dropped += ring.dropped;
-            for ev in &ring.events {
-                if q.after_id.is_some_and(|after| ev.id <= after) {
-                    continue;
+        let limit = q.limit.unwrap_or(200).clamp(1, 2048) as usize;
+
+        // Walk each sorted ring from newest to oldest so small limits only clone
+        // the `<= limit` matching events instead of copying all 2048 ring entries.
+        let (mut events, latest_id, dropped) = {
+            let state = self.lanes.lock();
+            let mut dropped = 0i64;
+            let mut cursors = [0usize; DebugTimelineLane::ALL.len()];
+            for (i, &lane) in lanes.iter().enumerate() {
+                let ring = state.ring(lane);
+                dropped += ring.dropped;
+                cursors[i] = ring.events.len();
+            }
+
+            let mut picked = Vec::with_capacity(limit.min(256));
+            while picked.len() < limit {
+                let mut best: Option<(usize, i64)> = None;
+                for (i, &lane) in lanes.iter().enumerate() {
+                    let idx = cursors[i];
+                    if idx == 0 {
+                        continue;
+                    }
+                    let ev = &state.ring(lane).events[idx - 1];
+                    if q.after_id.is_some_and(|after| ev.id <= after) {
+                        cursors[i] = 0;
+                        continue;
+                    }
+                    if best.is_none_or(|(_, best_id)| ev.id > best_id) {
+                        best = Some((i, ev.id));
+                    }
                 }
+                let Some((lane_idx, _)) = best else {
+                    break;
+                };
+                cursors[lane_idx] -= 1;
+                let ev = &state.ring(lanes[lane_idx]).events[cursors[lane_idx]];
                 if let Some(needle) = &search
                     && !matches_search(ev, needle)
                 {
                     continue;
                 }
-                events.push(ev.clone());
+                picked.push(ev.clone());
             }
-        }
-        let latest_id = self.next_id.load(Ordering::Relaxed).saturating_sub(1);
-        drop(state);
+            let latest_id = self.next_id.load(Ordering::Relaxed).saturating_sub(1);
+            (picked, latest_id, dropped)
+        };
 
-        events.sort_by_key(|ev| ev.id);
-        let limit = q.limit.unwrap_or(200).clamp(1, 2048) as usize;
-        if events.len() > limit {
-            let drain_count = events.len() - limit;
-            events.drain(..drain_count);
-        }
+        events.reverse();
         DebugTimelinePage { events, latest_id, dropped }
     }
 
@@ -260,9 +315,13 @@ impl InvokeObserver for DebugCollector {
         if op.starts_with("debug.") {
             return;
         }
-        let redactor = Redactor::from_setting(&self.setting);
-        let mut count = 0u32;
-        let clean = cap_json_bytes(redactor.redact_value(payload.clone(), &mut count), MAX_PAYLOAD_BYTES);
+        let clean = if value_needs_redaction(payload) {
+            let redactor = Redactor::from_setting(&self.setting);
+            let mut count = 0u32;
+            cap_json_bytes(redactor.redact_value(payload.clone(), &mut count), MAX_PAYLOAD_BYTES)
+        } else {
+            payload.clone()
+        };
         let mut in_flight = self.in_flight.lock();
         if in_flight.len() >= MAX_IN_FLIGHT {
             in_flight.clear();
@@ -275,25 +334,22 @@ impl InvokeObserver for DebugCollector {
             return;
         }
         let payload = self.in_flight.lock().remove(&(ctx.trace_id, op.to_string()));
-        let redactor = Redactor::from_setting(&self.setting);
-        let mut count = 0u32;
         let client = ctx.client.as_ref().map(|c| {
+            let redactor = Redactor::from_setting(&self.setting);
+            let mut count = 0u32;
             json!({
                 "id": redactor.redact_str(&c.id, &mut count),
                 "kind": c.kind.as_str(),
                 "label": redactor.redact_str(&c.label, &mut count),
             })
         });
-        let detail = cap_json_bytes(
-            json!({
-                "op": op,
-                "bizCode": biz_code,
-                "caller": format!("{:?}", ctx.caller),
-                "client": client,
-                "payload": payload,
-            }),
-            MAX_PAYLOAD_BYTES,
-        );
+        let detail = json!({
+            "op": op,
+            "bizCode": biz_code,
+            "caller": format!("{:?}", ctx.caller),
+            "client": client,
+            "payload": payload,
+        });
         let ms = duration_us as f64 / 1000.0;
         self.push(DebugTimelineEvent {
             id: 0,
@@ -311,15 +367,12 @@ impl InvokeObserver for DebugCollector {
     fn on_apply(&self, seq: i64, dirty: SliceMask, transitions: &[Transition], duration_us: u64) {
         let dirty_slices: Vec<&'static str> = dirty.kinds().map(|k| k.as_str()).collect();
         let facts: Vec<&'static str> = transitions.iter().map(|t| fact_kind(&t.fact)).collect();
-        let detail = cap_json_bytes(
-            json!({
-                "seq": seq,
-                "dirty": dirty_slices,
-                "transitionCount": transitions.len(),
-                "facts": facts,
-            }),
-            MAX_PAYLOAD_BYTES,
-        );
+        let detail = json!({
+            "seq": seq,
+            "dirty": dirty_slices,
+            "transitionCount": transitions.len(),
+            "facts": facts,
+        });
         let summary = format!("seq #{seq}: {} transitions [{}]", transitions.len(), dirty_slices.join(","));
         self.push(DebugTimelineEvent {
             id: 0,
@@ -340,7 +393,7 @@ impl OarObserver for DebugCollector {
         let redactor = Redactor::from_setting(&self.setting);
         let mut count = 0u32;
         let (kind, raw_note) = oar_event_summary(&event.kind);
-        let note = redactor.redact_str(&raw_note, &mut count);
+        let note = redactor.redact_cow(&raw_note, &mut count);
         let summary = if note.is_empty() {
             format!("[{session_id}] {kind}")
         } else {
@@ -353,15 +406,12 @@ impl OarObserver for DebugCollector {
         };
         let raw_event_val = serde_json::to_value(&event.kind).unwrap_or(Value::Null);
         let clean_event_val = redactor.redact_value(raw_event_val, &mut count);
-        let detail = cap_json_bytes(
-            json!({
-                "sessionId": session_id,
-                "seq": event.seq,
-                "agentPath": event.agent_path,
-                "event": clean_event_val,
-            }),
-            MAX_PAYLOAD_BYTES,
-        );
+        let detail = json!({
+            "sessionId": session_id,
+            "seq": event.seq,
+            "agentPath": event.agent_path,
+            "event": clean_event_val,
+        });
         self.push(DebugTimelineEvent {
             id: 0,
             time: i64::try_from(event.at_ms).unwrap_or_else(|_| now()),
@@ -419,7 +469,23 @@ fn disconnect_matches(target: &str, topic: &str) -> bool {
     !target.is_empty() && (target == "*" || target == "all" || target == topic || topic.contains(target))
 }
 
+fn value_needs_redaction(val: &Value) -> bool {
+    match val {
+        Value::Null | Value::Bool(_) | Value::Number(_) => false,
+        Value::String(s) => !s.is_empty(),
+        Value::Array(items) => !items.is_empty(),
+        Value::Object(map) => !map.is_empty(),
+    }
+}
+
 fn matches_search(ev: &DebugTimelineEvent, needle_lower: &str) -> bool {
+    if needle_lower.is_ascii() {
+        let needle = needle_lower.as_bytes();
+        if contains_ascii_ci(ev.kind.as_bytes(), needle) || contains_ascii_ci(ev.summary.as_bytes(), needle) {
+            return true;
+        }
+        return ev.detail.as_ref().is_some_and(|d| contains_ascii_ci(d.to_string().as_bytes(), needle));
+    }
     if ev.kind.to_ascii_lowercase().contains(needle_lower) || ev.summary.to_ascii_lowercase().contains(needle_lower) {
         return true;
     }
@@ -437,7 +503,42 @@ pub(crate) fn clip_utf8(text: &str, max_bytes: usize) -> (&str, bool) {
     (&text[..end], true)
 }
 
+fn json_upper_bound_bytes(val: &Value, limit: usize) -> usize {
+    match val {
+        Value::Null => 4,
+        Value::Bool(_) => 5,
+        Value::Number(_) => 32,
+        Value::String(s) => s.len().saturating_mul(6).saturating_add(2),
+        Value::Array(items) => {
+            let mut total = 2usize;
+            for item in items {
+                total = total.saturating_add(json_upper_bound_bytes(item, limit)).saturating_add(1);
+                if total > limit {
+                    return total;
+                }
+            }
+            total
+        }
+        Value::Object(map) => {
+            let mut total = 2usize;
+            for (k, v) in map {
+                total = total
+                    .saturating_add(k.len().saturating_mul(6))
+                    .saturating_add(4)
+                    .saturating_add(json_upper_bound_bytes(v, limit));
+                if total > limit {
+                    return total;
+                }
+            }
+            total
+        }
+    }
+}
+
 pub(crate) fn cap_json_bytes(val: Value, max_bytes: usize) -> Value {
+    if json_upper_bound_bytes(&val, max_bytes) <= max_bytes {
+        return val;
+    }
     let serialized = serde_json::to_string(&val).unwrap_or_default();
     if serialized.len() <= max_bytes {
         return val;

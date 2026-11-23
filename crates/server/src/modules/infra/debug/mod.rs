@@ -11,6 +11,7 @@ pub mod collector;
 pub mod redact;
 pub mod trajectory;
 
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use std::time::Instant;
@@ -28,6 +29,8 @@ use self::collector::DebugCollector;
 use self::redact::Redactor;
 use crate::modules::infra::setting::Setting;
 use crate::{Hub, Server};
+
+const SNAPSHOT_RECENT_TIMELINE_LIMIT: usize = 16;
 
 /// Snapshot of runtime probe status and profile counts injected from `start.rs`
 /// so `modules::infra::debug` stays free of upward business-domain imports.
@@ -114,6 +117,77 @@ pub struct DebugKit {
     debug_enabled: bool,
 }
 
+struct RawGraphSession {
+    session_id: String,
+    issue_id: Option<i64>,
+    title: String,
+    runtime: String,
+    status: &'static str,
+    worktree: Option<String>,
+    kind: DebugTrajectoryKind,
+}
+
+struct StateMetrics {
+    issues: u32,
+    sessions: u32,
+    channels: u32,
+    media_jobs: u32,
+    active_sessions: u32,
+}
+
+fn extract_state_metrics(state: &SpaceState) -> StateMetrics {
+    StateMetrics {
+        issues: state.issues.len() as u32,
+        sessions: state.sessions.len() as u32,
+        channels: state.chat.as_ref().map(|c| c.channels.len() as u32).unwrap_or(0),
+        media_jobs: state.media.as_ref().map(|m| m.len() as u32).unwrap_or(0),
+        active_sessions: state.sessions.iter().filter(|s| s.phase.is_working()).count() as u32,
+    }
+}
+
+fn extract_graph_sessions(state: &SpaceState, orchestrator_ids: &[String]) -> Vec<RawGraphSession> {
+    if state.sessions.is_empty() {
+        return Vec::new();
+    }
+    let issue_by_id: HashMap<&str, (i64, &str)> = state.issues.iter().map(|i| (i.id.as_str(), (i.number, i.title.as_str()))).collect();
+    let issue_exec_sessions: HashSet<&str> = state.issues.iter().flat_map(|i| i.executions().map(|e| e.session())).collect();
+
+    state
+        .sessions
+        .iter()
+        .map(|s| {
+            let matched_issue = s.issue_id().and_then(|iid| issue_by_id.get(iid).copied());
+            let title = matched_issue.map(|(_, t)| t).filter(|t| !t.is_empty()).unwrap_or(s.name.as_str()).to_string();
+            let kind = trajectory::classify_live_session(s, orchestrator_ids, issue_exec_sessions.contains(s.id.as_str()));
+            RawGraphSession {
+                session_id: s.id.clone(),
+                issue_id: matched_issue.map(|(num, _)| num),
+                title,
+                runtime: s.runtime.clone(),
+                status: trajectory::phase_status_str(&s.phase),
+                worktree: s.cwd.clone(),
+                kind,
+            }
+        })
+        .collect()
+}
+
+fn finish_graph(raw: Vec<RawGraphSession>, clients: Vec<DebugGraphClient>, redactor: &Redactor, count: &mut u32) -> DebugGraph {
+    let sessions = raw
+        .into_iter()
+        .map(|s| DebugGraphSession {
+            session_id: s.session_id,
+            issue_id: s.issue_id,
+            title: redactor.redact_owned(s.title, count),
+            runtime: s.runtime,
+            status: s.status.to_string(),
+            worktree: redactor.redact_opt_str(s.worktree, count),
+            kind: s.kind,
+        })
+        .collect();
+    DebugGraph { clients, sessions }
+}
+
 impl DebugKit {
     pub fn new(parts: DebugParts) -> Arc<Self> {
         let collector = DebugCollector::new(parts.setting.clone());
@@ -153,8 +227,12 @@ impl DebugKit {
         let Some(bridge) = hub.host_debug() else {
             return HostDebugPayload::default();
         };
-        let raw = bridge.snapshot();
-        self.collector.ingest_host_frames(&raw);
+        let mut raw = bridge.snapshot();
+        self.collector.ingest_host_frames_with(&raw, redactor, redacted_count);
+        // Frames are already ingested/redacted into the timeline ring and omitted from HostDebugPayload.
+        if let Some(obj) = raw.as_object_mut() {
+            obj.remove("frames");
+        }
         let clean = redactor.redact_value(raw, redacted_count);
         serde_json::from_value(clean).unwrap_or_default()
     }
@@ -169,67 +247,45 @@ impl DebugKit {
         })
     }
 
-    fn build_graph(&self, state: &SpaceState, host: &HostDebugPayload, orchestrator_ids: &[String], redactor: &Redactor, count: &mut u32) -> DebugGraph {
-        let sessions = state
-            .sessions
-            .iter()
-            .map(|s| {
-                let matched_issue = s.issue_id().and_then(|iid| state.issues.iter().find(|i| i.id == iid));
-                let title = matched_issue
-                    .map(|i| i.title.clone())
-                    .filter(|t| !t.is_empty())
-                    .unwrap_or_else(|| s.name.clone());
-                DebugGraphSession {
-                    session_id: s.id.clone(),
-                    issue_id: matched_issue.map(|i| i.number),
-                    title: redactor.redact_str(&title, count),
-                    runtime: s.runtime.clone(),
-                    status: trajectory::phase_status_str(&s.phase).to_string(),
-                    worktree: redactor.redact_opt_str(s.cwd.clone(), count),
-                    kind: trajectory::classify_session(&s.id, Some(s), &state.issues, orchestrator_ids, None),
-                }
-            })
-            .collect();
-        DebugGraph {
-            clients: host.clients.clone(),
-            sessions,
-        }
-    }
-
-    fn build_state_cache(&self, hub: &Hub, state: &SpaceState, host: &HostDebugPayload, agent_count: u32) -> DebugStateCache {
-        let mut caches = host.caches.clone();
+    fn build_state_cache(&self, hub: &Hub, metrics: &StateMetrics, mut caches: Vec<DebugCacheStat>, agent_count: u32) -> DebugStateCache {
         caches.extend(self.collector.cache_stats());
         DebugStateCache {
             seq: hub.seq(),
             slice_seqs: hub.slice_seqs(),
             slice_watchers: hub.slice_watcher_counts(),
             counts: DebugStateCounts {
-                issues: state.issues.len() as u32,
-                sessions: state.sessions.len() as u32,
-                channels: state.chat.as_ref().map(|c| c.channels.len() as u32).unwrap_or(0),
+                issues: metrics.issues,
+                sessions: metrics.sessions,
+                channels: metrics.channels,
                 agents: agent_count,
                 repos: self.sources.repo_count(),
                 artifacts: self.sources.artifact_count(),
                 inbox: hub.inbox_slice().items.len() as u32,
-                media_jobs: state.media.as_ref().map(|m| m.len() as u32).unwrap_or(0),
+                media_jobs: metrics.media_jobs,
             },
             caches,
         }
     }
 
-    fn build_overview(&self, hub: &Hub, state: &SpaceState, host: &HostDebugPayload, runtimes: Vec<DebugRuntimeSummary>) -> DebugOverview {
-        let active_sessions = state.sessions.iter().filter(|s| s.phase.is_working()).count() as u32;
+    fn build_overview(
+        &self,
+        hub: &Hub,
+        active_sessions: u32,
+        active_clients: u32,
+        host: &mut HostDebugPayload,
+        runtimes: Vec<DebugRuntimeSummary>,
+    ) -> DebugOverview {
         DebugOverview {
             channel: vibevalley_protocol::home::current_channel().as_str().to_string(),
             version: self.version.clone(),
-            loopback_url: host.loopback_url.clone().or_else(|| vibevalley_protocol::home::announced(&self.home)),
+            loopback_url: host.loopback_url.take().or_else(|| vibevalley_protocol::home::announced(&self.home)),
             home_path: self.home.display().to_string(),
             work_root: self.work_root.display().to_string(),
             db_path: self.home.join("server.db").display().to_string(),
-            bundle_mode: host.bundle_mode.clone(),
+            bundle_mode: host.bundle_mode.take(),
             boot_ms: host.boot_ms.or(Some(self.boot_duration_ms)),
             active_sessions,
-            active_clients: host.clients.len() as u32,
+            active_clients,
             active_subscriptions: hub.active_subscription_count(),
             latest_seq: hub.seq(),
             last_frame_ms: host.last_frame_ms,
@@ -242,15 +298,16 @@ impl DebugKit {
         let hub = self.hub()?;
         let redactor = Redactor::from_setting(&self.setting);
         let mut count = 0u32;
-        let host = self.read_host_payload(&hub, &redactor, &mut count);
-        let state = hub.state_now();
+        let mut host = self.read_host_payload(&hub, &redactor, &mut count);
         let probe = self.sources.runtime_probe();
-        let graph = self.build_graph(&state, &host, &probe.orchestrator_ids, &redactor, &mut count);
-        let state_cache = self.build_state_cache(&hub, &state, &host, probe.agent_count);
-        let overview = self.build_overview(&hub, &state, &host, probe.runtimes);
+        let (raw_sessions, metrics) = hub.read(|state| (extract_graph_sessions(state, &probe.orchestrator_ids), extract_state_metrics(state)));
+        let active_clients = host.clients.len() as u32;
+        let graph = finish_graph(raw_sessions, std::mem::take(&mut host.clients), &redactor, &mut count);
+        let state_cache = self.build_state_cache(&hub, &metrics, std::mem::take(&mut host.caches), probe.agent_count);
+        let overview = self.build_overview(&hub, metrics.active_sessions, active_clients, &mut host, probe.runtimes);
         let routes = host.routes.unwrap_or_else(Self::default_routes);
         let overrides = self.collector.overrides();
-        let recent_timeline = self.collector.recent(64);
+        let recent_timeline = self.collector.recent(SNAPSHOT_RECENT_TIMELINE_LIMIT);
         Ok(DebugSnapshot {
             overview,
             routes,
@@ -279,13 +336,13 @@ impl DebugKit {
     pub fn trajectory_list(&self) -> Result<Vec<DebugTrajectorySummary>, ApiError> {
         self.ensure_enabled()?;
         let hub = self.hub()?;
-        let state = hub.state_now();
+        let index = hub.read(trajectory::extract_trajectory_index);
         let probe = self.sources.runtime_probe();
         let redactor = Redactor::from_setting(&self.setting);
         let mut count = 0u32;
         Ok(trajectory::list_summaries(
             &self.home,
-            &state,
+            &index,
             self.sources.as_ref(),
             &redactor,
             &probe.orchestrator_ids,
@@ -295,12 +352,24 @@ impl DebugKit {
 
     pub fn trajectory_get(&self, req: &DebugTrajectoryGetRequest) -> Result<DebugTrajectoryDetail, ApiError> {
         self.ensure_enabled()?;
+        let id = req.id.trim();
+        if !trajectory::is_safe_id(id) {
+            return Err(ApiError::new(BizCode::InvalidInput, "invalid trajectory id"));
+        }
         let hub = self.hub()?;
-        let state = hub.state_now();
+        let meta = hub.read(|state| trajectory::extract_session_meta(state, id));
         let probe = self.sources.runtime_probe();
         let redactor = Redactor::from_setting(&self.setting);
         let mut count = 0u32;
-        trajectory::build_detail(&self.home, &state, self.sources.as_ref(), &redactor, req, &probe.orchestrator_ids, &mut count)
+        trajectory::build_detail(
+            &self.home,
+            meta.as_ref(),
+            self.sources.as_ref(),
+            &redactor,
+            req,
+            &probe.orchestrator_ids,
+            &mut count,
+        )
     }
 
     pub fn graph(&self) -> Result<DebugGraph, ApiError> {
@@ -309,9 +378,9 @@ impl DebugKit {
         let redactor = Redactor::from_setting(&self.setting);
         let mut count = 0u32;
         let host = self.read_host_payload(&hub, &redactor, &mut count);
-        let state = hub.state_now();
         let probe = self.sources.runtime_probe();
-        Ok(self.build_graph(&state, &host, &probe.orchestrator_ids, &redactor, &mut count))
+        let raw_sessions = hub.read(|state| extract_graph_sessions(state, &probe.orchestrator_ids));
+        Ok(finish_graph(raw_sessions, host.clients, &redactor, &mut count))
     }
 
     pub fn override_get(&self) -> Result<DebugOverrideConfig, ApiError> {
@@ -329,18 +398,25 @@ impl DebugKit {
         let hub = self.hub()?;
         let redactor = Redactor::from_setting(&self.setting);
         let mut prior_redactions = 0u32;
-        let host = self.read_host_payload(&hub, &redactor, &mut prior_redactions);
-        let state = hub.state_now();
+        let mut host = self.read_host_payload(&hub, &redactor, &mut prior_redactions);
         let probe = self.sources.runtime_probe();
-        let graph = self.build_graph(&state, &host, &probe.orchestrator_ids, &redactor, &mut prior_redactions);
-        let state_cache = self.build_state_cache(&hub, &state, &host, probe.agent_count);
-        let overview = self.build_overview(&hub, &state, &host, probe.runtimes);
+        let (raw_sessions, metrics, index) = hub.read(|state| {
+            (
+                extract_graph_sessions(state, &probe.orchestrator_ids),
+                extract_state_metrics(state),
+                trajectory::extract_trajectory_index(state),
+            )
+        });
+        let active_clients = host.clients.len() as u32;
+        let graph = finish_graph(raw_sessions, std::mem::take(&mut host.clients), &redactor, &mut prior_redactions);
+        let state_cache = self.build_state_cache(&hub, &metrics, std::mem::take(&mut host.caches), probe.agent_count);
+        let overview = self.build_overview(&hub, metrics.active_sessions, active_clients, &mut host, probe.runtimes);
         let routes = host.routes.unwrap_or_else(Self::default_routes);
         let overrides = self.collector.overrides();
         let timeline = self.collector.all_events();
         let trajectories = trajectory::export_snapshot(
             &self.home,
-            &state,
+            &index,
             self.sources.as_ref(),
             &redactor,
             &probe.orchestrator_ids,
