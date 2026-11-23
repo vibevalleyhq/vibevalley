@@ -8,67 +8,10 @@ use serde_json::{Value, json};
 use vibevalley_protocol::{ApiErrorKind, BizCode, Envelope, Next, Op, Preview, SliceKind};
 
 use crate::output::Output;
-
-/// Process exit codes scripts can branch on.
-pub mod exit {
-    pub const OK: i32 = 0;
-    pub const OTHER: i32 = 1;
-    pub const USAGE: i32 = 2;
-    pub const REFUSED: i32 = 3;
-    pub const MISSING: i32 = 4;
-    pub const UNREACHABLE: i32 = 5;
-}
-
-/// Structured command failure printed as one JSON line on stderr.
-#[derive(Debug, Clone)]
-pub struct Failure {
-    pub code: i32,
-    pub tag: String,
-    pub text: String,
-    pub biz_code: Option<u32>,
-    pub status: Option<u16>,
-    pub next: Vec<Next>,
-}
-
-impl Failure {
-    pub fn new(code: i32, tag: &str, text: impl Into<String>) -> Self {
-        Self {
-            code,
-            tag: tag.into(),
-            text: text.into(),
-            biz_code: None,
-            status: None,
-            next: vec![],
-        }
-    }
-
-    pub fn usage(tag: &str, text: impl Into<String>) -> Self {
-        Self::new(exit::USAGE, tag, text)
-    }
-
-    pub fn print(&self) {
-        let mut error = json!({ "tag": self.tag, "message": self.text });
-        if let Some(code) = self.biz_code {
-            error["bizCode"] = json!(code);
-        }
-        if let Some(status) = self.status {
-            error["status"] = json!(status);
-        }
-        if !self.next.is_empty() {
-            error["next"] = json!(self.next);
-        }
-        eprintln!("{}", json!({ "error": error }));
-    }
-}
-
-pub type Done = Result<(), Failure>;
+pub use vibevalley_cli::{Done, Failure, exit, no_dry_run};
 
 pub fn decode_failure(e: impl std::fmt::Display) -> Failure {
     Failure::new(exit::OTHER, "Server", e.to_string())
-}
-
-pub fn no_dry_run(command: &str) -> Failure {
-    Failure::usage("NoDryRun", format!("{command} does not support --dry-run"))
 }
 
 fn code_of(kind: ApiErrorKind) -> i32 {
@@ -137,7 +80,7 @@ pub fn fallback_server() -> String {
 }
 
 /// Server URL from `<home>/server.json`, falling back to the channel's default loopback port.
-pub fn default_server() -> String {
+fn default_server() -> String {
     vibevalley_protocol::home::announced(&vibevalley_protocol::home::home()).unwrap_or_else(fallback_server)
 }
 

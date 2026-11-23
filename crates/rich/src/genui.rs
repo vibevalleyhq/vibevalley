@@ -21,7 +21,6 @@ use crate::canvas::vv_canvas;
 use crate::chart::vv_chart;
 use crate::code_block::vv_code_block;
 use crate::diagram::vv_diagram;
-use crate::hooks::{GenUiActionSink, active_genui_renderer};
 use crate::markdown::{VvMarkdownSize, vv_markdown};
 use crate::theme::AdaptiveUi;
 
@@ -137,8 +136,7 @@ fn collect_runtime_errors(events: Vec<RuntimeEvent>, out: &mut Vec<String>) {
 
 type StateUpdater = Rc<dyn Fn(&str, StateValue)>;
 
-/// Native generative UI surface backed by `vibevalley-genui` (or a registered
-/// [`crate::hooks::GenUiRenderer`] override).
+/// Native generative UI surface backed by `vibevalley-genui`.
 ///
 /// Renders all 19 `ResolvedNodeKind` variants natively using `nsh_core` / `nsh_base` elements
 /// with reactive signals and embedded `VvChart` / `VvDiagram` / `VvCanvas` / `VvCodeBlock`,
@@ -151,21 +149,7 @@ pub fn VvGenUi(props: VvGenUiProps, cx: Scope<VvGenUiEvent>) -> impl IntoElement
     view().test_id("genui").flex_col().my(px(8.0)).max_w(relative(1.0)).child(dynamic(move || {
         let spec = props.spec.get();
         let streaming = props.streaming.get();
-        let is_dark = dark();
         let _rev = revision.get();
-
-        if let Some(renderer) = active_genui_renderer() {
-            let sink = GenUiActionSink::new(move |act| {
-                cx.emit(VvGenUiEvent::Action(VvGenUiActionEvent {
-                    action: act.action,
-                    payload: act.payload,
-                }));
-            });
-            return match renderer.render_element(spec.as_str(), is_dark, sink) {
-                Ok(el) => view().test_id("genui-surface").flex_col().max_w(relative(1.0)).child(el).into_element(),
-                Err(err) => render_genui_fallback(spec, err),
-            };
-        }
 
         let (resolved, first_error) = {
             let mut guard = session.borrow_mut();

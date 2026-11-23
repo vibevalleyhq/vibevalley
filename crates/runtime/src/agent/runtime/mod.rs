@@ -125,16 +125,7 @@ impl Runtime for VibeValleyRuntime {
     }
 
     fn capabilities(&self) -> Capabilities {
-        Capabilities {
-            resume: true,
-            steer: true,
-            queue: true,
-            permission_requests: true,
-            model_selection: true,
-            subagents: true,
-            usage: true,
-            config_options: false,
-        }
+        crate::oar::runtime_spec(ID).expect("vibevalley runtime spec").capabilities
     }
 
     fn installation(&self) -> Installation {

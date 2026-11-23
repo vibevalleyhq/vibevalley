@@ -6,8 +6,7 @@ use std::collections::HashMap;
 use crate::rules::{key_between, valid_key};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    Block, BlockAttrs, BlockInput, BlockOp, BlockOpMergeBlocks, BlockOpMoveBlock, BlockOpResult, BlockOpSplitBlock, BlockOpStatus, BlockOpUpdateText,
-    BlockType, TextSpan,
+    Block, BlockAttrs, BlockInput, BlockOp, BlockOpMergeBlocks, BlockOpMoveBlock, BlockOpResult, BlockOpSplitBlock, BlockOpStatus, BlockOpUpdateText, TextSpan,
 };
 
 use crate::artifact::spans::{has_text, joined, rune_len, same_text, split_at, text_for};
@@ -67,7 +66,7 @@ fn parent_of(b: &Block) -> &str {
     b.parent_id.as_deref().unwrap_or("")
 }
 
-pub fn is_deleted(b: &Block) -> bool {
+fn is_deleted(b: &Block) -> bool {
     b.deleted == Some(true)
 }
 
@@ -490,14 +489,3 @@ pub fn ordered(blocks: &[Block]) -> Vec<Block> {
     }
     out.into_iter().map(wire).collect()
 }
-
-pub const BLOCK_TYPES_WITH_TEXT: [BlockType; 8] = [
-    BlockType::Paragraph,
-    BlockType::Heading,
-    BlockType::Bulleted,
-    BlockType::Numbered,
-    BlockType::Todo,
-    BlockType::Quote,
-    BlockType::Code,
-    BlockType::MemoryItem,
-];

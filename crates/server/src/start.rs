@@ -38,9 +38,6 @@ pub struct ServerConfig {
     pub tool_permissions: vibevalley_runtime::agent::extensions::governance::Permissions,
     /// Probe every runtime at start, in the background.
     pub probe_runtimes: bool,
-    /// Override whether `gh` and repository PR capabilities are probed at boot
-    /// (`None` follows `probe_runtimes`).
-    pub probe_github: Option<bool>,
     /// Optional hosted-branch publisher override (offline tests).
     pub publisher: Option<Arc<modules::work::pull::Publisher>>,
     /// Poll open PRs every N seconds (`None` disables the background poller).
@@ -51,9 +48,7 @@ pub struct ServerConfig {
     pub link_previews: bool,
     /// Commits by these addresses count as the user's too (`gitEmails`).
     pub git_emails: Vec<String>,
-    /// Media execution backend; defaults to MOSS. Tests inject a deterministic backend.
-    pub media_backend: Option<Arc<dyn modules::content::media::image_provider::ImageBackend>>,
-    /// The vendors answered offline (the page's tests): `testing::OfflineImages`.
+    /// The vendors answered offline (the page's tests): `offline::network()`.
     pub offline_media: bool,
     /// How the media vendor is reached and its results fetched, in place of the network: a test keeps one across
     /// restarts, so the vendor remembers what it was asked.
@@ -103,14 +98,12 @@ impl ServerConfig {
             registry: None,
             tool_permissions: Default::default(),
             probe_runtimes: true,
-            probe_github: None,
             publisher: None,
             poll_pulls: None,
             tick_crons: true,
             link_previews: true,
             git_emails: vec![],
             model_client: None,
-            media_backend: None,
             offline_media: false,
             media_network: None,
             orchestrator_listens: true,
@@ -392,7 +385,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     } else if config.offline_media {
         crate::offline::network()
     } else {
-        (Arc::new(modules::infra::http::Http), Arc::new(modules::infra::http::Http))
+        (Arc::new(modules::infra::http::Http), Arc::new(modules::infra::http::PublicDownload))
     };
     modules::infra::provider::install(&hub, Arc::new(modules::infra::provider::Provider::new(setting.clone(), vendor.clone())));
     let voice_fetch = vendor.clone();
@@ -411,7 +404,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     };
     let repos = modules::work::repo::Repos::open(&config.work_root, board_config.per_repo).map_err(|e| failed("the repos")(&e))?;
     modules::work::repo::install(&hub, repos.clone());
-    if config.probe_github.unwrap_or(config.probe_runtimes) {
+    if config.probe_runtimes {
         repos.probe_in_background();
     }
     game.count_commits(repos.clone(), config.git_emails.clone());
@@ -459,16 +452,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         files: attachments.clone(),
         inputs: media_inputs.clone(),
         chat: chat.clone(),
-        images: config
-            .media_backend
-            .clone()
-            .unwrap_or_else(|| -> Arc<dyn modules::content::media::image_provider::ImageBackend> {
-                if config.offline_media {
-                    crate::testing::OfflineImages::new(setting.clone())
-                } else {
-                    Arc::new(modules::content::media::image_provider::Moss::new(setting.clone()))
-                }
-            }),
         vendor,
         download,
     })

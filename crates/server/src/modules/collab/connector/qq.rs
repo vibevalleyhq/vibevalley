@@ -12,7 +12,7 @@ use tokio_tungstenite::tungstenite::Message as WsMessage;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ConnectorID, ConnectorLogin};
 
-use super::adapter::{Adapter, AppFailed, FailedKind, Inbound, Linked, LoginIo, Receiving, client, timed};
+use super::adapter::{Adapter, AppFailed, FailedKind, Inbound, Linked, LoginIo, Receiving, TokenCache, client, timed};
 use crate::modules::infra::setting::Secret;
 use crate::now;
 
@@ -153,17 +153,11 @@ fn next_reply_seq(seqs: &mut Vec<(String, u32)>, msg: &str) -> u32 {
     next
 }
 
-struct Token {
-    of: String,
-    token: String,
-    until: i64,
-}
-
 pub struct Qq {
     api: String,
     token_at: String,
     /// One active QQ account; changing its credentials evicts the previous token.
-    token: Mutex<Option<Token>>,
+    token: TokenCache,
     reply_seq: Mutex<Vec<(String, u32)>>,
 }
 
@@ -172,7 +166,7 @@ impl Qq {
         Qq {
             api,
             token_at,
-            token: Mutex::new(None),
+            token: TokenCache::default(),
             reply_seq: Mutex::new(vec![]),
         }
     }
@@ -180,8 +174,8 @@ impl Qq {
     async fn token(&self, keys: &Keys) -> Result<String, AppFailed> {
         let of = format!("{}\u{0}{}", keys.app_id, keys.secret.expose());
         let at = now();
-        if let Some(cached) = self.token.lock().as_ref().filter(|c| c.of == of && c.until > at) {
-            return Ok(cached.token.clone());
+        if let Some(cached) = self.token.get(&of, at) {
+            return Ok(cached);
         }
         let auth = |why: String| AppFailed::failed(t("server.connector.qq.auth", &[("why", why.into())]));
         let body: TokenAnswer = timed(
@@ -208,11 +202,7 @@ impl Qq {
             Some(Seconds::Text(s)) => s.trim().parse().unwrap_or(7200),
             None => 7200,
         };
-        *self.token.lock() = Some(Token {
-            of,
-            token: token.clone(),
-            until: at + (seconds - 60) * 1000,
-        });
+        self.token.put(of, token.clone(), at, seconds);
         Ok(token)
     }
 

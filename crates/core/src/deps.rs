@@ -77,7 +77,7 @@ pub fn dag_problems(nodes: &[DagNode]) -> Vec<DagProblem> {
 
 /// Longest path from a node that waits for nothing. A node caught in a
 /// circle is in no layer.
-pub fn dag_layers(nodes: &[DagNode]) -> Vec<Vec<String>> {
+pub(crate) fn dag_layers(nodes: &[DagNode]) -> Vec<Vec<String>> {
     let known: HashSet<&str> = nodes.iter().map(|n| n.id.as_str()).collect();
     let mut depth: HashMap<&str, usize> = HashMap::new();
     let mut changed = true;
@@ -209,10 +209,4 @@ pub fn child_checks(child: &Issue, all: &[Issue]) -> CheckoutChecks {
         }
     }
     CheckoutChecks::Plain { frozen, checks }
-}
-
-/// What a child's brief says about its constraints. Ported from
-/// `workConstraints` in `apps/server/src/modules/issue/prompts.ts`.
-pub fn work_constraints(constraints: Option<&IssueConstraints>, frozen: &[String]) -> String {
-    crate::prompts::work_constraints(constraints, frozen)
 }

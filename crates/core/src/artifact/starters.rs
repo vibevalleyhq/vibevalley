@@ -2,11 +2,8 @@
 
 use serde_json::json;
 
+use crate::artifact::html::escape_html_text;
 use crate::artifact::store::{ArtifactEntryKind, ArtifactEntryOp, ArtifactEntryWriteInput, ArtifactType};
-
-fn esc(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
-}
 
 fn set_entry(path: &str, kind: ArtifactEntryKind, value: String) -> ArtifactEntryWriteInput {
     ArtifactEntryWriteInput {
@@ -21,7 +18,7 @@ fn set_entry(path: &str, kind: ArtifactEntryKind, value: String) -> ArtifactEntr
 }
 
 pub fn starter_entries_for_type(artifact_type: ArtifactType, title: &str) -> Vec<ArtifactEntryWriteInput> {
-    let escaped = esc(title);
+    let escaped = escape_html_text(title);
     match artifact_type {
         ArtifactType::Docs | ArtifactType::Outline => vec![],
         ArtifactType::Slides => vec![

@@ -91,8 +91,15 @@ fn harness_worker_prompt_fork_and_standin_recovery() -> crate::agent::durable::R
     let sink = events.clone();
     harness.attach_worker(&conv, brain, Arc::new(move |ev| sink.lock().unwrap().push(ev)))?;
 
-    let handle = harness.conversation(&conv);
-    let (_, task, _) = handle.prompt("mock", "req-1", "hi", "base system")?;
+    let (_, task, _) = harness.submit(Request {
+        conversation: &conv,
+        provider: "mock",
+        request_id: "req-1",
+        prompt: "hi",
+        source: "user",
+        system: "base system",
+        ..Default::default()
+    })?;
     let done = harness.scheduler().wait(&task.id, Duration::from_secs(3))?;
     assert_eq!(done.terminal_reason, "completed");
     {
@@ -102,17 +109,16 @@ fn harness_worker_prompt_fork_and_standin_recovery() -> crate::agent::durable::R
         assert!(recorded.iter().any(|e| matches!(e, AgentEvent::AgentEnd { .. })));
     }
 
-    let entries = handle.entries()?;
+    let entries = harness.entries(&conv)?;
     assert!(
         entries
             .iter()
             .any(|e| e.kind == "pi.system" && e.payload["text"].as_str().unwrap().contains("remember extension convention"))
     );
 
-    let forked = handle.fork("worker:s1-fork", entries.last().unwrap().seq, "mock")?;
-    assert_eq!(forked.entries()?.len(), entries.len());
-    drop(forked);
-    drop(handle);
+    let fork_seq = entries.last().unwrap().seq;
+    store.write(|tx| tx.fork_conversation(&conv, "worker:s1-fork", "mock", "", fork_seq))?;
+    assert_eq!(harness.entries("worker:s1-fork")?.len(), entries.len());
     harness.close();
     drop(harness);
 
@@ -199,11 +205,18 @@ fn harness_abort_cancels_active_generation_and_settles_unanswered() -> crate::ag
         Arc::new(|_| {}),
     )?;
 
-    let handle = harness.conversation(&conv);
-    let (sub, task, _) = handle.prompt("mock", "req-abort", "hang", "sys")?;
+    let (sub, task, _) = harness.submit(Request {
+        conversation: &conv,
+        provider: "mock",
+        request_id: "req-abort",
+        prompt: "hang",
+        source: "user",
+        system: "sys",
+        ..Default::default()
+    })?;
     started_rx.recv_timeout(Duration::from_secs(2)).expect("model started");
 
-    let aborted = handle.abort()?;
+    let aborted = harness.abort_conversation(&conv)?;
     assert_eq!(aborted, vec![task.id.clone()]);
     let terminal = harness.scheduler().wait(&task.id, Duration::from_secs(2))?;
     assert_eq!(terminal.terminal_reason, "aborted");

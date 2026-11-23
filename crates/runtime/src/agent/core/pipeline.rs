@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 
 use crate::agent::ai::types::{Message, Role, ToolCall, ToolSpec};
 use crate::agent::core::events::AgentMessage;
@@ -33,15 +32,11 @@ pub struct Transcript {
 impl Transcript {
     pub fn load(store: &Store, conv: &str) -> Result<Self> {
         let (conversation, entries) = store.read(|tx| Ok((tx.conversation(conv)?, tx.visible_entries(conv)?)))?;
-        let mut hash = Sha256::new();
-        for entry in &entries {
-            hash.update(format!("{}|{}|{}\n", entry.seq, entry.kind, entry.payload));
-        }
         Ok(Self {
             conversation_id: conv.into(),
             provider_affinity: conversation.provider_affinity,
             entries,
-            prefix_hash: hash.finalize().iter().map(|b| format!("{b:02x}")).collect(),
+            prefix_hash: String::new(),
         })
     }
 

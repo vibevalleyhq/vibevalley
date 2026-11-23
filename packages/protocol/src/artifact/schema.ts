@@ -12,9 +12,9 @@ const ArtifactType = z.enum(T.ArtifactTypeValues) satisfies Codec<T.ArtifactType
 
 const ArtifactDisplay = z.enum(T.ArtifactDisplayValues) satisfies Codec<T.ArtifactDisplay>;
 
-export const ArtifactEntryKind = z.enum(T.ArtifactEntryKindValues) satisfies Codec<T.ArtifactEntryKind>;
+const ArtifactEntryKind = z.enum(T.ArtifactEntryKindValues) satisfies Codec<T.ArtifactEntryKind>;
 
-export const ArtifactEntryOp = z.enum(T.ArtifactEntryOpValues) satisfies Codec<T.ArtifactEntryOp>;
+const ArtifactEntryOp = z.enum(T.ArtifactEntryOpValues) satisfies Codec<T.ArtifactEntryOp>;
 
 export const ArtifactCard = z.object({
   id: ArtifactId,

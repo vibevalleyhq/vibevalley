@@ -12,17 +12,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
-use tokio::task::JoinHandle;
-use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, BranchPublication, Caller, PublishPlatform, PullRequest, PullRequestState, SubmitBranch, ops};
 
-use crate::base::refused as refuse;
+use crate::base::{Ticker, refused as refuse};
 use crate::modules::work::issue::Board;
 use crate::modules::work::repo::Repos;
 use crate::{Hub, now};
 
-pub use publish::{Answer, HostRun, HostedRepo, Network, Publisher, hosted_origin, pull_request_of};
+pub use publish::{Answer, HostRun, HostedRepo, Network, Publisher, hosted_origin};
 pub use snapshot::{GitHubCheck, GitHubComment, GitHubPullSnapshot, GitHubReview, actions_job_of, checks_fingerprint, checks_verdict};
 pub use store::{KnownPullEvent, PullIndex, PullRecord, PullStore, UpsertPullInput};
 
@@ -38,7 +36,7 @@ pub struct Pulls {
     pub(crate) refresh_lock: Mutex<()>,
     pub(crate) poll_lock: Mutex<()>,
     closed: std::sync::atomic::AtomicBool,
-    poller: Mutex<Option<(CancellationToken, JoinHandle<()>)>>,
+    poller: Mutex<Option<Ticker>>,
 }
 
 impl Pulls {
@@ -73,9 +71,8 @@ impl Pulls {
 
     pub fn close(&self) {
         self.closed.store(true, std::sync::atomic::Ordering::Relaxed);
-        if let Some((cancel, handle)) = self.poller.lock().take() {
-            cancel.cancel();
-            let _ = vibevalley_runtime::rt::block_on(handle);
+        if let Some(poller) = self.poller.lock().take() {
+            poller.stop();
         }
     }
 
@@ -211,28 +208,17 @@ pub fn install(hub: &Hub, pulls: Arc<Pulls>, poll_seconds: Option<u64>) {
 
     if let Some(secs) = poll_seconds {
         let interval = Duration::from_secs(if secs > 0 { secs } else { DEFAULT_POLL_SECONDS });
-        let cancel = hub.child_token();
-        let task_cancel = cancel.clone();
         let weak = Arc::downgrade(&pulls);
-        let handle = hub.spawn_task(async move {
-            loop {
-                tokio::select! {
-                    biased;
-                    _ = task_cancel.cancelled() => return,
-                    _ = tokio::time::sleep(interval) => {}
-                }
-                let Some(p) = weak.upgrade() else { return };
-                if p.closed.load(std::sync::atomic::Ordering::Relaxed) {
-                    return;
-                }
-                let _ = tokio::task::spawn_blocking(move || {
-                    p.refresh();
-                    p.poll();
-                })
-                .await;
+        let ticker = Ticker::spawn_on(hub, interval, false, move || {
+            let Some(p) = weak.upgrade() else { return false };
+            if p.closed.load(std::sync::atomic::Ordering::Relaxed) {
+                return false;
             }
+            p.refresh();
+            p.poll();
+            true
         });
-        *pulls.poller.lock() = Some((cancel, handle));
+        *pulls.poller.lock() = Some(ticker);
     }
 }
 

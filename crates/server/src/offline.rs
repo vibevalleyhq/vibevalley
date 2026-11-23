@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 use base64::Engine;
 use parking_lot::Mutex;
 use serde_json::{Value, json};
+use tokio_util::sync::CancellationToken;
 
 use crate::modules::infra::http::{Fetch, FetchError, Request, Response};
 
@@ -36,13 +37,37 @@ struct State {
     next: usize,
 }
 
+struct OfflineVendor(Arc<Mutex<State>>);
+
+impl Fetch for OfflineVendor {
+    fn fetch(&self, request: Request) -> Result<Response, FetchError> {
+        answer(&self.0, request, None)
+    }
+
+    fn fetch_with_cancel(&self, request: Request, cancel: CancellationToken) -> Result<Response, FetchError> {
+        answer(&self.0, request, Some(cancel))
+    }
+}
+
+struct OfflineDownload(Arc<Mutex<State>>);
+
+impl Fetch for OfflineDownload {
+    fn fetch(&self, request: Request) -> Result<Response, FetchError> {
+        serve(&self.0, request)
+    }
+
+    fn fetch_with_cancel(&self, request: Request, cancel: CancellationToken) -> Result<Response, FetchError> {
+        if cancel.is_cancelled() {
+            return Err(FetchError::Network("cancelled".into()));
+        }
+        serve(&self.0, request)
+    }
+}
+
 /// The vendor and the public download, sharing what was made.
 pub fn network() -> (Arc<dyn Fetch>, Arc<dyn Fetch>) {
     let state = Arc::new(Mutex::new(State::default()));
-    let s = state.clone();
-    let vendor: Arc<dyn Fetch> = Arc::new(move |r: Request| answer(&s, r));
-    let download: Arc<dyn Fetch> = Arc::new(move |r: Request| serve(&state, r));
-    (vendor, download)
+    (Arc::new(OfflineVendor(state.clone())), Arc::new(OfflineDownload(state)))
 }
 
 fn json_response(status: u16, v: &Value) -> Result<Response, FetchError> {
@@ -61,10 +86,21 @@ fn empty(status: u16) -> Result<Response, FetchError> {
     })
 }
 
-/// An answer that never comes: the request waits out its timeout.
-fn never(r: &Request) -> Result<Response, FetchError> {
-    std::thread::sleep(r.timeout);
-    Err(FetchError::Timeout)
+/// An answer that never comes: the request waits out its timeout unless cancelled.
+fn never(r: &Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
+    match cancel {
+        Some(token) => vibevalley_runtime::rt::block_on(async {
+            tokio::select! {
+                biased;
+                _ = token.cancelled() => Err(FetchError::Network("cancelled".into())),
+                _ = tokio::time::sleep(r.timeout) => Err(FetchError::Timeout),
+            }
+        }),
+        None => {
+            std::thread::sleep(r.timeout);
+            Err(FetchError::Timeout)
+        }
+    }
 }
 
 /// `wav()`: a 440 Hz tone, 24 kHz mono 16-bit.
@@ -175,7 +211,7 @@ fn multipart(kind: &str, body: &[u8]) -> Vec<(String, Option<String>, Vec<u8>)> 
     out
 }
 
-fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
+fn answer(state: &Mutex<State>, r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
     let (path, query) = match r.url.split_once('?') {
         Some((p, q)) => (p.to_string(), q.to_string()),
         None => (r.url.clone(), String::new()),
@@ -216,6 +252,39 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
         s.next
     };
 
+    if path == format!("{MOSS}/images/generations") && r.method == "POST" && !form {
+        let prompt = input["prompt"].as_str().unwrap_or("");
+        if prompt.contains("[media:hold]") {
+            return never(&req, cancel);
+        }
+        if prompt.contains("[media:unknown]") {
+            return empty(503);
+        }
+        let size = input["size"].as_str().unwrap_or("");
+        let Some((w, h)) = size.split_once('x') else { return empty(400) };
+        let (Ok(width), Ok(height)) = (w.parse::<u32>(), h.parse::<u32>()) else {
+            return empty(400);
+        };
+        let mut s = state.lock();
+        let n = next(&mut s);
+        let url = format!("https://media.example.com/{n}-{width}x{height}.png");
+        s.assets.insert(
+            url.clone(),
+            Asset {
+                bytes: crate::testing::png(width, height),
+                kind: "image/png".into(),
+                fail_once: prompt.contains("[media:download-failure]"),
+            },
+        );
+        return json_response(
+            200,
+            &json!({
+                "created": 1,
+                "data": [{ "url": url }],
+                "usage": { "generated_images": 1, "output_width": width, "output_height": height }
+            }),
+        );
+    }
     if path == format!("{MOSS}/audio/voices") && r.method == "GET" {
         let last = query.contains("after");
         let account = if auth == "Bearer test-voice-second" { "second" } else { "first" };
@@ -247,7 +316,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
             .map(|p| String::from_utf8_lossy(&p.2).to_string())
             .unwrap_or_default();
         if name.contains("[clone:hold]") {
-            return never(&req);
+            return never(&req, cancel);
         }
         if name.contains("[clone:unknown]") {
             return empty(503);
@@ -361,7 +430,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
             input["input"].as_str().unwrap_or("").to_string()
         };
         if text.contains("[audio:hold]") {
-            return never(&req);
+            return never(&req, cancel);
         }
         if text.contains("[audio:unknown]") {
             return empty(503);
@@ -396,7 +465,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
     if path == format!("{MOSS}/audio/speech") && r.method == "POST" && !form {
         let text = input["input"].as_str().unwrap_or("").to_string();
         if text.contains("[speech:hold]") {
-            return never(&req);
+            return never(&req, cancel);
         }
         if text.contains("[speech:unknown]") {
             return empty(503);
@@ -555,7 +624,7 @@ fn answer(state: &Mutex<State>, r: Request) -> Result<Response, FetchError> {
         }
         if text.contains("[understanding:hold]") {
             drop(s);
-            return never(&req);
+            return never(&req, cancel);
         }
         if text.contains("[understanding:unknown]") {
             return empty(503);

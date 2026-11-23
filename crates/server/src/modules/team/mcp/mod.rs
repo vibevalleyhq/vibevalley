@@ -7,7 +7,8 @@ pub mod resource;
 use std::sync::Arc;
 
 use crate::transport::api::Mcp;
-use serde_json::{Value, json};
+use serde::Deserialize;
+use serde_json::{Map, Value, json};
 
 use crate::modules::team::tool::{self, Farm, Tool, Who};
 
@@ -15,6 +16,31 @@ pub use resource::{ResourceReadArgs, Resources};
 
 const UNKNOWN_CALLER: &str = "没认出你是谁：这些工具只给执行会话用";
 const PROTOCOL: &str = "2025-06-18";
+
+#[derive(Deserialize)]
+struct RpcRequest {
+    #[serde(default)]
+    id: Option<Value>,
+    #[serde(default)]
+    method: String,
+    #[serde(default)]
+    params: Value,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct InitializeParams {
+    #[serde(default)]
+    protocol_version: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+struct ToolCallParams {
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    arguments: Value,
+}
 
 pub struct Door {
     pub farm: Arc<Farm>,
@@ -31,13 +57,17 @@ impl Door {
         })
     }
 
-    fn result(&self, token: &str, method: &str, params: &Value) -> Result<Value, (i64, String)> {
+    fn result(&self, token: &str, method: &str, params: Value) -> Result<Value, (i64, String)> {
         match method {
-            "initialize" => Ok(json!({
-                "protocolVersion": params["protocolVersion"].as_str().unwrap_or(PROTOCOL),
-                "capabilities": { "tools": {} },
-                "serverInfo": { "name": "vibevalley", "version": self.version },
-            })),
+            "initialize" => {
+                let init: InitializeParams = serde_json::from_value(params).unwrap_or_default();
+                let version = init.protocol_version.as_deref().unwrap_or(PROTOCOL);
+                Ok(json!({
+                    "protocolVersion": version,
+                    "capabilities": { "tools": {} },
+                    "serverInfo": { "name": "vibevalley", "version": self.version },
+                }))
+            }
             "ping" => Ok(json!({})),
             // The list is anyone's; a call names its caller (mcp.ts: the tools refuse an unknown one themselves).
             "tools/list" => {
@@ -56,11 +86,14 @@ impl Door {
                 let Some(me) = self.caller(token) else {
                     return Ok(json!({ "content": [{ "type": "text", "text": UNKNOWN_CALLER }], "isError": true }));
                 };
-                let name = params["name"].as_str().unwrap_or("");
-                let args = params.get("arguments").cloned().filter(Value::is_object).unwrap_or_else(|| json!({}));
-                let called = match self.tools.iter().find(|t| t.words.name == name) {
+                let call: ToolCallParams = serde_json::from_value(params).unwrap_or_default();
+                let args = match call.arguments {
+                    Value::Object(map) => Value::Object(map),
+                    _ => Value::Object(Map::new()),
+                };
+                let called = match self.tools.iter().find(|t| t.words.name == call.name) {
                     Some(t) => t.run(&self.farm, &Who::Helper(Box::new(me)), &args),
-                    None => Err(format!("没成：没有 {name} 这个工具")),
+                    None => Err(format!("没成：没有 {} 这个工具", call.name)),
                 };
                 let (text, error) = match called {
                     Ok(text) => (text, false),
@@ -81,10 +114,9 @@ impl Door {
 
 impl Mcp for Door {
     fn message(&self, token: &str, message: Value) -> Option<Value> {
-        let id = message.get("id").cloned().filter(|id| !id.is_null())?;
-        let method = message["method"].as_str().unwrap_or("");
-        let params = message.get("params").cloned().unwrap_or(Value::Null);
-        Some(match self.result(token, method, &params) {
+        let req: RpcRequest = serde_json::from_value(message).ok()?;
+        let id = req.id.filter(|id| !id.is_null())?;
+        Some(match self.result(token, &req.method, req.params) {
             Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
             Err((code, why)) => json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": why } }),
         })

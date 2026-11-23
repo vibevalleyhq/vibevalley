@@ -43,24 +43,17 @@ impl Shell {
             | Action::DismissFarmForm
             | Action::FarmHandset { .. }
             | Action::FarmCall { .. }
-            | Action::SilenceFarmPhone => {}
+            | Action::SilenceFarmPhone
+            | Action::OpenTerminal { .. }
+            | Action::ActivateProject { .. }
+            | Action::RevealInTerminal { .. }
+            | Action::OpenHit { .. }
+            | Action::ToggleDevtools => {}
             Action::Probe { results } => {
                 eprintln!("bridge probe: {results}");
                 self.probe = Some(results);
             }
             Action::Call { op, .. } => eprintln!("host call {op} reached the shell without a reply handle"),
-            Action::OpenTerminal { cwd, title, command } => {
-                self.open_terminal_at(PathBuf::from(cwd), title, command, window, cx, |_| {});
-            }
-            Action::ActivateProject { id } => {
-                if let Some(project) = self.ws.project(id) {
-                    self.with_project_at(project.root().to_owned(), window, cx, |s, result, window, cx| {
-                        if let Ok(id) = result {
-                            s.activate_project(id, window, cx);
-                        }
-                    });
-                }
-            }
             Action::ActivatePath { path } => self.activate_path(PathBuf::from(path), window, cx, |_, _, _| {}),
             Action::ActivateTab { path, tab_id } => self.activate_path(PathBuf::from(path), window, cx, move |s, window, cx| {
                 if let Some(p) = s.ws.active_mut() {
@@ -114,15 +107,6 @@ impl Shell {
             }
             Action::OpenRepoMap => self.show_pixel("map", json!({}), window, cx),
             Action::OpenTree => self.show_pixel("tree", json!({}), window, cx),
-            Action::RevealInTerminal { path } => {
-                let path = PathBuf::from(path);
-                let dir = if path.is_dir() {
-                    path
-                } else {
-                    path.parent().map(Path::to_path_buf).unwrap_or(path)
-                };
-                self.open_terminal_at(dir, None, None, window, cx, |_| {});
-            }
             Action::OpenDiff { path, staged } => {
                 let spec = if staged {
                     vibevalley_workspace::DiffSpec::Staged
@@ -183,8 +167,6 @@ impl Shell {
                 }
                 self.run_search(regex, case_sensitive, cx);
             }
-            Action::OpenHit { path, line } => self.open_file(PathBuf::from(path), Some(line), window, cx),
-            Action::ToggleDevtools => self.toggle_devtools(window, cx),
             Action::DetachDevtools => self.detach_devtools(window, cx),
             Action::CloseDevtools => self.close_devtools(cx),
         }
@@ -248,18 +230,7 @@ impl Shell {
                     fonts.dedup();
                     fonts
                 });
-                Envelope::ok(json!({
-                    "name": "desktop",
-                    "version": crate::update::version(),
-                    "titleBar": { "top": 28, "left": 68 },
-                    "terminal": true,
-                    "monoFont": settings.mono_font,
-                    "monoFonts": fonts,
-                    "terminalFontSize": settings.terminal_font_size,
-                    "uiFontSize": settings.ui_font_size,
-                    "motion": settings.effective_motion().as_str(),
-                    "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile", "commandLine", "seekAudio", "pcm", "pickFile", "saveFile", "update", "mossVoice"],
-                }))
+                Envelope::ok(host_info_payload(settings, fonts))
             }
             HostOp::CliState => return self.run_cli_op(CliOp::State, reply, cx),
             HostOp::CliInstall => return self.run_cli_op(CliOp::Install, reply, cx),
@@ -534,25 +505,8 @@ impl Shell {
                 crate::audio::dispatch(reply, move || crate::audio::play_sound(name));
                 return;
             }
-            HostOp::SeekAudio(req) => {
-                crate::audio::dispatch(reply, move || crate::audio::seek(req.position));
-                return;
-            }
-            HostOp::AudioState => {
-                crate::audio::dispatch(reply, || Ok(crate::audio::state()));
-                return;
-            }
-            HostOp::PcmStart(req) => {
-                let format = crate::audio::PcmFormat {
-                    sample_rate: req.sample_rate,
-                    channels: req.channels,
-                };
-                crate::audio::dispatch(reply, move || crate::audio::start_pcm(format));
-                return;
-            }
-            HostOp::PcmAppend(req) => {
-                crate::audio::dispatch(reply, move || crate::audio::append_pcm(&req.data));
-                return;
+            HostOp::SeekAudio(_) | HostOp::AudioState | HostOp::PcmStart(_) | HostOp::PcmAppend(_) => {
+                refusal(BizCode::Refused, "legacy audio bridge op is no longer supported")
             }
             // A file the user dropped on a view: nsh gives views file: URLs
             // and no way to read them.
@@ -673,6 +627,22 @@ impl Shell {
     }
 }
 
+fn host_info_payload(settings: &crate::theme::Settings, fonts: &[String]) -> Value {
+    json!({
+        "name": "desktop",
+        "version": crate::update::version(),
+        "titleBar": { "top": 28, "left": 68 },
+        "terminal": true,
+        "monoFont": settings.mono_font,
+        "monoFonts": fonts,
+        "terminalFontSize": settings.terminal_font_size,
+        "uiFontSize": settings.ui_font_size,
+        "theme": settings.theme.as_str(),
+        "motion": settings.effective_motion().as_str(),
+        "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile", "commandLine", "pickFile", "saveFile", "update", "mossVoice"],
+    })
+}
+
 #[derive(Clone, Copy)]
 enum CliOp {
     State,
@@ -685,4 +655,28 @@ enum DocLoad {
     None,
     InFlight,
     Loaded(Value),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::theme::{SETTINGS_KEY, Settings};
+
+    #[test]
+    fn host_info_reports_persisted_theme_choice() {
+        let store = vibevalley_workspace::Store::open_in_memory().expect("open in-memory workspace store");
+        for (choice, expected) in [(ThemeChoice::Light, "light"), (ThemeChoice::Dark, "dark"), (ThemeChoice::System, "system")] {
+            let settings = Settings {
+                theme: choice,
+                ..Settings::default()
+            };
+            vibevalley_workspace::persist::save_setting(&store, SETTINGS_KEY, &settings).expect("persist settings");
+            let reloaded: Settings = vibevalley_workspace::persist::load_setting(&store, SETTINGS_KEY);
+            let info = host_info_payload(&reloaded, &["Menlo".into()]);
+            assert_eq!(info["theme"], expected);
+            let caps = info["capabilities"].as_array().expect("capabilities array");
+            assert!(caps.iter().any(|c| c == "theme"));
+            assert!(!caps.iter().any(|c| c == "seekAudio" || c == "pcm"));
+        }
+    }
 }

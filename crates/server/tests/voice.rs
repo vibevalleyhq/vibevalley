@@ -441,12 +441,18 @@ fn the_orchestrator_answers_a_call_on_its_own_line() {
     assert_eq!(f.voice.lines(), 1);
 
     // Agora's model call, as the tunnel brings it: the user's words in, the orchestrator's out.
-    let agent: ureq::Agent = ureq::Agent::config_builder().http_status_as_error(false).build().into();
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let client = reqwest::blocking::Client::builder().no_proxy().build().unwrap();
     let ask = json!({ "model": "vibevalley-orchestrator", "stream": true,
         "messages": [{ "role": "system", "content": "persona" }, { "role": "user", "content": "看板上有几张工单？" }] });
-    let mut answered = agent.post(url).header("authorization", &format!("Bearer {key}")).send(ask.to_string()).unwrap();
+    let answered = client
+        .post(url)
+        .header("authorization", format!("Bearer {key}"))
+        .body(ask.to_string())
+        .send()
+        .unwrap();
     assert_eq!(answered.status().as_u16(), 200);
-    let body = answered.body_mut().read_to_string().unwrap();
+    let body = answered.text().unwrap();
     assert!(body.contains("看板上有三张工单。") && body.ends_with("data: [DONE]\n\n"), "{body}");
 
     // Both sides are in the chat as spoken words, and the orchestrator was told it is on the phone.
@@ -460,7 +466,12 @@ fn the_orchestrator_answers_a_call_on_its_own_line() {
 
     f.ok("voice.call.stop", json!({ "agentId": call["agentId"] }));
     assert_eq!(f.voice.lines(), 0);
-    let closed = agent.post(url).header("authorization", &format!("Bearer {key}")).send(ask.to_string()).unwrap();
+    let closed = client
+        .post(url)
+        .header("authorization", format!("Bearer {key}"))
+        .body(ask.to_string())
+        .send()
+        .unwrap();
     assert_eq!(closed.status().as_u16(), 401);
 }
 

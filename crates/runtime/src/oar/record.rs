@@ -21,6 +21,7 @@ pub struct RecordHeader {
 }
 
 pub struct RecordFile {
+    path: PathBuf,
     file: File,
     last: Option<u64>,
     has_header: bool,
@@ -44,10 +45,16 @@ pub fn open_file(path: Option<&Path>) -> Result<Option<RecordFile>> {
         }
         file.seek(SeekFrom::End(0)).map_err(|e| AgentError::Io(e.to_string()))?;
     }
-    Ok(Some(RecordFile { file, last, has_header }))
+    Ok(Some(RecordFile {
+        path: path.to_path_buf(),
+        file,
+        last,
+        has_header,
+    }))
 }
 
 pub struct Recorder {
+    path: PathBuf,
     file: Option<RecordFile>,
     writer: Option<Writer<File>>,
     header: Header,
@@ -56,6 +63,7 @@ pub struct Recorder {
 impl Recorder {
     pub fn start(file: Option<RecordFile>, runtime: &str, session_id: &str, cwd: &Path, model: Option<&str>) -> Option<Self> {
         let file = file?;
+        let path = file.path.clone();
         let base = file.last.map_or(0, |s| s + 1);
         let mut header = Header::new(runtime, session_id, now_ms());
         header.metadata.insert("cwd".into(), cwd.to_string_lossy().into_owned());
@@ -66,11 +74,18 @@ impl Recorder {
             .metadata
             .insert("recorder".into(), concat!("vibevalley-oar/", env!("CARGO_PKG_VERSION")).into());
         Some(Self {
+            path,
             file: Some(file),
             writer: None,
             header,
             base,
         })
+    }
+    pub(crate) fn path(&self) -> &Path {
+        &self.path
+    }
+    pub(crate) fn base(&self) -> u64 {
+        self.base
     }
     pub fn write(&mut self, rec: &Record) -> Result<()> {
         if let Some(file) = self.file.take() {
@@ -85,6 +100,27 @@ impl Recorder {
         persisted.trace_id = crate::oar::voyage::normalize_trace_id(persisted.trace_id);
         self.writer.as_mut().expect("opened recorder").write(&persisted)
     }
+}
+
+pub(crate) fn read_session_records(path: &Path, base: u64, count: u64) -> Vec<Record> {
+    if count == 0 {
+        return Vec::new();
+    }
+    let Ok(file) = File::open(path) else {
+        return Vec::new();
+    };
+    let Ok(mut reader) = Reader::new(BufReader::new(file)) else {
+        return Vec::new();
+    };
+    let end = base.saturating_add(count);
+    let mut out = Vec::new();
+    while let Ok(Some(mut rec)) = reader.read() {
+        if rec.seq >= base && rec.seq < end {
+            rec.seq -= base;
+            out.push(rec);
+        }
+    }
+    out
 }
 
 pub fn read_record_with_header(path: &Path) -> Result<(Option<RecordHeader>, Vec<Event>)> {

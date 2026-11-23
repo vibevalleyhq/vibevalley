@@ -10,11 +10,11 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 use tempfile::tempdir;
-use vibevalley_runtime::agent::core::engine::{BrainProvider, KIND as GENERATION_KIND};
+use vibevalley_runtime::agent::core::engine::{BrainProvider, KIND as GENERATION_KIND, Request};
 use vibevalley_runtime::agent::core::tool::{Tool, ToolOutput};
-use vibevalley_runtime::agent::durable::conformance::{run_clocked_live_conformance, run_reopen_conformance, run_storage_conformance};
+use vibevalley_runtime::agent::durable::conformance::{run_reopen_conformance, run_storage_conformance};
 use vibevalley_runtime::agent::durable::{
-    CommitStats, Document, DocumentEvent, JsonlOptions, MemoryStorage, Result as DurableResult, SqliteStorage, StorageBackend, StorageRead, Store, TaskStatus,
+    CommitStats, DocumentEvent, JsonlOptions, MemoryStorage, Result as DurableResult, SqliteStorage, StorageBackend, StorageRead, Store, TaskStatus,
     WriteCallback,
 };
 use vibevalley_runtime::agent::experiments::ExperimentFlags;
@@ -32,7 +32,6 @@ const WAIT: Duration = Duration::from_secs(10);
 #[test]
 fn sqlite_storage_passes_conformance() -> DurableResult<()> {
     run_storage_conformance(|| Ok(Store::from_backend(Arc::new(SqliteStorage::memory()?))))?;
-    run_clocked_live_conformance(|clock| Ok(Store::from_backend(Arc::new(SqliteStorage::open_with_clock(None, move || clock())?))))?;
     let dir = tempdir().unwrap();
     let db = dir.path().join("server.db");
     run_reopen_conformance(|| Store::open(&db))?;
@@ -42,7 +41,6 @@ fn sqlite_storage_passes_conformance() -> DurableResult<()> {
 #[test]
 fn memory_storage_passes_conformance() -> DurableResult<()> {
     run_storage_conformance(|| Ok(Store::from_backend(Arc::new(MemoryStorage::new()))))?;
-    run_clocked_live_conformance(|clock| Ok(Store::from_backend(Arc::new(MemoryStorage::with_clock(move || clock())))))?;
     Ok(())
 }
 
@@ -58,19 +56,6 @@ fn jsonl_storage_passes_conformance() -> DurableResult<()> {
                 fsync: false,
                 read_only: false,
             },
-        )
-    })?;
-
-    let live_root = tempdir().unwrap();
-    let live_dir = live_root.path().join("live");
-    run_clocked_live_conformance(|clock| {
-        Store::jsonl_with_clock(
-            &live_dir,
-            JsonlOptions {
-                fsync: false,
-                read_only: false,
-            },
-            move || clock(),
         )
     })?;
 
@@ -173,7 +158,6 @@ fn jsonl_read_only_tracks_committed_snapshots_without_mutating_files_and_lock_pr
     assert!(reader.is_read_only());
     assert_eq!(reader.read(|r| r.entries("c1", 1))?.len(), 1);
     assert!(reader.write(|tx| tx.put_document("global", "g", "pi.x", &json!(1))).is_err());
-    assert!(reader.put_deferred("conversation", "c1", "pi.live", json!("no")).is_err());
 
     // Writer commits another transaction; read-only viewer picks it up on next read.
     writer.write(|tx| {
@@ -326,7 +310,15 @@ fn full_agent_harness_runs_end_to_end_on_memory_and_jsonl_with_crash_recovery() 
     );
     assert_eq!(mem_harness.store().backend_kind(), "memory");
     mem_harness.recover()?;
-    let (_, task, _) = mem_harness.conversation("mem-conv").prompt("deepseek-flash", "r1", "run script", "sys")?;
+    let (_, task, _) = mem_harness.submit(Request {
+        conversation: "mem-conv",
+        provider: "deepseek-flash",
+        request_id: "r1",
+        prompt: "run script",
+        source: "user",
+        system: "sys",
+        ..Default::default()
+    })?;
     let done = mem_harness.scheduler().wait(&task.id, WAIT)?;
     assert_eq!(done.result["output"], "mem done");
     mem_harness.close();
@@ -452,18 +444,6 @@ impl StorageBackend for CustomMemoryWrapper {
     }
     fn subscribe_tasks(&self) -> DurableResult<flume::Receiver<()>> {
         self.0.subscribe_tasks()
-    }
-    fn put_deferred(&self, scope: &str, id: &str, kind: &str, state: Value) -> DurableResult<()> {
-        self.0.put_deferred(scope, id, kind, state)
-    }
-    fn flush_due(&self) -> DurableResult<()> {
-        self.0.flush_due()
-    }
-    fn flush_deferred(&self) -> DurableResult<()> {
-        self.0.flush_deferred()
-    }
-    fn live_document(&self, scope: &str, id: &str) -> DurableResult<Option<Document>> {
-        self.0.live_document(scope, id)
     }
     fn close(&self) -> DurableResult<()> {
         self.0.close()

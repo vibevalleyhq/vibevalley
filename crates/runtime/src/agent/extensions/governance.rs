@@ -189,6 +189,9 @@ pub fn evaluate(permissions: &Permissions, classifier: &dyn Classifier, entries:
 }
 
 pub fn record_evaluation(tx: &mut Tx<'_>, conv: &str, task: &str, call_id: &str, args: &Value, eval: &Evaluation) -> Result<()> {
+    if eval.client_overridable && eval.verdict != Verdict::Ask {
+        return Ok(());
+    }
     let eval_doc = PermissionEvaluation {
         tool_name: eval.tool_name.clone(),
         policy: eval.policy.as_str().to_string(),
@@ -199,7 +202,6 @@ pub fn record_evaluation(tx: &mut Tx<'_>, conv: &str, task: &str, call_id: &str,
     let now_ms = tx.now_ms;
     let mut pending_alert = None;
     update_doc::<GovernanceDoc>(tx, SCOPE, conv, |gov| {
-        gov.evaluated_permissions.push(eval_doc.clone());
         if !eval.client_overridable {
             gov.hard_denied_calls.insert(call_id.to_owned(), true);
         }
@@ -375,8 +377,10 @@ impl Extension for GovernanceExtension {
     fn on_before_tool(&self, ctx: &ToolCallHookCtx<'_>) -> durable::Result<HookOutcome> {
         let perms = self.effective_permissions(ctx.store, ctx.conversation_id)?;
         let eval = evaluate(&perms, &*self.classifier, ctx.entries, ctx.tool_name, ctx.args, ctx.is_mcp);
-        ctx.store
-            .write(|tx| record_evaluation(tx, ctx.conversation_id, ctx.task_id, ctx.tool_call_id, ctx.args, &eval))?;
+        if !eval.client_overridable || eval.verdict == Verdict::Ask {
+            ctx.store
+                .write(|tx| record_evaluation(tx, ctx.conversation_id, ctx.task_id, ctx.tool_call_id, ctx.args, &eval))?;
+        }
 
         match eval.verdict {
             Verdict::Allow => Ok(HookOutcome::Continue),

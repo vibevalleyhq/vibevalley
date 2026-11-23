@@ -160,10 +160,6 @@ impl Store {
         self.backend.stats()
     }
 
-    pub fn flush_deferred(&self) -> Result<()> {
-        self.backend.flush_deferred()
-    }
-
     pub fn subscribe_documents(&self) -> Result<flume::Receiver<DocumentEvent>> {
         self.backend.subscribe_documents()
     }
@@ -171,18 +167,6 @@ impl Store {
     /// A coalesced hint after committed task or signal writes; subscribe before reading state.
     pub fn subscribe_tasks(&self) -> Result<flume::Receiver<()>> {
         self.backend.subscribe_tasks()
-    }
-
-    pub fn put_deferred(&self, scope: &str, id: &str, kind: &str, state: Value) -> Result<()> {
-        self.backend.put_deferred(scope, id, kind, state)
-    }
-
-    pub fn flush_due(&self) -> Result<()> {
-        self.backend.flush_due()
-    }
-
-    pub fn live_document(&self, scope: &str, id: &str) -> Result<Option<Document>> {
-        self.backend.live_document(scope, id)
     }
 
     pub fn close(&self) -> Result<()> {

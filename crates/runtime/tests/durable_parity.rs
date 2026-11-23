@@ -160,32 +160,6 @@ fn repeated_requests_and_settlements_survive_reopen_without_reposting() -> Resul
 }
 
 #[test]
-fn live_stream_has_separate_memory_and_durable_deadlines() -> Result<()> {
-    let clock = Arc::new(AtomicI64::new(1000));
-    let now = clock.clone();
-    let s = Store::open_with_clock(None, move || now.load(Ordering::Relaxed))?;
-    let rx = s.subscribe_documents()?;
-    assert!(s.put_deferred("conversation", "c", "pi.usage", Value::Null).is_err());
-    s.write(|tx| tx.put_document("conversation", "c", "pi.live", &json!("seed")))?;
-    rx.recv().unwrap();
-    for i in 1..=10 {
-        s.put_deferred("conversation", "c", "pi.live", json!(i))?;
-        clock.fetch_add(5, Ordering::Relaxed);
-    }
-    assert!(rx.try_recv().is_err());
-    clock.store(1110, Ordering::Relaxed);
-    s.flush_due()?;
-    assert!(!rx.recv_timeout(MAX).unwrap().durable);
-    assert_eq!(s.live_document("conversation", "c")?.unwrap().state, json!(10));
-    assert_eq!(s.read(|r| r.document("conversation", "c", "pi.live"))?.unwrap().state, json!("seed"));
-    clock.store(2000, Ordering::Relaxed);
-    s.flush_due()?;
-    assert!(rx.recv_timeout(MAX).unwrap().durable);
-    assert_eq!(s.read(|r| r.document("conversation", "c", "pi.live"))?.unwrap().state, json!(10));
-    Ok(())
-}
-
-#[test]
 fn early_and_late_signals_are_ordered_and_deduplicated() -> Result<()> {
     let store = Store::memory()?;
     let scheduler = Scheduler::new(store.clone(), 1);
@@ -283,7 +257,6 @@ fn process_exit_boundary() {
     scheduler.register("work", "run", |tc| {
         tc.checkpoint(&json!({"survived":true}))?;
         tc.store.write(|tx| tx.put_document("conversation", "c", "pi.live", &json!("durable")))?;
-        tc.store.put_deferred("conversation", "c", "pi.live", json!("volatile"))?;
         std::process::exit(73)
     });
     let mut t = Task::new("work", "run");
@@ -333,7 +306,13 @@ fn circuit_breaker_settles_children_before_parent_and_emits_one_alert() -> Resul
     scheduler.recover()?;
     let t = scheduler.wait("root", MAX)?;
     assert_eq!(t.terminal_reason, "restart_limit");
-    assert_eq!(scheduler.abort_trace(), ["grandchild", "child", "root"]);
+    store.read(|r| {
+        assert_eq!(r.task("grandchild")?.status, TaskStatus::Terminal);
+        assert_eq!(r.task("grandchild")?.terminal_reason, "aborted");
+        assert_eq!(r.task("child")?.status, TaskStatus::Terminal);
+        assert_eq!(r.task("child")?.terminal_reason, "aborted");
+        Ok(())
+    })?;
     assert_eq!(scheduler.wait("model", MAX)?.result, json!("resumed"));
     assert_eq!(
         store.read(|r| r.document("global", "inbox", "pi.inbox"))?.unwrap().state["items"]

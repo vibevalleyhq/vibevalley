@@ -11,11 +11,12 @@ use vibevalley_runtime::agent::compaction::{Compactor, FileOps, Level};
 use vibevalley_runtime::agent::core::doc::{
     AgentDoc, AgentState, CONVERSATION_SCOPE, FileOpsDoc, GovernanceDoc, InboxDoc, OarSessionDoc, OarSessionState, StandInDoc, TASK_SCOPE, read_doc, write_doc,
 };
-use vibevalley_runtime::agent::core::engine::{KIND as GENERATION_KIND, PHASE_GENERATE, PHASE_TOOL_JOIN, PHASE_YIELD_CHECK, TOOL_KIND, TOOL_RUN};
+use vibevalley_runtime::agent::core::engine::{KIND as GENERATION_KIND, PHASE_GENERATE, PHASE_TOOL_JOIN, PHASE_YIELD_CHECK, Request, TOOL_KIND, TOOL_RUN};
 use vibevalley_runtime::agent::core::events::AgentEvent;
+use vibevalley_runtime::agent::core::inbox;
 use vibevalley_runtime::agent::core::pipeline::PromptSection;
 use vibevalley_runtime::agent::core::tool::{Tool, ToolContext, ToolOutput};
-use vibevalley_runtime::agent::durable::{Store, SubmissionStatus, Task, TaskStatus, WaitMode};
+use vibevalley_runtime::agent::durable::{Result as DurableResult, Store, Submission, SubmissionStatus, Task, TaskStatus, WaitMode};
 use vibevalley_runtime::agent::extensions::{
     CodeModeExtension, ExplicitReviewProvider, GovernanceExtension, GraderExtension, OAR_PHASE_OPEN, OAR_TASK_KIND, OarExtension, OarPolicy, Permissions,
     Policy, SubagentExtension, tree_spend,
@@ -29,6 +30,18 @@ use vibevalley_runtime::oar::Registry;
 use vibevalley_runtime::oar::scripted::{Script, ScriptedRuntime, Step, TurnAsk};
 
 const WAIT: Duration = Duration::from_secs(10);
+
+fn submit_prompt(harness: &Harness, conv: &str, provider: &str, request_id: &str, prompt: &str, system: &str) -> DurableResult<(Submission, Task, bool)> {
+    harness.submit(Request {
+        conversation: conv,
+        provider,
+        request_id,
+        prompt,
+        source: "user",
+        system,
+        ..Default::default()
+    })
+}
 
 #[derive(Clone)]
 enum MockReply {
@@ -194,7 +207,7 @@ fn row1_generate_crash_before_commit_retries_and_crash_after_next_phase_skips_mo
         harness
             .attach_worker(&conv, Arc::new(Brain::new(c1, "deepseek-flash", "sys")), Arc::new(|_| {}))
             .unwrap();
-        let (_, task, _) = harness.conversation(&conv).prompt("deepseek-flash", "req-1", "hi", "sys").unwrap();
+        let (_, task, _) = submit_prompt(&harness, &conv, "deepseek-flash", "req-1", "hi", "sys").unwrap();
         entered_rx.recv_timeout(WAIT).unwrap();
         harness.close();
         drop(harness);
@@ -293,7 +306,7 @@ fn row2_safe_tool_reruns_trips_restart_limit_and_uses_memo_when_saved() {
             output: String::new(),
         }));
         harness.attach_worker(&conv_a, Arc::new(b), Arc::new(|_| {})).unwrap();
-        let (_, task, _) = harness.conversation(&conv_a).prompt("deepseek-flash", "req-a", "run safe", "sys").unwrap();
+        let (_, task, _) = submit_prompt(&harness, &conv_a, "deepseek-flash", "req-a", "run safe", "sys").unwrap();
         entered_rx.recv_timeout(WAIT).unwrap();
         harness.close();
         drop(harness);
@@ -342,7 +355,7 @@ fn row2_safe_tool_reruns_trips_restart_limit_and_uses_memo_when_saved() {
             output: String::new(),
         }));
         harness.attach_worker(&conv_b, Arc::new(b), Arc::new(|_| {})).unwrap();
-        let (_, task, _) = harness.conversation(&conv_b).prompt("deepseek-flash", "req-b", "loop crash", "sys").unwrap();
+        let (_, task, _) = submit_prompt(&harness, &conv_b, "deepseek-flash", "req-b", "loop crash", "sys").unwrap();
         enter_b_rx.recv_timeout(WAIT).unwrap();
         harness.close();
         drop(harness);
@@ -514,7 +527,7 @@ fn row3_unsafe_tool_crash_blocks_replay_and_reports_git_status() {
             output: String::new(),
         }));
         harness.attach_worker(&conv, Arc::new(b), Arc::new(|_| {})).unwrap();
-        let (_, task, _) = harness.conversation(&conv).prompt("deepseek-flash", "req-3", "write file", "sys").unwrap();
+        let (_, task, _) = submit_prompt(&harness, &conv, "deepseek-flash", "req-3", "write file", "sys").unwrap();
         entered_rx.recv_timeout(WAIT).unwrap();
         harness.close();
         drop(harness);
@@ -604,10 +617,9 @@ fn row4_steer_survives_restart_with_paired_tool_results_and_follow_up_defers_pri
             output: "two".into(),
         }));
         harness.attach_worker(&conv_a, Arc::new(b), Arc::new(|_| {})).unwrap();
-        let handle = harness.conversation(&conv_a);
-        let (_, task, _) = handle.prompt("deepseek-flash", "req-s", "run two", "sys").unwrap();
+        let (_, task, _) = submit_prompt(&harness, &conv_a, "deepseek-flash", "req-s", "run two", "sys").unwrap();
         entered_rx.recv_timeout(WAIT).unwrap();
-        handle.steer("steer-1", "pivot immediately").unwrap();
+        store.write(|tx| inbox::submit_steer(tx, &conv_a, "steer-1", "pivot immediately")).unwrap();
         harness.close();
         drop(harness);
         store.close().unwrap();
@@ -677,10 +689,9 @@ fn row4_steer_survives_restart_with_paired_tool_results_and_follow_up_defers_pri
     );
     b.tools.push(Box::new(GateTool(in_tx, gate_rx)));
     harness_b.attach_worker(&conv_b, Arc::new(b), Arc::new(|_| {})).unwrap();
-    let handle_b = harness_b.conversation(&conv_b);
-    let (primary_sub, task_b, _) = handle_b.prompt("deepseek-flash", "req-fu", "first", "sys").unwrap();
+    let (primary_sub, task_b, _) = submit_prompt(&harness_b, &conv_b, "deepseek-flash", "req-fu", "first", "sys").unwrap();
     in_rx.recv_timeout(WAIT).unwrap();
-    let (fu_sub, _) = handle_b.follow_up("fu-1", "second").unwrap();
+    let (fu_sub, _) = store_b.write(|tx| inbox::submit_follow_up(tx, &conv_b, "fu-1", "second", None)).unwrap();
     assert_eq!(store_b.read(|r| r.submission(&primary_sub.id)).unwrap().status, SubmissionStatus::Placed);
     gate_tx.send(()).unwrap();
     let done_b = harness_b.scheduler().wait(&task_b.id, WAIT).unwrap();
@@ -715,7 +726,7 @@ fn row5_subagent_crash_resumes_same_child_tracks_tree_spend_and_cascades_abort()
             output: String::new(),
         }));
         harness.attach_worker(&conv, Arc::new(b), Arc::new(|_| {})).unwrap();
-        let (_, task, _) = harness.conversation(&conv).prompt("deepseek-flash", "req-5", "delegate", "sys").unwrap();
+        let (_, task, _) = submit_prompt(&harness, &conv, "deepseek-flash", "req-5", "delegate", "sys").unwrap();
         entered_rx.recv_timeout(WAIT).unwrap();
         harness.close();
         drop(harness);
@@ -790,14 +801,31 @@ fn row5_subagent_crash_resumes_same_child_tracks_tree_spend_and_cascades_abort()
         output: String::new(),
     }));
     harness_abort.attach_worker(&conv_abort, Arc::new(b_abort), Arc::new(|_| {})).unwrap();
-    let handle_abort = harness_abort.conversation(&conv_abort);
-    let (_, task_abort, _) = handle_abort.prompt("deepseek-flash", "req-ab", "abort me", "sys").unwrap();
+    let (_, task_abort, _) = submit_prompt(&harness_abort, &conv_abort, "deepseek-flash", "req-ab", "abort me", "sys").unwrap();
     enter_ab_rx.recv_timeout(WAIT).unwrap();
-    handle_abort.abort().unwrap();
+    harness_abort.abort_conversation(&conv_abort).unwrap();
     let done_abort = harness_abort.scheduler().wait(&task_abort.id, WAIT).unwrap();
     assert_eq!(done_abort.terminal_reason, "aborted");
-    let trace = harness_abort.scheduler().abort_trace();
-    assert!(trace.len() >= 3, "expected cascade abort of child generation -> tool -> parent: {trace:?}");
+    let aborted_count = store_abort
+        .read(|tx| {
+            let mut stack = vec![task_abort.id.clone()];
+            let mut count = 0usize;
+            while let Some(id) = stack.pop() {
+                let t = tx.task(&id)?;
+                assert_eq!(t.status, TaskStatus::Terminal, "task {id} should be terminal");
+                assert_eq!(t.terminal_reason, "aborted", "task {id} should be aborted");
+                count += 1;
+                for child in tx.children(&id)? {
+                    stack.push(child.id);
+                }
+            }
+            Ok(count)
+        })
+        .unwrap();
+    assert!(
+        aborted_count >= 3,
+        "expected cascade abort of parent -> tool -> child generation, got {aborted_count}"
+    );
     harness_abort.close();
 }
 
@@ -960,7 +988,7 @@ fn row6_oar_run_crash_before_turn_resumes_and_crash_after_turn_started_returns_i
         harness
             .attach_worker(&conv_b, Arc::new(Brain::new(model, "deepseek-flash", "sys")), Arc::new(|_| {}))
             .unwrap();
-        let (_, task, _) = harness.conversation(&conv_b).prompt("deepseek-flash", "req-6b", "delegate", "sys").unwrap();
+        let (_, task, _) = submit_prompt(&harness, &conv_b, "deepseek-flash", "req-6b", "delegate", "sys").unwrap();
         enter_b_rx.recv_timeout(WAIT).unwrap();
         harness.close();
         drop(harness);
@@ -1039,7 +1067,7 @@ fn row7_codemode_crash_after_call1_replays_without_reexecuting_call1() {
             output: String::new(),
         }));
         harness.attach_worker(&conv, Arc::new(b), Arc::new(|_| {})).unwrap();
-        let (_, task, _) = harness.conversation(&conv).prompt("deepseek-flash", "req-7", "run js", "sys").unwrap();
+        let (_, task, _) = submit_prompt(&harness, &conv, "deepseek-flash", "req-7", "run js", "sys").unwrap();
         enter_rx.recv_timeout(WAIT).unwrap();
         harness.close();
         drop(harness);
@@ -1121,14 +1149,11 @@ fn row8_llm_compaction_tracks_file_ops_and_rejects_stale_base_head() {
         )
         .unwrap();
 
-    let (_, t1, _) = harness
-        .conversation(&conv)
-        .prompt("deepseek-flash", "r8-1", "read alpha write beta", "sys")
-        .unwrap();
+    let (_, t1, _) = submit_prompt(&harness, &conv, "deepseek-flash", "r8-1", "read alpha write beta", "sys").unwrap();
     harness.scheduler().wait(&t1.id, WAIT).unwrap();
 
     // Second turn triggers hard compaction via LlmSummarizer.
-    let (_, t2, _) = harness.conversation(&conv).prompt("deepseek-flash", "r8-2", "follow up", "sys").unwrap();
+    let (_, t2, _) = submit_prompt(&harness, &conv, "deepseek-flash", "r8-2", "follow up", "sys").unwrap();
     let d2 = harness.scheduler().wait(&t2.id, WAIT).unwrap();
     assert_eq!(d2.terminal_reason, "completed");
     assert!(compacted_events.load(Ordering::SeqCst));
@@ -1274,7 +1299,7 @@ fn row9_grader_reuses_persisted_verdict_and_standin_recovers_missing_extension()
                 Arc::new(|_| {}),
             )
             .unwrap();
-        let (_, t1, _) = harness.conversation(&conv_b).prompt("deepseek-flash", "r9-1", "hi", "base").unwrap();
+        let (_, t1, _) = submit_prompt(&harness, &conv_b, "deepseek-flash", "r9-1", "hi", "base").unwrap();
         harness.scheduler().wait(&t1.id, WAIT).unwrap();
         let doc = store.read(|r| read_doc::<StandInDoc>(r, CONVERSATION_SCOPE, &conv_b)).unwrap();
         assert_eq!(doc.sections.len(), 1);
@@ -1297,7 +1322,7 @@ fn row9_grader_reuses_persisted_verdict_and_standin_recovers_missing_extension()
         harness2
             .attach_worker(&conv_b, Arc::new(Brain::new(model2.clone(), "deepseek-flash", "base")), Arc::new(|_| {}))
             .unwrap();
-        let (_, t2, _) = harness2.conversation(&conv_b).prompt("deepseek-flash", "r9-2", "again", "base").unwrap();
+        let (_, t2, _) = submit_prompt(&harness2, &conv_b, "deepseek-flash", "r9-2", "again", "base").unwrap();
         let d2 = harness2.scheduler().wait(&t2.id, WAIT).unwrap();
         assert_eq!(d2.terminal_reason, "completed");
         assert_eq!(d2.result["output"], "stub handled");

@@ -1462,7 +1462,7 @@ mod tests {
         );
         assert_eq!(ext.active_sessions().len(), 1);
 
-        // Abort directly via scheduler without ConversationHandle::abort:
+        // Abort directly via scheduler without Harness::abort_conversation:
         // pruning still cleans up the active session immediately.
         harness.scheduler().abort(&task.id)?;
         assert!(ext.active_sessions().is_empty());

@@ -5,6 +5,7 @@ import { type Artifact, type LibraryItem, type PkmPageSummary, userId } from "@v
 import { artifactId } from "@vibevalley/protocol/schema";
 
 import type { ContentBucket } from "../content";
+import { countContentHub, countForBucket } from "../content/navigation";
 import { artifactMatchesType, shownArtifacts, shownMedia, shownNotes } from "./items";
 import {
   activeFileId,
@@ -269,4 +270,56 @@ test("reconcileSelection prunes vanished files, anchors, and out-of-range lightb
     prior: { ids: ["f2"], anchor: "f2" },
   });
   expect(reconcileSelection(lb, { fileIds: ["f2"], imageCount: 0 })).toEqual({ kind: "none" });
+});
+
+test("regression: countContentHub sidebar badges match LibraryPage visible counts across every bucket including pinned notes", () => {
+  const notes = [makeNote({ slug: "daily", title: "Daily", updated: 200 }), makeNote({ slug: "spec", title: "Spec", updated: 100 })];
+  const artifacts = [
+    makeArtifact({ id: "a-out", title: "Outline", body: "blocks", artifactType: "outline" }),
+    makeArtifact({ id: "a-wb", title: "Board", body: "store", artifactType: "whiteboard" }),
+    makeArtifact({ id: "a-doc", title: "Legacy Doc", body: "blocks" }),
+    makeArtifact({ id: "a-slides", title: "Legacy Slides", body: "html", display: "slides" }),
+    makeArtifact({ id: "a-html", title: "Raw Html", body: "html", display: "page" }),
+  ];
+  const media = [
+    makeMedia({ id: "m-img", name: "photo.png", type: "image/png", origin: { kind: "uploaded" } }),
+    makeMedia({ id: "m-aud", name: "voice.mp3", type: "audio/mpeg", origin: { kind: "generated", job: "j1", jobKind: "speech" } }),
+    makeMedia({ id: "m-vid", name: "clip.mp4", type: "video/mp4", origin: { kind: "uploaded" } }),
+    makeMedia({ id: "m-bin", name: "data.bin", type: "application/octet-stream", origin: { kind: "uploaded" } }),
+  ];
+  const pinned = new Set(["note:daily", "artifact:a-wb", "media:m-img", "artifact:gone"]);
+
+  const counts = countContentHub({ notes, artifacts, media, pinned });
+  const buckets: readonly ContentBucket[] = [
+    { kind: "recent" },
+    { kind: "pinned" },
+    { kind: "artifacts" },
+    { kind: "artifacts", artifactType: "outline" },
+    { kind: "artifacts", artifactType: "whiteboard" },
+    { kind: "artifacts", artifactType: "docs" },
+    { kind: "artifacts", artifactType: "slides" },
+    { kind: "artifacts", artifactType: "dashboard" },
+    { kind: "artifacts", artifactType: "design" },
+    { kind: "artifacts", artifactType: "design-system" },
+    { kind: "artifacts", artifactType: "motion" },
+    { kind: "artifacts", artifactType: "html" },
+    { kind: "media" },
+    { kind: "media", fileKind: "image" },
+    { kind: "media", fileKind: "audio" },
+    { kind: "media", fileKind: "video" },
+    { kind: "media", fileKind: "other" },
+  ];
+
+  for (const bucket of buckets) {
+    const pinnedOnly = isPinnedBucket(bucket);
+    const pageTotal =
+      (showsNotesInBucket(bucket) ? shownNotes(notes, { source: "all", sort: "recent", pinnedOnly, pinned }).length : 0) +
+      (showsArtifactsInBucket(bucket)
+        ? shownArtifacts(artifacts, { source: "all", artifactType: bucketArtifactType(bucket), sort: "recent", pinnedOnly, pinned }).length
+        : 0) +
+      (showsMediaInBucket(bucket) ? shownMedia(media, { source: "all", fileKind: bucketFileKind(bucket), pinnedOnly, pinned }).length : 0);
+    expect(countForBucket(counts, bucket)).toBe(pageTotal);
+  }
+  expect(counts.total).toBe(notes.length + artifacts.length + media.length);
+  expect(counts.pinned).toBe(3);
 });

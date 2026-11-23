@@ -1,4 +1,6 @@
-import { colorScheme, host } from "nsh";
+import { colorScheme, host, Storage } from "nsh";
+
+import { createPersistentStorage, setActiveStorageHydrated, type StorageBackend } from "./state/storage";
 
 // What nsh's JS engine (still in 0.6.0) lacks and the reused VibeValley code calls.
 // Import it first in every entry that loads VibeValley modules.
@@ -82,27 +84,53 @@ if (typeof Reflect.get(globalThis, "structuredClone") !== "function") {
   Reflect.set(globalThis, "structuredClone", (v: unknown): unknown => (v === undefined ? v : JSON.parse(JSON.stringify(v))));
 }
 
-// A page's globals the reused code reads: a memory localStorage (prefs live
-// for the session until the app agent backs them with nsh Storage), a
-// window whose only real part is matchMedia's dark-mode query, a document
-// with an empty root element.
-if (Reflect.get(globalThis, "localStorage") === undefined) {
-  const items = new Map<string, string>();
-  Reflect.set(globalThis, "localStorage", {
-    getItem: (k: string) => items.get(k) ?? null,
-    setItem: (k: string, v: string) => void items.set(k, v),
-    removeItem: (k: string) => void items.delete(k),
-  });
+// A page's globals the reused code reads: a `localStorage` cache hydrated from
+// nsh's persistent `Storage` (with write-through and in-memory fallback when
+// `Storage` is unavailable), a `window` with storage events and dark-mode
+// matchMedia, and a document with an empty root element.
+const storageListeners = new Set<(e: Event) => void>();
+
+function nativeStorageBackend(): StorageBackend | undefined {
+  if (
+    typeof Storage === "object" &&
+    Storage !== null &&
+    typeof Storage.getItem === "function" &&
+    typeof Storage.setItem === "function" &&
+    typeof Storage.removeItem === "function" &&
+    typeof Storage.keys === "function"
+  ) {
+    return Storage;
+  }
+  return undefined;
 }
+
 if (Reflect.get(globalThis, "window") === undefined) {
   Reflect.set(globalThis, "window", {
-    addEventListener: () => {},
-    removeEventListener: () => {},
+    addEventListener: (type: string, listener: (e: Event) => void) => {
+      if (type === "storage") storageListeners.add(listener);
+    },
+    removeEventListener: (type: string, listener: (e: Event) => void) => {
+      if (type === "storage") storageListeners.delete(listener);
+    },
     matchMedia: (query: string) => ({
       matches: query.includes("dark") && colorScheme() === "dark",
       addEventListener: () => {},
       removeEventListener: () => {},
     }),
+  });
+}
+if (Reflect.get(globalThis, "localStorage") === undefined) {
+  const persistent = createPersistentStorage(nativeStorageBackend());
+  setActiveStorageHydrated(persistent.hydrated);
+  persistent.onHydrate((key, newValue) => {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- polyfilled storage event carries key/newValue
+    const event = { type: "storage", key, newValue } as unknown as Event;
+    for (const listener of [...storageListeners]) listener(event);
+  });
+  Reflect.set(globalThis, "localStorage", {
+    getItem: persistent.getItem,
+    setItem: persistent.setItem,
+    removeItem: persistent.removeItem,
   });
 }
 const initialLocale = (host as { params?: { locale?: unknown } }).params?.locale === "en" ? "en" : "zh";

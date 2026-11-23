@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use tempfile::TempDir;
 
 use super::doc::{
-    AgentDoc, BudgetConfig, BudgetSnapshot, CONVERSATION_SCOPE, DocSpec, FileOpsDoc, GovernanceDoc, InboxDoc, LiveDoc, OarSessionDoc, PendingApproval,
+    AgentDoc, BudgetConfig, BudgetSnapshot, CONVERSATION_SCOPE, DocSpec, FileOpsDoc, GovernanceDoc, InboxDoc, OarSessionDoc, PendingApproval,
     PermissionEvaluation, StandInDoc, TodoDoc, TodoItem, TodoState, UsageDoc, UsageTotals, read_doc, update_doc, write_doc,
 };
 use super::engine::{BrainProvider, Engine, Request, TOOL_KIND, TOOL_RUN};
@@ -174,15 +174,6 @@ fn doc_specs_roundtrip_and_inbox_compat() -> crate::agent::durable::Result<()> {
                 items: vec![json!({"kind": "alert", "title": "hi"})],
             },
         )?;
-        write_doc::<LiveDoc>(
-            tx,
-            CONVERSATION_SCOPE,
-            "c1",
-            &super::doc::LiveState {
-                text: "partial".into(),
-                reasoning: "thinking".into(),
-            },
-        )?;
         update_doc::<FileOpsDoc>(tx, CONVERSATION_SCOPE, "c1", |ops| {
             ops.read.insert("src/lib.rs".into());
             Ok(())
@@ -267,7 +258,6 @@ fn doc_specs_roundtrip_and_inbox_compat() -> crate::agent::durable::Result<()> {
     store.read(|tx| {
         assert_eq!(read_doc::<AgentDoc>(tx, CONVERSATION_SCOPE, "c1")?.role, "worker");
         assert_eq!(read_doc::<InboxDoc>(tx, CONVERSATION_SCOPE, "c1")?.items.len(), 1);
-        assert_eq!(read_doc::<LiveDoc>(tx, CONVERSATION_SCOPE, "c1")?.reasoning, "thinking");
         assert!(read_doc::<FileOpsDoc>(tx, CONVERSATION_SCOPE, "c1")?.read.contains("src/lib.rs"));
         assert_eq!(read_doc::<UsageDoc>(tx, CONVERSATION_SCOPE, "c1")?.cost_micros, Some(500));
         assert_eq!(read_doc::<UsageDoc>(tx, "task", "t1")?.input_tokens, 5);
@@ -738,5 +728,74 @@ fn engine_run_codemode_tool_shares_before_tool_hooks() -> crate::agent::durable:
     assert_eq!(done.terminal_reason, "completed", "{}", done.error_text);
     assert_eq!(exec_calls.load(Ordering::SeqCst), 0);
     assert!(done.result["value"].as_str().unwrap_or_default().contains("blocked by policy"));
+    Ok(())
+}
+
+#[test]
+fn unset_budget_and_allowed_governance_do_not_open_write_transactions() -> crate::agent::durable::Result<()> {
+    use crate::agent::extensions::budget::{BudgetExtension, check_budget_if_configured};
+    use crate::agent::extensions::governance::GovernanceExtension;
+
+    let store = Store::memory()?;
+    store.write(|tx| {
+        tx.create_conversation("c-clean", "mock")?;
+        Ok(())
+    })?;
+    let stats_before = store.stats();
+    let snap = check_budget_if_configured(&store, "c-clean", "t-1")?;
+    assert!(!snap.reached);
+    assert_eq!(store.stats().requests, stats_before.requests, "unset budget must not open a write tx");
+    assert_eq!(store.stats().committed_ops, stats_before.committed_ops);
+
+    let scheduler = Scheduler::new(store.clone(), 2);
+    let client = Arc::new(ScriptedClient::new());
+    client.push_ok(Completion {
+        message: Message {
+            role: Role::Assistant,
+            content: None,
+            reasoning: None,
+            tool_calls: vec![ToolCall {
+                id: "tc-1".into(),
+                name: "read".into(),
+                arguments: json!({ "path": "Cargo.toml" }).to_string(),
+            }],
+            tool_call_id: None,
+        },
+        finish: FinishReason::ToolCalls,
+        usage: Usage::default(),
+    });
+    client.push_ok(Completion {
+        message: Message::assistant("done"),
+        finish: FinishReason::Stop,
+        usage: Usage::default(),
+    });
+    let mut brain = Brain::new(client, "deepseek-chat", "sys");
+    brain.tools.push(Box::new(UnsafeCounterTool {
+        name: "read".into(),
+        calls: Arc::new(AtomicUsize::new(0)),
+        started_tx: None,
+        release_rx: None,
+    }));
+    let engine = Engine::new(store.clone(), Arc::new(FixedBrainProvider::new(Arc::new(brain))))
+        .with_extensions(ExtensionRunner::new(vec![Arc::new(BudgetExtension), Arc::new(GovernanceExtension::default())]));
+    engine.register(&scheduler);
+    scheduler.recover()?;
+
+    let (_, task, _) = engine.submit(Request {
+        conversation: "c-clean",
+        provider: "mock",
+        request_id: "r-clean",
+        prompt: "read file",
+        source: "user",
+        system: "sys",
+        ..Default::default()
+    })?;
+    let done = scheduler.wait(&task.id, Duration::from_secs(3))?;
+    assert_eq!(done.terminal_reason, "completed");
+    assert!(
+        store.read(|tx| tx.document(CONVERSATION_SCOPE, "c-clean", GovernanceDoc::KIND))?.is_none(),
+        "unset budget and allowed tool calls must not create pi.governance"
+    );
+    scheduler.close();
     Ok(())
 }

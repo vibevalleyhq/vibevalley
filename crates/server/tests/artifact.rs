@@ -963,15 +963,18 @@ fn store_view_csp_headers_default_design_system_tokens_and_http_route() {
     assert!(csp.contains("http://127.0.0.1:8787/api/v1/attachment/"));
 
     // HTTP route `GET /api/v1/artifact/:id/view` serves the rendered HTML with CSP headers.
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let http = vibevalley_server::transport::http::serve(hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
-    let res = ureq::get(&format!("{}/api/v1/artifact/{slides_id}/view?theme=light", http.url()))
-        .call()
+    let client = reqwest::blocking::Client::builder().no_proxy().build().unwrap();
+    let res = client
+        .get(format!("{}/api/v1/artifact/{slides_id}/view?theme=light", http.url()))
+        .send()
         .unwrap();
-    assert_eq!(res.status(), 200);
+    assert_eq!(res.status().as_u16(), 200);
     let http_csp = res.headers().get("content-security-policy").unwrap().to_str().unwrap().to_string();
     assert!(http_csp.starts_with("sandbox "));
     assert!(http_csp.contains(&format!("{}/api/v1/attachment/", http.url())));
-    let body = res.into_body().read_to_string().unwrap();
+    let body = res.text().unwrap();
     assert!(body.contains("#123456"));
     drop(http);
     started.close();

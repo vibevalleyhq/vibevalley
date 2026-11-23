@@ -322,7 +322,7 @@ fn strip_agent_prefix(text: &str) -> &str {
 fn is_bare_agent_name(text: &str) -> bool {
     matches!(
         text.trim().to_ascii_lowercase().as_str(),
-        "antigravity" | "antigravity cli" | "agy" | "claude" | "claude code" | "codex" | "opencode" | "cursor" | "kimi" | "pi" | "dsh" | "grok"
+        "antigravity" | "antigravity cli" | "agy" | "claude" | "claude code" | "codex" | "opencode" | "cursor" | "kimi" | "pi" | "grok"
     )
 }
 
@@ -443,7 +443,6 @@ pub fn tab_title(shell: &Shell, tab: &Tab, cx: &App) -> String {
             "map" => "地图".into(),
             "tree" => "记忆树".into(),
             "opening" => "开场".into(),
-            "catalog" => "图鉴".into(),
             other => other.to_string(),
         },
     }
@@ -968,6 +967,7 @@ mod name_tests {
         assert_eq!(resolve_terminal_name(None, None, Some("claude"), &claude, "zsh"), "Claude Code");
         let codex = agent_status("codex", RunningState::Working);
         assert_eq!(resolve_terminal_name(None, Some("codex"), Some("codex"), &codex, "zsh"), "Codex");
+        assert!(!super::is_bare_agent_name("dsh"));
     }
 
     #[test]

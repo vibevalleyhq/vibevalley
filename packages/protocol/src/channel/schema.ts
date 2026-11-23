@@ -6,7 +6,7 @@ import type { Codec } from "../codec";
 import { Actor, MessageId, Outcome, SessionId, Spent } from "../common/schema";
 import * as T from "./shapes.gen";
 
-export const MessageKind = z.enum(T.MessageKindValues) satisfies Codec<T.MessageKind>;
+const MessageKind = z.enum(T.MessageKindValues) satisfies Codec<T.MessageKind>;
 
 export const Notify = z.enum(T.NotifyValues) satisfies Codec<T.Notify>;
 
@@ -51,9 +51,9 @@ export const ChatMessage = z.object({
   viewContext: z.exactOptional(ArtifactViewContext),
 }) satisfies Codec<T.ChatMessage>;
 
-export const ChannelType = z.enum(T.ChannelTypeValues) satisfies Codec<T.ChannelType>;
+const ChannelType = z.enum(T.ChannelTypeValues) satisfies Codec<T.ChannelType>;
 
-export const SubjectKind = z.enum(T.SubjectKindValues) satisfies Codec<T.SubjectKind>;
+const SubjectKind = z.enum(T.SubjectKindValues) satisfies Codec<T.SubjectKind>;
 
 export const Channel = z.object({
   id: z.string(),
@@ -159,29 +159,3 @@ export const ChannelUnread = z.object({
 }) satisfies Codec<T.ChannelUnread>;
 
 export const MessageHit = z.object({ message: ChatMessage, channel: z.string(), address: z.string() }) satisfies Codec<T.MessageHit>;
-
-export const FactMessageChanged = z.object({
-  type: z.literal("messageChanged"),
-  at: z.number(),
-  message: ChatMessage,
-  thread: z.exactOptional(z.string()),
-  answers: z.exactOptional(SessionId),
-}) satisfies Codec<T.FactMessageChanged>;
-
-export const FactChannelChanged = z.object({
-  type: z.literal("channelChanged"),
-  at: z.number(),
-  channel: Channel,
-}) satisfies Codec<T.FactChannelChanged>;
-
-export const FactChannelRemoved = z.object({
-  type: z.literal("channelRemoved"),
-  at: z.number(),
-  id: z.string(),
-}) satisfies Codec<T.FactChannelRemoved>;
-
-export const FactUserMentionsChanged = z.object({
-  type: z.literal("userMentionsChanged"),
-  at: z.number(),
-  mentions: z.array(UserMention),
-}) satisfies Codec<T.FactUserMentionsChanged>;

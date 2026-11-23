@@ -4,7 +4,6 @@ pub(in crate::modules::content::media) use crate::db::generated::content_media a
 pub mod inputs;
 pub mod validate;
 
-pub mod image_provider;
 pub mod png;
 
 mod audio;
@@ -35,8 +34,8 @@ impl Stop {
         Arc::ptr_eq(&self.0, &other.0)
     }
 
-    pub(super) async fn cancelled(&self) {
-        self.0.cancelled().await;
+    pub(super) fn token(&self) -> CancellationToken {
+        (*self.0).clone()
     }
 
     /// Waits for `duration`, returning `true` early if aborted.

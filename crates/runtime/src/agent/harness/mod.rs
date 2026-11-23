@@ -1,7 +1,6 @@
 //! Layer 4 runtime harness: extension registration, crash stand-in recovery,
-//! conversation handles, and worker pools.
+//! and worker pools.
 
-pub mod handle;
 pub mod registry;
 pub mod standin;
 
@@ -20,10 +19,11 @@ use crate::agent::core::engine::{ATTACHED_SIGNAL, BrainProvider, Engine, KIND, R
 use crate::agent::core::events::{AgentEvent, Brain};
 use crate::agent::core::extension::Extension;
 use crate::agent::core::pipeline::PromptSection;
-use crate::agent::durable::{Entry, Error, JsonlOptions, Result, Scheduler, Store, Submission, Task, TaskGraph, TaskStatus, TelemetrySink, Tx};
+use crate::agent::durable::{
+    Entry, Error, JsonlOptions, Result, Scheduler, Store, Submission, SubmissionStatus, Task, TaskGraph, TaskStatus, TelemetrySink, Tx,
+};
 use crate::agent::resources::prompts::assemble_system_prompt;
 
-pub use handle::ConversationHandle;
 pub use registry::ExtensionRegistry;
 pub use standin::{StandIn, StandInRecovery, StandInTool};
 
@@ -258,8 +258,39 @@ impl Harness {
         Ok(())
     }
 
-    pub fn conversation(&self, id: &str) -> ConversationHandle {
-        ConversationHandle::new(id, self.clone())
+    pub fn abort_conversation(&self, conv: &str) -> Result<Vec<String>> {
+        let (task_ids, tree_ids) = self.store.read(|r| {
+            let roots: Vec<String> = r
+                .tasks_by_conversation(conv)?
+                .into_iter()
+                .filter(|t| t.kind == KIND && t.status != TaskStatus::Terminal)
+                .map(|t| t.id)
+                .collect();
+            let mut tree = Vec::new();
+            let mut stack = roots.clone();
+            while let Some(next) = stack.pop() {
+                if !tree.contains(&next) {
+                    tree.push(next.clone());
+                    for child in r.children(&next)? {
+                        stack.push(child.id);
+                    }
+                }
+            }
+            Ok((roots, tree))
+        })?;
+        for id in &task_ids {
+            self.scheduler.abort(id)?;
+        }
+        self.engine.extensions_snapshot().notify_task_aborted(&tree_ids);
+        self.store.write(|tx| {
+            for sub in tx.submissions(conv)? {
+                if matches!(sub.status, SubmissionStatus::Queued | SubmissionStatus::Placed) {
+                    tx.settle(&sub.id, SubmissionStatus::Unanswered, &json!({ "error": "aborted" }))?;
+                }
+            }
+            Ok(())
+        })?;
+        Ok(task_ids)
     }
 
     pub fn submit(&self, r: Request<'_>) -> Result<(Submission, Task, bool)> {

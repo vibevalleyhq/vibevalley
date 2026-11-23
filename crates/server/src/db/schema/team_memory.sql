@@ -3,8 +3,6 @@ create table if not exists memory (
     agent text not null,
     kind text not null,
     body text not null,
-    terms text not null default '',
-    terms_of integer not null default 0,
     repo text,
     session text,
     author text not null,

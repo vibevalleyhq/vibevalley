@@ -213,42 +213,67 @@ fn audio_requires_more_than_a_container_header() {
 
 #[test]
 fn real_http_upload_preview_ranges_and_origin_checks() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let (_dir, inputs, _, hub) = setup();
     let listener = vibevalley_server::transport::http::serve(hub, "127.0.0.1:0".parse().unwrap()).unwrap();
+    let client = reqwest::blocking::Client::builder().no_proxy().build().unwrap();
     let r = inputs.create(&request()).unwrap();
     let url = format!("{}/api/v1/media/input/{}/content", listener.url(), r.id);
-    let ready: Value = ureq::put(&url)
+    let ready: Value = client
+        .put(&url)
         .header("content-type", "application/octet-stream")
-        .send(png())
+        .body(png())
+        .send()
         .unwrap()
-        .body_mut()
-        .read_json()
+        .json()
         .unwrap();
     assert_eq!(ready["data"]["phase"], "ready");
-    let mut response = ureq::get(&url).call().unwrap();
+    let response = client.get(&url).send().unwrap();
     assert_eq!(response.status().as_u16(), 200);
     assert_eq!(response.headers()["content-security-policy"], "sandbox");
-    assert_eq!(response.body_mut().read_to_vec().unwrap(), png());
-    let mut range = ureq::get(&url).header("range", "bytes=2-7").call().unwrap();
+    assert_eq!(response.bytes().unwrap().as_ref(), png().as_slice());
+    let range = client.get(&url).header("range", "bytes=2-7").send().unwrap();
     assert_eq!(range.status().as_u16(), 206);
     assert_eq!(range.headers()["content-range"], "bytes 2-7/24");
-    assert_eq!(range.body_mut().read_to_vec().unwrap(), png()[2..8]);
-    assert!(matches!(ureq::get(&url).header("range", "bytes=30-").call(), Err(ureq::Error::StatusCode(416))));
-    assert!(matches!(
-        ureq::get(&url).header("origin", "https://evil.example").call(),
-        Err(ureq::Error::StatusCode(403))
-    ));
-    assert!(matches!(
-        ureq::put(&url).header("content-type", "text/plain").send(png()),
-        Err(ureq::Error::StatusCode(415))
-    ));
+    assert_eq!(range.bytes().unwrap().as_ref(), &png()[2..8]);
+    assert_eq!(client.get(&url).header("range", "bytes=30-").send().unwrap().status().as_u16(), 416);
+    assert_eq!(client.get(&url).header("origin", "https://evil.example").send().unwrap().status().as_u16(), 403);
+    assert_eq!(
+        client
+            .put(&url)
+            .header("content-type", "text/plain")
+            .body(png())
+            .send()
+            .unwrap()
+            .status()
+            .as_u16(),
+        415
+    );
     // A reserved upload interrupted before its declared size is failed, then
     // the same reservation can be retried over the real transport.
     let interrupted = inputs.create(&request()).unwrap();
     let retry = format!("{}/api/v1/media/input/{}/content", listener.url(), interrupted.id);
-    assert!(ureq::put(&retry).header("content-type", "application/octet-stream").send(&png()[..20]).is_err());
+    assert!(
+        !client
+            .put(&retry)
+            .header("content-type", "application/octet-stream")
+            .body(png()[..20].to_vec())
+            .send()
+            .unwrap()
+            .status()
+            .is_success()
+    );
     assert_eq!(inputs.get(&interrupted.id).unwrap().phase, MediaInputPhase::Failed);
-    ureq::put(&retry).header("content-type", "application/octet-stream").send(png()).unwrap();
+    assert!(
+        client
+            .put(&retry)
+            .header("content-type", "application/octet-stream")
+            .body(png())
+            .send()
+            .unwrap()
+            .status()
+            .is_success()
+    );
     assert_eq!(inputs.get(&interrupted.id).unwrap().phase, MediaInputPhase::Ready);
 }
 

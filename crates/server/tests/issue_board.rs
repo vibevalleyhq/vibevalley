@@ -680,18 +680,13 @@ fn permission_requests_are_allowed_when_prompts_are_off() {
 }
 
 #[test]
-fn frames_reach_subscribers_newest_first() {
+fn snapshot_reads_stored_issues() {
     let rt = HookRuntime::new("t", quick(), |turn| turn.done("ok"));
     let w = world(vec![rt], |_| {});
-    let rx = w.board.subscribe();
-    assert_eq!(rx.recv().unwrap().board.issues.len(), 0);
     let main = repo(w.dir.path(), "app");
     for n in 0..5 {
         w.board.create(new(&format!("n{n}"), Some(&main))).unwrap();
     }
-    // Fell behind: only the newest bundle waits.
-    assert_eq!(rx.recv().unwrap().board.issues.len(), 5);
-    assert!(rx.try_recv().is_err());
     let snapshot = Board::snapshot(&w.store).unwrap();
     assert_eq!(snapshot.board.issues.len(), 5);
 }

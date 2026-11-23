@@ -27,6 +27,7 @@ import { Root } from "../infra/Root";
 import { Link, Navigate, Outlet, route, type RouteDefinition, type SearchCheck, Routes, useParams } from "../infra/router";
 import type { RouterHistory } from "../infra/router/history";
 import { prefsNow } from "../infra/state/prefs";
+import { isStorageHydrated } from "../infra/state/storage";
 import { defineStored } from "../infra/state/stored";
 import { places } from "./places";
 import { Shell } from "./Shell";
@@ -64,23 +65,27 @@ function Farm(props: { repo: string }) {
 /** VibeValley's FarmHome: the farm last open, else the repo worked in most recently, else the farm with none. */
 function FarmHome() {
   const repos = useRepos();
-  const last = untracked(() => lastFarm.get() ?? undefined);
   const list = () => ready(repos, undefined);
   const enter = (name: string) => <Navigate href={farmRoute.build({ repo: name })} />;
-  const known = () => (last !== undefined && (list()?.some((p) => p.name === last) ?? true) ? last : undefined);
+  const known = () => {
+    const last = lastFarm.get() ?? undefined;
+    return last !== undefined && (list()?.some((p) => p.name === last) ?? true) ? last : undefined;
+  };
   return (
-    <If
-      when={known()}
-      else={
-        <If
-          when={list()?.length === 0 || repos.status() === "error"}
-          else={<If when={list()}>{(all) => enter(untracked(() => sortRepos(all())[0]?.name ?? ""))}</If>}
-        >
-          <Farm repo="" />
-        </If>
-      }
-    >
-      {(name) => enter(name())}
+    <If when={isStorageHydrated()}>
+      <If
+        when={known()}
+        else={
+          <If
+            when={list()?.length === 0 || repos.status() === "error"}
+            else={<If when={list()}>{(all) => enter(untracked(() => sortRepos(all())[0]?.name ?? ""))}</If>}
+          >
+            <Farm repo="" />
+          </If>
+        }
+      >
+        {(name) => enter(name())}
+      </If>
     </If>
   );
 }
@@ -141,7 +146,14 @@ function PkmRoute(props: { rest: string }) {
 }
 
 const routes: readonly RouteDefinition[] = [
-  { path: "/", component: () => <Navigate href={prefsNow().start === "farm" ? "/farm" : (places[0]?.path ?? "/issues")} /> },
+  {
+    path: "/",
+    component: () => (
+      <If when={isStorageHydrated()}>
+        <Navigate href={prefsNow().start === "farm" ? "/farm" : (places[0]?.path ?? "/issues")} />
+      </If>
+    ),
+  },
 
   { path: "/present", component: PresenterPage },
   {
@@ -169,7 +181,14 @@ const routes: readonly RouteDefinition[] = [
       page("/runtimes", "team", (rest) => <RuntimesPage rest={rest()} />),
       page("/repos", "workspace", (rest) => <ReposPage rest={rest()} />),
       page("/catalog", "catalog", (rest) => <CatalogPage rest={rest()} />),
-      { path: "/content", component: () => <Navigate href={safeLastContentPath()} /> },
+      {
+        path: "/content",
+        component: () => (
+          <If when={isStorageHydrated()}>
+            <Navigate href={safeLastContentPath()} />
+          </If>
+        ),
+      },
       {
         layout: () => (
           <ContentShell>

@@ -70,7 +70,7 @@ pub trait StorageWrite: StorageRead {
 
 pub type WriteCallback<'a> = dyn for<'tx> FnMut(&'tx dyn StorageRead, &'tx dyn StorageWrite, Option<&'tx Sqlite<'tx>>, i64) -> Result<WriteOutcome> + 'a;
 
-/// Pluggable backend implementing ACID transactions, pub/sub hints, and deferred live updates.
+/// Pluggable backend implementing ACID transactions and pub/sub hints.
 pub trait StorageBackend: Send + Sync {
     fn kind(&self) -> &'static str;
     fn is_read_only(&self) -> bool {
@@ -82,9 +82,5 @@ pub trait StorageBackend: Send + Sync {
     fn stats(&self) -> CommitStats;
     fn subscribe_documents(&self) -> Result<flume::Receiver<DocumentEvent>>;
     fn subscribe_tasks(&self) -> Result<flume::Receiver<()>>;
-    fn put_deferred(&self, scope: &str, id: &str, kind: &str, state: Value) -> Result<()>;
-    fn flush_due(&self) -> Result<()>;
-    fn flush_deferred(&self) -> Result<()>;
-    fn live_document(&self, scope: &str, id: &str) -> Result<Option<Document>>;
     fn close(&self) -> Result<()>;
 }

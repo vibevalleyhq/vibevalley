@@ -136,7 +136,7 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 - `crates/server/tests/issue_family.rs`：父子拆单、验收子工单与冻结文件、起草。
 - `crates/server/tests/issue_edits.rs`：改字段、排位与删单。
 - `crates/server/tests/issue.rs`、`crates/server/tests/cron.rs`：经端点走一张工单；定时任务的增删、拒绝与到期。
-- `crates/core/src/tests.rs`：状态派生、挪动与依赖的纯函数。
+- `crates/core/src/core.rs`、`crates/core/src/tests_round2.rs` 与 `crates/core/tests/projection.rs`：状态派生、挪动、切片投影与依赖的纯函数。
 - `apps/mac/ui/app/scenarios.test.tsx`、`apps/mac/ui/app/interactions.test.tsx`：工单多密度看板、详情与核心写路径防回归测试（`nsh/test`）。
 
 ## 定时任务

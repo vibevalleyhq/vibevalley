@@ -72,20 +72,6 @@ impl DocSpec for InboxDoc {
     type State = InboxState;
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
-pub struct LiveState {
-    pub text: String,
-    pub reasoning: String,
-}
-
-pub struct LiveDoc;
-impl DocSpec for LiveDoc {
-    const KIND: &'static str = "pi.live";
-    const VERSION: u32 = 1;
-    type State = LiveState;
-}
-
 pub struct FileOpsDoc;
 impl DocSpec for FileOpsDoc {
     const KIND: &'static str = "pi.file_ops";
@@ -196,7 +182,6 @@ pub struct GovernanceState {
     pub budget: Option<BudgetConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub budget_snapshot: Option<BudgetSnapshot>,
-    pub evaluated_permissions: Vec<PermissionEvaluation>,
     pub hard_denied_calls: BTreeMap<String, bool>,
     pub pending_permissions: BTreeMap<String, PendingApproval>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

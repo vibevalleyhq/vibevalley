@@ -107,10 +107,6 @@ impl Atlas {
         self.yards.get(name).copied()
     }
 
-    pub fn names(&self) -> impl Iterator<Item = &str> {
-        self.sprites.keys().map(String::as_str)
-    }
-
     /// The first of `names` the atlas has, else the last.
     pub fn first<'a>(&self, names: &[&'a str]) -> &'a str {
         names.iter().copied().find(|n| self.has(n)).or(names.last().copied()).unwrap_or("")

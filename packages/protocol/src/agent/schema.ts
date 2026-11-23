@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Codec } from "../codec";
 import * as T from "./shapes";
 
-const AgentProblemLevel = z.enum(T.AgentIssueLevelValues) satisfies Codec<T.AgentProblemLevel>;
+const AgentProblemLevel = z.enum(T.AgentProblemLevelValues) satisfies Codec<T.AgentProblemLevel>;
 
 const AgentProblem = z.object({
   field: z.string(),
@@ -36,7 +36,7 @@ export const Outfit = z.enum(T.OutfitValues) satisfies Codec<T.Outfit>;
 
 export const Build = z.enum(T.BuildValues) satisfies Codec<T.Build>;
 
-export const Head = z.enum(T.HeadValues) satisfies Codec<T.Head>;
+const Head = z.enum(T.HeadValues) satisfies Codec<T.Head>;
 
 export const Look = z.object({
   species: Species.nullable(),

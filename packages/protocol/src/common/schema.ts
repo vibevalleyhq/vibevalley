@@ -25,7 +25,6 @@ export const issueId = mint("IssueId");
 export const sessionId = mint("SessionId");
 export const artifactId = mint("ArtifactId");
 export const blockId = mint("BlockId");
-export const suggestionId = mint("SuggestionId");
 export const messageId = mint("MessageId");
 
 /** JSON text read as x: a stored column, a file, a line. Not JSON, or JSON not of x's shape, fails the parse. */
@@ -41,26 +40,6 @@ export const jsonString = <A, I>(x: z.ZodType<A, I>): z.ZodType<A, string> =>
       }
     })
     .pipe(x);
-
-/** A secret: kept out of JSON (it throws) and out of logs (it prints as [secret]); its value is read only by reveal. */
-export class Secret {
-  readonly #value: string;
-  constructor(value: string) {
-    this.#value = value;
-  }
-  reveal(): string {
-    return this.#value;
-  }
-  toJSON(): never {
-    throw new Error("a secret is never written as JSON");
-  }
-  toString(): string {
-    return "[secret]";
-  }
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return "[secret]";
-  }
-}
 
 export const Validation = z.object({
   problem: z.string(),

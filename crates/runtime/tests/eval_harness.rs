@@ -272,7 +272,7 @@ fn sqlite_to_jsonl_export_preserves_full_closure_and_at_seq_slice() -> DurableRe
                 token_count: 42,
             },
         )?;
-        tx.put_document(CONVERSATION_SCOPE, "leaf", "pi.live", &json!({ "text": "streaming" }))?;
+        tx.put_document(CONVERSATION_SCOPE, "leaf", "pi.verdict", &json!({ "satisfied": true }))?;
         let mut gov = GovernanceState::default();
         gov.pending_permissions.insert(
             "call-1".into(),
@@ -359,7 +359,7 @@ fn sqlite_to_jsonl_export_preserves_full_closure_and_at_seq_slice() -> DurableRe
         let leaf = r.conversation("leaf")?;
         assert_eq!(leaf.next_seq, 4);
         assert!(r.entries("leaf", 1)?.iter().all(|e| e.seq <= 3));
-        assert!(r.document(CONVERSATION_SCOPE, "leaf", "pi.live")?.is_none());
+        assert!(r.document(CONVERSATION_SCOPE, "leaf", "pi.verdict")?.is_none());
         let gov: GovernanceState = read_doc::<GovernanceDoc>(r, CONVERSATION_SCOPE, "leaf")?;
         assert!(gov.pending_permissions.is_empty());
         assert!(gov.last_rubric_verdict.is_none());

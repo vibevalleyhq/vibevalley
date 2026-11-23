@@ -230,7 +230,7 @@ fn daily(from: i64, at: &str, days: &[i64], tz: &str) -> Option<i64> {
     next_of(&spec, &zone, from)
 }
 
-pub fn next_run(s: &Cron) -> Option<i64> {
+fn next_run(s: &Cron) -> Option<i64> {
     if !s.enabled {
         return None;
     }

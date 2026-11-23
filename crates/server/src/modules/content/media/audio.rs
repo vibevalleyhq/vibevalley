@@ -229,7 +229,7 @@ impl Jobs {
                 let Some(Ok((bytes, name))) = r.input.as_ref().map(|i| self.sample(i)) else {
                     return self.failed(id, Outcome::NotSubmitted);
                 };
-                match self.moss.clone_voice(&account.key, bytes, &name, q.name.as_deref()) {
+                match self.moss.clone_voice(&account.key, bytes, &name, q.name.as_deref(), stop) {
                     // Once cloned, the voice is written down whatever stopped the job meanwhile.
                     Ok(voice) => {
                         let _ = self.change(id, &[Phase::Generating, Phase::Canceled, Phase::Unknown], |r| {
@@ -238,7 +238,8 @@ impl Jobs {
                             r.problem.clear();
                         });
                     }
-                    Err(e) => self.failed(id, e.outcome),
+                    Err(e) if !stop.aborted() => self.failed(id, e.outcome),
+                    Err(_) => {}
                 }
             }
             Ask::Transcription(q) => {

@@ -5,20 +5,7 @@ use vibevalley_protocol::*;
 use crate::rules::{actor_role_of, compare_text};
 
 /// The state keeps at most these many channels; the database keeps all.
-pub const KEEP_CHANNELS: usize = 100;
-
-/// `targetOf`: a place's address as an agent writes it.
-pub fn target_of(c: &Channel, channel_name: &str) -> String {
-    if c.r#type == ChannelType::Direct {
-        return format!("@{USER_ID}");
-    }
-    if c.r#type == ChannelType::Thread
-        && let Some(root) = c.root_number
-    {
-        return format!("#{channel_name}:{root}");
-    }
-    format!("#{}", c.name.as_deref().unwrap_or(channel_name))
-}
+const KEEP_CHANNELS: usize = 100;
 
 fn empty_chat() -> Chat {
     Chat {
@@ -28,13 +15,13 @@ fn empty_chat() -> Chat {
 }
 
 /// `withUserMentions`.
-pub fn with_user_mentions(chat: &mut Option<Chat>, mentions: Vec<UserMention>) {
+pub(crate) fn with_user_mentions(chat: &mut Option<Chat>, mentions: Vec<UserMention>) {
     chat.get_or_insert_with(empty_chat).user_mentions = mentions;
 }
 
 /// `withMessage`: news when its number is past what the state knows of its
 /// channel, or when the state does not keep that channel.
-pub fn with_message(chat: &mut Option<Chat>, m: &ChatMessage) -> bool {
+pub(crate) fn with_message(chat: &mut Option<Chat>, m: &ChatMessage) -> bool {
     let Some(chat) = chat else { return true };
     let Some(c) = chat.channels.iter_mut().find(|x| x.id == m.channel) else {
         return true;
@@ -47,7 +34,7 @@ pub fn with_message(chat: &mut Option<Chat>, m: &ChatMessage) -> bool {
 }
 
 /// `withChannel`: beyond `KEEP_CHANNELS` the quietest threads go.
-pub fn with_channel(chat: &mut Option<Chat>, c: Channel) {
+pub(crate) fn with_channel(chat: &mut Option<Chat>, c: Channel) {
     let base = chat.get_or_insert_with(empty_chat);
     base.channels.retain(|x| x.id != c.id);
     base.channels.push(c);

@@ -6,13 +6,6 @@ import * as T from "./shapes";
 
 export const CallState = z.enum(T.CallStateValues) satisfies Codec<T.CallState>;
 
-export const FactCallChanged = z.object({
-  type: z.literal("callChanged"),
-  at: z.number(),
-  state: CallState,
-  reason: z.string(),
-}) satisfies Codec<T.FactCallChanged>;
-
 export const VoiceCall = z.object({
   agentId: z.string(),
 }) satisfies Codec<T.VoiceCall>;

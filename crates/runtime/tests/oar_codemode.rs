@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use tempfile::TempDir;
 use vibevalley_runtime::agent::core::engine::Request;
 use vibevalley_runtime::agent::core::events::AgentEvent;
-use vibevalley_runtime::agent::durable::Store;
+use vibevalley_runtime::agent::durable::{Result as DurableResult, Store, Submission, Task};
 use vibevalley_runtime::agent::experiments::ExperimentFlags;
 use vibevalley_runtime::agent::extensions::{GovernanceExtension, OAR_TASK_KIND, OarExtension, OarPolicy, Permissions, Policy, tree_spend};
 use vibevalley_runtime::agent::harness::{Harness, WorkersOnly, worker_conversation};
@@ -17,6 +17,18 @@ use vibevalley_runtime::oar::scripted::{Script, ScriptedRuntime, Step, TurnAsk};
 use vibevalley_runtime::oar::{ContentBlock, EventKind, PermissionDecision, PermissionMode, Registry, Runtime, SessionOptions, StopReason};
 
 const WAIT: Duration = Duration::from_secs(10);
+
+fn submit_prompt(harness: &Harness, conv: &str, provider: &str, request_id: &str, prompt: &str, system: &str) -> DurableResult<(Submission, Task, bool)> {
+    harness.submit(Request {
+        conversation: conv,
+        provider,
+        request_id,
+        prompt,
+        source: "user",
+        system,
+        ..Default::default()
+    })
+}
 
 struct QueueClient {
     replies: Mutex<VecDeque<Completion>>,
@@ -303,8 +315,7 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
             }),
         )
         .unwrap();
-    let handle_slow = harness.conversation(&conv_slow);
-    let (_, t_slow, _) = handle_slow.prompt("deepseek-flash", "r-slow", "run slow", "sys").unwrap();
+    let (_, t_slow, _) = submit_prompt(&harness, &conv_slow, "deepseek-flash", "r-slow", "run slow", "sys").unwrap();
     block_enter_rx.recv_timeout(WAIT).unwrap();
 
     // Concurrent second OAR request fails cleanly with max_concurrent (1) on different workdir dir_b.
@@ -320,7 +331,7 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
     harness
         .attach_worker(&conv_conc, Arc::new(Brain::new(c_conc, "deepseek-flash", "sys")), Arc::new(|_| {}))
         .unwrap();
-    let (_, t_conc, _) = harness.conversation(&conv_conc).prompt("deepseek-flash", "r-conc", "second", "sys").unwrap();
+    let (_, t_conc, _) = submit_prompt(&harness, &conv_conc, "deepseek-flash", "r-conc", "second", "sys").unwrap();
     let d_conc = harness.scheduler().wait(&t_conc.id, WAIT).unwrap();
     assert_eq!(d_conc.terminal_reason, "completed");
     let e_conc = harness.entries(&conv_conc).unwrap();
@@ -328,7 +339,7 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
     assert!(err_conc.contains("max concurrent OAR sessions"), "{err_conc}");
 
     // Parent abort cancels active slow OAR session & cascades.
-    handle_slow.abort().unwrap();
+    harness.abort_conversation(&conv_slow).unwrap();
     let _ = block_rel_tx.send(());
     let d_slow = harness.scheduler().wait(&t_slow.id, WAIT).unwrap();
     assert_eq!(d_slow.terminal_reason, "aborted");
@@ -386,7 +397,7 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
         Arc::new(|_| {}),
     )
     .unwrap();
-    let (_, t_hold, _) = h_d.conversation(&conv_hold).prompt("deepseek-flash", "rh", "hold", "sys").unwrap();
+    let (_, t_hold, _) = submit_prompt(&h_d, &conv_hold, "deepseek-flash", "rh", "hold", "sys").unwrap();
     cw_enter_rx.recv_timeout(WAIT).unwrap();
 
     // Parallel Plan on SAME dir_a and parallel Bypass on DIFFERENT dir_b succeed; concurrent Bypass on SAME dir_a is rejected.
@@ -418,7 +429,7 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
         Arc::new(|_| {}),
     )
     .unwrap();
-    let (_, t_probe, _) = h_d.conversation(&conv_probe).prompt("deepseek-flash", "rp", "probe", "sys").unwrap();
+    let (_, t_probe, _) = submit_prompt(&h_d, &conv_probe, "deepseek-flash", "rp", "probe", "sys").unwrap();
     let d_probe = h_d.scheduler().wait(&t_probe.id, WAIT).unwrap();
     assert_eq!(d_probe.terminal_reason, "completed");
     let e_probe = h_d.entries(&conv_probe).unwrap();

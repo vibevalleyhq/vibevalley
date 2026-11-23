@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use serde_json::json;
 
-use crate::agent::core::doc::{BudgetConfig, CONVERSATION_SCOPE, DocSpec, GovernanceDoc, TASK_SCOPE, UsageDoc, read_doc, write_doc};
+use crate::agent::core::doc::{BudgetConfig, CONVERSATION_SCOPE, DocSpec, GovernanceDoc, TASK_SCOPE, UsageDoc, read_doc, read_doc_opt, write_doc};
 use crate::agent::core::extension::{DurableHookCtx, Extension, HookOutcome};
 use crate::agent::durable::{self, Error, Read, Result, Scheduler, Store, Tx};
 
@@ -71,9 +71,15 @@ pub fn set_budget(store: &Store, _scheduler: &Scheduler, conv: &str, task: Optio
 }
 
 pub fn check_budget(tx: &mut Tx<'_>, conv: &str, task: &str) -> Result<Budget> {
-    let mut gov = read_doc::<GovernanceDoc>(tx, CONVERSATION_SCOPE, conv)?;
+    let Some(mut gov) = read_doc_opt::<GovernanceDoc>(tx, CONVERSATION_SCOPE, conv)? else {
+        return Ok(Budget::default());
+    };
     let max = gov.budget.map_or(0, |b| b.max_cost_micros);
+    if max <= 0 {
+        return Ok(Budget::default());
+    }
     let snap = budget_snapshot(tx, conv, max)?;
+    let next_status = if snap.reached { "budget_reached" } else { "active" };
     if snap.reached && (gov.status != "budget_reached" || gov.budget_snapshot != Some(snap)) {
         tx.alert(
             Some(conv),
@@ -87,10 +93,26 @@ pub fn check_budget(tx: &mut Tx<'_>, conv: &str, task: &str) -> Result<Budget> {
             }),
         )?;
     }
-    gov.status = if snap.reached { "budget_reached".into() } else { "active".into() };
-    gov.budget_snapshot = Some(snap);
-    write_doc::<GovernanceDoc>(tx, CONVERSATION_SCOPE, conv, &gov)?;
+    if gov.status != next_status || gov.budget_snapshot != Some(snap) {
+        gov.status = next_status.into();
+        gov.budget_snapshot = Some(snap);
+        write_doc::<GovernanceDoc>(tx, CONVERSATION_SCOPE, conv, &gov)?;
+    }
     Ok(snap)
+}
+
+/// Checks budget via a read-only fast path so conversations without a configured
+/// budget never open an empty write transaction.
+pub(crate) fn check_budget_if_configured(store: &Store, conv: &str, task: &str) -> Result<Budget> {
+    let configured = store.read(|tx| {
+        Ok(read_doc_opt::<GovernanceDoc>(tx, CONVERSATION_SCOPE, conv)?
+            .and_then(|g| g.budget)
+            .is_some_and(|b| b.max_cost_micros > 0))
+    })?;
+    if !configured {
+        return Ok(Budget::default());
+    }
+    store.write(|tx| check_budget(tx, conv, task))
 }
 
 #[derive(Clone, Default)]
@@ -102,7 +124,7 @@ impl Extension for BudgetExtension {
     }
 
     fn on_before_turn(&self, ctx: &DurableHookCtx<'_>) -> durable::Result<HookOutcome> {
-        let snap = ctx.store.write(|tx| check_budget(tx, ctx.conversation_id, ctx.task_id))?;
+        let snap = check_budget_if_configured(ctx.store, ctx.conversation_id, ctx.task_id)?;
         if snap.reached {
             Ok(HookOutcome::Park {
                 signal: BUDGET_SIGNAL.into(),

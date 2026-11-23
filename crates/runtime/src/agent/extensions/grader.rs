@@ -6,7 +6,7 @@ use crate::agent::ai::types::{ChatRequest, Message, ResponseFormat};
 use crate::agent::core::doc::{AgentDoc, AgentState, CONVERSATION_SCOPE, GovernanceDoc, UsageTotals, update_doc, write_doc};
 use crate::agent::core::extension::{DurableHookCtx, Extension, HookOutcome, RunEndCtx};
 use crate::agent::durable::{self, Error, Read, Result, TaskStatus};
-use crate::agent::extensions::budget::{BUDGET_SIGNAL, check_budget};
+use crate::agent::extensions::budget::{BUDGET_SIGNAL, check_budget_if_configured};
 
 pub use crate::agent::core::extension::{OutcomeReview, ReviewRequest, Rubric, RubricVerdict};
 
@@ -159,7 +159,7 @@ impl Extension for GraderExtension {
         let verdict: RubricVerdict = if let Some(doc) = existing {
             serde_json::from_value(doc.state)?
         } else {
-            let budget = ctx.store.write(|tx| check_budget(tx, conv, ctx.task_id))?;
+            let budget = check_budget_if_configured(ctx.store, conv, ctx.task_id)?;
             if budget.reached {
                 return Ok(HookOutcome::Park {
                     signal: BUDGET_SIGNAL.into(),

@@ -16,13 +16,14 @@
 //! Codex decides by itself which commands are "trusted" (plain reads) and
 //! runs those without asking in every mode.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use parking_lot::Mutex;
+use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, rejected, rejection};
@@ -1039,6 +1040,111 @@ fn connect(binary: &Path, cwd: &Path, opts: Option<&SessionOptions>) -> Result<A
     Ok(shared)
 }
 
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WireModelListPage {
+    #[serde(default)]
+    data: Option<Vec<WireCodexModel>>,
+    #[serde(default)]
+    next_cursor: Option<Value>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WireCodexModel {
+    #[serde(default)]
+    hidden: Option<bool>,
+    #[serde(default)]
+    model: Option<String>,
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    display_name: Option<String>,
+    #[serde(default)]
+    supported_reasoning_efforts: Option<Vec<WireReasoningEffort>>,
+    #[serde(default)]
+    default_reasoning_effort: Option<String>,
+    #[serde(default)]
+    is_default: Option<bool>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WireReasoningEffort {
+    #[serde(default)]
+    reasoning_effort: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+struct WireThreadOpenReply {
+    #[serde(default)]
+    thread: Option<WireThreadRef>,
+    #[serde(default)]
+    model: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct WireThreadRef {
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    name: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WireAccountRead {
+    #[serde(default)]
+    account: Option<WireAccount>,
+    #[serde(default)]
+    requires_openai_auth: Option<bool>,
+}
+
+#[derive(Deserialize)]
+struct WireAccount {
+    #[serde(rename = "type", default)]
+    kind: Option<String>,
+    #[serde(default)]
+    email: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WireRateLimitsReply {
+    #[serde(default)]
+    rate_limits: Option<WireRateLimitBucket>,
+    #[serde(default)]
+    rate_limits_by_limit_id: Option<BTreeMap<String, Option<WireRateLimitBucket>>>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WireRateLimitBucket {
+    #[serde(default)]
+    limit_id: Option<String>,
+    #[serde(default)]
+    limit_name: Option<String>,
+    #[serde(default)]
+    plan_type: Option<String>,
+    #[serde(default)]
+    rate_limit_reached_type: Option<Value>,
+    #[serde(default)]
+    primary: Option<WireRateLimitWindow>,
+    #[serde(default)]
+    secondary: Option<WireRateLimitWindow>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WireRateLimitWindow {
+    #[serde(default)]
+    used_percent: Option<f64>,
+    #[serde(default)]
+    window_duration_mins: Option<f64>,
+    #[serde(default)]
+    resets_at: Option<i64>,
+}
+
 impl Runtime for CodexRuntime {
     fn id(&self) -> &str {
         ID
@@ -1049,16 +1155,7 @@ impl Runtime for CodexRuntime {
     }
 
     fn capabilities(&self) -> Capabilities {
-        Capabilities {
-            resume: true,
-            steer: true,
-            queue: true,
-            permission_requests: true,
-            model_selection: true,
-            subagents: true,
-            usage: true,
-            config_options: false,
-        }
+        crate::oar::runtime_spec(ID).expect("codex runtime spec").capabilities
     }
 
     fn installation(&self) -> Installation {
@@ -1070,7 +1167,7 @@ impl Runtime for CodexRuntime {
         let shared = connect(&binary, &std::env::temp_dir(), None)?;
         // Account first: an API-key login has no subscription windows, and
         // the rate-limit read would wrongly say to log in again.
-        let account = shared.call("account/read", json!({})).ok();
+        let account = shared.call("account/read", json!({})).ok().and_then(|v| WireAccountRead::deserialize(&v).ok());
         let result = if account.as_ref().is_some_and(non_subscription) {
             Ok(AccountUsage::Unsupported {
                 reason: "unsupported_auth_mode".into(),
@@ -1097,30 +1194,31 @@ impl Runtime for CodexRuntime {
         let mut models = Vec::new();
         let mut cursor = Value::Null;
         let result = loop {
-            let page = match shared.call("model/list", json!({ "cursor": cursor, "limit": 100 })) {
+            let page_raw = match shared.call("model/list", json!({ "cursor": cursor, "limit": 100 })) {
                 Ok(page) => page,
                 Err(error) => break Err(error),
             };
-            for model in page.get("data").and_then(Value::as_array).into_iter().flatten() {
-                if model.get("hidden").and_then(Value::as_bool) == Some(true) {
+            let page = WireModelListPage::deserialize(&page_raw).unwrap_or_default();
+            for model in page.data.into_iter().flatten() {
+                if model.hidden == Some(true) {
                     continue;
                 }
-                let Some(id) = str_of(model, "model").or_else(|| str_of(model, "id")) else {
+                let Some(id) = model.model.or(model.id) else {
                     continue;
                 };
-                let mut info = ModelInfo::new(id, str_of(model, "displayName").unwrap_or(id));
+                let display_name = model.display_name.unwrap_or_else(|| id.clone());
+                let mut info = ModelInfo::new(id, display_name);
                 info.effort_levels = model
-                    .get("supportedReasoningEfforts")
-                    .and_then(Value::as_array)
+                    .supported_reasoning_efforts
                     .into_iter()
                     .flatten()
-                    .filter_map(|e| str_of(e, "reasoningEffort").map(str::to_string))
+                    .filter_map(|e| e.reasoning_effort)
                     .collect();
-                info.default_effort = str_of(model, "defaultReasoningEffort").map(str::to_string);
-                info.is_default = model.get("isDefault").and_then(Value::as_bool) == Some(true);
+                info.default_effort = model.default_reasoning_effort;
+                info.is_default = model.is_default == Some(true);
                 models.push(info);
             }
-            cursor = page.get("nextCursor").cloned().unwrap_or(Value::Null);
+            cursor = page.next_cursor.unwrap_or(Value::Null);
             if cursor.is_null() {
                 break Ok(());
             }
@@ -1152,10 +1250,11 @@ impl Runtime for CodexRuntime {
                 (_, error) => error,
             })
         })?;
-        let Some(thread_id) = reply.pointer("/thread/id").and_then(Value::as_str).map(str::to_string) else {
+        let opened = WireThreadOpenReply::deserialize(&reply).unwrap_or_default();
+        let Some(thread_id) = opened.thread.as_ref().and_then(|t| t.id.clone()) else {
             return Err(kill(AgentError::Protocol(format!("codex {method} returned no thread id"))));
         };
-        let model = str_of(&reply, "model").map(str::to_string);
+        let model = opened.model;
         if let (Some(wanted), Some(running)) = (&opts.model, &model)
             && wanted != running
         {
@@ -1173,9 +1272,10 @@ impl Runtime for CodexRuntime {
             session_id: thread_id.clone(),
             model,
         });
-        let initial_title = reply
-            .pointer("/thread/name")
-            .and_then(Value::as_str)
+        let initial_title = opened
+            .thread
+            .and_then(|t| t.name)
+            .as_deref()
             .map(str::trim)
             .filter(|t| !t.is_empty())
             .map(str::to_string);
@@ -1207,17 +1307,15 @@ impl Runtime for CodexRuntime {
     }
 }
 
-fn non_subscription(account: &Value) -> bool {
-    let kind = account.pointer("/account/type").and_then(Value::as_str);
-    matches!(kind, Some("apiKey" | "amazonBedrock")) || account.get("requiresOpenaiAuth") == Some(&json!(false))
+fn non_subscription(account: &WireAccountRead) -> bool {
+    let kind = account.account.as_ref().and_then(|a| a.kind.as_deref());
+    matches!(kind, Some("apiKey" | "amazonBedrock")) || account.requires_openai_auth == Some(false)
 }
 
 /// Only a ChatGPT (subscription) login has an account email worth showing.
-fn email_of(account: &Value) -> Option<String> {
-    let account = account.get("account")?;
-    (account.get("type")? == "chatgpt")
-        .then(|| account.get("email")?.as_str().map(str::to_string))
-        .flatten()
+fn email_of(account: &WireAccountRead) -> Option<String> {
+    let account = account.account.as_ref()?;
+    (account.kind.as_deref() == Some("chatgpt")).then(|| account.email.clone()).flatten()
 }
 
 fn window_label(minutes: Option<f64>) -> String {
@@ -1239,18 +1337,18 @@ fn window_label(minutes: Option<f64>) -> String {
 /// `account/rateLimits/read` as oar projects it (`projectCodexUsage`): the
 /// single-bucket view first, then the other buckets by limit id.
 pub(crate) fn usage_of(result: &Value, email: Option<String>) -> Option<AccountUsage> {
-    let text = |v: &Value| v.as_str().map(str::trim).filter(|s| !s.is_empty() && s.len() <= 80).map(str::to_string);
-    let historical = result.get("rateLimits").filter(|v| v.is_object());
-    let primary_id = historical.and_then(|h| text(&h["limitId"]));
-    let mut buckets: Vec<&Value> = historical.into_iter().collect();
-    if let Some(indexed) = result.get("rateLimitsByLimitId").and_then(Value::as_object) {
-        for (id, bucket) in indexed {
-            if !bucket.is_object() {
+    let clean_text = |s: Option<&str>| s.map(str::trim).filter(|s| !s.is_empty() && s.len() <= 80).map(str::to_string);
+    let parsed = WireRateLimitsReply::deserialize(result).ok()?;
+    let primary_id = parsed.rate_limits.as_ref().and_then(|h| clean_text(h.limit_id.as_deref()));
+    let mut buckets: Vec<&WireRateLimitBucket> = parsed.rate_limits.iter().collect();
+    if let Some(indexed) = &parsed.rate_limits_by_limit_id {
+        for (id, maybe_bucket) in indexed {
+            let Some(bucket) = maybe_bucket.as_ref() else {
                 continue;
-            }
+            };
             if primary_id
                 .as_deref()
-                .is_some_and(|p| p == id || Some(p.to_string()) == text(&bucket["limitId"]))
+                .is_some_and(|p| p == id || Some(p) == clean_text(bucket.limit_id.as_deref()).as_deref())
             {
                 continue;
             }
@@ -1259,16 +1357,17 @@ pub(crate) fn usage_of(result: &Value, email: Option<String>) -> Option<AccountU
     }
     let (mut windows, mut rate_limited, mut plan) = (Vec::new(), false, None);
     for bucket in buckets {
-        let limit_id = text(&bucket["limitId"]);
-        let source = text(&bucket["limitName"]).or_else(|| limit_id.as_deref().map(|id| if id == "codex" { "Codex".to_string() } else { id.to_string() }));
-        plan = plan.or_else(|| text(&bucket["planType"]));
-        rate_limited |= !bucket["rateLimitReachedType"].is_null();
-        for kind in ["primary", "secondary"] {
-            let w = &bucket[kind];
-            let Some(used) = w.get("usedPercent").and_then(Value::as_f64).filter(|u| (0.0..=100.0).contains(u)) else {
+        let limit_id = clean_text(bucket.limit_id.as_deref());
+        let source =
+            clean_text(bucket.limit_name.as_deref()).or_else(|| limit_id.as_deref().map(|id| if id == "codex" { "Codex".to_string() } else { id.to_string() }));
+        plan = plan.or_else(|| clean_text(bucket.plan_type.as_deref()));
+        rate_limited |= bucket.rate_limit_reached_type.as_ref().is_some_and(|v| !v.is_null());
+        for (kind, maybe_w) in [("primary", bucket.primary.as_ref()), ("secondary", bucket.secondary.as_ref())] {
+            let Some(w) = maybe_w else { continue };
+            let Some(used) = w.used_percent.filter(|u| (0.0..=100.0).contains(u)) else {
                 continue;
             };
-            let minutes = w.get("windowDurationMins").and_then(Value::as_f64);
+            let minutes = w.window_duration_mins;
             let duration = window_label(minutes);
             windows.push(UsageWindow {
                 label: match &source {
@@ -1277,8 +1376,7 @@ pub(crate) fn usage_of(result: &Value, email: Option<String>) -> Option<AccountU
                 },
                 used_ratio: (used / 100.0 * 1e6).round() / 1e6,
                 resets_at: w
-                    .get("resetsAt")
-                    .and_then(Value::as_i64)
+                    .resets_at
                     .and_then(|s| jiff::Timestamp::from_second(s).ok())
                     .map(|t| t.strftime("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()),
                 id: limit_id.as_ref().map(|id| format!("{id}:{kind}")),

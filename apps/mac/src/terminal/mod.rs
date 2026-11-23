@@ -145,7 +145,6 @@ pub fn agent_display_name(agent: &str, label: &str) -> String {
         "cursor" => "Cursor".into(),
         "kimi" => "Kimi".into(),
         "pi" => "Pi".into(),
-        "dsh" => "dsh".into(),
         "grok" => "Grok".into(),
         _ if !label.trim().is_empty() => label.trim().to_string(),
         _ => agent.to_string(),
@@ -1175,7 +1174,6 @@ fn detect_agent_token(text: &str) -> Option<&'static str> {
             "cursor" | "cursor-agent" => return Some("cursor"),
             "kimi" | "kimi-cli" => return Some("kimi"),
             "pi" | "pi-cli" => return Some("pi"),
-            "dsh" => return Some("dsh"),
             "grok" | "grok-cli" => return Some("grok"),
             _ => {}
         }
@@ -1223,9 +1221,6 @@ fn detect_inline_agent(lines: &[String]) -> Option<&'static str> {
         }
         if matches_inline_cli(line, "pi") {
             return Some("pi");
-        }
-        if matches_inline_cli(line, "dsh") {
-            return Some("dsh");
         }
         if matches_inline_cli(line, "grok") {
             return Some("grok");
@@ -1512,7 +1507,7 @@ mod tests {
         assert_eq!(detect_agent_token("cursor-agent"), Some("cursor"));
         assert_eq!(detect_agent_token("kimi"), Some("kimi"));
         assert_eq!(detect_agent_token("pi"), Some("pi"));
-        assert_eq!(detect_agent_token("dsh"), Some("dsh"));
+        assert_eq!(detect_agent_token("dsh"), None);
         assert_eq!(detect_agent_token("grok"), Some("grok"));
         assert_eq!(detect_agent_token("zsh"), None);
         assert_eq!(detect_agent_token("cargo test -p vibevalley-mac"), None);
@@ -1523,7 +1518,7 @@ mod tests {
         assert_eq!(detect_inline_agent(&["welcome to antigravity".into()]), Some("antigravity"));
         assert_eq!(detect_inline_agent(&["~/repo % agy".into()]), Some("antigravity"));
         assert_eq!(detect_inline_agent(&["❯ pi --model fast".into()]), Some("pi"));
-        assert_eq!(detect_inline_agent(&["$ dsh".into()]), Some("dsh"));
+        assert_eq!(detect_inline_agent(&["$ dsh".into()]), None);
         assert_eq!(detect_inline_agent(&["➜ grok".into()]), Some("grok"));
         assert_eq!(detect_inline_agent(&["openai codex v0.1".into()]), Some("codex"));
         assert_eq!(detect_inline_agent(&["claude code".into()]), Some("claude"));

@@ -1,15 +1,17 @@
 import { signal } from "nsh";
 import { z } from "zod";
 
-import type { Artifact, ArtifactType, LibraryFileKind } from "@vibevalley/protocol";
+import type { Artifact, ArtifactBody, ArtifactDisplay, ArtifactType, LibraryFileKind, LibraryItem, PkmPageSummary } from "@vibevalley/protocol";
 
 import { defineAtom } from "../../infra/state/atom";
 import { defineStored } from "../../infra/state/stored";
 
+export type ArtifactFacet = ArtifactType | "html";
+
 export type ContentBucket =
   | { readonly kind: "recent" }
   | { readonly kind: "pinned" }
-  | { readonly kind: "artifacts"; readonly artifactType?: ArtifactType | "html" | undefined }
+  | { readonly kind: "artifacts"; readonly artifactType?: ArtifactFacet | undefined }
   | { readonly kind: "media"; readonly fileKind?: LibraryFileKind | undefined };
 
 export type TemplateCategory = "recommended" | "note" | "whiteboard" | "deliverable" | "ai";
@@ -91,15 +93,21 @@ export function safeLastContentPath(): string {
   return normalizeContentPath(pathname, query ? `?${query}` : "") ?? "/library";
 }
 
-export function artifactFacetOf(a: Pick<Artifact, "body" | "display" | "artifactType">): ArtifactType | "html" {
-  if (a.artifactType) return a.artifactType;
-  if (a.body === "blocks") return "docs";
-  if (a.body === "html") {
-    if (a.display === "slides") return "slides";
-    if (a.display === "motion") return "motion";
-    return "html";
+export function artifactFacetOf(a: {
+  readonly body: ArtifactBody;
+  readonly display?: ArtifactDisplay | undefined;
+  readonly artifactType?: ArtifactType | undefined;
+}): ArtifactFacet {
+  if (a.artifactType !== undefined) return a.artifactType;
+  switch (a.body) {
+    case "blocks":
+    case "store":
+      return "docs";
+    case "html":
+      if (a.display === "slides") return "slides";
+      if (a.display === "motion") return "motion";
+      return "html";
   }
-  return "docs";
 }
 
 export function mediaKindOf(mime: string): LibraryFileKind {
@@ -107,4 +115,59 @@ export function mediaKindOf(mime: string): LibraryFileKind {
   if (mime.startsWith("audio/")) return "audio";
   if (mime.startsWith("video/")) return "video";
   return "other";
+}
+
+export interface ContentHubCounts {
+  readonly total: number;
+  readonly pinned: number;
+  readonly artifacts: number;
+  readonly artifactByFacet: ReadonlyMap<ArtifactFacet, number>;
+  readonly media: number;
+  readonly mediaByKind: ReadonlyMap<LibraryFileKind, number>;
+}
+
+/** Single count formula shared by `ContentSidebar` badges and `LibraryPage` bucket views. */
+export function countContentHub(input: {
+  readonly notes: readonly Pick<PkmPageSummary, "slug">[];
+  readonly artifacts: readonly Pick<Artifact, "id" | "body" | "display" | "artifactType">[];
+  readonly media: readonly { readonly attachment: Pick<LibraryItem["attachment"], "id" | "type"> }[];
+  readonly pinned: ReadonlySet<string>;
+}): ContentHubCounts {
+  let pinned = 0;
+  for (const n of input.notes) {
+    if (input.pinned.has(`note:${n.slug}`)) pinned += 1;
+  }
+  const artifactByFacet = new Map<ArtifactFacet, number>();
+  for (const a of input.artifacts) {
+    if (input.pinned.has(`artifact:${a.id}`)) pinned += 1;
+    const facet = artifactFacetOf(a);
+    artifactByFacet.set(facet, (artifactByFacet.get(facet) ?? 0) + 1);
+  }
+  const mediaByKind = new Map<LibraryFileKind, number>();
+  for (const m of input.media) {
+    if (input.pinned.has(`media:${m.attachment.id}`)) pinned += 1;
+    const kind = mediaKindOf(m.attachment.type);
+    mediaByKind.set(kind, (mediaByKind.get(kind) ?? 0) + 1);
+  }
+  return {
+    total: input.notes.length + input.artifacts.length + input.media.length,
+    pinned,
+    artifacts: input.artifacts.length,
+    artifactByFacet,
+    media: input.media.length,
+    mediaByKind,
+  };
+}
+
+export function countForBucket(counts: ContentHubCounts, bucket: ContentBucket): number {
+  switch (bucket.kind) {
+    case "recent":
+      return counts.total;
+    case "pinned":
+      return counts.pinned;
+    case "artifacts":
+      return bucket.artifactType === undefined ? counts.artifacts : (counts.artifactByFacet.get(bucket.artifactType) ?? 0);
+    case "media":
+      return bucket.fileKind === undefined ? counts.media : (counts.mediaByKind.get(bucket.fileKind) ?? 0);
+  }
 }

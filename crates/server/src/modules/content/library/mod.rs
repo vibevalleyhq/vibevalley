@@ -6,7 +6,6 @@
 //! What the farm hears is recorded on its own event bus worker thread so
 //! recording never runs inside a chat write transaction.
 
-use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -26,7 +25,7 @@ use crate::db::generated::content_library as q;
 use crate::base::{LookIn, ModuleDb, missing};
 use crate::modules::collab::channel::{ChannelEvent, Chat, to_message};
 use crate::modules::content::attachment::{ATTACHMENT_MAX, Attachments};
-use crate::modules::infra::http::{no_redirect_client, public_https, public_v4, run_http};
+use crate::modules::infra::http::{PublicDownload, PublicDownloadError};
 use crate::{Hub, now};
 
 const LIST_MAX: i64 = 500;
@@ -84,18 +83,6 @@ fn type_of_name(name: &str) -> &'static str {
 
 fn given(text: &Option<String>) -> Option<&str> {
     text.as_deref().filter(|t| !t.trim().is_empty())
-}
-
-/// Every address the name resolves to is a public IPv4 one (VibeValley's
-/// `publicFetch` also dials exactly those).
-fn resolves_public(host: &str) -> bool {
-    match (host, 443).to_socket_addrs() {
-        Ok(addrs) => {
-            let all: Vec<_> = addrs.collect();
-            !all.is_empty() && all.iter().all(|a| matches!(a.ip(), IpAddr::V4(v4) if public_v4(v4)))
-        }
-        Err(_) => false,
-    }
 }
 
 fn origin_kind(o: &LibraryOrigin) -> &'static str {
@@ -319,61 +306,18 @@ fn too_big() -> ApiError {
 /// A file from a public https address: its bytes, its name (the last path
 /// segment, else the host) and the type the server said.
 fn download(address: &str) -> Result<(Vec<u8>, String, String), ApiError> {
-    let bad = || refused(t("server.library.badUrl", &[("url", address.into())]));
-    let url = url::Url::parse(address).map_err(|_| bad())?;
-    if !public_https(&url) {
-        return Err(bad());
-    }
-    let host = url.host_str().unwrap_or("").to_string();
-    if !resolves_public(&host) {
-        return Err(refused(t(
-            "server.library.notFetched",
-            &[("url", address.into()), ("why", "Public IPv4 resolution required".into())],
-        )));
-    }
-    let client = no_redirect_client()
-        .map_err(|e| refused(t("server.library.notFetched", &[("url", "".into()), ("why", e.into())])))?
-        .clone();
-    let target = address.to_string();
-    let (bytes, kind) = run_http(async move {
-        let mut response = client.get(&target).timeout(DOWNLOAD).send().await.map_err(|e| {
-            if e.is_timeout() {
-                refused(t("server.library.slow", &[]))
-            } else {
-                refused(t("server.library.notFetched", &[("url", "".into()), ("why", e.to_string().into())]))
-            }
-        })?;
-        let status = response.status().as_u16();
-        if status != 200 {
-            return Err(refused(t(
-                "server.library.notFetched",
-                &[("url", target.into()), ("why", status.to_string().into())],
-            )));
-        }
-        let kind = response
-            .headers()
-            .get("content-type")
-            .and_then(|v| v.to_str().ok())
-            .map(|v| v.split(';').next().unwrap_or("").trim().to_string())
-            .unwrap_or_default();
-        let mut bytes = vec![];
-        while let Some(chunk) = response.chunk().await.map_err(|e| {
-            if e.is_timeout() {
-                refused(t("server.library.slow", &[]))
-            } else {
-                refused(t("server.library.notFetched", &[("url", "".into()), ("why", e.to_string().into())]))
-            }
-        })? {
-            if bytes.len() + chunk.len() > ATTACHMENT_MAX {
-                return Err(too_big());
-            }
-            bytes.extend_from_slice(&chunk);
-        }
-        Ok((bytes, kind))
+    let fetched = PublicDownload::get_bytes(address, DOWNLOAD, ATTACHMENT_MAX).map_err(|e| match e {
+        PublicDownloadError::BadUrl => refused(t("server.library.badUrl", &[("url", address.into())])),
+        PublicDownloadError::Dns(why) => refused(t("server.library.notFetched", &[("url", address.into()), ("why", why.into())])),
+        PublicDownloadError::Timeout => refused(t("server.library.slow", &[])),
+        PublicDownloadError::HttpStatus(status) => refused(t("server.library.notFetched", &[("url", address.into()), ("why", status.to_string().into())])),
+        PublicDownloadError::TooLarge => too_big(),
+        PublicDownloadError::Network(why) => refused(t("server.library.notFetched", &[("url", "".into()), ("why", why.into())])),
     })?;
-    let segment = url.path().rsplit('/').next().unwrap_or("");
+    let host = fetched.url.host_str().unwrap_or("").to_string();
+    let segment = fetched.url.path().rsplit('/').next().unwrap_or("");
     let named = percent_decoded(segment).unwrap_or_else(|| segment.to_string());
-    Ok((bytes, if named.is_empty() { host } else { named }, kind))
+    Ok((fetched.bytes, if named.is_empty() { host } else { named }, fetched.media_type))
 }
 
 fn percent_decoded(s: &str) -> Option<String> {

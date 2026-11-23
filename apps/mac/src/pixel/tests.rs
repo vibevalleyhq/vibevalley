@@ -229,25 +229,6 @@ fn opening_draws_the_scene_of_the_hour() {
 }
 
 #[test]
-fn catalog_shelves_every_sprite() {
-    if !assets_dir().join("pixel/sprites.json").exists() {
-        return;
-    }
-    let atlas = load_atlas().unwrap();
-    let mut c = super::catalog::CatalogScene::new(atlas.clone());
-    let counts = c.debug_state()["counts"].clone();
-    let total: u64 = counts.as_object().unwrap().values().map(|v| v.as_u64().unwrap()).sum();
-    assert_eq!(total as usize, atlas.names().count());
-    assert_eq!(counts["helpers"], 7 * 72);
-    save("catalog-helpers", &raster(&c.draw(), Some(&atlas), 2.0));
-    c.tap(level::pt(4.0 + 40.0 * 5.0 + 5.0, 8.0)); // the map shelf
-    c.tap(level::pt(384.0 - 4.0 - 18.0 + 3.0, 8.0)); // night ground
-    assert_eq!(c.debug_state()["shelf"], "map");
-    assert_eq!(c.debug_state()["ground"], "夜里");
-    save("catalog-map-night", &raster(&c.draw(), Some(&atlas), 2.0));
-}
-
-#[test]
 fn regression_night_tints_ground_but_keeps_hud_readable() {
     let (world, atlas) = load_village().unwrap();
     let mut scene = FarmScene::new(world, atlas.clone());
@@ -256,8 +237,9 @@ fn regression_night_tints_ground_but_keeps_hud_readable() {
     let day = scene.draw(2.0);
     scene.clock.set_time_of_day(0.92);
     let night = scene.draw(2.0);
-    assert!(night.lit > 0);
-    assert!(night.ops[night.lit..].iter().any(|op| matches!(op, draw::Op::Glow { .. })));
+    let farm_light = night.farm_light.as_ref().expect("farm scene emits FarmLight");
+    assert!(farm_light.foreground.end > 0);
+    assert!(night.ops[farm_light.foreground.end..].iter().any(|op| matches!(op, draw::Op::Glow { .. })));
     let energy = |img: image::RgbaImage| img.pixels().map(|p| p.0[..3].iter().map(|c| *c as u64).sum::<u64>()).sum::<u64>();
     assert!(energy(raster(&night, Some(&atlas), 1.0)) < energy(raster(&day, Some(&atlas), 1.0)));
     let paper = |list: &draw::DrawList| {
@@ -486,10 +468,8 @@ fn regression_unread_channel_badge_stays_inside_the_chat_hit_area() {
 fn static_pixel_scenes_do_not_request_animation_and_glow_cache_matches_raster() {
     use view::Scene;
 
-    let atlas = Arc::new(atlas::Atlas::parse(std::path::Path::new("."), "{}", 1.0).unwrap());
     assert!(!Scene::Loading.needs_animation());
     assert!(!Scene::Failed("err".into()).needs_animation());
-    assert!(!Scene::Catalog(Box::new(catalog::CatalogScene::new(atlas))).needs_animation());
 
     let color = draw::rgba(0xc6ff70, 0.5);
     let cached_a = draw::cached_glow_image(12, color);

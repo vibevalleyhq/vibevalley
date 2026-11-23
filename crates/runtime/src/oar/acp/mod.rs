@@ -1966,27 +1966,18 @@ impl Runtime for AcpRuntime {
     /// capabilities are only known after `initialize`, so `resume` and
     /// `model` can still be refused at open.
     fn capabilities(&self) -> Capabilities {
-        match self.flavor() {
-            AcpFlavor::Antigravity => Capabilities {
-                resume: true,
-                steer: true,
-                queue: true,
-                permission_requests: true,
-                model_selection: true,
-                subagents: true,
-                usage: true,
-                config_options: true,
-            },
-            AcpFlavor::Generic => Capabilities {
-                resume: true,
-                steer: matches!(self.id(), "grok" | "acp:opencode" | "opencode"),
-                queue: true,
-                permission_requests: true,
-                model_selection: true,
-                subagents: false,
-                usage: true,
-                config_options: false,
-            },
+        if let Some(spec) = crate::oar::runtime_spec(self.id()) {
+            return spec.capabilities;
+        }
+        Capabilities {
+            resume: true,
+            steer: false,
+            queue: true,
+            permission_requests: true,
+            model_selection: true,
+            subagents: false,
+            usage: true,
+            config_options: false,
         }
     }
 

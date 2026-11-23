@@ -28,6 +28,7 @@ test("ready, at and a selection are taken; anything else a page posts is not", (
   frame.heard(JSON.stringify({ vibevalley: "selection", anchor: { kind: "text", exact: "两条测试", prefix: "", suffix: "" } }));
   frame.heard("not json");
   frame.heard(JSON.stringify({ vibevalley: "ready", display: "nonsense" }));
+  frame.heard(JSON.stringify({ vibevalley: "selection", anchor: { kind: "text", exact: "x".repeat(10_001), prefix: "", suffix: "" } }));
   expect(frame.shown().ready?.pages).toBe(3);
   expect(frame.shown().at?.page).toBe(2);
   expect(frame.picked()?.exact).toBe("两条测试");

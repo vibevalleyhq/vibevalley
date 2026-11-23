@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use schemars::JsonSchema;
@@ -8,9 +7,6 @@ use crate::agent::core::extension::Extension;
 use crate::agent::core::pipeline::PromptSection;
 use crate::agent::core::tool::{ReplayPolicy, Tool, ToolContext, TypedTool, TypedToolAdapter, TypedToolOutput};
 
-/// Cut from the top when the prompt carries it: the newest notes matter most.
-const MEMORY_PROMPT_CHARS: usize = 8_000;
-
 /// Where an agent's notes live. `read` never fails (an unreadable memory is
 /// none); `remember` and `rewrite` report errors.
 pub trait MemoryPort: Send + Sync {
@@ -18,83 +14,6 @@ pub trait MemoryPort: Send + Sync {
     fn remember(&self, note: &str) -> Result<(), String>;
     /// Returns the new line count.
     fn rewrite(&self, content: &str) -> Result<usize, String>;
-}
-
-/// `MEMORY.md` in a home directory: `- YYYY-MM-DD note` lines.
-pub struct FileMemory {
-    pub home: PathBuf,
-}
-
-impl FileMemory {
-    fn file(&self) -> PathBuf {
-        self.home.join("MEMORY.md")
-    }
-}
-
-impl MemoryPort for FileMemory {
-    fn prompt(&self) -> String {
-        let text = std::fs::read_to_string(self.file()).unwrap_or_default();
-        let text = text.trim();
-        let chars: Vec<char> = text.chars().collect();
-        if chars.len() <= MEMORY_PROMPT_CHARS {
-            return text.to_string();
-        }
-        let tail: String = chars[chars.len() - MEMORY_PROMPT_CHARS..].iter().collect();
-        format!("（更早的记录省略了，全文在 {}）\n{tail}", self.file().display())
-    }
-
-    fn remember(&self, note: &str) -> Result<(), String> {
-        use std::io::Write;
-        std::fs::create_dir_all(&self.home).map_err(|e| e.to_string())?;
-        let cleaned = note.split_whitespace().collect::<Vec<_>>().join(" ");
-        let mut f = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(self.file())
-            .map_err(|e| e.to_string())?;
-        writeln!(f, "- {} {cleaned}", local_date()).map_err(|e| e.to_string())
-    }
-
-    fn rewrite(&self, content: &str) -> Result<usize, String> {
-        std::fs::create_dir_all(&self.home).map_err(|e| e.to_string())?;
-        let body = if content.ends_with('\n') {
-            content.to_string()
-        } else {
-            format!("{content}\n")
-        };
-        std::fs::write(self.file(), &body).map_err(|e| e.to_string())?;
-        let trimmed = body.trim();
-        Ok(if trimmed.is_empty() { 0 } else { trimmed.lines().count() })
-    }
-}
-
-/// YYYY-MM-DD in this machine's time zone.
-fn local_date() -> String {
-    let out = std::process::Command::new("date").arg("+%Y-%m-%d").output();
-    out.ok()
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-        .filter(|s| s.len() == 10)
-        .unwrap_or_else(|| {
-            let days = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs() / 86_400)
-                .unwrap_or(0) as i64;
-            civil_date(days)
-        })
-}
-
-/// Days since 1970-01-01 to YYYY-MM-DD (UTC fallback).
-fn civil_date(days: i64) -> String {
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = yoe + era * 400 + i64::from(m <= 2);
-    format!("{y:04}-{m:02}-{d:02}")
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]

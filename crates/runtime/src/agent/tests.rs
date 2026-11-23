@@ -13,7 +13,7 @@ use crate::agent::core::doc::{CONVERSATION_SCOPE, GovernanceDoc, OarSessionDoc, 
 use crate::agent::core::engine::{KIND as GENERATION_KIND, Request, TOOL_RUN};
 use crate::agent::core::inbox::WhenBusy;
 use crate::agent::core::pipeline::PromptSection;
-use crate::agent::durable::{Store, SubmissionStatus, Task, TaskStatus};
+use crate::agent::durable::{Store, Submission, SubmissionStatus, Task, TaskStatus};
 use crate::agent::extensions::governance::{self, Decision, GovernanceExtension, Permissions};
 use crate::agent::extensions::grader::{ExplicitReviewProvider, GraderExtension, Rubric};
 use crate::agent::extensions::memory::MemoryExtension;
@@ -128,11 +128,30 @@ fn worker_harness(store: Store) -> Harness {
     harness
 }
 
+fn submit_prompt(
+    harness: &Harness,
+    conv: &str,
+    provider: &str,
+    request_id: &str,
+    prompt: &str,
+    system: &str,
+) -> crate::agent::durable::Result<(Submission, Task, bool)> {
+    harness.submit(Request {
+        conversation: conv,
+        provider,
+        request_id,
+        prompt,
+        source: "user",
+        system,
+        ..Default::default()
+    })
+}
+
 fn run_worker_turn(harness: &Harness, conv: &str, b: Arc<Brain>, prompt: &str) -> (Vec<AgentEvent>, Task) {
     let events = Arc::new(Mutex::new(Vec::new()));
     let ev_sink = events.clone();
     harness.attach_worker(conv, b, Arc::new(move |e| ev_sink.lock().unwrap().push(e))).unwrap();
-    let (_, task, _) = harness.conversation(conv).prompt("deepseek-flash", "req-1", prompt, "You are a test.").unwrap();
+    let (_, task, _) = submit_prompt(harness, conv, "deepseek-flash", "req-1", prompt, "You are a test.").unwrap();
     let done = harness.scheduler().wait(&task.id, Duration::from_secs(10)).unwrap();
     let captured = events.lock().unwrap().clone();
     harness.workers().detach(conv);
@@ -191,14 +210,14 @@ fn the_transcript_survives_a_reopen_and_feeds_the_next_turn() {
     {
         let h1 = worker_harness(Store::open(&db).unwrap());
         h1.attach_worker(&conv, brain(client.clone(), vec![]), Arc::new(|_| {})).unwrap();
-        let (_, t1, _) = h1.conversation(&conv).prompt("deepseek-flash", "r1", "one", "You are a test.").unwrap();
+        let (_, t1, _) = submit_prompt(&h1, &conv, "deepseek-flash", "r1", "one", "You are a test.").unwrap();
         h1.scheduler().wait(&t1.id, Duration::from_secs(10)).unwrap();
         h1.close();
     }
     {
         let h2 = worker_harness(Store::open(&db).unwrap());
         h2.attach_worker(&conv, brain(client.clone(), vec![]), Arc::new(|_| {})).unwrap();
-        let (_, t2, _) = h2.conversation(&conv).prompt("deepseek-flash", "r2", "two", "You are a test.").unwrap();
+        let (_, t2, _) = submit_prompt(&h2, &conv, "deepseek-flash", "r2", "two", "You are a test.").unwrap();
         h2.scheduler().wait(&t2.id, Duration::from_secs(10)).unwrap();
         h2.close();
     }
@@ -346,8 +365,8 @@ fn abort_stops_before_the_next_step() {
     let runs = Arc::new(Mutex::new(0));
     let client = Scripted::new(vec![call("c1", "count", json!({})), say("never")]);
     let conv = worker_conversation("abort");
-    let handle = harness.conversation(&conv);
-    let handle_abort = handle.clone();
+    let harness_abort = harness.clone();
+    let conv_abort = conv.clone();
     harness
         .attach_worker(
             &conv,
@@ -360,12 +379,12 @@ fn abort_stops_before_the_next_step() {
             ),
             Arc::new(move |e| {
                 if matches!(e, AgentEvent::ToolEnd { .. }) {
-                    let _ = handle_abort.abort();
+                    let _ = harness_abort.abort_conversation(&conv_abort);
                 }
             }),
         )
         .unwrap();
-    let (_, task, _) = handle.prompt("deepseek-flash", "r1", "go", "You are a test.").unwrap();
+    let (_, task, _) = submit_prompt(&harness, &conv, "deepseek-flash", "r1", "go", "You are a test.").unwrap();
     let done = harness.scheduler().wait(&task.id, Duration::from_secs(10)).unwrap();
     assert_eq!(done.terminal_reason, "aborted");
     assert_eq!(client.seen.lock().unwrap().len(), 1);
@@ -446,7 +465,7 @@ fn governance_extension_allows_readonly_tools_and_parks_on_unsafe_tool() {
         )
         .unwrap();
 
-    let (_, task, _) = harness.conversation(&conv).prompt("deepseek-flash", "req", "read then count", "sys").unwrap();
+    let (_, task, _) = submit_prompt(&harness, &conv, "deepseek-flash", "req", "read then count", "sys").unwrap();
 
     // `read` is allowlisted in DefaultClassifier so it runs without parking; `count` parks.
     let (parked_task, call_id, tool_name) = perm_rx.recv_timeout(Duration::from_secs(10)).unwrap();
@@ -550,10 +569,7 @@ fn subagent_extension_spawns_once_and_does_not_duplicate_on_replay() {
     harness
         .attach_worker(&conv, brain(client.clone(), vec![]), Arc::new(move |e| ev_sink.lock().unwrap().push(e)))
         .unwrap();
-    let (_, task, _) = harness
-        .conversation(&conv)
-        .prompt("deepseek-flash", "r1", "find clock", "You are parent.")
-        .unwrap();
+    let (_, task, _) = submit_prompt(&harness, &conv, "deepseek-flash", "r1", "find clock", "You are parent.").unwrap();
     let done = harness.scheduler().wait(&task.id, Duration::from_secs(10)).unwrap();
     assert_eq!(done.terminal_reason, "completed");
 
@@ -597,7 +613,7 @@ fn todo_extension_persists_graph_to_todo_doc_across_reopen() {
         let h1 = worker_harness(Store::open(&db).unwrap());
         h1.attach_worker(&conv, brain(client.clone(), todo_tools(Default::default())), Arc::new(|_| {}))
             .unwrap();
-        let (_, t1, _) = h1.conversation(&conv).prompt("deepseek-flash", "r1", "add step", "sys").unwrap();
+        let (_, t1, _) = submit_prompt(&h1, &conv, "deepseek-flash", "r1", "add step", "sys").unwrap();
         h1.scheduler().wait(&t1.id, Duration::from_secs(10)).unwrap();
         let doc = h1.store().read(|tx| read_doc::<TodoDoc>(tx, CONVERSATION_SCOPE, &conv)).unwrap();
         assert_eq!(doc.items.len(), 1);
@@ -608,7 +624,7 @@ fn todo_extension_persists_graph_to_todo_doc_across_reopen() {
         let h2 = worker_harness(Store::open(&db).unwrap());
         h2.attach_worker(&conv, brain(client.clone(), todo_tools(Default::default())), Arc::new(|_| {}))
             .unwrap();
-        let (_, t2, _) = h2.conversation(&conv).prompt("deepseek-flash", "r2", "list", "sys").unwrap();
+        let (_, t2, _) = submit_prompt(&h2, &conv, "deepseek-flash", "r2", "list", "sys").unwrap();
         h2.scheduler().wait(&t2.id, Duration::from_secs(10)).unwrap();
         h2.close();
     }
@@ -624,9 +640,8 @@ fn standin_and_durable_follow_up_work_through_harness() {
     let conv = worker_conversation("standin-fu");
     let client = Scripted::new(vec![say("first"), say("followed up")]);
     harness.attach_worker(&conv, brain(client.clone(), vec![]), Arc::new(|_| {})).unwrap();
-    let handle = harness.conversation(&conv);
-    let (_, task, _) = handle
-        .prompt_with(Request {
+    let (_, task, _) = harness
+        .submit(Request {
             conversation: &conv,
             provider: "deepseek-flash",
             request_id: "r1",
@@ -637,7 +652,9 @@ fn standin_and_durable_follow_up_work_through_harness() {
             ..Default::default()
         })
         .unwrap();
-    handle.follow_up("fu-1", "next thing").unwrap();
+    store
+        .write(|tx| crate::agent::core::inbox::submit_follow_up(tx, &conv, "fu-1", "next thing", None))
+        .unwrap();
     let done = harness.scheduler().wait(&task.id, Duration::from_secs(10)).unwrap();
     assert_eq!(done.terminal_reason, "completed");
 
@@ -770,8 +787,33 @@ mod kit_tests {
     use serde_json::json;
 
     use super::*;
-    use crate::agent::extensions::memory::{FileMemory, MemoryPort, Remember, RewriteMemory};
+    use crate::agent::extensions::memory::{MemoryPort, Remember, RewriteMemory};
     use crate::agent::resources::skills::{front_matter, read_skill, scan_skills, skill_body, skill_index};
+
+    #[derive(Default)]
+    struct InMemoryPort(Mutex<String>);
+
+    impl MemoryPort for InMemoryPort {
+        fn prompt(&self) -> String {
+            self.0.lock().unwrap().trim().to_owned()
+        }
+
+        fn remember(&self, note: &str) -> std::result::Result<(), String> {
+            let line = format!("- {}", note.split_whitespace().collect::<Vec<_>>().join(" "));
+            let mut body = self.0.lock().unwrap();
+            if !body.is_empty() {
+                body.push('\n');
+            }
+            body.push_str(&line);
+            Ok(())
+        }
+
+        fn rewrite(&self, content: &str) -> std::result::Result<usize, String> {
+            let trimmed = content.trim();
+            *self.0.lock().unwrap() = trimmed.to_owned();
+            Ok(trimmed.lines().filter(|l| !l.trim().is_empty()).count())
+        }
+    }
 
     #[test]
     fn front_matter_and_skills_scan_first_name_wins() {
@@ -801,15 +843,14 @@ mod kit_tests {
     }
 
     #[test]
-    fn memory_remembers_dated_lines_and_rewrites_and_builds_extension_section() {
-        let home = tempfile::tempdir().unwrap();
-        let mem: Arc<dyn MemoryPort> = Arc::new(FileMemory { home: home.path().into() });
+    fn memory_remembers_lines_and_rewrites_and_builds_extension_section() {
+        let mem: Arc<dyn MemoryPort> = Arc::new(InMemoryPort::default());
         assert_eq!(mem.prompt(), "");
         let remember = TypedToolAdapter(Remember(mem.clone()));
         assert!(remember.execute(&json!({"note": "  "})).is_error);
         assert_eq!(remember.execute(&json!({"note": "用户喜欢\n简短回答"})).text, "记下了。");
         let prompt = mem.prompt();
-        assert!(prompt.starts_with("- 20") && prompt.ends_with("用户喜欢 简短回答"), "{prompt}");
+        assert_eq!(prompt, "- 用户喜欢 简短回答");
         let ext = MemoryExtension::new(mem.clone());
         let sections = ext.sections();
         assert_eq!(sections.len(), 1);

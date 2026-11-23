@@ -25,9 +25,6 @@ const RECALL_MATCH_WEIGHT: f64 = 0.3;
 const RECALL_SHARED_WEIGHT: f64 = 0.5;
 pub const NOTE_MAX_CHARS: usize = 300;
 pub const SEARCH_LIMIT: usize = 10;
-/// Raised when the cut or the dictionary changes: stored terms are then
-/// cut again.
-pub const TERMS_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -112,11 +109,6 @@ pub fn terms_list(text: &str) -> Vec<String> {
 
 pub fn terms_of(text: &str) -> HashSet<String> {
     terms_list(text).into_iter().collect()
-}
-
-/// What a terms column holds: the words, space-joined.
-pub fn terms_text(text: &str) -> String {
-    terms_list(text).join(" ")
 }
 
 fn in_common(a: &HashSet<String>, b: &HashSet<String>) -> usize {

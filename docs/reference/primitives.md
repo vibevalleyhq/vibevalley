@@ -247,6 +247,9 @@
 | `rememberPick` | `state/prefs.ts` | Who and where an issue was given to, for the next quick add and the farm's next job: "" for no one is the orchestrator's. |
 | `usePrefs` | `state/prefs.ts` | One of the choices, following it. |
 | `shownTheme` | `state/prefs.ts` | The theme the workbench shows: "system" worked out from the system's own. Read again when the choice changes. |
+| `createPersistentStorage` | `state/storage.ts` | Synchronous `localStorage`-compatible cache hydrated asynchronously at boot |
+| `setActiveStorageHydrated` | `state/storage.ts` |  |
+| `isStorageHydrated` | `state/storage.ts` | Reactive flag that turns `true` once boot hydration from native `Storage` settles. |
 | `defineStored` | `state/stored.ts` | A choice kept on this machine, read and set as the page's value; `name` is unique across the page. |
 | `orFallback` | `state/stored.ts` | A field of a stored struct that reads as `fallback` when it is missing or does not decode, so one bad field does not throw away the others. |
 | `useTable` | `table.ts` |  |

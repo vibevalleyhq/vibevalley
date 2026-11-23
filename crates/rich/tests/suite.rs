@@ -1,8 +1,6 @@
 mod chart_common;
 mod support;
 
-mod canvas_engine;
-mod canvas_ops_history;
 mod canvas_spec_codec;
 mod canvas_svg_render;
 mod chart_and_genui;
@@ -15,7 +13,6 @@ mod genui_compound_interest_tests;
 mod genui_dashboard_tests;
 mod genui_expr_tests;
 mod genui_stream_and_roundtrip_tests;
-mod hooks;
 mod i18n;
 mod markdown;
 mod pinyin;

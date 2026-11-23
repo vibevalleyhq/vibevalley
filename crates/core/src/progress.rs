@@ -7,12 +7,12 @@ use std::collections::BTreeMap;
 use vibevalley_protocol::{
     AchievementCategory, Actor, AgentRole, AgentTally, CallState, DEFAULT_ORCHESTRATOR, EVERYONE, Fact, Issue, IssueStatus, JsNumber, Landing, LedgerEntry,
     LedgerEntryCalled, LedgerEntryConflicted, LedgerEntryFailed, LedgerEntryFamily, LedgerEntryHandoff, LedgerEntryHarvested, LedgerEntryHired,
-    LedgerEntryLevel, LedgerEntryMoment, LedgerEntryTold, Outcome, Progress, ProgressNews, ProgressTitle, Session, SessionClose, SpaceState, USER_ID, Unlock,
+    LedgerEntryLevel, LedgerEntryMoment, LedgerEntryTold, Outcome, Progress, ProgressNews, ProgressTitle, SessionClose, SpaceState, USER_ID, Unlock,
 };
 
 use crate::deps::{DagNode, dag_layers};
 use crate::game::{AchievementDef, achievements, level_for_commits};
-use crate::status::{is_hired, session_on_issue};
+use crate::status::{is_hired, session_of, session_on_issue};
 
 const CHEAP_CNY: f64 = 0.05;
 const FULL_HOUSE: usize = 6;
@@ -57,7 +57,7 @@ pub struct Folded {
     pub seen: Seen,
 }
 
-pub fn empty_progress() -> Progress {
+fn empty_progress() -> Progress {
     Progress {
         coins: 0,
         streak: 0,
@@ -261,10 +261,6 @@ pub fn progress_step(folded: &Folded, entry: &LedgerEntry) -> (Folded, ProgressN
 
 pub fn progress_fold(entries: &[LedgerEntry]) -> Folded {
     entries.iter().fold(Folded::default(), |f, e| progress_step(&f, e).0)
-}
-
-fn session_of<'a>(state: &'a SpaceState, id: &str) -> Option<&'a Session> {
-    state.sessions.iter().find(|s| s.id == id)
 }
 
 fn working(state: &SpaceState) -> usize {

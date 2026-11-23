@@ -1,11 +1,10 @@
 //! GPU-painted pixel scenes carried over from VibeValley: the farm, the map
-//! of islands, the memory tree, the opening and the catalog. Each scene is
+//! of islands, the memory tree and the opening. Each scene is
 //! plain Rust that turns the server's frame into a [`draw::DrawList`]; the
 //! GPUI element ([`element`]) paints it with nearest-neighbour sprites, and
 //! [`draw::raster`] paints the same list on the CPU for checks.
 
 pub mod atlas;
-pub mod catalog;
 pub mod draw;
 pub mod element;
 pub mod farm;

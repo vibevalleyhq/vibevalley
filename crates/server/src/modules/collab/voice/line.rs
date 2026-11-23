@@ -559,9 +559,15 @@ mod tests {
 
     /// A request over the loopback, as the tunnel would bring it: (status, body).
     fn post(url: &str, key: &str, body: &str) -> (u16, String) {
-        let agent: ureq::Agent = ureq::Agent::config_builder().http_status_as_error(false).build().into();
-        let mut answered = agent.post(url).header("authorization", &format!("Bearer {key}")).send(body).unwrap();
-        (answered.status().as_u16(), answered.body_mut().read_to_string().unwrap())
+        crate::install_tls();
+        let client = reqwest::blocking::Client::builder().no_proxy().build().unwrap();
+        let answered = client
+            .post(url)
+            .header("authorization", format!("Bearer {key}"))
+            .body(body.to_string())
+            .send()
+            .unwrap();
+        (answered.status().as_u16(), answered.text().unwrap())
     }
 
     #[test]

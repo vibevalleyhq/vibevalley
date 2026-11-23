@@ -92,7 +92,7 @@ test("workspace sidebar renders repos, tabs, collapse toggle, and posts project/
       "repo.list": [{ name: "vibevalley", path: "/work/vibevalley", git: true }],
     },
   );
-  const app = await open("../App.story.tsx", { width: 280, height: 760, colorScheme: "light", platform: "macos", host: host.options });
+  const app = await open("../ShellApp.story.tsx", { width: 280, height: 760, colorScheme: "light", platform: "macos", host: host.options });
   await host.pump(app);
 
   await host.pushFrame(app, "slice:board", { seq: 1, issues: [] });
@@ -188,7 +188,7 @@ test("workspace sidebar renders repos, tabs, collapse toggle, and posts project/
 
 test("workspace inspector FileTree expands, collapses, opens files, and handles context menus", async () => {
   const host = workspaceHost({ view: "sidebar", role: "inspector" });
-  const app = await open("../App.story.tsx", { width: 320, height: 760, colorScheme: "light", platform: "macos", host: host.options });
+  const app = await open("../ShellApp.story.tsx", { width: 320, height: 760, colorScheme: "light", platform: "macos", host: host.options });
   await host.pump(app);
 
   const initialFiles: FilesFrame = {
@@ -246,7 +246,7 @@ test("workspace inspector FileTree expands, collapses, opens files, and handles 
 
 test("workspace inspector GitPanel drives changes, staging/commit, branches, and commits tabs", async () => {
   const host = workspaceHost({ view: "sidebar", role: "inspector" });
-  const app = await open("../App.story.tsx", { width: 340, height: 820, colorScheme: "light", platform: "macos", host: host.options });
+  const app = await open("../ShellApp.story.tsx", { width: 340, height: 820, colorScheme: "light", platform: "macos", host: host.options });
   await host.pump(app);
 
   const gitFrame: GitFrame = {
@@ -294,7 +294,7 @@ test("workspace inspector GitPanel drives changes, staging/commit, branches, and
 
 test("workspace Palette handles commands filter/select/close and remote search/files queries", async () => {
   const host = workspaceHost({ view: "palette" });
-  const app = await open("../App.story.tsx", { width: 640, height: 420, colorScheme: "light", platform: "macos", host: host.options });
+  const app = await open("../ShellApp.story.tsx", { width: 640, height: 420, colorScheme: "light", platform: "macos", host: host.options });
   await host.pump(app);
 
   await host.pushFrame(app, "palette", {
@@ -349,7 +349,7 @@ test("workspace Palette handles commands filter/select/close and remote search/f
 
 test("workspace MarkdownPane renders delayed skeleton, pushed markdown documents, and error states", async () => {
   const host = workspaceHost({ view: "markdown" });
-  const app = await open("../App.story.tsx", {
+  const app = await open("../ShellApp.story.tsx", {
     width: 720,
     height: 600,
     colorScheme: "light",
@@ -440,7 +440,7 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
     },
   );
 
-  const app = await open("../App.story.tsx", { width: 820, height: 760, colorScheme: "light", platform: "macos", host: host.options });
+  const app = await open("../ShellApp.story.tsx", { width: 820, height: 760, colorScheme: "light", platform: "macos", host: host.options });
   await host.pump(app);
 
   expect(app.count("id:workspace-chat-pane")).toBe(1);
@@ -566,7 +566,7 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
   expect(app.count("id:chat-telemetry-drawer")).toBe(0);
 
   const freshHost = workspaceHost({ view: "workspace-chat", tabId: 43, runtime: "antigravity", cwd: "/work/vibevalley" }, { "runtime.list": [] });
-  const freshApp = await open("../App.story.tsx", { width: 400, height: 760, colorScheme: "light", platform: "macos", host: freshHost.options });
+  const freshApp = await open("../ShellApp.story.tsx", { width: 400, height: 760, colorScheme: "light", platform: "macos", host: freshHost.options });
   await freshHost.pump(freshApp);
   expect(freshApp.count("id:chat-telemetry-toggle")).toBe(0);
   expect(freshApp.count("id:chat-swarm-pill")).toBe(0);
@@ -611,7 +611,7 @@ test("workspace SwarmPanel hides pill when absent, switches Overview/Roster/Boar
     ["session.childTranscript"],
   );
 
-  const app = await open("../App.story.tsx", {
+  const app = await open("../ShellApp.story.tsx", {
     width: 820,
     height: 760,
     colorScheme: "light",
@@ -716,7 +716,7 @@ test("workspace SwarmPanel hides pill when absent, switches Overview/Roster/Boar
 
 test("workspace skeletons: 150ms anti-flash gate suppresses fast loads and renders delayed FileTree, GitPanel, and Palette skeletons", async () => {
   const host = workspaceHost({ view: "sidebar", role: "inspector" });
-  const app = await open("../App.story.tsx", {
+  const app = await open("../ShellApp.story.tsx", {
     width: 320,
     height: 760,
     colorScheme: "light",
@@ -775,7 +775,7 @@ test("workspace skeletons: 150ms anti-flash gate suppresses fast loads and rende
   expect(app.texts()).toContain(t("web.shell.git.notRepo"));
 
   const palHost = workspaceHost({ view: "palette" });
-  const pal = await open("../App.story.tsx", {
+  const pal = await open("../ShellApp.story.tsx", {
     width: 640,
     height: 420,
     colorScheme: "light",
@@ -859,7 +859,7 @@ test("regression: ChatPane hides thought level and omits effort for Orchestrator
     },
   );
 
-  const app = await open("../App.story.tsx", { width: 820, height: 760, colorScheme: "light", platform: "macos", host: host.options });
+  const app = await open("../ShellApp.story.tsx", { width: 820, height: 760, colorScheme: "light", platform: "macos", host: host.options });
   await host.pump(app);
 
   expect(app.count("id:chat-thought-level")).toBe(1);

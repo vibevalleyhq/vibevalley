@@ -5,11 +5,9 @@ use std::path::Path;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
-use pollster::block_on;
-use sqlx::SqliteConnection;
 use vibevalley_protocol::{ApiError, PublishPlatform, PullRequest, PullRequestState};
 
-use crate::base::{internal, open_sqlx_db};
+use crate::base::{ModuleDb, internal};
 use crate::modules::infra::column::{read_word, word};
 
 use crate::db::generated::work_pull as queries;
@@ -161,19 +159,15 @@ impl PullIndex {
 }
 
 pub struct PullStore {
-    db: Mutex<SqliteConnection>,
+    db: ModuleDb,
     index: Arc<Mutex<PullIndex>>,
 }
 
 impl PullStore {
     pub fn open(home: &Path) -> Result<PullStore, ApiError> {
-        let mut conn = block_on(async {
-            let mut db = open_sqlx_db(home).await?;
-            sqlx::raw_sql(SCHEMA).execute(&mut db).await?;
-            Ok::<_, sqlx::Error>(db)
-        })
-        .map_err(internal)?;
-        let rows: Vec<PullRecord> = block_on(queries::list_pulls(&mut conn))
+        let db = ModuleDb::open(home, SCHEMA).map_err(internal)?;
+        let rows: Vec<PullRecord> = db
+            .run(async |conn| queries::list_pulls(conn).await)
             .map_err(internal)?
             .into_iter()
             .map(record_of)
@@ -182,7 +176,7 @@ impl PullStore {
         let mut index = PullIndex::default();
         index.load(rows);
         Ok(PullStore {
-            db: Mutex::new(conn),
+            db,
             index: Arc::new(Mutex::new(index)),
         })
     }
@@ -221,7 +215,9 @@ impl PullStore {
             created_at: input.at,
             updated_at: input.at,
         };
-        let saved = block_on(queries::upsert_pull(&mut *self.db.lock(), params))
+        let saved = self
+            .db
+            .run(async |conn| queries::upsert_pull(conn, params).await)
             .and_then(record_of)
             .map_err(internal)?;
         Ok(self.index.lock().put(saved))
@@ -233,7 +229,9 @@ impl PullStore {
             state: word(&state).map_err(internal)?,
             updated_at: at,
         };
-        let saved = block_on(queries::set_pull_state(&mut *self.db.lock(), params))
+        let saved = self
+            .db
+            .run(async |conn| queries::set_pull_state(conn, params).await)
             .and_then(record_of)
             .map_err(internal)?;
         Ok(self.index.lock().put(saved))
@@ -246,18 +244,19 @@ impl PullStore {
             check_revision: revision,
             updated_at: at,
         };
-        let saved = block_on(queries::observe_pull_checks(&mut *self.db.lock(), params))
+        let saved = self
+            .db
+            .run(async |conn| queries::observe_pull_checks(conn, params).await)
             .and_then(record_of)
             .map_err(internal)?;
         Ok(self.index.lock().put(saved))
     }
 
     pub fn known_events(&self, pull_id: &str) -> Result<Vec<KnownPullEvent>, ApiError> {
-        let rows = block_on(queries::known_pull_events(
-            &mut *self.db.lock(),
-            queries::KnownPullEventsParams { pull_id: pull_id.into() },
-        ))
-        .map_err(internal)?;
+        let rows = self
+            .db
+            .run(async |conn| queries::known_pull_events(conn, queries::KnownPullEventsParams { pull_id: pull_id.into() }).await)
+            .map_err(internal)?;
         Ok(rows
             .into_iter()
             .map(|r| KnownPullEvent {
@@ -269,15 +268,19 @@ impl PullStore {
     }
 
     pub fn keep_event(&self, pull_id: &str, key: &str, bot_round_key: Option<&str>, bot_round: Option<i64>) -> Result<(), ApiError> {
-        block_on(queries::keep_pull_event(
-            &mut *self.db.lock(),
-            queries::KeepPullEventParams {
-                pull_id: pull_id.into(),
-                key: key.into(),
-                bot_round_key: bot_round_key.map(str::to_owned),
-                bot_round,
-            },
-        ))
-        .map_err(internal)
+        self.db
+            .run(async |conn| {
+                queries::keep_pull_event(
+                    conn,
+                    queries::KeepPullEventParams {
+                        pull_id: pull_id.into(),
+                        key: key.into(),
+                        bot_round_key: bot_round_key.map(str::to_owned),
+                        bot_round,
+                    },
+                )
+                .await
+            })
+            .map_err(internal)
     }
 }

@@ -732,6 +732,39 @@ mod tests {
         assert_eq!(counts.len(), 1);
         assert_eq!((counts[0].name.as_str(), counts[0].files), ("Rust", 2));
     }
+
+    #[test]
+    fn regression_pyproject_toml_detects_python_stack_and_ruff() {
+        let mut with_ruff = std::collections::HashMap::new();
+        with_ruff.insert("pyproject.toml", "[tool.ruff]\nline-length = 100\n".to_string());
+        let py = stack_of(&with_ruff);
+        assert_eq!(py.name, "python");
+        assert_eq!(py.test.as_deref(), Some("pytest"));
+        assert_eq!(py.lint.as_deref(), Some("ruff check ."));
+
+        let mut no_ruff = std::collections::HashMap::new();
+        no_ruff.insert("pyproject.toml", "[project]\nname = \"demo\"\n".to_string());
+        let plain = stack_of(&no_ruff);
+        assert_eq!(plain.name, "python");
+        assert_eq!(plain.test.as_deref(), Some("pytest"));
+        assert_eq!(plain.lint, None);
+
+        let mut typo = std::collections::HashMap::new();
+        typo.insert("pyrepo.toml", "[tool.ruff]\n".to_string());
+        assert_eq!(stack_of(&typo).name, "");
+
+        let work = tempfile::tempdir().unwrap();
+        let repo_dir = work.path().join("repos/pyapp");
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        let init = std::process::Command::new("git").args(["init", "-q"]).current_dir(&repo_dir).status().unwrap();
+        assert!(init.success());
+        std::fs::write(repo_dir.join("pyproject.toml"), "[tool.ruff]\n").unwrap();
+        let repos = Repos::open(work.path(), 3).unwrap();
+        let detected = repos.stack("pyapp").unwrap();
+        assert_eq!(detected.name, "python");
+        assert_eq!(detected.lint.as_deref(), Some("ruff check ."));
+        repos.close();
+    }
 }
 
 const STACK_FILES: [&str; 11] = [
@@ -739,7 +772,7 @@ const STACK_FILES: [&str; 11] = [
     "Cargo.toml",
     "pubspec.yaml",
     "package.json",
-    "pyrepo.toml",
+    "pyproject.toml",
     "requirements.txt",
     "setup.py",
     "bun.lock",
@@ -800,9 +833,9 @@ pub fn stack_of(files: &std::collections::HashMap<&str, String>) -> RepoStack {
         let label = t("shared.join.aside", &[("text", "Node".into()), ("aside", pm.into())]);
         return stack("node", label, &run("test"), &run("lint"), &run("build"));
     }
-    let pyrepo = files.get("pyrepo.toml");
-    if pyrepo.is_some() || has("requirements.txt") || has("setup.py") {
-        let lint = if pyrepo.is_some_and(|p| p.contains("ruff")) { "ruff check ." } else { "" };
+    let pyproject = files.get("pyproject.toml");
+    if pyproject.is_some() || has("requirements.txt") || has("setup.py") {
+        let lint = if pyproject.is_some_and(|p| p.contains("ruff")) { "ruff check ." } else { "" };
         return stack("python", "Python".into(), "pytest", lint, "");
     }
     RepoStack {

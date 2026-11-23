@@ -3,49 +3,16 @@
 //! Built only with `--features eval` so the default `vibevalley` HTTP CLI does not link `vibevalley-runtime`.
 
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use clap::error::ErrorKind;
 use clap::{Parser, Subcommand};
-use serde::Serialize;
 use serde_json::json;
+use vibevalley_cli::{Done, Failure, Output, exit, no_dry_run, run_cli};
 use vibevalley_runtime::agent::OpenAiClient;
 use vibevalley_runtime::agent::ai::types::ModelClient;
 use vibevalley_runtime::agent::durable::{ExportOptions, Store, read_telemetry_jsonl};
 use vibevalley_runtime::agent::eval::{EvalRunner, EvalSuite, ReplaySpec, analyze_store, export_html, render_timeline, resolve_root_conversation, run_replay};
-
-mod exit {
-    pub const OK: i32 = 0;
-    pub const OTHER: i32 = 1;
-    pub const USAGE: i32 = 2;
-    pub const REFUSED: i32 = 3;
-}
-
-struct Failure {
-    code: i32,
-    tag: &'static str,
-    message: String,
-}
-
-impl Failure {
-    fn new(code: i32, tag: &'static str, message: impl Into<String>) -> Self {
-        Self {
-            code,
-            tag,
-            message: message.into(),
-        }
-    }
-
-    fn usage(tag: &'static str, message: impl Into<String>) -> Self {
-        Self::new(exit::USAGE, tag, message)
-    }
-
-    fn print(&self) {
-        eprintln!("{}", json!({ "error": { "tag": self.tag, "message": self.message } }));
-    }
-}
 
 /// Durable trajectory export, inspection, replay, and evaluation runner.
 #[derive(Debug, Parser)]
@@ -130,18 +97,6 @@ enum EvalCommand {
     },
 }
 
-fn show<T: Serialize>(json_mode: bool, value: &T, format: impl FnOnce(&T) -> String) {
-    let mut stdout = std::io::stdout();
-    if json_mode {
-        let _ = writeln!(stdout, "{}", serde_json::to_string(value).unwrap_or_else(|_| "null".into()));
-    } else {
-        let text = format(value);
-        if !text.is_empty() {
-            let _ = writeln!(stdout, "{text}");
-        }
-    }
-}
-
 fn eval_err(err: impl std::fmt::Display) -> Failure {
     Failure::new(exit::OTHER, "Eval", err.to_string())
 }
@@ -162,7 +117,8 @@ fn resolve_deepseek_client() -> Result<Arc<dyn ModelClient>, Failure> {
     Ok(Arc::new(OpenAiClient::deepseek(move || Some(key.clone()))))
 }
 
-fn run(cli: EvalCli) -> Result<(), Failure> {
+fn run(cli: EvalCli) -> Done {
+    let output = Output { json: cli.json };
     match cli.command {
         EvalCommand::Export {
             conversation,
@@ -172,7 +128,7 @@ fn run(cli: EvalCli) -> Result<(), Failure> {
             no_children,
         } => {
             if cli.dry_run {
-                return Err(Failure::usage("NoDryRun", "eval export does not support --dry-run"));
+                return Err(no_dry_run("eval export"));
             }
             if let Some(seq) = at_seq
                 && seq < 0
@@ -193,7 +149,7 @@ fn run(cli: EvalCli) -> Result<(), Failure> {
                 )
                 .map_err(eval_err)?;
             let _ = store.close();
-            show(cli.json, &manifest, |m| {
+            output.show(&manifest, |m| {
                 format!(
                     "exported {} ({} conversations, {} entries, {} tasks, {} docs) -> {}",
                     m.root_conversation_id,
@@ -236,15 +192,15 @@ fn run(cli: EvalCli) -> Result<(), Failure> {
             };
             let _ = store.close();
 
-            if cli.json {
+            if output.json {
                 if let Some(tl) = rendered_timeline {
-                    show(true, &json!({ "metrics": metrics, "timeline": tl }), |_| String::new());
+                    output.show(&json!({ "metrics": metrics, "timeline": tl }), |_| String::new());
                 } else {
-                    show(true, &metrics, |_| String::new());
+                    output.show(&metrics, |_| String::new());
                 }
                 return Ok(());
             }
-            show(false, &metrics, |m| {
+            output.show(&metrics, |m| {
                 let summary = format!(
                     "conversation={} turns={} entries={} tools={} (errors={}, loops={}) compactions={} cost=${:.6} duration={}ms",
                     m.conversation_id,
@@ -266,13 +222,13 @@ fn run(cli: EvalCli) -> Result<(), Failure> {
         }
         EvalCommand::Replay { spec, out } => {
             if cli.dry_run {
-                return Err(Failure::usage("NoDryRun", "eval replay does not support --dry-run"));
+                return Err(no_dry_run("eval replay"));
             }
             let raw = fs::read_to_string(&spec).map_err(eval_err)?;
             let parsed: ReplaySpec = serde_json::from_str(&raw).map_err(|e| Failure::usage("InvalidValue", e.to_string()))?;
             let client = resolve_deepseek_client()?;
             let outcome = run_replay(&parsed, &out, client).map_err(eval_err)?;
-            show(cli.json, &outcome, |o| {
+            output.show(&outcome, |o| {
                 format!(
                     "replay {}@seq{} passed={} turns={} cost=${:.6} -> {}",
                     o.conversation_id,
@@ -287,7 +243,7 @@ fn run(cli: EvalCli) -> Result<(), Failure> {
         }
         EvalCommand::Run { suite, out, trials, profile } => {
             if cli.dry_run {
-                return Err(Failure::usage("NoDryRun", "eval run does not support --dry-run"));
+                return Err(no_dry_run("eval run"));
             }
             let raw = fs::read_to_string(&suite).map_err(eval_err)?;
             let mut parsed: EvalSuite = serde_json::from_str(&raw).map_err(|e| Failure::usage("InvalidValue", e.to_string()))?;
@@ -305,49 +261,12 @@ fn run(cli: EvalCli) -> Result<(), Failure> {
             }
             let client = resolve_deepseek_client()?;
             let report = EvalRunner.run(&parsed, &out, move |_, _, _| client.clone()).map_err(eval_err)?;
-            show(cli.json, &report, |r| r.render_markdown());
+            output.show(&report, |r| r.render_markdown());
             Ok(())
         }
     }
 }
 
-fn parse_failure(err: &clap::Error) -> Failure {
-    let tag = match err.kind() {
-        ErrorKind::MissingRequiredArgument | ErrorKind::TooFewValues => "MissingArgument",
-        ErrorKind::UnknownArgument => "UnrecognizedOption",
-        ErrorKind::InvalidSubcommand => "UnknownSubcommand",
-        ErrorKind::MissingSubcommand => "MissingSubcommand",
-        ErrorKind::ArgumentConflict => "ConflictingOption",
-        _ => "InvalidValue",
-    };
-    let text = err.to_string();
-    let first = text.lines().next().unwrap_or("").trim_start_matches("error: ").to_string();
-    Failure::usage(tag, first)
-}
-
 fn main() {
-    let cli = match EvalCli::try_parse() {
-        Ok(parsed) => parsed,
-        Err(err) => {
-            let code = match err.kind() {
-                ErrorKind::DisplayHelp | ErrorKind::DisplayVersion | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => {
-                    print!("{}", err.render());
-                    exit::OK
-                }
-                _ => {
-                    parse_failure(&err).print();
-                    exit::USAGE
-                }
-            };
-            std::process::exit(code);
-        }
-    };
-    let code = match run(cli) {
-        Ok(()) => exit::OK,
-        Err(failure) => {
-            failure.print();
-            failure.code
-        }
-    };
-    std::process::exit(code);
+    std::process::exit(run_cli(std::env::args_os(), run));
 }

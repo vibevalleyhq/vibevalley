@@ -6,13 +6,13 @@ use vibevalley_protocol::{Deliverable, IssueConstraints, Question};
 
 use crate::rules::{js_len, slice};
 
-pub const CRITERIA_HEAD: &str =
+const CRITERIA_HEAD: &str =
     "验收标准（用户照这几条验收；做完逐条写进 issue_report.checks，criterion 从 0 开始，result 填 met、unmet 或 unsure，proof 写验证命令与结果或文件依据）：";
 
-pub const PULL_REQUEST_DELIVERY: &str =
+const PULL_REQUEST_DELIVERY: &str =
     "预期交付物：提交 PR/MR，不要求合入。未获发布授权时先交回分支和验证结果，由用户通过产品入口发布；不要自行推送。用用户的语言汇报。";
 
-pub const ANSWER_OPENING: &str = "这一轮你只查清楚、回答问题：读代码、跑只读的命令，不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
+const ANSWER_OPENING: &str = "这一轮你只查清楚、回答问题：读代码、跑只读的命令，不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
 
 const ANSWER_EXAMPLE: &str = r#"{
   "conclusion": "看板拖卡还在调旧的 start 接口，所以挪到已完成时没反应。",
@@ -28,7 +28,7 @@ const ANSWER_EXAMPLE: &str = r#"{
   ]
 }"#;
 
-pub fn answer_format() -> String {
+fn answer_format() -> String {
     [
         "调用 issue_report 时，把 state 填 ready，并把 answer 填成这个形状：",
         ANSWER_EXAMPLE,
@@ -37,7 +37,7 @@ pub fn answer_format() -> String {
     .join("\n")
 }
 
-pub const REFINEMENT_OPENING: &str = "这一轮你只起草工单：读代码，把用户想做的事写成一张能派出去的工单，交给别的帮工去做。你不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
+const REFINEMENT_OPENING: &str = "这一轮你只起草工单：读代码，把用户想做的事写成一张能派出去的工单，交给别的帮工去做。你不改文件、不提交；干活的规矩里提交、写 commit 号的那两条，这一轮不用照做。你改了什么，交回来以后都会被清掉。";
 
 const REFINEMENT_EXAMPLE: &str = r#"{
   "title": "看板拖卡改用 issue.status",
@@ -104,7 +104,15 @@ pub fn work_constraints(constraints: Option<&IssueConstraints>, frozen: &[String
 
 /// `refinementBrief`: the draft so far goes in when there is one, as the
 /// user may have edited it.
-pub fn refinement_brief(title: &str, description: &str, criteria: &[String], questions: &[Question], word: &str, repo: &str, discussion: &str) -> String {
+pub(crate) fn refinement_brief(
+    title: &str,
+    description: &str,
+    criteria: &[String],
+    questions: &[Question],
+    word: &str,
+    repo: &str,
+    discussion: &str,
+) -> String {
     let word = word.trim();
     let answering = !word.is_empty() && !questions.is_empty();
     let redraft = !description.is_empty() || !criteria.is_empty();

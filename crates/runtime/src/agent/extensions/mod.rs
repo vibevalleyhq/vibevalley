@@ -14,7 +14,7 @@ pub use governance::{
     Verdict, evaluate, resolve,
 };
 pub use grader::{ExplicitReviewProvider, GraderExtension, OutcomeReview, ReviewProvider, ReviewRequest, Rubric, RubricVerdict};
-pub use memory::{FileMemory, MemoryExtension, MemoryPort, Remember, RewriteMemory};
+pub use memory::{MemoryExtension, MemoryPort, Remember, RewriteMemory};
 pub use oar::{ActiveOarSession, OAR_PHASE_OPEN, OAR_PHASE_RUN, OAR_TASK_KIND, OarExtension, OarList, OarPolicy, OarRun, OarSteer, OarStop};
 pub use subagent::{SpawnAgent, SubagentExtension};
 pub use todo::{NewTodo, Todo, TodoChange, TodoExtension, TodoState, todo_add, todo_text, todo_tools, todo_update};

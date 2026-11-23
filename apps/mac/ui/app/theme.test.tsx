@@ -72,7 +72,7 @@ test("workspace palette and inspector surfaces resolve to identical theme.json t
   const pixelDir = decodeURI(new URL("../../../../assets/pixel", import.meta.url).pathname);
   let paletteRev = 0;
 
-  const paletteApp = await open("../App.story.tsx", {
+  const paletteApp = await open("../ShellApp.story.tsx", {
     width: 640,
     height: 420,
     colorScheme: "light",
@@ -93,7 +93,7 @@ test("workspace palette and inspector surfaces resolve to identical theme.json t
   expect(paletteApp.viewStyle("id:palette-root")?.backgroundColor).toBe(normHex(darkTokens.elevated));
   expect(paletteApp.spanStyle("id:palette-root >> text:Open workspace").color).toBe(normHex(darkTokens.ink));
 
-  const inspectorApp = await open("../App.story.tsx", {
+  const inspectorApp = await open("../ShellApp.story.tsx", {
     width: 320,
     height: 760,
     colorScheme: "light",

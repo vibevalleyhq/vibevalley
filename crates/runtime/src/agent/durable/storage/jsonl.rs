@@ -9,12 +9,11 @@ use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use super::live::LiveHub;
 use super::memory::{JournalOp, MemoryRead, MemoryState, MemoryTx};
 use super::{StorageBackend, StorageRead, WriteCallback};
-use crate::agent::durable::{CommitStats, Document, DocumentEvent, Error, Result, now_ms};
+use crate::agent::durable::{CommitStats, DocumentEvent, Error, Result, now_ms};
 
 const COMMITS_FILE: &str = "commits.jsonl";
 const META_FILE: &str = "meta.jsonl";
@@ -75,9 +74,6 @@ struct JsonlInner {
 
 impl Drop for JsonlInner {
     fn drop(&mut self) {
-        if !self.hub.is_closed() && !self.opts.read_only {
-            let _ = flush_jsonl(self, self.hub.now_ms(), true);
-        }
         if let Ok(mut guard) = self.lock_file.lock() {
             guard.take();
         }
@@ -395,69 +391,6 @@ fn persist_journal_ops(dir: &Path, tx_id: u64, now: i64, ops: &[JournalOp], fsyn
     Ok(())
 }
 
-fn flush_jsonl(inner: &JsonlInner, now: i64, force: bool) -> Result<()> {
-    if inner.opts.read_only {
-        return Ok(());
-    }
-    let disk_batch = inner.hub.drain_due(now, force, |keys| {
-        let state = inner.state.lock().unwrap_or_else(|e| e.into_inner());
-        let mut revs = HashMap::new();
-        for key in keys {
-            revs.insert(key.clone(), state.mem.documents.get(key).map_or(0, |d| d.rev));
-        }
-        Ok(revs)
-    })?;
-    if disk_batch.is_empty() {
-        return Ok(());
-    }
-    let mut state = inner.state.lock().unwrap_or_else(|e| e.into_inner());
-    let tx_id = state.next_tx_id;
-    let JsonlState {
-        mem, next_tx_id, open_files, ..
-    } = &mut *state;
-    let mut undo = Vec::new();
-    let mut ops = Vec::with_capacity(disk_batch.len());
-    let mut events = Vec::with_capacity(disk_batch.len());
-    let mut keys = Vec::with_capacity(disk_batch.len());
-    for (key, value) in disk_batch {
-        let rev = mem.documents.get(&key).map_or(1, |d| d.rev + 1);
-        let op = JournalOp::PutDocument {
-            scope_kind: key.0.clone(),
-            scope_id: key.1.clone(),
-            doc_kind: key.2.clone(),
-            rev,
-            state: value.clone(),
-            updated_at_ms: now,
-        };
-        if let Err(err) = mem.apply_op_with_undo(&op, &mut undo) {
-            mem.rollback(undo);
-            return Err(err);
-        }
-        ops.push(op);
-        let doc = Document {
-            scope_kind: key.0.clone(),
-            scope_id: key.1.clone(),
-            doc_kind: key.2.clone(),
-            rev,
-            state: value,
-            updated_at_ms: now,
-        };
-        events.push(DocumentEvent {
-            document: doc,
-            durable: true,
-            retired: false,
-        });
-        keys.push(key);
-    }
-    if let Err(err) = persist_journal_ops(&inner.dir, tx_id, now, &ops, inner.opts.fsync, open_files) {
-        mem.rollback(undo);
-        return Err(err);
-    }
-    *next_tx_id = tx_id + 1;
-    inner.hub.complete_disk_flush(&keys, events);
-    Ok(())
-}
-
 impl StorageBackend for JsonlStorage {
     fn kind(&self) -> &'static str {
         "jsonl"
@@ -544,71 +477,9 @@ impl StorageBackend for JsonlStorage {
         self.0.hub.subscribe_tasks()
     }
 
-    fn put_deferred(&self, scope: &str, id: &str, kind: &str, state: Value) -> Result<()> {
-        if self.0.opts.read_only {
-            return Err(Error::Invalid("jsonl storage is open read-only".into()));
-        }
-        let weak = Arc::downgrade(&self.0);
-        self.0.hub.queue_deferred(scope, id, kind, state, move || {
-            std::thread::spawn(move || {
-                loop {
-                    let Some(inner) = weak.upgrade() else {
-                        return;
-                    };
-                    if inner.hub.is_closed() {
-                        return;
-                    }
-                    let now = inner.hub.now_ms();
-                    if flush_jsonl(&inner, now, false).is_err() {
-                        inner.hub.reschedule_disk_on_error(now);
-                    }
-                    let Some(wait) = inner.hub.next_timer_wait(now) else {
-                        return;
-                    };
-                    drop(inner);
-                    std::thread::sleep(wait);
-                }
-            });
-        })
-    }
-
-    fn flush_due(&self) -> Result<()> {
-        if self.0.hub.is_closed() {
-            return Err(Error::Closed);
-        }
-        flush_jsonl(&self.0, self.0.hub.now_ms(), false)
-    }
-
-    fn flush_deferred(&self) -> Result<()> {
-        if self.0.hub.is_closed() {
-            return Err(Error::Closed);
-        }
-        flush_jsonl(&self.0, self.0.hub.now_ms(), true)
-    }
-
-    fn live_document(&self, scope: &str, id: &str) -> Result<Option<Document>> {
-        let mut state = self.0.state.lock().unwrap_or_else(|e| e.into_inner());
-        if self.0.hub.is_closed() {
-            return Err(Error::Closed);
-        }
-        if self.0.opts.read_only {
-            let current_stamp = read_disk_stamp(&self.0.dir);
-            if current_stamp != state.stamp {
-                let (mem, next_tx_id, new_stamp) = load_and_maybe_repair(&self.0.dir, self.0.opts)?;
-                state.mem = mem;
-                state.next_tx_id = next_tx_id;
-                state.stamp = new_stamp;
-            }
-        }
-        self.0.hub.live_document(scope, id, &MemoryRead(&state.mem))
-    }
-
     fn close(&self) -> Result<()> {
         if self.0.hub.is_closed() {
             return Ok(());
-        }
-        if !self.0.opts.read_only {
-            flush_jsonl(&self.0, self.0.hub.now_ms(), true)?;
         }
         self.0.hub.mark_closed();
         self.0.state.lock().unwrap_or_else(|e| e.into_inner()).open_files.clear();

@@ -8,7 +8,11 @@ import { responses as artifactResponses } from "../fixtures/artifacts";
 import { SCENARIO_NOW, scenarios } from "../fixtures/scenarios";
 import { fakeHost, type FakeHost } from "./fakeHost";
 
-async function mountApp(route: string, configure?: (fake: FakeHost) => void, opts?: { params?: Record<string, unknown>; reducedMotion?: boolean }) {
+async function mountApp(
+  route: string,
+  configure?: (fake: FakeHost) => void,
+  opts?: { params?: Record<string, unknown>; reducedMotion?: boolean; storage?: Record<string, string> },
+) {
   const fixture = scenarios.typical;
   const fake = fakeHost(fixture, { route, ...opts?.params });
   configure?.(fake);
@@ -18,6 +22,7 @@ async function mountApp(route: string, configure?: (fake: FakeHost) => void, opt
     colorScheme: "light",
     platform: "macos",
     reducedMotion: opts?.reducedMotion,
+    storage: opts?.storage,
     clock: { time: SCENARIO_NOW },
     host: fake.options,
   });
@@ -732,4 +737,42 @@ test("regression: whiteboard ChannelSidePane survives artifact polling, remount 
   await clock.fastForward(21_000);
   await fake.pump(app);
   expect(app.count("id:pending-line-failed")).toBe(0);
+});
+
+test("regression: defineStored preferences persist through nsh Storage and survive app reload", async () => {
+  const first = await mountApp("/settings/general", (f) => {
+    f.respond("host.theme", null);
+    f.respond("host.font", { monoFont: "Menlo", terminalFontSize: 14, uiFontSize: 14 });
+  });
+
+  await first.app.press("id:theme-dark");
+  await first.app.press("id:scale-110");
+  await first.app.press("id:start-farm");
+  await first.app.waitUntil(() => {
+    const raw = first.app.storage()["vibevalley.prefs"];
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { theme?: string; scale?: number; start?: string };
+    return parsed.theme === "dark" && parsed.scale === 110 && parsed.start === "farm";
+  });
+
+  const persisted = first.app.storage();
+  expect(JSON.parse(persisted["vibevalley.prefs"] ?? "{}")).toMatchObject({
+    theme: "dark",
+    scale: 110,
+    start: "farm",
+  });
+
+  const reloaded = await mountApp("/settings/general", undefined, { storage: persisted });
+  await reloaded.app.waitUntil(
+    () =>
+      reloaded.app.viewStyle("id:theme-dark")?.backgroundColor !== undefined &&
+      reloaded.app.viewStyle("id:scale-110")?.backgroundColor !== undefined &&
+      reloaded.app.viewStyle("id:start-farm")?.backgroundColor !== undefined,
+  );
+  expect(reloaded.app.viewStyle("id:theme-system")?.backgroundColor).toBeUndefined();
+  expect(reloaded.app.viewStyle("id:start-workbench")?.backgroundColor).toBeUndefined();
+
+  const rootReload = await mountApp("/", undefined, { storage: persisted });
+  await rootReload.fake.pumpUntil(rootReload.app, () => rootReload.fake.acts.some((a) => a.type === "openFarm"));
+  expect(rootReload.fake.acts.some((a) => a.type === "openFarm")).toBe(true);
 });

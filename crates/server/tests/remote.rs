@@ -32,12 +32,9 @@ fn start_server(dir: &std::path::Path) -> vibevalley_server::Started {
     .unwrap()
 }
 
-fn http_agent() -> ureq::Agent {
-    ureq::Agent::config_builder()
-        .http_status_as_error(false)
-        .timeout_global(Some(Duration::from_secs(5)))
-        .build()
-        .into()
+fn http_agent() -> reqwest::blocking::Client {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    reqwest::blocking::Client::builder().no_proxy().timeout(Duration::from_secs(5)).build().unwrap()
 }
 
 fn post_json(url: &str, token: Option<&str>, body: Value) -> (u16, Value) {
@@ -45,9 +42,9 @@ fn post_json(url: &str, token: Option<&str>, body: Value) -> (u16, Value) {
     if let Some(tok) = token {
         req = req.header("authorization", format!("Bearer {tok}"));
     }
-    let mut res = req.send_json(body).unwrap();
+    let res = req.json(&body).send().unwrap();
     let status = res.status().as_u16();
-    let text = res.body_mut().read_to_string().unwrap();
+    let text = res.text().unwrap();
     let parsed = serde_json::from_str(&text).unwrap_or_else(|_| json!({ "raw": text }));
     (status, parsed)
 }
@@ -57,9 +54,9 @@ fn get_json(url: &str, token: Option<&str>) -> (u16, Value) {
     if let Some(tok) = token {
         req = req.header("authorization", format!("Bearer {tok}"));
     }
-    let mut res = req.call().unwrap();
+    let res = req.send().unwrap();
     let status = res.status().as_u16();
-    let text = res.body_mut().read_to_string().unwrap();
+    let text = res.text().unwrap();
     let parsed = serde_json::from_str(&text).unwrap_or_else(|_| json!({ "raw": text }));
     (status, parsed)
 }
@@ -72,10 +69,10 @@ fn open_sse(url: &str, token: &str, last_event_id: Option<&str>) -> BufReader<Bo
     if let Some(id) = last_event_id {
         req = req.header("last-event-id", id);
     }
-    let res = req.call().unwrap();
+    let res = req.send().unwrap();
     assert_eq!(res.status().as_u16(), 200);
     assert_eq!(res.headers().get("content-type").unwrap().to_str().unwrap(), "text/event-stream");
-    BufReader::new(Box::new(res.into_body().into_reader()))
+    BufReader::new(Box::new(res))
 }
 
 fn next_sse_event(reader: &mut BufReader<Box<dyn std::io::Read + Send>>) -> (Option<String>, Value) {
@@ -243,7 +240,7 @@ fn remote_full_lifecycle_pairing_bearer_ops_slices_sse_resume_and_disable() {
     assert!(disabled.get("url").is_none());
 
     assert!(
-        http_agent().post(&format!("{remote_url}/api/v1/remote/whoami")).send_json(json!({})).is_err(),
+        http_agent().post(format!("{remote_url}/api/v1/remote/whoami")).json(&json!({})).send().is_err(),
         "disabled remote listener must stop accepting TCP connections"
     );
     let (st, disabled_err) = post_json(&format!("{}/api/v1/issue/list", local_listener.url()), Some(&token), json!({}));

@@ -236,8 +236,6 @@ pub enum IssueChange {
     },
     /// Assigned to `agent` when nobody was (the drafter).
     Assigned(String),
-    /// A pull (or merge) request opened or updated for the issue's branch.
-    PullRequest(PullRequest),
     /// A session started working it: it leaves the queue, and a new worker
     /// is its current assignment's newest execution.
     Started {
@@ -249,7 +247,6 @@ pub enum IssueChange {
 impl IssueChange {
     pub fn fold(self, t: &mut Issue, at: Millis) {
         match self {
-            IssueChange::PullRequest(pr) => t.pull_request = Some(pr),
             IssueChange::Queued => t.queued_at = Some(at),
             IssueChange::Unqueued => t.queued_at = None,
             IssueChange::Reopened => {
@@ -396,8 +393,6 @@ pub struct Ledger {
     facts: Arc<dyn Facts>,
     /// Held across every apply and every read-modify-apply of an issue.
     write: Mutex<()>,
-    /// Each subscriber's sender and a receiver to drop a stale bundle with.
-    subscribers: Mutex<Vec<(flume::Sender<SliceBundle>, flume::Receiver<SliceBundle>)>>,
     cron_of_issue: Mutex<Option<CronOfIssue>>,
     pull_of_issue: Mutex<Option<PullOfIssue>>,
 }
@@ -502,7 +497,6 @@ impl Ledger {
             db: Mutex::new(conn),
             facts,
             write: Mutex::new(()),
-            subscribers: Mutex::new(Vec::new()),
             cron_of_issue: Mutex::new(None),
             pull_of_issue: Mutex::new(None),
         };
@@ -607,16 +601,7 @@ impl Ledger {
         self.database(|db| session_db::past(db, id)).ok().flatten()
     }
 
-    /// The newest slice bundle after every change; a receiver that falls behind
-    /// skips to the newest.
-    pub fn subscribe(&self) -> flume::Receiver<SliceBundle> {
-        let (tx, rx) = flume::bounded(1);
-        let _ = tx.try_send(self.facts.bundle());
-        self.subscribers.lock().push((tx, rx.clone()));
-        rx
-    }
-
-    /// Stores `facts`, folds them in as one commit and tells the subscribers.
+    /// Stores `facts`, folds them in as one commit.
     pub fn apply(&self, facts: Vec<Fact>) -> Result<()> {
         let _write = self.write.lock();
         self.apply_locked(facts, |_| Ok(()))
@@ -700,15 +685,7 @@ impl Ledger {
     }
 
     fn publish(&self, facts: Vec<Fact>) {
-        let applied = self.facts.apply(facts);
-        let mut subscribers = self.subscribers.lock();
-        if !applied.transitions.is_empty() && !subscribers.is_empty() {
-            let bundle = self.facts.bundle();
-            subscribers.retain(|(tx, stale)| {
-                let _ = stale.try_recv();
-                !matches!(tx.try_send(bundle.clone()), Err(flume::TrySendError::Disconnected(_)))
-            });
-        }
+        self.facts.apply(facts);
     }
 
     pub(crate) fn update_subagents(

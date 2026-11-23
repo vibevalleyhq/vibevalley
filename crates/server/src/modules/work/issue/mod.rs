@@ -15,11 +15,9 @@ pub use board::{Board, NewIssue, Sent};
 pub use chat::IssueChat;
 pub use family::{ChildDraft, MAX_CHILDREN};
 
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use parking_lot::Mutex;
 use vibevalley_core::Move;
 use vibevalley_core::brief::{findings_of, milestones_of, resume_words};
 use vibevalley_core::rules::short_title;
@@ -29,14 +27,10 @@ use vibevalley_protocol::{
     IssueStatus, IssueUpdate, Next, Preview, StuckReason, UncommittedItem, ops,
 };
 
-use crate::base::LookIn;
+use crate::base::{LookIn, RequestKeys};
 use crate::modules::team::agent::Agents;
 use crate::modules::work::ledger::{BoardError, Undelivered};
 use crate::{Hub, now};
-
-const REQUEST_KEY_MAX: usize = 64;
-const REQUEST_KEYS_KEPT: usize = 500;
-const REQUEST_KEY_TTL_MS: i64 = 5 * 60_000;
 
 fn refused(key: &str, params: Params) -> ApiError {
     ApiError::new(BizCode::IssueRefused, t(key, params))
@@ -75,44 +69,6 @@ fn get(board: &Board, reference: &str) -> Result<Issue, ApiError> {
 
 fn applied(hub: &Hub, issue: Issue) -> AppliedIssue {
     AppliedIssue::from_issue(issue, hub.seq())
-}
-
-/// `requestKeys`: a retry with the same key gets the first answer for
-/// five minutes; a failure is forgotten.
-#[derive(Default)]
-struct RequestKeys {
-    seen: Mutex<Seen>,
-}
-
-/// The keys oldest first, and each key's expiry and answer.
-type Seen = (Vec<String>, HashMap<String, (i64, AppliedIssue)>);
-
-impl RequestKeys {
-    fn once(&self, key: Option<&str>, work: impl FnOnce() -> Result<AppliedIssue, ApiError>) -> Result<AppliedIssue, ApiError> {
-        let Some(key) = key.filter(|k| !k.is_empty()) else { return work() };
-        if key.chars().count() > REQUEST_KEY_MAX {
-            return Err(ApiError::new(
-                BizCode::RequestKeyTooLong,
-                t("server.base.requestKeyLong", &[("max", REQUEST_KEY_MAX.into())]),
-            ));
-        }
-        // Held while working: a duplicate waits for the first answer.
-        let mut seen = self.seen.lock();
-        if let Some((expires, done)) = seen.1.get(key)
-            && *expires > now()
-        {
-            return Ok(done.clone());
-        }
-        let done = work()?;
-        seen.0.retain(|k| k != key);
-        seen.0.push(key.to_string());
-        seen.1.insert(key.to_string(), (now() + REQUEST_KEY_TTL_MS, done.clone()));
-        while seen.0.len() > REQUEST_KEYS_KEPT {
-            let old = seen.0.remove(0);
-            seen.1.remove(&old);
-        }
-        Ok(done)
-    }
 }
 
 /// `nextSteps`: what the user can do with the issue, as words and commands.
