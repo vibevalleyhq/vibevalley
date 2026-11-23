@@ -11,6 +11,7 @@
 //! [`Hub::apply`].
 
 use std::any::Any;
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
@@ -23,6 +24,7 @@ use serde_json::Value;
 use tokio::sync::{broadcast, watch};
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
+use tracing::Instrument as _;
 use vibevalley_core::{Applied, Core, SliceMask, Transition};
 use vibevalley_protocol::{
     ApiError, BizCode, BoardSlice, Caller, CollabSlice, Envelope, Fact, FarmFrame, GameEffect, InboxSlice, LiveEvent, LiveEventNotice, LiveEventRuntime,
@@ -781,6 +783,26 @@ impl Hub {
         self.handlers.write().insert(O::NAME, RouteHandler::Async(h));
     }
 
+    fn ensure_trace_id<'a>(&self, caller_ctx: &'a CallerContext) -> Cow<'a, CallerContext> {
+        if caller_ctx.trace_id != 0 {
+            Cow::Borrowed(caller_ctx)
+        } else {
+            Cow::Owned(CallerContext {
+                caller: caller_ctx.caller,
+                principal: caller_ctx.principal.clone(),
+                client: caller_ctx.client.clone(),
+                trace_id: self.next_trace_id.fetch_add(1, Ordering::Relaxed),
+            })
+        }
+    }
+
+    fn ensure_trace_id_owned(&self, mut caller_ctx: CallerContext) -> CallerContext {
+        if caller_ctx.trace_id == 0 {
+            caller_ctx.trace_id = self.next_trace_id.fetch_add(1, Ordering::Relaxed);
+        }
+        caller_ctx
+    }
+
     /// Invokes endpoint `O` directly in-process with zero JSON round-trip while
     /// enforcing `endpoint(O::NAME).can`, [`InvokeObserver`], and [`FaultGate`].
     pub fn invoke<O: Op>(&self, caller_ctx: &CallerContext, input: O::Input) -> Result<O::Result, ApiError>
@@ -792,26 +814,13 @@ impl Hub {
         let is_debug_op = op.starts_with("debug.");
         let observer = if is_debug_op { None } else { self.current_observer() };
         let trace_debug = tracing::enabled!(tracing::Level::DEBUG);
-        let (started, effective_ctx_owned);
-        let effective_ctx = if let Some(obs) = &observer {
-            let trace_id = if caller_ctx.trace_id != 0 {
-                caller_ctx.trace_id
-            } else {
-                self.next_trace_id.fetch_add(1, Ordering::Relaxed)
-            };
-            effective_ctx_owned = CallerContext {
-                caller: caller_ctx.caller,
-                principal: caller_ctx.principal.clone(),
-                client: caller_ctx.client.clone(),
-                trace_id,
-            };
+        let effective_ctx = self.ensure_trace_id(caller_ctx);
+        let started = if let Some(obs) = &observer {
             let payload = serde_json::to_value(&input).unwrap_or(Value::Null);
-            obs.on_call_start(&effective_ctx_owned, op, &payload);
-            started = Some(Instant::now());
-            &effective_ctx_owned
+            obs.on_call_start(&effective_ctx, op, &payload);
+            Some(Instant::now())
         } else {
-            started = trace_debug.then(Instant::now);
-            caller_ctx
+            trace_debug.then(Instant::now)
         };
 
         if !is_debug_op && let Some(gate) = self.current_fault_gate() {
@@ -821,14 +830,18 @@ impl Hub {
             }
         }
 
-        let result = self.dispatch_typed::<O>(effective_ctx, input);
+        let span = tracing::debug_span!("hub.op", op, trace_id = effective_ctx.trace_id);
+        let result = {
+            let _entered = span.enter();
+            self.dispatch_typed::<O>(&effective_ctx, input)
+        };
         let biz_code = match &result {
             Ok(_) => 0,
             Err(err) => err.biz_code.code(),
         };
         let duration_us = started.map(|t0| t0.elapsed().as_micros() as u64);
         if let (Some(obs), Some(us)) = (observer, duration_us) {
-            obs.on_call_end(effective_ctx, op, biz_code, us);
+            obs.on_call_end(&effective_ctx, op, biz_code, us);
         }
         if trace_debug {
             tracing::debug!(
@@ -862,45 +875,37 @@ impl Hub {
         let is_debug_op = op.starts_with("debug.");
         let observer = if is_debug_op { None } else { self.current_observer() };
         let trace_debug = tracing::enabled!(tracing::Level::DEBUG);
-        let (started, effective_ctx_owned);
-        let effective_ctx = if let Some(obs) = &observer {
-            let trace_id = if caller_ctx.trace_id != 0 {
-                caller_ctx.trace_id
-            } else {
-                self.next_trace_id.fetch_add(1, Ordering::Relaxed)
-            };
-            effective_ctx_owned = CallerContext {
-                caller: caller_ctx.caller,
-                principal: caller_ctx.principal.clone(),
-                client: caller_ctx.client.clone(),
-                trace_id,
-            };
+        let effective_ctx = self.ensure_trace_id(caller_ctx);
+        let started = if let Some(obs) = &observer {
             let payload = serde_json::to_value(&input).unwrap_or(Value::Null);
-            obs.on_call_start(&effective_ctx_owned, op, &payload);
-            started = Some(Instant::now());
-            &effective_ctx_owned
+            obs.on_call_start(&effective_ctx, op, &payload);
+            Some(Instant::now())
         } else {
-            started = trace_debug.then(Instant::now);
-            caller_ctx
+            trace_debug.then(Instant::now)
         };
 
-        let delay = if !is_debug_op {
-            self.current_fault_gate().map(|gate| gate.delay_ms(op)).unwrap_or(0)
-        } else {
-            0
-        };
-        if delay > 0 {
-            tokio::time::sleep(Duration::from_millis(delay)).await;
+        let span = tracing::debug_span!("hub.op", op, trace_id = effective_ctx.trace_id);
+        let result = async {
+            let delay = if !is_debug_op {
+                self.current_fault_gate().map(|gate| gate.delay_ms(op)).unwrap_or(0)
+            } else {
+                0
+            };
+            if delay > 0 {
+                tokio::time::sleep(Duration::from_millis(delay)).await;
+            }
+            self.dispatch_typed_async::<O>(&effective_ctx, input).await
         }
+        .instrument(span)
+        .await;
 
-        let result = self.dispatch_typed_async::<O>(effective_ctx, input).await;
         let biz_code = match &result {
             Ok(_) => 0,
             Err(err) => err.biz_code.code(),
         };
         let duration_us = started.map(|t0| t0.elapsed().as_micros() as u64);
         if let (Some(obs), Some(us)) = (observer, duration_us) {
-            obs.on_call_end(effective_ctx, op, biz_code, us);
+            obs.on_call_end(&effective_ctx, op, biz_code, us);
         }
         if trace_debug {
             tracing::debug!(
@@ -962,7 +967,7 @@ impl Hub {
                     trace_id: caller_ctx.trace_id,
                     hub: self.self_arc(),
                 };
-                vibevalley_runtime::rt::block_on(handler(ctx, input))
+                vibevalley_runtime::rt::block_on(handler(ctx, input).in_current_span())
             }
         }
     }
@@ -1001,7 +1006,9 @@ impl Hub {
             TypedEntry::Sync(handler) => {
                 let hub = self.self_arc();
                 let ctx_owned = caller_ctx.clone();
+                let span = tracing::Span::current();
                 tokio::task::spawn_blocking(move || {
+                    let _entered = span.enter();
                     let ctx = Ctx {
                         caller: ctx_owned.caller,
                         principal: ctx_owned.principal,
@@ -1032,25 +1039,12 @@ impl Hub {
         let is_debug_op = op.starts_with("debug.");
         let observer = if is_debug_op { None } else { self.current_observer() };
         let trace_debug = tracing::enabled!(tracing::Level::DEBUG);
-        let (started, effective_ctx_owned);
-        let effective_ctx = if let Some(obs) = &observer {
-            let trace_id = if caller_ctx.trace_id != 0 {
-                caller_ctx.trace_id
-            } else {
-                self.next_trace_id.fetch_add(1, Ordering::Relaxed)
-            };
-            effective_ctx_owned = CallerContext {
-                caller: caller_ctx.caller,
-                principal: caller_ctx.principal.clone(),
-                client: caller_ctx.client.clone(),
-                trace_id,
-            };
-            obs.on_call_start(&effective_ctx_owned, op, &payload);
-            started = Some(Instant::now());
-            &effective_ctx_owned
+        let effective_ctx = self.ensure_trace_id(caller_ctx);
+        let started = if let Some(obs) = &observer {
+            obs.on_call_start(&effective_ctx, op, &payload);
+            Some(Instant::now())
         } else {
-            started = trace_debug.then(Instant::now);
-            caller_ctx
+            trace_debug.then(Instant::now)
         };
 
         if !is_debug_op && let Some(gate) = self.current_fault_gate() {
@@ -1060,10 +1054,14 @@ impl Hub {
             }
         }
 
-        let envelope = self.dispatch_call(effective_ctx, op, payload);
+        let span = tracing::debug_span!("hub.op", op, trace_id = effective_ctx.trace_id);
+        let envelope = {
+            let _entered = span.enter();
+            self.dispatch_call(&effective_ctx, op, payload)
+        };
         let duration_us = started.map(|t0| t0.elapsed().as_micros() as u64);
         if let (Some(obs), Some(us)) = (observer, duration_us) {
-            obs.on_call_end(effective_ctx, op, envelope.biz_code, us);
+            obs.on_call_end(&effective_ctx, op, envelope.biz_code, us);
         }
         if trace_debug {
             tracing::debug!(
@@ -1113,7 +1111,7 @@ impl Hub {
                     trace_id: caller_ctx.trace_id,
                     hub: self.self_arc(),
                 };
-                vibevalley_runtime::rt::block_on(handler(ctx, payload))
+                vibevalley_runtime::rt::block_on(handler(ctx, payload).in_current_span())
             }
         };
         match outcome {
@@ -1131,34 +1129,29 @@ impl Hub {
         let is_debug_op = op.starts_with("debug.");
         let observer = if is_debug_op { None } else { self.current_observer() };
         let trace_debug = tracing::enabled!(tracing::Level::DEBUG);
-        let (started, effective_ctx) = if let Some(obs) = &observer {
-            let trace_id = if caller_ctx.trace_id != 0 {
-                caller_ctx.trace_id
+        let effective_ctx = self.ensure_trace_id_owned(caller_ctx);
+        let started = if let Some(obs) = &observer {
+            obs.on_call_start(&effective_ctx, &op, &payload);
+            Some(Instant::now())
+        } else {
+            trace_debug.then(Instant::now)
+        };
+
+        let span = tracing::debug_span!("hub.op", op = op.as_str(), trace_id = effective_ctx.trace_id);
+        let envelope = async {
+            let delay = if !is_debug_op {
+                self.current_fault_gate().map(|gate| gate.delay_ms(&op)).unwrap_or(0)
             } else {
-                self.next_trace_id.fetch_add(1, Ordering::Relaxed)
+                0
             };
-            let ctx = CallerContext {
-                caller: caller_ctx.caller,
-                principal: caller_ctx.principal,
-                client: caller_ctx.client,
-                trace_id,
-            };
-            obs.on_call_start(&ctx, &op, &payload);
-            (Some(Instant::now()), ctx)
-        } else {
-            (trace_debug.then(Instant::now), caller_ctx)
-        };
-
-        let delay = if !is_debug_op {
-            self.current_fault_gate().map(|gate| gate.delay_ms(&op)).unwrap_or(0)
-        } else {
-            0
-        };
-        if delay > 0 {
-            tokio::time::sleep(Duration::from_millis(delay)).await;
+            if delay > 0 {
+                tokio::time::sleep(Duration::from_millis(delay)).await;
+            }
+            self.dispatch_call_async(&effective_ctx, &op, payload).await
         }
+        .instrument(span)
+        .await;
 
-        let envelope = self.dispatch_call_async(&effective_ctx, &op, payload).await;
         let duration_us = started.map(|t0| t0.elapsed().as_micros() as u64);
         if let (Some(obs), Some(us)) = (observer, duration_us) {
             obs.on_call_end(&effective_ctx, &op, envelope.biz_code, us);
@@ -1206,7 +1199,9 @@ impl Hub {
             RouteHandler::Sync(handler) => {
                 let hub = self.self_arc();
                 let ctx_owned = caller_ctx.clone();
+                let span = tracing::Span::current();
                 match tokio::task::spawn_blocking(move || {
+                    let _entered = span.enter();
                     let ctx = Ctx {
                         caller: ctx_owned.caller,
                         principal: ctx_owned.principal,
@@ -1611,9 +1606,9 @@ mod tests {
         });
 
         assert_eq!(call_env.biz_code, 0);
-        assert_eq!(call_env.data.unwrap()["version"], "async-0");
+        assert_eq!(call_env.data.unwrap()["version"], "async-1");
         assert!(invoke_res.ok);
-        assert_eq!(invoke_res.version, "async-0");
+        assert_eq!(invoke_res.version, "async-2");
 
         let entries = recorded.lock();
         assert_eq!(entries.len(), 2);
@@ -1629,16 +1624,230 @@ mod tests {
         }
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn unconditional_trace_id_and_hub_op_span_propagate_across_awaits() {
+        use std::io;
+
+        use parking_lot::Mutex;
+        use serde_json::Value;
+        use tracing::instrument::WithSubscriber as _;
+        use vibevalley_protocol::{Caller, Health, ops};
+
+        use super::{CallerContext, CallerPrincipal};
+
+        #[derive(Clone, Default)]
+        struct SharedBuf(Arc<Mutex<Vec<u8>>>);
+
+        struct BufWriter(Arc<Mutex<Vec<u8>>>);
+
+        impl io::Write for BufWriter {
+            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                self.0.lock().extend_from_slice(buf);
+                Ok(buf.len())
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for SharedBuf {
+            type Writer = BufWriter;
+
+            fn make_writer(&'a self) -> Self::Writer {
+                BufWriter(self.0.clone())
+            }
+        }
+
+        let buf = SharedBuf::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::DEBUG)
+            .with_ansi(false)
+            .with_writer(buf.clone())
+            .finish();
+
+        async {
+            let hub = Hub::new(vibevalley_core::empty_space_state());
+            assert!(!hub.has_observer(), "test must run without InvokeObserver attached");
+
+            let observed = Arc::new(Mutex::new(Vec::<(u64, Option<&'static str>, Option<&'static str>, bool)>::new()));
+            let observed_async = observed.clone();
+            hub.on_async::<ops::ServerHealthGet, _, _>(move |ctx, ()| {
+                let observed = observed_async.clone();
+                async move {
+                    let before = tracing::Span::current();
+                    let before_name = before.metadata().map(|m| m.name());
+                    let before_id = before.id();
+
+                    tokio::task::yield_now().await;
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+
+                    let after = tracing::Span::current();
+                    let after_name = after.metadata().map(|m| m.name());
+                    let after_id = after.id();
+                    tracing::debug!(handler_trace_id = ctx.trace_id, "inside_async_handler");
+
+                    observed
+                        .lock()
+                        .push((ctx.trace_id, before_name, after_name, before_id.is_some() && before_id == after_id));
+                    Ok(Health {
+                        ok: true,
+                        version: format!("trace-{}", ctx.trace_id),
+                    })
+                }
+            });
+
+            let sync_trace_ids = Arc::new(Mutex::new(Vec::<(u64, Option<&'static str>)>::new()));
+            let sync_trace_ids_h = sync_trace_ids.clone();
+            hub.on::<ops::OrchestratorOpen>(move |ctx, ()| {
+                let span_name = tracing::Span::current().metadata().map(|m| m.name());
+                sync_trace_ids_h.lock().push((ctx.trace_id, span_name));
+                Ok(())
+            });
+
+            // (a) Unconditional non-zero trace_id minted with NO observer attached.
+            let minted_invoke = hub.invoke_async::<ops::ServerHealthGet>(&CallerContext::local(), ()).await.unwrap();
+            assert_eq!(minted_invoke.version, "trace-1");
+
+            let minted_call = hub.call_with_async(CallerContext::local(), "server.health.get".into(), Value::Null).await;
+            assert_eq!(minted_call.biz_code, 0);
+            assert_eq!(minted_call.data.unwrap()["version"], "trace-2");
+
+            // (b) Caller-supplied non-zero trace_id (42) is preserved verbatim.
+            let custom_ctx = CallerContext {
+                caller: Caller::User,
+                principal: CallerPrincipal::LocalOwner,
+                client: None,
+                trace_id: 42,
+            };
+            let custom_invoke = hub.invoke_async::<ops::ServerHealthGet>(&custom_ctx, ()).await.unwrap();
+            assert_eq!(custom_invoke.version, "trace-42");
+
+            let custom_call = hub.call_with_async(custom_ctx.clone(), "server.health.get".into(), Value::Null).await;
+            assert_eq!(custom_call.biz_code, 0);
+            assert_eq!(custom_call.data.unwrap()["version"], "trace-42");
+
+            // Sync paths also mint non-zero trace_id and preserve custom trace_id inside `hub.op`.
+            hub.invoke::<ops::OrchestratorOpen>(&CallerContext::local(), ()).unwrap();
+            hub.invoke::<ops::OrchestratorOpen>(&custom_ctx, ()).unwrap();
+            assert_eq!(hub.call_with(&CallerContext::local(), "orchestrator.open", Value::Null).biz_code, 0);
+            assert_eq!(hub.call_with(&custom_ctx, "orchestrator.open", Value::Null).biz_code, 0);
+
+            // (c) `tracing::Span::current()` stayed in `hub.op` across `.await` yields on all async calls.
+            let rows = observed.lock().clone();
+            assert_eq!(rows.len(), 4);
+            assert_eq!(rows[0], (1, Some("hub.op"), Some("hub.op"), true));
+            assert_eq!(rows[1], (2, Some("hub.op"), Some("hub.op"), true));
+            assert_eq!(rows[2], (42, Some("hub.op"), Some("hub.op"), true));
+            assert_eq!(rows[3], (42, Some("hub.op"), Some("hub.op"), true));
+
+            let sync_rows = sync_trace_ids.lock().clone();
+            assert_eq!(
+                sync_rows,
+                vec![(3, Some("hub.op")), (42, Some("hub.op")), (4, Some("hub.op")), (42, Some("hub.op")),]
+            );
+
+            let logs = String::from_utf8(buf.0.lock().clone()).unwrap();
+            assert!(
+                logs.contains("hub.op{op=\"server.health.get\" trace_id=1}"),
+                "missing minted span in logs:\n{logs}"
+            );
+            assert!(
+                logs.contains("hub.op{op=\"server.health.get\" trace_id=42}"),
+                "missing custom span in logs:\n{logs}"
+            );
+
+            hub.close();
+        }
+        .with_subscriber(subscriber)
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn async_fault_gate_delay_uses_virtual_clock_deterministically() {
+        use serde_json::Value;
+        use vibevalley_protocol::{Caller, Health, ops};
+
+        use super::{CallerContext, FaultGate};
+
+        struct DelayFaultGate {
+            target: &'static str,
+            delay_ms: u64,
+        }
+
+        impl FaultGate for DelayFaultGate {
+            fn delay_ms(&self, target: &str) -> u64 {
+                if target == self.target { self.delay_ms } else { 0 }
+            }
+
+            fn should_disconnect(&self, _topic: &str) -> bool {
+                false
+            }
+        }
+
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        hub.attach_fault_gate(Some(Arc::new(DelayFaultGate {
+            target: "server.health.get",
+            delay_ms: 5_000,
+        })));
+        hub.on_async::<ops::ServerHealthGet, _, _>(move |ctx, ()| async move {
+            Ok(Health {
+                ok: true,
+                version: format!("v-{}", ctx.trace_id),
+            })
+        });
+
+        let wall_start = std::time::Instant::now();
+
+        // `call_with_async`: stays pending at 4999ms and completes at exactly 5000ms virtual time.
+        let t0 = tokio::time::Instant::now();
+        let delayed_call = tokio::spawn({
+            let hub = hub.clone();
+            async move { hub.call_with_async(CallerContext::local(), "server.health.get".into(), Value::Null).await }
+        });
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_millis(4_999)).await;
+        tokio::task::yield_now().await;
+        assert!(!delayed_call.is_finished(), "call_with_async FaultGate must hold until full delay elapses");
+        tokio::time::advance(Duration::from_millis(1)).await;
+        let env = delayed_call.await.unwrap();
+        assert_eq!(env.biz_code, 0);
+        assert_eq!(env.data.unwrap()["version"], "v-1");
+        assert_eq!(t0.elapsed(), Duration::from_millis(5_000));
+
+        // `invoke_as_async`: stays pending at 4999ms and completes at exactly 5000ms virtual time.
+        let t1 = tokio::time::Instant::now();
+        let delayed_invoke = tokio::spawn({
+            let hub = hub.clone();
+            async move { hub.invoke_as_async::<ops::ServerHealthGet>(Caller::Remote, ()).await }
+        });
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_millis(4_999)).await;
+        tokio::task::yield_now().await;
+        assert!(!delayed_invoke.is_finished(), "invoke_async FaultGate must hold until full delay elapses");
+        tokio::time::advance(Duration::from_millis(1)).await;
+        let health = delayed_invoke.await.unwrap().unwrap();
+        assert_eq!(health.version, "v-2");
+        assert_eq!(t1.elapsed(), Duration::from_millis(5_000));
+
+        assert!(
+            wall_start.elapsed() < Duration::from_secs(1),
+            "10s of virtual FaultGate delays must finish instantaneously, took {:?}",
+            wall_start.elapsed()
+        );
+
+        hub.close();
+    }
+
     #[test]
-    fn dual_track_four_way_cross_dispatch_enforces_can_observer_and_async_fault_gate() {
+    fn dual_track_four_way_cross_dispatch_enforces_can_and_observer() {
         use std::sync::atomic::AtomicUsize;
-        use std::time::Instant;
 
         use parking_lot::Mutex;
         use serde_json::Value;
         use vibevalley_protocol::{BizCode, Caller, Health, ops};
 
-        use super::{CallerContext, FaultGate, InvokeObserver};
+        use super::{CallerContext, InvokeObserver};
 
         #[derive(Default)]
         struct RecordingObserver {
@@ -1658,28 +1867,9 @@ mod tests {
             fn on_apply(&self, _seq: i64, _dirty: vibevalley_core::SliceMask, _transitions: &[vibevalley_core::Transition], _duration_us: u64) {}
         }
 
-        struct DelayFaultGate {
-            target: &'static str,
-            delay_ms: u64,
-        }
-
-        impl FaultGate for DelayFaultGate {
-            fn delay_ms(&self, target: &str) -> u64 {
-                if target == self.target { self.delay_ms } else { 0 }
-            }
-
-            fn should_disconnect(&self, _topic: &str) -> bool {
-                false
-            }
-        }
-
         let hub = Hub::new(vibevalley_core::empty_space_state());
         let observer = Arc::new(RecordingObserver::default());
         hub.attach_observer(Some(observer.clone()));
-        hub.attach_fault_gate(Some(Arc::new(DelayFaultGate {
-            target: "server.health.get",
-            delay_ms: 25,
-        })));
 
         let sync_hits = Arc::new(AtomicUsize::new(0));
         let sync_hits_h = sync_hits.clone();
@@ -1716,16 +1906,13 @@ mod tests {
         let sync_to_async_typed = hub.invoke::<ops::ServerHealthGet>(&CallerContext::local(), ()).unwrap();
         assert_eq!(sync_to_async_typed.version, "v2");
 
-        // 3 & 4. async -> async + async -> sync + FaultGate delay + `can` RBAC enforcement.
+        // 3 & 4. async -> async + async -> sync + `can` RBAC enforcement.
         let hub_async = hub.clone();
-        let (caller_task_id, fault_elapsed) = vibevalley_runtime::rt::block_on(async move {
+        let caller_task_id = vibevalley_runtime::rt::block_on(async move {
             vibevalley_runtime::rt::spawn(async move {
                 let caller_task_id = tokio::task::try_id();
 
-                // async -> async (with non-blocking FaultGate sleep >= 25ms)
-                let t0 = Instant::now();
                 let async_env = hub_async.call_with_async(CallerContext::local(), "server.health.get".into(), Value::Null).await;
-                let fault_elapsed = t0.elapsed();
                 assert_eq!(async_env.biz_code, 0);
                 assert_eq!(async_env.data.unwrap()["version"], "v3");
 
@@ -1745,22 +1932,19 @@ mod tests {
                 let forbidden_invoke = hub_async.invoke_as_async::<ops::ServerHealthGet>(Caller::Session, ()).await.unwrap_err();
                 assert_eq!(forbidden_invoke.biz_code, BizCode::Forbidden);
 
-                (caller_task_id, fault_elapsed)
+                caller_task_id
             })
             .await
             .unwrap()
         });
 
-        assert!(
-            fault_elapsed >= Duration::from_millis(20),
-            "async FaultGate delay should be enforced via tokio::time::sleep, got {fault_elapsed:?}"
-        );
         assert_eq!(sync_hits.load(Ordering::SeqCst), 4);
         assert_eq!(async_hits.load(Ordering::SeqCst), 4);
 
         // Last two sync handler calls came from async callers -> ran via spawn_blocking (distinct from caller task).
         let ids = sync_task_ids.lock();
         assert_eq!(ids.len(), 4);
+        assert!(caller_task_id.is_some());
         assert_ne!(ids[2], caller_task_id);
         assert_ne!(ids[3], caller_task_id);
 
