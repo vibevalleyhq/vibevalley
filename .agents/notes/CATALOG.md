@@ -2,7 +2,7 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（23 篇）
+## proposed（24 篇）
 
 ### feature
 
@@ -16,6 +16,7 @@
 
 ### architecture
 
+- 2026-11-24 [Tokio 生态精简、类型化 HTTP 鉴权与异步链路追踪](.agents/notes/proposed/architecture/2026-11-24-tokio-ecosystem-slimming.md)
 - 2026-11-23 [Tokio 并发模型收敛与同步阻塞清理](.agents/notes/proposed/architecture/2026-11-23-tokio-concurrency-overhaul.md)
 - 2026-11-23 [Tailscale 与 nsh 原生移动远程控制（iOS 优先，Android 就绪）](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)
 - 2026-11-22 [工作台顶栏、页面交互精简与大纲笔记归属作品](.agents/notes/proposed/architecture/2026-11-22-workbench-ux-polish-and-outline-as-artifact.md)
