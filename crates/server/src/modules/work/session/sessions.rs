@@ -8,11 +8,13 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
+use tracing::Instrument as _;
+use tracing::instrument::WithSubscriber as _;
 use vibevalley_protocol::{
     Caller, Deliverable, Doing, Fact, Issue, IssueAnswer, IssueReportMemoryScope, MemoryCreateInput, Millis, Outcome, Phase, PhaseWorking, Question,
     RunTrigger, Session, SessionAction, Spent, ops,
@@ -480,7 +482,7 @@ impl Sessions {
             if let Some(hub) = &hub {
                 hub.spawn_blocking_task(reconcile);
             } else {
-                vibevalley_runtime::rt::handle().spawn_blocking(reconcile);
+                crate::spawn_blocking_traced(reconcile);
             }
         }
         let me = self.clone();
@@ -491,7 +493,7 @@ impl Sessions {
         if let Some(hub) = &hub {
             hub.spawn_task(pump);
         } else {
-            vibevalley_runtime::rt::handle().spawn(pump);
+            vibevalley_runtime::rt::current_or_global_handle().spawn(pump.in_current_span().with_current_subscriber());
         }
         Ok(())
     }
@@ -629,65 +631,70 @@ impl Sessions {
     /// Turns the agent's events into facts until the session ends or leaves,
     /// without pinning an OS thread while idle between agent events.
     async fn pump_async(&self, session_id: String, generation: u64, events: flume::Receiver<vibevalley_runtime::oar::Event>, cancel: CancellationToken) {
-        let quiet_after = self.0.config.quiet_after;
-        let tick = quiet_after.min(Duration::from_secs(5)).max(Duration::from_millis(20));
-        let mut last_event = Instant::now();
-        let mut state = PumpState::default();
-        loop {
-            let event = tokio::select! {
-                biased;
-                _ = cancel.cancelled() => return,
-                res = tokio::time::timeout(tick, events.recv_async()) => match res {
-                    Ok(Ok(event)) => event,
-                    Ok(Err(flume::RecvError::Disconnected)) => break,
-                    Err(_) => {
-                        if !self.current(&session_id, generation) {
-                            return;
+        let span = tracing::debug_span!("session.pump", session_id = %session_id, generation);
+        async move {
+            let quiet_after = self.0.config.quiet_after;
+            let tick = quiet_after.min(Duration::from_secs(5)).max(Duration::from_millis(20));
+            let mut last_event = tokio::time::Instant::now();
+            let mut state = PumpState::default();
+            loop {
+                let event = tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => return,
+                    res = tokio::time::timeout(tick, events.recv_async()) => match res {
+                        Ok(Ok(event)) => event,
+                        Ok(Err(flume::RecvError::Disconnected)) => break,
+                        Err(_) => {
+                            if !self.current(&session_id, generation) {
+                                return;
+                            }
+                            if last_event.elapsed() >= quiet_after {
+                                let me = self.clone();
+                                let sid = session_id.clone();
+                                let _ = crate::spawn_blocking_traced(move || me.set_quiet(&sid, Some(now()))).await;
+                            }
+                            continue;
                         }
-                        if last_event.elapsed() >= quiet_after {
-                            let me = self.clone();
-                            let sid = session_id.clone();
-                            let _ = tokio::task::spawn_blocking(move || me.set_quiet(&sid, Some(now()))).await;
-                        }
-                        continue;
-                    }
-                },
-            };
-            if cancel.is_cancelled() || !self.current(&session_id, generation) {
+                    },
+                };
+                if cancel.is_cancelled() || !self.current(&session_id, generation) {
+                    return;
+                }
+                last_event = tokio::time::Instant::now();
+                let me = self.clone();
+                let sid = session_id.clone();
+                let Ok((next_state, ended)) = crate::spawn_blocking_traced(move || {
+                    let ended = me.handle_pump_event(&sid, generation, event, &mut state);
+                    (state, ended)
+                })
+                .await
+                else {
+                    return;
+                };
+                state = next_state;
+                if ended {
+                    break;
+                }
+            }
+            if cancel.is_cancelled() {
                 return;
             }
-            last_event = Instant::now();
             let me = self.clone();
-            let sid = session_id.clone();
-            let Ok((next_state, ended)) = tokio::task::spawn_blocking(move || {
-                let ended = me.handle_pump_event(&sid, generation, event, &mut state);
-                (state, ended)
+            let _ = crate::spawn_blocking_traced(move || {
+                let mut live = me.0.live.lock();
+                let was_current = live.get(&session_id).is_some_and(|l| l.generation == generation);
+                if was_current {
+                    live.remove(&session_id);
+                }
+                drop(live);
+                if was_current {
+                    me.on_workspace_pump_exited(&session_id);
+                }
             })
-            .await
-            else {
-                return;
-            };
-            state = next_state;
-            if ended {
-                break;
-            }
+            .await;
         }
-        if cancel.is_cancelled() {
-            return;
-        }
-        let me = self.clone();
-        let _ = tokio::task::spawn_blocking(move || {
-            let mut live = me.0.live.lock();
-            let was_current = live.get(&session_id).is_some_and(|l| l.generation == generation);
-            if was_current {
-                live.remove(&session_id);
-            }
-            drop(live);
-            if was_current {
-                me.on_workspace_pump_exited(&session_id);
-            }
-        })
-        .await;
+        .instrument(span)
+        .await
     }
 
     fn handle_pump_event(&self, session_id: &str, generation: u64, event: vibevalley_runtime::oar::Event, state: &mut PumpState) -> bool {
@@ -1080,5 +1087,337 @@ fn read_round(issue: &Issue, reason: StopReason, report: Option<&Report>, said: 
         questions,
         checks,
         answer,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use parking_lot::Mutex;
+    use tracing::instrument::WithSubscriber as _;
+    use vibevalley_core::Applied;
+    use vibevalley_protocol::{ExecutionPolicy, Fact, Phase, Session, SessionAction, SessionController, SliceBundle, SpaceState};
+    use vibevalley_runtime::oar::{
+        Capabilities, ContentBlock, ControlAction, ControlOutcome, ControlStatus, Event, EventKind, Installation, ModelInfo, PermissionDecision, Registry,
+        Runtime, Session as OarSession, SessionOptions, SessionStatus, voyage,
+    };
+
+    use super::Sessions;
+    use crate::Hub;
+    use crate::modules::work::ledger::{BoardConfig, Facts, IssueStore, Ledger, LocalFacts, now};
+    use crate::modules::work::session::RuntimeDrivers;
+    use crate::modules::work::workplace::Workplace;
+
+    #[derive(Clone, Default)]
+    struct SharedBuf(Arc<Mutex<Vec<u8>>>);
+
+    struct BufWriter(Arc<Mutex<Vec<u8>>>);
+
+    impl io::Write for BufWriter {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.0.lock().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for SharedBuf {
+        type Writer = BufWriter;
+
+        fn make_writer(&'a self) -> Self::Writer {
+            BufWriter(self.0.clone())
+        }
+    }
+
+    struct QuietTrackingFacts {
+        inner: LocalFacts,
+        quiet_spans: Mutex<Vec<(Option<&'static str>, bool)>>,
+        quiet_set: Arc<tokio::sync::Notify>,
+        quiet_cleared: Arc<tokio::sync::Notify>,
+    }
+
+    impl QuietTrackingFacts {
+        fn new() -> Self {
+            Self {
+                inner: LocalFacts::default(),
+                quiet_spans: Mutex::new(Vec::new()),
+                quiet_set: Arc::new(tokio::sync::Notify::new()),
+                quiet_cleared: Arc::new(tokio::sync::Notify::new()),
+            }
+        }
+    }
+
+    impl Facts for QuietTrackingFacts {
+        fn apply(&self, facts: Vec<Fact>) -> Applied {
+            let quiet_events: Vec<(Option<&'static str>, bool)> = facts
+                .iter()
+                .filter_map(|fact| match fact {
+                    Fact::SessionPhaseChanged(changed) => match &changed.phase {
+                        Phase::Working(working) => {
+                            let current = tracing::Span::current();
+                            let span_name = current.metadata().map(|m| m.name());
+                            let is_quiet = working.quiet_since.is_some();
+                            tracing::debug!(is_quiet, "sessions.test.facts_apply");
+                            Some((span_name, is_quiet))
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                })
+                .collect();
+            let applied = self.inner.apply(facts);
+            if !quiet_events.is_empty() {
+                self.quiet_spans.lock().extend(quiet_events.iter().copied());
+                for (_, is_quiet) in quiet_events {
+                    if is_quiet {
+                        self.quiet_set.notify_one();
+                    } else {
+                        self.quiet_cleared.notify_one();
+                    }
+                }
+            }
+            applied
+        }
+
+        fn read(&self, f: &mut dyn FnMut(&SpaceState)) {
+            self.inner.read(f);
+        }
+
+        fn bundle(&self) -> SliceBundle {
+            self.inner.bundle()
+        }
+    }
+
+    struct StubSession {
+        id: String,
+        tx: flume::Sender<Event>,
+        rx: flume::Receiver<Event>,
+    }
+
+    impl OarSession for StubSession {
+        fn id(&self) -> String {
+            self.id.clone()
+        }
+
+        fn control(&self, action: ControlAction, _: &str, input_id: &str, span_id: &str) -> vibevalley_runtime::oar::Result<ControlOutcome> {
+            Ok(ControlOutcome {
+                action,
+                status: ControlStatus::Accepted,
+                code: String::new(),
+                reason: String::new(),
+                span_id: span_id.into(),
+                input_id: input_id.into(),
+            })
+        }
+
+        fn records(&self) -> Vec<voyage::Record> {
+            vec![]
+        }
+
+        fn subscribe_records(&self, _: Option<u64>) -> flume::Receiver<voyage::Record> {
+            let (_tx, rx) = flume::bounded(1);
+            rx
+        }
+
+        fn runtime_id(&self) -> &str {
+            "stub"
+        }
+
+        fn status(&self) -> SessionStatus {
+            SessionStatus::Idle
+        }
+
+        fn events(&self) -> flume::Receiver<Event> {
+            self.rx.clone()
+        }
+
+        fn prompt(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
+            Ok(())
+        }
+
+        fn steer(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
+            Ok(())
+        }
+
+        fn queue(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
+            Ok(())
+        }
+
+        fn abort(&self) -> vibevalley_runtime::oar::Result<()> {
+            Ok(())
+        }
+
+        fn respond_permission(&self, _: &str, _: PermissionDecision) -> vibevalley_runtime::oar::Result<()> {
+            Ok(())
+        }
+
+        fn dispose(&self) {
+            let _ = self.tx.try_send(Event {
+                seq: 0,
+                at_ms: 0,
+                agent_path: vec![],
+                kind: EventKind::SessionEnded,
+            });
+        }
+    }
+
+    struct StubRuntime;
+
+    impl Runtime for StubRuntime {
+        fn id(&self) -> &str {
+            "stub"
+        }
+
+        fn display_name(&self) -> &str {
+            "Stub"
+        }
+
+        fn capabilities(&self) -> Capabilities {
+            Capabilities::default()
+        }
+
+        fn installation(&self) -> Installation {
+            Installation::Available {
+                version: None,
+                path: std::path::PathBuf::from("/bin/true"),
+            }
+        }
+
+        fn list_models(&self) -> vibevalley_runtime::oar::Result<Vec<ModelInfo>> {
+            Ok(vec![])
+        }
+
+        fn open(&self, _: SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn OarSession>> {
+            let (tx, rx) = flume::unbounded();
+            Ok(Arc::new(StubSession { id: "stub-1".into(), tx, rx }))
+        }
+    }
+
+    struct NoopIssueStore;
+
+    impl IssueStore for NoopIssueStore {
+        fn all(&self, _db: &vibevalley_runtime::agent::durable::Sqlite<'_>) -> sqlx::Result<Vec<vibevalley_protocol::Issue>> {
+            Ok(vec![])
+        }
+
+        fn put(&self, _db: &vibevalley_runtime::agent::durable::Sqlite<'_>, _issue: &vibevalley_protocol::Issue) -> sqlx::Result<()> {
+            Ok(())
+        }
+
+        fn remove(&self, _db: &vibevalley_runtime::agent::durable::Sqlite<'_>, _id: &str) -> sqlx::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn pump_async_quiet_timer_uses_virtual_clock_and_propagates_session_pump_span() {
+        let buf = SharedBuf::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::DEBUG)
+            .with_ansi(false)
+            .with_writer(buf.clone())
+            .finish();
+
+        async {
+            let dir = tempfile::tempdir().unwrap();
+            let db = crate::base::ServerDb::open(dir.path()).unwrap();
+            let facts = Arc::new(QuietTrackingFacts::new());
+            let (ledger, _) = Ledger::open(
+                db.clone(),
+                facts.clone(),
+                Arc::new(NoopIssueStore),
+                Arc::new(super::super::db::SqliteSessionStore),
+            )
+            .unwrap();
+            let durable = db.durable().unwrap();
+            let mut cfg = BoardConfig::under(dir.path());
+            cfg.quiet_after = Duration::from_secs(300);
+            let config = Arc::new(cfg);
+            let workplaces = Arc::new(Workplace::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
+            let mut registry = Registry::new();
+            registry.register(Arc::new(StubRuntime));
+            let drivers = Arc::new(RuntimeDrivers {
+                registry: Arc::new(registry),
+                model: None,
+            });
+            let hub = Hub::new(vibevalley_core::empty_space_state());
+            let sessions = Sessions::new(durable, Arc::new(ledger), drivers, workplaces, config, Some(Arc::downgrade(&hub))).unwrap();
+
+            let (tx, rx) = flume::unbounded();
+            let agent = Arc::new(StubSession {
+                id: "stub-quiet".into(),
+                tx: tx.clone(),
+                rx,
+            });
+            let mut session = Session::new(
+                "w-quiet",
+                SessionController::IssueBoard,
+                "Quiet test",
+                "stub",
+                ExecutionPolicy::SandboxDir,
+                now(),
+            );
+            session.phase = Phase::working(now(), SessionAction::Thinking, "");
+
+            let wall_start = std::time::Instant::now();
+            sessions.go_live(agent, session, None).unwrap();
+            tokio::task::yield_now().await;
+
+            // Advance 290 virtual seconds (< 300s): session must not be marked quiet yet.
+            tokio::time::advance(Duration::from_secs(290)).await;
+            tokio::task::yield_now().await;
+            assert!(
+                matches!(sessions.session("w-quiet").unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_none()),
+                "session must not be quiet before quiet_after elapses"
+            );
+
+            // Advance past 300 virtual seconds: quiet timer fires via spawn_blocking_traced under session.pump span.
+            tokio::time::advance(Duration::from_secs(15)).await;
+            facts.quiet_set.notified().await;
+            assert!(
+                matches!(sessions.session("w-quiet").unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_some()),
+                "session must become quiet once virtual quiet_after elapses"
+            );
+            assert!(
+                wall_start.elapsed() < Duration::from_secs(2),
+                "5 virtual minutes must elapse instantaneously, took {:?}",
+                wall_start.elapsed()
+            );
+
+            // Delivering a new event clears quiet_since via spawn_blocking_traced under the same session.pump span.
+            tx.send(Event {
+                seq: 1,
+                at_ms: now() as u64,
+                agent_path: vec![],
+                kind: EventKind::TextDelta { text: "progress".into() },
+            })
+            .unwrap();
+            facts.quiet_cleared.notified().await;
+            assert!(
+                matches!(sessions.session("w-quiet").unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_none()),
+                "event arrival must clear quiet_since"
+            );
+
+            let recorded = facts.quiet_spans.lock().clone();
+            assert_eq!(recorded, vec![(Some("session.pump"), true), (Some("session.pump"), false)]);
+
+            hub.close_async().await;
+
+            let logs = String::from_utf8(buf.0.lock().clone()).unwrap();
+            assert!(
+                logs.contains("session.pump{session_id=w-quiet generation=1}")
+                    && logs.contains("sessions.test.facts_apply is_quiet=true")
+                    && logs.contains("sessions.test.facts_apply is_quiet=false"),
+                "expected session.pump span around blocking facts_apply:\n{logs}"
+            );
+        }
+        .with_subscriber(subscriber)
+        .await;
     }
 }

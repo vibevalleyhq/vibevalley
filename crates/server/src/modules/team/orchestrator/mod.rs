@@ -23,6 +23,8 @@ use parking_lot::Mutex;
 use tokio::sync::Notify;
 use tokio::task::JoinHandle as TaskHandle;
 use tokio_util::sync::CancellationToken;
+use tracing::Instrument as _;
+use tracing::instrument::WithSubscriber as _;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     Actor, AgentRole, ApiError, BizCode, ChannelType, Doing, ExecutionPolicy, Fact, FactSessionChanged, FactSessionPhaseChanged, NoticeLevel,
@@ -330,7 +332,7 @@ impl Orchestrator {
         if let Some(hub) = hub {
             hub.spawn_task(fut);
         } else {
-            vibevalley_runtime::rt::handle().spawn(fut);
+            vibevalley_runtime::rt::current_or_global_handle().spawn(fut.in_current_span().with_current_subscriber());
         }
         me
     }
@@ -425,7 +427,7 @@ impl Orchestrator {
         let fut = async move {
             let boot_o = o.clone();
             let boot_chat = chat.clone();
-            let _ = tokio::task::spawn_blocking(move || {
+            let _ = crate::spawn_blocking_traced(move || {
                 if let Some(o) = boot_o.upgrade()
                     && let Ok(pending) = boot_chat.pending_deliveries(DeliveryTargetKind::Orchestrator)
                 {
@@ -452,7 +454,7 @@ impl Orchestrator {
                     return;
                 }
                 let chat_c = chat.clone();
-                let _ = tokio::task::spawn_blocking(move || {
+                let _ = crate::spawn_blocking_traced(move || {
                     for d in &dispatched.deliveries {
                         if d.recipient_kind == DeliveryTargetKind::Orchestrator {
                             o.handle_chat_delivery(&chat_c, d, Some(&dispatched.committed));
@@ -465,7 +467,7 @@ impl Orchestrator {
         let handle = if let Some(hub) = hub {
             hub.spawn_task(fut)
         } else {
-            vibevalley_runtime::rt::handle().spawn(fut)
+            vibevalley_runtime::rt::current_or_global_handle().spawn(fut.in_current_span().with_current_subscriber())
         };
         let prev = self.chat_listener.lock().replace((cancel, handle));
         if let Some((old_cancel, old_handle)) = prev {
@@ -749,72 +751,77 @@ impl Orchestrator {
     }
 
     async fn work_async(o: Weak<Orchestrator>, me: Arc<Instance>, cancel: CancellationToken) {
-        loop {
-            let ready = loop {
-                if cancel.is_cancelled() {
+        let span = tracing::debug_span!("orchestrator.work", agent_id = %me.id);
+        async move {
+            loop {
+                let ready = loop {
+                    if cancel.is_cancelled() {
+                        return;
+                    }
+                    let Some(orch) = o.upgrade() else { return };
+                    if orch.closed.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    let notified = me.more.notified();
+                    tokio::pin!(notified);
+                    notified.as_mut().enable();
+                    {
+                        let mut q = me.queue.lock();
+                        if !q.is_empty() {
+                            q.clear();
+                            break true;
+                        }
+                    }
+                    let check_o = orch.clone();
+                    let check_id = me.id.clone();
+                    let saved = crate::spawn_blocking_traced(move || check_o.execution.has_inputs(&check_id).unwrap_or(false))
+                        .await
+                        .unwrap_or(false);
+                    drop(orch);
+                    if saved {
+                        break true;
+                    }
+                    tokio::select! {
+                        biased;
+                        _ = cancel.cancelled() => return,
+                        _ = tokio::time::timeout(std::time::Duration::from_secs(1), notified) => {}
+                    }
+                };
+                if !ready || cancel.is_cancelled() {
                     return;
                 }
                 let Some(orch) = o.upgrade() else { return };
                 if orch.closed.load(Ordering::Relaxed) {
                     return;
                 }
-                let notified = me.more.notified();
-                tokio::pin!(notified);
-                notified.as_mut().enable();
-                {
-                    let mut q = me.queue.lock();
-                    if !q.is_empty() {
-                        q.clear();
-                        break true;
-                    }
-                }
-                let check_o = orch.clone();
-                let check_id = me.id.clone();
-                let saved = tokio::task::spawn_blocking(move || check_o.execution.has_inputs(&check_id).unwrap_or(false))
-                    .await
-                    .unwrap_or(false);
-                drop(orch);
-                if saved {
-                    break true;
-                }
-                tokio::select! {
-                    biased;
-                    _ = cancel.cancelled() => return,
-                    _ = tokio::time::timeout(std::time::Duration::from_secs(1), notified) => {}
-                }
-            };
-            if !ready || cancel.is_cancelled() {
-                return;
-            }
-            let Some(orch) = o.upgrade() else { return };
-            if orch.closed.load(Ordering::Relaxed) {
-                return;
-            }
-            let inst = me.clone();
-            let keep_going = tokio::task::spawn_blocking(move || {
-                if orch.closed.load(Ordering::Acquire) {
-                    return false;
-                }
-                let batch = match orch.execution.batch(&inst.id) {
-                    Ok(b) => b,
-                    Err(e) => {
-                        if let Some(hub) = orch.hub() {
-                            hub.notice(NoticeLevel::Error, e.to_string());
-                        }
+                let inst = me.clone();
+                let keep_going = crate::spawn_blocking_traced(move || {
+                    if orch.closed.load(Ordering::Acquire) {
                         return false;
                     }
-                };
-                if !batch.is_empty() {
-                    orch.turn(&inst, batch);
+                    let batch = match orch.execution.batch(&inst.id) {
+                        Ok(b) => b,
+                        Err(e) => {
+                            if let Some(hub) = orch.hub() {
+                                hub.notice(NoticeLevel::Error, e.to_string());
+                            }
+                            return false;
+                        }
+                    };
+                    if !batch.is_empty() {
+                        orch.turn(&inst, batch);
+                    }
+                    true
+                })
+                .await
+                .unwrap_or(false);
+                if !keep_going {
+                    return;
                 }
-                true
-            })
-            .await
-            .unwrap_or(false);
-            if !keep_going {
-                return;
             }
         }
+        .instrument(span)
+        .await
     }
 
     /// The farm as it is shown before an input (`situation`).

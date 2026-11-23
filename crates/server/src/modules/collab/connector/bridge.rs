@@ -13,6 +13,8 @@ use sha2::{Digest, Sha256};
 use tokio::sync::{Mutex as AsyncMutex, Notify};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
+use tracing::Instrument as _;
+use tracing::instrument::WithSubscriber as _;
 use vibevalley_core::channel::for_user;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus, Fact, FactConnectorChanged};
@@ -365,7 +367,7 @@ impl Bridge {
     /// marked before the next is looked at.
     async fn drain(self: &Arc<Self>, late: bool, cancel: &CancellationToken) -> bool {
         let me = self.clone();
-        let DrainPlan { account: a, batches } = match tokio::task::spawn_blocking(move || me.prepare_drain(late)).await {
+        let DrainPlan { account: a, batches } = match crate::spawn_blocking_traced(move || me.prepare_drain(late)).await {
             Ok(Ok(Some(plan))) => plan,
             Ok(Ok(None)) => return true,
             Ok(Err(())) | Err(_) => return false,
@@ -377,7 +379,7 @@ impl Bridge {
             }
             let sent = self.app.send(&a.keys, &a.user, &text, &a.reply_context).await;
             let me = self.clone();
-            let ok = tokio::task::spawn_blocking(move || match sent {
+            let ok = crate::spawn_blocking_traced(move || match sent {
                 Ok(ext) => {
                     if let Err(e) = me.env.store.sent(&rows, now(), &ext) {
                         me.set_err(e.0);
@@ -430,7 +432,7 @@ impl Bridge {
         }
         let me = self.clone();
         let inbound = m.clone();
-        let step = tokio::task::spawn_blocking(move || -> Result<Step, Held> {
+        let step = crate::spawn_blocking_traced(move || -> Result<Step, Held> {
             let Some(a) = me.snapshot() else { return Ok(Step::Ignore) };
             let id = me.id();
             if a.user.is_empty() {
@@ -482,7 +484,7 @@ impl Bridge {
                     );
                 }
                 let me = self.clone();
-                let _ = tokio::task::spawn_blocking(move || me.tell()).await;
+                let _ = crate::spawn_blocking_traced(move || me.tell()).await;
                 Ok(None)
             }
             Step::Said(said) => {
@@ -496,7 +498,7 @@ impl Bridge {
     async fn drain_inbox(self: &Arc<Self>, cancel: &CancellationToken) -> Result<(), Held> {
         let id = self.id();
         let me = self.clone();
-        let pending = tokio::task::spawn_blocking(move || me.env.store.pending_inbound(id))
+        let pending = crate::spawn_blocking_traced(move || me.env.store.pending_inbound(id))
             .await
             .map_err(|e| Held(e.to_string()))??;
         for m in pending {
@@ -506,7 +508,7 @@ impl Bridge {
             let said = self.got(&m, cancel).await?;
             let me = self.clone();
             let mid = m.id.clone();
-            tokio::task::spawn_blocking(move || me.env.store.delivered(id, &mid, said.as_deref()))
+            crate::spawn_blocking_traced(move || me.env.store.delivered(id, &mid, said.as_deref()))
                 .await
                 .map_err(|e| Held(e.to_string()))??;
         }
@@ -515,50 +517,55 @@ impl Bridge {
 
     /// The worker: what came in goes to the farm in order, then what waits goes out; what is held is tried again.
     async fn work(self: Arc<Self>, cancel: CancellationToken) {
-        let mut backoff = self.env.retry_backoff();
-        let mut current_delay: Option<Duration> = None;
-        while !cancel.is_cancelled() {
-            let notified = self.wake.notified();
-            tokio::pin!(notified);
-            notified.as_mut().enable();
-            let taken = match self.drain_inbox(&cancel).await {
-                Ok(()) => true,
-                Err(e) => {
-                    let me = self.clone();
-                    let _ = tokio::task::spawn_blocking(move || me.set_err(e.0)).await;
-                    false
+        let span = tracing::debug_span!("connector.bridge", account_id = self.id().as_str(), role = "work");
+        async move {
+            let mut backoff = self.env.retry_backoff();
+            let mut current_delay: Option<Duration> = None;
+            while !cancel.is_cancelled() {
+                let notified = self.wake.notified();
+                tokio::pin!(notified);
+                notified.as_mut().enable();
+                let taken = match self.drain_inbox(&cancel).await {
+                    Ok(()) => true,
+                    Err(e) => {
+                        let me = self.clone();
+                        let _ = crate::spawn_blocking_traced(move || me.set_err(e.0)).await;
+                        false
+                    }
+                };
+                let held = !self.drain(false, &cancel).await || !taken;
+                if !held {
+                    backoff = self.env.retry_backoff();
+                    current_delay = None;
                 }
-            };
-            let held = !self.drain(false, &cancel).await || !taken;
-            if !held {
-                backoff = self.env.retry_backoff();
-                current_delay = None;
-            }
-            let wait_for = if held {
-                *current_delay.get_or_insert_with(|| backoff.next().unwrap_or(self.env.retry_most))
-            } else {
-                IDLE
-            };
-            enum Step {
-                Stopped,
-                Woke,
-                TimedOut,
-            }
-            let step = tokio::select! {
-                biased;
-                _ = cancel.cancelled() => Step::Stopped,
-                _ = notified => Step::Woke,
-                _ = tokio::time::sleep(wait_for) => Step::TimedOut,
-            };
-            match step {
-                Step::Stopped => break,
-                Step::Woke => {}
-                Step::TimedOut if held => {
-                    current_delay = Some(backoff.next().unwrap_or(self.env.retry_most));
+                let wait_for = if held {
+                    *current_delay.get_or_insert_with(|| backoff.next().unwrap_or(self.env.retry_most))
+                } else {
+                    IDLE
+                };
+                enum Step {
+                    Stopped,
+                    Woke,
+                    TimedOut,
                 }
-                Step::TimedOut => {}
+                let step = tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => Step::Stopped,
+                    _ = notified => Step::Woke,
+                    _ = tokio::time::sleep(wait_for) => Step::TimedOut,
+                };
+                match step {
+                    Step::Stopped => break,
+                    Step::Woke => {}
+                    Step::TimedOut if held => {
+                        current_delay = Some(backoff.next().unwrap_or(self.env.retry_most));
+                    }
+                    Step::TimedOut => {}
+                }
             }
         }
+        .instrument(span)
+        .await
     }
 
     fn accept(&self, messages: Vec<Inbound>, cursor: &str) -> Result<(), AppFailed> {
@@ -593,68 +600,73 @@ impl Bridge {
     /// Receives until stopped: a connection that ends is opened again, a stale login rests.
     async fn receiving(self: Arc<Self>, cancel: CancellationToken) {
         let id = self.id();
-        let mut failures = 0;
-        loop {
-            let Some(a) = self.snapshot() else { return };
-            if paused(&a, now()) {
-                if sleep_or_cancel(&cancel, Duration::from_millis((a.paused_until - now()).max(0) as u64)).await {
-                    return;
+        let span = tracing::debug_span!("connector.bridge", account_id = id.as_str(), role = "receiving");
+        async move {
+            let mut failures = 0;
+            loop {
+                let Some(a) = self.snapshot() else { return };
+                if paused(&a, now()) {
+                    if sleep_or_cancel(&cancel, Duration::from_millis((a.paused_until - now()).max(0) as u64)).await {
+                        return;
+                    }
+                    let me = self.clone();
+                    let res = crate::spawn_blocking_traced(move || me.env.store.pause(id, None).and_then(|()| me.reload())).await;
+                    match res {
+                        Ok(Ok(())) => {}
+                        Ok(Err(e)) => {
+                            let me = self.clone();
+                            let _ = crate::spawn_blocking_traced(move || me.set_err(e.0)).await;
+                            if sleep_or_cancel(&cancel, self.env.reconnect).await {
+                                return;
+                            }
+                        }
+                        Err(_) => return,
+                    }
+                    continue;
                 }
                 let me = self.clone();
-                let res = tokio::task::spawn_blocking(move || me.env.store.pause(id, None).and_then(|()| me.reload())).await;
-                match res {
-                    Ok(Ok(())) => {}
+                let cursor = match crate::spawn_blocking_traced(move || me.env.store.account(id)).await {
+                    Ok(Ok(row)) => row.map(|r| r.cursor).unwrap_or_default(),
                     Ok(Err(e)) => {
                         let me = self.clone();
-                        let _ = tokio::task::spawn_blocking(move || me.set_err(e.0)).await;
+                        let _ = crate::spawn_blocking_traced(move || me.set_err(e.0)).await;
                         if sleep_or_cancel(&cancel, self.env.reconnect).await {
                             return;
                         }
+                        continue;
                     }
                     Err(_) => return,
-                }
-                continue;
-            }
-            let me = self.clone();
-            let cursor = match tokio::task::spawn_blocking(move || me.env.store.account(id)).await {
-                Ok(Ok(row)) => row.map(|r| r.cursor).unwrap_or_default(),
-                Ok(Err(e)) => {
+                };
+                let accept = |messages: Vec<Inbound>, cursor: &str| self.accept(messages, cursor);
+                let io = Receiving { cursor, accept: &accept };
+                let ended = tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => return,
+                    ended = self.app.receive(&a.keys, &io) => ended,
+                };
+                if ended.kind == FailedKind::Stale {
                     let me = self.clone();
-                    let _ = tokio::task::spawn_blocking(move || me.set_err(e.0)).await;
-                    if sleep_or_cancel(&cancel, self.env.reconnect).await {
+                    let paused_ok = crate::spawn_blocking_traced(move || me.pause()).await.unwrap_or(false);
+                    if !paused_ok && sleep_or_cancel(&cancel, self.env.reconnect).await {
                         return;
                     }
                     continue;
                 }
-                Err(_) => return,
-            };
-            let accept = |messages: Vec<Inbound>, cursor: &str| self.accept(messages, cursor);
-            let io = Receiving { cursor, accept: &accept };
-            let ended = tokio::select! {
-                biased;
-                _ = cancel.cancelled() => return,
-                ended = self.app.receive(&a.keys, &io) => ended,
-            };
-            if ended.kind == FailedKind::Stale {
                 let me = self.clone();
-                let paused_ok = tokio::task::spawn_blocking(move || me.pause()).await.unwrap_or(false);
-                if !paused_ok && sleep_or_cancel(&cancel, self.env.reconnect).await {
+                let _ = crate::spawn_blocking_traced(move || me.set_err(ended.message)).await;
+                failures += 1;
+                let mut wait = self.env.reconnect;
+                if failures >= 3 {
+                    wait *= 15;
+                    failures = 0;
+                }
+                if sleep_or_cancel(&cancel, wait).await {
                     return;
                 }
-                continue;
-            }
-            let me = self.clone();
-            let _ = tokio::task::spawn_blocking(move || me.set_err(ended.message)).await;
-            failures += 1;
-            let mut wait = self.env.reconnect;
-            if failures >= 3 {
-                wait *= 15;
-                failures = 0;
-            }
-            if sleep_or_cancel(&cancel, wait).await {
-                return;
             }
         }
+        .instrument(span)
+        .await
     }
 
     fn child_cancel(&self) -> CancellationToken {
@@ -665,7 +677,7 @@ impl Bridge {
         if let Some(hub) = self.env.hub.upgrade() {
             hub.spawn_task(fut)
         } else {
-            vibevalley_runtime::rt::handle().spawn(fut)
+            vibevalley_runtime::rt::current_or_global_handle().spawn(fut.in_current_span().with_current_subscriber())
         }
     }
 
@@ -741,7 +753,7 @@ impl Bridge {
             Ok(_) if self.closing() => None,
             Ok(linked) => {
                 let me = self.clone();
-                let kept = tokio::task::spawn_blocking(move || {
+                let kept = crate::spawn_blocking_traced(move || {
                     let pair = linked.user.is_empty().then(pair_code);
                     me.env
                         .store
@@ -772,7 +784,7 @@ impl Bridge {
         *current = self.connected();
         drop(current);
         let me = self.clone();
-        let _ = tokio::task::spawn_blocking(move || me.tell()).await;
+        let _ = crate::spawn_blocking_traced(move || me.tell()).await;
     }
 
     pub fn load(&self) {

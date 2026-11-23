@@ -322,7 +322,7 @@ impl Repos {
 
     pub fn probe_in_background(self: &Arc<Repos>) {
         let weak = Arc::downgrade(self);
-        let handle = vibevalley_runtime::rt::handle().spawn_blocking(move || {
+        let handle = crate::spawn_blocking_traced(move || {
             let Some(repos) = weak.upgrade() else { return };
             if !repos.cancel.is_cancelled() {
                 repos.refresh_github();
@@ -426,7 +426,7 @@ impl Repos {
                 let sem = sem.clone();
                 set.spawn(async move {
                     let Ok(_permit) = sem.acquire_owned().await else { return None };
-                    let summary = tokio::task::spawn_blocking(move || {
+                    let summary = crate::spawn_blocking_traced(move || {
                         let last = if p.git {
                             seconds_of(&git_quiet(&p.path, &["log", "--all", "-1", "--format=%at"]))
                         } else {
@@ -644,7 +644,7 @@ impl Repos {
                         if cancel.is_cancelled() {
                             return None;
                         }
-                        tokio::task::spawn_blocking(move || {
+                        crate::spawn_blocking_traced(move || {
                             let repo = github_origin(&git_quiet(&p.path, &["remote", "get-url", "origin"]));
                             let c = if !p.git || repo.is_empty() {
                                 PullRequestCapability {
@@ -761,7 +761,7 @@ pub fn contributions_of(root: &Path, extra: &[String]) -> Vec<vibevalley_protoco
             let sem = sem.clone();
             set.spawn(async move {
                 let Ok(_permit) = sem.acquire_owned().await else { return None };
-                tokio::task::spawn_blocking(move || {
+                crate::spawn_blocking_traced(move || {
                     let common = git_quiet(&dir, &["rev-parse", "--path-format=absolute", "--git-common-dir"]);
                     (!common.is_empty()).then_some((idx, dir, common))
                 })
@@ -796,7 +796,7 @@ pub fn contributions_of(root: &Path, extra: &[String]) -> Vec<vibevalley_protoco
             let extra_lower = extra_lower.clone();
             set.spawn(async move {
                 let Ok(_permit) = sem.acquire_owned().await else { return None };
-                tokio::task::spawn_blocking(move || {
+                crate::spawn_blocking_traced(move || {
                     let own = git_quiet(&dir, &["config", "user.email"]).to_lowercase();
                     let mine: std::collections::HashSet<String> =
                         [global, own].into_iter().chain(extra_lower.iter().cloned()).filter(|e| !e.is_empty()).collect();
