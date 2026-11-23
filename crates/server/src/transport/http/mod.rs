@@ -31,7 +31,8 @@ use std::time::Duration;
 
 use axum::Router;
 use axum::body::{Body, Bytes};
-use axum::extract::{FromRef, Path, Query, Request, State};
+use axum::extract::{DefaultBodyLimit, FromRef, Path, Query, Request, State};
+use axum::handler::Handler as _;
 use axum::http::{HeaderMap, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::sse::{Event, KeepAlive, Sse};
@@ -105,6 +106,14 @@ pub struct Listener {
 impl Listener {
     pub fn url(&self) -> String {
         format!("http://{}", self.addr)
+    }
+
+    /// Gracefully stops the listener task and ends active SSE streams asynchronously.
+    pub async fn shutdown(mut self) {
+        self.shutdown.cancel();
+        if let Some(task) = self.task.take() {
+            let _ = task.await;
+        }
     }
 }
 
@@ -186,7 +195,13 @@ fn machine_routes() -> Router<HttpState> {
 
 fn local_only_routes() -> Router<HttpState> {
     Router::new()
-        .route("/api/v1/media/input/{id}/content", get(media::content).put(media::upload).post(command))
+        .route(
+            "/api/v1/media/input/{id}/content",
+            get(media::content)
+                // Streaming uploads enforce their own 512 MB cap in `media::upload`.
+                .put(media::upload.layer(DefaultBodyLimit::disable()))
+                .post(command),
+        )
         .route("/api/v1/media/speech/{id}/stream", get(media::speech).post(command))
         .route("/mcp", post(mcp).get(not_allowed))
 }
@@ -203,7 +218,7 @@ fn router_with_shutdown(server: Shared, shutdown: CancellationToken, is_remote: 
         .merge(machine_routes())
         .merge(local_only_routes())
         .fallback(not_found)
-        .layer(axum::extract::DefaultBodyLimit::max(MAX_JSON_BODY_BYTES))
+        .layer(DefaultBodyLimit::max(MAX_JSON_BODY_BYTES))
         .layer(middleware::from_fn(trace_request))
         .with_state(state)
 }
@@ -267,15 +282,7 @@ async fn mcp(State(state): State<HttpState>, _local: LocalOnly, headers: HeaderM
         let error = json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "parse error" } });
         return (StatusCode::BAD_REQUEST, axum::Json(error)).into_response();
     };
-    let answered = tokio::task::spawn_blocking(move || match message {
-        Value::Array(batch) => {
-            let answers: Vec<Value> = batch.into_iter().filter_map(|m| door.message(&token, m)).collect();
-            if answers.is_empty() { None } else { Some(Value::Array(answers)) }
-        }
-        one => door.message(&token, one),
-    })
-    .await
-    .unwrap_or(None);
+    let answered = crate::transport::api::dispatch_mcp_message_async(door, token, message).await;
     match answered {
         Some(answer) => (StatusCode::OK, axum::Json(answer)).into_response(),
         None => StatusCode::ACCEPTED.into_response(),
@@ -301,21 +308,13 @@ async fn command(State(state): State<HttpState>, Authenticated(ctx): Authenticat
     reply(state.server.call_with_async(ctx, op, payload).await)
 }
 
-/// A flume receiver as an SSE stream of `data:` lines, ending on `shutdown`.
-fn events<T: serde::Serialize + Send + 'static>(rx: flume::Receiver<T>, shutdown: CancellationToken) -> impl Stream<Item = Result<Event, Infallible>> {
-    futures_util::stream::unfold((rx, shutdown), |(rx, shutdown)| async move {
-        let item = tokio::select! {
-            biased;
-            _ = shutdown.cancelled() => return None,
-            res = rx.recv_async() => res.ok()?,
-        };
-        let data = serde_json::to_string(&item).unwrap_or_else(|_| "null".into());
-        Some((Ok(Event::default().data(data)), (rx, shutdown)))
-    })
-}
-
-fn sse<S: Stream<Item = Result<Event, Infallible>> + Send + 'static>(stream: S) -> Response {
-    Sse::new(stream).keep_alive(KeepAlive::new().interval(HEARTBEAT).text("ping")).into_response()
+/// Wraps an SSE event stream with cooperative shutdown cancellation and heartbeat pings.
+fn sse_with_shutdown<S>(stream: S, shutdown: CancellationToken) -> Response
+where
+    S: Stream<Item = Event> + Send + 'static,
+{
+    let guarded = stream.take_until(shutdown.cancelled_owned()).map(Ok::<Event, Infallible>);
+    Sse::new(guarded).keep_alive(KeepAlive::new().interval(HEARTBEAT).text("ping")).into_response()
 }
 
 /// `GET /api/v1/slice/{name}`: JSON snapshot when `Accept` contains
@@ -338,11 +337,7 @@ async fn slice(
             .and_then(|v| v.to_str().ok())
             .is_some_and(|accept| accept.contains("application/json"));
     if wants_json {
-        let server = state.server.clone();
-        let json = match tokio::task::spawn_blocking(move || server.slice_snapshot_json(kind)).await {
-            Ok(v) => v,
-            Err(e) => return refuse(BizCode::InternalError, e.to_string()),
-        };
+        let json = state.server.slice_snapshot_json_async(kind).await;
         return (StatusCode::OK, [("content-type", "application/json; charset=utf-8")], json.as_bytes().to_vec()).into_response();
     }
     let after_seq = query.get("after").and_then(|v| v.trim().parse::<i64>().ok()).or_else(|| {
@@ -352,87 +347,67 @@ async fn slice(
             .and_then(|v| v.trim().parse::<i64>().ok())
     });
 
-    let server = state.server.clone();
-    let subscribed = match tokio::task::spawn_blocking(move || server.subscribe_slice(kind)).await {
-        Ok(sub) => sub,
-        Err(e) => return refuse(BizCode::InternalError, e.to_string()),
-    };
-    if let Some(sub) = subscribed {
+    if let Some(sub) = state.server.clone().subscribe_slice_async(kind).await {
         let topic = sub.topic();
         let watch_stream = sub.into_json_watch_stream(after_seq);
         let server = state.server;
-        let shutdown = state.shutdown;
-        let stream = futures_util::stream::unfold((watch_stream, server, shutdown), move |(mut watch_stream, server, shutdown)| async move {
-            let (seq, json_str) = tokio::select! {
-                biased;
-                _ = shutdown.cancelled() => return None,
-                item = watch_stream.next() => item?,
-            };
-            if let Some(gate) = server.fault_gate() {
-                if gate.should_disconnect(topic) {
-                    return None;
-                }
-                let delay = gate.delay_ms(topic);
-                if delay > 0 {
-                    tokio::select! {
-                        biased;
-                        _ = shutdown.cancelled() => return None,
-                        _ = tokio::time::sleep(Duration::from_millis(delay)) => {}
+        let stream = watch_stream
+            .then(move |(seq, json_str)| {
+                let server = server.clone();
+                async move {
+                    if let Some(gate) = server.fault_gate() {
+                        if gate.should_disconnect(topic) {
+                            return None;
+                        }
+                        let delay = gate.delay_ms(topic);
+                        if delay > 0 {
+                            tokio::time::sleep(Duration::from_millis(delay)).await;
+                        }
                     }
+                    Some(Event::default().id(seq.to_string()).data(&*json_str))
                 }
-            }
-            let event = Event::default().id(seq.to_string()).data(&*json_str);
-            Some((Ok::<_, Infallible>(event), (watch_stream, server, shutdown)))
-        });
-        return sse(stream);
+            })
+            .take_while(|ev| std::future::ready(ev.is_some()))
+            .filter_map(std::future::ready);
+        return sse_with_shutdown(stream, state.shutdown);
     }
 
     // Fallback for custom `Server` implementations without a `SliceFeed` (e.g. test doubles).
     let (stop_tx, stop_rx) = flume::bounded::<()>(0);
     let (tx, rx) = flume::bounded::<(i64, String)>(1);
     let watch_server = state.server;
-    tokio::task::spawn_blocking(move || {
+    crate::spawn_blocking_traced(move || {
         watch_server.watch_slice(kind, after_seq, &stop_rx, &mut |seq, value| {
             let data = serde_json::to_string(value).unwrap_or_else(|_| "null".into());
             flume::Selector::new().send(&tx, (seq, data), |_| ()).recv(&stop_rx, |_| ()).wait();
         });
     });
-    let shutdown = state.shutdown;
-    let stream = futures_util::stream::unfold((rx, stop_tx, shutdown), |(rx, stop_tx, shutdown)| async move {
-        let (seq, data) = tokio::select! {
-            biased;
-            _ = shutdown.cancelled() => return None,
-            res = rx.recv_async() => res.ok()?,
-        };
-        let event = Event::default().id(seq.to_string()).data(data);
-        Some((Ok::<_, Infallible>(event), (rx, stop_tx, shutdown)))
+    let stream = rx.into_stream().map(move |(seq, data)| {
+        let _keep = &stop_tx;
+        Event::default().id(seq.to_string()).data(data)
     });
-    sse(stream)
+    sse_with_shutdown(stream, state.shutdown)
 }
 
 async fn live(State(state): State<HttpState>, _auth: Authenticated) -> Response {
     if let Some(rx) = state.server.subscribe_live() {
-        let bstream = BroadcastStream::new(rx);
-        let shutdown = state.shutdown;
-        let stream = futures_util::stream::unfold((bstream, shutdown), |(mut bstream, shutdown)| async move {
-            loop {
-                let next = tokio::select! {
-                    biased;
-                    _ = shutdown.cancelled() => return None,
-                    item = bstream.next() => item?,
-                };
-                match next {
-                    Ok(ev) => {
-                        let data = serde_json::to_string(&ev).unwrap_or_else(|_| "null".into());
-                        return Some((Ok::<_, Infallible>(Event::default().data(data)), (bstream, shutdown)));
-                    }
-                    Err(BroadcastStreamRecvError::Lagged(_)) => continue,
+        let stream = BroadcastStream::new(rx).filter_map(|next| {
+            let event = match next {
+                Ok(ev) => {
+                    let data = serde_json::to_string(&ev).unwrap_or_else(|_| "null".into());
+                    Some(Event::default().data(data))
                 }
-            }
+                Err(BroadcastStreamRecvError::Lagged(_)) => None,
+            };
+            std::future::ready(event)
         });
-        return sse(stream);
+        return sse_with_shutdown(stream, state.shutdown);
     }
-    sse(events(state.server.live(), state.shutdown))
+    let stream = state.server.live().into_stream().map(|item| {
+        let data = serde_json::to_string(&item).unwrap_or_else(|_| "null".into());
+        Event::default().data(data)
+    });
+    sse_with_shutdown(stream, state.shutdown)
 }
 
 /// Unsubscribes when the client goes away (the stream is dropped).
@@ -459,9 +434,8 @@ async fn subscribe(
         Err(e) => return refuse(BizCode::InvalidInput, e.to_string()),
     };
     match open(state.server, state.shutdown, ctx, name, payload).await {
-        Ok(Ok(stream)) => stream,
-        Ok(Err(envelope)) => reply(envelope),
-        Err(e) => refuse(BizCode::InternalError, e.to_string()),
+        Ok(stream) => stream,
+        Err(envelope) => reply(envelope),
     }
 }
 
@@ -472,6 +446,21 @@ fn is_artifact_id(id: &str) -> bool {
 fn is_artifact_version(version: &str) -> bool {
     let mut bytes = version.bytes();
     matches!(bytes.next(), Some(b'1'..=b'9')) && bytes.all(|b| b.is_ascii_digit())
+}
+
+fn artifact_html_response(data: Value) -> Response {
+    let mut response = data["content"].as_str().unwrap_or_default().to_string().into_response();
+    if let Some(map) = data["headers"].as_object() {
+        for (name, value) in map {
+            if let (Ok(name), Some(Ok(value))) = (
+                axum::http::HeaderName::try_from(name.as_str()),
+                value.as_str().map(axum::http::HeaderValue::try_from),
+            ) {
+                response.headers_mut().insert(name, value);
+            }
+        }
+    }
+    response
 }
 
 /// VibeValley's `artifact/:id/view`: what a structured store artifact's `<iframe src>` loads.
@@ -511,19 +500,7 @@ async fn artifact_view(
     if envelope.biz_code != 0 {
         return reply(envelope);
     }
-    let data = envelope.data.unwrap_or_default();
-    let mut response = data["content"].as_str().unwrap_or_default().to_string().into_response();
-    if let Some(map) = data["headers"].as_object() {
-        for (name, value) in map {
-            if let (Ok(name), Some(Ok(value))) = (
-                axum::http::HeaderName::try_from(name.as_str()),
-                value.as_str().map(axum::http::HeaderValue::try_from),
-            ) {
-                response.headers_mut().insert(name, value);
-            }
-        }
-    }
-    response
+    artifact_html_response(envelope.data.unwrap_or_default())
 }
 
 /// VibeValley's `artifactContent`: what an `<iframe src>` loads.
@@ -557,22 +534,10 @@ async fn artifact_page(
     if envelope.biz_code != 0 {
         return reply(envelope);
     }
-    let data = envelope.data.unwrap_or_default();
-    let mut response = data["content"].as_str().unwrap_or_default().to_string().into_response();
-    if let Some(map) = data["headers"].as_object() {
-        for (name, value) in map {
-            if let (Ok(name), Some(Ok(value))) = (
-                axum::http::HeaderName::try_from(name.as_str()),
-                value.as_str().map(axum::http::HeaderValue::try_from),
-            ) {
-                response.headers_mut().insert(name, value);
-            }
-        }
-    }
-    response
+    artifact_html_response(envelope.data.unwrap_or_default())
 }
 
-fn parse_byte_range(text: &str, size: u64) -> Option<(u64, u64)> {
+pub(super) fn parse_byte_range(text: &str, size: u64) -> Option<(u64, u64)> {
     if size == 0 {
         return None;
     }
@@ -665,43 +630,24 @@ async fn attachment(State(state): State<HttpState>, AuthenticatedQuery(ctx): Aut
 
 async fn issue_watch(State(state): State<HttpState>, Authenticated(ctx): Authenticated, Path(id): Path<String>) -> Response {
     match open(state.server, state.shutdown, ctx, "issue.watch".into(), serde_json::json!({ "id": id })).await {
-        Ok(Ok(stream)) => stream,
-        Ok(Err(envelope)) if envelope.biz_code == BizCode::Forbidden.code() || envelope.biz_code == BizCode::Unauthorized.code() => reply(envelope),
-        Ok(Err(_)) => StatusCode::NOT_FOUND.into_response(),
-        Err(e) => refuse(BizCode::InternalError, e.to_string()),
+        Ok(stream) => stream,
+        Err(envelope) if envelope.biz_code == BizCode::Forbidden.code() || envelope.biz_code == BizCode::Unauthorized.code() => reply(envelope),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
 }
 
-/// Opens `name` off the async runtime with `ctx`; `Ok(Ok)` is the event stream,
-/// which unsubscribes when the client goes away.
+/// Opens `name` asynchronously with `ctx`; `Ok` is the event stream, which
+/// unsubscribes when the client goes away or the listener shuts down.
 #[allow(clippy::result_large_err, reason = "Server::subscribe's contract returns the refusal envelope itself")]
-async fn open(
-    server: Shared,
-    shutdown: CancellationToken,
-    ctx: CallerContext,
-    name: String,
-    payload: Value,
-) -> Result<Result<Response, Envelope>, tokio::task::JoinError> {
-    let opened = {
-        let server = server.clone();
-        tokio::task::spawn_blocking(move || server.subscribe_with(&ctx, &name, payload)).await?
-    };
-    Ok(match opened {
-        Ok((id, rx)) => {
-            let guard = Subscription { server, id };
-            let stream = futures_util::stream::unfold((rx, guard, shutdown), |(rx, guard, shutdown)| async move {
-                let item = tokio::select! {
-                    biased;
-                    _ = shutdown.cancelled() => return None,
-                    res = rx.recv_async() => res.ok()?,
-                };
-                let data = serde_json::to_string(&item).unwrap_or_else(|_| "null".into());
-                Some((Ok::<_, Infallible>(Event::default().data(data)), (rx, guard, shutdown)))
-            });
-            Ok(sse(stream))
-        }
-        Err(envelope) => Err(envelope),
-    })
+async fn open(server: Shared, shutdown: CancellationToken, ctx: CallerContext, name: String, payload: Value) -> Result<Response, Envelope> {
+    let (id, rx) = server.clone().subscribe_with_async(ctx, name, payload).await?;
+    let guard = Subscription { server, id };
+    let stream = rx.into_stream().map(move |item| {
+        let _keep = &guard;
+        let data = serde_json::to_string(&item).unwrap_or_else(|_| "null".into());
+        Event::default().data(data)
+    });
+    Ok(sse_with_shutdown(stream, shutdown))
 }
 
 #[cfg(test)]

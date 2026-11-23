@@ -175,10 +175,10 @@ fn build_pair_url(url: &str, code: &str, scope: Option<&str>) -> String {
     deep.to_string()
 }
 
-/// Drops a `Listener` off the Tokio I/O workers because `Listener::drop` awaits graceful shutdown synchronously.
+/// Gracefully stops a running remote listener asynchronously without blocking Tokio workers.
 async fn stop_listener_async(listener: Option<Listener>) {
     if let Some(live) = listener {
-        let _ = tokio::task::spawn_blocking(move || drop(live)).await;
+        live.shutdown().await;
     }
 }
 

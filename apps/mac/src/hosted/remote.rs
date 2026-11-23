@@ -442,6 +442,76 @@ impl RemoteServer {
         };
         parse_envelope_or_fallback(status, &text)
     }
+    async fn slice_snapshot_json_http(&self, slice: SliceKind) -> Arc<str> {
+        let url = format!("{}/api/v1/slice/{}?once=1", self.base_url, slice.as_str());
+        let req = attach_headers(
+            self.client.get(&url).header("accept", "application/json").timeout(SNAPSHOT_TIMEOUT),
+            &self.token,
+        );
+        let Ok(response) = req.send().await else {
+            return Arc::<str>::from("null");
+        };
+        if !response.status().is_success() {
+            return Arc::<str>::from("null");
+        }
+        let Ok(text) = response.text().await else {
+            return Arc::<str>::from("null");
+        };
+        if serde_json::from_str::<serde::de::IgnoredAny>(&text).is_ok() {
+            Arc::<str>::from(text)
+        } else {
+            Arc::<str>::from("null")
+        }
+    }
+
+    #[allow(clippy::result_large_err, reason = "Server::subscribe's contract returns the refusal envelope itself")]
+    async fn subscribe_http(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        let payload_json = serde_json::to_string(&if payload.is_null() { Value::Object(Default::default()) } else { payload }).unwrap_or_else(|_| "{}".into());
+
+        let mut url = url::Url::parse(&format!("{}/api/v1/subscribe/{}", self.base_url, name))
+            .map_err(|e| refusal(BizCode::InvalidInput, format!("invalid subscription URL: {e}")))?;
+        url.query_pairs_mut().append_pair("payload", &payload_json);
+
+        let req = attach_headers(self.client.get(url).header("accept", "text/event-stream"), &self.token);
+        let response = req
+            .send()
+            .await
+            .map_err(|e| refusal(BizCode::ServiceUnavailable, format!("remote subscription unreachable: {e}")))?;
+        let status = response.status();
+        let is_json = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|ct| ct.contains("application/json"));
+        if !status.is_success() || is_json {
+            let text = response.text().await.unwrap_or_default();
+            return Err(parse_envelope_or_fallback(status, &text));
+        }
+
+        let sub_id = self.next_sub_id.fetch_add(1, Ordering::Relaxed);
+        let cancel = self.shutdown.child_token();
+        let (tx, rx) = flume::unbounded::<Value>();
+        self.subs.lock().insert(sub_id, cancel.clone());
+        let subs = self.subs.clone();
+
+        vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+            let mut last_seq = None;
+            let mut is_closed = || tx.is_disconnected();
+            let mut on_message = |msg: SseMessage| {
+                let tx = &tx;
+                async move {
+                    if let Ok(val) = serde_json::from_str::<Value>(&msg.data) {
+                        return if tx.send(val).is_ok() { SseStep::Continue } else { SseStep::Stop };
+                    }
+                    if tx.is_disconnected() { SseStep::Stop } else { SseStep::Continue }
+                }
+            };
+            let _ = drain_sse_response(response, &cancel, &mut last_seq, &mut is_closed, &mut on_message).await;
+            subs.lock().remove(&sub_id);
+        });
+
+        Ok((sub_id, rx))
+    }
 }
 
 impl Server for RemoteServer {
@@ -454,20 +524,12 @@ impl Server for RemoteServer {
     }
 
     fn slice_snapshot(&self, slice: SliceKind) -> Value {
-        let url = format!("{}/api/v1/slice/{}?once=1", self.base_url, slice.as_str());
-        let client = self.client.clone();
-        let token = self.token.clone();
+        let json = vibevalley_runtime::rt::block_on(self.slice_snapshot_json_http(slice));
+        serde_json::from_str(&json).unwrap_or(Value::Null)
+    }
 
-        vibevalley_runtime::rt::block_on(async move {
-            let req = attach_headers(client.get(&url).header("accept", "application/json").timeout(SNAPSHOT_TIMEOUT), &token);
-            let Ok(response) = req.send().await else {
-                return Value::Null;
-            };
-            if !response.status().is_success() {
-                return Value::Null;
-            }
-            response.json::<Value>().await.unwrap_or(Value::Null)
-        })
+    fn slice_snapshot_json_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Arc<str>> {
+        Box::pin(async move { self.slice_snapshot_json_http(slice).await })
     }
 
     fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
@@ -548,6 +610,10 @@ impl Server for RemoteServer {
                 strip_initial_effects: false,
             },
         })
+    }
+
+    fn subscribe_slice_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Option<SliceSubscription>> {
+        Box::pin(async move { self.subscribe_slice(slice) })
     }
 
     fn live(&self) -> flume::Receiver<LiveEvent> {
@@ -639,57 +705,16 @@ impl Server for RemoteServer {
     }
 
     fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
-        let payload_json = serde_json::to_string(&if payload.is_null() { Value::Object(Default::default()) } else { payload }).unwrap_or_else(|_| "{}".into());
+        vibevalley_runtime::rt::block_on(self.subscribe_http(name, payload))
+    }
 
-        let mut url = url::Url::parse(&format!("{}/api/v1/subscribe/{}", self.base_url, name))
-            .map_err(|e| refusal(BizCode::InvalidInput, format!("invalid subscription URL: {e}")))?;
-        url.query_pairs_mut().append_pair("payload", &payload_json);
-
-        let client = self.client.clone();
-        let token = self.token.clone();
-
-        let response = vibevalley_runtime::rt::block_on(async move {
-            let req = attach_headers(client.get(url).header("accept", "text/event-stream"), &token);
-            let res = req
-                .send()
-                .await
-                .map_err(|e| refusal(BizCode::ServiceUnavailable, format!("remote subscription unreachable: {e}")))?;
-            let status = res.status();
-            let is_json = res
-                .headers()
-                .get(reqwest::header::CONTENT_TYPE)
-                .and_then(|v| v.to_str().ok())
-                .is_some_and(|ct| ct.contains("application/json"));
-            if !status.is_success() || is_json {
-                let text = res.text().await.unwrap_or_default();
-                return Err(parse_envelope_or_fallback(status, &text));
-            }
-            Ok(res)
-        })?;
-
-        let sub_id = self.next_sub_id.fetch_add(1, Ordering::Relaxed);
-        let cancel = self.shutdown.child_token();
-        let (tx, rx) = flume::unbounded::<Value>();
-        self.subs.lock().insert(sub_id, cancel.clone());
-        let subs = self.subs.clone();
-
-        vibevalley_runtime::rt::handle().spawn(async move {
-            let mut last_seq = None;
-            let mut is_closed = || tx.is_disconnected();
-            let mut on_message = |msg: SseMessage| {
-                let tx = &tx;
-                async move {
-                    if let Ok(val) = serde_json::from_str::<Value>(&msg.data) {
-                        return if tx.send(val).is_ok() { SseStep::Continue } else { SseStep::Stop };
-                    }
-                    if tx.is_disconnected() { SseStep::Stop } else { SseStep::Continue }
-                }
-            };
-            let _ = drain_sse_response(response, &cancel, &mut last_seq, &mut is_closed, &mut on_message).await;
-            subs.lock().remove(&sub_id);
-        });
-
-        Ok((sub_id, rx))
+    fn subscribe_with_async(
+        self: Arc<Self>,
+        _ctx: CallerContext,
+        name: String,
+        payload: Value,
+    ) -> BoxFuture<'static, Result<(u64, flume::Receiver<Value>), Envelope>> {
+        Box::pin(async move { self.subscribe_http(&name, payload).await })
     }
 
     fn unsubscribe(&self, id: u64) {

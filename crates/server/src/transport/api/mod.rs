@@ -137,11 +137,31 @@ pub type SharedHostDebug = Arc<dyn HostDebugBridge>;
 
 /// The helpers' MCP door (`POST /mcp`): one JSON-RPC message from a helper
 /// with the bearer token it was given. `None` answers a notification.
-pub trait Mcp: Send + Sync {
+pub trait Mcp: Send + Sync + 'static {
     fn message(&self, token: &str, message: Value) -> Option<Value>;
+
+    fn message_async(self: Arc<Self>, token: String, message: Value) -> BoxFuture<'static, Option<Value>> {
+        Box::pin(async move { crate::spawn_blocking_traced(move || self.message(&token, message)).await.unwrap_or(None) })
+    }
 }
 
 pub type SharedMcp = Arc<dyn Mcp>;
+
+/// Executes one JSON-RPC MCP message or batch asynchronously through [`Mcp::message_async`].
+pub async fn dispatch_mcp_message_async(door: SharedMcp, token: String, message: Value) -> Option<Value> {
+    match message {
+        Value::Array(batch) => {
+            let mut answers = Vec::with_capacity(batch.len());
+            for item in batch {
+                if let Some(answer) = door.clone().message_async(token.clone(), item).await {
+                    answers.push(answer);
+                }
+            }
+            if answers.is_empty() { None } else { Some(Value::Array(answers)) }
+        }
+        one => door.message_async(token, one).await,
+    }
+}
 
 /// Authenticated remote mobile device identity returned by [`RemoteAuth::verify_bearer`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -158,7 +178,7 @@ pub trait RemoteAuth: Send + Sync + 'static {
     fn verify_bearer(&self, token: &str) -> Result<RemoteDeviceIdentity, ApiError>;
     fn verify_bearer_async(self: Arc<Self>, token: String) -> BoxFuture<'static, Result<RemoteDeviceIdentity, ApiError>> {
         Box::pin(async move {
-            tokio::task::spawn_blocking(move || self.verify_bearer(&token))
+            crate::spawn_blocking_traced(move || self.verify_bearer(&token))
                 .await
                 .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
         })
@@ -178,11 +198,19 @@ pub struct MachineConnection {
 /// Spine port connecting the `/api/v1/machine/ws` transport to the server's
 /// execution-layer machine manager without importing `crate::modules::*` into
 /// `transport/`.
-pub trait MachineBus: Send + Sync {
+pub trait MachineBus: Send + Sync + 'static {
     fn accept_connection(&self, conn: MachineConnection);
 
     fn mcp_tunnel(&self, server: &dyn Server, req: vibevalley_protocol::MachineMcpRequest) -> vibevalley_protocol::MachineMcpResponse {
         dispatch_mcp_tunnel(server, req)
+    }
+
+    fn mcp_tunnel_async(
+        self: Arc<Self>,
+        server: Arc<dyn Server>,
+        req: vibevalley_protocol::MachineMcpRequest,
+    ) -> BoxFuture<'static, vibevalley_protocol::MachineMcpResponse> {
+        Box::pin(dispatch_mcp_tunnel_async(server, req))
     }
 }
 
@@ -197,22 +225,9 @@ pub fn dispatch_mcp_tunnel(server: &dyn Server, req: vibevalley_protocol::Machin
         content_type: "application/json".to_string(),
         body,
     };
-    if req.session_token.starts_with("vv_dev_") {
-        return reply(403, serde_json::json!({ "error": "forbidden" }).to_string());
-    }
-    if !req.method.eq_ignore_ascii_case("POST") {
-        return reply(405, serde_json::json!({ "error": "use POST" }).to_string());
-    }
-    let normalized_path = req.path.trim().trim_end_matches('/');
-    if !normalized_path.is_empty() && normalized_path != "/mcp" {
-        return reply(404, serde_json::json!({ "error": "no such route" }).to_string());
-    }
-    let Some(door) = server.mcp() else {
-        return reply(503, serde_json::json!({ "error": "no MCP here" }).to_string());
-    };
-    let Ok(message) = serde_json::from_str::<Value>(&req.body) else {
-        let error = serde_json::json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "parse error" } });
-        return reply(400, error.to_string());
+    let (door, message) = match validate_mcp_tunnel(server, &req) {
+        Ok(pair) => pair,
+        Err(resp) => return resp,
     };
     let answered = match message {
         Value::Array(batch) => {
@@ -225,6 +240,54 @@ pub fn dispatch_mcp_tunnel(server: &dyn Server, req: vibevalley_protocol::Machin
         Some(answer) => reply(200, serde_json::to_string(&answer).unwrap_or_default()),
         None => reply(202, String::new()),
     }
+}
+
+/// Async counterpart of [`dispatch_mcp_tunnel`] using [`Mcp::message_async`].
+pub async fn dispatch_mcp_tunnel_async(server: Arc<dyn Server>, req: vibevalley_protocol::MachineMcpRequest) -> vibevalley_protocol::MachineMcpResponse {
+    let reply = |status: u16, body: String| vibevalley_protocol::MachineMcpResponse {
+        request_id: req.request_id.clone(),
+        status,
+        content_type: "application/json".to_string(),
+        body,
+    };
+    let (door, message) = match validate_mcp_tunnel(&*server, &req) {
+        Ok(pair) => pair,
+        Err(resp) => return resp,
+    };
+    match dispatch_mcp_message_async(door, req.session_token.clone(), message).await {
+        Some(answer) => reply(200, serde_json::to_string(&answer).unwrap_or_default()),
+        None => reply(202, String::new()),
+    }
+}
+
+fn validate_mcp_tunnel(
+    server: &dyn Server,
+    req: &vibevalley_protocol::MachineMcpRequest,
+) -> Result<(SharedMcp, Value), vibevalley_protocol::MachineMcpResponse> {
+    let reply = |status: u16, body: String| vibevalley_protocol::MachineMcpResponse {
+        request_id: req.request_id.clone(),
+        status,
+        content_type: "application/json".to_string(),
+        body,
+    };
+    if req.session_token.starts_with("vv_dev_") {
+        return Err(reply(403, serde_json::json!({ "error": "forbidden" }).to_string()));
+    }
+    if !req.method.eq_ignore_ascii_case("POST") {
+        return Err(reply(405, serde_json::json!({ "error": "use POST" }).to_string()));
+    }
+    let normalized_path = req.path.trim().trim_end_matches('/');
+    if !normalized_path.is_empty() && normalized_path != "/mcp" {
+        return Err(reply(404, serde_json::json!({ "error": "no such route" }).to_string()));
+    }
+    let Some(door) = server.mcp() else {
+        return Err(reply(503, serde_json::json!({ "error": "no MCP here" }).to_string()));
+    };
+    let Ok(message) = serde_json::from_str::<Value>(&req.body) else {
+        let error = serde_json::json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "parse error" } });
+        return Err(reply(400, error.to_string()));
+    };
+    Ok((door, message))
 }
 
 /// Live MOSS realtime line handle consumed by the desktop host audio pipeline.
@@ -262,7 +325,7 @@ pub trait Server: Send + Sync + 'static {
     /// Asynchronous endpoint invocation carrying caller identity, principal, and trace id.
     fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
         Box::pin(async move {
-            match tokio::task::spawn_blocking(move || self.call_with(&ctx, &op, payload)).await {
+            match crate::spawn_blocking_traced(move || self.call_with(&ctx, &op, payload)).await {
                 Ok(env) => env,
                 Err(e) => refusal(BizCode::InternalError, e.to_string()),
             }
@@ -273,6 +336,14 @@ pub trait Server: Send + Sync + 'static {
     /// Current pre-encoded UTF-8 JSON snapshot for one domain slice.
     fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
         Arc::<str>::from(serde_json::to_string(&self.slice_snapshot(slice)).unwrap_or_else(|_| "null".into()))
+    }
+    /// Asynchronous pre-encoded UTF-8 JSON snapshot for one domain slice.
+    fn slice_snapshot_json_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Arc<str>> {
+        Box::pin(async move {
+            crate::spawn_blocking_traced(move || self.slice_snapshot_json(slice))
+                .await
+                .unwrap_or_else(|_| Arc::<str>::from("null"))
+        })
     }
     /// Watches one domain slice with Bounded-1 coalescing.
     /// If `after_seq == Some(latest_seq)`, skips the initial send; otherwise
@@ -289,6 +360,10 @@ pub trait Server: Send + Sync + 'static {
     /// by [`crate::slice_feed::SliceFeed`], avoiding blocking threads on SSE and bridge pumps.
     fn subscribe_slice(&self, _slice: SliceKind) -> Option<crate::slice_feed::SliceSubscription> {
         None
+    }
+    /// Asynchronous `tokio::sync::watch` subscription for a domain slice.
+    fn subscribe_slice_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Option<crate::slice_feed::SliceSubscription>> {
+        Box::pin(async move { crate::spawn_blocking_traced(move || self.subscribe_slice(slice)).await.ok().flatten() })
     }
     /// Current fault-injection gate, if attached.
     fn fault_gate(&self) -> Option<SharedFaultGate> {
@@ -310,6 +385,41 @@ pub trait Server: Send + Sync + 'static {
     fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
         let _ = ctx;
         self.subscribe(name, payload)
+    }
+    /// Asynchronous subscription invocation carrying caller identity and principal for `can` RBAC enforcement.
+    #[allow(clippy::result_large_err, reason = "the approved contract returns the refusal envelope itself")]
+    fn subscribe_with_async(
+        self: Arc<Self>,
+        ctx: CallerContext,
+        name: String,
+        payload: Value,
+    ) -> BoxFuture<'static, Result<(u64, flume::Receiver<Value>), Envelope>> {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        Box::pin(async move {
+            struct CancelFlag(Arc<AtomicBool>);
+            impl Drop for CancelFlag {
+                fn drop(&mut self) {
+                    self.0.store(true, Ordering::Release);
+                }
+            }
+            let cancelled = Arc::new(AtomicBool::new(false));
+            let guard = CancelFlag(cancelled.clone());
+            let result = crate::spawn_blocking_traced(move || {
+                let opened = self.subscribe_with(&ctx, &name, payload);
+                if cancelled.load(Ordering::Acquire)
+                    && let Ok((id, _)) = &opened
+                {
+                    self.unsubscribe(*id);
+                }
+                opened
+            })
+            .await;
+            std::mem::forget(guard);
+            match result {
+                Ok(res) => res,
+                Err(e) => Err(refusal(BizCode::InternalError, e.to_string())),
+            }
+        })
     }
     fn unsubscribe(&self, id: u64);
     /// Optional local binary media transport.

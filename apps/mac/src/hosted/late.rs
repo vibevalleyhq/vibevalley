@@ -104,6 +104,20 @@ impl Server for LateServer {
         self.server().slice_snapshot_json(slice)
     }
 
+    fn slice_snapshot_json_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Arc<str>> {
+        if let Some(inner) = self.cell.get() {
+            return Arc::clone(inner).slice_snapshot_json_async(slice);
+        }
+        Box::pin(async move {
+            let mut ready = self.ready.clone();
+            let _ = ready.wait_for(|is_ready| *is_ready).await;
+            match self.cell.get() {
+                Some(inner) => Arc::clone(inner).slice_snapshot_json_async(slice).await,
+                None => Arc::<str>::from("null"),
+            }
+        })
+    }
+
     fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
         if self.cell.get().is_none() {
             let mut ready = self.ready.clone();
@@ -134,6 +148,20 @@ impl Server for LateServer {
 
     fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
         self.cell.get().and_then(|s| s.subscribe_slice(slice))
+    }
+
+    fn subscribe_slice_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Option<SliceSubscription>> {
+        if let Some(inner) = self.cell.get() {
+            return Arc::clone(inner).subscribe_slice_async(slice);
+        }
+        Box::pin(async move {
+            let mut ready = self.ready.clone();
+            let _ = ready.wait_for(|is_ready| *is_ready).await;
+            match self.cell.get() {
+                Some(inner) => Arc::clone(inner).subscribe_slice_async(slice).await,
+                None => None,
+            }
+        })
     }
 
     fn live(&self) -> flume::Receiver<LiveEvent> {
@@ -191,6 +219,25 @@ impl Server for LateServer {
 
     fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
         self.server().subscribe_with(ctx, name, payload)
+    }
+
+    fn subscribe_with_async(
+        self: Arc<Self>,
+        ctx: CallerContext,
+        name: String,
+        payload: Value,
+    ) -> BoxFuture<'static, Result<(u64, flume::Receiver<Value>), Envelope>> {
+        if let Some(inner) = self.cell.get() {
+            return Arc::clone(inner).subscribe_with_async(ctx, name, payload);
+        }
+        Box::pin(async move {
+            let mut ready = self.ready.clone();
+            let _ = ready.wait_for(|is_ready| *is_ready).await;
+            match self.cell.get() {
+                Some(inner) => Arc::clone(inner).subscribe_with_async(ctx, name, payload).await,
+                None => Err(refusal(BizCode::ServiceUnavailable, "server unavailable before startup completed")),
+            }
+        })
     }
 
     fn unsubscribe(&self, id: u64) {
@@ -555,5 +602,45 @@ mod tests {
         }));
         let forwarded = late.machine_bus().expect("machine_bus forwarded after attach");
         assert!(Arc::ptr_eq(&forwarded, &bus));
+    }
+
+    #[test]
+    fn regression_bridge_subscribe_is_non_blocking_on_unattached_late_server() {
+        let late = Arc::new(LateServer::new());
+        let hub = BridgeHub::new(late.clone(), 2);
+
+        let pre_rec = Arc::new(Recorder::default());
+        let pre_client = hub.attach(test_identity("pre-sub"), pre_rec.clone());
+        let cancelled_rec = Arc::new(Recorder::default());
+        let cancelled_client = hub.attach(test_identity("cancel-sub"), cancelled_rec.clone());
+
+        let t0 = Instant::now();
+        pre_client.subscribe("s1", "channel.follow", json!({ "id": "c1", "after": 0 }));
+        cancelled_client.subscribe("s2", "channel.follow", json!({ "id": "c1", "after": 0 }));
+        assert!(
+            t0.elapsed() < Duration::from_millis(200),
+            "Client::subscribe must return immediately without blocking on LateServer startup"
+        );
+        assert_eq!(pre_client.subscription_count(), 1);
+        assert_eq!(cancelled_client.subscription_count(), 1);
+
+        // Unsubscribing before startup finishes must never register on the attached server.
+        cancelled_client.unsubscribe("s2");
+        assert_eq!(cancelled_client.subscription_count(), 0);
+
+        let fake = Arc::new(FakeServer::from_bundle(empty_bundle(11)));
+        late.attach(Arc::new(FastPathOnlyServer(fake.clone())));
+
+        wait_for("pre-attach subscription registered", || fake.subscriber_count() == 1);
+        fake.emit("channel.follow", json!({ "text": "hello-after-attach" }));
+        wait_for("pre-attach subscription event", || pre_rec.named("sub:s1").len() == 1);
+        assert_eq!(pre_rec.named("sub:s1")[0], json!({ "event": { "text": "hello-after-attach" } }));
+        assert!(cancelled_rec.named("sub:s2").is_empty());
+
+        vibevalley_runtime::rt::block_on(async {
+            let snap = late.clone().slice_snapshot_json_async(SliceKind::Board).await;
+            assert!(snap.contains("\"seq\":11"));
+            assert!(late.clone().subscribe_slice_async(SliceKind::Board).await.is_some());
+        });
     }
 }

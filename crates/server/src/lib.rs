@@ -162,7 +162,14 @@ impl Sink {
     }
 }
 
-type Opener = Arc<dyn Fn(&Hub, Value, Sink) -> Result<(), ApiError> + Send + Sync>;
+type SyncOpener = Arc<dyn Fn(&Hub, Value, Sink) -> Result<(), ApiError> + Send + Sync>;
+type AsyncOpener = Arc<dyn Fn(Arc<Hub>, Value, Sink) -> BoxFuture<'static, Result<(), ApiError>> + Send + Sync>;
+
+#[derive(Clone)]
+enum SubscriptionOpener {
+    Sync(SyncOpener),
+    Async(AsyncOpener),
+}
 
 struct Slot<T: ?Sized>(ArcSwapOption<Arc<T>>);
 
@@ -231,7 +238,7 @@ pub struct Hub {
     tasks: TaskTracker,
     handlers: RwLock<HashMap<&'static str, RouteHandler>>,
     typed_handlers: RwLock<HashMap<&'static str, Arc<dyn Any + Send + Sync>>>,
-    openers: RwLock<HashMap<&'static str, (&'static [Caller], Opener)>>,
+    openers: RwLock<HashMap<&'static str, (&'static [Caller], SubscriptionOpener)>>,
     live: broadcast::Sender<LiveEvent>,
     subscriptions: Mutex<HashMap<u64, flume::Sender<()>>>,
     next_id: AtomicU64,
@@ -1229,8 +1236,28 @@ impl Hub {
     /// until the subscriber stops. An `Err` is a refusal before the first
     /// event.
     pub fn on_subscription<S: Subscription>(&self, open: impl Fn(&Hub, S::Payload, Sink) -> Result<(), ApiError> + Send + Sync + 'static) {
-        let o: Opener = Arc::new(move |hub, payload, sink| open(hub, decode(payload)?, sink));
-        self.openers.write().insert(S::NAME, (S::CAN, o));
+        let o: SyncOpener = Arc::new(move |hub, payload, sink| open(hub, decode(payload)?, sink));
+        self.openers.write().insert(S::NAME, (S::CAN, SubscriptionOpener::Sync(o)));
+    }
+
+    /// Serves subscription `S` asynchronously on the Tokio runtime without
+    /// blocking an OS thread during catch-up queries or validation.
+    pub fn on_subscription_async<S, F, Fut>(&self, open: F)
+    where
+        S: Subscription,
+        S::Payload: Send + 'static,
+        F: Fn(Arc<Hub>, S::Payload, Sink) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<(), ApiError>> + Send + 'static,
+    {
+        let open = Arc::new(open);
+        let o: AsyncOpener = Arc::new(move |hub, payload, sink| {
+            let open = open.clone();
+            Box::pin(async move {
+                let decoded = decode(payload)?;
+                open(hub, decoded, sink).await
+            })
+        });
+        self.openers.write().insert(S::NAME, (S::CAN, SubscriptionOpener::Async(o)));
     }
 
     #[allow(clippy::result_large_err, reason = "the contract's refusal is an envelope")]
@@ -1245,7 +1272,39 @@ impl Hub {
         let (stop_tx, stop) = flume::bounded(1);
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let payload = if payload.is_null() { Value::Object(Default::default()) } else { payload };
-        open(self, payload, Sink { events, stop }).map_err(|e| Envelope::failure(&e))?;
+        match open {
+            SubscriptionOpener::Sync(open) => open(self, payload, Sink { events, stop }),
+            SubscriptionOpener::Async(open) => vibevalley_runtime::rt::block_on(open(self.self_arc(), payload, Sink { events, stop }).in_current_span()),
+        }
+        .map_err(|e| Envelope::failure(&e))?;
+        self.subscriptions.lock().insert(id, stop_tx);
+        Ok((id, rx))
+    }
+
+    /// Opens subscription `name` asynchronously, executing `on_subscription_async`
+    /// openers inline on the caller Tokio task without `spawn_blocking`.
+    #[allow(clippy::result_large_err, reason = "the contract's refusal is an envelope")]
+    pub async fn subscribe_with_async(&self, caller_ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        let Some((can, open)) = self.openers.read().get(name).cloned() else {
+            return Err(refusal(BizCode::RouteNotFound, format!("no subscription {name}")));
+        };
+        if caller_ctx.caller != Caller::User && !can.contains(&caller_ctx.caller) {
+            return Err(refusal(BizCode::Forbidden, format!("{name} is not for the {:?}", caller_ctx.caller)));
+        }
+        let (events, rx) = flume::unbounded();
+        let (stop_tx, stop) = flume::bounded(1);
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let payload = if payload.is_null() { Value::Object(Default::default()) } else { payload };
+        match open {
+            SubscriptionOpener::Async(open) => open(self.self_arc(), payload, Sink { events, stop }).await.map_err(|e| Envelope::failure(&e))?,
+            SubscriptionOpener::Sync(open) => {
+                let hub = self.self_arc();
+                match spawn_blocking_traced(move || open(&hub, payload, Sink { events, stop })).await {
+                    Ok(res) => res.map_err(|e| Envelope::failure(&e))?,
+                    Err(e) => return Err(refusal(BizCode::InternalError, e.to_string())),
+                }
+            }
+        }
         self.subscriptions.lock().insert(id, stop_tx);
         Ok((id, rx))
     }
@@ -1460,6 +1519,10 @@ impl Server for Hub {
         }
     }
 
+    fn slice_snapshot_json_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Arc<str>> {
+        Box::pin(async move { self.slice_snapshot_json(slice) })
+    }
+
     fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
         self.sync_slice(slice);
         let gate = self.current_fault_gate();
@@ -1493,6 +1556,10 @@ impl Server for Hub {
         Some(self.subscribe_slice_feed(slice))
     }
 
+    fn subscribe_slice_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Option<slice_feed::SliceSubscription>> {
+        Box::pin(async move { Some(self.subscribe_slice_feed(slice)) })
+    }
+
     fn fault_gate(&self) -> Option<SharedFaultGate> {
         self.current_fault_gate()
     }
@@ -1511,6 +1578,15 @@ impl Server for Hub {
 
     fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
         self.open_subscription(ctx, name, payload)
+    }
+
+    fn subscribe_with_async(
+        self: Arc<Self>,
+        ctx: CallerContext,
+        name: String,
+        payload: Value,
+    ) -> BoxFuture<'static, Result<(u64, flume::Receiver<Value>), Envelope>> {
+        Box::pin(async move { Hub::subscribe_with_async(&self, &ctx, &name, payload).await })
     }
 
     fn unsubscribe(&self, id: u64) {
@@ -2093,5 +2169,57 @@ mod tests {
         }
         .with_subscriber(subscriber)
         .await;
+    }
+
+    #[test]
+    fn on_subscription_async_runs_inline_without_spawn_blocking() {
+        use parking_lot::Mutex;
+        use serde_json::json;
+        use vibevalley_protocol::subscriptions;
+
+        use super::{CallerContext, Server};
+
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let recorded = Arc::new(Mutex::new(None::<(String, Option<tokio::task::Id>)>));
+        let rec = recorded.clone();
+        hub.on_subscription_async::<subscriptions::ChannelFollow, _, _>(move |_hub, payload, sink| {
+            let rec = rec.clone();
+            async move {
+                tokio::task::yield_now().await;
+                let thread = std::thread::current().name().unwrap_or_default().to_string();
+                *rec.lock() = Some((thread, tokio::task::try_id()));
+                let _ = sink.send(&json!({ "channel": payload.id, "after": payload.after }));
+                Ok(())
+            }
+        });
+
+        let (caller_task_id, first) = vibevalley_runtime::rt::block_on(async move {
+            vibevalley_runtime::rt::spawn(async move {
+                let caller_task_id = tokio::task::try_id();
+                let server: Arc<dyn Server> = hub.clone();
+                let (id, rx) = server
+                    .clone()
+                    .subscribe_with_async(CallerContext::local(), "channel.follow".into(), json!({ "id": "c1", "after": 5 }))
+                    .await
+                    .unwrap();
+                let first = rx.recv_async().await.unwrap();
+                server.unsubscribe(id);
+                hub.close_async().await;
+                (caller_task_id, first)
+            })
+            .await
+            .unwrap()
+        });
+
+        assert_eq!(first, json!({ "channel": "c1", "after": 5 }));
+        let (thread_name, task_id) = recorded.lock().clone().expect("opener ran");
+        assert!(
+            thread_name.starts_with("vibevalley-io-"),
+            "expected vibevalley-io worker thread, got {thread_name}"
+        );
+        assert_eq!(
+            task_id, caller_task_id,
+            "on_subscription_async opener must run inline on caller Tokio task without spawn_blocking"
+        );
     }
 }

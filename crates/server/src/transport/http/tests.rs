@@ -638,3 +638,19 @@ fn tokio_util_streaming_upload_and_ranged_download_enforce_bounds_timeout_and_tr
     assert_eq!(partial.headers()["content-length"], (131080 - 65530 + 1).to_string());
     assert_eq!(partial.bytes().unwrap().as_ref(), &payload[65530..=131080]);
 }
+
+#[tokio::test]
+async fn listener_shutdown_ends_active_sse_stream_without_blocking() {
+    let (_fake, listener) = start();
+    let url = format!("{}/api/v1/live", listener.url());
+
+    let client = reqwest::Client::builder().no_proxy().build().unwrap();
+    let mut res = client.get(&url).send().await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // Shutdown completes asynchronously and closes the open SSE response body.
+    listener.shutdown().await;
+    while let Some(chunk) = res.chunk().await.unwrap() {
+        let _ = chunk;
+    }
+}

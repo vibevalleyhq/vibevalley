@@ -639,16 +639,16 @@ impl Artifacts {
 
     /// `follow`: each batch after `after`, then each from now on; `Reset`
     /// when too far behind.
-    pub fn follow(&self, hub: &Hub, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
-        let (rx, missed, current) = vibevalley_runtime::rt::block_on(async {
+    pub async fn follow_async(&self, hub: &Hub, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
+        let (rx, missed, current) = {
             let mut db = self.db.read_pool().acquire().await.map_err(q)?;
             self.found_blocks_async(&mut db, id).await?;
             // Subscribed before the catch-up is read; live ones are told by seq.
             let rx = self.changes.subscribe();
             let missed = db::changes_after(&mut db, id, after, CATCH_UP_MAX as i64 + 1).await.map_err(q)?;
             let current = db::blocks(&mut db, id).await.map_err(q)?;
-            Ok::<_, ApiError>((rx, missed, current))
-        })?;
+            (rx, missed, current)
+        };
         let id = id.to_string();
         let hub_cancel = hub.child_token();
         let closed = self.cancel.clone();
@@ -948,9 +948,9 @@ impl Artifacts {
     }
 
     /// `suggestionStream`: the list now, then the whole list after each change.
-    pub fn follow_suggestions(self: &Arc<Self>, hub: &Hub, id: &str, sink: Sink) -> Result<(), ApiError> {
+    pub async fn follow_suggestions_async(self: &Arc<Self>, hub: &Hub, id: &str, sink: Sink) -> Result<(), ApiError> {
         let mut rx = self.suggestion_changes.subscribe();
-        let first = vibevalley_runtime::rt::block_on(self.suggestions_async(id))?;
+        let first = self.suggestions_async(id).await?;
         let id = id.to_string();
         let weak = Arc::downgrade(self);
         let hub_cancel = hub.child_token();

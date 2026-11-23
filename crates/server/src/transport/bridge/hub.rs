@@ -7,7 +7,7 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::sync::{Notify, Semaphore, broadcast};
-use tokio_util::sync::CancellationToken;
+use tokio_util::sync::{CancellationToken, DropGuard};
 
 use crate::transport::bridge::{BizCode, Caller, CallerContext, CallerPrincipal, ClientIdentity, Envelope, Server, SliceKind, refusal};
 
@@ -122,7 +122,7 @@ impl Hub {
 
 /// Cancels a forwarding task when dropped.
 struct Pump {
-    cancel: Option<CancellationToken>,
+    _cancel_guard: DropGuard,
     server_sub: Option<u64>,
 }
 
@@ -174,14 +174,29 @@ async fn pump_flume_async<T: Send + 'static>(
     ended(stopped);
 }
 
-/// Spawns [`pump_flume_async`] on the shared Tokio runtime.
-fn pump_flume<T: Send + 'static>(
-    rx: flume::Receiver<T>,
-    cancel: CancellationToken,
-    each: impl FnMut(T) + Send + 'static,
-    ended: impl FnOnce(bool) + Send + 'static,
-) {
-    vibevalley_runtime::rt::handle().spawn(pump_flume_async(rx, cancel, each, ended));
+/// Runs `start` immediately when `server` is ready, or awaits `ready_async()`
+/// first on the Tokio runtime (stopping early if `cancel` fires).
+fn spawn_when_ready<F, Fut>(server: Arc<dyn Server>, cancel: CancellationToken, start: F)
+where
+    F: FnOnce(Arc<dyn Server>, CancellationToken) -> Fut + Send + 'static,
+    Fut: std::future::Future<Output = ()> + Send + 'static,
+{
+    let handle = vibevalley_runtime::rt::current_or_global_handle();
+    if let Some(ready) = server.ready_async() {
+        handle.spawn(async move {
+            tokio::select! {
+                biased;
+                _ = cancel.cancelled() => return,
+                _ = ready => {}
+            }
+            if cancel.is_cancelled() {
+                return;
+            }
+            start(server, cancel).await;
+        });
+    } else {
+        handle.spawn(start(server, cancel));
+    }
 }
 
 async fn pump_slice_subscription(
@@ -329,80 +344,40 @@ impl Client {
             let revisions = self.revisions.clone();
             let server = self.hub.server.clone();
             let event_name = format!("frame:{topic}");
-            let task_cancel = cancel.clone();
-            if let Some(ready) = server.ready_async() {
-                vibevalley_runtime::rt::handle().spawn(async move {
-                    tokio::select! {
-                        biased;
-                        _ = task_cancel.cancelled() => return,
-                        _ = ready => {}
-                    }
-                    if task_cancel.is_cancelled() {
-                        return;
-                    }
-                    if let Some(sub) = server.subscribe_slice(slice_kind) {
-                        pump_slice_subscription(server, sub, receipt, revisions, outlet, event_name, task_cancel).await;
-                    } else {
-                        spawn_slice_blocking_fallback(server, slice_kind, receipt, revisions, outlet, event_name, task_cancel);
-                    }
-                });
-            } else if let Some(sub) = server.subscribe_slice(slice_kind) {
-                vibevalley_runtime::rt::handle().spawn(pump_slice_subscription(server, sub, receipt, revisions, outlet, event_name, task_cancel));
-            } else {
-                spawn_slice_blocking_fallback(server, slice_kind, receipt, revisions, outlet, event_name, task_cancel);
-            }
+            spawn_when_ready(server, cancel.clone(), move |server, task_cancel| async move {
+                if let Some(sub) = server.subscribe_slice(slice_kind) {
+                    pump_slice_subscription(server, sub, receipt, revisions, outlet, event_name, task_cancel).await;
+                } else {
+                    spawn_slice_blocking_fallback(server, slice_kind, receipt, revisions, outlet, event_name, task_cancel);
+                }
+            });
         } else if topic == "live" {
             let server = self.hub.server.clone();
-            let task_cancel = cancel.clone();
-            if let Some(ready) = server.ready_async() {
-                vibevalley_runtime::rt::handle().spawn(async move {
-                    tokio::select! {
-                        biased;
-                        _ = task_cancel.cancelled() => return,
-                        _ = ready => {}
-                    }
-                    if task_cancel.is_cancelled() {
-                        return;
-                    }
-                    if let Some(rx) = server.subscribe_live() {
-                        pump_live_broadcast(rx, outlet, task_cancel).await;
-                    } else {
-                        let mut rev = 0u64;
-                        pump_flume_async(
-                            server.live(),
-                            task_cancel,
-                            move |event| {
-                                rev += 1;
-                                let data = serde_json::to_value(event).unwrap_or(Value::Null);
-                                outlet.send("frame:live", json!({ "rev": rev, "data": data }));
-                            },
-                            |_| {},
-                        )
-                        .await;
-                    }
-                });
-            } else if let Some(rx) = server.subscribe_live() {
-                vibevalley_runtime::rt::handle().spawn(pump_live_broadcast(rx, outlet, task_cancel));
-            } else {
-                let mut rev = 0u64;
-                pump_flume(
-                    server.live(),
-                    task_cancel,
-                    move |event| {
-                        rev += 1;
-                        let data = serde_json::to_value(event).unwrap_or(Value::Null);
-                        outlet.send("frame:live", json!({ "rev": rev, "data": data }));
-                    },
-                    |_| {},
-                );
-            }
+            spawn_when_ready(server, cancel.clone(), move |server, task_cancel| async move {
+                if let Some(rx) = server.subscribe_live() {
+                    pump_live_broadcast(rx, outlet, task_cancel).await;
+                } else {
+                    let mut rev = 0u64;
+                    pump_flume_async(
+                        server.live(),
+                        task_cancel,
+                        move |event| {
+                            rev += 1;
+                            let data = serde_json::to_value(event).unwrap_or(Value::Null);
+                            outlet.send("frame:live", json!({ "rev": rev, "data": data }));
+                        },
+                        |_| {},
+                    )
+                    .await;
+                }
+            });
         } else {
             return Err(format!("no topic {topic}"));
         }
         inner.watches.insert(
             topic.to_string(),
             Pump {
-                cancel: Some(cancel),
+                _cancel_guard: cancel.drop_guard(),
                 server_sub: None,
             },
         );
@@ -444,50 +419,89 @@ impl Client {
 
     /// Starts subscription `id` (the view's own id): events `sub:<id>`
     /// carrying `{ event }`, then once `{ end: null }`, or `{ end: <envelope> }`
-    /// for a refusal.
+    /// for a refusal. Dispatches asynchronously on the Tokio runtime so the
+    /// caller thread (e.g. the nsh JS engine) never blocks.
     pub fn subscribe(&self, id: &str, name: &str, payload: Value) {
         let event_name = format!("sub:{id}");
-        if self.inner.lock().subs.contains_key(id) {
-            let e = refusal(BizCode::InvalidInput, format!("subscription {id} already exists"));
-            self.outlet.send(&event_name, json!({ "end": e }));
-            return;
-        }
+        let cancel = {
+            let mut inner = self.inner.lock();
+            if inner.subs.contains_key(id) {
+                drop(inner);
+                let e = refusal(BizCode::InvalidInput, format!("subscription {id} already exists"));
+                self.outlet.send(&event_name, json!({ "end": e }));
+                return;
+            }
+            let cancel = self.cancel.child_token();
+            let pump = Pump {
+                _cancel_guard: cancel.clone().drop_guard(),
+                server_sub: None,
+            };
+            inner.subs.insert(id.to_string(), (name.to_string(), pump));
+            cancel
+        };
         let ctx = CallerContext {
             caller: Caller::User,
             principal: CallerPrincipal::LocalOwner,
             client: Some(self.identity.clone()),
             trace_id: 0,
         };
-        match self.hub.server.subscribe_with(&ctx, name, payload) {
-            Ok((server_id, rx)) => {
-                let outlet = self.outlet.clone();
-                let each_name = event_name.clone();
-                let end_outlet = self.outlet.clone();
-                let inner = Arc::downgrade(&self.inner);
-                let key = id.to_string();
-                let cancel = self.cancel.child_token();
-                pump_flume(
-                    rx,
-                    cancel.clone(),
-                    move |event| outlet.send(&each_name, json!({ "event": event })),
-                    move |_| {
-                        // Only a subscription still registered ended on the
-                        // server's side; one the view stopped says nothing.
-                        let Some(inner) = inner.upgrade() else { return };
-                        let Some((_, mut pump)) = inner.lock().subs.remove(&key) else { return };
-                        pump.server_sub = None;
-                        pump.cancel = None;
-                        end_outlet.send(&event_name, json!({ "end": null }));
-                    },
-                );
-                let pump = Pump {
-                    cancel: Some(cancel),
-                    server_sub: Some(server_id),
-                };
-                self.inner.lock().subs.insert(id.to_string(), (name.to_string(), pump));
+        let server = self.hub.server.clone();
+        let outlet = self.outlet.clone();
+        let inner = Arc::downgrade(&self.inner);
+        let key = id.to_string();
+        let sub_name = name.to_string();
+        vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+            let opened = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => return,
+                res = server.clone().subscribe_with_async(ctx, sub_name, payload) => res,
+            };
+            match opened {
+                Ok((server_id, rx)) => {
+                    let registered = if let Some(inner_arc) = inner.upgrade() {
+                        let mut guard = inner_arc.lock();
+                        if cancel.is_cancelled() {
+                            false
+                        } else if let Some((_, pump)) = guard.subs.get_mut(&key) {
+                            pump.server_sub = Some(server_id);
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+                    if !registered {
+                        server.unsubscribe(server_id);
+                        return;
+                    }
+                    let each_outlet = outlet.clone();
+                    let each_name = event_name.clone();
+                    pump_flume_async(
+                        rx,
+                        cancel,
+                        move |event| each_outlet.send(&each_name, json!({ "event": event })),
+                        move |_| {
+                            // Only a subscription still registered ended on the
+                            // server's side; one the view stopped says nothing.
+                            let Some(inner) = inner.upgrade() else { return };
+                            let Some((_, mut pump)) = inner.lock().subs.remove(&key) else { return };
+                            pump.server_sub = None;
+                            outlet.send(&event_name, json!({ "end": null }));
+                        },
+                    )
+                    .await;
+                }
+                Err(envelope) => {
+                    if let Some(inner) = inner.upgrade() {
+                        let removed = inner.lock().subs.remove(&key);
+                        if removed.is_some() && !cancel.is_cancelled() {
+                            outlet.send(&event_name, json!({ "end": envelope }));
+                        }
+                    }
+                }
             }
-            Err(envelope) => self.outlet.send(&event_name, json!({ "end": envelope })),
-        }
+        });
     }
 
     pub fn unsubscribe(&self, id: &str) {
@@ -514,14 +528,6 @@ impl Drop for Client {
             if let Some(id) = pump.server_sub.take() {
                 self.hub.server.unsubscribe(id);
             }
-        }
-    }
-}
-
-impl Drop for Pump {
-    fn drop(&mut self) {
-        if let Some(cancel) = self.cancel.take() {
-            cancel.cancel();
         }
     }
 }
@@ -634,6 +640,7 @@ mod tests {
         client.subscribe("s2", "channel.follow", json!({ "id": "c", "after": 0 }));
         assert_eq!(client.subscription_count(), 2);
         assert_eq!(hub.clients_snapshot()[0].subscriptions, vec!["channel.follow", "channel.follow"]);
+        wait_for("subscribers registered", || fake.subscriber_count() == 2);
         fake.emit("channel.follow", json!({ "n": 1 }));
         wait_for("events", || rec.named("sub:s1").len() == 1 && rec.named("sub:s2").len() == 1);
         assert_eq!(rec.named("sub:s1")[0], json!({ "event": { "n": 1 } }));
@@ -646,14 +653,16 @@ mod tests {
         assert_eq!(rec.named("sub:s2").len(), 1, "no end event after unsubscribe");
         wait_for("bookkeeping", || client.subscription_count() == 0);
         client.subscribe("s3", "fake.refuse", json!({}));
+        wait_for("refusal", || rec.named("sub:s3").len() == 1);
         assert_eq!(rec.named("sub:s3")[0]["end"]["bizCode"], 500001);
+        wait_for("refusal cleanup", || client.subscription_count() == 0);
     }
 
     #[test]
     fn dropping_the_client_unsubscribes_and_removes_from_snapshot() {
         let (fake, hub, _rec, client) = setup();
         client.subscribe("s", "x", json!({}));
-        assert_eq!(fake.subscriber_count(), 1);
+        wait_for("subscriber registered", || fake.subscriber_count() == 1);
         assert_eq!(hub.clients_snapshot().len(), 1);
         drop(client);
         assert_eq!(fake.subscriber_count(), 0);

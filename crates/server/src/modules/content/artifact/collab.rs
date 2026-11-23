@@ -471,11 +471,11 @@ impl Artifacts {
 
     /// Streams initial `Snapshot` of live peers followed by incremental `Upsert`
     /// and `Remove` events (including TTL evictions).
-    pub fn follow_presence(self: &Arc<Self>, hub: &Hub, id: &str, sink: Sink) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(async {
+    pub async fn follow_presence_async(self: &Arc<Self>, hub: &Hub, id: &str, sink: Sink) -> Result<(), ApiError> {
+        {
             let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.found(&mut db, id).await
-        })?;
+            self.found(&mut db, id).await?;
+        }
         let mut rx = self.presence_changes.subscribe();
         let initial = self.presence_snapshot(id);
         let weak = Arc::downgrade(self);

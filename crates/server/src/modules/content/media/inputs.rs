@@ -624,6 +624,12 @@ impl crate::transport::api::media::MediaInputs for Inputs {
     fn content(&self, id: &str) -> Result<AttachmentFile, ApiError> {
         vibevalley_runtime::rt::block_on(self.content_async(id))
     }
+    fn upload_async(self: Arc<Self>, id: String, source: Box<dyn Read + Send>) -> crate::BoxFuture<'static, Result<MediaInput, ApiError>> {
+        Box::pin(async move { Inputs::upload_async(&self, &id, source).await })
+    }
+    fn content_async(self: Arc<Self>, id: String) -> crate::BoxFuture<'static, Result<AttachmentFile, ApiError>> {
+        Box::pin(async move { Inputs::content_async(&self, &id).await })
+    }
 }
 
 #[cfg(test)]
@@ -691,6 +697,40 @@ mod tests {
         assert!(inputs.content(&pinned.id).is_err());
         inputs.sweep().unwrap();
         assert!(inputs.list().unwrap().is_empty());
+
+        inputs.close();
+        db.close();
+    }
+
+    #[test]
+    fn media_inputs_trait_upload_and_content_async_run_without_blocking() {
+        use crate::transport::api::media::SharedMediaInputs;
+
+        let dir = tempfile::tempdir().unwrap();
+        let db = ServerDb::open(dir.path()).unwrap();
+        let files = Attachments::open(dir.path(), db.clone());
+        let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+        let inputs = Inputs::open_with_clock(dir.path(), db.clone(), files, clock).unwrap();
+
+        let shared: SharedMediaInputs = inputs.clone();
+        let inputs_async = inputs.clone();
+        let file = vibevalley_runtime::rt::block_on(async move {
+            vibevalley_runtime::rt::spawn(async move {
+                let reserved = inputs_async.create_async(&png_request()).await.unwrap();
+                let uploaded = shared
+                    .clone()
+                    .upload_async(reserved.id.clone(), Box::new(Cursor::new(png_bytes())))
+                    .await
+                    .unwrap();
+                assert_eq!(uploaded.phase, MediaInputPhase::Ready);
+                shared.content_async(reserved.id).await.unwrap()
+            })
+            .await
+            .unwrap()
+        });
+        assert_eq!(file.r#type, "image/png");
+        assert_eq!(file.name, "sample.png");
+        assert!(Path::new(&file.path).is_file());
 
         inputs.close();
         db.close();

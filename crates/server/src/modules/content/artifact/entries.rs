@@ -610,16 +610,16 @@ impl Artifacts {
         Ok(result)
     }
 
-    pub fn follow_entries(&self, hub: &Hub, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
-        let (rx, missed, current) = vibevalley_runtime::rt::block_on(async {
+    pub async fn follow_entries_async(&self, hub: &Hub, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
+        let (rx, missed, current) = {
             let mut db = self.db.read_pool().acquire().await.map_err(q)?;
             self.found_store_async(&mut db, id).await?;
             // Subscribe before reading catch-up; live events are deduplicated by seq.
             let rx = self.entry_changes.subscribe();
             let missed = db::entry_changes_after(&mut db, id, after, CATCH_UP_MAX as i64 + 1).await.map_err(q)?;
             let current: HashMap<String, db::EntryRow> = db::entries(&mut db, id).await.map_err(q)?.into_iter().map(|r| (r.path.clone(), r)).collect();
-            Ok::<_, ApiError>((rx, missed, current))
-        })?;
+            (rx, missed, current)
+        };
         let id = id.to_string();
         let hub_cancel = hub.child_token();
         let closed = self.cancel.clone();

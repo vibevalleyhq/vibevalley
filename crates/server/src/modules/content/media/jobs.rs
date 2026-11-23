@@ -1825,15 +1825,122 @@ impl crate::transport::api::media::SpeechStreams for Jobs {
         Ok(crate::transport::api::media::SpeechClaim {
             events,
             // The page gone: its job is canceled and its work stopped (a finished one is left as it is).
+            // Runs asynchronously so `Drop` never calls `rt::block_on` on a Tokio I/O worker.
             gone: Box::new(move || {
                 let Some(me) = me.upgrade() else { return };
                 me.streams.lock().remove(&job);
-                let _ = me.change(&job, &[Phase::Queued, Phase::Generating], |r| {
-                    r.phase = Phase::Canceled;
-                    r.problem = t("server.media.canceled", &[]);
-                });
-                me.stop_run(&job);
+                let hub = me.hub.upgrade();
+                let fut = async move {
+                    let _ = me
+                        .change_async(&job, &[Phase::Queued, Phase::Generating], |r| {
+                            r.phase = Phase::Canceled;
+                            r.problem = t("server.media.canceled", &[]);
+                        })
+                        .await;
+                    me.stop_run(&job);
+                };
+                if let Some(hub) = hub {
+                    hub.spawn_task(fut);
+                } else {
+                    vibevalley_runtime::rt::current_or_global_handle().spawn(fut);
+                }
             }),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::modules::collab::channel::Chat;
+    use crate::modules::infra::setting::SettingConfig;
+    use crate::transport::api::media::SpeechStreams;
+
+    #[test]
+    fn regression_speech_claim_gone_does_not_block_tokio_worker_on_drop() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = ServerDb::open(dir.path()).unwrap();
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let setting = Setting::open(SettingConfig {
+            home: dir.path().to_path_buf(),
+            work_root: dir.path().to_path_buf(),
+            version: "0.1.0-test".into(),
+            deepseek_api_key: String::new(),
+        });
+        let files = Attachments::open(dir.path(), db.clone());
+        let chat = Chat::open(db.clone(), &hub, files.clone(), None, false).unwrap();
+        let inputs = Inputs::open(dir.path(), db.clone(), files.clone()).unwrap();
+        let (vendor, download) = crate::offline::network();
+        let jobs = Jobs::open(Parts {
+            db: db.clone(),
+            hub: Arc::downgrade(&hub),
+            setting,
+            files,
+            inputs: inputs.clone(),
+            channel: chat,
+            vendor,
+            download,
+        })
+        .unwrap();
+
+        let job_id = "speech-drop-1";
+        let req = MediaSpeechRequest {
+            id: job_id.into(),
+            text: "hello".into(),
+            voice: "alloy".into(),
+            format: MediaAudioFormat::Pcm,
+            connection: "moss".into(),
+            revision: 1,
+            streaming: Some(true),
+            asynchronous: None,
+        };
+        let mut rec = Record::new(
+            Ask::Speech(req),
+            MediaSource::User {},
+            "moss".into(),
+            1,
+            "moss-tts-1.0-pro".into(),
+            "fp".into(),
+            1_700_000_000_000,
+        );
+        rec.phase = Phase::Generating;
+        vibevalley_runtime::rt::block_on(async {
+            let mut conn = db.write_pool().acquire().await.unwrap();
+            Jobs::save_db(&mut conn, &mut rec, 1_700_000_000_000).await.unwrap();
+        });
+        let (tx, rx) = flume::bounded(16);
+        jobs.streams.lock().insert(job_id.into(), Stream { tx, rx, claimed: false });
+
+        let claim = jobs.claim(job_id).unwrap();
+
+        // Hold the sole write_pool connection on the Tokio worker while invoking `gone`:
+        // if `gone` still called `rt::block_on(change_async)`, this would deadlock before returning.
+        let jobs_async = jobs.clone();
+        let db_async = db.clone();
+        let hub_async = hub.clone();
+        vibevalley_runtime::rt::block_on(async move {
+            vibevalley_runtime::rt::spawn(async move {
+                let held_write = db_async.write_pool().acquire().await.unwrap();
+                (claim.gone)();
+                assert!(!jobs_async.streams.lock().contains_key(job_id));
+                drop(held_write);
+
+                let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
+                loop {
+                    if jobs_async.found_async(job_id).await.unwrap().phase == Phase::Canceled {
+                        break;
+                    }
+                    assert!(tokio::time::Instant::now() < deadline, "SpeechClaim::gone must cancel the job asynchronously");
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+                jobs_async.close();
+                hub_async.close_async().await;
+            })
+            .await
+            .unwrap();
+        });
+
+        inputs.close();
+        db.close();
     }
 }
