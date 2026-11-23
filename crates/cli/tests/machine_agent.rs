@@ -1025,3 +1025,135 @@ fn cli_machine_list_and_machine_up_pair_exchange_persistence_and_ephemeral() {
     stop.cancel();
     let _ = server_thread.join();
 }
+
+#[test]
+fn local_mcp_proxy_status_codes_limits_and_cleanup() {
+    vibevalley_runtime::rt::block_on(async {
+        use tokio::sync::mpsc;
+        use vibevalley_cli::machine_agent::TransportSlot;
+        use vibevalley_cli::machine_agent::mcp_proxy::{LocalMcpProxy, PendingMcpMap, resolve_mcp_response};
+
+        let transport = Arc::new(TransportSlot::new());
+        let pending = Arc::new(PendingMcpMap::default());
+        let cancel = CancellationToken::new();
+        let proxy = LocalMcpProxy::start("sess-edge".into(), "default-tok".into(), transport.clone(), pending.clone(), cancel.clone())
+            .await
+            .unwrap();
+
+        let base_url = proxy.url().trim_end_matches("/mcp").to_string();
+        let client = reqwest::Client::builder().no_proxy().build().unwrap();
+
+        // 404 on unknown path, 405 on non-POST method, 413 on payload > 16 MiB.
+        let r404 = client.post(format!("{base_url}/other")).body("{}").send().await.unwrap();
+        assert_eq!(r404.status().as_u16(), 404);
+
+        let r405 = client.get(proxy.url()).send().await.unwrap();
+        assert_eq!(r405.status().as_u16(), 405);
+
+        let oversize = vec![b'a'; 16 * 1024 * 1024 + 1];
+        let r413 = client.post(proxy.url()).body(oversize).send().await.unwrap();
+        assert_eq!(r413.status().as_u16(), 413);
+        assert!(pending.lock().is_empty());
+
+        // 503 with JSON-RPC error when machine WS transport is disconnected; pending map cleaned up.
+        let r503 = client.post(proxy.url()).body("{}").send().await.unwrap();
+        assert_eq!(r503.status().as_u16(), 503);
+        assert!(
+            r503.headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok())
+                .is_some_and(|v| v.starts_with("application/json")),
+            "expected application/json content-type on 503 disconnect"
+        );
+        assert!(r503.text().await.unwrap().contains("machine websocket disconnected"));
+        assert!(pending.lock().is_empty());
+
+        // Connect mock transport channel to exercise 200, 202, bearer fallback/override, 502, and shutdown 503.
+        let (tx, mut rx) = mpsc::unbounded_channel::<MachineWireFrame>();
+        transport.install(tx);
+
+        // 1. Default session token fallback + query string preservation + 202 empty content-type fallback.
+        let req_fut = client.post(format!("{}?v=1", proxy.url())).body(r#"{"jsonrpc":"2.0"}"#).send();
+        let responder = async {
+            let MachineWireFrame::MachineMcpRequest(req) = rx.recv().await.unwrap() else {
+                panic!("expected MachineMcpRequest");
+            };
+            assert_eq!(req.session_id, "sess-edge");
+            assert_eq!(req.session_token, "default-tok");
+            assert_eq!(req.method, "POST");
+            assert_eq!(req.path, "/mcp?v=1");
+            assert!(resolve_mcp_response(
+                &pending,
+                MachineMcpResponse {
+                    request_id: req.request_id,
+                    status: 202,
+                    content_type: String::new(),
+                    body: String::new(),
+                },
+            ));
+        };
+        let (resp202, ()) = tokio::join!(req_fut, responder);
+        let resp202 = resp202.unwrap();
+        assert_eq!(resp202.status().as_u16(), 202);
+        assert_eq!(
+            resp202.headers().get("content-type").and_then(|v| v.to_str().ok()),
+            Some("application/json; charset=utf-8")
+        );
+        assert!(pending.lock().is_empty());
+
+        // 2. Bearer override + 200 OK.
+        let req_fut = client
+            .post(proxy.url())
+            .header("authorization", "Bearer override-tok")
+            .body(r#"{"id":1}"#)
+            .send();
+        let responder = async {
+            let MachineWireFrame::MachineMcpRequest(req) = rx.recv().await.unwrap() else {
+                panic!("expected MachineMcpRequest");
+            };
+            assert_eq!(req.session_token, "override-tok");
+            assert!(resolve_mcp_response(
+                &pending,
+                MachineMcpResponse {
+                    request_id: req.request_id,
+                    status: 200,
+                    content_type: "application/json".into(),
+                    body: r#"{"ok":true}"#.into(),
+                },
+            ));
+        };
+        let (resp200, ()) = tokio::join!(req_fut, responder);
+        let resp200 = resp200.unwrap();
+        assert_eq!(resp200.status().as_u16(), 200);
+        assert_eq!(resp200.text().await.unwrap(), r#"{"ok":true}"#);
+        assert!(pending.lock().is_empty());
+
+        // 3. 502 Bad Gateway when upstream drops the response sender without sending.
+        let req_fut = client.post(proxy.url()).body("{}").send();
+        let dropper = async {
+            let MachineWireFrame::MachineMcpRequest(req) = rx.recv().await.unwrap() else {
+                panic!("expected MachineMcpRequest");
+            };
+            let _dropped = pending.lock().remove(&req.request_id);
+        };
+        let (resp502, ()) = tokio::join!(req_fut, dropper);
+        let resp502 = resp502.unwrap();
+        assert_eq!(resp502.status().as_u16(), 502);
+        assert_eq!(resp502.text().await.unwrap(), "upstream closed");
+        assert!(pending.lock().is_empty());
+
+        // 4. 503 when proxy shuts down while a request is in flight; pending map cleaned up.
+        let req_fut = client.post(proxy.url()).body("{}").send();
+        let canceller = async {
+            let MachineWireFrame::MachineMcpRequest(_req) = rx.recv().await.unwrap() else {
+                panic!("expected MachineMcpRequest");
+            };
+            proxy.shutdown();
+        };
+        let (resp_shutdown, ()) = tokio::join!(req_fut, canceller);
+        let resp_shutdown = resp_shutdown.unwrap();
+        assert_eq!(resp_shutdown.status().as_u16(), 503);
+        assert_eq!(resp_shutdown.text().await.unwrap(), "proxy shutting down");
+        assert!(pending.lock().is_empty());
+    });
+}

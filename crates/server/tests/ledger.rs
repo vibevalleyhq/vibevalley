@@ -32,7 +32,7 @@ fn regression_failed_batch_changes_neither_database_nor_core() {
     assert!(result.is_err());
     assert_eq!(ledger.bundle(), before);
     assert_eq!(
-        pollster::block_on(sqlx::query_scalar::<_, i64>("select count(*) from issue").fetch_one(&mut db)).unwrap(),
+        vibevalley_runtime::rt::block_on(sqlx::query_scalar::<_, i64>("select count(*) from issue").fetch_one(&mut db)).unwrap(),
         0
     );
 }

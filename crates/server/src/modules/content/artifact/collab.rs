@@ -446,9 +446,12 @@ impl Artifacts {
 
     /// Pure in-memory presence update (`artifact.presence.update`): never writes
     /// to SQLite and never increments `artifact.seq`.
-    pub fn update_presence(&self, actor: &str, req: &ArtifactPresenceUpdateRequest) -> Result<(), ApiError> {
+    pub async fn update_presence_async(&self, actor: &str, req: &ArtifactPresenceUpdateRequest) -> Result<(), ApiError> {
         // Read-only existence check.
-        self.found(&mut self.db(), &req.id)?;
+        {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            self.found(&mut db, &req.id).await?;
+        }
         self.evict_expired_presence(&req.id);
         match &req.presence {
             Some(p) => {
@@ -469,7 +472,10 @@ impl Artifacts {
     /// Streams initial `Snapshot` of live peers followed by incremental `Upsert`
     /// and `Remove` events (including TTL evictions).
     pub fn follow_presence(self: &Arc<Self>, hub: &Hub, id: &str, sink: Sink) -> Result<(), ApiError> {
-        self.found(&mut self.db(), id)?;
+        vibevalley_runtime::rt::block_on(async {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            self.found(&mut db, id).await
+        })?;
         let mut rx = self.presence_changes.subscribe();
         let initial = self.presence_snapshot(id);
         let weak = Arc::downgrade(self);
@@ -546,8 +552,13 @@ impl Artifacts {
 
     // ---- Phase B: CollabDoc bootstrap, sync & durable Cursor helpers --------
 
-    pub(super) fn load_or_bootstrap_blocks_doc(&self, db: &mut SqliteConnection, row: &ArtifactRow, existing: &[Block]) -> Result<CollabDoc, ApiError> {
-        if let Some(bytes) = db::artifact_collab(db, &row.id).map_err(q)? {
+    pub(super) async fn load_or_bootstrap_blocks_doc_async(
+        &self,
+        db: &mut SqliteConnection,
+        row: &ArtifactRow,
+        existing: &[Block],
+    ) -> Result<CollabDoc, ApiError> {
+        if let Some(bytes) = db::artifact_collab(db, &row.id).await.map_err(q)? {
             return CollabDoc::from_snapshot(&bytes).map_err(collab_err);
         }
         let doc = CollabDoc::new();
@@ -568,7 +579,7 @@ impl Artifacts {
         Ok(doc)
     }
 
-    pub(super) fn sync_blocks_to_collab(
+    pub(super) async fn sync_blocks_to_collab_async(
         &self,
         db: &mut SqliteConnection,
         row: &ArtifactRow,
@@ -580,7 +591,7 @@ impl Artifacts {
         if changed.is_empty() {
             return Ok(());
         }
-        let doc = self.load_or_bootstrap_blocks_doc(db, row, pre_blocks)?;
+        let doc = self.load_or_bootstrap_blocks_doc_async(db, row, pre_blocks).await?;
         let prev_by_id: HashMap<&str, &Block> = pre_blocks.iter().map(|b| (b.id.as_str(), b)).collect();
         let live_post = ordered(post_all);
         let mut live_index: HashMap<&str, usize> = HashMap::new();
@@ -612,12 +623,17 @@ impl Artifacts {
         }
         doc.commit(meta).map_err(collab_err)?;
         let snapshot = doc.export_snapshot().map_err(collab_err)?;
-        db::upsert_artifact_collab(db, &row.id, &snapshot, meta.at).map_err(q)?;
+        db::upsert_artifact_collab(db, &row.id, &snapshot, meta.at).await.map_err(q)?;
         Ok(())
     }
 
-    pub(super) fn load_or_bootstrap_store_doc(&self, db: &mut SqliteConnection, row: &ArtifactRow, existing: &[db::EntryRow]) -> Result<CollabDoc, ApiError> {
-        if let Some(bytes) = db::artifact_collab(db, &row.id).map_err(q)? {
+    pub(super) async fn load_or_bootstrap_store_doc_async(
+        &self,
+        db: &mut SqliteConnection,
+        row: &ArtifactRow,
+        existing: &[db::EntryRow],
+    ) -> Result<CollabDoc, ApiError> {
+        if let Some(bytes) = db::artifact_collab(db, &row.id).await.map_err(q)? {
             return CollabDoc::from_snapshot(&bytes).map_err(collab_err);
         }
         let doc = CollabDoc::new();
@@ -631,7 +647,7 @@ impl Artifacts {
         Ok(doc)
     }
 
-    pub(super) fn sync_store_to_collab(
+    pub(super) async fn sync_store_to_collab_async(
         db: &mut SqliteConnection,
         artifact_id: &str,
         doc: &CollabDoc,
@@ -653,11 +669,11 @@ impl Artifacts {
         }
         doc.commit(meta).map_err(collab_err)?;
         let snapshot = doc.export_snapshot().map_err(collab_err)?;
-        db::upsert_artifact_collab(db, artifact_id, &snapshot, meta.at).map_err(q)?;
+        db::upsert_artifact_collab(db, artifact_id, &snapshot, meta.at).await.map_err(q)?;
         Ok(())
     }
 
-    pub(super) fn sync_html_to_collab(
+    pub(super) async fn sync_html_to_collab_async(
         &self,
         db: &mut SqliteConnection,
         artifact_id: &str,
@@ -665,7 +681,7 @@ impl Artifacts {
         new_html: &str,
         meta: &CommitMeta,
     ) -> Result<(), ApiError> {
-        let doc = if let Some(bytes) = db::artifact_collab(db, artifact_id).map_err(q)? {
+        let doc = if let Some(bytes) = db::artifact_collab(db, artifact_id).await.map_err(q)? {
             CollabDoc::from_snapshot(&bytes).map_err(collab_err)?
         } else {
             let d = CollabDoc::new();
@@ -679,28 +695,28 @@ impl Artifacts {
         doc.html_update(new_html).map_err(collab_err)?;
         doc.commit(meta).map_err(collab_err)?;
         let snapshot = doc.export_snapshot().map_err(collab_err)?;
-        db::upsert_artifact_collab(db, artifact_id, &snapshot, meta.at).map_err(q)?;
+        db::upsert_artifact_collab(db, artifact_id, &snapshot, meta.at).await.map_err(q)?;
         Ok(())
     }
 
-    fn load_collab_for_row(&self, db: &mut SqliteConnection, row: &ArtifactRow) -> Result<CollabDoc, ApiError> {
-        if let Some(bytes) = db::artifact_collab(db, &row.id).map_err(q)? {
+    async fn load_collab_for_row_async(&self, db: &mut SqliteConnection, row: &ArtifactRow) -> Result<CollabDoc, ApiError> {
+        if let Some(bytes) = db::artifact_collab(db, &row.id).await.map_err(q)? {
             return CollabDoc::from_snapshot(&bytes).map_err(collab_err);
         }
         match row.body.as_str() {
             "blocks" => {
-                let blocks = db::blocks(db, &row.id).map_err(q)?;
-                self.load_or_bootstrap_blocks_doc(db, row, &blocks)
+                let blocks = db::blocks(db, &row.id).await.map_err(q)?;
+                self.load_or_bootstrap_blocks_doc_async(db, row, &blocks).await
             }
             "store" => {
-                let entries = db::entries(db, &row.id).map_err(q)?;
-                self.load_or_bootstrap_store_doc(db, row, &entries)
+                let entries = db::entries(db, &row.id).await.map_err(q)?;
+                self.load_or_bootstrap_store_doc_async(db, row, &entries).await
             }
             "html" => {
                 let doc = CollabDoc::new();
                 if row.version > 0
-                    && let Some(v) = db::version(db, &row.id, row.version).map_err(q)?
-                    && let Ok(source) = self.page_of(row, &v)
+                    && let Some(v) = db::version(db, &row.id, row.version).await.map_err(q)?
+                    && let Ok(source) = self.page_of_async(row, &v).await
                 {
                     doc.html_update(&source).map_err(collab_err)?;
                     let meta = commit_meta_for_actor(&v.by_id, v.note.clone(), v.created_at);
@@ -714,7 +730,7 @@ impl Artifacts {
 
     /// Anchors a text suggestion range on `block` using persistent Loro `Cursor`s,
     /// returning `(cursor_start, cursor_end, start_offset, end_offset, anchor_text, replacement_text)`.
-    pub(super) fn anchor_suggestion_range(
+    pub(super) async fn anchor_suggestion_range_async(
         &self,
         db: &mut SqliteConnection,
         row: &ArtifactRow,
@@ -722,7 +738,7 @@ impl Artifacts {
         block: &Block,
         new_text: &str,
     ) -> Result<(String, String, u32, u32, String, String), ApiError> {
-        let doc = self.load_or_bootstrap_blocks_doc(db, row, all_blocks)?;
+        let doc = self.load_or_bootstrap_blocks_doc_async(db, row, all_blocks).await?;
         let old_text = doc.text_get(&block.id).unwrap_or_else(|| plain(&block.text));
         if doc.text_get(&block.id).is_none() {
             let attrs = block_attrs_to_value(&block.attrs);
@@ -731,7 +747,7 @@ impl Artifacts {
             let meta = commit_meta_for_actor(&block.updated_by, Some("anchor-seed".into()), block.updated);
             doc.commit(&meta).map_err(collab_err)?;
             let snapshot = doc.export_snapshot().map_err(collab_err)?;
-            db::upsert_artifact_collab(db, &row.id, &snapshot, now()).map_err(q)?;
+            db::upsert_artifact_collab(db, &row.id, &snapshot, now()).await.map_err(q)?;
         }
         let (start, end, original, replacement) = diff_unicode_span(&old_text, new_text);
         let anchor = doc.anchor_text_range(&block.id, start, end).map_err(collab_err)?;
@@ -746,11 +762,11 @@ impl Artifacts {
     }
 
     /// Resolves live drifted offsets for any suggestion carrying persistent cursors.
-    pub(super) fn hydrate_suggestion_offsets(&self, db: &mut SqliteConnection, artifact_id: &str, items: &mut [Suggestion]) {
+    pub(super) async fn hydrate_suggestion_offsets_async(&self, db: &mut SqliteConnection, artifact_id: &str, items: &mut [Suggestion]) {
         if !items.iter().any(|s| s.cursor_start.is_some() && s.cursor_end.is_some()) {
             return;
         }
-        let Ok(Some(bytes)) = db::artifact_collab(db, artifact_id) else {
+        let Ok(Some(bytes)) = db::artifact_collab(db, artifact_id).await else {
             return;
         };
         let Ok(doc) = CollabDoc::from_snapshot(&bytes) else {
@@ -775,7 +791,12 @@ impl Artifacts {
     /// upstream/downstream edits, using its persistent Loro `Cursor` range.
     /// Returns `Ok(Some(merged_plain_text))` when the anchored span is intact, or
     /// `Ok(None)` when the anchored span itself was overwritten (caller refuses as stale).
-    pub(super) fn try_merge_cursor_suggestion(&self, artifact_id: &str, block: &Block, stored: &StoredSuggestion) -> Result<Option<String>, ApiError> {
+    pub(super) async fn try_merge_cursor_suggestion_async(
+        &self,
+        artifact_id: &str,
+        block: &Block,
+        stored: &StoredSuggestion,
+    ) -> Result<Option<String>, ApiError> {
         let (Some(cs), Some(ce)) = (&stored.wire.cursor_start, &stored.wire.cursor_end) else {
             return Ok(None);
         };
@@ -783,9 +804,9 @@ impl Artifacts {
             return Ok(None);
         };
         let doc = {
-            let mut db = self.db();
-            let row = self.found_blocks(&mut db, artifact_id)?;
-            self.load_collab_for_row(&mut db, &row)?
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            let row = self.found_blocks_async(&mut db, artifact_id).await?;
+            self.load_collab_for_row_async(&mut db, &row).await?
         };
         let anchor = TextRangeAnchor {
             text_key: block.id.clone(),
@@ -821,10 +842,11 @@ impl Artifacts {
 
     // ---- Phase C: Time Travel, Compaction & Selective Per-Origin Undo -------
 
-    pub fn history_list(&self, req: &ArtifactHistoryListRequest) -> Result<Vec<ArtifactHistoryEntry>, ApiError> {
-        let mut db = self.db();
-        let row = self.found(&mut db, &req.id)?;
-        let doc = self.load_collab_for_row(&mut db, &row)?;
+    pub async fn history_list_async(&self, req: &ArtifactHistoryListRequest) -> Result<Vec<ArtifactHistoryEntry>, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+        let row = self.found(&mut db, &req.id).await?;
+        let doc = self.load_collab_for_row_async(&mut db, &row).await?;
+        drop(db);
         let mut list: Vec<ArtifactHistoryEntry> = doc.history().map_err(collab_err)?.iter().map(history_entry_wire).collect();
         list.reverse();
         if let Some(limit) = req.limit {
@@ -833,10 +855,10 @@ impl Artifacts {
         Ok(list)
     }
 
-    pub fn history_preview(&self, req: &ArtifactHistoryPreviewRequest) -> Result<ArtifactHistoryPreviewResult, ApiError> {
-        let mut db = self.db();
-        let row = self.found(&mut db, &req.id)?;
-        let doc = self.load_collab_for_row(&mut db, &row)?;
+    pub async fn history_preview_async(&self, req: &ArtifactHistoryPreviewRequest) -> Result<ArtifactHistoryPreviewResult, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+        let row = self.found(&mut db, &req.id).await?;
+        let doc = self.load_collab_for_row_async(&mut db, &row).await?;
         let frontiers = decode_frontiers(&req.frontiers).map_err(collab_err)?;
         let snap = doc.checkout_snapshot(&frontiers).map_err(collab_err)?;
         let entry = doc
@@ -849,7 +871,7 @@ impl Artifacts {
         let artifact_type = row.artifact_type.as_deref().and_then(artifact_type_of);
         match row.body.as_str() {
             "blocks" => {
-                let existing = db::blocks(&mut db, &row.id).map_err(q)?;
+                let existing = db::blocks(&mut db, &row.id).await.map_err(q)?;
                 let blocks = snapshot_blocks_to_wire(&row.id, &snap.blocks, &existing, at);
                 let md = markdown_of(&blocks);
                 Ok(ArtifactHistoryPreviewResult {
@@ -865,7 +887,7 @@ impl Artifacts {
                 })
             }
             "store" => {
-                let existing = db::entries(&mut db, &row.id).map_err(q)?;
+                let existing = db::entries(&mut db, &row.id).await.map_err(q)?;
                 let entries = snapshot_store_entries_to_wire(&row.id, &snap.store_entries, &existing, at);
                 Ok(ArtifactHistoryPreviewResult {
                     artifact_id: row.id,
@@ -895,16 +917,16 @@ impl Artifacts {
 
     /// Projects a mutated `CollabDoc` (after `restore_to` or `selective_undo_origin`)
     /// back into SQLite projection tables + `artifact_collab` and broadcasts live updates.
-    fn apply_collab_projection(&self, row: &ArtifactRow, doc: &CollabDoc, actor: &str, note: Option<String>, at: i64) -> Result<Wire, ApiError> {
+    async fn apply_collab_projection_async(&self, row: &ArtifactRow, doc: &CollabDoc, actor: &str, note: Option<String>, at: i64) -> Result<Wire, ApiError> {
         let snap = doc.project_snapshot();
         let bytes = doc.export_snapshot().map_err(collab_err)?;
         match row.body.as_str() {
             "blocks" => {
                 let ack = {
-                    let mut conn = self.db();
-                    let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
-                    let current_row = self.found_blocks(&mut tx, &row.id)?;
-                    let existing = db::blocks(&mut tx, &row.id).map_err(q)?;
+                    let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
+                    let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
+                    let current_row = self.found_blocks_async(&mut tx, &row.id).await?;
+                    let existing = db::blocks(&mut tx, &row.id).await.map_err(q)?;
                     let existing_by_id: HashMap<String, Block> = existing.iter().cloned().map(|b| (b.id.clone(), b)).collect();
                     let projected = snapshot_blocks_to_wire(&row.id, &snap.blocks, &existing, at);
                     let projected_ids: HashSet<String> = projected.iter().map(|b| b.id.clone()).collect();
@@ -916,8 +938,8 @@ impl Artifacts {
                         b.deleted = Some(false);
                         b.updated_by = prev.map_or_else(|| actor.to_string(), |p| p.updated_by.clone());
                         b.updated = at;
-                        db::put_block(&mut tx, &row.id, &b).map_err(q)?;
-                        db::add_revision(&mut tx, &b.id, b.rev, &b.text, actor, "normal", at).map_err(q)?;
+                        db::put_block(&mut tx, &row.id, &b).await.map_err(q)?;
+                        db::add_revision(&mut tx, &b.id, b.rev, &b.text, actor, "normal", at).await.map_err(q)?;
                         changed.push(b);
                     }
                     // Tombstone blocks absent from the restored snapshot instead of hard-deleting
@@ -928,7 +950,7 @@ impl Artifacts {
                             tomb.rev += 1;
                             tomb.deleted = Some(true);
                             tomb.updated = at;
-                            db::put_block(&mut tx, &row.id, &tomb).map_err(q)?;
+                            db::put_block(&mut tx, &row.id, &tomb).await.map_err(q)?;
                             changed.push(tomb);
                         }
                     }
@@ -947,10 +969,11 @@ impl Artifacts {
                             created_at: at,
                         },
                     )
+                    .await
                     .map_err(q)?;
-                    db::artifact_accepted(&mut tx, &row.id, seq, at).map_err(q)?;
-                    db::upsert_artifact_collab(&mut tx, &row.id, &bytes, at).map_err(q)?;
-                    vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
+                    db::artifact_accepted(&mut tx, &row.id, seq, at).await.map_err(q)?;
+                    db::upsert_artifact_collab(&mut tx, &row.id, &bytes, at).await.map_err(q)?;
+                    tx.commit().await.map_err(q)?;
                     BlockAck {
                         batch_id,
                         seq,
@@ -959,21 +982,21 @@ impl Artifacts {
                     }
                 };
                 self.publish_change(&row.id, &ack);
-                self.get_now(&row.id)
+                self.get_now_async(&row.id).await
             }
             "store" => {
                 let change = {
-                    let mut conn = self.db();
-                    let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
-                    let current_row = self.found(&mut tx, &row.id)?;
-                    let existing = db::entries(&mut tx, &row.id).map_err(q)?;
+                    let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
+                    let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
+                    let current_row = self.found(&mut tx, &row.id).await?;
+                    let existing = db::entries(&mut tx, &row.id).await.map_err(q)?;
                     let prev_rev_by_path: HashMap<String, i64> = existing.iter().map(|r| (r.path.clone(), r.rev)).collect();
                     let projected = snapshot_store_entries_to_wire(&row.id, &snap.store_entries, &existing, at);
                     let projected_paths: HashSet<String> = projected.iter().map(|e| e.path.clone()).collect();
                     let mut deleted_paths = Vec::new();
                     for old in &existing {
                         if !projected_paths.contains(&old.path) {
-                            db::delete_entry(&mut tx, &row.id, &old.path).map_err(q)?;
+                            db::delete_entry(&mut tx, &row.id, &old.path).await.map_err(q)?;
                             deleted_paths.push(old.path.clone());
                         }
                     }
@@ -998,6 +1021,7 @@ impl Artifacts {
                                 updated_at: at,
                             },
                         )
+                        .await
                         .map_err(q)?;
                         changed_paths.push(e.path.clone());
                         if e.size > INLINE_EVENT_MAX_BYTES as i64 {
@@ -1006,10 +1030,12 @@ impl Artifacts {
                         event_entries.push(e);
                     }
                     let seq = current_row.seq + 1;
-                    db::add_entry_change(&mut tx, &row.id, seq, actor, &changed_paths, &deleted_paths, at).map_err(q)?;
-                    db::artifact_accepted(&mut tx, &row.id, seq, at).map_err(q)?;
-                    db::upsert_artifact_collab(&mut tx, &row.id, &bytes, at).map_err(q)?;
-                    vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
+                    db::add_entry_change(&mut tx, &row.id, seq, actor, &changed_paths, &deleted_paths, at)
+                        .await
+                        .map_err(q)?;
+                    db::artifact_accepted(&mut tx, &row.id, seq, at).await.map_err(q)?;
+                    db::upsert_artifact_collab(&mut tx, &row.id, &bytes, at).await.map_err(q)?;
+                    tx.commit().await.map_err(q)?;
                     EntryChange {
                         artifact: row.id.clone(),
                         seq,
@@ -1018,167 +1044,172 @@ impl Artifacts {
                     }
                 };
                 let _ = self.entry_changes.send(change);
-                self.get_now(&row.id)
+                self.get_now_async(&row.id).await
             }
             _ => {
                 let html = snap.html.unwrap_or_default();
-                let file = self.keep(html.as_bytes(), &row.title)?;
-                let mut conn = self.db();
-                let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
-                let current_row = self.found(&mut tx, &row.id)?;
-                let next = current_row.version + 1;
-                db::add_version(
-                    &mut tx,
-                    db::NewVersion {
-                        artifact_id: row.id.clone(),
-                        version: next,
-                        attachment_id: file,
-                        size: html.len() as i64,
-                        note,
-                        by_id: actor.to_string(),
-                        by_name: if actor == USER_ID {
-                            t("server.channel.name.user", &[])
-                        } else {
-                            actor.to_string()
+                let file = self.keep_async(html.as_bytes().to_vec(), &row.title).await?;
+                {
+                    let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
+                    let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
+                    let current_row = self.found(&mut tx, &row.id).await?;
+                    let next = current_row.version + 1;
+                    db::add_version(
+                        &mut tx,
+                        db::NewVersion {
+                            artifact_id: row.id.clone(),
+                            version: next,
+                            attachment_id: file,
+                            size: html.len() as i64,
+                            note,
+                            by_id: actor.to_string(),
+                            by_name: if actor == USER_ID {
+                                t("server.channel.name.user", &[])
+                            } else {
+                                actor.to_string()
+                            },
+                            created_at: at,
                         },
-                        created_at: at,
-                    },
-                )
-                .map_err(q)?;
-                db::artifact_versioned(&mut tx, &row.id, next, at).map_err(q)?;
-                db::upsert_artifact_collab(&mut tx, &row.id, &bytes, at).map_err(q)?;
-                vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
-                drop(conn);
-                self.get_now(&row.id)
+                    )
+                    .await
+                    .map_err(q)?;
+                    db::artifact_versioned(&mut tx, &row.id, next, at).await.map_err(q)?;
+                    db::upsert_artifact_collab(&mut tx, &row.id, &bytes, at).await.map_err(q)?;
+                    tx.commit().await.map_err(q)?;
+                }
+                self.get_now_async(&row.id).await
             }
         }
     }
 
-    fn with_body_lock<T>(&self, row: &ArtifactRow, f: impl FnOnce() -> T) -> T {
+    async fn lock_body(&self, row: &ArtifactRow) -> BodyLockGuard<'_> {
         match row.body.as_str() {
-            "blocks" => {
-                let _g = self.batches.lock();
-                f()
-            }
-            "store" => {
-                let wl = self.entry_lock(&row.id);
-                let _g = wl.lock();
-                f()
-            }
-            _ => {
-                let _g = self.rows.lock();
-                f()
-            }
+            "blocks" => BodyLockGuard::Blocks {
+                _guard: self.batches.lock().await,
+            },
+            "store" => BodyLockGuard::Store {
+                _guard: self.entry_lock(&row.id).lock_owned().await,
+            },
+            _ => BodyLockGuard::Rows {
+                _guard: self.rows.lock().await,
+            },
         }
     }
 
-    pub fn history_restore(&self, req: &ArtifactHistoryRestoreRequest) -> Result<Wire, ApiError> {
-        let row = self.found(&mut self.db(), &req.id)?;
+    pub async fn history_restore_async(&self, req: &ArtifactHistoryRestoreRequest) -> Result<Wire, ApiError> {
+        let row = {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            self.found(&mut db, &req.id).await?
+        };
         let target = decode_frontiers(&req.frontiers).map_err(collab_err)?;
         let at = now();
         let note = req.note.clone().or_else(|| Some("restore".to_string()));
         let meta = CommitMeta::user(USER_ID, note.clone(), at);
-        self.with_body_lock(&row, || {
-            let doc = {
-                let mut db = self.db();
-                self.load_collab_for_row(&mut db, &row)?
-            };
-            if doc.restore_to(&target, &meta).is_err() {
-                // Fallback when Loro's `revert_to` cannot emit an inverse diff across
-                // a child container deleted in an earlier commit: materialize the target
-                // snapshot via `checkout_snapshot` and apply it as a clean forward commit.
-                let target_snap = doc.checkout_snapshot(&target).map_err(collab_err)?;
-                let current_snap = doc.project_snapshot();
-                match row.body.as_str() {
-                    "blocks" => {
-                        let keep_ids: HashSet<&str> = target_snap.blocks.iter().map(|b| b.id.as_str()).collect();
-                        for cur in &current_snap.blocks {
-                            if !keep_ids.contains(cur.id.as_str()) {
-                                let _ = doc.tree_delete(&cur.id);
-                            }
-                        }
-                        let mut sibling_counts: HashMap<Option<&str>, usize> = HashMap::new();
-                        for bn in &target_snap.blocks {
-                            let idx = sibling_counts.entry(bn.parent_id.as_deref()).or_insert(0);
-                            let pos = *idx;
-                            *idx += 1;
-                            let attrs = block_attrs_from_map(&bn.attrs);
-                            let attrs_val = block_attrs_to_value(&attrs);
-                            doc.upsert_block(&bn.id, bn.parent_id.as_deref(), Some(pos), &bn.block_type, &bn.text, Some(&attrs_val))
-                                .map_err(collab_err)?;
+        let _body_lock = self.lock_body(&row).await;
+        let doc = {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            self.load_collab_for_row_async(&mut db, &row).await?
+        };
+        if doc.restore_to(&target, &meta).is_err() {
+            // Fallback when Loro's `revert_to` cannot emit an inverse diff across
+            // a child container deleted in an earlier commit: materialize the target
+            // snapshot via `checkout_snapshot` and apply it as a clean forward commit.
+            let target_snap = doc.checkout_snapshot(&target).map_err(collab_err)?;
+            let current_snap = doc.project_snapshot();
+            match row.body.as_str() {
+                "blocks" => {
+                    let keep_ids: HashSet<&str> = target_snap.blocks.iter().map(|b| b.id.as_str()).collect();
+                    for cur in &current_snap.blocks {
+                        if !keep_ids.contains(cur.id.as_str()) {
+                            let _ = doc.tree_delete(&cur.id);
                         }
                     }
-                    "store" => {
-                        let keep_paths: HashSet<&str> = target_snap.store_entries.iter().map(|e| e.path.as_str()).collect();
-                        for cur in &current_snap.store_entries {
-                            if !keep_paths.contains(cur.path.as_str()) {
-                                doc.entry_delete(&cur.path).map_err(collab_err)?;
-                            }
-                        }
-                        for se in &target_snap.store_entries {
-                            if se.kind == "json"
-                                && let Ok(val) = serde_json::from_str::<Value>(&se.content)
-                                && val.is_object()
-                            {
-                                let prev = doc.entry_get_json(&se.path);
-                                let patch = diff_json_object(prev.as_ref(), &val);
-                                if patch.as_object().is_some_and(|m| !m.is_empty()) || prev.is_none() {
-                                    doc.entry_patch_json(&se.path, &patch).map_err(collab_err)?;
-                                }
-                            } else {
-                                doc.entry_put_text(&se.path, &se.mime, &se.content).map_err(collab_err)?;
-                            }
-                        }
-                    }
-                    _ => {
-                        doc.html_update(&target_snap.html.unwrap_or_default()).map_err(collab_err)?;
+                    let mut sibling_counts: HashMap<Option<&str>, usize> = HashMap::new();
+                    for bn in &target_snap.blocks {
+                        let idx = sibling_counts.entry(bn.parent_id.as_deref()).or_insert(0);
+                        let pos = *idx;
+                        *idx += 1;
+                        let attrs = block_attrs_from_map(&bn.attrs);
+                        let attrs_val = block_attrs_to_value(&attrs);
+                        doc.upsert_block(&bn.id, bn.parent_id.as_deref(), Some(pos), &bn.block_type, &bn.text, Some(&attrs_val))
+                            .map_err(collab_err)?;
                     }
                 }
-                doc.commit(&meta).map_err(collab_err)?;
+                "store" => {
+                    let keep_paths: HashSet<&str> = target_snap.store_entries.iter().map(|e| e.path.as_str()).collect();
+                    for cur in &current_snap.store_entries {
+                        if !keep_paths.contains(cur.path.as_str()) {
+                            doc.entry_delete(&cur.path).map_err(collab_err)?;
+                        }
+                    }
+                    for se in &target_snap.store_entries {
+                        if se.kind == "json"
+                            && let Ok(val) = serde_json::from_str::<Value>(&se.content)
+                            && val.is_object()
+                        {
+                            let prev = doc.entry_get_json(&se.path);
+                            let patch = diff_json_object(prev.as_ref(), &val);
+                            if patch.as_object().is_some_and(|m| !m.is_empty()) || prev.is_none() {
+                                doc.entry_patch_json(&se.path, &patch).map_err(collab_err)?;
+                            }
+                        } else {
+                            doc.entry_put_text(&se.path, &se.mime, &se.content).map_err(collab_err)?;
+                        }
+                    }
+                }
+                _ => {
+                    doc.html_update(&target_snap.html.unwrap_or_default()).map_err(collab_err)?;
+                }
             }
-            self.apply_collab_projection(&row, &doc, USER_ID, note.clone(), at)
-        })
+            doc.commit(&meta).map_err(collab_err)?;
+        }
+        self.apply_collab_projection_async(&row, &doc, USER_ID, note, at).await
     }
 
-    pub fn history_undo_origin(&self, req: &ArtifactHistoryUndoOriginRequest) -> Result<Wire, ApiError> {
+    pub async fn history_undo_origin_async(&self, req: &ArtifactHistoryUndoOriginRequest) -> Result<Wire, ApiError> {
         let origin = req.origin.trim();
         if origin.is_empty() {
             return Err(refused(t("server.artifact.nothingToChange", &[])));
         }
-        let row = self.found(&mut self.db(), &req.id)?;
+        let row = {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            self.found(&mut db, &req.id).await?
+        };
         let at = now();
         let note = Some(format!("undo {origin}"));
         let meta = CommitMeta::undo(USER_ID, origin, note.clone(), at);
-        self.with_body_lock(&row, || {
-            let doc = {
-                let mut db = self.db();
-                self.load_collab_for_row(&mut db, &row)?
-            };
-            let reverted = doc.selective_undo_origin(origin, &meta).map_err(collab_err)?;
-            if reverted == 0 {
-                return self.get_now(&row.id);
-            }
-            self.apply_collab_projection(&row, &doc, USER_ID, note.clone(), at)
-        })
+        let _body_lock = self.lock_body(&row).await;
+        let doc = {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            self.load_collab_for_row_async(&mut db, &row).await?
+        };
+        let reverted = doc.selective_undo_origin(origin, &meta).map_err(collab_err)?;
+        if reverted == 0 {
+            return self.get_now_async(&row.id).await;
+        }
+        self.apply_collab_projection_async(&row, &doc, USER_ID, note, at).await
     }
 
-    pub fn history_compact(&self, req: &ArtifactHistoryCompactRequest) -> Result<Wire, ApiError> {
-        let row = self.found(&mut self.db(), &req.id)?;
-        self.with_body_lock(&row, || {
-            let mut db = self.db();
-            let doc = self.load_collab_for_row(&mut db, &row)?;
+    pub async fn history_compact_async(&self, req: &ArtifactHistoryCompactRequest) -> Result<Wire, ApiError> {
+        let row = {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            self.found(&mut db, &req.id).await?
+        };
+        let _body_lock = self.lock_body(&row).await;
+        {
+            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
+            let doc = self.load_collab_for_row_async(&mut db, &row).await?;
             let shallow = doc.compact_shallow_snapshot().map_err(collab_err)?;
-            db::upsert_artifact_collab(&mut db, &row.id, &shallow, now()).map_err(q)?;
-            drop(db);
-            self.get_now(&row.id)
-        })
+            db::upsert_artifact_collab(&mut db, &row.id, &shallow, now()).await.map_err(q)?;
+        }
+        self.get_now_async(&row.id).await
     }
 
-    pub fn history_fork(&self, req: &ArtifactHistoryForkRequest) -> Result<Wire, ApiError> {
+    pub async fn history_fork_async(&self, req: &ArtifactHistoryForkRequest) -> Result<Wire, ApiError> {
         let (row, forked_doc, snap) = {
-            let mut db = self.db();
-            let row = self.found(&mut db, &req.id)?;
-            let doc = self.load_collab_for_row(&mut db, &row)?;
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            let row = self.found(&mut db, &req.id).await?;
+            let doc = self.load_collab_for_row_async(&mut db, &row).await?;
             let target = decode_frontiers(&req.frontiers).map_err(collab_err)?;
             let forked = doc.fork_at(&target).map_err(collab_err)?;
             let snap = forked.project_snapshot();
@@ -1248,134 +1279,148 @@ impl Artifacts {
                 }
                 let collab_bytes = remapped_doc.export_snapshot().map_err(collab_err)?;
                 let seq = i64::from(!new_blocks.is_empty());
-                let mut conn = self.db();
-                let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
-                db::add_artifact(
-                    &mut tx,
-                    db::NewArtifact {
-                        id: new_art_id.clone(),
-                        title,
-                        body: "blocks".into(),
-                        artifact_type: artifact_type.map(|ty| ty.as_str().into()),
-                        is_default: 0,
-                        display: None,
-                        channel_id: channel,
-                        issue: None,
-                        by_id: maker.by,
-                        by_name: user_name,
-                        version: 0,
-                        created_at: at,
-                    },
-                )
-                .map_err(q)?;
-                for b in &new_blocks {
-                    db::put_block(&mut tx, &new_art_id, b).map_err(q)?;
-                    db::add_revision(&mut tx, &b.id, 1, &b.text, USER_ID, "normal", at).map_err(q)?;
+                {
+                    let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
+                    let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
+                    db::add_artifact(
+                        &mut tx,
+                        db::NewArtifact {
+                            id: new_art_id.clone(),
+                            title,
+                            body: "blocks".into(),
+                            artifact_type: artifact_type.map(|ty| ty.as_str().into()),
+                            is_default: 0,
+                            display: None,
+                            channel_id: channel,
+                            issue: None,
+                            by_id: maker.by,
+                            by_name: user_name,
+                            version: 0,
+                            created_at: at,
+                        },
+                    )
+                    .await
+                    .map_err(q)?;
+                    for b in &new_blocks {
+                        db::put_block(&mut tx, &new_art_id, b).await.map_err(q)?;
+                        db::add_revision(&mut tx, &b.id, 1, &b.text, USER_ID, "normal", at).await.map_err(q)?;
+                    }
+                    if seq > 0 {
+                        db::artifact_accepted(&mut tx, &new_art_id, seq, at).await.map_err(q)?;
+                    }
+                    db::upsert_artifact_collab(&mut tx, &new_art_id, &collab_bytes, at).await.map_err(q)?;
+                    tx.commit().await.map_err(q)?;
                 }
-                if seq > 0 {
-                    db::artifact_accepted(&mut tx, &new_art_id, seq, at).map_err(q)?;
-                }
-                db::upsert_artifact_collab(&mut tx, &new_art_id, &collab_bytes, at).map_err(q)?;
-                vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
-                drop(conn);
-                self.get_now(&new_art_id)
+                self.get_now_async(&new_art_id).await
             }
             "store" => {
                 let entries = snapshot_store_entries_to_wire(&new_art_id, &snap.store_entries, &[], at);
                 let collab_bytes = forked_doc.export_snapshot().map_err(collab_err)?;
                 let seq = i64::from(!entries.is_empty());
-                let mut conn = self.db();
-                let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
-                db::add_artifact(
-                    &mut tx,
-                    db::NewArtifact {
-                        id: new_art_id.clone(),
-                        title,
-                        body: "store".into(),
-                        artifact_type: artifact_type.map(|ty| ty.as_str().into()),
-                        is_default: 0,
-                        display: None,
-                        channel_id: channel,
-                        issue: None,
-                        by_id: maker.by,
-                        by_name: user_name,
-                        version: 0,
-                        created_at: at,
-                    },
-                )
-                .map_err(q)?;
-                let mut paths = Vec::with_capacity(entries.len());
-                for e in &entries {
-                    db::upsert_entry(
+                {
+                    let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
+                    let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
+                    db::add_artifact(
                         &mut tx,
-                        db::UpsertEntry {
-                            artifact_id: new_art_id.clone(),
-                            path: e.path.clone(),
-                            kind: e.kind.as_str().to_string(),
-                            mime: e.mime.clone(),
-                            value: e.value.clone(),
-                            attachment_id: e.attachment_id.clone(),
-                            size: e.size,
-                            rev: 1,
-                            updated_by: USER_ID.to_string(),
-                            updated_at: at,
+                        db::NewArtifact {
+                            id: new_art_id.clone(),
+                            title,
+                            body: "store".into(),
+                            artifact_type: artifact_type.map(|ty| ty.as_str().into()),
+                            is_default: 0,
+                            display: None,
+                            channel_id: channel,
+                            issue: None,
+                            by_id: maker.by,
+                            by_name: user_name,
+                            version: 0,
+                            created_at: at,
                         },
                     )
+                    .await
                     .map_err(q)?;
-                    paths.push(e.path.clone());
+                    let mut paths = Vec::with_capacity(entries.len());
+                    for e in &entries {
+                        db::upsert_entry(
+                            &mut tx,
+                            db::UpsertEntry {
+                                artifact_id: new_art_id.clone(),
+                                path: e.path.clone(),
+                                kind: e.kind.as_str().to_string(),
+                                mime: e.mime.clone(),
+                                value: e.value.clone(),
+                                attachment_id: e.attachment_id.clone(),
+                                size: e.size,
+                                rev: 1,
+                                updated_by: USER_ID.to_string(),
+                                updated_at: at,
+                            },
+                        )
+                        .await
+                        .map_err(q)?;
+                        paths.push(e.path.clone());
+                    }
+                    if seq > 0 {
+                        db::add_entry_change(&mut tx, &new_art_id, seq, USER_ID, &paths, &[], at).await.map_err(q)?;
+                        db::artifact_accepted(&mut tx, &new_art_id, seq, at).await.map_err(q)?;
+                    }
+                    db::upsert_artifact_collab(&mut tx, &new_art_id, &collab_bytes, at).await.map_err(q)?;
+                    tx.commit().await.map_err(q)?;
                 }
-                if seq > 0 {
-                    db::add_entry_change(&mut tx, &new_art_id, seq, USER_ID, &paths, &[], at).map_err(q)?;
-                    db::artifact_accepted(&mut tx, &new_art_id, seq, at).map_err(q)?;
-                }
-                db::upsert_artifact_collab(&mut tx, &new_art_id, &collab_bytes, at).map_err(q)?;
-                vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
-                drop(conn);
-                self.get_now(&new_art_id)
+                self.get_now_async(&new_art_id).await
             }
             _ => {
                 let html = snap.html.unwrap_or_default();
-                let file = self.keep(html.as_bytes(), &title)?;
+                let file = self.keep_async(html.as_bytes().to_vec(), &title).await?;
                 let collab_bytes = forked_doc.export_snapshot().map_err(collab_err)?;
-                let mut conn = self.db();
-                let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
-                db::add_artifact(
-                    &mut tx,
-                    db::NewArtifact {
-                        id: new_art_id.clone(),
-                        title,
-                        body: "html".into(),
-                        artifact_type: None,
-                        is_default: 0,
-                        display: row.display.clone().or_else(|| Some(ArtifactDisplay::Page.as_str().into())),
-                        channel_id: channel,
-                        issue: None,
-                        by_id: maker.by.clone(),
-                        by_name: user_name.clone(),
-                        version: 1,
-                        created_at: at,
-                    },
-                )
-                .map_err(q)?;
-                db::add_version(
-                    &mut tx,
-                    db::NewVersion {
-                        artifact_id: new_art_id.clone(),
-                        version: 1,
-                        attachment_id: file,
-                        size: html.len() as i64,
-                        note: Some("fork".into()),
-                        by_id: maker.by,
-                        by_name: user_name,
-                        created_at: at,
-                    },
-                )
-                .map_err(q)?;
-                db::upsert_artifact_collab(&mut tx, &new_art_id, &collab_bytes, at).map_err(q)?;
-                vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
-                drop(conn);
-                self.get_now(&new_art_id)
+                {
+                    let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
+                    let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
+                    db::add_artifact(
+                        &mut tx,
+                        db::NewArtifact {
+                            id: new_art_id.clone(),
+                            title,
+                            body: "html".into(),
+                            artifact_type: None,
+                            is_default: 0,
+                            display: row.display.clone().or_else(|| Some(ArtifactDisplay::Page.as_str().into())),
+                            channel_id: channel,
+                            issue: None,
+                            by_id: maker.by.clone(),
+                            by_name: user_name.clone(),
+                            version: 1,
+                            created_at: at,
+                        },
+                    )
+                    .await
+                    .map_err(q)?;
+                    db::add_version(
+                        &mut tx,
+                        db::NewVersion {
+                            artifact_id: new_art_id.clone(),
+                            version: 1,
+                            attachment_id: file,
+                            size: html.len() as i64,
+                            note: Some("fork".into()),
+                            by_id: maker.by,
+                            by_name: user_name,
+                            created_at: at,
+                        },
+                    )
+                    .await
+                    .map_err(q)?;
+                    db::upsert_artifact_collab(&mut tx, &new_art_id, &collab_bytes, at).await.map_err(q)?;
+                    tx.commit().await.map_err(q)?;
+                }
+                self.get_now_async(&new_art_id).await
             }
         }
     }
+}
+
+enum BodyLockGuard<'a> {
+    Blocks { _guard: tokio::sync::MutexGuard<'a, ()> },
+    Store { _guard: tokio::sync::OwnedMutexGuard<()> },
+    Rows { _guard: tokio::sync::MutexGuard<'a, ()> },
 }

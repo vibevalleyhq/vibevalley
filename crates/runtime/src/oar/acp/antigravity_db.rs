@@ -14,10 +14,11 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use parking_lot::Mutex;
-use pollster::block_on;
 use regex::Regex;
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{ConnectOptions, Row, SqliteConnection};
+
+use crate::rt::block_on;
 
 pub(crate) const STEP_TYPE_ERROR_MESSAGE: i64 = 17;
 pub(crate) const STEP_TYPE_INVOKE_SUBAGENT: i64 = 127;

@@ -143,12 +143,18 @@ impl ServerDb {
         &self.write_pool
     }
 
-    pub(crate) fn acquire(&self) -> sqlx::Result<DbConn> {
-        vibevalley_runtime::rt::block_on(self.write_pool.acquire()).map(|conn| DbConn(Some(conn)))
+    #[allow(dead_code)]
+    pub(crate) async fn acquire_write(&self) -> sqlx::Result<PoolConnection<Sqlite>> {
+        self.write_pool.acquire().await
     }
 
-    pub(crate) fn acquire_read(&self) -> sqlx::Result<DbConn> {
-        vibevalley_runtime::rt::block_on(self.read_pool.acquire()).map(|conn| DbConn(Some(conn)))
+    #[allow(dead_code)]
+    pub(crate) async fn acquire_read_async(&self) -> sqlx::Result<PoolConnection<Sqlite>> {
+        self.read_pool.acquire().await
+    }
+
+    pub(crate) fn acquire(&self) -> sqlx::Result<DbConn> {
+        vibevalley_runtime::rt::block_on(self.write_pool.acquire()).map(|conn| DbConn(Some(conn)))
     }
 
     pub(crate) fn run<T>(&self, query: impl AsyncFnOnce(&mut SqliteConnection) -> sqlx::Result<T>) -> sqlx::Result<T> {
@@ -181,22 +187,24 @@ impl ServerDb {
         })
     }
 
-    /// Returns the process-wide `durable::Store` handle backed by this same `server.db`.
+    /// Returns the process-wide `durable::Store` handle backed by this `ServerDb`'s shared pools.
     pub(crate) fn durable(&self) -> vibevalley_runtime::agent::durable::Result<vibevalley_runtime::agent::durable::Store> {
         let mut slot = self.durable.lock();
         if let Some(store) = slot.as_ref() {
             return Ok(store.clone());
         }
-        let store = vibevalley_runtime::agent::durable::Store::open(&self.path)?;
+        let store = vibevalley_runtime::agent::durable::Store::from_sqlite_pools(self.write_pool.clone(), Some(self.read_pool.clone()))?;
         *slot = Some(store.clone());
         Ok(store)
     }
 
-    /// Coordinated SQLite shutdown: drops the durable store handle, closes the
+    /// Coordinated SQLite shutdown: flushes and closes the durable store handle, closes the
     /// read pool first so no reader holds WAL frames, checkpoints WAL with
     /// `TRUNCATE` + `PRAGMA optimize`, and closes the write pool.
     pub fn close(&self) {
-        self.durable.lock().take();
+        if let Some(store) = self.durable.lock().take() {
+            let _ = store.close();
+        }
         vibevalley_runtime::rt::block_on(async {
             self.read_pool.close().await;
             if let Ok(mut conn) = self.write_pool.acquire().await {
@@ -464,5 +472,128 @@ mod tests {
         done_rx.recv_timeout(Duration::from_secs(2)).expect("ticker fired 3 times");
         ticker.stop();
         assert!(count.load(Ordering::SeqCst) >= 3);
+    }
+
+    #[test]
+    fn async_acquire_write_and_read_helpers_work_inside_send_futures() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = ServerDb::open(dir.path()).unwrap();
+        let db_task = db.clone();
+        let count = vibevalley_runtime::rt::block_on(async move {
+            vibevalley_runtime::rt::spawn(async move {
+                let mut writer = db_task.acquire_write().await?;
+                sqlx::raw_sql("INSERT INTO channel (id, type, is_default, name, created_at) VALUES ('async-c1', 'channel', 0, 'async', 100);")
+                    .execute(&mut *writer)
+                    .await?;
+                drop(writer);
+
+                let mut reader = db_task.acquire_read_async().await?;
+                let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM channel WHERE id = 'async-c1'")
+                    .fetch_one(&mut *reader)
+                    .await?;
+                Ok::<_, sqlx::Error>(count)
+            })
+            .await
+            .unwrap()
+        })
+        .unwrap();
+        assert_eq!(count, 1);
+        db.close();
+    }
+
+    #[test]
+    fn concurrent_server_db_and_durable_writes_serialize_without_busy_or_deadlock() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = ServerDb::open(dir.path()).unwrap();
+        let durable = db.durable().unwrap();
+
+        let server_threads = 4;
+        let durable_threads = 4;
+        let reader_threads = 2;
+        let ops_per_thread = 25;
+        let barrier = Arc::new(std::sync::Barrier::new(server_threads + durable_threads + reader_threads));
+
+        std::thread::scope(|scope| {
+            for t in 0..server_threads {
+                let db = db.clone();
+                let barrier = barrier.clone();
+                scope.spawn(move || {
+                    barrier.wait();
+                    for i in 0..ops_per_thread {
+                        let id = format!("ch-{t}-{i}");
+                        let name = format!("channel-{t}-{i}");
+                        db.run(async move |conn| {
+                            sqlx::raw_sql("BEGIN IMMEDIATE;").execute(&mut *conn).await?;
+                            let res = sqlx::query("INSERT INTO channel (id, type, is_default, name, created_at) VALUES (?1, 'channel', 0, ?2, ?3)")
+                                .bind(&id)
+                                .bind(&name)
+                                .bind((t * ops_per_thread + i) as i64)
+                                .execute(&mut *conn)
+                                .await;
+                            match res {
+                                Ok(_) => {
+                                    sqlx::raw_sql("COMMIT;").execute(&mut *conn).await?;
+                                    Ok(())
+                                }
+                                Err(err) => {
+                                    let _ = sqlx::raw_sql("ROLLBACK;").execute(&mut *conn).await;
+                                    Err(err)
+                                }
+                            }
+                        })
+                        .expect("ServerDb::run write must serialize cleanly without SQLITE_BUSY");
+                    }
+                });
+            }
+
+            for t in 0..durable_threads {
+                let durable = durable.clone();
+                let barrier = barrier.clone();
+                scope.spawn(move || {
+                    barrier.wait();
+                    for i in 0..ops_per_thread {
+                        let doc_id = format!("doc-{t}-{i}");
+                        let payload = serde_json::json!({ "thread": t, "iter": i });
+                        durable
+                            .write(|tx| {
+                                tx.put_document("stress", &doc_id, "item", &payload)?;
+                                Ok(())
+                            })
+                            .expect("durable.write must serialize cleanly without SQLITE_BUSY");
+                    }
+                });
+            }
+
+            for _ in 0..reader_threads {
+                let db = db.clone();
+                let durable = durable.clone();
+                let barrier = barrier.clone();
+                scope.spawn(move || {
+                    barrier.wait();
+                    for _ in 0..ops_per_thread {
+                        let _: i64 = db
+                            .read(async |conn| sqlx::query_scalar("SELECT COUNT(*) FROM channel").fetch_one(&mut *conn).await)
+                            .expect("concurrent ServerDb::read must succeed");
+                        let _ = durable
+                            .read(|r| r.documents_by_kind("stress", "item"))
+                            .expect("concurrent durable.read must succeed");
+                    }
+                });
+            }
+        });
+
+        let channel_count: i64 = db
+            .read(async |conn| sqlx::query_scalar("SELECT COUNT(*) FROM channel").fetch_one(&mut *conn).await)
+            .unwrap();
+        assert_eq!(channel_count, (server_threads * ops_per_thread) as i64);
+
+        let durable_docs = durable.read(|r| r.documents_by_kind("stress", "item")).unwrap();
+        assert_eq!(durable_docs.len(), durable_threads * ops_per_thread);
+
+        // Writer connection must be released immediately after durable writes finish.
+        let writer = db.acquire().expect("write_pool connection must not be starved by durable");
+        drop(writer);
+
+        db.close();
     }
 }

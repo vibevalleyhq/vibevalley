@@ -146,15 +146,44 @@ pub fn place_problem(bundle: &str, writable: bool) -> Option<Manual> {
     (!writable).then_some(Manual::ReadOnly)
 }
 
-pub fn plist_version(xml: &str) -> Option<&str> {
-    let key = if xml.contains("<key>VibeValleyVersion</key>") {
-        "<key>VibeValleyVersion</key>"
-    } else {
-        "<key>CFBundleShortVersionString</key>"
-    };
-    let rest = &xml[xml.find(key)? + key.len()..];
+pub const CHANNEL_BUNDLE_NAMES: &[&str] = &["VibeValley.app", "VibeValley-Alpha.app", "VibeValley-Beta.app", "VibeValley-Dev.app"];
+
+pub const CHANNEL_BUNDLE_IDS: &[&str] = &[
+    "dev.vibevalley.app",
+    "dev.vibevalley.app.alpha",
+    "dev.vibevalley.app.beta",
+    "dev.vibevalley.app.dev",
+];
+
+fn plist_string<'a>(xml: &'a str, key: &str) -> Option<&'a str> {
+    let tag = format!("<key>{key}</key>");
+    let rest = &xml[xml.find(&tag)? + tag.len()..];
     let rest = rest.trim_start().strip_prefix("<string>")?;
-    Some(&rest[..rest.find('<')?])
+    Some(rest[..rest.find('<')?].trim())
+}
+
+pub fn plist_version(xml: &str) -> Option<&str> {
+    plist_string(xml, "VibeValleyVersion").or_else(|| plist_string(xml, "CFBundleShortVersionString"))
+}
+
+pub fn plist_bundle_id(xml: &str) -> Option<&str> {
+    plist_string(xml, "CFBundleIdentifier").filter(|id| !id.is_empty())
+}
+
+pub fn is_channel_bundle_id(id: &str) -> bool {
+    CHANNEL_BUNDLE_IDS.contains(&id)
+}
+
+/// Validates that a downloaded update carries a known VibeValley channel bundle
+/// identifier, and matches the running bundle's identifier when known.
+pub fn valid_update_bundle_id(running_id: Option<&str>, next_id: Option<&str>) -> bool {
+    let Some(next) = next_id.filter(|id| is_channel_bundle_id(id)) else {
+        return false;
+    };
+    match running_id.filter(|id| !id.is_empty()) {
+        Some(running) => running == next,
+        None => true,
+    }
 }
 
 /// an ad-hoc signature (`TeamIdentifier=not set`) or none.
@@ -176,13 +205,29 @@ pub fn beside(feed: &str, file: &str) -> Option<String> {
     Some(format!("{}{file}", &feed[..=slash]))
 }
 
+fn archive_app_root(name: &str) -> Option<&'static str> {
+    CHANNEL_BUNDLE_NAMES
+        .iter()
+        .copied()
+        .find(|&bundle| name.strip_prefix(bundle).is_some_and(|rest| rest.starts_with('/')))
+}
+
 pub fn safe_archive(names: &str) -> bool {
+    let mut root: Option<&'static str> = None;
     !names.is_empty()
         && names.lines().all(|name| {
-            !name.starts_with('/')
-                && !name.split('/').any(|part| part == "..")
-                && (name == "VibeValley.app/" || name.starts_with("VibeValley.app/") || name.starts_with("__MACOSX/"))
+            if name.starts_with('/') || name.split('/').any(|part| part == "..") {
+                return false;
+            }
+            if name.starts_with("__MACOSX/") {
+                return true;
+            }
+            let Some(bundle) = archive_app_root(name) else {
+                return false;
+            };
+            *root.get_or_insert(bundle) == bundle
         })
+        && root.is_some()
 }
 
 #[cfg(test)]
@@ -192,10 +237,37 @@ mod tests {
     #[test]
     fn regression_archive_paths_stay_inside_the_app() {
         assert!(safe_archive("VibeValley.app/\nVibeValley.app/Contents/MacOS/VibeValley\n"));
+        for app in CHANNEL_BUNDLE_NAMES {
+            assert!(safe_archive(&format!("{app}/\n{app}/Contents/MacOS/VibeValley\n__MACOSX/._x\n")));
+        }
+        assert!(!safe_archive("VibeValley.app/\nVibeValley-Alpha.app/Contents/Info.plist\n"));
+        assert!(!safe_archive("VibeValley-Nightly.app/Contents/Info.plist\n"));
+        assert!(!safe_archive("VibeValley.app.evil/Contents/Info.plist\n"));
+        assert!(!safe_archive("__MACOSX/._only\n"));
         assert!(!safe_archive("VibeValley.app/../../outside\n"));
+        assert!(!safe_archive("VibeValley-Alpha.app/../../outside\n"));
         assert!(!safe_archive("/tmp/outside\n"));
         assert!(!safe_archive("../outside\n"));
         assert!(!safe_archive(""));
+    }
+
+    #[test]
+    fn bundle_identifiers_validate_all_channels_and_running_match() {
+        let compact = "<dict><key>CFBundleIdentifier</key><string>dev.vibevalley.app.alpha</string></dict>";
+        let indented = "<dict>\n\t<key>CFBundleIdentifier</key>\n\t<string>dev.vibevalley.app.beta</string>\n</dict>";
+        assert_eq!(plist_bundle_id(compact), Some("dev.vibevalley.app.alpha"));
+        assert_eq!(plist_bundle_id(indented), Some("dev.vibevalley.app.beta"));
+        assert_eq!(plist_bundle_id("<dict/>"), None);
+
+        for id in CHANNEL_BUNDLE_IDS {
+            assert!(is_channel_bundle_id(id));
+            assert!(valid_update_bundle_id(Some(id), Some(id)));
+            assert!(valid_update_bundle_id(None, Some(id)));
+        }
+        assert!(!valid_update_bundle_id(Some("dev.vibevalley.app.alpha"), Some("dev.vibevalley.app")));
+        assert!(!valid_update_bundle_id(Some("dev.vibevalley.app"), Some("dev.vibevalley.app.beta")));
+        assert!(!valid_update_bundle_id(None, Some("com.example.other")));
+        assert!(!valid_update_bundle_id(Some("dev.vibevalley.app"), None));
     }
 
     #[test]

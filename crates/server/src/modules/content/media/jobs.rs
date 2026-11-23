@@ -20,7 +20,7 @@ use parking_lot::{Mutex, MutexGuard};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::{Connection, SqliteConnection};
-use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tokio::sync::{Mutex as AsyncMutex, OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
@@ -536,9 +536,9 @@ pub struct Jobs {
     runs: Mutex<HashMap<String, Running>>,
     semaphores: KindSemaphores,
     /// One schedule at a time, so a waiting job starts once.
-    scheduling: Mutex<()>,
+    scheduling: AsyncMutex<()>,
     /// One cleanup at the vendor at a time.
-    pub(super) cleaning: Mutex<()>,
+    pub(super) cleaning: AsyncMutex<()>,
     pub(super) moss: Moss,
     download: Download,
     setting: Arc<Setting>,
@@ -561,8 +561,8 @@ impl Jobs {
             held: Mutex::default(),
             runs: Mutex::default(),
             semaphores: KindSemaphores::new(),
-            scheduling: Mutex::default(),
-            cleaning: Mutex::default(),
+            scheduling: AsyncMutex::new(()),
+            cleaning: AsyncMutex::new(()),
             moss: Moss { fetch: p.vendor },
             download: p.download,
             setting: p.setting,
@@ -576,12 +576,16 @@ impl Jobs {
             cancel,
         });
         let _ = jobs.me.set(Arc::downgrade(&jobs));
-        jobs.pick_up()?;
-        for r in jobs.recent()? {
+        let recent = vibevalley_runtime::rt::block_on(async {
+            jobs.pick_up_async().await?;
+            let recent = jobs.recent_async().await?;
+            jobs.publish_async().await;
+            jobs.schedule_async().await;
+            Ok::<_, ApiError>(recent)
+        })?;
+        for r in recent {
             jobs.post_back(&r);
         }
-        jobs.publish();
-        jobs.schedule();
         jobs.sweep_each_minute();
         Ok(jobs)
     }
@@ -598,7 +602,7 @@ impl Jobs {
                     _ = tokio::time::sleep(Duration::from_secs(60)) => {}
                 }
                 let Some(jobs) = me.upgrade() else { break };
-                let _ = tokio::task::spawn_blocking(move || jobs.expire_approvals()).await;
+                jobs.expire_approvals_async().await;
             }
         };
         if let Some(hub) = self.hub.upgrade() {
@@ -608,43 +612,54 @@ impl Jobs {
         }
     }
 
-    fn db(&self) -> Result<crate::base::DbConn, ApiError> {
-        self.db.acquire().map_err(storage)
-    }
-
     fn runs(&self) -> MutexGuard<'_, HashMap<String, Running>> {
         self.runs.lock()
     }
 
-    fn read(db: &mut SqliteConnection, id: &str) -> Result<Option<Record>, ApiError> {
-        match vibevalley_runtime::rt::block_on(q::get_job(db, q::GetJobParams { id: id.into() })) {
+    async fn read_db(db: &mut SqliteConnection, id: &str) -> Result<Option<Record>, ApiError> {
+        match q::get_job(db, q::GetJobParams { id: id.into() }).await {
             Ok(row) => serde_json::from_str(&row.data).map(Some).map_err(storage),
             Err(sqlx::Error::RowNotFound) => Ok(None),
             Err(error) => Err(storage(error)),
         }
     }
 
+    pub(super) async fn found_async(&self, id: &str) -> Result<Record, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(storage)?;
+        Self::read_db(&mut db, id).await?.ok_or_else(|| refused("missing"))
+    }
+
     pub(super) fn found(&self, id: &str) -> Result<Record, ApiError> {
-        let mut db = self.db()?;
-        Self::read(&mut db, id)?.ok_or_else(|| refused("missing"))
+        vibevalley_runtime::rt::block_on(self.found_async(id))
     }
 
-    pub(super) fn rows(&self, query: impl AsyncFnOnce(&mut SqliteConnection) -> sqlx::Result<Vec<q::GetJobRow>>) -> Result<Vec<Record>, ApiError> {
-        self.db
-            .run(query)
-            .map_err(storage)?
-            .into_iter()
-            .map(|row| serde_json::from_str(&row.data).map_err(storage))
-            .collect()
+    fn decode_rows(rows: Vec<q::GetJobRow>) -> Result<Vec<Record>, ApiError> {
+        rows.into_iter().map(|row| serde_json::from_str(&row.data).map_err(storage)).collect()
     }
 
-    fn recent(&self) -> Result<Vec<Record>, ApiError> {
-        self.rows(async |db| q::recent_jobs(db).await)
+    async fn recent_async(&self) -> Result<Vec<Record>, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(storage)?;
+        Self::decode_rows(q::recent_jobs(&mut *db).await.map_err(storage)?)
     }
 
-    fn save(db: &mut SqliteConnection, r: &mut Record) -> Result<(), ApiError> {
+    async fn waiting_jobs_async(&self) -> Result<Vec<Record>, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(storage)?;
+        Self::decode_rows(q::waiting_jobs(&mut *db).await.map_err(storage)?)
+    }
+
+    async fn active_jobs_async(&self) -> Result<Vec<Record>, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(storage)?;
+        Self::decode_rows(q::active_jobs(&mut *db).await.map_err(storage)?)
+    }
+
+    pub(super) async fn authorized_jobs_async(&self) -> Result<Vec<Record>, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(storage)?;
+        Self::decode_rows(q::authorized_jobs(&mut *db).await.map_err(storage)?)
+    }
+
+    async fn save_db(db: &mut SqliteConnection, r: &mut Record) -> Result<(), ApiError> {
         r.updated_at = now();
-        vibevalley_runtime::rt::block_on(q::save_job(
+        q::save_job(
             db,
             q::SaveJobParams {
                 id: r.id().into(),
@@ -654,12 +669,13 @@ impl Jobs {
                 created_at: r.created_at,
                 updated_at: r.updated_at,
             },
-        ))
+        )
+        .await
         .map_err(storage)
     }
 
-    fn require_capacity(db: &mut SqliteConnection) -> Result<(), ApiError> {
-        let count = vibevalley_runtime::rt::block_on(q::active_count(db)).map_err(storage)?.total;
+    async fn require_capacity_db(db: &mut SqliteConnection) -> Result<(), ApiError> {
+        let count = q::active_count(db).await.map_err(storage)?.total;
         if count >= ADMITTED {
             return Err(refused("busy"));
         }
@@ -667,8 +683,8 @@ impl Jobs {
     }
 
     /// Tells the state of every job now (`mediaChanged`).
-    fn publish(&self) {
-        match self.recent() {
+    async fn publish_async(&self) {
+        match self.recent_async().await {
             Ok(jobs) => {
                 if let Some(hub) = self.hub.upgrade() {
                     let jobs = jobs.iter().map(Record::view).collect();
@@ -680,30 +696,38 @@ impl Jobs {
     }
 
     /// The job moves only from one of `before`, and not once the machine closed; false when it had moved on.
-    pub(super) fn change(&self, id: &str, before: &[Phase], patch: impl FnOnce(&mut Record)) -> Result<bool, ApiError> {
+    pub(super) async fn change_async(&self, id: &str, before: &[Phase], patch: impl FnOnce(&mut Record)) -> Result<bool, ApiError> {
         if self.closed.load(Ordering::SeqCst) {
             return Ok(false);
         }
         {
-            let mut db = self.db()?;
-            let mut tx = vibevalley_runtime::rt::block_on(db.begin_with("BEGIN IMMEDIATE")).map_err(storage)?;
-            let Some(mut r) = Self::read(&mut tx, id)? else { return Ok(false) };
+            let mut db = self.db.write_pool().acquire().await.map_err(storage)?;
+            let mut tx = db.begin_with("BEGIN IMMEDIATE").await.map_err(storage)?;
+            let Some(mut r) = Self::read_db(&mut tx, id).await? else { return Ok(false) };
             if !before.contains(&r.phase) {
                 return Ok(false);
             }
             let was_active = active(r.phase);
             patch(&mut r);
             if !was_active && active(r.phase) {
-                Self::require_capacity(&mut tx)?;
+                Self::require_capacity_db(&mut tx).await?;
             }
-            Self::save(&mut tx, &mut r)?;
-            vibevalley_runtime::rt::block_on(tx.commit()).map_err(storage)?;
+            Self::save_db(&mut tx, &mut r).await?;
+            tx.commit().await.map_err(storage)?;
         }
-        self.publish();
+        self.publish_async().await;
         Ok(true)
     }
 
+    pub(super) fn change(&self, id: &str, before: &[Phase], patch: impl FnOnce(&mut Record)) -> Result<bool, ApiError> {
+        vibevalley_runtime::rt::block_on(self.change_async(id, before, patch))
+    }
+
     /// Something about the job written down, wherever it is.
+    pub(super) async fn note_async(&self, id: &str, patch: impl FnOnce(&mut Record)) -> Result<bool, ApiError> {
+        self.change_async(id, &Phase::ALL, patch).await
+    }
+
     pub(super) fn note(&self, id: &str, patch: impl FnOnce(&mut Record)) -> Result<bool, ApiError> {
         self.change(id, &Phase::ALL, patch)
     }
@@ -716,42 +740,42 @@ impl Jobs {
     }
 
     /// The job already under this ask's id, refused when it was asked otherwise.
-    pub(super) fn known(&self, ask: &Ask, alike: impl FnOnce(&Record) -> bool) -> Result<Option<Record>, ApiError> {
-        let mut db = self.db()?;
-        match Self::read(&mut db, ask.id())? {
+    pub(super) async fn known_async(&self, ask: &Ask, alike: impl FnOnce(&Record) -> bool) -> Result<Option<Record>, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(storage)?;
+        match Self::read_db(&mut db, ask.id()).await? {
             Some(old) if old.ask != *ask || !alike(&old) => Err(refused("reusedId")),
             old => Ok(old),
         }
     }
 
     /// A new job admitted under its id once: the same ask again is the job it made.
-    pub(super) fn admit(&self, mut r: Record, held: Option<Held>) -> Result<Record, ApiError> {
+    pub(super) async fn admit_async(&self, mut r: Record, held: Option<Held>) -> Result<Record, ApiError> {
         self.open_for_work()?;
         {
             // Another worker may scan queued jobs as soon as the transaction commits.
-            let _schedule = self.scheduling.lock();
-            let mut db = self.db()?;
-            let mut tx = vibevalley_runtime::rt::block_on(db.begin_with("BEGIN IMMEDIATE")).map_err(storage)?;
-            if let Some(old) = Self::read(&mut tx, r.id())? {
+            let _schedule = self.scheduling.lock().await;
+            let mut db = self.db.write_pool().acquire().await.map_err(storage)?;
+            let mut tx = db.begin_with("BEGIN IMMEDIATE").await.map_err(storage)?;
+            if let Some(old) = Self::read_db(&mut tx, r.id()).await? {
                 if old.ask != r.ask || old.source != r.source || old.authorization.as_ref().map(|a| &a.channel) != r.authorization.as_ref().map(|a| &a.channel)
                 {
                     return Err(refused("reusedId"));
                 }
                 return Ok(old);
             }
-            Self::require_capacity(&mut tx)?;
+            Self::require_capacity_db(&mut tx).await?;
             let ids: Vec<_> = r.input.iter().chain(&r.inputs).map(|input| input.id.clone()).collect();
             if !ids.is_empty() {
-                self.inputs.pin_in(&mut tx, &ids, r.id())?;
+                self.inputs.pin_in_async(&mut tx, &ids, r.id()).await?;
             }
-            Self::save(&mut tx, &mut r)?;
-            vibevalley_runtime::rt::block_on(tx.commit()).map_err(storage)?;
+            Self::save_db(&mut tx, &mut r).await?;
+            tx.commit().await.map_err(storage)?;
             if let Some(held) = held {
                 self.hold(r.id(), held);
             }
         }
-        self.publish();
-        self.schedule();
+        self.publish_async().await;
+        self.schedule_async().await;
         Ok(r)
     }
 
@@ -760,7 +784,7 @@ impl Jobs {
     }
 
     /// An image; orchestrators must have the user's word first (their tool checks it).
-    pub fn image(&self, request: MediaImageRequest, source: MediaSource) -> Result<MediaImageJob, ApiError> {
+    pub async fn image_async(&self, request: MediaImageRequest, source: MediaSource) -> Result<MediaImageJob, ApiError> {
         Moss::validate_image_request(&request).map_err(|_| refused("invalid"))?;
         if let MediaSource::Orchestrator { agent, channel } = &source
             && (agent.is_empty() || channel.is_empty())
@@ -769,10 +793,7 @@ impl Jobs {
         }
         self.open_for_work()?;
         let ask = Ask::Image(request);
-        if let Some(old) = Self::read(&mut *self.db()?, ask.id())? {
-            if old.ask != ask || old.source != source {
-                return Err(refused("reusedId"));
-            }
+        if let Some(old) = self.known_async(&ask, |old| old.source == source).await? {
             return Ok(image_view(&old));
         }
         let Ask::Image(request) = &ask else { unreachable!() };
@@ -789,7 +810,11 @@ impl Jobs {
             account.model.clone(),
             account.fingerprint.clone(),
         );
-        self.admit(r, Some(Held::Image { account, body })).map(|r| image_view(&r))
+        self.admit_async(r, Some(Held::Image { account, body })).await.map(|r| image_view(&r))
+    }
+
+    pub fn image(&self, request: MediaImageRequest, source: MediaSource) -> Result<MediaImageJob, ApiError> {
+        vibevalley_runtime::rt::block_on(self.image_async(request, source))
     }
 
     /// The account `u` is bound to in the settings now.
@@ -825,7 +850,7 @@ impl Jobs {
             .ok_or_else(|| refused(r.ask.words().account_changed))
     }
 
-    pub fn speech(&self, request: MediaSpeechRequest, source: MediaSource) -> Result<MediaSpeechJob, ApiError> {
+    pub async fn speech_async(&self, request: MediaSpeechRequest, source: MediaSource) -> Result<MediaSpeechJob, ApiError> {
         self.open_for_work()?;
         let streaming = request.streaming == Some(true);
         if streaming && (!matches!(source, MediaSource::User {}) || request.asynchronous == Some(true) || request.format != MediaAudioFormat::Pcm) {
@@ -835,10 +860,7 @@ impl Jobs {
             return Err(refused("speechInvalid"));
         }
         let ask = Ask::Speech(request.clone());
-        if let Some(old) = Self::read(&mut *self.db()?, &request.id)? {
-            if old.ask != ask || old.source != source {
-                return Err(refused("reusedId"));
-            }
+        if let Some(old) = self.known_async(&ask, |old| old.source == source).await? {
             return Ok(speech_view(&old));
         }
         let account = self.bound(Use::Speech)?;
@@ -858,17 +880,21 @@ impl Jobs {
             account.model.clone(),
             account.fingerprint.clone(),
         );
-        self.admit(r, Some(Held::Speech { account, body })).map(|r| speech_view(&r))
+        self.admit_async(r, Some(Held::Speech { account, body })).await.map(|r| speech_view(&r))
+    }
+
+    pub fn speech(&self, request: MediaSpeechRequest, source: MediaSource) -> Result<MediaSpeechJob, ApiError> {
+        vibevalley_runtime::rt::block_on(self.speech_async(request, source))
     }
 
     /// Starts what can run now: each kind's oldest waiting job while the kind has a free slot.
-    pub(super) fn schedule(&self) {
+    pub(super) async fn schedule_async(&self) {
         if self.closed.load(Ordering::SeqCst) {
             return;
         }
         let Some(me) = self.me.get().and_then(Weak::upgrade) else { return };
-        let _one = self.scheduling.lock();
-        let waiting = match self.rows(async |db| q::waiting_jobs(db).await) {
+        let _one = self.scheduling.lock().await;
+        let waiting = match self.waiting_jobs_async().await {
             Ok(w) => w,
             Err(e) => return eprintln!("media: {}", e.message),
         };
@@ -904,7 +930,7 @@ impl Jobs {
                         runs.remove(&id);
                     }
                 }
-                work.schedule();
+                vibevalley_runtime::rt::block_on(work.schedule_async());
             };
             if let Some(hub) = self.hub.upgrade() {
                 hub.spawn_blocking_task(run_job);
@@ -922,16 +948,16 @@ impl Jobs {
             Phase::Generating if r.remote_task.is_some() => self.poll(id, stop),
             _ => {}
         }
-        self.settle(id);
+        vibevalley_runtime::rt::block_on(self.settle_async(id));
     }
 
     /// After a run or a cancel, an audio job lets go of what it sent to the vendor.
-    fn settle(&self, id: &str) {
+    async fn settle_async(&self, id: &str) {
         if self.closed.load(Ordering::SeqCst) {
             return;
         }
-        if self.found(id).is_ok_and(|r| r.ask.is_audio()) {
-            self.tidy_audio(id);
+        if self.found_async(id).await.is_ok_and(|r| r.ask.is_audio()) {
+            self.tidy_audio_async(id).await;
         }
     }
 
@@ -1450,28 +1476,30 @@ impl Jobs {
 
     /// Jobs a restart left: a known vendor task is asked again (never a stream), a download fetched again, the rest
     /// given up. What never started lets go of its inputs; an upload cut short may or may not be at the vendor.
-    fn pick_up(&self) -> Result<(), ApiError> {
-        for r in self.rows(async |db| q::active_jobs(db).await)? {
+    async fn pick_up_async(&self) -> Result<(), ApiError> {
+        for r in self.active_jobs_async().await? {
             let id = r.id();
-            self.note(id, |r| {
+            self.note_async(id, |r| {
                 for file in r.remote.iter_mut().filter(|f| f.state == RemoteState::Uploading) {
                     file.state = RemoteState::Unknown;
                 }
-            })?;
+            })
+            .await?;
             match (r.phase, &r.remote_task) {
                 (Phase::Downloading, _) => {}
                 (Phase::Generating, Some(_)) if !r.ask.streamed() => {}
                 (phase, _) => {
                     let unsent = matches!(phase, Phase::Queued | Phase::Authorized);
-                    self.change(id, &[phase], |r| {
+                    self.change_async(id, &[phase], |r| {
                         r.phase = if unsent { Phase::Canceled } else { Phase::Unknown };
                         r.problem = t("server.media.restarted", &[]);
                         if unsent && r.cleanup.is_some() {
                             r.cleanup = Some(MediaCleanup::Done);
                         }
-                    })?;
+                    })
+                    .await?;
                     if unsent {
-                        self.inputs.release(id)?;
+                        self.inputs.release_async(id).await?;
                     }
                 }
             }
@@ -1479,12 +1507,12 @@ impl Jobs {
         Ok(())
     }
 
-    pub fn list(&self) -> Result<Vec<MediaJob>, ApiError> {
-        Ok(self.recent()?.iter().map(Record::view).collect())
+    pub async fn list_async(&self) -> Result<Vec<MediaJob>, ApiError> {
+        Ok(self.recent_async().await?.iter().map(Record::view).collect())
     }
 
-    pub fn get(&self, id: &str) -> Result<MediaJob, ApiError> {
-        Ok(self.found(id)?.view())
+    pub async fn get_async(&self, id: &str) -> Result<MediaJob, ApiError> {
+        Ok(self.found_async(id).await?.view())
     }
 
     fn stop_run(&self, id: &str) {
@@ -1493,48 +1521,51 @@ impl Jobs {
         }
     }
 
-    pub fn cancel(&self, id: &str) -> Result<MediaJob, ApiError> {
-        let r = self.found(id)?;
+    pub async fn cancel_async(&self, id: &str) -> Result<MediaJob, ApiError> {
+        let r = self.found_async(id).await?;
         if active(r.phase) {
             // Understanding that sent nothing has nothing to clean and no use for its inputs.
             let unsent = matches!(r.ask, Ask::Understanding(_)) && matches!(r.phase, Phase::Authorized | Phase::Queued);
-            let moved = self.change(id, &[r.phase], |r| {
-                r.phase = Phase::Canceled;
-                r.problem = t("server.media.canceled", &[]);
-                if unsent {
-                    r.cleanup = Some(MediaCleanup::Done);
-                }
-            })?;
+            let moved = self
+                .change_async(id, &[r.phase], |r| {
+                    r.phase = Phase::Canceled;
+                    r.problem = t("server.media.canceled", &[]);
+                    if unsent {
+                        r.cleanup = Some(MediaCleanup::Done);
+                    }
+                })
+                .await?;
             if moved && unsent {
-                self.inputs.release(id)?;
+                self.inputs.release_async(id).await?;
             }
             self.held.lock().remove(id);
             self.stop_run(id);
-            self.schedule();
-            self.settle(id);
+            self.schedule_async().await;
+            self.settle_async(id).await;
         }
-        self.get(id)
+        self.get_async(id).await
     }
 
-    pub fn retry_download(&self, id: &str) -> Result<MediaJob, ApiError> {
+    pub async fn retry_download_async(&self, id: &str) -> Result<MediaJob, ApiError> {
         self.open_for_work()?;
-        let r = self.found(id)?;
+        let r = self.found_async(id).await?;
         if matches!(r.phase, Phase::Ready | Phase::Downloading) {
             return Ok(r.view());
         }
         if !r.can_retry_download() {
             return Err(refused("noDownload"));
         }
-        self.change(id, &[r.phase], |r| {
+        self.change_async(id, &[r.phase], |r| {
             r.phase = Phase::Downloading;
             r.problem.clear();
-        })?;
-        self.schedule();
-        self.get(id)
+        })
+        .await?;
+        self.schedule_async().await;
+        self.get_async(id).await
     }
 
     /// `resume`: only the known vendor task is asked again, never a new one.
-    pub(super) fn resumed(&self, r: Record) -> Result<Record, ApiError> {
+    pub(super) async fn resumed_async(&self, r: Record) -> Result<Record, ApiError> {
         if r.phase == Phase::Ready || active(r.phase) {
             return Ok(r);
         }
@@ -1545,27 +1576,28 @@ impl Jobs {
         // Hold `scheduling` across the transition and snapshot so a finishing worker cannot
         // pick up the resumed job before the caller observes `Generating`.
         let updated = {
-            let _schedule = self.scheduling.lock();
-            self.change(r.id(), &[r.phase], |r| {
+            let _schedule = self.scheduling.lock().await;
+            self.change_async(r.id(), &[r.phase], |r| {
                 r.phase = Phase::Generating;
                 r.problem.clear();
-            })?;
-            self.found(r.id())?
+            })
+            .await?;
+            self.found_async(r.id()).await?
         };
-        self.schedule();
+        self.schedule_async().await;
         Ok(updated)
     }
 
-    pub fn resume(&self, id: &str) -> Result<MediaSpeechJob, ApiError> {
-        let r = self.found(id)?;
+    pub async fn resume_async(&self, id: &str) -> Result<MediaSpeechJob, ApiError> {
+        let r = self.found_async(id).await?;
         if !matches!(r.ask, Ask::Speech(_)) {
             return Err(refused("missing"));
         }
-        Ok(speech_view(&self.resumed(r)?))
+        Ok(speech_view(&self.resumed_async(r).await?))
     }
 
-    pub fn preview_release(&self, id: &str) -> Result<Preview, ApiError> {
-        let r = self.found(id)?;
+    pub async fn preview_release_async(&self, id: &str) -> Result<Preview, ApiError> {
+        let r = self.found_async(id).await?;
         if active(r.phase) || !r.releasable() {
             return Err(refused("releaseUnavailable"));
         }
@@ -1582,26 +1614,27 @@ impl Jobs {
     }
 
     /// The job's kept result let go; the job itself stays.
-    pub fn release(&self, id: &str) -> Result<MediaJob, ApiError> {
-        let r = self.found(id)?;
+    pub async fn release_async(&self, id: &str) -> Result<MediaJob, ApiError> {
+        let r = self.found_async(id).await?;
         if active(r.phase) || !r.releasable() {
             return Err(refused("releaseUnavailable"));
         }
         if !r.released {
-            self.inputs.release(id)?;
+            self.inputs.release_async(id).await?;
             // The inputs the job made for itself go; the one the user gave stays theirs.
             for input in r.result_input.iter().map(|i| &i.id).chain(&r.preview_input) {
-                let _ = self.inputs.delete(input);
+                let _ = self.inputs.delete_async(input).await;
             }
-            self.change(id, &[r.phase], |r| {
+            self.change_async(id, &[r.phase], |r| {
                 r.released = true;
                 r.attachment = None;
                 r.result_input = None;
                 r.preview_input = None;
                 r.url = None;
-            })?;
+            })
+            .await?;
         }
-        self.get(id)
+        self.get_async(id).await
     }
 
     /// Stops every run; what was running is picked up at the next start.
@@ -1643,63 +1676,126 @@ fn speech_view(r: &Record) -> MediaSpeechJob {
 pub fn install(hub: &Hub, jobs: Arc<Jobs>) {
     let user_only = |caller: Caller| if caller == Caller::User { Ok(()) } else { Err(refused("userRequired")) };
     let j = jobs.clone();
-    hub.on::<ops::MediaImageCreate>(move |ctx, r| {
-        user_only(ctx.caller)?;
-        j.image(r, MediaSource::User {})
-    });
-    let j = jobs.clone();
-    hub.on::<ops::MediaSpeechCreate>(move |ctx, r| {
-        user_only(ctx.caller)?;
-        j.speech(r, MediaSource::User {})
-    });
-    let j = jobs.clone();
-    hub.on::<ops::MediaSpeechResume>(move |_, r| j.resume(&r.id));
-    let j = jobs.clone();
-    hub.on::<ops::MediaDialogueCreate>(move |ctx, r| {
-        user_only(ctx.caller)?;
-        j.speakers(r, MediaSource::User {})
-    });
-    let j = jobs.clone();
-    hub.on::<ops::MediaVoiceDesignCreate>(move |ctx, r| {
-        user_only(ctx.caller)?;
-        j.voice_design(r, MediaSource::User {})
-    });
-    let j = jobs.clone();
-    hub.on::<ops::MediaCloneCreate>(move |_, r| j.clone_voice(r));
-    let j = jobs.clone();
-    hub.on::<ops::MediaTranscriptionCreate>(move |_, r| j.transcription(r));
-    let j = jobs.clone();
-    hub.on::<ops::MediaAudioResume>(move |_, r| j.audio_resume(&r.id));
-    let j = jobs.clone();
-    hub.on::<ops::MediaAudioPreviewCleanup>(move |_, r| j.preview_audio_cleanup(&r.id));
-    let j = jobs.clone();
-    hub.on::<ops::MediaAudioCleanup>(move |_, r| j.audio_cleanup(&r.id));
-    let j = jobs.clone();
-    hub.on::<ops::MediaUnderstandingCreate>(move |_, r| j.understanding(r));
-    let j = jobs.clone();
-    hub.on::<ops::MediaUnderstandingAuthorize>(move |_, r| j.authorize_understanding(r));
-    let j = jobs.clone();
-    hub.on::<ops::MediaUnderstandingStart>(move |ctx, r| {
-        if ctx.caller != Caller::Orchestrator {
-            return Err(refused("authorizationRequired"));
+    hub.on_async::<ops::MediaImageCreate, _, _>(move |ctx, r| {
+        let j = j.clone();
+        async move {
+            user_only(ctx.caller)?;
+            j.image_async(r, MediaSource::User {}).await
         }
-        j.start_understanding_by_id(&r.id)
     });
     let j = jobs.clone();
-    hub.on::<ops::MediaUnderstandingPreviewCleanup>(move |_, r| j.preview_understanding_cleanup(&r.id));
+    hub.on_async::<ops::MediaSpeechCreate, _, _>(move |ctx, r| {
+        let j = j.clone();
+        async move {
+            user_only(ctx.caller)?;
+            j.speech_async(r, MediaSource::User {}).await
+        }
+    });
     let j = jobs.clone();
-    hub.on::<ops::MediaUnderstandingCleanup>(move |_, r| j.understanding_cleanup(&r.id));
+    hub.on_async::<ops::MediaSpeechResume, _, _>(move |_, r| {
+        let j = j.clone();
+        async move { j.resume_async(&r.id).await }
+    });
     let j = jobs.clone();
-    hub.on::<ops::MediaJobList>(move |_, _| j.list());
+    hub.on_async::<ops::MediaDialogueCreate, _, _>(move |ctx, r| {
+        let j = j.clone();
+        async move {
+            user_only(ctx.caller)?;
+            j.speakers_async(r, MediaSource::User {}).await
+        }
+    });
     let j = jobs.clone();
-    hub.on::<ops::MediaJobGet>(move |_, r| j.get(&r.id));
+    hub.on_async::<ops::MediaVoiceDesignCreate, _, _>(move |ctx, r| {
+        let j = j.clone();
+        async move {
+            user_only(ctx.caller)?;
+            j.voice_design_async(r, MediaSource::User {}).await
+        }
+    });
     let j = jobs.clone();
-    hub.on::<ops::MediaJobCancel>(move |_, r| j.cancel(&r.id));
+    hub.on_async::<ops::MediaCloneCreate, _, _>(move |_, r| {
+        let j = j.clone();
+        async move { j.clone_voice_async(r).await }
+    });
     let j = jobs.clone();
-    hub.on::<ops::MediaJobDownload>(move |_, r| j.retry_download(&r.id));
+    hub.on_async::<ops::MediaTranscriptionCreate, _, _>(move |_, r| {
+        let j = j.clone();
+        async move { j.transcription_async(r).await }
+    });
     let j = jobs.clone();
-    hub.on::<ops::MediaJobPreviewRelease>(move |_, r| j.preview_release(&r.id));
-    hub.on::<ops::MediaJobRelease>(move |_, r| jobs.release(&r.id));
+    hub.on_async::<ops::MediaAudioResume, _, _>(move |_, r| {
+        let j = j.clone();
+        async move { j.audio_resume_async(&r.id).await }
+    });
+    let j = jobs.clone();
+    hub.on_async::<ops::MediaAudioPreviewCleanup, _, _>(move |_, r| {
+        let j = j.clone();
+        async move { j.preview_audio_cleanup_async(&r.id).await }
+    });
+    let j = jobs.clone();
+    hub.on_async::<ops::MediaAudioCleanup, _, _>(move |_, r| {
+        let j = j.clone();
+        async move { j.audio_cleanup_async(&r.id).await }
+    });
+    let j = jobs.clone();
+    hub.on_async::<ops::MediaUnderstandingCreate, _, _>(move |_, r| {
+        let j = j.clone();
+        async move { j.understanding_async(r).await }
+    });
+    let j = jobs.clone();
+    hub.on_async::<ops::MediaUnderstandingAuthorize, _, _>(move |_, r| {
+        let j = j.clone();
+        async move { j.authorize_understanding_async(r).await }
+    });
+    let j = jobs.clone();
+    hub.on_async::<ops::MediaUnderstandingStart, _, _>(move |ctx, r| {
+        let j = j.clone();
+        async move {
+            if ctx.caller != Caller::Orchestrator {
+                return Err(refused("authorizationRequired"));
+            }
+            j.start_understanding_by_id_async(&r.id).await
+        }
+    });
+    let j = jobs.clone();
+    hub.on_async::<ops::MediaUnderstandingPreviewCleanup, _, _>(move |_, r| {
+        let j = j.clone();
+        async move { j.preview_understanding_cleanup_async(&r.id).await }
+    });
+    let j = jobs.clone();
+    hub.on_async::<ops::MediaUnderstandingCleanup, _, _>(move |_, r| {
+        let j = j.clone();
+        async move { j.understanding_cleanup_async(&r.id).await }
+    });
+    let j = jobs.clone();
+    hub.on_async::<ops::MediaJobList, _, _>(move |_, _| {
+        let j = j.clone();
+        async move { j.list_async().await }
+    });
+    let j = jobs.clone();
+    hub.on_async::<ops::MediaJobGet, _, _>(move |_, r| {
+        let j = j.clone();
+        async move { j.get_async(&r.id).await }
+    });
+    let j = jobs.clone();
+    hub.on_async::<ops::MediaJobCancel, _, _>(move |_, r| {
+        let j = j.clone();
+        async move { j.cancel_async(&r.id).await }
+    });
+    let j = jobs.clone();
+    hub.on_async::<ops::MediaJobDownload, _, _>(move |_, r| {
+        let j = j.clone();
+        async move { j.retry_download_async(&r.id).await }
+    });
+    let j = jobs.clone();
+    hub.on_async::<ops::MediaJobPreviewRelease, _, _>(move |_, r| {
+        let j = j.clone();
+        async move { j.preview_release_async(&r.id).await }
+    });
+    hub.on_async::<ops::MediaJobRelease, _, _>(move |_, r| {
+        let jobs = jobs.clone();
+        async move { jobs.release_async(&r.id).await }
+    });
 }
 
 impl crate::transport::api::media::SpeechStreams for Jobs {

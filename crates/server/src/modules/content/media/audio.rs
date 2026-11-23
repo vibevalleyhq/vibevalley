@@ -103,24 +103,32 @@ fn shown(r: &Record) -> Result<MediaAudioJob, ApiError> {
 }
 
 impl Jobs {
+    pub async fn speakers_async(&self, request: MediaSpeakersRequest, source: MediaSource) -> Result<MediaAudioJob, ApiError> {
+        self.audio_async(Ask::Speakers(request), source).await
+    }
+
     pub fn speakers(&self, request: MediaSpeakersRequest, source: MediaSource) -> Result<MediaAudioJob, ApiError> {
-        self.audio(Ask::Speakers(request), source)
+        vibevalley_runtime::rt::block_on(self.speakers_async(request, source))
+    }
+
+    pub async fn voice_design_async(&self, request: MediaVoiceDesignRequest, source: MediaSource) -> Result<MediaAudioJob, ApiError> {
+        self.audio_async(Ask::VoiceDesign(request), source).await
     }
 
     pub fn voice_design(&self, request: MediaVoiceDesignRequest, source: MediaSource) -> Result<MediaAudioJob, ApiError> {
-        self.audio(Ask::VoiceDesign(request), source)
+        vibevalley_runtime::rt::block_on(self.voice_design_async(request, source))
     }
 
     /// A voice cloned from the user's sample: only the user can say whose voice it is.
-    pub fn clone_voice(&self, request: MediaCloneRequest) -> Result<MediaAudioJob, ApiError> {
-        self.audio(Ask::Clone(request), MediaSource::User {})
+    pub async fn clone_voice_async(&self, request: MediaCloneRequest) -> Result<MediaAudioJob, ApiError> {
+        self.audio_async(Ask::Clone(request), MediaSource::User {}).await
     }
 
-    pub fn transcription(&self, request: MediaTranscriptionRequest) -> Result<MediaAudioJob, ApiError> {
-        self.audio(Ask::Transcription(request), MediaSource::User {})
+    pub async fn transcription_async(&self, request: MediaTranscriptionRequest) -> Result<MediaAudioJob, ApiError> {
+        self.audio_async(Ask::Transcription(request), MediaSource::User {}).await
     }
 
-    fn audio(&self, ask: Ask, source: MediaSource) -> Result<MediaAudioJob, ApiError> {
+    async fn audio_async(&self, ask: Ask, source: MediaSource) -> Result<MediaAudioJob, ApiError> {
         self.open_for_work()?;
         if !id_ok(ask.id()) {
             return Err(invalid());
@@ -130,7 +138,7 @@ impl Jobs {
         {
             return Err(invalid());
         }
-        if let Some(old) = self.known(&ask, |old| old.source == source)? {
+        if let Some(old) = self.known_async(&ask, |old| old.source == source).await? {
             return shown(&old);
         }
         let changed = || refused("audioAccountChanged");
@@ -158,12 +166,12 @@ impl Jobs {
                 if q.name.as_ref().is_some_and(|n| !(1..=1000).contains(&n.chars().count())) {
                     return Err(invalid());
                 }
-                let input = self.audio_input(&q.input)?;
-                self.sample(&input)?;
+                let input = self.audio_input_async(&q.input).await?;
+                self.sample_async(&input).await?;
                 Some(input)
             }
             Ask::Transcription(q) => {
-                let input = self.audio_input(&q.input)?;
+                let input = self.audio_input_async(&q.input).await?;
                 let body = transcription_body(model, "file", q).map_err(|_| invalid())?;
                 if q.streaming == Some(true) && !Moss::streams_transcripts(&body) {
                     return Err(invalid());
@@ -181,12 +189,12 @@ impl Jobs {
             account.fingerprint.clone(),
         );
         r.input = input;
-        shown(&self.admit(r, Some(Held::Account(account)))?)
+        shown(&self.admit_async(r, Some(Held::Account(account))).await?)
     }
 
     /// The user's audio input, ready to be read.
-    fn audio_input(&self, id: &str) -> Result<MediaInputReference, ApiError> {
-        let input = self.inputs.get(id).map_err(|_| invalid())?;
+    async fn audio_input_async(&self, id: &str) -> Result<MediaInputReference, ApiError> {
+        let input = self.inputs.get_async(id).await.map_err(|_| invalid())?;
         match (input.kind, input.phase, input.hash) {
             (MediaInputKind::Audio, MediaInputPhase::Ready, Some(hash)) => Ok(MediaInputReference {
                 id: input.id,
@@ -201,6 +209,24 @@ impl Jobs {
     }
 
     /// A sample a voice can be cloned from: its bytes and the name to send them under.
+    async fn sample_async(&self, input: &MediaInputReference) -> Result<(Vec<u8>, String), ApiError> {
+        let format = sample_format(&input.mime).filter(|_| input.size <= SAMPLE_MAX).ok_or_else(invalid)?;
+        let content = self.inputs.content_async(&input.id).await.map_err(|_| invalid())?;
+        let mime = input.mime.clone();
+        let path = content.path;
+        let bytes = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ApiError> {
+            let bytes = std::fs::read(&path).map_err(|_| invalid())?;
+            let facts = super::validate::audio_facts(bytes.clone(), &mime).map_err(|_| invalid())?;
+            if facts.seconds > SAMPLE_SECONDS {
+                return Err(invalid());
+            }
+            Ok(bytes)
+        })
+        .await
+        .map_err(|_| invalid())??;
+        Ok((bytes, format!("sample.{format}")))
+    }
+
     fn sample(&self, input: &MediaInputReference) -> Result<(Vec<u8>, String), ApiError> {
         let format = sample_format(&input.mime).filter(|_| input.size <= SAMPLE_MAX).ok_or_else(invalid)?;
         let content = self.inputs.content(&input.id).map_err(|_| invalid())?;
@@ -342,20 +368,24 @@ impl Jobs {
 
     /// An ended audio job lets go of what it sent to the vendor, and of the input it made nothing of; a result keeps
     /// its source until the user releases the job. A cleanup that fails is said on the job and can be asked again.
-    pub(super) fn tidy_audio(&self, id: &str) {
-        let _one = self.cleaning.lock();
-        let Ok(r) = self.found(id) else { return };
+    pub(super) async fn tidy_audio_async(&self, id: &str) {
+        let _one = self.cleaning.lock().await;
+        let Ok(r) = self.found_async(id).await else { return };
         let ended = matches!(r.phase, Phase::Ready | Phase::Failed) || (r.phase == Phase::Canceled && r.remote_task.is_none());
         if !ended || r.remote.iter().any(|f| f.unresolved()) {
             return;
         }
         let pending = t("server.media.audioCleanupPending", &[]);
-        let cleaned = self.remove_remote(id).and_then(|()| {
-            if r.input.is_some() && r.made.is_none() {
-                self.inputs.release(id)?;
+        let cleaned = match self.remove_remote_async(id).await {
+            Ok(()) => {
+                if r.input.is_some() && r.made.is_none() {
+                    self.inputs.release_async(id).await
+                } else {
+                    Ok(())
+                }
             }
-            Ok(())
-        });
+            Err(e) => Err(e),
+        };
         let said = match cleaned {
             Ok(()) if r.problem == pending => String::new(),
             Ok(()) => return,
@@ -364,31 +394,34 @@ impl Jobs {
                 pending
             }
         };
-        if let Err(e) = self.change(id, &[Phase::Ready, Phase::Failed, Phase::Canceled], |r| r.problem = said) {
+        if let Err(e) = self
+            .change_async(id, &[Phase::Ready, Phase::Failed, Phase::Canceled], |r| r.problem = said)
+            .await
+        {
             eprintln!("media {id}: {}", e.message);
         }
     }
 
-    fn audio_job(&self, id: &str) -> Result<Record, ApiError> {
-        self.found(id).ok().filter(|r| r.ask.is_audio()).ok_or_else(|| refused("missing"))
+    async fn audio_job_async(&self, id: &str) -> Result<Record, ApiError> {
+        self.found_async(id).await.ok().filter(|r| r.ask.is_audio()).ok_or_else(|| refused("missing"))
     }
 
     /// `media.audio.resume`: the known vendor task asked again.
-    pub fn audio_resume(&self, id: &str) -> Result<MediaAudioJob, ApiError> {
-        shown(&self.resumed(self.audio_job(id)?)?)
+    pub async fn audio_resume_async(&self, id: &str) -> Result<MediaAudioJob, ApiError> {
+        shown(&self.resumed_async(self.audio_job_async(id).await?).await?)
     }
 
     /// The ended job whose vendor files a cleanup would delete.
-    fn cleanable_audio(&self, id: &str) -> Result<Record, ApiError> {
-        let r = self.audio_job(id)?;
+    async fn cleanable_audio_async(&self, id: &str) -> Result<Record, ApiError> {
+        let r = self.audio_job_async(id).await?;
         if !matches!(r.phase, Phase::Ready | Phase::Failed) {
             return Err(refused("busy"));
         }
         Ok(r)
     }
 
-    pub fn preview_audio_cleanup(&self, id: &str) -> Result<Preview, ApiError> {
-        let r = self.cleanable_audio(id)?;
+    pub async fn preview_audio_cleanup_async(&self, id: &str) -> Result<Preview, ApiError> {
+        let r = self.cleanable_audio_async(id).await?;
         let count = r.remote.iter().filter(|f| f.kept()).count() as i64;
         let does = if count == 0 {
             vec![]
@@ -401,9 +434,9 @@ impl Jobs {
         Ok(Preview { does })
     }
 
-    pub fn audio_cleanup(&self, id: &str) -> Result<MediaAudioJob, ApiError> {
-        self.cleanable_audio(id)?;
-        self.tidy_audio(id);
-        shown(&self.found(id)?)
+    pub async fn audio_cleanup_async(&self, id: &str) -> Result<MediaAudioJob, ApiError> {
+        self.cleanable_audio_async(id).await?;
+        self.tidy_audio_async(id).await;
+        shown(&self.found_async(id).await?)
     }
 }

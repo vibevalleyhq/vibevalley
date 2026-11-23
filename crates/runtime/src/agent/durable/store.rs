@@ -45,6 +45,10 @@ impl Store {
         }
     }
 
+    pub fn from_sqlite_pools(write_pool: sqlx::SqlitePool, read_pool: Option<sqlx::SqlitePool>) -> Result<Self> {
+        Ok(Self::from_backend(Arc::new(SqliteStorage::from_pools(write_pool, read_pool, super::now_ms)?)))
+    }
+
     pub fn open(path: &Path) -> Result<Self> {
         Ok(Self::from_backend(Arc::new(SqliteStorage::open(path)?)))
     }

@@ -55,6 +55,48 @@ fn read_ledger(file: &Path) -> Vec<LedgerEntry> {
     body.lines().filter_map(|line| serde_json::from_str::<LedgerEntry>(line).ok()).collect()
 }
 
+async fn run_commit_counter_loop<F, Fut>(soon: Arc<Notify>, cancel: CancellationToken, mut run_once: F)
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    if !run_once().await {
+        return;
+    }
+    let mut next = tokio::time::Instant::now() + COUNT_EVERY;
+    loop {
+        enum Wake {
+            Soon,
+            Periodic,
+            Stop,
+        }
+        let woke = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => Wake::Stop,
+            _ = soon.notified() => Wake::Soon,
+            _ = tokio::time::sleep_until(next) => Wake::Periodic,
+        };
+        match woke {
+            Wake::Stop => return,
+            Wake::Soon => {
+                let debounce = tokio::time::Instant::now() + COUNT_AFTER_RUN;
+                loop {
+                    tokio::select! {
+                        biased;
+                        _ = cancel.cancelled() => return,
+                        _ = soon.notified() => continue,
+                        _ = tokio::time::sleep_until(debounce) => break,
+                    }
+                }
+            }
+            Wake::Periodic => next = tokio::time::Instant::now() + COUNT_EVERY,
+        }
+        if !run_once().await {
+            return;
+        }
+    }
+}
+
 impl Game {
     /// The ledger under `home`, folded into the hub's state; from now on
     /// each fact's entries are kept.
@@ -137,57 +179,20 @@ impl Game {
         let task_cancel = cancel.clone();
         let soon = self.soon.clone();
         let g = Arc::downgrade(self);
-        let handle = hub.spawn_task(async move {
-            let run_once = |g: &Weak<Game>, repos: &Arc<crate::modules::work::repo::Repos>, emails: &[String]| {
-                let g = g.clone();
-                let repos = repos.clone();
-                let emails = emails.to_vec();
-                async move {
-                    tokio::task::spawn_blocking(move || {
-                        let Some(game) = g.upgrade() else { return false };
-                        game.set_commits(&repos.contributions(&emails));
-                        true
-                    })
-                    .await
-                    .unwrap_or(false)
-                }
-            };
-            if !run_once(&g, &repos, &git_emails).await {
-                return;
+        let handle = hub.spawn_task(run_commit_counter_loop(soon, task_cancel, move || {
+            let g = g.clone();
+            let repos = repos.clone();
+            let emails = git_emails.clone();
+            async move {
+                tokio::task::spawn_blocking(move || {
+                    let Some(game) = g.upgrade() else { return false };
+                    game.set_commits(&repos.contributions(&emails));
+                    true
+                })
+                .await
+                .unwrap_or(false)
             }
-            let mut next = tokio::time::Instant::now() + COUNT_EVERY;
-            loop {
-                enum Wake {
-                    Soon,
-                    Periodic,
-                    Stop,
-                }
-                let woke = tokio::select! {
-                    biased;
-                    _ = task_cancel.cancelled() => Wake::Stop,
-                    _ = soon.notified() => Wake::Soon,
-                    _ = tokio::time::sleep_until(next) => Wake::Periodic,
-                };
-                match woke {
-                    Wake::Stop => return,
-                    Wake::Soon => {
-                        let debounce = tokio::time::Instant::now() + COUNT_AFTER_RUN;
-                        loop {
-                            tokio::select! {
-                                biased;
-                                _ = task_cancel.cancelled() => return,
-                                _ = soon.notified() => continue,
-                                _ = tokio::time::sleep_until(debounce) => break,
-                            }
-                        }
-                    }
-                    Wake::Periodic => next = tokio::time::Instant::now() + COUNT_EVERY,
-                }
-                if !run_once(&g, &repos, &git_emails).await {
-                    return;
-                }
-            }
-        });
+        }));
         *self.counter.lock() = Some((cancel, handle));
     }
 
@@ -469,5 +474,66 @@ mod tests {
 
         game.close();
         hub.close_bus();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn commit_counter_loop_debounces_bursts_and_ticks_periodically_on_virtual_clock() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let soon = Arc::new(Notify::new());
+        let cancel = CancellationToken::new();
+        let runs = Arc::new(AtomicUsize::new(0));
+        let wall_start = Instant::now();
+
+        let task = tokio::spawn({
+            let soon = soon.clone();
+            let cancel = cancel.clone();
+            let runs = runs.clone();
+            async move {
+                run_commit_counter_loop(soon, cancel, move || {
+                    let runs = runs.clone();
+                    async move {
+                        runs.fetch_add(1, Ordering::SeqCst);
+                        true
+                    }
+                })
+                .await;
+            }
+        });
+
+        // Initial run fires immediately at t = 0.
+        tokio::task::yield_now().await;
+        assert_eq!(runs.load(Ordering::SeqCst), 1);
+
+        // Multiple rapid notifications coalesce into one debounced count after COUNT_AFTER_RUN (15s).
+        soon.notify_one();
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(5)).await;
+        soon.notify_one();
+        tokio::task::yield_now().await;
+        tokio::time::advance(COUNT_AFTER_RUN - Duration::from_secs(5) - Duration::from_millis(1)).await;
+        tokio::task::yield_now().await;
+        assert_eq!(runs.load(Ordering::SeqCst), 1, "debounced count must not fire before 15s");
+
+        tokio::time::advance(Duration::from_millis(1)).await;
+        tokio::task::yield_now().await;
+        assert_eq!(runs.load(Ordering::SeqCst), 2, "debounced count must fire at 15s");
+
+        // Periodic tick fires at COUNT_EVERY (120s from t = 0, i.e., 105s later).
+        tokio::time::advance(COUNT_EVERY - COUNT_AFTER_RUN - Duration::from_millis(1)).await;
+        tokio::task::yield_now().await;
+        assert_eq!(runs.load(Ordering::SeqCst), 2, "periodic count must not fire before 120s");
+
+        tokio::time::advance(Duration::from_millis(1)).await;
+        tokio::task::yield_now().await;
+        assert_eq!(runs.load(Ordering::SeqCst), 3, "periodic count must fire at 120s");
+
+        cancel.cancel();
+        task.await.unwrap();
+        assert!(
+            wall_start.elapsed() < Duration::from_secs(1),
+            "120s virtual-clock schedule must finish instantaneously, took {:?}",
+            wall_start.elapsed()
+        );
     }
 }

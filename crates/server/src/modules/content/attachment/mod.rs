@@ -57,88 +57,40 @@ impl Attachments {
         self.keep(&bytes, &upload.name, &upload.r#type)
     }
 
-    /// Streams a local regular file directly from disk into CAS without base64 framing (`Caller::User` only).
-    pub fn import_path(&self, input: &AttachmentImportPathInput) -> Result<Attachment, ApiError> {
-        let raw = input.path.trim();
-        let path = Path::new(raw);
-        if raw.is_empty() || !path.is_absolute() {
-            return Err(ApiError::new(BizCode::InvalidInput, "path must be an absolute path to a regular file"));
-        }
-        let sym_meta = std::fs::symlink_metadata(path).map_err(|e| refused(format!("{}: {e}", path.display())))?;
-        if sym_meta.file_type().is_symlink() {
-            return Err(refused("symlinks cannot be imported as attachments".into()));
-        }
-        if !sym_meta.file_type().is_file() {
-            return Err(refused(format!("{} is not a regular file", path.display())));
-        }
-        if sym_meta.len() == 0 {
-            return Err(refused(t("server.attachment.emptyFile", &[])));
-        }
-        if sym_meta.len() > ATTACHMENT_MAX as u64 {
-            return Err(file_too_big());
-        }
-
-        let mut source = std::fs::File::open(path).map_err(|e| refused(format!("{}: {e}", path.display())))?;
-        let file_meta = source.metadata().map_err(|e| refused(format!("{}: {e}", path.display())))?;
-        if !file_meta.is_file() {
-            return Err(refused(format!("{} is not a regular file", path.display())));
-        }
-        if file_meta.len() > ATTACHMENT_MAX as u64 {
-            return Err(file_too_big());
-        }
-
-        std::fs::create_dir_all(&self.root).map_err(|e| refused(e.to_string()))?;
-        let staging = self.root.join(format!(".put-{}", uuid::Uuid::new_v4()));
-        let streamed = (|| -> Result<(String, i64), ApiError> {
-            let mut dest = std::fs::File::create(&staging).map_err(|e| refused(e.to_string()))?;
-            let mut hasher = Sha256::new();
-            let mut buf = [0u8; 64 * 1024];
-            let mut total: u64 = 0;
-            loop {
-                let n = source.read(&mut buf).map_err(|e| refused(e.to_string()))?;
-                if n == 0 {
-                    break;
-                }
-                total = total.saturating_add(n as u64);
-                if total > ATTACHMENT_MAX as u64 {
-                    return Err(file_too_big());
-                }
-                hasher.update(&buf[..n]);
-                dest.write_all(&buf[..n]).map_err(|e| refused(e.to_string()))?;
+    pub async fn attach_async(&self, upload: AttachmentUpload) -> Result<Attachment, ApiError> {
+        let root = self.root.clone();
+        let data = upload.data;
+        let (id, size) = tokio::task::spawn_blocking(move || -> Result<(String, i64), ApiError> {
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(data.trim())
+                .map_err(|e| ApiError::new(BizCode::InvalidInput, format!("data: {e}")))?;
+            if bytes.len() > ATTACHMENT_MAX {
+                return Err(file_too_big());
             }
-            if total == 0 {
+            if bytes.is_empty() {
                 return Err(refused(t("server.attachment.emptyFile", &[])));
             }
-            dest.sync_all().map_err(|e| refused(e.to_string()))?;
-            let id = hasher.finalize().iter().map(|b| format!("{b:02x}")).collect::<String>();
-            Ok((id, total as i64))
-        })();
+            let id = Sha256::digest(&bytes).iter().map(|b| format!("{b:02x}")).collect::<String>();
+            write_once_at(&root, &id, &bytes).map_err(|e| refused(e.to_string()))?;
+            Ok((id, bytes.len() as i64))
+        })
+        .await
+        .map_err(internal)??;
+        self.record_async(&id, &upload.name, &upload.r#type, size).await
+    }
 
-        let (id, size) = match streamed {
-            Ok(pair) => pair,
-            Err(err) => {
-                let _ = std::fs::remove_file(&staging);
-                return Err(err);
-            }
-        };
+    /// Streams a local regular file directly from disk into CAS without base64 framing (`Caller::User` only).
+    pub fn import_path(&self, input: &AttachmentImportPathInput) -> Result<Attachment, ApiError> {
+        let (id, name, mime, size) = stream_import_to_cas(&self.root, input)?;
+        self.record(&id, &name, &mime, size)
+    }
 
-        let target = self.path_of(&id);
-        if std::fs::metadata(&target).is_ok_and(|m| m.len() == size as u64) {
-            let _ = std::fs::remove_file(&staging);
-        } else if let Err(err) = std::fs::rename(&staging, &target) {
-            let _ = std::fs::remove_file(&staging);
-            return Err(refused(err.to_string()));
-        }
-
-        let fallback_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
-        let name = input.name.as_deref().map(str::trim).filter(|s| !s.is_empty()).unwrap_or(fallback_name);
-        let mime = input
-            .mime
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| guess_mime_from_path(path));
-        self.record(&id, name, mime, size)
+    pub async fn import_path_async(&self, input: AttachmentImportPathInput) -> Result<Attachment, ApiError> {
+        let root = self.root.clone();
+        let (id, name, mime, size) = tokio::task::spawn_blocking(move || stream_import_to_cas(&root, &input))
+            .await
+            .map_err(internal)??;
+        self.record_async(&id, &name, &mime, size).await
     }
 
     /// `keep`: bytes kept once by their sha256; no size limit.
@@ -147,34 +99,41 @@ impl Attachments {
             return Err(refused(t("server.attachment.emptyFile", &[])));
         }
         let id = Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect::<String>();
-        self.write_once(&id, bytes).map_err(|e| refused(e.to_string()))?;
+        write_once_at(&self.root, &id, bytes).map_err(|e| refused(e.to_string()))?;
         self.record(&id, name, kind, bytes.len() as i64)
+    }
+
+    pub async fn keep_async(&self, bytes: Vec<u8>, name: String, kind: String) -> Result<Attachment, ApiError> {
+        if bytes.is_empty() {
+            return Err(refused(t("server.attachment.emptyFile", &[])));
+        }
+        let root = self.root.clone();
+        let (id, size) = tokio::task::spawn_blocking(move || -> Result<(String, i64), ApiError> {
+            let id = Sha256::digest(&bytes).iter().map(|b| format!("{b:02x}")).collect::<String>();
+            write_once_at(&root, &id, &bytes).map_err(|e| refused(e.to_string()))?;
+            Ok((id, bytes.len() as i64))
+        })
+        .await
+        .map_err(internal)??;
+        self.record_async(&id, &name, &kind, size).await
     }
 
     /// Promote a verified private staging file on the same filesystem. The
     /// media input row records the intended hash before this is called.
-    pub(crate) fn keep_staged(&self, path: &Path, hash: &str, size: i64, name: &str, kind: &str) -> Result<Attachment, ApiError> {
+    pub(crate) async fn keep_staged_async(&self, path: PathBuf, hash: String, size: i64, name: String, kind: String) -> Result<Attachment, ApiError> {
         if hash.len() != 64 || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err(refused("invalid content hash".into()));
         }
-        std::fs::create_dir_all(&self.root).map_err(|e| refused(e.to_string()))?;
-        std::fs::rename(path, self.path_of(hash)).map_err(|e| refused(e.to_string()))?;
-        self.record(hash, name, kind, size)
-    }
-
-    /// `writeOnce`: a file already there with these bytes is left; a new
-    /// one is written beside it first, so nobody reads half of it.
-    fn write_once(&self, id: &str, bytes: &[u8]) -> std::io::Result<()> {
-        let target = self.path_of(id);
-        if std::fs::metadata(&target).is_ok_and(|m| m.len() == bytes.len() as u64) {
-            return Ok(());
-        }
-        std::fs::create_dir_all(&self.root)?;
-        let staging = self.root.join(format!(".put-{}", uuid::Uuid::new_v4()));
-        let mut f = std::fs::File::create(&staging)?;
-        f.write_all(bytes)?;
-        f.sync_all()?;
-        std::fs::rename(&staging, &target)
+        let root = self.root.clone();
+        let target = self.path_of(&hash);
+        tokio::task::spawn_blocking(move || -> Result<(), ApiError> {
+            std::fs::create_dir_all(&root).map_err(|e| refused(e.to_string()))?;
+            std::fs::rename(&path, &target).map_err(|e| refused(e.to_string()))?;
+            Ok(())
+        })
+        .await
+        .map_err(internal)??;
+        self.record_async(&hash, &name, &kind, size).await
     }
 
     fn record(&self, id: &str, given: &str, given_type: &str, size: i64) -> Result<Attachment, ApiError> {
@@ -207,11 +166,53 @@ impl Attachments {
         })
     }
 
+    async fn record_async(&self, id: &str, given: &str, given_type: &str, size: i64) -> Result<Attachment, ApiError> {
+        let name = if given.trim().is_empty() { "file" } else { given.trim() };
+        let kind = if given_type.trim().is_empty() {
+            "application/octet-stream"
+        } else {
+            given_type.trim()
+        };
+        let mut conn = self.db.write_pool().acquire().await.map_err(internal)?;
+        queries::keep_attachment(
+            &mut *conn,
+            queries::KeepAttachmentParams {
+                id: id.into(),
+                name: name.into(),
+                r#type: kind.into(),
+                size,
+                created_at: now(),
+            },
+        )
+        .await
+        .map_err(internal)?;
+        Ok(Attachment {
+            id: id.into(),
+            name: name.into(),
+            r#type: kind.into(),
+            size,
+        })
+    }
+
     fn by_id(&self, id: &str) -> Result<Option<Attachment>, ApiError> {
         match self
             .db
-            .run(async |c| queries::get_attachment(c, queries::GetAttachmentParams { id: id.into() }).await)
+            .read(async |c| queries::get_attachment(c, queries::GetAttachmentParams { id: id.into() }).await)
         {
+            Ok(row) => Ok(Some(Attachment {
+                id: row.id,
+                name: row.name,
+                r#type: row.r#type,
+                size: row.size,
+            })),
+            Err(sqlx::Error::RowNotFound) => Ok(None),
+            Err(error) => Err(internal(error)),
+        }
+    }
+
+    pub async fn by_id_async(&self, id: &str) -> Result<Option<Attachment>, ApiError> {
+        let mut conn = self.db.read_pool().acquire().await.map_err(internal)?;
+        match queries::get_attachment(&mut *conn, queries::GetAttachmentParams { id: id.into() }).await {
             Ok(row) => Ok(Some(Attachment {
                 id: row.id,
                 name: row.name,
@@ -236,6 +237,17 @@ impl Attachments {
         Ok(out)
     }
 
+    pub async fn of_async(&self, ids: &[String]) -> Result<Vec<Attachment>, ApiError> {
+        let mut out: Vec<Attachment> = vec![];
+        for id in ids {
+            if out.iter().any(|a| &a.id == id) {
+                continue;
+            }
+            out.push(self.by_id_async(id).await?.ok_or_else(|| no_attachment(id))?);
+        }
+        Ok(out)
+    }
+
     /// `get`: the file of a kept attachment.
     pub fn file(&self, id: &str) -> Result<AttachmentFile, ApiError> {
         let a = self.by_id(id)?.ok_or_else(|| no_attachment(id))?;
@@ -249,6 +261,124 @@ impl Attachments {
             name: a.name,
         })
     }
+
+    pub async fn file_async(&self, id: &str) -> Result<AttachmentFile, ApiError> {
+        let a = self.by_id_async(id).await?.ok_or_else(|| no_attachment(id))?;
+        let path = self.path_of(&a.id);
+        if !tokio::fs::metadata(&path).await.is_ok_and(|m| m.is_file()) {
+            return Err(no_attachment(id));
+        }
+        Ok(AttachmentFile {
+            path: path.to_string_lossy().into_owned(),
+            r#type: a.r#type,
+            name: a.name,
+        })
+    }
+}
+
+/// `writeOnce`: a file already there with these bytes is left; a new
+/// one is written beside it first, so nobody reads half of it.
+fn write_once_at(root: &Path, id: &str, bytes: &[u8]) -> std::io::Result<()> {
+    let target = root.join(id);
+    if std::fs::metadata(&target).is_ok_and(|m| m.len() == bytes.len() as u64) {
+        return Ok(());
+    }
+    std::fs::create_dir_all(root)?;
+    let staging = root.join(format!(".put-{}", uuid::Uuid::new_v4()));
+    let mut f = std::fs::File::create(&staging)?;
+    f.write_all(bytes)?;
+    f.sync_all()?;
+    std::fs::rename(&staging, &target)
+}
+
+fn stream_import_to_cas(root: &Path, input: &AttachmentImportPathInput) -> Result<(String, String, String, i64), ApiError> {
+    let raw = input.path.trim();
+    let path = Path::new(raw);
+    if raw.is_empty() || !path.is_absolute() {
+        return Err(ApiError::new(BizCode::InvalidInput, "path must be an absolute path to a regular file"));
+    }
+    let sym_meta = std::fs::symlink_metadata(path).map_err(|e| refused(format!("{}: {e}", path.display())))?;
+    if sym_meta.file_type().is_symlink() {
+        return Err(refused("symlinks cannot be imported as attachments".into()));
+    }
+    if !sym_meta.file_type().is_file() {
+        return Err(refused(format!("{} is not a regular file", path.display())));
+    }
+    if sym_meta.len() == 0 {
+        return Err(refused(t("server.attachment.emptyFile", &[])));
+    }
+    if sym_meta.len() > ATTACHMENT_MAX as u64 {
+        return Err(file_too_big());
+    }
+
+    let mut source = std::fs::File::open(path).map_err(|e| refused(format!("{}: {e}", path.display())))?;
+    let file_meta = source.metadata().map_err(|e| refused(format!("{}: {e}", path.display())))?;
+    if !file_meta.is_file() {
+        return Err(refused(format!("{} is not a regular file", path.display())));
+    }
+    if file_meta.len() > ATTACHMENT_MAX as u64 {
+        return Err(file_too_big());
+    }
+
+    std::fs::create_dir_all(root).map_err(|e| refused(e.to_string()))?;
+    let staging = root.join(format!(".put-{}", uuid::Uuid::new_v4()));
+    let streamed = (|| -> Result<(String, i64), ApiError> {
+        let mut dest = std::fs::File::create(&staging).map_err(|e| refused(e.to_string()))?;
+        let mut hasher = Sha256::new();
+        let mut buf = [0u8; 64 * 1024];
+        let mut total: u64 = 0;
+        loop {
+            let n = source.read(&mut buf).map_err(|e| refused(e.to_string()))?;
+            if n == 0 {
+                break;
+            }
+            total = total.saturating_add(n as u64);
+            if total > ATTACHMENT_MAX as u64 {
+                return Err(file_too_big());
+            }
+            hasher.update(&buf[..n]);
+            dest.write_all(&buf[..n]).map_err(|e| refused(e.to_string()))?;
+        }
+        if total == 0 {
+            return Err(refused(t("server.attachment.emptyFile", &[])));
+        }
+        dest.sync_all().map_err(|e| refused(e.to_string()))?;
+        let id = hasher.finalize().iter().map(|b| format!("{b:02x}")).collect::<String>();
+        Ok((id, total as i64))
+    })();
+
+    let (id, size) = match streamed {
+        Ok(pair) => pair,
+        Err(err) => {
+            let _ = std::fs::remove_file(&staging);
+            return Err(err);
+        }
+    };
+
+    let target = root.join(&id);
+    if std::fs::metadata(&target).is_ok_and(|m| m.len() == size as u64) {
+        let _ = std::fs::remove_file(&staging);
+    } else if let Err(err) = std::fs::rename(&staging, &target) {
+        let _ = std::fs::remove_file(&staging);
+        return Err(refused(err.to_string()));
+    }
+
+    let fallback_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+    let name = input
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(fallback_name)
+        .to_owned();
+    let mime = input
+        .mime
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| guess_mime_from_path(path))
+        .to_owned();
+    Ok((id, name, mime, size))
 }
 
 impl crate::ports::AttachmentReadPort for Attachments {
@@ -296,15 +426,24 @@ fn guess_mime_from_path(path: &Path) -> &'static str {
 }
 
 pub fn install(hub: &Hub, files: Arc<Attachments>) {
-    hub.on::<ops::AttachmentCreate>({
+    hub.on_async::<ops::AttachmentCreate, _, _>({
         let files = files.clone();
-        move |_, upload| files.attach(&upload)
+        move |_, upload| {
+            let files = files.clone();
+            async move { files.attach_async(upload).await }
+        }
     });
-    hub.on::<ops::AttachmentImportPath>({
+    hub.on_async::<ops::AttachmentImportPath, _, _>({
         let files = files.clone();
-        move |_, input| files.import_path(&input)
+        move |_, input| {
+            let files = files.clone();
+            async move { files.import_path_async(input).await }
+        }
     });
-    hub.on::<native_ops::AttachmentFile>(move |_, i| files.file(&i.id));
+    hub.on_async::<native_ops::AttachmentFile, _, _>(move |_, i| {
+        let files = files.clone();
+        async move { files.file_async(&i.id).await }
+    });
 }
 
 #[cfg(test)]

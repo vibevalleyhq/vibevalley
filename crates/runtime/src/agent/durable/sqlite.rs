@@ -10,7 +10,7 @@ impl<'a> Sqlite<'a> {
     }
 
     pub fn query<T>(&self, f: impl AsyncFnOnce(&mut SqliteConnection) -> sqlx::Result<T>) -> sqlx::Result<T> {
-        pollster::block_on(f(&mut self.0.borrow_mut()))
+        crate::rt::block_on(f(&mut self.0.borrow_mut()))
     }
 }
 

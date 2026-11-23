@@ -11,10 +11,11 @@
 //! [`Hub::apply`].
 
 use std::any::Any;
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, OnceLock, Weak};
 use std::time::{Duration, Instant};
 
 use arc_swap::ArcSwapOption;
@@ -23,6 +24,7 @@ use serde_json::Value;
 use tokio::sync::{broadcast, watch};
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
+use tracing::Instrument as _;
 use vibevalley_core::{Applied, Core, SliceMask, Transition};
 use vibevalley_protocol::{
     ApiError, BizCode, BoardSlice, Caller, CollabSlice, Envelope, Fact, FarmFrame, GameEffect, InboxSlice, LiveEvent, LiveEventNotice, LiveEventRuntime,
@@ -32,9 +34,9 @@ use vibevalley_protocol::{
 
 pub mod transport;
 pub use crate::transport::api::{
-    CallerContext, CallerPrincipal, ClientIdentity, ClientKind, FaultGate, HostDebugBridge, InvokeObserver, LiveVoiceLine, LiveVoicePort, MachineBus,
-    MachineConnection, RemoteAuth, RemoteDeviceIdentity, Server, SharedFaultGate, SharedHostDebug, SharedInvokeObserver, SharedLiveVoice, SharedMachineBus,
-    SharedRemoteAuth, refusal,
+    BoxFuture, CallerContext, CallerPrincipal, ClientIdentity, ClientKind, FaultGate, HostDebugBridge, InvokeObserver, LiveVoiceLine, LiveVoicePort,
+    MachineBus, MachineConnection, RemoteAuth, RemoteDeviceIdentity, Server, SharedFaultGate, SharedHostDebug, SharedInvokeObserver, SharedLiveVoice,
+    SharedMachineBus, SharedRemoteAuth, refusal,
 };
 
 pub mod base;
@@ -76,8 +78,57 @@ pub struct Ctx<'a> {
     pub hub: &'a Hub,
 }
 
-type Handler = Arc<dyn Fn(&Ctx, Value) -> Result<Value, ApiError> + Send + Sync>;
-type TypedHandler<O> = Arc<dyn Fn(&Ctx, <O as Op>::Input) -> Result<<O as Op>::Result, ApiError> + Send + Sync>;
+/// Owned invocation context passed to async handlers registered via [`Hub::on_async`].
+#[derive(Clone)]
+pub struct AsyncCtx {
+    pub caller: Caller,
+    pub principal: CallerPrincipal,
+    pub client: Option<ClientIdentity>,
+    pub trace_id: u64,
+    pub hub: Arc<Hub>,
+}
+
+impl AsyncCtx {
+    /// Reconstructs a [`CallerContext`] preserving caller role, principal, client identity, and trace id.
+    pub fn caller_ctx(&self) -> CallerContext {
+        CallerContext {
+            caller: self.caller,
+            principal: self.principal.clone(),
+            client: self.client.clone(),
+            trace_id: self.trace_id,
+        }
+    }
+
+    pub fn hub(&self) -> &Arc<Hub> {
+        &self.hub
+    }
+}
+
+type SyncHandler = Arc<dyn Fn(&Ctx, Value) -> Result<Value, ApiError> + Send + Sync>;
+type AsyncHandler = Arc<dyn Fn(AsyncCtx, Value) -> BoxFuture<'static, Result<Value, ApiError>> + Send + Sync>;
+
+#[derive(Clone)]
+enum RouteHandler {
+    Sync(SyncHandler),
+    Async(AsyncHandler),
+}
+
+type TypedSyncHandler<I, R> = Arc<dyn Fn(&Ctx, I) -> Result<R, ApiError> + Send + Sync>;
+type TypedAsyncHandler<I, R> = Arc<dyn Fn(AsyncCtx, I) -> BoxFuture<'static, Result<R, ApiError>> + Send + Sync>;
+
+enum TypedEntry<I, R> {
+    Sync(TypedSyncHandler<I, R>),
+    Async(TypedAsyncHandler<I, R>),
+}
+
+impl<I, R> Clone for TypedEntry<I, R> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Sync(h) => Self::Sync(h.clone()),
+            Self::Async(h) => Self::Async(h.clone()),
+        }
+    }
+}
 
 /// Where a subscription's events go; it ends when the subscriber stops
 /// (`stopped`) or the opener drops it.
@@ -139,6 +190,7 @@ const fn slice_index(kind: SliceKind) -> usize {
 /// The server: the state, the endpoints and the slice feeds. Cheap to share
 /// (`Arc<Hub>`).
 pub struct Hub {
+    self_weak: OnceLock<Weak<Hub>>,
     core: Mutex<Core>,
     seq: AtomicI64,
     dirty_seqs: [AtomicI64; 6],
@@ -147,7 +199,7 @@ pub struct Hub {
     bus: event_bus::EventBus,
     shutdown: CancellationToken,
     tasks: TaskTracker,
-    handlers: RwLock<HashMap<&'static str, Handler>>,
+    handlers: RwLock<HashMap<&'static str, RouteHandler>>,
     typed_handlers: RwLock<HashMap<&'static str, Arc<dyn Any + Send + Sync>>>,
     openers: RwLock<HashMap<&'static str, (&'static [Caller], Opener)>>,
     live: broadcast::Sender<LiveEvent>,
@@ -303,6 +355,7 @@ impl Hub {
         let bus = event_bus::EventBus::new(shutdown.child_token());
         let (wake, _) = watch::channel(0u64);
         let hub = Arc::new(Hub {
+            self_weak: OnceLock::new(),
             core: Mutex::new(core),
             seq: AtomicI64::new(seq),
             dirty_seqs: std::array::from_fn(|_| AtomicI64::new(seq)),
@@ -330,11 +383,20 @@ impl Hub {
             wake,
             kicks,
         });
+        let _ = hub.self_weak.set(Arc::downgrade(&hub));
         hub.bus.attach_hub(Arc::downgrade(&hub));
         let weak = Arc::downgrade(&hub);
         let cancel = hub.child_token();
         hub.spawn_task(pump_slices(weak, kicked, cancel));
         hub
+    }
+
+    /// Returns an owned `Arc<Hub>` handle to this hub.
+    pub fn self_arc(&self) -> Arc<Hub> {
+        self.self_weak
+            .get()
+            .and_then(Weak::upgrade)
+            .expect("Hub is always constructed inside Arc<Hub> via Hub::new")
     }
 
     fn current_observer(&self) -> Option<SharedInvokeObserver> {
@@ -687,15 +749,58 @@ impl Hub {
         O::Input: 'static,
         O::Result: 'static,
     {
-        let typed: TypedHandler<O> = Arc::new(handler);
+        let typed: TypedSyncHandler<O::Input, O::Result> = Arc::new(handler);
         let json_typed = typed.clone();
-        let h: Handler = Arc::new(move |ctx, payload| {
+        let h: SyncHandler = Arc::new(move |ctx, payload| {
             let input: O::Input = decode(payload)?;
             let out = json_typed(ctx, input)?;
             serde_json::to_value(out).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
         });
-        self.typed_handlers.write().insert(O::NAME, Arc::new(typed));
-        self.handlers.write().insert(O::NAME, h);
+        self.typed_handlers.write().insert(O::NAME, Arc::new(TypedEntry::Sync(typed)));
+        self.handlers.write().insert(O::NAME, RouteHandler::Sync(h));
+    }
+
+    /// Answers `O` asynchronously on the Tokio runtime, replacing any earlier handler.
+    pub fn on_async<O, F, Fut>(&self, handler: F)
+    where
+        O: Op,
+        O::Input: Send + 'static,
+        O::Result: Send + 'static,
+        F: Fn(AsyncCtx, O::Input) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<O::Result, ApiError>> + Send + 'static,
+    {
+        let typed: TypedAsyncHandler<O::Input, O::Result> = Arc::new(move |ctx, input| Box::pin(handler(ctx, input)));
+        let json_typed = typed.clone();
+        let h: AsyncHandler = Arc::new(move |ctx, payload| {
+            let json_typed = json_typed.clone();
+            Box::pin(async move {
+                let input: O::Input = decode(payload)?;
+                let out = json_typed(ctx, input).await?;
+                serde_json::to_value(out).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
+            })
+        });
+        self.typed_handlers.write().insert(O::NAME, Arc::new(TypedEntry::Async(typed)));
+        self.handlers.write().insert(O::NAME, RouteHandler::Async(h));
+    }
+
+    fn ensure_trace_id<'a>(&self, caller_ctx: &'a CallerContext) -> Cow<'a, CallerContext> {
+        if caller_ctx.trace_id != 0 {
+            Cow::Borrowed(caller_ctx)
+        } else {
+            Cow::Owned(CallerContext {
+                caller: caller_ctx.caller,
+                principal: caller_ctx.principal.clone(),
+                client: caller_ctx.client.clone(),
+                trace_id: self.next_trace_id.fetch_add(1, Ordering::Relaxed),
+            })
+        }
+    }
+
+    fn ensure_trace_id_owned(&self, mut caller_ctx: CallerContext) -> CallerContext {
+        if caller_ctx.trace_id == 0 {
+            caller_ctx.trace_id = self.next_trace_id.fetch_add(1, Ordering::Relaxed);
+        }
+        caller_ctx
     }
 
     /// Invokes endpoint `O` directly in-process with zero JSON round-trip while
@@ -709,26 +814,13 @@ impl Hub {
         let is_debug_op = op.starts_with("debug.");
         let observer = if is_debug_op { None } else { self.current_observer() };
         let trace_debug = tracing::enabled!(tracing::Level::DEBUG);
-        let (started, effective_ctx_owned);
-        let effective_ctx = if let Some(obs) = &observer {
-            let trace_id = if caller_ctx.trace_id != 0 {
-                caller_ctx.trace_id
-            } else {
-                self.next_trace_id.fetch_add(1, Ordering::Relaxed)
-            };
-            effective_ctx_owned = CallerContext {
-                caller: caller_ctx.caller,
-                principal: caller_ctx.principal.clone(),
-                client: caller_ctx.client.clone(),
-                trace_id,
-            };
+        let effective_ctx = self.ensure_trace_id(caller_ctx);
+        let started = if let Some(obs) = &observer {
             let payload = serde_json::to_value(&input).unwrap_or(Value::Null);
-            obs.on_call_start(&effective_ctx_owned, op, &payload);
-            started = Some(Instant::now());
-            &effective_ctx_owned
+            obs.on_call_start(&effective_ctx, op, &payload);
+            Some(Instant::now())
         } else {
-            started = trace_debug.then(Instant::now);
-            caller_ctx
+            trace_debug.then(Instant::now)
         };
 
         if !is_debug_op && let Some(gate) = self.current_fault_gate() {
@@ -738,14 +830,18 @@ impl Hub {
             }
         }
 
-        let result = self.dispatch_typed::<O>(effective_ctx, input);
+        let span = tracing::debug_span!("hub.op", op, trace_id = effective_ctx.trace_id);
+        let result = {
+            let _entered = span.enter();
+            self.dispatch_typed::<O>(&effective_ctx, input)
+        };
         let biz_code = match &result {
             Ok(_) => 0,
             Err(err) => err.biz_code.code(),
         };
         let duration_us = started.map(|t0| t0.elapsed().as_micros() as u64);
         if let (Some(obs), Some(us)) = (observer, duration_us) {
-            obs.on_call_end(effective_ctx, op, biz_code, us);
+            obs.on_call_end(&effective_ctx, op, biz_code, us);
         }
         if trace_debug {
             tracing::debug!(
@@ -768,6 +864,70 @@ impl Hub {
         self.invoke::<O>(&CallerContext::from_caller(caller), input)
     }
 
+    /// Asynchronously invokes endpoint `O` directly in-process with zero JSON round-trip while
+    /// enforcing `endpoint(O::NAME).can`, [`InvokeObserver`], and non-blocking [`FaultGate`].
+    pub async fn invoke_async<O: Op>(&self, caller_ctx: &CallerContext, input: O::Input) -> Result<O::Result, ApiError>
+    where
+        O::Input: Send + 'static,
+        O::Result: Send + 'static,
+    {
+        let op = O::NAME;
+        let is_debug_op = op.starts_with("debug.");
+        let observer = if is_debug_op { None } else { self.current_observer() };
+        let trace_debug = tracing::enabled!(tracing::Level::DEBUG);
+        let effective_ctx = self.ensure_trace_id(caller_ctx);
+        let started = if let Some(obs) = &observer {
+            let payload = serde_json::to_value(&input).unwrap_or(Value::Null);
+            obs.on_call_start(&effective_ctx, op, &payload);
+            Some(Instant::now())
+        } else {
+            trace_debug.then(Instant::now)
+        };
+
+        let span = tracing::debug_span!("hub.op", op, trace_id = effective_ctx.trace_id);
+        let result = async {
+            let delay = if !is_debug_op {
+                self.current_fault_gate().map(|gate| gate.delay_ms(op)).unwrap_or(0)
+            } else {
+                0
+            };
+            if delay > 0 {
+                tokio::time::sleep(Duration::from_millis(delay)).await;
+            }
+            self.dispatch_typed_async::<O>(&effective_ctx, input).await
+        }
+        .instrument(span)
+        .await;
+
+        let biz_code = match &result {
+            Ok(_) => 0,
+            Err(err) => err.biz_code.code(),
+        };
+        let duration_us = started.map(|t0| t0.elapsed().as_micros() as u64);
+        if let (Some(obs), Some(us)) = (observer, duration_us) {
+            obs.on_call_end(&effective_ctx, op, biz_code, us);
+        }
+        if trace_debug {
+            tracing::debug!(
+                op,
+                biz_code,
+                trace_id = effective_ctx.trace_id,
+                duration_us = duration_us.unwrap_or(0),
+                "hub.invoke"
+            );
+        }
+        result
+    }
+
+    /// Convenience async typed invocation as `caller`.
+    pub async fn invoke_as_async<O: Op>(&self, caller: Caller, input: O::Input) -> Result<O::Result, ApiError>
+    where
+        O::Input: Send + 'static,
+        O::Result: Send + 'static,
+    {
+        self.invoke_async::<O>(&CallerContext::from_caller(caller), input).await
+    }
+
     fn dispatch_typed<O: Op>(&self, caller_ctx: &CallerContext, input: O::Input) -> Result<O::Result, ApiError>
     where
         O::Input: 'static,
@@ -784,18 +944,84 @@ impl Hub {
             .typed_handlers
             .read()
             .get(op)
-            .and_then(|any| any.downcast_ref::<TypedHandler<O>>().cloned());
+            .and_then(|any| any.downcast_ref::<TypedEntry<O::Input, O::Result>>().cloned());
         let Some(handler) = handler else {
             return Err(ApiError::new(BizCode::ServiceUnavailable, format!("{op} is not served by VibeValley yet")));
         };
-        let ctx = Ctx {
-            caller: caller_ctx.caller,
-            principal: caller_ctx.principal.clone(),
-            client: caller_ctx.client.clone(),
-            trace_id: caller_ctx.trace_id,
-            hub: self,
+        match handler {
+            TypedEntry::Sync(handler) => {
+                let ctx = Ctx {
+                    caller: caller_ctx.caller,
+                    principal: caller_ctx.principal.clone(),
+                    client: caller_ctx.client.clone(),
+                    trace_id: caller_ctx.trace_id,
+                    hub: self,
+                };
+                handler(&ctx, input)
+            }
+            TypedEntry::Async(handler) => {
+                let ctx = AsyncCtx {
+                    caller: caller_ctx.caller,
+                    principal: caller_ctx.principal.clone(),
+                    client: caller_ctx.client.clone(),
+                    trace_id: caller_ctx.trace_id,
+                    hub: self.self_arc(),
+                };
+                vibevalley_runtime::rt::block_on(handler(ctx, input).in_current_span())
+            }
+        }
+    }
+
+    async fn dispatch_typed_async<O: Op>(&self, caller_ctx: &CallerContext, input: O::Input) -> Result<O::Result, ApiError>
+    where
+        O::Input: Send + 'static,
+        O::Result: Send + 'static,
+    {
+        let op = O::NAME;
+        let Some(e) = endpoint(op) else {
+            return Err(ApiError::new(BizCode::RouteNotFound, format!("no endpoint {op}")));
         };
-        handler(&ctx, input)
+        if caller_ctx.caller != Caller::User && !e.can.contains(&caller_ctx.caller) {
+            return Err(ApiError::new(BizCode::Forbidden, format!("{op} is not for the {:?}", caller_ctx.caller)));
+        }
+        let handler = self
+            .typed_handlers
+            .read()
+            .get(op)
+            .and_then(|any| any.downcast_ref::<TypedEntry<O::Input, O::Result>>().cloned());
+        let Some(handler) = handler else {
+            return Err(ApiError::new(BizCode::ServiceUnavailable, format!("{op} is not served by VibeValley yet")));
+        };
+        match handler {
+            TypedEntry::Async(handler) => {
+                let ctx = AsyncCtx {
+                    caller: caller_ctx.caller,
+                    principal: caller_ctx.principal.clone(),
+                    client: caller_ctx.client.clone(),
+                    trace_id: caller_ctx.trace_id,
+                    hub: self.self_arc(),
+                };
+                handler(ctx, input).await
+            }
+            TypedEntry::Sync(handler) => {
+                let hub = self.self_arc();
+                let ctx_owned = caller_ctx.clone();
+                let span = tracing::Span::current();
+                tokio::task::spawn_blocking(move || {
+                    let _entered = span.enter();
+                    let ctx = Ctx {
+                        caller: ctx_owned.caller,
+                        principal: ctx_owned.principal,
+                        client: ctx_owned.client,
+                        trace_id: ctx_owned.trace_id,
+                        hub: &hub,
+                    };
+                    handler(&ctx, input)
+                })
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+            }
+        }
     }
 
     /// Whether some module answers `op`.
@@ -813,25 +1039,12 @@ impl Hub {
         let is_debug_op = op.starts_with("debug.");
         let observer = if is_debug_op { None } else { self.current_observer() };
         let trace_debug = tracing::enabled!(tracing::Level::DEBUG);
-        let (started, effective_ctx_owned);
-        let effective_ctx = if let Some(obs) = &observer {
-            let trace_id = if caller_ctx.trace_id != 0 {
-                caller_ctx.trace_id
-            } else {
-                self.next_trace_id.fetch_add(1, Ordering::Relaxed)
-            };
-            effective_ctx_owned = CallerContext {
-                caller: caller_ctx.caller,
-                principal: caller_ctx.principal.clone(),
-                client: caller_ctx.client.clone(),
-                trace_id,
-            };
-            obs.on_call_start(&effective_ctx_owned, op, &payload);
-            started = Some(Instant::now());
-            &effective_ctx_owned
+        let effective_ctx = self.ensure_trace_id(caller_ctx);
+        let started = if let Some(obs) = &observer {
+            obs.on_call_start(&effective_ctx, op, &payload);
+            Some(Instant::now())
         } else {
-            started = trace_debug.then(Instant::now);
-            caller_ctx
+            trace_debug.then(Instant::now)
         };
 
         if !is_debug_op && let Some(gate) = self.current_fault_gate() {
@@ -841,10 +1054,14 @@ impl Hub {
             }
         }
 
-        let envelope = self.dispatch_call(effective_ctx, op, payload);
+        let span = tracing::debug_span!("hub.op", op, trace_id = effective_ctx.trace_id);
+        let envelope = {
+            let _entered = span.enter();
+            self.dispatch_call(&effective_ctx, op, payload)
+        };
         let duration_us = started.map(|t0| t0.elapsed().as_micros() as u64);
         if let (Some(obs), Some(us)) = (observer, duration_us) {
-            obs.on_call_end(effective_ctx, op, envelope.biz_code, us);
+            obs.on_call_end(&effective_ctx, op, envelope.biz_code, us);
         }
         if trace_debug {
             tracing::debug!(
@@ -875,14 +1092,133 @@ impl Hub {
             (Some(_), Value::Null) => Value::Object(Default::default()),
             (Some(_), p) => p,
         };
-        let ctx = Ctx {
-            caller: caller_ctx.caller,
-            principal: caller_ctx.principal.clone(),
-            client: caller_ctx.client.clone(),
-            trace_id: caller_ctx.trace_id,
-            hub: self,
+        let outcome = match handler {
+            RouteHandler::Sync(handler) => {
+                let ctx = Ctx {
+                    caller: caller_ctx.caller,
+                    principal: caller_ctx.principal.clone(),
+                    client: caller_ctx.client.clone(),
+                    trace_id: caller_ctx.trace_id,
+                    hub: self,
+                };
+                handler(&ctx, payload)
+            }
+            RouteHandler::Async(handler) => {
+                let ctx = AsyncCtx {
+                    caller: caller_ctx.caller,
+                    principal: caller_ctx.principal.clone(),
+                    client: caller_ctx.client.clone(),
+                    trace_id: caller_ctx.trace_id,
+                    hub: self.self_arc(),
+                };
+                vibevalley_runtime::rt::block_on(handler(ctx, payload).in_current_span())
+            }
         };
-        match handler(&ctx, payload) {
+        match outcome {
+            Ok(data) if e.result.is_none() => {
+                let _ = data;
+                Envelope::void()
+            }
+            Ok(data) => Envelope::ok(data),
+            Err(err) => Envelope::failure(&err),
+        }
+    }
+
+    /// Asynchronously invokes one endpoint with caller identity, principal, and optional trace id.
+    pub async fn call_with_async(&self, caller_ctx: CallerContext, op: String, payload: Value) -> Envelope {
+        let is_debug_op = op.starts_with("debug.");
+        let observer = if is_debug_op { None } else { self.current_observer() };
+        let trace_debug = tracing::enabled!(tracing::Level::DEBUG);
+        let effective_ctx = self.ensure_trace_id_owned(caller_ctx);
+        let started = if let Some(obs) = &observer {
+            obs.on_call_start(&effective_ctx, &op, &payload);
+            Some(Instant::now())
+        } else {
+            trace_debug.then(Instant::now)
+        };
+
+        let span = tracing::debug_span!("hub.op", op = op.as_str(), trace_id = effective_ctx.trace_id);
+        let envelope = async {
+            let delay = if !is_debug_op {
+                self.current_fault_gate().map(|gate| gate.delay_ms(&op)).unwrap_or(0)
+            } else {
+                0
+            };
+            if delay > 0 {
+                tokio::time::sleep(Duration::from_millis(delay)).await;
+            }
+            self.dispatch_call_async(&effective_ctx, &op, payload).await
+        }
+        .instrument(span)
+        .await;
+
+        let duration_us = started.map(|t0| t0.elapsed().as_micros() as u64);
+        if let (Some(obs), Some(us)) = (observer, duration_us) {
+            obs.on_call_end(&effective_ctx, &op, envelope.biz_code, us);
+        }
+        if trace_debug {
+            tracing::debug!(
+                op = %op,
+                biz_code = envelope.biz_code,
+                trace_id = effective_ctx.trace_id,
+                duration_us = duration_us.unwrap_or(0),
+                "hub.call"
+            );
+        }
+        envelope
+    }
+
+    async fn dispatch_call_async(&self, caller_ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
+        let Some(e) = endpoint(op) else {
+            return refusal(BizCode::RouteNotFound, format!("no endpoint {op}"));
+        };
+        if caller_ctx.caller != Caller::User && !e.can.contains(&caller_ctx.caller) {
+            return refusal(BizCode::Forbidden, format!("{op} is not for the {:?}", caller_ctx.caller));
+        }
+        let handler = self.handlers.read().get(op).cloned();
+        let Some(handler) = handler else {
+            return refusal(BizCode::ServiceUnavailable, format!("{op} is not served by VibeValley yet"));
+        };
+        // A body that is empty is `{}`; an endpoint that takes nothing reads nothing.
+        let payload = match (e.input, payload) {
+            (None, _) => Value::Null,
+            (Some(_), Value::Null) => Value::Object(Default::default()),
+            (Some(_), p) => p,
+        };
+        let outcome = match handler {
+            RouteHandler::Async(handler) => {
+                let ctx = AsyncCtx {
+                    caller: caller_ctx.caller,
+                    principal: caller_ctx.principal.clone(),
+                    client: caller_ctx.client.clone(),
+                    trace_id: caller_ctx.trace_id,
+                    hub: self.self_arc(),
+                };
+                handler(ctx, payload).await
+            }
+            RouteHandler::Sync(handler) => {
+                let hub = self.self_arc();
+                let ctx_owned = caller_ctx.clone();
+                let span = tracing::Span::current();
+                match tokio::task::spawn_blocking(move || {
+                    let _entered = span.enter();
+                    let ctx = Ctx {
+                        caller: ctx_owned.caller,
+                        principal: ctx_owned.principal,
+                        client: ctx_owned.client,
+                        trace_id: ctx_owned.trace_id,
+                        hub: &hub,
+                    };
+                    handler(&ctx, payload)
+                })
+                .await
+                {
+                    Ok(res) => res,
+                    Err(e) => Err(ApiError::new(BizCode::InternalError, e.to_string())),
+                }
+            }
+        };
+        match outcome {
             Ok(data) if e.result.is_none() => {
                 let _ = data;
                 Envelope::void()
@@ -1099,6 +1435,10 @@ impl Server for Hub {
         Hub::call_with(self, ctx, op, payload)
     }
 
+    fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
+        Box::pin(async move { Hub::call_with_async(&self, ctx, op, payload).await })
+    }
+
     fn slice_snapshot(&self, slice: SliceKind) -> Value {
         if slice == SliceKind::Farm {
             return serde_json::to_value(self.farm_frame()).expect("farm frame serializes");
@@ -1225,5 +1565,397 @@ mod tests {
         hub.close();
         assert!(async_done.load(Ordering::Acquire), "Hub::close must drain tracked async tasks");
         assert!(blocking_done.load(Ordering::Acquire), "Hub::close must drain tracked blocking tasks");
+    }
+
+    #[test]
+    fn on_async_runs_directly_on_io_worker_without_spawn_blocking() {
+        use parking_lot::Mutex;
+        use serde_json::Value;
+        use vibevalley_protocol::{Health, ops};
+
+        use super::{CallerContext, Server};
+
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let recorded = Arc::new(Mutex::new(Vec::<(String, Option<tokio::task::Id>)>::new()));
+        let rec_async = recorded.clone();
+        hub.on_async::<ops::ServerHealthGet, _, _>(move |ctx, ()| {
+            let rec = rec_async.clone();
+            async move {
+                let name = std::thread::current().name().unwrap_or_default().to_string();
+                let task_id = tokio::task::try_id();
+                rec.lock().push((name, task_id));
+                let _ = ctx.hub().seq();
+                Ok(Health {
+                    ok: true,
+                    version: format!("async-{}", ctx.caller_ctx().trace_id),
+                })
+            }
+        });
+
+        let (caller_task_id, call_env, invoke_res) = vibevalley_runtime::rt::block_on(async move {
+            vibevalley_runtime::rt::spawn(async move {
+                let caller_task_id = tokio::task::try_id();
+                let server: Arc<dyn Server> = hub.clone();
+                let call_env = server.call_with_async(CallerContext::local(), "server.health.get".into(), Value::Null).await;
+                let invoke_res = hub.invoke_async::<ops::ServerHealthGet>(&CallerContext::local(), ()).await.unwrap();
+                hub.close();
+                (caller_task_id, call_env, invoke_res)
+            })
+            .await
+            .unwrap()
+        });
+
+        assert_eq!(call_env.biz_code, 0);
+        assert_eq!(call_env.data.unwrap()["version"], "async-1");
+        assert!(invoke_res.ok);
+        assert_eq!(invoke_res.version, "async-2");
+
+        let entries = recorded.lock();
+        assert_eq!(entries.len(), 2);
+        for (thread_name, task_id) in entries.iter() {
+            assert!(
+                thread_name.starts_with("vibevalley-io-"),
+                "expected vibevalley-io worker thread, got {thread_name}"
+            );
+            assert_eq!(
+                *task_id, caller_task_id,
+                "on_async handler must run inline on caller Tokio task without spawn_blocking"
+            );
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn unconditional_trace_id_and_hub_op_span_propagate_across_awaits() {
+        use std::io;
+
+        use parking_lot::Mutex;
+        use serde_json::Value;
+        use tracing::instrument::WithSubscriber as _;
+        use vibevalley_protocol::{Caller, Health, ops};
+
+        use super::{CallerContext, CallerPrincipal};
+
+        #[derive(Clone, Default)]
+        struct SharedBuf(Arc<Mutex<Vec<u8>>>);
+
+        struct BufWriter(Arc<Mutex<Vec<u8>>>);
+
+        impl io::Write for BufWriter {
+            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                self.0.lock().extend_from_slice(buf);
+                Ok(buf.len())
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for SharedBuf {
+            type Writer = BufWriter;
+
+            fn make_writer(&'a self) -> Self::Writer {
+                BufWriter(self.0.clone())
+            }
+        }
+
+        let buf = SharedBuf::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::DEBUG)
+            .with_ansi(false)
+            .with_writer(buf.clone())
+            .finish();
+
+        async {
+            let hub = Hub::new(vibevalley_core::empty_space_state());
+            assert!(!hub.has_observer(), "test must run without InvokeObserver attached");
+
+            let observed = Arc::new(Mutex::new(Vec::<(u64, Option<&'static str>, Option<&'static str>, bool)>::new()));
+            let observed_async = observed.clone();
+            hub.on_async::<ops::ServerHealthGet, _, _>(move |ctx, ()| {
+                let observed = observed_async.clone();
+                async move {
+                    let before = tracing::Span::current();
+                    let before_name = before.metadata().map(|m| m.name());
+                    let before_id = before.id();
+
+                    tokio::task::yield_now().await;
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+
+                    let after = tracing::Span::current();
+                    let after_name = after.metadata().map(|m| m.name());
+                    let after_id = after.id();
+                    tracing::debug!(handler_trace_id = ctx.trace_id, "inside_async_handler");
+
+                    observed
+                        .lock()
+                        .push((ctx.trace_id, before_name, after_name, before_id.is_some() && before_id == after_id));
+                    Ok(Health {
+                        ok: true,
+                        version: format!("trace-{}", ctx.trace_id),
+                    })
+                }
+            });
+
+            let sync_trace_ids = Arc::new(Mutex::new(Vec::<(u64, Option<&'static str>)>::new()));
+            let sync_trace_ids_h = sync_trace_ids.clone();
+            hub.on::<ops::OrchestratorOpen>(move |ctx, ()| {
+                let span_name = tracing::Span::current().metadata().map(|m| m.name());
+                sync_trace_ids_h.lock().push((ctx.trace_id, span_name));
+                Ok(())
+            });
+
+            // (a) Unconditional non-zero trace_id minted with NO observer attached.
+            let minted_invoke = hub.invoke_async::<ops::ServerHealthGet>(&CallerContext::local(), ()).await.unwrap();
+            assert_eq!(minted_invoke.version, "trace-1");
+
+            let minted_call = hub.call_with_async(CallerContext::local(), "server.health.get".into(), Value::Null).await;
+            assert_eq!(minted_call.biz_code, 0);
+            assert_eq!(minted_call.data.unwrap()["version"], "trace-2");
+
+            // (b) Caller-supplied non-zero trace_id (42) is preserved verbatim.
+            let custom_ctx = CallerContext {
+                caller: Caller::User,
+                principal: CallerPrincipal::LocalOwner,
+                client: None,
+                trace_id: 42,
+            };
+            let custom_invoke = hub.invoke_async::<ops::ServerHealthGet>(&custom_ctx, ()).await.unwrap();
+            assert_eq!(custom_invoke.version, "trace-42");
+
+            let custom_call = hub.call_with_async(custom_ctx.clone(), "server.health.get".into(), Value::Null).await;
+            assert_eq!(custom_call.biz_code, 0);
+            assert_eq!(custom_call.data.unwrap()["version"], "trace-42");
+
+            // Sync paths also mint non-zero trace_id and preserve custom trace_id inside `hub.op`.
+            hub.invoke::<ops::OrchestratorOpen>(&CallerContext::local(), ()).unwrap();
+            hub.invoke::<ops::OrchestratorOpen>(&custom_ctx, ()).unwrap();
+            assert_eq!(hub.call_with(&CallerContext::local(), "orchestrator.open", Value::Null).biz_code, 0);
+            assert_eq!(hub.call_with(&custom_ctx, "orchestrator.open", Value::Null).biz_code, 0);
+
+            // (c) `tracing::Span::current()` stayed in `hub.op` across `.await` yields on all async calls.
+            let rows = observed.lock().clone();
+            assert_eq!(rows.len(), 4);
+            assert_eq!(rows[0], (1, Some("hub.op"), Some("hub.op"), true));
+            assert_eq!(rows[1], (2, Some("hub.op"), Some("hub.op"), true));
+            assert_eq!(rows[2], (42, Some("hub.op"), Some("hub.op"), true));
+            assert_eq!(rows[3], (42, Some("hub.op"), Some("hub.op"), true));
+
+            let sync_rows = sync_trace_ids.lock().clone();
+            assert_eq!(
+                sync_rows,
+                vec![(3, Some("hub.op")), (42, Some("hub.op")), (4, Some("hub.op")), (42, Some("hub.op")),]
+            );
+
+            let logs = String::from_utf8(buf.0.lock().clone()).unwrap();
+            assert!(
+                logs.contains("hub.op{op=\"server.health.get\" trace_id=1}"),
+                "missing minted span in logs:\n{logs}"
+            );
+            assert!(
+                logs.contains("hub.op{op=\"server.health.get\" trace_id=42}"),
+                "missing custom span in logs:\n{logs}"
+            );
+
+            hub.close();
+        }
+        .with_subscriber(subscriber)
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn async_fault_gate_delay_uses_virtual_clock_deterministically() {
+        use serde_json::Value;
+        use vibevalley_protocol::{Caller, Health, ops};
+
+        use super::{CallerContext, FaultGate};
+
+        struct DelayFaultGate {
+            target: &'static str,
+            delay_ms: u64,
+        }
+
+        impl FaultGate for DelayFaultGate {
+            fn delay_ms(&self, target: &str) -> u64 {
+                if target == self.target { self.delay_ms } else { 0 }
+            }
+
+            fn should_disconnect(&self, _topic: &str) -> bool {
+                false
+            }
+        }
+
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        hub.attach_fault_gate(Some(Arc::new(DelayFaultGate {
+            target: "server.health.get",
+            delay_ms: 5_000,
+        })));
+        hub.on_async::<ops::ServerHealthGet, _, _>(move |ctx, ()| async move {
+            Ok(Health {
+                ok: true,
+                version: format!("v-{}", ctx.trace_id),
+            })
+        });
+
+        let wall_start = std::time::Instant::now();
+
+        // `call_with_async`: stays pending at 4999ms and completes at exactly 5000ms virtual time.
+        let t0 = tokio::time::Instant::now();
+        let delayed_call = tokio::spawn({
+            let hub = hub.clone();
+            async move { hub.call_with_async(CallerContext::local(), "server.health.get".into(), Value::Null).await }
+        });
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_millis(4_999)).await;
+        tokio::task::yield_now().await;
+        assert!(!delayed_call.is_finished(), "call_with_async FaultGate must hold until full delay elapses");
+        tokio::time::advance(Duration::from_millis(1)).await;
+        let env = delayed_call.await.unwrap();
+        assert_eq!(env.biz_code, 0);
+        assert_eq!(env.data.unwrap()["version"], "v-1");
+        assert_eq!(t0.elapsed(), Duration::from_millis(5_000));
+
+        // `invoke_as_async`: stays pending at 4999ms and completes at exactly 5000ms virtual time.
+        let t1 = tokio::time::Instant::now();
+        let delayed_invoke = tokio::spawn({
+            let hub = hub.clone();
+            async move { hub.invoke_as_async::<ops::ServerHealthGet>(Caller::Remote, ()).await }
+        });
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_millis(4_999)).await;
+        tokio::task::yield_now().await;
+        assert!(!delayed_invoke.is_finished(), "invoke_async FaultGate must hold until full delay elapses");
+        tokio::time::advance(Duration::from_millis(1)).await;
+        let health = delayed_invoke.await.unwrap().unwrap();
+        assert_eq!(health.version, "v-2");
+        assert_eq!(t1.elapsed(), Duration::from_millis(5_000));
+
+        assert!(
+            wall_start.elapsed() < Duration::from_secs(1),
+            "10s of virtual FaultGate delays must finish instantaneously, took {:?}",
+            wall_start.elapsed()
+        );
+
+        hub.close();
+    }
+
+    #[test]
+    fn dual_track_four_way_cross_dispatch_enforces_can_and_observer() {
+        use std::sync::atomic::AtomicUsize;
+
+        use parking_lot::Mutex;
+        use serde_json::Value;
+        use vibevalley_protocol::{BizCode, Caller, Health, ops};
+
+        use super::{CallerContext, InvokeObserver};
+
+        #[derive(Default)]
+        struct RecordingObserver {
+            starts: Mutex<Vec<(String, u64)>>,
+            ends: Mutex<Vec<(String, u32, u64)>>,
+        }
+
+        impl InvokeObserver for RecordingObserver {
+            fn on_call_start(&self, ctx: &CallerContext, op: &str, _payload: &Value) {
+                self.starts.lock().push((op.to_string(), ctx.trace_id));
+            }
+
+            fn on_call_end(&self, ctx: &CallerContext, op: &str, biz_code: u32, _duration_us: u64) {
+                self.ends.lock().push((op.to_string(), biz_code, ctx.trace_id));
+            }
+
+            fn on_apply(&self, _seq: i64, _dirty: vibevalley_core::SliceMask, _transitions: &[vibevalley_core::Transition], _duration_us: u64) {}
+        }
+
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let observer = Arc::new(RecordingObserver::default());
+        hub.attach_observer(Some(observer.clone()));
+
+        let sync_hits = Arc::new(AtomicUsize::new(0));
+        let sync_hits_h = sync_hits.clone();
+        let sync_task_ids = Arc::new(Mutex::new(Vec::<Option<tokio::task::Id>>::new()));
+        let sync_task_ids_h = sync_task_ids.clone();
+        hub.on::<ops::OrchestratorOpen>(move |_ctx, ()| {
+            sync_hits_h.fetch_add(1, Ordering::SeqCst);
+            sync_task_ids_h.lock().push(tokio::task::try_id());
+            Ok(())
+        });
+
+        let async_hits = Arc::new(AtomicUsize::new(0));
+        let async_hits_h = async_hits.clone();
+        hub.on_async::<ops::ServerHealthGet, _, _>(move |_ctx, ()| {
+            let hits = async_hits_h.clone();
+            async move {
+                tokio::task::yield_now().await;
+                let n = hits.fetch_add(1, Ordering::SeqCst) + 1;
+                Ok(Health {
+                    ok: true,
+                    version: format!("v{n}"),
+                })
+            }
+        });
+
+        // 1. sync -> sync (`call_with` & `invoke`)
+        assert_eq!(hub.call_with(&CallerContext::local(), "orchestrator.open", Value::Null).biz_code, 0);
+        hub.invoke::<ops::OrchestratorOpen>(&CallerContext::local(), ()).unwrap();
+
+        // 2. sync -> async (`call_with` & `invoke`)
+        let sync_to_async_env = hub.call_with(&CallerContext::local(), "server.health.get", Value::Null);
+        assert_eq!(sync_to_async_env.biz_code, 0);
+        assert_eq!(sync_to_async_env.data.unwrap()["version"], "v1");
+        let sync_to_async_typed = hub.invoke::<ops::ServerHealthGet>(&CallerContext::local(), ()).unwrap();
+        assert_eq!(sync_to_async_typed.version, "v2");
+
+        // 3 & 4. async -> async + async -> sync + `can` RBAC enforcement.
+        let hub_async = hub.clone();
+        let caller_task_id = vibevalley_runtime::rt::block_on(async move {
+            vibevalley_runtime::rt::spawn(async move {
+                let caller_task_id = tokio::task::try_id();
+
+                let async_env = hub_async.call_with_async(CallerContext::local(), "server.health.get".into(), Value::Null).await;
+                assert_eq!(async_env.biz_code, 0);
+                assert_eq!(async_env.data.unwrap()["version"], "v3");
+
+                let async_typed = hub_async.invoke_as_async::<ops::ServerHealthGet>(Caller::Remote, ()).await.unwrap();
+                assert_eq!(async_typed.version, "v4");
+
+                // async -> sync (offloaded to spawn_blocking, never runs on caller Tokio task)
+                let async_to_sync_env = hub_async.call_with_async(CallerContext::local(), "orchestrator.open".into(), Value::Null).await;
+                assert_eq!(async_to_sync_env.biz_code, 0);
+                hub_async.invoke_as_async::<ops::OrchestratorOpen>(Caller::Remote, ()).await.unwrap();
+
+                // RBAC `can` check: `Caller::Session` is forbidden on `server.health.get`
+                let forbidden_call = hub_async
+                    .call_with_async(CallerContext::from_caller(Caller::Session), "server.health.get".into(), Value::Null)
+                    .await;
+                assert_eq!(forbidden_call.biz_code, BizCode::Forbidden.code());
+                let forbidden_invoke = hub_async.invoke_as_async::<ops::ServerHealthGet>(Caller::Session, ()).await.unwrap_err();
+                assert_eq!(forbidden_invoke.biz_code, BizCode::Forbidden);
+
+                caller_task_id
+            })
+            .await
+            .unwrap()
+        });
+
+        assert_eq!(sync_hits.load(Ordering::SeqCst), 4);
+        assert_eq!(async_hits.load(Ordering::SeqCst), 4);
+
+        // Last two sync handler calls came from async callers -> ran via spawn_blocking (distinct from caller task).
+        let ids = sync_task_ids.lock();
+        assert_eq!(ids.len(), 4);
+        assert!(caller_task_id.is_some());
+        assert_ne!(ids[2], caller_task_id);
+        assert_ne!(ids[3], caller_task_id);
+
+        // Observer saw all 10 calls (8 succeeded + 2 forbidden) with assigned non-zero trace IDs.
+        let starts = observer.starts.lock();
+        let ends = observer.ends.lock();
+        assert_eq!(starts.len(), 10);
+        assert_eq!(ends.len(), 10);
+        assert!(starts.iter().all(|(_, trace_id)| *trace_id > 0));
+        assert_eq!(ends.iter().filter(|(_, code, _)| *code == BizCode::Forbidden.code()).count(), 2);
+
+        hub.close();
     }
 }

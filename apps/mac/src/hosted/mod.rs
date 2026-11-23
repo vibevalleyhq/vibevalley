@@ -232,6 +232,162 @@ fn client_identity_for(view: &str, params: &Map<String, Value>) -> vibevalley_se
     next_client_identity(kind, label)
 }
 
+struct FailedFeeds {
+    board: vibevalley_server::slice_feed::SliceFeed<vibevalley_protocol::BoardSlice>,
+    sessions: vibevalley_server::slice_feed::SliceFeed<vibevalley_protocol::SessionsSlice>,
+    collab: vibevalley_server::slice_feed::SliceFeed<vibevalley_protocol::CollabSlice>,
+    inbox: vibevalley_server::slice_feed::SliceFeed<vibevalley_protocol::InboxSlice>,
+    ops: vibevalley_server::slice_feed::SliceFeed<vibevalley_protocol::OpsSlice>,
+    farm: vibevalley_server::slice_feed::SliceFeed<vibevalley_protocol::FarmFrame>,
+}
+
+impl FailedFeeds {
+    fn new() -> Self {
+        let bundle = vibevalley_server::transport::bridge::fake::empty_bundle(0);
+        Self {
+            board: vibevalley_server::slice_feed::SliceFeed::new("slice:board", bundle.board),
+            sessions: vibevalley_server::slice_feed::SliceFeed::new("slice:sessions", bundle.sessions),
+            collab: vibevalley_server::slice_feed::SliceFeed::new("slice:collab", bundle.collab),
+            inbox: vibevalley_server::slice_feed::SliceFeed::new("slice:inbox", bundle.inbox),
+            ops: vibevalley_server::slice_feed::SliceFeed::new("slice:ops", bundle.ops),
+            farm: vibevalley_server::slice_feed::SliceFeed::new("slice:farm", bundle.farm),
+        }
+    }
+}
+
+/// Fallback server installed when embedded or remote server startup fails.
+/// Surfaces the root-cause error on every RPC/subscription call while serving
+/// empty static slices so the desktop shell can render startup diagnostics.
+struct FailedServer {
+    reason: String,
+    feeds: FailedFeeds,
+}
+
+impl FailedServer {
+    fn new(reason: impl Into<String>) -> Self {
+        Self {
+            reason: reason.into(),
+            feeds: FailedFeeds::new(),
+        }
+    }
+
+    fn unavailable(&self) -> vibevalley_server::transport::bridge::Envelope {
+        use vibevalley_server::transport::bridge::{ApiError, BizCode, Envelope};
+        Envelope::failure(&ApiError::new(
+            BizCode::ServiceUnavailable,
+            format!("VibeValley server unavailable: {}", self.reason),
+        ))
+    }
+}
+
+impl vibevalley_server::transport::bridge::Server for FailedServer {
+    fn call(&self, _op: &str, _payload: Value) -> vibevalley_server::transport::bridge::Envelope {
+        self.unavailable()
+    }
+
+    fn call_with(
+        &self,
+        _ctx: &vibevalley_server::transport::bridge::CallerContext,
+        _op: &str,
+        _payload: Value,
+    ) -> vibevalley_server::transport::bridge::Envelope {
+        self.unavailable()
+    }
+
+    fn call_with_async(
+        self: Arc<Self>,
+        _ctx: vibevalley_server::transport::bridge::CallerContext,
+        _op: String,
+        _payload: Value,
+    ) -> vibevalley_server::transport::api::BoxFuture<'static, vibevalley_server::transport::bridge::Envelope> {
+        let envelope = self.unavailable();
+        Box::pin(async move { envelope })
+    }
+
+    fn slice_snapshot(&self, slice: vibevalley_server::transport::bridge::SliceKind) -> Value {
+        use vibevalley_server::transport::bridge::SliceKind;
+        match slice {
+            SliceKind::Board => self.feeds.board.snapshot().wire().clone(),
+            SliceKind::Sessions => self.feeds.sessions.snapshot().wire().clone(),
+            SliceKind::Collab => self.feeds.collab.snapshot().wire().clone(),
+            SliceKind::Inbox => self.feeds.inbox.snapshot().wire().clone(),
+            SliceKind::Ops => self.feeds.ops.snapshot().wire().clone(),
+            SliceKind::Farm => self.feeds.farm.snapshot().wire().clone(),
+        }
+    }
+
+    fn slice_snapshot_json(&self, slice: vibevalley_server::transport::bridge::SliceKind) -> Arc<str> {
+        use vibevalley_server::transport::bridge::SliceKind;
+        match slice {
+            SliceKind::Board => self.feeds.board.snapshot().json(),
+            SliceKind::Sessions => self.feeds.sessions.snapshot().json(),
+            SliceKind::Collab => self.feeds.collab.snapshot().json(),
+            SliceKind::Inbox => self.feeds.inbox.snapshot().json(),
+            SliceKind::Ops => self.feeds.ops.snapshot().json(),
+            SliceKind::Farm => self.feeds.farm.snapshot().json(),
+        }
+    }
+
+    fn watch_slice(
+        &self,
+        slice: vibevalley_server::transport::bridge::SliceKind,
+        after_seq: Option<i64>,
+        stop: &flume::Receiver<()>,
+        receive: &mut dyn FnMut(i64, &Value),
+    ) {
+        use vibevalley_server::transport::bridge::SliceKind;
+        match slice {
+            SliceKind::Board => self.feeds.board.watch_since(after_seq, None, stop, receive),
+            SliceKind::Sessions => self.feeds.sessions.watch_since(after_seq, None, stop, receive),
+            SliceKind::Collab => self.feeds.collab.watch_since(after_seq, None, stop, receive),
+            SliceKind::Inbox => self.feeds.inbox.watch_since(after_seq, None, stop, receive),
+            SliceKind::Ops => self.feeds.ops.watch_since(after_seq, None, stop, receive),
+            SliceKind::Farm => self.feeds.farm.watch_since(after_seq, None, stop, receive),
+        }
+    }
+
+    fn subscribe_slice(&self, slice: vibevalley_server::transport::bridge::SliceKind) -> Option<vibevalley_server::slice_feed::SliceSubscription> {
+        use vibevalley_server::slice_feed::SliceSubscription;
+        use vibevalley_server::transport::bridge::SliceKind;
+        Some(match slice {
+            SliceKind::Board => SliceSubscription::Board(self.feeds.board.subscribe()),
+            SliceKind::Sessions => SliceSubscription::Sessions(self.feeds.sessions.subscribe()),
+            SliceKind::Collab => SliceSubscription::Collab(self.feeds.collab.subscribe()),
+            SliceKind::Inbox => SliceSubscription::Inbox(self.feeds.inbox.subscribe()),
+            SliceKind::Ops => SliceSubscription::Ops(self.feeds.ops.subscribe()),
+            SliceKind::Farm => SliceSubscription::Farm {
+                rx: self.feeds.farm.subscribe(),
+                strip_initial_effects: false,
+            },
+        })
+    }
+
+    fn live(&self) -> flume::Receiver<vibevalley_server::transport::bridge::LiveEvent> {
+        let (_tx, rx) = flume::bounded(0);
+        rx
+    }
+
+    fn subscribe_live(&self) -> Option<tokio::sync::broadcast::Receiver<vibevalley_server::transport::bridge::LiveEvent>> {
+        let (_tx, rx) = tokio::sync::broadcast::channel(1);
+        Some(rx)
+    }
+
+    fn subscribe(&self, _name: &str, _payload: Value) -> Result<(u64, flume::Receiver<Value>), vibevalley_server::transport::bridge::Envelope> {
+        Err(self.unavailable())
+    }
+
+    fn subscribe_with(
+        &self,
+        _ctx: &vibevalley_server::transport::bridge::CallerContext,
+        _name: &str,
+        _payload: Value,
+    ) -> Result<(u64, flume::Receiver<Value>), vibevalley_server::transport::bridge::Envelope> {
+        Err(self.unavailable())
+    }
+
+    fn unsubscribe(&self, _id: u64) {}
+}
+
 impl BridgeHub {
     /// The real server under VibeValley's own data folder, started off the UI
     /// thread. `VIBEVALLEY_FAKE_SERVER=<dir>` serves fixtures instead
@@ -278,8 +434,9 @@ impl BridgeHub {
                             Arc::new(remote_server)
                         }
                         Err(e) => {
-                            let _ = ready.send_replace(Some(Err(format!("remote control plane: {e}"))));
-                            Arc::new(vibevalley_server::transport::bridge::fake::FakeServer::new())
+                            let reason = format!("remote control plane: {e}");
+                            let _ = ready.send_replace(Some(Err(reason.clone())));
+                            Arc::new(FailedServer::new(reason))
                         }
                     }
                 }
@@ -327,8 +484,9 @@ impl BridgeHub {
                                 hub
                             }
                             Err(e) => {
-                                let _ = ready.send_replace(Some(Err(format!("vibevalley server: {e}"))));
-                                Arc::new(vibevalley_server::transport::bridge::fake::FakeServer::new())
+                                let reason = format!("vibevalley server: {e}");
+                                let _ = ready.send_replace(Some(Err(reason.clone())));
+                                Arc::new(FailedServer::new(reason))
                             }
                         }
                     }))
@@ -336,8 +494,9 @@ impl BridgeHub {
                 Err(e) => {
                     drop(running_tx);
                     cx.set_global(ActiveDesktopConnection(Arc::new(connection::Mode::Embedded)));
-                    let _ = ready.send_replace(Some(Err(format!("desktop connection config: {e}"))));
-                    Arc::new(vibevalley_server::transport::bridge::fake::FakeServer::new())
+                    let reason = format!("desktop connection config: {e}");
+                    let _ = ready.send_replace(Some(Err(reason.clone())));
+                    Arc::new(FailedServer::new(reason))
                 }
             },
         };
@@ -1247,5 +1406,61 @@ mod tests {
         let reset_data = reset.data.unwrap();
         assert_eq!(reset_data["configuredMode"], "embedded");
         assert_eq!(reset_data["restartRequired"], false);
+    }
+
+    #[test]
+    fn failed_server_reports_service_unavailable_with_root_cause_and_empty_slices() {
+        use vibevalley_server::transport::bridge::{BizCode, CallerContext, Server, SliceKind};
+
+        let root_cause = "vibevalley server: no such column: source_job_id";
+        let server = Arc::new(FailedServer::new(root_cause));
+
+        for env in [
+            server.call("session.openWorkspace", json!({})),
+            server.call_with(&CallerContext::local(), "session.openWorkspace", json!({})),
+            vibevalley_runtime::rt::block_on(Arc::clone(&server).call_with_async(CallerContext::local(), "session.openWorkspace".into(), json!({}))),
+        ] {
+            assert_eq!(env.biz_code, BizCode::ServiceUnavailable.code());
+            assert!(env.message.contains(root_cause), "unexpected message: {}", env.message);
+            assert!(
+                !env.message.to_ascii_lowercase().contains("fake server"),
+                "must never mention fake server: {}",
+                env.message
+            );
+        }
+
+        let sub_err = server
+            .subscribe("channel.follow", json!({}))
+            .expect_err("FailedServer must refuse subscriptions");
+        assert_eq!(sub_err.biz_code, BizCode::ServiceUnavailable.code());
+        assert!(sub_err.message.contains(root_cause));
+        assert!(!sub_err.message.to_ascii_lowercase().contains("fake server"));
+
+        let sub_with_err = server
+            .subscribe_with(&CallerContext::local(), "channel.follow", json!({}))
+            .expect_err("FailedServer must refuse subscribe_with");
+        assert_eq!(sub_with_err.biz_code, BizCode::ServiceUnavailable.code());
+        assert!(sub_with_err.message.contains(root_cause));
+
+        // Empty slices render cleanly without panicking and expose cached JSON + async subscriptions.
+        for kind in [
+            SliceKind::Board,
+            SliceKind::Sessions,
+            SliceKind::Collab,
+            SliceKind::Inbox,
+            SliceKind::Ops,
+            SliceKind::Farm,
+        ] {
+            let snap = server.slice_snapshot(kind);
+            assert_eq!(snap["seq"], 0);
+            let json = server.slice_snapshot_json(kind);
+            assert!(json.contains("\"seq\":0"), "slice {kind:?} json: {json}");
+            assert!(server.subscribe_slice(kind).is_some());
+        }
+
+        // Live streams close immediately without spawning background threads.
+        assert!(server.live().try_recv().is_err());
+        let mut live_rx = server.subscribe_live().expect("broadcast receiver");
+        assert!(matches!(live_rx.try_recv(), Err(tokio::sync::broadcast::error::TryRecvError::Closed)));
     }
 }

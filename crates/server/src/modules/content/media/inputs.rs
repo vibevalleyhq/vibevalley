@@ -7,7 +7,7 @@ use crate::{
     modules::content::attachment::Attachments,
     now,
 };
-use parking_lot::{Mutex, MutexGuard};
+use parking_lot::Mutex as SyncMutex;
 use sha2::{Digest, Sha256};
 use sqlx::{Connection, SqliteConnection};
 use std::{
@@ -17,9 +17,9 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, AttachmentFile, BizCode, MediaInput, MediaInputKind, MediaInputPhase, MediaInputRequest, Preview, native_ops, ops};
-use vibevalley_runtime::rt::block_on;
 
 const LIFETIME: i64 = 86_400_000;
 const QUOTA: i64 = 2 * 1024 * 1024 * 1024;
@@ -34,10 +34,10 @@ struct Inner {
 }
 pub struct Inputs {
     db: Arc<ServerDb>,
-    inner: Mutex<Inner>,
+    inner: AsyncMutex<Inner>,
     files: Arc<Attachments>,
     staging: PathBuf,
-    sweeper: Mutex<Option<Ticker>>,
+    sweeper: SyncMutex<Option<Ticker>>,
 }
 fn input(row: q::GetInputRow, can_delete: bool) -> Result<MediaInput, ApiError> {
     let m: MediaInputRequest = serde_json::from_str(&row.metadata).map_err(storage)?;
@@ -67,40 +67,130 @@ async fn find_db(db: &mut SqliteConnection, id: &str) -> Result<Option<MediaInpu
     let free = q::get_pin(db, q::GetPinParams { input_id: id.into() }).await.map_err(storage)?.pinned == 0;
     input(row, free).map(Some)
 }
-fn find(db: &ServerDb, inner: &Inner, id: &str) -> Result<Option<MediaInput>, ApiError> {
-    let mut record = db.run_api(async |c| find_db(c, id).await)?;
+async fn find_read(db: &ServerDb, inner: &Inner, id: &str) -> Result<Option<MediaInput>, ApiError> {
+    let mut conn = db.read_pool().acquire().await.map_err(storage)?;
+    let mut record = find_db(&mut conn, id).await?;
     if let Some(r) = &mut record {
         r.can_delete &= !inner.uploading.contains(id);
     }
     Ok(record)
 }
-fn found(db: &ServerDb, inner: &Inner, id: &str) -> Result<MediaInput, ApiError> {
-    find(db, inner, id)?.ok_or_else(|| refused("inputMissing"))
+async fn found_read(db: &ServerDb, inner: &Inner, id: &str) -> Result<MediaInput, ApiError> {
+    find_read(db, inner, id).await?.ok_or_else(|| refused("inputMissing"))
 }
-fn phase(db: &ServerDb, id: &str, p: &str) -> Result<(), ApiError> {
-    db.run(async |c| {
-        q::set_input_phase(
-            c,
-            q::SetInputPhaseParams {
-                id: id.into(),
-                phase: p.into(),
-            },
-        )
-        .await
-    })
+async fn find_write(db: &ServerDb, inner: &Inner, id: &str) -> Result<Option<MediaInput>, ApiError> {
+    let mut conn = db.write_pool().acquire().await.map_err(storage)?;
+    let mut record = find_db(&mut conn, id).await?;
+    if let Some(r) = &mut record {
+        r.can_delete &= !inner.uploading.contains(id);
+    }
+    Ok(record)
+}
+async fn found_write(db: &ServerDb, inner: &Inner, id: &str) -> Result<MediaInput, ApiError> {
+    find_write(db, inner, id).await?.ok_or_else(|| refused("inputMissing"))
+}
+async fn phase_async(db: &ServerDb, id: &str, p: &str) -> Result<(), ApiError> {
+    let mut conn = db.write_pool().acquire().await.map_err(storage)?;
+    q::set_input_phase(
+        &mut *conn,
+        q::SetInputPhaseParams {
+            id: id.into(),
+            phase: p.into(),
+        },
+    )
+    .await
     .map_err(storage)
+}
+fn stage_upload_blocking(staging: &Path, r: &MediaInput, mut source: Box<dyn Read + Send>) -> Result<(PathBuf, String), ApiError> {
+    let directory = staging.join(&r.id);
+    std::fs::create_dir_all(&directory).map_err(storage)?;
+    let path = directory.join("content");
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(&path).map_err(storage)?;
+    let mut buffer = [0u8; 64 * 1024];
+    let mut hash = Sha256::new();
+    let mut size = 0i64;
+    let mut prefix = Vec::with_capacity(16);
+    let start = Instant::now();
+    loop {
+        if start.elapsed() > Duration::from_secs(300) {
+            return Err(refused("inputTimeout"));
+        }
+        let n = source.read(&mut buffer).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::TimedOut {
+                refused("inputTimeout")
+            } else {
+                refused("inputDisconnected")
+            }
+        })?;
+        if n == 0 {
+            break;
+        }
+        size += n as i64;
+        if size > r.size {
+            return Err(refused("inputInvalid"));
+        }
+        prefix.extend_from_slice(&buffer[..n.min(16 - prefix.len())]);
+        if prefix.len() == 16 && !validate::container(&r.mime, &prefix) {
+            return Err(refused("inputInvalid"));
+        }
+        hash.update(&buffer[..n]);
+        file.write_all(&buffer[..n]).map_err(storage)?;
+    }
+    if size != r.size || !validate::container(&r.mime, &prefix) {
+        return Err(refused("inputInvalid"));
+    }
+    file.sync_all().map_err(storage)?;
+    drop(file);
+    if r.kind == MediaInputKind::Audio {
+        validate::audio(&path, &r.mime)?;
+    }
+    let hash = hash.finalize().iter().map(|b| format!("{b:02x}")).collect::<String>();
+    if r.hash.as_ref().is_some_and(|h| h != &hash) {
+        return Err(refused("inputChanged"));
+    }
+    Ok((path, hash))
+}
+fn verify_content_blocking(path: &Path, expected_size: u64, expected_hash: &str) -> Result<(), ApiError> {
+    let mut f = std::fs::File::open(path).map_err(storage)?;
+    let mut digest = Sha256::new();
+    let mut size = 0u64;
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let n = f.read(&mut buffer).map_err(storage)?;
+        if n == 0 {
+            break;
+        }
+        size += n as u64;
+        if size > expected_size {
+            return Err(refused("inputChanged"));
+        }
+        digest.update(&buffer[..n]);
+    }
+    if size != expected_size || digest.finalize().iter().map(|b| format!("{b:02x}")).collect::<String>() != expected_hash {
+        return Err(refused("inputChanged"));
+    }
+    Ok(())
 }
 impl Inputs {
     pub fn open(home: &Path, db: Arc<ServerDb>, files: Arc<Attachments>) -> Result<Arc<Self>, ApiError> {
         let inputs = Arc::new(Self {
             db,
-            inner: Mutex::new(Inner { uploading: HashSet::new() }),
+            inner: AsyncMutex::new(Inner { uploading: HashSet::new() }),
             files,
             staging: home.join("attachments/.staging/media"),
-            sweeper: Mutex::new(None),
+            sweeper: SyncMutex::new(None),
         });
-        inputs.restore()?;
-        inputs.sweep()?;
+        vibevalley_runtime::rt::block_on(async {
+            inputs.restore_async().await?;
+            inputs.sweep_async().await
+        })?;
         let weak = Arc::downgrade(&inputs);
         let ticker = Ticker::spawn_detached(Duration::from_secs(60), false, move || {
             let Some(inputs) = weak.upgrade() else { return false };
@@ -118,22 +208,19 @@ impl Inputs {
             ticker.stop();
         }
     }
-    fn inner(&self) -> MutexGuard<'_, Inner> {
-        self.inner.lock()
+    pub async fn get_async(&self, id: &str) -> Result<MediaInput, ApiError> {
+        let inner = self.inner.lock().await;
+        found_read(&self.db, &inner, id).await
     }
     pub fn get(&self, id: &str) -> Result<MediaInput, ApiError> {
-        found(&self.db, &self.inner(), id)
+        vibevalley_runtime::rt::block_on(self.get_async(id))
     }
-    pub fn list(&self) -> Result<Vec<MediaInput>, ApiError> {
-        let uploading: HashSet<String> = self.inner().uploading.clone();
-        let (rows, pins) = self
-            .db
-            .run(async |c| {
-                let rows = q::list_inputs(&mut *c).await?;
-                let pins = q::pinned_inputs(&mut *c).await?;
-                Ok((rows, pins))
-            })
-            .map_err(storage)?;
+    pub async fn list_async(&self) -> Result<Vec<MediaInput>, ApiError> {
+        let uploading: HashSet<String> = self.inner.lock().await.uploading.clone();
+        let mut conn = self.db.read_pool().acquire().await.map_err(storage)?;
+        let rows = q::list_inputs(&mut *conn).await.map_err(storage)?;
+        let pins = q::pinned_inputs(&mut *conn).await.map_err(storage)?;
+        drop(conn);
         let pinned: HashSet<_> = pins.into_iter().map(|r| r.input_id).collect();
         rows.into_iter()
             .map(|row| {
@@ -142,58 +229,72 @@ impl Inputs {
             })
             .collect()
     }
-    pub fn create(&self, r: &MediaInputRequest) -> Result<MediaInput, ApiError> {
+    pub fn list(&self) -> Result<Vec<MediaInput>, ApiError> {
+        vibevalley_runtime::rt::block_on(self.list_async())
+    }
+    pub async fn create_async(&self, r: &MediaInputRequest) -> Result<MediaInput, ApiError> {
         validate::declared(r)?;
-        self.sweep()?;
+        self.sweep_async().await?;
         let id = uuid::Uuid::now_v7().to_string();
         let time = now();
-        self.transaction(|db| {
-            let quota = block_on(q::input_quota(&mut *db)).map_err(storage)?;
-            if quota.entries >= 256 || quota.bytes + r.size > QUOTA {
-                return Err(refused("inputQuota"));
-            }
-            block_on(q::reserve_input(
-                &mut *db,
-                q::ReserveInputParams {
-                    id: id.clone(),
-                    metadata: serde_json::to_string(r).map_err(storage)?,
-                    size: r.size,
-                    created_at: time,
-                    expires_at: time + LIFETIME,
-                },
-            ))
-            .map_err(storage)?;
-            block_on(find_db(db, &id))?.ok_or_else(|| refused("inputMissing"))
-        })
+        let _inner = self.inner.lock().await;
+        let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
+        let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(storage)?;
+        let quota = q::input_quota(&mut *tx).await.map_err(storage)?;
+        if quota.entries >= 256 || quota.bytes + r.size > QUOTA {
+            return Err(refused("inputQuota"));
+        }
+        q::reserve_input(
+            &mut *tx,
+            q::ReserveInputParams {
+                id: id.clone(),
+                metadata: serde_json::to_string(r).map_err(storage)?,
+                size: r.size,
+                created_at: time,
+                expires_at: time + LIFETIME,
+            },
+        )
+        .await
+        .map_err(storage)?;
+        let created = find_db(&mut tx, &id).await?.ok_or_else(|| refused("inputMissing"))?;
+        tx.commit().await.map_err(storage)?;
+        Ok(created)
     }
-    fn remove(&self, r: &MediaInput) -> Result<(), ApiError> {
+    pub fn create(&self, r: &MediaInputRequest) -> Result<MediaInput, ApiError> {
+        vibevalley_runtime::rt::block_on(self.create_async(r))
+    }
+    async fn remove_async(&self, r: &MediaInput) -> Result<(), ApiError> {
         if !r.can_delete {
             return Err(refused("inputBusy"));
         }
-        if self
-            .db
-            .run(async |c| q::mark_input_deleting(c, q::MarkInputDeletingParams { id: r.id.clone() }).await)
-            .map_err(storage)?
-            == 0
         {
-            return Err(refused("inputBusy"));
+            let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
+            if q::mark_input_deleting(&mut *conn, q::MarkInputDeletingParams { id: r.id.clone() })
+                .await
+                .map_err(storage)?
+                == 0
+            {
+                return Err(refused("inputBusy"));
+            }
         }
-        remove_dir(&self.staging.join(&r.id))?;
-        self.db
-            .run(async |c| q::forget_input(c, q::ForgetInputParams { id: r.id.clone() }).await)
-            .map_err(storage)?;
+        remove_dir_async(self.staging.join(&r.id)).await?;
+        let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
+        q::forget_input(&mut *conn, q::ForgetInputParams { id: r.id.clone() }).await.map_err(storage)?;
+        Ok(())
+    }
+    pub async fn delete_async(&self, id: &str) -> Result<(), ApiError> {
+        let inner = self.inner.lock().await;
+        if let Some(r) = find_write(&self.db, &inner, id).await? {
+            self.remove_async(&r).await?;
+        }
         Ok(())
     }
     pub fn delete(&self, id: &str) -> Result<(), ApiError> {
-        let inner = self.inner();
-        if let Some(r) = find(&self.db, &inner, id)? {
-            self.remove(&r)?;
-        }
-        Ok(())
+        vibevalley_runtime::rt::block_on(self.delete_async(id))
     }
-    pub fn preview_delete(&self, id: &str) -> Result<Preview, ApiError> {
-        let inner = self.inner();
-        let Some(r) = find(&self.db, &inner, id)? else {
+    pub async fn preview_delete_async(&self, id: &str) -> Result<Preview, ApiError> {
+        let inner = self.inner.lock().await;
+        let Some(r) = find_read(&self.db, &inner, id).await? else {
             return Ok(Preview { does: vec![] });
         };
         if !r.can_delete {
@@ -203,155 +304,121 @@ impl Inputs {
             does: vec![t("server.media.inputDeletePreview", &[("name", r.name.into())])],
         })
     }
-    pub fn sweep(&self) -> Result<(), ApiError> {
-        let inner = self.inner();
-        let ids = self
-            .db
-            .run(async |c| q::expired_inputs(c, q::ExpiredInputsParams { expires_at: now() }).await)
-            .map_err(storage)?;
+    pub async fn sweep_async(&self) -> Result<(), ApiError> {
+        let inner = self.inner.lock().await;
+        let ids = {
+            let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
+            q::expired_inputs(&mut *conn, q::ExpiredInputsParams { expires_at: now() })
+                .await
+                .map_err(storage)?
+        };
         for row in ids {
             let id = row.id;
-            let r = found(&self.db, &inner, &id)?;
+            let r = found_write(&self.db, &inner, &id).await?;
             if r.can_delete
-                && let Err(error) = self.remove(&r)
+                && let Err(error) = self.remove_async(&r).await
             {
                 eprintln!("media input cleanup pending for {id}: {}", error.message);
             }
         }
         Ok(())
     }
-    fn restore(&self) -> Result<(), ApiError> {
-        let _inner = self.inner();
-        remove_dir(&self.staging)?;
-        self.db.run(async |c| q::interrupt_uploads(c).await).map_err(storage)?;
-        for row in self.db.run(async |c| q::list_inputs(c).await).map_err(storage)? {
+    pub fn sweep(&self) -> Result<(), ApiError> {
+        vibevalley_runtime::rt::block_on(self.sweep_async())
+    }
+    async fn restore_async(&self) -> Result<(), ApiError> {
+        let _inner = self.inner.lock().await;
+        remove_dir_async(self.staging.clone()).await?;
+        let rows = {
+            let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
+            q::interrupt_uploads(&mut *conn).await.map_err(storage)?;
+            q::list_inputs(&mut *conn).await.map_err(storage)?
+        };
+        for row in rows {
             let r = input(row, false)?;
-            if r.phase == MediaInputPhase::Ready && !r.hash.as_ref().is_some_and(|h| self.files.path_of(h).is_file()) {
-                phase(&self.db, &r.id, "failed")?;
+            if r.phase == MediaInputPhase::Ready {
+                let exists = match r.hash.as_ref() {
+                    Some(h) => tokio::fs::metadata(self.files.path_of(h)).await.is_ok_and(|m| m.is_file()),
+                    None => false,
+                };
+                if !exists {
+                    phase_async(&self.db, &r.id, "failed").await?;
+                }
             }
         }
         Ok(())
     }
     /// Streams bounded chunks into a private file; only a complete verified
     /// file is promoted. Readers must enforce their own blocking-read timeout.
-    pub fn upload(&self, id: &str, source: impl Read) -> Result<MediaInput, ApiError> {
+    pub async fn upload_async(&self, id: &str, source: Box<dyn Read + Send>) -> Result<MediaInput, ApiError> {
         let r = {
-            let mut inner = self.inner();
-            let r = found(&self.db, &inner, id)?;
+            let mut inner = self.inner.lock().await;
+            let r = found_write(&self.db, &inner, id).await?;
             if r.phase == MediaInputPhase::Ready {
                 return Ok(r);
             }
             if r.phase == MediaInputPhase::Deleting || inner.uploading.contains(id) || r.expires_at <= now() || inner.uploading.len() >= 8 {
                 return Err(refused("inputBusy"));
             }
-            remove_dir(&self.staging.join(id))?;
-            phase(&self.db, id, "uploading")?;
+            remove_dir_async(self.staging.join(id)).await?;
+            phase_async(&self.db, id, "uploading").await?;
             inner.uploading.insert(id.to_owned());
             r
         };
-        let result = self.upload_inner(&r, source);
+        let result = self.upload_inner_async(&r, source).await;
         // Always give back the slot, even when staging or promotion fails.
-        let cleanup = remove_dir(&self.staging.join(id));
-        let mut inner = self.inner();
+        let cleanup = remove_dir_async(self.staging.join(id)).await;
+        let mut inner = self.inner.lock().await;
         inner.uploading.remove(id);
         if result.is_err() {
-            phase(&self.db, id, "failed")?;
+            phase_async(&self.db, id, "failed").await?;
         }
         result?;
         if let Err(error) = cleanup {
             eprintln!("media staging cleanup: {}", error.message);
         }
-        found(&self.db, &inner, id)
+        found_write(&self.db, &inner, id).await
     }
-    fn upload_inner(&self, r: &MediaInput, mut source: impl Read) -> Result<(), ApiError> {
-        let directory = self.staging.join(&r.id);
-        std::fs::create_dir_all(&directory).map_err(storage)?;
-        let path = directory.join("content");
-        let mut options = std::fs::OpenOptions::new();
-        options.write(true).create_new(true);
-        #[cfg(unix)]
+    pub fn upload(&self, id: &str, source: impl Read + Send + 'static) -> Result<MediaInput, ApiError> {
+        vibevalley_runtime::rt::block_on(self.upload_async(id, Box::new(source)))
+    }
+    async fn upload_inner_async(&self, r: &MediaInput, source: Box<dyn Read + Send>) -> Result<(), ApiError> {
+        let staging = self.staging.clone();
+        let record = r.clone();
+        let (path, hash) = tokio::task::spawn_blocking(move || stage_upload_blocking(&staging, &record, source))
+            .await
+            .map_err(storage)??;
         {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
+            let _inner = self.inner.lock().await;
+            let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
+            q::save_input_hash(
+                &mut *conn,
+                q::SaveInputHashParams {
+                    id: r.id.clone(),
+                    hash: Some(hash.clone()),
+                },
+            )
+            .await
+            .map_err(storage)?;
         }
-        let mut file = options.open(&path).map_err(storage)?;
-        let mut buffer = [0u8; 64 * 1024];
-        let mut hash = Sha256::new();
-        let mut size = 0i64;
-        let mut prefix = Vec::with_capacity(16);
-        let start = Instant::now();
-        loop {
-            if start.elapsed() > Duration::from_secs(300) {
-                return Err(refused("inputTimeout"));
-            }
-            let n = source.read(&mut buffer).map_err(|e| {
-                if e.kind() == std::io::ErrorKind::TimedOut {
-                    refused("inputTimeout")
-                } else {
-                    refused("inputDisconnected")
-                }
-            })?;
-            if n == 0 {
-                break;
-            }
-            size += n as i64;
-            if size > r.size {
-                return Err(refused("inputInvalid"));
-            }
-            prefix.extend_from_slice(&buffer[..n.min(16 - prefix.len())]);
-            if prefix.len() == 16 && !validate::container(&r.mime, &prefix) {
-                return Err(refused("inputInvalid"));
-            }
-            hash.update(&buffer[..n]);
-            file.write_all(&buffer[..n]).map_err(storage)?;
-        }
-        if size != r.size || !validate::container(&r.mime, &prefix) {
-            return Err(refused("inputInvalid"));
-        }
-        file.sync_all().map_err(storage)?;
-        drop(file);
-        if r.kind == MediaInputKind::Audio {
-            validate::audio(&path, &r.mime)?;
-        }
-        let hash = hash.finalize().iter().map(|b| format!("{b:02x}")).collect::<String>();
-        if r.hash.as_ref().is_some_and(|h| h != &hash) {
-            return Err(refused("inputChanged"));
-        }
+        self.files.keep_staged_async(path, hash, r.size, r.name.clone(), r.mime.clone()).await?;
         {
-            let _inner = self.inner();
-            self.db
-                .run(async |c| {
-                    q::save_input_hash(
-                        c,
-                        q::SaveInputHashParams {
-                            id: r.id.clone(),
-                            hash: Some(hash.clone()),
-                        },
-                    )
-                    .await
-                })
-                .map_err(storage)?;
-        }
-        self.files.keep_staged(&path, &hash, r.size, &r.name, &r.mime)?;
-        {
-            let _inner = self.inner();
-            self.db
-                .run(async |c| {
-                    q::input_ready(
-                        c,
-                        q::InputReadyParams {
-                            id: r.id.clone(),
-                            expires_at: now() + LIFETIME,
-                        },
-                    )
-                    .await
-                })
-                .map_err(storage)?;
+            let _inner = self.inner.lock().await;
+            let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
+            q::input_ready(
+                &mut *conn,
+                q::InputReadyParams {
+                    id: r.id.clone(),
+                    expires_at: now() + LIFETIME,
+                },
+            )
+            .await
+            .map_err(storage)?;
         }
         Ok(())
     }
-    pub fn adopt(&self, id: &str) -> Result<MediaInput, ApiError> {
-        let files = self.files.of(&[id.to_owned()]).map_err(|_| refused("inputInvalid"))?;
+    pub async fn adopt_async(&self, id: &str) -> Result<MediaInput, ApiError> {
+        let files = self.files.of_async(&[id.to_owned()]).await.map_err(|_| refused("inputInvalid"))?;
         let file = &files[0];
         let kind = match file.r#type.split('/').next() {
             Some("image") => MediaInputKind::Image,
@@ -359,143 +426,191 @@ impl Inputs {
             Some("audio") => MediaInputKind::Audio,
             _ => return Err(refused("inputInvalid")),
         };
-        let r = self.create(&MediaInputRequest {
-            kind,
-            name: file.name.clone(),
-            mime: file.r#type.clone(),
-            size: file.size,
-        })?;
-        self.upload(&r.id, std::fs::File::open(self.files.path_of(id)).map_err(storage)?)
+        let r = self
+            .create_async(&MediaInputRequest {
+                kind,
+                name: file.name.clone(),
+                mime: file.r#type.clone(),
+                size: file.size,
+            })
+            .await?;
+        let source_path = self.files.path_of(id);
+        let opened = tokio::task::spawn_blocking(move || std::fs::File::open(&source_path))
+            .await
+            .map_err(storage)?
+            .map_err(storage)?;
+        self.upload_async(&r.id, Box::new(opened)).await
+    }
+    pub fn adopt(&self, id: &str) -> Result<MediaInput, ApiError> {
+        vibevalley_runtime::rt::block_on(self.adopt_async(id))
+    }
+    pub async fn upload_file_async(&self, id: &str, path: PathBuf) -> Result<MediaInput, ApiError> {
+        if !path.is_absolute() {
+            return Err(refused("inputInvalid"));
+        }
+        let (file, file_len) = tokio::task::spawn_blocking(move || -> Result<(std::fs::File, u64), ApiError> {
+            if !std::fs::metadata(&path).map_err(storage)?.is_file() {
+                return Err(refused("inputInvalid"));
+            }
+            let file = std::fs::File::open(&path).map_err(storage)?;
+            let metadata = file.metadata().map_err(storage)?;
+            if !metadata.is_file() {
+                return Err(refused("inputInvalid"));
+            }
+            Ok((file, metadata.len()))
+        })
+        .await
+        .map_err(storage)??;
+        if file_len != self.get_async(id).await?.size as u64 {
+            return Err(refused("inputInvalid"));
+        }
+        self.upload_async(id, Box::new(file)).await
     }
     pub fn upload_file(&self, id: &str, path: &Path) -> Result<MediaInput, ApiError> {
-        if !path.is_absolute() || !std::fs::metadata(path).map_err(storage)?.is_file() {
-            return Err(refused("inputInvalid"));
-        }
-        let file = std::fs::File::open(path).map_err(storage)?;
-        let metadata = file.metadata().map_err(storage)?;
-        if !metadata.is_file() || metadata.len() != self.get(id)?.size as u64 {
-            return Err(refused("inputInvalid"));
-        }
-        self.upload(id, file)
+        vibevalley_runtime::rt::block_on(self.upload_file_async(id, path.to_path_buf()))
     }
-    pub fn content(&self, id: &str) -> Result<AttachmentFile, ApiError> {
-        let r = self.get(id)?;
+    pub async fn content_async(&self, id: &str) -> Result<AttachmentFile, ApiError> {
+        let r = self.get_async(id).await?;
         if r.phase != MediaInputPhase::Ready || (r.can_delete && r.expires_at <= now()) {
             return Err(refused("inputMissing"));
         }
-        let hash = r.hash.as_ref().ok_or_else(|| refused("inputMissing"))?;
-        let path = self.files.path_of(hash);
-        let mut f = std::fs::File::open(&path).map_err(storage)?;
-        let mut digest = Sha256::new();
-        let mut size = 0u64;
-        let mut buffer = [0u8; 64 * 1024];
-        loop {
-            let n = f.read(&mut buffer).map_err(storage)?;
-            if n == 0 {
-                break;
-            }
-            size += n as u64;
-            if size > r.size as u64 {
-                return Err(refused("inputChanged"));
-            }
-            digest.update(&buffer[..n]);
-        }
-        if size != r.size as u64 || digest.finalize().iter().map(|b| format!("{b:02x}")).collect::<String>() != *hash {
-            return Err(refused("inputChanged"));
-        }
+        let hash = r.hash.clone().ok_or_else(|| refused("inputMissing"))?;
+        let path = self.files.path_of(&hash);
+        let verify_path = path.clone();
+        let expected_size = r.size as u64;
+        tokio::task::spawn_blocking(move || verify_content_blocking(&verify_path, expected_size, &hash))
+            .await
+            .map_err(storage)??;
         Ok(AttachmentFile {
             path: path.to_string_lossy().into_owned(),
             r#type: r.mime,
             name: r.name,
         })
     }
-    fn transaction<T>(&self, write: impl FnOnce(&mut SqliteConnection) -> Result<T, ApiError>) -> Result<T, ApiError> {
-        let _inner = self.inner();
-        let mut conn = self.db.acquire().map_err(storage)?;
-        let mut tx = block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(storage)?;
-        let value = write(&mut tx)?;
-        block_on(tx.commit()).map_err(storage)?;
-        Ok(value)
+    pub fn content(&self, id: &str) -> Result<AttachmentFile, ApiError> {
+        vibevalley_runtime::rt::block_on(self.content_async(id))
     }
 
-    pub(super) fn pin_in(&self, db: &mut SqliteConnection, ids: &[String], holder: &str) -> Result<(), ApiError> {
+    pub(super) async fn pin_in_async(&self, db: &mut SqliteConnection, ids: &[String], holder: &str) -> Result<(), ApiError> {
         if ids.is_empty() || ids.len() > 5 {
             return Err(refused("inputInvalid"));
         }
         for id in ids {
-            let r = block_on(find_db(&mut *db, id))?.ok_or_else(|| refused("inputMissing"))?;
-            if r.phase != MediaInputPhase::Ready || (r.can_delete && r.expires_at <= now()) || !r.hash.as_ref().is_some_and(|h| self.files.path_of(h).is_file())
-            {
+            let r = find_db(&mut *db, id).await?.ok_or_else(|| refused("inputMissing"))?;
+            let has_file = match r.hash.as_ref() {
+                Some(h) => tokio::fs::metadata(self.files.path_of(h)).await.is_ok_and(|m| m.is_file()),
+                None => false,
+            };
+            if r.phase != MediaInputPhase::Ready || (r.can_delete && r.expires_at <= now()) || !has_file {
                 return Err(refused("inputMissing"));
             }
-            block_on(q::pin_input(
+            q::pin_input(
                 &mut *db,
                 q::PinInputParams {
                     input_id: id.clone(),
                     holder: holder.into(),
                 },
-            ))
+            )
+            .await
             .map_err(storage)?;
         }
         Ok(())
     }
 
-    pub fn pin(&self, ids: &[String], holder: &str) -> Result<(), ApiError> {
-        self.transaction(|db| self.pin_in(db, ids, holder))
+    pub async fn pin_async(&self, ids: &[String], holder: &str) -> Result<(), ApiError> {
+        let _inner = self.inner.lock().await;
+        let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
+        let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(storage)?;
+        self.pin_in_async(&mut tx, ids, holder).await?;
+        tx.commit().await.map_err(storage)?;
+        Ok(())
     }
-    pub fn release(&self, holder: &str) -> Result<(), ApiError> {
-        let _inner = self.inner();
-        self.db
-            .run(async |c| q::release_pins(c, q::ReleasePinsParams { holder: holder.into() }).await)
+    pub fn pin(&self, ids: &[String], holder: &str) -> Result<(), ApiError> {
+        vibevalley_runtime::rt::block_on(self.pin_async(ids, holder))
+    }
+    pub async fn release_async(&self, holder: &str) -> Result<(), ApiError> {
+        let _inner = self.inner.lock().await;
+        let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
+        q::release_pins(&mut *conn, q::ReleasePinsParams { holder: holder.into() })
+            .await
             .map_err(storage)
     }
+    pub fn release(&self, holder: &str) -> Result<(), ApiError> {
+        vibevalley_runtime::rt::block_on(self.release_async(holder))
+    }
 }
-fn remove_dir(path: &Path) -> Result<(), ApiError> {
-    match std::fs::remove_dir_all(path) {
+async fn remove_dir_async(path: PathBuf) -> Result<(), ApiError> {
+    tokio::task::spawn_blocking(move || match std::fs::remove_dir_all(&path) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(storage(e)),
-    }
+    })
+    .await
+    .map_err(storage)?
 }
 pub fn install(hub: &Hub, inputs: Arc<Inputs>) {
     hub.attach_media_inputs(inputs.clone());
-    hub.on::<native_ops::MediaInputFile>({
+    hub.on_async::<native_ops::MediaInputFile, _, _>({
         let i = inputs.clone();
-        move |_, r| i.content(&r.id)
+        move |_, r| {
+            let i = i.clone();
+            async move { i.content_async(&r.id).await }
+        }
     });
-    hub.on::<native_ops::MediaInputUploadFile>({
+    hub.on_async::<native_ops::MediaInputUploadFile, _, _>({
         let i = inputs.clone();
-        move |_, r| i.upload_file(&r.id, Path::new(&r.path))
+        move |_, r| {
+            let i = i.clone();
+            async move { i.upload_file_async(&r.id, PathBuf::from(r.path)).await }
+        }
     });
 
-    hub.on::<ops::MediaInputCreate>({
+    hub.on_async::<ops::MediaInputCreate, _, _>({
         let i = inputs.clone();
-        move |_, r| i.create(&r)
+        move |_, r| {
+            let i = i.clone();
+            async move { i.create_async(&r).await }
+        }
     });
-    hub.on::<ops::MediaInputAdopt>({
+    hub.on_async::<ops::MediaInputAdopt, _, _>({
         let i = inputs.clone();
-        move |_, r| i.adopt(&r.attachment)
+        move |_, r| {
+            let i = i.clone();
+            async move { i.adopt_async(&r.attachment).await }
+        }
     });
-    hub.on::<ops::MediaInputGet>({
+    hub.on_async::<ops::MediaInputGet, _, _>({
         let i = inputs.clone();
-        move |_, r| i.get(&r.id)
+        move |_, r| {
+            let i = i.clone();
+            async move { i.get_async(&r.id).await }
+        }
     });
-    hub.on::<ops::MediaInputList>({
+    hub.on_async::<ops::MediaInputList, _, _>({
         let i = inputs.clone();
-        move |_, _| i.list()
+        move |_, _| {
+            let i = i.clone();
+            async move { i.list_async().await }
+        }
     });
-    hub.on::<ops::MediaInputPreviewDelete>({
+    hub.on_async::<ops::MediaInputPreviewDelete, _, _>({
         let i = inputs.clone();
-        move |_, r| i.preview_delete(&r.id)
+        move |_, r| {
+            let i = i.clone();
+            async move { i.preview_delete_async(&r.id).await }
+        }
     });
-    hub.on::<ops::MediaInputDelete>(move |_, r| inputs.delete(&r.id));
+    hub.on_async::<ops::MediaInputDelete, _, _>(move |_, r| {
+        let i = inputs.clone();
+        async move { i.delete_async(&r.id).await }
+    });
 }
 
 impl crate::transport::api::media::MediaInputs for Inputs {
     fn upload(&self, id: &str, source: Box<dyn Read + Send>) -> Result<MediaInput, ApiError> {
-        Inputs::upload(self, id, source)
+        vibevalley_runtime::rt::block_on(self.upload_async(id, source))
     }
     fn content(&self, id: &str) -> Result<AttachmentFile, ApiError> {
-        Inputs::content(self, id)
+        vibevalley_runtime::rt::block_on(self.content_async(id))
     }
 }

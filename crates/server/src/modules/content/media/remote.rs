@@ -113,22 +113,33 @@ impl Jobs {
 
     /// The vendor's copies deleted, each written down as it goes; refused when the job's account changed or the vendor
     /// would not confirm one, so it can be asked again.
-    pub(super) fn remove_remote(&self, id: &str) -> Result<(), ApiError> {
-        let r = self.found(id)?;
-        let left: Vec<&RemoteFile> = r.remote.iter().filter(|f| f.kept() || f.state == RemoteState::Rejected).collect();
+    pub(super) async fn remove_remote_async(&self, id: &str) -> Result<(), ApiError> {
+        let r = self.found_async(id).await?;
+        let left: Vec<RemoteFile> = r.remote.iter().filter(|f| f.kept() || f.state == RemoteState::Rejected).cloned().collect();
         if left.is_empty() {
             return Ok(());
         }
-        let account = if left.iter().any(|f| f.kept()) { Some(self.account_of(&r)?) } else { None };
+        let account = if left.iter().any(RemoteFile::kept) {
+            Some(self.account_of(&r)?)
+        } else {
+            None
+        };
         for file in left {
             if let (Some(account), Some(remote)) = (&account, file.remote_id.as_ref().filter(|_| file.kept())) {
-                self.moss.delete_file(&account.key, remote).map_err(|_| refused("remoteCleanupFailed"))?;
+                let fetch = self.moss.fetch.clone();
+                let key = account.key.clone();
+                let remote = remote.clone();
+                tokio::task::spawn_blocking(move || super::vendor::Moss { fetch }.delete_file(&key, &remote))
+                    .await
+                    .map_err(|_| refused("remoteCleanupFailed"))?
+                    .map_err(|_| refused("remoteCleanupFailed"))?;
             }
-            self.note(id, |r| {
+            self.note_async(id, |r| {
                 if let Some(f) = r.remote.iter_mut().find(|f| f.input == file.input) {
                     f.state = RemoteState::Deleted;
                 }
-            })?;
+            })
+            .await?;
         }
         Ok(())
     }

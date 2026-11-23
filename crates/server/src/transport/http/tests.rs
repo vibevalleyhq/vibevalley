@@ -1,11 +1,14 @@
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::transport::api::{ClientKind, RemoteAuth, RemoteDeviceIdentity};
 use crate::transport::bridge::fake::{FakeServer, empty_bundle};
 use serde_json::{Value, json};
-use vibevalley_protocol::{Issue, SliceKind};
+use tokio_util::io::{StreamReader, SyncIoBridge};
+use vibevalley_protocol::{Issue, SCOPE_REMOTE_CLIENT, SCOPE_REMOTE_MACHINE, SliceKind};
 
+use super::auth::is_loopback;
 use super::*;
 
 fn start() -> (Arc<FakeServer>, Listener) {
@@ -346,4 +349,292 @@ fn loopback_and_artifact_route_validators_match_exact_ascii_rules() {
     for bad in ["", "0", "01", "-1", "1a", "+1"] {
         assert!(!is_artifact_version(bad), "{bad}");
     }
+}
+
+struct StaticRemoteAuth {
+    enabled: bool,
+    valid_token: &'static str,
+    scope: &'static str,
+}
+
+impl RemoteAuth for StaticRemoteAuth {
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    fn verify_bearer(&self, token: &str) -> Result<RemoteDeviceIdentity, ApiError> {
+        if token == self.valid_token {
+            Ok(RemoteDeviceIdentity {
+                device_id: "dev_1".into(),
+                name: "Test Phone".into(),
+                scope: self.scope.into(),
+            })
+        } else {
+            Err(ApiError::new(BizCode::Unauthorized, "invalid bearer"))
+        }
+    }
+}
+
+struct WithRemoteAuth {
+    inner: Arc<FakeServer>,
+    auth: Arc<dyn RemoteAuth>,
+}
+
+impl Server for WithRemoteAuth {
+    fn call(&self, op: &str, payload: Value) -> Envelope {
+        self.inner.call(op, payload)
+    }
+    fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
+        self.inner.call_with(ctx, op, payload)
+    }
+    fn slice_snapshot(&self, kind: SliceKind) -> Value {
+        self.inner.slice_snapshot(kind)
+    }
+    fn watch_slice(&self, kind: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, emit: &mut dyn FnMut(i64, &Value)) {
+        self.inner.watch_slice(kind, after_seq, stop, emit)
+    }
+    fn live(&self) -> flume::Receiver<vibevalley_protocol::LiveEvent> {
+        self.inner.live()
+    }
+    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        self.inner.subscribe(name, payload)
+    }
+    fn unsubscribe(&self, id: u64) {
+        self.inner.unsubscribe(id)
+    }
+    fn remote_auth(&self) -> Option<Arc<dyn RemoteAuth>> {
+        Some(self.auth.clone())
+    }
+}
+
+#[test]
+fn auth_extractors_enforce_authenticated_query_local_only_and_local_only_status() {
+    let fake = Arc::new(FakeServer::new());
+    let dir = tempfile::tempdir().unwrap();
+    let att_file = dir.path().join("hello.txt");
+    std::fs::write(&att_file, b"hello attachment").unwrap();
+    fake.respond("attachment.file", json!({ "path": att_file, "type": "text/plain", "name": "hello.txt" }));
+    fake.respond("issue.list", json!([]));
+    fake.respond("remote.pair.exchange", json!({ "paired": true }));
+
+    let remote_server: Shared = Arc::new(WithRemoteAuth {
+        inner: fake.clone(),
+        auth: Arc::new(StaticRemoteAuth {
+            enabled: true,
+            valid_token: "vv_dev_good",
+            scope: SCOPE_REMOTE_CLIENT,
+        }),
+    });
+    let remote = serve_remote(remote_server.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let local = serve(remote_server, "127.0.0.1:0".parse().unwrap()).unwrap();
+
+    // Authenticated: remote listener rejects missing token (403), rejects bad token (401), allows valid Bearer (200) and pairing exchange (200).
+    let (st, body) = post(&format!("{}/api/v1/issue/list", remote.url()), json!({}));
+    assert_eq!(st, 403);
+    assert_eq!(body["bizCode"], BizCode::Forbidden.code());
+
+    let res = agent()
+        .post(format!("{}/api/v1/issue/list", remote.url()))
+        .header("authorization", "Bearer vv_dev_bad")
+        .json(&json!({}))
+        .send()
+        .unwrap();
+    assert_eq!(res.status().as_u16(), 401);
+    assert_eq!(res.json::<Value>().unwrap()["bizCode"], BizCode::Unauthorized.code());
+
+    let res = agent()
+        .post(format!("{}/api/v1/issue/list", remote.url()))
+        .header("authorization", "Bearer vv_dev_good")
+        .json(&json!({}))
+        .send()
+        .unwrap();
+    assert_eq!(res.status().as_u16(), 200);
+    assert_eq!(fake.last_client().map(|c| c.kind), Some(ClientKind::RemoteDevice));
+
+    let (st, body) = post(&format!("{}/api/v1/remote/pair/exchange", remote.url()), json!({}));
+    assert_eq!(st, 200);
+    assert_eq!(body["data"]["paired"], true);
+
+    // AuthenticatedQuery: /api/v1/attachment/{id} accepts ?token= on remote listener and rejects missing/bad tokens.
+    let res = agent().get(format!("{}/api/v1/attachment/a1", remote.url())).send().unwrap();
+    assert_eq!(res.status().as_u16(), 403);
+    let res = agent().get(format!("{}/api/v1/attachment/a1?token=vv_dev_bad", remote.url())).send().unwrap();
+    assert_eq!(res.status().as_u16(), 401);
+    let res = agent().get(format!("{}/api/v1/attachment/a1?token=vv_dev_good", remote.url())).send().unwrap();
+    assert_eq!(res.status().as_u16(), 200);
+    assert_eq!(res.text().unwrap(), "hello attachment");
+
+    // LocalOnly: /mcp, media::upload, media::speech reject on remote listener with JSON BizCode::Forbidden envelope.
+    let media_id = "0196f8e2-7c0a-7f10-8b2d-9e5a4c1d2e3f";
+    for res in [
+        agent()
+            .post(format!("{}/mcp", remote.url()))
+            .header("authorization", "Bearer vv_dev_good")
+            .json(&json!({}))
+            .send()
+            .unwrap(),
+        agent()
+            .put(format!("{}/api/v1/media/input/{media_id}/content", remote.url()))
+            .header("authorization", "Bearer vv_dev_good")
+            .header("content-type", "application/octet-stream")
+            .body(vec![1, 2, 3])
+            .send()
+            .unwrap(),
+        agent()
+            .get(format!("{}/api/v1/media/speech/{media_id}/stream", remote.url()))
+            .header("authorization", "Bearer vv_dev_good")
+            .send()
+            .unwrap(),
+    ] {
+        assert_eq!(res.status().as_u16(), 403);
+        assert_eq!(res.json::<Value>().unwrap()["bizCode"], BizCode::Forbidden.code());
+    }
+
+    // LocalOnly on /mcp still rejects vv_dev_ bearer tokens on loopback.
+    let res = agent()
+        .post(format!("{}/mcp", local.url()))
+        .header("authorization", "Bearer vv_dev_good")
+        .json(&json!({}))
+        .send()
+        .unwrap();
+    assert_eq!(res.status().as_u16(), 403);
+    assert_eq!(res.json::<Value>().unwrap()["bizCode"], BizCode::Forbidden.code());
+
+    // LocalOnlyStatus: GET media::content rejects on remote listener and cross-origin loopback with plain 403 and empty body.
+    for res in [
+        agent()
+            .get(format!("{}/api/v1/media/input/{media_id}/content", remote.url()))
+            .header("authorization", "Bearer vv_dev_good")
+            .send()
+            .unwrap(),
+        agent()
+            .get(format!("{}/api/v1/media/input/{media_id}/content", local.url()))
+            .header("origin", "http://evil.example")
+            .send()
+            .unwrap(),
+    ] {
+        assert_eq!(res.status().as_u16(), 403);
+        assert_eq!(res.text().unwrap(), "");
+    }
+
+    // MachineAuth: wrong scope rejected with 403 envelope even on plain GET before WS upgrade.
+    let res = agent()
+        .get(format!("{}/api/v1/machine/ws", local.url()))
+        .header("authorization", "Bearer vv_dev_good")
+        .send()
+        .unwrap();
+    assert_eq!(res.status().as_u16(), 403);
+    assert_eq!(res.json::<Value>().unwrap()["bizCode"], BizCode::Forbidden.code());
+
+    let machine_server: Shared = Arc::new(WithRemoteAuth {
+        inner: fake,
+        auth: Arc::new(StaticRemoteAuth {
+            enabled: true,
+            valid_token: "vv_dev_machine",
+            scope: SCOPE_REMOTE_MACHINE,
+        }),
+    });
+    let machine_local = serve(machine_server, "127.0.0.1:0".parse().unwrap()).unwrap();
+    let res = agent()
+        .get(format!("{}/api/v1/machine/ws?token=vv_dev_machine", machine_local.url()))
+        .send()
+        .unwrap();
+    // MachineAuth succeeded, then machine_bus() is None -> 503 ServiceUnavailable.
+    assert_eq!(res.status().as_u16(), 503);
+    assert_eq!(res.json::<Value>().unwrap()["bizCode"], BizCode::ServiceUnavailable.code());
+}
+
+#[test]
+fn tokio_util_streaming_upload_and_ranged_download_enforce_bounds_timeout_and_truncation() {
+    // 1. StreamReader + SyncIoBridge multi-chunk upload.
+    vibevalley_runtime::rt::block_on(async {
+        let chunks = futures_util::stream::iter([
+            Ok::<_, io::Error>(Bytes::from_static(b"hello ")),
+            Ok(Bytes::from_static(b"tokio-")),
+            Ok(Bytes::from_static(b"util!")),
+        ]);
+        let stream = Box::pin(media::bounded_upload_stream(Body::from_stream(chunks), 64, Duration::from_secs(5)));
+        let mut reader = SyncIoBridge::new(StreamReader::new(stream));
+        let collected = tokio::task::spawn_blocking(move || {
+            let mut out = Vec::new();
+            reader.read_to_end(&mut out).map(|_| out)
+        })
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(collected, b"hello tokio-util!");
+
+        // 2. Max-size cap returns InvalidData.
+        let oversized = futures_util::stream::iter([Ok::<_, io::Error>(Bytes::from(vec![b'a'; 10])), Ok(Bytes::from(vec![b'b'; 10]))]);
+        let stream = Box::pin(media::bounded_upload_stream(Body::from_stream(oversized), 15, Duration::from_secs(5)));
+        let mut reader = SyncIoBridge::new(StreamReader::new(stream));
+        let err = tokio::task::spawn_blocking(move || {
+            let mut out = Vec::new();
+            reader.read_to_end(&mut out)
+        })
+        .await
+        .unwrap()
+        .unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+
+        // 3. Stalled body stream returns TimedOut when deadline elapses.
+        let stalled = futures_util::stream::pending::<Result<Bytes, io::Error>>();
+        let stream = Box::pin(media::bounded_upload_stream(Body::from_stream(stalled), 64, Duration::from_millis(25)));
+        let mut reader = SyncIoBridge::new(StreamReader::new(stream));
+        let err = tokio::task::spawn_blocking(move || {
+            let mut buf = [0u8; 16];
+            reader.read(&mut buf)
+        })
+        .await
+        .unwrap()
+        .unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::TimedOut);
+
+        // 4. ReaderStream file_range_stream flags truncated files with UnexpectedEof.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("short.bin");
+        std::fs::write(&path, b"short").unwrap();
+        let file = tokio::fs::File::open(&path).await.unwrap();
+        let mut stream = file_range_stream(file, 32, "truncated");
+        let mut seen = Vec::new();
+        let mut got_eof = false;
+        while let Some(item) = stream.next().await {
+            match item {
+                Ok(bytes) => seen.extend_from_slice(&bytes),
+                Err(err) => {
+                    assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof);
+                    got_eof = true;
+                    break;
+                }
+            }
+        }
+        assert_eq!(seen, b"short");
+        assert!(got_eof, "truncated stream must surface UnexpectedEof");
+    });
+
+    // 5. Real HTTP attachment ranged streaming across multiple 64 KiB ReaderStream chunks.
+    let (fake, l) = start();
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("big.bin");
+    let payload: Vec<u8> = (0..(150 * 1024)).map(|i| (i % 251) as u8).collect();
+    std::fs::write(&path, &payload).unwrap();
+    fake.respond(
+        "attachment.file",
+        json!({ "path": path, "type": "application/octet-stream", "name": "big.bin" }),
+    );
+
+    let full = agent().get(format!("{}/api/v1/attachment/big", l.url())).send().unwrap();
+    assert_eq!(full.status().as_u16(), 200);
+    assert_eq!(full.headers()["content-length"], payload.len().to_string());
+    assert_eq!(full.bytes().unwrap().as_ref(), payload.as_slice());
+
+    let partial = agent()
+        .get(format!("{}/api/v1/attachment/big", l.url()))
+        .header("range", "bytes=65530-131080")
+        .send()
+        .unwrap();
+    assert_eq!(partial.status().as_u16(), 206);
+    assert_eq!(partial.headers()["content-range"], format!("bytes 65530-131080/{}", payload.len()));
+    assert_eq!(partial.headers()["content-length"], (131080 - 65530 + 1).to_string());
+    assert_eq!(partial.bytes().unwrap().as_ref(), &payload[65530..=131080]);
 }

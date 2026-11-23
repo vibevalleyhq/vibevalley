@@ -54,13 +54,14 @@ impl Hub {
         &self.server
     }
 
-    /// Runs `op` on the shared runtime blocking pool with explicit caller context and hands its envelope to `reply`.
+    /// Runs `op` on the shared runtime with explicit caller context and hands its envelope to `reply`.
     pub fn call_with(&self, ctx: CallerContext, op: String, payload: Value, reply: impl FnOnce(Envelope) + Send + 'static) {
         let server = self.server.clone();
         let permits = self.permits.clone();
         vibevalley_runtime::rt::handle().spawn(async move {
             let Ok(_permit) = permits.acquire_owned().await else { return };
-            let _ = tokio::task::spawn_blocking(move || reply(server.call_with(&ctx, &op, payload))).await;
+            let envelope = server.call_with_async(ctx, op, payload).await;
+            reply(envelope);
         });
     }
 

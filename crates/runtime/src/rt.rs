@@ -1,10 +1,26 @@
 //! Process-wide shared Tokio runtime for asynchronous I/O in VibeValley.
 
 use std::future::Future;
-use std::sync::OnceLock;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::pin::pin;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, OnceLock};
+use std::task::{Context, Poll, Wake, Waker};
+use std::thread::Thread;
 
 use tokio::runtime::{Handle, Runtime, RuntimeFlavor};
+
+fn resolve_io_workers(env_val: Option<&str>, available: Option<usize>) -> usize {
+    if let Some(parsed) = env_val.and_then(|raw| raw.trim().parse::<usize>().ok()) {
+        return parsed.clamp(1, 16);
+    }
+    available.map(|n| n.clamp(2, 4)).unwrap_or(4)
+}
+
+fn io_workers() -> usize {
+    let env_val = std::env::var("VIBEVALLEY_IO_WORKERS").ok();
+    let available = std::thread::available_parallelism().ok().map(std::num::NonZeroUsize::get);
+    resolve_io_workers(env_val.as_deref(), available)
+}
 
 fn runtime() -> &'static Runtime {
     static RUNTIME: OnceLock<Runtime> = OnceLock::new();
@@ -12,6 +28,7 @@ fn runtime() -> &'static Runtime {
         let _ = rustls::crypto::ring::default_provider().install_default();
         let next = AtomicUsize::new(0);
         tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(io_workers())
             .enable_all()
             .thread_name_fn(move || {
                 let n = next.fetch_add(1, Ordering::Relaxed);
@@ -34,6 +51,42 @@ where
     handle().spawn(future)
 }
 
+struct ThreadWaker {
+    thread: Thread,
+    notified: AtomicBool,
+}
+
+impl Wake for ThreadWaker {
+    fn wake(self: Arc<Self>) {
+        self.wake_by_ref();
+    }
+
+    fn wake_by_ref(self: &Arc<Self>) {
+        self.notified.store(true, Ordering::Release);
+        self.thread.unpark();
+    }
+}
+
+fn block_on_park<F: Future>(future: F) -> F::Output {
+    let mut future = pin!(future);
+    let signal = Arc::new(ThreadWaker {
+        thread: std::thread::current(),
+        notified: AtomicBool::new(false),
+    });
+    let waker = Waker::from(signal.clone());
+    let mut cx = Context::from_waker(&waker);
+    loop {
+        match future.as_mut().poll(&mut cx) {
+            Poll::Ready(output) => return output,
+            Poll::Pending => {
+                while !signal.notified.swap(false, Ordering::Acquire) {
+                    std::thread::park();
+                }
+            }
+        }
+    }
+}
+
 pub fn block_on<F: Future>(future: F) -> F::Output {
     match Handle::try_current() {
         Err(_) => handle().block_on(future),
@@ -41,7 +94,7 @@ pub fn block_on<F: Future>(future: F) -> F::Output {
         // Current-thread runtimes panic on `block_in_place`; entering the shared runtime lets its workers drive Tokio I/O and timers.
         Ok(_) => {
             let _guard = handle().enter();
-            pollster::block_on(future)
+            block_on_park(future)
         }
     }
 }
@@ -77,5 +130,17 @@ mod tests {
             })
         });
         assert_eq!(from_current_thread, 99);
+    }
+
+    #[test]
+    fn io_worker_quota_respects_env_override_and_clamps_defaults() {
+        assert_eq!(resolve_io_workers(None, None), 4);
+        assert_eq!(resolve_io_workers(None, Some(1)), 2);
+        assert_eq!(resolve_io_workers(None, Some(3)), 3);
+        assert_eq!(resolve_io_workers(None, Some(16)), 4);
+        assert_eq!(resolve_io_workers(Some("0"), Some(16)), 1);
+        assert_eq!(resolve_io_workers(Some("8"), Some(16)), 8);
+        assert_eq!(resolve_io_workers(Some("64"), Some(16)), 16);
+        assert_eq!(resolve_io_workers(Some("invalid"), Some(12)), 4);
     }
 }

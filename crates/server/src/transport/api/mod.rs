@@ -2,11 +2,16 @@
 //! serve views through [`Server`]; `Hub` implements it. Payloads, slices, and
 //! events are VibeValley's protocol JSON.
 
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 pub use vibevalley_protocol::{ApiError, BizCode, Caller, Envelope, LiveEvent, SliceKind};
+
+/// Heap-allocated `Send` future returned by async spine trait methods.
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 pub mod media;
 
@@ -148,9 +153,16 @@ pub struct RemoteDeviceIdentity {
 
 /// Remote mobile access gate: reports whether remote access is enabled and
 /// validates Bearer device tokens against paired devices.
-pub trait RemoteAuth: Send + Sync {
+pub trait RemoteAuth: Send + Sync + 'static {
     fn is_enabled(&self) -> bool;
     fn verify_bearer(&self, token: &str) -> Result<RemoteDeviceIdentity, ApiError>;
+    fn verify_bearer_async(self: Arc<Self>, token: String) -> BoxFuture<'static, Result<RemoteDeviceIdentity, ApiError>> {
+        Box::pin(async move {
+            tokio::task::spawn_blocking(move || self.verify_bearer(&token))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        })
+    }
 }
 
 pub type SharedRemoteAuth = Arc<dyn RemoteAuth>;
@@ -238,7 +250,7 @@ pub trait LiveVoicePort: Send + Sync {
 pub type SharedLiveVoice = Arc<dyn LiveVoicePort>;
 
 /// What the server provides to the views and transports.
-pub trait Server: Send + Sync {
+pub trait Server: Send + Sync + 'static {
     /// One endpoint by name (`issue.status.update`, ...). Blocking; never
     /// called on the UI thread.
     fn call(&self, op: &str, payload: Value) -> Envelope;
@@ -246,6 +258,15 @@ pub trait Server: Send + Sync {
     fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
         let _ = ctx;
         self.call(op, payload)
+    }
+    /// Asynchronous endpoint invocation carrying caller identity, principal, and trace id.
+    fn call_with_async(self: Arc<Self>, ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
+        Box::pin(async move {
+            match tokio::task::spawn_blocking(move || self.call_with(&ctx, &op, payload)).await {
+                Ok(env) => env,
+                Err(e) => refusal(BizCode::InternalError, e.to_string()),
+            }
+        })
     }
     /// Current JSON snapshot for one domain slice.
     fn slice_snapshot(&self, slice: SliceKind) -> Value;

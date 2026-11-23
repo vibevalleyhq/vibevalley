@@ -1,7 +1,7 @@
 use sqlx::ConnectOptions;
 use sqlx::sqlite::SqliteConnectOptions;
 fn execute(path: &Path, sql: &'static str) -> sqlx::Result<()> {
-    pollster::block_on(async {
+    vibevalley_runtime::rt::block_on(async {
         let mut db = SqliteConnectOptions::new().filename(path).create_if_missing(true).connect().await?;
         sqlx::raw_sql(sql).execute(&mut db).await?;
         Ok(())
@@ -476,7 +476,7 @@ fn regression_domain_write_and_settlement_share_the_outer_commit() -> Result<()>
     let reopened = Store::open(&file)?;
     assert_eq!(reopened.read(|r| r.submission(&submission.id))?.result, json!("delivered"));
     assert_eq!(reopened.read(|r| r.document("run", "run", "issue.report"))?.unwrap().state, json!("report"));
-    let domain_rows: i64 = pollster::block_on(async {
+    let domain_rows: i64 = vibevalley_runtime::rt::block_on(async {
         let mut db = SqliteConnectOptions::new().filename(&file).read_only(true).connect().await?;
         sqlx::query_scalar("SELECT COUNT(*) FROM domain_result").fetch_one(&mut db).await
     })?;

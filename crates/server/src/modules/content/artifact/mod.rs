@@ -20,7 +20,7 @@ use std::time::Duration;
 
 use parking_lot::Mutex;
 use sqlx::{Connection, SqliteConnection};
-use tokio::sync::broadcast;
+use tokio::sync::{Mutex as AsyncMutex, broadcast};
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::artifact::{
     artifact_headers, artifact_problem, html_check, html_edit, html_problem, import_outline_markdown, infer_artifact_from_name, shell_theme_of,
@@ -40,7 +40,7 @@ pub use blocks::spans_of;
 use db::ArtifactRow;
 use entries::EntryChange;
 
-use crate::base::{LookIn, ServerDb, Ticker, missing};
+use crate::base::{LookIn, ServerDb, missing};
 use crate::modules::content::attachment::Attachments;
 use crate::ports::{ChannelAnnouncePort, ChannelQuotePort};
 use crate::{Hub, now};
@@ -119,39 +119,41 @@ impl BlockQuoter {
 
 impl ChannelQuotePort for BlockQuoter {
     fn quote(&self, refs: &[BlockRef]) -> Vec<QuotedBlock> {
-        let Ok(mut conn) = self.db.acquire() else {
-            return vec![];
-        };
-        let mut out = vec![];
-        for r in refs {
-            let row = match db::artifact(&mut conn, &r.artifact_id) {
-                Ok(Some(row)) => row,
-                Ok(None) => continue,
-                Err(e) => {
-                    eprintln!("vibevalley-server: quoting a block failed: {e}");
-                    continue;
-                }
+        vibevalley_runtime::rt::block_on(async {
+            let Ok(mut conn) = self.db.read_pool().acquire().await else {
+                return vec![];
             };
-            let blocks = match db::blocks(&mut conn, &r.artifact_id) {
-                Ok(b) => b,
-                Err(e) => {
-                    eprintln!("vibevalley-server: quoting a block failed: {e}");
-                    continue;
-                }
-            };
-            let b = blocks.iter().find(|b| b.id == r.block_id && b.deleted.is_none());
-            out.push(QuotedBlock {
-                artifact_id: r.artifact_id.clone(),
-                block_id: r.block_id.clone(),
-                rev: r.rev,
-                title: row.title,
-                r#type: b.and_then(|b| serde_json::to_value(b.r#type).ok()?.as_str().map(str::to_string)),
-                text: b.map(|b| vibevalley_core::artifact::plain(&b.text)),
-                now_rev: b.map(|b| b.rev),
-                deleted: b.is_none().then_some(true),
-            });
-        }
-        out
+            let mut out = vec![];
+            for r in refs {
+                let row = match db::artifact(&mut conn, &r.artifact_id).await {
+                    Ok(Some(row)) => row,
+                    Ok(None) => continue,
+                    Err(e) => {
+                        eprintln!("vibevalley-server: quoting a block failed: {e}");
+                        continue;
+                    }
+                };
+                let blocks = match db::blocks(&mut conn, &r.artifact_id).await {
+                    Ok(b) => b,
+                    Err(e) => {
+                        eprintln!("vibevalley-server: quoting a block failed: {e}");
+                        continue;
+                    }
+                };
+                let b = blocks.iter().find(|b| b.id == r.block_id && b.deleted.is_none());
+                out.push(QuotedBlock {
+                    artifact_id: r.artifact_id.clone(),
+                    block_id: r.block_id.clone(),
+                    rev: r.rev,
+                    title: row.title,
+                    r#type: b.and_then(|b| serde_json::to_value(b.r#type).ok()?.as_str().map(str::to_string)),
+                    text: b.map(|b| vibevalley_core::artifact::plain(&b.text)),
+                    now_rev: b.map(|b| b.rev),
+                    deleted: b.is_none().then_some(true),
+                });
+            }
+            out
+        })
     }
 }
 
@@ -159,11 +161,11 @@ pub struct Artifacts {
     db: Arc<ServerDb>,
     /// One change of an artifact's row at a time: a version's number is the
     /// latest's plus one.
-    rows: Mutex<()>,
+    rows: AsyncMutex<()>,
     /// One batch of block ops at a time.
-    batches: Mutex<()>,
+    batches: AsyncMutex<()>,
     /// Per-artifact write lock for structured entry store batches.
-    entry_locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
+    entry_locks: Mutex<HashMap<String, Arc<AsyncMutex<()>>>>,
     files: Arc<Attachments>,
     channel: Arc<dyn ChannelAnnouncePort>,
     changes: broadcast::Sender<Change>,
@@ -174,11 +176,11 @@ pub struct Artifacts {
     presence_extra: Mutex<PresenceExtra>,
     presence_changes: broadcast::Sender<(String, ArtifactPresenceEvent)>,
     cancel: CancellationToken,
-    prune_ticker: Mutex<Option<Ticker>>,
+    prune_task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
 impl Artifacts {
-    /// Opens artifacts on the shared [`ServerDb`]. The daily prune ticker is
+    /// Opens artifacts on the shared [`ServerDb`]. The daily prune task is
     /// attached to the hub's task tracker when [`install`] wires the endpoints.
     pub fn open(db: Arc<ServerDb>, files: Arc<Attachments>, channel: Arc<dyn ChannelAnnouncePort>) -> Arc<Artifacts> {
         let (changes, _) = broadcast::channel(STREAM_CAPACITY);
@@ -187,8 +189,8 @@ impl Artifacts {
         let (presence_changes, _) = broadcast::channel(STREAM_CAPACITY);
         Arc::new(Artifacts {
             db,
-            rows: Mutex::default(),
-            batches: Mutex::default(),
+            rows: AsyncMutex::new(()),
+            batches: AsyncMutex::new(()),
             entry_locks: Mutex::default(),
             files,
             channel,
@@ -199,50 +201,67 @@ impl Artifacts {
             presence_extra: Mutex::default(),
             presence_changes,
             cancel: CancellationToken::new(),
-            prune_ticker: Mutex::new(None),
+            prune_task: Mutex::new(None),
         })
     }
 
     fn start_prune_ticker(self: &Arc<Self>, hub: &Hub) {
-        let mut slot = self.prune_ticker.lock();
+        let mut slot = self.prune_task.lock();
         if slot.is_some() || self.cancel.is_cancelled() {
             return;
         }
         let weak = Arc::downgrade(self);
-        let ticker = Ticker::spawn_on(hub, Duration::from_millis(blocks::DAY_MS as u64), true, move || {
-            let Some(a) = weak.upgrade() else { return false };
-            if a.cancel.is_cancelled() {
-                return false;
+        let cancel = self.cancel.clone();
+        let hub_cancel = hub.child_token();
+        let handle = hub.spawn_task(async move {
+            let mut timer = tokio::time::interval(Duration::from_millis(blocks::DAY_MS as u64));
+            timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            loop {
+                tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => return,
+                    _ = hub_cancel.cancelled() => return,
+                    _ = timer.tick() => {}
+                }
+                let Some(a) = weak.upgrade() else { return };
+                if a.cancel.is_cancelled() {
+                    return;
+                }
+                let before = now() - blocks::KEPT_DAYS * blocks::DAY_MS;
+                match a.db.write_pool().acquire().await {
+                    Ok(mut conn) => {
+                        if let Err(e) = db::prune(&mut conn, before).await {
+                            eprintln!("vibevalley-server: artifact.prune failed: {e}");
+                        }
+                    }
+                    Err(e) => eprintln!("vibevalley-server: artifact.prune failed: {e}"),
+                }
             }
-            let before = now() - blocks::KEPT_DAYS * blocks::DAY_MS;
-            if let Err(e) = db::prune(&mut a.db(), before) {
-                eprintln!("vibevalley-server: artifact.prune failed: {e}");
-            }
-            true
         });
-        *slot = Some(ticker);
+        *slot = Some(handle);
     }
 
-    /// Stops the daily prune ticker and active subscription streams.
+    /// Stops the daily prune task and active subscription streams.
     pub fn close(&self) {
         self.cancel.cancel();
-        if let Some(ticker) = self.prune_ticker.lock().take() {
-            ticker.stop();
+        if let Some(handle) = self.prune_task.lock().take() {
+            handle.abort();
         }
     }
 
-    fn db(&self) -> crate::base::DbConn {
-        self.db.acquire().expect("server db pool open")
-    }
-
-    fn found(&self, db: &mut SqliteConnection, id: &str) -> Result<ArtifactRow, ApiError> {
+    async fn found(&self, db: &mut SqliteConnection, id: &str) -> Result<ArtifactRow, ApiError> {
         db::artifact(db, id)
+            .await
             .map_err(q)?
             .ok_or_else(|| missing(t("server.artifact.missing", &[("id", id.into())]), LookIn::Artifact))
     }
 
-    fn assemble(&self, db: &mut SqliteConnection, row: ArtifactRow) -> Result<Wire, ApiError> {
-        let versions = if row.body == "html" { db::versions(db, &row.id).map_err(q)? } else { vec![] };
+    async fn assemble(&self, db: &mut SqliteConnection, row: ArtifactRow) -> Result<Wire, ApiError> {
+        let versions = if row.body == "html" {
+            db::versions(db, &row.id).await.map_err(q)?
+        } else {
+            vec![]
+        };
         let channel = row.channel_id.clone().unwrap_or_default();
         let body = match row.body.as_str() {
             "html" => ArtifactBody::Html,
@@ -284,37 +303,49 @@ impl Artifacts {
         })
     }
 
-    fn get_now(&self, id: &str) -> Result<Wire, ApiError> {
-        let mut db = self.db();
-        let row = self.found(&mut db, id)?;
-        self.assemble(&mut db, row)
+    async fn get_now_async(&self, id: &str) -> Result<Wire, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+        let row = self.found(&mut db, id).await?;
+        self.assemble(&mut db, row).await
     }
 
-    pub fn list(&self, req: &ArtifactListRequest) -> Result<Vec<Wire>, ApiError> {
-        let mut db = self.db();
+    pub async fn list_async(&self, req: &ArtifactListRequest) -> Result<Vec<Wire>, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
         let channel = req.channel.as_deref().filter(|c| !c.is_empty());
         let rows = match (req.issue.as_deref().filter(|i| !i.is_empty()), channel) {
-            (Some(issue), _) => db::artifacts_for_issue(&mut db, issue),
-            (None, Some(channel)) => db::artifacts_in_channel(&mut db, channel),
-            (None, None) => db::artifacts(&mut db, LISTED_MAX),
+            (Some(issue), _) => db::artifacts_for_issue(&mut db, issue).await,
+            (None, Some(channel)) => db::artifacts_in_channel(&mut db, channel).await,
+            (None, None) => db::artifacts(&mut db, LISTED_MAX).await,
         }
         .map_err(q)?;
         // Both given: the issue's, in that channel; filtered by artifact_type when set.
-        rows.into_iter()
+        let mut out = Vec::new();
+        for r in rows
+            .into_iter()
             .filter(|r| channel.is_none_or(|c| r.channel_id.as_deref() == Some(c)))
             .filter(|r| req.artifact_type.is_none_or(|ty| r.artifact_type.as_deref() == Some(ty.as_str())))
-            .map(|r| self.assemble(&mut db, r))
-            .collect()
+        {
+            out.push(self.assemble(&mut db, r).await?);
+        }
+        Ok(out)
+    }
+
+    pub fn list(&self, req: &ArtifactListRequest) -> Result<Vec<Wire>, ApiError> {
+        vibevalley_runtime::rt::block_on(self.list_async(req))
+    }
+
+    pub async fn get_async(&self, id: &str) -> Result<Wire, ApiError> {
+        self.get_now_async(id).await
     }
 
     pub fn get(&self, id: &str) -> Result<Wire, ApiError> {
-        self.get_now(id)
+        vibevalley_runtime::rt::block_on(self.get_async(id))
     }
 
-    fn version_of(&self, db: &mut SqliteConnection, id: &str, version: Option<i64>) -> Result<(ArtifactRow, db::VersionRow), ApiError> {
-        let row = self.found(db, id)?;
+    async fn version_of(&self, db: &mut SqliteConnection, id: &str, version: Option<i64>) -> Result<(ArtifactRow, db::VersionRow), ApiError> {
+        let row = self.found(db, id).await?;
         let n = version.unwrap_or(row.version);
-        let Some(v) = db::version(db, id, n).map_err(q)? else {
+        let Some(v) = db::version(db, id, n).await.map_err(q)? else {
             return Err(ApiError::new(
                 BizCode::ArtifactNotFound,
                 t(
@@ -327,8 +358,9 @@ impl Artifacts {
     }
 
     /// `pageOf`: a file gone from disk is a version that cannot be read.
-    fn page_of(&self, row: &ArtifactRow, v: &db::VersionRow) -> Result<String, ApiError> {
-        std::fs::read(self.files.path_of(&v.attachment_id))
+    async fn page_of_async(&self, row: &ArtifactRow, v: &db::VersionRow) -> Result<String, ApiError> {
+        tokio::fs::read(self.files.path_of(&v.attachment_id))
+            .await
             .map(|b| String::from_utf8_lossy(&b).into_owned())
             .map_err(|e| {
                 eprintln!("vibevalley-server: artifact {} version {}: its page could not be read: {e}", row.id, v.version);
@@ -341,19 +373,22 @@ impl Artifacts {
 
     /// An html one's version as made; a blocks one's Markdown now; a store one's
     /// manifest summary, its version its seq.
-    pub fn content(&self, id: &str, version: Option<i64>) -> Result<(ArtifactContent, ArtifactBody), ApiError> {
-        let row = self.found(&mut self.db(), id)?;
+    pub async fn content_async(&self, id: &str, version: Option<i64>) -> Result<(ArtifactContent, ArtifactBody), ApiError> {
+        let row = {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            self.found(&mut db, id).await?
+        };
         if row.body == "blocks" {
             return Ok((
                 ArtifactContent {
                     version: row.seq,
-                    content: self.markdown(id)?,
+                    content: self.markdown_async(id).await?,
                 },
                 ArtifactBody::Blocks,
             ));
         }
         if row.body == "store" {
-            let summary = self.store_summary(&row)?;
+            let summary = self.store_summary_async(&row).await?;
             return Ok((
                 ArtifactContent {
                     version: row.seq,
@@ -362,24 +397,27 @@ impl Artifacts {
                 ArtifactBody::Store,
             ));
         }
-        let (row, v) = self.version_of(&mut self.db(), id, version)?;
-        let content = self.page_of(&row, &v)?;
+        let (row, v) = {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            self.version_of(&mut db, id, version).await?
+        };
+        let content = self.page_of_async(&row, &v).await?;
         Ok((ArtifactContent { version: v.version, content }, ArtifactBody::Html))
     }
 
     /// An html version's file on disk; none when there is none.
-    pub fn file(&self, id: &str, version: i64) -> Option<PathBuf> {
-        let mut db = self.db();
-        let row = db::artifact(&mut db, id).ok()??;
+    pub async fn file_async(&self, id: &str, version: i64) -> Option<PathBuf> {
+        let mut db = self.db.read_pool().acquire().await.ok()?;
+        let row = db::artifact(&mut db, id).await.ok()??;
         if row.body != "html" {
             return None;
         }
-        db::version(&mut db, id, version).ok()?.map(|v| self.files.path_of(&v.attachment_id))
+        db::version(&mut db, id, version).await.ok()?.map(|v| self.files.path_of(&v.attachment_id))
     }
 
     /// `keep`: a version's bytes as an attachment.
-    fn keep(&self, bytes: &[u8], title: &str) -> Result<String, ApiError> {
-        Ok(self.files.keep(bytes, &format!("{title}.html"), "text/html")?.id)
+    async fn keep_async(&self, bytes: Vec<u8>, title: &str) -> Result<String, ApiError> {
+        Ok(self.files.keep_async(bytes, format!("{title}.html"), "text/html".into()).await?.id)
     }
 
     pub(super) fn words(base: String, note: Option<&str>) -> String {
@@ -392,8 +430,8 @@ impl Artifacts {
     /// Without content, an empty blocks or store one. With content or entries, a
     /// hand-in: html kept whole, Markdown read into blocks, or store entries
     /// committed, announced when appropriate.
-    pub fn create(&self, maker: &Maker, req: &ArtifactRequest) -> Result<Wire, ApiError> {
-        let _rows = self.rows.lock();
+    pub async fn create_async(&self, maker: &Maker, req: &ArtifactRequest) -> Result<Wire, ApiError> {
+        let _rows = self.rows.lock().await;
         let trimmed = req.title.trim();
         let inferred = (req.kind.is_none() && req.artifact_type.is_none() && !trimmed.is_empty())
             .then(|| infer_artifact_from_name(trimmed, req.content.as_deref()))
@@ -423,7 +461,7 @@ impl Artifacts {
 
         if wants_store {
             let store_type = artifact_type.filter(|ty| ty.body() == ArtifactBody::Store);
-            return self.create_store(maker, req, &effective_title, store_type);
+            return self.create_store_async(maker, req, &effective_title, store_type).await;
         }
 
         let docs_type = artifact_type.filter(|ty| ty.body() == ArtifactBody::Blocks);
@@ -439,7 +477,7 @@ impl Artifacts {
                 Some(c) => Some(self.channel.place_of(&maker.from, c)?),
                 None => None,
             };
-            return self.start_blocks(maker, &effective_title, docs_type, channel, req.issue.clone());
+            return self.start_blocks_async(maker, &effective_title, docs_type, channel, req.issue.clone()).await;
         };
 
         let kind = req.kind.or_else(|| inferred.as_ref().map(|i| i.kind)).unwrap_or(ArtifactKind::Markdown);
@@ -463,7 +501,11 @@ impl Artifacts {
         });
         let final_type = if html { None } else { docs_type };
         let channel = self.channel.place_of(&maker.from, req.channel.as_deref().unwrap_or(""))?;
-        let file = if html { self.keep(bytes, &effective_title)? } else { String::new() };
+        let file = if html {
+            self.keep_async(bytes.to_vec(), &effective_title).await?
+        } else {
+            String::new()
+        };
         let id = new_id();
         let note = req.note.as_deref().map(str::trim).filter(|n| !n.is_empty());
         let version = if html { 1 } else { 0 };
@@ -483,8 +525,8 @@ impl Artifacts {
         };
         let initial = {
             let at = now();
-            let mut conn = self.db();
-            let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
+            let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
+            let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
             db::add_artifact(
                 &mut tx,
                 db::NewArtifact {
@@ -502,6 +544,7 @@ impl Artifacts {
                     created_at: at,
                 },
             )
+            .await
             .map_err(q)?;
             if html {
                 db::add_version(
@@ -517,41 +560,48 @@ impl Artifacts {
                         created_at: at,
                     },
                 )
+                .await
                 .map_err(q)?;
                 let meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned), at);
-                self.sync_html_to_collab(&mut tx, &id, None, content, &meta)?;
+                self.sync_html_to_collab_async(&mut tx, &id, None, content, &meta).await?;
             }
             let fill_meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned), at);
             let ack = if html {
                 None
             } else {
-                self.fill_with_meta(&mut tx, &id, content, &maker.by, &fill_meta)?
+                self.fill_with_meta_async(&mut tx, &id, content, &maker.by, &fill_meta).await?
             };
-            vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
+            tx.commit().await.map_err(q)?;
             ack
         };
         let text = Self::words(t("server.artifact.made", &[("title", effective_title.as_str().into())]), note);
         let said = match self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new()) {
             Ok(msg) => msg,
             Err(err) => {
-                let _ = db::delete_artifact(&mut self.db(), &id);
+                if let Ok(mut conn) = self.db.write_pool().acquire().await {
+                    let _ = db::delete_artifact(&mut conn, &id).await;
+                }
                 return Err(err);
             }
         };
         {
-            let mut db = self.db();
-            db::artifact_said(&mut db, &id, &said.id).map_err(q)?;
+            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
+            db::artifact_said(&mut db, &id, &said.id).await.map_err(q)?;
             if html {
-                db::version_announced(&mut db, &id, 1, &said.id).map_err(q)?;
+                db::version_announced(&mut db, &id, 1, &said.id).await.map_err(q)?;
             }
         }
         if let Some(ack) = initial {
             self.publish_change(&id, &ack);
         }
-        self.get_now(&id)
+        self.get_now_async(&id).await
     }
 
-    fn create_store(&self, maker: &Maker, req: &ArtifactRequest, title: &str, artifact_type: Option<ArtifactType>) -> Result<Wire, ApiError> {
+    pub fn create(&self, maker: &Maker, req: &ArtifactRequest) -> Result<Wire, ApiError> {
+        vibevalley_runtime::rt::block_on(self.create_async(maker, req))
+    }
+
+    async fn create_store_async(&self, maker: &Maker, req: &ArtifactRequest, title: &str, artifact_type: Option<ArtifactType>) -> Result<Wire, ApiError> {
         let title_for_check = if req.title.trim().is_empty() { title } else { req.title.as_str() };
         let problem = artifact_problem(Some(title_for_check), None, None);
         if !problem.is_empty() {
@@ -582,10 +632,10 @@ impl Artifacts {
         };
 
         {
-            let mut db = self.db();
-            let mut tx = vibevalley_runtime::rt::block_on(db.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
+            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
+            let mut tx = db.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
             if is_default {
-                db::clear_default_design_system(&mut tx, at).map_err(q)?;
+                db::clear_default_design_system(&mut tx, at).await.map_err(q)?;
             }
             db::add_artifact(
                 &mut tx,
@@ -604,8 +654,9 @@ impl Artifacts {
                     created_at: at,
                 },
             )
+            .await
             .map_err(q)?;
-            vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
+            tx.commit().await.map_err(q)?;
         }
 
         let mut seq = 0;
@@ -614,15 +665,17 @@ impl Artifacts {
             None => artifact_type.map(|ty| starter_entries_for_type(ty, title)).unwrap_or_default(),
         };
         if !initial_entries.is_empty() {
-            let seeded = self.batch_entries(
-                maker,
-                &ArtifactEntryBatchRequest {
-                    id: id.clone(),
-                    writes: initial_entries,
-                    note: None,
-                    announce: Some(false),
-                },
-            )?;
+            let seeded = self
+                .batch_entries_async(
+                    maker,
+                    &ArtifactEntryBatchRequest {
+                        id: id.clone(),
+                        writes: initial_entries,
+                        note: None,
+                        announce: Some(false),
+                    },
+                )
+                .await?;
             seq = seeded.seq;
         }
 
@@ -639,14 +692,15 @@ impl Artifacts {
             };
             let text = Self::words(t("server.artifact.made", &[("title", title.into())]), note);
             let said = self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new())?;
-            db::artifact_said(&mut self.db(), &id, &said.id).map_err(q)?;
+            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
+            db::artifact_said(&mut db, &id, &said.id).await.map_err(q)?;
         }
 
-        self.get_now(&id)
+        self.get_now_async(&id).await
     }
 
     /// An empty blocks one the user starts on the page.
-    fn start_blocks(
+    async fn start_blocks_async(
         &self,
         maker: &Maker,
         title: &str,
@@ -660,7 +714,7 @@ impl Artifacts {
         } else {
             maker.by.clone()
         };
-        let mut db = self.db();
+        let mut db = self.db.write_pool().acquire().await.map_err(q)?;
         db::add_artifact(
             &mut db,
             db::NewArtifact {
@@ -678,15 +732,16 @@ impl Artifacts {
                 created_at: now(),
             },
         )
+        .await
         .map_err(q)?;
-        let row = self.found(&mut db, &id)?;
-        self.assemble(&mut db, row)
+        let row = self.found(&mut db, &id).await?;
+        self.assemble(&mut db, row).await
     }
 
     /// Imports a `.md` document (standard Markdown, YAML frontmatter, or Logseq outline)
     /// into a new `ArtifactType::Outline` blocks artifact.
-    pub fn import_outline(&self, maker: &Maker, req: &ArtifactOutlineImportRequest) -> Result<Wire, ApiError> {
-        let _rows = self.rows.lock();
+    pub async fn import_outline_async(&self, maker: &Maker, req: &ArtifactOutlineImportRequest) -> Result<Wire, ApiError> {
+        let _rows = self.rows.lock().await;
         let imported = import_outline_markdown(&req.markdown, req.filename.as_deref(), req.title.as_deref());
         let explicit_title = req.title.as_deref().map(str::trim).filter(|s| !s.is_empty());
         let effective_title = if let Some(explicit) = explicit_title {
@@ -719,8 +774,8 @@ impl Artifacts {
             maker.by.clone()
         };
         let initial = {
-            let mut conn = self.db();
-            let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
+            let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
+            let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
             db::add_artifact(
                 &mut tx,
                 db::NewArtifact {
@@ -738,10 +793,13 @@ impl Artifacts {
                     created_at: at,
                 },
             )
+            .await
             .map_err(q)?;
             let fill_meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned).or_else(|| Some("import outline".into())), at);
-            let ack = self.fill_md_blocks_with_meta(&mut tx, &id, imported.blocks, &maker.by, &fill_meta)?;
-            vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
+            let ack = self
+                .fill_md_blocks_with_meta_async(&mut tx, &id, imported.blocks, &maker.by, &fill_meta)
+                .await?;
+            tx.commit().await.map_err(q)?;
             ack
         };
         if should_announce && let Some(channel) = resolved_channel {
@@ -758,40 +816,55 @@ impl Artifacts {
             let said = match self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new()) {
                 Ok(msg) => msg,
                 Err(err) => {
-                    let _ = db::delete_artifact(&mut self.db(), &id);
+                    if let Ok(mut conn) = self.db.write_pool().acquire().await {
+                        let _ = db::delete_artifact(&mut conn, &id).await;
+                    }
                     return Err(err);
                 }
             };
-            db::artifact_said(&mut self.db(), &id, &said.id).map_err(q)?;
+            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
+            db::artifact_said(&mut db, &id, &said.id).await.map_err(q)?;
         }
 
         if let Some(ack) = initial {
             self.publish_change(&id, &ack);
         }
-        self.get_now(&id)
+        self.get_now_async(&id).await
+    }
+
+    pub fn import_outline(&self, maker: &Maker, req: &ArtifactOutlineImportRequest) -> Result<Wire, ApiError> {
+        vibevalley_runtime::rt::block_on(self.import_outline_async(maker, req))
     }
 
     /// An html one's next version; a blocks or store one is refused.
-    pub fn version(&self, maker: &Maker, req: &ArtifactVersionRequest) -> Result<Wire, ApiError> {
-        let _rows = self.rows.lock();
-        self.version_locked(maker, req, None)
+    pub async fn version_async(&self, maker: &Maker, req: &ArtifactVersionRequest) -> Result<Wire, ApiError> {
+        let _rows = self.rows.lock().await;
+        self.version_locked_async(maker, req, None).await
+    }
+
+    pub async fn version_with_meta_async(&self, maker: &Maker, req: &ArtifactVersionRequest, meta: &CommitMeta) -> Result<Wire, ApiError> {
+        let _rows = self.rows.lock().await;
+        self.version_locked_async(maker, req, Some(meta)).await
     }
 
     pub fn version_with_meta(&self, maker: &Maker, req: &ArtifactVersionRequest, meta: &CommitMeta) -> Result<Wire, ApiError> {
-        let _rows = self.rows.lock();
-        self.version_locked(maker, req, Some(meta))
+        vibevalley_runtime::rt::block_on(self.version_with_meta_async(maker, req, meta))
     }
 
-    fn version_locked(&self, maker: &Maker, req: &ArtifactVersionRequest, explicit_meta: Option<&CommitMeta>) -> Result<Wire, ApiError> {
-        let (row, prior_html) = {
-            let mut db = self.db();
-            let row = self.found(&mut db, &req.id)?;
+    async fn version_locked_async(&self, maker: &Maker, req: &ArtifactVersionRequest, explicit_meta: Option<&CommitMeta>) -> Result<Wire, ApiError> {
+        let (row, prior_version) = {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            let row = self.found(&mut db, &req.id).await?;
             let prior = if row.body == "html" && row.version > 0 {
-                db::version(&mut db, &row.id, row.version).map_err(q)?.and_then(|v| self.page_of(&row, &v).ok())
+                db::version(&mut db, &row.id, row.version).await.map_err(q)?
             } else {
                 None
             };
             (row, prior)
+        };
+        let prior_html = match prior_version {
+            Some(v) => self.page_of_async(&row, &v).await.ok(),
+            None => None,
         };
         if row.body != "html" {
             return Err(refused(t("server.artifact.notHtml", &[("title", row.title.as_str().into())])));
@@ -804,7 +877,7 @@ impl Artifacts {
         if !problem.is_empty() {
             return Err(refused(problem));
         }
-        let file = self.keep(bytes, &row.title)?;
+        let file = self.keep_async(bytes.to_vec(), &row.title).await?;
         let next = row.version + 1;
         let note = req.note.as_deref().map(str::trim).filter(|n| !n.is_empty());
         let card = ArtifactCard {
@@ -823,8 +896,8 @@ impl Artifacts {
         };
         {
             let at = now();
-            let mut conn = self.db();
-            let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
+            let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
+            let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
             db::add_version(
                 &mut tx,
                 db::NewVersion {
@@ -838,13 +911,15 @@ impl Artifacts {
                     created_at: at,
                 },
             )
+            .await
             .map_err(q)?;
-            db::artifact_versioned(&mut tx, &row.id, next, at).map_err(q)?;
+            db::artifact_versioned(&mut tx, &row.id, next, at).await.map_err(q)?;
             let meta = explicit_meta
                 .cloned()
                 .unwrap_or_else(|| collab::commit_meta_for_maker(maker, note.map(str::to_owned), at));
-            self.sync_html_to_collab(&mut tx, &row.id, prior_html.as_deref(), &req.content, &meta)?;
-            vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
+            self.sync_html_to_collab_async(&mut tx, &row.id, prior_html.as_deref(), &req.content, &meta)
+                .await?;
+            tx.commit().await.map_err(q)?;
         }
         let text = Self::words(
             t("server.artifact.versioned", &[("title", row.title.as_str().into()), ("version", next.into())]),
@@ -858,47 +933,57 @@ impl Artifacts {
             maker.run.clone(),
             String::new(),
         )?;
-        db::version_announced(&mut self.db(), &row.id, next, &said.id).map_err(q)?;
-        self.get_now(&row.id)
+        {
+            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
+            db::version_announced(&mut db, &row.id, next, &said.id).await.map_err(q)?;
+        }
+        self.get_now_async(&row.id).await
     }
 
     /// The user's words in place of some in the latest version (or a store entry
     /// when `path` is given), kept as the next version or entry revision.
-    pub fn html_edit(&self, maker: &Maker, req: &ArtifactHtmlEdit) -> Result<Wire, ApiError> {
+    pub async fn html_edit_async(&self, maker: &Maker, req: &ArtifactHtmlEdit) -> Result<Wire, ApiError> {
         if let Some(path) = req.path.as_deref() {
-            let entry = self.get_entry(&ArtifactEntryGetRequest {
-                id: req.id.clone(),
-                path: path.into(),
-            })?;
+            let entry = self
+                .get_entry_async(&ArtifactEntryGetRequest {
+                    id: req.id.clone(),
+                    path: path.into(),
+                })
+                .await?;
             let source = entry.value.as_deref().unwrap_or("");
             let edited = html_edit(source, &req.anchor, &req.text).map_err(refused)?;
-            let res = self.batch_entries(
-                maker,
-                &ArtifactEntryBatchRequest {
-                    id: req.id.clone(),
-                    writes: vec![ArtifactEntryWriteInput {
-                        op: ArtifactEntryOp::Set,
-                        path: path.into(),
-                        kind: Some(ArtifactEntryKind::Text),
-                        value: Some(edited),
-                        from: None,
-                        mime: Some(entry.mime),
-                        if_rev: Some(entry.rev),
-                    }],
-                    note: None,
-                    announce: Some(false),
-                },
-            )?;
+            let res = self
+                .batch_entries_async(
+                    maker,
+                    &ArtifactEntryBatchRequest {
+                        id: req.id.clone(),
+                        writes: vec![ArtifactEntryWriteInput {
+                            op: ArtifactEntryOp::Set,
+                            path: path.into(),
+                            kind: Some(ArtifactEntryKind::Text),
+                            value: Some(edited),
+                            from: None,
+                            mime: Some(entry.mime),
+                            if_rev: Some(entry.rev),
+                        }],
+                        note: None,
+                        announce: Some(false),
+                    },
+                )
+                .await?;
             if !res.applied {
                 return Err(refused(t(
                     "server.artifact.edit.stale",
                     &[("version", entry.rev.into()), ("latest", res.seq.into())],
                 )));
             }
-            return self.get_now(&req.id);
+            return self.get_now_async(&req.id).await;
         }
-        let _rows = self.rows.lock();
-        let (row, v) = self.version_of(&mut self.db(), &req.id, Some(req.version))?;
+        let _rows = self.rows.lock().await;
+        let (row, v) = {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            self.version_of(&mut db, &req.id, Some(req.version)).await?
+        };
         if row.body != "html" {
             return Err(refused(t("server.artifact.notHtml", &[("title", row.title.as_str().into())])));
         }
@@ -909,13 +994,13 @@ impl Artifacts {
                 &[("version", v.version.into()), ("latest", row.version.into())],
             )));
         }
-        let source = self.page_of(&row, &v)?;
+        let source = self.page_of_async(&row, &v).await?;
         let edited = html_edit(&source, &req.anchor, &req.text).map_err(refused)?;
         let note = t(
             "server.artifact.edit.note",
             &[("old", head(req.anchor.exact.trim(), 40).into()), ("new", head(req.text.trim(), 40).into())],
         );
-        self.version_locked(
+        self.version_locked_async(
             maker,
             &ArtifactVersionRequest {
                 id: req.id.clone(),
@@ -924,13 +1009,14 @@ impl Artifacts {
             },
             None,
         )
+        .await
     }
 
     /// Its title, how an html one is shown, or whether a design-system is the farm's default.
-    pub fn update(&self, req: &ArtifactUpdateRequest) -> Result<Wire, ApiError> {
-        let _rows = self.rows.lock();
-        let mut db = self.db();
-        let row = self.found(&mut db, &req.id)?;
+    pub async fn update_async(&self, req: &ArtifactUpdateRequest) -> Result<Wire, ApiError> {
+        let _rows = self.rows.lock().await;
+        let mut db = self.db.write_pool().acquire().await.map_err(q)?;
+        let row = self.found(&mut db, &req.id).await?;
         if let Some(title) = &req.title {
             let problem = artifact_problem(Some(title), None, None);
             if !problem.is_empty() {
@@ -944,39 +1030,42 @@ impl Artifacts {
             return Err(refused(t("server.artifact.defaultDesignSystemOnly", &[])));
         }
         let at = now();
-        let mut tx = vibevalley_runtime::rt::block_on(db.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
+        let mut tx = db.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
         if let Some(title) = &req.title {
-            db::artifact_renamed(&mut tx, &req.id, title.trim(), at).map_err(q)?;
+            db::artifact_renamed(&mut tx, &req.id, title.trim(), at).await.map_err(q)?;
         }
         if let Some(display) = req.display {
-            db::artifact_shown(&mut tx, &req.id, display.as_str(), at).map_err(q)?;
+            db::artifact_shown(&mut tx, &req.id, display.as_str(), at).await.map_err(q)?;
         }
         if let Some(is_default) = req.is_default {
             if is_default {
-                db::clear_default_design_system(&mut tx, at).map_err(q)?;
+                db::clear_default_design_system(&mut tx, at).await.map_err(q)?;
             }
-            db::set_artifact_default(&mut tx, &req.id, is_default, at).map_err(q)?;
+            db::set_artifact_default(&mut tx, &req.id, is_default, at).await.map_err(q)?;
         }
-        vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
-        let row = self.found(&mut db, &req.id)?;
-        self.assemble(&mut db, row)
+        tx.commit().await.map_err(q)?;
+        let row = self.found(&mut db, &req.id).await?;
+        self.assemble(&mut db, row).await
     }
 
-    pub fn preview_remove(&self, id: &str) -> Result<Preview, ApiError> {
-        let row = self.found(&mut self.db(), id)?;
+    pub async fn preview_remove_async(&self, id: &str) -> Result<Preview, ApiError> {
+        let row = {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            self.found(&mut db, id).await?
+        };
         let what = if row.body == "html" {
             t(
                 "server.artifact.preview.remove",
                 &[("title", row.title.as_str().into()), ("n", row.version.into())],
             )
         } else if row.body == "store" {
-            let n = self.entry_count(id)?;
+            let n = self.entry_count_async(id).await?;
             t(
                 "server.artifact.preview.removeEntries",
                 &[("title", row.title.as_str().into()), ("n", n.into())],
             )
         } else {
-            let n = self.live_blocks(id)?.len();
+            let n = self.live_blocks_async(id).await?.len();
             t("server.artifact.preview.removeBlocks", &[("title", row.title.as_str().into()), ("n", n.into())])
         };
         let mut does = vec![what];
@@ -987,67 +1076,46 @@ impl Artifacts {
     }
 
     /// It and its versions, blocks, or entries go; the versions' attachments stay.
-    pub fn remove(&self, id: &str) -> Result<(), ApiError> {
-        let _rows = self.rows.lock();
-        let mut db = self.db();
-        self.found(&mut db, id)?;
-        db::delete_artifact(&mut db, id).map_err(q)?;
+    pub async fn remove_async(&self, id: &str) -> Result<(), ApiError> {
+        let _rows = self.rows.lock().await;
+        let mut db = self.db.write_pool().acquire().await.map_err(q)?;
+        self.found(&mut db, id).await?;
+        db::delete_artifact(&mut db, id).await.map_err(q)?;
         self.drop_presence_state(id);
         Ok(())
     }
 
-    pub fn snapshot(&self, id: &str) -> Result<BlockSnapshot, ApiError> {
-        let blocks = self.live_blocks(id)?;
+    pub async fn snapshot_async(&self, id: &str) -> Result<BlockSnapshot, ApiError> {
+        let blocks = self.live_blocks_async(id).await?;
         Ok(BlockSnapshot {
-            artifact: self.get_now(id)?,
+            artifact: self.get_now_async(id).await?,
             blocks,
         })
     }
 
-    /// `quoteBlocks`: the blocks a message quotes as they are now, so later
-    /// edits leave the quote as it was; one that cannot be read is left out.
-    pub fn quote(&self, refs: &[BlockRef]) -> Vec<QuotedBlock> {
-        let mut out = vec![];
-        for r in refs {
-            match self.snapshot(&r.artifact_id) {
-                Ok(s) => {
-                    let b = s.blocks.iter().find(|b| b.id == r.block_id);
-                    out.push(QuotedBlock {
-                        artifact_id: r.artifact_id.clone(),
-                        block_id: r.block_id.clone(),
-                        rev: r.rev,
-                        title: s.artifact.title.clone(),
-                        r#type: b.and_then(|b| serde_json::to_value(b.r#type).ok()?.as_str().map(str::to_string)),
-                        text: b.map(|b| vibevalley_core::artifact::plain(&b.text)),
-                        now_rev: b.map(|b| b.rev),
-                        deleted: b.is_none().then_some(true),
-                    });
-                }
-                Err(e) => eprintln!("vibevalley-server: quoting a block failed: {}", e.message),
-            }
-        }
-        out
+    pub fn snapshot(&self, id: &str) -> Result<BlockSnapshot, ApiError> {
+        vibevalley_runtime::rt::block_on(self.snapshot_async(id))
     }
 
     /// VibeValley's `artifact.page`: what `GET /api/v1/artifact/:id/:version`
     /// answers. Plain, the version's bytes; with `shell`, the workbench's
     /// view of it in its theme (`artifactContent` in `gateway/http/api.ts`).
-    pub fn page(&self, req: &ArtifactPageInput) -> Result<ArtifactPage, ApiError> {
+    pub async fn page_async(&self, req: &ArtifactPageInput) -> Result<ArtifactPage, ApiError> {
         let gone = || ApiError::new(BizCode::ArtifactNotFound, t("server.artifact.missing", &[("id", req.id.as_str().into())]));
         if req.version < 1 {
             return Err(gone());
         }
-        let path = self.file(&req.id, req.version).ok_or_else(gone)?;
+        let path = self.file_async(&req.id, req.version).await.ok_or_else(gone)?;
         let headers = artifact_headers(req.print == Some(true));
         if req.shell != Some(true) {
-            let content = std::fs::read(&path).map_err(|_| gone())?;
+            let content = tokio::fs::read(&path).await.map_err(|_| gone())?;
             return Ok(ArtifactPage {
                 content: String::from_utf8_lossy(&content).into_owned(),
                 headers,
             });
         }
-        let (page, _) = self.content(&req.id, Some(req.version))?;
-        let shown = self.get_now(&req.id)?;
+        let (page, _) = self.content_async(&req.id, Some(req.version)).await?;
+        let shown = self.get_now_async(&req.id).await?;
         let theme = shell_theme_of(req.theme.as_deref());
         let wrapped = with_shell(&page.content, shown.display.unwrap_or(ArtifactDisplay::Page), theme);
         Ok(ArtifactPage {
@@ -1086,204 +1154,314 @@ fn issue_id(hub: &Hub, reference: &str) -> Result<String, ApiError> {
 pub fn install(hub: &Hub, artifacts: Arc<Artifacts>) {
     artifacts.start_prune_ticker(hub);
     let a = artifacts;
-    hub.on::<ops::ArtifactList>({
+    hub.on_async::<ops::ArtifactList, _, _>({
         let a = a.clone();
         move |ctx, r| {
-            let issue = r.issue.as_deref().filter(|i| !i.is_empty()).map(|i| issue_id(ctx.hub, i)).transpose()?;
-            a.list(&ArtifactListRequest {
-                channel: r.channel.filter(|c| !c.is_empty()),
-                issue,
-                artifact_type: r.artifact_type,
-            })
+            let a = a.clone();
+            async move {
+                let issue = r.issue.as_deref().filter(|i| !i.is_empty()).map(|i| issue_id(&ctx.hub, i)).transpose()?;
+                a.list_async(&ArtifactListRequest {
+                    channel: r.channel.filter(|c| !c.is_empty()),
+                    issue,
+                    artifact_type: r.artifact_type,
+                })
+                .await
+            }
         }
     });
-    hub.on::<ops::ArtifactGet>({
+    hub.on_async::<ops::ArtifactGet, _, _>({
         let a = a.clone();
-        move |_, r| a.get(&r.id)
+        move |_, r| {
+            let a = a.clone();
+            async move { a.get_async(&r.id).await }
+        }
     });
-    hub.on::<ops::ArtifactContentGet>({
+    hub.on_async::<ops::ArtifactContentGet, _, _>({
         let a = a.clone();
-        move |_, r| a.content(&r.id, r.version).map(|(c, _)| c)
+        move |_, r| {
+            let a = a.clone();
+            async move { a.content_async(&r.id, r.version).await.map(|(c, _)| c) }
+        }
     });
-    hub.on::<ops::ArtifactCreate>({
+    hub.on_async::<ops::ArtifactCreate, _, _>({
         let a = a.clone();
         move |ctx, mut r| {
-            if let Some(i) = r.issue.as_deref().filter(|i| !i.is_empty()) {
-                r.issue = Some(issue_id(ctx.hub, i)?);
-            } else {
-                r.issue = None;
+            let a = a.clone();
+            async move {
+                if let Some(i) = r.issue.as_deref().filter(|i| !i.is_empty()) {
+                    r.issue = Some(issue_id(&ctx.hub, i)?);
+                } else {
+                    r.issue = None;
+                }
+                a.create_async(&Maker::user(), &r).await
             }
-            a.create(&Maker::user(), &r)
         }
     });
-    hub.on::<ops::ArtifactOutlineImport>({
+    hub.on_async::<ops::ArtifactOutlineImport, _, _>({
         let a = a.clone();
         move |ctx, mut r| {
-            if let Some(i) = r.issue.as_deref().filter(|i| !i.is_empty()) {
-                r.issue = Some(issue_id(ctx.hub, i)?);
-            } else {
-                r.issue = None;
+            let a = a.clone();
+            async move {
+                if let Some(i) = r.issue.as_deref().filter(|i| !i.is_empty()) {
+                    r.issue = Some(issue_id(&ctx.hub, i)?);
+                } else {
+                    r.issue = None;
+                }
+                a.import_outline_async(&Maker::user(), &r).await
             }
-            a.import_outline(&Maker::user(), &r)
         }
     });
-    hub.on::<ops::ArtifactVersionCreate>({
-        let a = a.clone();
-        move |_, r| a.version(&Maker::user(), &r)
-    });
-    hub.on::<ops::ArtifactHtmlEdit>({
-        let a = a.clone();
-        move |_, r| a.html_edit(&Maker::user(), &r)
-    });
-    hub.on::<ops::ArtifactUpdate>({
-        let a = a.clone();
-        move |_, r| a.update(&r)
-    });
-    hub.on::<ops::ArtifactDelete>({
-        let a = a.clone();
-        move |_, r| a.remove(&r.id)
-    });
-    hub.on::<ops::ArtifactPreviewDelete>({
-        let a = a.clone();
-        move |_, r| a.preview_remove(&r.id)
-    });
-    hub.on::<ops::ArtifactTypeList>({
-        let a = a.clone();
-        move |_, _| a.list_types()
-    });
-    hub.on::<ops::ArtifactTypeRead>({
-        let a = a.clone();
-        move |_, r| a.read_type(&r)
-    });
-    hub.on::<ops::ArtifactEntryList>({
-        let a = a.clone();
-        move |_, r| a.list_entries(&r)
-    });
-    hub.on::<ops::ArtifactEntryGet>({
-        let a = a.clone();
-        move |_, r| a.get_entry(&r)
-    });
-    hub.on::<ops::ArtifactEntryBatch>({
-        let a = a.clone();
-        move |_, r| a.batch_entries(&Maker::user(), &r)
-    });
-    hub.on::<ops::ArtifactBlockList>({
-        let a = a.clone();
-        move |_, r| a.snapshot(&r.id)
-    });
-    hub.on::<ops::ArtifactSubmit>({
-        let a = a.clone();
-        move |_, r| a.submit(&r.id, USER_ID, &r.batch_id, r.ops)
-    });
-    hub.on::<ops::ArtifactBlockCreate>({
+    hub.on_async::<ops::ArtifactVersionCreate, _, _>({
         let a = a.clone();
         move |_, r| {
-            let body = BlockCreate {
-                r#type: r.r#type,
-                level: r.level,
-                checked: r.checked,
-                language: r.language,
-                text: r.text,
-                after_block: r.after_block,
-                parent_id: r.parent_id,
-            };
-            a.insert_block(&r.id, USER_ID, &body)
+            let a = a.clone();
+            async move { a.version_async(&Maker::user(), &r).await }
         }
     });
-    hub.on::<ops::ArtifactBlockUpdate>({
+    hub.on_async::<ops::ArtifactHtmlEdit, _, _>({
         let a = a.clone();
         move |_, r| {
-            let body = BlockUpdate {
-                block: r.block,
-                base_rev: r.base_rev,
-                text: r.text,
-                r#type: r.r#type,
-                level: r.level,
-                checked: r.checked,
-                language: r.language,
-            };
-            a.update_block(&r.id, USER_ID, &body)
+            let a = a.clone();
+            async move { a.html_edit_async(&Maker::user(), &r).await }
         }
     });
-    hub.on::<ops::ArtifactBlockDelete>({
-        let a = a.clone();
-        move |_, r| a.delete_block(&r.id, USER_ID, &BlockDelete { block: r.block })
-    });
-    hub.on::<ops::ArtifactBlockPreviewDelete>({
-        let a = a.clone();
-        move |_, r| a.preview_delete_block(&r.id, &BlockDelete { block: r.block })
-    });
-    hub.on::<ops::ArtifactSuggestionList>({
-        let a = a.clone();
-        move |_, r| a.suggestions(&r.id)
-    });
-    hub.on::<ops::ArtifactSuggestionCreate>({
+    hub.on_async::<ops::ArtifactUpdate, _, _>({
         let a = a.clone();
         move |_, r| {
-            a.suggest(
-                &r.id,
-                USER_ID,
-                &vibevalley_protocol::SuggestionCreate {
+            let a = a.clone();
+            async move { a.update_async(&r).await }
+        }
+    });
+    hub.on_async::<ops::ArtifactDelete, _, _>({
+        let a = a.clone();
+        move |_, r| {
+            let a = a.clone();
+            async move { a.remove_async(&r.id).await }
+        }
+    });
+    hub.on_async::<ops::ArtifactPreviewDelete, _, _>({
+        let a = a.clone();
+        move |_, r| {
+            let a = a.clone();
+            async move { a.preview_remove_async(&r.id).await }
+        }
+    });
+    hub.on_async::<ops::ArtifactTypeList, _, _>({
+        let a = a.clone();
+        move |_, _| {
+            let a = a.clone();
+            async move { a.list_types_async().await }
+        }
+    });
+    hub.on_async::<ops::ArtifactTypeRead, _, _>({
+        let a = a.clone();
+        move |_, r| {
+            let a = a.clone();
+            async move { a.read_type_async(&r).await }
+        }
+    });
+    hub.on_async::<ops::ArtifactEntryList, _, _>({
+        let a = a.clone();
+        move |_, r| {
+            let a = a.clone();
+            async move { a.list_entries_async(&r).await }
+        }
+    });
+    hub.on_async::<ops::ArtifactEntryGet, _, _>({
+        let a = a.clone();
+        move |_, r| {
+            let a = a.clone();
+            async move { a.get_entry_async(&r).await }
+        }
+    });
+    hub.on_async::<ops::ArtifactEntryBatch, _, _>({
+        let a = a.clone();
+        move |_, r| {
+            let a = a.clone();
+            async move { a.batch_entries_async(&Maker::user(), &r).await }
+        }
+    });
+    hub.on_async::<ops::ArtifactBlockList, _, _>({
+        let a = a.clone();
+        move |_, r| {
+            let a = a.clone();
+            async move { a.snapshot_async(&r.id).await }
+        }
+    });
+    hub.on_async::<ops::ArtifactSubmit, _, _>({
+        let a = a.clone();
+        move |_, r| {
+            let a = a.clone();
+            async move { a.submit_async(&r.id, USER_ID, &r.batch_id, r.ops).await }
+        }
+    });
+    hub.on_async::<ops::ArtifactBlockCreate, _, _>({
+        let a = a.clone();
+        move |_, r| {
+            let a = a.clone();
+            async move {
+                let body = BlockCreate {
+                    r#type: r.r#type,
+                    level: r.level,
+                    checked: r.checked,
+                    language: r.language,
+                    text: r.text,
+                    after_block: r.after_block,
+                    parent_id: r.parent_id,
+                };
+                a.insert_block_async(&r.id, USER_ID, &body).await
+            }
+        }
+    });
+    hub.on_async::<ops::ArtifactBlockUpdate, _, _>({
+        let a = a.clone();
+        move |_, r| {
+            let a = a.clone();
+            async move {
+                let body = BlockUpdate {
                     block: r.block,
                     base_rev: r.base_rev,
-                    change: r.change,
-                },
-            )
+                    text: r.text,
+                    r#type: r.r#type,
+                    level: r.level,
+                    checked: r.checked,
+                    language: r.language,
+                };
+                a.update_block_async(&r.id, USER_ID, &body).await
+            }
         }
     });
-    hub.on::<ops::ArtifactSuggestionAccept>({
+    hub.on_async::<ops::ArtifactBlockDelete, _, _>({
         let a = a.clone();
-        move |_, r| a.accept_suggestion(&r.id, &r.suggestion, USER_ID)
+        move |_, r| {
+            let a = a.clone();
+            async move { a.delete_block_async(&r.id, USER_ID, &BlockDelete { block: r.block }).await }
+        }
     });
-    hub.on::<ops::ArtifactSuggestionReject>({
+    hub.on_async::<ops::ArtifactBlockPreviewDelete, _, _>({
         let a = a.clone();
-        move |_, r| a.reject_suggestion(&r.id, &r.suggestion, USER_ID)
+        move |_, r| {
+            let a = a.clone();
+            async move { a.preview_delete_block_async(&r.id, &BlockDelete { block: r.block }).await }
+        }
     });
-    hub.on::<ops::ArtifactMarkdownGet>({
+    hub.on_async::<ops::ArtifactSuggestionList, _, _>({
         let a = a.clone();
-        move |_, r| a.markdown(&r.id).map(|markdown| ArtifactMarkdown { markdown })
+        move |_, r| {
+            let a = a.clone();
+            async move { a.suggestions_async(&r.id).await }
+        }
     });
-    hub.on::<ops::ArtifactPresenceUpdate>({
+    hub.on_async::<ops::ArtifactSuggestionCreate, _, _>({
         let a = a.clone();
-        move |_, r| a.update_presence(USER_ID, &r)
+        move |_, r| {
+            let a = a.clone();
+            async move {
+                a.suggest_async(
+                    &r.id,
+                    USER_ID,
+                    &vibevalley_protocol::SuggestionCreate {
+                        block: r.block,
+                        base_rev: r.base_rev,
+                        change: r.change,
+                    },
+                )
+                .await
+            }
+        }
     });
-    hub.on::<ops::ArtifactHistoryList>({
+    hub.on_async::<ops::ArtifactSuggestionAccept, _, _>({
         let a = a.clone();
-        move |_, r| a.history_list(&r)
+        move |_, r| {
+            let a = a.clone();
+            async move { a.accept_suggestion_async(&r.id, &r.suggestion, USER_ID).await }
+        }
     });
-    hub.on::<ops::ArtifactHistoryPreview>({
+    hub.on_async::<ops::ArtifactSuggestionReject, _, _>({
         let a = a.clone();
-        move |_, r| a.history_preview(&r)
+        move |_, r| {
+            let a = a.clone();
+            async move { a.reject_suggestion_async(&r.id, &r.suggestion, USER_ID).await }
+        }
     });
-    hub.on::<ops::ArtifactHistoryRestore>({
+    hub.on_async::<ops::ArtifactMarkdownGet, _, _>({
         let a = a.clone();
-        move |_, r| a.history_restore(&r)
+        move |_, r| {
+            let a = a.clone();
+            async move { a.markdown_async(&r.id).await.map(|markdown| ArtifactMarkdown { markdown }) }
+        }
     });
-    hub.on::<ops::ArtifactHistoryFork>({
+    hub.on_async::<ops::ArtifactPresenceUpdate, _, _>({
         let a = a.clone();
-        move |_, r| a.history_fork(&r)
+        move |_, r| {
+            let a = a.clone();
+            async move { a.update_presence_async(USER_ID, &r).await }
+        }
     });
-    hub.on::<ops::ArtifactHistoryUndoOrigin>({
+    hub.on_async::<ops::ArtifactHistoryList, _, _>({
         let a = a.clone();
-        move |_, r| a.history_undo_origin(&r)
+        move |_, r| {
+            let a = a.clone();
+            async move { a.history_list_async(&r).await }
+        }
     });
-    hub.on::<ops::ArtifactHistoryCompact>({
+    hub.on_async::<ops::ArtifactHistoryPreview, _, _>({
         let a = a.clone();
-        move |_, r| a.history_compact(&r)
+        move |_, r| {
+            let a = a.clone();
+            async move { a.history_preview_async(&r).await }
+        }
     });
-    hub.on::<native_ops::ArtifactPage>({
+    hub.on_async::<ops::ArtifactHistoryRestore, _, _>({
         let a = a.clone();
-        move |_, r| a.page(&r)
+        move |_, r| {
+            let a = a.clone();
+            async move { a.history_restore_async(&r).await }
+        }
     });
-    hub.on::<native_ops::ArtifactView>({
+    hub.on_async::<ops::ArtifactHistoryFork, _, _>({
         let a = a.clone();
-        move |_, r| a.view(&r)
+        move |_, r| {
+            let a = a.clone();
+            async move { a.history_fork_async(&r).await }
+        }
     });
-    hub.on::<native_ops::ArtifactEntryWriteProps>({
+    hub.on_async::<ops::ArtifactHistoryUndoOrigin, _, _>({
         let a = a.clone();
-        move |_, r| a.write_entry_props(&Maker::user(), &r)
+        move |_, r| {
+            let a = a.clone();
+            async move { a.history_undo_origin_async(&r).await }
+        }
     });
-    hub.on::<native_ops::ArtifactTokensInspect>(move |_, r| Ok(Artifacts::inspect_tokens(&r)));
+    hub.on_async::<ops::ArtifactHistoryCompact, _, _>({
+        let a = a.clone();
+        move |_, r| {
+            let a = a.clone();
+            async move { a.history_compact_async(&r).await }
+        }
+    });
+    hub.on_async::<native_ops::ArtifactPage, _, _>({
+        let a = a.clone();
+        move |_, r| {
+            let a = a.clone();
+            async move { a.page_async(&r).await }
+        }
+    });
+    hub.on_async::<native_ops::ArtifactView, _, _>({
+        let a = a.clone();
+        move |_, r| {
+            let a = a.clone();
+            async move { a.view_async(&r).await }
+        }
+    });
+    hub.on_async::<native_ops::ArtifactEntryWriteProps, _, _>({
+        let a = a.clone();
+        move |_, r| {
+            let a = a.clone();
+            async move { a.write_entry_props_async(&Maker::user(), &r).await }
+        }
+    });
+    hub.on_async::<native_ops::ArtifactTokensInspect, _, _>(move |_, r| async move { Ok(Artifacts::inspect_tokens(&r)) });
     hub.on_subscription::<subscriptions::ArtifactFollow>({
         let a = a.clone();
         move |hub, p, sink| a.follow(hub, &p.id, p.after, sink)

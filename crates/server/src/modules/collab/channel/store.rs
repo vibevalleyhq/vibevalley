@@ -1,17 +1,18 @@
 use std::sync::Arc;
 
 use arc_swap::ArcSwap;
+use sqlx::{Connection, Sqlite, SqliteConnection, Transaction};
 use vibevalley_i18n::{list, t};
-use vibevalley_protocol::{ApiError, Channel, ChannelLast, ChannelUnread, DEFAULT_ORCHESTRATOR, EVERYONE, SubjectKind, USER_ID};
+use vibevalley_protocol::{ApiError, Channel, ChannelLast, ChannelUnread, DEFAULT_ORCHESTRATOR, EVERYONE, USER_ID};
 
-use super::db::{self, ChannelRow, Connection, EventRow, MsgRow, ParticipantRow};
+use super::db::{self, ChannelRow, EventRow, MsgRow, ParticipantRow};
 use super::dispatch::Reach;
 use super::model::ChatModel;
 use super::types::{
     AddressedMessage, ArtifactRef, Committed, FileAt, Place, Seat, ThreadSubject, actor_of, channel_type, meta_of, meta_text, new_id, notify_of, subject_kind,
 };
-use super::words::{self, ChatTarget, Nameable};
-use super::{CALLERS_MAX, LAST_MAX, THREAD_TITLE_MAX, line_of, refused};
+use super::words::{self, Nameable};
+use super::{CALLERS_MAX, LAST_MAX, THREAD_TITLE_MAX, line_of};
 use crate::base::{LookIn, internal, missing};
 use crate::modules::content::attachment::Attachments;
 use crate::now;
@@ -26,65 +27,184 @@ impl<T> Q<T> for sqlx::Result<T> {
     }
 }
 
-/// Write-side state under `Chat::inner`: the active write transaction handle,
-/// the mutable `ChatModel` staged inside transactions, and delivery loop-guard
-/// state. Read-only queries bypass this lock and read `Chat::snapshot` + the
-/// WAL `read_pool` directly.
+/// Write-side state under `Chat::inner`: the committed `ChatModel` staged
+/// inside transactions, delivery loop-guard state, and the atomic snapshot
+/// handle published on commit. Read-only queries bypass this lock and read
+/// `Chat::snapshot` + the WAL `read_pool` directly.
 pub struct Inner {
-    pub(super) db: Connection,
-    pub(super) transaction_depth: usize,
     pub(super) model: ChatModel,
     pub(super) reach: Reach,
     pub(super) snapshot: Arc<ArcSwap<ChatModel>>,
 }
 
-/// A savepoint around `work`: on failure the tables and the model are as
-/// they were. The outermost one takes the write lock at once: other modules
-/// write to the same file, and a read that later wants to write would be
-/// refused (`SQLITE_BUSY`) rather than wait. On outermost commit, the committed
-/// `ChatModel` is published atomically to lock-free readers via `snapshot`.
-pub(super) fn tx<T>(inner: &mut Inner, work: impl FnOnce(&mut Inner) -> Result<T, ApiError>) -> Result<T, ApiError> {
-    struct Savepoint<'a> {
-        inner: &'a mut Inner,
-        previous: Option<(ChatModel, Reach)>,
-        undo: &'static str,
+impl Inner {
+    pub(super) fn publish_snapshot(&self) {
+        self.snapshot.store(Arc::new(self.model.clone()));
     }
-    impl Drop for Savepoint<'_> {
-        fn drop(&mut self) {
-            self.inner.transaction_depth -= 1;
-            let release = self.inner.transaction_depth == 0;
-            if let Some((previous_model, previous_reach)) = self.previous.take() {
-                let _ = self.inner.db.end_tx(self.undo, release);
-                self.inner.model = previous_model;
-                self.inner.reach = previous_reach;
-            }
-        }
-    }
-    let is_outer = inner.transaction_depth == 0;
-    let (begin, commit, undo) = if is_outer {
-        ("begin immediate", "commit", "rollback")
-    } else {
-        ("savepoint chat", "release chat", "rollback to chat; release chat")
-    };
-    let previous = (inner.model.clone(), inner.reach.clone());
-    inner.db.begin_tx(begin, is_outer).q()?;
-    inner.transaction_depth += 1;
-    let mut guard = Savepoint {
-        inner,
-        previous: Some(previous),
-        undo,
-    };
-    let value = work(guard.inner)?;
-    guard.inner.db.end_tx(commit, is_outer).q()?;
-    guard.previous = None;
-    if is_outer {
-        guard.inner.publish_snapshot();
-    }
-    Ok(value)
 }
 
-pub(super) fn message_of(db: &Connection, id: &str) -> Result<MsgRow, ApiError> {
-    db::message_by_id(db, id)
+/// Stages in-memory `ChatModel` and `Reach` mutations alongside an open
+/// `BEGIN IMMEDIATE` SQLite transaction. Dropping without [`WriteTx::commit`]
+/// rolls back SQLite automatically and leaves [`Inner`] untouched; on commit,
+/// the new `ChatModel` is published atomically to lock-free readers via `snapshot`.
+pub(super) struct WriteTx<'a> {
+    inner: &'a mut Inner,
+    pub(super) model: ChatModel,
+    pub(super) reach: Reach,
+    pub(super) tx: Transaction<'a, Sqlite>,
+}
+
+impl<'a> WriteTx<'a> {
+    pub(super) async fn begin(inner: &'a mut Inner, conn: &'a mut SqliteConnection) -> Result<Self, ApiError> {
+        let tx = conn.begin_with("BEGIN IMMEDIATE").await.q()?;
+        Ok(Self {
+            model: inner.model.clone(),
+            reach: inner.reach.clone(),
+            inner,
+            tx,
+        })
+    }
+
+    pub(super) async fn commit(self) -> Result<(), ApiError> {
+        self.tx.commit().await.q()?;
+        self.inner.model = self.model;
+        self.inner.reach = self.reach;
+        self.inner.publish_snapshot();
+        Ok(())
+    }
+
+    pub(super) async fn add_member(&mut self, channel: &str, participant: &str, reason: &str, from: i64) -> Result<(), ApiError> {
+        db::add_member(&mut self.tx, channel, participant, reason, from).await.q()?;
+        self.model.member_added(channel, participant);
+        Ok(())
+    }
+
+    async fn upsert_participant(&mut self, p: ParticipantRow) -> Result<(), ApiError> {
+        db::upsert_participant(&mut self.tx, &p).await.q()?;
+        self.model.joined(p);
+        Ok(())
+    }
+
+    /// An agent's seat as it goes now; one already so is left as it is.
+    pub(super) async fn seat(&mut self, p: &Seat) -> Result<(), ApiError> {
+        if self.model.seat_matches(p) {
+            return Ok(());
+        }
+        self.upsert_participant(ParticipantRow {
+            id: p.id.clone(),
+            kind: "agent".into(),
+            name: p.name.clone(),
+            agent_id: p.agent.clone(),
+            home_id: p.home.clone(),
+            joined_at: now(),
+            left_at: None,
+        })
+        .await
+    }
+
+    pub(super) async fn set_read(&mut self, who: &str, channel: &str, upto: i64, at: i64) -> Result<(), ApiError> {
+        db::set_read_cursor(&mut self.tx, who, channel, upto, at).await.q()?;
+        if who == USER_ID {
+            self.model.user_read_to(channel, upto);
+        }
+        Ok(())
+    }
+
+    pub(super) async fn touch_channel(&mut self, id: &str, number: i64) -> Result<(), ApiError> {
+        db::touch_channel(&mut self.tx, id, number).await.q()?;
+        self.model.touched(id, number);
+        Ok(())
+    }
+
+    /// The thread under a message, made if there is none.
+    pub(super) async fn thread_for(&mut self, root_id: &str, root_number: i64, channel: &str, subject: &ThreadSubject) -> Result<String, ApiError> {
+        if let Some(existing) = self.model.thread_of_root(root_id).filter(|t| !t.is_empty()) {
+            return Ok(existing.to_string());
+        }
+        let id = new_id();
+        let at = now();
+        let subject_id = (!subject.id.is_empty()).then_some(subject.id.as_str());
+        db::create_thread(&mut self.tx, &id, root_id, root_number, subject.kind.as_str(), subject_id, channel, at)
+            .await
+            .q()?;
+        self.model.created(ChannelRow {
+            root_id: Some(root_id.into()),
+            root_number: Some(root_number),
+            subject_kind: Some(subject.kind.as_str().into()),
+            subject_id: subject_id.map(str::to_string),
+            parent_id: Some(channel.into()),
+            ..ChannelRow::empty(&id, "thread", at)
+        });
+        if !subject.owner.is_empty() {
+            self.add_member(&id, &subject.owner, "user", root_number).await?;
+        }
+        Ok(id)
+    }
+
+    /// `settle`: who a message names, and who follows the thread from it.
+    pub(super) async fn settle(&mut self, inserted: MsgRow) -> Result<(MsgRow, Vec<String>), ApiError> {
+        let mut row = inserted;
+        let ch = self
+            .model
+            .channel(&row.channel_id)
+            .cloned()
+            .ok_or_else(|| internal(format!("no channel {}", row.channel_id)))?;
+        let mut meta = meta_of(row.meta.as_deref());
+        let orchestrators = self.model.orchestrator_seats();
+        let here = self.model.orchestrator_in_row(Some(&ch));
+        let mentions = if ch.r#type == "direct" {
+            vec![]
+        } else {
+            words::mentions_in(
+                &row.body,
+                &Nameable {
+                    here: &here,
+                    orchestrators: &orchestrators,
+                },
+            )
+        };
+        let helper = |p: &ParticipantRow| p.kind == "agent" && p.agent_id.is_some() && p.left_at.is_none();
+        let present: Vec<String> = self.model.participants().iter().filter(|p| helper(p)).map(|p| p.id.clone()).collect();
+        let mut named: Vec<(String, &str)> = vec![];
+        for m in &mentions {
+            let how = if orchestrators.contains(m) || m == USER_ID || m == EVERYONE || present.contains(m) {
+                "delivered"
+            } else if self.model.participant(m).is_some() {
+                "absent"
+            } else {
+                "unknown"
+            };
+            db::insert_mention(&mut self.tx, &row.id, m, how).await.q()?;
+            named.push((m.clone(), how));
+        }
+        if !mentions.is_empty() {
+            meta.mentions = Some(mentions);
+            row.meta = meta_text(Some(&meta));
+            db::update_message_meta(&mut self.tx, &row.id, row.meta.as_deref()).await.q()?;
+        }
+        if ch.r#type == "thread" {
+            // A dispatch handing the issue on makes no one a member: the orchestrator would be woken by every word in it.
+            if row.sender_id != "system" && row.kind != "dispatch" {
+                self.add_member(&ch.id, &row.sender_id, "replied", row.number).await?;
+            }
+            for (m, how) in &named {
+                if *how == "delivered" && (orchestrators.contains(m) || present.contains(m)) {
+                    self.add_member(&ch.id, m, "mentioned", row.number - 1).await?;
+                }
+            }
+        }
+        let absent = named.into_iter().filter(|(_, how)| *how != "delivered").map(|(m, _)| m).collect();
+        Ok((row, absent))
+    }
+
+    pub(super) fn committed_from(&self, row: &MsgRow, event: &EventRow) -> Option<Committed> {
+        self.model.committed_from(row, event)
+    }
+}
+
+pub(super) async fn message_of(conn: &mut SqliteConnection, id: &str) -> Result<MsgRow, ApiError> {
+    db::message_by_id(conn, id)
+        .await
         .q()?
         .ok_or_else(|| missing(t("server.channel.noMessageId", &[("id", id.into())]), LookIn::Channel))
 }
@@ -236,11 +356,11 @@ impl ChatModel {
 
     /// `counted`: a channel as a page lists it, with the user's unread and
     /// a title.
-    pub(super) fn counted(&self, db: &Connection, row: &ChannelRow) -> Result<Channel, ApiError> {
+    pub(super) async fn counted_async(&self, conn: &mut SqliteConnection, row: &ChannelRow) -> Result<Channel, ApiError> {
         let n = match row.notify.as_str() {
             "none" => 0,
-            "mentions" => db::user_mentions(db).q()?.iter().filter(|m| m.row.channel_id == row.id).count() as i64,
-            _ => db::user_unread(db, &row.id, self.user_read_in(&row.id).unwrap_or(0)).q()?,
+            "mentions" => db::user_mentions(conn).await.q()?.iter().filter(|m| m.row.channel_id == row.id).count() as i64,
+            _ => db::user_unread(conn, &row.id, self.user_read_in(&row.id).unwrap_or(0)).await.q()?,
         };
         let sk = row.subject_kind.as_deref();
         let mut title = String::new();
@@ -260,11 +380,11 @@ impl ChatModel {
             && row.r#type == "thread"
             && let Some(root) = &row.root_id
         {
-            let body = db::message_by_id(db, root).q()?.map(|m| m.body).unwrap_or_default();
+            let body = db::message_by_id(conn, root).await.q()?.map(|m| m.body).unwrap_or_default();
             title = line_of(&body, THREAD_TITLE_MAX);
         }
         let last = match row.last_number {
-            Some(n) if n != 0 => db::message_by_number(db, &row.id, n).q()?,
+            Some(n) if n != 0 => db::message_by_number(conn, &row.id, n).await.q()?,
             _ => None,
         };
         Ok(self.to_channel(row, n, title, last.as_ref()))
@@ -328,12 +448,13 @@ impl ChatModel {
 
     /// A participant's unread: the channel given, or the one its home is
     /// in (else the default), and the threads it follows.
-    pub(super) fn unread_of(&self, db: &Connection, who: &str, in_channel: Option<&str>) -> Result<Vec<ChannelUnread>, ApiError> {
+    pub(super) async fn unread_of_async(&self, conn: &mut SqliteConnection, who: &str, in_channel: Option<&str>) -> Result<Vec<ChannelUnread>, ApiError> {
         let channel = in_channel
             .map(str::to_string)
             .or_else(|| self.home_of(who).and_then(|h| self.top_of_row(self.channel(&h)).map(|t| t.id.clone())))
             .unwrap_or_else(|| self.default_id());
-        Ok(db::unread_of(db, who, &channel)
+        Ok(db::unread_of(conn, who, &channel)
+            .await
             .q()?
             .into_iter()
             .map(|r| ChannelUnread {
@@ -375,211 +496,13 @@ impl ChatModel {
 
     /// `answersOf`: a helper's words answer the session that last named it
     /// there since it last spoke.
-    pub(super) fn answers_of(&self, db: &Connection, row: &MsgRow) -> Result<Option<String>, ApiError> {
+    pub(super) async fn answers_of_async(&self, conn: &mut SqliteConnection, row: &MsgRow) -> Result<Option<String>, ApiError> {
         if row.kind != "chat" || row.sender_kind != "agent" || self.is_orchestrator_seat(&row.sender_id) {
             return Ok(None);
         }
-        let callers = db::callers_of(db, &row.sender_id, &row.channel_id, &row.id, CALLERS_MAX).q()?;
+        let callers = db::callers_of(conn, &row.sender_id, &row.channel_id, &row.id, CALLERS_MAX).await.q()?;
         Ok(callers
             .into_iter()
             .find(|c| self.participant(c).is_some_and(|p| p.kind == "agent" && p.agent_id.is_some())))
-    }
-}
-
-impl Inner {
-    pub(super) fn publish_snapshot(&self) {
-        self.snapshot.store(Arc::new(self.model.clone()));
-    }
-
-    pub(super) fn add_member(&mut self, channel: &str, participant: &str, reason: &str, from: i64) -> Result<(), ApiError> {
-        db::add_member(&self.db, channel, participant, reason, from).q()?;
-        self.model.member_added(channel, participant);
-        Ok(())
-    }
-
-    fn upsert_participant(&mut self, p: ParticipantRow) -> Result<(), ApiError> {
-        db::upsert_participant(&self.db, &p).q()?;
-        self.model.joined(p);
-        Ok(())
-    }
-
-    /// An agent's seat as it goes now; one already so is left as it is.
-    pub(super) fn seat(&mut self, p: &Seat) -> Result<(), ApiError> {
-        if self.model.seat_matches(p) {
-            return Ok(());
-        }
-        self.upsert_participant(ParticipantRow {
-            id: p.id.clone(),
-            kind: "agent".into(),
-            name: p.name.clone(),
-            agent_id: p.agent.clone(),
-            home_id: p.home.clone(),
-            joined_at: now(),
-            left_at: None,
-        })
-    }
-
-    pub(super) fn set_read(&mut self, who: &str, channel: &str, upto: i64, at: i64) -> Result<(), ApiError> {
-        db::set_read_cursor(&self.db, who, channel, upto, at).q()?;
-        if who == USER_ID {
-            self.model.user_read_to(channel, upto);
-        }
-        Ok(())
-    }
-
-    pub(super) fn touch_channel(&mut self, id: &str, number: i64) -> Result<(), ApiError> {
-        db::touch_channel(&self.db, id, number).q()?;
-        self.model.touched(id, number);
-        Ok(())
-    }
-
-    /// The thread under a message, made if there is none.
-    pub(super) fn thread_for(&mut self, root_id: &str, root_number: i64, channel: &str, subject: &ThreadSubject) -> Result<String, ApiError> {
-        if let Some(existing) = self.model.thread_of_root(root_id).filter(|t| !t.is_empty()) {
-            return Ok(existing.to_string());
-        }
-        let id = new_id();
-        let at = now();
-        let subject_id = (!subject.id.is_empty()).then_some(subject.id.as_str());
-        db::create_thread(&self.db, &id, root_id, root_number, subject.kind.as_str(), subject_id, channel, at).q()?;
-        self.model.created(ChannelRow {
-            root_id: Some(root_id.into()),
-            root_number: Some(root_number),
-            subject_kind: Some(subject.kind.as_str().into()),
-            subject_id: subject_id.map(str::to_string),
-            parent_id: Some(channel.into()),
-            ..ChannelRow::empty(&id, "thread", at)
-        });
-        if !subject.owner.is_empty() {
-            self.add_member(&id, &subject.owner, "user", root_number)?;
-        }
-        Ok(id)
-    }
-
-    pub(super) fn counted(&self, row: &ChannelRow) -> Result<Channel, ApiError> {
-        self.model.counted(&self.db, row)
-    }
-
-    /// `resolveTarget`: an address as `who` would mean it.
-    pub(super) fn resolve_target(&mut self, who: &str, target: &str) -> Result<(String, Option<String>), ApiError> {
-        if target.trim().is_empty() {
-            return Ok((self.model.home_of(who).unwrap_or_else(|| self.model.default_id()), None));
-        }
-        let parsed = words::parse_chat_target(target).ok_or_else(|| refused(t("server.channel.badTarget", &[("target", target.into())])))?;
-        let root = match parsed {
-            ChatTarget::Direct(peer) => {
-                let direct = self
-                    .model
-                    .direct_with(who, &peer)
-                    .ok_or_else(|| refused(t("server.channel.noDirect", &[("target", target.trim().into())])))?;
-                return Ok((direct.id, None));
-            }
-            ChatTarget::Channel(_) => None,
-            ChatTarget::Thread(n) => Some(n),
-        };
-        let trimmed = target.trim();
-        let text = trimmed.strip_prefix('#').unwrap_or(trimmed);
-        let name = text.split(':').next().unwrap_or("");
-        let mut channel = self.model.default_id();
-        if !name.is_empty() {
-            let found = self.model.channel_by_name(name).ok_or_else(|| {
-                missing(
-                    t(
-                        "server.channel.noChannelNamed",
-                        &[("name", name.into()), ("tags", self.model.channel_tags().into())],
-                    ),
-                    LookIn::Channel,
-                )
-            })?;
-            channel = found.id.clone();
-        }
-        let Some(root) = root else { return Ok((channel, None)) };
-        let row = db::message_by_number(&self.db, &channel, root)
-            .q()?
-            .ok_or_else(|| refused(t("server.channel.noMessage", &[("n", root.into())])))?;
-        let talk = ThreadSubject {
-            kind: SubjectKind::Talk,
-            id: String::new(),
-            owner: String::new(),
-        };
-        let thread = tx(self, |me| me.thread_for(&row.id, row.number, &row.channel_id, &talk))?;
-        Ok((thread.clone(), Some(thread)))
-    }
-
-    pub(super) fn answered(&self, channel: &str, number: Option<i64>) -> Result<(), ApiError> {
-        if let Some(n) = number
-            && db::message_by_number(&self.db, channel, n).q()?.is_none()
-        {
-            return Err(refused(t("server.channel.noMessage", &[("n", n.into())])));
-        }
-        Ok(())
-    }
-
-    pub(super) fn message_of(&self, id: &str) -> Result<MsgRow, ApiError> {
-        message_of(&self.db, id)
-    }
-
-    /// `settle`: who a message names, and who follows the thread from it.
-    pub(super) fn settle(&mut self, inserted: MsgRow) -> Result<(MsgRow, Vec<String>), ApiError> {
-        let mut row = inserted;
-        let ch = self
-            .model
-            .channel(&row.channel_id)
-            .cloned()
-            .ok_or_else(|| internal(format!("no channel {}", row.channel_id)))?;
-        let mut meta = meta_of(row.meta.as_deref());
-        let orchestrators = self.model.orchestrator_seats();
-        let here = self.model.orchestrator_in_row(Some(&ch));
-        let mentions = if ch.r#type == "direct" {
-            vec![]
-        } else {
-            words::mentions_in(
-                &row.body,
-                &Nameable {
-                    here: &here,
-                    orchestrators: &orchestrators,
-                },
-            )
-        };
-        let helper = |p: &ParticipantRow| p.kind == "agent" && p.agent_id.is_some() && p.left_at.is_none();
-        let present: Vec<String> = self.model.participants().iter().filter(|p| helper(p)).map(|p| p.id.clone()).collect();
-        let mut named: Vec<(String, &str)> = vec![];
-        for m in &mentions {
-            let how = if orchestrators.contains(m) || m == USER_ID || m == EVERYONE || present.contains(m) {
-                "delivered"
-            } else if self.model.participant(m).is_some() {
-                "absent"
-            } else {
-                "unknown"
-            };
-            db::insert_mention(&self.db, &row.id, m, how).q()?;
-            named.push((m.clone(), how));
-        }
-        if !mentions.is_empty() {
-            meta.mentions = Some(mentions);
-            row.meta = meta_text(Some(&meta));
-            db::update_message_meta(&self.db, &row.id, row.meta.as_deref()).q()?;
-        }
-        if ch.r#type == "thread" {
-            // A dispatch handing the issue on makes no one a member: the orchestrator would be woken by every word in it.
-            if row.sender_id != "system" && row.kind != "dispatch" {
-                self.add_member(&ch.id, &row.sender_id, "replied", row.number)?;
-            }
-            for (m, how) in &named {
-                if *how == "delivered" && (orchestrators.contains(m) || present.contains(m)) {
-                    self.add_member(&ch.id, m, "mentioned", row.number - 1)?;
-                }
-            }
-        }
-        let absent = named.into_iter().filter(|(_, how)| *how != "delivered").map(|(m, _)| m).collect();
-        Ok((row, absent))
-    }
-
-    pub(super) fn committed_from(&self, row: &MsgRow, event: &EventRow) -> Option<Committed> {
-        self.model.committed_from(row, event)
-    }
-
-    pub(super) fn answers_of(&self, row: &MsgRow) -> Result<Option<String>, ApiError> {
-        self.model.answers_of(&self.db, row)
     }
 }

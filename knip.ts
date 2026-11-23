@@ -7,9 +7,6 @@
  * app's entries keep theirs: a config's default export is read by its tool.
  */
 
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-
 import type { KnipConfig } from "knip";
 
 const config: KnipConfig = {
@@ -36,17 +33,13 @@ const config: KnipConfig = {
       // nsh provides these modules inside its runtime, without npm packages.
       ignoreDependencies: ["nsh", "nsh/*"],
     },
-    ...(existsSync(resolve(import.meta.dirname, "apps/mobile/package.json"))
-      ? {
-          "apps/mobile": {
-            // nsh loads App.tsx, and tests open entry points by filename.
-            entry: ["App.tsx", "**/*.{test,story,stories}.{ts,tsx}", "**/main.tsx", "**/story.tsx"],
-            project: ["**/*.{ts,tsx}", "!.nsh/**", "!build/**"],
-            // nsh provides these modules inside its runtime, without npm packages.
-            ignoreDependencies: ["nsh", "nsh/*"],
-          },
-        }
-      : {}),
+    "apps/mobile": {
+      // nsh loads App.tsx, and tests open entry points by filename.
+      entry: ["App.tsx", "**/*.{test,story,stories}.{ts,tsx}", "**/main.tsx", "**/story.tsx"],
+      project: ["**/*.{ts,tsx}", "!.nsh/**", "!build/**"],
+      // nsh provides these modules inside its runtime, without npm packages.
+      ignoreDependencies: ["nsh", "nsh/*"],
+    },
     "packages/*": {
       project: ["src/**/*.{ts,tsx}"],
       includeEntryExports: true,
@@ -56,8 +49,8 @@ const config: KnipConfig = {
       ignoreDependencies: ["tsrs"],
     },
   },
-  // Programs on the machine, not packages: Xcode's swift and Rust's cargo.
-  ignoreBinaries: ["swift", "cargo"],
+  // Programs on the machine, not packages: Xcode's swift, Rust's cargo, and macOS packaging tools (hdiutil, sips).
+  ignoreBinaries: ["swift", "cargo", "hdiutil", "sips"],
   // Rust owns the complete wire contract; unused TS projections are not dead Rust API types.
   // Handwritten re-exports and schemas remain checked.
   ignoreIssues: { "packages/protocol/src/**/*.gen.ts": ["exports", "types"] },

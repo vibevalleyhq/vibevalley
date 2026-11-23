@@ -1,9 +1,8 @@
 //! Storage for artifacts and their references to optional channel messages.
 
 use crate::modules::infra::column::{json, optional, read_json, read_word, word};
-use sqlx::{Result as Q, SqliteConnection};
+use sqlx::{Connection, Result as Q, SqliteConnection};
 use vibevalley_protocol::{Block, BlockOpResult, Suggestion, TextSpan};
-use vibevalley_runtime::rt::block_on;
 
 use crate::db::generated::content_artifact as queries;
 pub use queries::{
@@ -11,128 +10,133 @@ pub use queries::{
     VersionRow,
 };
 
-pub fn artifact(db: &mut SqliteConnection, id: &str) -> Q<Option<ArtifactRow>> {
-    optional(block_on(queries::artifact(db, queries::ArtifactParams { id: id.into() })))
+pub async fn artifact(db: &mut SqliteConnection, id: &str) -> Q<Option<ArtifactRow>> {
+    optional(queries::artifact(db, queries::ArtifactParams { id: id.into() }).await)
 }
 
-pub fn default_design_system_artifact(db: &mut SqliteConnection) -> Q<Option<ArtifactRow>> {
-    optional(block_on(queries::default_design_system_artifact(db)))
+pub async fn default_design_system_artifact(db: &mut SqliteConnection) -> Q<Option<ArtifactRow>> {
+    optional(queries::default_design_system_artifact(db).await)
 }
 
-pub fn clear_default_design_system(db: &mut SqliteConnection, at: i64) -> Q<()> {
-    block_on(queries::clear_default_design_system(
-        db,
-        queries::ClearDefaultDesignSystemParams { updated_at: at },
-    ))
+pub async fn clear_default_design_system(db: &mut SqliteConnection, at: i64) -> Q<()> {
+    queries::clear_default_design_system(db, queries::ClearDefaultDesignSystemParams { updated_at: at }).await
 }
 
-pub fn set_artifact_default(db: &mut SqliteConnection, id: &str, is_default: bool, at: i64) -> Q<()> {
-    block_on(queries::set_artifact_default(
+pub async fn set_artifact_default(db: &mut SqliteConnection, id: &str, is_default: bool, at: i64) -> Q<()> {
+    queries::set_artifact_default(
         db,
         queries::SetArtifactDefaultParams {
             id: id.into(),
             is_default: i64::from(is_default),
             updated_at: at,
         },
-    ))
+    )
+    .await
 }
 
-pub fn artifacts_in_channel(db: &mut SqliteConnection, channel: &str) -> Q<Vec<ArtifactRow>> {
-    block_on(queries::artifacts_in_channel(
+pub async fn artifacts_in_channel(db: &mut SqliteConnection, channel: &str) -> Q<Vec<ArtifactRow>> {
+    queries::artifacts_in_channel(
         db,
         queries::ArtifactsInChannelParams {
             channel_id: Some(channel.into()),
         },
-    ))
+    )
+    .await
 }
 
-pub fn artifacts_for_issue(db: &mut SqliteConnection, issue: &str) -> Q<Vec<ArtifactRow>> {
-    block_on(queries::artifacts_for_issue(db, queries::ArtifactsForIssueParams { issue: Some(issue.into()) }))
+pub async fn artifacts_for_issue(db: &mut SqliteConnection, issue: &str) -> Q<Vec<ArtifactRow>> {
+    queries::artifacts_for_issue(db, queries::ArtifactsForIssueParams { issue: Some(issue.into()) }).await
 }
 
-pub fn artifacts(db: &mut SqliteConnection, limit: i64) -> Q<Vec<ArtifactRow>> {
-    block_on(queries::artifacts(db, queries::ArtifactsParams { limit }))
+pub async fn artifacts(db: &mut SqliteConnection, limit: i64) -> Q<Vec<ArtifactRow>> {
+    queries::artifacts(db, queries::ArtifactsParams { limit }).await
 }
 
-pub fn add_artifact(db: &mut SqliteConnection, params: NewArtifact) -> Q<()> {
-    block_on(queries::add_artifact(db, params))
+pub async fn add_artifact(db: &mut SqliteConnection, params: NewArtifact) -> Q<()> {
+    queries::add_artifact(db, params).await
 }
 
-pub fn add_version(db: &mut SqliteConnection, params: NewVersion) -> Q<()> {
-    block_on(queries::add_version(db, params))
+pub async fn add_version(db: &mut SqliteConnection, params: NewVersion) -> Q<()> {
+    queries::add_version(db, params).await
 }
 
-pub fn artifact_said(db: &mut SqliteConnection, id: &str, message: &str) -> Q<()> {
-    block_on(queries::artifact_said(
+pub async fn artifact_said(db: &mut SqliteConnection, id: &str, message: &str) -> Q<()> {
+    queries::artifact_said(
         db,
         queries::ArtifactSaidParams {
             id: id.into(),
             message_id: Some(message.into()),
         },
-    ))
+    )
+    .await
 }
 
-pub fn artifact_versioned(db: &mut SqliteConnection, id: &str, version: i64, at: i64) -> Q<()> {
-    block_on(queries::artifact_versioned(
+pub async fn artifact_versioned(db: &mut SqliteConnection, id: &str, version: i64, at: i64) -> Q<()> {
+    queries::artifact_versioned(
         db,
         queries::ArtifactVersionedParams {
             id: id.into(),
             version,
             updated_at: at,
         },
-    ))
+    )
+    .await
 }
 
-pub fn artifact_accepted(db: &mut SqliteConnection, id: &str, seq: i64, at: i64) -> Q<()> {
-    block_on(queries::artifact_accepted(
+pub async fn artifact_accepted(db: &mut SqliteConnection, id: &str, seq: i64, at: i64) -> Q<()> {
+    queries::artifact_accepted(
         db,
         queries::ArtifactAcceptedParams {
             id: id.into(),
             seq,
             updated_at: at,
         },
-    ))
+    )
+    .await
 }
 
-pub fn artifact_renamed(db: &mut SqliteConnection, id: &str, title: &str, at: i64) -> Q<()> {
-    block_on(queries::artifact_renamed(
+pub async fn artifact_renamed(db: &mut SqliteConnection, id: &str, title: &str, at: i64) -> Q<()> {
+    queries::artifact_renamed(
         db,
         queries::ArtifactRenamedParams {
             id: id.into(),
             title: title.into(),
             updated_at: at,
         },
-    ))
+    )
+    .await
 }
 
-pub fn artifact_shown(db: &mut SqliteConnection, id: &str, display: &str, at: i64) -> Q<()> {
-    block_on(queries::artifact_shown(
+pub async fn artifact_shown(db: &mut SqliteConnection, id: &str, display: &str, at: i64) -> Q<()> {
+    queries::artifact_shown(
         db,
         queries::ArtifactShownParams {
             id: id.into(),
             display: Some(display.into()),
             updated_at: at,
         },
-    ))
+    )
+    .await
 }
 
-pub fn delete_artifact(db: &mut SqliteConnection, id: &str) -> Q<()> {
-    block_on(queries::delete_artifact(db, queries::DeleteArtifactParams { id: id.into() }))
+pub async fn delete_artifact(db: &mut SqliteConnection, id: &str) -> Q<()> {
+    queries::delete_artifact(db, queries::DeleteArtifactParams { id: id.into() }).await
 }
 
-pub fn version_announced(db: &mut SqliteConnection, artifact: &str, version: i64, message: &str) -> Q<()> {
-    block_on(queries::version_announced(
+pub async fn version_announced(db: &mut SqliteConnection, artifact: &str, version: i64, message: &str) -> Q<()> {
+    queries::version_announced(
         db,
         queries::VersionAnnouncedParams {
             artifact_id: artifact.into(),
             version,
             message_id: Some(message.into()),
         },
-    ))
+    )
+    .await
 }
 
-pub fn resolve_suggestion(db: &mut SqliteConnection, id: &str, status: &str, at: i64, by: &str) -> Q<()> {
-    block_on(queries::resolve_suggestion(
+pub async fn resolve_suggestion(db: &mut SqliteConnection, id: &str, status: &str, at: i64, by: &str) -> Q<()> {
+    queries::resolve_suggestion(
         db,
         queries::ResolveSuggestionParams {
             id: id.into(),
@@ -140,25 +144,29 @@ pub fn resolve_suggestion(db: &mut SqliteConnection, id: &str, status: &str, at:
             resolved_at: Some(at),
             resolved_by: Some(by.into()),
         },
-    ))
+    )
+    .await
 }
 
-pub fn versions(db: &mut SqliteConnection, artifact: &str) -> Q<Vec<VersionRow>> {
-    block_on(queries::versions(db, queries::VersionsParams { artifact_id: artifact.into() }))
+pub async fn versions(db: &mut SqliteConnection, artifact: &str) -> Q<Vec<VersionRow>> {
+    queries::versions(db, queries::VersionsParams { artifact_id: artifact.into() }).await
 }
 
-pub fn version(db: &mut SqliteConnection, artifact: &str, version: i64) -> Q<Option<VersionRow>> {
-    optional(block_on(queries::version(
-        db,
-        queries::VersionParams {
-            artifact_id: artifact.into(),
-            version,
-        },
-    )))
+pub async fn version(db: &mut SqliteConnection, artifact: &str, version: i64) -> Q<Option<VersionRow>> {
+    optional(
+        queries::version(
+            db,
+            queries::VersionParams {
+                artifact_id: artifact.into(),
+                version,
+            },
+        )
+        .await,
+    )
 }
 
-pub fn blocks(db: &mut SqliteConnection, artifact: &str) -> Q<Vec<Block>> {
-    let rows = block_on(queries::blocks(db, queries::BlocksParams { artifact_id: artifact.into() }))?;
+pub async fn blocks(db: &mut SqliteConnection, artifact: &str) -> Q<Vec<Block>> {
+    let rows = queries::blocks(db, queries::BlocksParams { artifact_id: artifact.into() }).await?;
     rows.into_iter()
         .map(|r| {
             Ok(vibevalley_core::artifact::ops::wire(Block {
@@ -178,12 +186,12 @@ pub fn blocks(db: &mut SqliteConnection, artifact: &str) -> Q<Vec<Block>> {
         .collect()
 }
 
-pub fn block_owner(db: &mut SqliteConnection, id: &str) -> Q<Option<String>> {
-    Ok(optional(block_on(queries::block_owner(db, queries::BlockOwnerParams { id: id.into() })))?.map(|row| row.artifact_id))
+pub async fn block_owner(db: &mut SqliteConnection, id: &str) -> Q<Option<String>> {
+    Ok(optional(queries::block_owner(db, queries::BlockOwnerParams { id: id.into() }).await)?.map(|row| row.artifact_id))
 }
 
-pub fn put_block(db: &mut SqliteConnection, artifact: &str, b: &Block) -> Q<()> {
-    block_on(queries::put_block(
+pub async fn put_block(db: &mut SqliteConnection, artifact: &str, b: &Block) -> Q<()> {
+    queries::put_block(
         db,
         queries::PutBlockParams {
             id: b.id.clone(),
@@ -198,11 +206,12 @@ pub fn put_block(db: &mut SqliteConnection, artifact: &str, b: &Block) -> Q<()> 
             updated_by: b.updated_by.clone(),
             updated_at: b.updated,
         },
-    ))
+    )
+    .await
 }
 
-pub fn add_revision(db: &mut SqliteConnection, block: &str, rev: i64, spans: &[TextSpan], actor: &str, kind: &str, at: i64) -> Q<()> {
-    block_on(queries::add_revision(
+pub async fn add_revision(db: &mut SqliteConnection, block: &str, rev: i64, spans: &[TextSpan], actor: &str, kind: &str, at: i64) -> Q<()> {
+    queries::add_revision(
         db,
         queries::AddRevisionParams {
             id: uuid::Uuid::now_v7().to_string(),
@@ -213,21 +222,21 @@ pub fn add_revision(db: &mut SqliteConnection, block: &str, rev: i64, spans: &[T
             kind: kind.into(),
             created_at: at,
         },
-    ))
+    )
+    .await
 }
-pub fn revision(db: &mut SqliteConnection, block: &str, rev: i64) -> Q<Option<Vec<TextSpan>>> {
-    let row = optional(block_on(queries::revision(db, queries::RevisionParams { block_id: block.into(), rev })))?;
+
+pub async fn revision(db: &mut SqliteConnection, block: &str, rev: i64) -> Q<Option<Vec<TextSpan>>> {
+    let row = optional(queries::revision(db, queries::RevisionParams { block_id: block.into(), rev }).await)?;
     row.map(|r| read_json::<Option<Vec<TextSpan>>>(r.spans).map(Option::unwrap_or_default))
         .transpose()
 }
-pub fn prune(db: &mut SqliteConnection, before: i64) -> Q<()> {
-    block_on(async {
-        use sqlx::Connection;
-        let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
-        queries::prune_changes(&mut *tx, queries::PruneChangesParams { created_at: before }).await?;
-        queries::prune_revisions(&mut *tx, queries::PruneRevisionsParams { created_at: before }).await?;
-        tx.commit().await
-    })
+
+pub async fn prune(db: &mut SqliteConnection, before: i64) -> Q<()> {
+    let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
+    queries::prune_changes(&mut *tx, queries::PruneChangesParams { created_at: before }).await?;
+    queries::prune_revisions(&mut *tx, queries::PruneRevisionsParams { created_at: before }).await?;
+    tx.commit().await
 }
 
 pub struct ChangeRow {
@@ -256,16 +265,15 @@ fn change(row: queries::ChangeByBatchRow) -> Q<ChangeRow> {
         results: read_json(row.results)?,
     })
 }
-pub fn change_by_batch(db: &mut SqliteConnection, batch: &str) -> Q<Option<ChangeRow>> {
-    optional(block_on(queries::change_by_batch(
-        db,
-        queries::ChangeByBatchParams { batch_id: Some(batch.into()) },
-    )))?
-    .map(change)
-    .transpose()
+
+pub async fn change_by_batch(db: &mut SqliteConnection, batch: &str) -> Q<Option<ChangeRow>> {
+    optional(queries::change_by_batch(db, queries::ChangeByBatchParams { batch_id: Some(batch.into()) }).await)?
+        .map(change)
+        .transpose()
 }
-pub fn add_change(db: &mut SqliteConnection, c: &NewChange) -> Q<()> {
-    block_on(queries::add_change(
+
+pub async fn add_change(db: &mut SqliteConnection, c: &NewChange<'_>) -> Q<()> {
+    queries::add_change(
         db,
         queries::AddChangeParams {
             artifact_id: c.artifact_id.into(),
@@ -276,17 +284,20 @@ pub fn add_change(db: &mut SqliteConnection, c: &NewChange) -> Q<()> {
             payload: json(&c.results)?,
             created_at: c.created_at,
         },
-    ))
+    )
+    .await
 }
-pub fn changes_after(db: &mut SqliteConnection, artifact: &str, seq: i64, n: i64) -> Q<Vec<ChangeRow>> {
-    block_on(queries::changes_after(
+
+pub async fn changes_after(db: &mut SqliteConnection, artifact: &str, seq: i64, n: i64) -> Q<Vec<ChangeRow>> {
+    queries::changes_after(
         db,
         queries::ChangesAfterParams {
             artifact_id: artifact.into(),
             seq,
             limit: n,
         },
-    ))?
+    )
+    .await?
     .into_iter()
     .map(change)
     .collect()
@@ -322,8 +333,9 @@ fn decode_stored_suggestion(row: queries::SuggestionRow) -> Q<StoredSuggestion> 
         replacement_text: row.replacement_text,
     })
 }
-pub fn add_suggestion(db: &mut SqliteConnection, s: &StoredSuggestion) -> Q<()> {
-    block_on(queries::add_suggestion(
+
+pub async fn add_suggestion(db: &mut SqliteConnection, s: &StoredSuggestion) -> Q<()> {
+    queries::add_suggestion(
         db,
         queries::AddSuggestionParams {
             id: s.wire.id.clone(),
@@ -341,10 +353,12 @@ pub fn add_suggestion(db: &mut SqliteConnection, s: &StoredSuggestion) -> Q<()> 
             replacement_text: s.replacement_text.clone(),
             created_at: s.wire.created_at,
         },
-    ))
+    )
+    .await
 }
-pub fn update_suggestion(db: &mut SqliteConnection, s: &StoredSuggestion) -> Q<()> {
-    block_on(queries::update_suggestion(
+
+pub async fn update_suggestion(db: &mut SqliteConnection, s: &StoredSuggestion) -> Q<()> {
+    queries::update_suggestion(
         db,
         queries::UpdateSuggestionParams {
             id: s.wire.id.clone(),
@@ -357,96 +371,104 @@ pub fn update_suggestion(db: &mut SqliteConnection, s: &StoredSuggestion) -> Q<(
             anchor_text: s.anchor_text.clone(),
             replacement_text: s.replacement_text.clone(),
         },
-    ))
+    )
+    .await
 }
-pub fn stored_suggestion(db: &mut SqliteConnection, id: &str) -> Q<Option<StoredSuggestion>> {
-    optional(block_on(queries::suggestion(db, queries::SuggestionParams { id: id.into() })))?
+
+pub async fn stored_suggestion(db: &mut SqliteConnection, id: &str) -> Q<Option<StoredSuggestion>> {
+    optional(queries::suggestion(db, queries::SuggestionParams { id: id.into() }).await)?
         .map(decode_stored_suggestion)
         .transpose()
 }
-pub fn stored_suggestions(db: &mut SqliteConnection, artifact: &str, limit: i64) -> Q<Vec<StoredSuggestion>> {
-    block_on(queries::suggestions(
+
+pub async fn stored_suggestions(db: &mut SqliteConnection, artifact: &str, limit: i64) -> Q<Vec<StoredSuggestion>> {
+    queries::suggestions(
         db,
         queries::SuggestionsParams {
             artifact_id: artifact.into(),
             limit,
         },
-    ))?
+    )
+    .await?
     .into_iter()
     .map(decode_stored_suggestion)
     .collect()
 }
-pub fn suggestion(db: &mut SqliteConnection, id: &str) -> Q<Option<Suggestion>> {
-    Ok(stored_suggestion(db, id)?.map(|s| s.wire))
-}
-pub fn suggestions(db: &mut SqliteConnection, artifact: &str, limit: i64) -> Q<Vec<Suggestion>> {
-    Ok(stored_suggestions(db, artifact, limit)?.into_iter().map(|s| s.wire).collect())
+
+pub async fn suggestion(db: &mut SqliteConnection, id: &str) -> Q<Option<Suggestion>> {
+    Ok(stored_suggestion(db, id).await?.map(|s| s.wire))
 }
 
-pub fn artifact_collab(db: &mut SqliteConnection, artifact: &str) -> Q<Option<Vec<u8>>> {
-    Ok(optional(block_on(queries::artifact_collab(
-        db,
-        queries::ArtifactCollabParams { artifact_id: artifact.into() },
-    )))?
-    .map(|row| row.snapshot))
+pub async fn suggestions(db: &mut SqliteConnection, artifact: &str, limit: i64) -> Q<Vec<Suggestion>> {
+    Ok(stored_suggestions(db, artifact, limit).await?.into_iter().map(|s| s.wire).collect())
 }
 
-pub fn upsert_artifact_collab(db: &mut SqliteConnection, artifact: &str, snapshot: &[u8], updated_at: i64) -> Q<()> {
-    block_on(queries::upsert_artifact_collab(
+pub async fn artifact_collab(db: &mut SqliteConnection, artifact: &str) -> Q<Option<Vec<u8>>> {
+    Ok(optional(queries::artifact_collab(db, queries::ArtifactCollabParams { artifact_id: artifact.into() }).await)?.map(|row| row.snapshot))
+}
+
+pub async fn upsert_artifact_collab(db: &mut SqliteConnection, artifact: &str, snapshot: &[u8], updated_at: i64) -> Q<()> {
+    queries::upsert_artifact_collab(
         db,
         queries::UpsertArtifactCollabParams {
             artifact_id: artifact.into(),
             snapshot: snapshot.to_vec(),
             updated_at,
         },
-    ))
+    )
+    .await
 }
 
-pub fn entries(db: &mut SqliteConnection, artifact: &str) -> Q<Vec<EntryRow>> {
-    block_on(queries::artifact_entries(db, queries::ArtifactEntriesParams { artifact_id: artifact.into() }))
+pub async fn entries(db: &mut SqliteConnection, artifact: &str) -> Q<Vec<EntryRow>> {
+    queries::artifact_entries(db, queries::ArtifactEntriesParams { artifact_id: artifact.into() }).await
 }
 
-pub fn entries_by_prefix(db: &mut SqliteConnection, artifact: &str, prefix: &str) -> Q<Vec<EntryRow>> {
-    let rows = block_on(queries::artifact_entries_by_prefix(
+pub async fn entries_by_prefix(db: &mut SqliteConnection, artifact: &str, prefix: &str) -> Q<Vec<EntryRow>> {
+    let rows = queries::artifact_entries_by_prefix(
         db,
         queries::ArtifactEntriesByPrefixParams {
             artifact_id: artifact.into(),
             path: format!("{prefix}%"),
         },
-    ))?;
+    )
+    .await?;
     Ok(rows.into_iter().filter(|r| r.path.starts_with(prefix)).collect())
 }
 
-pub fn entry(db: &mut SqliteConnection, artifact: &str, path: &str) -> Q<Option<EntryRow>> {
-    optional(block_on(queries::artifact_entry(
-        db,
-        queries::ArtifactEntryParams {
-            artifact_id: artifact.into(),
-            path: path.into(),
-        },
-    )))
+pub async fn entry(db: &mut SqliteConnection, artifact: &str, path: &str) -> Q<Option<EntryRow>> {
+    optional(
+        queries::artifact_entry(
+            db,
+            queries::ArtifactEntryParams {
+                artifact_id: artifact.into(),
+                path: path.into(),
+            },
+        )
+        .await,
+    )
 }
 
-pub fn entry_count(db: &mut SqliteConnection, artifact: &str) -> Q<i64> {
-    Ok(block_on(queries::artifact_entry_count(
-        db,
-        queries::ArtifactEntryCountParams { artifact_id: artifact.into() },
-    ))?
-    .n)
+pub async fn entry_count(db: &mut SqliteConnection, artifact: &str) -> Q<i64> {
+    Ok(
+        queries::artifact_entry_count(db, queries::ArtifactEntryCountParams { artifact_id: artifact.into() })
+            .await?
+            .n,
+    )
 }
 
-pub fn upsert_entry(db: &mut SqliteConnection, params: UpsertEntry) -> Q<()> {
-    block_on(queries::upsert_artifact_entry(db, params))
+pub async fn upsert_entry(db: &mut SqliteConnection, params: UpsertEntry) -> Q<()> {
+    queries::upsert_artifact_entry(db, params).await
 }
 
-pub fn delete_entry(db: &mut SqliteConnection, artifact: &str, path: &str) -> Q<()> {
-    block_on(queries::delete_artifact_entry(
+pub async fn delete_entry(db: &mut SqliteConnection, artifact: &str, path: &str) -> Q<()> {
+    queries::delete_artifact_entry(
         db,
         queries::DeleteArtifactEntryParams {
             artifact_id: artifact.into(),
             path: path.into(),
         },
-    ))
+    )
+    .await
 }
 
 pub struct EntryChangeRow {
@@ -455,8 +477,16 @@ pub struct EntryChangeRow {
     pub deleted: Vec<String>,
 }
 
-pub fn add_entry_change(db: &mut SqliteConnection, artifact: &str, seq: i64, actor: &str, paths: &[String], deleted: &[String], created_at: i64) -> Q<()> {
-    block_on(queries::add_artifact_entry_change(
+pub async fn add_entry_change(
+    db: &mut SqliteConnection,
+    artifact: &str,
+    seq: i64,
+    actor: &str,
+    paths: &[String],
+    deleted: &[String],
+    created_at: i64,
+) -> Q<()> {
+    queries::add_artifact_entry_change(
         db,
         queries::AddArtifactEntryChangeParams {
             artifact_id: artifact.into(),
@@ -466,18 +496,20 @@ pub fn add_entry_change(db: &mut SqliteConnection, artifact: &str, seq: i64, act
             payload: json(&deleted)?,
             created_at,
         },
-    ))
+    )
+    .await
 }
 
-pub fn entry_changes_after(db: &mut SqliteConnection, artifact: &str, seq: i64, limit: i64) -> Q<Vec<EntryChangeRow>> {
-    block_on(queries::artifact_entry_changes_after(
+pub async fn entry_changes_after(db: &mut SqliteConnection, artifact: &str, seq: i64, limit: i64) -> Q<Vec<EntryChangeRow>> {
+    queries::artifact_entry_changes_after(
         db,
         queries::ArtifactEntryChangesAfterParams {
             artifact_id: artifact.into(),
             seq,
             limit,
         },
-    ))?
+    )
+    .await?
     .into_iter()
     .map(|r| {
         Ok(EntryChangeRow {

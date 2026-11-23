@@ -523,8 +523,8 @@ fn regression_job_admission_rolls_back_input_pins_without_a_second_write() {
     let image = picture(&s);
     let mut approved = understanding("atomic", revision, &image, "Describe");
     approved["channel"] = json!(s.test_internals().chat.default_channel());
-    let mut db = pollster::block_on(sqlx::sqlite::SqliteConnectOptions::new().filename(dir.path().join("server.db")).connect()).unwrap();
-    pollster::block_on(
+    let mut db = vibevalley_runtime::rt::block_on(sqlx::sqlite::SqliteConnectOptions::new().filename(dir.path().join("server.db")).connect()).unwrap();
+    vibevalley_runtime::rt::block_on(
         sqlx::raw_sql(
             "CREATE TRIGGER reject_job BEFORE INSERT ON media_job BEGIN SELECT RAISE(ABORT,'job store failed'); END;
          CREATE TRIGGER reject_unpin BEFORE DELETE ON media_input_pin BEGIN SELECT RAISE(ABORT,'storage unavailable'); END;",
@@ -535,7 +535,7 @@ fn regression_job_admission_rolls_back_input_pins_without_a_second_write() {
     refused(&s, "media.understanding.authorize", approved.clone());
     assert!(deletable(&s, &image));
     refused(&s, "media.job.get", json!({"id":"atomic"}));
-    pollster::block_on(sqlx::raw_sql("DROP TRIGGER reject_job; DROP TRIGGER reject_unpin;").execute(&mut db)).unwrap();
+    vibevalley_runtime::rt::block_on(sqlx::raw_sql("DROP TRIGGER reject_job; DROP TRIGGER reject_unpin;").execute(&mut db)).unwrap();
 
     std::thread::scope(|scope| {
         let duplicate = scope.spawn(|| ok(&s, "media.understanding.authorize", approved.clone()));
