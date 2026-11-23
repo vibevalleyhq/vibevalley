@@ -16,24 +16,34 @@ impl Shell {
         let active = self.workspace.ws.active_id();
         match action {
             Action::GlobalRail { rail_width } => {
-                self.chrome.global_rail_width = rail_width.clamp(56.0, 80.0);
-                cx.notify();
+                let next = rail_width.clamp(56.0, 80.0);
+                if (self.chrome.global_rail_width - next).abs() > 0.01 {
+                    self.chrome.global_rail_width = next;
+                    cx.notify();
+                }
             }
             Action::GlobalRoute { path } => {
-                self.chrome.native_workspace = path == "/workspace";
+                let next_native = path == "/workspace";
+                let had_pixel = self.chrome.native_pixel.is_some();
+                let route_changed = self.chrome.last_route.as_deref() != Some(path.as_str());
+                let native_changed = self.chrome.native_workspace != next_native;
+                self.chrome.native_workspace = next_native;
                 if self.chrome.native_workspace {
                     self.with_workspace_project(window, cx, |_, _, _, _| {});
                 }
                 if !path.starts_with("/farm") && path != "/tree" && path != "/map" {
                     self.chrome.native_pixel = None;
                 }
+                let pixel_changed = had_pixel != self.chrome.native_pixel.is_some();
                 self.sync_devtools_route(&path);
-                if self.chrome.last_route.as_deref() != Some(path.as_str()) {
+                if route_changed {
                     self.chrome.last_route = Some(path);
                     self.save_settings(cx);
                 }
-                self.publish_host_debug(cx);
-                cx.notify();
+                if route_changed || native_changed || pixel_changed {
+                    self.publish_host_debug(cx);
+                    cx.notify();
+                }
             }
             Action::OpenRoute { path } => self.navigate_workbench(&path, cx),
             Action::Applied { .. }
@@ -78,26 +88,30 @@ impl Shell {
             Action::AddProject => self.add_project(window, cx),
             Action::CloseProject { id } => self.close_project(id, cx),
             Action::ShowPanel { panel } => {
-                self.chrome.panel = panel;
-                self.chrome.inspector_open = true;
-                self.sync_inspector(window, cx);
-                self.push_sidebar(cx);
-                cx.notify();
+                if self.chrome.panel != panel || !self.chrome.inspector_open {
+                    self.chrome.panel = panel;
+                    self.chrome.inspector_open = true;
+                    self.sync_inspector(window, cx);
+                    self.push_sidebar(cx);
+                    cx.notify();
+                }
             }
             Action::ExpandDir { path } => {
+                let dir = PathBuf::from(path);
                 if let Some(id) = active
                     && let Some(pv) = self.workspace.projects.get_mut(&id)
+                    && (pv.tree.expanded.insert(dir.clone()) || !pv.tree.children.contains_key(&dir))
                 {
-                    pv.tree.expanded.insert(PathBuf::from(path));
                     self.load_dirs(id, cx);
                 }
             }
             Action::CollapseDir { path } => {
                 let path = PathBuf::from(path);
-                if let Some(pv) = active.and_then(|id| self.workspace.projects.get_mut(&id)) {
-                    pv.tree.expanded.remove(&path);
+                if let Some(pv) = active.and_then(|id| self.workspace.projects.get_mut(&id))
+                    && pv.tree.expanded.remove(&path)
+                {
+                    self.push_sidebar(cx);
                 }
-                self.push_sidebar(cx);
             }
             Action::OpenFile { path } => self.open_file(PathBuf::from(path), None, window, cx),
             Action::OpenFarm { repo } => {
@@ -153,10 +167,17 @@ impl Shell {
                 }
             }
             Action::PaletteQuery { query } => {
-                if let Some(p) = &mut self.overlays.palette {
-                    p.query = query;
+                let changed = self.overlays.palette.as_mut().is_some_and(|p| {
+                    if p.query == query {
+                        false
+                    } else {
+                        p.query = query;
+                        true
+                    }
+                });
+                if changed {
+                    self.refresh_palette(cx);
                 }
-                self.refresh_palette(cx);
             }
             Action::PaletteSelect { id } => self.palette_select(&id, window, cx),
             Action::PaletteClose => self.close_palette(window, cx),

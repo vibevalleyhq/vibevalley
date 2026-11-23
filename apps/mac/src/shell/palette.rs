@@ -65,7 +65,7 @@ impl Shell {
             .and_then(|id| self.workspace.projects.get(&id))
             .and_then(|pv| pv.index.clone());
         let Some(p) = &mut self.overlays.palette else { return };
-        if !p.open {
+        if !p.open || !p.view.read(cx).is_ready() {
             return;
         }
         p.seq += 1;
@@ -103,6 +103,9 @@ impl Shell {
     pub(super) fn run_search(&mut self, regex: bool, case_sensitive: bool, cx: &mut Context<Self>) {
         let root = self.workspace.ws.active().map(|p| p.root().to_path_buf());
         let (Some(p), Some(root)) = (&mut self.overlays.palette, root) else { return };
+        if !p.open || !p.view.read(cx).is_ready() {
+            return;
+        }
         p.seq += 1;
         let seq = p.seq;
         let query = p.query.clone();

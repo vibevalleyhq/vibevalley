@@ -27,6 +27,9 @@ impl Shell {
     }
 
     pub(super) fn show_workspace(&mut self, cx: &mut Context<Self>) {
+        if self.chrome.native_workspace && self.chrome.native_pixel.is_none() && self.chrome.last_route.as_deref() == Some("/workspace") {
+            return;
+        }
         self.chrome.native_workspace = true;
         self.chrome.native_pixel = None;
         self.chrome.last_route = Some("/workspace".to_string());
@@ -85,7 +88,6 @@ impl Shell {
             if let (Some(line), Some(PaneEntity::File(v))) = (line, s.workspace.panes.get(&(pid, tab)).map(|s| &s.entity)) {
                 v.update(cx, |v, cx| v.scroll_to_line(line, cx));
             }
-            s.push_sidebar(cx);
             s.layout_changed(window, cx);
         });
     }
@@ -191,7 +193,6 @@ impl Shell {
             if let (Some(line), Some(PaneEntity::File(v))) = (line, s.workspace.panes.get(&(pid, tab)).map(|slot| &slot.entity)) {
                 v.update(cx, |v, cx| v.scroll_to_line(line, cx));
             }
-            s.push_sidebar(cx);
             s.layout_changed(window, cx);
         });
     }
@@ -742,10 +743,16 @@ impl Shell {
                 }
                 TerminalEvent::TitleChanged => {
                     let title = view.read(cx).title().map(str::to_string);
+                    let mut changed = false;
                     if let Some(project) = this.workspace.ws.project_mut(owner)
                         && let Some(entry) = project.terminal_mut(&tid)
+                        && entry.title != title
                     {
                         entry.title = title;
+                        changed = true;
+                    }
+                    if !changed {
+                        return;
                     }
                 }
                 TerminalEvent::Bell | TerminalEvent::CommandFinished => {
@@ -793,7 +800,10 @@ impl Shell {
                         entry.exited = true;
                     }
                 }
-                TerminalEvent::SpawnFailed(e) => eprintln!("terminal {tid}: {e}"),
+                TerminalEvent::SpawnFailed(e) => {
+                    eprintln!("terminal {tid}: {e}");
+                    return;
+                }
             }
             this.push_sidebar(cx);
             cx.notify();

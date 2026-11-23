@@ -72,6 +72,7 @@ pub struct InspectorSlot {
 }
 
 /// A project's git state as the sidebar shows it.
+#[derive(PartialEq, Eq)]
 pub struct GitSummary {
     pub branch: Option<String>,
     pub worktrees: Vec<vibevalley_git::Worktree>,

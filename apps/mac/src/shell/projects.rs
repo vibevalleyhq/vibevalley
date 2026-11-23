@@ -315,8 +315,11 @@ impl Shell {
                     .collect::<Vec<_>>()
             },
             |s, read, cx| {
-                s.workspace.git_summaries = read.into_iter().collect();
-                s.push_sidebar(cx);
+                let next: HashMap<ProjectId, GitSummary> = read.into_iter().collect();
+                if s.workspace.git_summaries != next {
+                    s.workspace.git_summaries = next;
+                    s.push_sidebar(cx);
+                }
             },
         );
     }
