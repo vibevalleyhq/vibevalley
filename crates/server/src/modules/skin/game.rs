@@ -326,15 +326,29 @@ mod tests {
     use super::*;
     use crate::now;
 
-    fn until<T>(what: &str, mut f: impl FnMut() -> Option<T>) -> T {
-        let deadline = Instant::now() + Duration::from_secs(3);
-        loop {
-            if let Some(v) = f() {
-                return v;
-            }
-            assert!(Instant::now() < deadline, "timed out waiting for {what}");
-            std::thread::sleep(Duration::from_millis(10));
-        }
+    fn until<T>(hub: &Hub, what: &str, mut f: impl FnMut() -> Option<T>) -> T {
+        vibevalley_runtime::rt::block_on(async {
+            let notify = Arc::new(Notify::new());
+            let wake = notify.clone();
+            let sub = hub.subscribe_transitions("test-game-wait", move |_, _| {
+                wake.notify_one();
+            });
+            let res = tokio::time::timeout(Duration::from_secs(3), async {
+                loop {
+                    let notified = notify.notified();
+                    tokio::pin!(notified);
+                    notified.as_mut().enable();
+                    if let Some(v) = f() {
+                        return v;
+                    }
+                    notified.await;
+                }
+            })
+            .await
+            .ok();
+            sub.close_async().await;
+            res.unwrap_or_else(|| panic!("timed out waiting for {what}"))
+        })
     }
 
     fn working_phase(since: i64) -> Phase {
@@ -442,7 +456,7 @@ mod tests {
         })]);
 
         // The real worker claims the planted station (ws1..ws6 did NOT steal it) and tallies `backend`.
-        until("real worker station & tally", || {
+        until(&hub, "real worker station & tally", || {
             hub.read(|s| {
                 let station_ok = s.plays.as_ref().and_then(|p| p.get("w1")).map(|p| p.station) == Some(4);
                 let hired_ok = s.progress.as_ref().and_then(|p| p.agents.get("backend")).is_some_and(|t| t.hired == 1);
@@ -474,7 +488,7 @@ mod tests {
             checks: vec![],
             answer: None,
         })]);
-        until("real worker failure resets streak", || {
+        until(&hub, "real worker failure resets streak", || {
             hub.read(|s| {
                 let p = s.progress.as_ref()?;
                 (p.streak == 0 && p.agents.get("backend").is_some_and(|t| t.failed == 1) && game.asked() == 1).then_some(())
@@ -560,7 +574,7 @@ mod tests {
             at: at_inside,
             session: issue_worker("w-in", "i1", false),
         })]);
-        until("station claimed inside window", || {
+        until(&hub, "station claimed inside window", || {
             hub.read(|s| (s.plays.as_ref().and_then(|p| p.get("w-in")).map(|p| p.station) == Some(4)).then_some(()))
         });
 
@@ -580,7 +594,7 @@ mod tests {
             spent: None,
             brief: None,
         })]);
-        until("second worker hired tally processed", || {
+        until(&hub, "second worker hired tally processed", || {
             hub.read(|s| {
                 s.progress
                     .as_ref()

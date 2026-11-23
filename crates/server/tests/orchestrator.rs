@@ -3,10 +3,11 @@
 //! words are said in #general; a cron for no profile reaches it.
 
 use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
+use vibevalley_core::{Clock, ManualClock};
 use vibevalley_protocol::Caller;
 use vibevalley_runtime::agent::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, Role, ToolCall, Usage};
 
@@ -24,6 +25,58 @@ impl ModelClient for Scripted {
         }
         Ok(answer)
     }
+}
+
+struct SignaledScripted {
+    answers: Mutex<VecDeque<Completion>>,
+    seen: Mutex<Vec<ChatRequest>>,
+    seen_changed: Condvar,
+}
+
+impl SignaledScripted {
+    fn new(answers: impl Into<VecDeque<Completion>>) -> Arc<Self> {
+        Arc::new(Self {
+            answers: Mutex::new(answers.into()),
+            seen: Mutex::new(vec![]),
+            seen_changed: Condvar::new(),
+        })
+    }
+
+    fn wait_seen(&self, what: &str, mut pred: impl FnMut(&[ChatRequest]) -> bool) {
+        let deadline = Instant::now() + Duration::from_secs(30);
+        let mut guard = self.seen.lock().unwrap();
+        loop {
+            if pred(&guard) {
+                return;
+            }
+            let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
+                panic!("waited for {what}");
+            };
+            let (next, res) = self.seen_changed.wait_timeout(guard, remaining).unwrap();
+            guard = next;
+            if res.timed_out() && !pred(&guard) {
+                panic!("waited for {what}");
+            }
+        }
+    }
+}
+
+impl ModelClient for SignaledScripted {
+    fn complete(&self, request: &ChatRequest, on: &mut dyn FnMut(Delta)) -> vibevalley_runtime::agent::Result<Completion> {
+        {
+            self.seen.lock().unwrap().push(request.clone());
+            self.seen_changed.notify_all();
+        }
+        let answer = self.answers.lock().unwrap().pop_front().unwrap_or_else(|| say("好的。"));
+        if let Some(t) = &answer.message.content {
+            on(Delta::Text(t.clone()));
+        }
+        Ok(answer)
+    }
+}
+
+fn until<T>(what: &str, f: impl FnMut() -> Option<T>) -> T {
+    crate::support::wait_until_settled(None, Duration::from_secs(30), what, f)
 }
 
 fn say(text: &str) -> Completion {
@@ -66,30 +119,17 @@ fn call(id: &str, name: &str, args: Value) -> Completion {
     }
 }
 
-fn until<T>(what: &str, mut f: impl FnMut() -> Option<T>) -> T {
-    let deadline = Instant::now() + Duration::from_secs(30);
-    loop {
-        if let Some(v) = f() {
-            return v;
-        }
-        assert!(Instant::now() < deadline, "waited for {what}");
-        std::thread::sleep(Duration::from_millis(50));
-    }
-}
-
 #[test]
 fn the_orchestrator_hears_the_user_and_records_an_issue() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
-    let model = Arc::new(Scripted {
-        answers: Mutex::new(VecDeque::from([
-            call("c1", "issue_create", json!({ "title": "在 demo 里写 README", "repo": "demo" })),
-            say("记下了 #1，在备选里。"),
-            call("c2", "cron_list", json!({})),
-            say("到点了，看过了。"),
-        ])),
-        seen: Mutex::new(vec![]),
-    });
+    let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+    let model = SignaledScripted::new([
+        call("c1", "issue_create", json!({ "title": "在 demo 里写 README", "repo": "demo" })),
+        say("记下了 #1，在备选里。"),
+        call("c2", "cron_list", json!({})),
+        say("到点了，看过了。"),
+    ]);
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
     let started = vibevalley_server::start(vibevalley_server::ServerConfig {
@@ -98,6 +138,7 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
         link_previews: false,
         tick_crons: false,
         model_client: Some(model.clone()),
+        clock: clock.clone(),
         ..vibevalley_server::ServerConfig::under(dir.path())
     })
     .unwrap();
@@ -117,7 +158,7 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
         "channel.message.send",
         json!({ "id": general, "text": "帮我在 demo 里把 README 写了", "sendKey": "ask" }),
     );
-    let words = until("the orchestrator's words", || {
+    let words = crate::support::wait_until_channel_event(started.test_internals().chat, Duration::from_secs(30), "the orchestrator's words", || {
         let said = user("channel.message.list", json!({ "id": general }));
         said.as_array()?
             .iter()
@@ -198,28 +239,23 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
     assert_eq!(refusal(json!({ "on": said["seq"], "want": "x" })), vibevalley_protocol::BizCode::Refused.code());
 
     // A cron for no profile: said in #general, handed to the orchestrator.
-    let at = vibevalley_server::now() + 120;
+    let at = clock.now_ms() + 120;
     user(
         "cron.create",
         json!({ "name": "早会", "text": "看看昨天的活", "when": { "kind": "once", "at": at } }),
     );
-    std::thread::sleep(Duration::from_millis(150));
+    clock.advance(Duration::from_millis(150));
     started.test_internals().crons.tick();
-    until("the cron's turn", || {
-        let seen = model.seen.lock().unwrap();
+    model.wait_seen("the cron's turn", |seen| {
         seen.iter()
             .any(|r| r.messages.last().and_then(|m| m.content.clone()).is_some_and(|c| c.contains("[来源：定时]")))
-            .then_some(())
     });
     started.test_internals().board.close();
 }
 
-fn approval_fixture(home: &std::path::Path) -> (Arc<Scripted>, vibevalley_server::ServerConfig) {
+fn approval_fixture(home: &std::path::Path) -> (Arc<SignaledScripted>, vibevalley_server::ServerConfig) {
     use vibevalley_runtime::agent::extensions::governance::Policy;
-    let model = Arc::new(Scripted {
-        answers: Mutex::new([call("approval-1", "issue_create", json!({"title":"Approved work"})), say("done")].into()),
-        seen: Default::default(),
-    });
+    let model = SignaledScripted::new([call("approval-1", "issue_create", json!({"title":"Approved work"})), say("done")]);
     let mut cfg = vibevalley_server::ServerConfig {
         model_client: Some(model.clone()),
         probe_runtimes: false,
@@ -254,7 +290,9 @@ fn durable_approval_survives_restart_and_one_competing_decision_wins() {
     let (model, cfg) = approval_fixture(home.path());
     let started = vibevalley_server::start(cfg.clone()).unwrap();
     let channel = ask_to_create_issue(&started);
-    let card = until("pending approval", || pending_approvals(&started.hub).as_array()?.first().cloned());
+    let card = crate::support::wait_until_settled(Some(&started.hub), Duration::from_secs(30), "pending approval", || {
+        pending_approvals(&started.hub).as_array()?.first().cloned()
+    });
     assert_eq!(card["toolName"], "issue_create");
     assert_eq!(card["toolCallId"], "approval-1");
     started.close();
@@ -281,10 +319,15 @@ fn durable_approval_survives_restart_and_one_competing_decision_wins() {
     let mut opposite = approved.clone();
     opposite["approved"] = json!(false);
     assert_ne!(resolve(opposite).biz_code, 0);
-    until("assistant reported after recovery", || {
-        let messages = reopened.hub.call_as(Caller::User, "channel.message.list", json!({"id":channel})).data?;
-        messages.as_array()?.iter().any(|m| m["text"] == "done").then_some(())
-    });
+    crate::support::wait_until_channel_event(
+        reopened.test_internals().chat,
+        Duration::from_secs(30),
+        "assistant reported after recovery",
+        || {
+            let messages = reopened.hub.call_as(Caller::User, "channel.message.list", json!({"id":channel})).data?;
+            messages.as_array()?.iter().any(|m| m["text"] == "done").then_some(())
+        },
+    );
     let list = reopened.hub.call_as(Caller::User, "issue.list", json!({})).data.unwrap();
     assert_eq!(list.as_array().unwrap().iter().filter(|i| i["title"] == "Approved work").count(), 1);
     assert_eq!(pending_approvals(&reopened.hub), json!([]));
@@ -357,8 +400,8 @@ fn crash_restores_the_builtin_worker_in_the_same_issue_run() {
         start.test_internals().agents.profiles.save(helper).unwrap();
         let issue = call("issue.create", json!({"title":"Record one line","repo":"demo","agent":"Durable worker"}));
         call("issue.status.update", json!({"id":issue["id"],"status":"todo"}));
-        until("process exit", || None::<()>);
-        unreachable!();
+        std::thread::park_timeout(Duration::from_secs(30));
+        panic!("child worker did not crash with exit code 87");
     }
     let home = tempfile::tempdir().unwrap();
     let output = std::process::Command::new(std::env::current_exe().unwrap())
@@ -382,7 +425,7 @@ fn crash_restores_the_builtin_worker_in_the_same_issue_run() {
         calls: AtomicUsize::new(0),
     });
     let (start, _listen) = launch(home.path(), model.clone());
-    let issue = until("worker recovered", || {
+    let issue = crate::support::wait_until_transition(&start.hub, Duration::from_secs(30), "worker recovered", || {
         start.test_internals().board.issue("1").filter(|i| i.stage.state == IssueStageKind::Reviewing)
     });
     let session = start.test_internals().board.session(issue.latest_session_id().unwrap()).unwrap();
@@ -406,13 +449,7 @@ fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases(
     let dir = tempfile::tempdir().unwrap();
     let starts = dir.path().join("starts");
     let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../runtime/tests/fixtures/echo_mcp.py");
-    let model = Arc::new(Scripted {
-        answers: Mutex::new(VecDeque::from([
-            call("external", "probe__echo", json!({"text":"server roundtrip"})),
-            say("external done"),
-        ])),
-        seen: Default::default(),
-    });
+    let model = SignaledScripted::new([call("external", "probe__echo", json!({"text":"server roundtrip"})), say("external done")]);
     let started = vibevalley_server::start(vibevalley_server::ServerConfig {
         registry: Some(Arc::new(vibevalley_runtime::oar::Registry::new())),
         probe_runtimes: false,
@@ -450,18 +487,12 @@ fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases(
         assert_eq!(res.biz_code, 0, "{res:?}");
     };
     send("call the profile tool");
-    until("MCP result reached the orchestrator model", || {
-        model
-            .seen
-            .lock()
-            .unwrap()
-            .iter()
-            .any(|r| {
-                r.messages
-                    .iter()
-                    .any(|m| m.tool_call_id.as_deref() == Some("external") && m.content.as_deref() == Some("echo: server roundtrip"))
-            })
-            .then_some(())
+    model.wait_seen("MCP result reached the orchestrator model", |seen| {
+        seen.iter().any(|r| {
+            r.messages
+                .iter()
+                .any(|m| m.tool_call_id.as_deref() == Some("external") && m.content.as_deref() == Some("echo: server roundtrip"))
+        })
     });
     {
         let requests = model.seen.lock().unwrap();
@@ -475,14 +506,8 @@ fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases(
     profile.mcp_servers.clear();
     started.test_internals().agents.profiles.save(profile).unwrap();
     send("after removing the server");
-    until("the removed profile tool disappears", || {
-        model
-            .seen
-            .lock()
-            .unwrap()
-            .last()
-            .is_some_and(|r| r.tools.iter().all(|t| !t.name.starts_with("probe__")))
-            .then_some(())
+    model.wait_seen("the removed profile tool disappears", |seen| {
+        seen.last().is_some_and(|r| r.tools.iter().all(|t| !t.name.starts_with("probe__")))
     });
     started.close();
 }
@@ -513,7 +538,9 @@ fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
         assert_eq!(reply.biz_code, 0);
         serde_json::from_value(reply.data.unwrap()).unwrap()
     };
-    let first = until("first approval", || list(json!({})).into_iter().next());
+    let first = crate::support::wait_until_settled(Some(&started.hub), Duration::from_secs(30), "first approval", || {
+        list(json!({})).into_iter().next()
+    });
     assert_eq!(first.tool_call_id, "approval-1");
     assert_eq!(serde_json::from_str::<Value>(&first.arguments_json).unwrap(), json!({"title":"Approved work"}));
     assert!(list(json!({"conversationId":"another-assistant"})).is_empty());
@@ -529,7 +556,7 @@ fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
     assert_eq!(request("orchestrator/approval/resolve", decision(&first, true)).biz_code, 0);
 
     let filter = json!({"conversationId":first.conversation_id});
-    let second = until("second approval", || {
+    let second = crate::support::wait_until_settled(Some(&started.hub), Duration::from_secs(30), "second approval", || {
         list(filter.clone()).into_iter().find(|item| item.tool_call_id == "approval-2")
     });
     assert_eq!(second.task_id, first.task_id);
@@ -558,9 +585,13 @@ fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
             Ok(())
         })
         .unwrap();
-    let runtime_alert = until("budget_reached alert in InboxSlice", || {
-        started.hub.inbox_slice().items.into_iter().find(|i| i.kind == InboxKind::BudgetReached)
-    });
+    let runtime_alert = crate::support::wait_until_slice(
+        &started.hub,
+        SliceKind::Inbox,
+        Duration::from_secs(30),
+        "budget_reached alert in InboxSlice",
+        || started.hub.inbox_slice().items.into_iter().find(|i| i.kind == InboxKind::BudgetReached),
+    );
     assert_eq!(runtime_alert.from, InboxFrom::Runtime(vibevalley_protocol::InboxFromRuntime {}));
     assert_eq!(
         runtime_alert.target,
@@ -572,10 +603,15 @@ fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
     assert_eq!(runtime_alert.text, "Budget cap hit");
     let snap = started.hub.slice_snapshot(SliceKind::Inbox);
     assert!(snap["items"].as_array().unwrap().iter().any(|i| i["kind"] == "budget_reached"), "{snap}");
-    until("assistant's approved round settled", || {
-        let messages = started.hub.call_as(Caller::User, "channel.message.list", json!({"id":channel})).data?;
-        messages.as_array()?.iter().any(|m| m["text"] == "done").then_some(())
-    });
+    crate::support::wait_until_channel_event(
+        started.test_internals().chat,
+        Duration::from_secs(30),
+        "assistant's approved round settled",
+        || {
+            let messages = started.hub.call_as(Caller::User, "channel.message.list", json!({"id":channel})).data?;
+            messages.as_array()?.iter().any(|m| m["text"] == "done").then_some(())
+        },
+    );
     assert!(list(json!({})).is_empty());
     let issues: Vec<Issue> = serde_json::from_value(request("issue/list", json!({})).data.unwrap()).unwrap();
     assert!(!issues.iter().any(|i| i.title == "Denied work"));

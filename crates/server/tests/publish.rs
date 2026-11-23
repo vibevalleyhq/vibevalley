@@ -2,6 +2,8 @@
 //! (publish.test.ts): preview, refusals, the push and the pull request,
 //! the check, a conflict with the base, and the user-only rule.
 
+mod support;
+
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -230,7 +232,7 @@ fn only_the_user_publishes() {
 
 #[test]
 fn pull_request_issue_mandates_records_and_completes_cleanly() {
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
     use vibevalley_protocol::{Landing, PullRequest, PullRequestState};
     use vibevalley_runtime::oar::{Registry, scripted::ScriptedRuntime};
     use vibevalley_server::{Server, ServerConfig, start};
@@ -312,18 +314,16 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
         0
     );
 
-    let deadline = Instant::now() + Duration::from_secs(5);
-    let worktree = loop {
+    let worktree = crate::support::wait_until_transition(&started.hub, Duration::from_secs(5), "InReview", || {
         let state = started.hub.state_now();
-        let issue = state.issues.iter().find(|i| i.id == issue_id).unwrap();
+        let issue = state.issues.iter().find(|i| i.id == issue_id)?;
         if issue.status == vibevalley_protocol::IssueStatus::InReview {
-            let sid = issue.latest_session_id().unwrap();
-            let session = state.sessions.iter().find(|s| s.id == *sid).unwrap();
-            break PathBuf::from(session.cwd.clone().unwrap());
+            let sid = issue.latest_session_id()?;
+            let session = state.sessions.iter().find(|s| s.id == *sid)?;
+            return session.cwd.clone().map(PathBuf::from);
         }
-        assert!(Instant::now() < deadline, "timed out waiting for InReview");
-        std::thread::sleep(Duration::from_millis(20));
-    };
+        None
+    });
 
     // Completing before a PR is recorded is refused.
     let refused = started.hub.call("issue.status.update", json!({ "id": &issue_id, "status": "done" }));

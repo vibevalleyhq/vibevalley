@@ -3,21 +3,10 @@
 //! remembers set before the next round's words.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, Caller};
-
-fn until<T>(what: &str, mut f: impl FnMut() -> Option<T>) -> T {
-    let deadline = Instant::now() + Duration::from_secs(30);
-    loop {
-        if let Some(v) = f() {
-            return v;
-        }
-        assert!(Instant::now() < deadline, "waited for {what}");
-        std::thread::sleep(Duration::from_millis(50));
-    }
-}
 
 #[test]
 fn notes_are_kept_searched_recalled_and_forgotten() {
@@ -73,19 +62,19 @@ fn notes_are_kept_searched_recalled_and_forgotten() {
     let issue = ok("issue.create", json!({ "title": "say hello", "repo": "farm", "agent": a }));
     let id = issue["id"].as_str().unwrap().to_string();
     ok("issue.status.update", json!({ "id": id, "status": "todo" }));
-    let session = until("the session", || {
+    let session = crate::support::wait_until_transition(&hub, Duration::from_secs(30), "the session", || {
         started
             .test_internals()
             .board
             .read(|s| s.sessions.iter().find(|x| x.issue_id() == Some(id.as_str())).cloned())
     });
-    let asked = until("the first words", || {
+    let asked = crate::support::wait_until_live(&hub, Duration::from_secs(30), "the first words", || {
         let events = ok("session.event.list", json!({ "id": session.id }));
         let text = events.to_string();
         text.contains("say hello").then_some(text)
     });
     assert!(asked.contains("【你记得的】") && asked.contains("cargo test"), "{asked}");
-    until("the issue memory", || {
+    crate::support::wait_until_settled(Some(&hub), Duration::from_secs(30), "the issue memory", || {
         let listed = ok("memory.list", json!({ "agent": a }));
         listed["memories"].as_array()?.iter().find(|m| m["kind"] == "issue").cloned()
     });

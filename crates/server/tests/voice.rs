@@ -3,7 +3,7 @@
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, Caller, Envelope, VoiceFix};
@@ -151,17 +151,6 @@ fn farm(answers: &[&'static str]) -> Farm {
         voice,
         live,
         model,
-    }
-}
-
-fn until<T>(what: &str, mut f: impl FnMut() -> Option<T>) -> T {
-    let deadline = Instant::now() + Duration::from_secs(30);
-    loop {
-        if let Some(v) = f() {
-            return v;
-        }
-        assert!(Instant::now() < deadline, "waited for {what}");
-        std::thread::sleep(Duration::from_millis(20));
     }
 }
 
@@ -317,7 +306,7 @@ fn a_moss_call_answering_a_ring_speaks_what_rang() {
         "voice.call.start",
         json!({ "channel": grant["channel"], "uid": grant["uid"], "about": "#3 等你验收" }),
     );
-    let raw = until("ring commentary delivered", || line.outgoing.try_recv().ok());
+    let raw = line.outgoing.recv_timeout(Duration::from_secs(30)).expect("ring commentary delivered");
     let frame: Value = serde_json::from_str(&raw).unwrap();
     assert_eq!(frame["action"], "session.commentary.append");
     assert_eq!(frame["content"], "#3 做完了，等你验收。");

@@ -1,7 +1,7 @@
 //! A helper reaches the farm through `/mcp`: the board hands it the door
 //! and a token, the token names it, and its tools act as it.
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use serde_json::{Value, json};
@@ -12,7 +12,7 @@ use vibevalley_runtime::oar::{Capabilities, Installation, McpServer, ModelInfo, 
 /// The scripted runtime, keeping what each open was given.
 struct Recording {
     inner: ScriptedRuntime,
-    opened: Arc<Mutex<Vec<SessionOptions>>>,
+    opened: flume::Sender<SessionOptions>,
 }
 
 impl Runtime for Recording {
@@ -32,7 +32,7 @@ impl Runtime for Recording {
         self.inner.list_models()
     }
     fn open(&self, opts: SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn Session>> {
-        self.opened.lock().unwrap().push(opts.clone());
+        let _ = self.opened.send(opts.clone());
         self.inner.open(opts)
     }
 }
@@ -58,11 +58,11 @@ fn text_of(answer: &Value) -> String {
 fn a_helper_calls_its_tools_through_the_door_it_was_given() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
-    let opened = Arc::new(Mutex::new(vec![]));
+    let (opened_tx, opened_rx) = flume::unbounded();
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(Recording {
         inner: ScriptedRuntime::demo(),
-        opened: opened.clone(),
+        opened: opened_tx,
     }));
     let started = vibevalley_server::start(vibevalley_server::ServerConfig {
         registry: Some(Arc::new(registry)),
@@ -88,15 +88,7 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
     let sent = call("issue.status.update", json!({ "id": id, "status": "todo" }));
     assert!(sent.data.is_some(), "{}", sent.message);
 
-    let mut opts = None;
-    for _ in 0..100 {
-        if let Some(o) = opened.lock().unwrap().first().cloned() {
-            opts = Some(o);
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(50));
-    }
-    let opts = opts.expect("the helper was opened");
+    let opts = opened_rx.recv_timeout(Duration::from_secs(5)).expect("the helper was opened");
     let rules = opts.append_system_prompt.clone().unwrap_or_default();
     assert!(rules.contains("## 在 VibeValley 工作的规矩") && rules.contains("「farm」"), "{rules}");
     assert!(rules.contains("所有仓库都用 2 个空格缩进。"), "the house rules: {rules}");

@@ -156,15 +156,8 @@ fn a_grown_step_is_pushed_once() {
     assert!(live.recv_timeout(Duration::from_millis(500)).is_err());
 }
 
-fn until<T>(what: &str, mut f: impl FnMut() -> Option<T>) -> T {
-    let deadline = Instant::now() + Duration::from_secs(20);
-    loop {
-        if let Some(v) = f() {
-            return v;
-        }
-        assert!(Instant::now() < deadline, "waited for {what}");
-        std::thread::sleep(Duration::from_millis(50));
-    }
+fn until<T>(what: &str, f: impl FnMut() -> Option<T>) -> T {
+    crate::support::wait_until_settled(None, Duration::from_secs(20), what, f)
 }
 
 #[test]
@@ -196,7 +189,7 @@ fn a_sent_issue_is_logged_listed_and_watched() {
     assert_eq!(first["sessionIds"], json!([]));
 
     call("issue.status.update", json!({ "id": id, "status": "todo" })).data.unwrap();
-    let session = until("the session to rest with its run ended", || {
+    let session = crate::support::wait_until_live(&hub, Duration::from_secs(20), "the session to rest with its run ended", || {
         let s = started
             .test_internals()
             .board
@@ -221,12 +214,11 @@ fn a_sent_issue_is_logged_listed_and_watched() {
 
     // The watch saw the session's log and its state.
     let mut kinds = Vec::new();
-    until("the watch to show the session", || {
-        while let Ok(row) = rows.try_recv() {
-            kinds.push(row["kind"].as_str().unwrap_or("").to_string());
-        }
-        kinds.iter().any(|k| k == "history").then_some(())
-    });
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !(kinds.iter().any(|k| k == "history") && kinds.iter().any(|k| k == "state")) {
+        let row = rows.recv_deadline(deadline).expect("the watch to show the session");
+        kinds.push(row["kind"].as_str().unwrap_or("").to_string());
+    }
     assert!(kinds.contains(&"state".to_string()), "{kinds:?}");
     hub.unsubscribe(sub);
     let missing = hub.subscribe("issue.watch", json!({ "id": "i999" }));

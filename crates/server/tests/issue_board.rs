@@ -268,7 +268,7 @@ fn the_queue_waits_for_room_in_the_space_and_sends_the_next() {
     w.board.move_to("4", IssueStatus::Todo, None).unwrap();
     assert_eq!(w.board.move_to("4", IssueStatus::Backlog, None).unwrap(), Move::Unqueue);
     wait_stage(&w.board, "3", StageKind::Reviewing);
-    std::thread::sleep(Duration::from_millis(100));
+    w.board.refresh_queue().unwrap();
     assert_eq!(w.board.issue("4").unwrap().status, IssueStatus::Backlog);
 }
 
@@ -336,7 +336,7 @@ fn a_restart_marks_a_working_session_interrupted_and_it_goes_on() {
     assert!(matches!(busy, Err(BoardError::Busy(_))));
     w.board.close();
 
-    let board = Board::open(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
+    let (board, _hub) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
     let issue = board.issue("1").unwrap();
     assert_eq!(issue.stage.stuck, Some(StuckReason::Interrupted));
     let session = board.session(&session_id).unwrap();
@@ -361,7 +361,7 @@ fn a_lost_worktree_cancels_its_issue_on_open() {
     let worktree = w.board.session(issue.latest_session_id().unwrap()).unwrap().cwd.unwrap();
     w.board.close();
     std::fs::remove_dir_all(&worktree).unwrap();
-    let board = Board::open(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
+    let (board, _hub) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
     let lost = board.issue("1").unwrap();
     assert_eq!((lost.status, lost.canceled), (IssueStatus::Canceled, Some(IssueCanceled::Lost)));
     assert!(board.bundle().sessions.sessions.is_empty());
@@ -488,7 +488,7 @@ fn regression_review_keeps_the_seen_tree_and_records_the_delivered_commit() {
     w.board.move_to("1", IssueStatus::Done, None).unwrap();
 
     w.board.close();
-    let board = Board::open(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
+    let (board, _hub) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
     let archived = board.changes_since("1", Some(&first.revision.tree)).unwrap();
     assert_eq!(archived.revision, next.revision);
     assert_eq!(archived.files.len(), 2);
@@ -531,7 +531,7 @@ fn regression_reopen_recognizes_an_already_published_candidate_without_running_g
     assert!(!branch_exists(&main, "vibevalley/issue-1"));
     w.board.close();
     execute_sql(&mut db, "drop trigger stop_delivery");
-    let board = Board::open(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
+    let (board, _hub) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
     let restored = board.issue("1").unwrap();
     assert_eq!(restored.status, IssueStatus::Done);
     assert_eq!(restored.delivery_evidence.unwrap().merged_commit.as_deref(), Some(head.as_str()));
@@ -707,7 +707,7 @@ fn a_queued_issue_waits_for_the_issue_it_is_blocked_by() {
     assert_eq!(w.board.issue("2").unwrap().stage.state, StageKind::Queued);
     w.board.move_to("1", IssueStatus::Todo, None).unwrap();
     wait_stage(&w.board, "1", StageKind::Reviewing);
-    std::thread::sleep(Duration::from_millis(100));
+    w.board.refresh_queue().unwrap();
     assert_eq!(w.board.issue("2").unwrap().stage.state, StageKind::Queued, "in review is not done");
     w.board.move_to("1", IssueStatus::Done, None).unwrap();
     wait_stage(&w.board, "2", StageKind::Reviewing);

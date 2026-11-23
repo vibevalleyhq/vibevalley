@@ -1,7 +1,7 @@
 //! VibeValley `modules/media/library.test.ts`, through `start()`.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, Caller, Envelope, Fact, LibraryAddRequest};
@@ -26,15 +26,8 @@ fn ok(e: Envelope) -> Value {
     e.data.unwrap_or(Value::Null)
 }
 
-fn wait_for(what: &str, mut f: impl FnMut() -> Option<Value>) -> Value {
-    let deadline = Instant::now() + Duration::from_secs(5);
-    loop {
-        if let Some(v) = f() {
-            return v;
-        }
-        assert!(Instant::now() < deadline, "{what} never came");
-        std::thread::sleep(Duration::from_millis(30));
-    }
+fn wait_for(hub: &vibevalley_server::Hub, what: &str, f: impl FnMut() -> Option<Value>) -> Value {
+    crate::support::wait_until_settled(Some(hub), Duration::from_secs(5), what, f)
 }
 
 fn file(name: &str, words: &str, kind: &str) -> Value {
@@ -69,7 +62,7 @@ fn keeps_what_the_user_says_with_a_file_and_what_a_ready_job_made_once_each() {
         "channel.message.send",
         json!({ "id": general, "text": "看这个", "sendKey": "k1", "attachments": [said["id"]] }),
     ));
-    let uploaded = wait_for("the uploaded file", || {
+    let uploaded = wait_for(&hub, "the uploaded file", || {
         Some(list(json!({ "origin": "uploaded" }))).filter(|v| v.as_array().unwrap().len() == 1)
     });
     assert_eq!(uploaded[0]["attachment"], said);
@@ -80,18 +73,21 @@ fn keeps_what_the_user_says_with_a_file_and_what_a_ready_job_made_once_each() {
     hub.apply(vec![image("job-1", &made, "generating")]);
     hub.apply(vec![image("job-1", &made, "ready")]);
     hub.apply(vec![image("job-1", &made, "ready")]);
-    let generated = wait_for("the generated file", || {
+    let generated = wait_for(&hub, "the generated file", || {
         Some(list(json!({ "origin": "generated" }))).filter(|v| v.as_array().unwrap().len() == 1)
     });
     assert_eq!(generated[0]["attachment"], made);
     assert_eq!(generated[0]["origin"], json!({ "kind": "generated", "job": "job-1", "jobKind": "image" }));
 
-    std::thread::sleep(Duration::from_millis(5));
+    // Backdate existing library timestamps so re-referencing `made` guarantees `lastAt > addedAt` without sleeping.
+    let mut db = crate::support::inspect_db(&dir.path().join("server.db"));
+    crate::support::execute_sql(&mut db, "update media_library_item set added_at = added_at - 1000, last_at = last_at - 1000");
+    drop(db);
     ok(call(
         "channel.message.send",
         json!({ "id": general, "text": "再看一次", "sendKey": "k2", "attachments": [made["id"]] }),
     ));
-    let all = wait_for("the item moved up", || {
+    let all = wait_for(&hub, "the item moved up", || {
         Some(list(json!({}))).filter(|v| v[0]["attachment"]["id"] == made["id"] && v[0]["lastAt"].as_i64() > v[0]["addedAt"].as_i64())
     });
     let got: Vec<(Value, Value)> = all
@@ -261,7 +257,7 @@ fn regression_library_observes_edited_message_attachments() {
         .as_str()
         .unwrap()
         .to_string();
-    let first = wait_for("initial attachment in library", || {
+    let first = wait_for(&started.hub, "initial attachment in library", || {
         Some(list()).filter(|v| v.as_array().is_some_and(|a| a.len() == 1))
     });
     let first_last_at = first[0]["lastAt"].as_i64().unwrap();
@@ -271,12 +267,11 @@ fn regression_library_observes_edited_message_attachments() {
     ok(call("library.item.delete", json!({ "id": attached["id"] })));
     assert_eq!(list(), json!([]));
 
-    std::thread::sleep(Duration::from_millis(5));
     ok(call(
         "channel.message.update",
         json!({ "id": message_id, "text": "edited with same attachment" }),
     ));
-    let restored = wait_for("edited message attachment in library", || {
+    let restored = wait_for(&started.hub, "edited message attachment in library", || {
         Some(list()).filter(|v| v.as_array().is_some_and(|a| a.len() == 1))
     });
     assert_eq!(restored[0]["attachment"], attached);

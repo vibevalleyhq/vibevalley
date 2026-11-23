@@ -7,7 +7,7 @@
 //! - `Hub::on_system_wake()` waking subscribers and pinging connected machines
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use base64::Engine as _;
 use futures_util::{SinkExt, StreamExt};
@@ -113,17 +113,6 @@ async fn recv_frame(ws: &mut WsStream) -> MachineWireFrame {
             other => panic!("unexpected WS message: {other:?}"),
         }
     }
-}
-
-fn wait_until(timeout: Duration, mut pred: impl FnMut() -> bool) {
-    let deadline = Instant::now() + timeout;
-    while Instant::now() < deadline {
-        if pred() {
-            return;
-        }
-        std::thread::sleep(Duration::from_millis(15));
-    }
-    assert!(pred(), "condition not satisfied within {timeout:?}");
 }
 
 fn runtime_summary(id: &str, label: &str) -> MachineRuntimeSummary {
@@ -253,14 +242,16 @@ fn machine_hello_inventory_and_ephemeral_sandbox_disconnect_project_into_slices(
         )
         .await;
 
-        wait_until(Duration::from_secs(3), || {
+        crate::support::wait_until_transition_async(&started.hub, Duration::from_secs(3), "gpu-1 inventory updated", || {
             started
                 .hub
                 .sessions_slice()
                 .machines
                 .iter()
                 .any(|m| m.id == "gpu-1" && m.online && m.runtimes == vec!["claude", "codex"])
-        });
+                .then_some(())
+        })
+        .await;
 
         let listed: Vec<vibevalley_protocol::MachineInfo> =
             serde_json::from_value(started.hub.call_as(Caller::User, "machine.list", json!({})).data.unwrap()).unwrap();
@@ -286,16 +277,24 @@ fn machine_hello_inventory_and_ephemeral_sandbox_disconnect_project_into_slices(
         .await;
         assert!(matches!(recv_frame(&mut sbx_ws).await, MachineWireFrame::MachineHelloAck(_)));
 
-        wait_until(Duration::from_secs(3), || {
-            started.hub.sessions_slice().machines.iter().any(|m| m.id == "sbx-9" && m.ephemeral && m.online)
-        });
+        crate::support::wait_until_transition_async(&started.hub, Duration::from_secs(3), "sbx-9 online", || {
+            started
+                .hub
+                .sessions_slice()
+                .machines
+                .iter()
+                .any(|m| m.id == "sbx-9" && m.ephemeral && m.online)
+                .then_some(())
+        })
+        .await;
 
         // 3. Disconnect ephemeral sandbox -> emitted `MachineRemoved` drops it completely.
         let _ = sbx_ws.close(None).await;
         drop(sbx_ws);
-        wait_until(Duration::from_secs(3), || {
-            !started.hub.sessions_slice().machines.iter().any(|m| m.id == "sbx-9")
-        });
+        crate::support::wait_until_transition_async(&started.hub, Duration::from_secs(3), "sbx-9 removed", || {
+            (!started.hub.sessions_slice().machines.iter().any(|m| m.id == "sbx-9")).then_some(())
+        })
+        .await;
         let after_sbx: Vec<vibevalley_protocol::MachineInfo> =
             serde_json::from_value(started.hub.call_as(Caller::User, "machine.list", json!({})).data.unwrap()).unwrap();
         assert!(!after_sbx.iter().any(|m| m.id == "sbx-9"));
@@ -303,14 +302,16 @@ fn machine_hello_inventory_and_ephemeral_sandbox_disconnect_project_into_slices(
         // 4. Disconnect persistent `gpu-1` -> stays listed with `Offline`.
         let _ = gpu_ws.close(None).await;
         drop(gpu_ws);
-        wait_until(Duration::from_secs(3), || {
+        crate::support::wait_until_transition_async(&started.hub, Duration::from_secs(3), "gpu-1 offline", || {
             started
                 .hub
                 .sessions_slice()
                 .machines
                 .iter()
                 .any(|m| m.id == "gpu-1" && !m.online && m.status == Some(MachineStatus::Offline))
-        });
+                .then_some(())
+        })
+        .await;
     });
 
     started.close();
@@ -475,8 +476,14 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
     );
 
     // Confirm machine transitioned to Offline while session stayed alive.
-    wait_until(Duration::from_secs(3), || {
-        started.hub.sessions_slice().machines.iter().any(|m| m.id == "gpu-dev" && !m.online)
+    crate::support::wait_until_transition(&started.hub, Duration::from_secs(3), "gpu-dev offline", || {
+        started
+            .hub
+            .sessions_slice()
+            .machines
+            .iter()
+            .any(|m| m.id == "gpu-dev" && !m.online)
+            .then_some(())
     });
     assert!(started.test_internals().board.sessions().is_live(&session_id));
     assert_eq!(started.test_internals().board.session(&session_id).unwrap().machine.as_deref(), Some("gpu-dev"));
@@ -592,12 +599,13 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
     });
 
     // Wait for TurnFinished to settle the issue into InReview and verify NO duplicate `alpha-`!
-    wait_until(Duration::from_secs(3), || {
+    crate::support::wait_until_transition(&started.hub, Duration::from_secs(3), "issue InReview", || {
         started
             .test_internals()
             .board
             .issue(&issue_id)
             .is_some_and(|i| i.status == vibevalley_protocol::IssueStatus::InReview)
+            .then_some(())
     });
     let session = started.test_internals().board.session(&session_id).unwrap();
     let summary = session.last_run.as_ref().map(|r| r.summary.as_str()).unwrap_or("");
@@ -621,8 +629,8 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
         assert!(matches!(recv_frame(&mut ws).await, MachineWireFrame::MachineHelloAck(_)));
         ws
     });
-    wait_until(Duration::from_secs(2), || {
-        started.test_internals().machines.registry().get("gpu-ctrl").is_some()
+    crate::support::wait_until_transition(&started.hub, Duration::from_secs(2), "gpu-ctrl registered", || {
+        started.test_internals().machines.registry().get("gpu-ctrl").map(|_| ())
     });
     let (_, rt) = started
         .test_internals()

@@ -112,9 +112,107 @@ fn first_event(url: &str) -> Value {
     first_event_with_id(url, None).1
 }
 
+struct SignaledFake {
+    inner: Arc<FakeServer>,
+    on_watch: tokio::sync::Notify,
+    on_subscribe: tokio::sync::Notify,
+}
+
+impl SignaledFake {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            inner: Arc::new(FakeServer::new()),
+            on_watch: tokio::sync::Notify::new(),
+            on_subscribe: tokio::sync::Notify::new(),
+        })
+    }
+
+    fn wait_slice_watcher(&self, slice: SliceKind) {
+        vibevalley_runtime::rt::block_on(async {
+            tokio::time::timeout(Duration::from_secs(3), async {
+                loop {
+                    let notified = self.on_watch.notified();
+                    tokio::pin!(notified);
+                    notified.as_mut().enable();
+                    if self.inner.slice_watchers(slice) > 0 {
+                        return;
+                    }
+                    notified.await;
+                }
+            })
+            .await
+        })
+        .expect("slice watcher attached");
+    }
+
+    fn wait_subscriber(&self) {
+        vibevalley_runtime::rt::block_on(async {
+            tokio::time::timeout(Duration::from_secs(3), async {
+                loop {
+                    let notified = self.on_subscribe.notified();
+                    tokio::pin!(notified);
+                    notified.as_mut().enable();
+                    if self.inner.subscriber_count() > 0 {
+                        return;
+                    }
+                    notified.await;
+                }
+            })
+            .await
+        })
+        .expect("subscriber attached");
+    }
+}
+
+impl Server for SignaledFake {
+    fn call(&self, op: &str, payload: Value) -> Envelope {
+        self.inner.call(op, payload)
+    }
+    fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
+        self.inner.call_with(ctx, op, payload)
+    }
+    fn slice_snapshot(&self, slice: SliceKind) -> Value {
+        self.inner.slice_snapshot(slice)
+    }
+    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+        self.on_watch.notify_waiters();
+        self.inner.watch_slice(slice, after_seq, stop, receive)
+    }
+    fn subscribe_slice(&self, slice: SliceKind) -> Option<crate::slice_feed::SliceSubscription> {
+        let sub = self.inner.subscribe_slice(slice);
+        self.on_watch.notify_waiters();
+        sub
+    }
+    fn live(&self) -> flume::Receiver<vibevalley_protocol::LiveEvent> {
+        self.inner.live()
+    }
+    fn subscribe_live(&self) -> Option<tokio::sync::broadcast::Receiver<vibevalley_protocol::LiveEvent>> {
+        self.inner.subscribe_live()
+    }
+    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        let res = self.inner.subscribe(name, payload);
+        self.on_subscribe.notify_waiters();
+        res
+    }
+    fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        let res = self.inner.subscribe_with(ctx, name, payload);
+        self.on_subscribe.notify_waiters();
+        res
+    }
+    fn unsubscribe(&self, id: u64) {
+        self.inner.unsubscribe(id)
+    }
+}
+
+fn start_signaled() -> (Arc<SignaledFake>, Listener) {
+    let fake = SignaledFake::new();
+    let listener = serve(fake.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    (fake, listener)
+}
+
 #[test]
 fn slice_endpoint_serves_json_snapshots_sse_with_ids_and_resume() {
-    let (fake, l) = start();
+    let (fake, l) = start_signaled();
     // 1. Unknown slice -> 404
     let res = agent().get(format!("{}/api/v1/slice/unknown?once=1", l.url())).send().unwrap();
     assert_eq!(res.status().as_u16(), 404);
@@ -146,15 +244,10 @@ fn slice_endpoint_serves_json_snapshots_sse_with_ids_and_resume() {
     // 5. Last-Event-ID / ?after= skips matching initial seq and delivers the next update
     let url = format!("{}/api/v1/slice/board", l.url());
     let reader = std::thread::spawn(move || first_event_with_id(&url, Some(("Last-Event-ID", "0"))));
-    for _ in 0..200 {
-        if fake.slice_watchers(SliceKind::Board) > 0 {
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    }
+    fake.wait_slice_watcher(SliceKind::Board);
     let mut next = empty_bundle(3);
     next.board.issues.push(Issue::new("i3", 3, "Resumed", 3));
-    fake.swap_bundle(next);
+    fake.inner.swap_bundle(next);
     let (resumed_id, resumed) = reader.join().unwrap();
     assert_eq!(resumed_id.as_deref(), Some("3"));
     assert_eq!(resumed["seq"], 3);
@@ -163,28 +256,18 @@ fn slice_endpoint_serves_json_snapshots_sse_with_ids_and_resume() {
     // 6. Subscriptions still stream events
     let sub_url = format!("{}/api/v1/subscribe/channel.follow?payload=%7B%22id%22%3A%22c1%22%7D", l.url());
     let sub_reader = std::thread::spawn(move || first_event(&sub_url));
-    for _ in 0..200 {
-        if fake.subscriber_count() > 0 {
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    }
-    fake.emit("channel.follow", json!({ "kind": "message", "text": "你好" }));
+    fake.wait_subscriber();
+    fake.inner.emit("channel.follow", json!({ "kind": "message", "text": "你好" }));
     assert_eq!(sub_reader.join().unwrap(), json!({ "kind": "message", "text": "你好" }));
 }
 
 #[test]
 fn issue_watch_streams_the_subscription_and_refusals_are_an_empty_404() {
-    let (fake, l) = start();
+    let (fake, l) = start_signaled();
     let url = format!("{}/api/v1/issue/watch/i7", l.url());
     let reader = std::thread::spawn(move || first_event(&url));
-    for _ in 0..200 {
-        if fake.subscriber_count() > 0 {
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    }
-    fake.emit("issue.watch", json!({ "_tag": "state" }));
+    fake.wait_subscriber();
+    fake.inner.emit("issue.watch", json!({ "_tag": "state" }));
     assert_eq!(reader.join().unwrap(), json!({ "_tag": "state" }));
 
     struct Refuses;

@@ -70,14 +70,10 @@ fn a_repo_is_made_by_name_and_an_issue_names_it() {
     assert_eq!((session.profile.as_deref(), session.runtime.as_str()), (Some(helper.id.as_str()), "scripted"));
     assert!(session.name.starts_with("小帮手"), "{}", session.name);
     // The user looking at a live session's changes is a `reviewed` entry, once per session.
-    let mut diff = call("issue.diff.get", json!({ "id": id }));
-    for _ in 0..50 {
-        if diff.data.is_some() {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        diff = call("issue.diff.get", json!({ "id": id }));
-    }
+    let diff = crate::support::wait_until_transition(&hub, std::time::Duration::from_secs(10), "issue.diff.get ready", || {
+        let diff = call("issue.diff.get", json!({ "id": id }));
+        diff.data.is_some().then_some(diff)
+    });
     assert!(diff.data.is_some(), "{}", diff.message);
     let ledger = std::fs::read_to_string(dir.path().join("ledger.jsonl")).unwrap_or_default();
     let reviewed = ledger.lines().find(|l| l.contains("\"reviewed\"")).unwrap_or_else(|| panic!("{ledger}"));
@@ -237,13 +233,13 @@ fn sent_issue_hands_over_to_another_profile_and_split_renames_parent() {
     let work_id = work["id"].as_str().unwrap().to_string();
     assert_eq!(call("issue.status.update", json!({ "id": work_id, "status": "todo" })).biz_code, 0);
 
-    for _ in 0..100 {
-        let now_issue = started.test_internals().board.issue(&work_id).unwrap();
-        if now_issue.status == vibevalley_protocol::IssueStatus::InReview {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(20));
-    }
+    crate::support::wait_until_transition(&started.hub, std::time::Duration::from_secs(10), "issue InReview", || {
+        started
+            .test_internals()
+            .board
+            .issue(&work_id)
+            .filter(|i| i.status == vibevalley_protocol::IssueStatus::InReview)
+    });
     assert_eq!(
         started.test_internals().board.issue(&work_id).unwrap().status,
         vibevalley_protocol::IssueStatus::InReview
@@ -262,12 +258,12 @@ fn sent_issue_hands_over_to_another_profile_and_split_renames_parent() {
     assert_eq!(updated.assignments[1].agent, beta.id);
     assert!(updated.assignments[1].ended_at.is_none());
 
-    for _ in 0..100 {
-        let now_issue = started.test_internals().board.issue(&work_id).unwrap();
-        if now_issue.status == vibevalley_protocol::IssueStatus::InReview {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(20));
-    }
+    crate::support::wait_until_transition(&started.hub, std::time::Duration::from_secs(10), "handover issue InReview", || {
+        started
+            .test_internals()
+            .board
+            .issue(&work_id)
+            .filter(|i| i.status == vibevalley_protocol::IssueStatus::InReview)
+    });
     started.close();
 }

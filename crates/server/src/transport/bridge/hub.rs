@@ -534,7 +534,7 @@ impl Drop for Client {
 
 #[cfg(test)]
 mod tests {
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
 
     use super::*;
     use crate::transport::bridge::ClientKind;
@@ -542,26 +542,152 @@ mod tests {
     use vibevalley_protocol::{Issue, LiveEvent};
 
     #[derive(Default)]
-    struct Recorder(Mutex<Vec<(String, Value)>>);
+    struct Recorder {
+        events: Mutex<Vec<(String, Value)>>,
+        notify: Notify,
+    }
 
     impl Outlet for Recorder {
         fn send(&self, event: &str, data: Value) {
-            self.0.lock().push((event.to_string(), data));
+            self.events.lock().push((event.to_string(), data));
+            self.notify.notify_waiters();
         }
     }
 
     impl Recorder {
         fn named(&self, name: &str) -> Vec<Value> {
-            self.0.lock().iter().filter(|(n, _)| n == name).map(|(_, d)| d.clone()).collect()
+            self.events.lock().iter().filter(|(n, _)| n == name).map(|(_, d)| d.clone()).collect()
+        }
+
+        fn wait_for(&self, what: &str, mut f: impl FnMut(&Self) -> bool) {
+            vibevalley_runtime::rt::block_on(async {
+                tokio::time::timeout(Duration::from_secs(3), async {
+                    loop {
+                        let notified = self.notify.notified();
+                        tokio::pin!(notified);
+                        notified.as_mut().enable();
+                        if f(self) {
+                            return;
+                        }
+                        notified.await;
+                    }
+                })
+                .await
+            })
+            .unwrap_or_else(|_| panic!("timed out waiting for {what}"));
         }
     }
 
-    fn wait_for(what: &str, f: impl Fn() -> bool) {
-        let start = Instant::now();
-        while !f() {
-            assert!(start.elapsed() < Duration::from_secs(3), "timed out waiting for {what}");
-            std::thread::sleep(Duration::from_millis(5));
+    struct SignaledFake {
+        inner: Arc<FakeServer>,
+        on_subscribe: Notify,
+        on_live: Notify,
+    }
+
+    impl SignaledFake {
+        fn new() -> Arc<Self> {
+            Arc::new(Self {
+                inner: Arc::new(FakeServer::new()),
+                on_subscribe: Notify::new(),
+                on_live: Notify::new(),
+            })
         }
+
+        fn wait_subscribers(&self, what: &str, expected: usize) {
+            vibevalley_runtime::rt::block_on(async {
+                tokio::time::timeout(Duration::from_secs(3), async {
+                    loop {
+                        let notified = self.on_subscribe.notified();
+                        tokio::pin!(notified);
+                        notified.as_mut().enable();
+                        if self.inner.subscriber_count() == expected {
+                            return;
+                        }
+                        notified.await;
+                    }
+                })
+                .await
+            })
+            .unwrap_or_else(|_| panic!("timed out waiting for {what}"));
+        }
+
+        fn wait_live_watcher(&self, what: &str) {
+            vibevalley_runtime::rt::block_on(async {
+                tokio::time::timeout(Duration::from_secs(3), async {
+                    loop {
+                        let notified = self.on_live.notified();
+                        tokio::pin!(notified);
+                        notified.as_mut().enable();
+                        if self.inner.live_watchers() == 1 {
+                            return;
+                        }
+                        notified.await;
+                    }
+                })
+                .await
+            })
+            .unwrap_or_else(|_| panic!("timed out waiting for {what}"));
+        }
+    }
+
+    impl Server for SignaledFake {
+        fn call(&self, op: &str, payload: Value) -> Envelope {
+            self.inner.call(op, payload)
+        }
+        fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
+            self.inner.call_with(ctx, op, payload)
+        }
+        fn slice_snapshot(&self, slice: SliceKind) -> Value {
+            self.inner.slice_snapshot(slice)
+        }
+        fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+            self.inner.watch_slice(slice, after_seq, stop, receive)
+        }
+        fn subscribe_slice(&self, slice: SliceKind) -> Option<crate::slice_feed::SliceSubscription> {
+            self.inner.subscribe_slice(slice)
+        }
+        fn live(&self) -> flume::Receiver<vibevalley_protocol::LiveEvent> {
+            let rx = self.inner.live();
+            self.on_live.notify_waiters();
+            rx
+        }
+        fn subscribe_live(&self) -> Option<broadcast::Receiver<vibevalley_protocol::LiveEvent>> {
+            let rx = self.inner.subscribe_live();
+            self.on_live.notify_waiters();
+            rx
+        }
+        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+            let res = self.inner.subscribe(name, payload);
+            self.on_subscribe.notify_waiters();
+            res
+        }
+        fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+            let res = self.inner.subscribe_with(ctx, name, payload);
+            self.on_subscribe.notify_waiters();
+            res
+        }
+        fn unsubscribe(&self, id: u64) {
+            self.inner.unsubscribe(id);
+            self.on_subscribe.notify_waiters();
+        }
+    }
+
+    fn wait_task_cleanup(what: &str, mut f: impl FnMut() -> bool) {
+        vibevalley_runtime::rt::block_on(async {
+            tokio::time::timeout(Duration::from_secs(3), async {
+                let mut yields = 0usize;
+                while !f() {
+                    if yields < 64 {
+                        yields += 1;
+                        tokio::task::yield_now().await;
+                    } else {
+                        tokio::time::sleep(Duration::from_millis(1)).await;
+                    }
+                }
+            })
+            .await
+        })
+        .unwrap_or_else(|_| panic!("timed out waiting for {what}"));
     }
 
     fn test_identity(id: &str) -> ClientIdentity {
@@ -572,8 +698,8 @@ mod tests {
         }
     }
 
-    fn setup() -> (Arc<FakeServer>, Hub, Arc<Recorder>, Client) {
-        let fake = Arc::new(FakeServer::new());
+    fn setup() -> (Arc<SignaledFake>, Hub, Arc<Recorder>, Client) {
+        let fake = SignaledFake::new();
         let hub = Hub::new(fake.clone(), 2);
         let rec = Arc::new(Recorder::default());
         let client = hub.attach(test_identity("c1"), rec.clone());
@@ -585,11 +711,11 @@ mod tests {
         let (fake, _hub, rec, client) = setup();
         client.call("1", "health".into(), Value::Null);
         client.call("2", "no.such.op".into(), json!({}));
-        wait_for("replies", || rec.named("reply:1").len() == 1 && rec.named("reply:2").len() == 1);
+        rec.wait_for("replies", |r| r.named("reply:1").len() == 1 && r.named("reply:2").len() == 1);
         assert_eq!(rec.named("reply:1")[0]["bizCode"], 0);
         assert_eq!(rec.named("reply:2")[0]["bizCode"], 100005);
-        assert_eq!(fake.calls().len(), 2);
-        assert_eq!(fake.last_client().as_ref().map(|c| c.id.as_str()), Some("c1"));
+        assert_eq!(fake.inner.calls().len(), 2);
+        assert_eq!(fake.inner.last_client().as_ref().map(|c| c.id.as_str()), Some("c1"));
     }
 
     #[test]
@@ -598,7 +724,7 @@ mod tests {
         assert!(client.watch("state").is_err(), "legacy state topic must be rejected");
         client.watch("slice:board").unwrap();
         client.watch("slice:board").unwrap();
-        wait_for("first board slice", || rec.named("frame:slice:board").len() == 1);
+        rec.wait_for("first board slice", |r| r.named("frame:slice:board").len() == 1);
         let snap = hub.clients_snapshot();
         assert_eq!(snap.len(), 1);
         assert_eq!(snap[0].identity.id, "c1");
@@ -607,25 +733,25 @@ mod tests {
         client.applied_slice("slice:board", 1);
         let mut next = empty_bundle(1);
         next.board.issues.push(Issue::new("i1", 1, "Added", 1));
-        fake.swap_bundle(next);
-        wait_for("second board slice", || rec.named("frame:slice:board").len() >= 2);
+        fake.inner.swap_bundle(next);
+        rec.wait_for("second board slice", |r| r.named("frame:slice:board").len() >= 2);
         let frames = rec.named("frame:slice:board");
         assert_eq!(frames.last().unwrap()["data"]["issues"][0]["id"], "i1");
         assert_eq!(frames.last().unwrap()["data"]["seq"], 1);
         client.unwatch("slice:board");
-        wait_for("watcher gone", || fake.slice_watchers(SliceKind::Board) == 0);
+        wait_task_cleanup("watcher gone", || fake.inner.slice_watchers(SliceKind::Board) == 0);
     }
 
     #[test]
     fn live_events_each_arrive() {
         let (fake, _hub, rec, client) = setup();
         client.watch("live").unwrap();
-        wait_for("live watcher", || fake.live_watchers() == 1);
+        fake.wait_live_watcher("live watcher");
         for text in ["a", "b"] {
             let event: LiveEvent = serde_json::from_value(json!({ "type": "notice", "at": 1, "level": "info", "text": text })).unwrap();
-            fake.push_live(event);
+            fake.inner.push_live(event);
         }
-        wait_for("two events", || rec.named("frame:live").len() == 2);
+        rec.wait_for("two events", |r| r.named("frame:live").len() == 2);
         let live = rec.named("frame:live");
         assert_eq!(live[1]["data"]["text"], "b");
         assert_eq!(live[1]["data"]["type"], "notice");
@@ -640,32 +766,32 @@ mod tests {
         client.subscribe("s2", "channel.follow", json!({ "id": "c", "after": 0 }));
         assert_eq!(client.subscription_count(), 2);
         assert_eq!(hub.clients_snapshot()[0].subscriptions, vec!["channel.follow", "channel.follow"]);
-        wait_for("subscribers registered", || fake.subscriber_count() == 2);
-        fake.emit("channel.follow", json!({ "n": 1 }));
-        wait_for("events", || rec.named("sub:s1").len() == 1 && rec.named("sub:s2").len() == 1);
+        fake.wait_subscribers("subscribers registered", 2);
+        fake.inner.emit("channel.follow", json!({ "n": 1 }));
+        rec.wait_for("events", |r| r.named("sub:s1").len() == 1 && r.named("sub:s2").len() == 1);
         assert_eq!(rec.named("sub:s1")[0], json!({ "event": { "n": 1 } }));
         client.unsubscribe("s2");
-        assert_eq!(fake.subscriber_count(), 1);
-        fake.emit("channel.follow", json!({ "n": 2 }));
-        fake.end("channel.follow");
-        wait_for("end", || rec.named("sub:s1").last() == Some(&json!({ "end": null })));
+        assert_eq!(fake.inner.subscriber_count(), 1);
+        fake.inner.emit("channel.follow", json!({ "n": 2 }));
+        fake.inner.end("channel.follow");
+        rec.wait_for("end", |r| r.named("sub:s1").last() == Some(&json!({ "end": null })));
         assert_eq!(rec.named("sub:s1").len(), 3);
         assert_eq!(rec.named("sub:s2").len(), 1, "no end event after unsubscribe");
-        wait_for("bookkeeping", || client.subscription_count() == 0);
+        wait_task_cleanup("bookkeeping", || client.subscription_count() == 0);
         client.subscribe("s3", "fake.refuse", json!({}));
-        wait_for("refusal", || rec.named("sub:s3").len() == 1);
+        rec.wait_for("refusal", |r| r.named("sub:s3").len() == 1);
         assert_eq!(rec.named("sub:s3")[0]["end"]["bizCode"], 500001);
-        wait_for("refusal cleanup", || client.subscription_count() == 0);
+        wait_task_cleanup("refusal cleanup", || client.subscription_count() == 0);
     }
 
     #[test]
     fn dropping_the_client_unsubscribes_and_removes_from_snapshot() {
         let (fake, hub, _rec, client) = setup();
         client.subscribe("s", "x", json!({}));
-        wait_for("subscriber registered", || fake.subscriber_count() == 1);
+        fake.wait_subscribers("subscriber registered", 1);
         assert_eq!(hub.clients_snapshot().len(), 1);
         drop(client);
-        assert_eq!(fake.subscriber_count(), 0);
+        assert_eq!(fake.inner.subscriber_count(), 0);
         assert!(hub.clients_snapshot().is_empty());
     }
 }

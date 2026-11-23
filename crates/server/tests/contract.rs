@@ -119,15 +119,19 @@ fn live_events_reach_every_receiver() {
 #[test]
 fn subscriptions_send_until_stopped_and_refuse_before_the_first_event() {
     let hub = hub();
-    hub.on_subscription::<subscriptions::ChannelFollow>(|_, payload, sink: Sink| {
+    let (step_tx, step_rx) = flume::unbounded::<()>();
+    hub.on_subscription::<subscriptions::ChannelFollow>(move |_, payload, sink: Sink| {
         if payload.id == "nope" {
             return Err(vibevalley_protocol::ApiError::new(vibevalley_protocol::BizCode::ChannelNotFound, "no channel"));
         }
+        let step_rx = step_rx.clone();
         std::thread::spawn(move || {
             let mut n = 0;
             while sink.send(&json!({ "_tag": "Reset", "n": n })) {
                 n += 1;
-                std::thread::sleep(Duration::from_millis(10));
+                if step_rx.recv().is_err() {
+                    break;
+                }
             }
         });
         Ok(())
@@ -139,6 +143,8 @@ fn subscriptions_send_until_stopped_and_refuse_before_the_first_event() {
     let (id, rx) = hub.subscribe("channel.follow", json!({ "id": "c1", "after": 0 })).unwrap();
     assert_eq!(rx.recv_timeout(Duration::from_secs(1)).unwrap()["n"], 0);
     hub.unsubscribe(id);
+    let _ = step_tx.send(());
+    drop(step_tx);
     let deadline = Instant::now() + Duration::from_secs(2);
     while rx.recv_deadline(deadline).is_ok() {}
     assert!(rx.is_disconnected());
