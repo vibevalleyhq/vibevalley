@@ -171,7 +171,7 @@ impl Server for LateServer {
         let (tx, rx) = flume::unbounded();
         let cell = self.cell.clone();
         let mut ready = self.ready.clone();
-        vibevalley_runtime::rt::handle().spawn(async move {
+        vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
             let _ = ready.wait_for(|is_ready| *is_ready).await;
             if tx.is_disconnected() {
                 return;
@@ -285,43 +285,116 @@ mod tests {
 
     use super::*;
     use serde_json::json;
+    use tokio::sync::Notify;
     use vibevalley_protocol::Issue;
     use vibevalley_server::transport::bridge::fake::{FakeServer, empty_bundle};
     use vibevalley_server::transport::bridge::{ClientIdentity, ClientKind, Hub as BridgeHub, Outlet};
 
     #[derive(Default)]
-    struct Recorder(Mutex<Vec<(String, Value)>>);
+    struct Recorder {
+        events: Mutex<Vec<(String, Value)>>,
+        notify: Notify,
+    }
 
     impl Outlet for Recorder {
         fn send(&self, event: &str, data: Value) {
-            self.0.lock().push((event.to_string(), data));
+            self.events.lock().push((event.to_string(), data));
+            self.notify.notify_waiters();
         }
     }
 
     impl Recorder {
         fn named(&self, name: &str) -> Vec<Value> {
-            self.0.lock().iter().filter(|(n, _)| n == name).map(|(_, d)| d.clone()).collect()
+            self.events.lock().iter().filter(|(n, _)| n == name).map(|(_, d)| d.clone()).collect()
+        }
+
+        fn wait_for(&self, what: &str, mut f: impl FnMut(&Self) -> bool) {
+            vibevalley_runtime::rt::block_on(async {
+                tokio::time::timeout(Duration::from_secs(3), async {
+                    loop {
+                        let notified = self.notify.notified();
+                        tokio::pin!(notified);
+                        notified.as_mut().enable();
+                        if f(self) {
+                            return;
+                        }
+                        notified.await;
+                    }
+                })
+                .await
+            })
+            .unwrap_or_else(|_| panic!("timed out waiting for {what}"));
         }
     }
 
     /// Panics if any bridge consumer falls back to blocking `watch_slice` or `live`.
-    struct FastPathOnlyServer(Arc<FakeServer>);
+    struct FastPathOnlyServer {
+        inner: Arc<FakeServer>,
+        on_live: Notify,
+        on_subscribe: Notify,
+    }
+
+    impl FastPathOnlyServer {
+        fn new(inner: Arc<FakeServer>) -> Arc<Self> {
+            Arc::new(Self {
+                inner,
+                on_live: Notify::new(),
+                on_subscribe: Notify::new(),
+            })
+        }
+
+        fn wait_live_watchers(&self, what: &str, expected: usize) {
+            vibevalley_runtime::rt::block_on(async {
+                tokio::time::timeout(Duration::from_secs(3), async {
+                    loop {
+                        let notified = self.on_live.notified();
+                        tokio::pin!(notified);
+                        notified.as_mut().enable();
+                        if self.inner.live_watchers() == expected {
+                            return;
+                        }
+                        notified.await;
+                    }
+                })
+                .await
+            })
+            .unwrap_or_else(|_| panic!("timed out waiting for {what}"));
+        }
+
+        fn wait_subscribers(&self, what: &str, expected: usize) {
+            vibevalley_runtime::rt::block_on(async {
+                tokio::time::timeout(Duration::from_secs(3), async {
+                    loop {
+                        let notified = self.on_subscribe.notified();
+                        tokio::pin!(notified);
+                        notified.as_mut().enable();
+                        if self.inner.subscriber_count() == expected {
+                            return;
+                        }
+                        notified.await;
+                    }
+                })
+                .await
+            })
+            .unwrap_or_else(|_| panic!("timed out waiting for {what}"));
+        }
+    }
 
     impl Server for FastPathOnlyServer {
         fn call(&self, op: &str, payload: Value) -> Envelope {
-            self.0.call(op, payload)
+            self.inner.call(op, payload)
         }
 
         fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
-            self.0.call_with(ctx, op, payload)
+            self.inner.call_with(ctx, op, payload)
         }
 
         fn slice_snapshot(&self, slice: SliceKind) -> Value {
-            self.0.slice_snapshot(slice)
+            self.inner.slice_snapshot(slice)
         }
 
         fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
-            self.0.slice_snapshot_json(slice)
+            self.inner.slice_snapshot_json(slice)
         }
 
         fn watch_slice(&self, _slice: SliceKind, _after_seq: Option<i64>, _stop: &flume::Receiver<()>, _receive: &mut dyn FnMut(i64, &Value)) {
@@ -329,7 +402,7 @@ mod tests {
         }
 
         fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
-            self.0.subscribe_slice(slice)
+            self.inner.subscribe_slice(slice)
         }
 
         fn live(&self) -> flume::Receiver<LiveEvent> {
@@ -337,23 +410,26 @@ mod tests {
         }
 
         fn subscribe_live(&self) -> Option<broadcast::Receiver<LiveEvent>> {
-            self.0.subscribe_live()
+            let rx = self.inner.subscribe_live();
+            self.on_live.notify_waiters();
+            rx
         }
 
         fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
-            self.0.subscribe(name, payload)
+            let res = self.inner.subscribe(name, payload);
+            self.on_subscribe.notify_waiters();
+            res
+        }
+
+        fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+            let res = self.inner.subscribe_with(ctx, name, payload);
+            self.on_subscribe.notify_waiters();
+            res
         }
 
         fn unsubscribe(&self, id: u64) {
-            self.0.unsubscribe(id);
-        }
-    }
-
-    fn wait_for(what: &str, f: impl Fn() -> bool) {
-        let start = Instant::now();
-        while !f() {
-            assert!(start.elapsed() < Duration::from_secs(3), "timed out waiting for {what}");
-            std::thread::sleep(Duration::from_millis(5));
+            self.inner.unsubscribe(id);
+            self.on_subscribe.notify_waiters();
         }
     }
 
@@ -432,28 +508,29 @@ mod tests {
         drop(cancelled_client);
 
         let fake = Arc::new(FakeServer::from_bundle(empty_bundle(7)));
-        late.attach(Arc::new(FastPathOnlyServer(fake.clone())));
+        let fast = FastPathOnlyServer::new(fake.clone());
+        late.attach(fast.clone());
 
         assert!(late.ready_async().is_none());
         assert!(late.subscribe_slice(SliceKind::Board).is_some());
         assert!(late.subscribe_live().is_some());
         assert!(late.slice_snapshot_json(SliceKind::Board).contains("\"seq\":7"));
 
-        wait_for("pre-attach initial board slice", || pre_rec.named("frame:slice:board").len() == 1);
+        pre_rec.wait_for("pre-attach initial board slice", |r| r.named("frame:slice:board").len() == 1);
         assert_eq!(pre_rec.named("frame:slice:board")[0]["data"]["seq"], 7);
-        wait_for("pre-attach live subscriber", || fake.live_watchers() == 1);
+        fast.wait_live_watchers("pre-attach live subscriber", 1);
         assert_eq!(fake.slice_watchers(SliceKind::Board), 1);
 
         pre_client.applied_slice("slice:board", 1);
         let mut next = empty_bundle(8);
         next.board.issues.push(Issue::new("i1", 1, "Added", 1));
         fake.swap_bundle(next);
-        wait_for("pre-attach updated board slice", || pre_rec.named("frame:slice:board").len() == 2);
+        pre_rec.wait_for("pre-attach updated board slice", |r| r.named("frame:slice:board").len() == 2);
         assert_eq!(pre_rec.named("frame:slice:board")[1]["data"]["seq"], 8);
 
         let notice: LiveEvent = serde_json::from_value(json!({ "type": "notice", "at": 1, "level": "info", "text": "hello" })).unwrap();
         fake.push_live(notice);
-        wait_for("pre-attach live event", || pre_rec.named("frame:live").len() == 1);
+        pre_rec.wait_for("pre-attach live event", |r| r.named("frame:live").len() == 1);
         assert_eq!(pre_rec.named("frame:live")[0]["data"]["text"], "hello");
 
         // Post-attach clients enter subscribe_slice / subscribe_live immediately.
@@ -461,13 +538,13 @@ mod tests {
         let post_client = hub.attach(test_identity("post"), post_rec.clone());
         post_client.watch("slice:board").unwrap();
         post_client.watch("live").unwrap();
-        wait_for("post-attach initial board slice", || post_rec.named("frame:slice:board").len() == 1);
+        post_rec.wait_for("post-attach initial board slice", |r| r.named("frame:slice:board").len() == 1);
         assert_eq!(post_rec.named("frame:slice:board")[0]["data"]["seq"], 8);
-        wait_for("post-attach live subscriber", || fake.live_watchers() == 2);
+        fast.wait_live_watchers("post-attach live subscriber", 2);
 
         let notice2: LiveEvent = serde_json::from_value(json!({ "type": "notice", "at": 2, "level": "info", "text": "world" })).unwrap();
         fake.push_live(notice2);
-        wait_for("post-attach live event", || post_rec.named("frame:live").len() == 1);
+        post_rec.wait_for("post-attach live event", |r| r.named("frame:live").len() == 1);
         assert_eq!(post_rec.named("frame:live")[0]["data"]["text"], "world");
 
         assert!(cancelled_rec.named("frame:slice:board").is_empty());
@@ -519,7 +596,7 @@ mod tests {
             fake.respond("issue.list", json!([{ "id": "i1" }]));
 
             let pre_late = late.clone();
-            let pre_task = vibevalley_runtime::rt::spawn(async move {
+            let pre_task = tokio::spawn(async move {
                 let mut ctx = CallerContext::local();
                 ctx.client = Some(test_identity("pre-async"));
                 pre_late.call_with_async(ctx, "issue.list".into(), json!({})).await
@@ -629,11 +706,12 @@ mod tests {
         assert_eq!(cancelled_client.subscription_count(), 0);
 
         let fake = Arc::new(FakeServer::from_bundle(empty_bundle(11)));
-        late.attach(Arc::new(FastPathOnlyServer(fake.clone())));
+        let fast = FastPathOnlyServer::new(fake.clone());
+        late.attach(fast.clone());
 
-        wait_for("pre-attach subscription registered", || fake.subscriber_count() == 1);
+        fast.wait_subscribers("pre-attach subscription registered", 1);
         fake.emit("channel.follow", json!({ "text": "hello-after-attach" }));
-        wait_for("pre-attach subscription event", || pre_rec.named("sub:s1").len() == 1);
+        pre_rec.wait_for("pre-attach subscription event", |r| r.named("sub:s1").len() == 1);
         assert_eq!(pre_rec.named("sub:s1")[0], json!({ "event": { "text": "hello-after-attach" } }));
         assert!(cancelled_rec.named("sub:s2").is_empty());
 

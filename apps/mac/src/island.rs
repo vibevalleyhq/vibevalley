@@ -123,7 +123,7 @@ impl Island {
         let Some(binary) = candidates.into_iter().flatten().find(|p| p.is_file()) else {
             return Ok(None);
         };
-        let handle = vibevalley_runtime::rt::handle();
+        let handle = vibevalley_runtime::rt::current_or_global_handle();
         let mut child = {
             let _guard = handle.enter();
             Command::new(binary)
@@ -163,7 +163,7 @@ impl Drop for Island {
         self.cancel.cancel();
         if let Some(mut child) = self.child.take() {
             let _ = child.start_kill();
-            vibevalley_runtime::rt::handle().spawn(async move {
+            vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
                 let _ = child.wait().await;
             });
         }

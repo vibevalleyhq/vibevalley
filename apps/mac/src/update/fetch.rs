@@ -56,32 +56,27 @@ fn is_retryable_status(status: u16) -> bool {
     matches!(status, 408 | 429 | 500 | 502 | 503 | 504)
 }
 
-fn text_once(url: &str) -> Result<(u16, String), String> {
-    let local = validate_url(url)?;
-    let url = url.to_string();
-    vibevalley_runtime::rt::block_on(async move {
-        let client = build_client(local, TEXT_TIMEOUT)?;
-        let mut resp = client
-            .get(&url)
-            .header(reqwest::header::ACCEPT, "application/json, application/vnd.github+json")
-            .send()
-            .await
-            .map_err(|e| format!("http: {e}"))?;
-        let status = resp.status().as_u16();
-        if let Some(len) = resp.content_length()
-            && len > MAX_TEXT_BYTES as u64
-        {
+async fn text_once_async(client: &reqwest::Client, url: &str) -> Result<(u16, String), String> {
+    let mut resp = client
+        .get(url)
+        .header(reqwest::header::ACCEPT, "application/json, application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| format!("http: {e}"))?;
+    let status = resp.status().as_u16();
+    if let Some(len) = resp.content_length()
+        && len > MAX_TEXT_BYTES as u64
+    {
+        return Err(format!("response exceeds {MAX_TEXT_BYTES} byte limit"));
+    }
+    let mut body = Vec::new();
+    while let Some(chunk) = resp.chunk().await.map_err(|e| format!("http: {e}"))? {
+        if body.len().saturating_add(chunk.len()) > MAX_TEXT_BYTES {
             return Err(format!("response exceeds {MAX_TEXT_BYTES} byte limit"));
         }
-        let mut body = Vec::new();
-        while let Some(chunk) = resp.chunk().await.map_err(|e| format!("http: {e}"))? {
-            if body.len().saturating_add(chunk.len()) > MAX_TEXT_BYTES {
-                return Err(format!("response exceeds {MAX_TEXT_BYTES} byte limit"));
-            }
-            body.extend_from_slice(&chunk);
-        }
-        Ok((status, String::from_utf8_lossy(&body).into_owned()))
-    })
+        body.extend_from_slice(&chunk);
+    }
+    Ok((status, String::from_utf8_lossy(&body).into_owned()))
 }
 
 pub fn text(url: &str) -> Result<(u16, String), String> {
@@ -97,16 +92,20 @@ pub fn text(url: &str) -> Result<(u16, String), String> {
 }
 
 fn text_with_backoff(url: &str, mut backoff: impl Iterator<Item = Duration>) -> Result<(u16, String), String> {
-    loop {
-        let (status, body) = text_once(url)?;
-        if is_retryable_status(status)
-            && let Some(delay) = backoff.next()
-        {
-            std::thread::sleep(delay);
-            continue;
+    let local = validate_url(url)?;
+    vibevalley_runtime::rt::block_on(async {
+        let client = build_client(local, TEXT_TIMEOUT)?;
+        loop {
+            let (status, body) = text_once_async(&client, url).await?;
+            if is_retryable_status(status)
+                && let Some(delay) = backoff.next()
+            {
+                tokio::time::sleep(delay).await;
+                continue;
+            }
+            return Ok((status, body));
         }
-        return Ok((status, body));
-    }
+    })
 }
 
 fn download(url: &str, to: &Path, size: u64, mut percent: impl FnMut(u8)) -> Result<(), String> {

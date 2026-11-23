@@ -64,7 +64,7 @@ pub fn start(streams: SharedSpeechStreams, id: &str) -> Result<State, String> {
     };
     let initial = current.state.clone();
     drop(current);
-    vibevalley_runtime::rt::handle().spawn(async move {
+    vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
         let reserved = tokio::task::spawn_blocking(crate::audio::reserve_for_call)
             .await
             .map_err(|e| e.to_string())

@@ -302,7 +302,7 @@ where
             let kind = self.kind;
             let url = format!("{}/api/v1/slice/{}", server.base_url, kind.as_str());
 
-            vibevalley_runtime::rt::handle().spawn(async move {
+            vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
                 let mut last_seq: Option<i64> = None;
                 loop {
                     let exit = run_sse_loop(
@@ -542,7 +542,7 @@ impl Server for RemoteServer {
         let token = self.token.clone();
         let url = format!("{}/api/v1/slice/{}", self.base_url, slice.as_str());
 
-        vibevalley_runtime::rt::handle().spawn(async move {
+        vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
             let mut last_seq = after_seq;
             let _ = run_sse_loop(
                 client,
@@ -620,7 +620,7 @@ impl Server for RemoteServer {
         let (tx, rx) = flume::unbounded::<LiveEvent>();
         if let Some(mut live_rx) = self.subscribe_live() {
             let cancel = self.shutdown.child_token();
-            vibevalley_runtime::rt::handle().spawn(async move {
+            vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
                 loop {
                     let event = tokio::select! {
                         biased;
@@ -663,7 +663,7 @@ impl Server for RemoteServer {
         let token = self.token.clone();
         let url = format!("{}/api/v1/live", self.base_url);
 
-        vibevalley_runtime::rt::handle().spawn(async move {
+        vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
             let mut last_seq = None;
             loop {
                 let exit = run_sse_loop(
@@ -729,7 +729,7 @@ mod tests {
     use std::convert::Infallible;
     use std::net::SocketAddr;
     use std::sync::Arc;
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
 
     use axum::Router;
     use axum::body::{Body, Bytes};
@@ -738,6 +738,7 @@ mod tests {
     use parking_lot::Mutex;
     use serde_json::json;
     use tokio::net::TcpListener;
+    use tokio::sync::Notify;
     use vibevalley_protocol::{ApiError, BizCode, Issue, LiveEvent, NoticeLevel, RemoteDeviceSummary, RemotePlatform};
     use vibevalley_server::transport::api::{RemoteAuth, RemoteDeviceIdentity};
     use vibevalley_server::transport::bridge::fake::{FakeServer, empty_bundle};
@@ -785,6 +786,27 @@ mod tests {
     struct AuthedFake {
         inner: Arc<FakeServer>,
         auth: Arc<dyn RemoteAuth>,
+        on_live: Notify,
+    }
+
+    impl AuthedFake {
+        fn wait_live_watchers(&self, what: &str, min: usize) {
+            vibevalley_runtime::rt::block_on(async {
+                tokio::time::timeout(Duration::from_secs(5), async {
+                    loop {
+                        let notified = self.on_live.notified();
+                        tokio::pin!(notified);
+                        notified.as_mut().enable();
+                        if self.inner.live_watchers() >= min {
+                            return;
+                        }
+                        notified.await;
+                    }
+                })
+                .await
+            })
+            .unwrap_or_else(|_| panic!("timed out waiting for {what}"));
+        }
     }
 
     impl Server for AuthedFake {
@@ -801,7 +823,9 @@ mod tests {
         }
 
         fn live(&self) -> flume::Receiver<LiveEvent> {
-            self.inner.live()
+            let rx = self.inner.live();
+            self.on_live.notify_waiters();
+            rx
         }
 
         fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
@@ -818,17 +842,39 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct Recorder(Mutex<Vec<(String, Value)>>);
+    struct Recorder {
+        events: Mutex<Vec<(String, Value)>>,
+        notify: Notify,
+    }
 
     impl Outlet for Recorder {
         fn send(&self, event: &str, data: Value) {
-            self.0.lock().push((event.to_string(), data));
+            self.events.lock().push((event.to_string(), data));
+            self.notify.notify_waiters();
         }
     }
 
     impl Recorder {
         fn named(&self, name: &str) -> Vec<Value> {
-            self.0.lock().iter().filter(|(n, _)| n == name).map(|(_, d)| d.clone()).collect()
+            self.events.lock().iter().filter(|(n, _)| n == name).map(|(_, d)| d.clone()).collect()
+        }
+
+        fn wait_for(&self, what: &str, mut f: impl FnMut(&Self) -> bool) {
+            vibevalley_runtime::rt::block_on(async {
+                tokio::time::timeout(Duration::from_secs(5), async {
+                    loop {
+                        let notified = self.notify.notified();
+                        tokio::pin!(notified);
+                        notified.as_mut().enable();
+                        if f(self) {
+                            return;
+                        }
+                        notified.await;
+                    }
+                })
+                .await
+            })
+            .unwrap_or_else(|_| panic!("timed out waiting for {what}"));
         }
     }
 
@@ -971,8 +1017,9 @@ mod tests {
         let authed = Arc::new(AuthedFake {
             inner: fake.clone(),
             auth: Arc::new(StaticRemoteAuth { expected_token: token.into() }),
+            on_live: Notify::new(),
         });
-        let listener = http::serve_remote(authed, ([127, 0, 0, 1], 0).into()).unwrap();
+        let listener = http::serve_remote(authed.clone(), ([127, 0, 0, 1], 0).into()).unwrap();
         let base_url = listener.url();
 
         // 1. Pair code exchange and configure_remote persistence.
@@ -1015,33 +1062,24 @@ mod tests {
 
         // 4. watch_slice SSE receives initial snapshot + live update and stops cleanly.
         let (stop_tx, stop_rx) = flume::bounded::<()>(0);
-        let seen_slices = Arc::new(Mutex::new(Vec::<(i64, Value)>::new()));
-        let seen_for_watch = seen_slices.clone();
+        let (seen_tx, seen_rx) = flume::unbounded::<(i64, Value)>();
         let watcher_remote = RemoteServer::new(remote.base_url.clone(), Secret::new(token), None).unwrap();
         let handle = std::thread::spawn(move || {
             watcher_remote.watch_slice(SliceKind::Board, None, &stop_rx, &mut |seq, val| {
-                seen_for_watch.lock().push((seq, val.clone()));
+                let _ = seen_tx.send((seq, val.clone()));
             });
         });
 
-        let start = Instant::now();
-        while seen_slices.lock().is_empty() {
-            assert!(start.elapsed() < Duration::from_secs(5), "timed out waiting for initial SSE slice");
-            std::thread::sleep(Duration::from_millis(10));
-        }
-        assert_eq!(seen_slices.lock()[0].0, 1);
+        let (initial_seq, _) = seen_rx.recv_timeout(Duration::from_secs(5)).expect("timed out waiting for initial SSE slice");
+        assert_eq!(initial_seq, 1);
 
         let mut next = empty_bundle(2);
         next.board.issues.push(Issue::new("i-remote", 1, "Remote Issue", 2));
         fake.swap_bundle(next);
 
-        let start = Instant::now();
-        while seen_slices.lock().len() < 2 {
-            assert!(start.elapsed() < Duration::from_secs(5), "timed out waiting for updated SSE slice");
-            std::thread::sleep(Duration::from_millis(10));
-        }
-        assert_eq!(seen_slices.lock().last().unwrap().0, 2);
-        assert_eq!(seen_slices.lock().last().unwrap().1["issues"][0]["id"], "i-remote");
+        let (updated_seq, updated_val) = seen_rx.recv_timeout(Duration::from_secs(5)).expect("timed out waiting for updated SSE slice");
+        assert_eq!(updated_seq, 2);
+        assert_eq!(updated_val["issues"][0]["id"], "i-remote");
         drop(stop_tx);
         handle.join().unwrap();
 
@@ -1059,48 +1097,34 @@ mod tests {
         client.watch("slice:board").unwrap();
         client.watch("live").unwrap();
 
-        let start = Instant::now();
-        loop {
-            let frames = rec.named("frame:slice:board");
+        rec.wait_for("BridgeHub remote board slice", |r| {
+            let frames = r.named("frame:slice:board");
             if let Some(last) = frames.last() {
                 if let Some(rev) = last["rev"].as_u64() {
                     client.applied_slice("slice:board", rev);
                 }
                 if last["data"]["seq"] == 2 {
                     assert_eq!(last["data"]["issues"][0]["id"], "i-remote");
-                    break;
+                    return true;
                 }
             }
-            assert!(start.elapsed() < Duration::from_secs(5), "timed out waiting for BridgeHub remote board slice");
-            std::thread::sleep(Duration::from_millis(10));
-        }
+            false
+        });
 
-        let start = Instant::now();
-        while fake.live_watchers() == 0 {
-            assert!(start.elapsed() < Duration::from_secs(5), "timed out waiting for subscribe_live SSE attach");
-            std::thread::sleep(Duration::from_millis(10));
-        }
+        authed.wait_live_watchers("subscribe_live SSE attach", 1);
         let bridge_notice = LiveEvent::Notice(vibevalley_protocol::LiveEventNotice {
             at: 43,
             level: NoticeLevel::Info,
             text: "hello bridge live".into(),
         });
         fake.push_live(bridge_notice);
-        let start = Instant::now();
-        while rec.named("frame:live").is_empty() {
-            assert!(start.elapsed() < Duration::from_secs(5), "timed out waiting for BridgeHub remote live event");
-            std::thread::sleep(Duration::from_millis(10));
-        }
+        rec.wait_for("BridgeHub remote live event", |r| !r.named("frame:live").is_empty());
         assert_eq!(rec.named("frame:live")[0]["data"]["text"], "hello bridge live");
         drop(client);
 
         // 6. live SSE receives LiveEvent.
         let live_rx = remote.live();
-        let start = Instant::now();
-        while fake.live_watchers() == 0 {
-            assert!(start.elapsed() < Duration::from_secs(5), "timed out waiting for live SSE attach");
-            std::thread::sleep(Duration::from_millis(10));
-        }
+        authed.wait_live_watchers("live SSE attach", 1);
         let expected_notice = LiveEvent::Notice(vibevalley_protocol::LiveEventNotice {
             at: 42,
             level: NoticeLevel::Info,

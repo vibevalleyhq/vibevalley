@@ -67,7 +67,7 @@ pub fn start(voice: SharedLiveVoice, owner: String) -> Result<State, String> {
     current.owner = owner;
     let state = current.state.clone();
     drop(current);
-    vibevalley_runtime::rt::handle().spawn(async move {
+    vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
         let result = run(voice, cancel).await;
         let mut current = call().lock();
         current.state.phase = Phase::Idle;
@@ -772,7 +772,7 @@ mod tests {
         };
         let worker_probe = probe.clone();
         let worker_cancel = cancel.clone();
-        let worker = vibevalley_runtime::rt::handle().spawn(async move {
+        let worker = tokio::spawn(async move {
             session(
                 socket,
                 SessionMessages {
