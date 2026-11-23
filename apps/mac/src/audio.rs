@@ -3,7 +3,6 @@ use std::ffi::{CStr, CString, c_char};
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use base64::Engine as _;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
@@ -84,8 +83,7 @@ pub fn stop_queued() {
 unsafe extern "C" {
     fn vv_audio_play(path: *const c_char, position: f64, error: *mut c_char, capacity: usize) -> bool;
     fn vv_audio_play_data(bytes: *const u8, length: usize, error: *mut c_char, capacity: usize) -> bool;
-    fn vv_audio_seek(position: f64, error: *mut c_char, capacity: usize) -> bool;
-    fn vv_audio_state(position: *mut f64, duration: *mut f64, playing: *mut bool, queued: *mut f64);
+    fn vv_audio_state(playing: *mut bool, queued: *mut f64);
     fn vv_audio_stop();
     fn vv_pcm_start(rate: f64, channels: u32, error: *mut c_char, capacity: usize) -> bool;
     fn vv_pcm_append(bytes: *const u8, length: usize, error: *mut c_char, capacity: usize) -> bool;
@@ -95,17 +93,12 @@ unsafe extern "C" {
     fn vv_capture_stop();
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 pub struct Playback {
-    position: f64,
-    duration: f64,
-    playing: bool,
+    pub playing: bool,
     pub queued_seconds: f64,
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PcmFormat {
     pub sample_rate: u32,
     pub channels: u32,
@@ -146,19 +139,12 @@ pub fn play(path: &Path, seconds: f64) -> Result<(), String> {
     call(|error, capacity| unsafe { vv_audio_play(path.as_ptr(), seconds, error, capacity) })
 }
 
-pub fn seek(seconds: f64) -> Result<(), String> {
-    let seconds = position(seconds)?;
-    call(|error, capacity| unsafe { vv_audio_seek(seconds, error, capacity) })
-}
-
 pub fn state() -> Playback {
     let mut state = Playback {
-        position: 0.0,
-        duration: 0.0,
         playing: false,
         queued_seconds: 0.0,
     };
-    unsafe { vv_audio_state(&mut state.position, &mut state.duration, &mut state.playing, &mut state.queued_seconds) };
+    unsafe { vv_audio_state(&mut state.playing, &mut state.queued_seconds) };
     state
 }
 
@@ -169,14 +155,6 @@ pub fn stop() {
 pub fn start_pcm(format: PcmFormat) -> Result<(), String> {
     format.validate()?;
     call(|error, capacity| unsafe { vv_pcm_start(f64::from(format.sample_rate), format.channels, error, capacity) })
-}
-
-pub fn append_pcm(data: &str) -> Result<(), String> {
-    if data.len() > 2 << 20 {
-        return Err("PCM chunk exceeds 2 MB of base64".into());
-    }
-    let bytes = base64::engine::general_purpose::STANDARD.decode(data).map_err(|e| e.to_string())?;
-    call(|error, capacity| unsafe { vv_pcm_append(bytes.as_ptr(), bytes.len(), error, capacity) })
 }
 
 pub fn append_bytes(bytes: &[u8]) -> Result<(), String> {
@@ -885,8 +863,7 @@ mod tests {
     #[test]
     fn regression_pcm_requires_start_and_complete_sample_frames() {
         stop();
-        assert!(append_pcm("AA==").is_err());
-        assert!(seek(0.0).is_err());
+        assert!(append_bytes(&[0, 0]).is_err());
         assert!(!state().playing);
     }
 

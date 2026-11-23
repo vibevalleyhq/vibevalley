@@ -2,7 +2,7 @@ import { Scroll, Text, View } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { ArtifactType, LibraryFileKind } from "@vibevalley/protocol";
+import type { LibraryFileKind } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
@@ -16,13 +16,21 @@ import { createMemo } from "../../infra/solid";
 import { defineStored } from "../../infra/state/stored";
 import { artifactTypeIcon, useArtifacts } from "../artifact";
 import { libraryQuery } from "../media/listing";
-import { artifactFacetOf, type ContentBucket, contentBrowseBucket, mediaKindOf, openContentSearch, openTemplatePicker, pinnedKeys } from "./navigation";
+import { usePkmVault } from "../pkm/vault";
+import {
+  type ArtifactFacet,
+  type ContentBucket,
+  contentBrowseBucket,
+  countContentHub,
+  countForBucket,
+  openContentSearch,
+  openTemplatePicker,
+  pinnedKeys,
+} from "./navigation";
 import { createQuickBlankNote } from "./templates";
 
 const artifactsSectionOpen = defineStored("content.sidebar.artifacts", z.boolean(), true);
 const mediaSectionOpen = defineStored("content.sidebar.media", z.boolean(), true);
-
-type ArtifactFacet = ArtifactType | "html";
 
 const artifactFacets: readonly { readonly type: ArtifactFacet; readonly icon: IconName; readonly label: () => string }[] = [
   { type: "outline", icon: artifactTypeIcon.outline, label: () => t("web.library.content.artifactType.outline") },
@@ -60,9 +68,11 @@ export function ContentSidebar() {
 
   const artifacts = useArtifacts(() => ({}));
   const media = useQuery(() => libraryQuery({ text: "", sort: "recent" }), { interval: () => 10_000, keepPrevious: true });
+  const vault = usePkmVault();
 
   const allArtifacts = () => ready(artifacts, undefined) ?? [];
   const allMedia = () => ready(media, undefined) ?? [];
+  const allNotes = () => ready(vault, undefined)?.pages ?? [];
 
   const inBrowse = () => location().pathname === "/library" || location().pathname.startsWith("/library/");
   const bucket = () => contentBrowseBucket();
@@ -75,32 +85,14 @@ export function ContentSidebar() {
     return inBrowse() && b.kind === "media" && b.fileKind === undefined;
   };
 
-  const totalCount = () => allArtifacts().length + allMedia().length;
-  const pinnedCount = createMemo(() => {
-    const keys = new Set(pinnedKeys());
-    let n = 0;
-    for (const a of allArtifacts()) if (keys.has(`artifact:${a.id}`)) n += 1;
-    for (const m of allMedia()) if (keys.has(`media:${m.attachment.id}`)) n += 1;
-    return n;
-  });
-
-  const artifactCounts = createMemo(() => {
-    const map = new Map<ArtifactFacet, number>();
-    for (const a of allArtifacts()) {
-      const f = artifactFacetOf(a);
-      map.set(f, (map.get(f) ?? 0) + 1);
-    }
-    return map;
-  });
-
-  const mediaCounts = createMemo(() => {
-    const map = new Map<LibraryFileKind, number>();
-    for (const m of allMedia()) {
-      const k = mediaKindOf(m.attachment.type);
-      map.set(k, (map.get(k) ?? 0) + 1);
-    }
-    return map;
-  });
+  const counts = createMemo(() =>
+    countContentHub({
+      notes: allNotes(),
+      artifacts: allArtifacts(),
+      media: allMedia(),
+      pinned: new Set(pinnedKeys()),
+    }),
+  );
 
   const selectBucket = (next: ContentBucket) => {
     contentBrowseBucket.set(next);
@@ -139,7 +131,7 @@ export function ContentSidebar() {
             testID="content-nav-recent"
             icon="clock"
             label={t("web.library.content.recent")}
-            count={totalCount()}
+            count={countForBucket(counts(), { kind: "recent" })}
             active={inBrowse() && bucket().kind === "recent"}
             onPress={() => selectBucket({ kind: "recent" })}
           />
@@ -148,7 +140,7 @@ export function ContentSidebar() {
             icon="pin"
             iconTone="wheat"
             label={t("web.library.content.pinned")}
-            count={pinnedCount()}
+            count={countForBucket(counts(), { kind: "pinned" })}
             active={inBrowse() && bucket().kind === "pinned"}
             onPress={() => selectBucket({ kind: "pinned" })}
           />
@@ -157,7 +149,7 @@ export function ContentSidebar() {
         <SidebarSection
           testID="content-nav-artifacts-section"
           title={t("web.library.content.artifacts")}
-          count={allArtifacts().length}
+          count={counts().artifacts}
           open={artifactsSectionOpen.get()}
           onToggle={() => artifactsSectionOpen.update((on) => !on)}
           action={
@@ -176,7 +168,7 @@ export function ContentSidebar() {
             testID="content-nav-artifacts-all"
             icon="artifacts"
             label={t("web.library.content.artifactType.all")}
-            count={allArtifacts().length}
+            count={countForBucket(counts(), { kind: "artifacts" })}
             active={allArtifactsActive()}
             onPress={() => selectBucket({ kind: "artifacts" })}
           />
@@ -191,7 +183,7 @@ export function ContentSidebar() {
                   testID={`content-nav-artifact-${facet().type}`}
                   icon={facet().icon}
                   label={facet().label()}
-                  count={artifactCounts().get(facet().type) ?? 0}
+                  count={countForBucket(counts(), { kind: "artifacts", artifactType: facet().type })}
                   active={active()}
                   indent
                   onPress={() => selectBucket({ kind: "artifacts", artifactType: facet().type })}
@@ -204,7 +196,7 @@ export function ContentSidebar() {
         <SidebarSection
           testID="content-nav-media-section"
           title={t("web.library.content.media")}
-          count={allMedia().length}
+          count={counts().media}
           open={mediaSectionOpen.get()}
           onToggle={() => mediaSectionOpen.update((on) => !on)}
           listClass="gap-0.5"
@@ -213,7 +205,7 @@ export function ContentSidebar() {
             testID="content-nav-media-all"
             icon="media"
             label={t("web.library.kind.all")}
-            count={allMedia().length}
+            count={countForBucket(counts(), { kind: "media" })}
             active={allMediaActive()}
             onPress={() => selectBucket({ kind: "media" })}
           />
@@ -228,7 +220,7 @@ export function ContentSidebar() {
                   testID={`content-nav-media-${kind()}`}
                   icon={mediaKindIcons[kind()]}
                   label={t(`web.library.kind.${kind()}`)}
-                  count={mediaCounts().get(kind()) ?? 0}
+                  count={countForBucket(counts(), { kind: "media", fileKind: kind() })}
                   active={active()}
                   indent
                   onPress={() => selectBucket({ kind: "media", fileKind: kind() })}

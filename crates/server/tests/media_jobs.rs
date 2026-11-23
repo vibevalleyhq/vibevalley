@@ -1,22 +1,24 @@
 use serde_json::{Value, json};
 use std::{
-    io::Write,
+    io::{Cursor, Write},
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
-use vibevalley_protocol::{ApiError, MediaImageRequest, MediaImageUsage};
+use tokio_util::sync::CancellationToken;
 use vibevalley_server::{
     Server,
-    modules::content::media::image_provider::{self, Failure, Generated, ImageBackend, Prepared, Work},
+    modules::infra::http::{Fetch, FetchError, Request, Response},
 };
+
 struct Backend {
     generations: AtomicUsize,
     downloads: AtomicUsize,
     mode: &'static str,
 }
+
 impl Backend {
     fn new(mode: &'static str) -> Arc<Self> {
         Arc::new(Self {
@@ -26,47 +28,77 @@ impl Backend {
         })
     }
 }
-impl ImageBackend for Backend {
-    fn prepare(&self, r: &MediaImageRequest) -> Result<Prepared, ApiError> {
-        Ok(Prepared {
-            connection: "test".into(),
-            revision: 1,
-            model: "moss-image-base-1.0".into(),
-            body: image_provider::body(r, "moss-image-base-1.0")?,
-            key: "never-persist-this-key".into(),
-        })
+
+struct VendorFetch(Arc<Backend>);
+
+impl Fetch for VendorFetch {
+    fn fetch(&self, r: Request) -> Result<Response, FetchError> {
+        self.fetch_with_cancel(r, CancellationToken::new())
     }
-    fn generate<'a>(&'a self, _: Prepared) -> Work<'a, Generated> {
-        Box::pin(async move {
-            self.generations.fetch_add(1, Ordering::SeqCst);
-            match self.mode {
-                "wait" => std::future::pending().await,
-                "reject" => Err(Failure::Rejected),
-                "unknown" => Err(Failure::Unknown),
-                _ => Ok(Generated {
-                    url: "https://example.com/result.png?signed=secret".into(),
-                    usage: MediaImageUsage {
-                        images: 1,
-                        width: 256,
-                        height: 256,
-                    },
-                }),
+
+    fn fetch_with_cancel(&self, _r: Request, cancel: CancellationToken) -> Result<Response, FetchError> {
+        self.0.generations.fetch_add(1, Ordering::SeqCst);
+        match self.0.mode {
+            "wait" => {
+                vibevalley_runtime::rt::block_on(cancel.cancelled());
+                Err(FetchError::Network("cancelled".into()))
             }
-        })
+            "reject" => Ok(Response {
+                status: 400,
+                headers: vec![("content-type".into(), "application/json".into())],
+                body: Box::new(Cursor::new(br#"{"error":{"code":"invalid_request"}}"#.to_vec())),
+            }),
+            "unknown" => Ok(Response {
+                status: 503,
+                headers: vec![],
+                body: Box::new(std::io::empty()),
+            }),
+            _ => {
+                let body = json!({
+                    "created": 1,
+                    "data": [{ "url": "https://example.com/result.png?signed=secret" }],
+                    "usage": { "generated_images": 1, "output_width": 256, "output_height": 256 }
+                })
+                .to_string()
+                .into_bytes();
+                Ok(Response {
+                    status: 200,
+                    headers: vec![("content-type".into(), "application/json".into())],
+                    body: Box::new(Cursor::new(body)),
+                })
+            }
+        }
     }
-    fn download<'a>(&'a self, _: &'a str, _: i64, _: i64) -> Work<'a, Vec<u8>> {
-        Box::pin(async move {
-            let n = self.downloads.fetch_add(1, Ordering::SeqCst);
-            if self.mode == "retry" && n == 0 {
-                return Err(Failure::Unknown);
-            }
-            if self.mode == "download-wait" {
-                return std::future::pending().await;
-            }
-            Ok(png())
+}
+
+struct DownloadFetch(Arc<Backend>);
+
+impl Fetch for DownloadFetch {
+    fn fetch(&self, r: Request) -> Result<Response, FetchError> {
+        self.fetch_with_cancel(r, CancellationToken::new())
+    }
+
+    fn fetch_with_cancel(&self, _r: Request, cancel: CancellationToken) -> Result<Response, FetchError> {
+        let n = self.0.downloads.fetch_add(1, Ordering::SeqCst);
+        if self.0.mode == "retry" && n == 0 {
+            return Ok(Response {
+                status: 503,
+                headers: vec![],
+                body: Box::new(std::io::empty()),
+            });
+        }
+        if self.0.mode == "download-wait" {
+            vibevalley_runtime::rt::block_on(cancel.cancelled());
+            return Err(FetchError::Network("cancelled".into()));
+        }
+        Ok(Response {
+            status: 200,
+            headers: vec![("content-type".into(), "image/png".into())],
+            body: Box::new(Cursor::new(png())),
         })
     }
 }
+
 fn png() -> Vec<u8> {
     let mut b = b"\x89PNG\r\n\x1a\n".to_vec();
     let mut chunk = |kind: &[u8], data: &[u8]| {
@@ -89,12 +121,15 @@ fn png() -> Vec<u8> {
     chunk(b"IEND", &[]);
     b
 }
+
 fn start(dir: &std::path::Path, backend: Arc<Backend>) -> vibevalley_server::Started {
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    vibevalley_server::start(vibevalley_server::ServerConfig {
+    let vendor: Arc<dyn Fetch> = Arc::new(VendorFetch(backend.clone()));
+    let download: Arc<dyn Fetch> = Arc::new(DownloadFetch(backend));
+    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
         registry: Some(Arc::new(registry)),
-        media_backend: Some(backend),
+        media_network: Some((vendor, download)),
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
@@ -102,16 +137,41 @@ fn start(dir: &std::path::Path, backend: Arc<Backend>) -> vibevalley_server::Sta
         watch_pkm: false,
         ..vibevalley_server::ServerConfig::under(dir)
     })
-    .unwrap()
+    .unwrap();
+    let status = ok(&started, "provider.get", Value::Null);
+    if status["image"].is_null() {
+        let rev = status["revision"].as_i64().unwrap();
+        ok(
+            &started,
+            "provider.update",
+            json!({
+                "revision": rev,
+                "connections": [{"id":"moss","name":"MOSS","adapter":"moss","enabled":true,"key":"never-persist-this-key"}],
+                "image": {"connection":"moss","model":"moss-image-base-1.0"},
+                "speech": null,
+                "speakers": null,
+                "voiceDesign": null,
+                "transcription": null,
+                "understanding": null,
+                "dictation": null,
+                "live": null,
+                "vision": null,
+            }),
+        );
+    }
+    started
 }
+
 fn request(id: &str) -> Value {
     json!({"id":id,"prompt":"一只橘猫","format":"text","width":256,"height":256,"enhance":false,"watermark":true})
 }
+
 fn ok(s: &vibevalley_server::Started, op: &str, p: Value) -> Value {
     let e = s.hub.call(op, p);
     assert_eq!(e.biz_code, 0, "{}", e.message);
     e.data.unwrap_or(Value::Null)
 }
+
 fn wait(s: &vibevalley_server::Started, id: &str, phase: &str) -> Value {
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
@@ -123,6 +183,7 @@ fn wait(s: &vibevalley_server::Started, id: &str, phase: &str) -> Value {
         std::thread::sleep(Duration::from_millis(5));
     }
 }
+
 #[test]
 fn generation_is_idempotent_download_retries_without_generating_again_and_library_records_result() {
     let dir = tempfile::tempdir().unwrap();
@@ -166,6 +227,7 @@ fn generation_is_idempotent_download_retries_without_generating_again_and_librar
     let bytes = std::fs::read(dir.path().join("server.db")).unwrap();
     assert!(!String::from_utf8_lossy(&bytes).contains("never-persist-this-key"));
 }
+
 #[test]
 fn cancel_releases_execution_slot_and_admission_is_bounded() {
     let dir = tempfile::tempdir().unwrap();
@@ -188,6 +250,7 @@ fn cancel_releases_execution_slot_and_admission_is_bounded() {
     wait(&reopened, "j2", "canceled");
     reopened.close();
 }
+
 #[test]
 fn canceled_download_can_retry_and_restart_resumes_download_without_regeneration() {
     let dir = tempfile::tempdir().unwrap();
@@ -206,6 +269,7 @@ fn canceled_download_can_retry_and_restart_resumes_download_without_regeneration
     assert_eq!(fresh.downloads.load(Ordering::SeqCst), 1);
     reopened.close();
 }
+
 #[test]
 fn known_rejections_and_unknown_results_stay_distinct() {
     for (mode, phase) in [("reject", "failed"), ("unknown", "unknown")] {
@@ -220,6 +284,7 @@ fn known_rejections_and_unknown_results_stay_distinct() {
         s.close();
     }
 }
+
 #[test]
 fn image_request_refinements_prevent_submission() {
     let dir = tempfile::tempdir().unwrap();

@@ -156,15 +156,11 @@ fn regression_slow_workbench_skips_revisions_and_farm_slice_and_http_receive_ord
         }
     }
 
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let hub = hub();
     let listener = vibevalley_server::transport::http::serve(hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
-    let mut wire = BufReader::new(
-        ureq::get(format!("{}/api/v1/slice/farm", listener.url()))
-            .call()
-            .unwrap()
-            .into_body()
-            .into_reader(),
-    );
+    let client = reqwest::blocking::Client::builder().no_proxy().build().unwrap();
+    let mut wire = BufReader::new(client.get(format!("{}/api/v1/slice/farm", listener.url())).send().unwrap());
     let mut public_farm = || loop {
         let mut line = String::new();
         assert_ne!(wire.read_line(&mut line).unwrap(), 0);

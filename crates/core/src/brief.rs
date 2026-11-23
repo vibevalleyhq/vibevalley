@@ -11,7 +11,7 @@ use crate::rules::{closed_text, plain_text, short_title};
 /// `splitBrief`: the first line with words is the title, the rest the
 /// description; a first line too long for a title is cut and kept whole in
 /// the description.
-pub fn split_brief(brief: &str) -> (String, String) {
+fn split_brief(brief: &str) -> (String, String) {
     let text = brief.replace("\r\n", "\n");
     let lines: Vec<&str> = text.split('\n').collect();
     let Some(i) = lines.iter().position(|l| !l.trim().is_empty()) else {

@@ -1,37 +1,11 @@
 //! Output formatting, text/JSON input loading, and URL/time helpers.
 
-use std::io::Write;
 use std::path::Path;
 
-use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::client::{Failure, exit};
-
-/// Controls whether stdout prints raw protocol JSON or compact human lines.
-#[derive(Debug, Clone, Copy)]
-pub struct Output {
-    pub json: bool,
-}
-
-impl Output {
-    pub fn show<T: Serialize>(&self, value: &T, format: impl FnOnce(&T) -> String) {
-        if self.json {
-            out(&serde_json::to_string(value).unwrap_or_else(|_| "null".into()));
-        } else {
-            let text = format(value);
-            if !text.is_empty() {
-                out(&text);
-            }
-        }
-    }
-}
-
-/// Writes one line directly to stdout.
-pub fn out(text: &str) {
-    let mut stdout = std::io::stdout();
-    let _ = writeln!(stdout, "{text}");
-}
+pub use vibevalley_cli::{Output, out};
 
 /// Collapses all whitespace runs into single spaces.
 pub fn one_line(text: &str) -> String {

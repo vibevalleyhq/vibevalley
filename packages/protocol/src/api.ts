@@ -22,27 +22,6 @@ import { type SettingHandlers, settingEndpoints } from "./setting/api";
 import { type VoiceHandlers, voiceEndpoints } from "./voice/api";
 
 export * from "./endpoint";
-export type { AgentHandlers } from "./agent/api";
-export type { ArtifactHandlers } from "./artifact/api";
-export type { ChannelHandlers } from "./channel/api";
-export type { ConnectorHandlers } from "./connector/api";
-export type { CoreHandlers } from "./core/api";
-export type { CronHandlers } from "./cron/api";
-export type { DebugHandlers } from "./debug/api";
-export type { GameHandlers } from "./game/api";
-export type { IssueHandlers } from "./issue/api";
-export type { AttachmentHandlers } from "./attachment/api";
-export type { MemoryHandlers } from "./memory/api";
-export type { OrchestratorHandlers } from "./orchestrator/api";
-export type { PkmHandlers } from "./pkm/api";
-export type { ProviderHandlers } from "./provider/api";
-export type { RemoteHandlers } from "./remote/api";
-export type { MediaHandlers } from "./media/api";
-export type { RepoHandlers } from "./repo/api";
-export type { RuntimeHandlers } from "./runtime/api";
-export type { SessionHandlers } from "./session/api";
-export type { SettingHandlers } from "./setting/api";
-export type { VoiceHandlers } from "./voice/api";
 
 /** One answer per route: the server's Handlers. */
 export interface Handlers

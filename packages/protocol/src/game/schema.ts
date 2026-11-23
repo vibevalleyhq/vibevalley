@@ -1,12 +1,12 @@
 import { z } from "zod";
 
 import type { Codec } from "../codec";
-import { IssueId, SessionId } from "../common/schema";
+import { SessionId } from "../common/schema";
 import { Repo } from "../repo/schema";
 import { doingFields } from "../session/schema";
 import * as T from "./shapes.gen";
 
-export const AchievementCategory = z.enum(T.AchievementCategoryValues) satisfies Codec<T.AchievementCategory>;
+const AchievementCategory = z.enum(T.AchievementCategoryValues) satisfies Codec<T.AchievementCategory>;
 
 const AchievementTier = z.object({
   need: z.number(),
@@ -37,22 +37,17 @@ export const AchievementList = z.object({
   standings: z.array(AchievementStanding),
 }) satisfies Codec<T.AchievementList>;
 
-const PlayAction = z.object({ at: z.number(), ...doingFields }) satisfies Codec<T.PlayAction>;
-
 const PlayActionView = z.object({ at: z.number(), ...doingFields, actionText: z.string() }) satisfies Codec<T.PlayActionView>;
 
-const playFields = {
+const SessionPlayView = z.object({
   station: z.number(),
   toolsThisRun: z.number(),
   counts: z.record(z.string(), z.number()),
   files: z.array(z.string()),
   commands: z.array(z.string()),
   runStartedAt: z.exactOptional(z.number()),
-};
-
-export const SessionPlay = z.object({ ...playFields, history: z.array(PlayAction) }) satisfies Codec<T.SessionPlay>;
-
-const SessionPlayView = z.object({ ...playFields, history: z.array(PlayActionView) }) satisfies Codec<T.SessionPlayView>;
+  history: z.array(PlayActionView),
+}) satisfies Codec<T.SessionPlayView>;
 
 export const CommitCount = z.object({
   total: z.number(),
@@ -76,7 +71,7 @@ const ProgressTitle = z.object({
   tier: z.number(),
 }) satisfies Codec<T.ProgressTitle>;
 
-export const Progress = z.object({
+const Progress = z.object({
   coins: z.number(),
   streak: z.number(),
   bestStreak: z.number(),
@@ -86,12 +81,6 @@ export const Progress = z.object({
   agents: z.record(z.string(), AgentTally),
   multiplier: z.exactOptional(z.number()),
 }) satisfies Codec<T.Progress>;
-
-const ProgressNews = z.object({
-  coins: z.exactOptional(z.number()),
-  session: z.exactOptional(SessionId),
-  unlocked: z.array(Unlock),
-}) satisfies Codec<T.ProgressNews>;
 
 const FarmLevel = z.object({
   level: z.number(),
@@ -156,116 +145,7 @@ export const FarmFrame = z.object({
   effects: z.array(GameEffect),
 }) satisfies Codec<T.FarmFrame>;
 
-const LedgerEntryHarvested = z.object({
-  kind: z.literal("harvested"),
-  at: z.number(),
-  session: SessionId,
-  agent: z.exactOptional(z.string()),
-  repo: z.string(),
-  runtime: z.string(),
-  commits: z.number(),
-  cny: z.exactOptional(z.number()),
-  runs: z.number(),
-}) satisfies Codec<T.LedgerEntryHarvested>;
-
-const LedgerEntryFailed = z.object({
-  kind: z.literal("failed"),
-  at: z.number(),
-  session: SessionId,
-  agent: z.exactOptional(z.string()),
-}) satisfies Codec<T.LedgerEntryFailed>;
-
-const LedgerEntryConflicted = z.object({
-  kind: z.literal("conflicted"),
-  at: z.number(),
-  session: SessionId,
-}) satisfies Codec<T.LedgerEntryConflicted>;
-
-const LedgerEntryTold = z.object({
-  kind: z.literal("told"),
-  at: z.number(),
-  session: SessionId,
-}) satisfies Codec<T.LedgerEntryTold>;
-
-const LedgerEntryReviewed = z.object({
-  kind: z.literal("reviewed"),
-  at: z.number(),
-  session: SessionId,
-}) satisfies Codec<T.LedgerEntryReviewed>;
-
-const LedgerEntryFamily = z.object({
-  kind: z.literal("family"),
-  at: z.number(),
-  issue: IssueId,
-  merged: z.number(),
-  parallel: z.boolean(),
-}) satisfies Codec<T.LedgerEntryFamily>;
-
-const LedgerEntryHandoff = z.object({
-  kind: z.literal("handoff"),
-  at: z.number(),
-  session: SessionId,
-  to: z.string(),
-}) satisfies Codec<T.LedgerEntryHandoff>;
-
-const LedgerEntryCalled = z.object({
-  kind: z.literal("called"),
-  at: z.number(),
-  session: SessionId,
-}) satisfies Codec<T.LedgerEntryCalled>;
-
-const LedgerEntryHired = z.object({
-  kind: z.literal("hired"),
-  at: z.number(),
-  session: SessionId,
-  agent: z.exactOptional(z.string()),
-}) satisfies Codec<T.LedgerEntryHired>;
-
-const LedgerEntryMomentKind = z.enum(T.LedgerEntryMomentKindValues) satisfies Codec<T.LedgerEntryMomentKind>;
-
-const LedgerEntryMoment = z.object({
-  kind: LedgerEntryMomentKind,
-  at: z.number(),
-}) satisfies Codec<T.LedgerEntryMoment>;
-
-const LedgerEntryLevel = z.object({
-  kind: z.literal("level"),
-  at: z.number(),
-  level: z.number(),
-}) satisfies Codec<T.LedgerEntryLevel>;
-
-const LedgerEntryTitled = z.object({
-  kind: z.literal("titled"),
-  at: z.number(),
-  achievement: z.exactOptional(z.string()),
-  tier: z.exactOptional(z.number()),
-}) satisfies Codec<T.LedgerEntryTitled>;
-
-export const LedgerEntry = z.discriminatedUnion("kind", [
-  LedgerEntryHarvested,
-  LedgerEntryFailed,
-  LedgerEntryConflicted,
-  LedgerEntryTold,
-  LedgerEntryReviewed,
-  LedgerEntryFamily,
-  LedgerEntryHandoff,
-  LedgerEntryCalled,
-  LedgerEntryHired,
-  LedgerEntryMoment,
-  LedgerEntryLevel,
-  LedgerEntryTitled,
-]) satisfies Codec<T.LedgerEntry>;
-
 export const ChooseTitleRequest = z.object({
   achievement: z.exactOptional(z.string()),
   tier: z.exactOptional(z.number()),
 }) satisfies Codec<T.ChooseTitleRequest>;
-
-export const FactProgressChanged = z.object({
-  type: z.literal("progressChanged"),
-  at: z.number(),
-  progress: z.exactOptional(Progress),
-  news: z.exactOptional(ProgressNews),
-  commits: z.exactOptional(CommitCount),
-  station: z.exactOptional(z.object({ id: SessionId, station: z.number() })),
-}) satisfies Codec<T.FactProgressChanged>;

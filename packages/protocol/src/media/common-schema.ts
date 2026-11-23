@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { Codec } from "../codec";
-import * as T from "./shapes";
+import * as T from "./shapes.gen";
 
 export const MediaPhase = z.enum(T.MediaPhaseValues) satisfies Codec<T.MediaPhase>;
 export const MediaSource = z.discriminatedUnion("kind", [

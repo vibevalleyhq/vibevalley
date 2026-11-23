@@ -66,21 +66,8 @@ bool vv_audio_play_data(const unsigned char *bytes, size_t length, char *error, 
     return ok;
 }
 
-bool vv_audio_seek(double position, char *error, size_t capacity) {
-    __block bool ok = false;
-    dispatch_sync(queue(), ^{ @autoreleasepool {
-        if (!filePlayer) { failure(error, capacity, @"no audio file is loaded"); return; }
-        if (position > filePlayer.duration) { failure(error, capacity, @"audio position exceeds duration"); return; }
-        filePlayer.currentTime = position;
-        ok = true;
-    }});
-    return ok;
-}
-
-void vv_audio_state(double *position, double *duration, bool *playing, double *queued) {
+void vv_audio_state(bool *playing, double *queued) {
     dispatch_sync(queue(), ^{
-        *position = filePlayer.currentTime;
-        *duration = filePlayer.duration;
         *playing = filePlayer.isPlaying || (pcmPlayer.isPlaying && queuedFrames > 0);
         *queued = pcmEngine && !pcmEngine.isRunning && queuedFrames > 0 ? -1 : (pcmFormat ? (double)queuedFrames / pcmFormat.sampleRate : 0);
     });

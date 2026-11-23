@@ -38,12 +38,16 @@ impl Runtime for Recording {
 }
 
 fn rpc(url: &str, token: &str, id: i64, method: &str, params: Value) -> Value {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let body = json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params });
-    let mut res = ureq::post(url)
-        .header("authorization", &format!("Bearer {token}"))
-        .send_json(&body)
+    let client = reqwest::blocking::Client::builder().no_proxy().build().unwrap();
+    let res = client
+        .post(url)
+        .header("authorization", format!("Bearer {token}"))
+        .json(&body)
+        .send()
         .expect("POST /mcp");
-    res.body_mut().read_json().expect("a JSON-RPC answer")
+    res.json().expect("a JSON-RPC answer")
 }
 
 fn text_of(answer: &Value) -> String {

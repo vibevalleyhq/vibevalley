@@ -49,8 +49,10 @@ fn git(cwd: &Path, args: &[&str]) -> String {
 }
 
 fn call(url: &str, op: &str, input: Value) -> Value {
-    let mut response = ureq::post(&format!("{url}/api/v1/{}", op.replace('.', "/"))).send_json(input).unwrap();
-    let envelope: Value = response.body_mut().read_json().unwrap();
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let client = reqwest::blocking::Client::builder().no_proxy().build().unwrap();
+    let response = client.post(format!("{url}/api/v1/{}", op.replace('.', "/"))).json(&input).send().unwrap();
+    let envelope: Value = response.json().unwrap();
     assert_eq!(envelope["bizCode"], 0, "{op}: {envelope}");
     envelope["data"].clone()
 }
@@ -85,12 +87,14 @@ fn config(home: &Path, model: Arc<Model>) -> ServerConfig {
             McpServer::Http { name, url, headers } if name == "vibevalley" => Some((url, headers)),
             _ => None,
         }).ok_or("missing MCP door")?;
-        let mut request = ureq::post(url);
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let client = reqwest::blocking::Client::builder().no_proxy().build().map_err(|e| e.to_string())?;
+        let mut request = client.post(url);
         for (name, value) in headers { request = request.header(name, value); }
-        let mut response = request.send_json(json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+        let response = request.json(&json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
             "name": "issue_report", "arguments": { "summary": format!("committed {file}"), "remember": [{ "text": "The mainline uses real git", "scope": "all" }] }
-        }})).map_err(|e| e.to_string())?;
-        let reply: Value = response.body_mut().read_json().map_err(|e| e.to_string())?;
+        }})).send().map_err(|e| e.to_string())?;
+        let reply: Value = response.json().map_err(|e| e.to_string())?;
         if reply.get("error").is_some() || !reply["result"].is_object() || reply["result"]["isError"] == true { return Err(reply.to_string()); }
         Ok(vec![
             Step::text(format!("committed {file}")),

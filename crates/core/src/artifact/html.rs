@@ -22,11 +22,11 @@ use crate::artifact::spans::{js_space, js_trim};
 use crate::artifact::store::ArtifactType;
 
 /// The largest artifact body, bytes.
-pub const ARTIFACT_MAX: usize = 5 * 1024 * 1024;
+const ARTIFACT_MAX: usize = 5 * 1024 * 1024;
 const ARTIFACT_TITLE_MAX: usize = 80;
 
 /// `htmlSandbox` (protocol rules/display.ts).
-pub const HTML_SANDBOX: &str = "allow-scripts allow-popups allow-popups-to-escape-sandbox";
+pub(crate) const HTML_SANDBOX: &str = "allow-scripts allow-popups allow-popups-to-escape-sandbox";
 
 pub const DEMO_PIECES: usize = 6;
 pub const DEMO_JITTER: f64 = 0.3;
@@ -115,7 +115,7 @@ fn limits() -> String {
 
 /// The CSP an HTML artifact is served under: someone else's page, never
 /// one of the farm's.
-pub fn html_policy() -> String {
+fn html_policy() -> String {
     format!("sandbox {HTML_SANDBOX}; {}", limits())
 }
 
@@ -365,7 +365,7 @@ fn bare(s: impl IntoIterator<Item = char>) -> String {
     s.into_iter().filter(|c| !js_space(*c)).collect()
 }
 
-fn escaped(s: &str) -> String {
+pub(crate) fn escape_html_text(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }
 
@@ -412,7 +412,7 @@ pub fn html_edit(source: &str, anchor: &vibevalley_protocol::HtmlAnchor, text: &
     if first.node < 0 || first.node != last.node {
         return Err(t("server.artifact.edit.crosses", &[("words", exact.as_str().into())]));
     }
-    Ok(format!("{}{}{}", &source[..first.from], escaped(text), &source[last.to..]))
+    Ok(format!("{}{}{}", &source[..first.from], escape_html_text(text), &source[last.to..]))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -763,7 +763,7 @@ static RE_SECTION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)<section\
 static RE_SLIDE_CLASS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"(?i)\bclass=["'][^"']*\bslide\b"#).expect("regex"));
 static RE_HTML_HEAD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^\s*(?:<!doctype\s+html|<html\b|<section\b)").expect("regex"));
 
-pub fn infer_display_from_content(content: Option<&str>) -> Option<ArtifactDisplay> {
+fn infer_display_from_content(content: Option<&str>) -> Option<ArtifactDisplay> {
     let content = content?;
     if content.trim().is_empty() {
         return None;

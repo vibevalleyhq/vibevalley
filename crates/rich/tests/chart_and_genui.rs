@@ -4,9 +4,7 @@ use std::sync::Mutex;
 use nsh_core::ViewKind;
 use nsh_core::element::Root;
 use nsh_core::prelude::*;
-use vibevalley_rich::{
-    VvGenUiActionEvent, chart_cache_stats, clear_chart_cache, clear_chart_renderer, clear_genui_renderer, render_chart, vv_chart, vv_gen_ui,
-};
+use vibevalley_rich::{VvGenUiActionEvent, chart_cache_stats, clear_chart_cache, render_chart, vv_chart, vv_gen_ui, vv_markdown};
 
 use crate::support::{TestHarness, assert_inline_svg_image};
 
@@ -86,7 +84,6 @@ fn NativeGenUiRoot(props: NativeGenUiRootProps) -> impl IntoElement {
 #[test]
 fn native_vv_chart_renders_resolved_light_and_dark_svgs_with_lru_cache_and_error_fallback() {
     let _guard = CHART_GENUI_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-    clear_chart_renderer();
     clear_chart_cache();
 
     let spec = r#"{"type":"line","title":"Monthly Throughput","categories":["Jan","Feb","Mar"],"series":[{"name":"Issues","data":[14,22,31]}]}"#;
@@ -138,8 +135,6 @@ fn native_vv_chart_renders_resolved_light_and_dark_svgs_with_lru_cache_and_error
 #[test]
 fn native_vv_genui_compound_interest_simulator_updates_kpis_and_chart_reactively() {
     let _guard = CHART_GENUI_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-    clear_chart_renderer();
-    clear_genui_renderer();
     STATE_ACTIONS.with(|a| a.borrow_mut().clear());
 
     let mut harness = TestHarness::mount(Root::new::<NativeGenUiRoot>(|| NativeGenUiRootProps {
@@ -192,8 +187,6 @@ fn native_vv_genui_compound_interest_simulator_updates_kpis_and_chart_reactively
 #[test]
 fn native_vv_genui_renders_all_19_node_kinds_supports_tabs_and_select_and_handles_invalid_spec() {
     let _guard = CHART_GENUI_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-    clear_chart_renderer();
-    clear_genui_renderer();
 
     let mut harness = TestHarness::mount(Root::new::<NativeGenUiRoot>(|| NativeGenUiRootProps {
         spec: ALL_19_KINDS_JSONL.to_owned(),
@@ -232,4 +225,35 @@ fn native_vv_genui_renders_all_19_node_kinds_supports_tabs_and_select_and_handle
     }));
     assert!(invalid.find_test_id("genui-error").is_some());
     assert!(invalid.find_test_id("code-block").is_some());
+}
+
+#[component]
+fn MarkdownGenUiForwardRoot() -> impl IntoElement {
+    let md = concat!(
+        "```genui\n",
+        "{\"op\":\"state_init\",\"state\":{\"enabled\":false}}\n",
+        "{\"op\":\"set_node\",\"root\":true,\"node\":{\"id\":\"root\",\"kind\":\"switch\",\"bind\":\"enabled\",\"label\":\"Enable\"}}\n",
+        "{\"op\":\"done\"}\n",
+        "```",
+    );
+    vv_markdown().text(md).on_gen_ui_action(|ev: &VvGenUiActionEvent| {
+        STATE_ACTIONS.with(|a| a.borrow_mut().push(ev.clone()));
+    })
+}
+
+#[test]
+fn native_vv_markdown_forwards_genui_actions() {
+    let _guard = CHART_GENUI_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    STATE_ACTIONS.with(|a| a.borrow_mut().clear());
+
+    let mut harness = TestHarness::mount(Root::of::<MarkdownGenUiForwardRoot>());
+    let switch_id = harness.find_test_id("genui-switch-root").expect("embedded genui switch");
+    assert!(harness.press(switch_id));
+
+    STATE_ACTIONS.with(|a| {
+        let actions = a.borrow();
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0].action.as_str(), "state_change");
+        assert_eq!(actions[0].payload.as_str(), "enabled=true");
+    });
 }

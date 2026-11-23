@@ -1,7 +1,5 @@
-export type { Wire } from "./codec";
 export {
   Actor,
-  ActorKind,
   Applied,
   artifactId,
   ArtifactId,
@@ -14,16 +12,14 @@ export {
   MessageId,
   Outcome,
   Preview,
-  Secret,
   sessionId,
   SessionId,
   Spent,
-  suggestionId,
   SuggestionId,
   Validation,
 } from "./common/schema";
-export { BoardSlice, CollabSlice, Fact, Health, InboxSlice, LiveEvent, OpsSlice, ServerEvent, SessionsSlice, SliceBundle, SliceKind } from "./core/schema";
-export { Agent, AgentTemplate, AgentValidateRequest, AgentValidation, Build, Head, Outfit, PersonaMode, Skill, Species } from "./agent/schema";
+export { BoardSlice, CollabSlice, Health, InboxSlice, LiveEvent, OpsSlice, SessionsSlice, SliceBundle, SliceKind } from "./core/schema";
+export { Agent, AgentTemplate, AgentValidateRequest, AgentValidation, Build, Outfit, PersonaMode, Skill, Species } from "./agent/schema";
 export { ModelEntry, RuntimeInfo, RuntimePreset, RuntimeSettings, RuntimeSupport } from "./runtime/schema";
 export { Memory, MemoryList, MemoryRequest, MemorySearch, RecallPreview } from "./memory/schema";
 export {
@@ -40,7 +36,6 @@ export {
 } from "./repo/schema";
 export {
   ContextRef,
-  ExecutionPolicy,
   IssueAnswer,
   LastRun,
   Phase,
@@ -67,7 +62,6 @@ export {
   ChannelEvent,
   ChannelRequest,
   ChannelSummary,
-  ChannelType,
   ChannelUnread,
   ChannelUpdate,
   ChatMessage,
@@ -75,14 +69,12 @@ export {
   Embed,
   MessageEdit,
   MessageHit,
-  MessageKind,
   MessageSearch,
   Notify,
   NotifyRequest,
   OnSet,
   ReactionSet,
   SayRequest,
-  SubjectKind,
 } from "./channel/schema";
 export {
   Artifact,
@@ -93,9 +85,7 @@ export {
   ArtifactEntryBatchResult,
   ArtifactEntryEvent,
   ArtifactEntryGetRequest,
-  ArtifactEntryKind,
   ArtifactEntryListRequest,
-  ArtifactEntryOp,
   ArtifactEntrySnapshot,
   ArtifactEvent,
   ArtifactHistoryCompactRequest,
@@ -177,15 +167,12 @@ export {
   CriterionCheck,
   Finding,
   Issue,
-  IssueCardKind,
   IssueConstraints,
   IssueFilter,
   IssueHistory,
   IssueLane,
   IssuePromptKind,
   IssueRefineRequest,
-  IssueReport,
-  IssueReportMemory,
   IssueRequest,
   IssueReviewRequest,
   IssueSplitRequest,
@@ -194,10 +181,9 @@ export {
   IssueStatusRequest,
   IssueTimeline,
   IssueUpdate,
-  IssueWatch,
   Question,
 } from "./issue/schema";
-export { Cron, CronRequest, CronUpdate, CronWhen, CronWhenWeekly } from "./cron/schema";
+export { Cron, CronRequest, CronUpdate, CronWhenWeekly } from "./cron/schema";
 export {
   DebugBundleResult,
   DebugCacheStat,
@@ -229,7 +215,7 @@ export {
   OrchestratorEvalRequest,
 } from "./orchestrator/schema";
 export { InboxItem } from "./inbox/schema";
-export { Achievement, AchievementCategory, AchievementList, AchievementStanding, ChooseTitleRequest, FarmFrame, FarmView, LedgerEntry } from "./game/schema";
+export { Achievement, AchievementList, AchievementStanding, ChooseTitleRequest, FarmFrame, FarmView } from "./game/schema";
 export {
   HostAction,
   HostFileTreeFrame,
@@ -293,14 +279,22 @@ export {
   RemoteWhoami,
 } from "./remote/schema";
 export {
+  LibraryAddRequest,
+  LibraryItem,
+  LibraryItems,
+  LibraryListRequest,
+  LibraryOrigin,
+  MediaAudioMetadata,
+  MediaAudioUsage,
   MediaImageJob,
   MediaImageRequest,
   MediaImageUsage,
   MediaInput,
+  MediaInputReference,
   MediaInputRequest,
   MediaJob,
   MediaJobRequest,
-  MediaSpeechEvent,
+  MediaSource,
   MediaSpeechJob,
   MediaSpeechRequest,
   MediaSummary,
@@ -308,14 +302,5 @@ export {
   MediaUnderstandingJob,
   MediaUnderstandingRequest,
   MediaUnderstandingResult,
-  MediaAudioMetadata,
-  MediaAudioUsage,
-  MediaInputReference,
-  MediaSource,
-  LibraryAddRequest,
-  LibraryItem,
-  LibraryItems,
-  LibraryListRequest,
-  LibraryOrigin,
 } from "./media/schema";
-export { MediaAudioRequest, MediaAudioResult, MediaSpeakersRequest, MediaVoiceDesignRequest } from "./media/audio-schema";
+export { MediaSpeakersRequest, MediaVoiceDesignRequest } from "./media/audio-schema";

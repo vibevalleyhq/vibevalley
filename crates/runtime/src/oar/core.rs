@@ -77,6 +77,8 @@ pub(crate) fn now_ms() -> u64 {
 /// `SessionEnded` the status is `Failed` if it was failed, else `Ended`.
 /// How many events a session keeps in memory for `events_with_history`.
 pub const HISTORY_LIMIT: usize = 10_000;
+/// Cap on in-memory voyage records when no disk `record_to` file is attached.
+pub const RECORD_HISTORY_LIMIT: usize = 1_024;
 
 #[derive(Debug, Clone, Default)]
 pub struct StatusFold {
@@ -189,7 +191,13 @@ struct CoreState {
     history: std::collections::VecDeque<Event>,
     fold: StatusFold,
     recorder: Option<Recorder>,
-    records: Vec<crate::oar::voyage::Record>,
+    /// Disk backing file and sequence offset when `record_to` is set; avoids
+    /// duplicating every raw wire frame into RAM when no live consumer reads `records()`.
+    record_path: Option<PathBuf>,
+    record_base: u64,
+    next_record_seq: u64,
+    records: VecDeque<crate::oar::voyage::Record>,
+    last_usage: Option<crate::oar::TokenTotals>,
     frames: std::collections::HashMap<std::thread::ThreadId, crate::oar::voyage::Record>,
     record_subscribers: Vec<flume::Sender<crate::oar::voyage::Record>>,
     ended: bool,
@@ -239,6 +247,8 @@ impl Drop for FrameGuard<'_> {
 
 impl SessionCore {
     pub fn new(runtime_id: &str, session_id: &str, recorder: Option<Recorder>) -> Arc<Self> {
+        let record_path = recorder.as_ref().map(|r| r.path().to_path_buf());
+        let record_base = recorder.as_ref().map_or(0, Recorder::base);
         Arc::new(Self {
             runtime_id: runtime_id.to_string(),
             session_id: Mutex::new(session_id.to_string()),
@@ -248,7 +258,11 @@ impl SessionCore {
                 history: std::collections::VecDeque::new(),
                 fold: StatusFold::new(),
                 recorder,
-                records: vec![],
+                record_path,
+                record_base,
+                next_record_seq: 0,
+                records: VecDeque::new(),
+                last_usage: None,
                 frames: Default::default(),
                 record_subscribers: vec![],
                 ended: false,
@@ -440,18 +454,33 @@ impl SessionCore {
     }
 
     fn record_locked(&self, state: &mut CoreState, mut record: crate::oar::voyage::Record) {
-        record.seq = state.records.len() as u64;
+        record.seq = state.next_record_seq;
+        state.next_record_seq += 1;
         if record.span_id.is_empty() {
             record.span_id = state.span_id.clone();
         }
         record.trace_id = normalize_trace_id(record.trace_id).or(state.trace_id);
+        if record.agent_path.is_empty() {
+            for e in &record.events {
+                if e["kind"] == "usage" {
+                    state.last_usage = serde_json::from_value(e["usage"]["tokens"].clone()).ok();
+                }
+            }
+        }
         if let Some(recorder) = state.recorder.as_mut()
             && recorder.write(&record).is_err()
         {
             state.recorder = None;
         }
-        state.record_subscribers.retain(|s| s.send(record.clone()).is_ok());
-        state.records.push(record);
+        if !state.record_subscribers.is_empty() {
+            state.record_subscribers.retain(|s| s.send(record.clone()).is_ok());
+        }
+        if state.record_path.is_none() {
+            if state.records.len() == RECORD_HISTORY_LIMIT {
+                state.records.pop_front();
+            }
+            state.records.push_back(record);
+        }
     }
 
     pub(crate) fn resume_meter(&self, base: &serde_json::Value, reason: &'static str) {
@@ -909,7 +938,7 @@ impl<D: Driver> CoreSession<D> {
                     if action == A::Compact {
                         state.compacting = true;
                         state.manual_compaction = true;
-                        state.span_id = format!("compact-{}", state.records.len());
+                        state.span_id = format!("compact-{}", state.next_record_seq);
                         state.trace_id = trace_id;
                         self.core.compact_event(&mut state, true, "manual");
                         drop(state);
@@ -1043,15 +1072,37 @@ impl<D: Driver> Session for CoreSession<D> {
             None => Ok(()),
         }
     }
+    fn usage(&self) -> Option<crate::oar::TokenTotals> {
+        self.core.lock().last_usage
+    }
+
     fn records(&self) -> Vec<crate::oar::voyage::Record> {
-        self.core.lock().records.clone()
+        let state = self.core.lock();
+        if let Some(path) = state.record_path.clone() {
+            let base = state.record_base;
+            let count = state.next_record_seq;
+            drop(state);
+            return crate::oar::record::read_session_records(&path, base, count);
+        }
+        state.records.iter().cloned().collect()
     }
 
     fn subscribe_records(&self, after: Option<u64>) -> flume::Receiver<crate::oar::voyage::Record> {
         let (tx, rx) = flume::unbounded();
         let mut state = self.core.lock();
-        for rec in state.records.iter().filter(|r| after.is_none_or(|seq| r.seq > seq)) {
-            let _ = tx.send(rec.clone());
+        let needs_history = after.is_none_or(|seq| seq + 1 < state.next_record_seq);
+        if needs_history {
+            if let Some(path) = state.record_path.as_deref() {
+                for rec in crate::oar::record::read_session_records(path, state.record_base, state.next_record_seq) {
+                    if after.is_none_or(|seq| rec.seq > seq) {
+                        let _ = tx.send(rec);
+                    }
+                }
+            } else {
+                for rec in state.records.iter().filter(|r| after.is_none_or(|seq| r.seq > seq)) {
+                    let _ = tx.send(rec.clone());
+                }
+            }
         }
         if !state.ended {
             state.record_subscribers.push(tx);

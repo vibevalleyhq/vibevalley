@@ -15,7 +15,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/core/src/core.rs`、`inbox.rs`、`patrol.rs` | `Core`：`reduce`、`SliceMask`、6 路切片投影（`board_slice`、`sessions_slice`、`collab_slice`、`inbox_slice`、`ops_slice`、`farm_frame`）与离线 `slice_bundle`、`Transition`；收件箱纯计算（`inbox`、`inbox_entries`、`fresh_of`）与巡查规则（`patrol_step`） |
+| `crates/core/src/core.rs`、`inbox.rs` | `Core`：`reduce`、`SliceMask`、6 路切片投影（`board_slice`、`sessions_slice`、`collab_slice`、`inbox_slice`、`ops_slice`、`farm_frame`）与离线 `slice_bundle`、`Transition`；收件箱纯计算（`inbox`） |
 | `crates/server/src/lib.rs`、`event_bus.rs`、`slice_feed.rs`、`runtime_inbox.rs` | `Hub`、有界异步 `EventBus`、基于 `tokio::sync::watch` 的 6 路脏合并 `SliceFeed<T>` 与 `RuntimeInboxObserver`：持有 `Core`、端点表、订阅表、`tokio::sync::broadcast` 实时事件流与 `CancellationToken`/`TaskTracker` 停机作用域，按 `Applied.dirty: SliceMask` 仅推送变脏切片（`effects` 仅进 `farm`），将持久 `pi.inbox` 运行时告警实时并入 `InboxSlice`；经 `arc-swap` 无锁挂接 `CallerContext`/`ClientIdentity` 与 `InvokeObserver`/`FaultGate`/`HostDebugBridge`/`RemoteAuth` 插槽 |
 | `crates/server/src/start.rs` | `start`：按序打开设置、档案、仓库、工单板、频道、媒体、助手、`DebugKit`（[debug/mod.rs](crates/server/src/modules/infra/debug/mod.rs)）与远程访问控制（`crates/server/src/modules/infra/remote/`），接线 `IssueChat`、`SessionChat`、助手频道订阅与 `RuntimeInboxObserver`，注册所有端点；仅在 `VIBEVALLEY_DEBUG=1` 时挂接观察器、`FaultGate` 与 `OarObserver`，`Started::close` 停机并卸载全局观察器与远程监听 |
 | `crates/server/src/main.rs` | 二进制 `vibevalley-server`：初始化工作区 `tracing_subscriber`（`VIBEVALLEY_LOG`/`RUST_LOG`，`VIBEVALLEY_DEBUG=1` 默认 `info` 否则 `warn`），支持 `--web`、`--ready-json`，读环境变量，写 `server.json` |
@@ -43,21 +43,20 @@
 
 九种待处理事项（`InboxKind`，定义在 `crates/protocol/src/contract/inbox.rs` 与 `crates/core/src/inbox.rs`）：
 
-| 种类 | 触发条件 | 默认巡查宽限期 |
-|---|---|---|
-| `review` | 工单处于 `reviewing`（帮工做完一轮或全部子单完成，等用户验收） | 2 小时 |
-| `ask` | 工单处于 `asking`（帮工带着问题等用户回答） | 15 分钟 |
-| `fix` | 工单处于 `stuck: failed`（上一轮失败） | — |
-| `interrupted` | 工单处于 `stuck: interrupted`（上一轮停在半路） | 30 分钟 |
-| `conflict` | 工单处于 `stuck: conflict`（合入主分支存在冲突） | 2 小时 |
-| `quiet` | 工单处于 `stuck: quiet`（执行中长时间无事件） | 20 分钟 |
-| `mention` | 频道或串中有未读且未回复的 `@用户` 消息（`Chat.userMentions`）或持久运行时提及 | 15 分钟 |
-| `cron-ask` | 助手创建的定时任务处于 `pending` 等待用户同意 | — |
-| `budget_reached` | 持久执行引擎（`pi.inbox`）触发预算上限告警（`InboxFrom::Runtime` / `InboxTarget::Runtime { task_id, session_id }`） | — |
+| 种类 | 触发条件 |
+|---|---|
+| `review` | 工单处于 `reviewing`（帮工做完一轮或全部子单完成，等用户验收） |
+| `ask` | 工单处于 `asking`（帮工带着问题等用户回答） |
+| `fix` | 工单处于 `stuck: failed`（上一轮失败） |
+| `interrupted` | 工单处于 `stuck: interrupted`（上一轮停在半路） |
+| `conflict` | 工单处于 `stuck: conflict`（合入主分支存在冲突） |
+| `quiet` | 工单处于 `stuck: quiet`（执行中长时间无事件） |
+| `mention` | 频道或串中有未读且未回复的 `@用户` 消息（`Chat.userMentions`）或持久运行时提及 |
+| `cron-ask` | 助手创建的定时任务处于 `pending` 等待用户同意 |
+| `budget_reached` | 持久执行引擎（`pi.inbox`）触发预算上限告警（`InboxFrom::Runtime` / `InboxTarget::Runtime { task_id, session_id }`） |
 
-- **纯函数现算并合流运行时告警**：`inbox_slice(state, seq, extra_items)` 从 `SpaceState` 算出 `InboxEntry[]`，并与 `RuntimeInboxObserver`（`crates/server/src/runtime_inbox.rs`）订阅持久 `pi.inbox` 文档投影出的运行时告警合并排序后放进 `InboxSlice.items`（变更时立即递增 `seq` 并标脏 `SliceMask::INBOX`）；每条有稳定的 id，带 `who` 和预填好的文案 `words`（`label`、`title`、`body`、`tray`）。原生子工单成功完成后自动合入父分支，不单独产生 `review`。
-- **开机时已有的不响铃（`fresh_of`）**：服务端开机与页面首次打开都先记下存量 id，之后新出现的 id 才响铃和通知，同一个只响一次。
-- **巡查（`patrol_step`；规则和测例在 `crates/core/src/patrol.rs`）**：超过宽限期的按频道生成 `source = "patrol"` 摘要；同一件事 4 小时内最多报一次；用户读过报告所在的位置（`Chat::user_read_reports`），宽限期从读的时候起至少再延 2 小时。
+- **纯函数现算并合流运行时告警**：`inbox_slice(state, seq, extra_items)` 由 `inbox(state)` 从 `SpaceState` 直接算出 `InboxItem[]`，并与 `RuntimeInboxObserver`（`crates/server/src/runtime_inbox.rs`）订阅持久 `pi.inbox` 文档投影出的运行时告警合并排序后放进 `InboxSlice.items`（变更时立即递增 `seq` 并标脏 `SliceMask::INBOX`）；每条有稳定的 id，带 `who` 和预填好的文案 `words`（`label`、`title`、`body`、`tray`）。原生子工单成功完成后自动合入父分支，不单独产生 `review`。
+- **首次打开已有的不响铃（`freshOf`）**：页面首次打开经 `packages/protocol/src/rules/inbox.ts` 的 `freshOf` 记下存量 id，之后新出现的 id 才响铃和通知，同一个只响一次。
 
 ### 切片、SSE 流和其余路由
 

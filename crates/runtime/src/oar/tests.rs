@@ -833,3 +833,64 @@ fn trace_id_propagates_to_voyage_jsonl_and_omits_none_or_zero() {
     let decoded_nonzero: crate::oar::voyage::Record = serde_json::from_str(r#"{"seq":0,"kind":"frame","sessionId":"s","agentPath":[],"traceId":42}"#).unwrap();
     assert_eq!(decoded_nonzero.trace_id, Some(42));
 }
+
+#[test]
+fn builtin_runtime_specs_match_default_registry_and_exclude_dsh() {
+    assert!(runtime_spec("dsh").is_none());
+    let registry = crate::agent::runtime::default_registry();
+    for spec in BUILTIN_RUNTIME_SPECS {
+        let rt = registry.get(spec.id).unwrap_or_else(|| panic!("missing runtime {}", spec.id));
+        assert_eq!(rt.id(), spec.id);
+        assert_eq!(rt.display_name(), spec.display_name);
+        assert_eq!(rt.capabilities(), spec.capabilities, "capabilities drift for {}", spec.id);
+        assert_eq!(runtime_refused_options(spec.id), spec.refused_options, "refused_options drift for {}", spec.id);
+    }
+    for rt in registry.list() {
+        if rt.id() == "scripted" {
+            continue;
+        }
+        assert!(runtime_spec(rt.id()).is_some(), "runtime {} missing from BUILTIN_RUNTIME_SPECS", rt.id());
+    }
+}
+
+#[test]
+fn core_session_records_read_back_from_disk_and_cap_in_memory_history() {
+    // When `record_to` is set, records are streamed to disk and read back on demand.
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("recorded.jsonl");
+    let runtime = ScriptedRuntime::new("s", Script::echo());
+    let session = runtime
+        .open(SessionOptions {
+            record_to: Some(path.clone()),
+            ..opts()
+        })
+        .unwrap();
+    let rx = session.events();
+    session.prompt(text("disk-backed")).unwrap();
+    until(&rx, turn_finished);
+    let from_disk = session.records();
+    assert!(!from_disk.is_empty(), "records() must read back persisted records");
+    assert!(
+        from_disk
+            .iter()
+            .any(|r| r.events.iter().any(|e| e["kind"] == "text_delta" && e["text"] == "disk-backed"))
+    );
+    session.dispose();
+    until(&rx, |k| matches!(k, EventKind::SessionEnded));
+
+    // When `record_to` is None, in-memory history stays bounded at 1024 records.
+    let mut steps = Vec::with_capacity(1_100);
+    for i in 0..1_100 {
+        steps.push(Step::text(format!("chunk-{i}")));
+    }
+    let big_rt = ScriptedRuntime::new("s", Script::new().turn(steps));
+    let mem_session = big_rt.open(opts()).unwrap();
+    let mem_rx = mem_session.events();
+    mem_session.prompt(text("go")).unwrap();
+    until(&mem_rx, turn_finished);
+    let capped = mem_session.records();
+    assert_eq!(capped.len(), 1_024, "unrecorded history must be capped at 1024 records");
+    assert!(capped.windows(2).all(|w| w[0].seq < w[1].seq), "retained tail remains strictly ordered");
+    mem_session.dispose();
+    until(&mem_rx, |k| matches!(k, EventKind::SessionEnded));
+}

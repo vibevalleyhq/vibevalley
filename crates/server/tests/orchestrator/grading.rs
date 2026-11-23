@@ -1,9 +1,11 @@
 use super::*;
 
 fn via_http(gate: &vibevalley_server::transport::http::Listener, op: &str, req: Value) -> Value {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let url = format!("{}/api/v1/{}", gate.url(), op.replace('.', "/"));
-    let mut response = ureq::post(&url).send_json(req).unwrap_or_else(|e| panic!("{op}: {e}"));
-    let envelope: Value = response.body_mut().read_json().unwrap();
+    let client = reqwest::blocking::Client::builder().no_proxy().build().unwrap();
+    let response = client.post(&url).json(&req).send().unwrap_or_else(|e| panic!("{op}: {e}"));
+    let envelope: Value = response.json().unwrap();
     assert_eq!(envelope["bizCode"], 0, "{op}: {envelope}");
     envelope["data"].clone()
 }

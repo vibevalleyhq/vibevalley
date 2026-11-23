@@ -34,9 +34,3 @@ export const VerifyRequest = z.object({
 export const ConnectorsChannelRequest = z.object({
   channel: z.string(),
 }) satisfies Codec<T.ConnectorsChannelRequest>;
-
-export const FactConnectorChanged = z.object({
-  type: z.literal("connectorChanged"),
-  at: z.number(),
-  status: ConnectorStatus,
-}) satisfies Codec<T.FactConnectorChanged>;

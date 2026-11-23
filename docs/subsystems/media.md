@@ -22,7 +22,7 @@
 | `crates/server/src/modules/content/media/understanding.rs` | 图片／视频理解：上传、问一次、删上传；用户给助手的授权、到期与启动 |
 | `crates/server/src/modules/content/media/remote.rs` | 任务传给厂商的文件：发出前先记在任务上，只由原账号删除 |
 | `crates/server/src/modules/content/media/vendor.rs` | MOSS 的调用：每个请求经 `Fetch` 发出（测试替身照 MOSS 回答），不跟随重定向 |
-| `crates/server/src/modules/content/media/image_provider.rs`、`png.rs`、`validate.rs` | 生图请求的准备与可取消执行、PNG 校验、请求与格式校验 |
+| `crates/server/src/modules/content/media/png.rs`、`validate.rs` | PNG 校验、请求与格式校验 |
 | `crates/server/src/modules/content/media/inputs.rs` | 输入预留、上传、任务保留与回收 |
 | `crates/server/src/modules/infra/http.rs` | 下载与素材导入共用的公网 https 规则与 HTTP 客户端 |
 | `crates/server/src/modules/content/library/mod.rs` | 素材库：`list`、`add`、`remove`、`preview_remove`；听事实记下生成结果与聊天附件 |

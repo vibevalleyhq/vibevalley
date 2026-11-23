@@ -12,24 +12,26 @@ Status: proposed
 
 将剩余全仓收敛机会拆为三组挂账：**第一梯队（`C1`–`C14`）**为低争议清理与缺陷修复，**第二梯队（`S1`–`S6`）**为产品边界与模块取舍（已明确拍板方向，按项排期实施），**延后收敛组（`I1`–`I3`）**负责统一进程内 IO 调度底座与常用依赖减压。
 
-### 第一梯队：零争议收敛与缺陷修复（`C1`–`C14`）
+### 第一梯队：零争议收敛与缺陷修复（`C1`–`C14`，Stage 4A）
 
-1. **`C1`（`crates/runtime` 零消费者 `pi.live` 每 token 刷盘与 `Axum` WebSocket 冗余特性）**：`chord_space` 与 `/chord/ws` 已纳入 `SpaceState` 切片重构并随之删除；在此之后，建议继续移除 [live.rs](crates/runtime/src/agent/durable/storage/live.rs)、[sqlite.rs](crates/runtime/src/agent/durable/storage/sqlite.rs) 中无生产消费者的 `put_deferred`/`pi.live` 延迟刷盘线程与 `Core::engine` 逐 token 序列化（实际流式 delta 已走内存观察器），并移除 `crates/server/Cargo.toml` 上不再使用的 `axum/ws` 特性。
-2. **`C2`（削掉 `packages/protocol/` ~4.8k 行死 Zod 镜像与重复 RPC 壳）**：仅 ~5.6% 导出的 Zod Schema 在生产边界（SSE 与 iframe `postMessage`）执行运行时校验，其余经桥返回的数据在 [client.ts](packages/protocol/src/client.ts) 直接跳过解码，却把全部 `*/api.ts` 与 schema 对象树打入工作台包。后续应直接由 [typescript.rs](crates/protocol/tests/typescript.rs) 从 Rust 契约生成瘦 `VibeValleyApi` 与 `BizCode`，删净 19 份手写 `*/api.ts` 与死 Result Schema，仅保留真正跨边界输入的少数解码器。
-3. **`C3`（删除 `crates/rich/` 已被白板取代的死交互 Canvas 引擎与 `hooks.rs`）**：[原生白板](apps/mac/ui/features/artifact/WhiteboardView.tsx)已接管交互编辑，[canvas.rs](crates/rich/src/canvas.rs) 只用静态 SVG 渲染。迁出 `svg.rs` 依赖的 25 行标签矩形辅助后，删除 [ops.rs](crates/rich/src/engine/canvas/ops.rs)、[hit.rs](crates/rich/src/engine/canvas/hit.rs) 交互命中、[geometry.rs](crates/rich/src/engine/canvas/geometry.rs) 交互几何、两份对应测试及 0 生产调用的 [hooks.rs](crates/rich/src/hooks.rs)（约 3k 行）。
-4. **`C4`（`apps/mac` 壳层重复打包与像素场景死路径清理）**：从主入口 [App.tsx](apps/mac/ui/App.tsx) 剥离仅属于 [ShellApp.tsx](apps/mac/ui/ShellApp.tsx) 的 workspace 面板包体（避免 ~4.7k 行打入主工作台包）；移除 0 调用 `Action`、`host.*` 音频旧桥与 `hostApi.*` 包装、已退役的 `CatalogScene`（[catalog.rs](apps/mac/src/pixel/catalog.rs)）、旧着色素描路径与仅服务 headless 测试的前端兜底壳。
-5. **`C5`（`crates/runtime/` 与 `team/memory/` 清除 5 处线上隐形泄漏及死扩展/兼容兜底）**：停写无人读取的 `gov.evaluated_permissions`、`abort_trace`、`CoreState::records` 空消费者累积、`Transcript::prefix_hash` 每轮全量 SHA-256 及无预算下的空转写事务（[engine.rs](crates/runtime/src/agent/core/engine.rs) / [budget.rs](crates/runtime/src/agent/extensions/budget.rs)）；清理 0 调用 `TodoExtension`、`FileMemory`、`ConversationHandle`、`SharedExecution` 与 `memory.terms` 冗余分词列及 4 处旧 TS/Go 兼容兜底。
-6. **`C6`（统一 `media` 与 `library` 公网下载及 `Moss` 客户端）**：删去平行 [image_provider.rs](crates/server/src/modules/content/media/image_provider.rs)、每图重起 Tokio 运行时的 `until_stopped` 与冗余测试缝 `OfflineImages`，在 [http.rs](crates/server/src/modules/infra/http.rs) 提取单一绑定 DNS 验证的 `PublicDownload` 并收拢 [library](crates/server/src/modules/content/library/mod.rs) 与媒体下载。
-7. **`C7`（修复 `collab/connector/` 每请求自建 Tokio/Client 与 50Hz/200Hz 忙轮询）**：让 [adapter.rs](crates/server/src/modules/collab/connector/adapter.rs) 与 [bridge.rs](crates/server/src/modules/collab/connector/bridge.rs) 复用 `infra/http` 运行时与共享连接池，以 `Notify`/`watch` 替换 5 ms/20 ms 睡眠轮询，提取共用飞书/QQ Token 缓存。
-8. **`C8`（修复 `pyrepo.toml` 错字与 `defineStored` 重启丢失偏好缺陷）**：修正 [repo.rs](crates/server/src/modules/work/repo.rs) 把 `"pyproject.toml"` 误写成 `"pyrepo.toml"` 的缺陷；把 [polyfill.ts](apps/mac/ui/infra/polyfill.ts) 中基于内存 `Map` 的伪 `localStorage` 与 [stored.ts](apps/mac/ui/infra/state/stored.ts) 接入持久化 KV，并在 `host.info` 补齐主题状态回读。
-9. **`C9`（清理 `crates/core` 死导出与废止的 `patrol` / 每帧冗余文案）**：移除不再运行的 [patrol.rs](crates/core/src/patrol.rs) 与 [inbox.rs](crates/core/src/inbox.rs) 丢弃型 `brief::*` 每帧构造；清理 `crates/core` 与 `collab/channel` 的 0 调用导出与重复纯函数。
-10. **`C10`（清理 `work` 域冗余订阅与 `ServerConfig` 测试缝）**：移除 `Ledger::subscribe`/`Board::record_pull_request` 旧路径，统一复用 `base::RequestKeys`、`ModuleDb` 与定时 ticker，收拢散落的测试配置项。
-11. **`C11`（收敛内容中心 UI 分裂与 `artifact/collab.rs` 重复锁/兼容清洗）**：消除内容中心侧栏计数口径分歧、删除冗余搜索弹窗 [Search.tsx](apps/mac/ui/features/pkm/Search.tsx) 与 `frame.ts` 死分支；整合 [collab.rs](crates/server/src/modules/content/artifact/collab.rs) 重复锁分发与 `entries.rs` 历史重清洗。
-12. **`C12`（`crates/cli` 与 `workspace` 零星去重与死导出清理）**：抽取 `crates/cli` 共用入口消除 `vibevalley_eval` 粘贴，清理零星仅测导出。
-13. **`C13`（运行时支持矩阵单源化与失效的 `spent_today` 决断）**：让 [presets.rs](crates/server/src/modules/team/agent/presets.rs) 与 [oar/mod.rs](crates/runtime/src/oar/mod.rs) 共享单一能力真源（去掉过时 `"dsh"` 预设与漂移字段），明确补齐 `spent_today` 统计或移除无效每日限额。
-14. **`C14`（边界 `serde_json::Value` 强类型收口）**：将媒体厂商应答、`gh`/`glab` CLI 输出、MCP 工具入参与 OAR 驱动 JSON 解析在进门处一次性解码为 `Deserialize` 结构体（[media/vendor.rs](crates/server/src/modules/content/media/vendor.rs)、[publish.rs](crates/server/src/modules/work/pull/publish.rs)、[claude.rs](crates/runtime/src/oar/claude.rs)）。
+Stage 4A 在分支 `refactor/full-repo-convergence` 上按 Wave 1 / Wave 2 推进，除 `C2` 更深层的 Rust 直出瘦客户端重构外，其余项均随本批收口落地：
 
-### 第二梯队：已拍板产品边界收敛（`S1`–`S6`）
+1. **`C1`（`crates/runtime` 零消费者 `pi.live` 每 token 刷盘与 `Axum` WebSocket 冗余特性）— Stage 4A 收口**：Wave 1 已移除 [live.rs](crates/runtime/src/agent/durable/storage/live.rs)、[sqlite.rs](crates/runtime/src/agent/durable/storage/sqlite.rs) 与 `agent/core` 中无生产消费者的 `put_deferred`/`pi.live` 延迟刷盘线程与 `LiveDoc`/`LiveState` 逐 token 序列化（流式 delta 保留内存观察器）；Wave 2 同步移除 `crates/server/Cargo.toml` 上不再使用的 `axum/ws` 特性。
+2. **`C2`（`packages/protocol/` 死导出与死 Zod 镜像清理）— Stage 4A 部分落地，深层瘦客户端留作后续**：Wave 2 已清理 `packages/protocol/src/**` 中 48 处零引用死 Zod 镜像与遗留声明（`Fact*` × 20、`Fact`、`ServerEvent`、`SpaceState`、`LedgerEntry*` × 14、`Secret`、`suggestionId`、`IssueReport*`、`IssueWatch`、`MediaSpeechEvent`、`MediaAudioRequest`、`PlayAction`/`SessionPlay`/`ProgressNews`），移除 `packages/protocol/src/schema.ts` 的 13 个内部非对象死导出与 `packages/protocol/src/api.ts` 的 21 个未用 `*Handlers` 转发，并删除重复的 `agent/shapes.ts` 与 `media/shapes.ts`（改为直用生成物 `AgentProblemLevelValues`、`JobKindValues`），同时完整保留全部真实边界编解码器（6 域切片、订阅、`Host*`、`Remote*`、`Debug*`、iframe `postMessage` 及 `schema.test.ts`/`api.test.ts` 覆盖）。更深层的结构改造（由 [typescript.rs](crates/protocol/tests/typescript.rs) 直出瘦 `VibeValleyApi` 与 `BizCode` 并退役 19 份 `*/api.ts`）因牵动 `scripts/gen/{api-client,capabilities}.ts`，留作后续专项评估。
+3. **`C3`（删除 `crates/rich/` 已被白板取代的死交互 Canvas 引擎与 `hooks.rs`）— Wave 1 已落地**：[原生白板](apps/mac/ui/features/artifact/WhiteboardView.tsx)已接管交互编辑，[canvas.rs](crates/rich/src/canvas.rs) 只用静态 SVG 渲染。已内联 `svg.rs` 依赖的静态标签矩形与路由原语，删除 `crates/rich/src/engine/canvas/{ops,hit,geometry}.rs`、`crates/rich/src/hooks.rs` 与三份对应测试（净减 ~3.2k 行）。
+4. **`C4`（`apps/mac` 壳层重复打包与像素场景死路径清理）— Stage 4A 收口**：Wave 1 已从主入口 [App.tsx](apps/mac/ui/App.tsx) 剥离仅属于 [ShellApp.tsx](apps/mac/ui/ShellApp.tsx) 的 workspace 面板包体（主包 `bundle.nshc` 减少 ~1.14 MB）并清理 9 处零调用 `hostApi.*` 包装；Wave 2 同步清理原生壳已退役的 `CatalogScene`（`apps/mac/src/pixel/catalog.rs`）、死 `Action`、旧音频桥处理器与旧着色素描路径。
+5. **`C5`（`crates/runtime/` 与 `team/memory/` 清除 5 处线上隐形泄漏及死扩展/兼容兜底）— Stage 4A 收口**：Wave 1 已修复 5 处运行期泄漏（停写 `gov.evaluated_permissions`、`abort_trace`，`CoreState::records` 改为落盘按需读回与有界缓存，移除每轮 `Transcript::prefix_hash` SHA-256 重算，以及无预算空写事务），并删除零调用 `FileMemory`、`ConversationHandle`（`crates/runtime/src/agent/harness/handle.rs`）与 Go 兼容 base64 垫片（核实 `TodoExtension` 与 `SharedExecution` 仍有生产调用，予以保留）；Wave 2 同步审计 `team/memory/` 的 `memory.terms`（保留 `content/pkm` 所需的 `terms_list` 直至 Stage 4B `S2`）。
+6. **`C6`（统一 `media` 与 `library` 公网下载及 `Moss` 客户端）— Wave 2 收口**：在 [http.rs](crates/server/src/modules/infra/http.rs) 提取绑定 DNS 验证的 `PublicDownload` 收拢 [library](crates/server/src/modules/content/library/mod.rs) 与媒体下载及 MOSS 客户端，删除平行的 `crates/server/src/modules/content/media/image_provider.rs`、`until_stopped` 与冗余 `OfflineImages` 测试缝。
+7. **`C7`（修复 `collab/connector/` 连接池与 Token 缓存）— Wave 2 收口**：让 [adapter.rs](crates/server/src/modules/collab/connector/adapter.rs) 复用 `infra/http` 共享连接池，提取飞书/QQ 共用 Token 缓存（完整保留 `feishu.rs` Protobuf 解码）。
+8. **`C8`（修复 `pyrepo.toml` 错字与 `defineStored` 重启丢失偏好缺陷）— Stage 4A 收口**：Wave 1 已将 [polyfill.ts](apps/mac/ui/infra/polyfill.ts) 的 `localStorage` 与 [stored.ts](apps/mac/ui/infra/state/stored.ts) 接入 `nsh` 持久化 `Storage`（[storage.ts](apps/mac/ui/infra/state/storage.ts)）并在前端接入 `host.info` 主题回读；Wave 2 同步修正 [repo.rs](crates/server/src/modules/work/repo.rs) 的 `"pyrepo.toml"` → `"pyproject.toml"` 错字并在 Mac [host_bridge.rs](apps/mac/src/shell/host_bridge.rs) 补齐 `host.info` 主题字段回读。
+9. **`C9`（清理 `crates/core` 死导出与废止的 `patrol` / 每帧冗余文案）— Wave 1 已落地**：已删除不再运行的 `crates/core/src/patrol.rs`、孤立未编译测试 `crates/core/src/tests.rs`（抢救保留唯一有效回归测试至 `core.rs`）与 [inbox.rs](crates/core/src/inbox.rs) 的 `brief::*` / `inbox_entries` / `fresh_of` 每帧丢弃构造，收窄并清理全 crate 零调用导出（`brief::cure_words` 仍与 `server.issue.brief.{cure,cureHead,cureTail}` 词典配套保留，净减 ~1k 行）。
+10. **`C10`（清理 `work` 域冗余订阅与 `ServerConfig` 测试缝）— Wave 2 收口**：移除 `Ledger::subscribe`/`Board::record_pull_request` 旧路径，统一复用 `base::RequestKeys`、`ModuleDb` 与定时 ticker，收拢散落的测试配置项。
+11. **`C11`（收敛内容中心 UI 分裂与 `artifact/collab.rs` 重复锁/兼容清洗）— Stage 4A 收口**：Wave 1 已统一内容中心侧栏计数口径（[navigation.ts](apps/mac/ui/features/content/navigation.ts)）并清理 [frame.ts](apps/mac/ui/infra/frame.ts) 与 [artifact/frame.ts](apps/mac/ui/features/artifact/frame.ts) 死分支（核实 [Search.tsx](apps/mac/ui/features/pkm/Search.tsx) 仍有 `Shell.tsx` / `QuickSwitcher.tsx` 活调用与 8 条 `web.pkm.search.*` 词条，随 Stage 4B `S2` 统一退役）；Wave 2 同步整合 [collab.rs](crates/server/src/modules/content/artifact/collab.rs) 重复锁分发与 `entries.rs` 历史重清洗。
+12. **`C12`（`crates/cli` 与 `workspace` 零星去重与死导出清理）— Wave 2 收口**：抽取 `crates/cli` 共用入口消除与 `vibevalley_eval` 的粘贴重复，清理零星仅测导出。
+13. **`C13`（运行时支持矩阵单源化与失效的 `spent_today` 决断）— Stage 4A 收口**：Wave 1 已在 [oar/mod.rs](crates/runtime/src/oar/mod.rs) 落地 `BUILTIN_RUNTIME_SPECS` / `runtime_spec` / `runtime_refused_options` 单一能力真源；Wave 2 同步接入 [presets.rs](crates/server/src/modules/team/agent/presets.rs)、清理服务端与 Mac 壳遗留的 `"dsh"` 条目，并决断 `spent_today`。
+14. **`C14`（边界 `serde_json::Value` 强类型收口）— Stage 4A 收口**：Wave 1 已在 [claude.rs](crates/runtime/src/oar/claude.rs) 与 [codex.rs](crates/runtime/src/oar/codex.rs) 完成 OAR 驱动边界强类型 `Deserialize` 解码；Wave 2 同步收口 [media/vendor.rs](crates/server/src/modules/content/media/vendor.rs)、[publish.rs](crates/server/src/modules/work/pull/publish.rs) 与 `modules/team/mcp/` 工具入参边界解码。
+
+### 第二梯队：已拍板产品边界收敛（`S1`–`S6`，Stage 4B 待实施）
 
 | 编号 | 所在与体量 | 核心事实 | 已拍板方向 |
 | :--- | :--- | :--- | :--- |
@@ -50,7 +52,8 @@ Status: proposed
 | :--- | :--- | :--- |
 | `moka`（或 `quick_cache`） | 手写 `Mutex<HashMap>` 缓存淘汰与并发击穿防护 | 提供有界容量、TTL 与单飞加载 |
 | `notify-debouncer-mini`（待评估） | [crates/files/Cargo.toml](crates/files/Cargo.toml) 下手写监听防抖状态机 | 减少重复防抖状态机维护 |
-| 测试侧 `ureq` 收尾 | `crates/server/Cargo.toml` 的 `[dev-dependencies]` 与根 `Cargo.toml` 剩余 `ureq` 条目 | 生产路径已全面统一 `reqwest`，补齐测试迁移后可从工作区彻底移除 `ureq` |
+
+（`I3` 的测试侧 `ureq` 收尾已随 Stage 4A Wave 2 将 `crates/server` 剩余测试迁移至工作区 `reqwest::blocking` 并从 `Cargo.toml` 彻底移除 `ureq`。）
 
 ### 核实保留基线（不得误删）
 

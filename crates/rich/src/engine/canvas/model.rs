@@ -5,7 +5,6 @@ use std::str::FromStr;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::engine::canvas::extensions::ExtensionFields;
-use crate::engine::canvas::geometry::{Rect, Vec2};
 use crate::engine::canvas::validate::{ValidationReport, validate};
 
 #[derive(Debug, thiserror::Error)]
@@ -160,22 +159,6 @@ impl NodeBounds {
         self.width > 0 && self.height > 0
     }
 
-    pub const fn right(self) -> i64 {
-        self.x.saturating_add(self.width)
-    }
-
-    pub const fn bottom(self) -> i64 {
-        self.y.saturating_add(self.height)
-    }
-
-    pub fn center_x(self) -> i64 {
-        self.x.saturating_add(self.width / 2)
-    }
-
-    pub fn center_y(self) -> i64 {
-        self.y.saturating_add(self.height / 2)
-    }
-
     pub fn to_rect(self) -> Rect {
         Rect {
             x: self.x as f64,
@@ -184,21 +167,49 @@ impl NodeBounds {
             height: self.height as f64,
         }
     }
+}
 
-    pub fn contains_bounds(self, other: NodeBounds) -> bool {
-        let self_right = i128::from(self.x) + i128::from(self.width);
-        let self_bottom = i128::from(self.y) + i128::from(self.height);
-        let other_right = i128::from(other.x) + i128::from(other.width);
-        let other_bottom = i128::from(other.y) + i128::from(other.height);
-        i128::from(other.x) >= i128::from(self.x) && i128::from(other.y) >= i128::from(self.y) && other_right <= self_right && other_bottom <= self_bottom
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Rect {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+impl Rect {
+    pub const fn new(x: f64, y: f64, width: f64, height: f64) -> Self {
+        Self { x, y, width, height }
     }
 
-    pub fn intersects_bounds(self, other: NodeBounds) -> bool {
-        let self_right = i128::from(self.x) + i128::from(self.width);
-        let self_bottom = i128::from(self.y) + i128::from(self.height);
-        let other_right = i128::from(other.x) + i128::from(other.width);
-        let other_bottom = i128::from(other.y) + i128::from(other.height);
-        i128::from(self.x) < other_right && self_right > i128::from(other.x) && i128::from(self.y) < other_bottom && self_bottom > i128::from(other.y)
+    pub fn right(self) -> f64 {
+        self.x + self.width
+    }
+
+    pub fn bottom(self) -> f64 {
+        self.y + self.height
+    }
+
+    pub fn union(self, other: Rect) -> Rect {
+        let min_x = self.x.min(other.x);
+        let min_y = self.y.min(other.y);
+        let max_x = self.right().max(other.right());
+        let max_y = self.bottom().max(other.bottom());
+        Rect {
+            x: min_x,
+            y: min_y,
+            width: max_x - min_x,
+            height: max_y - min_y,
+        }
+    }
+
+    pub fn expand(self, margin: f64) -> Rect {
+        Rect {
+            x: self.x - margin,
+            y: self.y - margin,
+            width: self.width + margin * 2.0,
+            height: self.height + margin * 2.0,
+        }
     }
 }
 
@@ -423,8 +434,6 @@ pub enum Side {
 }
 
 impl Side {
-    pub const ALL: [Side; 4] = [Side::Top, Side::Right, Side::Bottom, Side::Left];
-
     pub const fn opposite(self) -> Side {
         match self {
             Side::Top => Side::Bottom,
@@ -442,22 +451,6 @@ impl Side {
             Side::Left => Side::Top,
         }
     }
-
-    pub const fn normal(self) -> Vec2 {
-        match self {
-            Side::Top => Vec2 { x: 0.0, y: -1.0 },
-            Side::Right => Vec2 { x: 1.0, y: 0.0 },
-            Side::Bottom => Vec2 { x: 0.0, y: 1.0 },
-            Side::Left => Vec2 { x: -1.0, y: 0.0 },
-        }
-    }
-
-    pub const fn is_horizontal(self) -> bool {
-        match self {
-            Side::Left | Side::Right => true,
-            Side::Top | Side::Bottom => false,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -473,14 +466,6 @@ pub enum BackgroundStyle {
     Cover,
     Ratio,
     Repeat,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum NodeKind {
-    Text,
-    File,
-    Link,
-    Group,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -629,22 +614,6 @@ impl Node {
         }
     }
 
-    pub fn kind(&self) -> NodeKind {
-        match self {
-            Node::Text(_) => NodeKind::Text,
-            Node::File(_) => NodeKind::File,
-            Node::Link(_) => NodeKind::Link,
-            Node::Group(_) => NodeKind::Group,
-        }
-    }
-
-    pub fn is_group(&self) -> bool {
-        match self {
-            Node::Group(_) => true,
-            Node::Text(_) | Node::File(_) | Node::Link(_) => false,
-        }
-    }
-
     pub fn x(&self) -> i64 {
         match self {
             Node::Text(n) => n.x,
@@ -692,42 +661,6 @@ impl Node {
 
     pub fn rect(&self) -> Rect {
         self.bounds().to_rect()
-    }
-
-    pub fn set_bounds(&mut self, bounds: NodeBounds) {
-        match self {
-            Node::Text(n) => {
-                n.x = bounds.x;
-                n.y = bounds.y;
-                n.width = bounds.width;
-                n.height = bounds.height;
-            }
-            Node::File(n) => {
-                n.x = bounds.x;
-                n.y = bounds.y;
-                n.width = bounds.width;
-                n.height = bounds.height;
-            }
-            Node::Link(n) => {
-                n.x = bounds.x;
-                n.y = bounds.y;
-                n.width = bounds.width;
-                n.height = bounds.height;
-            }
-            Node::Group(n) => {
-                n.x = bounds.x;
-                n.y = bounds.y;
-                n.width = bounds.width;
-                n.height = bounds.height;
-            }
-        }
-    }
-
-    pub fn translate(&mut self, dx: i64, dy: i64) {
-        let mut b = self.bounds();
-        b.x = b.x.saturating_add(dx);
-        b.y = b.y.saturating_add(dy);
-        self.set_bounds(b);
     }
 
     pub fn color(&self) -> Option<&CanvasColor> {
@@ -921,47 +854,9 @@ impl Canvas {
         self.nodes.iter().find(|n| n.id() == id)
     }
 
-    pub fn node_mut(&mut self, id: &NodeId) -> Option<&mut Node> {
-        self.nodes.iter_mut().find(|n| n.id() == id)
-    }
-
-    pub fn node_index(&self, id: &NodeId) -> Option<usize> {
-        self.nodes.iter().position(|n| n.id() == id)
-    }
-
-    pub fn edge(&self, id: &EdgeId) -> Option<&Edge> {
-        self.edges.iter().find(|e| &e.id == id)
-    }
-
-    pub fn edge_mut(&mut self, id: &EdgeId) -> Option<&mut Edge> {
-        self.edges.iter_mut().find(|e| &e.id == id)
-    }
-
-    pub fn edge_index(&self, id: &EdgeId) -> Option<usize> {
-        self.edges.iter().position(|e| &e.id == id)
-    }
-
-    pub fn edges_for_node(&self, id: &NodeId) -> Vec<&Edge> {
-        self.edges.iter().filter(|e| &e.from_node == id || &e.to_node == id).collect()
-    }
-
     pub fn content_bounds(&self) -> Option<Rect> {
         let mut iter = self.nodes.iter().map(Node::rect);
         let first = iter.next()?;
         Some(iter.fold(first, Rect::union))
-    }
-
-    pub fn nodes_bounds(&self, ids: &[NodeId]) -> Option<Rect> {
-        let mut bounds: Option<Rect> = None;
-        for id in ids {
-            if let Some(node) = self.node(id) {
-                let rect = node.rect();
-                bounds = Some(match bounds {
-                    Some(existing) => existing.union(rect),
-                    None => rect,
-                });
-            }
-        }
-        bounds
     }
 }

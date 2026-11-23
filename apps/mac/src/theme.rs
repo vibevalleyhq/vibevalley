@@ -17,6 +17,16 @@ pub enum ThemeChoice {
     System,
 }
 
+impl ThemeChoice {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            ThemeChoice::Dark => "dark",
+            ThemeChoice::Light => "light",
+            ThemeChoice::System => "system",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum MotionChoice {
@@ -327,6 +337,24 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn theme_choice_serde_roundtrip() {
+        for (choice, wire) in [
+            (ThemeChoice::Dark, "\"dark\""),
+            (ThemeChoice::Light, "\"light\""),
+            (ThemeChoice::System, "\"system\""),
+        ] {
+            let encoded = serde_json::to_string(&choice).expect("serialize ThemeChoice");
+            assert_eq!(encoded, wire);
+            let decoded: ThemeChoice = serde_json::from_str(&encoded).expect("deserialize ThemeChoice");
+            assert_eq!(decoded, choice);
+            assert_eq!(format!("\"{}\"", choice.as_str()), wire);
+        }
+
+        let settings: Settings = serde_json::from_str("{}").expect("default settings deserialize");
+        assert_eq!(settings.theme, ThemeChoice::System);
     }
 
     #[test]

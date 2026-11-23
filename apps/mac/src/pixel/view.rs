@@ -12,7 +12,6 @@ use gpui::{
 use serde_json::{Value, json};
 
 use super::atlas::Atlas;
-use super::catalog::CatalogScene;
 use super::draw::DrawList;
 use super::element::{SpriteCache, framing, paint};
 use super::farm::frame::Frame;
@@ -56,7 +55,6 @@ pub enum Scene {
     Map(Box<MapScene>),
     Tree(Box<TreeScene>),
     Opening(Box<OpeningScene>),
-    Catalog(Box<CatalogScene>),
 }
 
 impl Scene {
@@ -69,7 +67,6 @@ impl Scene {
             Scene::Farm(f) => Some(f.atlas.clone()),
             Scene::Map(m) => Some(m.atlas.clone()),
             Scene::Tree(t) => Some(t.atlas.clone()),
-            Scene::Catalog(c) => Some(c.atlas.clone()),
             _ => None,
         }
     }
@@ -555,12 +552,6 @@ impl PixelView {
             cx.notify();
             return;
         }
-        if let Scene::Catalog(c) = &mut self.scene {
-            c.tap(p);
-            self.taps.push(format!("{:?}", c.selected));
-            cx.notify();
-            return;
-        }
         if let Scene::Map(m) = &self.scene {
             let hit = m.hit_at(p);
             self.taps.push(format!("{hit:?}"));
@@ -750,7 +741,6 @@ impl PixelView {
             Scene::Map(m) => m.debug_state(),
             Scene::Tree(t) => t.debug_state(),
             Scene::Opening(o) => o.debug_state(),
-            Scene::Catalog(c) => c.debug_state(),
         };
         let sampled_fireflies = scene.get("captureMotion").is_some_and(Value::is_object).then(|| {
             self.last_list
@@ -828,7 +818,6 @@ impl PixelView {
                 o.tick(dt);
                 Some(o.draw())
             }
-            Scene::Catalog(c) => Some(c.draw()),
             _ => None,
         }
     }
@@ -839,7 +828,6 @@ fn try_load_cached(kind: &str) -> Option<Scene> {
         "farm" => super::try_cached_village().map(|(world, atlas)| Scene::Farm(Box::new(FarmScene::new(world, atlas)))),
         "map" => super::try_cached_atlas().map(|atlas| Scene::Map(Box::new(MapScene::new(atlas)))),
         "tree" => super::try_cached_atlas().map(|atlas| Scene::Tree(Box::new(TreeScene::new(atlas)))),
-        "catalog" => super::try_cached_atlas().map(|atlas| Scene::Catalog(Box::new(CatalogScene::new(atlas)))),
         _ => None,
     }
 }
@@ -856,10 +844,6 @@ fn load(kind: &str) -> Scene {
         },
         "tree" => match super::load_atlas() {
             Ok(atlas) => Scene::Tree(Box::new(TreeScene::new(atlas))),
-            Err(e) => Scene::Failed(e),
-        },
-        "catalog" => match super::load_atlas() {
-            Ok(atlas) => Scene::Catalog(Box::new(CatalogScene::new(atlas))),
             Err(e) => Scene::Failed(e),
         },
         "opening" => {

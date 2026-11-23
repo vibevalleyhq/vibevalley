@@ -117,7 +117,6 @@ impl RunningPhase {
 struct Runtime {
     active: HashMap<String, RunningPhase>,
     handlers: HashMap<(String, String), Phase>,
-    abort_trace: Vec<String>,
     started: bool,
     closing: bool,
     shutdown: Option<flume::Sender<()>>,
@@ -170,7 +169,6 @@ impl Scheduler {
             rt: Mutex::new(Runtime {
                 active: HashMap::new(),
                 handlers: HashMap::new(),
-                abort_trace: vec![],
                 started: false,
                 closing: false,
                 shutdown: Some(shutdown_tx),
@@ -269,9 +267,6 @@ impl Scheduler {
     pub fn active_workers(&self) -> usize {
         self.0.engine.rt.lock().unwrap().active.len()
     }
-    pub fn abort_trace(&self) -> Vec<String> {
-        self.0.engine.rt.lock().unwrap().abort_trace.clone()
-    }
     pub fn wait(&self, id: &str, timeout: Duration) -> Result<Task> {
         let changes = self.store().subscribe_tasks()?;
         let deadline = Instant::now() + timeout;
@@ -304,7 +299,6 @@ fn record_abort(rt: &mut Runtime, ids: Vec<String>) {
         if let Some(c) = rt.active.get_mut(&id) {
             c.cancel();
         }
-        rt.abort_trace.push(id);
     }
 }
 fn abort_tree(tx: &mut Tx<'_>, id: &str, reason: &str) -> Result<Vec<String>> {
@@ -707,5 +701,28 @@ mod tests {
         assert_eq!(done.terminal_reason, "completed");
         assert_eq!(done.result, json!({"woken": true}));
         Ok(())
+    }
+
+    #[test]
+    fn abort_tree_terminates_children_before_parent() -> Result<()> {
+        let store = Store::memory()?;
+        store.write(|tx| {
+            for (id, owner) in [("root", ""), ("child", "root"), ("grandchild", "child")] {
+                let mut t = Task::new("work", "run");
+                t.id = id.into();
+                t.owner_task_id = owner.into();
+                t.status = TaskStatus::Running;
+                tx.create_task(t)?;
+            }
+            Ok(())
+        })?;
+        let order = store.write(|tx| abort_tree(tx, "root", "restart_limit"))?;
+        assert_eq!(order, ["grandchild", "child", "root"]);
+        store.read(|r| {
+            assert_eq!(r.task("root")?.terminal_reason, "restart_limit");
+            assert_eq!(r.task("child")?.terminal_reason, "aborted");
+            assert_eq!(r.task("grandchild")?.terminal_reason, "aborted");
+            Ok(())
+        })
     }
 }

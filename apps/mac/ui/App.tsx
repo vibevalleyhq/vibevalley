@@ -1,5 +1,5 @@
-// Entry of every hosted view. Rust sets `host.params.view` before the
-// bundle loads; one bundle serves all surfaces.
+// Entry of workbench and pixel-farm overlay views (`is_workbench_view` in
+// apps/mac/src/hosted/mod.rs). Shell surfaces load `ShellApp.tsx` instead.
 import "./infra/polyfill";
 import "./infra/i18nBoot";
 import { host, mount, Text, View, type Component } from "nsh";
@@ -13,11 +13,6 @@ import { FarmPhone } from "./farm/FarmPhone";
 import { viewName } from "./infra/bridge";
 import { useBridge } from "./infra/bridged";
 import { readHostMotion } from "./infra/hostParams";
-import { BridgeProbe } from "./workspace/BridgeProbe";
-import { WorkspaceChatPane } from "./workspace/ChatPane";
-import { MarkdownPane } from "./workspace/MarkdownPane";
-import { Palette } from "./workspace/Palette";
-import { Sidebar } from "./workspace/Sidebar";
 
 function Unknown() {
   return (
@@ -30,11 +25,6 @@ function Unknown() {
 const views: Record<string, Component> = {
   "farm-form": FarmForm,
   "farm-phone": FarmPhone,
-  sidebar: Sidebar,
-  palette: Palette,
-  markdown: MarkdownPane,
-  "workspace-chat": WorkspaceChatPane,
-  probe: BridgeProbe,
   // The shell opens it as `vv`; `vibevalley` is the name the views use.
   vv: VibeValley,
   vibevalley: VibeValley,

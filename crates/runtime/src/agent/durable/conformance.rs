@@ -1,8 +1,8 @@
 //! Reusable conformance suite verifying `StorageBackend` implementations
 //! against VibeValley's durable semantics (ACID rollback, ordering, signals,
-//! scheduler wakeups, deferred live coalescing, and reopen recovery).
+//! scheduler wakeups, and reopen recovery).
 
-use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
@@ -19,52 +19,6 @@ pub fn run_storage_conformance(mut make: impl FnMut() -> Result<Store>) -> Resul
     test_atomic_rollback_and_concurrency(&make()?)?;
     test_submissions_and_settle_wakeup(&make()?)?;
     test_tasks_signals_and_scheduler(&make()?)?;
-    Ok(())
-}
-
-pub fn run_clocked_live_conformance<F>(mut make_with_clock: F) -> Result<()>
-where
-    F: FnMut(Arc<dyn Fn() -> i64 + Send + Sync>) -> Result<Store>,
-{
-    let clock = Arc::new(AtomicI64::new(1_000));
-    let reader_clock = clock.clone();
-    let store = make_with_clock(Arc::new(move || reader_clock.load(Ordering::Relaxed)))?;
-    let rx = store.subscribe_documents()?;
-
-    assert!(store.put_deferred("conversation", "c", "pi.usage", Value::Null).is_err());
-    store.write(|tx| tx.put_document("conversation", "c", "pi.live", &json!("seed")))?;
-    let initial = rx.recv_timeout(WAIT).expect("seed doc event");
-    assert!(initial.durable);
-
-    for i in 1..=10 {
-        store.put_deferred("conversation", "c", "pi.live", json!(i))?;
-        clock.fetch_add(5, Ordering::Relaxed);
-    }
-    assert!(rx.try_recv().is_err());
-
-    clock.store(1_110, Ordering::Relaxed);
-    store.flush_due()?;
-    let mem_ev = rx.recv_timeout(WAIT).expect("memory preview event");
-    assert!(!mem_ev.durable);
-    assert_eq!(store.live_document("conversation", "c")?.unwrap().state, json!(10));
-    assert_eq!(store.read(|r| r.document("conversation", "c", "pi.live"))?.unwrap().state, json!("seed"));
-
-    clock.store(2_150, Ordering::Relaxed);
-    store.flush_due()?;
-    let disk_ev = rx.recv_timeout(WAIT).expect("durable flush event");
-    assert!(disk_ev.durable);
-    assert_eq!(store.read(|r| r.document("conversation", "c", "pi.live"))?.unwrap().state, json!(10));
-
-    // A durable write supersedes deferred state without stale re-publish.
-    store.put_deferred("conversation", "c", "pi.live", json!("ephemeral"))?;
-    store.write(|tx| tx.put_document("conversation", "c", "pi.live", &json!("committed")))?;
-    let committed = rx.recv_timeout(WAIT).expect("committed pi.live");
-    assert!(committed.durable);
-    assert_eq!(committed.document.state, json!("committed"));
-    store.flush_deferred()?;
-    assert_eq!(store.read(|r| r.document("conversation", "c", "pi.live"))?.unwrap().state, json!("committed"));
-
-    store.close()?;
     Ok(())
 }
 
@@ -433,8 +387,14 @@ fn test_tasks_signals_and_scheduler(store: &Store) -> Result<()> {
     sched.recover()?;
     let tripped = sched.wait("p", WAIT)?;
     assert_eq!(tripped.terminal_reason, "restart_limit");
-    let expected_trace: Vec<String> = vec!["g".into(), "c".into(), "p".into()];
-    assert!(sched.abort_trace().ends_with(&expected_trace), "{:?}", sched.abort_trace());
+    store.read(|r| {
+        assert_eq!(r.task("g")?.status, TaskStatus::Terminal);
+        assert_eq!(r.task("g")?.terminal_reason, "aborted");
+        assert_eq!(r.task("c")?.status, TaskStatus::Terminal);
+        assert_eq!(r.task("c")?.terminal_reason, "aborted");
+        assert_eq!(r.task("p")?.status, TaskStatus::Terminal);
+        Ok(())
+    })?;
 
     sched.close();
     store.close()

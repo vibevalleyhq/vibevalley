@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-import { AgentRoleValues } from "../agent/shapes";
 import type { Codec } from "../codec";
 import { ArtifactId, IssueId, Outcome, Retry, SessionId, Spent } from "../common/schema";
+import { AgentRoleValues } from "../common/shapes.gen";
 import * as T from "./shapes.gen";
 
 const SessionAction = z.enum(T.SessionActionValues) satisfies Codec<T.SessionAction>;
@@ -30,7 +30,7 @@ const PhaseDone = z.object({ _tag: z.literal("done") }) satisfies Codec<T.PhaseD
 
 const PhaseFailed = z.object({ _tag: z.literal("failed") }) satisfies Codec<T.PhaseFailed>;
 
-export const PhaseResting = z.object({ _tag: z.literal("resting") }) satisfies Codec<T.PhaseResting>;
+const PhaseResting = z.object({ _tag: z.literal("resting") }) satisfies Codec<T.PhaseResting>;
 
 const SessionClose = z.enum(T.SessionCloseValues) satisfies Codec<T.SessionClose>;
 
@@ -87,7 +87,7 @@ export const SessionPermissionMode = z.enum(T.SessionPermissionModeValues) satis
 
 export const SessionController = z.enum(T.SessionControllerValues) satisfies Codec<T.SessionController>;
 
-export const ExecutionPolicy = z.discriminatedUnion("kind", [
+const ExecutionPolicy = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("directCwd"),
     repo: z.exactOptional(z.string()),
@@ -373,50 +373,6 @@ export const Run = z.object({
   spent: z.exactOptional(Spent),
 }) satisfies Codec<T.Run>;
 
-export const FactSessionSubagentsChanged = z.object({
-  type: z.literal("sessionSubagentsChanged"),
-  at: z.number(),
-  id: SessionId,
-  subagents: z.exactOptional(SessionSubagents),
-}) satisfies Codec<T.FactSessionSubagentsChanged>;
-
-export const FactSessionPhaseChanged = z.object({
-  type: z.literal("sessionPhaseChanged"),
-  at: z.number(),
-  id: SessionId,
-  phase: Phase,
-  channel: z.exactOptional(z.string()),
-  spent: z.exactOptional(Spent),
-  brief: z.exactOptional(z.string()),
-}) satisfies Codec<T.FactSessionPhaseChanged>;
-
-export const FactSessionChanged = z.object({
-  type: z.literal("sessionChanged"),
-  at: z.number(),
-  session: Session,
-}) satisfies Codec<T.FactSessionChanged>;
-
-export const FactSessionLeft = z.object({
-  type: z.literal("sessionLeft"),
-  at: z.number(),
-  id: SessionId,
-  closed: z.exactOptional(SessionClose),
-  merged: z.exactOptional(z.number()),
-}) satisfies Codec<T.FactSessionLeft>;
-
-export const FactSessionToolChanged = z.object({
-  type: z.literal("sessionToolChanged"),
-  at: z.number(),
-  id: SessionId,
-  connection: ToolConnection,
-}) satisfies Codec<T.FactSessionToolChanged>;
-
-export const FactSessionToolsReset = z.object({
-  type: z.literal("sessionToolsReset"),
-  at: z.number(),
-  id: SessionId,
-}) satisfies Codec<T.FactSessionToolsReset>;
-
 export const Machine = z.object({
   id: z.string(),
   name: z.string(),
@@ -424,9 +380,3 @@ export const Machine = z.object({
   online: z.boolean(),
   joinedAt: z.number(),
 }) satisfies Codec<T.Machine>;
-
-export const FactMachineChanged = z.object({
-  type: z.literal("machineChanged"),
-  at: z.number(),
-  machine: Machine,
-}) satisfies Codec<T.FactMachineChanged>;

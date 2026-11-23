@@ -95,7 +95,7 @@ impl Jobs {
         if !matches!(wrote, Ok(true)) {
             return Err(Outcome::NotSubmitted);
         }
-        let (state, remote_id, answer) = match self.moss.upload(&account.key, file, input.size, &filename, input.kind.as_str()) {
+        let (state, remote_id, answer) = match self.moss.upload(&account.key, file, input.size, &filename, input.kind.as_str(), stop) {
             Ok((file, Uploaded::Ready)) => (RemoteState::Ready, Some(file.clone()), Ok(file)),
             Ok((file, Uploaded::Rejected)) => (RemoteState::Rejected, Some(file), Err(Outcome::Rejected)),
             Ok((file, Uploaded::Unknown)) => (RemoteState::Unknown, Some(file), Err(Outcome::Unknown)),

@@ -1,17 +1,12 @@
 //! Second-round rules. Translated from VibeValley
-//! `modules/issue/dependencies.test.ts`, `merge.test.ts`, `landing.test.ts`,
-//! `github.test.ts` (checksVerdict), `recorded.test.ts` (drafts),
-//! `session/report.test.ts` and `watch/watch.test.ts` (summaryOf) and
-//! `watch/patrol.test.ts`; plus checks of `child_checks`.
-
-use std::collections::HashMap;
+//! `modules/issue/dependencies.test.ts`, `merge.test.ts`, `recorded.test.ts` (drafts),
+//! `session/report.test.ts` and `watch/watch.test.ts` (summaryOf); plus checks of `child_checks`.
 
 use vibevalley_protocol::*;
 
-use crate::core::empty_space_state;
 use crate::deps::*;
-use crate::patrol::*;
 use crate::pr::*;
+use crate::prompts::work_constraints;
 use crate::refine::*;
 use crate::text::*;
 
@@ -141,39 +136,6 @@ fn open_pr(state: PullRequestState) -> PullRequest {
 }
 
 #[test]
-fn an_issues_work_goes_in_from_its_own_checkout_its_sessions_workplace_or_not_at_all() {
-    let mut demo = Issue::new("t", 1, "t", 0);
-    demo.repo = Some("demo".into());
-    let none = Issue::new("u", 2, "u", 0);
-    let checkout = LandingRoute::Checkout { repo: "demo".into() };
-    assert_eq!(landing_route_of(&demo, Some("w1"), false, true, false), checkout);
-    assert_eq!(landing_route_of(&demo, None, false, true, false), checkout);
-    assert_eq!(
-        landing_route_of(&demo, Some("w1"), true, true, false),
-        LandingRoute::Merge { session: "w1".into() }
-    );
-    assert_eq!(landing_route_of(&none, None, false, true, false), LandingRoute::NotStarted);
-    assert_eq!(
-        landing_route_of(&demo, Some("w1"), false, false, false),
-        LandingRoute::HelperGone { session: "w1".into() }
-    );
-    assert_eq!(
-        landing_route_of(&demo, Some("w1"), true, false, true),
-        LandingRoute::PullRequest { session: "w1".into() }
-    );
-    let mut with_pr = demo.clone();
-    with_pr.pull_request = Some(open_pr(PullRequestState::Open));
-    assert_eq!(
-        landing_route_of(&with_pr, Some("w1"), true, false, false),
-        LandingRoute::PullRequest { session: "w1".into() }
-    );
-    assert_eq!(
-        landing_route_of(&none, Some("w1"), true, false, true),
-        LandingRoute::Merge { session: "w1".into() }
-    );
-}
-
-#[test]
 fn a_pull_request_carries_the_work_when_one_is_open_or_the_repo_goes_by_them() {
     let mut t = Issue::new("t", 1, "t", 0);
     assert!(!goes_by_pull_request(&t, false));
@@ -182,48 +144,6 @@ fn a_pull_request_carries_the_work_when_one_is_open_or_the_repo_goes_by_them() {
     assert!(goes_by_pull_request(&t, false));
     t.pull_request = Some(open_pr(PullRequestState::Merged));
     assert!(!goes_by_pull_request(&t, false));
-}
-
-fn check(status: &str, conclusion: &str) -> CiCheck {
-    CiCheck {
-        name: format!("{status}{conclusion}"),
-        status: status.into(),
-        conclusion: conclusion.into(),
-    }
-}
-
-#[test]
-fn a_pull_requests_checks_the_failed_ones_and_whether_all_have_finished() {
-    assert_eq!(
-        checks_verdict(&[]),
-        ChecksVerdict {
-            failed: vec![],
-            finished: false
-        }
-    );
-    assert_eq!(
-        checks_verdict(&[check("IN_PROGRESS", ""), check("COMPLETED", "SUCCESS")]),
-        ChecksVerdict {
-            failed: vec![],
-            finished: false
-        }
-    );
-    assert_eq!(
-        checks_verdict(&[check("COMPLETED", "SUCCESS"), check("success", "")]),
-        ChecksVerdict {
-            failed: vec![],
-            finished: true
-        }
-    );
-    let failed = check("COMPLETED", "failure");
-    assert_eq!(
-        checks_verdict(&[failed.clone(), check("QUEUED", "")]),
-        ChecksVerdict {
-            failed: vec![failed],
-            finished: false
-        }
-    );
-    assert_eq!(checks_verdict(&[check("TIMED_OUT", "")]).failed.len(), 1);
 }
 
 #[test]
@@ -292,60 +212,4 @@ fn a_summary_is_the_last_paragraphs() {
     assert_eq!(summary_of(&long), long);
     let tail = format!("start\n\n{}", "y".repeat(90));
     assert_eq!(summary_of(&tail), "y".repeat(90));
-}
-
-fn asking(at: Millis) -> SpaceState {
-    let mut state = empty_space_state();
-    let mut h = Session::new("w1", SessionController::IssueBoard, "Helper", "", ExecutionPolicy::SandboxDir, at);
-    h.attach_binding(ContextRef::Issue {
-        id: "t1".into(),
-        refining: None,
-    });
-    h.phase = Phase::resting();
-    h.last_run = Some(LastRun {
-        needs_reconciliation: false,
-        outcome: Outcome::Completed,
-        summary: "asked".into(),
-        at,
-        spent: None,
-        answer: None,
-    });
-    let mut t = Issue::new("t1", 1, "t", at);
-    t.status = IssueStatus::InReview;
-    t.assignments = vec![Assignment {
-        id: "a1".into(),
-        issue: "t1".into(),
-        agent: "lab".into(),
-        assigned_at: at,
-        ended_at: None,
-        executions: vec![Execution::Worker {
-            session: "w1".into(),
-            started_at: at,
-        }],
-    }];
-    t.questions = vec![Question {
-        question: "which port?".into(),
-        options: vec![],
-    }];
-    state.sessions.push(h);
-    state.issues.push(t);
-    crate::status::with_issue_statuses(&mut state);
-    state
-}
-
-#[test]
-fn the_patrol_gives_a_seen_user_two_hours_before_another_note() {
-    let at = 1_000;
-    let state = asking(at);
-    let now = at + 16 * 60_000;
-    let (out, memory) = patrol_step(&state, now, &PatrolMemory::default(), &HashMap::new());
-    assert_eq!(out.iter().map(|r| r.key.as_str()).collect::<Vec<_>>(), vec!["w1:ask:0"]);
-    assert_eq!(out[0].text, "Helper（w1）问了用户 1 个问题，16 分钟没人回：「which port?」");
-    let seen = HashMap::from([("w1:ask:0".to_string(), now - 2 * 60_000)]);
-    assert_eq!(patrol_step(&state, now, &PatrolMemory::default(), &seen).0, vec![]);
-    // Not again within four hours; again after.
-    assert_eq!(patrol_step(&state, now + 60_000, &memory, &HashMap::new()).0, vec![]);
-    assert_eq!(patrol_step(&state, now + REPORT_AGAIN_MS, &memory, &HashMap::new()).0.len(), 1);
-    // An item that left is forgotten.
-    assert!(patrol_step(&empty_space_state(), now, &memory, &HashMap::new()).1.reported.is_empty());
 }

@@ -53,5 +53,5 @@ vibevalley-protocol = { version = "0.1.0", path = "../protocol" }
 vibevalley-runtime = { version = "0.1.0", path = "../runtime" }
 
 [dev-dependencies]
+reqwest = { workspace = true, features = ["blocking"] }
 tempfile = { workspace = true }
-ureq = { workspace = true }

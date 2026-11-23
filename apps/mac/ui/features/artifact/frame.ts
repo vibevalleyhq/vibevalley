@@ -109,24 +109,23 @@ export function createFrame(): Frame {
       }
       for (const fn of listeners) fn(parsed);
       const message = shellMessageOf(parsed);
-      if (message) {
-        switch (message.vibevalley) {
-          case "selection":
-            picked.set(message.path !== undefined ? { ...message.anchor, path: message.path } : message.anchor);
-            return;
-          case "ready":
-            shown.set({ ...shown(), ready: message });
-            return;
-          case "at":
-            shown.set({ ...shown(), at: message });
-            return;
-          case "recorded":
-            shown.set({ ...shown(), recorded: message });
-            return;
+      if (!message) return;
+      switch (message.vibevalley) {
+        case "selection": {
+          const anchor = selectionOf(parsed);
+          if (anchor) picked.set(message.path !== undefined ? { ...anchor, path: message.path } : anchor);
+          return;
         }
+        case "ready":
+          shown.set({ ...shown(), ready: message });
+          return;
+        case "at":
+          shown.set({ ...shown(), at: message });
+          return;
+        case "recorded":
+          shown.set({ ...shown(), recorded: message });
+          return;
       }
-      const anchor = selectionOf(parsed);
-      if (anchor) picked.set(anchor);
     },
     onMessage: (listener) => {
       listeners.add(listener);

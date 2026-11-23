@@ -227,12 +227,6 @@ impl Board {
         self.0.ledger.read(f)
     }
 
-    /// The newest slice bundle after every change; a receiver that falls behind
-    /// skips to the newest.
-    pub fn subscribe(&self) -> flume::Receiver<SliceBundle> {
-        self.0.ledger.subscribe()
-    }
-
     /// By id, number or `#number`.
     pub fn issue(&self, reference: &str) -> Option<Issue> {
         self.0.ledger.issue(reference)
@@ -735,28 +729,6 @@ impl Board {
         let _ = self.take_words(&updated.id);
         self.refresh_queue_locked();
         Ok(Some(done))
-    }
-
-    /// Records a pull (or merge) request opened or updated for `reference`.
-    /// When a followed PR merges on an issue that finishes with its PR, the
-    /// issue completes as `Landing::PullRequest`.
-    pub fn record_pull_request(&self, reference: &str, pr: vibevalley_protocol::PullRequest) -> Result<Issue> {
-        let _work = self.0.work.lock();
-        let issue = self.stored(reference)?;
-        let merged = pr.state == vibevalley_protocol::PullRequestState::Merged;
-        let updated = self.change(&issue.id, IssueChange::PullRequest(pr))?;
-        if merged && vibevalley_core::pr::finishes_with_pull_request(&updated) {
-            if let Some(s) = self.on_board(&updated) {
-                self.0.sessions.dismiss(&s.id, Leave::KeepBranch)?;
-            } else if let Some(main) = self.0.workplaces.main_repo(updated.repo.as_deref())? {
-                self.0.workplaces.clear_checkout(&main, updated.number)?;
-            }
-            let done = self.change(&updated.id, IssueChange::Delivered(vibevalley_protocol::Landing::PullRequest, None))?;
-            let _ = self.take_words(&updated.id);
-            self.refresh_queue_locked();
-            return Ok(done);
-        }
-        Ok(updated)
     }
 
     /// Finds an open issue whose worktree or `vibevalley/issue-<n>` branch

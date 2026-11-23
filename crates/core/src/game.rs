@@ -15,7 +15,7 @@ const HISTORY_LIMIT: usize = 30;
 const FILE_LIMIT: usize = 24;
 const COMMAND_LIMIT: usize = 12;
 
-pub fn empty_play() -> SessionPlay {
+pub(crate) fn empty_play() -> SessionPlay {
     SessionPlay {
         station: -1,
         history: vec![],
@@ -27,12 +27,12 @@ pub fn empty_play() -> SessionPlay {
     }
 }
 
-pub fn play_of(plays: Option<&BTreeMap<String, SessionPlay>>, id: &str) -> SessionPlay {
+pub(crate) fn play_of(plays: Option<&BTreeMap<String, SessionPlay>>, id: &str) -> SessionPlay {
     plays.and_then(|p| p.get(id)).cloned().unwrap_or_else(empty_play)
 }
 
 /// `freeStation`: -1 when no station on this repo's farm is free.
-pub fn free_station(plays: Option<&BTreeMap<String, SessionPlay>>, sessions: &[&Session], repo: &str, prefer: Option<i64>) -> i64 {
+pub(crate) fn free_station(plays: Option<&BTreeMap<String, SessionPlay>>, sessions: &[&Session], repo: &str, prefer: Option<i64>) -> i64 {
     let taken: Vec<i64> = sessions.iter().filter(|h| farm_of(h) == repo).map(|h| play_of(plays, &h.id).station).collect();
     let max = MAX_RUNNING as i64;
     if let Some(p) = prefer
@@ -62,7 +62,7 @@ fn is_tool_action(a: SessionAction) -> bool {
 }
 
 /// `playedRun`: a new run starts.
-pub fn played_run(p: &SessionPlay, at: i64) -> SessionPlay {
+pub(crate) fn played_run(p: &SessionPlay, at: i64) -> SessionPlay {
     let mut history = p.history.clone();
     history.push(PlayAction {
         at,
@@ -78,7 +78,7 @@ pub fn played_run(p: &SessionPlay, at: i64) -> SessionPlay {
 }
 
 /// `playedDoing`: one step of a run.
-pub fn played_doing(p: &SessionPlay, at: i64, action: SessionAction, label: &str) -> SessionPlay {
+pub(crate) fn played_doing(p: &SessionPlay, at: i64, action: SessionAction, label: &str) -> SessionPlay {
     if p.history.last().is_some_and(|l| l.action == action && l.label == label) {
         return p.clone();
     }
@@ -106,7 +106,7 @@ pub fn played_doing(p: &SessionPlay, at: i64, action: SessionAction, label: &str
 }
 
 /// `stationed`: only to a bed that is free on its own farm.
-pub fn stationed(state: &mut SpaceState, id: &str, station: i64) -> bool {
+pub(crate) fn stationed(state: &mut SpaceState, id: &str, station: i64) -> bool {
     let Some(h) = session_of(state, id) else { return false };
     let play = play_of(state.plays.as_ref(), id);
     if play.station == station {
@@ -128,7 +128,7 @@ fn xp_to_next(level: i64) -> i64 {
 }
 
 /// `levelForCommits`: (level, xp into it).
-pub fn level_for_commits(total: i64) -> (i64, i64) {
+pub(crate) fn level_for_commits(total: i64) -> (i64, i64) {
     let mut level = 1;
     let mut rest = total.max(0);
     while rest >= xp_to_next(level) {
@@ -185,7 +185,7 @@ fn plot(crop: Crop, badge: Option<Badge>) -> PlotView {
 
 /// `plotOf`: a picture of its issue's stage; the session only adds how far
 /// this round has grown.
-pub fn plot_of(h: &Session, issue: Option<&Issue>, play: &SessionPlay) -> PlotView {
+fn plot_of(h: &Session, issue: Option<&Issue>, play: &SessionPlay) -> PlotView {
     let Some(issue) = issue else { return plot_of_session(h, play) };
     let a = &issue.stage;
     match a.state {
@@ -301,7 +301,7 @@ pub fn effects_of(before: &SpaceState, fact: &Fact) -> Vec<GameEffect> {
 
 /// `viewOf`: a plot per issue (the later hired session when two are on
 /// it), each session's play, and the level.
-pub fn view_of(state: &SpaceState) -> FarmView {
+pub(crate) fn view_of(state: &SpaceState) -> FarmView {
     let mut latest: HashMap<&str, &Session> = HashMap::new();
     for h in &state.sessions {
         if !is_farm_worker(h) {

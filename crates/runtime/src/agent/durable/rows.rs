@@ -96,7 +96,6 @@ pub struct Signal {
     pub task_id: String,
     pub signal_name: String,
     pub signal_key: String,
-    #[serde(rename = "payloadJson", with = "json_bytes")]
     pub payload: Value,
     pub consumed: bool,
     pub consumed_at_ms: i64,
@@ -172,21 +171,4 @@ pub struct CommitStats {
     pub batches: u64,
     pub committed_ops: u64,
     pub failed_ops: u64,
-    pub coalesced_live_memory: u64,
-    pub coalesced_live_disk: u64,
-}
-
-// The Go checkpoint encodes its raw JSON byte slice as base64 inside the wake memo.
-mod json_bytes {
-    use base64::{Engine, engine::general_purpose::STANDARD};
-    use serde::{Deserialize, Deserializer, Serializer, de::Error as _};
-    use serde_json::Value;
-
-    pub fn serialize<S: Serializer>(value: &Value, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&STANDARD.encode(value.to_string()))
-    }
-    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Value, D::Error> {
-        let bytes = STANDARD.decode(String::deserialize(deserializer)?).map_err(D::Error::custom)?;
-        serde_json::from_slice(&bytes).map_err(D::Error::custom)
-    }
 }

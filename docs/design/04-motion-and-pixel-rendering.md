@@ -10,7 +10,7 @@ VibeValley 在工作台微交互上保持克制，而在原生像素农场中实
 
 ## 4.2 Rust 2D 像素渲染与图集管线
 
-原生应用的 5 个像素场景（`Farm`、`Map`、`Tree`、`Opening`、`Catalog`）共享同一管线：逻辑构建帧列表 [`DrawList`](apps/mac/src/pixel/draw.rs) → CPU 光照合成/最近邻光栅 → [`SpriteCache`](apps/mac/src/pixel/element.rs) 缓存 → GPUI 1:1 绘出。
+原生应用的 4 个像素场景（`Farm`、`Map`、`Tree`、`Opening`）共享同一管线：逻辑构建帧列表 [`DrawList`](apps/mac/src/pixel/draw.rs) → CPU 光照合成/最近邻光栅 → [`SpriteCache`](apps/mac/src/pixel/element.rs) 缓存 → GPUI 1:1 绘出。
 
 ### 2D 精灵图集与法线推导（`apps/mac/src/pixel/atlas.rs` & `apps/mac/crates/pixel/src/`）
 
@@ -22,7 +22,7 @@ VibeValley 在工作台微交互上保持克制，而在原生像素农场中实
 - **基础画幅与 `Y` 轴排序**：主村庄逻辑基准画布固定为 `384×256` 逻辑像素（`LEVEL_WIDTH = 384.0`），地面、建筑、地块、道具与小动物直接沿 LDtk `village.ldtk` 原生网格布局并按足底 `y` 坐标排序入帧列表，保证遮挡自然清晰。
 - **整像素防模糊取景（`frame_whole`）**：
   - 农场场景调用 `frame_whole`，只采用整数倍缩放，允许裁剪边幅上限为 `FARM_CUT = (0.05, 0.08)`（左右最多裁 5%、上下最多裁 8%），防止非整数缩放破坏像素边缘。
-  - 图鉴等视图采用按需适配缩放（`fit` 半步取整），并由 `SpriteCache` 提前用 CPU 最近邻重采样到整设备像素（`resample` / `vibevalley_pixel::nearest`），规避 GPUI 默认线性纹理采样造成的模糊。
+  - 记忆树、开场等视图采用按需适配缩放（`fit` 半步取整），并由 `SpriteCache` 提前用 CPU 最近邻重采样到整设备像素（`resample` / `vibevalley_pixel::nearest`），规避 GPUI 默认线性纹理采样造成的模糊。
 
 ## 4.3 昼夜光影与开场氛围
 
@@ -38,11 +38,10 @@ VibeValley 在工作台微交互上保持克制，而在原生像素农场中实
 - **前景与 HUD 抗压暗分离（`farm_picture`）**：
   - `list.ops` 按索引区间分段渲染：先绘受光地景与地块/角色 → 执行 `surface.shade(&light.lighting)` 进行夜间乘色与光源调色 → 绘自发光光晕 `Op::Glow`（叠加模式） → 最后用 `flat_light * 0.82` 轻量着色近景树枝/草丛边框（`foreground`），防止前景遮罩在夜晚变成纯黑剪影；UI HUD 在最末独立按 view 像素叠加，不受场景夜间调暗影响。
 
-### 开场、记忆树与图鉴专有氛围
+### 开场与记忆树专有氛围
 
 - **开场（`opening.rs`）**：按本机小时分档选图（`05..09` 清晨、`10..17` 白日、其余夜晚），基准尺寸 `418×235.25`（原图四分之一）；底部覆 `#15141344` 至 `#151413dd` 线性暗幕渐变，进度条上方伴随 `opening-sprite.webp` 五段情绪小人奔跑（对应未启/行进/高进度/完成/失败）。
 - **记忆树（`tree.rs`）**：基于确定性随机树冠基因（`MAX_DEPTH = 6`, `UNFOLD = 0.14`）生长，轮次数越多枝叶越茂盛；按节点挂接绿色/金黄记忆叶子、果实与种子袋，点击 18px 半径内可弹卡阅读长期记忆内容；背景山丘按 `clock.tod` 平滑过渡 `tree-hill` 与 `tree-hill-night`。
-- **图鉴（`catalog.rs`）**：14 个常设货架（`帮工`、`助手`、`宠物`、`地块`、`院子`、`地图`、`农机`、`图标`、`动作`、`奖章`、`Logo`、`语言`、`界面`、`其他`）配合三种预设底面（格子 `0xf4ecd8` / 草地 `0x7fa650` / 夜色 `0x1c2233`）检验全部离线切片。
 
 ## 4.4 帮工运动与行为防抖物理学
 

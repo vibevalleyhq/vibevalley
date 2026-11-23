@@ -16,7 +16,7 @@ use image::RgbaImage;
 use smallvec::SmallVec;
 
 use super::atlas::Atlas;
-use super::draw::{Color, DrawList, HudOp, Op, glow_image, resample, shade, shade_color};
+use super::draw::{Color, DrawList, HudOp, Op, glow_image, resample, shade_color};
 use super::sky::{FARM_CUT, Framing, frame_whole};
 
 pub const PIXEL_FONT: &str = "Fusion Pixel 12px Prop zh-Hans";
@@ -38,8 +38,8 @@ fn hsla(c: Color) -> Hsla {
 
 #[derive(Hash, PartialEq, Eq, Clone)]
 enum KeyKind {
-    Sprite { name: String, lit: bool },
-    Image { key: String, lit: bool },
+    Sprite(String),
+    Image(String),
     Glow([u8; 3]),
     Hud(String),
 }
@@ -72,8 +72,6 @@ pub struct SpriteCache {
     /// Pictures made per frame (Op::Image): dropped once a paint does not use them.
     dynamic: HashMap<Key, bool>,
     device_scale: f32,
-    /// The light the lit pictures were shaded with; they are remade when it changes.
-    light: Option<[u8; 3]>,
     /// Pictures made this frame, for the dump.
     pub made: usize,
     pub last_paint_ms: f32,
@@ -106,7 +104,7 @@ impl SpriteCache {
         Some(render)
     }
 
-    fn reset(&mut self, device_scale: f32, light: Option<[u8; 3]>, window: &mut Window) {
+    fn reset(&mut self, device_scale: f32, window: &mut Window) {
         if self.device_scale != device_scale {
             for (_, img) in self.images.drain() {
                 let _ = window.drop_image(img);
@@ -114,21 +112,6 @@ impl SpriteCache {
             self.dynamic.clear();
             self.text_cache.clear();
             self.device_scale = device_scale;
-        }
-        if self.light != light {
-            let old: Vec<Key> = self
-                .images
-                .keys()
-                .filter(|k| matches!(k.kind, KeyKind::Sprite { lit: true, .. } | KeyKind::Image { lit: true, .. }))
-                .cloned()
-                .collect();
-            for k in old {
-                self.dynamic.remove(&k);
-                if let Some(img) = self.images.remove(&k) {
-                    let _ = window.drop_image(img);
-                }
-            }
-            self.light = light;
         }
     }
 
@@ -280,8 +263,8 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
     cache.made = 0;
     let s = f.scale;
     let device = s * window.scale_factor();
-    cache.reset(device, list.light.map(|l| l.map(|c| (c.clamp(0.0, 1.0) * 255.0).round() as u8)), window);
-    let background = shade_color(list.background, list.light);
+    cache.reset(device, window);
+    let background = shade_color(list.background, list.farm_light.as_ref().map(|l| l.sky_light));
     window.paint_quad(fill(bounds, hsla([background[0] * 0.7, background[1] * 0.7, background[2] * 0.7, 1.0])));
     let origin = bounds.origin + point(px(f.bx.x), px(f.bx.y));
     let at = |x: f32, y: f32| origin + point(px(x * s), px(y * s));
@@ -321,15 +304,7 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
         } else {
             false
         };
-        for (index, op) in list.ops.iter().enumerate().filter(|_| !painted) {
-            let light = list.light_on(index);
-            let is_lit = light.is_some();
-            let shaded = |mut img: RgbaImage| {
-                if let Some(l) = light {
-                    shade(&mut img, l);
-                }
-                img
-            };
+        for op in list.ops.iter().filter(|_| !painted) {
             match op {
                 Op::Sprite { name, x, y, flip, alpha } => {
                     let Some(atlas) = atlas else { continue };
@@ -340,16 +315,13 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
                     }
                     let (w, h) = (dev(info.w), dev(info.h));
                     let key = Key {
-                        kind: KeyKind::Sprite {
-                            name: name.clone(),
-                            lit: is_lit,
-                        },
+                        kind: KeyKind::Sprite(name.clone()),
                         flip: *flip,
                         alpha: a,
                         w,
                         h,
                     };
-                    let img = cache.get(key, || atlas.image(name).map(|src| shaded(resample(&src, w, h, *flip, a as f32 / 8.0))));
+                    let img = cache.get(key, || atlas.image(name).map(|src| resample(&src, w, h, *flip, a as f32 / 8.0)));
                     if let Some(img) = img {
                         let b = Bounds::new(at(*x, *y), size(px(w as f32 / window.scale_factor()), px(h as f32 / window.scale_factor())));
                         let _ = window.paint_image(b, b, Corners::default(), img, 0, false);
@@ -362,21 +334,21 @@ pub fn paint(list: &DrawList, atlas: Option<&Atlas>, f: Framing, bounds: Bounds<
                     }
                     let (dw, dh) = (dev(*w), dev(*h));
                     let k = Key {
-                        kind: KeyKind::Image { key: key.clone(), lit: is_lit },
+                        kind: KeyKind::Image(key.clone()),
                         flip: false,
                         alpha: a,
                         w: dw,
                         h: dh,
                     };
                     cache.dynamic.insert(k.clone(), true);
-                    let img = cache.get(k, || Some(shaded(resample(image, dw, dh, false, a as f32 / 8.0))));
+                    let img = cache.get(k, || Some(resample(image, dw, dh, false, a as f32 / 8.0)));
                     if let Some(img) = img {
                         let b = Bounds::new(at(*x, *y), size(px(dw as f32 / window.scale_factor()), px(dh as f32 / window.scale_factor())));
                         let _ = window.paint_image(b, b, Corners::default(), img, 0, false);
                     }
                 }
                 Op::Rect { x, y, w, h, color } => {
-                    window.paint_quad(fill(Bounds::new(at(*x, *y), size(px(w * s), px(h * s))), hsla(shade_color(*color, light))));
+                    window.paint_quad(fill(Bounds::new(at(*x, *y), size(px(w * s), px(h * s))), hsla(*color)));
                 }
                 Op::Glow { x, y, r, color } => {
                     let step = (color[3].clamp(0.0, 1.0) * 16.0).round() as u8;

@@ -42,10 +42,6 @@ impl SliceMask {
         (self.0 & other.0) == other.0
     }
 
-    pub const fn intersects(self, other: Self) -> bool {
-        (self.0 & other.0) != 0
-    }
-
     pub const fn is_empty(self) -> bool {
         self.0 == 0
     }
@@ -507,7 +503,7 @@ fn doing_view(d: &Doing) -> DoingView {
 }
 
 /// A session as the frame shows it (`withWords`).
-pub fn session_view(h: &Session, conflict: Option<&Conflict>) -> SessionView {
+fn session_view(h: &Session, conflict: Option<&Conflict>) -> SessionView {
     let phase = match &h.phase {
         Phase::Working(p) => PhaseView::Working(PhaseWorkingView {
             since: p.since,
@@ -624,7 +620,7 @@ pub fn cron_request_to_rules(r: &vibevalley_protocol::CronRequest) -> crate::cro
 
 /// A cron with its words (`whenText`, `nextText` of `issue/when.ts`, in
 /// `vibevalley-core::cron`).
-pub fn cron_view(c: &Cron) -> CronView {
+fn cron_view(c: &Cron) -> CronView {
     let ec = cron_to_rules(c);
     let when_text = crate::cron::when_text(&ec.when, &ec.tz);
     let next_text = crate::cron::next_text(&ec);
@@ -655,7 +651,7 @@ fn is_active_media_phase(phase: MediaPhase) -> bool {
 }
 
 /// Active file-producing media jobs (excludes understanding jobs, which produce no file).
-pub fn media_summary(state: &SpaceState) -> MediaSummary {
+fn media_summary(state: &SpaceState) -> MediaSummary {
     let active_ids: Vec<String> = state
         .media
         .as_deref()
@@ -683,7 +679,7 @@ pub fn media_summary(state: &SpaceState) -> MediaSummary {
 }
 
 /// Total unread count across all channels plus per-channel unread rolled up with direct child threads.
-pub fn channel_summary(state: &SpaceState) -> ChannelSummary {
+fn channel_summary(state: &SpaceState) -> ChannelSummary {
     let channels = state.chat.as_ref().map_or(&[][..], |c| &c.channels[..]);
     let mut unread_total: i64 = 0;
     let mut children_unread: BTreeMap<&str, i64> = BTreeMap::new();
@@ -751,10 +747,6 @@ impl Core {
     /// How many commits have changed the state (slice `seq`).
     pub fn seq(&self) -> i64 {
         self.seq
-    }
-
-    pub fn session(&self, id: &str) -> Option<&Session> {
-        session_of(&self.state, id)
     }
 
     /// Folds `facts` in as one commit. Each fact's `at` is taken as given
@@ -1197,5 +1189,53 @@ mod tests {
         assert_eq!(slice.items.len(), 2);
         assert_eq!(slice.items[0], runtime_item);
         assert_eq!(slice.items[1].kind, InboxKind::Review);
+    }
+
+    #[test]
+    fn regression_free_user_session_never_enters_slots_inbox_farm_or_progress() {
+        let mut core = Core::default();
+        let mut free_user = Session::new(
+            "u-free",
+            SessionController::User,
+            "Workspace",
+            "antigravity",
+            ExecutionPolicy::DirectCwd {
+                repo: Some("demo".into()),
+                permission_mode: SessionPermissionMode::AcceptEdits,
+            },
+            1,
+        );
+        free_user.cwd = Some("/tmp/demo".into());
+        free_user.phase = Phase::working(1, SessionAction::Thinking, "");
+
+        let add_fact = Fact::SessionChanged(FactSessionChanged { at: 1, session: free_user });
+        let fail_fact = Fact::SessionReported(FactSessionReported {
+            at: 2,
+            id: "u-free".into(),
+            run: None,
+            outcome: Outcome::Failed,
+            phase: None,
+            summary: "failed free chat".into(),
+            runs: 1,
+            spent: None,
+            questions: vec![],
+            checks: vec![],
+            answer: None,
+        });
+
+        let before = core.state().clone();
+        core.apply(vec![add_fact.clone()]);
+        let working = core.slice_bundle(vec![]);
+        assert_eq!(working.board.board_summary.as_ref().unwrap().running_slots, 0);
+        assert!(working.inbox.items.is_empty());
+        assert!(working.farm.view.plots.is_empty());
+        assert!(working.farm.view.plays.is_empty());
+        assert!(crate::progress::entries_for(&before, &add_fact, core.state()).is_empty());
+
+        let before_fail = core.state().clone();
+        let applied = core.apply(vec![fail_fact.clone()]);
+        assert!(applied.effects.is_empty());
+        assert!(core.inbox_slice(&[]).items.is_empty());
+        assert!(crate::progress::entries_for(&before_fail, &fail_fact, core.state()).is_empty());
     }
 }

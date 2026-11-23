@@ -12,13 +12,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
-use serde_json::Value;
+use serde::Deserialize;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{
-    ApiError, BizCode, BranchCheck, BranchPublication, BranchPublicationState, Caller, PublishPlatform, PullRequest, PullRequestState, SubmitBranch, ops,
-};
+use vibevalley_protocol::{ApiError, BizCode, BranchCheck, BranchPublication, BranchPublicationState, PublishPlatform, PullRequestState, SubmitBranch};
 
-use crate::Hub;
 use crate::base::refused as refuse;
 
 /// What a `gh`/`glab` call answered: ok, its output, and whether the tool is missing.
@@ -181,6 +178,60 @@ fn platform_failed(stage: &str) -> ApiError {
     refuse(BizCode::RepoRefused, t("server.repo.publish.platformFailed", &[("stage", stage.into())]))
 }
 
+#[derive(Deserialize)]
+struct WirePullState {
+    state: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WireGithubRepoView {
+    default_branch_ref: WireBranchRef,
+}
+
+#[derive(Deserialize)]
+struct WireBranchRef {
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct WireGitlabProject {
+    default_branch: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WireGithubPr {
+    #[serde(default)]
+    number: i64,
+    #[serde(default)]
+    url: String,
+    #[serde(default)]
+    is_cross_repository: bool,
+    #[serde(default)]
+    state: String,
+}
+
+#[derive(Deserialize)]
+struct WireGitlabMr {
+    #[serde(default)]
+    iid: i64,
+    #[serde(default)]
+    web_url: String,
+    #[serde(default)]
+    source_project_id: Option<i64>,
+    #[serde(default)]
+    target_project_id: Option<i64>,
+    #[serde(default)]
+    state: String,
+}
+
+impl WireGitlabMr {
+    fn is_same_project_open(&self) -> bool {
+        self.source_project_id == self.target_project_id && matches!(self.state.as_str(), "opened" | "locked")
+    }
+}
+
 struct Hosting<'a> {
     repo: &'a HostedRepo,
     run: &'a HostRun,
@@ -232,9 +283,8 @@ impl Hosting<'_> {
         } else {
             self.request(&["api", &format!("{}/merge_requests/{number}", self.project())])?
         };
-        let v: Value = serde_json::from_str(&out).map_err(|_| platform_failed("pull state decode"))?;
-        let raw = v["state"].as_str().ok_or_else(|| platform_failed("pull state decode"))?;
-        match raw.to_ascii_lowercase().as_str() {
+        let wire: WirePullState = serde_json::from_str(&out).map_err(|_| platform_failed("pull state decode"))?;
+        match wire.state.to_ascii_lowercase().as_str() {
             "open" | "opened" => Ok(PullRequestState::Open),
             "merged" => Ok(PullRequestState::Merged),
             "closed" => Ok(PullRequestState::Closed),
@@ -244,18 +294,15 @@ impl Hosting<'_> {
 
     fn inspect(&self) -> Result<String, ApiError> {
         self.request(&["auth", "status", "--hostname", &self.repo.host])?;
-        let out = if self.github() {
-            self.request(&["repo", "view", &self.repo.name, "--json", "defaultBranchRef"])?
+        if self.github() {
+            let out = self.request(&["repo", "view", &self.repo.name, "--json", "defaultBranchRef"])?;
+            let wire: WireGithubRepoView = serde_json::from_str(&out).map_err(|_| platform_failed("repository decode"))?;
+            Ok(wire.default_branch_ref.name)
         } else {
-            self.request(&["api", &self.project()])?
-        };
-        let v: Value = serde_json::from_str(&out).map_err(|_| platform_failed("repository decode"))?;
-        let base = if self.github() {
-            &v["defaultBranchRef"]["name"]
-        } else {
-            &v["default_branch"]
-        };
-        base.as_str().map(str::to_string).ok_or_else(|| platform_failed("repository decode"))
+            let out = self.request(&["api", &self.project()])?;
+            let wire: WireGitlabProject = serde_json::from_str(&out).map_err(|_| platform_failed("repository decode"))?;
+            Ok(wire.default_branch)
+        }
     }
 
     fn find(&self, branch: &str, base: &str) -> Result<Option<(i64, String)>, ApiError> {
@@ -274,14 +321,14 @@ impl Hosting<'_> {
                 "--json",
                 "url,number,isCrossRepository,state",
             ])?;
-            let list: Vec<Value> = serde_json::from_str(&out).map_err(|_| platform_failed("list decode"))?;
+            let list: Vec<WireGithubPr> = serde_json::from_str(&out).map_err(|_| platform_failed("list decode"))?;
             if list.len() > 1 {
                 return Err(platform_failed("list decode"));
             }
             return list
                 .iter()
-                .find(|p| p["isCrossRepository"] == false && p["state"] == "OPEN")
-                .map(|p| self.receipt(p["number"].as_i64().unwrap_or(0), p["url"].as_str().unwrap_or("")))
+                .find(|p| !p.is_cross_repository && p.state == "OPEN")
+                .map(|p| self.receipt(p.number, &p.url))
                 .transpose();
         }
         let enc = |s: &str| url::form_urlencoded::byte_serialize(s.as_bytes()).collect::<String>();
@@ -294,13 +341,13 @@ impl Hosting<'_> {
                 enc(base)
             ),
         ])?;
-        let list: Vec<Value> = serde_json::from_str(&out).map_err(|_| platform_failed("list decode"))?;
+        let list: Vec<WireGitlabMr> = serde_json::from_str(&out).map_err(|_| platform_failed("list decode"))?;
         if list.len() > 1 {
             return Err(platform_failed("list decode"));
         }
         list.iter()
-            .find(|m| m["source_project_id"] == m["target_project_id"] && (m["state"] == "opened" || m["state"] == "locked"))
-            .map(|m| self.receipt(m["iid"].as_i64().unwrap_or(0), m["web_url"].as_str().unwrap_or("")))
+            .find(|m| m.is_same_project_open())
+            .map(|m| self.receipt(m.iid, &m.web_url))
             .transpose()
     }
 
@@ -338,11 +385,11 @@ impl Hosting<'_> {
             "--raw-field",
             &format!("description={}", req.body),
         ])?;
-        let m: Value = serde_json::from_str(&out).map_err(|_| platform_failed("create decode"))?;
-        if m["source_project_id"] != m["target_project_id"] || !(m["state"] == "opened" || m["state"] == "locked") {
+        let m: WireGitlabMr = serde_json::from_str(&out).map_err(|_| platform_failed("create decode"))?;
+        if !m.is_same_project_open() {
             return Err(platform_failed("create decode"));
         }
-        self.receipt(m["iid"].as_i64().unwrap_or(0), m["web_url"].as_str().unwrap_or(""))
+        self.receipt(m.iid, &m.web_url)
     }
 }
 
@@ -583,40 +630,4 @@ impl Publisher {
 /// Queries the hosted platform (`gh`/`glab`) for a pull/merge request's current state.
 pub fn remote_pull_state(repo: &HostedRepo, number: i64, run: &HostRun) -> Result<PullRequestState, ApiError> {
     Hosting { repo, run }.state(number)
-}
-
-/// Extracts the protocol `PullRequest` when a branch publication pushed and
-/// opened or reused a hosted pull/merge request.
-pub fn pull_request_of(pubbed: &BranchPublication) -> Option<PullRequest> {
-    let (true, Some(number), Some(url)) = (pubbed.pushed, pubbed.number, pubbed.url.as_ref()) else {
-        return None;
-    };
-    let state = match pubbed.state.unwrap_or(BranchPublicationState::Open) {
-        BranchPublicationState::Open => PullRequestState::Open,
-    };
-    Some(PullRequest {
-        url: url.clone(),
-        number,
-        state,
-    })
-}
-
-/// `repo.pr.submit`, for the user only.
-pub fn install(hub: &Hub, publisher: Arc<Publisher>) {
-    install_with_board(hub, publisher, None);
-}
-
-pub fn install_with_board(hub: &Hub, publisher: Arc<Publisher>, board: Option<crate::modules::work::issue::Board>) {
-    hub.on::<ops::RepoPrSubmit>(move |ctx, req| {
-        if ctx.caller != Caller::User {
-            return Err(refuse(BizCode::RepoRefused, t("server.repo.publish.userOnly", &[])));
-        }
-        let out = publisher.submit(&req)?;
-        if let (Some(board), Some(pr)) = (&board, pull_request_of(&out))
-            && let Some(issue) = board.open_issue_for_branch(&req.cwd, &req.branch)
-        {
-            let _ = board.record_pull_request(&issue.id, pr);
-        }
-        Ok(out)
-    });
 }

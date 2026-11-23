@@ -29,7 +29,6 @@ use vibevalley_protocol::{
     MediaUnderstandingRequest, MediaUnderstandingResult, MediaVoiceDesignRequest, Preview, ops,
 };
 
-use super::image_provider::{Failure, ImageBackend, Prepared, Work};
 use super::remote::{RemoteFile, RemoteState};
 use super::understanding::Authorization;
 use super::vendor::{self, Account, Moss, Outcome, Task, TaskKind};
@@ -40,7 +39,7 @@ use crate::modules::collab::channel::{Chat, Made, Posting};
 use crate::modules::content::attachment::{ATTACHMENT_MAX, Attachments};
 use crate::modules::content::media::inputs::Inputs;
 use crate::modules::infra::http::{Fetch, Request, public_https};
-use crate::modules::infra::provider::Use;
+use crate::modules::infra::provider::{IMAGE_MODELS, Use};
 use crate::modules::infra::setting::Setting;
 use crate::now;
 
@@ -285,7 +284,10 @@ impl Ask {
 
 /// What a waiting job runs with, in memory only.
 pub(super) enum Held {
-    Image(Prepared),
+    Image {
+        account: Account,
+        body: Value,
+    },
     Speech {
         account: Account,
         body: Value,
@@ -494,7 +496,6 @@ pub struct Parts {
     pub files: Arc<Attachments>,
     pub inputs: Arc<Inputs>,
     pub chat: Arc<Chat>,
-    pub images: Arc<dyn ImageBackend>,
     pub vendor: Arc<dyn Fetch>,
     pub download: Download,
 }
@@ -507,7 +508,6 @@ pub struct Jobs {
     scheduling: Mutex<()>,
     /// One cleanup at the vendor at a time.
     pub(super) cleaning: Mutex<()>,
-    images: Arc<dyn ImageBackend>,
     pub(super) moss: Moss,
     download: Download,
     setting: Arc<Setting>,
@@ -533,7 +533,6 @@ impl Jobs {
             runs: Mutex::default(),
             scheduling: Mutex::default(),
             cleaning: Mutex::default(),
-            images: p.images,
             moss: Moss { fetch: p.vendor },
             download: p.download,
             setting: p.setting,
@@ -724,7 +723,7 @@ impl Jobs {
 
     /// An image; orchestrators must have the user's word first (their tool checks it).
     pub fn image(&self, request: MediaImageRequest, source: MediaSource) -> Result<MediaImageJob, ApiError> {
-        super::image_provider::body(&request, "")?;
+        Moss::validate_image_request(&request).map_err(|_| refused("invalid"))?;
         if let MediaSource::Orchestrator { agent, channel } = &source
             && (agent.is_empty() || channel.is_empty())
         {
@@ -739,22 +738,27 @@ impl Jobs {
             return Ok(image_view(&old));
         }
         let Ask::Image(request) = &ask else { unreachable!() };
-        let prepared = self.images.prepare(request)?;
+        let account = self.bound(Use::Image)?;
+        if !IMAGE_MODELS.contains(&account.model.as_str()) {
+            return Err(ApiError::new(BizCode::ProviderRefused, t("server.provider.imageModel", &[])));
+        }
+        let body = Moss::prepare_image(&account.model, request).map_err(|_| refused("invalid"))?;
         let r = Record::new(
             ask,
             source,
-            prepared.connection.clone(),
-            prepared.revision,
-            prepared.model.clone(),
-            String::new(),
+            account.connection.clone(),
+            account.revision,
+            account.model.clone(),
+            account.fingerprint.clone(),
         );
-        self.admit(r, Some(Held::Image(prepared))).map(|r| image_view(&r))
+        self.admit(r, Some(Held::Image { account, body })).map(|r| image_view(&r))
     }
 
     /// The account `u` is bound to in the settings now.
     pub(super) fn bound(&self, u: Use) -> Result<Account, ApiError> {
         let unbound = || {
             let words = match u {
+                Use::Image => t("server.provider.imageUnbound", &[]),
                 Use::Speech => t("server.provider.speechUnbound", &[]),
                 Use::Understanding => t("server.provider.understandingUnbound", &[]),
                 _ => {
@@ -903,27 +907,29 @@ impl Jobs {
         match (held, &r.ask) {
             (Some(Held::Account(account)), Ask::Understanding(request)) => self.understand(&r, request, &account, stop),
             (Some(Held::Account(account)), ask) if ask.is_audio() => self.generate_audio(&r, &account, stop),
-            (Some(Held::Image(prepared)), Ask::Image(_)) => self.generate_image(&id, prepared, stop),
+            (Some(Held::Image { account, body }), Ask::Image(request)) => self.generate_image(&id, request.width, request.height, &account, &body, stop),
             (Some(Held::Speech { account, body }), Ask::Speech(request)) => {
                 if request.streaming == Some(true) {
                     self.receive(&id, &account, &body, stop);
                 } else if request.asynchronous == Some(true) {
-                    match self.moss.speech_task(&account.key, &body) {
+                    match self.moss.speech_task(&account.key, &body, stop) {
                         Ok(task) => {
                             let _ = self.change(&id, &[Phase::Generating, Phase::Canceled, Phase::Unknown], |r| r.remote_task = Some(task));
                             self.poll(&id, stop);
                         }
-                        Err(e) => self.failed(&id, e.outcome),
+                        Err(e) if !stop.aborted() => self.failed(&id, e.outcome),
+                        Err(_) => {}
                     }
                 } else {
-                    match self.moss.speech_generate(&account.key, &body) {
+                    match self.moss.speech_generate(&account.key, &body, stop) {
                         Ok(g) if !stop.aborted() => {
                             if self.made(&id, g) {
                                 self.download(&id, stop);
                             }
                         }
                         Ok(_) => {}
-                        Err(e) => self.failed(&id, e.outcome),
+                        Err(e) if !stop.aborted() => self.failed(&id, e.outcome),
+                        Err(_) => {}
                     }
                 }
             }
@@ -931,25 +937,19 @@ impl Jobs {
         }
     }
 
-    fn generate_image(self: &Arc<Self>, id: &str, prepared: Prepared, stop: &Stop) {
-        let Some(result) = until_stopped(stop, self.images.generate(prepared)) else {
+    fn generate_image(self: &Arc<Self>, id: &str, width: i64, height: i64, account: &Account, body: &Value, stop: &Stop) {
+        let result = self.moss.image(&account.key, body, width, height, stop);
+        if stop.aborted() {
             return;
-        };
+        }
         let moved = match result {
-            Ok(g) => self.change(id, &[Phase::Generating], |r| {
-                r.url = Some(g.url);
-                r.usage = serde_json::to_value(g.usage).ok();
+            Ok((url, usage)) => self.change(id, &[Phase::Generating], |r| {
+                r.url = Some(url);
+                r.usage = serde_json::to_value(usage).ok();
                 r.phase = Phase::Downloading;
             }),
             Err(e) => {
-                self.failed(
-                    id,
-                    if matches!(e, Failure::Rejected) {
-                        Outcome::Rejected
-                    } else {
-                        Outcome::Unknown
-                    },
-                );
+                self.failed(id, e.outcome);
                 return;
             }
         };
@@ -974,12 +974,13 @@ impl Jobs {
 
     /// A vendor task asked for and followed; its id is kept even when the job was stopped meanwhile.
     pub(super) fn follow(self: &Arc<Self>, id: &str, key: &str, path: &str, body: &Value, stop: &Stop) {
-        match self.moss.submit(key, path, body) {
+        match self.moss.submit(key, path, body, stop) {
             Ok(task) => {
                 let _ = self.change(id, &[Phase::Generating, Phase::Canceled, Phase::Unknown], |r| r.remote_task = Some(task));
                 self.poll(id, stop);
             }
-            Err(e) => self.failed(id, e.outcome),
+            Err(e) if !stop.aborted() => self.failed(id, e.outcome),
+            Err(_) => {}
         }
     }
 
@@ -1009,7 +1010,7 @@ impl Jobs {
                 return;
             };
             let Ok(account) = self.account_of(&r) else { break };
-            match self.moss.task(&account.key, &task) {
+            match self.moss.task(&account.key, &task, stop) {
                 Ok(Task::Waiting) => {}
                 Ok(Task::Failed) => return self.failed(id, Outcome::Rejected),
                 Ok(Task::Audio(kind, g)) if r.ask.task() == Some(kind) => {
@@ -1048,20 +1049,7 @@ impl Jobs {
             return;
         };
         let (kept, failed_key) = match &r.ask {
-            Ask::Image(request) => {
-                let Some(bytes) = until_stopped(stop, self.images.download(&url, request.width, request.height)) else {
-                    return;
-                };
-                let kept = match bytes {
-                    Ok(bytes) if super::png::valid(&bytes, request.width, request.height) => self
-                        .files
-                        .keep(&bytes, &format!("moss-{id}.png"), "image/png")
-                        .map(|a| (Some(a), None, None))
-                        .map_err(|e| e.message),
-                    _ => Err("not the image asked for".to_string()),
-                };
-                (kept, "downloadFailed")
-            }
+            Ask::Image(request) => (self.fetch_image(&url, request.width, request.height, id, stop), "downloadFailed"),
             ask => match ask.audio() {
                 Some(asked) => (self.fetch_audio(&url, r.result_format.unwrap_or(asked), id, stop), "speechDownloadFailed"),
                 None => return,
@@ -1102,6 +1090,38 @@ impl Jobs {
         }
     }
 
+    fn fetch_image(&self, url: &str, width: i64, height: i64, id: &str, stop: &Stop) -> Result<Kept, String> {
+        let parsed = url::Url::parse(url).map_err(|e| e.to_string())?;
+        if !public_https(&parsed) {
+            return Err("not a public https address".into());
+        }
+        let mut response = self
+            .download
+            .fetch_with_cancel(
+                Request {
+                    method: "GET",
+                    url: url.into(),
+                    headers: vec![("accept".into(), "image/png".into())],
+                    body: None,
+                    timeout: Duration::from_secs(60),
+                },
+                stop.token(),
+            )
+            .map_err(|e| format!("{e:?}"))?;
+        let kind = response.media_type();
+        if response.status != 200 || kind != "image/png" {
+            return Err(format!("{} {kind}", response.status));
+        }
+        let bytes = vendor::read_max(&mut response.body, ATTACHMENT_MAX, Some(stop)).map_err(|e| format!("{e:?}"))?;
+        if !super::png::valid(&bytes, width, height) {
+            return Err("not the image asked for".into());
+        }
+        self.files
+            .keep(&bytes, &format!("moss-{id}.png"), "image/png")
+            .map(|a| (Some(a), None, None))
+            .map_err(|e| e.message)
+    }
+
     fn fetch_audio(&self, url: &str, format: MediaAudioFormat, id: &str, stop: &Stop) -> Result<Kept, String> {
         let parsed = url::Url::parse(url).map_err(|e| e.to_string())?;
         if !public_https(&parsed) {
@@ -1110,13 +1130,16 @@ impl Jobs {
         let types = vendor::audio_mimes(format.as_str());
         let mut response = self
             .download
-            .fetch(Request {
-                method: "GET",
-                url: url.into(),
-                headers: vec![("accept".into(), types.join(", "))],
-                body: None,
-                timeout: DOWNLOAD_TIME,
-            })
+            .fetch_with_cancel(
+                Request {
+                    method: "GET",
+                    url: url.into(),
+                    headers: vec![("accept".into(), types.join(", "))],
+                    body: None,
+                    timeout: DOWNLOAD_TIME,
+                },
+                stop.token(),
+            )
             .map_err(|e| format!("{e:?}"))?;
         let kind = response.media_type();
         if response.status != 200 || !types.contains(&kind.as_str()) {
@@ -1572,18 +1595,6 @@ fn speech_view(r: &Record) -> MediaSpeechJob {
         MediaJob::MediaSpeechJob(j) => j,
         _ => unreachable!("a speech's view"),
     }
-}
-
-/// Async vendor work run on the shared `vibevalley-io` runtime, given up when `stop` is set.
-fn until_stopped<T>(stop: &Stop, work: Work<'_, T>) -> Option<Result<T, Failure>> {
-    let result = vibevalley_runtime::rt::block_on(async {
-        tokio::select! {
-            biased;
-            _ = stop.cancelled() => None,
-            r = work => Some(r),
-        }
-    });
-    if stop.aborted() { None } else { result }
 }
 
 pub fn install(hub: &Hub, jobs: Arc<Jobs>) {

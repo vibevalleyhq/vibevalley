@@ -5,8 +5,7 @@ import type { Codec } from "../codec";
 import { codePoints, MessageId, SessionId } from "../common/schema";
 import { MediaAudioJob } from "./audio-schema";
 import { MediaAudioMetadata, MediaInputReference, MediaPhase, MediaSource, MediaAudioUsage } from "./common-schema";
-import { MediaAudioKindValues } from "./shapes";
-import * as T from "./shapes";
+import * as T from "./shapes.gen";
 
 export { MediaAudioMetadata, MediaInputReference, MediaSource, MediaAudioUsage } from "./common-schema";
 
@@ -138,21 +137,6 @@ export const MediaUnderstandingJob = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
 }) satisfies Codec<T.MediaUnderstandingJob>;
-export const MediaSpeechEvent = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("format"),
-    sampleRate: z.number().int().min(8000).max(192000),
-    channels: z.number().int().min(1).max(8),
-    bitDepth: z.literal(16),
-  }),
-  z.object({
-    type: z.literal("audio"),
-    sequence: z.number().int().min(0),
-    audio: z.string().max(2_000_000),
-  }),
-  z.object({ type: z.literal("done") }),
-  z.object({ type: z.literal("failed") }),
-]) satisfies Codec<T.MediaSpeechEvent>;
 export const MediaSpeechRequest = z.object({
   id: z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/u),
   text: z.string().check(codePoints(1, 10000)).regex(/\S/u),
@@ -194,14 +178,8 @@ export const MediaSummary = z.object({
   activeIds: z.array(z.string()),
 }) satisfies Codec<T.MediaSummary>;
 export const MediaJobRequest = z.object({ id: z.string() }) satisfies Codec<T.MediaJobRequest>;
-export const FactMediaChanged = z.object({
-  type: z.literal("mediaChanged"),
-  at: z.number(),
-  jobs: z.array(MediaJob),
-}) satisfies Codec<T.FactMediaChanged>;
 
-const MediaJobKindValues = ["image", "understanding", "speech", ...MediaAudioKindValues] as const;
-const JobKind = z.enum(MediaJobKindValues);
+const JobKind = z.enum(T.JobKindValues) satisfies Codec<T.JobKind>;
 
 export const LibraryOrigin = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("generated"), job: z.string(), jobKind: JobKind }),

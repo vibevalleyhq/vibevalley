@@ -289,7 +289,7 @@ fn collect_bundle(r: &Read<'_>, conv_id: &str, opts: ExportOptions) -> Result<Co
 }
 
 fn should_skip_doc(kind: &str, sliced: bool) -> bool {
-    sliced && matches!(kind, "pi.live" | "pi.inbox" | "pi.verdict")
+    sliced && matches!(kind, "pi.inbox" | "pi.verdict")
 }
 
 fn sanitize_doc(mut doc: Document, sliced: bool) -> Result<Document> {

@@ -504,9 +504,10 @@ fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
     let http = vibevalley_server::transport::http::serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let channel = ask_to_create_issue(&started);
     let request = |path: &str, input: Value| -> Envelope {
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let url = format!("{}/api/v1/{path}", http.url());
-        let agent: ureq::Agent = ureq::Agent::config_builder().http_status_as_error(false).build().into();
-        agent.post(url).send_json(input).unwrap().body_mut().read_json().unwrap()
+        let client = reqwest::blocking::Client::builder().no_proxy().build().unwrap();
+        client.post(url).json(&input).send().unwrap().json().unwrap()
     };
     let list = |filter| -> Vec<OrchestratorApproval> {
         let reply = request("orchestrator/approval/list", filter);

@@ -1,7 +1,12 @@
 //! Input reservations, uploads and job pins (`media/inputs.ts`). The mutex
 //! protects admission and pins, never a streaming read or attachment write.
 use super::{q, validate};
-use crate::{Hub, base::open_sqlx_db, modules::content::attachment::Attachments, now};
+use crate::{
+    Hub,
+    base::{Ticker, open_sqlx_db},
+    modules::content::attachment::Attachments,
+    now,
+};
 use parking_lot::{Mutex, MutexGuard};
 use pollster::block_on;
 use sha2::{Digest, Sha256};
@@ -13,7 +18,6 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, AttachmentFile, BizCode, MediaInput, MediaInputKind, MediaInputPhase, MediaInputRequest, Preview, native_ops, ops};
 
@@ -33,7 +37,7 @@ pub struct Inputs {
     inner: Mutex<Inner>,
     files: Arc<Attachments>,
     staging: PathBuf,
-    cancel: CancellationToken,
+    sweeper: Mutex<Option<Ticker>>,
 }
 fn input(row: q::GetInputRow, can_delete: bool) -> Result<MediaInput, ApiError> {
     let m: MediaInputRequest = serde_json::from_str(&row.metadata).map_err(storage)?;
@@ -87,37 +91,30 @@ impl Inputs {
     pub fn open(home: &Path, files: Arc<Attachments>) -> Result<Arc<Self>, ApiError> {
         let mut db = block_on(open_sqlx_db(home)).map_err(storage)?;
         block_on(sqlx::raw_sql(crate::db::schema::CONTENT_MEDIA).execute(&mut db)).map_err(storage)?;
-        let cancel = CancellationToken::new();
         let inputs = Arc::new(Self {
             inner: Mutex::new(Inner { db, uploading: HashSet::new() }),
             files,
             staging: home.join("attachments/.staging/media"),
-            cancel: cancel.clone(),
+            sweeper: Mutex::new(None),
         });
         inputs.restore()?;
         inputs.sweep()?;
         let weak = Arc::downgrade(&inputs);
-        vibevalley_runtime::rt::handle().spawn(async move {
-            loop {
-                tokio::select! {
-                    biased;
-                    _ = cancel.cancelled() => break,
-                    _ = tokio::time::sleep(Duration::from_secs(60)) => {}
-                }
-                let Some(inputs) = weak.upgrade() else { break };
-                // Tombstones survive storage failures and are retried next tick.
-                let _ = tokio::task::spawn_blocking(move || {
-                    if let Err(error) = inputs.sweep() {
-                        eprintln!("media input cleanup: {}", error.message);
-                    }
-                })
-                .await;
+        let ticker = Ticker::spawn_detached(Duration::from_secs(60), false, move || {
+            let Some(inputs) = weak.upgrade() else { return false };
+            // Tombstones survive storage failures and are retried next tick.
+            if let Err(error) = inputs.sweep() {
+                eprintln!("media input cleanup: {}", error.message);
             }
+            true
         });
+        *inputs.sweeper.lock() = Some(ticker);
         Ok(inputs)
     }
     pub fn close(&self) {
-        self.cancel.cancel();
+        if let Some(ticker) = self.sweeper.lock().take() {
+            ticker.stop();
+        }
     }
     fn inner(&self) -> MutexGuard<'_, Inner> {
         self.inner.lock()

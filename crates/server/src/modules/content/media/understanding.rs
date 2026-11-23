@@ -231,7 +231,10 @@ impl Jobs {
         }
         let sent: Vec<(MediaInputKind, String)> = r.inputs.iter().map(|i| i.kind).zip(files).collect();
         let answer = Moss::prepare_understanding(&account.model, &request.prompt, &sent, request.max_output_tokens)
-            .and_then(|body| self.moss.understand(&account.key, &body));
+            .and_then(|body| self.moss.understand(&account.key, &body, stop));
+        if stop.aborted() {
+            return;
+        }
         match answer {
             Ok(result) => {
                 let answered = self.change(id, &[Phase::Generating], |r| {

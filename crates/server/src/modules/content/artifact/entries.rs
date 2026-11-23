@@ -134,7 +134,6 @@ impl Artifacts {
     pub fn list_entries(&self, req: &ArtifactEntryListRequest) -> Result<ArtifactEntrySnapshot, ApiError> {
         let mut db = self.db();
         let row = self.found_store(&mut db, &req.id)?;
-        let artifact_type = row.artifact_type.as_deref().and_then(artifact_type_of);
         let prefix = req.prefix.as_deref().map(str::trim).unwrap_or("");
         let include_values = req.include_values == Some(true);
         let rows = if prefix.is_empty() {
@@ -144,28 +143,13 @@ impl Artifacts {
         };
         let seq = row.seq;
         let artifact = self.assemble(&mut db, row)?;
-        let entries = rows
-            .iter()
-            .map(|r| {
-                let mut e = entry_of(r, include_values);
-                if include_values
-                    && artifact_type == Some(ArtifactType::Whiteboard)
-                    && e.path.starts_with("elements/")
-                    && let Some(raw) = e.value.as_deref()
-                    && let Ok(clean) = sanitize_whiteboard_element_json(artifact_type, &e.path, raw)
-                {
-                    e.value = Some(clean);
-                }
-                e
-            })
-            .collect();
+        let entries = rows.iter().map(|r| entry_of(r, include_values)).collect();
         Ok(ArtifactEntrySnapshot { artifact, seq, entries })
     }
 
     pub fn get_entry(&self, req: &ArtifactEntryGetRequest) -> Result<ArtifactEntry, ApiError> {
         let mut db = self.db();
         let row = self.found_store(&mut db, &req.id)?;
-        let artifact_type = row.artifact_type.as_deref().and_then(artifact_type_of);
         check_path(&req.path)?;
         let entry = db::entry(&mut db, &req.id, &req.path).map_err(q)?.ok_or_else(|| {
             missing(
@@ -176,15 +160,7 @@ impl Artifacts {
                 LookIn::Artifact,
             )
         })?;
-        let mut out = entry_of(&entry, true);
-        if artifact_type == Some(ArtifactType::Whiteboard)
-            && out.path.starts_with("elements/")
-            && let Some(raw) = out.value.as_deref()
-            && let Ok(clean) = sanitize_whiteboard_element_json(artifact_type, &out.path, raw)
-        {
-            out.value = Some(clean);
-        }
-        Ok(out)
+        Ok(entry_of(&entry, true))
     }
 
     pub fn batch_entries(&self, maker: &Maker, req: &ArtifactEntryBatchRequest) -> Result<ArtifactEntryBatchResult, ApiError> {

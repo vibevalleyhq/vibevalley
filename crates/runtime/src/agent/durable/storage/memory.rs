@@ -928,14 +928,6 @@ struct MemoryInner {
     hub: LiveHub,
 }
 
-impl Drop for MemoryInner {
-    fn drop(&mut self) {
-        if !self.hub.is_closed() {
-            let _ = flush_memory(&self.state, &self.hub, self.hub.now_ms(), true);
-        }
-    }
-}
-
 #[derive(Clone)]
 pub struct MemoryStorage(Arc<MemoryInner>);
 
@@ -956,43 +948,6 @@ impl Default for MemoryStorage {
     fn default() -> Self {
         Self::new()
     }
-}
-
-fn flush_memory(state_mutex: &Mutex<MemoryState>, hub: &LiveHub, now: i64, force: bool) -> Result<()> {
-    let disk_batch = hub.drain_due(now, force, |keys| {
-        let state = state_mutex.lock().unwrap_or_else(|e| e.into_inner());
-        let mut revs = HashMap::new();
-        for key in keys {
-            revs.insert(key.clone(), state.documents.get(key).map_or(0, |d| d.rev));
-        }
-        Ok(revs)
-    })?;
-    if disk_batch.is_empty() {
-        return Ok(());
-    }
-    let mut state = state_mutex.lock().unwrap_or_else(|e| e.into_inner());
-    let mut events = Vec::with_capacity(disk_batch.len());
-    let mut keys = Vec::with_capacity(disk_batch.len());
-    for (key, value) in disk_batch {
-        let rev = state.documents.get(&key).map_or(1, |d| d.rev + 1);
-        let doc = Document {
-            scope_kind: key.0.clone(),
-            scope_id: key.1.clone(),
-            doc_kind: key.2.clone(),
-            rev,
-            state: value,
-            updated_at_ms: now,
-        };
-        state.documents.insert(key.clone(), doc.clone());
-        events.push(DocumentEvent {
-            document: doc,
-            durable: true,
-            retired: false,
-        });
-        keys.push(key);
-    }
-    hub.complete_disk_flush(&keys, events);
-    Ok(())
 }
 
 impl StorageBackend for MemoryStorage {
@@ -1052,58 +1007,10 @@ impl StorageBackend for MemoryStorage {
         self.0.hub.subscribe_tasks()
     }
 
-    fn put_deferred(&self, scope: &str, id: &str, kind: &str, state: Value) -> Result<()> {
-        let weak = Arc::downgrade(&self.0);
-        self.0.hub.queue_deferred(scope, id, kind, state, move || {
-            std::thread::spawn(move || {
-                loop {
-                    let Some(inner) = weak.upgrade() else {
-                        return;
-                    };
-                    if inner.hub.is_closed() {
-                        return;
-                    }
-                    let now = inner.hub.now_ms();
-                    if flush_memory(&inner.state, &inner.hub, now, false).is_err() {
-                        inner.hub.reschedule_disk_on_error(now);
-                    }
-                    let Some(wait) = inner.hub.next_timer_wait(now) else {
-                        return;
-                    };
-                    drop(inner);
-                    std::thread::sleep(wait);
-                }
-            });
-        })
-    }
-
-    fn flush_due(&self) -> Result<()> {
-        if self.0.hub.is_closed() {
-            return Err(Error::Closed);
-        }
-        flush_memory(&self.0.state, &self.0.hub, self.0.hub.now_ms(), false)
-    }
-
-    fn flush_deferred(&self) -> Result<()> {
-        if self.0.hub.is_closed() {
-            return Err(Error::Closed);
-        }
-        flush_memory(&self.0.state, &self.0.hub, self.0.hub.now_ms(), true)
-    }
-
-    fn live_document(&self, scope: &str, id: &str) -> Result<Option<Document>> {
-        let state = self.0.state.lock().unwrap_or_else(|e| e.into_inner());
-        if self.0.hub.is_closed() {
-            return Err(Error::Closed);
-        }
-        self.0.hub.live_document(scope, id, &MemoryRead(&state))
-    }
-
     fn close(&self) -> Result<()> {
         if self.0.hub.is_closed() {
             return Ok(());
         }
-        flush_memory(&self.0.state, &self.0.hub, self.0.hub.now_ms(), true)?;
         self.0.hub.mark_closed();
         Ok(())
     }

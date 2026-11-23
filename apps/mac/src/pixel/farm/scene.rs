@@ -982,8 +982,6 @@ impl FarmScene {
         let mut lamps = Vec::new();
         let sky = sky_at(self.clock.tod);
         let flat = flat_light(&sky);
-        list.light = Some(flat);
-        list.lit = list.ops.len();
         let night = sky.night;
         if night > 0.02 {
             for (i, (at, r)) in w.lights.iter().enumerate() {
@@ -1042,6 +1040,7 @@ impl FarmScene {
                 lamps,
             },
             foreground: foreground_start..foreground_end,
+            sky_light: flat,
         });
         hud::draw(self, &mut list, scale);
         list

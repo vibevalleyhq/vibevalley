@@ -8,9 +8,25 @@ use std::sync::OnceLock;
 use serde::Deserialize;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    AccountUsage, Agent, AgentProblem, AgentProblemLevel, Installation, ModelEntry, PersonaMode, RuntimeInfo, RuntimePreset, RuntimeQuota, RuntimeSettings,
-    RuntimeSupport,
+    AccountUsage, Agent, AgentProblem, AgentProblemLevel, Installation, ModelEntry, PersonaMode, RuntimeCapability, RuntimeInfo, RuntimePreset, RuntimeQuota,
+    RuntimeSettings, RuntimeSupport,
 };
+use vibevalley_runtime::oar::{BUILTIN_RUNTIME_SPECS, RefusableOption, runtime_refused_options, runtime_spec};
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct PresetSupport {
+    #[serde(default)]
+    steer: bool,
+    #[serde(default)]
+    refused: BTreeMap<String, String>,
+    #[serde(default)]
+    capabilities: Vec<RuntimeCapability>,
+    #[serde(default)]
+    in_process: bool,
+    #[serde(default)]
+    in_session_config: bool,
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,9 +34,17 @@ struct Presets {
     default_settings: RuntimeSettings,
     fallback_preset: RuntimePreset,
     runtime_presets: Vec<RuntimePreset>,
-    runtime_support: BTreeMap<String, RuntimeSupport>,
+    runtime_support: BTreeMap<String, PresetSupport>,
     runtime_ids: Vec<String>,
 }
+
+/// Profile-visible session options that `session_options` checks against `RuntimeSupport.refused`.
+const PROFILE_REFUSABLE: [RefusableOption; 4] = [
+    RefusableOption::SystemPrompt,
+    RefusableOption::AppendSystemPrompt,
+    RefusableOption::Effort,
+    RefusableOption::DisallowedTools,
+];
 
 fn presets() -> &'static Presets {
     static ZH: OnceLock<Presets> = OnceLock::new();
@@ -41,7 +65,13 @@ pub fn default_settings() -> RuntimeSettings {
 
 /// Every runtime the farm knows, in the order the page shows them.
 pub fn runtime_ids() -> Vec<String> {
-    presets().runtime_ids.clone()
+    let mut ids = presets().runtime_ids.clone();
+    for spec in BUILTIN_RUNTIME_SPECS {
+        if !ids.iter().any(|id| id == spec.id) {
+            ids.push(spec.id.to_string());
+        }
+    }
+    ids
 }
 
 /// A runtime's name, look and blurb; one with no look gets the fallback,
@@ -59,10 +89,41 @@ pub fn runtime_label(runtime: &str) -> String {
     preset_of(runtime).label
 }
 
-/// What a runtime takes before probing it: for one the farm has no word
-/// on, nothing beyond a prompt.
+/// What a runtime takes before probing it: built-in OAR runtimes read their
+/// capabilities and refused options from `vibevalley_runtime::oar::BUILTIN_RUNTIME_SPECS`,
+/// enriched with localized prose from `presets*.json`; unknown runtimes accept a prompt only.
 pub fn support_of(runtime: &str) -> RuntimeSupport {
-    presets().runtime_support.get(runtime).cloned().unwrap_or_default()
+    let preset = presets().runtime_support.get(runtime);
+    if let Some(spec) = runtime_spec(runtime) {
+        let mut refused = BTreeMap::new();
+        for opt in runtime_refused_options(runtime) {
+            if !PROFILE_REFUSABLE.contains(opt) {
+                continue;
+            }
+            let key = opt.camel_name();
+            let reason = preset
+                .and_then(|p| p.refused.get(key))
+                .cloned()
+                .unwrap_or_else(|| format!("{} does not support {key}", spec.display_name));
+            refused.insert(key.to_string(), reason);
+        }
+        return RuntimeSupport {
+            steer: spec.capabilities.steer,
+            refused,
+            capabilities: preset.map(|p| p.capabilities.clone()).unwrap_or_default(),
+            in_process: spec.in_process,
+            in_session_config: spec.capabilities.config_options,
+        };
+    }
+    preset
+        .map(|p| RuntimeSupport {
+            steer: p.steer,
+            refused: p.refused.clone(),
+            capabilities: p.capabilities.clone(),
+            in_process: p.in_process,
+            in_session_config: p.in_session_config,
+        })
+        .unwrap_or_default()
 }
 
 fn when_text(at: i64) -> String {
@@ -415,11 +476,37 @@ mod tests {
 
     #[test]
     fn presets_know_every_runtime() {
-        let ids = runtime_ids();
-        assert_eq!(ids.first().map(String::as_str), Some("claude"));
-        assert!(ids.iter().all(|id| preset_of(id).id == *id));
-        assert_eq!(preset_of("nope").label, "nope");
-        assert!(support_of("vibevalley").in_process);
+        for locale in ["zh", "en"] {
+            vibevalley_i18n::set_locale(locale);
+            let ids = runtime_ids();
+            assert_eq!(ids.first().map(String::as_str), Some("claude"));
+            assert!(!ids.iter().any(|id| id == "dsh"), "obsolete dsh must be dropped ({locale})");
+            assert!(ids.iter().all(|id| preset_of(id).id == *id));
+            assert_eq!(preset_of("nope").label, "nope");
+            assert!(support_of("vibevalley").in_process);
+            for spec in BUILTIN_RUNTIME_SPECS {
+                assert!(ids.iter().any(|id| id == spec.id), "missing {} in {locale}", spec.id);
+                let s = support_of(spec.id);
+                assert_eq!(s.steer, spec.capabilities.steer, "{} steer ({locale})", spec.id);
+                assert_eq!(s.in_process, spec.in_process, "{} in_process ({locale})", spec.id);
+                assert_eq!(
+                    s.in_session_config, spec.capabilities.config_options,
+                    "{} in_session_config ({locale})",
+                    spec.id
+                );
+                let expected_refused: Vec<&str> = runtime_refused_options(spec.id)
+                    .iter()
+                    .filter(|o| PROFILE_REFUSABLE.contains(o))
+                    .map(|o| o.camel_name())
+                    .collect();
+                let mut actual_refused: Vec<&str> = s.refused.keys().map(String::as_str).collect();
+                let mut expected_sorted = expected_refused;
+                actual_refused.sort_unstable();
+                expected_sorted.sort_unstable();
+                assert_eq!(actual_refused, expected_sorted, "{} refused keys ({locale})", spec.id);
+            }
+        }
+        vibevalley_i18n::set_locale("zh");
     }
 
     #[test]

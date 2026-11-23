@@ -1,6 +1,6 @@
 # 客户端
 
-VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibevalley-mac`）：GPUI 的窗口，里面带着服务端；工作台的页面是 nsh 跑的 TSX（`apps/mac/ui`），像素农场、地图、记忆树、开场和图鉴由 Rust 直接画（`apps/mac/src/pixel`）。页面按域只读服务端推来的独立切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）与查询接口，经进程内的桥发命令，不经 HTTP。另提供独立原生移动端应用 `apps/mobile`（`nsh/mobile`，iOS 优先、Android 就绪），通过 `@vibevalley/protocol/remote` 连接 Mac 上默认关闭的受认证远程 HTTP/SSE 门，实现离开桌面时的收件箱分拣、频道回复、会话观察与任务验收（[移动远程控制方案](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)）。没有浏览器页面或 Electron 桌面版（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
+VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibevalley-mac`）：GPUI 的窗口，里面带着服务端；工作台的页面是 nsh 跑的 TSX（`apps/mac/ui`），像素农场、地图、记忆树和开场由 Rust 直接画（`apps/mac/src/pixel`）。页面按域只读服务端推来的独立切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）与查询接口，经进程内的桥发命令，不经 HTTP。另提供独立原生移动端应用 `apps/mobile`（`nsh/mobile`，iOS 优先、Android 就绪），通过 `@vibevalley/protocol/remote` 连接 Mac 上默认关闭的受认证远程 HTTP/SSE 门，实现离开桌面时的收件箱分拣、频道回复、会话观察与任务验收（[移动远程控制方案](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)）。没有浏览器页面或 Electron 桌面版（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
 
 ## 管什么，不管什么
 
@@ -23,7 +23,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 | `apps/mac/src/audio.rs`、`audio.m` | AVFoundation 文件播放、跳播与有界 PCM 队列；宿主音频命令按桥的接收顺序执行 |
 | `apps/mac/src/command_line.rs`、`tray.rs`、`island.rs` | 命令行符号链接、菜单栏摘要、灵动岛进程与工单摘要 |
 | `apps/mac/src/terminal/`、`viewer.rs`、`diff.rs` | 终端（`apps/mac/crates/terminal`）、文件查看（经 `vibevalley-rich` 按 TextMate 作用域高亮）、diff；加载均带 150 毫秒防闪烁与骨架条 |
-| `apps/mac/src/pixel/` | 像素场景（引擎在 `apps/mac/crates/pixel`）：农场、地图、记忆树、开场、图鉴；进程级缓存 `Atlas` 与 `VillageWorld`（[农场的皮](docs/subsystems/farm.md)） |
+| `apps/mac/src/pixel/` | 像素场景（引擎在 `apps/mac/crates/pixel`）：农场、地图、记忆树、开场；进程级缓存 `Atlas` 与 `VillageWorld`（[农场的皮](docs/subsystems/farm.md)） |
 | `apps/mac/crates/` | 桌面端独占支撑 crate：`pixel`、`terminal`、`workspace`（项目、布局含 `PaneKind::Chat`、终端与宿主 `state.db` 持久化） |
 | `crates/rich/` | 原生富内容组件集（`VvMarkdown` 含 `Doc` 排版与相对图片解析、`VvIcon`（[icon.rs](crates/rich/src/icon.rs)，承载 97 枚工作台 reicon 线性图标并以无锁 `OnceLock<Vec<Path>>` 零拷贝共享解析路径；前端 [icons.ts](apps/mac/ui/design/icons.ts) 只保留纯类型 `IconName`，[icons.ts](scripts/gen/icons.ts) 另单源生成 `iconPaths.gen.ts` 供无原生 `VvIcon` 时经 `<Canvas>` + `Path2D` 矢量回退）、`VvI18n`（`"vibevalley/rich"` 导出 `.translate(...)`，由 `installNativeI18n()` 接管 `@vibevalley/i18n`，使生产 UI 包不含 `packages/i18n` JS 词典）、`VvCodeBlock`、`VvDiagram`、`VvCanvas`、`VvChart`、`VvGenUi`、`VvWhiteboard`（含 Loro Phase A 实时在场光标/占位框/一键跟随视口与 `onCursorMove`/`onViewportChange` 回调）、`VvPinyin`）与内部渲染引擎 `engine/` |
 | `apps/mac/src/theme.rs`、`apps/mac/src/theme_tokens.rs` | 外壳的主题、动画幅度（`Settings.motion`）与字号设置；令牌从 `design/tokens.json` 同步生成 |
@@ -60,7 +60,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 
 在终端中新建标签、向右或向下分屏时，宿主从 PTY 前台进程取得当前本地目录，必要时采用 shell 上报的目录。PTY 启动期间收到的键盘输入、输入法提交和粘贴按原顺序交给新 shell。切换项目保留运行中的进程；重启应用恢复原标签、目录和历史输出，启动新 shell。命名入口的工单号和目标路径存进布局，在子目录退出也能从同一张田找回原标签。[原生终端](apps/mac/src/terminal/mod.rs) · [PTY 会话](apps/mac/crates/terminal/src/lib.rs)
 
-终端标签内运行编码 agent（Claude Code、Codex、Cursor、OpenCode、Kimi、Pi、Antigravity、dsh、Grok）时，`AgentTurnTracker` 忽略 300 毫秒内的本地按键回显，并在响铃、3 秒输出静默（`Working → Ready`）或命令退出时发出一次 `TerminalEvent::AgentTurnFinished`（普通命令不触发）。该标签不在当前视图时标记 `attention`；若应用处于后台（`!host::is_app_active()`），外壳以项目目录名为标题通过 `host::notify` 发送 macOS 系统通知。[分栏与通知](apps/mac/src/shell/panes.rs)
+终端标签内运行编码 agent（Claude Code、Codex、Cursor、OpenCode、Kimi、Pi、Antigravity、Grok）时，`AgentTurnTracker` 忽略 300 毫秒内的本地按键回显，并在响铃、3 秒输出静默（`Working → Ready`）或命令退出时发出一次 `TerminalEvent::AgentTurnFinished`（普通命令不触发）。该标签不在当前视图时标记 `attention`；若应用处于后台（`!host::is_app_active()`），外壳以项目目录名为标题通过 `host::notify` 发送 macOS 系统通知。[分栏与通知](apps/mac/src/shell/panes.rs)
 
 ### 工作区直连对话、Markdown 预览与统一顶栏交互
 

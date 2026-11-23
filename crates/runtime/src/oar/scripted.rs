@@ -440,7 +440,7 @@ impl Runtime for ScriptedRuntime {
     }
 
     fn capabilities(&self) -> Capabilities {
-        self.capabilities.clone()
+        self.capabilities
     }
 
     fn installation(&self) -> Installation {
@@ -490,6 +490,6 @@ impl Runtime for ScriptedRuntime {
             answers,
             answers_rx,
         };
-        Ok(CoreSession::new(core, driver, self.capabilities.clone()))
+        Ok(CoreSession::new(core, driver, self.capabilities))
     }
 }

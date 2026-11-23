@@ -30,7 +30,7 @@ const CronWhenExpr = z.object({
   expr: z.string(),
 }) satisfies Codec<T.CronWhenExpr>;
 
-export const CronWhen = z.discriminatedUnion("kind", [CronWhenOnce, CronWhenEvery, CronWhenDaily, CronWhenWeekly, CronWhenExpr]) satisfies Codec<T.CronWhen>;
+const CronWhen = z.discriminatedUnion("kind", [CronWhenOnce, CronWhenEvery, CronWhenDaily, CronWhenWeekly, CronWhenExpr]) satisfies Codec<T.CronWhen>;
 
 const cronFields = {
   id: z.string(),
@@ -65,15 +65,3 @@ export const CronRequest = z.object({
 export const CronUpdate = z.object({
   enabled: z.exactOptional(z.boolean()),
 }) satisfies Codec<T.CronUpdate>;
-
-export const FactCronChanged = z.object({
-  type: z.literal("cronChanged"),
-  at: z.number(),
-  cron: Cron,
-}) satisfies Codec<T.FactCronChanged>;
-
-export const FactCronRemoved = z.object({
-  type: z.literal("cronRemoved"),
-  at: z.number(),
-  id: z.string(),
-}) satisfies Codec<T.FactCronRemoved>;

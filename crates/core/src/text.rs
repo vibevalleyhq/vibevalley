@@ -86,7 +86,7 @@ fn options_tail(raw: &str) -> Option<(usize, Vec<String>)> {
 
 /// What an undeclared report says in short: the last paragraphs, at least
 /// `min` characters of them.
-pub fn conclusion(text: &str, min: usize) -> String {
+fn conclusion(text: &str, min: usize) -> String {
     let text = text.trim();
     let blocks: Vec<&str> = text.split("\n\n").map(str::trim).filter(|b| !b.is_empty()).collect();
     let mut tail = String::new();
@@ -115,7 +115,7 @@ pub fn clip(text: &str, max: usize) -> String {
 }
 
 /// The fenced blocks of a text (```json or bare), in order.
-pub fn fenced_blocks(text: &str) -> Vec<&str> {
+fn fenced_blocks(text: &str) -> Vec<&str> {
     let mut out = Vec::new();
     let mut rest = text;
     while let Some(start) = rest.find("```") {
@@ -134,7 +134,7 @@ pub fn fenced_blocks(text: &str) -> Vec<&str> {
 
 /// Why no block was taken.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BlockProblem {
+pub(crate) enum BlockProblem {
     /// The text has no fenced block.
     None,
     /// The last block tried is not JSON, or JSON of another shape.
@@ -145,7 +145,7 @@ pub enum BlockProblem {
 
 /// The last fenced block that decodes as `T` and that `refuse` does not
 /// refuse.
-pub fn last_json_block<T: DeserializeOwned>(text: &str, refuse: impl Fn(&T) -> Option<String>) -> Result<T, BlockProblem> {
+pub(crate) fn last_json_block<T: DeserializeOwned>(text: &str, refuse: impl Fn(&T) -> Option<String>) -> Result<T, BlockProblem> {
     let mut problem = BlockProblem::None;
     for block in fenced_blocks(text).into_iter().rev() {
         match serde_json::from_str::<T>(block) {

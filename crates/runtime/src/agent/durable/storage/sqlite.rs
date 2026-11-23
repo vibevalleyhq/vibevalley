@@ -1,6 +1,5 @@
 //! SQLite `StorageBackend` with WAL mode, read-only reader pool, and group-commit savepoints.
 
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{
     Arc, Mutex, MutexGuard,
@@ -13,7 +12,6 @@ use serde_json::{Value, json};
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{ConnectOptions, Connection, SqliteConnection};
 
-use super::live::DocKey;
 use super::{StorageBackend, StorageRead, StorageWrite, WriteCallback};
 use crate::agent::durable::{
     CommitStats, Conversation, Document, DocumentEvent, Entry, Error, Result, Signal, Sqlite, Submission, SubmissionStatus, Task, TaskStatus, WaitMode, now_ms,
@@ -22,12 +20,6 @@ use crate::agent::durable::{
 
 type Ack = flume::Sender<std::result::Result<(), String>>;
 
-struct Deferred {
-    state: Value,
-    mem_pending: bool,
-    updated_at_ms: i64,
-}
-
 struct Database {
     conn: SqliteConnection,
     waiting: Vec<Ack>,
@@ -35,11 +27,6 @@ struct Database {
     tasks_changed: bool,
     docs: Vec<flume::Sender<DocumentEvent>>,
     tasks: Vec<flume::Sender<()>>,
-    live: HashMap<DocKey, Deferred>,
-    published: HashMap<DocKey, Document>,
-    mem_at: Option<i64>,
-    disk_at: Option<i64>,
-    timer_active: bool,
     stats: CommitStats,
 }
 
@@ -61,11 +48,6 @@ impl Database {
         if outcome.is_ok() {
             self.stats.committed_ops += self.waiting.len() as u64;
             for e in std::mem::take(&mut self.events) {
-                if e.document.doc_kind == "pi.live" {
-                    let key = (e.document.scope_kind.clone(), e.document.scope_id.clone(), e.document.doc_kind.clone());
-                    self.live.remove(&key);
-                    self.published.remove(&key);
-                }
                 self.publish(e);
             }
             if self.tasks_changed {
@@ -85,78 +67,6 @@ impl Database {
     fn publish(&mut self, event: DocumentEvent) {
         self.docs.retain(|tx| tx.send(event.clone()).is_ok());
     }
-
-    fn live_flush(&mut self, now: i64, force: bool) -> Result<()> {
-        self.flush()?;
-        if force || self.mem_at.is_some_and(|v| v <= now) {
-            self.mem_at = None;
-            let mut events = vec![];
-            for (key, live) in &mut self.live {
-                if !live.mem_pending {
-                    continue;
-                }
-                let rev = if let Some(prev) = self.published.get(key) {
-                    prev.rev
-                } else {
-                    let s = Sqlite::new(&mut self.conn);
-                    SqliteTx(&s).document(&key.0, &key.1, &key.2)?.map_or(0, |d| d.rev)
-                } + 1;
-                let doc = Document {
-                    scope_kind: key.0.clone(),
-                    scope_id: key.1.clone(),
-                    doc_kind: key.2.clone(),
-                    state: live.state.clone(),
-                    updated_at_ms: live.updated_at_ms,
-                    rev,
-                };
-                self.published.insert(key.clone(), doc.clone());
-                live.mem_pending = false;
-                events.push(DocumentEvent {
-                    document: doc,
-                    durable: false,
-                    retired: false,
-                });
-            }
-            self.stats.coalesced_live_memory += events.len() as u64;
-            for event in events {
-                self.publish(event);
-            }
-        }
-        if force || self.disk_at.is_some_and(|v| v <= now) {
-            let mut dbtx = block_on(self.conn.begin())?;
-            let events = {
-                let s = Sqlite::new(&mut dbtx);
-                let conn = SqliteTx(&s);
-                let mut events = Vec::with_capacity(self.live.len());
-                for ((scope, id, kind), d) in &self.live {
-                    let rev = conn.put_document(scope, id, kind, &d.state, now)?;
-                    let document = Document {
-                        scope_kind: scope.clone(),
-                        scope_id: id.clone(),
-                        doc_kind: kind.clone(),
-                        rev,
-                        state: d.state.clone(),
-                        updated_at_ms: now,
-                    };
-                    events.push(DocumentEvent {
-                        document,
-                        retired: false,
-                        durable: true,
-                    });
-                }
-                events
-            };
-            block_on(dbtx.commit())?;
-            self.stats.coalesced_live_disk += events.len() as u64;
-            self.disk_at = None;
-            self.live.clear();
-            self.published.clear();
-            for event in events {
-                self.publish(event);
-            }
-        }
-        Ok(())
-    }
 }
 
 struct SqliteInner {
@@ -173,7 +83,7 @@ impl Drop for SqliteInner {
             && !self.closed.load(Ordering::Acquire)
             && !self.read_only
         {
-            let _ = db.live_flush((self.clock)(), true);
+            let _ = db.flush();
         }
     }
 }
@@ -203,11 +113,6 @@ impl SqliteStorage {
                 tasks_changed: false,
                 docs: vec![],
                 tasks: vec![],
-                live: HashMap::new(),
-                published: HashMap::new(),
-                mem_at: None,
-                disk_at: None,
-                timer_active: false,
                 stats: CommitStats::default(),
             }),
             clock: Arc::new(now_ms),
@@ -240,11 +145,6 @@ impl SqliteStorage {
                 tasks_changed: false,
                 docs: vec![],
                 tasks: vec![],
-                live: HashMap::new(),
-                published: HashMap::new(),
-                mem_at: None,
-                disk_at: None,
-                timer_active: false,
                 stats: CommitStats::default(),
             }),
             clock: Arc::new(clock),
@@ -371,88 +271,13 @@ impl StorageBackend for SqliteStorage {
         Ok(rx)
     }
 
-    fn put_deferred(&self, scope: &str, id: &str, kind: &str, state: Value) -> Result<()> {
-        if self.0.read_only {
-            return Err(Error::Invalid("sqlite storage is open read-only".into()));
-        }
-        if scope.is_empty() || id.is_empty() || kind != "pi.live" {
-            return Err(Error::Invalid("only a scoped pi.live document can be deferred".into()));
-        }
-        let mut db = self.lock()?;
-        db.flush()?;
-        let now = self.now_ms();
-        db.live.insert(
-            (scope.into(), id.into(), kind.into()),
-            Deferred {
-                state,
-                mem_pending: true,
-                updated_at_ms: now,
-            },
-        );
-        db.mem_at.get_or_insert(now + 100);
-        db.disk_at.get_or_insert(now + 1000);
-        if !db.timer_active {
-            db.timer_active = true;
-            let weak = Arc::downgrade(&self.0);
-            std::thread::spawn(move || {
-                loop {
-                    let Some(s) = weak.upgrade().map(SqliteStorage) else {
-                        return;
-                    };
-                    let Ok(mut db) = s.lock() else {
-                        return;
-                    };
-                    let now = s.now_ms();
-                    // A transient write failure leaves the documents pending for the next disk deadline.
-                    if db.live_flush(now, false).is_err() {
-                        db.disk_at = Some(now + 1000);
-                    }
-                    let until = db.mem_at.into_iter().chain(db.disk_at).min();
-                    let Some(until) = until else {
-                        db.timer_active = false;
-                        return;
-                    };
-                    drop(db);
-                    drop(s);
-                    std::thread::sleep(Duration::from_millis((until - now).clamp(1, 100) as u64));
-                }
-            });
-        }
-        Ok(())
-    }
-
-    fn flush_due(&self) -> Result<()> {
-        if self.0.read_only {
-            return Ok(());
-        }
-        self.lock()?.live_flush(self.now_ms(), false)
-    }
-
-    fn flush_deferred(&self) -> Result<()> {
-        if self.0.read_only {
-            return Ok(());
-        }
-        self.lock()?.live_flush(self.now_ms(), true)
-    }
-
-    fn live_document(&self, scope: &str, id: &str) -> Result<Option<Document>> {
-        let mut db = self.lock()?;
-        db.flush()?;
-        let key = (scope.to_owned(), id.to_owned(), "pi.live".to_owned());
-        if let Some(doc) = db.published.get(&key) {
-            return Ok(Some(doc.clone()));
-        }
-        let s = Sqlite::new(&mut db.conn);
-        SqliteTx(&s).document(scope, id, "pi.live")
-    }
-
     fn close(&self) -> Result<()> {
         let mut db = self.0.db.lock().unwrap();
         if self.0.closed.load(Ordering::Acquire) {
             return Ok(());
         }
         if !self.0.read_only {
-            db.live_flush(self.now_ms(), true)?;
+            db.flush()?;
         }
         self.0.closed.store(true, Ordering::Release);
         db.docs.clear();

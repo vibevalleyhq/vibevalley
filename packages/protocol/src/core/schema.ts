@@ -1,45 +1,18 @@
 import { z } from "zod";
 
-import { ChannelSummary, Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactUserMentionsChanged } from "../channel/schema";
+import { ChannelSummary, Chat } from "../channel/schema";
 import type { Codec } from "../codec";
 import { SessionId } from "../common/schema";
-import { ConnectorStatus, FactConnectorChanged } from "../connector/schema";
-import { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/schema";
-import { CommitCount, FactProgressChanged, FarmFrame, Progress, SessionPlay } from "../game/schema";
+import { ConnectorStatus } from "../connector/schema";
+import { CronView } from "../cron/schema";
+import { CommitCount, FarmFrame } from "../game/schema";
 import { InboxItem } from "../inbox/schema";
-import { BoardSummary, FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/schema";
-import { MediaJob, MediaSummary, FactMediaChanged } from "../media/schema";
+import { BoardSummary, Issue } from "../issue/schema";
+import { MediaJob, MediaSummary } from "../media/schema";
 import { RuntimeInfo } from "../runtime/schema";
-import {
-  FactMachineChanged,
-  FactSessionToolChanged,
-  FactSessionToolsReset,
-  FactSessionChanged,
-  FactSessionLeft,
-  FactSessionSubagentsChanged,
-  FactSessionPhaseChanged,
-  Machine,
-  Session,
-  SessionEvent,
-  SessionView,
-} from "../session/schema";
-import { CallState, FactCallChanged } from "../voice/schema";
+import { Machine, SessionEvent, SessionView } from "../session/schema";
+import { CallState } from "../voice/schema";
 import * as T from "./shapes";
-
-const SpaceState = z.object({
-  call: CallState,
-  callReason: z.string(),
-  media: z.exactOptional(z.array(MediaJob)),
-  chat: z.exactOptional(Chat),
-  commits: z.exactOptional(CommitCount),
-  progress: z.exactOptional(Progress),
-  issues: z.array(Issue),
-  connectors: z.array(ConnectorStatus),
-  machines: z.array(Machine),
-  sessions: z.array(Session),
-  crons: z.array(Cron),
-  plays: z.exactOptional(z.record(z.string(), SessionPlay)),
-}) satisfies Codec<T.SpaceState>;
 
 export const SliceKind = z.enum(T.SliceKindValues) satisfies Codec<T.SliceKind>;
 
@@ -94,35 +67,6 @@ export const Health = z.object({
   version: z.string(),
 }) satisfies Codec<T.Health>;
 
-export const Fact = z.discriminatedUnion("type", [
-  FactCallChanged,
-  FactSessionToolChanged,
-  FactSessionToolsReset,
-  FactSessionSubagentsChanged,
-  FactSessionPhaseChanged,
-  FactMessageChanged,
-  FactChannelChanged,
-  FactUserMentionsChanged,
-  FactSessionChanged,
-  FactSessionReported,
-  FactSessionLeft,
-  FactProgressChanged,
-  FactIssueChanged,
-  FactIssueRemoved,
-  FactChannelRemoved,
-  FactCronChanged,
-  FactCronRemoved,
-  FactConnectorChanged,
-  FactMachineChanged,
-  FactMediaChanged,
-]) satisfies Codec<T.Fact>;
-
-const ServerEventSnapshot = z.object({
-  type: z.literal("snapshot"),
-  at: z.number(),
-  state: SpaceState,
-}) satisfies Codec<T.ServerEventSnapshot>;
-
 const LiveEventSession = z.object({
   type: z.literal("event"),
   at: z.number(),
@@ -144,30 +88,3 @@ const LiveEventRuntime = z.object({
 }) satisfies Codec<T.LiveEventRuntime>;
 
 export const LiveEvent = z.discriminatedUnion("type", [LiveEventSession, LiveEventNotice, LiveEventRuntime]) satisfies Codec<T.LiveEvent>;
-
-export const ServerEvent = z.discriminatedUnion("type", [
-  FactCallChanged,
-  FactSessionToolChanged,
-  FactSessionToolsReset,
-  FactSessionSubagentsChanged,
-  FactSessionPhaseChanged,
-  FactMessageChanged,
-  FactChannelChanged,
-  FactUserMentionsChanged,
-  FactSessionChanged,
-  FactSessionReported,
-  FactSessionLeft,
-  FactProgressChanged,
-  FactIssueChanged,
-  FactIssueRemoved,
-  FactChannelRemoved,
-  FactCronChanged,
-  FactCronRemoved,
-  FactConnectorChanged,
-  FactMachineChanged,
-  FactMediaChanged,
-  ServerEventSnapshot,
-  LiveEventSession,
-  LiveEventNotice,
-  LiveEventRuntime,
-]) satisfies Codec<T.ServerEvent>;

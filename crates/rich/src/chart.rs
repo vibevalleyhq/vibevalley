@@ -2,8 +2,7 @@
 //!
 //! Renders resvg-safe SVGs with `ThemeMode::Resolved(vv_chart_palette(dark()))` via
 //! `image(ImageSrc::svg_markup(&svg).size(...))` (never `element::svg`, which drops `<text>`),
-//! cached in a bounded LRU cache keyed by `(hash, spec, dark)`. Hosts or tests may still
-//! override rendering via [`crate::hooks::ChartRenderer`].
+//! cached in a bounded LRU cache keyed by `(hash, spec, dark)`.
 
 use std::sync::{Mutex, OnceLock};
 
@@ -13,10 +12,39 @@ use nsh_core::prelude::*;
 
 use crate::cache::{CacheStats, LruCache, hash_str};
 use crate::code_block::vv_code_block;
-use crate::hooks::{RenderedSvg, active_chart_renderer};
 use crate::theme::{AdaptiveUi, vv_chart_palette};
 
 const CHART_CACHE_CAPACITY: usize = 64;
+
+/// Standalone SVG image payload returned by `render_chart`.
+///
+/// Always rasterized through `nsh_core::element::image(ImageSrc::svg_markup(&svg).size(...))`
+/// (never `element::svg`, which drops `<text>` nodes).
+#[derive(Debug, Clone, PartialEq)]
+pub struct RenderedSvg {
+    pub svg: String,
+    pub width: f32,
+    pub height: f32,
+    pub label: Option<String>,
+}
+
+impl RenderedSvg {
+    /// Constructs a new `RenderedSvg` with positive layout dimensions.
+    pub fn new(svg: impl Into<String>, width: f32, height: f32) -> Self {
+        Self {
+            svg: svg.into(),
+            width: width.max(1.0),
+            height: height.max(1.0),
+            label: None,
+        }
+    }
+
+    /// Attaches an accessibility label to the rendered image.
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct ChartCacheKey {
@@ -73,7 +101,7 @@ pub struct VvChartProps {
     pub title: Prop<Option<SharedString>>,
 }
 
-/// Native chart view backed by `vibevalley-chart` (or a registered [`crate::hooks::ChartRenderer`] override).
+/// Native chart view backed by `vibevalley-chart`.
 ///
 /// Renders via `ImageSrc::svg_markup` with intrinsic sizing so labels rasterize crisply,
 /// falling back cleanly to a labeled JSON code block + error message on invalid specs.
@@ -85,12 +113,7 @@ pub fn VvChart(props: VvChartProps) -> impl IntoElement {
         let is_dark = dark();
         let fallback_label = title.clone().unwrap_or_else(|| SharedString::from("Chart"));
 
-        let rendered = match active_chart_renderer() {
-            Some(renderer) => renderer.render_svg(spec.as_str(), is_dark),
-            None => render_chart(spec.as_str(), is_dark),
-        };
-
-        match rendered {
+        match render_chart(spec.as_str(), is_dark) {
             Ok(rendered) => {
                 let width = rendered.width.max(1.0);
                 let height = rendered.height.max(1.0);

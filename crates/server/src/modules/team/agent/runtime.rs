@@ -12,12 +12,11 @@ use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 use parking_lot::Mutex;
-use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     Agent, AgentProblem, AgentProblemLevel, ApiError, BizCode, Installation, InstallationAvailable, InstallationChecking, InstallationNotFound,
-    InstallationUnsupported, ModelEntry, NoticeLevel, RuntimeInfo, RuntimeSettings, Via,
+    InstallationUnsupported, JsNumber, ModelEntry, NoticeLevel, RuntimeInfo, RuntimeSettings, Via,
 };
 use vibevalley_runtime::oar::{Registry, Runtime};
 
@@ -26,6 +25,7 @@ use super::presets::{
     support_of,
 };
 use super::profile::Profiles;
+use crate::base::Ticker;
 use crate::{Hub, now};
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -64,17 +64,59 @@ struct Observation {
     read: u64,
 }
 
+/// Per-runtime CNY spend accumulated during the current local calendar day.
+struct DailySpend {
+    day: jiff::civil::Date,
+    by_runtime: HashMap<String, f64>,
+}
+
+impl DailySpend {
+    fn today() -> jiff::civil::Date {
+        jiff::ZonedDateTime::now().date()
+    }
+
+    fn new() -> Self {
+        Self {
+            day: Self::today(),
+            by_runtime: HashMap::new(),
+        }
+    }
+
+    fn sync_day(&mut self) {
+        let today = Self::today();
+        if self.day != today {
+            self.day = today;
+            self.by_runtime.clear();
+        }
+    }
+
+    fn add(&mut self, runtime: &str, cny: f64) -> f64 {
+        self.sync_day();
+        let key = runtime.strip_prefix("acp:").unwrap_or(runtime);
+        let entry = self.by_runtime.entry(key.to_string()).or_insert(0.0);
+        *entry += cny;
+        *entry
+    }
+
+    fn get(&mut self, runtime: &str) -> Option<JsNumber> {
+        self.sync_day();
+        let key = runtime.strip_prefix("acp:").unwrap_or(runtime);
+        self.by_runtime.get(key).copied().filter(|v| *v > 0.0).map(JsNumber::from)
+    }
+}
+
 /// `RuntimeFleet`.
 pub struct Fleet {
     registry: Arc<Registry>,
     profiles: Arc<Profiles>,
     hub: Weak<Hub>,
     held: Mutex<HashMap<String, Observation>>,
+    spend: Mutex<DailySpend>,
     probing: Mutex<HashSet<String>>,
     reads: AtomicU64,
     closed: AtomicBool,
     cancel: CancellationToken,
-    usage_task: Mutex<Option<JoinHandle<()>>>,
+    usage_task: Mutex<Option<Ticker>>,
     sub: Mutex<Option<crate::event_bus::Subscription>>,
 }
 
@@ -127,51 +169,64 @@ impl Fleet {
             profiles,
             hub: Arc::downgrade(hub),
             held: Mutex::default(),
+            spend: Mutex::new(DailySpend::new()),
             probing: Mutex::default(),
             reads: AtomicU64::new(0),
             closed: AtomicBool::new(false),
-            cancel: cancel.clone(),
+            cancel,
             usage_task: Mutex::new(None),
             sub: Mutex::new(None),
         });
-        if background {
-            for id in fleet.ids() {
-                fleet.probe_later(&id);
-            }
-            let f = Arc::downgrade(&fleet);
-            let task_cancel = cancel;
-            let handle = hub.spawn_task(async move {
-                loop {
-                    tokio::select! {
-                        biased;
-                        _ = task_cancel.cancelled() => return,
-                        _ = tokio::time::sleep(USAGE_EVERY) => {}
-                    }
-                    let Some(fleet) = f.upgrade() else { return };
-                    if fleet.closed.load(Ordering::Relaxed) {
-                        return;
-                    }
-                    let _ = tokio::task::spawn_blocking(move || {
-                        for id in fleet.ids() {
-                            fleet.refresh_usage(&id);
-                        }
-                    })
-                    .await;
-                }
-            });
-            *fleet.usage_task.lock() = Some(handle);
+        {
             let f = Arc::downgrade(&fleet);
             let sub = hub.subscribe_transitions("runtime-usage", move |_, tr| {
                 let vibevalley_protocol::Fact::SessionReported(r) = &tr.fact else { return };
                 let Some(fleet) = f.upgrade() else { return };
                 if let Some(s) = tr.after.sessions.iter().chain(&tr.before.sessions).find(|s| s.id == r.id) {
-                    fleet.usage_soon(&s.runtime);
+                    if let Some(cny) = r.spent.as_ref().and_then(|sp| sp.cny).map(JsNumber::get)
+                        && cny.is_finite()
+                        && cny > 0.0
+                    {
+                        fleet.record_spend(&s.runtime, cny);
+                    }
+                    if background {
+                        fleet.usage_soon(&s.runtime);
+                    }
                 }
             });
             let prev = fleet.sub.lock().replace(sub);
             drop(prev);
         }
+        if background {
+            for id in fleet.ids() {
+                fleet.probe_later(&id);
+            }
+            let f = Arc::downgrade(&fleet);
+            let ticker = Ticker::spawn_on(hub, USAGE_EVERY, false, move || {
+                let Some(fleet) = f.upgrade() else { return false };
+                if fleet.closed.load(Ordering::Relaxed) {
+                    return false;
+                }
+                for id in fleet.ids() {
+                    fleet.refresh_usage(&id);
+                }
+                true
+            });
+            *fleet.usage_task.lock() = Some(ticker);
+        }
         fleet
+    }
+
+    fn record_spend(&self, runtime: &str, cny: f64) {
+        let key = runtime.strip_prefix("acp:").unwrap_or(runtime);
+        self.spend.lock().add(key, cny);
+        let updated = self.held(key).map(|hit| {
+            let settings = self.profiles.settings(key);
+            self.shown(RuntimeInfo { settings, ..hit.info })
+        });
+        if let (Some(info), Some(hub)) = (updated, self.hub.upgrade()) {
+            hub.runtime(info);
+        }
     }
 
     /// `usageSoon`: the runtime's usage read again 20 s from now (several
@@ -216,7 +271,7 @@ impl Fleet {
         }
         now_held.info.usage = Some(usage);
         now_held.info.checked_at = now();
-        let info = Self::shown(now_held.info.clone());
+        let info = self.shown(now_held.info.clone());
         drop(held);
         if let Some(hub) = self.hub.upgrade() {
             hub.runtime(info);
@@ -229,8 +284,8 @@ impl Fleet {
         self.cancel.cancel();
         let prev = self.sub.lock().take();
         drop(prev);
-        if let Some(handle) = self.usage_task.lock().take() {
-            let _ = vibevalley_runtime::rt::block_on(handle);
+        if let Some(ticker) = self.usage_task.lock().take() {
+            ticker.stop();
         }
     }
 
@@ -268,16 +323,17 @@ impl Fleet {
             mcp_servers: None,
             tools: None,
             settings: self.profiles.settings(id),
-            spent_today: None,
+            spent_today: self.spend.lock().get(id),
             quota: None,
             stop: String::new(),
             checked_at,
         }
     }
 
-    /// `withSpend`: the stop and the quota from what is known now.
-    fn shown(info: RuntimeInfo) -> RuntimeInfo {
-        let mut out = RuntimeInfo { spent_today: None, ..info };
+    /// `withSpend`: the stop, daily spend, and quota from what is known now.
+    fn shown(&self, info: RuntimeInfo) -> RuntimeInfo {
+        let spent_today = self.spend.lock().get(&info.id);
+        let mut out = RuntimeInfo { spent_today, ..info };
         out.stop = money_stop(Some(&out));
         out.quota = Some(quota_of(out.usage.as_ref()));
         out
@@ -286,10 +342,8 @@ impl Fleet {
     /// Points the runtime's binary at the saved `binPath`; empty searches
     /// PATH (`probeInstallation`).
     fn use_binary(id: &str, bin_path: &str) {
-        let command = match id.strip_prefix("acp:").unwrap_or(id) {
-            "antigravity" => "agy",
-            other => other,
-        };
+        let bare = id.strip_prefix("acp:").unwrap_or(id);
+        let command = vibevalley_runtime::oar::runtime_spec(bare).and_then(|s| s.binary).unwrap_or(bare);
         let path = Some(bin_path.trim()).filter(|p| !p.is_empty()).map(std::path::PathBuf::from);
         vibevalley_runtime::oar::set_binary(command, path);
     }
@@ -358,7 +412,7 @@ impl Fleet {
     /// A new lookup, kept and told on the live stream.
     fn lookup(&self, id: &str) -> RuntimeInfo {
         let read = self.reads.fetch_add(1, Ordering::Relaxed) + 1;
-        let info = Self::shown(self.probe(id));
+        let info = self.shown(self.probe(id));
         let mut held = self.held.lock();
         // A slower older lookup does not overwrite a newer one.
         if held.get(id).is_none_or(|o| o.read < read) {
@@ -417,7 +471,7 @@ impl Fleet {
                         self.probe_later(&id);
                     }
                     let settings = self.profiles.settings(&id);
-                    Self::shown(RuntimeInfo { settings, ..hit.info })
+                    self.shown(RuntimeInfo { settings, ..hit.info })
                 }
                 None => {
                     self.probe_later(&id);
@@ -437,7 +491,7 @@ impl Fleet {
             .map(|id| match self.held(&id) {
                 Some(hit) => {
                     let settings = self.profiles.settings(&id);
-                    Self::shown(RuntimeInfo { settings, ..hit.info })
+                    self.shown(RuntimeInfo { settings, ..hit.info })
                 }
                 None => self.placeholder(&id, 0),
             })
@@ -457,7 +511,7 @@ impl Fleet {
     /// What is kept in the farm's language, else a new probe.
     pub fn info(&self, id: &str) -> Option<RuntimeInfo> {
         match self.held(id) {
-            Some(hit) if hit.locale == vibevalley_i18n::locale() => Some(Self::shown(hit.info)),
+            Some(hit) if hit.locale == vibevalley_i18n::locale() => Some(self.shown(hit.info)),
             _ => self.refresh(id),
         }
     }
@@ -476,7 +530,7 @@ impl Fleet {
     fn configuration(&self, id: &str) -> (RuntimeSettings, Option<RuntimeInfo>) {
         let observed = self.info(id);
         let settings = self.profiles.settings(id);
-        (settings.clone(), observed.map(|i| Self::shown(RuntimeInfo { settings, ..i })))
+        (settings.clone(), observed.map(|i| self.shown(RuntimeInfo { settings, ..i })))
     }
 
     pub fn assess(&self, agent: &Agent) -> Assessment {
@@ -643,5 +697,74 @@ mod usage_tests {
             reason: "capability_unavailable".into(),
         });
         assert_eq!(serde_json::to_value(&none).unwrap()["reason"], "capability_unavailable");
+    }
+
+    #[test]
+    fn spent_today_accumulates_reported_cny_and_enforces_daily_budget() {
+        use std::time::Instant;
+        use vibevalley_protocol::{ExecutionPolicy, Fact, FactSessionChanged, FactSessionReported, Outcome, Session, SessionController, Spent};
+
+        let home = tempfile::tempdir().unwrap();
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let mut registry = Registry::new();
+        registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
+        let profiles = Profiles::open(home.path(), &[]).unwrap();
+        let fleet = Fleet::new(Arc::new(registry), profiles, &hub, false);
+        fleet
+            .update(
+                "scripted",
+                RuntimeSettings {
+                    daily_budget: Some(5.0.into()),
+                    ..super::super::presets::default_settings()
+                },
+            )
+            .unwrap();
+        let before = fleet.info("scripted").unwrap();
+        assert_eq!(before.spent_today, None);
+        assert!(before.stop.is_empty());
+
+        let session = Session::new(
+            "s1",
+            SessionController::IssueBoard,
+            "Worker",
+            "scripted",
+            ExecutionPolicy::ManagedWorktree {
+                repo: "demo".into(),
+                branch: None,
+            },
+            1,
+        );
+        hub.apply(vec![Fact::SessionChanged(FactSessionChanged { at: 1, session })]);
+        for (at, cny) in [(2, 3.5), (3, 2.0)] {
+            hub.apply(vec![Fact::SessionReported(FactSessionReported {
+                at,
+                id: "s1".into(),
+                run: None,
+                outcome: Outcome::Completed,
+                phase: None,
+                summary: "done".into(),
+                runs: 1,
+                spent: Some(Spent {
+                    tokens: 100,
+                    cny: Some(cny.into()),
+                }),
+                questions: vec![],
+                checks: vec![],
+                answer: None,
+            })]);
+        }
+
+        let deadline = Instant::now() + Duration::from_secs(3);
+        let after = loop {
+            let info = fleet.info("scripted").unwrap();
+            if info.spent_today.map(JsNumber::get).unwrap_or(0.0) >= 5.5 {
+                break info;
+            }
+            assert!(Instant::now() < deadline, "spent_today did not accumulate: {:?}", info.spent_today);
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        assert!(!after.stop.is_empty(), "daily budget stop should trigger at 5.5 >= 5.0");
+        fleet.close();
+        hub.close_bus();
     }
 }

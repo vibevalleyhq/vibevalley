@@ -8,7 +8,7 @@ use vibevalley_i18n::{list, t};
 use vibevalley_protocol::*;
 
 /// The length JavaScript gives `s.length`.
-pub fn js_len(s: &str) -> usize {
+pub(crate) fn js_len(s: &str) -> usize {
     s.encode_utf16().count()
 }
 
@@ -46,7 +46,7 @@ pub fn one_line(s: &str) -> String {
 
 /// `clip` (`base/clip.ts`): on one line and trimmed, at most `max` units
 /// with the ellipsis.
-pub fn clip(s: &str, max: usize) -> String {
+pub(crate) fn clip(s: &str, max: usize) -> String {
     let flat = one_line(s);
     let flat = flat.trim();
     if js_len(flat) > max {
@@ -62,7 +62,7 @@ pub fn compare_text(a: &str, b: &str) -> Ordering {
 }
 
 /// `plainText`: markdown read as plain words.
-pub fn plain_text(markdown: &str) -> String {
+pub(crate) fn plain_text(markdown: &str) -> String {
     use regex::Regex;
     use std::sync::LazyLock;
     static FENCE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"```[\s\S]*?```").unwrap());
@@ -105,11 +105,6 @@ fn strip_emphasis(s: &str) -> String {
         rest = &rest[c.len_utf8()..];
     }
     out
-}
-
-/// `assignmentOf`: the responsibility in force now.
-pub fn assignment_of(issue: &Issue) -> Option<&Assignment> {
-    issue.assignments.iter().rev().find(|a| a.ended_at.is_none())
 }
 
 /// `sessionIdsOf`: the helper sessions that executed it, in order.
@@ -172,7 +167,7 @@ pub fn stage_wants_user(s: IssueStageKind) -> bool {
 }
 
 /// `spanText`: seconds under a minute (at least one), else minutes.
-pub fn span_text(ms: i64) -> String {
+fn span_text(ms: i64) -> String {
     if ms < 60_000 {
         t("shared.seconds", &[("n", ((ms as f64 / 1000.0).round().max(1.0)).into())])
     } else {
@@ -180,7 +175,7 @@ pub fn span_text(ms: i64) -> String {
     }
 }
 
-pub fn is_busy(s: &Session) -> bool {
+pub(crate) fn is_busy(s: &Session) -> bool {
     s.phase.is_working()
 }
 
@@ -207,7 +202,7 @@ pub fn room_left(sessions: &[Session], repo: &str, space: usize, per_repo: usize
 
 /// `Need`: what a session wants of someone.
 #[derive(Debug, Clone, PartialEq)]
-pub enum Need {
+pub(crate) enum Need {
     Quiet { since: i64 },
     Retrying { retry: Retry },
     Conflict { conflict: Conflict },
@@ -215,7 +210,7 @@ pub enum Need {
     Fix,
 }
 
-pub fn need_of(h: &Session, conflict: Option<&Conflict>) -> Option<Need> {
+pub(crate) fn need_of(h: &Session, conflict: Option<&Conflict>) -> Option<Need> {
     match &h.phase {
         Phase::Working(p) => {
             if let Some(since) = p.quiet_since {
@@ -247,7 +242,7 @@ pub fn phase_text(h: &Session, now: i64, conflict: Option<&Conflict>) -> String 
 
 /// `phaseWords`: what a session is doing in words; how long it has been
 /// quiet is left as `{span}`.
-pub fn phase_words(h: &Session, conflict: Option<&Conflict>) -> String {
+pub(crate) fn phase_words(h: &Session, conflict: Option<&Conflict>) -> String {
     let need = need_of(h, conflict);
     let conflict_words = match &need {
         Some(Need::Conflict { conflict }) => t(
@@ -293,23 +288,13 @@ pub fn phase_words(h: &Session, conflict: Option<&Conflict>) -> String {
 }
 
 /// `farmOf`: each repo has its own farm; sessions without one share one.
-pub fn farm_of(h: &Session) -> &str {
+pub(crate) fn farm_of(h: &Session) -> &str {
     h.repo_name().unwrap_or("")
 }
 
 /// `plotKeyOf`: its issue, so a reopened issue keeps its plot.
-pub fn plot_key_of(h: &Session) -> &str {
+pub(crate) fn plot_key_of(h: &Session) -> &str {
     h.issue_id().unwrap_or(&h.id)
-}
-
-/// `defaultOf`: the channel words go to when none is named.
-pub fn default_of(chat: Option<&Chat>) -> Option<&Channel> {
-    chat?.channels.iter().find(|c| c.default)
-}
-
-pub fn channel_of<'a>(chat: Option<&'a Chat>, id: Option<&str>) -> Option<&'a Channel> {
-    let id = id.filter(|s| !s.is_empty())?;
-    chat?.channels.iter().find(|c| c.id == id)
 }
 
 /// `actorRoleOf`.
@@ -323,7 +308,7 @@ pub fn actor_role_of(actor: &Actor) -> Option<AgentRole> {
 const KEY_DIGITS: &str = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const MAX_KEY_LEN: usize = 256;
 
-pub fn valid_key(k: &str) -> bool {
+pub(crate) fn valid_key(k: &str) -> bool {
     !k.is_empty() && k.len() <= MAX_KEY_LEN && !k.ends_with('0') && k.chars().all(|c| KEY_DIGITS.contains(c))
 }
 
@@ -398,20 +383,6 @@ fn midpoint(a: &str, b: &str) -> String {
     format!("{}{}", digit_at(lo), midpoint(if a.len() > 1 { &a[1..] } else { "" }, ""))
 }
 
-/// `githubRepository`: only repository home URLs.
-pub fn github_repository(input: &str) -> Option<(String, String)> {
-    use regex::Regex;
-    use std::sync::LazyLock;
-    static URL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^https://github\.com/([A-Za-z0-9-]+)/([A-Za-z0-9_.-]+)/?$").unwrap());
-    let m = URL.captures(input.trim())?;
-    let name = m[2].strip_suffix(".git").unwrap_or(&m[2]).to_string();
-    if name.is_empty() || name == "." || name == ".." {
-        return None;
-    }
-    let url = format!("https://github.com/{}/{name}.git", &m[1]);
-    Some((name, url))
-}
-
 /// `actCommand`: the CLI command that does one of an issue's acts.
 pub fn act_command(
     issue: &vibevalley_protocol::Issue,
@@ -463,14 +434,5 @@ mod tests {
         let forty = "这是一个很长的标题，里面有很多很多的字，一直写下去一直写下去一直写下去一直写下去";
         assert_eq!(short_title(forty), forty);
         assert_eq!(short_title(&format!("{forty}再写一点")), "这是一个很长的标题，里面有很多很多的字");
-    }
-
-    #[test]
-    fn github_urls() {
-        assert_eq!(
-            github_repository("https://github.com/a-b/c.d.git"),
-            Some(("c.d".into(), "https://github.com/a-b/c.d.git".into()))
-        );
-        assert_eq!(github_repository("git@github.com:a/b"), None);
     }
 }

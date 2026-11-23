@@ -11,7 +11,7 @@ use crate::moves::status_moves;
 use crate::rules::{compare_text, is_busy};
 
 /// On duty: an orchestrator's standing session.
-pub fn is_on_duty(session: &Session) -> bool {
+fn is_on_duty(session: &Session) -> bool {
     session.is_orchestrator()
 }
 
@@ -25,12 +25,12 @@ pub fn is_farm_worker(session: &Session) -> bool {
     session.is_board_worker() || session.is_direct_talker()
 }
 
-pub fn session_of<'a>(state: &'a SpaceState, id: &str) -> Option<&'a Session> {
+pub(crate) fn session_of<'a>(state: &'a SpaceState, id: &str) -> Option<&'a Session> {
     state.sessions.iter().find(|h| h.id == id)
 }
 
 /// `sessionOnIssue`: the latest hired of those on the issue.
-pub fn session_on_issue<'a>(state: &'a SpaceState, issue: &str) -> Option<&'a Session> {
+pub(crate) fn session_on_issue<'a>(state: &'a SpaceState, issue: &str) -> Option<&'a Session> {
     let mut on: Option<&Session> = None;
     for h in &state.sessions {
         if h.issue_id() == Some(issue) && on.is_none_or(|o| h.hired_at >= o.hired_at) {
@@ -40,28 +40,9 @@ pub fn session_on_issue<'a>(state: &'a SpaceState, issue: &str) -> Option<&'a Se
     on
 }
 
-/// `doingOf`.
-pub fn doing_of(h: &Session) -> Doing {
-    match &h.phase {
-        Phase::Working(p) => p.doing.clone(),
-        _ => Doing {
-            action: SessionAction::None,
-            label: String::new(),
-        },
-    }
-}
-
 fn awaits_feedback(issue: &Issue, session: Option<&Session>) -> bool {
     session.is_some_and(|s| {
         matches!(s.phase, Phase::Resting(_)) && s.last_run.as_ref().is_some_and(|r| r.outcome == Outcome::Completed) && issue.questions.is_empty()
-    })
-}
-
-/// `conflictOf`: the conflict a preview of the branch shows.
-pub fn conflict_of(base: &str, conflicts: &[String]) -> Option<Conflict> {
-    (!conflicts.is_empty()).then(|| Conflict {
-        base: base.to_string(),
-        files: conflicts.to_vec(),
     })
 }
 
@@ -103,7 +84,7 @@ fn stuck(reason: StuckReason, since: Option<i64>, lead: IssueAct, acts: Vec<Issu
 
 /// `issueStageOf`: `session` is the issue's newest one, `None` while none
 /// is on the farm.
-pub fn issue_stage_of(t: &Issue, session: Option<&Session>) -> IssueStage {
+fn issue_stage_of(t: &Issue, session: Option<&Session>) -> IssueStage {
     use IssueAct as A;
     use IssueStageKind as K;
     let last = session.and_then(|s| s.last_run.as_ref());
@@ -211,12 +192,6 @@ pub fn issue_stage_of(t: &Issue, session: Option<&Session>) -> IssueStage {
     }
 }
 
-/// `issueStageIn`.
-pub fn issue_stage_in(t: &Issue, state: &SpaceState) -> IssueStage {
-    let session = t.latest_session_id().and_then(|id| session_of(state, id));
-    issue_stage_of(t, session)
-}
-
 struct Lookup<'a> {
     sessions: HashMap<&'a str, &'a Session>,
     refining: HashMap<&'a str, IssueRefining>,
@@ -292,26 +267,9 @@ fn status_with_lookup(t: &Issue, lookup: &Lookup) -> IssueStatus {
     Backlog
 }
 
-/// `issueStatusOf`.
-pub fn issue_status_of(t: &Issue, state: &SpaceState) -> IssueStatus {
-    status_with_lookup(t, &lookup_of(state))
-}
-
-/// `issueRefiningOf`.
-pub fn issue_refining_of(t: &Issue, state: &SpaceState) -> Option<IssueRefining> {
-    state
-        .sessions
-        .iter()
-        .find(|h| h.is_refining() && h.issue_id() == Some(&t.id))
-        .map(|h| IssueRefining {
-            session: h.id.clone(),
-            name: h.name.clone(),
-        })
-}
-
 /// `withIssueStatuses`: every issue's status, drafting session, stage and
 /// moves brought up to date. False when none changed.
-pub fn with_issue_statuses(state: &mut SpaceState) -> bool {
+pub(crate) fn with_issue_statuses(state: &mut SpaceState) -> bool {
     if state.issues.is_empty() {
         return false;
     }
@@ -338,7 +296,7 @@ pub fn with_issue_statuses(state: &mut SpaceState) -> bool {
     changed
 }
 
-pub const KEEP_CLOSED_ISSUES: usize = 50;
+const KEEP_CLOSED_ISSUES: usize = 50;
 
 /// `issueOrder`: the never-sent by rank, then the sent newest first.
 pub fn issue_order(a: &Issue, b: &Issue) -> Ordering {
@@ -359,7 +317,7 @@ pub fn issue_order(a: &Issue, b: &Issue) -> Ordering {
 
 /// `withIssue`: keeps the latest `KEEP_CLOSED_ISSUES` closed top-level
 /// issues; a sub-issue goes with its parent.
-pub fn with_issue(all: &mut Vec<Issue>, t: Issue) {
+pub(crate) fn with_issue(all: &mut Vec<Issue>, t: Issue) {
     all.retain(|x| x.id != t.id);
     all.push(t);
     let mut closed: Vec<(String, i64)> = all
@@ -405,17 +363,17 @@ pub fn pick_issues(all: &[Issue], f: &IssueFilter, now: i64) -> Vec<Issue> {
 }
 
 /// `openFindings`: a failed acceptance's findings not yet resolved.
-pub fn open_findings(t: &Issue) -> usize {
+pub(crate) fn open_findings(t: &Issue) -> usize {
     t.findings.iter().filter(|f| !f.resolved).count()
 }
 
 /// `assignedOnDuty`.
-pub fn assigned_on_duty(t: &Issue, on_duty: impl Fn(&str) -> bool) -> bool {
+fn assigned_on_duty(t: &Issue, on_duty: impl Fn(&str) -> bool) -> bool {
     on_duty(t.assigned_agent().unwrap_or(""))
 }
 
 /// Maps an issue's board status onto one of the four UI lanes.
-pub fn issue_lane_of(status: IssueStatus) -> IssueLane {
+fn issue_lane_of(status: IssueStatus) -> IssueLane {
     match status {
         IssueStatus::Backlog | IssueStatus::Todo => IssueLane::Todo,
         IssueStatus::InProgress => IssueLane::Working,
@@ -425,7 +383,7 @@ pub fn issue_lane_of(status: IssueStatus) -> IssueLane {
 }
 
 /// Structured, locale-free user prompt kind for an issue's current stage.
-pub fn issue_prompt_of(issue: &Issue) -> Option<IssuePromptKind> {
+fn issue_prompt_of(issue: &Issue) -> Option<IssuePromptKind> {
     match issue.stage.state {
         IssueStageKind::Asking => Some(IssuePromptKind::Asking),
         IssueStageKind::Reviewing => {
@@ -456,7 +414,7 @@ pub fn issue_prompt_of(issue: &Issue) -> Option<IssuePromptKind> {
 
 /// Deterministic board summary folded into `BoardSlice`: identical lane counts
 /// for wide and narrow views, active worker slot usage, and per-issue metadata.
-pub fn board_summary(state: &SpaceState) -> BoardSummary {
+pub(crate) fn board_summary(state: &SpaceState) -> BoardSummary {
     let lookup = lookup_of(state);
     let mut on_duty_agents: HashSet<&str> = HashSet::from([DEFAULT_ORCHESTRATOR]);
     for s in &state.sessions {

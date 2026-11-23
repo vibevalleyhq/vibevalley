@@ -93,7 +93,7 @@ type ActivitySummary = {
 const ROW_BASE_PAD = 6;
 const INDENT_STEP = 14;
 
-const KNOWN_RUNTIME_LOGOS = new Set(["claude", "codex", "opencode", "cursor", "kimi", "pi", "dsh", "grok", "antigravity"]);
+const KNOWN_RUNTIME_LOGOS = new Set(["claude", "codex", "opencode", "cursor", "kimi", "pi", "grok", "antigravity"]);
 
 function runtimeLogoOf(agent: string | undefined): string | undefined {
   if (!agent) return undefined;

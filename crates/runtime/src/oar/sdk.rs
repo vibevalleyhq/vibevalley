@@ -100,16 +100,7 @@ impl Runtime for SdkRuntime {
         }
     }
     fn capabilities(&self) -> Capabilities {
-        Capabilities {
-            resume: true,
-            steer: false,
-            queue: true,
-            permission_requests: true,
-            model_selection: true,
-            subagents: true,
-            usage: true,
-            config_options: false,
-        }
+        crate::oar::runtime_spec(self.id()).expect("sdk runtime spec").capabilities
     }
     fn installation(&self) -> Installation {
         probe_installation_with(self.command(), None)

@@ -15,13 +15,14 @@ import {
   userId,
 } from "@vibevalley/protocol";
 
+import { type ArtifactFacet, artifactFacetOf, mediaKindOf } from "../content/navigation";
+
 export type SourceFilter = "all" | "agent" | "user";
 export const sourceFilters: readonly SourceFilter[] = ["all", "agent", "user"];
 
-export type ArtifactTypeFilter = ArtifactType | "html";
+export type ArtifactTypeFilter = ArtifactFacet;
 
-export const kindOf = (type: string): LibraryFileKind =>
-  type.startsWith("image/") ? "image" : type.startsWith("audio/") ? "audio" : type.startsWith("video/") ? "video" : "other";
+export const kindOf = mediaKindOf;
 
 const isMediaFromSource = (item: LibraryItem, source: SourceFilter): boolean => {
   switch (source) {
@@ -55,27 +56,10 @@ const isNoteFromSource = (source: SourceFilter): boolean => {
   }
 };
 
-function resolvedArtifactType(a: {
-  readonly body: ArtifactBody;
-  readonly display?: ArtifactDisplay | undefined;
-  readonly artifactType?: ArtifactType | undefined;
-}): ArtifactTypeFilter {
-  if (a.artifactType !== undefined) return a.artifactType;
-  switch (a.body) {
-    case "blocks":
-    case "store":
-      return "docs";
-    case "html":
-      if (a.display === "slides") return "slides";
-      if (a.display === "motion") return "motion";
-      return "html";
-  }
-}
-
 export const artifactMatchesType = (
   a: { readonly body: ArtifactBody; readonly display?: ArtifactDisplay | undefined; readonly artifactType?: ArtifactType | undefined },
   type: ArtifactTypeFilter | undefined,
-): boolean => type === undefined || resolvedArtifactType(a) === type;
+): boolean => type === undefined || artifactFacetOf(a) === type;
 
 export const shownNotes = (
   pages: readonly PkmPageSummary[],

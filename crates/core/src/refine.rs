@@ -97,8 +97,6 @@ pub fn refinement_description(d: &Draft) -> String {
     parts.join("\n\n")
 }
 
-pub use crate::prompts::REFINEMENT_OPENING;
-
 /// The drafting session's prompt (`refinementBrief`).
 pub fn refinement_brief(
     title: &str,

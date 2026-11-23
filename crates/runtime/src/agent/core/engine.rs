@@ -10,7 +10,7 @@ use crate::agent::BrainError;
 use crate::agent::ai::CancelToken;
 use crate::agent::ai::types::{ChatRequest, Delta, ToolCall, ToolSpec, Usage};
 use crate::agent::compaction::{Compactor, FileOps, Level};
-use crate::agent::core::doc::{CONVERSATION_SCOPE, DocSpec, FileOpsDoc, LiveDoc, LiveState, StandInDoc, UsageTotals, read_doc, update_doc};
+use crate::agent::core::doc::{CONVERSATION_SCOPE, FileOpsDoc, StandInDoc, UsageTotals, read_doc, update_doc};
 use crate::agent::core::events::{AgentEvent, Brain, TurnOutcome};
 use crate::agent::core::extension::{CompactCtx, DurableHookCtx, ExtensionRunner, Rubric, RubricVerdict, RunEndCtx, ToolCallHookCtx};
 use crate::agent::core::inbox::{self, WhenBusy};
@@ -487,21 +487,12 @@ impl Engine {
         };
 
         let cancel = CancelToken::from_receiver(tc.cancellation());
-        let mut live = LiveState::default();
-        let stream_delta = |delta: Delta, live: &mut LiveState| match delta {
-            Delta::Text(text) => {
-                live.text.push_str(&text);
-                let _ = self.store.put_deferred(CONVERSATION_SCOPE, conv, LiveDoc::KIND, json!(live));
-                self.emit(conv, &tc.task.id, AgentEvent::TextDelta { delta: text });
-            }
-            Delta::Reasoning(r) => {
-                live.reasoning.push_str(&r);
-                let _ = self.store.put_deferred(CONVERSATION_SCOPE, conv, LiveDoc::KIND, json!(live));
-                self.emit(conv, &tc.task.id, AgentEvent::ReasoningDelta { delta: r });
-            }
+        let mut stream_delta = |delta: Delta| match delta {
+            Delta::Text(text) => self.emit(conv, &tc.task.id, AgentEvent::TextDelta { delta: text }),
+            Delta::Reasoning(r) => self.emit(conv, &tc.task.id, AgentEvent::ReasoningDelta { delta: r }),
         };
 
-        let resp = match brain.client.complete_cancellable(&req, &cancel, &mut |d| stream_delta(d, &mut live)) {
+        let resp = match brain.client.complete_cancellable(&req, &cancel, &mut stream_delta) {
             Err(BrainError::ContextOverflow(_)) => {
                 let compactor = self.effective_compactor(&brain);
                 if let Some(entry) = compactor.compact(conv, Level::Overflow, None)? {
@@ -517,8 +508,7 @@ impl Engine {
                 }
                 let tr2 = Transcript::load(&self.store, conv)?;
                 req.messages = convert_to_llm(transform_context(tr2.agent_messages(), &runner, &hook_ctx)?);
-                live = LiveState::default();
-                brain.client.complete_cancellable(&req, &cancel, &mut |d| stream_delta(d, &mut live))
+                brain.client.complete_cancellable(&req, &cancel, &mut stream_delta)
             }
             other => other,
         }

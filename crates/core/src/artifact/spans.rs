@@ -3,7 +3,7 @@
 
 use vibevalley_protocol::{BlockType, SpanMarks, TextSpan};
 
-pub fn span(t: impl Into<String>) -> TextSpan {
+pub(crate) fn span(t: impl Into<String>) -> TextSpan {
     TextSpan {
         t: t.into(),
         marks: SpanMarks::default(),
@@ -11,7 +11,7 @@ pub fn span(t: impl Into<String>) -> TextSpan {
 }
 
 /// The marks as the wire has them: only those set.
-pub fn marks_of(m: &SpanMarks) -> SpanMarks {
+fn marks_of(m: &SpanMarks) -> SpanMarks {
     SpanMarks {
         bold: (m.bold == Some(true)).then_some(true),
         italic: (m.italic == Some(true)).then_some(true),
@@ -22,7 +22,7 @@ pub fn marks_of(m: &SpanMarks) -> SpanMarks {
 }
 
 /// Equal for marks that read the same: unset and false give one key.
-pub fn marks_key(m: &SpanMarks) -> String {
+fn marks_key(m: &SpanMarks) -> String {
     let b = |x: Option<bool>| if x == Some(true) { '1' } else { '0' };
     let mut k: String = [b(m.bold), b(m.italic), b(m.code), b(m.strike)].iter().collect();
     if let Some(link) = &m.link {
@@ -34,7 +34,7 @@ pub fn marks_key(m: &SpanMarks) -> String {
 
 /// Drops empty spans and joins neighbours with the same marks, so one text
 /// has one way to be written.
-pub fn normal_spans<'a>(spans: impl IntoIterator<Item = &'a TextSpan>) -> Vec<TextSpan> {
+pub(crate) fn normal_spans<'a>(spans: impl IntoIterator<Item = &'a TextSpan>) -> Vec<TextSpan> {
     let mut out: Vec<TextSpan> = vec![];
     for s in spans {
         if s.t.is_empty() {
@@ -58,18 +58,18 @@ pub fn plain(spans: &[TextSpan]) -> String {
     spans.iter().map(|s| s.t.as_str()).collect()
 }
 
-pub fn rune_len(spans: &[TextSpan]) -> i64 {
+pub(crate) fn rune_len(spans: &[TextSpan]) -> i64 {
     spans.iter().map(|s| s.t.chars().count() as i64).sum()
 }
 
-pub fn same_text(a: &[TextSpan], b: &[TextSpan]) -> bool {
+pub(crate) fn same_text(a: &[TextSpan], b: &[TextSpan]) -> bool {
     let x = normal_spans(a);
     let y = normal_spans(b);
     x.len() == y.len() && x.iter().zip(&y).all(|(s, o)| s.t == o.t && marks_key(&s.marks) == marks_key(&o.marks))
 }
 
 /// Cuts spans at a code-point offset, 0 ≤ at ≤ rune_len(spans).
-pub fn split_at(spans: &[TextSpan], mut at: i64) -> (Vec<TextSpan>, Vec<TextSpan>) {
+pub(crate) fn split_at(spans: &[TextSpan], mut at: i64) -> (Vec<TextSpan>, Vec<TextSpan>) {
     let mut left = vec![];
     let mut right = vec![];
     for s in spans {
@@ -94,7 +94,7 @@ pub fn split_at(spans: &[TextSpan], mut at: i64) -> (Vec<TextSpan>, Vec<TextSpan
     (normal_spans(&left), normal_spans(&right))
 }
 
-pub fn joined(a: &[TextSpan], b: &[TextSpan]) -> Vec<TextSpan> {
+pub(crate) fn joined(a: &[TextSpan], b: &[TextSpan]) -> Vec<TextSpan> {
     normal_spans(a.iter().chain(b))
 }
 
@@ -105,11 +105,11 @@ pub fn unmarked(spans: &[TextSpan]) -> Vec<TextSpan> {
 }
 
 /// The types that hold words.
-pub fn has_text(t: BlockType) -> bool {
+pub(crate) fn has_text(t: BlockType) -> bool {
     !matches!(t, BlockType::Divider | BlockType::Image | BlockType::IssueRef)
 }
 
-pub fn text_for(t: BlockType, spans: &[TextSpan]) -> Vec<TextSpan> {
+pub(crate) fn text_for(t: BlockType, spans: &[TextSpan]) -> Vec<TextSpan> {
     if !has_text(t) {
         return vec![];
     }
@@ -120,7 +120,7 @@ pub fn text_for(t: BlockType, spans: &[TextSpan]) -> Vec<TextSpan> {
 }
 
 /// JavaScript's `\s`.
-pub fn js_space(c: char) -> bool {
+pub(crate) fn js_space(c: char) -> bool {
     matches!(
         c,
         '\t' | '\n' | '\u{b}' | '\u{c}' | '\r' | ' ' | '\u{a0}' | '\u{1680}' | '\u{2000}'
@@ -129,6 +129,6 @@ pub fn js_space(c: char) -> bool {
 }
 
 /// JavaScript's `trim()`.
-pub fn js_trim(s: &str) -> &str {
+pub(crate) fn js_trim(s: &str) -> &str {
     s.trim_matches(js_space)
 }

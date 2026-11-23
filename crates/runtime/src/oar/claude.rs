@@ -17,6 +17,7 @@ use std::time::Duration;
 
 use base64::Engine;
 use parking_lot::Mutex;
+use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, rejected, rejection};
@@ -74,11 +75,16 @@ const LOGIN: LoginCheck = LoginCheck {
     status: claude_login_status,
 };
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WireAuthStatus {
+    #[serde(default)]
+    logged_in: Option<bool>,
+}
+
 pub(crate) fn claude_login_status(ok: bool, text: &str) -> LoginStatus {
     let start = text.find('{').unwrap_or(0);
-    let reported = serde_json::from_str::<Value>(&text[start..])
-        .ok()
-        .and_then(|status| status.get("loggedIn").and_then(Value::as_bool));
+    let reported = serde_json::from_str::<WireAuthStatus>(&text[start..]).ok().and_then(|s| s.logged_in);
     match reported {
         Some(false) => LoginStatus::SignedOut,
         Some(true) => LoginStatus::SignedIn,
@@ -181,35 +187,315 @@ pub(crate) struct Projector {
     pub(crate) abort_requested: bool,
 }
 
-fn str_of<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
-    value.get(key).and_then(Value::as_str)
+#[derive(Default, Deserialize)]
+struct WireMeta {
+    #[serde(rename = "type", default)]
+    kind: Option<String>,
+    #[serde(default)]
+    subtype: Option<String>,
+    #[serde(default)]
+    parent_tool_use_id: Option<String>,
+    #[serde(default)]
+    session_id: Option<String>,
+    #[serde(default)]
+    model: Option<String>,
 }
 
-fn tool_result_text(content: Option<&Value>) -> String {
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum WireMessage {
+    StreamEvent {
+        #[serde(default)]
+        parent_tool_use_id: Option<String>,
+        #[serde(default)]
+        event: Option<WireStreamEvent>,
+    },
+    Assistant {
+        #[serde(default)]
+        parent_tool_use_id: Option<String>,
+        #[serde(default)]
+        message: Option<WireAssistantMessage>,
+    },
+    User {
+        #[serde(default)]
+        parent_tool_use_id: Option<String>,
+        #[serde(default)]
+        message: Option<WireUserMessage>,
+        #[serde(default)]
+        tool_use_result: Option<WireToolUseResult>,
+    },
+    Result {
+        #[serde(default)]
+        subtype: Option<String>,
+        #[serde(default)]
+        is_error: Option<bool>,
+        #[serde(default)]
+        result: Option<Value>,
+        #[serde(default)]
+        errors: Option<Value>,
+        #[serde(default)]
+        usage: Option<WireTurnUsage>,
+        #[serde(default)]
+        total_cost_usd: Option<f64>,
+    },
+    ControlResponse {
+        #[serde(default)]
+        response: Option<WireControlResponse>,
+    },
+    ControlRequest {
+        #[serde(default)]
+        request_id: Option<String>,
+        #[serde(default)]
+        request: Option<WireControlRequest>,
+    },
+    ControlCancelRequest {
+        #[serde(default)]
+        request_id: Option<String>,
+    },
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum WireStreamEvent {
+    MessageStart {
+        #[serde(default)]
+        message: Option<WireMessageRef>,
+    },
+    ContentBlockDelta {
+        #[serde(default)]
+        delta: Option<WireContentDelta>,
+    },
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Deserialize)]
+struct WireMessageRef {
+    #[serde(default)]
+    id: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum WireContentDelta {
+    TextDelta {
+        #[serde(default)]
+        text: Option<String>,
+    },
+    ThinkingDelta {
+        #[serde(default)]
+        thinking: Option<String>,
+    },
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Deserialize)]
+struct WireAssistantMessage {
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    content: Option<Vec<WireAssistantBlock>>,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum WireAssistantBlock {
+    Text {
+        #[serde(default)]
+        text: Option<String>,
+    },
+    Thinking {
+        #[serde(default)]
+        thinking: Option<String>,
+    },
+    ToolUse {
+        #[serde(default)]
+        id: Option<String>,
+        #[serde(default)]
+        name: Option<String>,
+        #[serde(default)]
+        input: Value,
+    },
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Deserialize)]
+struct WireUserMessage {
+    #[serde(default)]
+    content: Option<WireUserContent>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum WireUserContent {
+    Blocks(Vec<WireUserBlock>),
+    Other(#[allow(dead_code)] Value),
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum WireUserBlock {
+    ToolResult {
+        #[serde(default)]
+        tool_use_id: Option<String>,
+        #[serde(default)]
+        is_error: Option<bool>,
+        #[serde(default)]
+        content: Option<WireToolResultContent>,
+    },
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum WireToolResultContent {
+    Text(String),
+    Blocks(Vec<WireToolResultBlock>),
+    Other(Value),
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum WireToolResultBlock {
+    Typed {
+        #[serde(rename = "type")]
+        kind: String,
+        #[serde(default)]
+        text: Option<String>,
+    },
+    Raw(Value),
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum WireToolUseResult {
+    Object {
+        #[serde(rename = "type", default)]
+        kind: Option<String>,
+        #[serde(rename = "filePath", default)]
+        file_path: Option<String>,
+    },
+    Other(#[allow(dead_code)] Value),
+}
+
+#[derive(Default, Deserialize)]
+struct WireFileToolInput {
+    #[serde(default)]
+    file_path: Option<String>,
+    #[serde(default)]
+    notebook_path: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct WireTurnUsage {
+    #[serde(default)]
+    input_tokens: Option<u64>,
+    #[serde(default)]
+    output_tokens: Option<u64>,
+    #[serde(default)]
+    cache_read_input_tokens: Option<u64>,
+    #[serde(default)]
+    cache_creation_input_tokens: Option<u64>,
+}
+
+#[derive(Deserialize)]
+struct WireControlResponse {
+    #[serde(default)]
+    request_id: Option<String>,
+    #[serde(default)]
+    subtype: Option<String>,
+    #[serde(default)]
+    response: Option<Value>,
+    #[serde(default)]
+    error: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct WireCanUseTool {
+    #[serde(default)]
+    tool_name: Option<String>,
+    #[serde(default)]
+    display_name: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    tool_use_id: Option<String>,
+    #[serde(default)]
+    input: Value,
+    #[serde(default)]
+    permission_suggestions: Value,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "subtype", rename_all = "snake_case")]
+enum WireControlRequest {
+    CanUseTool(Box<WireCanUseTool>),
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Deserialize)]
+struct WireAskUserQuestionInput {
+    #[serde(default)]
+    questions: Option<Vec<WireAskQuestion>>,
+}
+
+#[derive(Deserialize)]
+struct WireAskQuestion {
+    #[serde(default)]
+    question: Option<String>,
+    #[serde(default)]
+    options: Option<Vec<WireAskQuestionOption>>,
+}
+
+#[derive(Deserialize)]
+struct WireAskQuestionOption {
+    #[serde(default)]
+    label: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+struct WirePermissionInputDetail {
+    #[serde(default)]
+    command: Option<String>,
+    #[serde(default)]
+    file_path: Option<String>,
+    #[serde(default)]
+    url: Option<String>,
+}
+
+fn tool_result_text(content: Option<WireToolResultContent>) -> String {
     match content {
-        Some(Value::String(text)) => text.clone(),
-        Some(Value::Array(blocks)) => blocks
-            .iter()
-            .map(|block| match str_of(block, "type") {
-                Some("text") => str_of(block, "text").unwrap_or_default().to_string(),
-                Some(other) => format!("[{other}]"),
-                None => block.to_string(),
+        Some(WireToolResultContent::Text(text)) => text,
+        Some(WireToolResultContent::Blocks(blocks)) => blocks
+            .into_iter()
+            .map(|block| match block {
+                WireToolResultBlock::Typed { kind, text } if kind == "text" => text.unwrap_or_default(),
+                WireToolResultBlock::Typed { kind, .. } => format!("[{kind}]"),
+                WireToolResultBlock::Raw(raw) => raw.to_string(),
             })
             .collect::<Vec<_>>()
             .join("\n"),
-        Some(Value::Null) | None => String::new(),
-        Some(other) => other.to_string(),
+        Some(WireToolResultContent::Other(Value::Null)) | None => String::new(),
+        Some(WireToolResultContent::Other(other)) => other.to_string(),
     }
 }
 
 fn question_text(input: &Value) -> String {
-    let questions = input.get("questions").and_then(Value::as_array).cloned().unwrap_or_default();
+    let parsed = WireAskUserQuestionInput::deserialize(input).ok();
     let mut lines = Vec::new();
-    for question in &questions {
-        lines.push(str_of(question, "question").unwrap_or_default().to_string());
-        for option in question.get("options").and_then(Value::as_array).into_iter().flatten() {
-            let label = str_of(option, "label").unwrap_or_default();
-            match str_of(option, "description") {
+    for question in parsed.and_then(|p| p.questions).into_iter().flatten() {
+        lines.push(question.question.unwrap_or_default());
+        for option in question.options.into_iter().flatten() {
+            let label = option.label.unwrap_or_default();
+            match option.description.as_deref() {
                 Some(description) if !description.is_empty() => lines.push(format!("- {label}: {description}")),
                 _ => lines.push(format!("- {label}")),
             }
@@ -218,20 +504,22 @@ fn question_text(input: &Value) -> String {
     if lines.is_empty() { input.to_string() } else { lines.join("\n") }
 }
 
-fn permission_summary(request: &Value) -> String {
-    let tool = str_of(request, "display_name").or_else(|| str_of(request, "tool_name")).unwrap_or("tool");
-    let input = request.get("input").unwrap_or(&Value::Null);
-    let detail = str_of(input, "command")
-        .or_else(|| str_of(request, "description"))
-        .or_else(|| str_of(input, "file_path"))
-        .or_else(|| str_of(input, "url"))
+fn permission_summary(display_name: Option<&str>, tool_name: Option<&str>, description: Option<&str>, input: &Value) -> String {
+    let tool = display_name.or(tool_name).unwrap_or("tool");
+    let detail_fields = WirePermissionInputDetail::deserialize(input).unwrap_or_default();
+    let detail = detail_fields
+        .command
+        .as_deref()
+        .or(description)
+        .or(detail_fields.file_path.as_deref())
+        .or(detail_fields.url.as_deref())
         .unwrap_or_default();
     if detail.is_empty() { tool.to_string() } else { format!("{tool}: {detail}") }
 }
 
 impl Projector {
-    fn agent_path(&self, message: &Value) -> Vec<String> {
-        match str_of(message, "parent_tool_use_id") {
+    fn agent_path(&self, parent_tool_use_id: Option<&str>) -> Vec<String> {
+        match parent_tool_use_id {
             Some(parent) => {
                 let mut path = self.tools.get(parent).map(|t| t.agent_path.clone()).unwrap_or_default();
                 path.push(parent.to_string());
@@ -242,65 +530,61 @@ impl Projector {
     }
 
     pub(crate) fn feed(&mut self, message: &Value) -> Vec<Out> {
+        let Ok(frame) = WireMessage::deserialize(message) else {
+            return Vec::new();
+        };
         let mut out = Vec::new();
-        match str_of(message, "type").unwrap_or_default() {
-            "stream_event" => {
-                let path = self.agent_path(message);
-                let event = message.get("event").unwrap_or(&Value::Null);
-                match str_of(event, "type").unwrap_or_default() {
-                    "message_start" => {
-                        if let Some(id) = event.pointer("/message/id").and_then(Value::as_str) {
-                            self.streamed_messages.insert(id.to_string());
+        match frame {
+            WireMessage::StreamEvent { parent_tool_use_id, event } => {
+                let path = self.agent_path(parent_tool_use_id.as_deref());
+                match event {
+                    Some(WireStreamEvent::MessageStart { message }) => {
+                        if let Some(id) = message.and_then(|m| m.id) {
+                            self.streamed_messages.insert(id);
                         }
                         if path.is_empty() {
                             out.push(Out::RootActivity);
                         }
                     }
-                    "content_block_delta" => {
-                        let delta = event.get("delta").unwrap_or(&Value::Null);
-                        match str_of(delta, "type") {
-                            Some("text_delta") => {
-                                let text = str_of(delta, "text").unwrap_or_default();
-                                if !text.is_empty() {
-                                    out.push(Out::Event(path, EventKind::TextDelta { text: text.to_string() }));
-                                }
+                    Some(WireStreamEvent::ContentBlockDelta { delta }) => match delta {
+                        Some(WireContentDelta::TextDelta { text }) => {
+                            if let Some(text) = text.filter(|t| !t.is_empty()) {
+                                out.push(Out::Event(path, EventKind::TextDelta { text }));
                             }
-                            Some("thinking_delta") => {
-                                let text = str_of(delta, "thinking").unwrap_or_default();
-                                if !text.is_empty() {
-                                    out.push(Out::Event(path, EventKind::ThinkingDelta { text: text.to_string() }));
-                                }
-                            }
-                            _ => {}
                         }
-                    }
-                    _ => {}
+                        Some(WireContentDelta::ThinkingDelta { thinking }) => {
+                            if let Some(text) = thinking.filter(|t| !t.is_empty()) {
+                                out.push(Out::Event(path, EventKind::ThinkingDelta { text }));
+                            }
+                        }
+                        Some(WireContentDelta::Other) | None => {}
+                    },
+                    Some(WireStreamEvent::Other) | None => {}
                 }
             }
-            "assistant" => {
-                let path = self.agent_path(message);
+            WireMessage::Assistant { parent_tool_use_id, message } => {
+                let path = self.agent_path(parent_tool_use_id.as_deref());
                 if path.is_empty() {
                     out.push(Out::RootActivity);
                 }
-                let inner = message.get("message").unwrap_or(&Value::Null);
+                let Some(inner) = message else { return out };
                 // Text of a message that streamed already arrived as deltas.
-                let streamed = str_of(inner, "id").is_some_and(|id| self.streamed_messages.contains(id));
-                for block in inner.get("content").and_then(Value::as_array).into_iter().flatten() {
-                    match str_of(block, "type") {
-                        Some("text") if !streamed => {
-                            if let Some(text) = str_of(block, "text").filter(|t| !t.is_empty()) {
-                                out.push(Out::Event(path.clone(), EventKind::TextDelta { text: text.to_string() }));
+                let streamed = inner.id.as_deref().is_some_and(|id| self.streamed_messages.contains(id));
+                for block in inner.content.into_iter().flatten() {
+                    match block {
+                        WireAssistantBlock::Text { text } if !streamed => {
+                            if let Some(text) = text.filter(|t| !t.is_empty()) {
+                                out.push(Out::Event(path.clone(), EventKind::TextDelta { text }));
                             }
                         }
-                        Some("thinking") if !streamed => {
-                            if let Some(text) = str_of(block, "thinking").filter(|t| !t.is_empty()) {
-                                out.push(Out::Event(path.clone(), EventKind::ThinkingDelta { text: text.to_string() }));
+                        WireAssistantBlock::Thinking { thinking } if !streamed => {
+                            if let Some(text) = thinking.filter(|t| !t.is_empty()) {
+                                out.push(Out::Event(path.clone(), EventKind::ThinkingDelta { text }));
                             }
                         }
-                        Some("tool_use") => {
-                            let id = str_of(block, "id").unwrap_or_default().to_string();
-                            let name = str_of(block, "name").unwrap_or_default().to_string();
-                            let input = block.get("input").cloned().unwrap_or(Value::Null);
+                        WireAssistantBlock::ToolUse { id, name, input } => {
+                            let id = id.unwrap_or_default();
+                            let name = name.unwrap_or_default();
                             self.tools.insert(
                                 id.clone(),
                                 ToolInfo {
@@ -311,37 +595,51 @@ impl Projector {
                             );
                             out.push(Out::Event(path.clone(), EventKind::ToolCallStarted { id, name, input }));
                         }
-                        _ => {}
+                        WireAssistantBlock::Text { .. } | WireAssistantBlock::Thinking { .. } | WireAssistantBlock::Other => {}
                     }
                 }
             }
-            "user" => {
-                let path = self.agent_path(message);
-                let blocks = message.pointer("/message/content").and_then(Value::as_array);
-                for block in blocks.into_iter().flatten() {
-                    if str_of(block, "type") != Some("tool_result") {
+            WireMessage::User {
+                parent_tool_use_id,
+                message,
+                tool_use_result,
+            } => {
+                let path = self.agent_path(parent_tool_use_id.as_deref());
+                let blocks = match message.and_then(|m| m.content) {
+                    Some(WireUserContent::Blocks(blocks)) => blocks,
+                    _ => Vec::new(),
+                };
+                let (result_kind, result_file_path) = match &tool_use_result {
+                    Some(WireToolUseResult::Object { kind, file_path }) => (kind.as_deref(), file_path.as_deref()),
+                    _ => (None, None),
+                };
+                for block in blocks {
+                    let WireUserBlock::ToolResult {
+                        tool_use_id,
+                        is_error,
+                        content,
+                    } = block
+                    else {
                         continue;
-                    }
-                    let id = str_of(block, "tool_use_id").unwrap_or_default().to_string();
-                    let ok = block.get("is_error").and_then(Value::as_bool) != Some(true);
+                    };
+                    let id = tool_use_id.unwrap_or_default();
+                    let ok = is_error != Some(true);
                     out.push(Out::Event(
                         path.clone(),
                         EventKind::ToolCallFinished {
                             id: id.clone(),
                             ok,
-                            output: tool_result_text(block.get("content")),
+                            output: tool_result_text(content),
                         },
                     ));
                     let Some(tool) = self.tools.get(&id) else { continue };
                     if !ok || !FILE_TOOLS.contains(&tool.name.as_str()) {
                         continue;
                     }
-                    let result = message.get("tool_use_result").unwrap_or(&Value::Null);
-                    let file = str_of(result, "filePath")
-                        .or_else(|| str_of(&tool.input, "file_path"))
-                        .or_else(|| str_of(&tool.input, "notebook_path"));
+                    let file_input = WireFileToolInput::deserialize(&tool.input).unwrap_or_default();
+                    let file = result_file_path.or(file_input.file_path.as_deref()).or(file_input.notebook_path.as_deref());
                     if let Some(file) = file {
-                        let change = if str_of(result, "type") == Some("create") {
+                        let change = if result_kind == Some("create") {
                             FileChangeKind::Created
                         } else {
                             FileChangeKind::Modified
@@ -356,9 +654,16 @@ impl Projector {
                     }
                 }
             }
-            "result" => {
-                let subtype = str_of(message, "subtype").unwrap_or_default();
-                let is_error = message.get("is_error").and_then(Value::as_bool) == Some(true);
+            WireMessage::Result {
+                subtype,
+                is_error,
+                result,
+                errors,
+                usage,
+                total_cost_usd,
+            } => {
+                let subtype = subtype.unwrap_or_default();
+                let is_error = is_error == Some(true);
                 let aborted = std::mem::take(&mut self.abort_requested);
                 let reason = if subtype == "success" && !is_error {
                     StopReason::Completed
@@ -370,18 +675,21 @@ impl Projector {
                     StopReason::Error
                 };
                 if reason == StopReason::Error {
-                    let detail = str_of(message, "result")
+                    let detail = result
+                        .as_ref()
+                        .and_then(Value::as_str)
                         .map(str::to_string)
-                        .or_else(|| message.get("errors").filter(|e| !e.is_null()).map(Value::to_string))
-                        .unwrap_or_else(|| subtype.to_string());
+                        .or_else(|| errors.as_ref().filter(|e| !e.is_null()).map(Value::to_string))
+                        .unwrap_or(subtype);
                     out.push(Out::Event(Vec::new(), EventKind::Error { message: detail }));
                 }
-                let usage = message.get("usage").unwrap_or(&Value::Null);
-                let count = |key: &str| usage.get(key).and_then(Value::as_u64);
                 // Cache reads and writes are input too (oar's TokenTotals.input).
-                let input_tokens =
-                    count("input_tokens").map(|base| base + count("cache_read_input_tokens").unwrap_or(0) + count("cache_creation_input_tokens").unwrap_or(0));
-                let cost_usd = message.get("total_cost_usd").and_then(Value::as_f64).map(|total| {
+                let input_tokens = usage.as_ref().and_then(|u| {
+                    u.input_tokens
+                        .map(|base| base + u.cache_read_input_tokens.unwrap_or(0) + u.cache_creation_input_tokens.unwrap_or(0))
+                });
+                let output_tokens = usage.as_ref().and_then(|u| u.output_tokens);
+                let cost_usd = total_cost_usd.map(|total| {
                     let turn = (total - self.last_total_cost).max(0.0);
                     self.last_total_cost = total;
                     turn
@@ -392,56 +700,69 @@ impl Projector {
                         reason,
                         usage: Usage {
                             input_tokens,
-                            output_tokens: count("output_tokens"),
+                            output_tokens,
                             cost_usd,
                             ..Default::default()
                         },
                     },
                 ));
             }
-            "control_response" => {
-                let response = message.get("response").unwrap_or(&Value::Null);
-                let request_id = str_of(response, "request_id").unwrap_or_default().to_string();
-                let result = if str_of(response, "subtype") == Some("success") {
-                    Ok(response.get("response").cloned().unwrap_or(Value::Null))
-                } else {
-                    Err(str_of(response, "error").unwrap_or("control request failed").to_string())
+            WireMessage::ControlResponse { response } => {
+                let (request_id, result) = match response {
+                    Some(resp) => {
+                        let request_id = resp.request_id.unwrap_or_default();
+                        let res = if resp.subtype.as_deref() == Some("success") {
+                            Ok(resp.response.unwrap_or(Value::Null))
+                        } else {
+                            Err(resp.error.unwrap_or_else(|| "control request failed".into()))
+                        };
+                        (request_id, res)
+                    }
+                    None => (String::new(), Err("control request failed".into())),
                 };
                 out.push(Out::ControlResponse { request_id, result });
             }
-            "control_request" => {
-                let request_id = str_of(message, "request_id").unwrap_or_default().to_string();
-                let request = message.get("request").unwrap_or(&Value::Null);
-                if str_of(request, "subtype") == Some("can_use_tool") {
-                    let tool = str_of(request, "tool_name").unwrap_or_default().to_string();
-                    let input = request.get("input").cloned().unwrap_or(Value::Null);
+            WireMessage::ControlRequest { request_id, request } => {
+                let request_id = request_id.unwrap_or_default();
+                if let Some(WireControlRequest::CanUseTool(req)) = request {
+                    let WireCanUseTool {
+                        tool_name,
+                        display_name,
+                        description,
+                        tool_use_id,
+                        input,
+                        permission_suggestions,
+                    } = *req;
+                    let tool = tool_name.unwrap_or_default();
                     if tool == "AskUserQuestion" {
                         out.push(Out::Question {
                             request_id,
                             text: question_text(&input),
                         });
                     } else {
-                        let agent_path = str_of(request, "tool_use_id")
+                        let agent_path = tool_use_id
+                            .as_deref()
                             .and_then(|id| self.tools.get(id))
                             .map(|t| t.agent_path.clone())
                             .unwrap_or_default();
+                        let summary = permission_summary(display_name.as_deref(), Some(tool.as_str()), description.as_deref(), &input);
                         out.push(Out::Permission {
                             request_id,
                             agent_path,
-                            summary: permission_summary(request),
+                            summary,
                             tool,
                             input,
-                            suggestions: request.get("permission_suggestions").cloned().unwrap_or(Value::Null),
+                            suggestions: permission_suggestions,
                         });
                     }
                 }
             }
-            "control_cancel_request" => {
+            WireMessage::ControlCancelRequest { request_id } => {
                 out.push(Out::PermissionCancelled {
-                    request_id: str_of(message, "request_id").unwrap_or_default().to_string(),
+                    request_id: request_id.unwrap_or_default(),
                 });
             }
-            _ => {}
+            WireMessage::Other => {}
         }
         out
     }
@@ -496,19 +817,20 @@ impl Shared {
 
     fn on_line(&self, line: &str) {
         let Ok(message) = serde_json::from_str::<Value>(line) else { return };
+        let meta = WireMeta::deserialize(&message).unwrap_or_default();
         if self.core.runtime_id() != ID
-            && message.get("parent_tool_use_id").is_none_or(Value::is_null)
-            && let Some(id) = str_of(&message, "session_id").filter(|id| !id.is_empty())
+            && meta.parent_tool_use_id.is_none()
+            && let Some(id) = meta.session_id.as_deref().filter(|id| !id.is_empty())
             && self.core.identify(id)
         {
             self.core.emit_root(EventKind::SessionStarted {
                 session_id: id.into(),
-                model: str_of(&message, "model").map(String::from),
+                model: meta.model.clone(),
             });
         }
-        let path = self.projector.lock().agent_path(&message);
-        let ty = str_of(&message, "type").unwrap_or("unknown");
-        let kind = str_of(&message, "subtype").map_or_else(|| ty.to_owned(), |s| format!("{ty}/{s}"));
+        let path = self.projector.lock().agent_path(meta.parent_tool_use_id.as_deref());
+        let ty = meta.kind.as_deref().unwrap_or("unknown");
+        let kind = meta.subtype.as_deref().map_or_else(|| ty.to_owned(), |s| format!("{ty}/{s}"));
         let _frame = self.core.record_raw(&kind, path, line, &message);
         let outs = self.projector.lock().feed(&message);
         for out in outs {
@@ -894,28 +1216,56 @@ fn open_failure(opts: &SessionOptions, message: String) -> AgentError {
     AgentError::Protocol(message)
 }
 
+#[derive(Default, Deserialize)]
+struct WireInitResponse {
+    #[serde(default)]
+    models: Option<Vec<WireInitModel>>,
+    #[serde(default)]
+    account: Option<WireInitAccount>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WireInitModel {
+    value: String,
+    #[serde(default)]
+    display_name: Option<String>,
+    #[serde(default)]
+    resolved_model: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum WireInitAccount {
+    Object {
+        #[serde(default)]
+        email: Option<String>,
+    },
+    Other(#[allow(dead_code)] Value),
+}
+
 fn models_of(init: &Value) -> Vec<ModelInfo> {
-    init.get("models")
-        .and_then(Value::as_array)
+    let parsed = WireInitResponse::deserialize(init).unwrap_or_default();
+    parsed
+        .models
         .into_iter()
         .flatten()
-        .filter_map(|model| {
-            let id = str_of(model, "value")?.to_string();
-            let display_name = str_of(model, "displayName").unwrap_or(&id).to_string();
-            Some(ModelInfo::new(id, display_name))
+        .map(|model| {
+            let display_name = model.display_name.unwrap_or_else(|| model.value.clone());
+            ModelInfo::new(model.value, display_name)
         })
         .collect()
 }
 
 fn resolved_model(init: &Value, requested: Option<&str>) -> Option<String> {
     let wanted = requested.unwrap_or("default");
-    init.get("models")
-        .and_then(Value::as_array)
+    let parsed = WireInitResponse::deserialize(init).unwrap_or_default();
+    parsed
+        .models
         .into_iter()
         .flatten()
-        .find(|model| str_of(model, "value") == Some(wanted))
-        .and_then(|model| str_of(model, "resolvedModel"))
-        .map(str::to_string)
+        .find(|model| model.value == wanted)
+        .and_then(|model| model.resolved_model)
         .or_else(|| requested.map(str::to_string))
 }
 
@@ -929,16 +1279,7 @@ impl Runtime for ClaudeRuntime {
     }
 
     fn capabilities(&self) -> Capabilities {
-        Capabilities {
-            resume: true,
-            steer: true,
-            queue: true,
-            permission_requests: true,
-            model_selection: true,
-            subagents: true,
-            usage: true,
-            config_options: false,
-        }
+        crate::oar::runtime_spec(ID).expect("claude runtime spec").capabilities
     }
 
     fn installation(&self) -> Installation {
@@ -1014,38 +1355,93 @@ fn running(started: Started, opts: &SessionOptions, caps: Capabilities) -> Arc<d
     CoreSession::new(core, ClaudeDriver { shared }, caps)
 }
 
+#[derive(Default, Deserialize)]
+struct WireUsageReply {
+    #[serde(default)]
+    rate_limits_available: Option<bool>,
+    #[serde(default)]
+    subscription_type: Option<String>,
+    #[serde(default)]
+    rate_limits: Option<WireRateLimits>,
+}
+
+#[derive(Deserialize)]
+struct WireRateLimits {
+    #[serde(default)]
+    five_hour: Option<WireRateWindow>,
+    #[serde(default)]
+    seven_day: Option<WireRateWindow>,
+    #[serde(default)]
+    seven_day_oauth_apps: Option<WireRateWindow>,
+    #[serde(default)]
+    seven_day_opus: Option<WireRateWindow>,
+    #[serde(default)]
+    seven_day_sonnet: Option<WireRateWindow>,
+    #[serde(default)]
+    extra_usage: Option<WireExtraUsage>,
+}
+
+#[derive(Deserialize)]
+struct WireRateWindow {
+    #[serde(default)]
+    utilization: Option<f64>,
+    #[serde(default)]
+    resets_at: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct WireExtraUsage {
+    #[serde(default)]
+    is_enabled: Option<bool>,
+    #[serde(default)]
+    utilization: Option<f64>,
+}
+
+#[derive(Deserialize)]
+struct WireControlEnvelope {
+    #[serde(rename = "type", default)]
+    kind: Option<String>,
+    #[serde(default)]
+    response: Option<WireControlResponse>,
+}
+
 /// `get_usage`'s answer as oar projects it (`claudeAccountUsage`).
+#[cfg(test)]
 pub(crate) fn usage_of(reply: &Value, email: Option<String>) -> Option<AccountUsage> {
+    let parsed = WireUsageReply::deserialize(reply).ok()?;
+    usage_from_reply(parsed, email)
+}
+
+fn usage_from_reply(parsed: WireUsageReply, email: Option<String>) -> Option<AccountUsage> {
     const HOUR_MS: u64 = 3_600_000;
     const WEEK_MS: u64 = 7 * 24 * HOUR_MS;
-    let limits = reply.get("rate_limits")?;
+    let limits = parsed.rate_limits?;
     let mut windows = Vec::new();
-    let mut add = |label: &str, key: &str, duration_ms: Option<u64>| {
-        let entry = &limits[key];
-        let Some(percent) = entry.get("utilization").and_then(Value::as_f64) else {
-            return;
-        };
+    let mut add = |label: &str, key: &str, entry: Option<WireRateWindow>, duration_ms: Option<u64>| {
+        let entry = entry?;
+        let percent = entry.utilization?;
         if !(0.0..=100.0).contains(&percent) {
-            return;
+            return None;
         }
         windows.push(UsageWindow {
             label: label.into(),
             used_ratio: (percent / 100.0 * 1e6).round() / 1e6,
-            resets_at: entry.get("resets_at").and_then(Value::as_str).map(str::to_string),
+            resets_at: entry.resets_at,
             id: Some(key.into()),
             duration_ms,
         });
+        Some(())
     };
-    add("Current session", "five_hour", Some(5 * HOUR_MS));
-    add("Current week (all models)", "seven_day", Some(WEEK_MS));
-    add("Current week (OAuth apps)", "seven_day_oauth_apps", Some(WEEK_MS));
-    add("Current week (Opus)", "seven_day_opus", Some(WEEK_MS));
-    add("Current week (Sonnet)", "seven_day_sonnet", Some(WEEK_MS));
+    add("Current session", "five_hour", limits.five_hour, Some(5 * HOUR_MS));
+    add("Current week (all models)", "seven_day", limits.seven_day, Some(WEEK_MS));
+    add("Current week (OAuth apps)", "seven_day_oauth_apps", limits.seven_day_oauth_apps, Some(WEEK_MS));
+    add("Current week (Opus)", "seven_day_opus", limits.seven_day_opus, Some(WEEK_MS));
+    add("Current week (Sonnet)", "seven_day_sonnet", limits.seven_day_sonnet, Some(WEEK_MS));
     let included_exhausted = windows.iter().any(|w| w.used_ratio >= 1.0);
-    let extra = &limits["extra_usage"];
     let mut extra_open = false;
-    if extra.get("is_enabled").and_then(Value::as_bool) == Some(true)
-        && let Some(percent) = extra.get("utilization").and_then(Value::as_f64)
+    if let Some(extra) = limits.extra_usage
+        && extra.is_enabled == Some(true)
+        && let Some(percent) = extra.utilization
     {
         extra_open = percent < 100.0;
         windows.push(UsageWindow {
@@ -1059,12 +1455,7 @@ pub(crate) fn usage_of(reply: &Value, email: Option<String>) -> Option<AccountUs
     if windows.is_empty() {
         return None;
     }
-    let plan = reply
-        .get("subscription_type")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|p| !p.is_empty())
-        .map(str::to_string);
+    let plan = parsed.subscription_type.as_deref().map(str::trim).filter(|p| !p.is_empty()).map(str::to_string);
     Some(AccountUsage::Available {
         plan,
         email,
@@ -1076,7 +1467,7 @@ pub(crate) fn usage_of(reply: &Value, email: Option<String>) -> Option<AccountUs
 /// A separate `claude -p --safe-mode` (no hooks, no MCP servers, no prompt)
 /// asked `initialize` and `get_usage`, as oar does.
 pub(crate) fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
-    let (tx, rx) = flume::unbounded::<Value>();
+    let (tx, rx) = flume::unbounded::<WireControlResponse>();
     let child = LineChild::spawn(
         Spawn {
             label: "claude-usage",
@@ -1099,33 +1490,41 @@ pub(crate) fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
             env_remove: PARENT_SESSION_MARKERS,
         },
         move |line| {
-            if let Ok(v) = serde_json::from_str::<Value>(line)
-                && v["type"] == "control_response"
+            if let Ok(env) = serde_json::from_str::<WireControlEnvelope>(line)
+                && env.kind.as_deref() == Some("control_response")
+                && let Some(resp) = env.response
             {
-                let _ = tx.send(v["response"].clone());
+                let _ = tx.send(resp);
             }
         },
         |_, _| {},
     )?;
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
-    let ask = |id: &str, subtype: &str| -> Result<Value> {
+    let ask = |id: &str, subtype: &str| -> Result<WireControlResponse> {
         child.write_json(&json!({ "type": "control_request", "request_id": id, "request": { "subtype": subtype } }))?;
         loop {
             let left = deadline.saturating_duration_since(std::time::Instant::now());
             let reply = rx
                 .recv_timeout(left)
                 .map_err(|_| AgentError::Io("claude did not answer the usage query in time".into()))?;
-            if reply["request_id"] == id {
+            if reply.request_id.as_deref() == Some(id) {
                 return Ok(reply);
             }
         }
     };
     let result = (|| {
         let init = ask("usage-init", "initialize")?;
-        let email = init.pointer("/response/account/email").and_then(Value::as_str).map(str::to_string);
+        let email = init
+            .response
+            .as_ref()
+            .and_then(|v| WireInitResponse::deserialize(v).ok())
+            .and_then(|r| match r.account {
+                Some(WireInitAccount::Object { email }) => email,
+                _ => None,
+            });
         let reply = ask("usage-read", "get_usage")?;
-        if reply["subtype"] != "success" {
-            let detail = reply["error"].as_str().unwrap_or("malformed control response").to_lowercase();
+        if reply.subtype.as_deref() != Some("success") {
+            let detail = reply.error.as_deref().unwrap_or("malformed control response").to_lowercase();
             if detail.contains("not logged in") || detail.contains("authentication required") || detail.contains("/login") {
                 return Ok(AccountUsage::ReauthRequired {
                     reason: "not_authenticated".into(),
@@ -1138,13 +1537,14 @@ pub(crate) fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
             }
             return Err(AgentError::Protocol(format!("claude usage query failed: {detail}")));
         }
-        let response = &reply["response"];
-        if response.get("rate_limits_available").and_then(Value::as_bool) == Some(false) {
+        let response = reply.response.unwrap_or(Value::Null);
+        let parsed = WireUsageReply::deserialize(&response).unwrap_or_default();
+        if parsed.rate_limits_available == Some(false) {
             return Ok(AccountUsage::Unsupported {
                 reason: "quota_unavailable".into(),
             });
         }
-        usage_of(response, email).ok_or_else(|| AgentError::Protocol("claude get_usage returned no usable windows".into()))
+        usage_from_reply(parsed, email).ok_or_else(|| AgentError::Protocol("claude get_usage returned no usable windows".into()))
     })();
     child.kill();
     result

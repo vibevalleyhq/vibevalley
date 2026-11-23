@@ -15,8 +15,8 @@ use sqlx::{Connection, SqliteConnection};
 use vibevalley_core::artifact::shell::{presence_highlight_from_payloads, presence_highlight_script};
 use vibevalley_core::artifact::{INLINE_EVENT_MAX_BYTES, markdown_of, ordered, plain};
 use vibevalley_core::collab::{
-    BlockNodeSnapshot, CollabDoc, CommitMeta, DocSnapshot, HistoryEntry, PresenceHub, PresenceKind, PresencePayload, PresenceViewport, StoreEntrySnapshot,
-    TextRangeAnchor, decode_frontiers, encode_frontiers,
+    BlockNodeSnapshot, CollabDoc, CommitMeta, HistoryEntry, PresenceHub, PresenceKind, PresencePayload, PresenceViewport, StoreEntrySnapshot, TextRangeAnchor,
+    decode_frontiers, encode_frontiers,
 };
 use vibevalley_core::rules::key_between;
 use vibevalley_i18n::t;
@@ -1101,16 +1101,34 @@ impl Artifacts {
         }
     }
 
+    fn with_body_lock<T>(&self, row: &ArtifactRow, f: impl FnOnce() -> T) -> T {
+        match row.body.as_str() {
+            "blocks" => {
+                let _g = self.batches.lock();
+                f()
+            }
+            "store" => {
+                let wl = self.entry_lock(&row.id);
+                let _g = wl.lock();
+                f()
+            }
+            _ => {
+                let _g = self.rows.lock();
+                f()
+            }
+        }
+    }
+
     pub fn history_restore(&self, req: &ArtifactHistoryRestoreRequest) -> Result<Wire, ApiError> {
         let row = self.found(&mut self.db(), &req.id)?;
         let target = decode_frontiers(&req.frontiers).map_err(collab_err)?;
         let at = now();
         let note = req.note.clone().or_else(|| Some("restore".to_string()));
         let meta = CommitMeta::user(USER_ID, note.clone(), at);
-        let apply = |this: &Self| -> Result<Wire, ApiError> {
+        self.with_body_lock(&row, || {
             let doc = {
-                let mut db = this.db();
-                this.load_collab_for_row(&mut db, &row)?
+                let mut db = self.db();
+                self.load_collab_for_row(&mut db, &row)?
             };
             if doc.restore_to(&target, &meta).is_err() {
                 // Fallback when Loro's `revert_to` cannot emit an inverse diff across
@@ -1165,23 +1183,8 @@ impl Artifacts {
                 }
                 doc.commit(&meta).map_err(collab_err)?;
             }
-            this.apply_collab_projection(&row, &doc, USER_ID, note.clone(), at)
-        };
-        match row.body.as_str() {
-            "blocks" => {
-                let _g = self.batches.lock();
-                apply(self)
-            }
-            "store" => {
-                let wl = self.entry_lock(&row.id);
-                let _g = wl.lock();
-                apply(self)
-            }
-            _ => {
-                let _g = self.rows.lock();
-                apply(self)
-            }
-        }
+            self.apply_collab_projection(&row, &doc, USER_ID, note.clone(), at)
+        })
     }
 
     pub fn history_undo_origin(&self, req: &ArtifactHistoryUndoOriginRequest) -> Result<Wire, ApiError> {
@@ -1193,59 +1196,29 @@ impl Artifacts {
         let at = now();
         let note = Some(format!("undo {origin}"));
         let meta = CommitMeta::undo(USER_ID, origin, note.clone(), at);
-        let apply = |this: &Self| -> Result<Wire, ApiError> {
+        self.with_body_lock(&row, || {
             let doc = {
-                let mut db = this.db();
-                this.load_collab_for_row(&mut db, &row)?
+                let mut db = self.db();
+                self.load_collab_for_row(&mut db, &row)?
             };
             let reverted = doc.selective_undo_origin(origin, &meta).map_err(collab_err)?;
             if reverted == 0 {
-                return this.get_now(&row.id);
+                return self.get_now(&row.id);
             }
-            this.apply_collab_projection(&row, &doc, USER_ID, note.clone(), at)
-        };
-        match row.body.as_str() {
-            "blocks" => {
-                let _g = self.batches.lock();
-                apply(self)
-            }
-            "store" => {
-                let wl = self.entry_lock(&row.id);
-                let _g = wl.lock();
-                apply(self)
-            }
-            _ => {
-                let _g = self.rows.lock();
-                apply(self)
-            }
-        }
+            self.apply_collab_projection(&row, &doc, USER_ID, note.clone(), at)
+        })
     }
 
     pub fn history_compact(&self, req: &ArtifactHistoryCompactRequest) -> Result<Wire, ApiError> {
         let row = self.found(&mut self.db(), &req.id)?;
-        let compact = |this: &Self| -> Result<Wire, ApiError> {
-            let mut db = this.db();
-            let doc = this.load_collab_for_row(&mut db, &row)?;
+        self.with_body_lock(&row, || {
+            let mut db = self.db();
+            let doc = self.load_collab_for_row(&mut db, &row)?;
             let shallow = doc.compact_shallow_snapshot().map_err(collab_err)?;
             db::upsert_artifact_collab(&mut db, &row.id, &shallow, now()).map_err(q)?;
             drop(db);
-            this.get_now(&row.id)
-        };
-        match row.body.as_str() {
-            "blocks" => {
-                let _g = self.batches.lock();
-                compact(self)
-            }
-            "store" => {
-                let wl = self.entry_lock(&row.id);
-                let _g = wl.lock();
-                compact(self)
-            }
-            _ => {
-                let _g = self.rows.lock();
-                compact(self)
-            }
-        }
+            self.get_now(&row.id)
+        })
     }
 
     pub fn history_fork(&self, req: &ArtifactHistoryForkRequest) -> Result<Wire, ApiError> {
@@ -1476,6 +1449,3 @@ pub(super) fn apply_legacy_presence_write(artifacts: &Artifacts, artifact_id: &s
         }
     }
 }
-
-#[allow(dead_code)]
-fn _assert_doc_snapshot(_: &DocSnapshot) {}

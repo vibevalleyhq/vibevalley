@@ -431,7 +431,7 @@ pub fn parse_tokens_spec(raw_json: &str) -> ParsedTokensSpec {
     }
 }
 
-pub fn compile_tokens_css(raw_json: &str) -> String {
+pub(crate) fn compile_tokens_css(raw_json: &str) -> String {
     parse_tokens_spec(raw_json).css
 }
 

@@ -11,14 +11,10 @@ use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 use parking_lot::Mutex;
-use pollster::block_on;
-use sqlx::SqliteConnection;
-use tokio::task::JoinHandle;
-use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ActorKind, ApiError, BizCode, Cron, CronRequest, Fact, FactCronChanged, FactCronRemoved, IssueStatus, NoticeLevel, Preview, ops};
 
-use crate::base::{LookIn, internal, missing, open_sqlx_db};
+use crate::base::{LookIn, ModuleDb, Ticker, internal, missing};
 use crate::modules::team::agent::Agents;
 use crate::modules::work::issue::{Board, NewIssue};
 use crate::{Hub, now};
@@ -62,7 +58,7 @@ impl CronLinks {
 }
 
 pub struct Crons {
-    db: Mutex<SqliteConnection>,
+    db: ModuleDb,
     links: Arc<Mutex<CronLinks>>,
     hub: Weak<Hub>,
     board: Board,
@@ -72,20 +68,15 @@ pub struct Crons {
     chat: std::sync::OnceLock<Weak<crate::modules::collab::channel::Chat>>,
     orchestrator: std::sync::OnceLock<Weak<crate::modules::team::orchestrator::Orchestrator>>,
     closed: std::sync::atomic::AtomicBool,
-    ticker: Mutex<Option<(CancellationToken, JoinHandle<()>)>>,
+    ticker: Mutex<Option<Ticker>>,
 }
 
 impl Crons {
     /// Opens `cron` in `<home>/server.db`, puts stored crons into the hub's
     /// state, and registers `Issue.cron` projection on `board`.
     pub fn open(home: &Path, hub: &Arc<Hub>, board: Board, agents: Arc<Agents>) -> Result<Arc<Crons>, ApiError> {
-        let mut conn = block_on(async {
-            let mut db = open_sqlx_db(home).await?;
-            sqlx::raw_sql(db::SCHEMA).execute(&mut db).await?;
-            Ok::<_, sqlx::Error>(db)
-        })
-        .map_err(internal)?;
-        let stored = db::list(&mut conn).map_err(internal)?;
+        let db = ModuleDb::open(home, db::SCHEMA).map_err(internal)?;
+        let stored = db.sync(db::list).map_err(internal)?;
         let links = Arc::new(Mutex::new(CronLinks::default()));
         let at = now();
         let mut facts = Vec::with_capacity(stored.len());
@@ -104,7 +95,7 @@ impl Crons {
         let lookup_links = links.clone();
         board.use_cron_of_issue(Arc::new(move |issue_id| lookup_links.lock().cron_of_issue.get(issue_id).cloned()));
         Ok(Arc::new(Crons {
-            db: Mutex::new(conn),
+            db,
             links,
             hub: Arc::downgrade(hub),
             board,
@@ -120,9 +111,8 @@ impl Crons {
     /// Stops the ticker.
     pub fn close(&self) {
         self.closed.store(true, std::sync::atomic::Ordering::Relaxed);
-        if let Some((cancel, handle)) = self.ticker.lock().take() {
-            cancel.cancel();
-            let _ = vibevalley_runtime::rt::block_on(handle);
+        if let Some(ticker) = self.ticker.lock().take() {
+            ticker.stop();
         }
     }
 
@@ -155,7 +145,7 @@ impl Crons {
     /// Persists `cron` (keeping its linked issue, if any) and tells the state.
     fn put(&self, cron: Cron) -> Result<(), ApiError> {
         let issue_id = self.issue_of(&cron.id);
-        db::upsert(&mut self.db.lock(), &cron, issue_id.as_deref()).map_err(internal)?;
+        self.db.sync(|conn| db::upsert(conn, &cron, issue_id.as_deref())).map_err(internal)?;
         if let Some(hub) = self.hub() {
             hub.apply(vec![Fact::CronChanged(FactCronChanged { at: now(), cron })]);
         }
@@ -163,7 +153,7 @@ impl Crons {
     }
 
     fn link_issue(&self, cron_id: &str, issue_id: Option<&str>) -> Result<(), ApiError> {
-        db::set_issue(&mut self.db.lock(), cron_id, issue_id).map_err(internal)?;
+        self.db.sync(|conn| db::set_issue(conn, cron_id, issue_id)).map_err(internal)?;
         let prev = self.links.lock().link(cron_id, issue_id);
         if let Some(prev_id) = prev
             && prev_id.as_str() != issue_id.unwrap_or("")
@@ -267,7 +257,7 @@ impl Crons {
     pub fn remove(&self, id: &str) -> Result<Cron, ApiError> {
         let _l = self.lock.lock();
         let was = self.find(id)?;
-        db::remove(&mut self.db.lock(), id).map_err(internal)?;
+        self.db.sync(|conn| db::remove(conn, id)).map_err(internal)?;
         let prev_issue = self.links.lock().link(id, None);
         if let Some(hub) = self.hub() {
             hub.apply(vec![Fact::CronRemoved(FactCronRemoved { at: now(), id: id.into() })]);
@@ -407,23 +397,15 @@ pub fn install(hub: &Arc<Hub>, crons: Arc<Crons>, tick: bool) {
     let c = crons.clone();
     hub.on::<ops::CronPreviewDelete>(move |_, input| c.preview_remove(&input.id));
     if tick {
-        let cancel = hub.child_token();
-        let task_cancel = cancel.clone();
         let weak = Arc::downgrade(&crons);
-        let handle = hub.spawn_task(async move {
-            loop {
-                let Some(c) = weak.upgrade() else { return };
-                if c.hub.strong_count() == 0 || c.closed.load(std::sync::atomic::Ordering::Relaxed) || task_cancel.is_cancelled() {
-                    return;
-                }
-                let _ = tokio::task::spawn_blocking(move || c.tick()).await;
-                tokio::select! {
-                    biased;
-                    _ = task_cancel.cancelled() => return,
-                    _ = tokio::time::sleep(TICK) => {}
-                }
+        let ticker = Ticker::spawn_on(hub, TICK, true, move || {
+            let Some(c) = weak.upgrade() else { return false };
+            if c.hub.strong_count() == 0 || c.closed.load(std::sync::atomic::Ordering::Relaxed) {
+                return false;
             }
+            c.tick();
+            true
         });
-        *crons.ticker.lock() = Some((cancel, handle));
+        *crons.ticker.lock() = Some(ticker);
     }
 }

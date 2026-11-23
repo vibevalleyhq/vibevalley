@@ -216,8 +216,10 @@ fn the_repos_check_runs_before_the_push() {
 
 #[test]
 fn only_the_user_publishes() {
+    let dir = tempfile::tempdir().unwrap();
     let hub = vibevalley_server::Hub::new(vibevalley_core::empty_space_state());
-    vibevalley_server::modules::work::pull::publish::install(&hub, Arc::new(farm().publisher));
+    let pulls = vibevalley_server::modules::work::pull::Pulls::open(dir.path(), Arc::new(farm().publisher), None, None, None, None).unwrap();
+    vibevalley_server::modules::work::pull::install(&hub, pulls, None);
     let asked = json!({ "cwd": "/tmp", "branch": "fix", "sha": "0", "base": "main", "title": "t", "body": "" });
     let e = hub.call_as(Caller::Remote, "repo.pr.submit", asked);
     // The hub's `can` refuses it before the endpoint's own rule does.
@@ -383,17 +385,22 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
         .data
         .unwrap();
     let change_id = change_issue["id"].as_str().unwrap();
-    let merged = started
-        .board
-        .record_pull_request(
-            change_id,
-            PullRequest {
-                url: "https://github.com/acme/farm/pull/8".into(),
-                number: 8,
-                state: PullRequestState::Merged,
-            },
-        )
+    started
+        .pulls
+        .store()
+        .upsert(vibevalley_server::modules::work::pull::UpsertPullInput {
+            platform: vibevalley_protocol::PublishPlatform::Github,
+            repo: "acme/farm".into(),
+            number: 8,
+            url: "https://github.com/acme/farm/pull/8".into(),
+            branch: "vibevalley/issue-2".into(),
+            base: "main".into(),
+            state: PullRequestState::Merged,
+            issue_id: Some(change_id.into()),
+            at: 1000,
+        })
         .unwrap();
+    let merged = started.board.settle_pull(change_id, PullRequestState::Merged).unwrap().unwrap();
     assert_eq!(merged.delivered, Some(Landing::PullRequest));
 
     started.close();

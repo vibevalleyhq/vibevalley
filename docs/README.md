@@ -31,10 +31,10 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [provider.md](docs/subsystems/provider.md) | AI 服务：供应商连接、模型目录、默认用途、凭据与配置版本 |
 | [media.md](docs/subsystems/media.md) | 媒体和素材库：一个任务机上的生图与语音任务、本机输入、独立下载与安全校验；统一内容中心浏览与原生媒体详情栏 |
 | [game.md](docs/subsystems/game.md) | 游戏：账本、金币和成就、等级、空地和特效 |
-| [core.md](docs/subsystems/core.md) | 核心状态：一份状态只因事实而变、异步 `EventBus`、收件箱与巡查、SSE 流和全部路由、接口和能力表、重启 |
+| [core.md](docs/subsystems/core.md) | 核心状态：一份状态只因事实而变、异步 `EventBus`、收件箱、SSE 流和全部路由、接口和能力表、重启 |
 | [foundation.md](docs/subsystems/foundation.md) | 地基：Cargo 与 pnpm 工作区、深模块、边界一次解码的类型、契约的生成、SQLite 存储、测试分层 |
 | [app.md](docs/subsystems/app.md) | 客户端：原生应用 `apps/mac`（GPUI 窗口、进程里的服务端、页面和服务端之间的桥、nsh TSX 的工作台、宿主能力） |
-| [farm.md](docs/subsystems/farm.md) | 农场的皮：Rust 画的像素村、地里长什么、走路、地图、记忆树、图鉴 |
+| [farm.md](docs/subsystems/farm.md) | 农场的皮：Rust 画的像素村、地里长什么、走路、地图、记忆树、开场 |
 | [agent.md](docs/subsystems/agent.md) | 档案和农机：档案和它的角色、种子、农机的探测和清单、技能书 |
 | [process.md](docs/subsystems/process.md) | 工程流程：文档分层、Note 和子系统、检查、skill、写作规范、素材流水线 |
 | [site.md](docs/subsystems/site.md) | 官网：Vite + Solid 2 静态生成、图从游戏来 |
@@ -129,7 +129,6 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | 定时任务 | scheduled task | cron（`Cron`） | 定时（指定时任务时）、schedule（指定时任务时）、recurrence |
 | 收件箱 | inbox | `InboxItem`（`InboxSlice.items`，服务是 `Inbox`） | 通知（指收件箱时）、来电（农场的皮里用）、Inbox（中文界面，指收件箱时） |
 | 提醒 | notice | `Core.notice`、`NoticeLevel`（事件流里是 `LiveEventNotice`） |  |
-| 巡查 | patrol | `patrolStep`（`Inbox.patrol`） |  |
 | 通话 | call | `VoiceCall`（`voice.call.*`） |  |
 | 听写 | dictation | dictation（`Dictation`） |  |
 | 花费 | spending | `Spent`、`RuntimeQuota` |  |

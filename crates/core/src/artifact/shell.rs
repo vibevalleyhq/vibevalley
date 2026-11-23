@@ -24,16 +24,16 @@ pub fn shell_theme_of(asked: Option<&str>) -> &'static str {
     if asked == Some("dark") { "dark" } else { "light" }
 }
 
-pub fn theme_variables(theme: &str) -> &'static str {
+pub(crate) fn theme_variables(theme: &str) -> &'static str {
     let key = if shell_theme_of(Some(theme)) == "dark" { "theme_dark" } else { "theme_light" };
     BUNDLE.get(key).map_or("", String::as_str)
 }
 
-pub fn type_variables() -> &'static str {
+pub(crate) fn type_variables() -> &'static str {
     BUNDLE.get("type_variables").map_or("", String::as_str)
 }
 
-pub fn selection_script() -> &'static str {
+pub(crate) fn selection_script() -> &'static str {
     BUNDLE.get("selection_script").map_or("", String::as_str)
 }
 
@@ -83,13 +83,6 @@ pub struct PresenceHighlightCommand {
     pub items: Vec<PresenceHighlight>,
 }
 
-pub fn presence_highlight_command(items: Vec<PresenceHighlight>) -> PresenceHighlightCommand {
-    PresenceHighlightCommand {
-        vibevalley: "presence-highlight",
-        items,
-    }
-}
-
 #[cfg(feature = "collab")]
 pub fn presence_highlight_from_payloads<'a>(payloads: impl IntoIterator<Item = &'a PresencePayload>) -> PresenceHighlightCommand {
     let items = payloads
@@ -107,7 +100,10 @@ pub fn presence_highlight_from_payloads<'a>(payloads: impl IntoIterator<Item = &
             h: p.h,
         })
         .collect();
-    presence_highlight_command(items)
+    PresenceHighlightCommand {
+        vibevalley: "presence-highlight",
+        items,
+    }
 }
 
 /// Inline strict-CSP-safe sandbox listener that renders breathing highlight boxes
@@ -125,20 +121,4 @@ pub fn with_shell(page: &str, display: ArtifactDisplay, theme: &str) -> String {
     };
     let key = format!("{}|{}", display.as_str(), shell_theme_of(Some(theme)));
     format!("{base}{}{}", BUNDLE.get(&key).map_or("", String::as_str), presence_highlight_script())
-}
-
-/// `shellPath`: the query carries the display and theme because a
-/// version's answer is cached for good.
-pub fn shell_path(id: &str, version: i64, display: ArtifactDisplay, theme: &str, at: Option<i64>, still: bool, print: bool) -> String {
-    let mut p = format!("/api/v1/artifact/{id}/{version}?shell=1&display={}&theme={theme}", display.as_str());
-    if let Some(at) = at {
-        p.push_str(&format!("&at={at}"));
-    }
-    if still {
-        p.push_str("&still=1");
-    }
-    if print {
-        p.push_str("&print=1");
-    }
-    p
 }

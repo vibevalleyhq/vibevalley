@@ -25,6 +25,9 @@ const SLICE_KINDS: readonly SliceKind[] = ["board", "sessions", "collab", "inbox
 export interface Slices {
   readonly slice: <K extends SliceKind>(kind: K) => Accessor<SliceMap[K] | undefined>;
   readonly link: Accessor<Link>;
+  readonly sessionsById: Accessor<ReadonlyMap<string, SessionView>>;
+  readonly sessionsByIssue: Accessor<ReadonlyMap<string, SessionView>>;
+  readonly issuesById: Accessor<ReadonlyMap<string, Issue>>;
 }
 
 export interface SlicesSource {
@@ -119,13 +122,6 @@ export const slices: SlicesSource = {
 
 export const SlicesContext = createContext<Slices>();
 
-interface SliceIndex {
-  readonly sessionsById: Accessor<ReadonlyMap<string, SessionView>>;
-  readonly sessionsByIssue: Accessor<ReadonlyMap<string, SessionView>>;
-  readonly issuesById: Accessor<ReadonlyMap<string, Issue>>;
-}
-
-const sliceIndices = new WeakMap<Slices, SliceIndex>();
 const emptySessions = new Map<string, SessionView>();
 const emptyIssues = new Map<string, Issue>();
 
@@ -210,12 +206,9 @@ export function createSlices(source: SlicesSource = slices): Slices {
     }
   };
 
-  const handle: Slices = {
+  return {
     slice: ensureSlice,
     link: () => linkSig(),
-  };
-
-  sliceIndices.set(handle, {
     sessionsById: () => {
       syncSessions();
       return sessionsById;
@@ -228,9 +221,7 @@ export function createSlices(source: SlicesSource = slices): Slices {
       syncIssues();
       return issuesById;
     },
-  });
-
-  return handle;
+  };
 }
 
 let shared: Slices | undefined;
@@ -248,14 +239,7 @@ export const useOpsSlice = (): Accessor<OpsSlice | undefined> => useSlice("ops")
 export const useLink = (): Accessor<Link> => useSlices().link;
 
 export function useSessionsMap(): Accessor<ReadonlyMap<string, SessionView>> {
-  const s = useSlices();
-  const idx = sliceIndices.get(s);
-  if (idx) return idx.sessionsById;
-  const sessions = s.slice("sessions");
-  return () => {
-    const list = sessions()?.sessions;
-    return list && list.length > 0 ? new Map(list.map((x) => [x.id, x])) : emptySessions;
-  };
+  return useSlices().sessionsById;
 }
 
 export function useSession(id: Accessor<string | undefined>): Accessor<SessionView | undefined> {
@@ -267,17 +251,7 @@ export function useSession(id: Accessor<string | undefined>): Accessor<SessionVi
 }
 
 export function useIssue(id: Accessor<string | undefined>): Accessor<Issue | undefined> {
-  const s = useSlices();
-  const idx = sliceIndices.get(s);
-  const byId: Accessor<ReadonlyMap<string, Issue>> = idx
-    ? idx.issuesById
-    : (() => {
-        const board = s.slice("board");
-        return () => {
-          const list = board()?.issues;
-          return list && list.length > 0 ? new Map(list.map((i) => [i.id, i])) : emptyIssues;
-        };
-      })();
+  const byId = useSlices().issuesById;
   return () => {
     const key = id();
     return key !== undefined ? byId().get(key) : undefined;
@@ -286,17 +260,11 @@ export function useIssue(id: Accessor<string | undefined>): Accessor<Issue | und
 
 export function useThreadOwner(thread: Accessor<Channel>): Accessor<SessionView | undefined> {
   const s = useSlices();
-  const idx = sliceIndices.get(s);
-  const sessions = idx ? undefined : s.slice("sessions");
   return () => {
     const c = thread();
     if (c.subjectId === undefined) return undefined;
-    if (c.subjectKind === "talk") {
-      return idx ? idx.sessionsById().get(c.subjectId) : sessions?.()?.sessions.find((x) => x.id === c.subjectId);
-    }
-    if (c.subjectKind === "issue") {
-      return idx ? idx.sessionsByIssue().get(c.subjectId) : sessions?.()?.sessions.findLast((x) => sessionIssueId(x) === c.subjectId);
-    }
+    if (c.subjectKind === "talk") return s.sessionsById().get(c.subjectId);
+    if (c.subjectKind === "issue") return s.sessionsByIssue().get(c.subjectId);
     return undefined;
   };
 }

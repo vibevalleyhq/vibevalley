@@ -3,9 +3,9 @@
 //! own typed keys; the bridge holds them sealed, as one `Secret`.
 
 use std::future::Future;
-use std::sync::OnceLock;
 use std::time::Duration;
 
+use parking_lot::Mutex;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tokio_util::sync::CancellationToken;
@@ -192,17 +192,33 @@ impl<A: Adapter> App for A {
     }
 }
 
-/// Shared `reqwest::Client` reused across connector calls on the shared `vibevalley-io` runtime.
+/// Shared `reqwest::Client` reused across connector calls via `infra::http::pooled_client`.
 pub fn client() -> Result<reqwest::Client, AppFailed> {
-    static CLIENT: OnceLock<Result<reqwest::Client, String>> = OnceLock::new();
-    CLIENT
-        .get_or_init(|| {
-            crate::install_tls();
-            reqwest::Client::builder().build().map_err(|e| e.to_string())
-        })
-        .as_ref()
-        .cloned()
-        .map_err(AppFailed::failed)
+    crate::modules::infra::http::pooled_client().cloned().map_err(AppFailed::failed)
+}
+
+struct CachedToken {
+    of: String,
+    token: String,
+    until: i64,
+}
+
+/// Caches one active credential-scoped token until 60 s before expiry.
+#[derive(Default)]
+pub(super) struct TokenCache(Mutex<Option<CachedToken>>);
+
+impl TokenCache {
+    pub(super) fn get(&self, of: &str, at: i64) -> Option<String> {
+        self.0.lock().as_ref().filter(|c| c.of == of && c.until > at).map(|c| c.token.clone())
+    }
+
+    pub(super) fn put(&self, of: String, token: String, at: i64, ttl_seconds: i64) {
+        *self.0.lock() = Some(CachedToken {
+            of,
+            token,
+            until: at + (ttl_seconds - 60) * 1000,
+        });
+    }
 }
 
 /// `work` with a deadline; past it, what `late` says.

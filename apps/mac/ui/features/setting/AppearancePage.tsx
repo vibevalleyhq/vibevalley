@@ -1,7 +1,7 @@
 import { host, setColorScheme, signal } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { MotionChoiceValues, type ThemeChoice, ThemeChoiceValues } from "@vibevalley/protocol/host";
+import { MotionChoiceValues, ThemeChoice, ThemeChoiceValues } from "@vibevalley/protocol/host";
 
 import { SettingRow, SettingsGroup } from "../../design/domain/settings";
 import { Select } from "../../design/Field";
@@ -10,7 +10,7 @@ import { applyMotion, chooseMotion, motionChoice } from "../../design/motion";
 import { Segmented } from "../../design/Segmented";
 import { hostApi } from "../../infra/bridge";
 import { currentHost } from "../../infra/host";
-import { ScaleValues, setScale, setTheme, usePrefs } from "../../infra/state/prefs";
+import { prefsNow, ScaleValues, setScale, setTheme, usePrefs } from "../../infra/state/prefs";
 
 const themeIcon: Record<ThemeChoice, IconName> = { light: "themeLight", dark: "themeDark", system: "themeSystem" };
 
@@ -45,6 +45,8 @@ export function AppearanceGroups() {
   if (host.available()) {
     void hostApi.info().then((env) => {
       if (env.bizCode === 0 && env.data) {
+        const parsedTheme = ThemeChoice.safeParse(env.data.theme);
+        if (parsedTheme.success && parsedTheme.data !== prefsNow().theme) setTheme(parsedTheme.data);
         if (env.data.motion) applyMotion(env.data.motion);
         if (env.data.monoFont) monoFont.set(env.data.monoFont);
         if (Array.isArray(env.data.monoFonts) && env.data.monoFonts.length > 0) {

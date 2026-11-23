@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
-use parking_lot::Mutex;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -19,7 +18,7 @@ use tokio_tungstenite::tungstenite::Message as WsMessage;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ConnectorID, ConnectorLogin, ConnectorState};
 
-use super::adapter::{Adapter, AppFailed, Inbound, Linked, LoginIo, Progress, Receiving, client, timed};
+use super::adapter::{Adapter, AppFailed, Inbound, Linked, LoginIo, Progress, Receiving, TokenCache, client, timed};
 use crate::modules::infra::setting::Secret;
 use crate::now;
 
@@ -382,17 +381,11 @@ fn whole(parts: &mut HashMap<String, Vec<Option<Vec<u8>>>>, frame: &Frame) -> Op
     Some(parts.remove(&id)?.into_iter().flatten().flatten().collect())
 }
 
-struct Token {
-    of: String,
-    token: String,
-    until: i64,
-}
-
 pub struct Feishu {
     hosts: Hosts,
     /// A registration is asked about no more often than this.
     poll_floor: Duration,
-    token: Mutex<Option<Token>>,
+    token: TokenCache,
 }
 
 impl Feishu {
@@ -400,7 +393,7 @@ impl Feishu {
         Feishu {
             hosts,
             poll_floor,
-            token: Mutex::new(None),
+            token: TokenCache::default(),
         }
     }
 
@@ -468,8 +461,8 @@ impl Feishu {
     async fn tenant_token(&self, keys: &Keys) -> Result<String, AppFailed> {
         let of = format!("{}\u{0}{}", keys.app_id, keys.app_secret.expose());
         let at = now();
-        if let Some(cached) = self.token.lock().as_ref().filter(|c| c.of == of && c.until > at) {
-            return Ok(cached.token.clone());
+        if let Some(cached) = self.token.get(&of, at) {
+            return Ok(cached);
         }
         let why = |e: String| AppFailed::failed(t("server.connector.feishu.send", &[("why", e.into())]));
         let answer = client()?
@@ -482,11 +475,7 @@ impl Feishu {
         let Some(token) = body.tenant_access_token.filter(|x| !x.is_empty() && body.code.unwrap_or(0) == 0) else {
             return Err(why(format!("{} {}", body.code.unwrap_or(0), body.msg.unwrap_or_default())));
         };
-        *self.token.lock() = Some(Token {
-            of,
-            token: token.clone(),
-            until: at + (body.expire.unwrap_or(7200) - 60) * 1000,
-        });
+        self.token.put(of, token.clone(), at, body.expire.unwrap_or(7200));
         Ok(token)
     }
 

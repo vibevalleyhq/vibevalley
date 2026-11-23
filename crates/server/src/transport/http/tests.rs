@@ -14,14 +14,15 @@ fn start() -> (Arc<FakeServer>, Listener) {
     (fake, listener)
 }
 
-fn agent() -> ureq::Agent {
-    ureq::Agent::config_builder().http_status_as_error(false).build().into()
+fn agent() -> reqwest::blocking::Client {
+    crate::install_tls();
+    reqwest::blocking::Client::builder().no_proxy().build().unwrap()
 }
 
 fn post(url: &str, body: Value) -> (u16, Value) {
-    let mut res = agent().post(url).send_json(body).unwrap();
+    let res = agent().post(url).json(&body).send().unwrap();
     let status = res.status().as_u16();
-    (status, serde_json::from_str(&res.body_mut().read_to_string().unwrap()).unwrap())
+    (status, serde_json::from_str(&res.text().unwrap()).unwrap())
 }
 
 #[test]
@@ -38,21 +39,22 @@ fn commands_reach_the_server_by_op_name_with_vibevalleys_envelope() {
 #[test]
 fn refusals_carry_their_http_status_and_bad_bodies_are_invalid_input() {
     let (_fake, l) = start();
-    let mut res = agent()
-        .post(&format!("{}/api/v1/issue/list", l.url()))
+    let res = agent()
+        .post(format!("{}/api/v1/issue/list", l.url()))
         .header("content-type", "application/json")
-        .send("{not json")
+        .body("{not json")
+        .send()
         .unwrap();
     assert_eq!(res.status().as_u16(), 400);
-    let body: Value = serde_json::from_str(&res.body_mut().read_to_string().unwrap()).unwrap();
+    let body: Value = serde_json::from_str(&res.text().unwrap()).unwrap();
     assert_eq!(body["bizCode"], 100001);
-    let res = agent().get(&format!("{}/api/v1/issue/list", l.url())).call().unwrap();
+    let res = agent().get(format!("{}/api/v1/issue/list", l.url())).send().unwrap();
     assert_eq!(res.status().as_u16(), 405);
-    let res = agent().get(&format!("{}/api/v1/state", l.url())).call().unwrap();
+    let res = agent().get(format!("{}/api/v1/state", l.url())).send().unwrap();
     assert_eq!(res.status().as_u16(), 405, "/api/v1/state GET must be removed");
-    let res = agent().get(&format!("{}/chord/ws", l.url())).call().unwrap();
+    let res = agent().get(format!("{}/chord/ws", l.url())).send().unwrap();
     assert_eq!(res.status().as_u16(), 404, "/chord/ws must be removed");
-    let res = agent().get(&format!("{}/nowhere", l.url())).call().unwrap();
+    let res = agent().get(format!("{}/nowhere", l.url())).send().unwrap();
     assert_eq!(res.status().as_u16(), 404);
 }
 
@@ -60,15 +62,17 @@ fn refusals_carry_their_http_status_and_bad_bodies_are_invalid_input() {
 fn another_sites_page_is_refused() {
     let (_fake, l) = start();
     let res = agent()
-        .post(&format!("{}/api/v1/issue/list", l.url()))
+        .post(format!("{}/api/v1/issue/list", l.url()))
         .header("origin", "http://evil.example")
-        .send_json(json!({}))
+        .json(&json!({}))
+        .send()
         .unwrap();
     assert_eq!(res.status().as_u16(), 403);
     let res = agent()
-        .post(&format!("{}/api/v1/issue/list", l.url()))
+        .post(format!("{}/api/v1/issue/list", l.url()))
         .header("sec-fetch-site", "cross-site")
-        .send_json(json!({}))
+        .json(&json!({}))
+        .send()
         .unwrap();
     assert_eq!(res.status().as_u16(), 403);
     let mut headers = HeaderMap::new();
@@ -85,9 +89,9 @@ fn first_event_with_id(url: &str, extra_header: Option<(&str, &str)>) -> (Option
     if let Some((k, v)) = extra_header {
         req = req.header(k, v);
     }
-    let res = req.call().unwrap();
+    let res = req.send().unwrap();
     assert_eq!(res.headers().get("content-type").unwrap().to_str().unwrap(), "text/event-stream");
-    let mut reader = BufReader::new(res.into_body().into_reader());
+    let mut reader = BufReader::new(res);
     let mut line = String::new();
     let mut id = None;
     loop {
@@ -109,25 +113,25 @@ fn first_event(url: &str) -> Value {
 fn slice_endpoint_serves_json_snapshots_sse_with_ids_and_resume() {
     let (fake, l) = start();
     // 1. Unknown slice -> 404
-    let res = agent().get(&format!("{}/api/v1/slice/unknown?once=1", l.url())).call().unwrap();
+    let res = agent().get(format!("{}/api/v1/slice/unknown?once=1", l.url())).send().unwrap();
     assert_eq!(res.status().as_u16(), 404);
 
     // 2. ?once=1 returns JSON snapshot directly
-    let mut res = agent().get(&format!("{}/api/v1/slice/board?once=1", l.url())).call().unwrap();
+    let res = agent().get(format!("{}/api/v1/slice/board?once=1", l.url())).send().unwrap();
     assert_eq!(res.status().as_u16(), 200);
     assert!(res.headers().get("content-type").unwrap().to_str().unwrap().contains("application/json"));
-    let snap: Value = serde_json::from_str(&res.body_mut().read_to_string().unwrap()).unwrap();
+    let snap: Value = serde_json::from_str(&res.text().unwrap()).unwrap();
     assert_eq!(snap["seq"], 0);
     assert!(snap["issues"].is_array());
 
     // 3. Accept: application/json returns JSON snapshot directly
-    let mut res = agent()
-        .get(&format!("{}/api/v1/slice/inbox", l.url()))
+    let res = agent()
+        .get(format!("{}/api/v1/slice/inbox", l.url()))
         .header("accept", "application/json")
-        .call()
+        .send()
         .unwrap();
     assert_eq!(res.status().as_u16(), 200);
-    let inbox_snap: Value = serde_json::from_str(&res.body_mut().read_to_string().unwrap()).unwrap();
+    let inbox_snap: Value = serde_json::from_str(&res.text().unwrap()).unwrap();
     assert_eq!(inbox_snap["seq"], 0);
     assert!(inbox_snap["items"].is_array());
 
@@ -200,9 +204,9 @@ fn issue_watch_streams_the_subscription_and_refusals_are_an_empty_404() {
         fn unsubscribe(&self, _: u64) {}
     }
     let l = serve(Arc::new(Refuses), "127.0.0.1:0".parse().unwrap()).unwrap();
-    let mut res = agent().get(&format!("{}/api/v1/issue/watch/nope", l.url())).call().unwrap();
+    let res = agent().get(format!("{}/api/v1/issue/watch/nope", l.url())).send().unwrap();
     assert_eq!(res.status().as_u16(), 404);
-    assert_eq!(res.body_mut().read_to_string().unwrap(), "");
+    assert_eq!(res.text().unwrap(), "");
 }
 
 #[test]
@@ -212,15 +216,15 @@ fn attachments_are_served_from_the_path_the_server_gives() {
     let file = dir.path().join("abc");
     std::fs::write(&file, b"\x89PNG fake").unwrap();
     fake.respond("attachment.file", json!({ "path": file, "type": "image/png", "name": "shot \"1\".png" }));
-    let mut res = agent().get(&format!("{}/api/v1/attachment/a1", l.url())).call().unwrap();
+    let res = agent().get(format!("{}/api/v1/attachment/a1", l.url())).send().unwrap();
     assert_eq!(res.status().as_u16(), 200);
     assert_eq!(res.headers().get("content-type").unwrap(), "image/png");
     assert_eq!(res.headers().get("content-disposition").unwrap(), "inline; filename=\"shot _1_.png\"");
-    assert_eq!(res.body_mut().read_to_vec().unwrap(), b"\x89PNG fake");
+    assert_eq!(res.bytes().unwrap().as_ref(), b"\x89PNG fake");
     assert_eq!(fake.calls().last().unwrap(), &("attachment.file".to_string(), json!({ "id": "a1" })));
 
     fake.respond("attachment.file", json!({ "path": dir.path().join("gone"), "type": "image/png" }));
-    let res = agent().get(&format!("{}/api/v1/attachment/a2", l.url())).call().unwrap();
+    let res = agent().get(format!("{}/api/v1/attachment/a2", l.url())).send().unwrap();
     assert_eq!(res.status().as_u16(), 404);
 }
 
@@ -232,11 +236,11 @@ fn artifact_pages_carry_the_servers_headers_and_bad_ids_are_404() {
         "artifact.page",
         json!({ "content": "<h1>hi</h1>", "headers": { "content-type": "text/html; charset=utf-8", "content-security-policy": "sandbox allow-scripts" } }),
     );
-    let mut res = agent().get(&format!("{}/api/v1/artifact/{id}/2?shell=1&theme=dark", l.url())).call().unwrap();
+    let res = agent().get(format!("{}/api/v1/artifact/{id}/2?shell=1&theme=dark", l.url())).send().unwrap();
     assert_eq!(res.status().as_u16(), 200);
     assert_eq!(res.headers().get("content-type").unwrap(), "text/html; charset=utf-8");
     assert_eq!(res.headers().get("content-security-policy").unwrap(), "sandbox allow-scripts");
-    assert_eq!(res.body_mut().read_to_string().unwrap(), "<h1>hi</h1>");
+    assert_eq!(res.text().unwrap(), "<h1>hi</h1>");
     assert_eq!(
         fake.calls().last().unwrap(),
         &("artifact.page".to_string(), json!({ "id": id, "version": 2, "shell": true, "theme": "dark" }))
@@ -244,7 +248,7 @@ fn artifact_pages_carry_the_servers_headers_and_bad_ids_are_404() {
 
     let calls = fake.calls().len();
     for bad in ["not-an-id/1", &format!("{id}/0"), &format!("{id}/01"), &format!("{id}/x")] {
-        let res = agent().get(&format!("{}/api/v1/artifact/{bad}", l.url())).call().unwrap();
+        let res = agent().get(format!("{}/api/v1/artifact/{bad}", l.url())).send().unwrap();
         assert_eq!(res.status().as_u16(), 404, "{bad}");
     }
     assert_eq!(fake.calls().len(), calls, "a bad id never reaches the server");

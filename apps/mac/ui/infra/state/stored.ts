@@ -26,10 +26,15 @@ function storedAtom<S extends z.ZodType>(name: string, schema: S, fallback: z.ou
   };
   return {
     init: (set) => {
-      // Another tab on this machine wrote it: the storage event comes to every other tab, never to the one that wrote.
+      // Another tab or async boot hydration from native Storage wrote it: update without writing back.
       if (typeof window !== "undefined") {
         window.addEventListener("storage", (e: Event) => {
-          if (!("key" in e) || e.key !== key || !("newValue" in e) || typeof e.newValue !== "string") return;
+          if (!("key" in e) || e.key !== key || !("newValue" in e)) return;
+          if (e.newValue === null) {
+            set(fallback);
+            return;
+          }
+          if (typeof e.newValue !== "string") return;
           const got = decode(e.newValue);
           if (got) set(got.value);
         });

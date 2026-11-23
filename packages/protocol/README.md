@@ -13,7 +13,7 @@ Schemas, `api.ts`, the rules and the client are hand-written here for the native
 | `@vibevalley/protocol/api` | `endpoints` (method, path, parameters, request and answer Schemas, who may call) and `Handlers`, put together from each concept's `src/<concept>/api.ts` (`api.test.ts` holds it to the served table, `endpoints.gen.ts`); `BizCode`, `bizCodeMeta`, `ApiError`, `ApiErrorEnvelope`, `ApiVoidEnvelope`, `apiSuccessEnvelope`, `Endpoint` and `input` from `src/endpoint.ts` |
 | `@vibevalley/protocol/rpc` | `subscriptions` and `Subscriptions`: what a page follows a channel, the farm's reports and an artifact by, each over SSE at `subscriptionPath` (`GET /api/v1/subscribe/<name>?payload=…`, `subscriptionUrl`) |
 | `@vibevalley/protocol/host` | `Host`: what the page may ask of the native macOS shell around it (below), with the Schemas of what crosses (`UpdateState`, `CommandLineState`, `ThemeChoice`) |
-| `@vibevalley/protocol/rules` | pure rules both the server and the page run: phase and action words (`phase.ts`), issue titles and stage helpers (`issues.ts`, `stage.ts`), channel lookup (`channel.ts`), block order keys (`order.ts`), sandbox attributes (`display.ts`), repo name validation (`repo.ts`), inbox news (`inbox.ts`), a session's farm (`play.ts`), and small helpers (`same.ts`, `plain.ts`, `omit.ts`, `oneOf.ts`, `cut.ts`) |
+| `@vibevalley/protocol/rules` | pure rules both the server and the page run: span words (`phase.ts`), issue titles and stage helpers (`issues.ts`, `stage.ts`), channel lookup (`channel.ts`), block order keys (`order.ts`), repo name validation (`repo.ts`), inbox news (`inbox.ts`), session field projection (`session.ts`), and small helpers (`same.ts`, `plain.ts`, `omit.ts`, `oneOf.ts`, `cut.ts`) |
 
 
 ## The host

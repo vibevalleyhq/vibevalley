@@ -3,9 +3,8 @@ import { z } from "zod";
 import type { Codec } from "../codec";
 import { IssueId, Outcome, SessionId, Spent } from "../common/schema";
 import { Conflict, ReviewRevision } from "../repo/schema";
-import { IssueAnswer, PhaseResting, Session, SessionEvent } from "../session/schema";
+import { IssueAnswer, Session } from "../session/schema";
 import * as T from "./shapes.gen";
-import { IssueReportMemoryScopeValues } from "./shapes.gen";
 
 const Landing = z.enum(T.LandingValues) satisfies Codec<T.Landing>;
 const IssueCanceled = z.enum(T.IssueCanceledValues) satisfies Codec<T.IssueCanceled>;
@@ -16,7 +15,7 @@ export const IssueStatus = z.enum(T.IssueStatusValues) satisfies Codec<T.IssueSt
 
 export const IssueLane = z.enum(T.IssueLaneValues) satisfies Codec<T.IssueLane>;
 
-export const IssueCardKind = z.enum(T.IssueCardKindValues) satisfies Codec<T.IssueCardKind>;
+const IssueCardKind = z.enum(T.IssueCardKindValues) satisfies Codec<T.IssueCardKind>;
 
 export const IssuePromptKind = z.enum(T.IssuePromptKindValues) satisfies Codec<T.IssuePromptKind>;
 
@@ -134,17 +133,6 @@ const IssueMandate = z.object({
   maxBotReviewRounds: z.number().int(),
   autoSubmitPr: z.boolean(),
 }) satisfies Codec<T.IssueMandate>;
-
-export const IssueReportMemory = z.object({ text: z.string(), scope: z.enum(IssueReportMemoryScopeValues) }) satisfies Codec<T.IssueReportMemory>;
-
-export const IssueReport = z.object({
-  summary: z.string(),
-  questions: z.array(Question),
-  checks: z.array(CriterionCheck),
-  remember: z.array(IssueReportMemory),
-  prSubmit: z.boolean(),
-  answer: z.exactOptional(IssueAnswer),
-}) satisfies Codec<T.IssueReport>;
 
 export const IssueConstraints = z.object({
   check: z.exactOptional(z.string()),
@@ -298,45 +286,3 @@ export const IssueStatusRequest = z.object({
   edit: z.exactOptional(IssueUpdate),
   requestKey: z.exactOptional(z.string()),
 }) satisfies Codec<T.IssueStatusRequest>;
-
-export const FactSessionReported = z.object({
-  type: z.literal("sessionReported"),
-  at: z.number(),
-  id: SessionId,
-  run: z.exactOptional(z.string()),
-  outcome: Outcome,
-  phase: z.exactOptional(PhaseResting),
-  summary: z.string(),
-  runs: z.number(),
-  spent: z.exactOptional(Spent),
-  questions: z.array(Question),
-  checks: z.array(CriterionCheck),
-  answer: z.exactOptional(IssueAnswer),
-}) satisfies Codec<T.FactSessionReported>;
-
-export const FactIssueChanged = z.object({
-  type: z.literal("issueChanged"),
-  at: z.number(),
-  issue: Issue,
-}) satisfies Codec<T.FactIssueChanged>;
-
-export const FactIssueRemoved = z.object({
-  type: z.literal("issueRemoved"),
-  at: z.number(),
-  id: IssueId,
-}) satisfies Codec<T.FactIssueRemoved>;
-
-export const IssueWatch = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("history"), session: SessionId, events: z.array(SessionEvent) }),
-  z.object({
-    kind: z.literal("state"),
-    issue: Issue,
-    sessions: z.array(Session),
-    sessionIds: z.array(SessionId),
-    settled: z.boolean(),
-    omittedSessions: z.number().int(),
-  }),
-  z.object({ kind: z.literal("event"), session: SessionId, event: SessionEvent }),
-  z.object({ kind: z.literal("gap"), session: SessionId, before: z.exactOptional(z.number().int()) }),
-  z.object({ kind: z.literal("missing"), issue: IssueId }),
-]) satisfies Codec<T.IssueWatch>;

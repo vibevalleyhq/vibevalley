@@ -7,10 +7,12 @@ use std::io::Read;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use vibevalley_protocol::{
-    JsNumber, MediaAudioSegment, MediaAudioVoice, MediaInputKind, MediaSpeakersRequestSegments, MediaSpeakersRequestSpeakers, MediaUnderstandingResult,
-    MediaUnderstandingResultIncompleteReason, MediaUnderstandingResultUsage, MediaUnderstandingStatus,
+    JsNumber, MediaAudioSegment, MediaAudioVoice, MediaImageFormat, MediaImageRequest, MediaImageUsage, MediaInputKind, MediaSpeakersRequestSegments,
+    MediaSpeakersRequestSpeakers, MediaUnderstandingResult, MediaUnderstandingResultIncompleteReason, MediaUnderstandingResultUsage, MediaUnderstandingStatus,
 };
 
 use super::Stop;
@@ -135,25 +137,258 @@ pub fn audio_mimes(format: &str) -> &'static [&'static str] {
 
 const FORMATS: [&str; 6] = ["mp3", "wav", "pcm", "flac", "aac", "opus"];
 
+#[derive(Deserialize)]
+struct WireErrorBody {
+    error: Option<WireErrorDetail>,
+}
+
+#[derive(Deserialize)]
+struct WireErrorDetail {
+    code: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct WireAudioUsage {
+    input_characters: Option<serde_json::Number>,
+    prompt_tokens: Option<serde_json::Number>,
+    completion_tokens: Option<serde_json::Number>,
+    total_tokens: Option<serde_json::Number>,
+    input_audio_seconds: Option<serde_json::Number>,
+}
+
 /// `audioUsage`: MOSS's snake case to the farm's camel case.
-fn usage_of(u: &Value) -> Option<Value> {
-    let o = u.as_object()?;
+fn usage_of(u: WireAudioUsage) -> Option<Value> {
     let mut out = serde_json::Map::new();
-    for (from, to) in [
-        ("input_characters", "inputCharacters"),
-        ("prompt_tokens", "promptTokens"),
-        ("completion_tokens", "completionTokens"),
-        ("total_tokens", "totalTokens"),
-        ("input_audio_seconds", "inputAudioSeconds"),
+    for (to, val) in [
+        ("inputCharacters", u.input_characters),
+        ("promptTokens", u.prompt_tokens),
+        ("completionTokens", u.completion_tokens),
+        ("totalTokens", u.total_tokens),
+        ("inputAudioSeconds", u.input_audio_seconds),
     ] {
-        if let Some(v) = o.get(from).filter(|v| v.is_number()) {
-            if v.as_f64().is_some_and(|f| f < 0.0) {
+        if let Some(n) = val {
+            if !n.as_f64().is_some_and(|f| f.is_finite() && f >= 0.0) {
                 return None;
             }
-            out.insert(to.into(), v.clone());
+            out.insert(to.into(), Value::Number(n));
         }
     }
     Some(Value::Object(out))
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct LayoutPrompt {
+    summary: LayoutSummary,
+    items: Vec<LayoutItem>,
+    bbox_format: String,
+    bbox_coord_space: String,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct LayoutSummary {
+    caption: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    meta: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    canvas: Option<String>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct LayoutItem {
+    label: String,
+    caption: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    text: Option<String>,
+    bbox: [f64; 4],
+}
+
+#[derive(Deserialize)]
+struct WireImageResponse {
+    created: Option<i64>,
+    data: Vec<WireImageItem>,
+    usage: WireImageUsage,
+}
+
+#[derive(Deserialize)]
+struct WireImageItem {
+    url: String,
+}
+
+#[derive(Deserialize)]
+struct WireImageUsage {
+    generated_images: i64,
+    output_width: i64,
+    output_height: i64,
+}
+
+#[derive(Deserialize)]
+struct WireSpeechResponse {
+    object: String,
+    status: String,
+    id: String,
+    url: String,
+    response_format: String,
+    content_type: String,
+    usage: Option<WireAudioUsage>,
+}
+
+#[derive(Deserialize)]
+struct WireTaskSubmitted {
+    task_id: String,
+}
+
+#[derive(Deserialize)]
+struct WireSegment {
+    speaker: String,
+    text: String,
+    start: f64,
+    end: f64,
+}
+
+#[derive(Deserialize)]
+struct WireAudioTaskResponse {
+    object: String,
+    id: String,
+    status: String,
+    created_at: i64,
+    updated_at: i64,
+    url: Option<String>,
+    response_format: Option<String>,
+    content_type: Option<String>,
+    text: Option<String>,
+    segments: Option<Vec<WireSegment>>,
+    usage: Option<WireAudioUsage>,
+}
+
+#[derive(Deserialize)]
+struct WireSpeechMeta {
+    performance: Option<WireSpeechPerformance>,
+}
+
+#[derive(Deserialize)]
+struct WireSpeechPerformance {
+    audio_duration_s: Option<f64>,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+enum WireSpeechSseEvent {
+    #[serde(rename = "task.created")]
+    TaskCreated { task_id: String },
+    #[serde(rename = "speech.created")]
+    SpeechCreated {
+        format: String,
+        sample_rate: i64,
+        channels: i64,
+        bit_depth: i64,
+    },
+    #[serde(rename = "speech.audio.delta")]
+    AudioDelta { audio: String },
+    #[serde(rename = "speech.audio.done")]
+    AudioDone {
+        usage: Option<WireAudioUsage>,
+        meta_info: Option<WireSpeechMeta>,
+    },
+}
+
+impl WireSpeechSseEvent {
+    fn event_type(&self) -> &'static str {
+        match self {
+            WireSpeechSseEvent::TaskCreated { .. } => "task.created",
+            WireSpeechSseEvent::SpeechCreated { .. } => "speech.created",
+            WireSpeechSseEvent::AudioDelta { .. } => "speech.audio.delta",
+            WireSpeechSseEvent::AudioDone { .. } => "speech.audio.done",
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+enum WireTranscriptionSseEvent {
+    #[serde(rename = "task.created")]
+    TaskCreated { task_id: String },
+    #[serde(rename = "transcript.text.delta")]
+    TextDelta { delta: String },
+    #[serde(rename = "transcript.segment.done")]
+    SegmentDone {
+        content_index: i64,
+        speaker: String,
+        text: String,
+        start: f64,
+        end: f64,
+        session_usage: Option<WireAudioUsage>,
+    },
+    #[serde(rename = "transcript.text.done")]
+    TextDone { text: String, usage: Option<WireAudioUsage> },
+}
+
+impl WireTranscriptionSseEvent {
+    fn event_type(&self) -> &'static str {
+        match self {
+            WireTranscriptionSseEvent::TaskCreated { .. } => "task.created",
+            WireTranscriptionSseEvent::TextDelta { .. } => "transcript.text.delta",
+            WireTranscriptionSseEvent::SegmentDone { .. } => "transcript.segment.done",
+            WireTranscriptionSseEvent::TextDone { .. } => "transcript.text.done",
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct WireUnderstandingResponse {
+    model: String,
+    status: String,
+    incomplete_details: Option<WireIncompleteDetails>,
+    output: Vec<WireUnderstandingOutput>,
+    usage: WireUnderstandingUsage,
+}
+
+#[derive(Deserialize)]
+struct WireIncompleteDetails {
+    reason: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct WireUnderstandingOutput {
+    content: Vec<WireUnderstandingPart>,
+}
+
+#[derive(Deserialize)]
+struct WireUnderstandingPart {
+    #[serde(rename = "type")]
+    kind: String,
+    text: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct WireUnderstandingUsage {
+    input_tokens: i64,
+    output_tokens: i64,
+    total_tokens: i64,
+}
+
+#[derive(Deserialize)]
+struct WireUploadedFile {
+    id: String,
+    object: String,
+    bytes: i64,
+    purpose: String,
+    status: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct WireDeletedFile {
+    id: String,
+    deleted: bool,
+}
+
+#[derive(Deserialize)]
+struct WireClonedVoice {
+    id: String,
+    name: String,
+    created_at: i64,
 }
 
 /// What a generated audio is at the vendor (`GeneratedAudio`).
@@ -195,15 +430,13 @@ pub enum Uploaded {
 }
 
 /// One transcript segment as MOSS says it, or nothing when it is malformed.
-fn segment_of(s: &Value) -> Option<MediaAudioSegment> {
-    let (start, end) = (s["start"].as_f64()?, s["end"].as_f64()?);
-    let speaker = s["speaker"].as_str().filter(|p| code_points(p, 1, 256))?;
-    if start < 0.0 || end < start {
+fn segment_of(speaker: String, text: String, start: f64, end: f64) -> Option<MediaAudioSegment> {
+    if !code_points(&speaker, 1, 256) || !start.is_finite() || !end.is_finite() || start < 0.0 || end < start {
         return None;
     }
     Some(MediaAudioSegment {
-        speaker: speaker.into(),
-        text: s["text"].as_str()?.into(),
+        speaker,
+        text,
         start: JsNumber(start),
         end: JsNumber(end),
     })
@@ -267,51 +500,102 @@ fn multipart(parts: Vec<Part>) -> (String, Box<dyn Read + Send>) {
     (format!("multipart/form-data; boundary={boundary}"), body)
 }
 
+fn validate_image_prompt(r: &MediaImageRequest) -> Result<String, VendorError> {
+    if r.id.is_empty()
+        || r.id.len() > 80
+        || !r.id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+        || !text_ok(&r.prompt, 4000)
+        || !(256..=2048).contains(&r.width)
+        || !(256..=2048).contains(&r.height)
+        || r.width % 16 != 0
+        || r.height % 16 != 0
+        || r.width * r.height > 2_097_152
+        || r.steps.is_some_and(|s| !(1..=100).contains(&s))
+        || r.guidance.is_some_and(|g| !g.0.is_finite() || !(0.0..=10.0).contains(&g.0))
+        || r.negative_prompt.as_ref().is_some_and(|s| s.chars().count() > 4000)
+    {
+        return Err(invalid_input());
+    }
+    if r.format != MediaImageFormat::Layout {
+        return Ok(r.prompt.clone());
+    }
+    let layout: LayoutPrompt = serde_json::from_str(&r.prompt).map_err(|_| invalid_input())?;
+    if !text_ok(&layout.summary.caption, 4000)
+        || layout.summary.canvas.as_ref().is_some_and(String::is_empty)
+        || layout.summary.meta.as_ref().is_some_and(|m| m.iter().any(String::is_empty))
+        || layout.bbox_format != "yxyx"
+        || layout.bbox_coord_space != "abs_centralized"
+        || layout.items.is_empty()
+        || layout.items.len() > 100
+    {
+        return Err(invalid_input());
+    }
+    let (h, w) = (r.height as f64 / 2.0, r.width as f64 / 2.0);
+    for item in &layout.items {
+        let b = item.bbox;
+        if item.label.is_empty()
+            || !text_ok(&item.caption, 4000)
+            || !b.iter().all(|v| v.is_finite())
+            || b[0] >= b[2]
+            || b[1] >= b[3]
+            || b[0] < -h
+            || b[2] > h
+            || b[1] < -w
+            || b[3] > w
+        {
+            return Err(invalid_input());
+        }
+    }
+    let serialized = serde_json::to_string(&layout).map_err(|_| invalid_input())?;
+    if serialized.chars().count() > 4000 {
+        return Err(invalid_input());
+    }
+    Ok(serialized)
+}
+
+struct VendorCall<'a> {
+    key: &'a str,
+    method: &'static str,
+    path: &'a str,
+    body: Option<(String, Box<dyn Read + Send>)>,
+    timeout: Duration,
+    audio: bool,
+    stop: Option<&'a Stop>,
+}
+
 impl Moss {
-    fn send(
-        &self,
-        key: &str,
-        method: &'static str,
-        url: String,
-        body: Option<(String, Box<dyn Read + Send>)>,
-        accept: &str,
-        timeout: Duration,
-    ) -> Result<Response, VendorError> {
-        if bad_key(key) {
+    fn send(&self, req: VendorCall<'_>, accept: &str) -> Result<Response, VendorError> {
+        if bad_key(req.key) {
             return Err(VendorError::new(Reason::Credentials, Outcome::NotSubmitted));
         }
-        let headers = vec![("authorization".into(), format!("Bearer {key}")), ("accept".into(), accept.into())];
-        self.fetch
-            .fetch(Request {
-                method,
-                url,
-                headers,
-                body,
-                timeout,
-            })
-            .map_err(|e| match e {
-                FetchError::Timeout => VendorError::new(Reason::Timeout, Outcome::Unknown),
-                FetchError::Network(_) => VendorError::new(Reason::Network, Outcome::Unknown),
-            })
+        let headers = vec![("authorization".into(), format!("Bearer {}", req.key)), ("accept".into(), accept.into())];
+        let request = Request {
+            method: req.method,
+            url: format!("{MOSS}{}", req.path),
+            headers,
+            body: req.body,
+            timeout: req.timeout,
+        };
+        let res = match req.stop {
+            Some(stop) => self.fetch.fetch_with_cancel(request, stop.token()),
+            None => self.fetch.fetch(request),
+        };
+        res.map_err(|e| match e {
+            FetchError::Timeout => VendorError::new(Reason::Timeout, Outcome::Unknown),
+            FetchError::Network(_) => VendorError::new(Reason::Network, Outcome::Unknown),
+        })
     }
 
-    /// A JSON call: the parsed 2xx body, or a `HttpStatus` failure saying
+    /// A JSON call: the typed 2xx body, or a `HttpStatus` failure saying
     /// whether MOSS refused it (`audio` also takes a 404 for a missing voice
     /// or task as refused).
-    fn call(
-        &self,
-        key: &str,
-        method: &'static str,
-        path: &str,
-        body: Option<(String, Box<dyn Read + Send>)>,
-        timeout: Duration,
-        audio: bool,
-    ) -> Result<Value, VendorError> {
-        let mut r = self.send(key, method, format!("{MOSS}{path}"), body, "application/json", timeout)?;
-        let raw = read_max(&mut r.body, 1 << 20, None)?;
-        let parsed: Option<Value> = serde_json::from_slice(&raw).ok();
+    fn call<T: DeserializeOwned>(&self, req: VendorCall<'_>) -> Result<T, VendorError> {
+        let audio = req.audio;
+        let stop = req.stop;
+        let mut r = self.send(req, "application/json")?;
+        let raw = read_max(&mut r.body, 1 << 20, stop)?;
         if !(200..300).contains(&r.status) {
-            let code = parsed.as_ref().and_then(|v| v["error"]["code"].as_str()).map(str::to_string);
+            let code = serde_json::from_slice::<WireErrorBody>(&raw).ok().and_then(|e| e.error).and_then(|e| e.code);
             let missing = r.status == 404 && audio && matches!(code.as_deref(), Some("voice_not_found" | "task_not_found"));
             let outcome = if REJECTED.contains(&r.status) || missing {
                 Outcome::Rejected
@@ -325,82 +609,63 @@ impl Moss {
                 code,
             });
         }
-        parsed.ok_or_else(invalid_response)
+        serde_json::from_slice(&raw).map_err(|_| invalid_response())
+    }
+
+    /// Validates all image request refinements omitted by protocol generation.
+    pub fn validate_image_request(r: &MediaImageRequest) -> Result<(), VendorError> {
+        validate_image_prompt(r).map(|_| ())
     }
 
     /// `prepareMossImage`: the wire body, or refused.
-    pub fn prepare_image(model: &str, prompt: &Value, width: i64, height: i64, extra: &Value) -> Result<Value, VendorError> {
+    pub fn prepare_image(model: &str, r: &MediaImageRequest) -> Result<Value, VendorError> {
         if !IMAGE_MODELS.contains(&model) {
             return Err(invalid_input());
         }
-        let dim = |d: i64| (256..=2048).contains(&d) && d % 16 == 0;
-        if !dim(width) || !dim(height) || width * height > 2_097_152 {
-            return Err(invalid_input());
-        }
-        let prompt = match prompt {
-            Value::String(s) if text_ok(s, 4000) => s.clone(),
-            Value::Object(o) => {
-                let items = o.get("items").and_then(Value::as_array).ok_or_else(invalid_input)?;
-                if items.is_empty() || items.len() > 100 || o.get("bbox_format") != Some(&json!("yxyx")) {
-                    return Err(invalid_input());
-                }
-                for item in items {
-                    let b = item["bbox"].as_array().filter(|b| b.len() == 4).ok_or_else(invalid_input)?;
-                    let n: Vec<f64> = b.iter().filter_map(Value::as_f64).collect();
-                    let (h, w) = (height as f64 / 2.0, width as f64 / 2.0);
-                    if n.len() != 4 || n[0] >= n[2] || n[1] >= n[3] || n[0] < -h || n[2] > h || n[1] < -w || n[3] > w {
-                        return Err(invalid_input());
-                    }
-                }
-                let text = Value::Object(o.clone()).to_string();
-                if text.chars().count() > 4000 {
-                    return Err(invalid_input());
-                }
-                text
-            }
-            _ => return Err(invalid_input()),
-        };
-        if extra["steps"].as_i64().is_some_and(|s| !(1..=100).contains(&s))
-            || extra["guidance"].as_f64().is_some_and(|g| !(0.0..=10.0).contains(&g))
-            || extra["negativePrompt"].as_str().is_some_and(|n| n.chars().count() > 4000)
-        {
-            return Err(invalid_input());
-        }
+        let prompt = validate_image_prompt(r)?;
         let mut body = json!({
             "model": model,
             "prompt": prompt,
-            "size": format!("{width}x{height}"),
+            "size": format!("{}x{}", r.width, r.height),
             "n": 1,
             "response_format": "url",
-            "prompt_enhance": extra["enhance"].as_bool().unwrap_or(false),
-            "output_watermark": { "enabled": extra["watermark"].as_bool().unwrap_or(true) },
+            "prompt_enhance": r.enhance,
+            "output_watermark": { "enabled": r.watermark },
         });
-        for (from, to) in [
-            ("seed", "seed"),
-            ("steps", "num_inference_steps"),
-            ("guidance", "guidance_scale"),
-            ("negativePrompt", "negative_prompt"),
-        ] {
-            if !extra[from].is_null() {
-                body[to] = extra[from].clone();
-            }
+        if let Some(seed) = r.seed {
+            body["seed"] = json!(seed);
+        }
+        if let Some(steps) = r.steps {
+            body["num_inference_steps"] = json!(steps);
+        }
+        if let Some(guidance) = r.guidance {
+            body["guidance_scale"] = json!(guidance.0);
+        }
+        if let Some(neg) = &r.negative_prompt {
+            body["negative_prompt"] = json!(neg);
         }
         Ok(body)
     }
 
     /// `generateMossImage`: the signed address and usage.
-    pub fn image(&self, key: &str, body: &Value, width: i64, height: i64) -> Result<(String, Value), VendorError> {
-        let r = self.call(key, "POST", "/images/generations", json_body(body), Duration::from_secs(900), false)?;
-        let url = r["data"][0]["url"]
-            .as_str()
-            .filter(|u| https_url(u, 8192) && r["data"].as_array().is_some_and(|d| d.len() == 1));
-        let usage = &r["usage"];
-        match url {
-            Some(url) if usage["generated_images"] == 1 && usage["output_width"] == width && usage["output_height"] == height => {
-                Ok((url.to_string(), json!({ "images": 1, "width": width, "height": height })))
-            }
-            _ => Err(invalid_response()),
+    pub fn image(&self, key: &str, body: &Value, width: i64, height: i64, stop: &Stop) -> Result<(String, MediaImageUsage), VendorError> {
+        let r: WireImageResponse = self.call(VendorCall {
+            key,
+            method: "POST",
+            path: "/images/generations",
+            body: json_body(body),
+            timeout: Duration::from_secs(900),
+            audio: false,
+            stop: Some(stop),
+        })?;
+        if r.created.is_none() || r.data.len() != 1 || r.usage.generated_images != 1 || r.usage.output_width != width || r.usage.output_height != height {
+            return Err(invalid_response());
         }
+        let url = &r.data[0].url;
+        if !https_url(url, 8192) {
+            return Err(invalid_response());
+        }
+        Ok((url.clone(), MediaImageUsage { images: 1, width, height }))
     }
 
     /// `prepareMossSpeech` (the farm sends no language or metadata).
@@ -420,78 +685,117 @@ impl Moss {
         Ok(json!({ "model": model, "input": text, "voice_id": voice, "response_format": format, "delivery_method": "url", "stream": false }))
     }
 
-    fn audio_result(r: &Value) -> Option<Generated> {
-        let url = r["url"].as_str().filter(|u| https_url(u, 8192))?;
-        let format = r["response_format"].as_str().filter(|f| FORMATS.contains(f))?;
-        let kind = r["content_type"].as_str().filter(|c| code_points(c, 1, 256))?;
-        let bare = kind.split(';').next().unwrap_or("").trim().to_lowercase();
-        if !audio_mimes(format).contains(&bare.as_str()) {
+    fn audio_result(url: String, format: String, content_type: String, usage: Option<WireAudioUsage>) -> Option<Generated> {
+        if !https_url(&url, 8192) || !FORMATS.contains(&format.as_str()) || !code_points(&content_type, 1, 256) {
             return None;
         }
-        let usage = if r["usage"].is_null() { None } else { Some(usage_of(&r["usage"])?) };
+        let bare = content_type.split(';').next().unwrap_or("").trim().to_lowercase();
+        if !audio_mimes(&format).contains(&bare.as_str()) {
+            return None;
+        }
+        let usage = match usage {
+            None => None,
+            Some(u) => Some(usage_of(u)?),
+        };
         Some(Generated {
-            url: url.into(),
-            format: format.into(),
-            content_type: kind.into(),
+            url,
+            format,
+            content_type,
             usage,
         })
     }
 
-    pub fn speech_generate(&self, key: &str, body: &Value) -> Result<Generated, VendorError> {
+    pub fn speech_generate(&self, key: &str, body: &Value, stop: &Stop) -> Result<Generated, VendorError> {
         let mut b = body.clone();
         b["async"] = json!(false);
-        let r = self.call(key, "POST", "/audio/speech", json_body(&b), Duration::from_secs(300), true)?;
-        if r["object"] != "audio.speech" || r["status"] != "SUCCESS" || !r["id"].as_str().is_some_and(audio_id) {
+        let r: WireSpeechResponse = self.call(VendorCall {
+            key,
+            method: "POST",
+            path: "/audio/speech",
+            body: json_body(&b),
+            timeout: Duration::from_secs(300),
+            audio: true,
+            stop: Some(stop),
+        })?;
+        if r.object != "audio.speech" || r.status != "SUCCESS" || !audio_id(&r.id) {
             return Err(invalid_response());
         }
-        Self::audio_result(&r).ok_or_else(invalid_response)
+        Self::audio_result(r.url, r.response_format, r.content_type, r.usage).ok_or_else(invalid_response)
     }
 
     /// `submitMossAudioTask` and the speech task: the task id.
-    pub fn submit(&self, key: &str, path: &str, body: &Value) -> Result<String, VendorError> {
-        let r = self.call(key, "POST", path, json_body(body), Duration::from_secs(300), true)?;
-        r["task_id"].as_str().filter(|t| audio_id(t)).map(str::to_string).ok_or_else(invalid_response)
+    pub fn submit(&self, key: &str, path: &str, body: &Value, stop: &Stop) -> Result<String, VendorError> {
+        let r: WireTaskSubmitted = self.call(VendorCall {
+            key,
+            method: "POST",
+            path,
+            body: json_body(body),
+            timeout: Duration::from_secs(300),
+            audio: true,
+            stop: Some(stop),
+        })?;
+        if audio_id(&r.task_id) { Ok(r.task_id) } else { Err(invalid_response()) }
     }
 
-    pub fn speech_task(&self, key: &str, body: &Value) -> Result<String, VendorError> {
+    pub fn speech_task(&self, key: &str, body: &Value, stop: &Stop) -> Result<String, VendorError> {
         let mut b = body.clone();
         b["async"] = json!(true);
-        self.submit(key, "/audio/speech", &b)
+        self.submit(key, "/audio/speech", &b, stop)
     }
 
     /// `getMossAudioTask`.
-    pub fn task(&self, key: &str, id: &str) -> Result<Task, VendorError> {
+    pub fn task(&self, key: &str, id: &str, stop: &Stop) -> Result<Task, VendorError> {
         if !audio_id(id) {
             return Err(invalid_input());
         }
-        let r = self.call(key, "GET", &format!("/audio/tasks/{id}"), None, Duration::from_secs(30), true)?;
-        let kind = match r["object"].as_str() {
-            Some("audio.speech") => TaskKind::Speech,
-            Some("audio.voice_generation") => TaskKind::VoiceGeneration,
-            Some("audio.transcription") => TaskKind::Transcription,
+        let path = format!("/audio/tasks/{id}");
+        let r: WireAudioTaskResponse = self.call(VendorCall {
+            key,
+            method: "GET",
+            path: &path,
+            body: None,
+            timeout: Duration::from_secs(30),
+            audio: true,
+            stop: Some(stop),
+        })?;
+        let kind = match r.object.as_str() {
+            "audio.speech" => TaskKind::Speech,
+            "audio.voice_generation" => TaskKind::VoiceGeneration,
+            "audio.transcription" => TaskKind::Transcription,
             _ => return Err(invalid_response()),
         };
-        if r["id"] != id || !r["created_at"].is_i64() || r["updated_at"].as_i64() < r["created_at"].as_i64() {
+        if r.id != id || r.updated_at < r.created_at {
             return Err(invalid_response());
         }
-        match r["status"].as_str() {
-            Some("PENDING" | "PROCESSING") => Ok(Task::Waiting),
-            Some("FAILED") => Ok(Task::Failed),
-            Some("SUCCESS") if kind == TaskKind::Transcription => {
-                let text = r["text"].as_str().ok_or_else(invalid_response)?.to_string();
-                let segments = match &r["segments"] {
-                    Value::Null => vec![],
-                    Value::Array(a) if a.len() <= 10000 => a.iter().map(segment_of).collect::<Option<Vec<_>>>().ok_or_else(invalid_response)?,
-                    _ => return Err(invalid_response()),
+        match r.status.as_str() {
+            "PENDING" | "PROCESSING" => Ok(Task::Waiting),
+            "FAILED" => Ok(Task::Failed),
+            "SUCCESS" if kind == TaskKind::Transcription => {
+                let text = r.text.ok_or_else(invalid_response)?;
+                let segments = match r.segments {
+                    None => vec![],
+                    Some(list) if list.len() <= 10000 => list
+                        .into_iter()
+                        .map(|s| segment_of(s.speaker, s.text, s.start, s.end))
+                        .collect::<Option<Vec<_>>>()
+                        .ok_or_else(invalid_response)?,
+                    Some(_) => return Err(invalid_response()),
                 };
-                let usage = if r["usage"].is_null() {
-                    None
-                } else {
-                    Some(usage_of(&r["usage"]).ok_or_else(invalid_response)?)
+                let usage = match r.usage {
+                    None => None,
+                    Some(u) => Some(usage_of(u).ok_or_else(invalid_response)?),
                 };
                 Ok(Task::Transcription { text, segments, usage })
             }
-            Some("SUCCESS") => Ok(Task::Audio(kind, Self::audio_result(&r).ok_or_else(invalid_response)?)),
+            "SUCCESS" => {
+                let (Some(url), Some(format), Some(content_type)) = (r.url, r.response_format, r.content_type) else {
+                    return Err(invalid_response());
+                };
+                Ok(Task::Audio(
+                    kind,
+                    Self::audio_result(url, format, content_type, r.usage).ok_or_else(invalid_response)?,
+                ))
+            }
             _ => Err(invalid_response()),
         }
     }
@@ -512,16 +816,25 @@ impl Moss {
         b["async"] = json!(false);
         let started = Instant::now();
         let mut r = self.send(
-            key,
-            "POST",
-            format!("{MOSS}/audio/speech"),
-            json_body(&b),
+            VendorCall {
+                key,
+                method: "POST",
+                path: "/audio/speech",
+                body: json_body(&b),
+                timeout: Duration::from_secs(300),
+                audio: true,
+                stop: Some(stop),
+            },
             "text/event-stream",
-            Duration::from_secs(300),
         )?;
         if !(200..300).contains(&r.status) {
-            let raw = read_max(&mut r.body, 1 << 20, None)?;
-            let missing = serde_json::from_slice::<Value>(&raw).is_ok_and(|v| v["error"]["code"] == "voice_not_found");
+            let raw = read_max(&mut r.body, 1 << 20, Some(stop))?;
+            let missing = serde_json::from_slice::<WireErrorBody>(&raw)
+                .ok()
+                .and_then(|e| e.error)
+                .and_then(|e| e.code)
+                .as_deref()
+                == Some("voice_not_found");
             let outcome = if REJECTED.contains(&r.status) || (r.status == 404 && missing) {
                 Outcome::Rejected
             } else {
@@ -544,39 +857,43 @@ impl Moss {
             if count > 100_000 {
                 return Err(StreamError::Vendor(VendorError::new(Reason::TooLarge, Outcome::Unknown)));
             }
-            let v: Value = serde_json::from_str(data).map_err(|_| StreamError::Vendor(invalid_response()))?;
-            let kind = v["type"].as_str().unwrap_or("");
-            if event != "message" && event != kind {
-                return Err(StreamError::Vendor(invalid_response()));
-            }
             let bad = || StreamError::Vendor(invalid_response());
-            let next = match kind {
-                "task.created" => {
-                    if task || frame != 0 || !v["task_id"].as_str().is_some_and(audio_id) {
+            let parsed: WireSpeechSseEvent = serde_json::from_str(data).map_err(|_| bad())?;
+            if event != "message" && event != parsed.event_type() {
+                return Err(bad());
+            }
+            let next = match parsed {
+                WireSpeechSseEvent::TaskCreated { task_id } => {
+                    if task || frame != 0 || !audio_id(&task_id) {
                         return Err(bad());
                     }
                     task = true;
-                    SpeechEvent::TaskCreated(v["task_id"].as_str().unwrap_or("").into())
+                    SpeechEvent::TaskCreated(task_id)
                 }
-                "speech.created" => {
-                    let (rate, ch, depth) = (
-                        v["sample_rate"].as_i64().unwrap_or(0),
-                        v["channels"].as_i64().unwrap_or(0),
-                        v["bit_depth"].as_i64().unwrap_or(0),
-                    );
-                    if frame != 0 || v["format"] != "pcm" || !(8000..=192000).contains(&rate) || !(1..=8).contains(&ch) || ![8, 16, 24, 32].contains(&depth) {
+                WireSpeechSseEvent::SpeechCreated {
+                    format,
+                    sample_rate,
+                    channels,
+                    bit_depth,
+                } => {
+                    if frame != 0
+                        || format != "pcm"
+                        || !(8000..=192000).contains(&sample_rate)
+                        || !(1..=8).contains(&channels)
+                        || ![8, 16, 24, 32].contains(&bit_depth)
+                    {
                         return Err(bad());
                     }
-                    frame = ch * depth / 8;
+                    frame = channels * bit_depth / 8;
                     SpeechEvent::Created {
-                        sample_rate: rate,
-                        channels: ch,
-                        bit_depth: depth,
+                        sample_rate,
+                        channels,
+                        bit_depth,
                     }
                 }
-                "speech.audio.delta" => {
+                WireSpeechSseEvent::AudioDelta { audio: raw_audio } => {
                     use base64::Engine;
-                    let text: String = v["audio"].as_str().unwrap_or("").chars().filter(|c| *c != '\n' && *c != '\r').collect();
+                    let text: String = raw_audio.chars().filter(|c| *c != '\n' && *c != '\r').collect();
                     if frame == 0 || text.is_empty() {
                         return Err(bad());
                     }
@@ -590,18 +907,16 @@ impl Moss {
                     }
                     SpeechEvent::Delta(bytes)
                 }
-                "speech.audio.done" => {
+                WireSpeechSseEvent::AudioDone { usage, meta_info } => {
                     if frame == 0 || audio == 0 || audio % frame as usize != 0 {
                         return Err(bad());
                     }
                     done = true;
-                    let usage = if v["usage"].is_null() { None } else { usage_of(&v["usage"]) };
                     SpeechEvent::Done {
-                        usage,
-                        duration: v["meta_info"]["performance"]["audio_duration_s"].as_f64(),
+                        usage: usage.and_then(usage_of),
+                        duration: meta_info.and_then(|m| m.performance).and_then(|p| p.audio_duration_s),
                     }
                 }
-                _ => return Err(bad()),
             };
             on(next).map_err(StreamError::Mine)?;
             Ok(!done)
@@ -693,15 +1008,19 @@ impl Moss {
         b["async"] = json!(false);
         let started = Instant::now();
         let mut r = self.send(
-            key,
-            "POST",
-            format!("{MOSS}/audio/transcriptions"),
-            json_body(&b),
+            VendorCall {
+                key,
+                method: "POST",
+                path: "/audio/transcriptions",
+                body: json_body(&b),
+                timeout: Duration::from_secs(900),
+                audio: true,
+                stop: Some(stop),
+            },
             "text/event-stream",
-            Duration::from_secs(900),
         )?;
         if !(200..300).contains(&r.status) {
-            read_max(&mut r.body, 1 << 20, None)?;
+            read_max(&mut r.body, 1 << 20, Some(stop))?;
             let outcome = if REJECTED.contains(&r.status) { Outcome::Rejected } else { Outcome::Unknown };
             return Err(StreamError::Vendor(VendorError {
                 reason: Reason::HttpStatus,
@@ -721,50 +1040,54 @@ impl Moss {
                 return Err(too_large());
             }
             let bad = || StreamError::Vendor(invalid_response());
-            let v: Value = serde_json::from_str(data).map_err(|_| bad())?;
-            let kind = v["type"].as_str().unwrap_or("");
-            if event != "message" && event != kind {
+            let parsed: WireTranscriptionSseEvent = serde_json::from_str(data).map_err(|_| bad())?;
+            if event != "message" && event != parsed.event_type() {
                 return Err(bad());
             }
-            let next = match kind {
-                "task.created" => {
-                    if count != 1 || !v["task_id"].as_str().is_some_and(audio_id) {
+            let next = match parsed {
+                WireTranscriptionSseEvent::TaskCreated { task_id } => {
+                    if count != 1 || !audio_id(&task_id) {
                         return Err(bad());
                     }
-                    TranscriptionEvent::TaskCreated(v["task_id"].as_str().unwrap_or("").into())
+                    TranscriptionEvent::TaskCreated(task_id)
                 }
-                "transcript.text.delta" => {
-                    let d = v["delta"].as_str().ok_or_else(bad)?;
-                    deltas += d.encode_utf16().count();
+                WireTranscriptionSseEvent::TextDelta { delta } => {
+                    deltas += delta.encode_utf16().count();
                     if deltas > 1 << 20 {
                         return Err(too_large());
                     }
-                    TranscriptionEvent::Delta(d.into())
+                    TranscriptionEvent::Delta(delta)
                 }
-                "transcript.segment.done" => {
-                    let segment = segment_of(&v).filter(|_| v["content_index"].is_i64()).ok_or_else(bad)?;
+                WireTranscriptionSseEvent::SegmentDone {
+                    content_index,
+                    speaker,
+                    text,
+                    start,
+                    end,
+                    session_usage,
+                } => {
+                    let segment = segment_of(speaker, text, start, end).ok_or_else(bad)?;
                     seg_len += segment.text.encode_utf16().count();
                     segs += 1;
                     if segs > 10000 || seg_len > 1 << 20 {
                         return Err(too_large());
                     }
-                    let usage = if v["session_usage"].is_null() { None } else { usage_of(&v["session_usage"]) };
                     TranscriptionEvent::Segment {
-                        index: v["content_index"].as_i64().unwrap_or(0),
+                        index: content_index,
                         segment,
-                        usage,
+                        usage: session_usage.and_then(usage_of),
                     }
                 }
-                "transcript.text.done" => {
-                    let text = v["text"].as_str().ok_or_else(bad)?;
+                WireTranscriptionSseEvent::TextDone { text, usage } => {
                     if text.encode_utf16().count() > 1 << 20 {
                         return Err(too_large());
                     }
                     done = true;
-                    let usage = if v["usage"].is_null() { None } else { usage_of(&v["usage"]) };
-                    TranscriptionEvent::Done { text: text.into(), usage }
+                    TranscriptionEvent::Done {
+                        text,
+                        usage: usage.and_then(usage_of),
+                    }
                 }
-                _ => return Err(bad()),
             };
             on(next).map_err(StreamError::Mine)?;
             Ok(!done)
@@ -792,16 +1115,20 @@ impl Moss {
     }
 
     /// `understandMossMedia`.
-    pub fn understand(&self, key: &str, body: &Value) -> Result<MediaUnderstandingResult, VendorError> {
+    pub fn understand(&self, key: &str, body: &Value, stop: &Stop) -> Result<MediaUnderstandingResult, VendorError> {
         let mut r = self.send(
-            key,
-            "POST",
-            format!("{MOSS}/responses"),
-            json_body(body),
+            VendorCall {
+                key,
+                method: "POST",
+                path: "/responses",
+                body: json_body(body),
+                timeout: Duration::from_secs(180),
+                audio: false,
+                stop: Some(stop),
+            },
             "application/json",
-            Duration::from_secs(180),
         )?;
-        let raw = read_max(&mut r.body, 1 << 20, None)?;
+        let raw = read_max(&mut r.body, 1 << 20, Some(stop))?;
         if r.status != 200 {
             let outcome = if REJECTED.contains(&r.status) { Outcome::Rejected } else { Outcome::Unknown };
             return Err(VendorError {
@@ -811,45 +1138,43 @@ impl Moss {
                 code: None,
             });
         }
-        let v: Value = serde_json::from_slice(&raw).map_err(|_| invalid_response())?;
-        let status = match v["status"].as_str() {
-            Some("completed") => MediaUnderstandingStatus::Completed,
-            Some("incomplete") => MediaUnderstandingStatus::Incomplete,
+        let v: WireUnderstandingResponse = serde_json::from_slice(&raw).map_err(|_| invalid_response())?;
+        let status = match v.status.as_str() {
+            "completed" => MediaUnderstandingStatus::Completed,
+            "incomplete" => MediaUnderstandingStatus::Incomplete,
             _ => return Err(invalid_response()),
         };
-        let output = v["output"].as_array().filter(|o| !o.is_empty()).ok_or_else(invalid_response)?;
+        if v.output.is_empty() || v.model.is_empty() || v.usage.input_tokens < 0 || v.usage.output_tokens < 0 || v.usage.total_tokens < 0 {
+            return Err(invalid_response());
+        }
         let mut texts = vec![];
-        for item in output {
-            let content = item["content"].as_array().filter(|c| !c.is_empty()).ok_or_else(invalid_response)?;
-            for part in content {
-                if part["type"] != "output_text" {
+        for item in v.output {
+            if item.content.is_empty() {
+                return Err(invalid_response());
+            }
+            for part in item.content {
+                if part.kind != "output_text" {
                     return Err(invalid_response());
                 }
-                texts.push(part["text"].as_str().ok_or_else(invalid_response)?.to_string());
+                texts.push(part.text.ok_or_else(invalid_response)?);
             }
         }
-        let u = &v["usage"];
-        let tokens = |k: &str| u[k].as_i64().filter(|n| *n >= 0);
-        let (Some(i), Some(o), Some(t)) = (tokens("input_tokens"), tokens("output_tokens"), tokens("total_tokens")) else {
-            return Err(invalid_response());
-        };
-        let model = v["model"].as_str().filter(|m| !m.is_empty()).ok_or_else(invalid_response)?;
-        let cut = status == MediaUnderstandingStatus::Incomplete && v["incomplete_details"]["reason"] == "max_output_tokens";
+        let cut = status == MediaUnderstandingStatus::Incomplete && v.incomplete_details.and_then(|d| d.reason).as_deref() == Some("max_output_tokens");
         Ok(MediaUnderstandingResult {
-            model: model.into(),
+            model: v.model,
             text: texts.join("\n"),
             status,
             incomplete_reason: cut.then_some(MediaUnderstandingResultIncompleteReason::MaxOutputTokens),
             usage: MediaUnderstandingResultUsage {
-                input_tokens: i,
-                output_tokens: o,
-                total_tokens: t,
+                input_tokens: v.usage.input_tokens,
+                output_tokens: v.usage.output_tokens,
+                total_tokens: v.usage.total_tokens,
             },
         })
     }
 
     /// `uploadMossFile`: the file's id and whether MOSS took it.
-    pub fn upload(&self, key: &str, file: std::fs::File, size: i64, filename: &str, purpose: &str) -> Result<(String, Uploaded), VendorError> {
+    pub fn upload(&self, key: &str, file: std::fs::File, size: i64, filename: &str, purpose: &str, stop: &Stop) -> Result<(String, Uploaded), VendorError> {
         if !(1..=512_000_000).contains(&size) || !code_points(filename, 1, 256) {
             return Err(invalid_input());
         }
@@ -867,17 +1192,24 @@ impl Moss {
                 bytes: Box::new(file),
             },
         ];
-        let r = self.call(key, "POST", "/files", Some(multipart(parts)), Duration::from_secs(300), false)?;
-        let id = r["id"].as_str().filter(|i| file_id_ok(i)).ok_or_else(invalid_response)?;
-        if r["object"] != "file" || r["bytes"] != size || r["purpose"] != purpose {
+        let r: WireUploadedFile = self.call(VendorCall {
+            key,
+            method: "POST",
+            path: "/files",
+            body: Some(multipart(parts)),
+            timeout: Duration::from_secs(300),
+            audio: false,
+            stop: Some(stop),
+        })?;
+        if !file_id_ok(&r.id) || r.object != "file" || r.bytes != size || r.purpose != purpose {
             return Err(invalid_response());
         }
-        let state = match r["status"].as_str() {
+        let state = match r.status.as_deref() {
             Some("processed" | "active") => Uploaded::Ready,
             Some("failed") => Uploaded::Rejected,
             _ => Uploaded::Unknown,
         };
-        Ok((id.into(), state))
+        Ok((r.id, state))
     }
 
     /// `deleteMossFile`; a 404 counts as gone.
@@ -886,8 +1218,16 @@ impl Moss {
             return Err(invalid_input());
         }
         let path = format!("/files/{}", url::form_urlencoded::byte_serialize(id.as_bytes()).collect::<String>());
-        match self.call(key, "DELETE", &path, None, Duration::from_secs(300), false) {
-            Ok(r) if r["id"] == id && r["deleted"] == true => Ok(()),
+        match self.call::<WireDeletedFile>(VendorCall {
+            key,
+            method: "DELETE",
+            path: &path,
+            body: None,
+            timeout: Duration::from_secs(300),
+            audio: false,
+            stop: None,
+        }) {
+            Ok(r) if r.id == id && r.deleted => Ok(()),
             Ok(_) => Err(invalid_response()),
             Err(e) if e.status == Some(404) => Ok(()),
             Err(e) => Err(e),
@@ -895,7 +1235,7 @@ impl Moss {
     }
 
     /// `createMossVoice`: the cloned voice.
-    pub fn clone_voice(&self, key: &str, audio: Vec<u8>, filename: &str, name: Option<&str>) -> Result<MediaAudioVoice, VendorError> {
+    pub fn clone_voice(&self, key: &str, audio: Vec<u8>, filename: &str, name: Option<&str>, stop: &Stop) -> Result<MediaAudioVoice, VendorError> {
         let mut parts = vec![Part {
             name: "audio_sample".into(),
             filename: Some(filename.into()),
@@ -910,15 +1250,23 @@ impl Moss {
                 bytes: Box::new(std::io::Cursor::new(n.as_bytes().to_vec())),
             });
         }
-        let r = self.call(key, "POST", "/audio/voices", Some(multipart(parts)), Duration::from_secs(300), true)?;
-        match (r["id"].as_str().filter(|i| audio_id(i)), r["name"].as_str(), r["created_at"].as_i64()) {
-            (Some(id), Some(n), Some(at)) => Ok(MediaAudioVoice {
-                id: id.into(),
-                name: n.into(),
-                created_at_seconds: JsNumber(at as f64),
-            }),
-            _ => Err(invalid_response()),
+        let r: WireClonedVoice = self.call(VendorCall {
+            key,
+            method: "POST",
+            path: "/audio/voices",
+            body: Some(multipart(parts)),
+            timeout: Duration::from_secs(300),
+            audio: true,
+            stop: Some(stop),
+        })?;
+        if !audio_id(&r.id) {
+            return Err(invalid_response());
         }
+        Ok(MediaAudioVoice {
+            id: r.id,
+            name: r.name,
+            created_at_seconds: JsNumber(r.created_at as f64),
+        })
     }
 }
 

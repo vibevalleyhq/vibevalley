@@ -40,6 +40,68 @@ impl ModuleDb {
         let mut connection = self.0.lock();
         pollster::block_on(query(&mut connection))
     }
+
+    pub(crate) fn run_api<T>(&self, query: impl AsyncFnOnce(&mut sqlx::SqliteConnection) -> Result<T, ApiError>) -> Result<T, ApiError> {
+        let mut connection = self.0.lock();
+        pollster::block_on(query(&mut connection))
+    }
+
+    pub(crate) fn sync<T>(&self, query: impl FnOnce(&mut sqlx::SqliteConnection) -> T) -> T {
+        let mut connection = self.0.lock();
+        query(&mut connection)
+    }
+}
+
+/// A cancelable background periodic ticker running blocking work on the Tokio pool.
+pub(crate) struct Ticker {
+    cancel: tokio_util::sync::CancellationToken,
+    handle: tokio::task::JoinHandle<()>,
+}
+
+async fn run_ticker(cancel: tokio_util::sync::CancellationToken, interval: Duration, immediate: bool, mut tick: impl FnMut() -> bool + Send + 'static) {
+    if !immediate {
+        tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return,
+            _ = tokio::time::sleep(interval) => {}
+        }
+    }
+    loop {
+        if cancel.is_cancelled() {
+            return;
+        }
+        let result = tokio::task::spawn_blocking(move || {
+            let keep_going = tick();
+            (tick, keep_going)
+        })
+        .await;
+        let Ok((returned, true)) = result else { return };
+        tick = returned;
+        tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return,
+            _ = tokio::time::sleep(interval) => {}
+        }
+    }
+}
+
+impl Ticker {
+    pub(crate) fn spawn_on(hub: &crate::Hub, interval: Duration, immediate: bool, tick: impl FnMut() -> bool + Send + 'static) -> Self {
+        let cancel = hub.child_token();
+        let handle = hub.spawn_task(run_ticker(cancel.clone(), interval, immediate, tick));
+        Self { cancel, handle }
+    }
+
+    pub(crate) fn spawn_detached(interval: Duration, immediate: bool, tick: impl FnMut() -> bool + Send + 'static) -> Self {
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let handle = vibevalley_runtime::rt::handle().spawn(run_ticker(cancel.clone(), interval, immediate, tick));
+        Self { cancel, handle }
+    }
+
+    pub(crate) fn stop(self) {
+        self.cancel.cancel();
+        let _ = vibevalley_runtime::rt::block_on(self.handle);
+    }
 }
 
 /// `lookIn`: a hint listing the ones there are, and the code a miss gets.
