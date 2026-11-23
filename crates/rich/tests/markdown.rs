@@ -200,6 +200,7 @@ fn vv_markdown_mounts_in_core_and_emits_typed_events_without_canvas_svg_view_kin
 
     // Mermaid diagram inside Markdown MUST mount as ViewKind::Image (never element::svg ViewKind::Canvas).
     assert!(!harness.has_view_kind(ViewKind::Canvas));
+    assert!(harness.wait_until(std::time::Duration::from_secs(5), |h| h.find_test_id("diagram-image").is_some()));
     assert!(harness.has_view_kind(ViewKind::Image));
 
     // Press standard Markdown link ("Docs") via its inline TextLink node.

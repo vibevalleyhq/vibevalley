@@ -3,24 +3,24 @@
 //! Replaces spawning a read-only `<Editor>` per fenced code block:
 //! - Renders styled `nsh_core::element::text` spans reacting to `dark()`.
 //! - Shows a language/line-count header, copy action with clipboard write & feedback, and 16-line fold.
-//! - Tokenizes small blocks (and LRU cache hits) inline and offloads large blocks to
-//!   `nsh_core::prelude::blocking` + `Signal` with instant plain-text first paint.
+//! - Tokenizes small blocks (and LRU cache hits) inline and offloads large blocks off the UI
+//!   thread via [`crate::highlight::run_offloaded`] + `Signal` with instant plain-text first paint.
 
 use std::time::Duration;
 
 use nsh_core::prelude::*;
 use vibevalley_i18n::t;
 
-use crate::highlight::{HighlightedCode, cached_highlight_code, highlight_code};
+use crate::highlight::{HighlightedCode, cached_highlight_code, highlight_code, run_offloaded};
 use crate::theme::{AdaptiveUi, CODE_FONT_MONO, UiPalette, shiki_rgba_to_hsla};
 
 /// Default line threshold above which `VvCodeBlock` starts collapsed (matches `CodeBlock.tsx`).
 pub const DEFAULT_FOLD_LINES: u32 = 16;
 /// Line height in points for code block text (16 * 18 = 288pt collapsed height).
 pub const CODE_LINE_HEIGHT: f32 = 18.0;
-/// Code blocks above this byte size offload tokenization via `nsh_core::prelude::blocking`.
+/// Code blocks above this byte size offload tokenization off the UI thread.
 pub const ASYNC_HIGHLIGHT_BYTE_THRESHOLD: usize = 4_096;
-/// Code blocks above this line count offload tokenization via `nsh_core::prelude::blocking`.
+/// Code blocks above this line count offload tokenization off the UI thread.
 pub const ASYNC_HIGHLIGHT_LINE_THRESHOLD: usize = 120;
 
 /// Props of [`VvCodeBlock`].
@@ -144,14 +144,7 @@ pub fn VvCodeBlock(props: VvCodeBlockProps, cx: Scope<VvCodeBlockEvent>) -> impl
         let code_owned = code.to_string();
         let lang_owned = lang.map(|s| s.to_string());
         spawn(async move {
-            let highlighted = if tokio::runtime::Handle::try_current().is_ok() {
-                match blocking(move || highlight_code(&code_owned, lang_owned.as_deref(), is_dark)).await {
-                    Ok(res) => res,
-                    Err(_) => return,
-                }
-            } else {
-                highlight_code(&code_owned, lang_owned.as_deref(), is_dark)
-            };
+            let highlighted = run_offloaded(move || highlight_code(&code_owned, lang_owned.as_deref(), is_dark)).await;
             if generation.get_untracked() == next_gen {
                 async_result.set(Some((next_gen, highlighted)));
             }

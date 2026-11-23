@@ -201,6 +201,7 @@ fn native_vv_genui_renders_all_19_node_kinds_supports_tabs_and_select_and_handle
     assert!(harness.contains_text("Controls"));
     // Embedded chart, diagram, canvas, and code block all mount cleanly without ViewKind::Canvas.
     assert!(!harness.has_view_kind(ViewKind::Canvas));
+    assert!(harness.wait_until(std::time::Duration::from_secs(5), |h| h.find_test_id("diagram-image").is_some()));
     assert!(harness.find_test_id("chart-image").is_some());
     assert!(harness.find_test_id("diagram-image").is_some());
     assert!(harness.find_test_id("canvas-image").is_some());
