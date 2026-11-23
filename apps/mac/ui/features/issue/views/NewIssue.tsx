@@ -5,24 +5,29 @@ import { t } from "@vibevalley/i18n";
 import { Button } from "../../../design/Button";
 import { Dialog } from "../../../design/Dialog";
 import { Select, TextArea } from "../../../design/Field";
+import { Banner } from "../../../design/layout";
 import { toast } from "../../../design/toasts";
 import { useWorkAgents } from "../../../infra/agents";
 import { newSendKey } from "../../../infra/api";
-import { ready, useRepos } from "../../../infra/query";
+import { ready, useRepos, useRuntimes } from "../../../infra/query";
+import { useRouter } from "../../../infra/router";
 import { prefsNow } from "../../../infra/state/prefs";
 import { canSubmitDraft, type DraftSubmitEvent, type DraftSubmitState, draftSubmitTransition, initialDraftSubmit } from "../model/draftSubmit";
+import { isRuntimeReady } from "../model/onboarding";
 
-/** The repo and helper the board is filtered to, or the list group it was opened in. */
+/** The repo and helper the board is filtered to, the list group it was opened in, or a starter template's text. */
 export interface NewIssueAt {
   readonly repo?: string;
   readonly agent?: string;
+  readonly text?: string;
 }
 
 export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where: NewIssueAt, requestKey: string) => Promise<boolean>; onClose: () => void }) {
+  const router = useRouter();
   const last = prefsNow();
   const flow = signal<DraftSubmitState>(
     initialDraftSubmit({
-      text: "",
+      text: props.at.text ?? "",
       repo: props.at.repo ?? last.repo,
       agent: props.at.agent ?? (last.pick === "auto" ? "" : last.pick),
     }),
@@ -35,7 +40,14 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
   const draft = () => flow().draft;
   const agents = useWorkAgents(true);
   const repoList = useRepos();
+  const runtimeList = useRuntimes();
   const repos = () => ready(repoList, []).map((p) => p.name);
+  const noRepos = () => repoList.status() === "success" && repos().length === 0;
+  const noReadyRuntimes = () => runtimeList.status() === "success" && ready(runtimeList, []).filter(isRuntimeReady).length === 0;
+  const goTo = (path: string) => {
+    props.onClose();
+    router.navigate(path);
+  };
   const textFocused = signal(true);
   let mounted = true;
   cleanup(() => {
@@ -90,28 +102,58 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
           onFocus={() => textFocused.set(true)}
           onBlur={() => textFocused.set(false)}
         />
-        <View class="flex-row flex-wrap items-center gap-2">
-          <Select
-            quiet
-            size="control"
-            label={t("web.issue.task.repo")}
-            testid="issue-new-repo"
-            value={draft().repo}
-            placeholder={t("web.issue.todo.whichRepo")}
-            onChange={(repo) => dispatch({ kind: "setRepo", repo })}
-            options={[...new Set([...repos(), ...(draft().repo ? [draft().repo] : [])])].map((p) => ({ value: p, label: p }))}
-          />
-          <Select
-            quiet
-            size="control"
-            label={t("web.issue.detail.helper")}
-            testid="issue-new-helper"
-            value={draft().agent}
-            placeholder={t("web.issue.todo.pickForMe")}
-            onChange={(agent) => dispatch({ kind: "setAgent", agent })}
-            options={agents().map((a) => ({ value: a.id, label: a.name }))}
-          />
-        </View>
+        <If when={!noRepos() || !noReadyRuntimes()}>
+          <View class="flex-row flex-wrap items-center gap-2">
+            <If when={!noRepos()}>
+              <Select
+                quiet
+                size="control"
+                label={t("web.issue.task.repo")}
+                testid="issue-new-repo"
+                value={draft().repo}
+                placeholder={t("web.issue.todo.whichRepo")}
+                onChange={(repo) => dispatch({ kind: "setRepo", repo })}
+                options={[...new Set([...repos(), ...(draft().repo ? [draft().repo] : [])])].map((p) => ({ value: p, label: p }))}
+              />
+            </If>
+            <If when={!noReadyRuntimes()}>
+              <Select
+                quiet
+                size="control"
+                label={t("web.issue.detail.helper")}
+                testid="issue-new-helper"
+                value={draft().agent}
+                placeholder={t("web.issue.todo.pickForMe")}
+                onChange={(agent) => dispatch({ kind: "setAgent", agent })}
+                options={agents().map((a) => ({ value: a.id, label: a.name }))}
+              />
+            </If>
+          </View>
+        </If>
+        <If when={noRepos() || noReadyRuntimes()}>
+          <View class="gap-2">
+            <If when={noRepos()}>
+              <Banner tone="warn" size="sm" icon="repos">
+                <View testID="issue-new-missing-repo" class="flex-row items-center justify-between gap-2">
+                  <Text class="min-w-0 flex-1 text-xs leading-snug text-warn-ink">{t("web.issue.new.missingRepo")}</Text>
+                  <Button size="compact" icon="repos" testID="issue-new-go-repos" onPress={() => goTo("/repos")}>
+                    {t("web.issue.new.goRepos")}
+                  </Button>
+                </View>
+              </Banner>
+            </If>
+            <If when={noReadyRuntimes()}>
+              <Banner tone="warn" size="sm" icon="runtimes">
+                <View testID="issue-new-missing-runtime" class="flex-row items-center justify-between gap-2">
+                  <Text class="min-w-0 flex-1 text-xs leading-snug text-warn-ink">{t("web.issue.new.missingRuntime")}</Text>
+                  <Button size="compact" icon="runtimes" testID="issue-new-go-runtimes" onPress={() => goTo("/runtimes")}>
+                    {t("web.issue.new.goRuntimes")}
+                  </Button>
+                </View>
+              </Banner>
+            </If>
+          </View>
+        </If>
         <View class="flex-row items-center justify-end gap-2 border-t border-line pt-3">
           <Text class="mr-auto text-xs text-faint">{t("web.issue.new.keys")}</Text>
           <Button tone="quiet" testID="issue-new-dialog-never" onPress={() => props.onClose()}>

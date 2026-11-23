@@ -1409,6 +1409,17 @@ export const catalogs = {
           waiting: "做完的、没做成的在这里等你看；拖到「已关」完成或取消。",
           closed: "已完成、已取消的任务；拖回「处理中」重开。",
         },
+        emptyGuide: {
+          todoTitle: "待办还是空的",
+          todoBody: "记下要做的任务，选好仓库和角色就能派发开工。",
+          workingTitle: "暂无处理中任务",
+          workingBody: "给待办任务选好角色并派发，或拖到这里即开独立 worktree 执行会话。",
+          waitingTitle: "暂无待验收改动",
+          waitingBody: "执行会话跑完一轮或有疑问时会停在这里，方便看改动、回复或完成交付。",
+          closedTitle: "还没有已关任务",
+          closedBody: "已完成或取消的任务会留在这里，拖回「处理中」即可随时重开。",
+          filtered: "当前筛选条件下此列没有任务。",
+        },
         whichLane: "看哪一列",
         spots: "{taken} / {of} 个并发上限",
         moveFailed: "没挪过去",
@@ -1648,6 +1659,7 @@ export const catalogs = {
         queued: "排队中",
         cron: "定时任务",
         noHelper: "还没选角色",
+        assignHelper: "待选角色",
         pickFirst: "没选角色或仓库，开工前要选好",
         waiting: "等并发上限，{ago}排上的",
         written: "写于 {ago}",
@@ -1703,21 +1715,61 @@ export const catalogs = {
         keys: "⌘ 回车记下",
         keep: "记下",
         editsKept: "刚才的内容已提交，修改后的草稿已保留。",
+        missingRepo: "还没有添加仓库，可先记在待办，添加仓库后再派发。",
+        goRepos: "去添加仓库",
+        missingRuntime: "尚未启用可用引擎，配置好编码引擎后就能自动起草和开工。",
+        goRuntimes: "去配置引擎",
       },
       conversation: { title: "讨论与交付记录", older: "加载更早的消息", empty: "需求讨论、执行反馈与交付会保留在这里" },
+      guide: {
+        title: "任务流转指南",
+        summary: "写下需求并指派角色，执行会话在独立 worktree 改代码，完成后经验收合入主分支。",
+        collapse: "收起指南",
+        expand: "展开指南",
+        stage: {
+          todo: "写下目标、挑好仓库和角色，按先后排好待办。",
+          working: "确认派发或拖入此列，执行会话自动开 worktree 干活。",
+          waiting: "跑完一轮后在此验收改动、回答问题，或打回继续修。",
+          closed: "验收通过后完成交付并合入主分支，需要时可随时重开。",
+        },
+      },
       onboarding: {
         title: "开始使用 VibeValley",
-        subtitle: "按下面三步准备好环境，就能把任务派给执行会话干活。",
-        step1Title: "检查或配置引擎",
-        step1Desc: "确认本机已安装并启用编码 agent（如 Claude Code、Codex 等）",
-        step1Action: "配置引擎",
-        step2Title: "添加代码仓库",
-        step2Desc: "绑定本机 Git 仓库，执行会话会在独立工作区里改动代码",
-        step2Action: "添加仓库",
+        subtitle: "完成下面三步准备工作，就能让执行会话在独立 worktree 里帮你改代码。",
+        progress: "{done} / {total} 已就绪",
+        step1Title: "添加代码仓库",
+        step1Desc: "绑定本机 Git 仓库，执行会话会在独立工作区里改动代码。",
+        step1Action: "添加仓库",
+        step1Manage: "管理仓库",
+        step1Ready: "{n} 个仓库已就绪",
+        step2Title: "检查或配置引擎",
+        step2Desc: "确认本机已安装并启用编码引擎（如 Claude Code、Codex 等）。",
+        step2Action: "配置引擎",
+        step2Manage: "管理引擎",
+        step2Ready: "{n} 个引擎已就绪",
         step3Title: "创建第一条任务，或在聊天中派活",
-        step3Desc: "写下需求直接派给执行会话，或按 C 键新建任务，也可以在聊天里让主助手帮你拆解",
+        step3Desc: "写下需求直接派给执行会话，按 C 键快速新建，或从下方模板一键预填。",
+        step3Ready: "{n} 条任务",
         newIssue: "新建任务",
         openChat: "去聊天派活",
+        templatesTitle: "或选一个起步模板快速开始",
+        templates: {
+          bug: {
+            title: "修复缺陷",
+            desc: "定位报错或异常行为并补回归测试",
+            prompt: "修复：[简述问题现象]\n\n复现步骤：\n1. \n预期结果：\n验收标准：补充回归测试并通过检查",
+          },
+          feature: {
+            title: "新增功能",
+            desc: "明确范围、交互和验收标准后交给执行会话",
+            prompt: "实现：[简述功能目标]\n\n范围：\n- \n不涉及：\n- \n验收标准：补齐测试并验证关键路径",
+          },
+          refactor: {
+            title: "排查并重构",
+            desc: "清理重复逻辑、收敛边界并保持行为一致",
+            prompt: "重构：[目标模块或路径]\n\n目标：\n- 简化结构，消除重复逻辑\n- 保持对外行为和现有测试不变",
+          },
+        },
       },
     },
     "web.library": {
@@ -4408,6 +4460,17 @@ export const catalogs = {
           waiting: "What is done or failed waits here for you; drag it to Closed to complete or cancel it.",
           closed: "Completed and canceled tickets; drag one back to In progress to reopen it.",
         },
+        emptyGuide: {
+          todoTitle: "No to-dos yet",
+          todoBody: "Jot down a ticket, pick a repo and helper, and dispatch it.",
+          workingTitle: "Nothing in progress",
+          workingBody: "Assign a helper and dispatch a To do ticket, or drag it here to start a worktree session.",
+          waitingTitle: "Nothing waiting for review",
+          waitingBody: "Completed rounds and helper questions appear here so you can inspect changes and merge.",
+          closedTitle: "No closed tickets yet",
+          closedBody: "Completed and canceled tickets stay here; drag one back to In progress to reopen.",
+          filtered: "No matching tickets in this column.",
+        },
         whichLane: "Which column",
         spots: "{taken} / {of} spots",
         moveFailed: "Not moved",
@@ -4654,6 +4717,7 @@ export const catalogs = {
         queued: "Queued",
         cron: "Scheduled task",
         noHelper: "No helper yet",
+        assignHelper: "Assign helper",
         pickFirst: "No helper or repo picked: pick them before starting",
         waiting: "waiting for a free spot, queued {ago}",
         written: "written {ago}",
@@ -4709,21 +4773,62 @@ export const catalogs = {
         keys: "⌘ Enter to save",
         keep: "Save",
         editsKept: "The previous version was submitted. Your edits are still in the draft.",
+        missingRepo: "No repo added yet. Add a repo before dispatching this ticket.",
+        goRepos: "Add repo",
+        missingRuntime: "No ready engine configured yet. Set up an engine to draft and run tickets.",
+        goRuntimes: "Configure engines",
       },
       conversation: { title: "Discussion and delivery", older: "Load earlier messages", empty: "Requirements, execution feedback and deliveries stay here" },
+      guide: {
+        title: "How issues flow",
+        summary: "Assign a helper to launch a worktree session, then inspect changes in Review to complete.",
+        collapse: "Hide guide",
+        expand: "Show guide",
+        stage: {
+          todo: "Capture work, pick a repo and helper, and order your queue.",
+          working: "Dispatch or drag here to launch an isolated worktree session.",
+          waiting: "Review changes, answer questions, or send back for another round.",
+          closed: "Complete to merge into the base branch, or reopen anytime.",
+        },
+      },
       onboarding: {
         title: "Get started with VibeValley",
-        subtitle: "Complete these three steps to dispatch tickets to helpers.",
-        step1Title: "Check or configure runtimes",
-        step1Desc: "Verify a local coding agent (such as Claude Code or Codex) is installed and enabled.",
-        step1Action: "Configure runtimes",
-        step2Title: "Add a repository",
-        step2Desc: "Link a local Git repository so helpers can work in isolated worktrees.",
-        step2Action: "Add repository",
-        step3Title: "Create your first ticket or dispatch in chat",
-        step3Desc: "Describe what to build for a helper, press C to create a ticket, or ask the assistant in chat to break it down.",
+        subtitle: "Complete these three steps to dispatch tickets to helpers in isolated worktrees.",
+        progress: "{done} / {total} ready",
+        step1Title: "Add a Git repository",
+        step1Desc: "Link a local Git repository so helpers can work in isolated worktrees.",
+        step1Action: "Add repository",
+        step1Manage: "Manage repos",
+        step1Ready: "{n, plural, one {# repo ready} other {# repos ready}}",
+        step2Title: "Connect a coding engine",
+        step2Desc: "Verify a local coding engine (such as Claude Code or Codex) is installed and enabled.",
+        step2Action: "Configure engines",
+        step2Manage: "Manage engines",
+        step2Ready: "{n, plural, one {# engine ready} other {# engines ready}}",
+        step3Title: "Create your first ticket",
+        step3Desc: "Describe what to build, press C to create a ticket, or pick a starter template below.",
+        step3Ready: "{n, plural, one {# ticket} other {# tickets}}",
         newIssue: "New ticket",
         openChat: "Open chat",
+        templatesTitle: "Or start from a template",
+        templates: {
+          bug: {
+            title: "Fix a bug",
+            desc: "Track down a failure and add a regression test",
+            prompt: "Fix: [describe the issue]\n\nSteps to reproduce:\n1. \nExpected behavior:\nAcceptance criteria: add a regression test and pass checks",
+          },
+          feature: {
+            title: "Add a feature",
+            desc: "Define scope and criteria for a helper to build",
+            prompt: "Add: [describe the feature]\n\nScope:\n- \nOut of scope:\n- \nAcceptance criteria: cover the main flow with tests",
+          },
+          refactor: {
+            title: "Audit & refactor",
+            desc: "Simplify boundaries while keeping behavior intact",
+            prompt:
+              "Refactor: [target module or path]\n\nGoals:\n- Simplify structure and remove duplication\n- Keep external behavior and existing tests unchanged",
+          },
+        },
       },
     },
     "web.library": {
@@ -7435,6 +7540,15 @@ export interface Messages {
   "web.issue.board.empty.todo": undefined;
   "web.issue.board.empty.waiting": undefined;
   "web.issue.board.empty.working": undefined;
+  "web.issue.board.emptyGuide.closedBody": undefined;
+  "web.issue.board.emptyGuide.closedTitle": undefined;
+  "web.issue.board.emptyGuide.filtered": undefined;
+  "web.issue.board.emptyGuide.todoBody": undefined;
+  "web.issue.board.emptyGuide.todoTitle": undefined;
+  "web.issue.board.emptyGuide.waitingBody": undefined;
+  "web.issue.board.emptyGuide.waitingTitle": undefined;
+  "web.issue.board.emptyGuide.workingBody": undefined;
+  "web.issue.board.emptyGuide.workingTitle": undefined;
   "web.issue.board.moveFailed": undefined;
   "web.issue.board.putBack": undefined;
   "web.issue.board.recent": undefined;
@@ -7459,6 +7573,7 @@ export interface Messages {
   "web.issue.boardLabels.stage.work": undefined;
   "web.issue.boardLabels.view.board": undefined;
   "web.issue.boardLabels.view.list": undefined;
+  "web.issue.card.assignHelper": undefined;
   "web.issue.card.cron": undefined;
   "web.issue.card.draft": undefined;
   "web.issue.card.lost": undefined;
@@ -7598,6 +7713,14 @@ export interface Messages {
   "web.issue.display.show": undefined;
   "web.issue.family.children": undefined;
   "web.issue.family.parent": undefined;
+  "web.issue.guide.collapse": undefined;
+  "web.issue.guide.expand": undefined;
+  "web.issue.guide.stage.closed": undefined;
+  "web.issue.guide.stage.todo": undefined;
+  "web.issue.guide.stage.waiting": undefined;
+  "web.issue.guide.stage.working": undefined;
+  "web.issue.guide.summary": undefined;
+  "web.issue.guide.title": undefined;
   "web.issue.issue.and": undefined;
   "web.issue.issue.asking": { readonly n: number; readonly who: string | number };
   "web.issue.issue.askingLine": undefined;
@@ -7657,23 +7780,43 @@ export interface Messages {
   "web.issue.never": undefined;
   "web.issue.new.card": undefined;
   "web.issue.new.editsKept": undefined;
+  "web.issue.new.goRepos": undefined;
+  "web.issue.new.goRuntimes": undefined;
   "web.issue.new.keep": undefined;
   "web.issue.new.keys": undefined;
+  "web.issue.new.missingRepo": undefined;
+  "web.issue.new.missingRuntime": undefined;
   "web.issue.new.placeholder": undefined;
   "web.issue.new.title": undefined;
   "web.issue.new.words": undefined;
   "web.issue.noHelper": undefined;
   "web.issue.onboarding.newIssue": undefined;
   "web.issue.onboarding.openChat": undefined;
+  "web.issue.onboarding.progress": { readonly done: string | number; readonly total: string | number };
   "web.issue.onboarding.step1Action": undefined;
   "web.issue.onboarding.step1Desc": undefined;
+  "web.issue.onboarding.step1Manage": undefined;
+  "web.issue.onboarding.step1Ready": { readonly n: number };
   "web.issue.onboarding.step1Title": undefined;
   "web.issue.onboarding.step2Action": undefined;
   "web.issue.onboarding.step2Desc": undefined;
+  "web.issue.onboarding.step2Manage": undefined;
+  "web.issue.onboarding.step2Ready": { readonly n: number };
   "web.issue.onboarding.step2Title": undefined;
   "web.issue.onboarding.step3Desc": undefined;
+  "web.issue.onboarding.step3Ready": { readonly n: number };
   "web.issue.onboarding.step3Title": undefined;
   "web.issue.onboarding.subtitle": undefined;
+  "web.issue.onboarding.templates.bug.desc": undefined;
+  "web.issue.onboarding.templates.bug.prompt": undefined;
+  "web.issue.onboarding.templates.bug.title": undefined;
+  "web.issue.onboarding.templates.feature.desc": undefined;
+  "web.issue.onboarding.templates.feature.prompt": undefined;
+  "web.issue.onboarding.templates.feature.title": undefined;
+  "web.issue.onboarding.templates.refactor.desc": undefined;
+  "web.issue.onboarding.templates.refactor.prompt": undefined;
+  "web.issue.onboarding.templates.refactor.title": undefined;
+  "web.issue.onboarding.templatesTitle": undefined;
   "web.issue.onboarding.title": undefined;
   "web.issue.orchestrator": undefined;
   "web.issue.page.allHelpers": undefined;
