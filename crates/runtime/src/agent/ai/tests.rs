@@ -1,10 +1,17 @@
-use std::io::{BufRead, BufReader, Write};
-use std::net::TcpListener;
-use std::sync::Arc;
+use std::convert::Infallible;
+use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use axum::Router;
+use axum::http::{HeaderMap, StatusCode, header};
+use axum::response::IntoResponse;
+use axum::response::sse::{Event, Sse};
+use axum::routing::get;
 use serde_json::json;
+use tokio::net::TcpListener;
+use tokio_util::sync::{CancellationToken, DropGuard};
 
 use crate::agent::BrainError;
 use crate::agent::ai::ModelClient;
@@ -14,69 +21,44 @@ use crate::agent::ai::retry::{RetryPolicy, parse_retry_after};
 use crate::agent::ai::stream::{CancelHandle, CancelToken, fold_stream};
 use crate::agent::ai::types::{ChatRequest, Delta, FinishReason, Message, ResponseFormat, Role, ToolCall, Usage};
 
-fn read_http_request(stream: &std::net::TcpStream) -> (String, Vec<(String, String)>) {
-    let mut reader = BufReader::new(stream);
-    let mut request_line = String::new();
-    let _ = reader.read_line(&mut request_line);
-    let mut headers = vec![];
-    let mut content_len = 0usize;
-    loop {
-        let mut line = String::new();
-        let n = reader.read_line(&mut line).unwrap_or(0);
-        if n == 0 || line == "\r\n" || line == "\n" {
-            break;
-        }
-        if let Some((k, v)) = line.split_once(':') {
-            let key = k.trim().to_ascii_lowercase();
-            let val = v.trim().to_string();
-            if key == "content-length" {
-                content_len = val.parse().unwrap_or(0);
-            }
-            headers.push((key, val));
-        }
-    }
-    if content_len > 0 {
-        let mut body = vec![0u8; content_len];
-        let _ = std::io::Read::read_exact(&mut reader, &mut body);
-    }
-    (request_line, headers)
+fn spawn_mock(router: Router) -> (SocketAddr, DropGuard) {
+    crate::rt::block_on(async move {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let cancel = CancellationToken::new();
+        let guard = cancel.clone().drop_guard();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, router).with_graceful_shutdown(cancel.cancelled_owned()).await;
+        });
+        (addr, guard)
+    })
 }
 
 #[test]
 fn retry_policy_retries_429_with_retry_after_header_and_succeeds() {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
     let hits = Arc::new(AtomicUsize::new(0));
     let server_hits = hits.clone();
-    let server = std::thread::spawn(move || {
-        for _ in 0..2 {
-            let (mut sock, _) = listener.accept().unwrap();
-            let _ = read_http_request(&sock);
-            let n = server_hits.fetch_add(1, Ordering::SeqCst);
+    let app = Router::new().fallback(move || {
+        let n = server_hits.fetch_add(1, Ordering::SeqCst);
+        async move {
             if n == 0 {
-                let body = r#"{"error":{"message":"rate limited"}}"#;
-                let resp = format!(
-                    "HTTP/1.1 429 Too Many Requests\r\nRetry-After: 1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                    body.len(),
-                    body
-                );
-                sock.write_all(resp.as_bytes()).unwrap();
+                (
+                    StatusCode::TOO_MANY_REQUESTS,
+                    [(header::RETRY_AFTER, "1"), (header::CONTENT_TYPE, "application/json")],
+                    r#"{"error":{"message":"rate limited"}}"#,
+                )
+                    .into_response()
             } else {
                 let body = concat!(
                     "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ok\"}}]}\n\n",
                     "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":2}}\n\n",
                     "data: [DONE]\n\n"
                 );
-                let resp = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                    body.len(),
-                    body
-                );
-                sock.write_all(resp.as_bytes()).unwrap();
+                (StatusCode::OK, [(header::CONTENT_TYPE, "text/event-stream")], body).into_response()
             }
-            sock.flush().unwrap();
         }
     });
+    let (addr, _guard) = spawn_mock(app);
 
     let client = OpenAiClient::new(format!("http://{addr}"), || Some("sk-test".into())).with_retry(RetryPolicy {
         max_retries: 2,
@@ -93,25 +75,29 @@ fn retry_policy_retries_429_with_retry_after_header_and_succeeds() {
     assert!(start.elapsed() >= Duration::from_millis(900), "expected Retry-After: 1s to be honored");
     assert_eq!(completion.message.content.as_deref(), Some("ok"));
     assert_eq!(hits.load(Ordering::SeqCst), 2);
-    server.join().unwrap();
 }
 
 #[test]
 fn mid_stream_cancellation_returns_under_500ms() {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    let (release_tx, release_rx) = flume::bounded::<()>(1);
-    let server = std::thread::spawn(move || {
-        let (mut sock, _) = listener.accept().unwrap();
-        let _ = read_http_request(&sock);
-        sock.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n")
-            .unwrap();
-        let chunk = "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hello \"}}]}\n\n";
-        let frame = format!("{:x}\r\n{}\r\n", chunk.len(), chunk);
-        sock.write_all(frame.as_bytes()).unwrap();
-        sock.flush().unwrap();
-        let _ = release_rx.recv_timeout(Duration::from_secs(5));
+    let stream_cancel = CancellationToken::new();
+    let stream_cancel_for_route = stream_cancel.clone();
+    let app = Router::new().fallback(move || {
+        let cancel = stream_cancel_for_route.clone();
+        let stream = futures_util::stream::unfold((true, cancel), |(first, cancel)| async move {
+            if first {
+                Some((
+                    Ok::<_, Infallible>(Event::default().data(r#"{"choices":[{"index":0,"delta":{"content":"hello "}}]}"#)),
+                    (false, cancel),
+                ))
+            } else {
+                cancel.cancelled().await;
+                None
+            }
+        });
+        async move { Sse::new(stream) }
     });
+    let (addr, _guard) = spawn_mock(app);
+    let _stream_guard = stream_cancel.drop_guard();
 
     let client = OpenAiClient::new(format!("http://{addr}"), || Some("sk-test".into())).with_retry(RetryPolicy::none());
     let handle = Arc::new(CancelHandle::new());
@@ -133,30 +119,27 @@ fn mid_stream_cancellation_returns_under_500ms() {
     assert!(matches!(err, BrainError::Cancelled), "expected Cancelled, got {err:?}");
     let elapsed = cancelled_at.expect("received first chunk").elapsed();
     assert!(elapsed < Duration::from_millis(500), "cancellation took {elapsed:?}");
-    let _ = release_tx.send(());
-    server.join().unwrap();
 }
 
 #[test]
 fn cancel_aborts_retry_backoff_immediately() {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
     let handle = Arc::new(CancelHandle::new());
     let cancel_after_hit = handle.clone();
-    let server = std::thread::spawn(move || {
-        let (mut sock, _) = listener.accept().unwrap();
-        let _ = read_http_request(&sock);
-        let body = r#"{"error":{"message":"unavailable"}}"#;
-        let resp = format!(
-            "HTTP/1.1 503 Service Unavailable\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-            body.len(),
-            body
-        );
-        sock.write_all(resp.as_bytes()).unwrap();
-        sock.flush().unwrap();
-        std::thread::sleep(Duration::from_millis(40));
-        cancel_after_hit.cancel();
+    let app = Router::new().fallback(move || {
+        let cancel_after_hit = cancel_after_hit.clone();
+        async move {
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(40)).await;
+                cancel_after_hit.cancel();
+            });
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                [(header::CONTENT_TYPE, "application/json")],
+                r#"{"error":{"message":"unavailable"}}"#,
+            )
+        }
     });
+    let (addr, _guard) = spawn_mock(app);
 
     let client = OpenAiClient::new(format!("http://{addr}"), || Some("sk-test".into())).with_retry(RetryPolicy {
         max_retries: 3,
@@ -172,37 +155,37 @@ fn cancel_aborts_retry_backoff_immediately() {
     let err = client.complete_cancellable(&req, &handle.token(), &mut |_| {}).unwrap_err();
     assert!(matches!(err, BrainError::Cancelled), "expected Cancelled, got {err:?}");
     assert!(start.elapsed() < Duration::from_millis(500));
-    server.join().unwrap();
 }
 
 #[test]
 fn fetch_balance_parses_user_balance_endpoint() {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    let server = std::thread::spawn(move || {
-        let (mut sock, _) = listener.accept().unwrap();
-        let (req_line, headers) = read_http_request(&sock);
-        assert!(req_line.starts_with("GET /user/balance "), "{req_line}");
-        assert!(headers.iter().any(|(k, v)| k == "authorization" && v == "Bearer sk-bal"), "{headers:?}");
-        let body = r#"{"is_available":true,"balance_infos":[{"currency":"CNY","total_balance":"42.50","granted_balance":"2.50","topped_up_balance":"40.00"}]}"#;
-        let resp = format!(
-            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-            body.len(),
-            body
-        );
-        sock.write_all(resp.as_bytes()).unwrap();
-        sock.flush().unwrap();
-    });
+    let seen_auth = Arc::new(Mutex::new(None::<String>));
+    let seen_for_route = seen_auth.clone();
+    let app = Router::new().route(
+        "/user/balance",
+        get(move |headers: HeaderMap| {
+            let auth = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).map(ToString::to_string);
+            *seen_for_route.lock().unwrap() = auth;
+            async move {
+                (
+                    StatusCode::OK,
+                    [(header::CONTENT_TYPE, "application/json")],
+                    r#"{"is_available":true,"balance_infos":[{"currency":"CNY","total_balance":"42.50","granted_balance":"2.50","topped_up_balance":"40.00"}]}"#,
+                )
+            }
+        }),
+    );
+    let (addr, _guard) = spawn_mock(app);
 
     let client = OpenAiClient::new(format!("http://{addr}"), || Some("sk-bal".into())).with_retry(RetryPolicy::none());
     let bal = client.fetch_balance().unwrap();
+    assert_eq!(seen_auth.lock().unwrap().as_deref(), Some("Bearer sk-bal"));
     assert!(bal.is_available);
     assert_eq!(bal.balance_infos.len(), 1);
     assert_eq!(bal.balance_infos[0].currency, "CNY");
     assert!((bal.balance_infos[0].total_balance - 42.50).abs() < 1e-6);
     assert!((bal.balance_infos[0].granted_balance - 2.50).abs() < 1e-6);
     assert!((bal.balance_infos[0].topped_up_balance - 40.00).abs() < 1e-6);
-    server.join().unwrap();
 }
 
 #[test]

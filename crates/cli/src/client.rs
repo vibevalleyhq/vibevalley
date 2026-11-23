@@ -622,25 +622,48 @@ mod tests {
         assert_eq!(r.token_source, TokenSource::Env);
     }
 
+    fn spawn_mock(router: axum::Router) -> (std::net::SocketAddr, tokio_util::sync::CancellationToken, tokio_util::sync::DropGuard) {
+        vibevalley_runtime::rt::block_on(async move {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let cancel = tokio_util::sync::CancellationToken::new();
+            let guard = cancel.clone().drop_guard();
+            let shutdown = cancel.clone();
+            tokio::spawn(async move {
+                let _ = axum::serve(listener, router).with_graceful_shutdown(shutdown.cancelled_owned()).await;
+            });
+            (addr, cancel, guard)
+        })
+    }
+
     #[test]
     fn sse_streams_multiline_events_and_enforces_timeout_with_bearer_header() {
-        use std::io::{Read as _, Write as _};
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        let (hold_tx, hold_rx) = std::sync::mpsc::channel::<()>();
-        let (req_tx, req_rx) = std::sync::mpsc::channel::<String>();
-        let server = std::thread::spawn(move || {
-            let (mut conn, _) = listener.accept().unwrap();
-            let mut req = [0u8; 2048];
-            let n = conn.read(&mut req).unwrap_or(0);
-            let _ = req_tx.send(String::from_utf8_lossy(&req[..n]).to_string());
-            let _ = conn.write_all(
-                b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n\
-                  1b\r\ndata: line-1\ndata: line-2\n\n\r\n",
-            );
-            let _ = conn.flush();
-            let _ = hold_rx.recv_timeout(Duration::from_secs(5));
-        });
+        use axum::http::HeaderMap;
+        use axum::response::sse::{Event, Sse};
+        use axum::routing::get;
+
+        let (auth_tx, auth_rx) = std::sync::mpsc::channel::<Option<String>>();
+        let stream_cancel = tokio_util::sync::CancellationToken::new();
+        let stream_cancel_for_route = stream_cancel.clone();
+        let router = axum::Router::new().route(
+            "/events",
+            get(move |headers: HeaderMap| {
+                let auth = headers.get("authorization").and_then(|v| v.to_str().ok()).map(ToString::to_string);
+                let _ = auth_tx.send(auth);
+                let cancel = stream_cancel_for_route.clone();
+                let stream = futures_util::stream::unfold((true, cancel), |(first, cancel)| async move {
+                    if first {
+                        Some((Ok::<_, std::convert::Infallible>(Event::default().data("line-1\nline-2")), (false, cancel)))
+                    } else {
+                        cancel.cancelled().await;
+                        None
+                    }
+                });
+                async move { Sse::new(stream) }
+            }),
+        );
+        let (addr, _cancel, _guard) = spawn_mock(router);
+        let _stream_guard = stream_cancel.drop_guard();
 
         let client = Client::from_parts(
             PathBuf::from("/tmp"),
@@ -660,44 +683,36 @@ mod tests {
                 Ok(true)
             })
             .unwrap_err();
-        let captured_req = req_rx.recv_timeout(Duration::from_secs(2)).unwrap();
-        assert!(
-            captured_req.to_ascii_lowercase().contains("authorization: bearer vv_dev_sse_token_1234"),
-            "SSE request missing Bearer header:\n{captured_req}"
+        let captured_auth = auth_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert_eq!(
+            captured_auth.as_deref(),
+            Some("Bearer vv_dev_sse_token_1234"),
+            "SSE request missing Bearer header"
         );
         assert_eq!(seen, vec!["line-1\nline-2"]);
         assert_eq!((err.code, err.tag.as_str()), (exit::OTHER, "Timeout"));
-        let _ = hold_tx.send(());
-        server.join().unwrap();
     }
 
     #[test]
     fn api_download_and_upload_attach_bearer_header() {
-        use std::io::{Read as _, Write as _};
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        let (req_tx, req_rx) = std::sync::mpsc::channel::<String>();
+        use axum::http::{HeaderMap, StatusCode, Uri, header};
 
-        let server = std::thread::spawn(move || {
-            for idx in 0..4 {
-                let (mut conn, _) = listener.accept().unwrap();
-                let mut req = [0u8; 4096];
-                let n = conn.read(&mut req).unwrap_or(0);
-                let _ = req_tx.send(String::from_utf8_lossy(&req[..n]).to_string());
-                let (content_type, body) = match idx {
-                    0 => ("application/json", r#"{"bizCode":0,"message":"ok","data":{"ok":true}}"#),
-                    1 => ("application/json", r#"{"ok":true}"#),
-                    2 => ("application/octet-stream", "hello"),
+        let (req_tx, req_rx) = std::sync::mpsc::channel::<Option<String>>();
+        let router = axum::Router::new().fallback(move |uri: Uri, headers: HeaderMap| {
+            let req_tx = req_tx.clone();
+            async move {
+                let auth = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).map(ToString::to_string);
+                let _ = req_tx.send(auth);
+                let (content_type, body) = match uri.path() {
+                    "/api/v1/server/health/get" => ("application/json", r#"{"bizCode":0,"message":"ok","data":{"ok":true}}"#),
+                    "/api/v1/health" => ("application/json", r#"{"ok":true}"#),
+                    "/api/v1/attachment/att-1" => ("application/octet-stream", "hello"),
                     _ => ("application/json", r#"{"bizCode":0,"message":"ok","data":{"ok":true}}"#),
                 };
-                let resp = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\n\r\n{body}",
-                    body.len()
-                );
-                let _ = conn.write_all(resp.as_bytes());
-                let _ = conn.flush();
+                (StatusCode::OK, [(header::CONTENT_TYPE, content_type)], body)
             }
         });
+        let (addr, _cancel, _guard) = spawn_mock(router);
 
         let client = Client::from_parts(
             PathBuf::from("/tmp"),
@@ -720,12 +735,8 @@ mod tests {
             .unwrap();
 
         for i in 0..4 {
-            let raw = req_rx.recv_timeout(Duration::from_secs(2)).unwrap();
-            assert!(
-                raw.to_ascii_lowercase().contains("authorization: bearer vv_dev_all_paths_token"),
-                "request #{i} missing Bearer header:\n{raw}"
-            );
+            let auth = req_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+            assert_eq!(auth.as_deref(), Some("Bearer vv_dev_all_paths_token"), "request #{i} missing Bearer header");
         }
-        server.join().unwrap();
     }
 }

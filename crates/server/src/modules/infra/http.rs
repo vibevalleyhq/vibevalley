@@ -420,10 +420,31 @@ pub(crate) fn public_https(url: &url::Url) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Cursor, Read, Write};
-    use std::net::TcpListener;
+    use std::convert::Infallible;
+    use std::io::{Cursor, Read};
+    use std::sync::{Arc, Mutex};
+
+    use axum::Router;
+    use axum::body::{Body, Bytes};
+    use axum::http::{HeaderMap, StatusCode, header};
+    use axum::routing::{get, post};
+    use tokio::net::TcpListener;
+    use tokio_util::sync::DropGuard;
 
     use super::*;
+
+    fn spawn_mock(router: Router) -> (SocketAddr, DropGuard) {
+        vibevalley_runtime::rt::block_on(async move {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let cancel = CancellationToken::new();
+            let guard = cancel.clone().drop_guard();
+            tokio::spawn(async move {
+                let _ = axum::serve(listener, router).with_graceful_shutdown(cancel.cancelled_owned()).await;
+            });
+            (addr, guard)
+        })
+    }
 
     #[test]
     fn download_addresses_cannot_reach_private_networks_or_carry_credentials() {
@@ -468,32 +489,22 @@ mod tests {
 
     #[test]
     fn http_fetch_streams_post_body_and_never_follows_redirects() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        let handle = std::thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut req = Vec::new();
-            let mut chunk = [0u8; 1024];
-            loop {
-                let n = stream.read(&mut chunk).unwrap();
-                req.extend_from_slice(&chunk[..n]);
-                if req.windows(7).any(|w| w == b"payload") {
-                    break;
-                }
-            }
-            let raw = String::from_utf8_lossy(&req);
-            assert!(raw.starts_with("POST /upload HTTP/1.1"), "{raw}");
-            assert!(raw.to_ascii_lowercase().contains("x-test: ok"), "{raw}");
-            stream
-                .write_all(b"HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: 11\r\nConnection: close\r\n\r\n{\"ok\":true}")
-                .unwrap();
-
-            let (mut stream, _) = listener.accept().unwrap();
-            let _ = stream.read(&mut chunk);
-            stream
-                .write_all(b"HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:1/other\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
-                .unwrap();
-        });
+        let seen = Arc::new(Mutex::new(None::<(Option<String>, Vec<u8>)>));
+        let seen_for_route = seen.clone();
+        let app = Router::new()
+            .route(
+                "/upload",
+                post(move |headers: HeaderMap, body: Bytes| {
+                    let x_test = headers.get("x-test").and_then(|v| v.to_str().ok()).map(ToString::to_string);
+                    *seen_for_route.lock().unwrap() = Some((x_test, body.to_vec()));
+                    async move { (StatusCode::CREATED, [(header::CONTENT_TYPE, "application/json")], r#"{"ok":true}"#) }
+                }),
+            )
+            .route(
+                "/redir",
+                get(|| async { (StatusCode::FOUND, [(header::LOCATION, "http://127.0.0.1:1/other")]) }),
+            );
+        let (addr, _guard) = spawn_mock(app);
 
         let mut res = Http
             .fetch(Request {
@@ -509,6 +520,7 @@ mod tests {
         let mut body = String::new();
         res.body.read_to_string(&mut body).unwrap();
         assert_eq!(body, "{\"ok\":true}");
+        assert_eq!(seen.lock().unwrap().as_ref(), Some(&(Some("ok".to_string()), b"payload".to_vec())));
 
         let redirect = Http
             .fetch(Request {
@@ -521,22 +533,12 @@ mod tests {
             .unwrap();
         assert_eq!(redirect.status, 302);
         assert_eq!(redirect.header("location"), Some("http://127.0.0.1:1/other"));
-
-        handle.join().unwrap();
     }
 
     #[test]
     fn async_fetch_and_public_download_reject_bad_urls_and_stream_without_block_on() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        let handle = std::thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut chunk = [0u8; 512];
-            let _ = stream.read(&mut chunk);
-            stream
-                .write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello")
-                .unwrap();
-        });
+        let app = Router::new().route("/ping", get(|| async { ([(header::CONTENT_TYPE, "text/plain")], "hello") }));
+        let (addr, _guard) = spawn_mock(app);
 
         vibevalley_runtime::rt::block_on(async move {
             assert!(matches!(
@@ -565,36 +567,37 @@ mod tests {
             .unwrap();
             assert_eq!(body, "hello");
         });
-
-        handle.join().unwrap();
     }
 
     #[test]
     fn http_fetch_streams_chunks_enforces_read_max_and_aborts_on_cancel() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        let (release_tx, release_rx) = flume::bounded::<()>(1);
-        let handle = std::thread::spawn(move || {
-            // 1. Multi-chunk response exceeding read_max.
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut buf = [0u8; 512];
-            let _ = stream.read(&mut buf);
-            stream
-                .write_all(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Type: application/octet-stream\r\nConnection: close\r\n\r\n")
-                .unwrap();
-            stream.write_all(b"5\r\nhello\r\n5\r\nworld\r\n0\r\n\r\n").unwrap();
-            let _ = stream.flush();
-            drop(stream);
-
-            // 2. Stalled chunked response that never finishes until released.
-            let (mut stream, _) = listener.accept().unwrap();
-            let _ = stream.read(&mut buf);
-            stream
-                .write_all(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n5\r\nfirst\r\n")
-                .unwrap();
-            let _ = stream.flush();
-            let _ = release_rx.recv();
-        });
+        let stream_cancel = CancellationToken::new();
+        let stream_cancel_for_route = stream_cancel.clone();
+        let app = Router::new()
+            .route(
+                "/chunks",
+                get(|| async {
+                    let stream = futures_util::stream::iter([Ok::<_, Infallible>(Bytes::from_static(b"hello")), Ok(Bytes::from_static(b"world"))]);
+                    ([(header::CONTENT_TYPE, "application/octet-stream")], Body::from_stream(stream))
+                }),
+            )
+            .route(
+                "/stalled",
+                get(move || {
+                    let cancel = stream_cancel_for_route.clone();
+                    let stream = futures_util::stream::unfold((true, cancel), |(first, cancel)| async move {
+                        if first {
+                            Some((Ok::<_, Infallible>(Bytes::from_static(b"first")), (false, cancel)))
+                        } else {
+                            cancel.cancelled().await;
+                            None
+                        }
+                    });
+                    async move { ([(header::CONTENT_TYPE, "text/plain")], Body::from_stream(stream)) }
+                }),
+            );
+        let (addr, _guard) = spawn_mock(app);
+        let _stream_guard = stream_cancel.drop_guard();
 
         // Response size limit enforced over streamed chunks.
         let mut res = Http
@@ -641,7 +644,5 @@ mod tests {
         assert_eq!(res.body.read(&mut rest).unwrap_err().kind(), std::io::ErrorKind::Interrupted);
 
         canceller.join().unwrap();
-        let _ = release_tx.send(());
-        handle.join().unwrap();
     }
 }

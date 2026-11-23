@@ -44,5 +44,6 @@ uuid = { workspace = true }
 vibevalley-protocol = { version = "0.1.0", path = "../protocol" }
 
 [dev-dependencies]
+axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio"] }
 proptest = "1.12.0"
 tokio = { workspace = true, features = ["test-util"] }

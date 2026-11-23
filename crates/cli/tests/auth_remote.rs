@@ -2,16 +2,19 @@
 //! target/token precedence, non-leakage across servers, and Bearer header propagation.
 
 use std::collections::HashMap;
-use std::io::{Read, Write};
-use std::net::TcpListener;
+use std::convert::Infallible;
 use std::path::Path;
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::thread::JoinHandle;
-use std::time::Duration;
 
+use axum::Router;
+use axum::body::Bytes;
+use axum::http::{HeaderMap, Method, StatusCode, Uri, header};
+use axum::response::sse::{Event, Sse};
+use axum::response::{IntoResponse, Response};
 use serde_json::{Value, json};
+use tokio::net::TcpListener;
+use tokio_util::sync::{CancellationToken, DropGuard};
 
 #[derive(Debug, Clone)]
 struct RecordedRequest {
@@ -31,150 +34,79 @@ impl RecordedRequest {
     }
 }
 
-#[derive(Clone)]
-struct MockResponse {
-    status: u16,
-    content_type: &'static str,
-    body: Vec<u8>,
-    sse: bool,
-}
+struct MockResponse(Response);
 
 impl MockResponse {
     fn ok_envelope(data: Value) -> Self {
-        let body = json!({ "bizCode": 0, "message": "ok", "data": data }).to_string().into_bytes();
-        Self {
-            status: 200,
-            content_type: "application/json; charset=utf-8",
-            body,
-            sse: false,
-        }
+        Self::ok_json(json!({ "bizCode": 0, "message": "ok", "data": data }))
     }
 
     fn ok_void() -> Self {
-        let body = json!({ "bizCode": 0, "message": "ok" }).to_string().into_bytes();
-        Self {
-            status: 200,
-            content_type: "application/json; charset=utf-8",
-            body,
-            sse: false,
-        }
+        Self::ok_json(json!({ "bizCode": 0, "message": "ok" }))
     }
 
     fn ok_json(data: Value) -> Self {
-        Self {
-            status: 200,
-            content_type: "application/json; charset=utf-8",
-            body: data.to_string().into_bytes(),
-            sse: false,
-        }
+        Self((StatusCode::OK, [(header::CONTENT_TYPE, "application/json; charset=utf-8")], data.to_string()).into_response())
     }
 
     fn ok_bytes(content_type: &'static str, bytes: &[u8]) -> Self {
-        Self {
-            status: 200,
-            content_type,
-            body: bytes.to_vec(),
-            sse: false,
-        }
+        Self((StatusCode::OK, [(header::CONTENT_TYPE, content_type)], bytes.to_vec()).into_response())
     }
 
     fn sse_event(data: Value) -> Self {
-        let frame = format!("data: {data}\n\n");
-        Self {
-            status: 200,
-            content_type: "text/event-stream",
-            body: frame.into_bytes(),
-            sse: true,
-        }
+        let stream = futures_util::stream::once(async move { Ok::<_, Infallible>(Event::default().data(data.to_string())) });
+        Self(Sse::new(stream).into_response())
     }
 
     fn error(status: u16, biz_code: u32, message: &str) -> Self {
-        let body = json!({ "bizCode": biz_code, "message": message }).to_string().into_bytes();
-        Self {
-            status,
-            content_type: "application/json; charset=utf-8",
-            body,
-            sse: false,
-        }
+        let code = StatusCode::from_u16(status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+        let body = json!({ "bizCode": biz_code, "message": message }).to_string();
+        Self((code, [(header::CONTENT_TYPE, "application/json; charset=utf-8")], body).into_response())
     }
 }
 
 struct MockServer {
     url: String,
     recorded: Arc<Mutex<Vec<RecordedRequest>>>,
-    stop: Arc<AtomicBool>,
-    handle: Option<JoinHandle<()>>,
+    _guard: DropGuard,
 }
 
 impl MockServer {
     fn start(handler: impl Fn(&RecordedRequest) -> MockResponse + Send + Sync + 'static) -> Self {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        listener.set_nonblocking(true).unwrap();
         let recorded = Arc::new(Mutex::new(Vec::new()));
         let recorded_bg = recorded.clone();
-        let stop = Arc::new(AtomicBool::new(false));
-        let stop_bg = stop.clone();
         let handler = Arc::new(handler);
 
-        let handle = std::thread::spawn(move || {
-            while !stop_bg.load(Ordering::Acquire) {
-                match listener.accept() {
-                    Ok((mut stream, _)) => {
-                        let _ = stream.set_nonblocking(false);
-                        let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
-                        let Some(req) = read_http_request(&mut stream) else {
-                            continue;
-                        };
-                        recorded_bg.lock().unwrap().push(req.clone());
-                        let resp = handler(&req);
-                        if resp.sse {
-                            let header = format!(
-                                "HTTP/1.1 {} OK\r\nContent-Type: {}\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n{:x}\r\n",
-                                resp.status,
-                                resp.content_type,
-                                resp.body.len()
-                            );
-                            let _ = stream.write_all(header.as_bytes());
-                            let _ = stream.write_all(&resp.body);
-                            let _ = stream.write_all(b"\r\n0\r\n\r\n");
-                            let _ = stream.flush();
-                        } else {
-                            let reason = match resp.status {
-                                200 => "OK",
-                                400 => "Bad Request",
-                                401 => "Unauthorized",
-                                403 => "Forbidden",
-                                404 => "Not Found",
-                                405 => "Method Not Allowed",
-                                _ => "Error",
-                            };
-                            let header = format!(
-                                "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                                resp.status,
-                                reason,
-                                resp.content_type,
-                                resp.body.len()
-                            );
-                            let _ = stream.write_all(header.as_bytes());
-                            let _ = stream.write_all(&resp.body);
-                            let _ = stream.flush();
-                        }
-                    }
-                    Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
-                        std::thread::sleep(Duration::from_millis(5));
-                    }
-                    Err(_) => break,
-                }
+        let app = Router::new().fallback(move |method: Method, uri: Uri, headers: HeaderMap, body: Bytes| {
+            let recorded_bg = recorded_bg.clone();
+            let handler = handler.clone();
+            async move {
+                let req = RecordedRequest {
+                    method: method.to_string(),
+                    path: uri.path_and_query().map_or_else(|| uri.path().to_string(), ToString::to_string),
+                    headers: headers
+                        .iter()
+                        .filter_map(|(k, v)| Some((k.as_str().to_string(), v.to_str().ok()?.to_string())))
+                        .collect(),
+                    body: String::from_utf8_lossy(&body).to_string(),
+                };
+                recorded_bg.lock().unwrap().push(req.clone());
+                handler(&req).0
             }
         });
 
-        Self {
-            url: format!("http://{addr}"),
-            recorded,
-            stop,
-            handle: Some(handle),
-        }
+        let (url, _guard) = vibevalley_runtime::rt::block_on(async move {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let cancel = CancellationToken::new();
+            let guard = cancel.clone().drop_guard();
+            tokio::spawn(async move {
+                let _ = axum::serve(listener, app).with_graceful_shutdown(cancel.cancelled_owned()).await;
+            });
+            (format!("http://{addr}"), guard)
+        });
+
+        Self { url, recorded, _guard }
     }
 
     fn requests(&self) -> Vec<RecordedRequest> {
@@ -184,66 +116,6 @@ impl MockServer {
     fn clear(&self) {
         self.recorded.lock().unwrap().clear();
     }
-}
-
-impl Drop for MockServer {
-    fn drop(&mut self) {
-        self.stop.store(true, Ordering::Release);
-        if let Some(handle) = self.handle.take() {
-            let _ = handle.join();
-        }
-    }
-}
-
-fn read_http_request(stream: &mut std::net::TcpStream) -> Option<RecordedRequest> {
-    let mut buf = Vec::new();
-    let mut chunk = [0u8; 4096];
-    let header_end = loop {
-        let n = stream.read(&mut chunk).ok()?;
-        if n == 0 {
-            return None;
-        }
-        buf.extend_from_slice(&chunk[..n]);
-        if let Some(pos) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
-            break pos + 4;
-        }
-    };
-
-    let head = String::from_utf8_lossy(&buf[..header_end - 4]);
-    let mut lines = head.split("\r\n");
-    let first = lines.next()?;
-    let mut parts = first.split_whitespace();
-    let method = parts.next()?.to_string();
-    let path = parts.next()?.to_string();
-    let mut headers = HashMap::new();
-    let mut content_length: usize = 0;
-    for line in lines {
-        if let Some((k, v)) = line.split_once(':') {
-            let key = k.trim().to_ascii_lowercase();
-            let val = v.trim().to_string();
-            if key == "content-length" {
-                content_length = val.parse().unwrap_or(0);
-            }
-            headers.insert(key, val);
-        }
-    }
-
-    let mut body = buf[header_end..].to_vec();
-    while body.len() < content_length {
-        let n = stream.read(&mut chunk).ok()?;
-        if n == 0 {
-            break;
-        }
-        body.extend_from_slice(&chunk[..n]);
-    }
-    body.truncate(content_length);
-
-    Some(RecordedRequest {
-        method,
-        path,
-        headers,
-        body: String::from_utf8_lossy(&body).to_string(),
-    })
 }
 
 struct Ran {

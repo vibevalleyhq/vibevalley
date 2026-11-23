@@ -726,12 +726,17 @@ impl Server for RemoteServer {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::Infallible;
+    use std::net::SocketAddr;
     use std::sync::Arc;
     use std::time::{Duration, Instant};
 
+    use axum::Router;
+    use axum::body::{Body, Bytes};
+    use axum::http::{HeaderMap, Method, StatusCode, Uri, header};
+    use axum::routing::get;
     use parking_lot::Mutex;
     use serde_json::json;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
     use vibevalley_protocol::{ApiError, BizCode, Issue, LiveEvent, NoticeLevel, RemoteDeviceSummary, RemotePlatform};
     use vibevalley_server::transport::api::{RemoteAuth, RemoteDeviceIdentity};
@@ -741,6 +746,19 @@ mod tests {
 
     use super::*;
     use crate::hosted::connection::{ConnectionSaveRequest, configure_remote, exchange_pair_code};
+
+    fn spawn_mock(router: Router) -> (SocketAddr, DropGuard) {
+        vibevalley_runtime::rt::block_on(async move {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let cancel = CancellationToken::new();
+            let guard = cancel.clone().drop_guard();
+            tokio::spawn(async move {
+                let _ = axum::serve(listener, router).with_graceful_shutdown(cancel.cancelled_owned()).await;
+            });
+            (addr, guard)
+        })
+    }
 
     struct StaticRemoteAuth {
         expected_token: String,
@@ -855,31 +873,27 @@ mod tests {
         let part1 = raw_bytes[..split_at].to_vec();
         let part2 = raw_bytes[split_at..].to_vec();
 
-        let addr = vibevalley_runtime::rt::block_on(async move {
-            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let addr = listener.local_addr().unwrap();
-            tokio::spawn(async move {
-                let (mut socket, _) = listener.accept().await.unwrap();
-                let mut req_buf = vec![0u8; 4096];
-                let _ = socket.read(&mut req_buf).await;
-                let head = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ntransfer-encoding: chunked\r\n\r\n";
-                socket.write_all(head.as_bytes()).await.unwrap();
-                let chunk1 = format!("{:x}\r\n", part1.len());
-                socket.write_all(chunk1.as_bytes()).await.unwrap();
-                socket.write_all(&part1).await.unwrap();
-                socket.write_all(b"\r\n").await.unwrap();
-                socket.flush().await.unwrap();
-
-                tokio::time::sleep(Duration::from_millis(20)).await;
-
-                let chunk2 = format!("{:x}\r\n", part2.len());
-                socket.write_all(chunk2.as_bytes()).await.unwrap();
-                socket.write_all(&part2).await.unwrap();
-                socket.write_all(b"\r\n0\r\n\r\n").await.unwrap();
-                socket.flush().await.unwrap();
-            });
-            addr
-        });
+        let app = Router::new().route(
+            "/api/v1/live",
+            get(move || {
+                let part1 = part1.clone();
+                let part2 = part2.clone();
+                async move {
+                    let (tx, rx) = flume::bounded::<Result<Bytes, Infallible>>(2);
+                    tokio::spawn(async move {
+                        let _ = tx.send_async(Ok(Bytes::from(part1))).await;
+                        tokio::time::sleep(Duration::from_millis(20)).await;
+                        let _ = tx.send_async(Ok(Bytes::from(part2))).await;
+                    });
+                    (
+                        StatusCode::OK,
+                        [(header::CONTENT_TYPE, "text/event-stream")],
+                        Body::from_stream(rx.into_stream()),
+                    )
+                }
+            }),
+        );
+        let (addr, _guard) = spawn_mock(app);
 
         let remote = RemoteServer::new(format!("http://{addr}"), Secret::new("vv_dev_utf8_test"), None).unwrap();
         let live_rx = remote.live();
@@ -895,28 +909,21 @@ mod tests {
 
     #[test]
     fn remote_server_sends_bearer_and_client_headers_over_http() {
-        let seen_headers = Arc::new(Mutex::new(Vec::<String>::new()));
-        let seen_for_task = seen_headers.clone();
-
-        let addr = vibevalley_runtime::rt::block_on(async move {
-            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let addr = listener.local_addr().unwrap();
-            tokio::spawn(async move {
-                let (mut socket, _) = listener.accept().await.unwrap();
-                let mut buf = vec![0u8; 4096];
-                let n = socket.read(&mut buf).await.unwrap();
-                let req_text = String::from_utf8_lossy(&buf[..n]).to_string();
-                seen_for_task.lock().push(req_text);
-                let body = r#"{"bizCode":0,"message":"ok","data":{"ok":true,"version":"1.2.3"}}"#;
-                let resp = format!(
-                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
-                    body.len(),
-                    body
-                );
-                let _ = socket.write_all(resp.as_bytes()).await;
-            });
-            addr
+        let seen_requests = Arc::new(Mutex::new(Vec::<(String, String, Option<String>, Option<String>)>::new()));
+        let seen_for_task = seen_requests.clone();
+        let app = Router::new().fallback(move |method: Method, uri: Uri, headers: HeaderMap| {
+            let auth = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).map(ToString::to_string);
+            let client = headers.get("x-vibevalley-client").and_then(|v| v.to_str().ok()).map(ToString::to_string);
+            seen_for_task.lock().push((method.to_string(), uri.path().to_string(), auth, client));
+            async move {
+                (
+                    StatusCode::OK,
+                    [(header::CONTENT_TYPE, "application/json")],
+                    r#"{"bizCode":0,"message":"ok","data":{"ok":true,"version":"1.2.3"}}"#,
+                )
+            }
         });
+        let (addr, _guard) = spawn_mock(app);
 
         let remote = RemoteServer::new(
             format!("http://{addr}"),
@@ -932,13 +939,10 @@ mod tests {
         assert_eq!(env.biz_code, 0);
         assert_eq!(env.data.unwrap()["version"], "1.2.3");
 
-        let captured = seen_headers.lock()[0].to_lowercase();
-        assert!(captured.starts_with("post /api/v1/health "));
-        assert!(
-            captured.contains("authorization: bearer vv_dev_header_check_token_42"),
-            "missing bearer header: {captured}"
-        );
-        assert!(captured.contains("x-vibevalley-client: remote"), "missing remote client header: {captured}");
+        let (method, path, auth, client) = seen_requests.lock()[0].clone();
+        assert_eq!((method.as_str(), path.as_str()), ("POST", "/api/v1/health"));
+        assert_eq!(auth.as_deref(), Some("Bearer vv_dev_header_check_token_42"));
+        assert_eq!(client.as_deref(), Some("remote"));
     }
 
     #[test]

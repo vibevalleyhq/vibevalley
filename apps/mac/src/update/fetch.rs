@@ -267,23 +267,45 @@ pub fn staged_app(url: &str, build: &Build, version: &str, bundle: &Path, folder
 
 #[cfg(test)]
 mod tests {
+    use std::net::SocketAddr;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use axum::Router;
+    use axum::http::{StatusCode, header};
+    use axum::routing::get;
+    use tokio::net::TcpListener;
+    use tokio_util::sync::{CancellationToken, DropGuard};
+
     use super::*;
+
+    fn spawn_mock(router: Router) -> (SocketAddr, DropGuard) {
+        vibevalley_runtime::rt::block_on(async move {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let cancel = CancellationToken::new();
+            let guard = cancel.clone().drop_guard();
+            tokio::spawn(async move {
+                let _ = axum::serve(listener, router).with_graceful_shutdown(cancel.cancelled_owned()).await;
+            });
+            (addr, guard)
+        })
+    }
 
     #[test]
     fn regression_plain_http_is_only_allowed_for_a_loopback_feed_without_redirects() {
-        use std::io::Write as _;
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        let server = std::thread::spawn(move || {
-            let (mut connection, _) = listener.accept().unwrap();
-            let mut request = [0u8; 2048];
-            assert!(connection.read(&mut request).unwrap() > 0);
-            connection
-                .write_all(b"HTTP/1.1 302 Found\r\nLocation: http://example.invalid/release.json\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
-                .unwrap();
-        });
+        let hits = Arc::new(AtomicUsize::new(0));
+        let server_hits = hits.clone();
+        let app = Router::new().route(
+            "/release.json",
+            get(move || {
+                server_hits.fetch_add(1, Ordering::SeqCst);
+                async { (StatusCode::FOUND, [(header::LOCATION, "http://example.invalid/release.json")]) }
+            }),
+        );
+        let (address, _guard) = spawn_mock(app);
         assert!(text(&format!("http://{address}/release.json")).is_err());
-        server.join().unwrap();
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
         assert!(text("http://example.invalid/release.json").is_err());
     }
 
@@ -303,20 +325,22 @@ mod tests {
     #[test]
     fn text_retries_transient_server_errors_with_backon() {
         use backon::BackoffBuilder as _;
-        use std::io::Write as _;
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        let server = std::thread::spawn(move || {
-            for response in [
-                "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 4\r\nConnection: close\r\n\r\nbusy",
-                "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
-            ] {
-                let (mut connection, _) = listener.accept().unwrap();
-                let mut request = [0u8; 2048];
-                assert!(connection.read(&mut request).unwrap() > 0);
-                connection.write_all(response.as_bytes()).unwrap();
-            }
-        });
+        let hits = Arc::new(AtomicUsize::new(0));
+        let server_hits = hits.clone();
+        let app = Router::new().route(
+            "/release.json",
+            get(move || {
+                let n = server_hits.fetch_add(1, Ordering::SeqCst);
+                async move {
+                    if n == 0 {
+                        (StatusCode::SERVICE_UNAVAILABLE, "busy")
+                    } else {
+                        (StatusCode::OK, "{}")
+                    }
+                }
+            }),
+        );
+        let (address, _guard) = spawn_mock(app);
         let backoff = backon::ExponentialBuilder::new()
             .with_min_delay(Duration::from_millis(1))
             .with_max_delay(Duration::from_millis(5))
@@ -324,28 +348,25 @@ mod tests {
             .build();
         let (status, body) = text_with_backoff(&format!("http://{address}/release.json"), backoff).unwrap();
         assert_eq!((status, body.as_str()), (200, "{}"));
-        server.join().unwrap();
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
     }
 
     #[test]
     fn download_streams_with_progress_and_enforces_max_size() {
-        use std::io::Write as _;
         let dir = tempfile::tempdir().unwrap();
         let target = dir.path().join("payload.bin");
-        let payload = b"vibevalley-update-bytes";
+        let payload: &'static [u8] = b"vibevalley-update-bytes";
 
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        let server = std::thread::spawn(move || {
-            for _ in 0..2 {
-                let (mut conn, _) = listener.accept().unwrap();
-                let mut req = [0u8; 2048];
-                assert!(conn.read(&mut req).unwrap() > 0);
-                let header = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", payload.len());
-                conn.write_all(header.as_bytes()).unwrap();
-                conn.write_all(payload).unwrap();
-            }
-        });
+        let hits = Arc::new(AtomicUsize::new(0));
+        let server_hits = hits.clone();
+        let app = Router::new().route(
+            "/app.zip",
+            get(move || {
+                server_hits.fetch_add(1, Ordering::SeqCst);
+                async move { (StatusCode::OK, payload) }
+            }),
+        );
+        let (address, _guard) = spawn_mock(app);
 
         let mut progress = Vec::new();
         download(&format!("http://{address}/app.zip"), &target, payload.len() as u64, |p| progress.push(p)).unwrap();
@@ -355,7 +376,7 @@ mod tests {
         // Exceeding declared max size is rejected.
         let oversized = dir.path().join("oversized.bin");
         assert!(download(&format!("http://{address}/app.zip"), &oversized, 4, |_| {}).is_err());
-        server.join().unwrap();
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
     }
 
     #[test]
