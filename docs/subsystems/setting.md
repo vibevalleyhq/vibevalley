@@ -33,7 +33,7 @@
 |---|---|---|
 | `VIBEVALLEY_CHANNEL` | 覆盖发布通道（`release`/`final`/`stable`、`beta`、`alpha`、`dev`，不区分大小写） | 见下表判定顺序 |
 | `VIBEVALLEY_HOME` | 家目录：`settings.json`、`config.json`、`server.db`、`server.json`、附件 | 按通道（`~/.vibevalley{,-beta,-alpha,-dev}`） |
-| `VIBEVALLEY_WORK_ROOT` | 空间：`repos/`、`worktrees/`、`pkm/` 的根，开机时建好 | `~/vibevalley-dev` |
+| `VIBEVALLEY_WORK_ROOT` | 空间：`repos/`、`worktrees/` 的根，开机时建好 | `~/vibevalley-dev` |
 | `VIBEVALLEY_PORT` | 主 HTTP 与 `/mcp` 的端口（只绑 `127.0.0.1`，`0` 随机）；显式非零端口冲突或非法值拒绝开机 | 按通道（`8787` / `8788` / `8789` / `8790`） |
 | `VIBEVALLEY_STORE` | 原生应用宿主库 `state.db` 路径（覆盖按通道默认路径） | 按通道（`~/Library/Application Support/VibeValley{,-beta,-alpha,-dev}/state.db`） |
 | `VIBEVALLEY_AGENT_STARTERS` | 新农场装在助手旁边的内置模板 ID，逗号分隔 | 空 |
@@ -61,8 +61,8 @@
 - **设置优先于启动配置**：DeepSeek 钥匙先取 `settings.json`，空的才用 `ServerConfig` 给的，保存后立刻生效。
 - **钥匙在内存里是 `Secret`**：`settings.json` 一次读成 `Stored`，钥匙封成 `Secret`，`Debug` 只出提示，只在真正发请求处 `expose()`；`setting.get` 只给来源（`settings`/`config`）和末四位。
 - **原子写、坏文件留底**：经临时文件改名写入，权限 `0600`；读不懂的文件改名为 `settings.json.bad`，从空设置开始。
-- **就绪状态由服务端算一份**：`status` 为每个功能（助手、生图、理解、语音、对白、音色设计、转写、听写、Live、Vision、电话）给出就绪或缺什么；连接的部分问 `Providers::readiness`。
-- **空间路径**：`SettingsStatus.paths` 给出 `repos`、`worktrees`、`pkm` 的绝对路径。
+- **就绪状态由服务端算一份**：`status` 为每个功能（助手、生图、理解、语音、对白、音色设计、转写、Live、Vision、电话）给出就绪或缺什么；连接的部分问 `Providers::readiness`。
+- **空间路径**：`SettingsStatus.paths` 给出 `repos`、`worktrees` 的绝对路径。
 - **语音设置只存差异**：`voice` 只存和默认值不同的项。
 - **设备本地外观与动画幅度独立于 `settings.json`**：主题、动画幅度（`Settings.motion`：`off | on | system`，默认 `system`）、界面缩放与终端字体属于单机宿主设置，存在 `state.db` 的 `app.settings` 中，在 `/settings/general` 外观分组经 `host.*`（含 `host.motion`）即时生效并同步到全部托管视图；环境变量 `VIBEVALLEY_NO_ANIMATION=1`（`1` 或 `true`）仅在当前进程将生效动画幅度强制覆盖为 `off`（供 UI 截图与测试使用，不改写用户设置），TSX 页面通过 `apps/mac/ui/design/motion.ts` 统一消费并由 `scripts/audit/ui-tokens.ts` 的 `unmanaged-motion` 规则守护（详见[客户端](docs/subsystems/app.md)）。
 

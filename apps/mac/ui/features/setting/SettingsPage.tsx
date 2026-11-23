@@ -46,7 +46,6 @@ const sections: readonly Section[] = [
   { id: "about", group: "about", icon: "info", label: t("web.setting.nav.about"), words: t("web.setting.words.about") },
 ];
 
-type VoiceTab = "call" | "moss" | "dictation";
 type ConnectionsTab = "chat" | "github" | "remote";
 
 function legacyRedirect(rest: string): string | undefined {
@@ -60,8 +59,7 @@ function legacyRedirect(rest: string): string | undefined {
       return "/settings/models";
     case "call":
     case "moss":
-    case "dictation":
-      return `/settings/voice/${first}`;
+      return "/settings/voice";
     case "chat":
       return tail ? `/settings/connections/chat/${tail}` : "/settings/connections/chat";
     case "github":
@@ -77,25 +75,11 @@ function legacyRedirect(rest: string): string | undefined {
   }
 }
 
-function VoiceSettings(props: { sub: string | undefined }) {
-  const router = useRouter();
-  const tab = (): VoiceTab => (props.sub === "moss" || props.sub === "dictation" ? props.sub : "call");
-  const features = () => (tab() === "moss" ? (["live", "vision"] as const) : tab() === "dictation" ? (["dictation"] as const) : (["call"] as const));
+function VoiceSettings() {
   return (
-    <Page title={t("web.setting.nav.voice")} hint={tab() === "moss" ? t("web.voice.moss.intro") : undefined}>
-      <Segmented
-        label={t("web.setting.nav.voice")}
-        testid="voice-subnav"
-        value={tab()}
-        options={[
-          { value: "call", label: t("web.setting.nav.call") },
-          { value: "moss", label: "MOSS Live" },
-          { value: "dictation", label: t("web.setting.nav.dictation") },
-        ]}
-        onChange={(v) => router.navigate(`/settings/voice/${v}`)}
-      />
-      <Readiness features={features()} />
-      <VoiceForm part="line" view={tab()} />
+    <Page title={t("web.setting.nav.voice")} hint={t("web.voice.moss.intro")}>
+      <Readiness features={["live", "vision", "call"]} />
+      <VoiceForm part="line" />
     </Page>
   );
 }
@@ -170,11 +154,10 @@ export function SettingsPage(props: { rest: string }) {
             <Readiness features={["orchestrator", "call"]} />
             <SettingsForm part="deepseek" />
             <ProviderModels />
-            <VoiceForm part="line" view="accounts" />
           </Page>
         );
       case "voice":
-        return <VoiceSettings sub={parts()[1]} />;
+        return <VoiceSettings />;
       case "connections":
         return <ConnectionsSettings sub={parts()[1]} id={connectorId()} />;
       default:

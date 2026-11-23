@@ -319,7 +319,6 @@ function classifyShot(name: string): { scenarios: string[]; views: string[] } {
   if (
     parts.includes("workspace") ||
     parts.includes("palette") ||
-    parts.includes("pkm") ||
     parts.includes("agents") ||
     parts.includes("orchestrator") ||
     parts.includes("repos") ||

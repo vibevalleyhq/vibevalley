@@ -155,7 +155,6 @@ impl Shell {
             "nav.issues" => self.navigate_workbench("/issues", cx),
             "nav.chat" => self.navigate_workbench("/chat", cx),
             "nav.content" | "nav.library" => self.navigate_workbench("/library", cx),
-            "nav.pkm" => self.navigate_workbench("/pkm", cx),
             "nav.team" | "nav.agents" => self.navigate_workbench("/agents", cx),
             "nav.runtimes" => self.navigate_workbench("/runtimes", cx),
             "nav.repos" => self.navigate_workbench("/repos", cx),

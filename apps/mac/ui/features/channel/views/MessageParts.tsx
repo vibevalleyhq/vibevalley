@@ -16,10 +16,11 @@ import { MoreMenu } from "../../../design/MoreMenu";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
-import { api, reasonOf } from "../../../infra/api";
+import { api, newSendKey, reasonOf } from "../../../infra/api";
 import { fileUrl, openAttachment, playAudio, useAttachmentFile } from "../../../infra/attachmentFile";
 import { hostApi } from "../../../infra/bridge";
 import { useCollabSlice } from "../../../infra/frame";
+import { formatGenUiAction, type VvGenUiActionEvent } from "../../../infra/rich";
 import { useRouter } from "../../../infra/router";
 import { createEffect } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
@@ -69,6 +70,18 @@ export function ReplyQuote(props: { channel: string; number: number }) {
 /** Past this height a message's words start folded: a helper's long report should not push the conversation away. */
 const foldPx = 360;
 
+/** Dispatches a GenUI action emitted inside a channel message: state edits show feedback; explicit actions post a reply. */
+export function handleChannelGenUiAction(m: Pick<ChatMessage, "channel" | "number">, event: VvGenUiActionEvent): void {
+  const action = event.action.trim();
+  const summary = formatGenUiAction(event);
+  if (!summary) return;
+  if (action === "state_change") {
+    toast(summary);
+    return;
+  }
+  void api.channel.message.send({ id: m.channel, text: summary, replyTo: m.number, sendKey: newSendKey() }).catch((e: unknown) => bad(reasonOf(e)));
+}
+
 export function MessageBody(props: { m: ChatMessage }) {
   const fold = signal<"short" | "folded" | "expanded">("short");
   const isFolded = () => fold() === "folded";
@@ -88,7 +101,7 @@ export function MessageBody(props: { m: ChatMessage }) {
               fold.set(!isLong ? "short" : prev === "short" ? "folded" : prev);
             }}
           >
-            <Markdown text={props.m.text} mentions />
+            <Markdown text={props.m.text} mentions onGenUiAction={(ev) => handleChannelGenUiAction(props.m, ev)} />
           </View>
         </View>
         <If when={fold() !== "short"}>

@@ -12,7 +12,6 @@ import { type IssueHandlers, issueEndpoints } from "./issue/api";
 import { type MediaHandlers, mediaEndpoints } from "./media/api";
 import { type MemoryHandlers, memoryEndpoints } from "./memory/api";
 import { type OrchestratorHandlers, orchestratorEndpoints } from "./orchestrator/api";
-import { type PkmHandlers, pkmEndpoints } from "./pkm/api";
 import { type ProviderHandlers, providerEndpoints } from "./provider/api";
 import { type RemoteHandlers, remoteEndpoints } from "./remote/api";
 import { type RepoHandlers, repoEndpoints } from "./repo/api";
@@ -43,7 +42,6 @@ export interface Handlers
     RuntimeHandlers,
     RepoHandlers,
     AgentHandlers,
-    PkmHandlers,
     MemoryHandlers,
     ConnectorHandlers,
     AttachmentHandlers {}
@@ -66,7 +64,6 @@ export const endpoints: readonly Endpoint[] = [
   ...runtimeEndpoints,
   ...repoEndpoints,
   ...agentEndpoints,
-  ...pkmEndpoints,
   ...memoryEndpoints,
   ...connectorEndpoints,
   ...attachmentEndpoints,

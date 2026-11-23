@@ -40,10 +40,6 @@ describe("ui-tokens guardrail", () => {
   });
 
   it("enforces narrow rule-specific exemptions without blanket-excluding the file", () => {
-    const outline = "apps/mac/ui/features/pkm/OutlineEditor.tsx";
-    const outlineFindings = scanUiTokens(outline, '<View role="checkbox" class="bg-[#112233]" style={{ color: "#abcdef" }} />');
-    expect(outlineFindings.map((f) => f.rule)).toEqual(["arbitrary-tailwind", "hardcoded-color"]);
-
     const connector = "apps/mac/ui/features/connector/ConnectorsPage.tsx";
     const connectorFindings = scanUiTokens(connector, '<View style={{ color: "#07c160" }} class="rounded-[9px]"><Switch checked /></View>');
     expect(connectorFindings.map((f) => f.rule)).toEqual(["arbitrary-tailwind", "raw-control"]);

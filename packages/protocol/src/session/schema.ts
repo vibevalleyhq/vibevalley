@@ -117,10 +117,6 @@ export const ContextRef = z.discriminatedUnion("kind", [
     kind: z.literal("artifact"),
     id: ArtifactId,
   }),
-  z.object({
-    kind: z.literal("pkm"),
-    path: z.string(),
-  }),
 ]) satisfies Codec<T.ContextRef>;
 
 const sessionFields = {

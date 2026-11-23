@@ -4,11 +4,13 @@
 
 ## Workflow
 
-1. **Create**: `artifact_create({ title, artifactType: "outline", content })` seeds an indented list tree, or omit `content` to start an empty outline.
+1. **Create or import**:
+   - Create fresh: `artifact_create({ title, artifactType: "outline", content })` seeds an indented list tree, or omit `content` to start empty.
+   - Import Markdown / Logseq notes: `artifact_outline_import({ markdown, title, filename })` (helpers may pass workspace `file`), parsing YAML frontmatter, `key:: value` properties, nested indentation, and `TODO`/`DOING`/`DONE`/`CANCELED` task items into an `outline` artifact.
 2. **Model hierarchy with parent/child blocks**:
+   - Inspect current nodes and `rev` via `artifact_block_list({ id })`; prefer `artifact_block_batch({ id, ops })` for multi-node `create` (with `tempId`), `update` (with `baseRev`), `move`, and `delete`, or use `artifact_block_create` / `update` / `delete` for single edits.
    - Use top-level nodes for themes or groups, `parentId` for nested children, and `afterBlock` for sibling ordering.
-   - Prefer `bulleted` for points and `todo` (with `checked`) for actionable items.
-   - Edit surgically via `artifact_block_create`, `artifact_block_update` (with `baseRev`), and `artifact_block_delete` rather than rewriting the whole outline.
+   - Prefer `bulleted` for points and `todo` (with `checked`) for actionable items; embed `type: "code"` with `language: "chart"` or `"genui"` when a branch needs a native chart or interactive calculator.
 3. **Respect user-authored nodes**: Agent edits to nodes written by the user become tracked suggestions for approval.
 
 ## Craft

@@ -3,6 +3,7 @@ import { Scroll, signal, Text, untracked, View, windowSize } from "nsh";
 import { t } from "@vibevalley/i18n";
 
 import { createAct } from "../../design/act";
+import { Button } from "../../design/Button";
 import { Dialog } from "../../design/Dialog";
 import { SearchField } from "../../design/Field";
 import { Icon } from "../../design/Icon";
@@ -13,7 +14,7 @@ import { mix } from "../../design/tone";
 import { spelled } from "../../infra/base/search";
 import { ready, useQueryClient } from "../../infra/query";
 import { useRouter } from "../../infra/router";
-import { useArtifacts } from "../artifact";
+import { openOutlineImport, useArtifacts } from "../artifact";
 import { closeTemplatePicker, type TemplateCategory, templatePickerState } from "./navigation";
 import { CONTENT_TEMPLATES, type ContentTemplate, createFromTemplate, TEMPLATE_CATEGORIES, templateDesc, templateName } from "./templates";
 
@@ -72,6 +73,19 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
             label: t(`web.library.content.templates.cat.${c}`),
           }))}
         />
+        <View class="ml-auto">
+          <Button
+            icon="upload"
+            size="compact"
+            testID="content-template-import-md"
+            onPress={() => {
+              closeTemplatePicker();
+              openOutlineImport();
+            }}
+          >
+            {t("web.artifact.outline.importAction")}
+          </Button>
+        </View>
       </View>
 
       <Scroll style={{ maxHeight: Math.max(280, windowSize().height * 0.62) }} contentClass="pb-1">

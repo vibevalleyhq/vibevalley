@@ -6,26 +6,9 @@ import type { TextViewClasses, TextViewLinks, TextViewStyles } from "nsh/base";
 
 import { setTranslator } from "@vibevalley/i18n";
 
-export interface BlockRefPayload {
-  block: string;
-  body?: string | null;
-  page?: string | null;
-  pageTitle?: string | null;
-  found?: boolean;
-}
-
-export interface VvBlockRefPressEvent {
-  id: string;
-  page?: string | null;
-}
-
 export interface VvCodeCopyEvent {
   code: string;
   language?: string | null;
-}
-
-export interface VvEmbedPressEvent {
-  target: string;
 }
 
 export interface VvGenUiActionEvent {
@@ -51,12 +34,16 @@ export interface VvTaskPressEvent {
   checked: boolean;
 }
 
-export interface VvWikilinkPressEvent {
-  page: string;
-  label: string;
-}
-
 export type VvMarkdownSize = "base" | "sm" | "doc";
+
+/** Formats a GenUI action event into a concise human-readable line for toasts or channel feedback. */
+export function formatGenUiAction(event: VvGenUiActionEvent): string {
+  const action = event.action.trim();
+  const payload = event.payload.trim();
+  if (action === "state_change") return payload;
+  if (!action) return payload;
+  return payload ? `${action}: ${payload}` : action;
+}
 
 export interface VvCanvasProps extends ComponentHostProps {
   data: string;
@@ -101,8 +88,6 @@ export interface VvMarkdownProps extends ComponentHostProps {
   size?: VvMarkdownSize;
   baseDir?: string | null;
   mentions?: boolean;
-  pkm?: boolean;
-  refs?: readonly BlockRefPayload[];
   streaming?: boolean;
   selectable?: boolean;
   links?: TextViewLinks;
@@ -111,9 +96,6 @@ export interface VvMarkdownProps extends ComponentHostProps {
   onLinkPress?: (event: VvLinkPressEvent) => void;
   onIssuePress?: (event: VvIssuePressEvent) => void;
   onMentionPress?: (event: VvMentionPressEvent) => void;
-  onWikilinkPress?: (event: VvWikilinkPressEvent) => void;
-  onBlockRefPress?: (event: VvBlockRefPressEvent) => void;
-  onEmbedPress?: (event: VvEmbedPressEvent) => void;
   onTaskPress?: (event: VvTaskPressEvent) => void;
   onCodeCopy?: (event: VvCodeCopyEvent) => void;
   onGenUiAction?: (event: VvGenUiActionEvent) => void;

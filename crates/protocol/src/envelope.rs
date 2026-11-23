@@ -77,8 +77,6 @@ biz_codes! {
     GameRefused = 500006 => 409, Refused, false;
     ArtifactNotFound = 600001 => 404, Missing, false;
     ArtifactRefused = 600002 => 409, Refused, false;
-    PkmNotFound = 600003 => 404, Missing, false;
-    PkmRefused = 600004 => 409, Refused, false;
     MemoryNotFound = 600005 => 404, Missing, false;
     MemoryRefused = 600006 => 409, Refused, false;
     LibraryNotFound = 600007 => 404, Missing, false;
@@ -86,7 +84,6 @@ biz_codes! {
     AttachmentRefused = 600009 => 409, Refused, false;
     VoiceUnavailable = 700001 => 503, VoiceUnavailable, false;
     VoiceCallFailed = 700002 => 502, VoiceCallFailed, true;
-    VoiceRefused = 700003 => 409, Refused, false;
     MediaNotFound = 700004 => 404, Missing, false;
     MediaRefused = 700005 => 409, Refused, false;
     ProviderRefused = 700006 => 409, Refused, false;
@@ -131,9 +128,7 @@ pub struct BizCodeMeta {
 #[serde(rename_all = "snake_case")]
 pub enum VoiceFix {
     Models,
-    Call,
     Moss,
-    Dictation,
 }
 
 /// What to do about a failure: words to say and commands to run.

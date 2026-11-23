@@ -1,6 +1,6 @@
 # AI 服务
 
-用户在「设置 → AI 服务」保存供应商连接（现在只有 MOSS），为每个用途（听写、生图、媒体理解、单人语音、多人对白、音色设计、长音频转写、Live、Vision）选连接和模型；用途可以共用一个账号，也可以各用各的。除 `vision` 尚未接入外，其余八种用途均已由[媒体与素材库](docs/subsystems/media.md)与[语音](docs/subsystems/voice.md)调用。
+用户在「设置 → AI 服务」保存供应商连接（现在只有 MOSS），为每个用途（生图、媒体理解、单人语音、多人对白、音色设计、长音频转写、Live、Vision）选连接和模型；用途可以共用一个账号，也可以各用各的。除 `vision` 尚未接入外，其余七种用途均已由[媒体与素材库](docs/subsystems/media.md)与[语音](docs/subsystems/voice.md)调用。
 
 ## 管什么，不管什么
 
@@ -16,7 +16,7 @@ DeepSeek（助手的对话模型）的钥匙在设置里，不是连接。
 
 | 位置 | 职责 |
 |---|---|
-| `crates/server/src/modules/infra/provider.rs` | `Provider`：`status`、`update`（`connections_over` 把更新叠到当前配置上，不对就拒）、`models`、`voices`；`Use` 是九个用途的闭集，各带自己的模型列表；`Providers::account` 给用的地方一个账号（连接、revision、模型、钥匙） |
+| `crates/server/src/modules/infra/provider.rs` | `Provider`：`status`、`update`（`connections_over` 把更新叠到当前配置上，不对就拒）、`models`、`voices`；`Use` 是八个用途的闭集，各带自己的模型列表；`Providers::account` 给用的地方一个账号（连接、revision、模型、钥匙） |
 | `crates/server/src/modules/content/media/vendor.rs` | MOSS 的 HTTP 调用（生图、语音、文件、理解），响应进门即解码 |
 | `crates/protocol/src/contract/provider.rs`、`packages/protocol/src/provider/` | 公共形状和接口（Rust 为源，TS 形状由它生成） |
 | `apps/mac/ui/features/provider/` | `/settings/models` 的连接与默认用途表单 |
@@ -25,7 +25,7 @@ DeepSeek（助手的对话模型）的钥匙在设置里，不是连接。
 
 ## 模型和不变量
 
-- **配置只有一份**：`settings.json` 的 `providers` 存 `revision`、`connections` 和九个用途的绑定；读进来是 `Providers`/`Connection` 结构体，钥匙是 `Secret`（打印只出末四位）。连接有稳定 ID、名称、`adapter`、开关和钥匙，最多 32 条。
+- **配置只有一份**：`settings.json` 的 `providers` 存 `revision`、`connections` 和八个用途的绑定；读进来是 `Providers`/`Connection` 结构体，钥匙是 `Secret`（打印只出末四位）。连接有稳定 ID、名称、`adapter`、开关和钥匙，最多 32 条。
 - **整组修改检查版本**：请求带读到的 `revision`，对不上就拒；写盘失败不改内存和版本。
 - **钥匙更新三个动作**：省略 `key` 保留，非空字符串替换，`null` 清除。
 - **用途引用有效连接**：绑定的连接必须存在、开着、有钥匙；删、停、清钥匙时用户要在同一次修改里改绑，服务端不自动换账号。

@@ -14,11 +14,9 @@ import { Bubble } from "../../../design/Tip";
 import { useOrchestrators, useWorkAgents } from "../../../infra/agents";
 import { api } from "../../../infra/api";
 import { useBoardSlice, useCollabSlice, useSessionsSlice } from "../../../infra/frame";
-import { ready } from "../../../infra/query";
 import { useRouter } from "../../../infra/router";
 import { createMemo } from "../../../infra/solid";
 import { defineAtom } from "../../../infra/state/atom";
-import { notesSearch, noteTargets, pkmHref, usePkmVault } from "../../pkm";
 import { chatPath, type SwitchTarget, switchTargets } from "../model/places";
 import { Count, HelperFace } from "./presence";
 
@@ -54,9 +52,7 @@ function SwitcherBody(props: { onClose: () => void }) {
   const profiles = useWorkAgents();
   const orchestrators = useOrchestrators();
   const query = signal("");
-  const vault = usePkmVault();
   const grouped = createMemo(() => {
-    const typed = query().trim();
     const chat = switchTargets(collab()?.chat, query(), {
       issues: board()?.issues ?? [],
       sessions: sessions()?.sessions ?? [],
@@ -66,22 +62,10 @@ function SwitcherBody(props: { onClose: () => void }) {
     const channels = chat.filter((s) => s.kind === "channel");
     const threads = chat.filter((s) => s.kind === "thread");
     const directs = chat.filter((s) => s.kind === "direct" || s.kind === "profile");
-    const notes = noteTargets(ready(vault, undefined)?.pages ?? [], typed).map((n): SwitchTarget => ({
-      kind: "note",
-      id: n.slug,
-      label: n.label,
-      hint: t("web.channel.switcher.note", { tier: t(`web.pkm.tier.${n.tier}`) }),
-      unread: 0,
-      at: 0,
-    }));
-    const searchNotes: SwitchTarget[] = typed
-      ? [{ kind: "notes", id: typed, label: t("web.channel.switcher.searchNotes", { q: typed }), hint: "", unread: 0, at: 0 }]
-      : [];
     return [
       ...channels.map((target) => ({ target, group: t("web.channel.channelsTitle") })),
       ...threads.map((target) => ({ target, group: t("web.channel.thread") })),
       ...directs.map((target) => ({ target, group: t("web.channel.directsTitle") })),
-      ...[...notes, ...searchNotes].map((target) => ({ target, group: t("web.pkm.place.label") })),
     ];
   });
   const byId = createMemo(() => new Map(grouped().map((item) => [keyOf(item.target), item.target])));
@@ -90,8 +74,6 @@ function SwitcherBody(props: { onClose: () => void }) {
   const act = createAct();
   const go = (to: SwitchTarget) => {
     untracked(() => props.onClose)();
-    if (to.kind === "note") return router.navigate(pkmHref(to.id));
-    if (to.kind === "notes") return notesSearch.open(to.id);
     if (to.kind !== "profile") return router.navigate(chatPath(channelOf(untracked(collab)?.chat, to.id)));
     const agent = to.id;
     void act.run(async () => router.navigate(`/chat/${await api.channel.direct.create({ agent })}`));
@@ -189,12 +171,6 @@ function SwitcherBody(props: { onClose: () => void }) {
                     </If>
                   )}
                 </If>
-              </If>
-              <If when={target()?.kind === "note"}>
-                <Icon name="notes" size={14} tone="muted" />
-              </If>
-              <If when={target()?.kind === "notes"}>
-                <Icon name="search" size={14} tone="accent" />
               </If>
             </View>
             <Text class={`min-w-0 flex-1 truncate text-sm text-ink ${(target()?.unread ?? 0) > 0 ? "font-semibold" : "font-normal"}`}>{label()}</Text>

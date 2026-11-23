@@ -82,7 +82,7 @@ fn code_words() -> &'static Regex {
 /// Words in lower case, in order of appearance, each once: Chinese words of
 /// two or more characters (search cut, then every dictionary word), then
 /// Latin, numbers and code whole (`db/migrations`, `v1.2.3`).
-pub fn terms_list(text: &str) -> Vec<String> {
+fn terms_list(text: &str) -> Vec<String> {
     let mut seen = HashSet::new();
     let mut out = vec![];
     let stop = stopwords();

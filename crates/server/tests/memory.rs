@@ -103,7 +103,6 @@ fn regression_replacing_an_agents_notes_rolls_back_the_entire_set() {
     let server = vibevalley_server::start(vibevalley_server::ServerConfig {
         probe_runtimes: false,
         tick_crons: false,
-        watch_pkm: false,
         link_previews: false,
         ..vibevalley_server::ServerConfig::under(home.path())
     })

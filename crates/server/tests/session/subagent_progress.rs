@@ -70,7 +70,6 @@ fn open(home: &Path) -> Started {
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
-        watch_pkm: false,
         ..ServerConfig::under(home)
     })
     .unwrap()

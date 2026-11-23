@@ -2,26 +2,24 @@
 //! batches of ops in one transaction each, one batch at a time; a batch
 //! sent again gets its first answer; the text by rev that a stale update is
 //! merged against; suggestions on a block the user wrote; followers of
-//! the batches and of the suggestions; the scripted demo.
+//! the batches and of the suggestions.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::Ordering;
 
 use sqlx::SqliteConnection;
-use vibevalley_core::artifact::{Page, blocks_of_markdown, inline_spans, markdown_of, ordered, plain, unmarked};
+use vibevalley_core::artifact::{MdBlock, Page, blocks_of_markdown, inline_spans, markdown_of, ordered, plain, unmarked};
 use vibevalley_core::collab::{CommitMeta, SuggestionSpan, coalesce_suggestions};
 use vibevalley_core::rules::key_between;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    Agent, ApiError, ArtifactEvent, Block, BlockAck, BlockAttrs, BlockCreate, BlockDelete, BlockInput, BlockOp, BlockOpDeleteBlock, BlockOpInsertBlock,
-    BlockOpResult, BlockOpSetAttrs, BlockOpSetType, BlockOpStatus, BlockOpUpdateText, BlockType, BlockUpdate, Preview, Suggestion, SuggestionChange,
-    SuggestionCreate, SuggestionEvent, SuggestionEventKind, SuggestionStatus, TextSpan, USER_ID,
+    ApiError, ArtifactEvent, Block, BlockAck, BlockAttrs, BlockCreate, BlockDelete, BlockInput, BlockOp, BlockOpDeleteBlock, BlockOpInsertBlock,
+    BlockOpMoveBlock, BlockOpResult, BlockOpSetAttrs, BlockOpSetType, BlockOpStatus, BlockOpUpdateText, BlockType, BlockUpdate, Preview, Suggestion,
+    SuggestionChange, SuggestionCreate, SuggestionEvent, SuggestionEventKind, SuggestionStatus, TextSpan, USER_ID,
 };
 
 use super::collab::commit_meta_for_actor;
 use super::db::{self, ArtifactRow, ChangeRow, StoredSuggestion};
 use super::{Artifacts, Change, new_id, q, refused};
-use crate::base::LookIn;
 use crate::{Sink, now};
 
 /// How long a batch is kept to answer it again, and a block's text to
@@ -30,7 +28,6 @@ pub const KEPT_DAYS: i64 = 30;
 pub const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 const CATCH_UP_MAX: usize = 200;
 const SUGGESTIONS_LISTED: i64 = 500;
-pub const DEMO_TICK_MS: u64 = 1000;
 
 const APPEND_TYPES: [BlockType; 7] = [
     BlockType::Paragraph,
@@ -324,27 +321,6 @@ impl Artifacts {
         self.changes.lock().retain(|tx| tx.send(change.clone()).is_ok());
     }
 
-    fn one(ack: BlockAck, block: &str) -> (Option<Block>, Option<BlockOpResult>) {
-        let b = ack.blocks.iter().find(|b| b.id == block).cloned();
-        (b, ack.results.into_iter().next())
-    }
-
-    /// `updateText`: a block's whole text, as `actor`.
-    fn update_text(&self, artifact: &str, actor: &str, block: &str, base_rev: i64, text: &str) -> Result<(Option<Block>, Option<BlockOpResult>), ApiError> {
-        let _batches = self.batches.lock();
-        let kind = self
-            .blocks_of(artifact)?
-            .into_iter()
-            .find(|b| b.id == block)
-            .map_or(BlockType::Paragraph, |b| b.r#type);
-        let op = BlockOp::UpdateText(BlockOpUpdateText {
-            block_id: block.into(),
-            base_rev,
-            text: spans_of(kind, text),
-        });
-        Ok(Self::one(self.submit_locked(artifact, actor, &new_id(), vec![op], None)?, block))
-    }
-
     pub fn insert_block(&self, artifact: &str, actor: &str, req: &BlockCreate) -> Result<BlockOpResult, ApiError> {
         self.insert_block_inner(artifact, actor, req, None)
     }
@@ -482,6 +458,57 @@ impl Artifacts {
             None => self.submit(artifact, actor, &new_id(), ops)?,
         };
         ack.results.into_iter().last().ok_or_else(|| refused(t("server.artifact.notApplied", &[])))
+    }
+
+    pub fn move_block_with_meta(
+        &self,
+        artifact: &str,
+        actor: &str,
+        block: &str,
+        parent_id: Option<&str>,
+        after_block: Option<&str>,
+        meta: &CommitMeta,
+    ) -> Result<BlockOpResult, ApiError> {
+        self.found_blocks(&mut self.db(), artifact)?;
+        let block_id = block.trim().to_string();
+        let _batches = self.batches.lock();
+        let page = Page::new(artifact, actor, 0, &self.blocks_of(artifact)?);
+        let Some(existing) = page.find(&block_id) else {
+            return Err(refused(t("server.artifact.op.noBlock", &[("id", block_id.as_str().into())])));
+        };
+        if existing.deleted == Some(true) {
+            return Err(refused(t("server.artifact.op.noBlock", &[("id", block_id.as_str().into())])));
+        }
+        let parent = parent_id.map(str::trim).unwrap_or("").to_string();
+        if !parent.is_empty() {
+            let Some(b) = page.find(&parent) else {
+                return Err(refused(t("server.artifact.op.noBlock", &[("id", parent.as_str().into())])));
+            };
+            if b.deleted == Some(true) {
+                return Err(refused(t("server.artifact.parentDeleted", &[("id", parent.as_str().into())])));
+            }
+        }
+        let siblings: Vec<_> = page.children(&parent).into_iter().filter(|b| b.id != block_id).collect();
+        let (after, before) = match after_block {
+            None => (siblings.last().map(|b| b.order_key.clone()).unwrap_or_default(), String::new()),
+            Some("") => (String::new(), siblings.first().map(|b| b.order_key.clone()).unwrap_or_default()),
+            Some(id) => {
+                let Some(at) = siblings.iter().position(|b| b.id == id) else {
+                    return Err(refused(t("server.artifact.afterNotSibling", &[("id", id.into())])));
+                };
+                (
+                    siblings[at].order_key.clone(),
+                    siblings.get(at + 1).map(|b| b.order_key.clone()).unwrap_or_default(),
+                )
+            }
+        };
+        let op = BlockOp::MoveBlock(BlockOpMoveBlock {
+            block_id,
+            parent_id: (!parent.is_empty()).then_some(parent),
+            order_key: key_or_refuse(&after, &before)?,
+        });
+        let ack = self.submit_locked(artifact, actor, &new_id(), vec![op], Some(meta))?;
+        ack.results.into_iter().next().ok_or_else(|| refused(t("server.artifact.notApplied", &[])))
     }
 
     pub fn delete_block(&self, artifact: &str, actor: &str, req: &BlockDelete) -> Result<BlockOpResult, ApiError> {
@@ -861,10 +888,22 @@ impl Artifacts {
         actor: &str,
         meta: &CommitMeta,
     ) -> Result<Option<BlockAck>, ApiError> {
+        self.fill_md_blocks_with_meta(db, id, blocks_of_markdown(markdown), actor, meta)
+    }
+
+    /// Inserts pre-parsed Markdown blocks as one atomic batch.
+    pub(super) fn fill_md_blocks_with_meta(
+        &self,
+        db: &mut SqliteConnection,
+        id: &str,
+        blocks: Vec<MdBlock>,
+        actor: &str,
+        meta: &CommitMeta,
+    ) -> Result<Option<BlockAck>, ApiError> {
         let mut parents: Vec<String> = vec![];
         let mut last: HashMap<String, String> = HashMap::new();
         let mut ops = vec![];
-        for b in blocks_of_markdown(markdown) {
+        for b in blocks {
             parents.truncate(b.depth);
             let parent = if b.depth > 0 { parents.get(b.depth - 1).cloned() } else { None };
             let slot = parent.clone().unwrap_or_default();
@@ -889,154 +928,6 @@ impl Artifacts {
         let (ack, _) = self.apply_batch(db, id, actor, &new_id(), &ops, Some(meta))?;
         Ok(Some(ack))
     }
-
-    fn wait(&self, ticks: f64) -> Result<(), ApiError> {
-        let jitter = 1.0 + vibevalley_core::artifact::html::DEMO_JITTER * (2.0 * rand_unit() - 1.0);
-        let mut left = (ticks * jitter * self.demo_tick_ms.load(Ordering::Relaxed) as f64) as i64;
-        while left > 0 {
-            if self.closed.load(Ordering::Relaxed) {
-                return Err(ApiError::new(vibevalley_protocol::BizCode::ServiceUnavailable, "stopped"));
-            }
-            let step = left.min(50);
-            std::thread::sleep(std::time::Duration::from_millis(step as u64));
-            left -= step;
-        }
-        Ok(())
-    }
-
-    /// Inserts at the end of the top level, or at the end of a section; the
-    /// key is picked under the batch lock, so two writers cannot pick the
-    /// same place.
-    fn demo_insert(&self, artifact: &str, writer: &str, mut b: BlockInput, at: Option<(&[String], usize)>) -> Result<i64, ApiError> {
-        let _batches = self.batches.lock();
-        let all = self.blocks_of(artifact)?;
-        let page = Page::new(artifact, writer, 0, &all);
-        let top = page.children("");
-        let mut after = top.last().map(|x| x.order_key.clone()).unwrap_or_default();
-        let mut before = String::new();
-        if let Some((headings, section)) = at
-            && section + 1 < headings.len()
-            && let Some(i) = top.iter().position(|x| x.id == headings[section + 1])
-        {
-            before = top[i].order_key.clone();
-            after = if i > 0 { top[i - 1].order_key.clone() } else { String::new() };
-        }
-        b.order_key = key_or_refuse(&after, &before)?;
-        let id = b.id.clone();
-        let ack = self.submit_locked(artifact, writer, &new_id(), vec![BlockOp::InsertBlock(BlockOpInsertBlock { block: b })], None)?;
-        let status = ack.results.first().map(|r| r.status);
-        let not_inserted = |s: &str| refused(t("server.artifact.demoNotInserted", &[("status", s.into())]));
-        if status != Some(BlockOpStatus::Applied) {
-            return Err(not_inserted(status.map_or("missing", BlockOpStatus::as_str)));
-        }
-        ack.blocks.iter().find(|x| x.id == id).map(|x| x.rev).ok_or_else(|| not_inserted("applied"))
-    }
-
-    fn demo_write(&self, artifact: &str, writer: &str, headings: &[String], section: usize) -> Result<(), ApiError> {
-        for p in 0..3 {
-            let text = t(&format!("server.artifact.demo.{section}.paragraphs.{p}"), &[]);
-            let b = BlockInput {
-                id: new_id(),
-                parent_id: None,
-                order_key: String::new(),
-                r#type: BlockType::Paragraph,
-                attrs: BlockAttrs::default(),
-                text: vec![],
-            };
-            let id = b.id.clone();
-            let mut rev = self.demo_insert(artifact, writer, b, Some((headings, section)))?;
-            let chars: Vec<char> = text.chars().collect();
-            let pieces = vibevalley_core::artifact::html::DEMO_PIECES;
-            for n in 1..=pieces {
-                self.wait(1.0)?;
-                let upto: String = chars[..chars.len() * n / pieces].iter().collect();
-                let (_, r) = self.update_text(artifact, writer, &id, rev, &upto)?;
-                match r {
-                    Some(r) if r.status == BlockOpStatus::Applied => rev = r.rev.unwrap_or(rev),
-                    _ => break,
-                }
-            }
-            self.wait(0.8)?;
-        }
-        Ok(())
-    }
-
-    fn run_demo(self: &std::sync::Arc<Self>, artifact: &str, writers: &[(String, usize)]) -> Result<(), ApiError> {
-        let mut headings = vec![];
-        for (writer, section) in writers {
-            let b = BlockInput {
-                id: new_id(),
-                parent_id: None,
-                order_key: String::new(),
-                r#type: BlockType::Heading,
-                attrs: BlockAttrs {
-                    level: Some(2),
-                    ..BlockAttrs::default()
-                },
-                text: spans_of(BlockType::Heading, &t(&format!("server.artifact.demo.{section}.heading"), &[])),
-            };
-            headings.push(b.id.clone());
-            self.demo_insert(artifact, writer, b, None)?;
-            self.wait(0.5)?;
-        }
-        let results: Vec<Result<(), ApiError>> = std::thread::scope(|s| {
-            let jobs: Vec<_> = writers
-                .iter()
-                .map(|(writer, section)| {
-                    let headings = &headings;
-                    s.spawn(move || {
-                        self.wait(*section as f64 / 3.0)?;
-                        self.demo_write(artifact, writer, headings, *section)
-                    })
-                })
-                .collect();
-            jobs.into_iter().map(|j| j.join().unwrap_or(Ok(()))).collect()
-        });
-        results.into_iter().collect()
-    }
-
-    /// `demo`: up to three helpers write their own sections at once; returns
-    /// at once.
-    pub fn demo(self: &std::sync::Arc<Self>, id: &str, helpers: &[Agent]) -> Result<(), ApiError> {
-        self.found_blocks(&mut self.db(), id)?;
-        let writers: Vec<(String, usize)> = helpers
-            .iter()
-            .filter(|a| a.enabled)
-            .take(3)
-            .enumerate()
-            .map(|(section, a)| (a.id.clone(), section))
-            .collect();
-        if writers.is_empty() {
-            return Err(refused(t("server.artifact.noWriter", &[])).with_next(vec![LookIn::Agent.next()]));
-        }
-        if self.demo_on.swap(true, Ordering::SeqCst) {
-            return Err(refused(t("server.artifact.demoRunning", &[])));
-        }
-        let me = self.clone();
-        let id = id.to_string();
-        std::thread::Builder::new()
-            .name("vibevalley-artifact-demo".into())
-            .spawn(move || {
-                // A demo that stops part way only leaves fewer blocks; stopped with the server, it says nothing.
-                if let Err(e) = me.run_demo(&id, &writers)
-                    && !me.closed.load(Ordering::Relaxed)
-                {
-                    eprintln!("vibevalley-server: artifact: the demo stopped: {}", e.message);
-                }
-                me.demo_on.store(false, Ordering::SeqCst);
-            })
-            .map_err(crate::base::internal)?;
-        Ok(())
-    }
-
-    pub fn demo_running(&self) -> bool {
-        self.demo_on.load(Ordering::SeqCst)
-    }
-}
-
-/// `Math.random()` enough for the demo's jitter.
-fn rand_unit() -> f64 {
-    (uuid::Uuid::new_v4().as_u128() % 1_000_000) as f64 / 1_000_000.0
 }
 
 pub(super) fn relay<T, E: serde::Serialize>(rx: &flume::Receiver<T>, sink: &Sink, keep: impl Fn(T) -> Option<E>) {

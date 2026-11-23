@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use vibevalley_runtime::agent::core::engine::{BrainProvider, Request};
 use vibevalley_runtime::agent::core::pipeline::Transcript;
 use vibevalley_runtime::agent::durable::{Error, Result, Scheduler, Store, SubmissionStatus, Task, TaskStatus};
-use vibevalley_runtime::agent::extensions::budget::{BUDGET_SIGNAL, BudgetExtension, set_budget};
+use vibevalley_runtime::agent::extensions::budget::BudgetExtension;
 use vibevalley_runtime::agent::extensions::governance::{self, GovernanceExtension, Permissions};
 use vibevalley_runtime::agent::extensions::grader::{GraderExtension, OutcomeReview, ReviewProvider, ReviewRequest, Rubric};
 use vibevalley_runtime::agent::extensions::subagent::SubagentExtension;
@@ -220,39 +220,6 @@ impl Execution {
             },
         )
         .map_err(approval_error)
-    }
-
-    pub(crate) fn raise_budget(&self, input: Value) -> vibevalley_protocol::Envelope {
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct Raise {
-            #[serde(default)]
-            conversation_id: String,
-            #[serde(default)]
-            task_id: String,
-            new_max_cost_micros: i64,
-        }
-        let result = (|| -> Result<Value> {
-            let p: Raise = serde_json::from_value(input)?;
-            let (conv, task) = self.store().read(|tx| {
-                let conv = if p.conversation_id.is_empty() {
-                    tx.task(&p.task_id)?.conversation_id
-                } else {
-                    p.conversation_id
-                };
-                let task = if !p.task_id.is_empty() {
-                    Some(p.task_id)
-                } else {
-                    tx.tasks_by_conversation(&conv)?
-                        .into_iter()
-                        .find(|t| t.status == TaskStatus::Sleeping && t.wait_signal_name == BUDGET_SIGNAL)
-                        .map(|t| t.id)
-                };
-                Ok((conv, task))
-            })?;
-            Ok(json!(set_budget(self.store(), &self.scheduler, &conv, task.as_deref(), p.new_max_cost_micros)?))
-        })();
-        envelope(result)
     }
 
     pub(super) fn enqueue(&self, profile: &str, input: &Input) -> Result<()> {
@@ -473,11 +440,4 @@ fn approval_error(error: Error) -> ApiError {
         Error::Commit(_) | Error::Sql(_) | Error::Json(_) => BizCode::InternalError,
     };
     ApiError::new(code, error.to_string())
-}
-
-fn envelope(result: Result<Value>) -> vibevalley_protocol::Envelope {
-    match result {
-        Ok(v) => vibevalley_protocol::Envelope::ok(v),
-        Err(e) => crate::transport::api::refusal(vibevalley_protocol::BizCode::Refused, e.to_string()),
-    }
 }

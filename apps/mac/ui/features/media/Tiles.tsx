@@ -1,7 +1,7 @@
 import { effect, Image, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { Artifact, LibraryItem, MediaJob, PkmPageSummary } from "@vibevalley/protocol";
+import type { Artifact, LibraryItem, MediaJob } from "@vibevalley/protocol";
 
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
@@ -10,7 +10,6 @@ import { useAttachmentUrl } from "../../infra/attachmentFile";
 import { useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
 import { artifactIcon, artifactSuffix, kindLabel } from "../artifact";
-import { titleFor } from "../pkm/days";
 import { durationText, extOf, justify, kindOf, type Placed } from "./items";
 
 export interface Seen {
@@ -226,62 +225,6 @@ function Tile(props: {
         </If>
       </View>
       <Text class={`pt-1.5 truncate text-xs font-medium ${props.picked ? "text-ink" : "text-muted"}`}>{file().name}</Text>
-    </View>
-  );
-}
-
-export function NoteTiles(props: {
-  notes: readonly PkmPageSummary[];
-  onOpen: (slug: string) => void;
-  isPinned: (slug: string) => boolean;
-  onTogglePin: (slug: string) => void;
-}) {
-  const now = useNow();
-  return (
-    <View testID="library-notes" class="flex-row flex-wrap gap-3">
-      <Each of={props.notes} key={(n) => n.slug}>
-        {(n) => {
-          const pinned = () => props.isPinned(n().slug);
-          const displayTitle = () => titleFor(n().title, n().day);
-          return (
-            <View
-              role="button"
-              testID={`library-note-${n().slug}`}
-              accessibilityLabel={displayTitle()}
-              tooltip={<Bubble text={displayTitle()} />}
-              onPress={() => props.onOpen(n().slug)}
-              class="group relative w-56 shrink-0 gap-2.5 rounded-lg border border-line bg-page p-3 hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
-            >
-              <View class="flex-row items-start gap-2.5">
-                <View class="size-8 shrink-0 items-center justify-center rounded-md bg-side">
-                  <Icon name={n().day ? "calendar" : "notes"} size={16} tone="muted" />
-                </View>
-                <View class="min-w-0 flex-1 gap-0.5">
-                  <View class="h-5 items-center justify-center self-start rounded-sm bg-side px-1.5">
-                    <Text class="text-2xs font-medium text-ink">{t("web.library.content.notes")}</Text>
-                  </View>
-                  <If when={n().day}>{(day) => <Text class="truncate font-mono text-2xs text-faint">{day()}</Text>}</If>
-                </View>
-                <CardPinButton testid={`library-note-pin-${n().slug}`} pinned={pinned()} onToggle={() => props.onTogglePin(n().slug)} />
-              </View>
-              <View class="gap-1">
-                <Text class="truncate text-sm font-semibold text-ink">{displayTitle()}</Text>
-                <If when={n().tldr.trim() !== ""}>
-                  <Text class="truncate text-xs text-muted">{n().tldr.trim()}</Text>
-                </If>
-              </View>
-              <View class="flex-row items-center justify-between gap-2">
-                <Text class="min-w-0 flex-1 truncate text-xs text-faint">{ago(n().updated, now())}</Text>
-                <If when={n().open > 0}>
-                  <View testID={`library-note-todo-${n().slug}`} class="h-5 shrink-0 items-center justify-center rounded-sm bg-warn-soft px-1.5">
-                    <Text class="text-2xs font-medium text-warn-ink tabular-nums">{t("web.library.content.notesTodoCount", { n: n().open })}</Text>
-                  </View>
-                </If>
-              </View>
-            </View>
-          );
-        }}
-      </Each>
     </View>
   );
 }

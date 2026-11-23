@@ -41,7 +41,7 @@ fn spawn_server() -> TestServer {
         "reviewer",
     ];
     let work = dir.path().join("work");
-    for subdir in ["repos", "worktrees", "pkm"] {
+    for subdir in ["repos", "worktrees"] {
         std::fs::create_dir_all(work.join(subdir)).unwrap();
     }
     let started = vibevalley_server::start(vibevalley_server::ServerConfig {
@@ -52,7 +52,6 @@ fn spawn_server() -> TestServer {
         tick_crons: false,
         link_previews: false,
         orchestrator_listens: false,
-        watch_pkm: false,
         offline_media: true,
         ..vibevalley_server::ServerConfig::under(dir.path().join("home"))
     })
@@ -175,15 +174,6 @@ const COMMANDS: &[&str] = &[
     "orchestrator approval resolve",
     "orchestrator open",
     "orchestrator stop",
-    "pkm capture",
-    "pkm journal show",
-    "pkm page export",
-    "pkm page list",
-    "pkm page rename",
-    "pkm page save",
-    "pkm page show",
-    "pkm search",
-    "pkm undo",
     "repo create",
     "repo list",
     "repo pr submit",
@@ -528,33 +518,12 @@ fn content_domain_artifacts_entries_attachments_library_media_and_channel_flags(
 }
 
 #[test]
-fn pkm_clean_surface_agent_update_cron_and_resources() {
+fn clean_surface_agent_update_cron_and_resources() {
     let srv = spawn_server();
 
-    // Dropped legacy PKM verbs/flags are rejected cleanly
-    assert_eq!(srv.run(&["pkm", "radar"]).tag(), "UnknownSubcommand");
-    assert_eq!(srv.run(&["pkm", "page", "edit", "foo"]).tag(), "UnknownSubcommand");
-    assert_eq!(srv.run(&["pkm", "search", "--tier", "inbox"]).tag(), "UnrecognizedOption");
+    // Retired PKM subcommand and legacy flags are rejected cleanly
+    assert_eq!(srv.run(&["pkm", "page", "list"]).tag(), "UnknownSubcommand");
     assert_eq!(srv.run(&["chat", "--orchestrator", "hi"]).tag(), "UnrecognizedOption");
-
-    // PKM dry-run refusal & full lifecycle (capture, save, list, show, rename, export, undo)
-    for args in [
-        &["pkm", "capture", "不应写入", "--dry-run"][..],
-        &["pkm", "journal", "show", "--dry-run"][..],
-        &["pkm", "page", "save", "--dry-run", "读书", "--", "- 条目"][..],
-    ] {
-        let ran = srv.run(args);
-        assert_eq!((args, ran.code, ran.tag()), (args, 2, "NoDryRun"));
-    }
-    assert_eq!(srv.run(&["pkm", "page", "list"]).out, "");
-    assert_eq!(srv.run(&["pkm", "page", "save", "读书", "--", "- 置身事内"]).code, 0);
-    assert!(srv.run(&["pkm", "page", "show", "读书"]).out.contains("置身事内"));
-    assert!(srv.run(&["pkm", "page", "export", "读书"]).out.contains("置身事内"));
-    assert_eq!(srv.run(&["pkm", "page", "rename", "读书", "阅读笔记"]).code, 0);
-    assert!(srv.run(&["pkm", "page", "list"]).out.contains("阅读笔记"));
-    assert_eq!(srv.run(&["pkm", "capture", "记一笔"]).code, 0);
-    assert!(srv.run(&["pkm", "search", "记一笔"]).out.contains("记一笔"));
-    assert_eq!(srv.run(&["pkm", "undo"]).code, 0);
 
     // Agent create default runtime + agent update
     let owl = srv.run(&["agent", "create", "owl", "--json"]).json();

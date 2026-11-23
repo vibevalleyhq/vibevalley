@@ -204,7 +204,6 @@ def seed_old(c):
     profile = c.cli("agent", "list")
     agent = next(p["id"] for p in profile if p["id"] == "docs" or p.get("name") == "docs")
     memory = c.cli("memory", "create", agent, "retain old note", "--key", "legacy-note")
-    page = c.cli("pkm", "page", "save", "Checkpoint", "--", "- retain old block\n")
     artifact = c.cli(
         "artifact",
         "create",
@@ -236,7 +235,6 @@ def seed_old(c):
             **dict.fromkeys(
                 (
                     "speech",
-                    "dictation",
                     "understanding",
                     "live",
                     "speakers",
@@ -288,7 +286,6 @@ def seed_old(c):
         "channel": general,
         "agent": agent,
         "memory": memory["id"],
-        "page": page["slug"],
         "artifact": artifact["id"],
         "attachment": attachment["id"],
         "mediaInput": media_input["id"],
@@ -308,7 +305,6 @@ def verify_old_content(c, ids):
     messages = c.cli("channel", "message", "list", ids["channel"])
     assert sum(m["text"] == "checkpoint-old" for m in messages) == 1
     assert any(m["id"] == ids["memory"] for m in c.cli("memory", "list", ids["agent"])["memories"])
-    assert c.cli("pkm", "page", "show", ids["page"])["page"]["blocks"][0]["body"] == "retain old block"
     assert c.cli("artifact", "show", ids["artifact"])["title"] == "Checkpoint"
     assert "old artifact" in c.cli("artifact", "read", ids["artifact"], "--version", "1")["content"]
 
@@ -503,7 +499,6 @@ def verify(old, new, root):
                     "session",
                     "channel",
                     "memory",
-                    "pkm",
                     "artifact",
                     "attachment",
                     "library",

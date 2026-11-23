@@ -98,13 +98,11 @@ export interface QuoteTarget {
   readonly text: string;
 }
 
-/** Keyed by the id by its caller: one editor for the page's life, handed to onEditor for what the page's menu does with
- * it. onRail: where the open suggestions are drawn is the caller's (the artifacts page's side panel); without it, above
- * the blocks. */
+/** Keyed by the id by its caller: one editor for the page's life. onRail: where the open suggestions are drawn is the
+ * caller's (the artifacts page's side panel); without it, above the blocks. */
 export function BlocksView(props: {
   id: ArtifactId;
   artifactType?: ArtifactType | undefined;
-  onEditor?: (editor: BlockEditor) => void;
   onQuote?: ((block: QuoteTarget) => void) | undefined;
   onRail?: ((list: () => JSX.Element) => void) | undefined;
 }) {
@@ -112,7 +110,6 @@ export function BlocksView(props: {
     api,
     untrack(() => props.id),
   );
-  untrack(() => props.onEditor)?.(editor);
   const [suggestions, setSuggestions] = createSignal<Suggestion[]>([]);
   const [working, setWorking] = createSignal<string>();
   const acting = createAct();

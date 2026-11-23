@@ -14,8 +14,6 @@ const provider: ProviderStatus = {
   imageModels: ["moss-image-1", "moss-image-1-hd"],
   understanding: { connection: "moss-main", model: "moss-vl" },
   understandingModels: ["moss-vl"],
-  dictation: { connection: "moss-main", model: "moss-asr" },
-  dictationModels: ["moss-asr", "moss-asr-fast"],
   speech: null,
   speechModels: ["moss-tts"],
   speakers: null,

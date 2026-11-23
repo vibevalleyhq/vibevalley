@@ -423,8 +423,6 @@ pub enum ContextRef {
         #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
         id: ArtifactId,
     },
-    #[serde(rename_all = "camelCase")]
-    Pkm { path: String },
 }
 
 #[skip_serializing_none]

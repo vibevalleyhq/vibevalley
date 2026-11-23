@@ -1,7 +1,7 @@
 import { signal } from "nsh";
 import { z } from "zod";
 
-import type { Artifact, ArtifactBody, ArtifactDisplay, ArtifactType, LibraryFileKind, LibraryItem, PkmPageSummary } from "@vibevalley/protocol";
+import type { Artifact, ArtifactBody, ArtifactDisplay, ArtifactType, LibraryFileKind, LibraryItem } from "@vibevalley/protocol";
 
 import { defineAtom } from "../../infra/state/atom";
 import { defineStored } from "../../infra/state/stored";
@@ -61,7 +61,7 @@ export function closeContentSearch(): void {
   contentSearchOpen.set(false);
 }
 
-const contentPrefixes = ["/library", "/artifacts", "/pkm"] as const;
+const contentPrefixes = ["/library", "/artifacts"] as const;
 
 function isContentPath(path: string): boolean {
   return contentPrefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(`${prefix}?`));
@@ -128,15 +128,11 @@ export interface ContentHubCounts {
 
 /** Single count formula shared by `ContentSidebar` badges and `LibraryPage` bucket views. */
 export function countContentHub(input: {
-  readonly notes: readonly Pick<PkmPageSummary, "slug">[];
   readonly artifacts: readonly Pick<Artifact, "id" | "body" | "display" | "artifactType">[];
   readonly media: readonly { readonly attachment: Pick<LibraryItem["attachment"], "id" | "type"> }[];
   readonly pinned: ReadonlySet<string>;
 }): ContentHubCounts {
   let pinned = 0;
-  for (const n of input.notes) {
-    if (input.pinned.has(`note:${n.slug}`)) pinned += 1;
-  }
   const artifactByFacet = new Map<ArtifactFacet, number>();
   for (const a of input.artifacts) {
     if (input.pinned.has(`artifact:${a.id}`)) pinned += 1;
@@ -150,7 +146,7 @@ export function countContentHub(input: {
     mediaByKind.set(kind, (mediaByKind.get(kind) ?? 0) + 1);
   }
   return {
-    total: input.notes.length + input.artifacts.length + input.media.length,
+    total: input.artifacts.length + input.media.length,
     pinned,
     artifacts: input.artifacts.length,
     artifactByFacet,

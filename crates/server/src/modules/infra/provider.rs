@@ -46,7 +46,6 @@ pub const VOICE_DESIGN_MODELS: [&str; 2] = ["moss-voice-generator-1.0", "moss-vo
 /// What a MOSS account is bound to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Use {
-    Dictation,
     Image,
     Understanding,
     Speech,
@@ -58,8 +57,7 @@ pub enum Use {
 }
 
 impl Use {
-    pub const ALL: [Use; 9] = [
-        Use::Dictation,
+    pub const ALL: [Use; 8] = [
         Use::Image,
         Use::Understanding,
         Use::Speech,
@@ -72,7 +70,6 @@ impl Use {
 
     pub fn name(self) -> &'static str {
         match self {
-            Use::Dictation => "dictation",
             Use::Image => "image",
             Use::Understanding => "understanding",
             Use::Speech => "speech",
@@ -86,7 +83,7 @@ impl Use {
 
     pub fn models(self) -> &'static [&'static str] {
         match self {
-            Use::Dictation | Use::Transcription => &TRANSCRIPTION_MODELS,
+            Use::Transcription => &TRANSCRIPTION_MODELS,
             Use::Image => &IMAGE_MODELS,
             Use::Understanding => &UNDERSTANDING_MODELS,
             Use::Speech => &SPEECH_MODELS,
@@ -100,11 +97,10 @@ impl Use {
     /// The refusal for a model this use does not run.
     fn wrong_model(self) -> ApiError {
         match self {
-            Use::Dictation => refuse("server.provider.model"),
             Use::Image => refuse("server.provider.imageModel"),
             Use::Understanding => refuse("server.provider.understandingModel"),
             Use::Speech => refuse("server.provider.speechModel"),
-            _ => {
+            Use::Live | Use::Speakers | Use::VoiceDesign | Use::Transcription | Use::Vision => {
                 let capability = t(&format!("server.provider.use.{}", self.name()), &[]);
                 ApiError::new(
                     BizCode::ProviderRefused,
@@ -136,7 +132,6 @@ pub struct Providers {
     pub revision: i64,
     #[serde(default)]
     pub connections: Vec<Connection>,
-    pub dictation: Option<ProviderBinding>,
     pub image: Option<ProviderBinding>,
     pub understanding: Option<ProviderBinding>,
     pub speech: Option<ProviderBinding>,
@@ -159,7 +154,6 @@ pub struct Account {
 impl Providers {
     pub fn binding(&self, u: Use) -> Option<&ProviderBinding> {
         match u {
-            Use::Dictation => self.dictation.as_ref(),
             Use::Image => self.image.as_ref(),
             Use::Understanding => self.understanding.as_ref(),
             Use::Speech => self.speech.as_ref(),
@@ -233,7 +227,6 @@ impl Providers {
                     key: c.key.status(KeySource::Settings),
                 })
                 .collect(),
-            dictation: self.dictation.clone(),
             image: self.image.clone(),
             live: self.live.clone(),
             live_models: models(&LIVE_MODELS),
@@ -245,7 +238,6 @@ impl Providers {
             transcription_models: models(&TRANSCRIPTION_MODELS),
             vision: self.vision.clone(),
             vision_models: models(&VISION_MODELS),
-            dictation_models: models(&TRANSCRIPTION_MODELS),
             image_models: models(&IMAGE_MODELS),
             understanding: self.understanding.clone(),
             understanding_models: models(&UNDERSTANDING_MODELS),
@@ -302,7 +294,6 @@ pub fn connections_over(current: &Providers, update: &ProviderUpdate) -> Result<
     let next = Providers {
         revision: current.revision + 1,
         connections,
-        dictation: update.dictation.clone(),
         image: update.image.clone(),
         understanding: update.understanding.clone(),
         speech: update.speech.clone(),

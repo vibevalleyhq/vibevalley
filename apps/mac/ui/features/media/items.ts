@@ -11,7 +11,6 @@ import {
   type MediaJob,
   type MediaSummary,
   type MediaUnderstandingJob,
-  type PkmPageSummary,
   userId,
 } from "@vibevalley/protocol";
 
@@ -46,35 +45,10 @@ const isArtifactFromSource = (artifact: Artifact, source: SourceFilter): boolean
   }
 };
 
-const isNoteFromSource = (source: SourceFilter): boolean => {
-  switch (source) {
-    case "all":
-    case "user":
-      return true;
-    case "agent":
-      return false;
-  }
-};
-
 export const artifactMatchesType = (
   a: { readonly body: ArtifactBody; readonly display?: ArtifactDisplay | undefined; readonly artifactType?: ArtifactType | undefined },
   type: ArtifactTypeFilter | undefined,
 ): boolean => type === undefined || artifactFacetOf(a) === type;
-
-export const shownNotes = (
-  pages: readonly PkmPageSummary[],
-  filter: {
-    readonly source: SourceFilter;
-    readonly sort: LibrarySort;
-    readonly pinnedOnly?: boolean | undefined;
-    readonly pinned?: ReadonlySet<string> | undefined;
-  },
-): PkmPageSummary[] => {
-  if (!isNoteFromSource(filter.source)) return [];
-  const filtered = filter.pinnedOnly === true ? pages.filter((p) => filter.pinned?.has(`note:${p.slug}`) === true) : [...pages];
-  if (filter.sort === "name") return filtered.toSorted((a, b) => a.title.localeCompare(b.title));
-  return filtered.toSorted((a, b) => b.updated - a.updated);
-};
 
 export const shownArtifacts = (
   all: readonly Artifact[],

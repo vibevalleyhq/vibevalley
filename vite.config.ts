@@ -52,8 +52,8 @@ export default defineConfig({
       // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/audit/deadcode.ts says what to do).
       deadcode: "vpx scripts/audit/deadcode.ts",
       // The Rust workspace (crates/, apps/mac): format, clippy, tests. protocol:check fails when packages/protocol's
-      // shapes.gen.ts differ from the Rust contract (vp run protocol:ts writes them), or the artifact and pkm goldens from
-      // their TS engines (vp run goldens).
+      // shapes.gen.ts differ from the Rust contract (vp run protocol:ts writes them), or the artifact goldens from
+      // its engine (vp run goldens).
       "rust:check": {
         command:
           "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && { if command -v cargo-nextest >/dev/null 2>&1; then cargo nextest run --workspace --no-fail-fast && cargo test --workspace --doc; else cargo test --workspace; fi; }",

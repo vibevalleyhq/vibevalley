@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 
 import { ToastHost } from "../design/ToastHost";
 import { AgentsRoute } from "../features/agent";
-import { artifactHref, ArtifactsPage, PresenterPage, useArtifacts } from "../features/artifact";
+import { ArtifactsPage, PresenterPage } from "../features/artifact";
 import { CatalogPage } from "../features/catalog";
 import { ChannelSidePane, ChatPage } from "../features/channel";
 import { ContentShell, safeLastContentPath } from "../features/content";
@@ -14,7 +14,6 @@ import { issueSearch } from "../features/issue/model/navigation";
 import { IssuesPage } from "../features/issue/views/IssuesPage";
 import { LibraryPage } from "../features/media";
 import { OrchestratorPage } from "../features/orchestrator";
-import { PkmPage } from "../features/pkm";
 import { ReposPage } from "../features/repo";
 import { sortRepos } from "../features/repo/repos";
 import { RuntimesPage, SkillsPage } from "../features/runtime";
@@ -123,28 +122,6 @@ function MissingPage(props: { invalid?: boolean }) {
   );
 }
 
-function PkmRoute(props: { rest: string }) {
-  const slug = () => (props.rest ? decodeURIComponent(props.rest.split("?")[0] ?? "") : "");
-  const outlines = useArtifacts(() => ({ artifactType: "outline" }));
-  const latestOutline = () => {
-    const list = ready(outlines, undefined)?.filter((a) => a.artifactType === "outline");
-    if (!list || list.length === 0) return undefined;
-    return list.toSorted((a, b) => b.updated - a.updated)[0];
-  };
-  return (
-    <If
-      when={slug() !== ""}
-      else={
-        <If when={latestOutline()} else={<PkmPage rest="" />}>
-          {(art) => <Navigate href={artifactHref(art().id)} />}
-        </If>
-      }
-    >
-      <PkmPage rest={props.rest} />
-    </If>
-  );
-}
-
 const routes: readonly RouteDefinition[] = [
   {
     path: "/",
@@ -198,7 +175,6 @@ const routes: readonly RouteDefinition[] = [
         children: [
           page("/library", "content", () => <LibraryPage />),
           page("/artifacts", "content", (rest) => <ArtifactsPage rest={rest()} chat={ChannelSidePane} />),
-          page("/pkm", "content", (rest) => <PkmRoute rest={rest()} />),
         ],
       },
     ],

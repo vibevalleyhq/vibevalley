@@ -28,9 +28,6 @@ const ARTIFACT_TITLE_MAX: usize = 80;
 /// `htmlSandbox` (protocol rules/display.ts).
 pub(crate) const HTML_SANDBOX: &str = "allow-scripts allow-popups allow-popups-to-escape-sandbox";
 
-pub const DEMO_PIECES: usize = 6;
-pub const DEMO_JITTER: f64 = 0.3;
-
 /// Why a title, a kind or a hand-in's size is refused; "" when right.
 pub fn artifact_problem(title: Option<&str>, kind: Option<&str>, size: Option<usize>) -> String {
     if let Some(title) = title {

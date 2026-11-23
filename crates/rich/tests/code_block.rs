@@ -140,7 +140,6 @@ fn regression_all_rich_ui_i18n_keys_resolve_in_zh_and_en() {
             "web.base.rich.more",
             "web.base.rich.less",
             "web.base.rich.diagram",
-            "web.pkm.page.missingRef",
         ] {
             let value = vibevalley_i18n::t_in(lang, key, &[]);
             assert!(!value.starts_with("web."), "{lang} key {key} resolved to raw key {value:?}");
@@ -149,8 +148,6 @@ fn regression_all_rich_ui_i18n_keys_resolve_in_zh_and_en() {
         assert!(!lines.starts_with("web."), "{lang} lines resolved to {lines:?}");
         let failed = vibevalley_i18n::t_in(lang, "web.base.rich.diagramFailed", &[("why", "syntax".into())]);
         assert!(!failed.starts_with("web."), "{lang} diagramFailed resolved to {failed:?}");
-        let ref_from = vibevalley_i18n::t_in(lang, "web.pkm.page.refFrom", &[("page", "Notes".into())]);
-        assert!(!ref_from.starts_with("web."), "{lang} refFrom resolved to {ref_from:?}");
     }
 }
 

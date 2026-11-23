@@ -1357,14 +1357,20 @@ pub struct ArtifactMarkdownGetInput {
     pub id: ArtifactId,
 }
 
+/// Imports a `.md` document into a new `ArtifactType::Outline` blocks artifact.
 #[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
-pub struct ArtifactDemoInput {
-    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
-    pub id: ArtifactId,
+pub struct ArtifactOutlineImportRequest {
+    pub markdown: String,
+    pub title: Option<String>,
+    pub filename: Option<String>,
+    pub channel: Option<String>,
+    pub issue: Option<String>,
+    pub announce: Option<bool>,
+    pub note: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -1668,7 +1674,7 @@ crate::typescript::module! {
     ArtifactSuggestionCreateInput,
     ArtifactSuggestionAcceptInput,
     ArtifactMarkdownGetInput,
-    ArtifactDemoInput,
+    ArtifactOutlineImportRequest,
     ArtifactPresenceKind,
     ViewportRect,
     ArtifactPresence,

@@ -27,7 +27,6 @@
     "saved": "All saved",
     "blocks": "{n, plural, one {# block} other {# blocks}}",
     "helpersWriting": "helpers writing",
-    "demo": "Demo: several helpers writing at once",
     "append": "Write a paragraph at the end",
     "user": "You",
     "done": "Done",
@@ -257,5 +256,12 @@
     "waiting": "Waiting for the slide deck",
     "empty": "This deck has no slides",
     "loadFailure": "Could not load the slide deck: {reason}"
+  },
+  "outline": {
+    "importTitle": "Import Markdown outline",
+    "importAction": "Import .md",
+    "pickFile": "Choose .md file",
+    "markdownLabel": "Markdown (.md)",
+    "submit": "Import outline"
   }
 }

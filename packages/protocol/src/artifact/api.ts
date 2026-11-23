@@ -55,9 +55,8 @@ export interface ArtifactHandlers {
   readonly "artifact.entry.get": (a: T.ArtifactEntryGetRequest) => Promise<T.ArtifactEntry>;
   /** An atomic batch of set, patch, delete or copy writes on a store artifact with per-entry optimistic concurrency. */
   readonly "artifact.entry.batch": (a: T.ArtifactEntryBatchRequest) => Promise<T.ArtifactEntryBatchResult>;
-  /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
-   * one already running is refused. */
-  readonly "artifact.demo": (a: { readonly id: T.ArtifactId }) => Promise<void>;
+  /** Imports a `.md` document into a new `ArtifactType::Outline` blocks artifact. */
+  readonly "artifact.outline.import": (a: T.ArtifactOutlineImportRequest) => Promise<T.Artifact>;
   /** Ephemeral live presence update (cursor, selection, highlight, viewport); never persisted to SQLite. */
   readonly "artifact.presence.update": (a: T.ArtifactPresenceUpdateRequest) => Promise<void>;
   /** Newest first. */
@@ -253,11 +252,11 @@ export const artifactEndpoints: readonly Endpoint[] = [
     can: ["user", "remote", "orchestrator", "session"],
   },
   {
-    op: "artifact.demo",
-    about: ["id"],
-    input: input({ id: S.ArtifactId }),
-    result: undefined,
-    can: ["user"],
+    op: "artifact.outline.import",
+    about: [],
+    input: S.ArtifactOutlineImportRequest,
+    result: S.Artifact,
+    can: ["user", "remote", "orchestrator", "session"],
   },
   {
     op: "artifact.presence.update",

@@ -2,9 +2,8 @@
 //! prints `{"url","pid"}` once it listens. The environment configures the
 //! rest via [`vibevalley_server::ServerConfig::from_env`]: `VIBEVALLEY_HOME`,
 //! `VIBEVALLEY_WORK_ROOT`, `VIBEVALLEY_PORT` (0: any), `DEEPSEEK_API_KEY`,
-//! `AGORA_APP_ID`, `AGORA_APP_CERTIFICATE`, `VIBEVALLEY_VOICE_ID`,
-//! `VIBEVALLEY_GIT_EMAILS`, `VIBEVALLEY_PKM_ROOT`, `VIBEVALLEY_AGENT_STARTERS`,
-//! `VIBEVALLEY_VOICE_LINE_URL`, and `VIBEVALLEY_TEST_RUNTIMES=1`.
+//! `VIBEVALLEY_GIT_EMAILS`, `VIBEVALLEY_AGENT_STARTERS`, and
+//! `VIBEVALLEY_TEST_RUNTIMES=1`.
 
 struct Flags {
     ready_json: bool,

@@ -1,6 +1,6 @@
 //! Loro 1.18.0 content-plane integration for artifacts:
 //! - Phase A: pure in-memory `PresenceHub` (`artifact.presence.{update,follow}`,
-//!   legacy `presence/*` interception, strict-CSP sandbox highlight injection).
+//!   strict-CSP sandbox highlight injection).
 //! - Phase B: `CollabDoc` CRDT proxy (lazy bootstrap from SQLite, `CommitMeta`
 //!   persistence, persistent `Cursor` suggestion anchoring & same-origin folding).
 //! - Phase C: time-travel timeline (`list`/`preview`/`restore`/`fork`), shallow
@@ -21,10 +21,10 @@ use vibevalley_core::collab::{
 use vibevalley_core::rules::key_between;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, Artifact as Wire, ArtifactBody, ArtifactDisplay, ArtifactEntry, ArtifactEntryKind, ArtifactEntryOp, ArtifactEntryWriteInput,
-    ArtifactHistoryCompactRequest, ArtifactHistoryEntry, ArtifactHistoryForkRequest, ArtifactHistoryListRequest, ArtifactHistoryPreviewRequest,
-    ArtifactHistoryPreviewResult, ArtifactHistoryRestoreRequest, ArtifactHistoryUndoOriginRequest, ArtifactPresence, ArtifactPresenceEvent,
-    ArtifactPresenceKind, ArtifactPresenceUpdateRequest, Block, BlockAck, BlockAttrs, BlockType, JsNumber, Suggestion, USER_ID, ViewportRect,
+    ApiError, Artifact as Wire, ArtifactBody, ArtifactDisplay, ArtifactEntry, ArtifactEntryKind, ArtifactHistoryCompactRequest, ArtifactHistoryEntry,
+    ArtifactHistoryForkRequest, ArtifactHistoryListRequest, ArtifactHistoryPreviewRequest, ArtifactHistoryPreviewResult, ArtifactHistoryRestoreRequest,
+    ArtifactHistoryUndoOriginRequest, ArtifactPresence, ArtifactPresenceEvent, ArtifactPresenceKind, ArtifactPresenceUpdateRequest, Block, BlockAck,
+    BlockAttrs, BlockType, JsNumber, Suggestion, USER_ID, ViewportRect,
 };
 
 use super::blocks::spans_of;
@@ -140,61 +140,6 @@ fn payload_to_presence(p: PresencePayload, extra: Option<(Option<String>, Option
         }),
         session_id,
         updated_at: p.updated_at,
-    }
-}
-
-/// Parses a legacy `presence/<peer>` store write into a strongly-typed
-/// in-memory `ArtifactPresence` record so legacy callers never touch SQLite.
-pub(super) fn parse_legacy_presence_write(peer_id: &str, actor: &str, raw: Option<&str>, at: i64) -> ArtifactPresence {
-    let parsed = raw.and_then(|s| serde_json::from_str::<Value>(s).ok());
-    let obj = parsed.as_ref().and_then(Value::as_object);
-    let str_field = |k: &str| obj.and_then(|m| m.get(k)).and_then(Value::as_str).map(str::to_string);
-    let num_field = |k: &str| obj.and_then(|m| m.get(k)).and_then(Value::as_f64).map(JsNumber);
-    let u32_field = |k: &str| obj.and_then(|m| m.get(k)).and_then(Value::as_u64).and_then(|n| u32::try_from(n).ok());
-    let id = str_field("id").filter(|s| !s.trim().is_empty()).unwrap_or_else(|| peer_id.to_string());
-    let name = str_field("name")
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| if actor.is_empty() { id.clone() } else { actor.to_string() });
-    let kind = match str_field("kind").as_deref() {
-        Some("block_cursor") => ArtifactPresenceKind::BlockCursor,
-        Some("selection") => ArtifactPresenceKind::Selection,
-        Some("highlight") => ArtifactPresenceKind::Highlight,
-        Some("viewport") => ArtifactPresenceKind::Viewport,
-        _ => {
-            if num_field("w").is_some() && num_field("h").is_some() && str_field("selector").is_none() {
-                ArtifactPresenceKind::Highlight
-            } else {
-                ArtifactPresenceKind::Cursor
-            }
-        }
-    };
-    let viewport = obj.and_then(|m| m.get("viewport")).and_then(Value::as_object).and_then(|vm| {
-        Some(ViewportRect {
-            x: JsNumber(vm.get("x")?.as_f64()?),
-            y: JsNumber(vm.get("y")?.as_f64()?),
-            w: JsNumber(vm.get("w")?.as_f64()?),
-            h: JsNumber(vm.get("h")?.as_f64()?),
-            zoom: vm.get("zoom").and_then(Value::as_f64).map(JsNumber),
-        })
-    });
-    ArtifactPresence {
-        color: str_field("color").or_else(|| Some(default_color_for(&id))),
-        id,
-        name,
-        kind,
-        x: num_field("x"),
-        y: num_field("y"),
-        w: num_field("w"),
-        h: num_field("h"),
-        status: str_field("status"),
-        block_id: str_field("blockId"),
-        offset: u32_field("offset"),
-        end_offset: u32_field("endOffset"),
-        selector: str_field("selector"),
-        path: str_field("path"),
-        viewport,
-        session_id: str_field("sessionId"),
-        updated_at: obj.and_then(|m| m.get("updatedAt")).and_then(Value::as_i64).unwrap_or(at),
     }
 }
 
@@ -1423,29 +1368,6 @@ impl Artifacts {
                 drop(conn);
                 self.get_now(&new_art_id)
             }
-        }
-    }
-}
-
-/// Checks whether a store write targets the ephemeral `presence/*` namespace.
-pub(super) fn is_presence_write(w: &ArtifactEntryWriteInput) -> bool {
-    w.path.starts_with("presence/")
-}
-
-/// Applies one legacy `presence/<peer>` write directly to the in-memory `PresenceHub`.
-pub(super) fn apply_legacy_presence_write(artifacts: &Artifacts, artifact_id: &str, actor: &str, w: &ArtifactEntryWriteInput) -> Result<(), ApiError> {
-    let peer_id = w.path.strip_prefix("presence/").unwrap_or(&w.path).trim();
-    if peer_id.is_empty() {
-        return Ok(());
-    }
-    match w.op {
-        ArtifactEntryOp::Delete => {
-            artifacts.remove_presence_entry(artifact_id, peer_id);
-            Ok(())
-        }
-        ArtifactEntryOp::Set | ArtifactEntryOp::Patch | ArtifactEntryOp::Copy => {
-            let presence = parse_legacy_presence_write(peer_id, actor, w.value.as_deref(), now());
-            artifacts.upsert_presence_entry(artifact_id, presence)
         }
     }
 }

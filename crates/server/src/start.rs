@@ -22,14 +22,11 @@ pub struct ServerConfig {
     /// The farm's home: `settings.json`, `config.json`, `state.db`,
     /// `issues/` (records, reports).
     pub home: PathBuf,
-    /// Repos, worktrees and notes live under it.
+    /// Repos and worktrees live under it.
     pub work_root: PathBuf,
     pub version: String,
     /// Given outside the settings file (`DEEPSEEK_API_KEY`); the file's wins.
     pub deepseek_api_key: String,
-    pub agora_app_id: String,
-    pub agora_app_certificate: String,
-    pub voice_id: String,
     /// Built-in templates a new farm installs beside its orchestrator.
     pub starters: Vec<String>,
     /// The runtimes; none is every built-in one, VibeValley's own reading
@@ -58,12 +55,6 @@ pub struct ServerConfig {
     /// The orchestrator hears the farm (VibeValley `listen`); a test without
     /// a model turns it off, so nothing answers in the chat.
     pub orchestrator_listens: bool,
-    /// The notes' vault (VibeValley `pkm.root`); none is `<work_root>/pkm`.
-    pub pkm_root: Option<PathBuf>,
-    /// Rescans the vault when a file in it changes (VibeValley's own).
-    pub watch_pkm: bool,
-    /// Where the voice line listens and how Agora reaches it.
-    pub voice_line: modules::collab::voice::LineConfig,
     /// How the chat apps are reached and paced; tests point it at local stubs.
     pub connector: modules::collab::connector::Options,
     /// Enables DevTools diagnostics (`debug.*` endpoints, timeline observer, fault gate).
@@ -91,9 +82,6 @@ impl ServerConfig {
             work_root: dir,
             version: env!("CARGO_PKG_VERSION").into(),
             deepseek_api_key: String::new(),
-            agora_app_id: String::new(),
-            agora_app_certificate: String::new(),
-            voice_id: String::new(),
             starters: vec![],
             registry: None,
             tool_permissions: Default::default(),
@@ -107,17 +95,14 @@ impl ServerConfig {
             offline_media: false,
             media_network: None,
             orchestrator_listens: true,
-            pkm_root: None,
-            watch_pkm: true,
-            voice_line: Default::default(),
             connector: modules::collab::connector::Options::default(),
             debug_enabled: false,
         }
     }
 
-    /// Reads the process environment (`VIBEVALLEY_*`, `DEEPSEEK_API_KEY`,
-    /// `AGORA_*`) so standalone `vibevalley-server` and `vibevalley-mac` share
-    /// one configuration path.
+    /// Reads the process environment (`VIBEVALLEY_*`, `DEEPSEEK_API_KEY`) so
+    /// standalone `vibevalley-server` and `vibevalley-mac` share one
+    /// configuration path.
     pub fn from_env(home: impl Into<PathBuf>, version: impl Into<String>) -> ServerConfig {
         let env_str = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
         let csv = |name: &str| -> Vec<String> {
@@ -130,17 +115,12 @@ impl ServerConfig {
             work_root: Self::default_work_root(),
             version: version.into(),
             deepseek_api_key: env_str("DEEPSEEK_API_KEY").unwrap_or_default(),
-            agora_app_id: env_str("AGORA_APP_ID").unwrap_or_default(),
-            agora_app_certificate: env_str("AGORA_APP_CERTIFICATE").unwrap_or_default(),
-            voice_id: env_str("VIBEVALLEY_VOICE_ID").unwrap_or_default(),
             starters: csv("VIBEVALLEY_AGENT_STARTERS"),
             git_emails: csv("VIBEVALLEY_GIT_EMAILS"),
-            pkm_root: env_str("VIBEVALLEY_PKM_ROOT").map(PathBuf::from),
             poll_pulls: Some(env_str("VIBEVALLEY_GITHUB_PR_POLL_SECONDS").and_then(|s| s.parse::<u64>().ok()).unwrap_or(180)),
             debug_enabled: env_str("VIBEVALLEY_DEBUG").as_deref() == Some("1"),
             ..Self::under(home)
         };
-        config.voice_line.url = env_str("VIBEVALLEY_VOICE_LINE_URL").unwrap_or_default();
         if env_str("VIBEVALLEY_TEST_RUNTIMES").as_deref() == Some("1") {
             crate::testing::configure(&mut config, env_str("VIBEVALLEY_TEST_MODEL_PORT").as_deref());
         }
@@ -174,8 +154,6 @@ pub struct Started {
     pub memories: Arc<modules::team::memory::Memories>,
     /// Pages the user and the agents make.
     pub artifacts: Arc<modules::content::artifact::Artifacts>,
-    /// The user's notes.
-    pub pkm: Arc<modules::content::pkm::Pkm>,
     /// Durable media jobs and their executor.
     pub media: Arc<modules::content::media::jobs::Jobs>,
     /// Media reservations, binary uploads and job references.
@@ -186,7 +164,7 @@ pub struct Started {
     pub resources: Arc<modules::team::mcp::Resources>,
     /// What the orchestrator's and the helpers' tools reach.
     pub farm: Arc<modules::team::tool::Farm>,
-    /// Dictation, grants and calls.
+    /// MOSS Live voice calls.
     pub voice: Arc<modules::collab::voice::Voice>,
     /// The chat apps tied to channels.
     pub connectors: Arc<modules::collab::connector::Connectors>,
@@ -222,7 +200,6 @@ impl Started {
         self.agents.fleet.close();
         self.repos.close();
         self.artifacts.close();
-        self.pkm.close();
         self.media.close();
         self.media_inputs.close();
         self.library.close();
@@ -357,12 +334,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     crate::install_tls();
     std::fs::create_dir_all(&config.home).map_err(|e| failed("the home")(&e))?;
     std::fs::create_dir_all(&config.work_root).map_err(|e| failed("the work root")(&e))?;
-    let pkm_root = config
-        .pkm_root
-        .clone()
-        .filter(|r| !r.as_os_str().is_empty())
-        .unwrap_or_else(|| config.work_root.join("pkm"));
-    for dir in [config.work_root.join("repos"), config.work_root.join("worktrees"), pkm_root.clone()] {
+    for dir in [config.work_root.join("repos"), config.work_root.join("worktrees")] {
         std::fs::create_dir_all(&dir).map_err(|e| failed("the work root")(&e))?;
     }
     let hub = Hub::new(vibevalley_core::empty_space_state());
@@ -372,9 +344,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         work_root: config.work_root.clone(),
         version: config.version.clone(),
         deepseek_api_key: config.deepseek_api_key.clone(),
-        agora_app_id: config.agora_app_id.clone(),
-        agora_app_certificate: config.agora_app_certificate.clone(),
-        voice_id: config.voice_id.clone(),
     });
     modules::infra::setting::install(&hub, setting.clone());
     let game = modules::skin::game::Game::open(&config.home, &hub);
@@ -465,15 +434,10 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     crons.attach_chat(&chat);
     let artifacts =
         modules::content::artifact::Artifacts::open(&config.home, attachments.clone(), chat.clone()).map_err(|e| failed("the artifacts")(&e.message))?;
-    modules::content::artifact::install(&hub, artifacts.clone(), agents.clone(), board.clone());
+    modules::content::artifact::install(&hub, artifacts.clone(), board.clone());
     {
         let a = Arc::downgrade(&artifacts);
         chat.set_quoter(Arc::new(move |refs| a.upgrade().map(|a| a.quote(refs)).unwrap_or_default()));
-    }
-    let pkm = modules::content::pkm::Pkm::open(&config.home, &pkm_root).map_err(|e| failed("the notes")(&e.message))?;
-    modules::content::pkm::install(&hub, pkm.clone());
-    if config.watch_pkm {
-        pkm.watch();
     }
     let resources = modules::team::mcp::Resources::with_pulls(board.clone(), chat.clone(), trajectories.clone(), pulls.clone());
     let farm = Arc::new(modules::team::tool::Farm {
@@ -485,7 +449,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         crons: crons.clone(),
         memories: memories.clone(),
         media: media.clone(),
-        pkm: pkm.clone(),
         artifacts: artifacts.clone(),
         library: library.clone(),
         resources: resources.clone(),
@@ -508,7 +471,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     })
     .map_err(|e| failed("durable execution")(&e))?;
     let _ = execution.set(vibevalley_runtime::agent::harness::SharedExecution::new(orchestrator.execution.harness.clone()));
-    let _ = hub.execution.set(Arc::downgrade(&orchestrator));
     hub.runtime_inbox
         .attach(orchestrator.execution.store(), &hub)
         .map_err(|e| failed("durable projection")(&e))?;
@@ -537,8 +499,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         orchestrator: orchestrator.clone(),
         fetch: voice_fetch,
         realtime: None,
-        line: config.voice_line.clone(),
-        pause: None,
     });
     modules::collab::voice::install(&hub, voice.clone());
     hub.attach_voice(voice.clone());
@@ -590,7 +550,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         trajectories,
         memories,
         artifacts,
-        pkm,
         library,
         resources,
         farm,

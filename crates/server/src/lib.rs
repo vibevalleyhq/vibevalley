@@ -142,7 +142,6 @@ pub struct Hub {
     bus: event_bus::EventBus,
     shutdown: CancellationToken,
     tasks: TaskTracker,
-    execution: std::sync::OnceLock<std::sync::Weak<modules::team::orchestrator::Orchestrator>>,
     handlers: RwLock<HashMap<&'static str, Handler>>,
     openers: RwLock<HashMap<&'static str, Opener>>,
     live: broadcast::Sender<LiveEvent>,
@@ -262,7 +261,6 @@ impl Hub {
             bus,
             shutdown,
             tasks: TaskTracker::new(),
-            execution: std::sync::OnceLock::new(),
             handlers: RwLock::default(),
             openers: RwLock::default(),
             live,
@@ -927,13 +925,6 @@ impl modules::work::ledger::Facts for std::sync::Weak<Hub> {
 }
 
 impl Server for Hub {
-    fn raise_budget(&self, input: Value) -> Envelope {
-        self.execution.get().and_then(std::sync::Weak::upgrade).map_or_else(
-            || crate::transport::api::refusal(BizCode::Refused, "durable execution unavailable"),
-            |o| o.execution.raise_budget(input),
-        )
-    }
-
     fn speech_streams(&self) -> Option<crate::transport::api::media::SharedSpeechStreams> {
         self.speech.load().as_ref().map(|slot| slot.0.clone())
     }

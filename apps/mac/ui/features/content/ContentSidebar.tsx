@@ -14,9 +14,8 @@ import { ready, useQuery, useQueryClient } from "../../infra/query";
 import { useLocation, useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import { defineStored } from "../../infra/state/stored";
-import { artifactTypeIcon, useArtifacts } from "../artifact";
+import { artifactTypeIcon, openOutlineImport, useArtifacts } from "../artifact";
 import { libraryQuery } from "../media/listing";
-import { usePkmVault } from "../pkm/vault";
 import {
   type ArtifactFacet,
   type ContentBucket,
@@ -68,11 +67,9 @@ export function ContentSidebar() {
 
   const artifacts = useArtifacts(() => ({}));
   const media = useQuery(() => libraryQuery({ text: "", sort: "recent" }), { interval: () => 10_000, keepPrevious: true });
-  const vault = usePkmVault();
 
   const allArtifacts = () => ready(artifacts, undefined) ?? [];
   const allMedia = () => ready(media, undefined) ?? [];
-  const allNotes = () => ready(vault, undefined)?.pages ?? [];
 
   const inBrowse = () => location().pathname === "/library" || location().pathname.startsWith("/library/");
   const bucket = () => contentBrowseBucket();
@@ -87,7 +84,6 @@ export function ContentSidebar() {
 
   const counts = createMemo(() =>
     countContentHub({
-      notes: allNotes(),
       artifacts: allArtifacts(),
       media: allMedia(),
       pinned: new Set(pinnedKeys()),
@@ -153,14 +149,24 @@ export function ContentSidebar() {
           open={artifactsSectionOpen.get()}
           onToggle={() => artifactsSectionOpen.update((on) => !on)}
           action={
-            <IconButton
-              icon="add"
-              size={12}
-              label={t("web.library.content.newNote")}
-              testid="content-new-note-btn"
-              disabled={act.busy()}
-              onClick={newBlankNote}
-            />
+            <View class="flex-row items-center gap-0.5">
+              <IconButton
+                icon="upload"
+                size={12}
+                label={t("web.artifact.outline.importAction")}
+                testid="content-import-outline-btn"
+                disabled={act.busy()}
+                onClick={() => openOutlineImport()}
+              />
+              <IconButton
+                icon="add"
+                size={12}
+                label={t("web.library.content.newNote")}
+                testid="content-new-note-btn"
+                disabled={act.busy()}
+                onClick={newBlankNote}
+              />
+            </View>
           }
           listClass="gap-0.5"
         >

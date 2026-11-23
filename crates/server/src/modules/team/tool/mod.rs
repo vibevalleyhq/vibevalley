@@ -5,9 +5,9 @@
 //! crate owns; who may call which is the file the tool is listed in.
 
 mod chat;
+mod content;
 mod issue;
 mod memory;
-mod notes;
 mod plan;
 
 use std::sync::{Arc, LazyLock};
@@ -71,7 +71,6 @@ pub struct Farm {
     pub crons: Arc<Crons>,
     pub memories: Arc<crate::modules::team::memory::Memories>,
     pub media: Arc<crate::modules::content::media::jobs::Jobs>,
-    pub pkm: Arc<crate::modules::content::pkm::Pkm>,
     pub artifacts: Arc<crate::modules::content::artifact::Artifacts>,
     pub library: Arc<crate::modules::content::library::Library>,
     pub resources: Arc<crate::modules::team::mcp::Resources>,
@@ -215,37 +214,36 @@ fn handler(op: &str) -> Option<Run> {
         "cron.create" => typed!(plan::cron_create),
         "cron.list" => typed!(plan::cron_list),
         "cron.delete" => typed!(plan::cron_delete),
-        "resource.read" => typed!(notes::resource_read),
+        "resource.read" => typed!(content::resource_read),
         "memory.search" => typed!(memory::search),
         "memory.create" => typed!(memory::create),
-        "pkm.search" => typed!(notes::pkm_search),
-        "pkm.page.get" => typed!(notes::pkm_page),
-        "pkm.capture" => typed!(notes::pkm_capture),
-        "pkm.comment.suggest" => typed!(notes::pkm_suggest),
-        "media.image.create" => typed!(notes::image),
-        "media.speech.create" => typed!(notes::speech),
-        "media.dialogue.create" => typed!(notes::dialogue),
-        "media.voiceDesign.create" => typed!(notes::voice_design),
-        "media.understanding.start" => typed!(notes::understand),
-        "media.job.get" => typed!(notes::job_get),
-        "media.job.list" => typed!(notes::job_list),
-        "media.job.cancel" => typed!(notes::job_cancel),
-        "media.job.download" => typed!(notes::job_download),
-        "library.item.list" => typed!(notes::library_list),
-        "library.item.add" => typed!(notes::library_add),
-        "artifact.list" => typed!(notes::artifact_list),
-        "artifact.get" => typed!(notes::artifact_get),
-        "artifact.content.get" => typed!(notes::artifact_content),
-        "artifact.create" => typed!(notes::artifact_create),
-        "artifact.version.create" => typed!(notes::artifact_version),
-        "artifact.block.create" => typed!(notes::block_create),
-        "artifact.block.update" => typed!(notes::block_update),
-        "artifact.block.delete" => typed!(notes::block_delete),
-        "artifact.type.list" => typed!(notes::artifact_type_list),
-        "artifact.type.read" => typed!(notes::artifact_type_read),
-        "artifact.entry.list" => typed!(notes::artifact_entry_list),
-        "artifact.entry.get" => typed!(notes::artifact_entry_get),
-        "artifact.entry.batch" => typed!(notes::artifact_entry_batch),
+        "media.image.create" => typed!(content::image),
+        "media.speech.create" => typed!(content::speech),
+        "media.dialogue.create" => typed!(content::dialogue),
+        "media.voiceDesign.create" => typed!(content::voice_design),
+        "media.understanding.start" => typed!(content::understand),
+        "media.job.get" => typed!(content::job_get),
+        "media.job.list" => typed!(content::job_list),
+        "media.job.cancel" => typed!(content::job_cancel),
+        "media.job.download" => typed!(content::job_download),
+        "library.item.list" => typed!(content::library_list),
+        "library.item.add" => typed!(content::library_add),
+        "artifact.list" => typed!(content::artifact_list),
+        "artifact.get" => typed!(content::artifact_get),
+        "artifact.content.get" => typed!(content::artifact_content),
+        "artifact.create" => typed!(content::artifact_create),
+        "artifact.outline.import" => typed!(content::artifact_outline_import),
+        "artifact.version.create" => typed!(content::artifact_version),
+        "artifact.block.list" => typed!(content::block_list),
+        "artifact.block.create" => typed!(content::block_create),
+        "artifact.block.update" => typed!(content::block_update),
+        "artifact.block.delete" => typed!(content::block_delete),
+        "artifact.block.batch" => typed!(content::block_batch),
+        "artifact.type.list" => typed!(content::artifact_type_list),
+        "artifact.type.read" => typed!(content::artifact_type_read),
+        "artifact.entry.list" => typed!(content::artifact_entry_list),
+        "artifact.entry.get" => typed!(content::artifact_entry_get),
+        "artifact.entry.batch" => typed!(content::artifact_entry_batch),
         _ => return None,
     })
 }
@@ -289,7 +287,7 @@ impl Tool {
     /// Reads only: safe to run again if the process died while it ran.
     pub fn replay_safe(&self) -> bool {
         let op = self.words.op.as_str();
-        op.ends_with(".list") || op.ends_with(".get") || op.ends_with(".read") || op == "memory.search" || op == "pkm.search"
+        op.ends_with(".list") || op.ends_with(".get") || op.ends_with(".read") || op == "memory.search"
     }
 }
 
@@ -351,7 +349,7 @@ mod tests {
     }
 
     #[test]
-    fn artifact_store_tools_are_listed_with_expected_replay_safety() {
+    fn artifact_store_and_block_tools_are_listed_with_expected_replay_safety() {
         for tools in [orchestrator(), helper()] {
             for (op, expected_safe) in [
                 ("artifact.type.list", true),
@@ -359,6 +357,9 @@ mod tests {
                 ("artifact.entry.list", true),
                 ("artifact.entry.get", true),
                 ("artifact.entry.batch", false),
+                ("artifact.block.list", true),
+                ("artifact.block.batch", false),
+                ("artifact.outline.import", false),
             ] {
                 let t = tools.iter().find(|t| t.words.op == op).unwrap_or_else(|| panic!("missing {op}"));
                 assert_eq!(t.replay_safe(), expected_safe, "replay_safe mismatch for {op}");

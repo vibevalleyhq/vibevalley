@@ -467,7 +467,6 @@ fn start_with(home: &Path, runtime: Arc<MockRuntime>) -> Started {
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
-        watch_pkm: false,
         orchestrator_listens: false,
         ..ServerConfig::under(home)
     })
@@ -768,7 +767,6 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
-        watch_pkm: false,
         orchestrator_listens: false,
         ..ServerConfig::under(home.path())
     })

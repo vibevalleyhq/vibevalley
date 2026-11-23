@@ -1,7 +1,7 @@
 import { effect, keymap, Picker, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { type Artifact, type LibraryItem, type LibrarySort, LibrarySortValues, type MediaJob, type PkmPageSummary } from "@vibevalley/protocol";
+import { type Artifact, type LibraryItem, type LibrarySort, LibrarySortValues, type MediaJob } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
@@ -35,7 +35,6 @@ import {
   pinnedKeys,
   togglePinned,
 } from "../content";
-import { pkmHref, usePkmVault } from "../pkm";
 import { AudioPanel } from "./AudioPanel";
 import { ImagePanel } from "./ImagePanel";
 import { Inspector } from "./Inspector";
@@ -48,7 +47,6 @@ import {
   neighbor,
   shownArtifacts,
   shownMedia,
-  shownNotes,
   type SourceFilter,
   sourceFilters,
   understoodText,
@@ -74,12 +72,11 @@ import {
   selectedFileIds,
   showsArtifactsInBucket,
   showsMediaInBucket,
-  showsNotesInBucket,
 } from "./libraryView";
 import { libraryQuery } from "./listing";
 import { publicationKey } from "./publication";
 import { SpeechPanel } from "./SpeechPanel";
-import { ArtifactTiles, knows, MakingTiles, NoteTiles, ratioOf, type Seen, tileGap, Tiles } from "./Tiles";
+import { ArtifactTiles, knows, MakingTiles, ratioOf, type Seen, tileGap, Tiles } from "./Tiles";
 import { UnderstandingPanel } from "./UnderstandingPanel";
 
 type Make = "image" | "speech" | "audio";
@@ -88,7 +85,8 @@ const tileMin = 96;
 const tileMax = 280;
 
 const deliverableNameRe =
-  /\.(?:(?:slide|slides|visual|canvas|design|dashboard|motion|page)\.html|html|htm|whiteboard(?:\.json|\.html)?|(?:design-system|tokens)\.json|doc\.md|md|markdown)$/iu;
+  /\.(?:(?:slide|slides|visual|canvas|design|dashboard|motion|page)\.html|html|htm|whiteboard(?:\.json|\.html)?|(?:design-system|tokens)\.json|outline\.md|doc\.md|md|markdown)$/iu;
+const markdownFileRe = /\.(?:md|markdown)$/iu;
 
 function base64ToUtf8(b64: string): string {
   const binary = atob(b64);
@@ -145,7 +143,6 @@ export function LibraryPage() {
   const source = signal<SourceFilter>("all");
   const items = useQuery(() => libraryQuery({ text: "", sort: sort() }), { interval: () => 10_000, keepPrevious: true });
   const artifactsQuery = useArtifacts(() => ({}));
-  const vaultQuery = usePkmVault();
   const selection = signal<LibrarySelection>(initialLibrarySelection);
   const dragging = signal(false);
   const seen = signal<ReadonlyMap<string, Seen>>(new Map());
@@ -155,7 +152,6 @@ export function LibraryPage() {
   const tile = () => Math.min(tileMax, Math.max(tileMin, prefsNow().libraryTile));
   const allMedia = (): readonly LibraryItem[] => ready(items, undefined) ?? [];
   const allArtifacts = (): readonly Artifact[] => ready(artifactsQuery, undefined) ?? [];
-  const allNotes = (): readonly PkmPageSummary[] => ready(vaultQuery, undefined)?.pages ?? [];
   const jobs = (): readonly MediaJob[] => ops()?.media ?? [];
   const mediaSummary = () => ops()?.mediaSummary;
   const working = () => making(jobs(), mediaSummary());
@@ -164,9 +160,6 @@ export function LibraryPage() {
   const pinnedSet = createMemo(() => new Set(pinnedKeys()));
   const pinnedOnly = () => isPinnedBucket(bucket());
 
-  const visibleNotes = createMemo(() =>
-    showsNotesInBucket(bucket()) ? shownNotes(allNotes(), { source: source(), sort: sort(), pinnedOnly: pinnedOnly(), pinned: pinnedSet() }) : [],
-  );
   const visibleArtifacts = createMemo(() =>
     showsArtifactsInBucket(bucket())
       ? shownArtifacts(allArtifacts(), {
@@ -189,8 +182,8 @@ export function LibraryPage() {
       : [],
   );
 
-  const totalCount = () => visibleNotes().length + visibleArtifacts().length + visibleMedia().length;
-  const sectionCount = () => (visibleNotes().length > 0 ? 1 : 0) + (visibleArtifacts().length > 0 ? 1 : 0) + (visibleMedia().length > 0 ? 1 : 0);
+  const totalCount = () => visibleArtifacts().length + visibleMedia().length;
+  const sectionCount = () => (visibleArtifacts().length > 0 ? 1 : 0) + (visibleMedia().length > 0 ? 1 : 0);
   const ids = createMemo(() => visibleMedia().map((item) => item.attachment.id));
   const imageItems = createMemo(() => visibleMedia().filter((item) => kindOf(item.attachment.type) === "image"));
 
@@ -288,7 +281,6 @@ export function LibraryPage() {
     return allMedia().find((item) => item.attachment.id === id)?.attachment ?? { id, name: id, type: "", size: 0 };
   };
 
-  const openNote = (slug: string) => router.navigate(pkmHref(slug));
   const openArtifact = (id: string) => router.navigate(`/artifacts/${encodeURIComponent(id)}`);
 
   const handleTogglePin = (key: string) => {
@@ -302,19 +294,24 @@ export function LibraryPage() {
       : act.run(async () => {
           let lastMedia: LibraryItem | undefined;
           let lastArtifact: Artifact | undefined;
+          const inOutlineBucket = bucketArtifactType(untracked(contentBrowseBucket)) === "outline";
           for (const entry of entries) {
             const data = await entry.data;
             const filename = entry.name.trim() || "file";
             if (deliverableNameRe.test(filename)) {
               const content = base64ToUtf8(data);
               const inferred = inferArtifactFromName(filename, content);
-              lastArtifact = await api.artifact.create({
-                title: inferred.title,
-                kind: inferred.kind,
-                ...(inferred.display !== undefined ? { display: inferred.display } : {}),
-                ...(inferred.artifactType !== undefined ? { artifactType: inferred.artifactType } : {}),
-                content,
-              });
+              if (inferred.artifactType === "outline" || (inOutlineBucket && markdownFileRe.test(filename))) {
+                lastArtifact = await api.artifact.outline.import({ markdown: content, filename });
+              } else {
+                lastArtifact = await api.artifact.create({
+                  title: inferred.title,
+                  kind: inferred.kind,
+                  ...(inferred.display !== undefined ? { display: inferred.display } : {}),
+                  ...(inferred.artifactType !== undefined ? { artifactType: inferred.artifactType } : {}),
+                  content,
+                });
+              }
             } else {
               const kept = await api.attachment.create({
                 name: filename,
@@ -407,7 +404,7 @@ export function LibraryPage() {
     { when: "notEditing", passThrough: true },
   );
 
-  const empty = () => allNotes().length === 0 && allArtifacts().length === 0 && allMedia().length === 0 && activeMediaCount() === 0;
+  const empty = () => allArtifacts().length === 0 && allMedia().length === 0 && activeMediaCount() === 0;
   const nothingShown = () => totalCount() === 0;
   const bucketTitle = () => titleOfBucket(bucket());
 
@@ -507,22 +504,6 @@ export function LibraryPage() {
               <MakingTiles jobs={working()} width={inner()} height={tile()} label={(job) => t(`web.library.job.${job.kind}`)} />
             </If>
             <If when={!nothingShown()} else={<Quiet>{t("web.library.nothingShown")}</Quiet>}>
-              <If when={visibleNotes().length > 0}>
-                <View class="gap-2.5">
-                  <If when={sectionCount() > 1}>
-                    <View class="flex-row items-center gap-1.5">
-                      <Text class="text-xs font-semibold text-muted">{t("web.library.content.notes")}</Text>
-                      <CountPill count={visibleNotes().length} hoverBright />
-                    </View>
-                  </If>
-                  <NoteTiles
-                    notes={visibleNotes()}
-                    onOpen={(slug) => openNote(slug)}
-                    isPinned={(slug) => isPinned(`note:${slug}`)}
-                    onTogglePin={(slug) => handleTogglePin(`note:${slug}`)}
-                  />
-                </View>
-              </If>
               <If when={visibleArtifacts().length > 0}>
                 <View class="gap-2.5">
                   <If when={sectionCount() > 1}>

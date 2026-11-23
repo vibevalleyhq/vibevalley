@@ -194,9 +194,7 @@
     "hint": "输入名字；# 只找频道和话题，@ 只找私聊",
     "none": "没有找到",
     "direct": "私聊",
-    "newDirect": "开一个私聊",
-    "note": "笔记 · {tier}",
-    "searchNotes": "在笔记里搜「{q}」"
+    "newDirect": "开一个私聊"
   },
   "farmSearch": {
     "title": "全部搜索",

@@ -44,9 +44,8 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 | `/issues`、`/issues/:id` | `issues` | 四列状态看板、搜索与过滤（`issueSearch`）以及独立全页工单详情、差异审查、关闭交付与快捷终端入口 |
 | `/runs` | `runs` | 运行中心：查询参数 `?session=&scope=&agent=&issue=` 定位与过滤、7 态运行徽标、助手待批栏 `PendingApprovals`、`WaterfallView` 瀑布图、240 步工作日志与子线程协作进度 |
 | `/library` | `library` | 媒体素材库三栏网格（图片/音频/语音/Artifact 统一视图、多选删除与灯箱） |
-| `/artifacts`、`/artifacts/*` | `library` | Artifact 三态（`blocks`/`store`/`HTML`）工作台视图与右侧配套群聊侧栏 |
+| `/artifacts`、`/artifacts/*` | `library` | Artifact 三态（`blocks` 含 `outline` 大纲笔记与 `.md` 导入 / `store` / `HTML`）工作台视图与右侧配套群聊侧栏 |
 | `/present` | 独立演示全屏 | Artifact 演讲者模式，独立于常规窗口 Rail 与侧边栏 |
-| `/pkm`、`/pkm/*` | `pkm` | 个人知识库与 Markdown 笔记管理页（`PkmPage.tsx`） |
 | `/agents`、`/agents/:id` | `agents` | 助手置顶 + 帮工列表；点击进入 `AgentConfig` 修改农机、模型、思考深度、技能勾选、MCP 与动物外观（助手的职责/模型/人设/造型由 `OrchestratorProfile.tsx` 承载） |
 | `/orchestrator`、`/orchestrator/*` | `agents` | 助手的 `memory`（记性）与 `voice`（语音）配置标签页、跳往 `/runs` 的运行轨迹链接以及 `/orchestrator[/id]/trajectory` 兼容重定向（`OrchestratorPage.tsx`） |
 | `/runtimes` | `runtimes` | 农机安装检测、CLI 可用性与额度精力瓶水位仪（`RuntimesPage.tsx`） |

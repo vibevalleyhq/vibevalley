@@ -46,7 +46,6 @@ tracing-subscriber = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
 vibevalley-core = { version = "0.1.0", path = "../core", features = ["collab"] }
-vibevalley-files = { version = "0.1.0", path = "../files" }
 vibevalley-git = { version = "0.1.0", path = "../git" }
 vibevalley-i18n = { version = "0.1.0", path = "../i18n" }
 vibevalley-protocol = { version = "0.1.0", path = "../protocol" }

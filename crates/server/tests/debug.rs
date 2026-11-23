@@ -32,7 +32,6 @@ fn start_server(dir: &Path, debug_enabled: bool, deepseek_key: &str) -> Started 
         orchestrator_listens: false,
         link_previews: false,
         tick_crons: false,
-        watch_pkm: false,
         deepseek_api_key: deepseek_key.into(),
         debug_enabled,
         ..ServerConfig::under(dir)

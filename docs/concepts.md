@@ -10,19 +10,18 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，和 [Multica](https://gi
 
 ```
 Host（~/.vibevalley：密钥、引擎、全局角色模板）
-└── Space（<space>/：repos、worktrees、pkm、AGENTS.md）
+└── Space（<space>/：repos、worktrees、AGENTS.md）
     ├── Repo（<space>/repos/<name>，一个 git 仓库，地图上的一座岛）
     │   └── Worktree（<space>/worktrees/<repo>.<issue>，任务的检出）
     ├── Issue（任务，可以指一个 Repo）
     │   ├── Assignment → Agent 角色
     │   └── IssueThread → Channel
-    ├── Pkm（<space>/pkm，按 PARA 组织的笔记）
-    └── Artifact（作品）
+    └── Artifact（作品，含 outline 大纲笔记）
 ```
 
-一个 Space 有若干个 **Repo**、若干个 **Issue** 和一份 **Pkm**。Repo 是仓库本身；Issue 归 Space，用 `repo` 指向它要改的仓库，也可以不指（只调研、只写笔记）；指了仓库且角色开了 worktree 时，才为它切出 **Worktree**。Agent、Session、Run 是在这个 Space 里运行与协同的实体。
+一个 Space 有若干个 **Repo**、若干个 **Issue** 和若干份 **Artifact**。Repo 是仓库本身；Issue 归 Space，用 `repo` 指向它要改的仓库，也可以不指（只调研、只写大纲或文档）；指了仓库且角色开了 worktree 时，才为它切出 **Worktree**。Agent、Session、Run 是在这个 Space 里运行与协同的实体。
 
-现在任务、频道这些状态还在 Host 的库里（`$VIBEVALLEY_HOME/server.db`），所以切换 Space 目前只切 `repos/`、`worktrees/` 和 `pkm/`，看板还没跟着切；让整个 Space 自包含是 [Space 领域模型](.agents/notes/proposed/architecture/2026-11-06-space-domain-model.md) 还没做完的一步。
+现在任务、频道这些状态还在 Host 的库里（`$VIBEVALLEY_HOME/server.db`），所以切换 Space 目前只切 `repos/` 和 `worktrees/`，看板还没跟着切；让整个 Space 自包含是 [Space 领域模型](.agents/notes/proposed/architecture/2026-11-06-space-domain-model.md) 还没做完的一步。
 
 ## 一件活怎么走
 
@@ -44,7 +43,7 @@ Host（~/.vibevalley：密钥、引擎、全局角色模板）
 | 概念 | 代码里 | 是什么 |
 |---|---|---|
 | Host | `ServerConfig` 的 `home` | 本机的 VibeValley：跨空间共用的密钥、引擎、全局角色模板和日志都在 `$VIBEVALLEY_HOME` |
-| Space | `SpaceState`（核心状态）；目录是服务端 `ServerConfig` 的 `workRoot` | 一套独立的工作：`repos/`、`worktrees/`、`pkm/`；同时运行的上限（6）是它的 |
+| Space | `SpaceState`（核心状态）；目录是服务端 `ServerConfig` 的 `workRoot` | 一套独立的工作：`repos/`、`worktrees/`；同时运行的上限（6）是它的 |
 | 主助手 | `Orchestrator` | 用户的统筹 agent：听用户说，拆成任务，派出去，转告结果 |
 | Agent 角色 | `Agent` | 能派活的「同事」：引擎、模型、人设、技能、MCP、环境变量、长相 |
 | 引擎 | `RuntimeInfo` | 本机上的一种编码 agent 程序，由 oar 驱动 |
@@ -61,8 +60,7 @@ Host（~/.vibevalley：密钥、引擎、全局角色模板）
 | 父子任务 | `Issue.parent`、`blockedBy`（拆单输入 `IssueChildDraft`） | 一件大活拆成有先后的子任务：每个子任务是普通任务，前置做完后派发，过了检查先合进父任务分支，最后由父任务统一验收、合进主分支 |
 | 频道 | `Channel`（`type: channel`、`direct`、`thread`） | 说话的地方，照 Discord：频道、私聊和话题都是 channel；有一个默认频道（`default`，农场画成田头），用户和主助手有一个私聊（`peer`），话题挂在一个频道（`parent`）的一条消息（`root`）下面；外面的聊天软件经连接器接到一个频道上 |
 | 任务话题 | `type: thread`、`subjectKind: issue` | 一个任务下的对话，相当于 Linear 的评论 |
-| 作品 | `Artifact`（正文 `blocks`、`store` 或 `html`） | 留下来要人看的作品：协作块文档、结构化多条目作品（幻灯片、看板、短片、白板、界面画板、设计体系）或按稿保存的单页网页 |
-| 笔记 | `Pkm`（`PkmPage`、`PkmBlock`） | 用户的大纲知识库：按 PARA 文件夹与日记组织的 Markdown 页面 |
+| 作品 | `Artifact`（正文 `blocks`、`store` 或 `html`） | 留下来要人看的作品：协作块文档（含 `outline` 树状大纲与 `.md` 导入）、结构化多条目作品（幻灯片、看板、短片、白板、界面画板、设计体系）或按稿保存的单页网页 |
 | 定时任务 | `Cron` | 一个任务的一种触发：一个定时任务对应一个任务，派给一个角色或主助手，每次到点是它的一次 run |
 | 收件箱 | `InboxItem` | 要你处理的事，从核心状态现算（[核心状态的收件箱](docs/subsystems/core.md#收件箱)） |
 | 记忆 | `Memory` | 一个角色记得的事 |

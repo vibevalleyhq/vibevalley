@@ -28,12 +28,7 @@ function isolatedEnvironment(home: string, work: string): Record<string, string>
   const env: Record<string, string> = {};
   const screenOptions = new Set(["VIBEVALLEY_PAGES", "VIBEVALLEY_SCREEN"]);
   for (const [key, value] of Object.entries(process.env)) {
-    if (
-      value !== undefined &&
-      (!key.startsWith("VIBEVALLEY_") || screenOptions.has(key)) &&
-      !["DEEPSEEK_API_KEY", "AGORA_APP_ID", "AGORA_APP_CERTIFICATE"].includes(key)
-    )
-      env[key] = value;
+    if (value !== undefined && (!key.startsWith("VIBEVALLEY_") || screenOptions.has(key)) && !["DEEPSEEK_API_KEY"].includes(key)) env[key] = value;
   }
   return {
     ...env,

@@ -7,13 +7,11 @@ import type * as T from "../shapes";
 export interface VoiceHandlers {
   /** A line heard on the call that is on, without its id: refused unless one call is. */
   readonly "voice.hear": (a: { readonly text: string; readonly agent?: string; readonly sendKey?: string }) => Promise<void>;
-  readonly "voice.grant.create": () => Promise<T.AgoraGrant>;
-  readonly "voice.grant.renew": (a: T.VoiceGrantRenew) => Promise<T.AgoraGrant>;
+  readonly "voice.grant.create": () => Promise<T.VoiceGrant>;
   readonly "voice.call.start": (a: T.VoiceCallStart) => Promise<T.VoiceCall>;
   readonly "voice.call.stop": (a: T.VoiceCall) => Promise<void>;
   readonly "voice.call.hear": (a: T.VoiceHeard) => Promise<void>;
   readonly "voice.call.say": (a: T.VoiceSaid) => Promise<void>;
-  readonly "voice.dictate": (a: T.DictateRequest) => Promise<T.Dictated>;
   /** Whether MOSS Live takes the key: a session is attached and closed again, nothing is said. */
   readonly "voice.moss.verify": () => Promise<T.Validation>;
 }
@@ -37,14 +35,7 @@ export const voiceEndpoints: readonly Endpoint[] = [
     op: "voice.grant.create",
     about: [],
     input: undefined,
-    result: S.AgoraGrant,
-    can: ["user", "remote"],
-  },
-  {
-    op: "voice.grant.renew",
-    about: [],
-    input: S.VoiceGrantRenew,
-    result: S.AgoraGrant,
+    result: S.VoiceGrant,
     can: ["user", "remote"],
   },
   {
@@ -73,13 +64,6 @@ export const voiceEndpoints: readonly Endpoint[] = [
     about: [],
     input: S.VoiceSaid,
     result: undefined,
-    can: ["user", "remote"],
-  },
-  {
-    op: "voice.dictate",
-    about: [],
-    input: S.DictateRequest,
-    result: S.Dictated,
     can: ["user", "remote"],
   },
 ];

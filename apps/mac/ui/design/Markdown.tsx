@@ -1,21 +1,21 @@
 // Declarative Markdown wrapper backed by native Rust `vibevalley/rich` (`VvMarkdown`),
 // with a stock `nsh/base` `TextView` fallback when running headless under `nsh test`.
-// Issue numbers (#12), @mentions, PKM syntax, Shiki code blocks, Mermaid diagrams,
+// Issue numbers (#12), @mentions, Shiki code blocks, Mermaid diagrams,
 // JSON Canvas, SVG Charts, reactive GenUI, and LaTeX math are all handled natively in Rust.
+import { Clipboard } from "nsh";
 import { TextView } from "nsh/base";
+
+import { t } from "@vibevalley/i18n";
 
 import { hostApi } from "../infra/bridge";
 import {
+  formatGenUiAction,
   richNative,
-  type BlockRefPayload,
-  type VvBlockRefPressEvent,
   type VvCodeCopyEvent,
-  type VvEmbedPressEvent,
   type VvGenUiActionEvent,
   type VvIssuePressEvent,
   type VvMentionPressEvent,
   type VvTaskPressEvent,
-  type VvWikilinkPressEvent,
 } from "../infra/rich";
 import { useRouter } from "../infra/router";
 import { Canvas } from "./code/Canvas";
@@ -23,6 +23,7 @@ import { Chart } from "./code/Chart";
 import { CodeBlock } from "./code/CodeBlock";
 import { Diagram } from "./code/Diagram";
 import { GenUi } from "./code/GenUi";
+import { toast } from "./toasts";
 
 const fallbackClasses = {
   link: "text-water underline",
@@ -64,15 +65,10 @@ export interface MarkdownProps {
   size?: "base" | "sm" | "doc";
   baseDir?: string | null;
   mentions?: boolean;
-  pkm?: boolean;
-  refs?: readonly BlockRefPayload[];
   streaming?: boolean;
   selectable?: boolean;
   onIssuePress?: (event: VvIssuePressEvent) => void;
   onMentionPress?: (event: VvMentionPressEvent) => void;
-  onWikilinkPress?: (event: VvWikilinkPressEvent) => void;
-  onBlockRefPress?: (event: VvBlockRefPressEvent) => void;
-  onEmbedPress?: (event: VvEmbedPressEvent) => void;
   onTaskPress?: (event: VvTaskPressEvent) => void;
   onCodeCopy?: (event: VvCodeCopyEvent) => void;
   onGenUiAction?: (event: VvGenUiActionEvent) => void;
@@ -86,6 +82,27 @@ export function Markdown(props: MarkdownProps) {
     if (url.startsWith("/")) router.navigate(url);
     else void hostApi.openUrl(url);
   };
+  const handleGenUiAction = (event: VvGenUiActionEvent) => {
+    if (props.onGenUiAction) {
+      props.onGenUiAction(event);
+      return;
+    }
+    const action = event.action.trim();
+    const payload = event.payload.trim();
+    if (action === "navigate" && payload.startsWith("/")) {
+      router.navigate(payload);
+      return;
+    }
+    if (action === "copy" && payload) {
+      void Clipboard.writeText(payload).then(
+        () => toast(t("web.base.rich.copied")),
+        () => undefined,
+      );
+      return;
+    }
+    const summary = formatGenUiAction(event);
+    if (summary) toast(summary);
+  };
   const native = richNative();
   if (native) {
     const VvMarkdown = native.VvMarkdown;
@@ -95,8 +112,6 @@ export function Markdown(props: MarkdownProps) {
         size={size()}
         baseDir={props.baseDir ?? null}
         mentions={props.mentions === true}
-        pkm={props.pkm === true}
-        refs={props.refs}
         streaming={props.streaming === true}
         selectable={props.selectable ?? true}
         class={props.class}
@@ -106,18 +121,9 @@ export function Markdown(props: MarkdownProps) {
           else router.navigate(`/issues/${e.number}`);
         }}
         onMentionPress={props.onMentionPress}
-        onWikilinkPress={(e) => {
-          if (props.onWikilinkPress) props.onWikilinkPress(e);
-          else router.navigate(`/pkm/${encodeURIComponent(e.page)}`);
-        }}
-        onBlockRefPress={(e) => {
-          if (props.onBlockRefPress) props.onBlockRefPress(e);
-          else if (e.page) router.navigate(`/pkm/${encodeURIComponent(e.page)}?b=${encodeURIComponent(e.id)}`);
-        }}
-        onEmbedPress={props.onEmbedPress}
         onTaskPress={props.onTaskPress}
         onCodeCopy={props.onCodeCopy}
-        onGenUiAction={props.onGenUiAction}
+        onGenUiAction={handleGenUiAction}
       />
     );
   }
@@ -139,7 +145,7 @@ export function Markdown(props: MarkdownProps) {
           case "canvas":
             return <Canvas data={block.code} />;
           case "genui":
-            return <GenUi spec={block.code} streaming={props.streaming} onAction={props.onGenUiAction} />;
+            return <GenUi spec={block.code} streaming={props.streaming} onAction={handleGenUiAction} />;
           default:
             return <CodeBlock code={block.code} language={block.language} onCopy={props.onCodeCopy} />;
         }

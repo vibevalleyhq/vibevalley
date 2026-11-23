@@ -186,9 +186,6 @@ async fn run(voice: Arc<Voice>, cancel: CancellationToken) -> Result<(), String>
             return Ok(None);
         }
         let grant = setup_voice.grant().map_err(|e| e.message)?;
-        if grant.app_id != "moss" {
-            return Err("select MOSS Live as the call's answer provider first".into());
-        }
         let line = setup_voice.moss_line().map_err(|e| e.message)?;
         let voice_call = setup_voice.start(&grant.channel, &grant.uid, None).map_err(|e| e.message)?;
         Ok(Some((audio, line, voice_call)))

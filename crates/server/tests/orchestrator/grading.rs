@@ -31,7 +31,6 @@ fn graded_issue(
         tick_crons: false,
         link_previews: false,
         orchestrator_listens: false,
-        watch_pkm: false,
         ..vibevalley_server::ServerConfig::under(home.path())
     };
     config.tool_permissions.overrides.insert(

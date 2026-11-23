@@ -76,11 +76,9 @@
     "unpin": "取消置顶",
     "pinnedToast": "已置顶收藏",
     "unpinnedToast": "已取消置顶",
-    "notes": "大纲笔记",
     "newNote": "新建大纲笔记",
     "artifacts": "作品",
     "media": "素材",
-    "notesTodoCount": "{n} 项待办",
     "sendArtifact": "发到频道",
     "exportArtifact": "导出",
     "turnIntoIssue": "转为任务",
@@ -244,7 +242,6 @@
       "title": "搜索内容",
       "placeholder": "搜索笔记、作品和素材…",
       "empty": "未找到匹配的笔记、作品或素材",
-      "typeNote": "大纲笔记",
       "typeMedia": "素材"
     }
   }

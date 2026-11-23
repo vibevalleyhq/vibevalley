@@ -70,8 +70,6 @@ export interface Finding {
 }
 
 const RULE_EXEMPTIONS: Readonly<Record<string, readonly ViolationRule[]>> = {
-  // 5-state PKM task marker (TODO/DOING/DONE/WAIT/CANCELED), not binary <Checkbox>.
-  "apps/mac/ui/features/pkm/OutlineEditor.tsx": ["raw-control"],
   // Third-party WeChat/Feishu/QQ brand stand-ins and QR quiet frame.
   "apps/mac/ui/features/connector/ConnectorsPage.tsx": ["hardcoded-color"],
   // Sandboxed WebView HTML CSS custom properties (--vv-*).

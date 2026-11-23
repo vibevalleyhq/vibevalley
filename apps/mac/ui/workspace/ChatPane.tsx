@@ -13,7 +13,7 @@ import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
 import { act, hostApi } from "../infra/bridge";
 import { readChatPaneParams } from "../infra/hostParams";
-import { richNative } from "../infra/rich";
+import { formatGenUiAction, richNative, type VvGenUiActionEvent } from "../infra/rich";
 import {
   asThoughtLevel,
   clampThoughtLevel,
@@ -120,7 +120,7 @@ function basenameOf(path: string): string {
   return trimmed.split("/").pop() || trimmed || "/";
 }
 
-function ChatMarkdown(props: { text: string; streaming?: boolean }) {
+function ChatMarkdown(props: { text: string; streaming?: boolean; onGenUiAction?: (event: VvGenUiActionEvent) => void }) {
   const native = richNative();
   const openLink = (url: string) => {
     if (url.startsWith("/")) {
@@ -131,9 +131,27 @@ function ChatMarkdown(props: { text: string; streaming?: boolean }) {
       void hostApi.openUrl(url);
     }
   };
+  const handleGenUiAction = (event: VvGenUiActionEvent) => {
+    if (props.onGenUiAction) {
+      props.onGenUiAction(event);
+      return;
+    }
+    if (event.action.trim() === "navigate" && event.payload.trim().startsWith("/")) {
+      act({ type: "open_route", path: event.payload.trim() });
+    }
+  };
   if (native) {
     const VvMarkdown = native.VvMarkdown;
-    return <VvMarkdown text={props.text} size="sm" streaming={props.streaming === true} selectable onLinkPress={(e) => openLink(e.url)} />;
+    return (
+      <VvMarkdown
+        text={props.text}
+        size="sm"
+        streaming={props.streaming === true}
+        selectable
+        onLinkPress={(e) => openLink(e.url)}
+        onGenUiAction={handleGenUiAction}
+      />
+    );
   }
   return <TextView markdown={props.text} selectable onLinkPress={(e) => openLink(e.url)} />;
 }
@@ -852,7 +870,25 @@ export function WorkspaceChatPane() {
 
               <If when={step().type === "assistant/message"}>
                 <View class="rounded-lg px-1 py-0.5">
-                  <ChatMarkdown text={step().text} streaming={effectivePhase() === "working"} />
+                  <ChatMarkdown
+                    text={step().text}
+                    streaming={effectivePhase() === "working"}
+                    onGenUiAction={(ev) => {
+                      const action = ev.action.trim();
+                      const payload = ev.payload.trim();
+                      if (action === "navigate" && payload.startsWith("/")) {
+                        act({ type: "open_route", path: payload });
+                        return;
+                      }
+                      if (action !== "state_change") {
+                        const text = formatGenUiAction(ev);
+                        if (text) {
+                          draft.set(text);
+                          void send();
+                        }
+                      }
+                    }}
+                  />
                 </View>
               </If>
 

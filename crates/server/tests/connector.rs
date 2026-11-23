@@ -536,7 +536,6 @@ fn start(dir: &std::path::Path, world: &World) -> Started {
         tick_crons: false,
         link_previews: false,
         orchestrator_listens: false,
-        watch_pkm: false,
         connector: Options {
             vendors: Vendors {
                 weixin: world.http.clone(),

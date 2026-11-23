@@ -99,7 +99,7 @@ writeFileSync(
 <key>CFBundleVersion</key><string>${version.split("-")[0]}</string>
 <key>LSMinimumSystemVersion</key><string>${minimumMacOS}</string>
 <key>NSHighResolutionCapable</key><true/>
-<key>NSMicrophoneUsageDescription</key><string>VibeValley uses the microphone for voice conversations and dictation.</string>
+<key>NSMicrophoneUsageDescription</key><string>VibeValley uses the microphone for voice conversations.</string>
 </dict></plist>\n`,
 );
 sign(app, true);

@@ -174,6 +174,7 @@
 | `useQuery` | `query/solid.tsx` |  |
 | `ready` | `query/solid.tsx` |  |
 | `fixOf` | `readiness.ts` | What a feature lacks, in words, and the settings page that fixes it (SettingsStatus.readiness says what lacks). |
+| `formatGenUiAction` | `rich.ts` | Formats a GenUI action event into a concise human-readable line for toasts or channel feedback. |
 | `richNative` | `rich.ts` |  |
 | `installNativeI18n` | `rich.ts` | Routes `@vibevalley/i18n` through native Rust `VvI18n` when the host registers it. |
 | `appHistory` | `router/context.tsx` | The one history of the app's page, for code outside the tree (the host's "open this route"). |

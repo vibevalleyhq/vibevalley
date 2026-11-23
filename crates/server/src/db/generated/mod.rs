@@ -13,8 +13,6 @@ pub(crate) mod content_library;
 #[rustfmt::skip]
 pub(crate) mod content_media;
 #[rustfmt::skip]
-pub(crate) mod content_pkm;
-#[rustfmt::skip]
 pub(crate) mod infra_remote;
 #[rustfmt::skip]
 pub(crate) mod shared;

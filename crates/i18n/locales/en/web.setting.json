@@ -51,15 +51,13 @@
     "remote": "Remote Access",
     "about": "About & Data",
     "memory": "Memory",
-    "call": "Call line",
-    "dictation": "Dictation",
     "chat": "Chat apps",
     "width": "Navigation width (drag; double-click for the default)"
   },
   "words": {
     "general": "language start workbench farm theme dark light size zoom scale font animation motion reduce",
-    "models": "keys accounts DeepSeek MOSS Agora API key models binding",
-    "voice": "Agora call phone recognition speech MOSS live realtime vision dictation transcription",
+    "models": "keys accounts DeepSeek MOSS API key models binding",
+    "voice": "call phone recognition speech MOSS live realtime vision transcription",
     "connections": "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
     "remote": "remote mobile phone Tailscale pair pairing QR device iOS Android listener token",
     "about": "version home folder settings data catalog"
@@ -119,8 +117,6 @@
     "reposHint": "The space's repos; each folder is a git repository",
     "worktrees": "Worktrees",
     "worktreesHint": "Each issue's own checkout while a helper works",
-    "pkm": "Notes vault",
-    "pkmHint": "The space's PARA folders and journals",
     "copy": "Copy the path",
     "copied": "Path copied",
     "reveal": "Show in Finder",
@@ -161,9 +157,7 @@
     "mossAccount": "No MOSS account yet",
     "mossKey": "The MOSS account has no key yet",
     "mossOff": "The MOSS account it uses is turned off",
-    "binding": "No account and model chosen for it yet",
-    "agora": "Agora's credentials are missing",
-    "dictationUrl": "No dictation address yet"
+    "binding": "No account and model chosen for it yet"
   },
   "feature": {
     "orchestrator": "The assistant",
@@ -173,7 +167,6 @@
     "speakers": "Dialogue",
     "voiceDesign": "Voice design",
     "transcription": "Transcription",
-    "dictation": "Dictation",
     "live": "MOSS Live",
     "vision": "Live vision",
     "call": "Calls"

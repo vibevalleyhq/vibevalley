@@ -356,7 +356,7 @@ mod tests {
     }
 
     #[test]
-    fn regression_web_base_and_pkm_rich_ui_keys_are_embedded_in_both_languages() {
+    fn regression_web_base_and_artifact_rich_ui_keys_are_embedded_in_both_languages() {
         for key in [
             "web.base.rich.copy",
             "web.base.rich.copied",
@@ -365,7 +365,6 @@ mod tests {
             "web.base.rich.diagram",
             "web.artifact.whiteboard.inspector",
             "web.artifact.whiteboard.fitView",
-            "web.pkm.page.missingRef",
         ] {
             for lang in ["zh", "en"] {
                 let translated = t_in(lang, key, &[]);
@@ -376,7 +375,6 @@ mod tests {
         assert_eq!(t_in("en", "web.base.rich.copy", &[]), "Copy");
         assert!(!t_in("zh", "web.base.rich.lines", &[("n", 12i64.into())]).starts_with("web."));
         assert!(!t_in("en", "web.base.rich.diagramFailed", &[("why", "parse".into())]).starts_with("web."));
-        assert!(!t_in("zh", "web.pkm.page.refFrom", &[("page", "Home".into())]).starts_with("web."));
     }
 
     #[test]

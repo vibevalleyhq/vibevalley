@@ -2,7 +2,7 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（23 篇）
+## proposed（22 篇）
 
 ### feature
 
@@ -13,10 +13,6 @@
 - 2026-10-20 [几个帮工同时写一篇文章：在屏幕上看起来怎样](.agents/notes/proposed/feature/2026-10-20-block-editor-ux.md)
 - 2026-10-13 [帮工各自的音色](.agents/notes/proposed/feature/2026-10-13-helper-voices.md)
 - 2026-10-09 [商店和每日任务](.agents/notes/proposed/feature/2026-10-09-shop-and-daily-tasks.md)
-
-### simplification
-
-- 2026-11-22 [全仓收敛审计清单（C1–C14 与 S1–S6 待选收敛项）](.agents/notes/proposed/simplification/2026-11-22-full-repo-convergence-audit.md)
 
 ### architecture
 
@@ -30,7 +26,7 @@
 - 2026-11-18 [在原生版复刻 Chord、持久执行、oar 和 Web 农场](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)
 - 2026-11-14 [原生的 VibeValley：Rust 服务端为准，激进重构，删掉 Electron、TS 服务端、页面和手机壳](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)
 - 2026-11-07 [让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)
-- 2026-11-06 [Space 核心业务概念模型（Space、Repo、Worktree、Issue、Pkm 与执行体）](.agents/notes/proposed/architecture/2026-11-06-space-domain-model.md)
+- 2026-11-06 [Space 核心业务概念模型（Space、Repo、Worktree、Issue 与执行体）](.agents/notes/proposed/architecture/2026-11-06-space-domain-model.md)
 - 2026-10-28 [agent 带什么：工具集（toolsets）和技能（skill 模块），用户用 `/` 叫它们](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)
 - 2026-10-18 [记忆表加上用户画像和干活的经过，相似的新记忆取代旧的](.agents/notes/proposed/architecture/2026-10-18-profile-and-episode-memories.md)
 - 2026-10-18 [一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)

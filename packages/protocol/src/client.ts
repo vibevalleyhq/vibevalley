@@ -371,18 +371,14 @@ export class VibeValleyApi {
     /** A line heard on the call that is on, without its id: refused unless one call is. */
     hear: (a: { text: string; agent?: string; sendKey?: string }, options?: { signal?: AbortSignal }): Promise<void> =>
       this.call<void>("voice.hear", "/api/v1/voice/hear", a, options),
-    dictate: (a: T.DictateRequest, options?: { signal?: AbortSignal }): Promise<T.Dictated> =>
-      this.call<T.Dictated>("voice.dictate", "/api/v1/voice/dictate", a, options),
     moss: {
       /** Whether MOSS Live takes the key: a session is attached and closed again, nothing is said. */
       verify: (options?: { signal?: AbortSignal }): Promise<T.Validation> =>
         this.call<T.Validation>("voice.moss.verify", "/api/v1/voice/moss/verify", undefined, options),
     },
     grant: {
-      create: (options?: { signal?: AbortSignal }): Promise<T.AgoraGrant> =>
-        this.call<T.AgoraGrant>("voice.grant.create", "/api/v1/voice/grant/create", undefined, options),
-      renew: (a: T.VoiceGrantRenew, options?: { signal?: AbortSignal }): Promise<T.AgoraGrant> =>
-        this.call<T.AgoraGrant>("voice.grant.renew", "/api/v1/voice/grant/renew", a, options),
+      create: (options?: { signal?: AbortSignal }): Promise<T.VoiceGrant> =>
+        this.call<T.VoiceGrant>("voice.grant.create", "/api/v1/voice/grant/create", undefined, options),
     },
     call: {
       start: (a: T.VoiceCallStart, options?: { signal?: AbortSignal }): Promise<T.VoiceCall> =>
@@ -505,9 +501,6 @@ export class VibeValleyApi {
     /** A batch of ops, as the user: taken in order, in one transaction, one batch at a time. */
     submit: (a: { id: T.ArtifactId } & T.BlockSubmit, options?: { signal?: AbortSignal }): Promise<T.BlockAck> =>
       this.call<T.BlockAck>("artifact.submit", "/api/v1/artifact/submit", a, options),
-    /** Starts the scripted demo (up to three helpers writing their own sections at once, no model) and returns at once;
-     * one already running is refused. */
-    demo: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("artifact.demo", "/api/v1/artifact/demo", a, options),
     content: {
       /** Its words: an html one's version as made, a blocks one's Markdown now (its version is its seq). What an agent reads
        * to make the next one. */
@@ -576,6 +569,11 @@ export class VibeValleyApi {
       /** An atomic batch of set, patch, delete or copy writes on a store artifact with per-entry optimistic concurrency. */
       batch: (a: T.ArtifactEntryBatchRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactEntryBatchResult> =>
         this.call<T.ArtifactEntryBatchResult>("artifact.entry.batch", "/api/v1/artifact/entry/batch", a, options),
+    },
+    outline: {
+      /** Imports a `.md` document into a new `ArtifactType::Outline` blocks artifact. */
+      import: (a: T.ArtifactOutlineImportRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
+        this.call<T.Artifact>("artifact.outline.import", "/api/v1/artifact/outline/import", a, options),
     },
     presence: {
       /** Ephemeral live presence update (cursor, selection, highlight, viewport); never persisted to SQLite. */
@@ -700,76 +698,6 @@ export class VibeValleyApi {
     /** What delete would do, refused as it would be; nothing changes. */
     previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
       this.call<T.Preview>("skill.previewDelete", "/api/v1/skill/previewDelete", a, options),
-  };
-
-  readonly pkm = {
-    search: (a: T.PkmSearchRequest, options?: { signal?: AbortSignal }): Promise<T.PkmSearchHit[]> =>
-      this.call<T.PkmSearchHit[]>("pkm.search", "/api/v1/pkm/search", a, options),
-    /** Into today's journal as LATER lines tagged #inbox (an agent's says who noted it), or at the end of a page. */
-    capture: (a: T.PkmCaptureRequest, options?: { signal?: AbortSignal }): Promise<T.PkmPage> =>
-      this.call<T.PkmPage>("pkm.capture", "/api/v1/pkm/capture", a, options),
-    /** Puts back the file the last change wrote. */
-    undo: (options?: { signal?: AbortSignal }): Promise<T.PkmUndo> => this.call<T.PkmUndo>("pkm.undo", "/api/v1/pkm/undo", undefined, options),
-    /** Reads again every file that changed on disk. */
-    scan: (options?: { signal?: AbortSignal }): Promise<T.PkmScan> => this.call<T.PkmScan>("pkm.scan", "/api/v1/pkm/scan", undefined, options),
-    page: {
-      /** Every page in the vault, newest first; files changed on disk are read again first. */
-      list: (options?: { signal?: AbortSignal }): Promise<T.PkmVault> => this.call<T.PkmVault>("pkm.page.list", "/api/v1/pkm/page/list", undefined, options),
-      /** The page with its ((refs)) read out, the blocks linking to it and its open remarks; read again from its file when that changed. */
-      get: (a: T.PkmPageRef, options?: { signal?: AbortSignal }): Promise<T.PkmPageView> =>
-        this.call<T.PkmPageView>("pkm.page.get", "/api/v1/pkm/page/get", a, options),
-      /** Makes the page, or sets the props and tier of the one with that title (its file moves to the tier's folder). */
-      save: (a: T.PkmPageRequest, options?: { signal?: AbortSignal }): Promise<T.PkmPage> =>
-        this.call<T.PkmPage>("pkm.page.save", "/api/v1/pkm/page/save", a, options),
-      move: (a: T.PkmMoveRequest, options?: { signal?: AbortSignal }): Promise<T.PkmPage> =>
-        this.call<T.PkmPage>("pkm.page.move", "/api/v1/pkm/page/move", a, options),
-      rename: (a: T.PkmRenameRequest, options?: { signal?: AbortSignal }): Promise<T.PkmRename> =>
-        this.call<T.PkmRename>("pkm.page.rename", "/api/v1/pkm/page/rename", a, options),
-      /** The page as plain Markdown: refs read out, links and remarks taken off. */
-      export: (a: T.PkmPageRef, options?: { signal?: AbortSignal }): Promise<T.PkmMarkdown> =>
-        this.call<T.PkmMarkdown>("pkm.page.export", "/api/v1/pkm/page/export", a, options),
-    },
-    block: {
-      /** The ops in order on the page as its file is now, written back once. */
-      apply: (a: T.PkmMutation, options?: { signal?: AbortSignal }): Promise<T.PkmPage> =>
-        this.call<T.PkmPage>("pkm.block.apply", "/api/v1/pkm/block/apply", a, options),
-    },
-    source: {
-      /** The page's file as written, ids and all, with when it was written. */
-      get: (a: T.PkmPageRef, options?: { signal?: AbortSignal }): Promise<T.PkmSource> =>
-        this.call<T.PkmSource>("pkm.source.get", "/api/v1/pkm/source/get", a, options),
-      /** The page written anew from its file's text; refused when the file changed after it was read. */
-      update: (a: T.PkmSourceUpdate, options?: { signal?: AbortSignal }): Promise<T.PkmPage> =>
-        this.call<T.PkmPage>("pkm.source.update", "/api/v1/pkm/source/update", a, options),
-    },
-    journal: {
-      /** The journal of a day, made empty when it has none yet. */
-      open: (a: T.PkmJournalRequest, options?: { signal?: AbortSignal }): Promise<T.PkmPage> =>
-        this.call<T.PkmPage>("pkm.journal.open", "/api/v1/pkm/journal/open", a, options),
-    },
-    radar: {
-      get: (a: { staleDays?: number }, options?: { signal?: AbortSignal }): Promise<T.PkmRadar> =>
-        this.call<T.PkmRadar>("pkm.radar.get", "/api/v1/pkm/radar/get", a, options),
-    },
-    comment: {
-      list: (a: { page?: string }, options?: { signal?: AbortSignal }): Promise<T.PkmComment[]> =>
-        this.call<T.PkmComment[]>("pkm.comment.list", "/api/v1/pkm/comment/list", a, options),
-      /** A rewrite of a block for the user to accept: it keeps every [[link]] and ((ref)) the block had. */
-      suggest: (a: T.PkmProposalRequest, options?: { signal?: AbortSignal }): Promise<T.PkmProposal> =>
-        this.call<T.PkmProposal>("pkm.comment.suggest", "/api/v1/pkm/comment/suggest", a, options),
-      /** Accepted, the suggested text replaces the block's and its remarks come off; rejected, the block stays. */
-      resolve: (a: T.PkmResolveRequest, options?: { signal?: AbortSignal }): Promise<T.PkmPage> =>
-        this.call<T.PkmPage>("pkm.comment.resolve", "/api/v1/pkm/comment/resolve", a, options),
-    },
-    clip: {
-      create: (a: T.PkmClipRequest, options?: { signal?: AbortSignal }): Promise<T.PkmClip> =>
-        this.call<T.PkmClip>("pkm.clip.create", "/api/v1/pkm/clip/create", a, options),
-    },
-    cluster: {
-      /** A resource page of ((refs)) to the inbox, journal and resource blocks about the topic. */
-      create: (a: T.PkmClusterRequest, options?: { signal?: AbortSignal }): Promise<T.PkmCluster> =>
-        this.call<T.PkmCluster>("pkm.cluster.create", "/api/v1/pkm/cluster/create", a, options),
-    },
   };
 
   readonly memory = {

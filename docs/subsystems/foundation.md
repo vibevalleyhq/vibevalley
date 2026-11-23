@@ -24,7 +24,7 @@
 | `crates/server/src/db/{schema,queries,generated}/` | 服务端 SQLite 建表语句（含 `shared.sql` 共享 `seq_counter` 与 `infra_remote.sql` 远程配置/设备表）、命名查询（`*.sql`）与 sqlc 生成的 SQLx 查询模块（`*.rs`，由边界测试锁死仅限所属域模块调用） |
 | `crates/server/src/modules/`、`crates/server/src/transport/` | 按六大域分组的业务模块（`work`、`team`、`collab`、`content`、`skin`、`infra`，含 `infra/debug/` `DebugKit` 与 `infra/remote/` 远程访问控制）与传输层（`api`、`bridge`、`http`） |
 | `crates/protocol/src/contract/`、`crates/protocol/tests/typescript.rs`、`crates/protocol/src/home.rs` | 线上类型（含 5 域切片、`FarmFrame`、`debug.rs` 的 `DebugKit`、[remote.rs](crates/protocol/src/contract/remote.rs) 的远程访问契约与 `host.rs` 的 `Host*` 帧/`HostAction`/`HostOp` 壳协议，`ts-rs` 写出 `packages/protocol` 的 `*.gen.ts`，`vp run protocol:check` 查最新）与家目录约定（`server.json`、语言） |
-| `crates/core/src/` | 纯规则中心：`reduce`、`SliceMask` 与按域切片投影、状态派生、收件箱、依赖、定时任务（`cron/`）、笔记大纲（`pkm/`）、作品引擎（`artifact/`） |
+| `crates/core/src/` | 纯规则中心：`reduce`、`SliceMask` 与按域切片投影、状态派生、收件箱、依赖、定时任务（`cron/`）、作品引擎（`artifact/`） |
 | `crates/runtime/src/` | 进程级共享 Tokio 运行时 `rt.rs`（`vibevalley_runtime::rt::{handle, spawn, block_on}`）、`oar/` 驱动与自研 `agent/` 持久对话引擎（`execution.db`） |
 | `crates/rich/`、`crates/engines/{onig,pele,shiki}` | 原生富内容组件与内部引擎（`canvas`、`chart`、`genui`、`pinyin`）及底层正则/高亮/图谱引擎 |
 | `apps/mac/crates/workspace/src/store/mod.rs` | 原生应用外壳的 `state.db`（SQLite）：项目、终端与布局；连同 `pixel`、`terminal` 共 3 个桌面支撑 crate |
@@ -90,7 +90,7 @@
 | 像素场景 | 真的素材、样例帧，在 CPU 上画 | `apps/mac/src/pixel/tests.rs` |
 
 - **不靠睡眠等待**：Rust 测试用 `until` 轮询条件；TS 测试禁止写死 `setTimeout` 或 `waitForTimeout`（`vibevalley/no-test-sleep` 查）。
-- **对照 golden**：`reduce` 与出帧、artifact 与 pkm 的规则对着 golden；artifact 与 pkm 的由 TS 的引擎写出（`vp run goldens`）（`crates/core/tests/projection.rs`、`crates/core/tests/artifact_golden.rs`）。
+- **对照 golden**：`reduce` 与出帧、artifact 的规则对着 golden；artifact 的 golden 由 `vp run goldens` 校验与更新（`crates/core/tests/projection.rs`、`crates/core/tests/artifact_golden.rs`）。
 
 ### 话放在哪
 

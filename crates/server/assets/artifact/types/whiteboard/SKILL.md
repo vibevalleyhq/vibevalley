@@ -15,7 +15,7 @@
   - **独立贴纸或矢量插图（`type: "sticker" | "svg"`）**：`{ "id": "s1", "type": "sticker", "sticker": "truck", "x": 420, "y": 240, "w": 110, "h": 72, "label": "运输" }` 或 `type: "svg"` 带 `svg` 字段。
   - **表格与扩展条**：`type: "table"`（`headers`、`rows`）与 `type: "html"`（小部件元数据条目）。
   - **占座施工框（`type: "claim"`）**：帮工绘制复杂区域前先写一条 `claim` 框提示正在绘制，画完同批 `delete` 掉。
-- `presence/<id>`（JSON，可选）：`{ "id": "orch", "name": "主助手", "color": "coral" | "teal" | "blue" | "leaf" | "wheat" | "lavender", "x": 520, "y": 110, "status": "排版中" }`，在画布上显示实时协作光标与名牌（可点击跟踪视角）。
+- 实时协作光标与名牌走独立接口 `artifact.presence.update` / `artifact.presence.follow`（纯内存推送，不落盘，不写入 `elements/*` 或 `presence/*` 条目）。
 
 ## 空间排版纪律
 

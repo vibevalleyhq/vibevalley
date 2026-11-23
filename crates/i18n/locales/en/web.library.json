@@ -76,11 +76,9 @@
     "unpin": "Unpin",
     "pinnedToast": "Pinned",
     "unpinnedToast": "Unpinned",
-    "notes": "Outline notes",
     "newNote": "New outline note",
     "artifacts": "Artifacts",
     "media": "Media",
-    "notesTodoCount": "{n, plural, one {# todo} other {# todos}}",
     "sendArtifact": "Send to channel",
     "exportArtifact": "Export",
     "turnIntoIssue": "Turn into ticket",
@@ -244,7 +242,6 @@
       "title": "Search content",
       "placeholder": "Search notes, artifacts, and media…",
       "empty": "No matching notes, artifacts, or media",
-      "typeNote": "Note",
       "typeMedia": "Media"
     }
   }

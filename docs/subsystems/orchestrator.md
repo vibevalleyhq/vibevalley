@@ -16,9 +16,9 @@
 | 位置 | 职责 |
 |---|---|
 | `crates/server/src/modules/team/orchestrator/mod.rs` | `Orchestrator`：每个助手档案一个 `vibevalley-runtime::agent` 的持久对话（SQLite 队列与 `Harness`，并配置 `record_to` 写出 `<家目录>/records/<id>.jsonl` 的 `oar-voyage/3` 记录），消费频道异步投递（`Chat::dispatches()`）和没指定档案的定时任务，拼现状、跑一轮、把回复写回频道 |
-| `crates/server/src/modules/team/orchestrator/words.rs` | 对助手说的话：来源头、现状与增量、长汇报截断；提示在 `crates/server/assets/orchestrator/prompts.json` |
+| `crates/server/src/modules/team/orchestrator/words.rs` | 对助手说的话：来源头、现状与增量、长汇报截断；提示在 `crates/server/assets/orchestrator/prompts.json`（含 `chart` 与 `genui` 富内容块规范） |
 | `crates/server/src/modules/team/tool/mod.rs` | 助手和帮工共用的工具：每个工具一个参数结构体，宽松解析写一处，按调用者分支；工具名、说明与 JSON Schema 在 `crates/server/assets/tools/orchestrator.json`、`crates/server/assets/tools/helper.json` |
-| `crates/server/src/modules/team/tool/issue.rs`、`chat.rs`、`notes.rs`、`plan.rs`、`memory.rs` | 按领域分的工具：工单与帮工、频道、笔记与 Artifact 与媒体、仓库与定时任务、记性 |
+| `crates/server/src/modules/team/tool/issue.rs`、`chat.rs`、`content.rs`、`plan.rs`、`memory.rs` | 按领域分的工具：工单与帮工、频道、Artifact（含 `artifact_block_list`、`artifact_block_batch`、`artifact_outline_import`）与媒体、仓库与定时任务、记性 |
 | `crates/server/src/modules/team/mcp/resource.rs` | `resource_read`：解析 `vv://` URI，按会话裁剪只读权限、分页 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`orchestrator.*`）。

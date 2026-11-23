@@ -8,19 +8,15 @@ import { Dialog } from "../../design/Dialog";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
 import { Kbd } from "../../design/layout";
-import { api } from "../../infra/api";
 import { useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
 import { spelled } from "../../infra/base/search";
 import { ready, useQuery } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
-import { useLatest } from "../../infra/state/atom";
 import { artifactIcon, kindLabel, useArtifacts } from "../artifact";
 import { artifactHref } from "../artifact/ArtifactCard";
 import { libraryQuery } from "../media/listing";
-import { titleFor } from "../pkm/days";
-import { pkmHref, usePkmVault } from "../pkm/vault";
 import { closeContentSearch, contentBrowseBucket, contentFocusMediaId, contentSearchOpen, mediaKindOf } from "./navigation";
 
 export function ContentSearchModal() {
@@ -34,27 +30,6 @@ export function ContentSearchModal() {
 }
 
 type SearchHit =
-  | {
-      readonly key: string;
-      readonly kind: "note";
-      readonly slug: string;
-      readonly title: string;
-      readonly subtitle: string;
-      readonly badge: string;
-      readonly icon: IconName;
-      readonly updated: number;
-    }
-  | {
-      readonly key: string;
-      readonly kind: "noteBlock";
-      readonly slug: string;
-      readonly block: string;
-      readonly title: string;
-      readonly subtitle: string;
-      readonly badge: string;
-      readonly icon: IconName;
-      readonly updated: number;
-    }
   | {
       readonly key: string;
       readonly kind: "artifact";
@@ -87,62 +62,17 @@ const mediaIcon: Record<LibraryFileKind, IconName> = {
 function SearchBody() {
   const router = useRouter();
   const now = useNow();
-  const vault = usePkmVault();
   const artifacts = useArtifacts(() => ({}));
   const media = useQuery(() => libraryQuery({ text: "", sort: "recent" }), { interval: () => 10_000, keepPrevious: true });
 
   const query = signal("");
   const active = signal(0);
 
-  const blockSearch = useLatest(
-    () => {
-      const q = query().trim();
-      return q.length > 0 ? q : undefined;
-    },
-    (text) => api.pkm.search({ text, limit: 15 }),
-    150,
-  );
-
   const hits = createMemo((): readonly SearchHit[] => {
     const q = query().trim().toLowerCase();
-    const pages = ready(vault, undefined)?.pages ?? [];
-    const pageDays = new Map(pages.flatMap((p) => (p.day ? [[p.slug, p.day] as const] : [])));
     const allArtifacts = ready(artifacts, undefined) ?? [];
     const allMedia = ready(media, undefined) ?? [];
     const currentNow = now();
-
-    const noteHits: SearchHit[] = pages
-      .filter((p) => !q || spelled(titleFor(p.title, p.day), q) || spelled(p.tldr, q))
-      .map((p) => ({
-        key: `note:${p.slug}`,
-        kind: "note",
-        slug: p.slug,
-        title: titleFor(p.title, p.day),
-        subtitle: p.tldr || ago(p.updated, currentNow),
-        badge: t("web.library.content.search.typeNote"),
-        icon: p.day ? "calendar" : "notes",
-        updated: p.updated,
-      }));
-
-    const matchedNoteSlugs = new Set(noteHits.map((h) => (h.kind === "note" ? h.slug : "")));
-    const blockAnswer = blockSearch();
-    const blockHits: SearchHit[] =
-      q && blockAnswer?.state === "done"
-        ? blockAnswer.value
-            .filter((b) => !matchedNoteSlugs.has(b.page) || b.plain.trim() !== "")
-            .slice(0, 8)
-            .map((b) => ({
-              key: `block:${b.block}`,
-              kind: "noteBlock",
-              slug: b.page,
-              block: b.block,
-              title: titleFor(b.pageTitle, pageDays.get(b.page)),
-              subtitle: b.plain,
-              badge: t("web.library.content.search.typeNote"),
-              icon: "notes",
-              updated: currentNow,
-            }))
-        : [];
 
     const artifactHits: SearchHit[] = allArtifacts
       .filter((a) => !q || spelled(a.title, q) || spelled(kindLabel(a), q))
@@ -175,21 +105,15 @@ function SearchBody() {
       });
 
     if (!q) {
-      return [...artifactHits, ...mediaHits, ...noteHits].toSorted((a, b) => b.updated - a.updated).slice(0, 14);
+      return [...artifactHits, ...mediaHits].toSorted((a, b) => b.updated - a.updated).slice(0, 14);
     }
 
-    return [...artifactHits.slice(0, 10), ...mediaHits.slice(0, 8), ...noteHits.slice(0, 6), ...blockHits].slice(0, 24);
+    return [...artifactHits.slice(0, 16), ...mediaHits.slice(0, 8)].slice(0, 24);
   });
 
   const openHit = (hit: SearchHit) => {
     closeContentSearch();
     switch (hit.kind) {
-      case "note":
-        router.navigate(pkmHref(hit.slug));
-        return;
-      case "noteBlock":
-        router.navigate(pkmHref(hit.slug, hit.block));
-        return;
       case "artifact":
         router.navigate(artifactHref(hit.id));
         return;

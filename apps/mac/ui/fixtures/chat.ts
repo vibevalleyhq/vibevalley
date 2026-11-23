@@ -131,55 +131,25 @@ export const crons: CronView[] = [
 ];
 
 const voice = {
-  area: "CN",
-  language: "zh-CN",
-  asr: { vendor: "ares" },
-  answer: { vendor: "orchestrator" },
-  tts: { vendor: "minimax", model: "speech_2_6_turbo", voiceId: "female-shaonv" },
   persona: "",
   greeting: "你好！今天种点什么？",
-  failureMessage: "",
-  silenceMs: 800,
-  interruptMs: 300,
-  idleSeconds: 60,
 };
 
-const features: readonly Feature[] = [
-  "orchestrator",
-  "image",
-  "understanding",
-  "speech",
-  "speakers",
-  "voiceDesign",
-  "transcription",
-  "dictation",
-  "live",
-  "vision",
-  "call",
-];
-const readiness = Object.fromEntries(
-  features.map((f): [Feature, Readiness] => [f, f === "orchestrator" ? { ready: true } : f === "call" ? { ready: false, missing: "agora" } : { ready: true }]),
-) as Record<Feature, Readiness>;
+const features: readonly Feature[] = ["orchestrator", "image", "understanding", "speech", "speakers", "voiceDesign", "transcription", "live", "vision", "call"];
+const readiness = Object.fromEntries(features.map((f): [Feature, Readiness] => [f, { ready: true }])) as Record<Feature, Readiness>;
 
-const settings = {
+const settings: SettingsStatus = {
   file: "~/.vibevalley/settings.json",
   home: "~/.vibevalley",
-  paths: { repos: "~/.vibevalley/repos", worktrees: "~/.vibevalley/worktrees", pkm: "~/.vibevalley/pkm" },
+  paths: { repos: "~/.vibevalley/repos", worktrees: "~/.vibevalley/worktrees" },
   version: "0.42.0",
   locale: "zh",
   deepseekApiKey: { source: "settings", hint: "…3f9a" },
-  agoraAppId: { source: null },
-  agoraAppCertificate: { source: null },
   voice,
   voiceDefaults: voice,
-  asrKey: { source: null },
-  llmKey: { source: null },
-  ttsKey: { source: null },
-  dictation: { via: "moss", url: "", model: "" },
-  dictationKey: { source: null },
   readiness,
   memorySources: [{ kind: "nowledge", url: "http://127.0.0.1:14242/mcp/", enabled: true, read: true, write: true, everything: false, key: { source: null } }],
-} as unknown as SettingsStatus;
+};
 
 const github: GitHubStatus = { installed: true, version: "2.62.0", loggedIn: true, account: "lucas", reason: "", checkedAt: now };
 
