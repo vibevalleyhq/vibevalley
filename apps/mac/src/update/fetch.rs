@@ -1,26 +1,55 @@
-use std::io::Read as _;
+use std::io::{BufWriter, Read as _, Write as _};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::time::Duration;
 
 use sha2::Digest as _;
 
 use super::releases::{self, Build};
 
-const CURL: &str = "/usr/bin/curl";
+const MAX_TEXT_BYTES: usize = 1_048_576;
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
+const TEXT_TIMEOUT: Duration = Duration::from_secs(60);
+const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(1800);
+const MAX_HTTPS_REDIRECTS: usize = 10;
 
-fn transfer(url: &str) -> Command {
-    let local = url
-        .strip_prefix("http://")
+fn is_loopback_http(url: &str) -> bool {
+    url.strip_prefix("http://")
         .and_then(|rest| rest.split('/').next())
         .and_then(|authority| authority.parse::<std::net::SocketAddr>().ok())
-        .is_some_and(|address| address.ip().is_loopback());
-    let mut command = Command::new(CURL);
-    command.args(["--proto", if local { "=http" } else { "=https" }, "--proto-redir", "=https"]);
-    if local {
-        command.args(["--max-redirs", "0"]);
+        .is_some_and(|address| address.ip().is_loopback())
+}
+
+fn validate_url(url: &str) -> Result<bool, String> {
+    if url.starts_with("https://") {
+        return Ok(false);
     }
-    command
+    if is_loopback_http(url) {
+        return Ok(true);
+    }
+    Err("only https URLs (or loopback http feeds) are allowed".into())
+}
+
+fn build_client(local_http: bool, total_timeout: Duration) -> Result<reqwest::Client, String> {
+    let redirect_policy = reqwest::redirect::Policy::custom(move |attempt| {
+        if local_http {
+            return attempt.error("redirects are disabled for local loopback feeds");
+        }
+        if attempt.previous().len() >= MAX_HTTPS_REDIRECTS {
+            return attempt.error("too many redirects");
+        }
+        if attempt.url().scheme() != "https" {
+            return attempt.error("redirect to non-https URL refused");
+        }
+        attempt.follow()
+    });
+    reqwest::Client::builder()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(total_timeout)
+        .redirect(redirect_policy)
+        .user_agent(concat!("VibeValley/", env!("CARGO_PKG_VERSION")))
+        .build()
+        .map_err(|e| format!("http client: {e}"))
 }
 
 fn is_retryable_status(status: u16) -> bool {
@@ -28,19 +57,31 @@ fn is_retryable_status(status: u16) -> bool {
 }
 
 fn text_once(url: &str) -> Result<(u16, String), String> {
-    let out = transfer(url)
-        .args(["-sSL", "--connect-timeout", "20", "--max-time", "60", "--max-filesize", "1048576"])
-        .args(["-H", "accept: application/json, application/vnd.github+json", "-w", "\n%{http_code}", "--"])
-        .arg(url)
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|e| format!("curl: {e}"))?;
-    if !out.status.success() {
-        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
-    }
-    let body = String::from_utf8_lossy(&out.stdout);
-    let (body, status) = body.rsplit_once('\n').ok_or("curl: no status")?;
-    Ok((status.trim().parse().map_err(|_| "curl: no status")?, body.to_string()))
+    let local = validate_url(url)?;
+    let url = url.to_string();
+    vibevalley_runtime::rt::block_on(async move {
+        let client = build_client(local, TEXT_TIMEOUT)?;
+        let mut resp = client
+            .get(&url)
+            .header(reqwest::header::ACCEPT, "application/json, application/vnd.github+json")
+            .send()
+            .await
+            .map_err(|e| format!("http: {e}"))?;
+        let status = resp.status().as_u16();
+        if let Some(len) = resp.content_length()
+            && len > MAX_TEXT_BYTES as u64
+        {
+            return Err(format!("response exceeds {MAX_TEXT_BYTES} byte limit"));
+        }
+        let mut body = Vec::new();
+        while let Some(chunk) = resp.chunk().await.map_err(|e| format!("http: {e}"))? {
+            if body.len().saturating_add(chunk.len()) > MAX_TEXT_BYTES {
+                return Err(format!("response exceeds {MAX_TEXT_BYTES} byte limit"));
+            }
+            body.extend_from_slice(&chunk);
+        }
+        Ok((status, String::from_utf8_lossy(&body).into_owned()))
+    })
 }
 
 pub fn text(url: &str) -> Result<(u16, String), String> {
@@ -69,37 +110,41 @@ fn text_with_backoff(url: &str, mut backoff: impl Iterator<Item = Duration>) -> 
 }
 
 fn download(url: &str, to: &Path, size: u64, mut percent: impl FnMut(u8)) -> Result<(), String> {
-    let mut child = transfer(url)
-        .arg("--max-filesize")
-        .arg(size.to_string())
-        .args(["-fsSL", "--connect-timeout", "20", "--max-time", "1800", "-o"])
-        .arg(to)
-        .arg("--")
-        .arg(url)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("curl: {e}"))?;
-    let status = loop {
-        let got = std::fs::metadata(to).map_or(0, |m| m.len());
-        percent((got.saturating_mul(100) / size.max(1)).min(100) as u8);
-        match child.try_wait().map_err(|e| e.to_string())? {
-            Some(status) => break status,
-            None => std::thread::sleep(Duration::from_millis(200)),
+    let local = validate_url(url)?;
+    let url = url.to_string();
+    let to = to.to_path_buf();
+    vibevalley_runtime::rt::block_on(async move {
+        let client = build_client(local, DOWNLOAD_TIMEOUT)?;
+        let mut resp = client.get(&url).send().await.map_err(|e| format!("http: {e}"))?;
+        if !resp.status().is_success() {
+            return Err(format!("http status {}", resp.status().as_u16()));
         }
-    };
-    if status.success() {
-        return Ok(());
-    }
-    let mut why = String::new();
-    if let Some(mut stderr) = child.stderr.take() {
-        let _ = stderr.read_to_string(&mut why);
-    }
-    Err(if why.trim().is_empty() {
-        format!("curl exited with {status}")
-    } else {
-        why.trim().to_string()
+        if let Some(len) = resp.content_length()
+            && len > size
+        {
+            return Err(format!("download exceeds expected {size} bytes"));
+        }
+        let file = std::fs::File::create(&to).map_err(|e| format!("{}: {e}", to.display()))?;
+        let mut writer = BufWriter::new(file);
+        let mut got = 0u64;
+        let mut last_pct = None;
+        percent(0);
+        while let Some(chunk) = resp.chunk().await.map_err(|e| format!("http: {e}"))? {
+            got = got.saturating_add(chunk.len() as u64);
+            if got > size {
+                drop(writer);
+                let _ = std::fs::remove_file(&to);
+                return Err(format!("download exceeded expected {size} bytes"));
+            }
+            writer.write_all(&chunk).map_err(|e| format!("{}: {e}", to.display()))?;
+            let pct = (got.saturating_mul(100) / size.max(1)).min(100) as u8;
+            if last_pct != Some(pct) {
+                last_pct = Some(pct);
+                percent(pct);
+            }
+        }
+        writer.flush().map_err(|e| format!("{}: {e}", to.display()))?;
+        Ok(())
     })
 }
 
@@ -118,6 +163,27 @@ pub fn measure(path: &Path) -> std::io::Result<(u64, String)> {
     }
     let hex = hash.finalize().iter().map(|b| format!("{b:02x}")).collect();
     Ok((size, hex))
+}
+
+/// Validates every zip entry path and rejects symbolic links directly in Rust without
+/// spawning `/usr/bin/zipinfo`.
+fn inspect_archive(zip_path: &Path) -> Result<(), String> {
+    let file = std::fs::File::open(zip_path).map_err(|e| format!("zip: {e}"))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("zip: {e}"))?;
+    let mut names = String::new();
+    for i in 0..archive.len() {
+        let entry = archive.by_index_raw(i).map_err(|e| format!("zip: {e}"))?;
+        let name = entry.name().map_err(|e| format!("archive paths: {e}"))?;
+        if entry.is_symlink() || entry.unix_mode().is_some_and(|mode| (mode & 0o170000) == 0o120000) {
+            return Err("the update archive contains symbolic links".into());
+        }
+        names.push_str(&name);
+        names.push('\n');
+    }
+    if !releases::safe_archive(&names) {
+        return Err("the update archive contains paths outside its app".into());
+    }
+    Ok(())
 }
 
 fn signature(app: &Path) -> Result<String, String> {
@@ -147,23 +213,7 @@ pub fn staged_app(url: &str, build: &Build, version: &str, bundle: &Path, folder
     if size != build.size || !sha512.eq_ignore_ascii_case(&build.sha512) {
         return Err(format!("{}: not the file the release lists", build.file));
     }
-    let listing = Command::new("/usr/bin/zipinfo")
-        .arg("-1")
-        .arg(&zip)
-        .output()
-        .map_err(|e| format!("zipinfo: {e}"))?;
-    let names = String::from_utf8(listing.stdout).map_err(|e| format!("archive paths: {e}"))?;
-    if !listing.status.success() || !releases::safe_archive(&names) {
-        return Err("the update archive contains paths outside its app".into());
-    }
-    let metadata = Command::new("/usr/bin/zipinfo")
-        .arg("-l")
-        .arg(&zip)
-        .output()
-        .map_err(|e| format!("zipinfo: {e}"))?;
-    if !metadata.status.success() || String::from_utf8_lossy(&metadata.stdout).lines().any(|line| line.starts_with('l')) {
-        return Err("the update archive contains symbolic links".into());
-    }
+    inspect_archive(&zip)?;
     // ditto keeps what a .app holds that unzip would lose (symlinks, extended attributes).
     let unpacked = Command::new("/usr/bin/ditto")
         .args(["-x", "-k"])
@@ -250,5 +300,74 @@ mod tests {
         let (status, body) = text_with_backoff(&format!("http://{address}/release.json"), backoff).unwrap();
         assert_eq!((status, body.as_str()), (200, "{}"));
         server.join().unwrap();
+    }
+
+    #[test]
+    fn download_streams_with_progress_and_enforces_max_size() {
+        use std::io::Write as _;
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("payload.bin");
+        let payload = b"vibevalley-update-bytes";
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            for _ in 0..2 {
+                let (mut conn, _) = listener.accept().unwrap();
+                let mut req = [0u8; 2048];
+                assert!(conn.read(&mut req).unwrap() > 0);
+                let header = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", payload.len());
+                conn.write_all(header.as_bytes()).unwrap();
+                conn.write_all(payload).unwrap();
+            }
+        });
+
+        let mut progress = Vec::new();
+        download(&format!("http://{address}/app.zip"), &target, payload.len() as u64, |p| progress.push(p)).unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), payload);
+        assert_eq!(progress.last().copied(), Some(100));
+
+        // Exceeding declared max size is rejected.
+        let oversized = dir.path().join("oversized.bin");
+        assert!(download(&format!("http://{address}/app.zip"), &oversized, 4, |_| {}).is_err());
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn inspect_archive_validates_paths_and_rejects_symlinks() {
+        use zip::write::SimpleFileOptions;
+
+        let dir = tempfile::tempdir().unwrap();
+
+        let make_zip = |name: &str, entries: &[(&str, u32, &[u8])]| -> PathBuf {
+            let path = dir.path().join(name);
+            let file = std::fs::File::create(&path).unwrap();
+            let mut writer = zip::ZipWriter::new(file);
+            for (entry_name, mode, data) in entries {
+                let opts = SimpleFileOptions::default()
+                    .compression_method(zip::CompressionMethod::Stored)
+                    .unix_permissions(*mode);
+                writer.start_file(*entry_name, opts).unwrap();
+                writer.write_all(data).unwrap();
+            }
+            writer.finish().unwrap();
+            path
+        };
+
+        let safe = make_zip("safe.zip", &[("VibeValley.app/Contents/Info.plist", 0o100644, b"<plist/>")]);
+        assert!(inspect_archive(&safe).is_ok());
+
+        let traversal = make_zip("traversal.zip", &[("VibeValley.app/../../evil", 0o100644, b"x")]);
+        assert!(inspect_archive(&traversal).unwrap_err().contains("outside its app"));
+
+        let symlink = dir.path().join("symlink.zip");
+        {
+            let file = std::fs::File::create(&symlink).unwrap();
+            let mut writer = zip::ZipWriter::new(file);
+            let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+            writer.add_symlink("VibeValley.app/Contents/MacOS/link", "/etc/passwd", opts).unwrap();
+            writer.finish().unwrap();
+        }
+        assert!(inspect_archive(&symlink).unwrap_err().contains("symbolic links"));
     }
 }

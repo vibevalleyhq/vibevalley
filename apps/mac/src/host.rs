@@ -1,7 +1,12 @@
 //! Native halves of VibeValley's host capabilities (packages/protocol/src/host.ts).
 
+use std::ffi::{CString, c_char, c_void};
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::ptr::NonNull;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, OnceLock};
+use std::time::Duration;
 
 use serde_json::Value;
 
@@ -38,12 +43,6 @@ pub fn worktree_file(worktree: &Path, relative: &Path) -> Option<(PathBuf, PathB
     (path.starts_with(&root) && path.is_file()).then_some((root, path))
 }
 
-/// AppleScript string literal for `text`.
-fn applescript_string(text: &str) -> String {
-    let single_line = text.replace(['\r', '\n'], " ");
-    format!("\"{}\"", single_line.replace('\\', "\\\\").replace('"', "\\\""))
-}
-
 /// Whether this application is currently active in the macOS foreground.
 pub fn is_app_active() -> bool {
     use objc2_app_kit::NSApplication;
@@ -55,14 +54,60 @@ pub fn is_app_active() -> bool {
     NSApplication::sharedApplication(mtm).isActive()
 }
 
-/// A system notification. Blocking (runs `osascript`).
+/// True when the running process has a macOS `.app` bundle identifier.
+/// `UNUserNotificationCenter::currentNotificationCenter()` throws an ObjC exception
+/// if called from an unpackaged binary without a bundle identifier.
+fn has_bundle_identifier() -> bool {
+    use objc2_foundation::NSBundle;
+    NSBundle::mainBundle().bundleIdentifier().is_some()
+}
+
+/// Delivers a native macOS notification via `UNUserNotificationCenter` without shelling out.
+/// When running unpackaged (no `CFBundleIdentifier`, e.g. `cargo run` / tests), logs instead
+/// of invoking `UNUserNotificationCenter` which aborts outside an `.app` bundle.
 pub fn notify(title: &str, body: &str) -> Result<(), String> {
-    let script = format!("display notification {} with title {}", applescript_string(body), applescript_string(title));
-    let out = Command::new("/usr/bin/osascript").arg("-e").arg(script).output().map_err(|e| e.to_string())?;
-    if out.status.success() {
-        Ok(())
-    } else {
-        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    use block2::RcBlock;
+    use objc2::runtime::Bool;
+    use objc2_foundation::{NSError, NSString};
+    use objc2_user_notifications::{
+        UNAuthorizationOptions, UNMutableNotificationContent, UNNotificationRequest, UNNotificationSound, UNUserNotificationCenter,
+    };
+
+    if !has_bundle_identifier() {
+        tracing::debug!(target: "vibevalley::host", %title, %body, "skipping UNUserNotificationCenter without bundle identifier");
+        return Ok(());
+    }
+
+    let center = UNUserNotificationCenter::currentNotificationCenter();
+    static AUTH_REQUESTED: OnceLock<()> = OnceLock::new();
+    AUTH_REQUESTED.get_or_init(|| {
+        let auth_block = RcBlock::new(|_granted: Bool, _err: *mut NSError| {});
+        center.requestAuthorizationWithOptions_completionHandler(UNAuthorizationOptions::Alert | UNAuthorizationOptions::Sound, &auth_block);
+    });
+
+    let content = UNMutableNotificationContent::new();
+    content.setTitle(&NSString::from_str(title));
+    content.setBody(&NSString::from_str(body));
+    content.setSound(Some(&UNNotificationSound::defaultSound()));
+
+    let id = NSString::from_str(&uuid::Uuid::new_v4().to_string());
+    let request = UNNotificationRequest::requestWithIdentifier_content_trigger(&id, &content, None);
+
+    let (tx, rx) = flume::bounded::<Result<(), String>>(1);
+    let completion = RcBlock::new(move |err: *mut NSError| {
+        let result = if err.is_null() {
+            Ok(())
+        } else {
+            // SAFETY: macOS passes a valid `NSError` pointer when non-null.
+            let desc = unsafe { &*err }.localizedDescription().to_string();
+            Err(desc)
+        };
+        let _ = tx.send(result);
+    });
+    center.addNotificationRequest_withCompletionHandler(&request, Some(&completion));
+    match rx.recv_timeout(Duration::from_secs(5)) {
+        Ok(res) => res,
+        Err(_) => Ok(()),
     }
 }
 
@@ -100,7 +145,7 @@ fn load_pixel_manifest(path: &Path) -> Result<PixelManifest, String> {
 /// Reads and caches `assets/pixel/sprites.json` once per process so the UI bundle
 /// does not inline the 105 KB manifest.
 pub fn pixel_manifest() -> Result<&'static PixelManifest, String> {
-    static CACHED: std::sync::OnceLock<PixelManifest> = std::sync::OnceLock::new();
+    static CACHED: OnceLock<PixelManifest> = OnceLock::new();
     if let Some(manifest) = CACHED.get() {
         return Ok(manifest);
     }
@@ -304,22 +349,343 @@ pub fn copy_file(source: &Path, target: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Opens `path` in its default app.
+/// Opens `path` in its default macOS app via `NSWorkspace` without spawning `/usr/bin/open`.
 pub fn open(path: &Path) -> Result<(), String> {
-    let status = Command::new("/usr/bin/open").arg("--").arg(path).status().map_err(|e| e.to_string())?;
-    if status.success() {
+    use objc2_app_kit::NSWorkspace;
+    use objc2_foundation::{NSString, NSURL};
+
+    if !path.exists() {
+        return Err(format!("path does not exist: {}", path.display()));
+    }
+    let ns_path = NSString::from_str(&path.to_string_lossy());
+    let url = NSURL::fileURLWithPath(&ns_path);
+    if NSWorkspace::sharedWorkspace().openURL(&url) {
         Ok(())
     } else {
-        Err(format!("open exited with {status}"))
+        Err(format!("NSWorkspace failed to open {}", path.display()))
     }
 }
 
+/// Reveals `path` in Finder via `NSWorkspace` without spawning `/usr/bin/open -R`.
 pub fn reveal(path: &Path) -> Result<(), String> {
-    let status = Command::new("/usr/bin/open").arg("-R").arg(path).status().map_err(|e| e.to_string())?;
-    if status.success() {
-        Ok(())
+    use objc2_app_kit::NSWorkspace;
+    use objc2_foundation::{NSArray, NSString, NSURL};
+
+    if !path.exists() {
+        return Err(format!("path does not exist: {}", path.display()));
+    }
+    let ns_path = NSString::from_str(&path.to_string_lossy());
+    let url = NSURL::fileURLWithPath(&ns_path);
+    let urls = NSArray::from_retained_slice(&[url]);
+    NSWorkspace::sharedWorkspace().activateFileViewerSelectingURLs(&urls);
+    Ok(())
+}
+
+/// System lifecycle events observed natively via `NSWorkspace` and `Network.framework`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+pub enum SystemEvent {
+    /// macOS woke from sleep (`NSWorkspaceDidWakeNotification`).
+    Wake,
+    /// Network interface or path status changed (`nw_path_monitor`).
+    NetworkChanged { reachable: bool },
+}
+
+#[allow(dead_code)]
+#[link(name = "Network", kind = "framework")]
+unsafe extern "C" {
+    fn nw_path_monitor_create() -> *mut c_void;
+    fn nw_path_monitor_set_update_handler(monitor: *mut c_void, handler: &block2::DynBlock<dyn Fn(*mut c_void)>);
+    fn nw_path_monitor_set_queue(monitor: *mut c_void, queue: *mut c_void);
+    fn nw_path_monitor_start(monitor: *mut c_void);
+    fn nw_path_monitor_cancel(monitor: *mut c_void);
+    fn nw_path_get_status(path: *mut c_void) -> i32;
+    fn nw_release(obj: *mut c_void);
+}
+
+#[allow(dead_code)]
+unsafe extern "C" {
+    fn dispatch_queue_create(label: *const c_char, attr: *const c_void) -> *mut c_void;
+    fn dispatch_release(obj: *mut c_void);
+}
+
+const NW_PATH_STATUS_SATISFIED: i32 = 1;
+
+/// RAII handle that keeps native macOS sleep/wake (`NSWorkspaceDidWakeNotification`)
+/// and network-change (`nw_path_monitor`) observers registered until dropped.
+#[allow(dead_code)]
+pub struct SystemObserver {
+    wake_token: *mut objc2::runtime::AnyObject,
+    monitor: *mut c_void,
+    queue: *mut c_void,
+    _wake_block: block2::RcBlock<dyn Fn(NonNull<objc2_foundation::NSNotification>)>,
+    _net_block: block2::RcBlock<dyn Fn(*mut c_void)>,
+}
+
+// SAFETY: `NSNotificationCenter::removeObserver`, `nw_path_monitor_cancel`, `nw_release`,
+// and `dispatch_release` are thread-safe Apple APIs, and the observer pointers are never
+// dereferenced concurrently outside `Drop`.
+unsafe impl Send for SystemObserver {}
+
+impl Drop for SystemObserver {
+    fn drop(&mut self) {
+        use objc2::rc::Retained;
+        use objc2_app_kit::NSWorkspace;
+
+        if !self.wake_token.is_null() {
+            // SAFETY: `wake_token` is a retained observer token returned by `addObserverForName`.
+            unsafe {
+                let token = Retained::from_raw(self.wake_token);
+                if let Some(token) = token {
+                    NSWorkspace::sharedWorkspace().notificationCenter().removeObserver(&token);
+                }
+            }
+            self.wake_token = std::ptr::null_mut();
+        }
+        if !self.monitor.is_null() {
+            // SAFETY: `monitor` was created by `nw_path_monitor_create` and owned exclusively here.
+            unsafe {
+                nw_path_monitor_cancel(self.monitor);
+                nw_release(self.monitor);
+            }
+            self.monitor = std::ptr::null_mut();
+        }
+        if !self.queue.is_null() {
+            // SAFETY: `queue` was created by `dispatch_queue_create` and owned exclusively here.
+            unsafe {
+                dispatch_release(self.queue);
+            }
+            self.queue = std::ptr::null_mut();
+        }
+    }
+}
+
+/// Registers native macOS sleep/wake (`NSWorkspaceDidWakeNotification`) and
+/// network-path (`nw_path_monitor`) observers, invoking `on_event` on each event.
+#[allow(dead_code)]
+pub fn observe_system_events(on_event: impl Fn(SystemEvent) + Send + Sync + 'static) -> SystemObserver {
+    use block2::RcBlock;
+    use objc2::rc::Retained;
+    use objc2_app_kit::{NSWorkspace, NSWorkspaceDidWakeNotification};
+    use objc2_foundation::NSNotification;
+
+    let callback: Arc<dyn Fn(SystemEvent) + Send + Sync> = Arc::new(on_event);
+    let wake_cb = callback.clone();
+    let wake_block = RcBlock::new(move |_notif: NonNull<NSNotification>| {
+        wake_cb(SystemEvent::Wake);
+    });
+
+    let center = NSWorkspace::sharedWorkspace().notificationCenter();
+    // SAFETY: `wake_block` is a valid sendable Objective-C block and `NSWorkspaceDidWakeNotification`
+    // is a static notification name from AppKit.
+    let token = unsafe { center.addObserverForName_object_queue_usingBlock(Some(NSWorkspaceDidWakeNotification), None, None, &wake_block) };
+    let wake_token = Retained::into_raw(token).cast::<objc2::runtime::AnyObject>();
+
+    let initial_seen = Arc::new(AtomicBool::new(false));
+    let net_cb = callback;
+    let net_block = RcBlock::new(move |path: *mut c_void| {
+        let status = if path.is_null() {
+            0
+        } else {
+            // SAFETY: `nw_path_monitor` passes a valid `nw_path_t` for the duration of the callback.
+            unsafe { nw_path_get_status(path) }
+        };
+        // Skip the immediate baseline snapshot delivered right after `nw_path_monitor_start`.
+        if !initial_seen.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        net_cb(SystemEvent::NetworkChanged {
+            reachable: status == NW_PATH_STATUS_SATISFIED,
+        });
+    });
+
+    // SAFETY: `nw_path_monitor_create` and `dispatch_queue_create` return retained OS objects
+    // released in `SystemObserver::drop`.
+    let (monitor, queue) = unsafe {
+        let monitor = nw_path_monitor_create();
+        let queue = dispatch_queue_create(c"dev.vibevalley.app.net-monitor".as_ptr(), std::ptr::null());
+        if !monitor.is_null() && !queue.is_null() {
+            nw_path_monitor_set_update_handler(monitor, &net_block);
+            nw_path_monitor_set_queue(monitor, queue);
+            nw_path_monitor_start(monitor);
+        }
+        (monitor, queue)
+    };
+
+    SystemObserver {
+        wake_token,
+        monitor,
+        queue,
+        _wake_block: wake_block,
+        _net_block: net_block,
+    }
+}
+
+/// Convenience hook for wiring macOS wake and network-recovery events directly into
+/// `Hub::on_system_wake()`.
+#[allow(dead_code)]
+pub fn observe_system_wake(on_wake: impl Fn() + Send + Sync + 'static) -> SystemObserver {
+    observe_system_events(move |event| match event {
+        SystemEvent::Wake | SystemEvent::NetworkChanged { reachable: true } => on_wake(),
+        SystemEvent::NetworkChanged { reachable: false } => {}
+    })
+}
+
+// ---- macOS Unified Logging (`os_log`) tracing layer -------------------------
+
+const OS_LOG_TYPE_DEFAULT: u8 = 0x00;
+const OS_LOG_TYPE_INFO: u8 = 0x01;
+const OS_LOG_TYPE_DEBUG: u8 = 0x02;
+const OS_LOG_TYPE_ERROR: u8 = 0x10;
+
+unsafe extern "C" {
+    static __dso_handle: u8;
+    fn os_log_create(subsystem: *const c_char, category: *const c_char) -> *mut c_void;
+    fn os_log_type_enabled(log: *mut c_void, log_type: u8) -> bool;
+    fn _os_log_internal(dso: *const c_void, log: *mut c_void, log_type: u8, format: *const c_char, ...);
+}
+
+#[derive(Clone, Copy)]
+struct OsLogHandle(*mut c_void);
+
+// SAFETY: `os_log_t` objects returned by `os_log_create` are global, immutable, immortal,
+// and documented by Apple to be safe for concurrent use across threads.
+unsafe impl Send for OsLogHandle {}
+unsafe impl Sync for OsLogHandle {}
+
+const OSLOG_CATEGORIES: [&std::ffi::CStr; 8] = [c"mac", c"server", c"runtime", c"core", c"git", c"files", c"rich", c"app"];
+
+fn oslog_category_index(target: &str) -> usize {
+    if target.starts_with("vibevalley_mac") || target.starts_with("vibevalley::host") {
+        0
+    } else if target.starts_with("vibevalley_server") {
+        1
+    } else if target.starts_with("vibevalley_runtime") {
+        2
+    } else if target.starts_with("vibevalley_core") {
+        3
+    } else if target.starts_with("vibevalley_git") {
+        4
+    } else if target.starts_with("vibevalley_files") {
+        5
+    } else if target.starts_with("vibevalley_rich") {
+        6
     } else {
-        Err(format!("open -R exited with {status}"))
+        7
+    }
+}
+
+fn oslog_handles() -> &'static [OsLogHandle; 8] {
+    static HANDLES: OnceLock<[OsLogHandle; 8]> = OnceLock::new();
+    HANDLES.get_or_init(|| {
+        // Bounded static set of categories: Apple's `os_log_create` objects are never freed.
+        OSLOG_CATEGORIES.map(|cat| {
+            // SAFETY: both subsystem and category are static NUL-terminated C strings.
+            OsLogHandle(unsafe { os_log_create(c"dev.vibevalley.app".as_ptr(), cat.as_ptr()) })
+        })
+    })
+}
+
+fn oslog_type_for(level: &tracing::Level) -> u8 {
+    match *level {
+        tracing::Level::ERROR => OS_LOG_TYPE_ERROR,
+        tracing::Level::WARN => OS_LOG_TYPE_DEFAULT,
+        tracing::Level::INFO => OS_LOG_TYPE_INFO,
+        tracing::Level::DEBUG | tracing::Level::TRACE => OS_LOG_TYPE_DEBUG,
+    }
+}
+
+struct OsLogVisitor {
+    message: String,
+    fields: String,
+}
+
+impl OsLogVisitor {
+    fn new() -> Self {
+        Self {
+            message: String::new(),
+            fields: String::new(),
+        }
+    }
+
+    fn finish(self, target: &str) -> String {
+        let mut out = String::with_capacity(target.len() + self.message.len() + self.fields.len() + 4);
+        out.push_str(target);
+        if !self.message.is_empty() {
+            out.push_str(": ");
+            out.push_str(&self.message);
+        }
+        if !self.fields.is_empty() {
+            out.push(' ');
+            out.push_str(&self.fields);
+        }
+        out
+    }
+}
+
+impl tracing::field::Visit for OsLogVisitor {
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        if field.name() == "message" {
+            let _ = write!(self.message, "{value:?}");
+        } else {
+            if !self.fields.is_empty() {
+                self.fields.push(' ');
+            }
+            let _ = write!(self.fields, "{}={value:?}", field.name());
+        }
+    }
+
+    fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+        if field.name() == "message" {
+            self.message.push_str(value);
+        } else {
+            if !self.fields.is_empty() {
+                self.fields.push(' ');
+            }
+            let _ = write!(self.fields, "{}={value}", field.name());
+        }
+    }
+}
+
+/// Lightweight `tracing_subscriber::Layer` routing events to macOS Unified Logging
+/// (`Console.app` / `log stream --predicate 'subsystem == "dev.vibevalley.app"'`).
+pub struct OsLogLayer;
+
+impl OsLogLayer {
+    pub fn new() -> Self {
+        let _ = oslog_handles();
+        Self
+    }
+}
+
+impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for OsLogLayer {
+    fn on_event(&self, event: &tracing::Event<'_>, _ctx: tracing_subscriber::layer::Context<'_, S>) {
+        let meta = event.metadata();
+        let log_type = oslog_type_for(meta.level());
+        let handle = oslog_handles()[oslog_category_index(meta.target())].0;
+        if handle.is_null() {
+            return;
+        }
+        // SAFETY: `handle` is a valid immortal `os_log_t` created by `os_log_create`.
+        if !unsafe { os_log_type_enabled(handle, log_type) } {
+            return;
+        }
+        let mut visitor = OsLogVisitor::new();
+        event.record(&mut visitor);
+        let formatted = visitor.finish(meta.target()).replace('\0', " ");
+        let Ok(c_msg) = CString::new(formatted) else {
+            return;
+        };
+        // SAFETY: `__dso_handle`, `handle`, format string, and `c_msg` are all valid pointers for this call.
+        unsafe {
+            _os_log_internal(
+                (&raw const __dso_handle).cast::<c_void>(),
+                handle,
+                log_type,
+                c"%{public}s".as_ptr(),
+                c_msg.as_ptr(),
+            );
+        }
     }
 }
 
@@ -431,8 +797,6 @@ enum CfPrefValue {
 /// Reads a preference via the exact `CFPreferencesCopyAppValue` lookup
 /// `gpui-fast-apple` uses for `AppleFontSmoothing`.
 fn cf_app_pref(key: &str) -> CfPrefValue {
-    use std::ffi::c_void;
-
     use objc2_foundation::NSString;
 
     const K_CF_NUMBER_SINT64_TYPE: isize = 4;
@@ -604,8 +968,60 @@ mod tests {
     }
 
     #[test]
-    fn applescript_strings_are_escaped() {
-        assert_eq!(applescript_string(r#"say "hi" \ bye"#), r#""say \"hi\" \\ bye""#);
+    fn native_notify_open_and_reveal_validate_safely_without_shell_outs() {
+        // Test binaries have no `.app` bundle identifier, so `notify` must not crash on
+        // `UNUserNotificationCenter::currentNotificationCenter()`.
+        assert!(!has_bundle_identifier());
+        assert!(notify("VibeValley", "Task completed").is_ok());
+
+        let missing = Path::new("/nonexistent/vibevalley-missing-file");
+        assert!(open(missing).is_err());
+        assert!(reveal(missing).is_err());
+    }
+
+    #[test]
+    fn system_observer_receives_wake_notifications_and_unregisters_on_drop() {
+        use std::sync::atomic::AtomicUsize;
+
+        use objc2_app_kit::{NSWorkspace, NSWorkspaceDidWakeNotification};
+
+        let wakes = Arc::new(AtomicUsize::new(0));
+        let wakes_cb = wakes.clone();
+        let observer = observe_system_wake(move || {
+            wakes_cb.fetch_add(1, Ordering::SeqCst);
+        });
+
+        let center = NSWorkspace::sharedWorkspace().notificationCenter();
+        // SAFETY: posting a synthetic `NSWorkspaceDidWakeNotification` exercises our real observer block.
+        unsafe {
+            center.postNotificationName_object(NSWorkspaceDidWakeNotification, None);
+        }
+        assert_eq!(wakes.load(Ordering::SeqCst), 1);
+
+        drop(observer);
+        unsafe {
+            center.postNotificationName_object(NSWorkspaceDidWakeNotification, None);
+        }
+        assert_eq!(wakes.load(Ordering::SeqCst), 1, "observer must unregister on drop");
+    }
+
+    #[test]
+    fn oslog_layer_maps_categories_levels_and_emits_events() {
+        use tracing_subscriber::layer::SubscriberExt as _;
+
+        assert_eq!(oslog_category_index("vibevalley_mac::shell"), 0);
+        assert_eq!(oslog_category_index("vibevalley_server::hub"), 1);
+        assert_eq!(oslog_category_index("vibevalley_runtime::oar"), 2);
+        assert_eq!(oslog_category_index("other::crate"), 7);
+        assert_eq!(oslog_type_for(&tracing::Level::ERROR), OS_LOG_TYPE_ERROR);
+        assert_eq!(oslog_type_for(&tracing::Level::WARN), OS_LOG_TYPE_DEFAULT);
+        assert_eq!(oslog_type_for(&tracing::Level::INFO), OS_LOG_TYPE_INFO);
+        assert_eq!(oslog_type_for(&tracing::Level::DEBUG), OS_LOG_TYPE_DEBUG);
+
+        let subscriber = tracing_subscriber::registry().with(OsLogLayer::new());
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::info!(target: "vibevalley_mac::test", count = 3, "unified logging smoke test");
+        });
     }
 
     #[test]
@@ -658,8 +1074,6 @@ mod tests {
 
     #[test]
     fn disable_default_font_smoothing_sets_zero_without_overriding_explicit_value() {
-        use std::ffi::c_void;
-
         use objc2::runtime::AnyObject;
         use objc2::{class, msg_send};
         use objc2_foundation::NSString;

@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 percent-encoding = "2.3.2"
 base64 = "0.23.1"
+block2 = "0.6.2"
 vibevalley-files = { version = "0.1.0", path = "../../crates/files" }
 vibevalley-git = { version = "0.1.0", path = "../../crates/git" }
 vibevalley-i18n = { version = "0.1.0", path = "../../crates/i18n" }
@@ -21,6 +22,7 @@ gpui = { package = "gpui-fast", version = "0.1.17", default-features = false, fe
 gpui-platform = { package = "gpui-fast-platform", version = "0.1.17", default-features = false, features = ["font-kit"] }
 image = { workspace = true }
 indexmap = "2.14.2"
+jiff = { workspace = true }
 nsh-base = { version = "0.6.0", default-features = false }
 nsh-engine = { version = "0.6.0", default-features = false }
 nsh-platform-gpui = { version = "0.6.0", default-features = false, features = ["js", "webview", "editor", "math", "svg"] }
@@ -39,8 +41,33 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = [
   "NSStatusBarButton",
   "NSStatusItem",
   "NSView",
+  "NSWorkspace",
 ] }
-objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSGeometry", "NSObject", "NSString", "objc2-core-foundation"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "block2",
+  "NSArray",
+  "NSBundle",
+  "NSError",
+  "NSGeometry",
+  "NSNotification",
+  "NSObject",
+  "NSOperation",
+  "NSString",
+  "NSURL",
+  "objc2-core-foundation",
+] }
+objc2-user-notifications = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "bitflags",
+  "block2",
+  "UNNotificationContent",
+  "UNNotificationRequest",
+  "UNNotificationSound",
+  "UNNotificationTrigger",
+  "UNUserNotificationCenter",
+] }
+reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
@@ -49,10 +76,11 @@ unicode-segmentation = "1.13.3"
 rustybuzz = "0.20.1"
 unicode-width = "0.2.3"
 uuid = { workspace = true }
+zip = { version = "9.7.1", default-features = false }
 
 backon = { workspace = true }
 parking_lot = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["process", "io-util"] }
 tokio-tungstenite = { workspace = true }
 tokio-util = { workspace = true }
 tracing = { workspace = true }

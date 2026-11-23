@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, OnceLock, Weak};
 
 use image::RgbaImage;
 use parking_lot::Mutex;
@@ -37,16 +37,23 @@ impl Phase {
 }
 
 pub struct OpeningScene {
-    scene: Option<Arc<RgbaImage>>,
-    frames: Vec<Arc<RgbaImage>>,
+    art: Option<Arc<OpeningArt>>,
     pub which: &'static str,
     pub phase: Phase,
     pub progress: f32,
     shown: f32,
     t: f32,
-    fade: Arc<RgbaImage>,
     /// Shown as a pane (not over the starting app): the bar runs on its own.
     pub demo: bool,
+}
+
+impl Drop for OpeningScene {
+    fn drop(&mut self) {
+        // Release our strong handle before pruning so the weak cache frees heavy art immediately
+        // once the launch overlay closes.
+        drop(self.art.take());
+        prune_dead_art_cache();
+    }
 }
 
 /// The scene picture's size in this scene's pixels (a quarter of the 1672×941 painting).
@@ -62,33 +69,43 @@ pub fn scene_of_hour(hour: u32) -> &'static str {
 }
 
 fn local_hour() -> u32 {
-    let out = std::process::Command::new("date").arg("+%H").output().ok();
-    out.and_then(|o| String::from_utf8_lossy(&o.stdout).trim().parse().ok()).unwrap_or(12)
+    u32::try_from(jiff::ZonedDateTime::now().hour()).unwrap_or(12)
 }
 
-#[derive(Clone)]
 struct OpeningArt {
     scene: Option<Arc<RgbaImage>>,
     frames: Vec<Arc<RgbaImage>>,
     fade: Arc<RgbaImage>,
 }
 
-fn opening_art_cache() -> &'static Mutex<HashMap<(PathBuf, &'static str), OpeningArt>> {
-    static CACHE: OnceLock<Mutex<HashMap<(PathBuf, &'static str), OpeningArt>>> = OnceLock::new();
+type OpeningArtCache = HashMap<(PathBuf, &'static str), Weak<OpeningArt>>;
+
+fn opening_art_cache() -> &'static Mutex<OpeningArtCache> {
+    static CACHE: OnceLock<Mutex<OpeningArtCache>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+fn prune_dead_art_cache() {
+    opening_art_cache().lock().retain(|_, weak| weak.strong_count() > 0);
+}
+
+/// Explicitly clears all cached opening splash art references.
+#[allow(dead_code)]
+pub fn evict_art_cache() {
+    opening_art_cache().lock().clear();
+}
+
 impl OpeningScene {
-    /// Blocking on cold miss: decodes the pictures and caches them process-wide.
+    /// Blocking on cold miss: decodes the pictures and shares them across active
+    /// `OpeningScene` instances via a weak cache that evicts automatically once
+    /// the last opening view closes.
     pub fn load(which: Option<&'static str>) -> OpeningScene {
         let which = which.unwrap_or_else(|| scene_of_hour(local_hour()));
         let dir = super::assets_dir().join("brand");
         let key = (dir.clone(), which);
-        if let Some(art) = opening_art_cache().lock().get(&key).cloned() {
+        if let Some(art) = opening_art_cache().lock().get(&key).and_then(Weak::upgrade) {
             return OpeningScene {
-                fade: art.fade,
-                scene: art.scene,
-                frames: art.frames,
+                art: Some(art),
                 which,
                 phase: Phase::Starting,
                 progress: 0.0,
@@ -119,18 +136,10 @@ impl OpeningScene {
             };
             image::Rgba([0x15, 0x14, 0x13, a as u8])
         }));
-        opening_art_cache().lock().insert(
-            key,
-            OpeningArt {
-                scene: scene.clone(),
-                frames: frames.clone(),
-                fade: fade.clone(),
-            },
-        );
+        let art = Arc::new(OpeningArt { scene, frames, fade });
+        opening_art_cache().lock().insert(key, Arc::downgrade(&art));
         OpeningScene {
-            fade,
-            scene,
-            frames,
+            art: Some(art),
             which,
             phase: Phase::Starting,
             progress: 0.0,
@@ -168,27 +177,29 @@ impl OpeningScene {
 
     pub fn draw(&self) -> DrawList {
         let mut list = DrawList::new(W, H, rgba(0x151413, 1.0));
-        if let Some(scene) = &self.scene {
+        if let Some(art) = &self.art {
+            if let Some(scene) = &art.scene {
+                list.ops.push(Op::Image {
+                    key: format!("opening-{}", self.which),
+                    image: scene.clone(),
+                    x: 0.0,
+                    y: 0.0,
+                    w: W,
+                    h: H,
+                    alpha: 1.0,
+                });
+            }
+            // The fade to the ground colour under the words.
             list.ops.push(Op::Image {
-                key: format!("opening-{}", self.which),
-                image: scene.clone(),
+                key: "opening-fade".into(),
+                image: art.fade.clone(),
                 x: 0.0,
-                y: 0.0,
+                y: H * 0.4,
                 w: W,
-                h: H,
+                h: H * 0.6,
                 alpha: 1.0,
             });
         }
-        // The fade to the ground colour under the words.
-        list.ops.push(Op::Image {
-            key: "opening-fade".into(),
-            image: self.fade.clone(),
-            x: 0.0,
-            y: H * 0.4,
-            w: W,
-            h: H * 0.6,
-            alpha: 1.0,
-        });
         // HUD in view pixels around the picture's bottom centre; the element centres the picture.
         let cream = rgba(0xf7e8c4, 1.0);
         let shadow = rgba(0x2f1f13, 1.0);
@@ -246,7 +257,7 @@ impl OpeningScene {
             });
             x += 10.0;
         }
-        if let Some(frame) = self.frames.get(self.mood()) {
+        if let Some(frame) = self.art.as_ref().and_then(|art| art.frames.get(self.mood())) {
             let hop = match self.mood() {
                 0 => frame_at(self.t, 2, 1.4) as f32 * 2.0,
                 1 => -(frame_at(self.t, 2, 4.0) as f32) * 3.0,
@@ -276,9 +287,10 @@ impl OpeningScene {
     }
 
     pub fn debug_state(&self) -> serde_json::Value {
+        let (pictures, frames) = self.art.as_ref().map_or((false, 0), |art| (art.scene.is_some(), art.frames.len()));
         serde_json::json!({
             "scene": self.which, "phase": format!("{:?}", self.phase), "progress": self.progress, "shown": self.shown,
-            "mood": self.mood(), "pictures": self.scene.is_some(), "frames": self.frames.len(),
+            "mood": self.mood(), "pictures": pictures, "frames": frames,
         })
     }
 }
@@ -293,5 +305,24 @@ mod tests {
         assert_eq!(scene_of_hour(12), "day");
         assert_eq!(scene_of_hour(22), "night");
         assert_eq!(scene_of_hour(3), "night");
+        assert!(local_hour() < 24);
+    }
+
+    #[test]
+    fn opening_art_cache_shares_while_open_and_evicts_on_close() {
+        let first = OpeningScene::load(Some("day"));
+        let weak = Arc::downgrade(first.art.as_ref().expect("art loaded"));
+        {
+            let second = OpeningScene::load(Some("day"));
+            assert!(Arc::ptr_eq(first.art.as_ref().expect("first art"), second.art.as_ref().expect("second art"),));
+        }
+        assert!(weak.upgrade().is_some(), "art remains live while first scene is open");
+        drop(first);
+        assert!(weak.upgrade().is_none(), "opening splash buffers must be freed once overlay closes");
+        let dir = super::super::assets_dir().join("brand");
+        assert!(
+            !opening_art_cache().lock().contains_key(&(dir, "day")),
+            "dead weak cache entry should be pruned on drop"
+        );
     }
 }
