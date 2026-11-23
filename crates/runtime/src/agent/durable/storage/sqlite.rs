@@ -7,27 +7,76 @@ use std::sync::{
 };
 use std::time::Duration;
 
-use pollster::block_on;
 use serde_json::{Value, json};
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
-use sqlx::{ConnectOptions, Connection, SqliteConnection};
+use sqlx::pool::PoolConnection;
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
+use sqlx::{Connection, Sqlite as SqlxSqlite, SqliteConnection, SqlitePool};
 
 use super::{StorageBackend, StorageRead, StorageWrite, WriteCallback};
 use crate::agent::durable::{
     CommitStats, Conversation, Document, DocumentEvent, Entry, Error, Result, Signal, Sqlite, Submission, SubmissionStatus, Task, TaskStatus, WaitMode, now_ms,
     queries as q, sqlite::optional,
 };
+use crate::rt::block_on;
 
 type Ack = flume::Sender<std::result::Result<(), String>>;
 
+/// Pooled SQLite connection guard that enters the shared Tokio runtime before
+/// returning its `PoolConnection` to `SqlitePool`, preventing off-runtime drop panics.
+struct PooledConn(Option<PoolConnection<SqlxSqlite>>);
+
+impl PooledConn {
+    fn new(conn: PoolConnection<SqlxSqlite>) -> Self {
+        Self(Some(conn))
+    }
+}
+
+impl std::ops::Deref for PooledConn {
+    type Target = SqliteConnection;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref().expect("PooledConn live before drop")
+    }
+}
+
+impl std::ops::DerefMut for PooledConn {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.as_mut().expect("PooledConn live before drop")
+    }
+}
+
+impl Drop for PooledConn {
+    fn drop(&mut self) {
+        if let Some(conn) = self.0.take() {
+            let _guard = crate::rt::handle().enter();
+            drop(conn);
+        }
+    }
+}
+
 struct Database {
-    conn: SqliteConnection,
+    /// Writer connection checked out only for the duration of an open group-commit batch.
+    active_tx: Option<PooledConn>,
     waiting: Vec<Ack>,
     events: Vec<DocumentEvent>,
     tasks_changed: bool,
     docs: Vec<flume::Sender<DocumentEvent>>,
     tasks: Vec<flume::Sender<()>>,
     stats: CommitStats,
+}
+
+impl Database {
+    fn new() -> Self {
+        Self {
+            active_tx: None,
+            waiting: vec![],
+            events: vec![],
+            tasks_changed: false,
+            docs: vec![],
+            tasks: vec![],
+            stats: CommitStats::default(),
+        }
+    }
 }
 
 fn batch(conn: &mut SqliteConnection, sql: &'static str) -> sqlx::Result<()> {
@@ -37,13 +86,16 @@ fn batch(conn: &mut SqliteConnection, sql: &'static str) -> sqlx::Result<()> {
 impl Database {
     fn flush(&mut self) -> Result<()> {
         if self.waiting.is_empty() {
+            self.active_tx.take();
             return Ok(());
         }
+        let mut conn = self.active_tx.take().expect("active_tx present while writers are waiting");
         self.stats.batches += 1;
-        let outcome = batch(&mut self.conn, "COMMIT");
+        let outcome = batch(&mut conn, "COMMIT");
         if outcome.is_err() {
-            let _ = batch(&mut self.conn, "ROLLBACK");
+            let _ = batch(&mut conn, "ROLLBACK");
         }
+        drop(conn);
         let receipt = outcome.as_ref().map(|_| ()).map_err(ToString::to_string);
         if outcome.is_ok() {
             self.stats.committed_ops += self.waiting.len() as u64;
@@ -71,7 +123,9 @@ impl Database {
 
 struct SqliteInner {
     db: Mutex<Database>,
-    reader: Option<Mutex<SqliteConnection>>,
+    write_pool: Option<SqlitePool>,
+    read_pool: Option<SqlitePool>,
+    owns_pools: bool,
     read_only: bool,
     closed: AtomicBool,
     clock: Arc<dyn Fn() -> i64 + Send + Sync>,
@@ -85,6 +139,9 @@ impl Drop for SqliteInner {
         {
             let _ = db.flush();
         }
+        let _guard = crate::rt::handle().enter();
+        self.read_pool.take();
+        self.write_pool.take();
     }
 }
 
@@ -96,25 +153,45 @@ impl SqliteStorage {
         Self::open_with_clock(Some(path), now_ms)
     }
 
+    /// Wraps externally managed `SqlitePool`s (such as `ServerDb`'s shared write/read pools)
+    /// and initializes durable's schema once on `write_pool`.
+    pub fn from_pools(write_pool: SqlitePool, read_pool: Option<SqlitePool>, clock: impl Fn() -> i64 + Send + Sync + 'static) -> Result<Self> {
+        let (write_pool, read_pool) = block_on(async move {
+            let mut conn = write_pool.acquire().await?;
+            sqlx::raw_sql(include_str!("../schema.sql")).execute(&mut *conn).await?;
+            drop(conn);
+            Ok::<_, sqlx::Error>((write_pool, read_pool))
+        })?;
+        Ok(Self(Arc::new(SqliteInner {
+            db: Mutex::new(Database::new()),
+            write_pool: Some(write_pool),
+            read_pool,
+            owns_pools: false,
+            read_only: false,
+            closed: AtomicBool::new(false),
+            clock: Arc::new(clock),
+        })))
+    }
+
     pub fn open_read_only(path: &Path) -> Result<Self> {
         if !path.is_file() {
             return Err(Error::Invalid(format!("sqlite database does not exist: {}", path.display())));
         }
-        let options = SqliteConnectOptions::new().filename(path).read_only(true).busy_timeout(Duration::from_secs(5));
-        let conn = block_on(options.connect())?;
+        let path_buf = path.to_path_buf();
+        let read_pool = block_on(async move {
+            let options = SqliteConnectOptions::new()
+                .filename(&path_buf)
+                .read_only(true)
+                .busy_timeout(Duration::from_secs(5));
+            SqlitePoolOptions::new().max_connections(4).min_connections(1).connect_with(options).await
+        })?;
         Ok(Self(Arc::new(SqliteInner {
-            reader: None,
+            db: Mutex::new(Database::new()),
+            write_pool: None,
+            read_pool: Some(read_pool),
+            owns_pools: true,
             read_only: true,
             closed: AtomicBool::new(false),
-            db: Mutex::new(Database {
-                conn,
-                waiting: vec![],
-                events: vec![],
-                tasks_changed: false,
-                docs: vec![],
-                tasks: vec![],
-                stats: CommitStats::default(),
-            }),
             clock: Arc::new(now_ms),
         })))
     }
@@ -124,29 +201,50 @@ impl SqliteStorage {
     }
 
     pub fn open_with_clock(path: Option<&Path>, clock: impl Fn() -> i64 + Send + Sync + 'static) -> Result<Self> {
-        let options = SqliteConnectOptions::new().busy_timeout(Duration::from_secs(5));
-        let write = match path {
-            Some(file) => options.clone().filename(file).create_if_missing(true),
-            None => options.clone().in_memory(true),
-        };
-        let mut conn = block_on(write.journal_mode(SqliteJournalMode::Wal).synchronous(SqliteSynchronous::Normal).connect())?;
-        batch(&mut conn, include_str!("../schema.sql"))?;
-        let reader = path
-            .map(|file| block_on(options.filename(file).read_only(true).connect()).map(Mutex::new))
-            .transpose()?;
+        let path_buf = path.map(Path::to_path_buf);
+        let (write_pool, read_pool) = block_on(async move {
+            let base = SqliteConnectOptions::new().busy_timeout(Duration::from_secs(5));
+            let (write_pool, read_pool) = match path_buf {
+                Some(file) => {
+                    let write_opts = base
+                        .clone()
+                        .filename(&file)
+                        .create_if_missing(true)
+                        .journal_mode(SqliteJournalMode::Wal)
+                        .synchronous(SqliteSynchronous::Normal);
+                    let write_pool = SqlitePoolOptions::new().max_connections(1).min_connections(1).connect_with(write_opts).await?;
+                    let mut conn = write_pool.acquire().await?;
+                    sqlx::raw_sql(include_str!("../schema.sql")).execute(&mut *conn).await?;
+                    drop(conn);
+                    let read_opts = base.filename(&file).read_only(true);
+                    let read_pool = SqlitePoolOptions::new().max_connections(4).min_connections(1).connect_with(read_opts).await?;
+                    (write_pool, Some(read_pool))
+                }
+                None => {
+                    // Disable pool recycling for in-memory SQLite so sqlx never drops and wipes the DB.
+                    let write_opts = base.in_memory(true).journal_mode(SqliteJournalMode::Wal).synchronous(SqliteSynchronous::Normal);
+                    let write_pool = SqlitePoolOptions::new()
+                        .max_connections(1)
+                        .min_connections(1)
+                        .idle_timeout(None)
+                        .max_lifetime(None)
+                        .connect_with(write_opts)
+                        .await?;
+                    let mut conn = write_pool.acquire().await?;
+                    sqlx::raw_sql(include_str!("../schema.sql")).execute(&mut *conn).await?;
+                    drop(conn);
+                    (write_pool, None)
+                }
+            };
+            Ok::<_, sqlx::Error>((write_pool, read_pool))
+        })?;
         Ok(Self(Arc::new(SqliteInner {
-            reader,
+            db: Mutex::new(Database::new()),
+            write_pool: Some(write_pool),
+            read_pool,
+            owns_pools: true,
             read_only: false,
             closed: AtomicBool::new(false),
-            db: Mutex::new(Database {
-                conn,
-                waiting: vec![],
-                events: vec![],
-                tasks_changed: false,
-                docs: vec![],
-                tasks: vec![],
-                stats: CommitStats::default(),
-            }),
             clock: Arc::new(clock),
         })))
     }
@@ -157,6 +255,23 @@ impl SqliteStorage {
             return Err(Error::Closed);
         }
         Ok(db)
+    }
+}
+
+fn run_read_tx(conn: &mut SqliteConnection, f: &mut dyn FnMut(&dyn StorageRead) -> Result<()>) -> Result<()> {
+    let mut tx = block_on(conn.begin())?;
+    let s = Sqlite::new(&mut tx);
+    let read = SqliteTx(&s);
+    let outcome = f(&read);
+    match outcome {
+        Ok(()) => {
+            block_on(tx.commit())?;
+            Ok(())
+        }
+        Err(err) => {
+            let _ = block_on(tx.rollback());
+            Err(err)
+        }
     }
 }
 
@@ -174,55 +289,72 @@ impl StorageBackend for SqliteStorage {
     }
 
     fn read_dyn(&self, f: &mut dyn FnMut(&dyn StorageRead) -> Result<()>) -> Result<()> {
-        if let Some(reader) = &self.0.reader {
-            let mut conn = reader.lock().unwrap_or_else(|p| p.into_inner());
+        if let Some(read_pool) = &self.0.read_pool {
             if self.0.closed.load(Ordering::Acquire) {
                 return Err(Error::Closed);
             }
-            let mut tx = block_on(conn.begin())?;
-            let s = Sqlite::new(&mut tx);
-            let read = SqliteTx(&s);
-            f(&read)?;
-            block_on(tx.commit())?;
-            return Ok(());
+            let mut conn = PooledConn::new(block_on(read_pool.acquire())?);
+            return run_read_tx(&mut conn, f);
         }
+        let write_pool = self.0.write_pool.as_ref().ok_or_else(|| Error::Invalid("sqlite storage has no pool".into()))?;
         let mut db = self.lock()?;
         db.flush()?;
-        let mut tx = block_on(db.conn.begin())?;
-        let s = Sqlite::new(&mut tx);
-        let read = SqliteTx(&s);
-        f(&read)?;
-        block_on(tx.commit())?;
-        Ok(())
+        let mut conn = PooledConn::new(block_on(write_pool.acquire())?);
+        run_read_tx(&mut conn, f)
     }
 
     fn write_dyn(&self, f: &mut WriteCallback<'_>) -> Result<()> {
         if self.0.read_only {
             return Err(Error::Invalid("sqlite storage is open read-only".into()));
         }
+        let write_pool = self
+            .0
+            .write_pool
+            .as_ref()
+            .ok_or_else(|| Error::Invalid("sqlite storage has no writer pool".into()))?;
         let (ack, done) = flume::bounded(1);
         let leader = {
             let mut db = self.lock()?;
             db.stats.requests += 1;
             let leader = db.waiting.is_empty();
-            let start = if leader {
-                "BEGIN IMMEDIATE; SAVEPOINT operation"
-            } else {
-                "SAVEPOINT operation"
-            };
-            if let Err(error) = batch(&mut db.conn, start) {
-                if leader {
-                    let _ = batch(&mut db.conn, "ROLLBACK");
+            if leader {
+                let mut conn = PooledConn::new(block_on(write_pool.acquire())?);
+                if let Err(error) = batch(&mut conn, "BEGIN IMMEDIATE; SAVEPOINT operation") {
+                    let _ = batch(&mut conn, "ROLLBACK");
+                    drop(conn);
+                    return Err(error.into());
                 }
-                return Err(error.into());
+                db.active_tx = Some(conn);
+            } else {
+                let conn = db.active_tx.as_mut().expect("active_tx present while writers are waiting");
+                if let Err(error) = batch(conn, "SAVEPOINT operation") {
+                    return Err(error.into());
+                }
             }
             let now = self.now_ms();
-            let conn_wrap = Sqlite::new(&mut db.conn);
-            let tx = SqliteTx(&conn_wrap);
-            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&tx, &tx, Some(&conn_wrap), now)));
+            let outcome = {
+                let conn = db.active_tx.as_mut().expect("active_tx present during write operation");
+                let conn_wrap = Sqlite::new(conn);
+                let tx = SqliteTx(&conn_wrap);
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&tx, &tx, Some(&conn_wrap), now)))
+            };
             match outcome {
                 Ok(Ok(write_outcome)) => {
-                    batch(&mut db.conn, "RELEASE operation")?;
+                    let release_res = {
+                        let conn = db.active_tx.as_mut().expect("active_tx present before release");
+                        batch(conn, "RELEASE operation")
+                    };
+                    if let Err(error) = release_res {
+                        db.stats.failed_ops += 1;
+                        if leader {
+                            if let Some(mut conn) = db.active_tx.take() {
+                                let _ = batch(&mut conn, "ROLLBACK");
+                            }
+                        } else if let Some(conn) = db.active_tx.as_mut() {
+                            let _ = batch(conn, "ROLLBACK TO operation; RELEASE operation");
+                        }
+                        return Err(error.into());
+                    }
                     db.events.extend(write_outcome.events);
                     db.tasks_changed |= write_outcome.tasks_changed;
                     db.waiting.push(ack);
@@ -233,8 +365,16 @@ impl StorageBackend for SqliteStorage {
                 }
                 other => {
                     db.stats.failed_ops += 1;
-                    let rollback = if leader { "ROLLBACK" } else { "ROLLBACK TO operation; RELEASE operation" };
-                    batch(&mut db.conn, rollback)?;
+                    if leader {
+                        if let Some(mut conn) = db.active_tx.take() {
+                            let _ = batch(&mut conn, "ROLLBACK");
+                        }
+                    } else if let Some(conn) = db.active_tx.as_mut() {
+                        let rb = batch(conn, "ROLLBACK TO operation; RELEASE operation");
+                        if let (Ok(_), Err(err)) = (&other, rb) {
+                            return Err(err.into());
+                        }
+                    }
                     match other {
                         Ok(Err(e)) => return Err(e),
                         Err(panic) => {
@@ -272,16 +412,31 @@ impl StorageBackend for SqliteStorage {
     }
 
     fn close(&self) -> Result<()> {
-        let mut db = self.0.db.lock().unwrap();
-        if self.0.closed.load(Ordering::Acquire) {
-            return Ok(());
+        let should_close_pools = {
+            let mut db = self.0.db.lock().unwrap_or_else(|e| e.into_inner());
+            if self.0.closed.load(Ordering::Acquire) {
+                return Ok(());
+            }
+            if !self.0.read_only {
+                db.flush()?;
+            }
+            self.0.closed.store(true, Ordering::Release);
+            db.docs.clear();
+            db.tasks.clear();
+            self.0.owns_pools
+        };
+        if should_close_pools {
+            let read_pool = self.0.read_pool.clone();
+            let write_pool = self.0.write_pool.clone();
+            block_on(async move {
+                if let Some(pool) = read_pool {
+                    pool.close().await;
+                }
+                if let Some(pool) = write_pool {
+                    pool.close().await;
+                }
+            });
         }
-        if !self.0.read_only {
-            db.flush()?;
-        }
-        self.0.closed.store(true, Ordering::Release);
-        db.docs.clear();
-        db.tasks.clear();
         Ok(())
     }
 }

@@ -634,8 +634,8 @@ fn regression_a_failed_artifact_version_never_publishes_its_channel_card() {
     let first_card = last_message(&call, &channel);
     let mut events = server.test_internals().chat.subscribe_events();
     let opts = SqliteConnectOptions::new().filename(dir.path().join("server.db"));
-    let mut inspect = pollster::block_on(SqliteConnection::connect_with(&opts)).unwrap();
-    pollster::block_on(
+    let mut inspect = vibevalley_runtime::rt::block_on(SqliteConnection::connect_with(&opts)).unwrap();
+    vibevalley_runtime::rt::block_on(
         sqlx::raw_sql(
             "CREATE TRIGGER reject_version BEFORE INSERT ON artifact_version WHEN NEW.version = 2 BEGIN SELECT raise(ABORT, 'blocked version'); END;",
         )
@@ -651,8 +651,8 @@ fn regression_a_failed_artifact_version_never_publishes_its_channel_card() {
     assert_eq!(ok(call("channel.message.list", json!({"id":channel}))), before);
     assert!(events.try_recv().is_err());
 
-    pollster::block_on(sqlx::raw_sql("DROP TRIGGER reject_version").execute(&mut inspect)).unwrap();
-    pollster::block_on(
+    vibevalley_runtime::rt::block_on(sqlx::raw_sql("DROP TRIGGER reject_version").execute(&mut inspect)).unwrap();
+    vibevalley_runtime::rt::block_on(
         sqlx::raw_sql(
             "CREATE TABLE proof_parent (id integer primary key);
          CREATE TABLE proof_child (parent integer references proof_parent(id) deferrable initially deferred);
@@ -667,7 +667,7 @@ fn regression_a_failed_artifact_version_never_publishes_its_channel_card() {
     assert_eq!(ok(call("artifact.get", json!({"id":created["id"]})))["version"], 1);
     assert_eq!(ok(call("channel.message.list", json!({"id":channel}))), before);
     assert!(events.try_recv().is_err());
-    pollster::block_on(sqlx::raw_sql("DROP TRIGGER reject_commit").execute(&mut inspect)).unwrap();
+    vibevalley_runtime::rt::block_on(sqlx::raw_sql("DROP TRIGGER reject_commit").execute(&mut inspect)).unwrap();
     let published = ok(version());
     let card = last_message(&call, &channel);
     assert_eq!(published["version"], 2);
@@ -1152,8 +1152,8 @@ fn presence_update_follow_and_view_highlights_never_write_sqlite() {
     // Verify zero `presence/*` rows in SQLite and `artifact.seq` stayed at 1.
     assert_eq!(ok(call("artifact.get", json!({ "id": id })))["seq"], 1);
     let opts = SqliteConnectOptions::new().filename(dir.path().join("server.db"));
-    let mut inspect = pollster::block_on(SqliteConnection::connect_with(&opts)).unwrap();
-    let count: i64 = pollster::block_on(
+    let mut inspect = vibevalley_runtime::rt::block_on(SqliteConnection::connect_with(&opts)).unwrap();
+    let count: i64 = vibevalley_runtime::rt::block_on(
         sqlx::query("SELECT count(*) AS n FROM artifact_entry WHERE artifact_id = ?1 AND path LIKE 'presence/%'")
             .bind(&id)
             .fetch_one(&mut inspect),

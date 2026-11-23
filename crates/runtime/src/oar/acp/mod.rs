@@ -1576,7 +1576,7 @@ fn connection_thread(
         .connect_with(Lines::new(outgoing, incoming), |cx: ConnectionTo<Agent>| {
             serve(cx, serving, opts, probe_models, commands, ready)
         });
-    let result = pollster::block_on(connection);
+    let result = crate::rt::block_on(connection);
     let child_error = shared.child.get().map(|c| c.stderr_text()).unwrap_or_default();
     let mut message = match &result {
         Ok(()) => format!("{} closed the connection", shared.runtime_id),

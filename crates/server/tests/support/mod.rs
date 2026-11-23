@@ -20,11 +20,11 @@ use vibevalley_server::modules::work::ledger::BoardConfig;
 /// Opens a separate connection for assertions or SQLite failure injection.
 pub fn inspect_db(path: &Path) -> sqlx::SqliteConnection {
     use sqlx::ConnectOptions;
-    pollster::block_on(sqlx::sqlite::SqliteConnectOptions::new().filename(path).connect()).unwrap()
+    vibevalley_runtime::rt::block_on(sqlx::sqlite::SqliteConnectOptions::new().filename(path).connect()).unwrap()
 }
 
 pub fn execute_sql(connection: &mut sqlx::SqliteConnection, sql: &'static str) {
-    pollster::block_on(sqlx::raw_sql(sql).execute(connection)).unwrap();
+    vibevalley_runtime::rt::block_on(sqlx::raw_sql(sql).execute(connection)).unwrap();
 }
 
 /// What a hook sees of a turn.

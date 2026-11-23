@@ -137,7 +137,7 @@ impl Store {
             .journal_mode(SqliteJournalMode::Wal)
             .synchronous(SqliteSynchronous::Normal)
             .foreign_keys(true);
-        pollster::block_on(async {
+        vibevalley_runtime::rt::block_on(async {
             let mut conn = options.connect().await?;
             schema::migrate(&mut conn).await?;
             Ok(Self { conn: Mutex::new(conn) })
@@ -162,7 +162,7 @@ impl Store {
 
     fn run<T>(&self, f: impl AsyncFnOnce(&mut SqliteConnection) -> Result<T>) -> Result<T> {
         let mut conn = self.conn.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        pollster::block_on(f(&mut conn))
+        vibevalley_runtime::rt::block_on(f(&mut conn))
     }
 
     pub fn projects(&self) -> Result<Vec<Project>> {

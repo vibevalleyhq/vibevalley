@@ -156,7 +156,7 @@ fn remote_full_lifecycle_pairing_bearer_ops_slices_sse_resume_and_disable() {
 
     {
         let mut conn = inspect_db(&dir.path().join("server.db"));
-        let row = pollster::block_on(
+        let row = vibevalley_runtime::rt::block_on(
             sqlx::query("select token_hash from remote_device where id = ?1")
                 .bind(&device_id)
                 .fetch_one(&mut conn),

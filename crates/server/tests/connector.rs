@@ -789,7 +789,7 @@ fn what_weixin_refuses_waits_then_goes_out_later_or_is_withdrawn() {
     call(&s, "channel.markRead", json!({ "id": general, "number": said.number }));
     pending(0, "the seen handoff withdrawn");
     let mut db = crate::support::inspect_db(&dir.path().join("server.db"));
-    let state: String = pollster::block_on(
+    let state: String = vibevalley_runtime::rt::block_on(
         sqlx::query_scalar("select state from connector_outbox where message_id = ?1")
             .bind(&said.id)
             .fetch_one(&mut db),

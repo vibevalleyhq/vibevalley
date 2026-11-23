@@ -26,7 +26,6 @@ futures-util = { workspace = true }
 include_dir = "0.7.4"
 jiff = { workspace = true }
 parking_lot = { workspace = true }
-pollster = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 rustls = { workspace = true }

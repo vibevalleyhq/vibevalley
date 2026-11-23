@@ -11932,7 +11932,6 @@ dependencies = [
  "oxc_parser",
  "oxc_span",
  "parking_lot",
- "pollster 0.4.0",
  "proptest",
  "quickjs-jit",
  "regex",
@@ -11967,7 +11966,6 @@ dependencies = [
  "include_dir",
  "jiff 1.0.1",
  "parking_lot",
- "pollster 0.4.0",
  "regex",
  "reqwest",
  "rustls",
@@ -12024,13 +12022,13 @@ dependencies = [
 name = "vibevalley-workspace"
 version = "0.1.0"
 dependencies = [
- "pollster 0.4.0",
  "serde",
  "serde_json",
  "sqlx",
  "tempfile",
  "thiserror 2.0.21",
  "vibevalley-git",
+ "vibevalley-runtime",
  "vibevalley-terminal",
 ]
 

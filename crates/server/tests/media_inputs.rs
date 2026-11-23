@@ -10,7 +10,7 @@ use vibevalley_server::{
 };
 fn database(root: &Path) -> sqlx::SqliteConnection {
     use sqlx::ConnectOptions;
-    pollster::block_on(sqlx::sqlite::SqliteConnectOptions::new().filename(root.join("server.db")).connect()).unwrap()
+    vibevalley_runtime::rt::block_on(sqlx::sqlite::SqliteConnectOptions::new().filename(root.join("server.db")).connect()).unwrap()
 }
 
 fn setup() -> (
@@ -99,7 +99,7 @@ fn pins_admission_rollback_expiry_and_restart() {
     assert!(!inputs.get(&r.id).unwrap().can_delete);
     assert!(inputs.delete(&r.id).is_err());
     let mut conn = database(dir.path());
-    pollster::block_on(sqlx::query("update media_input set expires_at=0").execute(&mut conn)).unwrap();
+    vibevalley_runtime::rt::block_on(sqlx::query("update media_input set expires_at=0").execute(&mut conn)).unwrap();
     inputs.sweep().unwrap();
     assert!(inputs.content(&r.id).is_ok());
     let restored = Inputs::open(dir.path(), db.clone(), files.clone()).unwrap();
@@ -109,7 +109,7 @@ fn pins_admission_rollback_expiry_and_restart() {
     restored.sweep().unwrap();
     assert!(restored.list().unwrap().is_empty());
     let interrupted = restored.create(&request()).unwrap();
-    pollster::block_on(
+    vibevalley_runtime::rt::block_on(
         sqlx::query("update media_input set phase='uploading' where id=?1")
             .bind(&interrupted.id)
             .execute(&mut conn),
@@ -130,7 +130,7 @@ fn quota_and_corrupted_content() {
     }
     assert!(inputs.create(&r).is_err());
     let mut db = database(dir.path());
-    pollster::block_on(sqlx::query("update media_input set expires_at=0").execute(&mut db)).unwrap();
+    vibevalley_runtime::rt::block_on(sqlx::query("update media_input set expires_at=0").execute(&mut db)).unwrap();
     inputs.sweep().unwrap();
     let input = inputs.create(&request()).unwrap();
     let ready = inputs.upload(&input.id, Cursor::new(png())).unwrap();
@@ -289,7 +289,7 @@ fn failed_promotion_keeps_hash_and_refuses_changed_retry() {
     let (dir, _db, inputs, _, _) = setup();
     let r = inputs.create(&request()).unwrap();
     let mut db = database(dir.path());
-    pollster::block_on(
+    vibevalley_runtime::rt::block_on(
         sqlx::raw_sql("create trigger fail_attachment before insert on attachment begin select raise(abort, 'disk failure'); end;").execute(&mut db),
     )
     .unwrap();
@@ -297,7 +297,7 @@ fn failed_promotion_keeps_hash_and_refuses_changed_retry() {
     let failed = inputs.get(&r.id).unwrap();
     assert_eq!(failed.phase, MediaInputPhase::Failed);
     assert!(failed.hash.is_some());
-    pollster::block_on(sqlx::query("drop trigger fail_attachment").execute(&mut db)).unwrap();
+    vibevalley_runtime::rt::block_on(sqlx::query("drop trigger fail_attachment").execute(&mut db)).unwrap();
     let mut changed = png();
     changed[23] = 1;
     assert!(inputs.upload(&r.id, Cursor::new(changed)).is_err());
@@ -334,7 +334,7 @@ fn regression_list_reads_without_write_lock_during_concurrent_transaction() {
     // Hold a SQLite write lock open on a separate connection; `Inputs::list()` must
     // use plain WAL reads without `BEGIN IMMEDIATE` and return immediately.
     let mut writer = database(dir.path());
-    pollster::block_on(sqlx::raw_sql("BEGIN IMMEDIATE").execute(&mut writer)).unwrap();
+    vibevalley_runtime::rt::block_on(sqlx::raw_sql("BEGIN IMMEDIATE").execute(&mut writer)).unwrap();
     let started = std::time::Instant::now();
     let listed = inputs.list().expect("list must succeed while another connection holds write lock");
     assert!(
@@ -342,7 +342,7 @@ fn regression_list_reads_without_write_lock_during_concurrent_transaction() {
         "list blocked on writer lock for {:?}",
         started.elapsed()
     );
-    pollster::block_on(sqlx::raw_sql("ROLLBACK").execute(&mut writer)).unwrap();
+    vibevalley_runtime::rt::block_on(sqlx::raw_sql("ROLLBACK").execute(&mut writer)).unwrap();
 
     let ready_entry = listed.iter().find(|i| i.id == ready.id).expect("ready input listed");
     let free_entry = listed.iter().find(|i| i.id == free.id).expect("free input listed");

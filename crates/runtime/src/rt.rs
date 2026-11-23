@@ -1,8 +1,11 @@
 //! Process-wide shared Tokio runtime for asynchronous I/O in VibeValley.
 
 use std::future::Future;
-use std::sync::OnceLock;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::pin::pin;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, OnceLock};
+use std::task::{Context, Poll, Wake, Waker};
+use std::thread::Thread;
 
 use tokio::runtime::{Handle, Runtime, RuntimeFlavor};
 
@@ -48,6 +51,42 @@ where
     handle().spawn(future)
 }
 
+struct ThreadWaker {
+    thread: Thread,
+    notified: AtomicBool,
+}
+
+impl Wake for ThreadWaker {
+    fn wake(self: Arc<Self>) {
+        self.wake_by_ref();
+    }
+
+    fn wake_by_ref(self: &Arc<Self>) {
+        self.notified.store(true, Ordering::Release);
+        self.thread.unpark();
+    }
+}
+
+fn block_on_park<F: Future>(future: F) -> F::Output {
+    let mut future = pin!(future);
+    let signal = Arc::new(ThreadWaker {
+        thread: std::thread::current(),
+        notified: AtomicBool::new(false),
+    });
+    let waker = Waker::from(signal.clone());
+    let mut cx = Context::from_waker(&waker);
+    loop {
+        match future.as_mut().poll(&mut cx) {
+            Poll::Ready(output) => return output,
+            Poll::Pending => {
+                while !signal.notified.swap(false, Ordering::Acquire) {
+                    std::thread::park();
+                }
+            }
+        }
+    }
+}
+
 pub fn block_on<F: Future>(future: F) -> F::Output {
     match Handle::try_current() {
         Err(_) => handle().block_on(future),
@@ -55,7 +94,7 @@ pub fn block_on<F: Future>(future: F) -> F::Output {
         // Current-thread runtimes panic on `block_in_place`; entering the shared runtime lets its workers drive Tokio I/O and timers.
         Ok(_) => {
             let _guard = handle().enter();
-            pollster::block_on(future)
+            block_on_park(future)
         }
     }
 }
