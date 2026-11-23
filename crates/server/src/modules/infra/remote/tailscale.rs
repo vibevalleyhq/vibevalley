@@ -1,7 +1,6 @@
 //! Local Tailscale status probe (`tailscale status --json`) with a short bounded timeout.
 
 use std::net::Ipv4Addr;
-use std::path::Path;
 use std::time::Duration;
 
 use serde::Deserialize;
@@ -76,21 +75,27 @@ pub fn parse_status_json(raw: &str) -> Result<TailscaleInfo, serde_json::Error> 
     Ok(TailscaleInfo { online, ipv4, host })
 }
 
-fn run_tailscale_status(bin: &str) -> Option<String> {
+async fn run_tailscale_status_async(bin: &str) -> Option<String> {
     let mut cmd = tokio::process::Command::new(bin);
     cmd.args(["status", "--json"]);
-    let output = vibevalley_runtime::rt::block_on(vibevalley_runtime::oar::run_output_with_timeout(cmd, PROBE_TIMEOUT, Some(MAX_OUTPUT_BYTES))).ok()?;
+    let output = vibevalley_runtime::oar::run_output_with_timeout(cmd, PROBE_TIMEOUT, Some(MAX_OUTPUT_BYTES))
+        .await
+        .ok()?;
     output.success().then(|| String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
-/// Probes the local Tailscale CLI without panicking when Tailscale is missing or stopped.
-pub fn probe() -> TailscaleInfo {
+/// Probes the local Tailscale CLI asynchronously without panicking when Tailscale is missing or stopped.
+pub async fn probe_async() -> TailscaleInfo {
     for candidate in CANDIDATE_PATHS {
-        if Path::new(candidate).is_file() {
-            return run_tailscale_status(candidate).and_then(|raw| parse_status_json(&raw).ok()).unwrap_or_default();
+        if tokio::fs::metadata(candidate).await.is_ok_and(|m| m.is_file()) {
+            return run_tailscale_status_async(candidate)
+                .await
+                .and_then(|raw| parse_status_json(&raw).ok())
+                .unwrap_or_default();
         }
     }
-    run_tailscale_status("tailscale")
+    run_tailscale_status_async("tailscale")
+        .await
         .and_then(|raw| parse_status_json(&raw).ok())
         .unwrap_or_default()
 }

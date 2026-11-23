@@ -280,12 +280,30 @@ pub fn reachable(url: &url::Url, resolve: &dyn Fn(&str, u16) -> Vec<std::net::Ip
     !addresses.is_empty() && addresses.iter().all(|a| !private_address(a))
 }
 
-fn resolve_all(host: &str, port: u16) -> Vec<std::net::IpAddr> {
-    use std::net::ToSocketAddrs;
+async fn resolve_all_async(host: &str, port: u16) -> Vec<std::net::IpAddr> {
     if let Ok(ip) = host.parse() {
         return vec![ip];
     }
-    (host, port).to_socket_addrs().map(|a| a.map(|s| s.ip()).collect()).unwrap_or_default()
+    tokio::net::lookup_host((host, port))
+        .await
+        .map(|addrs| addrs.map(|s| s.ip()).collect())
+        .unwrap_or_default()
+}
+
+async fn reachable_async(url: &url::Url) -> bool {
+    if url.scheme() != "http" && url.scheme() != "https" {
+        return false;
+    }
+    if !url.username().is_empty() || url.password().is_some() {
+        return false;
+    }
+    let Some(host) = url.host_str() else { return false };
+    let host = host.trim_start_matches('[').trim_end_matches(']');
+    if host == "localhost" || host.ends_with(".localhost") || host.ends_with(".local") || host.ends_with(".internal") {
+        return false;
+    }
+    let addresses = resolve_all_async(host, url.port_or_known_default().unwrap_or(80)).await;
+    !addresses.is_empty() && addresses.iter().all(|a| !private_address(a))
 }
 
 static META_TAG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)<meta\s+[^>]*>").expect("meta"));
@@ -346,81 +364,70 @@ pub fn embed_of(url: &str, html: &str) -> Option<Embed> {
     })
 }
 
-/// `readEmbed`: a link's preview, or none when it cannot be read (not
-/// public, not a page, too slow, too big).
-pub fn read_embed(link: &str) -> Option<Embed> {
-    enum Hop {
-        Redirect(String),
-        Html(Vec<u8>),
-        Stop,
-    }
-
+/// `readEmbed`: asynchronously reads a link's preview without blocking an OS thread,
+/// or returns none when it cannot be read (not public, not a page, too slow, too big).
+pub async fn read_embed_async(link: &str) -> Option<Embed> {
     let mut url = url::Url::parse(link).ok()?;
     let client = crate::modules::infra::http::no_redirect_client().ok()?.clone();
     for _ in 0..=REDIRECTS_MAX {
-        if !reachable(&url, &resolve_all) {
+        if !reachable_async(&url).await {
             return None;
         }
-        let target = url.to_string();
-        let client = client.clone();
-        match crate::modules::infra::http::run_http(async move {
-            let mut res = match client
-                .get(&target)
-                .timeout(EMBED_TIMEOUT)
-                .header("accept", "text/html")
-                .header("user-agent", "VibeValley link preview")
-                .send()
-                .await
-            {
-                Ok(r) => r,
-                Err(_) => return Hop::Stop,
-            };
-            let status = res.status().as_u16();
-            if (300..400).contains(&status) {
-                return match res.headers().get("location").and_then(|v| v.to_str().ok()) {
-                    Some(next) => Hop::Redirect(next.to_string()),
-                    None => Hop::Stop,
-                };
-            }
-            let html = res
-                .headers()
-                .get("content-type")
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("")
-                .contains("text/html");
-            if !(200..300).contains(&status) || !html {
-                return Hop::Stop;
-            }
-            let mut bytes = Vec::new();
-            loop {
-                let chunk = match res.chunk().await {
-                    Ok(Some(c)) => c,
-                    Ok(None) => break,
-                    Err(_) => {
-                        if bytes.is_empty() {
-                            return Hop::Stop;
-                        }
-                        break;
-                    }
-                };
-                let remaining = BODY_MAX.saturating_sub(bytes.len());
-                if remaining == 0 {
-                    break;
-                }
-                let take = chunk.len().min(remaining);
-                bytes.extend_from_slice(&chunk[..take]);
-                if bytes.len() >= BODY_MAX {
-                    break;
-                }
-            }
-            Hop::Html(bytes)
-        }) {
-            Hop::Redirect(next) => url = url.join(&next).ok()?,
-            Hop::Html(bytes) => return embed_of(link, &String::from_utf8_lossy(&bytes)),
-            Hop::Stop => return None,
+        let mut res = client
+            .get(url.as_str())
+            .timeout(EMBED_TIMEOUT)
+            .header("accept", "text/html")
+            .header("user-agent", "VibeValley link preview")
+            .send()
+            .await
+            .ok()?;
+        let status = res.status().as_u16();
+        if (300..400).contains(&status) {
+            let next = res.headers().get("location").and_then(|v| v.to_str().ok())?;
+            url = url.join(next).ok()?;
+            continue;
         }
+        let html = res
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .contains("text/html");
+        if !(200..300).contains(&status) || !html {
+            return None;
+        }
+        let mut bytes = Vec::new();
+        loop {
+            let chunk = match res.chunk().await {
+                Ok(Some(c)) => c,
+                Ok(None) => break,
+                Err(_) => {
+                    if bytes.is_empty() {
+                        return None;
+                    }
+                    break;
+                }
+            };
+            let remaining = BODY_MAX.saturating_sub(bytes.len());
+            if remaining == 0 {
+                break;
+            }
+            let take = chunk.len().min(remaining);
+            bytes.extend_from_slice(&chunk[..take]);
+            if bytes.len() >= BODY_MAX {
+                break;
+            }
+        }
+        return embed_of(link, &String::from_utf8_lossy(&bytes));
     }
     None
+}
+
+/// `readEmbed`: a link's preview, or none when it cannot be read (not
+/// public, not a page, too slow, too big).
+pub fn read_embed(link: &str) -> Option<Embed> {
+    let link = link.to_string();
+    crate::modules::infra::http::run_http(async move { read_embed_async(&link).await })
 }
 
 #[cfg(test)]

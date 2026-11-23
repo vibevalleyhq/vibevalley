@@ -62,6 +62,14 @@ impl<F: Fn(Request) -> Result<Response, FetchError> + Send + Sync> Fetch for F {
 /// `reqwest`, no redirects, statuses answered rather than failed.
 pub struct Http;
 
+impl Http {
+    #[allow(dead_code)]
+    pub(crate) async fn fetch_async(r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
+        let client = no_redirect_client().map_err(FetchError::Network)?.clone();
+        execute_request_async(client, r, cancel).await
+    }
+}
+
 impl Fetch for Http {
     fn fetch(&self, r: Request) -> Result<Response, FetchError> {
         let client = no_redirect_client().map_err(FetchError::Network)?.clone();
@@ -116,57 +124,60 @@ fn pinned_public_client(host: &str, addrs: &[SocketAddr]) -> Result<reqwest::Cli
 }
 
 impl PublicDownload {
-    /// Downloads a public HTTPS resource with bound-DNS pinning, enforcing `timeout`,
-    /// HTTP 200, and `max_bytes`.
-    pub(crate) fn get_bytes(address: &str, timeout: Duration, max_bytes: usize) -> Result<PublicBytes, PublicDownloadError> {
+    /// Downloads a public HTTPS resource asynchronously with bound-DNS pinning,
+    /// enforcing `timeout`, HTTP 200, and `max_bytes`.
+    pub(crate) async fn get_bytes_async(address: &str, timeout: Duration, max_bytes: usize) -> Result<PublicBytes, PublicDownloadError> {
         let url = url::Url::parse(address).map_err(|_| PublicDownloadError::BadUrl)?;
         if !public_https(&url) {
             return Err(PublicDownloadError::BadUrl);
         }
         let host = url.host_str().ok_or(PublicDownloadError::BadUrl)?.to_string();
-        let target = url.clone();
-        let (bytes, media_type) = run_http(async move {
-            let addrs = tokio::time::timeout(timeout, resolve_public_v4(&host))
-                .await
-                .map_err(|_| PublicDownloadError::Timeout)?
-                .map_err(PublicDownloadError::Dns)?;
-            let client = pinned_public_client(&host, &addrs).map_err(PublicDownloadError::Network)?;
-            let mut response = client.get(target).timeout(timeout).send().await.map_err(|e| {
-                if e.is_timeout() {
-                    PublicDownloadError::Timeout
-                } else {
-                    PublicDownloadError::Network(e.to_string())
-                }
-            })?;
-            let status = response.status().as_u16();
-            if status != 200 {
-                return Err(PublicDownloadError::HttpStatus(status));
+        let addrs = tokio::time::timeout(timeout, resolve_public_v4(&host))
+            .await
+            .map_err(|_| PublicDownloadError::Timeout)?
+            .map_err(PublicDownloadError::Dns)?;
+        let client = pinned_public_client(&host, &addrs).map_err(PublicDownloadError::Network)?;
+        let mut response = client.get(url.clone()).timeout(timeout).send().await.map_err(|e| {
+            if e.is_timeout() {
+                PublicDownloadError::Timeout
+            } else {
+                PublicDownloadError::Network(e.to_string())
             }
-            let media_type = response
-                .headers()
-                .get("content-type")
-                .and_then(|v| v.to_str().ok())
-                .map(|v| v.split(';').next().unwrap_or("").trim().to_string())
-                .unwrap_or_default();
-            let mut bytes = Vec::new();
-            while let Some(chunk) = response.chunk().await.map_err(|e| {
-                if e.is_timeout() {
-                    PublicDownloadError::Timeout
-                } else {
-                    PublicDownloadError::Network(e.to_string())
-                }
-            })? {
-                if bytes.len() + chunk.len() > max_bytes {
-                    return Err(PublicDownloadError::TooLarge);
-                }
-                bytes.extend_from_slice(&chunk);
-            }
-            Ok((bytes, media_type))
         })?;
+        let status = response.status().as_u16();
+        if status != 200 {
+            return Err(PublicDownloadError::HttpStatus(status));
+        }
+        let media_type = response
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v.split(';').next().unwrap_or("").trim().to_string())
+            .unwrap_or_default();
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.chunk().await.map_err(|e| {
+            if e.is_timeout() {
+                PublicDownloadError::Timeout
+            } else {
+                PublicDownloadError::Network(e.to_string())
+            }
+        })? {
+            if bytes.len() + chunk.len() > max_bytes {
+                return Err(PublicDownloadError::TooLarge);
+            }
+            bytes.extend_from_slice(&chunk);
+        }
         Ok(PublicBytes { bytes, media_type, url })
     }
 
-    fn fetch_inner(&self, r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
+    /// Downloads a public HTTPS resource with bound-DNS pinning, enforcing `timeout`,
+    /// HTTP 200, and `max_bytes`.
+    pub(crate) fn get_bytes(address: &str, timeout: Duration, max_bytes: usize) -> Result<PublicBytes, PublicDownloadError> {
+        let address = address.to_string();
+        run_http(async move { Self::get_bytes_async(&address, timeout, max_bytes).await })
+    }
+
+    pub(crate) async fn fetch_async(r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
         if cancel.as_ref().is_some_and(CancellationToken::is_cancelled) {
             return Err(FetchError::Network("cancelled".into()));
         }
@@ -176,25 +187,26 @@ impl PublicDownload {
         }
         let host = parsed.host_str().ok_or_else(|| FetchError::Network("missing host".into()))?.to_string();
         let timeout = r.timeout;
-        let resolve_cancel = cancel.clone();
-        let addrs = run_http(async move {
-            let resolve = async {
-                tokio::time::timeout(timeout, resolve_public_v4(&host))
-                    .await
-                    .map_err(|_| FetchError::Timeout)?
-                    .map_err(FetchError::Network)
-            };
-            match resolve_cancel {
-                Some(token) => tokio::select! {
-                    biased;
-                    _ = token.cancelled() => Err(FetchError::Network("cancelled".into())),
-                    res = resolve => res,
-                },
-                None => resolve.await,
-            }
-        })?;
-        let client = pinned_public_client(parsed.host_str().unwrap_or(""), &addrs).map_err(FetchError::Network)?;
-        execute_request(client, r, cancel)
+        let resolve = async {
+            tokio::time::timeout(timeout, resolve_public_v4(&host))
+                .await
+                .map_err(|_| FetchError::Timeout)?
+                .map_err(FetchError::Network)
+        };
+        let addrs = match &cancel {
+            Some(token) => tokio::select! {
+                biased;
+                _ = token.cancelled() => return Err(FetchError::Network("cancelled".into())),
+                res = resolve => res?,
+            },
+            None => resolve.await?,
+        };
+        let client = pinned_public_client(&host, &addrs).map_err(FetchError::Network)?;
+        execute_request_async(client, r, cancel).await
+    }
+
+    fn fetch_inner(&self, r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
+        run_http(Self::fetch_async(r, cancel))
     }
 }
 
@@ -208,80 +220,63 @@ impl Fetch for PublicDownload {
     }
 }
 
-fn execute_request(client: reqwest::Client, r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
+/// Executes `r` asynchronously on `client`, awaiting response headers directly
+/// and streaming body chunks into [`Response::body`] on the shared Tokio runtime.
+pub(crate) async fn execute_request_async(client: reqwest::Client, r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
     if cancel.as_ref().is_some_and(CancellationToken::is_cancelled) {
         return Err(FetchError::Network("cancelled".into()));
     }
     let method = reqwest::Method::from_bytes(r.method.as_bytes()).map_err(|e| FetchError::Network(e.to_string()))?;
-    let (head_tx, head_rx) = flume::bounded::<Result<Response, FetchError>>(1);
-    vibevalley_runtime::rt::handle().spawn(async move {
-        let mut req = client.request(method, &r.url).timeout(r.timeout);
-        for (k, v) in &r.headers {
-            req = req.header(k.as_str(), v.as_str());
-        }
-        if let Some((kind, mut reader)) = r.body {
-            req = req.header("content-type", kind);
-            let (body_tx, body_rx) = flume::bounded::<std::io::Result<Vec<u8>>>(8);
-            tokio::task::spawn_blocking(move || {
-                let mut buf = [0u8; 64 * 1024];
-                loop {
-                    match reader.read(&mut buf) {
-                        Ok(0) => break,
-                        Ok(n) => {
-                            if body_tx.send(Ok(buf[..n].to_vec())).is_err() {
-                                break;
-                            }
-                        }
-                        Err(e) => {
-                            let _ = body_tx.send(Err(e));
+    let mut req = client.request(method, &r.url).timeout(r.timeout);
+    for (k, v) in &r.headers {
+        req = req.header(k.as_str(), v.as_str());
+    }
+    if let Some((kind, mut reader)) = r.body {
+        req = req.header("content-type", kind);
+        let (body_tx, body_rx) = flume::bounded::<std::io::Result<Vec<u8>>>(8);
+        tokio::task::spawn_blocking(move || {
+            let mut buf = [0u8; 64 * 1024];
+            loop {
+                match reader.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        if body_tx.send(Ok(buf[..n].to_vec())).is_err() {
                             break;
                         }
                     }
+                    Err(e) => {
+                        let _ = body_tx.send(Err(e));
+                        break;
+                    }
                 }
-            });
-            let stream = futures_util::stream::unfold(body_rx, |rx| async move { rx.recv_async().await.ok().map(|chunk| (chunk, rx)) });
-            req = req.body(reqwest::Body::wrap_stream(stream));
-        }
-        let send_res = match &cancel {
-            Some(token) => tokio::select! {
-                biased;
-                _ = token.cancelled() => {
-                    let _ = head_tx.send(Err(FetchError::Network("cancelled".into())));
-                    return;
-                }
-                res = req.send() => res,
-            },
-            None => req.send().await,
-        };
-        let mut response = match send_res {
-            Ok(res) => res,
-            Err(e) => {
-                let err = if e.is_timeout() {
-                    FetchError::Timeout
-                } else {
-                    FetchError::Network(e.to_string())
-                };
-                let _ = head_tx.send(Err(err));
-                return;
             }
-        };
-        let status = response.status().as_u16();
-        let headers = response
-            .headers()
-            .iter()
-            .filter_map(|(k, v)| Some((k.as_str().to_string(), v.to_str().ok()?.to_string())))
-            .collect();
-        let (res_tx, res_rx) = flume::bounded::<std::io::Result<Vec<u8>>>(16);
-        if head_tx
-            .send(Ok(Response {
-                status,
-                headers,
-                body: Box::new(ChannelReader::new(res_rx)),
-            }))
-            .is_err()
-        {
-            return;
+        });
+        let stream = futures_util::stream::unfold(body_rx, |rx| async move { rx.recv_async().await.ok().map(|chunk| (chunk, rx)) });
+        req = req.body(reqwest::Body::wrap_stream(stream));
+    }
+    let send_res = match &cancel {
+        Some(token) => tokio::select! {
+            biased;
+            _ = token.cancelled() => return Err(FetchError::Network("cancelled".into())),
+            res = req.send() => res,
+        },
+        None => req.send().await,
+    };
+    let mut response = send_res.map_err(|e| {
+        if e.is_timeout() {
+            FetchError::Timeout
+        } else {
+            FetchError::Network(e.to_string())
         }
+    })?;
+    let status = response.status().as_u16();
+    let headers = response
+        .headers()
+        .iter()
+        .filter_map(|(k, v)| Some((k.as_str().to_string(), v.to_str().ok()?.to_string())))
+        .collect();
+    let (res_tx, res_rx) = flume::bounded::<std::io::Result<Vec<u8>>>(16);
+    vibevalley_runtime::rt::handle().spawn(async move {
         loop {
             let chunk_res = match &cancel {
                 Some(token) => tokio::select! {
@@ -313,7 +308,15 @@ fn execute_request(client: reqwest::Client, r: Request, cancel: Option<Cancellat
             }
         }
     });
-    head_rx.recv().map_err(|_| FetchError::Network("http task stopped".into()))?
+    Ok(Response {
+        status,
+        headers,
+        body: Box::new(ChannelReader::new(res_rx)),
+    })
+}
+
+fn execute_request(client: reqwest::Client, r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
+    run_http(execute_request_async(client, r, cancel))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -546,6 +549,50 @@ mod tests {
             .unwrap();
         assert_eq!(redirect.status, 302);
         assert_eq!(redirect.header("location"), Some("http://127.0.0.1:1/other"));
+
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn async_fetch_and_public_download_reject_bad_urls_and_stream_without_block_on() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut chunk = [0u8; 512];
+            let _ = stream.read(&mut chunk);
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello")
+                .unwrap();
+        });
+
+        vibevalley_runtime::rt::block_on(async move {
+            assert!(matches!(
+                PublicDownload::get_bytes_async("https://127.0.0.1/private", Duration::from_secs(1), 1024).await,
+                Err(PublicDownloadError::BadUrl)
+            ));
+            let mut res = Http::fetch_async(
+                Request {
+                    method: "GET",
+                    url: format!("http://{addr}/ping"),
+                    headers: vec![],
+                    body: None,
+                    timeout: Duration::from_secs(5),
+                },
+                None,
+            )
+            .await
+            .unwrap();
+            assert_eq!(res.status, 200);
+            let body = tokio::task::spawn_blocking(move || {
+                let mut text = String::new();
+                res.body.read_to_string(&mut text).unwrap();
+                text
+            })
+            .await
+            .unwrap();
+            assert_eq!(body, "hello");
+        });
 
         handle.join().unwrap();
     }

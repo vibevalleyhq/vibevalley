@@ -9,14 +9,15 @@ use std::sync::{Arc, OnceLock, Weak};
 
 use parking_lot::Mutex;
 use sha2::{Digest, Sha256};
+use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, BizCode, Millis, RemoteDeviceRevokeRequest, RemoteDeviceSummary, RemoteEnableRequest, RemotePairCode, RemotePairExchangeRequest,
+    ApiError, BizCode, Caller, Millis, RemoteDeviceRevokeRequest, RemoteDeviceSummary, RemoteEnableRequest, RemotePairCode, RemotePairExchangeRequest,
     RemotePairExchangeResult, RemotePlatform, RemoteStatus, RemoteWhoami, SCOPE_REMOTE_CLIENT, SCOPE_REMOTE_MACHINE, ops,
 };
 
 use crate::base::ServerDb;
-use crate::transport::api::{CallerPrincipal, RemoteAuth, RemoteDeviceIdentity};
+use crate::transport::api::{BoxFuture, CallerPrincipal, RemoteAuth, RemoteDeviceIdentity};
 use crate::transport::http::{Listener, is_allowed_remote_ip, is_remote_allow_all, serve_remote};
 use crate::{Ctx, Hub};
 
@@ -79,7 +80,7 @@ pub struct Remote {
     hub: Weak<Hub>,
     version: String,
     enabled: AtomicBool,
-    lifecycle: Mutex<()>,
+    lifecycle: AsyncMutex<()>,
     listener: Mutex<Option<Listener>>,
     pairing: Mutex<PairingState>,
     last_seen_cache: Mutex<HashMap<String, Millis>>,
@@ -172,16 +173,23 @@ fn build_pair_url(url: &str, code: &str, scope: Option<&str>) -> String {
     deep.to_string()
 }
 
+/// Drops a `Listener` off the Tokio I/O workers because `Listener::drop` awaits graceful shutdown synchronously.
+async fn stop_listener_async(listener: Option<Listener>) {
+    if let Some(live) = listener {
+        let _ = tokio::task::spawn_blocking(move || drop(live)).await;
+    }
+}
+
 impl Remote {
     pub fn open(db: Arc<ServerDb>, hub: Weak<Hub>, version: String) -> Result<Arc<Self>, ApiError> {
         let db = RemoteDb::new(db);
-        let persisted_enabled = db.get_config()?.is_some_and(|cfg| cfg.enabled);
+        let persisted_enabled = vibevalley_runtime::rt::block_on(db.get_config())?.is_some_and(|cfg| cfg.enabled);
         Ok(Arc::new(Self {
             db,
             hub,
             version,
             enabled: AtomicBool::new(persisted_enabled),
-            lifecycle: Mutex::new(()),
+            lifecycle: AsyncMutex::new(()),
             listener: Mutex::new(None),
             pairing: Mutex::new(PairingState::default()),
             last_seen_cache: Mutex::new(HashMap::new()),
@@ -191,8 +199,12 @@ impl Remote {
     /// Starts the remote listener on boot only when persisted config has `enabled == true`.
     /// Failures (e.g. an offline Tailscale interface) log a warning without failing server boot.
     pub fn restore_if_enabled(&self) {
-        let _guard = self.lifecycle.lock();
-        let cfg = match self.db.get_config() {
+        vibevalley_runtime::rt::block_on(self.restore_if_enabled_async());
+    }
+
+    pub async fn restore_if_enabled_async(&self) {
+        let _guard = self.lifecycle.lock().await;
+        let cfg = match self.db.get_config().await {
             Ok(Some(cfg)) if cfg.enabled => cfg,
             Ok(_) => return,
             Err(err) => {
@@ -216,7 +228,7 @@ impl Remote {
                 }
             },
             None => {
-                let ts = tailscale::probe();
+                let ts = tailscale::probe_async().await;
                 if ts.online
                     && let Some(ip) = ts.ipv4.as_deref().and_then(|s| s.parse::<IpAddr>().ok())
                 {
@@ -244,18 +256,26 @@ impl Remote {
 
     /// Stops the live remote listener without mutating persisted config.
     pub fn close(&self) {
-        let _guard = self.lifecycle.lock();
+        vibevalley_runtime::rt::block_on(self.close_async());
+    }
+
+    pub async fn close_async(&self) {
+        let _guard = self.lifecycle.lock().await;
         let live = self.listener.lock().take();
-        drop(live);
+        stop_listener_async(live).await;
     }
 
     pub fn status(&self) -> Result<RemoteStatus, ApiError> {
-        self.status_with_tailscale(tailscale::probe())
+        vibevalley_runtime::rt::block_on(self.status_async())
     }
 
-    fn status_with_tailscale(&self, ts: TailscaleInfo) -> Result<RemoteStatus, ApiError> {
-        let cfg = self.db.get_config()?;
-        let devices = self.db.list_devices()?;
+    pub async fn status_async(&self) -> Result<RemoteStatus, ApiError> {
+        self.status_with_tailscale_async(tailscale::probe_async().await).await
+    }
+
+    async fn status_with_tailscale_async(&self, ts: TailscaleInfo) -> Result<RemoteStatus, ApiError> {
+        let cfg = self.db.get_config().await?;
+        let devices = self.db.list_devices().await?;
         let live_addr = self.listener.lock().as_ref().map(|l| (l.addr, l.url()));
         let enabled = self.enabled.load(Ordering::Acquire);
         let (listening, bind_addr, port, url) = match live_addr {
@@ -280,9 +300,13 @@ impl Remote {
     }
 
     pub fn enable(&self, req: RemoteEnableRequest) -> Result<RemoteStatus, ApiError> {
-        let _guard = self.lifecycle.lock();
-        let ts = tailscale::probe();
-        let stored = self.db.get_config()?;
+        vibevalley_runtime::rt::block_on(self.enable_async(req))
+    }
+
+    pub async fn enable_async(&self, req: RemoteEnableRequest) -> Result<RemoteStatus, ApiError> {
+        let _guard = self.lifecycle.lock().await;
+        let ts = tailscale::probe_async().await;
+        let stored = self.db.get_config().await?;
         let requested_bind = req
             .bind_addr
             .as_deref()
@@ -312,9 +336,9 @@ impl Remote {
 
         let current_addr = self.listener.lock().as_ref().map(|l| l.addr);
         if port != 0 && current_addr == Some(target) {
-            self.db.save_config(true, Some(&target.ip().to_string()), target.port(), crate::now())?;
+            self.db.save_config(true, Some(&target.ip().to_string()), target.port(), crate::now()).await?;
             self.enabled.store(true, Ordering::Release);
-            return self.status_with_tailscale(ts);
+            return self.status_with_tailscale_async(ts).await;
         }
 
         let Some(hub) = self.hub.upgrade() else {
@@ -325,7 +349,7 @@ impl Remote {
         let need_drop_first = current_addr.is_some_and(|addr| addr.port() == port);
         if need_drop_first {
             let old = self.listener.lock().take();
-            drop(old);
+            stop_listener_async(old).await;
         }
 
         let next = match serve_remote(hub, target) {
@@ -333,36 +357,43 @@ impl Remote {
             Err(err) => {
                 if need_drop_first {
                     self.enabled.store(false, Ordering::Release);
-                    let _ = self.db.save_config(
-                        false,
-                        stored.as_ref().and_then(|c| c.bind_addr.as_deref()),
-                        stored.as_ref().map(|c| c.port).unwrap_or_else(default_remote_port),
-                        crate::now(),
-                    );
+                    let _ = self
+                        .db
+                        .save_config(
+                            false,
+                            stored.as_ref().and_then(|c| c.bind_addr.as_deref()),
+                            stored.as_ref().map(|c| c.port).unwrap_or_else(default_remote_port),
+                            crate::now(),
+                        )
+                        .await;
                 }
                 return Err(bind_failed(&target.to_string(), err));
             }
         };
 
         let actual = next.addr;
-        self.db.save_config(true, Some(&actual.ip().to_string()), actual.port(), crate::now())?;
+        self.db.save_config(true, Some(&actual.ip().to_string()), actual.port(), crate::now()).await?;
         let old = self.listener.lock().replace(next);
-        drop(old);
+        stop_listener_async(old).await;
         self.enabled.store(true, Ordering::Release);
-        self.status_with_tailscale(ts)
+        self.status_with_tailscale_async(ts).await
     }
 
     pub fn disable(&self) -> Result<RemoteStatus, ApiError> {
-        let _guard = self.lifecycle.lock();
+        vibevalley_runtime::rt::block_on(self.disable_async())
+    }
+
+    pub async fn disable_async(&self) -> Result<RemoteStatus, ApiError> {
+        let _guard = self.lifecycle.lock().await;
         let old = self.listener.lock().take();
-        drop(old);
+        stop_listener_async(old).await;
         self.enabled.store(false, Ordering::Release);
         self.pairing.lock().codes.clear();
-        let stored = self.db.get_config()?;
+        let stored = self.db.get_config().await?;
         let bind_addr = stored.as_ref().and_then(|c| c.bind_addr.as_deref());
         let port = stored.as_ref().map(|c| c.port).filter(|&p| p != 0).unwrap_or_else(default_remote_port);
-        self.db.save_config(false, bind_addr, port, crate::now())?;
-        self.status()
+        self.db.save_config(false, bind_addr, port, crate::now()).await?;
+        self.status_async().await
     }
 
     pub fn pair_create(&self) -> Result<RemotePairCode, ApiError> {
@@ -438,10 +469,19 @@ impl Remote {
     }
 
     pub fn pair_exchange(&self, req: RemotePairExchangeRequest) -> Result<RemotePairExchangeResult, ApiError> {
-        self.pair_exchange_at(req, crate::now())
+        vibevalley_runtime::rt::block_on(self.pair_exchange_async(req))
     }
 
+    pub async fn pair_exchange_async(&self, req: RemotePairExchangeRequest) -> Result<RemotePairExchangeResult, ApiError> {
+        self.pair_exchange_at_async(req, crate::now()).await
+    }
+
+    #[cfg(test)]
     fn pair_exchange_at(&self, req: RemotePairExchangeRequest, now: Millis) -> Result<RemotePairExchangeResult, ApiError> {
+        vibevalley_runtime::rt::block_on(self.pair_exchange_at_async(req, now))
+    }
+
+    async fn pair_exchange_at_async(&self, req: RemotePairExchangeRequest, now: Millis) -> Result<RemotePairExchangeResult, ApiError> {
         if !self.enabled.load(Ordering::Acquire) {
             return Err(ApiError::new(BizCode::Refused, t("server.remote.disabled", &[])));
         }
@@ -505,7 +545,7 @@ impl Remote {
             last_seen_at: None,
             revoked_at: None,
         };
-        self.db.insert_device(&device, &token_hash)?;
+        self.db.insert_device(&device, &token_hash).await?;
 
         Ok(RemotePairExchangeResult {
             device,
@@ -516,8 +556,12 @@ impl Remote {
     }
 
     pub fn revoke_device(&self, req: RemoteDeviceRevokeRequest) -> Result<(), ApiError> {
+        vibevalley_runtime::rt::block_on(self.revoke_device_async(req))
+    }
+
+    pub async fn revoke_device_async(&self, req: RemoteDeviceRevokeRequest) -> Result<(), ApiError> {
         let id = req.id.trim();
-        if id.is_empty() || !self.db.revoke_device(id, crate::now())? {
+        if id.is_empty() || !self.db.revoke_device(id, crate::now()).await? {
             return Err(ApiError::new(BizCode::NotFound, t("server.remote.deviceNotFound", &[])));
         }
         self.last_seen_cache.lock().remove(id);
@@ -525,26 +569,24 @@ impl Remote {
     }
 
     pub fn whoami(&self, ctx: &Ctx) -> Result<RemoteWhoami, ApiError> {
-        let device = match &ctx.principal {
-            CallerPrincipal::RemoteDevice { device_id, .. } if !device_id.is_empty() => self.db.find_by_id(device_id)?,
+        vibevalley_runtime::rt::block_on(self.whoami_async(&ctx.principal, ctx.caller))
+    }
+
+    pub async fn whoami_async(&self, principal: &CallerPrincipal, caller: Caller) -> Result<RemoteWhoami, ApiError> {
+        let device = match principal {
+            CallerPrincipal::RemoteDevice { device_id, .. } if !device_id.is_empty() => self.db.find_by_id(device_id).await?,
             CallerPrincipal::LocalOwner | CallerPrincipal::RemoteDevice { .. } | CallerPrincipal::Connector { .. } => None,
         };
         Ok(RemoteWhoami {
             device,
-            caller: ctx.caller.as_str().to_string(),
+            caller: caller.as_str().to_string(),
             server_name: server_name(),
             version: self.version.clone(),
             channel: vibevalley_protocol::home::current_channel().as_str().to_string(),
         })
     }
-}
 
-impl RemoteAuth for Remote {
-    fn is_enabled(&self) -> bool {
-        self.enabled.load(Ordering::Acquire)
-    }
-
-    fn verify_bearer(&self, token: &str) -> Result<RemoteDeviceIdentity, ApiError> {
+    async fn verify_bearer_inner_async(&self, token: &str) -> Result<RemoteDeviceIdentity, ApiError> {
         if !self.enabled.load(Ordering::Acquire) {
             return Err(ApiError::new(BizCode::Unauthorized, t("server.remote.disabled", &[])));
         }
@@ -552,7 +594,7 @@ impl RemoteAuth for Remote {
             return Err(ApiError::new(BizCode::Unauthorized, t("server.remote.unauthorized", &[])));
         }
         let hash = sha256_hex(token);
-        let Some(device) = self.db.find_by_token_hash(&hash)? else {
+        let Some(device) = self.db.find_by_token_hash(&hash).await? else {
             return Err(ApiError::new(BizCode::Unauthorized, t("server.remote.unauthorized", &[])));
         };
         if device.revoked_at.is_some() {
@@ -574,7 +616,7 @@ impl RemoteAuth for Remote {
             }
         };
         if should_touch {
-            let _ = self.db.touch_last_seen(&device.id, now);
+            let _ = self.db.touch_last_seen(&device.id, now).await;
         }
 
         Ok(RemoteDeviceIdentity {
@@ -585,20 +627,55 @@ impl RemoteAuth for Remote {
     }
 }
 
+impl RemoteAuth for Remote {
+    fn is_enabled(&self) -> bool {
+        self.enabled.load(Ordering::Acquire)
+    }
+
+    fn verify_bearer(&self, token: &str) -> Result<RemoteDeviceIdentity, ApiError> {
+        vibevalley_runtime::rt::block_on(self.verify_bearer_inner_async(token))
+    }
+
+    fn verify_bearer_async(self: Arc<Self>, token: String) -> BoxFuture<'static, Result<RemoteDeviceIdentity, ApiError>> {
+        Box::pin(async move { self.verify_bearer_inner_async(&token).await })
+    }
+}
+
 pub fn install(hub: &Hub, remote: Arc<Remote>) {
     let r = remote.clone();
-    hub.on::<ops::RemoteStatus>(move |_, ()| r.status());
+    hub.on_async::<ops::RemoteStatus, _, _>(move |_, ()| {
+        let r = r.clone();
+        async move { r.status_async().await }
+    });
     let r = remote.clone();
-    hub.on::<ops::RemoteEnable>(move |_, req| r.enable(req));
+    hub.on_async::<ops::RemoteEnable, _, _>(move |_, req| {
+        let r = r.clone();
+        async move { r.enable_async(req).await }
+    });
     let r = remote.clone();
-    hub.on::<ops::RemoteDisable>(move |_, ()| r.disable());
+    hub.on_async::<ops::RemoteDisable, _, _>(move |_, ()| {
+        let r = r.clone();
+        async move { r.disable_async().await }
+    });
     let r = remote.clone();
-    hub.on::<ops::RemotePairCreate>(move |_, ()| r.pair_create());
+    hub.on_async::<ops::RemotePairCreate, _, _>(move |_, ()| {
+        let r = r.clone();
+        async move { r.pair_create() }
+    });
     let r = remote.clone();
-    hub.on::<ops::RemotePairExchange>(move |_, req| r.pair_exchange(req));
+    hub.on_async::<ops::RemotePairExchange, _, _>(move |_, req| {
+        let r = r.clone();
+        async move { r.pair_exchange_async(req).await }
+    });
     let r = remote.clone();
-    hub.on::<ops::RemoteDeviceRevoke>(move |_, req| r.revoke_device(req));
-    hub.on::<ops::RemoteWhoami>(move |ctx, ()| remote.whoami(ctx));
+    hub.on_async::<ops::RemoteDeviceRevoke, _, _>(move |_, req| {
+        let r = r.clone();
+        async move { r.revoke_device_async(req).await }
+    });
+    hub.on_async::<ops::RemoteWhoami, _, _>(move |ctx, ()| {
+        let r = remote.clone();
+        async move { r.whoami_async(&ctx.principal, ctx.caller).await }
+    });
 }
 
 #[cfg(test)]
@@ -735,6 +812,67 @@ mod tests {
         assert_eq!(denied.biz_code, BizCode::Forbidden);
 
         remote.close();
+        db.close();
+    }
+
+    #[test]
+    fn verify_bearer_async_reads_wal_read_pool_while_writer_holds_transaction() {
+        vibevalley_i18n::set_locale("en");
+        let dir = tempfile::tempdir().unwrap();
+        let db = ServerDb::open(dir.path()).unwrap();
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let remote = Remote::open(db.clone(), Arc::downgrade(&hub), "0.1.0-test".into()).unwrap();
+        install(&hub, remote.clone());
+
+        vibevalley_runtime::rt::block_on(async {
+            let status = hub
+                .invoke_as_async::<ops::RemoteEnable>(
+                    Caller::User,
+                    RemoteEnableRequest {
+                        bind_addr: Some("127.0.0.1".into()),
+                        port: Some(0),
+                    },
+                )
+                .await
+                .unwrap();
+            assert!(status.enabled && status.listening);
+
+            let pair = hub.invoke_as_async::<ops::RemotePairCreate>(Caller::User, ()).await.unwrap();
+            let exchanged = hub
+                .invoke_as_async::<ops::RemotePairExchange>(
+                    Caller::Remote,
+                    RemotePairExchangeRequest {
+                        code: pair.code,
+                        device_name: "Async iPhone".into(),
+                        platform: RemotePlatform::Ios,
+                        scope: None,
+                    },
+                )
+                .await
+                .unwrap();
+
+            // Prime last_seen_cache so the next verify_bearer_async is pure read_pool.
+            let first = RemoteAuth::verify_bearer_async(remote.clone(), exchanged.token.clone()).await.unwrap();
+            assert_eq!(first.device_id, exchanged.device.id);
+
+            // Hold an open BEGIN IMMEDIATE write transaction on write_pool while verify_bearer_async runs.
+            let mut writer = db.write_pool().acquire().await.unwrap();
+            sqlx::raw_sql("BEGIN IMMEDIATE;").execute(&mut *writer).await.unwrap();
+            let second = tokio::time::timeout(
+                std::time::Duration::from_secs(2),
+                RemoteAuth::verify_bearer_async(remote.clone(), exchanged.token.clone()),
+            )
+            .await
+            .expect("verify_bearer_async must not block on write_pool")
+            .unwrap();
+            assert_eq!(second.device_id, exchanged.device.id);
+            sqlx::raw_sql("ROLLBACK;").execute(&mut *writer).await.unwrap();
+            drop(writer);
+
+            hub.invoke_as_async::<ops::RemoteDisable>(Caller::User, ()).await.unwrap();
+        });
+
+        hub.close();
         db.close();
     }
 }

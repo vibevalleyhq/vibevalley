@@ -50,8 +50,9 @@ impl RemoteDb {
         Self { db }
     }
 
-    pub(crate) fn get_config(&self) -> Result<Option<StoredConfig>, ApiError> {
-        let row = self.db.run(async |c| optional(q::get_config(c).await)).map_err(internal)?;
+    pub(crate) async fn get_config(&self) -> Result<Option<StoredConfig>, ApiError> {
+        let mut conn = self.db.read_pool().acquire().await.map_err(internal)?;
+        let row = optional(q::get_config(&mut *conn).await).map_err(internal)?;
         Ok(row.map(|r| StoredConfig {
             enabled: r.enabled != 0,
             bind_addr: r.bind_addr.filter(|s| !s.is_empty()),
@@ -60,103 +61,93 @@ impl RemoteDb {
         }))
     }
 
-    pub(crate) fn save_config(&self, enabled: bool, bind_addr: Option<&str>, port: u16, updated_at: Millis) -> Result<(), ApiError> {
+    pub(crate) async fn save_config(&self, enabled: bool, bind_addr: Option<&str>, port: u16, updated_at: Millis) -> Result<(), ApiError> {
         let bind_addr = bind_addr.map(str::trim).filter(|s| !s.is_empty()).map(String::from);
-        self.db
-            .run(async |c| {
-                q::save_config(
-                    c,
-                    q::SaveConfigParams {
-                        enabled: i64::from(enabled),
-                        bind_addr,
-                        port: i64::from(port),
-                        updated_at,
-                    },
-                )
-                .await
-            })
-            .map_err(internal)
+        let mut conn = self.db.write_pool().acquire().await.map_err(internal)?;
+        q::save_config(
+            &mut *conn,
+            q::SaveConfigParams {
+                enabled: i64::from(enabled),
+                bind_addr,
+                port: i64::from(port),
+                updated_at,
+            },
+        )
+        .await
+        .map_err(internal)
     }
 
-    pub(crate) fn insert_device(&self, device: &RemoteDeviceSummary, token_hash: &str) -> Result<(), ApiError> {
-        self.db
-            .run(async |c| {
-                q::insert_device(
-                    c,
-                    q::InsertDeviceParams {
-                        id: device.id.clone(),
-                        name: device.name.clone(),
-                        platform: device.platform.as_str().into(),
-                        token_hash: token_hash.into(),
-                        scope: device.scope.clone(),
-                        created_at: device.created_at,
-                    },
-                )
-                .await
-            })
-            .map_err(internal)
+    pub(crate) async fn insert_device(&self, device: &RemoteDeviceSummary, token_hash: &str) -> Result<(), ApiError> {
+        let mut conn = self.db.write_pool().acquire().await.map_err(internal)?;
+        q::insert_device(
+            &mut *conn,
+            q::InsertDeviceParams {
+                id: device.id.clone(),
+                name: device.name.clone(),
+                platform: device.platform.as_str().into(),
+                token_hash: token_hash.into(),
+                scope: device.scope.clone(),
+                created_at: device.created_at,
+            },
+        )
+        .await
+        .map_err(internal)
     }
 
-    pub(crate) fn find_by_token_hash(&self, token_hash: &str) -> Result<Option<RemoteDeviceSummary>, ApiError> {
-        let row = self
-            .db
-            .run(async |c| optional(q::find_device_by_token_hash(c, q::FindDeviceByTokenHashParams { token_hash: token_hash.into() }).await))
-            .map_err(internal)?;
+    pub(crate) async fn find_by_token_hash(&self, token_hash: &str) -> Result<Option<RemoteDeviceSummary>, ApiError> {
+        let mut conn = self.db.read_pool().acquire().await.map_err(internal)?;
+        let row =
+            optional(q::find_device_by_token_hash(&mut *conn, q::FindDeviceByTokenHashParams { token_hash: token_hash.into() }).await).map_err(internal)?;
         Ok(row.map(|r| summary_from(r.id, r.name, r.platform, r.scope, r.created_at, r.last_seen_at, r.revoked_at)))
     }
 
-    pub(crate) fn find_by_id(&self, id: &str) -> Result<Option<RemoteDeviceSummary>, ApiError> {
-        let row = self
-            .db
-            .run(async |c| optional(q::find_device_by_id(c, q::FindDeviceByIdParams { id: id.into() }).await))
-            .map_err(internal)?;
+    pub(crate) async fn find_by_id(&self, id: &str) -> Result<Option<RemoteDeviceSummary>, ApiError> {
+        let mut conn = self.db.read_pool().acquire().await.map_err(internal)?;
+        let row = optional(q::find_device_by_id(&mut *conn, q::FindDeviceByIdParams { id: id.into() }).await).map_err(internal)?;
         Ok(row.map(|r| summary_from(r.id, r.name, r.platform, r.scope, r.created_at, r.last_seen_at, r.revoked_at)))
     }
 
-    pub(crate) fn list_devices(&self) -> Result<Vec<RemoteDeviceSummary>, ApiError> {
-        let rows = self.db.run(async |c| q::list_devices(c).await).map_err(internal)?;
+    pub(crate) async fn list_devices(&self) -> Result<Vec<RemoteDeviceSummary>, ApiError> {
+        let mut conn = self.db.read_pool().acquire().await.map_err(internal)?;
+        let rows = q::list_devices(&mut *conn).await.map_err(internal)?;
         Ok(rows
             .into_iter()
             .map(|r| summary_from(r.id, r.name, r.platform, r.scope, r.created_at, r.last_seen_at, r.revoked_at))
             .collect())
     }
 
-    pub(crate) fn touch_last_seen(&self, id: &str, at: Millis) -> Result<(), ApiError> {
-        self.db
-            .run(async |c| {
-                q::touch_device_last_seen(
-                    c,
-                    q::TouchDeviceLastSeenParams {
-                        id: id.into(),
-                        last_seen_at: Some(at),
-                    },
-                )
-                .await
-            })
-            .map_err(internal)
+    pub(crate) async fn touch_last_seen(&self, id: &str, at: Millis) -> Result<(), ApiError> {
+        let mut conn = self.db.write_pool().acquire().await.map_err(internal)?;
+        q::touch_device_last_seen(
+            &mut *conn,
+            q::TouchDeviceLastSeenParams {
+                id: id.into(),
+                last_seen_at: Some(at),
+            },
+        )
+        .await
+        .map_err(internal)
     }
 
-    pub(crate) fn revoke_device(&self, id: &str, at: Millis) -> Result<bool, ApiError> {
-        self.db
-            .run(async |c| {
-                let mut tx = c.begin_with("BEGIN IMMEDIATE").await?;
-                let found = optional(q::find_device_by_id(&mut *tx, q::FindDeviceByIdParams { id: id.into() }).await)?;
-                let Some(device) = found else {
-                    return Ok(false);
-                };
-                if device.revoked_at.is_none() {
-                    q::revoke_device(
-                        &mut *tx,
-                        q::RevokeDeviceParams {
-                            id: id.into(),
-                            revoked_at: Some(at),
-                        },
-                    )
-                    .await?;
-                }
-                tx.commit().await?;
-                Ok(true)
-            })
-            .map_err(internal)
+    pub(crate) async fn revoke_device(&self, id: &str, at: Millis) -> Result<bool, ApiError> {
+        let mut conn = self.db.write_pool().acquire().await.map_err(internal)?;
+        let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(internal)?;
+        let found = optional(q::find_device_by_id(&mut *tx, q::FindDeviceByIdParams { id: id.into() }).await).map_err(internal)?;
+        let Some(device) = found else {
+            return Ok(false);
+        };
+        if device.revoked_at.is_none() {
+            q::revoke_device(
+                &mut *tx,
+                q::RevokeDeviceParams {
+                    id: id.into(),
+                    revoked_at: Some(at),
+                },
+            )
+            .await
+            .map_err(internal)?;
+        }
+        tx.commit().await.map_err(internal)?;
+        Ok(true)
     }
 }

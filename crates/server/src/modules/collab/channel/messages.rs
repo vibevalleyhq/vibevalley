@@ -4,7 +4,7 @@ use vibevalley_protocol::{
 };
 
 use super::db::{self, EventRow, MsgRow};
-use super::store::{Q, message_of, tx};
+use super::store::{Q, WriteTx, message_of};
 use super::types::{
     AddressedMessage, ChannelEvent, Made, Meta, Note, Noticing, Picked, Posting, Saying, Speaking, Spoken, ThreadSubject, Write, line_of, meta_of, meta_text,
     reactions_of, reactions_text, to_message,
@@ -17,6 +17,10 @@ use crate::now;
 impl Chat {
     /// `say`: the user's words in a place; the farm goes live.
     pub fn say(&self, s: Saying) -> Result<(ChatMessage, bool), ApiError> {
+        vibevalley_runtime::rt::block_on(self.say_async(s))
+    }
+
+    pub async fn say_async(&self, s: Saying) -> Result<(ChatMessage, bool), ApiError> {
         if let Some(hub) = self.hub.upgrade()
             && hub.read(|st| st.call != CallState::Live)
         {
@@ -34,7 +38,7 @@ impl Chat {
             return Err(refused(t("server.channel.sendKeyLong", &[])));
         }
         let written = {
-            let mut inner = self.locked();
+            let mut inner = self.locked().await;
             if let Some(to) = &s.to
                 && !inner.model.is_orchestrator_seat(to)
             {
@@ -45,18 +49,18 @@ impl Chat {
                 None => inner.model.default_id(),
                 Some(c) if inner.model.channel(c).is_some() => c.clone(),
                 Some(c) => {
-                    let (place, thread) = inner.resolve_target(USER_ID, c)?;
+                    let (place, thread) = self.resolve_target_async(&mut inner, USER_ID, c).await?;
                     opened = thread;
                     place
                 }
             };
             if let Some(thread) = opened {
-                self.publish_channel(&inner, &thread)?;
+                self.publish_channel_async(&inner.model, &thread).await?;
             }
             if inner.model.channel(&place).is_none() {
                 return Err(no_channel(&place));
             }
-            inner.answered(&place, s.reply_to)?;
+            self.answered_async(&place, s.reply_to).await?;
             let picked = Picked {
                 agent: s.picked.as_ref().and_then(|p| p.agent.clone()).filter(|a| !a.is_empty()),
                 repo: s
@@ -81,16 +85,18 @@ impl Chat {
                 ..Meta::default()
             };
             let empty = meta == Meta::default();
-            let written = self.write(
-                &mut inner,
-                Write {
-                    send_key: Some(s.send_key.clone()),
-                    read_by: Some(USER_ID.into()),
-                    reply_to: s.reply_to,
-                    meta: (!empty).then_some(meta),
-                    ..Write::new(&place, USER_ID, MessageKind::Chat, s.text.trim())
-                },
-            )?;
+            let written = self
+                .write_async(
+                    &mut inner,
+                    Write {
+                        send_key: Some(s.send_key.clone()),
+                        read_by: Some(USER_ID.into()),
+                        reply_to: s.reply_to,
+                        meta: (!empty).then_some(meta),
+                        ..Write::new(&place, USER_ID, MessageKind::Chat, s.text.trim())
+                    },
+                )
+                .await?;
             if !written.again
                 && !written.absent.is_empty()
                 && let Some(hub) = self.hub.upgrade()
@@ -110,15 +116,19 @@ impl Chat {
     /// message; newer words it has not seen are shown instead (held); a
     /// channel right after reading a thread elsewhere is confirmed once.
     pub fn speak(&self, s: Speaking) -> Result<Spoken, ApiError> {
+        vibevalley_runtime::rt::block_on(self.speak_async(s))
+    }
+
+    pub async fn speak_async(&self, s: Speaking) -> Result<Spoken, ApiError> {
         self.prepare_seat(&s.from);
-        let mut inner = self.locked();
+        let mut inner = self.locked().await;
         let text = s.text.trim();
         if text.is_empty() {
             return Err(refused(t("server.channel.empty", &[])));
         }
-        let (channel, opened) = inner.resolve_target(&s.from, s.target.as_deref().unwrap_or(""))?;
+        let (channel, opened) = self.resolve_target_async(&mut inner, &s.from, s.target.as_deref().unwrap_or("")).await?;
         if let Some(thread) = opened {
-            self.publish_channel(&inner, &thread)?;
+            self.publish_channel_async(&inner.model, &thread).await?;
         }
         let row = inner
             .model
@@ -126,48 +136,67 @@ impl Chat {
             .cloned()
             .ok_or_else(|| refused(t("server.channel.channelGone", &[])))?;
         let target = inner.model.target_of_channel(&row);
-        if let Some(again) = db::recent_duplicate(&inner.db, &s.from, &channel, text, now() - RETRY_WINDOW_MS).q()?
-            && let Some(m) = db::message_by_id(&inner.db, &again).q()?
         {
-            return Ok(Spoken::Sent {
-                message: Box::new(to_message(&m)),
-                target,
-                absent: vec![],
-            });
+            let mut rconn = self.db.read_pool().acquire().await.q()?;
+            if let Some(again) = db::recent_duplicate(&mut rconn, &s.from, &channel, text, now() - RETRY_WINDOW_MS).await.q()?
+                && let Some(m) = db::message_by_id(&mut rconn, &again).await.q()?
+            {
+                return Ok(Spoken::Sent {
+                    message: Box::new(to_message(&m)),
+                    target,
+                    absent: vec![],
+                });
+            }
         }
         let last = inner.model.last_read.get(&s.from).cloned().unwrap_or_default();
         if row.r#type != "thread" && !s.confirm && !last.is_empty() && last != target {
             return Ok(Spoken::Confirm { target, last_read: last });
         }
-        let unseen = db::unseen_in(&inner.db, &channel, &s.from).q()?;
+        let unseen = {
+            let mut rconn = self.db.read_pool().acquire().await.q()?;
+            db::unseen_in(&mut rconn, &channel, &s.from).await.q()?
+        };
         if !unseen.is_empty() && !s.anyway {
             let mut shown = vec![];
-            for id in unseen.iter().take(HELD_SHOWN) {
-                if let Some(m) = db::message_by_id(&inner.db, id).q()? {
-                    shown.push(inner.model.addressed_of(&m, &self.files));
+            {
+                let mut rconn = self.db.read_pool().acquire().await.q()?;
+                for id in unseen.iter().take(HELD_SHOWN) {
+                    if let Some(m) = db::message_by_id(&mut rconn, id).await.q()? {
+                        shown.push(inner.model.addressed_of(&m, &self.files));
+                    }
                 }
             }
             if let Some(newest) = shown.last() {
                 let n = newest.number;
-                tx(&mut inner, |me| me.set_read(&s.from, &channel, n, now()))?;
+                let mut conn = self.db.write_pool().acquire().await.q()?;
+                let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
+                wtx.set_read(&s.from, &channel, n, now()).await?;
+                wtx.commit().await?;
             }
             let more = unseen.len() - shown.len();
             return Ok(Spoken::Held { target, shown, more });
         }
-        inner.answered(&channel, s.reply)?;
-        let written = self.write(
-            &mut inner,
-            Write {
-                reply_to: s.reply,
-                meta: Some(Meta {
-                    run: s.run.clone(),
-                    ..Meta::default()
-                }),
-                ..Write::new(&channel, &s.from, MessageKind::Chat, text)
-            },
-        )?;
+        self.answered_async(&channel, s.reply).await?;
+        let written = self
+            .write_async(
+                &mut inner,
+                Write {
+                    reply_to: s.reply,
+                    meta: Some(Meta {
+                        run: s.run.clone(),
+                        ..Meta::default()
+                    }),
+                    ..Write::new(&channel, &s.from, MessageKind::Chat, text)
+                },
+            )
+            .await?;
         let n = written.row.number;
-        tx(&mut inner, |me| me.set_read(&s.from, &channel, n, now()))?;
+        {
+            let mut conn = self.db.write_pool().acquire().await.q()?;
+            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
+            wtx.set_read(&s.from, &channel, n, now()).await?;
+            wtx.commit().await?;
+        }
         Ok(Spoken::Sent {
             message: Box::new(to_message(&written.row)),
             target,
@@ -178,8 +207,12 @@ impl Chat {
     /// `post`: words written as `from` into a place; the speaker has read
     /// the place up to them.
     pub fn post(&self, p: Posting) -> Result<(ChatMessage, bool), ApiError> {
+        vibevalley_runtime::rt::block_on(self.post_async(p))
+    }
+
+    pub async fn post_async(&self, p: Posting) -> Result<(ChatMessage, bool), ApiError> {
         let written = {
-            let mut inner = self.locked();
+            let mut inner = self.locked().await;
             if p.send_key.encode_utf16().count() > SEND_KEY_MAX {
                 return Err(refused(t("server.channel.sendKeyLong", &[])));
             }
@@ -189,9 +222,9 @@ impl Chat {
             let place = if inner.model.channel(&p.channel).is_some() {
                 p.channel.clone()
             } else {
-                let (place, opened) = inner.resolve_target(&p.from, &p.channel)?;
+                let (place, opened) = self.resolve_target_async(&mut inner, &p.from, &p.channel).await?;
                 if let Some(thread) = opened {
-                    self.publish_channel(&inner, &thread)?;
+                    self.publish_channel_async(&inner.model, &thread).await?;
                 }
                 place
             };
@@ -208,7 +241,7 @@ impl Chat {
                 Some(Made::Attachments(ids)) => meta.attachments = Some(self.files.of(ids)?),
                 None => {}
             }
-            self.write(
+            self.write_async(
                 &mut inner,
                 Write {
                     meta: Some(meta),
@@ -216,20 +249,31 @@ impl Chat {
                     read_by: Some(p.from.clone()),
                     ..Write::new(&place, &p.from, MessageKind::Chat, p.text.trim())
                 },
-            )?
+            )
+            .await?
         };
         Ok((to_message(&written.row), written.again))
     }
 
     /// `notice`: the farm's line; best effort, never fails, wakes no one.
     pub fn notice(&self, n: Noticing) {
-        let mut inner = self.locked();
-        self.notice_locked(&mut inner, n);
+        vibevalley_runtime::rt::block_on(self.notice_async(n));
     }
 
-    pub(super) fn notice_locked(&self, inner: &mut super::store::Inner, n: Noticing) {
-        if n.until_user_speaks && db::notice_since_user(&inner.db, &n.channel, &n.code).unwrap_or(0) > 0 {
-            return;
+    pub async fn notice_async(&self, n: Noticing) {
+        let mut inner = self.locked().await;
+        self.notice_locked_async(&mut inner, n).await;
+    }
+
+    pub(super) async fn notice_locked_async(&self, inner: &mut super::store::Inner, n: Noticing) {
+        if n.until_user_speaks {
+            let count = match self.db.read_pool().acquire().await {
+                Ok(mut conn) => db::notice_since_user(&mut conn, &n.channel, &n.code).await.unwrap_or(0),
+                Err(_) => 0,
+            };
+            if count > 0 {
+                return;
+            }
         }
         let w = Write {
             meta: Some(Meta {
@@ -239,7 +283,7 @@ impl Chat {
             send_key: Some(n.send_key),
             ..Write::new(&n.channel, "system", MessageKind::Notice, &n.text)
         };
-        if let Err(e) = self.write(inner, w) {
+        if let Err(e) = self.write_async(inner, w).await {
             eprintln!("vibevalley-server: chat: notice: {}", e.message);
         }
     }
@@ -251,37 +295,54 @@ impl Chat {
     }
 
     pub(crate) fn note_once(&self, n: Note, key: Option<String>) -> Result<String, ApiError> {
-        let mut inner = self.locked();
+        vibevalley_runtime::rt::block_on(self.note_once_async(n, key))
+    }
+
+    pub(crate) async fn note_once_async(&self, n: Note, key: Option<String>) -> Result<String, ApiError> {
+        let mut inner = self.locked().await;
         if let Some(seat) = &n.seat {
-            tx(&mut inner, |me| me.seat(seat))?;
+            let mut conn = self.db.write_pool().acquire().await.q()?;
+            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
+            wtx.seat(seat).await?;
+            wtx.commit().await?;
         }
-        let written = self.write(
-            &mut inner,
-            Write {
-                meta: Some(n.meta),
-                send_key: key,
-                thread: n.topic,
-                member: n.member,
-                ..Write::new(&n.channel, &n.from, n.kind, &n.text)
-            },
-        )?;
+        let written = self
+            .write_async(
+                &mut inner,
+                Write {
+                    meta: Some(n.meta),
+                    send_key: key,
+                    thread: n.topic,
+                    member: n.member,
+                    ..Write::new(&n.channel, &n.from, n.kind, &n.text)
+                },
+            )
+            .await?;
         if let Some(mut seat) = n.seat {
             if seat.home.is_none() && !written.thread.is_empty() {
                 seat.home = Some(written.thread.clone());
             }
             let at = now();
-            tx(&mut inner, |me| {
-                me.seat(&seat)?;
-                me.set_read(&seat.id, &n.channel, written.row.number, at)
-            })?;
+            let mut conn = self.db.write_pool().acquire().await.q()?;
+            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
+            wtx.seat(&seat).await?;
+            wtx.set_read(&seat.id, &n.channel, written.row.number, at).await?;
+            wtx.commit().await?;
         }
         Ok(written.thread)
     }
 
     /// `edit`: the user's own words, changed; nobody is woken.
     pub fn edit(&self, id: &str, text: &str, keep: Option<&[String]>) -> Result<ChatMessage, ApiError> {
-        let mut inner = self.locked();
-        let row = inner.message_of(id)?;
+        vibevalley_runtime::rt::block_on(self.edit_async(id, text, keep))
+    }
+
+    pub async fn edit_async(&self, id: &str, text: &str, keep: Option<&[String]>) -> Result<ChatMessage, ApiError> {
+        let mut inner = self.locked().await;
+        let row = {
+            let mut rconn = self.db.read_pool().acquire().await.q()?;
+            message_of(&mut rconn, id).await?
+        };
         if row.sender_id != USER_ID || row.kind != "chat" || row.deleted_at.is_some() {
             return Err(refused(t("server.channel.notYours", &[])));
         }
@@ -301,13 +362,18 @@ impl Chat {
         let files_changed = files.len() != had.len();
         meta.attachments = Some(files);
         let text_meta = meta_text(Some(&meta));
-        let changed = self.change(&mut inner, &row, |db, revision, at| {
-            db::edit_message(db, id, &words, at, revision)?;
+        let at = now();
+        {
+            let mut conn = self.db.write_pool().acquire().await.q()?;
+            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
+            let revision = db::bump_revision(&mut wtx.tx, &row.channel_id).await.q()?;
+            db::edit_message(&mut wtx.tx, id, &words, at, revision).await.q()?;
             if files_changed {
-                db::set_meta(db, id, text_meta.as_deref(), revision)?;
+                db::set_meta(&mut wtx.tx, id, text_meta.as_deref(), revision).await.q()?;
             }
-            Ok(())
-        })?;
+            wtx.commit().await?;
+        }
+        let changed = self.finish_message_change_async(&inner.model, &row).await?;
         self.emit_event(ChannelEvent::Edited(changed.clone()));
         if words != row.body {
             self.embed_later(&MsgRow { body: words.clone(), ..row });
@@ -317,22 +383,32 @@ impl Chat {
 
     /// `remove`: its words go, its number stays, pending deliveries are withdrawn immediately.
     pub fn remove(&self, id: &str) -> Result<(), ApiError> {
-        let mut inner = self.locked();
-        let row = inner.message_of(id)?;
+        vibevalley_runtime::rt::block_on(self.remove_async(id))
+    }
+
+    pub async fn remove_async(&self, id: &str) -> Result<(), ApiError> {
+        let mut inner = self.locked().await;
+        let row = {
+            let mut rconn = self.db.read_pool().acquire().await.q()?;
+            message_of(&mut rconn, id).await?
+        };
         if row.deleted_at.is_some() {
             return Err(refused(t("server.channel.messageGone", &[])));
         }
-        let mut seq = 0;
-        let mut at = 0;
-        let message = self.change(&mut inner, &row, |db, revision, now| {
-            db::delete_message(db, id, now, revision)?;
-            db::delete_mentions_for_message(db, id)?;
-            db::withdraw_deliveries_for_message(db, id, now)?;
-            seq = db::insert_event(db, "removed", &row.channel_id, id, now)?;
-            at = now;
-            Ok(())
-        })?;
-        self.publish_user_mentions(&inner)?;
+        let at = now();
+        let seq = {
+            let mut conn = self.db.write_pool().acquire().await.q()?;
+            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
+            let revision = db::bump_revision(&mut wtx.tx, &row.channel_id).await.q()?;
+            db::delete_message(&mut wtx.tx, id, at, revision).await.q()?;
+            db::delete_mentions_for_message(&mut wtx.tx, id).await.q()?;
+            db::withdraw_deliveries_for_message(&mut wtx.tx, id, at).await.q()?;
+            let seq = db::insert_event(&mut wtx.tx, "removed", &row.channel_id, id, at).await.q()?;
+            wtx.commit().await?;
+            seq
+        };
+        let message = self.finish_message_change_async(&inner.model, &row).await?;
+        self.publish_user_mentions_async(&inner.model).await?;
         let event = EventRow {
             seq,
             kind: "removed".into(),
@@ -345,13 +421,19 @@ impl Chat {
     }
 
     pub fn preview_remove(&self, id: &str) -> Result<Preview, ApiError> {
-        let db = self.read_db();
-        let row = message_of(&db, id)?;
+        vibevalley_runtime::rt::block_on(self.preview_remove_async(id))
+    }
+
+    pub async fn preview_remove_async(&self, id: &str) -> Result<Preview, ApiError> {
+        let mut conn = self.db.read_pool().acquire().await.q()?;
+        let row = message_of(&mut conn, id).await?;
         if row.deleted_at.is_some() {
             return Err(refused(t("server.channel.messageGone", &[])));
         }
-        let model = self.model();
-        let target = model.channel(&row.channel_id).map(|c| model.target_of_channel(c)).unwrap_or_default();
+        let target = {
+            let model = self.model();
+            model.channel(&row.channel_id).map(|c| model.target_of_channel(c)).unwrap_or_default()
+        };
         let mut does = vec![t(
             "server.channel.deletes",
             &[
@@ -361,7 +443,7 @@ impl Chat {
                 ("text", line_of(&row.body, LAST_MAX).into()),
             ],
         )];
-        let pending = db::pending_deliveries_for_message(&db, id).q()?;
+        let pending = db::pending_deliveries_for_message(&mut conn, id).await.q()?;
         if pending > 0 {
             does.push(t("server.channel.deletesDeliveries", &[("n", pending.into())]));
         }
@@ -370,13 +452,20 @@ impl Chat {
 
     /// `reacting`: setting a reaction as it already is writes nothing.
     pub fn react(&self, id: &str, who: &str, emoji: &str, on: bool) -> Result<ChatMessage, ApiError> {
-        let mut inner = self.locked();
+        vibevalley_runtime::rt::block_on(self.react_async(id, who, emoji, on))
+    }
+
+    pub async fn react_async(&self, id: &str, who: &str, emoji: &str, on: bool) -> Result<ChatMessage, ApiError> {
+        let mut inner = self.locked().await;
         let e = emoji.trim();
         let fits = !e.is_empty() && e.chars().count() <= 16 && !e.chars().any(char::is_whitespace);
         if !fits {
             return Err(refused(t("server.channel.badEmoji", &[])));
         }
-        let row = inner.message_of(id)?;
+        let row = {
+            let mut rconn = self.db.read_pool().acquire().await.q()?;
+            message_of(&mut rconn, id).await?
+        };
         if row.deleted_at.is_some() {
             return Err(refused(t("server.channel.messageGone", &[])));
         }
@@ -396,38 +485,71 @@ impl Chat {
             None => r.push((e.to_string(), next)),
         }
         let text = reactions_text(&r);
-        let message = self.change(&mut inner, &row, |db, revision, _| db::set_reactions(db, id, text.as_deref(), revision))?;
+        {
+            let mut conn = self.db.write_pool().acquire().await.q()?;
+            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
+            let revision = db::bump_revision(&mut wtx.tx, &row.channel_id).await.q()?;
+            db::set_reactions(&mut wtx.tx, id, text.as_deref(), revision).await.q()?;
+            wtx.commit().await?;
+        }
+        let message = self.finish_message_change_async(&inner.model, &row).await?;
         self.emit_event(ChannelEvent::Reacted(message.clone()));
         Ok(message)
     }
 
     pub fn pin(&self, id: &str, on: bool) -> Result<ChatMessage, ApiError> {
-        let mut inner = self.locked();
-        let row = inner.message_of(id)?;
+        vibevalley_runtime::rt::block_on(self.pin_async(id, on))
+    }
+
+    pub async fn pin_async(&self, id: &str, on: bool) -> Result<ChatMessage, ApiError> {
+        let mut inner = self.locked().await;
+        let row = {
+            let mut rconn = self.db.read_pool().acquire().await.q()?;
+            message_of(&mut rconn, id).await?
+        };
         if row.deleted_at.is_some() {
             return Err(refused(t("server.channel.messageGone", &[])));
         }
         if row.pinned_at.is_some() == on {
             return Ok(to_message(&row));
         }
-        let message = self.change(&mut inner, &row, |db, revision, at| db::set_pinned(db, id, on.then_some(at), revision))?;
+        let at = now();
+        {
+            let mut conn = self.db.write_pool().acquire().await.q()?;
+            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
+            let revision = db::bump_revision(&mut wtx.tx, &row.channel_id).await.q()?;
+            db::set_pinned(&mut wtx.tx, id, on.then_some(at), revision).await.q()?;
+            wtx.commit().await?;
+        }
+        let message = self.finish_message_change_async(&inner.model, &row).await?;
         self.emit_event(ChannelEvent::Pinned(message.clone()));
         Ok(message)
     }
 
     pub fn pins(&self, channel: &str) -> Result<Vec<ChatMessage>, ApiError> {
+        vibevalley_runtime::rt::block_on(self.pins_async(channel))
+    }
+
+    pub async fn pins_async(&self, channel: &str) -> Result<Vec<ChatMessage>, ApiError> {
         if self.model().channel(channel).is_none() {
             return Err(no_channel(channel));
         }
-        let db = self.read_db();
-        Ok(db::pinned_in(&db, channel).q()?.iter().map(to_message).collect())
+        let mut conn = self.db.read_pool().acquire().await.q()?;
+        Ok(db::pinned_in(&mut conn, channel).await.q()?.iter().map(to_message).collect())
     }
 
     /// `threadUnder`: the thread under a message in a channel, made if
     /// there is none.
     pub fn thread_under(&self, id: &str) -> Result<String, ApiError> {
-        let mut inner = self.locked();
-        let row = inner.message_of(id)?;
+        vibevalley_runtime::rt::block_on(self.thread_under_async(id))
+    }
+
+    pub async fn thread_under_async(&self, id: &str) -> Result<String, ApiError> {
+        let mut inner = self.locked().await;
+        let row = {
+            let mut rconn = self.db.read_pool().acquire().await.q()?;
+            message_of(&mut rconn, id).await?
+        };
         if inner.model.channel(&row.channel_id).is_none_or(|c| c.r#type != "channel") {
             return Err(refused(t("server.channel.threadOnlyInChannel", &[])));
         }
@@ -436,18 +558,28 @@ impl Chat {
             id: String::new(),
             owner: String::new(),
         };
-        let thread = tx(&mut inner, |me| me.thread_for(&row.id, row.number, &row.channel_id, &talk))?;
-        self.publish_channel(&inner, &thread)?;
+        let thread = {
+            let mut conn = self.db.write_pool().acquire().await.q()?;
+            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
+            let thread = wtx.thread_for(&row.id, row.number, &row.channel_id, &talk).await?;
+            wtx.commit().await?;
+            thread
+        };
+        self.publish_channel_async(&inner.model, &thread).await?;
         Ok(thread)
     }
 
     /// `issueThread`: the issue's thread, opened under a notice in
     /// `channel` (else the default) when there is none.
     pub fn issue_thread(&self, issue: &str, title: &str, channel: Option<&str>) -> Result<String, ApiError> {
+        vibevalley_runtime::rt::block_on(self.issue_thread_async(issue, title, channel))
+    }
+
+    pub async fn issue_thread_async(&self, issue: &str, title: &str, channel: Option<&str>) -> Result<String, ApiError> {
         if let Some(existing) = self.model().thread_of_subject("issue", issue) {
             return Ok(existing.to_string());
         }
-        let mut inner = self.locked();
+        let mut inner = self.locked().await;
         if let Some(existing) = inner.model.thread_of_subject("issue", issue) {
             return Ok(existing.to_string());
         }
@@ -455,17 +587,19 @@ impl Chat {
         if inner.model.channel(&place).is_none_or(|c| c.r#type != "channel") {
             return Err(refused(t("server.channel.threadOnlyInChannel", &[])));
         }
-        let written = self.write(
-            &mut inner,
-            Write {
-                thread: Some(ThreadSubject {
-                    kind: SubjectKind::Issue,
-                    id: issue.into(),
-                    owner: String::new(),
-                }),
-                ..Write::new(&place, "system", MessageKind::Notice, title)
-            },
-        )?;
+        let written = self
+            .write_async(
+                &mut inner,
+                Write {
+                    thread: Some(ThreadSubject {
+                        kind: SubjectKind::Issue,
+                        id: issue.into(),
+                        owner: String::new(),
+                    }),
+                    ..Write::new(&place, "system", MessageKind::Notice, title)
+                },
+            )
+            .await?;
         Ok(written.thread)
     }
 
@@ -475,27 +609,35 @@ impl Chat {
 
     /// The newest 50 messages of an issue's thread.
     pub fn issue_messages(&self, issue: &str) -> Result<Vec<AddressedMessage>, ApiError> {
-        let Some(thread) = self.issue_thread_id(issue) else { return Ok(vec![]) };
-        self.recent(&thread, 50)
+        vibevalley_runtime::rt::block_on(self.issue_messages_async(issue))
     }
 
-    fn recent(&self, channel: &str, n: i64) -> Result<Vec<AddressedMessage>, ApiError> {
-        let model = self.model();
+    pub async fn issue_messages_async(&self, issue: &str) -> Result<Vec<AddressedMessage>, ApiError> {
+        let Some(thread) = self.issue_thread_id(issue) else { return Ok(vec![]) };
+        self.recent_async(&thread, 50).await
+    }
+
+    async fn recent_async(&self, channel: &str, n: i64) -> Result<Vec<AddressedMessage>, ApiError> {
+        let model = self.snapshot.load_full();
         if model.channel(channel).is_none() {
             return Ok(vec![]);
         }
-        let db = self.read_db();
-        let mut rows = db::messages_before(&db, channel, NO_NUMBER, n).q()?;
+        let mut conn = self.db.read_pool().acquire().await.q()?;
+        let mut rows = db::messages_before(&mut conn, channel, NO_NUMBER, n).await.q()?;
         rows.reverse();
         Ok(rows.iter().map(|r| model.addressed_of(r, &self.files)).collect())
     }
 
     pub fn search(&self, text: &str, channel: Option<&str>) -> Result<Vec<MessageHit>, ApiError> {
+        vibevalley_runtime::rt::block_on(self.search_async(text, channel))
+    }
+
+    pub async fn search_async(&self, text: &str, channel: Option<&str>) -> Result<Vec<MessageHit>, ApiError> {
         let q = words::parse_search(text);
         if q.words.is_empty() && q.from.is_none() && q.r#in.is_none() && q.has.is_empty() && q.before.is_none() && q.after.is_none() {
             return Err(refused(t("server.channel.empty", &[])));
         }
-        let model = self.model();
+        let model = self.snapshot.load_full();
         let mut scope = channel.unwrap_or("").to_string();
         if let Some(name) = &q.r#in {
             let named = model.channel_by_name(name).ok_or_else(|| {
@@ -509,9 +651,9 @@ impl Chat {
             })?;
             scope = named.id.clone();
         }
-        let db = self.read_db();
+        let mut conn = self.db.read_pool().acquire().await.q()?;
         let rows = db::search_messages(
-            &db,
+            &mut conn,
             &db::SearchParams {
                 text: &q.words,
                 channel: &scope,
@@ -524,6 +666,7 @@ impl Chat {
                 n: SEARCH_MAX,
             },
         )
+        .await
         .q()?;
         Ok(rows
             .into_iter()

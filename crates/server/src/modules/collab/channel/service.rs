@@ -1,13 +1,63 @@
+use std::collections::HashMap;
+use std::future::Future;
 use std::sync::Arc;
 
+use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, ChannelUpdate, USER_ID, ops, subscriptions};
 
 use super::Chat;
 use super::types::{Picked, Saying, Seat};
 use crate::Hub;
-use crate::base::{LookIn, RequestKeys, missing};
+use crate::base::{LookIn, missing};
 use crate::modules::team::agent::Agents;
+
+const REQUEST_KEY_MAX: usize = 64;
+const REQUEST_KEYS_KEPT: usize = 500;
+const REQUEST_KEY_TTL_MS: i64 = 5 * 60_000;
+
+type Answered<T> = (Vec<String>, HashMap<String, (i64, T)>);
+
+/// Async idempotency gate matching `base::RequestKeys` without holding a sync mutex across `.await`.
+struct AsyncRequestKeys<T> {
+    seen: AsyncMutex<Answered<T>>,
+}
+
+impl<T> Default for AsyncRequestKeys<T> {
+    fn default() -> Self {
+        Self {
+            seen: AsyncMutex::new((Vec::new(), HashMap::new())),
+        }
+    }
+}
+
+impl<T: Clone> AsyncRequestKeys<T> {
+    async fn once(&self, key: Option<&str>, work: impl Future<Output = Result<T, ApiError>>) -> Result<T, ApiError> {
+        let Some(key) = key.filter(|k| !k.is_empty()) else { return work.await };
+        if key.chars().count() > REQUEST_KEY_MAX {
+            return Err(ApiError::new(
+                BizCode::RequestKeyTooLong,
+                t("server.base.requestKeyLong", &[("max", REQUEST_KEY_MAX.into())]),
+            ));
+        }
+        // Held while working: a duplicate waits for the first answer.
+        let mut seen = self.seen.lock().await;
+        if let Some((expires, done)) = seen.1.get(key)
+            && *expires > crate::now()
+        {
+            return Ok(done.clone());
+        }
+        let done = work.await?;
+        seen.0.retain(|k| k != key);
+        seen.0.push(key.to_string());
+        seen.1.insert(key.to_string(), (crate::now() + REQUEST_KEY_TTL_MS, done.clone()));
+        while seen.0.len() > REQUEST_KEYS_KEPT {
+            let old = seen.0.remove(0);
+            seen.1.remove(&old);
+        }
+        Ok(done)
+    }
+}
 
 /// A helper profile's seat in the chat, the peer of its direct channel.
 pub fn profile_id(agent: &str) -> String {
@@ -16,7 +66,7 @@ pub fn profile_id(agent: &str) -> String {
 
 /// The orchestrators seated under their profiles' names, each with its
 /// direct channel (watch.ts `seatOrchestrator`).
-fn seat_orchestrator(chat: &Chat, agents: &Agents, agent: &vibevalley_protocol::Agent) -> Result<(), ApiError> {
+async fn seat_orchestrator_async(chat: &Chat, agents: &Agents, agent: &vibevalley_protocol::Agent) -> Result<(), ApiError> {
     if !agents.profiles.is_orchestrator(&agent.id) {
         return Ok(());
     }
@@ -25,17 +75,27 @@ fn seat_orchestrator(chat: &Chat, agents: &Agents, agent: &vibevalley_protocol::
     } else {
         agent.name.trim().to_string()
     };
-    chat.seat(&Seat {
+    chat.seat_async(&Seat {
         id: agent.id.clone(),
         name,
         agent: None,
         home: None,
-    })?;
-    chat.create_direct(&agent.id).map(|_| ())
+    })
+    .await?;
+    chat.create_direct_async(&agent.id).await.map(|_| ())
+}
+
+fn seat_orchestrator(chat: &Chat, agents: &Agents, agent: &vibevalley_protocol::Agent) -> Result<(), ApiError> {
+    vibevalley_runtime::rt::block_on(seat_orchestrator_async(chat, agents, agent))
 }
 
 /// `watch.direct`: the direct channel with a profile (by name or id).
 pub fn direct(chat: &Chat, agents: &Agents, reference: &str) -> Result<String, ApiError> {
+    vibevalley_runtime::rt::block_on(direct_async(chat, agents, reference))
+}
+
+/// Async version of [`direct`] for non-blocking `Hub::on_async` handlers.
+pub async fn direct_async(chat: &Chat, agents: &Agents, reference: &str) -> Result<String, ApiError> {
     let name = reference.trim();
     let p = &agents.profiles;
     let agent = p
@@ -44,17 +104,18 @@ pub fn direct(chat: &Chat, agents: &Agents, reference: &str) -> Result<String, A
         .or_else(|| p.orchestrators().into_iter().find(|o| o.name == name))
         .ok_or_else(|| missing(t("server.channel.noProfileNamed", &[("key", reference.into())]), LookIn::Agent))?;
     if p.is_orchestrator(&agent.id) {
-        seat_orchestrator(chat, agents, &agent)?;
-        return chat.create_direct(&agent.id);
+        seat_orchestrator_async(chat, agents, &agent).await?;
+        return chat.create_direct_async(&agent.id).await;
     }
     let seat = profile_id(&agent.id);
-    chat.seat(&Seat {
+    chat.seat_async(&Seat {
         id: seat.clone(),
         name: agent.name.clone(),
         agent: Some(agent.id.clone()),
         home: None,
-    })?;
-    chat.create_direct(&seat)
+    })
+    .await?;
+    chat.create_direct_async(&seat).await
 }
 
 /// `channel.*`, `channel.follow`, `channel.reports`; the orchestrators
@@ -73,135 +134,206 @@ pub fn install(hub: &Hub, chat: Arc<Chat>, agents: Arc<Agents>, on_station: Opti
         }));
     }
 
-    hub.on::<ops::ChannelMessageSend>({
-        let (c, a) = (chat.clone(), agents.clone());
+    hub.on_async::<ops::ChannelMessageSend, _, _>({
+        let (c, a, on_station) = (chat.clone(), agents.clone(), on_station);
         move |_, body| {
-            if let (Some(station), Some(on_station)) = (body.station, &on_station) {
-                on_station(station);
+            let (c, a, on_station) = (c.clone(), a.clone(), on_station.clone());
+            async move {
+                if let (Some(station), Some(on_station)) = (body.station, &on_station) {
+                    on_station(station);
+                }
+                // A profile picked that is not there is not passed on.
+                let blocks = c.quoted(body.blocks.as_deref().unwrap_or_default());
+                let picked = body.agent.as_deref().and_then(|x| a.profiles.agent(x)).map(|x| x.id);
+                c.say_async(Saying {
+                    text: body.text,
+                    channel: Some(body.id),
+                    send_key: body.send_key.unwrap_or_default(),
+                    picked: Some(Picked {
+                        agent: picked,
+                        repo: body.repo.filter(|r| !r.is_empty()),
+                    }),
+                    reply_to: body.reply_to,
+                    attachments: body.attachments.unwrap_or_default(),
+                    to: body.to,
+                    blocks,
+                    view_context: body.view_context,
+                    ..Saying::default()
+                })
+                .await
+                .map(|_| ())
             }
-            // A profile picked that is not there is not passed on.
-            let blocks = c.quoted(body.blocks.as_deref().unwrap_or_default());
-            let picked = body.agent.as_deref().and_then(|x| a.profiles.agent(x)).map(|x| x.id);
-            c.say(Saying {
-                text: body.text,
-                channel: Some(body.id),
-                send_key: body.send_key.unwrap_or_default(),
-                picked: Some(Picked {
-                    agent: picked,
-                    repo: body.repo.filter(|r| !r.is_empty()),
-                }),
-                reply_to: body.reply_to,
-                attachments: body.attachments.unwrap_or_default(),
-                to: body.to,
-                blocks,
-                view_context: body.view_context,
-                ..Saying::default()
-            })
-            .map(|_| ())
         }
     });
-    hub.on::<ops::ChannelCreate>({
+    hub.on_async::<ops::ChannelCreate, _, _>({
         let c = chat.clone();
         move |_, b| {
-            c.open_channel(&b.name, b.description.as_deref().unwrap_or(""), b.repo.as_deref().unwrap_or(""))
-                .map(|i| i.id)
+            let c = c.clone();
+            async move {
+                c.open_channel_async(&b.name, b.description.as_deref().unwrap_or(""), b.repo.as_deref().unwrap_or(""))
+                    .await
+                    .map(|i| i.id)
+            }
         }
     });
-    hub.on::<ops::ChannelUpdate>({
+    hub.on_async::<ops::ChannelUpdate, _, _>({
         let c = chat.clone();
         move |_, b| {
-            c.update_channel(
-                &b.id,
-                ChannelUpdate {
-                    description: b.description,
-                    repo: b.repo,
-                    name: b.name,
-                    category: b.category,
-                    before: b.before,
-                    members: b.members,
-                },
-            )
+            let c = c.clone();
+            async move {
+                c.update_channel_async(
+                    &b.id,
+                    ChannelUpdate {
+                        description: b.description,
+                        repo: b.repo,
+                        name: b.name,
+                        category: b.category,
+                        before: b.before,
+                        members: b.members,
+                    },
+                )
+                .await
+            }
         }
     });
-    hub.on::<ops::ChannelArchiveSet>({
+    hub.on_async::<ops::ChannelArchiveSet, _, _>({
         let c = chat.clone();
-        move |_, b| c.archive(&b.id, b.on)
+        move |_, b| {
+            let c = c.clone();
+            async move { c.archive_async(&b.id, b.on).await }
+        }
     });
-    hub.on::<ops::ChannelDelete>({
+    hub.on_async::<ops::ChannelDelete, _, _>({
         let c = chat.clone();
-        move |_, b| c.remove_channel(&b.id)
+        move |_, b| {
+            let c = c.clone();
+            async move { c.remove_channel_async(&b.id).await }
+        }
     });
-    hub.on::<ops::ChannelPreviewDelete>({
+    hub.on_async::<ops::ChannelPreviewDelete, _, _>({
         let c = chat.clone();
-        move |_, b| c.preview_remove_channel(&b.id)
+        move |_, b| {
+            let c = c.clone();
+            async move { c.preview_remove_channel_async(&b.id).await }
+        }
     });
-    hub.on::<ops::ChannelNotifySet>({
+    hub.on_async::<ops::ChannelNotifySet, _, _>({
         let c = chat.clone();
-        move |_, b| c.set_notify(&b.id, b.notify)
+        move |_, b| {
+            let c = c.clone();
+            async move { c.set_notify_async(&b.id, b.notify).await }
+        }
     });
-    hub.on::<ops::ChannelDirectCreate>({
+    hub.on_async::<ops::ChannelDirectCreate, _, _>({
         let (c, a) = (chat.clone(), agents.clone());
-        move |_, b| direct(&c, &a, &b.agent)
-    });
-    hub.on::<ops::ChannelMarkUnread>({
-        let c = chat.clone();
-        move |_, b| c.mark_unread(&b.id, b.number)
-    });
-    hub.on::<ops::ChannelList>({
-        let c = chat.clone();
-        move |_, ()| c.list()
-    });
-    hub.on::<ops::ChannelUnreadList>({
-        let c = chat.clone();
-        move |_, ()| Ok(c.unread(USER_ID, None))
-    });
-    hub.on::<ops::ChannelDefaultSet>({
-        let c = chat.clone();
-        move |_, b| c.make_default(&b.id)
-    });
-    hub.on::<ops::ChannelMessageList>({
-        let c = chat.clone();
-        move |_, b| c.history(&b.id, b.before, b.limit)
-    });
-    hub.on::<ops::ChannelMarkRead>({
-        let c = chat.clone();
         move |_, b| {
-            c.mark_read(&b.id, b.number)
-                .map_err(|e| ApiError::new(BizCode::ChannelNotFound, e.message).with_next(vec![LookIn::Channel.next()]))
+            let (c, a) = (c.clone(), a.clone());
+            async move { direct_async(&c, &a, &b.agent).await }
         }
     });
-    hub.on::<ops::ChannelMessageUpdate>({
+    hub.on_async::<ops::ChannelMarkUnread, _, _>({
         let c = chat.clone();
-        move |_, b| c.edit(&b.id, &b.text, b.attachments.as_deref())
+        move |_, b| {
+            let c = c.clone();
+            async move { c.mark_unread_async(&b.id, b.number).await }
+        }
     });
-    hub.on::<ops::ChannelMessageDelete>({
+    hub.on_async::<ops::ChannelList, _, _>({
         let c = chat.clone();
-        move |_, b| c.remove(&b.id)
+        move |_, ()| {
+            let c = c.clone();
+            async move { c.list_async().await }
+        }
     });
-    hub.on::<ops::ChannelMessagePreviewDelete>({
+    hub.on_async::<ops::ChannelUnreadList, _, _>({
         let c = chat.clone();
-        move |_, b| c.preview_remove(&b.id)
+        move |_, ()| {
+            let c = c.clone();
+            async move { Ok(c.unread_async(USER_ID, None).await) }
+        }
     });
-    hub.on::<ops::ChannelMessageSearch>({
+    hub.on_async::<ops::ChannelDefaultSet, _, _>({
         let c = chat.clone();
-        move |_, b| c.search(&b.text, b.channel.as_deref())
+        move |_, b| {
+            let c = c.clone();
+            async move { c.make_default_async(&b.id).await }
+        }
     });
-    hub.on::<ops::ChannelReactionSet>({
+    hub.on_async::<ops::ChannelMessageList, _, _>({
         let c = chat.clone();
-        move |_, b| c.react(&b.id, USER_ID, &b.emoji, b.on)
+        move |_, b| {
+            let c = c.clone();
+            async move { c.history_async(&b.id, b.before, b.limit).await }
+        }
     });
-    hub.on::<ops::ChannelPinSet>({
+    hub.on_async::<ops::ChannelMarkRead, _, _>({
         let c = chat.clone();
-        move |_, b| c.pin(&b.id, b.on)
+        move |_, b| {
+            let c = c.clone();
+            async move {
+                c.mark_read_async(&b.id, b.number)
+                    .await
+                    .map_err(|e| ApiError::new(BizCode::ChannelNotFound, e.message).with_next(vec![LookIn::Channel.next()]))
+            }
+        }
     });
-    hub.on::<ops::ChannelPinList>({
+    hub.on_async::<ops::ChannelMessageUpdate, _, _>({
         let c = chat.clone();
-        move |_, b| c.pins(&b.id)
+        move |_, b| {
+            let c = c.clone();
+            async move { c.edit_async(&b.id, &b.text, b.attachments.as_deref()).await }
+        }
     });
-    let thread_once = Arc::new(RequestKeys::<String>::default());
-    hub.on::<ops::ChannelThreadCreate>({
+    hub.on_async::<ops::ChannelMessageDelete, _, _>({
         let c = chat.clone();
-        move |_, b| thread_once.once(b.request_key.as_deref(), || c.thread_under(&b.id))
+        move |_, b| {
+            let c = c.clone();
+            async move { c.remove_async(&b.id).await }
+        }
+    });
+    hub.on_async::<ops::ChannelMessagePreviewDelete, _, _>({
+        let c = chat.clone();
+        move |_, b| {
+            let c = c.clone();
+            async move { c.preview_remove_async(&b.id).await }
+        }
+    });
+    hub.on_async::<ops::ChannelMessageSearch, _, _>({
+        let c = chat.clone();
+        move |_, b| {
+            let c = c.clone();
+            async move { c.search_async(&b.text, b.channel.as_deref()).await }
+        }
+    });
+    hub.on_async::<ops::ChannelReactionSet, _, _>({
+        let c = chat.clone();
+        move |_, b| {
+            let c = c.clone();
+            async move { c.react_async(&b.id, USER_ID, &b.emoji, b.on).await }
+        }
+    });
+    hub.on_async::<ops::ChannelPinSet, _, _>({
+        let c = chat.clone();
+        move |_, b| {
+            let c = c.clone();
+            async move { c.pin_async(&b.id, b.on).await }
+        }
+    });
+    hub.on_async::<ops::ChannelPinList, _, _>({
+        let c = chat.clone();
+        move |_, b| {
+            let c = c.clone();
+            async move { c.pins_async(&b.id).await }
+        }
+    });
+    let thread_once = Arc::new(AsyncRequestKeys::<String>::default());
+    hub.on_async::<ops::ChannelThreadCreate, _, _>({
+        let c = chat.clone();
+        move |_, b| {
+            let c = c.clone();
+            let thread_once = thread_once.clone();
+            async move { thread_once.once(b.request_key.as_deref(), c.thread_under_async(&b.id)).await }
+        }
     });
     hub.on_subscription::<subscriptions::ChannelFollow>({
         let c = chat.clone();
