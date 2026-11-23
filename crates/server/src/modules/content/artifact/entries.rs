@@ -6,9 +6,9 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
-use parking_lot::Mutex;
 use serde_json::Value;
 use sqlx::{Connection, SqliteConnection};
+use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_core::artifact::{
     ENTRY_MAX_BYTES, ENTRY_MAX_COUNT, INLINE_EVENT_MAX_BYTES, RenderStoreOptions, apply_json_merge_patch, canonical_json, contrast_ratio, entry_path_problem,
     format_store_summary, infer_entry_kind, infer_entry_mime, parse_tokens_spec, render_store_artifact_html, sanitize_whiteboard_svg, shell_theme_of,
@@ -106,51 +106,53 @@ fn sanitize_whiteboard_element_json(artifact_type: Option<ArtifactType>, path: &
 }
 
 impl Artifacts {
-    pub(super) fn entry_lock(&self, id: &str) -> Arc<Mutex<()>> {
+    pub(super) fn entry_lock(&self, id: &str) -> Arc<AsyncMutex<()>> {
         let mut map = self.entry_locks.lock();
-        map.entry(id.to_string()).or_insert_with(|| Arc::new(Mutex::new(()))).clone()
+        map.entry(id.to_string()).or_insert_with(|| Arc::new(AsyncMutex::new(()))).clone()
     }
 
-    fn found_store(&self, db: &mut SqliteConnection, id: &str) -> Result<db::ArtifactRow, ApiError> {
-        let row = self.found(db, id)?;
+    async fn found_store_async(&self, db: &mut SqliteConnection, id: &str) -> Result<db::ArtifactRow, ApiError> {
+        let row = self.found(db, id).await?;
         if row.body != "store" {
             return Err(refused(t("server.artifact.notStore", &[("title", row.title.as_str().into())])));
         }
         Ok(row)
     }
 
-    pub(super) fn entry_count(&self, id: &str) -> Result<i64, ApiError> {
-        db::entry_count(&mut self.db(), id).map_err(q)
+    pub(super) async fn entry_count_async(&self, id: &str) -> Result<i64, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+        db::entry_count(&mut db, id).await.map_err(q)
     }
 
-    pub(super) fn store_summary(&self, row: &db::ArtifactRow) -> Result<String, ApiError> {
-        let rows = db::entries(&mut self.db(), &row.id).map_err(q)?;
+    pub(super) async fn store_summary_async(&self, row: &db::ArtifactRow) -> Result<String, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+        let rows = db::entries(&mut db, &row.id).await.map_err(q)?;
         let entries: Vec<ArtifactEntry> = rows.iter().map(|r| entry_of(r, true)).collect();
         let artifact_type = row.artifact_type.as_deref().and_then(artifact_type_of);
         Ok(format_store_summary(&row.title, artifact_type, row.seq, &entries))
     }
 
-    pub fn list_entries(&self, req: &ArtifactEntryListRequest) -> Result<ArtifactEntrySnapshot, ApiError> {
-        let mut db = self.db();
-        let row = self.found_store(&mut db, &req.id)?;
+    pub async fn list_entries_async(&self, req: &ArtifactEntryListRequest) -> Result<ArtifactEntrySnapshot, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+        let row = self.found_store_async(&mut db, &req.id).await?;
         let prefix = req.prefix.as_deref().map(str::trim).unwrap_or("");
         let include_values = req.include_values == Some(true);
         let rows = if prefix.is_empty() {
-            db::entries(&mut db, &req.id).map_err(q)?
+            db::entries(&mut db, &req.id).await.map_err(q)?
         } else {
-            db::entries_by_prefix(&mut db, &req.id, prefix).map_err(q)?
+            db::entries_by_prefix(&mut db, &req.id, prefix).await.map_err(q)?
         };
         let seq = row.seq;
-        let artifact = self.assemble(&mut db, row)?;
+        let artifact = self.assemble(&mut db, row).await?;
         let entries = rows.iter().map(|r| entry_of(r, include_values)).collect();
         Ok(ArtifactEntrySnapshot { artifact, seq, entries })
     }
 
-    pub fn get_entry(&self, req: &ArtifactEntryGetRequest) -> Result<ArtifactEntry, ApiError> {
-        let mut db = self.db();
-        let row = self.found_store(&mut db, &req.id)?;
+    pub async fn get_entry_async(&self, req: &ArtifactEntryGetRequest) -> Result<ArtifactEntry, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+        let row = self.found_store_async(&mut db, &req.id).await?;
         check_path(&req.path)?;
-        let entry = db::entry(&mut db, &req.id, &req.path).map_err(q)?.ok_or_else(|| {
+        let entry = db::entry(&mut db, &req.id, &req.path).await.map_err(q)?.ok_or_else(|| {
             missing(
                 t(
                     "server.artifact.entry.missing",
@@ -162,26 +164,35 @@ impl Artifacts {
         Ok(entry_of(&entry, true))
     }
 
-    pub fn batch_entries(&self, maker: &Maker, req: &ArtifactEntryBatchRequest) -> Result<ArtifactEntryBatchResult, ApiError> {
-        self.batch_entries_inner(maker, req, None)
+    pub async fn batch_entries_async(&self, maker: &Maker, req: &ArtifactEntryBatchRequest) -> Result<ArtifactEntryBatchResult, ApiError> {
+        self.batch_entries_inner_async(maker, req, None).await
+    }
+
+    pub async fn batch_entries_with_meta_async(
+        &self,
+        maker: &Maker,
+        req: &ArtifactEntryBatchRequest,
+        meta: &CommitMeta,
+    ) -> Result<ArtifactEntryBatchResult, ApiError> {
+        self.batch_entries_inner_async(maker, req, Some(meta)).await
     }
 
     pub fn batch_entries_with_meta(&self, maker: &Maker, req: &ArtifactEntryBatchRequest, meta: &CommitMeta) -> Result<ArtifactEntryBatchResult, ApiError> {
-        self.batch_entries_inner(maker, req, Some(meta))
+        vibevalley_runtime::rt::block_on(self.batch_entries_with_meta_async(maker, req, meta))
     }
 
-    fn batch_entries_inner(
+    async fn batch_entries_inner_async(
         &self,
         maker: &Maker,
         req: &ArtifactEntryBatchRequest,
         explicit_meta: Option<&CommitMeta>,
     ) -> Result<ArtifactEntryBatchResult, ApiError> {
         let write_lock = self.entry_lock(&req.id);
-        let _guard = write_lock.lock();
+        let _guard = write_lock.lock().await;
 
         let (row, current_rows) = {
-            let mut db = self.db();
-            let row = self.found_store(&mut db, &req.id)?;
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            let row = self.found_store_async(&mut db, &req.id).await?;
             for w in &req.writes {
                 check_path(&w.path)?;
                 if w.op == ArtifactEntryOp::Copy {
@@ -200,7 +211,7 @@ impl Artifacts {
                     conflicts: vec![],
                 });
             }
-            let rows = db::entries(&mut db, &req.id).map_err(q)?;
+            let rows = db::entries(&mut db, &req.id).await.map_err(q)?;
             (row, rows)
         };
 
@@ -226,7 +237,7 @@ impl Artifacts {
             if resolved_assets.contains_key(&att_id) {
                 continue;
             }
-            let found = self.files.of(std::slice::from_ref(&att_id)).ok().and_then(|mut list| list.pop());
+            let found = self.files.of_async(std::slice::from_ref(&att_id)).await.ok().and_then(|mut list| list.pop());
             let Some(att) = found else {
                 return Err(refused(t(
                     "server.artifact.entry.noAttachment",
@@ -239,10 +250,10 @@ impl Artifacts {
         let artifact_type = row.artifact_type.as_deref().and_then(artifact_type_of);
 
         let (result, change) = {
-            let mut db = self.db();
-            let mut tx = vibevalley_runtime::rt::block_on(db.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
+            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
+            let mut tx = db.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
 
-            let collab_doc = self.load_or_bootstrap_store_doc(&mut tx, &row, &current_rows)?;
+            let collab_doc = self.load_or_bootstrap_store_doc_async(&mut tx, &row, &current_rows).await?;
             let mut working: BTreeMap<String, db::EntryRow> = current_rows.into_iter().map(|r| (r.path.clone(), r)).collect();
 
             // Check optimistic concurrency preconditions before mutating any entry.
@@ -265,7 +276,7 @@ impl Artifacts {
                 }
             }
             if !conflicts.is_empty() {
-                vibevalley_runtime::rt::block_on(tx.rollback()).map_err(q)?;
+                tx.rollback().await.map_err(q)?;
                 return Ok(ArtifactEntryBatchResult {
                     applied: false,
                     seq: row.seq,
@@ -503,7 +514,7 @@ impl Artifacts {
                 return Err(refused(t("server.artifact.entry.tooMany", &[("max", (ENTRY_MAX_COUNT as i64).into())])));
             }
             if upserted_paths.is_empty() && deleted_paths.is_empty() {
-                vibevalley_runtime::rt::block_on(tx.rollback()).map_err(q)?;
+                tx.rollback().await.map_err(q)?;
                 return Ok(ArtifactEntryBatchResult {
                     applied: true,
                     seq: row.seq,
@@ -516,7 +527,7 @@ impl Artifacts {
             let changed_paths: Vec<String> = upserted_paths.into_iter().collect();
 
             for p in &removed_paths {
-                db::delete_entry(&mut tx, &req.id, p).map_err(q)?;
+                db::delete_entry(&mut tx, &req.id, p).await.map_err(q)?;
             }
             for p in &changed_paths {
                 if let Some(next) = working.get(p) {
@@ -535,16 +546,19 @@ impl Artifacts {
                             updated_at: next.updated_at,
                         },
                     )
+                    .await
                     .map_err(q)?;
                 }
             }
 
             let seq = row.seq + 1;
-            db::add_entry_change(&mut tx, &req.id, seq, &maker.by, &changed_paths, &removed_paths, at).map_err(q)?;
-            db::artifact_accepted(&mut tx, &req.id, seq, at).map_err(q)?;
+            db::add_entry_change(&mut tx, &req.id, seq, &maker.by, &changed_paths, &removed_paths, at)
+                .await
+                .map_err(q)?;
+            db::artifact_accepted(&mut tx, &req.id, seq, at).await.map_err(q)?;
             let meta = explicit_meta.cloned().unwrap_or_else(|| commit_meta_for_maker(maker, req.note.clone(), at));
-            Self::sync_store_to_collab(&mut tx, &row.id, &collab_doc, &working, &changed_paths, &removed_paths, &meta)?;
-            vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
+            Self::sync_store_to_collab_async(&mut tx, &row.id, &collab_doc, &working, &changed_paths, &removed_paths, &meta).await?;
+            tx.commit().await.map_err(q)?;
 
             let full_entries: Vec<ArtifactEntry> = changed_paths.iter().filter_map(|p| working.get(p).map(|r| entry_of(r, true))).collect();
             let event_entries: Vec<ArtifactEntry> = changed_paths
@@ -588,7 +602,8 @@ impl Artifacts {
             );
             let said = self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new())?;
             if row.message_id.is_none() {
-                db::artifact_said(&mut self.db(), &row.id, &said.id).map_err(q)?;
+                let mut db = self.db.write_pool().acquire().await.map_err(q)?;
+                db::artifact_said(&mut db, &row.id, &said.id).await.map_err(q)?;
             }
         }
 
@@ -596,15 +611,15 @@ impl Artifacts {
     }
 
     pub fn follow_entries(&self, hub: &Hub, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
-        let (rx, missed, current) = {
-            let mut db = self.db();
-            self.found_store(&mut db, id)?;
+        let (rx, missed, current) = vibevalley_runtime::rt::block_on(async {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            self.found_store_async(&mut db, id).await?;
             // Subscribe before reading catch-up; live events are deduplicated by seq.
             let rx = self.entry_changes.subscribe();
-            let missed = db::entry_changes_after(&mut db, id, after, CATCH_UP_MAX as i64 + 1).map_err(q)?;
-            let current: HashMap<String, db::EntryRow> = db::entries(&mut db, id).map_err(q)?.into_iter().map(|r| (r.path.clone(), r)).collect();
-            (rx, missed, current)
-        };
+            let missed = db::entry_changes_after(&mut db, id, after, CATCH_UP_MAX as i64 + 1).await.map_err(q)?;
+            let current: HashMap<String, db::EntryRow> = db::entries(&mut db, id).await.map_err(q)?.into_iter().map(|r| (r.path.clone(), r)).collect();
+            Ok::<_, ApiError>((rx, missed, current))
+        })?;
         let id = id.to_string();
         let hub_cancel = hub.child_token();
         let closed = self.cancel.clone();
@@ -642,13 +657,13 @@ impl Artifacts {
 
     /// Renders a store artifact's sandboxed HTML viewer document and CSP headers
     /// (`artifact.view` native op & `GET /api/v1/artifact/:id/view`).
-    pub fn view(&self, req: &ArtifactViewInput) -> Result<ArtifactPage, ApiError> {
+    pub async fn view_async(&self, req: &ArtifactViewInput) -> Result<ArtifactPage, ApiError> {
         let (row, rows, default_tokens_json) = {
-            let mut db = self.db();
-            let row = self.found_store(&mut db, &req.id)?;
-            let rows = db::entries(&mut db, &req.id).map_err(q)?;
-            let default_tokens_json = match db::default_design_system_artifact(&mut db).map_err(q)? {
-                Some(ds) if ds.id != req.id => db::entry(&mut db, &ds.id, "project/tokens.json").map_err(q)?.and_then(|e| e.value),
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            let row = self.found_store_async(&mut db, &req.id).await?;
+            let rows = db::entries(&mut db, &req.id).await.map_err(q)?;
+            let default_tokens_json = match db::default_design_system_artifact(&mut db).await.map_err(q)? {
+                Some(ds) if ds.id != req.id => db::entry(&mut db, &ds.id, "project/tokens.json").await.map_err(q)?.and_then(|e| e.value),
                 _ => None,
             };
             (row, rows, default_tokens_json)
@@ -671,11 +686,13 @@ impl Artifacts {
     }
 
     /// Rewrites declared `data-props` defaults in a `.dc.html` store entry and commits the update.
-    pub fn write_entry_props(&self, maker: &Maker, req: &ArtifactEntryWritePropsInput) -> Result<ArtifactEntryBatchResult, ApiError> {
-        let entry = self.get_entry(&ArtifactEntryGetRequest {
-            id: req.id.clone(),
-            path: req.path.clone(),
-        })?;
+    pub async fn write_entry_props_async(&self, maker: &Maker, req: &ArtifactEntryWritePropsInput) -> Result<ArtifactEntryBatchResult, ApiError> {
+        let entry = self
+            .get_entry_async(&ArtifactEntryGetRequest {
+                id: req.id.clone(),
+                path: req.path.clone(),
+            })
+            .await?;
         let source = entry.value.as_deref().unwrap_or("");
         let values: BTreeMap<String, Value> = req
             .values
@@ -690,7 +707,7 @@ impl Artifacts {
             })
             .collect();
         let updated = write_props_into_dc_html(source, &values);
-        self.batch_entries(
+        self.batch_entries_async(
             maker,
             &ArtifactEntryBatchRequest {
                 id: req.id.clone(),
@@ -707,6 +724,7 @@ impl Artifacts {
                 announce: Some(false),
             },
         )
+        .await
     }
 
     /// Parses a design-system `tokens.json` payload, computes WCAG contrast against the surface swatch, and compiles CSS.
@@ -812,115 +830,124 @@ mod tests {
         let (_dir, artifacts) = test_artifacts();
         let maker = Maker::user();
 
-        // 1. Omitting `entries` on a typed store seeds starters server-side.
-        let slides = artifacts
-            .create(
-                &maker,
-                &ArtifactRequest {
-                    title: "Q4 Deck".into(),
-                    kind: Some(ArtifactKind::Store),
-                    artifact_type: Some(ArtifactType::Slides),
-                    display: None,
-                    content: None,
-                    entries: None,
-                    is_default: None,
-                    announce: None,
-                    note: None,
-                    channel: None,
-                    issue: None,
-                },
-            )
-            .unwrap();
-        assert_eq!(slides.seq, 1);
-        let snap = artifacts
-            .list_entries(&ArtifactEntryListRequest {
-                id: slides.id.clone(),
-                prefix: None,
-                include_values: Some(true),
-            })
-            .unwrap();
-        let slide = snap
-            .entries
-            .iter()
-            .find(|e| e.path.starts_with("project/slides/") && e.path.ends_with(".html"))
-            .unwrap();
-        assert!(slide.value.as_deref().unwrap().contains("Q4 Deck"));
-
-        // 2. `html_edit` with `path` edits the slide entry via Rust `html_edit`.
-        let edited_art = artifacts
-            .html_edit(
-                &maker,
-                &ArtifactHtmlEdit {
-                    id: slides.id.clone(),
-                    version: slides.seq,
-                    path: Some(slide.path.clone()),
-                    anchor: HtmlAnchor {
-                        kind: HtmlAnchorKind::Text,
-                        exact: "Q4 Deck".into(),
-                        prefix: String::new(),
-                        suffix: String::new(),
+        vibevalley_runtime::rt::block_on(async {
+            // 1. Omitting `entries` on a typed store seeds starters server-side.
+            let slides = artifacts
+                .create_async(
+                    &maker,
+                    &ArtifactRequest {
+                        title: "Q4 Deck".into(),
+                        kind: Some(ArtifactKind::Store),
+                        artifact_type: Some(ArtifactType::Slides),
+                        display: None,
+                        content: None,
+                        entries: None,
+                        is_default: None,
+                        announce: None,
+                        note: None,
+                        channel: None,
+                        issue: None,
                     },
-                    text: "Q1 Roadmap".into(),
-                },
-            )
-            .unwrap();
-        assert_eq!(edited_art.seq, 2);
-        let updated_slide = artifacts
-            .get_entry(&ArtifactEntryGetRequest {
-                id: slides.id.clone(),
-                path: slide.path.clone(),
-            })
-            .unwrap();
-        assert!(updated_slide.value.as_deref().unwrap().contains("Q1 Roadmap"));
+                )
+                .await
+                .unwrap();
+            assert_eq!(slides.seq, 1);
+            let snap = artifacts
+                .list_entries_async(&ArtifactEntryListRequest {
+                    id: slides.id.clone(),
+                    prefix: None,
+                    include_values: Some(true),
+                })
+                .await
+                .unwrap();
+            let slide = snap
+                .entries
+                .iter()
+                .find(|e| e.path.starts_with("project/slides/") && e.path.ends_with(".html"))
+                .unwrap();
+            assert!(slide.value.as_deref().unwrap().contains("Q4 Deck"));
 
-        // 3. `write_entry_props` updates `data-props` defaults in a `.dc.html` entry.
-        let design = artifacts
-            .create(
-                &maker,
-                &ArtifactRequest {
-                    title: "Hero".into(),
-                    kind: Some(ArtifactKind::Store),
-                    artifact_type: Some(ArtifactType::Design),
-                    display: None,
-                    content: None,
-                    entries: Some(vec![ArtifactEntryWriteInput {
-                        op: ArtifactEntryOp::Set,
+            // 2. `html_edit` with `path` edits the slide entry via Rust `html_edit`.
+            let edited_art = artifacts
+                .html_edit_async(
+                    &maker,
+                    &ArtifactHtmlEdit {
+                        id: slides.id.clone(),
+                        version: slides.seq,
+                        path: Some(slide.path.clone()),
+                        anchor: HtmlAnchor {
+                            kind: HtmlAnchorKind::Text,
+                            exact: "Q4 Deck".into(),
+                            prefix: String::new(),
+                            suffix: String::new(),
+                        },
+                        text: "Q1 Roadmap".into(),
+                    },
+                )
+                .await
+                .unwrap();
+            assert_eq!(edited_art.seq, 2);
+            let updated_slide = artifacts
+                .get_entry_async(&ArtifactEntryGetRequest {
+                    id: slides.id.clone(),
+                    path: slide.path.clone(),
+                })
+                .await
+                .unwrap();
+            assert!(updated_slide.value.as_deref().unwrap().contains("Q1 Roadmap"));
+
+            // 3. `write_entry_props` updates `data-props` defaults in a `.dc.html` entry.
+            let design = artifacts
+                .create_async(
+                    &maker,
+                    &ArtifactRequest {
+                        title: "Hero".into(),
+                        kind: Some(ArtifactKind::Store),
+                        artifact_type: Some(ArtifactType::Design),
+                        display: None,
+                        content: None,
+                        entries: Some(vec![ArtifactEntryWriteInput {
+                            op: ArtifactEntryOp::Set,
+                            path: "project/main.dc.html".into(),
+                            kind: Some(ArtifactEntryKind::Text),
+                            value: Some(
+                                r#"<x-dc data-props='[{"name":"density","type":"select","options":["comfortable","compact"],"value":"comfortable"}]'><div>Body</div></x-dc>"#
+                                    .into(),
+                            ),
+                            from: None,
+                            mime: None,
+                            if_rev: None,
+                        }]),
+                        is_default: None,
+                        announce: None,
+                        note: None,
+                        channel: None,
+                        issue: None,
+                    },
+                )
+                .await
+                .unwrap();
+            let res = artifacts
+                .write_entry_props_async(
+                    &maker,
+                    &ArtifactEntryWritePropsInput {
+                        id: design.id.clone(),
                         path: "project/main.dc.html".into(),
-                        kind: Some(ArtifactEntryKind::Text),
-                        value: Some(
-                            r#"<x-dc data-props='[{"name":"density","type":"select","options":["comfortable","compact"],"value":"comfortable"}]'><div>Body</div></x-dc>"#
-                                .into(),
-                        ),
-                        from: None,
-                        mime: None,
-                        if_rev: None,
-                    }]),
-                    is_default: None,
-                    announce: None,
-                    note: None,
-                    channel: None,
-                    issue: None,
-                },
-            )
-            .unwrap();
-        let res = artifacts
-            .write_entry_props(
-                &maker,
-                &ArtifactEntryWritePropsInput {
-                    id: design.id.clone(),
+                        values: BTreeMap::from([("density".into(), DesignPropValue::String("compact".into()))]),
+                    },
+                )
+                .await
+                .unwrap();
+            assert!(res.applied);
+            let dc = artifacts
+                .get_entry_async(&ArtifactEntryGetRequest {
+                    id: design.id,
                     path: "project/main.dc.html".into(),
-                    values: BTreeMap::from([("density".into(), DesignPropValue::String("compact".into()))]),
-                },
-            )
-            .unwrap();
-        assert!(res.applied);
-        let dc = artifacts
-            .get_entry(&ArtifactEntryGetRequest {
-                id: design.id,
-                path: "project/main.dc.html".into(),
-            })
-            .unwrap();
-        assert!(dc.value.as_deref().unwrap().contains(r#""value":"compact""#));
+                })
+                .await
+                .unwrap();
+            assert!(dc.value.as_deref().unwrap().contains(r#""value":"compact""#));
+        });
         artifacts.close();
     }
 

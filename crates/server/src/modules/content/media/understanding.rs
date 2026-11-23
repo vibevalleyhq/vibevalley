@@ -76,12 +76,12 @@ fn shown(r: &Record) -> Result<MediaUnderstandingJob, ApiError> {
 
 impl Jobs {
     /// `media.understanding.create`: the user asks, and it runs at once.
-    pub fn understanding(&self, request: MediaUnderstandingRequest) -> Result<MediaUnderstandingJob, ApiError> {
-        self.understanding_for(request, None)
+    pub async fn understanding_async(&self, request: MediaUnderstandingRequest) -> Result<MediaUnderstandingJob, ApiError> {
+        self.understanding_for_async(request, None).await
     }
 
     /// `media.understanding.authorize`: the user approves the upload for an orchestrator in `channel` to start.
-    pub fn authorize_understanding(&self, r: MediaUnderstandingAuthorizationRequest) -> Result<MediaUnderstandingJob, ApiError> {
+    pub async fn authorize_understanding_async(&self, r: MediaUnderstandingAuthorizationRequest) -> Result<MediaUnderstandingJob, ApiError> {
         if !self.channel.place_exists(&r.channel) {
             return Err(invalid());
         }
@@ -94,16 +94,19 @@ impl Jobs {
             allow_upload: r.allow_upload,
             max_output_tokens: r.max_output_tokens,
         };
-        self.understanding_for(request, Some(r.channel))
+        self.understanding_for_async(request, Some(r.channel)).await
     }
 
-    fn understanding_for(&self, request: MediaUnderstandingRequest, channel: Option<String>) -> Result<MediaUnderstandingJob, ApiError> {
+    async fn understanding_for_async(&self, request: MediaUnderstandingRequest, channel: Option<String>) -> Result<MediaUnderstandingJob, ApiError> {
         self.open_for_work()?;
         if !id_ok(&request.id) {
             return Err(invalid());
         }
         let ask = Ask::Understanding(request);
-        if let Some(old) = self.known(&ask, |old| old.authorization.as_ref().map(|a| &a.channel) == channel.as_ref())? {
+        if let Some(old) = self
+            .known_async(&ask, |old| old.authorization.as_ref().map(|a| &a.channel) == channel.as_ref())
+            .await?
+        {
             return shown(&old);
         }
         let Ask::Understanding(request) = &ask else { unreachable!() };
@@ -116,7 +119,7 @@ impl Jobs {
             if inputs.iter().any(|i| i.id == *id) {
                 return Err(invalid());
             }
-            let input = self.inputs.get(id).map_err(|_| invalid())?;
+            let input = self.inputs.get_async(id).await.map_err(|_| invalid())?;
             let (MediaInputPhase::Ready, Some(hash)) = (input.phase, input.hash) else {
                 return Err(invalid());
             };
@@ -152,15 +155,15 @@ impl Jobs {
             }
             None => Some(Held::Account(account)),
         };
-        shown(&self.admit(r, held)?)
+        shown(&self.admit_async(r, held).await?)
     }
 
     /// `media.understanding.start`: an orchestrator, with the user's word in this batch, starts what the user approved
     /// for its channel. Asked again it is the same job; nothing is uploaded twice.
-    pub fn start_understanding(&self, id: &str, agent: &str, channel: &str) -> Result<MediaUnderstandingJob, ApiError> {
+    pub async fn start_understanding_async(&self, id: &str, agent: &str, channel: &str) -> Result<MediaUnderstandingJob, ApiError> {
         self.open_for_work()?;
         let unapproved = || refused("authorizationRequired");
-        let r = self.found(id)?;
+        let r = self.found_async(id).await?;
         let Some(approval) = r
             .authorization
             .as_ref()
@@ -185,25 +188,32 @@ impl Jobs {
                 approval.expires_at > now() && a.connection == r.connection && a.revision == r.revision && a.model == r.model && a.fingerprint == r.fingerprint
             })
             .ok_or_else(|| refused("consentChanged"))?;
-        if self.change(id, &[Phase::Authorized], |r| {
-            r.source = source;
-            r.phase = Phase::Queued;
-        })? {
+        if self
+            .change_async(id, &[Phase::Authorized], |r| {
+                r.source = source;
+                r.phase = Phase::Queued;
+            })
+            .await?
+        {
             self.hold(id, Held::Account(account));
-            self.schedule();
+            self.schedule_async().await;
         }
-        shown(&self.found(id)?)
+        shown(&self.found_async(id).await?)
     }
 
-    pub fn start_understanding_by_id(&self, id: &str) -> Result<MediaUnderstandingJob, ApiError> {
-        let r = self.found(id)?;
+    pub fn start_understanding(&self, id: &str, agent: &str, channel: &str) -> Result<MediaUnderstandingJob, ApiError> {
+        vibevalley_runtime::rt::block_on(self.start_understanding_async(id, agent, channel))
+    }
+
+    pub async fn start_understanding_by_id_async(&self, id: &str) -> Result<MediaUnderstandingJob, ApiError> {
+        let r = self.found_async(id).await?;
         let channel = r
             .authorization
             .as_ref()
             .map(|a| a.channel.clone())
             .ok_or_else(|| refused("authorizationRequired"))?;
         let agent = self.channel.orchestrator_in(&channel);
-        self.start_understanding(id, &agent, &channel)
+        self.start_understanding_async(id, &agent, &channel).await
     }
 
     /// An understanding job's run, from `uploading`.
@@ -247,7 +257,7 @@ impl Jobs {
                     r.problem.clear();
                 });
                 if matches!(answered, Ok(true)) {
-                    self.tidy_understanding(id);
+                    vibevalley_runtime::rt::block_on(self.tidy_understanding_async(id));
                 }
             }
             Err(e) => self.failed(id, e.outcome),
@@ -256,13 +266,19 @@ impl Jobs {
 
     /// What the job uploaded goes at the vendor and its inputs are let go; a file the vendor never answered for
     /// leaves the cleanup unknown and is named, and a deletion that fails leaves it blocked, to be asked again.
-    fn tidy_understanding(&self, id: &str) {
-        let _one = self.cleaning.lock();
-        let cleaned = self.remove_remote(id).and_then(|()| self.inputs.release(id)).and_then(|()| self.found(id));
+    async fn tidy_understanding_async(&self, id: &str) {
+        let _one = self.cleaning.lock().await;
+        let cleaned = match self.remove_remote_async(id).await {
+            Ok(()) => match self.inputs.release_async(id).await {
+                Ok(()) => self.found_async(id).await,
+                Err(e) => Err(e),
+            },
+            Err(e) => Err(e),
+        };
         let wrote = match cleaned {
             Ok(r) => {
                 let unresolved: Vec<&str> = r.remote.iter().filter(|f| f.unresolved()).map(|f| f.filename.as_str()).collect();
-                self.change(id, &Phase::ENDED, |r| {
+                self.change_async(id, &Phase::ENDED, |r| {
                     if unresolved.is_empty() {
                         r.cleanup = Some(MediaCleanup::Done);
                     } else {
@@ -270,10 +286,11 @@ impl Jobs {
                         r.problem = t("server.media.remoteUnresolved", &[("files", unresolved.join(", ").into())]);
                     }
                 })
+                .await
             }
             Err(e) => {
                 eprintln!("media {id}: cleanup is blocked: {}", e.message);
-                self.change(id, &Phase::ENDED, |r| r.cleanup = Some(MediaCleanup::Blocked))
+                self.change_async(id, &Phase::ENDED, |r| r.cleanup = Some(MediaCleanup::Blocked)).await
             }
         };
         if let Err(e) = wrote {
@@ -282,8 +299,8 @@ impl Jobs {
     }
 
     /// The ended understanding job, and whether a cleanup has anything left to do.
-    fn cleanable(&self, id: &str) -> Result<(Record, bool), ApiError> {
-        let r = self.found(id)?;
+    async fn cleanable_async(&self, id: &str) -> Result<(Record, bool), ApiError> {
+        let r = self.found_async(id).await?;
         if !matches!(r.ask, Ask::Understanding(_)) {
             return Err(refused("missing"));
         }
@@ -294,8 +311,8 @@ impl Jobs {
         Ok((r, left))
     }
 
-    pub fn preview_understanding_cleanup(&self, id: &str) -> Result<Preview, ApiError> {
-        let (r, left) = self.cleanable(id)?;
+    pub async fn preview_understanding_cleanup_async(&self, id: &str) -> Result<Preview, ApiError> {
+        let (r, left) = self.cleanable_async(id).await?;
         if !left {
             return Ok(Preview { does: vec![] });
         }
@@ -311,29 +328,31 @@ impl Jobs {
         })
     }
 
-    pub fn understanding_cleanup(&self, id: &str) -> Result<MediaUnderstandingJob, ApiError> {
-        let (r, left) = self.cleanable(id)?;
-        if left && self.change(id, &[r.phase], |r| r.cleanup = Some(MediaCleanup::Running))? {
-            self.tidy_understanding(id);
+    pub async fn understanding_cleanup_async(&self, id: &str) -> Result<MediaUnderstandingJob, ApiError> {
+        let (r, left) = self.cleanable_async(id).await?;
+        if left && self.change_async(id, &[r.phase], |r| r.cleanup = Some(MediaCleanup::Running)).await? {
+            self.tidy_understanding_async(id).await;
         }
-        shown(&self.found(id)?)
+        shown(&self.found_async(id).await?)
     }
 
     /// Approvals that ran out before an orchestrator used them end here, and let go of their inputs.
-    pub(super) fn expire_approvals(&self) {
-        let waiting = match self.rows(async |db| super::q::authorized_jobs(db).await) {
+    pub(super) async fn expire_approvals_async(&self) {
+        let waiting = match self.authorized_jobs_async().await {
             Ok(w) => w,
             Err(e) => return eprintln!("media: {}", e.message),
         };
         let at = now();
         for r in waiting.iter().filter(|r| r.authorization.as_ref().is_some_and(|a| a.expires_at <= at)) {
-            let expired = self.change(r.id(), &[Phase::Authorized], |r| {
-                r.phase = Phase::Canceled;
-                r.cleanup = Some(MediaCleanup::Done);
-                r.problem = t("server.media.authorizationExpired", &[]);
-            });
+            let expired = self
+                .change_async(r.id(), &[Phase::Authorized], |r| {
+                    r.phase = Phase::Canceled;
+                    r.cleanup = Some(MediaCleanup::Done);
+                    r.problem = t("server.media.authorizationExpired", &[]);
+                })
+                .await;
             if matches!(expired, Ok(true)) {
-                let _ = self.inputs.release(r.id());
+                let _ = self.inputs.release_async(r.id()).await;
             }
         }
     }

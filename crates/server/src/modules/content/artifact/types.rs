@@ -66,8 +66,10 @@ fn read_asset(path: &str) -> Result<String, ApiError> {
 }
 
 impl Artifacts {
-    pub fn list_types(&self) -> Result<Vec<ArtifactTypeInfo>, ApiError> {
-        let def = db::default_design_system_artifact(&mut self.db()).map_err(q)?;
+    pub async fn list_types_async(&self) -> Result<Vec<ArtifactTypeInfo>, ApiError> {
+        let mut conn = self.db.read_pool().acquire().await.map_err(q)?;
+        let def = db::default_design_system_artifact(&mut conn).await.map_err(q)?;
+        drop(conn);
         let mut out = Vec::with_capacity(ArtifactType::ALL.len());
         for ty in ArtifactType::ALL {
             let (title, summary) = type_words(ty);
@@ -87,11 +89,13 @@ impl Artifacts {
         Ok(out)
     }
 
-    pub fn read_type(&self, req: &ArtifactTypeReadRequest) -> Result<ArtifactTypeGuide, ApiError> {
+    pub async fn read_type_async(&self, req: &ArtifactTypeReadRequest) -> Result<ArtifactTypeGuide, ApiError> {
         let ty = req.r#type;
         let references = list_references(ty);
         let (title, _) = type_words(ty);
-        let def = db::default_design_system_artifact(&mut self.db()).map_err(q)?;
+        let mut conn = self.db.read_pool().acquire().await.map_err(q)?;
+        let def = db::default_design_system_artifact(&mut conn).await.map_err(q)?;
+        drop(conn);
         let raw_ref = req.reference.as_deref().unwrap_or("").trim();
         let wanted = if raw_ref.len() >= 3 && raw_ref[raw_ref.len() - 3..].eq_ignore_ascii_case(".md") {
             &raw_ref[..raw_ref.len() - 3]

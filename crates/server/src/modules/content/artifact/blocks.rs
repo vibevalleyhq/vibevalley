@@ -7,7 +7,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use sqlx::SqliteConnection;
+use sqlx::{Connection, SqliteConnection};
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::artifact::{MdBlock, Page, blocks_of_markdown, inline_spans, markdown_of, ordered, plain, unmarked};
@@ -168,27 +168,36 @@ fn base_of(op: &BlockOp) -> Option<(&str, i64)> {
 
 impl Artifacts {
     /// `foundBlocks`: the artifact, refused when it is not written in blocks.
-    pub(super) fn found_blocks(&self, db: &mut SqliteConnection, id: &str) -> Result<ArtifactRow, ApiError> {
-        let row = self.found(db, id)?;
+    pub(super) async fn found_blocks_async(&self, db: &mut SqliteConnection, id: &str) -> Result<ArtifactRow, ApiError> {
+        let row = self.found(db, id).await?;
         if row.body != "blocks" {
             return Err(refused(t("server.artifact.notBlocks", &[("title", row.title.as_str().into())])));
         }
         Ok(row)
     }
 
-    fn blocks_of(&self, id: &str) -> Result<Vec<Block>, ApiError> {
-        db::blocks(&mut self.db(), id).map_err(q)
+    async fn blocks_of_async(&self, id: &str) -> Result<Vec<Block>, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+        db::blocks(&mut db, id).await.map_err(q)
     }
 
     /// The live blocks in order.
+    pub async fn live_blocks_async(&self, id: &str) -> Result<Vec<Block>, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+        self.found_blocks_async(&mut db, id).await?;
+        Ok(ordered(&db::blocks(&mut db, id).await.map_err(q)?))
+    }
+
     pub fn live_blocks(&self, id: &str) -> Result<Vec<Block>, ApiError> {
-        let mut db = self.db();
-        self.found_blocks(&mut db, id)?;
-        Ok(ordered(&db::blocks(&mut db, id).map_err(q)?))
+        vibevalley_runtime::rt::block_on(self.live_blocks_async(id))
+    }
+
+    pub async fn markdown_async(&self, id: &str) -> Result<String, ApiError> {
+        Ok(markdown_of(&self.live_blocks_async(id).await?))
     }
 
     pub fn markdown(&self, id: &str) -> Result<String, ApiError> {
-        Ok(markdown_of(&self.live_blocks(id)?))
+        vibevalley_runtime::rt::block_on(self.markdown_async(id))
     }
 
     fn again(&self, all: &[Block], id: &str, seen: ChangeRow) -> Result<BlockAck, ApiError> {
@@ -205,27 +214,30 @@ impl Artifacts {
     }
 
     /// `submit`: one batch, in one transaction, one at a time.
-    pub fn submit(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>) -> Result<BlockAck, ApiError> {
-        let _batches = self.batches.lock();
-        self.submit_locked(id, actor, batch_id, ops, None)
+    pub async fn submit_async(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>) -> Result<BlockAck, ApiError> {
+        let _batches = self.batches.lock().await;
+        self.submit_locked_async(id, actor, batch_id, ops, None).await
     }
 
-    pub fn submit_with_meta(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>, meta: &CommitMeta) -> Result<BlockAck, ApiError> {
-        let _batches = self.batches.lock();
-        self.submit_locked(id, actor, batch_id, ops, Some(meta))
+    pub fn submit(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>) -> Result<BlockAck, ApiError> {
+        vibevalley_runtime::rt::block_on(self.submit_async(id, actor, batch_id, ops))
+    }
+
+    pub async fn submit_with_meta_async(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>, meta: &CommitMeta) -> Result<BlockAck, ApiError> {
+        let _batches = self.batches.lock().await;
+        self.submit_locked_async(id, actor, batch_id, ops, Some(meta)).await
     }
 
     /// One batch, under the batch lock the caller holds.
-    fn submit_locked(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>, meta: Option<&CommitMeta>) -> Result<BlockAck, ApiError> {
+    async fn submit_locked_async(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>, meta: Option<&CommitMeta>) -> Result<BlockAck, ApiError> {
         if batch_id.trim().is_empty() {
             return Err(refused(t("server.artifact.noBatch", &[])));
         }
         let (ack, fresh) = {
-            let mut conn = self.db();
-            use sqlx::Connection;
-            let mut tx = vibevalley_runtime::rt::block_on(conn.begin_with("BEGIN IMMEDIATE")).map_err(q)?;
-            let result = self.apply_batch(&mut tx, id, actor, batch_id, &ops, meta)?;
-            vibevalley_runtime::rt::block_on(tx.commit()).map_err(q)?;
+            let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
+            let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
+            let result = self.apply_batch_async(&mut tx, id, actor, batch_id, &ops, meta).await?;
+            tx.commit().await.map_err(q)?;
             result
         };
         if fresh {
@@ -234,7 +246,7 @@ impl Artifacts {
         Ok(ack)
     }
 
-    fn apply_batch(
+    async fn apply_batch_async(
         &self,
         db: &mut SqliteConnection,
         id: &str,
@@ -243,19 +255,18 @@ impl Artifacts {
         ops: &[BlockOp],
         explicit_meta: Option<&CommitMeta>,
     ) -> Result<(BlockAck, bool), ApiError> {
-        let row = self.found_blocks(db, id)?;
-        let all = db::blocks(db, id).map_err(q)?;
-        if let Some(seen) = db::change_by_batch(db, batch_id).map_err(q)? {
+        let row = self.found_blocks_async(db, id).await?;
+        let all = db::blocks(db, id).await.map_err(q)?;
+        if let Some(seen) = db::change_by_batch(db, batch_id).await.map_err(q)? {
             return Ok((self.again(&all, id, seen)?, false));
         }
         let at = now();
-        let mut p = Page::new(id, actor, at, &all);
         // Page.apply runs without the database: the base texts and the
-        // ids other artifacts hold are read first.
+        // ids other artifacts hold are read first before creating the `!Send` Page.
         let mut revisions: HashMap<(String, i64), Vec<TextSpan>> = HashMap::new();
         for op in ops {
             let Some((block, base)) = base_of(op) else { continue };
-            let Some(b) = p.find(block) else { continue };
+            let Some(b) = all.iter().find(|b| b.id == block) else { continue };
             if base > b.rev || revisions.contains_key(&(b.id.clone(), base)) {
                 continue;
             }
@@ -263,28 +274,32 @@ impl Artifacts {
                 revisions.insert((b.id.clone(), base), b.text.clone());
                 continue;
             }
-            if let Some(spans) = db::revision(db, &b.id, base).map_err(q)? {
+            if let Some(spans) = db::revision(db, &b.id, base).await.map_err(q)? {
                 revisions.insert((b.id.clone(), base), spans);
             }
         }
         let mut taken = HashSet::new();
         for op in ops {
             if let Some(fresh) = fresh_id(op)
-                && db::block_owner(db, fresh).map_err(q)?.is_some()
+                && db::block_owner(db, fresh).await.map_err(q)?.is_some()
             {
                 taken.insert(fresh.to_string());
             }
         }
-        p.base = Box::new(move |block, rev| revisions.get(&(block.to_string(), rev)).cloned());
-        p.taken = Box::new(move |block| taken.contains(block));
-        let results: Vec<BlockOpResult> = ops.iter().map(|op| p.apply(op)).collect();
-        let changed = p.changed_blocks();
-        let post_all: Vec<Block> = p.all().cloned().collect();
+        let (results, changed, post_all, p_revisions, p_changed) = {
+            let mut p = Page::new(id, actor, at, &all);
+            p.base = Box::new(move |block, rev| revisions.get(&(block.to_string(), rev)).cloned());
+            p.taken = Box::new(move |block| taken.contains(block));
+            let results: Vec<BlockOpResult> = ops.iter().map(|op| p.apply(op)).collect();
+            let changed = p.changed_blocks();
+            let post_all: Vec<Block> = p.all().cloned().collect();
+            (results, changed, post_all, p.revisions, p.changed)
+        };
         for b in &changed {
-            db::put_block(db, id, b).map_err(q)?;
+            db::put_block(db, id, b).await.map_err(q)?;
         }
-        for r in &p.revisions {
-            db::add_revision(db, &r.block, r.rev, &r.spans, actor, r.kind.as_str(), at).map_err(q)?;
+        for r in &p_revisions {
+            db::add_revision(db, &r.block, r.rev, &r.spans, actor, r.kind.as_str(), at).await.map_err(q)?;
         }
         let seq = row.seq + 1;
         db::add_change(
@@ -294,16 +309,17 @@ impl Artifacts {
                 seq,
                 batch_id,
                 actor,
-                block_ids: &p.changed,
+                block_ids: &p_changed,
                 results: &results,
                 created_at: at,
             },
         )
+        .await
         .map_err(q)?;
-        db::artifact_accepted(db, id, seq, at).map_err(q)?;
+        db::artifact_accepted(db, id, seq, at).await.map_err(q)?;
         if !changed.is_empty() {
             let meta = explicit_meta.cloned().unwrap_or_else(|| commit_meta_for_actor(actor, None, at));
-            self.sync_blocks_to_collab(db, &row, &all, &post_all, &changed, &meta)?;
+            self.sync_blocks_to_collab_async(db, &row, &all, &post_all, &changed, &meta).await?;
         }
         Ok((
             BlockAck {
@@ -324,69 +340,93 @@ impl Artifacts {
         let _ = self.changes.send(change);
     }
 
+    pub async fn insert_block_async(&self, artifact: &str, actor: &str, req: &BlockCreate) -> Result<BlockOpResult, ApiError> {
+        self.insert_block_inner_async(artifact, actor, req, None).await
+    }
+
     pub fn insert_block(&self, artifact: &str, actor: &str, req: &BlockCreate) -> Result<BlockOpResult, ApiError> {
-        self.insert_block_inner(artifact, actor, req, None)
+        vibevalley_runtime::rt::block_on(self.insert_block_async(artifact, actor, req))
+    }
+
+    pub async fn insert_block_with_meta_async(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
+        self.insert_block_inner_async(artifact, actor, req, Some(meta)).await
     }
 
     pub fn insert_block_with_meta(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
-        self.insert_block_inner(artifact, actor, req, Some(meta))
+        vibevalley_runtime::rt::block_on(self.insert_block_with_meta_async(artifact, actor, req, meta))
     }
 
-    fn insert_block_inner(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
-        self.found_blocks(&mut self.db(), artifact)?;
+    async fn insert_block_inner_async(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
+        {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            self.found_blocks_async(&mut db, artifact).await?;
+        }
         let name = req.r#type.as_deref().map(str::trim).filter(|s| !s.is_empty()).unwrap_or("paragraph");
         let kind = append_type(name).ok_or_else(bad_block_type)?;
         if let Some(problem) = attr_problem(kind, &req.into()) {
             return Err(problem);
         }
-        let _batches = self.batches.lock();
-        let page = Page::new(artifact, actor, 0, &self.blocks_of(artifact)?);
-        let parent = req.parent_id.as_deref().map(str::trim).unwrap_or("").to_string();
-        if !parent.is_empty() {
-            let Some(b) = page.find(&parent) else {
-                return Err(refused(t("server.artifact.op.noBlock", &[("id", parent.as_str().into())])));
-            };
-            if b.deleted == Some(true) {
-                return Err(refused(t("server.artifact.parentDeleted", &[("id", parent.as_str().into())])));
-            }
-        }
-        let siblings = page.children(&parent);
-        let (after, before) = match req.after_block.as_deref() {
-            None => (siblings.last().map(|b| b.order_key.clone()).unwrap_or_default(), String::new()),
-            Some("") => (String::new(), siblings.first().map(|b| b.order_key.clone()).unwrap_or_default()),
-            Some(id) => {
-                let Some(at) = siblings.iter().position(|b| b.id == id) else {
-                    return Err(refused(t("server.artifact.afterNotSibling", &[("id", id.into())])));
+        let _batches = self.batches.lock().await;
+        let existing = self.blocks_of_async(artifact).await?;
+        let block = {
+            let page = Page::new(artifact, actor, 0, &existing);
+            let parent = req.parent_id.as_deref().map(str::trim).unwrap_or("").to_string();
+            if !parent.is_empty() {
+                let Some(b) = page.find(&parent) else {
+                    return Err(refused(t("server.artifact.op.noBlock", &[("id", parent.as_str().into())])));
                 };
-                (
-                    siblings[at].order_key.clone(),
-                    siblings.get(at + 1).map(|b| b.order_key.clone()).unwrap_or_default(),
-                )
+                if b.deleted == Some(true) {
+                    return Err(refused(t("server.artifact.parentDeleted", &[("id", parent.as_str().into())])));
+                }
+            }
+            let siblings = page.children(&parent);
+            let (after, before) = match req.after_block.as_deref() {
+                None => (siblings.last().map(|b| b.order_key.clone()).unwrap_or_default(), String::new()),
+                Some("") => (String::new(), siblings.first().map(|b| b.order_key.clone()).unwrap_or_default()),
+                Some(id) => {
+                    let Some(at) = siblings.iter().position(|b| b.id == id) else {
+                        return Err(refused(t("server.artifact.afterNotSibling", &[("id", id.into())])));
+                    };
+                    (
+                        siblings[at].order_key.clone(),
+                        siblings.get(at + 1).map(|b| b.order_key.clone()).unwrap_or_default(),
+                    )
+                }
+            };
+            BlockInput {
+                id: new_id(),
+                parent_id: (!parent.is_empty()).then_some(parent),
+                order_key: key_or_refuse(&after, &before)?,
+                r#type: kind,
+                attrs: attrs_for(kind, &req.into()),
+                text: spans_of(kind, &req.text),
             }
         };
-        let block = BlockInput {
-            id: new_id(),
-            parent_id: (!parent.is_empty()).then_some(parent),
-            order_key: key_or_refuse(&after, &before)?,
-            r#type: kind,
-            attrs: attrs_for(kind, &req.into()),
-            text: spans_of(kind, &req.text),
-        };
-        let ack = self.submit_locked(artifact, actor, &new_id(), vec![BlockOp::InsertBlock(BlockOpInsertBlock { block })], meta)?;
+        let ack = self
+            .submit_locked_async(artifact, actor, &new_id(), vec![BlockOp::InsertBlock(BlockOpInsertBlock { block })], meta)
+            .await?;
         ack.results.into_iter().next().ok_or_else(|| refused(t("server.artifact.notApplied", &[])))
     }
 
+    pub async fn update_block_async(&self, artifact: &str, actor: &str, req: &BlockUpdate) -> Result<BlockOpResult, ApiError> {
+        self.update_block_inner_async(artifact, actor, req, None).await
+    }
+
     pub fn update_block(&self, artifact: &str, actor: &str, req: &BlockUpdate) -> Result<BlockOpResult, ApiError> {
-        self.update_block_inner(artifact, actor, req, None)
+        vibevalley_runtime::rt::block_on(self.update_block_async(artifact, actor, req))
+    }
+
+    pub async fn update_block_with_meta_async(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
+        self.update_block_inner_async(artifact, actor, req, Some(meta)).await
     }
 
     pub fn update_block_with_meta(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
-        self.update_block_inner(artifact, actor, req, Some(meta))
+        vibevalley_runtime::rt::block_on(self.update_block_with_meta_async(artifact, actor, req, meta))
     }
 
-    fn update_block_inner(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
+    async fn update_block_inner_async(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
         let block = req.block.trim().to_string();
-        let Some(now_b) = self.blocks_of(artifact)?.into_iter().find(|b| b.id == block) else {
+        let Some(now_b) = self.blocks_of_async(artifact).await?.into_iter().find(|b| b.id == block) else {
             return Err(refused(t("server.artifact.op.noBlock", &[("id", block.as_str().into())])));
         };
         if actor != USER_ID && now_b.updated_by == USER_ID {
@@ -410,16 +450,18 @@ impl Artifacts {
                 delete: None,
             };
             let origin = meta.map(|m| m.origin.as_str());
-            let made = self.suggest_with_origin(
-                artifact,
-                actor,
-                origin,
-                &SuggestionCreate {
-                    block: block.clone(),
-                    base_rev: req.base_rev,
-                    change,
-                },
-            )?;
+            let made = self
+                .suggest_with_origin_async(
+                    artifact,
+                    actor,
+                    origin,
+                    &SuggestionCreate {
+                        block: block.clone(),
+                        base_rev: req.base_rev,
+                        change,
+                    },
+                )
+                .await?;
             return Ok(diverted(&block, now_b.rev, &made));
         }
         let asked: Asked = req.into();
@@ -457,10 +499,67 @@ impl Artifacts {
             return Err(refused(t("server.artifact.nothingToChange", &[])));
         }
         let ack = match meta {
-            Some(m) => self.submit_with_meta(artifact, actor, &new_id(), ops, m)?,
-            None => self.submit(artifact, actor, &new_id(), ops)?,
+            Some(m) => self.submit_with_meta_async(artifact, actor, &new_id(), ops, m).await?,
+            None => self.submit_async(artifact, actor, &new_id(), ops).await?,
         };
         ack.results.into_iter().last().ok_or_else(|| refused(t("server.artifact.notApplied", &[])))
+    }
+
+    pub async fn move_block_with_meta_async(
+        &self,
+        artifact: &str,
+        actor: &str,
+        block: &str,
+        parent_id: Option<&str>,
+        after_block: Option<&str>,
+        meta: &CommitMeta,
+    ) -> Result<BlockOpResult, ApiError> {
+        {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            self.found_blocks_async(&mut db, artifact).await?;
+        }
+        let block_id = block.trim().to_string();
+        let _batches = self.batches.lock().await;
+        let existing_blocks = self.blocks_of_async(artifact).await?;
+        let op = {
+            let page = Page::new(artifact, actor, 0, &existing_blocks);
+            let Some(existing) = page.find(&block_id) else {
+                return Err(refused(t("server.artifact.op.noBlock", &[("id", block_id.as_str().into())])));
+            };
+            if existing.deleted == Some(true) {
+                return Err(refused(t("server.artifact.op.noBlock", &[("id", block_id.as_str().into())])));
+            }
+            let parent = parent_id.map(str::trim).unwrap_or("").to_string();
+            if !parent.is_empty() {
+                let Some(b) = page.find(&parent) else {
+                    return Err(refused(t("server.artifact.op.noBlock", &[("id", parent.as_str().into())])));
+                };
+                if b.deleted == Some(true) {
+                    return Err(refused(t("server.artifact.parentDeleted", &[("id", parent.as_str().into())])));
+                }
+            }
+            let siblings: Vec<_> = page.children(&parent).into_iter().filter(|b| b.id != block_id).collect();
+            let (after, before) = match after_block {
+                None => (siblings.last().map(|b| b.order_key.clone()).unwrap_or_default(), String::new()),
+                Some("") => (String::new(), siblings.first().map(|b| b.order_key.clone()).unwrap_or_default()),
+                Some(id) => {
+                    let Some(at) = siblings.iter().position(|b| b.id == id) else {
+                        return Err(refused(t("server.artifact.afterNotSibling", &[("id", id.into())])));
+                    };
+                    (
+                        siblings[at].order_key.clone(),
+                        siblings.get(at + 1).map(|b| b.order_key.clone()).unwrap_or_default(),
+                    )
+                }
+            };
+            BlockOp::MoveBlock(BlockOpMoveBlock {
+                block_id,
+                parent_id: (!parent.is_empty()).then_some(parent),
+                order_key: key_or_refuse(&after, &before)?,
+            })
+        };
+        let ack = self.submit_locked_async(artifact, actor, &new_id(), vec![op], Some(meta)).await?;
+        ack.results.into_iter().next().ok_or_else(|| refused(t("server.artifact.notApplied", &[])))
     }
 
     pub fn move_block_with_meta(
@@ -472,59 +571,28 @@ impl Artifacts {
         after_block: Option<&str>,
         meta: &CommitMeta,
     ) -> Result<BlockOpResult, ApiError> {
-        self.found_blocks(&mut self.db(), artifact)?;
-        let block_id = block.trim().to_string();
-        let _batches = self.batches.lock();
-        let page = Page::new(artifact, actor, 0, &self.blocks_of(artifact)?);
-        let Some(existing) = page.find(&block_id) else {
-            return Err(refused(t("server.artifact.op.noBlock", &[("id", block_id.as_str().into())])));
-        };
-        if existing.deleted == Some(true) {
-            return Err(refused(t("server.artifact.op.noBlock", &[("id", block_id.as_str().into())])));
-        }
-        let parent = parent_id.map(str::trim).unwrap_or("").to_string();
-        if !parent.is_empty() {
-            let Some(b) = page.find(&parent) else {
-                return Err(refused(t("server.artifact.op.noBlock", &[("id", parent.as_str().into())])));
-            };
-            if b.deleted == Some(true) {
-                return Err(refused(t("server.artifact.parentDeleted", &[("id", parent.as_str().into())])));
-            }
-        }
-        let siblings: Vec<_> = page.children(&parent).into_iter().filter(|b| b.id != block_id).collect();
-        let (after, before) = match after_block {
-            None => (siblings.last().map(|b| b.order_key.clone()).unwrap_or_default(), String::new()),
-            Some("") => (String::new(), siblings.first().map(|b| b.order_key.clone()).unwrap_or_default()),
-            Some(id) => {
-                let Some(at) = siblings.iter().position(|b| b.id == id) else {
-                    return Err(refused(t("server.artifact.afterNotSibling", &[("id", id.into())])));
-                };
-                (
-                    siblings[at].order_key.clone(),
-                    siblings.get(at + 1).map(|b| b.order_key.clone()).unwrap_or_default(),
-                )
-            }
-        };
-        let op = BlockOp::MoveBlock(BlockOpMoveBlock {
-            block_id,
-            parent_id: (!parent.is_empty()).then_some(parent),
-            order_key: key_or_refuse(&after, &before)?,
-        });
-        let ack = self.submit_locked(artifact, actor, &new_id(), vec![op], Some(meta))?;
-        ack.results.into_iter().next().ok_or_else(|| refused(t("server.artifact.notApplied", &[])))
+        vibevalley_runtime::rt::block_on(self.move_block_with_meta_async(artifact, actor, block, parent_id, after_block, meta))
+    }
+
+    pub async fn delete_block_async(&self, artifact: &str, actor: &str, req: &BlockDelete) -> Result<BlockOpResult, ApiError> {
+        self.delete_block_inner_async(artifact, actor, req, None).await
     }
 
     pub fn delete_block(&self, artifact: &str, actor: &str, req: &BlockDelete) -> Result<BlockOpResult, ApiError> {
-        self.delete_block_inner(artifact, actor, req, None)
+        vibevalley_runtime::rt::block_on(self.delete_block_async(artifact, actor, req))
+    }
+
+    pub async fn delete_block_with_meta_async(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
+        self.delete_block_inner_async(artifact, actor, req, Some(meta)).await
     }
 
     pub fn delete_block_with_meta(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
-        self.delete_block_inner(artifact, actor, req, Some(meta))
+        vibevalley_runtime::rt::block_on(self.delete_block_with_meta_async(artifact, actor, req, meta))
     }
 
-    fn delete_block_inner(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
+    async fn delete_block_inner_async(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
         let block = req.block.trim().to_string();
-        let now_b = self.blocks_of(artifact)?.into_iter().find(|b| b.id == block);
+        let now_b = self.blocks_of_async(artifact).await?.into_iter().find(|b| b.id == block);
         if let Some(b) = now_b
             && actor != USER_ID
             && b.updated_by == USER_ID
@@ -534,28 +602,30 @@ impl Artifacts {
                 ..SuggestionChange::default()
             };
             let origin = meta.map(|m| m.origin.as_str());
-            let made = self.suggest_with_origin(
-                artifact,
-                actor,
-                origin,
-                &SuggestionCreate {
-                    block: block.clone(),
-                    base_rev: b.rev,
-                    change,
-                },
-            )?;
+            let made = self
+                .suggest_with_origin_async(
+                    artifact,
+                    actor,
+                    origin,
+                    &SuggestionCreate {
+                        block: block.clone(),
+                        base_rev: b.rev,
+                        change,
+                    },
+                )
+                .await?;
             return Ok(diverted(&block, b.rev, &made));
         }
         let ops = vec![BlockOp::DeleteBlock(BlockOpDeleteBlock { block_id: block })];
         let ack = match meta {
-            Some(m) => self.submit_with_meta(artifact, actor, &new_id(), ops, m)?,
-            None => self.submit(artifact, actor, &new_id(), ops)?,
+            Some(m) => self.submit_with_meta_async(artifact, actor, &new_id(), ops, m).await?,
+            None => self.submit_async(artifact, actor, &new_id(), ops).await?,
         };
         ack.results.into_iter().next().ok_or_else(|| refused(t("server.artifact.notApplied", &[])))
     }
 
-    pub fn preview_delete_block(&self, artifact: &str, req: &BlockDelete) -> Result<Preview, ApiError> {
-        let all = self.blocks_of(artifact)?;
+    pub async fn preview_delete_block_async(&self, artifact: &str, req: &BlockDelete) -> Result<Preview, ApiError> {
+        let all = self.blocks_of_async(artifact).await?;
         let Some(block) = all.iter().find(|b| b.id == req.block) else {
             return Err(refused(t("server.artifact.op.noBlock", &[("id", req.block.as_str().into())])));
         };
@@ -570,14 +640,15 @@ impl Artifacts {
     /// `follow`: each batch after `after`, then each from now on; `Reset`
     /// when too far behind.
     pub fn follow(&self, hub: &Hub, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
-        let (rx, missed, current) = {
-            let mut db = self.db();
-            self.found_blocks(&mut db, id)?;
+        let (rx, missed, current) = vibevalley_runtime::rt::block_on(async {
+            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+            self.found_blocks_async(&mut db, id).await?;
             // Subscribed before the catch-up is read; live ones are told by seq.
             let rx = self.changes.subscribe();
-            let missed = db::changes_after(&mut db, id, after, CATCH_UP_MAX as i64 + 1).map_err(q)?;
-            (rx, missed, db::blocks(&mut db, id).map_err(q)?)
-        };
+            let missed = db::changes_after(&mut db, id, after, CATCH_UP_MAX as i64 + 1).await.map_err(q)?;
+            let current = db::blocks(&mut db, id).await.map_err(q)?;
+            Ok::<_, ApiError>((rx, missed, current))
+        })?;
         let id = id.to_string();
         let hub_cancel = hub.child_token();
         let closed = self.cancel.clone();
@@ -604,29 +675,37 @@ impl Artifacts {
         Ok(())
     }
 
-    pub fn suggestions(&self, id: &str) -> Result<Vec<Suggestion>, ApiError> {
-        let mut db = self.db();
-        self.found_blocks(&mut db, id)?;
-        let mut list = db::suggestions(&mut db, id, SUGGESTIONS_LISTED).map_err(q)?;
-        self.hydrate_suggestion_offsets(&mut db, id, &mut list);
+    pub async fn suggestions_async(&self, id: &str) -> Result<Vec<Suggestion>, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+        self.found_blocks_async(&mut db, id).await?;
+        let mut list = db::suggestions(&mut db, id, SUGGESTIONS_LISTED).await.map_err(q)?;
+        self.hydrate_suggestion_offsets_async(&mut db, id, &mut list).await;
         Ok(list)
     }
 
-    fn publish_suggestions(&self, id: &str) -> Result<(), ApiError> {
-        let list = self.suggestions(id)?;
+    pub fn suggestions(&self, id: &str) -> Result<Vec<Suggestion>, ApiError> {
+        vibevalley_runtime::rt::block_on(self.suggestions_async(id))
+    }
+
+    async fn publish_suggestions_async(&self, id: &str) -> Result<(), ApiError> {
+        let list = self.suggestions_async(id).await?;
         let _ = self.suggestion_changes.send((id.to_string(), list));
         Ok(())
     }
 
-    pub fn suggest(&self, artifact: &str, actor: &str, req: &SuggestionCreate) -> Result<Suggestion, ApiError> {
-        self.suggest_with_origin(artifact, actor, None, req)
+    pub async fn suggest_async(&self, artifact: &str, actor: &str, req: &SuggestionCreate) -> Result<Suggestion, ApiError> {
+        self.suggest_with_origin_async(artifact, actor, None, req).await
     }
 
-    pub fn suggest_with_origin(&self, artifact: &str, actor: &str, origin: Option<&str>, req: &SuggestionCreate) -> Result<Suggestion, ApiError> {
+    pub fn suggest(&self, artifact: &str, actor: &str, req: &SuggestionCreate) -> Result<Suggestion, ApiError> {
+        vibevalley_runtime::rt::block_on(self.suggest_async(artifact, actor, req))
+    }
+
+    pub async fn suggest_with_origin_async(&self, artifact: &str, actor: &str, origin: Option<&str>, req: &SuggestionCreate) -> Result<Suggestion, ApiError> {
         let made = {
-            let mut db = self.db();
-            let row = self.found_blocks(&mut db, artifact)?;
-            let all_blocks = db::blocks(&mut db, artifact).map_err(q)?;
+            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
+            let row = self.found_blocks_async(&mut db, artifact).await?;
+            let all_blocks = db::blocks(&mut db, artifact).await.map_err(q)?;
             let block = all_blocks.iter().find(|b| b.id == req.block);
             let Some(block) = block.filter(|b| b.deleted != Some(true)) else {
                 return Err(refused(t("server.artifact.suggestion.noBlock", &[("id", req.block.as_str().into())])));
@@ -650,7 +729,7 @@ impl Artifacts {
 
             let (cursor_start, cursor_end, start_offset, end_offset, anchor_text, replacement_text) = if let Some(spans) = &req.change.text {
                 let new_text = plain(spans);
-                let (cs, ce, so, eo, orig, repl) = self.anchor_suggestion_range(&mut db, &row, &all_blocks, block, &new_text)?;
+                let (cs, ce, so, eo, orig, repl) = self.anchor_suggestion_range_async(&mut db, &row, &all_blocks, block, &new_text).await?;
                 (Some(cs), Some(ce), Some(so), Some(eo), Some(orig), Some(repl))
             } else {
                 (None, None, None, None, None, None)
@@ -659,6 +738,7 @@ impl Artifacts {
             // Coalesce overlapping/adjacent text-only suggestions from the same origin on the same block.
             if is_text_only && let (Some(so), Some(eo)) = (start_offset, end_offset) {
                 let open_same: Vec<StoredSuggestion> = db::stored_suggestions(&mut db, artifact, SUGGESTIONS_LISTED)
+                    .await
                     .map_err(q)?
                     .into_iter()
                     .filter(|s| {
@@ -720,12 +800,15 @@ impl Artifacts {
                             anchor_text: anchor_text.clone(),
                             replacement_text: replacement_text.clone(),
                         };
-                        db::update_suggestion(&mut db, &updated).map_err(q)?;
-                        let mut wire = db::suggestion(&mut db, &updated.wire.id).map_err(q)?.unwrap_or_else(|| updated.wire.clone());
-                        self.hydrate_suggestion_offsets(&mut db, artifact, std::slice::from_mut(&mut wire));
+                        db::update_suggestion(&mut db, &updated).await.map_err(q)?;
+                        let mut wire = db::suggestion(&mut db, &updated.wire.id)
+                            .await
+                            .map_err(q)?
+                            .unwrap_or_else(|| updated.wire.clone());
+                        self.hydrate_suggestion_offsets_async(&mut db, artifact, std::slice::from_mut(&mut wire)).await;
                         updated.wire = wire;
                         drop(db);
-                        self.publish_suggestions(artifact)?;
+                        self.publish_suggestions_async(artifact).await?;
                         return Ok(updated.wire);
                     }
                 }
@@ -753,42 +836,45 @@ impl Artifacts {
                 anchor_text,
                 replacement_text,
             };
-            db::add_suggestion(&mut db, &open).map_err(q)?;
+            db::add_suggestion(&mut db, &open).await.map_err(q)?;
             let mut made = db::suggestion(&mut db, &id)
+                .await
                 .map_err(q)?
                 .ok_or_else(|| refused(t("server.artifact.suggestion.missing", &[("id", id.as_str().into())])))?;
-            self.hydrate_suggestion_offsets(&mut db, artifact, std::slice::from_mut(&mut made));
+            self.hydrate_suggestion_offsets_async(&mut db, artifact, std::slice::from_mut(&mut made)).await;
             made
         };
-        self.publish_suggestions(artifact)?;
+        self.publish_suggestions_async(artifact).await?;
         Ok(made)
     }
 
-    fn open_stored_suggestion(&self, artifact: &str, suggestion: &str) -> Result<StoredSuggestion, ApiError> {
-        db::stored_suggestion(&mut self.db(), suggestion)
+    async fn open_stored_suggestion_async(&self, artifact: &str, suggestion: &str) -> Result<StoredSuggestion, ApiError> {
+        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+        db::stored_suggestion(&mut db, suggestion)
+            .await
             .map_err(q)?
             .filter(|s| s.wire.artifact_id == artifact)
             .ok_or_else(|| refused(t("server.artifact.suggestion.missing", &[("id", suggestion.into())])))
     }
 
-    fn resolve(&self, artifact: &str, row: &Suggestion, status: SuggestionStatus, actor: &str) -> Result<Suggestion, ApiError> {
+    async fn resolve_async(&self, artifact: &str, row: &Suggestion, status: SuggestionStatus, actor: &str) -> Result<Suggestion, ApiError> {
         let updated = {
-            let mut db = self.db();
-            db::resolve_suggestion(&mut db, &row.id, status.as_str(), now(), actor).map_err(q)?;
-            db::suggestion(&mut db, &row.id).map_err(q)?
+            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
+            db::resolve_suggestion(&mut db, &row.id, status.as_str(), now(), actor).await.map_err(q)?;
+            db::suggestion(&mut db, &row.id).await.map_err(q)?
         };
-        self.publish_suggestions(artifact)?;
+        self.publish_suggestions_async(artifact).await?;
         Ok(updated.unwrap_or_else(|| row.clone()))
     }
 
-    pub fn accept_suggestion(&self, artifact: &str, suggestion: &str, actor: &str) -> Result<Suggestion, ApiError> {
-        let _batches = self.batches.lock();
-        let stored = self.open_stored_suggestion(artifact, suggestion)?;
+    pub async fn accept_suggestion_async(&self, artifact: &str, suggestion: &str, actor: &str) -> Result<Suggestion, ApiError> {
+        let _batches = self.batches.lock().await;
+        let stored = self.open_stored_suggestion_async(artifact, suggestion).await?;
         let row = &stored.wire;
         if row.status != SuggestionStatus::Open {
             return Ok(row.clone());
         }
-        let block = self.blocks_of(artifact)?.into_iter().find(|b| b.id == row.block_id);
+        let block = self.blocks_of_async(artifact).await?.into_iter().find(|b| b.id == row.block_id);
         let Some(block) = block.filter(|b| b.deleted != Some(true)) else {
             return Err(refused(t("server.artifact.suggestion.noBlock", &[("id", row.block_id.as_str().into())])));
         };
@@ -797,7 +883,7 @@ impl Artifacts {
         let ops = if block.rev != row.base_rev {
             // When the block moved on, a persistent Loro `Cursor` anchor lets
             // text-only suggestions apply cleanly if the anchored span is intact.
-            if is_text_only && let Some(merged_text) = self.try_merge_cursor_suggestion(artifact, &block, &stored)? {
+            if is_text_only && let Some(merged_text) = self.try_merge_cursor_suggestion_async(artifact, &block, &stored).await? {
                 vec![BlockOp::UpdateText(BlockOpUpdateText {
                     block_id: block.id.clone(),
                     base_rev: block.rev,
@@ -838,7 +924,9 @@ impl Artifacts {
             ops
         };
         let accept_meta = commit_meta_for_actor(actor, Some(format!("accept suggestion {suggestion}")), now());
-        let ack = self.submit_locked(artifact, actor, &format!("suggestion:{suggestion}"), ops, Some(&accept_meta))?;
+        let ack = self
+            .submit_locked_async(artifact, actor, &format!("suggestion:{suggestion}"), ops, Some(&accept_meta))
+            .await?;
         if let Some(bad) = ack
             .results
             .iter()
@@ -846,23 +934,23 @@ impl Artifacts {
         {
             return Err(refused(bad.reason.clone().unwrap_or_else(|| t("server.artifact.notApplied", &[]))));
         }
-        self.resolve(artifact, row, SuggestionStatus::Accepted, actor)
+        self.resolve_async(artifact, row, SuggestionStatus::Accepted, actor).await
     }
 
-    pub fn reject_suggestion(&self, artifact: &str, suggestion: &str, actor: &str) -> Result<Suggestion, ApiError> {
-        let _batches = self.batches.lock();
-        let stored = self.open_stored_suggestion(artifact, suggestion)?;
+    pub async fn reject_suggestion_async(&self, artifact: &str, suggestion: &str, actor: &str) -> Result<Suggestion, ApiError> {
+        let _batches = self.batches.lock().await;
+        let stored = self.open_stored_suggestion_async(artifact, suggestion).await?;
         let row = &stored.wire;
         if row.status != SuggestionStatus::Open {
             return Ok(row.clone());
         }
-        self.resolve(artifact, row, SuggestionStatus::Rejected, actor)
+        self.resolve_async(artifact, row, SuggestionStatus::Rejected, actor).await
     }
 
     /// `suggestionStream`: the list now, then the whole list after each change.
     pub fn follow_suggestions(self: &Arc<Self>, hub: &Hub, id: &str, sink: Sink) -> Result<(), ApiError> {
         let mut rx = self.suggestion_changes.subscribe();
-        let first = self.suggestions(id)?;
+        let first = vibevalley_runtime::rt::block_on(self.suggestions_async(id))?;
         let id = id.to_string();
         let weak = Arc::downgrade(self);
         let hub_cancel = hub.child_token();
@@ -894,8 +982,7 @@ impl Artifacts {
                     }
                     Err(broadcast::error::RecvError::Lagged(_)) => {
                         let Some(a) = weak.upgrade() else { return };
-                        let aid = id.clone();
-                        let Ok(Ok(list)) = tokio::task::spawn_blocking(move || a.suggestions(&aid)).await else {
+                        let Ok(list) = a.suggestions_async(&id).await else {
                             return;
                         };
                         if !sink.send(&event(list)) {
@@ -910,7 +997,7 @@ impl Artifacts {
     }
 
     /// `fill`: Markdown read into blocks, as one batch.
-    pub(super) fn fill_with_meta(
+    pub(super) async fn fill_with_meta_async(
         &self,
         db: &mut SqliteConnection,
         id: &str,
@@ -918,11 +1005,11 @@ impl Artifacts {
         actor: &str,
         meta: &CommitMeta,
     ) -> Result<Option<BlockAck>, ApiError> {
-        self.fill_md_blocks_with_meta(db, id, blocks_of_markdown(markdown), actor, meta)
+        self.fill_md_blocks_with_meta_async(db, id, blocks_of_markdown(markdown), actor, meta).await
     }
 
     /// Inserts pre-parsed Markdown blocks as one atomic batch.
-    pub(super) fn fill_md_blocks_with_meta(
+    pub(super) async fn fill_md_blocks_with_meta_async(
         &self,
         db: &mut SqliteConnection,
         id: &str,
@@ -955,7 +1042,7 @@ impl Artifacts {
         if ops.is_empty() {
             return Ok(None);
         }
-        let (ack, _) = self.apply_batch(db, id, actor, &new_id(), &ops, Some(meta))?;
+        let (ack, _) = self.apply_batch_async(db, id, actor, &new_id(), &ops, Some(meta)).await?;
         Ok(Some(ack))
     }
 }
