@@ -3,13 +3,11 @@ use super::{Error, Read, Result, Signal, Store, Task, TaskStatus, Tx, WaitMode};
 use serde_json::{Value, json};
 use std::{
     collections::{HashMap, HashSet},
-    sync::{
-        Arc, Condvar, Mutex,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Arc, Condvar, Mutex, OnceLock},
     thread::{self, JoinHandle},
-    time::{Duration, Instant},
+    time::Duration,
 };
+use tokio_util::sync::{CancellationToken, DropGuard};
 
 const WOKEN: &str = "__durable_woken_signal";
 type Phase = Arc<dyn Fn(&TaskContext) -> Result<Transition> + Send + Sync>;
@@ -39,16 +37,40 @@ pub struct TaskContext {
     pub store: Store,
     pub signal: Option<Signal>,
     pub children: Vec<Task>,
-    cancelled: Arc<AtomicBool>,
-    stopped: flume::Receiver<()>,
+    cancel: CancellationToken,
+    done: CancellationToken,
+    _done_guard: DropGuard,
+    stopped: OnceLock<flume::Receiver<()>>,
 }
 impl TaskContext {
     pub fn is_cancelled(&self) -> bool {
-        self.cancelled.load(Ordering::Acquire)
+        self.cancel.is_cancelled()
+    }
+    pub fn cancel_token(&self) -> CancellationToken {
+        self.cancel.clone()
     }
     /// Disconnection wakes a phase blocked on an external model or tool.
     pub fn cancellation(&self) -> flume::Receiver<()> {
-        self.stopped.clone()
+        self.stopped
+            .get_or_init(|| {
+                let (tx, rx) = flume::bounded(0);
+                if self.cancel.is_cancelled() {
+                    drop(tx);
+                } else {
+                    let cancel = self.cancel.clone();
+                    let done = self.done.clone();
+                    crate::rt::spawn(async move {
+                        tokio::select! {
+                            biased;
+                            _ = cancel.cancelled() => {}
+                            _ = done.cancelled() => {}
+                        }
+                        drop(tx);
+                    });
+                }
+                rx
+            })
+            .clone()
     }
     fn live_task(&self, tx: &Read<'_>) -> Result<Task> {
         let task = tx.task(&self.task.id)?;
@@ -103,23 +125,10 @@ impl TaskContext {
     }
 }
 
-struct RunningPhase {
-    flag: Arc<AtomicBool>,
-    stop: Option<flume::Sender<()>>,
-}
-impl RunningPhase {
-    fn cancel(&mut self) {
-        self.flag.store(true, Ordering::Release);
-        self.stop.take();
-    }
-}
-
 struct Runtime {
-    active: HashMap<String, RunningPhase>,
+    active: HashMap<String, CancellationToken>,
     handlers: HashMap<(String, String), Phase>,
     started: bool,
-    closing: bool,
-    shutdown: Option<flume::Sender<()>>,
 }
 struct Engine {
     store: Store,
@@ -127,7 +136,7 @@ struct Engine {
     idle: Condvar,
     max_workers: usize,
     wake: flume::Sender<()>,
-    shutdown: flume::Receiver<()>,
+    shutdown: CancellationToken,
 }
 struct Owner {
     engine: Arc<Engine>,
@@ -137,12 +146,8 @@ impl Owner {
     fn close(&self) {
         let e = &self.engine;
         {
-            let mut rt = e.rt.lock().unwrap();
-            rt.closing = true;
-            rt.shutdown.take();
-            for c in rt.active.values_mut() {
-                c.cancel();
-            }
+            let _rt = e.rt.lock().unwrap();
+            e.shutdown.cancel();
         }
         let _ = e.wake.try_send(());
         if let Some(thread) = self.coordinator.lock().unwrap().take() {
@@ -163,20 +168,17 @@ impl Scheduler {
     pub fn new(store: Store, max_workers: usize) -> Self {
         let changes = store.subscribe_tasks().expect("scheduler requires an open durable store");
         let (wake, control) = flume::bounded(1);
-        let (shutdown_tx, shutdown) = flume::bounded(0);
         let engine = Arc::new(Engine {
             store,
             rt: Mutex::new(Runtime {
                 active: HashMap::new(),
                 handlers: HashMap::new(),
                 started: false,
-                closing: false,
-                shutdown: Some(shutdown_tx),
             }),
             idle: Condvar::new(),
             max_workers: if max_workers == 0 { 32 } else { max_workers },
             wake,
-            shutdown,
+            shutdown: CancellationToken::new(),
         });
         let e = Arc::clone(&engine);
         let thread = thread::Builder::new()
@@ -197,7 +199,7 @@ impl Scheduler {
     pub fn start(&self, task: Task) -> Result<(Task, bool)> {
         let e = &self.0.engine;
         let mut rt = e.rt.lock().unwrap();
-        if rt.closing {
+        if e.shutdown.is_cancelled() {
             return Err(Error::Closed);
         }
         let result = e.store.write(|tx| tx.create_task(task))?;
@@ -219,7 +221,7 @@ impl Scheduler {
     pub fn recover(&self) -> Result<()> {
         let e = &self.0.engine;
         let mut rt = e.rt.lock().unwrap();
-        if rt.closing {
+        if e.shutdown.is_cancelled() {
             return Err(Error::Closed);
         }
         let mut aborts = vec![];
@@ -254,7 +256,7 @@ impl Scheduler {
     pub fn abort(&self, id: &str) -> Result<()> {
         let e = &self.0.engine;
         let mut rt = e.rt.lock().unwrap();
-        if rt.closing {
+        if e.shutdown.is_cancelled() {
             return Err(Error::Closed);
         }
         let order = e.store.write(|tx| abort_tree(tx, id, "aborted"))?;
@@ -267,27 +269,40 @@ impl Scheduler {
     pub fn active_workers(&self) -> usize {
         self.0.engine.rt.lock().unwrap().active.len()
     }
-    pub fn wait(&self, id: &str, timeout: Duration) -> Result<Task> {
+    pub async fn wait_until_done(&self, id: &str, cancel: &CancellationToken) -> Result<Task> {
         let changes = self.store().subscribe_tasks()?;
-        let deadline = Instant::now() + timeout;
+        let id_owned = id.to_owned();
         loop {
-            let t = self.store().read(|r| r.task(id))?;
+            let store = self.store().clone();
+            let task_id = id_owned.clone();
+            let t = tokio::task::spawn_blocking(move || store.read(|r| r.task(&task_id)))
+                .await
+                .map_err(|_| Error::Closed)??;
             if t.status == TaskStatus::Terminal {
                 return Ok(t);
             }
-            if self.0.engine.rt.lock().unwrap().closing {
+            if self.0.engine.shutdown.is_cancelled() || cancel.is_cancelled() {
                 return Err(Error::Closed);
             }
-            match flume::Selector::new()
-                .recv(&changes, |r| r)
-                .recv(&self.0.engine.shutdown, |r| r)
-                .wait_deadline(deadline)
-            {
-                Ok(Ok(())) => {}
-                Ok(Err(_)) => return Err(Error::Closed),
-                Err(_) => return Err(Error::Timeout),
+            tokio::select! {
+                biased;
+                _ = cancel.cancelled() => return Err(Error::Closed),
+                _ = self.0.engine.shutdown.cancelled() => return Err(Error::Closed),
+                msg = changes.recv_async() => {
+                    if msg.is_err() {
+                        return Err(Error::Closed);
+                    }
+                }
             }
         }
+    }
+    pub fn wait(&self, id: &str, timeout: Duration) -> Result<Task> {
+        let never = CancellationToken::new();
+        crate::rt::block_on(async {
+            tokio::time::timeout(timeout, self.wait_until_done(id, &never))
+                .await
+                .map_err(|_| Error::Timeout)?
+        })
     }
     pub fn close(&self) {
         self.0.close();
@@ -296,8 +311,8 @@ impl Scheduler {
 
 fn record_abort(rt: &mut Runtime, ids: Vec<String>) {
     for id in ids {
-        if let Some(c) = rt.active.get_mut(&id) {
-            c.cancel();
+        if let Some(cancel) = rt.active.get(&id) {
+            cancel.cancel();
         }
     }
 }
@@ -382,7 +397,7 @@ fn run_scheduler(e: Arc<Engine>, changes: flume::Receiver<()>, control: flume::R
     loop {
         let timeout = {
             let mut rt = e.rt.lock().unwrap();
-            if rt.closing {
+            if e.shutdown.is_cancelled() {
                 break;
             }
             if rt.started {
@@ -453,15 +468,10 @@ fn dispatch(e: &Arc<Engine>, rt: &mut Runtime) -> Result<Option<Duration>> {
         Ok(())
     })?;
     for (task, signal, children) in claimed {
-        let cancel = Arc::new(AtomicBool::new(false));
-        let (stop, stopped) = flume::bounded(0);
-        rt.active.insert(
-            task.id.clone(),
-            RunningPhase {
-                flag: cancel.clone(),
-                stop: Some(stop),
-            },
-        );
+        let cancel = e.shutdown.child_token();
+        let done = CancellationToken::new();
+        let done_guard = done.clone().drop_guard();
+        rt.active.insert(task.id.clone(), cancel.clone());
         let handler = rt.handlers.get(&(task.kind.clone(), task.phase_name.clone())).cloned();
         let engine = e.clone();
         let tc = TaskContext {
@@ -469,8 +479,10 @@ fn dispatch(e: &Arc<Engine>, rt: &mut Runtime) -> Result<Option<Duration>> {
             signal,
             children,
             store: e.store.clone(),
-            cancelled: cancel,
-            stopped,
+            cancel,
+            done,
+            _done_guard: done_guard,
+            stopped: OnceLock::new(),
         };
         thread::spawn(move || {
             let started_ms = engine.store.now_ms();
@@ -501,7 +513,7 @@ fn dispatch(e: &Arc<Engine>, rt: &mut Runtime) -> Result<Option<Duration>> {
             };
             let mut final_outcome = outcome_label.to_owned();
             let mut rt = engine.rt.lock().unwrap();
-            if !rt.closing && !tc.is_cancelled() {
+            if !engine.shutdown.is_cancelled() && !tc.is_cancelled() {
                 match engine.store.write(|tx| advance(tx, &tc.task.id, outcome)) {
                     Ok(order) => {
                         if !order.is_empty() && final_outcome != "fail" {
@@ -619,6 +631,7 @@ fn advance(tx: &mut Tx<'_>, id: &str, outcome: Transition) -> Result<Vec<String>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Instant;
 
     #[test]
     fn settle_immediately_wakes_sleeping_task_without_polling() -> Result<()> {

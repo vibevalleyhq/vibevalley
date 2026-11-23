@@ -2,10 +2,9 @@
 
 use std::fs;
 use std::path::{Component, Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::sync::Arc;
-use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -260,15 +259,11 @@ fn resolve_workspace_path(workspace: &Path, rel: &str) -> Result<PathBuf, String
 }
 
 fn run_shell_grader(workspace: &Path, command: &str, timeout_secs: u64) -> GraderResult {
-    let mut child = match Command::new("sh")
-        .arg("-c")
-        .arg(command)
-        .current_dir(workspace)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-    {
-        Ok(c) => c,
+    let mut cmd = tokio::process::Command::new("sh");
+    cmd.arg("-c").arg(command).current_dir(workspace);
+
+    let output = match crate::rt::block_on(crate::oar::run_output_with_timeout(cmd, Duration::from_secs(timeout_secs), Some(8192))) {
+        Ok(out) => out,
         Err(err) => {
             return GraderResult {
                 kind: "shell".into(),
@@ -279,33 +274,10 @@ fn run_shell_grader(workspace: &Path, command: &str, timeout_secs: u64) -> Grade
         }
     };
 
-    let stdout = child.stdout.take();
-    let stderr = child.stderr.take();
-    let out_handle = thread::spawn(move || read_pipe_bounded(stdout, 8192));
-    let err_handle = thread::spawn(move || read_pipe_bounded(stderr, 8192));
+    let out_str = output.stdout_lossy();
+    let err_str = output.stderr_lossy();
 
-    let deadline = Instant::now() + Duration::from_secs(timeout_secs);
-    let mut timed_out = false;
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(st)) => break Some(st),
-            Ok(None) => {
-                if Instant::now() >= deadline {
-                    timed_out = true;
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    break None;
-                }
-                thread::sleep(Duration::from_millis(20));
-            }
-            Err(_) => break None,
-        }
-    };
-
-    let out_str = out_handle.join().unwrap_or_default();
-    let err_str = err_handle.join().unwrap_or_default();
-
-    if timed_out {
+    if output.timed_out {
         return GraderResult {
             kind: "shell".into(),
             passed: false,
@@ -314,8 +286,8 @@ fn run_shell_grader(workspace: &Path, command: &str, timeout_secs: u64) -> Grade
         };
     }
 
-    let code = status.and_then(|s| s.code()).unwrap_or(-1);
-    let passed = status.is_some_and(|s| s.success());
+    let code = output.code().unwrap_or(-1);
+    let passed = output.success();
     GraderResult {
         kind: "shell".into(),
         passed,
@@ -326,34 +298,6 @@ fn run_shell_grader(workspace: &Path, command: &str, timeout_secs: u64) -> Grade
         },
         details: json!({ "command": command, "exitCode": code, "stdout": out_str, "stderr": err_str }),
     }
-}
-
-fn read_pipe_bounded(pipe: Option<impl std::io::Read>, cap: usize) -> String {
-    let Some(mut pipe) = pipe else {
-        return String::new();
-    };
-    let mut buf = Vec::new();
-    let mut chunk = [0u8; 4096];
-    let mut truncated = false;
-    loop {
-        match pipe.read(&mut chunk) {
-            Ok(0) | Err(_) => break,
-            Ok(n) => {
-                let remaining = cap.saturating_sub(buf.len());
-                if remaining > 0 {
-                    buf.extend_from_slice(&chunk[..n.min(remaining)]);
-                }
-                if n > remaining {
-                    truncated = true;
-                }
-            }
-        }
-    }
-    let mut text = String::from_utf8_lossy(&buf).into_owned();
-    if truncated {
-        text.push_str("\n[truncated]");
-    }
-    text
 }
 
 fn run_rubric_grader(ctx: &GradeContext<'_>, markdown: &str, model_override: Option<&str>) -> GraderResult {

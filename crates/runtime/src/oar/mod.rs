@@ -30,6 +30,7 @@ pub mod subagent;
 pub mod voyage;
 
 pub use crate::oar::core::{OarObserver, StatusFold, derive_status, has_observer, rejection, set_observer};
+pub use crate::oar::process::{CommandOutput, run_output_with_timeout};
 pub use crate::oar::record::{RecordHeader, read_record_with_header};
 
 #[derive(Debug, thiserror::Error)]
