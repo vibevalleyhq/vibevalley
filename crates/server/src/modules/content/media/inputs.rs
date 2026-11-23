@@ -5,7 +5,6 @@ use crate::{
     Hub,
     base::{ServerDb, Ticker},
     modules::content::attachment::Attachments,
-    now,
 };
 use parking_lot::Mutex as SyncMutex;
 use sha2::{Digest, Sha256};
@@ -18,6 +17,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::Mutex as AsyncMutex;
+use vibevalley_core::{SharedClock, system_clock};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, AttachmentFile, BizCode, MediaInput, MediaInputKind, MediaInputPhase, MediaInputRequest, Preview, native_ops, ops};
 
@@ -38,6 +38,7 @@ pub struct Inputs {
     files: Arc<Attachments>,
     staging: PathBuf,
     sweeper: SyncMutex<Option<Ticker>>,
+    clock: SharedClock,
 }
 fn input(row: q::GetInputRow, can_delete: bool) -> Result<MediaInput, ApiError> {
     let m: MediaInputRequest = serde_json::from_str(&row.metadata).map_err(storage)?;
@@ -180,12 +181,17 @@ fn verify_content_blocking(path: &Path, expected_size: u64, expected_hash: &str)
 }
 impl Inputs {
     pub fn open(home: &Path, db: Arc<ServerDb>, files: Arc<Attachments>) -> Result<Arc<Self>, ApiError> {
+        Self::open_with_clock(home, db, files, system_clock())
+    }
+    /// Same as [`Inputs::open`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
+    pub fn open_with_clock(home: &Path, db: Arc<ServerDb>, files: Arc<Attachments>, clock: SharedClock) -> Result<Arc<Self>, ApiError> {
         let inputs = Arc::new(Self {
             db,
             inner: AsyncMutex::new(Inner { uploading: HashSet::new() }),
             files,
             staging: home.join("attachments/.staging/media"),
             sweeper: SyncMutex::new(None),
+            clock,
         });
         vibevalley_runtime::rt::block_on(async {
             inputs.restore_async().await?;
@@ -236,7 +242,7 @@ impl Inputs {
         validate::declared(r)?;
         self.sweep_async().await?;
         let id = uuid::Uuid::now_v7().to_string();
-        let time = now();
+        let time = self.clock.now_ms();
         let _inner = self.inner.lock().await;
         let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
         let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(storage)?;
@@ -308,9 +314,14 @@ impl Inputs {
         let inner = self.inner.lock().await;
         let ids = {
             let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
-            q::expired_inputs(&mut *conn, q::ExpiredInputsParams { expires_at: now() })
-                .await
-                .map_err(storage)?
+            q::expired_inputs(
+                &mut *conn,
+                q::ExpiredInputsParams {
+                    expires_at: self.clock.now_ms(),
+                },
+            )
+            .await
+            .map_err(storage)?
         };
         for row in ids {
             let id = row.id;
@@ -357,7 +368,7 @@ impl Inputs {
             if r.phase == MediaInputPhase::Ready {
                 return Ok(r);
             }
-            if r.phase == MediaInputPhase::Deleting || inner.uploading.contains(id) || r.expires_at <= now() || inner.uploading.len() >= 8 {
+            if r.phase == MediaInputPhase::Deleting || inner.uploading.contains(id) || r.expires_at <= self.clock.now_ms() || inner.uploading.len() >= 8 {
                 return Err(refused("inputBusy"));
             }
             remove_dir_async(self.staging.join(id)).await?;
@@ -409,7 +420,7 @@ impl Inputs {
                 &mut *conn,
                 q::InputReadyParams {
                     id: r.id.clone(),
-                    expires_at: now() + LIFETIME,
+                    expires_at: self.clock.now_ms() + LIFETIME,
                 },
             )
             .await
@@ -471,7 +482,7 @@ impl Inputs {
     }
     pub async fn content_async(&self, id: &str) -> Result<AttachmentFile, ApiError> {
         let r = self.get_async(id).await?;
-        if r.phase != MediaInputPhase::Ready || (r.can_delete && r.expires_at <= now()) {
+        if r.phase != MediaInputPhase::Ready || (r.can_delete && r.expires_at <= self.clock.now_ms()) {
             return Err(refused("inputMissing"));
         }
         let hash = r.hash.clone().ok_or_else(|| refused("inputMissing"))?;
@@ -501,7 +512,7 @@ impl Inputs {
                 Some(h) => tokio::fs::metadata(self.files.path_of(h)).await.is_ok_and(|m| m.is_file()),
                 None => false,
             };
-            if r.phase != MediaInputPhase::Ready || (r.can_delete && r.expires_at <= now()) || !has_file {
+            if r.phase != MediaInputPhase::Ready || (r.can_delete && r.expires_at <= self.clock.now_ms()) || !has_file {
                 return Err(refused("inputMissing"));
             }
             q::pin_input(
@@ -612,5 +623,76 @@ impl crate::transport::api::media::MediaInputs for Inputs {
     }
     fn content(&self, id: &str) -> Result<AttachmentFile, ApiError> {
         vibevalley_runtime::rt::block_on(self.content_async(id))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use serde_json::json;
+    use vibevalley_core::{Clock, ManualClock};
+
+    use super::*;
+
+    fn png_request() -> MediaInputRequest {
+        serde_json::from_value(json!({ "kind": "image", "mime": "image/png", "name": "sample.png", "size": 24 })).unwrap()
+    }
+
+    fn png_bytes() -> Vec<u8> {
+        let mut bytes = b"\x89PNG\r\n\x1a\n".to_vec();
+        bytes.resize(24, 0);
+        bytes
+    }
+
+    #[test]
+    fn manual_clock_drives_input_ttl_expiry_and_pin_protection_without_sleep() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = ServerDb::open(dir.path()).unwrap();
+        let files = Attachments::open(dir.path(), db.clone());
+        let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+        let inputs = Inputs::open_with_clock(dir.path(), db.clone(), files, clock.clone()).unwrap();
+
+        // Reserve and upload; uploading refreshes `expires_at` from the current clock.
+        let reserved = inputs.create(&png_request()).unwrap();
+        assert_eq!(reserved.created_at, 1_700_000_000_000);
+        assert_eq!(reserved.expires_at, 1_700_000_000_000 + LIFETIME);
+
+        clock.advance(Duration::from_secs(60));
+        let ready = inputs.upload(&reserved.id, Cursor::new(png_bytes())).unwrap();
+        assert_eq!(ready.expires_at, clock.now_ms() + LIFETIME);
+
+        // Just before expiry, the input stays readable and survives sweep.
+        clock.advance(Duration::from_millis((LIFETIME - 1) as u64));
+        inputs.sweep().unwrap();
+        assert!(inputs.content(&ready.id).is_ok());
+
+        // At expiry, content is refused and sweep deletes the unpinned record.
+        clock.advance(Duration::from_millis(1));
+        assert!(inputs.content(&ready.id).is_err());
+        inputs.sweep().unwrap();
+        assert!(inputs.list().unwrap().is_empty());
+
+        // An unuploaded reservation expires past LIFETIME and refuses upload.
+        let pending = inputs.create(&png_request()).unwrap();
+        clock.advance(Duration::from_millis(LIFETIME as u64));
+        assert!(inputs.upload(&pending.id, Cursor::new(png_bytes())).is_err());
+        inputs.sweep().unwrap();
+        assert!(inputs.list().unwrap().is_empty());
+
+        // A pinned input survives sweep past LIFETIME until released.
+        let pinned = inputs.create(&png_request()).unwrap();
+        let pinned = inputs.upload(&pinned.id, Cursor::new(png_bytes())).unwrap();
+        inputs.pin(std::slice::from_ref(&pinned.id), "job-1").unwrap();
+        clock.advance(Duration::from_millis(LIFETIME as u64));
+        inputs.sweep().unwrap();
+        assert!(inputs.content(&pinned.id).is_ok());
+        inputs.release("job-1").unwrap();
+        assert!(inputs.content(&pinned.id).is_err());
+        inputs.sweep().unwrap();
+        assert!(inputs.list().unwrap().is_empty());
+
+        inputs.close();
+        db.close();
     }
 }

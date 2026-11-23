@@ -22,12 +22,13 @@ use serde_json::{Value, json};
 use sqlx::{Connection, SqliteConnection};
 use tokio::sync::{Mutex as AsyncMutex, OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
+use vibevalley_core::{SharedClock, system_clock};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, Attachment, BizCode, Caller, Fact, JsNumber, MediaAudioFormat, MediaAudioMetadata, MediaAudioMetadataSource, MediaAudioResult, MediaCleanup,
     MediaCloneRequest, MediaImageJob, MediaImageJobKind, MediaImageRequest, MediaInputKind, MediaInputReference, MediaInputRequest, MediaJob, MediaPhase,
     MediaSource, MediaSpeakersRequest, MediaSpeechJob, MediaSpeechJobKind, MediaSpeechRequest, MediaTranscriptionRequest, MediaUnderstandingPhase,
-    MediaUnderstandingRequest, MediaUnderstandingResult, MediaVoiceDesignRequest, Preview, ops,
+    MediaUnderstandingRequest, MediaUnderstandingResult, MediaVoiceDesignRequest, Millis, Preview, ops,
 };
 
 use super::remote::{RemoteFile, RemoteState};
@@ -41,7 +42,6 @@ use crate::modules::content::media::inputs::Inputs;
 use crate::modules::infra::http::{Fetch, Request, public_https};
 use crate::modules::infra::provider::{IMAGE_MODELS, Use};
 use crate::modules::infra::setting::Setting;
-use crate::now;
 use crate::ports::ChannelAnnouncePort;
 
 /// Jobs active at once, every kind together.
@@ -342,8 +342,7 @@ pub(super) struct Record {
 }
 
 impl Record {
-    pub(super) fn new(ask: Ask, source: MediaSource, connection: String, revision: i64, model: String, fingerprint: String) -> Record {
-        let at = now();
+    pub(super) fn new(ask: Ask, source: MediaSource, connection: String, revision: i64, model: String, fingerprint: String, at: Millis) -> Record {
         Record {
             ask,
             source,
@@ -546,6 +545,7 @@ pub struct Jobs {
     pub(super) inputs: Arc<Inputs>,
     pub(super) channel: Arc<dyn ChannelAnnouncePort>,
     hub: Weak<Hub>,
+    clock: SharedClock,
     closed: AtomicBool,
     me: OnceLock<Weak<Jobs>>,
     streams: Mutex<HashMap<String, Stream>>,
@@ -555,6 +555,11 @@ pub struct Jobs {
 
 impl Jobs {
     pub fn open(p: Parts) -> Result<Arc<Jobs>, ApiError> {
+        Self::open_with_clock(p, system_clock())
+    }
+
+    /// Same as [`Jobs::open`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
+    pub fn open_with_clock(p: Parts, clock: SharedClock) -> Result<Arc<Jobs>, ApiError> {
         let cancel = p.hub.upgrade().map(|h| h.child_token()).unwrap_or_default();
         let jobs = Arc::new(Jobs {
             db: p.db,
@@ -570,6 +575,7 @@ impl Jobs {
             inputs: p.inputs,
             channel: p.channel,
             hub: p.hub,
+            clock,
             closed: AtomicBool::new(false),
             me: OnceLock::new(),
             streams: Mutex::default(),
@@ -657,8 +663,12 @@ impl Jobs {
         Self::decode_rows(q::authorized_jobs(&mut *db).await.map_err(storage)?)
     }
 
-    async fn save_db(db: &mut SqliteConnection, r: &mut Record) -> Result<(), ApiError> {
-        r.updated_at = now();
+    pub(super) fn now_ms(&self) -> Millis {
+        self.clock.now_ms()
+    }
+
+    async fn save_db(db: &mut SqliteConnection, r: &mut Record, at: Millis) -> Result<(), ApiError> {
+        r.updated_at = at;
         q::save_job(
             db,
             q::SaveJobParams {
@@ -688,7 +698,7 @@ impl Jobs {
             Ok(jobs) => {
                 if let Some(hub) = self.hub.upgrade() {
                     let jobs = jobs.iter().map(Record::view).collect();
-                    hub.apply(vec![Fact::MediaChanged(vibevalley_protocol::FactMediaChanged { at: now(), jobs })]);
+                    hub.apply(vec![Fact::MediaChanged(vibevalley_protocol::FactMediaChanged { at: self.now_ms(), jobs })]);
                 }
             }
             Err(e) => eprintln!("media: {}", e.message),
@@ -712,7 +722,7 @@ impl Jobs {
             if !was_active && active(r.phase) {
                 Self::require_capacity_db(&mut tx).await?;
             }
-            Self::save_db(&mut tx, &mut r).await?;
+            Self::save_db(&mut tx, &mut r, self.now_ms()).await?;
             tx.commit().await.map_err(storage)?;
         }
         self.publish_async().await;
@@ -768,7 +778,7 @@ impl Jobs {
             if !ids.is_empty() {
                 self.inputs.pin_in_async(&mut tx, &ids, r.id()).await?;
             }
-            Self::save_db(&mut tx, &mut r).await?;
+            Self::save_db(&mut tx, &mut r, self.now_ms()).await?;
             tx.commit().await.map_err(storage)?;
             if let Some(held) = held {
                 self.hold(r.id(), held);
@@ -809,6 +819,7 @@ impl Jobs {
             account.revision,
             account.model.clone(),
             account.fingerprint.clone(),
+            self.now_ms(),
         );
         self.admit_async(r, Some(Held::Image { account, body })).await.map(|r| image_view(&r))
     }
@@ -879,6 +890,7 @@ impl Jobs {
             account.revision,
             account.model.clone(),
             account.fingerprint.clone(),
+            self.now_ms(),
         );
         self.admit_async(r, Some(Held::Speech { account, body })).await.map(|r| speech_view(&r))
     }
