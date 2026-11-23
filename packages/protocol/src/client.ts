@@ -93,6 +93,33 @@ export class VibeValleyApi {
     },
   };
 
+  readonly debug = {
+    snapshot: (options?: { signal?: AbortSignal }): Promise<T.DebugSnapshot> =>
+      this.call<T.DebugSnapshot>("debug.snapshot", "/api/v1/debug/snapshot", undefined, options),
+    graph: (options?: { signal?: AbortSignal }): Promise<T.DebugGraph> => this.call<T.DebugGraph>("debug.graph", "/api/v1/debug/graph", undefined, options),
+    timeline: {
+      list: (a: T.DebugTimelineQuery, options?: { signal?: AbortSignal }): Promise<T.DebugTimelinePage> =>
+        this.call<T.DebugTimelinePage>("debug.timeline.list", "/api/v1/debug/timeline/list", a, options),
+      clear: (options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("debug.timeline.clear", "/api/v1/debug/timeline/clear", undefined, options),
+    },
+    trajectory: {
+      list: (options?: { signal?: AbortSignal }): Promise<T.DebugTrajectorySummary[]> =>
+        this.call<T.DebugTrajectorySummary[]>("debug.trajectory.list", "/api/v1/debug/trajectory/list", undefined, options),
+      get: (a: T.DebugTrajectoryGetRequest, options?: { signal?: AbortSignal }): Promise<T.DebugTrajectoryDetail> =>
+        this.call<T.DebugTrajectoryDetail>("debug.trajectory.get", "/api/v1/debug/trajectory/get", a, options),
+    },
+    override: {
+      get: (options?: { signal?: AbortSignal }): Promise<T.DebugOverrideConfig> =>
+        this.call<T.DebugOverrideConfig>("debug.override.get", "/api/v1/debug/override/get", undefined, options),
+      set: (a: T.DebugOverrideConfig, options?: { signal?: AbortSignal }): Promise<T.DebugOverrideConfig> =>
+        this.call<T.DebugOverrideConfig>("debug.override.set", "/api/v1/debug/override/set", a, options),
+    },
+    bundle: {
+      export: (options?: { signal?: AbortSignal }): Promise<T.DebugBundleResult> =>
+        this.call<T.DebugBundleResult>("debug.bundle.export", "/api/v1/debug/bundle/export", undefined, options),
+    },
+  };
+
   readonly orchestrator = {
     open: (options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("orchestrator.open", "/api/v1/orchestrator/open", undefined, options),
     /** Ends the orchestrator's run under way and drops what waits for it; the sessions it sent keep working. */

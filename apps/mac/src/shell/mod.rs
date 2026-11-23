@@ -4,6 +4,7 @@
 //! All backend work runs on background threads (`Shell::bg`); results come
 //! back to the UI thread and are pushed to the views as frames.
 
+mod devtools;
 mod host_bridge;
 mod menus;
 mod palette;
@@ -12,6 +13,7 @@ mod projects;
 mod render;
 mod settings;
 
+pub use devtools::devtools_enabled;
 pub use menus::{bind_keys, update_menus};
 
 use std::collections::{BTreeSet, HashMap};
@@ -118,6 +120,7 @@ pub struct Shell {
     pub native_pixel: Option<PixelSlot>,
     pub global_rail_width: f32,
     pub palette: Option<Palette>,
+    pub devtools: devtools::DevtoolsSlot,
     pub panel: Panel,
     pub inspector_open: bool,
     pub inspector_width: f32,
@@ -147,13 +150,13 @@ impl Shell {
         let sidebar = cx.new(|cx| HostedView::new("sidebar", serde_json::from_value(json!({"contextual":true})).unwrap(), dark, window, cx));
         let sub = cx.subscribe_in(&sidebar, window, |this, _, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(action) => this.on_action(action.clone(), window, cx),
-            HostedEvent::HostCall { op, payload, reply } => this.host_call(op, payload.clone(), reply.clone(), window, cx),
+            HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
             HostedEvent::Ready => this.push_sidebar(cx),
         });
         let inspector = cx.new(|cx| HostedView::new("sidebar", serde_json::from_value(json!({"role":"inspector"})).unwrap(), dark, window, cx));
         let inspector_sub = cx.subscribe_in(&inspector, window, |this, _, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(action) => this.on_action(action.clone(), window, cx),
-            HostedEvent::HostCall { op, payload, reply } => this.host_call(op, payload.clone(), reply.clone(), window, cx),
+            HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
             HostedEvent::Ready => this.push_sidebar(cx),
         });
         let workbench = cx.new(|cx| {
@@ -167,7 +170,7 @@ impl Shell {
         });
         let workbench_sub = cx.subscribe_in(&workbench, window, |this, _, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(action) => this.on_action(action.clone(), window, cx),
-            HostedEvent::HostCall { op, payload, reply } => this.host_call(op, payload.clone(), reply.clone(), window, cx),
+            HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
             HostedEvent::Ready => {
                 this.workbench_ready = true;
                 this.finish_opening(true, cx);
@@ -183,6 +186,7 @@ impl Shell {
         })
         .detach();
         let quit = cx.on_app_quit(|this: &mut Shell, cx| {
+            this.close_devtools(cx);
             this.island = None;
             this.island_client = None;
             crate::live_voice::stop(None);
@@ -261,6 +265,7 @@ impl Shell {
             native_pixel: None,
             global_rail_width: 76.0,
             palette: None,
+            devtools: devtools::DevtoolsSlot::new(devtools_enabled()),
             panel: Panel::Files,
             inspector_open: Ui::get(cx).settings.inspector_open,
             inspector_width: Ui::get(cx).settings.inspector_width,
@@ -371,6 +376,7 @@ impl Shell {
             Err(error) => eprintln!("island: {error}"),
         }
         shell.publish_host_debug(cx);
+        shell.start_devtools_refresh(cx);
         shell.load(cx);
         shell
     }
@@ -421,9 +427,9 @@ impl Shell {
                 "framesSeen": view.frames_seen,
             })
         });
-        handle.update(json!({
+        let routes = json!({
+            "current": self.last_route.as_deref().unwrap_or("/issues"),
             "loaded": self.loaded,
-            "route": self.last_route.as_deref().unwrap_or("/issues"),
             "nativeWorkspace": self.native_workspace,
             "panel": self.panel.as_str(),
             "sidebarVisible": self.sidebar_visible,
@@ -431,9 +437,30 @@ impl Shell {
             "activeProjectId": active_project,
             "projects": projects,
             "activePixel": active_pixel,
-            "liveTerminals": self.terminals.len(),
-            "openPanes": self.panes.len(),
-        }));
+        });
+        let caches = vec![
+            crate::hosted::DebugCacheEntry {
+                name: "panes".into(),
+                entries: self.panes.len() as u32,
+                detail: Some("open pane entities".into()),
+            },
+            crate::hosted::DebugCacheEntry {
+                name: "terminals".into(),
+                entries: self.terminals.len() as u32,
+                detail: Some("live terminal views".into()),
+            },
+            crate::hosted::DebugCacheEntry {
+                name: "projects".into(),
+                entries: self.projects.len() as u32,
+                detail: Some("loaded project views".into()),
+            },
+            crate::hosted::DebugCacheEntry {
+                name: "chatWatches".into(),
+                entries: self.chat_watches.len() as u32,
+                detail: Some("active chat status watches".into()),
+            },
+        ];
+        handle.update_shell(routes, caches);
     }
 
     /// Runs `work` on a background thread, then `then` on the UI thread.
@@ -499,6 +526,7 @@ impl Shell {
                         && route != "/issues"
                     {
                         this.last_route = Some(route.clone());
+                        this.sync_devtools_route(&route);
                         this.workbench.update(cx, |v, cx| v.navigate(&route, cx));
                     }
                     if Ui::get(cx).colors.dark != was_dark {

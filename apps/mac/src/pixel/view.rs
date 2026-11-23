@@ -32,8 +32,7 @@ use vibevalley_protocol::{AchievementList, ActWords, BoardSlice, CollabSlice, Fa
 pub enum PixelEvent {
     Sound(&'static str),
     HostCall {
-        op: String,
-        payload: Value,
+        op: vibevalley_protocol::HostOp,
         reply: crate::hosted::Replier,
     },
     /// A VibeValley page (`/issues/<id>`, `/agents`…), hosted.
@@ -462,9 +461,8 @@ impl PixelView {
                 }
                 cx.notify();
             }
-            HostedEvent::HostCall { op, payload, reply } => cx.emit(PixelEvent::HostCall {
+            HostedEvent::HostCall { op, reply } => cx.emit(PixelEvent::HostCall {
                 op: op.clone(),
-                payload: payload.clone(),
                 reply: reply.clone(),
             }),
             _ => {}

@@ -429,6 +429,23 @@ impl Fleet {
         out
     }
 
+    /// Pure read-only view of cached runtime probes without spawning background probes.
+    pub fn cached_runtimes(&self) -> Vec<RuntimeInfo> {
+        let mut out: Vec<RuntimeInfo> = self
+            .ids()
+            .into_iter()
+            .map(|id| match self.held(&id) {
+                Some(hit) => {
+                    let settings = self.profiles.settings(&id);
+                    Self::shown(RuntimeInfo { settings, ..hit.info })
+                }
+                None => self.placeholder(&id, 0),
+            })
+            .collect();
+        out.sort_by_key(Self::runtime_order);
+        out
+    }
+
     /// `refresh` (blocking): none for a runtime the farm does not know.
     pub fn refresh(&self, id: &str) -> Option<RuntimeInfo> {
         if !self.known(id) || self.closed.load(Ordering::Relaxed) {

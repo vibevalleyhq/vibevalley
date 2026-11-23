@@ -155,7 +155,7 @@ const SessionEventType = z.enum(T.SessionEventTypeValues) satisfies Codec<T.Sess
 
 const ToolAction = z.enum(T.ToolActionValues) satisfies Codec<T.ToolAction>;
 
-const EventTokens = z.object({
+export const EventTokens = z.object({
   input: z.number(),
   cacheRead: z.number(),
   output: z.number(),

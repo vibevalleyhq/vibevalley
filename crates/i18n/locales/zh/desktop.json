@@ -20,6 +20,7 @@
     "view": "显示",
     "toggleSidebar": "切换侧边栏",
     "toggleTheme": "切换主题",
+    "toggleDevtools": "切换开发者工具",
     "resetZoom": "实际大小",
     "zoomIn": "放大",
     "zoomOut": "缩小",

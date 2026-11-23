@@ -109,6 +109,10 @@ impl Server for LateServer {
         self.cell.get().and_then(|s| s.host_debug())
     }
 
+    fn fault_gate(&self) -> Option<vibevalley_server::SharedFaultGate> {
+        self.cell.get().and_then(|s| s.fault_gate())
+    }
+
     fn voice(&self) -> Option<Arc<vibevalley_server::modules::collab::voice::Voice>> {
         self.cell.get().and_then(|s| s.voice())
     }

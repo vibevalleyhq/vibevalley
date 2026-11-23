@@ -22,8 +22,8 @@
 | `scripts/{gen,audit,docs,release}/` | 工程脚本：`gen/`（生成物写出）、`audit/`（lint 插件、死代码、注释审查）、`docs/`（Note、链接、术语与旧名检查）、`release/`（发版、回归与验收沙箱） |
 | `crates/server/src/lib.rs`、`crates/server/src/start.rs` | `Hub`（状态、端点表、事实）与按序打开各模块的 `start` |
 | `crates/server/src/db/{schema,queries,generated}/` | 服务端 13 组 SQLite 建表语句（含 `shared.sql` 共享 `seq_counter`）、命名查询（`*.sql`）与 sqlc 生成的 SQLx 查询模块（`*.rs`，由边界测试锁死仅限所属域模块调用） |
-| `crates/server/src/modules/`、`crates/server/src/transport/` | 按六大域分组的业务模块（`work`、`team`、`collab`、`content`、`skin`、`infra`）与传输层（`api`、`bridge`、`http`） |
-| `crates/protocol/src/contract/`、`crates/protocol/tests/typescript.rs`、`crates/protocol/src/home.rs` | 线上类型（含 5 域切片、`FarmFrame` 与 `host.rs` 壳协议，`ts-rs` 写出 `packages/protocol` 的 `*.gen.ts`，`vp run protocol:check` 查最新）与家目录约定（`server.json`、语言） |
+| `crates/server/src/modules/`、`crates/server/src/transport/` | 按六大域分组的业务模块（`work`、`team`、`collab`、`content`、`skin`、`infra`，含 `infra/debug/` `DebugKit`）与传输层（`api`、`bridge`、`http`） |
+| `crates/protocol/src/contract/`、`crates/protocol/tests/typescript.rs`、`crates/protocol/src/home.rs` | 线上类型（含 5 域切片、`FarmFrame`、`debug.rs` 的 `DebugKit` 与 `host.rs` 的 `Host*` 帧/`HostAction`/`HostOp` 壳协议，`ts-rs` 写出 `packages/protocol` 的 `*.gen.ts`，`vp run protocol:check` 查最新）与家目录约定（`server.json`、语言） |
 | `crates/core/src/` | 纯规则中心：`reduce`、`SliceMask` 与按域切片投影、状态派生、收件箱、依赖、定时任务（`cron/`）、笔记大纲（`pkm/`）、作品引擎（`artifact/`） |
 | `crates/runtime/src/` | 进程级共享 Tokio 运行时 `rt.rs`（`vibevalley_runtime::rt::{handle, spawn, block_on}`）、`oar/` 驱动与自研 `agent/` 持久对话引擎（`execution.db`） |
 | `crates/rich/`、`crates/engines/{onig,pele,shiki}` | 原生富内容组件与内部引擎（`canvas`、`chart`、`genui`、`pinyin`）及底层正则/高亮/图谱引擎 |
@@ -52,7 +52,8 @@
 
 ### 异步、资源与错误
 
-- **边界解码一次，门内全是类型**：HTTP 的入参经 `decode`（`crates/server/src/lib.rs`，serde）按端点的类型解成结构体，解不开当场拒绝；文件、厂商响应、模型给的工具参数各在进门处解成结构体和 enum。门内不传 `serde_json::Value`，不按字符串分支。
+- **边界解码一次，门内全是类型**：HTTP 的入参经 `decode`（`crates/server/src/lib.rs`，serde）按端点的类型解成结构体，解不开当场拒绝；GPUI 宿主桥的全部 40 个 `host.*` 调用在入口经 `HostOp::from_wire`（`crates/protocol/src/contract/host.rs`）一次性解码为封闭枚举后穷尽分发；文件、厂商响应、模型给的工具参数各在进门处解成结构体和 enum。门内不传 `serde_json::Value`，不按字符串分支。
+- **统一结构化日志**：根 `Cargo.toml` 声明工作区 `tracing` 与 `tracing-subscriber`；`vibevalley-server` 与 `vibevalley-mac` 启动调用 `try_init()` 读取 `VIBEVALLEY_LOG`／`RUST_LOG`（未设且 `VIBEVALLEY_DEBUG=1` 时默认 `info`，否则 `warn`）。
 - **钥匙是 `Secret`**：`settings.json` 里的钥匙读成 `Secret`（`crates/server/src/modules/infra/setting.rs`），打印只出提示。
 - **拒绝带 `BizCode`**：对调用方的拒绝是 `ApiError`（带 `bizCode` 与 `next`），网关写成全信封；模块内部可分辨的失败是 `thiserror` 的 enum；预期的结果（合进去或冲突）返回 enum，不当错误。
 - **同步领域接口，共享异步底座**。领域模块保留同步接口，内部互斥锁统一用 `parking_lot`（无毒化），全局热读观察者与脊柱插槽用 `arc-swap` 无锁读取，重试退避用 `backon`。全进程共享唯一多线 Tokio 运行时 `vibevalley_runtime::rt`（工作线程 `vibevalley-io-{n}`，初始化即安装 `rustls` `ring` 提供方），集中承载 `axum` HTTP 门、工作区 `reqwest` 出站调用、`SliceFeed`/`WatchStream`、`BridgeHub`、`EventBus`、MCP 客户端与原生语音流；取消与停机经 `tokio_util::sync::CancellationToken` 与 `TaskTracker` 级联收敛。SQLx 的 SQLite 工作线程执行查询，同步阻塞工作显式走 `spawn_blocking` 或后台线程。

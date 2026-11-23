@@ -25,7 +25,15 @@ fn env(name: &str) -> Option<String> {
     std::env::var(name).ok().filter(|v| !v.is_empty())
 }
 
+fn init_tracing() {
+    let default_level = if env("VIBEVALLEY_DEBUG").as_deref() == Some("1") { "info" } else { "warn" };
+    let spec = env("VIBEVALLEY_LOG").or_else(|| env("RUST_LOG")).unwrap_or_else(|| default_level.to_string());
+    let filter = tracing_subscriber::EnvFilter::try_new(&spec).unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(default_level));
+    let _ = tracing_subscriber::fmt().with_env_filter(filter).with_writer(std::io::stderr).try_init();
+}
+
 fn main() {
+    init_tracing();
     if let Err(why) = run() {
         eprintln!("vibevalley: {why}");
         std::process::exit(1);

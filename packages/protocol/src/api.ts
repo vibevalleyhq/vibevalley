@@ -5,6 +5,7 @@ import { type ChannelHandlers, channelEndpoints } from "./channel/api";
 import { type ConnectorHandlers, connectorEndpoints } from "./connector/api";
 import { type CoreHandlers, coreEndpoints } from "./core/api";
 import { type CronHandlers, cronEndpoints } from "./cron/api";
+import { type DebugHandlers, debugEndpoints } from "./debug/api";
 import type { Endpoint } from "./endpoint";
 import { type GameHandlers, gameEndpoints } from "./game/api";
 import { type IssueHandlers, issueEndpoints } from "./issue/api";
@@ -26,6 +27,7 @@ export type { ChannelHandlers } from "./channel/api";
 export type { ConnectorHandlers } from "./connector/api";
 export type { CoreHandlers } from "./core/api";
 export type { CronHandlers } from "./cron/api";
+export type { DebugHandlers } from "./debug/api";
 export type { GameHandlers } from "./game/api";
 export type { IssueHandlers } from "./issue/api";
 export type { AttachmentHandlers } from "./attachment/api";
@@ -44,6 +46,7 @@ export type { VoiceHandlers } from "./voice/api";
 export interface Handlers
   extends
     CoreHandlers,
+    DebugHandlers,
     OrchestratorHandlers,
     SettingHandlers,
     ProviderHandlers,
@@ -65,6 +68,7 @@ export interface Handlers
 
 export const endpoints: readonly Endpoint[] = [
   ...coreEndpoints,
+  ...debugEndpoints,
   ...orchestratorEndpoints,
   ...settingEndpoints,
   ...providerEndpoints,

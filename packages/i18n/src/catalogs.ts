@@ -1063,6 +1063,109 @@ export const catalogs = {
         newCode: "换一个码",
       },
     },
+    "web.devtools": {
+      title: "开发者工具",
+      tabs: { overview: "概览", routes: "路由", timeline: "时间线", trajectory: "轨迹", state: "状态与缓存", lab: "实验与覆盖" },
+      actions: {
+        refresh: "刷新",
+        autoRefresh: "自动刷新",
+        pause: "暂停",
+        resume: "继续",
+        detach: "独立窗口打开",
+        close: "关闭",
+        clear: "清空",
+        exportBundle: "导出诊断包",
+        exporting: "正在导出…",
+        copy: "复制",
+        copied: "已复制",
+        apply: "应用",
+        reset: "重置",
+        disconnect: "模拟断开",
+      },
+      lanes: { all: "全部通道", coreApply: "Core::apply", bridgeRpc: "桥接 RPC", oarWire: "OAR 协议流", gpuiFrame: "GPUI 渲染帧" },
+      overview: {
+        channel: "发布通道",
+        version: "版本",
+        loopbackUrl: "本地地址",
+        homePath: "宿主目录",
+        workRoot: "空间目录",
+        dbPath: "数据库",
+        bundleMode: "构建模式",
+        bootTime: "启动耗时",
+        activeSessions: "活跃执行会话",
+        activeClients: "活跃客户端",
+        activeSubscriptions: "活跃订阅",
+        latestSeq: "最新序号",
+        lastFrameMs: "最近帧耗时",
+        runtimes: "引擎状态",
+        installed: "已安装",
+        notInstalled: "未安装",
+        ready: "就绪",
+        notReady: "未就绪",
+        graph: "拓扑关系",
+        clients: "客户端",
+        sessions: "执行会话",
+        watches: "监听切片",
+        subscriptions: "订阅",
+        bundleExported: "诊断包已导出至 {path}（已脱敏 {redacted} 处）",
+      },
+      routes: { searchPlaceholder: "筛选路由…", empty: "暂无路由状态。" },
+      timeline: {
+        searchPlaceholder: "搜索事件…",
+        slowOnly: "仅看慢事件",
+        slow: "慢",
+        dropped: "已丢弃 {count} 条",
+        empty: "暂无时间线事件。",
+        durationUs: "{us} µs",
+        correlationId: "关联 #{id}",
+      },
+      trajectory: {
+        kind: { issueSession: "任务", workspaceChat: "对话", orchestrator: "主助手" },
+        silentError: "静默错误",
+        tokens: "Token 消耗",
+        rawPayload: "原始载荷",
+        truncated: "已截断（原 {bytes} B）",
+        subagents: "子代理",
+        systemPrompt: "系统提示词",
+        turns: "轮次",
+        turnIndex: "第 {index} 轮",
+        prompt: "输入提示",
+        events: "事件",
+        rawEntries: "原始帧",
+        voyageRecords: "原始记录",
+        emptyList: "暂无轨迹记录。",
+        selectPrompt: "选择一条轨迹以查看各轮详情和原始帧。",
+      },
+      state: {
+        seq: "状态序号",
+        slices: "切片",
+        watchers: "{count} 个监听者",
+        counts: "实体计数",
+        caches: "缓存统计",
+        entries: "{count} 项",
+        issues: "任务",
+        sessions: "执行会话",
+        channels: "频道",
+        agents: "角色",
+        repos: "仓库",
+        artifacts: "作品",
+        inbox: "收件箱",
+        mediaJobs: "媒体",
+        emptyCaches: "暂无缓存统计。",
+      },
+      lab: {
+        rpcDelayMs: "RPC 延迟 (ms)",
+        sliceDelayMs: "切片延迟 (ms)",
+        targetFilter: "目标过滤",
+        targetFilterPlaceholder: "如 issue.* 或 slice:board",
+        disconnectTopic: "模拟断开主题",
+        disconnectTopicPlaceholder: "如 slice:board 或 channel.follow",
+        applied: "覆盖配置已应用。",
+        resetDone: "已恢复默认配置。",
+        warning: "已启用故障注入，将影响当前进程内的所有视图。",
+      },
+      status: { loading: "加载中…", error: "加载开发者工具数据失败：{reason}", disabled: "服务端未启用开发者工具。", empty: "暂无数据。" },
+    },
     "web.farm": {
       panel: {
         shop: "商店",
@@ -4021,6 +4124,114 @@ export const catalogs = {
         ok: "OK",
         cannotScan: "Cannot scan? Open this link on the phone: ",
         newCode: "Another code",
+      },
+    },
+    "web.devtools": {
+      title: "DevTools",
+      tabs: { overview: "Overview", routes: "Routes", timeline: "Timeline", trajectory: "Trajectory", state: "State & Cache", lab: "Lab & Overrides" },
+      actions: {
+        refresh: "Refresh",
+        autoRefresh: "Auto-refresh",
+        pause: "Pause",
+        resume: "Resume",
+        detach: "Detach Window",
+        close: "Close",
+        clear: "Clear",
+        exportBundle: "Export Bundle",
+        exporting: "Exporting…",
+        copy: "Copy",
+        copied: "Copied",
+        apply: "Apply",
+        reset: "Reset",
+        disconnect: "Simulate Disconnect",
+      },
+      lanes: { all: "All Lanes", coreApply: "Core::apply", bridgeRpc: "Bridge RPC", oarWire: "OAR Wire", gpuiFrame: "GPUI Frame" },
+      overview: {
+        channel: "Channel",
+        version: "Version",
+        loopbackUrl: "Loopback URL",
+        homePath: "Host Path",
+        workRoot: "Space Root",
+        dbPath: "Database",
+        bundleMode: "Bundle Mode",
+        bootTime: "Boot Time",
+        activeSessions: "Active Helpers",
+        activeClients: "Active Clients",
+        activeSubscriptions: "Active Subscriptions",
+        latestSeq: "Latest Seq",
+        lastFrameMs: "Last Frame",
+        runtimes: "Engines",
+        installed: "Installed",
+        notInstalled: "Not Installed",
+        ready: "Ready",
+        notReady: "Not Ready",
+        graph: "Topology",
+        clients: "Clients",
+        sessions: "Helpers",
+        watches: "Watches",
+        subscriptions: "Subscriptions",
+        bundleExported: "Bundle saved to {path} ({redacted} redacted)",
+      },
+      routes: { searchPlaceholder: "Filter routes…", empty: "No route state available." },
+      timeline: {
+        searchPlaceholder: "Search events…",
+        slowOnly: "Slow Only",
+        slow: "Slow",
+        dropped: "{count} dropped",
+        empty: "No timeline events recorded yet.",
+        durationUs: "{us} µs",
+        correlationId: "Correlation #{id}",
+      },
+      trajectory: {
+        kind: { issueSession: "Ticket", workspaceChat: "Chat", orchestrator: "Assistant" },
+        silentError: "Silent Error",
+        tokens: "Tokens",
+        rawPayload: "Raw Payload",
+        truncated: "Truncated ({bytes} B)",
+        subagents: "Subagents",
+        systemPrompt: "System Prompt",
+        turns: "Rounds",
+        turnIndex: "Round #{index}",
+        prompt: "Prompt",
+        events: "Events",
+        rawEntries: "Wire Entries",
+        voyageRecords: "Voyage Records",
+        emptyList: "No trajectories recorded yet.",
+        selectPrompt: "Select a trajectory to inspect its rounds and raw frames.",
+      },
+      state: {
+        seq: "State Seq",
+        slices: "Slices",
+        watchers: "{count} watchers",
+        counts: "Entity Counts",
+        caches: "Caches",
+        entries: "{count} entries",
+        issues: "Tickets",
+        sessions: "Helpers",
+        channels: "Channels",
+        agents: "Profiles",
+        repos: "Repos",
+        artifacts: "Artifacts",
+        inbox: "Inbox",
+        mediaJobs: "Media",
+        emptyCaches: "No cache metrics reported.",
+      },
+      lab: {
+        rpcDelayMs: "RPC Delay (ms)",
+        sliceDelayMs: "Slice Delay (ms)",
+        targetFilter: "Target Filter",
+        targetFilterPlaceholder: "e.g. issue.* or slice:board",
+        disconnectTopic: "Disconnect Topic",
+        disconnectTopicPlaceholder: "e.g. slice:board or channel.follow",
+        applied: "Overrides applied.",
+        resetDone: "Overrides reset to defaults.",
+        warning: "Active fault injection affects all views in this process.",
+      },
+      status: {
+        loading: "Loading…",
+        error: "Failed to load DevTools data: {reason}",
+        disabled: "DevTools are disabled on the server.",
+        empty: "Nothing to show.",
       },
     },
     "web.farm": {
@@ -7090,6 +7301,110 @@ export interface Messages {
   "web.connector.connectors.user": undefined;
   "web.connector.connectors.weixinIntro": undefined;
   "web.connector.connectors.whichChannel": undefined;
+  "web.devtools.actions.apply": undefined;
+  "web.devtools.actions.autoRefresh": undefined;
+  "web.devtools.actions.clear": undefined;
+  "web.devtools.actions.close": undefined;
+  "web.devtools.actions.copied": undefined;
+  "web.devtools.actions.copy": undefined;
+  "web.devtools.actions.detach": undefined;
+  "web.devtools.actions.disconnect": undefined;
+  "web.devtools.actions.exportBundle": undefined;
+  "web.devtools.actions.exporting": undefined;
+  "web.devtools.actions.pause": undefined;
+  "web.devtools.actions.refresh": undefined;
+  "web.devtools.actions.reset": undefined;
+  "web.devtools.actions.resume": undefined;
+  "web.devtools.lab.applied": undefined;
+  "web.devtools.lab.disconnectTopic": undefined;
+  "web.devtools.lab.disconnectTopicPlaceholder": undefined;
+  "web.devtools.lab.resetDone": undefined;
+  "web.devtools.lab.rpcDelayMs": undefined;
+  "web.devtools.lab.sliceDelayMs": undefined;
+  "web.devtools.lab.targetFilter": undefined;
+  "web.devtools.lab.targetFilterPlaceholder": undefined;
+  "web.devtools.lab.warning": undefined;
+  "web.devtools.lanes.all": undefined;
+  "web.devtools.lanes.bridgeRpc": undefined;
+  "web.devtools.lanes.coreApply": undefined;
+  "web.devtools.lanes.gpuiFrame": undefined;
+  "web.devtools.lanes.oarWire": undefined;
+  "web.devtools.overview.activeClients": undefined;
+  "web.devtools.overview.activeSessions": undefined;
+  "web.devtools.overview.activeSubscriptions": undefined;
+  "web.devtools.overview.bootTime": undefined;
+  "web.devtools.overview.bundleExported": { readonly path: string | number; readonly redacted: string | number };
+  "web.devtools.overview.bundleMode": undefined;
+  "web.devtools.overview.channel": undefined;
+  "web.devtools.overview.clients": undefined;
+  "web.devtools.overview.dbPath": undefined;
+  "web.devtools.overview.graph": undefined;
+  "web.devtools.overview.homePath": undefined;
+  "web.devtools.overview.installed": undefined;
+  "web.devtools.overview.lastFrameMs": undefined;
+  "web.devtools.overview.latestSeq": undefined;
+  "web.devtools.overview.loopbackUrl": undefined;
+  "web.devtools.overview.notInstalled": undefined;
+  "web.devtools.overview.notReady": undefined;
+  "web.devtools.overview.ready": undefined;
+  "web.devtools.overview.runtimes": undefined;
+  "web.devtools.overview.sessions": undefined;
+  "web.devtools.overview.subscriptions": undefined;
+  "web.devtools.overview.version": undefined;
+  "web.devtools.overview.watches": undefined;
+  "web.devtools.overview.workRoot": undefined;
+  "web.devtools.routes.empty": undefined;
+  "web.devtools.routes.searchPlaceholder": undefined;
+  "web.devtools.state.agents": undefined;
+  "web.devtools.state.artifacts": undefined;
+  "web.devtools.state.caches": undefined;
+  "web.devtools.state.channels": undefined;
+  "web.devtools.state.counts": undefined;
+  "web.devtools.state.emptyCaches": undefined;
+  "web.devtools.state.entries": { readonly count: string | number };
+  "web.devtools.state.inbox": undefined;
+  "web.devtools.state.issues": undefined;
+  "web.devtools.state.mediaJobs": undefined;
+  "web.devtools.state.repos": undefined;
+  "web.devtools.state.seq": undefined;
+  "web.devtools.state.sessions": undefined;
+  "web.devtools.state.slices": undefined;
+  "web.devtools.state.watchers": { readonly count: string | number };
+  "web.devtools.status.disabled": undefined;
+  "web.devtools.status.empty": undefined;
+  "web.devtools.status.error": { readonly reason: string | number };
+  "web.devtools.status.loading": undefined;
+  "web.devtools.tabs.lab": undefined;
+  "web.devtools.tabs.overview": undefined;
+  "web.devtools.tabs.routes": undefined;
+  "web.devtools.tabs.state": undefined;
+  "web.devtools.tabs.timeline": undefined;
+  "web.devtools.tabs.trajectory": undefined;
+  "web.devtools.timeline.correlationId": { readonly id: string | number };
+  "web.devtools.timeline.dropped": { readonly count: string | number };
+  "web.devtools.timeline.durationUs": { readonly us: string | number };
+  "web.devtools.timeline.empty": undefined;
+  "web.devtools.timeline.searchPlaceholder": undefined;
+  "web.devtools.timeline.slow": undefined;
+  "web.devtools.timeline.slowOnly": undefined;
+  "web.devtools.title": undefined;
+  "web.devtools.trajectory.emptyList": undefined;
+  "web.devtools.trajectory.events": undefined;
+  "web.devtools.trajectory.kind.issueSession": undefined;
+  "web.devtools.trajectory.kind.orchestrator": undefined;
+  "web.devtools.trajectory.kind.workspaceChat": undefined;
+  "web.devtools.trajectory.prompt": undefined;
+  "web.devtools.trajectory.rawEntries": undefined;
+  "web.devtools.trajectory.rawPayload": undefined;
+  "web.devtools.trajectory.selectPrompt": undefined;
+  "web.devtools.trajectory.silentError": undefined;
+  "web.devtools.trajectory.subagents": undefined;
+  "web.devtools.trajectory.systemPrompt": undefined;
+  "web.devtools.trajectory.tokens": undefined;
+  "web.devtools.trajectory.truncated": { readonly bytes: string | number };
+  "web.devtools.trajectory.turnIndex": { readonly index: string | number };
+  "web.devtools.trajectory.turns": undefined;
+  "web.devtools.trajectory.voyageRecords": undefined;
   "web.farm.aim.bug": undefined;
   "web.farm.aim.clearAt": { readonly level: string | number };
   "web.farm.aim.flowerbed": undefined;

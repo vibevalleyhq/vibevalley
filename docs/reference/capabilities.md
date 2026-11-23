@@ -19,6 +19,22 @@
 |---|---|---|---|---|---|---|
 | `server.health.get` | 服务端在不在、是哪个版本 | `/api/v1/server/health/get` | ✓ | ✓ |   |   |
 
+## debug
+
+开发者工具：快照、时间线、轨迹、拓扑、故障注入和诊断包导出
+
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
+|---|---|---|---|---|---|---|
+| `debug.snapshot` | 读取开发者工具全景快照（概览、路由、覆盖、拓扑、状态缓存与近期时间线） | `/api/v1/debug/snapshot` | ✓ |   |   |   |
+| `debug.timeline.list` | 按通道和游标查询时间线事件 | `/api/v1/debug/timeline/list` | ✓ |   |   |   |
+| `debug.timeline.clear` | 清空开发者工具时间线缓冲区 | `/api/v1/debug/timeline/clear` | ✓ |   |   |   |
+| `debug.trajectory.list` | 列出可检视的执行会话、工作区对话与主助手轨迹摘要 | `/api/v1/debug/trajectory/list` | ✓ |   |   |   |
+| `debug.trajectory.get` | 读取单条执行会话、工作区对话或主助手轨迹详情与原始帧 | `/api/v1/debug/trajectory/get` | ✓ |   |   |   |
+| `debug.graph` | 读取当前客户端监听与执行会话拓扑图 | `/api/v1/debug/graph` | ✓ |   |   |   |
+| `debug.override.get` | 读取当前故障注入与延迟覆盖配置 | `/api/v1/debug/override/get` | ✓ |   |   |   |
+| `debug.override.set` | 更新故障注入与延迟覆盖配置 | `/api/v1/debug/override/set` | ✓ |   |   |   |
+| `debug.bundle.export` | 导出脱敏后的本机诊断包 | `/api/v1/debug/bundle/export` | ✓ |   |   |   |
+
 ## orchestrator
 
 主助手：上线、停下、评测

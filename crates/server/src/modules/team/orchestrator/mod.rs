@@ -556,6 +556,12 @@ impl Orchestrator {
         })
     }
 
+    pub(crate) fn system_prompt_snapshot(&self, id: &str) -> String {
+        let home = self.home.join("agent").join(id);
+        let memory = self.farm.memories.port(id, crate::modules::team::memory::By::Orchestrator);
+        self.system_prompt(id, &home, memory.as_ref())
+    }
+
     fn system_prompt(&self, id: &str, home: &std::path::Path, memory: &dyn MemoryPort) -> String {
         let p = &*words::PROMPTS;
         let profile = self.farm.agents.profiles.agent(id);

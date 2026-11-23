@@ -6,6 +6,7 @@ mod channel;
 mod connector;
 mod contract;
 mod cron;
+mod debug;
 mod game;
 mod issue;
 mod issue_board;

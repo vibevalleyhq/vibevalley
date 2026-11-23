@@ -3,6 +3,7 @@
 
 mod element;
 mod keys;
+mod preview;
 
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -277,6 +278,8 @@ pub struct TerminalView {
     hovered_cell: Option<vibevalley_terminal::Point>,
     hover_eval_key: Option<(u64, vibevalley_terminal::Point, bool)>,
     hovered_link: Option<HoveredLink>,
+    preview_gen: u64,
+    image_preview: Option<preview::ImagePreview>,
     cmd_held: bool,
     context_menu: Option<Point<Pixels>>,
 }
@@ -362,6 +365,8 @@ impl TerminalView {
             hovered_cell: None,
             hover_eval_key: None,
             hovered_link: None,
+            preview_gen: 0,
+            image_preview: None,
             cmd_held: false,
             context_menu: None,
         }
@@ -699,6 +704,7 @@ impl TerminalView {
         }
         let option_as_meta = Ui::get(cx).settings.option_as_meta;
         if let Some(input) = keys::map_keystroke(&event.keystroke, option_as_meta) {
+            self.dismiss_image_preview();
             self.input(Input::Key(input));
             cx.stop_propagation();
             self.wake_cursor(cx);
@@ -706,6 +712,9 @@ impl TerminalView {
     }
 
     fn on_key_down(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
+        if self.dismiss_image_preview() {
+            cx.notify();
+        }
         if self.context_menu.take().is_some() {
             cx.notify();
             if event.keystroke.key == "escape" {
@@ -787,10 +796,68 @@ impl TerminalView {
         self.match_link_in(&snapshot, at)
     }
 
+    fn hovered_image_path(&self) -> Option<&std::path::Path> {
+        match &self.hovered_link.as_ref()?.link.target {
+            LinkTarget::File { path, .. } if preview::is_previewable_image(path) => Some(path.as_path()),
+            _ => None,
+        }
+    }
+
+    fn dismiss_image_preview(&mut self) -> bool {
+        self.preview_gen = self.preview_gen.wrapping_add(1);
+        self.image_preview.take().is_some()
+    }
+
+    fn sync_image_preview(&mut self, cx: &mut Context<Self>) {
+        let Some(path) = (!self.dragging && self.context_menu.is_none())
+            .then(|| self.hovered_image_path().map(PathBuf::from))
+            .flatten()
+        else {
+            if self.dismiss_image_preview() {
+                cx.notify();
+            }
+            return;
+        };
+        if self.image_preview.as_ref().is_some_and(|meta| meta.path == path) {
+            return;
+        }
+        self.preview_gen = self.preview_gen.wrapping_add(1);
+        let generation = self.preview_gen;
+        if self.image_preview.take().is_some() {
+            cx.notify();
+        }
+        let probe_path = path.clone();
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(preview::HOVER_DEBOUNCE).await;
+            let still_current = this
+                .update(cx, |view, _| {
+                    view.preview_gen == generation && view.context_menu.is_none() && !view.dragging && view.hovered_image_path() == Some(probe_path.as_path())
+                })
+                .unwrap_or(false);
+            if !still_current {
+                return;
+            }
+            let path_for_probe = probe_path.clone();
+            let meta = cx.background_spawn(async move { preview::probe_image_meta(&path_for_probe) }).await;
+            let Some(meta) = meta else {
+                return;
+            };
+            let _ = this.update(cx, |view, cx| {
+                if view.preview_gen == generation && view.context_menu.is_none() && !view.dragging && view.hovered_image_path() == Some(probe_path.as_path()) {
+                    view.image_preview = Some(meta);
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
     fn clear_hover(&mut self, cx: &mut Context<Self>) {
         self.hovered_cell = None;
         self.hover_eval_key = None;
-        if self.hovered_link.take().is_some() {
+        let link_cleared = self.hovered_link.take().is_some();
+        let preview_cleared = self.dismiss_image_preview();
+        if link_cleared || preview_cleared {
             cx.notify();
         }
     }
@@ -799,6 +866,7 @@ impl TerminalView {
         let Some(snapshot) = self.snapshot() else {
             self.hovered_link = None;
             self.hover_eval_key = None;
+            self.dismiss_image_preview();
             return;
         };
         if let Some(hovered) = &self.hovered_link {
@@ -810,6 +878,7 @@ impl TerminalView {
             if !allow_hover || !rows_unchanged {
                 self.hovered_link = None;
                 self.hover_eval_key = None;
+                self.dismiss_image_preview();
             }
         } else {
             self.hover_eval_key = None;
@@ -821,14 +890,18 @@ impl TerminalView {
         self.cmd_held = cmd_held;
         if self.context_menu.is_some() || self.dragging {
             self.hover_eval_key = None;
-            if self.hovered_link.take().is_some() {
+            let link_cleared = self.hovered_link.take().is_some();
+            let preview_cleared = self.dismiss_image_preview();
+            if link_cleared || preview_cleared {
                 cx.notify();
             }
             return;
         }
         let (Some(cell), Some(snapshot)) = (cell, self.snapshot()) else {
             self.hover_eval_key = None;
-            if self.hovered_link.take().is_some() {
+            let link_cleared = self.hovered_link.take().is_some();
+            let preview_cleared = self.dismiss_image_preview();
+            if link_cleared || preview_cleared {
                 cx.notify();
             }
             return;
@@ -837,7 +910,9 @@ impl TerminalView {
         let eval_key = (snapshot.seq, cell, cmd_held);
         if !allow_hover {
             self.hover_eval_key = Some(eval_key);
-            if self.hovered_link.take().is_some() {
+            let link_cleared = self.hovered_link.take().is_some();
+            let preview_cleared = self.dismiss_image_preview();
+            if link_cleared || preview_cleared {
                 cx.notify();
             }
             return;
@@ -869,6 +944,7 @@ impl TerminalView {
             }
         });
         if !unchanged {
+            self.sync_image_preview(cx);
             cx.notify();
         }
     }
@@ -883,6 +959,9 @@ impl TerminalView {
         window.focus(&self.focus, cx);
         self.cmd_held = event.modifiers.platform;
         self.plain_click_cell = None;
+        if self.dismiss_image_preview() {
+            cx.notify();
+        }
         let (Some(session), Some(g)) = (self.session().cloned(), self.geometry) else {
             return;
         };
@@ -1025,7 +1104,10 @@ impl TerminalView {
         self.on_mouse_up(event, window, cx);
     }
 
-    fn on_scroll(&mut self, event: &ScrollEvent, _: &mut Window, _: &mut Context<Self>) {
+    fn on_scroll(&mut self, event: &ScrollEvent, _: &mut Window, cx: &mut Context<Self>) {
+        if self.dismiss_image_preview() {
+            cx.notify();
+        }
         let (Some(session), Some(g)) = (self.session().cloned(), self.geometry) else {
             return;
         };
@@ -1266,9 +1348,22 @@ impl Render for TerminalView {
             .on_action(cx.listener(Self::copy))
             .on_action(cx.listener(Self::paste))
             .on_action(cx.listener(Self::clear))
-            .on_action(cx.listener(|this, _: &ScrollPageUp, _, _| this.scroll_page(1)))
-            .on_action(cx.listener(|this, _: &ScrollPageDown, _, _| this.scroll_page(-1)))
-            .on_action(cx.listener(|this, _: &ScrollToBottom, _, _| {
+            .on_action(cx.listener(|this, _: &ScrollPageUp, _, cx| {
+                if this.dismiss_image_preview() {
+                    cx.notify();
+                }
+                this.scroll_page(1);
+            }))
+            .on_action(cx.listener(|this, _: &ScrollPageDown, _, cx| {
+                if this.dismiss_image_preview() {
+                    cx.notify();
+                }
+                this.scroll_page(-1);
+            }))
+            .on_action(cx.listener(|this, _: &ScrollToBottom, _, cx| {
+                if this.dismiss_image_preview() {
+                    cx.notify();
+                }
                 if let Some(session) = this.session() {
                     session.scroll_to_bottom();
                 }
@@ -1285,6 +1380,15 @@ impl Render for TerminalView {
         if self.hovered_link.is_some() {
             root = root.cursor_pointer();
         }
+        let image_preview = self
+            .image_preview
+            .as_ref()
+            .filter(|_| self.context_menu.is_none() && !self.dragging)
+            .and_then(|meta| {
+                let geometry = self.geometry?;
+                let span = self.hovered_link.as_ref()?.link.spans.first().copied()?;
+                Some(preview::render_popover(meta, &geometry, span, colors))
+            });
         root.child(TerminalElement::new(cx.entity(), self.focus.clone()))
             .children(message.map(|text| {
                 div()
@@ -1298,6 +1402,7 @@ impl Render for TerminalView {
                     .text_size(px(12.0))
                     .child(text)
             }))
+            .children(image_preview)
             .children(self.context_menu.map(|pos| {
                 let colors = colors.clone();
                 let item = |id: &'static str, label: &'static str| {

@@ -29,6 +29,7 @@ impl Shell {
                 if !path.starts_with("/farm") && path != "/tree" && path != "/map" {
                     self.native_pixel = None;
                 }
+                self.sync_devtools_route(&path);
                 if self.last_route.as_deref() != Some(path.as_str()) {
                     self.last_route = Some(path);
                     self.save_settings(cx);
@@ -183,6 +184,9 @@ impl Shell {
                 self.run_search(regex, case_sensitive, cx);
             }
             Action::OpenHit { path, line } => self.open_file(PathBuf::from(path), Some(line), window, cx),
+            Action::ToggleDevtools => self.toggle_devtools(window, cx),
+            Action::DetachDevtools => self.detach_devtools(window, cx),
+            Action::CloseDevtools => self.close_devtools(cx),
         }
     }
 
@@ -191,7 +195,7 @@ impl Shell {
     pub fn on_pixel_event(&mut self, event: crate::pixel::view::PixelEvent, window: &mut Window, cx: &mut Context<Self>) {
         match event {
             crate::pixel::view::PixelEvent::Sound(name) => self.workbench.read(cx).play_farm_sound(name, cx),
-            crate::pixel::view::PixelEvent::HostCall { op, payload, reply } => self.host_call(&op, payload, reply, window, cx),
+            crate::pixel::view::PixelEvent::HostCall { op, reply } => self.host_call(op, reply, window, cx),
             crate::pixel::view::PixelEvent::Route(route) => self.open_pane(
                 PaneKind::Hosted {
                     module: "vv".into(),
@@ -208,15 +212,16 @@ impl Shell {
     }
 
     /// The `host.*` ops of the bridge: VibeValley's host capabilities
-    /// (packages/protocol/src/host.ts) and VibeValley's terminal.
-    pub fn host_call(&mut self, op: &str, payload: Value, reply: crate::hosted::Replier, window: &mut Window, cx: &mut Context<Self>) {
+    /// (packages/protocol/src/host.ts) and VibeValley's terminal, decoded once into [`vibevalley_protocol::HostOp`].
+    pub fn host_call(&mut self, op: vibevalley_protocol::HostOp, reply: crate::hosted::Replier, window: &mut Window, cx: &mut Context<Self>) {
+        use vibevalley_protocol::{HostMotionChoice, HostOp, HostOpeningPhase, HostThemeChoice};
         use vibevalley_server::transport::bridge::{BizCode, Envelope, refusal};
-        if op.starts_with("host.update") {
-            return crate::update::host_call(op, reply, cx);
-        }
-        let text = |k: &str| payload[k].as_str().unwrap_or_default().to_string();
+
         let envelope = match op {
-            "host.info" => {
+            HostOp::UpdateState => return crate::update::host_call(crate::update::UpdateOp::State, reply, cx),
+            HostOp::UpdateCheck => return crate::update::host_call(crate::update::UpdateOp::Check, reply, cx),
+            HostOp::UpdateInstall => return crate::update::host_call(crate::update::UpdateOp::Install, reply, cx),
+            HostOp::Info => {
                 let settings = &Ui::get(cx).settings;
                 static MONO_FONTS: OnceLock<Vec<String>> = OnceLock::new();
                 let fonts = MONO_FONTS.get_or_init(|| {
@@ -256,38 +261,19 @@ impl Shell {
                     "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile", "commandLine", "seekAudio", "pcm", "pickFile", "saveFile", "update", "mossVoice"],
                 }))
             }
-            "host.cliState" | "host.cliInstall" | "host.cliRemove" => {
-                let op = op.to_string();
-                Self::bg(
-                    cx,
-                    move || {
-                        let cli = crate::command_line::CommandLine::current()?;
-                        match op.as_str() {
-                            "host.cliInstall" => cli.install(),
-                            "host.cliRemove" => cli.remove(),
-                            _ if cli.available() => Ok(cli.state()),
-                            _ => Err("the CLI is not installed beside the app".into()),
-                        }
-                    },
-                    move |_, result, _| {
-                        reply.send(match result {
-                            Ok(state) => Envelope::ok(json!(state)),
-                            Err(error) => refusal(BizCode::Refused, error),
-                        })
-                    },
-                );
-                return;
-            }
-            "host.font" => {
+            HostOp::CliState => return self.run_cli_op(CliOp::State, reply, cx),
+            HostOp::CliInstall => return self.run_cli_op(CliOp::Install, reply, cx),
+            HostOp::CliRemove => return self.run_cli_op(CliOp::Remove, reply, cx),
+            HostOp::Font(req) => {
                 let was_ui = Ui::get(cx).settings.ui_font_size;
                 let mut settings = Ui::get(cx).settings.clone();
-                if let Some(family) = payload["monoFont"].as_str().map(str::trim).filter(|s| !s.is_empty()) {
+                if let Some(family) = req.mono_font.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
                     settings.mono_font = family.to_string();
                 }
-                if let Some(size) = payload["terminalFontSize"].as_f64() {
+                if let Some(size) = req.terminal_font_size {
                     settings.terminal_font_size = (size as f32).clamp(9.0, 32.0);
                 }
-                if let Some(size) = payload["uiFontSize"].as_f64() {
+                if let Some(size) = req.ui_font_size {
                     settings.ui_font_size = (size as f32).clamp(10.0, 24.0);
                 }
                 let mono = settings.mono_font.clone();
@@ -305,11 +291,10 @@ impl Shell {
                     "uiFontSize": ui_size,
                 }))
             }
-            "host.notify" => {
-                let (title, body) = (text("title"), text("body"));
+            HostOp::Notify(req) => {
                 Self::bg(
                     cx,
-                    move || crate::host::notify(&title, &body),
+                    move || crate::host::notify(&req.title, &req.body),
                     |_, r, _| {
                         if let Err(e) = r {
                             eprintln!("notify: {e}");
@@ -318,74 +303,65 @@ impl Shell {
                 );
                 Envelope::void()
             }
-            "host.tray" => match serde_json::from_value::<crate::tray::Summary>(payload.clone()) {
-                Ok(summary) => {
-                    crate::tray::update(&summary);
-                    self.tray = Some(payload.clone());
-                    Envelope::void()
-                }
-                Err(error) => refusal(BizCode::InvalidInput, error.to_string()),
-            },
-            "host.locale" => match payload.as_str() {
-                Some(loc @ ("zh" | "en")) => {
-                    vibevalley_i18n::set_locale(loc);
-                    update_menus(cx);
-                    crate::tray::refresh();
-                    self.notify_locale(loc, cx);
-                    self.locale = Some(loc.to_string());
-                    Envelope::void()
-                }
-                _ => refusal(BizCode::InvalidInput, "locale is zh or en"),
-            },
-            "host.reveal" => match payload.as_str() {
-                Some(path) if path.starts_with('/') => {
+            HostOp::Tray(tray) => {
+                let summary = crate::tray::Summary {
+                    title: tray.title.clone(),
+                    lines: tray.lines.clone(),
+                };
+                crate::tray::update(&summary);
+                self.tray = Some(serde_json::to_value(&tray).unwrap_or(Value::Null));
+                Envelope::void()
+            }
+            HostOp::Locale(locale) => {
+                let loc = locale.as_str();
+                vibevalley_i18n::set_locale(loc);
+                update_menus(cx);
+                crate::tray::refresh();
+                self.notify_locale(loc, cx);
+                self.locale = Some(loc.to_string());
+                Envelope::void()
+            }
+            HostOp::Reveal(path) => {
+                if path.starts_with('/') {
                     let path = PathBuf::from(path);
                     Self::bg(cx, move || crate::host::reveal(&path), |_, _, _| {});
                     Envelope::void()
-                }
-                _ => refusal(BizCode::InvalidInput, "reveal takes an absolute path"),
-            },
-            "host.theme" => {
-                let choice = match payload.as_str() {
-                    Some("light") => Some(ThemeChoice::Light),
-                    Some("dark") => Some(ThemeChoice::Dark),
-                    Some("system") => Some(ThemeChoice::System),
-                    _ => None,
-                };
-                match choice {
-                    Some(choice) => {
-                        self.set_theme(choice, cx);
-                        Envelope::void()
-                    }
-                    None => refusal(BizCode::InvalidInput, "theme is light, dark or system"),
+                } else {
+                    refusal(BizCode::InvalidInput, "reveal takes an absolute path")
                 }
             }
-            "host.motion" => match payload.as_str().and_then(MotionChoice::parse) {
-                Some(choice) => {
-                    self.set_motion(choice, cx);
-                    Envelope::void()
+            HostOp::Theme(choice) => {
+                let theme = match choice {
+                    HostThemeChoice::Light => ThemeChoice::Light,
+                    HostThemeChoice::Dark => ThemeChoice::Dark,
+                    HostThemeChoice::System => ThemeChoice::System,
+                };
+                self.set_theme(theme, cx);
+                Envelope::void()
+            }
+            HostOp::Motion(choice) => {
+                let motion = match choice {
+                    HostMotionChoice::Off => MotionChoice::Off,
+                    HostMotionChoice::On => MotionChoice::On,
+                    HostMotionChoice::System => MotionChoice::System,
+                };
+                self.set_motion(motion, cx);
+                Envelope::void()
+            }
+            HostOp::Opening(state) => {
+                if let Some(opening) = &self.launch {
+                    let phase = crate::serving::opening_pixel_phase(state.phase);
+                    opening.update(cx, |view, _| view.set_phase(phase, (state.progress as f32).clamp(0.0, 100.0)));
                 }
-                None => refusal(BizCode::InvalidInput, "motion is off, on or system"),
-            },
-            "host.opening" => match serde_json::from_value::<crate::serving::Opening>(payload.clone()) {
-                Ok(state) => {
-                    if let Some(opening) = &self.launch {
-                        opening.update(cx, |view, _| view.set_phase(state.phase.pixel(), state.progress.clamp(0.0, 100.0)));
-                    }
-                    self.opening = Some(payload.clone());
-                    if state.phase == crate::serving::OpeningPhase::Ready {
-                        self.finish_opening(true, cx);
-                    }
-                    cx.notify();
-                    Envelope::void()
+                self.opening = Some(serde_json::to_value(&state).unwrap_or(Value::Null));
+                if state.phase == HostOpeningPhase::Ready {
+                    self.finish_opening(true, cx);
                 }
-                Err(error) => refusal(BizCode::InvalidInput, error.to_string()),
-            },
-            "host.openTerminal" => {
-                let cwd = PathBuf::from(text("cwd"));
-                let title = payload["title"].as_str().map(str::to_string);
-                let command = payload["command"].as_str().map(str::to_string);
-                self.open_terminal_at(cwd, title, command, window, cx, move |result| {
+                cx.notify();
+                Envelope::void()
+            }
+            HostOp::OpenTerminal(req) => {
+                self.open_terminal_at(PathBuf::from(req.cwd), req.title, req.command, window, cx, move |result| {
                     reply.send(match result {
                         Ok(id) => Envelope::ok(json!({ "terminalId": id })),
                         Err(reason) => refusal(BizCode::Refused, reason),
@@ -393,39 +369,37 @@ impl Shell {
                 });
                 return;
             }
-            "host.openUrl" => {
-                let url = text("url");
-                if url.starts_with("https://") || url.starts_with("http://") || url.starts_with("mailto:") {
-                    cx.open_url(&url);
+            HostOp::OpenUrl(req) => {
+                if req.url.starts_with("https://") || req.url.starts_with("http://") || req.url.starts_with("mailto:") {
+                    cx.open_url(&req.url);
                     Envelope::void()
                 } else {
                     refusal(BizCode::InvalidInput, "only http(s) and mailto URLs open")
                 }
             }
-            "host.openFile" if payload.get("worktree").is_some() => {
-                let relative = text("path");
-                let Some((root, file)) = crate::host::worktree_file(Path::new(&text("worktree")), Path::new(&relative)) else {
-                    return reply.send(refusal(
-                        BizCode::Refused,
-                        vibevalley_i18n::t("desktop.files.missingInWorktree", &[("path", relative.into())]),
-                    ));
-                };
-                self.with_project_at(root, window, cx, move |s, id, window, cx| {
-                    reply.send(match id {
-                        Ok(id) => {
-                            s.activate_project(id, window, cx);
-                            s.open_file(file, None, window, cx);
-                            Envelope::void()
-                        }
-                        Err(why) => refusal(BizCode::Refused, why),
+            HostOp::OpenFile(req) => {
+                if let Some(worktree) = req.worktree {
+                    let Some((root, file)) = crate::host::worktree_file(Path::new(&worktree), Path::new(&req.path)) else {
+                        return reply.send(refusal(
+                            BizCode::Refused,
+                            vibevalley_i18n::t("desktop.files.missingInWorktree", &[("path", req.path.into())]),
+                        ));
+                    };
+                    self.with_project_at(root, window, cx, move |s, id, window, cx| {
+                        reply.send(match id {
+                            Ok(id) => {
+                                s.activate_project(id, window, cx);
+                                s.open_file(file, None, window, cx);
+                                Envelope::void()
+                            }
+                            Err(why) => refusal(BizCode::Refused, why),
+                        });
                     });
-                });
-                return;
-            }
-            // Opens a file in the system's default app (a PDF, a picture).
-            "host.openFile" => match payload["path"].as_str() {
-                Some(path) if path.starts_with('/') => {
-                    let path = PathBuf::from(path);
+                    return;
+                }
+                // Opens a file in the system's default app (a PDF, a picture).
+                if req.path.starts_with('/') {
+                    let path = PathBuf::from(req.path);
                     Self::bg(
                         cx,
                         move || {
@@ -446,9 +420,9 @@ impl Shell {
                     );
                     return;
                 }
-                _ => refusal(BizCode::InvalidInput, "openFile takes the absolute path of an existing file"),
-            },
-            "host.pickFile" => {
+                refusal(BizCode::InvalidInput, "openFile takes the absolute path of an existing file")
+            }
+            HostOp::PickFile => {
                 let chosen = cx.prompt_for_paths(PathPromptOptions {
                     files: true,
                     directories: false,
@@ -473,16 +447,13 @@ impl Shell {
                 .detach();
                 return;
             }
-            "host.saveFile" => {
-                let source = PathBuf::from(text("path"));
+            HostOp::SaveFile(req) => {
+                let source = PathBuf::from(req.path);
                 if !source.is_absolute() {
                     reply.send(refusal(BizCode::InvalidInput, "saveFile requires an absolute path to a regular file"));
                     return;
                 }
-                let requested_name = payload["name"]
-                    .as_str()
-                    .filter(|n| !n.is_empty() && !n.contains('/') && !n.contains('\\'))
-                    .map(str::to_string);
+                let requested_name = req.name.filter(|n| !n.is_empty() && !n.contains('/') && !n.contains('\\'));
                 cx.spawn(async move |_, cx| {
                     let probe = source.clone();
                     let is_file = cx.background_spawn(async move { probe.is_file() }).await;
@@ -509,9 +480,9 @@ impl Shell {
                 .detach();
                 return;
             }
-            "host.speechState" => Envelope::ok(json!(crate::speech_audio::state(&text("id")))),
-            "host.speechStart" => {
-                let id = text("id");
+            HostOp::SpeechState(req) => Envelope::ok(json!(crate::speech_audio::state(req.id.as_deref().unwrap_or_default()))),
+            HostOp::SpeechStart(req) => {
+                let id = req.id.unwrap_or_default();
                 let server = cx.try_global::<crate::hosted::BridgeHub>().map(|b| b.0.server().clone());
                 Self::bg(
                     cx,
@@ -530,10 +501,10 @@ impl Shell {
                 );
                 return;
             }
-            "host.speechStop" => Envelope::ok(json!(crate::speech_audio::stop(Some(&text("id"))))),
-            "host.voiceState" => Envelope::ok(json!(crate::live_voice::state(&text("id")))),
-            "host.voiceStart" => {
-                let id = text("id");
+            HostOp::SpeechStop(req) => Envelope::ok(json!(crate::speech_audio::stop(Some(req.id.as_deref().unwrap_or_default())))),
+            HostOp::VoiceState(req) => Envelope::ok(json!(crate::live_voice::state(req.id.as_deref().unwrap_or_default()))),
+            HostOp::VoiceStart(req) => {
+                let id = req.id.unwrap_or_default();
                 let server = cx.try_global::<crate::hosted::BridgeHub>().map(|b| b.0.server().clone());
                 Self::bg(
                     cx,
@@ -550,58 +521,43 @@ impl Shell {
                 );
                 return;
             }
-            "host.voiceStop" => Envelope::ok(json!(crate::live_voice::stop(Some(&text("id"))))),
-            "host.voiceMute" => match payload["muted"].as_bool() {
-                Some(muted) => Envelope::ok(json!(crate::live_voice::mute(&text("id"), muted))),
-                None => refusal(BizCode::InvalidInput, "voiceMute requires a boolean muted value"),
-            },
-            "host.playAudio" => {
-                let seconds = payload["position"].as_f64().unwrap_or(0.0);
-                let path = payload["path"].as_str().map(PathBuf::from);
-                crate::audio::dispatch(reply, move || match path {
-                    Some(path) => crate::audio::play(&path, seconds),
-                    None => Err("playAudio requires a file path".into()),
-                });
+            HostOp::VoiceStop(req) => Envelope::ok(json!(crate::live_voice::stop(Some(req.id.as_deref().unwrap_or_default())))),
+            HostOp::VoiceMute(req) => Envelope::ok(json!(crate::live_voice::mute(req.id.as_deref().unwrap_or_default(), req.muted))),
+            HostOp::PlayAudio(req) => {
+                let seconds = req.position.unwrap_or(0.0);
+                let path = PathBuf::from(req.path);
+                crate::audio::dispatch(reply, move || crate::audio::play(&path, seconds));
                 return;
             }
-            "host.playSound" => {
-                #[derive(serde::Deserialize)]
-                #[serde(deny_unknown_fields)]
-                struct PlaySoundRequest {
-                    name: crate::audio::SoundName,
-                }
-                match serde_json::from_value::<PlaySoundRequest>(payload.clone()) {
-                    Ok(req) => {
-                        crate::audio::dispatch(reply, move || crate::audio::play_sound(req.name));
-                        return;
-                    }
-                    Err(e) => refusal(BizCode::InvalidInput, format!("playSound: {e}")),
-                }
-            }
-            "host.seekAudio" => {
-                let seconds = payload["position"].as_f64().unwrap_or(f64::NAN);
-                crate::audio::dispatch(reply, move || crate::audio::seek(seconds));
+            HostOp::PlaySound(req) => {
+                let name = crate::audio::SoundName::from(req.name);
+                crate::audio::dispatch(reply, move || crate::audio::play_sound(name));
                 return;
             }
-            "host.audioState" => {
+            HostOp::SeekAudio(req) => {
+                crate::audio::dispatch(reply, move || crate::audio::seek(req.position));
+                return;
+            }
+            HostOp::AudioState => {
                 crate::audio::dispatch(reply, || Ok(crate::audio::state()));
                 return;
             }
-            "host.pcmStart" => {
-                let format = serde_json::from_value::<crate::audio::PcmFormat>(payload.clone());
-                crate::audio::dispatch(reply, move || crate::audio::start_pcm(format.map_err(|e| e.to_string())?));
+            HostOp::PcmStart(req) => {
+                let format = crate::audio::PcmFormat {
+                    sample_rate: req.sample_rate,
+                    channels: req.channels,
+                };
+                crate::audio::dispatch(reply, move || crate::audio::start_pcm(format));
                 return;
             }
-            "host.pcmAppend" => {
-                let data = text("data");
-                crate::audio::dispatch(reply, move || crate::audio::append_pcm(&data));
+            HostOp::PcmAppend(req) => {
+                crate::audio::dispatch(reply, move || crate::audio::append_pcm(&req.data));
                 return;
             }
             // A file the user dropped on a view: nsh gives views file: URLs
             // and no way to read them.
-            "host.readFile" => {
-                let path = payload["path"].as_str().unwrap_or_default();
-                let path = path.strip_prefix("file://").unwrap_or(path);
+            HostOp::ReadFile(req) => {
+                let path = req.path.strip_prefix("file://").unwrap_or(&req.path);
                 let path = percent_decode(path);
                 if !path.starts_with('/') {
                     refusal(BizCode::InvalidInput, "readFile takes an absolute path or a file: URL")
@@ -620,7 +576,7 @@ impl Shell {
                     return;
                 }
             }
-            "host.stopAudio" => {
+            HostOp::StopAudio => {
                 crate::audio::dispatch(reply, || {
                     crate::audio::stop();
                     Ok(())
@@ -628,7 +584,7 @@ impl Shell {
                 return;
             }
             // VibeValley's built pixel art: sprites.json and its PNGs.
-            "host.pixelDir" => {
+            HostOp::PixelDir => {
                 Self::bg(
                     cx,
                     || {
@@ -644,12 +600,33 @@ impl Shell {
                 );
                 return;
             }
-            other => match crate::host::handle_stateless_op(other, &payload) {
-                Some(env) => env,
-                None => refusal(BizCode::RouteNotFound, format!("the host has no op {other}")),
-            },
+            stateless @ (HostOp::PixelManifest | HostOp::Sha256(_) | HostOp::RandomBytes(_) | HostOp::Qr(_)) => {
+                crate::host::handle_stateless_op(&stateless).expect("stateless HostOp handled")
+            }
         };
         reply.send(envelope);
+    }
+
+    fn run_cli_op(&self, cli_op: CliOp, reply: crate::hosted::Replier, cx: &mut Context<Self>) {
+        use vibevalley_server::transport::bridge::{BizCode, Envelope, refusal};
+        Self::bg(
+            cx,
+            move || {
+                let cli = crate::command_line::CommandLine::current()?;
+                match cli_op {
+                    CliOp::Install => cli.install(),
+                    CliOp::Remove => cli.remove(),
+                    CliOp::State if cli.available() => Ok(cli.state()),
+                    CliOp::State => Err("the CLI is not installed beside the app".into()),
+                }
+            },
+            move |_, result, _| {
+                reply.send(match result {
+                    Ok(state) => Envelope::ok(json!(state)),
+                    Err(error) => refusal(BizCode::Refused, error),
+                })
+            },
+        );
     }
 
     pub(super) fn subscribe_hosted(&mut self, view: &Entity<HostedView>, doc: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) -> Subscription {
@@ -662,7 +639,7 @@ impl Shell {
         let doc_cache = cached_doc;
         cx.subscribe_in(view, window, move |this, view, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(a) => this.on_action(a.clone(), window, cx),
-            HostedEvent::HostCall { op, payload, reply } => this.host_call(op, payload.clone(), reply.clone(), window, cx),
+            HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
             HostedEvent::Ready => {
                 if let Some(path) = &doc {
                     let state = doc_cache.borrow().clone();
@@ -694,6 +671,13 @@ impl Shell {
             },
         );
     }
+}
+
+#[derive(Clone, Copy)]
+enum CliOp {
+    State,
+    Install,
+    Remove,
 }
 
 #[derive(Clone)]

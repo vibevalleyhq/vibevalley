@@ -285,6 +285,374 @@
    "type": "open_hit",
    "path": "/tmp/a.rs",
    "line": 12
+  },
+  {
+   "type": "toggle_devtools"
+  },
+  {
+   "type": "detach_devtools"
+  },
+  {
+   "type": "close_devtools"
+  }
+ ],
+ "HostThemeChoice": [
+  "light",
+  "dark",
+  "system"
+ ],
+ "HostMotionChoice": [
+  "off",
+  "on",
+  "system"
+ ],
+ "HostOpeningPhase": [
+  "connecting",
+  "reading",
+  "loading",
+  "ready",
+  "waiting",
+  "failed"
+ ],
+ "HostSoundName": [
+  "tap",
+  "levelUp",
+  "voiceOff"
+ ],
+ "HostFontPayload": [
+  {
+   "monoFont": "Menlo",
+   "terminalFontSize": 13.5,
+   "uiFontSize": 14.5
+  },
+  {}
+ ],
+ "HostNotifyPayload": [
+  {
+   "title": "Done",
+   "body": "Checks passed"
+  }
+ ],
+ "HostTrayPayload": [
+  {
+   "title": "2 working",
+   "lines": [
+    "#1 Fix bug"
+   ]
+  }
+ ],
+ "HostOpeningPayload": [
+  {
+   "phase": "ready",
+   "progress": 100.0
+  }
+ ],
+ "HostOpenTerminalPayload": [
+  {
+   "cwd": "/tmp/repo",
+   "title": "dev",
+   "command": "cargo test"
+  },
+  {
+   "cwd": "/tmp/repo"
+  }
+ ],
+ "HostOpenUrlPayload": [
+  {
+   "url": "https://vibevalley.dev"
+  }
+ ],
+ "HostOpenFilePayload": [
+  {
+   "path": "/tmp/a.png"
+  },
+  {
+   "path": "src/lib.rs",
+   "worktree": "/tmp/wt"
+  }
+ ],
+ "HostSaveFilePayload": [
+  {
+   "path": "/tmp/a.png",
+   "name": "export.png"
+  },
+  {
+   "path": "/tmp/a.png"
+  }
+ ],
+ "HostIdPayload": [
+  {
+   "id": "v1"
+  },
+  {}
+ ],
+ "HostVoiceMutePayload": [
+  {
+   "id": "v1",
+   "muted": true
+  },
+  {
+   "muted": false
+  }
+ ],
+ "HostPlayAudioPayload": [
+  {
+   "path": "/tmp/a.wav",
+   "position": 1.5
+  },
+  {
+   "path": "/tmp/a.wav"
+  }
+ ],
+ "HostPlaySoundPayload": [
+  {
+   "name": "levelUp"
+  }
+ ],
+ "HostSeekAudioPayload": [
+  {
+   "position": 2.5
+  }
+ ],
+ "HostPcmStartPayload": [
+  {
+   "sampleRate": 24000,
+   "channels": 1
+  }
+ ],
+ "HostPcmAppendPayload": [
+  {
+   "data": "AAAA"
+  }
+ ],
+ "HostReadFilePayload": [
+  {
+   "path": "/tmp/note.txt"
+  }
+ ],
+ "HostSha256Payload": [
+  {
+   "text": "abc"
+  }
+ ],
+ "HostRandomBytesPayload": [
+  {
+   "length": 32
+  }
+ ],
+ "HostQrPayload": [
+  {
+   "text": "https://vibevalley.dev",
+   "border": 2
+  },
+  {
+   "text": "https://vibevalley.dev"
+  }
+ ],
+ "HostOp": [
+  {
+   "op": "host.info"
+  },
+  {
+   "op": "host.updateState"
+  },
+  {
+   "op": "host.updateCheck"
+  },
+  {
+   "op": "host.updateInstall"
+  },
+  {
+   "op": "host.cliState"
+  },
+  {
+   "op": "host.cliInstall"
+  },
+  {
+   "op": "host.cliRemove"
+  },
+  {
+   "op": "host.font",
+   "payload": {
+    "monoFont": "Menlo",
+    "terminalFontSize": 13.5
+   }
+  },
+  {
+   "op": "host.notify",
+   "payload": {
+    "title": "Done",
+    "body": "Build green"
+   }
+  },
+  {
+   "op": "host.tray",
+   "payload": {
+    "title": "1 working",
+    "lines": [
+     "#1"
+    ]
+   }
+  },
+  {
+   "op": "host.locale",
+   "payload": "zh"
+  },
+  {
+   "op": "host.reveal",
+   "payload": "/tmp/file.txt"
+  },
+  {
+   "op": "host.theme",
+   "payload": "dark"
+  },
+  {
+   "op": "host.motion",
+   "payload": "off"
+  },
+  {
+   "op": "host.opening",
+   "payload": {
+    "phase": "ready",
+    "progress": 100.0
+   }
+  },
+  {
+   "op": "host.openTerminal",
+   "payload": {
+    "cwd": "/tmp/repo"
+   }
+  },
+  {
+   "op": "host.openUrl",
+   "payload": {
+    "url": "https://vibevalley.dev"
+   }
+  },
+  {
+   "op": "host.openFile",
+   "payload": {
+    "path": "src/lib.rs",
+    "worktree": "/tmp/wt"
+   }
+  },
+  {
+   "op": "host.pickFile"
+  },
+  {
+   "op": "host.saveFile",
+   "payload": {
+    "path": "/tmp/a.png",
+    "name": "a.png"
+   }
+  },
+  {
+   "op": "host.speechState",
+   "payload": {}
+  },
+  {
+   "op": "host.speechStart",
+   "payload": {
+    "id": "s1"
+   }
+  },
+  {
+   "op": "host.speechStop",
+   "payload": {}
+  },
+  {
+   "op": "host.voiceState",
+   "payload": {
+    "id": "v1"
+   }
+  },
+  {
+   "op": "host.voiceStart",
+   "payload": {
+    "id": "v1"
+   }
+  },
+  {
+   "op": "host.voiceStop",
+   "payload": {
+    "id": "v1"
+   }
+  },
+  {
+   "op": "host.voiceMute",
+   "payload": {
+    "id": "v1",
+    "muted": true
+   }
+  },
+  {
+   "op": "host.playAudio",
+   "payload": {
+    "path": "/tmp/a.wav",
+    "position": 1.5
+   }
+  },
+  {
+   "op": "host.playSound",
+   "payload": {
+    "name": "tap"
+   }
+  },
+  {
+   "op": "host.seekAudio",
+   "payload": {
+    "position": 2.5
+   }
+  },
+  {
+   "op": "host.audioState"
+  },
+  {
+   "op": "host.pcmStart",
+   "payload": {
+    "sampleRate": 24000,
+    "channels": 1
+   }
+  },
+  {
+   "op": "host.pcmAppend",
+   "payload": {
+    "data": "AAAA"
+   }
+  },
+  {
+   "op": "host.stopAudio"
+  },
+  {
+   "op": "host.readFile",
+   "payload": {
+    "path": "/tmp/note.txt"
+   }
+  },
+  {
+   "op": "host.pixelDir"
+  },
+  {
+   "op": "host.pixelManifest"
+  },
+  {
+   "op": "host.sha256",
+   "payload": {
+    "text": "abc"
+   }
+  },
+  {
+   "op": "host.randomBytes",
+   "payload": {
+    "length": 32
+   }
+  },
+  {
+   "op": "host.qr",
+   "payload": {
+    "text": "https://vibevalley.dev",
+    "border": 2
+   }
   }
  ]
 }

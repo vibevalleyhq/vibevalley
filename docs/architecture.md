@@ -52,12 +52,12 @@ flowchart LR
 
 仓库目录结构见根目录 [AGENTS.md](AGENTS.md#目录)。
 
-- **契约与环境约定（`crates/protocol` → `packages/protocol`）**：服务端与客户端唯一的共享契约，以 Rust 为源：`src/contract/` 一个概念一个文件（含 5 域切片、`FarmFrame` 与 GPUI 壳 ↔ 托管界面的强类型 `host.rs`），`typescript.rs` 写出 `packages/protocol/src/<概念>/shapes.gen.ts` 与 `endpoints.gen.ts`（`vp run protocol:ts`）；`home.rs` 约定家目录、`server.json` 与语言；页面在边界解码用的 Zod（`schema.ts`）和带入参出参的端点表（`api.ts`）是手写的，由测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）。
+- **契约与环境约定（`crates/protocol` → `packages/protocol`）**：服务端与客户端唯一的共享契约，以 Rust 为源：`src/contract/` 一个概念一个文件（含 5 域切片、`FarmFrame`、`debug.rs` 的 `DebugKit` 契约，以及 GPUI 壳 ↔ 托管界面的强类型 `host.rs`：`Host*` 帧、`HostAction` 与 40 成员封闭 `HostOp`），`typescript.rs` 写出 `packages/protocol/src/<概念>/shapes.gen.ts` 与 `endpoints.gen.ts`（`vp run protocol:ts`）；`home.rs` 约定家目录、`server.json` 与语言；页面在边界解码用的 Zod（`schema.ts`）和带入参出参的端点表（`api.ts`）是手写的，由测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）。
 - **规则（`crates/core`）**：纯函数规则层：`reduce`、`SliceMask` 与按域切片投影（`board_slice`、`sessions_slice`、`collab_slice`、`inbox_slice`、`ops_slice`、`farm_frame`）、任务的状态与阶段和可做的动作、收件箱、巡查、简报和起草、农场的画面（[核心状态](docs/subsystems/core.md)），并收拢定时任务规则（`cron/`）、笔记大纲引擎（`pkm/`）与作品引擎（`artifact/`）。
-- **服务与传输（`crates/server`）**：`src/lib.rs` 的 `Hub` 持有核心状态、接口表、异步 `EventBus`、基于 `tokio::sync::watch` 的 6 路 `SliceFeed<T>`、`tokio::sync::broadcast` 实时事件流、`CancellationToken`/`TaskTracker` 生命周期与 `arc-swap` 无锁可插拔脊柱钩子（`CallerContext`/`ClientIdentity`、`InvokeObserver`、`FaultGate`、`HostDebugBridge`）；`src/modules/` 按 `work`、`team`、`collab`、`content`、`skin`、`infra` 六个业务域分组，`src/start.rs` 照依赖次序打开各模块（任务板拆成 `work/issue`、`work/session`、`work/workplace`，都只经 `work/ledger.rs` 写；频道仅做纯受众路由、`channel_delivery` 与穷尽 `ChannelEvent` 广播）；`src/db/{schema,queries,generated}/` 集中管理服务端 13 组 SQLite 建表语句（含共享 `seq_counter`）、命名查询与 sqlc 生成绑定；`src/transport/` 收拢服务接口（`api`）、进程内桥（`bridge`）和跑在共享运行时上的 HTTP 门（`http`：命令、基于 `WatchStream` 的 `/api/v1/slice/{name}`、SSE、`/mcp`）。
+- **服务与传输（`crates/server`）**：`src/lib.rs` 的 `Hub` 持有核心状态、接口表、异步 `EventBus`、基于 `tokio::sync::watch` 的 6 路 `SliceFeed<T>`、`tokio::sync::broadcast` 实时事件流、`CancellationToken`/`TaskTracker` 生命周期与 `arc-swap` 无锁可插拔脊柱钩子（`CallerContext`/`ClientIdentity`、`InvokeObserver`、`FaultGate`、`HostDebugBridge`）；`src/modules/` 按 `work`、`team`、`collab`、`content`、`skin`、`infra` 六个业务域分组（其中 `infra/debug/` 提供 `DebugKit`，仅在 `VIBEVALLEY_DEBUG=1` 下挂接四泳道定长环形缓冲、跳过 `debug.*` 的 `FaultGate`、统一脱敏器与纯 Rust ZIP `debug-bundle.zip` 导出；进程日志经工作区 `tracing` + `tracing-subscriber` 初始化），`src/start.rs` 照依赖次序打开各模块（任务板拆成 `work/issue`、`work/session`、`work/workplace`，都只经 `work/ledger.rs` 写；频道仅做纯受众路由、`channel_delivery` 与穷尽 `ChannelEvent` 广播）；`src/db/{schema,queries,generated}/` 集中管理服务端 13 组 SQLite 建表语句（含共享 `seq_counter`）、命名查询与 sqlc 生成绑定；`src/transport/` 收拢服务接口（`api`）、进程内桥（`bridge`）和跑在共享运行时上的 HTTP 门（`http`：命令、基于 `WatchStream` 的 `/api/v1/slice/{name}`、SSE、`/mcp`）。
 - **运行与引擎（`crates/runtime`、`crates/rich`、`crates/engines`）**：`crates/runtime` 提供进程级共享 Tokio 运行时 `rt`（`vibevalley_runtime::rt::{handle, spawn, block_on}`，工作线程 `vibevalley-io-{n}`），合拢 `oar/`（Claude Code、Codex、ACP、自研 `vibevalley` 与 scripted，含基于 `arc-swap` 的零开销 `OarObserver` 钩子与 `oar-voyage/3` 记录流）与自研 `agent/`（经工作区 `reqwest` 与 `backon` 接 DeepSeek，[自研 agent](docs/subsystems/brain.md)）；`crates/rich` 基于 `crates/engines/{onig,pele,shiki}` 提供原生富内容组件与文本引擎（`engine/{canvas,chart,genui,pinyin}`）。
 - **存储（SQLite + 文件）**：服务端 38 张表集中定义并生成于 `crates/server/src/db/{schema,queries,generated}/`（`server.db` 按 `create table if not exists` 建表，`seq_counter` 共享序号）；任务（单表 `issue`）、领域无关 `AgentSession`（`session`、`session_run`、`session_mailbox`、`session_event`）、`channel_delivery` 与作品/媒体表都在同一个库；没有迁移，形状变了直接改。
-- **客户端（`apps/mac`、`crates/cli`）**：原生应用带着服务端（外壳拆为 `apps/mac/src/shell/` 八个文件，独占支撑库在 `apps/mac/crates/{pixel,terminal,workspace}`），工作台（`apps/mac/ui/{app,workspace,design,features,farm,infra}`）是 nsh 跑的 TSX，像素场景由 Rust 画（[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)）；命令行经 `server.json` 找到运行中的服务端。
+- **客户端（`apps/mac`、`crates/cli`）**：原生应用带着服务端（外壳拆为 `apps/mac/src/shell/` 九个文件，含 `VIBEVALLEY_DEBUG=1` 门控的底边悬浮胶囊、`⇧⌥D` 浮层与独立拆窗 `devtools.rs`，独占支撑库在 `apps/mac/crates/{pixel,terminal,workspace}`），工作台（`apps/mac/ui/{app,workspace,design,features,farm,infra}`，含六视图 `HostedView("devtools")`）是 nsh 跑的 TSX，像素场景由 Rust 画（[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)）；命令行经 `server.json` 找到运行中的服务端。
 
 ## 核心状态
 
@@ -89,6 +89,7 @@ Host：
 | `conversations/` | `vibevalley` 引擎上执行会话的对话 |
 | `agent/<角色 id>/` | 主助手的对话 `conversation.jsonl` 和 `MEMORY.md` |
 | `attachments/` | 附件，按 SHA-256 存一份 |
+| `debug-bundles/` | `debug.bundle.export` 导出的脱敏诊断包（`debug-bundle-*.zip`，仅 `VIBEVALLEY_DEBUG=1`） |
 
 Space 下：
 - `repos/`：仓库的 git 仓库。

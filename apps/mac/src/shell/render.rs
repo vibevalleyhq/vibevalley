@@ -9,7 +9,9 @@ use super::menus::*;
 
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let frame_start = self.devtools.state.enabled.then(std::time::Instant::now);
         self.ensure_panes(window, cx);
+        self.ensure_devtools_overlay(window, cx);
         let colors = Ui::get(cx).colors.clone();
         let sidebar_w: Pixels = px(self.sidebar_width);
         let main = crate::panes::render_main(self, window, cx);
@@ -37,7 +39,9 @@ impl Render for Shell {
                 )
         });
         let launch = self.launch.clone().map(|o| div().absolute().inset_0().child(o));
-        div()
+        let devtools_overlay = self.render_devtools_overlay(cx);
+        let devtools_capsule = self.render_devtools_capsule(cx);
+        let root = div()
             .id("shell")
             .size_full()
             .relative()
@@ -147,6 +151,7 @@ impl Render for Shell {
             .on_action(cx.listener(|s, _: &ZoomReset, _, cx| s.reset_font_size(cx)))
             .on_action(cx.listener(|s, _: &ToggleSidebar, _, cx| s.toggle_sidebar(cx)))
             .on_action(cx.listener(|s, _: &ToggleTheme, _, cx| s.toggle_theme(cx)))
+            .on_action(cx.listener(|s, _: &ToggleDevtools, w, cx| s.toggle_devtools(w, cx)))
             .on_action(cx.listener(|_, _: &Quit, _, cx| cx.quit()))
             .on_mouse_move(cx.listener(Self::on_mouse_move))
             .on_mouse_up(MouseButton::Left, cx.listener(|s, _, _, cx| s.on_mouse_up(cx)))
@@ -252,6 +257,19 @@ impl Render for Shell {
                             .child(vibevalley_i18n::t("desktop.terminal.dismiss", &[])),
                     )
             }))
-            .children(launch)
+            .children(devtools_overlay)
+            .children(devtools_capsule)
+            .children(launch);
+        if let Some(started) = frame_start {
+            let duration_us = started.elapsed().as_micros() as u64;
+            let ms = duration_us as f64 / 1000.0;
+            self.devtools.state.record_frame_ms(ms);
+            if self.devtools.state.should_record_frame(duration_us)
+                && let Some(handle) = cx.try_global::<crate::hosted::ShellDebugHandle>()
+            {
+                handle.record_frame(duration_us, "Shell::render");
+            }
+        }
+        root
     }
 }

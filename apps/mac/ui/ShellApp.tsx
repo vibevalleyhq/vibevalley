@@ -5,6 +5,7 @@ import { host, mount, Text, View, type Component } from "nsh";
 import { setLocale } from "@vibevalley/i18n";
 
 import { applyMotion } from "./design/motion";
+import { DevToolsApp } from "./features/devtools/DevToolsApp";
 import { viewName } from "./infra/bridge";
 import { useBridge } from "./infra/bridged";
 import { readHostMotion } from "./infra/hostParams";
@@ -23,6 +24,7 @@ function Unknown() {
 }
 
 const views: Record<string, Component> = {
+  devtools: DevToolsApp,
   sidebar: Sidebar,
   palette: Palette,
   markdown: MarkdownPane,

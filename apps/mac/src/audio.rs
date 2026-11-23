@@ -239,6 +239,43 @@ pub enum SoundName {
     VoiceOff,
 }
 
+impl From<vibevalley_protocol::HostSoundName> for SoundName {
+    fn from(name: vibevalley_protocol::HostSoundName) -> Self {
+        use vibevalley_protocol::HostSoundName as H;
+        match name {
+            H::Tap => SoundName::Tap,
+            H::Nope => SoundName::Nope,
+            H::Pick => SoundName::Pick,
+            H::Open => SoundName::Open,
+            H::Close => SoundName::Close,
+            H::Water => SoundName::Water,
+            H::Spray => SoundName::Spray,
+            H::Weed => SoundName::Weed,
+            H::Harvest => SoundName::Harvest,
+            H::Shovel => SoundName::Shovel,
+            H::Plant => SoundName::Plant,
+            H::Ripe => SoundName::Ripe,
+            H::Bug => SoundName::Bug,
+            H::Coin => SoundName::Coin,
+            H::LevelUp => SoundName::LevelUp,
+            H::Achievement => SoundName::Achievement,
+            H::Arrive => SoundName::Arrive,
+            H::Rustle => SoundName::Rustle,
+            H::Splash => SoundName::Splash,
+            H::Thud => SoundName::Thud,
+            H::Woof => SoundName::Woof,
+            H::Yip => SoundName::Yip,
+            H::Pant => SoundName::Pant,
+            H::Meow => SoundName::Meow,
+            H::Mew => SoundName::Mew,
+            H::Purr => SoundName::Purr,
+            H::VoiceOn => SoundName::VoiceOn,
+            H::Ring => SoundName::Ring,
+            H::VoiceOff => SoundName::VoiceOff,
+        }
+    }
+}
+
 /// Plays a named synthesized UI sound from the in-memory WAV cache without disk I/O.
 pub fn play_sound(name: SoundName) -> Result<(), String> {
     let bytes = cached_sound_wav(name);

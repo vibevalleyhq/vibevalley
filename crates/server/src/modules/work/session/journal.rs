@@ -789,6 +789,11 @@ impl Trajectories {
         self.with(id, f)
     }
 
+    /// Session ids that currently have an open in-memory journal.
+    pub fn open_session_ids(&self) -> Vec<String> {
+        self.open.lock().keys().cloned().collect()
+    }
+
     /// Deletes a session's log.
     pub fn forget(&self, id: &str) {
         if !known_id(id) {

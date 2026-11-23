@@ -47,6 +47,10 @@ export interface FarmPhoneParams {
   readonly calls: FarmCalls;
 }
 
+export interface DevToolsParams {
+  readonly detached: boolean;
+}
+
 const optString = z.string().optional().catch(undefined);
 const localeSchema = z.enum(["en", "zh"]).catch("zh");
 const motionSchema = MotionChoice.optional().catch(undefined);
@@ -98,6 +102,10 @@ const farmPhoneParamsSchema = z.object({
   calls: farmCallsSchema.catch(emptyCalls),
 });
 
+const devToolsParamsSchema = z.object({
+  detached: z.boolean().catch(false),
+});
+
 function rawParams(): Record<string, unknown> {
   return typeof host.params === "object" && host.params !== null ? host.params : {};
 }
@@ -138,4 +146,8 @@ export function readFarmFormParams(): FarmFormParams {
 
 export function readFarmPhoneParams(): FarmPhoneParams {
   return farmPhoneParamsSchema.parse(rawParams());
+}
+
+export function readDevToolsParams(): DevToolsParams {
+  return devToolsParamsSchema.parse(rawParams());
 }
