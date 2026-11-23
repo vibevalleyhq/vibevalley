@@ -32,7 +32,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 | `apps/mac/ui/{app,features,design,infra}/` | 工作台共 6 个顶级目录：入口外壳 `app/`（路由表 `Workbench.tsx`、6 项一级导航 `places.ts`、外框 `Shell.tsx`）、领域切片 `features/<概念>/`（含二元统一内容中心壳 `content/`、5 栏设置页、Artifact 引擎含 `TimelineBar.tsx` 时间旅行与 `outline` 大纲笔记、素材库及历史 `pkm` 兜底）、共享原语与表面 `design/`（含动效出口 `motion.ts` 与防闪烁骨架原语 `Skeleton.tsx`）、底层运行时与状态 `infra/`（`bridge.ts`、`solid.ts`、`polyfill.ts`、`state/`），另加 `workspace/` 与 `farm/` |
 | `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[哲学与令牌](docs/design/01-philosophy-and-tokens.md)），与 `apps/mobile` 令牌一同由 [tokens.ts](scripts/gen/tokens.ts) 从 [tokens.json](design/tokens.json) 生成 |
 | `apps/mac/ui/features/setting/RemoteAccessPage.tsx` | Mac 设置页 `/settings/connections/remote`：远程访问开关、Tailscale 在线状态与地址、二维码配对（`host.qr`）与已配对设备撤销 |
-| `apps/mobile/` | 独立原生移动应用（`nsh/mobile`，iOS 优先、Android 就绪）：基于 `@vibevalley/protocol/remote`（[transport.ts](packages/protocol/src/remote/transport.ts)）连接 Mac 远程门，含配对页、4 个一级原生标签（收件箱、频道、会话、任务）与 `<Canvas>` + `Path2D` 97 枚 reicons 渲染 |
+| `apps/mobile/` | 独立原生移动应用（`nsh/mobile`，iOS + Android 折叠屏／iPhone Duo 自适应）：基于 `@vibevalley/protocol/remote`（[transport.ts](packages/protocol/src/remote/transport.ts)）连接 Mac 远程门，含配对页、4 个一级标签（收件箱、频道、会话、任务）、[layout.ts](apps/mobile/src/design/layout.ts) 自适应单／双栏布局与 `<Canvas>` + `Path2D` 97 枚 reicons 渲染 |
 | `crates/server/src/transport/bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
 | `packages/protocol/src/host.ts` | `Host` 接口：页面能向宿主要的东西 |
 | `apps/island/` | 刘海上的灵动岛（Swift）：一个单独的小程序，stdin 收工单摘要，stdout 说点了哪一行（[apps/island/README.md](apps/island/README.md)）；`apps/mac` 从包内带起它，退出时关闭 |
@@ -112,7 +112,9 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 ### 移动端与远程访问
 
 - **Mac 设置入口（`/settings/connections/remote`）**：[RemoteAccessPage.tsx](apps/mac/ui/features/setting/RemoteAccessPage.tsx) 挂在设置「外部连接」的第 3 个子标签，调用 `remote.status`、`remote.enable`、`remote.disable`、`remote.pair.create` 与 `remote.device.revoke`，展示 Tailscale 在线态与访问地址、经 `host.qr` 渲染 `vibevalley://pair` 二维码与 6 位一次性配对码，并支持复制配对链接和即时撤销设备。
-- **独立原生外壳 `apps/mobile/`**：基于 `nsh/mobile` 接入原生 `TabBar`（4 个一级标签：`收件箱`、`频道`、`会话`、`任务`，无桌面工作区和像素农场）、`Haptics` 触觉反馈、`Storage` 凭据持久化和 `UrlScheme`（截获 `vibevalley://pair?url=...&code=...` 深链自动配对）；无移动端原生宿主时（如无头 `nsh test`）自动退化到同令牌组件以保障可测性。
+- **独立原生外壳 `apps/mobile/` 与折叠屏／iPhone Duo 自适应布局**：基于 `nsh/mobile` 接入原生 `TabBar`、`Haptics`、`Storage`、`UrlScheme`（截获 `vibevalley://pair?url=...&code=...` 深链自动配对）与 Android `BackHandler`，无桌面工作区和像素农场；[layout.ts](apps/mobile/src/design/layout.ts) 以响应式 `windowSize()` 与四边 `safeArea()` 按 `DUAL_PANE_MIN_WIDTH = 600` 切换两种布局态：
+  - `compact`（`< 600`）：单栏列表／详情视图 + 底部原生 `TabBar`（按 `platform.select` 分别传入 iOS SF Symbols 与 Android 系统图标，并在详情态由 Android `BackHandler` 优先返回列表）。
+  - `dual_pane`（`>= 600`，适配展开后的 Android 折叠屏如 Pixel Fold `841×701 dp` 与 iPhone Duo `744–840 pt`）：隐藏底部 `TabBar`，改为 `72px` 左侧导航栏（`NAV_RAIL_WIDTH = 72`）+ 4 个标签共享的主从 `<SplitPane>` 双栏视图与居中配对卡片；选中项统一托管在根组件，折展切换时保持详情连续不丢态。无移动端原生宿主时（如无头 `nsh test`）自动退化到同令牌组件。
 - **零平台依赖传输层（`@vibevalley/protocol/remote`）**：[transport.ts](packages/protocol/src/remote/transport.ts) 仅用 Web Fetch、`AbortController`、`ReadableStream` 与 `TextDecoder` 实现 `HttpRemoteTransport`、`parsePairUrl`、`normalizeServerUrl` 与 `pairWithServer`，按需订阅业务切片并通过 `Last-Event-ID` 指数退避续读，遇 `401` / `403` 立即停连并上报 `unauthorized`。
 - **97 枚 reicons 矢量回退与令牌单源**：[icons.ts](scripts/gen/icons.ts) 从 [icon.rs](crates/rich/src/icon.rs) 提取全部 97 枚图标路径（含填充、描边、线帽、拐角、`evenodd` 与透明度）写出 `iconPaths.gen.ts`；在无原生 `VvIcon` 的载体（`apps/mobile` 及非 GPUI 回退）中由 `<Canvas>` + `Path2D` 按 `size / 24` 缩放绘制（[Icon.tsx](apps/mac/ui/design/Icon.tsx)）。[tokens.ts](scripts/gen/tokens.ts) 同步从 [tokens.json](design/tokens.json) 写出 `apps/mobile/design/theme.json` 与 `apps/mobile/nsh.json` 的 Tailwind 令牌配置。
 
@@ -155,7 +157,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 - 真实音频与麦克风验收、Developer ID 签名公证与签名包全路由截图验收，见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)的「剩下的」。
 - DevTools V2（画布 `Inspector` `testID` 点选与源码跳转、Loro 前沿视图、强类型 `DebugCommand` 替换 `apps/mac/src/debug.rs`），见[VibeValley DevTools 与跨边界强类型协议准则](.agents/notes/proposed/architecture/2026-11-22-devtools-and-protocol-boundaries.md)。
 - 宽屏对话次级标签收敛、历史 `pkm` 本地导入/退役与素材组织方式等后续项，见[工作台顶栏、页面交互精简与大纲笔记归属作品](.agents/notes/proposed/architecture/2026-11-22-workbench-ux-polish-and-outline-as-artifact.md)。
-- 移动端 Android 真机构建验证与后续推送能力，见[Tailscale 与 nsh 原生移动远程控制](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)。
+- 移动端真机分发签名与系统远程推送能力，见[Tailscale 与 nsh 原生移动远程控制](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)。
 
 ## 怎么验证
 

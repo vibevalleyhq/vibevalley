@@ -3,6 +3,7 @@ import { Input } from "nsh/base";
 
 import type { IconName } from "../../design/icons";
 import { Icon } from "./Icon";
+import type { MobileLayout } from "./layout";
 import { mix } from "./tone";
 
 export type ButtonTone = "primary" | "plain" | "ok" | "danger" | "quiet";
@@ -11,6 +12,8 @@ export type TagTone = "ok" | "bad" | "wait" | "info" | "neutral";
 export function SafeScreen(props: {
   readonly bottomInset?: boolean;
   readonly topInset?: boolean;
+  readonly leftInset?: boolean;
+  readonly rightInset?: boolean;
   readonly class?: string;
   readonly testID?: string;
   readonly children?: JSX.Element;
@@ -20,8 +23,8 @@ export function SafeScreen(props: {
     return {
       paddingTop: props.topInset === false ? 0 : insets.top,
       paddingBottom: props.bottomInset === false ? 0 : insets.bottom,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
+      paddingLeft: props.leftInset === false ? 0 : insets.left,
+      paddingRight: props.rightInset === false ? 0 : insets.right,
     };
   };
 
@@ -29,6 +32,50 @@ export function SafeScreen(props: {
     <View testID={props.testID} class={`flex-1 bg-page ${props.class ?? ""}`} style={paddingStyle()}>
       {props.children}
     </View>
+  );
+}
+
+export function SplitPane(props: {
+  readonly layout: () => MobileLayout;
+  readonly hasSelection: () => boolean;
+  readonly master: () => JSX.Element;
+  readonly detail: () => JSX.Element;
+  readonly emptyDetail?: () => JSX.Element;
+  readonly testID?: string;
+}) {
+  const isDual = () => props.layout().mode === "dual_pane";
+
+  return (
+    <If
+      when={isDual()}
+      else={
+        <View testID={props.testID} class="min-h-0 flex-1 bg-page">
+          <If
+            when={props.hasSelection()}
+            else={
+              <View testID="mobile-master-pane" class="min-h-0 flex-1 bg-page">
+                {props.master()}
+              </View>
+            }
+          >
+            <View testID="mobile-detail-pane" class="min-h-0 flex-1 bg-page">
+              {props.detail()}
+            </View>
+          </If>
+        </View>
+      }
+    >
+      <View testID={props.testID} class="min-h-0 flex-1 flex-row bg-page">
+        <View testID="mobile-master-pane" class="min-h-0 shrink-0 border-r border-line bg-side" style={{ width: props.layout().masterWidth }}>
+          {props.master()}
+        </View>
+        <View testID="mobile-detail-pane" class="min-h-0 min-w-0 flex-1 bg-page">
+          <If when={props.hasSelection()} else={props.emptyDetail?.()}>
+            {props.detail()}
+          </If>
+        </View>
+      </View>
+    </If>
   );
 }
 

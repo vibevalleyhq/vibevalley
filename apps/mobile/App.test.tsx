@@ -2,6 +2,8 @@ import { expect, open, test, type StubRequest, type StubResponse } from "nsh/tes
 
 import { BizCode } from "@vibevalley/protocol/api";
 
+import { computeMobileLayout, DUAL_PANE_MIN_WIDTH } from "./src/design/layout";
+
 const BASE = "http://127.0.0.1:8890";
 const TOKEN = "vv_dev_mobile_test_token";
 const NOW = 1_764_000_000_000;
@@ -590,4 +592,163 @@ test("connection state reflects unauthorized 401 and supports tapping Inbox revi
   await navApp.press("id:inbox-item-inbox-review-1");
   await navApp.waitFor("id:issue-detail");
   expect(navApp.texts()).toContain("#101 Build iOS mobile remote shell");
+});
+
+test("computeMobileLayout classifies compact phones, Pixel Fold cover/unfolded, and iPhone Duo / iPad mini accurately", () => {
+  expect(DUAL_PANE_MIN_WIDTH).toBe(600);
+
+  const compactIphone = computeMobileLayout({ width: 393, height: 852 }, { top: 59, right: 0, bottom: 34, left: 0 });
+  expect(compactIphone).toEqual({
+    mode: "compact",
+    masterWidth: 393,
+    isLandscape: false,
+    safe: { top: 59, right: 0, bottom: 34, left: 0 },
+  });
+
+  const pixelFoldCover = computeMobileLayout({ width: 384, height: 832 }, { top: 44, right: 0, bottom: 24, left: 0 });
+  expect(pixelFoldCover.mode).toBe("compact");
+  expect(pixelFoldCover.isLandscape).toBe(false);
+  expect(pixelFoldCover.masterWidth).toBe(384);
+
+  const pixelFoldUnfolded = computeMobileLayout({ width: 841, height: 701 }, { top: 24, right: 16, bottom: 24, left: 16 });
+  expect(pixelFoldUnfolded.mode).toBe("dual_pane");
+  expect(pixelFoldUnfolded.isLandscape).toBe(true);
+  expect(pixelFoldUnfolded.masterWidth).toBe(320);
+
+  const iphoneDuo = computeMobileLayout({ width: 744, height: 1133 }, { top: 24, right: 0, bottom: 20, left: 0 });
+  expect(iphoneDuo.mode).toBe("dual_pane");
+  expect(iphoneDuo.isLandscape).toBe(false);
+  expect(iphoneDuo.masterWidth).toBe(283);
+
+  const wideClamp = computeMobileLayout({ width: 1200, height: 800 }, { top: 20, right: 0, bottom: 20, left: 0 });
+  expect(wideClamp.mode).toBe("dual_pane");
+  expect(wideClamp.masterWidth).toBe(360);
+
+  const threshold = computeMobileLayout({ width: 600, height: 800 }, { top: 0, right: 0, bottom: 0, left: 0 });
+  expect(threshold.mode).toBe("dual_pane");
+  expect(threshold.masterWidth).toBe(280);
+});
+
+test("Pixel Fold unfolded (840x700 Android) renders centered PairScreen, Left Navigation Rail, and simultaneous master-detail across all 4 tabs", async () => {
+  const app = await open("./App.story.tsx", {
+    platform: "android",
+    locale: "en-US",
+    width: 840,
+    height: 700,
+    safeArea: { top: 24, bottom: 24, left: 12, right: 12 },
+    network: createFullNetwork(),
+  });
+
+  await app.waitFor("id:pair-screen");
+  expect(app.shows("id:pair-card-container")).toBe(true);
+  expect(app.value("id:pair-device-input")).toBe("Android");
+
+  await app.type("id:pair-url-input", BASE);
+  await app.type("id:pair-code-input", "FOLD35");
+  await app.press("id:pair-submit");
+
+  await app.waitFor("id:mobile-home");
+  await app.waitFor("id:mobile-nav-rail");
+  await app.waitUntil(() => app.texts().includes("Connected"));
+
+  const pairReq = app.requests().find((r) => r.url === `${BASE}/api/v1/remote/pair/exchange`);
+  expect(JSON.parse(pairReq?.body ?? "{}")).toMatchObject({
+    code: "FOLD35",
+    deviceName: "Android",
+    platform: "android",
+  });
+  expect(app.count("id:mobile-tabbar")).toBe(0);
+
+  await app.waitFor("id:inbox-row-perm:sess-1:perm-1");
+  expect(app.shows("id:mobile-master-pane")).toBe(true);
+  expect(app.shows("id:mobile-detail-pane")).toBe(true);
+  await app.waitFor("id:inbox-permission-perm-1");
+  await app.press("id:inbox-approve-perm-1");
+  await app.waitFor("id:inbox-permission-perm-2");
+
+  await app.press("id:inbox-row-item:inbox-review-1");
+  await app.waitFor("id:inbox-jump-inbox-review-1");
+  await app.press("id:inbox-jump-inbox-review-1");
+  await app.waitFor("id:issues-tab");
+  expect(app.shows("id:mobile-master-pane")).toBe(true);
+  expect(app.shows("id:mobile-detail-pane")).toBe(true);
+  expect(app.shows("id:issue-filter-bar")).toBe(true);
+  expect(app.texts()).toContain("#101 Build iOS mobile remote shell");
+
+  await app.press("id:tab-channels");
+  await app.waitFor("id:channel-row-ch-1");
+  await app.waitFor("id:channel-detail");
+  await app.waitFor("id:channel-message-msg-1");
+  expect(app.shows("id:mobile-master-pane")).toBe(true);
+  expect(app.shows("id:mobile-detail-pane")).toBe(true);
+
+  await app.press("id:tab-sessions");
+  await app.waitFor("id:session-row-sess-1");
+  await app.waitFor("id:session-detail");
+  await app.waitFor("id:session-event-1");
+  expect(app.shows("id:mobile-master-pane")).toBe(true);
+  expect(app.shows("id:mobile-detail-pane")).toBe(true);
+});
+
+test("iPhone Duo (744x1024) fold/unfold preserves active detail selection and compact Android BackHandler exits detail cleanly", async () => {
+  const initialStorage = {
+    "vibevalley.remote.credentials.v1": JSON.stringify({
+      baseUrl: BASE,
+      token: TOKEN,
+      deviceName: "iPhone",
+      serverName: "Lucas MacBook Pro",
+    }),
+  };
+
+  const app = await open("./App.story.tsx", {
+    platform: "ios",
+    locale: "en-US",
+    width: 744,
+    height: 1024,
+    safeArea: { top: 24, bottom: 20, left: 0, right: 0 },
+    storage: initialStorage,
+    network: createFullNetwork(),
+  });
+
+  await app.waitFor("id:mobile-nav-rail");
+  await app.press("id:tab-issues");
+  await app.waitFor("id:issue-row-issue-2");
+  await app.press("id:issue-row-issue-2");
+  await app.waitUntil(() => app.texts().includes("#102 Add Tailscale diagnostics"));
+
+  await app.setViewport(393, 852);
+  await app.waitFor("id:issue-back");
+  expect(app.count("id:mobile-nav-rail")).toBe(0);
+  expect(app.shows("id:mobile-detail-pane")).toBe(true);
+  expect(app.texts()).toContain("#102 Add Tailscale diagnostics");
+
+  await app.setViewport(840, 700);
+  await app.waitFor("id:mobile-nav-rail");
+  expect(app.shows("id:mobile-master-pane")).toBe(true);
+  expect(app.shows("id:mobile-detail-pane")).toBe(true);
+  expect(app.count("id:issue-back")).toBe(0);
+  expect(app.texts()).toContain("#102 Add Tailscale diagnostics");
+
+  const androidCover = await open("./App.story.tsx", {
+    platform: "android",
+    locale: "en-US",
+    width: 384,
+    height: 832,
+    storage: initialStorage,
+    network: createFullNetwork(),
+  });
+
+  await androidCover.waitFor("id:inbox-item-inbox-review-1");
+  await androidCover.press("id:inbox-item-inbox-review-1");
+  await androidCover.waitFor("id:issue-detail");
+  await androidCover.waitFor("id:issue-back");
+  await androidCover.back();
+  await androidCover.waitFor("id:issue-row-issue-1");
+  expect(androidCover.count("id:issue-detail")).toBe(0);
+
+  await androidCover.press("id:issue-row-issue-1");
+  await androidCover.waitFor("id:issue-detail");
+  await androidCover.press("id:issue-back");
+  await androidCover.waitFor("id:issue-row-issue-1");
+  expect(androidCover.count("id:issue-detail")).toBe(0);
 });

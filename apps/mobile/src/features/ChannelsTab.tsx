@@ -6,7 +6,8 @@ import type { Channel, ChatMessage } from "@vibevalley/protocol";
 import { ChannelEvent as ChannelEventSchema, ChatMessage as ChatMessageSchema } from "@vibevalley/protocol/schema";
 
 import { Icon } from "../design/Icon";
-import { EmptyPanel, FieldInput, PillButton, SectionCard, StatusTag, TopBar } from "../design/ui";
+import type { MobileLayout } from "../design/layout";
+import { EmptyPanel, FieldInput, PillButton, SectionCard, SplitPane, StatusTag, TopBar } from "../design/ui";
 import { hapticImpact, hapticNotification, type RemoteSession } from "../infra/session";
 
 const ChatMessageListSchema = z.array(ChatMessageSchema);
@@ -30,6 +31,7 @@ function channelLabel(channel: Channel): string {
 
 export function ChannelsTab(props: {
   readonly session: RemoteSession;
+  readonly layout: () => MobileLayout;
   readonly selectedChannelId: () => string | undefined;
   readonly onSelectChannel: (id: string | undefined) => void;
 }) {
@@ -38,6 +40,7 @@ export function ChannelsTab(props: {
   const draft = signal("");
   const sending = signal(false);
   const sendError = signal<string | undefined>(undefined);
+  const isDual = () => props.layout().mode === "dual_pane";
 
   const channels = () => {
     const list = props.session.collab()?.chat?.channels ?? [];
@@ -50,6 +53,15 @@ export function ChannelsTab(props: {
     if (id === undefined) return undefined;
     return channels().find((c) => c.id === id);
   };
+
+  effect(() => {
+    if (!isDual()) return;
+    const list = channels();
+    const current = props.selectedChannelId();
+    if (list.length > 0 && (current === undefined || !list.some((c) => c.id === current))) {
+      props.onSelectChannel(list[0]?.id);
+    }
+  });
 
   effect(() => {
     const channelId = props.selectedChannelId();
@@ -139,110 +151,119 @@ export function ChannelsTab(props: {
     }
   };
 
-  return (
-    <View testID="channels-tab" class="flex-1 bg-page">
+  const renderMaster = () => (
+    <If when={channels().length > 0} else={<EmptyPanel testID="channels-empty" icon="chat" message={t("web.remote.channel.empty")} />}>
+      <Scroll class="flex-1" contentClass="gap-2.5 p-3.5">
+        <Each of={channels()} key={(ch) => ch.id}>
+          {(ch) => {
+            const active = () => isDual() && props.selectedChannelId() === ch().id;
+            return (
+              <SectionCard
+                testID={`channel-row-${ch().id}`}
+                onPress={() => {
+                  hapticImpact("light");
+                  props.onSelectChannel(ch().id);
+                }}
+                class={`gap-1.5 ${active() ? "border-focus bg-selected" : ""}`}
+              >
+                <View class="flex-row items-center justify-between gap-2">
+                  <View class="min-w-0 flex-1 flex-row items-center gap-2">
+                    <Icon name="chat" size={16} tone="accent" />
+                    <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{channelLabel(ch())}</Text>
+                  </View>
+                  <If when={(ch().unread ?? 0) > 0}>
+                    <StatusTag label={String(ch().unread ?? 0)} tone="info" />
+                  </If>
+                </View>
+                <If when={ch().last}>
+                  {(last) => (
+                    <Text class="truncate text-xs text-muted">
+                      {last().name}: {last().text}
+                    </Text>
+                  )}
+                </If>
+              </SectionCard>
+            );
+          }}
+        </Each>
+      </Scroll>
+    </If>
+  );
+
+  const renderDetail = () => (
+    <View testID="channel-detail" class="min-h-0 flex-1">
+      <TopBar
+        testID="channel-detail-bar"
+        backTestID="channel-back"
+        title={selectedChannel() ? channelLabel(selectedChannel()!) : (props.selectedChannelId() ?? "")}
+        subtitle={selectedChannel()?.description || undefined}
+        onBack={isDual() ? undefined : () => props.onSelectChannel(undefined)}
+      />
+
+      <If when={sendError()}>
+        {(msg) => (
+          <View testID="channel-error" class="mx-4 mt-2 rounded-lg border border-berry bg-bad-soft px-3 py-2">
+            <Text class="text-xs font-medium text-berry">{msg()}</Text>
+          </View>
+        )}
+      </If>
+
       <If
-        when={props.selectedChannelId() !== undefined}
+        when={!loading() && messages().length === 0}
         else={
-          <If when={channels().length > 0} else={<EmptyPanel testID="channels-empty" icon="chat" message={t("web.remote.channel.empty")} />}>
-            <Scroll class="flex-1" contentClass="gap-2.5 p-4">
-              <Each of={channels()} key={(ch) => ch.id}>
-                {(ch) => (
-                  <SectionCard
-                    testID={`channel-row-${ch().id}`}
-                    onPress={() => {
-                      hapticImpact("light");
-                      props.onSelectChannel(ch().id);
-                    }}
-                    class="gap-1.5"
-                  >
-                    <View class="flex-row items-center justify-between gap-2">
-                      <View class="min-w-0 flex-1 flex-row items-center gap-2">
-                        <Icon name="chat" size={16} tone="accent" />
-                        <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{channelLabel(ch())}</Text>
-                      </View>
-                      <If when={(ch().unread ?? 0) > 0}>
-                        <StatusTag label={String(ch().unread ?? 0)} tone="info" />
-                      </If>
-                    </View>
-                    <If when={ch().last}>
-                      {(last) => (
-                        <Text class="truncate text-xs text-muted">
-                          {last().name}: {last().text}
-                        </Text>
-                      )}
-                    </If>
-                  </SectionCard>
-                )}
-              </Each>
-            </Scroll>
-          </If>
+          <Scroll class="flex-1" contentClass="gap-2.5 p-4">
+            <Each of={messages()} key={(msg) => msg.id}>
+              {(msg) => (
+                <SectionCard testID={`channel-message-${msg().id}`} class="gap-1">
+                  <View class="flex-row items-center justify-between gap-2">
+                    <Text class="text-xs font-semibold text-accent">{msg().name}</Text>
+                    <Text class="font-mono text-2xs text-faint">#{String(msg().number)}</Text>
+                  </View>
+                  <Text class="text-sm text-ink">{msg().text}</Text>
+                </SectionCard>
+              )}
+            </Each>
+          </Scroll>
         }
       >
-        <View testID="channel-detail" class="flex-1">
-          <TopBar
-            testID="channel-detail-bar"
-            backTestID="channel-back"
-            title={selectedChannel() ? channelLabel(selectedChannel()!) : (props.selectedChannelId() ?? "")}
-            subtitle={selectedChannel()?.description || undefined}
-            onBack={() => props.onSelectChannel(undefined)}
-          />
-
-          <If when={sendError()}>
-            {(msg) => (
-              <View testID="channel-error" class="mx-4 mt-2 rounded-lg border border-berry bg-bad-soft px-3 py-2">
-                <Text class="text-xs font-medium text-berry">{msg()}</Text>
-              </View>
-            )}
-          </If>
-
-          <If
-            when={!loading() && messages().length === 0}
-            else={
-              <Scroll class="flex-1" contentClass="gap-2.5 p-4">
-                <Each of={messages()} key={(msg) => msg.id}>
-                  {(msg) => (
-                    <SectionCard testID={`channel-message-${msg().id}`} class="gap-1">
-                      <View class="flex-row items-center justify-between gap-2">
-                        <Text class="text-xs font-semibold text-accent">{msg().name}</Text>
-                        <Text class="font-mono text-2xs text-faint">#{String(msg().number)}</Text>
-                      </View>
-                      <Text class="text-sm text-ink">{msg().text}</Text>
-                    </SectionCard>
-                  )}
-                </Each>
-              </Scroll>
-            }
-          >
-            <EmptyPanel testID="channel-messages-empty" icon="chat" message={t("web.remote.channel.empty")} />
-          </If>
-
-          <View class="flex-row items-center gap-2 border-t border-line bg-side px-3.5 py-2.5">
-            <FieldInput
-              testID="channel-reply-input"
-              placeholder={t("web.remote.channel.replyPlaceholder")}
-              value={draft()}
-              onInput={(v) => draft.set(v)}
-              onSubmit={() => {
-                void sendReply();
-              }}
-              disabled={sending()}
-              class="min-w-0 flex-1"
-            />
-            <PillButton
-              testID="channel-reply-send"
-              tone="primary"
-              size="sm"
-              icon="send"
-              label={t("web.remote.channel.send")}
-              disabled={sending() || draft().trim() === ""}
-              onPress={() => {
-                void sendReply();
-              }}
-            />
-          </View>
-        </View>
+        <EmptyPanel testID="channel-messages-empty" icon="chat" message={t("web.remote.channel.empty")} />
       </If>
+
+      <View class="flex-row items-center gap-2 border-t border-line bg-side px-3.5 py-2.5">
+        <FieldInput
+          testID="channel-reply-input"
+          placeholder={t("web.remote.channel.replyPlaceholder")}
+          value={draft()}
+          onInput={(v) => draft.set(v)}
+          onSubmit={() => {
+            void sendReply();
+          }}
+          disabled={sending()}
+          class="min-w-0 flex-1"
+        />
+        <PillButton
+          testID="channel-reply-send"
+          tone="primary"
+          size="sm"
+          icon="send"
+          label={t("web.remote.channel.send")}
+          disabled={sending() || draft().trim() === ""}
+          onPress={() => {
+            void sendReply();
+          }}
+        />
+      </View>
     </View>
+  );
+
+  return (
+    <SplitPane
+      testID="channels-tab"
+      layout={props.layout}
+      hasSelection={() => props.selectedChannelId() !== undefined}
+      master={renderMaster}
+      detail={renderDetail}
+      emptyDetail={() => <EmptyPanel testID="channel-detail-empty" icon="chat" message={t("web.remote.channel.empty")} />}
+    />
   );
 }

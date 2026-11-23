@@ -38,7 +38,9 @@ VibeValley 当前只允许在本机回环地址（`127.0.0.1`）访问服务端�
 
 - **97 枚 reicons 单源矢量回退**：由 `scripts/gen/icons.ts` 从 [icon.rs](crates/rich/src/icon.rs) 生成矢量路径表，在无 GPUI 原生 `VvIcon` 的载体（`apps/mobile` 及非 GPUI 宿主回退）中用 `<Canvas>` + `Path2D` 按 24×24 坐标系精确绘制填充、描边、线帽、拐角、`evenodd` 与透明度，保持桌面与移动端视觉一致。
 - **令牌同步**：`scripts/gen/tokens.ts` 从 [tokens.json](design/tokens.json) 同步写出 `apps/mobile/design/theme.json` 与 `apps/mobile/nsh.json` 的 Tailwind 令牌配置，移动端与桌面工作台共用田间工作台设计系统。
-- **`apps/mobile` 原生外壳**：独立 `nsh` 移动端应用，通过 `nsh/mobile` 接入原生 `TabBar`（4 个一级标签：`收件箱`、`频道`、`会话`、`任务`）、`Haptics` 触觉反馈、`Storage` 凭据持久化与 `UrlScheme`（接收 `vibevalley://pair` 深链自动填充配对表单）。首期以 iOS Simulator 与真机为验收基线，所有 `nsh/mobile` API 均面向 Android 兼容层设计。
+- **`apps/mobile` 原生外壳与折叠屏／iPhone Duo 自适应布局**：独立 `nsh` 移动端应用，通过 `nsh/mobile` 接入原生 `TabBar`（4 个一级标签：`收件箱`、`频道`、`会话`、`任务`）、`Haptics` 触觉反馈、`Storage` 凭据持久化、`UrlScheme`（接收 `vibevalley://pair` 深链自动配对）与 Android `BackHandler`；同时由 [layout.ts](apps/mobile/src/design/layout.ts) 基于响应式 `windowSize()` 与四边 `safeArea()` 以 `DUAL_PANE_MIN_WIDTH = 600` 划分 `compact`／`dual_pane` 两态：
+  - **`compact`（宽度 `< 600`）**：单栏列表／详情切换，底部渲染原生 `TabBar`（经 `platform.select` 分别提供 iOS SF Symbols 与 Android 系统图标，避免向 Android Material 3 导航栏发送 SF Symbols）并由 Android `BackHandler` 拦截系统返回键先退出详情页。
+  - **`dual_pane`（宽度 `>= 600`，覆盖 Android 折叠屏展开态如 Pixel Fold `841×701 dp` 及 iPhone Duo `744–840 pt`）**：卸除底部 `TabBar` 并切换为 `72px` 左侧导航栏（`NAV_RAIL_WIDTH = 72`）+ 4 个标签通用的主从 `<SplitPane>` 双栏布局，配对页则居中渲染最大 `480px` 卡片；所有标签选中项提升至根组件，折叠与展开切换时零状态丢失。
 
 ## Alternatives considered
 
@@ -54,7 +56,7 @@ VibeValley 当前只允许在本机回环地址（`127.0.0.1`）访问服务端�
 
 - 协议与传输层：`crates/protocol/src/contract/remote.rs`、`endpoints.rs`、`golden/schema/remote.json`、`packages/protocol/src/remote/{schema,api,transport}.ts` 与 `client.ts`、`capabilities.md` 全部通过 `cargo test`、`vp run protocol:check`、`vp run packages:check`；`transport.test.ts` 覆盖深链解析、地址规范化、配对交换、Bearer 头、跨分片多行 SSE、`Last-Event-ID` 续读重连、`401` 停连、`subscribe` 与 `close()` 清理。
 - 服务端远程门：默认不启动远程监听；`remote.enable` 仅允许 Tailscale IPv4 或回环地址；一次性配对码 5 分钟过期且仅可兑换一次；撤销设备后原令牌立即返回 `401`；`Caller::Remote` 调用 `Caller::User` 专属端点返回 `403`。
-- 桌面端设置与移动端应用：Mac 设置页提供远程访问开关、Tailscale 状态、二维码配对与设备撤销；`apps/mobile` 通过 `nsh check`、`nsh build` 与组件测试，支持深链／手动配对、4 标签实时切片刷新、审批权限与回复消息，且全部 97 枚图标通过 `<Canvas>` + `Path2D` 正确渲染。
+- 桌面端设置与移动端应用：Mac 设置页提供远程访问开关、Tailscale 状态、二维码配对与设备撤销；`apps/mobile` 通过 `nsh check`、`nsh build` 与组件测试，支持深链／手动配对、4 标签实时切片刷新、审批权限与回复消息、折叠屏与 iPhone Duo（`>= 600` 宽度）左侧导航栏 + `<SplitPane>` 双栏自适应与折展态连续性，以及全部 97 枚图标经 `<Canvas>` + `Path2D` 正确渲染。
 
 ## Risks
 
