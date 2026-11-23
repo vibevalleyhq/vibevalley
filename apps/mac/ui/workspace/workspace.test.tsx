@@ -12,7 +12,7 @@ type App = Awaited<ReturnType<typeof open>>;
 
 function workspaceHost(params: Record<string, unknown>, rpcResponses: Record<string, unknown> = {}, deferOps: readonly string[] = []) {
   const queue: [string, unknown][] = [];
-  const heldReplies: [string, unknown][] = [];
+  const heldReplies: { op: string; reply: [string, unknown] }[] = [];
   const acts: { type: string; [key: string]: unknown }[] = [];
   const calls: { op: string; payload: unknown }[] = [];
   const subscriptions = new Map<string, { name: string; payload: unknown }>();
@@ -32,7 +32,7 @@ function workspaceHost(params: Record<string, unknown>, rpcResponses: Record<str
       const answer = op in responses ? responses[op] : null;
       const body = typeof answer === "function" ? (answer as (p: unknown) => unknown)(a.payload) : answer;
       const reply: [string, unknown] = [`reply:${a.id}`, { bizCode: 0, message: "ok", data: body }];
-      if (deferOps.includes(op)) heldReplies.push(reply);
+      if (deferOps.includes(op)) heldReplies.push({ op, reply });
       else queue.push(reply);
     } else if (a.type === "subscribe" && a.id !== undefined) {
       subscriptions.set(a.id, { name: a.name ?? "", payload: a.payload });
@@ -50,8 +50,17 @@ function workspaceHost(params: Record<string, unknown>, rpcResponses: Record<str
     }
   };
 
-  const releaseDeferred = async (app: App) => {
-    queue.push(...heldReplies.splice(0));
+  const releaseDeferred = async (app: App, op?: string) => {
+    for (let i = 0; i < heldReplies.length;) {
+      const entry = heldReplies[i];
+      if (entry === undefined) break;
+      if (op === undefined || entry.op === op) {
+        queue.push(entry.reply);
+        heldReplies.splice(i, 1);
+      } else {
+        i++;
+      }
+    }
     await pump(app);
   };
 
@@ -1009,4 +1018,82 @@ test("regression: GitPanel preserves commit draft across rail and git frame upda
   await clock.fastForward(2600);
   await host.pump(app);
   expect(app.texts()).not.toContain(t("web.shell.git.commitSuccess"));
+});
+
+test("regression: ChatPane sends optimistically before session.openWorkspace settles, survives empty history, and rolls back on failure", async () => {
+  const baseSession = {
+    id: "sess-opt-1",
+    controller: "user" as const,
+    name: "Antigravity",
+    runtime: "antigravity",
+    brief: "Optimistic chat",
+    cwd: "/work/vibevalley",
+    policy: { kind: "directCwd" as const, repo: "vibevalley", permissionMode: "acceptEdits" as const },
+    bindings: [],
+    hiredAt: 1_700_000_000_000,
+    runs: 1,
+    phase: { _tag: "working" as const, since: 1_700_000_000_000, doing: { action: "thinking" as const, label: "Working" } },
+  };
+  const host = workspaceHost(
+    { view: "workspace-chat", tabId: 60, runtime: "antigravity", cwd: "/work/vibevalley", repo: "vibevalley" },
+    {
+      "runtime.list": [],
+      "session.openWorkspace": {
+        id: "sess-opt-1",
+        session: baseSession,
+        permissionMode: "acceptEdits",
+      },
+      "session.send": baseSession,
+    },
+    ["session.openWorkspace", "session.send"],
+  );
+
+  const app = await open("../ShellApp.story.tsx", { width: 820, height: 760, colorScheme: "light", platform: "macos", host: host.options });
+  await host.pump(app);
+
+  await app.type("id:chat-composer-input", "Optimistic check");
+  await app.press("id:chat-send");
+
+  expect(app.value("id:chat-composer-input")).toBe("");
+  expect(app.count("id:chat-step--1")).toBe(1);
+  expect(app.texts()).toContain("Optimistic check");
+
+  await host.releaseDeferred(app, "session.openWorkspace");
+  await host.emitSub(app, "session.watch", {
+    kind: "history",
+    session: "sess-opt-1",
+    events: [],
+  });
+  expect(app.count("id:chat-step--1")).toBe(1);
+  expect(app.texts()).toContain("Optimistic check");
+
+  await host.releaseDeferred(app, "session.send");
+  await host.emitSub(app, "session.watch", {
+    kind: "event",
+    session: "sess-opt-1",
+    event: { seq: 1, revision: 1, time: 1_700_000_001_000, type: "user/message", text: "Optimistic check" },
+  });
+  expect(app.count("id:chat-step--1")).toBe(0);
+  expect(app.count("id:chat-step-1")).toBe(1);
+
+  const failHost = workspaceHost(
+    { view: "workspace-chat", tabId: 61, runtime: "antigravity", cwd: "/work/vibevalley" },
+    {
+      "runtime.list": [],
+      "session.openWorkspace": null,
+    },
+    ["session.openWorkspace"],
+  );
+  const failApp = await open("../ShellApp.story.tsx", { width: 820, height: 760, colorScheme: "light", platform: "macos", host: failHost.options });
+  await failHost.pump(failApp);
+
+  await failApp.type("id:chat-composer-input", "Should restore");
+  await failApp.press("id:chat-send");
+  expect(failApp.value("id:chat-composer-input")).toBe("");
+  expect(failApp.count("id:chat-step--1")).toBe(1);
+
+  await failHost.releaseDeferred(failApp, "session.openWorkspace");
+  expect(failApp.count("id:chat-step--1")).toBe(0);
+  expect(failApp.value("id:chat-composer-input")).toBe("Should restore");
+  expect(failApp.count("id:chat-error")).toBe(1);
 });

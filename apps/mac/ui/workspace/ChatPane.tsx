@@ -449,16 +449,18 @@ export function WorkspaceChatPane() {
   const errorText = signal<string | undefined>(undefined);
   const telemetryOpen = signal(false);
   let localSeq = 0;
+  const inFlightOptimistic = new Map<number, string>();
 
-  const canSend = () => !sending() && (draft().trim().length > 0 || attachedFiles().length > 0);
-  const currentRuntime = () => runtimes().find((r) => r.id === runtime());
-  const currentModels = () => currentRuntime()?.models ?? [];
-  const currentModelInfo = () => currentModels().find((m) => m.id === model());
-  const modelTriggerLabel = () => currentModelInfo()?.label ?? runtimeDisplayName(runtime());
-  const effortOptions = (): readonly ThoughtLevel[] => currentModelInfo()?.effortLevels ?? [];
-  const effectiveThoughtLevel = (): ThoughtLevel | undefined => clampThoughtLevel(currentModelInfo(), thoughtLevel());
-  const hasAttention = () => pendingInteractions().length > 0 || pendingPermissions().length > 0;
-  const effectivePhase = (): ChatPhase => (hasAttention() ? "waiting" : phase());
+  const hasDraft = computed(() => draft().trim().length > 0);
+  const canSend = computed(() => !sending() && (hasDraft() || attachedFiles().length > 0));
+  const currentRuntime = computed(() => runtimes().find((r) => r.id === runtime()));
+  const currentModels = computed(() => currentRuntime()?.models ?? []);
+  const currentModelInfo = computed(() => currentModels().find((m) => m.id === model()));
+  const modelTriggerLabel = computed(() => currentModelInfo()?.label ?? runtimeDisplayName(runtime()));
+  const effortOptions = computed((): readonly ThoughtLevel[] => currentModelInfo()?.effortLevels ?? []);
+  const effectiveThoughtLevel = computed((): ThoughtLevel | undefined => clampThoughtLevel(currentModelInfo(), thoughtLevel()));
+  const hasAttention = computed(() => pendingInteractions().length > 0 || pendingPermissions().length > 0);
+  const effectivePhase = computed((): ChatPhase => (hasAttention() ? "waiting" : phase()));
   const shownSteps = computed(() => visibleChatSteps(steps()));
   const telemetry = computed(() => computeTelemetry(steps(), latestTokens()));
 
@@ -505,14 +507,27 @@ export function WorkspaceChatPane() {
           break;
         }
         case "history": {
-          // Drop optimistic local placeholders (negative seq) once canonical history arrives.
+          // Drop completed optimistic local placeholders once canonical history arrives, but keep still-in-flight ones unless echoed.
           const canonical = untracked(steps).filter((s) => s.seq > 0);
-          steps.set(mergeChatSteps(canonical, ev.events));
+          const knownSeqs = new Set(canonical.map((s) => s.seq));
+          const incomingUserTexts = new Set(ev.events.filter((e) => e.type === "user/message" && !knownSeqs.has(e.seq)).map((e) => e.text));
+          const preserved = untracked(steps).filter((s) => {
+            if (s.seq > 0) return true;
+            if (!inFlightOptimistic.has(s.seq)) return false;
+            return !incomingUserTexts.has(s.text);
+          });
+          steps.set(mergeChatSteps(preserved, ev.events));
           break;
         }
         case "event": {
           const step = ev.event;
-          const prev = untracked(steps).filter((s) => !(s.seq < 0 && step.type === "user/message" && s.text === step.text));
+          const prev = untracked(steps).filter((s) => {
+            if (s.seq < 0 && step.type === "user/message" && s.text === step.text) {
+              inFlightOptimistic.delete(s.seq);
+              return false;
+            }
+            return true;
+          });
           steps.set(mergeChatSteps(prev, [step]));
           if (step.type === "run/start") phase.set("working");
           else if (step.type === "run/end") phase.set("ready");
@@ -591,35 +606,57 @@ export function WorkspaceChatPane() {
   };
 
   const send = async () => {
-    const text = untracked(draft).trim();
+    const rawDraft = untracked(draft);
+    const text = rawDraft.trim();
     const files = untracked(attachedFiles);
     if ((text.length === 0 && files.length === 0) || untracked(sending)) return;
     errorText.set(undefined);
     sending.set(true);
     const isSteer = untracked(effectivePhase) === "working";
+    draft.set("");
+    attachedFiles.set([]);
+    const seq = --localSeq;
+    const displayText = text.length > 0 ? text : `[${files.map((f) => f.name).join(", ")}]`;
+    inFlightOptimistic.set(seq, displayText);
+    if (isSteer) {
+      const next = new Set(untracked(steeredSeqs));
+      next.add(seq);
+      steeredSeqs.set(next);
+    }
+    steps.set(
+      mergeChatSteps(untracked(steps), [
+        {
+          seq,
+          revision: 1,
+          time: Date.now(),
+          type: "user/message",
+          text: displayText,
+        },
+      ]),
+    );
+    phase.set(untracked(sessionId) ? "working" : "starting");
+
+    const rollbackOptimistic = () => {
+      inFlightOptimistic.delete(seq);
+      steps.set(untracked(steps).filter((s) => s.seq !== seq));
+      if (isSteer) {
+        const prevSteered = untracked(steeredSeqs);
+        if (prevSteered.has(seq)) {
+          const next = new Set(prevSteered);
+          next.delete(seq);
+          steeredSeqs.set(next);
+        }
+      }
+      if (untracked(draft) === "") draft.set(rawDraft);
+      if (untracked(attachedFiles).length === 0 && files.length > 0) attachedFiles.set(files);
+    };
+
     try {
       const sid = await ensureSession();
-      if (!sid) return;
-      draft.set("");
-      attachedFiles.set([]);
-      const seq = --localSeq;
-      if (isSteer) {
-        const next = new Set(untracked(steeredSeqs));
-        next.add(seq);
-        steeredSeqs.set(next);
+      if (!sid) {
+        rollbackOptimistic();
+        return;
       }
-      const displayText = text.length > 0 ? text : `[${files.map((f) => f.name).join(", ")}]`;
-      steps.set(
-        mergeChatSteps(untracked(steps), [
-          {
-            seq,
-            revision: 1,
-            time: Date.now(),
-            type: "user/message",
-            text: displayText,
-          },
-        ]),
-      );
       phase.set("working");
       const res = await sendWorkspaceMessage(
         sid,
@@ -627,10 +664,18 @@ export function WorkspaceChatPane() {
         files.map((f) => ({ path: f.path })),
       );
       if (!res.ok) {
+        rollbackOptimistic();
         errorText.set(t("web.shell.chat.sendFailed", { why: res.reason }));
         if (!isSteer) phase.set("error");
+        return;
       }
+      inFlightOptimistic.delete(seq);
+    } catch (e) {
+      rollbackOptimistic();
+      errorText.set(t("web.shell.chat.sendFailed", { why: e instanceof Error ? e.message : String(e) }));
+      if (!isSteer) phase.set("error");
     } finally {
+      inFlightOptimistic.delete(seq);
       sending.set(false);
     }
   };
@@ -686,7 +731,7 @@ export function WorkspaceChatPane() {
     }
   };
 
-  const runtimeOptions = (): readonly { value: string; label: string; disabled?: boolean }[] => {
+  const runtimeOptions = computed((): readonly { value: string; label: string; disabled?: boolean }[] => {
     const list = runtimes();
     if (list.length === 0) {
       return [
@@ -696,9 +741,9 @@ export function WorkspaceChatPane() {
       ];
     }
     return list.map((r) => ({ value: r.id, label: r.name, disabled: !r.available }));
-  };
+  });
 
-  const modelOptions = () => currentModels().map((m) => ({ value: m.id, label: m.label }));
+  const modelOptions = computed(() => currentModels().map((m) => ({ value: m.id, label: m.label })));
 
   const permissionOptions: readonly { value: SessionPermissionMode; label: string }[] = [
     { value: "ask", label: t("web.shell.chat.modeAsk") },
@@ -707,19 +752,19 @@ export function WorkspaceChatPane() {
     { value: "readOnly", label: t("web.shell.chat.modeReadOnly") },
   ];
 
-  const hasTelemetry = () => telemetry().turns > 0 || telemetry().contextUsed > 0 || currentRuntime()?.quotaPct !== undefined;
-  const telemetryWarn = () => {
+  const hasTelemetry = computed(() => telemetry().turns > 0 || telemetry().contextUsed > 0 || currentRuntime()?.quotaPct !== undefined);
+  const telemetryWarn = computed(() => {
     const q = currentRuntime()?.quotaPct;
     return telemetry().contextPct >= 85 || (q !== undefined && q <= 15);
-  };
-  const cachedBarPercent = () => {
+  });
+  const cachedBarPercent = computed(() => {
     const tel = telemetry();
     return Math.min(100, Math.round((tel.cachedRead / tel.contextWindow) * 100));
-  };
-  const uncachedBarPercent = () => {
+  });
+  const uncachedBarPercent = computed(() => {
     const tel = telemetry();
     return Math.min(100 - cachedBarPercent(), Math.round((tel.uncachedInput / tel.contextWindow) * 100));
-  };
+  });
 
   effect(() => {
     if (!swarmOpen()) return;
@@ -729,7 +774,7 @@ export function WorkspaceChatPane() {
   const composerMenuClass = `${menuPopupClass} ${motionClass("transition-opacity duration-120 ease-out")}`;
   const composerMenuItemClass = "h-7 flex-row items-center justify-between gap-2 rounded-md px-2 hover:bg-hover focus:bg-hover";
 
-  const permissionLabel = () => permissionOptions.find((o) => o.value === permissionMode())?.label ?? permissionMode();
+  const permissionLabel = computed(() => permissionOptions.find((o) => o.value === permissionMode())?.label ?? permissionMode());
 
   return (
     <View testID="workspace-chat-pane" class="min-h-0 flex-1 bg-page">

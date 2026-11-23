@@ -1,5 +1,5 @@
 import "../infra/polyfill";
-import { cleanup, effect, host, keymap, Scroll, signal, Text, View, type JSX } from "nsh";
+import { cleanup, computed, effect, host, keymap, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
 
 import { t, setLocale } from "@vibevalley/i18n";
 import type { InboxItem } from "@vibevalley/protocol";
@@ -35,9 +35,15 @@ function Label(props: { children: JSX.Element; size?: 14 | 18 | 20; tone?: keyof
   const sizeClass = props.size === 20 ? "text-xl" : props.size === 18 ? "text-[18px]" : props.size === 14 ? "text-base" : "text-xs";
   return <Text class={`font-pixel ${sizeClass} ${labelTone[props.tone ?? "ink"]}`}>{props.children}</Text>;
 }
-function Press(props: { children: JSX.Element; run: () => void; id?: string; selected?: boolean }) {
+function Press(props: { children: JSX.Element; run: () => void; id?: string; selected?: boolean; disabled?: boolean }) {
   return (
-    <View testID={props.id} role="button" onPress={props.run} class={`px-1.5 py-1 ${props.selected === true ? "bg-lcd-dark" : "bg-lcd-light"}`}>
+    <View
+      testID={props.id}
+      role="button"
+      disabled={props.disabled}
+      onPress={props.run}
+      class={`px-1.5 py-1 ${props.selected === true ? "bg-lcd-dark" : "bg-lcd-light"} ${props.disabled === true ? "opacity-50" : ""}`}
+    >
       <Label tone={props.selected === true ? "pale" : "ink"}>{props.children}</Label>
     </View>
   );
@@ -55,25 +61,27 @@ function Chat(props: { fold: () => void; large: () => boolean; resize: () => voi
   const collab = useCollabSlice();
   const chosen = signal<string | undefined>(undefined);
   const menu = signal(false);
-  const rooms = () => collab()?.chat?.channels.filter((c) => c.archived === undefined) ?? [];
-  const room = () => rooms().find((c) => c.id === chosen()) ?? rooms().find((c) => c.default) ?? rooms()[0];
+  const rooms = computed(() => collab()?.chat?.channels.filter((c) => c.archived === undefined) ?? []);
+  const room = computed(() => rooms().find((c) => c.id === chosen()) ?? rooms().find((c) => c.default) ?? rooms()[0]);
   const messages = useFollowed(() => room()?.id);
   const input = signal("");
   const busy = signal(false);
   const problem = signal("");
+  const canSend = computed(() => !busy() && input().trim().length > 0 && room() !== undefined);
   let pendingKey: { room: string; text: string; id: string } | undefined;
   const send = async (line: string) => {
-    const id = room()?.id;
+    const id = untracked(room)?.id;
     const text = line.trim();
-    if (!id || !text || busy()) return;
+    if (!id || !text || untracked(busy)) return;
     if (pendingKey?.room !== id || pendingKey.text !== text) pendingKey = { room: id, text, id: newSendKey() };
     busy.set(true);
     problem.set("");
+    input.set("");
     try {
       await api.channel.message.send({ id, text, sendKey: pendingKey.id });
-      if (input() === line) input.set("");
       pendingKey = undefined;
     } catch (e) {
+      if (untracked(input) === "") input.set(line);
       problem.set(reasonOf(e));
     } finally {
       busy.set(false);
@@ -127,7 +135,7 @@ function Chat(props: { fold: () => void; large: () => boolean; resize: () => voi
       <If when={problem()}>{(s) => <Label tone="error">{s()}</Label>}</If>
       <View class="gap-1 p-[5px]">
         <TextArea value={input()} onInput={(v) => input.set(v)} rows={2} submit testID="farm-chat-input" onSubmit={(s) => void send(s)} />
-        <Press id="farm-chat-send" run={() => void send(input())}>
+        <Press id="farm-chat-send" disabled={!canSend()} run={() => void send(untracked(input))}>
           {t("web.farm.chat.send")}
         </Press>
       </View>
