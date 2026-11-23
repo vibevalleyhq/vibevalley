@@ -177,7 +177,7 @@ export function DesignCanvasView(props: StoreViewerProps) {
         />
 
         <View class="flex-row flex-wrap items-center gap-1">
-          <Each of={artboards()}>
+          <Each of={artboards()} key={(ab) => ab.id}>
             {(ab) => {
               const active = () => ab().id === activeArtboard()?.id;
               return (
@@ -214,7 +214,7 @@ export function DesignCanvasView(props: StoreViewerProps) {
         when={mode() === "focus"}
         else={
           <Scroll testID="design-artboards-grid" class="min-h-0 flex-1" contentClass="gap-4 p-4">
-            <Each of={artboards()}>
+            <Each of={artboards()} key={(ab) => ab.id}>
               {(ab) => (
                 <View testID="design-artboard-card" class="overflow-hidden rounded-lg border border-line bg-page shadow-raise">
                   <View class="flex-row items-center justify-between gap-2 border-b border-line px-3.5 py-2.5">
@@ -283,7 +283,7 @@ export function DesignCanvasView(props: StoreViewerProps) {
                 }
               >
                 <View class="gap-3">
-                  <Each of={propDefs()}>
+                  <Each of={propDefs()} key={(def) => def.name}>
                     {(def) => {
                       const current = () => propValues()[def().name] ?? def().value;
                       const label = () => def().label ?? def().name;

@@ -2,7 +2,7 @@
 //   - "changes": commit box, conflicts, staged & unstaged file diffs
 //   - "branches": current branch, local branches (click to checkout) & worktrees
 //   - "commits": commit history log (click to open commit diff)
-import { Clipboard, effect, Scroll, signal, Text, View, type TextStyle } from "nsh";
+import { Clipboard, computed, effect, Scroll, signal, Text, untracked, View, type TextStyle } from "nsh";
 import { Button, ContextMenu, Input, MenuItem, MenuSeparator } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -99,13 +99,50 @@ function FileRow(props: { row: GitRow; staged: boolean }) {
         class="h-6.5 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
       >
         <Text class={`shrink truncate text-sm ${gitToneTextClass(props.row.tone)}`}>{name()}</Text>
-        {dir() ? (
-          <Text class="min-w-0 flex-1 truncate text-2xs text-muted" style={startEllipsis}>
-            {dir()}
-          </Text>
-        ) : null}
+        <If when={dir()}>
+          {(d) => (
+            <Text class="min-w-0 flex-1 truncate text-2xs text-muted" style={startEllipsis}>
+              {d()}
+            </Text>
+          )}
+        </If>
       </Button>
-      {confirmingDiscard() ? (
+      <If
+        when={confirmingDiscard()}
+        else={
+          <If when={hovered()}>
+            <View class="shrink-0 flex-row items-center gap-0.5">
+              <If
+                when={props.staged}
+                else={
+                  <>
+                    <ShellIconButton
+                      compact
+                      danger
+                      icon="undo"
+                      label={t("web.shell.git.discardPath", { path: props.row.path })}
+                      onPress={() => confirmingDiscard.set(true)}
+                    />
+                    <ShellIconButton
+                      compact
+                      icon="add"
+                      label={t("web.shell.git.stagePath", { path: props.row.path })}
+                      onPress={() => act({ type: "stage", paths: [props.row.path] })}
+                    />
+                  </>
+                }
+              >
+                <ShellIconButton
+                  compact
+                  icon="minus"
+                  label={t("web.shell.git.unstagePath", { path: props.row.path })}
+                  onPress={() => act({ type: "unstage", paths: [props.row.path] })}
+                />
+              </If>
+            </View>
+          </If>
+        }
+      >
         <View class="shrink-0 flex-row items-center gap-1">
           <Button
             onPress={() => {
@@ -123,34 +160,7 @@ function FileRow(props: { row: GitRow; staged: boolean }) {
             <Text class="text-2xs text-ink">{t("web.shell.git.cancel")}</Text>
           </Button>
         </View>
-      ) : hovered() ? (
-        <View class="shrink-0 flex-row items-center gap-0.5">
-          {props.staged ? (
-            <ShellIconButton
-              compact
-              icon="minus"
-              label={t("web.shell.git.unstagePath", { path: props.row.path })}
-              onPress={() => act({ type: "unstage", paths: [props.row.path] })}
-            />
-          ) : (
-            <>
-              <ShellIconButton
-                compact
-                danger
-                icon="undo"
-                label={t("web.shell.git.discardPath", { path: props.row.path })}
-                onPress={() => confirmingDiscard.set(true)}
-              />
-              <ShellIconButton
-                compact
-                icon="add"
-                label={t("web.shell.git.stagePath", { path: props.row.path })}
-                onPress={() => act({ type: "stage", paths: [props.row.path] })}
-              />
-            </>
-          )}
-        </View>
-      ) : null}
+      </If>
       <Text class={`w-4 shrink-0 text-center font-mono text-2xs font-semibold ${gitToneTextClass(props.row.tone)}`}>{props.row.code}</Text>
     </View>
   );
@@ -183,7 +193,9 @@ function WorktreeRow(props: {
     <View
       class={`relative gap-1 border-b border-line px-3 py-2 ${motionClass("transition-opacity duration-120 ease-out")} ${w().current === true ? "bg-selected" : "bg-transparent hover:bg-hover"} ${isRemoving() ? "opacity-60" : ""}`}
     >
-      {w().current === true ? <ActiveBar /> : null}
+      <If when={w().current === true}>
+        <ActiveBar />
+      </If>
       <Button
         disabled={isRemoving()}
         onPress={() => {
@@ -199,61 +211,76 @@ function WorktreeRow(props: {
               <Icon name="branch" size={12} tone={w().current === true ? "ink" : "muted"} />
             </View>
             <Text class="min-w-0 shrink truncate font-mono text-xs font-medium text-ink">{w().branch ?? "(detached)"}</Text>
-            {w().main ? (
+            <If when={w().main}>
               <View
                 class={`h-4 shrink-0 items-center justify-center rounded-sm border border-line px-1.5 ${w().current === true ? "bg-elevated" : "bg-hover"}`}
               >
                 <Text class="text-2xs text-muted">{t("web.shell.git.mainLabel")}</Text>
               </View>
-            ) : null}
-            {w().locked ? <Icon name="lock" size={11} tone="faint" /> : null}
+            </If>
+            <If when={w().locked}>
+              <Icon name="lock" size={11} tone="faint" />
+            </If>
           </View>
           <View class="shrink-0 flex-row items-center gap-1.5">
-            {isRemoving() ? (
+            <If
+              when={isRemoving()}
+              else={
+                <>
+                  <If when={(w().ahead ?? 0) > 0}>
+                    <View class="flex-row items-center gap-0.5">
+                      <Icon name="moveUp" size={10} tone="leaf" />
+                      <Text class="font-mono text-2xs font-medium text-leaf">{w().ahead}</Text>
+                    </View>
+                  </If>
+                  <If when={(w().behind ?? 0) > 0}>
+                    <View class="flex-row items-center gap-0.5">
+                      <Icon name="moveDown" size={10} tone="warn-ink" />
+                      <Text class="font-mono text-2xs font-medium text-warn-ink">{w().behind}</Text>
+                    </View>
+                  </If>
+                  <If
+                    when={(w().conflicts ?? 0) > 0}
+                    else={
+                      <If
+                        when={(w().changed ?? 0) > 0}
+                        else={
+                          <View class={`h-4.5 items-center justify-center rounded-sm px-1.5 ${w().current === true ? "bg-elevated" : "bg-hover"}`}>
+                            <Text class="text-2xs text-muted">{t("web.shell.git.wtClean")}</Text>
+                          </View>
+                        }
+                      >
+                        <View class="h-4.5 items-center justify-center rounded-sm border bg-warn-soft px-1.5" style={{ borderColor: mix("wheat", 0.25) }}>
+                          <Text class="text-2xs font-medium text-warn-ink">{t("web.shell.git.wtChangedCount", { n: w().changed ?? 0 })}</Text>
+                        </View>
+                      </If>
+                    }
+                  >
+                    <View class="h-4.5 items-center justify-center rounded-sm border bg-bad-soft px-1.5" style={{ borderColor: mix("berry", 0.25) }}>
+                      <Text class="text-2xs font-medium text-berry">{t("web.shell.git.wtConflictsCount", { n: w().conflicts ?? 0 })}</Text>
+                    </View>
+                  </If>
+                </>
+              }
+            >
               <Text class="text-2xs font-medium text-muted">{t("web.shell.git.removing")}</Text>
-            ) : (
-              <>
-                {(w().ahead ?? 0) > 0 ? (
-                  <View class="flex-row items-center gap-0.5">
-                    <Icon name="moveUp" size={10} tone="leaf" />
-                    <Text class="font-mono text-2xs font-medium text-leaf">{w().ahead}</Text>
-                  </View>
-                ) : null}
-                {(w().behind ?? 0) > 0 ? (
-                  <View class="flex-row items-center gap-0.5">
-                    <Icon name="moveDown" size={10} tone="warn-ink" />
-                    <Text class="font-mono text-2xs font-medium text-warn-ink">{w().behind}</Text>
-                  </View>
-                ) : null}
-                {(w().conflicts ?? 0) > 0 ? (
-                  <View class="h-4.5 items-center justify-center rounded-sm border bg-bad-soft px-1.5" style={{ borderColor: mix("berry", 0.25) }}>
-                    <Text class="text-2xs font-medium text-berry">{t("web.shell.git.wtConflictsCount", { n: w().conflicts ?? 0 })}</Text>
-                  </View>
-                ) : (w().changed ?? 0) > 0 ? (
-                  <View class="h-4.5 items-center justify-center rounded-sm border bg-warn-soft px-1.5" style={{ borderColor: mix("wheat", 0.25) }}>
-                    <Text class="text-2xs font-medium text-warn-ink">{t("web.shell.git.wtChangedCount", { n: w().changed ?? 0 })}</Text>
-                  </View>
-                ) : (
-                  <View class={`h-4.5 items-center justify-center rounded-sm px-1.5 ${w().current === true ? "bg-elevated" : "bg-hover"}`}>
-                    <Text class="text-2xs text-muted">{t("web.shell.git.wtClean")}</Text>
-                  </View>
-                )}
-              </>
-            )}
+            </If>
           </View>
         </View>
-        {props.badge ? (
-          <View class="flex-row items-center gap-1.5 pl-5">
-            <View class={`size-1.5 shrink-0 rounded-full ${props.running === true ? "bg-leaf" : "bg-faint"}`} />
-            <Text class={`min-w-0 flex-1 truncate text-2xs ${props.running === true ? "font-medium text-leaf" : "text-muted"}`}>{props.badge}</Text>
-          </View>
-        ) : null}
-        {w().summary ? <Text class="truncate pl-5 text-xs text-ink">{w().summary}</Text> : null}
+        <If when={props.badge}>
+          {(badge) => (
+            <View class="flex-row items-center gap-1.5 pl-5">
+              <View class={`size-1.5 shrink-0 rounded-full ${props.running === true ? "bg-leaf" : "bg-faint"}`} />
+              <Text class={`min-w-0 flex-1 truncate text-2xs ${props.running === true ? "font-medium text-leaf" : "text-muted"}`}>{badge()}</Text>
+            </View>
+          )}
+        </If>
+        <If when={w().summary}>{(summary) => <Text class="truncate pl-5 text-xs text-ink">{summary()}</Text>}</If>
         <Text class="truncate pl-5 font-mono text-2xs text-faint" style={startEllipsis}>
           {w().path}
         </Text>
       </Button>
-      {confirming() && !isRemoving() ? (
+      <If when={confirming() && !isRemoving()}>
         <View class="flex-row items-center justify-end gap-1.5 pt-1">
           <Text class="text-2xs text-muted">{dirty() ? t("web.shell.git.wtDirtyPrompt") : t("web.shell.git.wtConfirmDeletePrompt")}</Text>
           <Button
@@ -269,8 +296,8 @@ function WorktreeRow(props: {
             <Text class="text-2xs text-ink">{t("web.shell.git.cancel")}</Text>
           </Button>
         </View>
-      ) : null}
-      {rowError() ? <Text class="pt-0.5 pl-5 text-2xs text-berry">{t("web.shell.git.removeFailed", { why: rowError() ?? "" })}</Text> : null}
+      </If>
+      <If when={rowError()}>{(err) => <Text class="pt-0.5 pl-5 text-2xs text-berry">{t("web.shell.git.removeFailed", { why: err() })}</Text>}</If>
     </View>
   );
   return (
@@ -284,14 +311,12 @@ function WorktreeRow(props: {
       <MenuItem onSelect={() => void Clipboard.writeText(w().path)} class={menuItemClass}>
         <Text class="text-xs text-ink">{t("web.shell.sidebar.copyPath")}</Text>
       </MenuItem>
-      {!w().main ? (
-        <>
-          <MenuSeparator class={menuSeparatorClass} />
-          <MenuItem onSelect={() => props.setPendingRemove(w().path)} class={menuDangerItemClass}>
-            <Text class="text-xs text-berry">{t("web.shell.git.wtRemoveMenu")}</Text>
-          </MenuItem>
-        </>
-      ) : null}
+      <If when={!w().main}>
+        <MenuSeparator class={menuSeparatorClass} />
+        <MenuItem onSelect={() => props.setPendingRemove(w().path)} class={menuDangerItemClass}>
+          <Text class="text-xs text-berry">{t("web.shell.git.wtRemoveMenu")}</Text>
+        </MenuItem>
+      </If>
     </ContextMenu>
   );
 }
@@ -317,28 +342,38 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
     if (folded()[key]) folded.update((prev) => ({ ...prev, [key]: false }));
   };
 
-  const worktreeMeta = (path: string): { badge: string | null; running: boolean } => {
-    const target = normWtPath(path);
-    const sessions = sessionsSlice()?.sessions ?? [];
-    const session = sessions.find((s) => s.phase._tag !== "closed" && normWtPath(sessionWorktree(s)) === target);
-    if (!session) return { badge: null, running: false };
-    const iid = sessionIssueId(session);
-    const issue = iid ? (board()?.issues ?? []).find((i) => i.id === iid) : undefined;
-    const running = session.phase._tag === "working";
-    const parts = [issue ? `#${issue.number} ${issue.title}` : session.name, running ? t("web.shell.git.wtRunning") : ""].filter(Boolean);
-    return { badge: parts.join(" · "), running };
-  };
+  const worktreeMetaMap = computed(() => {
+    const map = new Map<string, { badge: string | null; running: boolean }>();
+    const issuesById = new Map((board()?.issues ?? []).map((i) => [i.id, i]));
+    for (const session of sessionsSlice()?.sessions ?? []) {
+      if (session.phase._tag === "closed") continue;
+      const target = normWtPath(sessionWorktree(session));
+      if (!target || map.has(target)) continue;
+      const iid = sessionIssueId(session);
+      const issue = iid ? issuesById.get(iid) : undefined;
+      const running = session.phase._tag === "working";
+      const parts = [issue ? `#${issue.number} ${issue.title}` : session.name, running ? t("web.shell.git.wtRunning") : ""].filter(Boolean);
+      map.set(target, { badge: parts.join(" · "), running });
+    }
+    return map;
+  });
+  const worktreeMeta = (path: string): { badge: string | null; running: boolean } => worktreeMetaMap().get(normWtPath(path)) ?? { badge: null, running: false };
+  let createWtStartFrame: GitFrame | null = null;
   const submitNewWorktree = () => {
     const branch = newBranch().trim();
     if (!branch || creatingWt()) return;
+    createWtStartFrame = untracked(f);
     creatingWt.set(true);
     act({ type: "add_worktree", branch });
     newBranch.set("");
     addingWt.set(false);
   };
   effect(() => {
-    if (creatingWt() && f()?.busy !== true) {
+    const frameVal = f();
+    if (!frameVal || frameVal === createWtStartFrame) return;
+    if (creatingWt() && frameVal.busy !== true) {
       creatingWt.set(false);
+      createWtStartFrame = null;
     }
   });
   const startRemove = (w: GitWorktree, force: boolean) => {
@@ -356,44 +391,54 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
     if (!stillPresent) {
       removing.set(null);
       removeError.set(null);
-      const notice = t("web.shell.git.removedWorktree", { label: cur.label });
-      removeNotice.set(notice);
-      const timer = setTimeout(() => {
-        if (removeNotice() === notice) removeNotice.set(null);
-      }, 3000);
-      return () => clearTimeout(timer);
+      removeNotice.set(t("web.shell.git.removedWorktree", { label: cur.label }));
+      return;
     }
     if (frameVal.busy !== true && frameVal.error) {
       removing.set(null);
       removeError.set({ path: cur.path, text: frameVal.error });
     }
   });
+  effect(() => {
+    const notice = removeNotice();
+    if (!notice) return;
+    const timer = setTimeout(() => {
+      if (untracked(removeNotice) === notice) removeNotice.set(null);
+    }, 3000);
+    return () => clearTimeout(timer);
+  });
   const committing = signal(false);
   const commitNotice = signal<string | null>(null);
   const branchQuery = signal("");
   const switchingBranch = signal<string | null>(null);
+  let commitStartFrame: GitFrame | null = null;
   const commit = () => {
     const text = message().trim();
     if (!text || committing()) return;
+    commitStartFrame = untracked(f);
     committing.set(true);
     commitNotice.set(null);
     act({ type: "commit", message: text });
   };
   effect(() => {
     const frameVal = f();
-    if (!frameVal) return;
+    if (!frameVal || frameVal === commitStartFrame) return;
     if (committing() && frameVal.busy !== true) {
       committing.set(false);
+      commitStartFrame = null;
       if (!frameVal.error && (frameVal.staged?.length ?? 0) === 0) {
         message.set("");
-        const notice = t("web.shell.git.commitSuccess");
-        commitNotice.set(notice);
-        const timer = setTimeout(() => {
-          if (commitNotice() === notice) commitNotice.set(null);
-        }, 2500);
-        return () => clearTimeout(timer);
+        commitNotice.set(t("web.shell.git.commitSuccess"));
       }
     }
+  });
+  effect(() => {
+    const notice = commitNotice();
+    if (!notice) return;
+    const timer = setTimeout(() => {
+      if (untracked(commitNotice) === notice) commitNotice.set(null);
+    }, 2500);
+    return () => clearTimeout(timer);
   });
   effect(() => {
     const target = switchingBranch();
@@ -406,10 +451,18 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
 
   const changedCount = () => (f()?.staged?.length ?? 0) + (f()?.changes?.length ?? 0) + (f()?.conflicts?.length ?? 0);
   const branchLabel = () => f()?.branch ?? `detached ${f()?.head ?? ""}`;
-  const filteredBranches = () => {
+  const filteredBranches = computed(() => {
     const q = branchQuery().trim().toLowerCase();
     return (f()?.branches ?? []).filter((b) => !q || b.name.toLowerCase().includes(q));
-  };
+  });
+  const subTabs: readonly { readonly id: GitTab; readonly label: () => string }[] = [
+    {
+      id: "changes",
+      label: () => (changedCount() > 0 ? t("web.shell.git.tab.changesCount", { count: changedCount() }) : t("web.shell.git.tab.changes")),
+    },
+    { id: "branches", label: () => t("web.shell.git.tab.branches", { count: f()?.branches?.length ?? 0 }) },
+    { id: "commits", label: () => t("web.shell.git.tab.commits") },
+  ];
 
   const renderWorktreesSection = (sectionKey: string, title: string, borderTop: boolean, showNotice: boolean) => (
     <View>
@@ -436,9 +489,9 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
           </Button>
         }
       />
-      {isOpen(sectionKey) ? (
+      <If when={isOpen(sectionKey)}>
         <View>
-          {addingWt() ? (
+          <If when={addingWt()}>
             <View class="flex-row items-center gap-1.5 border-b border-line px-3 pt-0.5 pb-2">
               <Input
                 value={newBranch()}
@@ -459,12 +512,14 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 <Text class={`text-2xs font-medium ${!newBranch().trim() || creatingWt() ? "text-muted" : "text-page"}`}>{t("web.shell.git.createBtn")}</Text>
               </Button>
             </View>
-          ) : null}
-          {showNotice && removeNotice() ? (
-            <View class="border-b border-line bg-ok-soft px-3 py-1.5">
-              <Text class="text-2xs text-ok-ink">{removeNotice()}</Text>
-            </View>
-          ) : null}
+          </If>
+          <If when={showNotice ? removeNotice() : null}>
+            {(notice) => (
+              <View class="border-b border-line bg-ok-soft px-3 py-1.5">
+                <Text class="text-2xs text-ok-ink">{notice()}</Text>
+              </View>
+            )}
+          </If>
           <Each of={f()?.worktrees ?? []} key={(w) => w.path}>
             {(w) => {
               const meta = () => worktreeMeta(w().path);
@@ -483,32 +538,32 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
             }}
           </Each>
         </View>
-      ) : null}
+      </If>
     </View>
   );
 
-  const isLoadingGit = () => !f() || (f()?.repo !== true && f()?.busy === true);
+  const isRepo = computed(() => f()?.repo === true);
+  const isLoadingGit = computed(() => !f() || (f()?.repo !== true && f()?.busy === true));
   const showGitSkeleton = useDelayedBusy(isLoadingGit);
 
   return (
     <View class="flex-1">
-      {f()?.repo !== true ? (
-        <View class="flex-1">
-          <SectionHead title={t("web.shell.git.title")} borderBottom />
-          {isLoadingGit() ? (
-            showGitSkeleton() ? (
-              <View testID="git-panel-skeleton" accessibilityLabel={t("web.shell.git.loading")} accessibilityState={{ busy: true }} class="gap-2.5 px-3 py-3">
-                <SkeletonBar surface="side" class="h-7 w-full rounded-md" />
-                <SkeletonLines surface="side" rows={["52%", "76%", "64%", "44%"]} />
-              </View>
-            ) : (
-              <View class="flex-1" />
-            )
-          ) : (
-            <PanelEmpty text={f()?.error ?? t("web.shell.git.notRepo")} />
-          )}
-        </View>
-      ) : (
+      <If
+        when={isRepo()}
+        else={
+          <View class="flex-1">
+            <SectionHead title={t("web.shell.git.title")} borderBottom />
+            <If when={isLoadingGit()} else={<PanelEmpty text={f()?.error ?? t("web.shell.git.notRepo")} />}>
+              <If when={showGitSkeleton()} else={<View class="flex-1" />}>
+                <View testID="git-panel-skeleton" accessibilityLabel={t("web.shell.git.loading")} accessibilityState={{ busy: true }} class="gap-2.5 px-3 py-3">
+                  <SkeletonBar surface="side" class="h-7 w-full rounded-md" />
+                  <SkeletonLines surface="side" rows={["52%", "76%", "64%", "44%"]} />
+                </View>
+              </If>
+            </If>
+          </View>
+        }
+      >
         <View class="flex-1">
           <View class="h-7.5 flex-row items-center gap-1.5 border-b border-line pr-2 pl-3">
             <View class="size-3.5 shrink-0 items-center justify-center">
@@ -517,58 +572,53 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
             <View class="min-w-0 flex-1" tooltip={<Bubble text={branchLabel()} />}>
               <Text class="truncate font-mono text-xs font-medium text-ink">{branchLabel()}</Text>
             </View>
-            {(f()?.ahead ?? 0) > 0 ? (
+            <If when={(f()?.ahead ?? 0) > 0}>
               <View class="shrink-0 flex-row items-center gap-0.5">
                 <Icon name="moveUp" size={10} tone="leaf" />
                 <Text class="font-mono text-2xs font-medium text-leaf">{f()?.ahead}</Text>
               </View>
-            ) : null}
-            {(f()?.behind ?? 0) > 0 ? (
+            </If>
+            <If when={(f()?.behind ?? 0) > 0}>
               <View class="shrink-0 flex-row items-center gap-0.5">
                 <Icon name="moveDown" size={10} tone="warn-ink" />
                 <Text class="font-mono text-2xs font-medium text-warn-ink">{f()?.behind}</Text>
               </View>
-            ) : null}
+            </If>
             <ShellIconButton label={t("web.shell.git.refresh")} icon="refresh" onPress={() => act({ type: "refresh_git" })} />
           </View>
 
           {/* Sub-navigation when not driven by parent header */}
-          {props.tab === undefined ? (
+          <If when={props.tab === undefined}>
             <View class="flex-row gap-1 border-b border-line px-2.5 py-1.5">
-              {(
-                [
-                  {
-                    id: "changes",
-                    label: changedCount() > 0 ? t("web.shell.git.tab.changesCount", { count: changedCount() }) : t("web.shell.git.tab.changes"),
-                  },
-                  { id: "branches", label: t("web.shell.git.tab.branches", { count: f()?.branches?.length ?? 0 }) },
-                  { id: "commits", label: t("web.shell.git.tab.commits") },
-                ] as const
-              ).map((item) => {
-                const cur = () => activeTab() === item.id;
-                return (
-                  <Button
-                    onPress={() => localTab.set(item.id)}
-                    class={`h-6 flex-1 items-center justify-center rounded-md ${motionClass("transition-opacity duration-120 ease-out")} active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus ${
-                      cur() ? "bg-selected" : "bg-transparent hover:bg-hover"
-                    }`}
-                  >
-                    <Text class={`text-2xs font-medium ${cur() ? "text-ink" : "text-muted"}`}>{item.label}</Text>
-                  </Button>
-                );
-              })}
+              <Each of={subTabs} key={(item) => item.id}>
+                {(item) => {
+                  const cur = () => activeTab() === item().id;
+                  return (
+                    <Button
+                      onPress={() => localTab.set(item().id)}
+                      class={`h-6 flex-1 items-center justify-center rounded-md ${motionClass("transition-opacity duration-120 ease-out")} active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus ${
+                        cur() ? "bg-selected" : "bg-transparent hover:bg-hover"
+                      }`}
+                    >
+                      <Text class={`text-2xs font-medium ${cur() ? "text-ink" : "text-muted"}`}>{item().label()}</Text>
+                    </Button>
+                  );
+                }}
+              </Each>
             </View>
-          ) : null}
+          </If>
 
           <Scroll class="flex-1">
-            {activeTab() === "changes" ? (
+            <If when={activeTab() === "changes"}>
               <View>
-                {removeNotice() ? (
-                  <View class="border-b border-line bg-ok-soft px-3 py-1.5">
-                    <Text class="text-2xs text-ok-ink">{removeNotice()}</Text>
-                  </View>
-                ) : null}
-                {(f()?.worktrees?.length ?? 0) > 1 ? renderWorktreesSection("changes-worktrees", t("web.shell.git.worktrees"), false, false) : null}
+                <If when={removeNotice()}>
+                  {(notice) => (
+                    <View class="border-b border-line bg-ok-soft px-3 py-1.5">
+                      <Text class="text-2xs text-ok-ink">{notice()}</Text>
+                    </View>
+                  )}
+                </If>
+                <If when={(f()?.worktrees?.length ?? 0) > 1}>{renderWorktreesSection("changes-worktrees", t("web.shell.git.worktrees"), false, false)}</If>
                 <View class="gap-2 border-b border-line px-3 py-2.5">
                   <Input
                     value={message()}
@@ -584,7 +634,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                         ? t("web.shell.git.commitStaged", { count: f()?.staged?.length ?? 0 })
                         : t("web.shell.git.noStaged")}
                   </DesignButton>
-                  {(f()?.staged?.length ?? 0) === 0 && (f()?.changes?.length ?? 0) > 0 ? (
+                  <If when={(f()?.staged?.length ?? 0) === 0 && (f()?.changes?.length ?? 0) > 0}>
                     <Button
                       onPress={() => act({ type: "stage", paths: (f()?.changes ?? []).map((r) => r.path) })}
                       class={`h-6.5 flex-row items-center justify-center gap-1 rounded-md border border-line bg-transparent px-2.5 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-hover active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
@@ -594,16 +644,18 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                         {t("web.shell.git.stageAllCount", { count: (f()?.changes?.length ?? 0).toLocaleString() })}
                       </Text>
                     </Button>
-                  ) : null}
-                  {commitNotice() ? <Text class="text-2xs text-ok-ink">{commitNotice()}</Text> : null}
-                  {f()?.error ? (
-                    <View class="rounded-md border bg-bad-soft px-2 py-1.5" style={{ borderColor: mix("berry", 0.25) }}>
-                      <Text class="text-2xs text-berry">{f()?.error}</Text>
-                    </View>
-                  ) : null}
+                  </If>
+                  <If when={commitNotice()}>{(notice) => <Text class="text-2xs text-ok-ink">{notice()}</Text>}</If>
+                  <If when={f()?.error}>
+                    {(err) => (
+                      <View class="rounded-md border bg-bad-soft px-2 py-1.5" style={{ borderColor: mix("berry", 0.25) }}>
+                        <Text class="text-2xs text-berry">{err()}</Text>
+                      </View>
+                    )}
+                  </If>
                 </View>
 
-                {(f()?.conflicts?.length ?? 0) > 0 ? (
+                <If when={(f()?.conflicts?.length ?? 0) > 0}>
                   <View class="pb-1">
                     <SectionHead
                       title={t("web.shell.git.conflicts")}
@@ -613,15 +665,15 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                       expanded={isOpen("conflicts")}
                       onToggle={() => toggleSection("conflicts")}
                     />
-                    {isOpen("conflicts") ? (
+                    <If when={isOpen("conflicts")}>
                       <View class="gap-px">
                         <Each of={f()?.conflicts ?? []} key={(r) => r.path}>
                           {(row) => <FileRow row={row()} staged={false} />}
                         </Each>
                       </View>
-                    ) : null}
+                    </If>
                   </View>
-                ) : null}
+                </If>
 
                 <View class="pb-1">
                   <SectionHead
@@ -632,26 +684,24 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                     onToggle={() => toggleSection("staged")}
                     borderTop={(f()?.conflicts?.length ?? 0) > 0}
                     right={
-                      (f()?.staged?.length ?? 0) > 0 ? (
+                      <If when={(f()?.staged?.length ?? 0) > 0}>
                         <ShellIconButton
                           label={t("web.shell.git.unstageAll")}
                           icon="minus"
                           onPress={() => act({ type: "unstage", paths: (f()?.staged ?? []).map((r) => r.path) })}
                         />
-                      ) : undefined
+                      </If>
                     }
                   />
-                  {isOpen("staged") ? (
-                    (f()?.staged?.length ?? 0) > 0 ? (
+                  <If when={isOpen("staged")}>
+                    <If when={(f()?.staged?.length ?? 0) > 0} else={<PanelEmpty text={t("web.shell.git.stagedEmpty")} compact />}>
                       <View class="gap-px">
                         <Each of={f()?.staged ?? []} key={(r) => r.path}>
                           {(row) => <FileRow row={row()} staged />}
                         </Each>
                       </View>
-                    ) : (
-                      <PanelEmpty text={t("web.shell.git.stagedEmpty")} compact />
-                    )
-                  ) : null}
+                    </If>
+                  </If>
                 </View>
 
                 <View class="pb-1">
@@ -663,31 +713,29 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                     onToggle={() => toggleSection("changes")}
                     borderTop
                     right={
-                      (f()?.changes?.length ?? 0) > 0 ? (
+                      <If when={(f()?.changes?.length ?? 0) > 0}>
                         <ShellIconButton
                           label={t("web.shell.git.stageAll")}
                           icon="add"
                           onPress={() => act({ type: "stage", paths: (f()?.changes ?? []).map((r) => r.path) })}
                         />
-                      ) : undefined
+                      </If>
                     }
                   />
-                  {isOpen("changes") ? (
-                    (f()?.changes?.length ?? 0) > 0 ? (
+                  <If when={isOpen("changes")}>
+                    <If when={(f()?.changes?.length ?? 0) > 0} else={<PanelEmpty text={t("web.shell.git.clean")} compact />}>
                       <View class="gap-px">
                         <Each of={f()?.changes ?? []} key={(r) => r.path}>
                           {(row) => <FileRow row={row()} staged={false} />}
                         </Each>
                       </View>
-                    ) : (
-                      <PanelEmpty text={t("web.shell.git.clean")} compact />
-                    )
-                  ) : null}
+                    </If>
+                  </If>
                 </View>
               </View>
-            ) : null}
+            </If>
 
-            {activeTab() === "branches" ? (
+            <If when={activeTab() === "branches"}>
               <View>
                 <View class="pb-1">
                   <SectionHead
@@ -697,9 +745,9 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                     expanded={isOpen("branches")}
                     onToggle={() => toggleSection("branches")}
                   />
-                  {isOpen("branches") ? (
+                  <If when={isOpen("branches")}>
                     <View>
-                      {(f()?.branches?.length ?? 0) > 6 ? (
+                      <If when={(f()?.branches?.length ?? 0) > 6}>
                         <View class="px-3 pt-0.5 pb-1.5">
                           <Input
                             value={branchQuery()}
@@ -708,9 +756,9 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                             class="h-6.5 rounded-md border border-line bg-elevated px-2 text-xs text-ink placeholder:text-faint hover:border-faint focus:border-focus"
                           />
                         </View>
-                      ) : null}
-                      {(f()?.branches?.length ?? 0) > 0 ? (
-                        filteredBranches().length > 0 ? (
+                      </If>
+                      <If when={(f()?.branches?.length ?? 0) > 0} else={<PanelEmpty text={t("web.shell.git.noBranches")} compact />}>
+                        <If when={filteredBranches().length > 0} else={<PanelEmpty text={t("web.shell.git.noMatchingBranches")} compact />}>
                           <View class="gap-px">
                             <Each of={filteredBranches()} key={(b) => b.name}>
                               {(b) => (
@@ -729,37 +777,42 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                                     switchingBranch() !== null ? "" : "active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
                                   } ${b().head ? "bg-selected" : "bg-transparent hover:bg-hover"}`}
                                 >
-                                  {b().head ? <ActiveBar /> : null}
+                                  <If when={b().head}>
+                                    <ActiveBar />
+                                  </If>
                                   <View class="size-3.5 shrink-0 items-center justify-center">
                                     <Icon name={b().head ? "ticked" : "branch"} size={12} tone={b().head ? "leaf" : "faint"} />
                                   </View>
                                   <Text class="min-w-0 flex-1 truncate font-mono text-xs font-medium text-ink">{b().name}</Text>
-                                  {switchingBranch() === b().name ? (
+                                  <If
+                                    when={switchingBranch() === b().name}
+                                    else={
+                                      <If when={b().upstream}>
+                                        {(upstream) => (
+                                          <Text class="max-w-32 shrink-0 truncate font-mono text-2xs text-muted" style={startEllipsis}>
+                                            {upstream()}
+                                          </Text>
+                                        )}
+                                      </If>
+                                    }
+                                  >
                                     <Text class="shrink-0 text-2xs font-medium text-warn-ink">{t("web.shell.git.switching")}</Text>
-                                  ) : b().upstream ? (
-                                    <Text class="max-w-32 shrink-0 truncate font-mono text-2xs text-muted" style={startEllipsis}>
-                                      {b().upstream}
-                                    </Text>
-                                  ) : null}
+                                  </If>
                                 </Button>
                               )}
                             </Each>
                           </View>
-                        ) : (
-                          <PanelEmpty text={t("web.shell.git.noMatchingBranches")} compact />
-                        )
-                      ) : (
-                        <PanelEmpty text={t("web.shell.git.noBranches")} compact />
-                      )}
+                        </If>
+                      </If>
                     </View>
-                  ) : null}
+                  </If>
                 </View>
 
-                {(f()?.worktrees?.length ?? 0) > 0 ? renderWorktreesSection("branches-worktrees", t("web.shell.git.worktrees"), true, true) : null}
+                <If when={(f()?.worktrees?.length ?? 0) > 0}>{renderWorktreesSection("branches-worktrees", t("web.shell.git.worktrees"), true, true)}</If>
               </View>
-            ) : null}
+            </If>
 
-            {activeTab() === "commits" ? (
+            <If when={activeTab() === "commits"}>
               <View>
                 <SectionHead
                   title={t("web.shell.git.commits")}
@@ -769,8 +822,8 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                   onToggle={() => toggleSection("commits")}
                   borderBottom={isOpen("commits") && (f()?.log?.length ?? 0) > 0}
                 />
-                {isOpen("commits") ? (
-                  (f()?.log?.length ?? 0) > 0 ? (
+                <If when={isOpen("commits")}>
+                  <If when={(f()?.log?.length ?? 0) > 0} else={<PanelEmpty text={t("web.shell.git.noCommits")} compact />}>
                     <Each of={f()?.log ?? []} key={(c) => c.id}>
                       {(c) => (
                         <Button
@@ -794,16 +847,14 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                         </Button>
                       )}
                     </Each>
-                  ) : (
-                    <PanelEmpty text={t("web.shell.git.noCommits")} compact />
-                  )
-                ) : null}
+                  </If>
+                </If>
               </View>
-            ) : null}
+            </If>
             <View class="h-4" />
           </Scroll>
         </View>
-      )}
+      </If>
     </View>
   );
 }

@@ -437,7 +437,7 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
                 when={selectedElement()}
                 else={
                   <View class="gap-1.5">
-                    <Each of={elements()}>
+                    <Each of={elements()} key={(el) => el.id}>
                       {(el) => (
                         <View
                           role="button"

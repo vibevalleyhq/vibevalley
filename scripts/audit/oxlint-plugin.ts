@@ -452,6 +452,368 @@ const noComponentInterval = defineRule({
   },
 });
 
+type AstNode = ESTree.Node;
+type FnNode = ESTree.Function | ESTree.ArrowFunctionExpression;
+
+const isFunctionNode = (node: AstNode): node is FnNode =>
+  node.type === "FunctionDeclaration" || node.type === "FunctionExpression" || node.type === "ArrowFunctionExpression";
+
+function isAstNode(value: unknown): value is AstNode {
+  return typeof value === "object" && value !== null && "type" in value && typeof value.type === "string";
+}
+
+function unwrapTypeExpr(node: AstNode | null | undefined): AstNode | null | undefined {
+  let cur = node;
+  while (cur && (cur.type === "TSAsExpression" || cur.type === "TSSatisfiesExpression" || cur.type === "TSNonNullExpression")) {
+    cur = cur.expression;
+  }
+  return cur;
+}
+
+/** True when an expression directly evaluates to JSX (including through nested conditionals or logical chains). */
+function producesJsx(node: AstNode | null | undefined): boolean {
+  const cur = unwrapTypeExpr(node);
+  if (!cur) return false;
+  if (cur.type === "JSXElement" || cur.type === "JSXFragment") return true;
+  if (cur.type === "ConditionalExpression") return producesJsx(cur.consequent) || producesJsx(cur.alternate);
+  if (cur.type === "LogicalExpression") return producesJsx(cur.left) || producesJsx(cur.right);
+  return false;
+}
+
+const astSkipKeys = new Set(["parent", "loc", "range", "tokens", "comments", "typeAnnotation", "returnType", "typeParameters"]);
+
+/** Walks AST descendants inside the current function scope without descending into nested functions. Return false to skip children. */
+function visitSameFunction(root: AstNode | null | undefined, visitor: (node: AstNode) => boolean): void {
+  if (!root) return;
+  const walk = (node: AstNode): void => {
+    if (!visitor(node)) return;
+    const entries: [string, unknown][] = Object.entries(node);
+    for (const [key, value] of entries) {
+      if (astSkipKeys.has(key) || value === null || value === undefined) continue;
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (isAstNode(item) && !isFunctionNode(item)) walk(item);
+        }
+      } else if (isAstNode(value) && !isFunctionNode(value)) {
+        walk(value);
+      }
+    }
+  };
+  walk(root);
+}
+
+function functionReturnsJsx(fn: FnNode): boolean {
+  if (!fn.body) return false;
+  if (fn.body.type !== "BlockStatement") return producesJsx(fn.body);
+  let found = false;
+  visitSameFunction(fn.body, (node) => {
+    if (found) return false;
+    if (node.type === "ReturnStatement" && producesJsx(node.argument)) {
+      found = true;
+      return false;
+    }
+    return true;
+  });
+  return found;
+}
+
+function isPascalCase(name: string): boolean {
+  return /^[A-Z][A-Za-z0-9_]*$/u.test(name);
+}
+
+function componentNameOf(fn: FnNode): string | undefined {
+  if (fn.type === "FunctionDeclaration") return fn.id?.name;
+  const parent = fn.parent;
+  if (parent.type === "VariableDeclarator" && parent.init === fn && parent.id.type === "Identifier") {
+    return parent.id.name;
+  }
+  return undefined;
+}
+
+function isJsxComponentFn(fn: FnNode): boolean {
+  const name = componentNameOf(fn);
+  return name !== undefined && isPascalCase(name) && functionReturnsJsx(fn);
+}
+
+function isUntrackedCall(node: AstNode): boolean {
+  return node.type === "CallExpression" && node.callee.type === "Identifier" && node.callee.name === "untracked";
+}
+
+const nshNoJsxConditional = defineRule({
+  meta: {
+    messages: {
+      conditional: says(
+        "raw JS ternaries and logical expressions producing JSX compile to dynamic `insert` slots in nsh and remount subtrees on every reactive update (and break inside `<If else={...}>`)",
+        "use `<If when={...} else={...}>...</If>` instead (nesting `<If>` inside `else` for multi-branch UI)",
+        "docs/style/nsh-tsx.md",
+      ),
+    },
+  },
+  create(context) {
+    const check = (node: ESTree.ConditionalExpression | ESTree.LogicalExpression) => {
+      if (!producesJsx(node)) return;
+      const parent = node.parent;
+      if ((parent.type === "ConditionalExpression" || parent.type === "LogicalExpression") && producesJsx(parent)) {
+        return;
+      }
+      context.report({ node, messageId: "conditional" });
+    };
+    return {
+      ConditionalExpression: check,
+      LogicalExpression: check,
+    };
+  },
+});
+
+const nshNoJsxMap = defineRule({
+  meta: {
+    messages: {
+      map: says(
+        "`.map()` / `.flatMap()` returning JSX rebuilds every item's component tree whenever the list updates instead of reconciling by key",
+        "use `<Each of={list} key={(item) => item.id}>{(item) => ...}</Each>` or `<List each={list} keyExtractor={(item) => item.id}>`",
+        "docs/style/nsh-tsx.md",
+      ),
+      iife: says(
+        "an IIFE returning JSX inside `{...}` compiles to a dynamic `insert` slot that recreates its subtree on every reactive tick",
+        "extract a small component or use `<If>` / `<Each>`",
+        "docs/style/nsh-tsx.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        if (
+          node.callee.type === "MemberExpression" &&
+          !node.callee.computed &&
+          node.callee.property.type === "Identifier" &&
+          (node.callee.property.name === "map" || node.callee.property.name === "flatMap")
+        ) {
+          const cb = node.arguments[0];
+          if (cb && isFunctionNode(cb) && functionReturnsJsx(cb)) {
+            context.report({ node, messageId: "map" });
+          }
+          return;
+        }
+        if (isFunctionNode(node.callee) && node.parent.type === "JSXExpressionContainer" && functionReturnsJsx(node.callee)) {
+          context.report({ node, messageId: "iife" });
+        }
+      },
+    };
+  },
+});
+
+const nshEachKey = defineRule({
+  meta: {
+    messages: {
+      missingKey: says(
+        "`<Each>` without an explicit `key` defaults to JS object pointer identity, unmounting and remounting every row whenever a new slice or array arrives",
+        'pass a stable `key={(item) => item.id}` (or `key="index"` only for static positional lists)',
+        "docs/style/nsh-tsx.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      JSXOpeningElement(node) {
+        if (node.name.type !== "JSXIdentifier" || node.name.name !== "Each") return;
+        const keyAttr = node.attributes.find((attr) => attr.type === "JSXAttribute" && attr.name.type === "JSXIdentifier" && attr.name.name === "key");
+        if (!keyAttr) {
+          context.report({ node, messageId: "missingKey" });
+          return;
+        }
+        if (
+          keyAttr.type === "JSXAttribute" &&
+          keyAttr.value?.type === "JSXExpressionContainer" &&
+          keyAttr.value.expression.type === "Identifier" &&
+          keyAttr.value.expression.name === "undefined"
+        ) {
+          context.report({ node: keyAttr, messageId: "missingKey" });
+        }
+      },
+    };
+  },
+});
+
+const nshNoPropsDestructure = defineRule({
+  meta: {
+    messages: {
+      param: says(
+        "destructuring `props` in a component parameter reads every property eagerly once and breaks nsh getter reactivity",
+        "accept `props` as a single parameter and read `props.x` inside JSX or closures (or use `split(props, [...])` from `nsh`)",
+        "docs/style/nsh-tsx.md",
+      ),
+      body: says(
+        "destructuring `props` at the top level of a component reads every property eagerly once and breaks nsh getter reactivity",
+        "read `props.x` inside JSX, `computed()`, or closures (or use `split(props, [...])` from `nsh`; wrap one-time snapshots in `untracked(() => props.x)`)",
+        "docs/style/nsh-tsx.md",
+      ),
+    },
+  },
+  create(context) {
+    const checkFn = (fn: FnNode) => {
+      if (!isJsxComponentFn(fn)) return;
+      const first = fn.params[0];
+      if (first === undefined) return;
+      const param = first.type === "AssignmentPattern" ? first.left : first;
+      if (param.type === "ObjectPattern") {
+        context.report({ node: param, messageId: "param" });
+        return;
+      }
+      if (param.type !== "Identifier" || fn.body?.type !== "BlockStatement") return;
+      const propsName = param.name;
+      visitSameFunction(fn.body, (node) => {
+        if (isUntrackedCall(node) || node.type === "JSXElement" || node.type === "JSXFragment") return false;
+        if (node.type === "VariableDeclarator" && node.id.type === "ObjectPattern" && node.init) {
+          const init = unwrapTypeExpr(node.init);
+          if (init?.type === "Identifier" && init.name === propsName) {
+            context.report({ node, messageId: "body" });
+          }
+        }
+        return true;
+      });
+    };
+    return {
+      FunctionDeclaration: checkFn,
+      FunctionExpression: checkFn,
+      ArrowFunctionExpression: checkFn,
+    };
+  },
+});
+
+const reactiveCreatorNames = new Set(["signal", "computed", "createSignal", "createMemo", "frame"]);
+
+function collectLocalReactiveAccessors(body: ESTree.BlockStatement): Set<string> {
+  const names = new Set<string>();
+  for (const stmt of body.body) {
+    if (stmt.type !== "VariableDeclaration") continue;
+    for (const decl of stmt.declarations) {
+      const init = unwrapTypeExpr(decl.init);
+      if (!init || init.type !== "CallExpression" || init.callee.type !== "Identifier") continue;
+      const callee = init.callee.name;
+      if (!reactiveCreatorNames.has(callee)) continue;
+      if (callee === "createSignal" && decl.id.type === "ArrayPattern" && decl.id.elements[0]?.type === "Identifier") {
+        names.add(decl.id.elements[0].name);
+      } else if (decl.id.type === "Identifier") {
+        names.add(decl.id.name);
+      }
+    }
+  }
+  return names;
+}
+
+function readsPropsDirectly(node: AstNode | null | undefined, propsName: string): boolean {
+  const cur = unwrapTypeExpr(node);
+  if (!cur) return false;
+  if (cur.type === "ChainExpression") return readsPropsDirectly(cur.expression, propsName);
+  if (cur.type === "MemberExpression") {
+    if (cur.object.type === "Identifier" && cur.object.name === propsName) return true;
+    return readsPropsDirectly(cur.object, propsName);
+  }
+  if (cur.type === "UnaryExpression") return readsPropsDirectly(cur.argument, propsName);
+  if (cur.type === "BinaryExpression" || cur.type === "LogicalExpression") {
+    return readsPropsDirectly(cur.left, propsName) || readsPropsDirectly(cur.right, propsName);
+  }
+  if (cur.type === "ConditionalExpression") {
+    return readsPropsDirectly(cur.test, propsName) || readsPropsDirectly(cur.consequent, propsName) || readsPropsDirectly(cur.alternate, propsName);
+  }
+  if (cur.type === "TemplateLiteral") return cur.expressions.some((expr) => readsPropsDirectly(expr, propsName));
+  return false;
+}
+
+function readsAccessorDirectly(node: AstNode | null | undefined, accessors: ReadonlySet<string>): boolean {
+  const cur = unwrapTypeExpr(node);
+  if (!cur) return false;
+  if (cur.type === "ChainExpression") return readsAccessorDirectly(cur.expression, accessors);
+  if (cur.type === "CallExpression") {
+    return cur.callee.type === "Identifier" && accessors.has(cur.callee.name) && cur.arguments.length === 0;
+  }
+  if (cur.type === "MemberExpression") return readsAccessorDirectly(cur.object, accessors);
+  if (cur.type === "UnaryExpression") return readsAccessorDirectly(cur.argument, accessors);
+  if (cur.type === "BinaryExpression" || cur.type === "LogicalExpression") {
+    return readsAccessorDirectly(cur.left, accessors) || readsAccessorDirectly(cur.right, accessors);
+  }
+  if (cur.type === "ConditionalExpression") {
+    return readsAccessorDirectly(cur.test, accessors) || readsAccessorDirectly(cur.consequent, accessors) || readsAccessorDirectly(cur.alternate, accessors);
+  }
+  if (cur.type === "TemplateLiteral") return cur.expressions.some((expr) => readsAccessorDirectly(expr, accessors));
+  return false;
+}
+
+const nshNoEagerAccessor = defineRule({
+  meta: {
+    messages: {
+      callbackAccessor: says(
+        "calling `<If>`/`<Each>` accessor `{{name}}()` at the top level of its render callback reads it once and freezes subsequent updates",
+        "read `{{name}}()` inside JSX, a `computed()`, or a helper arrow function (or pass `{{name}}` as an accessor `() => T`)",
+        "docs/style/nsh-tsx.md",
+      ),
+      componentRead: says(
+        "reading reactive `props` or signals eagerly at component top level runs once during mount and will not update when inputs change",
+        "wrap derived values in `() => ...` or `computed(() => ...)`, use `<If>` for conditional UI, or wrap intentional one-time snapshots in `untracked(() => ...)`",
+        "docs/style/nsh-tsx.md",
+      ),
+    },
+  },
+  create(context) {
+    const checkComponent = (fn: FnNode) => {
+      if (!isJsxComponentFn(fn) || fn.body?.type !== "BlockStatement") return;
+      const first = fn.params[0];
+      const propsName = first?.type === "Identifier" ? first.name : undefined;
+      const accessors = collectLocalReactiveAccessors(fn.body);
+      if (propsName === undefined && accessors.size === 0) return;
+
+      visitSameFunction(fn.body, (node) => {
+        if (isUntrackedCall(node) || node.type === "JSXElement" || node.type === "JSXFragment") return false;
+        if (node.type === "VariableDeclarator" && node.init) {
+          if ((propsName !== undefined && readsPropsDirectly(node.init, propsName)) || (accessors.size > 0 && readsAccessorDirectly(node.init, accessors))) {
+            context.report({ node, messageId: "componentRead" });
+            return false;
+          }
+        }
+        if (node.type === "IfStatement" || node.type === "SwitchStatement") {
+          const test = node.type === "IfStatement" ? node.test : node.discriminant;
+          if ((propsName !== undefined && readsPropsDirectly(test, propsName)) || (accessors.size > 0 && readsAccessorDirectly(test, accessors))) {
+            context.report({ node: test, messageId: "componentRead" });
+          }
+        }
+        return true;
+      });
+    };
+
+    const checkControlFlowChild = (node: ESTree.JSXElement) => {
+      if (node.openingElement.name.type !== "JSXIdentifier") return;
+      const tag = node.openingElement.name.name;
+      if (tag !== "If" && tag !== "Each") return;
+      for (const child of node.children) {
+        if (child.type !== "JSXExpressionContainer") continue;
+        const expr = child.expression;
+        if (!isFunctionNode(expr) || !expr.body) continue;
+        const paramNames = new Set<string>();
+        for (const p of expr.params) {
+          if (p.type === "Identifier") paramNames.add(p.name);
+        }
+        if (paramNames.size === 0) continue;
+        visitSameFunction(expr.body, (inner) => {
+          if (isUntrackedCall(inner) || inner.type === "JSXElement" || inner.type === "JSXFragment") return false;
+          if (inner.type === "CallExpression" && inner.callee.type === "Identifier" && paramNames.has(inner.callee.name) && inner.arguments.length === 0) {
+            context.report({ node: inner, messageId: "callbackAccessor", data: { name: inner.callee.name } });
+            return false;
+          }
+          return true;
+        });
+      }
+    };
+
+    return {
+      FunctionDeclaration: checkComponent,
+      FunctionExpression: checkComponent,
+      ArrowFunctionExpression: checkComponent,
+      JSXElement: checkControlFlowChild,
+    };
+  },
+});
+
 export default definePlugin({
   meta: { name: "vibevalley" },
   rules: {
@@ -466,5 +828,10 @@ export default definePlugin({
     "child-process-door": childProcessDoor,
     "one-absent": oneAbsent,
     "global-doors": globalDoors,
+    "nsh-no-jsx-conditional": nshNoJsxConditional,
+    "nsh-no-jsx-map": nshNoJsxMap,
+    "nsh-each-key": nshEachKey,
+    "nsh-no-props-destructure": nshNoPropsDestructure,
+    "nsh-no-eager-accessor": nshNoEagerAccessor,
   },
 });

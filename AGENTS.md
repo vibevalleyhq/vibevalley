@@ -100,6 +100,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **生成的不手改**：`packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`（`protocol:ts`）、`client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）、`iconPaths.gen.ts`（`icons:gen`）、artifact 的 golden（`goldens`）和生成的参考表由脚本写出，`protocol:check` 和 `docs:verify` 查是不是最新。SQLite 查询绑定由 sqlc 生成，输入和输出见[配置](sqlc.yaml)。
 - **内部不留兼容**：改名、改形状、改落盘格式直接改，不写兼容层、旧数据兜底或迁移脚本；对外 HTTP `v1` 是唯一例外（[接口版本](docs/subsystems/core.md)）。
 - **页面不折事实**：页面只读按域推来的切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）并写画面摆法，请求只经 `Transport`；缺数据就补进契约与 `reduce` 或调接口问服务端（[客户端](docs/subsystems/app.md)）。
+- **页面守 `nsh` 响应式**：动态 JSX 分支用 `<If>`、列表用带稳定 `key` 的 `<Each>` 或 `<List>`，不解构 `props`、不提前求值访问器、多处派生用 `computed()`（[NSH TSX 规范](docs/style/nsh-tsx.md)）。
 - **处理函数要薄**：HTTP 门、桥和页面组件只做转发与展示，规则留在所属模块或纯函数里（[架构](docs/architecture.md)）。
 - **执行会话没有权限确认**：服务端只听 `127.0.0.1`，执行会话只在工作区开工（[执行会话](docs/subsystems/session.md)）。
 - **包之间只经包名**：TS 跨包只经 `package.json` 的 `exports` 写 `@vibevalley/*`（`no-cross-package-path` 查）；Rust 跨 crate 只经 `Cargo.toml` 的依赖。

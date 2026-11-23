@@ -30,7 +30,7 @@ export function Tabs<T extends string>(props: {
   const look = () => looks[props.look ?? "pills"];
   return (
     <View role="tablist" accessibilityLabel={props.label} class={`${look().list} ${props.class ?? ""}`}>
-      <Each of={props.items}>
+      <Each of={props.items} key={(item) => item.value}>
         {(item) => {
           const on = () => item().value === props.value;
           return (

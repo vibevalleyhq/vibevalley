@@ -49,7 +49,7 @@ export function MoreMenu(props: {
         </View>
       }
     >
-      <Each of={props.items}>
+      <Each of={props.items} key={(item) => item.key}>
         {(item, index) => (
           <>
             <If when={index() > 0 && item().danger === true && props.items[index() - 1]?.danger !== true}>

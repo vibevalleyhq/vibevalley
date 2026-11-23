@@ -30,7 +30,7 @@ function Offered(props: { value: string; onChange: (v: string) => void; offered:
       <TextInput testID={props.testid} value={props.value} onInput={props.onChange} placeholder={props.placeholder} />
       <If when={shown().length > 0}>
         <View class="flex-row flex-wrap gap-1.5">
-          <Each of={shown()}>
+          <Each of={shown()} key={(o) => o}>
             {(o) => (
               <View
                 role="button"
@@ -348,7 +348,7 @@ function ChannelDanger(props: { channel: Channel; onDone: () => void; onGone: ()
               <Text class="text-xs font-semibold text-berry">{t("web.channel.manage.removeWill")}</Text>
             </View>
             <View class="gap-1 pl-1">
-              <Each of={lines()}>
+              <Each of={lines()} key="index">
                 {(line) => (
                   <View class="flex-row items-start gap-1.5">
                     <Text class="text-xs text-berry">·</Text>

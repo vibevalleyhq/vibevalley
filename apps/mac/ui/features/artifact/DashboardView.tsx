@@ -212,7 +212,7 @@ export function DashboardView(props: StoreViewerProps) {
                 }
               >
                 <View class="flex-row flex-wrap items-center gap-1">
-                  <Each of={datasetNames()}>
+                  <Each of={datasetNames()} key={(ds) => ds}>
                     {(ds) => {
                       const active = () => ds() === activeDataset();
                       return (
@@ -277,7 +277,7 @@ export function DashboardView(props: StoreViewerProps) {
                           <Scroll horizontal>
                             <View>
                               <View class="min-h-8 flex-row items-center bg-side">
-                                <Each of={activeCols()}>
+                                <Each of={activeCols()} key={(col) => col}>
                                   {(col) => (
                                     <View class="w-28 shrink-0 px-2.5 py-1.5">
                                       <Text class="truncate text-xs font-semibold text-muted">{col()}</Text>
@@ -285,10 +285,10 @@ export function DashboardView(props: StoreViewerProps) {
                                   )}
                                 </Each>
                               </View>
-                              <Each of={activeRows().slice(0, 30)}>
+                              <Each of={activeRows().slice(0, 30)} key="index">
                                 {(row) => (
                                   <View class="min-h-8 flex-row items-center border-t border-line bg-page hover:bg-hover">
-                                    <Each of={activeCols()}>
+                                    <Each of={activeCols()} key={(col) => col}>
                                       {(col) => (
                                         <View class="w-28 shrink-0 px-2.5 py-1.5">
                                           <Text class="truncate font-mono text-xs text-ink tabular-nums">{formatCellValue(row()[col()])}</Text>

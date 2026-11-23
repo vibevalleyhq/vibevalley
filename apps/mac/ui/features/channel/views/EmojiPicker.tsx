@@ -231,12 +231,12 @@ function EmojiPicker(props: { onPick: (emoji: string) => void; onClose?: () => v
   const groups = [{ id: "frequent", emoji: quickReactions }, ...emojiGroups];
   return (
     <View testID="emoji-picker" accessibilityLabel={t("web.channel.emoji.open")} class="gap-2" style={{ width: width - 16 }}>
-      <Each of={groups}>
+      <Each of={groups} key={(g) => g.id}>
         {(g) => (
           <View accessibilityLabel={groupName(g().id)}>
             <Text class="px-1 pb-1 text-xs font-semibold text-muted">{groupName(g().id)}</Text>
             <View class="flex-row flex-wrap gap-0.5">
-              <Each of={g().emoji}>
+              <Each of={g().emoji} key={(e) => e}>
                 {(e) => (
                   <View
                     role="button"
