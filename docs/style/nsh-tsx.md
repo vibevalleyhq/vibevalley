@@ -94,6 +94,24 @@ export function PendingApprovals(props: { conversationId: string }) {
 3. **组件内不应直接调用 `setInterval`**：应使用 `apps/mac/ui/infra/base/dom.tsx` 的共享时钟桶 `useNow(ms)` 或 `apps/mac/ui/infra/base/timer.ts` 的 `useInterval(fn, ms)`（静态检查：`vibevalley/no-component-interval`）。
 4. **`<Tree>` 自带 `<Scroll>`，避免同轴嵌套 `<Scroll>`**：`nsh/base` 的 `<Tree>` 内部已包含纵向 `<Scroll>`，不应再把 `<Tree>` 包进外层纵向 `<Scroll>`；其余场景嵌套同轴 `<Scroll>` 时，内层应设置明确的最大高度（如 `max-h-40`）。
 
+## 规则 5：高频输入、拖拽与持久化解耦
+
+1. **受控输入与拖拽回调去重**：`<Input>` 的 `onSelectionChange` 应在更新信号前对比 `untracked(selection)`（`start` 与 `end` 未变直接返回）；`onChange` 与 `Splitter` 拖拽（`PanResponder` `onPanResponderMove`）应跳过与当前值相等的写入，防止重复信号触发整段视图或桥接回传（见 `apps/mac/ui/features/channel/views/Composer.tsx` 与 `apps/mac/ui/design/Splitter.tsx`）。
+2. **频道草稿 `250 ms` 缓冲与按需刷盘**：高频键入不应每次按键都同步写入持久存储。频道输入框通过 `drafts.text(channel, text)` 在内存 `bufferedText` 缓冲 `DRAFT_DEBOUNCE_MS = 250` ms 后落盘，并在发送清空（`drafts.clear`）、其它字段更新（`put`）以及 `pagehide` / `beforeunload` 时通过 `flushDrafts()` 合并刷盘（见 `apps/mac/ui/features/channel/model/composing.ts`）。
+3. **`createPersistentStorage` 按键合并写盘**：`apps/mac/ui/infra/state/storage.ts` 的 `createPersistentStorage` 用内存 `cache` 同步响应读取，异步持久化经 `queued` `Map` 按键合并后由单一 `drain` 队列串行提交到 `StorageBackend`，连续写同一键只落最新值，测试与退出点通过 `flush()` 显式等待落盘完成。
+4. **`prefs` 相等性守卫与 `computed()` 窄选择隔离**：`apps/mac/ui/infra/state/prefs.ts` 的 `set` 与 `setWidth` 应在更新前用 `Object.is` / `===` 校验字段是否变化，相等时直接返回原对象以跳过存储写入；消费侧通过 `usePrefs(select)` 与 `usePaneWidth`（`apps/mac/ui/design/Splitter.tsx`）经 `computed()` 隔离单个字段订阅，保证调整侧栏宽度不会重跑 `theme` 等无关计算（静态检查：`vibevalley/nsh-no-direct-storage-in-event`）。
+5. **`keymap.bind` 用 `computed` 布尔条件隔离**：全局快捷键绑定应放进 `effect()` 并由 `computed()` 产出的低频布尔条件（如 `menuOpen`、`isEmpty`、`swarmOpen`）守卫，不应在绑定条件或 `effect` 依赖里直接读取原始文本信号 `text()` / `draft()`，避免每次按键都卸载并重建键盘监听器（见 `apps/mac/ui/features/channel/views/Composer.tsx`；静态检查：`vibevalley/nsh-keymap-no-text-signal`）。
+
+## 规则 6：乐观交互先行与失败可回滚
+
+1. **发送即时清空输入并插入乐观占位**：用户提交消息时应立即清空输入草稿并在消息流插入本地占位，不得等待服务端 RPC 完成才清空输入框，覆盖以下四条消息通道：
+   - **Workspace Chat**（`apps/mac/ui/workspace/ChatPane.tsx`）：立即清空 `draft` 与 `attachedFiles`，分配负局部序号 `seq = --localSeq` 记入 `inFlightOptimistic` 并通过 `mergeChatSteps` 插入 `user/message` 占位，新建会话期间将阶段置为 `"starting"`。
+   - **Channel Chat**（`apps/mac/ui/features/channel/model/composing.ts`、`apps/mac/ui/features/channel/views/MessageList.tsx`）：`createComposer` 立即执行 `edit("", 0)` 与 `ways.sent?.()`，未确认发送经 `chatSay`（`defineIntent`）与 `pendingLines` 渲染 `"sending"` / `"failed"` 占位，待服务端带相同 `sendKey` 的消息到达 `followed` 后自动替换。
+   - **FarmPhone**（`apps/mac/ui/farm/FarmPhone.tsx`）与 **Mobile**（`apps/mobile/src/features/ChannelsTab.tsx`）：同样遵循发送即时清空草稿、请求期间不阻塞连续输入体验的乐观交互约定。
+2. **防慢启动初始空 `history` 擦除在途占位**：会话尚未就绪或慢启动时，服务端首次推送的 `history` 可能为空列表。`WorkspaceChatPane` 在处理 `history` 事件时应保留仍在 `inFlightOptimistic` 且尚未被 `incomingUserTexts` 回显的本地负 `seq` 占位，仅清理已落地或被回显替代的占位，防止消息闪失。
+3. **失败恢复草稿但不覆盖新输入**：发送失败执行回滚（如 `ChatPane.tsx` 的 `rollbackOptimistic` 或 `FarmPhone.tsx` 的 `catch` 分支）删除失败占位并恢复原草稿时，应先校验当前输入仍为空（`untracked(draft) === ""` / `untracked(input) === ""`）且附件列表为空后再回填，严禁覆盖用户在等待期间重新键入的新内容。
+4. **`sendKey` 幂等**：所有频道发送与失败重试（`composing.ts` 的 `chatSay`、`FarmPhone.tsx` 的 `pendingKey` 等）应生成并复用稳定的 `sendKey`（`newSendKey()`），失败重试沿用原 `sendKey`，确保网络超时重试不会产生重复消息。
+
 ## 静态检查清单
 
 `scripts/audit/oxlint-plugin.ts` 提供以下规则并在 `vite.config.ts` 接入 `vp check`：
@@ -106,3 +124,5 @@ export function PendingApprovals(props: { conversationId: string }) {
 | `vibevalley/nsh-no-props-destructure` | 组件参数解构或顶层 `const { a } = props` | 直接读 `props.a`，拆分透传属性用 `split(props, [...])` |
 | `vibevalley/nsh-no-eager-accessor` | 组件或 `<If>`/`<Each>` 回调顶层提前读取 `props.x` / 访问器 / 信号 | 放入 JSX、派生闭包 `() => ...`、`computed`、`effect` 或 `untracked` |
 | `vibevalley/no-component-interval` | 组件内直接调用 `setInterval` | 改用 `useNow(ms)` 或 `useInterval` |
+| `vibevalley/nsh-no-direct-storage-in-event` | 输入或拖拽事件回调内直接同步写入 `localStorage` / `Storage` | 改用 `drafts.text` 缓冲、`createPersistentStorage` 合并或带相等性守卫的 `prefs` |
+| `vibevalley/nsh-keymap-no-text-signal` | `keymap.bind` 所在的 `effect` 内直接读取原始文本信号（如 `text()`、`draft()`） | 抽成 `computed()` 布尔条件（如 `isEmpty`、`menuOpen`）作为 `effect` 守卫 |

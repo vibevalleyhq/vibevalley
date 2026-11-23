@@ -50,6 +50,8 @@ cargo run -p vibevalley-server                                  # 只跑服务�
 cargo run -p vibevalley-cli -- issue list                       # 命令行：issue、session、repo、cron、agent、orchestrator、runtime、memory、channel、chat、artifact、library、media、attachment、state、setting、doctor（--json 输出原始 JSON）
 vp run rust:check                                               # 改完 crates/ 或 apps/mac/src：cargo fmt、clippy（-D warnings）、cargo test
 vp run rust:changed                                             # 只检查相对 origin/main 改到的 Rust crate 及其反向依赖（fmt、clippy、nextest）
+vp run rust:loom                                                # 对并发状态机内核跑 loom 穷举模型检验（--features loom --profile loom）
+vp run audit:rust                                               # 检查 Rust 异步并发、虚拟时钟与 UI 卸载静态护栏（scripts/audit/rust-ratchets.ts）
 vp run protocol:ts                                              # 改了 crates/protocol/src/contract：重写 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts
 sqlc generate                                                   # 改完 SQLite 表结构或命名查询：重写 crates/server/src/db/generated/ 与宿主查询绑定
 vp run sql:check                                                # 用 sqlc 1.31.1 对账 Rust 绑定；用 Python 3 的 SQLite 按参数个数预编译每条查询
@@ -95,6 +97,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **核心状态只有一份**：执行会话或农场的新状态加进契约的形状与事实，在 `vibevalley-core` 的 `reduce` 里折叠，只经事实施加，不在服务端或页面另存一份（[核心状态](docs/subsystems/core.md)）。
 - **边界解码一次，门内全是类型**：HTTP、文件、厂商响应、模型给的工具参数，各在进门处用 serde 解码成结构体和 enum；门内不传 `serde_json::Value`、不按字符串分支；钥匙包进 `Secret`（打印只出提示）；页面在边界用 Zod 解码（`satisfies Codec<T.X>`）（[类型驱动与进门解码](docs/style/module-design.md)）。
 - **深模块**：每个模块对外一个窄接口；不靠一个带 `kind` 的入口复用多种操作（[模块设计](docs/style/module-design.md)）。
+- **Rust 异步与并发**：共用单一 `vibevalley-runtime::rt`，异步函数与 `Drop` 禁 `rt::block_on`（用 `close_async`），测试用 `start_paused` + `ManualClock` 及 `--features loom` 内核，`crates/rich` 重计算离线程卸载（[Rust 异步并发规范](docs/style/rust-async-concurrency.md)，`vp run audit:rust`）。
 - **封闭的联合穷尽处理**：Rust 的 `match` 不写吞掉新成员的 `_`；TS 按 `_tag`、`kind`、`type` 分支时 `switch` 覆盖全部成员（`switch-exhaustiveness-check` 查）。
 - **契约改在 Rust**：形状和接口表改 `crates/protocol/src/contract`，TS 的类型由它生成；页面要用的同改手写的 `schema.ts` 与 `api.ts`，它们的测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）。
 - **生成的不手改**：`packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`（`protocol:ts`）、`client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）、`iconPaths.gen.ts`（`icons:gen`）、artifact 的 golden（`goldens`）和生成的参考表由脚本写出，`protocol:check` 和 `docs:verify` 查是不是最新。SQLite 查询绑定由 sqlc 生成，输入和输出见[配置](sqlc.yaml)。

@@ -16,7 +16,7 @@
 | `subsystems/` 下的各篇（[写法](docs/subsystems/README.md)） | 一个子系统沉淀下来的样子，从架构的角度：边界、在哪、模型和不变量、流程、和谁打交道、为什么这样、放弃了哪些路 | 教学步骤（→ 教程）、过程和日期、计划（→ 提案）、另一份子系统索引 |
 | [concepts.md](docs/concepts.md) 和 `reference/` 下的各篇 | 概念，和查的东西：还没拆成子系统的行为、生成的表（[capabilities.md](docs/reference/capabilities.md)、[primitives.md](docs/reference/primitives.md)） | 子系统已经写了的（→ 链接过去）、教学步骤、理由、计划 |
 | `design/` 下的各篇（[README.md](docs/design/README.md) 索引 `01`–`09`） | 设计系统、五载体令牌、原子组件、像素渲染、页面清单与 Agent 审查准则 | 某个子系统内部服务端实现 |
-| `style/` 下的各篇（[module-design.md](docs/style/module-design.md)、[code.md](docs/style/code.md)、[nsh-tsx.md](docs/style/nsh-tsx.md)、[naming.md](docs/style/naming.md)、[writing.md](docs/style/writing.md)） | 模块边界、代码、NSH TSX 响应式与文字怎么写 | 某个子系统的行为 |
+| `style/` 下的各篇（[module-design.md](docs/style/module-design.md)、[rust-async-concurrency.md](docs/style/rust-async-concurrency.md)、[code.md](docs/style/code.md)、[nsh-tsx.md](docs/style/nsh-tsx.md)、[naming.md](docs/style/naming.md)、[writing.md](docs/style/writing.md)） | 模块边界、Rust 异步并发、代码、NSH TSX 响应式与文字怎么写 | 某个子系统的行为 |
 | [Agent Notes](.agents/notes/README.md) | 具体的计划：要做什么、怎么做、怎么算做完；做的过程里的决定 | 做完以后仍然成立的（→ 沉淀进子系统，Note 删掉） |
 | 包的 README（`apps/*/README.md`、`packages/*/README.md`） | 这个包的对外约定：管什么、导出什么、依赖谁、不变量、测试 | 别的包的事、代码注释的复述 |
 | 代码注释（[写法](docs/style/code.md#注释)） | 这段代码的约定和不显然的约束 | 推理过程、测试流程、远处的行为、概述和历史 |
