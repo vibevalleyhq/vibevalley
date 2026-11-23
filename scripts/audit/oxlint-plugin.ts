@@ -814,6 +814,139 @@ const nshNoEagerAccessor = defineRule({
   },
 });
 
+const highFreqEventProps = new Set(["onChange", "onInput", "onSelectionChange", "onPanResponderMove", "onScroll", "onScrollBeginDrag"]);
+
+function memberPropertyName(node: ESTree.MemberExpression): string | undefined {
+  if (!node.computed && node.property.type === "Identifier") return node.property.name;
+  if (node.computed && node.property.type === "Literal" && typeof node.property.value === "string") return node.property.value;
+  return undefined;
+}
+
+function storageWriteTarget(calleeNode: AstNode): "localStorage" | "Storage" | undefined {
+  const cur = unwrapTypeExpr(calleeNode);
+  const callee = cur?.type === "ChainExpression" ? unwrapTypeExpr(cur.expression) : cur;
+  if (!callee || callee.type !== "MemberExpression") return undefined;
+  if (memberPropertyName(callee) !== "setItem") return undefined;
+  const obj = unwrapTypeExpr(callee.object);
+  if (!obj) return undefined;
+  if (obj.type === "Identifier") {
+    if (obj.name === "localStorage" || obj.name === "Storage") return obj.name;
+    return undefined;
+  }
+  if (obj.type === "MemberExpression" && memberPropertyName(obj) === "localStorage" && obj.object.type === "Identifier" && globals.has(obj.object.name)) {
+    return "localStorage";
+  }
+  return undefined;
+}
+
+function collectHandlerFns(expr: AstNode | null | undefined, out: FnNode[]): void {
+  const cur = unwrapTypeExpr(expr);
+  if (!cur) return;
+  if (isFunctionNode(cur)) {
+    out.push(cur);
+    return;
+  }
+  if (cur.type === "ConditionalExpression") {
+    collectHandlerFns(cur.consequent, out);
+    collectHandlerFns(cur.alternate, out);
+  } else if (cur.type === "LogicalExpression") {
+    collectHandlerFns(cur.left, out);
+    collectHandlerFns(cur.right, out);
+  }
+}
+
+const nshNoDirectStorageInEvent = defineRule({
+  meta: {
+    messages: {
+      directWrite: says(
+        "calling `{{target}}.setItem()` directly inside high-frequency `{{event}}` handlers causes per-frame JSON serialization and synchronous storage I/O jank",
+        "route writes through a debounced buffer or `defineStored` with an equality guard",
+        "docs/style/nsh-tsx.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      JSXAttribute(node) {
+        if (node.name.type !== "JSXIdentifier") return;
+        const event = node.name.name;
+        if (!highFreqEventProps.has(event) || node.value?.type !== "JSXExpressionContainer") return;
+        const handlers: FnNode[] = [];
+        collectHandlerFns(node.value.expression, handlers);
+        for (const fn of handlers) {
+          visitSameFunction(fn.body, (inner) => {
+            if (inner.type === "CallExpression") {
+              const target = storageWriteTarget(inner.callee);
+              if (target !== undefined) context.report({ node: inner, messageId: "directWrite", data: { target, event } });
+            }
+            return true;
+          });
+        }
+      },
+    };
+  },
+});
+
+function isKeymapBindCall(node: AstNode): boolean {
+  if (node.type !== "CallExpression") return false;
+  const callee = unwrapTypeExpr(node.callee);
+  if (!callee || callee.type !== "MemberExpression") return false;
+  const obj = unwrapTypeExpr(callee.object);
+  return obj?.type === "Identifier" && obj.name === "keymap" && memberPropertyName(callee) === "bind";
+}
+
+function isStringLiteralNode(node: AstNode | null | undefined): boolean {
+  const cur = unwrapTypeExpr(node);
+  if (!cur) return false;
+  if (cur.type === "Literal") return typeof cur.value === "string";
+  return cur.type === "TemplateLiteral" && cur.expressions.length === 0;
+}
+
+function isZeroArgCall(node: AstNode | null | undefined): boolean {
+  const cur = unwrapTypeExpr(node);
+  if (!cur) return false;
+  if (cur.type === "ChainExpression") return isZeroArgCall(cur.expression);
+  return cur.type === "CallExpression" && cur.arguments.length === 0;
+}
+
+const nshKeymapNoTextSignal = defineRule({
+  meta: {
+    messages: {
+      textSignal: says(
+        "reading a live text signal directly inside a keymap `effect` tears down and re-registers native GPUI keymaps on every keystroke",
+        "lift the predicate into `const isEmpty = computed(() => ...)` outside `effect()`",
+        "docs/style/nsh-tsx.md",
+      ),
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        if (node.callee.type !== "Identifier" || node.callee.name !== "effect") return;
+        const cb = node.arguments[0];
+        if (!cb || !isFunctionNode(cb) || !cb.body) return;
+        let hasKeymapBind = false;
+        const comparisons: ESTree.BinaryExpression[] = [];
+        visitSameFunction(cb.body, (inner) => {
+          if (isKeymapBindCall(inner)) hasKeymapBind = true;
+          if (
+            inner.type === "BinaryExpression" &&
+            (inner.operator === "===" || inner.operator === "!==") &&
+            ((isZeroArgCall(inner.left) && isStringLiteralNode(inner.right)) || (isStringLiteralNode(inner.left) && isZeroArgCall(inner.right)))
+          ) {
+            comparisons.push(inner);
+          }
+          return true;
+        });
+        if (!hasKeymapBind) return;
+        for (const cmp of comparisons) {
+          context.report({ node: cmp, messageId: "textSignal" });
+        }
+      },
+    };
+  },
+});
+
 export default definePlugin({
   meta: { name: "vibevalley" },
   rules: {
@@ -833,5 +966,7 @@ export default definePlugin({
     "nsh-each-key": nshEachKey,
     "nsh-no-props-destructure": nshNoPropsDestructure,
     "nsh-no-eager-accessor": nshNoEagerAccessor,
+    "nsh-no-direct-storage-in-event": nshNoDirectStorageInEvent,
+    "nsh-keymap-no-text-signal": nshKeymapNoTextSignal,
   },
 });

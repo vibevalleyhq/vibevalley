@@ -378,6 +378,15 @@ export default defineConfig({
           "vibevalley/nsh-no-eager-accessor": "error",
         },
       },
+      {
+        // nsh input/drag/keymap responsiveness ratchets across all native UI surfaces (docs/style/nsh-tsx.md).
+        files: ["apps/mac/ui/**", "apps/mobile/src/**"],
+        excludeFiles: ["**/*.test.ts", "**/*.test.tsx", "**/*.story.tsx", "**/story.tsx", "**/stories/**"],
+        rules: {
+          "vibevalley/nsh-no-direct-storage-in-event": "error",
+          "vibevalley/nsh-keymap-no-text-signal": "error",
+        },
+      },
     ],
     // A disable comment whose rule no longer fires there is an error, so none outlives its reason.
     options: { typeAware: true, typeCheck: true, reportUnusedDisableDirectives: "error" },
