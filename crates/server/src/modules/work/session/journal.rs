@@ -4,11 +4,12 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use parking_lot::Mutex;
 use tokio::sync::Notify;
 use tokio::task::JoinHandle as TaskHandle;
+use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::rules::cut;
 use vibevalley_i18n::t;
@@ -580,15 +581,18 @@ impl Trajectories {
                         _ = task_cancel.cancelled() => true,
                         _ = wake.notified() => false,
                     },
-                    Some(at) => match at.checked_duration_since(Instant::now()) {
-                        None => false,
-                        Some(wait) => tokio::select! {
-                            biased;
-                            _ = task_cancel.cancelled() => true,
-                            _ = wake.notified() => false,
-                            _ = tokio::time::sleep(wait) => false,
-                        },
-                    },
+                    Some(at) => {
+                        if at <= Instant::now() {
+                            false
+                        } else {
+                            tokio::select! {
+                                biased;
+                                _ = task_cancel.cancelled() => true,
+                                _ = wake.notified() => false,
+                                _ = tokio::time::sleep_until(at) => false,
+                            }
+                        }
+                    }
                 };
                 let Some(t) = weak.upgrade() else { return };
                 if stop || t.hub.strong_count() == 0 {
@@ -766,6 +770,17 @@ impl Trajectories {
         for id in ids {
             self.finish(&id);
         }
+    }
+
+    /// Asynchronously stops the flusher worker and seals/flushes every open
+    /// log without calling `rt::block_on` on the worker handle.
+    pub async fn close_async(&self) {
+        let worker = self.worker.lock().take();
+        if let Some((cancel, handle)) = worker {
+            cancel.cancel();
+            let _ = handle.await;
+        }
+        self.finish_all();
     }
 
     /// Seals and flushes every open log.
@@ -955,7 +970,7 @@ mod tests {
         // Idle close returns immediately without polling delay.
         let idle = Trajectories::open(db.clone(), &hub);
         assert!(idle.next_deadline().is_none());
-        let start = Instant::now();
+        let start = std::time::Instant::now();
         idle.close();
         assert!(start.elapsed() < Duration::from_secs(1));
 
@@ -964,9 +979,9 @@ mod tests {
         tr.step("w1", "", Step::Asked { text: "hello".into() });
         assert!(tr.next_deadline().is_some());
 
-        let deadline = Instant::now() + Duration::from_secs(2);
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
         let mut saw_push = false;
-        while Instant::now() < deadline {
+        while std::time::Instant::now() < deadline {
             match live.recv_timeout(Duration::from_millis(50)) {
                 Ok(LiveEvent::Event(ev)) if ev.id == "w1" && ev.activity.text == "hello" => {
                     saw_push = true;
@@ -1036,5 +1051,41 @@ mod tests {
         assert_eq!(burst.oldest_seq, Some(0));
         assert_eq!(burst.newest_seq, Some(264));
         tr4.close();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn trajectories_push_and_close_async_follow_virtual_clock() {
+        let wall_start = std::time::Instant::now();
+        let home = tempfile::tempdir().unwrap();
+        let db = crate::base::ServerDb::open(home.path()).unwrap();
+        let hub = Hub::new(vibevalley_core::Core::default().state().clone());
+        let mut live = hub.subscribe_live();
+        let tr = Trajectories::open(db.clone(), &hub);
+
+        tr.step("w-vclock", "", Step::Asked { text: "virtual".into() });
+        assert!(tr.next_deadline().is_some());
+
+        tokio::time::advance(PUSH_AFTER - Duration::from_millis(1)).await;
+        tokio::task::yield_now().await;
+        assert!(live.try_recv().is_err(), "push must wait for full PUSH_AFTER window");
+
+        tokio::time::advance(Duration::from_millis(1)).await;
+        let event = live.recv().await.expect("live event pushed at PUSH_AFTER");
+        match event {
+            LiveEvent::Event(ev) => {
+                assert_eq!(ev.id, "w-vclock");
+                assert_eq!(ev.activity.text, "virtual");
+            }
+            other => panic!("unexpected live event: {other:?}"),
+        }
+
+        tr.close_async().await;
+        hub.close_async().await;
+        db.close();
+        assert!(
+            wall_start.elapsed() < Duration::from_secs(1),
+            "virtual-clock journal push & close_async must finish instantaneously, took {:?}",
+            wall_start.elapsed()
+        );
     }
 }

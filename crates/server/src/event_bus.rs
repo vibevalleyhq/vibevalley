@@ -23,10 +23,16 @@ use crate::Hub;
 pub const CHANNEL_CAPACITY: usize = 1024;
 const BUS_SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 
+struct Delivery {
+    transition: Arc<Transition>,
+    span: tracing::Span,
+    dispatch: tracing::Dispatch,
+}
+
 struct Subscriber {
     id: u64,
     name: &'static str,
-    tx: Mutex<Option<mpsc::Sender<Arc<Transition>>>>,
+    tx: Mutex<Option<mpsc::Sender<Delivery>>>,
     cancel: CancellationToken,
     running_thread: Arc<Mutex<Option<ThreadId>>>,
     handle: Mutex<Option<JoinHandle<()>>>,
@@ -38,13 +44,28 @@ impl Subscriber {
         let _ = self.tx.lock().take();
     }
 
-    fn join(&self) {
+    fn take_join_handle(&self) -> Option<JoinHandle<()>> {
         if *self.running_thread.lock() == Some(std::thread::current().id()) {
-            return;
+            return None;
         }
-        if let Some(handle) = self.handle.lock().take() {
+        self.handle.lock().take()
+    }
+
+    async fn join_async(&self) {
+        if let Some(handle) = self.take_join_handle() {
+            let _ = tokio::time::timeout(BUS_SHUTDOWN_GRACE, handle).await;
+        }
+    }
+
+    fn join(&self) {
+        if let Some(handle) = self.take_join_handle() {
             let _ = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(BUS_SHUTDOWN_GRACE, handle).await });
         }
+    }
+
+    async fn close_async(&self) {
+        self.signal_stop();
+        self.join_async().await;
     }
 
     fn close(&self) {
@@ -88,6 +109,15 @@ impl Subscription {
         }
         sub.close();
     }
+
+    /// Asynchronously unsubscribes and awaits the subscriber task without calling `rt::block_on`.
+    pub async fn close_async(&self) {
+        let Some(sub) = &self.sub else { return };
+        if let Some(state) = self.state.upgrade() {
+            state.lock().subscribers.retain(|s| s.id != sub.id);
+        }
+        sub.close_async().await;
+    }
 }
 
 impl Drop for Subscription {
@@ -121,7 +151,7 @@ impl EventBus {
             return Subscription::closed();
         }
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
-        let (tx, mut rx) = mpsc::channel::<Arc<Transition>>(CHANNEL_CAPACITY);
+        let (tx, mut rx) = mpsc::channel::<Delivery>(CHANNEL_CAPACITY);
         let cancel = self.cancel.child_token();
         let worker_cancel = cancel.clone();
         let hub_weak = self.hub.get().cloned().unwrap_or_default();
@@ -129,13 +159,13 @@ impl EventBus {
         let worker_thread = running_thread.clone();
         let handler = Arc::new(handler);
 
-        let handle = vibevalley_runtime::rt::handle().spawn(async move {
+        let handle = vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
             loop {
-                let tr = tokio::select! {
+                let delivery = tokio::select! {
                     biased;
                     _ = worker_cancel.cancelled() => return,
                     item = rx.recv() => match item {
-                        Some(tr) => tr,
+                        Some(delivery) => delivery,
                         None => return,
                     },
                 };
@@ -154,7 +184,7 @@ impl EventBus {
                     }
                     *worker_thread.lock() = Some(std::thread::current().id());
                     let _guard = ThreadGuard(worker_thread);
-                    handler(&hub, &tr);
+                    tracing::dispatcher::with_default(&delivery.dispatch, || delivery.span.in_scope(|| handler(&hub, &delivery.transition)));
                 })
                 .await;
             }
@@ -194,7 +224,7 @@ impl EventBus {
         if transitions.is_empty() {
             return;
         }
-        let targets: Vec<(&'static str, mpsc::Sender<Arc<Transition>>, u64)> = {
+        let targets: Vec<(&'static str, mpsc::Sender<Delivery>, u64)> = {
             let st = self.state.lock();
             if st.closed || st.subscribers.is_empty() {
                 return;
@@ -204,11 +234,17 @@ impl EventBus {
         if targets.is_empty() {
             return;
         }
+        let dispatch = tracing::dispatcher::get_default(|d| d.clone());
+        let span = tracing::Span::current();
         let items: Vec<Arc<Transition>> = transitions.iter().cloned().map(Arc::new).collect();
         let mut disconnected = Vec::new();
         for tr in &items {
             for (name, tx, id) in &targets {
-                match tx.try_send(tr.clone()) {
+                match tx.try_send(Delivery {
+                    transition: tr.clone(),
+                    span: span.clone(),
+                    dispatch: dispatch.clone(),
+                }) {
                     Ok(()) => {}
                     Err(mpsc::error::TrySendError::Full(_)) => {
                         eprintln!("vibevalley-server: event_bus: subscriber '{name}' queue full ({CHANNEL_CAPACITY}); dropping transition");
@@ -224,9 +260,7 @@ impl EventBus {
         }
     }
 
-    /// Cooperatively cancels and concurrently awaits every registered
-    /// subscriber task, bounded by [`BUS_SHUTDOWN_GRACE`].
-    pub fn close(&self) {
+    fn take_close_handles(&self) -> Vec<JoinHandle<()>> {
         self.cancel.cancel();
         let subs = {
             let mut st = self.state.lock();
@@ -243,23 +277,45 @@ impl EventBus {
                 handles.push(handle);
             }
         }
+        handles
+    }
+
+    async fn join_handles(handles: Vec<JoinHandle<()>>) {
         if handles.is_empty() {
             return;
         }
-        let timed_out = vibevalley_runtime::rt::block_on(async {
+        let timed_out = tokio::time::timeout(BUS_SHUTDOWN_GRACE, async {
             let mut set = JoinSet::new();
             for handle in handles {
                 set.spawn(async move {
                     let _ = handle.await;
                 });
             }
-            tokio::time::timeout(BUS_SHUTDOWN_GRACE, async { while set.join_next().await.is_some() {} })
-                .await
-                .is_err()
-        });
+            while set.join_next().await.is_some() {}
+        })
+        .await
+        .is_err();
         if timed_out {
             tracing::warn!(timeout_secs = BUS_SHUTDOWN_GRACE.as_secs(), "event_bus.close timed out waiting for subscribers");
         }
+    }
+
+    /// Asynchronously cancels and concurrently awaits every registered
+    /// subscriber task, bounded by [`BUS_SHUTDOWN_GRACE`], without calling
+    /// `rt::block_on`.
+    pub async fn close_async(&self) {
+        let handles = self.take_close_handles();
+        Self::join_handles(handles).await;
+    }
+
+    /// Cooperatively cancels and concurrently awaits every registered
+    /// subscriber task, bounded by [`BUS_SHUTDOWN_GRACE`].
+    pub fn close(&self) {
+        let handles = self.take_close_handles();
+        if handles.is_empty() {
+            return;
+        }
+        vibevalley_runtime::rt::block_on(Self::join_handles(handles));
     }
 }
 
@@ -379,16 +435,20 @@ mod tests {
     fn close_awaits_multiple_subscribers_concurrently() {
         let hub = Hub::new(empty_space_state());
         let (entered_tx, entered_rx) = flume::bounded::<()>(4);
-        let (release_tx, release_rx) = flume::bounded::<()>(1);
+        let mut release_txs = Vec::with_capacity(4);
+        let mut done_rxs = Vec::with_capacity(4);
 
         let mut subs = Vec::new();
         for name in ["slow-a", "slow-b", "slow-c", "slow-d"] {
             let entered_tx = entered_tx.clone();
-            let release_rx = release_rx.clone();
+            let (release_tx, release_rx) = flume::bounded::<()>(1);
+            let (done_tx, done_rx) = flume::bounded::<()>(1);
+            release_txs.push(release_tx);
+            done_rxs.push(done_rx);
             subs.push(hub.subscribe_transitions(name, move |_, _| {
                 let _ = entered_tx.try_send(());
                 let _ = release_rx.recv_timeout(Duration::from_secs(5));
-                std::thread::sleep(Duration::from_millis(120));
+                let _ = done_tx.send(());
             }));
         }
 
@@ -397,13 +457,100 @@ mod tests {
             entered_rx.recv_timeout(Duration::from_secs(2)).expect("subscriber entered");
         }
 
-        let started = std::time::Instant::now();
-        drop(release_tx);
-        hub.close_bus();
-        let elapsed = started.elapsed();
-        drop(subs);
+        let hub_close = hub.clone();
+        let (closed_tx, closed_rx) = flume::bounded::<()>(1);
+        let closer = std::thread::spawn(move || {
+            hub_close.close_bus();
+            let _ = closed_tx.send(());
+        });
 
-        // Sequential draining would take >= 4 * 120ms = 480ms; concurrent join finishes in ~120ms.
-        assert!(elapsed < Duration::from_millis(380), "close_bus drained sequentially: {elapsed:?}");
+        // Release in reverse order: later subscribers finish without waiting on earlier ones,
+        // and close_bus finishes only once the last remaining subscriber completes.
+        for (release_tx, done_rx) in release_txs.into_iter().zip(done_rxs).rev() {
+            drop(release_tx);
+            done_rx.recv_timeout(Duration::from_secs(2)).expect("subscriber finished");
+        }
+        closed_rx.recv_timeout(Duration::from_secs(2)).expect("close_bus completed");
+        closer.join().unwrap();
+        drop(subs);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn event_bus_propagates_tracing_span_and_drains_via_close_async() {
+        use std::io;
+
+        use tracing::instrument::WithSubscriber as _;
+
+        #[derive(Clone, Default)]
+        struct SharedBuf(Arc<Mutex<Vec<u8>>>);
+
+        struct BufWriter(Arc<Mutex<Vec<u8>>>);
+
+        impl io::Write for BufWriter {
+            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                self.0.lock().extend_from_slice(buf);
+                Ok(buf.len())
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for SharedBuf {
+            type Writer = BufWriter;
+
+            fn make_writer(&'a self) -> Self::Writer {
+                BufWriter(self.0.clone())
+            }
+        }
+
+        let buf = SharedBuf::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::DEBUG)
+            .with_ansi(false)
+            .with_writer(buf.clone())
+            .finish();
+
+        async {
+            let wall_start = std::time::Instant::now();
+            let hub = Hub::new(empty_space_state());
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            let tx = Mutex::new(Some(tx));
+            let sub = hub.subscribe_transitions("span-check", move |_, _| {
+                let current = tracing::Span::current();
+                tracing::debug!("inside_bus_subscriber");
+                if let Some(sender) = tx.lock().take() {
+                    let _ = sender.send((current.metadata().map(|m| m.name()), current.id()));
+                }
+            });
+
+            let span = tracing::debug_span!("hub.op", op = "bus.test", trace_id = 77u64);
+            let expected_id = span.id();
+            span.in_scope(|| {
+                hub.apply(vec![commit_fact(1)]);
+            });
+
+            let (seen_name, seen_id) = rx.await.expect("subscriber observed transition");
+            assert_eq!(seen_name, Some("hub.op"));
+            assert!(expected_id.is_some());
+            assert_eq!(seen_id, expected_id);
+
+            hub.close_async().await;
+            drop(sub);
+
+            let logs = String::from_utf8(buf.0.lock().clone()).unwrap();
+            assert!(
+                logs.contains("hub.op{op=\"bus.test\" trace_id=77}") && logs.contains("inside_bus_subscriber"),
+                "expected subscriber log inside originating hub.op span, got:\n{logs}"
+            );
+            assert!(
+                wall_start.elapsed() < Duration::from_secs(1),
+                "event_bus span test and close_async must finish instantaneously, took {:?}",
+                wall_start.elapsed()
+            );
+        }
+        .with_subscriber(subscriber)
+        .await;
     }
 }

@@ -657,6 +657,7 @@ impl IssueChat {
         let ic = Arc::downgrade(self);
         let id_for_task = issue_id;
         let cancel = self.cancel.clone();
+        let handle = vibevalley_runtime::rt::current_or_global_handle();
         self.lane_tasks.spawn_on(
             async move {
                 loop {
@@ -685,7 +686,7 @@ impl IssueChat {
                     let _ = tokio::task::spawn_blocking(move || ic.handle_wake(item)).await;
                 }
             },
-            vibevalley_runtime::rt::handle(),
+            &handle,
         );
     }
 
@@ -1071,6 +1072,7 @@ impl SessionChat {
         let sc = Arc::downgrade(self);
         let key = agent_id;
         let cancel = self.cancel.clone();
+        let handle = vibevalley_runtime::rt::current_or_global_handle();
         self.lane_tasks.spawn_on(
             async move {
                 loop {
@@ -1099,7 +1101,7 @@ impl SessionChat {
                     let _ = tokio::task::spawn_blocking(move || sc.on_direct(item)).await;
                 }
             },
-            vibevalley_runtime::rt::handle(),
+            &handle,
         );
     }
 

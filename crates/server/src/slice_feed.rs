@@ -2,12 +2,13 @@
 //! `collab`, `inbox`, `ops`, `farm`), backed by `tokio::sync::watch`.
 
 use std::sync::{Arc, OnceLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use parking_lot::Mutex;
 use serde::Serialize;
 use serde_json::Value;
 use tokio::sync::watch;
+use tokio::time::Instant;
 use tokio_stream::Stream;
 use tokio_stream::wrappers::WatchStream;
 use vibevalley_protocol::{BoardSlice, CollabSlice, FarmFrame, InboxSlice, OpsSlice, STATE_EVERY_MS, SessionsSlice};
@@ -596,9 +597,9 @@ mod tests {
             hub.apply(vec![fact]);
         }
 
-        let deadline = Instant::now() + Duration::from_secs(2);
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
         let mut last_seq = 10;
-        while last_seq < 20 && Instant::now() < deadline {
+        while last_seq < 20 && std::time::Instant::now() < deadline {
             if let Ok(seq) = got.recv_timeout(Duration::from_millis(200)) {
                 last_seq = seq;
             }
@@ -608,5 +609,81 @@ mod tests {
         drop(stop);
         t1.join().unwrap();
         t2.join().unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn slice_feed_leading_and_trailing_throttling_tracks_virtual_time() {
+        let wall_start = std::time::Instant::now();
+        let base = Core::new(empty_space_state()).board_slice();
+        let feed = SliceFeed::new("slice:board", base.clone());
+        let mut rx = feed.subscribe();
+
+        // First update publishes immediately on the leading edge.
+        feed.replace_if_newer(BoardSlice { seq: 1, ..base.clone() });
+        assert!(feed.should_publish(1, true));
+        feed.publish(true);
+        assert!(rx.has_changed().unwrap());
+        assert_eq!(rx.borrow_and_update().seq, 1);
+
+        // Subsequent update inside STATE_EVERY_MS is held on the leading edge.
+        feed.replace_if_newer(BoardSlice { seq: 2, ..base.clone() });
+        assert!(!feed.should_publish(2, true));
+        feed.publish(true);
+        assert!(!rx.has_changed().unwrap());
+
+        tokio::time::advance(Duration::from_millis(STATE_EVERY_MS - 1)).await;
+        assert!(!feed.should_publish(2, true));
+        feed.publish(true);
+        assert!(!rx.has_changed().unwrap());
+
+        // Reaching STATE_EVERY_MS opens the leading-edge gate again.
+        tokio::time::advance(Duration::from_millis(1)).await;
+        assert!(feed.should_publish(2, true));
+        feed.publish(true);
+        assert!(rx.has_changed().unwrap());
+        assert_eq!(rx.borrow_and_update().seq, 2);
+
+        // Trailing-edge publish bypasses the leading-edge throttle window.
+        feed.replace_if_newer(BoardSlice { seq: 3, ..base });
+        assert!(feed.should_publish(3, false));
+        feed.publish(false);
+        assert!(rx.has_changed().unwrap());
+        assert_eq!(rx.borrow_and_update().seq, 3);
+
+        // End-to-end Hub pump_slices coalesces burst updates over virtual STATE_EVERY_MS.
+        let hub = crate::Hub::new(empty_space_state());
+        let mut sub = hub.subscribe_slice_feed(SliceKind::Inbox);
+        let (init_seq, _, _) = sub.borrow_and_update(true);
+        assert_eq!(init_seq, 0);
+
+        hub.apply(vec![Fact::CallChanged(FactCallChanged {
+            at: 1,
+            state: CallState::Idle,
+            reason: "lead".into(),
+        })]);
+        assert!(sub.changed().await);
+        assert_eq!(sub.borrow_and_update(false).0, 1);
+
+        for n in 2..=5 {
+            hub.apply(vec![Fact::CallChanged(FactCallChanged {
+                at: n,
+                state: CallState::Idle,
+                reason: format!("burst-{n}"),
+            })]);
+        }
+        tokio::time::advance(Duration::from_millis(STATE_EVERY_MS - 1)).await;
+        tokio::task::yield_now().await;
+        assert_eq!(sub.borrow_and_update(false).0, 1, "trailing burst must wait for STATE_EVERY_MS");
+
+        tokio::time::advance(Duration::from_millis(1)).await;
+        assert!(sub.changed().await);
+        assert_eq!(sub.borrow_and_update(false).0, 5);
+
+        hub.close_async().await;
+        assert!(
+            wall_start.elapsed() < Duration::from_secs(1),
+            "virtual slice throttling must finish instantaneously, took {:?}",
+            wall_start.elapsed()
+        );
     }
 }

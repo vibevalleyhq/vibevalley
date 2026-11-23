@@ -257,13 +257,17 @@ impl Ticker {
 
     pub(crate) fn spawn_detached(interval: Duration, immediate: bool, tick: impl FnMut() -> bool + Send + 'static) -> Self {
         let cancel = tokio_util::sync::CancellationToken::new();
-        let handle = vibevalley_runtime::rt::handle().spawn(run_ticker(cancel.clone(), interval, immediate, tick));
+        let handle = vibevalley_runtime::rt::current_or_global_handle().spawn(run_ticker(cancel.clone(), interval, immediate, tick));
         Self { cancel, handle }
     }
 
-    pub(crate) fn stop(self) {
+    pub(crate) async fn stop_async(self) {
         self.cancel.cancel();
-        let _ = vibevalley_runtime::rt::block_on(self.handle);
+        let _ = self.handle.await;
+    }
+
+    pub(crate) fn stop(self) {
+        vibevalley_runtime::rt::block_on(self.stop_async());
     }
 }
 
@@ -472,6 +476,43 @@ mod tests {
         done_rx.recv_timeout(Duration::from_secs(2)).expect("ticker fired 3 times");
         ticker.stop();
         assert!(count.load(Ordering::SeqCst) >= 3);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn ticker_advances_deterministically_over_virtual_minutes_and_stops_async() {
+        let wall_start = Instant::now();
+        let (tick_tx, mut tick_rx) = tokio::sync::mpsc::unbounded_channel();
+        let count = Arc::new(AtomicUsize::new(0));
+        let c = count.clone();
+        let ticker = Ticker::spawn_detached(Duration::from_secs(60), false, move || {
+            let n = c.fetch_add(1, Ordering::SeqCst) + 1;
+            let _ = tick_tx.send(n);
+            true
+        });
+
+        tokio::task::yield_now().await;
+        assert!(tick_rx.try_recv().is_err(), "non-immediate ticker must not fire at t=0");
+
+        tokio::time::advance(Duration::from_secs(59)).await;
+        tokio::task::yield_now().await;
+        assert!(tick_rx.try_recv().is_err(), "ticker must not fire before 60s");
+
+        tokio::time::advance(Duration::from_secs(1)).await;
+        assert_eq!(tick_rx.recv().await, Some(1));
+
+        tokio::time::advance(Duration::from_secs(60)).await;
+        assert_eq!(tick_rx.recv().await, Some(2));
+
+        tokio::time::advance(Duration::from_secs(60)).await;
+        assert_eq!(tick_rx.recv().await, Some(3));
+
+        ticker.stop_async().await;
+        assert_eq!(count.load(Ordering::SeqCst), 3);
+        assert!(
+            wall_start.elapsed() < Duration::from_secs(1),
+            "3 virtual minutes of Ticker ticks must finish instantaneously, took {:?}",
+            wall_start.elapsed()
+        );
     }
 
     #[test]
