@@ -461,7 +461,9 @@ impl Ledger {
         let mut sessions = Vec::new();
         let mut opened = Opened::default();
         for mut session in stored {
-            let lost = matches!(session.policy, ExecutionPolicy::ManagedWorktree { .. }) && session.cwd.as_deref().is_some_and(|w| !Path::new(w).exists());
+            let lost = session.machine.is_none()
+                && matches!(session.policy, ExecutionPolicy::ManagedWorktree { .. })
+                && session.cwd.as_deref().is_some_and(|w| !Path::new(w).exists());
             if !lost && session.is_refining() {
                 opened.drafts.push(session.id.clone());
             }

@@ -50,7 +50,11 @@ export type InventoryEntry = { name: string, description: string, source: string
 
 export type RuntimeSettings = { enabled: boolean, binPath: string, defaultModel: string, defaultEffort: string, env: { [key in string]: string }, dailyBudget?: number, maxWorking?: number, };
 
-export type RuntimeInfo = { id: string, preset: RuntimePreset, support: RuntimeSupport, installation: Installation, models: Array<ModelEntry> | null, usage: AccountUsage | null, skills: Array<InventoryEntry> | null, mcpServers: Array<InventoryEntry> | null, tools: Array<InventoryEntry> | null, settings: RuntimeSettings, spentToday?: number, quota?: RuntimeQuota, stop: string, checkedAt: number, };
+export type RuntimeInfo = { id: string,
+/**
+ * Execution host id (`"local"` or omitted for the server's own machine).
+ */
+machineId?: string, preset: RuntimePreset, support: RuntimeSupport, installation: Installation, models: Array<ModelEntry> | null, usage: AccountUsage | null, skills: Array<InventoryEntry> | null, mcpServers: Array<InventoryEntry> | null, tools: Array<InventoryEntry> | null, settings: RuntimeSettings, spentToday?: number, quota?: RuntimeQuota, stop: string, checkedAt: number, };
 
 export type RuntimeRefreshInput = { id: string, };
 

@@ -170,6 +170,14 @@ impl Attachments {
     }
 }
 
+impl crate::ports::AttachmentReadPort for Attachments {
+    fn read_bytes(&self, id: &str) -> Result<(String, Vec<u8>), ApiError> {
+        let file = self.file(id)?;
+        let bytes = std::fs::read(&file.path).map_err(|_| no_attachment(id))?;
+        Ok((file.r#type, bytes))
+    }
+}
+
 pub fn install(hub: &Hub, files: Arc<Attachments>) {
     hub.on::<ops::AttachmentCreate>({
         let files = files.clone();

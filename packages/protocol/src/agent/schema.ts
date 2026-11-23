@@ -60,6 +60,7 @@ export const Agent = z.object({
   duty: z.string(),
   enabled: z.boolean(),
   runtime: z.string(),
+  machineId: z.exactOptional(z.string()),
   model: z.string(),
   effort: z.string(),
   persona: z.string(),

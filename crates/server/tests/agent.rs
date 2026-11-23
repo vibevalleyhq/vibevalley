@@ -30,6 +30,7 @@ fn draft() -> Agent {
         duty: String::new(),
         enabled: true,
         runtime: "pi".into(),
+        machine_id: None,
         model: String::new(),
         effort: String::new(),
         persona: String::new(),

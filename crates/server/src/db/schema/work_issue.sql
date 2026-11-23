@@ -4,6 +4,7 @@ create table if not exists issue (
   title             text not null,
   description       text not null,
   repo              text,
+  machine_id        text,
   priority          text not null,
   rank              integer,
   deliver           text not null,

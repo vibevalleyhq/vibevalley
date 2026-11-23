@@ -16,7 +16,7 @@ export const RuntimePreset = z.object({
   look: Look,
 }) satisfies Codec<T.RuntimePreset>;
 
-const RuntimeCapability = z.enum(T.RuntimeCapabilityValues) satisfies Codec<T.RuntimeCapability>;
+export const RuntimeCapability = z.enum(T.RuntimeCapabilityValues) satisfies Codec<T.RuntimeCapability>;
 
 export const RuntimeSupport = z.object({
   steer: z.boolean(),
@@ -123,6 +123,7 @@ export const RuntimeSettings = z.object({
 
 export const RuntimeInfo = z.object({
   id: z.string(),
+  machineId: z.exactOptional(z.string()),
   preset: RuntimePreset,
   support: RuntimeSupport,
   installation: Installation,

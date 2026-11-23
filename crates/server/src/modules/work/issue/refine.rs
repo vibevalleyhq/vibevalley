@@ -33,13 +33,25 @@ impl Board {
             return Err(BoardError::NoRoom("no room for a drafting session".into()));
         }
         let wp = &self.0.workplaces;
-        // Each draft starts from the main branch.
-        let (cwd, branch, base) = match wp.main_repo(issue.repo.as_deref())? {
-            Some(main) => {
-                let (dir, branch, base) = wp.fresh_worktree(&main, issue.number)?;
-                (dir, Some(branch), Some(base))
+        // Each draft starts from the main branch; skip local worktrees for remote machines.
+        let (cwd, branch, base) = if !drive.is_local {
+            let branch = issue.repo.as_ref().map(|_| crate::modules::work::workplace::issue_branch(issue.number));
+            let base = if let Some(repo) = issue.repo.as_deref() {
+                wp.existing(repo)?
+                    .and_then(|main| crate::modules::work::workplace::Workplace::main_branch(&main).ok())
+                    .or_else(|| Some("main".to_string()))
+            } else {
+                None
+            };
+            (std::path::PathBuf::new(), branch, base)
+        } else {
+            match wp.main_repo(issue.repo.as_deref())? {
+                Some(main) => {
+                    let (dir, branch, base) = wp.fresh_worktree(&main, issue.number)?;
+                    (dir, Some(branch), Some(base))
+                }
+                None => (wp.context(&issue.id)?, None, None),
             }
-            None => (wp.context(&issue.id)?, None, None),
         };
         let word = words.trim();
         let prompt = vibevalley_core::refine::refinement_brief(

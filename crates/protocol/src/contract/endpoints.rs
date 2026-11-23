@@ -1806,6 +1806,15 @@ pub const ENDPOINTS: &[Endpoint] = &[
         input: None,
         result: Some("RemoteWhoami"),
     },
+    Endpoint {
+        op: "machine.list",
+        module: "machine",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: None,
+        result: Some("Vec<MachineInfo>"),
+    },
 ];
 
 /// Each endpoint as a type: its name, input and result.
@@ -3112,6 +3121,12 @@ pub mod ops {
         const NAME: &'static str = "remote.whoami";
         type Input = ();
         type Result = t::RemoteWhoami;
+    }
+    pub struct MachineList;
+    impl Op for MachineList {
+        const NAME: &'static str = "machine.list";
+        type Input = ();
+        type Result = Vec<t::MachineInfo>;
     }
 }
 

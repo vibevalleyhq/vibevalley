@@ -19,6 +19,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 | [issue.md](docs/subsystems/issue.md) | 工单：一块地：工单的模型、状态和派活、验收、完成与交付、定时任务 |
 | [pull.md](docs/subsystems/pull.md) | PR 与分支发布：分支预检与推送、GitHub PR / GitLab.com MR、状态轮询、CI/评审去重与 `vv://github/...` 快照 |
 | [session.md](docs/subsystems/session.md) | 帮工：Session 和 Run、工作目录、经 oar 开会话、`/mcp`、规矩和汇报、轨迹、额度和上限 |
+| [runtime.md](docs/subsystems/runtime.md) | 执行层与运行机器：`Machine`、`LocalMachine`、`RemoteMachine`、无锁 `MachineRegistry`、`/api/v1/machine/ws`、`vibevalley machine up` 与容器沙箱 `SandboxMachine` |
 | [repo.md](docs/subsystems/repo.md) | 仓库：工作目录、worktree、检查、本地合并、GitHub 检测、提交统计 |
 | [artifact.md](docs/subsystems/artifact.md) | Artifact：八种 `ArtifactType`（含大纲笔记 `outline` 与 `.md` 导入）、结构化多条目作品（`store`）、协作块文档（`blocks`）与单页网页（`html`）；乐观并发、双语指南、全出血原生白板与统一内容中心 |
 | [channel.md](docs/subsystems/channel.md) | 频道：默认频道、私聊、消息和事件、工单串、纯受众与环路刹车、持久投递 |

@@ -69,6 +69,11 @@ export function IssuesTab(props: {
   const useNativeSegmented = mobileAvailable && platform.os === "ios";
 
   const allIssues = () => props.session.board()?.issues ?? [];
+  const machineLabelOf = (machineId: string | undefined): string | undefined => {
+    if (machineId === undefined || machineId === "") return undefined;
+    const found = (props.session.sessions()?.machines ?? []).find((m) => m.id === machineId);
+    return found ? found.name : machineId;
+  };
   const filteredIssues = () => allIssues().filter((issue) => matchesFilter(issue, filter()));
   const selectedIssue = () => {
     const id = props.selectedIssueId();
@@ -205,7 +210,12 @@ export function IssuesTab(props: {
                 >
                   <View class="flex-row items-center justify-between gap-2">
                     <Text class="font-mono text-xs text-muted">#{String(issue().number)}</Text>
-                    <StatusTag label={issue().status} tone={statusTone(issue().status)} />
+                    <View class="flex-row items-center gap-1.5">
+                      <If when={machineLabelOf(issue().machineId)}>
+                        {(label) => <StatusTag testID={`issue-machine-${issue().id}`} label={label()} icon="devices" tone="info" />}
+                      </If>
+                      <StatusTag label={issue().status} tone={statusTone(issue().status)} />
+                    </View>
                   </View>
                   <Text class="text-sm font-semibold text-ink">{issue().title}</Text>
                   <If when={issue().description}>{(desc) => <Text class="truncate text-xs text-muted">{desc()}</Text>}</If>
@@ -242,7 +252,12 @@ export function IssuesTab(props: {
             <SectionCard class="gap-2.5">
               <View class="flex-row items-center justify-between gap-2">
                 <Text class="text-xs font-semibold text-muted">{t("web.remote.issue.status")}</Text>
-                <StatusTag testID="issue-detail-status" label={issue().status} tone={statusTone(issue().status)} />
+                <View class="flex-row items-center gap-1.5">
+                  <If when={machineLabelOf(issue().machineId)}>
+                    {(label) => <StatusTag testID="issue-detail-machine" label={label()} icon="devices" tone="info" />}
+                  </If>
+                  <StatusTag testID="issue-detail-status" label={issue().status} tone={statusTone(issue().status)} />
+                </View>
               </View>
               <If when={issue().description}>{(desc) => <Text class="text-sm text-ink">{desc()}</Text>}</If>
               <View class="flex-row flex-wrap gap-2 pt-1">

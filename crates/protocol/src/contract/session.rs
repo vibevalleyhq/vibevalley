@@ -913,6 +913,16 @@ pub struct Machine {
     /// Reachable now: the server can hire helpers on it.
     pub online: bool,
     pub joined_at: i64,
+    #[serde(default)]
+    pub platform: Option<MachinePlatform>,
+    #[serde(default)]
+    pub status: Option<MachineStatus>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<bool>", optional))]
+    pub ephemeral: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<String>>", optional))]
+    pub runtimes: Vec<String>,
 }
 
 #[skip_serializing_none]
@@ -923,6 +933,16 @@ pub struct Machine {
 pub struct FactMachineChanged {
     pub at: i64,
     pub machine: Machine,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct FactMachineRemoved {
+    pub at: i64,
+    pub id: String,
 }
 
 /// `PhaseResting` where nothing else is taken: its `_tag` written.
@@ -1364,6 +1384,7 @@ crate::typescript::module! {
     FactSessionToolsReset,
     Machine,
     FactMachineChanged,
+    FactMachineRemoved,
     PhaseRestingOnly,
     SessionStopInput,
     SessionListInput,

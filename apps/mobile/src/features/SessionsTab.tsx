@@ -73,6 +73,11 @@ export function SessionsTab(props: {
   const isDual = () => props.layout().mode === "dual_pane";
 
   const sessionList = () => props.session.sessions()?.sessions ?? [];
+  const machineLabelOf = (machineId: string | undefined): string | undefined => {
+    if (machineId === undefined || machineId === "") return undefined;
+    const found = (props.session.sessions()?.machines ?? []).find((m) => m.id === machineId);
+    return found ? found.name : machineId;
+  };
   const selectedView = () => {
     const id = props.selectedSessionId();
     if (id === undefined) return undefined;
@@ -202,9 +207,14 @@ export function SessionsTab(props: {
                   <StatusTag label={s().phaseText || s().phase._tag} tone={phaseTone(s().phase)} dot />
                 </View>
                 <Text class="truncate text-xs text-muted">{phaseSubtitle(s())}</Text>
-                <View class="flex-row items-center gap-2">
-                  <Icon name="runtimes" size={12} tone="faint" />
-                  <Text class="font-mono text-2xs text-faint">{s().runtime}</Text>
+                <View class="flex-row flex-wrap items-center gap-2">
+                  <View class="flex-row items-center gap-1.5">
+                    <Icon name="runtimes" size={12} tone="faint" />
+                    <Text class="font-mono text-2xs text-faint">{s().runtime}</Text>
+                  </View>
+                  <If when={machineLabelOf(s().machine)}>
+                    {(label) => <StatusTag testID={`session-machine-${s().id}`} label={label()} icon="devices" tone="neutral" />}
+                  </If>
                 </View>
               </SectionCard>
             );
@@ -248,6 +258,14 @@ export function SessionsTab(props: {
       </If>
 
       <Scroll class="flex-1" contentClass="gap-3 p-4">
+        <If when={machineLabelOf(selectedView()?.machine ?? watchState()?.session?.machine)}>
+          {(label) => (
+            <View class="flex-row items-center gap-2">
+              <StatusTag testID="session-detail-machine" label={label()} icon="devices" tone="info" />
+            </View>
+          )}
+        </If>
+
         <Each of={watchState()?.pendingPermissions ?? []} key={(req) => req.requestId}>
           {(req) => (
             <SectionCard testID={`session-permission-${req().requestId}`} class="gap-2.5">

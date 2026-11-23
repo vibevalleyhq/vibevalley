@@ -160,6 +160,7 @@ pub struct Started {
     pub(crate) connectors: Arc<modules::collab::connector::Connectors>,
     pub(crate) debug: Arc<modules::infra::debug::DebugKit>,
     pub(crate) remote: Arc<modules::infra::remote::Remote>,
+    pub(crate) machines: Arc<modules::infra::machine::MachineManager>,
 }
 
 /// White-box test view over `Started` internals for `crates/server/tests/*`.
@@ -191,6 +192,7 @@ pub struct TestInternals<'a> {
     pub connectors: &'a Arc<modules::collab::connector::Connectors>,
     pub debug: &'a Arc<modules::infra::debug::DebugKit>,
     pub remote: &'a Arc<modules::infra::remote::Remote>,
+    pub machines: &'a Arc<modules::infra::machine::MachineManager>,
 }
 
 impl Started {
@@ -228,6 +230,7 @@ impl Started {
             connectors: &self.connectors,
             debug: &self.debug,
             remote: &self.remote,
+            machines: &self.machines,
         }
     }
 
@@ -241,6 +244,8 @@ impl Started {
             self.hub.attach_fault_gate(None);
             vibevalley_runtime::oar::set_observer(None);
         }
+        self.hub.attach_machine_bus(None);
+        self.machines.close();
         self.hub.attach_remote_auth(None);
         self.remote.close();
         self.hub.shutdown_token().cancel();
@@ -416,15 +421,26 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     };
     modules::infra::provider::install(&hub, Arc::new(modules::infra::provider::Provider::new(setting.clone(), vendor.clone())));
     let voice_fetch = vendor.clone();
+    let attachments = modules::content::attachment::Attachments::open(&config.home, db.clone());
+    modules::content::attachment::install(&hub, attachments.clone());
     let execution = Arc::new(std::sync::OnceLock::new());
     let registry = config
         .registry
         .clone()
         .unwrap_or_else(|| Arc::new(runtimes(&setting, &config.home, execution.clone(), config.model_client.clone())));
-    let agents = Agents::open(&hub, &config.home, &config.starters, registry.clone(), config.probe_runtimes).map_err(|e| failed("the profiles")(&e))?;
+    let machines = modules::infra::machine::MachineManager::open(&hub, registry.clone(), attachments.clone(), config.version.clone());
+    modules::infra::machine::install(&hub, machines.clone());
+    hub.attach_machine_bus(Some(Arc::new(modules::infra::machine::MachineBusAdapter(machines.clone()))));
+    let agents = Agents::open_with_machines(
+        &hub,
+        &config.home,
+        &config.starters,
+        registry.clone(),
+        machines.registry().clone(),
+        config.probe_runtimes,
+    )
+    .map_err(|e| failed("the profiles")(&e))?;
     modules::team::agent::install(&hub, agents.clone());
-    let attachments = modules::content::attachment::Attachments::open(&config.home, db.clone());
-    modules::content::attachment::install(&hub, attachments.clone());
 
     // Skin observer starts on the empty state so loaded facts replay cleanly.
     let game = modules::skin::game::Game::open(&config.home, &hub);
@@ -639,5 +655,6 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         connectors,
         debug,
         remote,
+        machines,
     })
 }

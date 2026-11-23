@@ -89,5 +89,36 @@
     "changes": "Request changes",
     "status": "Status",
     "empty": "No matching issues."
+  },
+  "controlPlane": {
+    "title": "Control plane connection",
+    "subtitle": "Choose whether this Mac runs an embedded local server or connects to a remote control plane.",
+    "modeLabel": "Connection mode",
+    "mode": {
+      "embedded": "Local embedded",
+      "remote": "Remote control plane"
+    },
+    "envOverride": "Environment override",
+    "switchAction": "Connect to remote",
+    "changeAction": "Change remote",
+    "resetAction": "Reset to local",
+    "methodLabel": "Authentication method",
+    "method": {
+      "pair": "Pairing code",
+      "token": "Bearer token"
+    },
+    "urlLabel": "Control plane URL",
+    "urlPlaceholder": "https://hub.tailnet.ts.net:8791",
+    "codeLabel": "Pairing code",
+    "codePlaceholder": "6-character code",
+    "tokenLabel": "Bearer token",
+    "tokenPlaceholder": "vv_dev_…",
+    "labelField": "Label (optional)",
+    "labelPlaceholder": "Studio Hub",
+    "save": "Save connection",
+    "cancel": "Cancel",
+    "restartToRemote": "Remote target {url} saved. Restart VibeValley to switch connections.",
+    "restartToEmbedded": "Switched back to local embedded mode. Restart VibeValley to apply.",
+    "tokenHint": "Token {hint}"
   }
 }

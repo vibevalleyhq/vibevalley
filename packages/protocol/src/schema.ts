@@ -250,6 +250,7 @@ export {
   RemoteStatus,
   RemoteWhoami,
 } from "./remote/schema";
+export { MachineInfo, MachineInputKind, MachinePlatform, MachineRuntimeSummary, MachineStatus, MachineWireFrame, RuntimeRef } from "./machine/schema";
 export {
   LibraryAddRequest,
   LibraryItem,

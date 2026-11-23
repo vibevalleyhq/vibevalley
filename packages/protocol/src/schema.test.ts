@@ -185,3 +185,22 @@ test("Remote codecs parse every Rust golden sample", () => {
   }
   expect(checked).toBeGreaterThan(10);
 });
+
+test("Machine codecs parse every Rust golden sample", () => {
+  const raw = JSON.parse(readFileSync(new URL("../../../crates/protocol/golden/schema/machine.json", import.meta.url), "utf8")) as Record<
+    string,
+    readonly unknown[]
+  >;
+  const schemas = new Map<string, z.ZodType>();
+  for (const [k, v] of Object.entries(S)) if (v instanceof z.ZodType) schemas.set(k, v);
+  let checked = 0;
+  for (const [name, samples] of Object.entries(raw)) {
+    const codec = schemas.get(name);
+    expect(codec, `missing schema export ${name}`).toBeDefined();
+    for (const sample of samples) {
+      codec!.parse(sample);
+      checked++;
+    }
+  }
+  expect(checked).toBeGreaterThan(30);
+});

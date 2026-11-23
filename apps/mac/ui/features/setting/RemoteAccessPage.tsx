@@ -1,20 +1,320 @@
 import { Clipboard, signal, Text, View } from "nsh";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { RemoteDeviceSummary, RemotePairCode, RemotePlatform, RemoteStatus } from "@vibevalley/protocol";
+import { BizCode } from "@vibevalley/protocol/api";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { SettingRow, SettingsGroup, SettingsPage } from "../../design/domain/settings";
+import { Field, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
-import { Banner, Quiet } from "../../design/layout";
+import { Banner, Quiet, SecretInput } from "../../design/layout";
 import { Qr } from "../../design/Qr";
+import { Segmented } from "../../design/Segmented";
 import { Tag } from "../../design/Tag";
 import { api, reasonOf } from "../../infra/api";
 import { shortMomentText } from "../../infra/base/format";
 import { useTimeout } from "../../infra/base/timer";
+import { hostApi, type DesktopConnectionSaveInput, type DesktopConnectionSnapshot } from "../../infra/bridge";
 import { onSettled } from "../../infra/solid";
+
+type AuthMethod = "pair" | "token";
+
+const DesktopConnectionModeSchema = z.enum(["embedded", "remote"]);
+const DesktopConnectionSourceSchema = z.enum(["env", "file", "default"]);
+const DesktopConnectionSnapshotSchema = z.object({
+  activeMode: DesktopConnectionModeSchema,
+  activeUrl: z.exactOptional(z.string()),
+  activeLabel: z.exactOptional(z.string()),
+  configuredMode: DesktopConnectionModeSchema,
+  configuredUrl: z.exactOptional(z.string()),
+  configuredLabel: z.exactOptional(z.string()),
+  tokenHint: z.exactOptional(z.string()),
+  source: DesktopConnectionSourceSchema,
+  restartRequired: z.boolean(),
+});
+
+const DEFAULT_CONNECTION: DesktopConnectionSnapshot = {
+  activeMode: "embedded",
+  configuredMode: "embedded",
+  source: "default",
+  restartRequired: false,
+};
+
+function decodeConnectionSnapshot(raw: unknown): DesktopConnectionSnapshot | undefined {
+  const parsed = DesktopConnectionSnapshotSchema.safeParse(raw);
+  return parsed.success ? parsed.data : undefined;
+}
+
+function ControlPlaneConnectionSection() {
+  const conn = signal<DesktopConnectionSnapshot>(DEFAULT_CONNECTION);
+  const editing = signal(false);
+  const method = signal<AuthMethod>("pair");
+  const urlDraft = signal("");
+  const codeDraft = signal("");
+  const tokenDraft = signal("");
+  const labelDraft = signal("");
+  const busy = signal(false);
+  const errorText = signal<string | undefined>(undefined);
+
+  let alive = true;
+
+  const refreshConnection = async () => {
+    const env = await hostApi.connectionState();
+    if (!alive) return;
+    if (env.bizCode === 0) {
+      const decoded = decodeConnectionSnapshot(env.data);
+      if (decoded) conn.set(decoded);
+      return;
+    }
+    if (env.bizCode !== BizCode.RouteNotFound && env.bizCode !== BizCode.ServiceUnavailable) {
+      errorText.set(env.message);
+    }
+  };
+
+  onSettled(() => {
+    void refreshConnection();
+    return () => {
+      alive = false;
+    };
+  });
+
+  const openEditor = () => {
+    const current = conn();
+    urlDraft.set(current.configuredUrl ?? current.activeUrl ?? "");
+    labelDraft.set(current.configuredLabel ?? current.activeLabel ?? "");
+    codeDraft.set("");
+    tokenDraft.set("");
+    errorText.set(undefined);
+    editing.set(true);
+  };
+
+  const canSave = () => {
+    if (busy() || urlDraft().trim() === "") return false;
+    return method() === "pair" ? codeDraft().trim() !== "" : tokenDraft().trim() !== "";
+  };
+
+  const onSave = async () => {
+    if (!canSave()) return;
+    busy.set(true);
+    errorText.set(undefined);
+    try {
+      const url = urlDraft().trim();
+      const trimmedLabel = labelDraft().trim();
+      const input: DesktopConnectionSaveInput =
+        method() === "pair"
+          ? {
+              url,
+              pairCode: codeDraft().trim(),
+              ...(trimmedLabel !== "" ? { label: trimmedLabel } : {}),
+            }
+          : {
+              url,
+              token: tokenDraft().trim(),
+              ...(trimmedLabel !== "" ? { label: trimmedLabel } : {}),
+            };
+      const env = await hostApi.connectionSave(input);
+      if (!alive) return;
+      if (env.bizCode !== 0) {
+        errorText.set(env.message);
+        return;
+      }
+      const decoded = decodeConnectionSnapshot(env.data);
+      if (decoded) conn.set(decoded);
+      codeDraft.set("");
+      tokenDraft.set("");
+      editing.set(false);
+    } finally {
+      if (alive) busy.set(false);
+    }
+  };
+
+  const onReset = async () => {
+    if (busy()) return;
+    busy.set(true);
+    errorText.set(undefined);
+    try {
+      const env = await hostApi.connectionReset();
+      if (!alive) return;
+      if (env.bizCode !== 0) {
+        errorText.set(env.message);
+        return;
+      }
+      const decoded = decodeConnectionSnapshot(env.data);
+      if (decoded) conn.set(decoded);
+      editing.set(false);
+    } finally {
+      if (alive) busy.set(false);
+    }
+  };
+
+  const isRemote = () => conn().activeMode === "remote";
+  const hasRemoteConfigured = () => conn().configuredMode === "remote";
+  const envLocked = () => conn().source === "env";
+  const displayedUrl = () => conn().configuredUrl ?? conn().activeUrl;
+  const displayedLabel = () => conn().configuredLabel ?? conn().activeLabel;
+  const showTargetDetails = () => displayedUrl() !== undefined || conn().tokenHint !== undefined;
+
+  return (
+    <View testID="control-plane-section" class="gap-3">
+      <If when={errorText()}>
+        {(err) => (
+          <Banner tone="bad" role="alert" testID="control-plane-error">
+            {err()}
+          </Banner>
+        )}
+      </If>
+
+      <If when={conn().restartRequired}>
+        <Banner tone="warn" testID="control-plane-restart">
+          {hasRemoteConfigured()
+            ? t("web.remote.controlPlane.restartToRemote", { url: conn().configuredUrl ?? "" })
+            : t("web.remote.controlPlane.restartToEmbedded")}
+        </Banner>
+      </If>
+
+      <SettingsGroup title={t("web.remote.controlPlane.title")}>
+        <SettingRow
+          label={t("web.remote.controlPlane.modeLabel")}
+          hint={t("web.remote.controlPlane.subtitle")}
+          testid="control-plane-mode-row"
+          last={!showTargetDetails() && !editing()}
+        >
+          <View testID="control-plane-mode-badge">
+            <Tag
+              icon={isRemote() ? "web" : "runtimes"}
+              tone={isRemote() ? "info" : "ok"}
+              label={isRemote() ? t("web.remote.controlPlane.mode.remote") : t("web.remote.controlPlane.mode.embedded")}
+            />
+          </View>
+          <If when={envLocked()}>
+            <View testID="control-plane-env-badge">
+              <Tag icon="terminal" tone="wait" label={t("web.remote.controlPlane.envOverride")} />
+            </View>
+          </If>
+          <If when={!envLocked() && !editing()}>
+            <Button tone={hasRemoteConfigured() ? "plain" : "primary"} icon="link" testID="control-plane-configure" disabled={busy()} onPress={openEditor}>
+              {hasRemoteConfigured() ? t("web.remote.controlPlane.changeAction") : t("web.remote.controlPlane.switchAction")}
+            </Button>
+          </If>
+          <If when={!envLocked() && (hasRemoteConfigured() || isRemote())}>
+            <Button tone="plain" icon="undo" testID="control-plane-reset" disabled={busy()} onPress={() => void onReset()}>
+              {t("web.remote.controlPlane.resetAction")}
+            </Button>
+          </If>
+        </SettingRow>
+
+        <If when={showTargetDetails()}>
+          <SettingRow label={t("web.remote.controlPlane.urlLabel")} hint={displayedLabel()} testid="control-plane-target-row" last={!editing()}>
+            <If when={displayedUrl()}>
+              {(url) => (
+                <View class="max-w-full flex-row items-center gap-1.5 rounded-sm bg-page px-2 py-0.5">
+                  <Icon name="link" size={12} tone="muted" />
+                  <Text testID="control-plane-url" class="min-w-0 select-text truncate font-mono text-xs tabular-nums text-ink">
+                    {url()}
+                  </Text>
+                </View>
+              )}
+            </If>
+            <If when={conn().tokenHint}>
+              {(hint) => (
+                <Text testID="control-plane-token-hint" class="font-mono text-xs text-muted">
+                  {t("web.remote.controlPlane.tokenHint", { hint: hint() })}
+                </Text>
+              )}
+            </If>
+          </SettingRow>
+        </If>
+
+        <If when={editing()}>
+          <View testID="control-plane-editor" class="gap-3 px-4 py-4">
+            <Field label={t("web.remote.controlPlane.methodLabel")}>
+              <Segmented<AuthMethod>
+                testid="control-plane-method"
+                label={t("web.remote.controlPlane.methodLabel")}
+                value={method()}
+                onChange={(v) => method.set(v)}
+                options={[
+                  { value: "pair", label: t("web.remote.controlPlane.method.pair"), icon: "devices" },
+                  { value: "token", label: t("web.remote.controlPlane.method.token"), icon: "lock" },
+                ]}
+              />
+            </Field>
+
+            <Field label={t("web.remote.controlPlane.urlLabel")}>
+              <TextInput
+                testID="control-plane-url-input"
+                accessibilityLabel={t("web.remote.controlPlane.urlLabel")}
+                placeholder={t("web.remote.controlPlane.urlPlaceholder")}
+                value={urlDraft()}
+                disabled={busy()}
+                onInput={(v) => urlDraft.set(v)}
+              />
+            </Field>
+
+            <If
+              when={method() === "pair"}
+              else={
+                <Field label={t("web.remote.controlPlane.tokenLabel")}>
+                  <SecretInput
+                    testID="control-plane-token-input"
+                    accessibilityLabel={t("web.remote.controlPlane.tokenLabel")}
+                    placeholder={t("web.remote.controlPlane.tokenPlaceholder")}
+                    value={tokenDraft()}
+                    disabled={busy()}
+                    onInput={(v) => tokenDraft.set(v)}
+                  />
+                </Field>
+              }
+            >
+              <Field label={t("web.remote.controlPlane.codeLabel")}>
+                <TextInput
+                  testID="control-plane-code-input"
+                  accessibilityLabel={t("web.remote.controlPlane.codeLabel")}
+                  placeholder={t("web.remote.controlPlane.codePlaceholder")}
+                  value={codeDraft()}
+                  disabled={busy()}
+                  onInput={(v) => codeDraft.set(v)}
+                />
+              </Field>
+            </If>
+
+            <Field label={t("web.remote.controlPlane.labelField")}>
+              <TextInput
+                testID="control-plane-label-input"
+                accessibilityLabel={t("web.remote.controlPlane.labelField")}
+                placeholder={t("web.remote.controlPlane.labelPlaceholder")}
+                value={labelDraft()}
+                disabled={busy()}
+                onInput={(v) => labelDraft.set(v)}
+              />
+            </Field>
+
+            <View class="flex-row items-center gap-2 pt-1">
+              <Button tone="primary" icon="check" testID="control-plane-save" disabled={!canSave()} onPress={() => void onSave()}>
+                {t("web.remote.controlPlane.save")}
+              </Button>
+              <Button
+                tone="plain"
+                testID="control-plane-cancel"
+                disabled={busy()}
+                onPress={() => {
+                  errorText.set(undefined);
+                  editing.set(false);
+                }}
+              >
+                {t("web.remote.controlPlane.cancel")}
+              </Button>
+            </View>
+          </View>
+        </If>
+      </SettingsGroup>
+    </View>
+  );
+}
 
 function platformLabel(platform: RemotePlatform): string {
   switch (platform) {
@@ -147,6 +447,8 @@ export function RemoteAccessPage() {
 
   return (
     <SettingsPage title={t("web.remote.title")} hint={t("web.remote.subtitle")}>
+      <ControlPlaneConnectionSection />
+
       <If
         when={status()}
         else={
@@ -278,7 +580,7 @@ export function RemoteAccessPage() {
                     </View>
                   }
                 >
-                  <Each of={devices()}>
+                  <Each of={devices()} key={(d) => d.id}>
                     {(device, index) => (
                       <View
                         testID={`remote-device-${device().id}`}

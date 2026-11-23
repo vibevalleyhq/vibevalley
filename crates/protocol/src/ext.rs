@@ -150,6 +150,7 @@ impl Issue {
             mandate: IssueMandate::explicit("", false),
             conflict: None,
             repo: None,
+            machine_id: None,
             assignments: vec![],
             priority: Priority::Medium,
             rank: None,
@@ -380,6 +381,14 @@ impl Fact {
         Fact::RuntimeInboxChanged(FactRuntimeInboxChanged { at, items })
     }
 
+    pub fn machine_changed(at: Millis, machine: Machine) -> Fact {
+        Fact::MachineChanged(FactMachineChanged { at, machine })
+    }
+
+    pub fn machine_removed(at: Millis, id: impl Into<String>) -> Fact {
+        Fact::MachineRemoved(FactMachineRemoved { at, id: id.into() })
+    }
+
     /// When it happened.
     pub fn at(&self) -> Millis {
         match self {
@@ -402,6 +411,7 @@ impl Fact {
             Fact::CronRemoved(f) => f.at,
             Fact::ConnectorChanged(f) => f.at,
             Fact::MachineChanged(f) => f.at,
+            Fact::MachineRemoved(f) => f.at,
             Fact::MediaChanged(f) => f.at,
             Fact::RuntimeInboxChanged(f) => f.at,
         }

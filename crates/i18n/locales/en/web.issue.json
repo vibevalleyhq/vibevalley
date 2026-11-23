@@ -374,7 +374,9 @@
     "placeholder": "What needs doing? A sentence is enough; it is drafted from your words",
     "keys": "⌘ Enter to save",
     "keep": "Save",
-    "editsKept": "The previous version was submitted. Your edits are still in the draft."
+    "editsKept": "The previous version was submitted. Your edits are still in the draft.",
+    "machine": "Execution machine",
+    "machineAuto": "Auto machine"
   },
   "conversation": {
     "title": "Discussion and delivery",

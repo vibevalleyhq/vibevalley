@@ -8,14 +8,16 @@ import { Select, TextArea } from "../../../design/Field";
 import { toast } from "../../../design/toasts";
 import { useWorkAgents } from "../../../infra/agents";
 import { newSendKey } from "../../../infra/api";
+import { useSessionsSlice } from "../../../infra/frame";
 import { ready, useRepos } from "../../../infra/query";
 import { prefsNow } from "../../../infra/state/prefs";
 import { canSubmitDraft, type DraftSubmitEvent, type DraftSubmitState, draftSubmitTransition, initialDraftSubmit } from "../model/draftSubmit";
 
-/** The repo and helper the board is filtered to, or the list group it was opened in. */
+/** The repo, helper, and optional execution machine the board is filtered to or opened with. */
 export interface NewIssueAt {
   readonly repo?: string;
   readonly agent?: string;
+  readonly machineId?: string;
 }
 
 export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where: NewIssueAt, requestKey: string) => Promise<boolean>; onClose: () => void }) {
@@ -27,6 +29,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
       agent: props.at.agent ?? (last.pick === "auto" ? "" : last.pick),
     }),
   );
+  const machineId = signal(props.at.machineId ?? "");
   const dispatch = (event: DraftSubmitEvent): DraftSubmitState => {
     const next = draftSubmitTransition(untracked(flow), event, newSendKey);
     flow.set(next);
@@ -36,6 +39,9 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
   const agents = useWorkAgents(true);
   const repoList = useRepos();
   const repos = () => ready(repoList, []).map((p) => p.name);
+  const sessions = useSessionsSlice();
+  const machines = () => sessions()?.machines ?? [];
+  const hasMultipleMachines = () => machines().length > 1 || machines().some((m) => !m.here);
   const textFocused = signal(true);
   let mounted = true;
   cleanup(() => {
@@ -46,11 +52,16 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
     const started = dispatch({ kind: "submit" });
     if (started.kind !== "submitting") return;
     const { submitted, requestKey } = started;
+    const pickedMachine = untracked(machineId);
     let kept = false;
     try {
       kept = await props.onKeep(
         submitted.words,
-        { ...(submitted.repo ? { repo: submitted.repo } : {}), ...(submitted.agent ? { agent: submitted.agent } : {}) },
+        {
+          ...(submitted.repo ? { repo: submitted.repo } : {}),
+          ...(submitted.agent ? { agent: submitted.agent } : {}),
+          ...(pickedMachine ? { machineId: pickedMachine } : {}),
+        },
         requestKey,
       );
     } catch (error) {
@@ -111,6 +122,18 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
             onChange={(agent) => dispatch({ kind: "setAgent", agent })}
             options={agents().map((a) => ({ value: a.id, label: a.name }))}
           />
+          <If when={hasMultipleMachines()}>
+            <Select
+              quiet
+              size="control"
+              label={t("web.issue.new.machine")}
+              testid="issue-new-machine"
+              value={machineId()}
+              placeholder={t("web.issue.new.machineAuto")}
+              onChange={(id) => machineId.set(id)}
+              options={machines().map((m) => ({ value: m.id, label: m.name }))}
+            />
+          </If>
         </View>
         <View class="flex-row items-center justify-end gap-2 border-t border-line pt-3">
           <Text class="mr-auto text-xs text-faint">{t("web.issue.new.keys")}</Text>

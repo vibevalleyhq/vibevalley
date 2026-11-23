@@ -20,7 +20,7 @@ use std::time::{Duration, Instant};
 use arc_swap::ArcSwapOption;
 use parking_lot::{Mutex, RwLock};
 use serde_json::Value;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, watch};
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 use vibevalley_core::{Applied, Core, SliceMask, Transition};
@@ -32,8 +32,9 @@ use vibevalley_protocol::{
 
 pub mod transport;
 pub use crate::transport::api::{
-    CallerContext, CallerPrincipal, ClientIdentity, ClientKind, FaultGate, HostDebugBridge, InvokeObserver, LiveVoiceLine, LiveVoicePort, RemoteAuth,
-    RemoteDeviceIdentity, Server, SharedFaultGate, SharedHostDebug, SharedInvokeObserver, SharedLiveVoice, SharedRemoteAuth, refusal,
+    CallerContext, CallerPrincipal, ClientIdentity, ClientKind, FaultGate, HostDebugBridge, InvokeObserver, LiveVoiceLine, LiveVoicePort, MachineBus,
+    MachineConnection, RemoteAuth, RemoteDeviceIdentity, Server, SharedFaultGate, SharedHostDebug, SharedInvokeObserver, SharedLiveVoice, SharedMachineBus,
+    SharedRemoteAuth, refusal,
 };
 
 pub mod base;
@@ -103,6 +104,7 @@ struct FaultGateSlot(SharedFaultGate);
 struct HostDebugSlot(SharedHostDebug);
 struct McpSlot(crate::transport::api::SharedMcp);
 struct RemoteAuthSlot(SharedRemoteAuth);
+struct MachineBusSlot(SharedMachineBus);
 struct SpeechStreamsSlot(crate::transport::api::media::SharedSpeechStreams);
 struct MediaInputsSlot(crate::transport::api::media::SharedMediaInputs);
 
@@ -158,7 +160,9 @@ pub struct Hub {
     media_inputs: ArcSwapOption<MediaInputsSlot>,
     mcp: ArcSwapOption<McpSlot>,
     remote_auth: ArcSwapOption<RemoteAuthSlot>,
+    machine_bus: ArcSwapOption<MachineBusSlot>,
     speech: ArcSwapOption<SpeechStreamsSlot>,
+    wake: watch::Sender<u64>,
     /// Each fold's dirty slice mask and farm effects, for the feed pump task.
     kicks: flume::Sender<Kick>,
 }
@@ -237,6 +241,33 @@ impl Hub {
         self.remote_auth.store(auth.map(|a| Arc::new(RemoteAuthSlot(a))));
     }
 
+    /// Attaches or clears the execution-layer machine WS bus.
+    pub fn attach_machine_bus(&self, bus: Option<SharedMachineBus>) {
+        self.machine_bus.store(bus.map(|b| Arc::new(MachineBusSlot(b))));
+    }
+
+    /// Notifies subscribed subsystems (connectors, machine heartbeats, runtime probes)
+    /// that the host system woke from sleep so they can re-probe / reconnect immediately.
+    pub fn on_system_wake(&self) {
+        let mut next = 0;
+        self.wake.send_modify(|count| {
+            *count = count.wrapping_add(1);
+            next = *count;
+        });
+        tracing::info!(wake_seq = next, "hub.system_wake");
+    }
+
+    /// Subscribes to host system wake notifications (`watch::Receiver<u64>` carrying
+    /// the monotonic wake sequence number).
+    pub fn subscribe_wake(&self) -> watch::Receiver<u64> {
+        self.wake.subscribe()
+    }
+
+    /// Current monotonic count of host system wake events observed by this hub.
+    pub fn wake_count(&self) -> u64 {
+        *self.wake.borrow()
+    }
+
     /// A server holding `state`, with no endpoint answered yet. Its feed
     /// pump ends when [`Hub::close`] is called or the last `Arc<Hub>` is dropped.
     pub fn new(state: SpaceState) -> Arc<Hub> {
@@ -254,6 +285,7 @@ impl Hub {
         };
         let shutdown = CancellationToken::new();
         let bus = event_bus::EventBus::new(shutdown.child_token());
+        let (wake, _) = watch::channel(0u64);
         let hub = Arc::new(Hub {
             core: Mutex::new(core),
             seq: AtomicI64::new(seq),
@@ -277,7 +309,9 @@ impl Hub {
             media_inputs: ArcSwapOption::empty(),
             mcp: ArcSwapOption::empty(),
             remote_auth: ArcSwapOption::empty(),
+            machine_bus: ArcSwapOption::empty(),
             speech: ArcSwapOption::empty(),
+            wake,
             kicks,
         });
         hub.bus.attach_hub(Arc::downgrade(&hub));
@@ -1035,6 +1069,10 @@ impl Server for Hub {
 
     fn remote_auth(&self) -> Option<SharedRemoteAuth> {
         self.remote_auth.load().as_ref().map(|slot| slot.0.clone())
+    }
+
+    fn machine_bus(&self) -> Option<SharedMachineBus> {
+        self.machine_bus.load().as_ref().map(|slot| slot.0.clone())
     }
 
     fn call(&self, op: &str, payload: Value) -> Envelope {

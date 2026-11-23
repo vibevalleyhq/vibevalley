@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use vibevalley_i18n::t;
-use vibevalley_protocol::{Agent, ApiError, BizCode, Deliverable, Issue, MCPServer, Next, PersonaMode};
+use vibevalley_protocol::{Agent, ApiError, BizCode, Deliverable, Issue, LOCAL_MACHINE_ID, MCPServer, Next, PersonaMode, RuntimeRef};
 use vibevalley_runtime::oar::{Installation, McpServer, Registry, Runtime};
 
 use crate::base::LookIn;
@@ -32,6 +32,10 @@ pub struct Drive {
     pub runtime: Arc<dyn Runtime>,
     /// The runtime as the session names it (`Session.runtime`).
     pub runtime_id: String,
+    /// Execution machine id (`"local"` or remote/sandbox machine id).
+    pub machine_id: String,
+    /// True when executing in-process on the control plane host.
+    pub is_local: bool,
     /// What the session is called after: `<name> #<n>`.
     pub name: String,
     pub model: Option<String>,
@@ -121,6 +125,8 @@ impl Drivers for RuntimeDrivers {
         Ok(Drive {
             agent: wire_id.clone(),
             runtime_id: wire_id,
+            machine_id: LOCAL_MACHINE_ID.to_string(),
+            is_local: true,
             name: runtime.display_name().to_string(),
             runtime,
             model: model.map(str::trim).filter(|m| !m.is_empty()).map(String::from).or_else(|| self.model.clone()),
@@ -148,8 +154,11 @@ impl AgentDrivers {
         Self { agents, memory }
     }
 
-    fn drive_on(&self, agent: &Agent) -> Result<Drive> {
-        let resolved = self.agents.fleet.resolve(agent).map_err(BoardError::Api)?;
+    fn drive_on(&self, agent: &Agent, machine_override: Option<&str>) -> Result<Drive> {
+        let resolved = self.agents.fleet.resolve_on_machine(agent, machine_override).map_err(BoardError::Api)?;
+        let bare_runtime = RuntimeRef::parse(agent.runtime.trim())
+            .map(|r| r.runtime_id)
+            .unwrap_or_else(|_| agent.runtime.clone());
         let text = instructions(agent, &self.agents.profiles.skills());
         let persona = match agent.persona_mode {
             _ if text.is_empty() => None,
@@ -178,7 +187,9 @@ impl AgentDrivers {
         Ok(Drive {
             agent: agent.id.clone(),
             runtime: resolved.runtime,
-            runtime_id: agent.runtime.clone(),
+            runtime_id: bare_runtime,
+            machine_id: resolved.machine_id,
+            is_local: resolved.is_local,
             name: agent.name.clone(),
             model: Some(resolved.model).filter(|m| !m.is_empty()),
             env: resolved.env.into_iter().collect(),
@@ -255,13 +266,14 @@ impl Drivers for AgentDrivers {
         let Some(profile) = self.agents.profiles.agent(id) else {
             return Err(refusal(t("server.issue.profileGone", &[("id", id.into())]), pick));
         };
-        self.drive_on(&profile)
+        self.drive_on(&profile, issue.machine_id.as_deref())
     }
 
     fn drive_runtime(&self, runtime: &str, model: Option<&str>, effort: Option<&str>) -> Result<Drive> {
         let runtime_id = runtime.trim();
         let resolved = self.agents.fleet.resolve_runtime(runtime_id, model, effort).map_err(BoardError::Api)?;
-        let wire_id = runtime_id.strip_prefix("acp:").unwrap_or(runtime_id).to_string();
+        let bare = RuntimeRef::parse(runtime_id).map(|r| r.runtime_id).unwrap_or_else(|_| runtime_id.to_string());
+        let wire_id = bare.strip_prefix("acp:").unwrap_or(&bare).to_string();
         let label = runtime_label(&wire_id);
         let name = if label == wire_id {
             resolved.runtime.display_name().to_string()
@@ -272,6 +284,8 @@ impl Drivers for AgentDrivers {
             agent: wire_id.clone(),
             runtime: resolved.runtime,
             runtime_id: wire_id,
+            machine_id: resolved.machine_id,
+            is_local: resolved.is_local,
             name,
             model: (!resolved.model.is_empty()).then_some(resolved.model),
             env: resolved.env.into_iter().collect(),
@@ -297,6 +311,6 @@ impl Drivers for AgentDrivers {
             .fleet
             .choose(&format!("起草 {}", issue.title), &named, "")
             .ok_or_else(|| refusal(t("server.issue.refinement.noDrafter", &[]), vec![LookIn::Agent.next()]))?;
-        self.drive_on(&chosen)
+        self.drive_on(&chosen, issue.machine_id.as_deref())
     }
 }

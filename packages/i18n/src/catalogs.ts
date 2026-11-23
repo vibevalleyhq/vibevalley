@@ -236,6 +236,11 @@ export const catalogs = {
       runtimeDefaultModel: "引擎默认（{model}）",
       noEffort: "这个模型没有推理强度可选。",
       noEffortModel: "{model}没有推理强度可选。",
+      targetMachine: "执行机器",
+      targetMachineTip: "将此角色固定到某台执行机器，或保持「自动」由总控端优先调度本机或在线机器。",
+      targetMachineAuto: "自动（优先本机或在线）",
+      targetMachineOffline: "{name}（离线）",
+      targetMachineDraining: "{name}（排空中）",
     },
     "web.artifact": {
       card: { version: "第 {version} 稿", open: "打开「{title}」" },
@@ -1703,6 +1708,8 @@ export const catalogs = {
         keys: "⌘ 回车记下",
         keep: "记下",
         editsKept: "刚才的内容已提交，修改后的草稿已保留。",
+        machine: "执行机器",
+        machineAuto: "自动分配机器",
       },
       conversation: { title: "讨论与交付记录", older: "加载更早的消息", empty: "需求讨论、执行反馈与交付会保留在这里" },
       onboarding: {
@@ -2155,6 +2162,31 @@ export const catalogs = {
         status: "状态",
         empty: "没有符合条件的任务。",
       },
+      controlPlane: {
+        title: "总控端连接",
+        subtitle: "选择这台 Mac 运行本机内嵌服务端，还是连接到远端总控端。",
+        modeLabel: "连接模式",
+        mode: { embedded: "本机内嵌", remote: "远端总控端" },
+        envOverride: "环境变量覆盖",
+        switchAction: "连接远端总控",
+        changeAction: "更换远端地址",
+        resetAction: "恢复本机内嵌",
+        methodLabel: "认证方式",
+        method: { pair: "配对码", token: "令牌" },
+        urlLabel: "总控端地址",
+        urlPlaceholder: "https://hub.tailnet.ts.net:8791",
+        codeLabel: "配对码",
+        codePlaceholder: "6 位配对码",
+        tokenLabel: "访问令牌",
+        tokenPlaceholder: "vv_dev_…",
+        labelField: "名称（可选）",
+        labelPlaceholder: "例如：工作室主机",
+        save: "保存连接",
+        cancel: "取消",
+        restartToRemote: "已保存远端总控端 {url}，重启 VibeValley 后生效。",
+        restartToEmbedded: "已切回本机内嵌模式，重启 VibeValley 后生效。",
+        tokenHint: "令牌 {hint}",
+      },
     },
     "web.repo": {
       list: "仓库列表",
@@ -2351,6 +2383,13 @@ export const catalogs = {
       missingCommand: "请在本机安装 {runtime}，再点「重新检测」。如果已经安装，可填写可执行文件的完整路径。",
       enterPath: "填写命令路径",
       signInTerminal: "打开终端登录",
+      machines: {
+        title: "执行机器",
+        kind: { local: "本机", remote: "远端", sandbox: "临时沙箱" },
+        platform: { macos: "macOS", linux: "Linux", container: "容器", other: "其他" },
+        status: { online: "在线", offline: "离线", draining: "排空中" },
+        noRuntimes: "未上报引擎",
+      },
     },
     "web.session": {
       log: {
@@ -2528,7 +2567,7 @@ export const catalogs = {
         models: "密钥 钥匙 账号 DeepSeek MOSS API Key 模型 绑定",
         voice: "电话 通话 MOSS Live 实时 视觉 转写 语音",
         connections: "微信 飞书 QQ 连接器 配对 GitHub gh PR 登录",
-        remote: "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌",
+        remote: "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
         about: "版本 家目录 设置文件 数据 素材图鉴 version catalog",
       },
       scope: { farm: "对整个 VibeValley", device: "只对这台设备" },
@@ -3161,6 +3200,11 @@ export const catalogs = {
       runtimeDefaultModel: "The runtime's default ({model})",
       noEffort: "This model has no effort levels.",
       noEffortModel: "{model} has no effort levels.",
+      targetMachine: "Execution machine",
+      targetMachineTip: "Pin this profile to a specific execution machine, or leave on Auto to route to the local or best online machine.",
+      targetMachineAuto: "Auto (local or online)",
+      targetMachineOffline: "{name} (offline)",
+      targetMachineDraining: "{name} (draining)",
     },
     "web.artifact": {
       card: { version: "Version {version}", open: 'Open "{title}"' },
@@ -4709,6 +4753,8 @@ export const catalogs = {
         keys: "⌘ Enter to save",
         keep: "Save",
         editsKept: "The previous version was submitted. Your edits are still in the draft.",
+        machine: "Execution machine",
+        machineAuto: "Auto machine",
       },
       conversation: { title: "Discussion and delivery", older: "Load earlier messages", empty: "Requirements, execution feedback and deliveries stay here" },
       onboarding: {
@@ -5190,6 +5236,31 @@ export const catalogs = {
         status: "Status",
         empty: "No matching issues.",
       },
+      controlPlane: {
+        title: "Control plane connection",
+        subtitle: "Choose whether this Mac runs an embedded local server or connects to a remote control plane.",
+        modeLabel: "Connection mode",
+        mode: { embedded: "Local embedded", remote: "Remote control plane" },
+        envOverride: "Environment override",
+        switchAction: "Connect to remote",
+        changeAction: "Change remote",
+        resetAction: "Reset to local",
+        methodLabel: "Authentication method",
+        method: { pair: "Pairing code", token: "Bearer token" },
+        urlLabel: "Control plane URL",
+        urlPlaceholder: "https://hub.tailnet.ts.net:8791",
+        codeLabel: "Pairing code",
+        codePlaceholder: "6-character code",
+        tokenLabel: "Bearer token",
+        tokenPlaceholder: "vv_dev_…",
+        labelField: "Label (optional)",
+        labelPlaceholder: "Studio Hub",
+        save: "Save connection",
+        cancel: "Cancel",
+        restartToRemote: "Remote target {url} saved. Restart VibeValley to switch connections.",
+        restartToEmbedded: "Switched back to local embedded mode. Restart VibeValley to apply.",
+        tokenHint: "Token {hint}",
+      },
     },
     "web.repo": {
       list: "Repos",
@@ -5396,6 +5467,13 @@ export const catalogs = {
       missingCommand: "Install {runtime} on this computer, then check again. If it is installed, enter the full path to its executable.",
       enterPath: "Enter command path",
       signInTerminal: "Open a terminal to sign in",
+      machines: {
+        title: "Execution machines",
+        kind: { local: "Local", remote: "Remote", sandbox: "Ephemeral sandbox" },
+        platform: { macos: "macOS", linux: "Linux", container: "Container", other: "Other" },
+        status: { online: "Online", offline: "Offline", draining: "Draining" },
+        noRuntimes: "No engines reported",
+      },
     },
     "web.session": {
       log: {
@@ -5583,7 +5661,7 @@ export const catalogs = {
         models: "keys accounts DeepSeek MOSS API key models binding",
         voice: "call phone recognition speech MOSS live realtime vision transcription",
         connections: "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
-        remote: "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token",
+        remote: "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
         about: "version home folder settings data catalog",
       },
       scope: { farm: "For all of VibeValley", device: "This device only" },
@@ -6181,6 +6259,11 @@ export interface Messages {
   "web.agent.tagsHint": undefined;
   "web.agent.tagsTip": undefined;
   "web.agent.talk": undefined;
+  "web.agent.targetMachine": undefined;
+  "web.agent.targetMachineAuto": undefined;
+  "web.agent.targetMachineDraining": { readonly name: string | number };
+  "web.agent.targetMachineOffline": { readonly name: string | number };
+  "web.agent.targetMachineTip": undefined;
   "web.agent.templates.add": undefined;
   "web.agent.templates.added": { readonly name: string | number };
   "web.agent.templates.addedHere": undefined;
@@ -7659,6 +7742,8 @@ export interface Messages {
   "web.issue.new.editsKept": undefined;
   "web.issue.new.keep": undefined;
   "web.issue.new.keys": undefined;
+  "web.issue.new.machine": undefined;
+  "web.issue.new.machineAuto": undefined;
   "web.issue.new.placeholder": undefined;
   "web.issue.new.title": undefined;
   "web.issue.new.words": undefined;
@@ -8153,6 +8238,31 @@ export interface Messages {
   "web.remote.channel.empty": undefined;
   "web.remote.channel.replyPlaceholder": undefined;
   "web.remote.channel.send": undefined;
+  "web.remote.controlPlane.cancel": undefined;
+  "web.remote.controlPlane.changeAction": undefined;
+  "web.remote.controlPlane.codeLabel": undefined;
+  "web.remote.controlPlane.codePlaceholder": undefined;
+  "web.remote.controlPlane.envOverride": undefined;
+  "web.remote.controlPlane.labelField": undefined;
+  "web.remote.controlPlane.labelPlaceholder": undefined;
+  "web.remote.controlPlane.method.pair": undefined;
+  "web.remote.controlPlane.method.token": undefined;
+  "web.remote.controlPlane.methodLabel": undefined;
+  "web.remote.controlPlane.mode.embedded": undefined;
+  "web.remote.controlPlane.mode.remote": undefined;
+  "web.remote.controlPlane.modeLabel": undefined;
+  "web.remote.controlPlane.resetAction": undefined;
+  "web.remote.controlPlane.restartToEmbedded": undefined;
+  "web.remote.controlPlane.restartToRemote": { readonly url: string | number };
+  "web.remote.controlPlane.save": undefined;
+  "web.remote.controlPlane.subtitle": undefined;
+  "web.remote.controlPlane.switchAction": undefined;
+  "web.remote.controlPlane.title": undefined;
+  "web.remote.controlPlane.tokenHint": { readonly hint: string | number };
+  "web.remote.controlPlane.tokenLabel": undefined;
+  "web.remote.controlPlane.tokenPlaceholder": undefined;
+  "web.remote.controlPlane.urlLabel": undefined;
+  "web.remote.controlPlane.urlPlaceholder": undefined;
   "web.remote.devices.empty": undefined;
   "web.remote.devices.lastSeen": { readonly time: string | number };
   "web.remote.devices.platform.android": undefined;
@@ -8367,6 +8477,18 @@ export interface Messages {
   "web.runtime.library.where": undefined;
   "web.runtime.library.who": undefined;
   "web.runtime.list": undefined;
+  "web.runtime.machines.kind.local": undefined;
+  "web.runtime.machines.kind.remote": undefined;
+  "web.runtime.machines.kind.sandbox": undefined;
+  "web.runtime.machines.noRuntimes": undefined;
+  "web.runtime.machines.platform.container": undefined;
+  "web.runtime.machines.platform.linux": undefined;
+  "web.runtime.machines.platform.macos": undefined;
+  "web.runtime.machines.platform.other": undefined;
+  "web.runtime.machines.status.draining": undefined;
+  "web.runtime.machines.status.offline": undefined;
+  "web.runtime.machines.status.online": undefined;
+  "web.runtime.machines.title": undefined;
   "web.runtime.makeAgent": undefined;
   "web.runtime.maxWorking": undefined;
   "web.runtime.maxWorkingHint": undefined;

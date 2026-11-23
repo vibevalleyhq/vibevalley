@@ -49,6 +49,14 @@
 | `remote.device.revoke` | 撤销一台已配对设备的访问令牌 | `/api/v1/remote/device/revoke` | ✓ |   |   |   |
 | `remote.whoami` | 查看当前调用者与已配对设备身份 | `/api/v1/remote/whoami` | ✓ | ✓ |   |   |
 
+## machine
+
+
+
+| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
+|---|---|---|---|---|---|---|
+| `machine.list` | cap.op.machine.list | `/api/v1/machine/list` | ✓ | ✓ |   |   |
+
 ## orchestrator
 
 主助手：上线、停下、评测

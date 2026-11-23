@@ -9,6 +9,7 @@ import { type DebugHandlers, debugEndpoints } from "./debug/api";
 import type { Endpoint } from "./endpoint";
 import { type GameHandlers, gameEndpoints } from "./game/api";
 import { type IssueHandlers, issueEndpoints } from "./issue/api";
+import { type MachineHandlers, machineEndpoints } from "./machine/api";
 import { type MediaHandlers, mediaEndpoints } from "./media/api";
 import { type MemoryHandlers, memoryEndpoints } from "./memory/api";
 import { type OrchestratorHandlers, orchestratorEndpoints } from "./orchestrator/api";
@@ -28,6 +29,7 @@ export interface Handlers
     CoreHandlers,
     DebugHandlers,
     RemoteHandlers,
+    MachineHandlers,
     OrchestratorHandlers,
     SettingHandlers,
     ProviderHandlers,
@@ -50,6 +52,7 @@ export const endpoints: readonly Endpoint[] = [
   ...coreEndpoints,
   ...debugEndpoints,
   ...remoteEndpoints,
+  ...machineEndpoints,
   ...orchestratorEndpoints,
   ...settingEndpoints,
   ...providerEndpoints,

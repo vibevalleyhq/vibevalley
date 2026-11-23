@@ -1,5 +1,7 @@
-//! Shared CLI entry, exit codes, output formatting, and structured error helpers
-//! used by both `vibevalley` and the optional `vibevalley-eval` binary.
+//! Shared CLI entry, exit codes, output formatting, structured error helpers,
+//! and the outbound machine execution daemon (`machine_agent`).
+
+pub mod machine_agent;
 
 use std::ffi::OsString;
 use std::io::Write;

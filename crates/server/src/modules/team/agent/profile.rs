@@ -317,6 +317,7 @@ fn profile_of(item: &AgentTemplate, id: String, name: String) -> Agent {
         duty: item.duty.clone(),
         enabled: true,
         runtime: item.runtime.clone(),
+        machine_id: None,
         model: item.model.clone(),
         effort: item.effort.clone(),
         persona: item.persona.clone(),

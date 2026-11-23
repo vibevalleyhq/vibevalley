@@ -30,6 +30,7 @@ import { sortRuntimes } from "../../infra/agents";
 import { ready, useRuntimes } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 import { MemoryPanel } from "../memory";
+import { type DisplayMachine, useMergedMachines } from "../runtime/machines";
 import { useSkills } from "../runtime/SkillsPage";
 import { Labeled } from "./AgentLook";
 
@@ -98,6 +99,7 @@ export function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo | undefi
           />
         </If>
         <If when={tab() === "runtime"}>
+          <MachineTargetChoice draft={draft()} patch={props.patch} />
           <RuntimeChoice draft={draft()} patch={props.patch} />
           <ModelAndEffort draft={draft()} runtime={props.runtime} patch={props.patch} />
           <Support runtime={draft().runtime} info={props.runtime} />
@@ -148,6 +150,46 @@ function ScrollBody(props: { children: JSX.Element }) {
     <Scroll class="min-h-0 flex-1" contentClass="gap-4 p-4">
       {props.children}
     </Scroll>
+  );
+}
+
+function machineOptionLabel(machine: DisplayMachine): string {
+  switch (machine.status) {
+    case "online":
+      return machine.name;
+    case "offline":
+      return t("web.agent.targetMachineOffline", { name: machine.name });
+    case "draining":
+      return t("web.agent.targetMachineDraining", { name: machine.name });
+  }
+}
+
+function MachineTargetChoice(props: { draft: Agent; patch: Patch }) {
+  const machines = useMergedMachines();
+  const options = () => {
+    const list = machines();
+    const mapped = list.map((m) => ({ value: m.id, label: machineOptionLabel(m) }));
+    const pinned = props.draft.machineId;
+    if (pinned && !list.some((m) => m.id === pinned)) {
+      mapped.push({ value: pinned, label: pinned });
+    }
+    return mapped;
+  };
+  const setMachineId = (next: string) => {
+    const { machineId: _, ...rest } = props.draft;
+    props.patch(next ? { ...rest, machineId: next } : rest);
+  };
+  return (
+    <Labeled label={t("web.agent.targetMachine")} tip={t("web.agent.targetMachineTip")}>
+      <Select
+        testid="agent-machine-id"
+        label={t("web.agent.targetMachine")}
+        value={props.draft.machineId ?? ""}
+        placeholder={t("web.agent.targetMachineAuto")}
+        options={options()}
+        onChange={setMachineId}
+      />
+    </Labeled>
   );
 }
 

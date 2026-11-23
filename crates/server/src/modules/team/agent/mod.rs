@@ -5,6 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use vibevalley_protocol::{AgentRole, AgentValidation, Installation, PersonaMode, RuntimeSettings, ops};
+use vibevalley_runtime::machine::MachineRegistry;
 use vibevalley_runtime::oar::Registry;
 
 use crate::Hub;
@@ -30,8 +31,21 @@ impl Agents {
     /// orchestrator and the `starters`), the runtimes in `registry`,
     /// probed in the background when `background`.
     pub fn open(hub: &Arc<Hub>, home: &Path, starters: &[String], registry: Arc<Registry>, background: bool) -> std::io::Result<Arc<Agents>> {
+        let machines = Arc::new(MachineRegistry::with_local(registry.clone()));
+        Self::open_with_machines(hub, home, starters, registry, machines, background)
+    }
+
+    /// `open`, routing execution targets through a shared `MachineRegistry`.
+    pub fn open_with_machines(
+        hub: &Arc<Hub>,
+        home: &Path,
+        starters: &[String],
+        registry: Arc<Registry>,
+        machines: Arc<MachineRegistry>,
+        background: bool,
+    ) -> std::io::Result<Arc<Agents>> {
         let profiles = Profiles::open(home, starters)?;
-        let fleet = Fleet::new(registry, profiles.clone(), hub, background);
+        let fleet = Fleet::new_with_machines(registry, machines, profiles.clone(), hub, background);
         Ok(Arc::new(Agents { profiles, fleet }))
     }
 }

@@ -1,14 +1,17 @@
 import { Text, View, type InputRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { Agent, RuntimeInfo } from "@vibevalley/protocol";
+import type { Agent, MachinePlatform, MachineStatus, RuntimeInfo } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { AgentFace } from "../../design/domain/Face";
 import { OpenTerminal } from "../../design/domain/OpenTerminal";
+import { Icon } from "../../design/Icon";
+import type { IconName } from "../../design/icons";
 import { Card, ListCard, ListRow, Quiet, Split } from "../../design/layout";
 import { RuntimeIcon } from "../../design/pixel/RuntimeIcon";
+import { CountPill, Dot, Tag, type DotTone, type TagTone } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
 import { sortRuntimes, useWorkAgents } from "../../infra/agents";
 import { api, reasonOf } from "../../infra/api";
@@ -16,6 +19,7 @@ import { Keyed, variant } from "../../infra/base/dom";
 import { wallClockText } from "../../infra/base/format";
 import { ready, runtimesQuery, useQueryClient, useRuntimes } from "../../infra/query";
 import { Link as A } from "../../infra/router";
+import { type DisplayMachine, type MachineKind, machineKindOf, useMergedMachines } from "./machines";
 import { quotaOf } from "./quota";
 import { InventoryCard, ModelsCard, SettingsCard, Stamina, SupportCard, Usage } from "./RuntimeCards";
 
@@ -37,10 +41,97 @@ const statusOf = (r: RuntimeInfo) => {
 /** The folder of an absolute command, where a terminal for the runtime opens. */
 const folderOf = (command: string) => (command.startsWith("/") ? command.slice(0, command.lastIndexOf("/")) || "/" : undefined);
 
+function machineKindMeta(kind: MachineKind): { readonly label: string; readonly tone: TagTone; readonly icon: IconName } {
+  switch (kind) {
+    case "local":
+      return { label: t("web.runtime.machines.kind.local"), tone: "ok", icon: "runtimes" };
+    case "remote":
+      return { label: t("web.runtime.machines.kind.remote"), tone: "info", icon: "web" };
+    case "sandbox":
+      return { label: t("web.runtime.machines.kind.sandbox"), tone: "wait", icon: "lock" };
+  }
+}
+
+function platformMeta(platform: MachinePlatform): { readonly label: string; readonly icon: IconName } {
+  switch (platform) {
+    case "macos":
+      return { label: t("web.runtime.machines.platform.macos"), icon: "devices" };
+    case "linux":
+      return { label: t("web.runtime.machines.platform.linux"), icon: "terminal" };
+    case "container":
+      return { label: t("web.runtime.machines.platform.container"), icon: "lock" };
+    case "other":
+      return { label: t("web.runtime.machines.platform.other"), icon: "devices" };
+  }
+}
+
+function machineStatusMeta(status: MachineStatus): { readonly label: string; readonly dot: DotTone } {
+  switch (status) {
+    case "online":
+      return { label: t("web.runtime.machines.status.online"), dot: "leaf" };
+    case "offline":
+      return { label: t("web.runtime.machines.status.offline"), dot: "berry" };
+    case "draining":
+      return { label: t("web.runtime.machines.status.draining"), dot: "wheat" };
+  }
+}
+
+function ExecutionMachinesStrip(props: { readonly machines: readonly DisplayMachine[] }) {
+  return (
+    <If when={props.machines.length > 0}>
+      <View testID="execution-machines" class="shrink-0 gap-2 border-b border-line bg-side px-4 py-3">
+        <View class="flex-row items-center gap-2">
+          <Icon name="devices" size={14} tone="muted" />
+          <Text role="header" class="text-xs font-semibold text-ink">
+            {t("web.runtime.machines.title")}
+          </Text>
+          <CountPill count={props.machines.length} />
+        </View>
+        <View class="flex-row flex-wrap gap-2">
+          <Each of={props.machines} key={(m) => m.id}>
+            {(m) => {
+              const kind = () => machineKindMeta(machineKindOf(m()));
+              const plat = () => platformMeta(m().platform);
+              const state = () => machineStatusMeta(m().status);
+              return (
+                <View testID={`machine-card-${m().id}`} class="min-w-56 gap-1.5 rounded-md border border-line bg-page px-3 py-2">
+                  <View class="flex-row items-center gap-2">
+                    <Dot tone={state().dot} size={8} ring={false} />
+                    <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{m().name}</Text>
+                    <Text testID={`machine-status-${m().id}`} class="text-xs text-muted">
+                      {state().label}
+                    </Text>
+                  </View>
+                  <View class="flex-row flex-wrap items-center gap-1.5">
+                    <Tag icon={kind().icon} tone={kind().tone} label={kind().label} />
+                    <Tag icon={plat().icon} tone="neutral" label={plat().label} />
+                  </View>
+                  <If when={m().runtimes.length > 0} else={<Text class="text-2xs text-faint">{t("web.runtime.machines.noRuntimes")}</Text>}>
+                    <View class="flex-row flex-wrap items-center gap-1">
+                      <Each of={m().runtimes} key={(rid) => rid}>
+                        {(rid) => (
+                          <View class="rounded-xs bg-hover px-1.5 py-px">
+                            <Text class="font-mono text-2xs text-muted">{rid()}</Text>
+                          </View>
+                        )}
+                      </Each>
+                    </View>
+                  </If>
+                </View>
+              );
+            }}
+          </Each>
+        </View>
+      </View>
+    </If>
+  );
+}
+
 /** `rest` is the path after /runtimes/. */
 export function RuntimesPage(props: { rest: string }) {
   const runtimes = useRuntimes();
   const agents = useWorkAgents();
+  const machines = useMergedMachines();
   const list = () => sortRuntimes(ready(runtimes, []));
   const selected = () => list().find((r) => r.id === props.rest) ?? list()[0];
   return (
@@ -54,6 +145,7 @@ export function RuntimesPage(props: { rest: string }) {
       }
     >
       <View testID="runtimes-page" class="h-full flex-1 bg-page">
+        <ExecutionMachinesStrip machines={machines()} />
         <Split
           edge
           list={

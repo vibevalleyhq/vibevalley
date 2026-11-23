@@ -211,18 +211,24 @@ impl Sessions {
         self.0.door.lock().tokens.get(token).cloned()
     }
 
-    /// The helper's door entry, minting its token once.
-    pub(super) fn door_for(&self, session: &str) -> Option<McpServer> {
+    /// Mints (or reuses) the per-session MCP bearer token so remote sessions can
+    /// authenticate over the WS MCP reverse tunnel even without a local HTTP MCP URL.
+    pub(super) fn mcp_token_for(&self, session: &str) -> String {
         let mut door = self.0.door.lock();
-        let url = door.url.clone()?;
-        let token = match door.tokens.iter().find(|(_, s)| s.as_str() == session) {
+        match door.tokens.iter().find(|(_, s)| s.as_str() == session) {
             Some((t, _)) => t.clone(),
             None => {
                 let t = uuid::Uuid::new_v4().simple().to_string();
                 door.tokens.insert(t.clone(), session.to_string());
                 t
             }
-        };
+        }
+    }
+
+    /// The helper's door entry, minting its token once.
+    pub(super) fn door_for(&self, session: &str) -> Option<McpServer> {
+        let url = self.0.door.lock().url.clone()?;
+        let token = self.mcp_token_for(session);
         Some(McpServer::Http {
             name: "vibevalley".into(),
             url,
@@ -276,9 +282,10 @@ impl Sessions {
             now(),
         );
         session.profile = (!h.drive.agent.is_empty()).then(|| h.drive.agent.clone());
+        session.machine = (!h.drive.is_local).then(|| h.drive.machine_id.clone());
         session.brief = h.brief;
         self.0.extras.lock().entry(id.clone()).or_default().base = h.base;
-        session.cwd = Some(h.cwd.to_string_lossy().into_owned());
+        session.cwd = (!h.cwd.as_os_str().is_empty()).then(|| h.cwd.to_string_lossy().into_owned());
         session.attach_binding(vibevalley_protocol::ContextRef::Issue {
             id: h.issue.id.clone(),
             refining: h.drafting.then_some(true),
@@ -294,6 +301,7 @@ impl Sessions {
     /// first prompt. `resume` reopens the runtime's own session.
     fn start(&self, drive: Drive, mut session: Session, issue: &Issue, prompt: String, resume: bool, trigger: RunTrigger) -> Result<String> {
         let _ = std::fs::remove_file(self.report_path(&session.id));
+        let is_remote = !drive.is_local;
         let (agent, prompt) = self.open_for(drive, &session, issue, prompt, resume)?;
         session.phase = Phase::working(now(), SessionAction::Thinking, "");
         let started = IssueChange::Started {
@@ -304,15 +312,15 @@ impl Sessions {
         let run = self.begin_run(&session.id, &issue.id, trigger)?;
         let prompt = self.with_recall(&session, prompt);
         self.record(&session.id, Step::Asked { text: prompt.clone() });
-        if let Err(e) = Self::prompt_run(&*agent, &run, &prompt) {
+        if let Err(e) = Self::prompt_run(&*agent, is_remote, &run, &prompt) {
             let _ = self.dismiss(&session.id, Leave::Keep);
             return Err(e.into());
         }
         Ok(session.id)
     }
 
-    fn prompt_run(agent: &dyn vibevalley_runtime::oar::Session, run: &str, prompt: &str) -> vibevalley_runtime::oar::Result<()> {
-        if agent.runtime_id() != vibevalley_runtime::agent::runtime::ID {
+    fn prompt_run(agent: &dyn vibevalley_runtime::oar::Session, is_remote: bool, run: &str, prompt: &str) -> vibevalley_runtime::oar::Result<()> {
+        if !is_remote && agent.runtime_id() != vibevalley_runtime::agent::runtime::ID {
             return agent.prompt(text(prompt));
         }
         let key = format!("work:{run}");
@@ -342,11 +350,12 @@ impl Sessions {
             .read(|tx| tx.submission_by_request(&conv, &format!("work:{run}")))?
             .ok_or_else(|| BoardError::Other(format!("missing generation for {run}")))?;
         let task = self.0.durable.read(|tx| tx.task(&format!("gen-{}", sub.id)))?;
+        let is_remote = session.machine.is_some();
         let drive = self.0.drivers.drive(session.profile_id(), &issue)?;
         let (agent, _) = self.open_for(drive, &session, &issue, String::new(), true)?;
         self.go_live(agent.clone(), session, None)?;
         if task.status == vibevalley_runtime::agent::durable::TaskStatus::Terminal {
-            Self::prompt_run(&*agent, &run, sub.payload["text"].as_str().unwrap_or_default())?;
+            Self::prompt_run(&*agent, is_remote, &run, sub.payload["text"].as_str().unwrap_or_default())?;
         }
         Ok(())
     }
@@ -368,7 +377,7 @@ impl Sessions {
                 branch: session.worktree_branch().map(String::from),
                 cwd: session.cwd.clone().unwrap_or_default(),
                 id: session.id.clone(),
-                pull_request: issue.deliver == Deliverable::PullRequest,
+                pull_request: issue.deliver == Deliverable::PullRequest || !drive.is_local,
                 house: self.0.workplaces.house_rules(),
             };
             self.0.drivers.rules(&place, issue.deliver)
@@ -386,13 +395,30 @@ impl Sessions {
         mcp_servers.extend(drive.mcp_servers.iter().cloned());
         #[allow(clippy::needless_update, reason = "fields vibevalley-oar adds later")]
         let (append_system_prompt, prompt) = drive.work_instructions(instructions, prompt);
+        let mut env = drive.env.clone();
+        if !drive.is_local {
+            let repo_ref = issue
+                .repo
+                .as_deref()
+                .map(|r| self.0.workplaces.repo_remote_url(r).unwrap_or_else(|| r.to_string()));
+            let branch = session.worktree_branch().map(String::from);
+            let base_ref = self.extra(&session.id).base;
+            let meta = crate::modules::infra::machine::RemoteDispatchMeta {
+                session_id: Some(session.id.clone()),
+                repo_ref,
+                branch,
+                base_ref,
+                mcp_session_token: Some(self.mcp_token_for(&session.id)),
+            };
+            crate::modules::infra::machine::attach_dispatch_meta(&mut env, &meta);
+        }
         let opts = SessionOptions {
             cwd,
             model: drive.model.clone(),
             resume: if resume { self.extra(&session.id).agent_session } else { None },
             permission_mode: self.0.config.permission,
             append_system_prompt,
-            env: drive.env.clone(),
+            env,
             record_to: Some(self.record_path(&session.id)),
             effort: drive.effort.clone(),
             mcp_servers,
@@ -482,7 +508,7 @@ impl Sessions {
                 let run = self.begin_run(&session.id, &issue.id, trigger)?;
                 let words = self.with_recall(session, words);
                 self.record(&session.id, Step::Asked { text: words.clone() });
-                Self::prompt_run(&*agent, &run, &words)?;
+                Self::prompt_run(&*agent, session.machine.is_some(), &run, &words)?;
                 self.0.ledger.change(&issue.id, IssueChange::Unqueued)?;
                 Ok(session.id.clone())
             }
@@ -559,6 +585,7 @@ impl Sessions {
             self.end_run(session_id, Outcome::Interrupted, "", None)?;
         }
         if let Some(s) = &session
+            && s.machine.is_none()
             && let (Some(repo), Some(worktree), Some(branch)) = (s.repo_name(), s.cwd.as_deref(), s.worktree_branch())
         {
             let leaving = Leaving {

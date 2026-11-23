@@ -17,9 +17,11 @@ export function createWriteKey() {
 }
 
 /** The plus: an issue made at once in the backlog. With words, they are its title and its draft starts from them. */
-export async function writeIssue(text: string, agent: string, repo: string, requestKey: string): Promise<{ issue: Issue; refused: string }> {
+export async function writeIssue(text: string, agent: string, repo: string, requestKey: string, machineId = ""): Promise<{ issue: Issue; refused: string }> {
   const words = text.trim();
-  const made = await api.issue.create(omitUndefined({ title: words || newIssueTitle, repo: repo || undefined, agent: agent || undefined, requestKey }));
+  const made = await api.issue.create(
+    omitUndefined({ title: words || newIssueTitle, repo: repo || undefined, agent: agent || undefined, machineId: machineId || undefined, requestKey }),
+  );
   if (!words) return { issue: made, refused: "" };
   try {
     return { issue: await api.issue.refine({ id: made.id, text: words }), refused: "" };

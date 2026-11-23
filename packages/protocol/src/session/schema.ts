@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Codec } from "../codec";
 import { ArtifactId, IssueId, Outcome, Retry, SessionId, Spent } from "../common/schema";
 import { AgentRoleValues } from "../common/shapes.gen";
+import { MachinePlatform, MachineStatus } from "../machine/schema";
 import * as T from "./shapes.gen";
 
 const SessionAction = z.enum(T.SessionActionValues) satisfies Codec<T.SessionAction>;
@@ -375,4 +376,8 @@ export const Machine = z.object({
   here: z.boolean(),
   online: z.boolean(),
   joinedAt: z.number(),
+  platform: z.exactOptional(MachinePlatform),
+  status: z.exactOptional(MachineStatus),
+  ephemeral: z.exactOptional(z.boolean()),
+  runtimes: z.exactOptional(z.array(z.string())),
 }) satisfies Codec<T.Machine>;

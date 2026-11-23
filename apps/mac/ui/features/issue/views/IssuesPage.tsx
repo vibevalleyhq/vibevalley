@@ -143,7 +143,7 @@ export function IssuesPage(props: { rest: string }) {
     { when: "notEditing" },
   );
   const keepNew = async (words: string, where: NewIssueAt, requestKey: string) => {
-    const made = await act.run(() => writeIssue(words, where.agent ?? "", where.repo ?? "", requestKey));
+    const made = await act.run(() => writeIssue(words, where.agent ?? "", where.repo ?? "", requestKey, where.machineId ?? ""));
     if (!made) return false;
     rememberPick(where.agent ?? "", where.repo ?? "");
     if (made.refused) toast(t("web.issue.page.notDrafted", { why: made.refused }));

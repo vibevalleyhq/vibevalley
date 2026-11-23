@@ -141,6 +141,11 @@ export class VibeValleyApi {
     },
   };
 
+  readonly machine = {
+    list: (options?: { signal?: AbortSignal }): Promise<T.MachineInfo[]> =>
+      this.call<T.MachineInfo[]>("machine.list", "/api/v1/machine/list", undefined, options),
+  };
+
   readonly orchestrator = {
     open: (options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("orchestrator.open", "/api/v1/orchestrator/open", undefined, options),
     /** Ends the orchestrator's run under way and drops what waits for it; the sessions it sent keep working. */

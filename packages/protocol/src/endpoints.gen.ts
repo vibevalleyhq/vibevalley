@@ -201,6 +201,7 @@ export const servedEndpoints = [
   { op: "remote.pair.exchange", can: ["user", "remote"], about: [] },
   { op: "remote.device.revoke", can: ["user"], about: ["id"] },
   { op: "remote.whoami", can: ["user", "remote"], about: [] },
+  { op: "machine.list", can: ["user", "remote"], about: [] },
 ] as const;
 
 export const servedSubscriptions = [

@@ -416,6 +416,18 @@ fn fold(state: &mut SpaceState, f: &Fact) -> (SliceMask, bool) {
             }
             (SliceMask::SESSIONS, false)
         }
+        Fact::MachineRemoved(f) => {
+            let before = state.machines.len();
+            state.machines.retain(|x| x.id != f.id);
+            (
+                if state.machines.len() != before {
+                    SliceMask::SESSIONS
+                } else {
+                    SliceMask::NONE
+                },
+                false,
+            )
+        }
         Fact::RuntimeInboxChanged(f) => {
             if state.runtime_inbox_items == f.items {
                 return (SliceMask::NONE, false);
@@ -1004,6 +1016,7 @@ mod tests {
                     here: true,
                     online: true,
                     joined_at: 3,
+                    ..Machine::default()
                 },
             })])
             .dirty,
@@ -1267,5 +1280,64 @@ mod tests {
         assert!(applied.effects.is_empty());
         assert!(core.inbox_slice().items.is_empty());
         assert!(crate::progress::entries_for(&before_fail, &fail_fact, core.state()).is_empty());
+    }
+
+    #[test]
+    fn machine_changed_and_removed_project_enriched_fields_into_sessions_slice() {
+        let mut core = Core::default();
+        let gpu = Machine {
+            id: "gpu-1".into(),
+            name: "Linux GPU Box".into(),
+            here: false,
+            online: true,
+            joined_at: 100,
+            platform: Some(MachinePlatform::Linux),
+            status: Some(MachineStatus::Online),
+            ephemeral: false,
+            runtimes: vec!["claude".into(), "codex".into()],
+        };
+        let sandbox = Machine {
+            id: "sbx-42".into(),
+            name: "Sandbox #42".into(),
+            here: false,
+            online: true,
+            joined_at: 200,
+            platform: Some(MachinePlatform::Container),
+            status: Some(MachineStatus::Draining),
+            ephemeral: true,
+            runtimes: vec!["claude".into()],
+        };
+
+        let a1 = core.apply(vec![Fact::machine_changed(100, gpu.clone()), Fact::machine_changed(200, sandbox.clone())]);
+        assert_eq!(a1.dirty, SliceMask::SESSIONS);
+        assert_eq!(core.state().machines, vec![gpu.clone(), sandbox.clone()]);
+        assert_eq!(core.sessions_slice().machines, vec![gpu.clone(), sandbox.clone()]);
+
+        // Re-applying identical machine state is a no-op.
+        let noop = core.apply(vec![Fact::machine_changed(250, gpu.clone())]);
+        assert_eq!(noop.dirty, SliceMask::NONE);
+        assert!(noop.transitions.is_empty());
+
+        // Transitioning to offline updates status, online flag, and runtimes in place.
+        let gpu_offline = Machine {
+            online: false,
+            status: Some(MachineStatus::Offline),
+            runtimes: vec!["claude".into()],
+            ..gpu
+        };
+        let a2 = core.apply(vec![Fact::machine_changed(300, gpu_offline.clone())]);
+        assert_eq!(a2.dirty, SliceMask::SESSIONS);
+        assert_eq!(core.sessions_slice().machines, vec![gpu_offline.clone(), sandbox]);
+
+        // Removing ephemeral sandbox removes it from SpaceState & SessionsSlice.
+        let a3 = core.apply(vec![Fact::machine_removed(400, "sbx-42")]);
+        assert_eq!(a3.dirty, SliceMask::SESSIONS);
+        assert_eq!(core.state().machines, vec![gpu_offline.clone()]);
+        assert_eq!(core.sessions_slice().machines, vec![gpu_offline]);
+
+        // Removing an absent machine is a no-op.
+        let absent = core.apply(vec![Fact::machine_removed(401, "sbx-42")]);
+        assert_eq!(absent.dirty, SliceMask::NONE);
+        assert!(absent.transitions.is_empty());
     }
 }

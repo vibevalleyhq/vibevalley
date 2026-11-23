@@ -374,7 +374,9 @@
     "placeholder": "要做什么？一句话就行，执行会话会照它起草",
     "keys": "⌘ 回车记下",
     "keep": "记下",
-    "editsKept": "刚才的内容已提交，修改后的草稿已保留。"
+    "editsKept": "刚才的内容已提交，修改后的草稿已保留。",
+    "machine": "执行机器",
+    "machineAuto": "自动分配机器"
   },
   "conversation": {
     "title": "讨论与交付记录",

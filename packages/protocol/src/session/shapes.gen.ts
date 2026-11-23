@@ -1,6 +1,7 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 import type { AgentRole, ArtifactId, IssueId, Outcome, Retry, SessionId, Spent } from "../common/shapes.gen";
+import type { MachinePlatform, MachineStatus } from "../machine/shapes.gen";
 
 export const SessionActionValues = ["run_command", "read_file", "edit_file", "search", "web", "mcp", "wait", "other", "thinking", "speaking_text", "none"] as const;
 export type SessionAction = (typeof SessionActionValues)[number];
@@ -148,9 +149,11 @@ here: boolean,
 /**
  * Reachable now: the server can hire helpers on it.
  */
-online: boolean, joinedAt: number, };
+online: boolean, joinedAt: number, platform?: MachinePlatform, status?: MachineStatus, ephemeral?: boolean, runtimes?: Array<string>, };
 
 export type FactMachineChanged = { "type": "machineChanged", at: number, machine: Machine, };
+
+export type FactMachineRemoved = { "type": "machineRemoved", at: number, id: string, };
 
 /**
  * `PhaseResting` where nothing else is taken: its `_tag` written.

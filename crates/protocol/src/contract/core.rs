@@ -247,6 +247,8 @@ pub enum Fact {
     ConnectorChanged(FactConnectorChanged),
     #[serde(rename = "machineChanged")]
     MachineChanged(FactMachineChanged),
+    #[serde(rename = "machineRemoved")]
+    MachineRemoved(FactMachineRemoved),
     #[serde(rename = "mediaChanged")]
     MediaChanged(FactMediaChanged),
     #[serde(rename = "runtimeInboxChanged")]
@@ -356,6 +358,8 @@ pub enum ServerEvent {
     ConnectorChanged(FactConnectorChanged),
     #[serde(rename = "machineChanged")]
     MachineChanged(FactMachineChanged),
+    #[serde(rename = "machineRemoved")]
+    MachineRemoved(FactMachineRemoved),
     #[serde(rename = "mediaChanged")]
     MediaChanged(FactMediaChanged),
     #[serde(rename = "runtimeInboxChanged")]

@@ -20,22 +20,28 @@ required-features = ["eval"]
 
 [features]
 default = []
-eval = ["dep:vibevalley-runtime"]
+eval = []
 
 [dependencies]
 base64 = { workspace = true }
 clap = { version = "4.6.7", features = ["derive", "string"] }
+flume = { workspace = true }
+futures-util = { workspace = true }
 jiff = { workspace = true }
+parking_lot = { workspace = true }
 reqwest = { workspace = true, features = ["blocking"] }
 rustls = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tokio = { workspace = true, features = ["io-util"] }
+tokio-tungstenite = { workspace = true }
+tokio-util = { workspace = true }
 url = { workspace = true }
+uuid = { workspace = true }
 vibevalley-core = { path = "../core", default-features = false }
 vibevalley-protocol = { path = "../protocol" }
-vibevalley-runtime = { path = "../runtime", optional = true }
+vibevalley-runtime = { path = "../runtime" }
 
 [dev-dependencies]
 tempfile = { workspace = true }
-vibevalley-runtime = { path = "../runtime" }
 vibevalley-server = { path = "../server" }

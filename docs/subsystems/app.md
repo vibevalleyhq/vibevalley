@@ -18,7 +18,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 | 位置 | 职责 |
 |---|---|
 | `apps/mac/src/main.rs`、`shell/` | 开窗口并初始化工作区 `tracing_subscriber`（`VIBEVALLEY_LOG`/`RUST_LOG`，`VIBEVALLEY_DEBUG=1` 默认 `info` 否则 `warn`）；根视图 `Shell` 拆为 9 个职责文件（`mod.rs`、`projects.rs`、`panes.rs`、`render.rs`、`menus.rs`、`palette.rs`、`settings.rs`、`host_bridge.rs`、`devtools.rs`）：项目、分栏布局、侧栏、命令面板、快捷键（`bind_keys`）、宿主接口与 `VIBEVALLEY_DEBUG=1` 悬浮胶囊／`⇧⌥D` 浮层／独立拆窗 |
-| `apps/mac/src/hosted/` | 托管视图：一个视图一个 nsh 引擎，按 `is_workbench_view` 分别缓存与惰性装载双入口包（重型工作台 `App.tsx` → `ui/build`，含 `devtools`；轻量壳窗格 `ShellApp.tsx` → `ui/build-shell`）；`bridge.rs` 与 `frames.rs` 复用 `vibevalley_protocol` 的 `HostAction`、`HostOp` 与强类型 `Host*` 帧（`HostRailFrame`、`HostFileTreeFrame`、`HostGitPanelFrame`、`HostPaletteFrame`），`ShellDebugHandle` 向 `HostDebugBridge` 提供路由、客户端、包模式、回环地址、启动耗时、缓存统计与有界帧耗时（`>= 16 ms` 标慢），`late.rs` 让服务端在后台线程起来 |
+| `apps/mac/src/hosted/` | 托管视图：一个视图一个 nsh 引擎，按 `is_workbench_view` 分别缓存与惰性装载双入口包（重型工作台 `App.tsx` → `ui/build`，含 `devtools`；轻量壳窗格 `ShellApp.tsx` → `ui/build-shell`）；`bridge.rs` 与 `frames.rs` 复用 `vibevalley_protocol` 的 `HostAction`、`HostOp` 与强类型 `Host*` 帧（`HostRailFrame`、`HostFileTreeFrame`、`HostGitPanelFrame`、`HostPaletteFrame`），`ShellDebugHandle` 向 `HostDebugBridge` 提供路由、客户端、包模式、回环地址、启动耗时、缓存统计与有界帧耗时（`>= 16 ms` 标慢），`late.rs` 让内置服务端在后台线程起来；`connection.rs` 与 `remote.rs` 实现桌面 `ClientTransport` 的本地合体（默认）与远程控制面模式切换 |
 | `apps/mac/src/host.rs` | 宿主能力的原生一半：系统通知、Finder 里显示、`open`、本地文件选择与另存、读文件 |
 | `apps/mac/src/audio.rs`、`audio.m` | AVFoundation 文件播放、跳播与有界 PCM 队列；宿主音频命令按桥的接收顺序执行 |
 | `apps/mac/src/command_line.rs`、`tray.rs`、`island.rs` | 命令行符号链接、菜单栏摘要、灵动岛进程与工单摘要 |
@@ -31,18 +31,21 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 | `apps/mac/ui/App.tsx`、`ShellApp.tsx`、`workspace/` | 双入口 TSX 包：`App.tsx` 供全量工作台（`vv` / `vibevalley`）、农场视图（`farm-form` / `farm-phone`）与六视图 DevTools（`devtools` → `features/devtools/`），`ShellApp.tsx` 专供轻量工作区壳窗格（`sidebar`、`palette`、`markdown`、`workspace-chat`、`probe`），两份入口启动时均调 `installNativeI18n()` 走原生 `VvI18n`，按 `host.params.view` 挑视图 |
 | `apps/mac/ui/{app,features,design,infra}/` | 工作台共 6 个顶级目录：入口外壳 `app/`（路由表 `Workbench.tsx`、6 项一级导航 `places.ts`、外框 `Shell.tsx`）、领域切片 `features/<概念>/`（含二元统一内容中心壳 `content/`、5 栏设置页、Artifact 引擎含 `TimelineBar.tsx` 时间旅行、`outline` 大纲笔记与 `OutlineImportModal.tsx` `.md` 导入、素材库）、共享原语与表面 `design/`（含动效出口 `motion.ts`、防闪烁骨架原语 `Skeleton.tsx` 与 `Markdown.tsx` / `code/GenUi.tsx` 的 `onGenUiAction` 闭环）、底层运行时与状态 `infra/`（`bridge.ts`、`solid.ts`、`polyfill.ts`、`state/`），另加 `workspace/` 与 `farm/` |
 | `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[哲学与令牌](docs/design/01-philosophy-and-tokens.md)），与 `apps/mobile` 令牌一同由 [tokens.ts](scripts/gen/tokens.ts) 从 [tokens.json](design/tokens.json) 生成 |
-| `apps/mac/ui/features/setting/RemoteAccessPage.tsx` | Mac 设置页 `/settings/connections/remote`：远程访问开关、Tailscale 在线状态与地址、二维码配对（`host.qr`）与已配对设备撤销 |
-| `apps/mobile/` | 独立原生移动应用（`nsh/mobile`，iOS + Android 折叠屏／iPhone Duo 自适应）：基于 `@vibevalley/protocol/remote`（[transport.ts](packages/protocol/src/remote/transport.ts)）连接 Mac 远程门，含配对页、4 个一级标签（收件箱、频道、会话、任务）、[layout.ts](apps/mobile/src/design/layout.ts) 自适应单／双栏布局与 `<Canvas>` + `Path2D` 97 枚 reicons 渲染 |
+| `apps/mac/ui/features/setting/RemoteAccessPage.tsx` | Mac 设置页 `/settings/connections/remote`：桌面控制面连接模式（本地内置 / 远程控制面切换与重置）、远程访问开关、Tailscale 在线状态与地址、二维码配对（`host.qr`）与已配对设备撤销 |
+| `apps/mobile/` | 独立原生移动应用（`nsh/mobile`，iOS + Android 折叠屏／iPhone Duo 自适应）：基于 `@vibevalley/protocol/remote`（[transport.ts](packages/protocol/src/remote/transport.ts)）连接 Mac 远程门，含配对页、4 个一级标签（收件箱、频道、会话、任务；会话与任务行在指定机器时展示轻量机器徽标）、[layout.ts](apps/mobile/src/design/layout.ts) 自适应单／双栏布局与 `<Canvas>` + `Path2D` 97 枚 reicons 渲染 |
 | `crates/server/src/transport/bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
 | `packages/protocol/src/host.ts` | `Host` 接口：页面能向宿主要的东西 |
 | `apps/island/` | 刘海上的灵动岛（Swift）：一个单独的小程序，stdin 收工单摘要，stdout 说点了哪一行（[apps/island/README.md](apps/island/README.md)）；`apps/mac` 从包内带起它，退出时关闭 |
 
 ## 模型和不变量
 
-### 进程和服务端
+### 进程、内置服务端与远程控制面
 
-- **服务端在应用的进程里**：`BridgeHub::install` 在后台线程调 `vibevalley_server::start`，家目录按当前发布通道解析（`VIBEVALLEY_HOME` 覆盖，默认 `~/.vibevalley{,-beta,-alpha,-dev}`，见[设置和配置](docs/subsystems/setting.md#发布通道默认端口与数据目录)），工作目录是 `$VIBEVALLEY_WORK_ROOT`，默认 `~/vibevalley-dev`；起来之前的调用由 `LateServer` 接住。开场等待服务端、HTTP 地址公告和项目加载都成功；失败停在失败画面。
-- **同一个服务端另开一道本机的 HTTP 门**：`vibevalley_server::transport::http::serve` 默认按当前发布通道绑定 `127.0.0.1:<默认端口>`（`release` `8787`、`beta` `8788`、`alpha` `8789`、`dev` `8790`）；未显式设置 `VIBEVALLEY_PORT` 且首选端口已被占用（`AddrInUse`）时，应用向 stderr 打印告警并自动回落到空闲端口（`127.0.0.1:0`），显式设置非零 `VIBEVALLEY_PORT` 冲突时直接失败；实际监听地址写进家目录的 `server.json`，命令行据此找到它，帮工的 `/mcp` 也在这道门上。
+- **默认本地合体，支持零代码切换远程控制面**：[connection.rs](apps/mac/src/hosted/connection.rs) 从 `$VIBEVALLEY_HOME/desktop-connection.json`（Unix `0o600` 权限，令牌以 `Secret` 包装并在 `Debug`/`Display` 中脱敏）解析桌面连接模式，并允许环境变量 `VIBEVALLEY_CONTROL_PLANE_URL` 与 `VIBEVALLEY_CONTROL_PLANE_TOKEN`（可选 `VIBEVALLEY_CONTROL_PLANE_LABEL`）优先覆盖供无头或 CI 测试使用：
+  - **`Mode::Embedded`（默认，零配置）**：`BridgeHub::install` 在后台线程调 `vibevalley_server::start`，家目录按当前发布通道解析（`VIBEVALLEY_HOME` 覆盖，默认 `~/.vibevalley{,-beta,-alpha,-dev}`，见[设置和配置](docs/subsystems/setting.md#发布通道默认端口与数据目录)），工作目录是 `$VIBEVALLEY_WORK_ROOT`，默认 `~/vibevalley-dev`；起来之前的调用由 `LateServer` 接住。开场等待服务端、HTTP 地址公告和项目加载都成功；失败停在失败画面。
+  - **`Mode::Remote`**：启动时不拉起本机内置 `vibevalley-server`，直接将 [remote.rs](apps/mac/src/hosted/remote.rs) 的 `RemoteServer`（实现 `vibevalley_server::transport::api::Server`）挂到 `BridgeHub` 上。`RemoteServer` 携带 `Authorization: Bearer <token>` 与 `X-VibeValley-Client: remote`，通过 `POST /api/v1/{op}`、`GET /api/v1/slice/{name}`（SSE + `Last-Event-ID` 自动重连，快照走 `?once=1`）、`GET /api/v1/live` 与 `GET /api/v1/subscribe/{name}` 与远程控制面对接，页面、桥与切片消费层零感知切换。
+- **桌面控制面连接设置**：[hosted/mod.rs](apps/mac/src/hosted/mod.rs) 拦截 `host.connectionState`、`host.connectionSave` 与 `host.connectionReset` 三个桌面宿主操作，支持在 `/settings/connections/remote`（[RemoteAccessPage.tsx](apps/mac/ui/features/setting/RemoteAccessPage.tsx)）查看当前运行态与持久化配置、通过 6 位配对码（经 `POST /api/v1/remote/pair/exchange` 换领令牌）或 Bearer 令牌保存远程目标，或一键切回本地内置模式并提示重启生效；该分区独立于远端 `remote.status` 渲染，即使当前配置的远程控制面不可达也可随时修改或重置。
+- **内置模式另开一道本机的 HTTP 门**：`vibevalley_server::transport::http::serve` 默认按当前发布通道绑定 `127.0.0.1:<默认端口>`（`release` `8787`、`beta` `8788`、`alpha` `8789`、`dev` `8790`）；未显式设置 `VIBEVALLEY_PORT` 且首选端口已被占用（`AddrInUse`）时，应用向 stderr 打印告警并自动回落到空闲端口（`127.0.0.1:0`），显式设置非零 `VIBEVALLEY_PORT` 冲突时直接失败；实际监听地址写进家目录的 `server.json`，命令行据此找到它，帮工的 `/mcp` 也在这道门上。
 - **一个服务端只有一个本机用户，远程设备按需配对**：主回环门只听 `127.0.0.1`，本机来的请求直接为 `Caller::User`；远程监听门默认关闭，仅当用户在本机 `/settings/connections/remote` 显式开启并完成一次性配对后，才接受已配对设备的 Bearer 令牌（`Caller::Remote` + `CallerPrincipal::RemoteDevice`，见[受控远程访问](docs/subsystems/core.md#受控远程访问)）。
 - **外壳自己的数据按发布通道另存一个库**：项目、布局、外壳的设置按当前发布通道存于 `~/Library/Application Support/VibeValley{,-beta,-alpha,-dev}/state.db`（`VIBEVALLEY_STORE` 覆盖）。宿主库名为 `state.db` 时，nsh 页面在同目录的 `nsh/` 读写。其他库名各用同目录的 `<库名>.nsh/`。服务端使用自己的家目录。已有项目可直接激活。用户按目录打开新项目或关联终端时，宿主在后台读取项目。终端桥在标签创建或复用后返回其标识。
 

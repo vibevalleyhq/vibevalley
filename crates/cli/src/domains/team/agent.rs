@@ -134,6 +134,7 @@ pub fn run(client: &Client, cmd: AgentCmd) -> Done {
                 duty,
                 enabled: true,
                 runtime,
+                machine_id: None,
                 model,
                 effort,
                 persona: String::new(),

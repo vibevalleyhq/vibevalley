@@ -292,6 +292,9 @@ pub struct RuntimeSettings {
 #[serde(rename_all = "camelCase")]
 pub struct RuntimeInfo {
     pub id: String,
+    /// Execution host id (`"local"` or omitted for the server's own machine).
+    #[serde(default)]
+    pub machine_id: Option<String>,
     pub preset: RuntimePreset,
     pub support: RuntimeSupport,
     pub installation: Installation,

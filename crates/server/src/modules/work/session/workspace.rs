@@ -366,13 +366,13 @@ impl Sessions {
     /// Opens a new user workspace session or reconnects an existing one.
     pub fn open_workspace(&self, input: SessionOpenWorkspaceInput) -> Result<SessionWorkspace> {
         let cwd = input.cwd.trim().to_string();
-        if cwd.is_empty() || !Path::new(&cwd).is_dir() {
-            return Err(invalid_input(t("server.session.workspace.badCwd", &[("cwd", cwd.into())])));
-        }
         if let Some(existing_id) = input.session_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
             let mut session = self.session(existing_id).ok_or_else(|| missing_session(existing_id))?;
             if session.controller != SessionController::User {
                 return Err(refused_session(t("server.session.workspace.notWorkspace", &[])));
+            }
+            if session.machine.is_none() && (cwd.is_empty() || !Path::new(&cwd).is_dir()) {
+                return Err(invalid_input(t("server.session.workspace.badCwd", &[("cwd", cwd.into())])));
             }
             let mut meta = self.workspace_snapshot(&session.id);
             let model_opt = input.model.as_deref().map(str::trim).filter(|m| !m.is_empty());
@@ -418,8 +418,15 @@ impl Sessions {
             } else {
                 session.runtime.clone()
             };
-            session.runtime = runtime_id.strip_prefix("acp:").unwrap_or(&runtime_id).to_string();
-            session.cwd = Some(cwd);
+            if let Ok(parsed) = vibevalley_protocol::RuntimeRef::parse(&runtime_id) {
+                session.runtime = parsed.runtime_id.strip_prefix("acp:").unwrap_or(&parsed.runtime_id).to_string();
+                session.machine = (!parsed.is_local()).then_some(parsed.machine_id);
+            } else {
+                session.runtime = runtime_id.strip_prefix("acp:").unwrap_or(&runtime_id).to_string();
+            }
+            if !cwd.is_empty() {
+                session.cwd = Some(cwd);
+            }
             let next_repo = input.repo.filter(|r| !r.trim().is_empty()).or_else(|| session.repo_name().map(String::from));
             session.policy = ExecutionPolicy::DirectCwd {
                 repo: next_repo,
@@ -440,6 +447,9 @@ impl Sessions {
             return Err(invalid_input(t("server.session.workspace.runtimeRequired", &[])));
         }
         let drive = self.0.drivers.drive_runtime(runtime_id, input.model.as_deref(), input.effort.as_deref())?;
+        if drive.is_local && (cwd.is_empty() || !Path::new(&cwd).is_dir()) {
+            return Err(invalid_input(t("server.session.workspace.badCwd", &[("cwd", cwd.into())])));
+        }
         let number = self.0.ledger.next("session", 0)?;
         let id = format!("w{number}");
         let permission_mode = input.permission_mode.unwrap_or(SessionPermissionMode::AcceptEdits);
@@ -448,19 +458,21 @@ impl Sessions {
             .clone()
             .filter(|_| !drive.runtime.refused_options().contains(&RefusableOption::Effort));
         let title = input.title.as_deref().map(str::trim).filter(|t| !t.is_empty()).map(String::from);
+        let repo_name = input.repo.filter(|r| !r.trim().is_empty());
         let mut session = Session::new(
             &id,
             SessionController::User,
             title.clone().unwrap_or_else(|| drive.name.clone()),
             drive.runtime_id.clone(),
             ExecutionPolicy::DirectCwd {
-                repo: input.repo.filter(|r| !r.trim().is_empty()),
+                repo: repo_name.clone(),
                 permission_mode,
             },
             now(),
         );
+        session.machine = (!drive.is_local).then(|| drive.machine_id.clone());
         session.brief = title.clone().unwrap_or_default();
-        session.cwd = Some(cwd.clone());
+        session.cwd = (!cwd.is_empty()).then(|| cwd.clone());
         session.phase = Phase::Resting(PhaseResting {});
 
         let meta = WorkspaceMeta {
@@ -470,12 +482,27 @@ impl Sessions {
             permission_mode,
         };
 
+        let mut env = drive.env.clone();
+        if !drive.is_local {
+            let repo_ref = repo_name
+                .as_deref()
+                .map(|r| self.0.workplaces.repo_remote_url(r).unwrap_or_else(|| r.to_string()));
+            let dispatch = crate::modules::infra::machine::RemoteDispatchMeta {
+                session_id: Some(id.clone()),
+                repo_ref,
+                branch: None,
+                base_ref: None,
+                mcp_session_token: Some(self.mcp_token_for(&id)),
+            };
+            crate::modules::infra::machine::attach_dispatch_meta(&mut env, &dispatch);
+        }
+
         let opts = SessionOptions {
             cwd: PathBuf::from(&cwd),
             model: drive.model.clone(),
             resume: None,
             permission_mode: to_oar_permission(permission_mode),
-            env: drive.env.clone(),
+            env,
             record_to: Some(self.record_path(&id)),
             effort: effective_effort,
             ..Default::default()
@@ -496,10 +523,14 @@ impl Sessions {
 
     fn launch_workspace_agent(&self, mut session: Session, mut meta: WorkspaceMeta, try_resume: bool) -> Result<Session> {
         let cwd = session.cwd.clone().unwrap_or_default();
-        if cwd.is_empty() || !Path::new(&cwd).is_dir() {
+        let runtime_target = match session.machine.as_deref() {
+            Some(machine) if !machine.is_empty() => format!("{machine}/{}", session.runtime),
+            _ => session.runtime.clone(),
+        };
+        let drive = self.0.drivers.drive_runtime(&runtime_target, meta.model.as_deref(), meta.effort.as_deref())?;
+        if drive.is_local && (cwd.is_empty() || !Path::new(&cwd).is_dir()) {
             return Err(invalid_input(t("server.session.workspace.badCwd", &[("cwd", cwd.into())])));
         }
-        let drive = self.0.drivers.drive_runtime(&session.runtime, meta.model.as_deref(), meta.effort.as_deref())?;
         meta.model = drive.model.clone();
         meta.effort = drive
             .effort
@@ -510,12 +541,26 @@ impl Sessions {
         } else {
             None
         };
+        let mut env = drive.env.clone();
+        if !drive.is_local {
+            let repo_ref = session
+                .repo_name()
+                .map(|r| self.0.workplaces.repo_remote_url(r).unwrap_or_else(|| r.to_string()));
+            let dispatch = crate::modules::infra::machine::RemoteDispatchMeta {
+                session_id: Some(session.id.clone()),
+                repo_ref,
+                branch: None,
+                base_ref: None,
+                mcp_session_token: Some(self.mcp_token_for(&session.id)),
+            };
+            crate::modules::infra::machine::attach_dispatch_meta(&mut env, &dispatch);
+        }
         let opts = SessionOptions {
             cwd: PathBuf::from(&cwd),
             model: meta.model.clone(),
             resume,
             permission_mode: to_oar_permission(meta.permission_mode),
-            env: drive.env.clone(),
+            env,
             record_to: Some(self.record_path(&session.id)),
             effort: meta.effort.clone(),
             ..Default::default()

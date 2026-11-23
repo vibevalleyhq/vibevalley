@@ -545,6 +545,7 @@ mod tests {
         };
         let runtime = RuntimeInfo {
             id: "antigravity".into(),
+            machine_id: None,
             preset: preset_of("antigravity"),
             support: support_of("antigravity"),
             installation: Installation::Available(InstallationAvailable {
@@ -570,6 +571,7 @@ mod tests {
             duty: String::new(),
             enabled: true,
             runtime: "antigravity".into(),
+            machine_id: None,
             model: String::new(),
             effort: String::new(),
             persona: String::new(),

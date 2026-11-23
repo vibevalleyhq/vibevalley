@@ -190,5 +190,10 @@
   "runtimeDefault": "引擎默认",
   "runtimeDefaultModel": "引擎默认（{model}）",
   "noEffort": "这个模型没有推理强度可选。",
-  "noEffortModel": "{model}没有推理强度可选。"
+  "noEffortModel": "{model}没有推理强度可选。",
+  "targetMachine": "执行机器",
+  "targetMachineTip": "将此角色固定到某台执行机器，或保持「自动」由总控端优先调度本机或在线机器。",
+  "targetMachineAuto": "自动（优先本机或在线）",
+  "targetMachineOffline": "{name}（离线）",
+  "targetMachineDraining": "{name}（排空中）"
 }

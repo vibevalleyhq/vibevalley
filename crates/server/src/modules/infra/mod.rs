@@ -5,6 +5,7 @@ use crate::Hub;
 pub(crate) mod column;
 pub mod debug;
 pub mod http;
+pub mod machine;
 pub mod provider;
 pub mod remote;
 pub mod setting;

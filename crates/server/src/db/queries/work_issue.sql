@@ -1,15 +1,16 @@
 -- name: ListIssues :many
-SELECT id, number, title, description, repo, priority, rank, deliver, parent, created_at, queued_at, closed_at, reviewed_at, canceled, delivered, mandate, constraints, conflict, last_run, answer, delivery_evidence, blocked_by, criteria, checks, findings, questions, assignments
+SELECT id, number, title, description, repo, machine_id, priority, rank, deliver, parent, created_at, queued_at, closed_at, reviewed_at, canceled, delivered, mandate, constraints, conflict, last_run, answer, delivery_evidence, blocked_by, criteria, checks, findings, questions, assignments
 FROM issue ORDER BY number;
 
 -- name: PutIssue :exec
-INSERT INTO issue (id, number, title, description, repo, priority, rank, deliver, parent, created_at, queued_at, closed_at, reviewed_at, canceled, delivered, mandate, constraints, conflict, last_run, answer, delivery_evidence, blocked_by, criteria, checks, findings, questions, assignments)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)
+INSERT INTO issue (id, number, title, description, repo, machine_id, priority, rank, deliver, parent, created_at, queued_at, closed_at, reviewed_at, canceled, delivered, mandate, constraints, conflict, last_run, answer, delivery_evidence, blocked_by, criteria, checks, findings, questions, assignments)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28)
 ON CONFLICT(id) DO UPDATE SET
   number = excluded.number,
   title = excluded.title,
   description = excluded.description,
   repo = excluded.repo,
+  machine_id = excluded.machine_id,
   priority = excluded.priority,
   rank = excluded.rank,
   deliver = excluded.deliver,

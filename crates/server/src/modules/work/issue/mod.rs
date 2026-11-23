@@ -630,6 +630,7 @@ fn edit_rewords(edit: &IssueUpdate) -> bool {
         || edit.description.is_some()
         || edit.repo.is_some()
         || edit.agent.is_some()
+        || edit.machine_id.is_some()
         || edit.priority.is_some()
         || edit.criteria.is_some()
         || edit.before.is_some()
@@ -645,6 +646,10 @@ fn apply_preview_edit(item: &mut Issue, edit: &IssueUpdate) {
     }
     if let Some(v) = &edit.repo {
         item.repo = Some(v.clone()).filter(|r| !r.is_empty());
+    }
+    if let Some(v) = &edit.machine_id {
+        let trimmed = v.trim();
+        item.machine_id = (!trimmed.is_empty()).then(|| trimmed.to_string());
     }
     if let Some(v) = edit.priority {
         item.priority = v;
@@ -670,6 +675,7 @@ pub(crate) fn create(board: &Board, profiles: Option<&Agents>, req: &vibevalley_
         criteria: req.criteria.clone().unwrap_or_default(),
         repo: req.repo.as_deref().map(str::trim).filter(|r| !r.is_empty()).map(PathBuf::from),
         agent,
+        machine_id: req.machine_id.clone(),
         // An issue for the orchestrator asks for an answer; any other a change (lifecycle.ts `create`).
         deliver: req.deliver.unwrap_or(if on_duty {
             vibevalley_protocol::Deliverable::Answer
@@ -693,6 +699,7 @@ pub(crate) fn update(board: &Board, profiles: Option<&Agents>, input: vibevalley
         description: input.description,
         repo: input.repo,
         agent: input.agent.map(|a| resolve_agent(profiles, &a)),
+        machine_id: input.machine_id,
         priority: input.priority,
         criteria: input.criteria,
         deliver: input.deliver,

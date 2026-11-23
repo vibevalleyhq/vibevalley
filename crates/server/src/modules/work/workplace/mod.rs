@@ -179,6 +179,12 @@ impl Workplace {
         Ok(Repo::discover(&self.repo_dir(repo))?)
     }
 
+    /// Reads the `origin` git remote URL for `repo` if a local checkout exists with one.
+    pub fn repo_remote_url(&self, repo: &str) -> Option<String> {
+        let found = self.existing(repo).ok().flatten()?;
+        git::remote_origin_url(found.root())
+    }
+
     pub fn main_branch(main: &Repo) -> Result<String> {
         main.status()?
             .branch

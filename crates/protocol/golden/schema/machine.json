@@ -1,0 +1,270 @@
+{
+ "MachinePlatform": [
+  "macos",
+  "linux",
+  "container",
+  "other"
+ ],
+ "MachineStatus": [
+  "online",
+  "offline",
+  "draining"
+ ],
+ "RuntimeRef": [
+  {
+   "machineId": "local",
+   "runtimeId": "claude"
+  },
+  {
+   "machineId": "gpu-1",
+   "runtimeId": "acp:opencode"
+  }
+ ],
+ "MachineRuntimeSummary": [
+  {
+   "id": "claude",
+   "label": "Claude Code",
+   "models": [
+    {
+     "id": "claude-sonnet-4-5",
+     "name": "Claude Sonnet 4.5",
+     "effortLevels": [
+      "low",
+      "medium",
+      "high"
+     ],
+     "defaultEffort": "medium",
+     "isDefault": true
+    }
+   ],
+   "capabilities": [
+    "listModels",
+    "accountUsage",
+    "skills",
+    "mcpServers"
+   ],
+   "available": true
+  },
+  {
+   "id": "codex",
+   "label": "Codex",
+   "models": [],
+   "capabilities": [],
+   "available": false
+  }
+ ],
+ "MachineInfo": [
+  {
+   "id": "local",
+   "name": "MacBook Pro",
+   "platform": "macos",
+   "status": "online",
+   "here": true,
+   "ephemeral": false,
+   "worktreeSupported": true,
+   "joinedAt": 1700000000000,
+   "lastSeenAt": 1700000060000,
+   "runtimes": [
+    {
+     "id": "claude",
+     "label": "Claude Code",
+     "models": [],
+     "capabilities": [
+      "listModels"
+     ],
+     "available": true
+    }
+   ]
+  },
+  {
+   "id": "sbx-42",
+   "name": "CI Sandbox #42",
+   "platform": "container",
+   "status": "draining",
+   "here": false,
+   "ephemeral": true,
+   "worktreeSupported": false,
+   "joinedAt": 1700000100000,
+   "runtimes": []
+  }
+ ],
+ "MachineInputKind": [
+  "prompt",
+  "steer",
+  "queue",
+  "abort",
+  "setConfig",
+  "dispose"
+ ],
+ "MachineWireFrame": [
+  {
+   "type": "machine.hello",
+   "machineId": "gpu-1",
+   "name": "Linux GPU Box",
+   "platform": "linux",
+   "ephemeral": false,
+   "worktreeSupported": true,
+   "runtimes": [
+    {
+     "id": "claude",
+     "label": "Claude Code",
+     "models": [],
+     "capabilities": [
+      "listModels"
+     ],
+     "available": true
+    }
+   ]
+  },
+  {
+   "type": "machine.helloAck",
+   "machineId": "gpu-1",
+   "serverVersion": "0.1.0",
+   "heartbeatMs": 15000
+  },
+  {
+   "type": "machine.inventory",
+   "machineId": "gpu-1",
+   "runtimes": []
+  },
+  {
+   "type": "machine.ping",
+   "ts": 1700000000000
+  },
+  {
+   "type": "machine.pong",
+   "ts": 1700000000000
+  },
+  {
+   "type": "session.open",
+   "requestId": "req-1",
+   "sessionId": "w1",
+   "runtimeId": "claude",
+   "repoRef": "vibevalley",
+   "branch": "feat/machine",
+   "baseRef": "main",
+   "workdir": "/work/w1",
+   "systemPrompt": "Be concise.",
+   "model": "claude-sonnet-4-5",
+   "effort": "high",
+   "mcpSessionToken": "vv_sess_token",
+   "env": {
+    "RUST_LOG": "info"
+   }
+  },
+  {
+   "type": "session.opened",
+   "requestId": "req-1",
+   "sessionId": "w1",
+   "ok": true,
+   "workdir": "/work/w1"
+  },
+  {
+   "type": "session.opened",
+   "requestId": "req-2",
+   "sessionId": "w2",
+   "ok": false,
+   "error": "runtime unavailable"
+  },
+  {
+   "type": "session.input",
+   "requestId": "req-3",
+   "sessionId": "w1",
+   "inputId": "in-1",
+   "kind": "prompt",
+   "text": "Run tests",
+   "model": "claude-sonnet-4-5",
+   "effort": "medium"
+  },
+  {
+   "type": "session.ack",
+   "requestId": "req-3",
+   "sessionId": "w1",
+   "inputId": "in-1",
+   "ok": true
+  },
+  {
+   "type": "session.respond",
+   "requestId": "req-4",
+   "sessionId": "w1",
+   "targetId": "perm-1",
+   "allow": true,
+   "answer": "approved"
+  },
+  {
+   "type": "session.attach",
+   "requestId": "req-5",
+   "sessionId": "w1",
+   "afterSeq": 42
+  },
+  {
+   "type": "session.event",
+   "sessionId": "w1",
+   "seq": 43,
+   "at": 1700000005000,
+   "eventJson": "{\"kind\":\"textDelta\",\"text\":\"hi\"}",
+   "terminal": false
+  },
+  {
+   "type": "session.record",
+   "sessionId": "w1",
+   "seq": 43,
+   "recordJson": "{\"v\":3,\"kind\":\"event\"}"
+  },
+  {
+   "type": "mcp.request",
+   "requestId": "req-6",
+   "sessionId": "w1",
+   "sessionToken": "vv_sess_token",
+   "method": "POST",
+   "path": "/mcp",
+   "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"
+  },
+  {
+   "type": "mcp.response",
+   "requestId": "req-6",
+   "status": 200,
+   "contentType": "application/json",
+   "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}"
+  },
+  {
+   "type": "attachment.fetch",
+   "requestId": "req-7",
+   "attachmentId": "att-abc123"
+  },
+  {
+   "type": "attachment.data",
+   "requestId": "req-7",
+   "ok": true,
+   "mime": "image/png",
+   "bytesB64": "iVBORw0KGgo="
+  },
+  {
+   "type": "worktree.prepare",
+   "requestId": "req-8",
+   "taskId": "i1",
+   "repoRef": "vibevalley",
+   "branch": "feat/issue-1",
+   "baseRef": "main"
+  },
+  {
+   "type": "worktree.result",
+   "requestId": "req-8",
+   "ok": true,
+   "workdir": "/work/i1",
+   "branch": "feat/issue-1"
+  },
+  {
+   "type": "worktree.cleanup",
+   "requestId": "req-9",
+   "taskId": "i1",
+   "workdir": "/work/i1"
+  },
+  {
+   "type": "error",
+   "requestId": "req-10",
+   "code": "INVALID_FRAME",
+   "message": "unknown runtime"
+  }
+ ]
+}
