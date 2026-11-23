@@ -1,8 +1,11 @@
-use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::Stdio;
 
 use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
+use tokio::process::{Child, Command};
+use tokio::sync::watch;
+use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{BoardSlice, IssueStageKind};
 
@@ -64,31 +67,46 @@ pub fn glance(board: &BoardSlice) -> Glance {
     }
 }
 
-struct LatestFrame {
-    pending: std::sync::Arc<parking_lot::Mutex<Option<String>>>,
-    wake: flume::Sender<()>,
+async fn write_frames(mut stdin: impl AsyncWrite + Unpin, mut rx: watch::Receiver<Option<String>>, cancel: CancellationToken) {
+    loop {
+        let changed = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => break,
+            res = rx.changed() => res,
+        };
+        if changed.is_err() {
+            break;
+        }
+        let Some(frame) = rx.borrow_and_update().clone() else {
+            continue;
+        };
+        if stdin.write_all(frame.as_bytes()).await.is_err() || stdin.write_all(b"\n").await.is_err() || stdin.flush().await.is_err() {
+            break;
+        }
+    }
 }
 
-impl LatestFrame {
-    fn channel() -> (Self, flume::Receiver<()>) {
-        let (wake, receiver) = flume::bounded(1);
-        (
-            Self {
-                pending: Default::default(),
-                wake,
+async fn read_clicks(stdout: impl AsyncRead + Unpin, clicks: flume::Sender<String>, cancel: CancellationToken) {
+    let mut lines = BufReader::new(stdout).lines();
+    loop {
+        let line = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => break,
+            res = lines.next_line() => match res {
+                Ok(Some(line)) => line,
+                Ok(None) | Err(_) => break,
             },
-            receiver,
-        )
-    }
-    fn send(&self, frame: String) {
-        *self.pending.lock() = Some(frame);
-        let _ = self.wake.try_send(());
+        };
+        if let Some(issue) = opened_issue(&line) {
+            let _ = clicks.try_send(issue);
+        }
     }
 }
 
 pub struct Island {
-    child: Child,
-    frames: LatestFrame,
+    child: Option<Child>,
+    frames: watch::Sender<Option<String>>,
+    cancel: CancellationToken,
 }
 
 impl Island {
@@ -105,49 +123,50 @@ impl Island {
         let Some(binary) = candidates.into_iter().flatten().find(|p| p.is_file()) else {
             return Ok(None);
         };
-        let mut child = Command::new(binary)
-            .arg("--font")
-            .arg(crate::pixel::assets_dir().join("fonts/fusion-pixel-12px-proportional-zh_hans.otf"))
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        let mut stdin = child.stdin.take().ok_or("island stdin was not piped")?;
+        let handle = vibevalley_runtime::rt::handle();
+        let mut child = {
+            let _guard = handle.enter();
+            Command::new(binary)
+                .arg("--font")
+                .arg(crate::pixel::assets_dir().join("fonts/fusion-pixel-12px-proportional-zh_hans.otf"))
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .kill_on_drop(true)
+                .spawn()
+                .map_err(|e| e.to_string())?
+        };
+        let stdin = child.stdin.take().ok_or("island stdin was not piped")?;
         let stdout = child.stdout.take().ok_or("island stdout was not piped")?;
-        let (frames, incoming) = LatestFrame::channel();
-        let pending = frames.pending.clone();
-        std::thread::spawn(move || {
-            for () in incoming {
-                let Some(frame) = pending.lock().take() else {
-                    continue;
-                };
-                if writeln!(stdin, "{frame}").and_then(|_| stdin.flush()).is_err() {
-                    break;
-                }
-            }
-        });
+        let (frames, incoming) = watch::channel(None::<String>);
+        let cancel = CancellationToken::new();
+        handle.spawn(write_frames(stdin, incoming, cancel.clone()));
         let (clicks, opened) = flume::bounded(8);
-        std::thread::spawn(move || {
-            for line in BufReader::new(stdout).lines() {
-                let Ok(line) = line else { break };
-                if let Some(issue) = opened_issue(&line) {
-                    let _ = clicks.try_send(issue);
-                }
-            }
-        });
-        Ok(Some((Self { child, frames }, opened)))
+        handle.spawn(read_clicks(stdout, clicks, cancel.clone()));
+        Ok(Some((
+            Self {
+                child: Some(child),
+                frames,
+                cancel,
+            },
+            opened,
+        )))
     }
 
     pub fn show(&self, glance: &Glance) {
         let frame = serde_json::json!({ "glance": glance }).to_string();
-        self.frames.send(frame);
+        let _ = self.frames.send(Some(frame));
     }
 }
 
 impl Drop for Island {
     fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        self.cancel.cancel();
+        if let Some(mut child) = self.child.take() {
+            let _ = child.start_kill();
+            vibevalley_runtime::rt::handle().spawn(async move {
+                let _ = child.wait().await;
+            });
+        }
     }
 }
 
@@ -165,13 +184,41 @@ mod tests {
     use super::*;
     #[test]
     fn regression_a_busy_island_receives_the_final_frame() {
-        let (frames, wake) = LatestFrame::channel();
-        frames.send("working".into());
-        frames.send("waiting".into());
-        frames.send("done".into());
-        wake.recv().unwrap();
-        assert_eq!(frames.pending.lock().take().as_deref(), Some("done"));
-        assert!(wake.try_recv().is_err());
+        let (tx, mut rx) = watch::channel(None::<String>);
+        let _ = tx.send(Some("working".into()));
+        let _ = tx.send(Some("waiting".into()));
+        let _ = tx.send(Some("done".into()));
+        assert!(rx.has_changed().unwrap());
+        assert_eq!(rx.borrow_and_update().as_deref(), Some("done"));
+        assert!(!rx.has_changed().unwrap());
+    }
+
+    #[test]
+    fn async_pipes_write_latest_frame_and_read_clicks() {
+        vibevalley_runtime::rt::block_on(async {
+            let (stdin_tx, mut stdin_rx) = tokio::io::duplex(256);
+            let (frames_tx, frames_rx) = watch::channel(None::<String>);
+            let cancel = CancellationToken::new();
+            let writer = tokio::spawn(write_frames(stdin_tx, frames_rx, cancel.clone()));
+            let _ = frames_tx.send(Some("first".into()));
+            let _ = frames_tx.send(Some("final".into()));
+            let mut line = String::new();
+            let mut reader = BufReader::new(&mut stdin_rx);
+            reader.read_line(&mut line).await.unwrap();
+            assert!(line == "final\n" || line == "first\n");
+            cancel.cancel();
+            writer.await.unwrap();
+
+            let (mut stdout_tx, stdout_rx) = tokio::io::duplex(256);
+            let (clicks_tx, clicks_rx) = flume::bounded(8);
+            let cancel = CancellationToken::new();
+            let reader_task = tokio::spawn(read_clicks(stdout_rx, clicks_tx, cancel.clone()));
+            stdout_tx.write_all(b"{\"open\":\"issue-42\"}\n").await.unwrap();
+            stdout_tx.flush().await.unwrap();
+            assert_eq!(clicks_rx.recv_async().await.unwrap(), "issue-42");
+            cancel.cancel();
+            reader_task.await.unwrap();
+        });
     }
 
     #[test]

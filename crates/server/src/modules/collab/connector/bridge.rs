@@ -1,21 +1,23 @@
 //! One chat app's account on the farm: its login, and while it is connected
-//! a thread that receives and a thread that works through what came in and
-//! what goes out, both ended before the account is replaced.
+//! a Tokio task that receives and a Tokio task that works through what came in
+//! and what goes out, both cancelled and awaited before the account is replaced.
 
+use std::future::Future;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
-use std::thread::JoinHandle;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use backon::{BackoffBuilder, ExponentialBackoff, ExponentialBuilder};
 use parking_lot::Mutex;
 use sha2::{Digest, Sha256};
 use tokio::sync::{Mutex as AsyncMutex, Notify};
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use vibevalley_core::channel::for_user;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus, Fact, FactConnectorChanged};
 
-use super::adapter::{App, AppFailed, FailedKind, Inbound, LoginIo, Progress, Receiving, Stop};
+use super::adapter::{App, AppFailed, FailedKind, Inbound, LoginIo, Progress, Receiving};
 use super::digest::{DIGEST_OVER, digest, is_pairing, short_id, split_text, user_line};
 use super::store::{Account, Store, StoreFailed};
 use crate::modules::collab::channel::{Chat, Saying};
@@ -99,10 +101,16 @@ struct Shown {
     login_try: u64,
 }
 
-/// The account's work now: a login, or receiving and the worker.
+/// Prepared outgoing work for [`Bridge::drain`].
+struct DrainPlan {
+    account: Account,
+    batches: Vec<(Vec<i64>, String)>,
+}
+
+/// The account's work now: a login task, or receiving and worker tasks.
 struct Generation {
-    stop: Arc<Stop>,
-    threads: Vec<JoinHandle<()>>,
+    cancel: CancellationToken,
+    tasks: Vec<JoinHandle<()>>,
 }
 
 pub struct Bridge {
@@ -120,8 +128,15 @@ fn paused(a: &Account, at: i64) -> bool {
     a.paused_until != 0 && a.paused_until > at
 }
 
-fn spawn(name: String, work: impl FnOnce() + Send + 'static) -> JoinHandle<()> {
-    std::thread::Builder::new().name(name).spawn(work).expect("a connector's thread")
+async fn sleep_or_cancel(cancel: &CancellationToken, d: Duration) -> bool {
+    if cancel.is_cancelled() {
+        return true;
+    }
+    tokio::select! {
+        biased;
+        _ = cancel.cancelled() => true,
+        _ = tokio::time::sleep(d) => false,
+    }
 }
 
 fn pair_code() -> String {
@@ -295,11 +310,10 @@ impl Bridge {
         }
     }
 
-    /// Sends what waits, in order; false when some of it is held. Only the worker calls it, so a message sent is
-    /// marked before the next is looked at.
-    fn drain(&self, late: bool) -> bool {
+    /// Prepares pending outgoing batches synchronously on a blocking thread.
+    fn prepare_drain(&self, late: bool) -> Result<Option<DrainPlan>, ()> {
         let Some(a) = self.snapshot().filter(|a| !a.user.is_empty()) else {
-            return true;
+            return Ok(None);
         };
         let id = self.id();
         let store = &self.env.store;
@@ -307,7 +321,7 @@ impl Bridge {
             Ok(l) => l,
             Err(e) => {
                 eprintln!("vibevalley-server: connector: {}: the outbox could not be read: {}", id.as_str(), e.0);
-                return false;
+                return Err(());
             }
         };
         let mut settled: Vec<&str> = vec![];
@@ -321,13 +335,13 @@ impl Bridge {
                 Ok(Handoff::Settled) => {
                     if let Err(e) = store.withdraw(&row.message) {
                         self.set_err(e.0);
-                        return false;
+                        return Err(());
                     }
                     settled.push(&row.message);
                 }
                 Err(e) => {
                     self.set_err(e.message);
-                    return false;
+                    return Err(());
                 }
             }
         }
@@ -336,7 +350,7 @@ impl Bridge {
             self.tell();
         }
         if paused(&a, now()) || pending.is_empty() {
-            return true;
+            return Ok(None);
         }
         let batches: Vec<(Vec<i64>, String)> = if late && pending.len() > DIGEST_OVER {
             let lines: Vec<String> = pending.iter().map(|r| r.body.clone()).collect();
@@ -344,30 +358,55 @@ impl Bridge {
         } else {
             pending.iter().map(|r| (vec![r.seq], r.body.clone())).collect()
         };
+        Ok(Some(DrainPlan { account: a, batches }))
+    }
+
+    /// Sends what waits, in order; false when some of it is held. Only the worker calls it, so a message sent is
+    /// marked before the next is looked at.
+    async fn drain(self: &Arc<Self>, late: bool, cancel: &CancellationToken) -> bool {
+        let me = self.clone();
+        let DrainPlan { account: a, batches } = match tokio::task::spawn_blocking(move || me.prepare_drain(late)).await {
+            Ok(Ok(Some(plan))) => plan,
+            Ok(Ok(None)) => return true,
+            Ok(Err(())) | Err(_) => return false,
+        };
+        let id = self.id();
         for (rows, text) in batches {
-            let ext = match self.app.send(&a.keys, &a.user, &text, &a.reply_context) {
-                Ok(ext) => ext,
+            if cancel.is_cancelled() {
+                return false;
+            }
+            let sent = self.app.send(&a.keys, &a.user, &text, &a.reply_context).await;
+            let me = self.clone();
+            let ok = tokio::task::spawn_blocking(move || match sent {
+                Ok(ext) => {
+                    if let Err(e) = me.env.store.sent(&rows, now(), &ext) {
+                        me.set_err(e.0);
+                        return false;
+                    }
+                    me.set_err("");
+                    me.tell();
+                    true
+                }
                 Err(refused) => {
-                    if let Err(e) = store.not_sent(&rows, &refused.message) {
+                    if let Err(e) = me.env.store.not_sent(&rows, &refused.message) {
                         eprintln!("vibevalley-server: connector: {}: {}", id.as_str(), e.0);
                     }
                     match refused.kind {
                         FailedKind::Stale => {
-                            self.pause();
+                            me.pause();
                         }
                         // Tried again later, and with the user's next message.
-                        FailedKind::Restricted => self.set_err(""),
-                        FailedKind::Failed => self.set_err(refused.message),
+                        FailedKind::Restricted => me.set_err(""),
+                        FailedKind::Failed => me.set_err(refused.message),
                     }
-                    return false;
+                    false
                 }
-            };
-            if let Err(e) = store.sent(&rows, now(), &ext) {
-                self.set_err(e.0);
+            })
+            .await
+            .unwrap_or(false);
+            if !ok {
                 return false;
             }
-            self.set_err("");
-            self.tell();
         }
         true
     }
@@ -383,84 +422,114 @@ impl Bridge {
     }
 
     /// One message of the app's: the pairing word, or the user's words into the farm. The farm's id of what was said.
-    fn got(&self, m: &Inbound) -> Result<Option<String>, Held> {
-        let Some(a) = self.snapshot() else { return Ok(None) };
-        let id = self.id();
-        if a.user.is_empty() {
-            if a.pair_code.is_empty() || !is_pairing(&m.text, &a.pair_code) {
-                return Ok(None);
+    async fn got(self: &Arc<Self>, m: &Inbound, cancel: &CancellationToken) -> Result<Option<String>, Held> {
+        enum Step {
+            Ignore,
+            Paired(Account),
+            Said(Option<String>),
+        }
+        let me = self.clone();
+        let inbound = m.clone();
+        let step = tokio::task::spawn_blocking(move || -> Result<Step, Held> {
+            let Some(a) = me.snapshot() else { return Ok(Step::Ignore) };
+            let id = me.id();
+            if a.user.is_empty() {
+                if a.pair_code.is_empty() || !is_pairing(&inbound.text, &a.pair_code) {
+                    return Ok(Step::Ignore);
+                }
+                me.env.store.paired(id, &inbound, now())?;
+                me.shown.lock().account = me.env.store.account(id)?;
+                return Ok(Step::Paired(a));
             }
-            self.env.store.paired(id, m, now())?;
-            self.shown.lock().account = self.env.store.account(id)?;
-            // Told once the user has the word: the status is not paired before the app's confirmation went out.
-            if let Err(e) = self.app.send(&a.keys, &m.from, &t("server.connector.paired", &[]), &m.reply) {
-                eprintln!(
-                    "vibevalley-server: connector: {}: the pairing confirmation was not sent: {}",
-                    id.as_str(),
-                    e.message
-                );
+            if inbound.from != a.user {
+                return Ok(Step::Ignore);
             }
-            self.tell();
-            return Ok(None);
+            me.env.store.replied(id, &inbound.reply, now())?;
+            me.reload()?;
+            let channel = match me.quoted_channel(&inbound.quoted)? {
+                Some(c) => Some(c),
+                None => me.snapshot().and_then(|a| a.channel),
+            };
+            let mut said = None;
+            if !inbound.text.is_empty() {
+                // Keyed by the app's message: one said but not yet settled when the farm stopped is said once, not twice.
+                let key = Sha256::digest(format!("{}:{}", id.as_str(), inbound.id))
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect::<String>();
+                let (message, _) = me.env.chat.say(Saying {
+                    text: inbound.text.clone(),
+                    channel,
+                    send_key: key,
+                    source: Some("connector".into()),
+                    ..Saying::default()
+                })?;
+                said = Some(message.id);
+            }
+            Ok(Step::Said(said))
+        })
+        .await
+        .map_err(|e| Held(e.to_string()))??;
+        match step {
+            Step::Ignore => Ok(None),
+            Step::Paired(a) => {
+                // Told once the user has the word: the status is not paired before the app's confirmation went out.
+                if let Err(e) = self.app.send(&a.keys, &m.from, &t("server.connector.paired", &[]), &m.reply).await {
+                    eprintln!(
+                        "vibevalley-server: connector: {}: the pairing confirmation was not sent: {}",
+                        self.id().as_str(),
+                        e.message
+                    );
+                }
+                let me = self.clone();
+                let _ = tokio::task::spawn_blocking(move || me.tell()).await;
+                Ok(None)
+            }
+            Step::Said(said) => {
+                // The user's words withdraw what they answer, before the fresh reply opens the app's delivery window.
+                self.drain(true, cancel).await;
+                Ok(said)
+            }
         }
-        if m.from != a.user {
-            return Ok(None);
-        }
-        self.env.store.replied(id, &m.reply, now())?;
-        self.reload()?;
-        let channel = match self.quoted_channel(&m.quoted)? {
-            Some(c) => Some(c),
-            None => self.snapshot().and_then(|a| a.channel),
-        };
-        let mut said = None;
-        if !m.text.is_empty() {
-            // Keyed by the app's message: one said but not yet settled when the farm stopped is said once, not twice.
-            let key = Sha256::digest(format!("{}:{}", id.as_str(), m.id))
-                .iter()
-                .map(|b| format!("{b:02x}"))
-                .collect::<String>();
-            let (message, _) = self.env.chat.say(Saying {
-                text: m.text.clone(),
-                channel,
-                send_key: key,
-                source: Some("connector".into()),
-                ..Saying::default()
-            })?;
-            said = Some(message.id);
-        }
-        // The user's words withdraw what they answer, before the fresh reply opens the app's delivery window.
-        self.drain(true);
-        Ok(said)
     }
 
-    fn drain_inbox(&self, stop: &Stop) -> Result<(), Held> {
+    async fn drain_inbox(self: &Arc<Self>, cancel: &CancellationToken) -> Result<(), Held> {
         let id = self.id();
-        for m in self.env.store.pending_inbound(id)? {
-            if stop.is_set() {
+        let me = self.clone();
+        let pending = tokio::task::spawn_blocking(move || me.env.store.pending_inbound(id))
+            .await
+            .map_err(|e| Held(e.to_string()))??;
+        for m in pending {
+            if cancel.is_cancelled() {
                 break;
             }
-            let said = self.got(&m)?;
-            self.env.store.delivered(id, &m.id, said.as_deref())?;
+            let said = self.got(&m, cancel).await?;
+            let me = self.clone();
+            let mid = m.id.clone();
+            tokio::task::spawn_blocking(move || me.env.store.delivered(id, &mid, said.as_deref()))
+                .await
+                .map_err(|e| Held(e.to_string()))??;
         }
         Ok(())
     }
 
     /// The worker: what came in goes to the farm in order, then what waits goes out; what is held is tried again.
-    fn work(&self, stop: &Stop) {
+    async fn work(self: Arc<Self>, cancel: CancellationToken) {
         let mut backoff = self.env.retry_backoff();
         let mut current_delay: Option<Duration> = None;
-        while !stop.is_set() {
+        while !cancel.is_cancelled() {
             let notified = self.wake.notified();
             tokio::pin!(notified);
             notified.as_mut().enable();
-            let taken = match self.drain_inbox(stop) {
+            let taken = match self.drain_inbox(&cancel).await {
                 Ok(()) => true,
                 Err(e) => {
-                    self.set_err(e.0);
+                    let me = self.clone();
+                    let _ = tokio::task::spawn_blocking(move || me.set_err(e.0)).await;
                     false
                 }
             };
-            let held = !self.drain(false) || !taken;
+            let held = !self.drain(false, &cancel).await || !taken;
             if !held {
                 backoff = self.env.retry_backoff();
                 current_delay = None;
@@ -475,14 +544,12 @@ impl Bridge {
                 Woke,
                 TimedOut,
             }
-            let step = vibevalley_runtime::rt::block_on(async {
-                tokio::select! {
-                    biased;
-                    _ = stop.stopped() => Step::Stopped,
-                    _ = notified => Step::Woke,
-                    _ = tokio::time::sleep(wait_for) => Step::TimedOut,
-                }
-            });
+            let step = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => Step::Stopped,
+                _ = notified => Step::Woke,
+                _ = tokio::time::sleep(wait_for) => Step::TimedOut,
+            };
             match step {
                 Step::Stopped => break,
                 Step::Woke => {}
@@ -524,62 +591,89 @@ impl Bridge {
     }
 
     /// Receives until stopped: a connection that ends is opened again, a stale login rests.
-    fn receiving(&self, stop: &Stop) {
+    async fn receiving(self: Arc<Self>, cancel: CancellationToken) {
         let id = self.id();
         let mut failures = 0;
         loop {
             let Some(a) = self.snapshot() else { return };
             if paused(&a, now()) {
-                if stop.sleep(Duration::from_millis((a.paused_until - now()).max(0) as u64)) {
+                if sleep_or_cancel(&cancel, Duration::from_millis((a.paused_until - now()).max(0) as u64)).await {
                     return;
                 }
-                if let Err(e) = self.env.store.pause(id, None).and_then(|()| self.reload()) {
-                    self.set_err(e.0);
-                    if stop.sleep(self.env.reconnect) {
-                        return;
+                let me = self.clone();
+                let res = tokio::task::spawn_blocking(move || me.env.store.pause(id, None).and_then(|()| me.reload())).await;
+                match res {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => {
+                        let me = self.clone();
+                        let _ = tokio::task::spawn_blocking(move || me.set_err(e.0)).await;
+                        if sleep_or_cancel(&cancel, self.env.reconnect).await {
+                            return;
+                        }
                     }
+                    Err(_) => return,
                 }
                 continue;
             }
-            let cursor = match self.env.store.account(id) {
-                Ok(row) => row.map(|r| r.cursor).unwrap_or_default(),
-                Err(e) => {
-                    self.set_err(e.0);
-                    if stop.sleep(self.env.reconnect) {
+            let me = self.clone();
+            let cursor = match tokio::task::spawn_blocking(move || me.env.store.account(id)).await {
+                Ok(Ok(row)) => row.map(|r| r.cursor).unwrap_or_default(),
+                Ok(Err(e)) => {
+                    let me = self.clone();
+                    let _ = tokio::task::spawn_blocking(move || me.set_err(e.0)).await;
+                    if sleep_or_cancel(&cancel, self.env.reconnect).await {
                         return;
                     }
                     continue;
                 }
+                Err(_) => return,
             };
-            let io = Receiving {
-                cursor,
-                accept: &|messages, cursor| self.accept(messages, cursor),
+            let accept = |messages: Vec<Inbound>, cursor: &str| self.accept(messages, cursor);
+            let io = Receiving { cursor, accept: &accept };
+            let ended = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => return,
+                ended = self.app.receive(&a.keys, &io) => ended,
             };
-            let Some(ended) = self.app.receive(&a.keys, &io, stop) else { return };
             if ended.kind == FailedKind::Stale {
-                if !self.pause() && stop.sleep(self.env.reconnect) {
+                let me = self.clone();
+                let paused_ok = tokio::task::spawn_blocking(move || me.pause()).await.unwrap_or(false);
+                if !paused_ok && sleep_or_cancel(&cancel, self.env.reconnect).await {
                     return;
                 }
                 continue;
             }
-            self.set_err(ended.message);
+            let me = self.clone();
+            let _ = tokio::task::spawn_blocking(move || me.set_err(ended.message)).await;
             failures += 1;
             let mut wait = self.env.reconnect;
             if failures >= 3 {
                 wait *= 15;
                 failures = 0;
             }
-            if stop.sleep(wait) {
+            if sleep_or_cancel(&cancel, wait).await {
                 return;
             }
         }
     }
 
-    fn stop_generation(&self, current: &mut Option<Generation>) {
+    fn child_cancel(&self) -> CancellationToken {
+        self.env.hub.upgrade().map(|h| h.child_token()).unwrap_or_default()
+    }
+
+    fn spawn_task(&self, fut: impl Future<Output = ()> + Send + 'static) -> JoinHandle<()> {
+        if let Some(hub) = self.env.hub.upgrade() {
+            hub.spawn_task(fut)
+        } else {
+            vibevalley_runtime::rt::handle().spawn(fut)
+        }
+    }
+
+    async fn stop_generation(current: &mut Option<Generation>) {
         let Some(g) = current.take() else { return };
-        g.stop.set();
-        for thread in g.threads {
-            let _ = thread.join();
+        g.cancel.cancel();
+        for task in g.tasks {
+            let _ = task.await;
         }
     }
 
@@ -587,22 +681,19 @@ impl Bridge {
         if self.closing() || self.snapshot().is_none() {
             return None;
         }
-        let stop = Arc::new(Stop::default());
-        let name = self.id().as_str();
-        let (b, s) = (self.clone(), stop.clone());
-        let receiving = spawn(format!("vibevalley-connector-{name}-in"), move || b.receiving(&s));
-        let (b, s) = (self.clone(), stop.clone());
-        let worker = spawn(format!("vibevalley-connector-{name}"), move || b.work(&s));
+        let cancel = self.child_cancel();
+        let receiving = self.spawn_task(self.clone().receiving(cancel.clone()));
+        let worker = self.spawn_task(self.clone().work(cancel.clone()));
         Some(Generation {
-            stop,
-            threads: vec![receiving, worker],
+            cancel,
+            tasks: vec![receiving, worker],
         })
     }
 
     fn logging_in(self: &Arc<Self>, input: ConnectorLogin, attempt: u64) -> Generation {
-        let stop = Arc::new(Stop::default());
-        let (b, s) = (self.clone(), stop.clone());
-        let login = spawn(format!("vibevalley-connector-{}-login", self.id().as_str()), move || {
+        let cancel = self.child_cancel();
+        let (b, c) = (self.clone(), cancel.clone());
+        let login = self.spawn_task(async move {
             let progress = |p: Progress| {
                 {
                     let mut shown = b.shown.lock();
@@ -620,47 +711,56 @@ impl Bridge {
                 progress: &progress,
                 code: &code,
             };
-            if let Some(result) = b.app.login(&input, &io, &s) {
-                b.logged_in(&s, result);
+            if let Some(result) = b.app.login(&input, &io, &c) {
+                b.logged_in(&c, result).await;
             }
         });
-        Generation { stop, threads: vec![login] }
+        Generation { cancel, tasks: vec![login] }
     }
 
-    /// The login's answer, taken as a command by the login's own thread: a newer command that stops it first wins.
-    fn logged_in(self: &Arc<Self>, stop: &Stop, result: Result<super::adapter::Linked<crate::modules::infra::setting::Secret>, AppFailed>) {
-        let Some(mut current) = vibevalley_runtime::rt::block_on(async {
-            tokio::select! {
-                biased;
-                _ = stop.stopped() => None,
-                guard = self.commands.lock() => Some(guard),
-            }
+    /// The login's answer, taken as a command by the login's own task: a newer command that stops it first wins.
+    async fn logged_in(
+        self: &Arc<Self>,
+        cancel: &CancellationToken,
+        result: Result<super::adapter::Linked<crate::modules::infra::setting::Secret>, AppFailed>,
+    ) {
+        let Some(mut current) = (tokio::select! {
+            biased;
+            _ = cancel.cancelled() => None,
+            guard = self.commands.lock() => Some(guard),
         }) else {
             return;
         };
-        if stop.is_set() {
+        if cancel.is_cancelled() {
             return;
         }
-        // This thread is the generation: it ends by returning.
+        // This task is the generation: it ends by returning.
         *current = None;
         let failure = match result {
             Err(e) => Some(e.message),
             Ok(_) if self.closing() => None,
             Ok(linked) => {
-                let pair = linked.user.is_empty().then(pair_code);
-                let kept = self
-                    .env
-                    .store
-                    .connect(
-                        self.id(),
-                        &linked.keys,
-                        &linked.user,
-                        pair.as_deref(),
-                        now(),
-                        &t("server.connector.switched", &[]),
-                    )
-                    .and_then(|()| self.reload());
-                kept.err().map(|e| e.0)
+                let me = self.clone();
+                let kept = tokio::task::spawn_blocking(move || {
+                    let pair = linked.user.is_empty().then(pair_code);
+                    me.env
+                        .store
+                        .connect(
+                            me.id(),
+                            &linked.keys,
+                            &linked.user,
+                            pair.as_deref(),
+                            now(),
+                            &t("server.connector.switched", &[]),
+                        )
+                        .and_then(|()| me.reload())
+                })
+                .await;
+                match kept {
+                    Ok(Ok(())) => None,
+                    Ok(Err(e)) => Some(e.0),
+                    Err(e) => Some(e.to_string()),
+                }
             }
         };
         {
@@ -671,7 +771,8 @@ impl Bridge {
         self.progressed.notify_waiters();
         *current = self.connected();
         drop(current);
-        self.tell();
+        let me = self.clone();
+        let _ = tokio::task::spawn_blocking(move || me.tell()).await;
     }
 
     pub fn load(&self) {
@@ -682,56 +783,64 @@ impl Bridge {
 
     /// Goes on with the account there is.
     pub fn resume(self: &Arc<Self>) {
-        let mut current = vibevalley_runtime::rt::block_on(self.commands.lock());
-        if current.is_none() {
-            *current = self.connected();
-        }
+        vibevalley_runtime::rt::block_on(async {
+            let mut current = self.commands.lock().await;
+            if current.is_none() {
+                *current = self.connected();
+            }
+        });
     }
 
     pub fn login(self: &Arc<Self>, input: ConnectorLogin) -> ConnectorStatus {
-        let started = {
-            let mut current = vibevalley_runtime::rt::block_on(self.commands.lock());
-            let going = self.shown.lock().signing_in.is_some();
-            if going && input.force != Some(true) {
-                self.shown.lock().login_try
-            } else {
-                self.stop_generation(&mut current);
-                let attempt = {
-                    let mut shown = self.shown.lock();
-                    shown.login_try += 1;
-                    shown.error.clear();
-                    shown.signing_in = Some(SigningIn {
-                        progress: Progress {
-                            state: ConnectorState::Waiting,
-                            qr: String::new(),
-                        },
-                        code: String::new(),
-                    });
-                    shown.login_try
+        vibevalley_runtime::rt::block_on(async {
+            let started = {
+                let mut current = self.commands.lock().await;
+                let going = self.shown.lock().signing_in.is_some();
+                if going && input.force != Some(true) {
+                    self.shown.lock().login_try
+                } else {
+                    Self::stop_generation(&mut current).await;
+                    let attempt = {
+                        let mut shown = self.shown.lock();
+                        shown.login_try += 1;
+                        shown.error.clear();
+                        shown.signing_in = Some(SigningIn {
+                            progress: Progress {
+                                state: ConnectorState::Waiting,
+                                qr: String::new(),
+                            },
+                            code: String::new(),
+                        });
+                        shown.login_try
+                    };
+                    *current = Some(self.logging_in(input, attempt));
+                    attempt
+                }
+            };
+            self.tell();
+            // The answer carries the code when it shows within a moment.
+            let deadline = tokio::time::Instant::now() + self.env.moment;
+            loop {
+                let notified = self.progressed.notified();
+                tokio::pin!(notified);
+                notified.as_mut().enable();
+                let there = {
+                    let shown = self.shown.lock();
+                    shown.login_try != started || shown.signing_in.as_ref().is_none_or(|x| !x.progress.qr.is_empty())
                 };
-                *current = Some(self.logging_in(input, attempt));
-                attempt
+                if there {
+                    break;
+                }
+                let now_inst = tokio::time::Instant::now();
+                let Some(left) = deadline.checked_duration_since(now_inst) else {
+                    break;
+                };
+                if tokio::time::timeout(left, notified).await.is_err() {
+                    break;
+                }
             }
-        };
-        self.tell();
-        // The answer carries the code when it shows within a moment.
-        let deadline = Instant::now() + self.env.moment;
-        loop {
-            let notified = self.progressed.notified();
-            tokio::pin!(notified);
-            notified.as_mut().enable();
-            let there = {
-                let shown = self.shown.lock();
-                shown.login_try != started || shown.signing_in.as_ref().is_none_or(|x| !x.progress.qr.is_empty())
-            };
-            let Some(left) = deadline.checked_duration_since(Instant::now()).filter(|_| !there) else {
-                break;
-            };
-            vibevalley_runtime::rt::block_on(async {
-                let _ = tokio::time::timeout(left, notified).await;
-            });
-        }
-        self.status()
+            self.status()
+        })
     }
 
     /// The code the user typed for the login going on; with none going on it is for none.
@@ -747,29 +856,31 @@ impl Bridge {
     }
 
     pub fn logout(self: &Arc<Self>) -> ConnectorStatus {
-        {
-            let mut current = vibevalley_runtime::rt::block_on(self.commands.lock());
-            self.stop_generation(&mut current);
-            let gone = self.env.store.disconnect(self.id(), &t("server.connector.disconnected", &[]));
+        vibevalley_runtime::rt::block_on(async {
             {
-                let mut shown = self.shown.lock();
-                shown.signing_in = None;
-                shown.login_try += 1;
-                match &gone {
-                    Ok(()) => {
-                        shown.account = None;
-                        shown.error.clear();
+                let mut current = self.commands.lock().await;
+                Self::stop_generation(&mut current).await;
+                let gone = self.env.store.disconnect(self.id(), &t("server.connector.disconnected", &[]));
+                {
+                    let mut shown = self.shown.lock();
+                    shown.signing_in = None;
+                    shown.login_try += 1;
+                    match &gone {
+                        Ok(()) => {
+                            shown.account = None;
+                            shown.error.clear();
+                        }
+                        Err(e) => shown.error = e.0.clone(),
                     }
-                    Err(e) => shown.error = e.0.clone(),
+                }
+                self.progressed.notify_waiters();
+                if gone.is_err() {
+                    *current = self.connected();
                 }
             }
-            self.progressed.notify_waiters();
-            if gone.is_err() {
-                *current = self.connected();
-            }
-        }
-        self.tell();
-        self.status()
+            self.tell();
+            self.status()
+        })
     }
 
     pub fn set_channel(&self, channel: Option<&str>) -> Result<ConnectorStatus, StoreFailed> {
@@ -783,7 +894,9 @@ impl Bridge {
     }
 
     pub fn stop(&self) {
-        let mut current = vibevalley_runtime::rt::block_on(self.commands.lock());
-        self.stop_generation(&mut current);
+        vibevalley_runtime::rt::block_on(async {
+            let mut current = self.commands.lock().await;
+            Self::stop_generation(&mut current).await;
+        });
     }
 }

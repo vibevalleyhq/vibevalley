@@ -4,6 +4,7 @@ use std::time::Duration;
 use base64::Engine as _;
 use parking_lot::Mutex;
 use serde::Serialize;
+use tokio_util::sync::CancellationToken;
 use vibevalley_protocol::MediaSpeechEvent;
 use vibevalley_server::transport::api::media::{SharedSpeechStreams, SpeechClaim};
 
@@ -25,7 +26,7 @@ enum Phase {
 #[derive(Default)]
 struct Playback {
     state: State,
-    stop: Option<flume::Sender<()>>,
+    cancel: Option<CancellationToken>,
     owner: String,
 }
 fn playback() -> &'static Mutex<Playback> {
@@ -54,35 +55,40 @@ pub fn start(streams: SharedSpeechStreams, id: &str) -> Result<State, String> {
         return Err("speech playback is already active".into());
     }
     let claim = Claim(streams.claim(id).map_err(|e| e.message)?);
-    let (stop, stopped) = flume::bounded(1);
-    current.stop = Some(stop);
+    let cancel = CancellationToken::new();
+    current.cancel = Some(cancel.clone());
     current.owner = id.to_string();
     current.state = State {
         phase: Phase::Playing,
         problem: None,
     };
-    std::thread::Builder::new()
-        .name("speech-audio".into())
-        .spawn(move || {
-            let result = crate::audio::reserve_for_call().and_then(|lease| {
-                let _lease = lease;
-                play(claim, stopped, &mut Native, || {
+    let initial = current.state.clone();
+    drop(current);
+    vibevalley_runtime::rt::handle().spawn(async move {
+        let reserved = tokio::task::spawn_blocking(crate::audio::reserve_for_call)
+            .await
+            .map_err(|e| e.to_string())
+            .and_then(|r| r);
+        let result = match reserved {
+            Ok(lease) => {
+                let outcome = play(claim, cancel, &mut Native, || {
                     playback().lock().state.phase = Phase::Draining;
                 })
-            });
-            let mut current = playback().lock();
-            current.stop = None;
-            current.state = State {
-                phase: Phase::Idle,
-                problem: result.err(),
-            };
-        })
-        .map_err(|e| {
-            current.stop = None;
-            current.state.phase = Phase::Idle;
-            e.to_string()
-        })?;
-    Ok(current.state.clone())
+                .await;
+                // Release CoreAudio lease off the Tokio worker thread.
+                let _ = tokio::task::spawn_blocking(move || drop(lease)).await;
+                outcome
+            }
+            Err(err) => Err(err),
+        };
+        let mut current = playback().lock();
+        current.cancel = None;
+        current.state = State {
+            phase: Phase::Idle,
+            problem: result.err(),
+        };
+    });
+    Ok(initial)
 }
 
 pub fn stop(owner: Option<&str>) -> State {
@@ -90,7 +96,8 @@ pub fn stop(owner: Option<&str>) -> State {
     if owner.is_some_and(|id| id != playback.owner) {
         return State::default();
     }
-    if playback.stop.take().is_some() {
+    if let Some(cancel) = playback.cancel.take() {
+        cancel.cancel();
         playback.state.phase = Phase::Stopping;
     }
     playback.state.clone()
@@ -119,31 +126,36 @@ impl Output for Native {
     }
 }
 
-fn stopped(stop: &flume::Receiver<()>) -> bool {
-    stop.is_disconnected() || stop.try_recv().is_ok()
-}
-fn wait_capacity(stop: &flume::Receiver<()>, output: &impl Output, seconds: f64) -> Result<bool, String> {
+async fn wait_capacity(cancel: &CancellationToken, output: &impl Output, seconds: f64) -> Result<bool, String> {
     while output.queued_seconds()? + seconds > 5.0 {
-        if !matches!(stop.recv_timeout(Duration::from_millis(20)), Err(flume::RecvTimeoutError::Timeout)) {
-            return Ok(false);
+        tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return Ok(false),
+            _ = tokio::time::sleep(Duration::from_millis(20)) => {}
         }
     }
-    Ok(!stopped(stop))
+    Ok(!cancel.is_cancelled())
 }
-fn play(claim: Claim, stop: flume::Receiver<()>, output: &mut impl Output, draining: impl Fn()) -> Result<(), String> {
+async fn play(claim: Claim, cancel: CancellationToken, output: &mut impl Output, draining: impl Fn()) -> Result<(), String> {
     let mut format = None;
     let mut sequence = 0;
     loop {
-        if stopped(&stop) {
+        if cancel.is_cancelled() {
             return Ok(());
         }
-        let event = flume::Selector::new().recv(&stop, |_| None).recv(&claim.0.events, Result::ok).wait();
-        let Some(event) = event else {
-            return if stopped(&stop) {
-                Ok(())
-            } else {
-                Err("speech stream ended without completion".into())
-            };
+        let event = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return Ok(()),
+            res = claim.0.events.recv_async() => match res {
+                Ok(ev) => ev,
+                Err(_) => {
+                    return if cancel.is_cancelled() {
+                        Ok(())
+                    } else {
+                        Err("speech stream ended without completion".into())
+                    };
+                }
+            },
         };
         match serde_json::from_value::<MediaSpeechEvent>(event).map_err(|e| e.to_string())? {
             MediaSpeechEvent::Format {
@@ -175,7 +187,7 @@ fn play(claim: Claim, stop: flume::Receiver<()>, output: &mut impl Output, drain
                 let size = (rate as usize / 10) * block;
                 for piece in bytes.chunks(size) {
                     let seconds = piece.len() as f64 / (f64::from(rate) * block as f64);
-                    if !wait_capacity(&stop, output, seconds)? {
+                    if !wait_capacity(&cancel, output, seconds).await? {
                         return Ok(());
                     }
                     output.append(piece)?;
@@ -187,8 +199,10 @@ fn play(claim: Claim, stop: flume::Receiver<()>, output: &mut impl Output, drain
                 }
                 draining();
                 while output.queued_seconds()? > 0.0 {
-                    if !matches!(stop.recv_timeout(Duration::from_millis(20)), Err(flume::RecvTimeoutError::Timeout)) {
-                        return Ok(());
+                    tokio::select! {
+                        biased;
+                        _ = cancel.cancelled() => return Ok(()),
+                        _ = tokio::time::sleep(Duration::from_millis(20)) => {}
                     }
                 }
                 return Ok(());
@@ -207,7 +221,7 @@ mod tests {
         atomic::{AtomicBool, AtomicUsize, Ordering},
     };
     struct OutputProbe {
-        queued: std::cell::Cell<f64>,
+        queued: Mutex<f64>,
         bytes: usize,
         drain: Arc<AtomicBool>,
         full: Option<flume::Sender<()>>,
@@ -217,20 +231,22 @@ mod tests {
             Ok(())
         }
         fn queued_seconds(&self) -> Result<f64, String> {
-            let queued = self.queued.get();
+            let mut slot = self.queued.lock();
+            let queued = *slot;
             if queued >= 4.99
                 && let Some(full) = &self.full
             {
                 let _ = full.try_send(());
             }
             if self.drain.load(Ordering::SeqCst) || (self.full.is_none() && queued >= 4.99) {
-                self.queued.set((queued - 1.0).max(0.0));
+                *slot = (queued - 1.0).max(0.0);
             }
             Ok(queued)
         }
         fn append(&mut self, bytes: &[u8]) -> Result<(), String> {
-            assert!(self.queued.get() + bytes.len() as f64 / 16000.0 <= 5.000001);
-            self.queued.set(self.queued.get() + bytes.len() as f64 / 16000.0);
+            let mut slot = self.queued.lock();
+            assert!(*slot + bytes.len() as f64 / 16000.0 <= 5.000001);
+            *slot += bytes.len() as f64 / 16000.0;
             self.bytes += bytes.len();
             Ok(())
         }
@@ -252,50 +268,56 @@ mod tests {
     }
     #[test]
     fn regression_a_ten_second_burst_waits_for_playback_capacity_then_drains() {
-        let (claim, send, gone) = claim();
-        let (_stop, stopped) = flume::bounded(1);
-        send.send(json!({"type":"format","sampleRate":8000,"channels":1,"bitDepth":16})).unwrap();
-        send.send(json!({"type":"audio","sequence":0,"audio":base64::engine::general_purpose::STANDARD.encode(vec![0;160000])}))
+        vibevalley_runtime::rt::block_on(async {
+            let (claim, send, gone) = claim();
+            let cancel = CancellationToken::new();
+            send.send(json!({"type":"format","sampleRate":8000,"channels":1,"bitDepth":16})).unwrap();
+            send.send(json!({"type":"audio","sequence":0,"audio":base64::engine::general_purpose::STANDARD.encode(vec![0;160000])}))
+                .unwrap();
+            send.send(json!({"type":"done"})).unwrap();
+            let mut output = OutputProbe {
+                queued: Mutex::new(0.0),
+                bytes: 0,
+                drain: Arc::new(AtomicBool::new(false)),
+                full: None,
+            };
+            let drain = output.drain.clone();
+            let drained = AtomicUsize::new(0);
+            play(claim, cancel, &mut output, || {
+                drain.store(true, Ordering::SeqCst);
+                drained.fetch_add(1, Ordering::SeqCst);
+            })
+            .await
             .unwrap();
-        send.send(json!({"type":"done"})).unwrap();
-        let mut output = OutputProbe {
-            queued: 0.0.into(),
-            bytes: 0,
-            drain: Arc::new(AtomicBool::new(false)),
-            full: None,
-        };
-        let drain = output.drain.clone();
-        let drained = AtomicUsize::new(0);
-        play(claim, stopped, &mut output, || {
-            drain.store(true, Ordering::SeqCst);
-            drained.fetch_add(1, Ordering::SeqCst);
-        })
-        .unwrap();
-        assert_eq!(output.bytes, 160000);
-        assert_eq!(output.queued.get(), 0.0);
-        assert_eq!(drained.load(Ordering::SeqCst), 1);
-        assert!(gone.load(Ordering::SeqCst));
+            assert_eq!(output.bytes, 160000);
+            assert_eq!(*output.queued.lock(), 0.0);
+            assert_eq!(drained.load(Ordering::SeqCst), 1);
+            assert!(gone.load(Ordering::SeqCst));
+        });
     }
     #[test]
     fn regression_stop_interrupts_a_full_playback_window_and_releases_the_claim() {
-        let (claim, send, gone) = claim();
-        let (stop, stopped) = flume::bounded(1);
-        send.send(json!({"type":"format","sampleRate":8000,"channels":1,"bitDepth":16})).unwrap();
-        send.send(json!({"type":"audio","sequence":0,"audio":"AAAAAA=="})).unwrap();
-        let (full, reached) = flume::bounded(1);
-        let worker = std::thread::spawn(move || {
-            let mut output = OutputProbe {
-                queued: 5.0.into(),
-                bytes: 0,
-                drain: Arc::new(AtomicBool::new(false)),
-                full: Some(full),
-            };
-            play(claim, stopped, &mut output, || {}).unwrap();
-            output.bytes
+        vibevalley_runtime::rt::block_on(async {
+            let (claim, send, gone) = claim();
+            let cancel = CancellationToken::new();
+            send.send(json!({"type":"format","sampleRate":8000,"channels":1,"bitDepth":16})).unwrap();
+            send.send(json!({"type":"audio","sequence":0,"audio":"AAAAAA=="})).unwrap();
+            let (full, reached) = flume::bounded(1);
+            let task_cancel = cancel.clone();
+            let worker = tokio::spawn(async move {
+                let mut output = OutputProbe {
+                    queued: Mutex::new(5.0),
+                    bytes: 0,
+                    drain: Arc::new(AtomicBool::new(false)),
+                    full: Some(full),
+                };
+                play(claim, task_cancel, &mut output, || {}).await.unwrap();
+                output.bytes
+            });
+            tokio::time::timeout(Duration::from_secs(5), reached.recv_async()).await.unwrap().unwrap();
+            cancel.cancel();
+            assert_eq!(worker.await.unwrap(), 0);
+            assert!(gone.load(Ordering::SeqCst));
         });
-        reached.recv_timeout(Duration::from_secs(5)).unwrap();
-        drop(stop);
-        assert_eq!(worker.join().unwrap(), 0);
-        assert!(gone.load(Ordering::SeqCst));
     }
 }

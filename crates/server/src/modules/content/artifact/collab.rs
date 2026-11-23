@@ -8,10 +8,11 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde_json::{Map, Value};
 use sqlx::{Connection, SqliteConnection};
+use tokio::sync::broadcast;
 use vibevalley_core::artifact::shell::{presence_highlight_from_payloads, presence_highlight_script};
 use vibevalley_core::artifact::{INLINE_EVENT_MAX_BYTES, markdown_of, ordered, plain};
 use vibevalley_core::collab::{
@@ -31,7 +32,7 @@ use super::blocks::spans_of;
 use super::db::{self, ArtifactRow, StoredSuggestion};
 use super::entries::EntryChange;
 use super::{Artifacts, Maker, artifact_type_of, new_id, q, refused};
-use crate::{Sink, now};
+use crate::{Hub, Sink, now};
 
 const DEFAULT_PRESENCE_COLORS: [&str; 6] = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
 const PRESENCE_EVICT_INTERVAL: Duration = Duration::from_secs(2);
@@ -354,9 +355,7 @@ impl Artifacts {
     }
 
     fn publish_presence_event(&self, artifact_id: &str, event: ArtifactPresenceEvent) {
-        self.presence_changes
-            .lock()
-            .retain(|tx| tx.send((artifact_id.to_string(), event.clone())).is_ok());
+        let _ = self.presence_changes.send((artifact_id.to_string(), event));
     }
 
     pub(super) fn evict_expired_presence(&self, artifact_id: &str) {
@@ -469,44 +468,53 @@ impl Artifacts {
 
     /// Streams initial `Snapshot` of live peers followed by incremental `Upsert`
     /// and `Remove` events (including TTL evictions).
-    pub fn follow_presence(self: &Arc<Self>, id: &str, sink: Sink) -> Result<(), ApiError> {
+    pub fn follow_presence(self: &Arc<Self>, hub: &Hub, id: &str, sink: Sink) -> Result<(), ApiError> {
         self.found(&mut self.db(), id)?;
-        let (tx, rx) = flume::unbounded();
-        self.presence_changes.lock().push(tx);
+        let mut rx = self.presence_changes.subscribe();
         let initial = self.presence_snapshot(id);
         let weak = Arc::downgrade(self);
         let artifact_id = id.to_string();
-        std::thread::Builder::new()
-            .name("vibevalley-artifact-presence".into())
-            .spawn(move || {
-                if !sink.send(&ArtifactPresenceEvent::Snapshot { peers: initial }) {
+        let hub_cancel = hub.child_token();
+        let closed = self.cancel.clone();
+        hub.spawn_task(async move {
+            if !sink.send(&ArtifactPresenceEvent::Snapshot { peers: initial }) {
+                return;
+            }
+            let mut evict = tokio::time::interval(PRESENCE_EVICT_INTERVAL);
+            evict.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            // Skip immediate tick; `presence_snapshot` just evicted expired peers.
+            evict.tick().await;
+            loop {
+                if sink.stopped() {
                     return;
                 }
-                let mut last_evict = Instant::now();
-                loop {
-                    if sink.stopped() {
-                        return;
+                tokio::select! {
+                    biased;
+                    _ = hub_cancel.cancelled() => return,
+                    _ = closed.cancelled() => return,
+                    _ = sink.stop.recv_async() => return,
+                    _ = evict.tick() => {
+                        let Some(a) = weak.upgrade() else { return };
+                        a.evict_expired_presence(&artifact_id);
                     }
-                    if last_evict.elapsed() >= PRESENCE_EVICT_INTERVAL {
-                        if let Some(a) = weak.upgrade() {
-                            a.evict_expired_presence(&artifact_id);
-                        } else {
-                            return;
-                        }
-                        last_evict = Instant::now();
-                    }
-                    match rx.recv_timeout(Duration::from_millis(250)) {
+                    res = rx.recv() => match res {
                         Ok((aid, ev)) => {
                             if aid == artifact_id && !sink.send(&ev) {
                                 return;
                             }
                         }
-                        Err(flume::RecvTimeoutError::Timeout) => {}
-                        Err(flume::RecvTimeoutError::Disconnected) => return,
-                    }
+                        Err(broadcast::error::RecvError::Lagged(_)) => {
+                            let Some(a) = weak.upgrade() else { return };
+                            let peers = a.presence_snapshot(&artifact_id);
+                            if !sink.send(&ArtifactPresenceEvent::Snapshot { peers }) {
+                                return;
+                            }
+                        }
+                        Err(broadcast::error::RecvError::Closed) => return,
+                    },
                 }
-            })
-            .map_err(crate::base::internal)?;
+            }
+        });
         Ok(())
     }
 
@@ -1009,7 +1017,7 @@ impl Artifacts {
                         deleted: deleted_paths,
                     }
                 };
-                self.entry_changes.lock().retain(|tx| tx.send(change.clone()).is_ok());
+                let _ = self.entry_changes.send(change);
                 self.get_now(&row.id)
             }
             _ => {
