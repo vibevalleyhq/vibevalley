@@ -20,12 +20,12 @@
 | `Cargo.toml`、`rust-toolchain.toml`、`rustfmt.toml` | Rust 工作区成员、工具链与格式 |
 | `pnpm-workspace.yaml`、`vite.config.ts` | TS 工作区包列表、依赖版本 catalog、oxfmt 与 oxlint 配置、检查任务（`rust:check`、`docs:verify`…） |
 | `scripts/{gen,audit,docs,release}/` | 工程脚本：`gen/`（契约、词典、令牌、97 枚 reicons 矢量路径 [icons.ts](scripts/gen/icons.ts) 与 sqlc 生成）、`audit/`（lint 插件、死代码、注释审查、Rust 静态模块边界门禁 [module-boundaries.ts](scripts/audit/module-boundaries.ts)）、`docs/`（Note、链接、术语与旧名检查）、`release/`（发版、回归与验收沙箱） |
-| `crates/server/src/lib.rs`、`crates/server/src/base.rs`、`crates/server/src/start.rs` | `Hub`（核心状态、端点表、`Hub::invoke` 命令总线、事实与可插拔插槽）、单一 `ServerDb` 连接池与按 `L0`–`L3` 顺序一次性不可变组装的 `start` |
+| `crates/server/src/lib.rs`、`crates/server/src/base.rs`、`crates/server/src/start.rs` | `Hub`（核心状态、端点表、`Hub::invoke` / `invoke_async` 双轨命令总线、无条件 `trace_id` 与 `tracing::Span` 链路、无锁 `Slot<T>` 插槽与 `TaskTracker` 停机域）、读写分离的 `ServerDb` 连接池与按 `L0`–`L3` 顺序组装并通过 `ShutdownList` 阶段排空的 `start` |
 | `crates/server/src/db/{schema,queries,generated}/` | 服务端 SQLite 建表语句（含 `shared.sql` 共享 `seq_counter` 与 `infra_remote.sql` 远程配置/设备表）、命名查询（`*.sql`）与 sqlc 生成的 SQLx 查询模块（`*.rs`，由边界测试锁死仅限所属域模块调用） |
 | `crates/server/src/modules/`、`crates/server/src/transport/` | 按六大域分组的业务模块（`work`、`team`、`collab`、`content`、`skin`、`infra`，含 `infra/debug/` `DebugKit` 与 `infra/remote/` 远程访问控制）与传输层（`api`、`bridge`、`http`） |
 | `crates/protocol/src/contract/`、`crates/protocol/tests/typescript.rs`、`crates/protocol/src/home.rs` | 线上类型（含 5 域切片、`FarmFrame`、`debug.rs` 的 `DebugKit`、[remote.rs](crates/protocol/src/contract/remote.rs) 的远程访问契约与 `host.rs` 的 `Host*` 帧/`HostAction`/`HostOp` 壳协议，`ts-rs` 写出 `packages/protocol` 的 `*.gen.ts`，`vp run protocol:check` 查最新）与家目录约定（`server.json`、语言） |
-| `crates/core/src/` | 纯规则中心：`reduce`、`SliceMask` 与按域切片投影、状态派生、收件箱、依赖、定时任务（`cron/`）、作品引擎（`artifact/`） |
-| `crates/runtime/src/` | 进程级共享 Tokio 运行时 `rt.rs`（`vibevalley_runtime::rt::{handle, spawn, block_on}`）、`oar/` 驱动与自研 `agent/` 持久对话引擎（`execution.db`） |
+| `crates/core/src/` | 纯规则中心：`reduce`、`SliceMask` 与按域切片投影、状态派生、收件箱、依赖、挂钟抽象 [clock.rs](crates/core/src/clock.rs)（`Clock` / `ManualClock`）、定时任务（`cron/`）、作品引擎（`artifact/`） |
+| `crates/runtime/src/` | 进程级共享 Tokio 运行时 `rt.rs`（`rt::handle`、`rt::current_or_global_handle`、`run_command_with_timeout`）、幂等析构门 `teardown_gate.rs`、`oar/` 驱动与自研 `agent/` 持久对话引擎（`execution.db`） |
 | `crates/rich/`、`crates/engines/{onig,pele,shiki}` | 原生富内容组件与内部引擎（`canvas`、`chart`、`genui`、`pinyin`）及底层正则/高亮/图谱引擎 |
 | `apps/mac/crates/workspace/src/store/mod.rs` | 原生应用外壳的 `state.db`（SQLite）：项目、终端与布局；连同 `pixel`、`terminal` 共 3 个桌面支撑 crate |
 | `crates/i18n/src/lib.rs`、`crates/i18n/locales/` | 消息格式与词典；词典构建时编进去，前端 `web.*` 词典挂在可选特性 `web` 下（仅 `crates/rich` 开启） |
@@ -36,7 +36,7 @@
 
 ### 仓库和包
 
-- **Rust 为准**：服务端（`vibevalley-server`）、命令行（`vibevalley-cli`）、原生应用（`apps/mac`）都是 Rust；TS 承接桌面工作台（`apps/mac/ui`）、独立原生移动端（`apps/mobile`，`nsh/mobile`，iOS 优先、Android 就绪）、4 个共用包（`packages/{protocol,i18n,testkit,tsrs}`）、官网（`apps/site`）与脚本（[原生的 VibeValley](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
+- **Rust 为准**：服务端（`vibevalley-server`）、命令行（`vibevalley-cli`）、原生应用（`apps/mac`）都是 Rust；TS 承接桌面工作台（`apps/mac/ui`）、独立原生移动端（`apps/mobile`，`nsh/mobile`，iOS 优先、Android 就绪）、4 个共用包（`packages/{protocol,i18n,testkit,tsrs}`）、官网（`apps/site`）与脚本，不维护浏览器应用与 Electron 桌面壳。
 - **一个 Cargo 工作区（16 个 crate）**：成员按层组织为 `crates/*`（`protocol`、`i18n`、`core`、`git`、`files`、`runtime`、`rich`、`server`、`cli`）、`crates/engines/{onig,pele,shiki}`、`apps/mac` 与桌面支撑 `apps/mac/crates/{pixel,terminal,workspace}`（包名仍保留 `vibevalley-*`，使 `core` 不遮蔽 `::core`），版本与 edition 写在根 `Cargo.toml` 的 `[workspace.package]`，依赖各 crate 自己写；`vp run rust:check` 跑 `cargo fmt --check`、`cargo clippy -D warnings` 与 `cargo test`。
 - **TS 依赖版本集中**：版本在 `pnpm-workspace.yaml` 的 catalog，各包写 `catalog:`（`scripts/audit/catalog.test.ts` 查）。
 - **跨包走包名**：TS 跨包写 `@vibevalley/*`（`no-cross-package-path` 查）；`apps/mac/ui` 经 `nsh.json` 的别名解析它们；`packages/*` 的类型导出指向 `dist/*.d.ts`（`vp run packages:build`）。
@@ -45,8 +45,9 @@
 
 架构、边界与测试如何共同设计，见[模块设计](docs/style/module-design.md)。
 
-- **深模块与严格 `L0`–`L3` 无环 DAG**：每个模块对外一个类型和它的几个方法，里面的表、锁和线程不露出去；不靠一个带 `kind` 的入口复用多种操作。服务端模块收敛为 4 层无环 DAG（`L0` 共享契约与纯规则、`L1` 基础叶子模块、`L2` 四个互不直调的同级业务域 `work` / `collab` / `content` / `team/memory`、`L3` 编排与触发层），跨域写入走强类型 `Hub::invoke`，异步反应走 `EventBus`，只读跨层依赖走窄 Port trait，脊柱与 `apps/mac/src/` 禁止导入具体业务模块；四条硬边界由 `vp run audit:boundaries`（[module-boundaries.ts](scripts/audit/module-boundaries.ts)）在 CI 与 `release:verify` 中强制拦截（详见 [目标架构与部署拓扑](docs/architecture-topology.md#32-总控端内部子模块与调用收敛control-plane)）。
-- **按序不可变启动**：`start`（`crates/server/src/start.rs`）按 `L0` → `L1` → `L2` → `L3` 次序一次性打开模块并注入窄 Port，不留启动后置挂钩；状态只经 `Hub::apply` 改，模块之间的上行反应经 `Hub` 的异步 `EventBus`（`Hub::subscribe_transitions`）。
+- **跨边界强类型协议化，进程内保持直调**：跨越运行时、渲染载体或进程边界的交互（`HostFrame`/`HostAction`/`HostOp`、`DebugKit`、`MachineWireFrame`、`Remote*`）统一收拢进 `crates/protocol` 强类型契约；同一 Rust 进程内业务模块之间（如 `modules/work/{issue,session,workplace}`）维持窄 trait 与直接调用，不引入进程内 JSON/RPC 或 `tower::Service` 包装层。
+- **深模块与严格 `L0`–`L3` 无环 DAG**：每个模块对外一个类型和它的几个方法，里面的表、锁和线程不露出去；不靠一个带 `kind` 的入口复用多种操作。服务端模块收敛为 4 层无环 DAG（`L0` 共享契约与纯规则、`L1` 基础叶子模块、`L2` 四个互不直调的同级业务域 `work` / `collab` / `content` / `team/memory`、`L3` 编排与触发层，其中 `work/chat` 归属 `L3` 直连 `Board`/`Sessions` 与 `collab/channel::Chat`），跨域写入走强类型 `Hub::invoke` / `invoke_async`，异步反应走 `EventBus`，只读跨层依赖走窄 Port trait，脊柱与 `apps/mac/src/` 禁止导入具体业务模块；边界由 `vp run audit:boundaries`（[module-boundaries.ts](scripts/audit/module-boundaries.ts)）在 CI 与 `release:verify` 中强制拦截（详见 [目标架构与部署拓扑](docs/architecture-topology.md#32-总控端内部子模块与调用收敛control-plane)）。
+- **按序不可变启动与阶段排空**：`start`（`crates/server/src/start.rs`）按 `L0` → `L1` → `L2` → `L3` 次序一次性打开模块并注入窄 Port，不留启动后置挂钩；停机通过 `ShutdownList` 按 `pre_drain` → `JoinSet` 有界并发排空 → `finalizers` 逆序收口，且 `Hub::close_async()`（排空 `TaskTracker` 与层级 `CancellationToken`）始终在 `ServerDb::close()` 之前完成。状态只经 `Hub::apply` 改，模块之间的上行反应经 `Hub` 的异步 `EventBus`（`Hub::subscribe_transitions`）。
 - **操作与发言主体统一用 `Actor`**：`kind` 是 `user`、`agent`、`system`，`agent` 带 `role` 与 `forUser`；HTTP 来的是 `user`，助手的工具是 `agent`（`orchestrator`），`/mcp` 是 `agent`（`worker`），定时任务是 `system`。
 - **同一个家目录只有一个工单板**：工单板在它的数据旁放一个锁文件，别的进程只能读快照（`Board::snapshot`）。
 
@@ -56,13 +57,15 @@
 - **统一结构化日志**：根 `Cargo.toml` 声明工作区 `tracing` 与 `tracing-subscriber`；`vibevalley-server` 与 `vibevalley-mac` 启动调用 `try_init()` 读取 `VIBEVALLEY_LOG`／`RUST_LOG`（未设且 `VIBEVALLEY_DEBUG=1` 时默认 `info`，否则 `warn`）。
 - **钥匙是 `Secret`**：`settings.json` 里的钥匙读成 `Secret`（`crates/server/src/modules/infra/setting.rs`），打印只出提示。
 - **拒绝带 `BizCode`**：对调用方的拒绝是 `ApiError`（带 `bizCode` 与 `next`），网关写成全信封；模块内部可分辨的失败是 `thiserror` 的 enum；预期的结果（合进去或冲突）返回 enum，不当错误。
-- **同步领域接口，共享异步底座**。领域模块保留同步接口，内部互斥锁统一用 `parking_lot`（无毒化），全局热读观察者与脊柱插槽用 `arc-swap` 无锁读取，重试退避用 `backon`。全进程共享唯一多线 Tokio 运行时 `vibevalley_runtime::rt`（工作线程 `vibevalley-io-{n}`，初始化即安装 `rustls` `ring` 提供方），集中承载 `axum` HTTP 门、工作区 `reqwest` 出站调用、`SliceFeed`/`WatchStream`、`BridgeHub`、`EventBus`、MCP 客户端与原生语音流；取消与停机经 `tokio_util::sync::CancellationToken` 与 `TaskTracker` 级联收敛。SQLx 的 SQLite 工作线程执行查询，同步阻塞工作显式走 `spawn_blocking` 或后台线程。
+- **双轨异步底座与共享运行时**：全进程共享唯一多线程 Tokio 运行时 `vibevalley_runtime::rt`（工作线程 `vibevalley-io-{n}`，初始化即安装 `rustls` `ring` 提供方，无 `pollster` 依赖）。`Hub` 对纯内存读取保留同步 `Hub::on` 避免多余 `BoxFuture` 分配，对数据库与网络 I/O 端点提供原生异步 `Hub::on_async`（对应 `Server::call_with_async`）；热读脊柱插槽封装为无锁 `Slot<T>`（`ArcSwapOption<Arc<T>>`），全局互斥锁用 `parking_lot`（无毒化），重试退避用 `backon`。后台异步与阻塞任务分别经 `Hub::spawn_task` / `spawn_blocking_task` 纳入 `TaskTracker` 与层级 `CancellationToken`；超时的外部子进程统一使用 `run_command_with_timeout`（`tokio::process::Command` + `.kill_on_drop(true)` + `tokio::time::timeout`），批量多目标外呼以 `JoinSet` + `Semaphore` 有界并发。
+- **双轨无条件 `trace_id` 与 `tracing::Span` 传播**：`Hub` 的 `invoke`、`invoke_async`、`call_with`、`call_with_async` 在调用方未传入非零 `trace_id` 时无条件通过 `next_trace_id` 分配单调非零标识，并建立 `tracing::debug_span!("hub.op", op, trace_id, caller)`（异步路径使用 `.instrument(span)`，跨 `spawn_blocking` 以 `Span::current().in_scope(...)` 延续），使服务端模块、`sqlx`、macOS `OsLogLayer` 与 `oar-voyage/3` 记录自动关联。
+- **两层确定性虚拟时钟与定向 `loom` 内核检验**：单调异步计时器经 [rt.rs](crates/runtime/src/rt.rs) 的 `rt::current_or_global_handle()` 派发（生产回落全局 `vibevalley-io` 运行时，`#[tokio::test(start_paused = true)]` 下附着当前线程测试时钟，统一使用 `tokio::time::Instant`，`tokio/test-util` 仅限 `[dev-dependencies]`）；挂钟与日历期限逻辑（`cron`、`remote`、`media`、`patrol`）注入 `Clock` / `ManualClock`（[clock.rs](crates/core/src/clock.rs)）。真正依赖原子内存序的四处并发内核（`SliceWakeGate`、`AcpTurnMachine`、`SessionGenerationTable`、`TeardownGate`）抽离至独立子模块并通过 `vp run rust:loom`（`--features loom`）做穷举交错模型检验，业务模块中不出现 `#[cfg(loom)]`。
 
 ### 契约、规则和数据库
 
 - **契约以 Rust 为源，生成 TS**：`crates/protocol/src/contract/` 的类型是数据源，`vp run protocol:ts` 写出 `packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`，`cargo test` 里的 `tests/typescript.rs` 查最新；页面在边界解码用的 Zod Schema 与 `api.ts` 手写，由 `schema.test.ts`、`api.test.ts` 对着生成物查。词典在 `crates/i18n/locales/`，`vp run i18n:gen` 写出 TS 目录。
 - **生成文件不手改**：`packages/protocol` 的 `*.gen.ts`、`packages/protocol/src/client.ts`、`packages/i18n/src/catalogs.ts`、`iconPaths.gen.ts`（`vp run icons:gen`）、[capabilities.md](docs/reference/capabilities.md) 由脚本生成并有检查。
-- **SQLite 单连接池分工。** 宿主 `state.db` 保存项目、布局、终端和设置。服务端全部 SQLite 模块与工单账本共用唯一的 `ServerDb` 连接池（`crates/server/src/base.rs`，单一 `sqlx::SqlitePool` 持有 `server.db`，启用 WAL、外键约束与 `busy_timeout`，启动时统一建表，停机时协调执行 `PRAGMA wal_checkpoint(PASSIVE)` 与 `PRAGMA optimize`）。各模块用同一份 SQL 定义运行时表结构和查询生成时的输入。[sqlc 配置](sqlc.yaml)
+- **SQLite 读写分离单库分工**：宿主 `state.db` 保存项目、布局、终端和设置。服务端全部 SQLite 模块、工单账本与 `durable::SqliteStorage` 共用唯一的 `ServerDb`（`crates/server/src/base.rs`，`server.db` 启用 WAL、外键约束与 `busy_timeout`）：拆分多连接只读 `read_pool`（`read_only(true)`，上限 6 连接并发 WAL 读）与单连接 `write_pool`（`max_connections(1)` 在 Tokio 异步队列中串行写，避免写写 `SQLITE_BUSY` 互锁），启动时统一建表，停机时协调执行 `PRAGMA wal_checkpoint(PASSIVE)` 与 `PRAGMA optimize`。各模块用同一份 SQL 定义运行时表结构和查询生成时的输入。[sqlc 配置](sqlc.yaml)
 - **sqlc 检查 SQL，SQLx 执行查询。** sqlc 通过标准输入把命名查询的 JSON 发给本仓库的进程插件。插件按参数编号绑定值，并用 sqlc 标注的列名、类型和可空性生成 Rust 行类型。SQLite 的 `INTEGER`、`TEXT`、`REAL`、`BLOB` 分别映射为 `i64`、`String`、`f64`、`Vec<u8>`。可空列使用 `Option<T>`。不支持的类型或命令使生成失败。[生成器](scripts/gen/sqlc-rust/generate.ts) · [官方插件协议](https://docs.sqlc.dev/en/latest/guides/plugins.html)
 - **调用方持有事务。** 生成函数接受 SQLx 连接池或调用方的连接。`:one` 查不到记录时返回 `RowNotFound`，`:many` 返回列表，`:exec` 成功时返回 `()`，`:execrows` 返回受影响行数。领域模块决定何时提交，并将数据库行转换为业务类型。[宿主调用点](apps/mac/crates/workspace/src/store/mod.rs) · [事务回归](scripts/gen/sqlc-rust/smoke.rs)
 - **工单结算与持久执行共用写连接**：账本把工单事实、轮次和待投递结果写入调用方的 SQLx 事务。一次业务写入占用一个保存点。外层批次提交成功后，服务才发布订阅通知。保存点回滚只撤销这一次写入。磁盘库用独立的只读连接查询已提交快照。[事务](crates/runtime/src/agent/durable/store.rs) · [工单账本](crates/server/src/modules/work/ledger.rs)
@@ -111,9 +114,10 @@
 
 ## 为什么这样
 
-- **只有一个服务端，Rust 的**：原生应用和命令行直接用它的类型；用户选了激进重构、速度优先（[原生的 VibeValley](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
-- **SQLite，不是 Postgres**：一台电脑一个人，SQLite 开箱即用、不带 WASM；多机与外部库不在当前计划里。
-- **领域同步直调、IO 集中异步**：模块内部多为子进程、文件与 SQLite，对外保留同步直调并在异步任务中经 `spawn_blocking` 隔离；网络、流式扇出与取消统一收拢到共享 `vibevalley_runtime::rt` 运行时，不引入重型 Actor 框架。
+- **只有一个服务端，Rust 的**：原生应用和命令行直接用它的类型；工程选择单机 Rust 控制面，只保留 macOS 桌面应用、Rust CLI 与独立移动端外壳。
+- **SQLite，不是 Postgres 或 ORM**：一台电脑一个人，SQLite 开箱即用；`sqlc` 命名查询 + `sqlx` 编译期校验证明比早期 ORM（如 `toasty`）更能守住 `read_pool` / `write_pool` 分离与零反射开销。
+- **按端点特征分同步与异步、共享单一运行时**：纯内存读端点保持同步 `Hub::on`，I/O 端点走原生异步 `Hub::on_async`；全进程共用 `vibevalley_runtime::rt` 与 `TaskTracker`，避免为每个模块拆独立运行时导致跨运行时 `PoolConnection` 析构异常。
+- **定向隔离 `loom`、不引入重型模拟网络栈**：`loom` 仅包裹四个纯原子并发内核而不侵入业务异步任务；以单宿主控制面为主，暂不引入 `turmoil` 整套网络模拟栈。
 - **对模型的话保持中文、不进词典**：避免双份提示调优与评测漂移。
 
 ## 怎么验证

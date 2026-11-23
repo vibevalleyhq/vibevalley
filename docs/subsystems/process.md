@@ -21,7 +21,7 @@
 | `scripts/gen/capabilities.ts`、`api-client.ts`、`primitives.ts`、`i18n.ts` | 生成并校验 `capabilities.md`、`client.ts`、`primitives.md` 与双语词典的 `catalogs.ts`；`i18n.ts check` 同步扫描 Rust 的 `t("key")` 与前端词条，缺键和未用键直接报错 |
 | `scripts/audit/oxlint-plugin.ts`、`deadcode.ts` | 仓库自定义 lint 规则、`knip` 死代码检查 |
 | `scripts/release/regression.ts`、`verify-server.ts` | PR 回归测试修改门禁、启动隔离沙箱服务端 |
-| `vite.config.ts` 的 `rust:check`、`protocol:check`、`mac:check` | Rust 的格式、clippy（`-D warnings`）与测试；生成的契约类型和 golden 是不是最新；原生页面的 nsh 类型检查 |
+| `vite.config.ts` 的 `rust:check`、`rust:loom`、`protocol:check`、`mac:check` | Rust 的格式、clippy（`-D warnings`）与测试；四个原子并发内核的穷举交错模型检验（`--features loom`、`[profile.loom]`）；生成的契约类型和 golden 是不是最新；原生页面的 nsh 类型检查 |
 | `scripts/audit/comment-review.ts` | 调用模型审查新增注释 |
 | `.agents/notes/`、`.agents/skills/` | Agent Notes 目录与仓库 skills（`.claude/skills` 软链至此） |
 | `design/pixel/gen.sh`、`process.py`、`design/art.sh` | 像素素材生成、去品红切格缩放脚本与原图仓库软链 |
@@ -33,6 +33,7 @@
 - **链接与反引号路径全校验**：文档链接从仓库根写起；反引号内含目录且扩展名为源码/配置的路径必须在仓库中存在（`scripts/docs/doc-links.ts` 检查）。
 - **报错信息给出改法**：自定义 lint 规则与门禁报错应包含原因、`Fix:` 改法与 `See` 参考文件路径（`scripts/audit/oxlint-plugin.test.ts` 检查）。
 - **静态门禁按语言分**：Rust 靠类型、clippy（`-D warnings`）和测试（`rust:check`）；TS 靠严格的 TypeScript（tsrs）和 oxlint 插件（`vp check`），`apps/mac/ui` 靠 nsh 的类型检查（`mac:check`，lint 不扫它）。Rust 上的约束写成类型、clippy 规则或测试。
+- **两层虚拟时钟与定向 `loom` 模型检验**：单调异步超时测试通过 `tokio/test-util`（仅限 `[dev-dependencies]`）与 `rt::current_or_global_handle()` 在 `#[tokio::test(start_paused = true)]` 下确定性推进，日历与挂钟期限通过 `Clock` / `ManualClock`（[clock.rs](crates/core/src/clock.rs)）注入，替代测试中的 `std::thread::sleep` 轮询；四处纯原子并发内核（`SliceWakeGate`、`AcpTurnMachine`、`SessionGenerationTable`、`TeardownGate`）在独立子模块通过 `vp run rust:loom` 穷举线程交错，不侵入业务模块。
 - **死代码零容忍，回归测试受保护**：`vp run deadcode` 拦截未使用导出与依赖。修改或删除 `regression: ` 测试，或 `fix/` 分支未补回归测试，须在 PR 正文 `## Regression` 说明（`scripts/release/regression.ts` 检查）。
 - **命名一致**：展示名用 `VibeValley`；代码、目录、环境变量 `VIBEVALLEY_*` 和分支前缀 `vibevalley/` 统一用小写 `vibevalley`。
 
@@ -78,5 +79,6 @@
 ## 怎么验证
 
 - `vp run docs:verify`：依次执行 9 项文档与生成物同步检查。
+- `vp run rust:loom`：对四个隔离的原子并发内核执行穷举交错模型检验。
 - `vp run deadcode`：死代码扫描。
 - `vp run scripts:test`：验证 lint 报错格式、沙箱、注释审查与回归门禁。

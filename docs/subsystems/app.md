@@ -1,6 +1,6 @@
 # 客户端
 
-VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibevalley-mac`）：GPUI 的窗口，里面带着服务端；工作台的页面是 nsh 跑的 TSX（`apps/mac/ui`），像素农场、地图、记忆树和开场由 Rust 直接画（`apps/mac/src/pixel`）。页面按域只读服务端推来的独立切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）与查询接口，经进程内的桥发命令，不经 HTTP。另提供独立原生移动端应用 `apps/mobile`（`nsh/mobile`，iOS 优先、Android 就绪），通过 `@vibevalley/protocol/remote` 连接 Mac 上默认关闭的受认证远程 HTTP/SSE 门，实现离开桌面时的收件箱分拣、频道回复、会话观察与任务验收（[移动远程控制方案](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)）。没有浏览器页面或 Electron 桌面版（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
+VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibevalley-mac`）：GPUI 的窗口，里面带着服务端；工作台的页面是 nsh 跑的 TSX（`apps/mac/ui`），像素农场、地图、记忆树和开场由 Rust 直接画（`apps/mac/src/pixel`）。页面按域只读服务端推来的独立切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）与查询接口，经进程内的桥发命令，不经 HTTP。另提供独立原生移动端应用 `apps/mobile`（`nsh/mobile`，iOS 优先、Android 就绪），通过 `@vibevalley/protocol/remote` 连接 Mac 上默认关闭的受认证远程 HTTP/SSE 门，实现离开桌面时的收件箱分拣、频道回复、会话观察与任务验收。不维护浏览器应用或 Electron 桌面壳。
 
 ## 管什么，不管什么
 
@@ -18,7 +18,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 | 位置 | 职责 |
 |---|---|
 | `apps/mac/src/main.rs`、`shell/` | 开窗口并初始化工作区 `tracing_subscriber`（`VIBEVALLEY_LOG`/`RUST_LOG`，`VIBEVALLEY_DEBUG=1` 默认 `info` 否则 `warn`）；根视图 `Shell` 拆为 9 个职责文件（`mod.rs`、`projects.rs`、`panes.rs`、`render.rs`、`menus.rs`、`palette.rs`、`settings.rs`、`host_bridge.rs`、`devtools.rs`），内部收敛为 3 个高内聚子模型（`WorkspaceProjects`、`HostChrome`、`NativeOverlays`）：右侧 `inspector` 仅在工作区展开且宽屏时惰性挂载并在收起时回收，命令面板 `palette` 关闭时立即置 `None` 释放 QuickJS VM；同时承载项目、分栏布局、快捷键（`bind_keys`）、宿主接口与 `VIBEVALLEY_DEBUG=1` 悬浮胶囊／`⇧⌥D` 浮层／独立拆窗 |
-| `apps/mac/src/hosted/` | 托管视图：一个视图一个 nsh 引擎，按 `is_workbench_view` 分别缓存与惰性装载双入口包（重型工作台 `App.tsx` → `ui/build`；轻量壳窗格 `ShellApp.tsx` → `ui/build-shell`），并在每个视图启动参数注入当前 `connectionMode`；`bridge.rs` 与 `frames.rs` 复用 `vibevalley_protocol` 的 `HostAction`、`HostOp` 与强类型 `Host*` 帧（`HostRailFrame`、`HostFileTreeFrame`、`HostGitPanelFrame`、`HostPaletteFrame`），`ShellDebugHandle` 向 `HostDebugBridge` 提供路由、客户端、包模式、回环地址、启动耗时、缓存统计与有界帧耗时（`>= 16 ms` 标慢），`late.rs` 让内置服务端在后台线程起来；`connection.rs` 与 `remote.rs` 实现桌面 `ClientTransport` 的本地合体（默认）与远程控制面模式切换 |
+| `apps/mac/src/hosted/` | 托管视图：一个视图一个 nsh 引擎，按 `is_workbench_view` 分别缓存与惰性装载双入口包（重型工作台 `App.tsx` → `ui/build`；轻量壳窗格 `ShellApp.tsx` → `ui/build-shell`），并在每个视图启动参数注入当前 `connectionMode`；`BridgeHub`（`mod.rs`，信号量并发上限 `BRIDGE_CONCURRENCY = 16`）与 `Outbox`（`bridge.rs`，按 topic 对相邻相同帧载荷去重避免重复序列化与桥派发）及 `frames.rs` 复用 `vibevalley_protocol` 的 `HostAction`、`HostOp` 与强类型 `Host*` 帧（`HostRailFrame`、`HostFileTreeFrame`、`HostGitPanelFrame`、`HostPaletteFrame`），`ShellDebugHandle` 向 `HostDebugBridge` 提供路由、客户端、包模式、回环地址、启动耗时、缓存统计与有界帧耗时（`>= 16 ms` 标慢）；`late.rs` 的 `LateServer` 暴露 `ready_async()` 与零额外 OS 转发线程的切片/实时流透传，启动失败时回落 `FailedServer` 呈现空静态切片与根因错误；`connection.rs` 与 `remote.rs` 实现桌面 `ClientTransport` 的本地合体（默认）与远程控制面模式切换 |
 | `apps/mac/src/host.rs` | 宿主能力的原生一半：系统通知、Finder 里显示、`open`、本地文件选择与另存、读文件 |
 | `apps/mac/src/audio.rs`、`audio.m` | AVFoundation 文件播放、跳播与有界 PCM 队列；宿主音频命令按桥的接收顺序执行 |
 | `apps/mac/src/command_line.rs`、`tray.rs`、`island.rs` | 命令行符号链接、菜单栏摘要、灵动岛进程与工单摘要 |
@@ -42,7 +42,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 ### 进程、内置服务端与远程控制面
 
 - **默认本地合体，支持零代码切换远程控制面**：[connection.rs](apps/mac/src/hosted/connection.rs) 从 `$VIBEVALLEY_HOME/desktop-connection.json`（Unix `0o600` 权限，令牌以 `Secret` 包装并在 `Debug`/`Display` 中脱敏）解析桌面连接模式，并允许环境变量 `VIBEVALLEY_CONTROL_PLANE_URL` 与 `VIBEVALLEY_CONTROL_PLANE_TOKEN`（可选 `VIBEVALLEY_CONTROL_PLANE_LABEL`）优先覆盖供无头或 CI 测试使用：
-  - **`Mode::Embedded`（默认，零配置）**：`BridgeHub::install` 在后台线程调 `vibevalley_server::start`，家目录按当前发布通道解析（`VIBEVALLEY_HOME` 覆盖，默认 `~/.vibevalley{,-beta,-alpha,-dev}`，见[设置和配置](docs/subsystems/setting.md#发布通道默认端口与数据目录)），工作目录是 `$VIBEVALLEY_WORK_ROOT`，默认 `~/vibevalley-dev`；起来之前的调用由 `LateServer` 接住。开场等待服务端、HTTP 地址公告和项目加载都成功；失败停在失败画面。
+  - **`Mode::Embedded`（默认，零配置）**：`BridgeHub::install` 在后台线程调 `vibevalley_server::start`，家目录按当前发布通道解析（`VIBEVALLEY_HOME` 覆盖，默认 `~/.vibevalley{,-beta,-alpha,-dev}`，见[设置和配置](docs/subsystems/setting.md#发布通道默认端口与数据目录)），工作目录是 `$VIBEVALLEY_WORK_ROOT`，默认 `~/vibevalley-dev`；起来之前的调用由 `LateServer` 接住（通过 `ready_async()` 与 `subscribe_slice`/`subscribe_live` 透传走 Tokio 异步快速路径，不额外起转发线程），启动失败时以 `FailedServer` 挂接空静态切片并在所有调用返回 `BizCode::ServiceUnavailable` 诊断根因。开场等待服务端、HTTP 地址公告和项目加载都成功；退出应用经 `cx.background_executor()` 异步排空落盘与关机，不阻塞 GPUI 主线程。`apps/mac/src` 中任务统一经 `rt::current_or_global_handle()` 派发，等待使用 `flume` / `Notify` 而非 `std::thread::sleep`。
   - **`Mode::Remote`**：启动时不拉起本机内置 `vibevalley-server`，直接将 [remote.rs](apps/mac/src/hosted/remote.rs) 的 `RemoteServer`（实现 `vibevalley_server::transport::api::Server`）挂到 `BridgeHub` 上。`RemoteServer` 携带 `Authorization: Bearer <token>` 与 `X-VibeValley-Client: remote`，通过 `POST /api/v1/{op}`、`GET /api/v1/slice/{name}`（SSE + `Last-Event-ID` 自动重连，快照走 `?once=1`）、`GET /api/v1/live` 与 `GET /api/v1/subscribe/{name}` 与远程控制面对接，页面、桥与切片消费层零感知切换。
 - **桌面控制面连接设置**：[hosted/mod.rs](apps/mac/src/hosted/mod.rs) 拦截 `host.connectionState`、`host.connectionSave` 与 `host.connectionReset` 三个桌面宿主操作，支持在 `/settings/connections/remote`（[RemoteAccessPage.tsx](apps/mac/ui/features/setting/RemoteAccessPage.tsx)）查看当前运行态与持久化配置、通过 6 位配对码（经 `POST /api/v1/remote/pair/exchange` 换领令牌）或 Bearer 令牌保存远程目标，或一键切回本地内置模式并提示重启生效；该分区独立于远端 `remote.status` 渲染，即使当前配置的远程控制面不可达也可随时修改或重置。
 - **内置模式另开一道本机的 HTTP 门**：`vibevalley_server::transport::http::serve` 默认按当前发布通道绑定 `127.0.0.1:<默认端口>`（`release` `8787`、`beta` `8788`、`alpha` `8789`、`dev` `8790`）；未显式设置 `VIBEVALLEY_PORT` 且首选端口已被占用（`AddrInUse`）时，应用向 stderr 打印告警并自动回落到空闲端口（`127.0.0.1:0`），显式设置非零 `VIBEVALLEY_PORT` 冲突时直接失败；实际监听地址写进家目录的 `server.json`，命令行据此找到它，帮工的 `/mcp` 也在这道门上。
@@ -92,7 +92,10 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 
 ### 页面状态与数据流
 
+- **三层 UI 状态边界与单窗口显式 FSM**：跨视图共享的领域投影（`BoardSummary`、`BoardIssueSummary`、`IssuePromptKind`、`MediaSummary`、`ChannelSummary`）由 `vibevalley-core` 统一折叠随切片下发；单窗口多步瞬态交互收口在纯 TypeScript 判别联合与无副作用 `transition(state, event)` 状态机（[closeFlow.ts](apps/mac/ui/features/issue/model/closeFlow.ts)、[draftSubmit.ts](apps/mac/ui/features/issue/model/draftSubmit.ts)、[libraryView.ts](apps/mac/ui/features/media/libraryView.ts)），TSX 层只做穷尽 `switch` 渲染与事件派发；热点选择器（如 `usePrefs`、`composing.ts` 的 `canSend`/`stoppable`/`here`）以 `computed()` 记忆化避免无关重算。
 - **页面按域只读独立切片**：`infra/frame.ts` 为 `board`、`sessions`、`collab`、`inbox`、`ops`、`farm` 维护各自独立的响应式信号（`useBoardSlice`、`useSessionsSlice`、`useCollabSlice`、`useInboxSlice`、`useOpsSlice`、`useFarmFrame`），单域变更不触发其他域消费者重算；外壳（`shell/mod.rs`）与灵动岛（`island.rs`）直接订阅 `SliceKind::Sessions` / `SliceKind::Inbox`；按 id 的列表用 `Each` 保住行。
+- **草稿去抖与持久化写入合批**：频道输入框（[composing.ts](apps/mac/ui/features/channel/model/composing.ts)）在内存中保留实时草稿缓冲，并以 `250 ms`（`DRAFT_DEBOUNCE_MS = 250`）防抖写入持久化草稿；[storage.ts](apps/mac/ui/infra/state/storage.ts) 的 `createPersistentStorage` 通过 `queued` 映射表与单串行 `drain()` 循环按 key 合并并发 `setItem` / `removeItem` 写入（`storage.json`），避免逐键击发写盘放大。
+- **工作区与移动端即时乐观交互与回滚**：工作区 [ChatPane.tsx](apps/mac/ui/workspace/ChatPane.tsx) 在发送或引导插话时立即插入本地临时 `user/message` 占位（`inFlightOptimistic`），待服务端历史确认到达或发送失败时按原草稿、附件与阶段状态精确清理或回滚；移动端 [session.ts](apps/mobile/src/infra/session.ts) 在 `session.respondPermission` / `session.respondInteraction` 成功后乐观清除对应待批条目，频道发送（[ChannelsTab.tsx](apps/mobile/src/features/ChannelsTab.tsx)）失败时在界面展示显式错误并触觉反馈。
 - **UI 目录单向依赖**：`infra` → `design` → `features` → `{app, farm, workspace}`，`app`、`farm` 与 `workspace` 之间互不引用；由 `oxlint` 的 `vibevalley/ui-layer-boundaries` 规则拦截。
 - **状态中间层是 `state/`**：跨组件的状态 `defineAtom`（`atom.ts`）、本机存下的选择 `defineStored`（`stored.ts`、`prefs.ts`）、乐观意图 `defineIntent`（`intent.ts`）。
 - **乐观意图等切片 `seq` 追上后结算**：`Intent` 是按 `phase` 区分的判别联合；写操作带 `requestKey` 或 `sendKey` 叠在当前切片上，等到对应切片的 `slice.seq >= reply.seq` 或频道出现对应消息才结算。
@@ -137,9 +140,9 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 
 ### 打包和更新
 
-`scripts/release/package.ts` 将应用（`vibevalley-mac`）、命令行（`vibevalley`）和灵动岛放进 `.app/Contents/MacOS`，静态素材（`assets`，经 `scripts/release/package-assets.ts` 的 `shouldPackageAsset` 过滤仅官网使用的 `assets/title/` 与 `assets/pixel/title-*.jpg`）与图标放进 `Contents/Resources`（两份 `--release` 字节码已直接嵌入 `vibevalley-mac` 二进制，不再向 `Contents/Resources/ui` 复制开发页面包）。应用从自身包定位资源，不依赖构建仓库的位置；`release.json` 记录版本、架构、ZIP 文件名、字节数和 SHA-512。
+`scripts/release/package.ts` 与 [package-platform.ts](scripts/release/package-platform.ts) 将应用（`vibevalley-mac`）、命令行（`vibevalley`）和灵动岛放进 `.app/Contents/MacOS`，按发布通道设置独立包标识（`dev.vibevalley.app{,.alpha,.beta,.dev}`），将静态素材（`assets`，经 `scripts/release/package-assets.ts` 的 `shouldPackageAsset` 过滤仅官网使用的 `assets/title/` 与 `assets/pixel/title-*.jpg`）、通道图标与经 `xcrun actool` 从全出血通道 PNG（`appicon-{release,alpha,beta,dev}.png`）编译出的 Tahoe `Assets.car` 放进 `Contents/Resources`（两份 `--release` 字节码已直接嵌入 `vibevalley-mac` 二进制，不再向 `Contents/Resources/ui` 复制开发页面包），并产出带 Retina 背景的 DMG 与 ZIP 安装包。应用从自身包定位资源，不依赖构建仓库的位置；`release.json` 记录版本、架构、ZIP 文件名、字节数和 SHA-512。
 
-`apps/mac/src/update` 只在打包版本上启动更新检查，启动时和每四小时各检查一次。稳定版读最新正式版，alpha、beta 各读同阶段最新版本；仓库运行和 `0.0.0` 不自动检查。`VIBEVALLEY_UPDATE_FEED=off` 关闭检查，指定清单 URL 可验证本地更新。
+`apps/mac/src/update` 只在打包版本上按通道包名启动更新检查，启动时和每四小时各检查一次（[fetch.rs](apps/mac/src/update/fetch.rs) 使用带 `tokio::time::sleep` 的异步重试循环，[releases.rs](apps/mac/src/update/releases.rs) 匹配通道包名与归档）。稳定版读最新正式版，alpha、beta 各读同阶段最新版本；仓库运行和 `0.0.0` 不自动检查。`VIBEVALLEY_UPDATE_FEED=off` 关闭检查，指定清单 URL 可验证本地更新。
 
 更新包的大小、哈希、归档路径、版本和签名全部通过后才进入 ready；Developer ID 应用只接受同一团队签名。DMG、系统转移位置或不可写目录要求手工安装。更新先复制到应用旁边，退出后由独立进程替换；移动新包失败时恢复原包。页面的立即安装会重启，普通退出只替换；原包保留在同目录的 `.VibeValley-previous-<pid>.app`。更新不移动或迁移用户数据。
 
@@ -157,10 +160,11 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 
 ## 还没做的
 
-- 真实音频与麦克风验收、Developer ID 签名公证与签名包全路由截图验收，见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)的「剩下的」。
-- DevTools V2（画布 `Inspector` `testID` 点选与源码跳转、Loro 前沿视图、强类型 `DebugCommand` 替换 `apps/mac/src/debug.rs`），见[VibeValley DevTools 与跨边界强类型协议准则](.agents/notes/proposed/architecture/2026-11-22-devtools-and-protocol-boundaries.md)。
-- 宽屏对话次级标签收敛与素材组织方式等后续项，见[工作台顶栏、页面交互精简与大纲笔记归属作品](.agents/notes/proposed/architecture/2026-11-22-workbench-ux-polish-and-outline-as-artifact.md)。
-- 移动端真机分发签名与系统远程推送能力，见[Tailscale 与 nsh 原生移动远程控制](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)。
+- 真实音频验收、Developer ID 签名公证与签名包发布主线验收，见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)。
+- 移动端真机分发签名与后台提醒机制，见[移动远程控制](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)。
+- DevTools V2（画布 `Inspector` `testID` 点选与源码跳转、Loro 前沿视图、强类型 `DebugCommand` 替换 `apps/mac/src/debug.rs`），见[VibeValley DevTools V2](.agents/notes/proposed/architecture/2026-11-22-devtools-and-protocol-boundaries.md)。
+- 宽屏对话次级标签收敛与素材组织方式，见[对话页次级标签收敛与素材组织方式](.agents/notes/proposed/architecture/2026-11-22-workbench-ux-polish-and-outline-as-artifact.md)。
+- 看板覆层/拖拽显式状态机与会话轨迹摘要下沉评估，见[工作台剩余交互 FSM 与会话轨迹投影收口](.agents/notes/proposed/architecture/2026-11-21-ui-state-machine-consolidation.md)。
 
 ## 怎么验证
 
