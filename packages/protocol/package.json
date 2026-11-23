@@ -31,6 +31,10 @@
       "types": "./dist/rpc.d.ts",
       "default": "./src/rpc.ts"
     },
+    "./remote": {
+      "types": "./dist/remote/transport.d.ts",
+      "default": "./src/remote/transport.ts"
+    },
     "./host": {
       "types": "./dist/host.d.ts",
       "default": "./src/host.ts"

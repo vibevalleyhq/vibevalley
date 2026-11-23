@@ -1,6 +1,6 @@
 # 客户端
 
-VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibevalley-mac`）：GPUI 的窗口，里面带着服务端；工作台的页面是 nsh 跑的 TSX（`apps/mac/ui`），像素农场、地图、记忆树、开场和图鉴由 Rust 直接画（`apps/mac/src/pixel`）。页面按域只读服务端推来的独立切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）与查询接口，经进程内的桥发命令，不经 HTTP。没有浏览器页面、Electron 桌面版和手机壳，只支持 macOS（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
+VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibevalley-mac`）：GPUI 的窗口，里面带着服务端；工作台的页面是 nsh 跑的 TSX（`apps/mac/ui`），像素农场、地图、记忆树、开场和图鉴由 Rust 直接画（`apps/mac/src/pixel`）。页面按域只读服务端推来的独立切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）与查询接口，经进程内的桥发命令，不经 HTTP。另提供独立原生移动端应用 `apps/mobile`（`nsh/mobile`，iOS 优先、Android 就绪），通过 `@vibevalley/protocol/remote` 连接 Mac 上默认关闭的受认证远程 HTTP/SSE 门，实现离开桌面时的收件箱分拣、频道回复、会话观察与任务验收（[移动远程控制方案](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)）。没有浏览器页面或 Electron 桌面版（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
 
 ## 管什么，不管什么
 
@@ -25,12 +25,14 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 | `apps/mac/src/terminal/`、`viewer.rs`、`diff.rs` | 终端（`apps/mac/crates/terminal`）、文件查看（经 `vibevalley-rich` 按 TextMate 作用域高亮）、diff；加载均带 150 毫秒防闪烁与骨架条 |
 | `apps/mac/src/pixel/` | 像素场景（引擎在 `apps/mac/crates/pixel`）：农场、地图、记忆树、开场、图鉴；进程级缓存 `Atlas` 与 `VillageWorld`（[农场的皮](docs/subsystems/farm.md)） |
 | `apps/mac/crates/` | 桌面端独占支撑 crate：`pixel`、`terminal`、`workspace`（项目、布局含 `PaneKind::Chat`、终端与宿主 `state.db` 持久化） |
-| `crates/rich/` | 原生富内容组件集（`VvMarkdown` 含 `Doc` 排版与相对图片解析、`VvIcon`（`crates/rich/src/icon.rs`，承载 97 枚工作台 reicon 线性图标并以无锁 `OnceLock<Vec<Path>>` 零拷贝共享解析路径；前端 `apps/mac/ui/design/icons.ts` 只保留纯类型 `IconName`）、`VvI18n`（`"vibevalley/rich"` 导出 `.translate(...)`，由 `installNativeI18n()` 接管 `@vibevalley/i18n`，使生产 UI 包不含 `packages/i18n` JS 词典）、`VvCodeBlock`、`VvDiagram`、`VvCanvas`、`VvChart`、`VvGenUi`、`VvWhiteboard`（含 Loro Phase A 实时在场光标/占位框/一键跟随视口与 `onCursorMove`/`onViewportChange` 回调）、`VvPinyin`）与内部渲染引擎 `engine/` |
+| `crates/rich/` | 原生富内容组件集（`VvMarkdown` 含 `Doc` 排版与相对图片解析、`VvIcon`（[icon.rs](crates/rich/src/icon.rs)，承载 97 枚工作台 reicon 线性图标并以无锁 `OnceLock<Vec<Path>>` 零拷贝共享解析路径；前端 [icons.ts](apps/mac/ui/design/icons.ts) 只保留纯类型 `IconName`，[icons.ts](scripts/gen/icons.ts) 另单源生成 `iconPaths.gen.ts` 供无原生 `VvIcon` 时经 `<Canvas>` + `Path2D` 矢量回退）、`VvI18n`（`"vibevalley/rich"` 导出 `.translate(...)`，由 `installNativeI18n()` 接管 `@vibevalley/i18n`，使生产 UI 包不含 `packages/i18n` JS 词典）、`VvCodeBlock`、`VvDiagram`、`VvCanvas`、`VvChart`、`VvGenUi`、`VvWhiteboard`（含 Loro Phase A 实时在场光标/占位框/一键跟随视口与 `onCursorMove`/`onViewportChange` 回调）、`VvPinyin`）与内部渲染引擎 `engine/` |
 | `apps/mac/src/theme.rs`、`apps/mac/src/theme_tokens.rs` | 外壳的主题、动画幅度（`Settings.motion`）与字号设置；令牌从 `design/tokens.json` 同步生成 |
 | `apps/mac/src/debug.rs` | 不看屏幕检查应用的两个入口：状态转储和脚本（[验收](.agents/skills/vv-acceptance/references/app.md)） |
 | `apps/mac/ui/App.tsx`、`ShellApp.tsx`、`workspace/` | 双入口 TSX 包：`App.tsx` 供全量工作台（`vv` / `vibevalley`）、农场视图（`farm-form` / `farm-phone`）与六视图 DevTools（`devtools` → `features/devtools/`），`ShellApp.tsx` 专供轻量工作区壳窗格（`sidebar`、`palette`、`markdown`、`workspace-chat`、`probe`），两份入口启动时均调 `installNativeI18n()` 走原生 `VvI18n`，按 `host.params.view` 挑视图 |
 | `apps/mac/ui/{app,features,design,infra}/` | 工作台共 6 个顶级目录：入口外壳 `app/`（路由表 `Workbench.tsx`、6 项一级导航 `places.ts`、外框 `Shell.tsx`）、领域切片 `features/<概念>/`（含二元统一内容中心壳 `content/`、5 栏设置页、Artifact 引擎含 `TimelineBar.tsx` 时间旅行与 `outline` 大纲笔记、素材库及历史 `pkm` 兜底）、共享原语与表面 `design/`（含动效出口 `motion.ts` 与防闪烁骨架原语 `Skeleton.tsx`）、底层运行时与状态 `infra/`（`bridge.ts`、`solid.ts`、`polyfill.ts`、`state/`），另加 `workspace/` 与 `farm/` |
-| `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[哲学与令牌](docs/design/01-philosophy-and-tokens.md)） |
+| `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[哲学与令牌](docs/design/01-philosophy-and-tokens.md)），与 `apps/mobile` 令牌一同由 [tokens.ts](scripts/gen/tokens.ts) 从 [tokens.json](design/tokens.json) 生成 |
+| `apps/mac/ui/features/setting/RemoteAccessPage.tsx` | Mac 设置页 `/settings/connections/remote`：远程访问开关、Tailscale 在线状态与地址、二维码配对（`host.qr`）与已配对设备撤销 |
+| `apps/mobile/` | 独立原生移动应用（`nsh/mobile`，iOS + Android 折叠屏／iPhone Duo 自适应）：基于 `@vibevalley/protocol/remote`（[transport.ts](packages/protocol/src/remote/transport.ts)）连接 Mac 远程门，含配对页、4 个一级标签（收件箱、频道、会话、任务）、[layout.ts](apps/mobile/src/design/layout.ts) 自适应单／双栏布局与 `<Canvas>` + `Path2D` 97 枚 reicons 渲染 |
 | `crates/server/src/transport/bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
 | `packages/protocol/src/host.ts` | `Host` 接口：页面能向宿主要的东西 |
 | `apps/island/` | 刘海上的灵动岛（Swift）：一个单独的小程序，stdin 收工单摘要，stdout 说点了哪一行（[apps/island/README.md](apps/island/README.md)）；`apps/mac` 从包内带起它，退出时关闭 |
@@ -41,7 +43,7 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 
 - **服务端在应用的进程里**：`BridgeHub::install` 在后台线程调 `vibevalley_server::start`，家目录按当前发布通道解析（`VIBEVALLEY_HOME` 覆盖，默认 `~/.vibevalley{,-beta,-alpha,-dev}`，见[设置和配置](docs/subsystems/setting.md#发布通道默认端口与数据目录)），工作目录是 `$VIBEVALLEY_WORK_ROOT`，默认 `~/vibevalley-dev`；起来之前的调用由 `LateServer` 接住。开场等待服务端、HTTP 地址公告和项目加载都成功；失败停在失败画面。
 - **同一个服务端另开一道本机的 HTTP 门**：`vibevalley_server::transport::http::serve` 默认按当前发布通道绑定 `127.0.0.1:<默认端口>`（`release` `8787`、`beta` `8788`、`alpha` `8789`、`dev` `8790`）；未显式设置 `VIBEVALLEY_PORT` 且首选端口已被占用（`AddrInUse`）时，应用向 stderr 打印告警并自动回落到空闲端口（`127.0.0.1:0`），显式设置非零 `VIBEVALLEY_PORT` 冲突时直接失败；实际监听地址写进家目录的 `server.json`，命令行据此找到它，帮工的 `/mcp` 也在这道门上。
-- **一个服务端只有一个用户**：门只听 `127.0.0.1`，本机来的请求就是用户，没有登录、设备和配对。
+- **一个服务端只有一个本机用户，远程设备按需配对**：主回环门只听 `127.0.0.1`，本机来的请求直接为 `Caller::User`；远程监听门默认关闭，仅当用户在本机 `/settings/connections/remote` 显式开启并完成一次性配对后，才接受已配对设备的 Bearer 令牌（`Caller::Remote` + `CallerPrincipal::RemoteDevice`，见[受控远程访问](docs/subsystems/core.md#受控远程访问)）。
 - **外壳自己的数据按发布通道另存一个库**：项目、布局、外壳的设置按当前发布通道存于 `~/Library/Application Support/VibeValley{,-beta,-alpha,-dev}/state.db`（`VIBEVALLEY_STORE` 覆盖）。宿主库名为 `state.db` 时，nsh 页面在同目录的 `nsh/` 读写。其他库名各用同目录的 `<库名>.nsh/`。服务端使用自己的家目录。已有项目可直接激活。用户按目录打开新项目或关联终端时，宿主在后台读取项目。终端桥在标签创建或复用后返回其标识。
 
 ### 工单里的子任务
@@ -107,6 +109,15 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 - **默认关闭 CoreGraphics 字体平滑膨胀**：`main.rs` 启动最早期（GPUI 初始化前）调 `host::disable_default_font_smoothing()`，当 `CFPreferencesCopyAppValue("AppleFontSmoothing", kCFPreferencesCurrentApplication)` 未设置时，向内存域 `NSRegistrationDomain` 注册 `AppleFontSmoothing = 0`（不写用户 plist），避免 CoreGraphics 对终端和工作台字形施加 10–22% 笔画膨胀；若用户经命令行参数或 `defaults` 显式设置了 `AppleFontSmoothing` 则保持原值。
 - **像素场景归外壳画**：`/farm`、`/farm/<仓库>` 和 `/tree` 的页面只发 `openFarm`、`openTree`，外壳在同一个位置换上像素视图；像素视图要去工作台的某一页时发 `PixelEvent::Route`，要开终端时发 `PixelEvent::Terminal`。
 
+### 移动端与远程访问
+
+- **Mac 设置入口（`/settings/connections/remote`）**：[RemoteAccessPage.tsx](apps/mac/ui/features/setting/RemoteAccessPage.tsx) 挂在设置「外部连接」的第 3 个子标签，调用 `remote.status`、`remote.enable`、`remote.disable`、`remote.pair.create` 与 `remote.device.revoke`，展示 Tailscale 在线态与访问地址、经 `host.qr` 渲染 `vibevalley://pair` 二维码与 6 位一次性配对码，并支持复制配对链接和即时撤销设备。
+- **独立原生外壳 `apps/mobile/` 与折叠屏／iPhone Duo 自适应布局**：基于 `nsh/mobile` 接入原生 `TabBar`、`Haptics`、`Storage`、`UrlScheme`（截获 `vibevalley://pair?url=...&code=...` 深链自动配对）与 Android `BackHandler`，无桌面工作区和像素农场；[layout.ts](apps/mobile/src/design/layout.ts) 以响应式 `windowSize()` 与四边 `safeArea()` 按 `DUAL_PANE_MIN_WIDTH = 600` 切换两种布局态：
+  - `compact`（`< 600`）：单栏列表／详情视图 + 底部原生 `TabBar`（按 `platform.select` 分别传入 iOS SF Symbols 与 Android 系统图标，并在详情态由 Android `BackHandler` 优先返回列表）。
+  - `dual_pane`（`>= 600`，适配展开后的 Android 折叠屏如 Pixel Fold `841×701 dp` 与 iPhone Duo `744–840 pt`）：隐藏底部 `TabBar`，改为 `72px` 左侧导航栏（`NAV_RAIL_WIDTH = 72`）+ 4 个标签共享的主从 `<SplitPane>` 双栏视图与居中配对卡片；选中项统一托管在根组件，折展切换时保持详情连续不丢态。无移动端原生宿主时（如无头 `nsh test`）自动退化到同令牌组件。
+- **零平台依赖传输层（`@vibevalley/protocol/remote`）**：[transport.ts](packages/protocol/src/remote/transport.ts) 仅用 Web Fetch、`AbortController`、`ReadableStream` 与 `TextDecoder` 实现 `HttpRemoteTransport`、`parsePairUrl`、`normalizeServerUrl` 与 `pairWithServer`，按需订阅业务切片并通过 `Last-Event-ID` 指数退避续读，遇 `401` / `403` 立即停连并上报 `unauthorized`。
+- **97 枚 reicons 矢量回退与令牌单源**：[icons.ts](scripts/gen/icons.ts) 从 [icon.rs](crates/rich/src/icon.rs) 提取全部 97 枚图标路径（含填充、描边、线帽、拐角、`evenodd` 与透明度）写出 `iconPaths.gen.ts`；在无原生 `VvIcon` 的载体（`apps/mobile` 及非 GPUI 回退）中由 `<Canvas>` + `Path2D` 按 `size / 24` 缩放绘制（[Icon.tsx](apps/mac/ui/design/Icon.tsx)）。[tokens.ts](scripts/gen/tokens.ts) 同步从 [tokens.json](design/tokens.json) 写出 `apps/mobile/design/theme.json` 与 `apps/mobile/nsh.json` 的 Tailwind 令牌配置。
+
 ## 怎么走
 
 **打开**
@@ -139,17 +150,19 @@ VibeValley 的客户端是一个原生 macOS 应用 `apps/mac`（二进制 `vibe
 - **服务端在进程里，页面走桥**：少一个进程和一层序列化之外的网络；HTTP 门只为命令行和帮工的 `/mcp` 留着。
 - **工作台用 TSX，像素场景用 Rust**：工作台是表单、列表和文字，沿用页面的写法和契约的 TS 类型最省；像素场景要逐像素对齐和每帧重画，直接画成 `DrawList`，同一份还能在 CPU 上画成 PNG 来查。
 - **状态中间层收在 `state/`，意图按帧 `seq` 结算**：消除「请求返回先弹回旧状态、下一帧再跳过去」的闪烁。
-- **只做 macOS，只在本机**：浏览器、手机和另一台电脑进来的门连同登录一起去掉，主监听不用再分本机和外面。
+- **Mac 是唯一服务端宿主，远程访问收口在 Tailscale + 原生移动壳**：不引入公网中继和 WebView 壳，主回环门保持无认证极简路径；远程监听默认关闭，仅在用户需要时对私有 Tailscale 网络或本地调试回环开放，由独立 4 标签 `apps/mobile` 聚焦离开桌面后的高频分拣与回复。
 
 ## 还没做的
 
 - 真实音频与麦克风验收、Developer ID 签名公证与签名包全路由截图验收，见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)的「剩下的」。
 - DevTools V2（画布 `Inspector` `testID` 点选与源码跳转、Loro 前沿视图、强类型 `DebugCommand` 替换 `apps/mac/src/debug.rs`），见[VibeValley DevTools 与跨边界强类型协议准则](.agents/notes/proposed/architecture/2026-11-22-devtools-and-protocol-boundaries.md)。
 - 宽屏对话次级标签收敛、历史 `pkm` 本地导入/退役与素材组织方式等后续项，见[工作台顶栏、页面交互精简与大纲笔记归属作品](.agents/notes/proposed/architecture/2026-11-22-workbench-ux-polish-and-outline-as-artifact.md)。
+- 移动端真机分发签名与系统远程推送能力，见[Tailscale 与 nsh 原生移动远程控制](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)。
 
 ## 怎么验证
 
 - `vp run rust:check`：`apps/mac` 和它用的 crate 的格式、clippy 与测试（`apps/mac/src/pixel/tests.rs` 用真的素材和替身服务端的样例画每个场景）。
 - `vp run mac:check`：`apps/mac/ui` 的 nsh 类型检查、打包、`vp lint --deny-warnings` 与全量 `nsh/test` 单元测试及集成测试（含 `interactions.test.tsx`、`scenarios.test.tsx`）。
+- `vp run mobile:check` 与 `vpx scripts/gen/icons.ts --check`：`apps/mobile` 的 nsh 类型检查、打包、无头组件测试、`vp lint --deny-warnings` 与 97 枚 reicons 矢量路径同步检查。
 - `apps/mac/ui/{app,workspace}/*.test.{ts,tsx}`、`apps/mac/ui/features/**`: `nsh/test` 写的页面、工作区外壳、主题令牌与领域逻辑测试，用样例的 `Transport`。
 - 在真的应用上：一键运行 `vp run ui:gallery`（[画廊脚本](scripts/audit/ui-gallery.ts)）或按 [验收的应用分册](.agents/skills/vv-acceptance/references/app.md)，用 `VIBEVALLEY_DEBUG_SCRIPT` 走一遍并截图。

@@ -19,24 +19,24 @@
 |---|---|
 | `Cargo.toml`、`rust-toolchain.toml`、`rustfmt.toml` | Rust 工作区成员、工具链与格式 |
 | `pnpm-workspace.yaml`、`vite.config.ts` | TS 工作区包列表、依赖版本 catalog、oxfmt 与 oxlint 配置、检查任务（`rust:check`、`docs:verify`…） |
-| `scripts/{gen,audit,docs,release}/` | 工程脚本：`gen/`（生成物写出）、`audit/`（lint 插件、死代码、注释审查）、`docs/`（Note、链接、术语与旧名检查）、`release/`（发版、回归与验收沙箱） |
-| `crates/server/src/lib.rs`、`crates/server/src/start.rs` | `Hub`（状态、端点表、事实）与按序打开各模块的 `start` |
-| `crates/server/src/db/{schema,queries,generated}/` | 服务端 13 组 SQLite 建表语句（含 `shared.sql` 共享 `seq_counter`）、命名查询（`*.sql`）与 sqlc 生成的 SQLx 查询模块（`*.rs`，由边界测试锁死仅限所属域模块调用） |
-| `crates/server/src/modules/`、`crates/server/src/transport/` | 按六大域分组的业务模块（`work`、`team`、`collab`、`content`、`skin`、`infra`，含 `infra/debug/` `DebugKit`）与传输层（`api`、`bridge`、`http`） |
-| `crates/protocol/src/contract/`、`crates/protocol/tests/typescript.rs`、`crates/protocol/src/home.rs` | 线上类型（含 5 域切片、`FarmFrame`、`debug.rs` 的 `DebugKit` 与 `host.rs` 的 `Host*` 帧/`HostAction`/`HostOp` 壳协议，`ts-rs` 写出 `packages/protocol` 的 `*.gen.ts`，`vp run protocol:check` 查最新）与家目录约定（`server.json`、语言） |
+| `scripts/{gen,audit,docs,release}/` | 工程脚本：`gen/`（契约、词典、令牌、97 枚 reicons 矢量路径 [icons.ts](scripts/gen/icons.ts) 与 sqlc 生成）、`audit/`（lint 插件、死代码、注释审查）、`docs/`（Note、链接、术语与旧名检查）、`release/`（发版、回归与验收沙箱） |
+| `crates/server/src/lib.rs`、`crates/server/src/start.rs` | `Hub`（状态、端点表、事实与可插拔插槽）与按序打开各模块的 `start` |
+| `crates/server/src/db/{schema,queries,generated}/` | 服务端 SQLite 建表语句（含 `shared.sql` 共享 `seq_counter` 与 `infra_remote.sql` 远程配置/设备表）、命名查询（`*.sql`）与 sqlc 生成的 SQLx 查询模块（`*.rs`，由边界测试锁死仅限所属域模块调用） |
+| `crates/server/src/modules/`、`crates/server/src/transport/` | 按六大域分组的业务模块（`work`、`team`、`collab`、`content`、`skin`、`infra`，含 `infra/debug/` `DebugKit` 与 `infra/remote/` 远程访问控制）与传输层（`api`、`bridge`、`http`） |
+| `crates/protocol/src/contract/`、`crates/protocol/tests/typescript.rs`、`crates/protocol/src/home.rs` | 线上类型（含 5 域切片、`FarmFrame`、`debug.rs` 的 `DebugKit`、[remote.rs](crates/protocol/src/contract/remote.rs) 的远程访问契约与 `host.rs` 的 `Host*` 帧/`HostAction`/`HostOp` 壳协议，`ts-rs` 写出 `packages/protocol` 的 `*.gen.ts`，`vp run protocol:check` 查最新）与家目录约定（`server.json`、语言） |
 | `crates/core/src/` | 纯规则中心：`reduce`、`SliceMask` 与按域切片投影、状态派生、收件箱、依赖、定时任务（`cron/`）、笔记大纲（`pkm/`）、作品引擎（`artifact/`） |
 | `crates/runtime/src/` | 进程级共享 Tokio 运行时 `rt.rs`（`vibevalley_runtime::rt::{handle, spawn, block_on}`）、`oar/` 驱动与自研 `agent/` 持久对话引擎（`execution.db`） |
 | `crates/rich/`、`crates/engines/{onig,pele,shiki}` | 原生富内容组件与内部引擎（`canvas`、`chart`、`genui`、`pinyin`）及底层正则/高亮/图谱引擎 |
 | `apps/mac/crates/workspace/src/store/mod.rs` | 原生应用外壳的 `state.db`（SQLite）：项目、终端与布局；连同 `pixel`、`terminal` 共 3 个桌面支撑 crate |
 | `crates/i18n/src/lib.rs`、`crates/i18n/locales/` | 消息格式与词典；词典构建时编进去，前端 `web.*` 词典挂在可选特性 `web` 下（仅 `crates/rich` 开启） |
 | `crates/server/src/testing.rs` | 测试和验收沙箱用的替身农机 `pi`（`VIBEVALLEY_TEST_RUNTIMES=1`） |
-| `packages/protocol/src/<概念>/` | 页面用的契约：生成的 `shapes.gen.ts`，手写的 `schema.ts`（Zod）和 `api.ts`（额外导出或别名才设 `shapes.ts`）；`src/rules/` 是页面用的纯函数规则；`src/client.ts` 是生成的 `VibeValleyApi` |
+| `packages/protocol/src/<概念>/` | 页面用的契约：生成的 `shapes.gen.ts`，手写的 `schema.ts`（Zod）和 `api.ts`（额外导出或别名才设 `shapes.ts`）；`src/rules/` 是页面用的纯函数规则；`@vibevalley/protocol/remote`（[transport.ts](packages/protocol/src/remote/transport.ts)）导出零平台依赖的纯 Web Fetch `HttpRemoteTransport`（Bearer 鉴权、`Last-Event-ID` SSE 续读与 `vibevalley://pair` 解析）；`src/client.ts` 是生成的 `VibeValleyApi` |
 
 ## 模型和不变量
 
 ### 仓库和包
 
-- **Rust 为准**：服务端（`vibevalley-server`）、命令行（`vibevalley-cli`）、原生应用（`apps/mac`）都是 Rust；TS 只剩原生应用的页面（`apps/mac/ui`）和 4 个共用包（`packages/{protocol,i18n,testkit,tsrs}`）、官网（`apps/site`）与脚本（[原生的 VibeValley](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
+- **Rust 为准**：服务端（`vibevalley-server`）、命令行（`vibevalley-cli`）、原生应用（`apps/mac`）都是 Rust；TS 承接桌面工作台（`apps/mac/ui`）、独立原生移动端（`apps/mobile`，`nsh/mobile`，iOS 优先、Android 就绪）、4 个共用包（`packages/{protocol,i18n,testkit,tsrs}`）、官网（`apps/site`）与脚本（[原生的 VibeValley](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
 - **一个 Cargo 工作区（16 个 crate）**：成员按层组织为 `crates/*`（`protocol`、`i18n`、`core`、`git`、`files`、`runtime`、`rich`、`server`、`cli`）、`crates/engines/{onig,pele,shiki}`、`apps/mac` 与桌面支撑 `apps/mac/crates/{pixel,terminal,workspace}`（包名仍保留 `vibevalley-*`，使 `core` 不遮蔽 `::core`），版本与 edition 写在根 `Cargo.toml` 的 `[workspace.package]`，依赖各 crate 自己写；`vp run rust:check` 跑 `cargo fmt --check`、`cargo clippy -D warnings` 与 `cargo test`。
 - **TS 依赖版本集中**：版本在 `pnpm-workspace.yaml` 的 catalog，各包写 `catalog:`（`scripts/audit/catalog.test.ts` 查）。
 - **跨包走包名**：TS 跨包写 `@vibevalley/*`（`no-cross-package-path` 查）；`apps/mac/ui` 经 `nsh.json` 的别名解析它们；`packages/*` 的类型导出指向 `dist/*.d.ts`（`vp run packages:build`）。
@@ -61,7 +61,7 @@
 ### 契约、规则和数据库
 
 - **契约以 Rust 为源，生成 TS**：`crates/protocol/src/contract/` 的类型是数据源，`vp run protocol:ts` 写出 `packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`，`cargo test` 里的 `tests/typescript.rs` 查最新；页面在边界解码用的 Zod Schema 与 `api.ts` 手写，由 `schema.test.ts`、`api.test.ts` 对着生成物查。词典在 `crates/i18n/locales/`，`vp run i18n:gen` 写出 TS 目录。
-- **生成文件不手改**：`packages/protocol` 的 `*.gen.ts`、`packages/protocol/src/client.ts`、`packages/i18n/src/catalogs.ts`、[capabilities.md](docs/reference/capabilities.md) 由脚本生成并有检查。
+- **生成文件不手改**：`packages/protocol` 的 `*.gen.ts`、`packages/protocol/src/client.ts`、`packages/i18n/src/catalogs.ts`、`iconPaths.gen.ts`（`vp run icons:gen`）、[capabilities.md](docs/reference/capabilities.md) 由脚本生成并有检查。
 - **SQLite 按连接范围分工。** 宿主 `state.db` 保存项目、布局、终端和设置。服务端业务模块共用 `server.db`。各模块用同一份 SQL 定义运行时表结构和查询生成时的输入。[sqlc 配置](sqlc.yaml)
 - **sqlc 检查 SQL，SQLx 执行查询。** sqlc 通过标准输入把命名查询的 JSON 发给本仓库的进程插件。插件按参数编号绑定值，并用 sqlc 标注的列名、类型和可空性生成 Rust 行类型。SQLite 的 `INTEGER`、`TEXT`、`REAL`、`BLOB` 分别映射为 `i64`、`String`、`f64`、`Vec<u8>`。可空列使用 `Option<T>`。不支持的类型或命令使生成失败。[生成器](scripts/gen/sqlc-rust/generate.ts) · [官方插件协议](https://docs.sqlc.dev/en/latest/guides/plugins.html)
 - **调用方持有事务。** 生成函数接受 SQLx 连接池或调用方的连接。`:one` 查不到记录时返回 `RowNotFound`，`:many` 返回列表，`:exec` 成功时返回 `()`，`:execrows` 返回受影响行数。领域模块决定何时提交，并将数据库行转换为业务类型。[宿主调用点](apps/mac/crates/workspace/src/store/mod.rs) · [事务回归](scripts/gen/sqlc-rust/smoke.rs)
@@ -120,5 +120,5 @@
 
 - `vp run rust:check`：格式、clippy 与全部 Rust 测试。
 - `vp run protocol:check`：生成的线上类型与 golden 是最新的。
-- `vp check`、`vp run packages:check`、`vp run mac:check`：TS。
-- `vp run docs:verify`：生成物、词典、旧名字与文档链接。
+- `vp check`、`vp run packages:check`、`vp run mac:check`、`vp run mobile:check`：TS 与原生页面（桌面与移动端）。
+- `vp run docs:verify`：生成物（含 `icons.ts --check`）、词典、旧名字与文档链接。

@@ -2167,6 +2167,57 @@ export const catalogs = {
       openSpeechShort: "去生成",
       adapted: "能用的模型",
     },
+    "web.remote": {
+      title: "远程访问",
+      subtitle: "通过 Tailscale 从手机远程查看与操作这台 Mac 上的 VibeValley。",
+      toggle: { enable: "开启远程访问", disable: "关闭远程访问", enabled: "已开启", disabled: "未开启" },
+      tailscale: { online: "Tailscale 在线", offline: "Tailscale 未连接", ip: "Tailscale IP", url: "访问地址" },
+      pair: {
+        action: "配对新设备",
+        qrHint: "在手机上扫描二维码，或手动输入地址与配对码",
+        code: "配对码",
+        expires: "有效期至 {time}",
+        copy: "复制配对链接",
+        copied: "已复制",
+      },
+      devices: {
+        title: "已配对设备",
+        platform: { ios: "iOS", android: "Android", other: "其他设备" },
+        lastSeen: "最近活跃：{time}",
+        revoke: "撤销",
+        empty: "还没有配对过设备。",
+      },
+      mobile: {
+        pairTitle: "连接到 Mac",
+        pairSubtitle: "输入 Mac 远程访问面板显示的地址和一次性配对码。",
+        urlLabel: "Mac 地址",
+        codeLabel: "配对码",
+        deviceNameLabel: "设备名称",
+        pairAction: "配对并连接",
+        pairing: "正在配对…",
+        invalidInput: "请填写有效的地址、配对码和设备名称。",
+      },
+      state: {
+        connecting: "正在连接…",
+        connected: "已连接",
+        reconnecting: "连接中断，正在重连…",
+        unauthorized: "访问权限已失效，请重新配对",
+        offline: "已断开",
+        disconnect: "断开连接",
+      },
+      tabs: { inbox: "收件箱", channels: "频道", sessions: "会话", issues: "任务" },
+      inbox: { approve: "同意", deny: "拒绝", answer: "回复", empty: "收件箱为空，暂时没有待处理项。" },
+      channel: { replyPlaceholder: "输入消息回复…", send: "发送", empty: "这个频道还没有消息。" },
+      session: { promptPlaceholder: "给执行会话发一条指令…", send: "发送", stop: "停止", events: "轨迹", empty: "当前没有运行中的执行会话。" },
+      issue: {
+        filter: { all: "全部", active: "进行中", review: "待验收", done: "已完成" },
+        comment: "评论",
+        approve: "通过验收",
+        changes: "打回修改",
+        status: "状态",
+        empty: "没有符合条件的任务。",
+      },
+    },
     "web.repo": {
       list: "仓库列表",
       add: "新增仓库",
@@ -2528,6 +2579,7 @@ export const catalogs = {
         models: "模型与密钥",
         voice: "语音与通话",
         connections: "外部连接",
+        remote: "远程访问",
         about: "关于与数据",
         memory: "记忆",
         call: "通话线路",
@@ -2540,6 +2592,7 @@ export const catalogs = {
         models: "密钥 钥匙 账号 DeepSeek MOSS 声网 Agora API Key 模型 绑定",
         voice: "声网 Agora 电话 通话 MOSS Live 实时 视觉 听写 转写 语音",
         connections: "微信 飞书 QQ 连接器 配对 GitHub gh PR 登录",
+        remote: "远程 手机 Tailscale 配对 二维码 设备 iOS Android 监听 令牌",
         about: "版本 家目录 设置文件 数据 素材图鉴 version catalog",
       },
       scope: { farm: "对整个 VibeValley", device: "只对这台设备" },
@@ -5314,6 +5367,63 @@ export const catalogs = {
       openSpeechShort: "Open",
       adapted: "Models it can use",
     },
+    "web.remote": {
+      title: "Remote Access",
+      subtitle: "View and control VibeValley on this Mac from your phone over Tailscale.",
+      toggle: { enable: "Enable remote access", disable: "Disable remote access", enabled: "Enabled", disabled: "Disabled" },
+      tailscale: { online: "Tailscale online", offline: "Tailscale offline", ip: "Tailscale IP", url: "Access URL" },
+      pair: {
+        action: "Pair new device",
+        qrHint: "Scan the QR code on your phone, or enter the address and pairing code",
+        code: "Pairing code",
+        expires: "Expires at {time}",
+        copy: "Copy pairing link",
+        copied: "Copied",
+      },
+      devices: {
+        title: "Paired devices",
+        platform: { ios: "iOS", android: "Android", other: "Other" },
+        lastSeen: "Last active: {time}",
+        revoke: "Revoke",
+        empty: "No paired devices yet.",
+      },
+      mobile: {
+        pairTitle: "Connect to Mac",
+        pairSubtitle: "Enter the address and one-time pairing code shown in Remote Access settings on your Mac.",
+        urlLabel: "Mac address",
+        codeLabel: "Pairing code",
+        deviceNameLabel: "Device name",
+        pairAction: "Pair & connect",
+        pairing: "Pairing…",
+        invalidInput: "Enter a valid address, pairing code, and device name.",
+      },
+      state: {
+        connecting: "Connecting…",
+        connected: "Connected",
+        reconnecting: "Connection lost, reconnecting…",
+        unauthorized: "Access revoked or expired. Pair again.",
+        offline: "Disconnected",
+        disconnect: "Disconnect",
+      },
+      tabs: { inbox: "Inbox", channels: "Channels", sessions: "Sessions", issues: "Issues" },
+      inbox: { approve: "Approve", deny: "Deny", answer: "Answer", empty: "Inbox is clear. Nothing needs your attention." },
+      channel: { replyPlaceholder: "Write a reply…", send: "Send", empty: "No messages in this channel yet." },
+      session: {
+        promptPlaceholder: "Send instructions to this helper…",
+        send: "Send",
+        stop: "Stop",
+        events: "Trajectory",
+        empty: "No active helpers right now.",
+      },
+      issue: {
+        filter: { all: "All", active: "Active", review: "In review", done: "Done" },
+        comment: "Comment",
+        approve: "Approve",
+        changes: "Request changes",
+        status: "Status",
+        empty: "No matching issues.",
+      },
+    },
     "web.repo": {
       list: "Repos",
       add: "New repo",
@@ -5695,6 +5805,7 @@ export const catalogs = {
         models: "Models & Keys",
         voice: "Voice",
         connections: "Connections",
+        remote: "Remote Access",
         about: "About & Data",
         memory: "Memory",
         call: "Call line",
@@ -5707,6 +5818,7 @@ export const catalogs = {
         models: "keys accounts DeepSeek MOSS Agora API key models binding",
         voice: "Agora call phone recognition speech MOSS live realtime vision dictation transcription",
         connections: "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
+        remote: "remote mobile phone Tailscale pair pairing QR device iOS Android listener token",
         about: "version home folder settings data catalog",
       },
       scope: { farm: "For all of VibeValley", device: "This device only" },
@@ -8449,6 +8561,68 @@ export interface Messages {
   "web.provider.uses": undefined;
   "web.provider.usesIntro": undefined;
   "web.provider.words": undefined;
+  "web.remote.channel.empty": undefined;
+  "web.remote.channel.replyPlaceholder": undefined;
+  "web.remote.channel.send": undefined;
+  "web.remote.devices.empty": undefined;
+  "web.remote.devices.lastSeen": { readonly time: string | number };
+  "web.remote.devices.platform.android": undefined;
+  "web.remote.devices.platform.ios": undefined;
+  "web.remote.devices.platform.other": undefined;
+  "web.remote.devices.revoke": undefined;
+  "web.remote.devices.title": undefined;
+  "web.remote.inbox.answer": undefined;
+  "web.remote.inbox.approve": undefined;
+  "web.remote.inbox.deny": undefined;
+  "web.remote.inbox.empty": undefined;
+  "web.remote.issue.approve": undefined;
+  "web.remote.issue.changes": undefined;
+  "web.remote.issue.comment": undefined;
+  "web.remote.issue.empty": undefined;
+  "web.remote.issue.filter.active": undefined;
+  "web.remote.issue.filter.all": undefined;
+  "web.remote.issue.filter.done": undefined;
+  "web.remote.issue.filter.review": undefined;
+  "web.remote.issue.status": undefined;
+  "web.remote.mobile.codeLabel": undefined;
+  "web.remote.mobile.deviceNameLabel": undefined;
+  "web.remote.mobile.invalidInput": undefined;
+  "web.remote.mobile.pairAction": undefined;
+  "web.remote.mobile.pairSubtitle": undefined;
+  "web.remote.mobile.pairTitle": undefined;
+  "web.remote.mobile.pairing": undefined;
+  "web.remote.mobile.urlLabel": undefined;
+  "web.remote.pair.action": undefined;
+  "web.remote.pair.code": undefined;
+  "web.remote.pair.copied": undefined;
+  "web.remote.pair.copy": undefined;
+  "web.remote.pair.expires": { readonly time: string | number };
+  "web.remote.pair.qrHint": undefined;
+  "web.remote.session.empty": undefined;
+  "web.remote.session.events": undefined;
+  "web.remote.session.promptPlaceholder": undefined;
+  "web.remote.session.send": undefined;
+  "web.remote.session.stop": undefined;
+  "web.remote.state.connected": undefined;
+  "web.remote.state.connecting": undefined;
+  "web.remote.state.disconnect": undefined;
+  "web.remote.state.offline": undefined;
+  "web.remote.state.reconnecting": undefined;
+  "web.remote.state.unauthorized": undefined;
+  "web.remote.subtitle": undefined;
+  "web.remote.tabs.channels": undefined;
+  "web.remote.tabs.inbox": undefined;
+  "web.remote.tabs.issues": undefined;
+  "web.remote.tabs.sessions": undefined;
+  "web.remote.tailscale.ip": undefined;
+  "web.remote.tailscale.offline": undefined;
+  "web.remote.tailscale.online": undefined;
+  "web.remote.tailscale.url": undefined;
+  "web.remote.title": undefined;
+  "web.remote.toggle.disable": undefined;
+  "web.remote.toggle.disabled": undefined;
+  "web.remote.toggle.enable": undefined;
+  "web.remote.toggle.enabled": undefined;
   "web.repo.add": undefined;
   "web.repo.all": undefined;
   "web.repo.allLine": undefined;
@@ -8889,6 +9063,7 @@ export interface Messages {
   "web.setting.nav.label": undefined;
   "web.setting.nav.memory": undefined;
   "web.setting.nav.models": undefined;
+  "web.setting.nav.remote": undefined;
   "web.setting.nav.search": undefined;
   "web.setting.nav.voice": undefined;
   "web.setting.nav.width": undefined;
@@ -8919,6 +9094,7 @@ export interface Messages {
   "web.setting.words.connections": undefined;
   "web.setting.words.general": undefined;
   "web.setting.words.models": undefined;
+  "web.setting.words.remote": undefined;
   "web.setting.words.voice": undefined;
   "web.shell.chat.attachFile": undefined;
   "web.shell.chat.chooseModel": undefined;

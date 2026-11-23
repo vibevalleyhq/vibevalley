@@ -1,6 +1,6 @@
 # AGENTS.md
 
-VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：任务派给角色（Agent），服务端为它派一个执行会话（Session，经 Rust 的 oar 驱动本机的编码引擎），按角色设置在仓库目录或任务的 worktree 里一轮一轮运行，用户看改动、合进主分支；用户、主助手（替用户派活的 agent）和执行会话在频道里说话。外面另有一层像素农场皮肤：仓库是岛，在做的任务是一块地，帮工在地上干活，默认频道画成田头（[概念](docs/concepts.md)）。它是全原生的，只支持 macOS，只在本机用：服务端和命令行是 Rust（`crates/`），应用是 `apps/mac`（GPUI 窗口，里面带着服务端；工作台是 nsh 跑的 TSX 页面，像素农场由 Rust 画）；契约、词典、工具说明和提示以 Rust 为源，TS 由它生成。还在做的部分见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)。改 `crates/`、`apps/`、`packages/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；子系统沉淀在 [docs/subsystems](docs/subsystems/README.md)，计划写成 [Agent Notes](.agents/notes/README.md)。
+VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：任务派给角色（Agent），服务端为它派一个执行会话（Session，经 Rust 的 oar 驱动本机的编码引擎），按角色设置在仓库目录或任务的 worktree 里一轮一轮运行，用户看改动、合进主分支；用户、主助手（替用户派活的 agent）和执行会话在频道里说话。外面另有一层像素农场皮肤：仓库是岛，在做的任务是一块地，帮工在地上干活，默认频道画成田头（[概念](docs/concepts.md)）。它是全原生的，桌面宿主运行于 macOS：服务端和命令行是 Rust（`crates/`），桌面应用是 `apps/mac`（GPUI 窗口，里面带着服务端；工作台是 nsh 跑的 TSX 页面，像素农场由 Rust 画），另提供独立原生移动端 `apps/mobile`（`nsh/mobile`，iOS 优先、Android 就绪，经默认关闭的 Tailscale / 回环受认证远程门接入 Mac，见[移动远程控制方案](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)）；契约、词典、工具说明和提示以 Rust 为源，TS 由它生成。还在做的部分见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)。改 `crates/`、`apps/`、`packages/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；子系统沉淀在 [docs/subsystems](docs/subsystems/README.md)，计划写成 [Agent Notes](.agents/notes/README.md)。
 
 ## 目录
 
@@ -14,20 +14,21 @@ crates/engines/            底层引擎：纯 Rust 正则（onig）、语法高�
 crates/rich/               原生富内容组件与辅助（vibevalley-rich）：Markdown、代码块、图谱、画布、图表、GenUI 与拼音匹配（engine/ 含 canvas、chart、genui、pinyin）
 crates/server/             服务端（二进制 vibevalley-server）：src/modules 按 6 个业务域分组（work：issue、session、workplace、repo、cron、pull、ledger；
                            team：agent、orchestrator、memory、tool、mcp；collab：channel、connector、voice；
-                           content：attachment、library、media、artifact、pkm；skin：game；infra：setting、provider、http、column；
+                           content：attachment、library、media、artifact、pkm；skin：game；infra：setting、provider、http、column、debug、remote；
                            任务板拆成 work/issue（状态与交付）、work/session（领域无关 AgentSession、SQLite session_mailbox 与游标轨迹 session_event）、work/workplace（worktree 与合并），都只经 work/ledger 写），
-                           src/db/{schema,queries,generated}/ 集中管理 SQLite 建表语句（13 份，含 shared.sql 共享 seq_counter）、命名查询与 sqlc 生成绑定；
-                           src/transport/ 收拢接口契约（api）、进程内桥（bridge）与 HTTP 门（http）；
-                           lib.rs 组装 Hub（含 EventBus、SliceFeed、CallerContext 与观察/故障/宿主调试插槽），start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、作品类型指南（artifact/types/）、主助手和执行会话的提示
+                           src/db/{schema,queries,generated}/ 集中管理 SQLite 建表语句（含 shared.sql 共享 seq_counter 与 infra_remote.sql 远程配置/设备表）、命名查询与 sqlc 生成绑定；
+                           src/transport/ 收拢接口契约（api）、进程内桥（bridge）与 HTTP 门（http，含默认关闭的受认证远程监听门）；
+                           lib.rs 组装 Hub（含 EventBus、SliceFeed、CallerContext 与观察/故障/宿主调试/远程认证插槽），start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、作品类型指南（artifact/types/）、主助手和执行会话的提示
 crates/cli/                命令行（二进制 vibevalley，clap）：按五大业务域（work/team/collab/content/infra）组织的纯 HTTP 客户端；评测另拆为可选二进制 vibevalley-eval（--features eval）
 apps/mac/                  原生应用（二进制 vibevalley-mac）：src/ 是窗口外壳（src/shell/*）、终端、宿主能力和像素场景（src/pixel：农场、地图、记忆树、开场、图鉴）；
                            crates/ 是桌面独占支撑 crate（pixel、terminal、workspace）；
-                           ui/ 是 nsh 跑的 TSX：app（含 6 项主导航，详见 docs/subsystems/app.md）、workspace（侧栏/Git/文件/命令面板）、design（共享令牌与组件）、features/<概念>（含笔记与作品前端引擎、5 栏设置）、farm、infra
+                           ui/ 是 nsh 跑的 TSX：app（含 6 项主导航，详见 docs/subsystems/app.md）、workspace（侧栏/Git/文件/命令面板）、design（共享令牌与组件）、features/<概念>（含笔记与作品前端引擎、5 栏设置与远程访问面板）、farm、infra
+apps/mobile/               独立原生移动应用（nsh/mobile，iOS 优先、Android 就绪）：经 @vibevalley/protocol/remote 连接 Mac 远程门，4 标签页（收件箱、频道、会话、任务）与 97 枚 reicons 矢量回退
 apps/island/               刘海上的灵动岛（Swift）：单独的小程序（apps/island/README.md）
 apps/site/                 官网 vibevalley.dev（Vite + Solid 2 静态生成），图和像素字用根目录 assets/ 的
 assets/                    全部的图、像素字、指针和像素村的地图
 packages/protocol/         页面用的契约：src/<概念>/shapes.gen.ts 和 endpoints.gen.ts 是生成的；Zod（schema.ts）、端点表（api.ts）、双端规则（rules/）、
-                           client.ts、宿主接口（host.ts）是手写的
+                           纯 Web Fetch 远程传输层（@vibevalley/protocol/remote：remote/transport.ts）、client.ts、宿主接口（host.ts）是手写的
 packages/i18n/             页面里 t("key")：src/catalogs.ts 由 i18n:gen 从 crates/i18n/locales 写出
 packages/testkit/、tsrs/   测试共用的；vp check 用的 TypeScript（tsrs）
 design/                    生图提示词、脚本和切图规则；原图在单独的仓库 vibevalley-art，design/art.sh 链接进来
@@ -55,6 +56,8 @@ vp run sql:check                                                # 用 sqlc 1.31.
 vp run goldens                                                  # 改了笔记/作品规则或对照用例：跑 Rust 两个 crate 的 golden 测试
 vp run protocol:check                                           # 生成的 TS 契约和两份 golden 是不是最新，和提交的不同就失败
 vp run mac:check                                                # 改完 apps/mac/ui：nsh 类型检查、打包和工单按钮行为测试
+vp run mobile:check                                             # 改完 apps/mobile：nsh 类型检查、打包、测试与 lint
+vp run icons:gen                                                # 改了 crates/rich/src/icon.rs：重新生成 97 枚 reicons 矢量路径表 iconPaths.gen.ts
 vp check                                                        # 改完 apps/mac/ui 以外的 TS：格式（oxfmt）、lint（oxlint，带类型，跑在 tsrs 上）和类型；--fix 改格式
 vp run packages:check                                           # 改完 packages/：打出声明、vp check、各包的测试
 vp run scripts:test                                             # 改完 scripts/：它自己的测试
@@ -94,14 +97,14 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **深模块**：每个模块对外一个窄接口；不靠一个带 `kind` 的入口复用多种操作（[模块设计](docs/style/module-design.md)）。
 - **封闭的联合穷尽处理**：Rust 的 `match` 不写吞掉新成员的 `_`；TS 按 `_tag`、`kind`、`type` 分支时 `switch` 覆盖全部成员（`switch-exhaustiveness-check` 查）。
 - **契约改在 Rust**：形状和接口表改 `crates/protocol/src/contract`，TS 的类型由它生成；页面要用的同改手写的 `schema.ts` 与 `api.ts`，它们的测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）。
-- **生成的不手改**：`packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`（`protocol:ts`）、`client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）、artifact 与 pkm 的 golden（`goldens`）和生成的参考表由脚本写出，`protocol:check` 和 `docs:verify` 查是不是最新。SQLite 查询绑定由 sqlc 生成，输入和输出见[配置](sqlc.yaml)。
+- **生成的不手改**：`packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`（`protocol:ts`）、`client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）、`iconPaths.gen.ts`（`icons:gen`）、artifact 与 pkm 的 golden（`goldens`）和生成的参考表由脚本写出，`protocol:check` 和 `docs:verify` 查是不是最新。SQLite 查询绑定由 sqlc 生成，输入和输出见[配置](sqlc.yaml)。
 - **内部不留兼容**：改名、改形状、改落盘格式直接改，不写兼容层、旧数据兜底或迁移脚本；对外 HTTP `v1` 是唯一例外（[接口版本](docs/subsystems/core.md)）。
 - **页面不折事实**：页面只读按域推来的切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）并写画面摆法，请求只经 `Transport`；缺数据就补进契约与 `reduce` 或调接口问服务端（[客户端](docs/subsystems/app.md)）。
 - **处理函数要薄**：HTTP 门、桥和页面组件只做转发与展示，规则留在所属模块或纯函数里（[架构](docs/architecture.md)）。
 - **执行会话没有权限确认**：服务端只听 `127.0.0.1`，执行会话只在工作区开工（[执行会话](docs/subsystems/session.md)）。
 - **包之间只经包名**：TS 跨包只经 `package.json` 的 `exports` 写 `@vibevalley/*`（`no-cross-package-path` 查）；Rust 跨 crate 只经 `Cargo.toml` 的依赖。
-- **图标分两套**：工作台用 `crates/rich/src/icon.rs` 原生 `VvIcon` 渲染的 97 枚 reicon 线条图标（TS 侧由 `apps/mac/ui/design/icons.ts` 声明 `IconName`，经 `<Icon name>` 使用），像素皮与头像、引擎 logo 用 `design/pixel` 生成的像素图，都不用字符符号代替（[图标与令牌](docs/design/01-philosophy-and-tokens.md)）。
-- **界面照田间工作台**：工作台、工作区外壳和原生壳面的颜色、圆角、字号、阴影和缓动一律走 `design/tokens.json`（由 `vp run tokens:gen` 同步写出 `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` 与 `apps/mac/src/theme_tokens.rs`）；照 [设计系统](docs/design/README.md) 与 [Agent UI 指南](docs/design/08-agent-ui-guide.md)，class 写法照 [vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)。
+- **图标分两套**：工作台用 `crates/rich/src/icon.rs` 原生 `VvIcon` 渲染的 97 枚 reicon 线条图标（TS 侧由 `apps/mac/ui/design/icons.ts` 声明 `IconName`，经 `<Icon name>` 使用；无原生 `VvIcon` 的载体及 `apps/mobile` 使用 `scripts/gen/icons.ts` 单源生成的 `iconPaths.gen.ts` 与 `<Canvas>` + `Path2D` 矢量回退），像素皮与头像、引擎 logo 用 `design/pixel` 生成的像素图，都不用字符符号代替（[图标与令牌](docs/design/01-philosophy-and-tokens.md)）。
+- **界面照田间工作台**：工作台、工作区外壳、移动端和原生壳面的颜色、圆角、字号、阴影和缓动一律走 `design/tokens.json`（由 `vp run tokens:gen` 同步写出 `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json`、`apps/mac/src/theme_tokens.rs` 及 `apps/mobile` 令牌）；照 [设计系统](docs/design/README.md) 与 [Agent UI 指南](docs/design/08-agent-ui-guide.md)，class 写法照 [vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)。
 - **密钥**：家目录的 `settings.json` 不进仓库；日志、快照和文档里不出现真实密钥。
 - **话放在哪**：对用户的话进 `crates/i18n/locales/{zh,en}/<宿主.模块>.json`，Rust 调 `vibevalley_i18n::t`，TS 调 `t("key")`（`vpx scripts/gen/i18n.ts check` 查漏翻）；对模型的话用中文写进 `crates/server/assets`（[话放在哪](docs/subsystems/foundation.md)）。
 - **代码风格**：代码和接口用实际业务概念，种地双关只留在农场的皮里（`stale-names.ts` 查，[用语表](docs/README.md#用语)）；命名站在领域视角说管什么事，不用 `utils`、`state` 一类泛词（[命名](docs/style/naming.md)）；英文注释只写不看就会改错的约束与原因（[代码风格](docs/style/code.md)）。

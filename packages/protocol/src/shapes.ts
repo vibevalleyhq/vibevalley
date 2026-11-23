@@ -365,6 +365,17 @@ export type {
   ProviderVoiceRequest,
 } from "./provider/shapes.gen";
 export {
+  type RemoteDeviceRevokeRequest,
+  type RemoteDeviceSummary,
+  type RemoteEnableRequest,
+  type RemotePairCode,
+  type RemotePairExchangeRequest,
+  type RemotePairExchangeResult,
+  type RemotePlatform,
+  type RemoteStatus,
+  type RemoteWhoami,
+} from "./remote/shapes.gen";
+export {
   type MediaAudioFormat,
   MediaAudioFormatValues,
   type MediaImageJob,

@@ -5,10 +5,10 @@ import { defineConfig } from "vite-plus";
 
 import { says } from "./scripts/audit/oxlint-plugin.ts";
 
-// `apps/mac/ui/.nsh/tsconfig.json` is generated on macOS by `nsh check` (and is gitignored).
-// Linux CI (`ci.yml`) cannot install the macOS-only nsh CLI, so type-aware lint skips `apps/mac/ui/**`
-// only when `.nsh/tsconfig.json` is absent; `mac:check` runs `nsh check` then `vp lint apps/mac/ui`.
+// `apps/mac/ui/.nsh/tsconfig.json` and `apps/mobile/.nsh/tsconfig.json` are generated on macOS by `nsh check` (gitignored).
+// Linux CI (`ci.yml`) cannot install the macOS-only nsh CLI, so type-aware lint skips each app only when its `.nsh/tsconfig.json` is absent.
 const hasNshTypes = existsSync(resolve(import.meta.dirname, "apps/mac/ui/.nsh/tsconfig.json"));
+const hasMobileNshTypes = existsSync(resolve(import.meta.dirname, "apps/mobile/.nsh/tsconfig.json"));
 
 // What no-restricted-imports says, each written once: what is wrong, how to fix it, and where to look
 // (scripts/audit/oxlint-plugin.ts, says; its test reads these too).
@@ -34,6 +34,7 @@ export default defineConfig({
         "vpx scripts/gen/capabilities.ts --check",
         "vpx scripts/gen/api-client.ts --check",
         "vpx scripts/gen/primitives.ts --check",
+        "vpx scripts/gen/icons.ts --check",
       ],
       "notes:verify": "vpx scripts/docs/agent-notes.ts",
       "site:check": { command: "vp run --filter @vibevalley/site check", cache: false },
@@ -81,6 +82,11 @@ export default defineConfig({
         dependsOn: ["mac:build-test"],
         cache: false,
       },
+      "mobile:check": {
+        command:
+          "cd apps/mobile && ../../.tools/bin/nsh check && ../../.tools/bin/nsh build App.tsx -o build && ../../.tools/bin/nsh test && cd ../.. && vp lint --deny-warnings apps/mobile",
+        cache: false,
+      },
       // packages:check already runs type-aware vp check across apps/mac/ui, so release:verify uses mac:build-test to avoid linting twice.
       "release:verify": {
         command: "true",
@@ -106,6 +112,7 @@ export default defineConfig({
       "crates/**",
       "apps/mac/ui/build/**",
       "apps/mac/ui/build-shell/**",
+      "apps/mobile/build/**",
     ],
     // Imports from farthest to nearest: Node, packages, the workspace's own, this app's #/, then the same folder.
     sortImports: {
@@ -114,7 +121,11 @@ export default defineConfig({
     },
   },
   lint: {
-    ignorePatterns: hasNshTypes ? ["crates/**", "apps/mac/ui/.nsh/**", "apps/mac/ui/build/**", "apps/mac/ui/build-shell/**"] : ["crates/**", "apps/mac/ui/**"],
+    ignorePatterns: [
+      "crates/**",
+      ...(hasNshTypes ? ["apps/mac/ui/.nsh/**", "apps/mac/ui/build/**", "apps/mac/ui/build-shell/**"] : ["apps/mac/ui/**"]),
+      ...(hasMobileNshTypes ? ["apps/mobile/.nsh/**", "apps/mobile/build/**"] : ["apps/mobile/**"]),
+    ],
     // oxlint's defaults and import for no-cycle; listing plugins replaces the defaults.
     plugins: ["eslint", "typescript", "unicorn", "oxc", "import"],
     jsPlugins: [
@@ -236,7 +247,7 @@ export default defineConfig({
       },
       {
         // nsh 0.6.0's generated `test.d.ts` types `test(name, body: () => void)` without `Promise<void>`, so async tests fire no-misused-promises.
-        files: ["apps/mac/ui/**/*.test.ts", "apps/mac/ui/**/*.test.tsx"],
+        files: ["apps/mac/ui/**/*.test.ts", "apps/mac/ui/**/*.test.tsx", "apps/mobile/**/*.test.ts", "apps/mobile/**/*.test.tsx"],
         rules: { "typescript/no-misused-promises": "off" },
       },
       {

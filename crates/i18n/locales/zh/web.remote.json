@@ -1,0 +1,90 @@
+{
+  "title": "远程访问",
+  "subtitle": "通过 Tailscale 从手机远程查看与操作这台 Mac 上的 VibeValley。",
+  "toggle": {
+    "enable": "开启远程访问",
+    "disable": "关闭远程访问",
+    "enabled": "已开启",
+    "disabled": "未开启"
+  },
+  "tailscale": {
+    "online": "Tailscale 在线",
+    "offline": "Tailscale 未连接",
+    "ip": "Tailscale IP",
+    "url": "访问地址"
+  },
+  "pair": {
+    "action": "配对新设备",
+    "qrHint": "在手机上扫描二维码，或手动输入地址与配对码",
+    "code": "配对码",
+    "expires": "有效期至 {time}",
+    "copy": "复制配对链接",
+    "copied": "已复制"
+  },
+  "devices": {
+    "title": "已配对设备",
+    "platform": {
+      "ios": "iOS",
+      "android": "Android",
+      "other": "其他设备"
+    },
+    "lastSeen": "最近活跃：{time}",
+    "revoke": "撤销",
+    "empty": "还没有配对过设备。"
+  },
+  "mobile": {
+    "pairTitle": "连接到 Mac",
+    "pairSubtitle": "输入 Mac 远程访问面板显示的地址和一次性配对码。",
+    "urlLabel": "Mac 地址",
+    "codeLabel": "配对码",
+    "deviceNameLabel": "设备名称",
+    "pairAction": "配对并连接",
+    "pairing": "正在配对…",
+    "invalidInput": "请填写有效的地址、配对码和设备名称。"
+  },
+  "state": {
+    "connecting": "正在连接…",
+    "connected": "已连接",
+    "reconnecting": "连接中断，正在重连…",
+    "unauthorized": "访问权限已失效，请重新配对",
+    "offline": "已断开",
+    "disconnect": "断开连接"
+  },
+  "tabs": {
+    "inbox": "收件箱",
+    "channels": "频道",
+    "sessions": "会话",
+    "issues": "任务"
+  },
+  "inbox": {
+    "approve": "同意",
+    "deny": "拒绝",
+    "answer": "回复",
+    "empty": "收件箱为空，暂时没有待处理项。"
+  },
+  "channel": {
+    "replyPlaceholder": "输入消息回复…",
+    "send": "发送",
+    "empty": "这个频道还没有消息。"
+  },
+  "session": {
+    "promptPlaceholder": "给执行会话发一条指令…",
+    "send": "发送",
+    "stop": "停止",
+    "events": "轨迹",
+    "empty": "当前没有运行中的执行会话。"
+  },
+  "issue": {
+    "filter": {
+      "all": "全部",
+      "active": "进行中",
+      "review": "待验收",
+      "done": "已完成"
+    },
+    "comment": "评论",
+    "approve": "通过验收",
+    "changes": "打回修改",
+    "status": "状态",
+    "empty": "没有符合条件的任务。"
+  }
+}

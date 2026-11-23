@@ -9,19 +9,19 @@
 | `SpaceState` 的折叠（`apply`、`reduce`）、脏切片掩码 `SliceMask`、前后状态对 `Transition` 与序号 `seq` | 事实何时发出、各表如何持久化（[工单](docs/subsystems/issue.md)、[帮工](docs/subsystems/session.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/issue.md#定时任务)） |
 | 5 域切片（`BoardSlice`、`SessionsSlice`、`CollabSlice`、`InboxSlice`、`OpsSlice`）与独立 `FarmFrame` 投影，及统一有界合并推流 `SliceFeed<T>` | 地块画面规则与游戏账本计算（[游戏](docs/subsystems/game.md)、[农场的皮](docs/subsystems/farm.md)） |
 | 全部路由：SSE／快照流（`/api/v1/slice/{name}`、`/live`、`/events`、工单观察流、订阅流）和其余 `GET`、`PUT` 路由 | 订阅里频道和 Artifact 的事件内容（[频道](docs/subsystems/channel.md)、[Artifact](docs/subsystems/artifact.md)）、工单观察流的内容（[工单](docs/subsystems/issue.md#观察执行)）、帮工 `/mcp` 的工具 |
-| 接口表 `ENDPOINTS`、权限 `can`、调用上下文 `CallerContext`、幂等键 `requestKey`、试跑 `dryRun`、可插拔脊柱钩子（`InvokeObserver`、`FaultGate`、`HostDebugBridge`）与 CLI 映射 | 各接口业务实现、模型工具（[助手](docs/subsystems/orchestrator.md)） |
+| 接口表 `ENDPOINTS`、权限 `can`、调用上下文 `CallerContext`、幂等键 `requestKey`、试跑 `dryRun`、可插拔脊柱钩子（`InvokeObserver`、`FaultGate`、`HostDebugBridge`、`RemoteAuth`）与 CLI 映射 | 各接口业务实现、模型工具（[助手](docs/subsystems/orchestrator.md)） |
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
 | `crates/core/src/core.rs`、`inbox.rs`、`patrol.rs` | `Core`：`reduce`、`SliceMask`、6 路切片投影（`board_slice`、`sessions_slice`、`collab_slice`、`inbox_slice`、`ops_slice`、`farm_frame`）与离线 `slice_bundle`、`Transition`；收件箱纯计算（`inbox`、`inbox_entries`、`fresh_of`）与巡查规则（`patrol_step`） |
-| `crates/server/src/lib.rs`、`event_bus.rs`、`slice_feed.rs`、`runtime_inbox.rs` | `Hub`、有界异步 `EventBus`、基于 `tokio::sync::watch` 的 6 路脏合并 `SliceFeed<T>` 与 `RuntimeInboxObserver`：持有 `Core`、端点表、订阅表、`tokio::sync::broadcast` 实时事件流与 `CancellationToken`/`TaskTracker` 停机作用域，按 `Applied.dirty: SliceMask` 仅推送变脏切片（`effects` 仅进 `farm`），将持久 `pi.inbox` 运行时告警实时并入 `InboxSlice`；经 `arc-swap` 无锁挂接 `CallerContext`/`ClientIdentity` 与 `InvokeObserver`/`FaultGate`/`HostDebugBridge` 插槽 |
-| `crates/server/src/start.rs` | `start`：按序打开设置、档案、仓库、工单板、频道、媒体、助手与 `DebugKit`（[debug/mod.rs](crates/server/src/modules/infra/debug/mod.rs)），接线 `IssueChat`、`SessionChat`、助手频道订阅与 `RuntimeInboxObserver`，注册所有端点；仅在 `VIBEVALLEY_DEBUG=1` 时挂接观察器、`FaultGate` 与 `OarObserver`，`Started::close` 停机并卸载全局观察器 |
+| `crates/server/src/lib.rs`、`event_bus.rs`、`slice_feed.rs`、`runtime_inbox.rs` | `Hub`、有界异步 `EventBus`、基于 `tokio::sync::watch` 的 6 路脏合并 `SliceFeed<T>` 与 `RuntimeInboxObserver`：持有 `Core`、端点表、订阅表、`tokio::sync::broadcast` 实时事件流与 `CancellationToken`/`TaskTracker` 停机作用域，按 `Applied.dirty: SliceMask` 仅推送变脏切片（`effects` 仅进 `farm`），将持久 `pi.inbox` 运行时告警实时并入 `InboxSlice`；经 `arc-swap` 无锁挂接 `CallerContext`/`ClientIdentity` 与 `InvokeObserver`/`FaultGate`/`HostDebugBridge`/`RemoteAuth` 插槽 |
+| `crates/server/src/start.rs` | `start`：按序打开设置、档案、仓库、工单板、频道、媒体、助手、`DebugKit`（[debug/mod.rs](crates/server/src/modules/infra/debug/mod.rs)）与远程访问控制（`crates/server/src/modules/infra/remote/`），接线 `IssueChat`、`SessionChat`、助手频道订阅与 `RuntimeInboxObserver`，注册所有端点；仅在 `VIBEVALLEY_DEBUG=1` 时挂接观察器、`FaultGate` 与 `OarObserver`，`Started::close` 停机并卸载全局观察器与远程监听 |
 | `crates/server/src/main.rs` | 二进制 `vibevalley-server`：初始化工作区 `tracing_subscriber`（`VIBEVALLEY_LOG`/`RUST_LOG`，`VIBEVALLEY_DEBUG=1` 默认 `info` 否则 `warn`），支持 `--web`、`--ready-json`，读环境变量，写 `server.json` |
-| `crates/protocol/src/contract/` | `SpaceState`、`Fact`、`SliceKind`、5 域切片、`FarmFrame`、`SliceBundle`、`LiveEvent`、`DebugKit`（`debug.rs`）、GPUI 壳强类型协议（`host.rs`：`Host*` 帧、`HostAction` 与 `HostOp`）与接口表 `ENDPOINTS`（`endpoints.rs`），手写的源头，TS 由它生成 |
+| `crates/protocol/src/contract/` | `SpaceState`、`Fact`、`SliceKind`、5 域切片、`FarmFrame`、`SliceBundle`、`LiveEvent`、`DebugKit`（`debug.rs`）、远程访问契约（[remote.rs](crates/protocol/src/contract/remote.rs)）、GPUI 壳强类型协议（`host.rs`：`Host*` 帧、`HostAction` 与 `HostOp`）与接口表 `ENDPOINTS`（`endpoints.rs`），手写的源头，TS 由它生成 |
 | `crates/protocol/src/envelope.rs` | 全信封、`BizCode`、`ApiError` |
-| `crates/server/src/transport/http/mod.rs` | axum 路由：命令接口、`/api/v1/slice/{name}`、`/live`、订阅流、工单观察流、附件、网页 Artifact、`/mcp`；来源校验 `from_the_farm`；`media.rs` 媒体输入与语音流 |
+| `crates/server/src/transport/http/mod.rs` | axum 路由：命令接口、`/api/v1/slice/{name}`、`/live`、订阅流、工单观察流、附件、网页 Artifact、`/mcp`；本机门来源校验 `from_the_farm` 与独立受认证远程监听门（`serve_remote`）；`media.rs` 媒体输入与语音流 |
 | `crates/cli/src/` | 命令行 `vibevalley`：`main.rs` 入口、`client.rs` HTTP/SSE 客户端（`Client::slice`）与退出码、`output.rs` 输出格式化、`domains/` 按五大业务域组织的强类型子命令 |
 
 全部接口与权限矩阵见生成的 [capabilities.md](docs/reference/capabilities.md)。
@@ -92,6 +92,12 @@ SSE 以外的路由：
 - **CLI 是纯 HTTP 客户端**：`crates/cli` 不载入服务端、不直连数据库，通过 `--server`、`VIBEVALLEY_SERVER` 或当前发布通道家目录的 `server.json`（未记录时回落到当前通道默认端口，见 `crates/protocol/src/home.rs`）连接服务端；失败时 stderr 打一行 JSON，退出码同 TS 版。
 - **拥有者负责协调与身份分配**：处理器只传业务意图，由拥有者模块协调内部步骤并在锁内分配新实体 ID；查询缺失关联时列入 `missingSessions`，不伪造缺省对象。
 
+### 受控远程访问
+
+- **默认关闭与绑定约束**：`crates/server/src/modules/infra/remote/` 默认关闭远程监听；仅本机 `Caller::User` 调用 `remote.enable` 时，服务端按显式 `bindAddr` → 在线 Tailscale IPv4（`100.64.0.0/10`）→ `127.0.0.1`（供 iOS Simulator 或本地联调）的优先级选取监听地址，在独立端口（通道默认端口 `+ 100`，如 dev `8890` / release `8887`）启动 `serve_remote`，拒绝绑定通配或公网地址；`remote.disable` 立即停机并持久化关闭状态。
+- **一次性配对码与 SHA-256 哈希令牌**：`remote.pair.create`（仅 `Caller::User`）在远程开启时生成 5 分钟有效、单次使用的高熵配对码与 `vibevalley://pair?url=<encoded>&code=<code>` 深链；`remote.pair.exchange` 受失败速率限制保护，核验后立即作废配对码并签发 `vv_dev_*` 持久 Bearer 令牌，数据库（`remote_device`）只存 SHA-256 哈希，线缆类型 `RemoteDeviceSummary` 永不返回 `token_hash`。
+- **`RemoteAuth` 插槽与最小权限边界**：`Hub` 通过无锁 `ArcSwapOption` 挂载 `RemoteAuth`；远程监听门除 `remote.pair.exchange` 外强制校验 `Authorization: Bearer <token>`，认证通过后构造 `Caller::Remote` 与 `CallerPrincipal::RemoteDevice { device_id, scope }` 并更新 `last_seen_at`，已撤销（`remote.device.revoke`）或未知令牌立即返回 `401`（`BizCode::Unauthorized`）。远程门开放已认证设备访问 `GET /api/v1/slice/{name}`（支持 `Last-Event-ID` 续读）、`/live`、`/subscribe/{name}` 与 `can` 包含 `remote` 的业务端点，严格拦截 `debug.*`、`/mcp` 及全部 `Caller::User` 专属管理端点（`remote.{status,enable,disable,pair.create,device.revoke}`、`setting.update`、`agent.{create,update,delete}`、`provider.*`、`connector.{login,verify,logout,channel.set}`、`repo.pr.submit`）。
+
 ## 怎么走
 
 **施加一条事实**
@@ -112,7 +118,7 @@ SSE 以外的路由：
 
 - **施加事实的模块**：工单板（`modules/work/issue` 与 `modules/work/session`，经 `modules/work/ledger.rs`）、`channel`、`media`、`cron`、`game`、`agent`、`RuntimeInboxObserver`。
 - **订阅事实的模块（`EventBus`）**：`game`、`memory`、`runtime`、`library`、`issue`（`issue-watch`）、`session`（`session-chat`）。
-- **外部客户端**：`apps/mac`（进程内经桥按切片订阅）、命令行 `vibevalley`（HTTP `/api/v1/slice/{name}`）。
+- **外部客户端**：`apps/mac`（进程内经桥按切片订阅）、`apps/mobile`（通过 `@vibevalley/protocol/remote` 的 `HttpRemoteTransport` 经远程门带 Bearer 令牌与 `Last-Event-ID` 订阅）、命令行 `vibevalley`（HTTP `/api/v1/slice/{name}`）。
 
 ## 为什么这样
 

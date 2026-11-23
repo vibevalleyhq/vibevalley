@@ -1,0 +1,21 @@
+{
+  "extends": "./.nsh/tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "nsh": ["./.nsh/types/nsh/index.d.ts"],
+      "nsh/*": ["./.nsh/types/nsh/*.d.ts"],
+      "*": ["./.nsh/types/*.d.ts", "./node_modules/*"],
+      "@vibevalley/protocol": ["../../packages/protocol/src/index.ts"],
+      "@vibevalley/protocol/remote": ["../../packages/protocol/src/remote/transport.ts"],
+      "@vibevalley/protocol/*": ["../../packages/protocol/src/*", "../../packages/protocol/src/*/index.ts"],
+      "@vibevalley/i18n": ["../../packages/i18n/src/index.ts"],
+      "@vibevalley/i18n/catalogs": ["../../packages/i18n/src/catalog-translator.ts"],
+      "@vibevalley/i18n/*": ["../../packages/i18n/src/*", "../../packages/i18n/src/*/index.ts"]
+    },
+    "allowImportingTsExtensions": true,
+    "noUnusedLocals": true,
+    "noEmit": true
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "build"]
+}

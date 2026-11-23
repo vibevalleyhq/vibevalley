@@ -1,0 +1,10 @@
+{
+  "disabled": "远程访问未开启。",
+  "invalidCode": "配对码无效或已被使用。",
+  "expiredCode": "配对码已过期，请在 Mac 上重新生成。",
+  "rateLimited": "尝试次数过多，请稍后再试。",
+  "revoked": "这台设备的访问权限已被撤销，请重新配对。",
+  "unauthorized": "远程访问未授权，请先配对设备。",
+  "deviceNotFound": "找不到这台已配对设备。",
+  "bindFailed": "无法在 {addr} 上启动远程监听：{why}"
+}

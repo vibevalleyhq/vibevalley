@@ -48,6 +48,7 @@
     "models": "Models & Keys",
     "voice": "Voice",
     "connections": "Connections",
+    "remote": "Remote Access",
     "about": "About & Data",
     "memory": "Memory",
     "call": "Call line",
@@ -60,6 +61,7 @@
     "models": "keys accounts DeepSeek MOSS Agora API key models binding",
     "voice": "Agora call phone recognition speech MOSS live realtime vision dictation transcription",
     "connections": "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
+    "remote": "remote mobile phone Tailscale pair pairing QR device iOS Android listener token",
     "about": "version home folder settings data catalog"
   },
   "scope": {

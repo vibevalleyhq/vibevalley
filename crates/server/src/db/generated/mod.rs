@@ -15,6 +15,8 @@ pub(crate) mod content_media;
 #[rustfmt::skip]
 pub(crate) mod content_pkm;
 #[rustfmt::skip]
+pub(crate) mod infra_remote;
+#[rustfmt::skip]
 pub(crate) mod shared;
 #[rustfmt::skip]
 pub(crate) mod team_memory;

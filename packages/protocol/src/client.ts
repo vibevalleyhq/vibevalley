@@ -120,6 +120,27 @@ export class VibeValleyApi {
     },
   };
 
+  readonly remote = {
+    status: (options?: { signal?: AbortSignal }): Promise<T.RemoteStatus> =>
+      this.call<T.RemoteStatus>("remote.status", "/api/v1/remote/status", undefined, options),
+    enable: (a: T.RemoteEnableRequest, options?: { signal?: AbortSignal }): Promise<T.RemoteStatus> =>
+      this.call<T.RemoteStatus>("remote.enable", "/api/v1/remote/enable", a, options),
+    disable: (options?: { signal?: AbortSignal }): Promise<T.RemoteStatus> =>
+      this.call<T.RemoteStatus>("remote.disable", "/api/v1/remote/disable", undefined, options),
+    whoami: (options?: { signal?: AbortSignal }): Promise<T.RemoteWhoami> =>
+      this.call<T.RemoteWhoami>("remote.whoami", "/api/v1/remote/whoami", undefined, options),
+    pair: {
+      create: (options?: { signal?: AbortSignal }): Promise<T.RemotePairCode> =>
+        this.call<T.RemotePairCode>("remote.pair.create", "/api/v1/remote/pair/create", undefined, options),
+      exchange: (a: T.RemotePairExchangeRequest, options?: { signal?: AbortSignal }): Promise<T.RemotePairExchangeResult> =>
+        this.call<T.RemotePairExchangeResult>("remote.pair.exchange", "/api/v1/remote/pair/exchange", a, options),
+    },
+    device: {
+      revoke: (a: T.RemoteDeviceRevokeRequest, options?: { signal?: AbortSignal }): Promise<void> =>
+        this.call<void>("remote.device.revoke", "/api/v1/remote/device/revoke", a, options),
+    },
+  };
+
   readonly orchestrator = {
     open: (options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("orchestrator.open", "/api/v1/orchestrator/open", undefined, options),
     /** Ends the orchestrator's run under way and drops what waits for it; the sessions it sent keep working. */

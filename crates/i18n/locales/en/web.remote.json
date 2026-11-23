@@ -1,0 +1,90 @@
+{
+  "title": "Remote Access",
+  "subtitle": "View and control VibeValley on this Mac from your phone over Tailscale.",
+  "toggle": {
+    "enable": "Enable remote access",
+    "disable": "Disable remote access",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
+  },
+  "tailscale": {
+    "online": "Tailscale online",
+    "offline": "Tailscale offline",
+    "ip": "Tailscale IP",
+    "url": "Access URL"
+  },
+  "pair": {
+    "action": "Pair new device",
+    "qrHint": "Scan the QR code on your phone, or enter the address and pairing code",
+    "code": "Pairing code",
+    "expires": "Expires at {time}",
+    "copy": "Copy pairing link",
+    "copied": "Copied"
+  },
+  "devices": {
+    "title": "Paired devices",
+    "platform": {
+      "ios": "iOS",
+      "android": "Android",
+      "other": "Other"
+    },
+    "lastSeen": "Last active: {time}",
+    "revoke": "Revoke",
+    "empty": "No paired devices yet."
+  },
+  "mobile": {
+    "pairTitle": "Connect to Mac",
+    "pairSubtitle": "Enter the address and one-time pairing code shown in Remote Access settings on your Mac.",
+    "urlLabel": "Mac address",
+    "codeLabel": "Pairing code",
+    "deviceNameLabel": "Device name",
+    "pairAction": "Pair & connect",
+    "pairing": "Pairing…",
+    "invalidInput": "Enter a valid address, pairing code, and device name."
+  },
+  "state": {
+    "connecting": "Connecting…",
+    "connected": "Connected",
+    "reconnecting": "Connection lost, reconnecting…",
+    "unauthorized": "Access revoked or expired. Pair again.",
+    "offline": "Disconnected",
+    "disconnect": "Disconnect"
+  },
+  "tabs": {
+    "inbox": "Inbox",
+    "channels": "Channels",
+    "sessions": "Sessions",
+    "issues": "Issues"
+  },
+  "inbox": {
+    "approve": "Approve",
+    "deny": "Deny",
+    "answer": "Answer",
+    "empty": "Inbox is clear. Nothing needs your attention."
+  },
+  "channel": {
+    "replyPlaceholder": "Write a reply…",
+    "send": "Send",
+    "empty": "No messages in this channel yet."
+  },
+  "session": {
+    "promptPlaceholder": "Send instructions to this helper…",
+    "send": "Send",
+    "stop": "Stop",
+    "events": "Trajectory",
+    "empty": "No active helpers right now."
+  },
+  "issue": {
+    "filter": {
+      "all": "All",
+      "active": "Active",
+      "review": "In review",
+      "done": "Done"
+    },
+    "comment": "Comment",
+    "approve": "Approve",
+    "changes": "Request changes",
+    "status": "Status",
+    "empty": "No matching issues."
+  }
+}
