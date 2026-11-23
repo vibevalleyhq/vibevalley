@@ -203,8 +203,35 @@ fn signature(app: &Path) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&said.stderr).into_owned())
 }
 
+fn unpacked_app(folder: &Path, bundle: &Path) -> Result<PathBuf, String> {
+    let expected = folder.join(bundle.file_name().ok_or("the app has no name")?);
+    if expected.is_dir() {
+        return Ok(expected);
+    }
+    releases::CHANNEL_BUNDLE_NAMES
+        .iter()
+        .map(|name| folder.join(name))
+        .find(|path| path.is_dir())
+        .ok_or_else(|| "the update archive contains no VibeValley app bundle".into())
+}
+
+fn validate_bundle_id(running_bundle_id: Option<&str>, next_plist: &str, file: &str) -> Result<(), String> {
+    let next_id = releases::plist_bundle_id(next_plist);
+    if !releases::valid_update_bundle_id(running_bundle_id, next_id) {
+        return Err(match (running_bundle_id, next_id) {
+            (Some(running), Some(next)) if releases::is_channel_bundle_id(next) => {
+                format!("{file}: bundle identifier {next} does not match running app {running}")
+            }
+            _ => format!("{file}: not a VibeValley app"),
+        });
+    }
+    Ok(())
+}
+
 pub fn staged_app(url: &str, build: &Build, version: &str, bundle: &Path, folder: &Path, percent: impl FnMut(u8)) -> Result<PathBuf, String> {
     let running = signature(bundle).map_err(|why| format!("running app signature: {why}"))?;
+    let running_plist = std::fs::read_to_string(bundle.join("Contents/Info.plist")).unwrap_or_default();
+    let running_bundle_id = releases::plist_bundle_id(&running_plist);
     let _ = std::fs::remove_dir_all(folder);
     std::fs::create_dir_all(folder).map_err(|e| format!("{}: {e}", folder.display()))?;
     let zip = folder.join("update.zip");
@@ -225,14 +252,12 @@ pub fn staged_app(url: &str, build: &Build, version: &str, bundle: &Path, folder
         return Err(format!("{}: {}", build.file, String::from_utf8_lossy(&unpacked.stderr).trim()));
     }
     let _ = std::fs::remove_file(&zip);
-    let app = folder.join(bundle.file_name().ok_or("the app has no name")?);
+    let app = unpacked_app(folder, bundle)?;
     let plist = std::fs::read_to_string(app.join("Contents/Info.plist")).unwrap_or_default();
     if releases::plist_version(&plist) != Some(version) {
         return Err(format!("{}: no VibeValley {version} in it", build.file));
     }
-    if !plist.contains("<key>CFBundleIdentifier</key><string>dev.vibevalley.app</string>") {
-        return Err(format!("{}: not a VibeValley app", build.file));
-    }
+    validate_bundle_id(running_bundle_id, &plist, &build.file)?;
     let said = signature(&app).map_err(|why| format!("{}: its signature does not hold: {why}", build.file))?;
     if !releases::same_signer(releases::team_of(&running), releases::team_of(&said)) {
         return Err(format!("{}: not signed by the team that signed this app", build.file));
@@ -357,6 +382,9 @@ mod tests {
         let safe = make_zip("safe.zip", &[("VibeValley.app/Contents/Info.plist", 0o100644, b"<plist/>")]);
         assert!(inspect_archive(&safe).is_ok());
 
+        let alpha = make_zip("alpha.zip", &[("VibeValley-Alpha.app/Contents/Info.plist", 0o100644, b"<plist/>")]);
+        assert!(inspect_archive(&alpha).is_ok());
+
         let traversal = make_zip("traversal.zip", &[("VibeValley.app/../../evil", 0o100644, b"x")]);
         assert!(inspect_archive(&traversal).unwrap_err().contains("outside its app"));
 
@@ -369,5 +397,34 @@ mod tests {
             writer.finish().unwrap();
         }
         assert!(inspect_archive(&symlink).unwrap_err().contains("symbolic links"));
+    }
+
+    #[test]
+    fn validate_bundle_id_accepts_all_channels_and_rejects_mismatches() {
+        let plist_for = |id: &str| format!("<dict><key>CFBundleIdentifier</key><string>{id}</string></dict>");
+
+        for id in releases::CHANNEL_BUNDLE_IDS {
+            assert!(validate_bundle_id(Some(id), &plist_for(id), "update.zip").is_ok());
+            assert!(validate_bundle_id(None, &plist_for(id), "update.zip").is_ok());
+        }
+
+        let mismatch = validate_bundle_id(Some("dev.vibevalley.app.alpha"), &plist_for("dev.vibevalley.app"), "VibeValley-0.2.0.zip").unwrap_err();
+        assert!(mismatch.contains("does not match running app dev.vibevalley.app.alpha"), "{mismatch}");
+
+        let foreign = validate_bundle_id(None, &plist_for("com.evil.app"), "evil.zip").unwrap_err();
+        assert!(foreign.contains("not a VibeValley app"), "{foreign}");
+
+        let missing = validate_bundle_id(Some("dev.vibevalley.app.alpha"), "<dict/>", "empty.zip").unwrap_err();
+        assert!(missing.contains("not a VibeValley app"), "{missing}");
+    }
+
+    #[test]
+    fn unpacked_app_resolves_channel_bundle_names() {
+        let dir = tempfile::tempdir().unwrap();
+        let alpha = dir.path().join("VibeValley-Alpha.app");
+        std::fs::create_dir(&alpha).unwrap();
+
+        assert_eq!(unpacked_app(dir.path(), Path::new("/Applications/VibeValley-Alpha.app")).unwrap(), alpha);
+        assert_eq!(unpacked_app(dir.path(), Path::new("/Applications/Renamed.app")).unwrap(), alpha);
     }
 }
