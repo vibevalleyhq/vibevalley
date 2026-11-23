@@ -346,7 +346,7 @@ mod tests {
         );
         assert!(due.contains("错过的，补一次") && due.contains("「早报」") && due.ends_with("跑测试"), "{due}");
         let due = t("server.cron.due", &[("name", "早报".into()), ("missed", false.into()), ("text", "x".into())]);
-        assert_eq!(due, "⏰ 定时任务「早报」到点了：x");
+        assert_eq!(due, "定时任务「早报」到点了：x");
     }
 
     #[test]

@@ -582,10 +582,18 @@ function HistoryPreviewBody(props: { artifact: Artifact; preview: ArtifactHistor
             {(block) => (
               <View class="flex-row items-start gap-2">
                 <If when={block().type === "bulleted"}>
-                  <Text class="text-sm text-muted">•</Text>
+                  <View class="mt-2 size-1.5 shrink-0 rounded-full bg-faint" />
                 </If>
                 <If when={block().type === "todo"}>
-                  <Text class="font-mono text-xs text-muted">{block().attrs.checked === true ? "[x]" : "[ ]"}</Text>
+                  <View
+                    class={`mt-0.5 size-4 shrink-0 items-center justify-center rounded-xs border ${
+                      block().attrs.checked === true ? "border-accent bg-accent" : "border-idle bg-page"
+                    }`}
+                  >
+                    <If when={block().attrs.checked === true}>
+                      <Icon name="ticked" size={12} tone="page" />
+                    </If>
+                  </View>
                 </If>
                 <Text
                   class={

@@ -338,8 +338,9 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
         label={t("web.agent.library")}
         tip={t("web.agent.libraryTip")}
         aside={
-          <A href="/team/skills">
-            <Text class="text-xs text-muted underline">{t("web.agent.manageLibrary")}</Text>
+          <A href="/team/skills" class="group flex-row items-center gap-1 rounded-sm px-1 py-0.5 hover:bg-hover">
+            <Text class="text-xs text-muted underline group-hover:text-ink">{t("web.agent.manageLibrary")}</Text>
+            <Icon name="next" size={12} tone="muted" />
           </A>
         }
       >
@@ -487,9 +488,10 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
                   <View
                     role="button"
                     onPress={() => props.patch({ ...props.draft, disallowedTools: [...props.draft.disallowedTools, tool().name] })}
-                    class="group rounded-sm border border-line bg-page px-1.5 py-0.5 hover:bg-hover"
+                    class="group flex-row items-center gap-1 rounded-sm border border-line bg-page px-1.5 py-0.5 hover:bg-hover"
                   >
-                    <Text class="font-mono text-xs text-muted group-hover:text-ink">{`+ ${tool().name}`}</Text>
+                    <Icon name="add" size={11} tone="muted" />
+                    <Text class="font-mono text-xs text-muted group-hover:text-ink">{tool().name}</Text>
                   </View>
                 )}
               </Each>

@@ -161,4 +161,53 @@ describe("ui-tokens guardrail", () => {
     ].join("\n");
     expect(scanUiTokens(file, good)).toEqual([]);
   });
+
+  it("flags standalone glyph icon substitutes inside Text, Button, and ButtonLink", () => {
+    const file = "apps/mac/ui/features/example/Demo.tsx";
+    const bad = [
+      "export function Bad(props: { done: boolean; open: boolean }) {",
+      "  return (",
+      "    <View>",
+      "      <Text>×</Text>",
+      "      <Button>✓</Button>",
+      '      <ButtonLink href="/next">→</ButtonLink>',
+      '      <Text>{props.done ? "[x]" : "[ ]"}</Text>',
+      '      <Text>{props.open ? "▾" : "▸"}</Text>',
+      "      <Button>＋</Button>",
+      "    </View>",
+      "  );",
+      "}",
+    ].join("\n");
+    expect(scanUiTokens(file, bad).map((f) => ({ rule: f.rule, snippet: f.snippet }))).toEqual([
+      { rule: "glyph-icon-substitute", snippet: "<Text>×</Text>" },
+      { rule: "glyph-icon-substitute", snippet: "<Button>✓</Button>" },
+      { rule: "glyph-icon-substitute", snippet: "<ButtonLink>→</ButtonLink>" },
+      { rule: "glyph-icon-substitute", snippet: "<Text>[x]</Text>" },
+      { rule: "glyph-icon-substitute", snippet: "<Text>[ ]</Text>" },
+      { rule: "glyph-icon-substitute", snippet: "<Text>▾</Text>" },
+      { rule: "glyph-icon-substitute", snippet: "<Text>▸</Text>" },
+      { rule: "glyph-icon-substitute", snippet: "<Button>＋</Button>" },
+    ]);
+  });
+
+  it("exempts Kbd, KeyCap, EmojiPicker, shortcuts, farm games, and inline flow arrows from glyph-icon-substitute", () => {
+    const file = "apps/mac/ui/features/example/Demo.tsx";
+    const ok = [
+      "export function Ok() {",
+      "  return (",
+      "    <View>",
+      "      <Kbd><Text>←</Text></Kbd>",
+      "      <KeyCap><Text>→</Text></KeyCap>",
+      "      <Text>1280 × 720</Text>",
+      '      <Text>cmd<Text>{" → "}</Text>ok</Text>',
+      "      <View><Text>feat</Text><Text>→</Text><Text>main</Text></View>",
+      "    </View>",
+      "  );",
+      "}",
+    ].join("\n");
+    expect(scanUiTokens(file, ok)).toEqual([]);
+    expect(scanUiTokens("apps/mac/ui/features/channel/views/EmojiPicker.tsx", "export const E = () => <Text>✓</Text>;")).toEqual([]);
+    expect(scanUiTokens("apps/mac/ui/infra/base/shortcuts.ts", "export const S = () => <Text>←</Text>;")).toEqual([]);
+    expect(scanUiTokens("apps/mac/ui/farm/games/BlocksGame.tsx", "export const G = () => <Button>←</Button>;")).toEqual([]);
+  });
 });

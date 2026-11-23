@@ -10,6 +10,7 @@ import { Button } from "../../../design/Button";
 import { ConfirmButton } from "../../../design/ConfirmButton";
 import { Dialog } from "../../../design/Dialog";
 import { TextArea, TextInput } from "../../../design/Field";
+import { Icon } from "../../../design/Icon";
 import { toast } from "../../../design/toasts";
 import { useWorkAgents } from "../../../infra/agents";
 import { api } from "../../../infra/api";
@@ -324,7 +325,13 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             onChange={(v) => edit({ repo: v })}
             options={[...new Set([...repos(), ...(d().repo ? [d().repo] : [])])].map((p) => ({ value: p, label: p }))}
           />
-          <View role="button" testID="new-repo" onPress={() => newRepo.set(true)} class="-ml-1 self-start rounded-sm px-1 py-0.5 hover:bg-hover">
+          <View
+            role="button"
+            testID="new-repo"
+            onPress={() => newRepo.set(true)}
+            class="-ml-1 flex-row items-center gap-1 self-start rounded-sm px-1 py-0.5 hover:bg-hover"
+          >
+            <Icon name="add" size={12} tone="water" />
             <Text class="text-xs text-water">{repos().length === 0 && !d().repo ? t("web.issue.todo.firstRepo") : t("web.issue.todo.newRepoLink")}</Text>
           </View>
         </View>

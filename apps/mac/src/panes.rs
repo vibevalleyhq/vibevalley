@@ -13,6 +13,7 @@ use vibevalley_workspace::{Axis, Group, Layout, Node, PaneKind, Tab, TabId};
 
 use crate::diff::DiffView;
 use crate::hosted::HostedView;
+use crate::icon::gpui_icon;
 use crate::pixel::view::PixelView;
 use crate::shell::Shell;
 use crate::theme::{Palette, Ui};
@@ -451,7 +452,6 @@ pub fn tab_title(shell: &Shell, tab: &Tab, cx: &App) -> String {
 fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, cx: &mut Context<Shell>) -> AnyElement {
     let colors = Ui::get(cx).colors.clone();
     let hover_bg = colors.hover;
-    let text_color = colors.text;
     let focused = layout.focused == g.id;
     let group_id = g.id;
     let pid = shell.ws.active_id().unwrap_or_default();
@@ -488,7 +488,7 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                 .border_color(transparent())
                 .cursor_pointer()
                 .hover(move |s| s.bg(hover_bg))
-                .child(panel_icon(false, colors.muted, false))
+                .child(gpui_icon("sidebar", 14.0, colors.muted))
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(|s, _, _, cx| {
@@ -579,12 +579,9 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                         .items_center()
                         .justify_center()
                         .rounded(px(4.0))
-                        .pb(px(1.0))
-                        .text_size(px(13.0))
-                        .text_color(if active { colors.muted } else { colors.faint })
                         .cursor_pointer()
-                        .hover(move |s| s.bg(hover_bg).text_color(text_color))
-                        .child("×")
+                        .hover(move |s| s.bg(hover_bg))
+                        .child(gpui_icon("close", 11.0, if active { colors.muted } else { colors.faint }))
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .on_click(cx.listener(move |shell, _, window, cx| {
                             cx.stop_propagation();
@@ -617,13 +614,16 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
             }),
         );
     let new_btn = if menu_open {
-        new_btn.bg(colors.elevated).border_color(colors.border).child(plus_icon(colors.text))
+        new_btn
+            .bg(colors.elevated)
+            .border_color(colors.border)
+            .child(gpui_icon("add", 13.0, colors.text))
     } else {
         new_btn
             .bg(transparent())
             .border_color(transparent())
             .hover(move |s| s.bg(hover_bg))
-            .child(plus_icon(colors.muted))
+            .child(gpui_icon("add", 13.0, colors.muted))
     };
 
     let mut bar = div()
@@ -662,13 +662,13 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
             inspector_btn
                 .bg(colors.elevated)
                 .border_color(colors.border)
-                .child(panel_icon(true, colors.text, true))
+                .child(gpui_icon("sidebarRight", 14.0, colors.text))
         } else {
             inspector_btn
                 .bg(transparent())
                 .border_color(transparent())
                 .hover(move |s| s.bg(hover_bg))
-                .child(panel_icon(true, colors.muted, false))
+                .child(gpui_icon("sidebarRight", 14.0, colors.muted))
         };
         bar = bar.child(inspector_btn);
     }
@@ -732,7 +732,7 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                             .flex_row()
                             .items_center()
                             .gap(px(8.0))
-                            .child(div().size(px(6.0)).rounded(px(1.5)).bg(colors.muted))
+                            .child(gpui_icon("terminal", 13.0, colors.muted))
                             .child(vibevalley_i18n::t("desktop.workspace.newTerminal", &[])),
                     )
                     .child(div().text_size(px(11.0)).text_color(colors.faint).child("⌘T"))
@@ -783,7 +783,7 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                             .flex_row()
                             .items_center()
                             .gap(px(8.0))
-                            .child(div().size(px(6.0)).rounded_full().bg(colors.accent))
+                            .child(gpui_icon("chat", 13.0, colors.accent))
                             .child(vibevalley_i18n::t("desktop.workspace.newChatWith", &[("runtime", (*rt_label).into())])),
                     )
                     .children((idx == 0).then(|| div().text_size(px(11.0)).text_color(colors.faint).child("⇧⌘T")))
@@ -829,40 +829,6 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
 
 fn transparent() -> Hsla {
     gpui::hsla(0.0, 0.0, 0.0, 0.0)
-}
-
-fn panel_icon(right: bool, color: Hsla, filled: bool) -> AnyElement {
-    let pane_fill = if filled { Hsla { a: 0.24, ..color } } else { transparent() };
-    let pane = div().w(px(4.5)).h_full().bg(pane_fill);
-    let divider = div().w(px(1.0)).h_full().bg(color);
-    let main = div().flex_1().h_full();
-    let frame = div()
-        .w(px(14.0))
-        .h(px(11.0))
-        .flex()
-        .flex_row()
-        .rounded(px(2.5))
-        .border_1()
-        .border_color(color)
-        .overflow_hidden();
-    let frame = if right {
-        frame.child(main).child(divider).child(pane)
-    } else {
-        frame.child(pane).child(divider).child(main)
-    };
-    frame.into_any_element()
-}
-
-fn plus_icon(color: Hsla) -> AnyElement {
-    div()
-        .size(px(10.0))
-        .flex()
-        .flex_col()
-        .items_center()
-        .child(div().w(px(1.5)).h(px(4.25)).rounded(px(0.75)).bg(color))
-        .child(div().w(px(10.0)).h(px(1.5)).rounded(px(0.75)).bg(color))
-        .child(div().w(px(1.5)).h(px(4.25)).rounded(px(0.75)).bg(color))
-        .into_any_element()
 }
 
 trait TabLook {

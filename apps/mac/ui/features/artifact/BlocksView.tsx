@@ -553,7 +553,7 @@ function BlockRow(props: {
   const mark = (): JSX.Element | undefined => {
     switch (r().type) {
       case "bulleted":
-        return props.outline ? <View class="mt-2 ml-1.5 size-1.5 shrink-0 rounded-full bg-faint" /> : <Text class="text-base text-muted">•</Text>;
+        return <View class={`mt-2 size-1.5 shrink-0 rounded-full ${props.outline ? "ml-1.5 bg-faint" : "bg-muted"}`} />;
       case "numbered":
         return <Text class="text-base text-muted tabular-nums">{`${r().number ?? 1}.`}</Text>;
       case "memory_item":

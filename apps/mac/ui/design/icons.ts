@@ -98,7 +98,8 @@ export type IconName =
   | "collapseAll"
   | "expandAll"
   | "lock"
-  | "sidebar";
+  | "sidebar"
+  | "sidebarRight";
 
 /** What a helper is doing, as the workbench draws it. */
 export const actionIcon: Record<SessionAction, IconName> = {

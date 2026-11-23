@@ -57,7 +57,11 @@ function OrchestratorOf(props: { agent: string; tab: Tab }) {
   const look = () => orchestratorLooks.find((l) => l.id === (profile()?.look.orchestrator ?? "farmer"));
   const head = () => (
     <View class="gap-2 pt-4">
-      <A href="/agents" class="group -ml-1.5 self-start rounded-md px-1.5 py-0.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus">
+      <A
+        href="/agents"
+        class="group -ml-1.5 flex-row items-center gap-1 self-start rounded-md px-1.5 py-0.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+      >
+        <Icon name="back" size={12} tone="muted" />
         <Text class="text-xs text-muted group-hover:text-ink">{t("web.orchestrator.orchestrator.all")}</Text>
       </A>
       <View class="flex-row flex-wrap items-center gap-4">
