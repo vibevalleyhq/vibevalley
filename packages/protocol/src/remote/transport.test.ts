@@ -301,4 +301,184 @@ describe("createHttpRemoteTransport", () => {
     unsubRefused();
     unsubLive();
   });
+
+  it("suspends active SSE streams cleanly without disconnect errors and resyncs immediately with Last-Event-ID on resume()", async () => {
+    vi.useFakeTimers();
+    const states: RemoteConnectionState[] = [];
+    const sliceLastIds: (string | undefined)[] = [];
+    const receivedSeqs: number[] = [];
+    const subEvents: unknown[] = [];
+    const subEnded: (RemoteEnvelope | null)[] = [];
+
+    const firstSlice = streamFromChunks(['id: 10\ndata: {"seq":10,"issues":[]}\n\n'], { holdOpen: true });
+    const secondSlice = streamFromChunks(['id: 12\ndata: {"seq":12,"issues":[]}\n\n'], { holdOpen: true });
+    const firstSub = streamFromChunks(['data: {"kind":"state","rev":1}\n\n'], { holdOpen: true });
+    const secondSub = streamFromChunks(['data: {"kind":"state","rev":2}\n\n'], { holdOpen: true });
+    const finishedSub = streamFromChunks(['data: {"kind":"done"}\n\n']);
+
+    let sliceAttempts = 0;
+    let subAttempts = 0;
+    let finishedSubAttempts = 0;
+
+    const transport = createHttpRemoteTransport({
+      baseUrl: "http://127.0.0.1:8890",
+      token: "vv_dev_tok_lifecycle",
+      onConnectionChange: (s) => states.push(s),
+      fetch: (input, init) => {
+        const url = urlOf(input);
+        if (url.includes("/api/v1/slice/board")) {
+          sliceAttempts++;
+          sliceLastIds.push(headerOf(init, "last-event-id"));
+          const chosen = sliceAttempts === 1 ? firstSlice.stream : secondSlice.stream;
+          return Promise.resolve(new Response(chosen, { status: 200, headers: { "content-type": "text/event-stream" } }));
+        }
+        if (url.includes("/api/v1/subscribe/session.watch")) {
+          subAttempts++;
+          const chosen = subAttempts === 1 ? firstSub.stream : secondSub.stream;
+          return Promise.resolve(new Response(chosen, { status: 200, headers: { "content-type": "text/event-stream" } }));
+        }
+        finishedSubAttempts++;
+        return Promise.resolve(new Response(finishedSub.stream, { status: 200, headers: { "content-type": "text/event-stream" } }));
+      },
+    });
+
+    const unsubSlice = transport.slice("board", (frame) => receivedSeqs.push(frame.seq));
+    const unsubWatch = transport.subscribe(
+      "session.watch",
+      { id: "sess-1" },
+      (ev) => subEvents.push(ev),
+      (why) => subEnded.push(why),
+    );
+    const unsubDone = transport.subscribe(
+      "one.shot",
+      {},
+      () => undefined,
+      (why) => subEnded.push(why),
+    );
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(receivedSeqs).toEqual([10]);
+    expect(sliceLastIds).toEqual([undefined]);
+    expect(subEvents).toEqual([{ kind: "state", rev: 1 }]);
+    expect(subEnded).toEqual([null]);
+    expect(states).toEqual(["connecting", "connected"]);
+
+    // Backgrounding aborts active SSE streams cleanly without reporting reconnecting/offline or ending active subscriptions.
+    transport.suspend();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(firstSlice.cancelled()).toBe(true);
+    expect(firstSub.cancelled()).toBe(true);
+    expect(states).toEqual(["connecting", "connected"]);
+    expect(subEnded).toEqual([null]);
+
+    // While suspended, advancing time does not reconnect.
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(sliceAttempts).toBe(1);
+    expect(subAttempts).toBe(1);
+
+    // Returning to foreground immediately resyncs in 0ms with Last-Event-ID and reopens active subscriptions only.
+    transport.resume();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sliceAttempts).toBe(2);
+    expect(sliceLastIds).toEqual([undefined, "10"]);
+    expect(receivedSeqs).toEqual([10, 12]);
+    expect(subAttempts).toBe(2);
+    expect(subEvents).toEqual([
+      { kind: "state", rev: 1 },
+      { kind: "state", rev: 2 },
+    ]);
+    expect(finishedSubAttempts).toBe(1);
+    expect(states).toEqual(["connecting", "connected"]);
+
+    unsubSlice();
+    unsubWatch();
+    unsubDone();
+    transport.close();
+  });
+
+  it("resume() interrupts backoff immediately and refreshes active streams on system wake without flagging reconnecting", async () => {
+    vi.useFakeTimers();
+    const states: RemoteConnectionState[] = [];
+    const lastIds: (string | undefined)[] = [];
+    const receivedSeqs: number[] = [];
+    let attempt = 0;
+
+    const heldSecond = streamFromChunks(['id: 21\ndata: {"seq":21,"issues":[]}\n\n'], { holdOpen: true });
+    const heldThird = streamFromChunks(['id: 22\ndata: {"seq":22,"issues":[]}\n\n'], { holdOpen: true });
+
+    const transport = createHttpRemoteTransport({
+      baseUrl: "http://127.0.0.1:8890",
+      token: "vv_dev_tok_wake",
+      onConnectionChange: (s) => states.push(s),
+      fetch: (_input, init) => {
+        attempt++;
+        lastIds.push(headerOf(init, "last-event-id"));
+        if (attempt === 1) {
+          return Promise.reject(new TypeError("offline"));
+        }
+        if (attempt === 2) {
+          return Promise.resolve(new Response(heldSecond.stream, { status: 200, headers: { "content-type": "text/event-stream" } }));
+        }
+        return Promise.resolve(new Response(heldThird.stream, { status: 200, headers: { "content-type": "text/event-stream" } }));
+      },
+    });
+
+    const unsub = transport.slice("board", (frame) => receivedSeqs.push(frame.seq));
+
+    // Initial failure enters 1000ms backoff.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(attempt).toBe(1);
+    expect(states).toEqual(["connecting", "reconnecting"]);
+
+    // resume() cancels the backoff timer and reconnects immediately at t=0.
+    transport.resume();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(attempt).toBe(2);
+    expect(receivedSeqs).toEqual([21]);
+    expect(states).toEqual(["connecting", "reconnecting", "connected"]);
+
+    // System wake while active cycles the open stream and resyncs immediately with Last-Event-ID without reporting reconnecting.
+    transport.resume();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(heldSecond.cancelled()).toBe(true);
+    expect(attempt).toBe(3);
+    expect(lastIds).toEqual([undefined, undefined, "21"]);
+    expect(receivedSeqs).toEqual([21, 22]);
+    expect(states).toEqual(["connecting", "reconnecting", "connected"]);
+
+    unsub();
+    transport.close();
+  });
+
+  it("holds subscriptions created while suspended until resume() and cleans up if unsubscribed while suspended", async () => {
+    vi.useFakeTimers();
+    let fetchCalls = 0;
+
+    const transport = createHttpRemoteTransport({
+      baseUrl: "http://127.0.0.1:8890",
+      token: "vv_dev_tok_pre_suspend",
+      fetch: () => {
+        fetchCalls++;
+        const { stream } = streamFromChunks(['id: 1\ndata: {"seq":1,"issues":[]}\n\n'], { holdOpen: true });
+        return Promise.resolve(new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } }));
+      },
+    });
+
+    transport.suspend();
+    const unsubDropped = transport.slice("board", () => undefined);
+    const received: number[] = [];
+    const unsubKept = transport.slice("board", (frame) => received.push(frame.seq));
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(fetchCalls).toBe(0);
+
+    unsubDropped();
+    transport.resume();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchCalls).toBe(1);
+    expect(received).toEqual([1]);
+
+    unsubKept();
+    transport.close();
+  });
 });

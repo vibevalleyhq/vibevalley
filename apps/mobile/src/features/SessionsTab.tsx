@@ -1,4 +1,4 @@
-import { effect, Scroll, signal, Text, View } from "nsh";
+import { effect, List, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { PhaseView, SessionEvent, SessionPermissionDecision, SessionView } from "@vibevalley/protocol";
@@ -6,7 +6,7 @@ import type { PhaseView, SessionEvent, SessionPermissionDecision, SessionView } 
 import type { IconName } from "../../design/icons";
 import { Icon } from "../design/Icon";
 import type { MobileLayout } from "../design/layout";
-import { EmptyPanel, FieldInput, PillButton, SectionCard, SplitPane, StatusTag, TopBar, type TagTone } from "../design/ui";
+import { EmptyPanel, FieldInput, MarkdownText, PillButton, SectionCard, SplitPane, StatusTag, TopBar, type TagTone } from "../design/ui";
 import { hapticImpact, hapticNotification, type RemoteSession } from "../infra/session";
 
 function phaseTone(phase: PhaseView): TagTone {
@@ -56,6 +56,10 @@ function phaseSubtitle(session: SessionView): string {
     return session.phase.doing.label || session.phase.doing.actionText || session.brief;
   }
   return session.brief || session.runtime;
+}
+
+function isMarkdownEvent(type: SessionEvent["type"]): boolean {
+  return type === "assistant/message" || type === "assistant/thinking" || type === "user/message";
 }
 
 export function SessionsTab(props: {
@@ -184,34 +188,126 @@ export function SessionsTab(props: {
 
   const renderMaster = () => (
     <If when={sessionList().length > 0} else={<EmptyPanel testID="sessions-empty" icon="terminal" message={t("web.remote.session.empty")} />}>
-      <Scroll class="flex-1" contentClass="gap-2.5 p-3.5">
-        <Each of={sessionList()} key={(s) => s.id}>
-          {(s) => {
-            const active = () => isDual() && props.selectedSessionId() === s().id;
-            return (
-              <SectionCard
-                testID={`session-row-${s().id}`}
-                onPress={() => {
-                  hapticImpact("light");
-                  props.onSelectSession(s().id);
-                }}
-                class={`gap-2 ${active() ? "border-focus bg-selected" : ""}`}
-              >
-                <View class="flex-row items-center justify-between gap-2">
-                  <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{s().name}</Text>
-                  <StatusTag label={s().phaseText || s().phase._tag} tone={phaseTone(s().phase)} dot />
-                </View>
-                <Text class="truncate text-xs text-muted">{phaseSubtitle(s())}</Text>
-                <View class="flex-row items-center gap-2">
-                  <Icon name="runtimes" size={12} tone="faint" />
-                  <Text class="font-mono text-2xs text-faint">{s().runtime}</Text>
-                </View>
-              </SectionCard>
-            );
-          }}
-        </Each>
-      </Scroll>
+      <List testID="sessions-list" each={sessionList()} keyExtractor={(s) => s.id} estimatedItemSize={88} class="min-h-0 flex-1" contentClass="gap-2.5 p-3.5">
+        {(s) => {
+          const active = () => isDual() && props.selectedSessionId() === s().id;
+          return (
+            <SectionCard
+              testID={`session-row-${s().id}`}
+              onPress={() => {
+                hapticImpact("light");
+                props.onSelectSession(s().id);
+              }}
+              class={`gap-2 ${active() ? "border-focus bg-selected" : ""}`}
+            >
+              <View class="flex-row items-center justify-between gap-2">
+                <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{s().name}</Text>
+                <StatusTag label={s().phaseText || s().phase._tag} tone={phaseTone(s().phase)} dot />
+              </View>
+              <Text class="truncate text-xs text-muted">{phaseSubtitle(s())}</Text>
+              <View class="flex-row items-center gap-2">
+                <Icon name="runtimes" size={12} tone="faint" />
+                <Text class="font-mono text-2xs text-faint">{s().runtime}</Text>
+              </View>
+            </SectionCard>
+          );
+        }}
+      </List>
     </If>
+  );
+
+  const renderTrajectoryHeader = () => (
+    <View class="gap-3 pb-1">
+      <Each of={watchState()?.pendingPermissions ?? []} key={(req) => req.requestId}>
+        {(req) => (
+          <SectionCard testID={`session-permission-${req().requestId}`} class="gap-2.5">
+            <View class="flex-row items-center justify-between gap-2">
+              <Text class="text-xs font-semibold text-warn-ink">{req().tool}</Text>
+              <StatusTag label={req().tool} tone="wait" icon="lock" />
+            </View>
+            <Text class="text-sm text-ink">{req().summary}</Text>
+            <View class="flex-row items-center gap-2">
+              <PillButton
+                testID={`session-approve-${req().requestId}`}
+                tone="ok"
+                size="sm"
+                icon="check"
+                label={t("web.remote.inbox.approve")}
+                disabled={busyAction() === req().requestId}
+                onPress={() => {
+                  void respondPermission(req().requestId, "allowOnce");
+                }}
+                class="flex-1"
+              />
+              <PillButton
+                testID={`session-deny-${req().requestId}`}
+                tone="danger"
+                size="sm"
+                icon="cross"
+                label={t("web.remote.inbox.deny")}
+                disabled={busyAction() === req().requestId}
+                onPress={() => {
+                  void respondPermission(req().requestId, "deny");
+                }}
+                class="flex-1"
+              />
+            </View>
+          </SectionCard>
+        )}
+      </Each>
+
+      <Each of={watchState()?.pendingInteractions ?? []} key={(req) => req.requestId}>
+        {(req) => {
+          const draft = () => interactionDrafts()[req().requestId] ?? "";
+          return (
+            <SectionCard testID={`session-interaction-${req().requestId}`} class="gap-2.5">
+              <Text class="text-sm font-medium text-ink">{req().question}</Text>
+              <If when={req().options.length > 0}>
+                <View class="flex-row flex-wrap gap-2">
+                  <Each of={req().options} key={(opt) => opt.id}>
+                    {(opt) => (
+                      <PillButton
+                        testID={`session-option-${req().requestId}-${opt().id}`}
+                        tone="plain"
+                        size="sm"
+                        label={opt().label}
+                        disabled={busyAction() === req().requestId}
+                        onPress={() => {
+                          void respondInteraction(req().requestId, { optionId: opt().id });
+                        }}
+                      />
+                    )}
+                  </Each>
+                </View>
+              </If>
+              <If when={req().allowCustom}>
+                <View class="flex-row items-center gap-2">
+                  <FieldInput
+                    testID={`session-interaction-input-${req().requestId}`}
+                    placeholder={t("web.remote.inbox.answer")}
+                    value={draft()}
+                    onInput={(v) => interactionDrafts.update((prev) => ({ ...prev, [req().requestId]: v }))}
+                    class="min-w-0 flex-1"
+                  />
+                  <PillButton
+                    testID={`session-interaction-send-${req().requestId}`}
+                    tone="primary"
+                    size="sm"
+                    label={t("web.remote.inbox.answer")}
+                    disabled={busyAction() === req().requestId || draft().trim() === ""}
+                    onPress={() => {
+                      void respondInteraction(req().requestId, { text: draft().trim() });
+                    }}
+                  />
+                </View>
+              </If>
+            </SectionCard>
+          );
+        }}
+      </Each>
+
+      <Text class="text-xs font-semibold tracking-wide text-muted">{t("web.remote.session.events")}</Text>
+    </View>
   );
 
   const renderDetail = () => (
@@ -247,124 +343,42 @@ export function SessionsTab(props: {
         )}
       </If>
 
-      <Scroll class="flex-1" contentClass="gap-3 p-4">
-        <Each of={watchState()?.pendingPermissions ?? []} key={(req) => req.requestId}>
-          {(req) => (
-            <SectionCard testID={`session-permission-${req().requestId}`} class="gap-2.5">
-              <View class="flex-row items-center justify-between gap-2">
-                <Text class="text-xs font-semibold text-warn-ink">{req().tool}</Text>
-                <StatusTag label={req().tool} tone="wait" icon="lock" />
-              </View>
-              <Text class="text-sm text-ink">{req().summary}</Text>
-              <View class="flex-row items-center gap-2">
-                <PillButton
-                  testID={`session-approve-${req().requestId}`}
-                  tone="ok"
-                  size="sm"
-                  icon="check"
-                  label={t("web.remote.inbox.approve")}
-                  disabled={busyAction() === req().requestId}
-                  onPress={() => {
-                    void respondPermission(req().requestId, "allowOnce");
-                  }}
-                  class="flex-1"
-                />
-                <PillButton
-                  testID={`session-deny-${req().requestId}`}
-                  tone="danger"
-                  size="sm"
-                  icon="cross"
-                  label={t("web.remote.inbox.deny")}
-                  disabled={busyAction() === req().requestId}
-                  onPress={() => {
-                    void respondPermission(req().requestId, "deny");
-                  }}
-                  class="flex-1"
-                />
-              </View>
-            </SectionCard>
-          )}
-        </Each>
-
-        <Each of={watchState()?.pendingInteractions ?? []} key={(req) => req.requestId}>
-          {(req) => {
-            const draft = () => interactionDrafts()[req().requestId] ?? "";
-            return (
-              <SectionCard testID={`session-interaction-${req().requestId}`} class="gap-2.5">
-                <Text class="text-sm font-medium text-ink">{req().question}</Text>
-                <If when={req().options.length > 0}>
-                  <View class="flex-row flex-wrap gap-2">
-                    <Each of={req().options} key={(opt) => opt.id}>
-                      {(opt) => (
-                        <PillButton
-                          testID={`session-option-${req().requestId}-${opt().id}`}
-                          tone="plain"
-                          size="sm"
-                          label={opt().label}
-                          disabled={busyAction() === req().requestId}
-                          onPress={() => {
-                            void respondInteraction(req().requestId, { optionId: opt().id });
-                          }}
-                        />
-                      )}
-                    </Each>
-                  </View>
+      <List
+        testID="session-events-list"
+        each={watchState()?.events ?? []}
+        keyExtractor={(ev) => String(ev.seq)}
+        estimatedItemSize={96}
+        maintainVisibleContentPosition={{ autoscrollToBottomThreshold: 64 }}
+        keyboardDismissMode="on-drag"
+        class="min-h-0 flex-1"
+        contentClass="gap-2.5 p-4"
+        header={renderTrajectoryHeader()}
+        empty={<EmptyPanel testID="session-events-empty" icon="log" message={t("web.remote.session.empty")} />}
+      >
+        {(ev) => (
+          <SectionCard testID={`session-event-${String(ev().seq)}`} class="gap-1.5">
+            <View class="flex-row items-center gap-2">
+              <Icon name={eventIcon(ev().type)} size={14} tone="muted" />
+              <Text class="min-w-0 flex-1 truncate font-mono text-xs font-medium text-muted">{ev().tool ?? ev().actionText ?? ev().type}</Text>
+              <Text class="font-mono text-2xs text-faint">#{String(ev().seq)}</Text>
+            </View>
+            <If when={ev().text}>
+              {(text) => (
+                <If when={isMarkdownEvent(ev().type)} else={<Text class="text-sm text-ink">{text()}</Text>}>
+                  <MarkdownText testID={`session-event-md-${String(ev().seq)}`} text={text()} size="sm" />
                 </If>
-                <If when={req().allowCustom}>
-                  <View class="flex-row items-center gap-2">
-                    <FieldInput
-                      testID={`session-interaction-input-${req().requestId}`}
-                      placeholder={t("web.remote.inbox.answer")}
-                      value={draft()}
-                      onInput={(v) => interactionDrafts.update((prev) => ({ ...prev, [req().requestId]: v }))}
-                      class="min-w-0 flex-1"
-                    />
-                    <PillButton
-                      testID={`session-interaction-send-${req().requestId}`}
-                      tone="primary"
-                      size="sm"
-                      label={t("web.remote.inbox.answer")}
-                      disabled={busyAction() === req().requestId || draft().trim() === ""}
-                      onPress={() => {
-                        void respondInteraction(req().requestId, { text: draft().trim() });
-                      }}
-                    />
-                  </View>
-                </If>
-              </SectionCard>
-            );
-          }}
-        </Each>
-
-        <Text class="text-xs font-semibold tracking-wide text-muted">{t("web.remote.session.events")}</Text>
-
-        <If
-          when={(watchState()?.events.length ?? 0) > 0}
-          else={<EmptyPanel testID="session-events-empty" icon="log" message={t("web.remote.session.empty")} />}
-        >
-          <View class="gap-2">
-            <Each of={watchState()?.events ?? []} key={(ev) => ev.seq}>
-              {(ev) => (
-                <SectionCard testID={`session-event-${String(ev().seq)}`} class="gap-1.5">
-                  <View class="flex-row items-center gap-2">
-                    <Icon name={eventIcon(ev().type)} size={14} tone="muted" />
-                    <Text class="min-w-0 flex-1 truncate font-mono text-xs font-medium text-muted">{ev().tool ?? ev().actionText ?? ev().type}</Text>
-                    <Text class="font-mono text-2xs text-faint">#{String(ev().seq)}</Text>
-                  </View>
-                  <If when={ev().text}>{(text) => <Text class="text-sm text-ink">{text()}</Text>}</If>
-                  <If when={ev().output}>
-                    {(output) => (
-                      <View class="rounded-md bg-code-bg px-2.5 py-2">
-                        <Text class="font-mono text-xs text-code-ink">{output()}</Text>
-                      </View>
-                    )}
-                  </If>
-                </SectionCard>
               )}
-            </Each>
-          </View>
-        </If>
-      </Scroll>
+            </If>
+            <If when={ev().output}>
+              {(output) => (
+                <View class="rounded-md bg-code-bg px-2.5 py-2">
+                  <Text class="font-mono text-xs text-code-ink">{output()}</Text>
+                </View>
+              )}
+            </If>
+          </SectionCard>
+        )}
+      </List>
 
       <View class="flex-row items-center gap-2 border-t border-line bg-side px-3.5 py-2.5">
         <FieldInput

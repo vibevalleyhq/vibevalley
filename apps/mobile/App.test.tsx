@@ -1,12 +1,76 @@
 import { expect, open, test, type StubRequest, type StubResponse } from "nsh/test";
 
 import { BizCode } from "@vibevalley/protocol/api";
+import { InboxItem as InboxItemSchema } from "@vibevalley/protocol/schema";
 
-import { computeMobileLayout, DUAL_PANE_MIN_WIDTH } from "./src/design/layout";
+import { computeMobileLayout, DUAL_PANE_MIN_WIDTH, NAV_RAIL_WIDTH } from "./src/design/layout";
+import {
+  decodeNotificationRoute,
+  encodeInboxNotificationId,
+  encodeInteractionNotificationId,
+  encodePermissionNotificationId,
+  isHighPriorityInboxKind,
+} from "./src/infra/notifications";
+import {
+  clearCredentials,
+  loadCredentials,
+  PROFILE_STORAGE_KEY,
+  saveCredentials,
+  TEST_HARNESS_TOKEN_KEY,
+  TOKEN_ACCOUNT_KEY,
+  type SecureTokenStore,
+} from "./src/infra/storage";
 
 const BASE = "http://127.0.0.1:8890";
 const TOKEN = "vv_dev_mobile_test_token";
 const NOW = 1_764_000_000_000;
+
+function harnessCredentialsStorage(deviceName = "iPhone"): Record<string, string> {
+  return {
+    [PROFILE_STORAGE_KEY]: JSON.stringify({
+      baseUrl: BASE,
+      deviceName,
+      serverName: "Lucas MacBook Pro",
+    }),
+    [TEST_HARNESS_TOKEN_KEY]: TOKEN,
+  };
+}
+
+function profileOnlyStorage(deviceName = "iPhone"): Record<string, string> {
+  return {
+    [PROFILE_STORAGE_KEY]: JSON.stringify({
+      baseUrl: BASE,
+      deviceName,
+      serverName: "Lucas MacBook Pro",
+    }),
+  };
+}
+
+function createHostKeychainStub(initialToken?: string) {
+  const vault = new Map<string, string>();
+  if (initialToken !== undefined) vault.set(TOKEN_ACCOUNT_KEY, initialToken);
+  return {
+    vault,
+    host: {
+      handlers: {
+        "keychain.get": (data: unknown) => {
+          const account = (data as { account?: string } | null)?.account ?? "";
+          return vault.get(account) ?? null;
+        },
+        "keychain.set": (data: unknown) => {
+          const entry = data as { account?: string; token?: string } | null;
+          if (entry?.account && entry.token) vault.set(entry.account, entry.token);
+          return null;
+        },
+        "keychain.delete": (data: unknown) => {
+          const account = (data as { account?: string } | null)?.account ?? "";
+          vault.delete(account);
+          return null;
+        },
+      },
+    },
+  };
+}
 
 function sseResponse(events: readonly { readonly id?: string; readonly data: unknown }[], holdOpen = true): StubResponse {
   const body = events.map((ev) => `${ev.id !== undefined ? `id: ${ev.id}\n` : ""}data: ${JSON.stringify(ev.data)}\n\n`).join("");
@@ -360,13 +424,16 @@ test("manual pairing validates input, pairs via POST /api/v1/remote/pair/exchang
     platform: "other",
   });
 
-  const saved = app.storage()["vibevalley.remote.credentials.v1"];
-  expect(saved).toBeDefined();
-  expect(JSON.parse(saved)).toMatchObject({
+  const savedProfile = app.storage()[PROFILE_STORAGE_KEY];
+  expect(savedProfile).toBeDefined();
+  const parsedProfile = JSON.parse(savedProfile);
+  expect(parsedProfile).toEqual({
     baseUrl: BASE,
-    token: TOKEN,
+    deviceName: "Test iPhone",
     serverName: "Lucas MacBook Pro",
   });
+  expect(parsedProfile.token).toBeUndefined();
+  expect(app.storage()[TEST_HARNESS_TOKEN_KEY]).toBe(TOKEN);
 });
 
 test("deep-link vibevalley://pair automatically pairs at launch and via openWithUrl", async () => {
@@ -389,7 +456,8 @@ test("deep-link vibevalley://pair automatically pairs at launch and via openWith
 
   await app.press("id:disconnect-button");
   await app.waitFor("id:pair-screen");
-  expect(app.storage()["vibevalley.remote.credentials.v1"]).toBeUndefined();
+  expect(app.storage()[PROFILE_STORAGE_KEY]).toBeUndefined();
+  expect(app.storage()[TEST_HARNESS_TOKEN_KEY]).toBeUndefined();
 
   await app.openWithUrl(`vibevalley://pair?url=${encodeURIComponent(BASE)}&code=LIVE99`);
   await app.waitFor("id:mobile-home");
@@ -398,21 +466,12 @@ test("deep-link vibevalley://pair automatically pairs at launch and via openWith
 });
 
 test("all 4 tabs exercise Inbox approve/deny/answer, Channels history+follow+send, Sessions watch+send+stop, and Issues filter+status+comment+review", async () => {
-  const initialStorage = {
-    "vibevalley.remote.credentials.v1": JSON.stringify({
-      baseUrl: BASE,
-      token: TOKEN,
-      deviceName: "iPhone",
-      serverName: "Lucas MacBook Pro",
-    }),
-  };
-
   const app = await open("./App.story.tsx", {
     platform: "macos",
     locale: "en-US",
     width: 390,
     height: 844,
-    storage: initialStorage,
+    storage: harnessCredentialsStorage("iPhone"),
     network: createFullNetwork(),
   });
 
@@ -551,14 +610,7 @@ test("iOS platform defaults device name to iPhone, sends platform ios, and rende
 });
 
 test("connection state reflects unauthorized 401 and supports tapping Inbox review item to jump to Issue detail", async () => {
-  const initialStorage = {
-    "vibevalley.remote.credentials.v1": JSON.stringify({
-      baseUrl: BASE,
-      token: TOKEN,
-      deviceName: "iPhone",
-      serverName: "Lucas MacBook Pro",
-    }),
-  };
+  const initialStorage = harnessCredentialsStorage("iPhone");
 
   const revokedApp = await open("./App.story.tsx", {
     platform: "macos",
@@ -596,6 +648,7 @@ test("connection state reflects unauthorized 401 and supports tapping Inbox revi
 
 test("computeMobileLayout classifies compact phones, Pixel Fold cover/unfolded, and iPhone Duo / iPad mini accurately", () => {
   expect(DUAL_PANE_MIN_WIDTH).toBe(600);
+  expect(NAV_RAIL_WIDTH).toBe(80);
 
   const compactIphone = computeMobileLayout({ width: 393, height: 852 }, { top: 59, right: 0, bottom: 34, left: 0 });
   expect(compactIphone).toEqual({
@@ -691,22 +744,15 @@ test("Pixel Fold unfolded (840x700 Android) renders centered PairScreen, Left Na
 });
 
 test("iPhone Duo (744x1024) fold/unfold preserves active detail selection and compact Android BackHandler exits detail cleanly", async () => {
-  const initialStorage = {
-    "vibevalley.remote.credentials.v1": JSON.stringify({
-      baseUrl: BASE,
-      token: TOKEN,
-      deviceName: "iPhone",
-      serverName: "Lucas MacBook Pro",
-    }),
-  };
-
+  const iosKeychain = createHostKeychainStub(TOKEN);
   const app = await open("./App.story.tsx", {
     platform: "ios",
     locale: "en-US",
     width: 744,
     height: 1024,
     safeArea: { top: 24, bottom: 20, left: 0, right: 0 },
-    storage: initialStorage,
+    storage: profileOnlyStorage("iPhone"),
+    host: iosKeychain.host,
     network: createFullNetwork(),
   });
 
@@ -729,12 +775,14 @@ test("iPhone Duo (744x1024) fold/unfold preserves active detail selection and co
   expect(app.count("id:issue-back")).toBe(0);
   expect(app.texts()).toContain("#102 Add Tailscale diagnostics");
 
+  const androidKeychain = createHostKeychainStub(TOKEN);
   const androidCover = await open("./App.story.tsx", {
     platform: "android",
     locale: "en-US",
     width: 384,
     height: 832,
-    storage: initialStorage,
+    storage: profileOnlyStorage("Android"),
+    host: androidKeychain.host,
     network: createFullNetwork(),
   });
 
@@ -751,4 +799,343 @@ test("iPhone Duo (744x1024) fold/unfold preserves active detail selection and co
   await androidCover.press("id:issue-back");
   await androidCover.waitFor("id:issue-row-issue-1");
   expect(androidCover.count("id:issue-detail")).toBe(0);
+});
+
+test("lifecycle background suspends SSE cleanly and foreground/wake immediately resyncs with Last-Event-ID", async () => {
+  let inboxCalls = 0;
+  const updatedInbox = {
+    ...sampleInboxSlice,
+    seq: 5,
+    items: [
+      ...sampleInboxSlice.items,
+      {
+        id: "inbox-ask-2",
+        kind: "ask",
+        from: { kind: "session", id: "sess-1", name: "Builder Fox", agent: "builder" },
+        who: "Builder Fox",
+        text: "Approve release tag?",
+        at: NOW + 1000,
+        target: { kind: "session", id: "sess-1" },
+        words: {
+          label: "Question",
+          title: "Release confirmation",
+          body: "Ready to tag **v0.9.1**?",
+          tray: "Release confirmation",
+        },
+      },
+    ],
+  };
+
+  const app = await open("./App.story.tsx", {
+    platform: "macos",
+    locale: "en-US",
+    width: 390,
+    height: 844,
+    storage: harnessCredentialsStorage("iPhone"),
+    network: createFullNetwork({
+      [`GET ${BASE}/api/v1/slice/inbox`]: () => {
+        inboxCalls++;
+        return inboxCalls === 1 ? sseResponse([{ id: "1", data: sampleInboxSlice }]) : sseResponse([{ id: "5", data: updatedInbox }]);
+      },
+    }),
+  });
+
+  await app.waitFor("id:inbox-item-inbox-review-1");
+  await app.waitUntil(() => app.texts().includes("Connected"));
+  expect(inboxCalls).toBe(1);
+
+  await app.setLifecycle("background");
+  expect(app.texts()).not.toContain("Connection lost, reconnecting…");
+
+  await app.setLifecycle("inactive");
+  expect(inboxCalls).toBe(1);
+
+  await app.setLifecycle("active");
+  await app.waitFor("id:inbox-item-inbox-ask-2");
+  expect(inboxCalls).toBe(2);
+
+  const inboxReqs = app.requests().filter((r) => r.url === `${BASE}/api/v1/slice/inbox`);
+  expect(inboxReqs[1]?.headers["last-event-id"]).toBe("1");
+
+  await app.wake();
+  await app.waitUntil(() => inboxCalls >= 3);
+  const wakeInboxReqs = app.requests().filter((r) => r.url === `${BASE}/api/v1/slice/inbox`);
+  expect(wakeInboxReqs[2]?.headers["last-event-id"]).toBe("5");
+});
+
+test("notifications encode/decode deep-link routes, sync app badge, notify high-priority arrivals, and navigate on press", async () => {
+  expect(isHighPriorityInboxKind("ask")).toBe(true);
+  expect(isHighPriorityInboxKind("review")).toBe(true);
+  expect(isHighPriorityInboxKind("conflict")).toBe(true);
+  expect(isHighPriorityInboxKind("quiet")).toBe(false);
+
+  expect(decodeNotificationRoute(encodePermissionNotificationId("sess-1", "perm-1"))).toEqual({
+    tab: "inbox",
+    key: "perm:sess-1:perm-1",
+  });
+  expect(decodeNotificationRoute(encodeInteractionNotificationId("sess-1", "inter-1"))).toEqual({
+    tab: "inbox",
+    key: "inter:sess-1:inter-1",
+  });
+  expect(decodeNotificationRoute(encodeInboxNotificationId(InboxItemSchema.parse(sampleInboxSlice.items[0])))).toEqual({
+    tab: "issues",
+    issueId: "issue-1",
+  });
+  expect(
+    decodeNotificationRoute(
+      encodeInboxNotificationId(
+        InboxItemSchema.parse({
+          ...sampleInboxSlice.items[0],
+          id: "inbox-chat-1",
+          target: { kind: "chat", channel: "ch-1" },
+        }),
+      ),
+    ),
+  ).toEqual({
+    tab: "channels",
+    channelId: "ch-1",
+  });
+  expect(
+    decodeNotificationRoute(
+      encodeInboxNotificationId(
+        InboxItemSchema.parse({
+          ...sampleInboxSlice.items[0],
+          id: "inbox-sess-1",
+          target: { kind: "session", id: "sess-1" },
+        }),
+      ),
+    ),
+  ).toEqual({
+    tab: "sessions",
+    sessionId: "sess-1",
+  });
+
+  const shown: { id: string; title: string; body?: string | null }[] = [];
+  const badges: number[] = [];
+  let closedAll = 0;
+  let inboxCalls = 0;
+
+  const secondInbox = {
+    ...sampleInboxSlice,
+    seq: 6,
+    items: [
+      ...sampleInboxSlice.items,
+      {
+        id: "inbox-quiet-1",
+        kind: "quiet",
+        from: { kind: "orchestrator" },
+        who: "Orchestrator",
+        text: "Low priority background note",
+        at: NOW + 100,
+        target: { kind: "chat", channel: "ch-1" },
+        words: { label: "Note", title: "Background note", body: "No popup", tray: "Note" },
+      },
+      {
+        id: "inbox-mention-2",
+        kind: "mention",
+        from: { kind: "orchestrator" },
+        who: "Orchestrator",
+        text: "Please check #general",
+        at: NOW + 200,
+        target: { kind: "chat", channel: "ch-1" },
+        words: { label: "Mention", title: "Mention in #general", body: "Please check #general", tray: "Mention" },
+      },
+    ],
+  };
+
+  const app = await open("./App.story.tsx", {
+    platform: "macos",
+    locale: "en-US",
+    width: 390,
+    height: 844,
+    storage: harnessCredentialsStorage("iPhone"),
+    host: {},
+    modules: {
+      nsh: {
+        "Notifications.permission": () => "granted",
+        "Notifications.requestPermission": () => "granted",
+        "Notifications.show": (opts: { id: string; title: string; body?: string | null }) => {
+          shown.push(opts);
+          return true;
+        },
+        "Notifications.setBadge": (count: number) => {
+          badges.push(count);
+        },
+        "Notifications.closeAll": () => {
+          closedAll++;
+        },
+      },
+    },
+    network: createFullNetwork({
+      [`GET ${BASE}/api/v1/slice/inbox`]: () => {
+        inboxCalls++;
+        return inboxCalls === 1 ? sseResponse([{ id: "1", data: sampleInboxSlice }]) : sseResponse([{ id: "6", data: secondInbox }]);
+      },
+    }),
+  });
+
+  await app.waitFor("id:inbox-permission-perm-1");
+  await app.waitUntil(() => badges.includes(4));
+  // Baseline items must not spam notifications on initial connect.
+  expect(shown).toHaveLength(0);
+
+  // Foreground resync delivers a quiet item + a high-priority mention; only the mention notifies.
+  await app.setLifecycle("background");
+  await app.setLifecycle("active");
+  await app.waitUntil(() => shown.length === 1);
+  expect(shown[0]).toMatchObject({
+    id: "channel:ch-1:inbox-mention-2",
+    title: "Mention in #general",
+    body: "Please check #general",
+  });
+  await app.waitUntil(() => badges.at(-1) === 6);
+
+  // Pressing the notification deep-links directly into the target channel.
+  await app.host.send("notification.press", { id: shown[0].id });
+  await app.waitFor("id:channel-detail");
+  await app.waitFor("id:channel-message-msg-1");
+
+  // Pressing an issue notification deep-links directly into the target issue detail.
+  await app.host.send("notification.press", { id: "issue:issue-2:inbox-issue-2" });
+  await app.waitFor("id:issue-detail");
+  expect(app.texts()).toContain("#102 Add Tailscale diagnostics");
+
+  // Pressing a session notification deep-links directly into the target session detail.
+  await app.host.send("notification.press", { id: "session:sess-1:inbox-sess-1" });
+  await app.waitFor("id:session-detail");
+  await app.waitFor("id:session-event-1");
+
+  // Disconnecting clears the app badge and removes delivered notifications.
+  await app.press("id:disconnect-button");
+  await app.waitFor("id:pair-screen");
+  await app.waitUntil(() => badges.at(-1) === 0 && closedAll > 0);
+});
+
+test("SecureTokenStore keeps tokens out of plaintext Storage on mobile and supports native keychain round-trip", async () => {
+  // 1. Direct SecureTokenStore contract check (save, load, missing-token invalidation, clear).
+  const mem = new Map<string, string>();
+  const customStore: SecureTokenStore = {
+    backend: "native-keychain",
+    getToken: (account) => Promise.resolve(mem.get(account)),
+    setToken: (account, value) => {
+      mem.set(account, value);
+      return Promise.resolve();
+    },
+    deleteToken: (account) => {
+      mem.delete(account);
+      return Promise.resolve();
+    },
+  };
+  await saveCredentials({ baseUrl: BASE, token: "vv_dev_secret_unit", deviceName: "UnitPhone", serverName: "UnitMac" }, customStore);
+  expect(mem.get(TOKEN_ACCOUNT_KEY)).toBe("vv_dev_secret_unit");
+  expect(await loadCredentials(customStore)).toEqual({
+    baseUrl: BASE,
+    token: "vv_dev_secret_unit",
+    deviceName: "UnitPhone",
+    serverName: "UnitMac",
+  });
+  await clearCredentials(customStore);
+  expect(mem.has(TOKEN_ACCOUNT_KEY)).toBe(false);
+  expect(await loadCredentials(customStore)).toBeUndefined();
+
+  // 2. Native host keychain on iOS stores token ONLY in Keychain, never in plaintext Storage.
+  const keychain = createHostKeychainStub();
+  const iosWithKeychain = await open("./App.story.tsx", {
+    platform: "ios",
+    locale: "en-US",
+    width: 390,
+    height: 844,
+    host: keychain.host,
+    network: createFullNetwork(),
+  });
+
+  await iosWithKeychain.waitFor("id:pair-screen");
+  await iosWithKeychain.type("id:pair-url-input", BASE);
+  await iosWithKeychain.type("id:pair-code-input", "KEYCHAIN1");
+  await iosWithKeychain.press("id:pair-submit");
+  await iosWithKeychain.waitFor("id:mobile-home");
+
+  expect(keychain.vault.get(TOKEN_ACCOUNT_KEY)).toBe(TOKEN);
+  const allStorageValues = Object.values(iosWithKeychain.storage()).join("\n");
+  expect(allStorageValues).not.toContain(TOKEN);
+  expect(iosWithKeychain.storage()[PROFILE_STORAGE_KEY]).toBeDefined();
+
+  await iosWithKeychain.press("id:disconnect-button");
+  await iosWithKeychain.waitFor("id:pair-screen");
+  expect(keychain.vault.has(TOKEN_ACCOUNT_KEY)).toBe(false);
+  expect(iosWithKeychain.storage()[PROFILE_STORAGE_KEY]).toBeUndefined();
+
+  // 3. Mobile without native keychain never writes plaintext token into Storage.
+  const androidNoKeychain = await open("./App.story.tsx", {
+    platform: "android",
+    locale: "en-US",
+    width: 840,
+    height: 700,
+    network: createFullNetwork(),
+  });
+
+  await androidNoKeychain.waitFor("id:pair-screen");
+  await androidNoKeychain.type("id:pair-url-input", BASE);
+  await androidNoKeychain.type("id:pair-code-input", "MEMONLY2");
+  await androidNoKeychain.press("id:pair-submit");
+  await androidNoKeychain.waitFor("id:mobile-home");
+
+  const androidStorageValues = Object.values(androidNoKeychain.storage()).join("\n");
+  expect(androidStorageValues).not.toContain(TOKEN);
+  expect(androidNoKeychain.shows("id:mobile-nav-rail")).toBe(true);
+});
+
+test("recycling List views and TextView markdown render across Inbox, Channels, Sessions, and Issues", async () => {
+  const markdownHistory = [
+    {
+      ...sampleChannelHistory[0],
+      id: "msg-md-1",
+      text: "Check **bold status** and `cargo test` output.",
+    },
+  ];
+  const markdownBoard = {
+    ...sampleBoardSlice,
+    issues: [
+      {
+        ...sampleBoardSlice.issues[0],
+        description: "Support **recycling lists** and `TextView` markdown.",
+      },
+      ...sampleBoardSlice.issues.slice(1),
+    ],
+  };
+
+  const app = await open("./App.story.tsx", {
+    platform: "macos",
+    locale: "en-US",
+    width: 390,
+    height: 844,
+    storage: harnessCredentialsStorage("iPhone"),
+    network: createFullNetwork({
+      [`GET ${BASE}/api/v1/slice/board`]: sseResponse([{ id: "4", data: markdownBoard }]),
+      [`POST ${BASE}/api/v1/channel/message/list`]: okEnvelope(markdownHistory),
+    }),
+  });
+
+  await app.waitFor("id:inbox-list");
+  expect(app.shows("id:inbox-list")).toBe(true);
+
+  await app.press("id:tab-channels");
+  await app.waitFor("id:channels-list");
+  await app.press("id:channel-row-ch-1");
+  await app.waitFor("id:channel-messages-list");
+  await app.waitFor("id:channel-message-body-msg-md-1");
+  expect(app.texts().join(" ")).toContain("bold status");
+  expect(app.texts().join(" ")).toContain("cargo test");
+
+  await app.press("id:tab-sessions");
+  await app.waitFor("id:sessions-list");
+  await app.press("id:session-row-sess-1");
+  await app.waitFor("id:session-events-list");
+  await app.waitFor("id:session-event-1");
+
+  await app.press("id:tab-issues");
+  await app.waitFor("id:issues-list");
+  await app.press("id:issue-row-issue-1");
+  await app.waitFor("id:issue-detail-description");
+  expect(app.texts().join(" ")).toContain("recycling lists");
 });

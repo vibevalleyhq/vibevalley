@@ -4,7 +4,8 @@ export type LayoutMode = "compact" | "dual_pane";
 
 /** Covers Android Foldables unfolded (~740-840dp), iPhone Duo (~740-840pt), and iPad mini (744pt). */
 export const DUAL_PANE_MIN_WIDTH = 600;
-export const NAV_RAIL_WIDTH = 72;
+/** Wide enough that "Channels" and "Sessions" labels never elide on Android foldables or compact tablets. */
+export const NAV_RAIL_WIDTH = 80;
 
 const MASTER_MIN_WIDTH = 280;
 const MASTER_MAX_WIDTH = 360;

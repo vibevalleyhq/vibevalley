@@ -15,6 +15,7 @@ import { IssuesTab } from "./features/IssuesTab";
 import { PairScreen } from "./features/PairScreen";
 import { SessionsTab } from "./features/SessionsTab";
 import { syncMobileLocale } from "./infra/i18nBoot";
+import { subscribeNotificationPress, type NotificationRoute } from "./infra/notifications";
 import { createRemoteSession, hapticSelection } from "./infra/session";
 
 type MobileTabId = "inbox" | "channels" | "sessions" | "issues";
@@ -58,6 +59,7 @@ function connectionTag(state: RemoteConnectionState): { readonly label: string; 
 
 export interface MobileAppProps {
   readonly fetchImpl?: typeof fetch;
+  readonly subscribeNotificationPress?: (onRoute: (route: NotificationRoute) => void) => () => void;
 }
 
 export function MobileApp(props: MobileAppProps = {}) {
@@ -77,6 +79,30 @@ export function MobileApp(props: MobileAppProps = {}) {
   const selectedChannelId = signal<string | undefined>(undefined);
   const selectedSessionId = signal<string | undefined>(undefined);
   const selectedIssueId = signal<string | undefined>(undefined);
+
+  const handleNotificationRoute = (route: NotificationRoute) => {
+    switch (route.tab) {
+      case "inbox":
+        if (route.key !== undefined) selectedInboxKey.set(route.key);
+        activeTab.set("inbox");
+        break;
+      case "channels":
+        selectedChannelId.set(route.channelId);
+        activeTab.set("channels");
+        break;
+      case "sessions":
+        selectedSessionId.set(route.sessionId);
+        activeTab.set("sessions");
+        break;
+      case "issues":
+        selectedIssueId.set(route.issueId);
+        activeTab.set("issues");
+        break;
+    }
+  };
+
+  const stopNotificationPress = (props.subscribeNotificationPress ?? subscribeNotificationPress)(handleNotificationRoute);
+  cleanup(() => stopNotificationPress());
 
   const stopBackHandler = BackHandler.on("press", () => {
     if (layout().mode !== "compact") return false;
@@ -288,7 +314,7 @@ export function MobileApp(props: MobileAppProps = {}) {
                   paddingBottom: Math.max(12, layout().safe.bottom),
                 }}
               >
-                <View class="w-full items-center gap-1.5 px-1.5">
+                <View class="w-full items-center gap-1.5 px-1">
                   <Each of={TAB_ORDER} key={(id) => id}>
                     {(id) => {
                       const active = () => activeTab() === id();
@@ -302,7 +328,7 @@ export function MobileApp(props: MobileAppProps = {}) {
                             hapticSelection();
                             activeTab.set(id());
                           }}
-                          class={`w-full flex-row items-center rounded-lg py-2 pr-1.5 pl-1 ${active() ? "bg-selected" : "active:bg-hover"}`}
+                          class={`w-full flex-row items-center rounded-lg px-1 py-2 ${active() ? "bg-selected" : "active:bg-hover"}`}
                         >
                           <View class={`h-5 w-1 shrink-0 rounded-full ${active() ? "bg-accent" : "bg-transparent"}`} />
                           <View class="min-w-0 flex-1 items-center gap-1">
