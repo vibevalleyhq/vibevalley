@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, View, windowSize, type JSX } from "nsh";
+import { Scroll, signal, Text, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
@@ -129,6 +129,35 @@ export function TeamMemoryPage() {
 /** Tailwind's md (48rem): narrower, the list sits over the section. */
 const md = () => windowSize().width >= 768;
 
+function SectionBody(props: { id: string; sub: string | undefined; connectorId: string | undefined }) {
+  return (
+    <>
+      <If when={props.id === "general"}>
+        <Page title={t("web.setting.nav.general")}>
+          <GeneralGroups />
+          <AppearanceGroups />
+        </Page>
+      </If>
+      <If when={props.id === "models"}>
+        <Page title={t("web.setting.nav.models")} hint={t("web.setting.models.intro")} action={<SettingsFile />}>
+          <Readiness features={["orchestrator", "call"]} />
+          <SettingsForm part="deepseek" />
+          <ProviderModels />
+        </Page>
+      </If>
+      <If when={props.id === "voice"}>
+        <VoiceSettings />
+      </If>
+      <If when={props.id === "connections"}>
+        <ConnectionsSettings sub={props.sub} id={props.connectorId} />
+      </If>
+      <If when={props.id === "about"}>
+        <AboutPage />
+      </If>
+    </>
+  );
+}
+
 /** `rest` is the path after /settings/. */
 export function SettingsPage(props: { rest: string }) {
   const query = signal("");
@@ -139,31 +168,6 @@ export function SettingsPage(props: { rest: string }) {
   const connectorId = () => (parts().length > 2 ? decodeURIComponent(parts().slice(2).join("/")) : undefined);
   const shown = (g: Group) => sections.filter((s) => s.group === g && matches(q(), [s.label, s.words]));
   const navWidth = usePaneWidth("settingsNav", 224, 176, 360);
-  const body = (s: Section): JSX.Element => {
-    switch (s.id) {
-      case "general":
-        return (
-          <Page title={t("web.setting.nav.general")}>
-            <GeneralGroups />
-            <AppearanceGroups />
-          </Page>
-        );
-      case "models":
-        return (
-          <Page title={t("web.setting.nav.models")} hint={t("web.setting.models.intro")} action={<SettingsFile />}>
-            <Readiness features={["orchestrator", "call"]} />
-            <SettingsForm part="deepseek" />
-            <ProviderModels />
-          </Page>
-        );
-      case "voice":
-        return <VoiceSettings />;
-      case "connections":
-        return <ConnectionsSettings sub={parts()[1]} id={connectorId()} />;
-      default:
-        return <AboutPage />;
-    }
-  };
   return (
     <If
       when={redirect()}
@@ -191,11 +195,13 @@ export function SettingsPage(props: { rest: string }) {
                     />
                     <If when={shown("main").length > 0}>
                       <View class="gap-0.5">
-                        <Each of={shown("main")}>{(s) => <SectionLink section={s()} current={s() === current()} />}</Each>
+                        <Each of={shown("main")} key={(s) => s.id}>
+                          {(s) => <SectionLink section={s()} current={s() === current()} />}
+                        </Each>
                       </View>
                     </If>
                     <View class="flex-1" />
-                    <Each of={shown("about")}>
+                    <Each of={shown("about")} key={(s) => s.id}>
                       {(s) => (
                         <View class="border-t border-line pt-3">
                           <SectionLink section={s()} current={s() === current()} />
@@ -205,7 +211,9 @@ export function SettingsPage(props: { rest: string }) {
                   </Scroll>
                 </View>
                 <Scroll testID={`settings-${current().id}`} class="min-h-0 min-w-0 flex-1 bg-page" contentClass="px-6 py-5">
-                  <Each of={[current()]}>{(s) => body(s())}</Each>
+                  <Each of={[current()]} key={(s) => s.id}>
+                    {(s) => <SectionBody id={s().id} sub={parts()[1]} connectorId={connectorId()} />}
+                  </Each>
                 </Scroll>
               </View>
             </SettingsSearch.Provider>

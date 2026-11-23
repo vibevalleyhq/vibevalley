@@ -228,7 +228,7 @@ export function Stages(props: { at: Stage }) {
   const ati = () => stages.indexOf(props.at);
   return (
     <View class="flex-row items-center" accessibilityLabel={t("web.issue.sheet.at", { stage: stageLabel[props.at] })}>
-      <Each of={stages}>
+      <Each of={stages} key={(s) => s}>
         {(s, i) => (
           <View class={`flex-row items-center ${i() > 0 ? "flex-1" : ""}`}>
             <If when={i() > 0}>

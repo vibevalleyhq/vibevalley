@@ -162,7 +162,7 @@ export function IssueBoard(props: BoardProps) {
     <View ref={drag.setRoot} class="min-h-0 flex-1 px-3 pb-3">
       <If when={narrow()}>
         <View accessibilityLabel={t("web.issue.board.whichLane")} class="mb-2 flex-row gap-0.5 rounded-md border border-line bg-side p-0.5">
-          <Each of={lanes}>
+          <Each of={lanes} key={(l) => l}>
             {(l) => (
               <View
                 testID={`board-lane-tab-${l()}`}
@@ -185,7 +185,7 @@ export function IssueBoard(props: BoardProps) {
         </View>
       </If>
       <View class="min-h-0 flex-1 flex-row gap-2.5">
-        <Each of={lanes}>
+        <Each of={lanes} key={(l) => l}>
           {(l) => (
             <If when={!narrow() || l() === lane()}>
               <LaneView
@@ -405,7 +405,7 @@ function CardView(props: {
         testID="issue-card"
         accessibilityLabel={look().title}
         accessibilityState={{ selected: props.selected, busy: props.card.move?.state === "moving" }}
-        tooltip={look().detail ? <Bubble text={look().detail} /> : undefined}
+        tooltip={<If when={look().detail}>{(d) => <Bubble text={d()} />}</If>}
         class={[
           "relative overflow-hidden rounded-lg border px-2.5 py-2 focus-visible:outline-2 focus-visible:outline-focus",
           props.selected ? "border-accent bg-selected" : "border-line bg-elevated hover:border-faint hover:shadow-raise",
@@ -452,7 +452,9 @@ function CardView(props: {
               </View>
             </If>
             <If when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
-            <Each of={look().flags}>{(f) => <FlagChip text={f().text} tone={f().tone} />}</Each>
+            <Each of={look().flags} key={(f) => `${f.tone}:${f.text}`}>
+              {(f) => <FlagChip text={f().text} tone={f().tone} />}
+            </Each>
           </View>
         </If>
       </View>

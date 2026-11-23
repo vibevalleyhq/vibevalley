@@ -16,7 +16,7 @@ function makeRepo(name: string): RepoSummary {
   };
 }
 
-function makeRuntime(id: string, status: RuntimeInfo["installation"]["status"], enabled: boolean): RuntimeInfo {
+function sampleRuntime(id: string, status: RuntimeInfo["installation"]["status"], enabled: boolean): RuntimeInfo {
   const installation: RuntimeInfo["installation"] =
     status === "available"
       ? { status: "available", via: "executable", command: `/usr/local/bin/${id}`, version: "1.0.0" }
@@ -47,15 +47,15 @@ function makeRuntime(id: string, status: RuntimeInfo["installation"]["status"], 
 }
 
 test("isRuntimeReady requires both available installation and enabled setting", () => {
-  expect(isRuntimeReady(makeRuntime("claude", "available", true))).toBe(true);
-  expect(isRuntimeReady(makeRuntime("claude", "available", false))).toBe(false);
-  expect(isRuntimeReady(makeRuntime("codex", "not_found", true))).toBe(false);
-  expect(isRuntimeReady(makeRuntime("opencode", "unsupported", true))).toBe(false);
-  expect(isRuntimeReady(makeRuntime("checking", "checking", true))).toBe(false);
+  expect(isRuntimeReady(sampleRuntime("claude", "available", true))).toBe(true);
+  expect(isRuntimeReady(sampleRuntime("claude", "available", false))).toBe(false);
+  expect(isRuntimeReady(sampleRuntime("codex", "not_found", true))).toBe(false);
+  expect(isRuntimeReady(sampleRuntime("opencode", "unsupported", true))).toBe(false);
+  expect(isRuntimeReady(sampleRuntime("checking", "checking", true))).toBe(false);
 });
 
 test("computeOnboardingReadiness tracks 0/3 -> 1/3 -> 2/3 -> 3/3 progression", () => {
-  const step0 = computeOnboardingReadiness({ repos: [], runtimes: [makeRuntime("opencode", "not_found", true)], issueCount: 0 });
+  const step0 = computeOnboardingReadiness({ repos: [], runtimes: [sampleRuntime("opencode", "not_found", true)], issueCount: 0 });
   expect(step0).toEqual({
     reposReady: false,
     repoCount: 0,
@@ -70,7 +70,7 @@ test("computeOnboardingReadiness tracks 0/3 -> 1/3 -> 2/3 -> 3/3 progression", (
 
   const step1 = computeOnboardingReadiness({
     repos: [makeRepo("vibevalley")],
-    runtimes: [makeRuntime("claude", "available", false)],
+    runtimes: [sampleRuntime("claude", "available", false)],
     issueCount: 0,
   });
   expect(step1.reposReady).toBe(true);
@@ -81,7 +81,7 @@ test("computeOnboardingReadiness tracks 0/3 -> 1/3 -> 2/3 -> 3/3 progression", (
 
   const step2 = computeOnboardingReadiness({
     repos: [makeRepo("vibevalley"), makeRepo("site")],
-    runtimes: [makeRuntime("claude", "available", true), makeRuntime("codex", "available", true), makeRuntime("opencode", "not_found", true)],
+    runtimes: [sampleRuntime("claude", "available", true), sampleRuntime("codex", "available", true), sampleRuntime("opencode", "not_found", true)],
     issueCount: 0,
   });
   expect(step2.reposReady).toBe(true);
@@ -94,7 +94,7 @@ test("computeOnboardingReadiness tracks 0/3 -> 1/3 -> 2/3 -> 3/3 progression", (
 
   const step3 = computeOnboardingReadiness({
     repos: [makeRepo("vibevalley")],
-    runtimes: [makeRuntime("claude", "available", true)],
+    runtimes: [sampleRuntime("claude", "available", true)],
     issueCount: 4,
   });
   expect(step3.issuesReady).toBe(true);

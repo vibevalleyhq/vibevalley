@@ -355,7 +355,15 @@ export default defineConfig({
       },
       {
         // nsh fine-grained reactivity rules (docs/style/nsh-tsx.md; scripts/audit/oxlint-plugin.ts).
-        files: ["apps/mac/ui/workspace/**/*.tsx", "apps/mac/ui/design/**/*.tsx", "apps/mac/ui/features/channel/**/*.tsx", "apps/mobile/src/**/*.tsx"],
+        files: [
+          "apps/mac/ui/workspace/**/*.tsx",
+          "apps/mac/ui/design/**/*.tsx",
+          "apps/mac/ui/features/channel/**/*.tsx",
+          "apps/mac/ui/features/issue/**/*.tsx",
+          "apps/mac/ui/features/runtime/**/*.tsx",
+          "apps/mac/ui/features/setting/**/*.tsx",
+          "apps/mobile/src/**/*.tsx",
+        ],
         excludeFiles: ["**/*.test.tsx", "**/*.story.tsx", "**/story.tsx", "**/stories/**"],
         rules: {
           "vibevalley/nsh-no-jsx-conditional": "error",

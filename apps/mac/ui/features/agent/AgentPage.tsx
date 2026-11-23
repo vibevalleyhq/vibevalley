@@ -188,9 +188,9 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
       {bar()}
       <If when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={(a) => draft.set(a)} />}</If>
       <Scroll class="min-h-0 flex-1" contentClass="min-h-full gap-3 pt-3 lg:flex-row">
-        <Scroll class="shrink-0 rounded-lg border border-line bg-page lg:w-76" contentClass="p-4">
+        <View class="shrink-0 rounded-lg border border-line bg-page p-4 lg:w-76">
           <LookPanel draft={draft()} onChange={(look) => draft.set({ ...draft(), look })} />
-        </Scroll>
+        </View>
         <View class="min-h-104 flex-1 overflow-hidden rounded-lg border border-line bg-page">
           <Stage draft={draft()} pose={pose()} />
           <View class="flex-row flex-wrap justify-center gap-1.5 p-3">

@@ -17,7 +17,7 @@ export function Readiness(props: { features: readonly Feature[] }) {
     <If when={readiness()}>
       {(all) => (
         <View class="gap-1.5 rounded-lg bg-side px-3.5 py-2.5" testID="readiness">
-          <Each of={props.features}>
+          <Each of={props.features} key={(feature) => feature}>
             {(feature) => {
               const state = () => all()[feature()];
               const name = () => t(`web.setting.feature.${feature()}`);

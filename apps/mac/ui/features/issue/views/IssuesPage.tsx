@@ -224,6 +224,7 @@ export function IssuesPage(props: { rest: string }) {
             const cur = id();
             return cur === undefined ? [] : [cur];
           })()}
+          key={(cur) => cur}
         >
           {(at) => (
             <IssueView onBack={() => open(undefined)} backLabel={fromScene() ?? t("web.issue.page.backToBoard")} blocked={dialogUp}>
@@ -292,8 +293,10 @@ function Detail(props: {
         </Scroll>
       }
     >
-      <Each of={shows("todo")}>{() => <TodoDetail item={cardOf("todo").issue} onDone={props.open} />}</Each>
-      <Each of={shows("issue")}>
+      <Each of={shows("todo")} key={(k) => k}>
+        {() => <TodoDetail item={cardOf("todo").issue} onDone={props.open} />}
+      </Each>
+      <Each of={shows("issue")} key={(k) => k}>
         {() => (
           <IssueDetail
             issue={cardOf("issue").issue}
@@ -304,8 +307,10 @@ function Detail(props: {
           />
         )}
       </Each>
-      <Each of={shows("orchestrator")}>{() => <OrchestratorIssueDetail issue={cardOf("orchestrator").issue} />}</Each>
-      <Each of={shows("missing")}>
+      <Each of={shows("orchestrator")} key={(k) => k}>
+        {() => <OrchestratorIssueDetail issue={cardOf("orchestrator").issue} />}
+      </Each>
+      <Each of={shows("missing")} key={(k) => k}>
         {() => (
           <Scroll class="min-h-0 flex-1">
             <View class="w-full max-w-200 self-center px-6 py-8">
@@ -317,7 +322,7 @@ function Detail(props: {
           </Scroll>
         )}
       </Each>
-      <Each of={shows("family")}>
+      <Each of={shows("family")} key={(k) => k}>
         {() => (
           <FamilyDetail
             issue={cardOf("family").issue}

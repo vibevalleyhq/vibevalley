@@ -67,6 +67,7 @@ export function AboutPage() {
                   { label: t("web.setting.about.repos"), hint: t("web.setting.about.reposHint"), path: s().paths.repos },
                   { label: t("web.setting.about.worktrees"), hint: t("web.setting.about.worktreesHint"), path: s().paths.worktrees },
                 ]}
+                key={(p) => p.label}
               >
                 {(p, i) => <PathRow label={p().label} hint={p().hint} path={p().path} last={i() === 3} />}
               </Each>

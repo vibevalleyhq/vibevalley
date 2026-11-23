@@ -60,7 +60,7 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
       </If>
       <SheetLabel first={!props.issue.description}>{t("web.issue.family.children")}</SheetLabel>
       <View class="overflow-hidden rounded-lg border border-line bg-page">
-        <Each of={props.children}>
+        <Each of={props.children} key={(child) => child.id}>
           {(child, i) => (
             <View
               role="button"
@@ -94,7 +94,7 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
       </Property>
       <If when={props.issue.stage.acts.length > 0}>
         <View class="mt-3 flex-row flex-wrap gap-2">
-          <Each of={props.issue.stage.acts}>
+          <Each of={props.issue.stage.acts} key={(action) => action.act}>
             {(action) => (
               <Button
                 testID={`act-${action().act}`}

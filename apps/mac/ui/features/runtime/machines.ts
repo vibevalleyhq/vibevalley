@@ -34,7 +34,7 @@ function statusFromSlice(machine: SliceMachine): MachineStatus {
 }
 
 /** Merges real-time `SessionsSlice.machines` with richer `machine.list` metadata, local machine first. */
-export function mergeMachines(sliceMachines: readonly SliceMachine[] | undefined, rpcMachines: readonly MachineInfo[] | undefined): DisplayMachine[] {
+function mergeMachines(sliceMachines: readonly SliceMachine[] | undefined, rpcMachines: readonly MachineInfo[] | undefined): DisplayMachine[] {
   const byId = new Map<string, DisplayMachine>();
 
   for (const info of rpcMachines ?? []) {

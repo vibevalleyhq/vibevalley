@@ -201,13 +201,13 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       <Note tone={drafting() ? "water" : "wheat"}>
         <Text class="text-base font-semibold text-ink">{said()[0]}</Text>
         <Text class="mt-1 text-sm text-ink">{said()[1]}</Text>
-        <Each of={questions()}>
+        <Each of={questions()} key={(a) => a.question}>
           {(a) => (
             <View class="mt-1.5">
               <Text class="text-sm text-ink">{`· ${a().question}`}</Text>
               <If when={a().options.length}>
                 <View class="mt-1 flex-row flex-wrap gap-1.5 pl-3" accessibilityLabel={t("web.issue.todo.answerTo", { question: a().question })}>
-                  <Each of={a().options}>
+                  <Each of={a().options} key={(o) => o}>
                     {(o) => (
                       <Button disabled={busy()} onPress={() => word.set(o())}>
                         {o()}

@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, View, type JSX } from "nsh";
+import { Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { IssueStatus } from "@vibevalley/protocol";
@@ -79,26 +79,6 @@ export function IssueList(props: {
                         : t("web.issue.noHelper")
                       : t("web.issue.list.all");
               };
-              const icon = (): JSX.Element => {
-                const key = g().key;
-                const l = groupLane();
-                switch (props.grouping) {
-                  case "status":
-                    return l ? <StatusMark status={laneStatus[l]} size={14} /> : undefined;
-                  case "repo":
-                    return <Icon name="folder" size={14} tone="muted" />;
-                  case "agent":
-                    return !key ? (
-                      <NoFaceMark size={14} />
-                    ) : isOrchestrator(key) ? (
-                      <OrchestratorFace size={16} agent={key} />
-                    ) : (
-                      <AgentFaceOf agent={key} size={16} />
-                    );
-                  default:
-                    return undefined;
-                }
-              };
               return (
                 <View accessibilityLabel={label()} testID="issue-group" class="mb-1.5">
                   {/* A head of words on the page, not a bar: its line under it sets the group off. */}
@@ -120,7 +100,21 @@ export function IssueList(props: {
                         <Icon name="expand" size={10} tone="muted" />
                       </View>
                       <If when={props.grouping !== "none"}>
-                        <View class="w-4 shrink-0 items-center justify-center">{icon()}</View>
+                        <View class="w-4 shrink-0 items-center justify-center">
+                          <If when={props.grouping === "status" ? groupLane() : undefined}>{(l) => <StatusMark status={laneStatus[l()]} size={14} />}</If>
+                          <If when={props.grouping === "repo"}>
+                            <Icon name="folder" size={14} tone="muted" />
+                          </If>
+                          <If when={props.grouping === "agent"}>
+                            <If when={g().key} else={<NoFaceMark size={14} />}>
+                              {(key) => (
+                                <If when={isOrchestrator(key())} else={<AgentFaceOf agent={key()} size={16} />}>
+                                  <OrchestratorFace size={16} agent={key()} />
+                                </If>
+                              )}
+                            </If>
+                          </If>
+                        </View>
                       </If>
                       <Text class="truncate text-sm font-semibold text-ink">{label()}</Text>
                       <CountPill count={g().rows.length} />
@@ -199,7 +193,7 @@ function Row(props: {
       }}
       accessibilityLabel={look().title}
       accessibilityState={{ selected: props.selected }}
-      tooltip={look().detail ? <Bubble text={look().detail} /> : undefined}
+      tooltip={<If when={look().detail}>{(d) => <Bubble text={d()} />}</If>}
       onPress={() => props.onOpen(props.card.id)}
       class={`relative min-h-9.5 flex-row items-center gap-2.5 rounded-md px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-focus ${props.selected ? "bg-selected" : "hover:bg-hover"}`}
     >
@@ -228,7 +222,9 @@ function Row(props: {
       <If when={hasTrailingMarks()}>
         <View class="shrink-0 flex-row items-center gap-1.5">
           <If when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
-          <Each of={shownFlags()}>{(f) => <FlagChip text={f().text} tone={f().tone} />}</Each>
+          <Each of={shownFlags()} key={(f) => `${f.tone}:${f.text}`}>
+            {(f) => <FlagChip text={f().text} tone={f().tone} />}
+          </Each>
         </View>
       </If>
       <If when={props.showRepo && props.wide}>
