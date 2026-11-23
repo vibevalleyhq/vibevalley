@@ -17,6 +17,17 @@
       "waiting": "What is done or failed waits here for you; drag it to Closed to complete or cancel it.",
       "closed": "Completed and canceled tickets; drag one back to In progress to reopen it."
     },
+    "emptyGuide": {
+      "todoTitle": "No to-dos yet",
+      "todoBody": "Jot down a ticket, pick a repo and helper, and dispatch it.",
+      "workingTitle": "Nothing in progress",
+      "workingBody": "Assign a helper and dispatch a To do ticket, or drag it here to start a worktree session.",
+      "waitingTitle": "Nothing waiting for review",
+      "waitingBody": "Completed rounds and helper questions appear here so you can inspect changes and merge.",
+      "closedTitle": "No closed tickets yet",
+      "closedBody": "Completed and canceled tickets stay here; drag one back to In progress to reopen.",
+      "filtered": "No matching tickets in this column."
+    },
     "whichLane": "Which column",
     "spots": "{taken} / {of} spots",
     "moveFailed": "Not moved",
@@ -307,6 +318,7 @@
     "queued": "Queued",
     "cron": "Scheduled task",
     "noHelper": "No helper yet",
+    "assignHelper": "Assign helper",
     "pickFirst": "No helper or repo picked: pick them before starting",
     "waiting": "waiting for a free spot, queued {ago}",
     "written": "written {ago}",
@@ -376,25 +388,65 @@
     "keep": "Save",
     "editsKept": "The previous version was submitted. Your edits are still in the draft.",
     "machine": "Execution machine",
-    "machineAuto": "Auto machine"
+    "machineAuto": "Auto machine",
+    "missingRepo": "No repo added yet. Add a repo before dispatching this ticket.",
+    "goRepos": "Add repo",
+    "missingRuntime": "No ready engine configured yet. Set up an engine to draft and run tickets.",
+    "goRuntimes": "Configure engines"
   },
   "conversation": {
     "title": "Discussion and delivery",
     "older": "Load earlier messages",
     "empty": "Requirements, execution feedback and deliveries stay here"
   },
+  "guide": {
+    "title": "How issues flow",
+    "summary": "Assign a helper to launch a worktree session, then inspect changes in Review to complete.",
+    "collapse": "Hide guide",
+    "expand": "Show guide",
+    "stage": {
+      "todo": "Capture work, pick a repo and helper, and order your queue.",
+      "working": "Dispatch or drag here to launch an isolated worktree session.",
+      "waiting": "Review changes, answer questions, or send back for another round.",
+      "closed": "Complete to merge into the base branch, or reopen anytime."
+    }
+  },
   "onboarding": {
     "title": "Get started with VibeValley",
-    "subtitle": "Complete these three steps to dispatch tickets to helpers.",
-    "step1Title": "Check or configure runtimes",
-    "step1Desc": "Verify a local coding agent (such as Claude Code or Codex) is installed and enabled.",
-    "step1Action": "Configure runtimes",
-    "step2Title": "Add a repository",
-    "step2Desc": "Link a local Git repository so helpers can work in isolated worktrees.",
-    "step2Action": "Add repository",
-    "step3Title": "Create your first ticket or dispatch in chat",
-    "step3Desc": "Describe what to build for a helper, press C to create a ticket, or ask the assistant in chat to break it down.",
+    "subtitle": "Complete these three steps to dispatch tickets to helpers in isolated worktrees.",
+    "progress": "{done} / {total} ready",
+    "step1Title": "Add a Git repository",
+    "step1Desc": "Link a local Git repository so helpers can work in isolated worktrees.",
+    "step1Action": "Add repository",
+    "step1Manage": "Manage repos",
+    "step1Ready": "{n, plural, one {# repo ready} other {# repos ready}}",
+    "step2Title": "Connect a coding engine",
+    "step2Desc": "Verify a local coding engine (such as Claude Code or Codex) is installed and enabled.",
+    "step2Action": "Configure engines",
+    "step2Manage": "Manage engines",
+    "step2Ready": "{n, plural, one {# engine ready} other {# engines ready}}",
+    "step3Title": "Create your first ticket",
+    "step3Desc": "Describe what to build, press C to create a ticket, or pick a starter template below.",
+    "step3Ready": "{n, plural, one {# ticket} other {# tickets}}",
     "newIssue": "New ticket",
-    "openChat": "Open chat"
+    "openChat": "Open chat",
+    "templatesTitle": "Or start from a template",
+    "templates": {
+      "bug": {
+        "title": "Fix a bug",
+        "desc": "Track down a failure and add a regression test",
+        "prompt": "Fix: [describe the issue]\n\nSteps to reproduce:\n1. \nExpected behavior:\nAcceptance criteria: add a regression test and pass checks"
+      },
+      "feature": {
+        "title": "Add a feature",
+        "desc": "Define scope and criteria for a helper to build",
+        "prompt": "Add: [describe the feature]\n\nScope:\n- \nOut of scope:\n- \nAcceptance criteria: cover the main flow with tests"
+      },
+      "refactor": {
+        "title": "Audit & refactor",
+        "desc": "Simplify boundaries while keeping behavior intact",
+        "prompt": "Refactor: [target module or path]\n\nGoals:\n- Simplify structure and remove duplication\n- Keep external behavior and existing tests unchanged"
+      }
+    }
   }
 }

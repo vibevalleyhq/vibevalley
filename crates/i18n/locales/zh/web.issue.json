@@ -17,6 +17,17 @@
       "waiting": "做完的、没做成的在这里等你看；拖到「已关」完成或取消。",
       "closed": "已完成、已取消的任务；拖回「处理中」重开。"
     },
+    "emptyGuide": {
+      "todoTitle": "待办还是空的",
+      "todoBody": "记下要做的任务，选好仓库和角色就能派发开工。",
+      "workingTitle": "暂无处理中任务",
+      "workingBody": "给待办任务选好角色并派发，或拖到这里即开独立 worktree 执行会话。",
+      "waitingTitle": "暂无待验收改动",
+      "waitingBody": "执行会话跑完一轮或有疑问时会停在这里，方便看改动、回复或完成交付。",
+      "closedTitle": "还没有已关任务",
+      "closedBody": "已完成或取消的任务会留在这里，拖回「处理中」即可随时重开。",
+      "filtered": "当前筛选条件下此列没有任务。"
+    },
     "whichLane": "看哪一列",
     "spots": "{taken} / {of} 个并发上限",
     "moveFailed": "没挪过去",
@@ -307,6 +318,7 @@
     "queued": "排队中",
     "cron": "定时任务",
     "noHelper": "还没选角色",
+    "assignHelper": "待选角色",
     "pickFirst": "没选角色或仓库，开工前要选好",
     "waiting": "等并发上限，{ago}排上的",
     "written": "写于 {ago}",
@@ -376,25 +388,65 @@
     "keep": "记下",
     "editsKept": "刚才的内容已提交，修改后的草稿已保留。",
     "machine": "执行机器",
-    "machineAuto": "自动分配机器"
+    "machineAuto": "自动分配机器",
+    "missingRepo": "还没有添加仓库，可先记在待办，添加仓库后再派发。",
+    "goRepos": "去添加仓库",
+    "missingRuntime": "尚未启用可用引擎，配置好编码引擎后就能自动起草和开工。",
+    "goRuntimes": "去配置引擎"
   },
   "conversation": {
     "title": "讨论与交付记录",
     "older": "加载更早的消息",
     "empty": "需求讨论、执行反馈与交付会保留在这里"
   },
+  "guide": {
+    "title": "任务流转指南",
+    "summary": "写下需求并指派角色，执行会话在独立 worktree 改代码，完成后经验收合入主分支。",
+    "collapse": "收起指南",
+    "expand": "展开指南",
+    "stage": {
+      "todo": "写下目标、挑好仓库和角色，按先后排好待办。",
+      "working": "确认派发或拖入此列，执行会话自动开 worktree 干活。",
+      "waiting": "跑完一轮后在此验收改动、回答问题，或打回继续修。",
+      "closed": "验收通过后完成交付并合入主分支，需要时可随时重开。"
+    }
+  },
   "onboarding": {
     "title": "开始使用 VibeValley",
-    "subtitle": "按下面三步准备好环境，就能把任务派给执行会话干活。",
-    "step1Title": "检查或配置引擎",
-    "step1Desc": "确认本机已安装并启用编码 agent（如 Claude Code、Codex 等）",
-    "step1Action": "配置引擎",
-    "step2Title": "添加代码仓库",
-    "step2Desc": "绑定本机 Git 仓库，执行会话会在独立工作区里改动代码",
-    "step2Action": "添加仓库",
+    "subtitle": "完成下面三步准备工作，就能让执行会话在独立 worktree 里帮你改代码。",
+    "progress": "{done} / {total} 已就绪",
+    "step1Title": "添加代码仓库",
+    "step1Desc": "绑定本机 Git 仓库，执行会话会在独立工作区里改动代码。",
+    "step1Action": "添加仓库",
+    "step1Manage": "管理仓库",
+    "step1Ready": "{n} 个仓库已就绪",
+    "step2Title": "检查或配置引擎",
+    "step2Desc": "确认本机已安装并启用编码引擎（如 Claude Code、Codex 等）。",
+    "step2Action": "配置引擎",
+    "step2Manage": "管理引擎",
+    "step2Ready": "{n} 个引擎已就绪",
     "step3Title": "创建第一条任务，或在聊天中派活",
-    "step3Desc": "写下需求直接派给执行会话，或按 C 键新建任务，也可以在聊天里让主助手帮你拆解",
+    "step3Desc": "写下需求直接派给执行会话，按 C 键快速新建，或从下方模板一键预填。",
+    "step3Ready": "{n} 条任务",
     "newIssue": "新建任务",
-    "openChat": "去聊天派活"
+    "openChat": "去聊天派活",
+    "templatesTitle": "或选一个起步模板快速开始",
+    "templates": {
+      "bug": {
+        "title": "修复缺陷",
+        "desc": "定位报错或异常行为并补回归测试",
+        "prompt": "修复：[简述问题现象]\n\n复现步骤：\n1. \n预期结果：\n验收标准：补充回归测试并通过检查"
+      },
+      "feature": {
+        "title": "新增功能",
+        "desc": "明确范围、交互和验收标准后交给执行会话",
+        "prompt": "实现：[简述功能目标]\n\n范围：\n- \n不涉及：\n- \n验收标准：补齐测试并验证关键路径"
+      },
+      "refactor": {
+        "title": "排查并重构",
+        "desc": "清理重复逻辑、收敛边界并保持行为一致",
+        "prompt": "重构：[目标模块或路径]\n\n目标：\n- 简化结构，消除重复逻辑\n- 保持对外行为和现有测试不变"
+      }
+    }
   }
 }
