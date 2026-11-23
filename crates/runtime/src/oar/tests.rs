@@ -566,6 +566,208 @@ fn account_usage_as_oar_projects_it() {
 }
 
 #[test]
+fn antigravity_usage_parses_real_payload_orders_windows_and_handles_errors() {
+    let raw = r#"{
+      "conversation_id": "",
+      "status": "SUCCESS",
+      "num_turns": 0,
+      "command": {
+        "name": "usage",
+        "data": {
+          "groups": [
+            {
+              "name": "Gemini Models",
+              "buckets": [
+                { "id": "gemini-weekly", "name": "Weekly Limit Remaining", "window": "weekly", "remaining_fraction": 0.6147, "reset_time": "2026-11-28T08:48:18Z" },
+                { "id": "gemini-5h", "name": "Five Hour Limit Remaining", "window": "5h", "remaining_fraction": 0.8367, "reset_time": "2026-11-23T16:55:14Z" }
+              ]
+            },
+            {
+              "name": "Claude and GPT models",
+              "buckets": [
+                { "id": "3p-weekly", "window": "weekly", "remaining_fraction": 1, "reset_time": "2026-11-30T15:01:10Z" },
+                { "id": "3p-5h", "window": "5h", "remaining_fraction": 1, "reset_time": "2026-11-23T20:01:10Z" }
+              ]
+            }
+          ]
+        }
+      }
+    }"#;
+    let AccountUsage::Available {
+        plan,
+        email,
+        rate_limited,
+        windows,
+    } = crate::oar::acp::antigravity::usage_of(raw).unwrap()
+    else {
+        panic!("expected Available usage");
+    };
+    assert_eq!(plan, None);
+    assert_eq!(email, None);
+    assert!(!rate_limited);
+    assert_eq!(
+        windows
+            .iter()
+            .map(|w| (w.label.as_str(), w.used_ratio, w.resets_at.as_deref()))
+            .collect::<Vec<_>>(),
+        vec![
+            ("Gemini · 5h", 0.1633, Some("2026-11-23T16:55:14Z")),
+            ("Gemini · 7d", 0.3853, Some("2026-11-28T08:48:18Z")),
+            ("Claude/GPT · 5h", 0.0, Some("2026-11-23T20:01:10Z")),
+            ("Claude/GPT · 7d", 0.0, Some("2026-11-30T15:01:10Z")),
+        ]
+    );
+    assert_eq!(windows[0].id.as_deref(), Some("gemini-5h"));
+    assert_eq!(windows[0].duration_ms, Some(5 * 3_600_000));
+    assert_eq!(windows[1].id.as_deref(), Some("gemini-weekly"));
+    assert_eq!(windows[1].duration_ms, Some(7 * 24 * 3_600_000));
+
+    // Partial multi-group exhaustion is not globally rate_limited; total exhaustion is.
+    let partial = r#"{
+      "status": "SUCCESS",
+      "command": {
+        "name": "usage",
+        "data": {
+          "groups": [
+            { "name": "Gemini Models", "buckets": [{ "id": "g5", "window": "5h", "remaining_fraction": 0 }] },
+            { "name": "Claude and GPT models", "buckets": [{ "id": "c5", "window": "5h", "remaining_fraction": 0.9 }] }
+          ]
+        }
+      }
+    }"#;
+    assert!(matches!(
+        crate::oar::acp::antigravity::usage_of(partial).unwrap(),
+        AccountUsage::Available { rate_limited: false, .. }
+    ));
+
+    let total = r#"{
+      "status": "SUCCESS",
+      "command": {
+        "name": "usage",
+        "data": {
+          "groups": [
+            { "name": "Gemini Models", "buckets": [{ "id": "g5", "window": "5h", "remaining_fraction": 0 }] },
+            { "name": "Claude and GPT models", "buckets": [{ "id": "c7", "window": "weekly", "remaining_fraction": -0.1 }] }
+          ]
+        }
+      }
+    }"#;
+    let AccountUsage::Available { rate_limited, windows, .. } = crate::oar::acp::antigravity::usage_of(total).unwrap() else {
+        panic!("expected Available");
+    };
+    assert!(rate_limited);
+    assert_eq!(windows[1].used_ratio, 1.0);
+
+    // Fallback group name strips trailing " Models" / " models".
+    let custom_group = r#"{
+      "status": "SUCCESS",
+      "command": {
+        "name": "usage",
+        "data": {
+          "groups": [
+            { "name": "Preview Models", "buckets": [{ "window": "5h", "remaining_fraction": 0.5 }] }
+          ]
+        }
+      }
+    }"#;
+    let AccountUsage::Available { windows, .. } = crate::oar::acp::antigravity::usage_of(custom_group).unwrap() else {
+        panic!("expected Available");
+    };
+    assert_eq!(windows[0].label, "Preview · 5h");
+
+    // Auth / login-required outputs map to ReauthRequired.
+    for auth_raw in [
+        "Open the following link to authenticate the ACP server: https://example.com/auth",
+        "Error: not logged in. Run agy login.",
+        "Authentication required to access quota",
+        "Login required",
+        r#"{"status":"ERROR","error":"Authentication required"}"#,
+        r#"{"status":"AUTH_REQUIRED","response":"Please sign in"}"#,
+    ] {
+        assert_eq!(
+            crate::oar::acp::antigravity::usage_of(auth_raw).unwrap(),
+            AccountUsage::ReauthRequired {
+                reason: "not_authenticated".into()
+            },
+            "input: {auth_raw}"
+        );
+    }
+
+    // Empty / unsupported payloads map to Unsupported.
+    for unsupported_raw in [
+        "",
+        "{}",
+        r#"{"status":"SUCCESS","command":{"name":"status","data":{"groups":[]}}}"#,
+        r#"{"status":"SUCCESS","command":{"name":"usage","data":{"groups":[]}}}"#,
+        r#"{"status":"SUCCESS","command":{"name":"usage","data":{"groups":[{"name":"Gemini Models","buckets":[]}]}}}"#,
+    ] {
+        assert_eq!(
+            crate::oar::acp::antigravity::usage_of(unsupported_raw).unwrap(),
+            AccountUsage::Unsupported {
+                reason: "quota_unavailable".into()
+            },
+            "input: {unsupported_raw}"
+        );
+    }
+}
+
+#[test]
+fn antigravity_read_account_usage_and_acp_runtime_dispatch() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let dir = tempfile::tempdir().unwrap();
+    let ok_script = dir.path().join("fake-agy-ok");
+    std::fs::write(
+        &ok_script,
+        r#"#!/bin/sh
+if [ "$AGY_CLI_DISABLE_AUTO_UPDATE" != "1" ]; then
+  echo "missing disable auto update" >&2
+  exit 1
+fi
+if [ "$1" != "--print" ] || [ "$2" != "/usage" ] || [ "$3" != "--output-format" ] || [ "$4" != "json" ]; then
+  echo "bad args: $*" >&2
+  exit 2
+fi
+cat <<'EOF'
+{"status":"SUCCESS","command":{"name":"usage","data":{"groups":[{"name":"Gemini Models","buckets":[{"id":"gemini-5h","window":"5h","remaining_fraction":0.75,"reset_time":"2026-11-23T16:55:14Z"}]}]}}}
+EOF
+"#,
+    )
+    .unwrap();
+    std::fs::set_permissions(&ok_script, PermissionsExt::from_mode(0o755)).unwrap();
+
+    let usage = crate::oar::acp::antigravity::read_account_usage(&ok_script).unwrap();
+    let AccountUsage::Available { windows, .. } = usage else {
+        panic!("expected Available, got {usage:?}");
+    };
+    assert_eq!(windows.len(), 1);
+    assert_eq!(windows[0].label, "Gemini · 5h");
+    assert_eq!(windows[0].used_ratio, 0.25);
+
+    let auth_script = dir.path().join("fake-agy-auth");
+    std::fs::write(
+        &auth_script,
+        "#!/bin/sh\necho 'Open the following link to authenticate: https://auth.local' >&2\nexit 1\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&auth_script, PermissionsExt::from_mode(0o755)).unwrap();
+    assert_eq!(
+        crate::oar::acp::antigravity::read_account_usage(&auth_script).unwrap(),
+        AccountUsage::ReauthRequired {
+            reason: "not_authenticated".into()
+        }
+    );
+
+    let generic = crate::oar::acp::AcpRuntime::new(crate::oar::acp::AcpAgentSpec::new("opencode", "OpenCode", "opencode", ["acp"]));
+    assert_eq!(
+        generic.account_usage().unwrap(),
+        AccountUsage::Unsupported {
+            reason: "not_supported".into()
+        }
+    );
+}
+
+#[test]
 fn regression_only_root_usage_reported_in_this_turn_is_charged() {
     use serde_json::json;
     let core = crate::oar::core::SessionCore::new("qwen", "meter", None);

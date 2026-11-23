@@ -226,7 +226,7 @@
         "systemPrompt": "Antigravity ACP 没有系统提示覆盖",
         "disallowedTools": "Antigravity ACP 没有会话级的工具黑名单"
       },
-      "capabilities": ["listModels", "checkUpdate"]
+      "capabilities": ["listModels", "accountUsage", "checkUpdate"]
     }
   },
   "runtimeIds": ["claude", "codex", "opencode", "qwen", "qoder", "codebuddy", "vibevalley", "pi", "cursor", "grok", "kimi", "antigravity"]

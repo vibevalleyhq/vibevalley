@@ -149,27 +149,87 @@ pub fn yuan(cny: f64) -> String {
     }
 }
 
+struct WindowGroup<'a> {
+    name: &'a str,
+    windows: Vec<&'a vibevalley_protocol::UsageWindow>,
+}
+
+/// Groups usage windows by the `" · "` group prefix (ungrouped windows share `""`),
+/// preserving first-seen group order.
+fn group_windows(windows: &[vibevalley_protocol::UsageWindow]) -> Vec<WindowGroup<'_>> {
+    let mut groups: Vec<WindowGroup<'_>> = Vec::new();
+    for w in windows {
+        let name = w.label.split_once(" · ").map_or("", |(g, _)| g.trim());
+        if let Some(group) = groups.iter_mut().find(|g| g.name == name) {
+            group.windows.push(w);
+        } else {
+            groups.push(WindowGroup { name, windows: vec![w] });
+        }
+    }
+    groups
+}
+
+fn exhausted_window<'a>(group: &WindowGroup<'a>) -> Option<&'a vibevalley_protocol::UsageWindow> {
+    group.windows.iter().copied().find(|w| w.used_percent.get() >= 100.0)
+}
+
+fn quota_gone_text(runtime_id: &str, window: &vibevalley_protocol::UsageWindow) -> String {
+    let resets = match window.resets_at {
+        Some(at) if at != 0 => t("server.runtime.resets", &[("when", when_text(at).into())]),
+        _ => String::new(),
+    };
+    t(
+        "server.runtime.quotaGone",
+        &[
+            ("runtime", runtime_label(runtime_id).into()),
+            ("window", window.label.clone().into()),
+            ("resets", resets.into()),
+        ],
+    )
+}
+
+fn antigravity_model_group(runtime_id: &str, model_id: &str) -> Option<&'static str> {
+    let bare = runtime_id.strip_prefix("acp:").unwrap_or(runtime_id);
+    if bare != "antigravity" {
+        return None;
+    }
+    let lower = model_id.trim().to_ascii_lowercase();
+    if lower.is_empty() {
+        return None;
+    }
+    if lower.contains("gemini") || lower.contains("orchestrator") {
+        Some("Gemini")
+    } else if lower.contains("claude") || lower.contains("gpt") {
+        Some("Claude/GPT")
+    } else {
+        None
+    }
+}
+
+fn model_quota_stop<'a>(runtime: &'a RuntimeInfo, model_id: &str) -> Option<&'a vibevalley_protocol::UsageWindow> {
+    let target_group = antigravity_model_group(&runtime.id, model_id)?;
+    let Some(AccountUsage::Ok(u)) = &runtime.usage else {
+        return None;
+    };
+    let groups = group_windows(&u.windows);
+    let group = groups.iter().find(|g| g.name.eq_ignore_ascii_case(target_group))?;
+    exhausted_window(group)
+}
+
 /// Why a runtime takes no work now because of money; "" when it does.
 pub fn money_stop(info: Option<&RuntimeInfo>) -> String {
     let Some(info) = info else { return String::new() };
     match &info.usage {
-        Some(AccountUsage::Ok(u)) => {
-            for w in &u.windows {
-                if w.used_percent.get() < 100.0 {
-                    continue;
-                }
-                let resets = match w.resets_at {
-                    Some(at) if at != 0 => t("server.runtime.resets", &[("when", when_text(at).into())]),
-                    _ => String::new(),
-                };
-                return t(
-                    "server.runtime.quotaGone",
-                    &[
-                        ("runtime", runtime_label(&info.id).into()),
-                        ("window", w.label.clone().into()),
-                        ("resets", resets.into()),
-                    ],
-                );
+        Some(AccountUsage::Ok(u)) if !u.windows.is_empty() => {
+            let groups = group_windows(&u.windows);
+            let exhausted: Vec<&vibevalley_protocol::UsageWindow> = groups.iter().filter_map(exhausted_window).collect();
+            if !groups.is_empty() && exhausted.len() == groups.len() {
+                let earliest = exhausted
+                    .iter()
+                    .copied()
+                    .min_by_key(|w| w.resets_at.filter(|&at| at != 0).unwrap_or(i64::MAX))
+                    .expect("exhausted is non-empty");
+                return quota_gone_text(&info.id, earliest);
             }
         }
         Some(AccountUsage::Balance(u)) if !u.balances.is_empty() && (!u.available || u.balances.iter().all(|b| b.amount.get() <= 0.0)) => {
@@ -185,12 +245,17 @@ pub fn money_stop(info: Option<&RuntimeInfo>) -> String {
     String::new()
 }
 
-/// The least left of any window; none when the usage has no windows.
+/// The best remaining quota across independent window groups (each group's
+/// remaining quota is the least left among its windows); none when the usage
+/// has no windows.
 pub fn quota_left(usage: Option<&AccountUsage>) -> Option<f64> {
     match usage {
         Some(AccountUsage::Ok(u)) if !u.windows.is_empty() => {
-            let least = u.windows.iter().map(|w| 100.0 - w.used_percent.get()).fold(f64::INFINITY, f64::min);
-            Some(least.max(0.0))
+            let groups = group_windows(&u.windows);
+            groups
+                .iter()
+                .map(|g| g.windows.iter().map(|w| 100.0 - w.used_percent.get()).fold(f64::INFINITY, f64::min).max(0.0))
+                .reduce(f64::max)
         }
         _ => None,
     }
@@ -402,9 +467,16 @@ pub fn agent_problems(agent: &Agent, runtime: Option<&RuntimeInfo>) -> Vec<Agent
     }
     let broke = money_stop(runtime);
     if !broke.is_empty() {
-        add(broke);
+        add(broke.clone());
     }
-    problems.extend(session_options(agent, runtime.map(|r| &r.settings), runtime).problems);
+    let opts = session_options(agent, runtime.map(|r| &r.settings), runtime);
+    if broke.is_empty()
+        && let Some(r) = runtime
+        && let Some(window) = model_quota_stop(r, &opts.model)
+    {
+        problems.push(problem("model", AgentProblemLevel::Error, quota_gone_text(&r.id, window)));
+    }
+    problems.extend(opts.problems);
     problems
 }
 
@@ -484,6 +556,10 @@ mod tests {
             assert!(ids.iter().all(|id| preset_of(id).id == *id));
             assert_eq!(preset_of("nope").label, "nope");
             assert!(support_of("vibevalley").in_process);
+            assert!(
+                support_of("antigravity").capabilities.contains(&RuntimeCapability::AccountUsage),
+                "antigravity must advertise accountUsage capability ({locale})"
+            );
             for spec in BUILTIN_RUNTIME_SPECS {
                 assert!(ids.iter().any(|id| id == spec.id), "missing {} in {locale}", spec.id);
                 let s = support_of(spec.id);
@@ -658,5 +734,175 @@ mod tests {
         let opts = session_options(&base_agent, Some(&settings), Some(&unadvertised));
         assert_eq!(opts.effort, "medium");
         assert!(opts.problems.is_empty());
+    }
+
+    #[test]
+    fn multi_group_quota_rules_preserve_single_group_and_gate_per_pool() {
+        use vibevalley_protocol::{AccountUsageOk, AgentRole, Build, Head, InstallationAvailable, Look, UsageWindow, Via};
+
+        let mk_runtime = |id: &str, windows: Vec<UsageWindow>| RuntimeInfo {
+            id: id.into(),
+            preset: preset_of(id),
+            support: support_of(id),
+            installation: Installation::Available(InstallationAvailable {
+                via: Via::Executable,
+                command: id.into(),
+                version: Some("1.5.14".into()),
+            }),
+            models: None,
+            usage: Some(AccountUsage::Ok(AccountUsageOk { subscription: None, windows })),
+            skills: None,
+            mcp_servers: None,
+            tools: None,
+            settings: default_settings(),
+            spent_today: None,
+            quota: None,
+            stop: String::new(),
+            checked_at: 0,
+        };
+
+        let mk_agent = |runtime: &str, model: &str| Agent {
+            id: format!("agent-{model}"),
+            name: "Worker".into(),
+            role: AgentRole::Worker,
+            duty: String::new(),
+            enabled: true,
+            runtime: runtime.into(),
+            model: model.into(),
+            effort: String::new(),
+            persona: String::new(),
+            persona_mode: PersonaMode::Prompt,
+            skills: vec![],
+            mcp_servers: vec![],
+            disallowed_tools: vec![],
+            env: BTreeMap::new(),
+            workdir: String::new(),
+            worktree: false,
+            tags: vec![],
+            look: Look {
+                species: None,
+                outfit: None,
+                orchestrator: None,
+                build: Build::Biped,
+                head: Head::Rounded,
+                body: String::new(),
+                trim: String::new(),
+                hat: String::new(),
+                eye: String::new(),
+                avatar: None,
+            },
+            from: None,
+        };
+
+        // 1. Regression: single-group runtime exhaustion still triggers money_stop.
+        let claude_exhausted = mk_runtime(
+            "claude",
+            vec![
+                UsageWindow {
+                    label: "Current session".into(),
+                    used_percent: 100.0.into(),
+                    resets_at: None,
+                },
+                UsageWindow {
+                    label: "Current week (all models)".into(),
+                    used_percent: 25.0.into(),
+                    resets_at: None,
+                },
+            ],
+        );
+        let stop = money_stop(Some(&claude_exhausted));
+        assert!(stop.contains("Current session"), "expected single-group stop: {stop}");
+        assert_eq!(quota_left(claude_exhausted.usage.as_ref()), Some(0.0));
+
+        // 2. Multi-group partial exhaustion: Gemini 100%, Claude/GPT 0% -> runtime stays open,
+        // remaining quota reflects usable pool, and only Gemini-targeted agents are flagged.
+        let agy_partial = mk_runtime(
+            "antigravity",
+            vec![
+                UsageWindow {
+                    label: "Gemini · 5h".into(),
+                    used_percent: 100.0.into(),
+                    resets_at: Some(1_795_452_914_000),
+                },
+                UsageWindow {
+                    label: "Gemini · 7d".into(),
+                    used_percent: 40.0.into(),
+                    resets_at: Some(1_795_855_698_000),
+                },
+                UsageWindow {
+                    label: "Claude/GPT · 5h".into(),
+                    used_percent: 0.0.into(),
+                    resets_at: Some(1_795_464_070_000),
+                },
+                UsageWindow {
+                    label: "Claude/GPT · 7d".into(),
+                    used_percent: 15.0.into(),
+                    resets_at: Some(1_796_050_870_000),
+                },
+            ],
+        );
+        assert!(money_stop(Some(&agy_partial)).is_empty(), "partial exhaustion must not stop the whole runtime");
+        assert_eq!(quota_left(agy_partial.usage.as_ref()), Some(85.0));
+        let text = quota_text(agy_partial.usage.as_ref());
+        assert!(text.contains("Gemini · 5h") && text.contains("Claude/GPT · 7d"), "{text}");
+
+        let gemini_problems = agent_problems(&mk_agent("antigravity", "gemini-4-neon"), Some(&agy_partial));
+        assert_eq!(gemini_problems.len(), 1, "{gemini_problems:?}");
+        assert_eq!(gemini_problems[0].field, "model");
+        assert_eq!(gemini_problems[0].level, AgentProblemLevel::Error);
+        assert!(gemini_problems[0].text.contains("Gemini · 5h"), "{:?}", gemini_problems[0]);
+
+        let claude_problems = agent_problems(&mk_agent("antigravity", "claude-sonnet-5-5"), Some(&agy_partial));
+        assert!(claude_problems.is_empty(), "{claude_problems:?}");
+        let gpt_problems = agent_problems(&mk_agent("antigravity", "gpt-oss-120b"), Some(&agy_partial));
+        assert!(gpt_problems.is_empty(), "{gpt_problems:?}");
+
+        // Reverse partial exhaustion: Claude/GPT at 100%, Gemini open.
+        let agy_claude_gone = mk_runtime(
+            "antigravity",
+            vec![
+                UsageWindow {
+                    label: "Gemini · 5h".into(),
+                    used_percent: 20.0.into(),
+                    resets_at: None,
+                },
+                UsageWindow {
+                    label: "Claude/GPT · 7d".into(),
+                    used_percent: 100.0.into(),
+                    resets_at: None,
+                },
+            ],
+        );
+        assert!(money_stop(Some(&agy_claude_gone)).is_empty());
+        assert_eq!(quota_left(agy_claude_gone.usage.as_ref()), Some(80.0));
+        assert!(agent_problems(&mk_agent("antigravity", "gemini-4-neon"), Some(&agy_claude_gone)).is_empty());
+        let gpt_blocked = agent_problems(&mk_agent("antigravity", "gpt-oss-120b"), Some(&agy_claude_gone));
+        assert_eq!(gpt_blocked.len(), 1, "{gpt_blocked:?}");
+        assert_eq!(gpt_blocked[0].field, "model");
+        assert!(gpt_blocked[0].text.contains("Claude/GPT · 7d"), "{:?}", gpt_blocked[0]);
+
+        // 3. Multi-group total exhaustion: both groups at 100% -> triggers runtime-wide money_stop,
+        // choosing the earliest reset window and avoiding duplicate agent_problems entries.
+        let agy_total = mk_runtime(
+            "antigravity",
+            vec![
+                UsageWindow {
+                    label: "Gemini · 5h".into(),
+                    used_percent: 100.0.into(),
+                    resets_at: Some(1_795_460_000_000),
+                },
+                UsageWindow {
+                    label: "Claude/GPT · 5h".into(),
+                    used_percent: 100.0.into(),
+                    resets_at: Some(1_795_450_000_000),
+                },
+            ],
+        );
+        let total_stop = money_stop(Some(&agy_total));
+        assert!(total_stop.contains("Claude/GPT · 5h"), "expected earliest reset window: {total_stop}");
+        assert_eq!(quota_left(agy_total.usage.as_ref()), Some(0.0));
+        let total_problems = agent_problems(&mk_agent("antigravity", "gemini-4-neon"), Some(&agy_total));
+        assert_eq!(total_problems.len(), 1, "must not duplicate runtime and model quota errors: {total_problems:?}");
+        assert_eq!(total_problems[0].field, "runtime");
     }
 }
