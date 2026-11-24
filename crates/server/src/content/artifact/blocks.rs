@@ -188,16 +188,8 @@ impl Artifacts {
         Ok(ordered(&db::blocks(conn, id).await.map_err(q)?))
     }
 
-    pub fn live_blocks(&self, id: &str) -> Result<Vec<Block>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.live_blocks_async(id))
-    }
-
     pub async fn markdown_async(&self, id: &str) -> Result<String, ApiError> {
         Ok(markdown_of(&self.live_blocks_async(id).await?))
-    }
-
-    pub fn markdown(&self, id: &str) -> Result<String, ApiError> {
-        vibevalley_runtime::rt::block_on(self.markdown_async(id))
     }
 
     fn again(&self, all: &[Block], id: &str, seen: ChangeRow) -> Result<BlockAck, ApiError> {
@@ -213,14 +205,10 @@ impl Artifacts {
         })
     }
 
-    /// `submit`: one batch, in one transaction, one at a time.
+    /// `submit_async`: one batch, in one transaction, one at a time.
     pub async fn submit_async(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>) -> Result<BlockAck, ApiError> {
         let _batches = self.batches.lock().await;
         self.submit_locked_async(id, actor, batch_id, ops, None).await
-    }
-
-    pub fn submit(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>) -> Result<BlockAck, ApiError> {
-        vibevalley_runtime::rt::block_on(self.submit_async(id, actor, batch_id, ops))
     }
 
     pub async fn submit_with_meta_async(&self, id: &str, actor: &str, batch_id: &str, ops: Vec<BlockOp>, meta: &CommitMeta) -> Result<BlockAck, ApiError> {
@@ -348,20 +336,12 @@ impl Artifacts {
         self.insert_block_inner_async(artifact, actor, req, None).await
     }
 
-    pub fn insert_block(&self, artifact: &str, actor: &str, req: &BlockCreate) -> Result<BlockOpResult, ApiError> {
-        self.insert_block_inner(artifact, actor, req, None)
-    }
-
     pub async fn insert_block_with_meta_async(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
         self.insert_block_inner_async(artifact, actor, req, Some(meta)).await
     }
 
     pub fn insert_block_with_meta(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
-        self.insert_block_inner(artifact, actor, req, Some(meta))
-    }
-
-    fn insert_block_inner(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.insert_block_inner_async(artifact, actor, req, meta))
+        vibevalley_runtime::rt::block_on(self.insert_block_inner_async(artifact, actor, req, Some(meta)))
     }
 
     async fn insert_block_inner_async(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
@@ -417,20 +397,12 @@ impl Artifacts {
         self.update_block_inner_async(artifact, actor, req, None).await
     }
 
-    pub fn update_block(&self, artifact: &str, actor: &str, req: &BlockUpdate) -> Result<BlockOpResult, ApiError> {
-        self.update_block_inner(artifact, actor, req, None)
-    }
-
     pub async fn update_block_with_meta_async(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
         self.update_block_inner_async(artifact, actor, req, Some(meta)).await
     }
 
     pub fn update_block_with_meta(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
-        self.update_block_inner(artifact, actor, req, Some(meta))
-    }
-
-    fn update_block_inner(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.update_block_inner_async(artifact, actor, req, meta))
+        vibevalley_runtime::rt::block_on(self.update_block_inner_async(artifact, actor, req, Some(meta)))
     }
 
     async fn update_block_inner_async(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
@@ -584,20 +556,12 @@ impl Artifacts {
         self.delete_block_inner_async(artifact, actor, req, None).await
     }
 
-    pub fn delete_block(&self, artifact: &str, actor: &str, req: &BlockDelete) -> Result<BlockOpResult, ApiError> {
-        self.delete_block_inner(artifact, actor, req, None)
-    }
-
     pub async fn delete_block_with_meta_async(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
         self.delete_block_inner_async(artifact, actor, req, Some(meta)).await
     }
 
     pub fn delete_block_with_meta(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
-        self.delete_block_inner(artifact, actor, req, Some(meta))
-    }
-
-    fn delete_block_inner(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.delete_block_inner_async(artifact, actor, req, meta))
+        vibevalley_runtime::rt::block_on(self.delete_block_inner_async(artifact, actor, req, Some(meta)))
     }
 
     async fn delete_block_inner_async(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
@@ -693,10 +657,6 @@ impl Artifacts {
         Ok(list)
     }
 
-    pub fn suggestions(&self, id: &str) -> Result<Vec<Suggestion>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.suggestions_async(id))
-    }
-
     async fn publish_suggestions_async(&self, id: &str) -> Result<(), ApiError> {
         let list = self.suggestions_async(id).await?;
         let _ = self.suggestion_changes.send((id.to_string(), list));
@@ -705,10 +665,6 @@ impl Artifacts {
 
     pub async fn suggest_async(&self, artifact: &str, actor: &str, req: &SuggestionCreate) -> Result<Suggestion, ApiError> {
         self.suggest_with_origin_async(artifact, actor, None, req).await
-    }
-
-    pub fn suggest(&self, artifact: &str, actor: &str, req: &SuggestionCreate) -> Result<Suggestion, ApiError> {
-        vibevalley_runtime::rt::block_on(self.suggest_async(artifact, actor, req))
     }
 
     pub async fn suggest_with_origin_async(&self, artifact: &str, actor: &str, origin: Option<&str>, req: &SuggestionCreate) -> Result<Suggestion, ApiError> {

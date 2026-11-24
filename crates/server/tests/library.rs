@@ -168,7 +168,7 @@ fn refuses_what_does_not_name_one_public_source_or_is_not_the_callers_to_give() 
     }
     asks.push((req(json!({ "path": "a.png" })), helper.clone()));
     for (r, by) in &asks {
-        let e = library.add(r, by).expect_err("refused");
+        let e = vibevalley_runtime::rt::block_on(library.add_async(r, by)).expect_err("refused");
         assert_eq!(e.biz_code, BizCode::LibraryRefused, "{r:?}: {}", e.message);
     }
 
@@ -180,13 +180,13 @@ fn refuses_what_does_not_name_one_public_source_or_is_not_the_callers_to_give() 
         session: None,
         dir: Some(work.path().into()),
     };
-    let item = library.add(&req(json!({ "path": "plan.md" })), &inside).unwrap();
+    let item = vibevalley_runtime::rt::block_on(library.add_async(&req(json!({ "path": "plan.md" })), &inside)).unwrap();
     assert_eq!((item.attachment.name.as_str(), item.attachment.r#type.as_str()), ("plan.md", "text/markdown"));
     assert_eq!(
         serde_json::to_value(&item.origin).unwrap(),
         json!({ "kind": "fetched", "agent": "lab", "from": { "path": "plan.md" } })
     );
-    let e = library.add(&req(json!({ "path": "../../etc/hosts" })), &inside).expect_err("outside");
+    let e = vibevalley_runtime::rt::block_on(library.add_async(&req(json!({ "path": "../../etc/hosts" })), &inside)).expect_err("outside");
     assert_eq!(e.biz_code, BizCode::LibraryRefused);
 }
 

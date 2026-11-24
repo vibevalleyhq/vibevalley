@@ -91,7 +91,7 @@ fn pins_admission_rollback_expiry_and_restart() {
     assert!(inputs.get(&r.id).unwrap().can_delete);
     inputs.pin(&[r.id.clone(), r.id.clone()], "job").unwrap();
     assert!(!inputs.get(&r.id).unwrap().can_delete);
-    assert!(inputs.delete(&r.id).is_err());
+    assert!(vibevalley_runtime::rt::block_on(inputs.delete_async(&r.id)).is_err());
     let mut conn = database(dir.path());
     vibevalley_runtime::rt::block_on(sqlx::query("update media_input set expires_at=0").execute(&mut conn)).unwrap();
     inputs.sweep().unwrap();
@@ -172,7 +172,7 @@ fn active_upload_cannot_be_deleted_or_pinned() {
     });
     rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
     assert!(!inputs.get(&r.id).unwrap().can_delete);
-    assert!(inputs.delete(&r.id).is_err());
+    assert!(vibevalley_runtime::rt::block_on(inputs.delete_async(&r.id)).is_err());
     assert!(inputs.pin(&[r.id], "job").is_err());
     go.send(()).unwrap();
     assert!(task.join().unwrap().is_ok());

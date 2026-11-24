@@ -604,7 +604,7 @@ impl Artifacts {
         let seq = change.seq;
         let _ = self.entry_changes.send(change);
         if req.announce == Some(true) {
-            let channel = self.channel.place_of(&maker.from, row.channel_id.as_deref().unwrap_or(""))?;
+            let channel = self.channel.place_of_async(&maker.from, row.channel_id.as_deref().unwrap_or("")).await?;
             let note = req.note.as_deref().map(str::trim).filter(|n| !n.is_empty());
             let card = ArtifactCard {
                 id: row.id.clone(),
@@ -619,7 +619,10 @@ impl Artifacts {
                 t("server.artifact.entry.updated", &[("title", row.title.as_str().into()), ("seq", seq.into())]),
                 note,
             );
-            let said = self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new())?;
+            let said = self
+                .channel
+                .post_card_async(&maker.from, &channel, &text, card, maker.run.clone(), String::new())
+                .await?;
             if row.message_id.is_none() {
                 db::artifact_said(self.db.write_conn(), &row.id, &said.id).await.map_err(q)?;
             }

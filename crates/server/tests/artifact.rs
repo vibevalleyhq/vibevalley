@@ -273,7 +273,7 @@ fn html_edits_and_removal_keep_the_pages_once() {
 }
 
 fn blocks_now(a: &Artifacts, id: &str) -> Vec<vibevalley_protocol::Block> {
-    a.live_blocks(id).unwrap()
+    vibevalley_runtime::rt::block_on(a.live_blocks_async(id)).unwrap()
 }
 
 fn plain_of(b: &vibevalley_protocol::Block) -> String {
@@ -325,7 +325,7 @@ fn blocks_are_written_together() {
     // A stale update over someone else's change is a conflict; a tick since is not.
     let id = new("t");
     ok(call("artifact.submit", insert(&id, "x", "V", "原来")));
-    let r = a.update_block(
+    let r = vibevalley_runtime::rt::block_on(a.update_block_async(
         &id,
         "lab",
         &BlockUpdate {
@@ -337,18 +337,18 @@ fn blocks_are_written_together() {
             checked: None,
             language: None,
         },
-    );
+    ));
     assert_eq!(
         r.unwrap().status,
         vibevalley_protocol::BlockOpStatus::Rejected,
         "the user's block becomes a suggestion"
     );
-    a.submit(
+    vibevalley_runtime::rt::block_on(a.submit_async(
         &id,
         "lab",
         "lab-1",
         vec![serde_json::from_value(json!({ "op": "update_text", "blockId": "x", "baseRev": 1, "text": [{ "t": "帮工改的", "marks": {} }] })).unwrap()],
-    )
+    ))
     .unwrap();
     let mine = ok(call(
         "artifact.submit",
@@ -443,20 +443,19 @@ fn blocks_are_written_together() {
     let sa = ins_on(&call, &id, "用户写的");
     let (_, srx) = hub.subscribe("artifact.suggestion.follow", json!({ "id": id })).unwrap();
     assert_eq!(srx.recv_timeout(Duration::from_secs(2)).unwrap()["suggestions"], json!([]));
-    let made = a
-        .suggest(
-            &id,
-            "lab",
-            &SuggestionCreate {
-                block: str_of(&sa["blockId"]),
-                base_rev: 1,
-                change: SuggestionChange {
-                    text: Some(vec![span("帮工改的")]),
-                    ..Default::default()
-                },
+    let made = vibevalley_runtime::rt::block_on(a.suggest_async(
+        &id,
+        "lab",
+        &SuggestionCreate {
+            block: str_of(&sa["blockId"]),
+            base_rev: 1,
+            change: SuggestionChange {
+                text: Some(vec![span("帮工改的")]),
+                ..Default::default()
             },
-        )
-        .unwrap();
+        },
+    ))
+    .unwrap();
     assert_eq!(srx.recv_timeout(Duration::from_secs(2)).unwrap()["suggestions"][0]["author"], "lab");
     let accepted = ok(call("artifact.suggestion.accept", json!({ "id": id, "suggestion": made.id })));
     assert_eq!(accepted["status"], "accepted");
@@ -466,20 +465,19 @@ fn blocks_are_written_together() {
         "accepted"
     );
     let sb = ins_on(&call, &id, "再写一块");
-    let stale = a
-        .suggest(
-            &id,
-            "lab",
-            &SuggestionCreate {
-                block: str_of(&sb["blockId"]),
-                base_rev: 1,
-                change: SuggestionChange {
-                    text: Some(vec![span("晚到的")]),
-                    ..Default::default()
-                },
+    let stale = vibevalley_runtime::rt::block_on(a.suggest_async(
+        &id,
+        "lab",
+        &SuggestionCreate {
+            block: str_of(&sb["blockId"]),
+            base_rev: 1,
+            change: SuggestionChange {
+                text: Some(vec![span("晚到的")]),
+                ..Default::default()
             },
-        )
-        .unwrap();
+        },
+    ))
+    .unwrap();
     ok(call(
         "artifact.block.update",
         json!({ "id": id, "block": sb["blockId"], "baseRev": 1, "text": "用户先改了" }),
@@ -501,7 +499,7 @@ fn blocks_are_written_together() {
     let id = new("授权矩阵");
     let text = ins_on(&call, &id, "用户的字");
     let block = str_of(&text["blockId"]);
-    let up = |more: BlockUpdate| a.update_block(&id, "lab", &more).unwrap();
+    let up = |more: BlockUpdate| vibevalley_runtime::rt::block_on(a.update_block_async(&id, "lab", &more)).unwrap();
     let base = BlockUpdate {
         block: block.clone(),
         base_rev: 1,
@@ -525,7 +523,7 @@ fn blocks_are_written_together() {
             checked: Some(true),
             ..base.clone()
         }),
-        a.delete_block(&id, "lab", &BlockDelete { block: block.clone() }).unwrap(),
+        vibevalley_runtime::rt::block_on(a.delete_block_async(&id, "lab", &BlockDelete { block: block.clone() })).unwrap(),
     ];
     assert!(
         results
@@ -555,17 +553,16 @@ fn blocks_are_written_together() {
             json!([false, null, null, true])
         ]
     );
-    let own = a
-        .insert_block(
-            &id,
-            "lab",
-            &BlockCreate {
-                text: "帮工自己的".into(),
-                ..Default::default()
-            },
-        )
-        .unwrap();
-    let mine = a.update_block(
+    let own = vibevalley_runtime::rt::block_on(a.insert_block_async(
+        &id,
+        "lab",
+        &BlockCreate {
+            text: "帮工自己的".into(),
+            ..Default::default()
+        },
+    ))
+    .unwrap();
+    let mine = vibevalley_runtime::rt::block_on(a.update_block_async(
         &id,
         "lab",
         &BlockUpdate {
@@ -574,14 +571,17 @@ fn blocks_are_written_together() {
             text: Some("帮工改自己的".into()),
             ..base
         },
-    );
+    ));
     assert_eq!(mine.unwrap().status, vibevalley_protocol::BlockOpStatus::Applied);
 
     // What was written is there for a fresh reader of the same database.
     let fresh_db = vibevalley_server::db::ServerDb::open(dir.path()).unwrap();
     let reopened = Artifacts::open(fresh_db, started.test_internals().attachments.clone(), started.test_internals().chat.clone());
-    assert_eq!(reopened.suggestions(&id).unwrap().len(), 4);
-    assert_eq!(reopened.markdown(&id).unwrap(), "用户的字\n\n帮工改自己的\n");
+    assert_eq!(vibevalley_runtime::rt::block_on(reopened.suggestions_async(&id)).unwrap().len(), 4);
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(reopened.markdown_async(&id)).unwrap(),
+        "用户的字\n\n帮工改自己的\n"
+    );
 }
 
 fn str_of(v: &Value) -> String {

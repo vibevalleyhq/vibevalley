@@ -98,97 +98,105 @@ mod tests {
         fn orchestrator_in(&self, _channel: &str) -> String {
             "orch".into()
         }
-        fn place_of(&self, _who: &str, target: &str) -> Result<String, ApiError> {
-            if target.trim().is_empty() {
-                Ok("general".into())
-            } else {
-                Ok(target.trim().to_owned())
-            }
+        fn place_of_async<'a>(&'a self, _who: &'a str, target: &'a str) -> crate::BoxFuture<'a, Result<String, ApiError>> {
+            let trimmed = target.trim();
+            let out = if trimmed.is_empty() { "general".to_owned() } else { trimmed.to_owned() };
+            Box::pin(async move { Ok(out) })
         }
-        fn post_card(&self, _from: &str, ch: &str, text: &str, card: ArtifactCard, _run: Option<String>, _send_key: String) -> Result<ChatMessage, ApiError> {
-            let num = self.seq.fetch_add(1, Ordering::SeqCst);
-            let msg_id = format!("msg-{num}");
-            let db = self.db.clone();
-            let ch_owned = ch.to_owned();
-            let body = text.to_owned();
-            let msg_id_c = msg_id.clone();
-            // Runs inside test_content_on via block_in_place-compatible synchronous thread or direct insert;
-            // here we use a scoped std::thread when called from inside an async block so `rt::block_on` never nests.
-            std::thread::spawn(move || {
-                vibevalley_runtime::rt::block_on(async move {
-                    channel_message::ActiveModel {
-                        id: Set(msg_id_c),
-                        channel_id: Set(ch_owned),
-                        number: Set(num),
-                        sender_id: Set(USER_ID.into()),
-                        kind: Set("chat".into()),
-                        body: Set(body),
-                        meta: Set(None),
-                        system_code: Set(None),
-                        send_key: Set(None),
-                        created_at: Set(1000 + num),
-                        revision: Set(num),
-                        reply_number: Set(None),
-                        edited_at: Set(None),
-                        deleted_at: Set(None),
-                        pinned_at: Set(None),
-                        reactions: Set(None),
-                    }
-                    .insert(db.write_conn())
-                    .await
-                    .unwrap();
-                });
-            })
-            .join()
-            .unwrap();
-            Ok(ChatMessage {
-                id: msg_id,
-                number: num,
-                channel: ch.to_owned(),
-                from: USER_ID.into(),
-                actor: Actor::User {
-                    id: USER_ID.into(),
-                    name: Some("User".into()),
-                },
-                name: "User".into(),
-                agent: None,
-                kind: MessageKind::Chat,
-                text: text.to_owned(),
-                mentions: vec![],
-                session: None,
-                run: None,
-                outcome: None,
-                spent: None,
-                spoken: false,
-                send_key: None,
-                at: 1000 + num,
-                revision: num,
-                reply_to: None,
-                edited: None,
-                deleted: None,
-                pinned: None,
-                reactions: vec![],
-                attachments: vec![],
-                embeds: vec![],
-                artifact: Some(card),
-                blocks: None,
-                view_context: None,
+        fn post_card_async<'a>(
+            &'a self,
+            _from: &'a str,
+            ch: &'a str,
+            text: &'a str,
+            card: ArtifactCard,
+            _run: Option<String>,
+            _send_key: String,
+        ) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>> {
+            Box::pin(async move {
+                let num = self.seq.fetch_add(1, Ordering::SeqCst);
+                let msg_id = format!("msg-{num}");
+                channel_message::ActiveModel {
+                    id: Set(msg_id.clone()),
+                    channel_id: Set(ch.to_owned()),
+                    number: Set(num),
+                    sender_id: Set(USER_ID.into()),
+                    kind: Set("chat".into()),
+                    body: Set(text.to_owned()),
+                    meta: Set(None),
+                    system_code: Set(None),
+                    send_key: Set(None),
+                    created_at: Set(1000 + num),
+                    revision: Set(num),
+                    reply_number: Set(None),
+                    edited_at: Set(None),
+                    deleted_at: Set(None),
+                    pinned_at: Set(None),
+                    reactions: Set(None),
+                }
+                .insert(self.db.write_conn())
+                .await
+                .unwrap();
+                Ok(ChatMessage {
+                    id: msg_id,
+                    number: num,
+                    channel: ch.to_owned(),
+                    from: USER_ID.into(),
+                    actor: Actor::User {
+                        id: USER_ID.into(),
+                        name: Some("User".into()),
+                    },
+                    name: "User".into(),
+                    agent: None,
+                    kind: MessageKind::Chat,
+                    text: text.to_owned(),
+                    mentions: vec![],
+                    session: None,
+                    run: None,
+                    outcome: None,
+                    spent: None,
+                    spoken: false,
+                    send_key: None,
+                    at: 1000 + num,
+                    revision: num,
+                    reply_to: None,
+                    edited: None,
+                    deleted: None,
+                    pinned: None,
+                    reactions: vec![],
+                    attachments: vec![],
+                    embeds: vec![],
+                    artifact: Some(card),
+                    blocks: None,
+                    view_context: None,
+                })
             })
         }
-        fn post_attachments(&self, _from: &str, _ch: &str, _text: &str, _attachments: Vec<String>, _send_key: String) -> Result<ChatMessage, ApiError> {
+        fn post_attachments_async<'a>(
+            &'a self,
+            _from: &'a str,
+            _ch: &'a str,
+            _text: &'a str,
+            _attachments: Vec<String>,
+            _send_key: String,
+        ) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>> {
             unimplemented!()
         }
-        fn issue_thread(&self, _issue_id: &str, _title: &str, _preferred_channel: Option<&str>) -> Result<String, ApiError> {
+        fn issue_thread_async<'a>(
+            &'a self,
+            _issue_id: &'a str,
+            _title: &'a str,
+            _preferred_channel: Option<&'a str>,
+        ) -> crate::BoxFuture<'a, Result<String, ApiError>> {
             unimplemented!()
         }
         fn issue_thread_id(&self, _issue_id: &str) -> Option<String> {
             None
         }
-        fn say_in(&self, _channel: &str, _text: &str, _send_key: String) -> Result<ChatMessage, ApiError> {
+        fn say_in_async<'a>(&'a self, _channel: &'a str, _text: &'a str, _send_key: String) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>> {
             unimplemented!()
         }
-        fn history(&self, _channel: &str, _limit: i64) -> Result<Vec<ChatMessage>, ApiError> {
-            Ok(vec![])
+        fn history_async<'a>(&'a self, _channel: &'a str, _limit: i64) -> crate::BoxFuture<'a, Result<Vec<ChatMessage>, ApiError>> {
+            Box::pin(async { Ok(vec![]) })
         }
         fn message_locations<'a>(&'a self, ids: &'a [String]) -> crate::app::hub::ports::MessageLocationsFuture<'a> {
             Box::pin(async move {

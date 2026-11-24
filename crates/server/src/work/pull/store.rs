@@ -246,10 +246,6 @@ impl PullStore {
         Ok(self.index.lock().put(record))
     }
 
-    pub fn upsert(&self, input: UpsertPullInput) -> Result<PullRecord, ApiError> {
-        block_on(self.upsert_async(input))
-    }
-
     pub async fn set_state_async(&self, id: &str, state: PullRequestState, at: i64) -> Result<PullRecord, ApiError> {
         let state_word = word(&state).map_err(internal_db)?;
         let rows = Update::many(pull::Entity)
@@ -265,10 +261,6 @@ impl PullStore {
             .ok_or_else(|| internal_db(DbErr::RecordNotFound(format!("pull {id} not found"))))?;
         let record = record_of(saved).map_err(internal_db)?;
         Ok(self.index.lock().put(record))
-    }
-
-    pub fn set_state(&self, id: &str, state: PullRequestState, at: i64) -> Result<PullRecord, ApiError> {
-        block_on(self.set_state_async(id, state, at))
     }
 
     pub async fn observe_checks_async(&self, id: &str, fingerprint: &str, revision: i64, at: i64) -> Result<PullRecord, ApiError> {
@@ -288,10 +280,6 @@ impl PullStore {
         Ok(self.index.lock().put(record))
     }
 
-    pub fn observe_checks(&self, id: &str, fingerprint: &str, revision: i64, at: i64) -> Result<PullRecord, ApiError> {
-        block_on(self.observe_checks_async(id, fingerprint, revision, at))
-    }
-
     pub async fn known_events_async(&self, pull_id: &str) -> Result<Vec<KnownPullEvent>, ApiError> {
         let rows = pull_event::Entity::find()
             .filter(pull_event::Column::PullId.eq(pull_id))
@@ -308,10 +296,6 @@ impl PullStore {
             .collect())
     }
 
-    pub fn known_events(&self, pull_id: &str) -> Result<Vec<KnownPullEvent>, ApiError> {
-        block_on(self.known_events_async(pull_id))
-    }
-
     pub async fn keep_event_async(&self, pull_id: &str, key: &str, bot_round_key: Option<&str>, bot_round: Option<i64>) -> Result<(), ApiError> {
         let model = pull_event::ActiveModel {
             pull_id: Set(pull_id.to_owned()),
@@ -325,9 +309,5 @@ impl PullStore {
             .await
             .map_err(internal_db)?;
         Ok(())
-    }
-
-    pub fn keep_event(&self, pull_id: &str, key: &str, bot_round_key: Option<&str>, bot_round: Option<i64>) -> Result<(), ApiError> {
-        block_on(self.keep_event_async(pull_id, key, bot_round_key, bot_round))
     }
 }

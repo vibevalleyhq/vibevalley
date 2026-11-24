@@ -481,7 +481,7 @@ impl Artifacts {
                 return Err(refused(t("server.artifact.displayHtmlOnly", &[])));
             }
             let channel = match req.channel.as_deref() {
-                Some(c) => Some(self.channel.place_of(&maker.from, c)?),
+                Some(c) => Some(self.channel.place_of_async(&maker.from, c).await?),
                 None => None,
             };
             return self.start_blocks_async(maker, &effective_title, docs_type, channel, req.issue.clone()).await;
@@ -507,7 +507,7 @@ impl Artifacts {
                 .unwrap_or(ArtifactDisplay::Page)
         });
         let final_type = if html { None } else { docs_type };
-        let channel = self.channel.place_of(&maker.from, req.channel.as_deref().unwrap_or(""))?;
+        let channel = self.channel.place_of_async(&maker.from, req.channel.as_deref().unwrap_or("")).await?;
         let file = if html {
             self.keep_async(bytes.to_vec(), &effective_title).await?
         } else {
@@ -592,7 +592,11 @@ impl Artifacts {
             }
         };
         let text = Self::words(t("server.artifact.made", &[("title", effective_title.as_str().into())]), note);
-        let said = match self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new()) {
+        let said = match self
+            .channel
+            .post_card_async(&maker.from, &channel, &text, card, maker.run.clone(), String::new())
+            .await
+        {
             Ok(msg) => msg,
             Err(err) => {
                 let _ = db::delete_artifact(self.db.write_conn(), &id).await;
@@ -630,7 +634,7 @@ impl Artifacts {
         let has_entries = req.entries.as_ref().is_some_and(|e| !e.is_empty());
         let should_announce = req.announce.unwrap_or_else(|| (maker.by != USER_ID && has_entries) || req.channel.is_some());
         let resolved_channel = if should_announce || req.channel.is_some() || maker.by != USER_ID {
-            Some(self.channel.place_of(&maker.from, req.channel.as_deref().unwrap_or(""))?)
+            Some(self.channel.place_of_async(&maker.from, req.channel.as_deref().unwrap_or("")).await?)
         } else {
             None
         };
@@ -712,7 +716,10 @@ impl Artifacts {
                 artifact_type,
             };
             let text = Self::words(t("server.artifact.made", &[("title", title.into())]), note);
-            let said = self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new())?;
+            let said = self
+                .channel
+                .post_card_async(&maker.from, &channel, &text, card, maker.run.clone(), String::new())
+                .await?;
             db::artifact_said(self.db.write_conn(), &id, &said.id).await.map_err(q)?;
         }
 
@@ -780,10 +787,10 @@ impl Artifacts {
         let note = req.note.as_deref().map(str::trim).filter(|n| !n.is_empty());
         let should_announce = req.announce.unwrap_or_else(|| req.channel.is_some());
         let resolved_channel = if should_announce {
-            Some(self.channel.place_of(&maker.from, req.channel.as_deref().unwrap_or(""))?)
+            Some(self.channel.place_of_async(&maker.from, req.channel.as_deref().unwrap_or("")).await?)
         } else {
             match req.channel.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
-                Some(c) => Some(self.channel.place_of(&maker.from, c)?),
+                Some(c) => Some(self.channel.place_of_async(&maker.from, c).await?),
                 None => None,
             }
         };
@@ -841,7 +848,11 @@ impl Artifacts {
                 artifact_type: Some(ArtifactType::Outline),
             };
             let text = Self::words(t("server.artifact.made", &[("title", effective_title.as_str().into())]), note);
-            let said = match self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new()) {
+            let said = match self
+                .channel
+                .post_card_async(&maker.from, &channel, &text, card, maker.run.clone(), String::new())
+                .await
+            {
                 Ok(msg) => msg,
                 Err(err) => {
                     let _ = db::delete_artifact(self.db.write_conn(), &id).await;
@@ -957,14 +968,17 @@ impl Artifacts {
             t("server.artifact.versioned", &[("title", row.title.as_str().into()), ("version", next.into())]),
             note,
         );
-        let said = self.channel.post_card(
-            &maker.from,
-            row.channel_id.as_deref().unwrap_or(""),
-            &text,
-            card,
-            maker.run.clone(),
-            String::new(),
-        )?;
+        let said = self
+            .channel
+            .post_card_async(
+                &maker.from,
+                row.channel_id.as_deref().unwrap_or(""),
+                &text,
+                card,
+                maker.run.clone(),
+                String::new(),
+            )
+            .await?;
         db::version_announced(self.db.write_conn(), &row.id, next, &said.id).await.map_err(q)?;
         self.get_now_async(&row.id).await
     }

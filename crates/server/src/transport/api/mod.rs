@@ -163,7 +163,7 @@ pub async fn dispatch_mcp_message_async(door: SharedMcp, token: String, message:
     }
 }
 
-/// Authenticated remote mobile device identity returned by [`RemoteAuth::verify_bearer`].
+/// Authenticated remote mobile device identity returned by [`RemoteAuth::verify_bearer_async`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RemoteDeviceIdentity {
     pub device_id: String,
@@ -175,14 +175,7 @@ pub struct RemoteDeviceIdentity {
 /// validates Bearer device tokens against paired devices.
 pub trait RemoteAuth: Send + Sync + 'static {
     fn is_enabled(&self) -> bool;
-    fn verify_bearer(&self, token: &str) -> Result<RemoteDeviceIdentity, ApiError>;
-    fn verify_bearer_async(self: Arc<Self>, token: String) -> BoxFuture<'static, Result<RemoteDeviceIdentity, ApiError>> {
-        Box::pin(async move {
-            crate::spawn_blocking_traced(move || self.verify_bearer(&token))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        })
-    }
+    fn verify_bearer_async(self: Arc<Self>, token: String) -> BoxFuture<'static, Result<RemoteDeviceIdentity, ApiError>>;
 }
 
 pub type SharedRemoteAuth = Arc<dyn RemoteAuth>;

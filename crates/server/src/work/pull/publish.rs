@@ -563,11 +563,6 @@ impl Publisher {
         self.publish_async(&cwd, req).await
     }
 
-    /// Sync shim for synchronous callers (e.g. integration tests).
-    pub fn submit(&self, req: &SubmitBranch) -> Result<BranchPublication, ApiError> {
-        vibevalley_runtime::rt::block_on(self.submit_async(req))
-    }
-
     async fn publish_async(&self, cwd: &Path, req: &SubmitBranch) -> Result<BranchPublication, ApiError> {
         let remote = {
             let cwd = cwd.to_path_buf();

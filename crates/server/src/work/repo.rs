@@ -981,20 +981,10 @@ pub async fn contributions_of_async(root: PathBuf, extra: Vec<String>) -> Vec<vi
     out.into_iter().map(|(_, repo)| repo).collect()
 }
 
-/// Sync shim for synchronous callers (`skin/game` and integration tests).
-pub fn contributions_of(root: &Path, extra: &[String]) -> Vec<vibevalley_protocol::Repo> {
-    vibevalley_runtime::rt::block_on(contributions_of_async(root.to_path_buf(), extra.to_vec()))
-}
-
 impl Repos {
-    /// `contributions` (async): the user's commits per repository under the root.
+    /// `contributions_async`: the user's commits per repository under the root.
     pub async fn contributions_async(&self, extra: Vec<String>) -> Vec<vibevalley_protocol::Repo> {
         contributions_of_async(self.root().to_path_buf(), extra).await
-    }
-
-    /// `contributions`: the user's commits per repository under the root.
-    pub fn contributions(&self, extra: &[String]) -> Vec<vibevalley_protocol::Repo> {
-        contributions_of(self.root(), extra)
     }
 }
 
@@ -1089,7 +1079,7 @@ mod tests {
         assert!(init.success());
         std::fs::write(repo_dir.join("pyproject.toml"), "[tool.ruff]\n").unwrap();
         let repos = Repos::open(work.path(), 3).unwrap();
-        let detected = repos.stack("pyapp").unwrap();
+        let detected = vibevalley_runtime::rt::block_on(repos.stack_async("pyapp")).unwrap();
         assert_eq!(detected.name, "python");
         assert_eq!(detected.lint.as_deref(), Some("ruff check ."));
         repos.close();
@@ -1294,16 +1284,7 @@ fn filled_template(s: &WrittenTemplate, stack: &RepoStack) -> IssueTemplate {
 }
 
 impl Repos {
-    /// `stack`: none when there is no repo by that name.
-    pub fn stack(&self, name: &str) -> Option<RepoStack> {
-        let p = self.find(name)?;
-        let files: std::collections::HashMap<&str, String> = STACK_FILES
-            .iter()
-            .filter_map(|f| std::fs::read_to_string(p.path.join(f)).ok().map(|body| (*f, body)))
-            .collect();
-        Some(stack_of(&files))
-    }
-
+    /// `stack_async`: none when there is no repo by that name.
     pub async fn stack_async(&self, name: &str) -> Option<RepoStack> {
         let p = self.find_async(name).await?;
         crate::spawn_blocking_traced(move || {

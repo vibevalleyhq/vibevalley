@@ -1229,7 +1229,7 @@ impl Artifacts {
             .map(str::to_string)
             .unwrap_or_else(|| format!("{} (fork)", row.title));
         let channel = match req.channel.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-            Some(c) => Some(self.channel.place_of(USER_ID, c)?),
+            Some(c) => Some(self.channel.place_of_async(USER_ID, c).await?),
             None => row.channel_id.clone(),
         };
         let artifact_type = row.artifact_type.as_deref().and_then(artifact_type_of);

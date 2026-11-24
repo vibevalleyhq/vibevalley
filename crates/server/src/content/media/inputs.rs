@@ -347,9 +347,6 @@ impl Inputs {
         }
         Ok(())
     }
-    pub fn delete(&self, id: &str) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.delete_async(id))
-    }
     pub async fn preview_delete_async(&self, id: &str) -> Result<Preview, ApiError> {
         let inner = self.inner.lock().await;
         let Some(r) = find_read(&self.db, &inner, id).await? else {
@@ -682,12 +679,6 @@ pub fn install(hub: &Hub, inputs: Arc<Inputs>) {
 }
 
 impl crate::transport::api::media::MediaInputs for Inputs {
-    fn upload(&self, id: &str, source: Box<dyn Read + Send>) -> Result<MediaInput, ApiError> {
-        Inputs::upload(self, id, source)
-    }
-    fn content(&self, id: &str) -> Result<AttachmentFile, ApiError> {
-        Inputs::content(self, id)
-    }
     fn upload_async(self: Arc<Self>, id: String, source: Box<dyn Read + Send>) -> crate::BoxFuture<'static, Result<MediaInput, ApiError>> {
         Box::pin(async move { Inputs::upload_async(&self, &id, source).await })
     }

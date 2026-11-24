@@ -649,73 +649,94 @@ impl ChannelAnnouncePort for Chat {
         Chat::orchestrator_in(self, channel)
     }
 
-    fn place_of(&self, who: &str, target: &str) -> Result<String, ApiError> {
-        Chat::place_of(self, who, target)
+    fn place_of_async<'a>(&'a self, who: &'a str, target: &'a str) -> crate::BoxFuture<'a, Result<String, ApiError>> {
+        Box::pin(Chat::place_of_async(self, who, target))
     }
 
-    fn post_card(
-        &self,
-        from: &str,
-        channel: &str,
-        text: &str,
+    fn post_card_async<'a>(
+        &'a self,
+        from: &'a str,
+        channel: &'a str,
+        text: &'a str,
         card: vibevalley_protocol::ArtifactCard,
         run: Option<String>,
         send_key: String,
-    ) -> Result<ChatMessage, ApiError> {
-        let (msg, _) = Chat::post(
-            self,
-            Posting {
-                from: from.to_string(),
-                channel: channel.to_string(),
-                text: text.to_string(),
-                run,
-                send_key,
-                made: Some(Made::Card(card)),
-                spoken: false,
-            },
-        )?;
-        Ok(msg)
+    ) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>> {
+        Box::pin(async move {
+            let (msg, _) = Chat::post_async(
+                self,
+                Posting {
+                    from: from.to_string(),
+                    channel: channel.to_string(),
+                    text: text.to_string(),
+                    run,
+                    send_key,
+                    made: Some(Made::Card(card)),
+                    spoken: false,
+                },
+            )
+            .await?;
+            Ok(msg)
+        })
     }
 
-    fn post_attachments(&self, from: &str, channel: &str, text: &str, attachments: Vec<String>, send_key: String) -> Result<ChatMessage, ApiError> {
-        let (msg, _) = Chat::post(
-            self,
-            Posting {
-                from: from.to_string(),
-                channel: channel.to_string(),
-                text: text.to_string(),
-                run: None,
-                send_key,
-                made: Some(Made::Attachments(attachments)),
-                spoken: false,
-            },
-        )?;
-        Ok(msg)
+    fn post_attachments_async<'a>(
+        &'a self,
+        from: &'a str,
+        channel: &'a str,
+        text: &'a str,
+        attachments: Vec<String>,
+        send_key: String,
+    ) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>> {
+        Box::pin(async move {
+            let (msg, _) = Chat::post_async(
+                self,
+                Posting {
+                    from: from.to_string(),
+                    channel: channel.to_string(),
+                    text: text.to_string(),
+                    run: None,
+                    send_key,
+                    made: Some(Made::Attachments(attachments)),
+                    spoken: false,
+                },
+            )
+            .await?;
+            Ok(msg)
+        })
     }
 
-    fn issue_thread(&self, issue_id: &str, title: &str, preferred_channel: Option<&str>) -> Result<String, ApiError> {
-        Chat::issue_thread(self, issue_id, title, preferred_channel)
+    fn issue_thread_async<'a>(
+        &'a self,
+        issue_id: &'a str,
+        title: &'a str,
+        preferred_channel: Option<&'a str>,
+    ) -> crate::BoxFuture<'a, Result<String, ApiError>> {
+        Box::pin(Chat::issue_thread_async(self, issue_id, title, preferred_channel))
     }
 
     fn issue_thread_id(&self, issue_id: &str) -> Option<String> {
         Chat::issue_thread_id(self, issue_id)
     }
 
-    fn say_in(&self, channel: &str, text: &str, send_key: String) -> Result<ChatMessage, ApiError> {
-        Chat::say(
-            self,
-            Saying {
-                text: text.to_string(),
-                channel: Some(channel.to_string()),
-                send_key,
-                ..Saying::default()
-            },
-        )
-        .map(|(m, _)| m)
+    fn say_in_async<'a>(&'a self, channel: &'a str, text: &'a str, send_key: String) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>> {
+        Box::pin(async move {
+            Chat::say_async(
+                self,
+                Saying {
+                    text: text.to_string(),
+                    channel: Some(channel.to_string()),
+                    send_key,
+                    ..Saying::default()
+                },
+            )
+            .await
+            .map(|(m, _)| m)
+        })
     }
 
-    fn history(&self, channel: &str, limit: i64) -> Result<Vec<ChatMessage>, ApiError> {
-        Chat::history(self, channel, None, Some(limit))
+    fn history_async<'a>(&'a self, channel: &'a str, limit: i64) -> crate::BoxFuture<'a, Result<Vec<ChatMessage>, ApiError>> {
+        Box::pin(Chat::history_async(self, channel, None, Some(limit)))
     }
 
     fn message_locations<'a>(&'a self, ids: &'a [String]) -> crate::app::hub::ports::MessageLocationsFuture<'a> {

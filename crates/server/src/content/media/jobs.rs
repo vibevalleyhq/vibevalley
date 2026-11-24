@@ -585,16 +585,16 @@ impl Jobs {
             cancel,
         });
         let _ = jobs.me.set(Arc::downgrade(&jobs));
-        let recent = vibevalley_runtime::rt::block_on(async {
+        vibevalley_runtime::rt::block_on(async {
             jobs.pick_up_async().await?;
             let recent = jobs.recent_async().await?;
             jobs.publish_async().await;
             jobs.schedule_async().await;
-            Ok::<_, ApiError>(recent)
+            for r in recent {
+                jobs.post_back_async(&r).await;
+            }
+            Ok::<_, ApiError>(())
         })?;
-        for r in recent {
-            jobs.post_back(&r);
-        }
         jobs.sweep_each_minute();
         Ok(jobs)
     }
@@ -1277,8 +1277,7 @@ impl Jobs {
             eprintln!("media {id}: {}", e.message);
         }
         if let Ok(r) = self.found_async(id).await {
-            let me = self.clone();
-            let _ = crate::spawn_blocking_traced(move || me.post_back(&r)).await;
+            self.post_back_async(&r).await;
         }
     }
 
@@ -1639,7 +1638,7 @@ impl Jobs {
     }
 
     /// A ready image the orchestrator asked for, posted once to its channel.
-    fn post_back(&self, r: &Record) {
+    async fn post_back_async(&self, r: &Record) {
         let (Ask::Image(request), Phase::Ready, MediaSource::Orchestrator { agent, channel }, Some(attachment)) = (&r.ask, r.phase, &r.source, &r.attachment)
         else {
             return;
@@ -1650,7 +1649,8 @@ impl Jobs {
         );
         if let Err(e) = self
             .channel
-            .post_attachments(agent, channel, &text, vec![attachment.id.clone()], format!("media:{}", r.id()))
+            .post_attachments_async(agent, channel, &text, vec![attachment.id.clone()], format!("media:{}", r.id()))
+            .await
         {
             eprintln!("media image post: {}", e.message);
         }

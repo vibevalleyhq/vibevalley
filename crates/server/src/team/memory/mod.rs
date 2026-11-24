@@ -20,7 +20,7 @@ use vibevalley_protocol::{
 };
 
 use crate::app::hub::ports::MemoryRecallPort;
-use crate::app::hub::refusal::RequestKeys;
+use crate::app::hub::refusal::AsyncRequestKeys;
 use crate::db::ServerDb;
 use crate::db::begin_write_tx;
 use crate::db::column::{db_word, read_db_word};
@@ -295,10 +295,6 @@ impl Memories {
         })
     }
 
-    pub fn forget(&self, agent: &str, id: &str) -> Result<(), ApiError> {
-        block_on(self.forget_async(agent, id))
-    }
-
     pub async fn forget_async(&self, agent: &str, id: &str) -> Result<(), ApiError> {
         self.forgettable_async(agent, id).await?;
         memory::Entity::delete_many()
@@ -308,10 +304,6 @@ impl Memories {
             .await
             .map_err(db_failed)?;
         Ok(())
-    }
-
-    pub fn preview_forget(&self, agent: &str, id: &str) -> Result<Preview, ApiError> {
-        block_on(self.preview_forget_async(agent, id))
     }
 
     pub async fn preview_forget_async(&self, agent: &str, id: &str) -> Result<Preview, ApiError> {
@@ -423,11 +415,7 @@ impl Memories {
         }
     }
 
-    /// `search`: one agent's, or every profile's when none is named.
-    pub fn search(&self, agent: &str, repo: &str, text: &str, limit: usize) -> MemorySearch {
-        block_on(self.search_async(agent, repo, text, limit))
-    }
-
+    /// `search_async`: one agent's, or every profile's when none is named.
     pub async fn search_async(&self, agent: &str, repo: &str, text: &str, limit: usize) -> MemorySearch {
         let agents: Vec<String> = if agent.is_empty() {
             self.agents.profiles.agents().into_iter().map(|a| a.id).collect()
@@ -623,7 +611,7 @@ pub fn install(hub: &Arc<Hub>, memories: Arc<Memories>) {
         }
     });
     let s = memories.clone();
-    let keys = Arc::new(RequestKeys::<Memory>::default());
+    let keys = Arc::new(AsyncRequestKeys::<Memory>::default());
     hub.on_async::<ops::MemoryCreate, _, _>(move |ctx, input| {
         let s = s.clone();
         let keys = keys.clone();
@@ -633,18 +621,16 @@ pub fn install(hub: &Arc<Hub>, memories: Arc<Memories>) {
             Caller::User | Caller::Remote => By::User,
         };
         async move {
-            crate::spawn_blocking_traced(move || {
-                keys.once(input.request_key.as_deref(), || {
-                    s.write(&Note {
-                        agent: input.agent.clone(),
-                        text: input.text.clone(),
-                        repo: input.repo.clone().unwrap_or_default(),
-                        by: by.clone(),
-                    })
+            keys.once(input.request_key.as_deref(), async move {
+                s.write_async(&Note {
+                    agent: input.agent.clone(),
+                    text: input.text.clone(),
+                    repo: input.repo.clone().unwrap_or_default(),
+                    by,
                 })
+                .await
             })
             .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
         }
     });
     let s = memories.clone();

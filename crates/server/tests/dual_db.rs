@@ -279,28 +279,26 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     ok(&started, "cron.update", json!({ "id": cron_id, "enabled": false }));
 
     // 4. work/pull
-    let pull_rec = started
-        .test_internals()
-        .pulls
-        .store()
-        .upsert(UpsertPullInput {
-            platform: PublishPlatform::Github,
-            repo: "acme/dual".into(),
-            number: 88,
-            url: "https://github.com/acme/dual/pull/88".into(),
-            branch: "feat/dual-db".into(),
-            base: "main".into(),
-            state: PullRequestState::Open,
-            issue_id: Some(issue_id.clone()),
-            at: now_ms(),
-        })
-        .unwrap();
-    started
-        .test_internals()
-        .pulls
-        .store()
-        .keep_event(&pull_rec.id, "ev-dual-1", Some("round-1"), Some(1))
-        .unwrap();
+    let pull_rec = vibevalley_runtime::rt::block_on(started.test_internals().pulls.store().upsert_async(UpsertPullInput {
+        platform: PublishPlatform::Github,
+        repo: "acme/dual".into(),
+        number: 88,
+        url: "https://github.com/acme/dual/pull/88".into(),
+        branch: "feat/dual-db".into(),
+        base: "main".into(),
+        state: PullRequestState::Open,
+        issue_id: Some(issue_id.clone()),
+        at: now_ms(),
+    }))
+    .unwrap();
+    vibevalley_runtime::rt::block_on(
+        started
+            .test_internals()
+            .pulls
+            .store()
+            .keep_event_async(&pull_rec.id, "ev-dual-1", Some("round-1"), Some(1)),
+    )
+    .unwrap();
 
     // 5. collab/channel + system_code suppression
     let eng_channel = ok(&started, "channel.create", json!({ "name": "dual-eng", "description": "Dual DB channel" }));
@@ -489,7 +487,12 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
 
     let pull_reloaded = reopened.test_internals().pulls.find("acme/dual", 88).expect("pull persisted");
     assert_eq!(pull_reloaded.issue_id.as_deref(), Some(issue_id.as_str()));
-    assert_eq!(reopened.test_internals().pulls.store().known_events(&pull_reloaded.id).unwrap().len(), 1);
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(reopened.test_internals().pulls.store().known_events_async(&pull_reloaded.id))
+            .unwrap()
+            .len(),
+        1
+    );
 
     let msgs = ok(&reopened, "channel.message.list", json!({ "id": eng_id }));
     assert!(msgs.to_string().contains("hello from dual db"));

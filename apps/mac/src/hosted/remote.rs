@@ -770,16 +770,21 @@ mod tests {
             true
         }
 
-        fn verify_bearer(&self, token: &str) -> Result<RemoteDeviceIdentity, ApiError> {
-            if token == self.expected_token {
-                Ok(RemoteDeviceIdentity {
-                    device_id: "dev-mac".into(),
-                    name: "Mac Client".into(),
-                    scope: vibevalley_protocol::SCOPE_REMOTE_CLIENT.into(),
-                })
-            } else {
-                Err(ApiError::new(BizCode::Unauthorized, "invalid bearer token"))
-            }
+        fn verify_bearer_async(
+            self: Arc<Self>,
+            token: String,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<RemoteDeviceIdentity, ApiError>> + Send + 'static>> {
+            Box::pin(async move {
+                if token == self.expected_token {
+                    Ok(RemoteDeviceIdentity {
+                        device_id: "dev-mac".into(),
+                        name: "Mac Client".into(),
+                        scope: vibevalley_protocol::SCOPE_REMOTE_CLIENT.into(),
+                    })
+                } else {
+                    Err(ApiError::new(BizCode::Unauthorized, "invalid bearer token"))
+                }
+            })
         }
     }
 

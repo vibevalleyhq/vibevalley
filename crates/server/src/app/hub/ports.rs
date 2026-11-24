@@ -53,13 +53,33 @@ pub trait ChannelAnnouncePort: Send + Sync {
     fn default_channel(&self) -> String;
     fn place_exists(&self, id: &str) -> bool;
     fn orchestrator_in(&self, channel: &str) -> String;
-    fn place_of(&self, who: &str, target: &str) -> Result<String, ApiError>;
-    fn post_card(&self, from: &str, channel: &str, text: &str, card: ArtifactCard, run: Option<String>, send_key: String) -> Result<ChatMessage, ApiError>;
-    fn post_attachments(&self, from: &str, channel: &str, text: &str, attachments: Vec<String>, send_key: String) -> Result<ChatMessage, ApiError>;
-    fn issue_thread(&self, issue_id: &str, title: &str, preferred_channel: Option<&str>) -> Result<String, ApiError>;
+    fn place_of_async<'a>(&'a self, who: &'a str, target: &'a str) -> crate::BoxFuture<'a, Result<String, ApiError>>;
+    fn post_card_async<'a>(
+        &'a self,
+        from: &'a str,
+        channel: &'a str,
+        text: &'a str,
+        card: ArtifactCard,
+        run: Option<String>,
+        send_key: String,
+    ) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>>;
+    fn post_attachments_async<'a>(
+        &'a self,
+        from: &'a str,
+        channel: &'a str,
+        text: &'a str,
+        attachments: Vec<String>,
+        send_key: String,
+    ) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>>;
+    fn issue_thread_async<'a>(
+        &'a self,
+        issue_id: &'a str,
+        title: &'a str,
+        preferred_channel: Option<&'a str>,
+    ) -> crate::BoxFuture<'a, Result<String, ApiError>>;
     fn issue_thread_id(&self, issue_id: &str) -> Option<String>;
-    fn say_in(&self, channel: &str, text: &str, send_key: String) -> Result<ChatMessage, ApiError>;
-    fn history(&self, channel: &str, limit: i64) -> Result<Vec<ChatMessage>, ApiError>;
+    fn say_in_async<'a>(&'a self, channel: &'a str, text: &'a str, send_key: String) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>>;
+    fn history_async<'a>(&'a self, channel: &'a str, limit: i64) -> crate::BoxFuture<'a, Result<Vec<ChatMessage>, ApiError>>;
     fn message_locations<'a>(&'a self, ids: &'a [String]) -> MessageLocationsFuture<'a>;
 }
 

@@ -391,10 +391,6 @@ impl Library {
         self.found_async(&attachment.id).await
     }
 
-    pub fn add(&self, req: &LibraryAddRequest, by: &AddedBy) -> Result<LibraryItem, ApiError> {
-        vibevalley_runtime::rt::block_on(self.add_async(req, by))
-    }
-
     pub async fn remove_async(&self, id: &str) -> Result<(), ApiError> {
         self.found_async(id).await?;
         let at = now();

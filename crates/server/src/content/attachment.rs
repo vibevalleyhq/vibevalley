@@ -169,10 +169,6 @@ impl Attachments {
         })
     }
 
-    fn by_id(&self, id: &str) -> Result<Option<Attachment>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.by_id_async(id))
-    }
-
     pub async fn by_id_async(&self, id: &str) -> Result<Option<Attachment>, ApiError> {
         let row = attachment::Entity::find_by_id(id.to_owned()).one(self.db.read_conn()).await.map_err(internal)?;
         Ok(row.map(|row| Attachment {
@@ -181,19 +177,6 @@ impl Attachments {
             r#type: row.content_type,
             size: row.size,
         }))
-    }
-
-    /// `of`: the attachments with these ids, each once; one not kept is
-    /// refused.
-    pub fn of(&self, ids: &[String]) -> Result<Vec<Attachment>, ApiError> {
-        let mut out: Vec<Attachment> = vec![];
-        for id in ids {
-            if out.iter().any(|a| &a.id == id) {
-                continue;
-            }
-            out.push(self.by_id(id)?.ok_or_else(|| no_attachment(id))?);
-        }
-        Ok(out)
     }
 
     pub async fn of_async(&self, ids: &[String]) -> Result<Vec<Attachment>, ApiError> {
@@ -209,16 +192,7 @@ impl Attachments {
 
     /// `get`: the file of a kept attachment.
     pub fn file(&self, id: &str) -> Result<AttachmentFile, ApiError> {
-        let a = self.by_id(id)?.ok_or_else(|| no_attachment(id))?;
-        let path = self.path_of(&a.id);
-        if !path.is_file() {
-            return Err(no_attachment(id));
-        }
-        Ok(AttachmentFile {
-            path: path.to_string_lossy().into_owned(),
-            r#type: a.r#type,
-            name: a.name,
-        })
+        vibevalley_runtime::rt::block_on(self.file_async(id))
     }
 
     pub async fn file_async(&self, id: &str) -> Result<AttachmentFile, ApiError> {

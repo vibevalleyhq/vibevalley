@@ -194,8 +194,22 @@ impl Crons {
             .ok_or_else(|| missing(t("server.cron.noCron", &[("id", id.into())]), LookIn::Cron))
     }
 
-    /// `add`: `by` is who asks, and on whose word (`needsOK`).
-    pub fn add(&self, req: CronRequest, by: ActorKind) -> Result<Cron, ApiError> {
+    /// `add_async`: `by` is who asks, and on whose word (`needsOK`).
+    pub async fn add_async(self: &Arc<Self>, req: CronRequest, by: ActorKind) -> Result<Cron, ApiError> {
+        let resolved_channel = match &self.chat {
+            Some(chat) => Some(match req.channel.as_deref() {
+                None => chat.default_channel(),
+                Some(c) => chat.place_of_async(vibevalley_protocol::USER_ID, c).await?,
+            }),
+            None => None,
+        };
+        let crons = self.clone();
+        crate::spawn_blocking_traced(move || crons.add_resolved(req, by, resolved_channel))
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+    }
+
+    fn add_resolved(&self, req: CronRequest, by: ActorKind, resolved_channel: Option<String>) -> Result<Cron, ApiError> {
         let _l = self.lock.lock();
         let at = self.clock.now_ms();
         let rules = vibevalley_core::cron_request_to_rules(&req);
@@ -203,13 +217,9 @@ impl Crons {
         if !problem.is_empty() {
             return Err(refused(problem));
         }
-        let (channel, channel_name, channel_repo) = match &self.chat {
+        let (channel, channel_name, channel_repo) = match (&self.chat, resolved_channel) {
             // A channel as the user names it (general, #general) as well as by id.
-            Some(chat) => {
-                let want = match req.channel.as_deref() {
-                    None => chat.default_channel(),
-                    Some(c) => chat.place_of(vibevalley_protocol::USER_ID, c)?,
-                };
+            (Some(chat), Some(want)) => {
                 let found = chat
                     .channels()
                     .into_iter()
@@ -217,7 +227,7 @@ impl Crons {
                     .ok_or_else(|| refused(t("server.cron.noChannel", &[("name", want.as_str().into())])).with_next(vec![LookIn::Channel.next()]))?;
                 (found.id, found.name, found.repo)
             }
-            None => {
+            _ => {
                 let named = req.channel.as_deref().map(|c| c.trim().trim_start_matches('#')).filter(|c| !c.is_empty());
                 let name = named.unwrap_or(DEFAULT_CHANNEL).to_string();
                 (name.clone(), name, String::new())
@@ -397,11 +407,7 @@ pub fn install(hub: &Arc<Hub>, crons: Arc<Crons>, tick: bool) {
             Caller::User | Caller::Remote => ActorKind::User,
             Caller::Orchestrator | Caller::Session => ActorKind::Agent,
         };
-        async move {
-            crate::spawn_blocking_traced(move || c.add(req, by))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
+        async move { c.add_async(req, by).await }
     });
     let c = crons.clone();
     hub.on::<ops::CronList>(move |_, ()| Ok(c.list()));
@@ -503,7 +509,7 @@ mod tests {
         )
         .unwrap();
 
-        let past = crons.add(
+        let past = block_on(crons.add_async(
             CronRequest {
                 name: "too late".into(),
                 text: "expired".into(),
@@ -514,24 +520,23 @@ mod tests {
                 tz: None,
             },
             ActorKind::User,
-        );
+        ));
         assert_eq!(past.unwrap_err().biz_code, BizCode::CronRefused);
 
         let due_at = clock.now_ms() + 60_000;
-        let once = crons
-            .add(
-                CronRequest {
-                    name: "standup".into(),
-                    text: "post standup notes".into(),
-                    channel: None,
-                    agent: None,
-                    repo: None,
-                    when: CronWhen::Once(CronWhenOnce { at: due_at }),
-                    tz: None,
-                },
-                ActorKind::User,
-            )
-            .unwrap();
+        let once = block_on(crons.add_async(
+            CronRequest {
+                name: "standup".into(),
+                text: "post standup notes".into(),
+                channel: None,
+                agent: None,
+                repo: None,
+                when: CronWhen::Once(CronWhenOnce { at: due_at }),
+                tz: None,
+            },
+            ActorKind::User,
+        ))
+        .unwrap();
         assert_eq!(once.created, 1_700_000_000_000);
         assert!(once.enabled);
 

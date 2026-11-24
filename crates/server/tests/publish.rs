@@ -118,19 +118,17 @@ fn hosted_origins_are_read_strictly() {
 fn a_branch_is_previewed_pushed_and_opened() {
     vibevalley_i18n::set_locale("en");
     let f = farm();
-    let preview = f
-        .publisher
-        .submit(&SubmitBranch {
-            dry_run: Some(true),
-            ..request(&f)
-        })
-        .unwrap();
+    let preview = vibevalley_runtime::rt::block_on(f.publisher.submit_async(&SubmitBranch {
+        dry_run: Some(true),
+        ..request(&f)
+    }))
+    .unwrap();
     assert_eq!(
         (preview.check, preview.pushed, preview.repository.as_str()),
         (BranchCheck::Preview, false, "acme/farm")
     );
 
-    let done = f.publisher.submit(&request(&f)).unwrap();
+    let done = vibevalley_runtime::rt::block_on(f.publisher.submit_async(&request(&f))).unwrap();
     assert!(done.pushed);
     assert_eq!(
         (done.number, done.url.as_deref(), done.reused),
@@ -150,28 +148,24 @@ fn a_branch_is_previewed_pushed_and_opened() {
 fn refusals_say_what_is_wrong() {
     vibevalley_i18n::set_locale("en");
     let f = farm();
-    let bad = f
-        .publisher
-        .submit(&SubmitBranch {
-            sha: "nope".into(),
-            ..request(&f)
-        })
-        .unwrap_err();
+    let bad = vibevalley_runtime::rt::block_on(f.publisher.submit_async(&SubmitBranch {
+        sha: "nope".into(),
+        ..request(&f)
+    }))
+    .unwrap_err();
     assert!(bad.message.contains("cwd / sha / title"), "{}", bad.message);
-    let base = f
-        .publisher
-        .submit(&SubmitBranch {
-            branch: "main".into(),
-            ..request(&f)
-        })
-        .unwrap_err();
+    let base = vibevalley_runtime::rt::block_on(f.publisher.submit_async(&SubmitBranch {
+        branch: "main".into(),
+        ..request(&f)
+    }))
+    .unwrap_err();
     assert!(base.message.contains("checkout changed or dirty"), "{}", base.message);
     std::fs::write(f.work.join("b.txt"), "dirty").unwrap();
-    let dirty = f.publisher.submit(&request(&f)).unwrap_err();
+    let dirty = vibevalley_runtime::rt::block_on(f.publisher.submit_async(&request(&f))).unwrap_err();
     assert!(dirty.message.contains("checkout changed or dirty"), "{}", dirty.message);
     std::fs::remove_file(f.work.join("b.txt")).unwrap();
     git(&f.work, &["remote", "add", "other", "https://github.com/acme/other.git"]);
-    let two = f.publisher.submit(&request(&f)).unwrap_err();
+    let two = vibevalley_runtime::rt::block_on(f.publisher.submit_async(&request(&f))).unwrap_err();
     assert!(two.message.contains("ambiguous remote"), "{}", two.message);
     git(&f.work, &["remote", "remove", "other"]);
 
@@ -183,7 +177,7 @@ fn refusals_say_what_is_wrong() {
     std::fs::write(other.join("a.txt"), "three\n").unwrap();
     git(&other, &["commit", "-q", "-am", "theirs"]);
     git(&other, &["push", "-q", "origin", "main"]);
-    let clash = f.publisher.submit(&request(&f)).unwrap_err();
+    let clash = vibevalley_runtime::rt::block_on(f.publisher.submit_async(&request(&f))).unwrap_err();
     assert!(clash.message.contains("main"), "{}", clash.message);
     assert!(
         std::process::Command::new("git")
@@ -205,7 +199,7 @@ fn the_repos_check_runs_before_the_push() {
     std::process::Command::new("chmod").arg("+x").arg(&check).status().unwrap();
     git(&f.work, &["add", "."]);
     git(&f.work, &["commit", "-q", "-m", "check"]);
-    let failed = f.publisher.submit(&request(&f)).unwrap_err();
+    let failed = vibevalley_runtime::rt::block_on(f.publisher.submit_async(&request(&f))).unwrap_err();
     assert!(
         failed.message.contains("exit status 3") && failed.message.contains("broken"),
         "{}",
@@ -213,7 +207,10 @@ fn the_repos_check_runs_before_the_push() {
     );
     std::fs::write(&check, "#!/bin/sh\nexit 0\n").unwrap();
     git(&f.work, &["commit", "-q", "-am", "check passes"]);
-    assert_eq!(f.publisher.submit(&request(&f)).unwrap().check, BranchCheck::Passed);
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(f.publisher.submit_async(&request(&f))).unwrap().check,
+        BranchCheck::Passed
+    );
 }
 
 #[test]
@@ -385,22 +382,24 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
         .data
         .unwrap();
     let change_id = change_issue["id"].as_str().unwrap();
-    started
-        .test_internals()
-        .pulls
-        .store()
-        .upsert(vibevalley_server::work::pull::UpsertPullInput {
-            platform: vibevalley_protocol::PublishPlatform::Github,
-            repo: "acme/farm".into(),
-            number: 8,
-            url: "https://github.com/acme/farm/pull/8".into(),
-            branch: "vibevalley/issue-2".into(),
-            base: "main".into(),
-            state: PullRequestState::Merged,
-            issue_id: Some(change_id.into()),
-            at: 1000,
-        })
-        .unwrap();
+    vibevalley_runtime::rt::block_on(
+        started
+            .test_internals()
+            .pulls
+            .store()
+            .upsert_async(vibevalley_server::work::pull::UpsertPullInput {
+                platform: vibevalley_protocol::PublishPlatform::Github,
+                repo: "acme/farm".into(),
+                number: 8,
+                url: "https://github.com/acme/farm/pull/8".into(),
+                branch: "vibevalley/issue-2".into(),
+                base: "main".into(),
+                state: PullRequestState::Merged,
+                issue_id: Some(change_id.into()),
+                at: 1000,
+            }),
+    )
+    .unwrap();
     let merged = started
         .test_internals()
         .board

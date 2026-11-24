@@ -22,11 +22,7 @@ use crate::app::hub::refusal::{LookIn, missing};
 use crate::{Sink, now};
 
 impl Chat {
-    /// `placeOf`: a place's id, or an address as `from` would say it.
-    pub fn place_of(&self, from: &str, channel: &str) -> Result<String, ApiError> {
-        vibevalley_runtime::rt::block_on(self.place_of_async(from, channel))
-    }
-
+    /// `place_of_async`: a place's id, or an address as `from` would say it.
     pub async fn place_of_async(&self, from: &str, channel: &str) -> Result<String, ApiError> {
         if self.model().channel(channel).is_some() {
             return Ok(channel.into());

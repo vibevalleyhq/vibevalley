@@ -30,7 +30,7 @@ impl Chat {
                 reason: String::new(),
             })]);
         }
-        let files = self.files.of(&s.attachments)?;
+        let files = self.files.of_async(&s.attachments).await?;
         if s.text.trim().is_empty() && files.is_empty() {
             return Err(refused(t("server.channel.empty", &[])));
         }
@@ -233,7 +233,7 @@ impl Chat {
             };
             match &p.made {
                 Some(Made::Card(card)) => meta.artifact = Some(card.clone()),
-                Some(Made::Attachments(ids)) => meta.attachments = Some(self.files.of(ids)?),
+                Some(Made::Attachments(ids)) => meta.attachments = Some(self.files.of_async(ids).await?),
                 None => {}
             }
             self.write_async(
@@ -484,12 +484,8 @@ impl Chat {
         Ok(db::pinned_in(self.db.read_conn(), channel).await.q()?.iter().map(to_message).collect())
     }
 
-    /// `threadUnder`: the thread under a message in a channel, made if
+    /// `thread_under_async`: the thread under a message in a channel, made if
     /// there is none.
-    pub fn thread_under(&self, id: &str) -> Result<String, ApiError> {
-        vibevalley_runtime::rt::block_on(self.thread_under_async(id))
-    }
-
     pub async fn thread_under_async(&self, id: &str) -> Result<String, ApiError> {
         let mut inner = self.locked().await;
         let row = message_of(self.db.read_conn(), id).await?;
@@ -511,12 +507,8 @@ impl Chat {
         Ok(thread)
     }
 
-    /// `issueThread`: the issue's thread, opened under a notice in
+    /// `issue_thread_async`: the issue's thread, opened under a notice in
     /// `channel` (else the default) when there is none.
-    pub fn issue_thread(&self, issue: &str, title: &str, channel: Option<&str>) -> Result<String, ApiError> {
-        vibevalley_runtime::rt::block_on(self.issue_thread_async(issue, title, channel))
-    }
-
     pub async fn issue_thread_async(&self, issue: &str, title: &str, channel: Option<&str>) -> Result<String, ApiError> {
         if let Some(existing) = self.model().thread_of_subject("issue", issue) {
             return Ok(existing.to_string());

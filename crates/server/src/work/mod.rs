@@ -268,40 +268,38 @@ mod tests {
 
         // 4. PullStore persistence + ON CONFLICT COALESCE + pull_event ON CONFLICT DO NOTHING
         let pulls = PullStore::open(db.clone()).unwrap();
-        let p = pulls
-            .upsert(UpsertPullInput {
-                platform: PublishPlatform::Github,
-                repo: "acme/app".into(),
-                number: 7,
-                url: "https://github.com/acme/app/pull/7".into(),
-                branch: "feat/x".into(),
-                base: "main".into(),
-                state: PullRequestState::Open,
-                issue_id: Some("iss-1".into()),
-                at: 700,
-            })
-            .unwrap();
-        let p_up = pulls
-            .upsert(UpsertPullInput {
-                platform: PublishPlatform::Github,
-                repo: "acme/app".into(),
-                number: 7,
-                url: "https://github.com/acme/app/pull/7".into(),
-                branch: "feat/x".into(),
-                base: "main".into(),
-                state: PullRequestState::Merged,
-                issue_id: None,
-                at: 701,
-            })
-            .unwrap();
+        let p = block_on(pulls.upsert_async(UpsertPullInput {
+            platform: PublishPlatform::Github,
+            repo: "acme/app".into(),
+            number: 7,
+            url: "https://github.com/acme/app/pull/7".into(),
+            branch: "feat/x".into(),
+            base: "main".into(),
+            state: PullRequestState::Open,
+            issue_id: Some("iss-1".into()),
+            at: 700,
+        }))
+        .unwrap();
+        let p_up = block_on(pulls.upsert_async(UpsertPullInput {
+            platform: PublishPlatform::Github,
+            repo: "acme/app".into(),
+            number: 7,
+            url: "https://github.com/acme/app/pull/7".into(),
+            branch: "feat/x".into(),
+            base: "main".into(),
+            state: PullRequestState::Merged,
+            issue_id: None,
+            at: 701,
+        }))
+        .unwrap();
         assert_eq!(p_up.id, p.id);
         assert_eq!(p_up.issue_id.as_deref(), Some("iss-1"));
         assert_eq!(p_up.state, PullRequestState::Merged);
 
-        pulls.observe_checks(&p.id, "fp1", 1, 702).unwrap();
-        pulls.keep_event(&p.id, "ev-1", Some("rk-1"), Some(1)).unwrap();
-        pulls.keep_event(&p.id, "ev-1", Some("rk-1"), Some(1)).unwrap();
-        let known = pulls.known_events(&p.id).unwrap();
+        block_on(pulls.observe_checks_async(&p.id, "fp1", 1, 702)).unwrap();
+        block_on(pulls.keep_event_async(&p.id, "ev-1", Some("rk-1"), Some(1))).unwrap();
+        block_on(pulls.keep_event_async(&p.id, "ev-1", Some("rk-1"), Some(1))).unwrap();
+        let known = block_on(pulls.known_events_async(&p.id)).unwrap();
         assert_eq!(known.len(), 1);
         assert_eq!(known[0].bot_round, Some(1));
 

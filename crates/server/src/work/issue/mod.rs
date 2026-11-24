@@ -638,11 +638,7 @@ pub fn install_on_with_clock(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Ag
     let b = board.clone();
     hub.on_async::<ops::IssueRefine, _, _>(move |_, input| {
         let b = b.clone();
-        async move {
-            crate::spawn_blocking_traced(move || refine(&b, None, &input))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
+        async move { refine_async(&b, None, &input).await }
     });
 
     let b = board.clone();
@@ -775,11 +771,7 @@ pub fn install_conversation(hub: &Hub, board: Board, channel: Arc<dyn crate::app
     hub.on_async::<ops::IssueRefine, _, _>(move |_, input| {
         let board = board.clone();
         let channel = channel.clone();
-        async move {
-            crate::spawn_blocking_traced(move || refine(&board, Some(channel.as_ref()), &input))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
+        async move { refine_async(&board, Some(channel.as_ref()), &input).await }
     });
 }
 
@@ -922,34 +914,54 @@ pub(crate) fn status(board: &Board, profiles: Option<&Agents>, input: &vibevalle
     get(board, &item.id)
 }
 
-pub(crate) fn refine(
+pub(crate) async fn refine_async(
     board: &Board,
     channel: Option<&dyn crate::app::hub::ports::ChannelAnnouncePort>,
     input: &vibevalley_protocol::IssueRefineInput,
 ) -> Result<Issue, ApiError> {
-    let mut item = get(board, &input.id)?;
-    if let Some(edit) = &input.edit {
-        item = board.edit(&item.id, edit).map_err(|e| api(board, e))?;
-    }
-    if item.status != IssueStatus::Backlog {
-        return Err(refused("server.issue.refinement.onlyBacklog", &[]).with_next(next_steps(&item)));
-    }
-    if let Some(r) = &item.refining {
-        return Err(refused("server.issue.refinement.drafting", &[("name", r.name.clone().into())]));
-    }
+    let b = board.clone();
+    let id = input.id.clone();
+    let edit = input.edit.clone();
+    let item = crate::spawn_blocking_traced(move || {
+        let mut item = get(&b, &id)?;
+        if let Some(edit) = &edit {
+            item = b.edit(&item.id, edit).map_err(|e| api(&b, e))?;
+        }
+        if item.status != IssueStatus::Backlog {
+            return Err(refused("server.issue.refinement.onlyBacklog", &[]).with_next(next_steps(&item)));
+        }
+        if let Some(r) = &item.refining {
+            return Err(refused("server.issue.refinement.drafting", &[("name", r.name.clone().into())]));
+        }
+        Ok(item)
+    })
+    .await
+    .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))??;
     let said = input.text.as_deref().unwrap_or("").trim().to_string();
     let discussion = if let Some(channel) = channel {
-        let thread = channel.issue_thread(&item.id, &item.title, None)?;
-        let discussion = channel.history(&thread, 40)?.into_iter().map(|m| m.text).collect::<Vec<_>>().join("\n\n");
+        let thread = channel.issue_thread_async(&item.id, &item.title, None).await?;
+        let discussion = channel
+            .history_async(&thread, 40)
+            .await?
+            .into_iter()
+            .map(|m| m.text)
+            .collect::<Vec<_>>()
+            .join("\n\n");
         if !said.is_empty() {
-            channel.say_in(&thread, &said, String::new())?;
+            channel.say_in_async(&thread, &said, String::new()).await?;
         }
         discussion
     } else {
         String::new()
     };
-    board.refine_with(&item.id, &said, &discussion).map_err(|e| api(board, e))?;
-    get(board, &item.id)
+    let b = board.clone();
+    let id = item.id;
+    crate::spawn_blocking_traced(move || {
+        b.refine_with(&id, &said, &discussion).map_err(|e| api(&b, e))?;
+        get(&b, &id)
+    })
+    .await
+    .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
 }
 
 #[cfg(test)]

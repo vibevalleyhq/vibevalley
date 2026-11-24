@@ -518,7 +518,7 @@ fn usage_is_read_again_and_told() {
 
     let live = vibevalley_server::Server::live(&*hub);
     *metered.used.lock().unwrap() = 0.5;
-    fleet.refresh_usage("scripted");
+    vibevalley_runtime::rt::block_on(fleet.refresh_usage_async("scripted"));
     let told = live.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
     assert!(serde_json::to_string(&told).unwrap().contains("\"usedPercent\":50"));
     assert_eq!(
@@ -527,6 +527,6 @@ fn usage_is_read_again_and_told() {
     );
 
     // Nothing changed: nothing is told.
-    fleet.refresh_usage("scripted");
+    vibevalley_runtime::rt::block_on(fleet.refresh_usage_async("scripted"));
     assert!(live.recv_timeout(std::time::Duration::from_millis(200)).is_err());
 }

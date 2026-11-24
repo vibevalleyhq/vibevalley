@@ -301,7 +301,7 @@ impl Fleet {
         });
     }
 
-    async fn refresh_usage_async(&self, id: &str) {
+    pub async fn refresh_usage_async(&self, id: &str) {
         let Some(before) = self.held(id) else { return };
         if !matches!(before.info.installation, Installation::Available(_)) || self.cancel.is_cancelled() {
             return;
@@ -326,12 +326,6 @@ impl Fleet {
         if let Some(hub) = self.hub.upgrade() {
             hub.runtime(info);
         }
-    }
-
-    /// `refreshUsage` (blocking): a runtime found available has its usage
-    /// read again; kept and told when it changed and no newer probe landed.
-    pub fn refresh_usage(&self, id: &str) {
-        vibevalley_runtime::rt::block_on(self.refresh_usage_async(id));
     }
 
     /// Refreshes usage across all available runtimes in parallel with bounded concurrency.

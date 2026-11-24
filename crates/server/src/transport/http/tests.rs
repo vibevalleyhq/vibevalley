@@ -445,16 +445,18 @@ impl RemoteAuth for StaticRemoteAuth {
         self.enabled
     }
 
-    fn verify_bearer(&self, token: &str) -> Result<RemoteDeviceIdentity, ApiError> {
-        if token == self.valid_token {
-            Ok(RemoteDeviceIdentity {
-                device_id: "dev_1".into(),
-                name: "Test Phone".into(),
-                scope: self.scope.into(),
-            })
-        } else {
-            Err(ApiError::new(BizCode::Unauthorized, "invalid bearer"))
-        }
+    fn verify_bearer_async(self: Arc<Self>, token: String) -> crate::BoxFuture<'static, Result<RemoteDeviceIdentity, ApiError>> {
+        Box::pin(async move {
+            if token == self.valid_token {
+                Ok(RemoteDeviceIdentity {
+                    device_id: "dev_1".into(),
+                    name: "Test Phone".into(),
+                    scope: self.scope.into(),
+                })
+            } else {
+                Err(ApiError::new(BizCode::Unauthorized, "invalid bearer"))
+            }
+        })
     }
 }
 

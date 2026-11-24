@@ -451,34 +451,30 @@ mod tests {
         let pulls = Pulls::open(db.clone(), Arc::new(Publisher::default()), None, Some(board.clone()), Some(gh.clone()), None).unwrap();
 
         // Upsert linked PR and standalone PR (issue_id = None)
-        let linked = pulls
-            .store()
-            .upsert(UpsertPullInput {
-                platform: PublishPlatform::Github,
-                repo: "acme/demo".into(),
-                number: 9,
-                url: "https://github.com/acme/demo/pull/9".into(),
-                branch: "vibevalley/issue-1".into(),
-                base: "main".into(),
-                state: PullRequestState::Open,
-                issue_id: Some(issue.id.clone()),
-                at: 1000,
-            })
-            .unwrap();
-        let standalone = pulls
-            .store()
-            .upsert(UpsertPullInput {
-                platform: PublishPlatform::Github,
-                repo: "acme/demo".into(),
-                number: 10,
-                url: "https://github.com/acme/demo/pull/10".into(),
-                branch: "feat/standalone".into(),
-                base: "main".into(),
-                state: PullRequestState::Open,
-                issue_id: None,
-                at: 1001,
-            })
-            .unwrap();
+        let linked = crate::work::block_on(pulls.store().upsert_async(UpsertPullInput {
+            platform: PublishPlatform::Github,
+            repo: "acme/demo".into(),
+            number: 9,
+            url: "https://github.com/acme/demo/pull/9".into(),
+            branch: "vibevalley/issue-1".into(),
+            base: "main".into(),
+            state: PullRequestState::Open,
+            issue_id: Some(issue.id.clone()),
+            at: 1000,
+        }))
+        .unwrap();
+        let standalone = crate::work::block_on(pulls.store().upsert_async(UpsertPullInput {
+            platform: PublishPlatform::Github,
+            repo: "acme/demo".into(),
+            number: 10,
+            url: "https://github.com/acme/demo/pull/10".into(),
+            branch: "feat/standalone".into(),
+            base: "main".into(),
+            state: PullRequestState::Open,
+            issue_id: None,
+            at: 1001,
+        }))
+        .unwrap();
         assert_eq!(standalone.issue_id, None);
         board.refresh_issue(&issue.id);
         assert_eq!(board.issue(&issue.id).unwrap().pull_request.as_ref().map(|p| p.number), Some(9));

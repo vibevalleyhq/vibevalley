@@ -613,10 +613,6 @@ impl RemoteAuth for Remote {
         self.enabled.load(Ordering::Acquire)
     }
 
-    fn verify_bearer(&self, token: &str) -> Result<RemoteDeviceIdentity, ApiError> {
-        block_on(self.verify_bearer_inner_async(token))
-    }
-
     fn verify_bearer_async(self: Arc<Self>, token: String) -> BoxFuture<'static, Result<RemoteDeviceIdentity, ApiError>> {
         Box::pin(async move { self.verify_bearer_inner_async(&token).await })
     }

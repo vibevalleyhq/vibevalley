@@ -1,6 +1,10 @@
 //! Shared refusals (`base/errors.ts`) and idempotent request keys.
 
+use std::collections::HashMap;
+use std::future::Future;
+
 use parking_lot::Mutex;
+use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, Next};
 
@@ -73,8 +77,13 @@ pub struct RequestKeys<T> {
     seen: Mutex<Answered<T>>,
 }
 
+/// Async idempotency gate matching [`RequestKeys`] without holding a sync mutex across `.await`.
+pub struct AsyncRequestKeys<T> {
+    seen: AsyncMutex<Answered<T>>,
+}
+
 /// The keys oldest first, and each key's expiry and answer.
-type Answered<T> = (Vec<String>, std::collections::HashMap<String, (i64, T)>);
+type Answered<T> = (Vec<String>, HashMap<String, (i64, T)>);
 
 impl<T> Default for RequestKeys<T> {
     fn default() -> Self {
@@ -82,30 +91,62 @@ impl<T> Default for RequestKeys<T> {
     }
 }
 
+impl<T> Default for AsyncRequestKeys<T> {
+    fn default() -> Self {
+        AsyncRequestKeys { seen: AsyncMutex::default() }
+    }
+}
+
+fn validate_key(key: &str) -> Result<(), ApiError> {
+    if key.chars().count() > REQUEST_KEY_MAX {
+        return Err(ApiError::new(
+            BizCode::RequestKeyTooLong,
+            t("server.base.requestKeyLong", &[("max", REQUEST_KEY_MAX.into())]),
+        ));
+    }
+    Ok(())
+}
+
+fn cached_answer<T: Clone>(seen: &Answered<T>, key: &str) -> Option<T> {
+    seen.1.get(key).filter(|(expires, _)| *expires > crate::now()).map(|(_, done)| done.clone())
+}
+
+fn record_answer<T: Clone>(seen: &mut Answered<T>, key: &str, done: &T) {
+    seen.0.retain(|k| k != key);
+    seen.0.push(key.to_string());
+    seen.1.insert(key.to_string(), (crate::now() + REQUEST_KEY_TTL_MS, done.clone()));
+    while seen.0.len() > REQUEST_KEYS_KEPT {
+        let old = seen.0.remove(0);
+        seen.1.remove(&old);
+    }
+}
+
 impl<T: Clone> RequestKeys<T> {
     pub fn once(&self, key: Option<&str>, work: impl FnOnce() -> Result<T, ApiError>) -> Result<T, ApiError> {
         let Some(key) = key.filter(|k| !k.is_empty()) else { return work() };
-        if key.chars().count() > REQUEST_KEY_MAX {
-            return Err(ApiError::new(
-                BizCode::RequestKeyTooLong,
-                t("server.base.requestKeyLong", &[("max", REQUEST_KEY_MAX.into())]),
-            ));
-        }
+        validate_key(key)?;
         // Held while working: a duplicate waits for the first answer.
         let mut seen = self.seen.lock();
-        if let Some((expires, done)) = seen.1.get(key)
-            && *expires > crate::now()
-        {
-            return Ok(done.clone());
+        if let Some(done) = cached_answer(&seen, key) {
+            return Ok(done);
         }
         let done = work()?;
-        seen.0.retain(|k| k != key);
-        seen.0.push(key.to_string());
-        seen.1.insert(key.to_string(), (crate::now() + REQUEST_KEY_TTL_MS, done.clone()));
-        while seen.0.len() > REQUEST_KEYS_KEPT {
-            let old = seen.0.remove(0);
-            seen.1.remove(&old);
+        record_answer(&mut seen, key, &done);
+        Ok(done)
+    }
+}
+
+impl<T: Clone> AsyncRequestKeys<T> {
+    pub async fn once(&self, key: Option<&str>, work: impl Future<Output = Result<T, ApiError>>) -> Result<T, ApiError> {
+        let Some(key) = key.filter(|k| !k.is_empty()) else { return work.await };
+        validate_key(key)?;
+        // Held while working: a duplicate waits for the first answer.
+        let mut seen = self.seen.lock().await;
+        if let Some(done) = cached_answer(&seen, key) {
+            return Ok(done);
         }
+        let done = work.await?;
+        record_answer(&mut seen, key, &done);
         Ok(done)
     }
 }

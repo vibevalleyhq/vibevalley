@@ -90,11 +90,14 @@ fn the_users_commits_are_counted_once_per_repository() {
     git(&["-c", "user.email=other@farm.test", "commit", "-q", "--allow-empty", "-m", "theirs"]);
     git(&["worktree", "add", "-q", "../farm.1", "-b", "issue-1"]);
     std::fs::create_dir_all(dir.path().join("a/node_modules/x/.git")).unwrap();
-    let counted = vibevalley_server::work::repo::contributions_of(dir.path(), &[]);
+    let counted = vibevalley_runtime::rt::block_on(vibevalley_server::work::repo::contributions_of_async(dir.path().to_path_buf(), vec![]));
     assert_eq!(counted.len(), 1, "{counted:?}");
     assert_eq!(counted[0].commits, 2);
     assert!(counted[0].path.ends_with("farm"), "{}", counted[0].path);
-    let with_other = vibevalley_server::work::repo::contributions_of(dir.path(), &["Other@farm.test".into()]);
+    let with_other = vibevalley_runtime::rt::block_on(vibevalley_server::work::repo::contributions_of_async(
+        dir.path().to_path_buf(),
+        vec!["Other@farm.test".into()],
+    ));
     assert_eq!(with_other[0].commits, 3);
 
     let hub = Hub::new(empty_space_state());
