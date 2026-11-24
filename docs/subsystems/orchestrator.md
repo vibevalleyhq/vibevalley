@@ -7,7 +7,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 助手输入拼装：来源标记、时间、现状增量（`situationDelta`）、记忆增量与汇报摘要 | 谁该被唤醒、刹车与投递队列（[帮工的信箱](docs/subsystems/session.md)） |
-| 助手与帮工共用的一套工具（`team/tool`）及用户授权门禁 | 工具背后的业务执行（[工单](docs/subsystems/issue.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/issue.md#定时任务)） |
+| 助手与帮工共用的一套工具（`agent/` 下的 `tool/`）及用户授权门禁 | 工具背后的业务执行（[工单](docs/subsystems/issue.md)、[频道](docs/subsystems/channel.md)、[定时任务](docs/subsystems/issue.md#定时任务)） |
 | 按档案管理多个助手实例、将回复写回频道 | 对话循环、前缀缓存、上下文压缩与断点续跑（[VibeValley 自己的 agent](docs/subsystems/brain.md)、[帮工](docs/subsystems/session.md)） |
 | — | 挑档案算法与农机可用性检查（[档案和农机](docs/subsystems/agent.md#模型和不变量)） |
 
@@ -15,11 +15,11 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/server/src/agent/orchestrator/mod.rs` | `Orchestrator`：每个助手档案一个 `vibevalley-runtime::agent` 的持久对话（SQLite 队列与 `Harness`，并配置 `record_to` 写出 `<家目录>/records/<id>.jsonl` 的 `oar-voyage/3` 记录），消费频道异步投递（`Chat::dispatches()`）和没指定档案的定时任务，拼现状、跑一轮、把回复写回频道 |
-| `crates/server/src/agent/orchestrator/words.rs` | 对助手说的话：来源头、现状与增量、长汇报截断；提示在 `crates/server/assets/orchestrator/prompts.json`（含 `chart` 与 `genui` 富内容块规范） |
-| `crates/server/src/agent/tool/mod.rs` | 助手和帮工共用的工具：每个工具一个参数结构体，宽松解析写一处，按调用者分支；工具名、说明与 JSON Schema 在 `crates/server/assets/tools/orchestrator.json`、`crates/server/assets/tools/helper.json` |
-| `crates/server/src/agent/tool/issue.rs`、`chat.rs`、`content.rs`、`plan.rs`、`memory.rs` | 按领域分的工具：工单与帮工、频道、Artifact（含 `artifact_block_list`、`artifact_block_batch`、`artifact_outline_import`）与媒体、仓库与定时任务、记性 |
-| `crates/server/src/agent/mcp/resource.rs` | `resource_read`：解析 `vv://` URI，按会话裁剪只读权限、分页 |
+| `crates/server/src/agent/orchestrator/` | `Orchestrator`：每个助手档案一个 `vibevalley-runtime::agent` 的持久对话（数据库队列与 `Harness`，并配置 `record_to` 写出 `<家目录>/records/<id>.jsonl` 的 `oar-voyage/3` 记录），消费频道异步投递与未指定档案的定时任务，拼现状、跑一轮、把回复写回频道 |
+| `crates/server/src/agent/orchestrator/` 的 `words.rs` | 对助手说的话：来源头、现状与增量、长汇报截断；提示在 `crates/server/assets/orchestrator/prompts.json`（含 `chart` 与 `genui` 富内容块规范） |
+| `crates/server/src/agent/tool/` | 助手和帮工共用的工具：每个工具一个参数结构体，宽松解析写一处，按调用者分支；工具名、说明与 JSON Schema 在 `crates/server/assets/tools/orchestrator.json`、`crates/server/assets/tools/helper.json` |
+| `crates/server/src/agent/tool/` 的 `issue.rs`、`chat.rs`、`content.rs`、`plan.rs`、`memory.rs` | 按领域分的工具：工单与帮工、频道、Artifact 目录化与统一实时协同（创建、版本快照、协同编辑、人机建议、12 类 `artifact_type_list` / `artifact_type_read` 技能指南，移除旧 `artifact_block_*` / `artifact_outline_import` / `artifact_entry_*`）与媒体库/媒体任务、仓库与定时任务、记性 |
+| `crates/server/src/agent/mcp/` 的 `resource.rs` | `resource_read`：解析 `vv://` URI，按会话裁剪只读权限、分页 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`orchestrator.*`）。
 
@@ -43,25 +43,25 @@
 
 工具策略要求确认时，执行器保存待批调用并暂停该任务。用户在助手的「执行轨迹」里核对工具名、参数与审批原因，也可以用 `vibevalley orchestrator approval list --json` 找到调用。CLI 的 `orchestrator approval resolve` 接收对话 ID、任务 ID、工具调用 ID 和 `approve` 或 `deny`。工作台和 CLI 使用同一条 Rust 审批契约。
 
-执行器在同一个 SQLite 事务中核对三个 ID、记录决定和唤醒信号，并清除待批项。同一决定可重试。重试上一张审批卡只会读回上一笔决定，即使同一任务已有下一项待批调用。[审批端点](crates/server/src/agent/orchestrator/execution.rs) · [决策事务](crates/runtime/src/agent/extensions/governance.rs)
+执行器在同一个数据库事务中核对三个 ID、记录决定和唤醒信号，并清除待批项。同一决定可重试。重试上一张审批卡只会读回上一笔决定，即使同一任务已有下一项待批调用。[审批端点](crates/server/src/team/orchestrator/execution.rs) · [决策事务](crates/runtime/src/agent/extensions/governance.rs)
 
 ## 怎么走
 
 **处理一条输入**
 
-1. 频道纯路由写入 `channel_delivery` 并经 `Chat::dispatches()` 异步投递（或定时任务触发）给 `Orchestrator`；它在忙就排着。
+1. 频道纯路由经 `ctx.service` 写入 `channel_delivery` 与 `Outbox` 异步投递（或定时任务触发）给 `Orchestrator`；它在忙就排着。
 2. 拼上来源头、时间与现状（或增量），跑一轮：模型调工具，生成回复。
 3. 回复整条写入目标频道，并结算对应 `channel_delivery`。
 
 ## 和谁打交道
 
-- **频道（`channel`）**：异步消费 `Chat::dispatches()` 与启动时未结算的 `channel_delivery`；回复经频道 `post` 写回。
-- **工单与定时任务**：经工具调 `Board` 和 `Crons`；指派给助手的工单跑完后进 `in_review` 等用户点头。
-- **自研 agent 与记性（`vibevalley-runtime::agent`、`memory`）**：对话、模型调用与压缩在 `vibevalley-runtime::agent`（[VibeValley 自己的 agent](docs/subsystems/brain.md)）；记性工具读写档案的记忆。
+- **频道（`channel/`）**：异步消费频道投递与启动时未结算的 `channel_delivery`；回复经 `channel::Service` 写回。
+- **工单、作品与定时任务（`issue/`、`artifact/`、`cron/`）**：经工具调用各扁平域服务；作品创建与多人/多 Agent 共编统一走目录化存储与实时协同层（动工前按需读取 12 类 `artifact_type_read` 技能指南，修改人类编辑区通过建议分流）；指派给助手的工单跑完后进 `in_review` 等用户点头。
+- **自研 agent 与记性（`vibevalley-runtime::agent`、`agent/memory/`）**：对话、模型调用与压缩在 `vibevalley-runtime::agent`（[VibeValley 自己的 agent](docs/subsystems/brain.md)）；记性工具读写档案的记忆。
 
 ## 为什么这样
 
-- **编排策略与对话循环分离**：对话循环、压缩在 `vibevalley-runtime::agent`，`team/orchestrator` 只管来源分发、现状拼装与工具绑定。
+- **编排策略与对话循环分离**：对话循环、压缩在 `vibevalley-runtime::agent`，`agent/orchestrator/` 只管来源分发、现状拼装与工具绑定。
 - **工具对齐协议接口，不起别名**：保证 HTTP、CLI、助手和帮工对同一件事使用完全相同的名字与参数校验。
 - **代码硬拦未授权合并，不靠提示词防注入**：在工具里按当轮是否有用户原话拦截工单修改与合并，防止帮工汇报中的提示注入触发合并或花钱。
 - **调研记成 `deliver: answer` 工单交给帮工，助手不读代码**：避免读取大量代码撑爆助手常驻对话上下文并破坏前缀缓存。

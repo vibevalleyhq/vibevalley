@@ -10,7 +10,7 @@
 
 ## 用哪一类词
 
-业务里的东西用业务的词（用语表）：`Issue`、`Session`、`moves`、`recall`。技术机制用通用直白的工程词：`App`、`Router`、`Context`、`TaskGroup`、`LiveState`、`Outbox`、`StateFeed`、`DbService`、`Storage`、`GatewayPorts`、`lease`（租约）、`breaker`（熔断）、`cursor`、`relay`、`queue`。不用自造隐喻或生僻黑话，也不用没有归属的空词：
+业务里的东西用业务的词（用语表）：`Issue`、`Session`、`moves`、`recall`。技术机制用通用直白的工程词：`App`、`Router`、`Context`、`TaskGroup`、`LiveState`、`Outbox`、`StateFeed`、`Service`（独立顶层 `service/` 数据服务聚合）、`Storage`、`GatewayPorts`、`lease`（租约）、`breaker`（熔断）、`cursor`、`relay`、`queue`。不用自造隐喻或生僻黑话，也不用没有归属的空词：
 
 | 不用 | 问题 | 换成 |
 |---|---|---|
@@ -18,7 +18,7 @@
 | `state.ts`、`data.ts`、`hooks.ts` | 只说在框架里的角色 | 它管的东西：`groups.ts`、`calendar.ts`、`lanes.ts` |
 | `utils`、`helpers`、`common`、`misc`、`lib` | 没有归属 | 用它的概念；两个模块都用的，放进下层拥有它的模块 |
 | `text.ts`（前端泛用） | 只说形式是文字 | 说给谁、说什么：`digest.ts`、`mentions.ts` |
-| `XManager`、`XHandler`、`XService`、`XUtil` | 重复领域前缀或空泛角色后缀 | 服务端深业务域用 `<domain>::Service`（调用处读作 `issue::Service`），单概念或基础模块用朴素单数名（`Storage`、`Setting`、`Provider`、`Repo`、`Game`），函数按它做的事叫 |
+| `XManager`、`XHandler`、`XUtil` | 重复领域前缀或空泛角色后缀 | 服务端顶层持久化查询层统一放在 `crates/server/src/service/`（聚合 `Service` 挂于 `ctx.service`，子服务如 `ArtifactService`、`IssueService`）；深业务域对外用 `<domain>::Service`（调用处读作 `issue::Service`），单概念或基础模块用朴素单数名（`Storage`、`Setting`、`Provider`、`Repo`、`Game`），函数按它做的事叫 |
 | 隐喻式自造架构黑话 | 读的人要靠上下文猜它是什么 | 通用工程名：组合根叫 `App`，路由门叫 `Router`，共享上下文叫 `Context`，瞬态叫 `LiveState`，切片推送叫 `StateFeed`，错误模块叫 `error.rs`，任务工作树叫 `worktree` |
 
 代码的技术性质不进名字，交给检查：
@@ -38,9 +38,9 @@
 
 | 复数是必要的 | 复数是多余的 |
 |---|---|
-| `issues: Issue[]`、`issues: Vec<Issue>` | 单个领域服务与基础模块：`issue::Service`、`agent::Service`、`channel::Service`、`Storage`、`Setting`、`Provider`、`Repo`、`Game`（不用 `Issues`、`Agents`、`Repos`、`Crons`，也不写重复前缀 `IssueService`） |
-| `issue.list`、`repo.list`（返回好几个） | 组合根、上下文与依赖字段：`app.issue`、`app.runtime`、`app.agent`、`ctx.db`、`ctx.task`、`ctx.live`、`ctx.outbox`、`ctx.feed`（不用 `app.issues`、`app.agents`） |
-| `runsOf(session)`、`questionsOf(issue)`（返回好几个） | 服务端模块目录：`crates/server/src/issue/`、`crates/server/src/db/entity/`、`crates/server/src/fake/`（不用 `entities/`、`fakes/`、`memories.ts`） |
+| `issues: Issue[]`、`issues: Vec<Issue>` | 单个领域服务与基础模块：`issue::Service`、`agent::Service`、`channel::Service`、`Storage`、`Setting`、`Provider`、`Repo`、`Game`（不用 `Issues`、`Agents`、`Repos`、`Crons`） |
+| `issue.list`、`repo.list`（返回好几个） | 组合根、上下文与依赖字段：`app.issue`、`app.runtime`、`app.agent`、`ctx.service`、`ctx.task`、`ctx.live`、`ctx.outbox`、`ctx.feed`（不用 `app.issues`、`app.agents`） |
+| `runsOf(session)`、`questionsOf(issue)`（返回好几个） | 服务端模块与实体目录：`crates/server/src/issue/`、`crates/server/src/service/`、`crates/server/src/db/entity/`（严格一表一文件 `<table_name>.rs`，如 `artifact.rs`、`artifact_version.rs`）、`crates/server/src/fake/`（不用 `entities/`、`services/`、`fakes/`、`memories.ts`） |
 | 一个数：`maxTasks`、`keepClosedIssues`、`autoRetries` | 返回一样东西的函数用复数名 |
 | 在内存里装着一组的：`Assignments`、`Deliveries`、`Trajectories` | |
 
@@ -60,7 +60,7 @@
 | 只说会怎样、不改东西 | `previewX` | `previewDelete`、`previewForget` |
 | 改东西 | 动词 | `issue.edit`、`channel.react` |
 | 新建、删掉 | `create`、`delete`（和接口的动词同一个词；不用 `open`、`remove`） | `channel.create`、`agent.delete`、`previewDelete` |
-| 写库并驱动切片与外部投递 | `ctx.db` 提交事务返回 `SliceMask`，同事务写 `Outbox`，提交后调 `ctx.mark_dirty(mask)` | `SliceMask::BOARD`、`Outbox` |
+| 写库并驱动切片与外部投递 | `ctx.service` 提交事务返回 `SliceMask`，同事务写 `Outbox`，提交后调 `ctx.mark_dirty(mask)` | `SliceMask::BOARD`、`Outbox` |
 
 两条容易犯的：
 
@@ -76,17 +76,18 @@
 
 | 什么 | 形状 | 例子 |
 |---|---|---|
-| 服务端的模块 | 单数，平铺于 `crates/server/src/` 顶层，概念的词 | `crates/server/src/runtime/`、`crates/server/src/issue/`、`crates/server/src/channel/` |
+| 服务端的模块 | 单数，平铺于 `crates/server/src/` 顶层，概念的词 | `crates/server/src/runtime/`、`crates/server/src/issue/`、`crates/server/src/channel/`、`crates/server/src/service/` |
+| 数据库表实体 | 严格一表一文件，单数蛇形小写，位于 `crates/server/src/db/entity/` | `crates/server/src/db/entity/<table_name>.rs`（如 `artifact.rs`、`artifact_version.rs`） |
 | 页面的 feature | 和服务端的模块同名 | `apps/mac/ui/features/issue` |
 | 包 | `@vibevalley/<文件夹>`（`scripts/audit/catalog.test.ts` 查） | `packages/protocol` 是 `@vibevalley/protocol` |
 | 组件 | 大驼峰，一个组件一个文件 | `Board.tsx`、`IssueDetail.tsx` |
 | 其他文件 | 小驼峰（TS）或蛇形小写（Rust） | `moves.ts`、`worktree` |
 | 测试 | 挨着被测的文件 | `outline.test.ts` |
-| 服务端模块对外的结构体 | 单数：深业务域为 `<domain>::Service`，单概念与基础模块用朴素单数名；不用复数，不写 `XManager`/`XHandler`/`XUtil` | `issue::Service`、`agent::Service`、`runtime::Service`、`Storage`、`Setting`、`Provider`、`Repo`、`Game`、`DbService` |
+| 服务端模块对外的结构体 | 单数：顶层数据服务层为 `service::Service`（挂载于 `Context::service`，子服务 `<Domain>Service`）；深业务域为 `<domain>::Service`，单概念与基础模块用朴素单数名；不用复数，不写 `XManager`/`XHandler`/`XUtil` | `service::Service`、`issue::Service`、`agent::Service`、`runtime::Service`、`Storage`、`Setting`、`Provider`、`Repo`、`Game` |
 | 带牌子的 id（页面） | `XId` | `IssueId`、`SessionId` |
 | 一组固定的取值 | 成员表 `XValues`，类型从它推；要每种都处理时用 `Record<X, …>` | `IssueStatusValues` |
 
-服务端业务域模块和契约形状撞名时，契约形状保留原名（`vibevalley_protocol::Issue`），深业务域主结构体统一为 `<domain>::Service`（在调用处通过模块路径消歧，如 `issue::Service`、`channel::Service`、`artifact::Service`），单概念与基础模块用朴素单数名（`Storage`、`Setting`、`Provider`、`Repo`、`Game`），组合根与上下文的依赖字段一律用单数（`app.issue`、`app.runtime`、`app.agent`、`ctx.db`）；别的库撞名的，导入时起别名（`use … as`）。
+服务端业务域模块和契约形状撞名时，契约形状保留原名（`vibevalley_protocol::Issue`），深业务域主结构体统一为 `<domain>::Service`（在调用处通过模块路径消歧，如 `issue::Service`、`channel::Service`、`artifact::Service`），单概念与基础模块用朴素单数名（`Storage`、`Setting`、`Provider`、`Repo`、`Game`），组合根与上下文的依赖字段一律用单数（`app.issue`、`app.runtime`、`app.agent`、`ctx.service`）；别的库撞名的，导入时起别名（`use … as`）。
 
 ## 线上和存盘的形状
 
@@ -94,7 +95,7 @@
 |---|---|---|
 | 接口 | `<模块>[.<名词>].<动词>`，单数；路径是 `POST /api/v1/<模块>[/<名词>]/<动词>` | `channel.message.send`、`issue.list` |
 | 接口的动词 | 先用这几个：`list`、`get`、`create`、`update`、`delete`、`previewDelete`、`set`、`toggle`、`start`、`stop`；别的动作用它在领域里的词 | `channel.markRead`、`issue.refine` |
-| 表 | `<模块>` 或 `<模块>_<概念>`，单数；索引以表名开头 | `channel_message`、`media_job` |
+| 表 | `<模块>` 或 `<模块>_<概念>`，单数；索引以表名开头；每张表在 `crates/server/src/db/entity/` 下对应唯一文件 `<table_name>.rs` | `channel_message`、`media_job`、`artifact_version` |
 | 词典的键 | `<宿主>.<模块>.…`，两边都说的在 `shared` | `web.issue.boardLabels.lane.todo`、`server.connector.qqKeys` |
 | 页面测试的标记 | `testID` 说它是什么，小写加连字符 | `route-missing`、`native-workspace` |
 | 分支 | `<类>/<主题>`，主题是英文小写加连字符 | `chore/repo-health` |
