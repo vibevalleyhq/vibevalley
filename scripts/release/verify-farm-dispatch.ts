@@ -296,12 +296,6 @@ async function verify(app: string, cli: string, assets: string, root: string): P
     return JSON.parse(stdout);
   };
 
-  const completed = (issueId: string) =>
-    until(`completed run for ${issueId}`, async () => {
-      const runs = z.array(RunRow).parse(await api("issue.run.list", { id: issueId }));
-      return runs.length === 1 && runs[0]?.outcome === "completed" ? runs : undefined;
-    });
-
   // Async variant for polling async `api` calls without spinning synchronously.
   const untilAsync = async <T>(label: string, read: () => Promise<T | undefined>, timeoutSec = 40): Promise<T> => {
     const deadline = Date.now() + timeoutSec * 1_000;
@@ -321,7 +315,6 @@ async function verify(app: string, cli: string, assets: string, root: string): P
       const runs = z.array(RunRow).parse(await api("issue.run.list", { id: issueId }));
       return runs.length === 1 && runs[0]?.outcome === "completed" ? runs : undefined;
     });
-  void completed;
 
   try {
     const receipt = await until("server startup", ready);

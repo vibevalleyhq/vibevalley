@@ -395,8 +395,8 @@ impl Client {
         Err(decode_failure("invalid health response"))
     }
 
-    /// Fetches raw JSON from a `GET` endpoint (e.g. `/api/v1/slice/<name>?once=1`).
-    pub fn get_json<T: DeserializeOwned>(&self, path: &str) -> Result<T, Failure> {
+    /// Fetches raw response text from a `GET` endpoint.
+    pub fn get_text(&self, path: &str) -> Result<String, Failure> {
         let url = self.url(path);
         let response = attach_headers(self.http.get(&url).header("accept", "application/json"), self.token.as_ref())
             .send()
@@ -406,7 +406,12 @@ impl Client {
         if status >= 300 {
             return Err(failure_of(status, &text));
         }
-        serde_json::from_str(&text).map_err(decode_failure)
+        Ok(text)
+    }
+
+    /// Fetches raw JSON from a `GET` endpoint (e.g. `/api/v1/slice/<name>?once=1`).
+    pub fn get_json<T: DeserializeOwned>(&self, path: &str) -> Result<T, Failure> {
+        serde_json::from_str(&self.get_text(path)?).map_err(decode_failure)
     }
 
     /// Fetches a single typed slice snapshot via `GET /api/v1/slice/<name>?once=1`.

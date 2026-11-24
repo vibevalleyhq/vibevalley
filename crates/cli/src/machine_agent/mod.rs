@@ -7,8 +7,6 @@ pub mod session;
 pub mod worktree;
 
 use std::collections::{HashMap, HashSet};
-use std::fs;
-use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -33,7 +31,7 @@ pub use vibevalley_runtime::sandbox::Secret;
 use self::mcp_proxy::{LocalMcpProxy, PendingMcpMap, resolve_mcp_response};
 use self::session::ManagedSession;
 use self::worktree::WorktreeManager;
-use crate::{Failure, exit};
+use crate::{Failure, exit, load_secret_json, save_secret_json};
 
 pub const MACHINE_AUTH_FILE: &str = "machine-auth.json";
 const RECONNECT_MIN_DELAY: Duration = Duration::from_secs(1);
@@ -60,71 +58,12 @@ pub fn machine_auth_path(home: &Path) -> PathBuf {
 
 /// Loads `$VIBEVALLEY_HOME/machine-auth.json`, returning `Ok(None)` when absent.
 pub fn load_machine_auth(home: &Path) -> Result<Option<MachineAuthConfig>, Failure> {
-    let path = machine_auth_path(home);
-    let raw = match fs::read_to_string(&path) {
-        Ok(content) => content,
-        Err(err) if err.kind() == ErrorKind::NotFound => return Ok(None),
-        Err(err) => {
-            return Err(Failure::new(exit::OTHER, "Auth", format!("failed to read {}: {err}", path.display())));
-        }
-    };
-    let cfg: MachineAuthConfig = serde_json::from_str(&raw).map_err(|err| {
-        Failure::new(
-            exit::OTHER,
-            "Auth",
-            format!(
-                "invalid machine credentials file {} (line {}, column {})",
-                path.display(),
-                err.line(),
-                err.column()
-            ),
-        )
-    })?;
-    Ok(Some(cfg))
+    load_secret_json(&machine_auth_path(home), "machine credentials")
 }
 
 /// Persists `config` atomically to `$VIBEVALLEY_HOME/machine-auth.json` with `0o600` permissions on Unix.
 pub fn save_machine_auth(home: &Path, config: &MachineAuthConfig) -> Result<PathBuf, Failure> {
-    fs::create_dir_all(home).map_err(|err| Failure::new(exit::OTHER, "Auth", format!("failed to create home directory {}: {err}", home.display())))?;
-    let body = serde_json::to_string_pretty(config).map_err(|err| Failure::new(exit::OTHER, "Auth", format!("failed to encode machine credentials: {err}")))?;
-
-    let path = machine_auth_path(home);
-    let tmp_name = format!(
-        ".machine-auth.json.tmp.{}.{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0)
-    );
-    let tmp_path = home.join(tmp_name);
-
-    let write_res = (|| -> std::io::Result<()> {
-        let mut opts = fs::OpenOptions::new();
-        opts.write(true).create_new(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            opts.mode(0o600);
-        }
-        let mut file = opts.open(&tmp_path)?;
-        file.write_all(body.as_bytes())?;
-        file.write_all(b"\n")?;
-        file.sync_all()?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&tmp_path, fs::Permissions::from_mode(0o600))?;
-        }
-        fs::rename(&tmp_path, &path)?;
-        Ok(())
-    })();
-
-    if let Err(err) = write_res {
-        let _ = fs::remove_file(&tmp_path);
-        return Err(Failure::new(exit::OTHER, "Auth", format!("failed to write {}: {err}", path.display())));
-    }
-    Ok(path)
+    save_secret_json(home, MACHINE_AUTH_FILE, config, "machine credentials")
 }
 
 /// Converts a normalized `http://` or `https://` server base URL into `<ws(s)://server>/api/v1/machine/ws`.

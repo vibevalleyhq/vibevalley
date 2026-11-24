@@ -37,14 +37,9 @@ export function programOf(path: string, source: string): Node {
   return program;
 }
 
-const nameOf = (n: unknown): string | undefined => {
-  if (!isNode(n)) return undefined;
-  if (n.type === "Identifier") return text(n.name);
-  if (n.type === "Literal" && typeof n.value === "string") return n.value;
-  return undefined;
-};
-
 const literal = (n: unknown): string | undefined => (isNode(n) && n.type === "Literal" && typeof n.value === "string" ? n.value : undefined);
+
+const nameOf = (n: unknown): string | undefined => (isNode(n) && n.type === "Identifier" ? text(n.name) : literal(n));
 
 /** Every import, export … from and dynamic import() of a string. */
 export function edgesOf(path: string, source: string): Edge[] {

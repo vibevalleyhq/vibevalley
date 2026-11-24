@@ -4,11 +4,14 @@
 pub mod machine_agent;
 
 use std::ffi::OsString;
-use std::io::Write;
+use std::fs;
+use std::io::{ErrorKind as IoErrorKind, Write};
+use std::path::{Path, PathBuf};
 
 use clap::Parser;
 use clap::error::ErrorKind;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use serde_json::json;
 use vibevalley_protocol::Next;
 
@@ -93,6 +96,68 @@ impl Output {
 pub fn out(text: &str) {
     let mut stdout = std::io::stdout();
     let _ = writeln!(stdout, "{text}");
+}
+
+/// Reads and deserializes a secret JSON record, returning `Ok(None)` when absent.
+pub fn load_secret_json<T: DeserializeOwned>(path: &Path, label: &str) -> Result<Option<T>, Failure> {
+    let raw = match fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(err) if err.kind() == IoErrorKind::NotFound => return Ok(None),
+        Err(err) => {
+            return Err(Failure::new(exit::OTHER, "Auth", format!("failed to read {}: {err}", path.display())));
+        }
+    };
+    serde_json::from_str(&raw).map(Some).map_err(|err| {
+        Failure::new(
+            exit::OTHER,
+            "Auth",
+            format!("invalid {label} file {} (line {}, column {})", path.display(), err.line(), err.column()),
+        )
+    })
+}
+
+/// Atomically writes a secret JSON record into `home/file_name` with `0o600` permissions on Unix.
+pub fn save_secret_json<T: Serialize>(home: &Path, file_name: &str, value: &T, label: &str) -> Result<PathBuf, Failure> {
+    fs::create_dir_all(home).map_err(|err| Failure::new(exit::OTHER, "Auth", format!("failed to create home directory {}: {err}", home.display())))?;
+    let body = serde_json::to_string_pretty(value).map_err(|err| Failure::new(exit::OTHER, "Auth", format!("failed to encode {label}: {err}")))?;
+
+    let path = home.join(file_name);
+    let tmp_name = format!(
+        ".{file_name}.tmp.{}.{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    );
+    let tmp_path = home.join(tmp_name);
+
+    let write_res = (|| -> std::io::Result<()> {
+        let mut opts = fs::OpenOptions::new();
+        opts.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600);
+        }
+        let mut file = opts.open(&tmp_path)?;
+        file.write_all(body.as_bytes())?;
+        file.write_all(b"\n")?;
+        file.sync_all()?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&tmp_path, fs::Permissions::from_mode(0o600))?;
+        }
+        fs::rename(&tmp_path, &path)?;
+        Ok(())
+    })();
+
+    if let Err(err) = write_res {
+        let _ = fs::remove_file(&tmp_path);
+        return Err(Failure::new(exit::OTHER, "Auth", format!("failed to write {}: {err}", path.display())));
+    }
+    Ok(path)
 }
 
 /// Translates a `clap` argument error into a typed usage [`Failure`].

@@ -317,10 +317,7 @@ pub fn run(client: &Client, cmd: ArtifactCmd) -> Done {
             announce,
             default,
         } => {
-            let content = match content {
-                Some(raw) => Some(read_text_input(&raw)?),
-                None => None,
-            };
+            let content = content.as_deref().map(read_text_input).transpose()?;
             let request = ArtifactRequest {
                 title,
                 kind: kind.map(Into::into),

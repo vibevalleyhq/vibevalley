@@ -64,39 +64,36 @@ export function encodeInboxNotificationId(item: InboxItem): string {
   }
 }
 
+function splitPair(rest: string): readonly [string, string] | undefined {
+  const sep = rest.indexOf(":");
+  if (sep <= 0 || sep === rest.length - 1) return undefined;
+  return [safeDecode(rest.slice(0, sep)), safeDecode(rest.slice(sep + 1))];
+}
+
+function firstSegment(rest: string): string {
+  const sep = rest.indexOf(":");
+  return safeDecode(sep === -1 ? rest : rest.slice(0, sep));
+}
+
 export function decodeNotificationRoute(id: string): NotificationRoute | undefined {
   if (id.startsWith(PREFIX_PERMISSION)) {
-    const rest = id.slice(PREFIX_PERMISSION.length);
-    const sep = rest.indexOf(":");
-    if (sep <= 0 || sep === rest.length - 1) return { tab: "inbox" };
-    const sessionId = safeDecode(rest.slice(0, sep));
-    const requestId = safeDecode(rest.slice(sep + 1));
-    return { tab: "inbox", key: `perm:${sessionId}:${requestId}` };
+    const pair = splitPair(id.slice(PREFIX_PERMISSION.length));
+    return pair ? { tab: "inbox", key: `perm:${pair[0]}:${pair[1]}` } : { tab: "inbox" };
   }
   if (id.startsWith(PREFIX_INTERACTION)) {
-    const rest = id.slice(PREFIX_INTERACTION.length);
-    const sep = rest.indexOf(":");
-    if (sep <= 0 || sep === rest.length - 1) return { tab: "inbox" };
-    const sessionId = safeDecode(rest.slice(0, sep));
-    const requestId = safeDecode(rest.slice(sep + 1));
-    return { tab: "inbox", key: `inter:${sessionId}:${requestId}` };
+    const pair = splitPair(id.slice(PREFIX_INTERACTION.length));
+    return pair ? { tab: "inbox", key: `inter:${pair[0]}:${pair[1]}` } : { tab: "inbox" };
   }
   if (id.startsWith(PREFIX_CHANNEL)) {
-    const rest = id.slice(PREFIX_CHANNEL.length);
-    const sep = rest.indexOf(":");
-    const channelId = safeDecode(sep === -1 ? rest : rest.slice(0, sep));
+    const channelId = firstSegment(id.slice(PREFIX_CHANNEL.length));
     return channelId !== "" ? { tab: "channels", channelId } : undefined;
   }
   if (id.startsWith(PREFIX_SESSION)) {
-    const rest = id.slice(PREFIX_SESSION.length);
-    const sep = rest.indexOf(":");
-    const sessionId = safeDecode(sep === -1 ? rest : rest.slice(0, sep));
+    const sessionId = firstSegment(id.slice(PREFIX_SESSION.length));
     return sessionId !== "" ? { tab: "sessions", sessionId } : undefined;
   }
   if (id.startsWith(PREFIX_ISSUE)) {
-    const rest = id.slice(PREFIX_ISSUE.length);
-    const sep = rest.indexOf(":");
-    const issueId = safeDecode(sep === -1 ? rest : rest.slice(0, sep));
+    const issueId = firstSegment(id.slice(PREFIX_ISSUE.length));
     return issueId !== "" ? { tab: "issues", issueId } : undefined;
   }
   if (id.startsWith(PREFIX_INBOX)) {

@@ -6,7 +6,7 @@ use vibevalley_protocol::{RemoteDeviceRevokeRequest, RemotePairExchangeRequest, 
 
 use crate::auth::{self, AuthConfig, Secret, default_device_name, normalize_server_url, parse_pair_url, same_server};
 use crate::client::{Client, Done, Failure, TokenSource, no_dry_run};
-use crate::output::line;
+use crate::output::{line, non_empty_opt};
 
 #[derive(Debug, Args)]
 #[command(arg_required_else_help = true, subcommand_required = true)]
@@ -117,19 +117,6 @@ struct AuthLogoutOutput {
     device_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     revoke_error: Option<String>,
-}
-
-fn non_empty_opt(raw: Option<String>, flag: &str) -> Result<Option<String>, Failure> {
-    match raw {
-        None => Ok(None),
-        Some(value) => {
-            let trimmed = value.trim();
-            if trimmed.is_empty() {
-                return Err(Failure::usage("InvalidValue", format!("{flag} must not be empty")));
-            }
-            Ok(Some(trimmed.to_string()))
-        }
-    }
 }
 
 fn format_login(out: &AuthLoginOutput) -> String {

@@ -207,10 +207,8 @@ export async function pairWithServer(
   }
   const checked = pairResultEnvelope.safeParse(parsed);
   if (!checked.success) {
-    const errEnv = ApiErrorEnvelope.safeParse(parsed);
-    if (errEnv.success) {
-      const meta = bizCodeMeta[errEnv.data.bizCode];
-      throw new VibeValleyApiError(meta.status, meta.kind, errEnv.data.message, errEnv.data.error, text, errEnv.data.bizCode);
+    if (ApiErrorEnvelope.safeParse(parsed).success) {
+      throw decodeApiErrorOrThrow(200, parsed, text);
     }
     const rawEnv = toEnvelope(parsed);
     if (rawEnv && rawEnv.bizCode !== 0) {

@@ -197,10 +197,7 @@ pub fn run(client: &Client, cmd: ChannelCmd) -> Done {
                 attachment,
                 view_context,
             } => {
-                let parsed_ctx = match view_context {
-                    Some(raw) => Some(read_json_input::<ArtifactViewContext>(&raw)?),
-                    None => None,
-                };
+                let parsed_ctx = view_context.as_deref().map(read_json_input::<ArtifactViewContext>).transpose()?;
                 let request = SayRequest {
                     id: channel.clone(),
                     text: words.join(" "),

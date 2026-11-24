@@ -24,6 +24,16 @@ function inboxItemOf(entry: InboxEntry): InboxItem | undefined {
   return entry.kind === "inbox" ? entry.item : undefined;
 }
 
+function entryTitle(entry: InboxEntry): string {
+  switch (entry.kind) {
+    case "permission":
+    case "interaction":
+      return entry.item.sessionName;
+    case "inbox":
+      return entry.item.words.title || entry.item.who;
+  }
+}
+
 function inboxKindTone(kind: InboxItem["kind"]): TagTone {
   switch (kind) {
     case "ask":
@@ -322,16 +332,7 @@ export function InboxTab(props: {
           >
             {(entry) => {
               const selected = computed(() => props.selectedKey() === entry().key);
-              const title = computed(() => {
-                const current = entry();
-                switch (current.kind) {
-                  case "permission":
-                  case "interaction":
-                    return current.item.sessionName;
-                  case "inbox":
-                    return current.item.words.title || current.item.who;
-                }
-              });
+              const title = computed(() => entryTitle(entry()));
               const subtitle = computed(() => {
                 const current = entry();
                 switch (current.kind) {
@@ -379,39 +380,17 @@ export function InboxTab(props: {
     </View>
   );
 
-  const selectedPermission = computed(() => {
-    const current = selectedEntry();
-    return current?.kind === "permission" ? current.item : undefined;
-  });
-  const selectedInteraction = computed(() => {
-    const current = selectedEntry();
-    return current?.kind === "interaction" ? current.item : undefined;
-  });
-  const selectedInboxItem = computed(() => {
-    const current = selectedEntry();
-    return current?.kind === "inbox" ? current.item : undefined;
-  });
-
   const renderDetail = () => (
     <If when={selectedEntry()}>
       {(entry) => {
-        const title = computed(() => {
-          const current = entry();
-          switch (current.kind) {
-            case "permission":
-            case "interaction":
-              return current.item.sessionName;
-            case "inbox":
-              return current.item.words.title || current.item.who;
-          }
-        });
+        const title = computed(() => entryTitle(entry()));
         return (
           <View testID="inbox-detail" class="min-h-0 flex-1">
             <TopBar testID="inbox-detail-bar" backTestID="inbox-back" title={title()} onBack={isDual() ? undefined : () => props.onSelectKey(undefined)} />
             <Scroll class="flex-1" contentClass="gap-3 p-4">
-              <If when={selectedPermission()}>{(item) => renderPermissionCard(item)}</If>
-              <If when={selectedInteraction()}>{(item) => renderInteractionCard(item)}</If>
-              <If when={selectedInboxItem()}>
+              <If when={permissionOf(entry())}>{(item) => renderPermissionCard(item)}</If>
+              <If when={interactionOf(entry())}>{(item) => renderInteractionCard(item)}</If>
+              <If when={inboxItemOf(entry())}>
                 {(item) => (
                   <SectionCard testID={`inbox-item-${item().id}`} class="gap-3">
                     <View class="flex-row items-center justify-between gap-2">

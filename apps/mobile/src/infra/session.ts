@@ -77,6 +77,7 @@ export interface RemoteSession {
   readonly board: Accessor<BoardSlice | undefined>;
   readonly pendingPermissions: Accessor<readonly PendingPermissionItem[]>;
   readonly pendingInteractions: Accessor<readonly PendingInteractionItem[]>;
+  readonly unreadInboxCount: Accessor<number>;
   readonly sessionWatchState: (sessionId: string) => SessionWatchState;
   readonly ensureSessionWatch: (sessionId: string) => () => void;
   readonly pair: (rawUrl: string, code: string, deviceName: string) => Promise<boolean>;
@@ -167,13 +168,7 @@ function mergeSessionEvents(existing: readonly SessionEvent[], incoming: readonl
   return [...bySeq.values()].toSorted((a, b) => a.seq - b.seq);
 }
 
-function upsertPermission(list: readonly SessionPermissionRequest[], req: SessionPermissionRequest): SessionPermissionRequest[] {
-  const next = list.filter((item) => item.requestId !== req.requestId);
-  next.push(req);
-  return next;
-}
-
-function upsertInteraction(list: readonly SessionInteractionRequest[], req: SessionInteractionRequest): SessionInteractionRequest[] {
+function upsertByRequestId<T extends { readonly requestId: string }>(list: readonly T[], req: T): T[] {
   const next = list.filter((item) => item.requestId !== req.requestId);
   next.push(req);
   return next;
@@ -199,12 +194,12 @@ function applySessionWatchEvent(prev: SessionWatchState, event: SessionWatchEven
       let nextPermissions = prev.pendingPermissions;
       let nextInteractions = prev.pendingInteractions;
       if (event.event.type === "permission/request" && event.event.permission) {
-        nextPermissions = upsertPermission(nextPermissions, event.event.permission);
+        nextPermissions = upsertByRequestId(nextPermissions, event.event.permission);
       } else if (event.event.type === "permission/resolved" && event.event.permission) {
         const resolvedId = event.event.permission.requestId;
         nextPermissions = nextPermissions.filter((item) => item.requestId !== resolvedId);
       } else if (event.event.type === "interaction/request" && event.event.interaction) {
-        nextInteractions = upsertInteraction(nextInteractions, event.event.interaction);
+        nextInteractions = upsertByRequestId(nextInteractions, event.event.interaction);
       } else if (event.event.type === "interaction/resolved" && event.event.interactionResolution) {
         const resolvedId = event.event.interactionResolution.requestId;
         nextInteractions = nextInteractions.filter((item) => item.requestId !== resolvedId);
@@ -711,6 +706,7 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
     board,
     pendingPermissions,
     pendingInteractions,
+    unreadInboxCount,
     sessionWatchState,
     ensureSessionWatch,
     pair,

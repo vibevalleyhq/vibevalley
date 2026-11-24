@@ -17,6 +17,20 @@ pub fn line(parts: &[&str]) -> String {
     parts.iter().filter(|p| !p.is_empty()).copied().collect::<Vec<_>>().join("  ")
 }
 
+/// Validates an optional CLI flag value by trimming whitespace and rejecting blanks.
+pub fn non_empty_opt(raw: Option<String>, flag: &str) -> Result<Option<String>, Failure> {
+    match raw {
+        None => Ok(None),
+        Some(value) => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                return Err(Failure::usage("InvalidValue", format!("{flag} must not be empty")));
+            }
+            Ok(Some(trimmed.to_string()))
+        }
+    }
+}
+
 /// Normalizes `#12` or `12` to the server's issue reference string.
 pub fn issue_ref(raw: &str) -> String {
     raw.trim_start_matches('#').to_string()

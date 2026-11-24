@@ -102,15 +102,16 @@ pub enum MediaInputAction {
 }
 
 fn job_line(job: &MediaJob) -> String {
+    let fmt = |id: &str, kind: &str, phase: &str, model: &str, prompt: &str| line(&[id, kind, phase, model, &one_line(prompt)]);
     match job {
-        MediaJob::MediaImageJob(j) => line(&[&j.id, j.kind.as_str(), j.phase.as_str(), &j.model, &one_line(&j.prompt)]),
-        MediaJob::MediaUnderstandingJob(j) => line(&[&j.id, j.kind.as_str(), j.phase.as_str(), &j.model, &one_line(&j.prompt)]),
-        MediaJob::MediaSpeechJob(j) => line(&[&j.id, j.kind.as_str(), j.phase.as_str(), &j.model, &one_line(&j.prompt)]),
+        MediaJob::MediaImageJob(j) => fmt(&j.id, j.kind.as_str(), j.phase.as_str(), &j.model, &j.prompt),
+        MediaJob::MediaUnderstandingJob(j) => fmt(&j.id, j.kind.as_str(), j.phase.as_str(), &j.model, &j.prompt),
+        MediaJob::MediaSpeechJob(j) => fmt(&j.id, j.kind.as_str(), j.phase.as_str(), &j.model, &j.prompt),
         MediaJob::MediaAudioJob(a) => match a {
-            MediaAudioJob::Speakers { id, phase, model, prompt, .. } => line(&[id, "speakers", phase.as_str(), model, &one_line(prompt)]),
-            MediaAudioJob::VoiceDesign { id, phase, model, prompt, .. } => line(&[id, "voiceDesign", phase.as_str(), model, &one_line(prompt)]),
-            MediaAudioJob::Clone { id, phase, model, prompt, .. } => line(&[id, "clone", phase.as_str(), model, &one_line(prompt)]),
-            MediaAudioJob::Transcription { id, phase, model, prompt, .. } => line(&[id, "transcription", phase.as_str(), model, &one_line(prompt)]),
+            MediaAudioJob::Speakers { id, phase, model, prompt, .. } => fmt(id, "speakers", phase.as_str(), model, prompt),
+            MediaAudioJob::VoiceDesign { id, phase, model, prompt, .. } => fmt(id, "voiceDesign", phase.as_str(), model, prompt),
+            MediaAudioJob::Clone { id, phase, model, prompt, .. } => fmt(id, "clone", phase.as_str(), model, prompt),
+            MediaAudioJob::Transcription { id, phase, model, prompt, .. } => fmt(id, "transcription", phase.as_str(), model, prompt),
         },
     }
 }
