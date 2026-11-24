@@ -1,29 +1,46 @@
-# slides：结构化幻灯片
+# slides：结构化演示文稿
 
-`slides` 用多条目存储（`body = "store"`，`artifactType: "slides"`）管理一套可逐页编辑、渐进揭示、双窗演讲与打印矢量 PDF 的演示文稿。只需改某一页时，只更新对应的 `project/slides/<id>.html`，不必重交整套讲稿。
+`slides` 面向可逐页协同编辑、渐进揭示、双窗演讲与导出矢量 PDF 的演示文稿。作品以独立目录存放在 `storage/`（`<storage>/artifact/<id>/`），讲稿索引在 `structure/deck.json`，每页独立存放在 `structure/slides/*.json`，配图与字体存放在 `asset/`。
 
-## 目录结构
+## 目录结构（Directory-per-Artifact）
 
-- `"project/deck.json"`（必填，JSON）：讲稿清单、画幅比例（`"16:9"` 默认 1920×1080，或 `"4:3"` 1440×1080）与演讲者备注：
-  ```json
-  {
-    "title": "季度产品发布",
-    "aspectRatio": "16:9",
-    "slides": [
-      { "id": "s01-cover", "file": "s01-cover.html", "title": "封面", "notes": "开场问候与核心议题" },
-      { "id": "s02-kpi", "file": "s02-kpi.html", "title": "关键指标", "notes": "按空格逐步揭示三张卡片" }
-    ]
-  }
-  ```
-- `"project/deck.css"`（可选，text）：全套共用的排版类与配色变量。若农场已设默认 `design-system`，其 `--color-*`、`--font-*` 令牌会自动注入 `:root`。
-- `project/slides/<file>`（必填，text）：每页一个独立的 HTML 片段（外层 `<div class="slide">...</div>`），严禁写 `<html>`/`<body>` 或翻页脚本。
-- `assets/<name>`（可选，asset）：挂接附件图片或字体，在 HTML/CSS 中直接写 `assets/<name>`，沙箱渲染器会自动重写为安全内网地址。
+```text
+<storage>/artifact/<id>/
+├── manifest.json             # id、artifactType: "slides"、title、entry: "structure/deck.json"
+├── structure/
+│   ├── deck.json             # 画幅比例、主题/设计体系链接、有序幻灯片清单
+│   └── slides/
+│       ├── s01-cover.json    # 单页结构化内容、版式、渐进揭示与演讲备注
+│       └── s02-kpi.json
+└── asset/
+    └── hero-arch.png         # 相对路径引用：asset/hero-arch.png
+```
 
-## 核心规则
+`structure/deck.json` 示例：
+```json
+{
+  "title": "季度产品发布",
+  "aspectRatio": "16:9",
+  "designSystemId": null,
+  "slides": [
+    { "id": "s01-cover", "file": "structure/slides/s01-cover.json", "title": "封面" },
+    { "id": "s02-kpi", "file": "structure/slides/s02-kpi.json", "title": "核心指标" }
+  ]
+}
+```
 
-1. **一页一事，版式交替**：连续两页不重复同一种列表版式；封面、大字论断、三栏指标卡、双栏对比、架构图示、金句收尾交替出现。
-2. **渐进揭示（`.fragment`）**：需要按顺序登场的卡片或要点加 `class="fragment"`，工作台放映时按方向键逐步显现，打印 PDF 时自动全部展开。
-3. **严防溢出**：画布固定 `1920×1080`（或 `1440×1080`），正文不超过 5 条要点，单页字数控制在 60 字以内，留足呼吸留白。
-4. **轻量单文件备选**：若只需一次性短小的 3–5 页简报，仍可用 `artifact_create({ kind: "html", display: "slides" })`。
+## 多人与多执行会话实时协作规则
+
+1. **按页解耦与实时同步（`artifact_collab`）**：每页独立存于 `structure/slides/<id>.json`，多人或多执行会话可同时编辑不同页、调序或改单页元素，由 `artifact_collab` 无冲突合并并写回目录文件；改某一页时严禁重写其他页。
+2. **来源追踪（`artifact_change`）**：每页修订与调序均记录 `origin`，支持回放单页演进、按来源撤销某轮排版改动、分叉不同受众版本；评审定稿用 `artifact_version` 留存不可变快照。
+3. **文案与结构审阅（`artifact_suggestion`）**：对用户手写的标题、论点或演讲备注做改写时，通过 `artifact_suggestion` 提议并说明理由，等待用户接受或拒绝。
+4. **实时在场感知（Presence）**：编辑前先看实时在场列表谁停留在哪一页（active slide），优先避开用户正在精修的页面，并行补齐其他页面或演讲备注。
+
+## 核心设计规则
+
+- **标题即结论**：每页标题是一句完整观点，观众只扫标题就能读完故事线。
+- **一页一事，版式交替**：连续两页不重复同一种列表版式；封面、大字论断、三栏指标卡、双栏对比、图示与收尾交替出现。
+- **零溢出与渐进揭示**：严格控制在 `1920×1080`（`16:9`）或 `1440×1080`（`4:3`）安全区内；每页正文 ≤ 5 条要点，按步登场的元素标记 `fragment: true`。
+- **资产与令牌**：图片存 `asset/` 用相对路径引用；若关联 `design-system`，优先复用其颜色与字阶令牌。
 
 按需延伸阅读：`artifact_type_read({ type: "slides", reference: "format" | "craft" | "layout" })`。

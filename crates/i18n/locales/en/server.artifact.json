@@ -95,35 +95,51 @@
   "types": {
     "docs": {
       "title": "Document",
-      "summary": "Collaborative block document with tracked suggestions and Markdown export"
+      "summary": "Multi-section technical specs, PRDs, and RFCs (structure/*.md) with real-time collaboration and review suggestions"
     },
     "outline": {
       "title": "Outline",
-      "summary": "Single-column infinitely nested tree outline with fold/zoom, checkable tasks, and live human-agent co-editing"
+      "summary": "Infinitely nested tree outline (structure/outline.json) with folding, branch zoom, checkable tasks, and live co-editing"
     },
     "slides": {
       "title": "Slide Deck",
-      "summary": "16:9 or 4:3 multi-file deck (deck.json + deck.css + slide HTML) with fragments, presenter view, and PDF print"
+      "summary": "16:9 or 4:3 structured presentation deck (deck.json + slides/*.json) with progressive fragments, presenter view, and PDF export"
     },
     "dashboard": {
       "title": "Dashboard",
-      "summary": "Structured datasets paired with sandboxed charts, field-level provenance inspection, persistent filters, and CSV export"
+      "summary": "Structured datasets separated from KPI and chart panels (dashboard.json + data/*.json) with field-level provenance and CSV export"
     },
     "motion": {
       "title": "Motion Film",
-      "summary": "Deterministic pure-time motion graphics with frame-accurate scrubbing, chapters, and WebM export to the library"
+      "summary": "Deterministic pure-time motion graphics (timeline.json + scenes/*.json) with frame scrubbing, chapters, and video export"
     },
     "whiteboard": {
       "title": "Whiteboard",
-      "summary": "Infinite pan-and-zoom canvas with shapes, containers, orthogonal arrows, tables, SVG sketches, and sealed embeds"
+      "summary": "Infinite spatial canvas (structure/board.json) with cards, containers, connectors, timelines, and built-in editorial stickers"
     },
     "design": {
       "title": "Design Canvas",
-      "summary": "Multi-artboard UI & graphic canvas (.dc.html) with interactive state logic and live property levers"
+      "summary": "Multi-artboard UI and visual mockups (structure/frames/*.json) with design-system token linking and live property levers"
     },
     "design-system": {
       "title": "Design System",
-      "summary": "Standing light/dark design tokens, typography specimens, and live component previews reusable across visual artifacts"
+      "summary": "Light/dark design tokens and component specifications (tokens.json + components/*.json) reusable across visual artifacts"
+    },
+    "sheet": {
+      "title": "Spreadsheet",
+      "summary": "Structured multi-sheet workbooks and datasets (workbook.json + sheets/*.json + asset/*.csv) with formulas, validation, and live collaboration"
+    },
+    "prototype": {
+      "title": "Web Prototype",
+      "summary": "Runnable sandboxed HTML/CSS/JS interactive web prototype (index.html, styles.css, app.js) with live state and collaboration"
+    },
+    "diagram": {
+      "title": "Diagram",
+      "summary": "Engineering diagrams for architecture, sequence, ER, and state machines (structure/diagram.json / .mmd) with collaborative editing"
+    },
+    "storyboard": {
+      "title": "Storyboard",
+      "summary": "Shot-by-shot visual, dialogue, and audio production script (shots.json + asset/{frames,refs,audio}/) bridging media generation and motion"
     }
   }
 }

@@ -1,21 +1,42 @@
 # whiteboard: Infinite Collaborative & Editorial Canvas
 
-`whiteboard` (`body = "store"`, `artifactType: "whiteboard"`) is rendered natively in pure Rust by `VvWhiteboard` (`crates/rich/src/whiteboard.rs` and `engine/whiteboard/*`), featuring dual-layer GPUI canvases (LRU-cached static layer + overlay selection/cursor layer), architectural/dot grids, editorial serif typography, warm milestone cards, vivid workshop sticky notes, capsule plan flows, external container section titles, 25 perched illustrations/stickers across 6 categories, curved timeline ribbons, smooth/orthogonal/straight connectors, pressure-sensitive pen and highlighter strokes, eraser, alignment/distribution/tidy, collaborator cursor speech bubbles (`presence.status`), workshop countdown timer, 6 bilingual starter templates (including Launch Workshop), minimap, JSON Canvas 1.0 (`.canvas`) interoperability, and SVG / 2x PNG / JSON export. Every element lives independently at `elements/<id>`.
+`whiteboard` is a natively rendered infinite spatial canvas supporting architectural/dot grids, snap/align/tidy, warm milestone cards, vivid workshop stickies, external-title containers, curved timeline ribbons, 25 perched editorial stickers, pressure-sensitive pen/highlighter strokes, smooth/orthogonal/straight connectors, and JSON Canvas interoperability. Stored as a directory in `storage/` (`<storage>/artifact/<id>/`), canvas data lives in `structure/board.json` and external graphics in `asset/`.
 
-## Entry Layout
+## Directory Layout
 
-- `board/meta` (JSON): `{ "title": "...", "mode": "board", "grid": "architectural" | "dots" | "none" }` (boolean `grid` also supported)
-- `elements/<id>` (JSON):
-  - `text`: `{ "id": "t1", "type": "text", "variant": "title" | "subtitle" | "callout" | "body", "x": 80, "y": 32, "w": 680, "h": 56, "label": "Launch Timeline", "highlight": "12 days", "icon": "⚠", "align": "left" | "center" }`
-  - `shape`: `{ "id": "n1", "type": "shape", "shape": "card" | "sticky" | "rect" | "diamond" | "ellipse" | "cylinder" | "triangle" | "pill", "x": 120, "y": 140, "w": 188, "h": 116, "title": "Lock scope", "body": "Milestone v1 locked", "fill": "sun" | "peach" | "leaf" | "water" | "lavender" | "berry" | "wheat" | "side" | "page", "sticker": "berry-lock", "badge": "Day 1" }` (`sticker` accepts any of the 25 built-in sticker IDs, emoji, or sanitized inline `stickerSvg`).
-  - `timeline`: `{ "id": "tl1", "type": "timeline", "x": 80, "y": 290, "w": 840, "h": 90, "fill": "peach", "points": [{ "x": 80, "y": 350 }, { "x": 380, "y": 320 }, { "x": 680, "y": 308 }, { "x": 920, "y": 280 }], "milestones": [{ "t": 0.08, "label": "Day 1", "kind": "major" }, { "t": 0.45, "label": "4", "kind": "minor", "caption": "4 days on the road" }] }`
-  - `container`: `{ "id": "c1", "type": "container", "x": 80, "y": 80, "w": 600, "h": 340, "title": "Core Boundary", "fill": "side" }`
-  - `arrow`: `{ "id": "a1", "type": "arrow", "curve": "smooth" | "orthogonal" | "straight", "style": "solid" | "dashed", "head": "arrow" | "none", "from": { "id": "n1", "side": "s" }, "to": { "id": "n2", "x": 220, "y": 340 }, "label": "...", "bends": [] }`
-  - `path`: `{ "id": "p1", "type": "path", "mode": "pen" | "highlighter", "points": [{ "x": 100, "y": 120, "pressure": 0.7 }, { "x": 160, "y": 140, "pressure": 0.8 }], "stroke": "#a83a2c", "strokeWidth": 3 }`
-  - `sticker` / `svg`: `{ "id": "s1", "type": "sticker", "sticker": "truck", "x": 420, "y": 240, "w": 110, "h": 72 }` or `type: "svg"` with `svg` markup.
-  - `table`, `html` widgets, and temporary `claim` frames.
-- Live collaborator cursors and viewports flow through `artifact.presence.update` / `artifact.presence.follow` (ephemeral in-memory channel, never stored as entries).
+```text
+<storage>/artifact/<id>/
+├── manifest.json          # id, artifactType: "whiteboard", title, entry: "structure/board.json"
+├── structure/
+│   └── board.json         # Grid config, viewport hint, and stable-ID elements map
+└── asset/
+    └── sketch-hero.svg    # External vector/image assets referenced via asset/<name>
+```
 
-Built-in templates cover Timeline, Launch Workshop, Architecture, User Journey, 2x2 Quadrant, and Comparison Table in both English and Chinese.
+Minimal `structure/board.json`:
+```json
+{
+  "version": 1,
+  "grid": "architectural",
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "elements": {
+    "t1": { "id": "t1", "type": "text", "variant": "title", "x": 80, "y": 32, "w": 680, "h": 54, "label": "Launch Timeline", "highlight": "12 days" },
+    "n1": { "id": "n1", "type": "shape", "shape": "card", "x": 120, "y": 140, "w": 200, "h": 116, "title": "Lock scope", "body": "Milestone v1 locked", "fill": "sun", "sticker": "berry-lock" },
+    "e1": { "id": "e1", "type": "arrow", "curve": "smooth", "from": { "id": "n1", "side": "e" }, "to": { "id": "n2", "side": "w" }, "label": "Handoff" }
+  }
+}
+```
+
+## Multi-Human & Multi-Agent Collaboration Rules
+
+1. **Element-level CRDT sync (`artifact_collab`)**: Mutate individual keys under `elements[id]` (e.g., updating only `x`/`y` or `title`) through `artifact_collab`. Never overwrite the full `elements` map, which clobbers concurrent drags and strokes.
+2. **Origin-tracked history (`artifact_change`)**: Every placement and tidy pass records its `origin` so users can replay workshop evolution, undo an agent's layout pass, or fork options; snapshot milestones with `artifact_version`.
+3. **Review suggestions (`artifact_suggestion`)**: Propose tracked suggestions before deleting or rewriting human-authored cards and stickies; prefer placing alternative groupings in open canvas space.
+4. **Live presence & spatial etiquette**: Cursors, viewports, and status bubbles flow over ephemeral presence broadcasts—never persist presence into `structure/board.json`. Check occupied coordinates before drawing and use a temporary `claim` frame while authoring dense clusters.
+
+## Spatial Craft
+
+- Anchor every board with a `title` + `subtitle` (`highlight` key metrics), then organize steps into warm `card` nodes with perched `sticker` accents and `container` zones (`parentId`).
+- Leave `64px–100px` gutters between cards so smooth connectors and perched stickers breathe cleanly.
 
 Further references: `artifact_type_read({ type: "whiteboard", reference: "elements" | "pictures" })`.
