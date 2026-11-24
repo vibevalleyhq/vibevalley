@@ -1,4 +1,4 @@
-import { Text } from "nsh";
+import { computed, Text } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { CommandLineState, UpdateState } from "@vibevalley/protocol/host";
@@ -34,7 +34,7 @@ function updateWords(state: UpdateState): string {
 export function UpdateRow(props: { state: Accessor<UpdateState | undefined>; last?: boolean }) {
   const update = currentHost().update;
   const sessions = useSessionsSlice();
-  const working = () => (sessions()?.sessions ?? []).filter((s) => s.phase._tag === "working").length;
+  const working = computed(() => (sessions()?.sessions ?? []).filter((s) => s.phase._tag === "working").length);
   const check = () => void update?.check().catch((e: unknown) => toast(reasonOf(e), "bad"));
   const install = () => void update?.install().catch((e: unknown) => toast(reasonOf(e), "bad"));
   return (

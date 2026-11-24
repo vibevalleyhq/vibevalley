@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, View } from "nsh";
+import { computed, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { IssueStatus } from "@vibevalley/protocol";
@@ -38,9 +38,11 @@ export function IssueList(props: {
   const folded = signal<ReadonlySet<string>>(new Set());
   const nameOf = useNameOf();
   const orchestrators = useOrchestrators();
-  const isOrchestrator = (id: string) => orchestrators().some((a) => a.id === id);
+  const orchestratorIds = computed(() => new Set(orchestrators().map((a) => a.id)));
+  const isOrchestrator = (id: string) => orchestratorIds().has(id);
   const box = useWidth();
-  const wide = () => box.width() === 0 || box.width() >= 640;
+  const wide = computed(() => box.width() === 0 || box.width() >= 640);
+  const groups = computed(() => groupRows(props.cards, props.grouping, rowKeys));
 
   // Only where a new todo belongs: the todo group, a repo's, a helper's (not the orchestrator's), or the one group.
   const canAdd = (g: RowGroup<BoardCard>) => (props.grouping === "status" ? g.lane === "todo" : props.grouping === "agent" ? !isOrchestrator(g.key) : true);
@@ -56,18 +58,18 @@ export function IssueList(props: {
     <If when={!props.loading} else={<EmptyNote>{t("web.issue.reading")}</EmptyNote>}>
       <Scroll testID="issue-list" class="min-h-0 flex-1" onLayout={box.onLayout}>
         <View class="px-3 pb-4">
-          <Each of={groupRows(props.cards, props.grouping, rowKeys)} key={(g) => g.key}>
+          <Each of={groups()} key={(g) => g.key}>
             {(g) => {
-              const groupLane = () => g().lane;
-              const ordered = () => {
+              const groupLane = computed(() => g().lane);
+              const ordered = computed(() => {
                 const l = groupLane();
                 return l ? laneOrder(l, g().rows, props.ordering) : orderRows(g().rows, props.ordering, rowKeys);
-              };
-              const folding = () => groupLane() === "closed" && !props.older && ordered().length > closedShown;
-              const rows = () => (folding() ? ordered().slice(0, closedShown) : ordered());
-              const hidden = () => (folding() ? ordered().length - closedShown : 0);
-              const isFolded = () => folded().has(g().key);
-              const label = () => {
+              });
+              const folding = computed(() => groupLane() === "closed" && !props.older && ordered().length > closedShown);
+              const rows = computed(() => (folding() ? ordered().slice(0, closedShown) : ordered()));
+              const hidden = computed(() => (folding() ? ordered().length - closedShown : 0));
+              const isFolded = computed(() => folded().has(g().key));
+              const label = computed(() => {
                 const l = groupLane();
                 return props.grouping === "status" && l
                   ? laneLabel[l]
@@ -78,7 +80,7 @@ export function IssueList(props: {
                         ? nameOf()(g().key)
                         : t("web.issue.noHelper")
                       : t("web.issue.list.all");
-              };
+              });
               return (
                 <View accessibilityLabel={label()} testID="issue-group" class="mb-1.5">
                   {/* A head of words on the page, not a bar: its line under it sets the group off. */}
@@ -176,10 +178,10 @@ function Row(props: {
 }) {
   const issues = useIssues();
   const now = () => Date.now();
-  const look = () => cardLook(props.card, props.nameOf, issues(), now());
-  const repo = () => cardRepo(props.card);
-  const shownFlags = () => (props.wide ? look().flags : look().flags.slice(0, 1));
-  const hasTrailingMarks = () => Boolean(look().progress) || shownFlags().length > 0;
+  const look = computed(() => cardLook(props.card, props.nameOf, issues(), now()));
+  const repo = computed(() => cardRepo(props.card));
+  const shownFlags = computed(() => (props.wide ? look().flags : look().flags.slice(0, 1)));
+  const hasTrailingMarks = computed(() => Boolean(look().progress) || shownFlags().length > 0);
   return (
     <View
       role="button"

@@ -1,4 +1,4 @@
-import { signal, Text, View, type JSX, type InputRef } from "nsh";
+import { computed, signal, Text, View, type JSX, type InputRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import {
@@ -191,7 +191,8 @@ function Window(props: { window: UsageWindow }) {
 
 export function SupportCard(props: { info: RuntimeInfo }) {
   const support = () => props.info.support;
-  const refused = () => Object.entries(support().refused);
+  const refused = computed(() => Object.entries(support().refused));
+  const capabilitySet = computed(() => new Set(support().capabilities));
   return (
     <Card title={t("web.runtime.can")}>
       <View class="gap-1.5">
@@ -216,10 +217,8 @@ export function SupportCard(props: { info: RuntimeInfo }) {
         <View class="flex-row flex-wrap gap-1.5">
           <Each of={RuntimeCapabilityValues} key={(c) => c}>
             {(c) => (
-              <View class={`rounded-sm px-1.5 py-0.5 ${support().capabilities.includes(c()) ? "bg-selected" : "bg-hover"}`}>
-                <Text class={`text-xs ${support().capabilities.includes(c()) ? "font-medium text-ink" : "text-faint line-through"}`}>
-                  {capabilityLabel[c()]}
-                </Text>
+              <View class={`rounded-sm px-1.5 py-0.5 ${capabilitySet().has(c()) ? "bg-selected" : "bg-hover"}`}>
+                <Text class={`text-xs ${capabilitySet().has(c()) ? "font-medium text-ink" : "text-faint line-through"}`}>{capabilityLabel[c()]}</Text>
               </View>
             )}
           </Each>
@@ -273,15 +272,20 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
       }
     },
   );
-  const dirty = () => !same(draft(), props.info.settings);
-  const models = () => props.info.models ?? [];
-  const model = () => {
+  const dirty = computed(() => !same(draft(), props.info.settings));
+  const models = computed(() => props.info.models ?? []);
+  const model = computed(() => {
     const wanted = draft().defaultModel || models().find((m) => m.isDefault)?.id;
     return models().find((m) => m.id === wanted);
-  };
-  const refusedEffort = () => props.info.support.refused[sessionEffort];
-  const refusedEnv = () => props.info.support.refused[sessionEnv];
-  const effortHint = () => refusedEffort() ?? ((model()?.effortLevels.length ?? 0) > 0 ? undefined : t("web.runtime.noEffort"));
+  });
+  const refusedEffort = computed(() => props.info.support.refused[sessionEffort]);
+  const refusedEnv = computed(() => props.info.support.refused[sessionEnv]);
+  const effortHint = computed(() => refusedEffort() ?? ((model()?.effortLevels.length ?? 0) > 0 ? undefined : t("web.runtime.noEffort")));
+  const modelOptions = computed(() => models().map((m) => ({ value: m.id, label: m.name })));
+  const effortOptions = computed(() => [
+    { value: "", label: t("web.runtime.default") },
+    ...(model()?.effortLevels ?? []).map((l) => ({ value: l, label: l, disabled: !!refusedEffort() })),
+  ]);
   const saving = createAct();
   const save = () => {
     const id = props.info.id;
@@ -329,7 +333,7 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
             label={t("web.runtime.defaultModel")}
             placeholder={t("web.runtime.ownDefault")}
             value={draft().defaultModel}
-            options={models().map((m) => ({ value: m.id, label: m.name }))}
+            options={modelOptions()}
             onChange={(defaultModel) => draft.set({ ...draft(), defaultModel, defaultEffort: "" })}
           />
         </Field>
@@ -338,10 +342,7 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
             <Segmented
               label={t("web.runtime.defaultEffort")}
               value={draft().defaultEffort}
-              options={[
-                { value: "", label: t("web.runtime.default") },
-                ...(model()?.effortLevels ?? []).map((l) => ({ value: l, label: l, disabled: !!refusedEffort() })),
-              ]}
+              options={effortOptions()}
               onChange={(defaultEffort) => draft.set({ ...draft(), defaultEffort })}
             />
           </If>

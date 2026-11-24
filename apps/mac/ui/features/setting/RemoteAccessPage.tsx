@@ -1,4 +1,4 @@
-import { Clipboard, signal, Text, View } from "nsh";
+import { Clipboard, computed, signal, Text, View } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
@@ -92,10 +92,10 @@ function ControlPlaneConnectionSection() {
     editing.set(true);
   };
 
-  const canSave = () => {
+  const canSave = computed(() => {
     if (busy() || urlDraft().trim() === "") return false;
     return method() === "pair" ? codeDraft().trim() !== "" : tokenDraft().trim() !== "";
-  };
+  });
 
   const onSave = async () => {
     if (!canSave()) return;
@@ -151,12 +151,12 @@ function ControlPlaneConnectionSection() {
     }
   };
 
-  const isRemote = () => conn().activeMode === "remote";
-  const hasRemoteConfigured = () => conn().configuredMode === "remote";
-  const envLocked = () => conn().source === "env";
-  const displayedUrl = () => conn().configuredUrl ?? conn().activeUrl;
-  const displayedLabel = () => conn().configuredLabel ?? conn().activeLabel;
-  const showTargetDetails = () => displayedUrl() !== undefined || conn().tokenHint !== undefined;
+  const isRemote = computed(() => conn().activeMode === "remote");
+  const hasRemoteConfigured = computed(() => conn().configuredMode === "remote");
+  const envLocked = computed(() => conn().source === "env");
+  const displayedUrl = computed(() => conn().configuredUrl ?? conn().activeUrl);
+  const displayedLabel = computed(() => conn().configuredLabel ?? conn().activeLabel);
+  const showTargetDetails = computed(() => displayedUrl() !== undefined || conn().tokenHint !== undefined);
 
   return (
     <View testID="control-plane-section" class="gap-3">
@@ -459,7 +459,7 @@ export function RemoteAccessPage() {
       >
         {(s) => {
           const liveUrl = () => (s().listening ? s().url : undefined);
-          const devices = () => activeDevicesOf(s());
+          const devices = computed(() => activeDevicesOf(s()));
           return (
             <View testID="remote-access-page" class="gap-5">
               <If when={actionError()}>

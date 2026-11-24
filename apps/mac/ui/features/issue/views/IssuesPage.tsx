@@ -93,11 +93,11 @@ export function IssuesPage(props: { rest: string }) {
   const moves = useIntents(issueMove);
   const act = createAct();
   const all = createMemo(() => movedCards(buildCards(history.rows() ?? [], board(), sessions()?.sessions, orchestratorIds()), moves.list()));
-  const shown = () => all().filter((c) => filterShows(filter(), c));
-  const card = () => {
+  const shown = createMemo(() => all().filter((c) => filterShows(filter(), c)));
+  const card = createMemo(() => {
     const at = id();
     return at === undefined ? undefined : all().find((c) => c.id === at || (c.kind === "issue" && issueIs(c.issue, at)));
-  };
+  });
 
   const place = async (c: BoardCard, before: string | undefined) => {
     if (c.id === before) return;
@@ -398,8 +398,13 @@ function Toolbar(props: {
   onNew: () => void;
 }) {
   const nameOf = useNameOf();
-  const repos = () => [...new Set(props.cards.map(cardRepo).filter((p): p is string => !!p))].toSorted();
-  const agents = () => [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].toSorted((a, b) => nameOf()(a).localeCompare(nameOf()(b)));
+  const repos = createMemo(() => [...new Set(props.cards.map(cardRepo).filter((p): p is string => !!p))].toSorted());
+  const agents = createMemo(() =>
+    [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].toSorted((a, b) => nameOf()(a).localeCompare(nameOf()(b))),
+  );
+  const repoOptions = createMemo(() => repos().map((p) => ({ value: p, label: p })));
+  const agentOptions = createMemo(() => agents().map((a) => ({ value: a, label: nameOf()(a) })));
+  const isFiltered = createMemo(() => filterAny(props.filter));
   return (
     <View class="flex-row flex-wrap items-center gap-2 px-3.5 py-2">
       <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-2">
@@ -420,7 +425,7 @@ function Toolbar(props: {
           filter
           value={props.filter.repo}
           placeholder={t("web.issue.page.allRepos")}
-          options={repos().map((p) => ({ value: p, label: p }))}
+          options={repoOptions()}
           onChange={(repo) => props.onFilter({ ...props.filter, repo })}
         />
         <Select
@@ -431,10 +436,10 @@ function Toolbar(props: {
           filter
           value={props.filter.agent}
           placeholder={t("web.issue.page.allHelpers")}
-          options={agents().map((a) => ({ value: a, label: nameOf()(a) }))}
+          options={agentOptions()}
           onChange={(agent) => props.onFilter({ ...props.filter, agent })}
         />
-        <If when={filterAny(props.filter)}>
+        <If when={isFiltered()}>
           <Text class="text-xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
             {t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}
           </Text>

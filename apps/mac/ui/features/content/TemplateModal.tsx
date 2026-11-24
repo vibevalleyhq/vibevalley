@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, untracked, View, windowSize } from "nsh";
+import { computed, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
@@ -35,7 +35,7 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
   const category = signal<TemplateCategory>(untracked(() => props.initialCategory));
   const query = signal("");
 
-  const filtered = () => {
+  const filtered = computed(() => {
     const q = query().trim().toLowerCase();
     return CONTENT_TEMPLATES.filter((tpl) => {
       const catMatch = q ? true : category() === "recommended" ? tpl.recommended : tpl.category === category();
@@ -43,7 +43,12 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
       if (!q) return true;
       return spelled(templateName(tpl), q) || spelled(templateDesc(tpl), q);
     });
-  };
+  });
+  const hasFiltered = computed(() => filtered().length > 0);
+  const categoryOptions = TEMPLATE_CATEGORIES.map((c) => ({
+    value: c,
+    label: t(`web.library.content.templates.cat.${c}`),
+  }));
 
   const pick = (tpl: ContentTemplate) => {
     if (act.busy()) return;
@@ -68,10 +73,7 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
           label={t("web.library.content.templates.title")}
           value={category()}
           onChange={(v) => category.set(v)}
-          options={TEMPLATE_CATEGORIES.map((c) => ({
-            value: c,
-            label: t(`web.library.content.templates.cat.${c}`),
-          }))}
+          options={categoryOptions}
         />
         <View class="ml-auto">
           <Button
@@ -89,7 +91,7 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
       </View>
 
       <Scroll style={{ maxHeight: Math.max(280, windowSize().height * 0.62) }} contentClass="pb-1">
-        <If when={filtered().length > 0} else={<Quiet>{t("web.library.content.templates.empty")}</Quiet>}>
+        <If when={hasFiltered()} else={<Quiet>{t("web.library.content.templates.empty")}</Quiet>}>
           <View class="flex-row flex-wrap gap-3">
             <Each of={filtered()} key={(tpl) => tpl.id}>
               {(tpl) => (

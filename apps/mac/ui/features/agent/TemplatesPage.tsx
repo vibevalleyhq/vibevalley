@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, View } from "nsh";
+import { computed, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { TemplateCategoryValues } from "@vibevalley/protocol";
@@ -23,8 +23,17 @@ export function TemplatesPage() {
   const category = signal<CategoryFilter>("all");
   const path = signal("");
   const adding = createAct();
-  const all = () => ready(templates, []);
-  const filtered = () => (category() === "all" ? all() : all().filter((tpl) => templateCategoryOf(tpl) === category()));
+  const all = computed(() => ready(templates, []));
+  const filtered = computed(() => (category() === "all" ? all() : all().filter((tpl) => templateCategoryOf(tpl) === category())));
+  const canAdd = computed(() => !adding.busy() && Boolean(path().trim()));
+  const categoryOptions = computed(() => [
+    { value: "all" as const, label: categoryLabel("all"), count: all().length },
+    ...TemplateCategoryValues.map((cat) => ({
+      value: cat,
+      label: categoryLabel(cat),
+      count: all().filter((tpl) => templateCategoryOf(tpl) === cat).length,
+    })),
+  ]);
   const add = () => {
     const at = path().trim();
     if (!at) return;
@@ -64,7 +73,7 @@ export function TemplatesPage() {
             wide={false}
             class="h-7 min-w-0 flex-1"
           />
-          <Button testID="template-add" disabled={adding.busy() || !path().trim()} onPress={() => void add()}>
+          <Button testID="template-add" disabled={!canAdd()} onPress={() => void add()}>
             {t("web.agent.templates.add")}
           </Button>
         </View>
@@ -73,14 +82,7 @@ export function TemplatesPage() {
           label={t("web.agent.templates.title")}
           value={category()}
           onChange={(v) => category.set(v)}
-          options={[
-            { value: "all", label: categoryLabel("all"), count: all().length },
-            ...TemplateCategoryValues.map((cat) => ({
-              value: cat,
-              label: categoryLabel(cat),
-              count: all().filter((tpl) => templateCategoryOf(tpl) === cat).length,
-            })),
-          ]}
+          options={categoryOptions()}
         />
         <View class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
           <Each of={filtered()} key={(template) => template.id}>

@@ -1,4 +1,4 @@
-import { cleanup, effect, Scroll, signal, Text, untracked, View } from "nsh";
+import { cleanup, computed, effect, Scroll, signal, Text, untracked, View } from "nsh";
 import { DiffView } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -53,8 +53,8 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
   });
   const registry = useRegistry();
   const live = useIssue(() => props.issue.id);
-  const acts = () => (live()?.stage.acts ?? []).map((a) => a.act);
-  const working = () => acts().includes("stop");
+  const acts = computed(() => (live()?.stage.acts ?? []).map((a) => a.act));
+  const working = computed(() => acts().includes("stop"));
   const presses = createPresses(() => props.lane);
   const changes = useIssueChanges(
     () => props.issue.id,
@@ -152,9 +152,9 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
   };
 
   const who = () => props.session?.name ?? props.issue.title;
-  const canComplete = () => acts().includes("complete");
-  const canClose = () => acts().includes("close");
-  const surface = () => closeDialogSurface(flow());
+  const canComplete = computed(() => acts().includes("complete"));
+  const canClose = computed(() => acts().includes("close"));
+  const surface = computed(() => closeDialogSurface(flow()));
 
   return (
     <Dialog open onClose={close} title={t("web.issue.close.title", { issue: issueTitle(props.issue) })} wide={isCloseDialogWide(flow())} testid="close-issue">
@@ -382,7 +382,7 @@ export function ConflictFiles(props: { files: string[]; worktree?: string | unde
 }
 
 export function ChangesHead(props: { changes: Changes }) {
-  const counts = () => lineCounts(props.changes);
+  const counts = computed(() => lineCounts(props.changes));
   return (
     <View class="flex-row flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-md bg-side px-3 py-2">
       <View class="flex-row items-center gap-1 rounded-sm bg-selected px-1.5 py-0.5">
@@ -411,7 +411,8 @@ export function ChangesHead(props: { changes: Changes }) {
 /** The commits and the files, each file opening to its patch. */
 export function ChangesBody(props: { changes: Changes }) {
   const now = Date.now();
-  const anyPatch = () => props.changes.files.some((f) => !!f.patch);
+  const anyPatch = computed(() => props.changes.files.some((f) => !!f.patch));
+  const conflictSet = computed(() => new Set(props.changes.conflicts));
   return (
     <>
       <If when={props.changes.commits.length > 0}>
@@ -440,12 +441,7 @@ export function ChangesBody(props: { changes: Changes }) {
           <View class="overflow-hidden rounded-md border border-line">
             <Each of={props.changes.files} key={(f) => f.path}>
               {(f, i) => (
-                <FileRow
-                  file={f()}
-                  last={i() === props.changes.files.length - 1}
-                  conflict={props.changes.conflicts.includes(f().path)}
-                  reserveChevron={anyPatch()}
-                />
+                <FileRow file={f()} last={i() === props.changes.files.length - 1} conflict={conflictSet().has(f().path)} reserveChevron={anyPatch()} />
               )}
             </Each>
           </View>
@@ -474,9 +470,9 @@ const kindLook: Record<string, { bgClass: string; ink: string }> = {
 
 function FileRow(props: { file: ChangedFile; conflict: boolean; last: boolean; reserveChevron: boolean }) {
   const open = signal(false);
-  const kind = () => changeKind(props.file.status);
-  const hasPatch = () => !!props.file.patch;
-  const look = () => kindLook[props.file.status];
+  const kind = computed(() => changeKind(props.file.status));
+  const hasPatch = computed(() => !!props.file.patch);
+  const look = computed(() => kindLook[props.file.status]);
   return (
     <View class={props.last ? "" : "border-b border-line"}>
       <View
@@ -551,15 +547,16 @@ export function wellFormed(patch: string): boolean {
 function Patch(props: { text: string; path: string }) {
   // DiffView scrolls itself and does not grow with its lines: it is given their height (a hunk's longer side and its
   // header, as it pairs the lines), up to the box's; past that it scrolls inside.
-  const height = () => {
+  const height = computed(() => {
     const lines = props.text.replace(/\n$/u, "").split("\n");
     const side = (mark: string) => lines.filter((l) => l.startsWith(mark) || l.startsWith(" ") || l === "").length;
     const hunks = lines.filter((l) => l.startsWith("@@")).length;
     return Math.min(320, (Math.max(side("+"), side("-")) + hunks) * 17 + 8);
-  };
+  });
+  const isWellFormed = computed(() => wellFormed(props.text));
   return (
     <If
-      when={wellFormed(props.text)}
+      when={isWellFormed()}
       else={
         <Scroll testID="patch" class="max-h-80 border-t border-line bg-page py-1">
           <TintedLines text={props.text} />
@@ -587,8 +584,9 @@ function Patch(props: { text: string; path: string }) {
 }
 
 function TintedLines(props: { text: string }) {
+  const lines = computed(() => patchLines(props.text));
   return (
-    <Each of={patchLines(props.text)} key="index">
+    <Each of={lines()} key="index">
       {(line) => {
         const look = () => patchTone[patchMarkOf(line())];
         const bg = () => look().bg?.();

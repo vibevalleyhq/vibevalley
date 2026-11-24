@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, View } from "nsh";
+import { computed, Scroll, signal, Text, View } from "nsh";
 
 import { list as listed, t } from "@vibevalley/i18n";
 import type { Agent, RuntimeInfo, Skill } from "@vibevalley/protocol";
@@ -42,35 +42,37 @@ export function SkillsPage(props: { id?: string | undefined }) {
   const ownOpen = signal(true);
   const skills = useSkills();
   const runtimes = useRuntimes();
-  const catalog = () => ready(runtimes, []);
-  const installed = () => installedSkills(catalog());
-  const all = (): readonly Skill[] => ready(skills, []);
-  const own = () => all().filter((s) => s.builtIn !== true);
-  const builtIns = () => all().filter((s) => s.builtIn === true);
+  const catalog = computed(() => ready(runtimes, []));
+  const installed = computed(() => installedSkills(catalog()));
+  const all = computed((): readonly Skill[] => ready(skills, []));
+  const own = computed(() => all().filter((s) => s.builtIn !== true));
+  const builtIns = computed(() => all().filter((s) => s.builtIn === true));
   const creating = () => props.id === "new";
-  const shownInstalled = () => {
+  const shownInstalled = computed(() => {
     const id = props.id;
     return id?.startsWith(installedPrefix) === true ? installed().find((s) => s.name === id.slice(installedPrefix.length)) : undefined;
-  };
-  const shownBuiltIn = () => {
+  });
+  const shownBuiltIn = computed(() => {
     const id = props.id;
     return creating() || shownInstalled() !== undefined ? undefined : builtIns().find((s) => s.id === id);
-  };
-  const selected = () =>
+  });
+  const selected = computed(() =>
     creating() || shownInstalled() || shownBuiltIn() !== undefined
       ? undefined
-      : (own().find((s) => s.id === props.id) ?? (installed().length > 0 ? undefined : own()[0]));
-  const first = () => (props.id === undefined ? installed()[0] : undefined);
-  const q = () => query().trim();
-  const list = () =>
-    q() ? installed().filter((s) => matches(q(), [s.name, s.description, ...s.runtimes.map((x) => runtimeName(catalog(), x.runtime))])) : installed();
-  const ownShown = () => (q() ? own().filter((s) => matches(q(), [s.name, s.description, s.body])) : own());
-  const builtInShown = () => {
+      : (own().find((s) => s.id === props.id) ?? (installed().length > 0 ? undefined : own()[0])),
+  );
+  const first = computed(() => (props.id === undefined ? installed()[0] : undefined));
+  const q = computed(() => query().trim());
+  const list = computed(() =>
+    q() ? installed().filter((s) => matches(q(), [s.name, s.description, ...s.runtimes.map((x) => runtimeName(catalog(), x.runtime))])) : installed(),
+  );
+  const ownShown = computed(() => (q() ? own().filter((s) => matches(q(), [s.name, s.description, s.body])) : own()));
+  const builtInShown = computed(() => {
     const text = q();
     return text === "" ? builtIns() : builtIns().filter((s) => matches(text, [s.name, s.description, s.body]));
-  };
-  const count = (shown: number, all: number) => (q() ? `${shown} / ${all}` : `${all}`);
-  const open = () => shownInstalled() ?? first();
+  });
+  const count = (shown: number, total: number) => (q() ? `${shown} / ${total}` : `${total}`);
+  const open = computed(() => shownInstalled() ?? first());
 
   return (
     <View class="h-full min-h-0 flex-1 gap-3 lg:flex-row">
@@ -195,10 +197,10 @@ function Entry(props: { to: string; on: boolean; title: string; detail: string }
 /** Read-only: it ships with VibeValley and changes with it. */
 function BuiltInCard(props: { skill: Skill }) {
   const allAgents = useAgents();
-  const agents = () => {
+  const agents = computed(() => {
     const id = props.skill.id;
     return ready(allAgents, []).filter((a) => a.skills.includes(id));
-  };
+  });
   return (
     <Card title={props.skill.name} class="max-w-3xl">
       <View testID="built-in-skill" class="gap-3">
@@ -272,7 +274,7 @@ function SkillEditor(props: { skill?: Skill }) {
   const router = useRouter();
   const client = useQueryClient();
   const allAgents = useAgents();
-  const agents = () => ready(allAgents, []).filter((a) => skill !== undefined && a.skills.includes(skill.id));
+  const agents = computed(() => ready(allAgents, []).filter((a) => skill !== undefined && a.skills.includes(skill.id)));
   const refresh = () => Promise.all([client.invalidate({ prefix: ["skills"] }), client.invalidate({ prefix: ["agents"] })]);
   const form = useForm({
     schema: SkillInput,

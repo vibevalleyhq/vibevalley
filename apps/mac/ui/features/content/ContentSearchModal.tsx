@@ -1,4 +1,4 @@
-import { keymap, Scroll, signal, Text, View, windowSize } from "nsh";
+import { computed, keymap, Scroll, signal, Text, View, windowSize } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -125,11 +125,11 @@ function SearchBody() {
     }
   };
 
-  const clampedIndex = () => {
+  const clampedIndex = computed(() => {
     const n = hits().length;
     if (n === 0) return -1;
     return Math.min(active(), n - 1);
-  };
+  });
 
   const move = (delta: number) => {
     const n = hits().length;

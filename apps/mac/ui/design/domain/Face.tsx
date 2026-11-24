@@ -1,4 +1,4 @@
-import { Image, pixelRatio, Text, View } from "nsh";
+import { computed, Image, pixelRatio, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator, type Look } from "@vibevalley/protocol";
@@ -66,12 +66,12 @@ export function AgentFace(props: {
   const agents = useAgents();
   const url = useSpriteUrl();
   const size = () => props.size ?? 24;
-  const avatarSprite = () => {
+  const avatarSprite = computed(() => {
     const all = ready(sprites, undefined);
     const avatar = props.look?.avatar;
     return all && avatar && avatar in all ? avatar : undefined;
-  };
-  const cut = (): Cut | undefined => {
+  });
+  const cut = computed((): Cut | undefined => {
     const all = ready(sprites, undefined);
     if (!all) return undefined;
     const avatar = avatarSprite();
@@ -88,8 +88,8 @@ export function AgentFace(props: {
     const cx = sp.w / 2;
     const cy = sp.h * 0.25 + sp.h * 0.03;
     return { src, left: size() / 2 - cx * k, top: size() / 2 - cy * k, width: sp.w * k, height: sp.h * k };
-  };
-  const name = () => props.name ?? ready(agents, []).find((a) => a.id === props.agentId)?.name ?? props.agentId;
+  });
+  const name = computed(() => props.name ?? ready(agents, []).find((a) => a.id === props.agentId)?.name ?? props.agentId);
   // The hat's colour lightened toward paper, opaque so the letter reads in both themes; the leaf wash without a hat.
   const ground = () => (props.look?.hat ? toward(hexColor(props.look.hat), 0.6) : tone("avatar-leaf"));
   return (
@@ -108,14 +108,14 @@ export function OrchestratorFace(props: { size?: number; agent?: string | undefi
   const agents = useAgents();
   const url = useSpriteUrl();
   const size = () => props.size ?? 24;
-  const avatarSprite = () => {
+  const avatarSprite = computed(() => {
     const all = ready(sprites, undefined);
     if (!all) return undefined;
     const candidate =
       props.avatar ?? (props.look === undefined ? ready(agents, []).find((a) => a.id === (props.agent ?? defaultOrchestrator))?.look.avatar : undefined);
     return candidate && candidate in all ? candidate : undefined;
-  };
-  const cut = (): Cut | undefined => {
+  });
+  const cut = computed((): Cut | undefined => {
     const all = ready(sprites, undefined);
     if (!all) return undefined;
     const avatar = avatarSprite();
@@ -136,11 +136,11 @@ export function OrchestratorFace(props: { size?: number; agent?: string | undefi
     if (!src) return undefined;
     const k = size() / (sp.w * 0.86);
     return { src, left: (size() - sp.w * k) / 2, top: size() * 0.04, width: sp.w * k, height: sp.h * k };
-  };
-  const letter = () => {
+  });
+  const letter = computed(() => {
     const agent = props.look === undefined ? ready(agents, []).find((a) => a.id === (props.agent ?? defaultOrchestrator)) : undefined;
     return initialOf(agent?.name ?? orchestratorLooks.find((l) => l.id === (props.look ?? "farmer"))?.name ?? "?");
-  };
+  });
   return (
     <If when={cut()} else={<Initial size={size()} letter={letter()} ground={tone("avatar-sky")} />}>
       {(c) => (

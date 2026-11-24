@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, View, type JSX } from "nsh";
+import { computed, Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import {
@@ -42,9 +42,9 @@ type Tab = "who" | "runtime" | "persona" | "skills" | "tools" | "env" | "memory"
 
 export function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: Patch; nameTaken: boolean; isNew: boolean }) {
   const tab = signal<Tab>("who");
-  const support = () => supportOf(props.runtime);
+  const support = computed(() => supportOf(props.runtime));
   const savedTabs: [Tab, string][] = [["memory", t("web.agent.tab.memory")]];
-  const tabs = (): [Tab, string][] => [
+  const tabs = computed<[Tab, string][]>(() => [
     ["who", t("web.agent.tab.who")],
     ["runtime", t("web.agent.tab.runtime")],
     ["persona", t("web.agent.tab.persona")],
@@ -52,18 +52,13 @@ export function ConfigTabs(props: { draft: Agent; runtime?: RuntimeInfo | undefi
     ["tools", t("web.agent.tab.tools")],
     ["env", t("web.agent.tab.env")],
     ...(props.isNew ? [] : savedTabs),
-  ];
-  const envRefused = () => support().refused[sessionEnv];
+  ]);
+  const tabItems = computed(() => tabs().map(([value, label]) => ({ value, label })));
+  const envRefused = computed(() => support().refused[sessionEnv]);
   const draft = () => props.draft;
   return (
     <View class="min-h-0 flex-1">
-      <Tabs
-        label={t("web.agent.tabs")}
-        value={tab()}
-        onChange={(v) => tab.set(v)}
-        items={tabs().map(([value, label]) => ({ value, label }))}
-        class="border-b border-line px-3 py-2"
-      />
+      <Tabs label={t("web.agent.tabs")} value={tab()} onChange={(v) => tab.set(v)} items={tabItems()} class="border-b border-line px-3 py-2" />
       <ScrollBody>
         <If when={tab() === "who"}>
           <Labeled label={t("web.agent.name")} tip={t("web.agent.nameTip")} error={props.nameTaken ? t("web.agent.nameTaken") : undefined}>
@@ -166,7 +161,7 @@ function machineOptionLabel(machine: DisplayMachine): string {
 
 function MachineTargetChoice(props: { draft: Agent; patch: Patch }) {
   const machines = useMergedMachines();
-  const options = () => {
+  const options = computed(() => {
     const list = machines();
     const mapped = list.map((m) => ({ value: m.id, label: machineOptionLabel(m) }));
     const pinned = props.draft.machineId;
@@ -174,7 +169,7 @@ function MachineTargetChoice(props: { draft: Agent; patch: Patch }) {
       mapped.push({ value: pinned, label: pinned });
     }
     return mapped;
-  };
+  });
   const setMachineId = (next: string) => {
     const { machineId: _, ...rest } = props.draft;
     props.patch(next ? { ...rest, machineId: next } : rest);
@@ -195,7 +190,7 @@ function MachineTargetChoice(props: { draft: Agent; patch: Patch }) {
 
 function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
   const all = useRuntimes();
-  const runtimes = () => sortRuntimes(ready(all, []));
+  const runtimes = computed(() => sortRuntimes(ready(all, [])));
   const choose = (info: RuntimeInfo) => {
     const f = supportOf(info);
     const cannotTakeSystemPrompt = !!f.refused[sessionAppendSystemPrompt] || !!f.refused[sessionSystemPrompt];
@@ -259,11 +254,21 @@ function RuntimeChoice(props: { draft: Agent; patch: Patch }) {
 }
 
 function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: Patch }) {
-  const models = () => props.runtime?.models ?? [];
-  const fallback = () => props.runtime?.settings.defaultModel || models().find((m) => m.isDefault)?.id || "";
-  const model = () => models().find((m) => m.id === (props.draft.model || fallback()));
-  const refusedEffort = () => supportOf(props.runtime).refused[sessionEffort];
-  const levels = () => model()?.effortLevels ?? [];
+  const models = computed(() => props.runtime?.models ?? []);
+  const fallback = computed(() => props.runtime?.settings.defaultModel || models().find((m) => m.isDefault)?.id || "");
+  const model = computed(() => models().find((m) => m.id === (props.draft.model || fallback())));
+  const refusedEffort = computed(() => supportOf(props.runtime).refused[sessionEffort]);
+  const levels = computed(() => model()?.effortLevels ?? []);
+  const modelOptions = computed(() =>
+    models().map((m) => ({
+      value: m.id,
+      label: m.effortLevels.length > 0 ? t("web.agent.modelLevels", { name: m.name, n: m.effortLevels.length }) : m.name,
+    })),
+  );
+  const effortOptions = computed(() => [
+    { value: "", label: t("web.agent.defaultEffort") },
+    ...levels().map((l) => ({ value: l, label: l, disabled: !!refusedEffort() })),
+  ]);
   return (
     <>
       <Labeled label={t("web.agent.model")} hint={models().length === 0 ? t("web.agent.noModels") : undefined}>
@@ -271,10 +276,7 @@ function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo | undefined
           label={t("web.agent.model")}
           value={props.draft.model}
           placeholder={fallback() ? t("web.agent.runtimeDefaultModel", { model: fallback() }) : t("web.agent.runtimeDefault")}
-          options={models().map((m) => ({
-            value: m.id,
-            label: m.effortLevels.length > 0 ? t("web.agent.modelLevels", { name: m.name, n: m.effortLevels.length }) : m.name,
-          }))}
+          options={modelOptions()}
           onChange={(m) => props.patch({ ...props.draft, model: m, effort: "" })}
         />
       </Labeled>
@@ -292,7 +294,7 @@ function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo | undefined
         <Segmented
           label={t("web.agent.effort")}
           value={props.draft.effort}
-          options={[{ value: "", label: t("web.agent.defaultEffort") }, ...levels().map((l) => ({ value: l, label: l, disabled: !!refusedEffort() }))]}
+          options={effortOptions()}
           onChange={(effort) => props.patch({ ...props.draft, effort })}
         />
       </Labeled>
@@ -302,7 +304,8 @@ function ModelAndEffort(props: { draft: Agent; runtime?: RuntimeInfo | undefined
 
 /** What it takes comes with runtime.list: until then, nothing is said rather than a guess. */
 function Support(props: { runtime: string; info?: RuntimeInfo | undefined }) {
-  const support = () => supportOf(props.info);
+  const support = computed(() => supportOf(props.info));
+  const refusedEntries = computed(() => Object.entries(support().refused));
   return (
     <View class="gap-1.5 rounded-lg bg-side p-3">
       <Text role="header" class="text-sm font-semibold text-ink">
@@ -316,7 +319,7 @@ function Support(props: { runtime: string; info?: RuntimeInfo | undefined }) {
           <Text class="text-sm text-ink">{support().steer ? t("web.agent.steer") : t("web.agent.noSteer")}</Text>
         </View>
         <Text class="text-sm text-ink">{support().inProcess ? t("web.agent.inProcess") : t("web.agent.ownProcess")}</Text>
-        <Each of={Object.entries(support().refused)}>
+        <Each of={refusedEntries()} key={(entry) => entry[0]}>
           {(entry) => (
             <Text class="text-sm text-muted">
               {t("web.agent.refuses")}
@@ -338,7 +341,15 @@ const personaModes: { value: PersonaMode; label: string; detail: string; option?
 ];
 
 function Persona(props: { draft: Agent; support: RuntimeSupport; patch: Patch }) {
-  const mode = () => personaModes.find((m) => m.value === props.draft.personaMode);
+  const mode = computed(() => personaModes.find((m) => m.value === props.draft.personaMode));
+  const modeOptions = computed(() =>
+    personaModes.map((m) => ({
+      value: m.value,
+      label: m.label,
+      disabled: !!m.option && !!props.support.refused[m.option],
+      title: m.option ? props.support.refused[m.option] : undefined,
+    })),
+  );
   return (
     <>
       <Labeled label={t("web.agent.tab.persona")} tip={t("web.agent.personaTip")}>
@@ -355,12 +366,7 @@ function Persona(props: { draft: Agent; support: RuntimeSupport; patch: Patch })
         <Segmented
           label={t("web.agent.personaMode")}
           value={props.draft.personaMode}
-          options={personaModes.map((m) => ({
-            value: m.value,
-            label: m.label,
-            disabled: !!m.option && !!props.support.refused[m.option],
-            title: m.option ? props.support.refused[m.option] : undefined,
-          }))}
+          options={modeOptions()}
           onChange={(personaMode) => props.patch({ ...props.draft, personaMode })}
         />
       </Labeled>
@@ -429,12 +435,18 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
 const mcpTarget = (s: MCPServer) => (s.type === "stdio" ? [s.command, ...s.args].join(" ") : s.url);
 
 function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: Patch }) {
-  const support = () => supportOf(props.runtime);
-  const mcpRefused = () => support().refused[sessionMcpServers];
-  const toolsRefused = () => support().refused[sessionDisallowedTools];
+  const support = computed(() => supportOf(props.runtime));
+  const mcpRefused = computed(() => support().refused[sessionMcpServers]);
+  const toolsRefused = computed(() => support().refused[sessionDisallowedTools]);
   const type = signal<"stdio" | "http">("stdio");
   const name = signal("");
   const target = signal("");
+  const canAddMcp = computed(() => !mcpRefused() && Boolean(name().trim()) && Boolean(target().trim()));
+  const availableTools = computed(() => {
+    if (toolsRefused() || !props.runtime?.tools) return undefined;
+    const disallowed = new Set(props.draft.disallowedTools);
+    return props.runtime.tools.filter((tool) => !disallowed.has(tool.name));
+  });
   const add = () => {
     const n = name().trim();
     const wanted = target().trim();
@@ -504,7 +516,7 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
               onInput={(v) => target.set(v)}
               onSubmit={add}
             />
-            <Button disabled={!!mcpRefused() || !name().trim() || !target().trim()} onPress={add}>
+            <Button disabled={!canAddMcp()} onPress={add}>
               {t("web.agent.add")}
             </Button>
           </View>
@@ -522,10 +534,10 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
           value={props.draft.disallowedTools}
           onChange={(disallowedTools) => props.patch({ ...props.draft, disallowedTools })}
         />
-        <If when={!toolsRefused() ? props.runtime?.tools : undefined}>
+        <If when={availableTools()}>
           {(tools) => (
             <View class="flex-row flex-wrap gap-1 pt-1.5">
-              <Each of={tools().filter((tool) => !props.draft.disallowedTools.includes(tool.name))} key={(tool) => tool.name}>
+              <Each of={tools()} key={(tool) => tool.name}>
                 {(tool) => (
                   <View
                     role="button"
@@ -554,7 +566,7 @@ function Inventory(props: { entries: InventoryEntry[] | null }) {
       {(entries) => (
         <If when={entries().length > 0} else={<Text class="text-xs text-muted">{t("web.agent.none")}</Text>}>
           <View class="gap-1">
-            <Each of={entries()}>
+            <Each of={entries()} key={(e) => e.name}>
               {(e) => (
                 <View class="flex-row items-baseline gap-2">
                   <Text class={`font-mono text-sm ${e().enabled === false ? "text-muted line-through" : "text-ink"}`}>{e().name}</Text>

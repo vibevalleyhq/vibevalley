@@ -150,11 +150,11 @@ export function LibraryPage() {
 
   const bucket = () => contentBrowseBucket();
   const tile = () => Math.min(tileMax, Math.max(tileMin, prefsNow().libraryTile));
-  const allMedia = (): readonly LibraryItem[] => ready(items, undefined) ?? [];
-  const allArtifacts = (): readonly Artifact[] => ready(artifactsQuery, undefined) ?? [];
+  const allMedia = createMemo((): readonly LibraryItem[] => ready(items, undefined) ?? []);
+  const allArtifacts = createMemo((): readonly Artifact[] => ready(artifactsQuery, undefined) ?? []);
   const jobs = (): readonly MediaJob[] => ops()?.media ?? [];
   const mediaSummary = () => ops()?.mediaSummary;
-  const working = () => making(jobs(), mediaSummary());
+  const working = createMemo(() => making(jobs(), mediaSummary()));
   const activeMediaCount = () => mediaSummary()?.activeCount ?? working().length;
 
   const pinnedSet = createMemo(() => new Set(pinnedKeys()));
@@ -182,8 +182,8 @@ export function LibraryPage() {
       : [],
   );
 
-  const totalCount = () => visibleArtifacts().length + visibleMedia().length;
-  const sectionCount = () => (visibleArtifacts().length > 0 ? 1 : 0) + (visibleMedia().length > 0 ? 1 : 0);
+  const totalCount = createMemo(() => visibleArtifacts().length + visibleMedia().length);
+  const sectionCount = createMemo(() => (visibleArtifacts().length > 0 ? 1 : 0) + (visibleMedia().length > 0 ? 1 : 0));
   const ids = createMemo(() => visibleMedia().map((item) => item.attachment.id));
   const imageItems = createMemo(() => visibleMedia().filter((item) => kindOf(item.attachment.type) === "image"));
 
@@ -196,15 +196,15 @@ export function LibraryPage() {
     const on = new Set(picked());
     return allMedia().filter((item) => on.has(item.attachment.id));
   });
-  const inspectorOpen = () => chosen().length > 0;
+  const inspectorOpen = createMemo(() => chosen().length > 0);
 
-  const inner = () => {
+  const inner = createMemo(() => {
     const w = windowSize().width;
     const appRailW = w < 640 ? 56 : 68;
     const sideW = contentSidebarOpen.get() ? 232 : 0;
     const inspW = inspectorOpen() && w >= 640 ? 304 : 0;
     return Math.max(220, w - appRailW - sideW - inspW - 32);
-  };
+  });
 
   const rows = createMemo(() => {
     const known = seen();
@@ -264,22 +264,23 @@ export function LibraryPage() {
   });
 
   effect(() => {
-    const next = reconcileSelection(untracked(selection), {
+    const cur = untracked(selection);
+    const next = reconcileSelection(cur, {
       fileIds: ids(),
       imageCount: imageItems().length,
     });
-    selection.set(next);
+    if (next !== cur) selection.set(next);
   });
 
-  const make = (): Make | undefined => {
+  const make = createMemo((): Make | undefined => {
     const m = search().get("make");
     return makes.find((x) => x === m);
-  };
-  const understanding = () => {
+  });
+  const understanding = createMemo(() => {
     const id = search().get("understand");
     if (id === null || id === "") return undefined;
     return allMedia().find((item) => item.attachment.id === id)?.attachment ?? { id, name: id, type: "", size: 0 };
-  };
+  });
 
   const openArtifact = (id: string) => router.navigate(`/artifacts/${encodeURIComponent(id)}`);
 
@@ -664,9 +665,9 @@ export function LibraryPage() {
 }
 
 function LibraryLightbox(props: { items: readonly LibraryItem[]; at: number | undefined; onAt: (at: number | undefined) => void }) {
-  const curId = () => (props.at !== undefined ? (props.items[props.at]?.attachment.id ?? "") : "");
+  const curId = createMemo(() => (props.at !== undefined ? (props.items[props.at]?.attachment.id ?? "") : ""));
   const file = useAttachmentFile(curId);
-  const pictures = (): readonly Picture[] =>
+  const pictures = createMemo((): readonly Picture[] =>
     props.items.map((item, i) => {
       const f = i === props.at ? file() : undefined;
       return {
@@ -674,6 +675,7 @@ function LibraryLightbox(props: { items: readonly LibraryItem[]; at: number | un
         name: item.attachment.name,
         ...(f ? { path: f.path } : {}),
       };
-    });
+    }),
+  );
   return <Lightbox pictures={pictures()} at={props.at} onAt={props.onAt} />;
 }

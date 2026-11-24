@@ -1,4 +1,4 @@
-import { Scroll, Text, View } from "nsh";
+import { computed, Scroll, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
@@ -30,13 +30,14 @@ function StepBadge(props: { number: number; done: boolean; testID: string }) {
 export function BoardOnboarding(props: { issueCount: number; onNavigate: (path: string) => void; onNew: (where: NewIssueAt) => void }) {
   const repoQuery = useRepos();
   const runtimeQuery = useRuntimes();
-  const readiness = () =>
+  const readiness = computed(() =>
     computeOnboardingReadiness({
       repos: ready(repoQuery, []),
       runtimes: ready(runtimeQuery, []),
       issueCount: props.issueCount,
-    });
-  const progressPercent = () => Math.round((readiness().completedCount / readiness().totalCount) * 100);
+    }),
+  );
+  const progressPercent = computed(() => Math.round((readiness().completedCount / readiness().totalCount) * 100));
 
   return (
     <Scroll testID="issues-empty-onboarding" class="min-h-0 flex-1">

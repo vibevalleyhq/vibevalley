@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, untracked, View } from "nsh";
+import { computed, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
 import type { ProviderConnectionUpdate, ProviderModelListing, ProviderStatus, ProviderUpdate } from "@vibevalley/protocol";
@@ -80,7 +80,8 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
   const error = signal<string | undefined>(undefined);
   const client = useQueryClient();
   const act = createAct((v) => error.set(v));
-  const dirty = () => !same(draft(), editable(base()));
+  const dirty = computed(() => !same(draft(), editable(base())));
+  const baseById = computed(() => new Map(base().connections.map((item) => [item.id, item])));
   const accept = (status: ProviderStatus) => {
     base.set(status);
     draft.set(editable(status));
@@ -122,7 +123,8 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
     error.set(undefined);
     return act.run(async () => listing.set(await api.provider.model.list({ connection, revision })));
   };
-  const choices = () => draft().connections.map((connection) => ({ value: connection.id, label: connection.name || "MOSS" }));
+  const choices = computed(() => draft().connections.map((connection) => ({ value: connection.id, label: connection.name || "MOSS" })));
+  const canAdd = computed(() => !act.busy() && draft().connections.length < 32);
   const bind = (use: Use, connection: string) => {
     const current = draft();
     draft.set({ ...current, [use]: connection ? { connection, model: current[use]?.model ?? base()[`${use}Models`][0] ?? "" } : null });
@@ -132,7 +134,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
     const binding = current[use];
     draft.set({ ...current, [use]: binding ? { ...binding, model } : null });
   };
-  const boundCount = () => adaptedUses.filter((use) => Boolean(draft()[use])).length;
+  const boundCount = computed(() => adaptedUses.filter((use) => Boolean(draft()[use])).length);
   return (
     <View accessibilityLabel={t("web.provider.title")} class="min-w-0 max-w-4xl gap-6" testID="provider-form">
       <If when={props.part !== "uses"}>
@@ -160,7 +162,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
             <Button
               testID="provider-add"
               icon="add"
-              disabled={act.busy() || draft().connections.length >= 32}
+              disabled={!canAdd()}
               onPress={() =>
                 draft.set({ ...draft(), connections: [...draft().connections, { id: crypto.randomUUID(), name: "MOSS", adapter: "moss", enabled: true }] })
               }
@@ -246,7 +248,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
                   <View testID="provider-key">
                     <KeyField
                       label="API Key"
-                      status={base().connections.find((item) => item.id === connection().id)?.key ?? { source: null }}
+                      status={baseById().get(connection().id)?.key ?? { source: null }}
                       removing={connection().key === null}
                       onRemove={(remove) => (remove ? change(connection().id, { key: null }) : keepKey(connection().id))}
                     >
@@ -283,7 +285,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
                             </View>
                           </View>
                           <Scroll class="max-h-48" contentClass="gap-0.5">
-                            <Each of={result().models}>
+                            <Each of={result().models} key={(model) => model.id}>
                               {(model) => (
                                 <View class="rounded-sm px-1.5 py-0.5 hover:bg-hover">
                                   <Text class="font-mono text-xs text-ink">{model().id}</Text>
@@ -314,20 +316,21 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
         >
           <Text class="text-xs leading-relaxed text-muted">{t("web.provider.usesIntro")}</Text>
           <View class="min-w-0">
-            <Each of={useGroups}>
+            <Each of={useGroups} key={(g) => g.title}>
               {(group) => {
-                const groupBound = () => group().uses.filter((entry) => Boolean(draft()[entry.use])).length;
+                const groupBound = computed(() => group().uses.filter((entry) => Boolean(draft()[entry.use])).length);
                 return (
                   <View>
                     <View class="flex-row items-center justify-between gap-2 pt-3 pb-1.5">
                       <Text class="text-xs font-semibold text-muted">{t(`web.provider.${group().title}`)}</Text>
                       <Text class="text-2xs text-faint tabular-nums">{`${groupBound()}/${group().uses.length}`}</Text>
                     </View>
-                    <Each of={group().uses}>
+                    <Each of={group().uses} key={(entry) => entry.use}>
                       {(item) => {
                         const use = item().use;
                         const name = t(`web.provider.use.${use}`);
-                        const bound = () => Boolean(draft()[use]);
+                        const bound = computed(() => Boolean(draft()[use]));
+                        const modelOptions = computed(() => base()[`${use}Models`].map((model) => ({ value: model, label: model })));
                         return (
                           <View testID={`provider-use-${use}`} class="min-w-0 flex-row flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-line py-2.5">
                             <View class="w-40 shrink-0 flex-row flex-wrap items-center gap-1.5">
@@ -369,7 +372,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
                                     testid={`provider-${use}-model`}
                                     disabled={act.busy()}
                                     value={draft()[use]?.model ?? ""}
-                                    options={base()[`${use}Models`].map((model) => ({ value: model, label: model }))}
+                                    options={modelOptions()}
                                     onChange={(model) => pickModel(use, model)}
                                   />
                                 </If>
@@ -417,7 +420,7 @@ function ProviderForm(props: { initial: ProviderStatus; part: ProviderPart }) {
 /** What models each use has on this account: <details> closed until its summary is pressed. */
 function Adapted(props: { status: ProviderStatus }) {
   const open = signal(false);
-  const total = () => adaptedUses.reduce((sum, use) => sum + props.status[`${use}Models`].length, 0);
+  const total = computed(() => adaptedUses.reduce((sum, use) => sum + props.status[`${use}Models`].length, 0));
   return (
     <View testID="provider-adapted" class="gap-1.5">
       <View

@@ -1,4 +1,4 @@
-import { signal, Text, untracked, View } from "nsh";
+import { computed, signal, Text, untracked, View } from "nsh";
 
 import { setLocale, t, currentLocale } from "@vibevalley/i18n";
 import {
@@ -114,7 +114,7 @@ function MemoryForm(props: { status: SettingsStatus }) {
 
   const setSource = (kind: MemorySourceKind, change: Partial<SourceDraft>, touched = true) =>
     sources.set(untracked(sources).map((d) => (d.kind === kind ? { ...d, ...change, changed: d.changed || touched } : d)));
-  const dirty = () => sources().some((d) => d.changed);
+  const dirty = computed(() => sources().some((d) => d.changed));
   const undo = () => {
     sources.set(draftsOf(status()).map((d, i) => ({ ...d, open: sources()[i]?.open ?? false })));
     error.set(undefined);

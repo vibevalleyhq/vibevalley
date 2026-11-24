@@ -1,3 +1,5 @@
+import { computed } from "nsh";
+
 import { t } from "@vibevalley/i18n";
 import { type Changes, type Issue, type IssueAct, type IssueAction, type IssueStatus } from "@vibevalley/protocol";
 import { latestSessionIdOf, omitUndefined } from "@vibevalley/protocol/rules";
@@ -51,9 +53,10 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
   const [text, setText] = createSignal("");
   const [box, setBox] = createSignal<ActBox | undefined>();
 
-  const move = () => issueMoveOf(issue().id, moves.list());
+  const move = computed(() => issueMoveOf(issue().id, moves.list()));
   // A move on its way changes what the buttons mean: none is pressed until the frame shows where the issue is.
-  const busy = () => ways.act.busy() || move()?.state === "moving";
+  const busy = computed(() => ways.act.busy() || move()?.state === "moving");
+  const words = computed(() => pendingWords(says.list(), issue().id));
   const run = (f: () => Promise<unknown>) => ways.act.run(async () => (await f(), true)).then((ok) => ok === true);
 
   /** True once the server took it; a failed move shows on the page with why. */
@@ -154,7 +157,7 @@ export function createIssueActs(issue: () => Issue, ways: ActWays) {
     /** Runs something beside the acts (a review choice) under the same busy flag. */
     run,
     /** The words said here on their way, or refused. */
-    words: () => pendingWords(says.list(), issue().id),
+    words,
     sayAgain: (key: string) => void says.retry(key),
     /** A refused line back into the box, to change or let go. */
     takeBack: (key: string) => {

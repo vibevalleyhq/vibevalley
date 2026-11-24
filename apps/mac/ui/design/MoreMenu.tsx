@@ -1,4 +1,4 @@
-import { Text, View } from "nsh";
+import { computed, Text, View } from "nsh";
 import { Menu, MenuItem, MenuSeparator } from "nsh/base";
 
 import { Icon } from "./Icon";
@@ -27,7 +27,7 @@ export function MoreMenu(props: {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
-  const hasIcons = () => props.items.some((item) => item.icon !== undefined);
+  const hasIcons = computed(() => props.items.some((item) => item.icon !== undefined));
   return (
     <Menu
       open={props.open}

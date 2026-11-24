@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, View } from "nsh";
+import { computed, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Issue, IssueAction, IssueAnswer, Milestone, Question as QuestionItem, SessionEvent } from "@vibevalley/protocol";
@@ -147,13 +147,14 @@ export function Runs(props: { issue: string; version: string; onChanges?: (() =>
     () => props.issue,
     () => props.version,
   );
-  const runs = () => ready(query, []);
+  const runs = computed(() => ready(query, []));
+  const reversedRuns = computed(() => runs().toReversed());
   const now = useNow();
   return (
     <If when={runs().length > 0} else={<Text class="text-xs text-faint">{t("web.issue.detail.noRuns")}</Text>}>
       <View>
         <Text class="mb-2 text-xs text-muted tabular-nums">{t("web.issue.detail.runCount", { n: runs().length })}</Text>
-        <Each of={runs().toReversed()} key={(run) => run.id}>
+        <Each of={reversedRuns()} key={(run) => run.id}>
           {(r) => (
             <View class="flex-row items-baseline gap-3 pb-2">
               <Text class="w-24 shrink-0 text-xs text-muted tabular-nums">{shortMomentText(r().startedAt, now())}</Text>
@@ -194,7 +195,7 @@ const stepWord: Partial<Record<SessionEvent["type"], string>> = {
 
 /** The session's steps, newest last; tool results and usage are left to the farm's fuller log. */
 export function WorkLog(props: { steps: SessionEvent[] }) {
-  const shown = () => props.steps.filter((e) => stepWord[e.type] !== undefined).slice(-240);
+  const shown = computed(() => props.steps.filter((e) => stepWord[e.type] !== undefined).slice(-240));
   return (
     <Scroll testID="issue-steps" class="max-h-[420px]">
       <Each of={shown()} key={(e) => e.seq}>
@@ -214,13 +215,13 @@ export function WorkLog(props: { steps: SessionEvent[] }) {
 
 /** An issue for the orchestrator: what it was asked, and its runs; the answers are in its channel. */
 export function OrchestratorIssueDetail(props: { issue: Issue }) {
-  const tag = () => issueTag(props.issue);
+  const tag = computed(() => issueTag(props.issue));
   const now = useNow();
   const act = createAct();
   const moves = useIntents(issueMove);
-  const move = () => issueMoveOf(props.issue.id, moves.list());
-  const busy = () => act.busy() || move()?.state === "moving";
-  const tone = () => stageTone[props.issue.stage.state];
+  const move = computed(() => issueMoveOf(props.issue.id, moves.list()));
+  const busy = computed(() => act.busy() || move()?.state === "moving");
+  const tone = computed(() => stageTone[props.issue.stage.state]);
   // The orchestrator's answer is the user's to take as done or put away; one that did not end well can only be put away.
   const go = (a: IssueAction) => {
     const issue = props.issue;

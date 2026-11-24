@@ -1,4 +1,4 @@
-import { Text, View, type InputRef, type JSX } from "nsh";
+import { computed, Text, View, type InputRef, type JSX } from "nsh";
 import { Input, Select as Base } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -167,10 +167,11 @@ export function Select<V extends string>(props: {
   /** A choice on its way to the server (shown already) or refused (the value is the server's again). */
   state?: "pending" | "failed" | undefined;
 }) {
-  const all = () => [...(props.placeholder !== undefined ? [{ value: "", label: props.placeholder, disabled: false }] : []), ...props.options];
+  const all = computed(() => [...(props.placeholder !== undefined ? [{ value: "", label: props.placeholder, disabled: false }] : []), ...props.options]);
   const offered = (v: string): v is V => all().some((o) => o.value === v);
-  const shown = () => all().find((o) => o.value === props.value)?.label ?? props.placeholder ?? "";
-  const tinted = () => props.filter === true && props.value !== "";
+  const shown = computed(() => all().find((o) => o.value === props.value)?.label ?? props.placeholder ?? "");
+  const tinted = computed(() => props.filter === true && props.value !== "");
+  const selectItems = computed(() => all().map((o) => ({ value: o.value, title: o.label, disabled: o.disabled === true })));
   const disabled = () => props.disabled === true;
   const textClass = () => (props.text === "xs" ? "text-xs" : "text-sm");
   const triggerSurface = () => {
@@ -197,7 +198,7 @@ export function Select<V extends string>(props: {
       accessibilityLabel={props.label}
       value={props.value}
       disabled={props.disabled}
-      items={all().map((o) => ({ value: o.value, title: o.label, disabled: o.disabled === true }))}
+      items={selectItems()}
       onChange={(e) => {
         const v = e.value ?? "";
         if (offered(v)) props.onChange(v);

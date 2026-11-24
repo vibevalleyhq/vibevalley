@@ -70,10 +70,10 @@ function DayStandIn(props: { level: number }) {
 
 export function Languages(props: { languages: Asked<RepoLanguages> }) {
   const data = () => ready(props.languages, undefined);
-  const shares = () => {
+  const shares = createMemo(() => {
     const d = data();
     return d ? languageShares(d.languages) : [];
-  };
+  });
   return (
     <Card title={t("web.repo.whatLanguages")} action={<Text class="text-xs text-muted">{t("web.repo.byLines")}</Text>}>
       <If when={!(props.languages.error() && !data())} else={<NotCounted reason={reasonOf(props.languages.error())} />}>
@@ -247,22 +247,25 @@ const hands = 8;
 
 export function Hands(props: { activity?: RepoActivity | undefined }) {
   const agents = useWorkAgents();
+  const agentByName = createMemo(() => new Map(agents().map((a) => [a.name, a])));
   const authors = () => props.activity?.authors ?? [];
-  const top = () => {
+  const shownAuthors = createMemo(() => authors().slice(0, hands));
+  const top = createMemo(() => {
     const first = authors().at(0);
     return first !== undefined && first.commits > 0 ? first.commits : 1;
-  };
-  const rest = () =>
+  });
+  const rest = createMemo(() =>
     authors()
       .slice(hands)
-      .reduce((n, a) => n + a.commits, 0);
+      .reduce((n, a) => n + a.commits, 0),
+  );
   return (
     <If when={authors().length > 0}>
       <Card title={t("web.repo.who")} action={<Text class="text-xs text-muted">{t("web.repo.whoWhen")}</Text>} testid="repo-hands">
         <View class="grid gap-2.5 sm:grid-cols-2">
-          <Each of={authors().slice(0, hands)}>
+          <Each of={shownAuthors()} key={(a) => a.name}>
             {(author) => {
-              const agent = () => agents().find((a) => a.name === author().name);
+              const agent = createMemo(() => agentByName().get(author().name));
               return (
                 <View class="flex-row items-center gap-3">
                   <If
@@ -306,7 +309,7 @@ export function NewRepoForm(props: { onDone: (made?: RepoSummary) => void }) {
   // A refusal shows in the form, beside what was typed.
   const act = createAct((reason) => error.set(reason));
   const busy = act.busy;
-  const canSubmit = () => !busy() && name().trim() !== "" && (importing() === "new" || github().trim() !== "");
+  const canSubmit = createMemo(() => !busy() && name().trim() !== "" && (importing() === "new" || github().trim() !== ""));
   const submit = async () => {
     if (!canSubmit()) return;
     const request = { name: name().trim(), ...(importing() === "github" ? { github: github().trim() } : {}) };

@@ -1,4 +1,4 @@
-import { signal, Text, untracked, View } from "nsh";
+import { computed, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Artifact, VibeValleyApi } from "@vibevalley/protocol";
@@ -105,6 +105,9 @@ function OutlineImportBody() {
       markdown.set(decodeBase64Utf8(res.data.data));
     });
 
+  const canSubmit = computed(() => !act.busy() && markdown().trim().length > 0);
+  const titlePlaceholder = computed(() => filename()?.replace(/\.(?:outline\.md|md|markdown)$/iu, "") ?? t("web.library.content.artifactType.outline"));
+
   const submit = () => {
     const raw = untracked(markdown);
     if (raw.trim().length === 0 || act.busy()) return;
@@ -151,7 +154,7 @@ function OutlineImportBody() {
           accessibilityLabel={t("web.artifact.page.title")}
           value={title()}
           onInput={(v) => title.set(v)}
-          placeholder={filename()?.replace(/\.(?:outline\.md|md|markdown)$/iu, "") ?? t("web.library.content.artifactType.outline")}
+          placeholder={titlePlaceholder()}
         />
       </Field>
 
@@ -178,7 +181,7 @@ function OutlineImportBody() {
         <Button testID="outline-import-cancel" disabled={act.busy()} onPress={closeOutlineImport}>
           {t("web.base.form.never")}
         </Button>
-        <Button tone="primary" icon="upload" testID="outline-import-submit" disabled={act.busy() || markdown().trim().length === 0} onPress={submit}>
+        <Button tone="primary" icon="upload" testID="outline-import-submit" disabled={!canSubmit()} onPress={submit}>
           {t("web.artifact.outline.submit")}
         </Button>
       </View>

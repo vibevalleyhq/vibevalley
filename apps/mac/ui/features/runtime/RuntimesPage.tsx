@@ -1,4 +1,4 @@
-import { Text, View, type InputRef } from "nsh";
+import { computed, Text, View, type InputRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Agent, MachinePlatform, MachineStatus, RuntimeInfo } from "@vibevalley/protocol";
@@ -132,8 +132,17 @@ export function RuntimesPage(props: { rest: string }) {
   const runtimes = useRuntimes();
   const agents = useWorkAgents();
   const machines = useMergedMachines();
-  const list = () => sortRuntimes(ready(runtimes, []));
-  const selected = () => list().find((r) => r.id === props.rest) ?? list()[0];
+  const list = computed(() => sortRuntimes(ready(runtimes, [])));
+  const selected = computed(() => list().find((r) => r.id === props.rest) ?? list()[0]);
+  const agentsByRuntime = computed(() => {
+    const map = new Map<string, Agent[]>();
+    for (const a of agents()) {
+      const existing = map.get(a.runtime);
+      if (existing) existing.push(a);
+      else map.set(a.runtime, [a]);
+    }
+    return map;
+  });
   return (
     <If
       when={!runtimes.error()}
@@ -164,9 +173,9 @@ export function RuntimesPage(props: { rest: string }) {
             >
               <Each of={list()} key={(r) => r.id}>
                 {(r) => {
-                  const ok = () => r().installation.status === "available";
-                  const using = () => agents().filter((a) => a.runtime === r().id).length;
-                  const quota = () => quotaOf(r());
+                  const ok = computed(() => r().installation.status === "available");
+                  const using = computed(() => agentsByRuntime().get(r().id)?.length ?? 0);
+                  const quota = computed(() => quotaOf(r()));
                   return (
                     <ListRow
                       to={`/runtimes/${r().id}`}
@@ -195,7 +204,7 @@ export function RuntimesPage(props: { rest: string }) {
           }
         >
           <If when={selected()} else={<Quiet>{t("web.runtime.reading")}</Quiet>}>
-            {(s) => <Keyed key={s().id}>{() => <Detail info={s()} agents={agents().filter((a) => a.runtime === s().id)} />}</Keyed>}
+            {(s) => <Keyed key={s().id}>{() => <Detail info={s()} agents={agentsByRuntime().get(s().id) ?? []} />}</Keyed>}
           </If>
         </Split>
       </View>

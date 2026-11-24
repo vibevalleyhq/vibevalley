@@ -68,19 +68,19 @@ export function ContentSidebar() {
   const artifacts = useArtifacts(() => ({}));
   const media = useQuery(() => libraryQuery({ text: "", sort: "recent" }), { interval: () => 10_000, keepPrevious: true });
 
-  const allArtifacts = () => ready(artifacts, undefined) ?? [];
-  const allMedia = () => ready(media, undefined) ?? [];
+  const allArtifacts = createMemo(() => ready(artifacts, undefined) ?? []);
+  const allMedia = createMemo(() => ready(media, undefined) ?? []);
 
-  const inBrowse = () => location().pathname === "/library" || location().pathname.startsWith("/library/");
+  const inBrowse = createMemo(() => location().pathname === "/library" || location().pathname.startsWith("/library/"));
   const bucket = () => contentBrowseBucket();
-  const allArtifactsActive = () => {
-    const b = bucket();
+  const allArtifactsActive = createMemo(() => {
+    const b = contentBrowseBucket();
     return inBrowse() && b.kind === "artifacts" && b.artifactType === undefined;
-  };
-  const allMediaActive = () => {
-    const b = bucket();
+  });
+  const allMediaActive = createMemo(() => {
+    const b = contentBrowseBucket();
     return inBrowse() && b.kind === "media" && b.fileKind === undefined;
-  };
+  });
 
   const counts = createMemo(() =>
     countContentHub({

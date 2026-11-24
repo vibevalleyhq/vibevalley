@@ -1,4 +1,4 @@
-import { cleanup, Clipboard, signal, Text, View } from "nsh";
+import { cleanup, Clipboard, computed, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import {
@@ -61,22 +61,19 @@ export function AudioPanel() {
   const mode = signal<AudioMode>("speakers");
   const error = signal<string | undefined>(undefined);
   const act = createAct((e) => error.set(e));
-  const jobs = () =>
-    ops()?.media?.filter(
-      (job): job is MediaAudioJob => job.kind === "speakers" || job.kind === "voiceDesign" || job.kind === "clone" || job.kind === "transcription",
-    ) ?? [];
+  const jobs = computed(
+    () =>
+      ops()?.media?.filter(
+        (job): job is MediaAudioJob => job.kind === "speakers" || job.kind === "voiceDesign" || job.kind === "clone" || job.kind === "transcription",
+      ) ?? [],
+  );
+  const modeOptions = computed(() => modes.map((kind) => ({ value: kind, label: titleOf(kind) })));
 
   return (
     <View testID="audio-panel" accessibilityLabel={t("web.audio.title")} class="max-w-3xl min-w-0 gap-4">
       <NoticeBanner tone="info">{t("web.audio.notice")}</NoticeBanner>
       <View class="flex-row flex-wrap items-center justify-between gap-2">
-        <Segmented
-          testid="audio-mode"
-          label={t("web.audio.title")}
-          value={mode()}
-          onChange={(kind) => mode.set(kind)}
-          options={modes.map((kind) => ({ value: kind, label: titleOf(kind) }))}
-        />
+        <Segmented testid="audio-mode" label={t("web.audio.title")} value={mode()} onChange={(kind) => mode.set(kind)} options={modeOptions()} />
         <View tooltip={<Bubble text={t("web.audio.refresh")} />}>
           <Button
             testID="audio-refresh"
@@ -266,17 +263,16 @@ function SpeakersForm(props: { status: ProviderStatus | undefined }) {
   const submitted = signal<MediaSpeakersRequest | undefined>(undefined);
   const error = signal<string | undefined>(undefined);
   const act = createAct((e) => error.set(e));
-  const mapped = () => speakers().map((speaker) => ({ id: speaker.id.trim(), voice: speaker.scope === scope() ? speaker.voice : "" }));
-  const turns = () =>
-    segments().map((segment) => ({
-      speaker:
-        speakers()
-          .find((speaker) => speaker.key === segment.speaker)
-          ?.id.trim() ?? "",
+  const mapped = computed(() => speakers().map((speaker) => ({ id: speaker.id.trim(), voice: speaker.scope === scope() ? speaker.voice : "" })));
+  const turns = computed(() => {
+    const byKey = new Map(speakers().map((speaker) => [speaker.key, speaker.id.trim()]));
+    return segments().map((segment) => ({
+      speaker: byKey.get(segment.speaker) ?? "",
       text: segment.text,
     }));
-  const valid = () => Boolean(binding()) && dialogueComplete(mapped(), turns());
-  const disabled = () => act.busy() || Boolean(submitted());
+  });
+  const valid = computed(() => Boolean(binding()) && dialogueComplete(mapped(), turns()));
+  const disabled = computed(() => act.busy() || Boolean(submitted()));
 
   const submit = () => {
     if (act.busy()) return;
@@ -903,7 +899,7 @@ function AudioJobCard(props: { job: MediaAudioJob }) {
                 </View>
                 <If when={result().segments.length > 0} else={<Quiet>{t("web.audio.noTimestamps")}</Quiet>}>
                   <View testID="audio-timeline" class="min-w-0 gap-1">
-                    <Each of={result().segments}>
+                    <Each of={result().segments} key={(s) => `${s.start}:${s.end}`}>
                       {(segment) => (
                         <View class="flex-row items-start gap-2.5 rounded-md px-2 py-1.5 hover:bg-hover">
                           <View

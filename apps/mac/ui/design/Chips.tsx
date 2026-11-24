@@ -1,4 +1,4 @@
-import { signal, Text, View } from "nsh";
+import { computed, signal, Text, View } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -65,8 +65,8 @@ export function ChipsInput(props: { value: readonly string[]; onChange: (v: stri
 export function KeyValueEditor(props: { value: Readonly<Record<string, string>>; onChange: (v: Record<string, string>) => void; disabled?: boolean }) {
   const key = signal("");
   const val = signal("");
-  const rows = () => Object.entries(props.value);
-  const addDisabled = () => props.disabled === true || key().trim() === "";
+  const rows = computed(() => Object.entries(props.value));
+  const addDisabled = computed(() => props.disabled === true || key().trim() === "");
   const inputClass = () => (props.disabled === true ? `${field} bg-side` : `${field} hover:border-faint focus:border-focus`);
   const add = () => {
     if (!key().trim()) return;
