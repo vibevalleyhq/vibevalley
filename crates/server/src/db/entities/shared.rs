@@ -1,3 +1,5 @@
+pub use super::outbox_item;
+
 pub mod seq_counter {
     use sea_orm::entity::prelude::*;
 

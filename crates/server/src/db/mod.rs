@@ -256,6 +256,225 @@ impl ServerDb {
     pub fn close(&self) {
         vibevalley_runtime::rt::block_on(self.close_async());
     }
+
+    /// Runs an async SeaORM write transaction whose closure returns `(T, SliceMask)`.
+    /// Commits only on `Ok` and rolls back on `Err`, guaranteeing dirty slice masks are
+    /// never surfaced from a failed or rolled-back transaction.
+    #[allow(dead_code)]
+    pub(crate) async fn write_dirty<T, E>(
+        &self,
+        f: impl for<'a> FnOnce(&'a DatabaseTransaction) -> crate::transport::api::BoxFuture<'a, Result<(T, vibevalley_core::SliceMask), E>> + Send,
+    ) -> Result<(T, vibevalley_core::SliceMask), E>
+    where
+        E: From<DbErr>,
+    {
+        self.write_dirty_with(E::from, f).await
+    }
+
+    /// Runs an async SeaORM write transaction like [`Self::write_dirty`] with an explicit `DbErr` mapper.
+    #[allow(dead_code)]
+    pub(crate) async fn write_dirty_with<T, E>(
+        &self,
+        mut map_err: impl FnMut(DbErr) -> E,
+        f: impl for<'a> FnOnce(&'a DatabaseTransaction) -> crate::transport::api::BoxFuture<'a, Result<(T, vibevalley_core::SliceMask), E>> + Send,
+    ) -> Result<(T, vibevalley_core::SliceMask), E> {
+        let tx = begin_write_tx(&self.write_conn).await.map_err(&mut map_err)?;
+        match f(&tx).await {
+            Ok((val, dirty)) => {
+                tx.commit().await.map_err(map_err)?;
+                Ok((val, dirty))
+            }
+            Err(err) => {
+                let _ = tx.rollback().await;
+                Err(err)
+            }
+        }
+    }
+}
+
+#[allow(dead_code)]
+pub(crate) const OUTBOX_STATUS_PENDING: &str = "pending";
+#[allow(dead_code)]
+pub(crate) const OUTBOX_STATUS_PROCESSING: &str = "processing";
+#[allow(dead_code)]
+pub(crate) const OUTBOX_STATUS_DONE: &str = "done";
+#[allow(dead_code)]
+pub(crate) const OUTBOX_STATUS_FAILED: &str = "failed";
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct OutboxItemRow {
+    pub id: i64,
+    pub topic: String,
+    pub payload_json: String,
+    pub status: String,
+    pub attempts: i64,
+    pub available_at: i64,
+    pub created_at: i64,
+    pub last_error: Option<String>,
+}
+
+impl From<entities::shared::outbox_item::Model> for OutboxItemRow {
+    fn from(model: entities::shared::outbox_item::Model) -> Self {
+        Self {
+            id: model.id,
+            topic: model.topic,
+            payload_json: model.payload_json,
+            status: model.status,
+            attempts: model.attempts,
+            available_at: model.available_at,
+            created_at: model.created_at,
+            last_error: model.last_error,
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl ServerDb {
+    pub(crate) async fn insert_outbox_item_in_tx(tx: &DatabaseTransaction, topic: &str, payload_json: &str, now_ms: i64) -> Result<i64, DbErr> {
+        use sea_orm::{ActiveModelTrait, ActiveValue::Set};
+
+        let saved = entities::shared::outbox_item::ActiveModel {
+            topic: Set(topic.to_owned()),
+            payload_json: Set(payload_json.to_owned()),
+            status: Set(OUTBOX_STATUS_PENDING.to_owned()),
+            attempts: Set(0),
+            available_at: Set(now_ms),
+            created_at: Set(now_ms),
+            last_error: Set(None),
+            ..Default::default()
+        }
+        .insert(tx)
+        .await?;
+        Ok(saved.id)
+    }
+
+    /// Requeues any rows left in `processing` from an unclean shutdown back to `pending`.
+    pub(crate) async fn recover_processing_outbox(&self, now_ms: i64) -> Result<u64, DbErr> {
+        use sea_orm::sea_query::Expr;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+        let res = entities::shared::outbox_item::Entity::update_many()
+            .col_expr(entities::shared::outbox_item::Column::Status, Expr::value(OUTBOX_STATUS_PENDING))
+            .col_expr(entities::shared::outbox_item::Column::AvailableAt, Expr::value(now_ms))
+            .filter(entities::shared::outbox_item::Column::Status.eq(OUTBOX_STATUS_PROCESSING))
+            .exec(&self.write_conn)
+            .await?;
+        Ok(res.rows_affected)
+    }
+
+    /// Atomically claims up to `limit` due `pending` outbox rows, marking them `processing`
+    /// and incrementing `attempts`.
+    pub(crate) async fn claim_pending_outbox(&self, now_ms: i64, limit: u64) -> Result<Vec<OutboxItemRow>, DbErr> {
+        use sea_orm::sea_query::Expr;
+        use sea_orm::{ColumnTrait, EntityTrait, ExprTrait, QueryFilter, QueryOrder, QuerySelect};
+
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let tx = begin_write_tx(&self.write_conn).await?;
+        let outcome: Result<Vec<OutboxItemRow>, DbErr> = async {
+            let candidates = entities::shared::outbox_item::Entity::find()
+                .filter(entities::shared::outbox_item::Column::Status.eq(OUTBOX_STATUS_PENDING))
+                .filter(entities::shared::outbox_item::Column::AvailableAt.lte(now_ms))
+                .order_by_asc(entities::shared::outbox_item::Column::AvailableAt)
+                .order_by_asc(entities::shared::outbox_item::Column::Id)
+                .limit(limit)
+                .all(&tx)
+                .await?;
+            if candidates.is_empty() {
+                return Ok(Vec::new());
+            }
+            let ids: Vec<i64> = candidates.into_iter().map(|row| row.id).collect();
+            let mut claimed = entities::shared::outbox_item::Entity::update_many()
+                .col_expr(entities::shared::outbox_item::Column::Status, Expr::value(OUTBOX_STATUS_PROCESSING))
+                .col_expr(
+                    entities::shared::outbox_item::Column::Attempts,
+                    Expr::col(entities::shared::outbox_item::Column::Attempts).add(1i64),
+                )
+                .filter(entities::shared::outbox_item::Column::Id.is_in(ids))
+                .filter(entities::shared::outbox_item::Column::Status.eq(OUTBOX_STATUS_PENDING))
+                .exec_with_returning(&tx)
+                .await?;
+            claimed.sort_by_key(|row| (row.available_at, row.id));
+            Ok(claimed.into_iter().map(OutboxItemRow::from).collect())
+        }
+        .await;
+        match outcome {
+            Ok(rows) => {
+                tx.commit().await?;
+                Ok(rows)
+            }
+            Err(err) => {
+                let _ = tx.rollback().await;
+                Err(err)
+            }
+        }
+    }
+
+    pub(crate) async fn next_pending_outbox_at(&self) -> Result<Option<i64>, DbErr> {
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+
+        let row = entities::shared::outbox_item::Entity::find()
+            .filter(entities::shared::outbox_item::Column::Status.eq(OUTBOX_STATUS_PENDING))
+            .order_by_asc(entities::shared::outbox_item::Column::AvailableAt)
+            .order_by_asc(entities::shared::outbox_item::Column::Id)
+            .limit(1)
+            .one(&self.read_conn)
+            .await?;
+        Ok(row.map(|m| m.available_at))
+    }
+
+    pub(crate) async fn complete_outbox_item(&self, id: i64) -> Result<(), DbErr> {
+        use sea_orm::sea_query::Expr;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+        entities::shared::outbox_item::Entity::update_many()
+            .col_expr(entities::shared::outbox_item::Column::Status, Expr::value(OUTBOX_STATUS_DONE))
+            .col_expr(entities::shared::outbox_item::Column::LastError, Expr::value(Option::<String>::None))
+            .filter(entities::shared::outbox_item::Column::Id.eq(id))
+            .exec(&self.write_conn)
+            .await?;
+        Ok(())
+    }
+
+    pub(crate) async fn reschedule_outbox_item(&self, id: i64, available_at: i64, error: &str) -> Result<(), DbErr> {
+        use sea_orm::sea_query::Expr;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+        entities::shared::outbox_item::Entity::update_many()
+            .col_expr(entities::shared::outbox_item::Column::Status, Expr::value(OUTBOX_STATUS_PENDING))
+            .col_expr(entities::shared::outbox_item::Column::AvailableAt, Expr::value(available_at))
+            .col_expr(entities::shared::outbox_item::Column::LastError, Expr::value(Some(error.to_owned())))
+            .filter(entities::shared::outbox_item::Column::Id.eq(id))
+            .exec(&self.write_conn)
+            .await?;
+        Ok(())
+    }
+
+    pub(crate) async fn fail_outbox_item(&self, id: i64, error: &str) -> Result<(), DbErr> {
+        use sea_orm::sea_query::Expr;
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+        entities::shared::outbox_item::Entity::update_many()
+            .col_expr(entities::shared::outbox_item::Column::Status, Expr::value(OUTBOX_STATUS_FAILED))
+            .col_expr(entities::shared::outbox_item::Column::LastError, Expr::value(Some(error.to_owned())))
+            .filter(entities::shared::outbox_item::Column::Id.eq(id))
+            .exec(&self.write_conn)
+            .await?;
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn list_outbox_items(&self) -> Result<Vec<OutboxItemRow>, DbErr> {
+        use sea_orm::{EntityTrait, QueryOrder};
+
+        let rows = entities::shared::outbox_item::Entity::find()
+            .order_by_asc(entities::shared::outbox_item::Column::Id)
+            .all(&self.read_conn)
+            .await?;
+        Ok(rows.into_iter().map(OutboxItemRow::from).collect())
+    }
 }
 
 pub(crate) async fn next_seq_async(db: &impl sea_orm::ConnectionTrait, name: &str, at_least: i64) -> Result<i64, DbErr> {
@@ -1152,6 +1371,23 @@ mod tests {
         .insert(w)
         .await
         .unwrap();
+
+        let (outbox_id, dirty) = db
+            .write_dirty(|tx| {
+                Box::pin(async move {
+                    let id = ServerDb::insert_outbox_item_in_tx(tx, "dual_db.ping", r#"{"ok":true}"#, 100).await?;
+                    Ok::<_, DbErr>((id, vibevalley_core::SliceMask::OPS))
+                })
+            })
+            .await
+            .unwrap();
+        assert!(outbox_id > 0);
+        assert_eq!(dirty, vibevalley_core::SliceMask::OPS);
+        let claimed = db.claim_pending_outbox(100, 8).await.unwrap();
+        assert_eq!(claimed.len(), 1);
+        assert_eq!(claimed[0].id, outbox_id);
+        assert_eq!(claimed[0].attempts, 1);
+        db.complete_outbox_item(outbox_id).await.unwrap();
     }
 
     #[test]
