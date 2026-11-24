@@ -24,7 +24,7 @@ use super::collab::commit_meta_for_actor;
 use super::db::{self, ArtifactRow, ChangeRow, StoredSuggestion};
 use super::{ArtifactStore, Change, new_id, q, refused};
 use crate::db::begin_write_tx;
-use crate::{Hub, Sink, now};
+use crate::{Sink, now};
 
 /// How long a batch is kept to answer it again, and a block's text to
 /// merge a stale update against.
@@ -589,7 +589,7 @@ impl ArtifactStore {
 
     /// `follow`: each batch after `after`, then each from now on; `Reset`
     /// when too far behind.
-    pub async fn follow_async(&self, hub: &Hub, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
+    pub async fn follow_async(&self, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
         let (rx, missed, current) = {
             let conn = self.db.read_conn();
             self.found_blocks_async(conn, id).await?;
@@ -600,9 +600,9 @@ impl ArtifactStore {
             (rx, missed, current)
         };
         let id = id.to_string();
-        let hub_cancel = hub.child_token();
+        let runtime_cancel = self.runtime.child_token();
         let closed = self.cancel.clone();
-        hub.spawn_task(async move {
+        self.runtime.spawn(async move {
             if missed.len() > CATCH_UP_MAX {
                 sink.send(&ArtifactEvent::Reset {});
                 return;
@@ -614,7 +614,7 @@ impl ArtifactStore {
                     return;
                 }
             }
-            relay_with_reset(rx, hub_cancel, closed, &sink, ArtifactEvent::Reset {}, |c: Change| {
+            relay_with_reset(rx, runtime_cancel, closed, &sink, ArtifactEvent::Reset {}, |c: Change| {
                 (c.artifact == id && c.ack.seq > upto).then_some(ArtifactEvent::Blocks {
                     seq: c.ack.seq,
                     blocks: c.ack.blocks,
@@ -883,14 +883,14 @@ impl ArtifactStore {
     }
 
     /// `suggestionStream`: the list now, then the whole list after each change.
-    pub async fn follow_suggestions_async(self: &Arc<Self>, hub: &Hub, id: &str, sink: Sink) -> Result<(), ApiError> {
+    pub async fn follow_suggestions_async(self: &Arc<Self>, id: &str, sink: Sink) -> Result<(), ApiError> {
         let mut rx = self.suggestion_changes.subscribe();
         let first = self.suggestions_async(id).await?;
         let id = id.to_string();
         let weak = Arc::downgrade(self);
-        let hub_cancel = hub.child_token();
+        let runtime_cancel = self.runtime.child_token();
         let closed = self.cancel.clone();
-        hub.spawn_task(async move {
+        self.runtime.spawn(async move {
             let event = |suggestions| SuggestionEvent {
                 tag: SuggestionEventKind::Suggestions,
                 suggestions,
@@ -904,7 +904,7 @@ impl ArtifactStore {
                 }
                 let next = tokio::select! {
                     biased;
-                    _ = hub_cancel.cancelled() => return,
+                    _ = runtime_cancel.cancelled() => return,
                     _ = closed.cancelled() => return,
                     _ = sink.stop.recv_async() => return,
                     res = rx.recv() => res,
@@ -984,7 +984,7 @@ impl ArtifactStore {
 
 pub(super) async fn relay_with_reset<T: Clone, E: serde::Serialize>(
     mut rx: broadcast::Receiver<T>,
-    hub_cancel: CancellationToken,
+    runtime_cancel: CancellationToken,
     closed: CancellationToken,
     sink: &Sink,
     reset: E,
@@ -996,7 +996,7 @@ pub(super) async fn relay_with_reset<T: Clone, E: serde::Serialize>(
         }
         let next = tokio::select! {
             biased;
-            _ = hub_cancel.cancelled() => return,
+            _ = runtime_cancel.cancelled() => return,
             _ = closed.cancelled() => return,
             _ = sink.stop.recv_async() => return,
             res = rx.recv() => res,

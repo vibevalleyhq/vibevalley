@@ -438,10 +438,19 @@ fn server_module_id_of_file(file_path: &str) -> Option<String> {
     Some(format!("{}/{}", mod_path[0], mod_path[1]))
 }
 
+fn is_spine_composition_or_fake(file_path: &str) -> bool {
+    matches!(
+        file_path,
+        "crates/server/src/app/mod.rs" | "crates/server/src/app/bootstrap.rs" | "crates/server/src/app/door.rs"
+    ) || file_path == "crates/server/src/app/fake.rs"
+        || file_path.starts_with("crates/server/src/app/fake/")
+        || file_path == "crates/server/src/app/fakes.rs"
+        || file_path.starts_with("crates/server/src/app/fakes/")
+}
+
 fn is_spine_file(file_path: &str) -> bool {
     file_path == "crates/server/src/lib.rs"
-        || file_path == "crates/server/src/app/mod.rs"
-        || (file_path.starts_with("crates/server/src/app/hub/") && file_path.ends_with(".rs"))
+        || (file_path.starts_with("crates/server/src/app/") && file_path.ends_with(".rs") && !is_spine_composition_or_fake(file_path))
         || (file_path.starts_with("crates/server/src/db/") && file_path.ends_with(".rs"))
         || (file_path.starts_with("crates/server/src/transport/") && file_path.ends_with(".rs"))
 }
@@ -855,7 +864,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                     line,
                     message: format!("server spine/transport imports concrete module `{target}` ({})", index.snippet_at(line)),
                     fix: format!(
-                        "Move the narrow port trait into crates/server/src/app/hub/ports.rs or crates/server/src/transport/api/ and inject the implementation in app/bootstrap.rs. See {TOPOLOGY_DOC} Section 3.2.2."
+                        "Move the narrow port trait into crates/server/src/app/port.rs or crates/server/src/transport/api/ and inject the implementation in app/bootstrap.rs. See {TOPOLOGY_DOC} Section 3.2.2."
                     ),
                     details: Vec::new(),
                 });
@@ -936,7 +945,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                                 source_class.layer.as_str()
                             ),
                             fix: format!(
-                                "Replace wildcard domain imports with explicit L1 or same-domain imports, or route cross-domain calls through Hub::invoke / EventBus / ports.rs. See {TOPOLOGY_DOC} Section 3.2.1."
+                                "Replace wildcard domain imports with explicit L1 or same-domain imports, or route cross-domain calls through App / SliceProjector / app/port.rs. See {TOPOLOGY_DOC} Section 3.2.1."
                             ),
                             details: Vec::new(),
                         });
@@ -985,7 +994,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                                 target_class.layer.as_str()
                             ),
                             fix: format!(
-                                "L1 modules must have zero upward dependencies; inject a narrow port trait from crates/server/src/app/hub/ports.rs or subscribe via EventBus. See {TOPOLOGY_DOC} Section 3.2."
+                                "L1 modules must have zero upward dependencies; inject a narrow port trait from crates/server/src/app/port.rs or mark slices dirty via SliceProjector. See {TOPOLOGY_DOC} Section 3.2."
                             ),
                             details: Vec::new(),
                         });
@@ -996,7 +1005,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                             line,
                             message: format!("L2 module `{source_module}` imports L3 module `{target_module}` ({snippet})"),
                             fix: format!(
-                                "Invert the dependency with a narrow port trait in crates/server/src/app/hub/ports.rs or move shared pure helpers down to L1 (infra/text). See {TOPOLOGY_DOC} Section 3.2."
+                                "Invert the dependency with a narrow port trait in crates/server/src/app/port.rs or move shared pure helpers down to L1 (infra/text). See {TOPOLOGY_DOC} Section 3.2."
                             ),
                             details: Vec::new(),
                         });
@@ -1015,7 +1024,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                                 dst_peer.as_str()
                             ),
                             fix: format!(
-                                "L2 peer domains (work, collab, content, team/memory) must not import each other directly; use Hub::invoke<O>, EventBus, SpaceState, or a read-only port in crates/server/src/app/hub/ports.rs. See {TOPOLOGY_DOC} Section 3.2.1."
+                                "L2 peer domains (work, collab, content, team/memory) must not import each other directly; use App, Outbox, LiveOverlay, SliceProjector, or a narrow port in crates/server/src/app/port.rs. See {TOPOLOGY_DOC} Section 3.2.1."
                             ),
                             details: Vec::new(),
                         });
@@ -1052,7 +1061,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                 line: primary_line,
                 message: format!("directed cycle in server modules: {cycle_label}"),
                 fix: format!(
-                    "Break the module cycle by extracting shared data/ports downward or routing writes via Hub::invoke / EventBus so crates/server/src/ domain modules form a strict DAG. See {TOPOLOGY_DOC} Section 3.2.2."
+                    "Break the module cycle by extracting shared data/ports downward or routing writes via App / Outbox / SliceProjector so crates/server/src/ domain modules form a strict DAG. See {TOPOLOGY_DOC} Section 3.2.2."
                 ),
                 details: hops,
             });
@@ -1244,11 +1253,12 @@ mod tests {
     #[test]
     fn spine_no_module_import_fails_on_lib_ports_and_transport() {
         let files = vec![
-            sf("crates/server/src/lib.rs", "use crate::collab::voice::Voice;\npub struct Hub;"),
-            sf(
-                "crates/server/src/app/hub/ports.rs",
-                "pub trait Recall { fn x(&self) -> crate::team::memory::Hit; }",
-            ),
+            sf("crates/server/src/lib.rs", "use crate::collab::voice::Voice;\npub struct Server;"),
+            sf("crates/server/src/app/port.rs", "pub trait Recall { fn x(&self) -> crate::team::memory::Hit; }"),
+            sf("crates/server/src/app/slice.rs", "use crate::work::issue::IssueStore;\n"),
+            sf("crates/server/src/app/bootstrap.rs", "use crate::work::issue::IssueStore;\n"),
+            sf("crates/server/src/app/door.rs", "use crate::content::artifact::ArtifactStore;\n"),
+            sf("crates/server/src/app/mod.rs", "use crate::work::issue::IssueStore;\n"),
             sf("crates/server/src/db/mod.rs", "pub fn bad() -> crate::work::ledger::Ledger { todo!() }"),
             sf(
                 "crates/server/src/transport/api/mod.rs",
@@ -1261,7 +1271,8 @@ mod tests {
         assert_eq!(
             tags,
             vec![
-                "spine-no-module-import@crates/server/src/app/hub/ports.rs:1",
+                "spine-no-module-import@crates/server/src/app/port.rs:1",
+                "spine-no-module-import@crates/server/src/app/slice.rs:1",
                 "spine-no-module-import@crates/server/src/db/mod.rs:1",
                 "spine-no-module-import@crates/server/src/lib.rs:1",
                 "spine-no-module-import@crates/server/src/transport/api/mod.rs:2",
@@ -1436,7 +1447,7 @@ mod tests {
     fn audits_workspace_from_disk() {
         let dir = TempDir::new("vv-boundaries");
         dir.write("crates/server/src/lib.rs", "pub mod app;\n");
-        dir.write("crates/server/src/app/hub/ports.rs", "pub trait LiveVoicePort {}\n");
+        dir.write("crates/server/src/app/port.rs", "pub trait LiveVoicePort {}\n");
         dir.write("crates/server/src/transport/api/mod.rs", "pub trait Server {}\n");
         dir.write("crates/server/src/infra/setting.rs", "pub struct Setting;\n");
         dir.write("crates/server/src/work/ledger.rs", "use crate::infra::setting::Setting;\n");

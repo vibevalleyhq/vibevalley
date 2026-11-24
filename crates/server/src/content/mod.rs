@@ -25,11 +25,12 @@ mod tests {
 
     use super::artifact::{ArtifactStore, BlockQuoter, Maker, spans_of};
     use super::attachment::AttachmentStore;
-    use super::library::{AddedBy, Library};
+    use super::library::{AddedBy, LibraryStore};
     use super::media::inputs::MediaInputStore;
     use super::media::jobs::{MediaStore, Parts};
-    use crate::Hub;
-    use crate::app::hub::ports::{ChannelAnnouncePort, ChannelQuotePort};
+    use crate::app::port::{ChannelAnnouncePort, ChannelQuotePort, MessageLocationsFuture};
+    use crate::app::runtime::Runtime;
+    use crate::app::slice::SliceProjector;
     use crate::db::ServerDb;
     use crate::db::entities::collab_channel::{channel, channel_message, channel_participant};
     use crate::db::entities::content_artifact::{artifact, artifact_change};
@@ -43,47 +44,45 @@ mod tests {
     }
 
     impl TestAnnounce {
-        fn new(db: Arc<ServerDb>) -> Arc<Self> {
-            vibevalley_runtime::rt::block_on(async {
-                let w = db.write_conn();
-                channel_participant::ActiveModel {
-                    id: Set(USER_ID.into()),
-                    kind: Set("user".into()),
-                    name: Set("User".into()),
-                    agent_id: Set(None),
-                    home_id: Set(None),
-                    joined_at: Set(100),
-                    left_at: Set(None),
-                }
-                .insert(w)
-                .await
-                .unwrap();
-                channel::ActiveModel {
-                    id: Set("general".into()),
-                    channel_type: Set("channel".into()),
-                    is_default: Set(true),
-                    root_id: Set(None),
-                    root_number: Set(None),
-                    subject_kind: Set(None),
-                    subject_id: Set(None),
-                    last_number: Set(Some(0)),
-                    reply_count: Set(0),
-                    created_at: Set(100),
-                    name: Set(Some("general".into())),
-                    description: Set(None),
-                    repo: Set(None),
-                    parent_id: Set(None),
-                    peer_id: Set(None),
-                    revision: Set(1),
-                    category: Set(None),
-                    position: Set(None),
-                    archived_at: Set(None),
-                    notify: Set("all".into()),
-                }
-                .insert(w)
-                .await
-                .unwrap();
-            });
+        async fn new_async(db: Arc<ServerDb>) -> Arc<Self> {
+            let w = db.write_conn();
+            channel_participant::ActiveModel {
+                id: Set(USER_ID.into()),
+                kind: Set("user".into()),
+                name: Set("User".into()),
+                agent_id: Set(None),
+                home_id: Set(None),
+                joined_at: Set(100),
+                left_at: Set(None),
+            }
+            .insert(w)
+            .await
+            .unwrap();
+            channel::ActiveModel {
+                id: Set("general".into()),
+                channel_type: Set("channel".into()),
+                is_default: Set(true),
+                root_id: Set(None),
+                root_number: Set(None),
+                subject_kind: Set(None),
+                subject_id: Set(None),
+                last_number: Set(Some(0)),
+                reply_count: Set(0),
+                created_at: Set(100),
+                name: Set(Some("general".into())),
+                description: Set(None),
+                repo: Set(None),
+                parent_id: Set(None),
+                peer_id: Set(None),
+                revision: Set(1),
+                category: Set(None),
+                position: Set(None),
+                archived_at: Set(None),
+                notify: Set("all".into()),
+            }
+            .insert(w)
+            .await
+            .unwrap();
             Arc::new(Self { db, seq: AtomicI64::new(1) })
         }
     }
@@ -198,7 +197,7 @@ mod tests {
         fn history_async<'a>(&'a self, _channel: &'a str, _limit: i64) -> crate::BoxFuture<'a, Result<Vec<ChatMessage>, ApiError>> {
             Box::pin(async { Ok(vec![]) })
         }
-        fn message_locations<'a>(&'a self, ids: &'a [String]) -> crate::app::hub::ports::MessageLocationsFuture<'a> {
+        fn message_locations<'a>(&'a self, ids: &'a [String]) -> MessageLocationsFuture<'a> {
             Box::pin(async move {
                 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
                 if ids.is_empty() {
@@ -247,7 +246,8 @@ mod tests {
         assert_eq!(f_info.name, "100%_chart.png");
 
         // 2. Library (add, filter including LIKE escaping & 'other', sort, soft vs hard remove)
-        let library = Library::open(db.clone(), files.clone());
+        let runtime = Arc::new(Runtime::new());
+        let library = LibraryStore::open(db.clone(), runtime.clone(), files.clone(), None, None);
         let lib_png = library
             .add_async(
                 &LibraryAddRequest {
@@ -329,11 +329,13 @@ mod tests {
                 .is_empty()
         );
         library.remove_async(&att_txt.id).await.unwrap();
-        library.close_async().await;
+        library.close();
 
         // 3. Media Inputs + Jobs
         let clock = Arc::new(ManualClock::new(1_700_000_000_000));
-        let inputs = MediaInputStore::open_with_clock(home, db.clone(), files.clone(), clock.clone()).unwrap();
+        let inputs = MediaInputStore::open_with_clock_async(home, db.clone(), runtime.clone(), files.clone(), clock.clone())
+            .await
+            .unwrap();
         let req = MediaInputRequest {
             kind: MediaInputKind::Image,
             mime: "image/png".into(),
@@ -354,19 +356,20 @@ mod tests {
         inputs.sweep_async().await.unwrap();
         assert!(inputs.list_async().await.unwrap().is_empty());
 
-        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let projector = Arc::new(SliceProjector::new());
         let setting = Setting::open(SettingConfig {
             home: home.to_path_buf(),
             work_root: home.to_path_buf(),
             version: "0.1.0-test".into(),
             deepseek_api_key: String::new(),
         });
-        let announce = TestAnnounce::new(db.clone());
+        let announce = TestAnnounce::new_async(db.clone()).await;
         let (vendor, download) = crate::app::fakes::moss::network();
-        let jobs = MediaStore::open_with_clock(
+        let jobs = MediaStore::open_with_clock_async(
             Parts {
                 db: db.clone(),
-                hub: Arc::downgrade(&hub),
+                runtime: runtime.clone(),
+                projector,
                 setting,
                 files: files.clone(),
                 inputs: inputs.clone(),
@@ -376,6 +379,7 @@ mod tests {
             },
             clock.clone(),
         )
+        .await
         .unwrap();
         let bad_img = jobs
             .image_async(
@@ -398,10 +402,10 @@ mod tests {
         // Offline without bound provider returns ProviderRefused (verifies known_async read path succeeds).
         assert_eq!(bad_img.unwrap_err().biz_code, BizCode::ProviderRefused);
         jobs.close();
-        inputs.close();
+        inputs.close_async().await;
 
         // 4. Artifacts (blocks + html + store + collab/history + constraints)
-        let artifacts = ArtifactStore::open(db.clone(), files.clone(), announce.clone());
+        let artifacts = ArtifactStore::open(db.clone(), runtime.clone(), files.clone(), announce.clone());
         let quoter = BlockQuoter::new(db.clone());
         let maker = Maker::user();
 
@@ -804,19 +808,19 @@ mod tests {
         super::artifact::db::prune(db.write_conn(), i64::MAX).await.unwrap();
         artifacts.remove_async(&forked.id).await.unwrap();
         artifacts.close();
-        hub.close_async().await;
+        runtime.shutdown(Duration::from_secs(2)).await;
     }
 
-    #[test]
-    fn dual_db_content_sqlite() {
+    #[tokio::test]
+    async fn dual_db_content_sqlite() {
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
-        vibevalley_runtime::rt::block_on(verify_content_on(dir.path(), db.clone()));
-        db.close();
+        verify_content_on(dir.path(), db.clone()).await;
+        db.close_async().await;
     }
 
-    #[test]
-    fn dual_db_content_postgres() {
+    #[tokio::test]
+    async fn dual_db_content_postgres() {
         let Some(pg) = EphemeralPostgres::start() else {
             eprintln!("skipping dual_db_content_postgres: initdb/pg_ctl not found");
             return;
@@ -825,7 +829,7 @@ mod tests {
         let url = pg.db_url("content_w3_test");
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open_url(&url).unwrap();
-        vibevalley_runtime::rt::block_on(verify_content_on(dir.path(), db.clone()));
-        db.close();
+        verify_content_on(dir.path(), db.clone()).await;
+        db.close_async().await;
     }
 }

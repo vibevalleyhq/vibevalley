@@ -26,9 +26,9 @@ use vibevalley_protocol::{
 use super::blocks::relay_with_reset;
 use super::collab::commit_meta_for_maker;
 use super::{ArtifactStore, Maker, artifact_type_of, db, q, refused};
-use crate::app::hub::refusal::{LookIn, missing};
+use crate::app::refusal::{LookIn, missing};
 use crate::db::begin_write_tx;
-use crate::{Hub, Sink, now};
+use crate::{Sink, now};
 
 const CATCH_UP_MAX: usize = 200;
 
@@ -101,7 +101,7 @@ fn sanitize_whiteboard_element_json(artifact_type: Option<ArtifactType>, path: &
         }
     }
     if dirty {
-        return serde_json::to_string(&parsed).map_err(crate::app::hub::refusal::internal);
+        return serde_json::to_string(&parsed).map_err(crate::app::refusal::internal);
     }
     Ok(canonical_text.to_string())
 }
@@ -627,7 +627,7 @@ impl ArtifactStore {
         Ok(result)
     }
 
-    pub async fn follow_entries_async(&self, hub: &Hub, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
+    pub async fn follow_entries_async(&self, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
         let (rx, missed, current) = {
             let conn = self.db.read_conn();
             self.found_store_async(conn, id).await?;
@@ -638,9 +638,9 @@ impl ArtifactStore {
             (rx, missed, current)
         };
         let id = id.to_string();
-        let hub_cancel = hub.child_token();
+        let runtime_cancel = self.runtime.child_token();
         let closed = self.cancel.clone();
-        hub.spawn_task(async move {
+        self.runtime.spawn(async move {
             if missed.len() > CATCH_UP_MAX {
                 sink.send(&ArtifactEntryEvent::Reset {});
                 return;
@@ -660,7 +660,7 @@ impl ArtifactStore {
                     return;
                 }
             }
-            relay_with_reset(rx, hub_cancel, closed, &sink, ArtifactEntryEvent::Reset {}, |c: EntryChange| {
+            relay_with_reset(rx, runtime_cancel, closed, &sink, ArtifactEntryEvent::Reset {}, |c: EntryChange| {
                 (c.artifact == id && c.seq > upto).then_some(ArtifactEntryEvent::Entries {
                     seq: c.seq,
                     entries: c.entries,
@@ -809,20 +809,29 @@ impl ArtifactStore {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
+    use crate::app::live::LiveOverlay;
+    use crate::app::runtime::Runtime;
+    use crate::app::slice::SliceProjector;
     use crate::collab::channel::Chat;
     use crate::content::attachment::AttachmentStore;
     use vibevalley_protocol::{ArtifactHtmlEdit, ArtifactKind, ArtifactRequest, HtmlAnchor, HtmlAnchorKind};
 
-    fn test_artifacts() -> (tempfile::TempDir, Arc<ArtifactStore>) {
+    async fn test_artifacts() -> (tempfile::TempDir, Arc<crate::db::ServerDb>, Arc<Runtime>, Arc<ArtifactStore>) {
         vibevalley_i18n::set_locale("zh");
         let dir = tempfile::tempdir().unwrap();
         let db = crate::db::ServerDb::open(dir.path()).unwrap();
-        let hub = crate::Hub::new(vibevalley_core::empty_space_state());
+        let runtime = Arc::new(Runtime::new());
+        let live = Arc::new(LiveOverlay::new());
+        let projector = Arc::new(SliceProjector::new());
         let files = AttachmentStore::open(dir.path(), db.clone());
-        let chat = Chat::open(db.clone(), &hub, files.clone(), None, false).unwrap();
-        let artifacts = ArtifactStore::open(db, files, chat);
-        (dir, artifacts)
+        let chat = Chat::open_async(db.clone(), runtime.clone(), live, projector, files.clone(), None, false)
+            .await
+            .unwrap();
+        let artifacts = ArtifactStore::open(db.clone(), runtime.clone(), files, chat);
+        (dir, db, runtime, artifacts)
     }
 
     #[test]
@@ -842,130 +851,130 @@ mod tests {
         assert!(non_surface.contrast_dark.is_some());
     }
 
-    #[test]
-    fn store_create_seeds_starters_and_supports_html_edit_and_write_props() {
-        let (_dir, artifacts) = test_artifacts();
+    #[tokio::test]
+    async fn store_create_seeds_starters_and_supports_html_edit_and_write_props() {
+        let (_dir, db, runtime, artifacts) = test_artifacts().await;
         let maker = Maker::user();
 
-        vibevalley_runtime::rt::block_on(async {
-            // 1. Omitting `entries` on a typed store seeds starters server-side.
-            let slides = artifacts
-                .create_async(
-                    &maker,
-                    &ArtifactRequest {
-                        title: "Q4 Deck".into(),
-                        kind: Some(ArtifactKind::Store),
-                        artifact_type: Some(ArtifactType::Slides),
-                        display: None,
-                        content: None,
-                        entries: None,
-                        is_default: None,
-                        announce: None,
-                        note: None,
-                        channel: None,
-                        issue: None,
-                    },
-                )
-                .await
-                .unwrap();
-            assert_eq!(slides.seq, 1);
-            let snap = artifacts
-                .list_entries_async(&ArtifactEntryListRequest {
-                    id: slides.id.clone(),
-                    prefix: None,
-                    include_values: Some(true),
-                })
-                .await
-                .unwrap();
-            let slide = snap
-                .entries
-                .iter()
-                .find(|e| e.path.starts_with("project/slides/") && e.path.ends_with(".html"))
-                .unwrap();
-            assert!(slide.value.as_deref().unwrap().contains("Q4 Deck"));
+        // 1. Omitting `entries` on a typed store seeds starters server-side.
+        let slides = artifacts
+            .create_async(
+                &maker,
+                &ArtifactRequest {
+                    title: "Q4 Deck".into(),
+                    kind: Some(ArtifactKind::Store),
+                    artifact_type: Some(ArtifactType::Slides),
+                    display: None,
+                    content: None,
+                    entries: None,
+                    is_default: None,
+                    announce: None,
+                    note: None,
+                    channel: None,
+                    issue: None,
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(slides.seq, 1);
+        let snap = artifacts
+            .list_entries_async(&ArtifactEntryListRequest {
+                id: slides.id.clone(),
+                prefix: None,
+                include_values: Some(true),
+            })
+            .await
+            .unwrap();
+        let slide = snap
+            .entries
+            .iter()
+            .find(|e| e.path.starts_with("project/slides/") && e.path.ends_with(".html"))
+            .unwrap();
+        assert!(slide.value.as_deref().unwrap().contains("Q4 Deck"));
 
-            // 2. `html_edit` with `path` edits the slide entry via Rust `html_edit`.
-            let edited_art = artifacts
-                .html_edit_async(
-                    &maker,
-                    &ArtifactHtmlEdit {
-                        id: slides.id.clone(),
-                        version: slides.seq,
-                        path: Some(slide.path.clone()),
-                        anchor: HtmlAnchor {
-                            kind: HtmlAnchorKind::Text,
-                            exact: "Q4 Deck".into(),
-                            prefix: String::new(),
-                            suffix: String::new(),
-                        },
-                        text: "Q1 Roadmap".into(),
-                    },
-                )
-                .await
-                .unwrap();
-            assert_eq!(edited_art.seq, 2);
-            let updated_slide = artifacts
-                .get_entry_async(&ArtifactEntryGetRequest {
+        // 2. `html_edit` with `path` edits the slide entry via Rust `html_edit`.
+        let edited_art = artifacts
+            .html_edit_async(
+                &maker,
+                &ArtifactHtmlEdit {
                     id: slides.id.clone(),
-                    path: slide.path.clone(),
-                })
-                .await
-                .unwrap();
-            assert!(updated_slide.value.as_deref().unwrap().contains("Q1 Roadmap"));
-
-            // 3. `write_entry_props` updates `data-props` defaults in a `.dc.html` entry.
-            let design = artifacts
-                .create_async(
-                    &maker,
-                    &ArtifactRequest {
-                        title: "Hero".into(),
-                        kind: Some(ArtifactKind::Store),
-                        artifact_type: Some(ArtifactType::Design),
-                        display: None,
-                        content: None,
-                        entries: Some(vec![ArtifactEntryWriteInput {
-                            op: ArtifactEntryOp::Set,
-                            path: "project/main.dc.html".into(),
-                            kind: Some(ArtifactEntryKind::Text),
-                            value: Some(
-                                r#"<x-dc data-props='[{"name":"density","type":"select","options":["comfortable","compact"],"value":"comfortable"}]'><div>Body</div></x-dc>"#
-                                    .into(),
-                            ),
-                            from: None,
-                            mime: None,
-                            if_rev: None,
-                        }]),
-                        is_default: None,
-                        announce: None,
-                        note: None,
-                        channel: None,
-                        issue: None,
+                    version: slides.seq,
+                    path: Some(slide.path.clone()),
+                    anchor: HtmlAnchor {
+                        kind: HtmlAnchorKind::Text,
+                        exact: "Q4 Deck".into(),
+                        prefix: String::new(),
+                        suffix: String::new(),
                     },
-                )
-                .await
-                .unwrap();
-            let res = artifacts
-                .write_entry_props_async(
-                    &maker,
-                    &ArtifactEntryWritePropsInput {
-                        id: design.id.clone(),
+                    text: "Q1 Roadmap".into(),
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(edited_art.seq, 2);
+        let updated_slide = artifacts
+            .get_entry_async(&ArtifactEntryGetRequest {
+                id: slides.id.clone(),
+                path: slide.path.clone(),
+            })
+            .await
+            .unwrap();
+        assert!(updated_slide.value.as_deref().unwrap().contains("Q1 Roadmap"));
+
+        // 3. `write_entry_props` updates `data-props` defaults in a `.dc.html` entry.
+        let design = artifacts
+            .create_async(
+                &maker,
+                &ArtifactRequest {
+                    title: "Hero".into(),
+                    kind: Some(ArtifactKind::Store),
+                    artifact_type: Some(ArtifactType::Design),
+                    display: None,
+                    content: None,
+                    entries: Some(vec![ArtifactEntryWriteInput {
+                        op: ArtifactEntryOp::Set,
                         path: "project/main.dc.html".into(),
-                        values: BTreeMap::from([("density".into(), DesignPropValue::String("compact".into()))]),
-                    },
-                )
-                .await
-                .unwrap();
-            assert!(res.applied);
-            let dc = artifacts
-                .get_entry_async(&ArtifactEntryGetRequest {
-                    id: design.id,
+                        kind: Some(ArtifactEntryKind::Text),
+                        value: Some(
+                            r#"<x-dc data-props='[{"name":"density","type":"select","options":["comfortable","compact"],"value":"comfortable"}]'><div>Body</div></x-dc>"#
+                                .into(),
+                        ),
+                        from: None,
+                        mime: None,
+                        if_rev: None,
+                    }]),
+                    is_default: None,
+                    announce: None,
+                    note: None,
+                    channel: None,
+                    issue: None,
+                },
+            )
+            .await
+            .unwrap();
+        let res = artifacts
+            .write_entry_props_async(
+                &maker,
+                &ArtifactEntryWritePropsInput {
+                    id: design.id.clone(),
                     path: "project/main.dc.html".into(),
-                })
-                .await
-                .unwrap();
-            assert!(dc.value.as_deref().unwrap().contains(r#""value":"compact""#));
-        });
+                    values: BTreeMap::from([("density".into(), DesignPropValue::String("compact".into()))]),
+                },
+            )
+            .await
+            .unwrap();
+        assert!(res.applied);
+        let dc = artifacts
+            .get_entry_async(&ArtifactEntryGetRequest {
+                id: design.id,
+                path: "project/main.dc.html".into(),
+            })
+            .await
+            .unwrap();
+        assert!(dc.value.as_deref().unwrap().contains(r#""value":"compact""#));
         artifacts.close();
+        runtime.shutdown(Duration::from_secs(2)).await;
+        db.close_async().await;
     }
 
     #[test]
