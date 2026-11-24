@@ -9,12 +9,14 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use vibevalley_protocol::{Issue, Session};
+use vibevalley_protocol::{Issue, IssueFilter, Session};
 
+use crate::app::port::ResourcePort;
 use crate::collab::channel::Chat;
-use crate::work::issue::Board;
-use crate::work::pull::Pulls;
-use crate::work::session::Trajectories;
+use crate::transport::api::BoxFuture;
+use crate::work::issue::IssueStore;
+use crate::work::pull::PullStore;
+use crate::work::session::TrajectoryStore;
 
 #[derive(Deserialize)]
 pub struct ResourceReadArgs {
@@ -150,21 +152,17 @@ impl Cache {
 }
 
 pub struct ResourceStore {
-    board: Board,
+    issues: Arc<IssueStore>,
     chat: Arc<Chat>,
-    trajectories: Arc<Trajectories>,
-    pulls: Option<Arc<Pulls>>,
+    trajectories: Arc<TrajectoryStore>,
+    pulls: Option<Arc<PullStore>>,
     cache: Mutex<Cache>,
 }
 
-/// Temporary compatibility alias until remaining unowned callers migrate.
-#[doc(hidden)]
-pub type Resources = ResourceStore;
-
 impl ResourceStore {
-    pub fn new(board: Board, chat: Arc<Chat>, trajectories: Arc<Trajectories>) -> Arc<ResourceStore> {
+    pub fn new(issues: Arc<IssueStore>, chat: Arc<Chat>, trajectories: Arc<TrajectoryStore>) -> Arc<ResourceStore> {
         Arc::new(ResourceStore {
-            board,
+            issues,
             chat,
             trajectories,
             pulls: None,
@@ -172,9 +170,9 @@ impl ResourceStore {
         })
     }
 
-    pub fn with_pulls(board: Board, chat: Arc<Chat>, trajectories: Arc<Trajectories>, pulls: Arc<Pulls>) -> Arc<ResourceStore> {
+    pub fn with_pulls(issues: Arc<IssueStore>, chat: Arc<Chat>, trajectories: Arc<TrajectoryStore>, pulls: Arc<PullStore>) -> Arc<ResourceStore> {
         Arc::new(ResourceStore {
-            board,
+            issues,
             chat,
             trajectories,
             pulls: Some(pulls),
@@ -184,11 +182,6 @@ impl ResourceStore {
 
     /// One page as `resource_read` answers it (JSON text), or the refusal.
     /// `reader` is a session; `None` reads as the orchestrator.
-    pub fn read(&self, reader: Option<&Session>, args: &ResourceReadArgs) -> Result<String, String> {
-        vibevalley_runtime::rt::block_on(self.read_async(reader, args))
-    }
-
-    /// Async implementation of [`Self::read`].
     pub async fn read_async(&self, reader: Option<&Session>, args: &ResourceReadArgs) -> Result<String, String> {
         let uri = args.uri.trim().to_string();
         let r = parse(&uri).ok_or_else(|| invalid_uri(&uri))?;
@@ -230,11 +223,12 @@ impl ResourceStore {
         match r {
             Ref::Absent => Err(missing(uri)),
             Ref::Issue(id) => {
-                let issue = self.issue(&id).ok_or_else(|| missing(uri))?;
-                if !orchestrator && !reader.is_some_and(|s| self.may_read_issue(s, &issue)) {
+                let all_issues = self.issues.list_async(&IssueFilter::default()).await.unwrap_or_default();
+                let issue = find_issue(&all_issues, &id).ok_or_else(|| missing(uri))?;
+                if !orchestrator && !reader.is_some_and(|s| may_read_issue(s, &issue, &all_issues)) {
                     return Err(forbidden(uri));
                 }
-                let runs = self.board.runs_async(&issue.id).await.unwrap_or_default();
+                let runs = self.issues.runs_async(&issue.id).await.unwrap_or_default();
                 let messages = self.chat.issue_messages_async(&issue.id).await.unwrap_or_default();
                 pretty(json!({ "issue": issue, "runs": runs, "messages": messages }))
             }
@@ -269,53 +263,48 @@ impl ResourceStore {
         }
     }
 
-    fn issue(&self, key: &str) -> Option<Issue> {
-        let k = key.trim_start_matches('#');
-        self.board.read(|s| s.issues.iter().find(|i| i.id == key || i.number.to_string() == k).cloned())
-    }
-
     fn may_read_channel(&self, s: &Session, channel: &str) -> bool {
         s.channel_id() == Some(channel) || self.chat.home_of(&s.id).as_deref() == Some(channel)
     }
-
-    /// Its own issue, the parent, and every issue its own waits on.
-    fn may_read_issue(&self, s: &Session, target: &Issue) -> bool {
-        let Some(own) = s.issue_id() else { return false };
-        if own == target.id {
-            return true;
-        }
-        self.board.read(|state| {
-            let all: HashMap<&str, &Issue> = state.issues.iter().map(|i| (i.id.as_str(), i)).collect();
-            let Some(mine) = all.get(own) else { return false };
-            if mine.parent.as_deref() == Some(target.id.as_str()) {
-                return true;
-            }
-            let mut seen: HashSet<&str> = HashSet::new();
-            let mut todo: Vec<&str> = mine.blocked_by.iter().map(String::as_str).collect();
-            while let Some(id) = todo.pop() {
-                if !seen.insert(id) {
-                    continue;
-                }
-                if let Some(i) = all.get(id) {
-                    todo.extend(i.blocked_by.iter().map(String::as_str));
-                }
-            }
-            seen.contains(target.id.as_str())
-        })
-    }
 }
 
-impl crate::app::hub::ports::ResourcePort for ResourceStore {
-    fn read(&self, reader: Option<&Session>, uri: &str, offset: Option<i64>, limit: Option<i64>) -> Result<String, String> {
-        ResourceStore::read(
-            self,
-            reader,
-            &ResourceReadArgs {
-                uri: uri.to_string(),
-                offset,
-                limit,
-            },
-        )
+fn find_issue(issues: &[Issue], key: &str) -> Option<Issue> {
+    let k = key.trim_start_matches('#');
+    issues.iter().find(|i| i.id == key || i.number.to_string() == k).cloned()
+}
+
+/// Its own issue, the parent, and every issue its own waits on.
+fn may_read_issue(s: &Session, target: &Issue, issues: &[Issue]) -> bool {
+    let Some(own) = s.issue_id() else { return false };
+    if own == target.id {
+        return true;
+    }
+    let all: HashMap<&str, &Issue> = issues.iter().map(|i| (i.id.as_str(), i)).collect();
+    let Some(mine) = all.get(own) else { return false };
+    if mine.parent.as_deref() == Some(target.id.as_str()) {
+        return true;
+    }
+    let mut seen: HashSet<&str> = HashSet::new();
+    let mut todo: Vec<&str> = mine.blocked_by.iter().map(String::as_str).collect();
+    while let Some(id) = todo.pop() {
+        if !seen.insert(id) {
+            continue;
+        }
+        if let Some(i) = all.get(id) {
+            todo.extend(i.blocked_by.iter().map(String::as_str));
+        }
+    }
+    seen.contains(target.id.as_str())
+}
+
+impl ResourcePort for ResourceStore {
+    fn read_async<'a>(&'a self, reader: Option<&'a Session>, uri: &'a str, offset: Option<i64>, limit: Option<i64>) -> BoxFuture<'a, Result<String, String>> {
+        let args = ResourceReadArgs {
+            uri: uri.to_string(),
+            offset,
+            limit,
+        };
+        Box::pin(async move { ResourceStore::read_async(self, reader, &args).await })
     }
 }
 

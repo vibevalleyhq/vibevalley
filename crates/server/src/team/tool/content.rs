@@ -1,6 +1,6 @@
-//! Resources, artifacts, the library and media: read/list/lifecycle calls route
-//! through `Hub::invoke_async` or `ResourcePort` (`vv://`), keeping actor-scoped
-//! artifact/media writes strongly typed without importing L3 `team/mcp` or L2 `content/library`.
+//! Resources, artifacts, the library and media: direct typed calls into domain
+//! stores and `ResourcePort` (`vv://`), keeping actor-scoped artifact/media/library
+//! writes strongly typed with zero `Hub` or `block_on`.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -8,14 +8,15 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use vibevalley_core::collab::CommitMeta;
 use vibevalley_protocol::{
-    ArtifactBody, ArtifactEntryBatchRequest, ArtifactEntryGetRequest, ArtifactEntryListRequest, ArtifactGetInput, ArtifactKind, ArtifactListRequest,
-    ArtifactOutlineImportRequest, ArtifactReadRequest, ArtifactRequest, ArtifactType, ArtifactTypeReadRequest, ArtifactVersionRequest, BlockCreate,
-    BlockDelete, BlockOpResult, BlockOpStatus, BlockUpdate, LibraryAddRequest, LibraryListRequest, MediaImageRequest, MediaJobRequest, MediaSource,
-    MediaSpeakersRequest, MediaSpeechRequest, MediaVoiceDesignRequest, Session, ops,
+    ArtifactBody, ArtifactEntryBatchRequest, ArtifactEntryGetRequest, ArtifactEntryListRequest, ArtifactKind, ArtifactListRequest,
+    ArtifactOutlineImportRequest, ArtifactRequest, ArtifactType, ArtifactTypeReadRequest, ArtifactVersionRequest, BlockCreate, BlockDelete, BlockOpResult,
+    BlockOpStatus, BlockUpdate, LibraryAddRequest, LibraryListRequest, MediaImageRequest, MediaSource, MediaSpeakersRequest, MediaSpeechRequest,
+    MediaVoiceDesignRequest, Session,
 };
 
 use super::{ToolBox, Who, given};
 use crate::content::artifact::Maker;
+use crate::content::library::AddedBy;
 use crate::now;
 
 fn text<T: serde::Serialize>(v: &T) -> Result<String, String> {
@@ -39,17 +40,11 @@ pub struct ResourceReadArgs {
 }
 
 pub async fn resource_read(f: &ToolBox, who: &Who, a: ResourceReadArgs) -> Result<String, String> {
-    let resources = f.resources.clone();
     let reader = match who {
         Who::Helper(me) => Some((**me).clone()),
         Who::Orchestrator(_) => None,
     };
-    let uri = a.uri;
-    let offset = a.offset;
-    let limit = a.limit;
-    crate::spawn_blocking_traced(move || resources.read(reader.as_ref(), &uri, offset, limit))
-        .await
-        .map_err(|e| format!("resource_read failed: {e}"))?
+    f.resources.read_async(reader.as_ref(), &a.uri, a.offset, a.limit).await
 }
 
 /// Where the orchestrator makes media from: only with the user's word in this batch.
@@ -98,39 +93,24 @@ pub async fn understand(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, Str
     text(&f.media.start_understanding_async(&a.id, &agent, &channel).await.map_err(|e| e.message)?)
 }
 
-pub async fn job_get(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
-    text(
-        &f.hub()?
-            .invoke_async::<ops::MediaJobGet>(&f.ctx(who), MediaJobRequest { id: a.id })
-            .await
-            .map_err(|e| e.message)?,
-    )
+pub async fn job_get(f: &ToolBox, _who: &Who, a: IdArgs) -> Result<String, String> {
+    text(&f.media.get_async(&a.id).await.map_err(|e| e.message)?)
 }
 
-pub async fn job_list(f: &ToolBox, who: &Who, _: EmptyArgs) -> Result<String, String> {
-    text(&f.hub()?.invoke_async::<ops::MediaJobList>(&f.ctx(who), ()).await.map_err(|e| e.message)?)
+pub async fn job_list(f: &ToolBox, _who: &Who, _: EmptyArgs) -> Result<String, String> {
+    text(&f.media.list_async().await.map_err(|e| e.message)?)
 }
 
-pub async fn job_cancel(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
-    text(
-        &f.hub()?
-            .invoke_async::<ops::MediaJobCancel>(&f.ctx(who), MediaJobRequest { id: a.id })
-            .await
-            .map_err(|e| e.message)?,
-    )
+pub async fn job_cancel(f: &ToolBox, _who: &Who, a: IdArgs) -> Result<String, String> {
+    text(&f.media.cancel_async(&a.id).await.map_err(|e| e.message)?)
 }
 
-pub async fn job_download(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
-    text(
-        &f.hub()?
-            .invoke_async::<ops::MediaJobDownload>(&f.ctx(who), MediaJobRequest { id: a.id })
-            .await
-            .map_err(|e| e.message)?,
-    )
+pub async fn job_download(f: &ToolBox, _who: &Who, a: IdArgs) -> Result<String, String> {
+    text(&f.media.retry_download_async(&a.id).await.map_err(|e| e.message)?)
 }
 
-pub async fn library_list(f: &ToolBox, who: &Who, req: LibraryListRequest) -> Result<String, String> {
-    let items = f.hub()?.invoke_async::<ops::LibraryItemList>(&f.ctx(who), req).await.map_err(|e| e.message)?;
+pub async fn library_list(f: &ToolBox, _who: &Who, req: LibraryListRequest) -> Result<String, String> {
+    let items = f.library.list_async(&req).await.map_err(|e| e.message)?;
     if items.is_empty() {
         return Ok("素材库里没有这样的文件。".into());
     }
@@ -138,11 +118,19 @@ pub async fn library_list(f: &ToolBox, who: &Who, req: LibraryListRequest) -> Re
 }
 
 pub async fn library_add(f: &ToolBox, who: &Who, req: LibraryAddRequest) -> Result<String, String> {
-    let item = f
-        .hub()?
-        .invoke_async::<ops::LibraryItemAdd>(&f.ctx(who), req)
-        .await
-        .map_err(|e| format!("没成：{}", e.message))?;
+    let by = match who {
+        Who::Orchestrator(here) => AddedBy::Agent {
+            agent: here.agent.clone(),
+            session: None,
+            dir: None,
+        },
+        Who::Helper(me) => AddedBy::Agent {
+            agent: me.profile.clone().unwrap_or_default(),
+            session: Some(me.id.clone()),
+            dir: me.cwd.clone(),
+        },
+    };
+    let item = f.library.add_async(&req, &by).await.map_err(|e| format!("没成：{}", e.message))?;
     Ok(format!("放进素材库了：「{}」，id={}。", item.attachment.name, item.attachment.id))
 }
 
@@ -157,34 +145,26 @@ pub struct ArtifactListArgs {
 pub async fn artifact_list(f: &ToolBox, who: &Who, a: ArtifactListArgs) -> Result<String, String> {
     let channel = given(&a.channel).map(String::from);
     let mut issue = match given(&a.issue) {
-        Some(r) => Some(f.issue(r)?.id),
+        Some(r) => Some(f.issue_async(r).await?.id),
         None => None,
     };
     if let (Who::Helper(me), None) = (who, &channel) {
         issue = me.issue_id().map(String::from);
     }
     text(
-        &f.hub()?
-            .invoke_async::<ops::ArtifactList>(
-                &f.ctx(who),
-                ArtifactListRequest {
-                    channel,
-                    issue,
-                    artifact_type: a.artifact_type,
-                },
-            )
+        &f.artifacts
+            .list_async(&ArtifactListRequest {
+                channel,
+                issue,
+                artifact_type: a.artifact_type,
+            })
             .await
             .map_err(|e| e.message)?,
     )
 }
 
-pub async fn artifact_get(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
-    text(
-        &f.hub()?
-            .invoke_async::<ops::ArtifactGet>(&f.ctx(who), ArtifactGetInput { id: a.id })
-            .await
-            .map_err(|e| e.message)?,
-    )
+pub async fn artifact_get(f: &ToolBox, _who: &Who, a: IdArgs) -> Result<String, String> {
+    text(&f.artifacts.get_async(&a.id).await.map_err(|e| e.message)?)
 }
 
 #[derive(Deserialize)]
@@ -194,12 +174,8 @@ pub struct ArtifactContentArgs {
     version: Option<i64>,
 }
 
-pub async fn artifact_content(f: &ToolBox, who: &Who, a: ArtifactContentArgs) -> Result<String, String> {
-    let content = f
-        .hub()?
-        .invoke_async::<ops::ArtifactContentGet>(&f.ctx(who), ArtifactReadRequest { id: a.id, version: a.version })
-        .await
-        .map_err(|e| e.message)?;
+pub async fn artifact_content(f: &ToolBox, _who: &Who, a: ArtifactContentArgs) -> Result<String, String> {
+    let (content, _) = f.artifacts.content_async(&a.id, a.version).await.map_err(|e| e.message)?;
     text(&content)
 }
 
@@ -262,12 +238,12 @@ pub async fn artifact_create(f: &ToolBox, who: &Who, mut a: ArtifactCreateArgs) 
                 a.req.channel = Some(here.channel.clone());
             }
             a.req.issue = match given(&a.req.issue) {
-                Some(r) => Some(f.issue(r)?.id),
+                Some(r) => Some(f.issue_async(r).await?.id),
                 None => None,
             };
         }
         Who::Helper(me) => {
-            if let Some(content) = read_helper_file(me, &a.file).await? {
+            if let Some(content) = read_helper_file(f, me, &a.file).await? {
                 a.req.content = Some(content);
             }
             if given(&a.req.issue).is_none() {
@@ -306,12 +282,12 @@ pub async fn artifact_outline_import(f: &ToolBox, who: &Who, mut a: ArtifactOutl
                 a.channel = Some(here.channel.clone());
             }
             a.issue = match given(&a.issue) {
-                Some(r) => Some(f.issue(r)?.id),
+                Some(r) => Some(f.issue_async(r).await?.id),
                 None => None,
             };
         }
         Who::Helper(me) => {
-            if let Some(content) = read_helper_file(me, &a.file).await? {
+            if let Some(content) = read_helper_file(f, me, &a.file).await? {
                 a.markdown = Some(content);
                 if given(&a.filename).is_none() {
                     a.filename = file;
@@ -360,7 +336,7 @@ fn commit_meta_for_who(who: &Who, summary: Option<String>) -> CommitMeta {
 
 pub async fn artifact_version(f: &ToolBox, who: &Who, mut a: ArtifactVersionArgs) -> Result<String, String> {
     if let Who::Helper(me) = who
-        && let Some(content) = read_helper_file(me, &a.file).await?
+        && let Some(content) = read_helper_file(f, me, &a.file).await?
     {
         a.req.content = content;
     }
@@ -596,22 +572,22 @@ pub async fn block_batch(f: &ToolBox, who: &Who, a: BlockBatchArgs) -> Result<St
     })
 }
 
-pub async fn artifact_type_list(f: &ToolBox, who: &Who, _: EmptyArgs) -> Result<String, String> {
-    text(&f.hub()?.invoke_async::<ops::ArtifactTypeList>(&f.ctx(who), ()).await.map_err(|e| e.message)?)
+pub async fn artifact_type_list(f: &ToolBox, _who: &Who, _: EmptyArgs) -> Result<String, String> {
+    text(&f.artifacts.list_types_async().await.map_err(|e| e.message)?)
 }
 
-pub async fn artifact_type_read(f: &ToolBox, who: &Who, req: ArtifactTypeReadRequest) -> Result<String, String> {
-    text(&f.hub()?.invoke_async::<ops::ArtifactTypeRead>(&f.ctx(who), req).await.map_err(|e| e.message)?)
+pub async fn artifact_type_read(f: &ToolBox, _who: &Who, req: ArtifactTypeReadRequest) -> Result<String, String> {
+    text(&f.artifacts.read_type_async(&req).await.map_err(|e| e.message)?)
 }
 
-pub async fn artifact_entry_list(f: &ToolBox, who: &Who, mut req: ArtifactEntryListRequest) -> Result<String, String> {
+pub async fn artifact_entry_list(f: &ToolBox, _who: &Who, mut req: ArtifactEntryListRequest) -> Result<String, String> {
     req.id = req.id.trim().to_string();
-    text(&f.hub()?.invoke_async::<ops::ArtifactEntryList>(&f.ctx(who), req).await.map_err(|e| e.message)?)
+    text(&f.artifacts.list_entries_async(&req).await.map_err(|e| e.message)?)
 }
 
-pub async fn artifact_entry_get(f: &ToolBox, who: &Who, mut req: ArtifactEntryGetRequest) -> Result<String, String> {
+pub async fn artifact_entry_get(f: &ToolBox, _who: &Who, mut req: ArtifactEntryGetRequest) -> Result<String, String> {
     req.id = req.id.trim().to_string();
-    text(&f.hub()?.invoke_async::<ops::ArtifactEntryGet>(&f.ctx(who), req).await.map_err(|e| e.message)?)
+    text(&f.artifacts.get_entry_async(&req).await.map_err(|e| e.message)?)
 }
 
 pub async fn artifact_entry_batch(f: &ToolBox, who: &Who, mut req: ArtifactEntryBatchRequest) -> Result<String, String> {
@@ -626,13 +602,15 @@ pub async fn artifact_entry_batch(f: &ToolBox, who: &Who, mut req: ArtifactEntry
 }
 
 /// `file`: a file in the helper's own folder becomes the content.
-async fn read_helper_file(me: &Session, file: &Option<String>) -> Result<Option<String>, String> {
+async fn read_helper_file(f: &ToolBox, me: &Session, file: &Option<String>) -> Result<Option<String>, String> {
     let Some(file) = given(file).map(str::to_string) else {
         return Ok(None);
     };
     let dir = me.cwd.as_deref().ok_or("你没有工作目录，不能用 file")?.to_string();
     let file_for_err = file.clone();
-    let path = crate::spawn_blocking_traced(move || inside(Path::new(&dir), &file))
+    let path = f
+        .runtime
+        .spawn_blocking(move || inside(Path::new(&dir), &file))
         .await
         .map_err(|e| format!("读不了 {file_for_err}：{e}"))??;
     tokio::fs::read_to_string(&path)

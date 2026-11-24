@@ -57,42 +57,58 @@ impl ReviewProvider for Bound {
             return Ok(request.explicit());
         };
         let o = self.orchestrator.upgrade().ok_or(Error::Closed)?;
-        let Some((issue, report)) = vibevalley_runtime::rt::block_on(o.board.sessions().review_work_async(vendor, run, request.candidate))
-            .map_err(|e| Error::Invalid(e.to_string()))?
-        else {
-            return Ok(None);
-        };
-        let changes = if issue.repo.is_some() {
-            let diff = crate::work::issue::changes_of(&o.board, &issue, None).map_err(|e| Error::Invalid(e.message))?;
-            Some(json!({"files":diff.files,"uncommitted":diff.uncommitted,"revision":diff.revision}))
-        } else {
-            None
-        };
-        let artifacts = o
-            .artifacts
-            .list(&vibevalley_protocol::ArtifactListRequest {
-                channel: None,
-                issue: Some(issue.id.clone()),
-                artifact_type: None,
-            })
-            .map_err(|e| Error::Invalid(e.message))?;
-        let deliverables = json!({"report":report, "changes":changes, "artifacts":artifacts}).to_string();
-        const EVIDENCE_CHARS: usize = 16_000;
-        Ok(Some(OutcomeReview {
-            task_prompt: format!("{}\n{}", issue.title, issue.description),
-            rubric: Rubric {
-                markdown: issue
-                    .criteria
-                    .iter()
-                    .filter(|v| !v.trim().is_empty())
-                    .map(|v| format!("- {v}"))
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-                max_iterations: 0,
-            },
-            deliverables: vibevalley_core::text::clip(&deliverables, EVIDENCE_CHARS),
-            evidence_truncated: deliverables.chars().nth(EVIDENCE_CHARS).is_some(),
-        }))
+        let (tx, rx) = flume::bounded(1);
+        let vendor = vendor.to_string();
+        let run = run.to_string();
+        let candidate = request.candidate.to_string();
+        let o_task = o.clone();
+        o.runtime.spawn(async move {
+            let res: Result<Option<OutcomeReview>> = async {
+                let Some((issue, report)) = o_task
+                    .sessions
+                    .review_work_async(&vendor, &run, &candidate)
+                    .await
+                    .map_err(|e| Error::Invalid(e.to_string()))?
+                else {
+                    return Ok(None);
+                };
+                let changes = if issue.repo.is_some() {
+                    let diff = o_task.issues.diff_async(&issue.id, None).await.map_err(|e| Error::Invalid(e.message))?;
+                    Some(json!({"files": diff.files, "uncommitted": diff.uncommitted, "revision": diff.revision}))
+                } else {
+                    None
+                };
+                let artifacts = o_task
+                    .artifacts
+                    .list_async(&vibevalley_protocol::ArtifactListRequest {
+                        channel: None,
+                        issue: Some(issue.id.clone()),
+                        artifact_type: None,
+                    })
+                    .await
+                    .map_err(|e| Error::Invalid(e.message))?;
+                let deliverables = json!({"report": report, "changes": changes, "artifacts": artifacts}).to_string();
+                const EVIDENCE_CHARS: usize = 16_000;
+                Ok(Some(OutcomeReview {
+                    task_prompt: format!("{}\n{}", issue.title, issue.description),
+                    rubric: Rubric {
+                        markdown: issue
+                            .criteria
+                            .iter()
+                            .filter(|v| !v.trim().is_empty())
+                            .map(|v| format!("- {v}"))
+                            .collect::<Vec<_>>()
+                            .join("\n"),
+                        max_iterations: 0,
+                    },
+                    deliverables: vibevalley_core::text::clip(&deliverables, EVIDENCE_CHARS),
+                    evidence_truncated: deliverables.chars().nth(EVIDENCE_CHARS).is_some(),
+                }))
+            }
+            .await;
+            let _ = tx.send(res);
+        });
+        rx.recv().map_err(|_| Error::Closed)?
     }
 }
 
@@ -287,16 +303,16 @@ impl Execution {
         })
     }
 
-    pub(super) fn run(&self, run: &mut Run<'_>, input: TurnInput<'_>) -> vibevalley_runtime::agent::Result<TurnOutcome> {
+    pub(super) async fn run_async(&self, run: &mut Run<'_>, input: TurnInput<'_>) -> vibevalley_runtime::agent::Result<TurnOutcome> {
         let id = run.me.id.clone();
         let (send, events) = flume::unbounded();
         self.bound.listeners.lock().insert(id.clone(), send);
-        let result = self.dispatch(run, &input, &events);
+        let result = self.dispatch_async(run, &input, &events).await;
         self.bound.listeners.lock().remove(&id);
         result.map_err(|e| BrainError::Store(e.to_string()))
     }
 
-    fn dispatch(&self, run: &mut Run<'_>, input: &TurnInput<'_>, events: &flume::Receiver<AgentEvent>) -> Result<TurnOutcome> {
+    async fn dispatch_async(&self, run: &mut Run<'_>, input: &TurnInput<'_>, events: &flume::Receiver<AgentEvent>) -> Result<TurnOutcome> {
         let conv = &run.me.id;
         let turn = format!("turn:{}", input.requests[0]);
         let brain = self
@@ -330,22 +346,24 @@ impl Execution {
                 return Err(Error::Closed);
             }
             while let Ok(e) = events.try_recv() {
-                run.on(e);
+                run.on_async(e).await;
             }
             let current = self.store().read(|tx| tx.task(&task.id))?;
             if current.status == TaskStatus::Terminal {
                 break current;
             }
-            flume::Selector::new()
-                .recv(events, |e| e.ok())
-                .recv(&changes, |_| None)
-                .recv(&self.stopped, |_| None)
-                .wait()
-                .into_iter()
-                .for_each(|e| run.on(e));
+            let ev = tokio::select! {
+                biased;
+                _ = self.stopped.recv_async() => None,
+                ev = events.recv_async() => ev.ok(),
+                _ = changes.recv_async() => None,
+            };
+            if let Some(e) = ev {
+                run.on_async(e).await;
+            }
         };
         while let Ok(e) = events.try_recv() {
-            run.on(e);
+            run.on_async(e).await;
         }
         let ok = task.terminal_reason == "completed";
         let payload = if ok {
@@ -359,7 +377,7 @@ impl Execution {
                 Ok(())
             })?;
         }
-        self.publish(run, &task)?;
+        self.publish_async(run, &task).await?;
         self.finish_inputs(input.requests, ok, &payload)?;
         if ok {
             Ok(TurnOutcome::Completed)
@@ -370,7 +388,7 @@ impl Execution {
         }
     }
 
-    fn publish(&self, run: &Run<'_>, task: &Task) -> Result<()> {
+    async fn publish_async(&self, run: &Run<'_>, task: &Task) -> Result<()> {
         let replies = self.store().read(|tx| {
             Ok(tx
                 .entries(&task.conversation_id, 1)?
@@ -384,7 +402,7 @@ impl Execution {
             };
             run.o
                 .chat
-                .post(Posting {
+                .post_async(Posting {
                     from: run.me.id.clone(),
                     channel: run.route.channel.clone(),
                     text: text.into(),
@@ -393,6 +411,7 @@ impl Execution {
                     made: None,
                     spoken: !run.ports.is_empty(),
                 })
+                .await
                 .map_err(|e| Error::Invalid(e.message))?;
         }
         Ok(())

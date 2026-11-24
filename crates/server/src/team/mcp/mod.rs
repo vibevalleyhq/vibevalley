@@ -1,6 +1,6 @@
 //! The helpers' MCP door (`gateway/mcp`): JSON-RPC over `POST /mcp`. Each
 //! helper's token, minted by the board when it starts the helper, names it;
-//! its tools are dispatched asynchronously through [`ToolBox`].
+//! its tools are dispatched asynchronously through [`ToolDispatchPort`].
 
 pub mod resource;
 
@@ -9,11 +9,10 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-use crate::app::hub::ports::ToolSpecWire;
-use crate::team::tool::ToolBox;
+use crate::app::port::{ToolDispatchPort, ToolSpecWire};
 use crate::transport::api::Mcp;
 
-pub use resource::{ResourceReadArgs, ResourceStore, Resources};
+pub use resource::{ResourceReadArgs, ResourceStore};
 
 const UNKNOWN_CALLER: &str = "没认出你是谁：这些工具只给执行会话用";
 const PROTOCOL: &str = "2025-06-18";
@@ -43,16 +42,16 @@ struct ToolCallParams {
     arguments: Value,
 }
 
-pub struct Door {
-    dispatch: Arc<ToolBox>,
+pub struct McpDoor {
+    dispatch: Arc<dyn ToolDispatchPort>,
     tools: Vec<ToolSpecWire>,
     version: String,
 }
 
-impl Door {
-    pub fn new(dispatch: Arc<ToolBox>, version: String) -> Arc<Door> {
-        let tools = dispatch.helper_tools_wire();
-        Arc::new(Door { dispatch, tools, version })
+impl McpDoor {
+    pub fn new(dispatch: Arc<dyn ToolDispatchPort>, version: String) -> Arc<McpDoor> {
+        let tools = dispatch.helper_tools();
+        Arc::new(McpDoor { dispatch, tools, version })
     }
 
     async fn result_async(&self, token: &str, method: &str, params: Value) -> Result<Value, (i64, String)> {
@@ -81,7 +80,7 @@ impl Door {
                 Ok(json!({ "tools": tools }))
             }
             "tools/call" => {
-                let Some(me) = self.dispatch.session_for_token(token) else {
+                let Some(me) = self.dispatch.session_for_token(token).await else {
                     return Ok(json!({ "content": [{ "type": "text", "text": UNKNOWN_CALLER }], "isError": true }));
                 };
                 let call: ToolCallParams = serde_json::from_value(params).unwrap_or_default();
@@ -103,7 +102,7 @@ impl Door {
     }
 }
 
-impl Mcp for Door {
+impl Mcp for McpDoor {
     fn message(&self, _token: &str, message: Value) -> Option<Value> {
         let req: RpcRequest = serde_json::from_value(message).ok()?;
         let id = req.id.filter(|id| !id.is_null())?;

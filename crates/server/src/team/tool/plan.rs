@@ -1,17 +1,16 @@
-//! Repos and timers (routed via `Hub::invoke_async` with zero `work/repo` or `work/cron` imports).
+//! Repos and timers (direct calls into [`RepoStore`] and [`CronToolPort`]).
 
 use serde::Deserialize;
-use vibevalley_protocol::{Caller, CronDeleteInput, CronRequest, CronWhen, CronWhenDaily, CronWhenEvery, CronWhenExpr, CronWhenOnce, CronWhenWeekly, ops};
+use vibevalley_protocol::{CronRequest, CronWhen, CronWhenDaily, CronWhenEvery, CronWhenExpr, CronWhenOnce, CronWhenWeekly};
 
 use super::{ToolBox, Who, given};
-use crate::CallerContext;
 use crate::infra::text;
 
 #[derive(Deserialize)]
 pub struct Nothing {}
 
-pub async fn repos(f: &ToolBox, who: &Who, _: Nothing) -> Result<String, String> {
-    let all = f.hub()?.invoke_async::<ops::RepoList>(&f.ctx(who), ()).await.map_err(|e| e.message)?;
+pub async fn repos(f: &ToolBox, _who: &Who, _: Nothing) -> Result<String, String> {
+    let all = f.repos.list_async().await;
     if all.is_empty() {
         return Ok(format!("工作目录（{}）下还没有仓库。", f.repos_root.display()));
     }
@@ -22,8 +21,8 @@ pub async fn repos(f: &ToolBox, who: &Who, _: Nothing) -> Result<String, String>
         .join("\n"))
 }
 
-pub async fn cron_list(f: &ToolBox, who: &Who, _: Nothing) -> Result<String, String> {
-    let all = f.hub()?.invoke_async::<ops::CronList>(&f.ctx(who), ()).await.map_err(|e| e.message)?;
+pub async fn cron_list(f: &ToolBox, _who: &Who, _: Nothing) -> Result<String, String> {
+    let all = f.crons.list_async().await.map_err(|e| e.message)?;
     if all.is_empty() {
         return Ok("没有定时。".into());
     }
@@ -41,16 +40,18 @@ pub struct IdArgs {
     id: String,
 }
 
-pub async fn cron_delete(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
+pub async fn cron_delete(f: &ToolBox, _who: &Who, a: IdArgs) -> Result<String, String> {
     let id = a.id.trim().to_string();
-    let hub = f.hub()?;
-    let name = hub.read(|s| s.crons.iter().find(|c| c.id == id).map(|c| c.name.clone()));
-    Ok(
-        match hub.invoke_async::<ops::CronDelete>(&f.ctx(who), CronDeleteInput { id: id.clone() }).await {
-            Ok(()) => format!("删掉了「{}」。", name.unwrap_or(id)),
-            Err(e) => text::failed(&e.message),
-        },
-    )
+    let name = f
+        .crons
+        .list_async()
+        .await
+        .ok()
+        .and_then(|all| all.into_iter().find(|c| c.id == id).map(|c| c.name));
+    Ok(match f.crons.delete_async(&id).await {
+        Ok(()) => format!("删掉了「{}」。", name.unwrap_or(id)),
+        Err(e) => text::failed(&e.message),
+    })
 }
 
 /// When a timer fires, as a model writes it: `once` takes a time in the forms a model writes.
@@ -133,15 +134,8 @@ async fn create(f: &ToolBox, who: &Who, a: CronArgs) -> Result<String, String> {
         when,
         tz: given(&a.tz).map(Into::into),
     };
-    let ctx = if here.user {
-        CallerContext {
-            caller: Caller::User,
-            ..f.ctx(who)
-        }
-    } else {
-        f.ctx(who)
-    };
-    let made = f.hub()?.invoke_async::<ops::CronCreate>(&ctx, req).await.map_err(|e| e.message)?;
+    let by = if here.user { "user" } else { here.agent.as_str() };
+    let made = f.crons.create_async(by, &req).await.map_err(|e| e.message)?;
     let line = text::cron_line(&made, &channel.name);
     Ok(if made.pending {
         format!(
