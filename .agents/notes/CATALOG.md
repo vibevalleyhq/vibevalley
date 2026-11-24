@@ -2,7 +2,7 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（20 篇）
+## proposed（21 篇）
 
 ### feature
 
@@ -16,6 +16,7 @@
 
 ### architecture
 
+- 2026-11-24 [第一性原理服务端脊柱重构（框架、目录、模板与彻底切换）](.agents/notes/proposed/architecture/2026-11-24-first-principles-server-spine.md)
 - 2026-11-23 [Tailscale 与 nsh 原生移动远程控制：真机分发与远程推送](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)
 - 2026-11-22 [对话页次级标签收敛与素材组织方式](.agents/notes/proposed/architecture/2026-11-22-workbench-ux-polish-and-outline-as-artifact.md)
 - 2026-11-22 [Loro 协作内容引擎：远端同步、流式合批与白板本地副本](.agents/notes/proposed/architecture/2026-11-22-loro-collaborative-content-engine.md)

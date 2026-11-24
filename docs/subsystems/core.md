@@ -130,6 +130,7 @@ SSE 以外的路由：
 ## 还没做的
 
 - `can` 只留 `user` 与 `remote`，agent 工具按档案配置：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
+- 取消 `Hub` / `SpaceState` 影子库与 `EventBus`，直接切换至四层全单数服务端脊柱（`App`、`ServerDoor`、`ServerDb` 事务 + `SliceProjector` + 统一 `Outbox`）：[第一性原理服务端脊柱重构](.agents/notes/proposed/architecture/2026-11-24-first-principles-server-spine.md)。
 
 ## 怎么验证
 
