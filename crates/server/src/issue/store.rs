@@ -66,10 +66,15 @@ impl IssueState {
             &live,
             0,
         );
+        let empty = vibevalley_core::slice_bundle(&vibevalley_core::empty_space_state(), vec![], 0);
         Ok(SliceBundle {
-            board: Some(board),
-            sessions: Some(sessions_slice),
-            ..Default::default()
+            seq: 0,
+            board,
+            sessions: sessions_slice,
+            collab: empty.collab,
+            inbox: empty.inbox,
+            ops: empty.ops,
+            farm: empty.farm,
         })
     }
 

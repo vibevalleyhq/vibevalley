@@ -29,13 +29,13 @@
 
 | 概念 | 服务端 | 存储 | oar |
 |---|---|---|---|
-| Host、空间 | `ServerConfig`（`home`、`work_root`，`crates/server/src/app/bootstrap.rs` 照次序打开全部模块） | `$VIBEVALLEY_HOME`、`$VIBEVALLEY_WORK_ROOT` | — |
+| Host、空间 | `ServerConfig`（`home`、`work_root`，`crates/server/src/app.rs` 照次序打开全部模块） | `$VIBEVALLEY_HOME`、`$VIBEVALLEY_WORK_ROOT` | — |
 | 仓库 | `Repos`（`repo.rs`），git 经 `crates/git` | Space 的 `repos/` 与工单检出 `worktrees/` | 会话的 `cwd` |
 | 助手 | `Orchestrator`（`orchestrator/mod.rs`） | `agent/<档案 id>/conversation.jsonl` | 不经 oar：跑在 `crates/runtime/src/agent` 的对话循环上（[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
-| 档案、技能 | `Agents`（`agent/profile.rs`、`presets.rs`） | `config.json`、`agent-templates/` | — |
-| 农机 | `Agents` 的农机部分（`agent/runtime.rs`；接口仍是 `runtime.*`） | `config.json` 农机设置 | `Runtime`、`Registry` |
-| 工单、父子工单 | `Board`（`crates/server/src/work/issue/board.rs`），接口在 `issue/mod.rs` | `server.db`、`issues/` | — |
-| 帮工、一轮 | `Sessions`（`session/sessions.rs`、`mailbox.rs`）与 `runs.rs`，农机经 `drivers.rs` 开会话；轨迹在 `session/journal.rs` | `server.db`（`session*`、`session_mailbox`、`session_event`）、`records/` | 一个帮工是一个 oar `Session`，一轮对应一个 turn |
+| 档案、技能 | `Agents`（`agent/profile/profile.rs`、`presets.rs`） | `config.json`、`agent-templates/` | — |
+| 农机 | `Agents` 的农机部分（`agent/profile/runtime.rs`；接口仍是 `runtime.*`） | `config.json` 农机设置 | `Runtime`、`Registry` |
+| 工单、父子工单 | `Board`（`crates/server/src/issue/board.rs`），接口在 `issue/mod.rs` | `server.db`、`issues/` | — |
+| 帮工、一轮 | `Sessions`（`session/engine.rs`、`mailbox.rs`）与 `runs.rs`，农机经 `drivers.rs` 开会话；轨迹在 `session/journal.rs` | `server.db`（`session*`、`session_mailbox`、`session_event`）、`records/` | 一个帮工是一个 oar `Session`，一轮对应一个 turn |
 | 频道、附件 | `Chat`（`channel/mod.rs`）、`dispatch.rs`（纯受众与刹车）、`Attachments`（`attachment.rs`） | `server.db` 的 `channel*`、`channel_delivery`、`attachment` 表 | 异步投递成帮工会话里的一段话 |
 | Artifact | `Artifacts`（`artifact/mod.rs`） | `server.db` 的 `artifact*` 表 | — |
 | 记性 | `Memories`（`team/memory/`） | `memory` 表 | — |

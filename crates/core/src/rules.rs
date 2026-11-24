@@ -283,7 +283,7 @@ pub(crate) fn phase_words(h: &Session, conflict: Option<&Conflict>) -> String {
 }
 
 /// `farmOf`: each repo has its own farm; sessions without one share one.
-pub(crate) fn farm_of(h: &Session) -> &str {
+pub fn farm_of(h: &Session) -> &str {
     h.repo_name().unwrap_or("")
 }
 

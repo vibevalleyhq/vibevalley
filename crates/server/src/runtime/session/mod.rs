@@ -9,9 +9,9 @@ use tokio_util::sync::CancellationToken;
 use vibevalley_core::rules::session_ids_of;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, BizCode, Issue, IssueStageKind, IssueWatch, IssueWatchInput, LiveEvent, Session, SessionBindingInput, SessionChildTranscript,
+    ApiError, BizCode, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, Session, SessionBindingInput, SessionChildTranscript,
     SessionChildTranscriptInput, SessionController, SessionEventListInput, SessionEventPage, SessionId, SessionOpenWorkspaceInput,
-    SessionRespondInteractionInput, SessionRespondPermissionInput, SessionSendInput, SessionSetConfigInput, SessionWatchEvent, SessionWatchInput,
+    SessionRespondInteractionInput, SessionRespondPermissionInput, SessionSendInput, SessionSetConfigInput, SessionWatchEvent, SessionWatchPayload,
     SessionWorkspace, SliceKind,
 };
 
@@ -158,7 +158,7 @@ impl SessionEngine {
 
     pub(crate) async fn watch_session_async(
         &self,
-        input: SessionWatchInput,
+        input: SessionWatchPayload,
         events: flume::Sender<serde_json::Value>,
         stop: flume::Receiver<()>,
     ) -> Result<(), ApiError> {
@@ -177,7 +177,7 @@ impl SessionEngine {
 
     pub(crate) async fn watch_issue_async(
         &self,
-        input: IssueWatchInput,
+        input: IssueGetInput,
         events: flume::Sender<serde_json::Value>,
         stop: flume::Receiver<()>,
     ) -> Result<(), ApiError> {

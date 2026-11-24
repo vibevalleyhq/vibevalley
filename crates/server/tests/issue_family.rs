@@ -5,7 +5,7 @@ use std::path::Path;
 
 use crate::support::*;
 use vibevalley_protocol::{IssueConstraints, IssueStageKind as StageKind, IssueStatus, Landing};
-use vibevalley_server::work::issue::{ChildDraft, NewIssue};
+use vibevalley_server::issue::{ChildDraft, NewIssue};
 
 fn issue(title: &str, repo: &Path) -> NewIssue {
     NewIssue {
@@ -86,15 +86,14 @@ fn acceptance(mode: Mode) {
         let parent = wait_stage(&w.board, &parent.id, StageKind::Reviewing);
         assert_eq!(parent.status, IssueStatus::InReview);
         assert!(
-            w.board
-                .bundle()
+            board_bundle(&w.board)
                 .inbox
                 .items
                 .iter()
                 .any(|i| matches!(&i.target, vibevalley_protocol::InboxTarget::Issue(t) if t.id == parent.id))
         );
         block_on(w.board.move_to_async(&parent.id, IssueStatus::Done, None)).unwrap();
-        assert_eq!(w.board.issue(&parent.id).unwrap().delivered, Some(Landing::Merged));
+        assert_eq!(board_issue(&w.board, &parent.id).unwrap().delivered, Some(Landing::Merged));
         assert_eq!(read_on(&main, "main", "result.txt").as_deref(), Some("implementation"));
         assert!(read_on(&main, "vibevalley/issue-1", "check.sh").is_none(), "the parent's merged branch is gone");
     } else {
@@ -167,10 +166,10 @@ fn a_split_queues_its_children_in_dependency_order() {
         ))
         .is_err()
     );
-    let first = w.board.issue(&children[0].id).unwrap();
+    let first = board_issue(&w.board, &children[0].id).unwrap();
     assert_eq!(first.stage.state, StageKind::Working);
-    assert_eq!(w.board.issue(&children[1].id).unwrap().stage.state, StageKind::Queued);
-    assert_eq!(w.board.issue(&parent.id).unwrap().status, IssueStatus::InProgress);
+    assert_eq!(board_issue(&w.board, &children[1].id).unwrap().stage.state, StageKind::Queued);
+    assert_eq!(board_issue(&w.board, &parent.id).unwrap().status, IssueStatus::InProgress);
     gate.release_n(2);
     wait_issue(&w.board, &children[1].id, "B merged", |t| t.status == IssueStatus::Done);
     let b_prompt = prompts.lock().unwrap().iter().find(|p| p.contains("Part B")).cloned().unwrap();
@@ -194,8 +193,13 @@ fn a_draft_writes_the_issue_up_and_leaves_no_trace() {
     let w = world(vec![rt], |_| {});
     let main = repo(w.dir.path(), "app");
     block_on(w.board.create_async(issue("Port", &main))).unwrap();
-    block_on(w.board.refine_async("1", "it should listen somewhere")).unwrap();
-    let drafting = w.board.issue("1").unwrap();
+    block_on(w.board.refine_async(&vibevalley_protocol::IssueRefineInput {
+        id: "1".into(),
+        text: Some("it should listen somewhere".into()),
+        edit: None,
+    }))
+    .unwrap();
+    let drafting = board_issue(&w.board, "1").unwrap();
     assert!(drafting.refining.is_some());
     assert!(
         block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).is_err(),
@@ -208,7 +212,7 @@ fn a_draft_writes_the_issue_up_and_leaves_no_trace() {
     assert_eq!(drafted.criteria, vec!["app --port 8080 serves"]);
     assert_eq!(drafted.questions[0].options, vec!["8080", "9090"]);
     assert_eq!((drafted.status, drafted.was_sent()), (IssueStatus::Backlog, false));
-    assert!(w.board.bundle().sessions.sessions.is_empty());
+    assert!(board_bundle(&w.board).sessions.sessions.is_empty());
     assert!(!w.dir.path().join("vibevalley/worktrees/app.1").exists());
     assert!(git(&main, &["branch", "--list", "vibevalley/issue-1"]).is_empty());
 }

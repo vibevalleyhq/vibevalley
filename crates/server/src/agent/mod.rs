@@ -214,7 +214,22 @@ impl Agent {
             EndpointId::RuntimeSettingUpdate => Some(
                 async {
                     let req: <ops::RuntimeSettingUpdate as Op>::Input = decode(payload)?;
-                    ok_json(self.profile.runtime_setting_update_async(&req.id, req.settings).await?)
+                    ok_json(
+                        self.profile
+                            .runtime_setting_update_async(
+                                &req.id,
+                                vibevalley_protocol::RuntimeSettings {
+                                    enabled: req.enabled,
+                                    bin_path: req.bin_path,
+                                    default_model: req.default_model,
+                                    default_effort: req.default_effort,
+                                    env: req.env,
+                                    daily_budget: req.daily_budget,
+                                    max_working: req.max_working,
+                                },
+                            )
+                            .await?,
+                    )
                 }
                 .await,
             ),

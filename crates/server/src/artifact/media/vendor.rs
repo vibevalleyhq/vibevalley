@@ -8,7 +8,6 @@ use std::time::{Duration, Instant};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use tokio_util::sync::CancellationToken;
 use vibevalley_protocol::{
     JsNumber, MediaAudioSegment, MediaAudioVoice, MediaImageFormat, MediaImageRequest, MediaImageUsage, MediaInputKind, MediaSpeakersRequestSegments,
     MediaSpeakersRequestSpeakers, MediaUnderstandingResult, MediaUnderstandingResultIncompleteReason, MediaUnderstandingResultUsage, MediaUnderstandingStatus,
@@ -576,7 +575,7 @@ impl Moss {
             body: req.body,
             timeout: req.timeout,
         };
-        let cancel = req.stop.map(Stop::token).unwrap_or_else(CancellationToken::new);
+        let cancel = req.stop.map(Stop::token).unwrap_or_default();
         self.fetch.clone().fetch_async(request, cancel).await.map_err(|e| match e {
             FetchError::Timeout => VendorError::new(Reason::Timeout, Outcome::Unknown),
             FetchError::Network(_) => VendorError::new(Reason::Network, Outcome::Unknown),

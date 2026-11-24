@@ -228,7 +228,7 @@ impl Remote {
                 Ok(Value::Null)
             }
             EndpointId::RemoteWhoami => ok_json(self.whoami_async(&caller.principal, caller.caller).await?),
-            other => Err(ApiError::new(BizCode::RouteNotFound, format!("unexpected remote endpoint {}", other.op()))),
+            other => Err(ApiError::new(BizCode::RouteNotFound, format!("unexpected remote endpoint {}", other.as_op()))),
         }
     }
 
@@ -653,13 +653,12 @@ mod tests {
     use vibevalley_core::{Clock, ManualClock, SharedClock};
 
     use super::*;
-    use crate::context::{Http, LiveState, Outbox, StateFeed, TaskGroup};
+    use crate::context::{Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
     use crate::gateway::bridge::fake::FakeServer;
     use crate::service::Service;
 
     async fn test_context(home: &std::path::Path, clock: SharedClock) -> Arc<Context> {
         let service = Service::open(home).await.unwrap();
-        let http = Arc::new(Http::new());
         let outbox = Arc::new(Outbox::new(service.clone()));
         Arc::new(Context::new(
             service,
@@ -668,8 +667,8 @@ mod tests {
             outbox,
             Arc::new(StateFeed::new()),
             clock,
-            http.clone(),
-            http,
+            Arc::new(Http),
+            Arc::new(PublicDownload),
         ))
     }
 

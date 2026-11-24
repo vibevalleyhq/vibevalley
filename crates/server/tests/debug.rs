@@ -10,23 +10,29 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
+use vibevalley_core::SliceMask;
 use vibevalley_protocol::{
     BizCode, Caller, ContextRef, DebugBundleResult, DebugGraph, DebugOverrideConfig, DebugSnapshot, DebugTimelineEvent, DebugTimelineLane, DebugTimelinePage,
-    DebugTrajectoryDetail, DebugTrajectoryKind, DebugTrajectorySummary, EventTokens, Execution, ExecutionPolicy, Fact, Issue, Phase, Session, SessionAction,
+    DebugTrajectoryDetail, DebugTrajectoryKind, DebugTrajectorySummary, EventTokens, Execution, ExecutionPolicy, Issue, Phase, Session, SessionAction,
     SessionController, SliceKind,
 };
 use vibevalley_runtime::oar::voyage::{Header as VoyageHeader, Kind as VoyageKind, Record as VoyageRecord, Writer as VoyageWriter};
 use vibevalley_runtime::oar::{Event as OarEvent, EventKind as OarEventKind, OarObserver, Registry, StopReason, Usage as OarUsage};
-use vibevalley_server::transport::api::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, FaultGate, HostDebugBridge, InvokeObserver};
-use vibevalley_server::work::ledger::Step;
-use vibevalley_server::{ServerConfig, Started, start};
+use vibevalley_server::Server as _;
+use vibevalley_server::gateway::api::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, FaultGate, HostDebugBridge, InvokeObserver};
+use vibevalley_server::runtime::Step;
+use vibevalley_server::{App, Config, create_app_blocking};
 
 static DEBUG_TEST_LOCK: Mutex<()> = Mutex::new(());
 
-fn start_server(dir: &Path, debug_enabled: bool, deepseek_key: &str) -> Started {
+fn start_server(dir: &Path, debug_enabled: bool, deepseek_key: &str) -> App {
+    start_server_with_host(dir, debug_enabled, deepseek_key, None)
+}
+
+fn start_server_with_host(dir: &Path, debug_enabled: bool, deepseek_key: &str, host_debug: Option<Arc<dyn HostDebugBridge>>) -> App {
     let mut registry = Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    start(ServerConfig {
+    create_app_blocking(Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         orchestrator_listens: false,
@@ -34,7 +40,8 @@ fn start_server(dir: &Path, debug_enabled: bool, deepseek_key: &str) -> Started 
         tick_crons: false,
         deepseek_api_key: deepseek_key.into(),
         debug_enabled,
-        ..ServerConfig::under(dir)
+        host_debug,
+        ..Config::under(dir)
     })
     .expect("server starts")
 }
@@ -114,8 +121,8 @@ fn disabled_by_default_refuses_all_nine_endpoints_and_leaves_hub_unobserved() {
     let started = start_server(dir.path(), false, "");
 
     assert!(!started.test_internals().debug.is_enabled());
-    assert!(!started.hub.has_observer(), "disabled server must not attach observer");
-    assert!(!started.hub.has_fault_gate(), "disabled server must not attach fault gate");
+    assert!(!started.router().has_observer(), "disabled server must not attach observer");
+    assert!(!started.router().has_fault_gate(), "disabled server must not attach fault gate");
     assert!(!vibevalley_runtime::oar::has_observer(), "disabled server must not attach global oar observer");
 
     let cases: [(&str, Value); 9] = [
@@ -130,7 +137,7 @@ fn disabled_by_default_refuses_all_nine_endpoints_and_leaves_hub_unobserved() {
         ("debug.bundle.export", json!({})),
     ];
     for (op, payload) in cases {
-        let user_env = started.hub.call_as(Caller::User, op, payload.clone());
+        let user_env = started.router().call_as(Caller::User, op, payload.clone());
         assert_eq!(
             user_env.biz_code,
             BizCode::Refused.code(),
@@ -138,7 +145,7 @@ fn disabled_by_default_refuses_all_nine_endpoints_and_leaves_hub_unobserved() {
         );
         assert!(!user_env.message.is_empty());
 
-        let session_env = started.hub.call_as(Caller::Session, op, payload);
+        let session_env = started.router().call_as(Caller::Session, op, payload);
         assert_eq!(
             session_env.biz_code,
             BizCode::Forbidden.code(),
@@ -146,10 +153,10 @@ fn disabled_by_default_refuses_all_nine_endpoints_and_leaves_hub_unobserved() {
         );
     }
 
-    let weak = Arc::downgrade(&started.hub);
-    started.close();
+    let weak = Arc::downgrade(started.router());
+    started.close_blocking();
     drop(started);
-    assert_eq!(weak.strong_count(), 0, "Hub dropped cleanly without Arc cycle");
+    assert_eq!(weak.strong_count(), 0, "Router dropped cleanly without Arc cycle");
 }
 
 #[test]
@@ -157,46 +164,49 @@ fn redaction_scrubs_secrets_across_rpc_timeline_trajectories_and_exported_zip() 
     let _guard = DEBUG_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let dir = tempfile::tempdir().unwrap();
     let live_secret = "live-deepseek-secret-xyz987654";
-    let started = start_server(dir.path(), true, live_secret);
-
-    assert!(started.test_internals().debug.is_enabled());
-    assert!(started.hub.has_observer());
-    assert!(started.hub.has_fault_gate());
-    assert!(vibevalley_runtime::oar::has_observer());
-
     let sk_token = "sk-antigravitySecretToken998877";
     let bearer_token = "Bearer eyJhbGciOiJIUzI1NiJ9.SuperSecretPayload";
     let ghp_token = "ghp_GitHubPersonalSecretToken1234";
     let plain_api_key = "plain-header-api-key-secret";
 
-    started.hub.attach_host_debug(Some(FakeHostDebug::new(json!({
-        "routes": {
-            "current": "/issues",
-            "nativeWorkspace": true,
-            "panel": "files",
-            "inspectorOpen": false,
-            "projects": [{ "name": format!("proj-{live_secret}") }]
-        },
-        "clients": [{
-            "id": "workbench-1",
-            "kind": "gpuiWorkbench",
-            "label": "Main Window",
-            "watches": ["slice:board", "slice:sessions"],
-            "subscriptions": ["issue.watch"]
-        }],
-        "bundleMode": "nshc",
-        "loopbackUrl": "http://127.0.0.1:8790",
-        "bootMs": 88,
-        "lastFrameMs": 19.4,
-        "frames": [{
-            "seq": 1,
-            "time": 1_732_000_000_500_i64,
-            "durationUs": 19_400,
-            "slow": true,
-            "summary": format!("Shell::render {sk_token}")
-        }],
-        "caches": [{ "name": "panes", "entries": 2, "detail": "2 open" }]
-    }))));
+    let started = start_server_with_host(
+        dir.path(),
+        true,
+        live_secret,
+        Some(FakeHostDebug::new(json!({
+            "routes": {
+                "current": "/issues",
+                "nativeWorkspace": true,
+                "panel": "files",
+                "inspectorOpen": false,
+                "projects": [{ "name": format!("proj-{live_secret}") }]
+            },
+            "clients": [{
+                "id": "workbench-1",
+                "kind": "gpuiWorkbench",
+                "label": "Main Window",
+                "watches": ["slice:board", "slice:sessions"],
+                "subscriptions": ["issue.watch"]
+            }],
+            "bundleMode": "nshc",
+            "loopbackUrl": "http://127.0.0.1:8790",
+            "bootMs": 88,
+            "lastFrameMs": 19.4,
+            "frames": [{
+                "seq": 1,
+                "time": 1_732_000_000_500_i64,
+                "durationUs": 19_400,
+                "slow": true,
+                "summary": format!("Shell::render {sk_token}")
+            }],
+            "caches": [{ "name": "panes", "entries": 2, "detail": "2 open" }]
+        }))),
+    );
+
+    assert!(started.test_internals().debug.is_enabled());
+    assert!(started.router().has_observer());
+    assert!(started.router().has_fault_gate());
+    assert!(vibevalley_runtime::oar::has_observer());
 
     let call_ctx = CallerContext {
         caller: Caller::User,
@@ -208,7 +218,7 @@ fn redaction_scrubs_secrets_across_rpc_timeline_trajectories_and_exported_zip() 
         }),
         trace_id: 42,
     };
-    let created = started.hub.call_with(
+    let created = started.router().call_with(
         &call_ctx,
         "issue.create",
         json!({
@@ -233,21 +243,21 @@ fn redaction_scrubs_secrets_across_rpc_timeline_trajectories_and_exported_zip() 
         },
     );
 
-    started.test_internals().trajectories.step(
+    started.test_internals().runtime.trajectory().step(
         "sess-secret",
         "",
         Step::Asked {
             text: format!("Use {live_secret} and {sk_token} with {bearer_token}"),
         },
     );
-    started.test_internals().trajectories.flush(true);
+    vibevalley_runtime::rt::block_on(started.test_internals().runtime.trajectory().flush_async(true));
     let mut vrec = VoyageRecord::new(VoyageKind::Frame, "sess-secret".into(), 1_732_000_000_700);
     vrec.seq = 0;
     vrec.frame_type = "text_delta".into();
     vrec.raw = format!(r#"{{"apiKey":"{plain_api_key}","msg":"{live_secret} {ghp_token}"}}"#).into_bytes();
     write_voyage_file(&dir.path().join("records/sess-secret.jsonl"), "claude", "sess-secret", &[vrec]);
 
-    let snap_env = started.hub.call_as(Caller::User, "debug.snapshot", json!({}));
+    let snap_env = started.router().call_as(Caller::User, "debug.snapshot", json!({}));
     assert_eq!(snap_env.biz_code, 0, "{}", snap_env.message);
     let snap: DebugSnapshot = serde_json::from_value(snap_env.data.clone().unwrap()).unwrap();
     assert_eq!(snap.overview.bundle_mode.as_deref(), Some("nshc"));
@@ -257,7 +267,7 @@ fn redaction_scrubs_secrets_across_rpc_timeline_trajectories_and_exported_zip() 
 
     let tl1: DebugTimelinePage = serde_json::from_value(
         started
-            .hub
+            .router()
             .call_as(Caller::User, "debug.timeline.list", json!({ "lane": "gpui_frame" }))
             .data
             .unwrap(),
@@ -265,7 +275,7 @@ fn redaction_scrubs_secrets_across_rpc_timeline_trajectories_and_exported_zip() 
     .unwrap();
     let tl2: DebugTimelinePage = serde_json::from_value(
         started
-            .hub
+            .router()
             .call_as(Caller::User, "debug.timeline.list", json!({ "lane": "gpui_frame" }))
             .data
             .unwrap(),
@@ -274,15 +284,19 @@ fn redaction_scrubs_secrets_across_rpc_timeline_trajectories_and_exported_zip() 
     assert_eq!(tl1.events.len(), 1);
     assert_eq!(tl2.events.len(), 1);
 
-    let all_tl = started.hub.call_as(Caller::User, "debug.timeline.list", json!({ "limit": 500 })).data.unwrap();
-    let traj_list = started.hub.call_as(Caller::User, "debug.trajectory.list", json!({})).data.unwrap();
+    let all_tl = started
+        .router()
+        .call_as(Caller::User, "debug.timeline.list", json!({ "limit": 500 }))
+        .data
+        .unwrap();
+    let traj_list = started.router().call_as(Caller::User, "debug.trajectory.list", json!({})).data.unwrap();
     let traj_get = started
-        .hub
+        .router()
         .call_as(Caller::User, "debug.trajectory.get", json!({ "id": "sess-secret" }))
         .data
         .unwrap();
 
-    let export_env = started.hub.call_as(Caller::User, "debug.bundle.export", json!({}));
+    let export_env = started.router().call_as(Caller::User, "debug.bundle.export", json!({}));
     assert_eq!(export_env.biz_code, 0, "{}", export_env.message);
     let exported: DebugBundleResult = serde_json::from_value(export_env.data.unwrap()).unwrap();
     assert!(Path::new(&exported.path).is_file());
@@ -325,9 +339,7 @@ fn redaction_scrubs_secrets_across_rpc_timeline_trajectories_and_exported_zip() 
         }
     }
 
-    started.close();
-    assert!(!started.hub.has_observer());
-    assert!(!started.hub.has_fault_gate());
+    started.close_blocking();
     assert!(!vibevalley_runtime::oar::has_observer());
 }
 
@@ -338,7 +350,7 @@ fn ring_buffer_bounds_each_lane_at_512_and_truncates_oversized_payloads() {
     let started = start_server(dir.path(), true, "");
     // Detach the process-global OarObserver and clear startup events so concurrent suite tests do not perturb ring counts.
     vibevalley_runtime::oar::set_observer(None);
-    assert_eq!(started.hub.call_as(Caller::User, "debug.timeline.clear", json!({})).biz_code, 0);
+    assert_eq!(started.router().call_as(Caller::User, "debug.timeline.clear", json!({})).biz_code, 0);
     let collector = started.test_internals().debug.collector();
 
     const PER_LANE: usize = 2000;
@@ -366,7 +378,7 @@ fn ring_buffer_bounds_each_lane_at_512_and_truncates_oversized_payloads() {
     for lane in DebugTimelineLane::ALL {
         let page: DebugTimelinePage = serde_json::from_value(
             started
-                .hub
+                .router()
                 .call_as(Caller::User, "debug.timeline.list", json!({ "lane": lane, "limit": 2048 }))
                 .data
                 .unwrap(),
@@ -383,7 +395,7 @@ fn ring_buffer_bounds_each_lane_at_512_and_truncates_oversized_payloads() {
 
     let filtered: DebugTimelinePage = serde_json::from_value(
         started
-            .hub
+            .router()
             .call_as(Caller::User, "debug.timeline.list", json!({ "search": "oar_wire-ev-1999", "limit": 100 }))
             .data
             .unwrap(),
@@ -396,7 +408,7 @@ fn ring_buffer_bounds_each_lane_at_512_and_truncates_oversized_payloads() {
     let anchor = filtered.events[0].id;
     let after: DebugTimelinePage = serde_json::from_value(
         started
-            .hub
+            .router()
             .call_as(Caller::User, "debug.timeline.list", json!({ "afterId": anchor, "limit": 2048 }))
             .data
             .unwrap(),
@@ -404,12 +416,12 @@ fn ring_buffer_bounds_each_lane_at_512_and_truncates_oversized_payloads() {
     .unwrap();
     assert!(after.events.iter().all(|e| e.id > anchor));
 
-    assert_eq!(started.hub.call_as(Caller::User, "debug.timeline.clear", json!({})).biz_code, 0);
-    let cleared: DebugTimelinePage = serde_json::from_value(started.hub.call_as(Caller::User, "debug.timeline.list", json!({})).data.unwrap()).unwrap();
+    assert_eq!(started.router().call_as(Caller::User, "debug.timeline.clear", json!({})).biz_code, 0);
+    let cleared: DebugTimelinePage = serde_json::from_value(started.router().call_as(Caller::User, "debug.timeline.list", json!({})).data.unwrap()).unwrap();
     assert!(cleared.events.is_empty());
     assert_eq!(cleared.dropped, 0);
 
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -418,9 +430,9 @@ fn fault_gate_delays_normal_ops_without_delaying_or_recording_debug_ops() {
     let dir = tempfile::tempdir().unwrap();
     let started = start_server(dir.path(), true, "");
 
-    assert_eq!(started.hub.call_as(Caller::User, "debug.timeline.clear", json!({})).biz_code, 0);
+    assert_eq!(started.router().call_as(Caller::User, "debug.timeline.clear", json!({})).biz_code, 0);
 
-    let set_env = started.hub.call_as(
+    let set_env = started.router().call_as(
         Caller::User,
         "debug.override.set",
         json!({
@@ -436,7 +448,7 @@ fn fault_gate_delays_normal_ops_without_delaying_or_recording_debug_ops() {
     assert_eq!(cfg.disconnect_topic.as_deref(), Some("slice:board"));
 
     let t_debug = Instant::now();
-    let get_env = started.hub.call_as(Caller::User, "debug.override.get", json!({}));
+    let get_env = started.router().call_as(Caller::User, "debug.override.get", json!({}));
     let debug_elapsed = t_debug.elapsed();
     assert_eq!(get_env.biz_code, 0);
     assert!(
@@ -445,7 +457,7 @@ fn fault_gate_delays_normal_ops_without_delaying_or_recording_debug_ops() {
     );
 
     let t_normal = Instant::now();
-    let health = started.hub.call_as(Caller::User, "server.health.get", json!({}));
+    let health = started.router().call_as(Caller::User, "server.health.get", json!({}));
     let normal_elapsed = t_normal.elapsed();
     assert_eq!(health.biz_code, 0);
     assert!(
@@ -455,7 +467,7 @@ fn fault_gate_delays_normal_ops_without_delaying_or_recording_debug_ops() {
 
     let rpc_page: DebugTimelinePage = serde_json::from_value(
         started
-            .hub
+            .router()
             .call_as(Caller::User, "debug.timeline.list", json!({ "lane": "bridge_rpc" }))
             .data
             .unwrap(),
@@ -473,10 +485,10 @@ fn fault_gate_delays_normal_ops_without_delaying_or_recording_debug_ops() {
     assert_eq!(gate.delay_ms("debug.snapshot"), 0);
     assert!(gate.should_disconnect("slice:board"));
     assert!(!gate.should_disconnect("slice:board"), "disconnect_topic must be one-shot");
-    let after_cfg: DebugOverrideConfig = serde_json::from_value(started.hub.call_as(Caller::User, "debug.override.get", json!({})).data.unwrap()).unwrap();
+    let after_cfg: DebugOverrideConfig = serde_json::from_value(started.router().call_as(Caller::User, "debug.override.get", json!({})).data.unwrap()).unwrap();
     assert_eq!(after_cfg.disconnect_topic, None);
 
-    started.hub.call_as(
+    started.router().call_as(
         Caller::User,
         "debug.override.set",
         json!({ "rpcDelayMs": 90, "sliceDelayMs": 45, "targetFilter": "issue." }),
@@ -485,7 +497,7 @@ fn fault_gate_delays_normal_ops_without_delaying_or_recording_debug_ops() {
     assert_eq!(gate.delay_ms("server.health.get"), 0);
     assert_eq!(gate.delay_ms("slice:board"), 0);
 
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -537,24 +549,24 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
     );
     ws_session.cwd = Some("/tmp/repo-farm".into());
 
-    started.hub.apply(vec![
-        Fact::issue_changed(1_732_000_000_100, issue),
-        Fact::session_changed(1_732_000_000_100, issue_session),
-        Fact::session_changed(1_732_000_000_200, ws_session),
-    ]);
+    vibevalley_runtime::rt::block_on(async {
+        started.test_internals().service.issue.put(&issue).await.unwrap();
+        started.test_internals().service.session.put(&issue_session, false).await.unwrap();
+        started.test_internals().service.session.put(&ws_session, false).await.unwrap();
+        started.ctx().mark_dirty(SliceMask::BOARD | SliceMask::SESSIONS);
+        started.ctx().feed.flush().await;
+    });
 
-    started
-        .test_internals()
-        .trajectories
-        .step("sess-issue-1", "", Step::RunStarted { run: "run-1".into() });
-    started.test_internals().trajectories.step(
+    let traj = started.test_internals().runtime.trajectory();
+    traj.step("sess-issue-1", "", Step::RunStarted { run: "run-1".into() });
+    traj.step(
         "sess-issue-1",
         "",
         Step::Asked {
             text: "Fix the silent failure".into(),
         },
     );
-    started.test_internals().trajectories.with_log("sess-issue-1", |j| {
+    traj.with_log("sess-issue-1", |j| {
         j.said("Checking logs...", &[]);
         j.usage(
             EventTokens {
@@ -569,7 +581,7 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
             &[],
         );
     });
-    started.test_internals().trajectories.flush(true);
+    vibevalley_runtime::rt::block_on(traj.flush_async(true));
 
     let big_raw = format!(r#"{{"step_type":17,"code":"QUOTA_EXHAUSTED","pad":"{}"}}"#, "z".repeat(5000));
     let mut r0 = VoyageRecord::new(VoyageKind::Frame, "sess-issue-1".into(), 1_732_000_000_150);
@@ -580,14 +592,14 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
     r0.raw = big_raw.into_bytes();
     write_voyage_file(&dir.path().join("issues/records/sess-issue-1.jsonl"), "claude", "sess-issue-1", &[r0]);
 
-    started.test_internals().trajectories.step(
+    traj.step(
         "sess-ws-1",
         "",
         Step::Asked {
             text: "Explain this diff".into(),
         },
     );
-    started.test_internals().trajectories.flush(true);
+    vibevalley_runtime::rt::block_on(traj.flush_async(true));
     let mut ws_rec = VoyageRecord::new(VoyageKind::Frame, "sess-ws-1".into(), 1_732_000_000_250);
     ws_rec.seq = 0;
     ws_rec.frame_type = "error".into();
@@ -628,7 +640,7 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
     o1.seq = 1;
     write_voyage_file(&dir.path().join("records/orchestrator.jsonl"), "vibevalley", "orchestrator", &[o0, o1]);
 
-    let list_env = started.hub.call_as(Caller::User, "debug.trajectory.list", json!({}));
+    let list_env = started.router().call_as(Caller::User, "debug.trajectory.list", json!({}));
     assert_eq!(list_env.biz_code, 0, "{}", list_env.message);
     let summaries: Vec<DebugTrajectorySummary> = serde_json::from_value(list_env.data.unwrap()).unwrap();
     let find = |id: &str| summaries.iter().find(|s| s.id == id).unwrap_or_else(|| panic!("missing {id} in {summaries:?}"));
@@ -652,7 +664,7 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
 
     let issue_detail: DebugTrajectoryDetail = serde_json::from_value(
         started
-            .hub
+            .router()
             .call_as(Caller::User, "debug.trajectory.get", json!({ "id": "sess-issue-1" }))
             .data
             .unwrap(),
@@ -672,7 +684,7 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
 
     let ws_detail: DebugTrajectoryDetail = serde_json::from_value(
         started
-            .hub
+            .router()
             .call_as(Caller::User, "debug.trajectory.get", json!({ "id": "sess-ws-1" }))
             .data
             .unwrap(),
@@ -687,7 +699,7 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
 
     let orch_detail: DebugTrajectoryDetail = serde_json::from_value(
         started
-            .hub
+            .router()
             .call_as(Caller::User, "debug.trajectory.get", json!({ "id": "orchestrator" }))
             .data
             .unwrap(),
@@ -699,25 +711,27 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
     assert_eq!(orch_detail.turns[0].prompt.as_deref(), Some("Plan today's work"));
     assert_eq!(orch_detail.turns[0].tokens.as_ref().unwrap().input, 800);
 
-    let missing = started.hub.call_as(Caller::User, "debug.trajectory.get", json!({ "id": "does-not-exist" }));
+    let missing = started
+        .router()
+        .call_as(Caller::User, "debug.trajectory.get", json!({ "id": "does-not-exist" }));
     assert_eq!(missing.biz_code, BizCode::SessionNotFound.code());
 
-    let _board_watch = started.hub.subscribe_slice_feed(SliceKind::Board);
-    let graph: DebugGraph = serde_json::from_value(started.hub.call_as(Caller::User, "debug.graph", json!({})).data.unwrap()).unwrap();
+    let _board_watch = started.ctx().feed.subscribe(SliceKind::Board);
+    let graph: DebugGraph = serde_json::from_value(started.router().call_as(Caller::User, "debug.graph", json!({})).data.unwrap()).unwrap();
     let g_issue = graph.sessions.iter().find(|s| s.session_id == "sess-issue-1").unwrap();
     assert_eq!(g_issue.issue_id, Some(7));
     assert_eq!(g_issue.kind, DebugTrajectoryKind::IssueSession);
     assert_eq!(g_issue.status, "working");
 
-    let snap: DebugSnapshot = serde_json::from_value(started.hub.call_as(Caller::User, "debug.snapshot", json!({})).data.unwrap()).unwrap();
+    let snap: DebugSnapshot = serde_json::from_value(started.router().call_as(Caller::User, "debug.snapshot", json!({})).data.unwrap()).unwrap();
     assert_eq!(snap.state_cache.slice_seqs.len(), 6);
     assert_eq!(snap.state_cache.slice_watchers.get("board"), Some(&1));
     assert_eq!(snap.state_cache.counts.issues, 1);
     assert!(snap.state_cache.counts.sessions >= 2);
     assert_eq!(snap.overview.active_sessions, 1);
     assert!(snap.overview.latest_seq > 0);
-    assert!(started.hub.slice_seqs().len() == 6);
-    assert_eq!(started.hub.slice_watcher_counts().get("board"), Some(&1));
+    assert!(started.router().slice_seqs().len() == 6);
+    assert_eq!(started.router().slice_watcher_counts().get("board"), Some(&1));
 
-    started.close();
+    started.close_blocking();
 }

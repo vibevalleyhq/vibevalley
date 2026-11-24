@@ -137,7 +137,7 @@ pub async fn library_add(f: &ToolRegistry, who: &Who, req: LibraryAddRequest) ->
         Who::Helper(me) => AddedBy::Agent {
             agent: me.profile.clone().unwrap_or_default(),
             session: Some(me.id.clone()),
-            dir: me.cwd.clone(),
+            dir: me.cwd.as_deref().map(PathBuf::from),
         },
     };
     let item = f.artifact.library.add_async(&req, &by).await.map_err(|e| format!("没成：{}", e.message))?;

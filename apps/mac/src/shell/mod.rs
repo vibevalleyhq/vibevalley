@@ -151,7 +151,7 @@ pub struct HostChrome {
 /// Transient overlays, companion processes (island/tray), and host-reported diagnostics.
 pub struct NativeOverlays {
     pub(super) island: Option<crate::island::Island>,
-    pub(super) island_client: Option<Arc<vibevalley_server::transport::bridge::Client>>,
+    pub(super) island_client: Option<Arc<vibevalley_server::gateway::bridge::Client>>,
     /// VibeValley's opening over the window until the projects are in (`VIBEVALLEY_NO_OPENING=1` skips it).
     pub launch: Option<Entity<crate::pixel::view::PixelView>>,
     pub palette: Option<Palette>,
@@ -361,7 +361,7 @@ impl Shell {
             Ok(Some((island, opened))) => {
                 shell.overlays.island = Some(island);
                 struct IslandOutlet(flume::Sender<(String, Value)>);
-                impl vibevalley_server::transport::bridge::Outlet for IslandOutlet {
+                impl vibevalley_server::gateway::bridge::Outlet for IslandOutlet {
                     fn send(&self, event: &str, data: Value) {
                         let _ = self.0.send((event.to_string(), data));
                     }

@@ -1,6 +1,7 @@
+use vibevalley_core::SliceMask;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    ApiError, ArtifactCard, Attachment, BizCode, CallState, ChatMessage, MessageHit, MessageKind, NoticeLevel, Preview, SliceMask, SubjectKind, USER_ID,
+    ApiError, ArtifactCard, Attachment, BizCode, CallState, ChatMessage, MessageHit, MessageKind, NoticeLevel, Preview, SubjectKind, USER_ID,
 };
 
 use super::model::{Q, WriteTx, message_of};

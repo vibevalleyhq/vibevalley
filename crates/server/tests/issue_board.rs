@@ -11,8 +11,8 @@ use vibevalley_core::Move;
 use vibevalley_protocol::{Deliverable, IssueCanceled, IssueStageKind as StageKind, IssueStatus, Landing, Outcome, Phase, StuckReason};
 use vibevalley_runtime::oar::scripted::{Script, Step};
 use vibevalley_runtime::oar::{PermissionMode, Runtime, StopReason};
-use vibevalley_server::work::issue::{Board, NewIssue};
-use vibevalley_server::work::ledger::{BoardError, Undelivered};
+use vibevalley_server::issue::{Board, NewIssue};
+use vibevalley_server::runtime::{BoardError, Undelivered};
 
 fn new(title: &str, repo: Option<&Path>) -> NewIssue {
     NewIssue {
@@ -54,7 +54,7 @@ fn an_issue_goes_from_backlog_to_merged() {
 
     let reviewing = wait_stage(&w.board, "1", StageKind::Reviewing);
     assert_eq!(reviewing.status, IssueStatus::InReview);
-    let session = w.board.session(reviewing.latest_session_id().unwrap()).unwrap();
+    let session = board_session(&w.board, reviewing.latest_session_id().unwrap()).unwrap();
     assert_eq!(session.phase, Phase::done());
     assert_eq!(session.last_run.as_ref().unwrap().summary, "Added feature.txt");
     assert_eq!(session.worktree_branch(), Some("vibevalley/issue-1"));
@@ -63,23 +63,23 @@ fn an_issue_goes_from_backlog_to_merged() {
     assert!(worktree.ends_with("worktrees/app.1"), "{worktree}");
     assert!(prompts.lock().unwrap()[0].starts_with("Add the feature"));
     assert!(prompts.lock().unwrap()[0].contains("1. it is there"));
-    let inbox = w.board.bundle().inbox.items;
+    let inbox = board_bundle(&w.board).inbox.items;
     assert_eq!(inbox.len(), 1);
     assert_eq!(inbox[0].kind, vibevalley_protocol::InboxKind::Review);
 
-    let changes = w.board.changes("1").unwrap();
+    let changes = board_changes(&w.board, "1").unwrap();
     assert_eq!(changes.commits.len(), 1);
     assert_eq!(changes.files.len(), 1);
     assert!(changes.uncommitted.is_empty() && changes.conflicts.is_empty());
 
     assert_eq!(block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap(), Move::Complete);
-    let done = w.board.issue("1").unwrap();
+    let done = board_issue(&w.board, "1").unwrap();
     assert_eq!((done.status, done.delivered), (IssueStatus::Done, Some(Landing::Merged)));
     assert!(exists_on(&main, "main", "feature.txt"));
     assert!(!Path::new(&worktree).exists(), "the worktree is removed");
     assert!(!branch_exists(&main, "vibevalley/issue-1"), "the merged branch is deleted");
-    assert!(w.board.bundle().sessions.sessions.is_empty(), "its session left");
-    assert!(w.board.bundle().inbox.items.is_empty());
+    assert!(board_bundle(&w.board).sessions.sessions.is_empty(), "its session left");
+    assert!(board_bundle(&w.board).inbox.items.is_empty());
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn uncommitted_leftovers_go_in_with_the_rest() {
     block_on(w.board.create_async(new("Loose", Some(&main)))).unwrap();
     block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
     wait_stage(&w.board, "1", StageKind::Reviewing);
-    assert_eq!(w.board.changes("1").unwrap().uncommitted.len(), 1);
+    assert_eq!(board_changes(&w.board, "1").unwrap().uncommitted.len(), 1);
     block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
     assert!(exists_on(&main, "main", "loose.txt"));
 }
@@ -120,11 +120,11 @@ fn a_failed_round_is_cured_not_completed() {
         block_on(w.board.move_to_async("1", IssueStatus::Done, None)),
         Err(BoardError::Refused(_))
     ));
-    assert_eq!(w.board.bundle().inbox.items[0].kind, vibevalley_protocol::InboxKind::Fix);
+    assert_eq!(board_bundle(&w.board).inbox.items[0].kind, vibevalley_protocol::InboxKind::Fix);
     // Cure: back to todo with the server's own words.
     assert_eq!(block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap(), Move::Round);
     let fixed = wait_stage(&w.board, "1", StageKind::Reviewing);
-    assert_eq!(w.board.session(fixed.latest_session_id().unwrap()).unwrap().runs, 2);
+    assert_eq!(board_session(&w.board, fixed.latest_session_id().unwrap()).unwrap().runs, 2);
     assert_eq!(vibevalley_core::rules::session_ids_of(&fixed).len(), 1, "the same session takes the next round");
 }
 
@@ -138,7 +138,7 @@ fn a_turn_that_errors_is_a_failed_round() {
     block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
     let stuck = wait_stage(&w.board, "1", StageKind::Stuck);
     assert_eq!(stuck.stage.stuck, Some(StuckReason::Failed));
-    let s = w.board.session(stuck.latest_session_id().unwrap()).unwrap();
+    let s = board_session(&w.board, stuck.latest_session_id().unwrap()).unwrap();
     assert_eq!(s.last_run.unwrap().outcome, Outcome::Failed);
 }
 
@@ -160,7 +160,7 @@ fn a_question_waits_for_the_answer_and_the_round_goes_on() {
     let asking = wait_stage(&w.board, "1", StageKind::Asking);
     assert_eq!(asking.status, IssueStatus::InProgress);
     assert_eq!(asking.questions[0].options, vec!["8080", "9090"]);
-    let inbox = w.board.bundle().inbox.items;
+    let inbox = board_bundle(&w.board).inbox.items;
     assert_eq!((inbox[0].kind, inbox[0].text.as_str()), (vibevalley_protocol::InboxKind::Ask, "Which port?"));
     block_on(w.board.tell_async("1", "Use 9090")).unwrap();
     let done = wait_stage(&w.board, "1", StageKind::Reviewing);
@@ -197,15 +197,15 @@ fn an_interrupted_round_resumes_or_completes() {
     assert_eq!(working.status, IssueStatus::InProgress);
     // Telling a working session steers it.
     block_on(w.board.tell_async("1", "also add docs")).unwrap();
-    w.board.stop("1").unwrap();
+    block_on(w.board.stop_async("1")).unwrap();
     let stuck = wait_stage(&w.board, "1", StageKind::Stuck);
     assert_eq!(stuck.stage.stuck, Some(StuckReason::Interrupted));
     assert!(!block_on(w.board.runs_async(&stuck.id)).unwrap().last().unwrap().needs_reconciliation);
-    let session = w.board.session(stuck.latest_session_id().unwrap()).unwrap();
+    let session = board_session(&w.board, stuck.latest_session_id().unwrap()).unwrap();
     assert!(!session.last_run.unwrap().needs_reconciliation);
 
     assert!(stuck.moves.contains(&IssueStatus::Done), "what is there can be completed");
-    assert_eq!(w.board.bundle().inbox.items[0].kind, vibevalley_protocol::InboxKind::Interrupted);
+    assert_eq!(board_bundle(&w.board).inbox.items[0].kind, vibevalley_protocol::InboxKind::Interrupted);
     assert_eq!(block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap(), Move::Round);
     wait_stage(&w.board, "1", StageKind::Reviewing);
     block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
@@ -220,13 +220,13 @@ fn canceling_lets_the_session_go_and_keeps_a_branch_with_work() {
     block_on(w.board.create_async(new("Doomed", Some(&main)))).unwrap();
     block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
     let working = wait_stage(&w.board, "1", StageKind::Working);
-    let worktree = w.board.session(working.latest_session_id().unwrap()).unwrap().cwd.unwrap();
+    let worktree = board_session(&w.board, working.latest_session_id().unwrap()).unwrap().cwd.unwrap();
     block_on(w.board.tell_async("1", "x")).unwrap();
     std::fs::write(Path::new(&worktree).join("loose.txt"), "uncommitted").unwrap();
     assert_eq!(block_on(w.board.move_to_async("1", IssueStatus::Canceled, None)).unwrap(), Move::Cancel);
-    let canceled = w.board.issue("1").unwrap();
+    let canceled = board_issue(&w.board, "1").unwrap();
     assert_eq!((canceled.status, canceled.canceled), (IssueStatus::Canceled, Some(IssueCanceled::Dismissed)));
-    assert!(w.board.bundle().sessions.sessions.is_empty());
+    assert!(board_bundle(&w.board).sessions.sessions.is_empty());
     assert!(!Path::new(&worktree).exists());
     assert!(exists_on(&main, "vibevalley/issue-1", "wip.txt") && exists_on(&main, "vibevalley/issue-1", "loose.txt"));
     // Reopened, it is sent again on the same branch.
@@ -236,7 +236,7 @@ fn canceling_lets_the_session_go_and_keeps_a_branch_with_work() {
     ));
     block_on(w.board.move_to_async("1", IssueStatus::Todo, Some("try again"))).unwrap();
     wait_stage(&w.board, "1", StageKind::Working);
-    w.board.stop("1").unwrap();
+    block_on(w.board.stop_async("1")).unwrap();
 
     // Dropped before it was ever sent: nothing to let go.
     block_on(w.board.create_async(new("Never", Some(&main)))).unwrap();
@@ -259,7 +259,7 @@ fn the_queue_waits_for_room_in_the_space_and_sends_the_next() {
     block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
     wait_stage(&w.board, "1", StageKind::Working);
     block_on(w.board.move_to_async("2", IssueStatus::Todo, None)).unwrap();
-    let queued = w.board.issue("2").unwrap();
+    let queued = board_issue(&w.board, "2").unwrap();
     assert_eq!((queued.status, queued.stage.state), (IssueStatus::Todo, StageKind::Queued));
     assert!(queued.queued_at.is_some());
     // When the first round ends there is room: the second goes by itself.
@@ -282,7 +282,7 @@ fn the_queue_waits_for_room_in_the_space_and_sends_the_next() {
     gate.release();
     wait_stage(&w.board, "3", StageKind::Reviewing);
     block_on(w.board.refresh_queue_async()).unwrap();
-    assert_eq!(w.board.issue("4").unwrap().status, IssueStatus::Backlog);
+    assert_eq!(board_issue(&w.board, "4").unwrap().status, IssueStatus::Backlog);
 }
 
 #[test]
@@ -301,9 +301,9 @@ fn the_per_repo_limit_holds_one_repo_back_and_not_another() {
     for n in ["1", "2", "3"] {
         block_on(w.board.move_to_async(n, IssueStatus::Todo, None)).unwrap();
     }
-    assert_eq!(w.board.issue("1").unwrap().stage.state, StageKind::Working);
-    assert_eq!(w.board.issue("2").unwrap().stage.state, StageKind::Queued);
-    assert_eq!(w.board.issue("3").unwrap().stage.state, StageKind::Working);
+    assert_eq!(board_issue(&w.board, "1").unwrap().stage.state, StageKind::Working);
+    assert_eq!(board_issue(&w.board, "2").unwrap().stage.state, StageKind::Queued);
+    assert_eq!(board_issue(&w.board, "3").unwrap().stage.state, StageKind::Working);
     gate.release_n(3);
     wait_stage(&w.board, "2", StageKind::Reviewing);
     // Words for a queued issue go with it when it is sent.
@@ -349,14 +349,14 @@ fn a_restart_marks_a_working_session_interrupted_and_it_goes_on() {
     let working = wait_stage(&w.board, "1", StageKind::Working);
     let session_id = working.latest_session_id().unwrap().clone();
     // Another process cannot take the board while this one holds it.
-    let busy = block_on(Board::open_async(&w.store, w.registry.clone(), config(w.dir.path())));
+    let busy = open_board(&w.store, w.registry.clone(), config(w.dir.path()));
     assert!(matches!(busy, Err(BoardError::Busy(_))));
     w.board.close();
 
-    let (board, _hub) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
-    let issue = board.issue("1").unwrap();
+    let (board, _ctx) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
+    let issue = board_issue(&board, "1").unwrap();
     assert_eq!(issue.stage.stuck, Some(StuckReason::Interrupted));
-    let session = board.session(&session_id).unwrap();
+    let session = board_session(&board, &session_id).unwrap();
     assert_eq!(session.phase, Phase::resting());
     assert_eq!(session.last_run.unwrap().outcome, Outcome::Interrupted);
     assert!(!board.sessions().is_live(&session_id));
@@ -375,13 +375,13 @@ fn a_lost_worktree_cancels_its_issue_on_open() {
     block_on(w.board.create_async(new("Lost", Some(&main)))).unwrap();
     block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
     let issue = wait_stage(&w.board, "1", StageKind::Reviewing);
-    let worktree = w.board.session(issue.latest_session_id().unwrap()).unwrap().cwd.unwrap();
+    let worktree = board_session(&w.board, issue.latest_session_id().unwrap()).unwrap().cwd.unwrap();
     w.board.close();
     std::fs::remove_dir_all(&worktree).unwrap();
-    let (board, _hub) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
-    let lost = board.issue("1").unwrap();
+    let (board, _ctx) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
+    let lost = board_issue(&board, "1").unwrap();
     assert_eq!((lost.status, lost.canceled), (IssueStatus::Canceled, Some(IssueCanceled::Lost)));
-    assert!(board.bundle().sessions.sessions.is_empty());
+    assert!(board_bundle(&board).sessions.sessions.is_empty());
 }
 
 #[test]
@@ -409,7 +409,7 @@ fn a_merge_conflict_stays_in_review_and_resolve_sends_it_back() {
     wait_stage(&w.board, "1", StageKind::Reviewing);
     std::fs::write(main.join("README.md"), "from main\n").unwrap();
     git(&main, &["commit", "-q", "-am", "main moves on"]);
-    assert_eq!(w.board.changes("1").unwrap().conflicts, vec![std::path::PathBuf::from("README.md")]);
+    assert_eq!(board_changes(&w.board, "1").unwrap().conflicts, vec![std::path::PathBuf::from("README.md")]);
 
     match block_on(w.board.move_to_async("1", IssueStatus::Done, None)) {
         Err(BoardError::NotDelivered(Undelivered::Conflict { base, files })) => {
@@ -417,18 +417,18 @@ fn a_merge_conflict_stays_in_review_and_resolve_sends_it_back() {
         }
         other => panic!("{other:?}"),
     }
-    let conflicted = w.board.issue("1").unwrap();
+    let conflicted = board_issue(&w.board, "1").unwrap();
     assert_eq!(
         (conflicted.status, conflicted.stage.stuck),
         (IssueStatus::InReview, Some(StuckReason::Conflict))
     );
-    assert_eq!(w.board.bundle().inbox.items[0].kind, vibevalley_protocol::InboxKind::Conflict);
+    assert_eq!(board_bundle(&w.board).inbox.items[0].kind, vibevalley_protocol::InboxKind::Conflict);
     // Resolve: back to its session with the server's words.
     block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
     let resolved = wait_stage(&w.board, "1", StageKind::Reviewing);
     assert!(resolved.conflict.is_none());
     block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
-    assert_eq!(w.board.issue("1").unwrap().delivered, Some(Landing::Merged));
+    assert_eq!(board_issue(&w.board, "1").unwrap().delivered, Some(Landing::Merged));
     assert_eq!(std::fs::read_to_string(main.join("README.md")).unwrap(), "from the branch\n");
 }
 
@@ -465,7 +465,7 @@ fn a_failing_check_sends_the_work_back_with_the_output_tail() {
         other => panic!("{other:?}"),
     }
     let back = wait_stage(&w.board, "1", StageKind::Reviewing);
-    assert_eq!(w.board.session(back.latest_session_id().unwrap()).unwrap().runs, 2);
+    assert_eq!(board_session(&w.board, back.latest_session_id().unwrap()).unwrap().runs, 2);
     block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
     assert!(exists_on(&main, "main", "ok.txt"));
 }
@@ -481,7 +481,7 @@ fn regression_review_keeps_the_seen_tree_and_records_the_delivered_commit() {
     block_on(w.board.create_async(new("Review the content", Some(&main)))).unwrap();
     block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
     wait_stage(&w.board, "1", StageKind::Reviewing);
-    let first = w.board.changes("1").unwrap();
+    let first = board_changes(&w.board, "1").unwrap();
     assert_eq!(first.files.len(), 1, "the displayed patch includes uncommitted files");
     assert_eq!(first.uncommitted[0].new_path.as_deref(), Some(Path::new("first.txt")));
     block_on(w.board.review_async("1", true, &[], "", Some(&first.revision))).unwrap();
@@ -489,7 +489,7 @@ fn regression_review_keeps_the_seen_tree_and_records_the_delivered_commit() {
     assert!(block_on(w.board.review_async("1", true, &[], "", Some(&first.revision))).is_err());
     assert!(block_on(w.board.move_to_async("1", IssueStatus::Done, None)).is_err());
     assert!(!main.join("first.txt").exists());
-    let next = w.board.changes("1").unwrap();
+    let next = board_changes(&w.board, "1").unwrap();
     let added = next.since_review.unwrap();
     assert_eq!(added.len(), 1);
     assert_eq!(added[0].new_path.as_deref(), Some(Path::new("second.txt")));
@@ -505,12 +505,12 @@ fn regression_review_keeps_the_seen_tree_and_records_the_delivered_commit() {
     block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
 
     w.board.close();
-    let (board, _hub) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
-    let archived = board.changes_since("1", Some(&first.revision.tree)).unwrap();
+    let (board, _ctx) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
+    let archived = block_on(board.changes_since_async("1", Some(&first.revision.tree))).unwrap();
     assert_eq!(archived.revision, next.revision);
     assert_eq!(archived.files.len(), 2);
     assert_eq!(archived.since_review.unwrap().len(), 1);
-    let delivery = board.issue("1").unwrap().delivery_evidence.unwrap();
+    let delivery = board_issue(&board, "1").unwrap().delivery_evidence.unwrap();
     assert_eq!(
         delivery.reviews.iter().map(|r| &r.revision).collect::<Vec<_>>(),
         [&first.revision, &next.revision]
@@ -548,8 +548,8 @@ fn regression_reopen_recognizes_an_already_published_candidate_without_running_g
     assert!(!branch_exists(&main, "vibevalley/issue-1"));
     w.board.close();
     execute_sql(&mut db, "drop trigger stop_delivery");
-    let (board, _hub) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
-    let restored = board.issue("1").unwrap();
+    let (board, _ctx) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
+    let restored = board_issue(&board, "1").unwrap();
     assert_eq!(restored.status, IssueStatus::Done);
     assert_eq!(restored.delivery_evidence.unwrap().merged_commit.as_deref(), Some(head.as_str()));
     assert_eq!(git(&main, &["rev-parse", "HEAD"]), head);
@@ -576,7 +576,7 @@ fn regression_project_check_runs_on_the_combined_tree_before_delivery() {
     block_on(w.board.create_async(new("Increase jobs", Some(&main)))).unwrap();
     block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
     let reviewing = wait_stage(&w.board, "1", StageKind::Reviewing);
-    let session = w.board.session(reviewing.latest_session_id().unwrap()).unwrap();
+    let session = board_session(&w.board, reviewing.latest_session_id().unwrap()).unwrap();
     let worktree = Path::new(session.cwd.as_ref().unwrap());
     std::fs::write(main.join("limit"), "1").unwrap();
     git(&main, &["commit", "-qam", "decrease capacity"]);
@@ -597,14 +597,14 @@ fn regression_project_check_runs_on_the_combined_tree_before_delivery() {
         matches!(result, Err(BoardError::NotDelivered(Undelivered::CheckFailed { ref output, .. })) if output == "too many jobs"),
         "{result:?}"
     );
-    let failed = w.board.issue("1").unwrap().delivery_evidence.unwrap().check.unwrap();
+    let failed = board_issue(&w.board, "1").unwrap().delivery_evidence.unwrap().check.unwrap();
     assert_eq!(failed.status, vibevalley_protocol::ProjectCheckStatus::Failed);
     assert_eq!(failed.output.as_deref(), Some("too many jobs"));
     assert_eq!(git(&main, &["rev-parse", "HEAD"]), target);
     assert_eq!(std::fs::read_to_string(main.join("jobs")).unwrap(), "1");
     wait_stage(&w.board, "1", StageKind::Reviewing);
     block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
-    assert_eq!(w.board.issue("1").unwrap().delivered, Some(Landing::Merged));
+    assert_eq!(board_issue(&w.board, "1").unwrap().delivered, Some(Landing::Merged));
     assert_eq!(std::fs::read_to_string(main.join("limit")).unwrap(), "1");
 }
 
@@ -625,7 +625,7 @@ fn an_answer_issue_is_acknowledged_with_its_conclusion() {
     assert_eq!(reviewing.answer.as_ref().unwrap().conclusion, "It is 42.");
     assert_eq!(reviewing.stage.lead, Some(vibevalley_protocol::IssueAct::Acknowledge));
     block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
-    assert_eq!(w.board.issue("1").unwrap().delivered, Some(Landing::None));
+    assert_eq!(board_issue(&w.board, "1").unwrap().delivered, Some(Landing::None));
 }
 
 #[test]
@@ -655,7 +655,7 @@ fn a_branch_issue_keeps_its_branch() {
     block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
     wait_stage(&w.board, "1", StageKind::Reviewing);
     block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
-    assert_eq!(w.board.issue("1").unwrap().delivered, Some(Landing::Kept));
+    assert_eq!(board_issue(&w.board, "1").unwrap().delivered, Some(Landing::Kept));
     assert!(exists_on(&main, "vibevalley/issue-1", "b.txt") && !exists_on(&main, "main", "b.txt"));
 }
 
@@ -669,7 +669,7 @@ fn a_quiet_session_is_stuck_until_it_speaks() {
     block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
     let quiet = wait_issue(&w.board, "1", "quiet", |t| t.stage.stuck == Some(StuckReason::Quiet));
     assert_eq!(quiet.status, IssueStatus::InProgress);
-    assert_eq!(w.board.bundle().inbox.items[0].kind, vibevalley_protocol::InboxKind::Quiet);
+    assert_eq!(board_bundle(&w.board).inbox.items[0].kind, vibevalley_protocol::InboxKind::Quiet);
     gate.release();
     wait_stage(&w.board, "1", StageKind::Reviewing);
 }
@@ -720,11 +720,11 @@ fn a_queued_issue_waits_for_the_issue_it_is_blocked_by() {
     after.blocked_by = vec!["1".into()];
     block_on(w.board.create_async(after)).unwrap();
     block_on(w.board.move_to_async("2", IssueStatus::Todo, None)).unwrap();
-    assert_eq!(w.board.issue("2").unwrap().stage.state, StageKind::Queued);
+    assert_eq!(board_issue(&w.board, "2").unwrap().stage.state, StageKind::Queued);
     block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
     wait_stage(&w.board, "1", StageKind::Reviewing);
     block_on(w.board.refresh_queue_async()).unwrap();
-    assert_eq!(w.board.issue("2").unwrap().stage.state, StageKind::Queued, "in review is not done");
+    assert_eq!(board_issue(&w.board, "2").unwrap().stage.state, StageKind::Queued, "in review is not done");
     block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
     wait_stage(&w.board, "2", StageKind::Reviewing);
     // A cycle is refused.

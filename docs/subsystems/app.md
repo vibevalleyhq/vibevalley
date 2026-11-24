@@ -33,7 +33,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 | `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[哲学与令牌](docs/design/01-philosophy-and-tokens.md)），与 `apps/mobile` 令牌一同由 [tokens.ts](scripts/gen/tokens.ts) 从 [tokens.json](design/tokens.json) 生成 |
 | `apps/mac/ui/features/setting/RemoteAccessPage.tsx` | Mac 设置页 `/settings/connections/remote`：桌面控制面连接模式（本地内置 / 远程控制面切换与重置）、远程访问开关、Tailscale 在线状态与地址、二维码配对（`host.qr`）与已配对设备撤销 |
 | `apps/mobile/` | 独立原生移动应用（`nsh/mobile`，iOS + Android 折叠屏／iPhone Duo 自适应）：基于 `@vibevalley/protocol/remote`（[transport.ts](packages/protocol/src/remote/transport.ts)）连接 Mac 远程门，含配对页、4 个一级标签（收件箱、频道、会话、任务；会话与任务行在指定机器时展示轻量机器徽标）、[layout.ts](apps/mobile/src/design/layout.ts) 自适应单／双栏布局与 `<Canvas>` + `Path2D` 97 枚 reicons 渲染 |
-| `crates/server/src/transport/bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
+| `crates/server/src/gateway/bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
 | `packages/protocol/src/host.ts` | `Host` 接口：页面能向宿主要的东西 |
 | `apps/island/` | 刘海上的灵动岛（Swift）：一个单独的小程序，stdin 收工单摘要，stdout 说点了哪一行（[apps/island/README.md](apps/island/README.md)）；`apps/mac` 从包内带起它，退出时关闭 |
 
@@ -75,7 +75,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 
 ### 桥
 
-页面经 nsh 的 `host.post("action", …)` 发动作，Rust 经 `HostChannel` 的事件回（`crates/server/src/transport/bridge/mod.rs` 开头的表）：
+页面经 nsh 的 `host.post("action", …)` 发动作，Rust 经 `HostChannel` 的事件回（`crates/server/src/gateway/bridge/mod.rs` 开头的表）：
 
 | 页面（`apps/mac/ui/infra/bridge.ts`） | 动作 | 回来的事件 |
 |---|---|---|

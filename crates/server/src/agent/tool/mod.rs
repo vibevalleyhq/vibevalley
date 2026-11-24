@@ -379,7 +379,8 @@ impl vibevalley_runtime::agent::Tool for Held {
         let route = self.route.lock().clone();
         let raw = args.clone();
         let (tx, rx) = flume::bounded(1);
-        tools.ctx.spawn("agent.tool.execute", async move {
+        let ctx = tools.ctx.clone();
+        ctx.spawn("agent.tool.execute", async move {
             let res = tool.run_async(&tools, &Who::Orchestrator(route), &raw).await;
             let _ = tx.send(res);
         });

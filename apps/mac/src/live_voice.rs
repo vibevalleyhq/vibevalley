@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio_tungstenite::tungstenite::{Message, client::IntoClientRequest};
 use tokio_util::sync::CancellationToken;
-use vibevalley_server::transport::api::SharedLiveVoice;
+use vibevalley_server::gateway::api::SharedLiveVoice;
 
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]

@@ -31,34 +31,52 @@ fn prod_lines(text: &str) -> Vec<(usize, &str)> {
 #[test]
 fn server_modules_respect_layer_and_skin_boundaries() {
     let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
-    let domains = ["work", "team", "collab", "content", "skin", "infra"];
+    let l1_dirs = [
+        "setting.rs",
+        "provider.rs",
+        "repo.rs",
+        "storage",
+        "debug",
+        "machine",
+        "runtime",
+        "channel",
+        "agent/profile",
+    ];
+    let l2_dirs = ["issue", "artifact", "agent/memory", "connector", "voice"];
+    let l3_targets = [
+        "crate::cron::",
+        "crate::game::",
+        "crate::agent::orchestrator::",
+        "crate::agent::tool::",
+        "crate::agent::mcp::",
+    ];
     let mut violations = Vec::new();
 
-    for top in domains {
-        for path in rs_files(&src_dir.join(top)) {
+    for entry in l1_dirs.iter().chain(l2_dirs.iter()) {
+        let full = src_dir.join(entry);
+        let paths = if full.is_file() { vec![full] } else { rs_files(&full) };
+        for path in paths {
             let rel = path.strip_prefix(&src_dir).unwrap().to_string_lossy().replace('\\', "/");
             let text = std::fs::read_to_string(&path).unwrap();
-
+            let is_l1 = l1_dirs.contains(entry);
             for (line_no, line) in prod_lines(&text) {
-                if top != "skin" && line.contains("crate::skin::") {
-                    violations.push(format!(
-                        "{rel}:{line_no} imports `skin` from a non-skin domain — pass a callback or subscribe to Hub transitions in app/bootstrap.rs"
-                    ));
-                }
-                if top == "infra" {
-                    for domain in ["work", "team", "collab", "content", "skin"] {
-                        let pat = format!("crate::{domain}::");
-                        if line.contains(&pat) {
-                            violations.push(format!(
-                                "{rel}:{line_no} imports upward into `{domain}` from `infra` — keep `infra` free of business domain dependencies"
-                            ));
-                        }
+                for target in l3_targets {
+                    if line.contains(target) {
+                        violations.push(format!("{rel}:{line_no} imports L3 `{target}` from `{entry}`"));
                     }
                 }
-                if rel.starts_with("collab/voice/") && line.contains("crate::content::media::") {
-                    violations.push(format!(
-                        "{rel}:{line_no} imports `content::media` from `collab/voice` — use shared primitives in `infra::{{http, provider}}`"
-                    ));
+                if is_l1 {
+                    for l2 in [
+                        "crate::issue::",
+                        "crate::artifact::",
+                        "crate::agent::memory::",
+                        "crate::connector::",
+                        "crate::voice::",
+                    ] {
+                        if line.contains(l2) {
+                            violations.push(format!("{rel}:{line_no} imports L2 `{l2}` from L1 `{entry}`"));
+                        }
+                    }
                 }
             }
         }
@@ -68,115 +86,59 @@ fn server_modules_respect_layer_and_skin_boundaries() {
 }
 
 #[test]
-fn server_db_entities_are_private_to_their_owning_domain() {
+fn server_sea_orm_and_entity_models_stay_inside_db_and_service() {
     let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
-    let entities_dir = src_dir.join("db/entities");
-    let migration_dir = src_dir.join("db/migration");
     let mut violations = Vec::new();
 
-    fn owner_allows(target: &str, rel: &str) -> Option<&'static str> {
-        if target.starts_with("work_") {
-            (!rel.starts_with("work/")).then_some("work/")
-        } else if target.starts_with("collab_") {
-            (!rel.starts_with("collab/")).then_some("collab/")
-        } else if target.starts_with("content_") {
-            (!rel.starts_with("content/")).then_some("content/")
-        } else if target == "team_memory" {
-            (!rel.starts_with("team/memory/")).then_some("team/memory/")
-        } else if target == "infra_remote" {
-            (!rel.starts_with("infra/remote/")).then_some("infra/remote/")
-        } else if target == "shared" {
-            (!(rel.starts_with("db/") || rel.starts_with("work/"))).then_some("db/ or work/")
-        } else {
-            Some("<classified owning domain>")
-        }
-    }
-
     for path in rs_files(&src_dir) {
-        if path.starts_with(&entities_dir) || path.starts_with(&migration_dir) {
+        let rel = path.strip_prefix(&src_dir).unwrap().to_string_lossy().replace('\\', "/");
+        if rel.starts_with("db/") || rel.starts_with("service/") {
             continue;
         }
-        let rel = path.strip_prefix(&src_dir).unwrap().to_string_lossy().replace('\\', "/");
         let text = std::fs::read_to_string(&path).unwrap();
-        let prod = prod_lines(&text);
-        let joined = prod.iter().map(|(_, l)| *l).collect::<Vec<_>>().join("\n");
-        let bytes = joined.as_bytes();
-        let mut cursor = 0;
-
-        while let Some(rel_idx) = joined[cursor..].find("db::entities::") {
-            let start = cursor + rel_idx + "db::entities::".len();
-            let line_no = prod.get(joined[..start].matches('\n').count()).map_or(1, |(n, _)| *n);
-            let rest = &joined[start..];
-            if rest.starts_with('{')
-                && let Some(close) = rest.find('}')
-            {
-                let inner = &rest[1..close];
-                let mut depth = 0usize;
-                for seg in inner.split(',') {
-                    let trimmed = seg.trim();
-                    if depth == 0 && !trimmed.is_empty() {
-                        let target: String = trimmed.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
-                        if target.is_empty() {
-                            violations.push(format!("{rel}:{line_no} references `db::entities::{{...}}` without a domain module"));
-                        } else if let Some(expected) = owner_allows(&target, &rel) {
-                            violations.push(format!("{rel}:{line_no} accesses `db::entities::{target}` outside `{expected}`"));
-                        }
-                    }
-                    depth = depth.saturating_add(seg.matches('{').count()).saturating_sub(seg.matches('}').count());
-                }
-                cursor = start + close + 1;
-                continue;
-            }
-            let target: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
-            if target.is_empty() {
-                violations.push(format!("{rel}:{line_no} references `db::entities::` without a domain module"));
-            } else if let Some(expected) = owner_allows(&target, &rel) {
-                violations.push(format!("{rel}:{line_no} accesses `db::entities::{target}` outside `{expected}`"));
-            }
-            cursor = start.min(bytes.len());
-        }
-
-        // Catch `use entities::...` inside `src/db/`.
-        if rel.starts_with("db/") {
-            for (line_no, line) in &prod {
-                if let Some(idx) = line.find("entities::") {
-                    let prefix = &line[..idx];
-                    if !prefix.ends_with("db::") {
-                        let target: String = line[idx + "entities::".len()..]
-                            .chars()
-                            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
-                            .collect();
-                        if !target.is_empty()
-                            && let Some(expected) = owner_allows(&target, &rel)
-                        {
-                            violations.push(format!("{rel}:{line_no} accesses `entities::{target}` outside `{expected}`"));
-                        }
-                    }
-                }
+        for (line_no, line) in prod_lines(&text) {
+            if line.contains("sea_orm::") || line.contains("sea_orm_migration::") || line.contains("db::entity") {
+                violations.push(format!("{rel}:{line_no} references SeaORM or `db::entity` outside `db/` and `service/`"));
             }
         }
     }
 
-    assert!(violations.is_empty(), "server db::entities privacy violations:\n{}", violations.join("\n"));
+    assert!(violations.is_empty(), "server SeaORM boundary violations:\n{}", violations.join("\n"));
 }
 
 #[test]
-fn server_spine_and_transport_never_import_domain_modules() {
+fn server_spine_and_gateway_never_import_domain_modules() {
     let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
-    let mut files = vec![src_dir.join("lib.rs"), src_dir.join("app/mod.rs")];
-    files.extend(rs_files(&src_dir.join("app/hub")));
-    files.extend(rs_files(&src_dir.join("db")));
-    files.extend(rs_files(&src_dir.join("transport")));
+    let mut files = vec![src_dir.join("lib.rs")];
+    for spine_dir in ["log", "db", "service", "context", "gateway"] {
+        files.extend(rs_files(&src_dir.join(spine_dir)));
+    }
+    let domain_targets = [
+        "crate::setting::",
+        "crate::provider::",
+        "crate::repo::",
+        "crate::storage::",
+        "crate::debug::",
+        "crate::machine::",
+        "crate::runtime::",
+        "crate::channel::",
+        "crate::connector::",
+        "crate::voice::",
+        "crate::artifact::",
+        "crate::issue::",
+        "crate::agent::",
+        "crate::cron::",
+        "crate::game::",
+    ];
     let mut violations = Vec::new();
 
     for path in files {
         let rel = path.strip_prefix(&src_dir).unwrap().to_string_lossy().replace('\\', "/");
         let text = std::fs::read_to_string(&path).unwrap();
         for (line_no, line) in prod_lines(&text) {
-            for domain in ["work", "team", "collab", "content", "skin", "infra"] {
-                let pat = format!("crate::{domain}::");
-                if line.contains(&pat) {
-                    violations.push(format!("{rel}:{line_no} references `{pat}` from L0 spine/transport"));
+            for pat in domain_targets {
+                if line.contains(pat) {
+                    violations.push(format!("{rel}:{line_no} references `{pat}` from L0 spine/gateway"));
                 }
             }
         }

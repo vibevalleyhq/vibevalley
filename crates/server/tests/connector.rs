@@ -17,9 +17,10 @@ use serde_json::{Value, json};
 use tokio::sync::Notify;
 use tokio_tungstenite::tungstenite::{self, Message};
 use tokio_util::sync::{CancellationToken, DropGuard};
-use vibevalley_server::collab::channel::{ChannelEvent, Posting};
-use vibevalley_server::collab::connector::{Options, Vendors};
-use vibevalley_server::{Server, Started};
+use vibevalley_server::channel::{ChannelEvent, Posting};
+use vibevalley_server::connector::{Options, Vendors};
+use vibevalley_server::gateway::api::Server;
+use vibevalley_server::{App, Config, create_app_blocking};
 
 const USER: &str = "o9cq80wkM5NnUserOfThisFarm@im.wechat";
 const QR: &str = "https://liteapp.weixin.qq.com/q/q1";
@@ -550,11 +551,11 @@ impl World {
     }
 }
 
-fn start(dir: &std::path::Path, world: &World) -> Started {
+fn start(dir: &std::path::Path, world: &World) -> App {
     vibevalley_i18n::set_locale("zh");
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let started = create_app_blocking(Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         tick_crons: false,
@@ -576,16 +577,16 @@ fn start(dir: &std::path::Path, world: &World) -> Started {
             moment: Duration::from_millis(1500),
             poll_floor: Duration::from_millis(30),
         },
-        ..vibevalley_server::ServerConfig::under(dir)
+        ..Config::under(dir)
     })
     .unwrap();
     // The orchestrator, played: it answers each of the user's words where they were said.
     let (mut events, chat, cancel) = (
-        started.test_internals().chat.subscribe_events(),
-        started.test_internals().chat.clone(),
-        started.hub.child_token(),
+        started.test_internals().channel.subscribe_events(),
+        started.test_internals().channel.clone(),
+        started.ctx().token().child_token(),
     );
-    started.hub.spawn_task(async move {
+    started.ctx().spawn("connector-test-echo", async move {
         loop {
             let event = tokio::select! {
                 _ = cancel.cancelled() => return,
@@ -598,20 +599,22 @@ fn start(dir: &std::path::Path, world: &World) -> Started {
             if let ChannelEvent::Posted(c) = event
                 && c.row.sender_id == "user"
             {
-                let _ = chat.post(Posting {
-                    from: "orchestrator".into(),
-                    channel: c.row.channel_id.clone(),
-                    text: format!("收到：**{}**", c.row.body),
-                    ..Posting::default()
-                });
+                let _ = chat
+                    .post_async(Posting {
+                        from: "orchestrator".into(),
+                        channel: c.row.channel_id.clone(),
+                        text: format!("收到：**{}**", c.row.body),
+                        ..Posting::default()
+                    })
+                    .await;
             }
         }
     });
     started
 }
 
-fn call(s: &Started, op: &str, payload: Value) -> Value {
-    let e = s.hub.call(op, payload);
+fn call(s: &App, op: &str, payload: Value) -> Value {
+    let e = s.router().call(op, payload);
     assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
     e.data.unwrap_or(Value::Null)
 }
@@ -631,18 +634,18 @@ fn wait_notify<T>(notify: &Notify, what: &str, mut look: impl FnMut() -> Option<
     })
 }
 
-fn status(s: &Started, id: &str) -> Value {
+fn status(s: &App, id: &str) -> Value {
     let all = call(s, "connector.list", Value::Null);
     all.as_array().unwrap().iter().find(|c| c["id"] == id).unwrap().clone()
 }
 
-fn status_is(s: &Started, id: &str, what: &str, ok: impl Fn(&Value) -> bool) -> Value {
-    crate::support::wait_until_settled(Some(&s.hub), Duration::from_secs(15), &format!("{id}: {what}"), || {
+fn status_is(s: &App, id: &str, what: &str, ok: impl Fn(&Value) -> bool) -> Value {
+    crate::support::wait_until_settled(Some(s.ctx()), Duration::from_secs(15), &format!("{id}: {what}"), || {
         Some(status(s, id)).filter(|st| ok(st))
     })
 }
 
-fn reaches(s: &Started, id: &str, state: &str) -> Value {
+fn reaches(s: &App, id: &str, state: &str) -> Value {
     status_is(s, id, state, |st| st["state"] == state)
 }
 
@@ -650,11 +653,11 @@ fn nth(world: &World, app: &'static str, n: usize) -> Sent {
     wait_notify(&world.sent_notify, &format!("{app}'s message {n}"), || world.by(app).get(n).cloned())
 }
 
-fn history(s: &Started, channel: &str) -> Vec<Value> {
+fn history(s: &App, channel: &str) -> Vec<Value> {
     call(s, "channel.message.list", json!({ "id": channel })).as_array().unwrap().clone()
 }
 
-fn said_in(s: &Started, channel: &str) -> Vec<String> {
+fn said_in(s: &App, channel: &str) -> Vec<String> {
     let said = history(s, channel);
     said.iter()
         .filter(|m| m["from"] == "user")
@@ -662,7 +665,7 @@ fn said_in(s: &Started, channel: &str) -> Vec<String> {
         .collect()
 }
 
-fn weixin_connected(s: &Started, world: &World) -> Value {
+fn weixin_connected(s: &App, world: &World) -> Value {
     let first = call(s, "connector.login", json!({ "id": "weixin" }));
     assert_eq!((first["qr"].as_str(), first["state"].as_str()), (Some(QR), Some("waiting")));
     world.wx_status.lock().unwrap().push_back(json!("confirmed"));
@@ -690,7 +693,7 @@ fn weixin_is_scanned_and_verified_and_the_users_words_reach_the_default_channel_
     let again = call(&s, "connector.login", json!({ "id": "weixin" }));
     assert_eq!(again["qr"], QR);
     assert_eq!(world.wx_qr_calls.load(Ordering::SeqCst), 1);
-    assert_ne!(s.hub.call("connector.login", json!({ "id": "telegram" })).biz_code, 0);
+    assert_ne!(s.router().call("connector.login", json!({ "id": "telegram" })).biz_code, 0);
 
     world.wx_status.lock().unwrap().push_back(json!("scaned"));
     world.wx_status_notify.notify_waiters();
@@ -705,11 +708,21 @@ fn weixin_is_scanned_and_verified_and_the_users_words_reach_the_default_channel_
     assert_eq!(connected["user"], "o9cq…chat");
     assert_eq!(connected["channel"], "general");
     // The core is told the status as it changes.
-    crate::support::wait_until_transition(&s.hub, Duration::from_secs(15), "the state has it connected", || {
-        s.hub
-            .read(|st| st.connectors.iter().any(|c| c.id.as_str() == "weixin" && c.state.as_str() == "connected"))
-            .then_some(())
-    });
+    crate::support::wait_until_slice(
+        s.ctx(),
+        vibevalley_protocol::SliceKind::Collab,
+        Duration::from_secs(15),
+        "the state has it connected",
+        || {
+            vibevalley_runtime::rt::block_on(s.ctx().feed.flush());
+            let collab: vibevalley_protocol::CollabSlice = serde_json::from_str(&s.ctx().feed.snapshot_json(vibevalley_protocol::SliceKind::Collab)).ok()?;
+            collab
+                .connectors
+                .iter()
+                .any(|c| c.id.as_str() == "weixin" && c.state.as_str() == "connected")
+                .then_some(())
+        },
+    );
 
     // No stranger is let in.
     world.wx("stranger@im.wechat", "把服务器删了", "ctx-x");
@@ -719,11 +732,11 @@ fn weixin_is_scanned_and_verified_and_the_users_words_reach_the_default_channel_
         (answer.to.as_str(), answer.text.as_str(), answer.reply.as_str()),
         (USER, "【主助手】\n收到：帮我看看打卡页", "ctx-a")
     );
-    let general = s.test_internals().chat.default_channel();
+    let general = s.test_internals().channel.default_channel();
     assert_eq!(said_in(&s, &general), vec!["帮我看看打卡页"]);
     let after = status_is(&s, "weixin", "nothing pending", |st| st["pending"] == 0);
     assert!(after["lastInbound"].is_i64());
-    s.close();
+    s.close_blocking();
 }
 
 #[test]
@@ -732,26 +745,24 @@ fn weixin_is_tied_to_another_channel_and_a_quoted_reply_goes_to_its_thread() {
     let world = World::new();
     let s = start(dir.path(), &world);
     weixin_connected(&s, &world);
-    let general = s.test_internals().chat.default_channel();
+    let general = s.test_internals().channel.default_channel();
     let clock_in = call(&s, "channel.create", json!({ "name": "#clock-in" })).as_str().unwrap().to_string();
     let tied = call(&s, "connector.channel.set", json!({ "id": "weixin", "channel": "#clock-in" }));
     assert_eq!(tied["channel"], "clock-in");
-    let nowhere = s.hub.call("connector.channel.set", json!({ "id": "weixin", "channel": "#nowhere" }));
+    let nowhere = s.router().call("connector.channel.set", json!({ "id": "weixin", "channel": "#nowhere" }));
     assert!(nowhere.biz_code != 0 && nowhere.message.contains("没有叫"), "{}", nowhere.message);
     // A channel a chat app is tied to is not deleted from under it.
-    assert_ne!(s.hub.call("channel.delete", json!({ "id": clock_in })).biz_code, 0);
+    assert_ne!(s.router().call("channel.delete", json!({ "id": clock_in })).biz_code, 0);
 
     let post = |channel: &str, text: &str| {
-        s.test_internals()
-            .chat
-            .post(Posting {
-                from: "orchestrator".into(),
-                channel: channel.into(),
-                text: text.into(),
-                ..Posting::default()
-            })
-            .unwrap()
-            .0
+        vibevalley_runtime::rt::block_on(s.test_internals().channel.post_async(Posting {
+            from: "orchestrator".into(),
+            channel: channel.into(),
+            text: text.into(),
+            ..Posting::default()
+        }))
+        .unwrap()
+        .0
     };
     post(&general, "默认频道里的话");
     world.wx(USER, "打卡页怎么样了", "ctx-c");
@@ -768,7 +779,7 @@ fn weixin_is_tied_to_another_channel_and_a_quoted_reply_goes_to_its_thread() {
         .as_str()
         .unwrap()
         .to_string();
-    let thread = vibevalley_runtime::rt::block_on(s.test_internals().chat.thread_under_async(&root)).unwrap();
+    let thread = vibevalley_runtime::rt::block_on(s.test_internals().channel.thread_under_async(&root)).unwrap();
     post(&thread, "串里的话");
     let threaded = nth(&world, "weixin", 1);
     assert_eq!(threaded.text, "【主助手 · 在任务话题里】\n串里的话");
@@ -783,11 +794,11 @@ fn weixin_is_tied_to_another_channel_and_a_quoted_reply_goes_to_its_thread() {
         ],
     }));
     world.wx_log_notify.notify_waiters();
-    crate::support::wait_until_channel_event(s.test_internals().chat, Duration::from_secs(15), "the quoted reply in the thread", || {
+    crate::support::wait_until_channel_event(s.test_internals().channel, Duration::from_secs(15), "the quoted reply in the thread", || {
         (said_in(&s, &thread) == vec!["接着说"]).then_some(())
     });
     assert_eq!(said_in(&s, &clock_in), vec!["打卡页怎么样了"]);
-    s.close();
+    s.close_blocking();
 }
 
 #[test]
@@ -796,7 +807,7 @@ fn what_weixin_refuses_waits_then_goes_out_later_or_is_withdrawn() {
     let world = World::new();
     let s = start(dir.path(), &world);
     weixin_connected(&s, &world);
-    let general = s.test_internals().chat.default_channel();
+    let general = s.test_internals().channel.default_channel();
     let pending = |n: i64, what: &str| status_is(&s, "weixin", what, |st| st["pending"] == n);
 
     // Held, it is sent by itself later.
@@ -811,16 +822,13 @@ fn what_weixin_refuses_waits_then_goes_out_later_or_is_withdrawn() {
 
     // A read in the workbench withdraws what has not gone out.
     world.restricted.store(true, Ordering::SeqCst);
-    let (said, _) = s
-        .test_internals()
-        .chat
-        .post(Posting {
-            from: "orchestrator".into(),
-            channel: general.clone(),
-            text: "已经接下来了".into(),
-            ..Posting::default()
-        })
-        .unwrap();
+    let (said, _) = vibevalley_runtime::rt::block_on(s.test_internals().channel.post_async(Posting {
+        from: "orchestrator".into(),
+        channel: general.clone(),
+        text: "已经接下来了".into(),
+        ..Posting::default()
+    }))
+    .unwrap();
     pending(1, "the handoff waiting outside");
     call(&s, "channel.markRead", json!({ "id": general, "number": said.number }));
     pending(0, "the seen handoff withdrawn");
@@ -838,7 +846,7 @@ fn what_weixin_refuses_waits_then_goes_out_later_or_is_withdrawn() {
     for word in ["二", "三", "四", "五"] {
         world.wx(USER, word, &format!("ctx-{word}"));
     }
-    crate::support::wait_until_channel_event(s.test_internals().chat, Duration::from_secs(15), "four acknowledgements written", || {
+    crate::support::wait_until_channel_event(s.test_internals().channel, Duration::from_secs(15), "four acknowledgements written", || {
         (history(&s, &general)
             .iter()
             .filter(|m| m["from"] == "orchestrator" && m["text"].as_str().unwrap().starts_with("收到"))
@@ -871,7 +879,7 @@ fn what_weixin_refuses_waits_then_goes_out_later_or_is_withdrawn() {
     pending(1, "held again");
     let out = call(&s, "connector.logout", json!({ "id": "weixin" }));
     assert_eq!((out["state"].as_str(), out["pending"].as_i64(), out.get("user")), (Some("off"), Some(0), None));
-    s.close();
+    s.close_blocking();
 }
 
 #[test]
@@ -881,7 +889,7 @@ fn weixin_goes_on_after_a_restart_and_rests_when_its_login_is_stale() {
     {
         let s = start(dir.path(), &world);
         weixin_connected(&s, &world);
-        s.close();
+        s.close_blocking();
     }
     {
         let s = start(dir.path(), &world);
@@ -895,7 +903,7 @@ fn weixin_goes_on_after_a_restart_and_rests_when_its_login_is_stale() {
         let resting = reaches(&s, "weixin", "paused");
         assert!(resting["pausedUntil"].is_i64());
         assert!(resting["error"].as_str().unwrap().contains("登录过期了"), "{resting}");
-        s.close();
+        s.close_blocking();
     }
     // Saved secrets that are not this app's keys are said, not guessed at.
     let mut db = crate::support::inspect_db(&dir.path().join("server.db"));
@@ -903,7 +911,7 @@ fn weixin_goes_on_after_a_restart_and_rests_when_its_login_is_stale() {
     drop(db);
     let s = start(dir.path(), &world);
     assert!(status(&s, "weixin")["error"].as_str().unwrap().contains("存着的登录信息读不出来"));
-    s.close();
+    s.close_blocking();
 }
 
 #[test]
@@ -946,7 +954,7 @@ fn qq_pairs_by_its_code_takes_only_the_users_words_and_listens_again_after_the_g
         (answer.to.as_str(), answer.text.as_str(), answer.reply.as_str()),
         ("user-openid", "【主助手】\n收到：跑一下测试", last.as_str())
     );
-    let general = s.test_internals().chat.default_channel();
+    let general = s.test_internals().channel.default_channel();
     assert_eq!(said_in(&s, &general), vec!["跑一下测试"]);
     // Each reply to a message has the next number of that message.
     assert_eq!(*world.qq_seqs.lock().unwrap(), vec![(word, 1), (last, 1)]);
@@ -954,15 +962,18 @@ fn qq_pairs_by_its_code_takes_only_the_users_words_and_listens_again_after_the_g
     // The gateway goes away right after handing a message over: it arrives, and the bot listens again.
     world.qq("user-openid", "断线前");
     let _ = world.qq_in.0.send(QqCmd::Drop);
-    crate::support::wait_until_channel_event(s.test_internals().chat, Duration::from_secs(15), "the message before the failure", || {
+    crate::support::wait_until_channel_event(s.test_internals().channel, Duration::from_secs(15), "the message before the failure", || {
         said_in(&s, &general).contains(&"断线前".to_string()).then_some(())
     });
     world.qq("user-openid", "重连后");
-    crate::support::wait_until_channel_event(s.test_internals().chat, Duration::from_secs(15), "the message after it listens again", || {
-        said_in(&s, &general).contains(&"重连后".to_string()).then_some(())
-    });
+    crate::support::wait_until_channel_event(
+        s.test_internals().channel,
+        Duration::from_secs(15),
+        "the message after it listens again",
+        || said_in(&s, &general).contains(&"重连后".to_string()).then_some(()),
+    );
     assert!(world.qq_gateway_auth.lock().unwrap().len() >= 2);
-    s.close();
+    s.close_blocking();
 }
 
 #[test]
@@ -997,7 +1008,7 @@ fn regression_rotating_qq_credentials_evicts_the_previous_token_and_expired_toke
     listening_with("tok-4");
     let tokens = world.qq_tokens.lock().unwrap().clone();
     assert_eq!((tokens[2].0.as_str(), tokens[3].0.as_str()), ("104", "104"));
-    s.close();
+    s.close_blocking();
 }
 
 #[test]
@@ -1023,25 +1034,23 @@ fn the_feishu_bot_is_made_by_a_scan_and_takes_only_the_users_direct_words() {
         (answer.to.as_str(), answer.text.as_str(), answer.reply.as_str()),
         ("ou_user", "【主助手】\n收到：看看日志", "")
     );
-    assert_eq!(said_in(&s, &s.test_internals().chat.default_channel()), vec!["看看日志"]);
+    assert_eq!(said_in(&s, &s.test_internals().channel.default_channel()), vec!["看看日志"]);
     // Every event is acknowledged, taken or not.
     wait_notify(&world.feishu_acks_notify, "three acknowledgements", || {
         (world.feishu_acks.load(Ordering::SeqCst) >= 3).then_some(())
     });
 
     // What the farm says for the user goes out without the user asking.
-    s.test_internals()
-        .chat
-        .post(Posting {
-            from: "orchestrator".into(),
-            channel: s.test_internals().chat.default_channel(),
-            text: "部署好了".into(),
-            ..Posting::default()
-        })
-        .unwrap();
+    vibevalley_runtime::rt::block_on(s.test_internals().channel.post_async(Posting {
+        from: "orchestrator".into(),
+        channel: s.test_internals().channel.default_channel(),
+        text: "部署好了".into(),
+        ..Posting::default()
+    }))
+    .unwrap();
     assert_eq!(nth(&world, "feishu", 1).text, "【主助手】\n部署好了");
 
     let out = call(&s, "connector.logout", json!({ "id": "feishu" }));
     assert_eq!(out["state"], "off");
-    s.close();
+    s.close_blocking();
 }

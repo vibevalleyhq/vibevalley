@@ -51,7 +51,7 @@ Host（~/.vibevalley：密钥、引擎、全局角色模板）
 | 工作树 | `Workplace` | 一个任务在某个仓库上的检出：`<space>/worktrees/<仓库>.<任务号>`，分支 `vibevalley/issue-<任务号>`；角色不开 worktree 时不切 |
 | 任务 | `Issue` | 一件活，从写下到关上一个 id；状态由服务端给，用户挪状态就是派活；代码相关的开不开 worktree 由角色设置决定；每个都有验收，完成就是通过；关上的能重开 |
 | 派工关联 | `Assignment` | 任务由哪个角色负责；可以尚未开工，同人继续负责时跨执行上下文保留，换人或清空指派才结束 |
-| 执行器 | `Drivers`（`crates/server/src/work/session/drivers.rs`） | 将指派的角色装配为 oar 引擎参数并开启会话；不替任务保存责任归属 |
+| 执行器 | `Drivers`（`crates/server/src/runtime/session/driver.rs`） | 将指派的角色装配为 oar 引擎参数并开启会话；不替任务保存责任归属 |
 | Session | `Session`（服务是 `Session`，派活是 `Issue` 的 `hire`） | 角色的执行上下文（界面叫执行会话）；任务使用仓库目录或任务 worktree，对话使用独立目录并关联频道；跨多轮、休眠和重启保留身份 |
 | Run | `Run`（`session_run` 表）；核心状态里由带着 `brief` 的 `sessionPhaseChanged` 事实开始、`sessionReported` 事实结束 | 一轮：一次触发到一次汇报；执行会话的一次 run 包着一个 oar turn，进程内 agent 的 loop 也记 Run |
 | 事件 | `SessionEvent`，一个 Session 的全部是它的日志 | 日志里的一条：收到的话、想、说、工具调用、重试、用量、出错，和 Run 的边界（`run/start`、`run/end`）；类型照 DeepSeek Harness 写成 `<主体>/<做了什么>` |

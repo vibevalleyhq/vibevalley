@@ -179,6 +179,9 @@ impl SessionDriver for AgentDriver {
             return Err(refusal(t("server.issue.noAssignee", &[]), pick));
         };
         let Some(profile) = self.profile.agent(id) else {
+            if self.profile.fleet.runtime(id).is_some() {
+                return self.drive_runtime(id, None, None);
+            }
             return Err(refusal(t("server.issue.profileGone", &[("id", id.into())]), pick));
         };
         self.drive_on(&profile, issue.machine_id.as_deref())

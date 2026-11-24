@@ -6,8 +6,10 @@ use std::sync::Arc;
 
 use serde_json::json;
 use vibevalley_protocol::{Agent, AgentRole, BizCode, Build, DEFAULT_ORCHESTRATOR, Head, Look, ORCHESTRATOR_RUNTIME, PersonaMode, Skill, Species};
-use vibevalley_server::Hub;
-use vibevalley_server::team::agent::{Agents, Profiles, profile};
+use vibevalley_server::agent::profile::{Profile, ProfileStore, profile};
+use vibevalley_server::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
+use vibevalley_server::service::Service;
+use vibevalley_server::{Config, create_app_blocking};
 
 fn starters() -> Vec<String> {
     profile::built_in_templates()
@@ -17,9 +19,9 @@ fn starters() -> Vec<String> {
         .collect()
 }
 
-fn open(home: &Path) -> Arc<Profiles> {
+fn open(home: &Path) -> Arc<ProfileStore> {
     vibevalley_i18n::set_locale("zh");
-    Profiles::open(home, &starters()).unwrap()
+    ProfileStore::open(home, &starters()).unwrap()
 }
 
 fn draft() -> Agent {
@@ -226,11 +228,11 @@ fn roles() {
 #[test]
 fn a_new_farm_has_the_orchestrator_and_the_starters() {
     let home = tempfile::tempdir().unwrap();
-    let s = Profiles::open(home.path(), &[]).unwrap();
+    let s = ProfileStore::open(home.path(), &[]).unwrap();
     let all: Vec<(String, Option<String>)> = s.all().into_iter().map(|a| (a.id, a.from.map(|f| f.template))).collect();
     assert_eq!(all, vec![(DEFAULT_ORCHESTRATOR.into(), Some(DEFAULT_ORCHESTRATOR.into()))]);
     let home = tempfile::tempdir().unwrap();
-    let named = Profiles::open(home.path(), &["docs".into(), "nobody".into(), "architect".into()]).unwrap();
+    let named = ProfileStore::open(home.path(), &["docs".into(), "nobody".into(), "architect".into()]).unwrap();
     let ids: Vec<String> = named.all().into_iter().map(|a| a.id).collect();
     assert_eq!(ids, vec![DEFAULT_ORCHESTRATOR, "docs", "architect"]);
 }
@@ -383,34 +385,42 @@ fn built_in_skills_are_read_only_and_listed_first() {
 fn runtimes_over_the_hub() {
     vibevalley_i18n::set_locale("zh");
     let home = tempfile::tempdir().unwrap();
-    let hub = Hub::new(vibevalley_core::empty_space_state());
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    let agents = Agents::open(&hub, home.path(), &starters(), Arc::new(registry), false).unwrap();
-    vibevalley_server::team::agent::install(&hub, agents);
-    let live = vibevalley_server::Server::live(&*hub);
+    let app = create_app_blocking(Config {
+        registry: Some(Arc::new(registry)),
+        probe_runtimes: false,
+        orchestrator_listens: false,
+        link_previews: false,
+        tick_crons: false,
+        starters: starters(),
+        ..Config::under(home.path())
+    })
+    .unwrap();
+    let router = app.router();
+    let mut live = app.ctx().live.subscribe_live();
 
-    let list = hub.call_as(vibevalley_protocol::Caller::User, "runtime.list", json!(null));
+    let list = router.call_as(vibevalley_protocol::Caller::User, "runtime.list", json!(null));
     let list = list.data.unwrap();
     let ids: Vec<&str> = list.as_array().unwrap().iter().map(|r| r["id"].as_str().unwrap()).collect();
     assert_eq!(ids.first(), Some(&"claude"));
     assert_eq!(ids.last(), Some(&"scripted"));
     assert!(list.as_array().unwrap().iter().all(|r| r["installation"]["status"] == "checking"));
 
-    let got = hub.call_as(vibevalley_protocol::Caller::User, "runtime.refresh", json!({ "id": "scripted" }));
+    let got = router.call_as(vibevalley_protocol::Caller::User, "runtime.refresh", json!({ "id": "scripted" }));
     let info = got.data.unwrap();
     assert_eq!(info["installation"]["status"], "available");
     assert_eq!(info["installation"]["via"], "bundled");
-    assert!(live.recv_timeout(std::time::Duration::from_secs(2)).is_ok());
+    assert!(vibevalley_runtime::rt::block_on(async { tokio::time::timeout(std::time::Duration::from_secs(2), live.recv()).await }).is_ok());
 
     // Once available and enabled, scripted sorts ahead of unprobed/unavailable runtimes.
-    let sorted = hub.call_as(vibevalley_protocol::Caller::User, "runtime.list", json!(null)).data.unwrap();
+    let sorted = router.call_as(vibevalley_protocol::Caller::User, "runtime.list", json!(null)).data.unwrap();
     assert_eq!(sorted.as_array().unwrap()[0]["id"], "scripted");
 
-    let missing = hub.call_as(vibevalley_protocol::Caller::User, "runtime.refresh", json!({ "id": "nobody" }));
+    let missing = router.call_as(vibevalley_protocol::Caller::User, "runtime.refresh", json!({ "id": "nobody" }));
     assert_eq!(missing.biz_code, BizCode::RuntimeNotFound.code());
 
-    let updated = hub.call_as(
+    let updated = router.call_as(
         vibevalley_protocol::Caller::User,
         "runtime.setting.update",
         json!({ "id": "scripted", "enabled": false, "binPath": "", "defaultModel": "", "defaultEffort": "", "env": {} }),
@@ -424,24 +434,24 @@ fn runtimes_over_the_hub() {
     })
     .unwrap();
     a["id"] = "x".into();
-    let v = hub.call_as(vibevalley_protocol::Caller::User, "agent.validate", json!({ "agents": [a] }));
+    let v = router.call_as(vibevalley_protocol::Caller::User, "agent.validate", json!({ "agents": [a] }));
     let problems = &v.data.unwrap()[0]["problems"];
     assert_eq!(problems[0]["field"], "runtime");
 
-    let listed = hub.call_as(vibevalley_protocol::Caller::User, "agent.list", json!(null));
+    let listed = router.call_as(vibevalley_protocol::Caller::User, "agent.list", json!(null));
     assert_eq!(listed.data.unwrap()[0]["id"], DEFAULT_ORCHESTRATOR);
 
-    // Re-enable scripted so installing a template through the hub automatically picks it instead of unavailable claude.
-    hub.call_as(
+    // Re-enable scripted so installing a template through the router automatically picks it instead of unavailable claude.
+    router.call_as(
         vibevalley_protocol::Caller::User,
         "runtime.setting.update",
         json!({ "id": "scripted", "enabled": true, "binPath": "", "defaultModel": "", "defaultEffort": "", "env": {} }),
     );
-    let installed_auto = hub.call_as(vibevalley_protocol::Caller::User, "agent.template.install", json!({ "id": "fullstack" }));
+    let installed_auto = router.call_as(vibevalley_protocol::Caller::User, "agent.template.install", json!({ "id": "fullstack" }));
     let made: Agent = serde_json::from_value(installed_auto.data.unwrap()).unwrap();
     assert_eq!(made.runtime, "scripted");
     assert_eq!(made.look.avatar.as_deref(), Some("avatar-fullstack"));
-    let installed_codex = hub.call_as(
+    let installed_codex = router.call_as(
         vibevalley_protocol::Caller::User,
         "agent.template.install",
         json!({ "id": "frontend", "runtime": "codex" }),
@@ -450,7 +460,7 @@ fn runtimes_over_the_hub() {
     assert_eq!(frontend.runtime, "codex");
     assert_eq!(frontend.persona_mode, PersonaMode::Append);
 
-    let installed_explicit = hub.call_as(
+    let installed_explicit = router.call_as(
         vibevalley_protocol::Caller::User,
         "agent.template.install",
         json!({ "id": "designer", "runtime": "kimi" }),
@@ -458,6 +468,7 @@ fn runtimes_over_the_hub() {
     let designed: Agent = serde_json::from_value(installed_explicit.data.unwrap()).unwrap();
     assert_eq!(designed.runtime, "kimi");
     assert_eq!(designed.persona_mode, PersonaMode::Prompt);
+    app.close_blocking();
 }
 
 /// The scripted runtime with an account whose usage the test sets.
@@ -504,29 +515,43 @@ impl vibevalley_runtime::oar::Runtime for Metered {
 #[test]
 fn usage_is_read_again_and_told() {
     let home = tempfile::tempdir().unwrap();
-    let hub = Hub::new(vibevalley_core::empty_space_state());
     let metered = Arc::new(Metered {
         inner: vibevalley_runtime::oar::scripted::ScriptedRuntime::demo(),
         used: 0.25.into(),
     });
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(metered.clone());
-    let agents = Agents::open(&hub, home.path(), &starters(), Arc::new(registry), false).unwrap();
-    let fleet = agents.fleet.clone();
-    let probed = fleet.refresh("scripted").unwrap();
-    assert_eq!(serde_json::to_value(&probed.usage).unwrap()["windows"][0]["usedPercent"], 25);
+    vibevalley_runtime::rt::block_on(async {
+        let service = Service::open(home.path()).await.unwrap();
+        let ctx = Arc::new(Context::new(
+            service.clone(),
+            TaskGroup::new(),
+            Arc::new(LiveState::new()),
+            Arc::new(Outbox::new(service.clone())),
+            Arc::new(StateFeed::new()),
+            vibevalley_core::system_clock(),
+            Arc::new(Http),
+            Arc::new(PublicDownload),
+        ));
+        let profile = Profile::open(ctx.clone(), home.path(), &starters(), Arc::new(registry), false).unwrap();
+        let fleet = profile.fleet.clone();
+        let probed = fleet.refresh_async("scripted").await.unwrap();
+        assert_eq!(serde_json::to_value(&probed.usage).unwrap()["windows"][0]["usedPercent"], 25);
 
-    let live = vibevalley_server::Server::live(&*hub);
-    *metered.used.lock().unwrap() = 0.5;
-    vibevalley_runtime::rt::block_on(fleet.refresh_usage_async("scripted"));
-    let told = live.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
-    assert!(serde_json::to_string(&told).unwrap().contains("\"usedPercent\":50"));
-    assert_eq!(
-        serde_json::to_value(&fleet.info("scripted").unwrap().usage).unwrap()["windows"][0]["usedPercent"],
-        50
-    );
+        let mut live = ctx.live.subscribe_live();
+        *metered.used.lock().unwrap() = 0.5;
+        fleet.refresh_usage_async("scripted").await;
+        let told = tokio::time::timeout(std::time::Duration::from_secs(2), live.recv()).await.unwrap().unwrap();
+        assert!(serde_json::to_string(&told).unwrap().contains("\"usedPercent\":50"));
+        assert_eq!(
+            serde_json::to_value(&fleet.info_async("scripted").await.unwrap().usage).unwrap()["windows"][0]["usedPercent"],
+            50
+        );
 
-    // Nothing changed: nothing is told.
-    vibevalley_runtime::rt::block_on(fleet.refresh_usage_async("scripted"));
-    assert!(live.recv_timeout(std::time::Duration::from_millis(200)).is_err());
+        // Nothing changed: nothing is told.
+        fleet.refresh_usage_async("scripted").await;
+        assert!(tokio::time::timeout(std::time::Duration::from_millis(200), live.recv()).await.is_err());
+        let _ = ctx.shutdown(std::time::Duration::from_secs(1)).await;
+        service.close().await;
+    });
 }

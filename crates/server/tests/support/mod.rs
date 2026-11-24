@@ -3,24 +3,25 @@
 
 #![allow(dead_code)]
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, LazyLock, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use tokio::sync::Notify;
 use vibevalley_core::empty_space_state;
-use vibevalley_protocol::{Issue, IssueStageKind as StageKind, SliceKind};
+use vibevalley_core::projection::{BoardInput, InboxInput, SessionInput, derive_issues, project_board, project_inbox, project_sessions};
+use vibevalley_protocol::{Issue, IssueStageKind as StageKind, Session as ProtocolSession, SliceBundle, SliceKind};
 use vibevalley_runtime::oar::scripted::{Script, ScriptedRuntime, Step};
 use vibevalley_runtime::oar::{
     Capabilities, ContentBlock, Event, Installation, ModelInfo, PermissionDecision, Registry, Runtime, Session, SessionOptions, SessionStatus,
 };
-use vibevalley_server::Hub;
-use vibevalley_server::collab::channel::Chat;
-use vibevalley_server::work::issue::Board;
-use vibevalley_server::work::ledger::{BoardConfig, BoardError};
+use vibevalley_server::channel::Chat;
+use vibevalley_server::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
+use vibevalley_server::db::DatabaseConfig;
+use vibevalley_server::issue::{Board, BoardConfig, BoardError};
+use vibevalley_server::runtime::{Changes, Runtime as ServerRuntime, RuntimeDriver};
+use vibevalley_server::service::Service;
 
 /// Opens a separate connection for assertions or SQLite failure injection.
 pub fn inspect_db(path: &Path) -> sqlx::SqliteConnection {
@@ -313,22 +314,11 @@ pub fn repo(dir: &Path, name: &str) -> PathBuf {
     root.canonicalize().unwrap()
 }
 
-static BOARD_HUBS: LazyLock<Mutex<HashMap<PathBuf, Weak<Hub>>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-
-fn register_board_hub(data_dir: &Path, hub: &Arc<Hub>) {
-    let mut map = BOARD_HUBS.lock().unwrap();
-    map.retain(|_, weak| weak.strong_count() > 0);
-    map.insert(data_dir.to_path_buf(), Arc::downgrade(hub));
-}
-
-fn hub_for_board(board: &Board) -> Option<Arc<Hub>> {
-    BOARD_HUBS.lock().unwrap().get(&board.config().data_dir).and_then(Weak::upgrade)
-}
-
 pub struct World {
     pub dir: tempfile::TempDir,
-    pub board: Board,
-    pub hub: Arc<Hub>,
+    pub ctx: Arc<Context>,
+    pub runtime: Arc<ServerRuntime>,
+    pub board: Arc<Board>,
     pub store: PathBuf,
     pub registry: Arc<Registry>,
 }
@@ -343,12 +333,23 @@ pub fn block_on<F: std::future::Future>(fut: F) -> F::Output {
     vibevalley_runtime::rt::block_on(fut)
 }
 
-pub fn open_board(store: &Path, registry: Arc<Registry>, config: BoardConfig) -> Result<(Board, Arc<Hub>), BoardError> {
-    let hub = Hub::new(empty_space_state());
-    let data_dir = config.data_dir.clone();
-    let board = block_on(Board::open_on_async(store, registry, config, hub.clone()))?;
-    register_board_hub(&data_dir, &hub);
-    Ok((board, hub))
+pub fn open_board(store: &Path, registry: Arc<Registry>, config: BoardConfig) -> Result<(Arc<Board>, Arc<Context>), BoardError> {
+    block_on(async move {
+        let service = Service::open_config(&DatabaseConfig::Sqlite { path: store.to_path_buf() }).await?;
+        let ctx = Arc::new(Context::new(
+            service.clone(),
+            TaskGroup::new(),
+            Arc::new(LiveState::new()),
+            Arc::new(Outbox::new(service)),
+            Arc::new(StateFeed::new()),
+            vibevalley_core::system_clock(),
+            Arc::new(Http),
+            Arc::new(PublicDownload),
+        ));
+        let (runtime, opened) = ServerRuntime::open_async(ctx.clone(), Arc::new(RuntimeDriver { registry, model: None }), config).await?;
+        let board = Board::open_async(ctx.clone(), runtime, opened, None, None).await?;
+        Ok((board, ctx))
+    })
 }
 
 pub fn world(runtimes: Vec<Arc<dyn Runtime>>, tune: impl FnOnce(&mut BoardConfig)) -> World {
@@ -361,79 +362,161 @@ pub fn world(runtimes: Vec<Arc<dyn Runtime>>, tune: impl FnOnce(&mut BoardConfig
     let store = dir.path().join("server.db");
     let mut config = config(dir.path());
     tune(&mut config);
-    let (board, hub) = open_board(&store, registry.clone(), config).unwrap();
+    let (board, ctx) = open_board(&store, registry.clone(), config).unwrap();
+    let runtime = board.runtime().clone();
     World {
         dir,
+        ctx,
+        runtime,
         board,
-        hub,
         store,
         registry,
     }
 }
 
-/// Event-driven waiter subscribed to `hub.subscribe_transitions`. Returns `None` on timeout.
-pub async fn try_wait_until_transition_async<T>(hub: &Hub, timeout: Duration, mut pred: impl FnMut() -> Option<T>) -> Option<T> {
-    let notify = Arc::new(Notify::new());
-    let wake = notify.clone();
-    let sub = hub.subscribe_transitions("test-wait-transition", move |_, _| {
-        wake.notify_one();
-    });
-    let res = tokio::time::timeout(timeout, async {
+pub fn board_issue(board: &Board, id: &str) -> Option<Issue> {
+    block_on(board.issue_async(id)).ok().flatten()
+}
+
+pub fn board_issues(board: &Board) -> Vec<Issue> {
+    block_on(board.issues_async()).unwrap_or_default()
+}
+
+pub fn board_session(board: &Board, id: &str) -> Option<ProtocolSession> {
+    block_on(board.session_async(id))
+}
+
+pub fn board_sessions(board: &Board) -> Vec<ProtocolSession> {
+    block_on(board.sessions_async()).unwrap_or_default()
+}
+
+pub fn board_changes(board: &Board, id: &str) -> vibevalley_server::issue::Result<Changes> {
+    block_on(board.changes_async(id))
+}
+
+pub fn board_bundle(board: &Board) -> SliceBundle {
+    block_on(async {
+        let raw_issues = board.raw_issues_async().await.unwrap_or_default();
+        let sessions = board.sessions_async().await.unwrap_or_default();
+        let issues = derive_issues(&raw_issues, &sessions);
+        let live = board.ctx().live.to_core_snapshot(false);
+        let empty = vibevalley_core::slice_bundle(&empty_space_state(), vec![], 0);
+        let board_slice = project_board(
+            &BoardInput {
+                issues: issues.clone(),
+                sessions: sessions.clone(),
+                ..Default::default()
+            },
+            &live,
+            0,
+        );
+        let sessions_slice = project_sessions(
+            &SessionInput {
+                sessions: sessions.clone(),
+                issues,
+                ..Default::default()
+            },
+            &live,
+            0,
+        );
+        let (call, call_reason) = board.ctx().live.call_snapshot();
+        let inbox = project_inbox(
+            &InboxInput {
+                issues: raw_issues,
+                sessions,
+                runtime_inbox_items: board.ctx().live.runtime_inbox_snapshot(),
+                call,
+                call_reason,
+                ..Default::default()
+            },
+            &live,
+            0,
+        );
+        SliceBundle {
+            seq: board.seq(),
+            board: board_slice,
+            sessions: sessions_slice,
+            collab: empty.collab,
+            inbox,
+            ops: empty.ops,
+            farm: empty.farm,
+        }
+    })
+}
+
+/// Event-driven waiter waking on `ctx.feed` (`dirty` + `cycles`) and `ctx.live`. Returns `None` on timeout.
+pub async fn try_wait_until_transition_async<T>(ctx: &Context, timeout: Duration, mut pred: impl FnMut() -> Option<T>) -> Option<T> {
+    let mut dirty = ctx.feed.subscribe_dirty();
+    let mut cycles = ctx.feed.subscribe_cycles();
+    let mut live = ctx.live.subscribe_live();
+    let _ = *dirty.borrow_and_update();
+    let _ = *cycles.borrow_and_update();
+    tokio::time::timeout(timeout, async {
         loop {
-            let notified = notify.notified();
-            tokio::pin!(notified);
-            notified.as_mut().enable();
             if let Some(val) = pred() {
-                return val;
+                return Some(val);
             }
-            notified.await;
+            tokio::select! {
+                _ = dirty.changed() => {}
+                _ = cycles.changed() => {}
+                res = live.recv() => {
+                    if matches!(res, Err(tokio::sync::broadcast::error::RecvError::Closed)) {
+                        return pred();
+                    }
+                }
+            }
         }
     })
     .await
-    .ok();
-    sub.close_async().await;
-    res
+    .ok()
+    .flatten()
 }
 
-/// Async event-driven waiter waking immediately on every `hub.apply` transition.
-pub async fn wait_until_transition_async<T>(hub: &Hub, timeout: Duration, what: &str, pred: impl FnMut() -> Option<T>) -> T {
-    try_wait_until_transition_async(hub, timeout, pred)
+/// Async event-driven waiter waking on `ctx.feed` (`dirty` + `cycles`) and `ctx.live`.
+pub async fn wait_until_transition_async<T>(ctx: &Context, timeout: Duration, what: &str, pred: impl FnMut() -> Option<T>) -> T {
+    try_wait_until_transition_async(ctx, timeout, pred)
         .await
         .unwrap_or_else(|| panic!("timed out after {timeout:?} waiting for {what}"))
 }
 
-/// Sync event-driven waiter waking immediately on every `hub.apply` transition.
-/// Evaluates `pred` on the caller's thread so predicates may safely perform blocking I/O.
-pub fn try_wait_until_transition<T>(hub: &Hub, timeout: Duration, mut pred: impl FnMut() -> Option<T>) -> Option<T> {
-    let (tx, rx) = flume::bounded::<()>(1);
-    let sub = hub.subscribe_transitions("test-wait-transition", move |_, _| {
-        let _ = tx.try_send(());
-    });
+/// Sync event-driven waiter waking immediately on `ctx.feed` / `ctx.live`.
+pub fn try_wait_until_transition<T>(ctx: &Context, timeout: Duration, mut pred: impl FnMut() -> Option<T>) -> Option<T> {
+    let mut dirty = ctx.feed.subscribe_dirty();
+    let mut cycles = ctx.feed.subscribe_cycles();
+    let mut live = ctx.live.subscribe_live();
+    let _ = *dirty.borrow_and_update();
+    let _ = *cycles.borrow_and_update();
     let deadline = Instant::now() + timeout;
-    let out = loop {
-        while rx.try_recv().is_ok() {}
+    loop {
         if let Some(val) = pred() {
-            break Some(val);
+            return Some(val);
         }
-        let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
-            break None;
-        };
-        if rx.recv_timeout(remaining).is_err() {
-            break pred();
+        let remaining = deadline.checked_duration_since(Instant::now())?;
+        let res = block_on(async {
+            tokio::time::timeout(remaining, async {
+                tokio::select! {
+                    r = dirty.changed() => r.is_ok(),
+                    r = cycles.changed() => r.is_ok(),
+                    r = live.recv() => !matches!(r, Err(tokio::sync::broadcast::error::RecvError::Closed)),
+                }
+            })
+            .await
+        });
+        match res {
+            Ok(true) => {}
+            Ok(false) | Err(_) => return pred(),
         }
-    };
-    drop(sub);
-    out
+    }
 }
 
-/// Sync event-driven waiter waking immediately on every `hub.apply` transition.
-pub fn wait_until_transition<T>(hub: &Hub, timeout: Duration, what: &str, pred: impl FnMut() -> Option<T>) -> T {
-    try_wait_until_transition(hub, timeout, pred).unwrap_or_else(|| panic!("timed out after {timeout:?} waiting for {what}"))
+/// Sync event-driven waiter waking immediately on `ctx.feed` / `ctx.live`.
+pub fn wait_until_transition<T>(ctx: &Context, timeout: Duration, what: &str, pred: impl FnMut() -> Option<T>) -> T {
+    try_wait_until_transition(ctx, timeout, pred).unwrap_or_else(|| panic!("timed out after {timeout:?} waiting for {what}"))
 }
 
 /// Async event-driven waiter subscribed to a single `SliceFeed`.
-pub async fn wait_until_slice_async<T>(hub: &Hub, kind: SliceKind, timeout: Duration, what: &str, mut pred: impl FnMut() -> Option<T>) -> T {
-    let mut sub = hub.subscribe_slice_feed(kind);
+pub async fn wait_until_slice_async<T>(ctx: &Context, kind: SliceKind, timeout: Duration, what: &str, mut pred: impl FnMut() -> Option<T>) -> T {
+    let mut sub = ctx.feed.subscribe(kind);
     tokio::time::timeout(timeout, async {
         loop {
             let _ = sub.borrow_and_update(false);
@@ -452,9 +535,8 @@ pub async fn wait_until_slice_async<T>(hub: &Hub, kind: SliceKind, timeout: Dura
 }
 
 /// Sync event-driven waiter subscribed to a single `SliceFeed`.
-/// Evaluates `pred` on the caller's thread so predicates may safely perform blocking I/O.
-pub fn wait_until_slice<T>(hub: &Hub, kind: SliceKind, timeout: Duration, what: &str, mut pred: impl FnMut() -> Option<T>) -> T {
-    let mut sub = hub.subscribe_slice_feed(kind);
+pub fn wait_until_slice<T>(ctx: &Context, kind: SliceKind, timeout: Duration, what: &str, mut pred: impl FnMut() -> Option<T>) -> T {
+    let mut sub = ctx.feed.subscribe(kind);
     let deadline = Instant::now() + timeout;
     loop {
         let _ = sub.borrow_and_update(false);
@@ -464,7 +546,7 @@ pub fn wait_until_slice<T>(hub: &Hub, kind: SliceKind, timeout: Duration, what: 
         let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
             panic!("timed out after {timeout:?} waiting for {what}");
         };
-        let changed = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(remaining, sub.changed()).await });
+        let changed = block_on(async { tokio::time::timeout(remaining, sub.changed()).await });
         match changed {
             Ok(true) => {}
             Ok(false) | Err(_) => {
@@ -477,49 +559,12 @@ pub fn wait_until_slice<T>(hub: &Hub, kind: SliceKind, timeout: Duration, what: 
     }
 }
 
-/// Event-driven waiter waking on both `hub.subscribe_transitions` and `hub.subscribe_live`.
-/// Evaluates `pred` on the caller's thread so predicates may safely perform blocking I/O.
-pub fn wait_until_live<T>(hub: &Hub, timeout: Duration, what: &str, mut pred: impl FnMut() -> Option<T>) -> T {
-    let (tx, rx) = flume::bounded::<()>(1);
-    let sub = hub.subscribe_transitions("test-wait-live", move |_, _| {
-        let _ = tx.try_send(());
-    });
-    let mut live = hub.subscribe_live();
-    let deadline = Instant::now() + timeout;
-    let mut live_open = true;
-    let out = loop {
-        while rx.try_recv().is_ok() {}
-        if let Some(val) = pred() {
-            break Some(val);
-        }
-        let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
-            break None;
-        };
-        let wait_res = vibevalley_runtime::rt::block_on(async {
-            tokio::time::timeout(remaining, async {
-                if live_open {
-                    tokio::select! {
-                        _ = rx.recv_async() => true,
-                        res = live.recv() => !matches!(res, Err(tokio::sync::broadcast::error::RecvError::Closed)),
-                    }
-                } else {
-                    let _ = rx.recv_async().await;
-                    false
-                }
-            })
-            .await
-        });
-        match wait_res {
-            Ok(still_open) => live_open = still_open,
-            Err(_) => break pred(),
-        }
-    };
-    drop(sub);
-    out.unwrap_or_else(|| panic!("timed out after {timeout:?} waiting for {what}"))
+/// Event-driven waiter waking on `ctx.feed` and `ctx.live`.
+pub fn wait_until_live<T>(ctx: &Context, timeout: Duration, what: &str, pred: impl FnMut() -> Option<T>) -> T {
+    wait_until_transition(ctx, timeout, what, pred)
 }
 
 /// Event-driven waiter subscribed to `chat.subscribe_events()`.
-/// Evaluates `pred` on the caller's thread so predicates may safely perform blocking I/O.
 pub fn wait_until_channel_event<T>(chat: &Chat, timeout: Duration, what: &str, mut pred: impl FnMut() -> Option<T>) -> T {
     let mut rx = chat.subscribe_events();
     let deadline = Instant::now() + timeout;
@@ -530,7 +575,7 @@ pub fn wait_until_channel_event<T>(chat: &Chat, timeout: Duration, what: &str, m
         let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
             panic!("timed out after {timeout:?} waiting for {what}");
         };
-        let res = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(remaining, rx.recv()).await });
+        let res = block_on(async { tokio::time::timeout(remaining, rx.recv()).await });
         match res {
             Ok(Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_))) => {}
             Ok(Err(tokio::sync::broadcast::error::RecvError::Closed)) | Err(_) => {
@@ -543,43 +588,43 @@ pub fn wait_until_channel_event<T>(chat: &Chat, timeout: Duration, what: &str, m
     }
 }
 
-/// Hybrid waiter for async SQLite background subscribers (e.g. `Memories`, `Library`,
-/// `session_mailbox`, durable approvals) that persist directly to SQLite without emitting
-/// a follow-up Hub transition. Wakes immediately on Hub transitions when provided and
-/// uses a bounded `flume::Receiver::recv_timeout` fallback on the caller's thread.
-pub fn wait_until_settled<T>(hub: Option<&Hub>, timeout: Duration, what: &str, mut pred: impl FnMut() -> Option<T>) -> T {
-    let (tx, rx) = flume::bounded::<()>(1);
-    let sub = hub.map(|h| {
-        let tx = tx.clone();
-        h.subscribe_transitions("test-wait-settled", move |_, _| {
-            let _ = tx.try_send(());
-        })
-    });
+/// Hybrid waiter for async SQLite background subscribers (wakes immediately on `ctx.feed`
+/// when provided and uses a short bounded wait fallback on the caller's thread).
+pub fn wait_until_settled<T>(ctx: Option<&Context>, timeout: Duration, what: &str, mut pred: impl FnMut() -> Option<T>) -> T {
+    let mut dirty = ctx.map(|c| c.feed.subscribe_dirty());
+    let mut cycles = ctx.map(|c| c.feed.subscribe_cycles());
     let deadline = Instant::now() + timeout;
-    let out = loop {
-        while rx.try_recv().is_ok() {}
+    loop {
         if let Some(val) = pred() {
-            break Some(val);
+            return val;
         }
         let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
-            break None;
+            panic!("timed out after {timeout:?} waiting for {what}");
         };
         let step = remaining.min(Duration::from_millis(5));
-        let _ = rx.recv_timeout(step);
-    };
-    drop(sub);
-    drop(tx);
-    out.unwrap_or_else(|| panic!("timed out after {timeout:?} waiting for {what}"))
+        if let (Some(d), Some(c)) = (dirty.as_mut(), cycles.as_mut()) {
+            let _ = block_on(async {
+                tokio::time::timeout(step, async {
+                    tokio::select! {
+                        _ = d.changed() => {}
+                        _ = c.changed() => {}
+                    }
+                })
+                .await
+            });
+        } else {
+            let (tx, rx) = flume::bounded::<()>(0);
+            let _ = rx.recv_timeout(step);
+            drop(tx);
+        }
+    }
 }
 
 /// Waits until `pred` holds of the issue, or panics after 15 s.
 pub fn wait_issue(board: &Board, id: &str, what: &str, pred: impl Fn(&Issue) -> bool) -> Issue {
     let timeout = Duration::from_secs(15);
-    if let Some(hub) = hub_for_board(board) {
-        return try_wait_until_transition(&hub, timeout, || board.issue(id).filter(|issue| pred(issue)))
-            .unwrap_or_else(|| panic!("timed out waiting for {what}: {:#?}", board.issue(id)));
-    }
-    wait_until_settled(None, timeout, what, || board.issue(id).filter(|issue| pred(issue)))
+    try_wait_until_transition(board.ctx(), timeout, || board_issue(board, id).filter(|issue| pred(issue)))
+        .unwrap_or_else(|| panic!("timed out waiting for {what}: {:#?}", board_issue(board, id)))
 }
 
 pub fn wait_stage(board: &Board, id: &str, state: StageKind) -> Issue {

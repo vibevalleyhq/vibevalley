@@ -17,8 +17,8 @@
 | 位置 | 职责 |
 |---|---|
 | `crates/server/src/main.rs` | 读参数（`--web`、`--ready-json`）和环境变量，组装 `ServerConfig`，只听 `127.0.0.1` |
-| `crates/server/src/app/bootstrap.rs` | `ServerConfig`（家目录、空间根、钥匙、内置模板、测试开关）与开机组装 |
-| `crates/server/src/infra/setting.rs` | `Setting`：`settings.json` 读成 `Stored`；`Secret`；`status`、`validate`、`save`；语音默认值与差异；就绪状态 |
+| `crates/server/src/app.rs` | `ServerConfig`（家目录、空间根、钥匙、内置模板、测试开关）与开机组装 |
+| `crates/server/src/setting.rs` | `Setting`：`settings.json` 读成 `Stored`；`Secret`；`status`、`validate`、`save`；语音默认值与差异；就绪状态 |
 | `crates/protocol/src/home.rs` | 发布通道判定（`ReleaseChannel`）、各通道默认端口与数据目录、`VIBEVALLEY_HOME`、`server.json`、保存的语言 |
 | `apps/mac/src/theme.rs`、`apps/mac/src/shell/settings.rs` | 设备本地外观设置（主题、`Settings.motion` 动画幅度、字体与字号，存于 `state.db` `app.settings`）及 `VIBEVALLEY_NO_ANIMATION` 测试覆盖 |
 | `apps/mac/ui/features/setting/` | 工作台设置页（`/settings/general` 含通用与设备本地外观分组，`/settings/appearance` 重定向到此页） |

@@ -422,13 +422,8 @@ impl BridgeHub {
                         let home = server_home();
                         let mut config: vibevalley_server::Config = crate::serving::config(&home, crate::serving::work_root());
                         config.host_debug = Some(Arc::new(host_debug_for_boot.clone()));
-                        let (boot_tx, boot_rx) = flume::bounded(1);
-                        vibevalley_runtime::rt::handle().spawn(async move {
-                            let _ = boot_tx.send(vibevalley_server::create_app(config).await);
-                        });
-                        match boot_rx.recv() {
-                            Ok(Ok(app)) => {
-                                let app: vibevalley_server::App = app;
+                        match vibevalley_server::create_app_blocking(config) {
+                            Ok(app) => {
                                 let server = app.server();
                                 let preference =
                                     port_preference_from(std::env::var("VIBEVALLEY_PORT").ok().as_deref(), vibevalley_protocol::home::default_port());
@@ -467,13 +462,8 @@ impl BridgeHub {
                                 }
                                 server
                             }
-                            Ok(Err(e)) => {
+                            Err(e) => {
                                 let reason = format!("vibevalley server: {e}");
-                                let _ = ready.send_replace(Some(Err(reason.clone())));
-                                Arc::new(FailedServer::new(reason))
-                            }
-                            Err(_) => {
-                                let reason = "vibevalley server: boot task cancelled".to_string();
                                 let _ = ready.send_replace(Some(Err(reason.clone())));
                                 Arc::new(FailedServer::new(reason))
                             }

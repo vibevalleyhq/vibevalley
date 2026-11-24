@@ -12,10 +12,10 @@ use std::sync::Arc;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use vibevalley_protocol::native::{NativeEndpointId, native_ops};
 use vibevalley_protocol::{
     ApiError, Attachment, AttachmentFile, AttachmentImportPathInput, AttachmentUpload, BizCode, EndpointId, MediaInput, MediaInputRequest, Op, Preview, ops,
 };
+use vibevalley_protocol::{NativeEndpointId, native_ops};
 
 pub use attachment::{ATTACHMENT_MAX, AttachmentStorage};
 pub use media_input::MediaInputStorage;
@@ -175,7 +175,7 @@ impl Storage {
             }
             other => Err(ApiError::new(
                 BizCode::RouteNotFound,
-                format!("storage does not handle endpoint {}", other.op()),
+                format!("storage does not handle endpoint {}", other.as_op()),
             )),
         }
     }

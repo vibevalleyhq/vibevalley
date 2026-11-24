@@ -3,10 +3,11 @@ use std::sync::Arc;
 
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
+use vibevalley_core::SliceMask;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
     ApiError, Channel, ChannelEvent as ProtocolChannelEvent, ChannelUnread, ChannelUpdate, ChatMessage, DEFAULT_ORCHESTRATOR, MessageKind, Notify, Preview,
-    SliceMask, SubjectKind, USER_ID,
+    SubjectKind, USER_ID,
 };
 
 use super::dispatch::{ChannelDispatched, DeliveryTargetKind, HeldBy, QueuedDelivery, Reason};
@@ -761,7 +762,7 @@ impl Chat {
     /// change from now on; `Reset` when too far behind.
     pub fn follow(&self, channel: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
         if self.model().channel(channel).is_none() {
-            return Err(refused(t("server.channel.channelGone", &[])));
+            return Err(super::no_channel(channel));
         }
         // Subscribed before the missed ones are read: nothing falls in between.
         let live = self.subscribe_events();

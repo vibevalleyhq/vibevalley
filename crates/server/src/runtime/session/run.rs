@@ -44,6 +44,7 @@ impl SessionEngine {
             summary: String::new(),
             spent: None,
         };
+        let _extra_guard = self.0.extra_lock.lock().await;
         let mut extra = self.extra(session);
         extra.run = Some(id.clone());
         let session_svc = self.0.ctx.service.session.clone();
@@ -73,12 +74,14 @@ impl SessionEngine {
             })
             .await?;
         self.0.extras.lock().insert(session.into(), saved_extra);
+        drop(_extra_guard);
         self.record_async(session, Step::RunStarted { run: id.clone() }).await;
         Ok(id)
     }
 
     /// The open round of `session`, if any, ends with `outcome`.
     pub async fn end_run_async(&self, session: &str, outcome: Outcome, summary: &str, spent: Option<Spent>) -> Result<()> {
+        let _extra_guard = self.0.extra_lock.lock().await;
         let Some((id, extra)) = ({
             let extras = self.0.extras.lock();
             let mut extra = extras.get(session).cloned().unwrap_or_default();
@@ -113,13 +116,8 @@ impl SessionEngine {
                 },
             )
             .await?;
-        {
-            let mut extras = self.0.extras.lock();
-            let current = extras.entry(session.into()).or_default();
-            if current.run.as_deref() == Some(&id) {
-                current.run = saved_extra.run;
-            }
-        }
+        self.0.extras.lock().insert(session.into(), saved_extra);
+        drop(_extra_guard);
         self.record_async(session, Step::RunEnded { run: id, outcome }).await;
         Ok(())
     }

@@ -64,25 +64,25 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
         inner: ScriptedRuntime::demo(),
         opened: opened_tx,
     }));
-    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let app = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         orchestrator_listens: false,
         link_previews: false,
-        ..vibevalley_server::ServerConfig::under(dir.path())
+        ..vibevalley_server::Config::under(dir.path())
     })
     .unwrap();
-    let listener = vibevalley_server::transport::http::serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let listener = vibevalley_server::gateway::http::serve(app.server(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let door = format!("{}/mcp", listener.url());
-    started.test_internals().board.sessions().set_mcp_url(door.clone());
+    app.set_mcp_url(door.clone());
     std::fs::write(dir.path().join("AGENTS.md"), "所有仓库都用 2 个空格缩进。").unwrap();
 
-    let call = |op: &str, p| started.hub.call_as(Caller::User, op, p);
+    let call = |op: &str, p| app.router().call_as(Caller::User, op, p);
     assert!(call("repo.create", json!({ "name": "farm" })).data.is_some());
-    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = app.test_internals().agent.profile.store.install_template("reviewer").unwrap();
     helper.runtime = "scripted".into();
     helper.name = "小帮手".into();
-    started.test_internals().agents.profiles.save(helper).unwrap();
+    app.test_internals().agent.profile.store.save(helper).unwrap();
     let made = call("issue.create", json!({ "title": "say hi", "repo": "farm", "agent": "小帮手" }));
     let id = made.data.unwrap()["id"].as_str().unwrap().to_string();
     let sent = call("issue.status.update", json!({ "id": id, "status": "todo" }));
@@ -107,7 +107,7 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
             _ => None,
         })
         .expect("the vibevalley door with a bearer token");
-    let session = started.test_internals().board.sessions().who(&token).expect("the token names the helper");
+    let session = app.test_internals().board.sessions().who(&token).expect("the token names the helper");
 
     let hello = rpc(&door, &token, 1, "initialize", json!({ "protocolVersion": "2025-06-18", "capabilities": {} }));
     assert_eq!(hello["result"]["serverInfo"]["name"], "vibevalley");
@@ -177,7 +177,7 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
         json!({ "name": "issue_report", "arguments": { "summary": "打了招呼 abc123", "remember": [{ "text": "测试用 cargo test", "scope": "all" }] } }),
     );
     assert_eq!(text_of(&reported), "报告已记录；现在用简短正文说明结果。");
-    let kept = std::fs::read_to_string(started.test_internals().board.sessions().report_path(&session)).unwrap();
+    let kept = std::fs::read_to_string(app.test_internals().board.sessions().report_path(&session)).unwrap();
     assert!(kept.contains("打了招呼 abc123") && kept.contains("测试用 cargo test"), "{kept}");
 
     let none = rpc(&door, &token, 9, "tools/call", json!({ "name": "no_such_tool", "arguments": {} }));
@@ -273,5 +273,5 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
     assert_eq!(after_blocks[0]["id"], moved_child_id, "child moved to top-level first");
     assert!(after_blocks[0].get("parentId").is_none());
 
-    started.close();
+    app.close_blocking();
 }

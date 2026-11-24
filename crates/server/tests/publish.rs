@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use serde_json::json;
 use vibevalley_protocol::{BranchCheck, Caller, SubmitBranch};
-use vibevalley_server::work::pull::{Answer, HostRun, Network, Publisher, hosted_origin};
+use vibevalley_server::issue::pull::{Answer, HostRun, Network, Publisher, hosted_origin};
 
 fn git(cwd: &Path, args: &[&str]) -> String {
     let o = std::process::Command::new("git").current_dir(cwd).args(args).output().unwrap();
@@ -216,23 +216,21 @@ fn the_repos_check_runs_before_the_push() {
 #[test]
 fn only_the_user_publishes() {
     let dir = tempfile::tempdir().unwrap();
-    let hub = vibevalley_server::Hub::new(vibevalley_core::empty_space_state());
-    let db = vibevalley_server::db::ServerDb::open(dir.path()).unwrap();
-    let pulls = vibevalley_runtime::rt::block_on(vibevalley_server::work::pull::Pulls::open_async(
-        db,
-        Arc::new(farm().publisher),
-        None,
-        None,
-        None,
-        None,
-    ))
+    let app = vibevalley_server::create_app_blocking(vibevalley_server::Config {
+        publisher: Some(Arc::new(farm().publisher)),
+        probe_runtimes: false,
+        tick_crons: false,
+        link_previews: false,
+        orchestrator_listens: false,
+        ..vibevalley_server::Config::under(dir.path())
+    })
     .unwrap();
-    vibevalley_server::work::pull::install(&hub, pulls, None);
     let asked = json!({ "cwd": "/tmp", "branch": "fix", "sha": "0", "base": "main", "title": "t", "body": "" });
-    let e = hub.call_as(Caller::Remote, "repo.pr.submit", asked);
-    // The hub's `can` refuses it before the endpoint's own rule does.
+    let e = app.router().call_as(Caller::Remote, "repo.pr.submit", asked);
+    // The router's `can` refuses it before the endpoint's own rule does.
     let codes = [vibevalley_protocol::BizCode::Forbidden.code(), vibevalley_protocol::BizCode::RepoRefused.code()];
     assert!(codes.contains(&e.biz_code), "{}", e.message);
+    app.close_blocking();
 }
 
 #[test]
@@ -240,7 +238,8 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
     use std::time::Duration;
     use vibevalley_protocol::{Landing, PullRequest, PullRequestState};
     use vibevalley_runtime::oar::{Registry, scripted::ScriptedRuntime};
-    use vibevalley_server::{Server, ServerConfig, start};
+    use vibevalley_server::gateway::api::Server;
+    use vibevalley_server::{Config, create_app_blocking};
 
     vibevalley_i18n::set_locale("en");
     let dir = tempfile::tempdir().unwrap();
@@ -267,7 +266,7 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
     let mut registry = Registry::new();
     registry.register(Arc::new(ScriptedRuntime::demo()));
 
-    let started = start(ServerConfig {
+    let started = create_app_blocking(Config {
         registry: Some(Arc::new(registry)),
         publisher: Some(publisher),
         probe_runtimes: false,
@@ -275,7 +274,7 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
         link_previews: false,
         offline_media: true,
         orchestrator_listens: false,
-        ..ServerConfig::under(&root)
+        ..Config::under(&root)
     })
     .unwrap();
 
@@ -290,14 +289,14 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
     git(&repo_dir, &["push", "-q", bare.to_str().unwrap(), "main"]);
     git(&repo_dir, &["remote", "add", "origin", "https://github.com/acme/farm.git"]);
 
-    let mut coder = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut coder = started.test_internals().agent.profile.store.install_template("reviewer").unwrap();
     coder.runtime = "scripted".into();
     coder.name = "Coder".into();
-    let coder = started.test_internals().agents.profiles.save(coder).unwrap();
+    let coder = started.test_internals().agent.profile.store.save(coder).unwrap();
     let agent_id = coder.id.as_str();
 
     let created = started
-        .hub
+        .router()
         .call(
             "issue.create",
             json!({
@@ -315,23 +314,25 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
     assert_eq!(created["mandate"]["strength"], "explicit");
 
     assert_eq!(
-        started.hub.call("issue.status.update", json!({ "id": &issue_id, "status": "todo" })).biz_code,
+        started
+            .router()
+            .call("issue.status.update", json!({ "id": &issue_id, "status": "todo" }))
+            .biz_code,
         0
     );
 
-    let worktree = crate::support::wait_until_transition(&started.hub, Duration::from_secs(5), "InReview", || {
-        let state = started.hub.state_now();
-        let issue = state.issues.iter().find(|i| i.id == issue_id)?;
+    let worktree = crate::support::wait_until_transition(started.ctx(), Duration::from_secs(5), "InReview", || {
+        let issue = crate::support::board_issue(started.test_internals().board, &issue_id)?;
         if issue.status == vibevalley_protocol::IssueStatus::InReview {
             let sid = issue.latest_session_id()?;
-            let session = state.sessions.iter().find(|s| s.id == *sid)?;
+            let session = crate::support::board_session(started.test_internals().board, sid)?;
             return session.cwd.clone().map(PathBuf::from);
         }
         None
     });
 
     // Completing before a PR is recorded is refused.
-    let refused = started.hub.call("issue.status.update", json!({ "id": &issue_id, "status": "done" }));
+    let refused = started.router().call("issue.status.update", json!({ "id": &issue_id, "status": "done" }));
     assert_ne!(refused.biz_code, 0);
 
     // Commit a change on the issue's worktree branch and publish it via repo.pr.submit.
@@ -342,7 +343,7 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
     let sha = git(&worktree, &["rev-parse", "HEAD"]);
     let branch = git(&worktree, &["rev-parse", "--abbrev-ref", "HEAD"]);
 
-    let pubbed = started.hub.call(
+    let pubbed = started.router().call(
         "repo.pr.submit",
         json!({
             "cwd": worktree.display().to_string(),
@@ -355,7 +356,7 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
     );
     assert_eq!(pubbed.biz_code, 0, "{}", pubbed.message);
 
-    let recorded = started.test_internals().board.issue(&issue_id).unwrap();
+    let recorded = crate::support::board_issue(started.test_internals().board, &issue_id).unwrap();
     assert_eq!(
         recorded.pull_request,
         Some(PullRequest {
@@ -366,18 +367,20 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
     );
 
     // Preview and complete now succeed with Landing::Submitted and keep the PR branch.
-    let preview = started.hub.call("issue.status.previewUpdate", json!({ "id": &issue_id, "status": "done" }));
+    let preview = started
+        .router()
+        .call("issue.status.previewUpdate", json!({ "id": &issue_id, "status": "done" }));
     assert_eq!(preview.biz_code, 0, "{}", preview.message);
 
-    let done = started.hub.call("issue.status.update", json!({ "id": &issue_id, "status": "done" }));
+    let done = started.router().call("issue.status.update", json!({ "id": &issue_id, "status": "done" }));
     assert_eq!(done.biz_code, 0, "{}", done.message);
-    let finished = started.test_internals().board.issue(&issue_id).unwrap();
+    let finished = crate::support::board_issue(started.test_internals().board, &issue_id).unwrap();
     assert_eq!(finished.delivered, Some(Landing::Submitted));
     assert_eq!(git(&repo_dir, &["rev-parse", &format!("refs/heads/{branch}")]), sha);
 
     // A change-delivering issue whose followed PR merges finishes automatically with Landing::PullRequest.
     let change_issue = started
-        .hub
+        .router()
         .call(
             "issue.create",
             json!({
@@ -390,28 +393,22 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
         .data
         .unwrap();
     let change_id = change_issue["id"].as_str().unwrap();
-    vibevalley_runtime::rt::block_on(
-        started
-            .test_internals()
-            .pulls
-            .store()
-            .upsert_async(vibevalley_server::work::pull::UpsertPullInput {
-                platform: vibevalley_protocol::PublishPlatform::Github,
-                repo: "acme/farm".into(),
-                number: 8,
-                url: "https://github.com/acme/farm/pull/8".into(),
-                branch: "vibevalley/issue-2".into(),
-                base: "main".into(),
-                state: PullRequestState::Merged,
-                issue_id: Some(change_id.into()),
-                at: 1000,
-            }),
-    )
+    vibevalley_runtime::rt::block_on(started.test_internals().pull.upsert_async(vibevalley_server::issue::pull::UpsertPullInput {
+        platform: vibevalley_protocol::PublishPlatform::Github,
+        repo: "acme/farm".into(),
+        number: 8,
+        url: "https://github.com/acme/farm/pull/8".into(),
+        branch: "vibevalley/issue-2".into(),
+        base: "main".into(),
+        state: PullRequestState::Merged,
+        issue_id: Some(change_id.into()),
+        at: 1000,
+    }))
     .unwrap();
     let merged = vibevalley_runtime::rt::block_on(started.test_internals().board.settle_pull_async(change_id, PullRequestState::Merged))
         .unwrap()
         .unwrap();
     assert_eq!(merged.delivered, Some(Landing::PullRequest));
 
-    started.close();
+    started.close_blocking();
 }

@@ -289,9 +289,7 @@ impl SliceFeed {
             true
         };
         let mut sub = self.subscribe();
-        let mut is_initial = after_seq.is_none();
-        let initial = sub.borrow_and_update(is_initial);
-        is_initial = false;
+        let initial = sub.borrow_and_update(after_seq.is_none());
         let mut seen_gen = initial.generation;
         if after_seq != Some(initial.seq) {
             let value: Value = serde_json::from_str(&initial.json).unwrap_or(Value::Null);
@@ -299,19 +297,41 @@ impl SliceFeed {
                 return;
             }
         }
+        let (tx, rx) = flume::bounded::<SliceFrame>(1);
         let handle = vibevalley_runtime::rt::current_or_global_handle();
-        let wait_changed = |sub: &mut SliceSubscription| {
-            let stop = stop.clone();
-            handle.block_on(async {
-                tokio::select! {
+        let stop_task = stop.clone();
+        let rx_coalesce = rx.clone();
+        handle.spawn(async move {
+            loop {
+                let changed = tokio::select! {
                     biased;
-                    _ = stop.recv_async() => false,
+                    _ = stop_task.recv_async() => false,
                     changed = sub.changed() => changed,
+                };
+                if !changed {
+                    break;
                 }
-            })
-        };
-        while !stop.is_disconnected() && wait_changed(&mut sub) {
-            let frame = sub.borrow_and_update(is_initial);
+                let frame = sub.borrow_and_update(false);
+                let _ = rx_coalesce.try_recv();
+                let sent = tokio::select! {
+                    biased;
+                    _ = stop_task.recv_async() => false,
+                    res = tx.send_async(frame) => res.is_ok(),
+                };
+                if !sent {
+                    break;
+                }
+            }
+        });
+        while !stop.is_disconnected() {
+            let mut next: Option<SliceFrame> = None;
+            flume::Selector::new()
+                .recv(&rx, |res| {
+                    next = res.ok();
+                })
+                .recv(stop, |_| {})
+                .wait();
+            let Some(frame) = next else { break };
             if frame.generation == seen_gen {
                 continue;
             }
@@ -491,6 +511,7 @@ pub struct StateFeed {
     last_published: Mutex<[Option<Instant>; SLICE_COUNT]>,
     running: AtomicBool,
     cycle_tx: watch::Sender<u64>,
+    dirty_tx: watch::Sender<i64>,
 }
 
 impl StateFeed {
@@ -503,6 +524,7 @@ impl StateFeed {
     /// Passing `Duration::ZERO` projects every coalesced single-flight batch immediately.
     pub fn with_throttle(throttle: Duration) -> Self {
         let (cycle_tx, _) = watch::channel(0u64);
+        let (dirty_tx, _) = watch::channel(0i64);
         Self {
             feeds: SliceFeedSet::new_empty(),
             gate: SliceWakeGate::new(0),
@@ -512,6 +534,7 @@ impl StateFeed {
             last_published: Mutex::new([None; SLICE_COUNT]),
             running: AtomicBool::new(false),
             cycle_tx,
+            dirty_tx,
         }
     }
 
@@ -568,6 +591,16 @@ impl StateFeed {
         self.feeds.get(kind).subscribe()
     }
 
+    /// Subscribes to `mark_dirty` sequence bumps (wakes even if `start` hasn't run).
+    pub fn subscribe_dirty(&self) -> watch::Receiver<i64> {
+        self.dirty_tx.subscribe()
+    }
+
+    /// Subscribes to projector cycle completions.
+    pub fn subscribe_cycles(&self) -> watch::Receiver<u64> {
+        self.cycle_tx.subscribe()
+    }
+
     pub fn has_watchers(&self, kind: SliceKind) -> bool {
         self.feeds.get(kind).has_watchers()
     }
@@ -580,6 +613,7 @@ impl StateFeed {
     /// updates per-slice dirty watermarks, and wakes the single-flight projector loop.
     pub fn mark_dirty(&self, mask: SliceMask) -> i64 {
         let (seq, should_wake) = self.gate.record_commit(mask.bits());
+        let _ = self.dirty_tx.send_replace(seq);
         if should_wake || (mask.bits() & SLICE_MASK_ALL) != 0 {
             self.notify.notify_one();
         }

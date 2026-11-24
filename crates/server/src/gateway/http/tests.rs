@@ -734,6 +734,7 @@ async fn listener_shutdown_ends_active_sse_stream_without_blocking() {
     let (_fake, listener) = start();
     let url = format!("{}/api/v1/live", listener.url());
 
+    crate::context::install_tls();
     let client = reqwest::Client::builder().no_proxy().build().unwrap();
     let mut res = client.get(&url).send().await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);

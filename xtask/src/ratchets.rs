@@ -14,7 +14,7 @@ const NAMING_DOC: &str = "docs/style/naming.md";
 
 /// Shrink-only ceiling for non-test `rt::block_on(` calls under `crates/server/src/`.
 /// This ceiling may only decrease as sync wrappers migrate to async; never raise it.
-pub const SERVER_BLOCK_ON_CEILING: usize = 47;
+pub const SERVER_BLOCK_ON_CEILING: usize = 5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[allow(clippy::enum_variant_names)]
@@ -621,7 +621,7 @@ fn check_no_attach_slots(file: &SourceFile, stripped_rust: &str, non_test_code: 
     let mut violations = Vec::new();
 
     if let Some(code) = non_test_code
-        && file.path.starts_with("crates/server/src/app/")
+        && (file.path == "crates/server/src/app.rs" || file.path.starts_with("crates/server/src/app/"))
     {
         let mut cursor = 0usize;
         while let Some((offset, ident)) = next_ident_after_keyword(code, "fn", &mut cursor) {
@@ -1086,7 +1086,7 @@ mod tests {
 
     #[test]
     fn block_on_ceiling_excludes_cfg_test() {
-        assert_eq!(SERVER_BLOCK_ON_CEILING, 47);
+        assert_eq!(SERVER_BLOCK_ON_CEILING, 5);
 
         let files = vec![
             sf(

@@ -16,10 +16,10 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex as AsyncMutex, broadcast};
 use vibevalley_core::{Refusal, SliceMask, derive_issues};
 use vibevalley_protocol::{
-    ApiError, Assignment, Conflict, CriterionCheck, Execution, ExecutionPolicy, Finding, Issue, IssueAnswer, IssueCanceled, IssueWatchInput, Landing, LastRun,
+    ApiError, Assignment, Conflict, CriterionCheck, Execution, ExecutionPolicy, Finding, Issue, IssueAnswer, IssueCanceled, IssueGetInput, Landing, LastRun,
     Millis, Outcome, Phase, Question, Run, Session, SessionBindingInput, SessionChildTranscript, SessionChildTranscriptInput, SessionController,
     SessionEventListInput, SessionEventPage, SessionOpenWorkspaceInput, SessionRespondInteractionInput, SessionRespondPermissionInput, SessionSendInput,
-    SessionSetConfigInput, SessionWatchInput, SessionWorkspace,
+    SessionSetConfigInput, SessionWatchPayload, SessionWorkspace,
 };
 use vibevalley_runtime::oar::{PermissionMode, Registry};
 
@@ -155,9 +155,9 @@ pub(crate) fn find_issue<'a>(issues: &'a [Issue], reference: &str) -> Option<&'a
 pub(crate) fn derive_all_issues(raw_issues: &[Issue], sessions: &[Session]) -> Vec<Issue> {
     let mut out = derive_issues(raw_issues, sessions);
     if out.len() < raw_issues.len() {
-        let seen: HashSet<&str> = out.iter().map(|i| i.id.as_str()).collect();
+        let seen: HashSet<String> = out.iter().map(|i| i.id.clone()).collect();
         for issue in raw_issues {
-            if !seen.contains(issue.id.as_str()) {
+            if !seen.contains(&issue.id) {
                 out.extend(derive_issues(std::slice::from_ref(issue), sessions));
             }
         }
@@ -736,7 +736,7 @@ impl Runtime {
 
     pub(crate) async fn watch_session_async(
         &self,
-        input: SessionWatchInput,
+        input: SessionWatchPayload,
         events: flume::Sender<serde_json::Value>,
         stop: flume::Receiver<()>,
     ) -> std::result::Result<(), ApiError> {
@@ -745,7 +745,7 @@ impl Runtime {
 
     pub(crate) async fn watch_issue_async(
         &self,
-        input: IssueWatchInput,
+        input: IssueGetInput,
         events: flume::Sender<serde_json::Value>,
         stop: flume::Receiver<()>,
     ) -> std::result::Result<(), ApiError> {

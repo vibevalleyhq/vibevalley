@@ -131,7 +131,11 @@ pub struct Journal {
 
 impl Journal {
     pub fn new(initial: Vec<SessionEvent>) -> Journal {
-        let next = initial.last().map(|e| e.seq + 1).unwrap_or(0);
+        Self::new_with_next(initial, 0)
+    }
+
+    pub fn new_with_next(initial: Vec<SessionEvent>, min_next: i64) -> Journal {
+        let next = initial.last().map(|e| e.seq + 1).unwrap_or(0).max(min_next);
         Journal {
             steps: initial,
             next,
@@ -540,6 +544,7 @@ fn known_id(id: &str) -> bool {
 pub struct Trajectory {
     ctx: Arc<Context>,
     open: Mutex<HashMap<String, Journal>>,
+    closed_next: Mutex<HashMap<String, i64>>,
     wake: Arc<Notify>,
     worker: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
 }
@@ -551,6 +556,7 @@ impl Trajectory {
         let t = Arc::new(Trajectory {
             ctx: ctx.clone(),
             open: Mutex::default(),
+            closed_next: Mutex::default(),
             wake: wake.clone(),
             worker: Mutex::new(None),
         });
@@ -614,8 +620,9 @@ impl Trajectory {
             return;
         }
         let existing_tail = self.ctx.service.session.list_events_tail(id, "", KEEP_EVENTS as i64).await.unwrap_or_default();
+        let min_next = self.closed_next.lock().get(id).copied().unwrap_or(0);
         let mut open = self.open.lock();
-        open.entry(id.to_string()).or_insert_with(|| Journal::new(existing_tail));
+        open.entry(id.to_string()).or_insert_with(|| Journal::new_with_next(existing_tail, min_next));
     }
 
     async fn persist_dirty_async(&self, writes: Vec<(String, Vec<SessionEvent>)>) {
@@ -664,8 +671,9 @@ impl Trajectory {
             return None;
         }
         let (out, dirty) = {
+            let min_next = self.closed_next.lock().get(id).copied().unwrap_or(0);
             let mut open = self.open.lock();
-            let j = open.entry(id.to_string()).or_insert_with(|| Journal::new(Vec::new()));
+            let j = open.entry(id.to_string()).or_insert_with(|| Journal::new_with_next(Vec::new(), min_next));
             let out = f(j);
             (out, j.next_deadline().is_some())
         };
@@ -747,6 +755,7 @@ impl Trajectory {
         j.close();
         let pushes = j.due(true);
         let dirty = j.take_dirty_for_save(false);
+        self.closed_next.lock().insert(id.to_string(), j.next);
         let at = now();
         for e in pushes {
             self.ctx.live.publish_session_event(at, id.to_string(), e);
@@ -789,6 +798,7 @@ impl Trajectory {
             return;
         }
         self.open.lock().remove(id);
+        self.closed_next.lock().remove(id);
         let _ = self.ctx.service.session.delete_events(id).await;
     }
 
@@ -1056,11 +1066,12 @@ mod tests {
         ctx.service.close().await;
     }
 
-    #[tokio::test(start_paused = true)]
+    #[tokio::test(flavor = "current_thread")]
     async fn trajectories_push_and_close_async_follow_virtual_clock() {
-        let wall_start = std::time::Instant::now();
         let home = tempfile::tempdir().unwrap();
         let ctx = test_context(home.path()).await;
+        tokio::time::pause();
+        let wall_start = std::time::Instant::now();
         let mut live_rx = ctx.live.subscribe_live();
         let tr = Trajectory::open(ctx.clone());
 

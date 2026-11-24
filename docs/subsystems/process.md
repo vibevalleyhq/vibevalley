@@ -19,7 +19,7 @@
 | `scripts/docs/agent-notes.ts`、`skills.ts`、`doc-links.ts` | 校验 Note 目录格式并生成 `CATALOG.md`、校验 skill 结构、校验文档链接与反引号路径（含 `.rs`、`.toml`） |
 | `scripts/docs/stale-names.ts`、`glossary.ts` | 拦截已废弃旧名字、校验用语表代码名 |
 | `scripts/gen/capabilities.ts`、`api-client.ts`、`primitives.ts`、`i18n.ts` | 生成并校验 `capabilities.md`、`client.ts`、`primitives.md` 与双语词典的 `catalogs.ts`；`i18n.ts check` 同步扫描 Rust 的 `t("key")` 与前端词条，缺键和未用键直接报错 |
-| `scripts/audit/oxlint-plugin.ts`、`deadcode.ts` 与 `xtask/src/{boundaries,ratchets}.rs` | 仓库自定义 lint 规则、Rust 并发棘轮门禁（`SERVER_BLOCK_ON_CEILING = 47` 及零睡眠区）、`L0`–`L3` 模块边界与 `knip` 死代码检查 |
+| `scripts/audit/oxlint-plugin.ts`、`deadcode.ts` 与 `xtask/src/{boundaries,ratchets}.rs` | 仓库自定义 lint 规则、Rust 并发棘轮门禁（`SERVER_BLOCK_ON_CEILING = 5` 及零睡眠区）、`L0`–`L3` 模块边界与 `knip` 死代码检查 |
 | `scripts/release/regression.ts`、`verify-server.ts` | PR 回归测试修改门禁、启动隔离沙箱服务端 |
 | `Makefile` 与 `xtask/`、`vite.config.ts` 的 `mac:check` | `cargo xtask check`（fmt、clippy `-D warnings` 与测试）、`cargo xtask loom`（四个并发内核模型检验）、`cargo xtask protocol`（TS 契约与 golden）、`vp run mac:check`（原生页面 nsh 类型检查） |
 | `scripts/audit/comment-review.ts` | 调用模型审查新增注释 |
@@ -79,7 +79,7 @@
 ## 怎么验证
 
 - `vp run docs:verify`：依次执行 9 项文档与生成物同步检查。
-- `cargo xtask audit`：校验 Rust `L0`–`L3` 模块边界与并发棘轮（`SERVER_BLOCK_ON_CEILING = 47`、`no-pollster`、`no-thread-sleep-in-zeroed-zones` 等）。
+- `cargo xtask audit`：校验 Rust `L0`–`L3` 模块边界与并发棘轮（`SERVER_BLOCK_ON_CEILING = 5`、`no-pollster`、`no-thread-sleep-in-zeroed-zones` 等）。
 - `cargo xtask loom`：对四个隔离的原子并发内核执行穷举交错模型检验。
 - `vp run deadcode`：死代码扫描。
 - `vp run scripts:test`：验证 lint 报错格式、沙箱、注释审查与回归门禁。

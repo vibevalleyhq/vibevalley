@@ -6,19 +6,19 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, BlockCreate, BlockDelete, BlockUpdate, Caller, Envelope, SuggestionChange, SuggestionCreate, TextSpan};
-use vibevalley_server::Server;
-use vibevalley_server::content::artifact::{ArtifactStore, Maker};
+use vibevalley_server::artifact::{Maker, Manager as ArtifactManager};
+use vibevalley_server::gateway::api::Server;
 
-fn start(dir: &std::path::Path) -> vibevalley_server::Started {
+fn start(dir: &std::path::Path) -> vibevalley_server::App {
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    vibevalley_server::start(vibevalley_server::ServerConfig {
+    vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
         orchestrator_listens: false,
-        ..vibevalley_server::ServerConfig::under(dir)
+        ..vibevalley_server::Config::under(dir)
     })
     .unwrap()
 }
@@ -63,9 +63,9 @@ fn html_and_markdown_hand_ins_their_versions_and_refusals() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
-    let hub = started.hub.clone();
+    let hub = started.router().clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
-    let general = started.test_internals().chat.default_channel();
+    let general = started.test_internals().channel.default_channel();
 
     // Announced with its card where it belongs; a new version keeps the old ones readable.
     let made = ok(call(
@@ -122,7 +122,7 @@ fn html_and_markdown_hand_ins_their_versions_and_refusals() {
     drop(db);
     let linked_issue = ok(call("issue.create", json!({ "title": "关联工单" })))["id"].as_str().unwrap().to_string();
     let notes = vibevalley_runtime::rt::block_on(
-        started.test_internals().artifacts.create_async(
+        started.test_internals().artifact.create_async(
             &Maker {
                 from: "user".into(),
                 by: "lab".into(),
@@ -224,9 +224,9 @@ fn html_edits_and_removal_keep_the_pages_once() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
-    let hub = started.hub.clone();
+    let hub = started.router().clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
-    let general = started.test_internals().chat.default_channel();
+    let general = started.test_internals().channel.default_channel();
 
     let source = "<h1>Launch</h1>\n<p>Ship on Friday.</p>\n<script>document.title = 'Friday'</script>";
     let made = ok(call("artifact.create", json!({ "title": "上线", "kind": "html", "content": source })));
@@ -271,7 +271,7 @@ fn html_edits_and_removal_keep_the_pages_once() {
     assert_eq!(pages(), before + 2);
 }
 
-fn blocks_now(a: &ArtifactStore, id: &str) -> Vec<vibevalley_protocol::Block> {
+fn blocks_now(a: &ArtifactManager, id: &str) -> Vec<vibevalley_protocol::Block> {
     vibevalley_runtime::rt::block_on(a.live_blocks_async(id)).unwrap()
 }
 
@@ -284,9 +284,9 @@ fn blocks_are_written_together() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
-    let hub = started.hub.clone();
+    let hub = started.router().clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
-    let a = started.test_internals().artifacts.clone();
+    let a = started.test_internals().artifact.clone();
     let new = |title: &str| {
         ok(call("artifact.create", json!({ "title": title, "kind": "markdown" })))["id"]
             .as_str()
@@ -574,13 +574,19 @@ fn blocks_are_written_together() {
     assert_eq!(mine.unwrap().status, vibevalley_protocol::BlockOpStatus::Applied);
 
     // What was written is there for a fresh reader of the same database.
-    let fresh_db = vibevalley_server::db::ServerDb::open(dir.path()).unwrap();
-    let reopened = ArtifactStore::open(fresh_db, started.test_internals().attachments.clone(), started.test_internals().chat.clone());
-    assert_eq!(vibevalley_runtime::rt::block_on(reopened.suggestions_async(&id)).unwrap().len(), 4);
+    started.close_blocking();
+    let reopened = start(dir.path());
     assert_eq!(
-        vibevalley_runtime::rt::block_on(reopened.markdown_async(&id)).unwrap(),
+        vibevalley_runtime::rt::block_on(reopened.test_internals().artifact.suggestions_async(&id))
+            .unwrap()
+            .len(),
+        4
+    );
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(reopened.test_internals().artifact.markdown_async(&id)).unwrap(),
         "用户的字\n\n帮工改自己的\n"
     );
+    reopened.close_blocking();
 }
 
 fn str_of(v: &Value) -> String {
@@ -596,7 +602,7 @@ fn a_message_quotes_blocks_as_when_said_and_demo_op_is_retired() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
-    let hub = started.hub.clone();
+    let hub = started.router().clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
     assert!(!hub.answers("artifact.demo"));
     let id = ok(call("artifact.create", json!({ "title": "演示", "kind": "markdown" })))["id"]
@@ -606,7 +612,7 @@ fn a_message_quotes_blocks_as_when_said_and_demo_op_is_retired() {
     let first = ins_on(&call, &id, "用户先写的");
 
     // A message quotes a block as it is when said.
-    let general = started.test_internals().chat.default_channel();
+    let general = started.test_internals().channel.default_channel();
     let quoted = json!([{ "artifactId": id, "blockId": first["blockId"], "rev": 1 }, { "artifactId": id, "blockId": "gone", "rev": 1 }]);
     ok(call("channel.message.send", json!({ "id": general, "text": "看这段", "blocks": quoted })));
     ok(call(
@@ -621,7 +627,7 @@ fn a_message_quotes_blocks_as_when_said_and_demo_op_is_retired() {
             { "artifactId": id, "blockId": "gone", "rev": 1, "title": "演示", "deleted": true }
         ])
     );
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -629,12 +635,12 @@ fn regression_a_failed_artifact_version_never_publishes_its_channel_card() {
     use sqlx::{Connection, SqliteConnection, sqlite::SqliteConnectOptions};
     let dir = tempfile::tempdir().unwrap();
     let server = start(dir.path());
-    let call = |op: &str, p: Value| server.hub.call_as(Caller::User, op, p);
-    let channel = server.test_internals().chat.default_channel();
+    let call = |op: &str, p: Value| server.router().call_as(Caller::User, op, p);
+    let channel = server.test_internals().channel.default_channel();
     let created = ok(call("artifact.create", json!({"title":"Proposal","kind":"html","content":page("v1")})));
     let before = ok(call("channel.message.list", json!({"id":channel})));
     let first_card = last_message(&call, &channel);
-    let mut events = server.test_internals().chat.subscribe_events();
+    let mut events = server.test_internals().channel.subscribe_events();
     let opts = SqliteConnectOptions::new().filename(dir.path().join("server.db"));
     let mut inspect = vibevalley_runtime::rt::block_on(SqliteConnection::connect_with(&opts)).unwrap();
     vibevalley_runtime::rt::block_on(
@@ -679,7 +685,7 @@ fn regression_a_failed_artifact_version_never_publishes_its_channel_card() {
     assert_eq!(second["number"], card["number"]);
     assert!(events.try_recv().is_ok());
     assert!(events.try_recv().is_err());
-    server.close();
+    server.close_blocking();
 }
 
 #[test]
@@ -687,7 +693,7 @@ fn structured_artifact_types_guides_and_starters() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
-    let hub = started.hub.clone();
+    let hub = started.router().clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
 
     // Lists all 8 artifact types and serves bilingual progressive-disclosure guides.
@@ -760,7 +766,7 @@ fn structured_artifact_types_guides_and_starters() {
         (inferred["title"].as_str(), inferred["body"].as_str(), inferred["display"].as_str()),
         (Some("Q3"), Some("html"), Some("slides"))
     );
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -768,10 +774,10 @@ fn store_entry_batch_ops_optimistic_concurrency_and_sanitization() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
-    let hub = started.hub.clone();
+    let hub = started.router().clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
 
-    let png = vibevalley_runtime::rt::block_on(started.test_internals().attachments.keep_async(
+    let png = vibevalley_runtime::rt::block_on(started.test_internals().storage.keep_async(
         vec![0x89, 0x50, 0x4e, 0x47],
         "logo.png".into(),
         "image/png".into(),
@@ -870,7 +876,7 @@ fn store_entry_batch_ops_optimistic_concurrency_and_sanitization() {
         code(call("artifact.entry.get", json!({ "id": id, "path": "elements/api-copy" }))),
         BizCode::ArtifactNotFound.code()
     );
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -878,7 +884,7 @@ fn store_view_csp_headers_default_design_system_tokens_and_http_route() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
-    let hub = started.hub.clone();
+    let hub = started.router().clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
 
     // Create standing default design-system artifact.
@@ -935,7 +941,7 @@ fn store_view_csp_headers_default_design_system_tokens_and_http_route() {
 
     // HTTP route `GET /api/v1/artifact/:id/view` serves the rendered HTML with CSP headers.
     let _ = rustls::crypto::ring::default_provider().install_default();
-    let http = vibevalley_server::transport::http::serve(hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let http = vibevalley_server::gateway::http::serve(hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let client = reqwest::blocking::Client::builder().no_proxy().build().unwrap();
     let res = client
         .get(format!("{}/api/v1/artifact/{slides_id}/view?theme=light", http.url()))
@@ -948,7 +954,7 @@ fn store_view_csp_headers_default_design_system_tokens_and_http_route() {
     let body = res.text().unwrap();
     assert!(body.contains("#123456"));
     drop(http);
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -956,7 +962,7 @@ fn store_entry_follow_replays_and_streams_live_updates() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
-    let hub = started.hub.clone();
+    let hub = started.router().clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
 
     let made = ok(call(
@@ -986,7 +992,7 @@ fn store_entry_follow_replays_and_streams_live_updates() {
     assert!(live["entries"][0]["value"].as_str().unwrap().contains("west"));
 
     hub.unsubscribe(sub_id);
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -994,7 +1000,7 @@ fn artifact_issue_fk_sets_null_on_issue_delete() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
-    let hub = started.hub.clone();
+    let hub = started.router().clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
 
     let issue_id = ok(call("issue.create", json!({ "title": "临时工单" })))["id"].as_str().unwrap().to_string();
@@ -1013,7 +1019,7 @@ fn artifact_issue_fk_sets_null_on_issue_delete() {
     let after = ok(call("artifact.get", json!({ "id": artifact_id })));
     assert_eq!(after["id"], artifact_id);
     assert!(after.get("issue").is_none());
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -1021,9 +1027,9 @@ fn outline_artifact_create_read_edit_type_read_card_and_issue_link() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
-    let hub = started.hub.clone();
+    let hub = started.router().clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
-    let general = started.test_internals().chat.default_channel();
+    let general = started.test_internals().channel.default_channel();
 
     // Bilingual guide for `outline`.
     let guide_zh = ok(call("artifact.type.read", json!({ "type": "outline" })));
@@ -1074,7 +1080,7 @@ fn outline_artifact_create_read_edit_type_read_card_and_issue_link() {
 
     let outlines = ok(call("artifact.list", json!({ "artifactType": "outline" })));
     assert_eq!(outlines.as_array().unwrap().len(), 2);
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -1084,7 +1090,7 @@ fn presence_update_follow_and_view_highlights_never_write_sqlite() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
-    let hub = started.hub.clone();
+    let hub = started.router().clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
 
     let board = ok(call(
@@ -1182,7 +1188,7 @@ fn presence_update_follow_and_view_highlights_never_write_sqlite() {
     assert_eq!((rm2["_tag"].as_str(), rm2["peerId"].as_str()), (Some("Remove"), Some("user")));
 
     hub.unsubscribe(sub_id);
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -1192,8 +1198,8 @@ fn persistent_cursor_suggestion_survives_upstream_edit_and_coalesces_same_origin
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
-    let hub = started.hub.clone();
-    let a = started.test_internals().artifacts.clone();
+    let hub = started.router().clone();
+    let a = started.test_internals().artifact.clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
 
     let doc = ok(call("artifact.create", json!({ "title": "共编文档", "artifactType": "docs" })));
@@ -1261,7 +1267,7 @@ fn persistent_cursor_suggestion_survives_upstream_edit_and_coalesces_same_origin
     assert_eq!(accepted["status"], "accepted");
     let snap = ok(call("artifact.block.list", json!({ "id": id })));
     assert_eq!(texts(&snap["blocks"]), "NOTE: Hello world, ship v2.5 today.");
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -1271,8 +1277,8 @@ fn time_travel_preview_restore_fork_compaction_and_selective_origin_undo() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
-    let hub = started.hub.clone();
-    let a = started.test_internals().artifacts.clone();
+    let hub = started.router().clone();
+    let a = started.test_internals().artifact.clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
 
     // 1. Interleaved block history: user + session A + session B.
@@ -1459,7 +1465,7 @@ fn time_travel_preview_restore_fork_compaction_and_selective_origin_undo() {
     let box1_val: Value = serde_json::from_str(box1["value"].as_str().unwrap()).unwrap();
     assert_eq!(box1_val["color"], "blue");
     assert_eq!(box1_val["x"], 500);
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -1467,9 +1473,9 @@ fn outline_import_parses_markdown_frontmatter_and_logseq_tasks() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let started = start(dir.path());
-    let hub = started.hub.clone();
+    let hub = started.router().clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
-    let channel = started.test_internals().chat.default_channel();
+    let channel = started.test_internals().channel.default_channel();
 
     // 1. Standard Markdown + YAML frontmatter + fenced chart block (unannounced).
     let before_msgs = ok(call("channel.message.list", json!({ "id": channel }))).as_array().unwrap().len();
@@ -1584,5 +1590,5 @@ para:: project
     // 4. Empty markdown is refused cleanly.
     let empty_err = call("artifact.outline.import", json!({ "markdown": "   \n  " }));
     assert_eq!(code(empty_err), BizCode::ArtifactRefused.code());
-    started.close();
+    started.close_blocking();
 }

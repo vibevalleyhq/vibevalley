@@ -8,10 +8,10 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, Caller, Envelope, VoiceFix};
 use vibevalley_runtime::agent::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, Role, Usage};
-use vibevalley_server::collab::voice::moss::{Realtime, Verdict};
-use vibevalley_server::collab::voice::{self, Voice};
-use vibevalley_server::infra::http::{Fetch, FetchError, Request, Response};
-use vibevalley_server::infra::setting::Secret;
+use vibevalley_server::setting::Secret;
+use vibevalley_server::voice::Voice;
+use vibevalley_server::voice::moss::{Realtime, Verdict};
+use vibevalley_server::{App, Config, create_app_blocking};
 
 struct Scripted {
     answers: Mutex<VecDeque<&'static str>>,
@@ -41,34 +41,31 @@ impl ModelClient for Scripted {
     }
 }
 
-struct UnusedFetch;
-
-impl Fetch for UnusedFetch {
-    fn fetch(&self, r: Request) -> Result<Response, FetchError> {
-        Err(FetchError::Network(format!("unexpected fetch {} {}", r.method, r.url)))
-    }
-}
-
 struct Live(Mutex<Verdict>);
 
 impl Realtime for Live {
-    fn verify(&self, key: &Secret, model: &str) -> Verdict {
+    fn verify_async<'a>(&'a self, key: &'a Secret, model: &'a str) -> vibevalley_server::BoxFuture<'a, Verdict> {
+        let _ = (key, model);
         assert_eq!((key.expose(), model), ("test-key", "moss-live-1.0"));
-        self.0.lock().unwrap().clone()
+        let verdict = self.0.lock().unwrap().clone();
+        Box::pin(async move { verdict })
     }
 }
 
 struct Farm {
     _dir: tempfile::TempDir,
-    started: vibevalley_server::Started,
-    voice: Arc<Voice>,
+    app: App,
     live: Arc<Live>,
     model: Arc<Scripted>,
 }
 
 impl Farm {
+    fn voice(&self) -> &Arc<Voice> {
+        self.app.test_internals().voice
+    }
+
     fn call(&self, op: &str, payload: Value) -> Envelope {
-        self.started.hub.call_as(Caller::User, op, payload)
+        self.app.router().call_as(Caller::User, op, payload)
     }
 
     fn ok(&self, op: &str, payload: Value) -> Value {
@@ -98,7 +95,7 @@ impl Farm {
     }
 
     fn messages(&self) -> Vec<Value> {
-        let general = self.started.test_internals().chat.default_channel();
+        let general = self.app.test_internals().channel.default_channel();
         self.ok("channel.message.list", json!({ "id": general }))
             .as_array()
             .cloned()
@@ -112,8 +109,7 @@ impl Farm {
 
 impl Drop for Farm {
     fn drop(&mut self) {
-        self.voice.close();
-        self.started.close();
+        self.app.close_blocking();
     }
 }
 
@@ -126,32 +122,18 @@ fn farm(answers: &[&'static str]) -> Farm {
     });
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let live = Arc::new(Live(Mutex::new(Verdict::Ok)));
+    let app = create_app_blocking(Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         link_previews: false,
         tick_crons: false,
         model_client: Some(model.clone()),
-        ..vibevalley_server::ServerConfig::under(dir.path())
+        voice_realtime: Some(live.clone()),
+        ..Config::under(dir.path())
     })
     .unwrap();
-    let live = Arc::new(Live(Mutex::new(Verdict::Ok)));
-    let voice = Voice::open(voice::Parts {
-        hub: Arc::downgrade(&started.hub),
-        setting: started.test_internals().setting.clone(),
-        chat: started.test_internals().chat.clone(),
-        orchestrator: started.test_internals().orchestrator.clone(),
-        fetch: Arc::new(UnusedFetch),
-        realtime: Some(live.clone()),
-    });
-    voice::install(&started.hub, voice.clone());
-    Farm {
-        _dir: dir,
-        started,
-        voice,
-        live,
-        model,
-    }
+    Farm { _dir: dir, app, live, model }
 }
 
 #[test]
@@ -166,10 +148,10 @@ fn every_voice_endpoint_is_served_and_retired_endpoints_are_gone() {
         "voice.call.hear",
         "voice.call.say",
     ] {
-        assert!(f.started.hub.answers(op), "{op}");
+        assert!(f.app.router().answers(op), "{op}");
     }
     for retired in ["voice.dictate", "voice.grant.renew"] {
-        assert!(!f.started.hub.answers(retired), "retired endpoint still registered: {retired}");
+        assert!(!f.app.router().answers(retired), "retired endpoint still registered: {retired}");
     }
 }
 
@@ -219,18 +201,18 @@ fn a_farm_call_runs_over_moss_live() {
     assert_eq!(again.message, "这通电话已经在接通");
 
     // The host's line: where to connect, with which key, and the session's settings.
-    let line = f.voice.moss_line().unwrap();
+    let line = f.voice().moss_line().unwrap();
     assert_eq!(
         (line.url.as_str(), line.key.expose()),
         ("wss://api.mosi.cn/v1/realtime?model=moss-live-1.0", "test-key")
     );
-    assert!(f.voice.moss_line().is_err());
+    assert!(f.voice().moss_line().is_err());
     let update: Value = serde_json::from_str(&line.session_update()).unwrap();
     assert_eq!(update["session"]["persona"]["prompt"], "你是助手。");
     assert_eq!(update["session"]["tools"][0]["name"], "ask_orchestrator");
 
     // Words for the call wait until MOSS has taken the settings.
-    assert!(f.voice.speak("小吴的测试跑完了。"));
+    assert!(f.voice().speak("小吴的测试跑完了。"));
     assert!(line.outgoing.try_recv().is_err());
     line.heard(r#"{"action":"session.updated","data":{"error":""}}"#);
     let commentary: Value = serde_json::from_str(&line.outgoing.try_recv().unwrap()).unwrap();
@@ -238,7 +220,7 @@ fn a_farm_call_runs_over_moss_live() {
         (commentary["action"].as_str(), commentary["content"].as_str()),
         (Some("session.commentary.append"), Some("小吴的测试跑完了。"))
     );
-    assert!(f.voice.speak("后面的直接送到。"));
+    assert!(f.voice().speak("后面的直接送到。"));
     assert!(line.outgoing.try_recv().unwrap().contains("后面的直接送到。"));
 
     // The model's tool call is put to the orchestrator, answered, and resumed once MOSS acks the output.
@@ -288,16 +270,16 @@ fn a_farm_call_runs_over_moss_live() {
         f.refused("voice.hear", json!({ "text": "喂" }), BizCode::VoiceCallFailed).message,
         "没有正在接通的电话"
     );
-    assert!(!f.voice.speak("没人听"));
+    assert!(!f.voice().speak("没人听"));
     f.ok("voice.call.stop", json!({ "agentId": agent }));
-    assert!(f.voice.moss_line().is_ok());
+    assert!(f.voice().moss_line().is_ok());
 }
 
 #[test]
 fn a_moss_call_answering_a_ring_speaks_what_rang() {
     let f = farm(&["#3 做完了，等你验收。"]);
     f.moss();
-    let line = f.voice.moss_line().unwrap();
+    let line = f.voice().moss_line().unwrap();
     let _ = line.session_update();
     line.heard(r#"{"action":"session.updated","data":{"error":""}}"#);
 

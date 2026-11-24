@@ -1,13 +1,16 @@
 //! The ledger and its fold (VibeValley `progress.test.ts`, `game.test.ts`).
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use serde_json::json;
-use vibevalley_core::empty_space_state;
 use vibevalley_core::progress::harvest_coins;
-use vibevalley_protocol::{Caller, CommitCount, Fact, FactProgressChanged, LedgerEntry, LedgerEntryHarvested};
-use vibevalley_server::Hub;
-use vibevalley_server::skin::game::Game;
+use vibevalley_protocol::{Caller, LedgerEntry, LedgerEntryHarvested, Repo as ProtocolRepo};
+use vibevalley_server::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
+use vibevalley_server::game::Game;
+use vibevalley_server::repo::Repo;
+use vibevalley_server::service::Service;
+use vibevalley_server::{Config, create_app_blocking};
 
 #[test]
 fn a_harvest_pays_by_its_commits_and_the_streak() {
@@ -22,9 +25,15 @@ fn the_ledger_folds_back_through_a_restart_and_skips_what_it_cannot_read() {
     vibevalley_i18n::set_locale("zh");
     let home = tempfile::tempdir().unwrap();
     let before = {
-        let hub = Hub::new(empty_space_state());
-        let game = Game::open(home.path(), &hub);
-        vibevalley_server::skin::game::install(&hub, game.clone());
+        let app = create_app_blocking(Config {
+            probe_runtimes: false,
+            orchestrator_listens: false,
+            link_previews: false,
+            tick_crons: false,
+            ..Config::under(home.path())
+        })
+        .unwrap();
+        let game = app.test_internals().game;
         game.record(LedgerEntry::Harvested(LedgerEntryHarvested {
             at: 0,
             session: "w1".into(),
@@ -35,36 +44,44 @@ fn the_ledger_folds_back_through_a_restart_and_skips_what_it_cannot_read() {
             cny: None,
             runs: 1,
         }));
-        let p = hub.read(|s| s.progress.clone()).unwrap();
+        let p = game.progress();
         assert!(p.coins >= 35);
         assert_eq!(p.counts.get("harvests"), Some(&1));
-        hub.apply(vec![Fact::ProgressChanged(FactProgressChanged {
-            at: 1,
-            progress: None,
-            news: None,
-            commits: Some(CommitCount { total: 1000, repos: vec![] }),
-            station: None,
-        })]);
-        let p = crate::support::wait_until_transition(&hub, Duration::from_secs(3), "farm_level updated by async game bus", || {
-            hub.read(|s| s.progress.clone().filter(|p| p.counts.get("farm_level").copied().unwrap_or(0) > 1))
+        game.set_commits(&[ProtocolRepo {
+            path: "demo".into(),
+            commits: 1000,
+        }]);
+        let p = crate::support::wait_until_transition(app.ctx(), Duration::from_secs(3), "farm_level updated", || {
+            let progress = game.progress();
+            (progress.counts.get("farm_level").copied().unwrap_or(0) > 1).then_some(progress)
         });
         assert!(p.counts.get("farm_level").copied().unwrap_or(0) > 1, "{:?}", p.counts);
-        let titled = hub.call_as(Caller::User, "game.title.set", json!({ "achievement": "harvests", "tier": 1 }));
+        let titled = app
+            .router()
+            .call_as(Caller::User, "game.title.set", json!({ "achievement": "harvests", "tier": 1 }));
         assert!(titled.error.is_none(), "{}", titled.message);
-        let list = hub.call_as(Caller::User, "game.achievement.list", json!(null)).data.unwrap();
+        let list = app.router().call_as(Caller::User, "game.achievement.list", json!(null)).data.unwrap();
         let parsed: vibevalley_protocol::AchievementList = serde_json::from_value(list).unwrap();
         assert!(!parsed.items.is_empty());
         assert!(!parsed.standings.is_empty());
-        hub.close_bus();
-        hub.read(|s| s.progress.clone()).unwrap()
+        let saved = game.progress();
+        app.close_blocking();
+        saved
     };
     let ledger = home.path().join("ledger.jsonl");
     let mut body = std::fs::read_to_string(&ledger).unwrap();
     body.push_str("{\"kind\":\"level\",\"at\":2,\"level\":\"high\"}\nnot json\n");
     std::fs::write(&ledger, body).unwrap();
-    let hub = Hub::new(empty_space_state());
-    let _game = Game::open(home.path(), &hub);
-    assert_eq!(hub.read(|s| s.progress.clone()).unwrap(), before);
+    let app = create_app_blocking(Config {
+        probe_runtimes: false,
+        orchestrator_listens: false,
+        link_previews: false,
+        tick_crons: false,
+        ..Config::under(home.path())
+    })
+    .unwrap();
+    assert_eq!(app.test_internals().game.progress(), before);
+    app.close_blocking();
 }
 
 #[test]
@@ -90,18 +107,33 @@ fn the_users_commits_are_counted_once_per_repository() {
     git(&["-c", "user.email=other@farm.test", "commit", "-q", "--allow-empty", "-m", "theirs"]);
     git(&["worktree", "add", "-q", "../farm.1", "-b", "issue-1"]);
     std::fs::create_dir_all(dir.path().join("a/node_modules/x/.git")).unwrap();
-    let counted = vibevalley_runtime::rt::block_on(vibevalley_server::work::repo::contributions_of_async(dir.path().to_path_buf(), vec![]));
+    let counted = vibevalley_runtime::rt::block_on(vibevalley_server::repo::contributions_of_async(dir.path().to_path_buf(), vec![]));
     assert_eq!(counted.len(), 1, "{counted:?}");
     assert_eq!(counted[0].commits, 2);
     assert!(counted[0].path.ends_with("farm"), "{}", counted[0].path);
-    let with_other = vibevalley_runtime::rt::block_on(vibevalley_server::work::repo::contributions_of_async(
+    let with_other = vibevalley_runtime::rt::block_on(vibevalley_server::repo::contributions_of_async(
         dir.path().to_path_buf(),
         vec!["Other@farm.test".into()],
     ));
     assert_eq!(with_other[0].commits, 3);
 
-    let hub = Hub::new(empty_space_state());
-    let game = Game::open(dir.path(), &hub);
-    game.set_commits(&counted);
-    assert_eq!(hub.read(|s| s.commits.clone()).map(|c| c.total), Some(2));
+    vibevalley_runtime::rt::block_on(async {
+        let service = Service::open(dir.path()).await.unwrap();
+        let ctx = Arc::new(Context::new(
+            service.clone(),
+            TaskGroup::new(),
+            Arc::new(LiveState::new()),
+            Arc::new(Outbox::new(service.clone())),
+            Arc::new(StateFeed::new()),
+            vibevalley_core::system_clock(),
+            Arc::new(Http),
+            Arc::new(PublicDownload),
+        ));
+        let repo = Repo::open(dir.path(), 2).unwrap();
+        let game = Game::open(dir.path(), ctx.clone(), repo);
+        game.set_commits(&counted);
+        assert_eq!(ctx.live.commits_snapshot().map(|c| c.total), Some(2));
+        let _ = ctx.shutdown(Duration::from_secs(1)).await;
+        service.close().await;
+    });
 }

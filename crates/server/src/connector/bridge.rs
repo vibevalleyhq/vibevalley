@@ -39,7 +39,6 @@ pub(super) struct Account {
     /// `""` until the user pairs by a message.
     pub user: String,
     pub pair_code: String,
-    pub cursor: String,
     pub reply_context: String,
     pub last_inbound: i64,
     pub paused_until: i64,
@@ -53,7 +52,6 @@ impl From<ConnectorAccountRow> for Account {
             keys: Secret::new(r.secrets),
             user: r.user,
             pair_code: r.pair_code,
-            cursor: r.cursor,
             reply_context: r.reply_context,
             last_inbound: r.last_inbound,
             paused_until: r.paused_until,

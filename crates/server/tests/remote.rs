@@ -11,15 +11,15 @@ use sqlx::Row;
 use vibevalley_core::{Clock, ManualClock};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{BizCode, Caller};
-use vibevalley_server::infra::remote::{self, Remote, default_remote_port, tailscale};
-use vibevalley_server::transport::http::{is_allowed_remote_ip, serve, serve_remote};
+use vibevalley_server::gateway::http::{is_allowed_remote_ip, serve, serve_remote};
+use vibevalley_server::gateway::remote::{default_remote_port, tailscale};
 
 use crate::support::inspect_db;
 
-fn start_server(dir: &std::path::Path) -> vibevalley_server::Started {
+fn start_server(dir: &std::path::Path) -> vibevalley_server::App {
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    vibevalley_server::start(vibevalley_server::ServerConfig {
+    vibevalley_server::create_app_blocking(vibevalley_server::Config {
         version: "2.3.4-remote-test".into(),
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
@@ -27,7 +27,7 @@ fn start_server(dir: &std::path::Path) -> vibevalley_server::Started {
         link_previews: false,
         tick_crons: false,
         debug_enabled: true,
-        ..vibevalley_server::ServerConfig::under(dir)
+        ..vibevalley_server::Config::under(dir)
     })
     .unwrap()
 }
@@ -100,9 +100,9 @@ fn remote_full_lifecycle_pairing_bearer_ops_slices_sse_resume_and_disable() {
     vibevalley_i18n::set_locale("en");
     let dir = tempfile::tempdir().unwrap();
     let started = start_server(dir.path());
-    let local_listener = serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let local_listener = serve(started.server(), "127.0.0.1:0".parse().unwrap()).unwrap();
 
-    let status_env = started.hub.call_as(Caller::User, "remote.status", json!({}));
+    let status_env = started.router().call_as(Caller::User, "remote.status", json!({}));
     assert_eq!(status_env.biz_code, 0, "{}", status_env.message);
     let status = status_env.data.unwrap();
     assert_eq!(status["enabled"], false);
@@ -111,12 +111,12 @@ fn remote_full_lifecycle_pairing_bearer_ops_slices_sse_resume_and_disable() {
     assert!(status.get("url").is_none());
     assert_eq!(status["devices"], json!([]));
 
-    let pair_disabled = started.hub.call_as(Caller::User, "remote.pair.create", json!({}));
+    let pair_disabled = started.router().call_as(Caller::User, "remote.pair.create", json!({}));
     assert_eq!(pair_disabled.biz_code, BizCode::Refused.code());
     assert_eq!(pair_disabled.message, t("server.remote.disabled", &[]));
 
     let enabled_env = started
-        .hub
+        .router()
         .call_as(Caller::User, "remote.enable", json!({ "bindAddr": "127.0.0.1", "port": 0 }));
     assert_eq!(enabled_env.biz_code, 0, "{}", enabled_env.message);
     let enabled = enabled_env.data.unwrap();
@@ -128,7 +128,7 @@ fn remote_full_lifecycle_pairing_bearer_ops_slices_sse_resume_and_disable() {
     let remote_url = enabled["url"].as_str().unwrap().to_string();
     assert_eq!(remote_url, format!("http://127.0.0.1:{bound_port}"));
 
-    let pair_env = started.hub.call_as(Caller::User, "remote.pair.create", json!({}));
+    let pair_env = started.router().call_as(Caller::User, "remote.pair.create", json!({}));
     assert_eq!(pair_env.biz_code, 0, "{}", pair_env.message);
     let pair = pair_env.data.unwrap();
     let code = pair["code"].as_str().unwrap().to_string();
@@ -195,7 +195,7 @@ fn remote_full_lifecycle_pairing_bearer_ops_slices_sse_resume_and_disable() {
     assert_eq!(st, 200, "{issues}");
     assert!(issues["data"].is_array());
 
-    let channels = started.hub.call_as(Caller::User, "channel.list", json!({})).data.unwrap();
+    let channels = started.router().call_as(Caller::User, "channel.list", json!({})).data.unwrap();
     let default_channel_id = channels[0]["id"].as_str().unwrap().to_string();
     let (st, sent) = post_json(
         &format!("{remote_url}/api/v1/channel/message/send"),
@@ -205,7 +205,7 @@ fn remote_full_lifecycle_pairing_bearer_ops_slices_sse_resume_and_disable() {
     assert_eq!(st, 200, "{sent}");
     assert_eq!(sent["bizCode"], 0);
     let msgs = started
-        .hub
+        .router()
         .call_as(Caller::User, "channel.message.list", json!({ "id": default_channel_id }))
         .data
         .unwrap();
@@ -231,10 +231,10 @@ fn remote_full_lifecycle_pairing_bearer_ops_slices_sse_resume_and_disable() {
     assert_ne!(resumed_id.as_deref(), Some(initial_seq.as_str()));
     assert!(resumed_board["issues"].to_string().contains("Mobile created task"), "{resumed_board}");
 
-    let status_after = started.hub.call_as(Caller::User, "remote.status", json!({})).data.unwrap();
+    let status_after = started.router().call_as(Caller::User, "remote.status", json!({})).data.unwrap();
     assert!(status_after["devices"][0]["lastSeenAt"].as_i64().is_some());
 
-    let disabled = started.hub.call_as(Caller::User, "remote.disable", json!({})).data.unwrap();
+    let disabled = started.router().call_as(Caller::User, "remote.disable", json!({})).data.unwrap();
     assert_eq!(disabled["enabled"], false);
     assert_eq!(disabled["listening"], false);
     assert!(disabled.get("url").is_none());
@@ -248,23 +248,23 @@ fn remote_full_lifecycle_pairing_bearer_ops_slices_sse_resume_and_disable() {
     assert_eq!(disabled_err["bizCode"], BizCode::Unauthorized.code());
 
     let reenabled = started
-        .hub
+        .router()
         .call_as(Caller::User, "remote.enable", json!({ "bindAddr": "127.0.0.1", "port": 0 }))
         .data
         .unwrap();
     let persisted_port = reenabled["port"].as_u64().unwrap();
     drop(local_listener);
-    let weak = Arc::downgrade(&started.hub);
-    started.close();
+    let weak = Arc::downgrade(started.router());
+    started.close_blocking();
     drop(started);
-    assert_eq!(weak.strong_count(), 0, "Hub must drop cleanly after Started::close");
+    assert_eq!(weak.strong_count(), 0, "Router must drop cleanly after App::close");
 
     let reopened = start_server(dir.path());
-    let restored = reopened.hub.call_as(Caller::User, "remote.status", json!({})).data.unwrap();
+    let restored = reopened.router().call_as(Caller::User, "remote.status", json!({})).data.unwrap();
     assert_eq!(restored["enabled"], true);
     assert_eq!(restored["listening"], true);
     assert_eq!(restored["port"], persisted_port);
-    reopened.close();
+    reopened.close_blocking();
 }
 
 #[test]
@@ -272,14 +272,14 @@ fn remote_security_wall_rejects_privileged_ops_mcp_and_invalid_or_revoked_tokens
     vibevalley_i18n::set_locale("en");
     let dir = tempfile::tempdir().unwrap();
     let started = start_server(dir.path());
-    let local_listener = serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let local_listener = serve(started.server(), "127.0.0.1:0".parse().unwrap()).unwrap();
 
     for forbidden_ip in ["0.0.0.0", "8.8.8.8", "1.1.1.1", "::"] {
         let ip = forbidden_ip.parse::<IpAddr>().unwrap();
         assert!(!is_allowed_remote_ip(ip), "{forbidden_ip}");
-        let err = started.hub.call_as(Caller::User, "remote.enable", json!({ "bindAddr": forbidden_ip }));
+        let err = started.router().call_as(Caller::User, "remote.enable", json!({ "bindAddr": forbidden_ip }));
         assert_eq!(err.biz_code, BizCode::Refused.code(), "{forbidden_ip}: {err:?}");
-        assert!(serve_remote(started.hub.clone(), SocketAddr::new(ip, 0)).is_err());
+        assert!(serve_remote(started.server(), SocketAddr::new(ip, 0)).is_err());
     }
     for allowed_ip in [
         "127.0.0.1",
@@ -295,7 +295,7 @@ fn remote_security_wall_rejects_privileged_ops_mcp_and_invalid_or_revoked_tokens
     }
 
     let enabled = started
-        .hub
+        .router()
         .call_as(Caller::User, "remote.enable", json!({ "bindAddr": "127.0.0.1", "port": 0 }))
         .data
         .unwrap();
@@ -306,7 +306,7 @@ fn remote_security_wall_rejects_privileged_ops_mcp_and_invalid_or_revoked_tokens
     let (st, _) = get_json(&format!("{remote_url}/api/v1/slice/board?once=1"), None);
     assert_eq!(st, 403);
 
-    let pair = started.hub.call_as(Caller::User, "remote.pair.create", json!({})).data.unwrap();
+    let pair = started.router().call_as(Caller::User, "remote.pair.create", json!({})).data.unwrap();
     let (st, paired) = post_json(
         &format!("{remote_url}/api/v1/remote/pair/exchange"),
         None,
@@ -349,11 +349,11 @@ fn remote_security_wall_rejects_privileged_ops_mcp_and_invalid_or_revoked_tokens
         assert_eq!(body["message"], t("server.remote.unauthorized", &[]));
     }
 
-    let unknown = started.hub.call_as(Caller::User, "remote.device.revoke", json!({ "id": "dev_missing" }));
+    let unknown = started.router().call_as(Caller::User, "remote.device.revoke", json!({ "id": "dev_missing" }));
     assert_eq!(unknown.biz_code, BizCode::NotFound.code());
     assert_eq!(unknown.message, t("server.remote.deviceNotFound", &[]));
 
-    let revoked = started.hub.call_as(Caller::User, "remote.device.revoke", json!({ "id": device_id }));
+    let revoked = started.router().call_as(Caller::User, "remote.device.revoke", json!({ "id": device_id }));
     assert_eq!(revoked.biz_code, 0, "{}", revoked.message);
 
     for base in [&remote_url, &local_listener.url()] {
@@ -372,30 +372,36 @@ fn remote_security_wall_rejects_privileged_ops_mcp_and_invalid_or_revoked_tokens
     assert_eq!(ts.host.as_deref(), Some("mbp.tailnet.ts.net"));
 
     drop(local_listener);
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
 fn remote_manual_clock_drives_pair_expiry_rate_limit_and_last_seen_over_http() {
     vibevalley_i18n::set_locale("en");
     let dir = tempfile::tempdir().unwrap();
-    let db = vibevalley_server::db::ServerDb::open(dir.path()).unwrap();
-    let hub = vibevalley_server::Hub::new(vibevalley_core::empty_space_state());
     let clock = Arc::new(ManualClock::new(1_700_000_000_000));
-    let remote = Remote::open_with_clock(db.clone(), Arc::downgrade(&hub), "2.3.4-clock-test".into(), clock.clone()).unwrap();
-    hub.attach_remote_auth(Some(remote.clone()));
-    remote::install(&hub, remote.clone());
+    let started = vibevalley_server::create_app_blocking(vibevalley_server::Config {
+        version: "2.3.4-clock-test".into(),
+        probe_runtimes: false,
+        orchestrator_listens: false,
+        link_previews: false,
+        tick_crons: false,
+        clock: clock.clone(),
+        ..vibevalley_server::Config::under(dir.path())
+    })
+    .unwrap();
+    let router = started.router();
 
-    let enabled = hub
+    let enabled = router
         .call_as(Caller::User, "remote.enable", json!({ "bindAddr": "127.0.0.1", "port": 0 }))
         .data
         .unwrap();
     let remote_url = enabled["url"].as_str().unwrap().to_string();
 
     // Code 1 expires after 5 minutes; Code 2 created 3 minutes later remains valid past the 60s rate-limit window.
-    let expiring = hub.call_as(Caller::User, "remote.pair.create", json!({})).data.unwrap();
+    let expiring = router.call_as(Caller::User, "remote.pair.create", json!({})).data.unwrap();
     clock.advance(Duration::from_secs(180));
-    let fresh = hub.call_as(Caller::User, "remote.pair.create", json!({})).data.unwrap();
+    let fresh = router.call_as(Caller::User, "remote.pair.create", json!({})).data.unwrap();
     clock.advance(Duration::from_secs(121));
 
     let (st, body) = post_json(
@@ -452,7 +458,5 @@ fn remote_manual_clock_drives_pair_expiry_rate_limit_and_last_seen_over_http() {
     assert_eq!(st, 200, "{who3}");
     assert_eq!(who3["data"]["device"]["lastSeenAt"], t2);
 
-    remote.close();
-    hub.close();
-    db.close();
+    started.close_blocking();
 }

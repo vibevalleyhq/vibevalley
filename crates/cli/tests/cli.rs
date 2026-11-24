@@ -9,14 +9,14 @@ use serde_json::{Value, json};
 struct TestServer {
     url: String,
     dir: tempfile::TempDir,
-    started: Option<vibevalley_server::Started>,
-    _listener: vibevalley_server::transport::http::Listener,
+    app: Option<vibevalley_server::App>,
+    _listener: vibevalley_server::gateway::http::Listener,
 }
 
 impl Drop for TestServer {
     fn drop(&mut self) {
-        if let Some(started) = self.started.take() {
-            started.close();
+        if let Some(app) = self.app.take() {
+            app.close_blocking();
         }
     }
 }
@@ -24,7 +24,7 @@ impl Drop for TestServer {
 fn spawn_server() -> TestServer {
     let dir = tempfile::tempdir().unwrap();
     let mut registry = vibevalley_runtime::oar::Registry::new();
-    registry.register(vibevalley_server::app::fake::runtime::helper());
+    registry.register(vibevalley_server::fake::runtime::helper());
     let starters = [
         "fullstack",
         "architect",
@@ -44,7 +44,7 @@ fn spawn_server() -> TestServer {
     for subdir in ["repos", "worktrees"] {
         std::fs::create_dir_all(work.join(subdir)).unwrap();
     }
-    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let app = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
         starters: starters.iter().map(|s| s.to_string()).collect(),
         work_root: work,
@@ -53,16 +53,16 @@ fn spawn_server() -> TestServer {
         link_previews: false,
         orchestrator_listens: false,
         offline_media: true,
-        ..vibevalley_server::ServerConfig::under(dir.path().join("home"))
+        ..vibevalley_server::Config::under(dir.path().join("home"))
     })
     .unwrap();
-    let listener = vibevalley_server::transport::http::serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let listener = vibevalley_server::gateway::serve(app.server(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let url = listener.url();
-    started.set_mcp_url(format!("{url}/mcp"));
+    app.set_mcp_url(format!("{url}/mcp"));
     TestServer {
         url,
         dir,
-        started: Some(started),
+        app: Some(app),
         _listener: listener,
     }
 }

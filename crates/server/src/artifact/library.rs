@@ -168,7 +168,7 @@ impl Library {
     }
 
     /// Records ready media job outputs once per `(attachment_id, source_job_id)`.
-    pub(crate) async fn record_made_async(&self, jobs: &[MediaJob]) -> Result<(), ApiError> {
+    pub async fn record_made_async(&self, jobs: &[MediaJob]) -> Result<(), ApiError> {
         for job in jobs {
             let Some((id, job_kind, attachment, updated_at)) = ready_made(job) else {
                 continue;

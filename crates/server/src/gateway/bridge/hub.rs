@@ -809,7 +809,7 @@ mod tests {
         fake.wait_subscribers("subscriber registered", 1);
         assert_eq!(hub.clients_snapshot().len(), 1);
         drop(client);
-        assert_eq!(fake.inner.subscriber_count(), 0);
+        wait_task_cleanup("drop unsubscribes", || fake.inner.subscriber_count() == 0);
         assert!(hub.clients_snapshot().is_empty());
     }
 }

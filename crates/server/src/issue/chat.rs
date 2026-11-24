@@ -542,7 +542,7 @@ impl IssueChat {
                 .sessions()
                 .durable_store()
                 .write_with_async(id.to_string(), |tx, id| {
-                    Box::pin(async move { tx.delete_document_async("run", &id, "issue.report").await })
+                    Box::pin(async move { tx.delete_document_async("run", id, "issue.report").await })
                 })
                 .await
                 .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;

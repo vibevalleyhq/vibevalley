@@ -29,6 +29,7 @@ fn runtime() -> &'static Runtime {
         let next = AtomicUsize::new(0);
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(io_workers())
+            .thread_stack_size(8 * 1024 * 1024)
             .enable_all()
             .thread_name_fn(move || {
                 let n = next.fetch_add(1, Ordering::Relaxed);

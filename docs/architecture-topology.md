@@ -184,7 +184,7 @@ flowchart TD
 | 通道类型 | 唯一机制 | 应承担场景 | 被取代的旧直调路径 |
 |---|---|---|---|
 | **命令写（Command）** | 进程内强类型 `Hub::invoke<O: Op>(principal, input)` | 任何跨域写入（工具调用、频道发帖、任务状态迁移、触发媒体/作品动作）；不经 JSON 编解码，统一在 `Hub` 门口校验 `Principal` 与 `ENDPOINTS.can` 并写入 `DebugKit` 轨迹 | 解散 `team/tool::Farm` 持有的 12 个具体模块直调；移除 `work/issue` / `content/media` 直调 `Chat`；移除 `work/cron` 的 2 处 `OnceLock` 晚绑定 |
-| **异步反应（Reaction）** | `EventBus::publish` / `EventBus::subscribe` | 一件事完成后引发的多域联动（频道消息唤醒 `Session` / `Orchestrator` / `library` 入库；会话结束触发 `memory` 沉淀与 `skin/game` 记账；任务流转触发 `pull` 与 `game`） | 移除 `memory` 直挂 `Sessions::on_news` 与 `app/bootstrap.rs` 回调胶水 |
+| **异步反应（Reaction）** | `EventBus::publish` / `EventBus::subscribe` | 一件事完成后引发的多域联动（频道消息唤醒 `Session` / `Orchestrator` / `library` 入库；会话结束触发 `memory` 沉淀与 `skin/game` 记账；任务流转触发 `pull` 与 `game`） | 移除 `memory` 直挂 `Sessions::on_news` 与 `app.rs` 回调胶水 |
 | **只读查询（Read）** | 读 `Hub` 上的 `SpaceState` 快照、向下导入 `L1` 叶子模块，或单方法只读 Port trait | `content/artifact` 解析 `#编号` 直接读 `SpaceState`；跨 `L2` 读取（记忆召回、引用摘要、会话上下文）改以单方法 `MemoryRecallPort` / `ArtifactQuotePort` / `SessionContextPort` 在启动期注入 | 移除 `content/artifact` 导入 `work/issue::Board`；移除 `team/agent <-> team/memory` 双向导入 |
 
 #### 3.2.2 收敛前后指标与静态防退化门禁
@@ -199,7 +199,7 @@ flowchart TD
 > [!IMPORTANT]
 > **静态边界门禁强制生效**：应把模块依赖规则写进 `scripts/audit/` 静态检查脚本并纳入 `vp check`，防止架构在后续迭代中回潮。
 
-1. 扫描 `crates/server/src/transport/` 与 `lib.rs`：不应出现任何 `crate::<domain>::*` 导入。
+1. 扫描 `crates/server/src/gateway/` 与 `lib.rs`：不应出现任何 `crate::<domain>::*` 导入。
 2. 扫描 `L1` 基础层模块：不应出现任何指向 `L2` 或 `L3` 模块的 `use` 语句。
 3. 扫描 `L2` 同级业务域（`work` / `collab` / `content` / `team/memory`）：不应出现跨大域的具体模块 `use` 语句。
 4. 对 `crates/server/src/` 的模块导入图执行拓扑排序：发现任意有向环时，检查立即失败并定位违规 `use` 行。
@@ -249,7 +249,7 @@ flowchart TD
 
 | 适配器子模块 | 运行位置 | 实现方式 | 对总控端呈现 |
 |---|---|---|---|
-| **`LocalMachine`** | 与总控端同进程（单机合体 / 个人中枢模式） | 包装现有 [crates/server/src/work/workplace](crates/server/src/work/workplace/mod.rs) 与 [crates/runtime/src/oar](crates/runtime/src/oar/mod.rs)，0 网络序列化 | 一台永远在 `local` 的普通 `Machine`，唯一支持免推送本地即时 Diff 与合并的节点 |
+| **`LocalMachine`** | 与总控端同进程（单机合体 / 个人中枢模式） | 包装现有 [crates/server/src/work/workplace](crates/server/src/runtime/worktree/mod.rs) 与 [crates/runtime/src/oar](crates/runtime/src/oar/mod.rs)，0 网络序列化 | 一台永远在 `local` 的普通 `Machine`，唯一支持免推送本地即时 Diff 与合并的节点 |
 | **`RemoteMachine`** | 任意开发机 / GPU 机（运行 `vibevalley machine up`） | 反向连接总控端 WS，探针本机 `claude`/`codex`/`acp`，用本地 `oar` 驱动子进程并把事件按 `seq` 写盘缓冲支持断线续读；本机起临时 `127.0.0.1:<port>/mcp` 经同一 WS 隧道回调总控端 | 一台与本机完全平权的 `Machine`；下线时注册表置为 `offline`，但已启动的远端会话继续运行等待重连 |
 | **`SandboxMachine`** | Docker / Apple Containers / 云沙箱（批量验证与赛马） | 容器镜像内置轻量 `vibevalley` 二进制与一次性 `Principal::Machine` 令牌，启动后自动挂上指定 `Runtime` 与仓库快照，跑完测试并回传验证证据（测试日志、截图、PR 链接）后退出销毁 | 一台声明为 `ephemeral` 的 `Machine`，任务完结自动注销并清理凭证 |
 | **`AcpRemoteRuntime`** | 外部独立暴露标准 ACP-over-WS 的 Agent 服务 | 在总控端或 `Machine` 内将远程 JSON-RPC 2.0 ACP 流适配为标准 `oar::Session` | 当作单个独立 `Runtime` 挂载于某台虚拟或宿主 `Machine` 之下 |
@@ -361,10 +361,10 @@ stateDiagram-v2
 
 | 模块 / 文件位置 | 现状 | 目标态缺口 | 迁移切分位置 |
 |---|---|---|---|
-| [crates/server/src/app/bootstrap.rs](crates/server/src/app/bootstrap.rs) | 启动时硬编码绑定本地 `Repos`、本机 `Fleet` 扫描、15 路 `server.db` 连接与 7 处后置挂钩 | `Control Plane` 启动不应强依赖本地代码仓或 CLI；需支持独立无头部署与单 `ServerDb` 连接池 | 第一刀 + 第二刀 |
-| [crates/server/src/infra/remote/mod.rs](crates/server/src/infra/remote/mod.rs) | 作为 `127.0.0.1` 旁的「副门」存在；仅允许 Tailscale CGNAT/回环 | 合并为统一网关 + 三类 `Principal`；`GET /attachment/{id}` 与 8 条订阅补齐 `can` 鉴权 | 第一刀 |
-| [crates/server/src/lib.rs](crates/server/src/lib.rs) & [transport/api/mod.rs](crates/server/src/transport/api/mod.rs) | `Hub` / `Server` 泄漏具体 `Orchestrator`、`Voice`、`runtime_inbox_items`；`Started` 暴露 27 字段 | 拔除死接口与具体类型穿透，只保留窄 Port 与不可绕过的 `Hub::apply` 单写通道 | 第一刀 + 脊柱治理 |
-| [crates/runtime/src/oar/mod.rs](crates/runtime/src/oar/mod.rs) & [work/issue/board.rs](crates/server/src/work/issue/board.rs) | 静态 `Registry` 与写死的本地 `Arc<Workplace>` | 升级为动态 `MachineRegistry` + 区分「可选本地 `WorkplacePort`」与「PR-First 远端模式」 | 第二刀 |
+| [crates/server/src/app.rs](crates/server/src/app.rs) | 启动时硬编码绑定本地 `Repos`、本机 `Fleet` 扫描、15 路 `server.db` 连接与 7 处后置挂钩 | `Control Plane` 启动不应强依赖本地代码仓或 CLI；需支持独立无头部署与单 `ServerDb` 连接池 | 第一刀 + 第二刀 |
+| [crates/server/src/gateway/remote/mod.rs](crates/server/src/gateway/remote/mod.rs) | 作为 `127.0.0.1` 旁的「副门」存在；仅允许 Tailscale CGNAT/回环 | 合并为统一网关 + 三类 `Principal`；`GET /attachment/{id}` 与 8 条订阅补齐 `can` 鉴权 | 第一刀 |
+| [crates/server/src/lib.rs](crates/server/src/lib.rs) & [transport/api/mod.rs](crates/server/src/gateway/api/mod.rs) | `Hub` / `Server` 泄漏具体 `Orchestrator`、`Voice`、`runtime_inbox_items`；`Started` 暴露 27 字段 | 拔除死接口与具体类型穿透，只保留窄 Port 与不可绕过的 `Hub::apply` 单写通道 | 第一刀 + 脊柱治理 |
+| [crates/runtime/src/oar/mod.rs](crates/runtime/src/oar/mod.rs) & [work/issue/board.rs](crates/server/src/issue/board.rs) | 静态 `Registry` 与写死的本地 `Arc<Workplace>` | 升级为动态 `MachineRegistry` + 区分「可选本地 `WorkplacePort`」与「PR-First 远端模式」 | 第二刀 |
 | [apps/mac/src/shell/mod.rs](apps/mac/src/shell/mod.rs) & [crates/cli/src/client.rs](crates/cli/src/client.rs) | Mac 端写死同进程启动服务端且部分穿透具体模块；CLI 只连本机 `server.json` | Mac 端支持「切换连接远端总控 vs 一键内置启动」；CLI 支持 `auth login` 传达模式与 `machine up` 执行模式 | 第一刀 + 第二刀 |
 
 ### 6.2 分阶段迁移与验收路线
@@ -373,7 +373,7 @@ stateDiagram-v2
    - Stage 4A 零争议减法与 Stage 4B 产品边界收敛（`S1` `genui`/`chart` 闭环、`S2` `.md` 导入 `ArtifactType::Outline`、`S4` 聚焦 MOSS Live + `Voice::speak`、`S6` 补齐 `artifact_block_*` MCP 工具）均已落地。
 2. **第一刀 — 统一总控网关、主体鉴权、逻辑调用收敛与客户端纯协议化**
    - 收口单一 HTTP/WS 网关模型与 `Principal::{Client, Machine, Session}`；在 `crates/protocol` 为 `Subscription` 增加 `can` 并贯通 `CallerContext` 至 `Hub::open_subscription` 与 `/attachment/{id}`（含 Range 流式下载）。
-   - 收敛大模块间逻辑调用：为 `Hub` 增加进程内强类型 `Hub::invoke<O>` 命令总线，解散 12 字段上帝结构体 `Farm` 并切断 4 组循环依赖，消除 `app/bootstrap.rs` 7 处后置挂钩，收拢单 `ServerDb` 连接池；在 `scripts/audit/` 启用 `L0–L3` 静态边界检查门禁。
+   - 收敛大模块间逻辑调用：为 `Hub` 增加进程内强类型 `Hub::invoke<O>` 命令总线，解散 12 字段上帝结构体 `Farm` 并切断 4 组循环依赖，消除 `app.rs` 7 处后置挂钩，收拢单 `ServerDb` 连接池；在 `scripts/audit/` 启用 `L0–L3` 静态边界检查门禁。
    - 清理 `Hub` / `Server` 具体模块穿透（`LiveVoicePort`、`runtime_inbox` 归入 `Core::apply`），使 `apps/mac` 具备纯粹走协议连接远端总控端的能力；为 `crates/cli` 新增 `auth login` 与持久化 Bearer 凭据，并落地**看板 Issue 前端友好引导**与 `MarkdownPane` / Mobile `nsh` 能力接入。
 3. **第二刀 — 拆出 `Machine` + `Runtime` 执行层与双向总线**
    - 定义 `Machine` 与动态 `MachineRegistry`，将现有本地 `Registry` / `Workplace` 封装为内置 `LocalMachine` 适配器。

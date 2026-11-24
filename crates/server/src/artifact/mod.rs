@@ -26,7 +26,6 @@ use vibevalley_core::artifact::{
 };
 use vibevalley_core::collab::{CommitMeta, PresenceHub};
 use vibevalley_i18n::t;
-use vibevalley_protocol::native::{NativeEndpointId, native_ops};
 use vibevalley_protocol::{
     ApiError, Artifact as Wire, ArtifactBody, ArtifactCard, ArtifactContent, ArtifactDisplay, ArtifactEntryBatchRequest, ArtifactEntryGetRequest,
     ArtifactEntryKind, ArtifactEntryOp, ArtifactEntryWriteInput, ArtifactHtmlEdit, ArtifactKind, ArtifactListRequest, ArtifactMarkdown,
@@ -34,6 +33,7 @@ use vibevalley_protocol::{
     ArtifactVersion, ArtifactVersionRequest, BizCode, BlockAck, BlockCreate, BlockDelete, BlockRef, BlockSnapshot, BlockUpdate, Caller, ChatMessage,
     EndpointId, Op, Preview, QuotedBlock, Subscription, USER_ID, ops, subscriptions,
 };
+use vibevalley_protocol::{NativeEndpointId, native_ops};
 
 pub use block::spans_of;
 use entry::EntryChange;
@@ -1225,8 +1225,7 @@ impl Manager {
             }
             EndpointId::MediaAudioCleanup => {
                 let req: <ops::MediaAudioCleanup as Op>::Input = decode(payload)?;
-                self.media.audio_cleanup_async(&req.id).await?;
-                Ok(Value::Null)
+                ok_json(self.media.audio_cleanup_async(&req.id).await?)
             }
             EndpointId::MediaImageCreate => {
                 let req: <ops::MediaImageCreate as Op>::Input = decode(payload)?;
@@ -1258,8 +1257,7 @@ impl Manager {
             }
             EndpointId::MediaUnderstandingCleanup => {
                 let req: <ops::MediaUnderstandingCleanup as Op>::Input = decode(payload)?;
-                self.media.understanding_cleanup_async(&req.id).await?;
-                Ok(Value::Null)
+                ok_json(self.media.understanding_cleanup_async(&req.id).await?)
             }
             EndpointId::MediaJobGet => {
                 let req: <ops::MediaJobGet as Op>::Input = decode(payload)?;
@@ -1275,8 +1273,7 @@ impl Manager {
             }
             EndpointId::MediaJobRelease => {
                 let req: <ops::MediaJobRelease as Op>::Input = decode(payload)?;
-                self.media.release_async(&req.id).await?;
-                Ok(Value::Null)
+                ok_json(self.media.release_async(&req.id).await?)
             }
             EndpointId::MediaJobDownload => {
                 let req: <ops::MediaJobDownload as Op>::Input = decode(payload)?;
@@ -1509,7 +1506,7 @@ impl Manager {
             }
             other => Err(ApiError::new(
                 BizCode::RouteNotFound,
-                format!("artifact does not handle endpoint {}", other.op()),
+                format!("artifact does not handle endpoint {}", other.as_op()),
             )),
         }
     }

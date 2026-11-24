@@ -17,18 +17,18 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/server/src/content/media/jobs.rs` | 所有种类共用的一台任务机：表 `media_job`、收任务（八个在途）、按种类的执行槽、跑断了记未知、下载结果存成附件、跟厂商任务、取消、重取、释放、重启接续；生图与语音（含流式）两种 |
-| `crates/server/src/content/media/audio.rs` | 多人对白、音色设计、音色克隆、转写：各自向厂商要什么、怎么看，转写流边收边存，结束后删厂商那份上传 |
-| `crates/server/src/content/media/understanding.rs` | 图片／视频理解：上传、问一次、删上传；用户给助手的授权、到期与启动 |
-| `crates/server/src/content/media/remote.rs` | 任务传给厂商的文件：发出前先记在任务上，只由原账号删除 |
-| `crates/server/src/content/media/vendor.rs` | MOSS 的调用：每个请求经 `Fetch` 发出（测试替身照 MOSS 回答），不跟随重定向 |
-| `crates/server/src/content/media/png.rs`、`validate.rs` | PNG 校验、请求与格式校验 |
-| `crates/server/src/content/media/inputs.rs` | 输入预留、上传、任务保留与回收 |
-| `crates/server/src/infra/http.rs` | 下载与素材导入共用的公网 https 规则与 HTTP 客户端 |
-| `crates/server/src/content/library.rs` | 素材库：`list`、`add`、`remove`、`preview_remove`；听事实记下生成结果与聊天附件 |
-| `crates/server/src/transport/http/media.rs` | 本机二进制上传（`PUT /api/v1/media/input/:id/content`）与带范围的播放、语音流 |
-| `crates/server/src/team/tool/content.rs` | 助手与帮工的 `artifact_*`、`media_*`、`library_item_*` 工具 |
-| `crates/server/src/app/fakes/moss.rs` | 测试用的离线 MOSS 与下载 |
+| `crates/server/src/artifact/media/job.rs` | 所有种类共用的一台任务机：表 `media_job`、收任务（八个在途）、按种类的执行槽、跑断了记未知、下载结果存成附件、跟厂商任务、取消、重取、释放、重启接续；生图与语音（含流式）两种 |
+| `crates/server/src/artifact/media/audio.rs` | 多人对白、音色设计、音色克隆、转写：各自向厂商要什么、怎么看，转写流边收边存，结束后删厂商那份上传 |
+| `crates/server/src/artifact/media/understanding.rs` | 图片／视频理解：上传、问一次、删上传；用户给助手的授权、到期与启动 |
+| `crates/server/src/artifact/media/remote.rs` | 任务传给厂商的文件：发出前先记在任务上，只由原账号删除 |
+| `crates/server/src/artifact/media/vendor.rs` | MOSS 的调用：每个请求经 `Fetch` 发出（测试替身照 MOSS 回答），不跟随重定向 |
+| `crates/server/src/artifact/media/png.rs`、`validate.rs` | PNG 校验、请求与格式校验 |
+| `crates/server/src/storage/media_input.rs` | 输入预留、上传、任务保留与回收 |
+| `crates/server/src/context/http.rs` | 下载与素材导入共用的公网 https 规则与 HTTP 客户端 |
+| `crates/server/src/artifact/library.rs` | 素材库：`list`、`add`、`remove`、`preview_remove`；听事实记下生成结果与聊天附件 |
+| `crates/server/src/gateway/http/media.rs` | 本机二进制上传（`PUT /api/v1/media/input/:id/content`）与带范围的播放、语音流 |
+| `crates/server/src/agent/tool/content.rs` | 助手与帮工的 `artifact_*`、`media_*`、`library_item_*` 工具 |
+| `crates/server/src/fake/moss.rs` | 测试用的离线 MOSS 与下载 |
 | `crates/protocol/src/contract/media.rs`、`packages/protocol/src/media/` | 媒体任务、输入与素材库的形状和接口（Rust 为源，TS 形状由它生成） |
 | `apps/mac/ui/features/media/` | `/library` 浏览与媒体详情：单行筛选工具条（来源 `SourceFilter`、排序、缩略图档位、上传）、作品（含大纲笔记）/媒体卡片（`Tiles.tsx`）、原生文件详情栏（`Inspector.tsx`）与「生成」对话框；排法、计数、筛选与键盘落点在 `items.ts`、`libraryView.ts` 纯函数 |
 
@@ -63,7 +63,7 @@ PCM WAV 的元数据警告会转入 RIFF 结构校验：容器长度、chunk 边
 
 所有输入预留（包括失败的和被任务保留的）最多 256 条、按每条声明大小保守计入 2 GiB 配额；相同内容也各占一条预留。未保留的预留和文件在 24 小时后回收，每分钟检查一次，接受新预留前也先回收。删除先落 `deleting` 标记，再清它的暂存文件，最后删记录；附件的字节不删，别处可能也在用。删除失败保留标记供下次检查恢复。断线、取消和失败会关闭写入并清理临时文件；未能清理的部分文件归原输入 ID，预留继续占配额，清理成功前不能再次接收文件或删掉预留。发布前先记录预期哈希，数据库拒绝提交且文件回滚也失败时，完整文件同样仍有所属预留。一个输入的回收失败不阻塞其余输入。本机上传可以明确重试，和可能计费的厂商调用不是同一种重试。
 
-服务器用 SeaORM 在同一笔写事务内核对请求 ID 和在途配额、保留输入并登记任务。提交失败时，输入保留自动回滚。[媒体任务存储](crates/server/src/content/media/jobs.rs) · [媒体输入存储](crates/server/src/content/media/inputs.rs)。被保留的输入不按期限删除，也不能由用户单独删除。只有对应的保留者可以读它，读取前流式核对大小和哈希。文件丢失或内容损坏时标失败；修复只接受原内容，新内容必须新建输入。重复内容的发布也检查已有文件，损坏时用已核对的完整临时文件原子替换，不覆盖仍然完整的文件。
+服务器用 SeaORM 在同一笔写事务内核对请求 ID 和在途配额、保留输入并登记任务。提交失败时，输入保留自动回滚。[媒体任务存储](crates/server/src/artifact/media/job.rs) · [媒体输入存储](crates/server/src/storage/media_input.rs)。被保留的输入不按期限删除，也不能由用户单独删除。只有对应的保留者可以读它，读取前流式核对大小和哈希。文件丢失或内容损坏时标失败；修复只接受原内容，新内容必须新建输入。重复内容的发布也检查已有文件，损坏时用已核对的完整临时文件原子替换，不覆盖仍然完整的文件。
 
 重启把未结束的本机上传记为失败，清除暂存目录和没有记录引用的哈希文件；丢失文件的就绪记录改为失败。它不会自动重新读取用户的原始文件，更不会重传给厂商。
 
@@ -103,14 +103,14 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
 
 ## 素材库
 
-素材库（`crates/server/src/content/library.rs`，页面 `/library`）把用户关心的文件放在一处：生成的、用户上传的、帮工和助手拿回来的。一份素材是一个[附件](docs/subsystems/attachment.md)加上它的来路。在工作台里，`/library` 嵌套在统一二元内容中心 `ContentShell` 中，与作品共用左侧可折叠 `ContentSidebar`——侧栏收敛为顶部「全部最近」「置顶收藏」加 **「作品」（含置首的 `outline` 大纲笔记筛选与快捷新建及全部 8 种作品类型）+ 「素材」（4 种文件类型）** 二元结构，移除独立分裂的顶级「大纲笔记」大类以及底部与 `+ 新建` 重复的 `AI 生成素材` 按钮（侧栏展开时 `<Desk>` 顶栏也隐藏重复搜索/新建入口）。中间按当前桶展示作品卡（`ArtifactTiles`，单击直达 `/artifacts/:id`）和按比例排布的媒体网格（`Tiles`、`MakingTiles`），右侧为媒体详情栏（`Inspector`），生成的表单收在 `/library?make=…` 对话框里。
+素材库（`crates/server/src/artifact/library.rs`，页面 `/library`）把用户关心的文件放在一处：生成的、用户上传的、帮工和助手拿回来的。一份素材是一个[附件](docs/subsystems/attachment.md)加上它的来路。在工作台里，`/library` 嵌套在统一二元内容中心 `ContentShell` 中，与作品共用左侧可折叠 `ContentSidebar`——侧栏收敛为顶部「全部最近」「置顶收藏」加 **「作品」（含置首的 `outline` 大纲笔记筛选与快捷新建及全部 8 种作品类型）+ 「素材」（4 种文件类型）** 二元结构，移除独立分裂的顶级「大纲笔记」大类以及底部与 `+ 新建` 重复的 `AI 生成素材` 按钮（侧栏展开时 `<Desk>` 顶栏也隐藏重复搜索/新建入口）。中间按当前桶展示作品卡（`ArtifactTiles`，单击直达 `/artifacts/:id`）和按比例排布的媒体网格（`Tiles`、`MakingTiles`），右侧为媒体详情栏（`Inspector`），生成的表单收在 `/library?make=…` 对话框里。
 
 - **一份文件一张卡**：主键是附件的 id（内容的 SHA-256）。同一份字节再来只更新 `last_at`，来路照第一次的；生成的那条的时间不再变。
 - **来路是封闭的联合**（`LibraryOrigin`，按 `kind`）：
   - `generated`：媒体任务的 id 和种类；任务 `ready` 拿到附件时记，开机时按核心状态里已有的任务补齐。
   - `uploaded`：用户在聊天里发出带附件的话（记频道和消息），或在这页上传（两样都没有）。这页的上传是 `attachment.create` 再 `library.item.add({ attachment })`。
   - `fetched`：哪个档案、哪个帮工（会话）、从哪个网址或工作目录里的哪个文件。
-- **谁能给什么**：`library.item.add` 只收一种来源。经 HTTP 来的是用户，只能给已上传的附件；助手的工具只给网址，帮工的给网址或路径。网址只走公网 https（`infra/http.rs`），最大 `attachmentMax`（25 MB），60 秒；路径解析了符号链接以后仍要在工作目录里。
+- **谁能给什么**：`library.item.add` 只收一种来源。经 HTTP 来的是用户，只能给已上传的附件；助手的工具只给网址，帮工的给网址或路径。网址只走公网 https（`context/http.rs`），最大 `attachmentMax`（25 MB），60 秒；路径解析了符号链接以后仍要在工作目录里。
 - **拿掉只删这一条**：`library.item.delete` 不删附件，发过它的消息照样能打开。
 - **进行中任务实时对齐**：在做的生成任务读核心状态的 `media`，排在最前（麦色的虚线格）；完成的任务数一变，页面重读列表。
 - **搜排在服务端与统一弹窗，桶与来源筛选在页面**：`library.item.list` 按 `sort`（`recent`、`name`、`size`）列出素材，跨作品（含 `outline` 大纲笔记）与素材的统一检索由 `ContentSearchModal` 承接；页面内单行 `min-h-11` 工具条按正交 `SourceFilter`（全部 / 执行会话交付 / 我创建的）、排序与缩略图档位（`S/M/L`，媒体可见时显示）过滤当前桶（`items.ts`、`libraryView.ts`）。
@@ -118,7 +118,7 @@ Flash 流式由服务端请求厂商 SSE，从元数据与 PCM 分片生成有�
 - **缩略图按比例排满一行**（`justify`）：每行缩放到正好占满宽度，最后一行保持目标高度；比例夹在 1:2 到 3:1。缩略图的高度每个看的人自己记（`prefs` 的 `libraryTile`，96–280px）。每格按附件 id 绝对定位，排法变了格子不重建，图不会重载。图、视频的比例和像素、音频和视频的时长在它们加载后从元素上读。
 - **选和键盘**：点一下选一个，⌘/Ctrl 点加减，Shift 点选一段；← → 按顺序走，↑ ↓ 去上下一行中间最近的那格（`neighbor`）；空格全屏看（`Lightbox`，← → 翻）；Delete 在详情栏里原地问一遍再拿掉；Esc 不选。文件拖到页面上即可上传，带作品复合后缀的文件自动建为 Artifact。
 
-素材库收拢为单张 `media_library_item` 表（含 `source_job_id` 与软删标记 `removed_at` 及部分唯一索引，保留生成任务失败后的重试去重语义）。按附件标识保存首次来源，后续再次收到同一附件时只推进最近时间，生成任务标识与素材卡同时提交。列表先按选定的名称或大小排序，再按最近时间和附件标识排序。[素材库实体](crates/server/src/db/entities/content_library.rs) · [素材库服务](crates/server/src/content/library.rs)
+素材库收拢为单张 `media_library_item` 表（含 `source_job_id` 与软删标记 `removed_at` 及部分唯一索引，保留生成任务失败后的重试去重语义）。按附件标识保存首次来源，后续再次收到同一附件时只推进最近时间，生成任务标识与素材卡同时提交。列表先按选定的名称或大小排序，再按最近时间和附件标识排序。[素材库实体](crates/server/src/db/entity/media_library_item.rs) · [素材库服务](crates/server/src/artifact/library.rs)
 
 **素材库流转**
 

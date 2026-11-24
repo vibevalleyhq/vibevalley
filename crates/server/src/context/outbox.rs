@@ -242,15 +242,15 @@ mod tests {
     use super::*;
     use crate::service::outbox::{OUTBOX_STATUS_DONE, OUTBOX_STATUS_FAILED, OUTBOX_STATUS_PENDING};
 
-    fn test_service() -> (tempfile::TempDir, Arc<Service>) {
+    async fn test_service() -> (tempfile::TempDir, Arc<Service>) {
         let dir = tempfile::tempdir().unwrap();
-        let service = Service::open(dir.path()).unwrap();
+        let service = Service::open(dir.path()).await.unwrap();
         (dir, service)
     }
 
     #[tokio::test]
     async fn transactional_enqueue_commits_and_rolls_back_atomically_with_write_dirty() {
-        let (_dir, service) = test_service();
+        let (_dir, service) = test_service().await;
         let outbox = Arc::new(Outbox::new(service.clone()));
 
         let outbox_c = outbox.clone();
@@ -289,7 +289,7 @@ mod tests {
 
     #[tokio::test]
     async fn handler_failure_retries_with_exponential_backoff_and_succeeds_or_fails() {
-        let (_dir, service) = test_service();
+        let (_dir, service) = test_service().await;
         let outbox = Arc::new(Outbox::with_config(
             service.clone(),
             OutboxConfig {
@@ -360,7 +360,7 @@ mod tests {
 
     #[tokio::test]
     async fn task_group_bound_worker_recovers_processing_rows_dispatches_and_shuts_down() {
-        let (_dir, service) = test_service();
+        let (_dir, service) = test_service().await;
         let outbox = Arc::new(Outbox::with_config(
             service.clone(),
             OutboxConfig {

@@ -1,33 +1,29 @@
 use serde_json::{Value, json};
-use std::{io::Cursor, path::Path, sync::Arc};
+use std::{io::Cursor, path::Path};
 use vibevalley_protocol::{BizCode, Caller, MediaInputPhase, MediaInputRequest};
 use vibevalley_runtime::rt::block_on;
-use vibevalley_server::{
-    Hub,
-    content::{
-        attachment::AttachmentStore,
-        media::inputs::{self, MediaInputStore},
-    },
-};
+use vibevalley_server::{App, Config, Router, create_app_blocking};
+
 fn database(root: &Path) -> sqlx::SqliteConnection {
     use sqlx::ConnectOptions;
     block_on(sqlx::sqlite::SqliteConnectOptions::new().filename(root.join("server.db")).connect()).unwrap()
 }
 
-fn setup() -> (
-    tempfile::TempDir,
-    Arc<vibevalley_server::db::ServerDb>,
-    Arc<MediaInputStore>,
-    Arc<AttachmentStore>,
-    Arc<Hub>,
-) {
+fn app_at(dir: &Path) -> App {
+    create_app_blocking(Config {
+        probe_runtimes: false,
+        tick_crons: false,
+        link_previews: false,
+        orchestrator_listens: false,
+        ..Config::under(dir)
+    })
+    .unwrap()
+}
+
+fn setup() -> (tempfile::TempDir, App) {
     let dir = tempfile::tempdir().unwrap();
-    let db = vibevalley_server::db::ServerDb::open(dir.path()).unwrap();
-    let files = AttachmentStore::open(dir.path(), db.clone());
-    let inputs = MediaInputStore::open(dir.path(), db.clone(), files.clone()).unwrap();
-    let hub = Hub::new(vibevalley_core::empty_space_state());
-    inputs::install(&hub, inputs.clone());
-    (dir, db, inputs, files, hub)
+    let app = app_at(dir.path());
+    (dir, app)
 }
 fn request() -> MediaInputRequest {
     serde_json::from_value(json!({"kind":"image","mime":"image/png","name":"猫.png","size":24})).unwrap()
@@ -37,39 +33,46 @@ fn png() -> Vec<u8> {
     b.resize(24, 0);
     b
 }
-fn ok(h: &Hub, op: &str, p: Value) -> Value {
-    let e = h.call_as(Caller::User, op, p);
+fn ok(r: &Router, op: &str, p: Value) -> Value {
+    let e = r.call_as(Caller::User, op, p);
     assert_eq!(e.biz_code, 0, "{}", e.message);
     e.data.unwrap_or(Value::Null)
 }
 #[test]
 fn protocol_adopts_a_kept_attachment_and_delete_preserves_its_bytes() {
-    let (_dir, _db, inputs, files, hub) = setup();
+    let (_dir, app) = setup();
+    let files = &app.test_internals().storage.attachment;
+    let inputs = &app.test_internals().storage.media_input;
+    let router = app.router();
     let file = vibevalley_runtime::rt::block_on(files.keep_async(png(), "猫.png".into(), "image/png".into())).unwrap();
-    let r = ok(&hub, "media.input.adopt", json!({"attachment":file.id}));
+    let r = ok(router, "media.input.adopt", json!({"attachment":file.id}));
     assert_eq!(r["phase"], "ready");
     assert_eq!(r["hash"], file.id);
     let id = r["id"].as_str().unwrap();
-    assert_eq!(ok(&hub, "media.input.get", json!({"id":id})), r);
-    assert_eq!(ok(&hub, "media.input.list", Value::Null).as_array().unwrap().len(), 1);
-    assert_eq!(ok(&hub, "media.input.previewDelete", json!({"id":id}))["does"].as_array().unwrap().len(), 1);
+    assert_eq!(ok(router, "media.input.get", json!({"id":id})), r);
+    assert_eq!(ok(router, "media.input.list", Value::Null).as_array().unwrap().len(), 1);
+    assert_eq!(ok(router, "media.input.previewDelete", json!({"id":id}))["does"].as_array().unwrap().len(), 1);
     assert_eq!(
         std::fs::read(vibevalley_runtime::rt::block_on(inputs.content_async(id)).unwrap().path).unwrap(),
         png()
     );
-    ok(&hub, "media.input.delete", json!({"id":id}));
-    ok(&hub, "media.input.delete", json!({"id":id}));
+    ok(router, "media.input.delete", json!({"id":id}));
+    ok(router, "media.input.delete", json!({"id":id}));
     assert!(files.path_of(&file.id).is_file());
-    assert_eq!(ok(&hub, "media.input.previewDelete", json!({"id":id})), json!({"does":[]}));
+    assert_eq!(ok(router, "media.input.previewDelete", json!({"id":id})), json!({"does":[]}));
     assert_ne!(
-        hub.call_as(Caller::Orchestrator, "media.input.create", serde_json::to_value(request()).unwrap())
+        router
+            .call_as(Caller::Orchestrator, "media.input.create", serde_json::to_value(request()).unwrap())
             .biz_code,
         0
     );
+    app.close_blocking();
 }
 #[test]
 fn invalid_metadata_sizes_and_disguised_files_are_refused_and_upload_can_retry() {
-    let (_dir, _db, inputs, _, hub) = setup();
+    let (_dir, app) = setup();
+    let inputs = &app.test_internals().storage.media_input;
+    let router = app.router();
     for (field, value) in [
         ("size", json!(15)),
         ("size", json!(30_000_001)),
@@ -80,7 +83,7 @@ fn invalid_metadata_sizes_and_disguised_files_are_refused_and_upload_can_retry()
     ] {
         let mut r = serde_json::to_value(request()).unwrap();
         r[field] = value;
-        assert_eq!(hub.call_as(Caller::User, "media.input.create", r).biz_code, BizCode::MediaRefused.code());
+        assert_eq!(router.call_as(Caller::User, "media.input.create", r).biz_code, BizCode::MediaRefused.code());
     }
     let r = block_on(inputs.create_async(&request())).unwrap();
     for bytes in [vec![0; 24], png()[..20].to_vec(), vec![1; 25]] {
@@ -90,41 +93,55 @@ fn invalid_metadata_sizes_and_disguised_files_are_refused_and_upload_can_retry()
     let ready = block_on(inputs.upload_async(&r.id, Box::new(Cursor::new(png())))).unwrap();
     assert_eq!(ready.phase, MediaInputPhase::Ready);
     assert_eq!(block_on(inputs.upload_async(&r.id, Box::new(Cursor::new(Vec::<u8>::new())))).unwrap(), ready);
+    app.close_blocking();
 }
 #[test]
 fn pins_admission_rollback_expiry_and_restart() {
-    let (dir, db, inputs, files, _) = setup();
-    let r = block_on(inputs.create_async(&request())).unwrap();
-    block_on(inputs.upload_async(&r.id, Box::new(Cursor::new(png())))).unwrap();
-    let bad = block_on(inputs.pin_async(&[r.id.clone(), "missing".into()], "job"));
+    let (dir, app) = setup();
+    let r = block_on(app.test_internals().storage.media_input.create_async(&request())).unwrap();
+    block_on(app.test_internals().storage.media_input.upload_async(&r.id, Box::new(Cursor::new(png())))).unwrap();
+    let bad = block_on(app.test_internals().storage.media_input.pin_async(&[r.id.clone(), "missing".into()], "job"));
     assert!(bad.is_err());
-    assert!(block_on(inputs.get_async(&r.id)).unwrap().can_delete);
-    block_on(inputs.pin_async(&[r.id.clone(), r.id.clone()], "job")).unwrap();
-    assert!(!block_on(inputs.get_async(&r.id)).unwrap().can_delete);
-    assert!(block_on(inputs.delete_async(&r.id)).is_err());
+    assert!(block_on(app.test_internals().storage.media_input.get_async(&r.id)).unwrap().can_delete);
+    block_on(app.test_internals().storage.media_input.pin_async(&[r.id.clone(), r.id.clone()], "job")).unwrap();
+    assert!(!block_on(app.test_internals().storage.media_input.get_async(&r.id)).unwrap().can_delete);
+    assert!(block_on(app.test_internals().storage.media_input.delete_async(&r.id)).is_err());
     let mut conn = database(dir.path());
     block_on(sqlx::query("update media_input set expires_at=0").execute(&mut conn)).unwrap();
+    block_on(app.test_internals().storage.media_input.sweep_async()).unwrap();
+    assert!(block_on(app.test_internals().storage.media_input.content_async(&r.id)).is_ok());
+    app.close_blocking();
+
+    let restored = app_at(dir.path());
+    let inputs = &restored.test_internals().storage.media_input;
+    assert!(!block_on(inputs.get_async(&r.id)).unwrap().can_delete);
+    block_on(inputs.release_async("job")).unwrap();
+    assert!(block_on(inputs.content_async(&r.id)).is_err());
     block_on(inputs.sweep_async()).unwrap();
-    assert!(block_on(inputs.content_async(&r.id)).is_ok());
-    let restored = MediaInputStore::open(dir.path(), db.clone(), files.clone()).unwrap();
-    assert!(!block_on(restored.get_async(&r.id)).unwrap().can_delete);
-    block_on(restored.release_async("job")).unwrap();
-    assert!(block_on(restored.content_async(&r.id)).is_err());
-    block_on(restored.sweep_async()).unwrap();
-    assert!(block_on(restored.list_async()).unwrap().is_empty());
-    let interrupted = block_on(restored.create_async(&request())).unwrap();
+    assert!(block_on(inputs.list_async()).unwrap().is_empty());
+    let interrupted = block_on(inputs.create_async(&request())).unwrap();
     block_on(
         sqlx::query("update media_input set phase='uploading' where id=?1")
             .bind(&interrupted.id)
             .execute(&mut conn),
     )
     .unwrap();
-    let reopened = MediaInputStore::open(dir.path(), db, files).unwrap();
-    assert_eq!(block_on(reopened.get_async(&interrupted.id)).unwrap().phase, MediaInputPhase::Failed);
+    restored.close_blocking();
+
+    let reopened = app_at(dir.path());
+    assert_eq!(
+        block_on(reopened.test_internals().storage.media_input.get_async(&interrupted.id))
+            .unwrap()
+            .phase,
+        MediaInputPhase::Failed
+    );
+    reopened.close_blocking();
 }
 #[test]
 fn quota_and_corrupted_content() {
-    let (dir, _db, inputs, files, _) = setup();
+    let (dir, app) = setup();
+    let inputs = &app.test_internals().storage.media_input;
+    let files = &app.test_internals().storage.attachment;
     let mut r = request();
     r.kind = vibevalley_protocol::MediaInputKind::Audio;
     r.mime = "audio/wav".into();
@@ -147,7 +164,8 @@ fn quota_and_corrupted_content() {
 }
 #[test]
 fn active_upload_cannot_be_deleted_or_pinned() {
-    let (_dir, _db, inputs, _, _) = setup();
+    let (_dir, app) = setup();
+    let inputs = app.test_internals().storage.media_input.clone();
     let r = block_on(inputs.create_async(&request())).unwrap();
     struct Paused {
         entered: std::sync::mpsc::Sender<()>,
@@ -189,7 +207,8 @@ fn active_upload_cannot_be_deleted_or_pinned() {
 }
 #[test]
 fn audio_requires_more_than_a_container_header() {
-    let (_dir, _db, inputs, _, _) = setup();
+    let (_dir, app) = setup();
+    let inputs = &app.test_internals().storage.media_input;
     let mut r = request();
     r.kind = vibevalley_protocol::MediaInputKind::Audio;
     r.mime = "audio/wav".into();
@@ -228,8 +247,9 @@ fn audio_requires_more_than_a_container_header() {
 #[test]
 fn real_http_upload_preview_ranges_and_origin_checks() {
     let _ = rustls::crypto::ring::default_provider().install_default();
-    let (_dir, _db, inputs, _, hub) = setup();
-    let listener = vibevalley_server::transport::http::serve(hub, "127.0.0.1:0".parse().unwrap()).unwrap();
+    let (_dir, app) = setup();
+    let inputs = &app.test_internals().storage.media_input;
+    let listener = vibevalley_server::gateway::http::serve(app.server(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let client = reqwest::blocking::Client::builder().no_proxy().build().unwrap();
     let r = block_on(inputs.create_async(&request())).unwrap();
     let url = format!("{}/api/v1/media/input/{}/content", listener.url(), r.id);
@@ -293,7 +313,8 @@ fn real_http_upload_preview_ranges_and_origin_checks() {
 
 #[test]
 fn failed_promotion_keeps_hash_and_refuses_changed_retry() {
-    let (dir, _db, inputs, _, _) = setup();
+    let (dir, app) = setup();
+    let inputs = &app.test_internals().storage.media_input;
     let r = block_on(inputs.create_async(&request())).unwrap();
     let mut db = database(dir.path());
     block_on(sqlx::raw_sql("create trigger fail_attachment before insert on attachment begin select raise(abort, 'disk failure'); end;").execute(&mut db))
@@ -314,26 +335,33 @@ fn failed_promotion_keeps_hash_and_refuses_changed_retry() {
 
 #[test]
 fn regression_native_media_paths_stream_validated_files_and_refuse_other_callers() {
-    let (dir, _db, inputs, _, hub) = setup();
+    let (dir, app) = setup();
+    let inputs = &app.test_internals().storage.media_input;
+    let router = app.router();
     let file = dir.path().join("sample.png");
     std::fs::write(&file, png()).unwrap();
     let reserved = block_on(inputs.create_async(&request())).unwrap();
     for caller in [Caller::Orchestrator, Caller::Remote] {
-        assert_ne!(hub.call_as(caller, "media.input.uploadFile", json!({"id":reserved.id,"path":file})).biz_code, 0);
+        assert_ne!(
+            router.call_as(caller, "media.input.uploadFile", json!({"id":reserved.id,"path":file})).biz_code,
+            0
+        );
     }
     assert!(block_on(inputs.upload_file_async(&reserved.id, Path::new("relative.png").to_path_buf())).is_err());
     assert!(block_on(inputs.upload_file_async(&reserved.id, dir.path().to_path_buf())).is_err());
-    let ready = ok(&hub, "media.input.uploadFile", json!({"id":reserved.id,"path":file}));
+    let ready = ok(router, "media.input.uploadFile", json!({"id":reserved.id,"path":file}));
     assert_eq!(ready["phase"], "ready");
-    let stored = ok(&hub, "media.input.file", json!({"id":reserved.id}));
+    let stored = ok(router, "media.input.file", json!({"id":reserved.id}));
     assert_eq!(std::fs::read(stored["path"].as_str().unwrap()).unwrap(), png());
     std::fs::write(stored["path"].as_str().unwrap(), b"changed").unwrap();
-    assert_ne!(hub.call_as(Caller::User, "media.input.file", json!({"id":reserved.id})).biz_code, 0);
+    assert_ne!(router.call_as(Caller::User, "media.input.file", json!({"id":reserved.id})).biz_code, 0);
+    app.close_blocking();
 }
 
 #[test]
 fn regression_list_reads_without_write_lock_during_concurrent_transaction() {
-    let (dir, _db, inputs, _, _) = setup();
+    let (dir, app) = setup();
+    let inputs = &app.test_internals().storage.media_input;
     let ready = block_on(inputs.create_async(&request())).unwrap();
     block_on(inputs.upload_async(&ready.id, Box::new(Cursor::new(png())))).unwrap();
     block_on(inputs.pin_async(std::slice::from_ref(&ready.id), "job-1")).unwrap();

@@ -6,7 +6,7 @@ use parking_lot::Mutex;
 use serde::Serialize;
 use tokio_util::sync::CancellationToken;
 use vibevalley_protocol::MediaSpeechEvent;
-use vibevalley_server::transport::api::media::{SharedSpeechStreams, SpeechClaim};
+use vibevalley_server::gateway::api::media::{SharedSpeechStreams, SpeechClaim};
 
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]

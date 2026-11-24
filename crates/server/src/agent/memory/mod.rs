@@ -615,7 +615,7 @@ pub fn found_text(result: &MemorySearch, agent: &str, repo: &str, text: &str) ->
 mod tests {
     use std::time::Duration;
 
-    use vibevalley_protocol::{Session, SessionLastRun};
+    use vibevalley_protocol::{LastRun, Session};
 
     use super::*;
     use crate::context::{Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
@@ -659,11 +659,14 @@ mod tests {
             1,
         );
         ws.brief = "workspace chat".into();
-        ws.last_run = Some(SessionLastRun {
+        ws.runs = 1;
+        ws.last_run = Some(LastRun {
+            needs_reconciliation: false,
             outcome: Outcome::Completed,
             at: 2,
             summary: "workspace reply".into(),
-            runs: 1,
+            spent: None,
+            answer: None,
         });
         memories.keep_session_reported_async(&ws).await;
 
@@ -685,11 +688,14 @@ mod tests {
             refining: None,
         });
         worker.brief = "fix bug".into();
-        worker.last_run = Some(SessionLastRun {
+        worker.runs = 1;
+        worker.last_run = Some(LastRun {
+            needs_reconciliation: false,
             outcome: Outcome::Completed,
             at: 4,
             summary: "fixed it".into(),
-            runs: 1,
+            spent: None,
+            answer: None,
         });
         memories.keep_session_reported_async(&worker).await;
 
@@ -849,7 +855,7 @@ mod tests {
             eprintln!("skipping postgres memory dual-db test: Homebrew initdb/pg_ctl not found");
             return;
         };
-        pg.create_database("team_memory_dual");
+        pg.create_database("team_memory_dual").await;
         let pg_home = tempfile::tempdir().unwrap();
         let pg_service = Service::open_url(&pg.db_url("team_memory_dual")).await.unwrap();
         verify_memory_dual_db(pg_service.clone(), pg_home.path(), DbBackend::Postgres).await;

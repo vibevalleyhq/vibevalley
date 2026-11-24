@@ -14,25 +14,24 @@ fn notes_are_kept_searched_recalled_and_forgotten() {
     let dir = tempfile::tempdir().unwrap();
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let app = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         link_previews: false,
         tick_crons: false,
         orchestrator_listens: false,
-        ..vibevalley_server::ServerConfig::under(dir.path())
+        ..vibevalley_server::Config::under(dir.path())
     })
     .unwrap();
-    let hub = started.hub.clone();
-    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+    let call = |op: &str, p: Value| app.router().call_as(Caller::User, op, p);
     let ok = |op: &str, p: Value| {
         let e = call(op, p);
         assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
         e.data.unwrap_or(Value::Null)
     };
-    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = app.test_internals().agent.profile.store.install_template("reviewer").unwrap();
     helper.runtime = "scripted".into();
-    let helper = started.test_internals().agents.profiles.save(helper).unwrap();
+    let helper = app.test_internals().agent.profile.store.save(helper).unwrap();
     let a = helper.id.as_str();
 
     let empty = call("memory.create", json!({ "agent": a, "text": "   " }));
@@ -62,19 +61,18 @@ fn notes_are_kept_searched_recalled_and_forgotten() {
     let issue = ok("issue.create", json!({ "title": "say hello", "repo": "farm", "agent": a }));
     let id = issue["id"].as_str().unwrap().to_string();
     ok("issue.status.update", json!({ "id": id, "status": "todo" }));
-    let session = crate::support::wait_until_transition(&hub, Duration::from_secs(30), "the session", || {
-        started
-            .test_internals()
-            .board
-            .read(|s| s.sessions.iter().find(|x| x.issue_id() == Some(id.as_str())).cloned())
+    let session = crate::support::wait_until_transition(app.ctx(), Duration::from_secs(30), "the session", || {
+        crate::support::board_sessions(app.test_internals().board)
+            .into_iter()
+            .find(|x| x.issue_id() == Some(id.as_str()))
     });
-    let asked = crate::support::wait_until_live(&hub, Duration::from_secs(30), "the first words", || {
+    let asked = crate::support::wait_until_live(app.ctx(), Duration::from_secs(30), "the first words", || {
         let events = ok("session.event.list", json!({ "id": session.id }));
         let text = events.to_string();
         text.contains("say hello").then_some(text)
     });
     assert!(asked.contains("【你记得的】") && asked.contains("cargo test"), "{asked}");
-    crate::support::wait_until_settled(Some(&hub), Duration::from_secs(30), "the issue memory", || {
+    crate::support::wait_until_settled(Some(app.ctx()), Duration::from_secs(30), "the issue memory", || {
         let listed = ok("memory.list", json!({ "agent": a }));
         listed["memories"].as_array()?.iter().find(|m| m["kind"] == "issue").cloned()
     });
@@ -85,37 +83,43 @@ fn notes_are_kept_searched_recalled_and_forgotten() {
     ok("memory.delete", json!({ "agent": a, "memory": mid }));
     let gone = call("memory.delete", json!({ "agent": a, "memory": mid }));
     assert_eq!(gone.biz_code, BizCode::MemoryNotFound.code());
-    started.test_internals().board.close();
+    app.close_blocking();
 }
 
 #[test]
 fn regression_replacing_an_agents_notes_rolls_back_the_entire_set() {
-    use vibevalley_server::team::memory::{By, Note};
+    use vibevalley_server::agent::memory::{By, Note};
     let home = tempfile::tempdir().unwrap();
-    let server = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let app = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
-        ..vibevalley_server::ServerConfig::under(home.path())
+        ..vibevalley_server::Config::under(home.path())
     })
     .unwrap();
-    let notes = &server.test_internals().memories;
-    for (text, by) in [("Keep my preference", By::User), ("Previous note", By::Orchestrator)] {
-        notes
-            .write(&Note {
-                agent: "helper".into(),
-                text: text.into(),
-                repo: String::new(),
-                by,
-            })
-            .unwrap();
-    }
-    let before = notes.list("helper").unwrap();
-    let bad = notes.rewrite("helper", &["Partial note".into(), "  ".into()], By::Orchestrator).unwrap_err();
-    assert_eq!(bad.biz_code, BizCode::MemoryRefused);
-    assert_eq!(notes.list("helper").unwrap(), before);
-    notes.rewrite("helper", &["Replacement".into()], By::Orchestrator).unwrap();
-    let after: Vec<_> = notes.list("helper").unwrap().into_iter().map(|note| note.text).collect();
-    assert_eq!(after, ["Replacement", "Keep my preference"]);
-    server.close();
+    let notes = &app.test_internals().agent.memory;
+    crate::support::block_on(async {
+        for (text, by) in [("Keep my preference", By::User), ("Previous note", By::Orchestrator)] {
+            notes
+                .write_async(&Note {
+                    agent: "helper".into(),
+                    text: text.into(),
+                    repo: String::new(),
+                    by,
+                })
+                .await
+                .unwrap();
+        }
+        let before = notes.list_async("helper").await.unwrap();
+        let bad = notes
+            .rewrite_async("helper", &["Partial note".into(), "  ".into()], By::Orchestrator)
+            .await
+            .unwrap_err();
+        assert_eq!(bad.biz_code, BizCode::MemoryRefused);
+        assert_eq!(notes.list_async("helper").await.unwrap(), before);
+        notes.rewrite_async("helper", &["Replacement".into()], By::Orchestrator).await.unwrap();
+        let after: Vec<_> = notes.list_async("helper").await.unwrap().into_iter().map(|note| note.text).collect();
+        assert_eq!(after, ["Replacement", "Keep my preference"]);
+    });
+    app.close_blocking();
 }

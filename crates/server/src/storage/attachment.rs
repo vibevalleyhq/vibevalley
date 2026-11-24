@@ -378,7 +378,7 @@ mod tests {
                 mime: None,
             })
             .await;
-        assert_eq!(rel.unwrap_err().biz_code, BizCode::InvalidInput.code());
+        assert_eq!(rel.unwrap_err().biz_code, BizCode::InvalidInput);
 
         let subdir = dir.path().join("folder");
         std::fs::create_dir_all(&subdir).expect("mkdir");
@@ -389,7 +389,7 @@ mod tests {
                 mime: None,
             })
             .await;
-        assert_eq!(dir_res.unwrap_err().biz_code, BizCode::AttachmentRefused.code());
+        assert_eq!(dir_res.unwrap_err().biz_code, BizCode::AttachmentRefused);
 
         let empty = dir.path().join("empty.txt");
         std::fs::write(&empty, b"").expect("write empty");
@@ -400,7 +400,7 @@ mod tests {
                 mime: None,
             })
             .await;
-        assert_eq!(empty_res.unwrap_err().biz_code, BizCode::AttachmentRefused.code());
+        assert_eq!(empty_res.unwrap_err().biz_code, BizCode::AttachmentRefused);
 
         #[cfg(unix)]
         {
@@ -415,7 +415,7 @@ mod tests {
                     mime: None,
                 })
                 .await;
-            assert_eq!(link_res.unwrap_err().biz_code, BizCode::AttachmentRefused.code());
+            assert_eq!(link_res.unwrap_err().biz_code, BizCode::AttachmentRefused);
         }
 
         let custom = dir.path().join("blob");

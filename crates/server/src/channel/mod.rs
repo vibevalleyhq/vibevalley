@@ -29,8 +29,9 @@ use std::sync::{Arc, Weak};
 use arc_swap::{ArcSwap, Guard as SnapshotGuard};
 use parking_lot::{Mutex, RwLock};
 use tokio::sync::{Mutex as AsyncMutex, MutexGuard as AsyncMutexGuard, broadcast};
+use vibevalley_core::SliceMask;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, BizCode, BlockRef, ChatMessage, DEFAULT_ORCHESTRATOR, Embed, QuotedBlock, SliceMask, SubjectKind, USER_ID, UserMention};
+use vibevalley_protocol::{ApiError, BizCode, BlockRef, ChatMessage, DEFAULT_ORCHESTRATOR, Embed, QuotedBlock, SubjectKind, USER_ID, UserMention};
 
 use self::dispatch::Reach;
 use self::model::{ChatModel, Q, WriteTx};
@@ -205,8 +206,8 @@ impl Chat {
         out
     }
 
-    /// Projects the channel list + user mentions bundle for `SliceMask::COLLAB` / `state.get`.
-    pub async fn slice_chat_async(&self) -> Result<vibevalley_protocol::Chat, ApiError> {
+    /// Projects committed channels snapshot for `SliceMask::BOARD` and diagnostics.
+    pub async fn channels_snapshot_async(&self) -> Result<Vec<vibevalley_protocol::Channel>, ApiError> {
         let model = self.model();
         let channels_svc = &self.ctx.service.channel;
         let mut recent = channels_svc.recent_channels(KEEP_CHANNELS).await.q()?;
@@ -221,6 +222,12 @@ impl Chat {
             }
             channels.push(ch);
         }
+        Ok(channels)
+    }
+
+    /// Projects the channel list + user mentions bundle for `SliceMask::COLLAB` / `state.get`.
+    pub async fn slice_chat_async(&self) -> Result<vibevalley_protocol::Chat, ApiError> {
+        let channels = self.channels_snapshot_async().await?;
         let user_mentions = self.user_mentions_snapshot_async().await?;
         Ok(vibevalley_protocol::Chat { channels, user_mentions })
     }

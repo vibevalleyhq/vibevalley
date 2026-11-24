@@ -23,7 +23,7 @@
 | OpenCode、Grok、Kimi、CodeBuddy | ACP 协商会话、模型、推理强度和工具。OpenCode、Grok 支持中途插话；Kimi 和 CodeBuddy 的工作规则随首条输入发送。 | 新会话累计已报告用量；恢复会话缺少可查的历史基线，标记未知。 |
 | Qwen Code、Qoder | SDK stream-json。Qwen 首个输入帧是 `initialize`，Qoder 的提示和 MCP 配置经私有文件传入。厂商 ID 到达后写回业务会话，供下一轮续接。 | 平面用量按轮累加；Qoder 缺少用量字段时保留未知。 |
 
-工单只按根轮已报告的输入与输出 token 之和结算。轮次、最后一次汇报和工单时间线共用该结果。输入或输出缺失时省略 `spent`。子线程单独归属，USD 成本留在驱动记录。累计数缺少上一轮边界时，服务等到下一对完整读数再算增量。[用量归约](crates/runtime/src/oar/accounting.rs) · [工单结算](crates/server/src/work/session/sessions.rs)
+工单只按根轮已报告的输入与输出 token 之和结算。轮次、最后一次汇报和工单时间线共用该结果。输入或输出缺失时省略 `spent`。子线程单独归属，USD 成本留在驱动记录。累计数缺少上一轮边界时，服务等到下一对完整读数再算增量。[用量归约](crates/runtime/src/oar/accounting.rs) · [工单结算](crates/server/src/runtime/session/engine.rs)
 
 每个 `oar-voyage/3` JSONL 文件先写头，再写带序号、厂商会话 ID、轮次跨度和子 agent 路径的记录。原生进程帧、控制回执和生命周期标记分开存放。消费者可从已有序号订阅后续记录；同一路径重开时续写文件序号。[运行时接口](crates/runtime/src/oar/mod.rs) · [记录格式](crates/runtime/src/oar/voyage.rs)
 
@@ -31,7 +31,7 @@
 
 ## Codex 子线程的进度
 
-服务端按业务轮次和厂商线程保存摘要。`session.get` 和核心帧返回当前摘要，`issue.run.list` 返回各轮的摘要。工作日志保留最近 240 步。用户重开工单后仍可查看已移出日志的子任务。[服务端归约](crates/server/src/work/session/subagents.rs) · [重启回归](crates/server/tests/session/subagent_progress.rs)
+服务端按业务轮次和厂商线程保存摘要。`session.get` 和核心帧返回当前摘要，`issue.run.list` 返回各轮的摘要。工作日志保留最近 240 步。用户重开工单后仍可查看已移出日志的子任务。[服务端归约](crates/server/src/runtime/session/subagent.rs) · [重启回归](crates/server/tests/session/subagent_progress.rs)
 
 创建者取自派出事件或线程元数据。等待记录以等待者和调用标识区分。Codex 等待协作邮箱时可以省略目标。此时工作台显示「等待协作消息」。厂商只提供路径时，工作台显示路径。计划步骤和终态取自厂商事件。[真实 CLI 通知样本](crates/runtime/tests/fixtures/codex-0.170.0-collaboration.json)
 
@@ -41,14 +41,14 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/server/src/work/session/sessions.rs`、`gen_table.rs`、`mailbox.rs`、`db.rs` | `Sessions`：领域无关 `AgentSession` 核心，管创建/雇佣（`hire`）、下一轮（`next_round`）、插话（`steer`）、叫停（`stop`）、放走（`dismiss`，worktree 交给 `Workplace` 收拾）、把农机事件读成事实、结算一轮、静默检测、帮工 `/mcp` 钥匙、受 `loom` 验证的代次表 `SessionGenerationTable<V>`（[gen_table.rs](crates/server/src/work/session/gen_table.rs)）与持久 SQLite 信箱 `session_mailbox`（`mailbox.rs`，按 `idempotency_key` 去重并支持消费前撤回）；重启时把在干活的会话记成打断；并发上限在 `BoardConfig`（`ledger.rs`：`space_limit` 6、`per_repo` 3、`quiet_after` 240 秒），仅对工单受控会话计槽位 |
-| `crates/server/src/work/session/report.rs`、`runs.rs` | 一轮末尾的结构化汇报；每张工单的各轮 |
-| `crates/server/src/work/session/talk.rs` | 私聊会话：绑定频道的 `AgentSession`，在独立目录里一轮一轮答，答的话经 `SessionChat` 贴进私聊 |
-| `crates/server/src/work/session/workspace.rs` | 工作区直连对话会话（`open_workspace`、`close_workspace`、`send_workspace`、`respond_permission`、`respond_interaction`、`set_workspace_config`、`swarm_snapshot`、`read_child_transcript`、`session_title`）：作为 `controller: User` 的 `AgentSession` 统一落盘 `server.db` 的 `session` / `session_mailbox` / `session_event` 表，不占工单板并发上限、不进收件箱与像素农场 |
-| `crates/server/src/work/session/drivers.rs`、`crates/server/src/team/agent/drive.rs` | 把工单指派的档案变成农机和启动参数（规矩、人设、记性、MCP） |
-| `crates/server/src/work/session/journal.rs` | 游标分页轨迹：每个会话的步骤落盘 `session_event` 表（按 `(session_id, seq)` 索引，实体位于 `crates/server/src/db/entities/work_session.rs`），变化时每 300 毫秒推一次、每 1.5 秒刷盘；权限、交互提问与用量步骤立即刷盘 |
-| `crates/server/src/work/session/mod.rs` | 全部 `session.*` 端点通过 `Hub::on_async` 注册为原生异步处理器（`list`、`get`、`event.list`、`stop`、`openWorkspace`、`closeWorkspace`、`send`、`respondPermission`、`respondInteraction`、`setConfig`、`childTranscript`、`binding.attach`、`binding.detach`），并提供 `issue.watch` / `session.watch` 订阅流（按 `SessionsSlice` 与事件驱动同步 `title` 与 `swarm` 增量） |
-| `crates/server/src/team/mcp/mod.rs` | 帮工的 `/mcp` 门：JSON-RPC，令牌由工单板开帮工时签发（`Board::who` 认人），工具是农场的帮工工具（[工具](docs/subsystems/orchestrator.md)） |
+| `crates/server/src/runtime/session/engine.rs`、`gen_table.rs`、`mailbox.rs`、`db.rs` | `Sessions`：领域无关 `AgentSession` 核心，管创建/雇佣（`hire`）、下一轮（`next_round`）、插话（`steer`）、叫停（`stop`）、放走（`dismiss`，worktree 交给 `Workplace` 收拾）、把农机事件读成事实、结算一轮、静默检测、帮工 `/mcp` 钥匙、受 `loom` 验证的代次表 `SessionGenerationTable<V>`（[gen_table.rs](crates/server/src/runtime/session/gen_table.rs)）与持久 SQLite 信箱 `session_mailbox`（`mailbox.rs`，按 `idempotency_key` 去重并支持消费前撤回）；重启时把在干活的会话记成打断；并发上限在 `BoardConfig`（`ledger.rs`：`space_limit` 6、`per_repo` 3、`quiet_after` 240 秒），仅对工单受控会话计槽位 |
+| `crates/server/src/runtime/session/report.rs`、`runs.rs` | 一轮末尾的结构化汇报；每张工单的各轮 |
+| `crates/server/src/runtime/session/talk.rs` | 私聊会话：绑定频道的 `AgentSession`，在独立目录里一轮一轮答，答的话经 `SessionChat` 贴进私聊 |
+| `crates/server/src/runtime/session/workspace.rs` | 工作区直连对话会话（`open_workspace`、`close_workspace`、`send_workspace`、`respond_permission`、`respond_interaction`、`set_workspace_config`、`swarm_snapshot`、`read_child_transcript`、`session_title`）：作为 `controller: User` 的 `AgentSession` 统一落盘 `server.db` 的 `session` / `session_mailbox` / `session_event` 表，不占工单板并发上限、不进收件箱与像素农场 |
+| `crates/server/src/runtime/session/driver.rs`、`crates/server/src/agent/profile/drive.rs` | 把工单指派的档案变成农机和启动参数（规矩、人设、记性、MCP） |
+| `crates/server/src/runtime/session/journal.rs` | 游标分页轨迹：每个会话的步骤落盘 `session_event` 表（按 `(session_id, seq)` 索引，实体位于 `crates/server/src/db/entity/session.rs`），变化时每 300 毫秒推一次、每 1.5 秒刷盘；权限、交互提问与用量步骤立即刷盘 |
+| `crates/server/src/runtime/session/mod.rs` | 全部 `session.*` 端点通过 `Hub::on_async` 注册为原生异步处理器（`list`、`get`、`event.list`、`stop`、`openWorkspace`、`closeWorkspace`、`send`、`respondPermission`、`respondInteraction`、`setConfig`、`childTranscript`、`binding.attach`、`binding.detach`），并提供 `issue.watch` / `session.watch` 订阅流（按 `SessionsSlice` 与事件驱动同步 `title` 与 `swarm` 增量） |
+| `crates/server/src/agent/mcp/mod.rs` | 帮工的 `/mcp` 门：JSON-RPC，令牌由工单板开帮工时签发（`Board::who` 认人），工具是农场的帮工工具（[工具](docs/subsystems/orchestrator.md)） |
 | `crates/runtime/src/oar/` | 驱动各家农机：`claude.rs`、`codex.rs`、`acp/`（`mod.rs`、`turn_state.rs` 位打包原子状态机 `AcpTurnMachine`、`antigravity.rs`、`antigravity_db.rs`、`antigravity_swarm.rs`）、`sdk.rs`、`scripted.rs`；`record.rs`、`voyage.rs` 是 `oar-voyage/3` JSONL 记录流（内置农机在 `crates/runtime/src/agent/runtime/mod.rs`），`core.rs` 预留关闭态零开销的全局 `OarObserver` 钩子并支持 `TurnOptions { trace_id }` 透传（写入 `traceId`） |
 
 ## 模型和不变量

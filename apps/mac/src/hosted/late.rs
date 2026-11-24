@@ -15,10 +15,12 @@ use vibevalley_server::SliceSubscription;
 use vibevalley_server::gateway::api::{BoxFuture, GatewayPorts, refusal};
 use vibevalley_server::gateway::bridge::{BizCode, CallerContext, Envelope, LiveEvent, Server, SliceKind};
 
+type ReadyNotifier = Arc<Mutex<Option<(watch::Sender<bool>, flume::Sender<()>)>>>;
+
 #[derive(Clone)]
 pub struct LateServer {
     cell: Arc<OnceLock<Arc<dyn Server>>>,
-    ready_tx: Arc<Mutex<Option<(watch::Sender<bool>, flume::Sender<()>)>>>,
+    ready_tx: ReadyNotifier,
     ready: watch::Receiver<bool>,
     ready_flume: flume::Receiver<()>,
 }

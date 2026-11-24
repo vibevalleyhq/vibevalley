@@ -15,11 +15,11 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/server/src/team/orchestrator/mod.rs` | `Orchestrator`：每个助手档案一个 `vibevalley-runtime::agent` 的持久对话（SQLite 队列与 `Harness`，并配置 `record_to` 写出 `<家目录>/records/<id>.jsonl` 的 `oar-voyage/3` 记录），消费频道异步投递（`Chat::dispatches()`）和没指定档案的定时任务，拼现状、跑一轮、把回复写回频道 |
-| `crates/server/src/team/orchestrator/words.rs` | 对助手说的话：来源头、现状与增量、长汇报截断；提示在 `crates/server/assets/orchestrator/prompts.json`（含 `chart` 与 `genui` 富内容块规范） |
-| `crates/server/src/team/tool/mod.rs` | 助手和帮工共用的工具：每个工具一个参数结构体，宽松解析写一处，按调用者分支；工具名、说明与 JSON Schema 在 `crates/server/assets/tools/orchestrator.json`、`crates/server/assets/tools/helper.json` |
-| `crates/server/src/team/tool/issue.rs`、`chat.rs`、`content.rs`、`plan.rs`、`memory.rs` | 按领域分的工具：工单与帮工、频道、Artifact（含 `artifact_block_list`、`artifact_block_batch`、`artifact_outline_import`）与媒体、仓库与定时任务、记性 |
-| `crates/server/src/team/mcp/resource.rs` | `resource_read`：解析 `vv://` URI，按会话裁剪只读权限、分页 |
+| `crates/server/src/agent/orchestrator/mod.rs` | `Orchestrator`：每个助手档案一个 `vibevalley-runtime::agent` 的持久对话（SQLite 队列与 `Harness`，并配置 `record_to` 写出 `<家目录>/records/<id>.jsonl` 的 `oar-voyage/3` 记录），消费频道异步投递（`Chat::dispatches()`）和没指定档案的定时任务，拼现状、跑一轮、把回复写回频道 |
+| `crates/server/src/agent/orchestrator/words.rs` | 对助手说的话：来源头、现状与增量、长汇报截断；提示在 `crates/server/assets/orchestrator/prompts.json`（含 `chart` 与 `genui` 富内容块规范） |
+| `crates/server/src/agent/tool/mod.rs` | 助手和帮工共用的工具：每个工具一个参数结构体，宽松解析写一处，按调用者分支；工具名、说明与 JSON Schema 在 `crates/server/assets/tools/orchestrator.json`、`crates/server/assets/tools/helper.json` |
+| `crates/server/src/agent/tool/issue.rs`、`chat.rs`、`content.rs`、`plan.rs`、`memory.rs` | 按领域分的工具：工单与帮工、频道、Artifact（含 `artifact_block_list`、`artifact_block_batch`、`artifact_outline_import`）与媒体、仓库与定时任务、记性 |
+| `crates/server/src/agent/mcp/resource.rs` | `resource_read`：解析 `vv://` URI，按会话裁剪只读权限、分页 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`orchestrator.*`）。
 
@@ -43,7 +43,7 @@
 
 工具策略要求确认时，执行器保存待批调用并暂停该任务。用户在助手的「执行轨迹」里核对工具名、参数与审批原因，也可以用 `vibevalley orchestrator approval list --json` 找到调用。CLI 的 `orchestrator approval resolve` 接收对话 ID、任务 ID、工具调用 ID 和 `approve` 或 `deny`。工作台和 CLI 使用同一条 Rust 审批契约。
 
-执行器在同一个 SQLite 事务中核对三个 ID、记录决定和唤醒信号，并清除待批项。同一决定可重试。重试上一张审批卡只会读回上一笔决定，即使同一任务已有下一项待批调用。[审批端点](crates/server/src/team/orchestrator/execution.rs) · [决策事务](crates/runtime/src/agent/extensions/governance.rs)
+执行器在同一个 SQLite 事务中核对三个 ID、记录决定和唤醒信号，并清除待批项。同一决定可重试。重试上一张审批卡只会读回上一笔决定，即使同一任务已有下一项待批调用。[审批端点](crates/server/src/agent/orchestrator/execution.rs) · [决策事务](crates/runtime/src/agent/extensions/governance.rs)
 
 ## 怎么走
 

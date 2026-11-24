@@ -10,7 +10,7 @@ use serde_json::json;
 use vibevalley_runtime::oar::scripted::{Script, ScriptedRuntime, Step, TurnAsk};
 use vibevalley_runtime::oar::{EventKind, Runtime};
 
-pub fn configure(config: &mut crate::ServerConfig, model_port: Option<&str>) {
+pub fn configure(config: &mut crate::Config, model_port: Option<&str>) {
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(helper());
     config.registry = Some(Arc::new(registry));

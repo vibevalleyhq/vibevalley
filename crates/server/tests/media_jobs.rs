@@ -8,10 +8,8 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio_util::sync::CancellationToken;
-use vibevalley_server::{
-    Server,
-    infra::http::{Fetch, FetchError, Request, Response},
-};
+use vibevalley_server::context::{Fetch, FetchError, Request, Response};
+use vibevalley_server::{BoxFuture, Server as _};
 
 struct Backend {
     generations: AtomicUsize,
@@ -32,69 +30,65 @@ impl Backend {
 struct VendorFetch(Arc<Backend>);
 
 impl Fetch for VendorFetch {
-    fn fetch(&self, r: Request) -> Result<Response, FetchError> {
-        self.fetch_with_cancel(r, CancellationToken::new())
-    }
-
-    fn fetch_with_cancel(&self, _r: Request, cancel: CancellationToken) -> Result<Response, FetchError> {
-        self.0.generations.fetch_add(1, Ordering::SeqCst);
-        match self.0.mode {
-            "wait" => {
-                vibevalley_runtime::rt::block_on(cancel.cancelled());
-                Err(FetchError::Network("cancelled".into()))
-            }
-            "reject" => Ok(Response {
-                status: 400,
-                headers: vec![("content-type".into(), "application/json".into())],
-                body: Box::new(Cursor::new(br#"{"error":{"code":"invalid_request"}}"#.to_vec())),
-            }),
-            "unknown" => Ok(Response {
-                status: 503,
-                headers: vec![],
-                body: Box::new(std::io::empty()),
-            }),
-            _ => {
-                let body = json!({
-                    "created": 1,
-                    "data": [{ "url": "https://example.com/result.png?signed=secret" }],
-                    "usage": { "generated_images": 1, "output_width": 256, "output_height": 256 }
-                })
-                .to_string()
-                .into_bytes();
-                Ok(Response {
-                    status: 200,
+    fn fetch_async(self: Arc<Self>, _r: Request, cancel: CancellationToken) -> BoxFuture<'static, Result<Response, FetchError>> {
+        Box::pin(async move {
+            self.0.generations.fetch_add(1, Ordering::SeqCst);
+            match self.0.mode {
+                "wait" => {
+                    cancel.cancelled().await;
+                    Err(FetchError::Network("cancelled".into()))
+                }
+                "reject" => Ok(Response {
+                    status: 400,
                     headers: vec![("content-type".into(), "application/json".into())],
-                    body: Box::new(Cursor::new(body)),
-                })
+                    body: Box::new(Cursor::new(br#"{"error":{"code":"invalid_request"}}"#.to_vec())),
+                }),
+                "unknown" => Ok(Response {
+                    status: 503,
+                    headers: vec![],
+                    body: Box::new(std::io::empty()),
+                }),
+                _ => {
+                    let body = json!({
+                        "created": 1,
+                        "data": [{ "url": "https://example.com/result.png?signed=secret" }],
+                        "usage": { "generated_images": 1, "output_width": 256, "output_height": 256 }
+                    })
+                    .to_string()
+                    .into_bytes();
+                    Ok(Response {
+                        status: 200,
+                        headers: vec![("content-type".into(), "application/json".into())],
+                        body: Box::new(Cursor::new(body)),
+                    })
+                }
             }
-        }
+        })
     }
 }
 
 struct DownloadFetch(Arc<Backend>);
 
 impl Fetch for DownloadFetch {
-    fn fetch(&self, r: Request) -> Result<Response, FetchError> {
-        self.fetch_with_cancel(r, CancellationToken::new())
-    }
-
-    fn fetch_with_cancel(&self, _r: Request, cancel: CancellationToken) -> Result<Response, FetchError> {
-        let n = self.0.downloads.fetch_add(1, Ordering::SeqCst);
-        if self.0.mode == "retry" && n == 0 {
-            return Ok(Response {
-                status: 503,
-                headers: vec![],
-                body: Box::new(std::io::empty()),
-            });
-        }
-        if self.0.mode == "download-wait" {
-            vibevalley_runtime::rt::block_on(cancel.cancelled());
-            return Err(FetchError::Network("cancelled".into()));
-        }
-        Ok(Response {
-            status: 200,
-            headers: vec![("content-type".into(), "image/png".into())],
-            body: Box::new(Cursor::new(png())),
+    fn fetch_async(self: Arc<Self>, _r: Request, cancel: CancellationToken) -> BoxFuture<'static, Result<Response, FetchError>> {
+        Box::pin(async move {
+            let n = self.0.downloads.fetch_add(1, Ordering::SeqCst);
+            if self.0.mode == "retry" && n == 0 {
+                return Ok(Response {
+                    status: 503,
+                    headers: vec![],
+                    body: Box::new(std::io::empty()),
+                });
+            }
+            if self.0.mode == "download-wait" {
+                cancel.cancelled().await;
+                return Err(FetchError::Network("cancelled".into()));
+            }
+            Ok(Response {
+                status: 200,
+                headers: vec![("content-type".into(), "image/png".into())],
+                body: Box::new(Cursor::new(png())),
+            })
         })
     }
 }
@@ -122,19 +116,19 @@ fn png() -> Vec<u8> {
     b
 }
 
-fn start(dir: &std::path::Path, backend: Arc<Backend>) -> vibevalley_server::Started {
+fn start(dir: &std::path::Path, backend: Arc<Backend>) -> vibevalley_server::App {
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
     let vendor: Arc<dyn Fetch> = Arc::new(VendorFetch(backend.clone()));
     let download: Arc<dyn Fetch> = Arc::new(DownloadFetch(backend));
-    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let started = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
         media_network: Some((vendor, download)),
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
         orchestrator_listens: false,
-        ..vibevalley_server::ServerConfig::under(dir)
+        ..vibevalley_server::Config::under(dir)
     })
     .unwrap();
     let status = ok(&started, "provider.get", Value::Null);
@@ -164,14 +158,14 @@ fn request(id: &str) -> Value {
     json!({"id":id,"prompt":"一只橘猫","format":"text","width":256,"height":256,"enhance":false,"watermark":true})
 }
 
-fn ok(s: &vibevalley_server::Started, op: &str, p: Value) -> Value {
-    let e = s.hub.call(op, p);
+fn ok(s: &vibevalley_server::App, op: &str, p: Value) -> Value {
+    let e = s.router().call(op, p);
     assert_eq!(e.biz_code, 0, "{}", e.message);
     e.data.unwrap_or(Value::Null)
 }
 
-fn wait(s: &vibevalley_server::Started, id: &str, phase: &str) -> Value {
-    crate::support::wait_until_transition(&s.hub, Duration::from_secs(5), phase, || {
+fn wait(s: &vibevalley_server::App, id: &str, phase: &str) -> Value {
+    crate::support::wait_until_transition(s.ctx(), Duration::from_secs(5), phase, || {
         let j = ok(s, "media.job.get", json!({"id":id}));
         (j["phase"] == phase).then_some(j)
     })
@@ -187,47 +181,47 @@ fn generation_is_idempotent_download_retries_without_generating_again_and_librar
     ok(&s, "media.image.create", request("one"));
     let mut changed = request("one");
     changed["prompt"] = json!("different");
-    assert_ne!(s.hub.call("media.image.create", changed).biz_code, 0);
+    assert_ne!(s.router().call("media.image.create", changed).biz_code, 0);
     ok(&s, "media.job.download", json!({"id":"one"}));
     let ready = wait(&s, "one", "ready");
     assert_eq!(backend.generations.load(Ordering::SeqCst), 1);
     assert_eq!(backend.downloads.load(Ordering::SeqCst), 2);
     assert_eq!(
         std::fs::read(
-            vibevalley_runtime::rt::block_on(s.test_internals().attachments.file_async(ready["attachment"]["id"].as_str().unwrap()))
+            vibevalley_runtime::rt::block_on(s.test_internals().storage.file_async(ready["attachment"]["id"].as_str().unwrap()))
                 .unwrap()
                 .path
         )
         .unwrap(),
         png()
     );
-    let items = crate::support::wait_until_settled(Some(&s.hub), Duration::from_secs(3), "library item recorded", || {
+    let items = crate::support::wait_until_settled(Some(s.ctx()), Duration::from_secs(3), "library item recorded", || {
         let items = ok(&s, "library.item.list", json!({}));
         (items.as_array().unwrap().len() == 1).then_some(items)
     });
     assert_eq!(items[0]["origin"]["job"], "one");
     assert!(!serde_json::to_string(&ready).unwrap().contains("signed=secret"));
     ok(&s, "library.item.delete", json!({"id": ready["attachment"]["id"]}));
-    s.close();
+    s.close_blocking();
     let reopened = start(dir.path(), backend.clone());
     assert_eq!(wait(&reopened, "one", "ready")["attachment"], ready["attachment"]);
     ok(&reopened, "media.image.create", request("one"));
     assert_eq!(backend.generations.load(Ordering::SeqCst), 1);
-    // Causal barrier on the FIFO `library` EventBus subscriber: a newly sent attachment
-    // is processed strictly after any historical `mediaChanged` frames from reopen,
+    // Causal barrier on the attachment/library channel subscriber: a newly sent attachment
+    // is processed strictly after any historical ready media jobs from reopen,
     // proving the explicit deletion of `"one"` was not undone.
     let barrier = ok(
         &reopened,
         "attachment.create",
         json!({ "name": "barrier.txt", "type": "text/plain", "data": "b2s=" }),
     );
-    let general = reopened.test_internals().chat.default_channel();
+    let general = reopened.test_internals().channel.default_channel();
     ok(
         &reopened,
         "channel.message.send",
         json!({ "id": general, "text": "barrier", "sendKey": "library-barrier", "attachments": [barrier["id"]] }),
     );
-    let after_barrier = crate::support::wait_until_settled(Some(&reopened.hub), Duration::from_secs(3), "library barrier processed", || {
+    let after_barrier = crate::support::wait_until_settled(Some(reopened.ctx()), Duration::from_secs(3), "library barrier processed", || {
         let items = ok(&reopened, "library.item.list", json!({}));
         items
             .as_array()
@@ -239,7 +233,7 @@ fn generation_is_idempotent_download_retries_without_generating_again_and_librar
     assert_eq!(after_barrier.as_array().unwrap().len(), 1, "deleted job must not reappear: {after_barrier}");
     ok(&reopened, "library.item.delete", json!({ "id": barrier["id"] }));
     assert_eq!(ok(&reopened, "library.item.list", json!({})), json!([]));
-    reopened.close();
+    reopened.close_blocking();
     let bytes = std::fs::read(dir.path().join("server.db")).unwrap();
     assert!(!String::from_utf8_lossy(&bytes).contains("never-persist-this-key"));
 }
@@ -253,18 +247,18 @@ fn cancel_releases_execution_slot_and_admission_is_bounded() {
         ok(&s, "media.image.create", request(&format!("j{n}")));
     }
     wait(&s, "j0", "generating");
-    assert_ne!(s.hub.call("media.image.create", request("overflow")).biz_code, 0);
+    assert_ne!(s.router().call("media.image.create", request("overflow")).biz_code, 0);
     ok(&s, "media.job.cancel", json!({"id":"j0"}));
     wait(&s, "j1", "generating");
     assert_eq!(wait(&s, "j0", "canceled")["canCancel"], false);
     ok(&s, "media.image.create", request("replacement"));
     let time = Instant::now();
-    s.close();
+    s.close_blocking();
     assert!(time.elapsed() < Duration::from_secs(2));
     let reopened = start(dir.path(), backend);
     wait(&reopened, "j1", "unknown");
     wait(&reopened, "j2", "canceled");
-    reopened.close();
+    reopened.close_blocking();
 }
 
 #[test]
@@ -277,13 +271,13 @@ fn canceled_download_can_retry_and_restart_resumes_download_without_regeneration
     assert_eq!(ok(&s, "media.job.cancel", json!({"id":"retry"}))["canRetryDownload"], true);
     ok(&s, "media.job.download", json!({"id":"retry"}));
     wait(&s, "retry", "downloading");
-    s.close();
+    s.close_blocking();
     let fresh = Backend::new("ok");
     let reopened = start(dir.path(), fresh.clone());
     wait(&reopened, "retry", "ready");
     assert_eq!(fresh.generations.load(Ordering::SeqCst), 0);
     assert_eq!(fresh.downloads.load(Ordering::SeqCst), 1);
-    reopened.close();
+    reopened.close_blocking();
 }
 
 #[test]
@@ -296,8 +290,8 @@ fn known_rejections_and_unknown_results_stay_distinct() {
         let j = wait(&s, "job", phase);
         assert_eq!(j["canRetryDownload"], false);
         assert_eq!(b.downloads.load(Ordering::SeqCst), 0);
-        assert_ne!(s.hub.call("media.job.download", json!({"id":"job"})).biz_code, 0);
-        s.close();
+        assert_ne!(s.router().call("media.job.download", json!({"id":"job"})).biz_code, 0);
+        s.close_blocking();
     }
 }
 
@@ -315,26 +309,26 @@ fn image_request_refinements_prevent_submission() {
     ] {
         let mut r = request("bad");
         r[key] = value;
-        assert_ne!(s.hub.call("media.image.create", r).biz_code, 0);
+        assert_ne!(s.router().call("media.image.create", r).biz_code, 0);
     }
     assert_eq!(b.generations.load(Ordering::SeqCst), 0);
-    s.close();
+    s.close_blocking();
 }
 
 #[test]
 fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() {
     use parking_lot::Mutex;
-    use vibevalley_server::team::tool::{Route, held};
+    use vibevalley_server::agent::tool::{Route, held};
     let dir = tempfile::tempdir().unwrap();
     let backend = Backend::new("ok");
     let s = start(dir.path(), backend);
-    let channel = s.test_internals().chat.default_channel();
+    let channel = s.test_internals().channel.default_channel();
     let route = Arc::new(Mutex::new(Route {
         agent: "orchestrator".into(),
         channel: channel.clone(),
         ..Route::default()
     }));
-    let tools = held(s.test_internals().tools, &route);
+    let tools = held(&s.test_internals().agent.tool, &route);
     let tool = tools.iter().find(|t| t.spec().name == "media_image_create").unwrap();
     assert!(tool.execute(&request("asked")).is_error);
     assert_eq!(ok(&s, "media.job.list", Value::Null), json!([]));
@@ -343,7 +337,7 @@ fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() 
     assert!(!result.is_error, "{}", result.text);
     let ready = wait(&s, "asked", "ready");
     assert_eq!(ready["source"], json!({"kind":"orchestrator","agent":"orchestrator","channel":channel}));
-    crate::support::wait_until_channel_event(s.test_internals().chat, Duration::from_secs(3), "generated image message", || {
+    crate::support::wait_until_channel_event(s.test_internals().channel, Duration::from_secs(3), "generated image message", || {
         let messages = ok(&s, "channel.message.list", json!({"id":channel}));
         let made = messages
             .as_array()
@@ -354,7 +348,7 @@ fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() 
         (made == 1).then_some(())
     });
     assert!(!tool.execute(&request("asked")).is_error);
-    s.close();
+    s.close_blocking();
     let reopened = start(dir.path(), Backend::new("ok"));
     let messages = ok(&reopened, "channel.message.list", json!({"id":channel}));
     assert_eq!(
@@ -366,5 +360,5 @@ fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() 
             .count(),
         1
     );
-    reopened.close();
+    reopened.close_blocking();
 }

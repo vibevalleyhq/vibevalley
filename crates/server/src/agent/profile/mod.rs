@@ -3,6 +3,7 @@
 
 pub mod drive;
 pub mod preset;
+#[allow(clippy::module_inception)]
 pub mod profile;
 pub mod runtime;
 

@@ -6,9 +6,9 @@ use vibevalley_runtime::oar::{
     EventKind, Registry, SubagentPlanStatus, SubagentPlanStep, SubagentStatus,
     scripted::{Script, ScriptedRuntime, Step},
 };
-use vibevalley_server::{ServerConfig, Started};
+use vibevalley_server::{App, Config, create_app_blocking};
 
-fn open(home: &Path) -> Started {
+fn open(home: &Path) -> App {
     let mut steps = vec![
         Step::Emit(EventKind::SubagentSpawned {
             parent_thread_id: "parent".into(),
@@ -65,18 +65,18 @@ fn open(home: &Path) -> Started {
         "scripted",
         Script::new().turn(steps).turn(vec![Step::text("next")]),
     )));
-    vibevalley_server::start(ServerConfig {
+    create_app_blocking(Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
-        ..ServerConfig::under(home)
+        ..Config::under(home)
     })
     .unwrap()
 }
 
-fn call(server: &Started, op: &str, body: Value) -> Value {
-    let response = server.hub.call_as(Caller::User, op, body);
+fn call(server: &App, op: &str, body: Value) -> Value {
+    let response = server.router().call_as(Caller::User, op, body);
     response.data.unwrap_or_else(|| panic!("{op}: {}", response.message))
 }
 
@@ -84,19 +84,18 @@ fn call(server: &Started, op: &str, body: Value) -> Value {
 fn regression_child_progress_outlives_log_retention_and_reopen() {
     let home = tempfile::tempdir().unwrap();
     let server = open(home.path());
-    let mut worker = server.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut worker = server.test_internals().agent.profile.store.install_template("reviewer").unwrap();
     worker.runtime = "scripted".into();
-    let worker = server.test_internals().agents.profiles.save(worker).unwrap();
+    let worker = server.test_internals().agent.profile.store.save(worker).unwrap();
     call(&server, "repo.create", json!({"name":"progress"}));
     let issue = call(&server, "issue.create", json!({"repo":"progress","agent":worker.id,"title":"Run checks"}));
     let id = issue["id"].as_str().unwrap();
     call(&server, "issue.status.update", json!({"id":id,"status":"todo"}));
 
     let session = until("completed business round", || {
-        server
-            .test_internals()
-            .board
-            .read(|s| s.sessions.iter().find(|s| s.issue_id() == Some(id) && s.last_run.is_some()).cloned())
+        crate::support::board_sessions(server.test_internals().board)
+            .into_iter()
+            .find(|s| s.issue_id() == Some(id) && s.last_run.is_some())
     });
     let session_id = session.id.as_str();
     let summary = call(&server, "session.get", json!({"id":session_id}))["subagents"].clone();
@@ -127,7 +126,7 @@ fn regression_child_progress_outlives_log_retention_and_reopen() {
         log.len(),
         "cursor pagination must reconstruct full SQLite log without gaps"
     );
-    server.close();
+    server.close_blocking();
     drop(server);
     let reopened = open(home.path());
     assert_eq!(call(&reopened, "session.get", json!({"id":session_id}))["subagents"], summary);
@@ -135,5 +134,5 @@ fn regression_child_progress_outlives_log_retention_and_reopen() {
     assert_eq!(reopened_page["events"].as_array().unwrap().len(), log.len());
     let runs = call(&reopened, "issue.run.list", json!({"id":id}));
     assert_eq!(runs[0]["subagents"], summary);
-    reopened.close();
+    reopened.close_blocking();
 }

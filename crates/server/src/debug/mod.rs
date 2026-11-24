@@ -57,6 +57,8 @@ pub struct DebugStateSnapshot {
     pub issues: Vec<Issue>,
     pub sessions: Vec<Session>,
     pub channel_count: u32,
+    pub repo_count: u32,
+    pub artifact_count: u32,
     pub media_job_count: u32,
     pub inbox_count: u32,
     pub state_cache_json: Value,
@@ -69,8 +71,6 @@ pub trait DebugDataSource: Send + Sync {
     fn open_trajectory_ids(&self) -> Vec<String>;
     fn system_prompt(&self, session_id: &str, kind: DebugTrajectoryKind) -> Option<String>;
     fn runtime_probe(&self) -> RuntimeProbeSnapshot;
-    fn repo_count(&self) -> u32;
-    fn artifact_count(&self) -> u32;
     fn state_snapshot_async(&self) -> BoxFuture<'_, DebugStateSnapshot>;
 }
 
@@ -93,14 +93,6 @@ impl DebugDataSource for EmptyDebugDataSource {
 
     fn runtime_probe(&self) -> RuntimeProbeSnapshot {
         RuntimeProbeSnapshot::default()
-    }
-
-    fn repo_count(&self) -> u32 {
-        0
-    }
-
-    fn artifact_count(&self) -> u32 {
-        0
     }
 
     fn state_snapshot_async(&self) -> BoxFuture<'_, DebugStateSnapshot> {
@@ -161,6 +153,8 @@ struct StateMetrics {
     issues: u32,
     sessions: u32,
     channels: u32,
+    repos: u32,
+    artifacts: u32,
     media_jobs: u32,
     inbox: u32,
     active_sessions: u32,
@@ -171,6 +165,8 @@ fn extract_state_metrics(snap: &DebugStateSnapshot) -> StateMetrics {
         issues: snap.issues.len() as u32,
         sessions: snap.sessions.len() as u32,
         channels: snap.channel_count,
+        repos: snap.repo_count,
+        artifacts: snap.artifact_count,
         media_jobs: snap.media_job_count,
         inbox: snap.inbox_count,
         active_sessions: snap.sessions.iter().filter(|s| s.phase.is_working()).count() as u32,
@@ -269,7 +265,7 @@ impl DebugKit {
                 ok_json(self.override_set(req)?)
             }
             EndpointId::DebugBundleExport => ok_json(self.bundle_export_async().await?),
-            other => Err(ApiError::new(BizCode::RouteNotFound, format!("unexpected debug endpoint {}", other.op()))),
+            other => Err(ApiError::new(BizCode::RouteNotFound, format!("unexpected debug endpoint {}", other.as_op()))),
         }
     }
 
@@ -323,8 +319,8 @@ impl DebugKit {
                 sessions: metrics.sessions,
                 channels: metrics.channels,
                 agents: agent_count,
-                repos: self.sources.repo_count(),
-                artifacts: self.sources.artifact_count(),
+                repos: metrics.repos,
+                artifacts: metrics.artifacts,
                 inbox: metrics.inbox,
                 media_jobs: metrics.media_jobs,
             },

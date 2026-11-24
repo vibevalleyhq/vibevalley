@@ -51,7 +51,7 @@ pub(crate) struct OutboxSessionReported {
 /// Lifecycle notification for in-domain chat thread seating & dismissal.
 #[derive(Debug, Clone)]
 pub enum SessionLifecycleEvent {
-    Changed(Session),
+    Changed(Box<Session>),
     Left { at: Millis, id: String },
 }
 
@@ -119,6 +119,7 @@ pub(super) struct Inner {
     pub ctx: Arc<Context>,
     pub durable: vibevalley_runtime::agent::durable::Store,
     pub write_lock: Arc<AsyncMutex<()>>,
+    pub(super) extra_lock: AsyncMutex<()>,
     pub drivers: Arc<dyn SessionDriver>,
     pub worktree: Arc<Worktree>,
     pub config: Arc<RuntimeConfig>,
@@ -162,6 +163,7 @@ impl SessionEngine {
             ctx,
             durable,
             write_lock,
+            extra_lock: AsyncMutex::new(()),
             drivers,
             worktree,
             config,
@@ -355,6 +357,7 @@ impl SessionEngine {
     }
 
     pub(super) async fn set_extra_async(&self, session: &str, change: impl FnOnce(&mut SessionExtra)) -> Result<()> {
+        let _guard = self.0.extra_lock.lock().await;
         let extra = {
             let mut extras = self.0.extras.lock();
             let extra = extras.entry(session.to_string()).or_default();
@@ -646,7 +649,7 @@ impl SessionEngine {
             let others: Vec<&Session> = all_sessions.iter().filter(|x| x.id != session.id).collect();
             self.0.ctx.live.ensure_play_station(&session, &others, None);
         }
-        self.emit_lifecycle(SessionLifecycleEvent::Changed(session));
+        self.emit_lifecycle(SessionLifecycleEvent::Changed(Box::new(session)));
         if let Some(before) = previous {
             let me = self.clone();
             let session_id = id.clone();
@@ -851,7 +854,7 @@ impl SessionEngine {
             snap.brief = (!session.brief.is_empty()).then(|| session.brief.clone());
             snap.last_event_at = Some(now());
         });
-        self.emit_lifecycle(SessionLifecycleEvent::Changed(session.clone()));
+        self.emit_lifecycle(SessionLifecycleEvent::Changed(Box::new(session.clone())));
         Ok(())
     }
 
@@ -971,7 +974,7 @@ impl SessionEngine {
         }
         self.set_quiet_async(session_id, None).await;
         let root = event.agent_path.is_empty();
-        if root && matches!(event.kind, EventKind::TurnStarted { .. }) {
+        if state.observed_run.is_none() || (root && matches!(event.kind, EventKind::TurnStarted { .. })) {
             state.observed_run = self.extra(session_id).run;
         }
         if let Some(run) = state.observed_run.as_deref()
@@ -1202,7 +1205,7 @@ impl SessionEngine {
                 }
                 snap.last_event_at = Some(at);
             });
-            self.emit_lifecycle(SessionLifecycleEvent::Changed(session));
+            self.emit_lifecycle(SessionLifecycleEvent::Changed(Box::new(session)));
         }
         Ok(())
     }
@@ -1243,6 +1246,7 @@ impl SessionEngine {
         if p.quiet_since.is_some() == quiet.is_some() {
             return;
         }
+        tracing::debug!(quiet = quiet.is_some(), "session quiet state updated");
         let phase = Phase::Working(PhaseWorking { quiet_since: quiet, ..p });
         self.0.ctx.live.update_session(session_id, |snap| {
             snap.phase = Some(phase);
@@ -1289,6 +1293,7 @@ impl SessionEngine {
         )))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn settle_report_async(
         &self,
         session: &Session,
@@ -1416,7 +1421,7 @@ impl SessionEngine {
             if let Some(eff) = vibevalley_core::game::session_failed_penalty(&updated_session, outcome) {
                 self.0.ctx.live.push_farm_effect(eff);
             }
-            self.emit_lifecycle(SessionLifecycleEvent::Changed(updated_session));
+            self.emit_lifecycle(SessionLifecycleEvent::Changed(Box::new(updated_session)));
         }
         Ok(())
     }

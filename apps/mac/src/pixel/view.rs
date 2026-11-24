@@ -96,7 +96,7 @@ pub struct PixelView {
     command_pending: bool,
     /// Only reveals the cold-load indicator after 150ms so fast loads never flash.
     show_loading: bool,
-    _bridge: Option<Arc<vibevalley_server::transport::bridge::Client>>,
+    _bridge: Option<Arc<vibevalley_server::gateway::bridge::Client>>,
 }
 
 impl EventEmitter<PixelEvent> for PixelView {}
@@ -118,7 +118,7 @@ fn slices_for_scene(kind: &str) -> &'static [SliceKind] {
 
 struct SliceOutlet(flume::Sender<(String, Value)>);
 
-impl vibevalley_server::transport::bridge::Outlet for SliceOutlet {
+impl vibevalley_server::gateway::bridge::Outlet for SliceOutlet {
     fn send(&self, event: &str, data: Value) {
         let _ = self.0.send((event.to_string(), data));
     }

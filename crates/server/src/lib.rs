@@ -1,22 +1,36 @@
-//! VibeValley's in-process server: typed endpoint door (`ServerDoor`),
-//! single-source `ServerDb` + `Outbox` + `LiveOverlay` + `SliceProjector`
-//! projections (`board`, `sessions`, `collab`, `inbox`, `ops`, `farm`), live
-//! events and subscriptions implementing [`crate::transport::api::Server`].
+//! VibeValley's in-process server: shallow composition root (`App`),
+//! thin compile-time exhaustive [`Router`] implementing [`Server`], unified
+//! `Context` (`Service`, `TaskGroup`, `LiveState`, `Outbox`, `StateFeed`),
+//! and flat domain modules.
 
+pub mod agent;
 pub mod app;
-pub mod collab;
-pub mod content;
+pub mod artifact;
+pub mod channel;
+pub mod connector;
+pub mod context;
+pub mod cron;
 pub mod db;
-pub mod infra;
-pub mod skin;
-pub mod team;
-pub mod transport;
-pub mod work;
+pub mod debug;
+pub mod fake;
+pub mod game;
+pub mod gateway;
+pub mod issue;
+pub mod log;
+pub mod machine;
+pub mod provider;
+pub mod repo;
+pub mod router;
+pub mod runtime;
+pub mod service;
+pub mod setting;
+pub mod storage;
+pub mod voice;
 
 pub use vibevalley_protocol::home;
 
-pub use crate::app::bootstrap::{ServerConfig, StartError, Started, start, start_async};
-pub use crate::app::door::ServerDoor;
-pub use crate::app::slice::{SliceFeed, SliceFrame, SliceSubscription};
-pub use crate::app::{App, Sink, install_tls, now, spawn_blocking_traced};
-pub use crate::transport::api::*;
+pub use crate::app::{App, Config, StartError, TestInternals, create_app, create_app_blocking};
+pub use crate::context::{Sink, SliceFeed, SliceFrame, SliceSubscription, install_tls, now};
+pub use crate::gateway::api::*;
+pub use crate::log::spawn_blocking_traced;
+pub use crate::router::Router;

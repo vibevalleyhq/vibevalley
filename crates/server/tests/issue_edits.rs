@@ -4,8 +4,8 @@ use std::path::Path;
 
 use crate::support::*;
 use vibevalley_protocol::{IssueStageKind as StageKind, IssueStatus, IssueUpdate, MilestoneKind, Outcome, RunTriggerKind};
-use vibevalley_server::work::issue::NewIssue;
-use vibevalley_server::work::ledger::BoardError;
+use vibevalley_server::issue::NewIssue;
+use vibevalley_server::runtime::BoardError;
 
 fn new(title: &str, repo: Option<&Path>) -> NewIssue {
     NewIssue {
@@ -37,13 +37,13 @@ fn an_unsent_issue_is_edited_placed_and_deleted() {
     assert_eq!(edited.description, "with more words");
     assert_eq!(edited.criteria, vec!["one".to_string()]);
     assert_eq!(edited.assigned_agent(), None);
-    let ranks: Vec<(String, Option<i64>)> = w.board.read(|s| s.issues.iter().map(|i| (i.id.clone(), i.rank)).collect());
+    let ranks: Vec<(String, Option<i64>)> = board_issues(&w.board).into_iter().map(|i| (i.id, i.rank)).collect();
     let rank = |id: &str| ranks.iter().find(|r| r.0 == id).unwrap().1.unwrap_or(0);
     assert!(rank(&b.id) < rank(&a.id), "{ranks:?}");
 
     block_on(w.board.remove_async(&b.id)).unwrap();
-    assert!(w.board.issue(&b.id).is_none());
-    assert!(w.board.issue(&a.id).is_some());
+    assert!(board_issue(&w.board, &b.id).is_none());
+    assert!(board_issue(&w.board, &a.id).is_some());
 }
 
 #[test]

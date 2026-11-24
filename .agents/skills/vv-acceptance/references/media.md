@@ -8,7 +8,7 @@
 
 ## 准备
 
-- 不使用用户的家目录、钥匙或媒体。沙箱起隔离的服务端；`VIBEVALLEY_TEST_RUNTIMES=1` 下 [runtime.rs](crates/server/src/app/fakes/runtime.rs) 的 `OfflineImages` 只替换 MOSS 的生图请求和结果下载，任务、库、文件、状态流、频道和 Artifact 都走真的模块。不手工拼成功帧。
+- 不使用用户的家目录、钥匙或媒体。沙箱起隔离的服务端；`VIBEVALLEY_TEST_RUNTIMES=1` 下 [runtime.rs](crates/server/src/fake/runtime.rs) 的 `OfflineImages` 只替换 MOSS 的生图请求和结果下载，任务、库、文件、状态流、频道和 Artifact 都走真的模块。不手工拼成功帧。
 - 证据分三类：协议离线、隔离程序、真实厂商。替身给的是确定的 PNG 和合成音调，不证明账号权限、模型质量或实际费用。
 
 ## 步骤

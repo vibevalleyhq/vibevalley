@@ -130,7 +130,7 @@ impl Game {
                 self.set_title_async(req).await?;
                 Ok(Value::Null)
             }
-            other => Err(ApiError::new(BizCode::RouteNotFound, format!("unexpected game endpoint {}", other.op()))),
+            other => Err(ApiError::new(BizCode::RouteNotFound, format!("unexpected game endpoint {}", other.as_op()))),
         }
     }
 
@@ -182,6 +182,11 @@ impl Game {
         }
         let prev_total = prev.as_ref().map(|c| c.total);
         self.ctx.live.set_commits(Some(next.clone()));
+        let (level, _) = vibevalley_core::game::level_for_commits(next.total);
+        let known = self.folded.lock().progress.counts.get("farm_level").copied().unwrap_or(1);
+        if level > known {
+            self.record(LedgerEntry::Level(vibevalley_protocol::LedgerEntryLevel { at: 0, level }));
+        }
         let effects = vibevalley_core::game::progress_effects(prev_total, None, None, Some(&next));
         if !effects.is_empty() {
             self.ctx.live.push_farm_effects(effects);
@@ -345,6 +350,7 @@ impl Game {
                     Actor::Agent { id, .. } => id.clone(),
                     _ => String::new(),
                 },
+                to: String::new(),
             }));
         }
     }
@@ -423,12 +429,11 @@ mod tests {
     use vibevalley_protocol::{ContextRef, ExecutionPolicy, Phase, PhaseWorking, SessionAction, SessionController, SessionPermissionMode};
 
     use super::*;
-    use crate::context::{Http, LiveState, Outbox, StateFeed, TaskGroup};
+    use crate::context::{Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
     use crate::service::Service;
 
     async fn test_context(home: &Path, clock: SharedClock) -> Arc<Context> {
         let service = Service::open(home).await.unwrap();
-        let http = Arc::new(Http::new());
         let outbox = Arc::new(Outbox::new(service.clone()));
         Arc::new(Context::new(
             service,
@@ -437,8 +442,8 @@ mod tests {
             outbox,
             Arc::new(StateFeed::new()),
             clock,
-            http.clone(),
-            http,
+            Arc::new(Http),
+            Arc::new(PublicDownload),
         ))
     }
 
@@ -518,10 +523,14 @@ mod tests {
 
         // Open 6 working workspace sessions and fail one of them.
         let mut ws_list = Vec::new();
+        let idle_doing = Doing {
+            action: SessionAction::None,
+            label: String::new(),
+        };
         for i in 1..=6 {
             let ws = workspace_session(&format!("ws{i}"), true);
             game.on_session_hired(&ws, &[]);
-            game.on_session_working(&ws, false, &Doing::default());
+            game.on_session_working(&ws, false, &idle_doing);
             ws_list.push(ws);
         }
         game.on_session_reported(&ws_list[0], Outcome::Failed);
@@ -530,7 +539,7 @@ mod tests {
         let real = issue_worker("w1", "i1", false, 10);
         let others: Vec<&Session> = ws_list.iter().collect();
         game.on_session_hired(&real, &others);
-        game.on_session_working(&real, false, &Doing::default());
+        game.on_session_working(&real, false, &idle_doing);
 
         assert_eq!(ctx.live.plays_snapshot().get("w1").map(|p| p.station), Some(4));
         let progress = game.progress();

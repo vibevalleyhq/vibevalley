@@ -16,7 +16,8 @@ use vibevalley_runtime::oar::{
     InteractionDecision, InteractionOption, ModelInfo, PermissionDecision, PermissionMode, Registry, Runtime, Session, SessionOptions, SessionStatus,
     StopReason, SwarmMember, SwarmMemberState, SwarmMessage, SwarmPlan, SwarmPlanThread, SwarmSnapshot, Usage, voyage,
 };
-use vibevalley_server::{Server, ServerConfig, Started};
+use vibevalley_server::gateway::api::Server;
+use vibevalley_server::{App, Config, create_app_blocking};
 
 use super::until;
 
@@ -459,16 +460,16 @@ impl Session for MockSession {
     }
 }
 
-fn start_with(home: &Path, runtime: Arc<MockRuntime>) -> Started {
+fn start_with(home: &Path, runtime: Arc<MockRuntime>) -> App {
     let mut registry = Registry::new();
     registry.register(runtime);
-    vibevalley_server::start(ServerConfig {
+    create_app_blocking(Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
         orchestrator_listens: false,
-        ..ServerConfig::under(home)
+        ..Config::under(home)
     })
     .unwrap()
 }
@@ -519,7 +520,7 @@ fn workspace_session_full_lifecycle_permissions_interactions_config_steer_stop_a
         ],
     );
     let server = start_with(home.path(), rt);
-    let call = |op: &str, p: Value| server.hub.call_as(Caller::User, op, p);
+    let call = |op: &str, p: Value| server.router().call_as(Caller::User, op, p);
 
     // 1. Invalid cwd is refused cleanly.
     let bad = call(
@@ -551,7 +552,7 @@ fn workspace_session_full_lifecycle_permissions_interactions_config_steer_stop_a
     assert_eq!(ws["session"]["phase"]["_tag"], "resting");
 
     // Watch must NOT spam the default channel with dispatch messages for workspace sessions.
-    let general = server.test_internals().chat.default_channel();
+    let general = server.test_internals().channel.default_channel();
     let msgs = call("channel.message.list", json!({ "id": general })).data.unwrap();
     assert!(
         msgs.as_array().unwrap().iter().all(|m| m["kind"] != "dispatch"),
@@ -559,7 +560,7 @@ fn workspace_session_full_lifecycle_permissions_interactions_config_steer_stop_a
     );
 
     // 3. Subscribe via `session.watch`.
-    let (sub, rx) = server.hub.subscribe("session.watch", json!({ "id": sid })).unwrap();
+    let (sub, rx) = server.router().subscribe("session.watch", json!({ "id": sid })).unwrap();
     let first = rx.recv_timeout(Duration::from_secs(2)).unwrap();
     assert_eq!(first["kind"], "history");
     let second = rx.recv_timeout(Duration::from_secs(2)).unwrap();
@@ -608,18 +609,18 @@ fn workspace_session_full_lifecycle_permissions_interactions_config_steer_stop_a
     }
 
     // Verify `afterSeq` filtering on a second `session.watch` subscription.
-    server.test_internals().trajectories.flush(true);
+    vibevalley_runtime::rt::block_on(server.test_internals().runtime.trajectory().flush_async(true));
     let all_page = call("session.event.list", json!({ "id": sid })).data.unwrap();
     let all_arr = all_page["events"].as_array().unwrap();
     assert!(all_arr.len() >= 3, "{all_page}");
     let cutoff = all_arr[1]["seq"].as_i64().unwrap();
-    let (sub2, rx2) = server.hub.subscribe("session.watch", json!({ "id": sid, "afterSeq": cutoff })).unwrap();
+    let (sub2, rx2) = server.router().subscribe("session.watch", json!({ "id": sid, "afterSeq": cutoff })).unwrap();
     let filtered = rx2.recv_timeout(Duration::from_secs(2)).unwrap();
     assert_eq!(filtered["kind"], "history");
     let evs = filtered["events"].as_array().unwrap();
     assert!(!evs.is_empty());
     assert!(evs.iter().all(|e| e["seq"].as_i64().unwrap() > cutoff), "{evs:?}");
-    server.hub.unsubscribe(sub2);
+    server.router().unsubscribe(sub2);
 
     // 5. Permission flow in `ask` mode: waits until `session.respondPermission`.
     let sent2 = call("session.send", json!({ "id": sid, "text": "run ls" }));
@@ -691,7 +692,7 @@ fn workspace_session_full_lifecycle_permissions_interactions_config_steer_stop_a
     let sent4 = call("session.send", json!({ "id": sid, "text": "long task" }));
     assert_eq!(sent4.biz_code, 0, "{}", sent4.message);
     until("workspace session working", || {
-        server.test_internals().board.session(&sid).filter(|s| s.phase.is_working())
+        crate::support::board_session(server.test_internals().board, &sid).filter(|s| s.phase.is_working())
     });
     let steered = call("session.send", json!({ "id": sid, "text": "focus on tests" }));
     assert_eq!(steered.biz_code, 0, "{}", steered.message);
@@ -702,10 +703,10 @@ fn workspace_session_full_lifecycle_permissions_interactions_config_steer_stop_a
         v["kind"] == "state" && v["session"]["runs"] == 4 && v["session"]["phase"]["_tag"] == "resting"
     });
     assert_eq!(log.lock().unwrap().aborts, 1);
-    server.hub.unsubscribe(sub);
+    server.router().unsubscribe(sub);
 
     // 9. Restart server and verify persisted config + history + lazy resume on `session.send`!
-    server.close();
+    server.close_blocking();
     drop(server);
 
     let (rt2, log2) = MockRuntime::new(
@@ -717,7 +718,7 @@ fn workspace_session_full_lifecycle_permissions_interactions_config_steer_stop_a
         })],
     );
     let reopened = start_with(home.path(), rt2);
-    let (sub3, rx3) = reopened.hub.subscribe("session.watch", json!({ "id": sid })).unwrap();
+    let (sub3, rx3) = reopened.router().subscribe("session.watch", json!({ "id": sid })).unwrap();
     let hist3 = rx3.recv_timeout(Duration::from_secs(2)).unwrap();
     assert_eq!(hist3["kind"], "history");
     assert!(!hist3["events"].as_array().unwrap().is_empty(), "history survives restart");
@@ -729,15 +730,15 @@ fn workspace_session_full_lifecycle_permissions_interactions_config_steer_stop_a
 
     // Sending a message lazily reopens with `resume == Some("agy-vendor-1")`.
     let resumed = reopened
-        .hub
+        .router()
         .call_as(Caller::User, "session.send", json!({ "id": sid, "text": "after restart" }));
     assert_eq!(resumed.biz_code, 0, "{}", resumed.message);
     recv_until(&rx3, "resumed turn completes", |v| v["kind"] == "state" && v["session"]["runs"] == 5);
     assert_eq!(log2.lock().unwrap().opened.len(), 1);
     assert_eq!(log2.lock().unwrap().opened[0].resume.as_deref(), Some("agy-vendor-1"));
     assert_eq!(log2.lock().unwrap().opened[0].permission_mode, PermissionMode::Bypass);
-    reopened.hub.unsubscribe(sub3);
-    reopened.close();
+    reopened.router().unsubscribe(sub3);
+    reopened.close_blocking();
 }
 
 #[test]
@@ -765,19 +766,19 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
     let mut registry = Registry::new();
     registry.register(rt);
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    let server = vibevalley_server::start(ServerConfig {
+    let server = create_app_blocking(Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
         orchestrator_listens: false,
-        ..ServerConfig::under(home.path())
+        ..Config::under(home.path())
     })
     .unwrap();
-    let call = |op: &str, p: Value| server.hub.call_as(Caller::User, op, p);
+    let call = |op: &str, p: Value| server.router().call_as(Caller::User, op, p);
 
     // Unknown session watch is refused cleanly.
-    let missing_watch = server.hub.subscribe("session.watch", json!({ "id": "w999" }));
+    let missing_watch = server.router().subscribe("session.watch", json!({ "id": "w999" }));
     assert_eq!(missing_watch.err().unwrap().biz_code, BizCode::SessionNotFound.code());
 
     // Open in bypass mode and test custom + cancel interaction decisions.
@@ -788,7 +789,7 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
     .data
     .unwrap();
     let sid = opened["id"].as_str().unwrap().to_string();
-    let (sub, rx) = server.hub.subscribe("session.watch", json!({ "id": sid })).unwrap();
+    let (sub, rx) = server.router().subscribe("session.watch", json!({ "id": sid })).unwrap();
     let _ = rx.recv_timeout(Duration::from_secs(2)).unwrap();
     let _ = rx.recv_timeout(Duration::from_secs(2)).unwrap();
 
@@ -840,12 +841,12 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
     // Turn 3: hold working while an issue dispatches in the same farm without being blocked.
     assert_eq!(call("session.send", json!({ "id": sid, "text": "hold" })).biz_code, 0);
     until("workspace working", || {
-        server.test_internals().board.session(&sid).filter(|s| s.phase.is_working())
+        crate::support::board_session(server.test_internals().board, &sid).filter(|s| s.phase.is_working())
     });
 
-    let mut helper = server.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = server.test_internals().agent.profile.store.install_template("reviewer").unwrap();
     helper.runtime = "scripted".into();
-    let helper = server.test_internals().agents.profiles.save(helper).unwrap();
+    let helper = server.test_internals().agent.profile.store.save(helper).unwrap();
     assert_eq!(call("repo.create", json!({ "name": "farm" })).biz_code, 0);
     let issue = call("issue.create", json!({ "title": "parallel work", "repo": "farm", "agent": helper.id }))
         .data
@@ -853,10 +854,9 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
     let issue_id = issue["id"].as_str().unwrap().to_string();
     assert_eq!(call("issue.status.update", json!({ "id": issue_id, "status": "todo" })).biz_code, 0);
     let worker_sess = until("issue session starts alongside workspace session", || {
-        server
-            .test_internals()
-            .board
-            .read(|s| s.sessions.iter().find(|x| x.issue_id() == Some(issue_id.as_str())).cloned())
+        crate::support::board_sessions(server.test_internals().board)
+            .into_iter()
+            .find(|x| x.issue_id() == Some(issue_id.as_str()))
     });
 
     // Opening an issue session as a workspace chat is refused cleanly.
@@ -870,16 +870,16 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
     vibevalley_runtime::rt::block_on(
         server
             .test_internals()
-            .board
-            .sessions()
-            .dismiss_async(&sid, vibevalley_server::work::workplace::Leave::Keep),
+            .runtime
+            .session()
+            .dismiss_async(&sid, vibevalley_server::runtime::Leave::Keep),
     )
     .unwrap();
     let miss = recv_until(&rx, "missing event after dismiss", |v| v["kind"] == "missing" && v["session"] == sid.as_str());
     assert_eq!(miss["session"], sid.as_str());
 
-    server.hub.unsubscribe(sub);
-    server.close();
+    server.router().unsubscribe(sub);
+    server.close_blocking();
 }
 
 #[test]
@@ -894,12 +894,12 @@ fn workspace_session_swarm_watch_deltas_dedup_and_child_transcript() {
     let swarm_handle = rt.swarm.clone();
     let transcripts_handle = rt.transcripts.clone();
     let server = start_with(home.path(), rt);
-    let call = |op: &str, p: Value| server.hub.call_as(Caller::User, op, p);
+    let call = |op: &str, p: Value| server.router().call_as(Caller::User, op, p);
 
     let opened = call("session.openWorkspace", json!({ "runtime": "antigravity", "cwd": cwd })).data.unwrap();
     let sid = opened["id"].as_str().unwrap().to_string();
 
-    let (sub, rx) = server.hub.subscribe("session.watch", json!({ "id": sid })).unwrap();
+    let (sub, rx) = server.router().subscribe("session.watch", json!({ "id": sid })).unwrap();
     let _hist = rx.recv_timeout(Duration::from_secs(2)).unwrap();
     let initial_state = rx.recv_timeout(Duration::from_secs(2)).unwrap();
     assert_eq!(initial_state["kind"], "state");
@@ -1085,8 +1085,8 @@ fn workspace_session_swarm_watch_deltas_dedup_and_child_transcript() {
     let missing_sess = call("session.childTranscript", json!({ "id": "w404", "conversationId": "child-1" }));
     assert_eq!(missing_sess.biz_code, BizCode::SessionNotFound.code());
 
-    server.hub.unsubscribe(sub);
-    server.close();
+    server.router().unsubscribe(sub);
+    server.close_blocking();
 }
 
 #[test]
@@ -1101,13 +1101,13 @@ fn workspace_session_title_updates_dedup_and_persists_across_restart() {
     let title_handle = rt.title.clone();
     *title_handle.lock().unwrap() = Some("Initial Runtime Title".into());
     let server = start_with(home.path(), rt);
-    let call = |op: &str, p: Value| server.hub.call_as(Caller::User, op, p);
+    let call = |op: &str, p: Value| server.router().call_as(Caller::User, op, p);
 
     let opened = call("session.openWorkspace", json!({ "runtime": "antigravity", "cwd": cwd })).data.unwrap();
     let sid = opened["id"].as_str().unwrap().to_string();
     assert_eq!(opened["title"], "Initial Runtime Title");
 
-    let (sub, rx) = server.hub.subscribe("session.watch", json!({ "id": sid })).unwrap();
+    let (sub, rx) = server.router().subscribe("session.watch", json!({ "id": sid })).unwrap();
     let _hist = rx.recv_timeout(Duration::from_secs(2)).unwrap();
     let initial_state = rx.recv_timeout(Duration::from_secs(2)).unwrap();
     assert_eq!(initial_state["kind"], "state");
@@ -1127,20 +1127,20 @@ fn workspace_session_title_updates_dedup_and_persists_across_restart() {
         "unchanged or blank session title should be deduplicated"
     );
 
-    server.hub.unsubscribe(sub);
-    server.close();
+    server.router().unsubscribe(sub);
+    server.close_blocking();
     drop(server);
 
     // Persisted title survives restart before the runtime is reopened.
     let (rt2, _log2) = MockRuntime::new("antigravity", vec![]);
     let reopened = start_with(home.path(), rt2);
-    let (sub2, rx2) = reopened.hub.subscribe("session.watch", json!({ "id": sid })).unwrap();
+    let (sub2, rx2) = reopened.router().subscribe("session.watch", json!({ "id": sid })).unwrap();
     let _hist2 = rx2.recv_timeout(Duration::from_secs(2)).unwrap();
     let state2 = rx2.recv_timeout(Duration::from_secs(2)).unwrap();
     assert_eq!(state2["kind"], "state");
     assert_eq!(state2["title"], "Refactor Workspace Titles");
-    reopened.hub.unsubscribe(sub2);
-    reopened.close();
+    reopened.router().unsubscribe(sub2);
+    reopened.close_blocking();
 }
 
 #[test]
@@ -1153,7 +1153,7 @@ fn workspace_session_omits_effort_for_models_without_effort_levels_and_clears_on
 
     let (rt, log) = MockRuntime::new("antigravity", vec![]);
     let server = start_with(home.path(), rt);
-    let call = |op: &str, p: Value| server.hub.call_as(Caller::User, op, p);
+    let call = |op: &str, p: Value| server.router().call_as(Caller::User, op, p);
 
     // Populate cached runtime models and set a runtime-wide default effort.
     let refreshed = call("runtime.refresh", json!({ "id": "antigravity" }));
@@ -1218,7 +1218,7 @@ fn workspace_session_omits_effort_for_models_without_effort_levels_and_clears_on
     assert_eq!(ws_neon["effort"], "medium");
     assert_eq!(log.lock().unwrap().opened.last().unwrap().effort.as_deref(), Some("medium"));
 
-    let (sub, rx) = server.hub.subscribe("session.watch", json!({ "id": sid })).unwrap();
+    let (sub, rx) = server.router().subscribe("session.watch", json!({ "id": sid })).unwrap();
     let _hist = rx.recv_timeout(Duration::from_secs(2)).unwrap();
     let initial_state = rx.recv_timeout(Duration::from_secs(2)).unwrap();
     assert_eq!(initial_state["effort"], "medium");
@@ -1243,21 +1243,21 @@ fn workspace_session_omits_effort_for_models_without_effort_levels_and_clears_on
     });
     assert!(switched_state["effort"].is_null(), "watch state retained stale effort: {switched_state}");
 
-    server.hub.unsubscribe(sub);
-    server.close();
+    server.router().unsubscribe(sub);
+    server.close_blocking();
     drop(server);
 
     // Persisted workspace meta retains the cleared effort across restart.
     let (rt2, _log2) = MockRuntime::new("antigravity", vec![]);
     let reopened = start_with(home.path(), rt2);
-    let (sub2, rx2) = reopened.hub.subscribe("session.watch", json!({ "id": sid })).unwrap();
+    let (sub2, rx2) = reopened.router().subscribe("session.watch", json!({ "id": sid })).unwrap();
     let _hist2 = rx2.recv_timeout(Duration::from_secs(2)).unwrap();
     let state2 = rx2.recv_timeout(Duration::from_secs(2)).unwrap();
     assert_eq!(state2["kind"], "state");
     assert_eq!(state2["model"], "gemini-pro-orchestrator-neon");
     assert!(state2["effort"].is_null(), "persisted state retained stale effort: {state2}");
-    reopened.hub.unsubscribe(sub2);
-    reopened.close();
+    reopened.router().unsubscribe(sub2);
+    reopened.close_blocking();
 }
 
 #[test]
@@ -1276,7 +1276,7 @@ fn pr2_zero_binding_isolation_and_dynamic_binding_attach_detach() {
         })],
     );
     let server = start_with(home.path(), rt);
-    let call = |op: &str, p: Value| server.hub.call_as(Caller::User, op, p);
+    let call = |op: &str, p: Value| server.router().call_as(Caller::User, op, p);
 
     assert_eq!(call("repo.create", json!({ "name": "demo" })).biz_code, 0);
     let opened = call("session.openWorkspace", json!({ "runtime": "antigravity", "cwd": cwd, "repo": "demo" }));
@@ -1285,23 +1285,25 @@ fn pr2_zero_binding_isolation_and_dynamic_binding_attach_detach() {
 
     assert_eq!(call("session.send", json!({ "id": sid, "text": "hello" })).biz_code, 0);
     until("workspace turn finishes", || {
-        server.test_internals().board.session(&sid).filter(|s| s.runs >= 1 && !s.phase.is_working())
+        crate::support::board_session(server.test_internals().board, &sid).filter(|s| s.runs >= 1 && !s.phase.is_working())
     });
 
     // F1 leak isolation: 0-binding User session never enters board slots, inbox, FarmView plays/agents, memories, or issue_chat.
-    let bundle = server.test_internals().board.bundle();
-    let room = server
-        .test_internals()
-        .board
-        .read(|s| vibevalley_core::rules::room_left(&s.sessions, "demo", 6, 4, ""));
+    let bundle = crate::support::board_bundle(server.test_internals().board);
+    let sessions = crate::support::board_sessions(server.test_internals().board);
+    let room = vibevalley_core::rules::room_left(&sessions, "demo", 6, 4, "");
     assert_eq!(room.farm, 6);
     assert_eq!(room.repo, Some(4));
     assert!(bundle.inbox.items.is_empty());
     assert!(!bundle.farm.view.plays.contains_key(&sid));
     assert!(bundle.farm.view.plots.is_empty());
     assert!(bundle.farm.progress.as_ref().is_none_or(|p| p.agents.is_empty()));
-    assert!(server.test_internals().memories.list("antigravity").unwrap().is_empty());
-    let general = server.test_internals().chat.default_channel();
+    assert!(
+        vibevalley_runtime::rt::block_on(server.test_internals().agent.memory.list_async("antigravity"))
+            .unwrap()
+            .is_empty()
+    );
+    let general = server.test_internals().channel.default_channel();
     let msgs = call("channel.message.list", json!({ "id": general })).data.unwrap();
     assert!(msgs.as_array().unwrap().iter().all(|m| m["kind"] != "dispatch"));
 
@@ -1313,27 +1315,30 @@ fn pr2_zero_binding_isolation_and_dynamic_binding_attach_detach() {
     let attached_data = attached.data.unwrap();
     assert_eq!(attached_data["controller"], "user");
     assert_eq!(attached_data["bindings"], json!([{ "kind": "issue", "id": issue_id }]));
-    assert!(server.test_internals().board.session(&sid).unwrap().is_board_worker());
-    assert_eq!(server.test_internals().board.session(&sid).unwrap().issue_id(), Some(issue_id.as_str()));
+    assert!(crate::support::board_session(server.test_internals().board, &sid).unwrap().is_board_worker());
+    assert_eq!(
+        crate::support::board_session(server.test_internals().board, &sid).unwrap().issue_id(),
+        Some(issue_id.as_str())
+    );
 
     // Binding persists across server restart; detaching removes it cleanly.
-    server.close();
+    server.close_blocking();
     drop(server);
     let (rt2, _log2) = MockRuntime::new("antigravity", vec![]);
     let reopened = start_with(home.path(), rt2);
-    let persisted = reopened.test_internals().board.session(&sid).unwrap();
+    let persisted = crate::support::board_session(reopened.test_internals().board, &sid).unwrap();
     assert_eq!(persisted.issue_id(), Some(issue_id.as_str()));
-    let detached = reopened.hub.call_as(
+    let detached = reopened.router().call_as(
         Caller::User,
         "session.binding.detach",
         json!({ "id": sid, "binding": { "kind": "issue", "id": issue_id } }),
     );
     assert_eq!(detached.biz_code, 0, "{}", detached.message);
     assert_eq!(detached.data.unwrap()["bindings"], json!([]));
-    assert!(!reopened.test_internals().board.session(&sid).unwrap().is_board_worker());
-    assert!(vibevalley_server::Server::voice(&*reopened.hub).is_some(), "started hub exposes voice");
-    let closed = reopened.hub.call_as(Caller::User, "session.closeWorkspace", json!({ "id": sid }));
+    assert!(!crate::support::board_session(reopened.test_internals().board, &sid).unwrap().is_board_worker());
+    assert!(reopened.server().ports().voice.is_some(), "started server exposes voice");
+    let closed = reopened.router().call_as(Caller::User, "session.closeWorkspace", json!({ "id": sid }));
     assert_eq!(closed.biz_code, 0, "{}", closed.message);
-    assert!(reopened.test_internals().board.session(&sid).is_none());
-    reopened.close();
+    assert!(crate::support::board_session(reopened.test_internals().board, &sid).is_none());
+    reopened.close_blocking();
 }

@@ -218,9 +218,9 @@ pub fn random_seed_hex() -> String {
 }
 
 /// Decodes a `host.*` wire call once at the boundary into a typed [`vibevalley_protocol::HostOp`].
-pub fn decode_host_op(op: &str, payload: Value) -> Result<vibevalley_protocol::HostOp, Box<vibevalley_server::transport::bridge::Envelope>> {
+pub fn decode_host_op(op: &str, payload: Value) -> Result<vibevalley_protocol::HostOp, Box<vibevalley_server::gateway::bridge::Envelope>> {
     use vibevalley_protocol::HostOp;
-    use vibevalley_server::transport::bridge::{BizCode, refusal};
+    use vibevalley_server::gateway::bridge::{BizCode, refusal};
 
     HostOp::from_wire(op, payload).map_err(|msg| {
         let code = if HostOp::is_known_op(op) {
@@ -234,10 +234,10 @@ pub fn decode_host_op(op: &str, payload: Value) -> Result<vibevalley_protocol::H
 
 /// Handles fast, stateless host ops (`host.sha256`, `host.randomBytes`, `host.qr`,
 /// `host.pixelManifest`) on either the engine thread or the shell fallback path.
-pub fn handle_stateless_op(op: &vibevalley_protocol::HostOp) -> Option<vibevalley_server::transport::bridge::Envelope> {
+pub fn handle_stateless_op(op: &vibevalley_protocol::HostOp) -> Option<vibevalley_server::gateway::bridge::Envelope> {
     use serde_json::json;
     use vibevalley_protocol::HostOp;
-    use vibevalley_server::transport::bridge::{BizCode, Envelope, refusal};
+    use vibevalley_server::gateway::bridge::{BizCode, Envelope, refusal};
 
     match op {
         HostOp::Sha256(req) => Some(Envelope::ok(json!({ "hex": sha256_hex(&req.text) }))),
@@ -1077,9 +1077,9 @@ mod tests {
         assert_eq!(qr_env.data.unwrap()["size"], 25);
 
         let unknown = decode_host_op("host.doesNotExist", serde_json::json!({})).unwrap_err();
-        assert_eq!(unknown.biz_code, vibevalley_server::transport::bridge::BizCode::RouteNotFound.code());
+        assert_eq!(unknown.biz_code, vibevalley_server::gateway::bridge::BizCode::RouteNotFound.code());
         let malformed = decode_host_op("host.sha256", serde_json::json!({})).unwrap_err();
-        assert_eq!(malformed.biz_code, vibevalley_server::transport::bridge::BizCode::InvalidInput.code());
+        assert_eq!(malformed.biz_code, vibevalley_server::gateway::bridge::BizCode::InvalidInput.code());
 
         let manifest = pixel_manifest().unwrap();
         assert!(manifest.len() > 700);

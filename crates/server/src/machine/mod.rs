@@ -157,7 +157,7 @@ impl Machine {
     pub(crate) fn dispatch(&self, id: EndpointId) -> Result<Value, ApiError> {
         match id {
             EndpointId::MachineList => ok_json(self.list()),
-            other => Err(ApiError::new(BizCode::RouteNotFound, format!("unexpected machine endpoint {}", other.op()))),
+            other => Err(ApiError::new(BizCode::RouteNotFound, format!("unexpected machine endpoint {}", other.as_op()))),
         }
     }
 

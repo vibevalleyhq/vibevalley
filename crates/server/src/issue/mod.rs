@@ -27,9 +27,9 @@ use vibevalley_core::rules::short_title;
 use vibevalley_core::{Clock, Move};
 use vibevalley_i18n::{Params, t};
 use vibevalley_protocol::{
-    ActWords, ApiError, Applied, AppliedIssue, BizCode, Caller, ChangedFile, Changes, Commit, Issue, IssueAction, IssueFilter, IssueHistory, IssueRefineInput,
-    IssueRequest, IssueReviewInput, IssueSplitInput, IssueStageKind, IssueStatus, IssueStatusPreviewUpdateInput, IssueStatusUpdateInput, IssueTimeline,
-    IssueUpdate, IssueUpdateInput, Next, Preview, Run, Session, StuckReason, UncommittedItem,
+    ActWords, ApiError, AppliedIssue, BizCode, Caller, ChangedFile, Changes, Commit, Issue, IssueAction, IssueFilter, IssueHistory, IssueRefineInput,
+    IssueRequest, IssueReviewInput, IssueSplitInput, IssueStageKind, IssueStatus, IssueStatusUpdateInput, IssueTimeline, IssueUpdate, IssueUpdateInput, Next,
+    Preview, Run, Session, StuckReason, UncommittedItem,
 };
 
 use crate::context::error::LookIn;
@@ -257,7 +257,7 @@ async fn move_lines_async(board: &Board, item: &Issue, s: &Settled, name: Option
             if !c.uncommitted.is_empty() {
                 out.push(t(
                     "server.issue.does.commitFirst",
-                    &[("helper", helper.into()), ("files", c.uncommitted.len().into())],
+                    &[("helper", helper.clone().into()), ("files", c.uncommitted.len().into())],
                 ));
             }
             if !c.conflicts.is_empty() {
@@ -515,7 +515,7 @@ impl Board {
         let discussion = if let Some(channel) = self.channel() {
             let thread = channel.issue_thread_async(&item.id, &item.title, None).await?;
             let discussion = channel
-                .history_async(&thread, 40)
+                .history_async(&thread, None, Some(40))
                 .await?
                 .into_iter()
                 .map(|m| m.text)
@@ -655,7 +655,7 @@ impl Board {
             .await
     }
 
-    pub(crate) async fn issue_status_preview_update_endpoint_async(&self, input: &IssueStatusPreviewUpdateInput) -> std::result::Result<Preview, ApiError> {
+    pub(crate) async fn issue_status_preview_update_endpoint_async(&self, input: &IssueStatusUpdateInput) -> std::result::Result<Preview, ApiError> {
         let mut item = self.get_async(&input.id).await?;
         Self::verify_approval(&item, input.status, input.revision.as_ref()).map_err(api)?;
         if let Some(edit) = &input.edit {
@@ -694,11 +694,6 @@ impl Board {
 
     pub(crate) async fn issue_review_endpoint_async(&self, input: IssueReviewInput) -> std::result::Result<Issue, ApiError> {
         self.review_from_input_async(input).await
-    }
-
-    pub(crate) async fn issue_comment_endpoint_async(&self, id: &str, text: &str) -> std::result::Result<Applied, ApiError> {
-        self.comment_async(id, text).await?;
-        Ok(Applied { seq: self.seq() })
     }
 
     pub(crate) async fn issue_refine_endpoint_async(&self, input: &IssueRefineInput) -> std::result::Result<Issue, ApiError> {
@@ -758,7 +753,7 @@ impl Board {
         caller: Caller,
         id: &str,
         since_tree: Option<&str>,
-        on_reviewed: Option<&dyn Fn(&str)>,
+        on_reviewed: Option<&(dyn Fn(&str) + Send + Sync)>,
     ) -> std::result::Result<Changes, ApiError> {
         let item = self.get_async(id).await?;
         let changes = self.changes_of_async(&item, since_tree).await?;

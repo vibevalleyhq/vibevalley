@@ -296,11 +296,7 @@ pub enum Verdict {
 
 /// How MOSS Live is asked whether it takes a key; a test answers for it.
 pub trait Realtime: Send + Sync {
-    fn verify(&self, key: &Secret, model: &str) -> Verdict;
-
-    fn verify_async<'a>(&'a self, key: &'a Secret, model: &'a str) -> crate::BoxFuture<'a, Verdict> {
-        Box::pin(async move { self.verify(key, model) })
-    }
+    fn verify_async<'a>(&'a self, key: &'a Secret, model: &'a str) -> crate::BoxFuture<'a, Verdict>;
 }
 
 /// The realtime address asked over plain HTTPS with the key: 401 and 403
@@ -333,28 +329,6 @@ fn parse_probe_response(key: &Secret, status: u16, body: Vec<u8>) -> Verdict {
 }
 
 impl Realtime for HttpProbe {
-    fn verify(&self, key: &Secret, model: &str) -> Verdict {
-        let safe = |text: &str| -> String { text.replace(key.expose(), "[redacted]").chars().take(200).collect() };
-        let answered = self.0.fetch(Request {
-            method: "GET",
-            url: format!("{MOSS}/realtime?model={model}"),
-            headers: vec![("authorization".into(), format!("Bearer {}", key.expose()))],
-            body: None,
-            timeout: Duration::from_secs(8),
-        });
-        let mut response = match answered {
-            Ok(r) => r,
-            Err(FetchError::Timeout) => return Verdict::Silent,
-            Err(FetchError::Network(why)) => return Verdict::Unreachable(safe(&why)),
-        };
-        let body = if matches!(response.status, 401 | 403) {
-            read_max(&mut response.body, 1 << 16).unwrap_or_default()
-        } else {
-            Vec::new()
-        };
-        parse_probe_response(key, response.status, body)
-    }
-
     fn verify_async<'a>(&'a self, key: &'a Secret, model: &'a str) -> crate::BoxFuture<'a, Verdict> {
         Box::pin(async move {
             let safe = |text: &str| -> String { text.replace(key.expose(), "[redacted]").chars().take(200).collect() };
@@ -483,10 +457,10 @@ mod tests {
         assert_eq!(response_create("c1"), r#"{"action":"response.create","response":{"call_ids":["c1"]}}"#);
     }
 
-    #[test]
-    fn the_key_is_asked_over_https_without_opening_a_session() {
+    #[tokio::test]
+    async fn the_key_is_asked_over_https_without_opening_a_session() {
         use crate::context::http::Response;
-        let probe = |answer: Result<(u16, &'static str), FetchError>| {
+        let probe = |answer: Result<(u16, &'static str), FetchError>| async move {
             let answer = parking_lot::Mutex::new(Some(answer));
             HttpProbe(Arc::new(move |r: Request| {
                 assert_eq!(r.url, "https://api.mosi.cn/v1/realtime?model=moss-live-1.0");
@@ -496,15 +470,16 @@ mod tests {
                     body: Box::new(std::io::Cursor::new(body.as_bytes().to_vec())),
                 })
             }))
-            .verify(&Secret::new("test-key"), "moss-live-1.0")
+            .verify_async(&Secret::new("test-key"), "moss-live-1.0")
+            .await
         };
-        assert_eq!(probe(Ok((426, ""))), Verdict::Ok);
+        assert_eq!(probe(Ok((426, ""))).await, Verdict::Ok);
         assert_eq!(
-            probe(Ok((401, r#"{"error":{"message":"invalid key test-key"}}"#))),
+            probe(Ok((401, r#"{"error":{"message":"invalid key test-key"}}"#))).await,
             Verdict::Refused("invalid key [redacted]".into())
         );
-        assert_eq!(probe(Ok((503, ""))), Verdict::Failed("HTTP 503".into()));
-        assert_eq!(probe(Err(FetchError::Timeout)), Verdict::Silent);
-        assert_eq!(probe(Err(FetchError::Network("dns".into()))), Verdict::Unreachable("dns".into()));
+        assert_eq!(probe(Ok((503, ""))).await, Verdict::Failed("HTTP 503".into()));
+        assert_eq!(probe(Err(FetchError::Timeout)).await, Verdict::Silent);
+        assert_eq!(probe(Err(FetchError::Network("dns".into()))).await, Verdict::Unreachable("dns".into()));
     }
 }

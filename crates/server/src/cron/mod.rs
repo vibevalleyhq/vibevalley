@@ -357,20 +357,25 @@ impl Scheduler {
     async fn to_orchestrator_async(&self, cron: &Cron, words: &str) -> Result<(), ApiError> {
         let unserved = || ApiError::new(BizCode::ServiceUnavailable, "no orchestrator takes scheduled tasks".to_string());
         let o = self.orchestrator.as_ref().ok_or_else(unserved)?;
-        let chat = self.chat.as_ref().ok_or_else(unserved)?;
-        let channel = if chat.place(&cron.channel).is_some() {
-            cron.channel.clone()
+        let channel = if let Some(chat) = self.chat.as_ref() {
+            if chat.place(&cron.channel).is_some() {
+                cron.channel.clone()
+            } else {
+                chat.default_channel()
+            }
         } else {
-            chat.default_channel()
+            cron.channel.clone()
         };
-        chat.notice_async(Noticing {
-            channel: channel.clone(),
-            text: words.to_string(),
-            code: "cron".into(),
-            ..Default::default()
-        })
-        .await;
-        let agent = chat.orchestrator_in(&channel);
+        if let Some(chat) = self.chat.as_ref() {
+            chat.notice_async(Noticing {
+                channel: channel.clone(),
+                text: words.to_string(),
+                code: "cron".into(),
+                ..Default::default()
+            })
+            .await;
+        }
+        let agent = self.chat.as_ref().map(|chat| chat.orchestrator_in(&channel)).unwrap_or_default();
         if o.hear_cron(&agent, &channel, words) { Ok(()) } else { Err(unserved()) }
     }
 
@@ -535,7 +540,6 @@ mod tests {
 
     use super::*;
     use crate::context::{Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
-    use crate::issue::BoardConfig;
     use crate::runtime::{Runtime, RuntimeConfig, RuntimeDriver};
     use crate::service::Service;
 
@@ -572,8 +576,8 @@ mod tests {
             registry: registry.clone(),
             model: None,
         });
-        let runtime = Runtime::open_async(ctx.clone(), driver, RuntimeConfig::under(dir.path())).await.unwrap();
-        let board = Board::open_async(ctx.clone(), runtime.clone(), BoardConfig::under(dir.path())).await.unwrap();
+        let (runtime, opened) = Runtime::open_async(ctx.clone(), driver, RuntimeConfig::under(dir.path())).await.unwrap();
+        let board = Board::open_async(ctx.clone(), runtime.clone(), opened, None, None).await.unwrap();
         let profile = Profile::open(ctx.clone(), &dir.path().join("agents"), &[], registry, false).unwrap();
 
         let orchestrator = Arc::new(CountingOrchestrator { heard: AtomicUsize::new(0) });

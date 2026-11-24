@@ -455,6 +455,7 @@ impl RemoteServer {
     }
 
     #[allow(clippy::result_large_err, reason = "Server::subscribe's contract returns the refusal envelope itself")]
+    #[allow(clippy::too_many_arguments)]
     async fn subscribe_http_inner(
         client: reqwest::Client,
         base_url: String,
@@ -530,15 +531,11 @@ impl RemoteServer {
 
 impl Server for RemoteServer {
     fn call(&self, op: &str, payload: Value) -> Envelope {
-        let (tx, rx) = flume::bounded(1);
         let client = self.client.clone();
         let base_url = self.base_url.clone();
         let token = self.token.clone();
         let op = op.to_string();
-        vibevalley_runtime::rt::handle().spawn(async move {
-            let _ = tx.send(Self::call_http_inner(&client, &base_url, &token, &op, payload).await);
-        });
-        rx.recv().unwrap_or_else(|_| refusal(BizCode::ServiceUnavailable, "remote call cancelled"))
+        vibevalley_runtime::rt::block_on(async move { Self::call_http_inner(&client, &base_url, &token, &op, payload).await })
     }
 
     fn call_with_async(self: Arc<Self>, _ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
@@ -546,14 +543,10 @@ impl Server for RemoteServer {
     }
 
     fn slice_snapshot(&self, slice: SliceKind) -> Value {
-        let (tx, rx) = flume::bounded(1);
         let client = self.client.clone();
         let base_url = self.base_url.clone();
         let token = self.token.clone();
-        vibevalley_runtime::rt::handle().spawn(async move {
-            let _ = tx.send(Self::slice_snapshot_json_http_inner(&client, &base_url, &token, slice).await);
-        });
-        let json = rx.recv().unwrap_or_else(|_| Arc::<str>::from("null"));
+        let json = vibevalley_runtime::rt::block_on(async move { Self::slice_snapshot_json_http_inner(&client, &base_url, &token, slice).await });
         serde_json::from_str(&json).unwrap_or(Value::Null)
     }
 
@@ -730,7 +723,6 @@ impl Server for RemoteServer {
     }
 
     fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
-        let (tx, rx) = flume::bounded(1);
         let client = self.client.clone();
         let base_url = self.base_url.clone();
         let token = self.token.clone();
@@ -738,11 +730,7 @@ impl Server for RemoteServer {
         let sub_id = self.next_sub_id.fetch_add(1, Ordering::Relaxed);
         let shutdown = self.shutdown.clone();
         let name = name.to_string();
-        vibevalley_runtime::rt::handle().spawn(async move {
-            let _ = tx.send(Self::subscribe_http_inner(client, base_url, token, subs, sub_id, shutdown, &name, payload).await);
-        });
-        rx.recv()
-            .unwrap_or_else(|_| Err(refusal(BizCode::ServiceUnavailable, "remote subscription cancelled")))
+        vibevalley_runtime::rt::block_on(async move { Self::subscribe_http_inner(client, base_url, token, subs, sub_id, shutdown, &name, payload).await })
     }
 
     fn subscribe_with_async(
