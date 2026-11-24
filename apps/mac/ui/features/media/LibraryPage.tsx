@@ -23,8 +23,8 @@ import { ready, useAgents, useQuery, useQueryClient } from "../../infra/query";
 import { useRouter, useSearchParams } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import { prefsNow, setLibraryTile } from "../../infra/state/prefs";
-import { useArtifacts } from "../artifact";
-import { inferArtifactFromName } from "../artifact/html";
+import { artifactTypeLabel, useArtifacts } from "../artifact";
+import { buildOutlineFromMarkdown, inferArtifactFromName } from "../artifact/html";
 import {
   type ContentBucket,
   contentBrowseBucket,
@@ -85,45 +85,29 @@ const tileMin = 96;
 const tileMax = 280;
 
 const deliverableNameRe =
-  /\.(?:(?:slide|slides|visual|canvas|design|dashboard|motion|page)\.html|html|htm|whiteboard(?:\.json|\.html)?|(?:design-system|tokens)\.json|outline\.md|doc\.md|md|markdown)$/iu;
+  /\.(?:(?:slide|slides|visual|canvas|design|dashboard|motion|prototype|page)\.(?:json|html)|html|htm|whiteboard(?:\.json|\.html)?|(?:design-system|tokens|sheet|diagram|storyboard|outline)\.json|outline\.md|doc\.md|md|markdown)$/iu;
 const markdownFileRe = /\.(?:md|markdown)$/iu;
 
 function importDeliverable(filename: string, content: string, inOutlineBucket: boolean): Promise<Artifact> {
   const inferred = inferArtifactFromName(filename, content);
   if (inferred.artifactType === "outline" || (inOutlineBucket && markdownFileRe.test(filename))) {
-    return api.artifact.outline.import({ markdown: content, filename });
+    const outlineContent = markdownFileRe.test(filename) ? `${JSON.stringify(buildOutlineFromMarkdown(inferred.title, content), null, 2)}\n` : content;
+    return api.artifact.create({
+      title: inferred.title,
+      artifactType: "outline",
+      content: outlineContent,
+    });
   }
   return api.artifact.create({
     title: inferred.title,
-    kind: inferred.kind,
-    ...(inferred.display !== undefined ? { display: inferred.display } : {}),
-    ...(inferred.artifactType !== undefined ? { artifactType: inferred.artifactType } : {}),
+    artifactType: inferred.artifactType,
     content,
   });
 }
 
 function artifactTypeTitle(type: ArtifactTypeFilter | undefined): string {
   if (type === undefined) return t("web.library.content.artifactType.all");
-  switch (type) {
-    case "outline":
-      return t("web.library.content.artifactType.outline");
-    case "whiteboard":
-      return t("web.library.content.artifactType.whiteboard");
-    case "docs":
-      return t("web.library.content.artifactType.docs");
-    case "slides":
-      return t("web.library.content.artifactType.slides");
-    case "dashboard":
-      return t("web.library.content.artifactType.dashboard");
-    case "design":
-      return t("web.library.content.artifactType.design");
-    case "design-system":
-      return t("web.library.content.artifactType.designSystem");
-    case "motion":
-      return t("web.library.content.artifactType.motion");
-    case "html":
-      return t("web.library.content.artifactType.html");
-  }
+  return artifactTypeLabel(type);
 }
 
 function titleOfBucket(bucket: ContentBucket): string {

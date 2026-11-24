@@ -247,7 +247,7 @@ function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
     const job = props.job;
     if (!job.result) return;
     const content = job.result.text;
-    return act.run(async () => saved.set((await api.artifact.create({ title: job.prompt.slice(0, 80), kind: "markdown", content })).id));
+    return act.run(async () => saved.set((await api.artifact.create({ title: job.prompt.slice(0, 80), artifactType: "docs", content })).id));
   };
   return (
     <Card title={props.job.model} action={<PhasePill phase={props.job.phase} text={props.job.phaseText} />}>

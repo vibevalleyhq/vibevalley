@@ -4,7 +4,6 @@ import { Popover } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 import { type Channel } from "@vibevalley/protocol";
 import { channelOf } from "@vibevalley/protocol/rules";
-import { artifactId as brandArtifactId, blockId as brandBlockId } from "@vibevalley/protocol/schema";
 
 import { TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
@@ -14,13 +13,13 @@ import { Tabs } from "../../../design/Tabs";
 import { Bubble } from "../../../design/Tip";
 import { Keyed } from "../../../infra/base/dom";
 import { useRouter } from "../../../infra/router";
-import { createEffect, createMemo } from "../../../infra/solid";
-import { ArtifactCanvas, type QuoteTarget } from "../../artifact";
+import { createMemo } from "../../../infra/solid";
+import { ArtifactCanvas } from "../../artifact";
 import { useMarkedChat } from "../model/marks";
 import { channelLabel, channelName, chatPath, pointedAt, topOf, topsOf } from "../model/places";
 import { FarmSearch, Members, Pins, ThreadList, ThreadPane } from "./ChannelPanels";
 import { BarButton, markOf, Sidebar } from "./ChannelSidebar";
-import { Composer, FileDrop, type QuotedBlockDraft } from "./Composer";
+import { Composer, FileDrop } from "./Composer";
 import { ChannelSettingsDialog, NewChannelDialog } from "./Dialogs";
 import { MessageList } from "./MessageList";
 import { Crons, Sessions } from "./Tabs";
@@ -47,13 +46,6 @@ function Chat() {
   const dialog = signal<"none" | "new" | "search">("none");
   // A message's address (?m=) lights it up in the pane it is in: the thread's, or the channel's.
   const point = () => pointedAt(router.path());
-  // The blocks of an artifact the user is about to speak about (quoted from an artifact opened beside the talk).
-  const quoted = signal<QuotedBlockDraft[]>([]);
-  createEffect(
-    () => channel()?.id,
-    () => quoted.set([]),
-  );
-  const unquote = (blockId: string) => quoted.set(quoted().filter((q) => q.ref.blockId !== blockId));
   // An artifact opened beside the talk that made it (?artifact=).
   const artifact = () => new URLSearchParams(router.path().split("?")[1] ?? "").get("artifact") ?? undefined;
   const closeArtifact = () => {
@@ -62,11 +54,6 @@ function Chat() {
     params.delete("artifact");
     const qs = params.toString();
     router.navigate(`${path}${qs ? `?${qs}` : ""}`, { replace: true });
-  };
-  const quote = (id: string, block: QuoteTarget) => {
-    const had = quoted();
-    if (had.some((q) => q.ref.blockId === block.id)) return;
-    quoted.set([...had, { ref: { artifactId: brandArtifactId(id), blockId: brandBlockId(block.id), rev: block.rev }, text: block.text }]);
   };
 
   const sidebar = () => (
@@ -86,16 +73,7 @@ function Chat() {
       {/* Only once the chat is in: keyed before it, the channel's arrival would start a tab picked meanwhile over. */}
       <If when={chat()}>
         <Keyed key={channel()?.id ?? ""}>
-          {() => (
-            <ChannelMain
-              channel={channel()}
-              point={thread() ? undefined : point()}
-              onDrawer={() => drawer.set(!drawer())}
-              quoted={quoted()}
-              onClearQuote={() => quoted.set([])}
-              onRemoveQuote={unquote}
-            />
-          )}
+          {() => <ChannelMain channel={channel()} point={thread() ? undefined : point()} onDrawer={() => drawer.set(!drawer())} />}
         </Keyed>
       </If>
       <If when={thread()}>
@@ -111,7 +89,7 @@ function Chat() {
       <If when={artifact()}>
         {(id) => (
           <View class={`border-l border-line bg-page ${lg() ? "w-130 shrink-0" : "absolute inset-0 z-20"}`}>
-            <Keyed key={id()}>{() => <ArtifactCanvas id={untracked(id)} onClose={closeArtifact} onQuote={(block) => quote(untracked(id), block)} />}</Keyed>
+            <Keyed key={id()}>{() => <ArtifactCanvas id={untracked(id)} onClose={closeArtifact} />}</Keyed>
           </View>
         )}
       </If>
@@ -176,14 +154,7 @@ function HeadPopover(props: {
 }
 
 /** Built again for each channel (Keyed): its tab and search start over in another one. */
-function ChannelMain(props: {
-  channel: Channel | undefined;
-  point: number | undefined;
-  onDrawer: () => void;
-  quoted: readonly QuotedBlockDraft[];
-  onClearQuote: () => void;
-  onRemoveQuote: (blockId: string) => void;
-}) {
+function ChannelMain(props: { channel: Channel | undefined; point: number | undefined; onDrawer: () => void }) {
   const router = useRouter();
   const tab = signal<Tab>("chat");
   const overlay = signal<HeaderOverlay>("none");
@@ -323,13 +294,7 @@ function ChannelMain(props: {
               point={props.point}
               emptyText={t("web.channel.empty", { label: channelLabel(props.channel) })}
             />
-            <Composer
-              channel={props.channel}
-              placeholder={t("web.channel.sendTo", { label: channelLabel(props.channel) })}
-              quoted={props.quoted}
-              onClearQuote={props.onClearQuote}
-              onRemoveQuote={props.onRemoveQuote}
-            />
+            <Composer channel={props.channel} placeholder={t("web.channel.sendTo", { label: channelLabel(props.channel) })} />
           </FileDrop>
           <If when={md() && membersOpen() ? props.channel : undefined}>{(c) => <Members channel={c()} />}</If>
         </View>

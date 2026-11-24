@@ -3,7 +3,7 @@ import { Input, Progress } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import { userId } from "@vibevalley/protocol";
-import type { ArtifactViewContext, BlockRef, Channel } from "@vibevalley/protocol";
+import type { ArtifactViewContext, Channel } from "@vibevalley/protocol";
 import { sessionProfile } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
@@ -28,11 +28,6 @@ import { EmojiPopover } from "./EmojiPicker";
 import { HelperFace } from "./presence";
 
 /** The box for saying a sentence in a channel: Enter sends, Shift+Enter starts a line, @ names someone. */
-export interface QuotedBlockDraft {
-  readonly ref: BlockRef;
-  readonly text: string;
-}
-
 const key = (name: string, shiftKey = false): ComposerKey & { prevented: boolean } => {
   const k = {
     key: name,
@@ -52,6 +47,7 @@ function artifactContextLabel(ctx: ArtifactViewContext): string {
   else if (ctx.activeArtboard) parts.push(ctx.activeArtboard);
   else if (ctx.activeTab) parts.push(ctx.activeTab);
   else if (ctx.activeDataset) parts.push(ctx.activeDataset);
+  else if (ctx.activePath) parts.push(ctx.activePath);
   if (ctx.selectedIds && ctx.selectedIds.length > 0) {
     parts.push(t("web.channel.composer.artifactSelected", { n: ctx.selectedIds.length }));
   }
@@ -85,14 +81,7 @@ function BoxButton(props: {
   );
 }
 
-export function Composer(props: {
-  channel: Channel | undefined;
-  placeholder: string;
-  replyTo?: number | undefined;
-  quoted?: readonly QuotedBlockDraft[] | undefined;
-  onClearQuote?: (() => void) | undefined;
-  onRemoveQuote?: ((blockId: string) => void) | undefined;
-}) {
+export function Composer(props: { channel: Channel | undefined; placeholder: string; replyTo?: number | undefined }) {
   const collab = useCollabSlice();
   const sessions = useSessionsSlice();
   const problem = signal<string | undefined>(undefined);
@@ -123,7 +112,6 @@ export function Composer(props: {
         id: props.channel?.id ?? "",
         ...(replyNumber !== undefined ? { replyTo: replyNumber } : {}),
         ...(files.length > 0 ? { attachments: files.map((f) => f.id) } : {}),
-        ...((props.quoted?.length ?? 0) > 0 ? { blocks: (props.quoted ?? []).map((q) => q.ref) } : {}),
         ...(viewContext ? { viewContext } : {}),
       };
     },
@@ -140,7 +128,6 @@ export function Composer(props: {
     sent: () => {
       const id = props.channel?.id;
       if (id) drafts.clear(id);
-      props.onClearQuote?.();
     },
   });
   // The system's open panel (VibeValley's hidden file input); the picked files come with their bytes.
@@ -276,29 +263,6 @@ export function Composer(props: {
             {p()}
           </Text>
         )}
-      </If>
-      <If when={(props.quoted?.length ?? 0) > 0}>
-        <View class="mb-2 gap-1">
-          <Each of={props.quoted ?? []} key={(q) => q.ref.blockId}>
-            {(q) => (
-              <View
-                testID={`quoted-block-${q().ref.blockId}`}
-                class="flex-row items-center gap-2 rounded-md border-l-2 border-wheat bg-side py-1 pr-1.5 pl-2.5"
-              >
-                <Icon name="artifacts" size={12} tone="muted" />
-                <Text class="min-w-0 flex-1 truncate text-xs text-muted">{t("web.channel.composer.quotedBlock", { text: q().text })}</Text>
-                <BoxButton
-                  icon="close"
-                  iconSize={12}
-                  testid="quoted-block-remove"
-                  label={t("web.channel.composer.cancelQuote")}
-                  onPress={() => props.onRemoveQuote?.(q().ref.blockId)}
-                  class="h-5 w-5"
-                />
-              </View>
-            )}
-          </Each>
-        </View>
       </If>
       <If when={replying()}>
         {(m) => (

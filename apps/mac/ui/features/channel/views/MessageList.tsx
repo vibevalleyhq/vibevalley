@@ -558,28 +558,6 @@ function MessageRow(props: {
       </If>
       <If when={props.m.attachments.length > 0 ? props.m.attachments : undefined}>{(files) => <Attachments files={files()} />}</If>
       <If when={props.m.deleted === undefined ? props.m.artifact : undefined}>{(card) => <ArtifactCard card={card()} />}</If>
-      <If when={props.m.deleted === undefined && (props.m.blocks?.length ?? 0) > 0 ? props.m.blocks : undefined}>
-        {(blocks) => (
-          <View class="mt-1 gap-1">
-            <Each of={blocks()} key={(b) => `${b.artifactId}:${b.blockId}`}>
-              {(b) => (
-                <View
-                  testID={`message-quoted-block-${b().blockId}`}
-                  class="max-w-md flex-row items-center gap-2 rounded-md border-l-2 border-wheat bg-hover px-2 py-1"
-                >
-                  <Icon name="artifacts" size={12} tone="muted" />
-                  <Text class="min-w-0 flex-1 truncate text-xs text-muted">
-                    {t("web.channel.messages.quotedBlock", {
-                      title: b().title,
-                      text: b().deleted === true ? t("web.channel.messages.quotedGone") : (b().text ?? ""),
-                    })}
-                  </Text>
-                </View>
-              )}
-            </Each>
-          </View>
-        )}
-      </If>
       <If when={props.m.deleted === undefined && props.m.text !== "" ? props.m.text : undefined}>{(text) => <LinkedMessages text={text()} />}</If>
       <If when={props.m.deleted === undefined && props.m.embeds.length > 0 ? props.m.embeds : undefined}>{(embeds) => <Embeds embeds={embeds()} />}</If>
       <If when={props.m.reactions.length > 0}>

@@ -1,4 +1,4 @@
-import { cleanup, keymap, Scroll, signal, Text, View, WebView } from "nsh";
+import { cleanup, computed, keymap, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { artifactId } from "@vibevalley/protocol/schema";
@@ -6,23 +6,31 @@ import { artifactId } from "@vibevalley/protocol/schema";
 import { Button } from "../../design/Button";
 import { IconButton } from "../../design/IconButton";
 import { Empty, Kbd } from "../../design/layout";
-import { reasonOf } from "../../infra/api";
 import { useNow } from "../../infra/base/dom";
 import { useRouter } from "../../infra/router";
-import { shownTheme } from "../../infra/state/prefs";
 import { artifactHref, useArtifact } from "./ArtifactCard";
-import { createFrame, shim, withShellQuery } from "./frame";
 import { elapsedText, presenterOf, stepped } from "./slides";
-import { Slide } from "./SlidesControls";
-import { useArtifactPage, useStoreViewHtml } from "./store";
+import { useArtifactDirectory } from "./store";
 
-function withSlideQuery(html: string, at: number, still: boolean): string {
-  const asked = new URLSearchParams();
-  asked.set("at", String(at));
-  if (still) asked.set("still", "1");
-  const read = "new URLSearchParams(location.search)";
-  const idx = html.lastIndexOf(read);
-  return idx < 0 ? html : `${html.slice(0, idx)}new URLSearchParams(${JSON.stringify(asked.toString())})${html.slice(idx + read.length)}`;
+interface SlideItem {
+  readonly id: string;
+  readonly title: string;
+  readonly subtitle: string;
+  readonly notes: string;
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function parseJson(raw: string | undefined): Record<string, unknown> | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isRecord(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function PresenterPage() {
@@ -45,30 +53,38 @@ export function PresenterPage() {
 function Presenter(props: { id: string; version: number }) {
   const router = useRouter();
   const artifact = useArtifact(() => props.id);
-  const isStore = () => artifact.data()?.body === "store";
-  const htmlPage = useArtifactPage(() => (isStore() ? undefined : { id: props.id, version: props.version, theme: shownTheme() }));
-  const storeView = useStoreViewHtml(() => (isStore() ? { id: artifactId(props.id), theme: shownTheme(), seq: props.version } : undefined));
-  const currentHtml = () => {
-    if (isStore()) return storeView.html();
-    const raw = htmlPage.html();
-    return raw !== undefined ? withShellQuery(raw) : undefined;
-  };
-  const frame = createFrame();
-  const pages = () => frame.shown().ready?.pages ?? 0;
+  const { snapshot } = useArtifactDirectory(() => artifactId(props.id));
+  const at = signal(0);
+
+  const slides = computed((): readonly SlideItem[] => {
+    const deck = parseJson(snapshot().contents.get("structure/deck.json")?.content);
+    const list: unknown[] = Array.isArray(deck?.slides) ? deck.slides : [];
+    return list.map((raw, idx) => {
+      const rec = isRecord(raw) ? raw : {};
+      const file = typeof rec.file === "string" ? rec.file : "";
+      const detail = parseJson(file ? snapshot().contents.get(file)?.content : undefined);
+      return {
+        id: typeof rec.id === "string" ? rec.id : `slide-${idx + 1}`,
+        title: typeof detail?.title === "string" ? detail.title : typeof rec.title === "string" ? rec.title : `Slide ${idx + 1}`,
+        subtitle: typeof detail?.subtitle === "string" ? detail.subtitle : "",
+        notes: typeof detail?.notes === "string" ? detail.notes : "",
+      };
+    });
+  });
+
+  const pages = () => slides().length;
+  const current = () => slides()[at()];
+  const nextSlide = () => slides()[at() + 1];
   const statusText = () => {
-    const state = frame.state();
-    const error = isStore() ? storeView.error() : htmlPage.error();
-    if (error) return t("web.artifact.presenter.loadFailure", { reason: typeof error === "string" ? error : reasonOf(error) });
-    if (typeof state === "object") return t("web.artifact.presenter.loadFailure", { reason: state.error });
-    return frame.shown().ready ? t("web.artifact.presenter.empty") : t("web.artifact.presenter.waiting");
+    const err = snapshot().error;
+    if (err) return t("web.artifact.presenter.loadFailure", { reason: err });
+    return snapshot().loading ? t("web.artifact.presenter.waiting") : t("web.artifact.presenter.empty");
   };
-  const at = () => frame.shown().at?.page ?? 0;
-  const goto = (page: number) => frame.send({ vibevalley: "goto", page });
-  const goBack = () => router.navigate(artifactHref(props.id, isStore() ? undefined : props.version));
+  const goBack = () => router.navigate(artifactHref(props.id));
   const now = useNow(1000);
   const started = signal(now());
   const step = (n: 1 | -1) => {
-    if (pages() > 0) goto(stepped({ at: at(), step: n, pages: pages() }));
+    if (pages() > 0) at.set(stepped({ at: at(), step: n, pages: pages() }));
   };
   cleanup(
     keymap.bind(
@@ -77,7 +93,8 @@ function Presenter(props: { id: string; version: number }) {
     ),
   );
   const title = () => artifact.data()?.title ?? "";
-  const notes = () => frame.shown().ready?.notes?.[at()] ?? "";
+  const notes = () => current()?.notes ?? "";
+
   return (
     <View testID="presenter" accessibilityValue={{ now: at(), max: pages() }} class="h-full min-h-0 flex-1 bg-side">
       <View class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3.5">
@@ -113,21 +130,18 @@ function Presenter(props: { id: string; version: number }) {
 
       <View class="min-h-0 flex-1 gap-4 p-4 md:flex-row">
         <View accessibilityLabel={t("web.artifact.presenter.current")} class="min-h-0 gap-3 md:flex-2">
-          <View class="aspect-video w-full overflow-hidden rounded-lg border border-line bg-page shadow-raise">
-            <If when={currentHtml()}>
-              {(html) => (
-                <WebView
-                  ref={(r) => frame.setRef(r)}
-                  testID="presenter-current"
-                  accessibilityLabel={t("web.artifact.presenter.current")}
-                  html={html()}
-                  incognito
-                  injectedJavaScriptBeforeContentLoaded={shim}
-                  onLoad={() => frame.setState("loaded")}
-                  onError={(e) => frame.setState({ error: e.code ?? e.message })}
-                  onMessage={(e) => frame.heard(e.data)}
-                  class="h-full w-full"
-                />
+          <View
+            testID="presenter-current"
+            class="aspect-video w-full justify-center gap-3 overflow-hidden rounded-lg border border-line bg-page p-8 shadow-raise"
+          >
+            <If when={current()}>
+              {(slide) => (
+                <>
+                  <Text class="text-2xl font-semibold text-ink">{slide().title}</Text>
+                  <If when={slide().subtitle}>
+                    <Text class="text-base text-muted">{slide().subtitle}</Text>
+                  </If>
+                </>
               )}
             </If>
           </View>
@@ -153,7 +167,7 @@ function Presenter(props: { id: string; version: number }) {
               </If>
             </View>
             <If
-              when={pages() > 0 && at() < pages() - 1}
+              when={nextSlide()}
               else={
                 <View class="aspect-video w-full items-center justify-center rounded-lg border border-dashed border-line bg-page">
                   <If when={pages() > 0}>
@@ -162,15 +176,17 @@ function Presenter(props: { id: string; version: number }) {
                 </View>
               }
             >
-              <View testID="presenter-next-slide" class="aspect-video w-full overflow-hidden rounded-lg border border-line bg-page shadow-raise">
-                <If when={isStore()} else={<Slide id={props.id} version={props.version} at={at() + 1} />}>
-                  <If when={storeView.html()}>
-                    {(html) => (
-                      <WebView html={withSlideQuery(html(), at() + 1, true)} incognito scrollable={false} accessibilityElementsHidden class="h-full w-full" />
-                    )}
+              {(slide) => (
+                <View
+                  testID="presenter-next-slide"
+                  class="aspect-video w-full justify-center gap-1.5 overflow-hidden rounded-lg border border-line bg-page p-4 shadow-raise"
+                >
+                  <Text class="text-base font-semibold text-ink">{slide().title}</Text>
+                  <If when={slide().subtitle}>
+                    <Text class="text-xs text-muted">{slide().subtitle}</Text>
                   </If>
-                </If>
-              </View>
+                </View>
+              )}
             </If>
           </View>
           <View class="min-h-0 flex-1 overflow-hidden rounded-lg border border-line bg-page">
