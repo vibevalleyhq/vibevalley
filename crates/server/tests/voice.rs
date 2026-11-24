@@ -20,24 +20,30 @@ struct Scripted {
 }
 
 impl ModelClient for Scripted {
-    fn complete(&self, request: &ChatRequest, on: &mut dyn FnMut(Delta)) -> vibevalley_runtime::agent::Result<Completion> {
+    fn complete<'a>(
+        &'a self,
+        request: &'a ChatRequest,
+        on: &'a mut (dyn FnMut(Delta) + Send),
+    ) -> vibevalley_runtime::BoxFuture<'a, vibevalley_runtime::agent::Result<Completion>> {
         self.seen.lock().unwrap().push(request.clone());
         let text = self.answers.lock().unwrap().pop_front().unwrap_or("好的。");
         on(Delta::Text(text.into()));
-        Ok(Completion {
-            message: Message {
-                role: Role::Assistant,
-                content: Some(text.into()),
-                reasoning: None,
-                tool_calls: vec![],
-                tool_call_id: None,
-            },
-            finish: FinishReason::Stop,
-            usage: Usage {
-                input: 100,
-                output: 10,
-                cache_read: 0,
-            },
+        Box::pin(async move {
+            Ok(Completion {
+                message: Message {
+                    role: Role::Assistant,
+                    content: Some(text.into()),
+                    reasoning: None,
+                    tool_calls: vec![],
+                    tool_call_id: None,
+                },
+                finish: FinishReason::Stop,
+                usage: Usage {
+                    input: 100,
+                    output: 10,
+                    cache_read: 0,
+                },
+            })
         })
     }
 }
@@ -208,21 +214,25 @@ fn a_farm_call_runs_over_moss_live() {
         ("wss://api.mosi.cn/v1/realtime?model=moss-live-1.0", "test-key")
     );
     assert!(f.voice().moss_line().is_err());
+    let mut outgoing = line.take_outgoing().unwrap();
+    let recv_timeout = |rx: &mut tokio::sync::mpsc::UnboundedReceiver<String>, wait: Duration| -> Option<String> {
+        vibevalley_runtime::rt::block_on(async { tokio::time::timeout(wait, rx.recv()).await.ok().flatten() })
+    };
     let update: Value = serde_json::from_str(&line.session_update()).unwrap();
     assert_eq!(update["session"]["persona"]["prompt"], "你是助手。");
     assert_eq!(update["session"]["tools"][0]["name"], "ask_orchestrator");
 
     // Words for the call wait until MOSS has taken the settings.
     assert!(f.voice().speak("小吴的测试跑完了。"));
-    assert!(line.outgoing.try_recv().is_err());
+    assert!(outgoing.try_recv().is_err());
     line.heard(r#"{"action":"session.updated","data":{"error":""}}"#);
-    let commentary: Value = serde_json::from_str(&line.outgoing.try_recv().unwrap()).unwrap();
+    let commentary: Value = serde_json::from_str(&outgoing.try_recv().unwrap()).unwrap();
     assert_eq!(
         (commentary["action"].as_str(), commentary["content"].as_str()),
         (Some("session.commentary.append"), Some("小吴的测试跑完了。"))
     );
     assert!(f.voice().speak("后面的直接送到。"));
-    assert!(line.outgoing.try_recv().unwrap().contains("后面的直接送到。"));
+    assert!(outgoing.try_recv().unwrap().contains("后面的直接送到。"));
 
     // The model's tool call is put to the orchestrator, answered, and resumed once MOSS acks the output.
     let asked = json!({
@@ -232,18 +242,15 @@ fn a_farm_call_runs_over_moss_live() {
     .to_string();
     line.heard(&asked);
     line.heard(&asked);
-    let output: Value = serde_json::from_str(&line.outgoing.recv_timeout(Duration::from_secs(30)).unwrap()).unwrap();
+    let output: Value = serde_json::from_str(&recv_timeout(&mut outgoing, Duration::from_secs(30)).unwrap()).unwrap();
     assert_eq!(
         output,
         json!({ "action": "conversation.item.create", "item": { "type": "function_call_output", "call_id": "c1", "output": "一共三张，两张在做。" } })
     );
     line.heard(r#"{"action":"conversation.item.created","data":{"item":{"type":"function_call_output","call_id":"c1"}}}"#);
-    assert_eq!(
-        line.outgoing.try_recv().unwrap(),
-        r#"{"action":"response.create","response":{"call_ids":["c1"]}}"#
-    );
+    assert_eq!(outgoing.try_recv().unwrap(), r#"{"action":"response.create","response":{"call_ids":["c1"]}}"#);
     // Duplicate call_id is executed once.
-    assert!(line.outgoing.recv_timeout(Duration::from_millis(300)).is_err());
+    assert!(recv_timeout(&mut outgoing, Duration::from_millis(300)).is_none());
     assert_eq!(f.model.seen.lock().unwrap().len(), 1);
     let input = f.model.seen.lock().unwrap()[0].messages.last().unwrap().content.clone().unwrap_or_default();
     assert!(input.ends_with("[来源：通话]\n现在有几张工单？"), "{input}");
@@ -281,6 +288,7 @@ fn a_moss_call_answering_a_ring_speaks_what_rang() {
     let f = farm(&["#3 做完了，等你验收。"]);
     f.moss();
     let line = f.voice().moss_line().unwrap();
+    let mut outgoing = line.take_outgoing().unwrap();
     let _ = line.session_update();
     line.heard(r#"{"action":"session.updated","data":{"error":""}}"#);
 
@@ -289,7 +297,10 @@ fn a_moss_call_answering_a_ring_speaks_what_rang() {
         "voice.call.start",
         json!({ "channel": grant["channel"], "uid": grant["uid"], "about": "#3 等你验收" }),
     );
-    let raw = line.outgoing.recv_timeout(Duration::from_secs(30)).expect("ring commentary delivered");
+    let raw = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(30), outgoing.recv()).await })
+        .ok()
+        .flatten()
+        .expect("ring commentary delivered");
     let frame: Value = serde_json::from_str(&raw).unwrap();
     assert_eq!(frame["action"], "session.commentary.append");
     assert_eq!(frame["content"], "#3 做完了，等你验收。");

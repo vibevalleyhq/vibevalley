@@ -31,7 +31,7 @@ pub mod media {
     }
 
     pub struct SpeechClaim {
-        pub events: flume::Receiver<serde_json::Value>,
+        pub events: tokio::sync::mpsc::Receiver<serde_json::Value>,
         /// Called once when the reader goes away.
         pub gone: Box<dyn FnOnce() + Send>,
     }
@@ -214,8 +214,8 @@ pub type SharedRemoteAuth = Arc<dyn RemoteAuth>;
 /// `gateway::http::machine_ws` to [`MachineBus`].
 pub struct MachineConnection {
     pub device: RemoteDeviceIdentity,
-    pub incoming: flume::Receiver<vibevalley_protocol::MachineWireFrame>,
-    pub outgoing: flume::Sender<vibevalley_protocol::MachineWireFrame>,
+    pub incoming: tokio::sync::mpsc::Receiver<vibevalley_protocol::MachineWireFrame>,
+    pub outgoing: tokio::sync::mpsc::Sender<vibevalley_protocol::MachineWireFrame>,
 }
 
 /// Port connecting the `/api/v1/machine/ws` transport to the machine manager.
@@ -270,7 +270,7 @@ pub trait LiveVoiceLine: Send + Sync {
     fn url(&self) -> &str;
     fn bearer_token(&self) -> &str;
     fn session_update(&self) -> String;
-    fn outgoing(&self) -> flume::Receiver<String>;
+    fn take_outgoing(&self) -> Option<tokio::sync::mpsc::UnboundedReceiver<String>>;
     fn heard(&self, raw: &str);
 }
 

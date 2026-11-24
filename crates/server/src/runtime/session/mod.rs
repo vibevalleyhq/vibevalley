@@ -68,7 +68,7 @@ fn send_watch_event<T: serde::Serialize>(sink: &crate::context::Sink, event: &T)
 }
 
 fn watch_stopped(sink: &crate::context::Sink) -> bool {
-    sink.stopped() || sink.events.is_disconnected()
+    sink.stopped() || sink.events.is_closed()
 }
 
 impl SessionEngine {
@@ -99,7 +99,7 @@ impl SessionEngine {
             return Err(helper_ref(id));
         };
         if session.phase.is_working() {
-            let _ = self.stop(&session.id);
+            let _ = self.abort_turn_async(&session.id).await;
         }
         Ok(())
     }
@@ -206,7 +206,7 @@ async fn watch_session(
     sessions: SessionEngine,
     mut sessions_sub: SliceSubscription,
     mut live: broadcast::Receiver<LiveEvent>,
-    workspace_updates: flume::Receiver<()>,
+    mut workspace_updates: tokio::sync::mpsc::Receiver<()>,
     cancel: CancellationToken,
     sink: crate::context::Sink,
 ) {
@@ -249,10 +249,10 @@ async fn watch_session(
         let got = tokio::select! {
             biased;
             _ = cancel.cancelled() => Msg::Stop,
-            _ = sink.stop.recv_async() => Msg::Stop,
+            _ = sink.stop.cancelled() => Msg::Stop,
             changed = sessions_sub.changed() => if changed { Msg::State } else { Msg::Stop },
-            ws = workspace_updates.recv_async(), if workspace_open => {
-                if ws.is_ok() { Msg::State } else { Msg::WorkspaceDropped }
+            ws = workspace_updates.recv(), if workspace_open => {
+                if ws.is_some() { Msg::State } else { Msg::WorkspaceDropped }
             }
             ev = live.recv() => match ev {
                 Ok(e) => Msg::Live(Box::new(e)),
@@ -350,7 +350,7 @@ async fn watch_issue(
             tokio::select! {
                 biased;
                 _ = cancel.cancelled() => WatchStep::Stop,
-                _ = sink.stop.recv_async() => WatchStep::Stop,
+                _ = sink.stop.cancelled() => WatchStep::Stop,
                 changed = board_sub.changed() => if changed { WatchStep::State } else { WatchStep::Stop },
                 changed = sessions_sub.changed() => if changed { WatchStep::State } else { WatchStep::Stop },
                 ev = live.recv() => match ev {

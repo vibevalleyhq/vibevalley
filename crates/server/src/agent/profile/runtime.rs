@@ -124,17 +124,15 @@ pub struct RuntimeFleet {
     cancel: CancellationToken,
 }
 
-/// Runs a blocking OAR trait probe on Tokio's blocking pool with a hard `PROBE_TIMEOUT`
-/// and immediate wakeup on `cancel`.
-async fn probe_with_timeout<T: Send + 'static>(cancel: &CancellationToken, f: impl FnOnce() -> T + Send + 'static) -> Option<T> {
+/// Runs an async OAR trait probe with a hard `PROBE_TIMEOUT` and immediate wakeup on `cancel`.
+async fn probe_with_timeout<T>(cancel: &CancellationToken, fut: impl std::future::Future<Output = T>) -> Option<T> {
     if cancel.is_cancelled() {
         return None;
     }
-    let handle = vibevalley_runtime::rt::current_or_global_handle().spawn_blocking(f);
     tokio::select! {
         biased;
         _ = cancel.cancelled() => None,
-        res = tokio::time::timeout(PROBE_TIMEOUT, handle) => res.ok().and_then(Result::ok),
+        res = tokio::time::timeout(PROBE_TIMEOUT, fut) => res.ok(),
     }
 }
 
@@ -302,7 +300,7 @@ impl RuntimeFleet {
             return;
         }
         let Some(runtime) = self.runtime(id) else { return };
-        let Some(usage) = probe_with_timeout(&self.cancel, move || runtime.account_usage())
+        let Some(usage) = probe_with_timeout(&self.cancel, runtime.account_usage())
             .await
             .and_then(Result::ok)
             .map(usage_from_oar)
@@ -427,13 +425,11 @@ impl RuntimeFleet {
             info.installation = Installation::Unsupported(InstallationUnsupported { reason, sign_in_command: None });
             return info;
         };
-        let probed = runtime.clone();
-        let installation =
-            probe_with_timeout(&self.cancel, move || probed.installation())
-                .await
-                .unwrap_or_else(|| vibevalley_runtime::oar::Installation::Unusable {
-                    reason: t("server.runtime.probeTimeout", &[]),
-                });
+        let installation = probe_with_timeout(&self.cancel, runtime.installation())
+            .await
+            .unwrap_or_else(|| vibevalley_runtime::oar::Installation::Unusable {
+                reason: t("server.runtime.probeTimeout", &[]),
+            });
         info.installation = match installation {
             vibevalley_runtime::oar::Installation::LoginRequired { path } => Installation::Unsupported(InstallationUnsupported {
                 reason: t("server.runtime.signInRequired", &[("runtime", info.preset.label.clone().into())]),
@@ -460,11 +456,9 @@ impl RuntimeFleet {
         if !matches!(info.installation, Installation::Available(_)) {
             return info;
         }
-        let listed = runtime.clone();
-        let read = runtime.clone();
         let (models_res, usage_res) = tokio::join!(
-            probe_with_timeout(&self.cancel, move || listed.list_models()),
-            probe_with_timeout(&self.cancel, move || read.account_usage()),
+            probe_with_timeout(&self.cancel, runtime.list_models()),
+            probe_with_timeout(&self.cancel, runtime.account_usage()),
         );
         info.models = models_res.and_then(Result::ok).map(|models| {
             models
@@ -629,33 +623,38 @@ impl RuntimeFleet {
         }
     }
 
-    pub fn assess_cached(&self, agent: &Agent) -> Assessment {
+    pub async fn assess_from_cache_async(&self, agent: &Agent) -> Assessment {
         let (settings, cached) = self.configuration_cached(&agent.runtime);
-        let info = cached.or_else(|| {
-            let runtime = self.runtime(&agent.runtime)?;
-            let mut info = self.placeholder(&agent.runtime, 0);
-            info.settings = settings;
-            info.installation = match runtime.installation() {
-                vibevalley_runtime::oar::Installation::Available { version, path } => Installation::Available(InstallationAvailable {
-                    via: if info.support.in_process || path.as_os_str() == "(built in)" {
-                        Via::Bundled
-                    } else {
-                        Via::Executable
-                    },
-                    command: path.to_string_lossy().into_owned(),
-                    version: version.filter(|v| !v.is_empty()),
-                }),
-                vibevalley_runtime::oar::Installation::NotInstalled => Installation::NotFound(InstallationNotFound {}),
-                vibevalley_runtime::oar::Installation::LoginRequired { path } => Installation::Unsupported(InstallationUnsupported {
-                    reason: t("server.runtime.signInRequired", &[("runtime", info.preset.label.clone().into())]),
-                    sign_in_command: Some(path.to_string_lossy().into_owned()),
-                }),
-                vibevalley_runtime::oar::Installation::Unusable { reason } => {
-                    Installation::Unsupported(InstallationUnsupported { reason, sign_in_command: None })
+        let info = match cached {
+            Some(c) => Some(c),
+            None => match self.runtime(&agent.runtime) {
+                None => None,
+                Some(runtime) => {
+                    let mut info = self.placeholder(&agent.runtime, 0);
+                    info.settings = settings;
+                    info.installation = match runtime.installation().await {
+                        vibevalley_runtime::oar::Installation::Available { version, path } => Installation::Available(InstallationAvailable {
+                            via: if info.support.in_process || path.as_os_str() == "(built in)" {
+                                Via::Bundled
+                            } else {
+                                Via::Executable
+                            },
+                            command: path.to_string_lossy().into_owned(),
+                            version: version.filter(|v| !v.is_empty()),
+                        }),
+                        vibevalley_runtime::oar::Installation::NotInstalled => Installation::NotFound(InstallationNotFound {}),
+                        vibevalley_runtime::oar::Installation::LoginRequired { path } => Installation::Unsupported(InstallationUnsupported {
+                            reason: t("server.runtime.signInRequired", &[("runtime", info.preset.label.clone().into())]),
+                            sign_in_command: Some(path.to_string_lossy().into_owned()),
+                        }),
+                        vibevalley_runtime::oar::Installation::Unusable { reason } => {
+                            Installation::Unsupported(InstallationUnsupported { reason, sign_in_command: None })
+                        }
+                    };
+                    Some(self.shown(info))
                 }
-            };
-            Some(self.shown(info))
-        });
+            },
+        };
         let problems = agent_problems(agent, info.as_ref());
         let blocking = problems.iter().filter(|p| p.level == AgentProblemLevel::Error).cloned().collect();
         Assessment {
@@ -680,15 +679,14 @@ impl RuntimeFleet {
         out
     }
 
-    pub fn candidates_cached(&self) -> Vec<Candidate> {
-        self.profiles
-            .agents()
-            .into_iter()
-            .map(|agent| {
-                let usable = self.assess_cached(&agent).usable();
-                Candidate { agent, usable }
-            })
-            .collect()
+    pub async fn candidates_from_cache_async(&self) -> Vec<Candidate> {
+        let agents = self.profiles.agents();
+        let mut out = Vec::with_capacity(agents.len());
+        for agent in agents {
+            let usable = self.assess_from_cache_async(&agent).await.usable();
+            out.push(Candidate { agent, usable });
+        }
+        out
     }
 
     pub async fn choose_async(&self, brief: &str, named: &str, picked: &str) -> Option<Agent> {
@@ -696,8 +694,9 @@ impl RuntimeFleet {
         choose_agent(&candidates, brief, named, picked)
     }
 
-    pub fn choose_cached(&self, brief: &str, named: &str, picked: &str) -> Option<Agent> {
-        choose_agent(&self.candidates_cached(), brief, named, picked)
+    pub async fn choose_from_cache_async(&self, brief: &str, named: &str, picked: &str) -> Option<Agent> {
+        let candidates = self.candidates_from_cache_async().await;
+        choose_agent(&candidates, brief, named, picked)
     }
 
     /// Shared execution-layer `MachineRegistry` for resolving local and remote runtimes.
@@ -706,7 +705,7 @@ impl RuntimeFleet {
     }
 
     /// Resolves an explicit non-local `(machine_id, runtime_id)` pair from `MachineRegistry`.
-    fn resolve_remote_target(&self, machine_id: &str, runtime_id: &str) -> Result<(Arc<dyn Runtime>, bool), ApiError> {
+    async fn resolve_remote_target_async(&self, machine_id: &str, runtime_id: &str) -> Result<(Arc<dyn Runtime>, bool), ApiError> {
         let machine = self
             .machines
             .get(machine_id)
@@ -718,7 +717,7 @@ impl RuntimeFleet {
         let runtime = machine
             .runtime(runtime_id)
             .ok_or_else(|| refused(format!("runtime `{runtime_id}` is not available on execution machine `{machine_id}`")))?;
-        match runtime.installation() {
+        match runtime.installation().await {
             vibevalley_runtime::oar::Installation::Available { .. } => Ok((runtime, desc.local)),
             vibevalley_runtime::oar::Installation::NotInstalled => Err(refused(format!("runtime `{runtime_id}` is not installed on machine `{machine_id}`"))),
             vibevalley_runtime::oar::Installation::LoginRequired { .. } => {
@@ -750,7 +749,7 @@ impl RuntimeFleet {
             .unwrap_or(LOCAL_MACHINE_ID);
 
         if target_machine != LOCAL_MACHINE_ID {
-            return self.resolve_remote_agent(agent, target_machine, &bare_runtime);
+            return self.resolve_remote_agent_async(agent, target_machine, &bare_runtime).await;
         }
 
         let (settings, info) = self.configuration_async(&bare_runtime).await;
@@ -758,14 +757,14 @@ impl RuntimeFleet {
     }
 
     /// Non-blocking resolution of `agent` using cached runtime metadata.
-    pub fn resolve_cached(&self, agent: &Agent) -> Result<Resolved, ApiError> {
-        self.resolve_on_machine_cached(agent, None)
+    pub async fn resolve_from_cache_async(&self, agent: &Agent) -> Result<Resolved, ApiError> {
+        self.resolve_on_machine_from_cache_async(agent, None).await
     }
 
     /// Non-blocking resolution of `agent` against an explicit `machine_override`
     /// (`Issue.machine_id`), falling back to `agent.machine_id`, any `RuntimeRef`
     /// machine prefix on `agent.runtime`, and finally `"local"`.
-    pub fn resolve_on_machine_cached(&self, agent: &Agent, machine_override: Option<&str>) -> Result<Resolved, ApiError> {
+    pub async fn resolve_on_machine_from_cache_async(&self, agent: &Agent, machine_override: Option<&str>) -> Result<Resolved, ApiError> {
         let (ref_machine, bare_runtime) = match RuntimeRef::parse(agent.runtime.trim()) {
             Ok(parsed) => (Some(parsed.machine_id), parsed.runtime_id),
             Err(_) => (None, agent.runtime.trim().to_string()),
@@ -778,15 +777,15 @@ impl RuntimeFleet {
             .unwrap_or(LOCAL_MACHINE_ID);
 
         if target_machine != LOCAL_MACHINE_ID {
-            return self.resolve_remote_agent(agent, target_machine, &bare_runtime);
+            return self.resolve_remote_agent_async(agent, target_machine, &bare_runtime).await;
         }
 
         let (settings, info) = self.configuration_cached(&bare_runtime);
         self.resolve_local_agent(agent, &bare_runtime, settings, info)
     }
 
-    fn resolve_remote_agent(&self, agent: &Agent, target_machine: &str, bare_runtime: &str) -> Result<Resolved, ApiError> {
-        let (runtime, is_local) = self.resolve_remote_target(target_machine, bare_runtime)?;
+    async fn resolve_remote_agent_async(&self, agent: &Agent, target_machine: &str, bare_runtime: &str) -> Result<Resolved, ApiError> {
+        let (runtime, is_local) = self.resolve_remote_target_async(target_machine, bare_runtime).await?;
         let settings = self.profiles.settings(bare_runtime);
         let model = if !agent.model.trim().is_empty() {
             agent.model.trim().to_string()
@@ -857,11 +856,11 @@ impl RuntimeFleet {
     /// saved runtime settings (binary path, env, defaults) without blocking on
     /// a full background model probe. Accepts either `<runtime_id>` (local) or
     /// `<machine_id>/<runtime_id>` (`RuntimeRef`).
-    pub fn resolve_runtime(&self, runtime_id: &str, model: Option<&str>, effort: Option<&str>) -> Result<Resolved, ApiError> {
+    pub async fn resolve_runtime_async(&self, runtime_id: &str, model: Option<&str>, effort: Option<&str>) -> Result<Resolved, ApiError> {
         if let Ok(parsed) = RuntimeRef::parse(runtime_id.trim())
             && !parsed.is_local()
         {
-            let (runtime, is_local) = self.resolve_remote_target(&parsed.machine_id, &parsed.runtime_id)?;
+            let (runtime, is_local) = self.resolve_remote_target_async(&parsed.machine_id, &parsed.runtime_id).await?;
             let settings = self.profiles.settings(&parsed.runtime_id);
             let model = model
                 .map(str::trim)

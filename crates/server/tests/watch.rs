@@ -127,8 +127,8 @@ fn the_watch_routes_the_chat_to_a_session() {
 
 struct BlockingRuntime {
     id: String,
-    entered: flume::Sender<()>,
-    release: flume::Receiver<()>,
+    entered: tokio::sync::mpsc::Sender<()>,
+    release: Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<()>>>,
 }
 
 impl Runtime for BlockingRuntime {
@@ -144,21 +144,27 @@ impl Runtime for BlockingRuntime {
         ScriptedRuntime::new(&self.id, Script::new()).capabilities()
     }
 
-    fn installation(&self) -> Installation {
-        Installation::Available {
-            version: None,
-            path: PathBuf::from("(blocking-test)"),
-        }
+    fn installation(&self) -> vibevalley_runtime::oar::BoxFuture<'_, Installation> {
+        Box::pin(async {
+            Installation::Available {
+                version: None,
+                path: PathBuf::from("(blocking-test)"),
+            }
+        })
     }
 
-    fn list_models(&self) -> vibevalley_runtime::oar::Result<Vec<ModelInfo>> {
-        Ok(vec![])
+    fn list_models(&self) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Result<Vec<ModelInfo>>> {
+        Box::pin(async { Ok(vec![]) })
     }
 
-    fn open(&self, opts: SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn Session>> {
-        let _ = self.entered.send(());
-        let _ = self.release.recv_timeout(Duration::from_secs(15));
-        ScriptedRuntime::demo().open(opts)
+    fn open(&self, opts: SessionOptions) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Result<Arc<dyn Session>>> {
+        Box::pin(async move {
+            let _ = self.entered.send(()).await;
+            let mut rx = self.release.lock().await;
+            let _ = tokio::time::timeout(Duration::from_secs(15), rx.recv()).await;
+            drop(rx);
+            ScriptedRuntime::demo().open(opts).await
+        })
     }
 }
 
@@ -166,13 +172,13 @@ impl Runtime for BlockingRuntime {
 fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
-    let (entered_tx, entered_rx) = flume::bounded::<()>(4);
-    let (release_tx, release_rx) = flume::bounded::<()>(4);
+    let (entered_tx, mut entered_rx) = tokio::sync::mpsc::channel::<()>(4);
+    let (release_tx, release_rx) = tokio::sync::mpsc::channel::<()>(4);
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(BlockingRuntime {
         id: "blocking".into(),
         entered: entered_tx,
-        release: release_rx,
+        release: Arc::new(tokio::sync::Mutex::new(release_rx)),
     }));
     let started = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
@@ -205,8 +211,9 @@ fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
         "Chat::say blocked on slow direct wakeup: {:?}",
         started_at.elapsed()
     );
-    entered_rx
-        .recv_timeout(Duration::from_secs(5))
+    vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(5), entered_rx.recv()).await })
+        .ok()
+        .flatten()
         .expect("direct talk lane entered BlockingRuntime::open");
 
     // While `BlockingRuntime::open` is actively blocked, writing in `#other` returns immediately.
@@ -237,7 +244,7 @@ fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
     );
 
     // Unblock `runtime.open` and verify the direct-channel talk settles and reports cleanly.
-    let _ = release_tx.send(());
+    let _ = release_tx.try_send(());
     crate::support::wait_until_channel_event(started.test_internals().channel, Duration::from_secs(30), "direct talk report landed", || {
         let rows = call("channel.message.list", json!({ "id": direct }));
         rows.as_array()?.iter().any(|m| m["kind"] == "report").then_some(())
@@ -272,15 +279,15 @@ impl Runtime for ResumableTalkRuntime {
         }
     }
 
-    fn installation(&self) -> Installation {
+    fn installation(&self) -> vibevalley_runtime::oar::BoxFuture<'_, Installation> {
         self.inner.installation()
     }
 
-    fn list_models(&self) -> vibevalley_runtime::oar::Result<Vec<ModelInfo>> {
+    fn list_models(&self) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Result<Vec<ModelInfo>>> {
         self.inner.list_models()
     }
 
-    fn open(&self, mut opts: SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn Session>> {
+    fn open(&self, mut opts: SessionOptions) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Result<Arc<dyn Session>>> {
         self.resumes.lock().unwrap().push(opts.resume.clone());
         opts.resume = None;
         self.inner.open(opts)
@@ -364,13 +371,13 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
 
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
-    let (entered_tx, entered_rx) = flume::bounded::<()>(4);
-    let (release_tx, release_rx) = flume::bounded::<()>(4);
+    let (entered_tx, mut entered_rx) = tokio::sync::mpsc::channel::<()>(4);
+    let (release_tx, release_rx) = tokio::sync::mpsc::channel::<()>(4);
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(BlockingRuntime {
         id: "blocking".into(),
         entered: entered_tx,
-        release: release_rx,
+        release: Arc::new(tokio::sync::Mutex::new(release_rx)),
     }));
     let started = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
@@ -395,7 +402,10 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
 
     // First message enters BlockingRuntime::open so the lane thread is busy before second is claimed.
     call("channel.message.send", json!({ "id": direct, "text": "第一条", "sendKey": "mb-1" }));
-    entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(5), entered_rx.recv()).await })
+        .ok()
+        .flatten()
+        .unwrap();
 
     call("channel.message.send", json!({ "id": direct, "text": "撤回这条", "sendKey": "mb-2" }));
     let msgs = call("channel.message.list", json!({ "id": direct }));
@@ -421,8 +431,8 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
     );
 
     // Release BlockingRuntime so the first delivery finishes and the withdrawn second message is skipped.
-    let _ = release_tx.send(());
-    let _ = release_tx.send(());
+    let _ = release_tx.try_send(());
+    let _ = release_tx.try_send(());
     crate::support::wait_until_settled(
         Some(started.ctx()),
         Duration::from_secs(30),

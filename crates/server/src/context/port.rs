@@ -11,7 +11,7 @@ use crate::BoxFuture;
 
 /// Breaks the `cron <-> orchestrator` cycle so `cron` triggers the orchestrator while `orchestrator`/`tool` manages crons.
 pub trait CronOrchestratorPort: Send + Sync {
-    fn hear_cron(&self, agent: &str, channel: &str, line: &str) -> bool;
+    fn hear_cron<'a>(&'a self, agent: &'a str, channel: &'a str, line: &'a str) -> BoxFuture<'a, bool>;
 }
 
 /// Breaks the `agent <-> cron` cycle so `cron` resolves agent ids/names without importing `crate::agent::Profile`.

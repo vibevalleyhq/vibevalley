@@ -136,7 +136,7 @@ async fn wait_capacity(cancel: &CancellationToken, output: &impl Output, seconds
     }
     Ok(!cancel.is_cancelled())
 }
-async fn play(claim: Claim, cancel: CancellationToken, output: &mut impl Output, draining: impl Fn()) -> Result<(), String> {
+async fn play(mut claim: Claim, cancel: CancellationToken, output: &mut impl Output, draining: impl Fn()) -> Result<(), String> {
     let mut format = None;
     let mut sequence = 0;
     loop {
@@ -146,9 +146,9 @@ async fn play(claim: Claim, cancel: CancellationToken, output: &mut impl Output,
         let event = tokio::select! {
             biased;
             _ = cancel.cancelled() => return Ok(()),
-            res = claim.0.events.recv_async() => match res {
-                Ok(ev) => ev,
-                Err(_) => {
+            res = claim.0.events.recv() => match res {
+                Some(ev) => ev,
+                None => {
                     return if cancel.is_cancelled() {
                         Ok(())
                     } else {
@@ -224,7 +224,7 @@ mod tests {
         queued: Mutex<f64>,
         bytes: usize,
         drain: Arc<AtomicBool>,
-        full: Option<flume::Sender<()>>,
+        full: Option<tokio::sync::mpsc::Sender<()>>,
     }
     impl Output for OutputProbe {
         fn format(&mut self, _: u32, _: u32) -> Result<(), String> {
@@ -251,8 +251,8 @@ mod tests {
             Ok(())
         }
     }
-    fn claim() -> (Claim, flume::Sender<serde_json::Value>, Arc<AtomicBool>) {
-        let (send, events) = flume::unbounded();
+    fn claim() -> (Claim, tokio::sync::mpsc::Sender<serde_json::Value>, Arc<AtomicBool>) {
+        let (send, events) = tokio::sync::mpsc::channel(16);
         let gone = Arc::new(AtomicBool::new(false));
         let receipt = gone.clone();
         (
@@ -271,10 +271,11 @@ mod tests {
         vibevalley_runtime::rt::block_on(async {
             let (claim, send, gone) = claim();
             let cancel = CancellationToken::new();
-            send.send(json!({"type":"format","sampleRate":8000,"channels":1,"bitDepth":16})).unwrap();
+            send.send(json!({"type":"format","sampleRate":8000,"channels":1,"bitDepth":16})).await.unwrap();
             send.send(json!({"type":"audio","sequence":0,"audio":base64::engine::general_purpose::STANDARD.encode(vec![0;160000])}))
+                .await
                 .unwrap();
-            send.send(json!({"type":"done"})).unwrap();
+            send.send(json!({"type":"done"})).await.unwrap();
             let mut output = OutputProbe {
                 queued: Mutex::new(0.0),
                 bytes: 0,
@@ -300,9 +301,9 @@ mod tests {
         vibevalley_runtime::rt::block_on(async {
             let (claim, send, gone) = claim();
             let cancel = CancellationToken::new();
-            send.send(json!({"type":"format","sampleRate":8000,"channels":1,"bitDepth":16})).unwrap();
-            send.send(json!({"type":"audio","sequence":0,"audio":"AAAAAA=="})).unwrap();
-            let (full, reached) = flume::bounded(1);
+            send.send(json!({"type":"format","sampleRate":8000,"channels":1,"bitDepth":16})).await.unwrap();
+            send.send(json!({"type":"audio","sequence":0,"audio":"AAAAAA=="})).await.unwrap();
+            let (full, mut reached) = tokio::sync::mpsc::channel(1);
             let task_cancel = cancel.clone();
             let worker = tokio::spawn(async move {
                 let mut output = OutputProbe {
@@ -314,7 +315,7 @@ mod tests {
                 play(claim, task_cancel, &mut output, || {}).await.unwrap();
                 output.bytes
             });
-            tokio::time::timeout(Duration::from_secs(5), reached.recv_async()).await.unwrap().unwrap();
+            tokio::time::timeout(Duration::from_secs(5), reached.recv()).await.unwrap().unwrap();
             cancel.cancel();
             assert_eq!(worker.await.unwrap(), 0);
             assert!(gone.load(Ordering::SeqCst));

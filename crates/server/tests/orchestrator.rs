@@ -17,13 +17,17 @@ struct Scripted {
 }
 
 impl ModelClient for Scripted {
-    fn complete(&self, request: &ChatRequest, on: &mut dyn FnMut(Delta)) -> vibevalley_runtime::agent::Result<Completion> {
+    fn complete<'a>(
+        &'a self,
+        request: &'a ChatRequest,
+        on: &'a mut (dyn FnMut(Delta) + Send),
+    ) -> vibevalley_runtime::BoxFuture<'a, vibevalley_runtime::agent::Result<Completion>> {
         self.seen.lock().unwrap().push(request.clone());
         let answer = self.answers.lock().unwrap().pop_front().unwrap_or_else(|| say("好的。"));
         if let Some(t) = &answer.message.content {
             on(Delta::Text(t.clone()));
         }
-        Ok(answer)
+        Box::pin(async move { Ok(answer) })
     }
 }
 
@@ -62,7 +66,11 @@ impl SignaledScripted {
 }
 
 impl ModelClient for SignaledScripted {
-    fn complete(&self, request: &ChatRequest, on: &mut dyn FnMut(Delta)) -> vibevalley_runtime::agent::Result<Completion> {
+    fn complete<'a>(
+        &'a self,
+        request: &'a ChatRequest,
+        on: &'a mut (dyn FnMut(Delta) + Send),
+    ) -> vibevalley_runtime::BoxFuture<'a, vibevalley_runtime::agent::Result<Completion>> {
         {
             self.seen.lock().unwrap().push(request.clone());
             self.seen_changed.notify_all();
@@ -71,7 +79,7 @@ impl ModelClient for SignaledScripted {
         if let Some(t) = &answer.message.content {
             on(Delta::Text(t.clone()));
         }
-        Ok(answer)
+        Box::pin(async move { Ok(answer) })
     }
 }
 
@@ -348,10 +356,14 @@ fn crash_restores_the_builtin_worker_in_the_same_issue_run() {
         calls: AtomicUsize,
     }
     impl ModelClient for CrashModel {
-        fn complete(&self, request: &ChatRequest, on: &mut dyn FnMut(Delta)) -> vibevalley_runtime::agent::Result<Completion> {
+        fn complete<'a>(
+            &'a self,
+            request: &'a ChatRequest,
+            on: &'a mut (dyn FnMut(Delta) + Send),
+        ) -> vibevalley_runtime::BoxFuture<'a, vibevalley_runtime::agent::Result<Completion>> {
             let n = self.calls.fetch_add(1, Ordering::AcqRel);
             if self.crash && n == 0 {
-                return Ok(call("append-once", "bash", json!({"command":"printf x >> durable-count.txt"})));
+                return Box::pin(async { Ok(call("append-once", "bash", json!({"command":"printf x >> durable-count.txt"}))) });
             }
             assert!(
                 request
@@ -365,7 +377,7 @@ fn crash_restores_the_builtin_worker_in_the_same_issue_run() {
             }
             let text = "recovered same worker";
             on(Delta::Text(text.into()));
-            Ok(say(text))
+            Box::pin(async move { Ok(say(text)) })
         }
     }
     fn launch(path: &std::path::Path, model: Arc<CrashModel>) -> (vibevalley_server::App, vibevalley_server::gateway::http::Listener) {
@@ -599,27 +611,28 @@ fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
     assert_eq!(request("orchestrator/approval/resolve", decision(&second, false)).biz_code, 0);
 
     // Emit a durable pi.inbox budget_reached alert and verify it lands immediately in InboxSlice & slice_snapshot.
-    started
-        .test_internals()
-        .agent
-        .orchestrator
-        .execution
-        .store()
-        .write(|tx| {
-            tx.alert(
-                Some(&first.conversation_id),
+    let conv = first.conversation_id.clone();
+    let task_id = first.task_id.clone();
+    vibevalley_runtime::rt::block_on(started.test_internals().agent.orchestrator.execution.store().write_async(|tx| {
+        let conv = conv.clone();
+        let task_id = task_id.clone();
+        Box::pin(async move {
+            tx.alert_async(
+                Some(&conv),
                 &json!({
                     "kind": "budget_reached",
-                    "taskId": first.task_id,
-                    "conversationId": first.conversation_id,
+                    "taskId": task_id,
+                    "conversationId": conv,
                     "title": "Session budget reached",
                     "message": "Budget cap hit",
                     "createdAtMs": 123456,
                 }),
-            )?;
+            )
+            .await?;
             Ok(())
         })
-        .unwrap();
+    }))
+    .unwrap();
     let runtime_alert = crate::support::wait_until_slice(
         started.ctx(),
         SliceKind::Inbox,

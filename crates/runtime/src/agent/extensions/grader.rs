@@ -15,8 +15,8 @@ const GRADER_SYSTEM: &str = "你是独立的只读验收员。只根据工单、
 const DEFAULT_ITERATIONS: u32 = 3;
 
 pub trait ReviewProvider: Send + Sync {
-    fn review(&self, request: ReviewRequest<'_>) -> Result<Option<OutcomeReview>> {
-        Ok(request.explicit())
+    fn review<'a>(&'a self, request: ReviewRequest<'a>) -> BoxFuture<'a, Result<Option<OutcomeReview>>> {
+        Box::pin(std::future::ready(Ok(request.explicit())))
     }
 }
 
@@ -94,13 +94,16 @@ impl GraderExtension {
         if saved.is_some() {
             return Ok(saved);
         }
-        let Some(review) = self.provider.review(ReviewRequest {
-            conversation: conv,
-            request_id: ctx.request_id,
-            prompt: ctx.prompt,
-            candidate: ctx.last_output,
-            rubric: ctx.rubric,
-        })?
+        let Some(review) = self
+            .provider
+            .review(ReviewRequest {
+                conversation: conv,
+                request_id: ctx.request_id,
+                prompt: ctx.prompt,
+                candidate: ctx.last_output,
+                rubric: ctx.rubric,
+            })
+            .await?
         else {
             return Ok(None);
         };

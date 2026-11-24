@@ -221,12 +221,17 @@ impl Machine {
         let remotes: Vec<_> = self.remotes.read().values().cloned().collect();
         for remote in remotes {
             if remote.inner().status() == MachineStatus::Online {
-                let _ = remote.inner().send_frame(ping.clone());
+                let _ = remote.inner().try_send_frame(ping.clone());
             }
         }
     }
 
-    fn handle_hello(&self, mut hello: MachineHello, conn_id: u64, outgoing: &flume::Sender<MachineWireFrame>) -> Result<Arc<RemoteMachine>, MachineWireError> {
+    async fn handle_hello_async(
+        &self,
+        mut hello: MachineHello,
+        conn_id: u64,
+        outgoing: &tokio::sync::mpsc::Sender<MachineWireFrame>,
+    ) -> Result<Arc<RemoteMachine>, MachineWireError> {
         hello.machine_id = hello.machine_id.trim().to_string();
         if !valid_remote_machine_id(&hello.machine_id) {
             return Err(MachineWireError {
@@ -254,13 +259,15 @@ impl Machine {
         self.registry.register(remote.clone() as Arc<dyn RuntimeMachine>);
         self.emit_changed(remote.protocol_machine());
 
-        let _ = outgoing.send(MachineWireFrame::MachineHelloAck(MachineHelloAck {
-            machine_id: hello.machine_id,
-            server_version: self.server_version.clone(),
-            heartbeat_ms: MACHINE_HEARTBEAT_MS,
-        }));
+        let _ = outgoing
+            .send(MachineWireFrame::MachineHelloAck(MachineHelloAck {
+                machine_id: hello.machine_id,
+                server_version: self.server_version.clone(),
+                heartbeat_ms: MACHINE_HEARTBEAT_MS,
+            }))
+            .await;
         for attach in attaches {
-            let _ = outgoing.send(MachineWireFrame::MachineSessionAttach(attach));
+            let _ = outgoing.send(MachineWireFrame::MachineSessionAttach(attach)).await;
         }
         Ok(remote)
     }
@@ -280,7 +287,7 @@ impl Machine {
         }
     }
 
-    fn handle_attachment_fetch(&self, req: MachineAttachmentFetch, outgoing: flume::Sender<MachineWireFrame>) {
+    fn handle_attachment_fetch(&self, req: MachineAttachmentFetch, outgoing: tokio::sync::mpsc::Sender<MachineWireFrame>) {
         let span = tracing::debug_span!("machine.conn", op = "attachment_fetch", request_id = %req.request_id);
         let storage = self.storage.clone();
         self.ctx.task.spawn(
@@ -301,13 +308,13 @@ impl Machine {
                         error: Some(err.message),
                     },
                 };
-                let _ = outgoing.send_async(MachineWireFrame::MachineAttachmentData(reply)).await;
+                let _ = outgoing.send(MachineWireFrame::MachineAttachmentData(reply)).await;
             }
             .instrument(span),
         );
     }
 
-    async fn drive_connection(self: Arc<Self>, conn: MachineConnection) {
+    async fn drive_connection(self: Arc<Self>, mut conn: MachineConnection) {
         let conn_id = self.next_conn_id.fetch_add(1, Ordering::Relaxed);
         let span = tracing::debug_span!("machine.conn", conn_id, machine_id = tracing::field::Empty);
         async move {
@@ -318,20 +325,20 @@ impl Machine {
                 let frame = tokio::select! {
                     biased;
                     _ = cancel.cancelled() => break,
-                    res = conn.incoming.recv_async() => match res {
-                        Ok(frame) => frame,
-                        Err(_) => break,
+                    res = conn.incoming.recv() => match res {
+                        Some(frame) => frame,
+                        None => break,
                     },
                 };
 
                 match frame {
-                    MachineWireFrame::MachineHello(hello) => match self.handle_hello(hello, conn_id, &conn.outgoing) {
+                    MachineWireFrame::MachineHello(hello) => match self.handle_hello_async(hello, conn_id, &conn.outgoing).await {
                         Ok(remote) => {
                             tracing::Span::current().record("machine_id", remote.machine_id());
                             active = Some(remote);
                         }
                         Err(err) => {
-                            let _ = conn.outgoing.send_async(MachineWireFrame::MachineWireError(err)).await;
+                            let _ = conn.outgoing.send(MachineWireFrame::MachineWireError(err)).await;
                             break;
                         }
                     },
@@ -343,7 +350,7 @@ impl Machine {
                         } else {
                             let _ = conn
                                 .outgoing
-                                .send_async(MachineWireFrame::MachineWireError(MachineWireError {
+                                .send(MachineWireFrame::MachineWireError(MachineWireError {
                                     request_id: None,
                                     code: "hello_required".into(),
                                     message: "expected machine.hello before machine.inventory".into(),
@@ -392,7 +399,7 @@ impl Machine {
                         } else {
                             let _ = conn
                                 .outgoing
-                                .send_async(MachineWireFrame::MachineAttachmentData(MachineAttachmentData {
+                                .send(MachineWireFrame::MachineAttachmentData(MachineAttachmentData {
                                     request_id: req.request_id,
                                     ok: false,
                                     mime: None,

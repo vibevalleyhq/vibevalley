@@ -52,8 +52,8 @@ pub(super) async fn upgrade(
 
 async fn handle_socket(socket: WebSocket, server: Arc<dyn Server>, shutdown: CancellationToken, bus: SharedMachineBus, device: RemoteDeviceIdentity) {
     let (mut ws_tx, mut ws_rx) = socket.split();
-    let (in_tx, in_rx) = flume::bounded::<MachineWireFrame>(WS_CHANNEL_CAPACITY);
-    let (out_tx, out_rx) = flume::bounded::<MachineWireFrame>(WS_CHANNEL_CAPACITY);
+    let (in_tx, in_rx) = tokio::sync::mpsc::channel::<MachineWireFrame>(WS_CHANNEL_CAPACITY);
+    let (out_tx, mut out_rx) = tokio::sync::mpsc::channel::<MachineWireFrame>(WS_CHANNEL_CAPACITY);
 
     bus.accept_connection(MachineConnection {
         device,
@@ -73,14 +73,14 @@ async fn handle_socket(socket: WebSocket, server: Arc<dyn Server>, shutdown: Can
                 let _ = ws_tx.send(Message::Close(None)).await;
                 break;
             }
-            out_frame = out_rx.recv_async() => match out_frame {
-                Ok(frame) => {
+            out_frame = out_rx.recv() => match out_frame {
+                Some(frame) => {
                     let Ok(text) = serde_json::to_string(&frame) else { continue };
                     if ws_tx.send(Message::Text(text.into())).await.is_err() {
                         break;
                     }
                 }
-                Err(_) => {
+                None => {
                     let _ = ws_tx.send(Message::Close(None)).await;
                     break;
                 }
@@ -107,11 +107,11 @@ async fn handle_socket(socket: WebSocket, server: Arc<dyn Server>, shutdown: Can
                             let tx = out_tx.clone();
                             crate::log::spawn_traced(async move {
                                 let resp = bus_ref.mcp_tunnel_async(srv.mcp(), req).await;
-                                let _ = tx.send_async(MachineWireFrame::MachineMcpResponse(resp)).await;
+                                let _ = tx.send(MachineWireFrame::MachineMcpResponse(resp)).await;
                             });
                         }
                         Ok(frame) => {
-                            if in_tx.send_async(frame).await.is_err() {
+                            if in_tx.send(frame).await.is_err() {
                                 break;
                             }
                         }

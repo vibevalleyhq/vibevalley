@@ -258,7 +258,7 @@ impl SliceFeed {
     }
 
     /// Blocking bounded-1 watch helper for synchronous callers passing JSON `&str`.
-    pub fn watch_since_json(&self, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &str)) {
+    pub fn watch_since_json(&self, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &str)) {
         self.watch_since_json_with_gate(after_seq, None, stop, receive);
     }
 
@@ -267,7 +267,7 @@ impl SliceFeed {
         &self,
         after_seq: Option<i64>,
         gate: Option<&crate::SharedFaultGate>,
-        stop: &flume::Receiver<()>,
+        stop: &tokio_util::sync::CancellationToken,
         receive: &mut dyn FnMut(i64, &str),
     ) {
         let mut emit = |seq: i64, json: &str| {
@@ -286,44 +286,35 @@ impl SliceFeed {
         let mut sub = self.subscribe();
         let initial = sub.borrow_and_update(after_seq.is_none());
         let mut seen_gen = initial.generation;
-        if after_seq != Some(initial.seq) && !emit(initial.seq, &initial.json) {
+        if after_seq != Some(initial.seq) && !stop.is_cancelled() && !emit(initial.seq, &initial.json) {
             return;
         }
-        let (tx, rx) = flume::bounded::<SliceFrame>(1);
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<SliceFrame>(1);
         let handle = vibevalley_runtime::rt::current_or_global_handle();
         let stop_task = stop.clone();
-        let rx_coalesce = rx.clone();
         handle.spawn(async move {
             loop {
                 let changed = tokio::select! {
                     biased;
-                    _ = stop_task.recv_async() => false,
+                    _ = stop_task.cancelled() => false,
                     changed = sub.changed() => changed,
                 };
                 if !changed {
                     break;
                 }
                 let frame = sub.borrow_and_update(false);
-                let _ = rx_coalesce.try_recv();
                 let sent = tokio::select! {
                     biased;
-                    _ = stop_task.recv_async() => false,
-                    res = tx.send_async(frame) => res.is_ok(),
+                    _ = stop_task.cancelled() => false,
+                    res = tx.send(frame) => res.is_ok(),
                 };
                 if !sent {
                     break;
                 }
             }
         });
-        while !stop.is_disconnected() {
-            let mut next: Option<SliceFrame> = None;
-            flume::Selector::new()
-                .recv(&rx, |res| {
-                    next = res.ok();
-                })
-                .recv(stop, |_| {})
-                .wait();
-            let Some(frame) = next else { break };
+        while !stop.is_cancelled() {
+            let Some(frame) = rx.blocking_recv() else { break };
             if frame.generation == seen_gen {
                 continue;
             }

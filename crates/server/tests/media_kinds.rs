@@ -502,16 +502,16 @@ fn an_orchestrator_makes_audio_and_starts_understanding_only_with_the_users_word
     let (tools, route) = tools(&s, "elsewhere");
     let tool = |name: &str| tools.iter().find(|t| t.spec().name == name).unwrap();
     let start = tool("media_understanding_start");
-    assert!(start.execute(&json!({"id":"look"})).is_error);
+    assert!(vibevalley_runtime::rt::block_on(start.execute(&json!({"id":"look"}))).is_error);
     route.lock().user = true;
-    assert!(start.execute(&json!({"id":"look"})).is_error);
+    assert!(vibevalley_runtime::rt::block_on(start.execute(&json!({"id":"look"}))).is_error);
     assert_eq!(ok(&s, "media.job.get", json!({"id":"look"}))["phase"], "authorized");
     route.lock().channel = channel.clone();
-    let started = start.execute(&json!({"id":"look"}));
+    let started = vibevalley_runtime::rt::block_on(start.execute(&json!({"id":"look"})));
     assert!(!started.is_error, "{}", started.text);
     let done = until(&s, "look", "ready and cleaned", |j| j["phase"] == "ready" && j["cleanup"] == "done");
     assert_eq!(done["source"], json!({"kind":"orchestrator","agent":"orchestrator","channel":channel}));
-    assert!(!start.execute(&json!({"id":"look"})).is_error);
+    assert!(!vibevalley_runtime::rt::block_on(start.execute(&json!({"id":"look"}))).is_error);
     assert_eq!((network.count("POST /files"), network.count("POST /responses")), (1, 1));
 
     // An approval the user withdraws lets go of its inputs and can no longer be started.
@@ -521,17 +521,17 @@ fn an_orchestrator_makes_audio_and_starts_understanding_only_with_the_users_word
     assert!(!deletable(&s, &image));
     assert_eq!(ok(&s, "media.job.cancel", json!({"id":"withdrawn"}))["cleanup"], "done");
     assert!(deletable(&s, &image));
-    assert!(!start.execute(&json!({"id":"withdrawn"})).is_error);
+    assert!(!vibevalley_runtime::rt::block_on(start.execute(&json!({"id":"withdrawn"}))).is_error);
     assert_eq!(ok(&s, "media.job.get", json!({"id":"withdrawn"}))["phase"], "canceled");
 
     let talk = tool("media_dialogue_create");
     route.lock().user = false;
-    assert!(talk.execute(&dialogue("talk", revision, "Hello there.")).is_error);
+    assert!(vibevalley_runtime::rt::block_on(talk.execute(&dialogue("talk", revision, "Hello there."))).is_error);
     route.lock().user = true;
-    let asked = talk.execute(&dialogue("talk", revision, "Hello there."));
+    let asked = vibevalley_runtime::rt::block_on(talk.execute(&dialogue("talk", revision, "Hello there.")));
     assert!(!asked.is_error, "{}", asked.text);
     assert_eq!(wait(&s, "talk", "ready")["source"]["kind"], "orchestrator");
-    let voice = tool("media_voice_design_create").execute(&design("voice", revision, "A short line."));
+    let voice = vibevalley_runtime::rt::block_on(tool("media_voice_design_create").execute(&design("voice", revision, "A short line.")));
     assert!(!voice.is_error, "{}", voice.text);
     assert_eq!(wait(&s, "voice", "ready")["source"]["agent"], "orchestrator");
     s.close_blocking();

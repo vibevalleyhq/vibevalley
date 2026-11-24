@@ -70,7 +70,7 @@ struct Inner {
     responses: HashMap<String, Value>,
     calls: Vec<(String, Value)>,
     last_client: Option<ClientIdentity>,
-    subs: HashMap<u64, (String, flume::Sender<Value>)>,
+    subs: HashMap<u64, (String, tokio::sync::mpsc::UnboundedSender<Value>)>,
     next_sub: u64,
 }
 
@@ -290,7 +290,7 @@ impl Server for FakeServer {
         }
     }
 
-    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
         let mut forward = |seq: i64, json: &str| {
             let value: Value = serde_json::from_str(json).unwrap_or(Value::Null);
             receive(seq, &value);
@@ -316,7 +316,7 @@ impl Server for FakeServer {
         })
     }
 
-    fn live(&self) -> flume::Receiver<LiveEvent> {
+    fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
         bridge_live_receiver(self.live.subscribe(), CancellationToken::new())
     }
 
@@ -324,11 +324,11 @@ impl Server for FakeServer {
         Some(self.live.subscribe())
     }
 
-    fn subscribe(&self, name: &str, _payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+    fn subscribe(&self, name: &str, _payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
         if name == "fake.refuse" {
             return Err(refusal(BizCode::ChannelNotFound, "no such channel"));
         }
-        let (tx, rx) = flume::unbounded();
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         let mut inner = self.inner.lock();
         inner.next_sub += 1;
         let id = inner.next_sub;

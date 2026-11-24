@@ -176,7 +176,7 @@ impl Server for SignaledFake {
     fn slice_snapshot(&self, slice: SliceKind) -> Value {
         self.inner.slice_snapshot(slice)
     }
-    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
         self.on_watch.notify_waiters();
         self.inner.watch_slice(slice, after_seq, stop, receive)
     }
@@ -185,18 +185,18 @@ impl Server for SignaledFake {
         self.on_watch.notify_waiters();
         sub
     }
-    fn live(&self) -> flume::Receiver<vibevalley_protocol::LiveEvent> {
+    fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
         self.inner.live()
     }
     fn subscribe_live(&self) -> Option<tokio::sync::broadcast::Receiver<vibevalley_protocol::LiveEvent>> {
         self.inner.subscribe_live()
     }
-    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
         let res = self.inner.subscribe(name, payload);
         self.on_subscribe.notify_waiters();
         res
     }
-    fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+    fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
         let res = self.inner.subscribe_with(ctx, name, payload);
         self.on_subscribe.notify_waiters();
         res
@@ -280,13 +280,19 @@ fn issue_watch_streams_the_subscription_and_refusals_are_an_empty_404() {
         fn slice_snapshot(&self, _: SliceKind) -> Value {
             json!({ "seq": 0 })
         }
-        fn watch_slice(&self, _: SliceKind, _: Option<i64>, stop: &flume::Receiver<()>, _: &mut dyn FnMut(i64, &Value)) {
-            let _ = stop.recv();
+        fn watch_slice(&self, _: SliceKind, _: Option<i64>, stop: &tokio_util::sync::CancellationToken, _: &mut dyn FnMut(i64, &Value)) {
+            let (tx, rx) = std::sync::mpsc::channel::<()>();
+            let stop = stop.clone();
+            vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+                stop.cancelled().await;
+                drop(tx);
+            });
+            let _ = rx.recv();
         }
-        fn live(&self) -> flume::Receiver<vibevalley_protocol::LiveEvent> {
-            flume::unbounded().1
+        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
+            tokio::sync::mpsc::unbounded_channel().1
         }
-        fn subscribe(&self, _: &str, _: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        fn subscribe(&self, _: &str, _: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
             Err(Envelope::failure(&ApiError::new(BizCode::IssueNotFound, "no such issue")))
         }
         fn unsubscribe(&self, _: u64) {}
@@ -349,7 +355,7 @@ fn regression_native_file_operations_never_reach_the_server_over_http() {
 
 #[test]
 fn events_aliases_live_sse_stream() {
-    struct LiveOnly(flume::Receiver<vibevalley_protocol::LiveEvent>);
+    struct LiveOnly(parking_lot::Mutex<Option<tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent>>>);
     impl Server for LiveOnly {
         fn call(&self, _: &str, _: Value) -> Envelope {
             Envelope::void()
@@ -357,19 +363,25 @@ fn events_aliases_live_sse_stream() {
         fn slice_snapshot(&self, _: SliceKind) -> Value {
             json!({ "seq": 0 })
         }
-        fn watch_slice(&self, _: SliceKind, _: Option<i64>, stop: &flume::Receiver<()>, _: &mut dyn FnMut(i64, &Value)) {
-            let _ = stop.recv();
+        fn watch_slice(&self, _: SliceKind, _: Option<i64>, stop: &tokio_util::sync::CancellationToken, _: &mut dyn FnMut(i64, &Value)) {
+            let (tx, rx) = std::sync::mpsc::channel::<()>();
+            let stop = stop.clone();
+            vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+                stop.cancelled().await;
+                drop(tx);
+            });
+            let _ = rx.recv();
         }
-        fn live(&self) -> flume::Receiver<vibevalley_protocol::LiveEvent> {
-            self.0.clone()
+        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
+            self.0.lock().take().unwrap_or_else(|| tokio::sync::mpsc::unbounded_channel().1)
         }
-        fn subscribe(&self, _: &str, _: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        fn subscribe(&self, _: &str, _: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
             Err(Envelope::failure(&ApiError::new(BizCode::RouteNotFound, "no subscription")))
         }
         fn unsubscribe(&self, _: u64) {}
     }
-    let (tx, rx) = flume::unbounded();
-    let listener = serve(Arc::new(LiveOnly(rx)), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    let listener = serve(Arc::new(LiveOnly(parking_lot::Mutex::new(Some(rx)))), "127.0.0.1:0".parse().unwrap()).unwrap();
     tx.send(vibevalley_protocol::LiveEvent::Notice(vibevalley_protocol::LiveEventNotice {
         level: vibevalley_protocol::NoticeLevel::Info,
         text: "ready".into(),
@@ -444,13 +456,13 @@ impl Server for WithRemoteAuth {
     fn slice_snapshot(&self, kind: SliceKind) -> Value {
         self.inner.slice_snapshot(kind)
     }
-    fn watch_slice(&self, kind: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, emit: &mut dyn FnMut(i64, &Value)) {
+    fn watch_slice(&self, kind: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, emit: &mut dyn FnMut(i64, &Value)) {
         self.inner.watch_slice(kind, after_seq, stop, emit)
     }
-    fn live(&self) -> flume::Receiver<vibevalley_protocol::LiveEvent> {
+    fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
         self.inner.live()
     }
-    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
         self.inner.subscribe(name, payload)
     }
     fn unsubscribe(&self, id: u64) {

@@ -221,25 +221,27 @@ pub async fn execute_request_async(client: reqwest::Client, r: Request, cancel: 
     }
     if let Some((kind, mut reader)) = r.body {
         req = req.header("content-type", kind);
-        let (body_tx, body_rx) = flume::bounded::<std::io::Result<Vec<u8>>>(8);
+        let (body_tx, body_rx) = tokio::sync::mpsc::channel::<std::io::Result<Vec<u8>>>(8);
         crate::log::spawn_blocking_traced(move || {
             let mut buf = [0u8; 64 * 1024];
             loop {
                 match reader.read(&mut buf) {
                     Ok(0) => break,
                     Ok(n) => {
-                        if body_tx.send(Ok(buf[..n].to_vec())).is_err() {
+                        if body_tx.blocking_send(Ok(buf[..n].to_vec())).is_err() {
                             break;
                         }
                     }
                     Err(e) => {
-                        let _ = body_tx.send(Err(e));
+                        let _ = body_tx.blocking_send(Err(e));
                         break;
                     }
                 }
             }
         });
-        req = req.body(reqwest::Body::wrap_stream(body_rx.into_stream()));
+        req = req.body(reqwest::Body::wrap_stream(futures_util::stream::unfold(body_rx, |mut rx| async move {
+            rx.recv().await.map(|item| (item, rx))
+        })));
     }
     let send_res = match &cancel {
         Some(token) => tokio::select! {

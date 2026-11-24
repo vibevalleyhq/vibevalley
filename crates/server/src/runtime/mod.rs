@@ -387,7 +387,7 @@ pub struct Opened {
 /// Reopens stored sessions on server boot: interrupts active non-recoverable runs,
 /// marks lost worktrees as departed, and seeds live farm stations.
 pub async fn reopen_sessions_async(ctx: &Arc<Context>) -> Result<Opened> {
-    let durable = ctx.service.durable()?;
+    let durable = ctx.service.durable().await?;
     let stored = ctx.service.session.all().await?;
     let all_extras = ctx.service.session.extras().await?;
     let mut recoverable_ids = HashSet::new();

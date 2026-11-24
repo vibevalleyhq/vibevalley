@@ -54,11 +54,12 @@ impl AgentDriver {
         Self { profile, memory }
     }
 
-    fn drive_on(&self, agent: &Agent, machine_override: Option<&str>) -> Result<Drive, RuntimeError> {
+    async fn drive_on_async(&self, agent: &Agent, machine_override: Option<&str>) -> Result<Drive, RuntimeError> {
         let resolved = self
             .profile
             .fleet
-            .resolve_on_machine_cached(agent, machine_override)
+            .resolve_on_machine_from_cache_async(agent, machine_override)
+            .await
             .map_err(RuntimeError::Api)?;
         let bare_runtime = RuntimeRef::parse(agent.runtime.trim())
             .map(|r| r.runtime_id)
@@ -171,68 +172,80 @@ impl SessionDriver for AgentDriver {
         Ok(())
     }
 
-    fn drive(&self, agent: Option<&str>, issue: &Issue) -> Result<Drive, RuntimeError> {
-        let pick = vec![
-            LookIn::Agent.next(),
-            Next {
-                say: t("server.issue.pickHint", &[("n", issue.number.into())]),
-                run: None,
-            },
-        ];
-        let Some(id) = agent.map(str::trim).filter(|a| !a.is_empty()) else {
-            return Err(refusal(t("server.issue.noAssignee", &[]), pick));
-        };
-        let Some(profile) = self.profile.agent(id) else {
-            if self.profile.fleet.runtime(id).is_some() {
-                return self.drive_runtime(id, None, None);
-            }
-            return Err(refusal(t("server.issue.profileGone", &[("id", id.into())]), pick));
-        };
-        self.drive_on(&profile, issue.machine_id.as_deref())
-    }
-
-    fn drive_runtime(&self, runtime: &str, model: Option<&str>, effort: Option<&str>) -> Result<Drive, RuntimeError> {
-        let runtime_id = runtime.trim();
-        let resolved = self.profile.fleet.resolve_runtime(runtime_id, model, effort).map_err(RuntimeError::Api)?;
-        let bare = RuntimeRef::parse(runtime_id).map(|r| r.runtime_id).unwrap_or_else(|_| runtime_id.to_string());
-        let wire_id = bare.strip_prefix("acp:").unwrap_or(&bare).to_string();
-        let label = runtime_label(&wire_id);
-        let name = if label == wire_id {
-            resolved.runtime.display_name().to_string()
-        } else {
-            label
-        };
-        Ok(Drive {
-            agent: wire_id.clone(),
-            runtime: resolved.runtime,
-            runtime_id: wire_id,
-            machine_id: resolved.machine_id,
-            is_local: resolved.is_local,
-            name,
-            model: (!resolved.model.is_empty()).then_some(resolved.model),
-            env: resolved.env.into_iter().collect(),
-            persona: None,
-            effort: (!resolved.effort.is_empty()).then_some(resolved.effort),
-            mcp_servers: vec![],
-            disallowed_tools: vec![],
+    fn drive<'a>(&'a self, agent: Option<&'a str>, issue: &'a Issue) -> BoxFuture<'a, Result<Drive, RuntimeError>> {
+        Box::pin(async move {
+            let pick = vec![
+                LookIn::Agent.next(),
+                Next {
+                    say: t("server.issue.pickHint", &[("n", issue.number.into())]),
+                    run: None,
+                },
+            ];
+            let Some(id) = agent.map(str::trim).filter(|a| !a.is_empty()) else {
+                return Err(refusal(t("server.issue.noAssignee", &[]), pick));
+            };
+            let Some(profile) = self.profile.agent(id) else {
+                if self.profile.fleet.runtime(id).is_some() {
+                    return self.drive_runtime(id, None, None).await;
+                }
+                return Err(refusal(t("server.issue.profileGone", &[("id", id.into())]), pick));
+            };
+            self.drive_on_async(&profile, issue.machine_id.as_deref()).await
         })
     }
 
-    fn drafter(&self, issue: &Issue) -> Result<Drive, RuntimeError> {
-        let named = match issue.assigned_agent() {
-            Some(id) => {
-                if self.profile.agent(id).is_none() {
-                    return Err(refusal(t("server.issue.profileGone", &[("id", id.into())]), vec![]));
+    fn drive_runtime<'a>(&'a self, runtime: &'a str, model: Option<&'a str>, effort: Option<&'a str>) -> BoxFuture<'a, Result<Drive, RuntimeError>> {
+        Box::pin(async move {
+            let runtime_id = runtime.trim();
+            let resolved = self
+                .profile
+                .fleet
+                .resolve_runtime_async(runtime_id, model, effort)
+                .await
+                .map_err(RuntimeError::Api)?;
+            let bare = RuntimeRef::parse(runtime_id).map(|r| r.runtime_id).unwrap_or_else(|_| runtime_id.to_string());
+            let wire_id = bare.strip_prefix("acp:").unwrap_or(&bare).to_string();
+            let label = runtime_label(&wire_id);
+            let name = if label == wire_id {
+                resolved.runtime.display_name().to_string()
+            } else {
+                label
+            };
+            Ok(Drive {
+                agent: wire_id.clone(),
+                runtime: resolved.runtime,
+                runtime_id: wire_id,
+                machine_id: resolved.machine_id,
+                is_local: resolved.is_local,
+                name,
+                model: (!resolved.model.is_empty()).then_some(resolved.model),
+                env: resolved.env.into_iter().collect(),
+                persona: None,
+                effort: (!resolved.effort.is_empty()).then_some(resolved.effort),
+                mcp_servers: vec![],
+                disallowed_tools: vec![],
+            })
+        })
+    }
+
+    fn drafter<'a>(&'a self, issue: &'a Issue) -> BoxFuture<'a, Result<Drive, RuntimeError>> {
+        Box::pin(async move {
+            let named = match issue.assigned_agent() {
+                Some(id) => {
+                    if self.profile.agent(id).is_none() {
+                        return Err(refusal(t("server.issue.profileGone", &[("id", id.into())]), vec![]));
+                    }
+                    id.to_string()
                 }
-                id.to_string()
-            }
-            None => String::new(),
-        };
-        let chosen = self
-            .profile
-            .fleet
-            .choose_cached(&format!("起草 {}", issue.title), &named, "")
-            .ok_or_else(|| refusal(t("server.issue.refinement.noDrafter", &[]), vec![LookIn::Agent.next()]))?;
-        self.drive_on(&chosen, issue.machine_id.as_deref())
+                None => String::new(),
+            };
+            let chosen = self
+                .profile
+                .fleet
+                .choose_from_cache_async(&format!("起草 {}", issue.title), &named, "")
+                .await
+                .ok_or_else(|| refusal(t("server.issue.refinement.noDrafter", &[]), vec![LookIn::Agent.next()]))?;
+            self.drive_on_async(&chosen, issue.machine_id.as_deref()).await
+        })
     }
 }

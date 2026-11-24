@@ -190,14 +190,13 @@ fn wire_status(status: ObservedStatus) -> SubagentStatus {
     }
 }
 
-pub(super) fn read_back(
-    summary: &mut SessionSubagents,
-    mut read: impl FnMut(&str, Option<&str>) -> vibevalley_runtime::oar::Result<vibevalley_runtime::oar::SubagentSnapshot>,
-    confirmed_at: impl Fn() -> i64,
-) -> bool {
+pub(super) async fn read_back_async<'a, F>(summary: &mut SessionSubagents, mut read: F, confirmed_at: impl Fn() -> i64) -> bool
+where
+    F: for<'b> FnMut(&'b str, Option<&'b str>) -> vibevalley_runtime::BoxFuture<'b, vibevalley_runtime::oar::Result<vibevalley_runtime::oar::SubagentSnapshot>>,
+{
     let mut changed = false;
     for thread in &mut summary.threads {
-        let snapshot = match read(&thread.thread_id, thread.turn_id.as_deref()) {
+        let snapshot = match read(&thread.thread_id, thread.turn_id.as_deref()).await {
             Ok(snapshot) => snapshot,
             Err(vibevalley_runtime::oar::AgentError::Unsupported { .. } | vibevalley_runtime::oar::AgentError::Io(_)) => break,
             Err(_) => continue,
@@ -239,8 +238,8 @@ fn bounded(text: &str) -> String {
 mod tests {
     use super::*;
 
-    #[test]
-    fn regression_readback_binds_results_to_the_observed_child_turn_and_preserves_gaps() {
+    #[tokio::test]
+    async fn regression_readback_binds_results_to_the_observed_child_turn_and_preserves_gaps() {
         let mut summary = SessionSubagents {
             run: "r1".into(),
             root_thread_id: "root".into(),
@@ -254,27 +253,34 @@ mod tests {
         let done = thread(&mut summary, "done", 13);
         done.turn_id = Some("finished".into());
         done.status = Some(SubagentStatus::Errored);
-        assert!(read_back(
-            &mut summary,
-            |id, turn| {
-                if id == "unavailable" {
-                    return Err(vibevalley_runtime::oar::AgentError::Protocol("thread unavailable".into()));
-                }
-                let expected_turn = match id {
-                    "observed" => Some("turn-a"),
-                    "done" => Some("finished"),
-                    _ => None,
-                };
-                assert_eq!(turn, expected_turn);
-                Ok(vibevalley_runtime::oar::SubagentSnapshot {
-                    parent_thread_id: Some("root".into()),
-                    agent_name: Some(format!("/root/{id}")),
-                    status: Some(if id == "done" { ObservedStatus::Running } else { ObservedStatus::Completed }),
-                    message: Some("last public reply".into()),
-                })
-            },
-            || 25
-        ));
+        assert!(
+            read_back_async(
+                &mut summary,
+                |id, turn| {
+                    let id = id.to_owned();
+                    let turn = turn.map(str::to_owned);
+                    Box::pin(async move {
+                        if id == "unavailable" {
+                            return Err(vibevalley_runtime::oar::AgentError::Protocol("thread unavailable".into()));
+                        }
+                        let expected_turn = match id.as_str() {
+                            "observed" => Some("turn-a"),
+                            "done" => Some("finished"),
+                            _ => None,
+                        };
+                        assert_eq!(turn.as_deref(), expected_turn);
+                        Ok(vibevalley_runtime::oar::SubagentSnapshot {
+                            parent_thread_id: Some("root".into()),
+                            agent_name: Some(format!("/root/{id}")),
+                            status: Some(if id == "done" { ObservedStatus::Running } else { ObservedStatus::Completed }),
+                            message: Some("last public reply".into()),
+                        })
+                    })
+                },
+                || 25
+            )
+            .await
+        );
         assert_eq!(summary.disconnected_at, Some(15));
         assert_eq!(summary.threads[0].status, Some(SubagentStatus::Completed));
         assert_eq!(summary.threads[0].last_activity.as_deref(), Some("last public reply"));

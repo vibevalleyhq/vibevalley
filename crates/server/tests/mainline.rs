@@ -15,12 +15,16 @@ use vibevalley_server::{App, Config, create_app_blocking};
 struct Model(Mutex<VecDeque<Completion>>);
 
 impl ModelClient for Model {
-    fn complete(&self, _: &ChatRequest, on: &mut dyn FnMut(Delta)) -> vibevalley_runtime::agent::Result<Completion> {
+    fn complete<'a>(
+        &'a self,
+        _: &'a ChatRequest,
+        on: &'a mut (dyn FnMut(Delta) + Send),
+    ) -> vibevalley_runtime::BoxFuture<'a, vibevalley_runtime::agent::Result<Completion>> {
         let answer = self.0.lock().unwrap().pop_front().unwrap_or_else(|| answer(None));
         if let Some(text) = &answer.message.content {
             on(Delta::Text(text.clone()));
         }
-        Ok(answer)
+        Box::pin(async move { Ok(answer) })
     }
 }
 
@@ -194,15 +198,15 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
         .pop()
         .unwrap();
     assert!(run.heard.is_empty());
-    let queued = server
-        .test_internals()
-        .runtime
-        .durable_store()
-        .read(|tx| {
-            assert!(tx.document("run", &run.id, "issue.report")?.is_none());
-            tx.submissions(&format!("issue:{draft_id}"))
+    let queued = vibevalley_runtime::rt::block_on(server.test_internals().runtime.durable_store().read_async(|tx| {
+        let run_id = run.id.clone();
+        let conv = format!("issue:{draft_id}");
+        Box::pin(async move {
+            assert!(tx.document_async("run", &run_id, "issue.report").await?.is_none());
+            tx.submissions_async(&conv).await
         })
-        .unwrap();
+    }))
+    .unwrap();
     assert_eq!(queued.len(), 1);
     assert_eq!(queued[0].status, vibevalley_runtime::agent::durable::SubmissionStatus::Queued);
 

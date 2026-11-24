@@ -238,21 +238,27 @@ impl Database {
 
     /// Returns the process-wide `durable::Store` handle backed by this [`Database`]
     /// via `Store::from_sea_orm_conns`.
-    pub fn durable(&self) -> vibevalley_runtime::agent::durable::Result<vibevalley_runtime::agent::durable::Store> {
-        let mut slot = self.durable.lock();
-        if let Some(store) = slot.as_ref() {
-            return Ok(store.clone());
+    pub async fn durable(&self) -> vibevalley_runtime::agent::durable::Result<vibevalley_runtime::agent::durable::Store> {
+        if let Some(store) = self.durable.lock().clone() {
+            return Ok(store);
         }
         let store = match &self.backend_state {
-            DbBackendState::Sqlite { .. } => vibevalley_runtime::agent::durable::Store::from_sea_orm_conns(
-                self.write_conn.clone(),
-                Some(self.read_conn.clone()),
-                vibevalley_runtime::agent::durable::now_ms,
-            )?,
+            DbBackendState::Sqlite { .. } => {
+                vibevalley_runtime::agent::durable::Store::from_sea_orm_conns(
+                    self.write_conn.clone(),
+                    Some(self.read_conn.clone()),
+                    vibevalley_runtime::agent::durable::now_ms,
+                )
+                .await?
+            }
             DbBackendState::Postgres => {
-                vibevalley_runtime::agent::durable::Store::from_sea_orm_conns(self.write_conn.clone(), None, vibevalley_runtime::agent::durable::now_ms)?
+                vibevalley_runtime::agent::durable::Store::from_sea_orm_conns(self.write_conn.clone(), None, vibevalley_runtime::agent::durable::now_ms).await?
             }
         };
+        let mut slot = self.durable.lock();
+        if let Some(existing) = slot.as_ref() {
+            return Ok(existing.clone());
+        }
         *slot = Some(store.clone());
         Ok(store)
     }
@@ -260,8 +266,9 @@ impl Database {
     /// Coordinated async database shutdown: closes the durable store handle, then closes
     /// SQLite connections (with WAL `TRUNCATE` + `PRAGMA optimize`) or the PostgreSQL pool.
     pub async fn close(&self) {
-        if let Some(store) = self.durable.lock().take() {
-            let _ = store.close();
+        let store = self.durable.lock().take();
+        if let Some(store) = store {
+            let _ = store.close().await;
         }
         match &self.backend_state {
             DbBackendState::Sqlite { .. } => {

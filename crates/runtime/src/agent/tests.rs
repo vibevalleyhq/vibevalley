@@ -864,20 +864,24 @@ mod kit_tests {
             self.0.lock().unwrap().trim().to_owned()
         }
 
-        fn remember(&self, note: &str) -> std::result::Result<(), String> {
-            let line = format!("- {}", note.split_whitespace().collect::<Vec<_>>().join(" "));
-            let mut body = self.0.lock().unwrap();
-            if !body.is_empty() {
-                body.push('\n');
-            }
-            body.push_str(&line);
-            Ok(())
+        fn remember<'a>(&'a self, note: &'a str) -> crate::BoxFuture<'a, std::result::Result<(), String>> {
+            Box::pin(async move {
+                let line = format!("- {}", note.split_whitespace().collect::<Vec<_>>().join(" "));
+                let mut body = self.0.lock().unwrap();
+                if !body.is_empty() {
+                    body.push('\n');
+                }
+                body.push_str(&line);
+                Ok(())
+            })
         }
 
-        fn rewrite(&self, content: &str) -> std::result::Result<usize, String> {
-            let trimmed = content.trim();
-            *self.0.lock().unwrap() = trimmed.to_owned();
-            Ok(trimmed.lines().filter(|l| !l.trim().is_empty()).count())
+        fn rewrite<'a>(&'a self, content: &'a str) -> crate::BoxFuture<'a, std::result::Result<usize, String>> {
+            Box::pin(async move {
+                let trimmed = content.trim();
+                *self.0.lock().unwrap() = trimmed.to_owned();
+                Ok(trimmed.lines().filter(|l| !l.trim().is_empty()).count())
+            })
         }
     }
 

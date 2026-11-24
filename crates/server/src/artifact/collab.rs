@@ -1075,7 +1075,7 @@ impl Manager {
             loop {
                 tokio::select! {
                     biased;
-                    _ = sink.stop.recv_async() => return,
+                    _ = sink.stop.cancelled() => return,
                     msg = rx.recv() => match msg {
                         Ok((id, ev)) => {
                             if id == artifact_id {
@@ -1115,7 +1115,7 @@ impl Manager {
             loop {
                 tokio::select! {
                     biased;
-                    _ = sink.stop.recv_async() => return,
+                    _ = sink.stop.cancelled() => return,
                     msg = rx.recv() => match msg {
                         Ok((id, ev)) => {
                             if id == artifact_id && !sink.send(&ev) {
@@ -1144,7 +1144,7 @@ impl Manager {
             loop {
                 tokio::select! {
                     biased;
-                    _ = sink.stop.recv_async() => return,
+                    _ = sink.stop.cancelled() => return,
                     _ = ticker.tick() => {
                         let evicted = room.hub.evict_stale(this.ctx.now());
                         if !evicted.is_empty() {

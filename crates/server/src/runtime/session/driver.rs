@@ -67,13 +67,13 @@ pub trait SessionDriver: Send + Sync {
     fn check(&self, agent: &str) -> Result<()>;
 
     /// What the agent runs `issue` on now; `None` is nobody assigned.
-    fn drive(&self, agent: Option<&str>, issue: &Issue) -> Result<Drive>;
+    fn drive<'a>(&'a self, agent: Option<&'a str>, issue: &'a Issue) -> BoxFuture<'a, Result<Drive>>;
 
     /// What a direct workspace session opens on, named by runtime id.
-    fn drive_runtime(&self, runtime: &str, model: Option<&str>, effort: Option<&str>) -> Result<Drive>;
+    fn drive_runtime<'a>(&'a self, runtime: &'a str, model: Option<&'a str>, effort: Option<&'a str>) -> BoxFuture<'a, Result<Drive>>;
 
     /// Who drafts `issue` (`refine`); the board assigns it when nobody is.
-    fn drafter(&self, issue: &Issue) -> Result<Drive> {
+    fn drafter<'a>(&'a self, issue: &'a Issue) -> BoxFuture<'a, Result<Drive>> {
         self.drive(issue.assigned_agent(), issue)
     }
 
@@ -129,34 +129,36 @@ impl SessionDriver for RuntimeDriver {
         self.registry.require(agent).map(|_| ()).map_err(RuntimeError::from)
     }
 
-    fn drive(&self, agent: Option<&str>, _issue: &Issue) -> Result<Drive> {
+    fn drive<'a>(&'a self, agent: Option<&'a str>, _issue: &'a Issue) -> BoxFuture<'a, Result<Drive>> {
         let agent = agent.filter(|a| !a.trim().is_empty()).unwrap_or("claude");
         self.drive_runtime(agent, None, None)
     }
 
-    fn drive_runtime(&self, runtime_id: &str, model: Option<&str>, effort: Option<&str>) -> Result<Drive> {
-        let runtime_id = runtime_id.trim();
-        let runtime = self.registry.require(runtime_id)?;
-        match runtime.installation() {
-            Installation::Available { .. } => {}
-            Installation::LoginRequired { .. } => return Err(RuntimeError::Other(format!("{runtime_id} requires a local sign-in"))),
-            Installation::NotInstalled => return Err(RuntimeError::Other(format!("{runtime_id} is not installed"))),
-            Installation::Unusable { reason } => return Err(RuntimeError::Other(format!("{runtime_id} cannot be used: {reason}"))),
-        }
-        let wire_id = runtime.id().strip_prefix("acp:").unwrap_or(runtime.id()).to_string();
-        Ok(Drive {
-            agent: wire_id.clone(),
-            runtime_id: wire_id,
-            machine_id: LOCAL_MACHINE_ID.to_string(),
-            is_local: true,
-            name: runtime.display_name().to_string(),
-            runtime,
-            model: model.map(str::trim).filter(|m| !m.is_empty()).map(String::from).or_else(|| self.model.clone()),
-            env: vec![],
-            persona: None,
-            effort: effort.map(str::trim).filter(|e| !e.is_empty()).map(String::from),
-            mcp_servers: vec![],
-            disallowed_tools: vec![],
+    fn drive_runtime<'a>(&'a self, runtime_id: &'a str, model: Option<&'a str>, effort: Option<&'a str>) -> BoxFuture<'a, Result<Drive>> {
+        Box::pin(async move {
+            let runtime_id = runtime_id.trim();
+            let runtime = self.registry.require(runtime_id)?;
+            match runtime.installation().await {
+                Installation::Available { .. } => {}
+                Installation::LoginRequired { .. } => return Err(RuntimeError::Other(format!("{runtime_id} requires a local sign-in"))),
+                Installation::NotInstalled => return Err(RuntimeError::Other(format!("{runtime_id} is not installed"))),
+                Installation::Unusable { reason } => return Err(RuntimeError::Other(format!("{runtime_id} cannot be used: {reason}"))),
+            }
+            let wire_id = runtime.id().strip_prefix("acp:").unwrap_or(runtime.id()).to_string();
+            Ok(Drive {
+                agent: wire_id.clone(),
+                runtime_id: wire_id,
+                machine_id: LOCAL_MACHINE_ID.to_string(),
+                is_local: true,
+                name: runtime.display_name().to_string(),
+                runtime,
+                model: model.map(str::trim).filter(|m| !m.is_empty()).map(String::from).or_else(|| self.model.clone()),
+                env: vec![],
+                persona: None,
+                effort: effort.map(str::trim).filter(|e| !e.is_empty()).map(String::from),
+                mcp_servers: vec![],
+                disallowed_tools: vec![],
+            })
         })
     }
 }

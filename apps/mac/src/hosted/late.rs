@@ -15,14 +15,13 @@ use vibevalley_server::SliceSubscription;
 use vibevalley_server::gateway::api::{BoxFuture, GatewayPorts, refusal};
 use vibevalley_server::gateway::bridge::{BizCode, CallerContext, Envelope, LiveEvent, Server, SliceKind};
 
-type ReadyNotifier = Arc<Mutex<Option<(watch::Sender<bool>, flume::Sender<()>)>>>;
+type ReadyNotifier = Arc<Mutex<Option<watch::Sender<bool>>>>;
 
 #[derive(Clone)]
 pub struct LateServer {
     cell: Arc<OnceLock<Arc<dyn Server>>>,
     ready_tx: ReadyNotifier,
     ready: watch::Receiver<bool>,
-    ready_flume: flume::Receiver<()>,
 }
 
 impl Default for LateServer {
@@ -35,22 +34,19 @@ impl LateServer {
     /// Creates an unattached proxy whose async subscribers wait until [`Self::attach`] runs.
     pub fn new() -> LateServer {
         let (tx, ready) = watch::channel(false);
-        let (flume_tx, ready_flume) = flume::bounded(0);
         LateServer {
             cell: Arc::new(OnceLock::new()),
-            ready_tx: Arc::new(Mutex::new(Some((tx, flume_tx)))),
+            ready_tx: Arc::new(Mutex::new(Some(tx))),
             ready,
-            ready_flume,
         }
     }
 
     /// Installs the underlying server once and wakes all waiting callers and stream subscribers.
     pub fn attach(&self, server: Arc<dyn Server>) {
         if self.cell.set(server).is_ok()
-            && let Some((tx, flume_tx)) = self.ready_tx.lock().take()
+            && let Some(tx) = self.ready_tx.lock().take()
         {
             let _ = tx.send(true);
-            drop(flume_tx);
         }
     }
 
@@ -124,11 +120,22 @@ impl Server for LateServer {
         })
     }
 
-    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
         if self.cell.get().is_none() {
-            flume::Selector::new().recv(stop, |_| ()).recv(&self.ready_flume, |_| ()).wait();
+            let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+            let stop_wait = stop.clone();
+            let mut ready = self.ready.clone();
+            vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+                tokio::select! {
+                    biased;
+                    _ = stop_wait.cancelled() => {}
+                    _ = ready.wait_for(|is_ready| *is_ready) => {}
+                }
+                drop(done_tx);
+            });
+            let _ = done_rx.recv();
         }
-        if !stop.is_disconnected()
+        if !stop.is_cancelled()
             && let Some(server) = self.cell.get()
         {
             server.watch_slice(slice, after_seq, stop, receive);
@@ -163,16 +170,24 @@ impl Server for LateServer {
         })
     }
 
-    fn live(&self) -> flume::Receiver<LiveEvent> {
+    fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
         if let Some(server) = self.cell.get() {
             return server.live();
         }
-        let (tx, rx) = flume::unbounded();
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         let cell = self.cell.clone();
         let mut ready = self.ready.clone();
         vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
-            let _ = ready.wait_for(|is_ready| *is_ready).await;
-            if tx.is_disconnected() {
+            tokio::select! {
+                biased;
+                _ = tx.closed() => return,
+                res = ready.wait_for(|is_ready| *is_ready) => {
+                    if res.is_err() {
+                        return;
+                    }
+                }
+            }
+            if tx.is_closed() {
                 return;
             }
             let Some(server) = cell.get() else { return };
@@ -180,6 +195,7 @@ impl Server for LateServer {
                 loop {
                     tokio::select! {
                         biased;
+                        _ = tx.closed() => break,
                         res = live_rx.recv() => match res {
                             Ok(ev) => {
                                 if tx.send(ev).is_err() {
@@ -189,18 +205,22 @@ impl Server for LateServer {
                             Err(broadcast::error::RecvError::Lagged(_)) => continue,
                             Err(broadcast::error::RecvError::Closed) => break,
                         },
-                        _ = tokio::time::sleep(std::time::Duration::from_secs(30)) => {
-                            if tx.is_disconnected() {
-                                break;
-                            }
-                        }
                     }
                 }
             } else {
-                let from = server.live();
-                while let Ok(item) = from.recv_async().await {
-                    if tx.send(item).is_err() {
-                        break;
+                let mut from = server.live();
+                loop {
+                    tokio::select! {
+                        biased;
+                        _ = tx.closed() => break,
+                        item = from.recv() => match item {
+                            Some(item) => {
+                                if tx.send(item).is_err() {
+                                    break;
+                                }
+                            }
+                            None => break,
+                        }
                     }
                 }
             }
@@ -212,11 +232,11 @@ impl Server for LateServer {
         self.cell.get().and_then(|s| s.subscribe_live())
     }
 
-    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
         self.server().subscribe(name, payload)
     }
 
-    fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+    fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
         self.server().subscribe_with(ctx, name, payload)
     }
 
@@ -225,7 +245,7 @@ impl Server for LateServer {
         ctx: CallerContext,
         name: String,
         payload: Value,
-    ) -> BoxFuture<'static, Result<(u64, flume::Receiver<Value>), Envelope>> {
+    ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope>> {
         if let Some(inner) = self.cell.get() {
             return Arc::clone(inner).subscribe_with_async(ctx, name, payload);
         }
@@ -376,7 +396,7 @@ mod tests {
             self.inner.slice_snapshot_json(slice)
         }
 
-        fn watch_slice(&self, _slice: SliceKind, _after_seq: Option<i64>, _stop: &flume::Receiver<()>, _receive: &mut dyn FnMut(i64, &Value)) {
+        fn watch_slice(&self, _slice: SliceKind, _after_seq: Option<i64>, _stop: &tokio_util::sync::CancellationToken, _receive: &mut dyn FnMut(i64, &Value)) {
             panic!("blocking watch_slice fallback must not be used when subscribe_slice is available");
         }
 
@@ -384,7 +404,7 @@ mod tests {
             self.inner.subscribe_slice(slice)
         }
 
-        fn live(&self) -> flume::Receiver<LiveEvent> {
+        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
             panic!("blocking live fallback must not be used when subscribe_live is available");
         }
 
@@ -394,13 +414,13 @@ mod tests {
             rx
         }
 
-        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
             let res = self.inner.subscribe(name, payload);
             self.on_subscribe.notify_waiters();
             res
         }
 
-        fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
             let res = self.inner.subscribe_with(ctx, name, payload);
             self.on_subscribe.notify_waiters();
             res
@@ -422,25 +442,26 @@ mod tests {
 
     #[test]
     fn regression_a_closed_workbench_does_not_wait_for_server_startup() {
-        let (release, starting) = flume::bounded(0);
+        let (release, starting) = std::sync::mpsc::sync_channel::<()>(0);
         let late = LateServer::spawn(move || {
             starting.recv().unwrap();
             Arc::new(FakeServer::new())
         });
-        let (stop, stopped) = flume::bounded(0);
-        let (done, finished) = flume::bounded(1);
+        let stop = tokio_util::sync::CancellationToken::new();
+        let stopped = stop.clone();
+        let (done, finished) = std::sync::mpsc::sync_channel(1);
         std::thread::spawn(move || {
             late.watch_slice(SliceKind::Board, None, &stopped, &mut |_, _| panic!("closed view received a snapshot"));
             done.send(()).unwrap();
         });
-        drop(stop);
+        stop.cancel();
         finished.recv_timeout(Duration::from_secs(2)).unwrap();
         release.send(()).unwrap();
     }
 
     #[test]
     fn waits_for_the_server_then_serves_and_forwards_slices() {
-        let (go_tx, go_rx) = flume::bounded::<()>(0);
+        let (go_tx, go_rx) = std::sync::mpsc::sync_channel::<()>(0);
         let fake = Arc::new(FakeServer::from_bundle(empty_bundle(4)));
         fake.respond("issue.list", json!([]));
         let inner = fake.clone();
@@ -448,8 +469,9 @@ mod tests {
             let _ = go_rx.recv();
             inner
         });
-        let (stop, stopped) = flume::bounded(0);
-        let (seen_tx, seen_rx) = flume::bounded(1);
+        let stop = tokio_util::sync::CancellationToken::new();
+        let stopped = stop.clone();
+        let (seen_tx, seen_rx) = std::sync::mpsc::sync_channel(1);
         let watcher = late.clone();
         let handle = std::thread::spawn(move || {
             watcher.watch_slice(SliceKind::Board, None, &stopped, &mut |seq, val| {
@@ -462,7 +484,7 @@ mod tests {
         let (seq, val) = seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(seq, 4);
         assert_eq!(val["seq"], 4);
-        drop(stop);
+        stop.cancel();
         handle.join().unwrap();
     }
 
@@ -550,15 +572,15 @@ mod tests {
             self.0.slice_snapshot(slice)
         }
 
-        fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+        fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
             self.0.watch_slice(slice, after_seq, stop, receive);
         }
 
-        fn live(&self) -> flume::Receiver<LiveEvent> {
+        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
             self.0.live()
         }
 
-        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
             self.0.subscribe(name, payload)
         }
 
@@ -628,15 +650,15 @@ mod tests {
                 self.inner.slice_snapshot(slice)
             }
 
-            fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+            fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
                 self.inner.watch_slice(slice, after_seq, stop, receive);
             }
 
-            fn live(&self) -> flume::Receiver<LiveEvent> {
+            fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
                 self.inner.live()
             }
 
-            fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+            fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
                 self.inner.subscribe(name, payload)
             }
 

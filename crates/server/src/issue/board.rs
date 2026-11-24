@@ -565,7 +565,7 @@ impl Board {
         let issue = self.stored_async(reference).await?;
         let refining = issue.refining.as_ref().map(|r| r.session.clone());
         let session = refining.or_else(|| issue.latest_session_id().cloned());
-        self.session_engine().stop(&session.unwrap_or_default())
+        self.session_engine().abort_turn_async(&session.unwrap_or_default()).await
     }
 
     /// Sends queued issues while there is room, in board order. Children in
@@ -728,7 +728,7 @@ impl Board {
     }
 
     async fn hire_async(&self, issue: &Issue, all: &[Issue], words: Option<String>, kind: RunTriggerKind) -> Result<String> {
-        let drive = self.runtime.driver().drive(issue.assigned_agent(), issue)?;
+        let drive = self.runtime.driver().drive(issue.assigned_agent(), issue).await?;
         let wp = self.worktree();
         let parent_number = match issue.parent.as_deref() {
             Some(p) => all.iter().find(|i| i.id == p).map(|p| p.number),

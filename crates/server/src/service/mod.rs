@@ -109,8 +109,8 @@ impl Service {
         &self.database
     }
 
-    pub fn durable(&self) -> vibevalley_runtime::agent::durable::Result<vibevalley_runtime::agent::durable::Store> {
-        self.database.durable()
+    pub async fn durable(&self) -> vibevalley_runtime::agent::durable::Result<vibevalley_runtime::agent::durable::Store> {
+        self.database.durable().await
     }
 
     pub async fn next_seq(&self, name: &str, at_least: i64) -> DbResult<i64> {

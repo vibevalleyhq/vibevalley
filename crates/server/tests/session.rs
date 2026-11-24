@@ -202,8 +202,10 @@ fn a_sent_issue_is_logged_listed_and_watched() {
         .unwrap();
     let id = issue["id"].as_str().unwrap().to_string();
 
-    let (sub, rows) = router.subscribe("issue.watch", json!({ "id": id })).unwrap();
-    let first: serde_json::Value = rows.recv_timeout(Duration::from_secs(2)).unwrap();
+    let (sub, mut rows) = router.subscribe("issue.watch", json!({ "id": id })).unwrap();
+    let first: serde_json::Value = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(2), rows.recv()).await })
+        .unwrap()
+        .unwrap();
     assert_eq!(first["kind"], "state");
     assert_eq!(first["sessionIds"], json!([]));
 
@@ -234,7 +236,11 @@ fn a_sent_issue_is_logged_listed_and_watched() {
     let mut kinds = Vec::new();
     let deadline = Instant::now() + Duration::from_secs(20);
     while !(kinds.iter().any(|k| k == "history") && kinds.iter().any(|k| k == "state")) {
-        let row = rows.recv_deadline(deadline).expect("the watch to show the session");
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        let row = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(remaining, rows.recv()).await })
+            .ok()
+            .flatten()
+            .expect("the watch to show the session");
         kinds.push(row["kind"].as_str().unwrap_or("").to_string());
     }
     assert!(kinds.contains(&"state".to_string()), "{kinds:?}");

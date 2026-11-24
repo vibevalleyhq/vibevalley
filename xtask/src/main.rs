@@ -38,7 +38,8 @@ Commands:
   loom                                 Run loom concurrency tests (runtime & server)
   goldens [--check]                    Run vibevalley-core artifact golden tests
   protocol [--write]                   Check (or with --write, regenerate) TS contract & goldens
-  audit [--boundaries] [--ratchets]    Run Rust module-boundary and concurrency-ratchet audits
+  audit [--boundaries] [--ratchets] [--arch]
+                                       Run module-boundary, ratchet, and strict arch audits
   arch-audit [--report-locks] [--json] Run flat server architecture audit (11 rules) & lock report
   diagnose [--json] [--top <N>]        Compute architectural metrics, hotspots & prescriptive diagnostics"
     );
@@ -176,32 +177,40 @@ fn cmd_protocol(root: &Path, args: &[String]) -> Result<i32, String> {
 fn cmd_audit(root: &Path, args: &[String]) -> Result<i32, String> {
     let mut want_boundaries = false;
     let mut want_ratchets = false;
+    let mut want_arch = false;
     for arg in args {
         match arg.as_str() {
             "--boundaries" => want_boundaries = true,
             "--ratchets" => want_ratchets = true,
+            "--arch" => want_arch = true,
             "--help" | "-h" => {
-                println!("Usage: cargo xtask audit [--boundaries] [--ratchets]");
+                println!("Usage: cargo xtask audit [--boundaries] [--ratchets] [--arch]");
                 return Ok(0);
             }
             other => {
-                eprintln!("Usage: cargo xtask audit [--boundaries] [--ratchets] (unknown option {other})");
+                eprintln!("Usage: cargo xtask audit [--boundaries] [--ratchets] [--arch] (unknown option {other})");
                 return Ok(2);
             }
         }
     }
 
-    let run_both = !want_boundaries && !want_ratchets;
+    let run_all = !want_boundaries && !want_ratchets && !want_arch;
     let mut exit_code = 0;
 
-    if run_both || want_boundaries {
+    if run_all || want_boundaries {
         let code = boundaries::run(root)?;
         if code != 0 {
             exit_code = code;
         }
     }
-    if run_both || want_ratchets {
+    if run_all || want_ratchets {
         let code = ratchets::run(root)?;
+        if code != 0 {
+            exit_code = code;
+        }
+    }
+    if run_all || want_arch {
+        let code = arch_audit::run(root, &[])?;
         if code != 0 {
             exit_code = code;
         }

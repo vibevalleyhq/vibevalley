@@ -83,7 +83,7 @@ impl Router {
         self.invoke::<O>(&CallerContext::from_caller(caller), input)
     }
     #[allow(clippy::result_large_err)]
-    async fn open_sub_async(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+    async fn open_sub_async(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
         open_subscription_channel(&self.gw, ctx, name, payload, |sub, sink| pj::open_sub_domain_async(&self.core, sub, sink)).await
     }
     async fn dispatch_op_async(&self, ctx: CallerContext, op: &str, payload: Value) -> Envelope {
@@ -327,15 +327,15 @@ impl Server for Router {
         fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> { Some(self.core.ctx.feed.subscribe(slice)) }
         fn subscribe_slice_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Option<SliceSubscription>> { Box::pin(flush_and_subscribe_slice(self.core.ctx.clone(), slice)) }
         fn fault_gate(&self) -> Option<SharedFaultGate> { self.gw.fault_gate.clone() }
-        fn live(&self) -> flume::Receiver<LiveEvent> { bridge_live_receiver(self.core.ctx.live.subscribe_live(), self.core.ctx.token()) }
+        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> { bridge_live_receiver(self.core.ctx.live.subscribe_live(), self.core.ctx.token()) }
         fn subscribe_live(&self) -> Option<tokio::sync::broadcast::Receiver<LiveEvent>> { Some(self.core.ctx.live.subscribe_live()) }
-        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> { self.subscribe_with(&CallerContext::local(), name, payload) }
-        fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> { vibevalley_runtime::rt::block_on(self.open_sub_async(ctx, name, payload)) }
-        fn subscribe_with_async(self: Arc<Self>, ctx: CallerContext, name: String, payload: Value) -> BoxFuture<'static, Result<(u64, flume::Receiver<Value>), Envelope>> { Box::pin(async move { self.open_sub_async(&ctx, &name, payload).await }) }
+        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> { self.subscribe_with(&CallerContext::local(), name, payload) }
+        fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> { vibevalley_runtime::rt::block_on(self.open_sub_async(ctx, name, payload)) }
+        fn subscribe_with_async(self: Arc<Self>, ctx: CallerContext, name: String, payload: Value) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope>> { Box::pin(async move { self.open_sub_async(&ctx, &name, payload).await }) }
         fn ports(&self) -> GatewayPorts { self.gw.ports.clone() }
         fn host_debug(&self) -> Option<SharedHostDebug> { self.gw.host_debug.clone() }
     }
-    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
         watch_slice_value(&self.core.ctx, self.gw.fault_gate.as_ref(), slice, after_seq, stop, receive);
     }
     fn unsubscribe(&self, id: u64) {

@@ -27,14 +27,14 @@ pub type FarmEffect = GameEffect;
 /// Where a subscription's events go; ends when the subscriber stops (`stopped`)
 /// or the opener drops it.
 pub struct Sink {
-    pub events: flume::Sender<Value>,
-    /// Disconnected once the subscriber has stopped.
-    pub stop: flume::Receiver<()>,
+    pub events: tokio::sync::mpsc::UnboundedSender<Value>,
+    /// Cancelled once the subscriber has stopped.
+    pub stop: CancellationToken,
 }
 
 impl Sink {
     pub fn stopped(&self) -> bool {
-        matches!(self.stop.try_recv(), Err(flume::TryRecvError::Disconnected))
+        self.stop.is_cancelled()
     }
 
     /// Sends one serialized event; returns `false` once nobody listens.
@@ -419,15 +419,16 @@ impl Default for LiveState {
     }
 }
 
-/// Adapts a Tokio `broadcast::Receiver<LiveEvent>` onto a `flume::Receiver<LiveEvent>`
+/// Adapts a Tokio `broadcast::Receiver<LiveEvent>` onto an unbounded mpsc receiver
 /// for synchronous trait callers (`Server::live`).
-pub fn bridge_live_receiver(mut rx: broadcast::Receiver<LiveEvent>, cancel: CancellationToken) -> flume::Receiver<LiveEvent> {
-    let (tx, out) = flume::unbounded();
+pub fn bridge_live_receiver(mut rx: broadcast::Receiver<LiveEvent>, cancel: CancellationToken) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
+    let (tx, out) = tokio::sync::mpsc::unbounded_channel();
     crate::log::spawn_traced(async move {
         loop {
             let item = tokio::select! {
                 biased;
                 _ = cancel.cancelled() => break,
+                _ = tx.closed() => break,
                 res = rx.recv() => match res {
                     Ok(ev) => ev,
                     Err(broadcast::error::RecvError::Lagged(_)) => continue,

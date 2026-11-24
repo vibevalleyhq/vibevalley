@@ -65,7 +65,7 @@ struct World {
     wx_log_notify: Notify,
 
     feishu_scanned: AtomicBool,
-    feishu_in: (flume::Sender<String>, flume::Receiver<String>),
+    feishu_in: (std::sync::mpsc::Sender<String>, Mutex<std::sync::mpsc::Receiver<String>>),
     feishu_acks: AtomicUsize,
     feishu_acks_notify: Notify,
 
@@ -74,7 +74,7 @@ struct World {
     qq_expires: Mutex<Value>,
     qq_gateway_auth: Mutex<Vec<String>>,
     qq_gateway_notify: Notify,
-    qq_in: (flume::Sender<QqCmd>, flume::Receiver<QqCmd>),
+    qq_in: (std::sync::mpsc::Sender<QqCmd>, Mutex<std::sync::mpsc::Receiver<QqCmd>>),
     /// Each reply's (msg_id, msg_seq).
     qq_seqs: Mutex<Vec<(String, u64)>>,
 }
@@ -278,14 +278,20 @@ impl World {
                 wx_stale: AtomicBool::new(false),
                 wx_log_notify: Notify::new(),
                 feishu_scanned: AtomicBool::new(false),
-                feishu_in: flume::unbounded(),
+                feishu_in: {
+                    let (tx, rx) = std::sync::mpsc::channel();
+                    (tx, Mutex::new(rx))
+                },
                 feishu_acks: AtomicUsize::new(0),
                 feishu_acks_notify: Notify::new(),
                 qq_tokens: Mutex::default(),
                 qq_expires: Mutex::new(json!(7200)),
                 qq_gateway_auth: Mutex::default(),
                 qq_gateway_notify: Notify::new(),
-                qq_in: flume::unbounded(),
+                qq_in: {
+                    let (tx, rx) = std::sync::mpsc::channel();
+                    (tx, Mutex::new(rx))
+                },
                 qq_seqs: Mutex::default(),
             }
         })
@@ -470,7 +476,7 @@ impl World {
             if !identified {
                 continue;
             }
-            match self.qq_in.1.try_recv() {
+            match self.qq_in.1.lock().unwrap().try_recv() {
                 Ok(QqCmd::Push(dispatch)) => {
                     if socket.send(Message::text(dispatch.to_string())).is_err() {
                         return;
@@ -496,7 +502,7 @@ impl World {
                 Ok(_) => {}
                 Err(()) => return,
             }
-            if let Ok(event) = self.feishu_in.1.try_recv() {
+            if let Ok(event) = self.feishu_in.1.lock().unwrap().try_recv() {
                 let id = uuid::Uuid::new_v4().to_string();
                 let frame = feishu_frame(
                     1,

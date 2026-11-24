@@ -86,13 +86,13 @@ pub struct Chat {
     events: broadcast::Sender<ChannelEvent>,
     removals: broadcast::Sender<String>,
     message_events: broadcast::Sender<ChannelMessageEvent>,
-    dispatches: Mutex<Vec<flume::Sender<ChannelDispatched>>>,
+    dispatches: Mutex<Vec<tokio::sync::mpsc::UnboundedSender<ChannelDispatched>>>,
     seaters: RwLock<Vec<Seater>>,
     /// Link previews are read off the web; tests turn it off.
     embeds: bool,
 }
 
-fn publish<T: Clone>(to: &Mutex<Vec<flume::Sender<T>>>, value: &T) {
+fn publish<T: Clone>(to: &Mutex<Vec<tokio::sync::mpsc::UnboundedSender<T>>>, value: &T) {
     to.lock().retain(|tx| tx.send(value.clone()).is_ok());
 }
 

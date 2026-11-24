@@ -405,17 +405,24 @@ async fn slice(
     }
 
     // Fallback for custom `Server` implementations without a `SliceFeed` (e.g. test doubles).
-    let (stop_tx, stop_rx) = flume::bounded::<()>(0);
-    let (tx, rx) = flume::bounded::<(i64, String)>(1);
+    let stop = CancellationToken::new();
+    let stop_guard = stop.clone().drop_guard();
+    let watch_stop = stop.clone();
+    let (tx, rx) = tokio::sync::mpsc::channel::<(i64, String)>(1);
     let watch_server = state.server;
     crate::log::spawn_blocking_traced(move || {
-        watch_server.watch_slice(kind, after_seq, &stop_rx, &mut |seq, value| {
+        watch_server.watch_slice(kind, after_seq, &watch_stop, &mut |seq, value| {
+            if watch_stop.is_cancelled() {
+                return;
+            }
             let data = serde_json::to_string(value).unwrap_or_else(|_| "null".into());
-            flume::Selector::new().send(&tx, (seq, data), |_| ()).recv(&stop_rx, |_| ()).wait();
+            if tx.blocking_send((seq, data)).is_err() {
+                watch_stop.cancel();
+            }
         });
     });
-    let stream = rx.into_stream().map(move |(seq, data)| {
-        let _keep = &stop_tx;
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).map(move |(seq, data)| {
+        let _keep = &stop_guard;
         Event::default().id(seq.to_string()).data(data)
     });
     sse_with_shutdown(stream, state.shutdown)
@@ -435,7 +442,7 @@ async fn live(State(state): State<HttpState>, _auth: Authenticated) -> Response 
         });
         return sse_with_shutdown(stream, state.shutdown);
     }
-    let stream = state.server.live().into_stream().map(|item| {
+    let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(state.server.live()).map(|item| {
         let data = serde_json::to_string(&item).unwrap_or_else(|_| "null".into());
         Event::default().data(data)
     });
@@ -580,7 +587,7 @@ async fn issue_watch(State(state): State<HttpState>, Authenticated(ctx): Authent
 async fn open(server: Shared, shutdown: CancellationToken, ctx: CallerContext, name: String, payload: Value) -> Result<Response, Envelope> {
     let (id, rx) = server.clone().subscribe_with_async(ctx, name, payload).await?;
     let guard = Subscription { server, id };
-    let stream = rx.into_stream().map(move |item| {
+    let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(rx).map(move |item| {
         let _keep = &guard;
         let data = serde_json::to_string(&item).unwrap_or_else(|_| "null".into());
         Event::default().data(data)

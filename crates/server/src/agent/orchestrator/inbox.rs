@@ -43,13 +43,17 @@ struct Projection {
 pub struct RuntimeInboxObserver;
 
 impl RuntimeInboxObserver {
-    pub fn start(store: &durable::Store, ctx: &Context) -> durable::Result<()> {
-        let events = store.subscribe_documents()?;
-        let initial = store.read(|tx| {
-            let mut docs = tx.documents_by_kind("conversation", "pi.inbox")?;
-            docs.extend(tx.documents_by_kind("global", "pi.inbox")?);
-            Ok(docs)
-        })?;
+    pub async fn start_async(store: &durable::Store, ctx: &Context) -> durable::Result<()> {
+        let mut events = store.subscribe_documents()?;
+        let initial = store
+            .read_async(|tx| {
+                Box::pin(async move {
+                    let mut docs = tx.documents_by_kind_async("conversation", "pi.inbox").await?;
+                    docs.extend(tx.documents_by_kind_async("global", "pi.inbox").await?);
+                    Ok(docs)
+                })
+            })
+            .await?;
         let mut projection = Projection::default();
         for doc in initial {
             projection.apply_doc(&doc, false);
@@ -67,9 +71,9 @@ impl RuntimeInboxObserver {
                 let event = tokio::select! {
                     biased;
                     _ = cancel.cancelled() => return,
-                    res = events.recv_async() => match res {
-                        Ok(event) => event,
-                        Err(_) => return,
+                    res = events.recv() => match res {
+                        Some(event) => event,
+                        None => return,
                     },
                 };
                 if event.document.doc_kind != "pi.inbox" {

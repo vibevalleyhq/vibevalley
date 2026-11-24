@@ -214,8 +214,8 @@ impl Chat {
     }
 
     /// Non-blocking stream of committed messages with their pending deliveries.
-    pub fn dispatches(&self) -> flume::Receiver<ChannelDispatched> {
-        let (tx, rx) = flume::unbounded();
+    pub fn dispatches(&self) -> tokio::sync::mpsc::UnboundedReceiver<ChannelDispatched> {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         self.dispatches.lock().push(tx);
         rx
     }
@@ -859,7 +859,7 @@ async fn relay(mut live: broadcast::Receiver<ChannelEvent>, cancel: Cancellation
         let next = tokio::select! {
             biased;
             _ = cancel.cancelled() => return,
-            _ = sink.stop.recv_async() => return,
+            _ = sink.stop.cancelled() => return,
             res = live.recv() => res,
         };
         match next {

@@ -297,12 +297,12 @@ impl Shell {
             if self.workspace.chat_watches.contains_key(&sid) {
                 continue;
             }
-            let Ok((sub_id, rx)) = server.subscribe("session.watch", json!({ "id": sid, "afterSeq": i64::MAX })) else {
+            let Ok((sub_id, mut rx)) = server.subscribe("session.watch", json!({ "id": sid, "afterSeq": i64::MAX })) else {
                 continue;
             };
             let watch_sid = sid.clone();
             let task = cx.spawn(async move |this, cx| {
-                while let Ok(value) = rx.recv_async().await {
+                while let Some(value) = rx.recv().await {
                     let Ok(ev) = serde_json::from_value::<vibevalley_protocol::SessionWatchEvent>(value) else {
                         continue;
                     };

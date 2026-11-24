@@ -88,8 +88,9 @@ fn callers_are_held_to_can() {
 fn a_new_slice_watcher_gets_current_snapshot_then_coalesced_updates_only_when_dirty() {
     let dir = tempfile::tempdir().unwrap();
     let started = app(dir.path());
-    let (stop, stopped) = flume::bounded(0);
-    let (tx, rx) = flume::unbounded();
+    let stop = tokio_util::sync::CancellationToken::new();
+    let stopped = stop.clone();
+    let (tx, rx) = std::sync::mpsc::channel();
     let server = started.server();
     let watch = std::thread::spawn(move || {
         server.watch_slice(SliceKind::Board, None, &stopped, &mut |_seq, val| {
@@ -123,7 +124,7 @@ fn a_new_slice_watcher_gets_current_snapshot_then_coalesced_updates_only_when_di
     started.ctx().mark_dirty(SliceMask::OPS);
     assert!(rx.recv_timeout(Duration::from_millis(350)).is_err());
 
-    drop(stop);
+    stop.cancel();
     watch.join().unwrap();
     started.close_blocking();
 }
@@ -151,15 +152,17 @@ fn subscriptions_send_until_stopped_and_refuse_before_the_first_event() {
     assert_eq!(serde_json::to_value(refused).unwrap()["bizCode"], 500001);
     let bad = router.subscribe("channel.follow", json!({ "id": "c1" })).unwrap_err();
     assert_eq!(serde_json::to_value(bad).unwrap()["bizCode"], 100001);
-    let (id, rx) = router.subscribe("channel.follow", json!({ "id": general, "after": 0 })).unwrap();
+    let (id, mut rx) = router.subscribe("channel.follow", json!({ "id": general, "after": 0 })).unwrap();
     let sent = router.call_as(Caller::User, "channel.message.send", json!({ "id": general, "text": "hi" }));
     assert_eq!(sent.biz_code, 0, "{}", sent.message);
-    let first = rx.recv_timeout(Duration::from_secs(2)).unwrap();
+    let first = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(2), rx.recv()).await })
+        .unwrap()
+        .unwrap();
     assert_eq!(first["_tag"], "Message");
     router.unsubscribe(id);
-    let deadline = Instant::now() + Duration::from_secs(2);
-    while rx.recv_deadline(deadline).is_ok() {}
-    assert!(rx.is_disconnected());
+    let ended = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(2), async { while rx.recv().await.is_some() {} }).await });
+    assert!(ended.is_ok());
+    assert!(rx.is_closed());
     started.close_blocking();
 }
 
@@ -167,7 +170,7 @@ fn subscriptions_send_until_stopped_and_refuse_before_the_first_event() {
 fn regression_slow_workbench_skips_revisions_and_farm_slice_and_http_receive_ordered_effects() {
     use std::io::{BufRead, BufReader};
 
-    struct Window(flume::Sender<Value>);
+    struct Window(std::sync::mpsc::Sender<Value>);
     impl Outlet for Window {
         fn send(&self, name: &str, frame: Value) {
             assert_eq!(name, "frame:slice:board");
@@ -189,8 +192,9 @@ fn regression_slow_workbench_skips_revisions_and_farm_slice_and_http_receive_ord
         }
     };
 
-    let (farm_stop, farm_stopped) = flume::bounded(0);
-    let (farm_tx, farm_rx) = flume::unbounded();
+    let farm_stop = tokio_util::sync::CancellationToken::new();
+    let farm_stopped = farm_stop.clone();
+    let (farm_tx, farm_rx) = std::sync::mpsc::channel();
     let farm_server = started.server();
     let farm_thread = std::thread::spawn(move || {
         farm_server.watch_slice(SliceKind::Farm, None, &farm_stopped, &mut |_seq, val| {
@@ -202,7 +206,7 @@ fn regression_slow_workbench_skips_revisions_and_farm_slice_and_http_receive_ord
 
     let bridge = vibevalley_server::gateway::bridge::Bridge::new(started.server(), 1);
     let window = |id: &str| {
-        let (tx, rx) = flume::unbounded();
+        let (tx, rx) = std::sync::mpsc::channel();
         let identity = ClientIdentity {
             id: id.into(),
             kind: ClientKind::GpuiWorkbench,
@@ -261,7 +265,7 @@ fn regression_slow_workbench_skips_revisions_and_farm_slice_and_http_receive_ord
     let updated_fast = next_fast();
     assert_eq!(updated_fast["data"]["commits"]["total"], 125);
 
-    drop(farm_stop);
+    farm_stop.cancel();
     farm_thread.join().unwrap();
     drop(listener);
     started.close_blocking();

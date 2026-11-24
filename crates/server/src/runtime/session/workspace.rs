@@ -6,6 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
+use tokio::sync::mpsc;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, BizCode, EventTokens, ExecutionPolicy, Outcome, Phase, PhaseFailed, PhaseResting, Session, SessionAction, SessionChildStep, SessionChildToolCall,
@@ -23,7 +24,6 @@ use super::engine::SessionEngine;
 use super::mailbox::MailboxSource;
 use crate::context::error::{LookIn, missing};
 use crate::context::now;
-use crate::log::spawn_blocking_traced;
 use crate::runtime::worktree::Leave;
 use crate::runtime::{Result, RuntimeError, Step};
 use crate::service::session::SessionConfig;
@@ -96,7 +96,7 @@ pub(super) struct WorkspaceState {
     pub pending_permissions: Vec<SessionPermissionRequest>,
     pub pending_interactions: Vec<SessionInteractionRequest>,
     pub tokens: Option<EventTokens>,
-    pub watchers: Vec<flume::Sender<()>>,
+    pub watchers: Vec<mpsc::Sender<()>>,
 }
 
 #[derive(Debug, Clone)]
@@ -181,13 +181,14 @@ impl SessionEngine {
     pub(super) fn notify_workspace(&self, session_id: &str) {
         let mut map = self.0.workspaces.lock();
         let Some(ws) = map.get_mut(session_id) else { return };
-        ws.watchers.retain(|tx| !matches!(tx.try_send(()), Err(flume::TrySendError::Disconnected(_))));
+        ws.watchers
+            .retain(|tx| !matches!(tx.try_send(()), Err(tokio::sync::mpsc::error::TrySendError::Closed(_))));
     }
 
     /// Subscribes to out-of-band workspace state changes (pending permissions,
     /// pending interactions, live config, and latest token telemetry).
-    pub fn watch_workspace(&self, session_id: &str) -> flume::Receiver<()> {
-        let (tx, rx) = flume::bounded(1);
+    pub fn watch_workspace(&self, session_id: &str) -> mpsc::Receiver<()> {
+        let (tx, rx) = mpsc::channel(1);
         let mut map = self.0.workspaces.lock();
         let ws = self.ensure_workspace_entry(&mut map, session_id);
         ws.watchers.push(tx);
@@ -291,36 +292,32 @@ impl SessionEngine {
         let limit = input.limit.unwrap_or(30).clamp(1, 30) as usize;
         let agent = self.live_agent(&session.id);
         let steps = match agent {
-            Some(agent) => spawn_blocking_traced(move || {
-                agent
-                    .read_child_transcript(&conversation_id, limit)
-                    .into_iter()
-                    .map(|s| SessionChildStep {
-                        step_index: i64::try_from(s.step_index).unwrap_or(0),
-                        source: s.source,
-                        kind: s.kind,
-                        status: s.status,
-                        created_at: s.created_at,
-                        model: s.model,
-                        thinking: s.thinking,
-                        content: s.content,
-                        error: s.error,
-                        tool_calls: s
-                            .tool_calls
-                            .into_iter()
-                            .map(|tc| SessionChildToolCall {
-                                name: tc.name,
-                                args: tc.summary,
-                            })
-                            .collect(),
-                        input_tokens: s.input_tokens.and_then(|n| i64::try_from(n).ok()),
-                        cache_read_tokens: s.cache_read_tokens.and_then(|n| i64::try_from(n).ok()),
-                        output_tokens: s.output_tokens.and_then(|n| i64::try_from(n).ok()),
-                    })
-                    .collect()
-            })
-            .await
-            .map_err(|e| RuntimeError::Other(e.to_string()))?,
+            Some(agent) => agent
+                .read_child_transcript(&conversation_id, limit)
+                .into_iter()
+                .map(|s| SessionChildStep {
+                    step_index: i64::try_from(s.step_index).unwrap_or(0),
+                    source: s.source,
+                    kind: s.kind,
+                    status: s.status,
+                    created_at: s.created_at,
+                    model: s.model,
+                    thinking: s.thinking,
+                    content: s.content,
+                    error: s.error,
+                    tool_calls: s
+                        .tool_calls
+                        .into_iter()
+                        .map(|tc| SessionChildToolCall {
+                            name: tc.name,
+                            args: tc.summary,
+                        })
+                        .collect(),
+                    input_tokens: s.input_tokens.and_then(|n| i64::try_from(n).ok()),
+                    cache_read_tokens: s.cache_read_tokens.and_then(|n| i64::try_from(n).ok()),
+                    output_tokens: s.output_tokens.and_then(|n| i64::try_from(n).ok()),
+                })
+                .collect(),
             None => Vec::new(),
         };
         Ok(SessionChildTranscript {
@@ -405,7 +402,10 @@ impl SessionEngine {
             }
             if let Some(agent) = self.live_agent(&session.id) {
                 if input.model.is_some() || input.effort.is_some() || input.permission_mode.is_some() {
-                    match agent.set_config(input.model.as_deref(), input.effort.as_deref(), input.permission_mode.map(to_oar_permission)) {
+                    match agent
+                        .set_config(input.model.as_deref(), input.effort.as_deref(), input.permission_mode.map(to_oar_permission))
+                        .await
+                    {
                         Ok(()) | Err(AgentError::Unsupported { .. }) => {}
                         Err(e) => return Err(e.into()),
                     }
@@ -453,7 +453,11 @@ impl SessionEngine {
         if runtime_id.is_empty() {
             return Err(invalid_input(t("server.session.workspace.runtimeRequired", &[])));
         }
-        let drive = self.0.drivers.drive_runtime(runtime_id, input.model.as_deref(), input.effort.as_deref())?;
+        let drive = self
+            .0
+            .drivers
+            .drive_runtime(runtime_id, input.model.as_deref(), input.effort.as_deref())
+            .await?;
         if drive.is_local && (cwd.is_empty() || !Path::new(&cwd).is_dir()) {
             return Err(invalid_input(t("server.session.workspace.badCwd", &[("cwd", cwd.into())])));
         }
@@ -517,10 +521,7 @@ impl SessionEngine {
             effort: effective_effort,
             ..Default::default()
         };
-        let runtime = drive.runtime.clone();
-        let agent = spawn_blocking_traced(move || runtime.open(opts))
-            .await
-            .map_err(|e| RuntimeError::Other(e.to_string()))??;
+        let agent = drive.runtime.open(opts).await?;
         self.go_live_async(agent, session.clone(), None).await?;
         self.set_workspace_meta_async(&id, meta).await;
         self.notify_workspace(&id);
@@ -540,7 +541,11 @@ impl SessionEngine {
             Some(machine) if !machine.is_empty() => format!("{machine}/{}", session.runtime),
             _ => session.runtime.clone(),
         };
-        let drive = self.0.drivers.drive_runtime(&runtime_target, meta.model.as_deref(), meta.effort.as_deref())?;
+        let drive = self
+            .0
+            .drivers
+            .drive_runtime(&runtime_target, meta.model.as_deref(), meta.effort.as_deref())
+            .await?;
         if drive.is_local && (cwd.is_empty() || !Path::new(&cwd).is_dir()) {
             return Err(invalid_input(t("server.session.workspace.badCwd", &[("cwd", cwd.into())])));
         }
@@ -576,10 +581,7 @@ impl SessionEngine {
             effort: meta.effort.clone(),
             ..Default::default()
         };
-        let runtime = drive.runtime.clone();
-        let agent = spawn_blocking_traced(move || runtime.open(opts))
-            .await
-            .map_err(|e| RuntimeError::Other(e.to_string()))??;
+        let agent = drive.runtime.open(opts).await?;
         session.phase = Phase::Resting(PhaseResting {});
         self.go_live_async(agent, session.clone(), None).await?;
         self.set_workspace_meta_async(&session.id, meta).await;
@@ -681,9 +683,9 @@ impl SessionEngine {
         let turn_opts = TurnOptions { trace_id };
         if session.phase.is_working() {
             self.record_async(&session.id, Step::Asked { text: logged_text }).await;
-            let sent = match agent.steer(blocks.clone()) {
+            let sent = match agent.steer(blocks.clone()).await {
                 Ok(()) => Ok(()),
-                Err(_) => agent.queue_with(blocks, turn_opts),
+                Err(_) => agent.queue_with(blocks, turn_opts).await,
             };
             if let Err(e) = sent {
                 let _ = self.0.ctx.service.session.settle_mailbox(settle_id, false, Some(&e.to_string()), now()).await;
@@ -697,7 +699,7 @@ impl SessionEngine {
         let brief = session.brief.is_empty().then(|| vibevalley_core::text::clip(&logged_text, 120));
         self.persist_phase_change_async(&session.id, phase, brief, None).await?;
         self.record_async(&session.id, Step::Asked { text: logged_text }).await;
-        if let Err(e) = agent.prompt_with(blocks, turn_opts) {
+        if let Err(e) = agent.prompt_with(blocks, turn_opts).await {
             let _ = self.0.ctx.service.session.settle_mailbox(settle_id, false, Some(&e.to_string()), now()).await;
             let _ = self.persist_phase_change_async(&session.id, Phase::Failed(PhaseFailed {}), None, None).await;
             self.notify_workspace(&session.id);
@@ -719,7 +721,7 @@ impl SessionEngine {
             SessionPermissionDecision::AllowAlways => PermissionDecision::AllowAlways,
             SessionPermissionDecision::Deny => PermissionDecision::Deny { message: input.message },
         };
-        agent.respond_permission(&input.request_id, decision)?;
+        agent.respond_permission(&input.request_id, decision).await?;
         self.on_workspace_permission_resolved(&session.id, &input.request_id);
         Ok(())
     }
@@ -741,7 +743,7 @@ impl SessionEngine {
         } else {
             return Err(invalid_input(t("server.session.workspace.interactionDecisionRequired", &[])));
         };
-        agent.respond_interaction(&input.request_id, decision)?;
+        agent.respond_interaction(&input.request_id, decision).await?;
         self.on_workspace_interaction_resolved(&session.id, &input.request_id);
         Ok(())
     }
@@ -774,7 +776,7 @@ impl SessionEngine {
             next.permission_mode = p;
         }
         if let Some(agent) = self.live_agent(&session.id) {
-            match agent.set_config(model_opt, effort_opt, input.permission_mode.map(to_oar_permission)) {
+            match agent.set_config(model_opt, effort_opt, input.permission_mode.map(to_oar_permission)).await {
                 Ok(()) | Err(AgentError::Unsupported { .. }) => {}
                 Err(e) => return Err(e.into()),
             }
@@ -821,7 +823,9 @@ impl SessionEngine {
         let mode = self.workspace_snapshot(session_id).permission_mode;
         if mode == SessionPermissionMode::Bypass {
             if let Some(agent) = self.live_agent(session_id) {
-                let _ = agent.respond_permission(&request_id, PermissionDecision::AllowOnce);
+                self.0.ctx.spawn("session.workspace.auto_allow", async move {
+                    let _ = agent.respond_permission(&request_id, PermissionDecision::AllowOnce).await;
+                });
             }
             return;
         }
@@ -981,8 +985,8 @@ mod tests {
 
     struct StubSession {
         id: String,
-        tx: flume::Sender<Event>,
-        rx: flume::Receiver<Event>,
+        tx: mpsc::UnboundedSender<Event>,
+        rx: parking_lot::Mutex<Option<mpsc::UnboundedReceiver<Event>>>,
         aborts: Arc<AtomicUsize>,
         disposes: Arc<AtomicUsize>,
     }
@@ -992,14 +996,22 @@ mod tests {
             self.id.clone()
         }
 
-        fn control(&self, action: ControlAction, _: &str, input_id: &str, span_id: &str) -> vibevalley_runtime::oar::Result<ControlOutcome> {
-            Ok(ControlOutcome {
-                action,
-                status: ControlStatus::Accepted,
-                code: String::new(),
-                reason: String::new(),
-                span_id: span_id.into(),
-                input_id: input_id.into(),
+        fn control<'a>(
+            &'a self,
+            action: ControlAction,
+            _: &'a str,
+            input_id: &'a str,
+            span_id: &'a str,
+        ) -> vibevalley_runtime::BoxFuture<'a, vibevalley_runtime::oar::Result<ControlOutcome>> {
+            Box::pin(async move {
+                Ok(ControlOutcome {
+                    action,
+                    status: ControlStatus::Accepted,
+                    code: String::new(),
+                    reason: String::new(),
+                    span_id: span_id.into(),
+                    input_id: input_id.into(),
+                })
             })
         }
 
@@ -1007,8 +1019,8 @@ mod tests {
             vec![]
         }
 
-        fn subscribe_records(&self, _: Option<u64>) -> flume::Receiver<voyage::Record> {
-            let (_tx, rx) = flume::bounded(1);
+        fn subscribe_records(&self, _: Option<u64>) -> mpsc::UnboundedReceiver<voyage::Record> {
+            let (_tx, rx) = mpsc::unbounded_channel();
             rx
         }
 
@@ -1020,34 +1032,39 @@ mod tests {
             SessionStatus::Idle
         }
 
-        fn events(&self) -> flume::Receiver<Event> {
-            self.rx.clone()
+        fn events(&self) -> mpsc::UnboundedReceiver<Event> {
+            self.rx.lock().take().unwrap_or_else(|| mpsc::unbounded_channel().1)
         }
 
-        fn prompt(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
-            Ok(())
+        fn prompt(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
+            Box::pin(async { Ok(()) })
         }
 
-        fn steer(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
-            Ok(())
+        fn steer(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
+            Box::pin(async { Ok(()) })
         }
 
-        fn queue(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
-            Ok(())
+        fn queue(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
+            Box::pin(async { Ok(()) })
         }
 
-        fn abort(&self) -> vibevalley_runtime::oar::Result<()> {
+        fn abort(&self) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
             self.aborts.fetch_add(1, Ordering::SeqCst);
-            Ok(())
+            Box::pin(async { Ok(()) })
         }
 
-        fn respond_permission(&self, _: &str, _: PermissionDecision) -> vibevalley_runtime::oar::Result<()> {
-            Ok(())
+        fn respond_permission<'a>(&'a self, _: &'a str, _: PermissionDecision) -> vibevalley_runtime::BoxFuture<'a, vibevalley_runtime::oar::Result<()>> {
+            Box::pin(async { Ok(()) })
         }
 
-        fn dispose(&self) {
+        fn dispose(&self) -> vibevalley_runtime::BoxFuture<'_, ()> {
+            self.signal_dispose();
+            Box::pin(async {})
+        }
+
+        fn signal_dispose(&self) {
             self.disposes.fetch_add(1, Ordering::SeqCst);
-            let _ = self.tx.try_send(Event {
+            let _ = self.tx.send(Event {
                 seq: 0,
                 at_ms: 0,
                 agent_path: vec![],
@@ -1074,26 +1091,32 @@ mod tests {
             Capabilities::default()
         }
 
-        fn installation(&self) -> Installation {
-            Installation::Available {
-                version: None,
-                path: PathBuf::from("/bin/true"),
-            }
+        fn installation(&self) -> vibevalley_runtime::BoxFuture<'_, Installation> {
+            Box::pin(async {
+                Installation::Available {
+                    version: None,
+                    path: PathBuf::from("/bin/true"),
+                }
+            })
         }
 
-        fn list_models(&self) -> vibevalley_runtime::oar::Result<Vec<ModelInfo>> {
-            Ok(vec![])
+        fn list_models(&self) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<Vec<ModelInfo>>> {
+            Box::pin(async { Ok(vec![]) })
         }
 
-        fn open(&self, _: SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn OarSession>> {
-            let (tx, rx) = flume::unbounded();
-            Ok(Arc::new(StubSession {
-                id: "stub-1".into(),
-                tx,
-                rx,
-                aborts: self.aborts.clone(),
-                disposes: self.disposes.clone(),
-            }))
+        fn open(&self, _: SessionOptions) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<Arc<dyn OarSession>>> {
+            let aborts = self.aborts.clone();
+            let disposes = self.disposes.clone();
+            Box::pin(async move {
+                let (tx, rx) = mpsc::unbounded_channel();
+                Ok(Arc::new(StubSession {
+                    id: "stub-1".into(),
+                    tx,
+                    rx: parking_lot::Mutex::new(Some(rx)),
+                    aborts,
+                    disposes,
+                }) as Arc<dyn OarSession>)
+            })
         }
     }
 

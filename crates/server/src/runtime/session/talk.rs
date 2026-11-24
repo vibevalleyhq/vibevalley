@@ -11,7 +11,6 @@ use vibevalley_runtime::oar::{SessionOptions, StopReason};
 use super::driver::Persona;
 use super::engine::{SessionEngine, text};
 use crate::context::now;
-use crate::log::spawn_blocking_traced;
 use crate::runtime::{Result, RuntimeError, Step, io};
 
 impl SessionEngine {
@@ -34,7 +33,7 @@ impl SessionEngine {
                 self.persist_phase_change_async(&session.id, phase, None, None).await?;
                 let words = self.with_recall_async(&session, words.to_string()).await;
                 self.record_async(&session.id, Step::Asked { text: words.clone() }).await;
-                live.prompt(text(&words))?;
+                live.prompt(text(&words)).await?;
                 return Ok(session.id);
             }
             return self.open_talk_async(agent, channel, words, Some(session)).await;
@@ -43,7 +42,7 @@ impl SessionEngine {
     }
 
     async fn open_talk_async(&self, agent: &str, channel: &str, words: &str, again: Option<Session>) -> Result<String> {
-        let drive = self.0.drivers.drive(Some(agent), &Issue::new("", 0, words, now()))?;
+        let drive = self.0.drivers.drive(Some(agent), &Issue::new("", 0, words, now())).await?;
         let resuming = again.is_some();
         let mut session = match again {
             Some(s) => s,
@@ -118,19 +117,12 @@ impl SessionEngine {
             system_prompt,
             ..Default::default()
         };
-        let runtime = drive.runtime.clone();
-        let agent = spawn_blocking_traced(move || runtime.open(opts))
-            .await
-            .map_err(|e| RuntimeError::Other(e.to_string()))??;
+        let agent = drive.runtime.open(opts).await?;
         session.phase = Phase::working(now(), SessionAction::Thinking, "");
         self.go_live_async(agent.clone(), session.clone(), None).await?;
         let prompt = self.with_recall_async(&session, prompt).await;
         self.record_async(&session.id, Step::Asked { text: prompt.clone() }).await;
-        let prompt_agent = agent.clone();
-        spawn_blocking_traced(move || prompt_agent.prompt(text(&prompt)))
-            .await
-            .map_err(|e| RuntimeError::Other(e.to_string()))?
-            .map_err(RuntimeError::from)?;
+        agent.prompt(text(&prompt)).await.map_err(RuntimeError::from)?;
         Ok(session.id)
     }
 

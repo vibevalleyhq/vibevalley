@@ -230,8 +230,13 @@ fn artifact_file_ops_optimistic_hash_guard_and_follow_stream() {
     let id = board["id"].as_str().unwrap().to_string();
     assert_eq!(board["seq"], 1);
 
-    let (sub_id, rx) = hub.subscribe("artifact.follow", json!({ "id": id, "after": 0 })).unwrap();
-    let replay = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    let (sub_id, mut rx) = hub.subscribe("artifact.follow", json!({ "id": id, "after": 0 })).unwrap();
+    let recv = |rx: &mut tokio::sync::mpsc::UnboundedReceiver<Value>| {
+        vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(3), rx.recv()).await })
+            .unwrap()
+            .unwrap()
+    };
+    let replay = recv(&mut rx);
     assert_eq!(replay["_tag"], "Files");
     assert_eq!(replay["seq"], 1);
 
@@ -248,7 +253,7 @@ fn artifact_file_ops_optimistic_hash_guard_and_follow_stream() {
         }),
     ));
     assert_eq!(write1["seq"], 2);
-    let ev2 = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    let ev2 = recv(&mut rx);
     assert_eq!(ev2["_tag"], "Files");
     assert_eq!(ev2["seq"], 2);
     assert_eq!(ev2["files"].as_array().unwrap().len(), 2);
@@ -280,13 +285,13 @@ fn artifact_file_ops_optimistic_hash_guard_and_follow_stream() {
         }),
     ));
     assert_eq!(write2["seq"], 3);
-    let ev3 = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    let ev3 = recv(&mut rx);
     assert_eq!(ev3["seq"], 3);
 
     // Delete asset/logo.png streams deletion.
     let del = ok(call("artifact.file.delete", json!({ "id": id, "path": "asset/logo.png" })));
     assert_eq!(del["seq"], 4);
-    let ev4 = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    let ev4 = recv(&mut rx);
     assert_eq!(ev4["seq"], 4);
     assert_eq!(ev4["deleted"], json!(["asset/logo.png"]));
 
@@ -341,8 +346,13 @@ fn presence_update_follow_never_writes_sqlite() {
     let id = board["id"].as_str().unwrap().to_string();
     assert_eq!(board["seq"], 1);
 
-    let (sub_id, rx) = hub.subscribe("artifact.presence.follow", json!({ "id": id })).unwrap();
-    let snap = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    let (sub_id, mut rx) = hub.subscribe("artifact.presence.follow", json!({ "id": id })).unwrap();
+    let recv = |rx: &mut tokio::sync::mpsc::UnboundedReceiver<Value>| {
+        vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(3), rx.recv()).await })
+            .unwrap()
+            .unwrap()
+    };
+    let snap = recv(&mut rx);
     assert_eq!(snap["_tag"], "Snapshot");
     assert_eq!(snap["peers"], json!([]));
 
@@ -365,7 +375,7 @@ fn presence_update_follow_never_writes_sqlite() {
             }
         }),
     ));
-    let up = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    let up = recv(&mut rx);
     assert_eq!(up["_tag"], "Upsert");
     assert_eq!(up["peer"]["id"], "user");
     assert_eq!(up["peer"]["path"], "structure/board.json");
@@ -390,7 +400,7 @@ fn presence_update_follow_never_writes_sqlite() {
             }
         }),
     ));
-    let up2 = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    let up2 = recv(&mut rx);
     assert_eq!(up2["_tag"], "Upsert");
     assert_eq!(up2["peer"]["id"], "session-w1");
     assert_eq!(up2["peer"]["sessionId"], "session-w1");
@@ -399,11 +409,11 @@ fn presence_update_follow_never_writes_sqlite() {
     assert_eq!(ok(call("artifact.get", json!({ "id": id })))["seq"], 1);
 
     ok(call("artifact.presence.update", json!({ "id": id, "peerId": "session-w1" })));
-    let rm1 = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    let rm1 = recv(&mut rx);
     assert_eq!((rm1["_tag"].as_str(), rm1["peerId"].as_str()), (Some("Remove"), Some("session-w1")));
 
     ok(call("artifact.presence.update", json!({ "id": id, "peerId": "user" })));
-    let rm2 = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+    let rm2 = recv(&mut rx);
     assert_eq!((rm2["_tag"].as_str(), rm2["peerId"].as_str()), (Some("Remove"), Some("user")));
 
     hub.unsubscribe(sub_id);

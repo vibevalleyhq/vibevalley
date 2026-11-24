@@ -80,11 +80,11 @@ struct MossShared {
 enum MossPhase {
     /// Commentary waits in `pending` until the session takes its settings.
     Waiting {
-        out: Option<flume::Sender<String>>,
+        out: Option<tokio::sync::mpsc::UnboundedSender<String>>,
         pending: Vec<String>,
     },
     Ready {
-        out: flume::Sender<String>,
+        out: tokio::sync::mpsc::UnboundedSender<String>,
     },
     Closed,
 }
@@ -405,7 +405,7 @@ impl Voice {
         }
     }
 
-    fn deliver(&self, piece: &str, out: &flume::Sender<String>) {
+    fn deliver(&self, piece: &str, out: &tokio::sync::mpsc::UnboundedSender<String>) {
         for frame in moss::commentary(piece, || format!("brief-{}-{}", now(), self.commentary.fetch_add(1, Ordering::SeqCst))) {
             let _ = out.send(frame);
         }
@@ -470,7 +470,7 @@ impl Voice {
     /// MOSS says. One line at a time; dropping it ends its calls.
     pub fn moss_line(self: &Arc<Self>) -> Result<MossLine, ApiError> {
         let account = self.live_account()?;
-        let (out, outgoing) = flume::unbounded();
+        let (out, outgoing) = tokio::sync::mpsc::unbounded_channel();
         let shared = {
             let mut state = self.state.lock();
             if state.stopped {
@@ -488,7 +488,7 @@ impl Voice {
         Ok(MossLine {
             url: format!("wss://api.mosi.cn/v1/realtime?model={}", account.model),
             key: account.key,
-            outgoing,
+            outgoing: Mutex::new(Some(outgoing)),
             out,
             voice: self.clone(),
             shared,
@@ -554,15 +554,18 @@ struct Tools {
 pub struct MossLine {
     pub url: String,
     pub key: Secret,
-    /// Frames for MOSS, in order.
-    pub outgoing: flume::Receiver<String>,
-    out: flume::Sender<String>,
+    /// Frames for MOSS, in order (taken once by the socket driver).
+    pub outgoing: Mutex<Option<tokio::sync::mpsc::UnboundedReceiver<String>>>,
+    out: tokio::sync::mpsc::UnboundedSender<String>,
     voice: Arc<Voice>,
     shared: Arc<MossShared>,
     tools: Arc<Mutex<Tools>>,
 }
 
 impl MossLine {
+    pub fn take_outgoing(&self) -> Option<tokio::sync::mpsc::UnboundedReceiver<String>> {
+        self.outgoing.lock().take()
+    }
     /// The session's settings: the voice page's persona, how to open, and
     /// the tool that asks the orchestrator.
     pub fn session_update(&self) -> String {
@@ -665,8 +668,8 @@ impl LiveVoiceLine for MossLine {
         MossLine::session_update(self)
     }
 
-    fn outgoing(&self) -> flume::Receiver<String> {
-        self.outgoing.clone()
+    fn take_outgoing(&self) -> Option<tokio::sync::mpsc::UnboundedReceiver<String>> {
+        MossLine::take_outgoing(self)
     }
 
     fn heard(&self, raw: &str) {

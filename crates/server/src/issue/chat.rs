@@ -96,7 +96,7 @@ pub struct IssueChat {
     opening: tokio::sync::Mutex<()>,
     cancel: CancellationToken,
     coordinator: Mutex<Option<TaskHandle<()>>>,
-    lanes: Mutex<HashMap<String, flume::Sender<IssueWake>>>,
+    lanes: Mutex<HashMap<String, tokio::sync::mpsc::UnboundedSender<IssueWake>>>,
     lane_tasks: TaskTracker,
     next_waiter_id: AtomicU64,
     delivery_waiters: Mutex<HashMap<String, Vec<DeliveryWaiter>>>,
@@ -104,7 +104,7 @@ pub struct IssueChat {
 
 impl IssueChat {
     pub fn start(ctx: Arc<Context>, board: Arc<Board>, channel: Arc<Chat>) -> Arc<Self> {
-        let dispatches = channel.dispatches();
+        let mut dispatches = channel.dispatches();
         let cancel = ctx.task.child_token();
         let ic = Arc::new(Self {
             ctx: ctx.clone(),
@@ -141,15 +141,15 @@ impl IssueChat {
                 tokio::select! {
                     biased;
                     _ = task_cancel.cancelled() => return,
-                    res = dispatches.recv_async() => match res {
-                        Ok(dispatched) => {
+                    res = dispatches.recv() => match res {
+                        Some(dispatched) => {
                             let Some(ic) = w.upgrade() else { return };
                             if ic.cancel.is_cancelled() {
                                 return;
                             }
                             ic.route_dispatched_async(dispatched).await;
                         }
-                        Err(_) => return,
+                        None => return,
                     },
                     res = session_events.recv() => match res {
                         Ok(SessionLifecycleEvent::Changed(session)) => {
@@ -686,7 +686,7 @@ impl IssueChat {
         {
             return;
         }
-        let (tx, rx) = flume::unbounded::<IssueWake>();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<IssueWake>();
         let _ = tx.send(wake);
         lanes.insert(issue_id.clone(), tx);
         let ic = Arc::downgrade(self);
@@ -701,7 +701,7 @@ impl IssueChat {
                     }
                     let item = match rx.try_recv() {
                         Ok(item) => item,
-                        Err(flume::TryRecvError::Empty) => {
+                        Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
                             let Some(ic) = ic.upgrade() else { return };
                             let mut lanes = ic.lanes.lock();
                             match rx.try_recv() {
@@ -712,7 +712,7 @@ impl IssueChat {
                                 }
                             }
                         }
-                        Err(flume::TryRecvError::Disconnected) => return,
+                        Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
                     };
                     let Some(ic) = ic.upgrade() else { return };
                     if ic.cancel.is_cancelled() {
@@ -884,13 +884,13 @@ pub struct SessionChat {
     channel: Arc<Chat>,
     cancel: CancellationToken,
     coordinator: Mutex<Option<TaskHandle<()>>>,
-    lanes: Mutex<HashMap<String, flume::Sender<DirectWake>>>,
+    lanes: Mutex<HashMap<String, tokio::sync::mpsc::UnboundedSender<DirectWake>>>,
     lane_tasks: TaskTracker,
 }
 
 impl SessionChat {
     pub fn start(ctx: Arc<Context>, board: Arc<Board>, channel: Arc<Chat>, issue_chat: Option<Arc<IssueChat>>) -> Arc<Self> {
-        let dispatches = channel.dispatches();
+        let mut dispatches = channel.dispatches();
         let mut removals = channel.subscribe_removals();
         let cancel = ctx.task.child_token();
         let sc = Arc::new(Self {
@@ -967,9 +967,9 @@ impl SessionChat {
                 let event = tokio::select! {
                     biased;
                     _ = task_cancel.cancelled() => CoordinatorEvent::Stop,
-                    res = dispatches.recv_async() => match res {
-                        Ok(dispatched) => CoordinatorEvent::Dispatched(dispatched),
-                        Err(_) => CoordinatorEvent::Stop,
+                    res = dispatches.recv() => match res {
+                        Some(dispatched) => CoordinatorEvent::Dispatched(dispatched),
+                        None => CoordinatorEvent::Stop,
                     },
                     res = removals.recv() => match res {
                         Ok(message_id) => CoordinatorEvent::Removed(message_id),
@@ -1114,7 +1114,7 @@ impl SessionChat {
         {
             return;
         }
-        let (tx, rx) = flume::unbounded::<DirectWake>();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<DirectWake>();
         let _ = tx.send(wake);
         lanes.insert(agent_id.clone(), tx);
         let sc = Arc::downgrade(self);
@@ -1129,7 +1129,7 @@ impl SessionChat {
                     }
                     let item = match rx.try_recv() {
                         Ok(item) => item,
-                        Err(flume::TryRecvError::Empty) => {
+                        Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
                             let Some(sc) = sc.upgrade() else { return };
                             let mut lanes = sc.lanes.lock();
                             match rx.try_recv() {
@@ -1140,7 +1140,7 @@ impl SessionChat {
                                 }
                             }
                         }
-                        Err(flume::TryRecvError::Disconnected) => return,
+                        Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
                     };
                     let Some(sc) = sc.upgrade() else { return };
                     if sc.cancel.is_cancelled() {

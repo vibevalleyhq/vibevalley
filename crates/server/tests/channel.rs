@@ -60,7 +60,7 @@ fn the_chat_through_its_endpoints() {
     );
     let gid = general["id"].as_str().unwrap().to_string();
 
-    let follow = router.subscribe("channel.follow", json!({ "id": gid, "after": 0 })).unwrap();
+    let mut follow = router.subscribe("channel.follow", json!({ "id": gid, "after": 0 })).unwrap();
 
     // Said by name; a retry with the same key is the same message.
     ok(call(
@@ -76,7 +76,9 @@ fn the_chat_through_its_endpoints() {
     assert_eq!(first["actor"], json!({ "kind": "user", "id": "user", "name": "用户" }));
     let first_id = first["id"].as_str().unwrap().to_string();
 
-    let event: Value = follow.1.recv_timeout(Duration::from_secs(2)).unwrap();
+    let event: Value = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(2), follow.1.recv()).await })
+        .unwrap()
+        .unwrap();
     assert_eq!((event["_tag"].as_str(), event["message"]["number"].as_i64()), (Some("Message"), Some(1)));
 
     // The state keeps the chat.
@@ -150,7 +152,10 @@ fn the_chat_through_its_endpoints() {
     );
 
     // The follower saw every change, in revision order.
-    let revisions: Vec<i64> = follow.1.drain().map(|e| e["message"]["revision"].as_i64().unwrap()).collect();
+    let mut revisions = Vec::new();
+    while let Ok(e) = follow.1.try_recv() {
+        revisions.push(e["message"]["revision"].as_i64().unwrap());
+    }
     assert!(revisions.windows(2).all(|w| w[0] < w[1]) && revisions.len() >= 4, "{revisions:?}");
     router.unsubscribe(follow.0);
 

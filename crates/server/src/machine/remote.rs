@@ -8,11 +8,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
+use tokio::sync::{mpsc, oneshot};
 use vibevalley_protocol::{
     MachineHello, MachineInfo, MachineInputKind, MachinePlatform, MachineRuntimeSummary, MachineSessionAck, MachineSessionAttach, MachineSessionEvent,
     MachineSessionInput, MachineSessionOpen, MachineSessionOpened, MachineSessionRecord, MachineSessionRespond, MachineStatus, MachineWireError,
     MachineWireFrame, MachineWorktreeCleanup, MachineWorktreePrepare, MachineWorktreeResult, Millis, RuntimeCapability,
 };
+use vibevalley_runtime::BoxFuture;
 use vibevalley_runtime::machine::{Machine, MachineDescriptor, MachinePlatform as RtPlatform, MachineStatus as RtStatus, WorkdirHandle, WorkdirSpec};
 use vibevalley_runtime::oar::core::{HISTORY_LIMIT, RECORD_HISTORY_LIMIT, StatusFold};
 use vibevalley_runtime::oar::{
@@ -196,7 +198,25 @@ enum PendingReply {
 
 struct LiveLink {
     conn_id: u64,
-    outgoing: flume::Sender<MachineWireFrame>,
+    outgoing: mpsc::Sender<MachineWireFrame>,
+}
+
+enum PendingWaiter {
+    Async(oneshot::Sender<PendingReply>),
+    Sync(std::sync::mpsc::SyncSender<PendingReply>),
+}
+
+impl PendingWaiter {
+    fn send(self, reply: PendingReply) {
+        match self {
+            Self::Async(tx) => {
+                let _ = tx.send(reply);
+            }
+            Self::Sync(tx) => {
+                let _ = tx.send(reply);
+            }
+        }
+    }
 }
 
 struct RemoteMeta {
@@ -214,12 +234,12 @@ pub(crate) struct RemoteMachineInner {
     pub(crate) machine_id: String,
     meta: Mutex<RemoteMeta>,
     link: Mutex<Option<LiveLink>>,
-    pending: Mutex<HashMap<String, flume::Sender<PendingReply>>>,
+    pending: Mutex<HashMap<String, PendingWaiter>>,
     sessions: Mutex<HashMap<String, Arc<RemoteSessionInner>>>,
 }
 
 impl RemoteMachineInner {
-    fn new(hello: &MachineHello, conn_id: u64, outgoing: flume::Sender<MachineWireFrame>, at: Millis) -> Arc<Self> {
+    fn new(hello: &MachineHello, conn_id: u64, outgoing: mpsc::Sender<MachineWireFrame>, at: Millis) -> Arc<Self> {
         Arc::new(Self {
             machine_id: hello.machine_id.clone(),
             meta: Mutex::new(RemoteMeta {
@@ -238,7 +258,7 @@ impl RemoteMachineInner {
         })
     }
 
-    pub(crate) fn reconnect(&self, hello: &MachineHello, conn_id: u64, outgoing: flume::Sender<MachineWireFrame>, at: Millis) -> Vec<MachineSessionAttach> {
+    pub(crate) fn reconnect(&self, hello: &MachineHello, conn_id: u64, outgoing: mpsc::Sender<MachineWireFrame>, at: Millis) -> Vec<MachineSessionAttach> {
         {
             let mut meta = self.meta.lock();
             meta.name = hello.name.clone();
@@ -298,7 +318,7 @@ impl RemoteMachineInner {
         let reason = format!("machine `{}` disconnected", self.machine_id);
         let pending: Vec<_> = self.pending.lock().drain().map(|(_, tx)| tx).collect();
         for tx in pending {
-            let _ = tx.send(PendingReply::Disconnected(reason.clone()));
+            tx.send(PendingReply::Disconnected(reason.clone()));
         }
         let ephemeral = {
             let mut meta = self.meta.lock();
@@ -318,7 +338,7 @@ impl RemoteMachineInner {
         self.link.lock().take();
         let pending: Vec<_> = self.pending.lock().drain().map(|(_, tx)| tx).collect();
         for tx in pending {
-            let _ = tx.send(PendingReply::Disconnected("server shutting down".into()));
+            tx.send(PendingReply::Disconnected("server shutting down".into()));
         }
         let sessions: Vec<_> = self.sessions.lock().drain().map(|(_, s)| s).collect();
         for session in sessions {
@@ -326,32 +346,63 @@ impl RemoteMachineInner {
         }
     }
 
-    pub(crate) fn send_frame(&self, frame: MachineWireFrame) -> Result<(), String> {
+    pub(crate) fn try_send_frame(&self, frame: MachineWireFrame) -> Result<(), String> {
         let sender = self
             .link
             .lock()
             .as_ref()
             .map(|l| l.outgoing.clone())
             .ok_or_else(|| format!("machine `{}` is offline", self.machine_id))?;
-        sender
-            .send_timeout(frame, Duration::from_secs(5))
+        sender.try_send(frame).map_err(|_| format!("machine `{}` link closed", self.machine_id))
+    }
+
+    pub(crate) async fn send_frame_async(&self, frame: MachineWireFrame) -> Result<(), String> {
+        let sender = self
+            .link
+            .lock()
+            .as_ref()
+            .map(|l| l.outgoing.clone())
+            .ok_or_else(|| format!("machine `{}` is offline", self.machine_id))?;
+        tokio::time::timeout(Duration::from_secs(5), sender.send(frame))
+            .await
+            .map_err(|_| format!("machine `{}` link closed", self.machine_id))?
             .map_err(|_| format!("machine `{}` link closed", self.machine_id))
     }
 
-    fn send_rpc(&self, request_id: String, frame: MachineWireFrame, timeout: Duration) -> Result<PendingReply, String> {
-        let (tx, rx) = flume::bounded(1);
-        self.pending.lock().insert(request_id.clone(), tx);
-        if let Err(err) = self.send_frame(frame) {
+    async fn send_rpc_async(&self, request_id: String, frame: MachineWireFrame, timeout: Duration) -> Result<PendingReply, String> {
+        let (tx, rx) = oneshot::channel();
+        self.pending.lock().insert(request_id.clone(), PendingWaiter::Async(tx));
+        if let Err(err) = self.send_frame_async(frame).await {
+            self.pending.lock().remove(&request_id);
+            return Err(err);
+        }
+        match tokio::time::timeout(timeout, rx).await {
+            Ok(Ok(reply)) => Ok(reply),
+            Err(_) => {
+                self.pending.lock().remove(&request_id);
+                Err(format!("machine `{}` request `{request_id}` timed out", self.machine_id))
+            }
+            Ok(Err(_)) => {
+                self.pending.lock().remove(&request_id);
+                Err(format!("machine `{}` disconnected", self.machine_id))
+            }
+        }
+    }
+
+    fn send_rpc_blocking(&self, request_id: String, frame: MachineWireFrame, timeout: Duration) -> Result<PendingReply, String> {
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
+        self.pending.lock().insert(request_id.clone(), PendingWaiter::Sync(tx));
+        if let Err(err) = self.try_send_frame(frame) {
             self.pending.lock().remove(&request_id);
             return Err(err);
         }
         match rx.recv_timeout(timeout) {
             Ok(reply) => Ok(reply),
-            Err(flume::RecvTimeoutError::Timeout) => {
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                 self.pending.lock().remove(&request_id);
                 Err(format!("machine `{}` request `{request_id}` timed out", self.machine_id))
             }
-            Err(flume::RecvTimeoutError::Disconnected) => {
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                 self.pending.lock().remove(&request_id);
                 Err(format!("machine `{}` disconnected", self.machine_id))
             }
@@ -360,19 +411,19 @@ impl RemoteMachineInner {
 
     pub(crate) fn handle_session_opened(&self, opened: MachineSessionOpened) {
         if let Some(tx) = self.pending.lock().remove(&opened.request_id) {
-            let _ = tx.send(PendingReply::SessionOpened(opened));
+            tx.send(PendingReply::SessionOpened(opened));
         }
     }
 
     pub(crate) fn handle_session_ack(&self, ack: MachineSessionAck) {
         if let Some(tx) = self.pending.lock().remove(&ack.request_id) {
-            let _ = tx.send(PendingReply::SessionAck(ack));
+            tx.send(PendingReply::SessionAck(ack));
         }
     }
 
     pub(crate) fn handle_worktree_result(&self, res: MachineWorktreeResult) {
         if let Some(tx) = self.pending.lock().remove(&res.request_id) {
-            let _ = tx.send(PendingReply::WorktreeResult(res));
+            tx.send(PendingReply::WorktreeResult(res));
         }
     }
 
@@ -380,7 +431,7 @@ impl RemoteMachineInner {
         if let Some(req_id) = err.request_id.as_deref()
             && let Some(tx) = self.pending.lock().remove(req_id)
         {
-            let _ = tx.send(PendingReply::WireError(err));
+            tx.send(PendingReply::WireError(err));
         }
     }
 
@@ -464,7 +515,7 @@ pub struct RemoteMachine {
 }
 
 impl RemoteMachine {
-    pub(crate) fn new(hello: &MachineHello, conn_id: u64, outgoing: flume::Sender<MachineWireFrame>, at: Millis) -> Arc<Self> {
+    pub(crate) fn new(hello: &MachineHello, conn_id: u64, outgoing: mpsc::Sender<MachineWireFrame>, at: Millis) -> Arc<Self> {
         Arc::new(Self {
             inner: RemoteMachineInner::new(hello, conn_id, outgoing, at),
         })
@@ -522,7 +573,7 @@ impl Machine for RemoteMachine {
             branch: spec.branch.clone(),
             base_ref: spec.base_ref.clone(),
         });
-        match self.inner.send_rpc(request_id, frame, DEFAULT_RPC_TIMEOUT)? {
+        match self.inner.send_rpc_blocking(request_id, frame, DEFAULT_RPC_TIMEOUT)? {
             PendingReply::WorktreeResult(res) if res.ok => Ok(WorkdirHandle {
                 path: PathBuf::from(res.workdir.unwrap_or_default()),
                 branch: res.branch.or_else(|| spec.branch.clone()),
@@ -544,7 +595,7 @@ impl Machine for RemoteMachine {
             task_id: String::new(),
             workdir: handle.path.to_string_lossy().into_owned(),
         });
-        let _ = self.inner.send_frame(frame);
+        let _ = self.inner.try_send_frame(frame);
         Ok(())
     }
 }
@@ -572,101 +623,107 @@ impl Runtime for RemoteRuntime {
         capabilities_from_summary(&self.summary)
     }
 
-    fn installation(&self) -> Installation {
-        if self.machine.status() != MachineStatus::Online {
-            return Installation::Unusable {
-                reason: format!("machine `{}` is offline", self.machine.machine_id),
-            };
-        }
-        if !self.summary.available {
-            return Installation::NotInstalled;
-        }
-        Installation::Available {
-            version: None,
-            path: PathBuf::from(format!("machine://{}/{}", self.machine.machine_id, self.summary.id)),
-        }
-    }
-
-    fn list_models(&self) -> OarResult<Vec<ModelInfo>> {
-        Ok(self
-            .summary
-            .models
-            .iter()
-            .map(|m| ModelInfo {
-                id: m.id.clone(),
-                display_name: if m.name.is_empty() { m.id.clone() } else { m.name.clone() },
-                effort_levels: m.effort_levels.clone(),
-                default_effort: m.default_effort.clone(),
-                is_default: m.is_default,
-            })
-            .collect())
-    }
-
-    fn open(&self, opts: SessionOptions) -> OarResult<Arc<dyn Session>> {
-        if self.machine.status() != MachineStatus::Online {
-            return Err(AgentError::NotAvailable(format!("machine `{}` is offline", self.machine.machine_id)));
-        }
-        let (meta, env) = extract_dispatch_meta(&opts.env, &opts.mcp_servers);
-        let session_id = meta
-            .session_id
-            .or_else(|| opts.resume.clone())
-            .unwrap_or_else(|| format!("rs_{}", uuid::Uuid::new_v4().simple()));
-        let request_id = format!("open_{}", uuid::Uuid::new_v4().simple());
-        let workdir = (!opts.cwd.as_os_str().is_empty()).then(|| opts.cwd.to_string_lossy().into_owned());
-        let system_prompt = merge_system_prompts(opts.system_prompt.as_deref(), opts.append_system_prompt.as_deref());
-
-        let inner = RemoteSessionInner::new(session_id.clone(), self.summary.id.clone(), self.machine.clone(), workdir.clone());
-        // Register before sending `session.open` so early `session.event` frames are never dropped.
-        self.machine.sessions.lock().insert(session_id.clone(), inner.clone());
-
-        let frame = MachineWireFrame::MachineSessionOpen(MachineSessionOpen {
-            request_id: request_id.clone(),
-            session_id: session_id.clone(),
-            runtime_id: self.summary.id.clone(),
-            repo_ref: meta.repo_ref,
-            branch: meta.branch,
-            base_ref: meta.base_ref,
-            workdir,
-            system_prompt,
-            model: opts.model,
-            effort: opts.effort,
-            mcp_session_token: meta.mcp_session_token,
-            env,
-        });
-
-        let timeout = opts.request_timeout.unwrap_or(DEFAULT_RPC_TIMEOUT);
-        let reply = match self.machine.send_rpc(request_id, frame, timeout) {
-            Ok(reply) => reply,
-            Err(err) => {
-                self.machine.sessions.lock().remove(&session_id);
-                return Err(AgentError::Io(err));
+    fn installation(&self) -> BoxFuture<'_, Installation> {
+        Box::pin(async move {
+            if self.machine.status() != MachineStatus::Online {
+                return Installation::Unusable {
+                    reason: format!("machine `{}` is offline", self.machine.machine_id),
+                };
             }
-        };
+            if !self.summary.available {
+                return Installation::NotInstalled;
+            }
+            Installation::Available {
+                version: None,
+                path: PathBuf::from(format!("machine://{}/{}", self.machine.machine_id, self.summary.id)),
+            }
+        })
+    }
 
-        match reply {
-            PendingReply::SessionOpened(opened) if opened.ok => {
-                if let Some(dir) = opened.workdir.filter(|w| !w.is_empty()) {
-                    inner.state.lock().workdir = Some(dir);
+    fn list_models(&self) -> BoxFuture<'_, OarResult<Vec<ModelInfo>>> {
+        Box::pin(async move {
+            Ok(self
+                .summary
+                .models
+                .iter()
+                .map(|m| ModelInfo {
+                    id: m.id.clone(),
+                    display_name: if m.name.is_empty() { m.id.clone() } else { m.name.clone() },
+                    effort_levels: m.effort_levels.clone(),
+                    default_effort: m.default_effort.clone(),
+                    is_default: m.is_default,
+                })
+                .collect())
+        })
+    }
+
+    fn open(&self, opts: SessionOptions) -> BoxFuture<'_, OarResult<Arc<dyn Session>>> {
+        Box::pin(async move {
+            if self.machine.status() != MachineStatus::Online {
+                return Err(AgentError::NotAvailable(format!("machine `{}` is offline", self.machine.machine_id)));
+            }
+            let (meta, env) = extract_dispatch_meta(&opts.env, &opts.mcp_servers);
+            let session_id = meta
+                .session_id
+                .or_else(|| opts.resume.clone())
+                .unwrap_or_else(|| format!("rs_{}", uuid::Uuid::new_v4().simple()));
+            let request_id = format!("open_{}", uuid::Uuid::new_v4().simple());
+            let workdir = (!opts.cwd.as_os_str().is_empty()).then(|| opts.cwd.to_string_lossy().into_owned());
+            let system_prompt = merge_system_prompts(opts.system_prompt.as_deref(), opts.append_system_prompt.as_deref());
+
+            let inner = RemoteSessionInner::new(session_id.clone(), self.summary.id.clone(), self.machine.clone(), workdir.clone());
+            // Register before sending `session.open` so early `session.event` frames are never dropped.
+            self.machine.sessions.lock().insert(session_id.clone(), inner.clone());
+
+            let frame = MachineWireFrame::MachineSessionOpen(MachineSessionOpen {
+                request_id: request_id.clone(),
+                session_id: session_id.clone(),
+                runtime_id: self.summary.id.clone(),
+                repo_ref: meta.repo_ref,
+                branch: meta.branch,
+                base_ref: meta.base_ref,
+                workdir,
+                system_prompt,
+                model: opts.model,
+                effort: opts.effort,
+                mcp_session_token: meta.mcp_session_token,
+                env,
+            });
+
+            let timeout = opts.request_timeout.unwrap_or(DEFAULT_RPC_TIMEOUT);
+            let reply = match self.machine.send_rpc_async(request_id, frame, timeout).await {
+                Ok(reply) => reply,
+                Err(err) => {
+                    self.machine.sessions.lock().remove(&session_id);
+                    return Err(AgentError::Io(err));
                 }
-                Ok(Arc::new(RemoteSession { inner }))
+            };
+
+            match reply {
+                PendingReply::SessionOpened(opened) if opened.ok => {
+                    if let Some(dir) = opened.workdir.filter(|w| !w.is_empty()) {
+                        inner.state.lock().workdir = Some(dir);
+                    }
+                    Ok(Arc::new(RemoteSession { inner }) as Arc<dyn Session>)
+                }
+                PendingReply::SessionOpened(opened) => {
+                    self.machine.sessions.lock().remove(&session_id);
+                    Err(AgentError::Rejected(opened.error.unwrap_or_else(|| "remote refused session open".into())))
+                }
+                PendingReply::WireError(err) => {
+                    self.machine.sessions.lock().remove(&session_id);
+                    Err(AgentError::Protocol(format!("{}: {}", err.code, err.message)))
+                }
+                PendingReply::Disconnected(reason) => {
+                    self.machine.sessions.lock().remove(&session_id);
+                    Err(AgentError::Io(reason))
+                }
+                PendingReply::SessionAck(_) | PendingReply::WorktreeResult(_) => {
+                    self.machine.sessions.lock().remove(&session_id);
+                    Err(AgentError::Protocol("unexpected reply to session.open".into()))
+                }
             }
-            PendingReply::SessionOpened(opened) => {
-                self.machine.sessions.lock().remove(&session_id);
-                Err(AgentError::Rejected(opened.error.unwrap_or_else(|| "remote refused session open".into())))
-            }
-            PendingReply::WireError(err) => {
-                self.machine.sessions.lock().remove(&session_id);
-                Err(AgentError::Protocol(format!("{}: {}", err.code, err.message)))
-            }
-            PendingReply::Disconnected(reason) => {
-                self.machine.sessions.lock().remove(&session_id);
-                Err(AgentError::Io(reason))
-            }
-            PendingReply::SessionAck(_) | PendingReply::WorktreeResult(_) => {
-                self.machine.sessions.lock().remove(&session_id);
-                Err(AgentError::Protocol("unexpected reply to session.open".into()))
-            }
-        }
+        })
     }
 }
 
@@ -675,9 +732,9 @@ struct RemoteSessionState {
     last_record_seq: Option<u64>,
     fold: StatusFold,
     history: VecDeque<Event>,
-    subscribers: Vec<flume::Sender<Event>>,
+    subscribers: Vec<mpsc::UnboundedSender<Event>>,
     records: VecDeque<voyage::Record>,
-    record_subscribers: Vec<flume::Sender<voyage::Record>>,
+    record_subscribers: Vec<mpsc::UnboundedSender<voyage::Record>>,
     workdir: Option<String>,
     ended: bool,
     disposed: bool,
@@ -820,7 +877,7 @@ impl RemoteSessionInner {
         );
     }
 
-    fn send_input(
+    async fn send_input_async(
         &self,
         kind: MachineInputKind,
         text: Option<String>,
@@ -852,7 +909,11 @@ impl RemoteSessionInner {
             model,
             effort,
         });
-        let reply = self.machine.send_rpc(request_id, frame, DEFAULT_RPC_TIMEOUT).map_err(AgentError::Io)?;
+        let reply = self
+            .machine
+            .send_rpc_async(request_id, frame, DEFAULT_RPC_TIMEOUT)
+            .await
+            .map_err(AgentError::Io)?;
         match reply {
             PendingReply::SessionAck(ack) if ack.ok => Ok(input_id),
             PendingReply::SessionAck(ack) => Err(AgentError::Rejected(ack.error.unwrap_or_else(|| "remote rejected input".into()))),
@@ -862,7 +923,7 @@ impl RemoteSessionInner {
         }
     }
 
-    fn send_respond(&self, target_id: &str, allow: bool, answer: Option<String>) -> OarResult<()> {
+    async fn send_respond_async(&self, target_id: &str, allow: bool, answer: Option<String>) -> OarResult<()> {
         let frame = MachineWireFrame::MachineSessionRespond(MachineSessionRespond {
             request_id: format!("resp_{}", uuid::Uuid::new_v4().simple()),
             session_id: self.session_id.clone(),
@@ -870,7 +931,7 @@ impl RemoteSessionInner {
             allow,
             answer,
         });
-        self.machine.send_frame(frame).map_err(AgentError::Io)
+        self.machine.send_frame_async(frame).await.map_err(AgentError::Io)
     }
 }
 
@@ -890,50 +951,52 @@ impl Session for RemoteSession {
         self.inner.session_id.clone()
     }
 
-    fn control(&self, action: ControlAction, arg: &str, input_id: &str, span_id: &str) -> OarResult<ControlOutcome> {
-        let (kind, text) = match action {
-            ControlAction::Prompt => (MachineInputKind::Prompt, Some(arg.to_string())),
-            ControlAction::Steer => (MachineInputKind::Steer, Some(arg.to_string())),
-            ControlAction::Queue => (MachineInputKind::Queue, Some(arg.to_string())),
-            ControlAction::Abort => (MachineInputKind::Abort, None),
-            ControlAction::Withdraw | ControlAction::Compact | ControlAction::StopTask => {
-                return Ok(ControlOutcome {
+    fn control<'a>(&'a self, action: ControlAction, arg: &'a str, input_id: &'a str, span_id: &'a str) -> BoxFuture<'a, OarResult<ControlOutcome>> {
+        Box::pin(async move {
+            let (kind, text) = match action {
+                ControlAction::Prompt => (MachineInputKind::Prompt, Some(arg.to_string())),
+                ControlAction::Steer => (MachineInputKind::Steer, Some(arg.to_string())),
+                ControlAction::Queue => (MachineInputKind::Queue, Some(arg.to_string())),
+                ControlAction::Abort => (MachineInputKind::Abort, None),
+                ControlAction::Withdraw | ControlAction::Compact | ControlAction::StopTask => {
+                    return Ok(ControlOutcome {
+                        action,
+                        status: ControlStatus::Unsupported,
+                        code: "unsupported".into(),
+                        reason: "control action is not supported on remote machines".into(),
+                        span_id: span_id.into(),
+                        input_id: input_id.into(),
+                    });
+                }
+            };
+            match self.inner.send_input_async(kind, text, None, None, Some(input_id)).await {
+                Ok(effective_input_id) => Ok(ControlOutcome {
                     action,
-                    status: ControlStatus::Unsupported,
-                    code: "unsupported".into(),
-                    reason: "control action is not supported on remote machines".into(),
+                    status: ControlStatus::Accepted,
+                    code: String::new(),
+                    reason: String::new(),
+                    span_id: span_id.into(),
+                    input_id: effective_input_id,
+                }),
+                Err(AgentError::Rejected(reason)) => Ok(ControlOutcome {
+                    action,
+                    status: ControlStatus::Rejected,
+                    code: reason.split(':').next().unwrap_or("rejected").trim().to_string(),
+                    reason,
                     span_id: span_id.into(),
                     input_id: input_id.into(),
-                });
+                }),
+                Err(err) => Err(err),
             }
-        };
-        match self.inner.send_input(kind, text, None, None, Some(input_id)) {
-            Ok(effective_input_id) => Ok(ControlOutcome {
-                action,
-                status: ControlStatus::Accepted,
-                code: String::new(),
-                reason: String::new(),
-                span_id: span_id.into(),
-                input_id: effective_input_id,
-            }),
-            Err(AgentError::Rejected(reason)) => Ok(ControlOutcome {
-                action,
-                status: ControlStatus::Rejected,
-                code: reason.split(':').next().unwrap_or("rejected").trim().to_string(),
-                reason,
-                span_id: span_id.into(),
-                input_id: input_id.into(),
-            }),
-            Err(err) => Err(err),
-        }
+        })
     }
 
     fn records(&self) -> Vec<voyage::Record> {
         self.inner.state.lock().records.iter().cloned().collect()
     }
 
-    fn subscribe_records(&self, after: Option<u64>) -> flume::Receiver<voyage::Record> {
-        let (tx, rx) = flume::unbounded();
+    fn subscribe_records(&self, after: Option<u64>) -> mpsc::UnboundedReceiver<voyage::Record> {
+        let (tx, rx) = mpsc::unbounded_channel();
         let mut state = self.inner.state.lock();
         for rec in &state.records {
             if after.is_none_or(|a| rec.seq > a) {
@@ -954,8 +1017,8 @@ impl Session for RemoteSession {
         self.inner.state.lock().fold.status()
     }
 
-    fn events(&self) -> flume::Receiver<Event> {
-        let (tx, rx) = flume::unbounded();
+    fn events(&self) -> mpsc::UnboundedReceiver<Event> {
+        let (tx, rx) = mpsc::unbounded_channel();
         let mut state = self.inner.state.lock();
         if !state.ended {
             state.subscribers.push(tx);
@@ -963,8 +1026,8 @@ impl Session for RemoteSession {
         rx
     }
 
-    fn events_with_history(&self) -> flume::Receiver<Event> {
-        let (tx, rx) = flume::unbounded();
+    fn events_with_history(&self) -> mpsc::UnboundedReceiver<Event> {
+        let (tx, rx) = mpsc::unbounded_channel();
         let mut state = self.inner.state.lock();
         for event in &state.history {
             let _ = tx.send(event.clone());
@@ -975,62 +1038,102 @@ impl Session for RemoteSession {
         rx
     }
 
-    fn prompt(&self, content: Vec<ContentBlock>) -> OarResult<()> {
-        self.inner
-            .send_input(MachineInputKind::Prompt, Some(render_content(&content)), None, None, None)?;
-        Ok(())
+    fn prompt(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, OarResult<()>> {
+        Box::pin(async move {
+            self.inner
+                .send_input_async(MachineInputKind::Prompt, Some(render_content(&content)), None, None, None)
+                .await?;
+            Ok(())
+        })
     }
 
-    fn steer(&self, content: Vec<ContentBlock>) -> OarResult<()> {
-        self.inner
-            .send_input(MachineInputKind::Steer, Some(render_content(&content)), None, None, None)?;
-        Ok(())
+    fn steer(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, OarResult<()>> {
+        Box::pin(async move {
+            self.inner
+                .send_input_async(MachineInputKind::Steer, Some(render_content(&content)), None, None, None)
+                .await?;
+            Ok(())
+        })
     }
 
-    fn queue(&self, content: Vec<ContentBlock>) -> OarResult<()> {
-        self.inner
-            .send_input(MachineInputKind::Queue, Some(render_content(&content)), None, None, None)?;
-        Ok(())
+    fn queue(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, OarResult<()>> {
+        Box::pin(async move {
+            self.inner
+                .send_input_async(MachineInputKind::Queue, Some(render_content(&content)), None, None, None)
+                .await?;
+            Ok(())
+        })
     }
 
-    fn abort(&self) -> OarResult<()> {
-        self.inner.send_input(MachineInputKind::Abort, None, None, None, None)?;
-        Ok(())
+    fn abort(&self) -> BoxFuture<'_, OarResult<()>> {
+        Box::pin(async move {
+            self.inner.send_input_async(MachineInputKind::Abort, None, None, None, None).await?;
+            Ok(())
+        })
     }
 
-    fn respond_permission(&self, request_id: &str, decision: PermissionDecision) -> OarResult<()> {
-        let (allow, answer) = match decision {
-            PermissionDecision::AllowOnce => (true, None),
-            PermissionDecision::AllowAlways => (true, Some("always".into())),
-            PermissionDecision::Deny { message } => (false, message),
-        };
-        self.inner.send_respond(request_id, allow, answer)
+    fn respond_permission<'a>(&'a self, request_id: &'a str, decision: PermissionDecision) -> BoxFuture<'a, OarResult<()>> {
+        Box::pin(async move {
+            let (allow, answer) = match decision {
+                PermissionDecision::AllowOnce => (true, None),
+                PermissionDecision::AllowAlways => (true, Some("always".into())),
+                PermissionDecision::Deny { message } => (false, message),
+            };
+            self.inner.send_respond_async(request_id, allow, answer).await
+        })
     }
 
-    fn respond_interaction(&self, request_id: &str, decision: InteractionDecision) -> OarResult<()> {
-        let (allow, answer) = match decision {
-            InteractionDecision::Select { option_id } => (true, Some(option_id)),
-            InteractionDecision::Custom { text } => (true, Some(text)),
-            InteractionDecision::Cancel => (false, None),
-        };
-        self.inner.send_respond(request_id, allow, answer)
+    fn respond_interaction<'a>(&'a self, request_id: &'a str, decision: InteractionDecision) -> BoxFuture<'a, OarResult<()>> {
+        Box::pin(async move {
+            let (allow, answer) = match decision {
+                InteractionDecision::Select { option_id } => (true, Some(option_id)),
+                InteractionDecision::Custom { text } => (true, Some(text)),
+                InteractionDecision::Cancel => (false, None),
+            };
+            self.inner.send_respond_async(request_id, allow, answer).await
+        })
     }
 
-    fn set_config(&self, model: Option<&str>, effort: Option<&str>, _permission_mode: Option<PermissionMode>) -> OarResult<()> {
-        self.inner
-            .send_input(MachineInputKind::SetConfig, None, model.map(String::from), effort.map(String::from), None)?;
-        Ok(())
+    fn set_config<'a>(&'a self, model: Option<&'a str>, effort: Option<&'a str>, _permission_mode: Option<PermissionMode>) -> BoxFuture<'a, OarResult<()>> {
+        Box::pin(async move {
+            self.inner
+                .send_input_async(MachineInputKind::SetConfig, None, model.map(String::from), effort.map(String::from), None)
+                .await?;
+            Ok(())
+        })
     }
 
-    fn dispose(&self) {
-        {
-            let mut state = self.inner.state.lock();
-            if state.disposed {
+    fn dispose(&self) -> BoxFuture<'_, ()> {
+        Box::pin(async move {
+            if !self.mark_disposed() {
                 return;
             }
-            state.disposed = true;
+            let _ = self.inner.machine.send_frame_async(self.dispose_frame()).await;
+            self.finish_disposal();
+        })
+    }
+
+    fn signal_dispose(&self) {
+        if !self.mark_disposed() {
+            return;
         }
-        let frame = MachineWireFrame::MachineSessionInput(MachineSessionInput {
+        let _ = self.inner.machine.try_send_frame(self.dispose_frame());
+        self.finish_disposal();
+    }
+}
+
+impl RemoteSession {
+    fn mark_disposed(&self) -> bool {
+        let mut state = self.inner.state.lock();
+        if state.disposed {
+            return false;
+        }
+        state.disposed = true;
+        true
+    }
+
+    fn dispose_frame(&self) -> MachineWireFrame {
+        MachineWireFrame::MachineSessionInput(MachineSessionInput {
             request_id: format!("disp_{}", uuid::Uuid::new_v4().simple()),
             session_id: self.inner.session_id.clone(),
             input_id: format!("inp_{}", uuid::Uuid::new_v4().simple()),
@@ -1038,8 +1141,10 @@ impl Session for RemoteSession {
             text: None,
             model: None,
             effort: None,
-        });
-        let _ = self.inner.machine.send_frame(frame);
+        })
+    }
+
+    fn finish_disposal(&self) {
         self.inner.machine.sessions.lock().remove(&self.inner.session_id);
         let mut state = self.inner.state.lock();
         if !state.ended {

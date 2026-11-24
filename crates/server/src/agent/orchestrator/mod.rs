@@ -21,7 +21,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
 use parking_lot::Mutex;
-use tokio::sync::Notify;
+use tokio::sync::{Notify, mpsc};
 use tokio::task::JoinHandle as TaskHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument as _;
@@ -79,18 +79,18 @@ pub struct Input {
 /// Dropped, it stops waiting.
 pub struct Reply {
     id: String,
-    words: flume::Receiver<String>,
+    words: mpsc::UnboundedReceiver<String>,
     orchestrator: Weak<Orchestrator>,
 }
 
 impl Reply {
     /// The next words, none once the turn is over or nothing came in `wait`.
-    pub async fn next_async(&self, wait: std::time::Duration) -> Option<String> {
-        tokio::time::timeout(wait, self.words.recv_async()).await.ok().and_then(Result::ok)
+    pub async fn next_async(&mut self, wait: std::time::Duration) -> Option<String> {
+        tokio::time::timeout(wait, self.words.recv()).await.ok().flatten()
     }
 
     /// Everything said until the turn ends, or what came within `wait` of each other.
-    pub async fn whole_async(&self, wait: std::time::Duration) -> String {
+    pub async fn whole_async(&mut self, wait: std::time::Duration) -> String {
         let mut said = vec![];
         while let Some(words) = self.next_async(wait).await {
             said.push(words);
@@ -143,7 +143,7 @@ pub struct Orchestrator {
     pub execution: Execution,
     mcp: mcp::ProfileServers,
     /// The live answers not yet taken by a turn.
-    ports: Mutex<HashMap<String, flume::Sender<String>>>,
+    ports: Mutex<HashMap<String, mpsc::UnboundedSender<String>>>,
     chat_listener: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
     closed: AtomicBool,
 }
@@ -258,9 +258,9 @@ impl Orchestrator {
             Ok(())
         }));
         // A turn the last process left unfinished is finished now.
-        o.execution.scheduler.recover()?;
+        o.execution.scheduler.recover().await?;
         for a in o.profile.orchestrators() {
-            if o.execution.has_inputs(&a.id)? {
+            if o.execution.has_inputs_async(&a.id).await? {
                 o.instance(&a.id);
             }
         }
@@ -271,8 +271,8 @@ impl Orchestrator {
     }
 
     /// Starts projecting durable `pi.inbox` alerts into `ctx.live` and `SliceMask::INBOX`.
-    pub fn start_inbox_observer(&self) -> vibevalley_runtime::agent::durable::Result<()> {
-        RuntimeInboxObserver::start(self.execution.store(), &self.ctx)
+    pub async fn start_inbox_observer(&self) -> vibevalley_runtime::agent::durable::Result<()> {
+        RuntimeInboxObserver::start_async(self.execution.store(), &self.ctx).await
     }
 
     pub async fn ensure_open_async(&self) {
@@ -360,26 +360,24 @@ impl Orchestrator {
     }
 
     /// Hands an input to its orchestrator; false when it cannot take it.
-    pub fn hear(self: &Arc<Self>, input: Input) -> bool {
+    pub async fn hear_async(self: &Arc<Self>, input: Input) -> bool {
         if self.closed.load(Ordering::Relaxed) {
             return false;
         }
         let id = self.target(input.agent.as_deref());
         let me = self.instance(&id);
-        let mut queue = me.queue.lock();
-        if let Err(error) = self.execution.enqueue(&id, &input) {
+        if let Err(error) = self.execution.enqueue_async(&id, &input).await {
             self.ctx.live.publish_notice(self.ctx.now(), NoticeLevel::Error, error.to_string());
             return false;
         }
-        queue.push_back(());
-        drop(queue);
+        me.queue.lock().push_back(());
         me.more.notify_one();
         true
     }
 
     fn open_port(self: &Arc<Self>) -> Reply {
         let id = uuid::Uuid::new_v4().to_string();
-        let (tx, words) = flume::unbounded();
+        let (tx, words) = mpsc::unbounded_channel();
         self.ports.lock().insert(id.clone(), tx);
         Reply {
             id,
@@ -408,9 +406,9 @@ impl Orchestrator {
     /// `brief`: a line from a call (what to tell the user, a question its
     /// model passes on) put to the default orchestrator; none when it
     /// cannot take it.
-    pub fn brief(self: &Arc<Self>, line: String) -> Option<Reply> {
+    pub async fn brief_async(self: &Arc<Self>, line: String) -> Option<Reply> {
         let reply = self.open_port();
-        self.hear(Input {
+        self.hear_async(Input {
             agent: None,
             channel: self.chat.default_channel(),
             source: Source::Call,
@@ -420,6 +418,7 @@ impl Orchestrator {
             messages: vec![],
             port: Some(reply.id.clone()),
         })
+        .await
         .then_some(reply)
     }
 
@@ -430,17 +429,17 @@ impl Orchestrator {
     }
 
     /// `stop`: ends its turn under way and drops what waits for it.
-    pub fn stop(&self, agent: Option<&str>) {
+    pub async fn stop_async(&self, agent: Option<&str>) {
         let id = self.target(agent);
         let Some(me) = self.instances.lock().get(&id).cloned() else { return };
         me.queue.lock().clear();
-        let _ = self.execution.stop(&id);
+        let _ = self.execution.stop_async(&id).await;
     }
 
     /// Subscribes to orchestrator-targeted deliveries from `self.chat` on `ctx.task`
     /// (plus replays any pending deliveries left from a prior process).
     fn start_chat_listener(self: &Arc<Self>) {
-        let dispatches = self.chat.dispatches();
+        let mut dispatches = self.chat.dispatches();
         let o = Arc::downgrade(self);
         let chat = self.chat.clone();
         let cancel = self.ctx.task.child_token();
@@ -460,9 +459,9 @@ impl Orchestrator {
                 let dispatched = tokio::select! {
                     biased;
                     _ = task_cancel.cancelled() => return,
-                    res = dispatches.recv_async() => match res {
-                        Ok(dispatched) => dispatched,
-                        Err(_) => return,
+                    res = dispatches.recv() => match res {
+                        Some(dispatched) => dispatched,
+                        None => return,
                     },
                 };
                 let Some(o) = o.upgrade() else { return };
@@ -582,8 +581,7 @@ impl Orchestrator {
             messages: vec![c.row.id.clone()],
             port: meta.response_port.clone(),
         };
-        let o = self.clone();
-        let heard = self.ctx.task.spawn_blocking(move || o.hear(input)).await.unwrap_or(false);
+        let heard = self.hear_async(input).await;
         if heard {
             if let Some(id) = settle_id {
                 let _ = sessions.settle_mailbox(id, true, Some(&d.recipient_id), self.ctx.now()).await;
@@ -607,7 +605,7 @@ impl Orchestrator {
             cancel.cancel();
             let _ = handle.await;
         }
-        self.execution.close();
+        self.execution.close_async().await;
         self.mcp.close();
         self.ports.lock().clear();
         for me in self.instances.lock().values() {
@@ -634,9 +632,9 @@ impl Orchestrator {
         })
     }
 
-    pub(crate) fn system_prompt_snapshot(&self, id: &str) -> String {
+    pub(crate) async fn system_prompt_snapshot_async(&self, id: &str) -> String {
         let home = self.home.join("agent").join(id);
-        let memory = self.memory.port(id, By::Orchestrator);
+        let memory = self.memory.port_async(id, By::Orchestrator).await;
         self.system_prompt(id, &home, memory.as_ref())
     }
 
@@ -666,14 +664,14 @@ impl Orchestrator {
     }
 
     /// Everything it can call: the farm's tools for where it is, its skills and its memory.
-    fn tools(&self, me: &Instance, skills_dir: PathBuf, memory: Arc<dyn MemoryPort>) -> Vec<Box<dyn Tool>> {
-        self.tools_for(&me.id, &me.route, skills_dir, memory)
+    async fn tools_async(&self, me: &Instance, skills_dir: PathBuf, memory: Arc<dyn MemoryPort>) -> Vec<Box<dyn Tool>> {
+        self.tools_for_async(&me.id, &me.route, skills_dir, memory).await
     }
 
-    fn tools_for(&self, id: &str, route: &Arc<Mutex<Route>>, skills_dir: PathBuf, memory: Arc<dyn MemoryPort>) -> Vec<Box<dyn Tool>> {
+    async fn tools_for_async(&self, id: &str, route: &Arc<Mutex<Route>>, skills_dir: PathBuf, memory: Arc<dyn MemoryPort>) -> Vec<Box<dyn Tool>> {
         let mut tools = held(&self.tool, route);
         if let Some(profile) = self.profile.agent(id) {
-            tools.extend(self.mcp.tools(&profile));
+            tools.extend(self.mcp.tools(&profile).await);
         }
         let dirs = vec![skills_dir];
         tools.push(Box::new(LoadSkill {
@@ -711,7 +709,7 @@ impl Orchestrator {
             .iter()
             .filter(|e| e.seq < on && e.r#type == SessionEventType::UserMessage && e.text == asked.text)
             .count();
-        let entries = self.execution.entries(&id).map_err(|e| refused(BizCode::Refused, e.to_string()))?;
+        let entries = self.execution.entries_async(&id).await.map_err(|e| refused(BizCode::Refused, e.to_string()))?;
         let turns = entries
             .iter()
             .enumerate()
@@ -724,7 +722,7 @@ impl Orchestrator {
         };
         let model = self.model_of(&id).map_err(|e| refused(BizCode::Refused, e))?;
         let me = self.instance(&id);
-        let memory = self.memory.port(&id, By::Orchestrator);
+        let memory = self.memory.port_async(&id, By::Orchestrator).await;
         let case = EvalCase {
             id: uuid::Uuid::now_v7().to_string(),
             created_at: self.ctx.now(),
@@ -732,7 +730,8 @@ impl Orchestrator {
             want,
             memory: memory.prompt(),
             tools: self
-                .tools(&me, self.home.join("agent").join(&id).join("skills"), memory)
+                .tools_async(&me, self.home.join("agent").join(&id).join("skills"), memory)
+                .await
                 .iter()
                 .map(|tool| tool.spec().name)
                 .collect(),
@@ -762,12 +761,12 @@ impl Orchestrator {
         })
     }
 
-    fn brain_at(&self, id: &str, route: &Arc<Mutex<Route>>, model: &str) -> Brain {
+    async fn brain_at_async(&self, id: &str, route: &Arc<Mutex<Route>>, model: &str) -> Brain {
         let home = self.home.join("agent").join(id);
         let skills_dir = home.join("skills");
-        let memory = self.memory.port(id, By::Orchestrator);
+        let memory = self.memory.port_async(id, By::Orchestrator).await;
         let mut brain = Brain::new(self.client(), model, self.system_prompt(id, &home, memory.as_ref()));
-        brain.tools = self.tools_for(id, route, skills_dir, memory);
+        brain.tools = self.tools_for_async(id, route, skills_dir, memory).await;
         brain
     }
 
@@ -793,14 +792,7 @@ impl Orchestrator {
                             break true;
                         }
                     }
-                    let check_o = orch.clone();
-                    let check_id = me.id.clone();
-                    let saved = orch
-                        .ctx
-                        .task
-                        .spawn_blocking(move || check_o.execution.has_inputs(&check_id).unwrap_or(false))
-                        .await
-                        .unwrap_or(false);
+                    let saved = orch.execution.has_inputs_async(&me.id).await.unwrap_or(false);
                     drop(orch);
                     if saved {
                         break true;
@@ -818,26 +810,17 @@ impl Orchestrator {
                 if orch.closed.load(Ordering::Relaxed) {
                     return;
                 }
-                let inst = me.clone();
-                let orch_batch = orch.clone();
-                let batch = orch
-                    .ctx
-                    .task
-                    .spawn_blocking(move || {
-                        if orch_batch.closed.load(Ordering::Acquire) {
-                            return None;
+                let batch = if orch.closed.load(Ordering::Acquire) {
+                    None
+                } else {
+                    match orch.execution.batch_async(&me.id).await {
+                        Ok(b) => Some(b),
+                        Err(e) => {
+                            orch.ctx.live.publish_notice(orch.ctx.now(), NoticeLevel::Error, e.to_string());
+                            None
                         }
-                        match orch_batch.execution.batch(&inst.id) {
-                            Ok(b) => Some(b),
-                            Err(e) => {
-                                orch_batch.ctx.live.publish_notice(orch_batch.ctx.now(), NoticeLevel::Error, e.to_string());
-                                None
-                            }
-                        }
-                    })
-                    .await
-                    .ok()
-                    .flatten();
+                    }
+                };
                 let Some(batch) = batch else {
                     return;
                 };
@@ -958,7 +941,7 @@ impl Orchestrator {
             user: batch.iter().any(|i| i.user),
         };
         // Taken now: a turn that cannot start ends them unanswered.
-        let ports: Vec<flume::Sender<String>> = {
+        let ports: Vec<mpsc::UnboundedSender<String>> = {
             let mut open = self.ports.lock();
             batch.iter().filter_map(|i| i.port.as_ref().and_then(|p| open.remove(p))).collect()
         };
@@ -972,7 +955,7 @@ impl Orchestrator {
             }
         };
         if let Some(why) = cannot_reason {
-            let _ = self.execution.finish_inputs(&requests, false, &serde_json::json!({"error": why}));
+            let _ = self.execution.finish_inputs_async(&requests, false, &serde_json::json!({"error": why})).await;
             // The round is still in its log, failed: what it was told can be read and judged there.
             let run = Run::new_async(self, me, &route).await;
             let prompt = self.input_of_async(me, &batch).await;
@@ -1036,31 +1019,16 @@ impl Orchestrator {
     }
 
     pub(crate) async fn stop_endpoint_async(self: &Arc<Self>, input: OrchestratorStopInput) -> Result<(), ApiError> {
-        let o = self.clone();
-        self.ctx
-            .task
-            .spawn_blocking(move || o.stop(input.agent.as_deref()))
-            .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
+        self.stop_async(input.agent.as_deref()).await;
         Ok(())
     }
 
     pub(crate) async fn approvals_endpoint_async(self: &Arc<Self>, input: OrchestratorApprovalListInput) -> Result<Vec<OrchestratorApproval>, ApiError> {
-        let o = self.clone();
-        self.ctx
-            .task
-            .spawn_blocking(move || o.execution.approvals(input.conversation_id.as_deref()))
-            .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        self.execution.approvals_async(input.conversation_id.as_deref()).await
     }
 
     pub(crate) async fn resolve_approval_endpoint_async(self: &Arc<Self>, input: OrchestratorApprovalResolveInput) -> Result<(), ApiError> {
-        let o = self.clone();
-        self.ctx
-            .task
-            .spawn_blocking(move || o.execution.resolve_approval(input))
-            .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        self.execution.resolve_approval_async(input).await
     }
 
     pub(crate) async fn eval_create_endpoint_async(self: &Arc<Self>, input: OrchestratorEvalRequest) -> Result<OrchestratorEval, ApiError> {
@@ -1072,7 +1040,7 @@ impl VoiceOrchestratorPort for Orchestrator {
     fn brief<'a>(&'a self, line: String, wait: std::time::Duration) -> BoxFuture<'a, Option<String>> {
         Box::pin(async move {
             let me = self.me.upgrade()?;
-            let reply = me.brief(line)?;
+            let mut reply = me.brief_async(line).await?;
             if wait.is_zero() {
                 Some(String::new())
             } else {
@@ -1083,17 +1051,20 @@ impl VoiceOrchestratorPort for Orchestrator {
 }
 
 impl CronOrchestratorPort for Orchestrator {
-    fn hear_cron(&self, agent: &str, channel: &str, line: &str) -> bool {
-        let Some(me) = self.me.upgrade() else { return false };
-        me.hear(Input {
-            agent: Some(agent.to_string()),
-            channel: channel.to_string(),
-            source: Source::Cron,
-            line: line.to_string(),
-            user: false,
-            picked: None,
-            messages: vec![],
-            port: None,
+    fn hear_cron<'a>(&'a self, agent: &'a str, channel: &'a str, line: &'a str) -> BoxFuture<'a, bool> {
+        Box::pin(async move {
+            let Some(me) = self.me.upgrade() else { return false };
+            me.hear_async(Input {
+                agent: Some(agent.to_string()),
+                channel: channel.to_string(),
+                source: Source::Cron,
+                line: line.to_string(),
+                user: false,
+                picked: None,
+                messages: vec![],
+                port: None,
+            })
+            .await
         })
     }
 }
@@ -1108,7 +1079,7 @@ struct Run<'a> {
     calls: u64,
     durable: bool,
     /// The live answers this turn's words also go to, read out as they are.
-    ports: Vec<flume::Sender<String>>,
+    ports: Vec<mpsc::UnboundedSender<String>>,
     /// Per-turn `oar-voyage/3` JSONL recorder (`<home>/records/<id>.jsonl`).
     recorder: Mutex<Option<vibevalley_runtime::oar::record::Recorder>>,
     record_seq: std::sync::atomic::AtomicU64,

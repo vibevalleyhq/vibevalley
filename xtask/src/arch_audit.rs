@@ -53,7 +53,7 @@ pub const RUNTIME_OS_THREAD_CEILING: usize = 0;
 
 /// Shrink-only ceiling for non-test `block_on(` calls under `apps/mac/src/`.
 /// Locked at the current baseline; lower as sites migrate to async and never raise this ceiling.
-pub const MAC_BLOCK_ON_CEILING: usize = 8;
+pub const MAC_BLOCK_ON_CEILING: usize = 7;
 
 /// Shrink-only ceiling for non-test `thread::spawn` / `std::thread::Builder` sites under `apps/mac/src/`.
 /// Locked at the current baseline; lower as sites migrate to async and never raise this ceiling.
@@ -2547,7 +2547,7 @@ mod tests {
     fn rule11_runtime_and_mac_concurrency_ceilings_enforce_all_four_buckets() {
         assert_eq!(RUNTIME_BLOCK_ON_CEILING, 0);
         assert_eq!(RUNTIME_OS_THREAD_CEILING, 0);
-        assert_eq!(MAC_BLOCK_ON_CEILING, 8);
+        assert_eq!(MAC_BLOCK_ON_CEILING, 7);
         assert_eq!(MAC_OS_THREAD_CEILING, 4);
 
         let dir = TempDir::new("vv-arch-r11");

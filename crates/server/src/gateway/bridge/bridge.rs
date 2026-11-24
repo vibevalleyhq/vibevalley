@@ -159,8 +159,8 @@ fn parse_slice_topic(topic: &str) -> Option<SliceKind> {
 }
 
 /// Forwards every item from `rx` until `cancel` fires or the source closes.
-async fn pump_flume_async<T: Send + 'static>(
-    rx: flume::Receiver<T>,
+async fn pump_mpsc_async<T: Send + 'static>(
+    mut rx: tokio::sync::mpsc::UnboundedReceiver<T>,
     cancel: CancellationToken,
     mut each: impl FnMut(T) + Send + 'static,
     ended: impl FnOnce(bool) + Send + 'static,
@@ -169,9 +169,9 @@ async fn pump_flume_async<T: Send + 'static>(
         let item = tokio::select! {
             biased;
             _ = cancel.cancelled() => break true,
-            res = rx.recv_async() => match res {
-                Ok(item) => item,
-                Err(_) => break false,
+            res = rx.recv() => match res {
+                Some(item) => item,
+                None => break false,
             },
         };
         each(item);
@@ -272,7 +272,7 @@ async fn pump_slice_subscription(
 }
 
 /// Fallback for `Server` implementations without `SliceFeed` (e.g. custom test doubles).
-/// Bridges blocking `watch_slice` onto a bounded flume channel so Bounded-1 ack waiting
+/// Bridges blocking `watch_slice` onto a bounded mpsc channel so Bounded-1 ack waiting
 /// stays purely async without blocking the Tokio runtime.
 async fn pump_slice_blocking_fallback(
     server: Arc<dyn Server>,
@@ -284,15 +284,17 @@ async fn pump_slice_blocking_fallback(
     task_cancel: CancellationToken,
 ) {
     let handle = vibevalley_runtime::rt::current_or_global_handle();
-    let (stop_tx, stop_rx) = flume::bounded::<()>(0);
-    let (frame_tx, frame_rx) = flume::bounded::<Value>(1);
-    let watch_cancel = task_cancel.clone();
+    let stop = task_cancel.child_token();
+    let (frame_tx, mut frame_rx) = tokio::sync::mpsc::channel::<Value>(1);
+    let watch_stop = stop.clone();
     handle.spawn_blocking(move || {
-        server.watch_slice(slice_kind, None, &stop_rx, &mut |_seq, frame| {
-            if watch_cancel.is_cancelled() || stop_rx.is_disconnected() {
+        server.watch_slice(slice_kind, None, &watch_stop, &mut |_seq, frame| {
+            if watch_stop.is_cancelled() {
                 return;
             }
-            flume::Selector::new().send(&frame_tx, frame.clone(), |_| ()).recv(&stop_rx, |_| ()).wait();
+            if frame_tx.blocking_send(frame.clone()).is_err() {
+                watch_stop.cancel();
+            }
         });
     });
 
@@ -300,9 +302,9 @@ async fn pump_slice_blocking_fallback(
         let frame = tokio::select! {
             biased;
             _ = task_cancel.cancelled() => break,
-            res = frame_rx.recv_async() => match res {
-                Ok(frame) => frame,
-                Err(_) => break,
+            res = frame_rx.recv() => match res {
+                Some(frame) => frame,
+                None => break,
             },
         };
         let notified = receipt.ack.notified();
@@ -317,7 +319,7 @@ async fn pump_slice_blocking_fallback(
             _ = notified => {}
         }
     }
-    drop(stop_tx);
+    stop.cancel();
 }
 
 async fn pump_live_broadcast(mut rx: broadcast::Receiver<LiveEvent>, outlet: Arc<dyn Outlet>, task_cancel: CancellationToken) {
@@ -376,7 +378,7 @@ impl Client {
                     pump_live_broadcast(rx, outlet, task_cancel).await;
                 } else {
                     let mut rev = 0u64;
-                    pump_flume_async(
+                    pump_mpsc_async(
                         server.live(),
                         task_cancel,
                         move |event| {
@@ -512,7 +514,7 @@ impl ClientRpc for Client {
                     }
                     let each_outlet = outlet.clone();
                     let each_name = event_name.clone();
-                    pump_flume_async(
+                    pump_mpsc_async(
                         rx,
                         cancel,
                         move |event| each_outlet.send(&each_name, json!({ "event": event })),
@@ -664,13 +666,13 @@ mod tests {
         fn slice_snapshot(&self, slice: SliceKind) -> Value {
             self.inner.slice_snapshot(slice)
         }
-        fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+        fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
             self.inner.watch_slice(slice, after_seq, stop, receive)
         }
         fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
             self.inner.subscribe_slice(slice)
         }
-        fn live(&self) -> flume::Receiver<vibevalley_protocol::LiveEvent> {
+        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
             let rx = self.inner.live();
             self.on_live.notify_waiters();
             rx
@@ -680,12 +682,12 @@ mod tests {
             self.on_live.notify_waiters();
             rx
         }
-        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
             let res = self.inner.subscribe(name, payload);
             self.on_subscribe.notify_waiters();
             res
         }
-        fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
             let res = self.inner.subscribe_with(ctx, name, payload);
             self.on_subscribe.notify_waiters();
             res

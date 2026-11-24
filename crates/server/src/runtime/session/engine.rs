@@ -8,7 +8,7 @@ use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use parking_lot::Mutex;
-use tokio::sync::{Mutex as AsyncMutex, broadcast};
+use tokio::sync::{Mutex as AsyncMutex, broadcast, mpsc};
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument as _;
 use tracing::instrument::WithSubscriber as _;
@@ -29,7 +29,6 @@ use crate::context::error::{LookIn, missing};
 use crate::context::live::LiveSessionSnapshot;
 use crate::context::{Context, now};
 use crate::db::DbError;
-use crate::log::spawn_blocking_traced;
 use crate::runtime::worktree::{Leave, Leaving, Worktree};
 use crate::runtime::{IssueChange, Result, RuntimeConfig, RuntimeError, Step, find_issue};
 use crate::service::session::SessionExtra;
@@ -131,7 +130,7 @@ impl SessionEngine {
         config: Arc<RuntimeConfig>,
         trajectory: Option<Arc<Trajectory>>,
     ) -> Result<SessionEngine> {
-        let durable = ctx.service.durable()?;
+        let durable = ctx.service.durable().await?;
         let (extras, configs) = tokio::try_join!(ctx.service.session.extras(), ctx.service.session.configs())?;
         let mut workspaces = HashMap::new();
         for (id, cfg) in configs {
@@ -207,7 +206,7 @@ impl SessionEngine {
     /// interrupted when the board opens next.
     pub fn close(&self) {
         for agent in self.0.live.drain_all() {
-            agent.dispose();
+            agent.signal_dispose();
         }
     }
 
@@ -430,20 +429,11 @@ impl SessionEngine {
         run: &str,
         prompt: &str,
     ) -> vibevalley_runtime::oar::Result<()> {
-        let agent = agent.clone();
-        let run = run.to_string();
-        let prompt = prompt.to_string();
-        spawn_blocking_traced(move || Self::prompt_run(&*agent, is_remote, &run, &prompt))
-            .await
-            .map_err(|e| vibevalley_runtime::oar::AgentError::Io(e.to_string()))?
-    }
-
-    fn prompt_run(agent: &dyn vibevalley_runtime::oar::Session, is_remote: bool, run: &str, prompt: &str) -> vibevalley_runtime::oar::Result<()> {
         if !is_remote && agent.runtime_id() != vibevalley_runtime::agent::runtime::ID {
-            return agent.prompt(text(prompt));
+            return agent.prompt(text(prompt)).await;
         }
         let key = format!("work:{run}");
-        let outcome = agent.control(vibevalley_runtime::oar::ControlAction::Prompt, prompt, &key, &key)?;
+        let outcome = agent.control(vibevalley_runtime::oar::ControlAction::Prompt, prompt, &key, &key).await?;
         if outcome.status != vibevalley_runtime::oar::ControlStatus::Accepted {
             return Err(vibevalley_runtime::oar::AgentError::Rejected(format!("{}: {}", outcome.code, outcome.reason)));
         }
@@ -478,9 +468,15 @@ impl SessionEngine {
             .await?
             .ok_or_else(|| RuntimeError::Other(format!("missing generation for {run}")))?;
         let is_remote = session.machine.is_some();
-        let drive = self.0.drivers.drive(session.profile_id(), &issue)?;
+        let drive = self.0.drivers.drive(session.profile_id(), &issue).await?;
         let (agent, _) = self.open_for_async(drive, &session, &issue, String::new(), true).await?;
-        let turn_attached = agent.events_with_history().try_iter().any(|e| matches!(e.kind, EventKind::TurnStarted { .. }));
+        let mut history = agent.events_with_history();
+        let mut turn_attached = false;
+        while let Ok(e) = history.try_recv() {
+            if matches!(e.kind, EventKind::TurnStarted { .. }) {
+                turn_attached = true;
+            }
+        }
         self.go_live_async(agent.clone(), session, None).await?;
         if !turn_attached {
             Self::prompt_run_async(&agent, is_remote, &run, sub.payload["text"].as_str().unwrap_or_default()).await?;
@@ -553,10 +549,7 @@ impl SessionEngine {
             system_prompt,
             ..Default::default()
         };
-        let runtime = drive.runtime.clone();
-        let agent = spawn_blocking_traced(move || runtime.open(opts))
-            .await
-            .map_err(|e| RuntimeError::Other(e.to_string()))??;
+        let agent = drive.runtime.open(opts).await?;
         Ok((agent, prompt))
     }
 
@@ -580,7 +573,7 @@ impl SessionEngine {
         if let Some(prev) = replaced
             && !Arc::ptr_eq(&prev, &agent)
         {
-            prev.dispose();
+            prev.dispose().await;
         }
         let id = session.id.clone();
         let previous = session
@@ -636,7 +629,15 @@ impl SessionEngine {
             let session_id = id.clone();
             let reconcile = async move {
                 let mut after = before.clone();
-                let changed = super::subagent::read_back(&mut after, |thread, turn| agent.read_subagent(thread, turn), now);
+                let changed = super::subagent::read_back_async(
+                    &mut after,
+                    |thread, turn| {
+                        let agent = agent.clone();
+                        Box::pin(async move { agent.read_subagent(thread, turn).await })
+                    },
+                    now,
+                )
+                .await;
                 if changed
                     && me.current(&session_id, generation)
                     && let Err(err) = me.reconcile_subagents_async(&session_id, &before, after).await
@@ -734,7 +735,7 @@ impl SessionEngine {
                 Ok(session.id.clone())
             }
             None => {
-                let drive = self.0.drivers.drive(session.profile_id().filter(|a| !a.is_empty()), issue)?;
+                let drive = self.0.drivers.drive(session.profile_id().filter(|a| !a.is_empty()), issue).await?;
                 let resume = drive.runtime.capabilities().resume && self.extra(&session.id).agent_session.is_some();
                 let prompt = if resume { words } else { again(&words) };
                 self.start_async(drive, session.clone(), issue, prompt, resume, trigger).await
@@ -771,17 +772,17 @@ impl SessionEngine {
         }
         let agent = self.0.live.get(&session.id)?;
         self.record_async(&session.id, Step::Asked { text: words.to_string() }).await;
-        Some(match agent.steer(text(words)) {
+        Some(match agent.steer(text(words)).await {
             Ok(()) => Ok(()),
-            Err(_) => agent.queue(text(words)).map_err(RuntimeError::from),
+            Err(_) => agent.queue(text(words)).await.map_err(RuntimeError::from),
         })
     }
 
-    /// Stops the running turn of `session`.
-    pub fn stop(&self, session: &str) -> Result<()> {
+    /// Aborts the running turn of `session`.
+    pub async fn abort_turn_async(&self, session: &str) -> Result<()> {
         let agent = self.0.live.get(session);
         let agent = agent.ok_or_else(|| RuntimeError::Other("nothing is running".into()))?;
-        agent.abort()?;
+        agent.abort().await?;
         Ok(())
     }
 
@@ -843,8 +844,8 @@ impl SessionEngine {
     /// worktree is left as `leave` says, and it leaves the board.
     pub async fn dismiss_async(&self, session_id: &str, leave: Leave) -> Result<()> {
         if let Some(agent) = self.0.live.remove_any(session_id) {
-            let _ = agent.abort();
-            agent.dispose();
+            let _ = agent.abort().await;
+            agent.dispose().await;
         }
         let session = self.session_async(session_id).await;
         if session.as_ref().is_some_and(|s| s.phase.is_working()) {
@@ -904,7 +905,13 @@ impl SessionEngine {
 
     /// Turns the agent's events into live state and checkpoints until the session
     /// ends or leaves, without pinning an OS thread while idle between events.
-    async fn pump_async(&self, session_id: String, generation: u64, events: flume::Receiver<vibevalley_runtime::oar::Event>, cancel: CancellationToken) {
+    async fn pump_async(
+        &self,
+        session_id: String,
+        generation: u64,
+        mut events: mpsc::UnboundedReceiver<vibevalley_runtime::oar::Event>,
+        cancel: CancellationToken,
+    ) {
         let span = tracing::debug_span!("session.pump", session_id = %session_id, generation);
         async move {
             let quiet_after = self.0.config.quiet_after;
@@ -915,9 +922,9 @@ impl SessionEngine {
                 let event = tokio::select! {
                     biased;
                     _ = cancel.cancelled() => return,
-                    res = tokio::time::timeout(tick, events.recv_async()) => match res {
-                        Ok(Ok(event)) => event,
-                        Ok(Err(flume::RecvError::Disconnected)) => break,
+                    res = tokio::time::timeout(tick, events.recv()) => match res {
+                        Ok(Some(event)) => event,
+                        Ok(None) => break,
                         Err(_) => {
                             if !self.current(&session_id, generation) {
                                 return;
@@ -1009,7 +1016,7 @@ impl SessionEngine {
                 } else if self.0.config.permission == PermissionMode::Bypass
                     && let Some(agent) = self.0.live.get_if_current(session_id, generation)
                 {
-                    let _ = agent.respond_permission(&request_id, PermissionDecision::AllowOnce);
+                    let _ = agent.respond_permission(&request_id, PermissionDecision::AllowOnce).await;
                 }
             }
             EventKind::PermissionResolved { request_id, .. } => {
@@ -1466,28 +1473,20 @@ impl SessionEngine {
             checks: round.checks,
             answer: round.answer.clone(),
         };
-        if let Err(error) = self
-            .settle_report_async(
-                &session,
-                outcome,
-                round.summary,
-                spent,
-                round.answer,
-                run_id.clone(),
-                Some((issue.id.clone(), change)),
-            )
-            .await
-        {
-            eprintln!("vibevalley: settling {session_id}: {error}");
-            return;
-        }
-        if let Some(id) = run_id {
+        if let Some(id) = run_id.clone() {
             if let Some(extra) = self.0.extras.lock().get_mut(session_id)
                 && extra.run.as_ref() == Some(&id)
             {
                 extra.run = None;
             }
             self.record_async(session_id, Step::RunEnded { run: id, outcome }).await;
+        }
+        if let Err(error) = self
+            .settle_report_async(&session, outcome, round.summary, spent, round.answer, run_id, Some((issue.id.clone(), change)))
+            .await
+        {
+            eprintln!("vibevalley: settling {session_id}: {error}");
+            return;
         }
         if let Some(r) = report.as_ref().filter(|r| !r.remember.is_empty())
             && let Some(agent) = session.profile.clone()
@@ -1602,8 +1601,10 @@ mod tests {
     use std::time::Duration;
 
     use parking_lot::Mutex;
+    use tokio::sync::mpsc;
     use tracing::instrument::WithSubscriber as _;
     use vibevalley_protocol::{ExecutionPolicy, Phase, Session, SessionAction, SessionController};
+    use vibevalley_runtime::agent::durable::BoxFuture;
     use vibevalley_runtime::oar::{
         Capabilities, ContentBlock, ControlAction, ControlOutcome, ControlStatus, Event, EventKind, Installation, ModelInfo, PermissionDecision, Registry,
         Runtime as OarRuntime, Session as OarSession, SessionOptions, SessionStatus, voyage,
@@ -1642,8 +1643,8 @@ mod tests {
 
     struct StubSession {
         id: String,
-        tx: flume::Sender<Event>,
-        rx: flume::Receiver<Event>,
+        tx: mpsc::UnboundedSender<Event>,
+        rx: Mutex<Option<mpsc::UnboundedReceiver<Event>>>,
     }
 
     impl OarSession for StubSession {
@@ -1651,14 +1652,22 @@ mod tests {
             self.id.clone()
         }
 
-        fn control(&self, action: ControlAction, _: &str, input_id: &str, span_id: &str) -> vibevalley_runtime::oar::Result<ControlOutcome> {
-            Ok(ControlOutcome {
-                action,
-                status: ControlStatus::Accepted,
-                code: String::new(),
-                reason: String::new(),
-                span_id: span_id.into(),
-                input_id: input_id.into(),
+        fn control<'a>(
+            &'a self,
+            action: ControlAction,
+            _: &'a str,
+            input_id: &'a str,
+            span_id: &'a str,
+        ) -> BoxFuture<'a, vibevalley_runtime::oar::Result<ControlOutcome>> {
+            Box::pin(async move {
+                Ok(ControlOutcome {
+                    action,
+                    status: ControlStatus::Accepted,
+                    code: String::new(),
+                    reason: String::new(),
+                    span_id: span_id.into(),
+                    input_id: input_id.into(),
+                })
             })
         }
 
@@ -1666,8 +1675,8 @@ mod tests {
             vec![]
         }
 
-        fn subscribe_records(&self, _: Option<u64>) -> flume::Receiver<voyage::Record> {
-            let (_tx, rx) = flume::bounded(1);
+        fn subscribe_records(&self, _: Option<u64>) -> mpsc::UnboundedReceiver<voyage::Record> {
+            let (_tx, rx) = mpsc::unbounded_channel();
             rx
         }
 
@@ -1679,32 +1688,37 @@ mod tests {
             SessionStatus::Idle
         }
 
-        fn events(&self) -> flume::Receiver<Event> {
-            self.rx.clone()
+        fn events(&self) -> mpsc::UnboundedReceiver<Event> {
+            self.rx.lock().take().unwrap_or_else(|| mpsc::unbounded_channel().1)
         }
 
-        fn prompt(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
-            Ok(())
+        fn prompt(&self, _: Vec<ContentBlock>) -> BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
+            Box::pin(async { Ok(()) })
         }
 
-        fn steer(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
-            Ok(())
+        fn steer(&self, _: Vec<ContentBlock>) -> BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
+            Box::pin(async { Ok(()) })
         }
 
-        fn queue(&self, _: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
-            Ok(())
+        fn queue(&self, _: Vec<ContentBlock>) -> BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
+            Box::pin(async { Ok(()) })
         }
 
-        fn abort(&self) -> vibevalley_runtime::oar::Result<()> {
-            Ok(())
+        fn abort(&self) -> BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
+            Box::pin(async { Ok(()) })
         }
 
-        fn respond_permission(&self, _: &str, _: PermissionDecision) -> vibevalley_runtime::oar::Result<()> {
-            Ok(())
+        fn respond_permission<'a>(&'a self, _: &'a str, _: PermissionDecision) -> BoxFuture<'a, vibevalley_runtime::oar::Result<()>> {
+            Box::pin(async { Ok(()) })
         }
 
-        fn dispose(&self) {
-            let _ = self.tx.try_send(Event {
+        fn dispose(&self) -> BoxFuture<'_, ()> {
+            self.signal_dispose();
+            Box::pin(async {})
+        }
+
+        fn signal_dispose(&self) {
+            let _ = self.tx.send(Event {
                 seq: 0,
                 at_ms: 0,
                 agent_path: vec![],
@@ -1728,20 +1742,28 @@ mod tests {
             Capabilities::default()
         }
 
-        fn installation(&self) -> Installation {
-            Installation::Available {
-                version: None,
-                path: std::path::PathBuf::from("/bin/true"),
-            }
+        fn installation(&self) -> BoxFuture<'_, Installation> {
+            Box::pin(async {
+                Installation::Available {
+                    version: None,
+                    path: std::path::PathBuf::from("/bin/true"),
+                }
+            })
         }
 
-        fn list_models(&self) -> vibevalley_runtime::oar::Result<Vec<ModelInfo>> {
-            Ok(vec![])
+        fn list_models(&self) -> BoxFuture<'_, vibevalley_runtime::oar::Result<Vec<ModelInfo>>> {
+            Box::pin(async { Ok(vec![]) })
         }
 
-        fn open(&self, _: SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn OarSession>> {
-            let (tx, rx) = flume::unbounded();
-            Ok(Arc::new(StubSession { id: "stub-1".into(), tx, rx }))
+        fn open(&self, _: SessionOptions) -> BoxFuture<'_, vibevalley_runtime::oar::Result<Arc<dyn OarSession>>> {
+            Box::pin(async {
+                let (tx, rx) = mpsc::unbounded_channel();
+                Ok(Arc::new(StubSession {
+                    id: "stub-1".into(),
+                    tx,
+                    rx: Mutex::new(Some(rx)),
+                }) as Arc<dyn OarSession>)
+            })
         }
     }
 
@@ -1785,11 +1807,11 @@ mod tests {
 
             tokio::time::pause();
 
-            let (tx, rx) = flume::unbounded();
+            let (tx, rx) = mpsc::unbounded_channel();
             let agent = Arc::new(StubSession {
                 id: "stub-quiet".into(),
                 tx: tx.clone(),
-                rx,
+                rx: Mutex::new(Some(rx)),
             });
             let mut session = Session::new(
                 "w-quiet",

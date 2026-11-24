@@ -433,9 +433,8 @@ impl Record {
 type Kept = (Option<Attachment>, Option<MediaInputReference>, Option<MediaAudioMetadata>);
 
 struct Stream {
-    tx: flume::Sender<Value>,
-    rx: flume::Receiver<Value>,
-    claimed: bool,
+    tx: tokio::sync::mpsc::Sender<Value>,
+    rx: Option<tokio::sync::mpsc::Receiver<Value>>,
 }
 
 struct KindSemaphores {
@@ -851,8 +850,8 @@ impl Media {
         }
         let body = Moss::prepare_speech(&account.model, &request.text, &request.voice, request.format.as_str()).map_err(|_| refused("speechInvalid"))?;
         if streaming {
-            let (tx, rx) = flume::bounded(16);
-            self.streams.lock().insert(request.id.clone(), Stream { tx, rx, claimed: false });
+            let (tx, rx) = tokio::sync::mpsc::channel(16);
+            self.streams.lock().insert(request.id.clone(), Stream { tx, rx: Some(rx) });
         }
         let r = Record::new(
             ask,
@@ -1312,7 +1311,7 @@ impl Media {
         tokio::select! {
             biased;
             _ = token.cancelled() => false,
-            res = tx.send_async(event) => res.is_ok(),
+            res = tx.send(event) => res.is_ok(),
         }
     }
 
@@ -1747,11 +1746,10 @@ impl crate::context::api::media::SpeechStreams for Media {
     fn claim(&self, id: &str) -> Result<crate::context::api::media::SpeechClaim, ApiError> {
         let events = {
             let mut streams = self.streams.lock();
-            let Some(s) = streams.get_mut(id).filter(|s| !s.claimed) else {
+            let Some(rx) = streams.get_mut(id).and_then(|s| s.rx.take()) else {
                 return Err(refused("speechStreamUnavailable"));
             };
-            s.claimed = true;
-            s.rx.clone()
+            rx
         };
         let me = self.me.get().cloned().unwrap_or_default();
         let job = id.to_string();
@@ -1874,8 +1872,8 @@ mod tests {
         rec.phase = Phase::Generating;
         let row = rec.to_row().unwrap();
         ctx.service.artifact.save_media_job(&row).await.unwrap();
-        let (tx, rx) = flume::bounded(16);
-        jobs.streams.lock().insert(job_id.into(), Stream { tx, rx, claimed: false });
+        let (tx, rx) = tokio::sync::mpsc::channel(16);
+        jobs.streams.lock().insert(job_id.into(), Stream { tx, rx: Some(rx) });
 
         let claim = jobs.claim(job_id).unwrap();
 

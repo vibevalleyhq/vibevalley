@@ -330,10 +330,10 @@ fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() 
     }));
     let tools = held(&s.test_internals().agent.tool, &route);
     let tool = tools.iter().find(|t| t.spec().name == "media_image_create").unwrap();
-    assert!(tool.execute(&request("asked")).is_error);
+    assert!(vibevalley_runtime::rt::block_on(tool.execute(&request("asked"))).is_error);
     assert_eq!(ok(&s, "media.job.list", Value::Null), json!([]));
     route.lock().user = true;
-    let result = tool.execute(&request("asked"));
+    let result = vibevalley_runtime::rt::block_on(tool.execute(&request("asked")));
     assert!(!result.is_error, "{}", result.text);
     let ready = wait(&s, "asked", "ready");
     assert_eq!(ready["source"], json!({"kind":"orchestrator","agent":"orchestrator","channel":channel}));
@@ -347,7 +347,7 @@ fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() 
             .count();
         (made == 1).then_some(())
     });
-    assert!(!tool.execute(&request("asked")).is_error);
+    assert!(!vibevalley_runtime::rt::block_on(tool.execute(&request("asked"))).is_error);
     s.close_blocking();
     let reopened = start(dir.path(), Backend::new("ok"));
     let messages = ok(&reopened, "channel.message.list", json!({"id":channel}));

@@ -327,7 +327,7 @@ impl vibevalley_server::gateway::bridge::Server for FailedServer {
         &self,
         slice: vibevalley_server::gateway::bridge::SliceKind,
         after_seq: Option<i64>,
-        stop: &flume::Receiver<()>,
+        stop: &tokio_util::sync::CancellationToken,
         receive: &mut dyn FnMut(i64, &Value),
     ) {
         self.feeds.feed(slice).watch_since_json(after_seq, stop, &mut |seq, json| {
@@ -340,8 +340,8 @@ impl vibevalley_server::gateway::bridge::Server for FailedServer {
         Some(self.feeds.feed(slice).subscribe())
     }
 
-    fn live(&self) -> flume::Receiver<vibevalley_server::gateway::bridge::LiveEvent> {
-        let (_tx, rx) = flume::bounded(0);
+    fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_server::gateway::bridge::LiveEvent> {
+        let (_tx, rx) = tokio::sync::mpsc::unbounded_channel();
         rx
     }
 
@@ -350,7 +350,11 @@ impl vibevalley_server::gateway::bridge::Server for FailedServer {
         Some(rx)
     }
 
-    fn subscribe(&self, _name: &str, _payload: Value) -> Result<(u64, flume::Receiver<Value>), vibevalley_server::gateway::bridge::Envelope> {
+    fn subscribe(
+        &self,
+        _name: &str,
+        _payload: Value,
+    ) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), vibevalley_server::gateway::bridge::Envelope> {
         Err(self.unavailable())
     }
 
@@ -359,7 +363,7 @@ impl vibevalley_server::gateway::bridge::Server for FailedServer {
         _ctx: &vibevalley_server::gateway::bridge::CallerContext,
         _name: &str,
         _payload: Value,
-    ) -> Result<(u64, flume::Receiver<Value>), vibevalley_server::gateway::bridge::Envelope> {
+    ) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), vibevalley_server::gateway::bridge::Envelope> {
         Err(self.unavailable())
     }
 
@@ -1314,13 +1318,13 @@ mod tests {
             fn slice_snapshot(&self, slice: SliceKind) -> Value {
                 self.inner.slice_snapshot(slice)
             }
-            fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+            fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
                 self.inner.watch_slice(slice, after_seq, stop, receive);
             }
-            fn live(&self) -> flume::Receiver<LiveEvent> {
+            fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
                 self.inner.live()
             }
-            fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+            fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
                 self.inner.subscribe(name, payload)
             }
             fn unsubscribe(&self, id: u64) {
@@ -1552,16 +1556,16 @@ mod tests {
             fn slice_snapshot(&self, slice: SliceKind) -> Value {
                 self.inner.slice_snapshot(slice)
             }
-            fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+            fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
                 self.inner.watch_slice(slice, after_seq, stop, receive);
             }
-            fn live(&self) -> flume::Receiver<vibevalley_server::gateway::bridge::LiveEvent> {
+            fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_server::gateway::bridge::LiveEvent> {
                 self.inner.live()
             }
-            fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+            fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
                 self.inner.subscribe(name, payload)
             }
-            fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+            fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
                 self.inner.subscribe_with(ctx, name, payload)
             }
             fn unsubscribe(&self, id: u64) {

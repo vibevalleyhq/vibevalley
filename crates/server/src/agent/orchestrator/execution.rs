@@ -3,7 +3,10 @@ use std::sync::{Arc, OnceLock, Weak, atomic::Ordering};
 
 use parking_lot::Mutex;
 use serde_json::{Value, json};
+use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use vibevalley_protocol::{ApiError, BizCode, OrchestratorApproval, OrchestratorApprovalResolveInput};
+use vibevalley_runtime::BoxFuture;
 use vibevalley_runtime::agent::core::engine::{BrainProvider, Request};
 use vibevalley_runtime::agent::core::pipeline::Transcript;
 use vibevalley_runtime::agent::durable::{Error, Result, Scheduler, Store, SubmissionStatus, Task, TaskStatus};
@@ -28,19 +31,26 @@ pub(super) enum EvalEntry {
 struct Bound {
     orchestrator: OnceLock<Weak<Orchestrator>>,
     store: Store,
-    listeners: Mutex<HashMap<String, flume::Sender<AgentEvent>>>,
+    listeners: Mutex<HashMap<String, mpsc::UnboundedSender<AgentEvent>>>,
 }
 
 impl BrainProvider for Bound {
-    fn resolve_brain(&self, conv: &str, provider: &str) -> Result<Option<Arc<Brain>>> {
-        let o = self.orchestrator.get().and_then(Weak::upgrade).ok_or(Error::Closed)?;
-        let route = self.store.read(|tx| Ok(tx.document("conversation", conv, "pi.route")?.map(|d| d.state)))?;
-        let route: Route = route.map(serde_json::from_value).transpose()?.unwrap_or_else(|| Route {
-            agent: conv.into(),
-            channel: o.chat.default_channel(),
-            ..Default::default()
-        });
-        Ok(Some(Arc::new(o.brain_at(conv, &Arc::new(Mutex::new(route)), provider))))
+    fn resolve_brain<'a>(&'a self, conv: &'a str, provider: &'a str) -> BoxFuture<'a, Result<Option<Arc<Brain>>>> {
+        Box::pin(async move {
+            let o = self.orchestrator.get().and_then(Weak::upgrade).ok_or(Error::Closed)?;
+            let route = self
+                .store
+                .read_with_async(conv.to_owned(), |tx, conv| {
+                    Box::pin(async move { Ok(tx.document_async("conversation", conv, "pi.route").await?.map(|d| d.state)) })
+                })
+                .await?;
+            let route: Route = route.map(serde_json::from_value).transpose()?.unwrap_or_else(|| Route {
+                agent: conv.into(),
+                channel: o.chat.default_channel(),
+                ..Default::default()
+            });
+            Ok(Some(Arc::new(o.brain_at_async(conv, &Arc::new(Mutex::new(route)), provider).await)))
+        })
     }
 
     fn observe(&self, conv: &str, _task: &str, event: AgentEvent) {
@@ -51,63 +61,53 @@ impl BrainProvider for Bound {
 }
 
 impl ReviewProvider for Bound {
-    fn review(&self, request: ReviewRequest<'_>) -> Result<Option<OutcomeReview>> {
-        let (Some(vendor), Some(run)) = (request.conversation.strip_prefix("worker:"), request.request_id.strip_prefix("work:")) else {
-            return Ok(request.explicit());
-        };
-        let o = self.orchestrator.get().and_then(Weak::upgrade).ok_or(Error::Closed)?;
-        let (tx, rx) = flume::bounded(1);
-        let vendor = vendor.to_string();
-        let run = run.to_string();
-        let candidate = request.candidate.to_string();
-        let o_task = o.clone();
-        o.ctx.spawn("orchestrator.review", async move {
-            let res: Result<Option<OutcomeReview>> = async {
-                let Some((issue, report)) = o_task
-                    .runtime
-                    .review_work_async(&vendor, &run, &candidate)
-                    .await
-                    .map_err(|e| Error::Invalid(e.to_string()))?
-                else {
-                    return Ok(None);
-                };
-                let changes = if issue.repo.is_some() {
-                    let diff = o_task.issue.diff_async(&issue.id, None).await.map_err(|e| Error::Invalid(e.message))?;
-                    Some(json!({"files": diff.files, "uncommitted": diff.uncommitted, "revision": diff.revision}))
-                } else {
-                    None
-                };
-                let artifacts = o_task
-                    .artifact
-                    .list_async(&vibevalley_protocol::ArtifactListRequest {
-                        channel: None,
-                        issue: Some(issue.id.clone()),
-                        artifact_type: None,
-                    })
-                    .await
-                    .map_err(|e| Error::Invalid(e.message))?;
-                let deliverables = json!({"report": report, "changes": changes, "artifacts": artifacts}).to_string();
-                const EVIDENCE_CHARS: usize = 16_000;
-                Ok(Some(OutcomeReview {
-                    task_prompt: format!("{}\n{}", issue.title, issue.description),
-                    rubric: Rubric {
-                        markdown: issue
-                            .criteria
-                            .iter()
-                            .filter(|v| !v.trim().is_empty())
-                            .map(|v| format!("- {v}"))
-                            .collect::<Vec<_>>()
-                            .join("\n"),
-                        max_iterations: 0,
-                    },
-                    deliverables: vibevalley_core::text::clip(&deliverables, EVIDENCE_CHARS),
-                    evidence_truncated: deliverables.chars().nth(EVIDENCE_CHARS).is_some(),
-                }))
-            }
-            .await;
-            let _ = tx.send(res);
-        });
-        rx.recv().map_err(|_| Error::Closed)?
+    fn review<'a>(&'a self, request: ReviewRequest<'a>) -> BoxFuture<'a, Result<Option<OutcomeReview>>> {
+        Box::pin(async move {
+            let (Some(vendor), Some(run)) = (request.conversation.strip_prefix("worker:"), request.request_id.strip_prefix("work:")) else {
+                return Ok(request.explicit());
+            };
+            let o = self.orchestrator.get().and_then(Weak::upgrade).ok_or(Error::Closed)?;
+            let Some((issue, report)) = o
+                .runtime
+                .review_work_async(vendor, run, request.candidate)
+                .await
+                .map_err(|e| Error::Invalid(e.to_string()))?
+            else {
+                return Ok(None);
+            };
+            let changes = if issue.repo.is_some() {
+                let diff = o.issue.diff_async(&issue.id, None).await.map_err(|e| Error::Invalid(e.message))?;
+                Some(json!({"files": diff.files, "uncommitted": diff.uncommitted, "revision": diff.revision}))
+            } else {
+                None
+            };
+            let artifacts = o
+                .artifact
+                .list_async(&vibevalley_protocol::ArtifactListRequest {
+                    channel: None,
+                    issue: Some(issue.id.clone()),
+                    artifact_type: None,
+                })
+                .await
+                .map_err(|e| Error::Invalid(e.message))?;
+            let deliverables = json!({"report": report, "changes": changes, "artifacts": artifacts}).to_string();
+            const EVIDENCE_CHARS: usize = 16_000;
+            Ok(Some(OutcomeReview {
+                task_prompt: format!("{}\n{}", issue.title, issue.description),
+                rubric: Rubric {
+                    markdown: issue
+                        .criteria
+                        .iter()
+                        .filter(|v| !v.trim().is_empty())
+                        .map(|v| format!("- {v}"))
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                    max_iterations: 0,
+                },
+                deliverables: vibevalley_core::text::clip(&deliverables, EVIDENCE_CHARS),
+                evidence_truncated: deliverables.chars().nth(EVIDENCE_CHARS).is_some(),
+            }))
+        })
     }
 }
 
@@ -141,13 +141,11 @@ impl PendingExecution {
     pub(super) fn attach(self, o: Weak<Orchestrator>) -> Execution {
         let _ = self.bound.orchestrator.set(o);
         let scheduler = self.harness.scheduler().clone();
-        let (shutdown, stopped) = flume::bounded(0);
         Execution {
             scheduler,
             harness: self.harness,
             bound: self.bound,
-            shutdown: Mutex::new(Some(shutdown)),
-            stopped,
+            shutdown: CancellationToken::new(),
         }
     }
 }
@@ -156,8 +154,7 @@ pub struct Execution {
     pub scheduler: Scheduler,
     pub harness: Harness,
     bound: Arc<Bound>,
-    shutdown: Mutex<Option<flume::Sender<()>>>,
-    stopped: flume::Receiver<()>,
+    shutdown: CancellationToken,
 }
 
 pub(super) struct TurnInput<'a> {
@@ -172,16 +169,16 @@ impl Execution {
         PendingExecution::prepare(store, permissions).attach(o)
     }
 
-    pub(super) fn close(&self) {
-        self.shutdown.lock().take();
-        self.harness.close();
+    pub(super) async fn close_async(&self) {
+        self.shutdown.cancel();
+        self.harness.close().await;
     }
 
     pub fn store(&self) -> &Store {
         self.harness.store()
     }
 
-    pub(super) fn approvals(&self, conversation: Option<&str>) -> std::result::Result<Vec<OrchestratorApproval>, ApiError> {
+    pub(super) async fn approvals_async(&self, conversation: Option<&str>) -> std::result::Result<Vec<OrchestratorApproval>, ApiError> {
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase")]
         struct PendingApproval {
@@ -202,38 +199,42 @@ impl Execution {
         if conversation.is_some_and(|id| id.trim().is_empty()) {
             return Err(ApiError::new(BizCode::InvalidInput, "conversationId must be nonempty"));
         }
+        let conv = conversation.map(str::to_owned);
         self.store()
-            .read(|tx| {
-                let documents = match conversation {
-                    Some(id) => tx.document(governance::SCOPE, id, governance::GOVERNANCE)?.into_iter().collect(),
-                    None => tx.documents_by_kind(governance::SCOPE, governance::GOVERNANCE)?,
-                };
-                let mut approvals = vec![];
-                for document in documents {
-                    let pending: Governance = serde_json::from_value(document.state)?;
-                    for (task_id, approval) in pending.pending_permissions {
-                        let task = tx.task(&task_id)?;
-                        if task.status == TaskStatus::Terminal || task.conversation_id != document.scope_id {
-                            continue;
+            .read_with_async(conv, |tx, conv| {
+                Box::pin(async move {
+                    let documents = match conv {
+                        Some(id) => tx.document_async(governance::SCOPE, id, governance::GOVERNANCE).await?.into_iter().collect(),
+                        None => tx.documents_by_kind_async(governance::SCOPE, governance::GOVERNANCE).await?,
+                    };
+                    let mut approvals = vec![];
+                    for document in documents {
+                        let pending: Governance = serde_json::from_value(document.state)?;
+                        for (task_id, approval) in pending.pending_permissions {
+                            let task = tx.task_async(&task_id).await?;
+                            if task.status == TaskStatus::Terminal || task.conversation_id != document.scope_id {
+                                continue;
+                            }
+                            approvals.push(OrchestratorApproval {
+                                conversation_id: task.conversation_id,
+                                task_id,
+                                tool_call_id: approval.tool_call_id,
+                                tool_name: approval.evaluation.tool_name,
+                                arguments_json: approval.args_json.to_string(),
+                                reason: approval.evaluation.reason,
+                                requested_at_ms: approval.requested_at_ms,
+                            });
                         }
-                        approvals.push(OrchestratorApproval {
-                            conversation_id: task.conversation_id,
-                            task_id,
-                            tool_call_id: approval.tool_call_id,
-                            tool_name: approval.evaluation.tool_name,
-                            arguments_json: approval.args_json.to_string(),
-                            reason: approval.evaluation.reason,
-                            requested_at_ms: approval.requested_at_ms,
-                        });
                     }
-                }
-                approvals.sort_by_key(|approval| approval.requested_at_ms);
-                Ok(approvals)
+                    approvals.sort_by_key(|approval| approval.requested_at_ms);
+                    Ok(approvals)
+                })
             })
+            .await
             .map_err(approval_error)
     }
 
-    pub(super) fn resolve_approval(&self, input: OrchestratorApprovalResolveInput) -> std::result::Result<(), ApiError> {
+    pub(super) async fn resolve_approval_async(&self, input: OrchestratorApprovalResolveInput) -> std::result::Result<(), ApiError> {
         if [&input.conversation_id, &input.task_id, &input.tool_call_id]
             .iter()
             .any(|id| id.trim().is_empty())
@@ -251,116 +252,160 @@ impl Execution {
                 reason: input.reason.unwrap_or_default(),
             },
         )
+        .await
         .map_err(approval_error)
     }
 
-    pub(super) fn enqueue(&self, profile: &str, input: &Input) -> Result<()> {
+    pub(super) async fn enqueue_async(&self, profile: &str, input: &Input) -> Result<()> {
         let request = input
             .messages
             .last()
             .map(|m| format!("chat:{m}"))
             .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
         let inbox = format!("inbox:{profile}");
-        self.store().write(|tx| {
-            match tx.conversation(&inbox) {
-                Err(Error::Missing(_)) => {
-                    tx.create_conversation(&inbox, "")?;
-                }
-                Err(e) => return Err(e),
-                Ok(_) => (),
-            }
-            tx.submit(&inbox, &request, "input", &serde_json::to_value(input)?, None)?;
-            Ok(())
-        })
+        let payload = serde_json::to_value(input)?;
+        self.store()
+            .write_with_async((inbox, request, payload), |tx, (inbox, request, payload)| {
+                Box::pin(async move {
+                    match tx.conversation_async(inbox).await {
+                        Err(Error::Missing(_)) => {
+                            tx.create_conversation_async(inbox, "").await?;
+                        }
+                        Err(e) => return Err(e),
+                        Ok(_) => (),
+                    }
+                    tx.submit_async(inbox, request, "input", payload, None).await?;
+                    Ok(())
+                })
+            })
+            .await
     }
 
-    pub(super) fn has_inputs(&self, id: &str) -> Result<bool> {
-        self.store().read(|tx| {
-            Ok(tx
-                .submissions(&format!("inbox:{id}"))?
-                .iter()
-                .any(|s| matches!(s.status, SubmissionStatus::Queued | SubmissionStatus::Placed)))
-        })
+    pub(super) async fn has_inputs_async(&self, id: &str) -> Result<bool> {
+        let inbox = format!("inbox:{id}");
+        self.store()
+            .read_with_async(inbox, |tx, inbox| {
+                Box::pin(async move {
+                    Ok(tx
+                        .submissions_async(inbox)
+                        .await?
+                        .iter()
+                        .any(|s| matches!(s.status, SubmissionStatus::Queued | SubmissionStatus::Placed)))
+                })
+            })
+            .await
     }
 
-    pub(super) fn batch(&self, profile: &str) -> Result<Vec<(String, Input)>> {
-        self.store().read(|tx| {
-            let subs = tx.submissions(&format!("inbox:{profile}"))?;
-            // A batch that already owns a task must be delivered before newer inputs.
-            let status = if subs.iter().any(|s| s.status == SubmissionStatus::Placed) {
-                SubmissionStatus::Placed
-            } else {
-                SubmissionStatus::Queued
-            };
-            subs.into_iter()
-                .filter(|s| s.status == status)
-                .map(|s| Ok((s.id, serde_json::from_value(s.payload)?)))
-                .collect()
-        })
+    pub(super) async fn batch_async(&self, profile: &str) -> Result<Vec<(String, Input)>> {
+        let inbox = format!("inbox:{profile}");
+        self.store()
+            .read_with_async(inbox, |tx, inbox| {
+                Box::pin(async move {
+                    let subs = tx.submissions_async(inbox).await?;
+                    // A batch that already owns a task must be delivered before newer inputs.
+                    let status = if subs.iter().any(|s| s.status == SubmissionStatus::Placed) {
+                        SubmissionStatus::Placed
+                    } else {
+                        SubmissionStatus::Queued
+                    };
+                    subs.into_iter()
+                        .filter(|s| s.status == status)
+                        .map(|s| Ok((s.id, serde_json::from_value(s.payload)?)))
+                        .collect()
+                })
+            })
+            .await
     }
 
-    pub(super) fn stop(&self, profile: &str) -> Result<()> {
-        let tasks = self.store().read(|tx| tx.tasks_by_conversation(profile))?;
+    pub(super) async fn stop_async(&self, profile: &str) -> Result<()> {
+        let conv = profile.to_owned();
+        let tasks = self
+            .store()
+            .read_with_async(conv, |tx, conv| Box::pin(tx.tasks_by_conversation_async(conv)))
+            .await?;
         for t in tasks.into_iter().filter(|t| t.kind == generation_kind() && t.status != TaskStatus::Terminal) {
-            self.scheduler.abort(&t.id)?;
+            self.scheduler.abort(&t.id).await?;
         }
-        let ids = self.store().read(|tx| {
-            Ok(tx
-                .submissions(&format!("inbox:{profile}"))?
-                .into_iter()
-                .filter(|s| s.status == SubmissionStatus::Queued)
-                .map(|s| s.id)
-                .collect::<Vec<_>>())
-        })?;
-        self.finish_inputs(&ids, false, &json!({"error":"stopped"}))
+        let inbox = format!("inbox:{profile}");
+        let ids = self
+            .store()
+            .read_with_async(inbox, |tx, inbox| {
+                Box::pin(async move {
+                    Ok(tx
+                        .submissions_async(inbox)
+                        .await?
+                        .into_iter()
+                        .filter(|s| s.status == SubmissionStatus::Queued)
+                        .map(|s| s.id)
+                        .collect::<Vec<_>>())
+                })
+            })
+            .await?;
+        self.finish_inputs_async(&ids, false, &json!({"error":"stopped"})).await
     }
 
-    pub(super) fn finish_inputs(&self, ids: &[String], ok: bool, result: &Value) -> Result<()> {
-        self.store().write(|tx| {
-            for id in ids {
-                tx.settle(id, if ok { SubmissionStatus::Done } else { SubmissionStatus::Unanswered }, result)?;
-            }
-            Ok(())
-        })
+    pub(super) async fn finish_inputs_async(&self, ids: &[String], ok: bool, result: &Value) -> Result<()> {
+        let ids = ids.to_vec();
+        let result = result.clone();
+        self.store()
+            .write_with_async((ids, result), |tx, (ids, result)| {
+                Box::pin(async move {
+                    for id in ids {
+                        tx.settle_async(id, if ok { SubmissionStatus::Done } else { SubmissionStatus::Unanswered }, result)
+                            .await?;
+                    }
+                    Ok(())
+                })
+            })
+            .await
     }
 
     pub(super) async fn run_async(&self, run: &mut Run<'_>, input: TurnInput<'_>) -> vibevalley_runtime::agent::Result<TurnOutcome> {
         let id = run.me.id.clone();
-        let (send, events) = flume::unbounded();
+        let (send, mut events) = mpsc::unbounded_channel();
         self.bound.listeners.lock().insert(id.clone(), send);
-        let result = self.dispatch_async(run, &input, &events).await;
+        let result = self.dispatch_async(run, &input, &mut events).await;
         self.bound.listeners.lock().remove(&id);
         result.map_err(|e| BrainError::Store(e.to_string()))
     }
 
-    async fn dispatch_async(&self, run: &mut Run<'_>, input: &TurnInput<'_>, events: &flume::Receiver<AgentEvent>) -> Result<TurnOutcome> {
+    async fn dispatch_async(&self, run: &mut Run<'_>, input: &TurnInput<'_>, events: &mut mpsc::UnboundedReceiver<AgentEvent>) -> Result<TurnOutcome> {
         let conv = &run.me.id;
         let turn = format!("turn:{}", input.requests[0]);
         let brain = self
             .bound
-            .resolve_brain(conv, input.model)?
+            .resolve_brain(conv, input.model)
+            .await?
             .ok_or_else(|| Error::Invalid("orchestrator brain unavailable".into()))?;
         let trusted = input.batch.iter().filter(|i| i.user).map(|i| i.line.as_str()).collect::<Vec<_>>().join("\n");
-        let changes = self.store().subscribe_tasks()?;
-        let (sub, task, _) = self.harness.submit_with(
-            Request {
-                conversation: conv,
-                provider: input.model,
-                request_id: &turn,
-                prompt: input.text,
-                system: &brain.system,
-                source: if trusted.is_empty() { "agent" } else { "user" },
-                trusted_intent: Some(&trusted),
-                ..Default::default()
-            },
-            |tx, _| {
-                for id in input.requests {
-                    tx.set_submission_status(id, SubmissionStatus::Placed)?;
-                }
-                tx.put_document("conversation", conv, "pi.route", &serde_json::to_value(run.route)?)?;
-                Ok(())
-            },
-        )?;
+        let mut changes = self.store().subscribe_tasks()?;
+        let requests: Vec<String> = input.requests.to_vec();
+        let conv_owned = conv.clone();
+        let route_val = serde_json::to_value(run.route)?;
+        let (sub, task, _) = self
+            .harness
+            .submit_with(
+                Request {
+                    conversation: conv,
+                    provider: input.model,
+                    request_id: &turn,
+                    prompt: input.text,
+                    system: &brain.system,
+                    source: if trusted.is_empty() { "agent" } else { "user" },
+                    trusted_intent: Some(&trusted),
+                    ..Default::default()
+                },
+                move |tx, _| {
+                    Box::pin(async move {
+                        for id in &requests {
+                            tx.set_submission_status_async(id, SubmissionStatus::Placed).await?;
+                        }
+                        tx.put_document_async("conversation", &conv_owned, "pi.route", &route_val).await?;
+                        Ok(())
+                    })
+                },
+            )
+            .await?;
         run.durable = true;
         let task = loop {
             if run.o.closed.load(Ordering::Acquire) {
@@ -369,15 +414,16 @@ impl Execution {
             while let Ok(e) = events.try_recv() {
                 run.on_async(e).await;
             }
-            let current = self.store().read(|tx| tx.task(&task.id))?;
+            let tid = task.id.clone();
+            let current = self.store().read_with_async(tid, |tx, tid| Box::pin(tx.task_async(tid))).await?;
             if current.status == TaskStatus::Terminal {
                 break current;
             }
             let ev = tokio::select! {
                 biased;
-                _ = self.stopped.recv_async() => None,
-                ev = events.recv_async() => ev.ok(),
-                _ = changes.recv_async() => None,
+                _ = self.shutdown.cancelled() => None,
+                ev = events.recv() => ev,
+                _ = changes.recv() => None,
             };
             if let Some(e) = ev {
                 run.on_async(e).await;
@@ -393,13 +439,16 @@ impl Execution {
             json!({"error":task.error_text,"reason":task.terminal_reason})
         };
         if !ok {
-            self.store().write(|tx| {
-                tx.settle(&sub.id, SubmissionStatus::Unanswered, &payload)?;
-                Ok(())
-            })?;
+            let sub_id = sub.id.clone();
+            let p = payload.clone();
+            self.store()
+                .write_with_async((sub_id, p), |tx, (sub_id, p)| {
+                    Box::pin(tx.settle_async(sub_id, SubmissionStatus::Unanswered, p))
+                })
+                .await?;
         }
         self.publish_async(run, &task).await?;
-        self.finish_inputs(input.requests, ok, &payload)?;
+        self.finish_inputs_async(input.requests, ok, &payload).await?;
         if ok {
             Ok(TurnOutcome::Completed)
         } else if task.terminal_reason == "aborted" {
@@ -410,13 +459,21 @@ impl Execution {
     }
 
     async fn publish_async(&self, run: &Run<'_>, task: &Task) -> Result<()> {
-        let replies = self.store().read(|tx| {
-            Ok(tx
-                .entries(&task.conversation_id, 1)?
-                .into_iter()
-                .filter(|e| e.kind == "pi.assistant" && e.payload["generationTask"] == task.id)
-                .collect::<Vec<_>>())
-        })?;
+        let conv = task.conversation_id.clone();
+        let task_id = task.id.clone();
+        let replies = self
+            .store()
+            .read_with_async((conv, task_id), |tx, (conv, task_id)| {
+                Box::pin(async move {
+                    Ok(tx
+                        .entries_async(conv, 1)
+                        .await?
+                        .into_iter()
+                        .filter(|e| e.kind == "pi.assistant" && e.payload["generationTask"] == *task_id)
+                        .collect::<Vec<_>>())
+                })
+            })
+            .await?;
         for e in replies {
             let Some(text) = e.payload["text"].as_str().filter(|s| !s.trim().is_empty()) else {
                 continue;
@@ -438,31 +495,36 @@ impl Execution {
         Ok(())
     }
 
-    pub(super) fn entries(&self, profile: &str) -> Result<Vec<EvalEntry>> {
-        self.store().read(|tx| {
-            let mut out = vec![];
-            for e in tx.entries(profile, 1)? {
-                match e.kind.as_str() {
-                    "pi.user" => out.push(EvalEntry::TurnStarted {
-                        input: e.payload["text"].as_str().unwrap_or_default().into(),
-                    }),
-                    "pi.assistant" | "pi.tool_result" => {
-                        let tr = Transcript {
-                            conversation_id: profile.into(),
-                            provider_affinity: String::new(),
-                            entries: vec![e],
-                            prefix_hash: String::new(),
-                        };
-                        out.extend(tr.messages().into_iter().map(EvalEntry::Message));
+    pub(super) async fn entries_async(&self, profile: &str) -> Result<Vec<EvalEntry>> {
+        let conv = profile.to_owned();
+        self.store()
+            .read_with_async(conv, |tx, conv| {
+                Box::pin(async move {
+                    let mut out = vec![];
+                    for e in tx.entries_async(conv, 1).await? {
+                        match e.kind.as_str() {
+                            "pi.user" => out.push(EvalEntry::TurnStarted {
+                                input: e.payload["text"].as_str().unwrap_or_default().into(),
+                            }),
+                            "pi.assistant" | "pi.tool_result" => {
+                                let tr = Transcript {
+                                    conversation_id: conv.into(),
+                                    provider_affinity: String::new(),
+                                    entries: vec![e],
+                                    prefix_hash: String::new(),
+                                };
+                                out.extend(tr.messages().into_iter().map(EvalEntry::Message));
+                            }
+                            "pi.compaction" => out.push(EvalEntry::Compacted {
+                                summary: e.payload["summary"].as_str().unwrap_or_default().into(),
+                            }),
+                            _ => (),
+                        }
                     }
-                    "pi.compaction" => out.push(EvalEntry::Compacted {
-                        summary: e.payload["summary"].as_str().unwrap_or_default().into(),
-                    }),
-                    _ => (),
-                }
-            }
-            Ok(out)
-        })
+                    Ok(out)
+                })
+            })
+            .await
     }
 }
 

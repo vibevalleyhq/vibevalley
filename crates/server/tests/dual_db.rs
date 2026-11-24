@@ -456,15 +456,16 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     assert_eq!(whoami["data"]["device"]["id"], device_id);
 
     // 13. durable store sharing the same Database backend
-    let durable = started.test_internals().service.database().durable().unwrap();
-    durable
-        .write(|tx| {
-            tx.create_conversation("dual-conv", "deepseek-flash")?;
-            tx.append_entry("dual-conv", "pi.user", &json!({ "msg": "dual-db" }))?;
-            tx.put_document("dual", "e2e", "state", &json!({ "ok": true }))?;
+    let durable = vibevalley_runtime::rt::block_on(started.test_internals().service.database().durable()).unwrap();
+    vibevalley_runtime::rt::block_on(durable.write_async(|tx| {
+        Box::pin(async move {
+            tx.create_conversation_async("dual-conv", "deepseek-flash").await?;
+            tx.append_entry_async("dual-conv", "pi.user", &json!({ "msg": "dual-db" })).await?;
+            tx.put_document_async("dual", "e2e", "state", &json!({ "ok": true })).await?;
             Ok(())
         })
-        .unwrap();
+    }))
+    .unwrap();
     drop(durable);
 
     // Verify slice feed snapshot works before shutdown.
@@ -528,10 +529,12 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
             .any(|d| d["id"] == device_id && d["name"] == "DualDB CLI")
     );
 
-    let durable2 = reopened.test_internals().service.database().durable().unwrap();
-    let doc = durable2.read(|rd| rd.document("dual", "e2e", "state")).unwrap().unwrap();
+    let durable2 = vibevalley_runtime::rt::block_on(reopened.test_internals().service.database().durable()).unwrap();
+    let doc = vibevalley_runtime::rt::block_on(durable2.read_async(|rd| Box::pin(rd.document_async("dual", "e2e", "state"))))
+        .unwrap()
+        .unwrap();
     assert_eq!(doc.state, json!({ "ok": true }));
-    let entries2 = durable2.read(|rd| rd.entries("dual-conv", 0)).unwrap();
+    let entries2 = vibevalley_runtime::rt::block_on(durable2.read_async(|rd| Box::pin(rd.entries_async("dual-conv", 0)))).unwrap();
     assert_eq!(entries2.len(), 1);
     drop(durable2);
 

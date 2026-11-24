@@ -519,27 +519,33 @@ impl vibevalley_runtime::oar::Runtime for Metered {
     fn capabilities(&self) -> vibevalley_runtime::oar::Capabilities {
         self.inner.capabilities()
     }
-    fn installation(&self) -> vibevalley_runtime::oar::Installation {
+    fn installation(&self) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Installation> {
         self.inner.installation()
     }
-    fn list_models(&self) -> vibevalley_runtime::oar::Result<Vec<vibevalley_runtime::oar::ModelInfo>> {
+    fn list_models(&self) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<Vec<vibevalley_runtime::oar::ModelInfo>>> {
         self.inner.list_models()
     }
-    fn open(&self, opts: vibevalley_runtime::oar::SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn vibevalley_runtime::oar::Session>> {
+    fn open(
+        &self,
+        opts: vibevalley_runtime::oar::SessionOptions,
+    ) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<Arc<dyn vibevalley_runtime::oar::Session>>> {
         self.inner.open(opts)
     }
-    fn account_usage(&self) -> vibevalley_runtime::oar::Result<vibevalley_runtime::oar::AccountUsage> {
-        Ok(vibevalley_runtime::oar::AccountUsage::Available {
-            plan: Some("max".into()),
-            email: None,
-            rate_limited: false,
-            windows: vec![vibevalley_runtime::oar::UsageWindow {
-                label: "5h".into(),
-                used_ratio: *self.used.lock().unwrap(),
-                resets_at: None,
-                id: None,
-                duration_ms: None,
-            }],
+    fn account_usage(&self) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<vibevalley_runtime::oar::AccountUsage>> {
+        let used = *self.used.lock().unwrap();
+        Box::pin(async move {
+            Ok(vibevalley_runtime::oar::AccountUsage::Available {
+                plan: Some("max".into()),
+                email: None,
+                rate_limited: false,
+                windows: vec![vibevalley_runtime::oar::UsageWindow {
+                    label: "5h".into(),
+                    used_ratio: used,
+                    resets_at: None,
+                    id: None,
+                    duration_ms: None,
+                }],
+            })
         })
     }
 }

@@ -60,7 +60,7 @@ pub struct DebugStateSnapshot {
 pub trait DebugDataSource: Send + Sync {
     fn trajectory_events(&self, session_id: &str) -> Vec<SessionEvent>;
     fn open_trajectory_ids(&self) -> Vec<String>;
-    fn system_prompt(&self, session_id: &str, kind: DebugTrajectoryKind) -> Option<String>;
+    fn system_prompt_async<'a>(&'a self, session_id: &'a str, kind: DebugTrajectoryKind) -> BoxFuture<'a, Option<String>>;
     fn runtime_probe(&self) -> RuntimeProbeSnapshot;
     fn state_snapshot_async(&self) -> BoxFuture<'_, DebugStateSnapshot>;
 }
@@ -78,8 +78,8 @@ impl DebugDataSource for EmptyDebugDataSource {
         vec![]
     }
 
-    fn system_prompt(&self, _session_id: &str, _kind: DebugTrajectoryKind) -> Option<String> {
-        None
+    fn system_prompt_async<'a>(&'a self, _session_id: &'a str, _kind: DebugTrajectoryKind) -> BoxFuture<'a, Option<String>> {
+        Box::pin(async { None })
     }
 
     fn runtime_probe(&self) -> RuntimeProbeSnapshot {

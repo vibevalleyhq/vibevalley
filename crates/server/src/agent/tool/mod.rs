@@ -371,22 +371,17 @@ impl vibevalley_runtime::agent::Tool for Held {
         self.tool.replay_safe()
     }
 
-    fn execute(&self, args: &Value) -> vibevalley_runtime::agent::ToolOutput {
+    fn execute<'a>(&'a self, args: &'a Value) -> vibevalley_runtime::BoxFuture<'a, vibevalley_runtime::agent::ToolOutput> {
         let tool = self.tool.clone();
         let tools = self.tools.clone();
         let route = self.route.lock().clone();
         let raw_json = args.to_string();
-        let (tx, rx) = flume::bounded(1);
-        let ctx = tools.ctx.clone();
-        ctx.spawn("agent.tool.execute", async move {
-            let res = tool.run_async(&tools, &Who::Orchestrator(route), &raw_json).await;
-            let _ = tx.send(res);
-        });
-        match rx.recv() {
-            Ok(Ok(text)) => vibevalley_runtime::agent::ToolOutput::ok(text),
-            Ok(Err(why)) => vibevalley_runtime::agent::ToolOutput::error(why),
-            Err(_) => vibevalley_runtime::agent::ToolOutput::error("tool task cancelled"),
-        }
+        Box::pin(async move {
+            match tool.run_async(&tools, &Who::Orchestrator(route), &raw_json).await {
+                Ok(text) => vibevalley_runtime::agent::ToolOutput::ok(text),
+                Err(why) => vibevalley_runtime::agent::ToolOutput::error(why),
+            }
+        })
     }
 }
 

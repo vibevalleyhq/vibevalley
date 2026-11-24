@@ -370,7 +370,11 @@ impl Scheduler {
             .await;
         }
         let agent = self.chat.as_ref().map(|chat| chat.orchestrator_in(&channel)).unwrap_or_default();
-        if o.hear_cron(&agent, &channel, words) { Ok(()) } else { Err(unserved()) }
+        if o.hear_cron(&agent, &channel, words).await {
+            Ok(())
+        } else {
+            Err(unserved())
+        }
     }
 
     /// `scheduled_async`: the issue the cron owns, started, reopened or told;
@@ -487,9 +491,9 @@ mod tests {
     }
 
     impl CronOrchestratorPort for CountingOrchestrator {
-        fn hear_cron(&self, _agent: &str, _channel: &str, _words: &str) -> bool {
+        fn hear_cron<'a>(&'a self, _agent: &'a str, _channel: &'a str, _words: &'a str) -> crate::BoxFuture<'a, bool> {
             self.heard.fetch_add(1, Ordering::SeqCst);
-            true
+            Box::pin(std::future::ready(true))
         }
     }
 

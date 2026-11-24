@@ -98,7 +98,11 @@ fn block_on_park<F: Future>(future: F) -> F::Output {
 pub fn block_on<F: Future>(future: F) -> F::Output {
     match Handle::try_current() {
         Err(_) => handle().block_on(future),
-        Ok(current) if current.runtime_flavor() == RuntimeFlavor::MultiThread => tokio::task::block_in_place(|| handle().block_on(future)),
+        Ok(current) if current.runtime_flavor() == RuntimeFlavor::MultiThread =>
+        {
+            #[allow(clippy::disallowed_methods, reason = "central sync-to-async boundary helper entering the shared runtime")]
+            tokio::task::block_in_place(|| handle().block_on(future))
+        }
         // Current-thread runtimes panic on `block_in_place`; entering the shared runtime lets its workers drive Tokio I/O and timers.
         Ok(_) => {
             let _guard = handle().enter();

@@ -643,12 +643,14 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
         .expect("resolve gpu-ctrl/codex");
 
     let rt_thread = std::thread::spawn(move || {
-        let sess = rt.open(SessionOptions::default()).unwrap();
-        sess.steer(vec![ContentBlock::Text("focus tests".into())]).unwrap();
-        sess.queue(vec![ContentBlock::Text("then lint".into())]).unwrap();
-        sess.set_config(Some("o3"), Some("high"), None).unwrap();
-        sess.abort().unwrap();
-        sess.dispose();
+        vibevalley_runtime::rt::block_on(async move {
+            let sess = rt.open(SessionOptions::default()).await.unwrap();
+            sess.steer(vec![ContentBlock::Text("focus tests".into())]).await.unwrap();
+            sess.queue(vec![ContentBlock::Text("then lint".into())]).await.unwrap();
+            sess.set_config(Some("o3"), Some("high"), None).await.unwrap();
+            sess.abort().await.unwrap();
+            sess.dispose().await;
+        });
     });
 
     vibevalley_runtime::rt::block_on(async {

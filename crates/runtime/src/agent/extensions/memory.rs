@@ -12,9 +12,9 @@ use crate::agent::core::tool::{ReplayPolicy, Tool, ToolContext, TypedTool, Typed
 /// none); `remember` and `rewrite` report errors.
 pub trait MemoryPort: Send + Sync {
     fn prompt(&self) -> String;
-    fn remember(&self, note: &str) -> Result<(), String>;
+    fn remember<'a>(&'a self, note: &'a str) -> BoxFuture<'a, Result<(), String>>;
     /// Returns the new line count.
-    fn rewrite(&self, content: &str) -> Result<usize, String>;
+    fn rewrite<'a>(&'a self, content: &'a str) -> BoxFuture<'a, Result<usize, String>>;
 }
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -60,7 +60,7 @@ impl TypedTool for Remember {
             if args.note.trim().is_empty() {
                 return Err("note 是空的。".into());
             }
-            self.0.remember(&args.note)?;
+            self.0.remember(&args.note).await?;
             Ok(TypedToolOutput::ok_with("记下了。", MemoryDetails { lines: None }))
         })
     }
@@ -87,7 +87,7 @@ impl TypedTool for RewriteMemory {
             if ctx.cancel.is_cancelled() {
                 return Err("aborted by the user".into());
             }
-            let n = self.0.rewrite(&args.content)?;
+            let n = self.0.rewrite(&args.content).await?;
             Ok(TypedToolOutput::ok_with(format!("重写好了，现在 {n} 行。"), MemoryDetails { lines: Some(n) }))
         })
     }

@@ -138,7 +138,7 @@ pub(super) async fn speech(State(state): State<HttpState>, _local: LocalOnly, Pa
         Err(e) => return reply(Envelope::failure(&e)),
     };
     let gone = Gone(Some(claim.gone));
-    let lines = claim.events.into_stream().map(move |event| {
+    let lines = tokio_stream::wrappers::ReceiverStream::new(claim.events).map(move |event| {
         let _keep = &gone;
         Ok::<_, std::convert::Infallible>(axum::body::Bytes::from(format!("{event}\n")))
     });

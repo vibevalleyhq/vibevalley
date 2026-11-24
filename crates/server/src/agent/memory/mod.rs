@@ -39,16 +39,6 @@ fn refused(text: String) -> ApiError {
     ApiError::new(BizCode::MemoryRefused, text)
 }
 
-/// Bridges the synchronous `MemoryPort` trait called on runtime OS worker threads
-/// onto the global Tokio runtime without blocking a Tokio worker.
-fn run_sync_port<T: Send + 'static>(future: impl std::future::Future<Output = T> + Send + 'static) -> T {
-    let (tx, rx) = flume::bounded(1);
-    vibevalley_runtime::rt::handle().spawn(async move {
-        let _ = tx.send(future.await);
-    });
-    rx.recv().expect("memory port task cancelled")
-}
-
 /// Who writes a note: the user, an orchestrator, or a session (kept with it).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum By {
@@ -390,12 +380,25 @@ impl Memory {
     }
 
     /// An agent's notes as its prompt carries them (`forAgent`'s port).
-    pub fn port(self: &Arc<Self>, agent: &str, by: By) -> Arc<dyn vibevalley_runtime::agent::extensions::memory::MemoryPort> {
+    pub async fn port_async(self: &Arc<Self>, agent: &str, by: By) -> Arc<dyn vibevalley_runtime::agent::extensions::memory::MemoryPort> {
+        let cached = Self::render_prompt(self, agent).await;
         Arc::new(AgentMemory {
             store: self.clone(),
             agent: agent.into(),
             by,
+            cached_prompt: parking_lot::RwLock::new(cached),
         })
+    }
+
+    async fn render_prompt(&self, agent: &str) -> String {
+        let notes = self.list_async(agent).await.unwrap_or_default();
+        let lines: Vec<String> = notes
+            .iter()
+            .rev()
+            .filter(|n| n.kind == m::MemoryKind::Note)
+            .map(|n| format!("{}{}", if n.author == m::ActorKind::User { m::FROM_USER } else { "" }, n.text))
+            .collect();
+        m::carried_memory(&lines)
     }
 
     pub async fn keep_session_reported_async(&self, session: &Session) {
@@ -526,41 +529,33 @@ struct AgentMemory {
     store: Arc<Memory>,
     agent: String,
     by: By,
+    cached_prompt: parking_lot::RwLock<String>,
 }
 
 impl vibevalley_runtime::agent::extensions::memory::MemoryPort for AgentMemory {
     fn prompt(&self) -> String {
-        let store = self.store.clone();
-        let agent = self.agent.clone();
-        let notes = run_sync_port(async move { store.list_async(&agent).await.unwrap_or_default() });
-        let lines: Vec<String> = notes
-            .iter()
-            .rev()
-            .filter(|n| n.kind == m::MemoryKind::Note)
-            .map(|n| format!("{}{}", if n.author == m::ActorKind::User { m::FROM_USER } else { "" }, n.text))
-            .collect();
-        m::carried_memory(&lines)
+        self.cached_prompt.read().clone()
     }
 
-    fn remember(&self, note: &str) -> Result<(), String> {
-        let store = self.store.clone();
-        let note = Note {
-            agent: self.agent.clone(),
-            text: note.into(),
-            repo: String::new(),
-            by: self.by.clone(),
-        };
-        run_sync_port(async move { store.write_async(&note).await.map(|_| ()).map_err(|e| e.message) })
+    fn remember<'a>(&'a self, note: &'a str) -> BoxFuture<'a, Result<(), String>> {
+        Box::pin(async move {
+            let note = Note {
+                agent: self.agent.clone(),
+                text: note.into(),
+                repo: String::new(),
+                by: self.by.clone(),
+            };
+            self.store.write_async(&note).await.map(|_| ()).map_err(|e| e.message)?;
+            *self.cached_prompt.write() = self.store.render_prompt(&self.agent).await;
+            Ok(())
+        })
     }
 
-    fn rewrite(&self, content: &str) -> Result<usize, String> {
-        let store = self.store.clone();
-        let agent = self.agent.clone();
-        let by = self.by.clone();
-        let content = content.to_string();
-        run_sync_port(async move {
-            let users: HashSet<String> = store
-                .list_async(&agent)
+    fn rewrite<'a>(&'a self, content: &'a str) -> BoxFuture<'a, Result<usize, String>> {
+        Box::pin(async move {
+            let users: HashSet<String> = self
+                .store
+                .list_async(&self.agent)
                 .await
                 .map_err(|e| e.message)?
                 .into_iter()
@@ -573,7 +568,9 @@ impl vibevalley_runtime::agent::extensions::memory::MemoryPort for AgentMemory {
                 .filter(|l| !l.is_empty())
                 .filter(|l| !users.contains(l) && !l.strip_prefix(m::FROM_USER).is_some_and(|rest| users.contains(rest.trim())))
                 .collect();
-            store.rewrite_async(&agent, &notes, by).await.map_err(|e| e.message)
+            let lines = self.store.rewrite_async(&self.agent, &notes, self.by.clone()).await.map_err(|e| e.message)?;
+            *self.cached_prompt.write() = self.store.render_prompt(&self.agent).await;
+            Ok(lines)
         })
     }
 }

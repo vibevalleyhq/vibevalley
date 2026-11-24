@@ -58,8 +58,8 @@ pub trait Server: Send + Sync + 'static {
     }
     /// Watches one domain slice with Bounded-1 coalescing.
     /// If `after_seq == Some(latest_seq)`, skips the initial send; otherwise
-    /// delivers the latest snapshot immediately. Blocks until `stop` disconnects.
-    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value));
+    /// delivers the latest snapshot immediately. Blocks until `stop` cancels.
+    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, receive: &mut dyn FnMut(i64, &Value));
     /// Optional asynchronous readiness hook for proxies that finish startup
     /// off-thread (such as desktop `LateServer`). Returning `None` indicates
     /// the server is immediately ready for [`Self::subscribe_slice`] and
@@ -81,7 +81,7 @@ pub trait Server: Send + Sync + 'static {
         None
     }
     /// `LiveEvent`s from now on; a new receiver per call.
-    fn live(&self) -> flume::Receiver<LiveEvent>;
+    fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent>;
     /// Broadcast subscription for `LiveEvent`s when backed by a broadcast ring
     /// buffer, allowing SSE and bridge consumers to stream directly.
     fn subscribe_live(&self) -> Option<tokio::sync::broadcast::Receiver<LiveEvent>> {
@@ -90,10 +90,10 @@ pub trait Server: Send + Sync + 'static {
     /// One of `api.ts`'s subscriptions. `Err` is a refusal before the first
     /// event. The stream ends when the server drops its sender.
     #[allow(clippy::result_large_err, reason = "the approved contract returns the refusal envelope itself")]
-    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope>;
+    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope>;
     /// Subscription invocation carrying caller identity and principal for `can` RBAC enforcement.
     #[allow(clippy::result_large_err, reason = "the approved contract returns the refusal envelope itself")]
-    fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+    fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
         let _ = ctx;
         self.subscribe(name, payload)
     }
@@ -104,7 +104,7 @@ pub trait Server: Send + Sync + 'static {
         ctx: CallerContext,
         name: String,
         payload: Value,
-    ) -> BoxFuture<'static, Result<(u64, flume::Receiver<Value>), Envelope>> {
+    ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope>> {
         use std::sync::atomic::{AtomicBool, Ordering};
         Box::pin(async move {
             struct CancelFlag(Arc<AtomicBool>);
@@ -274,7 +274,7 @@ pub(crate) async fn open_subscription_channel<F, Fut>(
     name: &str,
     payload: Value,
     open_domain: F,
-) -> Result<(u64, flume::Receiver<Value>), Envelope>
+) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope>
 where
     F: FnOnce(DomainSubscription, crate::context::Sink) -> Fut,
     Fut: std::future::Future<Output = Result<(), ApiError>>,
@@ -301,15 +301,15 @@ where
         "issue.watch" => sub!(IssueWatch),
         other => return Err(refusal(BizCode::RouteNotFound, format!("no subscription {other}"))),
     };
-    let (events, rx) = flume::unbounded();
-    let (stop_tx, stop) = flume::bounded(1);
+    let (events, rx) = tokio::sync::mpsc::unbounded_channel();
+    let stop = tokio_util::sync::CancellationToken::new();
     let id = gw.subs.next_id.fetch_add(1, Ordering::Relaxed);
-    let sink = crate::context::Sink { events, stop };
+    let sink = crate::context::Sink { events, stop: stop.clone() };
     if let Err(err) = open_domain(domain_sub, sink).await {
         return Err(Envelope::failure(&err));
     }
     let mut active = gw.subs.active.lock();
-    active.insert(id, stop_tx);
+    active.insert(id, stop);
     gw.subs.count.store(active.len(), Ordering::Release);
     Ok((id, rx))
 }
@@ -323,7 +323,7 @@ pub(crate) fn watch_slice_value(
     fault_gate: Option<&SharedFaultGate>,
     slice: SliceKind,
     after_seq: Option<i64>,
-    stop: &flume::Receiver<()>,
+    stop: &tokio_util::sync::CancellationToken,
     receive: &mut dyn FnMut(i64, &Value),
 ) {
     ctx.feed.feed(slice).watch_since_json_with_gate(after_seq, fault_gate, stop, &mut |seq, json| {
@@ -361,7 +361,7 @@ where
 
 #[derive(Default)]
 pub(crate) struct SubscriptionRegistry {
-    pub(crate) active: parking_lot::Mutex<std::collections::HashMap<u64, flume::Sender<()>>>,
+    pub(crate) active: parking_lot::Mutex<std::collections::HashMap<u64, tokio_util::sync::CancellationToken>>,
     pub(crate) next_id: std::sync::atomic::AtomicU64,
     pub(crate) count: Arc<std::sync::atomic::AtomicUsize>,
 }
@@ -380,12 +380,18 @@ impl SubscriptionRegistry {
     pub(crate) fn close_all(&self) {
         let a = std::mem::take(&mut *self.active.lock());
         self.count.store(0, std::sync::atomic::Ordering::Release);
-        drop(a);
+        for token in a.into_values() {
+            token.cancel();
+        }
     }
     pub(crate) fn remove(&self, id: u64) {
         let mut a = self.active.lock();
-        a.remove(&id);
+        let removed = a.remove(&id);
         self.count.store(a.len(), std::sync::atomic::Ordering::Release);
+        drop(a);
+        if let Some(token) = removed {
+            token.cancel();
+        }
     }
 }
 

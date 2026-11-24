@@ -172,7 +172,7 @@ async fn create_app_inner(config: Config) -> Result<App, StartError> {
         .await
         .map_err(|e| failed("the storage")(&e.message))?;
 
-    let durable_store = ctx.service.durable().map_err(|e| failed("durable execution")(&e))?;
+    let durable_store = ctx.service.durable().await.map_err(|e| failed("durable execution")(&e))?;
     let pending_execution = PendingExecution::prepare(durable_store, config.tool_permissions.clone());
     let shared_execution = pending_execution.shared();
     let registry = config
@@ -293,7 +293,7 @@ async fn create_app_inner(config: Config) -> Result<App, StartError> {
     }))
     .await
     .map_err(|e| failed("durable execution")(&e))?;
-    orchestrator.start_inbox_observer().map_err(|e| failed("durable projection")(&e))?;
+    orchestrator.start_inbox_observer().await.map_err(|e| failed("durable projection")(&e))?;
     if config.orchestrator_listens {
         let _ = cron_orch_slot.set(orchestrator.clone() as Arc<dyn CronOrchestratorPort>);
     }

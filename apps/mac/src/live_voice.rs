@@ -215,7 +215,7 @@ async fn run(voice: SharedLiveVoice, cancel: CancellationToken) -> Result<(), St
             socket,
             SessionMessages {
                 update: line.session_update(),
-                outgoing: line.outgoing(),
+                outgoing: line.take_outgoing().ok_or("MOSS outgoing channel already taken")?,
                 cancel: cancel.clone(),
             },
             NativeAudio { _lease: audio },
@@ -321,7 +321,7 @@ struct Playing {
 
 struct SessionMessages {
     update: String,
-    outgoing: flume::Receiver<String>,
+    outgoing: tokio::sync::mpsc::UnboundedReceiver<String>,
     cancel: CancellationToken,
 }
 
@@ -339,7 +339,7 @@ where
         + Unpin,
 {
     let mut audio = HeldAudio(audio);
-    let SessionMessages { update, outgoing, cancel } = messages;
+    let SessionMessages { update, mut outgoing, cancel } = messages;
     let (mut writer, mut reader) = socket.split();
     async fn send<S>(writer: &mut S, cancel: &CancellationToken, message: Message) -> Result<(), WireError>
     where
@@ -445,8 +445,8 @@ where
                 Some(Ok(Message::Close(_))) | None => return Ok(()),
                 Some(Err(_)) => return Err("MOSS connection failed".into()),
             },
-            frame = outgoing.recv_async(), if handshake == Handshake::Live => {
-                if let Ok(frame) = frame { send(&mut writer, &cancel, Message::text(frame)).await?; }
+            frame = outgoing.recv(), if handshake == Handshake::Live => {
+                if let Some(frame) = frame { send(&mut writer, &cancel, Message::text(frame)).await?; }
             }
             _ = tick.tick(), if handshake == Handshake::Live => {
                 let is_muted = muted();
@@ -588,7 +588,7 @@ mod tests {
         });
         let (socket, _) = tokio_tungstenite::connect_async(format!("ws://{address}")).await.unwrap();
         let cancel = CancellationToken::new();
-        let (_out, outgoing) = flume::bounded(1);
+        let (_out, outgoing) = tokio::sync::mpsc::unbounded_channel();
         session(
             socket,
             SessionMessages {
@@ -628,7 +628,7 @@ mod tests {
         });
         let (socket, _) = tokio_tungstenite::connect_async(format!("ws://{address}")).await.unwrap();
         let cancel = CancellationToken::new();
-        let (_out, outgoing) = flume::bounded(1);
+        let (_out, outgoing) = tokio::sync::mpsc::unbounded_channel();
         let probe = Arc::new(Probe::default());
         let result = session(
             socket,
@@ -698,7 +698,7 @@ mod tests {
         });
         let (socket, _) = tokio_tungstenite::connect_async(format!("ws://{address}")).await.unwrap();
         let cancel = CancellationToken::new();
-        let (_out, outgoing) = flume::bounded(1);
+        let (_out, outgoing) = tokio::sync::mpsc::unbounded_channel();
         let probe = Arc::new(Probe::default());
         session(
             socket,
@@ -723,7 +723,7 @@ mod tests {
     struct SlowSocket {
         reads: VecDeque<Message>,
         sent: usize,
-        blocked: flume::Sender<()>,
+        blocked: tokio::sync::mpsc::Sender<()>,
     }
     impl futures_util::Stream for SlowSocket {
         type Item = Result<Message, tokio_tungstenite::tungstenite::Error>;
@@ -758,9 +758,9 @@ mod tests {
 
     #[tokio::test]
     async fn regression_hangup_interrupts_a_blocked_microphone_send_and_stops_capture() {
-        let (blocked, waiting) = flume::bounded(1);
+        let (blocked, mut waiting) = tokio::sync::mpsc::channel(1);
         let cancel = CancellationToken::new();
-        let (_out, outgoing) = flume::bounded(1);
+        let (_out, outgoing) = tokio::sync::mpsc::unbounded_channel();
         let probe = Arc::new(Probe::default());
         let socket = SlowSocket {
             reads: VecDeque::from([
@@ -790,7 +790,7 @@ mod tests {
             )
             .await
         });
-        tokio::time::timeout(Duration::from_secs(5), waiting.recv_async()).await.unwrap().unwrap();
+        tokio::time::timeout(Duration::from_secs(5), waiting.recv()).await.unwrap().unwrap();
         assert!(probe.started.load(Ordering::SeqCst));
         cancel.cancel();
         let result = tokio::time::timeout(Duration::from_secs(1), worker).await.unwrap().unwrap();

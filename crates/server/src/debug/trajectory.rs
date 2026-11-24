@@ -888,7 +888,8 @@ pub(crate) async fn build_detail_async(
     let has_voyage_record = voyage.is_some();
 
     let raw_system_prompt = sources
-        .system_prompt(id, kind)
+        .system_prompt_async(id, kind)
+        .await
         .or_else(|| voyage.as_ref().and_then(extract_voyage_system_prompt));
     let system_prompt = redactor.redact_opt_str(raw_system_prompt, redacted_count);
 

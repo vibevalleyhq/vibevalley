@@ -26,7 +26,7 @@ impl Board {
         if let Some(r) = &issue.refining {
             return Err(BoardError::Refused(Refusal::Drafting { name: r.name.clone() }));
         }
-        let drive = self.runtime.driver().drafter(&issue)?;
+        let drive = self.runtime.driver().drafter(&issue).await?;
         let (space, repo) = self.room_async(&issue, "").await;
         if space == 0 || repo == 0 {
             return Err(BoardError::NoRoom("no room for a drafting session".into()));

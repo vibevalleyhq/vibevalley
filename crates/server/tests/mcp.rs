@@ -12,7 +12,7 @@ use vibevalley_runtime::oar::{Capabilities, Installation, McpServer, ModelInfo, 
 /// The scripted runtime, keeping what each open was given.
 struct Recording {
     inner: ScriptedRuntime,
-    opened: flume::Sender<SessionOptions>,
+    opened: std::sync::mpsc::Sender<SessionOptions>,
 }
 
 impl Runtime for Recording {
@@ -25,13 +25,13 @@ impl Runtime for Recording {
     fn capabilities(&self) -> Capabilities {
         self.inner.capabilities()
     }
-    fn installation(&self) -> Installation {
+    fn installation(&self) -> vibevalley_runtime::oar::BoxFuture<'_, Installation> {
         self.inner.installation()
     }
-    fn list_models(&self) -> vibevalley_runtime::oar::Result<Vec<ModelInfo>> {
+    fn list_models(&self) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Result<Vec<ModelInfo>>> {
         self.inner.list_models()
     }
-    fn open(&self, opts: SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn Session>> {
+    fn open(&self, opts: SessionOptions) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Result<Arc<dyn Session>>> {
         let _ = self.opened.send(opts.clone());
         self.inner.open(opts)
     }
@@ -58,7 +58,7 @@ fn text_of(answer: &Value) -> String {
 fn a_helper_calls_its_tools_through_the_door_it_was_given() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
-    let (opened_tx, opened_rx) = flume::unbounded();
+    let (opened_tx, opened_rx) = std::sync::mpsc::channel();
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(Recording {
         inner: ScriptedRuntime::demo(),

@@ -184,8 +184,13 @@ pub(crate) fn build_runtimes(setting: &Arc<Setting>, home: &std::path::Path, exe
 pub(crate) struct LazyCronOrchestrator(pub Arc<OnceLock<Arc<dyn CronOrchestratorPort>>>);
 
 impl CronOrchestratorPort for LazyCronOrchestrator {
-    fn hear_cron(&self, agent: &str, channel: &str, line: &str) -> bool {
-        self.0.get().is_some_and(|o| o.hear_cron(agent, channel, line))
+    fn hear_cron<'a>(&'a self, agent: &'a str, channel: &'a str, line: &'a str) -> BoxFuture<'a, bool> {
+        Box::pin(async move {
+            match self.0.get() {
+                Some(o) => o.hear_cron(agent, channel, line).await,
+                None => false,
+            }
+        })
     }
 }
 
@@ -231,11 +236,13 @@ impl DebugDataSource for ServerDebugSources {
         self.runtime.trajectory().open_session_ids()
     }
 
-    fn system_prompt(&self, session_id: &str, kind: DebugTrajectoryKind) -> Option<String> {
-        match kind {
-            DebugTrajectoryKind::IssueSession | DebugTrajectoryKind::WorkspaceChat => None,
-            DebugTrajectoryKind::Orchestrator => Some(self.agent.orchestrator.system_prompt_snapshot(session_id)),
-        }
+    fn system_prompt_async<'a>(&'a self, session_id: &'a str, kind: DebugTrajectoryKind) -> vibevalley_runtime::agent::durable::BoxFuture<'a, Option<String>> {
+        Box::pin(async move {
+            match kind {
+                DebugTrajectoryKind::IssueSession | DebugTrajectoryKind::WorkspaceChat => None,
+                DebugTrajectoryKind::Orchestrator => Some(self.agent.orchestrator.system_prompt_snapshot_async(session_id).await),
+            }
+        })
     }
 
     fn runtime_probe(&self) -> RuntimeProbeSnapshot {

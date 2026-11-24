@@ -104,40 +104,44 @@ impl Runtime for HookRuntime {
     fn capabilities(&self) -> Capabilities {
         ScriptedRuntime::new(&self.id, Script::new()).capabilities()
     }
-    fn installation(&self) -> Installation {
-        Installation::Available {
-            version: None,
-            path: PathBuf::from("(test)"),
-        }
+    fn installation(&self) -> vibevalley_runtime::BoxFuture<'_, Installation> {
+        Box::pin(async {
+            Installation::Available {
+                version: None,
+                path: PathBuf::from("(test)"),
+            }
+        })
     }
-    fn list_models(&self) -> vibevalley_runtime::oar::Result<Vec<ModelInfo>> {
-        Ok(vec![])
+    fn list_models(&self) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<Vec<ModelInfo>>> {
+        Box::pin(async { Ok(vec![]) })
     }
-    fn open(&self, opts: SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn Session>> {
-        // Where `Sessions::report` keeps this session's report: beside its record, by the same name.
-        let record = opts.record_to.clone().expect("the board records every session");
-        let report = record
-            .parent()
-            .and_then(|d| d.parent())
-            .unwrap()
-            .join("reports")
-            .join(record.with_extension("json").file_name().unwrap());
-        let cwd = opts.cwd.clone();
-        let n = self.opened.fetch_add(1, Ordering::SeqCst);
-        let script = if n == 0 {
-            &self.script
-        } else {
-            self.later.get(n - 1).or(self.later.last()).unwrap_or(&self.script)
-        };
-        let inner = ScriptedRuntime::new(&self.id, script.clone()).open(opts)?;
-        Ok(Arc::new(HookSession {
-            inner,
-            cwd,
-            report,
-            turns: AtomicUsize::new(0),
-            hook: self.hook.clone(),
-            prompts: self.prompts.clone(),
-        }))
+    fn open(&self, opts: SessionOptions) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<Arc<dyn Session>>> {
+        Box::pin(async move {
+            // Where `Sessions::report` keeps this session's report: beside its record, by the same name.
+            let record = opts.record_to.clone().expect("the board records every session");
+            let report = record
+                .parent()
+                .and_then(|d| d.parent())
+                .unwrap()
+                .join("reports")
+                .join(record.with_extension("json").file_name().unwrap());
+            let cwd = opts.cwd.clone();
+            let n = self.opened.fetch_add(1, Ordering::SeqCst);
+            let script = if n == 0 {
+                &self.script
+            } else {
+                self.later.get(n - 1).or(self.later.last()).unwrap_or(&self.script)
+            };
+            let inner = ScriptedRuntime::new(&self.id, script.clone()).open(opts).await?;
+            Ok(Arc::new(HookSession {
+                inner,
+                cwd,
+                report,
+                turns: AtomicUsize::new(0),
+                hook: self.hook.clone(),
+                prompts: self.prompts.clone(),
+            }) as Arc<dyn Session>)
+        })
     }
 }
 
@@ -165,26 +169,26 @@ impl Session for HookSession {
     fn records(&self) -> Vec<vibevalley_runtime::oar::voyage::Record> {
         self.inner.records()
     }
-    fn subscribe_records(&self, after: Option<u64>) -> flume::Receiver<vibevalley_runtime::oar::voyage::Record> {
+    fn subscribe_records(&self, after: Option<u64>) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_runtime::oar::voyage::Record> {
         self.inner.subscribe_records(after)
     }
-    fn control(
-        &self,
+    fn control<'a>(
+        &'a self,
         action: vibevalley_runtime::oar::ControlAction,
-        arg: &str,
-        input_id: &str,
-        span_id: &str,
-    ) -> vibevalley_runtime::oar::Result<vibevalley_runtime::oar::ControlOutcome> {
+        arg: &'a str,
+        input_id: &'a str,
+        span_id: &'a str,
+    ) -> vibevalley_runtime::BoxFuture<'a, vibevalley_runtime::oar::Result<vibevalley_runtime::oar::ControlOutcome>> {
         self.inner.control(action, arg, input_id, span_id)
     }
-    fn control_with(
-        &self,
+    fn control_with<'a>(
+        &'a self,
         action: vibevalley_runtime::oar::ControlAction,
-        arg: &str,
-        input_id: &str,
-        span_id: &str,
+        arg: &'a str,
+        input_id: &'a str,
+        span_id: &'a str,
         opts: vibevalley_runtime::oar::TurnOptions,
-    ) -> vibevalley_runtime::oar::Result<vibevalley_runtime::oar::ControlOutcome> {
+    ) -> vibevalley_runtime::BoxFuture<'a, vibevalley_runtime::oar::Result<vibevalley_runtime::oar::ControlOutcome>> {
         self.inner.control_with(action, arg, input_id, span_id, opts)
     }
     fn id(&self) -> String {
@@ -196,42 +200,59 @@ impl Session for HookSession {
     fn status(&self) -> SessionStatus {
         self.inner.status()
     }
-    fn events(&self) -> flume::Receiver<Event> {
+    fn events(&self) -> tokio::sync::mpsc::UnboundedReceiver<Event> {
         self.inner.events()
     }
-    fn prompt(&self, content: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
+    fn prompt(&self, content: Vec<ContentBlock>) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
         self.prompt_with(content, vibevalley_runtime::oar::TurnOptions::default())
     }
-    fn prompt_with(&self, content: Vec<ContentBlock>, opts: vibevalley_runtime::oar::TurnOptions) -> vibevalley_runtime::oar::Result<()> {
-        let prompt = prompt_text(&content);
-        self.prompts.lock().unwrap().push(prompt.clone());
-        let index = self.turns.fetch_add(1, Ordering::SeqCst);
-        (self.hook)(&Turn {
-            cwd: self.cwd.clone(),
-            report: self.report.clone(),
-            prompt,
-            index,
-        });
-        self.inner.prompt_with(content, opts)
+    fn prompt_with(
+        &self,
+        content: Vec<ContentBlock>,
+        opts: vibevalley_runtime::oar::TurnOptions,
+    ) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
+        Box::pin(async move {
+            let prompt = prompt_text(&content);
+            self.prompts.lock().unwrap().push(prompt.clone());
+            let index = self.turns.fetch_add(1, Ordering::SeqCst);
+            (self.hook)(&Turn {
+                cwd: self.cwd.clone(),
+                report: self.report.clone(),
+                prompt,
+                index,
+            });
+            self.inner.prompt_with(content, opts).await
+        })
     }
-    fn steer(&self, content: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
+    fn steer(&self, content: Vec<ContentBlock>) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
         self.prompts.lock().unwrap().push(format!("(steer) {}", prompt_text(&content)));
         self.inner.steer(content)
     }
-    fn queue(&self, content: Vec<ContentBlock>) -> vibevalley_runtime::oar::Result<()> {
+    fn queue(&self, content: Vec<ContentBlock>) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
         self.inner.queue(content)
     }
-    fn queue_with(&self, content: Vec<ContentBlock>, opts: vibevalley_runtime::oar::TurnOptions) -> vibevalley_runtime::oar::Result<()> {
+    fn queue_with(
+        &self,
+        content: Vec<ContentBlock>,
+        opts: vibevalley_runtime::oar::TurnOptions,
+    ) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
         self.inner.queue_with(content, opts)
     }
-    fn abort(&self) -> vibevalley_runtime::oar::Result<()> {
+    fn abort(&self) -> vibevalley_runtime::BoxFuture<'_, vibevalley_runtime::oar::Result<()>> {
         self.inner.abort()
     }
-    fn respond_permission(&self, request_id: &str, decision: PermissionDecision) -> vibevalley_runtime::oar::Result<()> {
+    fn respond_permission<'a>(
+        &'a self,
+        request_id: &'a str,
+        decision: PermissionDecision,
+    ) -> vibevalley_runtime::BoxFuture<'a, vibevalley_runtime::oar::Result<()>> {
         self.inner.respond_permission(request_id, decision)
     }
-    fn dispose(&self) {
+    fn dispose(&self) -> vibevalley_runtime::BoxFuture<'_, ()> {
         self.inner.dispose()
+    }
+    fn signal_dispose(&self) {
+        self.inner.signal_dispose();
     }
 }
 
@@ -250,8 +271,7 @@ pub fn slow_first(ms: u64) -> Script {
 /// Deterministic gate that holds each turn until released by the test.
 #[derive(Clone)]
 pub struct TurnGate {
-    tx: flume::Sender<()>,
-    rx: flume::Receiver<()>,
+    permits: Arc<(std::sync::Mutex<usize>, std::sync::Condvar)>,
 }
 
 impl Default for TurnGate {
@@ -262,28 +282,37 @@ impl Default for TurnGate {
 
 impl TurnGate {
     pub fn new() -> Self {
-        let (tx, rx) = flume::unbounded();
-        Self { tx, rx }
+        Self {
+            permits: Arc::new((std::sync::Mutex::new(0), std::sync::Condvar::new())),
+        }
     }
 
     /// Unblocks one gated turn.
     pub fn release(&self) {
-        let _ = self.tx.send(());
+        let (lock, cv) = &*self.permits;
+        *lock.lock().unwrap() += 1;
+        cv.notify_one();
     }
 
     /// Unblocks `count` gated turns.
     pub fn release_n(&self, count: usize) {
-        for _ in 0..count {
-            self.release();
-        }
+        let (lock, cv) = &*self.permits;
+        *lock.lock().unwrap() += count;
+        cv.notify_all();
     }
 
     /// A `Script` whose turns block on the gate (15 s safety ceiling) before emitting `text`.
     pub fn script(&self, text: impl Into<String>) -> Script {
-        let rx = self.rx.clone();
+        let permits = self.permits.clone();
         let text = text.into();
         Script::computed(Arc::new(move |_| {
-            let _ = rx.recv_timeout(Duration::from_secs(15));
+            let (lock, cv) = &*permits;
+            let (mut guard, _) = cv
+                .wait_timeout_while(lock.lock().unwrap(), Duration::from_secs(15), |count| *count == 0)
+                .unwrap();
+            if *guard > 0 {
+                *guard -= 1;
+            }
             Ok(vec![Step::text(text.clone())])
         }))
     }
@@ -613,7 +642,7 @@ pub fn wait_until_settled<T>(ctx: Option<&Context>, timeout: Duration, what: &st
                 .await
             });
         } else {
-            let (tx, rx) = flume::bounded::<()>(0);
+            let (tx, rx) = std::sync::mpsc::channel::<()>();
             let _ = rx.recv_timeout(step);
             drop(tx);
         }

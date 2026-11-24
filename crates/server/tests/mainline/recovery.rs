@@ -174,10 +174,26 @@ fn regression_replies_and_reports_across_process_exit() {
             assert_eq!(run.outcome, Some(Outcome::Completed));
             let request = reply_id(&server, &thread, FOLLOW_UP);
             assert!(run.heard.contains(&request));
-            let sub = store.read(|tx| tx.submission_by_request(&format!("issue:{issue}"), &request)).unwrap().unwrap();
+            let conv = format!("issue:{issue}");
+            let req = request.clone();
+            let sub = vibevalley_runtime::rt::block_on(store.read_async(|tx| {
+                let conv = conv.clone();
+                let req = req.clone();
+                Box::pin(async move { tx.submission_by_request_async(&conv, &req).await })
+            }))
+            .unwrap()
+            .unwrap();
             assert_eq!(sub.status, SubmissionStatus::Done);
             assert_eq!(sub.result["runId"], run.id);
-            assert!(store.read(|tx| tx.document("run", &run.id, "issue.report")).unwrap().is_some());
+            let run_id = run.id.clone();
+            assert!(
+                vibevalley_runtime::rt::block_on(store.read_async(|tx| {
+                    let run_id = run_id.clone();
+                    Box::pin(async move { tx.document_async("run", &run_id, "issue.report").await })
+                }),)
+                .unwrap()
+                .is_some()
+            );
             if window == "posted" {
                 until(&server, "report posted before outbox acknowledgement", || {
                     (count_notes(&server, &thread, FOLLOW_UP) == 1).then_some(())
@@ -261,13 +277,15 @@ fn regression_replies_and_reports_across_process_exit() {
 
     let request = reply_id(&server, &thread, UNKNOWN);
     assert!(runs[2].heard.contains(&request));
-    let unknown = server
-        .test_internals()
-        .runtime
-        .durable_store()
-        .read(|tx| tx.submission_by_request(&format!("issue:{issue}"), &request))
-        .unwrap()
-        .unwrap();
+    let conv = format!("issue:{issue}");
+    let req = request.clone();
+    let unknown = vibevalley_runtime::rt::block_on(server.test_internals().runtime.durable_store().read_async(|tx| {
+        let conv = conv.clone();
+        let req = req.clone();
+        Box::pin(async move { tx.submission_by_request_async(&conv, &req).await })
+    }))
+    .unwrap()
+    .unwrap();
     assert_eq!(unknown.status, SubmissionStatus::Unanswered);
     assert_eq!(unknown.result["runId"], runs[2].id);
     assert_eq!(count_notes(&server, &thread, FOLLOW_UP), 1);

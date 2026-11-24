@@ -217,9 +217,9 @@ fn run_up(client: &Client, args: MachineUpArgs) -> Done {
     let config = resolve_machine_up(client, &args)?;
     let registry = build_runtime_registry(&args.runtime, args.scripted);
     let cancel = CancellationToken::new();
-    let agent = MachineAgent::new(config, registry, cancel.clone());
 
     vibevalley_runtime::rt::block_on(async move {
+        let agent = MachineAgent::new_async(config, registry, cancel.clone()).await;
         let sig_cancel = cancel.clone();
         let sig_task = tokio::spawn(async move {
             wait_for_shutdown_signal().await;
