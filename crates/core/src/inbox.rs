@@ -11,9 +11,21 @@ use crate::status::is_farm_worker;
 /// `inbox`: newest first; items of the same moment in the order gathered,
 /// followed by durable runtime alerts folded via `Fact::RuntimeInboxChanged`.
 pub(crate) fn inbox(state: &SpaceState) -> Vec<InboxItem> {
-    let mut items: Vec<InboxItem> = gathered(state).into_iter().map(worded).collect();
-    if !state.runtime_inbox_items.is_empty() {
-        items.extend(state.runtime_inbox_items.iter().cloned());
+    let user_mentions = state.chat.as_ref().map_or(&[][..], |c| &c.user_mentions[..]);
+    inbox_items(&state.issues, &state.sessions, &state.crons, user_mentions, &state.runtime_inbox_items)
+}
+
+/// Pure inbox projection from domain slices and runtime alerts.
+pub(crate) fn inbox_items(
+    issues: &[Issue],
+    sessions: &[Session],
+    crons: &[Cron],
+    user_mentions: &[UserMention],
+    runtime_inbox_items: &[InboxItem],
+) -> Vec<InboxItem> {
+    let mut items: Vec<InboxItem> = gathered(issues, sessions, crons, user_mentions).into_iter().map(worded).collect();
+    if !runtime_inbox_items.is_empty() {
+        items.extend(runtime_inbox_items.iter().cloned());
     }
     items.sort_by_key(|i| std::cmp::Reverse(i.at));
     items
@@ -38,19 +50,18 @@ enum Want<'a> {
     Quiet(i64),
 }
 
-fn gathered(state: &SpaceState) -> Vec<Bare> {
-    let chat = state.chat.as_ref();
+fn gathered(issues_slice: &[Issue], sessions: &[Session], crons: &[Cron], user_mentions: &[UserMention]) -> Vec<Bare> {
     let mut out = vec![];
-    let issues: HashMap<&str, &Issue> = state.issues.iter().map(|i| (i.id.as_str(), i)).collect();
+    let issues: HashMap<&str, &Issue> = issues_slice.iter().map(|i| (i.id.as_str(), i)).collect();
     let mut children: HashMap<&str, Vec<&Issue>> = HashMap::new();
-    for item in &state.issues {
+    for item in issues_slice {
         if let Some(p) = &item.parent {
             children.entry(p.as_str()).or_default().push(item);
         }
     }
-    let session_ids: HashSet<&str> = state.sessions.iter().map(|s| s.id.as_str()).collect();
+    let session_ids: HashSet<&str> = sessions.iter().map(|s| s.id.as_str()).collect();
 
-    for h in &state.sessions {
+    for h in sessions {
         if !is_farm_worker(h) {
             continue;
         }
@@ -100,7 +111,7 @@ fn gathered(state: &SpaceState) -> Vec<Bare> {
     }
 
     let orchestrator = || InboxFrom::Orchestrator(InboxFromOrchestrator {});
-    for issue in &state.issues {
+    for issue in issues_slice {
         let conflicted = issue.stage.state == IssueStageKind::Stuck && issue.stage.stuck == Some(StuckReason::Conflict);
         if issue.stage.state != IssueStageKind::Reviewing && !conflicted {
             continue;
@@ -127,7 +138,7 @@ fn gathered(state: &SpaceState) -> Vec<Bare> {
         });
     }
 
-    for sc in state.crons.iter().filter(|c| c.pending) {
+    for sc in crons.iter().filter(|c| c.pending) {
         out.push(Bare {
             id: format!("{}:ask", sc.id),
             kind: InboxKind::CronAsk,
@@ -138,7 +149,7 @@ fn gathered(state: &SpaceState) -> Vec<Bare> {
         });
     }
 
-    for UserMention { message: m, .. } in chat.map_or(&[][..], |c| &c.user_mentions[..]) {
+    for UserMention { message: m, .. } in user_mentions {
         let from = if actor_role_of(&m.actor) == Some(AgentRole::Worker) {
             InboxFrom::Session(InboxFromSession {
                 id: m.session.clone().unwrap_or_else(|| m.from.clone()),

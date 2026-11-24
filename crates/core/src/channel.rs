@@ -33,19 +33,24 @@ pub(crate) fn with_message(chat: &mut Option<Chat>, m: &ChatMessage) -> bool {
     true
 }
 
+/// Keeps at most `KEEP_CHANNELS`, dropping the quietest threads and sorting by id.
+pub(crate) fn trim_and_sort_channels(channels: &mut Vec<Channel>) {
+    if channels.len() > KEEP_CHANNELS {
+        let top = |x: &Channel| i32::from(x.r#type != ChannelType::Thread);
+        let mut ranked: Vec<&Channel> = channels.iter().collect();
+        ranked.sort_by(|a, b| top(b).cmp(&top(a)).then(b.last_number.unwrap_or(0).cmp(&a.last_number.unwrap_or(0))));
+        let keep: std::collections::HashSet<String> = ranked[..KEEP_CHANNELS].iter().map(|x| x.id.clone()).collect();
+        channels.retain(|x| keep.contains(&x.id));
+    }
+    channels.sort_by(|a, b| compare_text(&a.id, &b.id));
+}
+
 /// `withChannel`: beyond `KEEP_CHANNELS` the quietest threads go.
 pub(crate) fn with_channel(chat: &mut Option<Chat>, c: Channel) {
     let base = chat.get_or_insert_with(empty_chat);
     base.channels.retain(|x| x.id != c.id);
     base.channels.push(c);
-    if base.channels.len() > KEEP_CHANNELS {
-        let top = |x: &Channel| i32::from(x.r#type != ChannelType::Thread);
-        let mut ranked: Vec<&Channel> = base.channels.iter().collect();
-        ranked.sort_by(|a, b| top(b).cmp(&top(a)).then(b.last_number.unwrap_or(0).cmp(&a.last_number.unwrap_or(0))));
-        let keep: std::collections::HashSet<String> = ranked[..KEEP_CHANNELS].iter().map(|x| x.id.clone()).collect();
-        base.channels.retain(|x| keep.contains(&x.id));
-    }
-    base.channels.sort_by(|a, b| compare_text(&a.id, &b.id));
+    trim_and_sort_channels(&mut base.channels);
 }
 
 /// `forUser`: whether a message is for the user to read.

@@ -439,10 +439,11 @@ fn fold(state: &mut SpaceState, f: &Fact) -> (SliceMask, bool) {
 }
 
 pub fn board_slice(state: &SpaceState, seq: i64) -> BoardSlice {
+    let channels = state.chat.as_ref().map_or(&[][..], |c| &c.channels[..]);
     BoardSlice {
         seq,
         issues: state.issues.clone(),
-        board_summary: Some(board_summary(state)),
+        board_summary: Some(board_summary(&state.issues, &state.sessions, channels)),
         commits: state.commits.clone(),
     }
 }
@@ -461,10 +462,11 @@ pub fn sessions_slice(state: &SpaceState, seq: i64) -> SessionsSlice {
 }
 
 pub fn collab_slice(state: &SpaceState, seq: i64) -> CollabSlice {
+    let channels = state.chat.as_ref().map_or(&[][..], |c| &c.channels[..]);
     CollabSlice {
         seq,
         chat: state.chat.clone(),
-        channel_summary: Some(channel_summary(state)),
+        channel_summary: Some(channel_summary(channels)),
         connectors: state.connectors.clone(),
     }
 }
@@ -483,7 +485,7 @@ pub fn ops_slice(state: &SpaceState, seq: i64) -> OpsSlice {
         seq,
         crons: state.crons.iter().map(cron_view).collect(),
         media: state.media.clone(),
-        media_summary: Some(media_summary(state)),
+        media_summary: Some(media_summary(state.media.as_deref())),
     }
 }
 
@@ -518,7 +520,7 @@ fn doing_view(d: &Doing) -> DoingView {
 }
 
 /// A session as the frame shows it (`withWords`).
-fn session_view(h: &Session, conflict: Option<&Conflict>) -> SessionView {
+pub(crate) fn session_view(h: &Session, conflict: Option<&Conflict>) -> SessionView {
     let phase = match &h.phase {
         Phase::Working(p) => PhaseView::Working(PhaseWorkingView {
             since: p.since,
@@ -635,7 +637,7 @@ pub fn cron_request_to_rules(r: &vibevalley_protocol::CronRequest) -> crate::cro
 
 /// A cron with its words (`whenText`, `nextText` of `issue/when.ts`, in
 /// `vibevalley-core::cron`).
-fn cron_view(c: &Cron) -> CronView {
+pub(crate) fn cron_view(c: &Cron) -> CronView {
     let ec = cron_to_rules(c);
     let when_text = crate::cron::when_text(&ec.when, &ec.tz);
     let next_text = crate::cron::next_text(&ec);
@@ -666,10 +668,8 @@ fn is_active_media_phase(phase: MediaPhase) -> bool {
 }
 
 /// Active file-producing media jobs (excludes understanding jobs, which produce no file).
-fn media_summary(state: &SpaceState) -> MediaSummary {
-    let active_ids: Vec<String> = state
-        .media
-        .as_deref()
+pub(crate) fn media_summary(media: Option<&[MediaJob]>) -> MediaSummary {
+    let active_ids: Vec<String> = media
         .unwrap_or(&[])
         .iter()
         .filter_map(|job| match job {
@@ -694,8 +694,7 @@ fn media_summary(state: &SpaceState) -> MediaSummary {
 }
 
 /// Total unread count across all channels plus per-channel unread rolled up with direct child threads.
-fn channel_summary(state: &SpaceState) -> ChannelSummary {
-    let channels = state.chat.as_ref().map_or(&[][..], |c| &c.channels[..]);
+pub(crate) fn channel_summary(channels: &[Channel]) -> ChannelSummary {
     let mut unread_total: i64 = 0;
     let mut children_unread: BTreeMap<&str, i64> = BTreeMap::new();
     for c in channels {

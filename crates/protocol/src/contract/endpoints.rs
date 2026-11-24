@@ -3268,3 +3268,291 @@ pub mod subscriptions {
         type Event = t::IssueWatch;
     }
 }
+
+macro_rules! endpoint_ids {
+    ($($variant:ident => $op:literal),* $(,)?) => {
+        /// Compile-time exhaustive identifier for every endpoint in [`ENDPOINTS`].
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+        pub enum EndpointId {
+            $($variant,)*
+        }
+
+        impl EndpointId {
+            /// Every endpoint id in the exact order of [`ENDPOINTS`].
+            pub const ALL: &'static [EndpointId] = &[$(EndpointId::$variant,)*];
+
+            /// Maps an endpoint op string (e.g. `"issue.create"`) to its [`EndpointId`].
+            pub fn from_op(op: &str) -> Option<EndpointId> {
+                match op {
+                    $($op => Some(EndpointId::$variant),)*
+                    _ => None,
+                }
+            }
+
+            /// Returns the wire op string for this endpoint.
+            pub const fn as_op(self) -> &'static str {
+                match self {
+                    $(EndpointId::$variant => $op,)*
+                }
+            }
+
+            /// Returns the static [`Endpoint`] metadata for this endpoint.
+            pub const fn spec(self) -> &'static Endpoint {
+                &ENDPOINTS[self as usize]
+            }
+        }
+    };
+}
+
+endpoint_ids! {
+    // agent & skill
+    AgentList => "agent.list",
+    AgentValidate => "agent.validate",
+    AgentCreate => "agent.create",
+    AgentUpdate => "agent.update",
+    AgentDelete => "agent.delete",
+    AgentPreviewDelete => "agent.previewDelete",
+    AgentTemplateList => "agent.template.list",
+    AgentTemplateInstall => "agent.template.install",
+    AgentTemplateUpdate => "agent.template.update",
+    AgentTemplateAdd => "agent.template.add",
+    AgentTemplateDelete => "agent.template.delete",
+    AgentTemplatePreviewDelete => "agent.template.previewDelete",
+    SkillList => "skill.list",
+    SkillCreate => "skill.create",
+    SkillUpdate => "skill.update",
+    SkillDelete => "skill.delete",
+    SkillPreviewDelete => "skill.previewDelete",
+    // runtime
+    RuntimeList => "runtime.list",
+    RuntimeRefresh => "runtime.refresh",
+    RuntimeSettingUpdate => "runtime.setting.update",
+    // memory
+    MemoryList => "memory.list",
+    MemoryRecall => "memory.recall",
+    MemoryCreate => "memory.create",
+    MemorySearch => "memory.search",
+    MemoryDelete => "memory.delete",
+    MemoryPreviewDelete => "memory.previewDelete",
+    // repo & github
+    RepoPrSubmit => "repo.pr.submit",
+    GithubGet => "github.get",
+    GithubRefresh => "github.refresh",
+    RepoList => "repo.list",
+    RepoValidate => "repo.validate",
+    RepoCreate => "repo.create",
+    RepoLanguageList => "repo.language.list",
+    RepoTemplateList => "repo.template.list",
+    RepoActivityGet => "repo.activity.get",
+    // session
+    SessionStop => "session.stop",
+    SessionList => "session.list",
+    SessionGet => "session.get",
+    SessionEventList => "session.event.list",
+    SessionOpenWorkspace => "session.openWorkspace",
+    SessionCloseWorkspace => "session.closeWorkspace",
+    SessionSend => "session.send",
+    SessionRespondPermission => "session.respondPermission",
+    SessionRespondInteraction => "session.respondInteraction",
+    SessionSetConfig => "session.setConfig",
+    SessionChildTranscript => "session.childTranscript",
+    SessionBindingAttach => "session.binding.attach",
+    SessionBindingDetach => "session.binding.detach",
+    // issue
+    IssueConversationGet => "issue.conversation.get",
+    IssueCommentCreate => "issue.comment.create",
+    IssueDiffGet => "issue.diff.get",
+    IssueHistoryList => "issue.history.list",
+    IssueList => "issue.list",
+    IssueReview => "issue.review",
+    IssueSplit => "issue.split",
+    IssueGet => "issue.get",
+    IssueRunList => "issue.run.list",
+    IssueTimelineGet => "issue.timeline.get",
+    IssueCreate => "issue.create",
+    IssueUpdate => "issue.update",
+    IssueDelete => "issue.delete",
+    IssuePreviewDelete => "issue.previewDelete",
+    IssueStatusUpdate => "issue.status.update",
+    IssueStatusPreviewUpdate => "issue.status.previewUpdate",
+    IssueRefine => "issue.refine",
+    // cron
+    CronCreate => "cron.create",
+    CronList => "cron.list",
+    CronUpdate => "cron.update",
+    CronDelete => "cron.delete",
+    CronPreviewDelete => "cron.previewDelete",
+    // channel
+    ChannelMessageSend => "channel.message.send",
+    ChannelCreate => "channel.create",
+    ChannelUpdate => "channel.update",
+    ChannelDefaultSet => "channel.default.set",
+    ChannelMessageList => "channel.message.list",
+    ChannelMarkRead => "channel.markRead",
+    ChannelMessageUpdate => "channel.message.update",
+    ChannelMessageDelete => "channel.message.delete",
+    ChannelMessagePreviewDelete => "channel.message.previewDelete",
+    ChannelMessageSearch => "channel.message.search",
+    ChannelReactionSet => "channel.reaction.set",
+    ChannelPinSet => "channel.pin.set",
+    ChannelPinList => "channel.pin.list",
+    ChannelThreadCreate => "channel.thread.create",
+    ChannelArchiveSet => "channel.archive.set",
+    ChannelDelete => "channel.delete",
+    ChannelPreviewDelete => "channel.previewDelete",
+    ChannelDirectCreate => "channel.direct.create",
+    ChannelNotifySet => "channel.notify.set",
+    ChannelMarkUnread => "channel.markUnread",
+    ChannelList => "channel.list",
+    ChannelUnreadList => "channel.unread.list",
+    // connector
+    ConnectorList => "connector.list",
+    ConnectorLogin => "connector.login",
+    ConnectorVerify => "connector.verify",
+    ConnectorLogout => "connector.logout",
+    ConnectorChannelSet => "connector.channel.set",
+    // game
+    GameAchievementList => "game.achievement.list",
+    GameTitleSet => "game.title.set",
+    // media & library
+    MediaDialogueCreate => "media.dialogue.create",
+    MediaVoiceDesignCreate => "media.voiceDesign.create",
+    MediaCloneCreate => "media.clone.create",
+    MediaTranscriptionCreate => "media.transcription.create",
+    MediaAudioResume => "media.audio.resume",
+    MediaAudioPreviewCleanup => "media.audio.previewCleanup",
+    MediaAudioCleanup => "media.audio.cleanup",
+    MediaInputCreate => "media.input.create",
+    MediaInputAdopt => "media.input.adopt",
+    MediaInputGet => "media.input.get",
+    MediaInputList => "media.input.list",
+    MediaInputDelete => "media.input.delete",
+    MediaInputPreviewDelete => "media.input.previewDelete",
+    MediaImageCreate => "media.image.create",
+    MediaUnderstandingCreate => "media.understanding.create",
+    MediaUnderstandingAuthorize => "media.understanding.authorize",
+    MediaUnderstandingStart => "media.understanding.start",
+    MediaSpeechCreate => "media.speech.create",
+    MediaSpeechResume => "media.speech.resume",
+    MediaUnderstandingPreviewCleanup => "media.understanding.previewCleanup",
+    MediaUnderstandingCleanup => "media.understanding.cleanup",
+    MediaJobGet => "media.job.get",
+    MediaJobCancel => "media.job.cancel",
+    MediaJobPreviewRelease => "media.job.previewRelease",
+    MediaJobRelease => "media.job.release",
+    MediaJobDownload => "media.job.download",
+    MediaJobList => "media.job.list",
+    LibraryItemList => "library.item.list",
+    LibraryItemAdd => "library.item.add",
+    LibraryItemDelete => "library.item.delete",
+    LibraryItemPreviewDelete => "library.item.previewDelete",
+    // voice
+    VoiceHear => "voice.hear",
+    VoiceMossVerify => "voice.moss.verify",
+    VoiceGrantCreate => "voice.grant.create",
+    VoiceCallStart => "voice.call.start",
+    VoiceCallStop => "voice.call.stop",
+    VoiceCallHear => "voice.call.hear",
+    VoiceCallSay => "voice.call.say",
+    // artifact
+    ArtifactList => "artifact.list",
+    ArtifactGet => "artifact.get",
+    ArtifactContentGet => "artifact.content.get",
+    ArtifactCreate => "artifact.create",
+    ArtifactVersionCreate => "artifact.version.create",
+    ArtifactHtmlEdit => "artifact.html.edit",
+    ArtifactUpdate => "artifact.update",
+    ArtifactDelete => "artifact.delete",
+    ArtifactPreviewDelete => "artifact.previewDelete",
+    ArtifactBlockList => "artifact.block.list",
+    ArtifactSubmit => "artifact.submit",
+    ArtifactBlockCreate => "artifact.block.create",
+    ArtifactBlockUpdate => "artifact.block.update",
+    ArtifactBlockDelete => "artifact.block.delete",
+    ArtifactBlockPreviewDelete => "artifact.block.previewDelete",
+    ArtifactSuggestionList => "artifact.suggestion.list",
+    ArtifactSuggestionCreate => "artifact.suggestion.create",
+    ArtifactSuggestionAccept => "artifact.suggestion.accept",
+    ArtifactSuggestionReject => "artifact.suggestion.reject",
+    ArtifactMarkdownGet => "artifact.markdown.get",
+    ArtifactTypeList => "artifact.type.list",
+    ArtifactTypeRead => "artifact.type.read",
+    ArtifactEntryList => "artifact.entry.list",
+    ArtifactEntryGet => "artifact.entry.get",
+    ArtifactEntryBatch => "artifact.entry.batch",
+    ArtifactOutlineImport => "artifact.outline.import",
+    ArtifactPresenceUpdate => "artifact.presence.update",
+    ArtifactHistoryList => "artifact.history.list",
+    ArtifactHistoryPreview => "artifact.history.preview",
+    ArtifactHistoryRestore => "artifact.history.restore",
+    ArtifactHistoryFork => "artifact.history.fork",
+    ArtifactHistoryUndoOrigin => "artifact.history.undoOrigin",
+    ArtifactHistoryCompact => "artifact.history.compact",
+    // provider & setting
+    ProviderGet => "provider.get",
+    ProviderUpdate => "provider.update",
+    ProviderVoiceList => "provider.voice.list",
+    ProviderModelList => "provider.model.list",
+    SettingGet => "setting.get",
+    SettingValidate => "setting.validate",
+    SettingUpdate => "setting.update",
+    // orchestrator
+    OrchestratorOpen => "orchestrator.open",
+    OrchestratorStop => "orchestrator.stop",
+    OrchestratorEvalCreate => "orchestrator.eval.create",
+    OrchestratorApprovalList => "orchestrator.approval.list",
+    OrchestratorApprovalResolve => "orchestrator.approval.resolve",
+    // attachment & core
+    AttachmentCreate => "attachment.create",
+    AttachmentImportPath => "attachment.importPath",
+    ServerHealthGet => "server.health.get",
+    // debug
+    DebugSnapshot => "debug.snapshot",
+    DebugTimelineList => "debug.timeline.list",
+    DebugTimelineClear => "debug.timeline.clear",
+    DebugTrajectoryList => "debug.trajectory.list",
+    DebugTrajectoryGet => "debug.trajectory.get",
+    DebugGraph => "debug.graph",
+    DebugOverrideGet => "debug.override.get",
+    DebugOverrideSet => "debug.override.set",
+    DebugBundleExport => "debug.bundle.export",
+    // remote & machine
+    RemoteStatus => "remote.status",
+    RemoteEnable => "remote.enable",
+    RemoteDisable => "remote.disable",
+    RemotePairCreate => "remote.pair.create",
+    RemotePairExchange => "remote.pair.exchange",
+    RemoteDeviceRevoke => "remote.device.revoke",
+    RemoteWhoami => "remote.whoami",
+    MachineList => "machine.list",
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::*;
+
+    #[test]
+    fn endpoint_id_matches_endpoints_table_exhaustively() {
+        assert_eq!(EndpointId::ALL.len(), ENDPOINTS.len());
+
+        let mut seen = HashSet::new();
+        for (idx, ep) in ENDPOINTS.iter().enumerate() {
+            let id = EndpointId::from_op(ep.op).unwrap_or_else(|| panic!("missing EndpointId for {}", ep.op));
+            assert_eq!(id, EndpointId::ALL[idx], "order mismatch at index {idx} ({})", ep.op);
+            assert_eq!(id.as_op(), ep.op);
+            assert_eq!(id.spec().op, ep.op);
+            assert_eq!(id.spec(), ep);
+            assert!(seen.insert(id), "duplicate EndpointId for {}", ep.op);
+        }
+
+        for &id in EndpointId::ALL {
+            assert_eq!(EndpointId::from_op(id.as_op()), Some(id));
+            assert_eq!(id.spec().op, id.as_op());
+        }
+
+        assert_eq!(EndpointId::from_op(""), None);
+        assert_eq!(EndpointId::from_op("unknown.op"), None);
+    }
+}
