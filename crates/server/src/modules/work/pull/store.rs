@@ -11,7 +11,8 @@ use vibevalley_protocol::{ApiError, PublishPlatform, PullRequest, PullRequestSta
 use crate::base::ServerDb;
 use crate::db::entities::work_pull::{pull, pull_event};
 use crate::db::error::internal_db;
-use crate::modules::work::{block_on, read_word, word};
+use crate::modules::infra::column::{db_word as word, read_db_word as read_word};
+use crate::modules::work::block_on;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PullRecord {

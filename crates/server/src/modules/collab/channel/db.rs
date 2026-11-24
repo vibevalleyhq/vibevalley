@@ -1695,3 +1695,19 @@ pub async fn delete_channel<C: ConnectionTrait>(conn: &C, id: &str) -> Sql<()> {
 
     Ok(())
 }
+
+pub(super) async fn message_locations(db: &impl ConnectionTrait, ids: &[String]) -> Sql<std::collections::HashMap<String, (String, i64)>> {
+    if ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+    let rows: Vec<(String, String, i64)> = channel_message::Entity::find()
+        .select_only()
+        .column(channel_message::Column::Id)
+        .column(channel_message::Column::ChannelId)
+        .column(channel_message::Column::Number)
+        .filter(channel_message::Column::Id.is_in(ids.to_vec()))
+        .into_tuple()
+        .all(db)
+        .await?;
+    Ok(rows.into_iter().map(|(id, channel_id, number)| (id, (channel_id, number))).collect())
+}

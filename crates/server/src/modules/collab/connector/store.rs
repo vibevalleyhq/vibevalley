@@ -10,8 +10,9 @@ use vibevalley_protocol::ConnectorID;
 
 use super::adapter::Inbound;
 use crate::base::ServerDb;
+use crate::db::begin_write_tx;
 use crate::db::entities::collab_connector::{connector_account, connector_inbound, connector_outbox};
-use crate::modules::collab::{begin_write_tx, block_on};
+use crate::modules::collab::block_on;
 use crate::modules::infra::setting::Secret;
 
 /// The database did not take a step: said as the status's error.

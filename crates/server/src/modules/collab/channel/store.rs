@@ -56,7 +56,7 @@ pub(super) struct WriteTx<'a> {
 
 impl<'a> WriteTx<'a> {
     pub(super) async fn begin(inner: &'a mut Inner, conn: &DatabaseConnection) -> Result<Self, ApiError> {
-        let tx = crate::modules::collab::begin_write_tx(conn).await.q()?;
+        let tx = crate::db::begin_write_tx(conn).await.q()?;
         Ok(Self {
             model: inner.model.clone(),
             reach: inner.reach.clone(),

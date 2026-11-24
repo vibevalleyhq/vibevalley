@@ -716,6 +716,10 @@ impl ChannelAnnouncePort for Chat {
     fn history(&self, channel: &str, limit: i64) -> Result<Vec<ChatMessage>, ApiError> {
         Chat::history(self, channel, None, Some(limit))
     }
+
+    fn message_locations<'a>(&'a self, ids: &'a [String]) -> crate::ports::MessageLocationsFuture<'a> {
+        Box::pin(async move { db::message_locations(self.db.read_conn(), ids).await.unwrap_or_default() })
+    }
 }
 
 impl crate::ports::ChannelMessageEventsPort for Chat {
@@ -753,7 +757,7 @@ mod tests {
         // Hold BOTH the channel write mutex (`chat.inner`) AND a SQLite `BEGIN IMMEDIATE`
         // write transaction on `write_conn()` simultaneously.
         let _write_mutex_guard = chat.locked().await;
-        let write_tx = crate::modules::collab::begin_write_tx(db.write_conn()).await.unwrap();
+        let write_tx = crate::db::begin_write_tx(db.write_conn()).await.unwrap();
         let _ = db::bump_revision(&write_tx, &gid).await.unwrap();
 
         let started = Instant::now();

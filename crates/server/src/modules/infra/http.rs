@@ -187,13 +187,6 @@ impl PublicDownload {
         Ok(PublicBytes { bytes, media_type, url })
     }
 
-    /// Downloads a public HTTPS resource with bound-DNS pinning, enforcing `timeout`,
-    /// HTTP 200, and `max_bytes`.
-    pub(crate) fn get_bytes(address: &str, timeout: Duration, max_bytes: usize) -> Result<PublicBytes, PublicDownloadError> {
-        let address = address.to_string();
-        run_http(async move { Self::get_bytes_async(&address, timeout, max_bytes).await })
-    }
-
     pub(crate) async fn fetch_async(r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
         if cancel.as_ref().is_some_and(CancellationToken::is_cancelled) {
             return Err(FetchError::Network("cancelled".into()));

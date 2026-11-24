@@ -14,6 +14,10 @@ path = "tests/suite.rs"
 name = "publish"
 path = "tests/publish.rs"
 
+[[test]]
+name = "dual_db"
+path = "tests/dual_db.rs"
+
 [features]
 # Test-only model checking (`vp run rust:loom`); never enable in release binaries.
 loom = ["dep:loom"]
@@ -41,7 +45,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_path_to_error = "0.1.20"
 sha2 = { workspace = true }
-sqlx = { workspace = true, features = ["runtime-tokio"] }
 symphonia = { version = "0.6.1", default-features = false, features = ["wav", "mp3", "isomp4", "flac", "ogg", "mkv"] }
 thiserror = { workspace = true }
 tokio = { workspace = true }
@@ -60,5 +63,6 @@ vibevalley-runtime = { version = "0.1.0", path = "../runtime" }
 
 [dev-dependencies]
 reqwest = { workspace = true, features = ["blocking"] }
+sqlx = { workspace = true, features = ["runtime-tokio"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }

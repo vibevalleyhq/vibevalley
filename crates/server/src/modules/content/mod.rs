@@ -3,166 +3,6 @@ pub mod attachment;
 pub mod library;
 pub mod media;
 
-use std::future::Future;
-use std::pin::Pin;
-
-use sea_orm::{DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, SqliteTransactionMode, TransactionOptions, TransactionTrait};
-use serde::{Serialize, de::DeserializeOwned};
-
-pub(crate) fn word<T: Serialize>(value: &T) -> Result<String, DbErr> {
-    let value = serde_json::to_value(value).map_err(|e| DbErr::Custom(e.to_string()))?;
-    match value {
-        serde_json::Value::String(word) => Ok(word),
-        _ => Err(DbErr::Custom("expected a wire enum word".into())),
-    }
-}
-
-pub(crate) fn read_word<T: DeserializeOwned>(s: String) -> Result<T, DbErr> {
-    serde_json::from_value(serde_json::Value::String(s)).map_err(|e| DbErr::Custom(e.to_string()))
-}
-
-pub(crate) fn json<T: Serialize>(value: &T) -> Result<String, DbErr> {
-    serde_json::to_string(value).map_err(|e| DbErr::Custom(e.to_string()))
-}
-
-pub(crate) fn read_json<T: DeserializeOwned>(s: String) -> Result<T, DbErr> {
-    serde_json::from_str(&s).map_err(|e| DbErr::Custom(e.to_string()))
-}
-
-pub(crate) async fn begin_write_tx(db: &DatabaseConnection) -> Result<DatabaseTransaction, DbErr> {
-    let opts = match db.get_database_backend() {
-        DatabaseBackend::Sqlite => TransactionOptions {
-            sqlite_transaction_mode: Some(SqliteTransactionMode::Immediate),
-            ..Default::default()
-        },
-        _ => TransactionOptions::default(),
-    };
-    db.begin_with_options(opts).await
-}
-
-pub(crate) async fn write_tx<T, E>(
-    db: &DatabaseConnection,
-    map_err: fn(DbErr) -> E,
-    f: impl for<'a> FnOnce(&'a DatabaseTransaction) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'a>> + Send,
-) -> Result<T, E> {
-    let tx = begin_write_tx(db).await.map_err(map_err)?;
-    match f(&tx).await {
-        Ok(val) => {
-            tx.commit().await.map_err(map_err)?;
-            Ok(val)
-        }
-        Err(err) => {
-            let _ = tx.rollback().await;
-            Err(err)
-        }
-    }
-}
-
-#[cfg(test)]
-pub(crate) mod test_postgres {
-    use std::path::PathBuf;
-
-    use sea_orm::{ConnectionTrait, Database};
-
-    pub struct EphemeralPostgres {
-        data_dir: PathBuf,
-        pg_ctl: PathBuf,
-        port: u16,
-        _temp: tempfile::TempDir,
-    }
-
-    impl EphemeralPostgres {
-        pub fn start() -> Option<Self> {
-            let initdb = ["/opt/homebrew/bin/initdb", "/usr/local/bin/initdb"]
-                .into_iter()
-                .map(PathBuf::from)
-                .find(|p| p.is_file())?;
-            let pg_ctl = ["/opt/homebrew/bin/pg_ctl", "/usr/local/bin/pg_ctl"]
-                .into_iter()
-                .map(PathBuf::from)
-                .find(|p| p.is_file())?;
-
-            let temp = tempfile::tempdir().ok()?;
-            let data_dir = temp.path().join("pgdata");
-            let sock_dir = temp.path().join("sock");
-            std::fs::create_dir_all(&sock_dir).ok()?;
-
-            let listener = std::net::TcpListener::bind("127.0.0.1:0").ok()?;
-            let port = listener.local_addr().ok()?.port();
-            drop(listener);
-
-            let init = std::process::Command::new(&initdb)
-                .arg("-D")
-                .arg(&data_dir)
-                .args(["--username=postgres", "--auth=trust", "--encoding=UTF8", "--no-sync"])
-                .output()
-                .ok()?;
-            assert!(init.status.success(), "initdb failed: {}", String::from_utf8_lossy(&init.stderr));
-
-            use std::io::Write;
-            let conf = format!(
-                "\nlisten_addresses = '127.0.0.1'\nport = {port}\nunix_socket_directories = '{}'\nfsync = off\nsynchronous_commit = off\nfull_page_writes = off\n",
-                sock_dir.display()
-            );
-            std::fs::OpenOptions::new()
-                .append(true)
-                .open(data_dir.join("postgresql.conf"))
-                .unwrap()
-                .write_all(conf.as_bytes())
-                .unwrap();
-
-            let log = temp.path().join("postgres.log");
-            let start = std::process::Command::new(&pg_ctl)
-                .arg("-D")
-                .arg(&data_dir)
-                .arg("-l")
-                .arg(&log)
-                .args(["-w", "start"])
-                .output()
-                .ok()?;
-            assert!(
-                start.status.success(),
-                "pg_ctl start failed: {}\nlog:\n{}",
-                String::from_utf8_lossy(&start.stderr),
-                std::fs::read_to_string(&log).unwrap_or_default()
-            );
-
-            Some(Self {
-                data_dir,
-                pg_ctl,
-                port,
-                _temp: temp,
-            })
-        }
-
-        pub fn create_database(&self, db_name: &str) {
-            let admin_url = format!("postgres://postgres@127.0.0.1:{}/postgres", self.port);
-            let name = db_name.to_owned();
-            vibevalley_runtime::rt::block_on(async move {
-                let db = Database::connect(&admin_url).await.expect("connect postgres admin db");
-                db.execute_unprepared(&format!("CREATE DATABASE \"{name}\""))
-                    .await
-                    .expect("create test database");
-                db.close().await.expect("close admin db");
-            });
-        }
-
-        pub fn db_url(&self, db_name: &str) -> String {
-            format!("postgres://postgres@127.0.0.1:{}/{}", self.port, db_name)
-        }
-    }
-
-    impl Drop for EphemeralPostgres {
-        fn drop(&mut self) {
-            let _ = std::process::Command::new(&self.pg_ctl)
-                .arg("-D")
-                .arg(&self.data_dir)
-                .args(["-m", "immediate", "-w", "stop"])
-                .output();
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
@@ -188,12 +28,12 @@ mod tests {
     use super::library::{AddedBy, Library};
     use super::media::inputs::Inputs;
     use super::media::jobs::{Jobs, Parts};
-    use super::test_postgres::EphemeralPostgres;
     use crate::Hub;
     use crate::base::ServerDb;
     use crate::db::entities::collab_channel::{channel, channel_message, channel_participant};
     use crate::db::entities::content_artifact::{artifact, artifact_change};
     use crate::db::error::{is_fk_violation, is_unique_violation};
+    use crate::db::test_pg::EphemeralPostgres;
     use crate::modules::infra::setting::{Setting, SettingConfig};
     use crate::ports::{ChannelAnnouncePort, ChannelQuotePort};
 
@@ -349,6 +189,25 @@ mod tests {
         }
         fn history(&self, _channel: &str, _limit: i64) -> Result<Vec<ChatMessage>, ApiError> {
             Ok(vec![])
+        }
+        fn message_locations<'a>(&'a self, ids: &'a [String]) -> crate::ports::MessageLocationsFuture<'a> {
+            Box::pin(async move {
+                use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
+                if ids.is_empty() {
+                    return std::collections::HashMap::new();
+                }
+                let rows: Vec<(String, String, i64)> = channel_message::Entity::find()
+                    .select_only()
+                    .column(channel_message::Column::Id)
+                    .column(channel_message::Column::ChannelId)
+                    .column(channel_message::Column::Number)
+                    .filter(channel_message::Column::Id.is_in(ids.to_vec()))
+                    .into_tuple()
+                    .all(self.db.read_conn())
+                    .await
+                    .unwrap_or_default();
+                rows.into_iter().map(|(id, ch, num)| (id, (ch, num))).collect()
+            })
         }
     }
 

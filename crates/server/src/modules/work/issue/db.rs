@@ -7,8 +7,9 @@ use sea_orm::{
 use vibevalley_protocol::Issue;
 
 use crate::db::entities::work_issue::issue;
+use crate::modules::infra::column::{db_json as json, db_word as word, read_db_json as read_json, read_db_word as read_word};
+use crate::modules::work::block_on;
 use crate::modules::work::ledger::IssueStore;
-use crate::modules::work::{block_on, json, read_json, read_word, word};
 
 pub struct SqliteIssueStore;
 

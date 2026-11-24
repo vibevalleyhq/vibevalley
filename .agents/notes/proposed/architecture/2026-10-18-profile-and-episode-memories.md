@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-当前 Rust 服务端 `server.db` 的 `memory` 表（[记性](docs/subsystems/memory.md)，[建表语句](crates/server/src/db/schema/team_memory.sql)）仅包含 `kind`（`note` / `issue`）、`agent`、`body`、`terms`、`repo`、`session` 与召回计数，尚无 `scope`、`title`、`importance` 与 `replaced_by` 列，存在三项缺口：
+当前 Rust 服务端 `server.db` 的 `memory` 表（[记性](docs/subsystems/memory.md)，[实体定义](crates/server/src/db/entities/team_memory.rs)）仅包含 `kind`（`note` / `issue`）、`agent`、`body`、`terms`、`repo`、`session` 与召回计数，尚无 `scope`、`title`、`importance` 与 `replaced_by` 列，存在三项缺口：
 
 | 缺项 | 现状 | 问题 |
 |---|---|---|

@@ -5,7 +5,7 @@ use sea_orm::{ActiveValue::Set, ColumnTrait, ConnectionTrait, DbErr, EntityTrait
 use vibevalley_protocol::{ActorKind, Cron, CronWhen};
 
 use crate::db::entities::work_cron::cron;
-use crate::modules::work::{json, read_json, read_word, word};
+use crate::modules::infra::column::{db_json as json, db_word as word, read_db_json as read_json, read_db_word as read_word};
 
 pub struct StoredCron {
     pub cron: Cron,

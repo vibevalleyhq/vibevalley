@@ -6,24 +6,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
+use sea_orm::sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbErr, SqlxSqliteConnector};
 use sea_orm_migration::MigratorTrait;
-use sqlx::pool::PoolConnection;
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
-use sqlx::{Sqlite, SqliteConnection, SqlitePool};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, Next};
-
-// Wave 2-3 SQLite transition views for un-migrated collab_channel sqlx queries.
-const SQLITE_CHANNEL_VIEWS: &str = "\
-CREATE VIEW IF NOT EXISTS channel_message_detail AS \
-SELECT m.*, p.name AS sender_name, p.kind AS sender_kind, p.agent_id AS sender_agent \
-FROM channel_message m JOIN channel_participant p ON p.id = m.sender_id;\n\
-CREATE VIEW IF NOT EXISTS channel_message_location AS \
-SELECT d.*, c.type AS channel_type, c.root_number, \
-       CAST(COALESCE(c.parent_id, c.id) AS TEXT) AS top_id, \
-       CAST(COALESCE(ch.name, c.name, '') AS TEXT) AS channel_name \
-FROM channel_message_detail d JOIN channel c ON c.id = d.channel_id LEFT JOIN channel ch ON ch.id = c.parent_id;";
 
 const READ_POOL_MAX_CONNECTIONS: u32 = 6;
 const WRITE_POOL_MAX_CONNECTIONS: u32 = 1;
@@ -55,10 +42,6 @@ fn parse_sqlite_url(url: &str) -> Result<PathBuf, DbErr> {
         return Err(DbErr::Custom("sqlite URL must reference a database file path".into()));
     }
     Ok(PathBuf::from(path_part))
-}
-
-fn db_err_to_sqlx(err: DbErr) -> sqlx::Error {
-    sqlx::Error::Protocol(err.to_string())
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -99,40 +82,8 @@ impl DatabaseConfig {
     }
 }
 
-/// Pooled SQLite connection guard that enters the shared Tokio runtime context
-/// before returning the underlying `PoolConnection` to `SqlitePool` on drop, so
-/// synchronous callers on non-Tokio threads never panic.
-pub(crate) struct DbConn(Option<PoolConnection<Sqlite>>);
-
-impl std::ops::Deref for DbConn {
-    type Target = SqliteConnection;
-
-    fn deref(&self) -> &Self::Target {
-        self.0.as_ref().expect("DbConn live before Drop")
-    }
-}
-
-impl std::ops::DerefMut for DbConn {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.as_mut().expect("DbConn live before Drop")
-    }
-}
-
-impl Drop for DbConn {
-    fn drop(&mut self) {
-        if let Some(conn) = self.0.take() {
-            let _guard = vibevalley_runtime::rt::handle().enter();
-            drop(conn);
-        }
-    }
-}
-
 enum DbBackendState {
-    Sqlite {
-        path: PathBuf,
-        read_pool: SqlitePool,
-        write_pool: SqlitePool,
-    },
+    Sqlite { path: PathBuf },
     Postgres,
 }
 
@@ -149,14 +100,14 @@ pub struct ServerDb {
 }
 
 impl ServerDb {
-    /// Opens `<home>/server.db` with split read/write pools and initializes all schemas once.
-    pub fn open(home: &Path) -> sqlx::Result<Arc<Self>> {
+    /// Opens `<home>/server.db` with split read/write connections and initializes all schemas once.
+    pub fn open(home: &Path) -> Result<Arc<Self>, DbErr> {
         Self::open_at(&home.join("server.db"))
     }
 
-    /// Opens `path` with split read/write pools and initializes all schemas once.
-    pub fn open_at(path: &Path) -> sqlx::Result<Arc<Self>> {
-        Self::open_config(&DatabaseConfig::Sqlite { path: path.to_path_buf() }).map_err(db_err_to_sqlx)
+    /// Opens `path` with split read/write connections and initializes all schemas once.
+    pub fn open_at(path: &Path) -> Result<Arc<Self>, DbErr> {
+        Self::open_config(&DatabaseConfig::Sqlite { path: path.to_path_buf() })
     }
 
     /// Opens a SQLite or PostgreSQL database from a URL (`sqlite:...`, `postgres://...`, `postgresql://...`).
@@ -191,10 +142,9 @@ impl ServerDb {
                         .connect_with(write_options)
                         .await
                         .map_err(|e| DbErr::Conn(sea_orm::RuntimeErr::SqlxError(Arc::new(e))))?;
-                    let write_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(write_pool.clone());
+                    let write_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(write_pool);
                     crate::db::migration::Migrator::up(&write_conn, None).await?;
                     vibevalley_runtime::agent::durable::migration::Migrator::up(&write_conn, None).await?;
-                    write_conn.execute_unprepared(SQLITE_CHANNEL_VIEWS).await?;
 
                     let read_options = SqliteConnectOptions::new().filename(path).read_only(true).busy_timeout(Duration::from_secs(5));
                     let read_pool = SqlitePoolOptions::new()
@@ -203,17 +153,9 @@ impl ServerDb {
                         .connect_with(read_options)
                         .await
                         .map_err(|e| DbErr::Conn(sea_orm::RuntimeErr::SqlxError(Arc::new(e))))?;
-                    let read_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(read_pool.clone());
+                    let read_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(read_pool);
 
-                    Ok::<_, DbErr>((
-                        DbBackendState::Sqlite {
-                            path: path.clone(),
-                            read_pool,
-                            write_pool,
-                        },
-                        read_conn,
-                        write_conn,
-                    ))
+                    Ok::<_, DbErr>((DbBackendState::Sqlite { path: path.clone() }, read_conn, write_conn))
                 }
                 DatabaseConfig::Postgres { url, max_connections } => {
                     let mut opts = ConnectOptions::new(url);
@@ -259,84 +201,13 @@ impl ServerDb {
 
     pub fn path(&self) -> &Path {
         match &self.backend_state {
-            DbBackendState::Sqlite { path, .. } => path,
+            DbBackendState::Sqlite { path } => path,
             DbBackendState::Postgres => panic!("ServerDb::path() is only available on SQLite"),
         }
     }
 
-    /// Writer pool (backward-compatible SQLite transition accessor).
-    pub fn pool(&self) -> &SqlitePool {
-        self.write_pool()
-    }
-
-    /// Multi-connection read-only WAL pool for concurrent pure read queries (SQLite transition).
-    pub fn read_pool(&self) -> &SqlitePool {
-        match &self.backend_state {
-            DbBackendState::Sqlite { read_pool, .. } => read_pool,
-            DbBackendState::Postgres => panic!("ServerDb::read_pool() is only available on SQLite; use read_conn()"),
-        }
-    }
-
-    /// Single-connection read-write pool serializing SQLite mutations (SQLite transition).
-    pub fn write_pool(&self) -> &SqlitePool {
-        match &self.backend_state {
-            DbBackendState::Sqlite { write_pool, .. } => write_pool,
-            DbBackendState::Postgres => panic!("ServerDb::write_pool() is only available on SQLite; use write_conn()"),
-        }
-    }
-
-    #[allow(dead_code)]
-    pub(crate) async fn acquire_write(&self) -> sqlx::Result<PoolConnection<Sqlite>> {
-        self.write_pool().acquire().await
-    }
-
-    #[allow(dead_code)]
-    pub(crate) async fn acquire_read_async(&self) -> sqlx::Result<PoolConnection<Sqlite>> {
-        self.read_pool().acquire().await
-    }
-
-    pub(crate) fn acquire(&self) -> sqlx::Result<DbConn> {
-        vibevalley_runtime::rt::block_on(self.write_pool().acquire()).map(|conn| DbConn(Some(conn)))
-    }
-
-    pub(crate) fn run<T>(&self, query: impl AsyncFnOnce(&mut SqliteConnection) -> sqlx::Result<T>) -> sqlx::Result<T> {
-        let write_pool = self.write_pool();
-        vibevalley_runtime::rt::block_on(async {
-            let mut conn = write_pool.acquire().await?;
-            query(&mut conn).await
-        })
-    }
-
-    pub(crate) fn run_api<T>(&self, query: impl AsyncFnOnce(&mut SqliteConnection) -> Result<T, ApiError>) -> Result<T, ApiError> {
-        let write_pool = self.write_pool();
-        vibevalley_runtime::rt::block_on(async {
-            let mut conn = write_pool.acquire().await.map_err(internal)?;
-            query(&mut conn).await
-        })
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn read<T>(&self, query: impl AsyncFnOnce(&mut SqliteConnection) -> sqlx::Result<T>) -> sqlx::Result<T> {
-        let read_pool = self.read_pool();
-        vibevalley_runtime::rt::block_on(async {
-            let mut conn = read_pool.acquire().await?;
-            query(&mut conn).await
-        })
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn read_api<T>(&self, query: impl AsyncFnOnce(&mut SqliteConnection) -> Result<T, ApiError>) -> Result<T, ApiError> {
-        let read_pool = self.read_pool();
-        vibevalley_runtime::rt::block_on(async {
-            let mut conn = read_pool.acquire().await.map_err(internal)?;
-            query(&mut conn).await
-        })
-    }
-
-    /// Returns the process-wide `durable::Store` handle backed by this `ServerDb`:
-    /// uses the Wave 1–3 `SqliteStorage` transition bridge on SQLite (so un-migrated
-    /// `modules/work/*` callers using `tx.connection()` keep working until Wave 3)
-    /// and `Store::from_sea_orm_conns` on PostgreSQL.
+    /// Returns the process-wide `durable::Store` handle backed by this `ServerDb`
+    /// via `Store::from_sea_orm_conns`.
     pub(crate) fn durable(&self) -> vibevalley_runtime::agent::durable::Result<vibevalley_runtime::agent::durable::Store> {
         let mut slot = self.durable.lock();
         if let Some(store) = slot.as_ref() {
@@ -357,18 +228,16 @@ impl ServerDb {
     }
 
     /// Coordinated async database shutdown: closes the durable store handle, then closes
-    /// SQLite pools (with WAL `TRUNCATE` + `PRAGMA optimize`) or PostgreSQL pool.
+    /// SQLite connections (with WAL `TRUNCATE` + `PRAGMA optimize`) or the PostgreSQL pool.
     pub async fn close_async(&self) {
         if let Some(store) = self.durable.lock().take() {
             let _ = store.close();
         }
         match &self.backend_state {
-            DbBackendState::Sqlite { read_pool, write_pool, .. } => {
-                read_pool.close().await;
-                if let Ok(mut conn) = write_pool.acquire().await {
-                    let _ = sqlx::raw_sql("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA optimize;").execute(&mut *conn).await;
-                }
-                write_pool.close().await;
+            DbBackendState::Sqlite { .. } => {
+                let _ = self.read_conn.clone().close().await;
+                let _ = self.write_conn.execute_unprepared("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA optimize;").await;
+                let _ = self.write_conn.clone().close().await;
             }
             DbBackendState::Postgres => {
                 let _ = self.write_conn.clone().close().await;
@@ -377,7 +246,7 @@ impl ServerDb {
     }
 
     /// Coordinated database shutdown: closes the durable store handle, then closes
-    /// SQLite pools (with WAL `TRUNCATE` + `PRAGMA optimize`) or PostgreSQL pool.
+    /// SQLite connections (with WAL `TRUNCATE` + `PRAGMA optimize`) or the PostgreSQL pool.
     pub fn close(&self) {
         vibevalley_runtime::rt::block_on(self.close_async());
     }
@@ -553,77 +422,86 @@ mod tests {
     use super::*;
 
     #[test]
-    fn concurrent_reads_succeed_immediately_while_write_pool_holds_begin_immediate() {
+    fn concurrent_reads_succeed_immediately_while_write_tx_holds_begin_immediate() {
+        use sea_orm::{ActiveModelTrait, ActiveValue::Set, EntityTrait, PaginatorTrait};
+
+        use crate::db::begin_write_tx;
+        use crate::db::entities::collab_channel::channel;
+
+        fn make_channel(id: &str, name: &str, default: bool, created_at: i64) -> channel::ActiveModel {
+            channel::ActiveModel {
+                id: Set(id.into()),
+                channel_type: Set("channel".into()),
+                is_default: Set(default),
+                root_id: Set(None),
+                root_number: Set(None),
+                subject_kind: Set(None),
+                subject_id: Set(None),
+                last_number: Set(None),
+                reply_count: Set(0),
+                created_at: Set(created_at),
+                name: Set(Some(name.into())),
+                description: Set(None),
+                repo: Set(None),
+                parent_id: Set(None),
+                peer_id: Set(None),
+                revision: Set(1),
+                category: Set(None),
+                position: Set(None),
+                archived_at: Set(None),
+                notify: Set("all".into()),
+            }
+        }
+
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
 
-        db.run(async |conn| {
-            sqlx::raw_sql("INSERT INTO channel (id, type, is_default, name, created_at) VALUES ('c1', 'channel', 1, 'general', 100);")
-                .execute(&mut *conn)
-                .await
-        })
-        .unwrap();
-
-        // Hold an open BEGIN IMMEDIATE write transaction with an uncommitted row.
-        let mut writer = db.acquire().unwrap();
         vibevalley_runtime::rt::block_on(async {
-            sqlx::raw_sql("BEGIN IMMEDIATE;").execute(&mut *writer).await.unwrap();
-            sqlx::raw_sql("INSERT INTO channel (id, type, is_default, name, created_at) VALUES ('c2', 'channel', 0, 'pending', 200);")
-                .execute(&mut *writer)
-                .await
-                .unwrap();
+            make_channel("c1", "general", true, 100).insert(db.write_conn()).await.unwrap();
         });
 
-        // Multiple concurrent read() calls must succeed immediately against the WAL snapshot
+        // Hold an open BEGIN IMMEDIATE write transaction with an uncommitted row.
+        let write_tx = vibevalley_runtime::rt::block_on(async {
+            let tx = begin_write_tx(db.write_conn()).await.unwrap();
+            make_channel("c2", "pending", false, 200).insert(&tx).await.unwrap();
+            tx
+        });
+
+        // Multiple concurrent read_conn() calls must succeed immediately against the WAL snapshot
         // without blocking on the active write transaction or hitting SQLite busy_timeout.
         let started = Instant::now();
         let mut threads = Vec::new();
         for _ in 0..6 {
             let db = db.clone();
             threads.push(std::thread::spawn(move || {
-                db.read(async |conn| {
-                    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM channel").fetch_one(&mut *conn).await?;
-                    Ok(count)
-                })
-                .unwrap()
+                vibevalley_runtime::rt::block_on(async { channel::Entity::find().count(db.read_conn()).await.unwrap() })
             }));
         }
-        let counts: Vec<i64> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+        let counts: Vec<u64> = threads.into_iter().map(|t| t.join().unwrap()).collect();
         let elapsed = started.elapsed();
         assert_eq!(counts, vec![1; 6], "readers must see committed WAL snapshot while writer holds BEGIN IMMEDIATE");
         assert!(
             elapsed < Duration::from_secs(1),
-            "concurrent read_pool queries took too long while write tx open: {elapsed:?}"
+            "concurrent read_conn queries took too long while write tx open: {elapsed:?}"
         );
 
-        // Verify read_pool enforces read_only(true).
-        let write_on_read_pool = db.read(async |conn| {
-            sqlx::raw_sql("INSERT INTO channel (id, type, is_default, name, created_at) VALUES ('c3', 'channel', 0, 'illegal', 300);")
-                .execute(&mut *conn)
-                .await
-        });
-        assert!(write_on_read_pool.is_err(), "read_pool must reject writes");
+        // Verify read_conn enforces read_only(true).
+        let write_on_read_conn = vibevalley_runtime::rt::block_on(async { make_channel("c3", "illegal", false, 300).insert(db.read_conn()).await });
+        assert!(write_on_read_conn.is_err(), "read_conn must reject writes");
 
-        // Commit the write transaction and release the write connection.
-        vibevalley_runtime::rt::block_on(async {
-            sqlx::raw_sql("COMMIT;").execute(&mut *writer).await.unwrap();
-        });
-        drop(writer);
+        // Commit the write transaction.
+        vibevalley_runtime::rt::block_on(write_tx.commit()).unwrap();
 
         // New reads immediately see the committed write.
-        let after: i64 = db
-            .read(async |conn| sqlx::query_scalar("SELECT COUNT(*) FROM channel").fetch_one(&mut *conn).await)
-            .unwrap();
+        let after = vibevalley_runtime::rt::block_on(async { channel::Entity::find().count(db.read_conn()).await.unwrap() });
         assert_eq!(after, 2);
 
-        // Coordinated shutdown closes read_pool first, checkpoints WAL (TRUNCATE), and closes write_pool.
+        // Coordinated shutdown closes read_conn first, checkpoints WAL (TRUNCATE), and closes write_conn.
         db.close();
         drop(db);
 
         let reopened = ServerDb::open(dir.path()).unwrap();
-        let persisted: i64 = reopened
-            .read(async |conn| sqlx::query_scalar("SELECT COUNT(*) FROM channel").fetch_one(&mut *conn).await)
-            .unwrap();
+        let persisted = vibevalley_runtime::rt::block_on(async { channel::Entity::find().count(reopened.read_conn()).await.unwrap() });
         assert_eq!(persisted, 2);
         reopened.close();
     }
@@ -684,23 +562,45 @@ mod tests {
     }
 
     #[test]
-    fn async_acquire_write_and_read_helpers_work_inside_send_futures() {
+    fn async_write_and_read_conns_work_inside_send_futures() {
+        use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
+
+        use crate::db::entities::collab_channel::channel;
+
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
         let db_task = db.clone();
         let count = vibevalley_runtime::rt::block_on(async move {
             vibevalley_runtime::rt::spawn(async move {
-                let mut writer = db_task.acquire_write().await?;
-                sqlx::raw_sql("INSERT INTO channel (id, type, is_default, name, created_at) VALUES ('async-c1', 'channel', 0, 'async', 100);")
-                    .execute(&mut *writer)
-                    .await?;
-                drop(writer);
+                channel::ActiveModel {
+                    id: Set("async-c1".into()),
+                    channel_type: Set("channel".into()),
+                    is_default: Set(false),
+                    root_id: Set(None),
+                    root_number: Set(None),
+                    subject_kind: Set(None),
+                    subject_id: Set(None),
+                    last_number: Set(None),
+                    reply_count: Set(0),
+                    created_at: Set(100),
+                    name: Set(Some("async".into())),
+                    description: Set(None),
+                    repo: Set(None),
+                    parent_id: Set(None),
+                    peer_id: Set(None),
+                    revision: Set(1),
+                    category: Set(None),
+                    position: Set(None),
+                    archived_at: Set(None),
+                    notify: Set("all".into()),
+                }
+                .insert(db_task.write_conn())
+                .await?;
 
-                let mut reader = db_task.acquire_read_async().await?;
-                let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM channel WHERE id = 'async-c1'")
-                    .fetch_one(&mut *reader)
-                    .await?;
-                Ok::<_, sqlx::Error>(count)
+                channel::Entity::find()
+                    .filter(channel::Column::Id.eq("async-c1"))
+                    .count(db_task.read_conn())
+                    .await
             })
             .await
             .unwrap()
@@ -712,6 +612,11 @@ mod tests {
 
     #[test]
     fn concurrent_server_db_and_durable_writes_serialize_without_busy_or_deadlock() {
+        use sea_orm::{ActiveModelTrait, ActiveValue::Set, EntityTrait, PaginatorTrait};
+
+        use crate::db::begin_write_tx;
+        use crate::db::entities::collab_channel::channel;
+
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
         let durable = db.durable().unwrap();
@@ -731,26 +636,35 @@ mod tests {
                     for i in 0..ops_per_thread {
                         let id = format!("ch-{t}-{i}");
                         let name = format!("channel-{t}-{i}");
-                        db.run(async move |conn| {
-                            sqlx::raw_sql("BEGIN IMMEDIATE;").execute(&mut *conn).await?;
-                            let res = sqlx::query("INSERT INTO channel (id, type, is_default, name, created_at) VALUES (?1, 'channel', 0, ?2, ?3)")
-                                .bind(&id)
-                                .bind(&name)
-                                .bind((t * ops_per_thread + i) as i64)
-                                .execute(&mut *conn)
-                                .await;
-                            match res {
-                                Ok(_) => {
-                                    sqlx::raw_sql("COMMIT;").execute(&mut *conn).await?;
-                                    Ok(())
-                                }
-                                Err(err) => {
-                                    let _ = sqlx::raw_sql("ROLLBACK;").execute(&mut *conn).await;
-                                    Err(err)
-                                }
+                        vibevalley_runtime::rt::block_on(async {
+                            let tx = begin_write_tx(db.write_conn()).await?;
+                            channel::ActiveModel {
+                                id: Set(id),
+                                channel_type: Set("channel".into()),
+                                is_default: Set(false),
+                                root_id: Set(None),
+                                root_number: Set(None),
+                                subject_kind: Set(None),
+                                subject_id: Set(None),
+                                last_number: Set(None),
+                                reply_count: Set(0),
+                                created_at: Set((t * ops_per_thread + i) as i64),
+                                name: Set(Some(name)),
+                                description: Set(None),
+                                repo: Set(None),
+                                parent_id: Set(None),
+                                peer_id: Set(None),
+                                revision: Set(1),
+                                category: Set(None),
+                                position: Set(None),
+                                archived_at: Set(None),
+                                notify: Set("all".into()),
                             }
+                            .insert(&tx)
+                            .await?;
+                            tx.commit().await
                         })
-                        .expect("ServerDb::run write must serialize cleanly without SQLITE_BUSY");
+                        .expect("ServerDb::write_conn write must serialize cleanly without SQLITE_BUSY");
                     }
                 });
             }
@@ -780,9 +694,8 @@ mod tests {
                 scope.spawn(move || {
                     barrier.wait();
                     for _ in 0..ops_per_thread {
-                        let _: i64 = db
-                            .read(async |conn| sqlx::query_scalar("SELECT COUNT(*) FROM channel").fetch_one(&mut *conn).await)
-                            .expect("concurrent ServerDb::read must succeed");
+                        let _ = vibevalley_runtime::rt::block_on(async { channel::Entity::find().count(db.read_conn()).await })
+                            .expect("concurrent ServerDb::read_conn must succeed");
                         let _ = durable
                             .read(|r| r.documents_by_kind("stress", "item"))
                             .expect("concurrent durable.read must succeed");
@@ -791,17 +704,15 @@ mod tests {
             }
         });
 
-        let channel_count: i64 = db
-            .read(async |conn| sqlx::query_scalar("SELECT COUNT(*) FROM channel").fetch_one(&mut *conn).await)
-            .unwrap();
-        assert_eq!(channel_count, (server_threads * ops_per_thread) as i64);
+        let channel_count = vibevalley_runtime::rt::block_on(async { channel::Entity::find().count(db.read_conn()).await }).unwrap();
+        assert_eq!(channel_count, (server_threads * ops_per_thread) as u64);
 
         let durable_docs = durable.read(|r| r.documents_by_kind("stress", "item")).unwrap();
         assert_eq!(durable_docs.len(), durable_threads * ops_per_thread);
 
-        // Writer connection must be released immediately after durable writes finish.
-        let writer = db.acquire().expect("write_pool connection must not be starved by durable");
-        drop(writer);
+        // Writer connection must remain usable after durable writes finish.
+        let tx = vibevalley_runtime::rt::block_on(begin_write_tx(db.write_conn())).expect("write_conn must not be starved by durable");
+        vibevalley_runtime::rt::block_on(tx.rollback()).unwrap();
 
         db.close();
     }
@@ -1340,107 +1251,9 @@ mod tests {
         reopened.close();
     }
 
-    struct EphemeralPostgres {
-        data_dir: PathBuf,
-        pg_ctl: PathBuf,
-        port: u16,
-        _temp: tempfile::TempDir,
-    }
-
-    impl EphemeralPostgres {
-        fn start() -> Option<Self> {
-            let initdb = ["/opt/homebrew/bin/initdb", "/usr/local/bin/initdb"]
-                .into_iter()
-                .map(PathBuf::from)
-                .find(|p| p.is_file())?;
-            let pg_ctl = ["/opt/homebrew/bin/pg_ctl", "/usr/local/bin/pg_ctl"]
-                .into_iter()
-                .map(PathBuf::from)
-                .find(|p| p.is_file())?;
-
-            let temp = tempfile::tempdir().ok()?;
-            let data_dir = temp.path().join("pgdata");
-            let sock_dir = temp.path().join("sock");
-            std::fs::create_dir_all(&sock_dir).ok()?;
-
-            let listener = std::net::TcpListener::bind("127.0.0.1:0").ok()?;
-            let port = listener.local_addr().ok()?.port();
-            drop(listener);
-
-            let init = std::process::Command::new(&initdb)
-                .arg("-D")
-                .arg(&data_dir)
-                .args(["--username=postgres", "--auth=trust", "--encoding=UTF8", "--no-sync"])
-                .output()
-                .ok()?;
-            assert!(init.status.success(), "initdb failed: {}", String::from_utf8_lossy(&init.stderr));
-
-            use std::io::Write;
-            let conf = format!(
-                "\nlisten_addresses = '127.0.0.1'\nport = {port}\nunix_socket_directories = '{}'\nfsync = off\nsynchronous_commit = off\nfull_page_writes = off\n",
-                sock_dir.display()
-            );
-            std::fs::OpenOptions::new()
-                .append(true)
-                .open(data_dir.join("postgresql.conf"))
-                .unwrap()
-                .write_all(conf.as_bytes())
-                .unwrap();
-
-            let log = temp.path().join("postgres.log");
-            let start = std::process::Command::new(&pg_ctl)
-                .arg("-D")
-                .arg(&data_dir)
-                .arg("-l")
-                .arg(&log)
-                .args(["-w", "start"])
-                .output()
-                .ok()?;
-            assert!(
-                start.status.success(),
-                "pg_ctl start failed: {}\nlog:\n{}",
-                String::from_utf8_lossy(&start.stderr),
-                std::fs::read_to_string(&log).unwrap_or_default()
-            );
-
-            Some(Self {
-                data_dir,
-                pg_ctl,
-                port,
-                _temp: temp,
-            })
-        }
-
-        fn create_database(&self, db_name: &str) {
-            let admin_url = format!("postgres://postgres@127.0.0.1:{}/postgres", self.port);
-            let name = db_name.to_owned();
-            vibevalley_runtime::rt::block_on(async move {
-                let db = Database::connect(&admin_url).await.expect("connect postgres admin db");
-                db.execute_unprepared(&format!("CREATE DATABASE \"{name}\""))
-                    .await
-                    .expect("create test database");
-                db.close().await.expect("close admin db");
-            });
-        }
-
-        fn db_url(&self, db_name: &str) -> String {
-            format!("postgres://postgres@127.0.0.1:{}/{}", self.port, db_name)
-        }
-    }
-
-    impl Drop for EphemeralPostgres {
-        fn drop(&mut self) {
-            let _ = std::process::Command::new(&self.pg_ctl)
-                .arg("-D")
-                .arg(&self.data_dir)
-                .args(["-m", "immediate", "-w", "stop"])
-                .output();
-        }
-    }
-
     #[test]
     fn postgres_open_url_migrates_server_and_durable_schemas_and_runs_core_ops() {
-        let Some(pg) = EphemeralPostgres::start() else {
+        let Some(pg) = crate::db::test_pg::EphemeralPostgres::start() else {
             eprintln!("skipping postgres_open_url_migrates_server_and_durable_schemas_and_runs_core_ops: initdb/pg_ctl not found");
             return;
         };

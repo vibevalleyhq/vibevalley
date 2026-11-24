@@ -2,21 +2,6 @@ pub mod channel;
 pub mod connector;
 pub mod voice;
 
-use sea_orm::{DatabaseConnection, DatabaseTransaction, DbBackend, DbErr, SqliteTransactionMode, TransactionOptions, TransactionTrait};
-
-/// Begins a write transaction (`BEGIN IMMEDIATE` on SQLite so read-then-write
-/// upgrades never fail with `SQLITE_BUSY`, standard transaction on PostgreSQL).
-pub(super) async fn begin_write_tx(conn: &DatabaseConnection) -> Result<DatabaseTransaction, DbErr> {
-    let opts = match conn.get_database_backend() {
-        DbBackend::Sqlite => TransactionOptions {
-            sqlite_transaction_mode: Some(SqliteTransactionMode::Immediate),
-            ..Default::default()
-        },
-        _ => TransactionOptions::default(),
-    };
-    conn.begin_with_options(opts).await
-}
-
 /// Sync bridge for non-async callers at collab boundaries.
 pub(super) fn block_on<F: std::future::Future>(fut: F) -> F::Output {
     vibevalley_runtime::rt::block_on(fut)
@@ -24,119 +9,21 @@ pub(super) fn block_on<F: std::future::Future>(fut: F) -> F::Output {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use std::sync::Arc;
 
-    use sea_orm::{ColumnTrait, Database, EntityTrait, QueryFilter};
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
     use vibevalley_protocol::{ChannelUpdate, ConnectorID, MessageKind, Notify, SubjectKind, USER_ID};
 
     use super::block_on;
     use crate::Hub;
     use crate::base::ServerDb;
     use crate::db::entities::collab_channel::channel_message;
+    use crate::db::test_pg::EphemeralPostgres;
     use crate::modules::collab::channel::{Chat, DeliveryTargetKind, Noticing, Posting, ReadOptions, Saying, Seat, ThreadSubject, db};
     use crate::modules::collab::connector::adapter::Inbound;
     use crate::modules::collab::connector::store::Store;
     use crate::modules::content::attachment::Attachments;
     use crate::modules::infra::setting::Secret;
-
-    struct EphemeralPostgres {
-        data_dir: PathBuf,
-        pg_ctl: PathBuf,
-        port: u16,
-        _temp: tempfile::TempDir,
-    }
-
-    impl EphemeralPostgres {
-        fn start() -> Option<Self> {
-            let initdb = ["/opt/homebrew/bin/initdb", "/usr/local/bin/initdb"]
-                .into_iter()
-                .map(PathBuf::from)
-                .find(|p| p.is_file())?;
-            let pg_ctl = ["/opt/homebrew/bin/pg_ctl", "/usr/local/bin/pg_ctl"]
-                .into_iter()
-                .map(PathBuf::from)
-                .find(|p| p.is_file())?;
-
-            let temp = tempfile::tempdir().ok()?;
-            let data_dir = temp.path().join("pgdata");
-            let sock_dir = temp.path().join("sock");
-            std::fs::create_dir_all(&sock_dir).ok()?;
-
-            let listener = std::net::TcpListener::bind("127.0.0.1:0").ok()?;
-            let port = listener.local_addr().ok()?.port();
-            drop(listener);
-
-            let init = std::process::Command::new(&initdb)
-                .arg("-D")
-                .arg(&data_dir)
-                .args(["--username=postgres", "--auth=trust", "--encoding=UTF8", "--no-sync"])
-                .output()
-                .ok()?;
-            assert!(init.status.success(), "initdb failed: {}", String::from_utf8_lossy(&init.stderr));
-
-            use std::io::Write;
-            let conf = format!(
-                "\nlisten_addresses = '127.0.0.1'\nport = {port}\nunix_socket_directories = '{}'\nfsync = off\nsynchronous_commit = off\nfull_page_writes = off\n",
-                sock_dir.display()
-            );
-            std::fs::OpenOptions::new()
-                .append(true)
-                .open(data_dir.join("postgresql.conf"))
-                .unwrap()
-                .write_all(conf.as_bytes())
-                .unwrap();
-
-            let log = temp.path().join("postgres.log");
-            let start = std::process::Command::new(&pg_ctl)
-                .arg("-D")
-                .arg(&data_dir)
-                .arg("-l")
-                .arg(&log)
-                .args(["-w", "start"])
-                .output()
-                .ok()?;
-            assert!(
-                start.status.success(),
-                "pg_ctl start failed: {}\nlog:\n{}",
-                String::from_utf8_lossy(&start.stderr),
-                std::fs::read_to_string(&log).unwrap_or_default()
-            );
-
-            Some(Self {
-                data_dir,
-                pg_ctl,
-                port,
-                _temp: temp,
-            })
-        }
-
-        fn create_database(&self, db_name: &str) {
-            let admin_url = format!("postgres://postgres@127.0.0.1:{}/postgres", self.port);
-            let name = db_name.to_owned();
-            super::block_on(async move {
-                let db = Database::connect(&admin_url).await.expect("connect postgres admin db");
-                sea_orm::ConnectionTrait::execute_unprepared(&db, &format!("CREATE DATABASE \"{name}\""))
-                    .await
-                    .expect("create test database");
-                db.close().await.expect("close admin db");
-            });
-        }
-
-        fn db_url(&self, db_name: &str) -> String {
-            format!("postgres://postgres@127.0.0.1:{}/{}", self.port, db_name)
-        }
-    }
-
-    impl Drop for EphemeralPostgres {
-        fn drop(&mut self) {
-            let _ = std::process::Command::new(&self.pg_ctl)
-                .arg("-D")
-                .arg(&self.data_dir)
-                .args(["-m", "immediate", "-w", "stop"])
-                .output();
-        }
-    }
 
     async fn verify_dual_db_collab(db: &Arc<ServerDb>, home: &std::path::Path) {
         let hub = Hub::new(vibevalley_core::empty_space_state());

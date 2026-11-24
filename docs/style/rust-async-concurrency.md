@@ -45,7 +45,7 @@
 
 - I/O 密集或长耗时端点应使用 `Hub::on_async::<O, _, _>`（入参 `AsyncCtx`）与 `Hub::on_subscription_async`，在 Tokio 任务上直接挂起等待而零 OS 线程占用。
 - 纯内存短读取或极短计算端点可保留同步 `Hub::on::<O>`，避免无谓的状态机装箱。
-- 异步端点或后台任务需要执行 SQLite 查询（`ServerDb`）、文件系统访问或同步外部调用时，应通过 `crate::spawn_blocking_traced`（或 `Hub::spawn_blocking_task`）卸载到阻塞池，不应在 Tokio I/O 工作线程上直接执行阻塞操作。`spawn_blocking_traced` 会捕获当前 `tracing::Dispatch` 与 `tracing::Span::current()` 并在工作线程 `in_scope` 内恢复。
+- 异步端点或后台任务需要执行文件系统访问或同步外部调用时，应通过 `crate::spawn_blocking_traced`（或 `Hub::spawn_blocking_task`）卸载到阻塞池，不应在 Tokio I/O 工作线程上直接执行阻塞操作；数据库查询统一使用异步 SeaORM `DatabaseConnection`（`ServerDb::read_conn()` / `write_conn()`）在 Tokio 任务上直接 `.await`。`spawn_blocking_traced` 会捕获当前 `tracing::Dispatch` 与 `tracing::Span::current()` 并在工作线程 `in_scope` 内恢复。
 
 ### Axum `FromRequestParts` 类型化鉴权
 
@@ -123,7 +123,7 @@
 
 | 检查 / 脚本 | 守卫范围 | 触发方式 |
 |---|---|---|
-| [rust-ratchets.ts](scripts/audit/rust-ratchets.ts) | 禁止引入 `pollster`、锁定服务端非测试 `rt::block_on(` 仅缩减上限（`SERVER_BLOCK_ON_CEILING = 102`）、禁止 `apps/mac/src` 使用 `rt::handle`、禁止 `crates/server/tests/`、`apps/mac/src/`、`crates/cli/src/` 与 `crates/runtime/src/` 使用 `std::thread::sleep`、禁止 `crates/rich` 在 `highlight.rs` 外经 `Handle::try_current()` 回退同步执行等 | `vp run audit:rust` |
+| [rust-ratchets.ts](scripts/audit/rust-ratchets.ts) | 禁止引入 `pollster`、锁定服务端非测试 `rt::block_on(` 仅缩减上限（`SERVER_BLOCK_ON_CEILING = 91`）、禁止 `apps/mac/src` 使用 `rt::handle`、禁止 `crates/server/tests/`、`apps/mac/src/`、`crates/cli/src/` 与 `crates/runtime/src/` 使用 `std::thread::sleep`、禁止 `crates/rich` 在 `highlight.rs` 外经 `Handle::try_current()` 回退同步执行等 | `vp run audit:rust` |
 | [module-boundaries.ts](scripts/audit/module-boundaries.ts) | 守住服务端 `L0–L3` 无环 DAG、模块无循环依赖、脊柱（`lib.rs` / `ports.rs` / `transport/`）与 `apps/mac/src` 不直接导入 `crate::modules::*` | `vp run audit:boundaries` |
 | Rust 工作区全检 | `cargo fmt`、`cargo clippy --all-targets -- -D warnings`、工作区测试 | `vp run rust:check` |
 | Loom 状态机模型检验 | 4 个并发状态机内核穷举交错检查（`--features loom --profile loom`） | `vp run rust:loom` |

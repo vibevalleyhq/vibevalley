@@ -21,8 +21,8 @@ use vibevalley_protocol::{
 
 use crate::base::{LookIn, ServerDb, missing};
 use crate::db::entities::{content_attachment::attachment, content_library::media_library_item};
+use crate::db::write_tx;
 use crate::modules::content::attachment::{ATTACHMENT_MAX, Attachments};
-use crate::modules::content::write_tx;
 use crate::modules::infra::http::{PublicDownload, PublicDownloadError};
 use crate::{Hub, now};
 

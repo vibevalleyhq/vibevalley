@@ -32,7 +32,7 @@ use super::blocks::spans_of;
 use super::db::{self, ArtifactRow, StoredSuggestion};
 use super::entries::EntryChange;
 use super::{Artifacts, Maker, artifact_type_of, new_id, q, refused};
-use crate::modules::content::begin_write_tx;
+use crate::db::begin_write_tx;
 use crate::{Hub, Sink, now};
 
 const DEFAULT_PRESENCE_COLORS: [&str; 6] = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];

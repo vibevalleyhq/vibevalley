@@ -27,7 +27,7 @@ use super::blocks::relay_with_reset;
 use super::collab::commit_meta_for_maker;
 use super::{Artifacts, Maker, artifact_type_of, db, q, refused};
 use crate::base::{LookIn, missing};
-use crate::modules::content::begin_write_tx;
+use crate::db::begin_write_tx;
 use crate::{Hub, Sink, now};
 
 const CATCH_UP_MAX: usize = 200;

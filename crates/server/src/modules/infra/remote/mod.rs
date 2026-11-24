@@ -812,7 +812,7 @@ mod tests {
 
         remote.close_async().await;
         hub.close_async().await;
-        db.close();
+        db.close_async().await;
     }
 
     #[tokio::test]
@@ -877,7 +877,7 @@ mod tests {
         hub.invoke_as_async::<ops::RemoteDisable>(Caller::User, ()).await.unwrap();
 
         hub.close_async().await;
-        db.close();
+        db.close_async().await;
     }
 
     async fn verify_remote_dual_db(db: Arc<ServerDb>, expected_backend: sea_orm::DatabaseBackend) {
@@ -1022,7 +1022,7 @@ mod tests {
         block_on(verify_remote_dual_db(sqlite_db.clone(), sea_orm::DatabaseBackend::Sqlite));
         sqlite_db.close();
 
-        let Some(pg) = crate::modules::infra::column::test_pg::EphemeralPostgres::start() else {
+        let Some(pg) = crate::db::test_pg::EphemeralPostgres::start() else {
             eprintln!("skipping postgres remote dual-db test: Homebrew initdb/pg_ctl not found");
             return;
         };

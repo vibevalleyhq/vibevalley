@@ -15,8 +15,8 @@ crates/rich/               原生富内容组件与辅助（vibevalley-rich）�
 crates/server/             服务端（二进制 vibevalley-server）：src/modules 按 6 个业务域分组（work：issue、session、workplace、repo、cron、pull、ledger；
                            team：agent、orchestrator、memory、tool、mcp；collab：channel、connector、voice；
                            content：attachment、library、media、artifact；skin：game；infra：setting、provider、http、column、debug、remote；
-                           任务板拆成 work/issue（状态与交付）、work/session（领域无关 AgentSession、SQLite session_mailbox 与游标轨迹 session_event）、work/workplace（worktree 与合并），都只经 work/ledger 写），
-                           src/db/{schema,queries,generated}/ 集中管理 SQLite 建表语句（含 shared.sql 共享 seq_counter 与 infra_remote.sql 远程配置/设备表）、命名查询与 sqlc 生成绑定；
+                           任务板拆成 work/issue（状态与交付）、work/session（领域无关 AgentSession、session_mailbox 与游标轨迹 session_event）、work/workplace（worktree 与合并），都只经 work/ledger 写），
+                           src/db/{entities,migration}/ 集中管理双后端（SQLite + PostgreSQL）SeaORM 实体与迁移（含 shared 共享 seq_counter 与 infra_remote 远程配置/设备表），运行期经 ServerDb 的 read_conn()/write_conn() 读写；
                            src/transport/ 收拢接口契约（api）、进程内桥（bridge）与 HTTP 门（http，含默认关闭的受认证远程监听门）；
                            lib.rs 组装 Hub（含 EventBus、SliceFeed、CallerContext 与观察/故障/宿主调试/远程认证插槽），start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、作品类型指南（artifact/types/）、主助手和执行会话的提示
 crates/cli/                命令行（二进制 vibevalley，clap）：按五大业务域（work/team/collab/content/infra）组织的纯 HTTP 客户端；评测另拆为可选二进制 vibevalley-eval（--features eval）
@@ -46,15 +46,15 @@ scripts/                   gen/（生成物写出）、audit/（lint 插件、�
 vp install                                                      # 根目录：装 TS 依赖（Vite+ 带的 pnpm 12），打出各包的声明
 vp run nsh:install                                              # 把 nsh 的命令行装到 .tools/bin：打 apps/mac/ui 的包、跑 mac:check 之前
 cargo run -p vibevalley-mac                                     # 原生应用，里面带着服务端；dev 通道默认 127.0.0.1:8790 与 ~/.vibevalley-dev，VIBEVALLEY_HOME、VIBEVALLEY_STORE 改位置
-cargo run -p vibevalley-server                                  # 只跑服务端；按发布通道默认端口（dev 8790 / alpha 8789 / beta 8788 / release 8787），VIBEVALLEY_CHANNEL、VIBEVALLEY_HOME、VIBEVALLEY_WORK_ROOT、VIBEVALLEY_PORT 改位置
+cargo run -p vibevalley-server                                  # 只跑服务端；按发布通道默认端口（dev 8790 / alpha 8789 / beta 8788 / release 8787），VIBEVALLEY_CHANNEL、VIBEVALLEY_HOME、VIBEVALLEY_WORK_ROOT、VIBEVALLEY_PORT、VIBEVALLEY_DATABASE_URL（--database-url）改位置与数据库后端
 cargo run -p vibevalley-cli -- issue list                       # 命令行：issue、session、repo、cron、agent、orchestrator、runtime、memory、channel、chat、artifact、library、media、attachment、state、setting、doctor（--json 输出原始 JSON）
 vp run rust:check                                               # 改完 crates/ 或 apps/mac/src：cargo fmt、clippy（-D warnings）、cargo test
 vp run rust:changed                                             # 只检查相对 origin/main 改到的 Rust crate 及其反向依赖（fmt、clippy、nextest）
 vp run rust:loom                                                # 对并发状态机内核跑 loom 穷举模型检验（--features loom --profile loom）
 vp run audit:rust                                               # 检查 Rust 异步并发、虚拟时钟与 UI 卸载静态护栏（scripts/audit/rust-ratchets.ts）
 vp run protocol:ts                                              # 改了 crates/protocol/src/contract：重写 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts
-sqlc generate                                                   # 改完 SQLite 表结构或命名查询：重写 crates/server/src/db/generated/ 与宿主查询绑定
-vp run sql:check                                                # 用 sqlc 1.31.1 对账 Rust 绑定；用 Python 3 的 SQLite 按参数个数预编译每条查询
+sqlc generate                                                   # 改完宿主 state.db 表结构或命名查询：重写 apps/mac/crates/workspace 的查询绑定
+vp run sql:check                                                # 用 sqlc 1.31.1 对账宿主 SQLite 查询绑定；用 Python 3 的 SQLite 按参数个数预编译每条查询
 vp run goldens                                                  # 改了作品规则或对照用例：跑 Rust 两个 crate 的 golden 测试
 vp run protocol:check                                           # 生成的 TS 契约和 golden 是不是最新，和提交的不同就失败
 vp run mac:check                                                # 改完 apps/mac/ui：nsh 类型检查、打包和工单按钮行为测试
@@ -100,7 +100,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **Rust 异步与并发**：共用单一 `vibevalley-runtime::rt`，异步函数与 `Drop` 禁 `rt::block_on`（用 `close_async`），测试用 `start_paused` + `ManualClock` 及 `--features loom` 内核，`crates/rich` 重计算离线程卸载（[Rust 异步并发规范](docs/style/rust-async-concurrency.md)，`vp run audit:rust`）。
 - **封闭的联合穷尽处理**：Rust 的 `match` 不写吞掉新成员的 `_`；TS 按 `_tag`、`kind`、`type` 分支时 `switch` 覆盖全部成员（`switch-exhaustiveness-check` 查）。
 - **契约改在 Rust**：形状和接口表改 `crates/protocol/src/contract`，TS 的类型由它生成；页面要用的同改手写的 `schema.ts` 与 `api.ts`，它们的测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）。
-- **生成的不手改**：`packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`（`protocol:ts`）、`client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）、`iconPaths.gen.ts`（`icons:gen`）、artifact 的 golden（`goldens`）和生成的参考表由脚本写出，`protocol:check` 和 `docs:verify` 查是不是最新。SQLite 查询绑定由 sqlc 生成，输入和输出见[配置](sqlc.yaml)。
+- **生成的不手改**：`packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`（`protocol:ts`）、`client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）、`iconPaths.gen.ts`（`icons:gen`）、artifact 的 golden（`goldens`）和生成的参考表由脚本写出，`protocol:check` 和 `docs:verify` 查是不是最新。宿主 `state.db` 查询绑定由 sqlc 生成，输入和输出见[配置](sqlc.yaml)；服务端与持久执行使用 `SeaORM` + `SeaQuery` 实体与迁移同时支持 SQLite 与 PostgreSQL。
 - **内部不留兼容**：改名、改形状、改落盘格式直接改，不写兼容层、旧数据兜底或迁移脚本；对外 HTTP `v1` 是唯一例外（[接口版本](docs/subsystems/core.md)）。
 - **页面不折事实**：页面只读按域推来的切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）并写画面摆法，请求只经 `Transport`；缺数据就补进契约与 `reduce` 或调接口问服务端（[客户端](docs/subsystems/app.md)）。
 - **页面守 `nsh` 响应式**：动态 JSX 分支用 `<If>`、列表用带稳定 `key` 的 `<Each>` 或 `<List>`，不解构 `props`、不提前求值访问器、多处派生用 `computed()`（[NSH TSX 规范](docs/style/nsh-tsx.md)）。

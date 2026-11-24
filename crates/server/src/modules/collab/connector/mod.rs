@@ -167,8 +167,12 @@ impl Connectors {
         self.bridges.iter().find(|b| b.id() == id).expect("every chat app has its bridge")
     }
 
-    pub fn list(&self) -> Vec<ConnectorStatus> {
-        self.bridges.iter().map(|b| b.status()).collect()
+    pub async fn list_async(&self) -> Vec<ConnectorStatus> {
+        let mut out = Vec::with_capacity(self.bridges.len());
+        for b in &self.bridges {
+            out.push(b.status_async().await);
+        }
+        out
     }
 
     /// Starts a login (or says how far the one going on is); `force` starts over.
@@ -177,8 +181,8 @@ impl Connectors {
     }
 
     /// The code the app asked the user for during a login.
-    pub fn verify(&self, id: ConnectorID, code: &str) -> ConnectorStatus {
-        self.bridge(id).verify(code)
+    pub async fn verify_async(&self, id: ConnectorID, code: &str) -> ConnectorStatus {
+        self.bridge(id).verify_async(code).await
     }
 
     pub async fn logout_async(&self, id: ConnectorID) -> ConnectorStatus {
@@ -256,27 +260,19 @@ async fn feed(env: Arc<Env>, bridges: Vec<Arc<Bridge>>, mut events: broadcast::R
                         ChannelEvent::Edited(_) | ChannelEvent::Reacted(_) | ChannelEvent::Pinned(_) => false,
                     };
                     if wake {
-                        let bridges = bridges.clone();
-                        let _ = crate::spawn_blocking_traced(move || {
-                            for b in &bridges {
-                                if b.has_account() {
-                                    b.changed();
-                                }
+                        for b in &bridges {
+                            if b.has_account() {
+                                b.changed_async().await;
                             }
-                        })
-                        .await;
+                        }
                     }
                 }
                 Fed::Lagged => {
-                    let bridges = bridges.clone();
-                    let _ = crate::spawn_blocking_traced(move || {
-                        for b in &bridges {
-                            if b.has_account() {
-                                b.changed();
-                            }
+                    for b in &bridges {
+                        if b.has_account() {
+                            b.changed_async().await;
                         }
-                    })
-                    .await;
+                    }
                 }
                 Fed::Day => break,
                 Fed::Over => return,
@@ -296,11 +292,7 @@ pub fn install(hub: &Hub, connectors: Arc<Connectors>) {
     let c = connectors.clone();
     hub.on_async::<ops::ConnectorList, _, _>(move |_, _| {
         let c = c.clone();
-        async move {
-            crate::spawn_blocking_traced(move || c.list())
-                .await
-                .map_err(|e| ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))
-        }
+        async move { Ok(c.list_async().await) }
     });
     let c = connectors.clone();
     hub.on_async::<ops::ConnectorLogin, _, _>(move |_, input| {
@@ -320,9 +312,7 @@ pub fn install(hub: &Hub, connectors: Arc<Connectors>) {
         let c = c.clone();
         async move {
             let id = app_of(&input.id)?;
-            crate::spawn_blocking_traced(move || c.verify(id, &input.code))
-                .await
-                .map_err(|e| ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))
+            Ok(c.verify_async(id, &input.code).await)
         }
     });
     let c = connectors.clone();

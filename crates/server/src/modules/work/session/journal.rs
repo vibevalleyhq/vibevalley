@@ -1082,7 +1082,7 @@ mod tests {
 
         tr.close_async().await;
         hub.close_async().await;
-        db.close();
+        db.close_async().await;
         assert!(
             wall_start.elapsed() < Duration::from_secs(1),
             "virtual-clock journal push & close_async must finish instantaneously, took {:?}",

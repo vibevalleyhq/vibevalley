@@ -10,7 +10,7 @@ use sea_orm::{ActiveValue::Set, ColumnTrait, ConnectionTrait, DbErr, EntityTrait
 use serde::{Deserialize, Serialize};
 
 use crate::db::entities::work_session::session_mailbox;
-use crate::modules::work::{read_word, word};
+use crate::modules::infra::column::{db_word as word, read_db_word as read_word};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

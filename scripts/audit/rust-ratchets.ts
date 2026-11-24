@@ -7,7 +7,7 @@ const CONCURRENCY_DOC = "docs/style/rust-async-concurrency.md";
 
 // Shrink-only ceiling for non-test `rt::block_on(` calls under `crates/server/src/`.
 // This ceiling may only decrease as sync wrappers migrate to async; never raise it.
-export const SERVER_BLOCK_ON_CEILING = 102;
+export const SERVER_BLOCK_ON_CEILING = 91;
 
 const NON_HTTP_RAW_TCP_ALLOWLIST: Readonly<
   Record<

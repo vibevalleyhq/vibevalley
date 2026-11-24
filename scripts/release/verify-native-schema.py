@@ -98,7 +98,7 @@ def schema_shape(db):
 
 def runtime_includes(root):
     inputs = set()
-    for base in (root / "crates", root / "apps/mac/crates"):
+    for base in (root / "apps/mac/crates",):
         for path in base.glob("*/src/**/*.rs"):
             for name in re.findall(r'include_str!\s*\(\s*"([^"]+\.sql)"\s*\)', path.read_text()):
                 inputs.add((path.parent / name).resolve())
@@ -174,6 +174,19 @@ def drivers(source):
     return {"macProduction": normal, "workspaceIncludingDev": dev}
 
 
+def server_seaorm_surface(root):
+    entities_dir = root / "crates/server/src/db/entities"
+    migrations_dir = root / "crates/server/src/db/migration"
+    durable_entities_dir = root / "crates/runtime/src/agent/durable/entities"
+    durable_migrations_dir = root / "crates/runtime/src/agent/durable/migration"
+    return {
+        "serverEntities": sorted(p.stem for p in entities_dir.glob("*.rs") if p.stem != "mod"),
+        "serverMigrations": sorted(p.stem for p in migrations_dir.glob("*.rs") if p.stem != "mod"),
+        "durableEntities": sorted(p.stem for p in durable_entities_dir.glob("*.rs") if p.stem != "mod"),
+        "durableMigrations": sorted(p.stem for p in durable_migrations_dir.glob("*.rs") if p.stem != "mod"),
+    }
+
+
 def audit(live, sqlc, root, go_repo):
     config = yaml_file(root / "sqlc.yaml")
     includes = runtime_includes(root)
@@ -181,10 +194,11 @@ def audit(live, sqlc, root, go_repo):
     group = {}
     seen = set()
     queries = {}
-    expected = {scope: sqlite3.connect(":memory:") for scope in ("host", "home")}
+    expected = {"host": sqlite3.connect(":memory:")}
     for spec in config["sql"]:
         assert spec["engine"] == "sqlite"
-        scope = "host" if spec["queries"].startswith("apps/mac/crates/workspace/") else "home"
+        assert spec["queries"].startswith("apps/mac/crates/workspace/"), spec["queries"]
+        scope = "host"
         q = source_files(spec["queries"], root)
         queries[spec["codegen"][0]["out"]] = sum(len(re.findall(r"^-- name: ", p.read_text(), re.M)) for p in q)
         for path in source_files(spec["schema"], root):
@@ -204,7 +218,7 @@ def audit(live, sqlc, root, go_repo):
             db.executescript(path.read_text())
     assert seen == includes, ("SQL DDL includes missing from sqlc.yaml", sorted(includes - seen))
     for scope, db in expected.items():
-        path = live / scope / ("state.db" if scope == "host" else "server.db")
+        path = live / scope / "state.db"
         with sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True) as real:
             actual = schema_shape(real)
             actual_ddl = normalized_ddl(real)
@@ -225,6 +239,7 @@ def audit(live, sqlc, root, go_repo):
         }
     return {
         "native": group,
+        "seaorm": server_seaorm_surface(root),
         "drivers": drivers(root),
         "sourceHead": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
         "sourceChangedPaths": len(

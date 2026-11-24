@@ -228,8 +228,8 @@ describe("no-raw-tcp-http-mock", () => {
 });
 
 describe("no-block-on-in-async-server", () => {
-  test("locks shrink-only ceiling at 102 and excludes #[cfg(test)] inline and external submodules", () => {
-    expect(SERVER_BLOCK_ON_CEILING).toBe(102);
+  test("locks shrink-only ceiling at 91 and excludes #[cfg(test)] inline and external submodules", () => {
+    expect(SERVER_BLOCK_ON_CEILING).toBe(91);
 
     const files: SourceFile[] = [
       {

@@ -41,8 +41,8 @@ use db::ArtifactRow;
 use entries::EntryChange;
 
 use crate::base::{LookIn, ServerDb, missing};
+use crate::db::begin_write_tx;
 use crate::modules::content::attachment::Attachments;
-use crate::modules::content::begin_write_tx;
 use crate::ports::{ChannelAnnouncePort, ChannelQuotePort};
 use crate::{Hub, now};
 
@@ -256,12 +256,30 @@ impl Artifacts {
         } else {
             vec![]
         };
+        let mut message_ids = Vec::new();
+        if let Some(id) = &row.message_id {
+            message_ids.push(id.clone());
+        }
+        for v in &versions {
+            if let Some(id) = &v.message_id {
+                message_ids.push(id.clone());
+            }
+        }
+        let locations = if message_ids.is_empty() {
+            HashMap::new()
+        } else {
+            self.channel.message_locations(&message_ids).await
+        };
         let channel = row.channel_id.clone().unwrap_or_default();
         let body = match row.body.as_str() {
             "html" => ArtifactBody::Html,
             "store" => ArtifactBody::Store,
             _ => ArtifactBody::Blocks,
         };
+        let said = row.message_id.as_deref().and_then(|id| locations.get(id)).map(|(ch, number)| ArtifactSaid {
+            channel: ch.clone(),
+            number: *number,
+        });
         Ok(Wire {
             id: row.id,
             title: row.title,
@@ -270,10 +288,7 @@ impl Artifacts {
             is_default: row.is_default,
             display: row.display.as_deref().and_then(display_of),
             channel: row.channel_id,
-            said: match (row.said_channel, row.said_number) {
-                (Some(channel), Some(number)) => Some(ArtifactSaid { channel, number }),
-                _ => None,
-            },
+            said,
             issue: row.issue,
             by: row.by_id,
             by_name: row.by_name,
@@ -281,15 +296,18 @@ impl Artifacts {
             seq: row.seq,
             versions: versions
                 .into_iter()
-                .map(|v| ArtifactVersion {
-                    version: v.version,
-                    size: v.size,
-                    note: v.note.unwrap_or_default(),
-                    by: v.by_id,
-                    by_name: v.by_name,
-                    at: v.created_at,
-                    channel: v.message_channel.unwrap_or_else(|| channel.clone()),
-                    number: v.message_number,
+                .map(|v| {
+                    let loc = v.message_id.as_deref().and_then(|id| locations.get(id));
+                    ArtifactVersion {
+                        version: v.version,
+                        size: v.size,
+                        note: v.note.unwrap_or_default(),
+                        by: v.by_id,
+                        by_name: v.by_name,
+                        at: v.created_at,
+                        channel: loc.map(|(ch, _)| ch.clone()).unwrap_or_else(|| channel.clone()),
+                        number: loc.map(|(_, number)| *number),
+                    }
                 })
                 .collect(),
             at: row.created_at,

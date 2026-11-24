@@ -171,7 +171,7 @@ impl Bridge {
         self.env.closing.load(Ordering::SeqCst)
     }
 
-    pub fn status(&self) -> ConnectorStatus {
+    fn status_core(&self, pending: i64) -> ConnectorStatus {
         let (account, progress, error) = {
             let s = self.shown.lock();
             (s.account.clone(), s.signing_in.as_ref().map(|x| x.progress.clone()), s.error.clone())
@@ -186,7 +186,7 @@ impl Bridge {
             since: None,
             last_inbound: None,
             paused_until: None,
-            pending: self.env.store.count_pending(self.id()).unwrap_or(0),
+            pending,
             error,
         };
         if let Some(a) = &account {
@@ -217,31 +217,66 @@ impl Bridge {
         status
     }
 
-    /// Says the status to the core when a part of it changed.
-    fn tell(&self) {
+    pub fn status(&self) -> ConnectorStatus {
+        let pending = self.env.store.count_pending(self.id()).unwrap_or(0);
+        self.status_core(pending)
+    }
+
+    pub async fn status_async(&self) -> ConnectorStatus {
+        let pending = self.env.store.count_pending_async(self.id()).await.unwrap_or(0);
+        self.status_core(pending)
+    }
+
+    fn publish_status(&self, status: ConnectorStatus) {
         let Some(hub) = self.env.hub.upgrade() else { return };
         let mut told = self.told.lock();
-        let status = self.status();
         if told.as_ref() == Some(&status) {
             return;
         }
         *told = Some(status.clone());
+        drop(told);
         hub.apply(vec![Fact::ConnectorChanged(FactConnectorChanged { at: now(), status })]);
     }
 
-    fn set_err(&self, e: impl Into<String>) {
-        let e = e.into();
-        {
-            let mut s = self.shown.lock();
-            if s.error == e {
-                return;
-            }
-            s.error = e;
+    /// Says the status to the core when a part of it changed.
+    fn tell(&self) {
+        if self.env.hub.upgrade().is_none() {
+            return;
         }
-        self.tell();
+        self.publish_status(self.status());
     }
 
-    fn apply_loaded(&self, account: Option<Account>, err: Option<String>) {
+    async fn tell_async(&self) {
+        if self.env.hub.upgrade().is_none() {
+            return;
+        }
+        let status = self.status_async().await;
+        self.publish_status(status);
+    }
+
+    fn record_err(&self, e: impl Into<String>) -> bool {
+        let e = e.into();
+        let mut s = self.shown.lock();
+        if s.error == e {
+            return false;
+        }
+        s.error = e;
+        true
+    }
+
+    fn set_err(&self, e: impl Into<String>) {
+        if self.record_err(e) {
+            self.tell();
+        }
+    }
+
+    async fn set_err_async(&self, e: impl Into<String>) {
+        if self.record_err(e) {
+            self.tell_async().await;
+        }
+    }
+
+    fn record_loaded(&self, account: Option<Account>, err: Option<String>) {
         let unread = account.as_ref().is_some_and(|a| !self.app.reads(&a.keys));
         {
             let mut s = self.shown.lock();
@@ -255,7 +290,16 @@ impl Bridge {
         if unread {
             eprintln!("vibevalley-server: connector: {}: the saved secrets cannot be read", self.id().as_str());
         }
+    }
+
+    fn apply_loaded(&self, account: Option<Account>, err: Option<String>) {
+        self.record_loaded(account, err);
         self.tell();
+    }
+
+    async fn apply_loaded_async(&self, account: Option<Account>, err: Option<String>) {
+        self.record_loaded(account, err);
+        self.tell_async().await;
     }
 
     fn reload(&self) -> Result<(), StoreFailed> {
@@ -275,7 +319,7 @@ impl Bridge {
 
     async fn reload_with_err_async(&self, err: Option<String>) -> Result<(), StoreFailed> {
         let account = self.env.store.account_async(self.id()).await?;
-        self.apply_loaded(account, err);
+        self.apply_loaded_async(account, err).await;
         Ok(())
     }
 
@@ -285,12 +329,12 @@ impl Bridge {
             Ok(()) => match self.reload_with_err_async(Some(t("server.connector.expired", &[]))).await {
                 Ok(()) => true,
                 Err(e) => {
-                    self.set_err(e.0);
+                    self.set_err_async(e.0).await;
                     false
                 }
             },
             Err(e) => {
-                self.set_err(e.0);
+                self.set_err_async(e.0).await;
                 false
             }
         }
@@ -301,9 +345,9 @@ impl Bridge {
     }
 
     /// Something that decides what still goes out changed (a read, newer words): the worker looks again.
-    pub fn changed(&self) {
+    pub async fn changed_async(&self) {
         self.wake();
-        self.tell();
+        self.tell_async().await;
     }
 
     /// A farm message for the user: kept to go out when it was said in the account's channel.
@@ -312,7 +356,10 @@ impl Bridge {
         let location = match self.env.chat.message_location_async(&m.id).await {
             Ok(Some(loc)) => loc,
             Ok(None) => return,
-            Err(e) => return self.set_err(e.message),
+            Err(e) => {
+                self.set_err_async(e.message).await;
+                return;
+            }
         };
         let (place, top) = location;
         if top != a.channel.clone().unwrap_or_else(|| self.env.chat.default_channel()) {
@@ -320,9 +367,9 @@ impl Bridge {
         }
         let pieces = split_text(&user_line(m, &place), self.app.max_chars());
         match self.env.store.add_outgoing_async(self.id(), &m.id, &pieces, now()).await {
-            Ok(()) if !pieces.is_empty() => self.changed(),
+            Ok(()) if !pieces.is_empty() => self.changed_async().await,
             Ok(()) => {}
-            Err(e) => self.set_err(e.0),
+            Err(e) => self.set_err_async(e.0).await,
         }
     }
 
@@ -349,20 +396,20 @@ impl Bridge {
                 Ok(Handoff::Unseen) => unseen.push(row.message.clone()),
                 Ok(Handoff::Settled) => {
                     if let Err(e) = self.env.store.withdraw_async(&row.message).await {
-                        self.set_err(e.0);
+                        self.set_err_async(e.0).await;
                         return Err(());
                     }
                     settled.push(row.message.clone());
                 }
                 Err(e) => {
-                    self.set_err(e.message);
+                    self.set_err_async(e.message).await;
                     return Err(());
                 }
             }
         }
         let pending: Vec<_> = listed.iter().filter(|r| unseen.iter().any(|u| u == &r.message)).collect();
         if !settled.is_empty() {
-            self.tell();
+            self.tell_async().await;
         }
         if paused(&a, now()) || pending.is_empty() {
             return Ok(None);
@@ -393,12 +440,12 @@ impl Bridge {
             let ok = match sent {
                 Ok(ext) => match self.env.store.sent_async(&rows, now(), &ext).await {
                     Ok(()) => {
-                        self.set_err("");
-                        self.tell();
+                        self.set_err_async("").await;
+                        self.tell_async().await;
                         true
                     }
                     Err(e) => {
-                        self.set_err(e.0);
+                        self.set_err_async(e.0).await;
                         false
                     }
                 },
@@ -411,8 +458,8 @@ impl Bridge {
                             self.pause_async().await;
                         }
                         // Tried again later, and with the user's next message.
-                        FailedKind::Restricted => self.set_err(""),
-                        FailedKind::Failed => self.set_err(refused.message),
+                        FailedKind::Restricted => self.set_err_async("").await,
+                        FailedKind::Failed => self.set_err_async(refused.message).await,
                     }
                     false
                 }
@@ -480,7 +527,7 @@ impl Bridge {
                         e.message
                     );
                 }
-                self.tell();
+                self.tell_async().await;
                 Ok(None)
             }
             Step::Speak { key } => {
@@ -537,7 +584,7 @@ impl Bridge {
                 let taken = match self.drain_inbox(&cancel).await {
                     Ok(()) => true,
                     Err(e) => {
-                        self.set_err(e.0);
+                        self.set_err_async(e.0).await;
                         false
                     }
                 };
@@ -618,12 +665,12 @@ impl Bridge {
                         return;
                     }
                     if let Err(e) = self.env.store.pause_async(id, None).await {
-                        self.set_err(e.0);
+                        self.set_err_async(e.0).await;
                         if sleep_or_cancel(&cancel, self.env.reconnect).await {
                             return;
                         }
                     } else if let Err(e) = self.reload_async().await {
-                        self.set_err(e.0);
+                        self.set_err_async(e.0).await;
                         if sleep_or_cancel(&cancel, self.env.reconnect).await {
                             return;
                         }
@@ -633,7 +680,7 @@ impl Bridge {
                 let cursor = match self.env.store.account_async(id).await {
                     Ok(row) => row.map(|r| r.cursor).unwrap_or_default(),
                     Err(e) => {
-                        self.set_err(e.0);
+                        self.set_err_async(e.0).await;
                         if sleep_or_cancel(&cancel, self.env.reconnect).await {
                             return;
                         }
@@ -654,7 +701,7 @@ impl Bridge {
                     }
                     continue;
                 }
-                self.set_err(ended.message);
+                self.set_err_async(ended.message).await;
                 failures += 1;
                 let mut wait = self.env.reconnect;
                 if failures >= 3 {
@@ -783,7 +830,7 @@ impl Bridge {
         self.progressed.notify_waiters();
         *current = self.connected();
         drop(current);
-        self.tell();
+        self.tell_async().await;
     }
 
     pub fn load(&self) {
@@ -826,7 +873,7 @@ impl Bridge {
                 attempt
             }
         };
-        self.tell();
+        self.tell_async().await;
         // The answer carries the code when it shows within a moment.
         let deadline = tokio::time::Instant::now() + self.env.moment;
         loop {
@@ -848,19 +895,19 @@ impl Bridge {
                 break;
             }
         }
-        self.status()
+        self.status_async().await
     }
 
     /// The code the user typed for the login going on; with none going on it is for none.
-    pub fn verify(&self, code: &str) -> ConnectorStatus {
+    pub async fn verify_async(&self, code: &str) -> ConnectorStatus {
         if let Some(signing) = self.shown.lock().signing_in.as_mut() {
             if signing.progress.state == ConnectorState::Verify {
                 signing.progress.state = ConnectorState::Scanned;
             }
             signing.code = code.trim().to_string();
         }
-        self.tell();
-        self.status()
+        self.tell_async().await;
+        self.status_async().await
     }
 
     pub async fn logout_async(self: &Arc<Self>) -> ConnectorStatus {
@@ -885,14 +932,14 @@ impl Bridge {
                 *current = self.connected();
             }
         }
-        self.tell();
-        self.status()
+        self.tell_async().await;
+        self.status_async().await
     }
 
     pub async fn set_channel_async(&self, channel: Option<&str>) -> Result<ConnectorStatus, StoreFailed> {
         self.env.store.set_channel_async(self.id(), channel).await?;
         self.reload_async().await?;
-        Ok(self.status())
+        Ok(self.status_async().await)
     }
 
     pub fn has_account(&self) -> bool {

@@ -7,11 +7,11 @@ use sea_orm::{
 };
 use vibevalley_protocol::{Block, BlockOpResult, Suggestion, TextSpan};
 
-use crate::db::entities::collab_channel::channel_message;
 use crate::db::entities::content_artifact::{
     artifact, artifact_block, artifact_block_revision, artifact_change, artifact_collab, artifact_entry, artifact_suggestion, artifact_version,
 };
-use crate::modules::content::{json, read_json, read_word, word, write_tx};
+use crate::db::write_tx;
+use crate::modules::infra::column::{db_json as json, db_word as word, read_db_json as read_json, read_db_word as read_word};
 
 pub type Q<T> = Result<T, DbErr>;
 pub type EntryRow = artifact_entry::Model;
@@ -33,8 +33,6 @@ pub struct ArtifactRow {
     pub seq: i64,
     pub created_at: i64,
     pub updated_at: i64,
-    pub said_channel: Option<String>,
-    pub said_number: Option<i64>,
 }
 
 pub struct NewArtifact {
@@ -71,9 +69,8 @@ pub struct VersionRow {
     pub note: Option<String>,
     pub by_id: String,
     pub by_name: String,
+    pub message_id: Option<String>,
     pub created_at: i64,
-    pub message_channel: Option<String>,
-    pub message_number: Option<i64>,
 }
 
 pub struct UpsertEntry {
@@ -106,13 +103,7 @@ fn artifact_select() -> SelectStatement {
         .column((artifact::Entity, artifact::Column::Seq))
         .column((artifact::Entity, artifact::Column::CreatedAt))
         .column((artifact::Entity, artifact::Column::UpdatedAt))
-        .expr_as(Expr::col((channel_message::Entity, channel_message::Column::ChannelId)), "said_channel")
-        .expr_as(Expr::col((channel_message::Entity, channel_message::Column::Number)), "said_number")
         .from(artifact::Entity)
-        .left_join(
-            channel_message::Entity,
-            Expr::col((channel_message::Entity, channel_message::Column::Id)).equals((artifact::Entity, artifact::Column::MessageId)),
-        )
         .to_owned()
 }
 
@@ -124,14 +115,9 @@ fn version_select(artifact_id: &str) -> SelectStatement {
         .column((artifact_version::Entity, artifact_version::Column::Note))
         .column((artifact_version::Entity, artifact_version::Column::ById))
         .column((artifact_version::Entity, artifact_version::Column::ByName))
+        .column((artifact_version::Entity, artifact_version::Column::MessageId))
         .column((artifact_version::Entity, artifact_version::Column::CreatedAt))
-        .expr_as(Expr::col((channel_message::Entity, channel_message::Column::ChannelId)), "message_channel")
-        .expr_as(Expr::col((channel_message::Entity, channel_message::Column::Number)), "message_number")
         .from(artifact_version::Entity)
-        .left_join(
-            channel_message::Entity,
-            Expr::col((channel_message::Entity, channel_message::Column::Id)).equals((artifact_version::Entity, artifact_version::Column::MessageId)),
-        )
         .and_where(Expr::col((artifact_version::Entity, artifact_version::Column::ArtifactId)).eq(artifact_id))
         .to_owned()
 }

@@ -7,9 +7,10 @@ use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, Quer
 use vibevalley_protocol::{ApiError, BizCode, Millis, RemoteDeviceSummary, RemotePlatform};
 
 use crate::base::ServerDb;
+use crate::db::begin_write_tx;
 use crate::db::entities::infra_remote::{remote_config, remote_device};
 use crate::db::error::{internal_db, is_unique_violation};
-use crate::modules::infra::column::{begin_write_tx, db_word, read_db_word};
+use crate::modules::infra::column::{db_word, read_db_word};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StoredConfig {

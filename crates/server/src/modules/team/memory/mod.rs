@@ -20,8 +20,9 @@ use vibevalley_protocol::{
 };
 
 use crate::base::{RequestKeys, ServerDb};
+use crate::db::begin_write_tx;
 use crate::db::entities::team_memory::memory;
-use crate::modules::infra::column::{begin_write_tx, db_word, read_db_word};
+use crate::modules::infra::column::{db_word, read_db_word};
 use crate::modules::team::agent::Agents;
 use crate::ports::MemoryRecallPort;
 use crate::{Hub, now};
@@ -944,7 +945,7 @@ mod tests {
         block_on(verify_memory_dual_db(sqlite_db.clone(), sqlite_home.path(), sea_orm::DatabaseBackend::Sqlite));
         sqlite_db.close();
 
-        let Some(pg) = crate::modules::infra::column::test_pg::EphemeralPostgres::start() else {
+        let Some(pg) = crate::db::test_pg::EphemeralPostgres::start() else {
             eprintln!("skipping postgres memory dual-db test: Homebrew initdb/pg_ctl not found");
             return;
         };

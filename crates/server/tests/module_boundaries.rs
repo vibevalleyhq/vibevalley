@@ -66,43 +66,96 @@ fn server_modules_respect_layer_and_skin_boundaries() {
 }
 
 #[test]
-fn server_db_generated_queries_are_private_to_their_owning_module() {
+fn server_db_entities_are_private_to_their_owning_domain() {
     let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
-    let generated_dir = src_dir.join("db/generated");
+    let entities_dir = src_dir.join("db/entities");
+    let migration_dir = src_dir.join("db/migration");
     let mut violations = Vec::new();
 
+    fn owner_allows(target: &str, rel: &str) -> Option<&'static str> {
+        if target.starts_with("work_") {
+            (!rel.starts_with("modules/work/")).then_some("modules/work/")
+        } else if target.starts_with("collab_") {
+            (!rel.starts_with("modules/collab/")).then_some("modules/collab/")
+        } else if target.starts_with("content_") {
+            (!rel.starts_with("modules/content/")).then_some("modules/content/")
+        } else if target == "team_memory" {
+            (!rel.starts_with("modules/team/memory/")).then_some("modules/team/memory/")
+        } else if target == "infra_remote" {
+            (!rel.starts_with("modules/infra/remote/")).then_some("modules/infra/remote/")
+        } else if target == "shared" {
+            (!(rel.starts_with("db/") || rel.starts_with("modules/work/"))).then_some("db/ or modules/work/")
+        } else {
+            Some("<classified owning domain>")
+        }
+    }
+
     for path in rs_files(&src_dir) {
-        if path.starts_with(&generated_dir) {
+        if path.starts_with(&entities_dir) || path.starts_with(&migration_dir) {
             continue;
         }
         let rel = path.strip_prefix(&src_dir).unwrap().to_string_lossy().replace('\\', "/");
         let text = std::fs::read_to_string(&path).unwrap();
-        let owner = rel
-            .strip_prefix("modules/")
-            .and_then(|rest| {
-                let mut parts = rest.split('/');
-                Some((parts.next()?, parts.next()?))
-            })
-            .map(|(domain, module)| format!("{domain}_{module}"));
+        let prod = prod_lines(&text);
+        let joined = prod.iter().map(|(_, l)| *l).collect::<Vec<_>>().join("\n");
+        let bytes = joined.as_bytes();
+        let mut cursor = 0;
 
-        for (line_no, line) in prod_lines(&text) {
-            let mut rest = line;
-            while let Some(idx) = rest.find("db::generated::") {
-                rest = &rest[idx + "db::generated::".len()..];
-                let target: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
-                if target.is_empty() {
-                    violations.push(format!("{rel}:{line_no} references `db::generated::` without a specific module"));
-                } else if owner.as_deref() != Some(target.as_str()) {
-                    violations.push(format!(
-                        "{rel}:{line_no} accesses `db::generated::{target}` outside its owning module `modules/{}`",
-                        target.replace('_', "/")
-                    ));
+        while let Some(rel_idx) = joined[cursor..].find("db::entities::") {
+            let start = cursor + rel_idx + "db::entities::".len();
+            let line_no = prod.get(joined[..start].matches('\n').count()).map_or(1, |(n, _)| *n);
+            let rest = &joined[start..];
+            if rest.starts_with('{')
+                && let Some(close) = rest.find('}')
+            {
+                let inner = &rest[1..close];
+                let mut depth = 0usize;
+                for seg in inner.split(',') {
+                    let trimmed = seg.trim();
+                    if depth == 0 && !trimmed.is_empty() {
+                        let target: String = trimmed.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+                        if target.is_empty() {
+                            violations.push(format!("{rel}:{line_no} references `db::entities::{{...}}` without a domain module"));
+                        } else if let Some(expected) = owner_allows(&target, &rel) {
+                            violations.push(format!("{rel}:{line_no} accesses `db::entities::{target}` outside `{expected}`"));
+                        }
+                    }
+                    depth = depth.saturating_add(seg.matches('{').count()).saturating_sub(seg.matches('}').count());
+                }
+                cursor = start + close + 1;
+                continue;
+            }
+            let target: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+            if target.is_empty() {
+                violations.push(format!("{rel}:{line_no} references `db::entities::` without a domain module"));
+            } else if let Some(expected) = owner_allows(&target, &rel) {
+                violations.push(format!("{rel}:{line_no} accesses `db::entities::{target}` outside `{expected}`"));
+            }
+            cursor = start.min(bytes.len());
+        }
+
+        // Catch `use entities::...` inside `src/db/`.
+        if rel.starts_with("db/") {
+            for (line_no, line) in &prod {
+                if let Some(idx) = line.find("entities::") {
+                    let prefix = &line[..idx];
+                    if !prefix.ends_with("db::") {
+                        let target: String = line[idx + "entities::".len()..]
+                            .chars()
+                            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                            .collect();
+                        if !target.is_empty()
+                            && let Some(expected) = owner_allows(&target, &rel)
+                        {
+                            violations.push(format!("{rel}:{line_no} accesses `entities::{target}` outside `{expected}`"));
+                        }
+                    }
                 }
             }
         }
     }
 
-    assert!(violations.is_empty(), "server db::generated privacy violations:\n{}", violations.join("\n"));
+    assert!(violations.is_empty(), "server db::entities privacy violations:\n{}", violations.join("\n"));
 }
 
 #[test]

@@ -23,7 +23,7 @@ use vibevalley_protocol::{
 use super::collab::commit_meta_for_actor;
 use super::db::{self, ArtifactRow, ChangeRow, StoredSuggestion};
 use super::{Artifacts, Change, new_id, q, refused};
-use crate::modules::content::begin_write_tx;
+use crate::db::begin_write_tx;
 use crate::{Hub, Sink, now};
 
 /// How long a batch is kept to answer it again, and a block's text to
