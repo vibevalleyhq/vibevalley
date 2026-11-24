@@ -349,15 +349,15 @@ function WorktreeContextMenu(props: { group: WorktreeGroup; setFold: (key: strin
 
 function TabRow(props: { group: WorktreeGroup; tab: RailTab; depth: number; ctx: SidebarTreeCtx }) {
   const rowKey = () => `tab:${props.group.path}:${props.tab.id}`;
-  const isSelected = () => props.group.active && props.tab.active;
+  const isSelected = computed(() => props.group.active && props.tab.active);
   const isHovered = () => props.ctx.hoveredKey() === rowKey();
   const isMenuOpen = () => props.ctx.openMenuKey() === rowKey();
   const showMenu = computed(() => isHovered() || isMenuOpen());
   // Each terminal/chat tab displays strictly its own status (never polluted by group.sessionRunning).
-  const state = () => (props.tab.kind === "terminal" || props.tab.kind === "chat" ? tabRunningState(props.tab) : "idle");
+  const state = computed(() => (props.tab.kind === "terminal" || props.tab.kind === "chat" ? tabRunningState(props.tab) : "idle"));
   const ownAgent = () => (props.tab.kind === "terminal" || props.tab.kind === "chat" ? props.tab.runningAgent : undefined);
   const logoSrc = () => props.ctx.spriteSrc(runtimeLogoOf(ownAgent() ?? undefined));
-  const canClose = () => props.tab.kind === "terminal" || props.tab.kind === "chat" || props.group.tabs.length > 1;
+  const canClose = computed(() => props.tab.kind === "terminal" || props.tab.kind === "chat" || props.group.tabs.length > 1);
   const tabIconTone = () => (state() === "working" ? "leaf" : isSelected() ? "ink" : "muted");
   const fallbackIcon = (): IconName =>
     props.tab.kind === "chat" ? "chat" : props.tab.kind === "diff" ? "diff" : props.tab.kind === "file" ? "file" : "terminal";
@@ -471,10 +471,10 @@ function TabRow(props: { group: WorktreeGroup; tab: RailTab; depth: number; ctx:
 
 function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) {
   const rowKey = () => `wt:${props.group.path}`;
-  const expandable = () => isGroupExpandable(props.group);
-  const expanded = () => props.ctx.isGroupExpanded(props.group);
-  const isHovered = () => props.ctx.hoveredKey() === rowKey();
-  const isSelected = () => props.group.active && props.group.tabs.length === 0;
+  const expandable = computed(() => isGroupExpandable(props.group));
+  const expanded = computed(() => props.ctx.isGroupExpanded(props.group));
+  const isHovered = computed(() => props.ctx.hoveredKey() === rowKey());
+  const isSelected = computed(() => props.group.active && props.group.tabs.length === 0);
   const summary = computed(() => summarizeGroup(props.group));
   const sessionLogo = () => (props.group.sessionRunning ? props.ctx.spriteSrc(runtimeLogoOf(props.group.sessionAgent)) : undefined);
   const tipText = () =>
@@ -592,16 +592,16 @@ function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) 
 
 function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undefined; ctx: SidebarTreeCtx }) {
   const rowKey = () => `repo:${props.repo.path}`;
-  const hasMultipleWorktrees = () => props.repo.groups.length > 1;
+  const hasMultipleWorktrees = computed(() => props.repo.groups.length > 1);
   const mainGroup = () => props.repo.groups[0];
-  const expandable = () => isRepoExpandable(props.repo);
-  const expanded = () => props.ctx.isRepoExpanded(props.repo);
-  const isHovered = () => props.ctx.hoveredKey() === rowKey();
+  const expandable = computed(() => isRepoExpandable(props.repo));
+  const expanded = computed(() => props.ctx.isRepoExpanded(props.repo));
+  const isHovered = computed(() => props.ctx.hoveredKey() === rowKey());
   const summary = computed(() => summarizeRepo(props.repo));
-  const showActiveCard = () => props.repo.active && expandable() && expanded();
-  const isRepoSelected = () => props.repo.active && (!expandable() || !expanded());
+  const showActiveCard = computed(() => props.repo.active && expandable() && expanded());
+  const isRepoSelected = computed(() => props.repo.active && (!expandable() || !expanded()));
   const plotSrc = () => (props.repo.vibevalley ? props.ctx.spriteSrc(props.repo.active ? "plot-flowering" : "plot-leafy") : undefined);
-  const mainSessionRunning = () => !hasMultipleWorktrees() && mainGroup().sessionRunning;
+  const mainSessionRunning = computed(() => !hasMultipleWorktrees() && mainGroup().sessionRunning);
   const mainSessionLogo = () => (mainSessionRunning() ? props.ctx.spriteSrc(runtimeLogoOf(mainGroup().sessionAgent)) : undefined);
   const repoTip = () => formatSummaryTooltip(props.repo.path, summary(), expandable() && !expanded());
 
@@ -830,9 +830,9 @@ export function Sidebar() {
   if (hostParams.role === "inspector") {
     const showFiles = computed(() => panel() === "files");
     const showGit = computed(() => panel() === "git");
-    const conflictCount = () => git()?.conflicts?.length ?? 0;
-    const gitCount = () => (git()?.staged?.length ?? 0) + (git()?.changes?.length ?? 0) + conflictCount();
-    const currentView = () => (panel() === "git" ? `git:${gitTab()}` : panel());
+    const conflictCount = computed(() => git()?.conflicts?.length ?? 0);
+    const gitCount = computed(() => (git()?.staged?.length ?? 0) + (git()?.changes?.length ?? 0) + conflictCount());
+    const currentView = computed(() => (panel() === "git" ? `git:${gitTab()}` : panel()));
 
     const inspectorTabs: { id: string; label: string; tip: string; badge?: () => number; danger?: () => boolean; onSelect: () => void }[] = [
       { id: "files", label: t("web.shell.sidebar.files"), tip: t("web.shell.sidebar.filesTip"), onSelect: () => act({ type: "show_panel", panel: "files" }) },
@@ -908,7 +908,7 @@ export function Sidebar() {
     );
   }
 
-  const activePath = () => normPath(rail()?.projects.find((proj) => proj.active)?.path ?? files()?.root);
+  const activePath = computed(() => normPath(rail()?.projects.find((proj) => proj.active)?.path ?? files()?.root));
 
   const repoTree = computed((): RepoNode[] => {
     const projects = rail()?.projects ?? [];
@@ -1076,8 +1076,8 @@ export function Sidebar() {
     setFold(key, !current);
   };
 
-  const hasFoldableItems = () => repoTree().some((r) => isRepoExpandable(r));
-  const anyExpanded = () => {
+  const hasFoldableItems = computed(() => repoTree().some((r) => isRepoExpandable(r)));
+  const anyExpanded = computed(() => {
     for (const repo of repoTree()) {
       if (isRepoExpandable(repo) && isRepoExpanded(repo)) return true;
       if (repo.groups.length > 1) {
@@ -1087,7 +1087,7 @@ export function Sidebar() {
       }
     }
     return false;
-  };
+  });
 
   const toggleCollapseAll = () => {
     if (anyExpanded()) {

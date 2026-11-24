@@ -6,7 +6,6 @@
 //! parsed here into [`Action`].
 
 use std::collections::HashMap;
-use std::hash::{DefaultHasher, Hash, Hasher};
 
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -16,24 +15,19 @@ pub use vibevalley_protocol::{HostAction as Action, HostPanel as Panel};
 /// again, so callers may push on every change without diffing themselves.
 #[derive(Debug, Default)]
 pub struct Outbox {
-    last: HashMap<String, (u64, u64)>,
+    last: HashMap<String, (u64, Value)>,
 }
 
 impl Outbox {
     /// The envelope to send for `data` on `topic`, or `None` when the view
-    /// already has exactly this frame.
+    /// already has an identical `Value` (avoiding re-serialization and bridge sends).
     pub fn envelope(&mut self, topic: &str, data: Value) -> Option<(String, Value)> {
-        let hash = {
-            let mut h = DefaultHasher::new();
-            data.to_string().hash(&mut h);
-            h.finish()
-        };
-        let entry = self.last.entry(topic.to_string()).or_insert((0, 0));
-        if entry.0 > 0 && entry.1 == hash {
+        let entry = self.last.entry(topic.to_string()).or_insert((0, Value::Null));
+        if entry.0 > 0 && entry.1 == data {
             return None;
         }
         entry.0 += 1;
-        entry.1 = hash;
+        entry.1 = data.clone();
         Some((format!("frame:{topic}"), json!({ "rev": entry.0, "data": data })))
     }
 
@@ -232,5 +226,50 @@ mod tests {
         assert!(parse_action(&json!({"type": "nope"})).is_err());
         assert!(parse_action(&json!({"type": "activate_project"})).is_err());
         assert!(parse_action(&json!("activate_project")).is_err());
+    }
+
+    #[test]
+    fn outbox_dedup_skips_identical_payloads_forwards_changes_and_replays_on_ready() {
+        let mut out = Outbox::default();
+        let rail_v1 = json!({
+            "projects": [{ "id": 1, "name": "vibevalley", "active": true, "tabs": [{ "id": 10, "title": "Chat" }] }],
+            "panel": "files",
+            "inspectorOpen": true
+        });
+        let files_v1 = json!({ "root": "/repo", "items": [{ "id": "src", "tone": "clean" }] });
+        let git_v1 = json!({ "repo": true, "branch": "main", "changes": [] });
+        let palette_v1 = json!({ "mode": "commands", "query": "", "items": ["a", "b"] });
+
+        // First push for each topic emits rev 1.
+        for (topic, payload) in [
+            ("rail", rail_v1.clone()),
+            ("files", files_v1.clone()),
+            ("git", git_v1.clone()),
+            ("palette", palette_v1.clone()),
+        ] {
+            let (event, env) = out.envelope(topic, payload.clone()).expect("initial frame must send");
+            assert_eq!(event, format!("frame:{topic}"));
+            assert_eq!(env["rev"], 1);
+            assert_eq!(env["data"], payload);
+            assert!(out.envelope(topic, payload).is_none(), "identical consecutive {topic} payload must be skipped");
+        }
+
+        // Changed payload emits rev 2; reverting back to v1 emits rev 3.
+        let rail_v2 = json!({
+            "projects": [{ "id": 1, "name": "vibevalley", "active": true, "tabs": [{ "id": 10, "title": "Updated" }] }],
+            "panel": "git",
+            "inspectorOpen": true
+        });
+        let (_, env2) = out.envelope("rail", rail_v2.clone()).expect("changed rail must send");
+        assert_eq!(env2["rev"], 2);
+        assert!(out.envelope("rail", rail_v2).is_none());
+        let (_, env3) = out.envelope("rail", rail_v1.clone()).expect("reverted rail must send");
+        assert_eq!(env3["rev"], 3);
+
+        // Ready reload clears outbox so replayed frames send cleanly from rev 1.
+        out.reset();
+        assert_eq!(out.rev("rail"), 0);
+        let (_, replayed) = out.envelope("rail", rail_v1).expect("replay after Ready must send");
+        assert_eq!(replayed["rev"], 1);
     }
 }

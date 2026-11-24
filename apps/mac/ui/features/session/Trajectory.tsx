@@ -209,11 +209,12 @@ export function Trajectory(props: {
   const rowRefs = new Map<number, ViewRef>();
 
   const shown = createMemo(() => shownEvents(props.steps));
-  const end = () => {
+  const end = createMemo(() => {
     const last = props.steps.at(-1)?.time ?? props.now;
     return props.working === true && props.now > last ? props.now : last;
-  };
+  });
   const bySeq = createMemo(() => new Map(shown().map((s) => [s.seq, s])));
+  const summary = createMemo(() => summaryText(summaryOf(props.steps, end())));
 
   const groups = createMemo((): readonly RunGroup[] => {
     const firstAsked = shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq;
@@ -400,7 +401,7 @@ export function Trajectory(props: {
         </If>
       </Scroll>
       <Text testID="trajectory-summary" class="pt-2 text-xs text-muted tabular-nums">
-        {summaryText(summaryOf(props.steps, end()))}
+        {summary()}
       </Text>
     </View>
   );
@@ -408,12 +409,12 @@ export function Trajectory(props: {
 
 function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el: ViewRef) => void; onToggle: () => void }) {
   const step = () => props.spec.step;
-  const tagTone = () => tagToneOf(step());
+  const tagTone = createMemo(() => tagToneOf(step()));
   const tool = () => step().type === "tool/call";
   const running = () => tool() && step().ok === undefined;
   const failed = () => (tool() && step().ok === false) || step().type === "run/error";
   const sub = () => step().under !== undefined;
-  const bodyText = () => stepTextOf(step());
+  const bodyText = createMemo(() => stepTextOf(step()));
   return (
     <View
       ref={(el) => props.refTo(el)}
@@ -637,6 +638,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
   const act = createAct();
   const busy = act.busy;
   const want = signal("");
+  const canSubmit = createMemo(() => !busy() && Boolean(want().trim()));
   const submit = async () => {
     const w = want().trim();
     if (!w || busy()) return;
@@ -688,7 +690,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
             onSubmit={() => void submit()}
             class="flex-1"
           />
-          <Button tone="primary" testID="mark-submit" disabled={busy() || !want().trim()} onPress={() => void submit()}>
+          <Button tone="primary" testID="mark-submit" disabled={!canSubmit()} onPress={() => void submit()}>
             {t("web.base.write")}
           </Button>
           <Button tone="quiet" disabled={busy()} onPress={() => writing.set(false)}>

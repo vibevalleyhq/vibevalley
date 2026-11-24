@@ -35,16 +35,20 @@ use nsh_core::element::Registry;
 
 pub use cache::CacheStats;
 pub use canvas::{
-    CanvasRenderError, RenderedCanvas, VvCanvas, VvCanvasElement, VvCanvasProps, canvas_cache_stats, clear_canvas_cache, render_canvas, vv_canvas,
+    ASYNC_CANVAS_BYTE_THRESHOLD, CanvasRenderError, RenderedCanvas, VvCanvas, VvCanvasElement, VvCanvasProps, canvas_cache_stats, clear_canvas_cache,
+    render_canvas, should_offload_canvas, vv_canvas,
 };
-pub use chart::{RenderedSvg, VvChart, VvChartElement, VvChartProps, chart_cache_stats, clear_chart_cache, render_chart, vv_chart};
+pub use chart::{
+    ASYNC_CHART_BYTE_THRESHOLD, RenderedSvg, VvChart, VvChartElement, VvChartProps, cached_render_chart, chart_cache_stats, clear_chart_cache, render_chart,
+    should_offload_chart, vv_chart,
+};
 pub use code_block::{
     ASYNC_HIGHLIGHT_BYTE_THRESHOLD, ASYNC_HIGHLIGHT_LINE_THRESHOLD, CODE_LINE_HEIGHT, DEFAULT_FOLD_LINES, VvCodeBlock, VvCodeBlockElement, VvCodeBlockEvent,
     VvCodeBlockProps, VvCodeCopyEvent, count_code_lines, should_offload_highlight, vv_code_block,
 };
 pub use diagram::{
-    DiagramError, RenderedDiagram, VvDiagram, VvDiagramElement, VvDiagramProps, clear_diagram_cache, diagram_cache_stats, render_diagram,
-    render_diagram_with_max_width, vv_diagram,
+    DiagramError, RenderedDiagram, VvDiagram, VvDiagramElement, VvDiagramProps, cached_render_diagram_with_max_width, clear_diagram_cache, diagram_cache_stats,
+    render_diagram, render_diagram_with_max_width, vv_diagram,
 };
 pub use genui::{VvGenUi, VvGenUiActionEvent, VvGenUiElement, VvGenUiEvent, VvGenUiProps, vv_gen_ui};
 pub use grammars::{BUNDLED_GRAMMARS, BundledGrammar, MERMAID_LANGUAGE};

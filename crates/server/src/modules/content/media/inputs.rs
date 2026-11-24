@@ -452,9 +452,6 @@ impl Inputs {
             .map_err(storage)?;
         self.upload_async(&r.id, Box::new(opened)).await
     }
-    pub fn adopt(&self, id: &str) -> Result<MediaInput, ApiError> {
-        vibevalley_runtime::rt::block_on(self.adopt_async(id))
-    }
     pub async fn upload_file_async(&self, id: &str, path: PathBuf) -> Result<MediaInput, ApiError> {
         if !path.is_absolute() {
             return Err(refused("inputInvalid"));

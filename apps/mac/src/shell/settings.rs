@@ -221,12 +221,18 @@ impl Shell {
 
     pub(super) fn on_mouse_move(&mut self, e: &MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
         if self.chrome.resizing_sidebar {
-            self.chrome.sidebar_width = (f32::from(e.position.x) - self.chrome.global_rail_width).clamp(SIDEBAR_MIN, SIDEBAR_MAX);
-            cx.notify();
+            let next = (f32::from(e.position.x) - self.chrome.global_rail_width).clamp(SIDEBAR_MIN, SIDEBAR_MAX);
+            if (self.chrome.sidebar_width - next).abs() > 0.01 {
+                self.chrome.sidebar_width = next;
+                cx.notify();
+            }
         } else if self.chrome.resizing_inspector {
             let win_w = f32::from(window.viewport_size().width);
-            self.chrome.inspector_width = (win_w - f32::from(e.position.x)).clamp(SIDEBAR_MIN, SIDEBAR_MAX);
-            cx.notify();
+            let next = (win_w - f32::from(e.position.x)).clamp(SIDEBAR_MIN, SIDEBAR_MAX);
+            if (self.chrome.inspector_width - next).abs() > 0.01 {
+                self.chrome.inspector_width = next;
+                cx.notify();
+            }
         } else if let Some((split, index)) = self.chrome.dragging_split
             && let Some(project) = self.workspace.ws.active_mut()
             && let Some(fraction) = self.chrome.split_bounds.fraction(&project.layout, split, index, e.position)

@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, View, type JSX } from "nsh";
+import { computed, Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { SessionEvent } from "@vibevalley/protocol";
@@ -101,9 +101,9 @@ export function RunSteps(props: { session: string; run: string | undefined; orch
 
 /** A session's steps by run, each run folded to its answer but the last. Its height stops at 22rem, or at `height`. */
 export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: string; working?: boolean; class?: string | undefined; height?: number }) {
-  const shown = () => shownEvents(props.steps);
-  const runs = () => runsOf(shown());
-  const firstAsked = () => shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq;
+  const shown = computed(() => shownEvents(props.steps));
+  const runs = computed(() => runsOf(shown()));
+  const firstAsked = computed(() => shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq);
   return (
     <Scroll
       testID="work-log"
@@ -128,13 +128,13 @@ export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: str
 
 function RunFold(props: { run: RunView; last: boolean; live: boolean; now: number; label: string }) {
   const toggled = signal<boolean>();
-  const open = () => toggled() ?? props.last;
+  const open = computed(() => toggled() ?? props.last);
   const end = () => (props.live ? props.now : (lastTime(props.run) ?? props.now));
-  const hasError = () => props.run.steps.some((s) => s.type === "run/error");
-  const shown = () => {
+  const hasError = computed(() => props.run.steps.some((s) => s.type === "run/error"));
+  const shown = computed(() => {
     const answer = answerOf(props.run);
     return open() ? props.run.steps : answer ? [answer] : [];
-  };
+  });
   return (
     <View testID="run" class={`gap-1.5 px-2.5 pt-2 pb-2.5 ${props.last ? "" : "border-b border-line"}`}>
       <View
@@ -204,12 +204,12 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
 }
 
 function TimeBar(props: { run: RunView; end: number }) {
-  const spans = () => spansOf(props.run, props.end);
+  const spans = computed(() => spansOf(props.run, props.end));
   // The shortest span still shows: at least 1/80 of the bar.
-  const least = () => {
+  const least = computed(() => {
     const total = spans().reduce((n, s) => n + s.ms, 0);
     return total <= 0 ? 1 : total / 80;
-  };
+  });
   return (
     <View testID="time-bar" class="h-2 flex-row gap-px overflow-hidden rounded-sm bg-hover">
       <Each of={spans()} key={(s) => s.step.seq}>
@@ -325,9 +325,9 @@ export function WorkLogStep(props: { step: SessionEvent; now: number }) {
 
 function ToolStep(props: { step: SessionEvent; now: number }) {
   const open = signal(false);
-  const farm = () => farmToolText(props.step.text);
+  const farm = computed(() => farmToolText(props.step.text));
   const kind = () => (farm() ? t("web.session.log.farm") : (props.step.actionText ?? ""));
-  const input = () => readableInput(props.step);
+  const input = computed(() => readableInput(props.step));
   const running = () => props.step.ok === undefined;
   const failed = () => props.step.ok === false;
   const state = () => (running() ? t("web.session.log.running") : props.step.ok === true ? t("web.session.log.ok") : t("web.session.log.failed"));

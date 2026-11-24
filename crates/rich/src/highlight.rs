@@ -29,6 +29,58 @@ const LINE_TIME_LIMIT: Duration = Duration::from_millis(250);
 const CHECKPOINT_INTERVAL: usize = 64;
 /// Maximum number of highlighted code blocks kept in the process-wide LRU cache.
 const CODE_CACHE_CAPACITY: usize = 128;
+/// Number of fallback background threads used when no ambient Tokio runtime is active.
+const OFFLOAD_WORKERS: usize = 2;
+
+type OffloadJob = Box<dyn FnOnce() + Send + 'static>;
+
+fn offload_sender() -> &'static std::sync::mpsc::Sender<OffloadJob> {
+    static SENDER: OnceLock<std::sync::mpsc::Sender<OffloadJob>> = OnceLock::new();
+    SENDER.get_or_init(|| {
+        let (tx, rx) = std::sync::mpsc::channel::<OffloadJob>();
+        let rx = Arc::new(Mutex::new(rx));
+        for _ in 0..OFFLOAD_WORKERS {
+            let worker_rx = Arc::clone(&rx);
+            std::thread::Builder::new()
+                .name("vv-rich-offload".to_owned())
+                .spawn(move || {
+                    loop {
+                        let job = {
+                            let guard = worker_rx.lock().unwrap_or_else(|p| p.into_inner());
+                            guard.recv()
+                        };
+                        match job {
+                            Ok(job) => job(),
+                            Err(_) => break,
+                        }
+                    }
+                })
+                .expect("spawn vv-rich-offload worker thread");
+        }
+        tx
+    })
+}
+
+/// Runs `f` on a background worker thread without requiring an ambient Tokio runtime.
+///
+/// Uses `Handle::spawn_blocking` inside Tokio and otherwise dispatches onto the `"vv-rich-offload"`
+/// OS thread pool awaited through a runtime-agnostic oneshot channel.
+pub(crate) async fn run_offloaded<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        return handle.spawn_blocking(f).await.expect("vibevalley-rich offloaded task panicked");
+    }
+
+    let (tx, rx) = tokio::sync::oneshot::channel::<std::thread::Result<T>>();
+    let job: OffloadJob = Box::new(move || {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
+        let _ = tx.send(result);
+    });
+    offload_sender().send(job).expect("vv-rich-offload worker pool closed");
+    match rx.await.expect("vv-rich-offload worker exited without completing task") {
+        Ok(value) => value,
+        Err(payload) => std::panic::resume_unwind(payload),
+    }
+}
 
 /// Highlighted representation of a code block ready for `nsh_core::element::text` rendering.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -211,14 +263,13 @@ fn engine() -> &'static RwLock<ShikiEngine> {
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct CodeCacheKey {
-    hash: u64,
     dark: bool,
     language: String,
     code: String,
 }
 
-fn code_cache() -> &'static Mutex<LruCache<CodeCacheKey, HighlightedCode>> {
-    static CACHE: OnceLock<Mutex<LruCache<CodeCacheKey, HighlightedCode>>> = OnceLock::new();
+fn code_cache() -> &'static Mutex<LruCache<CodeCacheKey, Arc<HighlightedCode>>> {
+    static CACHE: OnceLock<Mutex<LruCache<CodeCacheKey, Arc<HighlightedCode>>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(LruCache::new(CODE_CACHE_CAPACITY)))
 }
 
@@ -255,21 +306,57 @@ pub fn loaded_languages() -> Vec<String> {
     engine().read().unwrap_or_else(|p| p.into_inner()).grammars.keys().cloned().collect()
 }
 
+fn code_cache_hash(code: &str, trimmed_lang: &str, dark: bool) -> u64 {
+    let mut lang_hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in trimmed_lang.bytes() {
+        lang_hash ^= u64::from(b.to_ascii_lowercase());
+        lang_hash = lang_hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash_str(code) ^ lang_hash.rotate_left(17) ^ u64::from(dark)
+}
+
+pub(crate) fn cached_highlight_code_arc(code: &str, language: Option<&str>, dark: bool) -> Option<Arc<HighlightedCode>> {
+    let trimmed_lang = language.unwrap_or("").trim();
+    let hash = code_cache_hash(code, trimmed_lang, dark);
+    code_cache()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .get_by(hash, |k| k.dark == dark && k.code == code && k.language.eq_ignore_ascii_case(trimmed_lang))
+}
+
+pub(crate) fn highlight_code_arc(code: &str, language: Option<&str>, dark: bool) -> Arc<HighlightedCode> {
+    let trimmed_lang = language.unwrap_or("").trim();
+    let hash = code_cache_hash(code, trimmed_lang, dark);
+    if let Some(hit) = code_cache()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .get_by(hash, |k| k.dark == dark && k.code == code && k.language.eq_ignore_ascii_case(trimmed_lang))
+    {
+        return hit;
+    }
+    let result = Arc::new(engine().read().unwrap_or_else(|p| p.into_inner()).highlight_code(code, language, dark));
+    let key = CodeCacheKey {
+        dark,
+        language: trimmed_lang.to_ascii_lowercase(),
+        code: code.to_owned(),
+    };
+    code_cache()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .insert_by(hash, key, Arc::clone(&result), |k| {
+            k.dark == dark && k.code == code && k.language.eq_ignore_ascii_case(trimmed_lang)
+        });
+    result
+}
+
 /// Looks up a previously highlighted code block in the LRU cache without running tokenization.
 pub fn cached_highlight_code(code: &str, language: Option<&str>, dark: bool) -> Option<HighlightedCode> {
-    let key = make_code_cache_key(code, language, dark);
-    code_cache().lock().unwrap_or_else(|p| p.into_inner()).get(&key)
+    cached_highlight_code_arc(code, language, dark).map(|arc| (*arc).clone())
 }
 
 /// Highlights `code` in `language` using VibeValley's warm light or dark Shiki theme (LRU-cached).
 pub fn highlight_code(code: &str, language: Option<&str>, dark: bool) -> HighlightedCode {
-    let key = make_code_cache_key(code, language, dark);
-    if let Some(hit) = code_cache().lock().unwrap_or_else(|p| p.into_inner()).get(&key) {
-        return hit;
-    }
-    let result = engine().read().unwrap_or_else(|p| p.into_inner()).highlight_code(code, language, dark);
-    code_cache().lock().unwrap_or_else(|p| p.into_inner()).insert(key, result.clone());
-    result
+    (*highlight_code_arc(code, language, dark)).clone()
 }
 
 /// Returns hit/miss/eviction metrics for the code-block highlight LRU cache.
@@ -280,17 +367,6 @@ pub fn code_highlight_cache_stats() -> CacheStats {
 /// Clears all entries from the code-block highlight LRU cache.
 pub fn clear_code_highlight_cache() {
     code_cache().lock().unwrap_or_else(|p| p.into_inner()).clear();
-}
-
-fn make_code_cache_key(code: &str, language: Option<&str>, dark: bool) -> CodeCacheKey {
-    let normalized_lang = language.unwrap_or("").trim().to_ascii_lowercase();
-    let hash = hash_str(code) ^ hash_str(&normalized_lang).rotate_left(17);
-    CodeCacheKey {
-        hash,
-        dark,
-        language: normalized_lang,
-        code: code.to_owned(),
-    }
 }
 
 /// Resolves the innermost TextMate scope stack into an `nsh_base::editor::EditorToken`.
@@ -579,6 +655,78 @@ pub fn register_shiki_editor_highlighters() {
         let canonical = bundled.canonical;
         for &editor_name in bundled.editor_names {
             register_highlighter(editor_name, move || Box::new(ShikiEditorHighlighter::for_language(canonical)));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn block_on_without_tokio<F: std::future::Future>(future: F) -> F::Output {
+        use std::pin::pin;
+        use std::task::{Context, Poll, Wake, Waker};
+
+        struct ThreadUnparker(std::thread::Thread);
+
+        impl Wake for ThreadUnparker {
+            fn wake(self: Arc<Self>) {
+                self.0.unpark();
+            }
+
+            fn wake_by_ref(self: &Arc<Self>) {
+                self.0.unpark();
+            }
+        }
+
+        let waker = Waker::from(Arc::new(ThreadUnparker(std::thread::current())));
+        let mut cx = Context::from_waker(&waker);
+        let mut fut = pin!(future);
+
+        loop {
+            match fut.as_mut().poll(&mut cx) {
+                Poll::Ready(out) => return out,
+                Poll::Pending => std::thread::park(),
+            }
+        }
+    }
+
+    #[test]
+    fn run_offloaded_executes_on_worker_thread_outside_tokio_runtime() {
+        assert!(
+            tokio::runtime::Handle::try_current().is_err(),
+            "test must run outside any ambient Tokio runtime"
+        );
+        let caller_thread = std::thread::current().id();
+
+        let (worker_thread, worker_name, highlighted) = block_on_without_tokio(run_offloaded(move || {
+            let current = std::thread::current();
+            let highlighted = highlight_code("pub fn offload_ok() -> u8 { 1 }", Some("rust"), false);
+            (current.id(), current.name().map(str::to_owned), highlighted)
+        }));
+
+        assert_ne!(worker_thread, caller_thread, "run_offloaded must execute on a background thread");
+        assert_eq!(worker_name.as_deref(), Some("vv-rich-offload"));
+        assert!(highlighted.highlighted);
+        assert_eq!(highlighted.lines.len(), 1);
+    }
+
+    #[test]
+    fn run_offloaded_recovers_worker_pool_after_task_panic() {
+        assert!(tokio::runtime::Handle::try_current().is_err());
+
+        let panicked = std::panic::catch_unwind(|| {
+            block_on_without_tokio(run_offloaded(|| -> usize {
+                panic!("simulated worker panic");
+            }))
+        });
+        assert!(panicked.is_err(), "panic in offloaded closure should propagate to caller");
+
+        let caller_thread = std::thread::current().id();
+        for i in 0..4 {
+            let (worker_thread, val) = block_on_without_tokio(run_offloaded(move || (std::thread::current().id(), i * 2)));
+            assert_ne!(worker_thread, caller_thread);
+            assert_eq!(val, i * 2);
         }
     }
 }

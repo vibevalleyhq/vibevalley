@@ -248,6 +248,7 @@ fn run_up(client: &Client, args: MachineUpArgs) -> Done {
         });
         let result = agent.run().await;
         sig_task.abort();
+        let _ = sig_task.await;
         result
     })
 }

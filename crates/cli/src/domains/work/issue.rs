@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use clap::{ArgGroup, Args, Subcommand, ValueEnum};
+use tokio_util::sync::CancellationToken;
 use vibevalley_protocol::{
     ActWords, AppliedIssue, BoardSlice, Changes, Issue, IssueAction, IssueCommentCreateInput, IssueDeleteInput, IssueDiffGetInput, IssueFilter, IssueGetInput,
     IssueRequest, IssueReviewInput, IssueStageKind, IssueStatus, IssueStatusUpdateInput, IssueTimelineGetInput, IssueUpdateInput, IssueWatch, Priority,
@@ -518,13 +519,32 @@ fn wait_for_issue(client: &Client, issue: &Issue, timeout: Option<i64>) -> Done 
     }
 }
 
+const OBSERVE_RETRY_MIN: Duration = Duration::from_secs(1);
+const OBSERVE_RETRY_MAX: Duration = Duration::from_secs(8);
+
+fn observe_reconnect_delay(attempt: u32) -> Duration {
+    let shift = attempt.min(3);
+    OBSERVE_RETRY_MIN.saturating_mul(1u32 << shift).min(OBSERVE_RETRY_MAX)
+}
+
+async fn wait_observe_retry(delay: Duration, cancel: &CancellationToken) -> bool {
+    tokio::select! {
+        biased;
+        () = cancel.cancelled() => false,
+        () = tokio::time::sleep(delay) => true,
+    }
+}
+
 fn observe(client: &Client, id: &str, follow: bool) -> Done {
     let mut seen: HashMap<String, HashMap<i64, i64>> = HashMap::new();
     let mut previous = String::new();
     let mut gaps: HashMap<String, String> = HashMap::new();
+    let mut unreachable_attempts: u32 = 0;
     let path = format!("/api/v1/issue/watch/{}", url_segment(id));
     loop {
+        let mut received_event = false;
         let res = client.sse(&path, None, |data| {
+            received_event = true;
             let row: IssueWatch = serde_json::from_str(data).map_err(|e| Failure::new(exit::OTHER, "WatchProtocol", e.to_string()))?;
             let rows = match row {
                 IssueWatch::History { session, events } => events
@@ -576,9 +596,29 @@ fn observe(client: &Client, id: &str, follow: bool) -> Done {
             }
             Ok(true)
         });
+        if received_event {
+            unreachable_attempts = 0;
+        }
         match res {
             Ok(()) => return Ok(()),
-            Err(f) if f.tag == "Unreachable" => std::thread::sleep(Duration::from_secs(1)),
+            Err(f) if f.tag == "Unreachable" => {
+                let delay = observe_reconnect_delay(unreachable_attempts);
+                unreachable_attempts = unreachable_attempts.saturating_add(1);
+                let interrupted = vibevalley_runtime::rt::block_on(async {
+                    let cancel = CancellationToken::new();
+                    tokio::select! {
+                        biased;
+                        _ = tokio::signal::ctrl_c() => {
+                            cancel.cancel();
+                            true
+                        }
+                        cont = wait_observe_retry(delay, &cancel) => !cont,
+                    }
+                });
+                if interrupted {
+                    return Ok(());
+                }
+            }
             Err(f) => return Err(f),
         }
     }
@@ -618,5 +658,40 @@ fn watch_text(row: &IssueWatch) -> String {
             format!("#{} {}\n{state}", issue.number, issue.stage.state.as_str())
         }
         IssueWatch::History { .. } => String::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn observe_retry_backoff_caps_and_cancels_on_virtual_clock() {
+        assert_eq!(observe_reconnect_delay(0), Duration::from_secs(1));
+        assert_eq!(observe_reconnect_delay(1), Duration::from_secs(2));
+        assert_eq!(observe_reconnect_delay(2), Duration::from_secs(4));
+        assert_eq!(observe_reconnect_delay(3), Duration::from_secs(8));
+        assert_eq!(observe_reconnect_delay(20), Duration::from_secs(8));
+
+        let wall = std::time::Instant::now();
+        let t0 = tokio::time::Instant::now();
+        let cancel = CancellationToken::new();
+        let child = cancel.child_token();
+        let task = tokio::spawn(async move { wait_observe_retry(observe_reconnect_delay(3), &child).await });
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(7)).await;
+        tokio::task::yield_now().await;
+        assert!(!task.is_finished());
+
+        tokio::time::advance(Duration::from_secs(1)).await;
+        assert!(task.await.unwrap());
+        assert_eq!(t0.elapsed(), Duration::from_secs(8));
+
+        let c2 = cancel.child_token();
+        let task2 = tokio::spawn(async move { wait_observe_retry(observe_reconnect_delay(2), &c2).await });
+        tokio::task::yield_now().await;
+        cancel.cancel();
+        assert!(!task2.await.unwrap());
+        assert!(wall.elapsed() < Duration::from_secs(1));
     }
 }

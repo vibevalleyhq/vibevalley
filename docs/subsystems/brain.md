@@ -1,6 +1,6 @@
 # VibeValley 自己的 agent
 
-助手和 `vibevalley` 农机的帮工跑在同一个自研的 agent 上：`crates/runtime/src/agent`。它把内置模型客户端、Durable SQLite 持久引擎、类型化工具、上下文压缩、资源与扩展、运行时挂架与内置 OAR 农机收拢成单向分层的单个 crate，只接 DeepSeek（OpenAI 兼容的 chat completions），不做多厂商路由（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)「砍掉的」）。终端里也能经 `vibevalley chat` 与服务端助手对话。
+助手和 `vibevalley` 农机的帮工跑在同一个自研的 agent 上：`crates/runtime/src/agent`。它把内置模型客户端、Durable SQLite 持久引擎、类型化工具、上下文压缩、资源与扩展、运行时挂架与内置 OAR 农机收拢成单向分层的单个 crate，只接 DeepSeek（OpenAI 兼容的 chat completions），不做多厂商路由。终端里也能经 `vibevalley chat` 与服务端助手对话。
 
 ## 管什么，不管什么
 
@@ -78,7 +78,7 @@
 ## 还没做的
 
 - 按档案 `toolsets` 分配工具、助手也能加载技能：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
-- 原生界面手工触发压缩、普通对话入口创建 CodeMode 脚本任务与真模型阈值验收：[持久执行与驱动验收](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)。
+- 原生界面手工触发压缩、普通对话入口创建 CodeMode 脚本任务与真模型阈值验收：[持久执行入口补齐、外部驱动实机验证与农场视觉对照](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)。
 
 ## 怎么验证
 

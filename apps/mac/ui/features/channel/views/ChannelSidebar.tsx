@@ -1,4 +1,4 @@
-import { cleanup, keymap, PanResponder, Scroll, signal, Text, View, type JSX, type ViewRef } from "nsh";
+import { cleanup, computed, keymap, PanResponder, Scroll, signal, Text, View, type JSX, type ViewRef } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -71,10 +71,11 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
   const sessionsSlice = useSessionsSlice();
   const router = useRouter();
   const chat = useMarkedChat();
-  const channels = () => topsOf(chat());
-  const directs = () => directsOf(chat());
-  const archived = () => archivedOf(chat());
-  const sessions = () => (sessionsSlice()?.sessions ?? []).filter((h) => !isFreeUserSession(h));
+  const channels = computed(() => topsOf(chat()));
+  const channelGroups = computed(() => groupsOf(channels()));
+  const directs = computed(() => directsOf(chat()));
+  const archived = computed(() => archivedOf(chat()));
+  const sessions = computed(() => (sessionsSlice()?.sessions ?? []).filter((h) => !isFreeUserSession(h)));
   const picking = signal(false);
   const go = (c: Channel) => {
     router.navigate(chatPath(c));
@@ -82,15 +83,16 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
   };
   const act = createAct();
   const reorder = createReorder((id, onto) => void act.run(() => api.channel.update({ id, before: onto.id, category: onto.category })));
-  const channelSummary = () => (chat() === collab()?.chat ? collab()?.channelSummary : undefined);
-  const totalUnread = () => unreadTotal(chat(), channelSummary());
+  const channelSummary = computed(() => (chat() === collab()?.chat ? collab()?.channelSummary : undefined));
+  const totalUnread = computed(() => unreadTotal(chat(), channelSummary()));
   const unreadOf = (c: Channel) => unreadUnder(chat(), c, channelSummary());
   const unreadSum = (list: readonly Channel[]) => list.reduce((sum, c) => sum + unreadOf(c), 0);
-  const helpersUnread = () =>
+  const helpersUnread = computed(() =>
     sessions().reduce((sum, h) => {
       const th = sessionThreadOf(chat(), h);
       return sum + (th ? unreadOf(th) : 0);
-    }, 0);
+    }, 0),
+  );
   const row = (c: () => Channel) => (
     <ChannelRow channel={c()} here={c().id === props.channel?.id} unread={unreadOf(c())} onClick={() => go(c())} reorder={reorder} />
   );
@@ -124,7 +126,7 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
           unread={unreadSum(channels())}
           action={<BarButton icon="add" size={14} compact testid="new-channel" label={t("web.channel.newChannel")} onPress={() => props.onNew()} />}
         >
-          <Each of={groupsOf(channels())} key={(g) => g.category ?? "__default__"}>
+          <Each of={channelGroups()} key={(g) => g.category ?? "__default__"}>
             {(g) => (
               <If
                 when={g().category}
@@ -210,7 +212,7 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
  * first time. */
 function DirectPicker(props: { onPicked: (channel: string) => void }) {
   const all = useAgents();
-  const agents = () => [...ready(all, [])].toSorted((a, b) => (a.role === b.role ? 0 : a.role === "orchestrator" ? -1 : 1));
+  const agents = computed(() => [...ready(all, [])].toSorted((a, b) => (a.role === b.role ? 0 : a.role === "orchestrator" ? -1 : 1)));
   const act = createAct();
   const open = async (agent: string) => {
     const id = await act.run(() => api.channel.direct.create({ agent }));
@@ -378,12 +380,12 @@ function ChannelRow(props: { channel: Channel; here: boolean; unread: number; on
 function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channel) => void }) {
   const collab = useCollabSlice();
   const now = useNow();
-  const thread = () => sessionThreadOf(collab()?.chat, props.h);
-  const unread = () => {
+  const thread = computed(() => sessionThreadOf(collab()?.chat, props.h));
+  const unread = computed(() => {
     const current = thread();
     return current ? unreadUnder(collab()?.chat, current, collab()?.channelSummary) : 0;
-  };
-  const phase = () => phaseText(props.h, now());
+  });
+  const phase = computed(() => phaseText(props.h, now()));
   return (
     <View
       role="button"
@@ -425,19 +427,19 @@ function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channe
 function OrchestratorLine(props: { agent: string }) {
   const sessions = useSessionsSlice();
   const profile = useAgent(() => props.agent);
-  const now = (): OrchestratorMood => orchestratorMood(sessions()?.sessions, props.agent);
+  const now = computed((): OrchestratorMood => orchestratorMood(sessions()?.sessions, props.agent));
   const settings = useQuery(settingsQuery);
   // Listening is not a promise the orchestrator can keep without its model: then the line says what it lacks, and where that is set.
-  const lacks = () => {
+  const lacks = computed(() => {
     const readiness = ready(settings, undefined)?.readiness.orchestrator;
     return readiness?.ready === false ? fixOf(readiness.missing) : undefined;
-  };
+  });
   const clock = useNow();
-  const since = () => {
+  const since = computed(() => {
     const phase = orchestratorSession(sessions()?.sessions, props.agent)?.phase;
     return phase?._tag === "working" ? phase.since : undefined;
-  };
-  const dotTone = () => (lacks() ? "berry" : now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf");
+  });
+  const dotTone = computed(() => (lacks() ? "berry" : now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf"));
   return (
     <View
       testID="channel-orchestrator-line"

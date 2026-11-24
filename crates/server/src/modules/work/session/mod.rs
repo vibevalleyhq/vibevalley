@@ -62,8 +62,18 @@ fn session_error(e: BoardError) -> ApiError {
     }
 }
 
+async fn run_blocking<F, R>(f: F) -> Result<R, ApiError>
+where
+    F: FnOnce() -> Result<R, ApiError> + Send + 'static,
+    R: Send + 'static,
+{
+    crate::spawn_blocking_traced(f)
+        .await
+        .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+}
+
 pub fn install(hub: &Arc<Hub>, sessions: Sessions, trajectories: Arc<Trajectories>, attachments: Option<Arc<Attachments>>) {
-    hub.on::<ops::SessionList>(move |ctx, input| {
+    hub.on_async::<ops::SessionList, _, _>(move |ctx, input| async move {
         let profile = input.profile.unwrap_or_default();
         let controller = input.controller;
         let mut out: Vec<_> = ctx.hub.read(|s| {
@@ -76,41 +86,78 @@ pub fn install(hub: &Arc<Hub>, sessions: Sessions, trajectories: Arc<Trajectorie
         out.sort_by_key(|s| std::cmp::Reverse(s.hired_at));
         Ok(out)
     });
-    hub.on::<ops::SessionGet>(move |ctx, input| {
+    hub.on_async::<ops::SessionGet, _, _>(move |ctx, input| async move {
         ctx.hub
             .read(|s| s.sessions.iter().find(|x| x.id == input.id).cloned())
             .ok_or_else(|| helper_ref(&input.id))
     });
     let tr = trajectories.clone();
-    hub.on::<ops::SessionEventList>(move |_, input| Ok(tr.events_page(&input).unwrap_or_default()));
+    hub.on_async::<ops::SessionEventList, _, _>(move |_, input| {
+        let tr = tr.clone();
+        async move { run_blocking(move || Ok(tr.events_page(&input).unwrap_or_default())).await }
+    });
     let s = sessions.clone();
-    hub.on::<ops::SessionStop>(move |_, input| stop(&s, &input.id));
+    hub.on_async::<ops::SessionStop, _, _>(move |_, input| {
+        let s = s.clone();
+        async move { run_blocking(move || stop(&s, &input.id)).await }
+    });
 
     let s = sessions.clone();
-    hub.on::<ops::SessionOpenWorkspace>(move |_, input| s.open_workspace(input).map_err(session_error));
+    hub.on_async::<ops::SessionOpenWorkspace, _, _>(move |_, input| {
+        let s = s.clone();
+        async move { run_blocking(move || s.open_workspace(input).map_err(session_error)).await }
+    });
     let s = sessions.clone();
-    hub.on::<ops::SessionCloseWorkspace>(move |_, input| {
-        s.close_workspace(&input.id);
-        Ok(())
+    hub.on_async::<ops::SessionCloseWorkspace, _, _>(move |_, input| {
+        let s = s.clone();
+        async move {
+            run_blocking(move || {
+                s.close_workspace(&input.id);
+                Ok(())
+            })
+            .await
+        }
     });
     let s = sessions.clone();
     let att = attachments;
-    hub.on::<ops::SessionSend>(move |ctx, input| {
-        let trace_id = (ctx.trace_id != 0).then_some(ctx.trace_id);
-        s.send_workspace_with_trace(input, att.as_deref(), trace_id).map_err(session_error)
+    hub.on_async::<ops::SessionSend, _, _>(move |ctx, input| {
+        let s = s.clone();
+        let att = att.clone();
+        async move {
+            let trace_id = (ctx.trace_id != 0).then_some(ctx.trace_id);
+            run_blocking(move || s.send_workspace_with_trace(input, att.as_deref(), trace_id).map_err(session_error)).await
+        }
     });
     let s = sessions.clone();
-    hub.on::<ops::SessionRespondPermission>(move |_, input| s.respond_permission(input).map_err(session_error));
+    hub.on_async::<ops::SessionRespondPermission, _, _>(move |_, input| {
+        let s = s.clone();
+        async move { run_blocking(move || s.respond_permission(input).map_err(session_error)).await }
+    });
     let s = sessions.clone();
-    hub.on::<ops::SessionRespondInteraction>(move |_, input| s.respond_interaction(input).map_err(session_error));
+    hub.on_async::<ops::SessionRespondInteraction, _, _>(move |_, input| {
+        let s = s.clone();
+        async move { run_blocking(move || s.respond_interaction(input).map_err(session_error)).await }
+    });
     let s = sessions.clone();
-    hub.on::<ops::SessionSetConfig>(move |_, input| s.set_workspace_config(input).map_err(session_error));
+    hub.on_async::<ops::SessionSetConfig, _, _>(move |_, input| {
+        let s = s.clone();
+        async move { run_blocking(move || s.set_workspace_config(input).map_err(session_error)).await }
+    });
     let s = sessions.clone();
-    hub.on::<ops::SessionChildTranscript>(move |_, input| s.read_child_transcript(input).map_err(session_error));
+    hub.on_async::<ops::SessionChildTranscript, _, _>(move |_, input| {
+        let s = s.clone();
+        async move { run_blocking(move || s.read_child_transcript(input).map_err(session_error)).await }
+    });
     let s = sessions.clone();
-    hub.on::<ops::SessionBindingAttach>(move |_, input| s.attach_binding(input).map_err(session_error));
+    hub.on_async::<ops::SessionBindingAttach, _, _>(move |_, input| {
+        let s = s.clone();
+        async move { run_blocking(move || s.attach_binding(input).map_err(session_error)).await }
+    });
     let s = sessions.clone();
-    hub.on::<ops::SessionBindingDetach>(move |_, input| s.detach_binding(input).map_err(session_error));
+    hub.on_async::<ops::SessionBindingDetach, _, _>(move |_, input| {
+        let s = s.clone();
+        async move { run_blocking(move || s.detach_binding(input).map_err(session_error)).await }
+    });
 
     let s = sessions;
     let tr = trajectories.clone();

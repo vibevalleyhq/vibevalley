@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, View, windowSize } from "nsh";
+import { computed, Scroll, signal, Text, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
@@ -115,20 +115,6 @@ function ConnectionsSettings(props: { sub: string | undefined; id: string | unde
   );
 }
 
-/** At /team/memory, under the Team place. */
-export function TeamMemoryPage() {
-  return (
-    <Scroll testID="team-memory-page" class="min-h-0 min-w-0 flex-1 bg-page" contentClass="px-6 py-5">
-      <Page title={t("web.setting.nav.memory")} hint={t("web.setting.memory.intro")} action={<SettingsFile />}>
-        <SettingsForm part="memory" />
-      </Page>
-    </Scroll>
-  );
-}
-
-/** Tailwind's md (48rem): narrower, the list sits over the section. */
-const md = () => windowSize().width >= 768;
-
 function SectionBody(props: { id: string; sub: string | undefined; connectorId: string | undefined }) {
   return (
     <>
@@ -158,15 +144,29 @@ function SectionBody(props: { id: string; sub: string | undefined; connectorId: 
   );
 }
 
+/** At /team/memory, under the Team place. */
+export function TeamMemoryPage() {
+  return (
+    <Scroll testID="team-memory-page" class="min-h-0 min-w-0 flex-1 bg-page" contentClass="px-6 py-5">
+      <Page title={t("web.setting.nav.memory")} hint={t("web.setting.memory.intro")} action={<SettingsFile />}>
+        <SettingsForm part="memory" />
+      </Page>
+    </Scroll>
+  );
+}
+
 /** `rest` is the path after /settings/. */
 export function SettingsPage(props: { rest: string }) {
+  /** Tailwind's md (48rem): narrower, the list sits over the section. */
+  const md = computed(() => windowSize().width >= 768);
   const query = signal("");
-  const q = () => query().trim().toLowerCase();
-  const parts = () => props.rest.split("/");
-  const redirect = () => legacyRedirect(props.rest);
-  const section = () => sections.find((s) => s.id === parts()[0]);
-  const connectorId = () => (parts().length > 2 ? decodeURIComponent(parts().slice(2).join("/")) : undefined);
-  const shown = (g: Group) => sections.filter((s) => s.group === g && matches(q(), [s.label, s.words]));
+  const q = computed(() => query().trim().toLowerCase());
+  const parts = computed(() => props.rest.split("/"));
+  const redirect = computed(() => legacyRedirect(props.rest));
+  const section = computed(() => sections.find((s) => s.id === parts()[0]));
+  const connectorId = computed(() => (parts().length > 2 ? decodeURIComponent(parts().slice(2).join("/")) : undefined));
+  const mainShown = computed(() => sections.filter((s) => s.group === "main" && matches(q(), [s.label, s.words])));
+  const aboutShown = computed(() => sections.filter((s) => s.group === "about" && matches(q(), [s.label, s.words])));
   const navWidth = usePaneWidth("settingsNav", 224, 176, 360);
   return (
     <If
@@ -193,15 +193,15 @@ export function SettingsPage(props: { rest: string }) {
                       placeholder={t("web.setting.nav.search")}
                       label={t("web.setting.nav.search")}
                     />
-                    <If when={shown("main").length > 0}>
+                    <If when={mainShown().length > 0}>
                       <View class="gap-0.5">
-                        <Each of={shown("main")} key={(s) => s.id}>
+                        <Each of={mainShown()} key={(s) => s.id}>
                           {(s) => <SectionLink section={s()} current={s() === current()} />}
                         </Each>
                       </View>
                     </If>
                     <View class="flex-1" />
-                    <Each of={shown("about")} key={(s) => s.id}>
+                    <Each of={aboutShown()} key={(s) => s.id}>
                       {(s) => (
                         <View class="border-t border-line pt-3">
                           <SectionLink section={s()} current={s() === current()} />

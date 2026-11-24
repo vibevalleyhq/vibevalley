@@ -449,8 +449,16 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
     }
   });
 
-  const changedCount = () => (f()?.staged?.length ?? 0) + (f()?.changes?.length ?? 0) + (f()?.conflicts?.length ?? 0);
-  const branchLabel = () => f()?.branch ?? `detached ${f()?.head ?? ""}`;
+  const stagedCount = computed(() => f()?.staged?.length ?? 0);
+  const changesCount = computed(() => f()?.changes?.length ?? 0);
+  const conflictsCount = computed(() => f()?.conflicts?.length ?? 0);
+  const worktreesCount = computed(() => f()?.worktrees?.length ?? 0);
+  const branchesCount = computed(() => f()?.branches?.length ?? 0);
+  const logCount = computed(() => f()?.log?.length ?? 0);
+  const canCreate = computed(() => newBranch().trim() !== "" && !creatingWt());
+  const canCommit = computed(() => !committing() && stagedCount() > 0 && message().trim() !== "");
+  const changedCount = computed(() => stagedCount() + changesCount() + conflictsCount());
+  const branchLabel = computed(() => f()?.branch ?? `detached ${f()?.head ?? ""}`);
   const filteredBranches = computed(() => {
     const q = branchQuery().trim().toLowerCase();
     return (f()?.branches ?? []).filter((b) => !q || b.name.toLowerCase().includes(q));
@@ -460,7 +468,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
       id: "changes",
       label: () => (changedCount() > 0 ? t("web.shell.git.tab.changesCount", { count: changedCount() }) : t("web.shell.git.tab.changes")),
     },
-    { id: "branches", label: () => t("web.shell.git.tab.branches", { count: f()?.branches?.length ?? 0 }) },
+    { id: "branches", label: () => t("web.shell.git.tab.branches", { count: branchesCount() }) },
     { id: "commits", label: () => t("web.shell.git.tab.commits") },
   ];
 
@@ -468,12 +476,12 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
     <View>
       <SectionHead
         title={title}
-        count={f()?.worktrees?.length ?? 0}
+        count={worktreesCount()}
         collapsible
         expanded={isOpen(sectionKey)}
         onToggle={() => toggleSection(sectionKey)}
         borderTop={borderTop}
-        borderBottom={isOpen(sectionKey) && (f()?.worktrees?.length ?? 0) > 0 && !addingWt()}
+        borderBottom={isOpen(sectionKey) && worktreesCount() > 0 && !addingWt()}
         right={
           <Button
             onPress={() => {
@@ -502,14 +510,14 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
               />
               <Button
                 onPress={submitNewWorktree}
-                disabled={!newBranch().trim() || creatingWt()}
+                disabled={!canCreate()}
                 class={`h-6.5 justify-center rounded-md border px-2.5 ${
-                  !newBranch().trim() || creatingWt()
+                  !canCreate()
                     ? "border-line bg-hover"
                     : "border-accent bg-accent hover:bg-accent-hover active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
                 }`}
               >
-                <Text class={`text-2xs font-medium ${!newBranch().trim() || creatingWt() ? "text-muted" : "text-page"}`}>{t("web.shell.git.createBtn")}</Text>
+                <Text class={`text-2xs font-medium ${!canCreate() ? "text-muted" : "text-page"}`}>{t("web.shell.git.createBtn")}</Text>
               </Button>
             </View>
           </If>
@@ -618,7 +626,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                     </View>
                   )}
                 </If>
-                <If when={(f()?.worktrees?.length ?? 0) > 1}>{renderWorktreesSection("changes-worktrees", t("web.shell.git.worktrees"), false, false)}</If>
+                <If when={worktreesCount() > 1}>{renderWorktreesSection("changes-worktrees", t("web.shell.git.worktrees"), false, false)}</If>
                 <View class="gap-2 border-b border-line px-3 py-2.5">
                   <Input
                     value={message()}
@@ -627,22 +635,20 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                     multiline
                     class="min-h-14 rounded-md border border-line bg-elevated px-2.5 py-1.5 text-xs leading-normal text-ink placeholder:text-faint hover:border-faint focus:border-focus"
                   />
-                  <DesignButton tone="primary" class="px-3" disabled={committing() || (f()?.staged?.length ?? 0) === 0 || !message().trim()} onPress={commit}>
+                  <DesignButton tone="primary" class="px-3" disabled={!canCommit()} onPress={commit}>
                     {committing()
                       ? t("web.shell.git.committing")
-                      : (f()?.staged?.length ?? 0) > 0
-                        ? t("web.shell.git.commitStaged", { count: f()?.staged?.length ?? 0 })
+                      : stagedCount() > 0
+                        ? t("web.shell.git.commitStaged", { count: stagedCount() })
                         : t("web.shell.git.noStaged")}
                   </DesignButton>
-                  <If when={(f()?.staged?.length ?? 0) === 0 && (f()?.changes?.length ?? 0) > 0}>
+                  <If when={stagedCount() === 0 && changesCount() > 0}>
                     <Button
                       onPress={() => act({ type: "stage", paths: (f()?.changes ?? []).map((r) => r.path) })}
                       class={`h-6.5 flex-row items-center justify-center gap-1 rounded-md border border-line bg-transparent px-2.5 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-hover active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
                     >
                       <Icon name="add" size={11} tone="ink" />
-                      <Text class="text-xs font-medium text-ink">
-                        {t("web.shell.git.stageAllCount", { count: (f()?.changes?.length ?? 0).toLocaleString() })}
-                      </Text>
+                      <Text class="text-xs font-medium text-ink">{t("web.shell.git.stageAllCount", { count: changesCount().toLocaleString() })}</Text>
                     </Button>
                   </If>
                   <If when={commitNotice()}>{(notice) => <Text class="text-2xs text-ok-ink">{notice()}</Text>}</If>
@@ -655,11 +661,11 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                   </If>
                 </View>
 
-                <If when={(f()?.conflicts?.length ?? 0) > 0}>
+                <If when={conflictsCount() > 0}>
                   <View class="pb-1">
                     <SectionHead
                       title={t("web.shell.git.conflicts")}
-                      count={f()?.conflicts?.length}
+                      count={conflictsCount()}
                       tone="danger"
                       collapsible
                       expanded={isOpen("conflicts")}
@@ -678,13 +684,13 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 <View class="pb-1">
                   <SectionHead
                     title={t("web.shell.git.staged")}
-                    count={f()?.staged?.length ?? 0}
+                    count={stagedCount()}
                     collapsible
                     expanded={isOpen("staged")}
                     onToggle={() => toggleSection("staged")}
-                    borderTop={(f()?.conflicts?.length ?? 0) > 0}
+                    borderTop={conflictsCount() > 0}
                     right={
-                      <If when={(f()?.staged?.length ?? 0) > 0}>
+                      <If when={stagedCount() > 0}>
                         <ShellIconButton
                           label={t("web.shell.git.unstageAll")}
                           icon="minus"
@@ -694,7 +700,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                     }
                   />
                   <If when={isOpen("staged")}>
-                    <If when={(f()?.staged?.length ?? 0) > 0} else={<PanelEmpty text={t("web.shell.git.stagedEmpty")} compact />}>
+                    <If when={stagedCount() > 0} else={<PanelEmpty text={t("web.shell.git.stagedEmpty")} compact />}>
                       <View class="gap-px">
                         <Each of={f()?.staged ?? []} key={(r) => r.path}>
                           {(row) => <FileRow row={row()} staged />}
@@ -707,13 +713,13 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 <View class="pb-1">
                   <SectionHead
                     title={t("web.shell.git.changes")}
-                    count={f()?.changes?.length ?? 0}
+                    count={changesCount()}
                     collapsible
                     expanded={isOpen("changes")}
                     onToggle={() => toggleSection("changes")}
                     borderTop
                     right={
-                      <If when={(f()?.changes?.length ?? 0) > 0}>
+                      <If when={changesCount() > 0}>
                         <ShellIconButton
                           label={t("web.shell.git.stageAll")}
                           icon="add"
@@ -723,7 +729,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                     }
                   />
                   <If when={isOpen("changes")}>
-                    <If when={(f()?.changes?.length ?? 0) > 0} else={<PanelEmpty text={t("web.shell.git.clean")} compact />}>
+                    <If when={changesCount() > 0} else={<PanelEmpty text={t("web.shell.git.clean")} compact />}>
                       <View class="gap-px">
                         <Each of={f()?.changes ?? []} key={(r) => r.path}>
                           {(row) => <FileRow row={row()} staged={false} />}
@@ -740,14 +746,14 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 <View class="pb-1">
                   <SectionHead
                     title={t("web.shell.git.branches")}
-                    count={f()?.branches?.length ?? 0}
+                    count={branchesCount()}
                     collapsible
                     expanded={isOpen("branches")}
                     onToggle={() => toggleSection("branches")}
                   />
                   <If when={isOpen("branches")}>
                     <View>
-                      <If when={(f()?.branches?.length ?? 0) > 6}>
+                      <If when={branchesCount() > 6}>
                         <View class="px-3 pt-0.5 pb-1.5">
                           <Input
                             value={branchQuery()}
@@ -757,7 +763,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                           />
                         </View>
                       </If>
-                      <If when={(f()?.branches?.length ?? 0) > 0} else={<PanelEmpty text={t("web.shell.git.noBranches")} compact />}>
+                      <If when={branchesCount() > 0} else={<PanelEmpty text={t("web.shell.git.noBranches")} compact />}>
                         <If when={filteredBranches().length > 0} else={<PanelEmpty text={t("web.shell.git.noMatchingBranches")} compact />}>
                           <View class="gap-px">
                             <Each of={filteredBranches()} key={(b) => b.name}>
@@ -808,7 +814,7 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                   </If>
                 </View>
 
-                <If when={(f()?.worktrees?.length ?? 0) > 0}>{renderWorktreesSection("branches-worktrees", t("web.shell.git.worktrees"), true, true)}</If>
+                <If when={worktreesCount() > 0}>{renderWorktreesSection("branches-worktrees", t("web.shell.git.worktrees"), true, true)}</If>
               </View>
             </If>
 
@@ -816,14 +822,14 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
               <View>
                 <SectionHead
                   title={t("web.shell.git.commits")}
-                  count={f()?.log?.length ?? 0}
+                  count={logCount()}
                   collapsible
                   expanded={isOpen("commits")}
                   onToggle={() => toggleSection("commits")}
-                  borderBottom={isOpen("commits") && (f()?.log?.length ?? 0) > 0}
+                  borderBottom={isOpen("commits") && logCount() > 0}
                 />
                 <If when={isOpen("commits")}>
-                  <If when={(f()?.log?.length ?? 0) > 0} else={<PanelEmpty text={t("web.shell.git.noCommits")} compact />}>
+                  <If when={logCount() > 0} else={<PanelEmpty text={t("web.shell.git.noCommits")} compact />}>
                     <Each of={f()?.log ?? []} key={(c) => c.id}>
                       {(c) => (
                         <Button

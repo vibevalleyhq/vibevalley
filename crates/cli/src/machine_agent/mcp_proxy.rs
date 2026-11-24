@@ -184,3 +184,83 @@ async fn handle_mcp(State(state): State<ProxyState>, uri: Uri, headers: HeaderMa
 
     (status, [(header::CONTENT_TYPE, content_type)], response.body).into_response()
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::body::to_bytes;
+    use tokio::sync::mpsc;
+
+    use super::*;
+
+    fn test_state(cancel: CancellationToken) -> (ProxyState, mpsc::UnboundedReceiver<MachineWireFrame>) {
+        let transport = Arc::new(TransportSlot::new());
+        let (tx, rx) = mpsc::unbounded_channel();
+        transport.install(tx);
+        let state = ProxyState {
+            session_id: "sess-1".into(),
+            default_token: "tok-default".into(),
+            transport,
+            pending: Arc::new(Mutex::new(HashMap::new())),
+            cancel,
+        };
+        (state, rx)
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn handle_mcp_times_out_and_cleans_pending_on_virtual_clock() {
+        let wall = std::time::Instant::now();
+        let cancel = CancellationToken::new();
+        let (state, mut rx) = test_state(cancel);
+        let pending = state.pending.clone();
+
+        let resp_task = tokio::spawn(handle_mcp(
+            State(state),
+            Uri::from_static("/mcp?x=1"),
+            HeaderMap::new(),
+            r#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#.into(),
+        ));
+
+        let frame = rx.recv().await.expect("MachineMcpRequest sent");
+        let req_id = match frame {
+            MachineWireFrame::MachineMcpRequest(req) => {
+                assert_eq!(req.session_token, "tok-default");
+                assert_eq!(req.path, "/mcp?x=1");
+                req.request_id
+            }
+            other => panic!("unexpected frame: {other:?}"),
+        };
+        assert!(pending.lock().contains_key(&req_id));
+
+        tokio::time::advance(DEFAULT_MCP_TIMEOUT - Duration::from_secs(1)).await;
+        tokio::task::yield_now().await;
+        assert!(!resp_task.is_finished());
+
+        tokio::time::advance(Duration::from_secs(1)).await;
+        let resp = resp_task.await.unwrap();
+        assert_eq!(resp.status(), StatusCode::GATEWAY_TIMEOUT);
+        assert!(!pending.lock().contains_key(&req_id), "PendingGuard must clean up timed-out request");
+        assert!(wall.elapsed() < Duration::from_secs(1), "virtual timeout took {:?}", wall.elapsed());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn handle_mcp_cancels_immediately_and_cleans_pending() {
+        let cancel = CancellationToken::new();
+        let (state, mut rx) = test_state(cancel.clone());
+        let pending = state.pending.clone();
+
+        let resp_task = tokio::spawn(handle_mcp(State(state), Uri::from_static("/mcp"), HeaderMap::new(), "{}".into()));
+
+        let req_id = match rx.recv().await.expect("MachineMcpRequest sent") {
+            MachineWireFrame::MachineMcpRequest(req) => req.request_id,
+            other => panic!("unexpected frame: {other:?}"),
+        };
+        assert!(pending.lock().contains_key(&req_id));
+
+        cancel.cancel();
+        let resp = resp_task.await.unwrap();
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let body = to_bytes(resp.into_body(), 1024).await.unwrap();
+        assert_eq!(&body[..], b"proxy shutting down");
+        assert!(!pending.lock().contains_key(&req_id));
+    }
+}

@@ -162,10 +162,6 @@ impl Chat {
         Ok(rows.iter().map(to_message).collect())
     }
 
-    pub fn mark_read(&self, channel: &str, number: i64) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.mark_read_async(channel, number))
-    }
-
     pub async fn mark_read_async(&self, channel: &str, number: i64) -> Result<(), ApiError> {
         let mut inner = self.locked().await;
         if inner.model.channel(channel).is_none() {
@@ -181,10 +177,6 @@ impl Chat {
     }
 
     /// `messageLocation`: a message's place and the channel it is in.
-    pub fn message_location(&self, id: &str) -> Result<Option<(Channel, String)>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.message_location_async(id))
-    }
-
     pub async fn message_location_async(&self, id: &str) -> Result<Option<(Channel, String)>, ApiError> {
         let m = {
             let mut conn = self.db.read_pool().acquire().await.q()?;
@@ -205,10 +197,6 @@ impl Chat {
 
     /// `userReceipt`: when the user read a message, and whether a later one
     /// took its place; none once it is deleted.
-    pub fn user_receipt(&self, id: &str) -> Result<Option<(ChatMessage, Option<i64>, bool)>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.user_receipt_async(id))
-    }
-
     pub async fn user_receipt_async(&self, id: &str) -> Result<Option<(ChatMessage, Option<i64>, bool)>, ApiError> {
         let mut conn = self.db.read_pool().acquire().await.q()?;
         let Some(row) = db::message_by_id(&mut conn, id).await.q()?.filter(|r| r.deleted_at.is_none()) else {
@@ -221,10 +209,6 @@ impl Chat {
     }
 
     /// Each speaker's newest report the user has read: (from, at, readAt).
-    pub fn user_read_reports(&self) -> Result<Vec<(String, i64, i64)>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.user_read_reports_async())
-    }
-
     pub async fn user_read_reports_async(&self) -> Result<Vec<(String, i64, i64)>, ApiError> {
         let mut conn = self.db.read_pool().acquire().await.q()?;
         db::user_read_reports(&mut conn).await.q()
@@ -245,10 +229,6 @@ impl Chat {
     }
 
     /// A posted message as it is now, told as when it was committed.
-    pub fn committed_of(&self, message: &str) -> Result<Option<Committed>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.committed_of_async(message))
-    }
-
     pub async fn committed_of_async(&self, message: &str) -> Result<Option<Committed>, ApiError> {
         let (row, event) = {
             let mut conn = self.db.read_pool().acquire().await.q()?;
@@ -284,10 +264,6 @@ impl Chat {
             .collect())
     }
 
-    pub fn pending_deliveries_for(&self, kind: DeliveryTargetKind, recipient: &str, max_id: i64) -> Result<Vec<QueuedDelivery>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.pending_deliveries_for_async(kind, recipient, max_id))
-    }
-
     pub async fn pending_deliveries_for_async(&self, kind: DeliveryTargetKind, recipient: &str, max_id: i64) -> Result<Vec<QueuedDelivery>, ApiError> {
         let mut conn = self.db.read_pool().acquire().await.q()?;
         Ok(db::pending_deliveries_for_recipient(&mut conn, kind.as_str(), recipient, max_id)
@@ -296,10 +272,6 @@ impl Chat {
             .into_iter()
             .map(queued_from_row)
             .collect())
-    }
-
-    pub fn delivery_is_pending(&self, id: i64) -> Result<bool, ApiError> {
-        vibevalley_runtime::rt::block_on(self.delivery_is_pending_async(id))
     }
 
     pub async fn delivery_is_pending_async(&self, id: i64) -> Result<bool, ApiError> {
@@ -315,10 +287,6 @@ impl Chat {
         let status = if delivered { "delivered" } else { "failed" };
         let mut conn = self.db.write_pool().acquire().await.q()?;
         db::settle_delivery(&mut conn, id, status, now()).await.q()
-    }
-
-    pub fn withdraw_delivery(&self, id: i64) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.withdraw_delivery_async(id))
     }
 
     pub async fn withdraw_delivery_async(&self, id: i64) -> Result<(), ApiError> {
@@ -410,10 +378,6 @@ impl Chat {
         model.channel(id).map(|r| model.place_of(r))
     }
 
-    pub fn mark_seen(&self, participant: &str, message: &str) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.mark_seen_async(participant, message))
-    }
-
     pub async fn mark_seen_async(&self, participant: &str, message: &str) -> Result<(), ApiError> {
         let mut conn = self.db.write_pool().acquire().await.q()?;
         db::mark_seen(&mut conn, participant, message, now()).await.q()
@@ -450,19 +414,11 @@ impl Chat {
     }
 
     /// The newest n messages of a place, oldest first.
-    pub fn recent_rows(&self, channel: &str, n: i64) -> Result<Vec<MsgRow>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.recent_rows_async(channel, n))
-    }
-
     pub async fn recent_rows_async(&self, channel: &str, n: i64) -> Result<Vec<MsgRow>, ApiError> {
         let mut conn = self.db.read_pool().acquire().await.q()?;
         let mut rows = db::messages_before(&mut conn, channel, NO_NUMBER, n).await.q()?;
         rows.reverse();
         Ok(rows)
-    }
-
-    pub fn rows_after(&self, channel: &str, after: i64) -> Result<Vec<MsgRow>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.rows_after_async(channel, after))
     }
 
     pub async fn rows_after_async(&self, channel: &str, after: i64) -> Result<Vec<MsgRow>, ApiError> {
@@ -534,10 +490,6 @@ impl Chat {
         )
     }
 
-    pub fn open_channel(&self, name: &str, description: &str, repo: &str) -> Result<Info, ApiError> {
-        vibevalley_runtime::rt::block_on(self.open_channel_async(name, description, repo))
-    }
-
     pub async fn open_channel_async(&self, name: &str, description: &str, repo: &str) -> Result<Info, ApiError> {
         let mut inner = self.locked().await;
         let trimmed = name.trim();
@@ -576,10 +528,6 @@ impl Chat {
     }
 
     /// `updateChannel`: a thread changes only its title.
-    pub fn update_channel(&self, id: &str, upd: ChannelUpdate) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.update_channel_async(id, upd))
-    }
-
     pub async fn update_channel_async(&self, id: &str, upd: ChannelUpdate) -> Result<(), ApiError> {
         let mut inner = self.locked().await;
         let row = inner
@@ -702,10 +650,6 @@ impl Chat {
         Ok(())
     }
 
-    pub fn archive(&self, id: &str, on: bool) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.archive_async(id, on))
-    }
-
     pub async fn archive_async(&self, id: &str, on: bool) -> Result<(), ApiError> {
         let mut inner = self.locked().await;
         let row = inner
@@ -760,10 +704,6 @@ impl Chat {
         Ok((model.target_of_channel(row), threads.len(), said))
     }
 
-    pub fn preview_remove_channel(&self, id: &str) -> Result<Preview, ApiError> {
-        vibevalley_runtime::rt::block_on(self.preview_remove_channel_async(id))
-    }
-
     pub async fn preview_remove_channel_async(&self, id: &str) -> Result<Preview, ApiError> {
         let model = self.snapshot.load_full();
         let mut conn = self.db.read_pool().acquire().await.q()?;
@@ -774,10 +714,6 @@ impl Chat {
                 &[("target", target.into()), ("threads", threads.into()), ("said", said.into())],
             )],
         })
-    }
-
-    pub fn remove_channel(&self, id: &str) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.remove_channel_async(id))
     }
 
     pub async fn remove_channel_async(&self, id: &str) -> Result<(), ApiError> {
@@ -801,10 +737,6 @@ impl Chat {
         }
         self.apply(vec![Fact::ChannelRemoved(FactChannelRemoved { at: now(), id: id.into() })]);
         Ok(())
-    }
-
-    pub fn set_notify(&self, id: &str, notify: Notify) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.set_notify_async(id, notify))
     }
 
     pub async fn set_notify_async(&self, id: &str, notify: Notify) -> Result<(), ApiError> {
@@ -839,10 +771,6 @@ impl Chat {
 
     /// `createDirect`: the direct channel with a seated agent, made when
     /// there is none.
-    pub fn create_direct(&self, peer: &str) -> Result<String, ApiError> {
-        vibevalley_runtime::rt::block_on(self.create_direct_async(peer))
-    }
-
     pub async fn create_direct_async(&self, peer: &str) -> Result<String, ApiError> {
         {
             let model = self.model();
@@ -875,10 +803,6 @@ impl Chat {
         Ok(id)
     }
 
-    pub fn mark_unread(&self, channel: &str, number: i64) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.mark_unread_async(channel, number))
-    }
-
     pub async fn mark_unread_async(&self, channel: &str, number: i64) -> Result<(), ApiError> {
         let mut inner = self.locked().await;
         if inner.model.channel(channel).is_none() {
@@ -894,10 +818,6 @@ impl Chat {
         }
         self.publish_channel_async(&inner.model, channel).await?;
         self.publish_user_mentions_async(&inner.model).await
-    }
-
-    pub fn make_default(&self, id: &str) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.make_default_async(id))
     }
 
     pub async fn make_default_async(&self, id: &str) -> Result<(), ApiError> {

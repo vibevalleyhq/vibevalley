@@ -520,66 +520,109 @@ pub fn found_text(result: &MemorySearch, agent: &str, repo: &str, text: &str) ->
 /// The `memory.*` endpoints, and what finished rounds teach their profiles.
 pub fn install(hub: &Arc<Hub>, memories: Arc<Memories>) {
     let s = memories.clone();
-    hub.on::<ops::MemoryList>(move |_, input| {
-        Ok(MemoryList {
-            memories: s.listed(&input.agent).into_iter().map(to_wire).collect(),
-            sources: s.sources(),
-        })
+    hub.on_async::<ops::MemoryList, _, _>(move |_, input| {
+        let s = s.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                Ok(MemoryList {
+                    memories: s.listed(&input.agent).into_iter().map(to_wire).collect(),
+                    sources: s.sources(),
+                })
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
     });
     let s = memories.clone();
-    hub.on::<ops::MemoryRecall>(move |_, input| {
-        let lines: Vec<String> = s
-            .recall(
-                &input.agent,
-                None,
-                input.repo.as_deref().unwrap_or(""),
-                input.text.as_deref().unwrap_or(""),
-                true,
-            )
-            .into_iter()
-            .map(|(_, l)| l)
-            .collect();
-        let chars = lines.iter().map(|l| l.encode_utf16().count() as i64 + 1).sum();
-        Ok(RecallPreview {
-            lines,
-            chars,
-            limit: m::RECALL_CHARS as i64,
-        })
+    hub.on_async::<ops::MemoryRecall, _, _>(move |_, input| {
+        let s = s.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                let lines: Vec<String> = s
+                    .recall(
+                        &input.agent,
+                        None,
+                        input.repo.as_deref().unwrap_or(""),
+                        input.text.as_deref().unwrap_or(""),
+                        true,
+                    )
+                    .into_iter()
+                    .map(|(_, l)| l)
+                    .collect();
+                let chars = lines.iter().map(|l| l.encode_utf16().count() as i64 + 1).sum();
+                Ok(RecallPreview {
+                    lines,
+                    chars,
+                    limit: m::RECALL_CHARS as i64,
+                })
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
     });
     let s = memories.clone();
     let keys = Arc::new(RequestKeys::<Memory>::default());
-    hub.on::<ops::MemoryCreate>(move |ctx, input| {
+    hub.on_async::<ops::MemoryCreate, _, _>(move |ctx, input| {
+        let s = s.clone();
+        let keys = keys.clone();
         let by = match ctx.caller {
             Caller::Session => By::Session(ctx.client.as_ref().map(|c| c.id.clone()).unwrap_or_default()),
             Caller::Orchestrator => By::Orchestrator,
             Caller::User | Caller::Remote => By::User,
         };
-        keys.once(input.request_key.as_deref(), || {
-            s.write(&Note {
-                agent: input.agent.clone(),
-                text: input.text.clone(),
-                repo: input.repo.clone().unwrap_or_default(),
-                by: by.clone(),
+        async move {
+            crate::spawn_blocking_traced(move || {
+                keys.once(input.request_key.as_deref(), || {
+                    s.write(&Note {
+                        agent: input.agent.clone(),
+                        text: input.text.clone(),
+                        repo: input.repo.clone().unwrap_or_default(),
+                        by: by.clone(),
+                    })
+                })
             })
-        })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
     });
     let s = memories.clone();
-    hub.on::<ops::MemorySearch>(move |_, input| {
-        let agent = input
-            .agent
-            .as_deref()
-            .map(|a| s.agents.profiles.named(a).map(|p| p.id).unwrap_or_else(|| a.to_string()));
-        Ok(s.search(
-            agent.as_deref().unwrap_or(""),
-            input.repo.as_deref().unwrap_or(""),
-            input.text.as_deref().unwrap_or(""),
-            0,
-        ))
+    hub.on_async::<ops::MemorySearch, _, _>(move |_, input| {
+        let s = s.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                let agent = input
+                    .agent
+                    .as_deref()
+                    .map(|a| s.agents.profiles.named(a).map(|p| p.id).unwrap_or_else(|| a.to_string()));
+                Ok(s.search(
+                    agent.as_deref().unwrap_or(""),
+                    input.repo.as_deref().unwrap_or(""),
+                    input.text.as_deref().unwrap_or(""),
+                    0,
+                ))
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
     });
     let s = memories.clone();
-    hub.on::<ops::MemoryDelete>(move |_, input| s.forget(&input.agent, &input.memory));
+    hub.on_async::<ops::MemoryDelete, _, _>(move |_, input| {
+        let s = s.clone();
+        async move {
+            crate::spawn_blocking_traced(move || s.forget(&input.agent, &input.memory))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
     let s = memories.clone();
-    hub.on::<ops::MemoryPreviewDelete>(move |_, input| s.preview_forget(&input.agent, &input.memory));
+    hub.on_async::<ops::MemoryPreviewDelete, _, _>(move |_, input| {
+        let s = s.clone();
+        async move {
+            crate::spawn_blocking_traced(move || s.preview_forget(&input.agent, &input.memory))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
 
     // A round that reported: what it did is kept for its profile on the async bus thread.
     let s = Arc::downgrade(&memories);
@@ -617,8 +660,8 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn session_reported_keeps_issue_worker_and_skips_workspace_sessions() {
+    #[tokio::test]
+    async fn session_reported_keeps_issue_worker_and_skips_workspace_sessions() {
         let home = tempfile::tempdir().unwrap();
         let db = ServerDb::open(home.path()).unwrap();
         let hub = Hub::new(empty_space_state());
@@ -689,24 +732,22 @@ mod tests {
         })]);
 
         // Memories persists directly to SQLite on the EventBus worker without emitting a follow-up Hub fact.
-        vibevalley_runtime::rt::block_on(async {
-            tokio::time::timeout(Duration::from_secs(3), async {
-                let mut tick = tokio::time::interval(Duration::from_millis(2));
-                tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-                loop {
-                    tick.tick().await;
-                    if !memories.list("backend").unwrap().is_empty() {
-                        break;
-                    }
+        tokio::time::timeout(Duration::from_secs(3), async {
+            let mut tick = tokio::time::interval(Duration::from_millis(2));
+            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            loop {
+                tick.tick().await;
+                if !memories.list("backend").unwrap().is_empty() {
+                    break;
                 }
-            })
-            .await
+            }
         })
+        .await
         .expect("issue memory was not recorded");
 
         assert!(memories.list("antigravity").unwrap().is_empty(), "workspace session leaked into memory");
         assert_eq!(memories.list("backend").unwrap().len(), 1);
         memories.close();
-        hub.close_bus();
+        hub.close_bus_async().await;
     }
 }

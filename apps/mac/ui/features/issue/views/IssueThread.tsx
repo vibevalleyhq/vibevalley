@@ -1,4 +1,4 @@
-import { Text, View } from "nsh";
+import { computed, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
@@ -28,10 +28,10 @@ export function IssueThread(props: { issue: string }) {
   const collab = useCollabSlice();
   const now = useNow();
   const location = useQuery(() => conversationQuery(props.issue));
-  const thread = () => issueThreadOf(collab()?.chat, props.issue)?.id ?? ready(location, undefined) ?? undefined;
+  const thread = computed(() => issueThreadOf(collab()?.chat, props.issue)?.id ?? ready(location, undefined) ?? undefined);
   const feed = useFollowed(thread);
   const act = createAct();
-  const visible = () => feed().messages.filter((message) => message.deleted === undefined);
+  const visible = computed(() => feed().messages.filter((message) => message.deleted === undefined));
   return (
     <View testID="issue-conversation" accessibilityLabel={t("web.issue.conversation.title")}>
       <SheetLabel>{t("web.issue.conversation.title")}</SheetLabel>

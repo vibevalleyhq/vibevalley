@@ -68,9 +68,9 @@ fn extension(mime: &str) -> Option<&'static str> {
 impl Jobs {
     /// The input sent to the vendor, once per job: its file id there. A file already sent is not sent again, so one
     /// whose answer was lost stays unknown.
-    pub(super) fn upload(&self, id: &str, input: &MediaInputReference, account: &Account, stop: &Stop) -> Result<String, Outcome> {
+    pub(super) async fn upload_async(&self, id: &str, input: &MediaInputReference, account: &Account, stop: &Stop) -> Result<String, Outcome> {
         let unsent = |_| Outcome::NotSubmitted;
-        let r = self.found(id).map_err(unsent)?;
+        let r = self.found_async(id).await.map_err(unsent)?;
         if let Some(sent) = r.remote.iter().find(|f| f.input == input.id) {
             return match (sent.state, &sent.remote_id) {
                 (RemoteState::Ready, Some(file)) => Ok(file.clone()),
@@ -78,36 +78,53 @@ impl Jobs {
             };
         }
         let extension = extension(&input.mime).ok_or(Outcome::NotSubmitted)?;
-        let content = self.inputs.content(&input.id).map_err(unsent)?;
-        let file = std::fs::File::open(&content.path).map_err(|_| Outcome::NotSubmitted)?;
+        let content = self.inputs.content_async(&input.id).await.map_err(unsent)?;
         if stop.aborted() {
             return Err(Outcome::NotSubmitted);
         }
         let filename = format!("vv-{}.{extension}", uuid::Uuid::new_v4().simple());
-        let wrote = self.note(id, |r| {
-            r.remote.push(RemoteFile {
-                input: input.id.clone(),
-                filename: filename.clone(),
-                state: RemoteState::Uploading,
-                remote_id: None,
+        let wrote = self
+            .note_async(id, |r| {
+                r.remote.push(RemoteFile {
+                    input: input.id.clone(),
+                    filename: filename.clone(),
+                    state: RemoteState::Uploading,
+                    remote_id: None,
+                })
             })
-        });
+            .await;
         if !matches!(wrote, Ok(true)) {
             return Err(Outcome::NotSubmitted);
         }
-        let (state, remote_id, answer) = match self.moss.upload(&account.key, file, input.size, &filename, input.kind.as_str(), stop) {
-            Ok((file, Uploaded::Ready)) => (RemoteState::Ready, Some(file.clone()), Ok(file)),
-            Ok((file, Uploaded::Rejected)) => (RemoteState::Rejected, Some(file), Err(Outcome::Rejected)),
-            Ok((file, Uploaded::Unknown)) => (RemoteState::Unknown, Some(file), Err(Outcome::Unknown)),
-            Err(e) if e.unknown() => (RemoteState::Unknown, None, Err(Outcome::Unknown)),
-            Err(_) => (RemoteState::Rejected, None, Err(Outcome::Rejected)),
+        let fetch = self.moss.fetch.clone();
+        let key = account.key.clone();
+        let path = content.path;
+        let size = input.size;
+        let kind = input.kind.as_str().to_string();
+        let upload_name = filename.clone();
+        let stop_upload = stop.clone();
+        let uploaded = crate::spawn_blocking_traced(move || {
+            let file = std::fs::File::open(&path).map_err(|_| Outcome::NotSubmitted)?;
+            Ok(super::vendor::Moss { fetch }.upload(&key, file, size, &upload_name, &kind, &stop_upload))
+        })
+        .await;
+        let (state, remote_id, answer) = match uploaded {
+            Ok(Ok(Ok((file, Uploaded::Ready)))) => (RemoteState::Ready, Some(file.clone()), Ok(file)),
+            Ok(Ok(Ok((file, Uploaded::Rejected)))) => (RemoteState::Rejected, Some(file), Err(Outcome::Rejected)),
+            Ok(Ok(Ok((file, Uploaded::Unknown)))) => (RemoteState::Unknown, Some(file), Err(Outcome::Unknown)),
+            Ok(Ok(Err(e))) if e.unknown() => (RemoteState::Unknown, None, Err(Outcome::Unknown)),
+            Ok(Ok(Err(_))) => (RemoteState::Rejected, None, Err(Outcome::Rejected)),
+            Ok(Err(outcome)) => (RemoteState::Rejected, None, Err(outcome)),
+            Err(_) => (RemoteState::Unknown, None, Err(Outcome::Unknown)),
         };
-        let _ = self.note(id, |r| {
-            if let Some(file) = r.remote.iter_mut().find(|f| f.input == input.id) {
-                file.state = state;
-                file.remote_id = remote_id;
-            }
-        });
+        let _ = self
+            .note_async(id, |r| {
+                if let Some(file) = r.remote.iter_mut().find(|f| f.input == input.id) {
+                    file.state = state;
+                    file.remote_id = remote_id;
+                }
+            })
+            .await;
         answer
     }
 

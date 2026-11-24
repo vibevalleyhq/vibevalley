@@ -17,10 +17,10 @@ use vibevalley_protocol::{
     RemotePairExchangeResult, RemotePlatform, RemoteStatus, RemoteWhoami, SCOPE_REMOTE_CLIENT, SCOPE_REMOTE_MACHINE, ops,
 };
 
+use crate::Hub;
 use crate::base::ServerDb;
 use crate::transport::api::{BoxFuture, CallerPrincipal, RemoteAuth, RemoteDeviceIdentity};
 use crate::transport::http::{Listener, is_allowed_remote_ip, is_remote_allow_all, serve_remote};
-use crate::{Ctx, Hub};
 
 mod db;
 pub mod tailscale;
@@ -273,10 +273,6 @@ impl Remote {
         stop_listener_async(live).await;
     }
 
-    pub fn status(&self) -> Result<RemoteStatus, ApiError> {
-        vibevalley_runtime::rt::block_on(self.status_async())
-    }
-
     pub async fn status_async(&self) -> Result<RemoteStatus, ApiError> {
         self.status_with_tailscale_async(tailscale::probe_async().await).await
     }
@@ -305,10 +301,6 @@ impl Remote {
             url,
             devices,
         })
-    }
-
-    pub fn enable(&self, req: RemoteEnableRequest) -> Result<RemoteStatus, ApiError> {
-        vibevalley_runtime::rt::block_on(self.enable_async(req))
     }
 
     pub async fn enable_async(&self, req: RemoteEnableRequest) -> Result<RemoteStatus, ApiError> {
@@ -389,10 +381,6 @@ impl Remote {
         stop_listener_async(old).await;
         self.enabled.store(true, Ordering::Release);
         self.status_with_tailscale_async(ts).await
-    }
-
-    pub fn disable(&self) -> Result<RemoteStatus, ApiError> {
-        vibevalley_runtime::rt::block_on(self.disable_async())
     }
 
     pub async fn disable_async(&self) -> Result<RemoteStatus, ApiError> {
@@ -477,10 +465,6 @@ impl Remote {
         })
     }
 
-    pub fn pair_exchange(&self, req: RemotePairExchangeRequest) -> Result<RemotePairExchangeResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.pair_exchange_async(req))
-    }
-
     pub async fn pair_exchange_async(&self, req: RemotePairExchangeRequest) -> Result<RemotePairExchangeResult, ApiError> {
         if !self.enabled.load(Ordering::Acquire) {
             return Err(ApiError::new(BizCode::Refused, t("server.remote.disabled", &[])));
@@ -556,10 +540,6 @@ impl Remote {
         })
     }
 
-    pub fn revoke_device(&self, req: RemoteDeviceRevokeRequest) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.revoke_device_async(req))
-    }
-
     pub async fn revoke_device_async(&self, req: RemoteDeviceRevokeRequest) -> Result<(), ApiError> {
         let id = req.id.trim();
         if id.is_empty() || !self.db.revoke_device(id, self.clock.now_ms()).await? {
@@ -567,10 +547,6 @@ impl Remote {
         }
         self.last_seen_cache.lock().remove(id);
         Ok(())
-    }
-
-    pub fn whoami(&self, ctx: &Ctx) -> Result<RemoteWhoami, ApiError> {
-        vibevalley_runtime::rt::block_on(self.whoami_async(&ctx.principal, ctx.caller))
     }
 
     pub async fn whoami_async(&self, principal: &CallerPrincipal, caller: Caller) -> Result<RemoteWhoami, ApiError> {
@@ -687,8 +663,8 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn pairing_code_format_expiry_cap_and_rate_limit_work() {
+    #[tokio::test]
+    async fn pairing_code_format_expiry_cap_and_rate_limit_work() {
         vibevalley_i18n::set_locale("en");
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
@@ -697,10 +673,11 @@ mod tests {
         let remote = Remote::open_with_clock(db.clone(), Arc::downgrade(&hub), "0.1.0-test".into(), clock.clone()).unwrap();
 
         let status = remote
-            .enable(RemoteEnableRequest {
+            .enable_async(RemoteEnableRequest {
                 bind_addr: Some("127.0.0.1".into()),
                 port: Some(0),
             })
+            .await
             .unwrap();
         assert!(status.enabled && status.listening);
         assert!(status.port > 0);
@@ -722,12 +699,13 @@ mod tests {
         clock.advance(Duration::from_secs(101));
 
         let err = remote
-            .pair_exchange(RemotePairExchangeRequest {
+            .pair_exchange_async(RemotePairExchangeRequest {
                 code: expiring.code,
                 device_name: "iPhone".into(),
                 platform: RemotePlatform::Ios,
                 scope: None,
             })
+            .await
             .unwrap_err();
         assert_eq!(err.biz_code, BizCode::AuthRefused);
         assert_eq!(err.message, t("server.remote.expiredCode", &[]));
@@ -735,23 +713,25 @@ mod tests {
         clock.advance(Duration::from_millis(1));
         for _ in 0..9 {
             let err = remote
-                .pair_exchange(RemotePairExchangeRequest {
+                .pair_exchange_async(RemotePairExchangeRequest {
                     code: "AAAAAA".into(),
                     device_name: "iPhone".into(),
                     platform: RemotePlatform::Ios,
                     scope: None,
                 })
+                .await
                 .unwrap_err();
             assert_eq!(err.message, t("server.remote.invalidCode", &[]));
         }
         clock.advance(Duration::from_millis(1));
         let limited = remote
-            .pair_exchange(RemotePairExchangeRequest {
+            .pair_exchange_async(RemotePairExchangeRequest {
                 code: fresh.code.clone(),
                 device_name: "iPhone".into(),
                 platform: RemotePlatform::Ios,
                 scope: None,
             })
+            .await
             .unwrap_err();
         assert_eq!(limited.biz_code, BizCode::Refused);
         assert_eq!(limited.message, t("server.remote.rateLimited", &[]));
@@ -759,12 +739,13 @@ mod tests {
         // Advancing past RATE_LIMIT_WINDOW_MS clears the rate-limit window while `fresh` is still unexpired.
         clock.advance(Duration::from_millis((RATE_LIMIT_WINDOW_MS + 5_000) as u64));
         let paired = remote
-            .pair_exchange(RemotePairExchangeRequest {
+            .pair_exchange_async(RemotePairExchangeRequest {
                 code: fresh.code,
                 device_name: "iPhone 16".into(),
                 platform: RemotePlatform::Ios,
                 scope: None,
             })
+            .await
             .unwrap();
         assert!(paired.token.starts_with(TOKEN_PREFIX));
         assert_eq!(paired.token.len(), TOKEN_PREFIX.len() + 64);
@@ -775,19 +756,19 @@ mod tests {
 
         // Verify LAST_SEEN_THROTTLE_MS uses the injected clock deterministically.
         let first_seen = clock.now_ms();
-        remote.verify_bearer(&paired.token).unwrap();
-        let dev = vibevalley_runtime::rt::block_on(remote.db.find_by_id(&paired.device.id)).unwrap().unwrap();
+        RemoteAuth::verify_bearer_async(remote.clone(), paired.token.clone()).await.unwrap();
+        let dev = remote.db.find_by_id(&paired.device.id).await.unwrap().unwrap();
         assert_eq!(dev.last_seen_at, Some(first_seen));
 
         clock.advance(Duration::from_millis((LAST_SEEN_THROTTLE_MS - 1) as u64));
-        remote.verify_bearer(&paired.token).unwrap();
-        let dev = vibevalley_runtime::rt::block_on(remote.db.find_by_id(&paired.device.id)).unwrap().unwrap();
+        RemoteAuth::verify_bearer_async(remote.clone(), paired.token.clone()).await.unwrap();
+        let dev = remote.db.find_by_id(&paired.device.id).await.unwrap().unwrap();
         assert_eq!(dev.last_seen_at, Some(first_seen));
 
         clock.advance(Duration::from_millis(1));
         let refreshed_seen = clock.now_ms();
-        remote.verify_bearer(&paired.token).unwrap();
-        let dev = vibevalley_runtime::rt::block_on(remote.db.find_by_id(&paired.device.id)).unwrap().unwrap();
+        RemoteAuth::verify_bearer_async(remote.clone(), paired.token.clone()).await.unwrap();
+        let dev = remote.db.find_by_id(&paired.device.id).await.unwrap().unwrap();
         assert_eq!(dev.last_seen_at, Some(refreshed_seen));
 
         // Verify all 6 platforms round-trip and machine/client scopes persist & enforce bounds.
@@ -796,15 +777,16 @@ mod tests {
             let code = remote.pair_create().unwrap();
             clock.advance(Duration::from_millis(1));
             let res = remote
-                .pair_exchange(RemotePairExchangeRequest {
+                .pair_exchange_async(RemotePairExchangeRequest {
                     code: code.code,
                     device_name: format!("dev-{}", platform.as_str()),
                     platform,
                     scope: None,
                 })
+                .await
                 .unwrap();
             assert_eq!(res.device.platform, platform);
-            let verified = remote.verify_bearer(&res.token).unwrap();
+            let verified = RemoteAuth::verify_bearer_async(remote.clone(), res.token).await.unwrap();
             assert_eq!(verified.scope, default_scope_for_platform(platform));
         }
 
@@ -814,21 +796,23 @@ mod tests {
         assert!(scoped.pair_url.contains("scope=remote%3Adefault"));
         clock.advance(Duration::from_millis(1));
         let denied = remote
-            .pair_exchange(RemotePairExchangeRequest {
+            .pair_exchange_async(RemotePairExchangeRequest {
                 code: scoped.code,
                 device_name: "Runner".into(),
                 platform: RemotePlatform::Machine,
                 scope: Some(SCOPE_REMOTE_MACHINE.into()),
             })
+            .await
             .unwrap_err();
         assert_eq!(denied.biz_code, BizCode::Forbidden);
 
-        remote.close();
+        remote.close_async().await;
+        hub.close_async().await;
         db.close();
     }
 
-    #[test]
-    fn verify_bearer_async_reads_wal_read_pool_while_writer_holds_transaction() {
+    #[tokio::test]
+    async fn verify_bearer_async_reads_wal_read_pool_while_writer_holds_transaction() {
         vibevalley_i18n::set_locale("en");
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
@@ -836,55 +820,53 @@ mod tests {
         let remote = Remote::open(db.clone(), Arc::downgrade(&hub), "0.1.0-test".into()).unwrap();
         install(&hub, remote.clone());
 
-        vibevalley_runtime::rt::block_on(async {
-            let status = hub
-                .invoke_as_async::<ops::RemoteEnable>(
-                    Caller::User,
-                    RemoteEnableRequest {
-                        bind_addr: Some("127.0.0.1".into()),
-                        port: Some(0),
-                    },
-                )
-                .await
-                .unwrap();
-            assert!(status.enabled && status.listening);
-
-            let pair = hub.invoke_as_async::<ops::RemotePairCreate>(Caller::User, ()).await.unwrap();
-            let exchanged = hub
-                .invoke_as_async::<ops::RemotePairExchange>(
-                    Caller::Remote,
-                    RemotePairExchangeRequest {
-                        code: pair.code,
-                        device_name: "Async iPhone".into(),
-                        platform: RemotePlatform::Ios,
-                        scope: None,
-                    },
-                )
-                .await
-                .unwrap();
-
-            // Prime last_seen_cache so the next verify_bearer_async is pure read_pool.
-            let first = RemoteAuth::verify_bearer_async(remote.clone(), exchanged.token.clone()).await.unwrap();
-            assert_eq!(first.device_id, exchanged.device.id);
-
-            // Hold an open BEGIN IMMEDIATE write transaction on write_pool while verify_bearer_async runs.
-            let mut writer = db.write_pool().acquire().await.unwrap();
-            sqlx::raw_sql("BEGIN IMMEDIATE;").execute(&mut *writer).await.unwrap();
-            let second = tokio::time::timeout(
-                std::time::Duration::from_secs(2),
-                RemoteAuth::verify_bearer_async(remote.clone(), exchanged.token.clone()),
+        let status = hub
+            .invoke_as_async::<ops::RemoteEnable>(
+                Caller::User,
+                RemoteEnableRequest {
+                    bind_addr: Some("127.0.0.1".into()),
+                    port: Some(0),
+                },
             )
             .await
-            .expect("verify_bearer_async must not block on write_pool")
             .unwrap();
-            assert_eq!(second.device_id, exchanged.device.id);
-            sqlx::raw_sql("ROLLBACK;").execute(&mut *writer).await.unwrap();
-            drop(writer);
+        assert!(status.enabled && status.listening);
 
-            hub.invoke_as_async::<ops::RemoteDisable>(Caller::User, ()).await.unwrap();
-        });
+        let pair = hub.invoke_as_async::<ops::RemotePairCreate>(Caller::User, ()).await.unwrap();
+        let exchanged = hub
+            .invoke_as_async::<ops::RemotePairExchange>(
+                Caller::Remote,
+                RemotePairExchangeRequest {
+                    code: pair.code,
+                    device_name: "Async iPhone".into(),
+                    platform: RemotePlatform::Ios,
+                    scope: None,
+                },
+            )
+            .await
+            .unwrap();
 
-        hub.close();
+        // Prime last_seen_cache so the next verify_bearer_async is pure read_pool.
+        let first = RemoteAuth::verify_bearer_async(remote.clone(), exchanged.token.clone()).await.unwrap();
+        assert_eq!(first.device_id, exchanged.device.id);
+
+        // Hold an open BEGIN IMMEDIATE write transaction on write_pool while verify_bearer_async runs.
+        let mut writer = db.write_pool().acquire().await.unwrap();
+        sqlx::raw_sql("BEGIN IMMEDIATE;").execute(&mut *writer).await.unwrap();
+        let second = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            RemoteAuth::verify_bearer_async(remote.clone(), exchanged.token.clone()),
+        )
+        .await
+        .expect("verify_bearer_async must not block on write_pool")
+        .unwrap();
+        assert_eq!(second.device_id, exchanged.device.id);
+        sqlx::raw_sql("ROLLBACK;").execute(&mut *writer).await.unwrap();
+        drop(writer);
+
+        hub.invoke_as_async::<ops::RemoteDisable>(Caller::User, ()).await.unwrap();
+
+        hub.close_async().await;
         db.close();
     }
 }

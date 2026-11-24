@@ -263,8 +263,29 @@ pub fn install(hub: &Hub, provider: Arc<Provider>) {
     let p = provider.clone();
     hub.on::<ops::ProviderGet>(move |_, ()| Ok(p.status()));
     let p = provider.clone();
-    hub.on::<ops::ProviderUpdate>(move |_, u| p.update(&u));
+    hub.on_async::<ops::ProviderUpdate, _, _>(move |_, u| {
+        let p = p.clone();
+        async move {
+            crate::spawn_blocking_traced(move || p.update(&u))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
     let p = provider.clone();
-    hub.on::<ops::ProviderModelList>(move |_, r| p.models(&r.connection, r.revision));
-    hub.on::<ops::ProviderVoiceList>(move |_, r| provider.voices(&r));
+    hub.on_async::<ops::ProviderModelList, _, _>(move |_, r| {
+        let p = p.clone();
+        async move {
+            crate::spawn_blocking_traced(move || p.models(&r.connection, r.revision))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
+    hub.on_async::<ops::ProviderVoiceList, _, _>(move |_, r| {
+        let provider = provider.clone();
+        async move {
+            crate::spawn_blocking_traced(move || provider.voices(&r))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
 }

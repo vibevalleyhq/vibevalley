@@ -1,10 +1,11 @@
 // Fenced code block backed by native Rust `vibevalley/rich` (`VvCodeBlock` via
 // vibevalley-shiki + vibevalley-onig), with a lightweight `<Text>` fallback for
 // stock `nsh test` (zero `<Editor readOnly>`).
-import { Clipboard, Scroll, signal, Text, View } from "nsh";
+import { Clipboard, computed, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
+import { useTimeout } from "../../infra/base/timer";
 import { richNative, type VvCodeCopyEvent } from "../../infra/rich";
 import { Icon } from "../Icon";
 import { mix } from "../tone";
@@ -42,17 +43,18 @@ export function CodeBlock(props: CodeBlockProps) {
 
 function CodeBlockFallback(props: CodeBlockProps) {
   const foldAt = () => props.foldLines ?? defaultFoldLines;
-  const lines = () => props.code.split("\n").length;
+  const lines = computed(() => props.code.split("\n").length);
   const folded = signal(true);
   const copied = signal(false);
-  const long = () => foldAt() > 0 && lines() > foldAt();
+  const later = useTimeout();
+  const long = computed(() => foldAt() > 0 && lines() > foldAt());
   const copy = () => {
     const code = props.code;
     const language = props.language ?? null;
     void Clipboard.writeText(code).then(() => {
       copied.set(true);
       props.onCopy?.({ code, language });
-      setTimeout(() => copied.set(false), 1500);
+      later(() => copied.set(false), 1500);
     });
   };
   return (

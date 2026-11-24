@@ -52,31 +52,56 @@ pub enum VvGenUiEvent {
 }
 
 struct GenUiSession {
+    initialized: bool,
     last_spec: SharedString,
     last_streaming: bool,
     is_single_doc: bool,
     runtime: GenUiRuntime,
     errors: Vec<String>,
+    resolved_cache: Option<(u64, u64, ResolvedDoc)>,
 }
 
 impl GenUiSession {
     fn new() -> Self {
         Self {
+            initialized: false,
             last_spec: SharedString::default(),
             last_streaming: false,
             is_single_doc: false,
             runtime: GenUiRuntime::new(),
             errors: Vec::new(),
+            resolved_cache: None,
         }
     }
 
-    fn sync(&mut self, spec: &SharedString, streaming: bool) {
-        if *spec == self.last_spec && streaming == self.last_streaming {
-            return;
+    fn resolve_cached(&mut self) -> ResolvedDoc {
+        let doc_gen = self.runtime.doc().generation;
+        let state_rev = self.runtime.state_revision();
+        if let Some((cached_gen, cached_rev, doc)) = &self.resolved_cache
+            && *cached_gen == doc_gen
+            && *cached_rev == state_rev
+        {
+            return doc.clone();
+        }
+        let doc = self.runtime.resolve_tree();
+        self.resolved_cache = Some((doc_gen, state_rev, doc.clone()));
+        doc
+    }
+
+    /// Syncs `spec`/`streaming` into the incremental runtime, returning `true` only when
+    /// the resolved UI tree or fallback view needs re-rendering.
+    fn sync(&mut self, spec: &SharedString, streaming: bool) -> bool {
+        if self.initialized && *spec == self.last_spec && streaming == self.last_streaming {
+            return false;
         }
 
         // Preserve user state edits and incremental node generations while streaming JSONL prefixes.
-        if !self.is_single_doc && !self.last_spec.is_empty() && spec.starts_with(self.last_spec.as_str()) {
+        if self.initialized && !self.is_single_doc && !self.last_spec.is_empty() && spec.starts_with(self.last_spec.as_str()) {
+            let prev_doc_gen = self.runtime.doc().generation;
+            let prev_state_rev = self.runtime.state_revision();
+            let prev_err_count = self.errors.len();
+            let prev_streaming = self.last_streaming;
+
             let delta = &spec[self.last_spec.len()..];
             if !delta.is_empty() {
                 let events = self.runtime.push_chunk(delta);
@@ -88,12 +113,20 @@ impl GenUiSession {
             }
             self.last_spec = spec.clone();
             self.last_streaming = streaming;
-            return;
+
+            let tree_changed = self.runtime.doc().generation != prev_doc_gen
+                || self.runtime.state_revision() != prev_state_rev
+                || self.errors.len() != prev_err_count
+                || streaming != prev_streaming;
+            let showing_fallback = self.runtime.doc().root_id.is_none() && !streaming;
+            return tree_changed || showing_fallback;
         }
 
+        self.initialized = true;
         self.runtime = GenUiRuntime::new();
         self.errors.clear();
         self.is_single_doc = false;
+        self.resolved_cache = None;
 
         let trimmed = spec.trim();
         if !trimmed.is_empty() {
@@ -120,6 +153,7 @@ impl GenUiSession {
 
         self.last_spec = spec.clone();
         self.last_streaming = streaming;
+        true
     }
 }
 
@@ -145,16 +179,27 @@ type StateUpdater = Rc<dyn Fn(&str, StateValue)>;
 pub fn VvGenUi(props: VvGenUiProps, cx: Scope<VvGenUiEvent>) -> impl IntoElement {
     let session = Rc::new(RefCell::new(GenUiSession::new()));
     let revision = signal(0u64);
+    let render_rev = signal(0u64);
 
-    view().test_id("genui").flex_col().my(px(8.0)).max_w(relative(1.0)).child(dynamic(move || {
+    let sync_session = Rc::clone(&session);
+    effect(move || {
         let spec = props.spec.get();
         let streaming = props.streaming.get();
-        let _rev = revision.get();
+        if sync_session.borrow_mut().sync(&spec, streaming) {
+            render_rev.update(|n| *n = n.wrapping_add(1));
+        }
+    });
+
+    view().test_id("genui").flex_col().my(px(8.0)).max_w(relative(1.0)).child(dynamic(move || {
+        let _spec_rev = render_rev.get();
+        let _state_rev = revision.get();
+        let spec = props.spec.get_untracked();
+        let streaming = props.streaming.get_untracked();
 
         let (resolved, first_error) = {
             let mut guard = session.borrow_mut();
             guard.sync(&spec, streaming);
-            let doc = guard.runtime.resolve_tree();
+            let doc = guard.resolve_cached();
             let err = guard.errors.first().cloned();
             (doc, err)
         };

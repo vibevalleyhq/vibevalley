@@ -102,6 +102,38 @@ fn item_of(row: q::GetItemRow) -> LibraryItem {
     }
 }
 
+struct LibraryHandle {
+    db: Arc<ServerDb>,
+    files: Arc<Attachments>,
+}
+
+impl LibraryHandle {
+    fn found(&self, id: &str) -> Result<LibraryItem, ApiError> {
+        match self.db.run(async |db| q::get_item(db, q::GetItemParams { attachment_id: id.into() }).await) {
+            Ok(row) => Ok(item_of(row)),
+            Err(sqlx::Error::RowNotFound) => Err(missing(t("server.library.noItem", &[("id", id.into())]), LookIn::Library)),
+            Err(error) => Err(db_failed(error)),
+        }
+    }
+
+    fn keep(&self, id: &str, origin: &LibraryOrigin, at: i64) -> Result<(), ApiError> {
+        self.db
+            .run(async |db| {
+                q::keep_item(
+                    db,
+                    q::KeepItemParams {
+                        attachment_id: id.into(),
+                        kind: origin_kind(origin).into(),
+                        origin: serde_json::to_string(origin).expect("JSON"),
+                        added_at: at,
+                    },
+                )
+                .await
+            })
+            .map_err(db_failed)
+    }
+}
+
 pub struct Library {
     db: Arc<ServerDb>,
     files: Arc<Attachments>,
@@ -119,6 +151,16 @@ impl Library {
         })
     }
 
+    pub async fn close_async(&self) {
+        let prev = self.sub.lock().take();
+        drop(prev);
+        let edit_task = self.edit_task.lock().take();
+        if let Some((cancel, handle)) = edit_task {
+            cancel.cancel();
+            let _ = handle.await;
+        }
+    }
+
     pub fn close(&self) {
         let prev = self.sub.lock().take();
         drop(prev);
@@ -129,29 +171,20 @@ impl Library {
     }
 
     fn found(&self, id: &str) -> Result<LibraryItem, ApiError> {
-        match self.db.run(async |db| q::get_item(db, q::GetItemParams { attachment_id: id.into() }).await) {
-            Ok(row) => Ok(item_of(row)),
-            Err(sqlx::Error::RowNotFound) => Err(missing(t("server.library.noItem", &[("id", id.into())]), LookIn::Library)),
-            Err(error) => Err(db_failed(error)),
+        LibraryHandle {
+            db: self.db.clone(),
+            files: self.files.clone(),
         }
+        .found(id)
     }
 
     /// A later arrival only moves `last_at`.
     fn keep(&self, id: &str, origin: &LibraryOrigin, at: i64) -> Result<(), ApiError> {
-        self.db
-            .run(async |db| {
-                q::keep_item(
-                    db,
-                    q::KeepItemParams {
-                        attachment_id: id.into(),
-                        kind: origin_kind(origin).into(),
-                        origin: serde_json::to_string(origin).expect("JSON"),
-                        added_at: at,
-                    },
-                )
-                .await
-            })
-            .map_err(db_failed)
+        LibraryHandle {
+            db: self.db.clone(),
+            files: self.files.clone(),
+        }
+        .keep(id, origin, at)
     }
 
     /// What a ready media job made, once per job.
@@ -217,6 +250,72 @@ impl Library {
             })
             .map_err(db_failed)?;
         Ok(rows.into_iter().map(item_of).collect())
+    }
+
+    pub async fn add_async(&self, req: &LibraryAddRequest, by: &AddedBy) -> Result<LibraryItem, ApiError> {
+        let sources = [given(&req.attachment), given(&req.url), given(&req.path)]
+            .iter()
+            .filter(|s| s.is_some())
+            .count();
+        if sources != 1 {
+            return Err(refused(t("server.library.oneSource", &[])));
+        }
+        let name = given(&req.name).map(|n| n.trim().to_string()).unwrap_or_default();
+        if let Some(id) = given(&req.attachment) {
+            if !matches!(by, AddedBy::User) {
+                return Err(refused(t("server.library.agentAttachment", &[])));
+            }
+            let id = id.to_string();
+            let me = self.clone_shallow();
+            return crate::spawn_blocking_traced(move || {
+                let at = now();
+                me.files.of(std::slice::from_ref(&id))?;
+                me.keep(&id, &LibraryOrigin::Uploaded { channel: None, message: None }, at)?;
+                me.found(&id)
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
+        }
+        let AddedBy::Agent { agent, session, dir } = by else {
+            return Err(refused(t("server.library.userFetch", &[])));
+        };
+        let url = given(&req.url).map(|u| u.trim().to_string());
+        let path = req.path.clone().unwrap_or_default();
+        let (bytes, found_name, kind) = match &url {
+            Some(u) => download_async(u).await?,
+            None => {
+                let dir = dir.clone();
+                let path = path.clone();
+                let (bytes, name) = crate::spawn_blocking_traced(move || work_file(dir.as_deref(), &path))
+                    .await
+                    .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))??;
+                (bytes, name, String::new())
+            }
+        };
+        let agent = agent.clone();
+        let session = session.clone();
+        let me = self.clone_shallow();
+        crate::spawn_blocking_traced(move || {
+            let at = now();
+            let name = if name.is_empty() { found_name } else { name };
+            let kind = if kind.is_empty() { type_of_name(&name).to_string() } else { kind };
+            let attachment = me.files.keep(&bytes, &name, &kind)?;
+            let from = match url {
+                Some(url) => LibraryOriginFetchedFrom::Url { url },
+                None => LibraryOriginFetchedFrom::Path { path },
+            };
+            me.keep(&attachment.id, &LibraryOrigin::Fetched { agent, session, from }, at)?;
+            me.found(&attachment.id)
+        })
+        .await
+        .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+    }
+
+    fn clone_shallow(&self) -> LibraryHandle {
+        LibraryHandle {
+            db: self.db.clone(),
+            files: self.files.clone(),
+        }
     }
 
     pub fn add(&self, req: &LibraryAddRequest, by: &AddedBy) -> Result<LibraryItem, ApiError> {
@@ -298,21 +397,36 @@ fn too_big() -> ApiError {
     refused(t("server.library.tooBig", &[("mb", (ATTACHMENT_MAX / 1024 / 1024).into())]))
 }
 
-/// A file from a public https address: its bytes, its name (the last path
-/// segment, else the host) and the type the server said.
-fn download(address: &str) -> Result<(Vec<u8>, String, String), ApiError> {
-    let fetched = PublicDownload::get_bytes(address, DOWNLOAD, ATTACHMENT_MAX).map_err(|e| match e {
+fn map_download_err(address: &str, err: PublicDownloadError) -> ApiError {
+    match err {
         PublicDownloadError::BadUrl => refused(t("server.library.badUrl", &[("url", address.into())])),
         PublicDownloadError::Dns(why) => refused(t("server.library.notFetched", &[("url", address.into()), ("why", why.into())])),
         PublicDownloadError::Timeout => refused(t("server.library.slow", &[])),
         PublicDownloadError::HttpStatus(status) => refused(t("server.library.notFetched", &[("url", address.into()), ("why", status.to_string().into())])),
         PublicDownloadError::TooLarge => too_big(),
         PublicDownloadError::Network(why) => refused(t("server.library.notFetched", &[("url", "".into()), ("why", why.into())])),
-    })?;
+    }
+}
+
+fn downloaded_tuple(fetched: crate::modules::infra::http::PublicBytes) -> (Vec<u8>, String, String) {
     let host = fetched.url.host_str().unwrap_or("").to_string();
     let segment = fetched.url.path().rsplit('/').next().unwrap_or("");
     let named = percent_decoded(segment).unwrap_or_else(|| segment.to_string());
-    Ok((fetched.bytes, if named.is_empty() { host } else { named }, fetched.media_type))
+    (fetched.bytes, if named.is_empty() { host } else { named }, fetched.media_type)
+}
+
+async fn download_async(address: &str) -> Result<(Vec<u8>, String, String), ApiError> {
+    let fetched = PublicDownload::get_bytes_async(address, DOWNLOAD, ATTACHMENT_MAX)
+        .await
+        .map_err(|e| map_download_err(address, e))?;
+    Ok(downloaded_tuple(fetched))
+}
+
+/// A file from a public https address: its bytes, its name (the last path
+/// segment, else the host) and the type the server said.
+fn download(address: &str) -> Result<(Vec<u8>, String, String), ApiError> {
+    let fetched = PublicDownload::get_bytes(address, DOWNLOAD, ATTACHMENT_MAX).map_err(|e| map_download_err(address, e))?;
+    Ok(downloaded_tuple(fetched))
 }
 
 fn percent_decoded(s: &str) -> Option<String> {
@@ -396,9 +510,17 @@ fn ready_made(job: &MediaJob) -> Option<(&str, JobKind, &str, i64)> {
 /// the farm hears (media jobs and posted/edited chat attachments via [`EventBus`]).
 pub fn install(hub: &Hub, library: Arc<Library>, channel_events: Option<Arc<dyn crate::ports::ChannelMessageEventsPort>>) {
     let l = library.clone();
-    hub.on::<ops::LibraryItemList>(move |_, r| l.list(&r));
+    hub.on_async::<ops::LibraryItemList, _, _>(move |_, r| {
+        let l = l.clone();
+        async move {
+            crate::spawn_blocking_traced(move || l.list(&r))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
     let l = library.clone();
-    hub.on::<ops::LibraryItemAdd>(move |ctx, r| {
+    hub.on_async::<ops::LibraryItemAdd, _, _>(move |ctx, r| {
+        let l = l.clone();
         let by = match ctx.caller {
             vibevalley_protocol::Caller::User | vibevalley_protocol::Caller::Remote => AddedBy::User,
             vibevalley_protocol::Caller::Orchestrator => AddedBy::Agent {
@@ -424,12 +546,26 @@ pub fn install(hub: &Hub, library: Arc<Library>, channel_events: Option<Arc<dyn 
                 }
             }
         };
-        l.add(&r, &by)
+        async move { l.add_async(&r, &by).await }
     });
     let l = library.clone();
-    hub.on::<ops::LibraryItemDelete>(move |_, r| l.remove(&r.id));
+    hub.on_async::<ops::LibraryItemDelete, _, _>(move |_, r| {
+        let l = l.clone();
+        async move {
+            crate::spawn_blocking_traced(move || l.remove(&r.id))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
     let l = library.clone();
-    hub.on::<ops::LibraryItemPreviewDelete>(move |_, r| l.preview_remove(&r.id));
+    hub.on_async::<ops::LibraryItemPreviewDelete, _, _>(move |_, r| {
+        let l = l.clone();
+        async move {
+            crate::spawn_blocking_traced(move || l.preview_remove(&r.id))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
 
     let weak = Arc::downgrade(&library);
     let sub = hub.subscribe_transitions("library", move |_, tr| {
@@ -468,7 +604,7 @@ pub fn install(hub: &Hub, library: Arc<Library>, channel_events: Option<Arc<dyn 
                     },
                 };
                 let Some(l) = weak.upgrade() else { return };
-                let _ = tokio::task::spawn_blocking(move || {
+                let _ = crate::spawn_blocking_traced(move || {
                     if let Err(e) = l.record_said(&message) {
                         eprintln!("vibevalley-server: library: recording: {}", e.message);
                     }
@@ -478,7 +614,9 @@ pub fn install(hub: &Hub, library: Arc<Library>, channel_events: Option<Arc<dyn 
         });
         if let Some((old_cancel, old_handle)) = library.edit_task.lock().replace((cancel, handle)) {
             old_cancel.cancel();
-            let _ = vibevalley_runtime::rt::block_on(old_handle);
+            hub.spawn_task(async move {
+                let _ = old_handle.await;
+            });
         }
     }
 }

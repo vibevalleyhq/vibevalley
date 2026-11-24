@@ -1,4 +1,4 @@
-import { cleanup, PanResponder, Scroll, signal, Text, View, windowSize, type JSX, type ViewRef } from "nsh";
+import { cleanup, computed, PanResponder, Scroll, signal, Text, View, windowSize, type JSX, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { type BoardSummary, maxRunning } from "@vibevalley/protocol";
@@ -154,10 +154,20 @@ type Drag = ReturnType<typeof createDrag>;
 /** Four lanes to drag between; narrower than 700, one lane at a time behind tabs. */
 export function IssueBoard(props: BoardProps) {
   const lane = signal<Lane>(props.cards.find((card) => card.id === props.selected)?.lane ?? "todo");
-  const narrow = () => windowSize().width < 700;
+  const narrow = computed(() => windowSize().width < 700);
   const drag = createDrag(() => props);
-  const countOf = (l: Lane) => laneCountOf(l, props.cards, props.summary, props.filtered === true, props.older);
-  const workingSlots = () => runningSlotsOf(props.cards, props.summary, props.filtered === true, maxRunning);
+  const cardsByLane = computed<Record<Lane, BoardCard[]>>(() => {
+    const grouped: Record<Lane, BoardCard[]> = { todo: [], working: [], waiting: [], closed: [] };
+    for (const c of props.cards) grouped[c.lane].push(c);
+    return grouped;
+  });
+  const laneCounts = computed<Record<Lane, number>>(() => ({
+    todo: laneCountOf("todo", props.cards, props.summary, props.filtered === true, props.older),
+    working: laneCountOf("working", props.cards, props.summary, props.filtered === true, props.older),
+    waiting: laneCountOf("waiting", props.cards, props.summary, props.filtered === true, props.older),
+    closed: laneCountOf("closed", props.cards, props.summary, props.filtered === true, props.older),
+  }));
+  const workingSlots = computed(() => runningSlotsOf(props.cards, props.summary, props.filtered === true, maxRunning));
   return (
     <View ref={drag.setRoot} class="min-h-0 flex-1 px-3 pb-3">
       <If when={narrow()}>
@@ -177,7 +187,7 @@ export function IssueBoard(props: BoardProps) {
                   class={`text-2xs ${lane() === l() ? "text-muted" : "text-faint"}`}
                   style={{ fontVariant: ["tabular-nums"] }}
                 >
-                  {String(countOf(l()))}
+                  {String(laneCounts()[l()])}
                 </Text>
               </View>
             )}
@@ -191,8 +201,8 @@ export function IssueBoard(props: BoardProps) {
               <LaneView
                 board={props}
                 lane={l()}
-                cards={props.cards.filter((c) => c.lane === l())}
-                count={countOf(l())}
+                cards={cardsByLane()[l()]}
+                count={laneCounts()[l()]}
                 slots={l() === "working" ? workingSlots() : undefined}
                 drag={drag}
               />
@@ -223,13 +233,13 @@ export function IssueBoard(props: BoardProps) {
 
 function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; count: number; slots?: { taken: number; of: number } | undefined; drag: Drag }) {
   const p = () => props.board;
-  const over = () => props.drag.over() === props.lane;
-  const folded = () => props.lane === "closed" && !p().older && props.cards.length > closedShown;
-  const ordered = () => laneOrder(props.lane, props.cards, p().ordering);
-  const shown = () => (folded() ? ordered().slice(0, closedShown) : ordered());
-  const hidden = () => (folded() ? ordered().length - closedShown : 0);
+  const over = computed(() => props.drag.over() === props.lane);
+  const folded = computed(() => props.lane === "closed" && !props.board.older && props.cards.length > closedShown);
+  const ordered = computed(() => laneOrder(props.lane, props.cards, props.board.ordering));
+  const shown = computed(() => (folded() ? ordered().slice(0, closedShown) : ordered()));
+  const hidden = computed(() => (folded() ? ordered().length - closedShown : 0));
   const guide = () => emptyLaneGuide[props.lane];
-  const showTopNew = () => props.lane === "todo" && (p().loading || props.cards.length > 0);
+  const showTopNew = computed(() => props.lane === "todo" && (props.board.loading || props.cards.length > 0));
   return (
     <View
       ref={(r) => props.drag.lane(props.lane, r)}
@@ -357,24 +367,26 @@ function CardView(props: {
 }) {
   const nameOf = useNameOf();
   const issues = useIssues();
-  const look = () => cardLook(props.card, nameOf(), issues(), Date.now());
-  const repo = () => cardRepo(props.card);
-  const hasMeta = () => Boolean(look().number || repo());
-  const loud = () => {
+  const look = computed(() => cardLook(props.card, nameOf(), issues(), Date.now()));
+  const repo = computed(() => cardRepo(props.card));
+  const hasMeta = computed(() => Boolean(look().number || repo()));
+  const loud = computed(() => {
     const pr = look().priority;
     return pr === "urgent" || pr === "high" ? pr : undefined;
-  };
-  const showsStatus = () => ownStatus(props.card.lane, look().status);
-  const unassignedTodo = () => props.card.kind === "todo" && props.card.lane === "todo" && !cardAgent(props.card);
-  const marks = () =>
-    showsStatus() ||
-    !!loud() ||
-    !!cardAgent(props.card) ||
-    unassignedTodo() ||
-    props.card.kind === "orchestrator" ||
-    !!look().progress ||
-    look().flags.length > 0;
-  const draggable = () => props.card.kind !== "orchestrator" && props.card.kind !== "missing" && props.card.move?.state !== "moving";
+  });
+  const showsStatus = computed(() => ownStatus(props.card.lane, look().status));
+  const unassignedTodo = computed(() => props.card.kind === "todo" && props.card.lane === "todo" && !cardAgent(props.card));
+  const marks = computed(
+    () =>
+      showsStatus() ||
+      !!loud() ||
+      !!cardAgent(props.card) ||
+      unassignedTodo() ||
+      props.card.kind === "orchestrator" ||
+      !!look().progress ||
+      look().flags.length > 0,
+  );
+  const draggable = computed(() => props.card.kind !== "orchestrator" && props.card.kind !== "missing" && props.card.move?.state !== "moving");
   const pan = PanResponder.create({
     // A press opens the card; only a move of a few points starts a drag.
     onMoveShouldSetPanResponder: (_, g) => draggable() && Math.abs(g.dx) + Math.abs(g.dy) > 4,
@@ -383,8 +395,8 @@ function CardView(props: {
     onPanResponderRelease: () => props.drag.end(true),
     onPanResponderTerminate: () => props.drag.end(false),
   });
-  const before = () => props.drag.before() === props.card.id;
-  const urgency = () => cardUrgencyTone(props.card);
+  const before = computed(() => props.drag.before() === props.card.id);
+  const urgency = computed(() => cardUrgencyTone(props.card));
   const cardStyle = () => (motionOff() ? undefined : { transitionProperty: "shadow", transitionDuration: motionDuration(180) });
   return (
     <View ref={(r) => props.drag.card(props.card.id, r, () => props.placeable)}>

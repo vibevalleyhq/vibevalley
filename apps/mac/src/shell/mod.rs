@@ -52,6 +52,8 @@ pub struct ProjectView {
     pub git_error: Option<String>,
     pub git_busy: bool,
     pub index: Option<Arc<FileIndex>>,
+    pub(super) dirs_gen: u64,
+    pub(super) git_gen: u64,
     pub(super) _watcher: Option<Watcher>,
 }
 
@@ -72,6 +74,7 @@ pub struct InspectorSlot {
 }
 
 /// A project's git state as the sidebar shows it.
+#[derive(PartialEq, Eq)]
 pub struct GitSummary {
     pub branch: Option<String>,
     pub worktrees: Vec<vibevalley_git::Worktree>,
@@ -119,7 +122,9 @@ pub struct WorkspaceProjects {
     pub chat_menu_group: Option<vibevalley_workspace::GroupId>,
     pub(super) save_pending: bool,
     pub(super) fs_tx: flume::Sender<(ProjectId, Vec<FsChange>)>,
+    pub(super) dir_refresh_pending: BTreeSet<ProjectId>,
     pub(super) git_refresh_pending: BTreeSet<ProjectId>,
+    pub(super) summaries_gen: u64,
 }
 
 /// Hosted chrome surfaces, layout visibility/widths, active route, and drag/resize tracking.
@@ -198,8 +203,12 @@ impl Shell {
         });
         let (fs_tx, fs_rx) = flume::unbounded::<(ProjectId, Vec<FsChange>)>();
         cx.spawn(async move |this, cx| {
-            while let Ok((project, changes)) = fs_rx.recv_async().await {
-                if this.update(cx, |s, cx| s.on_fs_changes(project, changes, cx)).is_err() {
+            while let Ok(first) = fs_rx.recv_async().await {
+                let mut batches = vec![first];
+                while let Ok(more) = fs_rx.try_recv() {
+                    batches.push(more);
+                }
+                if this.update(cx, |s, cx| s.on_fs_changes_batch(batches, cx)).is_err() {
                     break;
                 }
             }
@@ -280,7 +289,9 @@ impl Shell {
                 chat_menu_group: None,
                 save_pending: false,
                 fs_tx,
+                dir_refresh_pending: BTreeSet::new(),
                 git_refresh_pending: BTreeSet::new(),
+                summaries_gen: 0,
             },
             chrome: HostChrome {
                 sidebar,

@@ -388,6 +388,10 @@ impl vibevalley_server::transport::bridge::Server for FailedServer {
     fn unsubscribe(&self, _id: u64) {}
 }
 
+/// Slow `session.openWorkspace` handshakes across tabs must not starve fast UI
+/// RPCs (`session.send`, `channel.message.send`, `runtime.list`, issue mutations).
+const BRIDGE_CONCURRENCY: usize = 16;
+
 impl BridgeHub {
     /// The real server under VibeValley's own data folder, started off the UI
     /// thread. `VIBEVALLEY_FAKE_SERVER=<dir>` serves fixtures instead
@@ -500,7 +504,7 @@ impl BridgeHub {
                 }
             },
         };
-        let bridge = vibevalley_server::transport::bridge::Hub::new(server, 4);
+        let bridge = vibevalley_server::transport::bridge::Hub::new(server, BRIDGE_CONCURRENCY);
         let bridge_for_clients = bridge.clone();
         let clients_provider: Arc<ClientsProvider> = Arc::new(move || bridge_for_clients.clients_snapshot());
         host_debug.attach_clients(&clients_provider);
@@ -927,6 +931,7 @@ impl HostedView {
                 Ok(Action::Ready) => {
                     self.ready = true;
                     self.outbox.reset();
+                    self.applied.clear();
                     cx.emit(HostedEvent::Ready);
                 }
                 Ok(Action::Call { id, op, payload }) => {
@@ -1484,5 +1489,157 @@ mod tests {
         assert!(server.live().try_recv().is_err());
         let mut live_rx = server.subscribe_live().expect("broadcast receiver");
         assert!(matches!(live_rx.try_recv(), Err(tokio::sync::broadcast::error::TryRecvError::Closed)));
+    }
+
+    #[test]
+    fn bridge_concurrency_does_not_starve_fast_rpcs_behind_four_slow_session_opens() {
+        use parking_lot::Mutex;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::time::Duration;
+        use tokio::sync::Notify;
+        use vibevalley_server::transport::api::BoxFuture;
+        use vibevalley_server::transport::bridge::fake::FakeServer;
+        use vibevalley_server::transport::bridge::{CallerContext, Envelope, Hub as Bridge, Outlet, Server, SliceKind};
+
+        struct SlowOpenServer {
+            inner: FakeServer,
+            open_in_flight: AtomicUsize,
+            open_entered: Notify,
+            release_opens: Notify,
+        }
+
+        impl SlowOpenServer {
+            fn new() -> Arc<Self> {
+                Arc::new(Self {
+                    inner: FakeServer::new(),
+                    open_in_flight: AtomicUsize::new(0),
+                    open_entered: Notify::new(),
+                    release_opens: Notify::new(),
+                })
+            }
+        }
+
+        impl Server for SlowOpenServer {
+            fn call(&self, op: &str, payload: Value) -> Envelope {
+                self.inner.call(op, payload)
+            }
+            fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
+                self.inner.call_with(ctx, op, payload)
+            }
+            fn call_with_async(self: Arc<Self>, _ctx: CallerContext, op: String, _payload: Value) -> BoxFuture<'static, Envelope> {
+                Box::pin(async move {
+                    if op == "session.openWorkspace" {
+                        let notified = self.release_opens.notified();
+                        tokio::pin!(notified);
+                        notified.as_mut().enable();
+                        self.open_in_flight.fetch_add(1, Ordering::SeqCst);
+                        self.open_entered.notify_waiters();
+                        let _ = tokio::time::timeout(Duration::from_secs(5), notified).await;
+                        return Envelope::ok(json!({ "id": "w1" }));
+                    }
+                    Envelope::ok(json!({ "op": op }))
+                })
+            }
+            fn slice_snapshot(&self, slice: SliceKind) -> Value {
+                self.inner.slice_snapshot(slice)
+            }
+            fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+                self.inner.watch_slice(slice, after_seq, stop, receive);
+            }
+            fn live(&self) -> flume::Receiver<vibevalley_server::transport::bridge::LiveEvent> {
+                self.inner.live()
+            }
+            fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+                self.inner.subscribe(name, payload)
+            }
+            fn subscribe_with(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+                self.inner.subscribe_with(ctx, name, payload)
+            }
+            fn unsubscribe(&self, id: u64) {
+                self.inner.unsubscribe(id);
+            }
+        }
+
+        #[derive(Default)]
+        struct ReplyRecorder {
+            replies: Mutex<Vec<(String, Value)>>,
+            notify: Notify,
+        }
+
+        impl Outlet for ReplyRecorder {
+            fn send(&self, event: &str, data: Value) {
+                self.replies.lock().push((event.to_string(), data));
+                self.notify.notify_waiters();
+            }
+        }
+
+        impl ReplyRecorder {
+            fn has(&self, event: &str) -> bool {
+                self.replies.lock().iter().any(|(e, _)| e == event)
+            }
+        }
+
+        let server = SlowOpenServer::new();
+        let bridge = Bridge::new(server.clone(), BRIDGE_CONCURRENCY);
+        let rec = Arc::new(ReplyRecorder::default());
+        let client = bridge.attach(next_client_identity(vibevalley_server::ClientKind::GpuiWorkbench, "vv"), rec.clone());
+
+        for i in 1..=4 {
+            client.call(
+                &format!("open-{i}"),
+                "session.openWorkspace".into(),
+                json!({ "runtime": "claude", "cwd": "/tmp" }),
+            );
+        }
+
+        vibevalley_runtime::rt::block_on(async {
+            tokio::time::timeout(Duration::from_secs(3), async {
+                loop {
+                    let entered = server.open_entered.notified();
+                    tokio::pin!(entered);
+                    entered.as_mut().enable();
+                    if server.open_in_flight.load(Ordering::SeqCst) == 4 {
+                        break;
+                    }
+                    entered.await;
+                }
+            })
+            .await
+            .expect("all 4 slow session.openWorkspace calls must enter concurrently");
+
+            client.call("fast-1", "runtime.list".into(), Value::Null);
+            client.call("fast-2", "channel.message.send".into(), json!({ "channel": "c1", "text": "hi" }));
+
+            tokio::time::timeout(Duration::from_secs(3), async {
+                loop {
+                    let replied = rec.notify.notified();
+                    tokio::pin!(replied);
+                    replied.as_mut().enable();
+                    if rec.has("reply:fast-1") && rec.has("reply:fast-2") {
+                        break;
+                    }
+                    replied.await;
+                }
+            })
+            .await
+            .expect("fast RPCs must complete immediately while 4 slow opens are held in flight");
+
+            assert!(!rec.has("reply:open-1"), "slow opens must still be held in flight when fast RPCs complete");
+            server.release_opens.notify_waiters();
+
+            tokio::time::timeout(Duration::from_secs(3), async {
+                loop {
+                    let replied = rec.notify.notified();
+                    tokio::pin!(replied);
+                    replied.as_mut().enable();
+                    if (1..=4).all(|i| rec.has(&format!("reply:open-{i}"))) {
+                        break;
+                    }
+                    replied.await;
+                }
+            })
+            .await
+            .expect("all 4 slow opens must finish after release");
+        });
     }
 }

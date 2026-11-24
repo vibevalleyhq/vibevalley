@@ -1,4 +1,4 @@
-import { colorScheme, effect, Image, keymap, signal, Text, View, windowSize } from "nsh";
+import { colorScheme, computed, effect, Image, keymap, signal, Text, View, windowSize } from "nsh";
 import { Dialog } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -23,7 +23,7 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
     props.onAt((props.at + step + count()) % count());
   };
   keymap.bind({ left: () => go(-1), right: () => go(1) }, { passThrough: true });
-  const shown = () => (props.at === undefined ? undefined : props.pictures[props.at]);
+  const shown = computed(() => (props.at === undefined ? undefined : props.pictures[props.at]));
   // An Image takes no size from its picture: the picture's own, scaled down to the window (less the bar), never up.
   const natural = signal<{ src: string; width: number; height: number } | undefined>(undefined);
   effect(() => {
@@ -41,18 +41,18 @@ export function Lightbox(props: { pictures: readonly Picture[]; at: number | und
       active = false;
     };
   });
-  const fit = () => {
+  const fit = computed(() => {
     const n = natural();
     const boxW = Math.max(160, windowSize().width - 64);
     const boxH = Math.max(120, windowSize().height - 136);
     if (!n || n.src !== shown()?.src) return { width: Math.min(boxW, 480), height: Math.min(boxH, 320) };
     const k = Math.min(1, boxW / n.width, boxH / n.height);
     return { width: n.width * k, height: n.height * k };
-  };
-  const dims = () => {
+  });
+  const dims = computed(() => {
     const n = natural();
     return n && n.src === shown()?.src ? `${n.width}×${n.height}` : undefined;
-  };
+  });
   return (
     <Dialog
       open={props.at !== undefined}

@@ -659,6 +659,13 @@ impl MachineAgent {
                 }
             };
 
+            if cancel.is_cancelled() {
+                if ephemeral && let Some(wt) = &owned_worktree {
+                    let _ = worktrees.cleanup_worktree(wt);
+                }
+                return;
+            }
+
             let proxy = match LocalMcpProxy::start(
                 req.session_id.clone(),
                 req.mcp_session_token.clone().unwrap_or_default(),
@@ -748,6 +755,15 @@ impl MachineAgent {
                     return;
                 }
             };
+
+            if cancel.is_cancelled() {
+                proxy.shutdown();
+                oar_session.dispose();
+                if ephemeral && let Some(wt) = &owned_worktree {
+                    let _ = worktrees.cleanup_worktree(wt);
+                }
+                return;
+            }
 
             let events_rx = oar_session.events_with_history();
             let managed = Arc::new(ManagedSession::new(

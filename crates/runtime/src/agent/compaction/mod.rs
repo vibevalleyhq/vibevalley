@@ -142,7 +142,7 @@ impl Compactor {
         } else if tokens >= self.soft_tokens && self.active.0.lock().unwrap().insert(conv.to_owned()) {
             let compactor = self.clone();
             let conv = conv.to_owned();
-            std::thread::spawn(move || {
+            crate::rt::handle().spawn_blocking(move || {
                 let _ = compactor.compact(&conv, Level::Soft, None);
                 compactor.active.0.lock().unwrap().remove(&conv);
                 compactor.active.1.notify_all();

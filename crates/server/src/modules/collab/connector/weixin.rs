@@ -227,12 +227,15 @@ impl Weixin {
 
     /// WeChat's long poll on the code; a poll that fails reads as still waiting, after a breath so it does not spin.
     async fn qr_status(&self, base: &str, code: &str, verify: &str) -> QrStatus {
-        let mut query = url::form_urlencoded::Serializer::new(String::new());
-        query.append_pair("qrcode", code);
-        if !verify.is_empty() {
-            query.append_pair("verify_code", verify);
-        }
-        let url = endpoint(base, &format!("ilink/bot/get_qrcode_status?{}", query.finish()));
+        let query = {
+            let mut q = url::form_urlencoded::Serializer::new(String::new());
+            q.append_pair("qrcode", code);
+            if !verify.is_empty() {
+                q.append_pair("verify_code", verify);
+            }
+            q.finish()
+        };
+        let url = endpoint(base, &format!("ilink/bot/get_qrcode_status?{query}"));
         let polled = timed(
             Duration::from_secs(35),
             || AppFailed::failed("get_qrcode_status: timed out"),

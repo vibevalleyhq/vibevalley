@@ -77,7 +77,7 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
 
   // Where the user had read to as the list opened: the new ones below a line.
   const readTo = untracked(() => props.channel?.read ?? 0);
-  const searching = () => (props.filter ?? "").trim() !== "";
+  const searching = computed(() => (props.filter ?? "").trim() !== "");
   // A search is the server's, over the whole channel and its threads, not only the pages read here.
   const search = useLatest(
     () => {
@@ -92,14 +92,14 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
     },
     searchWaitMs,
   );
-  const hits = (): readonly MessageHit[] | undefined => {
+  const hits = computed((): readonly MessageHit[] | undefined => {
     const a = search();
     return a?.state === "done" ? a.value : undefined;
-  };
-  const searchFailed = () => {
+  });
+  const searchFailed = computed(() => {
     const a = search();
     return a?.state === "failed" ? a.reason : undefined;
-  };
+  });
   const items = computed(() =>
     searching()
       ? feedOf(
@@ -109,10 +109,10 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
       : feedOf(collab()?.chat, said().messages),
   );
   const addressOf = (m: ChatMessage) => (m.channel === id() ? undefined : hits()?.find((h) => h.message.id === m.id)?.address);
-  const firstNew = () => (searching() ? undefined : said().messages.find((m) => m.number > readTo && m.from !== userId)?.id);
+  const firstNew = computed(() => (searching() ? undefined : said().messages.find((m) => m.number > readTo && m.from !== userId)?.id));
   const parent = useMessage(() => (props.channel ? parentAt(collab()?.chat, props.channel) : undefined));
-  const hasOlder = () => !!id() && said().messages.length > 0 && !said().complete;
-  const typing = () => orchestratorTyping(sessions()?.sessions, props.channel);
+  const hasOlder = computed(() => !!id() && said().messages.length > 0 && !said().complete);
+  const typing = computed(() => orchestratorTyping(sessions()?.sessions, props.channel));
   const clock = useNow();
   // Thinking or writing, and for how long the round has gone on.
   const roundText = (mood: "thinking" | "speaking", since: number | undefined) => {
@@ -122,11 +122,11 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
   const orchestrators = useOrchestrators();
   // Scrolled up from the newest: the number it was at then, so what came after is counted for the way back.
   const awayFrom = signal<number | undefined>(undefined);
-  const newest = () => said().messages.at(-1)?.number ?? 0;
-  const unseen = () => {
+  const newest = computed(() => said().messages.at(-1)?.number ?? 0);
+  const unseen = computed(() => {
     const from = awayFrom();
     return from === undefined ? 0 : said().messages.filter((m) => m.number > from && m.from !== userId).length;
-  };
+  });
   const onScroll = (e: { offset: { y: number }; contentSize: { height: number }; size: { height: number } }) => {
     const away = e.contentSize.height - e.size.height - e.offset.y > awayPx;
     if (away && untracked(awayFrom) === undefined) awayFrom.set(untracked(newest));
@@ -478,7 +478,7 @@ function MessageRow(props: {
   onJump?: (() => void) | undefined;
 }) {
   const sessionsById = useSessionsMap();
-  const editing = () => editingId() === props.m.id;
+  const editing = computed(() => editingId() === props.m.id);
   const setEditing = (on: boolean) => setEditingId(on ? props.m.id : undefined);
   const orchestrators = useOrchestrators();
   const nameOf = (who: string) =>
@@ -488,20 +488,21 @@ function MessageRow(props: {
         (who === defaultOrchestrator ? t("web.channel.orchestrator") : undefined) ??
         sessionsById().get(who)?.name ??
         who);
-  const meta = () =>
+  const meta = computed(() =>
     [props.where ? t("web.channel.messages.inThread", { address: props.where }) : "", props.m.pinned !== undefined ? t("web.channel.messages.pinned") : ""]
       .filter(Boolean)
-      .join(" · ");
+      .join(" · "),
+  );
   const agentOf = useAgent(() => props.m.agent);
   const workerSession = useSession(() => (actorRoleOf(props.m.actor) === "worker" ? props.m.from : undefined));
   const session = workerSession;
-  const who = () => {
+  const who = computed(() => {
     if (actorRoleOf(props.m.actor) !== "worker") return "";
     const agent = agentOf();
     const s = session();
     return [`@${props.m.from}`, s ? (runtimeLabel[s.runtime] ?? s.runtime) : "", agent?.duty ? dutyShort(agent.duty) : ""].filter(Boolean).join(" ");
-  };
-  const outcome = () => outcomeTag[props.m.outcome ?? "completed"];
+  });
+  const outcome = computed(() => outcomeTag[props.m.outcome ?? "completed"]);
   return (
     <Frame
       face={<SenderFace m={props.m} />}

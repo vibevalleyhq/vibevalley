@@ -1,4 +1,4 @@
-import { cleanup, Clipboard, Image, signal, Text, View } from "nsh";
+import { cleanup, Clipboard, computed, Image, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { ArtifactId, Attachment, MediaUnderstandingAuthorizationRequest, MediaUnderstandingJob, MediaUnderstandingRequest } from "@vibevalley/protocol";
@@ -32,27 +32,27 @@ export function UnderstandingPanel(props: { file: Attachment }) {
   const status = () => ready(query, undefined);
   const thumbUrl = useAttachmentUrl(() => props.file.id);
   const kind = () => fileKind(props.file.type);
-  const jobs = () => {
+  const jobs = computed(() => {
     const file = props.file.id;
     return (ops()?.media ?? []).filter((job): job is MediaUnderstandingJob => job.kind === "understanding" && job.inputs.some((input) => input.hash === file));
-  };
+  });
   const prompt = signal("");
   const tokens = signal(512);
   const channel = signal("");
   const consent = signal<{ connection: string; revision: number } | undefined>(undefined);
-  const approved = () => {
+  const approved = computed(() => {
     const current = status();
     const approval = consent();
     return (
       current !== undefined && approval !== undefined && current.revision === approval.revision && current.understanding?.connection === approval.connection
     );
-  };
+  });
   const submitted = signal<MediaUnderstandingRequest | MediaUnderstandingAuthorizationRequest | undefined>(undefined);
   const error = signal<string | undefined>(undefined);
   const act = createAct((e) => error.set(e));
   let transfer: AbortController | undefined;
   cleanup(() => transfer?.abort());
-  const frozen = () => act.busy() || submitted() !== undefined;
+  const frozen = computed(() => act.busy() || submitted() !== undefined);
 
   const submit = () => {
     if (act.busy()) return;
@@ -256,7 +256,7 @@ function UnderstandingCard(props: { job: MediaUnderstandingJob }) {
           <Text class="font-mono text-2xs text-muted tabular-nums">{`${props.job.model} · ${props.job.connection} · ${props.job.id}`}</Text>
           <SourceLine source={props.job.source} testid="understanding-source" />
           <View class="flex-row flex-wrap items-center gap-1.5">
-            <Each of={props.job.inputs}>
+            <Each of={props.job.inputs} key={(i) => i.hash}>
               {(input) => (
                 <View class="rounded-xs bg-hover px-1.5 py-px">
                   <Text class="font-mono text-2xs text-muted">{input().name}</Text>

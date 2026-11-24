@@ -1,4 +1,4 @@
-import { Image, signal, Text, View } from "nsh";
+import { computed, Image, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { MediaImageJob, MediaImageRequest } from "@vibevalley/protocol";
@@ -31,7 +31,7 @@ const sizePresets: readonly { readonly ratio: string; readonly width: number; re
 
 export function ImagePanel() {
   const ops = useOpsSlice();
-  const images = () => ops()?.media?.filter((job): job is MediaImageJob => job.kind === "image") ?? [];
+  const images = computed(() => ops()?.media?.filter((job): job is MediaImageJob => job.kind === "image") ?? []);
   const prompt = signal("");
   const format = signal<"text" | "layout">("text");
   const width = signal(1024);
@@ -46,7 +46,7 @@ export function ImagePanel() {
   const submitted = signal<MediaImageRequest | undefined>(undefined);
   const error = signal<string | undefined>(undefined);
   const act = createAct((e) => error.set(e));
-  const hasAdvanced = () => Boolean(seed() || steps() || guidance() || negative().trim());
+  const hasAdvanced = computed(() => Boolean(seed() || steps() || guidance() || negative().trim()));
 
   const submit = () => {
     const input: MediaImageRequest = submitted() ?? {

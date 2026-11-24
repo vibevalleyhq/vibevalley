@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, View } from "nsh";
+import { computed, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
@@ -88,11 +88,11 @@ export function SubagentProgress(props: { session: string; progress: SubagentSum
       </Each>
       <Each of={props.progress.threads} key={(thread) => thread.threadId}>
         {(thread) => {
-          const status = (): ThreadStatus => thread().status ?? "unknown";
-          const meta = () => statusMeta[status()];
-          const isOpen = () => selected(thread().threadId);
-          const stepsCount = () => thread().steps?.length ?? 0;
-          const stepsDone = () => thread().steps?.filter((s) => s.status === "completed").length ?? 0;
+          const status = computed((): ThreadStatus => thread().status ?? "unknown");
+          const meta = computed(() => statusMeta[status()]);
+          const isOpen = computed(() => selected(thread().threadId));
+          const stepsCount = computed(() => thread().steps?.length ?? 0);
+          const stepsDone = computed(() => thread().steps?.filter((s) => s.status === "completed").length ?? 0);
           const observedText = () =>
             t("web.session.subagents.observed", {
               status: t(`web.session.subagents.status.${status()}`),

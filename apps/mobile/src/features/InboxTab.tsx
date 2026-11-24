@@ -1,4 +1,4 @@
-import { effect, List, Scroll, signal, Text, View } from "nsh";
+import { computed, effect, List, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { InboxItem, SessionPermissionDecision } from "@vibevalley/protocol";
@@ -66,22 +66,23 @@ export function InboxTab(props: {
   const actionError = signal<string | undefined>(undefined);
   let userPicked = false;
 
-  const items = () => props.session.inbox()?.items ?? [];
+  const items = computed(() => props.session.inbox()?.items ?? []);
   const permissions = () => props.session.pendingPermissions();
   const interactions = () => props.session.pendingInteractions();
-  const isDual = () => props.layout().mode === "dual_pane";
+  const isDual = computed(() => props.layout().mode === "dual_pane");
 
-  const entries = (): readonly InboxEntry[] => [
+  const entries = computed((): readonly InboxEntry[] => [
     ...permissions().map((item) => ({ kind: "permission" as const, key: `perm:${item.sessionId}:${item.request.requestId}`, item })),
     ...interactions().map((item) => ({ kind: "interaction" as const, key: `inter:${item.sessionId}:${item.request.requestId}`, item })),
     ...items().map((item) => ({ kind: "inbox" as const, key: `item:${item.id}`, item })),
-  ];
+  ]);
+  const hasEntries = computed(() => entries().length > 0);
 
-  const selectedEntry = () => {
+  const selectedEntry = computed(() => {
     const key = props.selectedKey();
     if (key === undefined) return undefined;
     return entries().find((entry) => entry.key === key);
-  };
+  });
 
   effect(() => {
     const list = entries();
@@ -104,12 +105,13 @@ export function InboxTab(props: {
   });
 
   const setDraft = (key: string, value: string) => {
+    if ((untracked(answerDrafts)[key] ?? "") === value) return;
     answerDrafts.update((prev) => ({ ...prev, [key]: value }));
   };
 
   const respondPermission = async (sessionId: string, requestId: string, decision: SessionPermissionDecision) => {
     const key = `perm:${requestId}`;
-    if (busyKey() === key) return;
+    if (untracked(busyKey) === key) return;
     busyKey.set(key);
     actionError.set(undefined);
     try {
@@ -124,6 +126,9 @@ export function InboxTab(props: {
       } else {
         hapticNotification(decision === "deny" ? "warning" : "success");
       }
+    } catch (err: unknown) {
+      actionError.set(err instanceof Error ? err.message : String(err));
+      hapticNotification("error");
     } finally {
       busyKey.set(undefined);
     }
@@ -131,7 +136,7 @@ export function InboxTab(props: {
 
   const respondInteraction = async (sessionId: string, requestId: string, payload: { readonly optionId?: string; readonly text?: string }) => {
     const key = `inter:${requestId}`;
-    if (busyKey() === key) return;
+    if (untracked(busyKey) === key) return;
     busyKey.set(key);
     actionError.set(undefined);
     try {
@@ -147,14 +152,17 @@ export function InboxTab(props: {
         setDraft(requestId, "");
         hapticImpact("light");
       }
+    } catch (err: unknown) {
+      actionError.set(err instanceof Error ? err.message : String(err));
+      hapticNotification("error");
     } finally {
       busyKey.set(undefined);
     }
   };
 
   const renderPermissionCard = (entry: () => PendingPermissionItem) => {
-    const req = () => entry().request;
-    const isBusy = () => busyKey() === `perm:${req().requestId}`;
+    const req = computed(() => entry().request);
+    const isBusy = computed(() => busyKey() === `perm:${req().requestId}`);
     return (
       <SectionCard testID={`inbox-permission-${req().requestId}`} class="gap-3">
         <View class="flex-row items-center justify-between gap-2">
@@ -200,9 +208,10 @@ export function InboxTab(props: {
   };
 
   const renderInteractionCard = (entry: () => PendingInteractionItem) => {
-    const req = () => entry().request;
-    const isBusy = () => busyKey() === `inter:${req().requestId}`;
-    const draft = () => answerDrafts()[req().requestId] ?? "";
+    const req = computed(() => entry().request);
+    const isBusy = computed(() => busyKey() === `inter:${req().requestId}`);
+    const draft = computed(() => answerDrafts()[req().requestId] ?? "");
+    const canSubmit = computed(() => !isBusy() && draft().trim() !== "");
     return (
       <SectionCard testID={`inbox-interaction-${req().requestId}`} class="gap-3">
         <View class="flex-row items-center justify-between gap-2">
@@ -243,7 +252,7 @@ export function InboxTab(props: {
               tone="primary"
               size="sm"
               label={t("web.remote.inbox.answer")}
-              disabled={isBusy() || draft().trim() === ""}
+              disabled={!canSubmit()}
               onPress={() => {
                 void respondInteraction(entry().sessionId, req().requestId, { text: draft().trim() });
               }}
@@ -264,7 +273,7 @@ export function InboxTab(props: {
         )}
       </If>
 
-      <If when={entries().length > 0} else={<EmptyPanel testID="inbox-empty" icon="inbox" message={t("web.remote.inbox.empty")} />}>
+      <If when={hasEntries()} else={<EmptyPanel testID="inbox-empty" icon="inbox" message={t("web.remote.inbox.empty")} />}>
         <If
           when={isDual()}
           else={
@@ -312,8 +321,8 @@ export function InboxTab(props: {
             contentClass="gap-2.5 p-3"
           >
             {(entry) => {
-              const selected = () => props.selectedKey() === entry().key;
-              const title = () => {
+              const selected = computed(() => props.selectedKey() === entry().key);
+              const title = computed(() => {
                 const current = entry();
                 switch (current.kind) {
                   case "permission":
@@ -322,8 +331,8 @@ export function InboxTab(props: {
                   case "inbox":
                     return current.item.words.title || current.item.who;
                 }
-              };
-              const subtitle = () => {
+              });
+              const subtitle = computed(() => {
                 const current = entry();
                 switch (current.kind) {
                   case "permission":
@@ -333,8 +342,8 @@ export function InboxTab(props: {
                   case "inbox":
                     return current.item.words.body || current.item.text;
                 }
-              };
-              const badge = (): { readonly label: string; readonly tone: TagTone } => {
+              });
+              const badge = computed((): { readonly label: string; readonly tone: TagTone } => {
                 const current = entry();
                 switch (current.kind) {
                   case "permission":
@@ -344,7 +353,7 @@ export function InboxTab(props: {
                   case "inbox":
                     return { label: current.item.words.label || current.item.kind, tone: inboxKindTone(current.item.kind) };
                 }
-              };
+              });
 
               return (
                 <SectionCard
@@ -370,23 +379,23 @@ export function InboxTab(props: {
     </View>
   );
 
-  const selectedPermission = () => {
+  const selectedPermission = computed(() => {
     const current = selectedEntry();
     return current?.kind === "permission" ? current.item : undefined;
-  };
-  const selectedInteraction = () => {
+  });
+  const selectedInteraction = computed(() => {
     const current = selectedEntry();
     return current?.kind === "interaction" ? current.item : undefined;
-  };
-  const selectedInboxItem = () => {
+  });
+  const selectedInboxItem = computed(() => {
     const current = selectedEntry();
     return current?.kind === "inbox" ? current.item : undefined;
-  };
+  });
 
   const renderDetail = () => (
     <If when={selectedEntry()}>
       {(entry) => {
-        const title = () => {
+        const title = computed(() => {
           const current = entry();
           switch (current.kind) {
             case "permission":
@@ -395,7 +404,7 @@ export function InboxTab(props: {
             case "inbox":
               return current.item.words.title || current.item.who;
           }
-        };
+        });
         return (
           <View testID="inbox-detail" class="min-h-0 flex-1">
             <TopBar testID="inbox-detail-bar" backTestID="inbox-back" title={title()} onBack={isDual() ? undefined : () => props.onSelectKey(undefined)} />

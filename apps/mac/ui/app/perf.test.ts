@@ -13,6 +13,7 @@ import {
 } from "@vibevalley/protocol";
 
 import "../infra/polyfill";
+import { createComposer, draftOf, drafts, flushDrafts } from "../features/channel/model/composing";
 import { mergeSteps, SessionLogs } from "../features/session/runs";
 import { state as baseState } from "../fixtures/workbench";
 import { useNow } from "../infra/base/dom";
@@ -28,6 +29,7 @@ import {
   useSessionsSlice,
   useThreadOwner,
 } from "../infra/frame";
+import { prefsNow, setTheme, setWidth, usePrefs } from "../infra/state/prefs";
 import type { SliceMap } from "../infra/transport";
 
 function makeEvent(seq: number, revision = 1, run = "r1"): SessionEvent {
@@ -273,4 +275,147 @@ test("slice indexed selectors resolve in O(1) and isolate reactivity per slice",
   expect(collabRuns).toBe(2);
 
   alive.set(false);
+});
+
+test("drafts.text debounces localStorage writes and createComposer memoizes canSend across typing", () => {
+  const realSetItem = localStorage.setItem.bind(localStorage);
+  const draftWrites: string[] = [];
+  localStorage.setItem = (key: string, value: string) => {
+    if (key === "vibevalley.chat.drafts") draftWrites.push(value);
+    realSetItem(key, value);
+  };
+
+  try {
+    const channel = "perf-draft-channel";
+    drafts.clear(channel);
+    draftWrites.length = 0;
+
+    let typed = "";
+    const chars = "abcdefghijklmnopqrst";
+    for (const ch of chars) {
+      typed += ch;
+      drafts.text(channel, typed);
+    }
+    expect(draftWrites.length).toBe(0);
+    expect(draftOf(channel).text).toBe(chars);
+
+    flushDrafts();
+    expect(draftWrites.length).toBe(1);
+    expect(JSON.parse(draftWrites[0] ?? "{}")).toMatchObject({ [channel]: { text: chars } });
+
+    drafts.text(channel, "cancelled-before-flush");
+    drafts.clear(channel);
+    flushDrafts();
+    expect(draftWrites.length).toBe(2);
+    expect(JSON.parse(draftWrites[1] ?? "{}")[channel]).toBeUndefined();
+    expect(draftOf(channel).text).toBeUndefined();
+
+    // Buffered text must survive drafts.reply without losing what was typed.
+    drafts.text(channel, "draft-with-reply");
+    drafts.reply(channel, { id: "m-1", number: 7 } as unknown as Parameters<typeof drafts.reply>[1]);
+    expect(draftOf(channel)).toMatchObject({ text: "draft-with-reply", reply: { id: "m-1", number: 7 } });
+    expect(draftWrites.length).toBe(3);
+    drafts.clear(channel);
+    expect(draftWrites.length).toBe(4);
+
+    const alive = signal(true);
+    const canSendHistory: boolean[] = [];
+    let box!: ReturnType<typeof createComposer>;
+    effect(() => {
+      if (!alive()) return;
+      box = createComposer(
+        () => undefined,
+        () => undefined,
+        () => {},
+        {
+          target: () => ({ id: channel, ...(draftOf(channel).files.length > 0 ? { attachments: draftOf(channel).files.map((f) => f.id) } : {}) }),
+          says: { send: () => ({ done: Promise.resolve(undefined) }), items: () => [] } as unknown as Parameters<typeof createComposer>[3]["says"],
+          failed: () => {},
+          edited: (v) => drafts.text(channel, v),
+        },
+      );
+      effect(() => {
+        canSendHistory.push(box.canSend());
+      });
+    });
+
+    expect(canSendHistory).toEqual([false]);
+    let boxText = "";
+    for (let i = 0; i < chars.length; i++) {
+      boxText += chars[i];
+      box.edit(boxText, i + 1);
+    }
+    expect(canSendHistory).toEqual([false, true]);
+    expect(draftWrites.length).toBe(4);
+    flushDrafts();
+    expect(draftWrites.length).toBe(5);
+
+    drafts.clear(channel);
+    alive.set(false);
+  } finally {
+    localStorage.setItem = realSetItem;
+  }
+});
+
+test("setWidth no-op skips storage writes and usePrefs(theme) does not re-run when only width changes", () => {
+  const realSetItem = localStorage.setItem.bind(localStorage);
+  const initialTheme = prefsNow().theme;
+  const initialThreadWidth = prefsNow().widths.thread;
+  const prefWrites: string[] = [];
+  localStorage.setItem = (key: string, value: string) => {
+    if (key === "vibevalley.prefs") prefWrites.push(value);
+    realSetItem(key, value);
+  };
+
+  const alive = signal(true);
+  let themeRuns = 0;
+  let widthRuns = 0;
+  let lastTheme = initialTheme;
+  let lastWidth: number | undefined;
+
+  try {
+    effect(() => {
+      if (!alive()) return;
+      const theme = usePrefs((p) => p.theme);
+      const threadWidth = usePrefs((p) => p.widths.thread);
+      effect(() => {
+        themeRuns++;
+        lastTheme = theme();
+      });
+      effect(() => {
+        widthRuns++;
+        lastWidth = threadWidth();
+      });
+    });
+
+    expect(themeRuns).toBe(1);
+    expect(widthRuns).toBe(1);
+    expect(prefWrites.length).toBe(0);
+
+    setWidth("thread", 480);
+    expect(lastWidth).toBe(480);
+    expect(widthRuns).toBe(2);
+    expect(themeRuns).toBe(1);
+    expect(prefWrites.length).toBe(1);
+
+    // Repeating the same width must be a no-op with zero storage writes or listener notifications.
+    setWidth("thread", 480);
+    setWidth("unused-pane", undefined);
+    setTheme(lastTheme);
+    expect(widthRuns).toBe(2);
+    expect(themeRuns).toBe(1);
+    expect(prefWrites.length).toBe(1);
+
+    const nextTheme = initialTheme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    expect(lastTheme).toBe(nextTheme);
+    expect(themeRuns).toBe(2);
+    expect(widthRuns).toBe(2);
+    expect(prefWrites.length).toBe(2);
+  } finally {
+    alive.set(false);
+    setTheme(initialTheme);
+    setWidth("thread", initialThreadWidth);
+    localStorage.setItem = realSetItem;
+  }
 });

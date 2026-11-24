@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, View } from "nsh";
+import { computed, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { type Agent, type AgentProblem, type RuntimeInfo, sessionAppendSystemPrompt } from "@vibevalley/protocol";
@@ -60,9 +60,9 @@ export function AgentPage(props: { id: string }) {
   const search = useSearch();
   const agents = useAgents();
   const runtimes = useRuntimes();
-  const loaded = () => ready(agents, undefined);
-  const saved = () => loaded()?.find((a) => a.id === props.id);
-  const role = () => saved()?.role ?? (search().get("role") === "orchestrator" ? "orchestrator" : "worker");
+  const loaded = computed(() => ready(agents, undefined));
+  const saved = computed(() => loaded()?.find((a) => a.id === props.id));
+  const role = computed(() => saved()?.role ?? (search().get("role") === "orchestrator" ? "orchestrator" : "worker"));
   return (
     <If when={!agents.error()} else={<Note>{t("web.agent.noProfiles") + reasonOf(agents.error())}</Note>}>
       <If
@@ -108,11 +108,11 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
   const router = useRouter();
   const client = useQueryClient();
   const runtimes = useRuntimes();
-  const runtime = () => ready(runtimes, []).find((r) => r.id === draft().runtime);
+  const runtime = computed(() => ready(runtimes, []).find((r) => r.id === draft().runtime));
   const allProblems = useAgentProblems(() => [draft()]);
-  const problems = () => allProblems()[draft().id] ?? [];
-  const dirty = () => isNew || !same(props.saved, draft());
-  const nameTaken = () => props.all.some((a) => a.id !== draft().id && a.name === draft().name.trim());
+  const problems = computed(() => allProblems()[draft().id] ?? []);
+  const dirty = computed(() => isNew || !same(props.saved, draft()));
+  const nameTaken = computed(() => props.all.some((a) => a.id !== draft().id && a.name === draft().name.trim()));
 
   const save = () => {
     const d = draft();
@@ -244,7 +244,7 @@ function Problems(props: { problems: AgentProblem[] }) {
       }
     >
       <Scroll accessibilityLabel={t("web.agent.problems")} testID="agent-problems" class="max-h-40 border-t border-line" contentClass="gap-1 px-4 py-3">
-        <Each of={props.problems}>
+        <Each of={props.problems} key={(p) => `${p.level}:${p.text}`}>
           {(i) => (
             <View class="flex-row items-start gap-1.5">
               <View class="mt-1">

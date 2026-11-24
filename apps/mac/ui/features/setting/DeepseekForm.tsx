@@ -1,4 +1,4 @@
-import { signal, untracked, View } from "nsh";
+import { computed, signal, untracked, View } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
@@ -34,7 +34,7 @@ export function DeepseekForm(props: { status: SettingsStatus }) {
   });
   const key = form.field(["key"]);
   const removing = form.field(["removing"]);
-  const dirty = () => key.value().trim() !== "" || removing.value();
+  const dirty = computed(() => key.value().trim() !== "" || removing.value());
   return (
     <Form form={form} class="gap-4" testid="deepseek-form">
       {(submit) => (

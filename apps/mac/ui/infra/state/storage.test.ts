@@ -92,3 +92,77 @@ test("regression: persistent storage falls back to in-memory cache when native S
   await store.flush();
   expect(store.getItem("vibevalley.prefs")).toBeNull();
 });
+
+test("regression: rapid setItem calls on the same key coalesce while a write is in flight", async () => {
+  let releaseFirstWrite: (() => void) | undefined;
+  const firstWriteGate = new Promise<void>((resolve) => {
+    releaseFirstWrite = resolve;
+  });
+  const data = new Map<string, string>();
+  const setCalls: [string, string][] = [];
+  const backend: StorageBackend = {
+    getItem: async (key) => data.get(key) ?? null,
+    setItem: async (key, value) => {
+      setCalls.push([key, value]);
+      if (setCalls.length === 1) await firstWriteGate;
+      data.set(key, value);
+    },
+    removeItem: async (key) => {
+      data.delete(key);
+    },
+    keys: async () => [...data.keys()],
+  };
+
+  const store = createPersistentStorage(backend);
+  await store.ready;
+
+  for (let i = 1; i <= 50; i++) {
+    store.setItem("k", `v${i}`);
+  }
+  expect(store.getItem("k")).toBe("v50");
+  expect(setCalls.length).toBe(1);
+
+  releaseFirstWrite?.();
+  await store.flush();
+
+  expect(setCalls.length).toBeLessThanOrEqual(2);
+  expect(setCalls.at(-1)).toEqual(["k", "v50"]);
+  expect(data.get("k")).toBe("v50");
+});
+
+test("regression: setItem followed by removeItem on the same key while in flight persists removal", async () => {
+  let releaseFirstWrite: (() => void) | undefined;
+  const firstWriteGate = new Promise<void>((resolve) => {
+    releaseFirstWrite = resolve;
+  });
+  const data = new Map<string, string>();
+  const ops: string[] = [];
+  const backend: StorageBackend = {
+    getItem: async (key) => data.get(key) ?? null,
+    setItem: async (key, value) => {
+      ops.push(`set:${key}=${value}`);
+      if (ops.length === 1) await firstWriteGate;
+      data.set(key, value);
+    },
+    removeItem: async (key) => {
+      ops.push(`remove:${key}`);
+      data.delete(key);
+    },
+    keys: async () => [...data.keys()],
+  };
+
+  const store = createPersistentStorage(backend);
+  await store.ready;
+
+  store.setItem("k", "v1");
+  store.setItem("k", "v2");
+  store.removeItem("k");
+  expect(store.getItem("k")).toBeNull();
+
+  releaseFirstWrite?.();
+  await store.flush();
+
+  expect(ops).toEqual(["set:k=v1", "remove:k"]);
+  expect(data.has("k")).toBe(false);
+  expect(store.getItem("k")).toBeNull();
+});

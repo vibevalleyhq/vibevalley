@@ -233,9 +233,9 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
   const asked = () => Number(search().get("v"));
   const version = createMemo((): ArtifactVersion | undefined => props.artifact.versions.find((v) => v.version === asked()) ?? props.artifact.versions.at(-1));
   const issue = useIssue(() => props.artifact.issue);
-  const channels = () => (collab()?.chat?.channels ?? []).filter((c) => c.type === "channel" && c.archived === undefined);
+  const channels = createMemo(() => (collab()?.chat?.channels ?? []).filter((c) => c.type === "channel" && c.archived === undefined));
   /** Where its comments are: the version shown, else where it was first said. */
-  const said = () => version() ?? props.artifact.said;
+  const said = createMemo(() => version() ?? props.artifact.said);
   const pick = (n: number) => router.navigate(artifactHref(props.artifact.id, n === props.artifact.version ? undefined : n), { replace: true });
   const removing = createAct();
   const exporting = createAct();
@@ -288,15 +288,15 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
   ];
 
   const [frame, setFrame] = createSignal<Frame>();
-  const framed = () => {
+  const framed = createMemo(() => {
     const v = version();
     const f = frame();
     return html() && v && f ? { version: v.version, frame: f } : undefined;
-  };
+  });
   const [suggestions, setSuggestions] = createSignal<{ readonly draw: () => JSX.Element }>();
   const Chat = untracked(() => props.chat);
   const presenting = () => contentPresenting();
-  const isCovered = () => menu() || sendMenu();
+  const isCovered = createMemo(() => menu() || sendMenu());
 
   effect(() => {
     if (!presenting()) return;

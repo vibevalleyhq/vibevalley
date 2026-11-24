@@ -28,7 +28,6 @@ use super::presets::{
     support_of,
 };
 use super::profile::Profiles;
-use crate::base::Ticker;
 use crate::{Hub, now};
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -122,7 +121,6 @@ pub struct Fleet {
     probing: Mutex<HashSet<String>>,
     reads: AtomicU64,
     cancel: CancellationToken,
-    usage_task: Mutex<Option<Ticker>>,
     sub: Mutex<Option<crate::event_bus::Subscription>>,
 }
 
@@ -188,7 +186,6 @@ impl Fleet {
             probing: Mutex::default(),
             reads: AtomicU64::new(0),
             cancel,
-            usage_task: Mutex::new(None),
             sub: Mutex::new(None),
         });
         {
@@ -219,15 +216,21 @@ impl Fleet {
                 fleet.probe_all_async(ids).await;
             });
             let f = Arc::downgrade(&fleet);
-            let ticker = Ticker::spawn_on(hub, USAGE_EVERY, false, move || {
-                let Some(fleet) = f.upgrade() else { return false };
-                if fleet.cancel.is_cancelled() {
-                    return false;
+            let cancel = fleet.cancel.clone();
+            hub.spawn_task(async move {
+                let mut tick = tokio::time::interval(USAGE_EVERY);
+                tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                tick.tick().await;
+                loop {
+                    tokio::select! {
+                        biased;
+                        _ = cancel.cancelled() => break,
+                        _ = tick.tick() => {}
+                    }
+                    let Some(fleet) = f.upgrade() else { break };
+                    fleet.refresh_all_usage_async().await;
                 }
-                fleet.refresh_all_usage();
-                true
             });
-            *fleet.usage_task.lock() = Some(ticker);
         }
         fleet
     }
@@ -332,33 +335,31 @@ impl Fleet {
     }
 
     /// Refreshes usage across all available runtimes in parallel with bounded concurrency.
-    fn refresh_all_usage(self: &Arc<Self>) {
+    async fn refresh_all_usage_async(self: &Arc<Self>) {
         let ids = self.ids();
         let fleet = self.clone();
-        vibevalley_runtime::rt::block_on(async move {
-            let sem = Arc::new(Semaphore::new(PROBE_CONCURRENCY));
-            let mut set = JoinSet::new();
-            for id in ids {
-                if fleet.cancel.is_cancelled() {
-                    break;
-                }
-                let fleet = fleet.clone();
-                let sem = sem.clone();
-                set.spawn(async move {
-                    let permit = tokio::select! {
-                        biased;
-                        _ = fleet.cancel.cancelled() => return,
-                        p = sem.acquire_owned() => match p {
-                            Ok(p) => p,
-                            Err(_) => return,
-                        },
-                    };
-                    let _permit = permit;
-                    fleet.refresh_usage_async(&id).await;
-                });
+        let sem = Arc::new(Semaphore::new(PROBE_CONCURRENCY));
+        let mut set = JoinSet::new();
+        for id in ids {
+            if fleet.cancel.is_cancelled() {
+                break;
             }
-            while set.join_next().await.is_some() {}
-        });
+            let fleet = fleet.clone();
+            let sem = sem.clone();
+            set.spawn(async move {
+                let permit = tokio::select! {
+                    biased;
+                    _ = fleet.cancel.cancelled() => return,
+                    p = sem.acquire_owned() => match p {
+                        Ok(p) => p,
+                        Err(_) => return,
+                    },
+                };
+                let _permit = permit;
+                fleet.refresh_usage_async(&id).await;
+            });
+        }
+        while set.join_next().await.is_some() {}
     }
 
     /// Stops answering with new probes (`close`).
@@ -366,9 +367,6 @@ impl Fleet {
         self.cancel.cancel();
         let prev = self.sub.lock().take();
         drop(prev);
-        if let Some(ticker) = self.usage_task.lock().take() {
-            ticker.stop();
-        }
     }
 
     /// The registry's runtime for a wire id.

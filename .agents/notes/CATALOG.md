@@ -2,7 +2,7 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（24 篇）
+## proposed（20 篇）
 
 ### feature
 
@@ -16,17 +16,13 @@
 
 ### architecture
 
-- 2026-11-24 [Tokio 生态精简、类型化 HTTP 鉴权与异步链路追踪](.agents/notes/proposed/architecture/2026-11-24-tokio-ecosystem-slimming.md)
-- 2026-11-23 [Tokio 并发模型收敛与同步阻塞清理](.agents/notes/proposed/architecture/2026-11-23-tokio-concurrency-overhaul.md)
-- 2026-11-23 [Tailscale 与 nsh 原生移动远程控制（iOS 优先，Android 就绪）](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)
-- 2026-11-22 [工作台顶栏、页面交互精简与大纲笔记归属作品](.agents/notes/proposed/architecture/2026-11-22-workbench-ux-polish-and-outline-as-artifact.md)
-- 2026-11-22 [Pure-Rust native collaborative whiteboard (`VvWhiteboard`)](.agents/notes/proposed/architecture/2026-11-22-native-rust-whiteboard.md)
-- 2026-11-22 [Loro 协作内容引擎：四平面边界、实时感知、块内共编与时间旅行](.agents/notes/proposed/architecture/2026-11-22-loro-collaborative-content-engine.md)
-- 2026-11-22 [VibeValley DevTools 与跨边界强类型协议准则](.agents/notes/proposed/architecture/2026-11-22-devtools-and-protocol-boundaries.md)
-- 2026-11-21 [工作台 UI 状态机与 Rust 领域投影收口架构](.agents/notes/proposed/architecture/2026-11-21-ui-state-machine-consolidation.md)
-- 2026-11-19 [原生工作台长期计划：从派出第一单到放心管理多份工作](.agents/notes/proposed/architecture/2026-11-19-native-product-roadmap.md)
-- 2026-11-18 [在原生版复刻 Chord、持久执行、oar 和 Web 农场](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)
-- 2026-11-14 [原生的 VibeValley：Rust 服务端为准，激进重构，删掉 Electron、TS 服务端、页面和手机壳](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)
+- 2026-11-23 [Tailscale 与 nsh 原生移动远程控制：真机分发与远程推送](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)
+- 2026-11-22 [对话页次级标签收敛与素材组织方式](.agents/notes/proposed/architecture/2026-11-22-workbench-ux-polish-and-outline-as-artifact.md)
+- 2026-11-22 [Loro 协作内容引擎：远端同步、流式合批与白板本地副本](.agents/notes/proposed/architecture/2026-11-22-loro-collaborative-content-engine.md)
+- 2026-11-22 [VibeValley DevTools V2](.agents/notes/proposed/architecture/2026-11-22-devtools-and-protocol-boundaries.md)
+- 2026-11-21 [工作台剩余交互 FSM 与会话轨迹投影收口](.agents/notes/proposed/architecture/2026-11-21-ui-state-machine-consolidation.md)
+- 2026-11-18 [持久执行入口补齐、外部驱动实机验证与农场视觉对照](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)
+- 2026-11-14 [原生的 VibeValley：真机音频、签名公证与发布主线验收](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)
 - 2026-11-07 [让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)
 - 2026-11-06 [Space 核心业务概念模型（Space、Repo、Worktree、Issue 与执行体）](.agents/notes/proposed/architecture/2026-11-06-space-domain-model.md)
 - 2026-10-28 [agent 带什么：工具集（toolsets）和技能（skill 模块），用户用 `/` 叫它们](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)

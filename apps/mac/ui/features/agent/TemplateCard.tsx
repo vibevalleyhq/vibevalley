@@ -1,4 +1,4 @@
-import { signal, Text, View } from "nsh";
+import { computed, signal, Text, View } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
 import type { AgentTemplate, RuntimeInfo, TemplateCategory } from "@vibevalley/protocol";
@@ -77,9 +77,12 @@ export function TemplateCard(props: { template: AgentTemplate; runtimes: readonl
   const library = useSkills();
   const template = () => props.template;
   const orchestrator = () => template().role === "orchestrator";
-  const target = () => resolveTargetRuntime(template(), props.runtimes);
-  const skills = () => template().skills.map((id) => ready(library, []).find((s) => s.id === id) ?? { id, name: id, description: "" });
-  const capabilities = () => {
+  const target = computed(() => resolveTargetRuntime(template(), props.runtimes));
+  const skills = computed(() => {
+    const known = new Map(ready(library, []).map((s) => [s.id, s]));
+    return template().skills.map((id) => known.get(id) ?? { id, name: id, description: "" });
+  });
+  const capabilities = computed(() => {
     const seen = new Set<string>();
     const out: string[] = [];
     for (const item of [...skills().map((s) => s.name), ...template().tags]) {
@@ -89,7 +92,7 @@ export function TemplateCard(props: { template: AgentTemplate; runtimes: readonl
       if (out.length === 3) break;
     }
     return out;
-  };
+  });
 
   const install = () => {
     const id = template().id;
@@ -160,7 +163,7 @@ export function TemplateCard(props: { template: AgentTemplate; runtimes: readonl
           <If when={template().tags.length > 0}>
             <Text class="text-xs text-muted">{`${t("web.agent.tags")}${t("web.agent.colon")}${list(template().tags)}`}</Text>
           </If>
-          <Each of={skills()}>
+          <Each of={skills()} key={(s) => s.id}>
             {(s) => (
               <Text testID="template-skill" class="text-xs text-muted">
                 {t("web.agent.templates.skill", { name: s().name, description: s().description })}

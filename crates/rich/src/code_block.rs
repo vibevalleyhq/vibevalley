@@ -3,24 +3,26 @@
 //! Replaces spawning a read-only `<Editor>` per fenced code block:
 //! - Renders styled `nsh_core::element::text` spans reacting to `dark()`.
 //! - Shows a language/line-count header, copy action with clipboard write & feedback, and 16-line fold.
-//! - Tokenizes small blocks (and LRU cache hits) inline and offloads large blocks to
-//!   `nsh_core::prelude::blocking` + `Signal` with instant plain-text first paint.
+//! - Tokenizes small blocks (and LRU cache hits) inline and offloads large blocks off the UI
+//!   thread via [`crate::highlight::run_offloaded`] + `Signal` with instant plain-text first paint.
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use nsh_core::prelude::*;
 use vibevalley_i18n::t;
 
-use crate::highlight::{HighlightedCode, cached_highlight_code, highlight_code};
+use crate::highlight::{HighlightedCode, cached_highlight_code_arc, highlight_code_arc, run_offloaded};
 use crate::theme::{AdaptiveUi, CODE_FONT_MONO, UiPalette, shiki_rgba_to_hsla};
 
 /// Default line threshold above which `VvCodeBlock` starts collapsed (matches `CodeBlock.tsx`).
 pub const DEFAULT_FOLD_LINES: u32 = 16;
 /// Line height in points for code block text (16 * 18 = 288pt collapsed height).
 pub const CODE_LINE_HEIGHT: f32 = 18.0;
-/// Code blocks above this byte size offload tokenization via `nsh_core::prelude::blocking`.
+/// Code blocks above this byte size offload tokenization off the UI thread.
 pub const ASYNC_HIGHLIGHT_BYTE_THRESHOLD: usize = 4_096;
-/// Code blocks above this line count offload tokenization via `nsh_core::prelude::blocking`.
+/// Code blocks above this line count offload tokenization off the UI thread.
 pub const ASYNC_HIGHLIGHT_LINE_THRESHOLD: usize = 120;
 
 /// Props of [`VvCodeBlock`].
@@ -123,10 +125,12 @@ pub fn VvCodeBlock(props: VvCodeBlockProps, cx: Scope<VvCodeBlockEvent>) -> impl
     let folded = signal(true);
     let copied = signal(false);
     let copy_seq = signal(0u64);
-    let async_result: Signal<Option<(u64, HighlightedCode)>> = signal(None);
+    let async_result: Signal<Option<(u64, Arc<HighlightedCode>)>> = signal(None);
     let generation = signal(0u64);
+    let latest_gen = Arc::new(AtomicU64::new(0));
 
     // Kick off background tokenization when a large uncached block mounts or changes.
+    let effect_latest_gen = Arc::clone(&latest_gen);
     effect(move || {
         let code = props.code.get();
         let lang = props.language.get();
@@ -134,8 +138,9 @@ pub fn VvCodeBlock(props: VvCodeBlockProps, cx: Scope<VvCodeBlockEvent>) -> impl
 
         let next_gen = generation.get_untracked().wrapping_add(1);
         generation.set(next_gen);
+        effect_latest_gen.store(next_gen, Ordering::Release);
 
-        if !should_offload_highlight(code.as_str()) || cached_highlight_code(code.as_str(), lang.as_deref(), is_dark).is_some() {
+        if !should_offload_highlight(code.as_str()) || cached_highlight_code_arc(code.as_str(), lang.as_deref(), is_dark).is_some() {
             async_result.set(None);
             return;
         }
@@ -143,16 +148,15 @@ pub fn VvCodeBlock(props: VvCodeBlockProps, cx: Scope<VvCodeBlockEvent>) -> impl
         async_result.set(None);
         let code_owned = code.to_string();
         let lang_owned = lang.map(|s| s.to_string());
+        let job_latest_gen = Arc::clone(&effect_latest_gen);
         spawn(async move {
-            let highlighted = if tokio::runtime::Handle::try_current().is_ok() {
-                match blocking(move || highlight_code(&code_owned, lang_owned.as_deref(), is_dark)).await {
-                    Ok(res) => res,
-                    Err(_) => return,
-                }
-            } else {
-                highlight_code(&code_owned, lang_owned.as_deref(), is_dark)
-            };
-            if generation.get_untracked() == next_gen {
+            let highlighted = run_offloaded(move || {
+                (job_latest_gen.load(Ordering::Acquire) == next_gen).then(|| highlight_code_arc(&code_owned, lang_owned.as_deref(), is_dark))
+            })
+            .await;
+            if let Some(highlighted) = highlighted
+                && generation.get_untracked() == next_gen
+            {
                 async_result.set(Some((next_gen, highlighted)));
             }
         });
@@ -247,12 +251,12 @@ pub fn VvCodeBlock(props: VvCodeBlockProps, cx: Scope<VvCodeBlockEvent>) -> impl
             let current_gen = generation.get_untracked();
             async_result
                 .with(|slot| match slot {
-                    Some((gen_id, res)) if *gen_id == current_gen => Some(res.clone()),
+                    Some((gen_id, res)) if *gen_id == current_gen => Some(Arc::clone(res)),
                     Some(_) | None => None,
                 })
-                .or_else(|| cached_highlight_code(code.as_str(), lang.as_deref(), is_dark))
+                .or_else(|| cached_highlight_code_arc(code.as_str(), lang.as_deref(), is_dark))
         } else {
-            Some(highlight_code(code.as_str(), lang.as_deref(), is_dark))
+            Some(highlight_code_arc(code.as_str(), lang.as_deref(), is_dark))
         };
 
         let palette = UiPalette::for_mode(is_dark);

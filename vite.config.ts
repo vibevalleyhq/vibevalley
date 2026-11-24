@@ -53,6 +53,7 @@ export default defineConfig({
       deadcode: "vpx scripts/audit/deadcode.ts",
       // Static Rust module boundary gate (L0-L3 DAG, acyclicity, spine/mac isolation; docs/architecture-topology.md Section 3.2.2).
       "audit:boundaries": { command: "vpx scripts/audit/module-boundaries.ts", cache: false },
+      "audit:rust": { command: "vpx scripts/audit/rust-ratchets.ts", cache: false },
       // The Rust workspace (crates/, apps/mac): format, clippy, tests. protocol:check fails when packages/protocol's
       // shapes.gen.ts differ from the Rust contract (vp run protocol:ts writes them), or the artifact goldens from
       // its engine (vp run goldens).
@@ -97,7 +98,7 @@ export default defineConfig({
       // packages:check already runs type-aware vp check across apps/mac/ui, so release:verify uses mac:build-test to avoid linting twice.
       "release:verify": {
         command: "true",
-        dependsOn: ["release:rust", "sql:check", "audit:boundaries", "packages:check", "scripts:test", "mac:build-test", "docs:verify"],
+        dependsOn: ["release:rust", "sql:check", "audit:boundaries", "audit:rust", "packages:check", "scripts:test", "mac:build-test", "docs:verify"],
         cache: false,
       },
     },
@@ -376,6 +377,15 @@ export default defineConfig({
           "vibevalley/nsh-each-key": "error",
           "vibevalley/nsh-no-props-destructure": "error",
           "vibevalley/nsh-no-eager-accessor": "error",
+        },
+      },
+      {
+        // nsh input/drag/keymap responsiveness ratchets across all native UI surfaces (docs/style/nsh-tsx.md).
+        files: ["apps/mac/ui/**", "apps/mobile/src/**"],
+        excludeFiles: ["**/*.test.ts", "**/*.test.tsx", "**/*.story.tsx", "**/story.tsx", "**/stories/**"],
+        rules: {
+          "vibevalley/nsh-no-direct-storage-in-event": "error",
+          "vibevalley/nsh-keymap-no-text-signal": "error",
         },
       },
     ],

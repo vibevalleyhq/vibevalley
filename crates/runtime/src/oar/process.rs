@@ -714,14 +714,15 @@ mod tests {
     use super::*;
 
     fn wait_until_dead(pid: i32, timeout: Duration) {
-        let deadline = std::time::Instant::now() + timeout;
-        loop {
-            if nix::sys::signal::kill(Pid::from_raw(pid), None) == Err(Errno::ESRCH) {
-                return;
-            }
-            assert!(std::time::Instant::now() < deadline, "process {pid} still alive after {timeout:?}");
-            std::thread::sleep(Duration::from_millis(10));
-        }
+        crate::rt::block_on(async {
+            tokio::time::timeout(timeout, async {
+                while nix::sys::signal::kill(Pid::from_raw(pid), None) != Err(Errno::ESRCH) {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            })
+            .await
+        })
+        .unwrap_or_else(|_| panic!("process {pid} still alive after {timeout:?}"));
     }
 
     #[test]

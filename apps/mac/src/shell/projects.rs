@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -14,6 +14,31 @@ use crate::hosted::frames::{self, RailProject, TreeState};
 use crate::panes::PaneEntity;
 
 use super::{ACTIVE_KEY, GitSummary, ProjectView, Shell};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct SidebarTopics {
+    pub rail: bool,
+    pub files: bool,
+    pub git: bool,
+}
+
+impl SidebarTopics {
+    pub const ALL: Self = Self {
+        rail: true,
+        files: true,
+        git: true,
+    };
+    pub const RAIL: Self = Self {
+        rail: true,
+        files: false,
+        git: false,
+    };
+    pub const FILES: Self = Self {
+        rail: false,
+        files: true,
+        git: false,
+    };
+}
 
 type GitSnapshot = (
     Repo,
@@ -219,6 +244,8 @@ impl Shell {
                 git_error: None,
                 git_busy: false,
                 index: None,
+                dirs_gen: 0,
+                git_gen: 0,
                 _watcher: None,
             },
         );
@@ -260,10 +287,12 @@ impl Shell {
     }
 
     pub(super) fn load_dirs(&mut self, id: ProjectId, cx: &mut Context<Self>) {
-        let Some(pv) = self.workspace.projects.get(&id) else { return };
+        let Some(pv) = self.workspace.projects.get_mut(&id) else { return };
+        pv.dirs_gen = pv.dirs_gen.wrapping_add(1);
+        let generation = pv.dirs_gen;
         let wanted = pv.tree.wanted();
         if wanted.is_empty() {
-            self.push_sidebar(cx);
+            self.push_sidebar_topics(SidebarTopics::FILES, cx);
             return;
         }
         let root = pv.tree.root.clone();
@@ -279,7 +308,11 @@ impl Shell {
                     .collect::<Vec<_>>()
             },
             move |s, listed, cx| {
-                if let Some(pv) = s.workspace.projects.get_mut(&id) {
+                let mut applied = false;
+                if let Some(pv) = s.workspace.projects.get_mut(&id)
+                    && pv.dirs_gen == generation
+                {
+                    applied = true;
                     for (dir, result) in listed {
                         match result {
                             Ok(entries) => {
@@ -293,13 +326,17 @@ impl Shell {
                         }
                     }
                 }
-                s.push_sidebar(cx);
+                if applied {
+                    s.push_sidebar_topics(SidebarTopics::FILES, cx);
+                }
             },
         );
     }
 
     /// Reads the branch and worktrees of every project the sidebar lists.
     pub fn refresh_summaries(&mut self, cx: &mut Context<Self>) {
+        self.workspace.summaries_gen = self.workspace.summaries_gen.wrapping_add(1);
+        let generation = self.workspace.summaries_gen;
         let roots: Vec<(ProjectId, PathBuf)> = self.workspace.ws.projects().iter().map(|p| (p.id(), p.root().to_path_buf())).collect();
         Self::bg(
             cx,
@@ -314,15 +351,23 @@ impl Shell {
                     })
                     .collect::<Vec<_>>()
             },
-            |s, read, cx| {
-                s.workspace.git_summaries = read.into_iter().collect();
-                s.push_sidebar(cx);
+            move |s, read, cx| {
+                if s.workspace.summaries_gen != generation {
+                    return;
+                }
+                let next: HashMap<ProjectId, GitSummary> = read.into_iter().collect();
+                if s.workspace.git_summaries != next {
+                    s.workspace.git_summaries = next;
+                    s.push_sidebar_topics(SidebarTopics::RAIL, cx);
+                }
             },
         );
     }
 
     pub fn refresh_git(&mut self, id: ProjectId, cx: &mut Context<Self>) {
         let Some(pv) = self.workspace.projects.get_mut(&id) else { return };
+        pv.git_gen = pv.git_gen.wrapping_add(1);
+        let generation = pv.git_gen;
         pv.git_busy = true;
         let root = pv.tree.root.clone();
         Self::bg(
@@ -382,25 +427,27 @@ impl Shell {
                 Ok(Some((repo, status, branches, worktrees, worktree_activity, log)))
             },
             move |s, result, cx| {
-                if let Some(pv) = s.workspace.projects.get_mut(&id) {
-                    pv.git_busy = false;
-                    match result {
-                        Ok(Some((repo, status, branches, worktrees, worktree_activity, log))) => {
-                            pv.tones = frames::path_tones(repo.root(), &status);
-                            pv.repo_root = Some(repo.root().to_path_buf());
-                            pv.status = Some(status);
-                            pv.branches = branches;
-                            pv.worktrees = worktrees;
-                            pv.worktree_activity = worktree_activity;
-                            pv.log = log;
-                            pv.git_error = None;
-                        }
-                        Ok(None) => {
-                            pv.status = None;
-                            pv.git_error = Some("This project is not a git repository.".into());
-                        }
-                        Err(e) => pv.git_error = Some(e),
+                let Some(pv) = s.workspace.projects.get_mut(&id) else { return };
+                if pv.git_gen != generation {
+                    return;
+                }
+                pv.git_busy = false;
+                match result {
+                    Ok(Some((repo, status, branches, worktrees, worktree_activity, log))) => {
+                        pv.tones = frames::path_tones(repo.root(), &status);
+                        pv.repo_root = Some(repo.root().to_path_buf());
+                        pv.status = Some(status);
+                        pv.branches = branches;
+                        pv.worktrees = worktrees;
+                        pv.worktree_activity = worktree_activity;
+                        pv.log = log;
+                        pv.git_error = None;
                     }
+                    Ok(None) => {
+                        pv.status = None;
+                        pv.git_error = Some("This project is not a git repository.".into());
+                    }
+                    Err(e) => pv.git_error = Some(e),
                 }
                 s.push_sidebar(cx);
                 s.reload_diffs(id, cx);
@@ -408,9 +455,16 @@ impl Shell {
         );
     }
 
+    pub(super) fn on_fs_changes_batch(&mut self, batches: Vec<(ProjectId, Vec<FsChange>)>, cx: &mut Context<Self>) {
+        for (id, changes) in coalesce_fs_batches(batches) {
+            self.on_fs_changes(id, changes, cx);
+        }
+    }
+
     pub(super) fn on_fs_changes(&mut self, id: ProjectId, changes: Vec<FsChange>, cx: &mut Context<Self>) {
         let mut git = false;
-        let mut files = Vec::new();
+        let mut need_dir_refresh = false;
+        let mut files = BTreeSet::new();
         if let Some(pv) = self.workspace.projects.get_mut(&id) {
             for change in &changes {
                 if Watcher::is_git_state_path(&change.path) {
@@ -419,30 +473,40 @@ impl Shell {
                 }
                 git = true;
                 pv.tree.invalidate(&change.path);
-                files.push(change.path.clone());
+                files.insert(change.path.clone());
             }
-            if pv.tree.children.is_empty() || !files.is_empty() {
-                self.load_dirs(id, cx);
-            }
+            need_dir_refresh = pv.tree.children.is_empty() || !files.is_empty();
         }
-        for ((p, _), pane) in &self.workspace.panes {
-            if *p == id {
-                match &pane.entity {
-                    PaneEntity::File(viewer) => {
-                        let path = viewer.read(cx).path().to_path_buf();
-                        if files.contains(&path) {
-                            viewer.update(cx, |v, cx| v.reload(cx));
+        if !files.is_empty() {
+            for ((p, _), pane) in &self.workspace.panes {
+                if *p == id {
+                    match &pane.entity {
+                        PaneEntity::File(viewer) => {
+                            let path = viewer.read(cx).path();
+                            if files.contains(path) {
+                                viewer.update(cx, |v, cx| v.reload(cx));
+                            }
                         }
-                    }
-                    PaneEntity::Markdown(md) => {
-                        let path = md.read(cx).path().to_path_buf();
-                        if files.contains(&path) {
-                            md.update(cx, |v, cx| v.reload(cx));
+                        PaneEntity::Markdown(md) => {
+                            let path = md.read(cx).path();
+                            if files.contains(path) {
+                                md.update(cx, |v, cx| v.reload(cx));
+                            }
                         }
+                        PaneEntity::Diff(_) | PaneEntity::Hosted(_) | PaneEntity::Pixel(_) => {}
                     }
-                    PaneEntity::Diff(_) | PaneEntity::Hosted(_) | PaneEntity::Pixel(_) => {}
                 }
             }
+        }
+        if need_dir_refresh && self.workspace.dir_refresh_pending.insert(id) {
+            cx.spawn(async move |this, cx| {
+                cx.background_executor().timer(Duration::from_millis(100)).await;
+                let _ = this.update(cx, |s, cx| {
+                    s.workspace.dir_refresh_pending.remove(&id);
+                    s.load_dirs(id, cx);
+                });
+            })
+            .detach();
         }
         if git && self.workspace.git_refresh_pending.insert(id) {
             // Debounced: a checkout or build touches many files at once.
@@ -468,153 +532,175 @@ impl Shell {
     }
 
     pub fn push_sidebar(&mut self, cx: &mut Context<Self>) {
-        self.publish_host_debug(cx);
+        self.push_sidebar_topics(SidebarTopics::ALL, cx);
+    }
+
+    pub(super) fn push_sidebar_topics(&mut self, topics: SidebarTopics, cx: &mut Context<Self>) {
+        if topics.rail {
+            self.publish_host_debug(cx);
+        }
         let sidebar_ready = self.chrome.sidebar.read(cx).is_ready();
         let inspector_ready = self.chrome.inspector_open && self.chrome.inspector.as_ref().is_some_and(|slot| slot.view.read(cx).is_ready());
         if !sidebar_ready && !inspector_ready {
             return;
         }
-        let rail_items: Vec<RailProject> = self
-            .workspace
-            .ws
-            .projects()
-            .iter()
-            .map(|p| {
-                let pv = self.workspace.projects.get(&p.id());
-                let summary = self.workspace.git_summaries.get(&p.id());
-                let worktrees_src = pv.map(|v| &v.worktrees).filter(|w| !w.is_empty()).or(summary.map(|s| &s.worktrees));
-                let branch = pv
-                    .and_then(|v| v.status.as_ref()?.branch.clone())
-                    .or_else(|| summary.and_then(|s| s.branch.clone()));
-                let main_root = worktrees_src.and_then(|ws| ws.iter().find(|w| w.is_main).map(|w| w.path.to_string_lossy().into_owned()));
-                let worktrees = worktrees_src
-                    .map(|ws| {
-                        ws.iter()
-                            .map(|w| vibevalley_protocol::HostRailWorktree {
-                                path: w.path.to_string_lossy().into_owned(),
-                                branch: w.branch.clone(),
-                                main: w.is_main,
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default();
-                let active_tab = p.layout.active_tab().map(|t| t.id);
-                let names = crate::panes::numbered_titles(self, p.layout.tabs(), cx);
-                let tabs: Vec<vibevalley_protocol::HostRailTab> = p
-                    .layout
-                    .tabs()
-                    .map(|t| {
-                        let title = names.get(&t.id).cloned().unwrap_or_else(|| crate::panes::tab_title(self, t, cx));
-                        let (kind, running, running_state, running_agent, running_label, attention) = match &t.kind {
-                            PaneKind::Terminal { terminal_id, .. } => {
-                                let status = self
-                                    .workspace
-                                    .terminals
-                                    .get(terminal_id)
-                                    .map(|v| v.view.read(cx).terminal_status())
-                                    .unwrap_or_default();
-                                let att = p.terminal(terminal_id).is_some_and(|e| e.attention);
-                                let running_label = if status.is_coding_agent() {
-                                    status
-                                        .agent
-                                        .as_deref()
-                                        .map(|agent| crate::terminal::agent_display_name(agent, status.label.as_deref().unwrap_or(agent)))
-                                } else {
-                                    status.label
-                                };
-                                let state = match status.state {
-                                    crate::terminal::RunningState::Working => vibevalley_protocol::HostRailRunningState::Working,
-                                    crate::terminal::RunningState::Ready => vibevalley_protocol::HostRailRunningState::Ready,
-                                    crate::terminal::RunningState::Idle => vibevalley_protocol::HostRailRunningState::Idle,
-                                };
-                                (
-                                    "terminal",
-                                    status.state == crate::terminal::RunningState::Working,
-                                    state,
-                                    status.agent,
-                                    running_label,
-                                    att,
-                                )
+        let rail = topics.rail.then(|| {
+            let rail_items: Vec<RailProject> = self
+                .workspace
+                .ws
+                .projects()
+                .iter()
+                .map(|p| {
+                    let pv = self.workspace.projects.get(&p.id());
+                    let summary = self.workspace.git_summaries.get(&p.id());
+                    let worktrees_src = pv.map(|v| &v.worktrees).filter(|w| !w.is_empty()).or(summary.map(|s| &s.worktrees));
+                    let branch = pv
+                        .and_then(|v| v.status.as_ref()?.branch.clone())
+                        .or_else(|| summary.and_then(|s| s.branch.clone()));
+                    let main_root = worktrees_src.and_then(|ws| ws.iter().find(|w| w.is_main).map(|w| w.path.to_string_lossy().into_owned()));
+                    let worktrees = worktrees_src
+                        .map(|ws| {
+                            ws.iter()
+                                .map(|w| vibevalley_protocol::HostRailWorktree {
+                                    path: w.path.to_string_lossy().into_owned(),
+                                    branch: w.branch.clone(),
+                                    main: w.is_main,
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+                    let active_tab = p.layout.active_tab().map(|t| t.id);
+                    let names = crate::panes::numbered_titles(self, p.layout.tabs(), cx);
+                    let tabs: Vec<vibevalley_protocol::HostRailTab> = p
+                        .layout
+                        .tabs()
+                        .map(|t| {
+                            let title = names.get(&t.id).cloned().unwrap_or_else(|| crate::panes::tab_title(self, t, cx));
+                            let (kind, running, running_state, running_agent, running_label, attention) = match &t.kind {
+                                PaneKind::Terminal { terminal_id, .. } => {
+                                    let status = self
+                                        .workspace
+                                        .terminals
+                                        .get(terminal_id)
+                                        .map(|v| v.view.read(cx).terminal_status())
+                                        .unwrap_or_default();
+                                    let att = p.terminal(terminal_id).is_some_and(|e| e.attention);
+                                    let running_label = if status.is_coding_agent() {
+                                        status
+                                            .agent
+                                            .as_deref()
+                                            .map(|agent| crate::terminal::agent_display_name(agent, status.label.as_deref().unwrap_or(agent)))
+                                    } else {
+                                        status.label
+                                    };
+                                    let state = match status.state {
+                                        crate::terminal::RunningState::Working => vibevalley_protocol::HostRailRunningState::Working,
+                                        crate::terminal::RunningState::Ready => vibevalley_protocol::HostRailRunningState::Ready,
+                                        crate::terminal::RunningState::Idle => vibevalley_protocol::HostRailRunningState::Idle,
+                                    };
+                                    (
+                                        "terminal",
+                                        status.state == crate::terminal::RunningState::Working,
+                                        state,
+                                        status.agent,
+                                        running_label,
+                                        att,
+                                    )
+                                }
+                                PaneKind::Chat { runtime, .. } => {
+                                    let st = self.workspace.chat_statuses.get(&(p.id(), t.id));
+                                    let raw = st.map(|s| s.status.as_str()).filter(|s| !s.is_empty()).unwrap_or("ready");
+                                    let state = match raw {
+                                        "working" => vibevalley_protocol::HostRailRunningState::Working,
+                                        "idle" => vibevalley_protocol::HostRailRunningState::Idle,
+                                        _ => vibevalley_protocol::HostRailRunningState::Ready,
+                                    };
+                                    let att = st.is_some_and(|s| s.attention);
+                                    (
+                                        "chat",
+                                        state == vibevalley_protocol::HostRailRunningState::Working,
+                                        state,
+                                        Some(runtime.clone()),
+                                        None,
+                                        att,
+                                    )
+                                }
+                                PaneKind::File { .. } => ("file", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
+                                PaneKind::Diff { .. } => ("diff", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
+                                PaneKind::Hosted { .. } => ("hosted", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
+                                PaneKind::Pixel { .. } => ("pixel", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
+                            };
+                            vibevalley_protocol::HostRailTab {
+                                id: t.id,
+                                title,
+                                active: active_tab == Some(t.id),
+                                kind: kind.to_string(),
+                                running: Some(running),
+                                running_state: Some(running_state),
+                                running_agent,
+                                running_label,
+                                attention: Some(attention),
                             }
-                            PaneKind::Chat { runtime, .. } => {
-                                let st = self.workspace.chat_statuses.get(&(p.id(), t.id));
-                                let raw = st.map(|s| s.status.as_str()).filter(|s| !s.is_empty()).unwrap_or("ready");
-                                let state = match raw {
-                                    "working" => vibevalley_protocol::HostRailRunningState::Working,
-                                    "idle" => vibevalley_protocol::HostRailRunningState::Idle,
-                                    _ => vibevalley_protocol::HostRailRunningState::Ready,
-                                };
-                                let att = st.is_some_and(|s| s.attention);
-                                (
-                                    "chat",
-                                    state == vibevalley_protocol::HostRailRunningState::Working,
-                                    state,
-                                    Some(runtime.clone()),
-                                    None,
-                                    att,
-                                )
-                            }
-                            PaneKind::File { .. } => ("file", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
-                            PaneKind::Diff { .. } => ("diff", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
-                            PaneKind::Hosted { .. } => ("hosted", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
-                            PaneKind::Pixel { .. } => ("pixel", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
-                        };
-                        vibevalley_protocol::HostRailTab {
-                            id: t.id,
-                            title,
-                            active: active_tab == Some(t.id),
-                            kind: kind.to_string(),
-                            running: Some(running),
-                            running_state: Some(running_state),
-                            running_agent,
-                            running_label,
-                            attention: Some(attention),
-                        }
-                    })
-                    .collect();
-                RailProject {
-                    id: p.id(),
-                    name: &p.info.name,
-                    path: p.root(),
-                    active: Some(p.id()) == self.workspace.ws.active_id(),
-                    attention: p.needs_attention() || self.workspace.chat_statuses.iter().any(|((pid, _), st)| *pid == p.id() && st.attention),
-                    terminals: p.live_terminals(),
-                    branch,
-                    main_root,
-                    worktrees: Some(worktrees),
-                    tabs: Some(tabs),
-                }
-            })
-            .collect();
-        let rail = frames::rail(&rail_items, self.chrome.panel, Some(self.chrome.inspector_open));
-        let (files, git) = match self.workspace.ws.active_id().and_then(|id| self.workspace.projects.get(&id)) {
-            Some(pv) => (
-                frames::file_tree(&pv.tree, &pv.tones),
-                frames::git_panel(&frames::GitView {
-                    status: pv.status.as_ref(),
-                    branches: &pv.branches,
-                    worktrees: &pv.worktrees,
-                    worktree_activity: &pv.worktree_activity,
-                    current_root: pv.repo_root.as_deref(),
-                    log: &pv.log,
-                    error: pv.git_error.as_deref(),
-                    busy: pv.git_busy,
-                }),
-            ),
-            None => (frames::empty_file_tree(!self.workspace.loaded), frames::empty_git_panel(!self.workspace.loaded)),
-        };
+                        })
+                        .collect();
+                    RailProject {
+                        id: p.id(),
+                        name: &p.info.name,
+                        path: p.root(),
+                        active: Some(p.id()) == self.workspace.ws.active_id(),
+                        attention: p.needs_attention() || self.workspace.chat_statuses.iter().any(|((pid, _), st)| *pid == p.id() && st.attention),
+                        terminals: p.live_terminals(),
+                        branch,
+                        main_root,
+                        worktrees: Some(worktrees),
+                        tabs: Some(tabs),
+                    }
+                })
+                .collect();
+            frames::rail(&rail_items, self.chrome.panel, Some(self.chrome.inspector_open))
+        });
+        let active_pv = self.workspace.ws.active_id().and_then(|id| self.workspace.projects.get(&id));
+        let files = topics.files.then(|| match active_pv {
+            Some(pv) => frames::file_tree(&pv.tree, &pv.tones),
+            None => frames::empty_file_tree(!self.workspace.loaded),
+        });
+        let git = topics.git.then(|| match active_pv {
+            Some(pv) => frames::git_panel(&frames::GitView {
+                status: pv.status.as_ref(),
+                branches: &pv.branches,
+                worktrees: &pv.worktrees,
+                worktree_activity: &pv.worktree_activity,
+                current_root: pv.repo_root.as_deref(),
+                log: &pv.log,
+                error: pv.git_error.as_deref(),
+                busy: pv.git_busy,
+            }),
+            None => frames::empty_git_panel(!self.workspace.loaded),
+        });
         if sidebar_ready {
             self.chrome.sidebar.update(cx, |v, cx| {
-                v.push("rail", rail.clone(), cx);
-                v.push("files", files.clone(), cx);
-                v.push("git", git.clone(), cx);
+                if let Some(r) = &rail {
+                    v.push("rail", r.clone(), cx);
+                }
+                if let Some(f) = &files {
+                    v.push("files", f.clone(), cx);
+                }
+                if let Some(g) = &git {
+                    v.push("git", g.clone(), cx);
+                }
             });
         }
         if inspector_ready && let Some(slot) = &self.chrome.inspector {
             slot.view.update(cx, |v, cx| {
-                v.push("rail", rail, cx);
-                v.push("files", files, cx);
-                v.push("git", git, cx);
+                if let Some(r) = rail {
+                    v.push("rail", r, cx);
+                }
+                if let Some(f) = files {
+                    v.push("files", f, cx);
+                }
+                if let Some(g) = git {
+                    v.push("git", g, cx);
+                }
             });
         }
     }
@@ -772,19 +858,43 @@ impl Shell {
             return then(self, Err(vibevalley_i18n::t("desktop.terminal.noProject", &[])), window, cx);
         }
         let root = crate::serving::work_root();
-        let dir = first_workspace_repo(&root).or_else(|| std::fs::create_dir_all(&root).ok().map(|()| root));
-        let Some(dir) = dir else {
-            return then(self, Err(vibevalley_i18n::t("desktop.terminal.noProject", &[])), window, cx);
-        };
-        self.with_project_at(dir, window, cx, move |s, id, w, cx| {
-            if let Ok(id) = id {
-                s.workspace.ws.activate(id);
-                s.refresh_summaries(cx);
-                s.push_sidebar(cx);
-            }
-            then(s, id, w, cx);
-        });
+        let window_handle = window.window_handle();
+        cx.spawn(async move |this, cx| {
+            let dir = cx
+                .background_spawn(async move { first_workspace_repo(&root).or_else(|| std::fs::create_dir_all(&root).ok().map(|()| root)) })
+                .await;
+            let _ = cx.update_window(window_handle, |_, window, cx| {
+                let _ = this.update(cx, |s, cx| {
+                    if let Some(id) = s.workspace.ws.active_id() {
+                        return then(s, Ok(id), window, cx);
+                    }
+                    let Some(dir) = dir else {
+                        return then(s, Err(vibevalley_i18n::t("desktop.terminal.noProject", &[])), window, cx);
+                    };
+                    s.with_project_at(dir, window, cx, move |s, id, w, cx| {
+                        if let Ok(id) = id {
+                            s.workspace.ws.activate(id);
+                            s.refresh_summaries(cx);
+                            s.push_sidebar(cx);
+                        }
+                        then(s, id, w, cx);
+                    });
+                });
+            });
+        })
+        .detach();
     }
+}
+
+fn coalesce_fs_batches(batches: Vec<(ProjectId, Vec<FsChange>)>) -> Vec<(ProjectId, Vec<FsChange>)> {
+    let mut by_project: BTreeMap<ProjectId, BTreeMap<PathBuf, FsChange>> = BTreeMap::new();
+    for (id, changes) in batches {
+        let map = by_project.entry(id).or_default();
+        for change in changes {
+            map.insert(change.path.clone(), change);
+        }
+    }
+    by_project.into_iter().map(|(id, map)| (id, map.into_values().collect())).collect()
 }
 
 pub(super) fn first_workspace_repo(work_root: &Path) -> Option<PathBuf> {
@@ -795,4 +905,59 @@ pub(super) fn first_workspace_repo(work_root: &Path) -> Option<PathBuf> {
         .find(|p| Repo::discover(p).ok().flatten().is_some())
         .cloned()
         .or_else(|| dirs.into_iter().next())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vibevalley_files::FsChangeKind;
+
+    #[test]
+    fn coalesce_fs_batches_merges_projects_and_deduplicates_paths() {
+        let p1 = PathBuf::from("/repo/src/main.rs");
+        let p2 = PathBuf::from("/repo/src/lib.rs");
+        let p3 = PathBuf::from("/other/README.md");
+        let batches = vec![
+            (
+                1,
+                vec![
+                    FsChange {
+                        path: p1.clone(),
+                        kind: FsChangeKind::Modified,
+                    },
+                    FsChange {
+                        path: p1.clone(),
+                        kind: FsChangeKind::Modified,
+                    },
+                ],
+            ),
+            (
+                2,
+                vec![FsChange {
+                    path: p3.clone(),
+                    kind: FsChangeKind::Created,
+                }],
+            ),
+            (
+                1,
+                vec![
+                    FsChange {
+                        path: p1.clone(),
+                        kind: FsChangeKind::Modified,
+                    },
+                    FsChange {
+                        path: p2.clone(),
+                        kind: FsChangeKind::Created,
+                    },
+                ],
+            ),
+        ];
+
+        let coalesced = coalesce_fs_batches(batches);
+        assert_eq!(coalesced.len(), 2);
+        assert_eq!(coalesced[0].0, 1);
+        assert_eq!(coalesced[0].1.len(), 2);
+        assert_eq!(coalesced[1].0, 2);
+        assert_eq!(coalesced[1].1.len(), 1);
+    }
 }

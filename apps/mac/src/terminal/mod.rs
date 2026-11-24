@@ -340,6 +340,7 @@ impl TerminalView {
         .detach();
 
         let initial_title = spec.title.as_deref().map(str::trim).filter(|t| !t.is_empty()).map(str::to_string);
+        let initial_status = classify_terminal_status(false, None, spec.program.as_deref(), initial_title.as_deref(), false, &[], &[], false, false);
         TerminalView {
             state: State::Unsized,
             pending_input: Vec::new(),
@@ -354,7 +355,7 @@ impl TerminalView {
             running_command: None,
             last_output_at: None,
             settle_pending: false,
-            last_status: TerminalStatus::idle(),
+            last_status: initial_status,
             turn_tracker: AgentTurnTracker::default(),
             exited: false,
             scroll_remainder: px(0.0),
@@ -402,7 +403,11 @@ impl TerminalView {
     /// from an interactive agent CLI sitting open at its prompt (`Ready`) and a plain
     /// idle shell (`Idle`).
     pub fn terminal_status(&self) -> TerminalStatus {
-        self.terminal_status_at(Instant::now())
+        let now = Instant::now();
+        if self.last_output_at.is_none_or(|t| now.saturating_duration_since(t) < ACTIVE_OUTPUT_WINDOW) {
+            return self.last_status.clone();
+        }
+        self.terminal_status_at(now)
     }
 
     fn terminal_status_at(&self, now: Instant) -> TerminalStatus {
@@ -572,6 +577,7 @@ impl TerminalView {
                             input.deliver(&session);
                         }
                         view.state = State::Running(session);
+                        view.last_status = view.terminal_status_at(Instant::now());
                         cx.emit(TerminalEvent::Spawned);
                         cx.notify();
                         true
@@ -588,10 +594,16 @@ impl TerminalView {
             if !ok {
                 return;
             }
-            // Session thread -> UI thread. `Dirty` is coalesced by the
-            // backend, so this is one wake-up per changed frame, no polling.
-            while let Ok(event) = rx.recv_async().await {
-                if this.update(cx, |view, cx| view.on_term_event(event, cx)).is_err() {
+            // Session thread -> UI thread. Drain any queued burst and coalesce
+            // redundant `Dirty` frames so rapid PTY output triggers one status scan
+            // and one repaint per UI wake-up.
+            while let Ok(first) = rx.recv_async().await {
+                let mut raw = vec![first];
+                while let Ok(next) = rx.try_recv() {
+                    raw.push(next);
+                }
+                let batch = coalesce_term_events(raw);
+                if this.update(cx, |view, cx| view.on_term_events(batch, cx)).is_err() {
                     break;
                 }
             }
@@ -599,13 +611,25 @@ impl TerminalView {
         .detach();
     }
 
-    fn on_term_event(&mut self, event: TermEvent, cx: &mut Context<Self>) {
+    fn on_term_events(&mut self, events: Vec<TermEvent>, cx: &mut Context<Self>) {
+        let mut needs_notify = false;
+        for event in events {
+            if self.apply_term_event(event, cx) {
+                needs_notify = true;
+            }
+        }
+        if needs_notify {
+            cx.notify();
+        }
+    }
+
+    fn apply_term_event(&mut self, event: TermEvent, cx: &mut Context<Self>) -> bool {
         match event {
             TermEvent::Dirty => {
                 self.invalidate_stale_hover();
                 let now = Instant::now();
                 self.last_output_at = Some(now);
-                let now_status = self.terminal_status();
+                let now_status = self.terminal_status_at(now);
                 self.turn_tracker.on_output(&now_status, now);
                 if now_status.state == RunningState::Working {
                     self.ensure_settle_timer(cx);
@@ -614,50 +638,57 @@ impl TerminalView {
                     self.last_status = now_status;
                     cx.emit(TerminalEvent::TitleChanged);
                 }
-                cx.notify();
+                true
             }
             TermEvent::TitleChanged(title) => {
                 let next = Some(title).filter(|t| !t.trim().is_empty());
                 if next.as_deref().is_some_and(crate::panes::is_default_title) && self.spec.title.as_deref().is_some_and(|t| !t.trim().is_empty()) {
-                    return;
+                    return false;
                 }
                 self.title = next.or_else(|| self.spec.title.clone().filter(|t| !t.trim().is_empty()));
-                let now_status = self.terminal_status();
+                let now_status = self.terminal_status_at(Instant::now());
                 if now_status.state == RunningState::Working {
                     self.ensure_settle_timer(cx);
                 }
                 self.last_status = now_status;
                 cx.emit(TerminalEvent::TitleChanged);
+                false
             }
-            TermEvent::CwdChanged(_) => cx.emit(TerminalEvent::TitleChanged),
+            TermEvent::CwdChanged(_) => {
+                cx.emit(TerminalEvent::TitleChanged);
+                false
+            }
             TermEvent::Bell => {
-                let status = self.terminal_status();
+                let status = self.terminal_status_at(Instant::now());
                 if let Some((agent, label)) = self.turn_tracker.on_bell(&status) {
                     cx.emit(TerminalEvent::AgentTurnFinished { agent, label });
                 }
                 cx.emit(TerminalEvent::Bell);
+                false
             }
             TermEvent::CommandStarted(block) => {
                 self.running_command = Some(block.command).filter(|c| !c.trim().is_empty());
                 let now = Instant::now();
                 self.last_output_at = Some(now);
-                let now_status = self.terminal_status();
+                let now_status = self.terminal_status_at(now);
                 self.turn_tracker.on_output(&now_status, now);
                 if now_status.state == RunningState::Working {
                     self.ensure_settle_timer(cx);
                 }
                 self.last_status = now_status;
                 cx.emit(TerminalEvent::TitleChanged);
+                false
             }
             TermEvent::CommandFinished(_) => {
                 let previous = self.last_status.clone();
                 self.running_command = None;
                 self.last_output_at = None;
-                self.last_status = self.terminal_status();
+                self.last_status = self.terminal_status_at(Instant::now());
                 if let Some((agent, label)) = self.turn_tracker.on_command_finished(&previous) {
                     cx.emit(TerminalEvent::AgentTurnFinished { agent, label });
                 }
                 cx.emit(TerminalEvent::CommandFinished);
+                false
             }
             TermEvent::Exited { .. } => {
                 self.running_command = None;
@@ -666,7 +697,7 @@ impl TerminalView {
                 self.turn_tracker.reset();
                 self.exited = true;
                 cx.emit(TerminalEvent::Exited);
-                cx.notify();
+                true
             }
         }
     }
@@ -1152,6 +1183,24 @@ impl Focusable for TerminalView {
     }
 }
 
+/// Collapses redundant `TermEvent::Dirty` frames in a queued burst into at most
+/// one `Dirty` at the end while preserving all semantic events in order.
+fn coalesce_term_events(events: impl IntoIterator<Item = TermEvent>) -> Vec<TermEvent> {
+    let mut out = Vec::new();
+    let mut saw_dirty = false;
+    for event in events {
+        if matches!(event, TermEvent::Dirty) {
+            saw_dirty = true;
+        } else {
+            out.push(event);
+        }
+    }
+    if saw_dirty {
+        out.push(TermEvent::Dirty);
+    }
+    out
+}
+
 pub(crate) fn first_command_token(cmd: &str) -> Option<&str> {
     cmd.split_whitespace()
         .find(|tok| !tok.contains('=') && *tok != "sudo" && *tok != "env" && *tok != "npx")
@@ -1599,5 +1648,25 @@ mod tests {
         tracker.on_input(true, t0 + Duration::from_secs(20));
         tracker.on_output(&working_cmd, t0 + Duration::from_secs(21));
         assert_eq!(tracker.on_settled(&working_cmd, &ready_cmd), None);
+    }
+
+    #[test]
+    fn coalesce_term_events_collapses_dirty_bursts_and_preserves_semantic_events() {
+        let coalesced = coalesce_term_events(vec![
+            TermEvent::Dirty,
+            TermEvent::Dirty,
+            TermEvent::TitleChanged("build".into()),
+            TermEvent::Dirty,
+            TermEvent::Bell,
+            TermEvent::Dirty,
+        ]);
+        assert_eq!(coalesced.len(), 3);
+        assert!(matches!(&coalesced[0], TermEvent::TitleChanged(title) if title == "build"));
+        assert!(matches!(&coalesced[1], TermEvent::Bell));
+        assert!(matches!(&coalesced[2], TermEvent::Dirty));
+
+        let semantic_only = coalesce_term_events(vec![TermEvent::Bell]);
+        assert_eq!(semantic_only.len(), 1);
+        assert!(matches!(&semantic_only[0], TermEvent::Bell));
     }
 }

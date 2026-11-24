@@ -13,6 +13,7 @@ use crate::terminal::{SpawnSpec, TerminalEvent, TerminalView};
 use crate::theme::Ui;
 use crate::viewer::FileViewer;
 
+use super::projects::SidebarTopics;
 use super::{PaneSlot, PixelSlot, Shell, TerminalSlot};
 
 impl Shell {
@@ -27,6 +28,9 @@ impl Shell {
     }
 
     pub(super) fn show_workspace(&mut self, cx: &mut Context<Self>) {
+        if self.chrome.native_workspace && self.chrome.native_pixel.is_none() && self.chrome.last_route.as_deref() == Some("/workspace") {
+            return;
+        }
         self.chrome.native_workspace = true;
         self.chrome.native_pixel = None;
         self.chrome.last_route = Some("/workspace".to_string());
@@ -85,7 +89,6 @@ impl Shell {
             if let (Some(line), Some(PaneEntity::File(v))) = (line, s.workspace.panes.get(&(pid, tab)).map(|s| &s.entity)) {
                 v.update(cx, |v, cx| v.scroll_to_line(line, cx));
             }
-            s.push_sidebar(cx);
             s.layout_changed(window, cx);
         });
     }
@@ -138,43 +141,39 @@ impl Shell {
         if cwd.as_os_str().is_empty() {
             return self.new_chat(runtime, window, cx);
         }
-        let Some(directory) = cwd.canonicalize().ok().filter(|p| p.is_dir()) else {
-            let reason = format!("{} {}", vibevalley_i18n::t("desktop.terminal.missingFolder", &[]), cwd.display());
-            self.workspace.terminal_notice = Some(reason);
-            cx.notify();
-            return;
-        };
-        let repo = Repo::discover(&directory).ok().flatten();
-        let root = repo.as_ref().map(|r| r.root()).unwrap_or(&directory);
-        let target = self
-            .workspace
-            .ws
-            .projects()
-            .iter()
-            .filter_map(|p| {
-                let path = p.root().canonicalize().ok()?;
-                (path == root || (repo.is_none() && directory.starts_with(&path))).then(|| (path.components().count(), p.root().to_owned()))
-            })
-            .max_by_key(|(depth, _)| *depth)
-            .map(|(_, path)| path)
-            .unwrap_or_else(|| root.to_owned());
-        self.with_project_at(target, window, cx, move |s, id, window, cx| {
-            let Ok(id) = id else { return };
-            s.workspace.ws.activate(id);
-            s.show_workspace(cx);
-            let Some(project) = s.workspace.ws.project_mut(id) else { return };
-            let runtime = runtime.as_deref().map(str::trim).filter(|r| !r.is_empty()).unwrap_or("antigravity").to_string();
-            project.layout.add_tab(
-                None,
-                PaneKind::Chat {
-                    session_id: String::new(),
-                    runtime,
-                    cwd: directory,
-                    title: None,
-                },
-            );
-            s.layout_changed(window, cx);
-        });
+        let known_roots: Vec<PathBuf> = self.workspace.ws.projects().iter().map(|p| p.root().to_owned()).collect();
+        let window_handle = window.window_handle();
+        cx.spawn(async move |this, cx| {
+            let resolved = cx.background_spawn(async move { resolve_project_directory(cwd, known_roots) }).await;
+            let _ = cx.update_window(window_handle, |_, window, cx| {
+                let _ = this.update(cx, |s, cx| match resolved {
+                    Ok((directory, target)) => {
+                        s.with_project_at(target, window, cx, move |s, id, window, cx| {
+                            let Ok(id) = id else { return };
+                            s.workspace.ws.activate(id);
+                            s.show_workspace(cx);
+                            let Some(project) = s.workspace.ws.project_mut(id) else { return };
+                            let runtime = runtime.as_deref().map(str::trim).filter(|r| !r.is_empty()).unwrap_or("antigravity").to_string();
+                            project.layout.add_tab(
+                                None,
+                                PaneKind::Chat {
+                                    session_id: String::new(),
+                                    runtime,
+                                    cwd: directory,
+                                    title: None,
+                                },
+                            );
+                            s.layout_changed(window, cx);
+                        });
+                    }
+                    Err(reason) => {
+                        s.workspace.terminal_notice = Some(reason);
+                        cx.notify();
+                    }
+                });
+            });
+        })
+        .detach();
     }
 
     pub fn open_file_adjacent(&mut self, path: PathBuf, line: Option<u32>, window: &mut Window, cx: &mut Context<Self>) {
@@ -191,7 +190,6 @@ impl Shell {
             if let (Some(line), Some(PaneEntity::File(v))) = (line, s.workspace.panes.get(&(pid, tab)).map(|slot| &slot.entity)) {
                 v.update(cx, |v, cx| v.scroll_to_line(line, cx));
             }
-            s.push_sidebar(cx);
             s.layout_changed(window, cx);
         });
     }
@@ -402,7 +400,7 @@ impl Shell {
                     self.schedule_save(cx);
                 }
                 if changed {
-                    self.push_sidebar(cx);
+                    self.push_sidebar_topics(SidebarTopics::RAIL, cx);
                     cx.notify();
                 }
             }
@@ -426,7 +424,7 @@ impl Shell {
                     bridge.0.server().unsubscribe(sub_id);
                 }
                 if changed {
-                    self.push_sidebar(cx);
+                    self.push_sidebar_topics(SidebarTopics::RAIL, cx);
                     cx.notify();
                 }
             }
@@ -469,38 +467,44 @@ impl Shell {
                 done(result);
             });
         }
-        let Some(directory) = cwd.canonicalize().ok().filter(|p| p.is_dir()) else {
-            let reason = format!("{} {}", vibevalley_i18n::t("desktop.terminal.missingFolder", &[]), cwd.display());
-            self.workspace.terminal_notice = Some(reason.clone());
-            cx.notify();
-            return done(Err(reason));
-        };
-        let repo = Repo::discover(&directory).ok().flatten();
-        let root = repo.as_ref().map(|r| r.root()).unwrap_or(&directory);
-        let target = self
-            .workspace
-            .ws
-            .projects()
-            .iter()
-            .filter_map(|p| {
-                let path = p.root().canonicalize().ok()?;
-                (path == root || (repo.is_none() && directory.starts_with(&path))).then(|| (path.components().count(), p.root().to_owned()))
-            })
-            .max_by_key(|(depth, _)| *depth)
-            .map(|(_, path)| path)
-            .unwrap_or_else(|| root.to_owned());
-        self.with_project_at(target, window, cx, move |s, id, window, cx| {
-            let result = id.and_then(|id| {
-                s.workspace.ws.activate(id);
-                s.show_workspace(cx);
-                s.terminal_in_active_project(directory, title, command, window, cx)
+        let known_roots: Vec<PathBuf> = self.workspace.ws.projects().iter().map(|p| p.root().to_owned()).collect();
+        let window_handle = window.window_handle();
+        cx.spawn(async move |this, cx| {
+            let resolved = cx.background_spawn(async move { resolve_project_directory(cwd, known_roots) }).await;
+            let mut done = Some(done);
+            let updated = cx.update_window(window_handle, |_, window, cx| {
+                let _ = this.update(cx, |s, cx| match resolved {
+                    Ok((directory, target)) => {
+                        let callback = done.take().expect("callback not yet invoked");
+                        s.with_project_at(target, window, cx, move |s, id, window, cx| {
+                            let result = id.and_then(|id| {
+                                s.workspace.ws.activate(id);
+                                s.show_workspace(cx);
+                                s.terminal_in_active_project(directory, title, command, window, cx)
+                            });
+                            if let Err(reason) = &result {
+                                s.workspace.terminal_notice = Some(reason.clone());
+                                cx.notify();
+                            }
+                            callback(result);
+                        });
+                    }
+                    Err(reason) => {
+                        s.workspace.terminal_notice = Some(reason.clone());
+                        cx.notify();
+                        if let Some(callback) = done.take() {
+                            callback(Err(reason));
+                        }
+                    }
+                });
             });
-            if let Err(reason) = &result {
-                s.workspace.terminal_notice = Some(reason.clone());
-                cx.notify();
+            if updated.is_err()
+                && let Some(callback) = done.take()
+            {
+                callback(Err("window closed before terminal could open".into()));
             }
-            done(result);
-        });
+        })
+        .detach();
     }
 
     fn terminal_in_active_project(
@@ -742,10 +746,16 @@ impl Shell {
                 }
                 TerminalEvent::TitleChanged => {
                     let title = view.read(cx).title().map(str::to_string);
+                    let mut changed = false;
                     if let Some(project) = this.workspace.ws.project_mut(owner)
                         && let Some(entry) = project.terminal_mut(&tid)
+                        && entry.title != title
                     {
                         entry.title = title;
+                        changed = true;
+                    }
+                    if !changed {
+                        return;
                     }
                 }
                 TerminalEvent::Bell | TerminalEvent::CommandFinished => {
@@ -793,9 +803,12 @@ impl Shell {
                         entry.exited = true;
                     }
                 }
-                TerminalEvent::SpawnFailed(e) => eprintln!("terminal {tid}: {e}"),
+                TerminalEvent::SpawnFailed(e) => {
+                    eprintln!("terminal {tid}: {e}");
+                    return;
+                }
             }
-            this.push_sidebar(cx);
+            this.push_sidebar_topics(SidebarTopics::RAIL, cx);
             cx.notify();
         });
         TerminalSlot { view, _sub: sub }
@@ -967,6 +980,24 @@ impl Shell {
             PaneKind::Terminal { .. } => unreachable!("terminals are kept in Shell::workspace.terminals"),
         }
     }
+}
+
+fn resolve_project_directory(cwd: PathBuf, known_roots: Vec<PathBuf>) -> Result<(PathBuf, PathBuf), String> {
+    let Some(directory) = cwd.canonicalize().ok().filter(|p| p.is_dir()) else {
+        return Err(format!("{} {}", vibevalley_i18n::t("desktop.terminal.missingFolder", &[]), cwd.display()));
+    };
+    let repo = Repo::discover(&directory).ok().flatten();
+    let root = repo.as_ref().map(|r| r.root()).unwrap_or(&directory);
+    let target = known_roots
+        .into_iter()
+        .filter_map(|known| {
+            let path = known.canonicalize().ok()?;
+            (path == root || (repo.is_none() && directory.starts_with(&path))).then(|| (path.components().count(), known))
+        })
+        .max_by_key(|(depth, _)| *depth)
+        .map(|(_, path)| path)
+        .unwrap_or_else(|| root.to_owned());
+    Ok((directory, target))
 }
 
 fn closed_chat_session_id(closed: Option<&PaneKind>) -> Option<String> {
@@ -1197,5 +1228,20 @@ mod url_tests {
             None
         );
         assert_eq!(super::closed_chat_session_id(None), None);
+    }
+
+    #[test]
+    fn resolve_project_directory_matches_known_root_and_rejects_missing_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("project");
+        let nested = project.join("src");
+        std::fs::create_dir_all(&nested).unwrap();
+
+        let (resolved_dir, target) = super::resolve_project_directory(nested.clone(), vec![project.clone()]).expect("existing directory resolves");
+        assert_eq!(resolved_dir, nested.canonicalize().unwrap());
+        assert_eq!(target, project);
+
+        let missing = dir.path().join("does-not-exist");
+        assert!(super::resolve_project_directory(missing, vec![]).is_err());
     }
 }

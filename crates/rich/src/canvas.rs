@@ -4,7 +4,8 @@
 //! output in a bounded LRU cache, and mounts it via `image(ImageSrc::svg_markup(&svg).size(...))`
 //! so all card text and labels rasterize crisply (NEVER `element::svg`).
 
-use std::sync::{Mutex, OnceLock};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::engine::canvas::{Canvas, SvgRenderOptions, SvgTheme, render_svg};
 use nsh_core::element::ImageSrc;
@@ -12,10 +13,13 @@ use nsh_core::prelude::*;
 
 use crate::cache::{CacheStats, LruCache, hash_str};
 use crate::code_block::vv_code_block;
+use crate::highlight::run_offloaded;
 use crate::theme::{AdaptiveUi, DIAGRAM_FONT_SANS, vv_canvas_palette};
 
 /// Maximum number of rendered JSON Canvas SVGs retained in the LRU cache.
 const CANVAS_CACHE_CAPACITY: usize = 32;
+/// JSON Canvas payloads at or above this byte size offload layout/SVG rendering off the UI thread.
+pub const ASYNC_CANVAS_BYTE_THRESHOLD: usize = 4_096;
 
 /// Rendered JSON Canvas SVG with intrinsic layout dimensions.
 #[derive(Debug, Clone, PartialEq)]
@@ -43,34 +47,43 @@ impl std::error::Error for CanvasRenderError {}
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct CanvasCacheKey {
-    hash: u64,
     dark: bool,
     show_grid: bool,
     padding_bits: u32,
     data: String,
 }
 
-fn canvas_cache() -> &'static Mutex<LruCache<CanvasCacheKey, Result<RenderedCanvas, CanvasRenderError>>> {
-    static CACHE: OnceLock<Mutex<LruCache<CanvasCacheKey, Result<RenderedCanvas, CanvasRenderError>>>> = OnceLock::new();
+type CanvasCacheEntry = Result<Arc<RenderedCanvas>, CanvasRenderError>;
+type CanvasAsyncSlot = Option<(u64, CanvasCacheEntry)>;
+
+fn canvas_cache() -> &'static Mutex<LruCache<CanvasCacheKey, CanvasCacheEntry>> {
+    static CACHE: OnceLock<Mutex<LruCache<CanvasCacheKey, CanvasCacheEntry>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(LruCache::new(CANVAS_CACHE_CAPACITY)))
 }
 
-/// Parses, validates, and renders a JSON Canvas 1.0 string to standalone SVG (LRU-cached).
-pub fn render_canvas(data: &str, dark: bool, show_grid: bool, padding: f32) -> Result<RenderedCanvas, CanvasRenderError> {
-    let clamped_padding = if padding.is_finite() && padding >= 0.0 { padding } else { 32.0 };
-    let key = CanvasCacheKey {
-        hash: hash_str(data),
-        dark,
-        show_grid,
-        padding_bits: clamped_padding.to_bits(),
-        data: data.to_owned(),
-    };
+fn canvas_cache_hash(data: &str, dark: bool, show_grid: bool, padding_bits: u32) -> u64 {
+    hash_str(data) ^ (u64::from(padding_bits) << 2) ^ (u64::from(show_grid) << 1) ^ u64::from(dark)
+}
 
-    if let Some(cached) = canvas_cache().lock().unwrap_or_else(|p| p.into_inner()).get(&key) {
-        return cached;
-    }
+fn sanitize_padding(padding: f32) -> (f32, u32) {
+    let clamped = if padding.is_finite() && padding >= 0.0 { padding } else { 32.0 };
+    (clamped, clamped.to_bits())
+}
 
-    let result = Canvas::from_json_str(data)
+pub fn should_offload_canvas(data: &str) -> bool {
+    data.len() >= ASYNC_CANVAS_BYTE_THRESHOLD
+}
+
+pub(crate) fn cached_render_canvas_arc(data: &str, dark: bool, show_grid: bool, padding: f32) -> Option<Result<Arc<RenderedCanvas>, CanvasRenderError>> {
+    let (_, padding_bits) = sanitize_padding(padding);
+    let hash = canvas_cache_hash(data, dark, show_grid, padding_bits);
+    canvas_cache().lock().unwrap_or_else(|p| p.into_inner()).get_by(hash, |k| {
+        k.dark == dark && k.show_grid == show_grid && k.padding_bits == padding_bits && k.data == data
+    })
+}
+
+fn render_canvas_uncached(data: &str, dark: bool, show_grid: bool, clamped_padding: f32) -> Result<Arc<RenderedCanvas>, CanvasRenderError> {
+    Canvas::from_json_str(data)
         .map(|canvas| {
             let options = SvgRenderOptions {
                 theme: SvgTheme::Custom(Box::new(vv_canvas_palette(dark))),
@@ -81,18 +94,48 @@ pub fn render_canvas(data: &str, dark: bool, show_grid: bool, padding: f32) -> R
             };
             let svg = render_svg(&canvas, &options);
             let (width, height) = extract_svg_dimensions(&svg).unwrap_or_else(|| fallback_dimensions(&canvas, clamped_padding));
-            RenderedCanvas {
+            Arc::new(RenderedCanvas {
                 svg,
                 width,
                 height,
                 node_count: canvas.nodes.len(),
                 edge_count: canvas.edges.len(),
-            }
+            })
         })
-        .map_err(|err| CanvasRenderError { message: err.to_string() });
+        .map_err(|err| CanvasRenderError { message: err.to_string() })
+}
 
-    canvas_cache().lock().unwrap_or_else(|p| p.into_inner()).insert(key, result.clone());
+pub(crate) fn render_canvas_arc(data: &str, dark: bool, show_grid: bool, padding: f32, cache_errors: bool) -> Result<Arc<RenderedCanvas>, CanvasRenderError> {
+    let (clamped_padding, padding_bits) = sanitize_padding(padding);
+    let hash = canvas_cache_hash(data, dark, show_grid, padding_bits);
+
+    if let Some(cached) = canvas_cache().lock().unwrap_or_else(|p| p.into_inner()).get_by(hash, |k| {
+        k.dark == dark && k.show_grid == show_grid && k.padding_bits == padding_bits && k.data == data
+    }) {
+        return cached;
+    }
+
+    let result = render_canvas_uncached(data, dark, show_grid, clamped_padding);
+    if result.is_ok() || cache_errors {
+        let key = CanvasCacheKey {
+            dark,
+            show_grid,
+            padding_bits,
+            data: data.to_owned(),
+        };
+        canvas_cache()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .insert_by(hash, key, result.clone(), |k| {
+                k.dark == dark && k.show_grid == show_grid && k.padding_bits == padding_bits && k.data == data
+            });
+    }
     result
+}
+
+/// Parses, validates, and renders a JSON Canvas 1.0 string to standalone SVG (LRU-cached).
+pub fn render_canvas(data: &str, dark: bool, show_grid: bool, padding: f32) -> Result<RenderedCanvas, CanvasRenderError> {
+    render_canvas_arc(data, dark, show_grid, padding, true).map(|arc| (*arc).clone())
 }
 
 /// Returns LRU hit/miss/eviction metrics for [`render_canvas`].
@@ -146,21 +189,89 @@ pub struct VvCanvasProps {
     /// Outer canvas padding in points around content bounds (default 32).
     #[prop(default = 32.0)]
     pub padding: Prop<f32>,
+    /// When true, incomplete JSON while token-streaming shows a lightweight loading placeholder
+    /// without polluting the cache or highlighting incomplete JSON on every token.
+    #[prop(default)]
+    pub streaming: Prop<bool>,
+}
+
+fn render_canvas_loading() -> AnyElement {
+    view()
+        .test_id("canvas-loading")
+        .flex_col()
+        .rounded_md()
+        .border_1()
+        .border_color(AdaptiveUi::LINE)
+        .bg(AdaptiveUi::SIDE)
+        .p(px(12.0))
+        .child(text("…").text_size(px(12.0)).text_color(AdaptiveUi::MUTED))
+        .into_element()
 }
 
 /// Native static JSON Canvas view rendered via `vibevalley-canvas` and `ImageSrc::svg_markup`.
 ///
-/// Reacts to `dark()`, caches rendered SVGs in an LRU cache, and falls back to [`crate::VvCodeBlock`]
-/// plus an error message when the JSON Canvas payload is invalid.
+/// Reacts to `dark()`, caches rendered SVGs in an LRU cache, offloads large uncached payloads off
+/// the UI thread, and falls back to [`crate::VvCodeBlock`] plus an error message when invalid.
 #[component]
 pub fn VvCanvas(props: VvCanvasProps) -> impl IntoElement {
+    let async_result: Signal<CanvasAsyncSlot> = signal(None);
+    let generation = signal(0u64);
+    let latest_gen = Arc::new(AtomicU64::new(0));
+
+    let effect_latest_gen = Arc::clone(&latest_gen);
+    effect(move || {
+        let data = props.data.get();
+        let show_grid = props.show_grid.get();
+        let padding = props.padding.get();
+        let streaming = props.streaming.get();
+        let is_dark = dark();
+
+        let next_gen = generation.get_untracked().wrapping_add(1);
+        generation.set(next_gen);
+        effect_latest_gen.store(next_gen, Ordering::Release);
+
+        if !should_offload_canvas(data.as_str()) || cached_render_canvas_arc(data.as_str(), is_dark, show_grid, padding).is_some() {
+            async_result.set(None);
+            return;
+        }
+
+        async_result.set(None);
+        let data_owned = data.to_string();
+        let job_latest_gen = Arc::clone(&effect_latest_gen);
+        spawn(async move {
+            let rendered = run_offloaded(move || {
+                (job_latest_gen.load(Ordering::Acquire) == next_gen).then(|| render_canvas_arc(&data_owned, is_dark, show_grid, padding, !streaming))
+            })
+            .await;
+            if let Some(rendered) = rendered
+                && generation.get_untracked() == next_gen
+            {
+                async_result.set(Some((next_gen, rendered)));
+            }
+        });
+    });
+
     view().test_id("canvas").flex_col().my(px(8.0)).max_w(relative(1.0)).child(dynamic(move || {
         let data = props.data.get();
         let show_grid = props.show_grid.get();
         let padding = props.padding.get();
+        let streaming = props.streaming.get();
         let is_dark = dark();
-        match render_canvas(data.as_str(), is_dark, show_grid, padding) {
-            Ok(rendered) => {
+
+        let result = if should_offload_canvas(data.as_str()) {
+            let current_gen = generation.get_untracked();
+            async_result
+                .with(|slot| match slot {
+                    Some((gen_id, res)) if *gen_id == current_gen => Some(res.clone()),
+                    Some(_) | None => None,
+                })
+                .or_else(|| cached_render_canvas_arc(data.as_str(), is_dark, show_grid, padding))
+        } else {
+            Some(render_canvas_arc(data.as_str(), is_dark, show_grid, padding, !streaming))
+        };
+
+        match result {
+            Some(Ok(rendered)) => {
                 let src = ImageSrc::svg_markup(&rendered.svg).size(Size::new(px(rendered.width), px(rendered.height)));
                 image(src)
                     .test_id("canvas-image")
@@ -175,12 +286,14 @@ pub fn VvCanvas(props: VvCanvasProps) -> impl IntoElement {
                     .border_color(AdaptiveUi::LINE)
                     .into_element()
             }
-            Err(err) => view()
+            Some(Err(_)) if streaming => render_canvas_loading(),
+            Some(Err(err)) => view()
                 .flex_col()
                 .gap(px(4.0))
                 .child(vv_code_block().code(data).language(Some(SharedString::from("json"))))
                 .child(text(err.message).test_id("canvas-error").text_size(px(12.0)).text_color(AdaptiveUi::BERRY))
                 .into_element(),
+            None => render_canvas_loading(),
         }
     }))
 }

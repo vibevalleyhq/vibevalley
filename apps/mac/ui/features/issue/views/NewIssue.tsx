@@ -1,4 +1,4 @@
-import { cleanup, effect, keymap, signal, Text, untracked, View } from "nsh";
+import { cleanup, computed, effect, keymap, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
@@ -44,12 +44,16 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
   const agents = useWorkAgents(true);
   const repoList = useRepos();
   const runtimeList = useRuntimes();
-  const repos = () => ready(repoList, []).map((p) => p.name);
+  const repos = computed(() => ready(repoList, []).map((p) => p.name));
   const sessions = useSessionsSlice();
-  const machines = () => sessions()?.machines ?? [];
-  const hasMultipleMachines = () => machines().length > 1 || machines().some((m) => !m.here);
-  const noRepos = () => repoList.status() === "success" && repos().length === 0;
-  const noReadyRuntimes = () => runtimeList.status() === "success" && ready(runtimeList, []).filter(isRuntimeReady).length === 0;
+  const machines = computed(() => sessions()?.machines ?? []);
+  const hasMultipleMachines = computed(() => machines().length > 1 || machines().some((m) => !m.here));
+  const noRepos = computed(() => repoList.status() === "success" && repos().length === 0);
+  const noReadyRuntimes = computed(() => runtimeList.status() === "success" && ready(runtimeList, []).filter(isRuntimeReady).length === 0);
+  const canSubmit = computed(() => canSubmitDraft(flow()));
+  const repoOptions = computed(() => [...new Set([...repos(), ...(draft().repo ? [draft().repo] : [])])].map((p) => ({ value: p, label: p })));
+  const agentOptions = computed(() => agents().map((a) => ({ value: a.id, label: a.name })));
+  const machineOptions = computed(() => machines().map((m) => ({ value: m.id, label: m.name })));
   const goTo = (path: string) => {
     props.onClose();
     router.navigate(path);
@@ -124,7 +128,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
                 value={draft().repo}
                 placeholder={t("web.issue.todo.whichRepo")}
                 onChange={(repo) => dispatch({ kind: "setRepo", repo })}
-                options={[...new Set([...repos(), ...(draft().repo ? [draft().repo] : [])])].map((p) => ({ value: p, label: p }))}
+                options={repoOptions()}
               />
             </If>
             <If when={!noReadyRuntimes()}>
@@ -136,7 +140,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
                 value={draft().agent}
                 placeholder={t("web.issue.todo.pickForMe")}
                 onChange={(agent) => dispatch({ kind: "setAgent", agent })}
-                options={agents().map((a) => ({ value: a.id, label: a.name }))}
+                options={agentOptions()}
               />
             </If>
             <If when={hasMultipleMachines()}>
@@ -148,7 +152,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
                 value={machineId()}
                 placeholder={t("web.issue.new.machineAuto")}
                 onChange={(id) => machineId.set(id)}
-                options={machines().map((m) => ({ value: m.id, label: m.name }))}
+                options={machineOptions()}
               />
             </If>
           </View>
@@ -182,7 +186,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
           <Button tone="quiet" testID="issue-new-dialog-never" onPress={() => props.onClose()}>
             {t("web.base.form.never")}
           </Button>
-          <Button tone="primary" testID="issue-new-keep" disabled={!canSubmitDraft(flow())} onPress={() => void keep()}>
+          <Button tone="primary" testID="issue-new-keep" disabled={!canSubmit()} onPress={() => void keep()}>
             {t("web.issue.new.keep")}
           </Button>
         </View>

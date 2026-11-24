@@ -1,4 +1,4 @@
-import { Clipboard, keymap, signal, Text, View, type ViewRef } from "nsh";
+import { Clipboard, computed, keymap, signal, Text, View, type ViewRef } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
 import { DeliverableValues, type Issue, type IssueAct, PriorityValues, type Session, type SessionView } from "@vibevalley/protocol";
@@ -55,7 +55,7 @@ export function IssueDetail(props: {
   const now = useNow();
   const moves = useIntents(issueMove);
   const sets = useIntents(issueSet);
-  const labeled = () => labeledIssue(issues().find((item) => item.id === props.issue.id) ?? props.issue, sets.list());
+  const labeled = createMemo(() => labeledIssue(issues().find((item) => item.id === props.issue.id) ?? props.issue, sets.list()));
   const live = () => labeled().issue;
   const s = createMemo(() => issueState(movedIssue(live(), moves.list()), props.sessions, props.session, issues(), board()?.boardSummary));
   const head = () => s().head;
@@ -77,19 +77,19 @@ export function IssueDetail(props: {
     () => props.issue.id,
     () => s().showsChanges,
   );
-  const changes = () => ready(changesQuery, undefined);
+  const changes = computed(() => ready(changesQuery, undefined));
   const filesOpen = signal(false);
   let changesSection: ViewRef | undefined;
   const reviewChanges = () => {
     filesOpen.set(true);
     requestAnimationFrame(() => changesSection?.reveal({ vertical: "nearest" }));
   };
-  const changesAction = () => (live().deliver !== "answer" && s().showsChanges ? reviewChanges : undefined);
+  const changesAction = computed(() => (live().deliver !== "answer" && s().showsChanges ? reviewChanges : undefined));
   const timelineQuery = useIssueTimeline(
     () => props.issue,
     () => head().runs,
   );
-  const timeline = () => ready(timelineQuery, undefined);
+  const timeline = computed(() => ready(timelineQuery, undefined));
 
   /** lead is read as it renders: the lead changes as the issue moves on. */
   const ActButton = (p: { act: IssueAct; lead: boolean }) => (
@@ -108,8 +108,8 @@ export function IssueDetail(props: {
     toast(t("web.base.rich.copied"));
   };
 
-  const parent = () => issues().find((item) => item.id === props.issue.parent);
-  const tone = () => stageTone[s().stage.state];
+  const parent = createMemo(() => issues().find((item) => item.id === props.issue.parent));
+  const tone = computed(() => stageTone[s().stage.state]);
   const heading = (
     <View>
       <View accessibilityLabel={t("web.issue.detail.trail")} testID="issue-trail" class="mb-1.5 flex-row flex-wrap items-center gap-1">
@@ -148,27 +148,30 @@ export function IssueDetail(props: {
     </View>
   );
 
-  const placeholder = () =>
+  const placeholder = computed(() =>
     box() === "reject"
       ? t("web.issue.detail.rejectWhere")
       : s().stage.state === "asking"
         ? t("web.issue.detail.sayIt")
         : s().stage.state === "canceled"
           ? t("web.issue.reopen.what")
-          : t("web.issue.detail.tell", { who: head().name });
-  const boxLabel = () =>
+          : t("web.issue.detail.tell", { who: head().name }),
+  );
+  const boxLabel = computed(() =>
     box() === "reject"
       ? t("web.issue.detail.rejectLabel")
       : s().stage.state === "asking"
         ? t("web.issue.detail.answer")
         : s().stage.state === "canceled"
           ? t("web.issue.reopen.title")
-          : t("web.issue.detail.tell", { who: head().name });
+          : t("web.issue.detail.tell", { who: head().name }),
+  );
 
-  const failedCheck = () => {
+  const failedCheck = computed(() => {
     const check = live().deliveryEvidence?.check;
     return check?.status === "failed" ? check : undefined;
-  };
+  });
+  const otherActs = createMemo(() => s().others.filter((a) => a !== "close" && a !== "stop"));
   const main = (
     <>
       <If when={failedCheck()}>
@@ -241,7 +244,7 @@ export function IssueDetail(props: {
               <Each of={((l) => (l ? [l] : []))(s().lead)} key={(l) => l}>
                 {(lead) => <ActButton act={lead()} lead />}
               </Each>
-              <Each of={s().others.filter((a) => a !== "close" && a !== "stop")} key={(a) => a}>
+              <Each of={otherActs()} key={(a) => a}>
                 {(a) => <ActButton act={a()} lead={false} />}
               </Each>
             </View>
@@ -410,14 +413,14 @@ export function IssueDetail(props: {
   );
 
   // The acts the block above does not offer: a word, a stop, a close.
-  const sideActs = () => {
+  const sideActs = createMemo(() => {
     const all = s().stage.acts.map((a) => a.act);
     return s().ask ? all.filter((a) => a === "close" || a === "stop") : all;
-  };
+  });
   // Destructive close lives in the danger button below: listing it here too would duplicate it.
-  const statusMoves = () => s().stage.acts.flatMap((a) => (a.does === "move" && a.act !== "close" ? [{ act: a.act, status: a.status }] : []));
+  const statusMoves = createMemo(() => s().stage.acts.flatMap((a) => (a.does === "move" && a.act !== "close" ? [{ act: a.act, status: a.status }] : [])));
   // Two acts to one status (reject and resume both go back to work) say which act each is.
-  const statusOptions = () => {
+  const statusOptions = createMemo(() => {
     const moves = statusMoves();
     const options: { value: IssueAct | "now"; label: string }[] = [{ value: "now", label: t(`shared.status.${live().status}`) }];
     for (const m of moves) {
@@ -426,11 +429,13 @@ export function IssueDetail(props: {
       options.push({ value: m.act, label: shared ? t("shared.join.aside", { text: status, aside: acts.label(m.act) }) : status });
     }
     return options;
-  };
-  const distinctProfile = () => {
+  });
+  const priorityOptions = computed(() => PriorityValues.map((v) => ({ value: v, label: t(`shared.priority.${v}`) })));
+  const deliverOptions = computed(() => DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) })));
+  const distinctProfile = computed(() => {
     const name = agent()?.name;
     return name && name !== head().name ? name : undefined;
-  };
+  });
   const side = (
     <>
       <SheetLabel first>{t("web.issue.detail.properties")}</SheetLabel>
@@ -453,7 +458,7 @@ export function IssueDetail(props: {
           state={labeled().state("priority")}
           disabled={!s().open}
           onChange={(priority) => setLabel({ priority })}
-          options={PriorityValues.map((v) => ({ value: v, label: t(`shared.priority.${v}`) }))}
+          options={priorityOptions()}
         />
       </Property>
       <If when={!s().inFamily}>
@@ -465,7 +470,7 @@ export function IssueDetail(props: {
             state={labeled().state("deliver")}
             disabled={busy() || !s().open}
             onChange={(deliver) => setLabel({ deliver })}
-            options={DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) }))}
+            options={deliverOptions()}
           />
         </Property>
       </If>

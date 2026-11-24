@@ -108,7 +108,7 @@ export function createComposer(
   const commanding = createAct((reason) => {
     if (!disposed) ways.failed(reason);
   });
-  const busy = () => sending() || commanding.busy();
+  const busy = computed(() => sending() || commanding.busy());
   const intent = (): Said => ({ ...ways.target(), text: text().trim() });
   const channelOf = (id: string | undefined): Channel | undefined => {
     const all = collab()?.chat?.channels ?? [];
@@ -118,7 +118,7 @@ export function createComposer(
   const orchestrators = useOrchestrators();
   const settings = useQuery(settingsQuery);
   const readiness = () => ready(settings, undefined)?.readiness;
-  const here = () => channelOf(ways.target().id)?.orchestrator ?? defaultOrchestrator;
+  const here = computed(() => channelOf(ways.target().id)?.orchestrator ?? defaultOrchestrator);
   const hidden = (kind: Trigger["kind"], found: { readonly start: number } | undefined) => {
     const m = menu();
     return m._tag === "away" || (m._tag === "shut" && found !== undefined && m.at.kind === kind && m.at.start === found.start);
@@ -221,6 +221,11 @@ export function createComposer(
     }
   };
 
+  const hasText = computed(() => text().trim() !== "");
+  const hasAttachments = computed(() => (ways.target().attachments?.length ?? 0) > 0);
+  const canSend = computed(() => !busy() && (hasText() || hasAttachments()));
+  const stoppable = computed(() => ["thinking", "speaking"].includes(orchestratorMood(sessions()?.sessions, here())));
+
   return {
     text,
     busy,
@@ -237,9 +242,9 @@ export function createComposer(
     },
     blur: () => setMenu({ _tag: "away" }),
     focus: () => setMenu((m) => (m._tag === "away" ? { _tag: "open" } : m)),
-    canSend: () => (text().trim() !== "" || (ways.target().attachments?.length ?? 0) > 0) && !busy(),
+    canSend,
     here,
-    stoppable: () => ["thinking", "speaking"].includes(orchestratorMood(sessions()?.sessions, here())),
+    stoppable,
   };
 }
 
@@ -257,21 +262,88 @@ const all = defineStored("chat.drafts", z.record(z.string(), DraftSchema), {});
 
 const empty = (d: Draft) => !d.text && !d.reply && d.files.length === 0;
 
-export const draftOf = (channel: string | undefined): Draft => (channel ? all.get()[channel] : undefined) ?? none;
+const DRAFT_DEBOUNCE_MS = 250;
+const bufferedText = new Map<string, string>();
+const draftTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-const put = (channel: string, change: (d: Draft) => Draft) =>
+const withText = (d: Draft, text: string): Draft => {
+  if (text === "") {
+    const { text: _, ...rest } = d;
+    return rest;
+  }
+  return { ...d, text };
+};
+
+const clearDraftTimer = (channel: string) => {
+  const timer = draftTimers.get(channel);
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    draftTimers.delete(channel);
+  }
+};
+
+export const draftOf = (channel: string | undefined): Draft => {
+  const stored = (channel ? all.get()[channel] : undefined) ?? none;
+  if (channel && bufferedText.has(channel)) {
+    return withText(stored, bufferedText.get(channel) ?? "");
+  }
+  return stored;
+};
+
+const put = (channel: string, change: (d: Draft) => Draft) => {
+  const hasBuffered = bufferedText.has(channel);
+  const pending = hasBuffered ? bufferedText.get(channel) : undefined;
+  if (hasBuffered) {
+    clearDraftTimer(channel);
+    bufferedText.delete(channel);
+  }
   all.update((a) => {
     const { [channel]: was, ...rest } = a;
-    const next = change(was ?? none);
-    return empty(next) ? rest : { ...rest, [channel]: next };
+    const base = hasBuffered && pending !== undefined ? withText(was ?? none, pending) : (was ?? none);
+    const next = change(base);
+    if (empty(next)) return was === undefined ? a : rest;
+    return { ...rest, [channel]: next };
   });
+};
+
+function flushChannelDraft(channel: string) {
+  clearDraftTimer(channel);
+  if (!bufferedText.has(channel)) return;
+  put(channel, (d) => d);
+}
+
+export function flushDrafts() {
+  for (const channel of [...bufferedText.keys()]) {
+    flushChannelDraft(channel);
+  }
+}
+
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+  window.addEventListener("pagehide", flushDrafts);
+  window.addEventListener("beforeunload", flushDrafts);
+}
 
 export const drafts = {
-  text: (channel: string, text: string) => put(channel, (d) => ({ ...d, text })),
+  text: (channel: string, text: string) => {
+    bufferedText.set(channel, text);
+    clearDraftTimer(channel);
+    draftTimers.set(
+      channel,
+      setTimeout(() => {
+        draftTimers.delete(channel);
+        flushChannelDraft(channel);
+      }, DRAFT_DEBOUNCE_MS),
+    );
+  },
   reply: (channel: string, m: ChatMessage | undefined) => put(channel, ({ reply: _, ...d }) => (m ? { ...d, reply: { id: m.id, number: m.number } } : d)),
   add: (channel: string, file: Attachment) => put(channel, (d) => ({ ...d, files: [...d.files.filter((f) => f.id !== file.id), file] })),
   drop: (channel: string, id: string) => put(channel, (d) => ({ ...d, files: d.files.filter((f) => f.id !== id) })),
-  clear: (channel: string) => put(channel, () => none),
+  clear: (channel: string) => {
+    clearDraftTimer(channel);
+    bufferedText.delete(channel);
+    put(channel, () => none);
+  },
+  flush: flushDrafts,
 };
 
 export function useReplying(channel: Accessor<string | undefined>): Accessor<ChatMessage | undefined> {

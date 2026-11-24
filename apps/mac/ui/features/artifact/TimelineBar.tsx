@@ -56,11 +56,11 @@ export function TimelineBar(props: TimelineBarProps) {
     if (idx === undefined) return list.at(-1);
     return list[idx];
   });
-  const isHistorical = () => {
+  const isHistorical = createMemo(() => {
     const list = chronological();
     const idx = selectedIndex();
     return idx !== undefined && list.length > 0 && idx < list.length - 1;
-  };
+  });
 
   let loadRun = 0;
   const loadHistory = async () => {
@@ -183,9 +183,9 @@ export function TimelineBar(props: TimelineBarProps) {
     return agent?.name ?? entry.agent ?? entry.author;
   };
 
-  const currentIdx = () => selectedIndex() ?? Math.max(0, chronological().length - 1);
-  const canPrev = () => chronological().length > 1 && currentIdx() > 0 && !previewAct.busy() && !mutateAct.busy();
-  const canNext = () => chronological().length > 1 && currentIdx() < chronological().length - 1 && !previewAct.busy() && !mutateAct.busy();
+  const currentIdx = createMemo(() => selectedIndex() ?? Math.max(0, chronological().length - 1));
+  const canPrev = createMemo(() => chronological().length > 1 && currentIdx() > 0 && !previewAct.busy() && !mutateAct.busy());
+  const canNext = createMemo(() => chronological().length > 1 && currentIdx() < chronological().length - 1 && !previewAct.busy() && !mutateAct.busy());
 
   return (
     <View testID="artifact-timeline-bar" class="shrink-0 gap-1.5 border-b border-line bg-side px-3 py-2">

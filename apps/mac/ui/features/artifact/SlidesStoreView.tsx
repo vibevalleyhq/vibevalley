@@ -81,23 +81,23 @@ export function SlidesStoreView(props: StoreViewerProps) {
       }));
   });
 
-  const aspect = () => deck()?.aspectRatio ?? "16:9";
+  const aspect = createMemo(() => deck()?.aspectRatio ?? "16:9");
   const shown = () => frame()?.shown();
-  const pages = () => shown()?.ready?.pages ?? slideList().length;
-  const at = () => shown()?.at?.page ?? 0;
-  const frag = () => shown()?.at?.fragment ?? 0;
-  const maxFrag = () => shown()?.ready?.fragments?.[at()] ?? 0;
-  const currentSlide = () => slideList().at(at());
-  const currentSlidePath = () => {
+  const pages = createMemo(() => shown()?.ready?.pages ?? slideList().length);
+  const at = createMemo(() => shown()?.at?.page ?? 0);
+  const frag = createMemo(() => shown()?.at?.fragment ?? 0);
+  const maxFrag = createMemo(() => shown()?.ready?.fragments?.[at()] ?? 0);
+  const currentSlide = createMemo(() => slideList().at(at()));
+  const currentSlidePath = createMemo(() => {
     const cur = currentSlide();
     if (!cur) return "project/slides/s01.html";
     const rel = cur.file ?? `${cur.id}.html`;
     return rel.startsWith("project/") ? rel : `project/slides/${rel}`;
-  };
-  const currentNotes = () => {
+  });
+  const currentNotes = createMemo(() => {
     const fromRuntime = shown()?.ready?.notes?.[at()];
     return fromRuntime && fromRuntime.trim() !== "" ? fromRuntime : (currentSlide()?.notes ?? "");
-  };
+  });
 
   useReportViewContext(
     () => props.artifact.id,

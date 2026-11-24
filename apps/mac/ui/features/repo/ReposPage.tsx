@@ -81,8 +81,8 @@ export function ReposPage(props: { rest: string }) {
   // A minute at a time: enough for "3h ago".
   const now = useNow(60_000);
   const list = useRepos();
-  const sorted = () => sortRepos(ready(list, []));
-  const selected = () => sorted().find((p) => p.name === (props.rest && decodeURIComponent(props.rest)));
+  const sorted = createMemo(() => sortRepos(ready(list, [])));
+  const selected = createMemo(() => sorted().find((p) => p.name === (props.rest && decodeURIComponent(props.rest))));
   const creating = signal(false);
   return (
     // The list is the page's side column, against the rail as the chat's and the notes' are (ui/layout.tsx Split edge).
@@ -208,10 +208,10 @@ async function copyPath(path: string) {
 }
 
 function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; activity: Asked<RepoActivity>; now: number }) {
-  const recency = () => recencyOf(props.repo.last, props.now);
+  const recency = createMemo(() => recencyOf(props.repo.last, props.now));
   const counted = () => ready(props.languages, undefined);
   const worked = () => ready(props.activity, undefined);
-  const lines = () => counted()?.languages.reduce((n, l) => n + l.code + l.comments, 0);
+  const lines = createMemo(() => counted()?.languages.reduce((n, l) => n + l.code + l.comments, 0));
   const notCounted = () => !!props.languages.error();
   const firstCommit = () => {
     const w = worked();
@@ -221,10 +221,10 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
     const n = lines();
     return n !== undefined ? t("web.repo.lines", { n: number(n) }) : notCounted() ? t("web.repo.uncounted") : "…";
   };
-  const languageCount = () => {
+  const languageCount = createMemo(() => {
     const c = counted();
     return c ? languageShares(c.languages, undefined).length : undefined;
-  };
+  });
   const commitTotal = () => {
     const w = worked();
     return w ? t("web.repo.commits", { n: number(w.total) }) : "…";
@@ -233,7 +233,7 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
     const count = languageCount();
     return count !== undefined ? t("web.repo.kinds", { n: count }) : notCounted() ? t("web.repo.uncounted") : "…";
   };
-  const busy = () => props.languages.fetching() || props.activity.fetching();
+  const busy = createMemo(() => props.languages.fetching() || props.activity.fetching());
   const badge = () => {
     switch (recency()) {
       case "day":

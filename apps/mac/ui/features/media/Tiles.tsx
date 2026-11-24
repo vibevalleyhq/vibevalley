@@ -1,4 +1,4 @@
-import { effect, Image, Text, View } from "nsh";
+import { computed, effect, Image, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Artifact, LibraryItem, MediaJob } from "@vibevalley/protocol";
@@ -66,7 +66,7 @@ function CardPinButton(props: { testid: string; pinned: boolean; onToggle: () =>
 }
 
 export function MakingTiles(props: { jobs: readonly MediaJob[]; width: number; height: number; label: (job: MediaJob) => string }) {
-  const rows = () => justify({ ratios: props.jobs.map(() => 1), width: props.width, height: props.height, gap: tileGap });
+  const rows = computed(() => justify({ ratios: props.jobs.map(() => 1), width: props.width, height: props.height, gap: tileGap }));
   return (
     <View class="gap-3">
       <Each of={rows()}>
@@ -121,7 +121,8 @@ export function Tiles(props: {
   onPick: (id: string, how: { readonly add: boolean; readonly range: boolean }) => void;
   onLook: (id: string) => void;
 }) {
-  const layout = () => stacked({ rows: props.rows, gap: tileGap });
+  const layout = computed(() => stacked({ rows: props.rows, gap: tileGap }));
+  const pickedSet = computed(() => new Set(props.picked));
   return (
     <View class="relative" style={{ height: layout().height }}>
       <Each of={props.items} key={(item) => item.attachment.id}>
@@ -134,7 +135,7 @@ export function Tiles(props: {
                 y={p().y}
                 width={p().width}
                 height={p().height}
-                picked={props.picked.includes(item().attachment.id)}
+                picked={pickedSet().has(item().attachment.id)}
                 active={props.active === item().attachment.id}
                 pinned={props.isPinned?.(item().attachment.id) === true}
                 seen={props.seen(item().attachment.id)}

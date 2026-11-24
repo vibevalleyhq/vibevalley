@@ -1,5 +1,6 @@
 import { computed, effect, lifecycle, platform, signal, UrlScheme, wakeCount, type Accessor } from "nsh";
 import { Haptics, type HapticImpact, type HapticNotification } from "nsh/mobile";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type {
@@ -223,9 +224,10 @@ function applySessionWatchEvent(prev: SessionWatchState, event: SessionWatchEven
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
+const RespondRefSchema = z.object({
+  id: z.string(),
+  requestId: z.string(),
+});
 
 export function createRemoteSession(options?: RemoteSessionOptions): RemoteSession {
   const tokenStore = options?.tokenStore ?? createSecureTokenStore();
@@ -241,6 +243,7 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
   const watchMap = signal<Readonly<Record<string, SessionWatchState>>>({});
 
   let transport: HttpRemoteTransport | undefined;
+  let pairController: AbortController | undefined;
   let sliceStops: (() => void)[] = [];
   const watchRefs = new Map<string, { count: number; stop: () => void }>();
   const bgWatchStops = new Map<string, () => void>();
@@ -482,6 +485,13 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
     ];
   };
 
+  const abortPendingPair = () => {
+    if (pairController && !pairController.signal.aborted) {
+      pairController.abort();
+    }
+    pairController = undefined;
+  };
+
   const pair = async (rawUrl: string, code: string, deviceName: string): Promise<boolean> => {
     const normalizedUrl = normalizeServerUrl(rawUrl);
     const trimmedCode = code.trim();
@@ -492,6 +502,9 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
       return false;
     }
 
+    abortPendingPair();
+    const controller = new AbortController();
+    pairController = controller;
     pairing.set(true);
     pairError.set(undefined);
     try {
@@ -503,8 +516,9 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
           platform: currentRemotePlatform(),
         },
         options?.fetch,
+        { signal: controller.signal },
       );
-      if (disposed) return false;
+      if (disposed || controller.signal.aborted) return false;
       const stored: StoredCredentials = {
         baseUrl: normalizedUrl,
         token: result.token,
@@ -512,24 +526,28 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
         serverName: result.serverName,
       };
       await saveCredentials(stored, tokenStore);
-      if (disposed) return false;
+      if (disposed || controller.signal.aborted) return false;
       credentials.set(stored);
       connectWith(stored);
       void trackTask(requestNotificationPermissionSafe());
       hapticNotification("success");
       return true;
     } catch (err: unknown) {
-      if (!disposed) {
+      if (!disposed && !controller.signal.aborted) {
         pairError.set(err instanceof Error ? err.message : String(err));
         hapticNotification("error");
       }
       return false;
     } finally {
-      if (!disposed) pairing.set(false);
+      if (pairController === controller) {
+        pairController = undefined;
+        if (!disposed) pairing.set(false);
+      }
     }
   };
 
   const disconnect = async (): Promise<void> => {
+    abortPendingPair();
     teardownTransport();
     await clearCredentials(tokenStore);
     void trackTask(syncAppBadge(0));
@@ -548,19 +566,21 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
       };
     }
     const envelope = await transport.call(op, payload, callOptions);
-    if (envelope.bizCode === 0 && isRecord(payload) && typeof payload.id === "string" && typeof payload.requestId === "string") {
-      const targetId = payload.id;
-      const reqId = payload.requestId;
-      if (op === "session.respondPermission") {
-        updateWatchState(targetId, (prev) => ({
-          ...prev,
-          pendingPermissions: prev.pendingPermissions.filter((item) => item.requestId !== reqId),
-        }));
-      } else if (op === "session.respondInteraction") {
-        updateWatchState(targetId, (prev) => ({
-          ...prev,
-          pendingInteractions: prev.pendingInteractions.filter((item) => item.requestId !== reqId),
-        }));
+    if (envelope.bizCode === 0) {
+      const ref = RespondRefSchema.safeParse(payload);
+      if (ref.success) {
+        const { id: targetId, requestId: reqId } = ref.data;
+        if (op === "session.respondPermission") {
+          updateWatchState(targetId, (prev) => ({
+            ...prev,
+            pendingPermissions: prev.pendingPermissions.filter((item) => item.requestId !== reqId),
+          }));
+        } else if (op === "session.respondInteraction") {
+          updateWatchState(targetId, (prev) => ({
+            ...prev,
+            pendingInteractions: prev.pendingInteractions.filter((item) => item.requestId !== reqId),
+          }));
+        }
       }
     }
     return envelope;
@@ -581,9 +601,11 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
     return transport.subscribe(name, payload, on, ended);
   };
 
+  const sessionNames = computed(() => new Map<string, string>((sessions()?.sessions ?? []).map((s) => [s.id, s.name] as const)));
+
   const pendingPermissions = computed<readonly PendingPermissionItem[]>(() => {
     const map = watchMap();
-    const names = new Map<string, string>((sessions()?.sessions ?? []).map((s) => [s.id, s.name] as const));
+    const names = sessionNames();
     const items: PendingPermissionItem[] = [];
     for (const [sessionId, state] of Object.entries(map)) {
       const sessionName = state.session?.name ?? names.get(sessionId) ?? sessionId;
@@ -596,7 +618,7 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
 
   const pendingInteractions = computed<readonly PendingInteractionItem[]>(() => {
     const map = watchMap();
-    const names = new Map<string, string>((sessions()?.sessions ?? []).map((s) => [s.id, s.name] as const));
+    const names = sessionNames();
     const items: PendingInteractionItem[] = [];
     for (const [sessionId, state] of Object.entries(map)) {
       const sessionName = state.session?.name ?? names.get(sessionId) ?? sessionId;
@@ -655,19 +677,24 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
   });
 
   void trackTask(
-    loadCredentials(tokenStore).then((stored) => {
-      if (disposed) return;
-      if (stored && !deepLinkStarted && credentials() === undefined) {
-        credentials.set(stored);
-        connectWith(stored);
-      }
-      ready.set(true);
-    }),
+    loadCredentials(tokenStore)
+      .then((stored) => {
+        if (disposed) return;
+        if (stored && !deepLinkStarted && credentials() === undefined) {
+          credentials.set(stored);
+          connectWith(stored);
+        }
+        ready.set(true);
+      })
+      .catch(() => {
+        if (!disposed) ready.set(true);
+      }),
   );
 
   const dispose = () => {
     if (disposed) return;
     disposed = true;
+    abortPendingPair();
     stopUrlScheme();
     teardownTransport();
   };

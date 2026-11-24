@@ -13,6 +13,9 @@ description: 在 VibeValley 里管住 agent 写的代码不变坏：加规矩、
 
 - 要回答「白皮书的某一条在这里怎么样」，或者下面任何一步碰到具体的一条：读 [references/whitepaper.md](.agents/skills/vv-governance/references/whitepaper.md) 里对应的一行。每条写了处境：**已有**（在哪）、**已做**（吸收白皮书时加的，在哪）、**改写**（思路留下、换成这里的做法）、**以后做**（什么条件下做，挂在[提案](.agents/notes/proposed/process/2026-10-30-whitepaper-checks-that-say-how.md)）、**不做**（为什么）。
 - 回答这类问题时，先给处境的结论，再给在哪、为什么；以后做的说出触发条件；不做的说出它和哪条规矩冲突。不要把白皮书的原文当成这里的做法讲。
+- 评审具体子领域的 PR / 重构时，按改动范围加载对应清单（只读用得上的那份）：
+  - 涉及 Rust 异步、Tokio 运行时边界、`Hub::on_async`、Axum/SSE/Range、虚拟时钟、`loom` 状态机或 `crates/rich` 后台渲染：读 [references/rust-concurrency-checklist.md](.agents/skills/vv-governance/references/rust-concurrency-checklist.md)。
+  - 涉及 `apps/mac/ui`、`apps/mac/src/hosted`、`apps/mac/src/shell` 或 `apps/mobile/src` 的输入延迟、`computed()` 扇出、`keymap.bind`、乐观发送/回滚或宿主帧去重：读 [references/ui-responsiveness-checklist.md](.agents/skills/vv-governance/references/ui-responsiveness-checklist.md)。
 
 ## 1. 加一条规矩或一个检查
 
@@ -38,7 +41,7 @@ agent 照着已有的代码抄、走最短的路，写在文字里的规矩会�
 | 架构漂移 | 有没有新加依赖？有没有跨层、跨模块、穿过别人 `index.ts` 的 import？ | `pnpm-workspace.yaml` 的 catalog 的 diff；`vp check`（`page-layers`、`import/no-cycle`、`no-restricted-imports`）；Rust 的 `Cargo.toml` 依赖的 diff、`mod`/`use` 有没有绕过模块对外的结构体 |
 | 看不过来 | 用户要读哪几行才能放心合？契约（`packages/protocol`、表结构、模块对外的接口）改了什么？ | 把契约的 diff 单独列在 PR 正文最前；一批工作一个 PR，不同的事分成不同的提交（[vv-pr](.agents/skills/vv-pr/SKILL.md) 第 1 节） |
 
-查到的照 [vv-simplify](.agents/skills/vv-simplify/SKILL.md) 的格式列给用户：每处带证据（文件和行号、命令的输出）、怎么改、靠哪个测试证明没变坏。只列不改，用户点了再改。
+查到的照 [vv-simplify](.agents/skills/vv-simplify/SKILL.md) 的格式列给用户：每处带证据（文件和行号、命令的输出）、怎么改、靠哪个测试证明没变坏。只列不改，用户点了再改。涉及 Rust 并发边界或 UI 响应性的改动，同时对照「先读哪里」列出的专项清单逐项核查。
 
 ## 3. 写计划前问清边界
 

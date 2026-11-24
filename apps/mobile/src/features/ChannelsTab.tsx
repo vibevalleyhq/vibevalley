@@ -1,9 +1,9 @@
-import { effect, List, signal, Text, View } from "nsh";
+import { computed, effect, List, signal, Text, untracked, View } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { Channel, ChatMessage } from "@vibevalley/protocol";
-import { ChannelEvent as ChannelEventSchema, ChatMessage as ChatMessageSchema } from "@vibevalley/protocol/schema";
+import { ChannelEvent as ChannelEventSchema, ChatMessage as ChatMessageSchema, messageId } from "@vibevalley/protocol/schema";
 
 import { Icon } from "../design/Icon";
 import type { MobileLayout } from "../design/layout";
@@ -11,6 +11,12 @@ import { EmptyPanel, FieldInput, MarkdownText, PillButton, SectionCard, SplitPan
 import { hapticImpact, hapticNotification, type RemoteSession } from "../infra/session";
 
 const ChatMessageListSchema = z.array(ChatMessageSchema);
+
+interface OptimisticChannelMessage {
+  readonly channelId: string;
+  readonly sendKey: string;
+  readonly message: ChatMessage;
+}
 
 function mergeMessages(existing: readonly ChatMessage[], incoming: readonly ChatMessage[]): ChatMessage[] {
   const byId = new Map<string, ChatMessage>();
@@ -36,23 +42,48 @@ export function ChannelsTab(props: {
   readonly onSelectChannel: (id: string | undefined) => void;
 }) {
   const messages = signal<readonly ChatMessage[]>([]);
+  const pendingMessages = signal<readonly OptimisticChannelMessage[]>([]);
   const loading = signal(false);
   const draft = signal("");
   const sending = signal(false);
   const sendError = signal<string | undefined>(undefined);
-  const isDual = () => props.layout().mode === "dual_pane";
+  let localSendSeq = 0;
+  let retrySend: { readonly channelId: string; readonly text: string; readonly sendKey: string } | undefined;
 
-  const channels = () => {
+  const isDual = computed(() => props.layout().mode === "dual_pane");
+
+  const channels = computed(() => {
     const list = props.session.collab()?.chat?.channels ?? [];
     const active = list.filter((c) => c.archived === undefined);
     return active.length > 0 ? active : list;
-  };
+  });
 
-  const selectedChannel = () => {
+  const selectedChannel = computed(() => {
     const id = props.selectedChannelId();
     if (id === undefined) return undefined;
     return channels().find((c) => c.id === id);
-  };
+  });
+
+  const hasDraft = computed(() => draft().trim() !== "");
+  const canSend = computed(() => props.selectedChannelId() !== undefined && !sending() && hasDraft());
+
+  const displayedMessages = computed((): readonly ChatMessage[] => {
+    const channelId = props.selectedChannelId();
+    const canonical = messages();
+    if (channelId === undefined) return canonical;
+    const canonicalKeys = new Set<string>();
+    for (const msg of canonical) {
+      if (msg.sendKey !== undefined) canonicalKeys.add(msg.sendKey);
+    }
+    const pending = pendingMessages()
+      .filter((item) => item.channelId === channelId && !canonicalKeys.has(item.sendKey))
+      .map((item) => item.message);
+    if (pending.length === 0) return canonical;
+    return [...canonical, ...pending];
+  });
+
+  const isEmptyFeed = computed(() => !loading() && displayedMessages().length === 0);
+  const detailTitle = computed(() => (selectedChannel() ? channelLabel(selectedChannel()!) : (props.selectedChannelId() ?? "")));
 
   effect(() => {
     if (!isDual()) return;
@@ -71,15 +102,34 @@ export function ChannelsTab(props: {
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
     let stopFollow: (() => void) | undefined;
     messages.set([]);
     sendError.set(undefined);
     loading.set(true);
 
+    const applyReloadedMessages = (data: unknown) => {
+      const reloaded = ChatMessageListSchema.safeParse(data);
+      if (!reloaded.success) return;
+      const ordered = mergeMessages([], reloaded.data);
+      messages.set(ordered);
+      const reloadedKeys = new Set(ordered.map((m) => m.sendKey).filter((k): k is string => k !== undefined));
+      if (reloadedKeys.size > 0) {
+        pendingMessages.update((prev) => prev.filter((item) => item.channelId !== channelId || !reloadedKeys.has(item.sendKey)));
+      }
+    };
+
     const loadAndFollow = async () => {
-      const env = await props.session.call("channel.message.list", { id: channelId, limit: 50 });
-      if (cancelled) return;
+      let env;
+      try {
+        env = await props.session.call("channel.message.list", { id: channelId, limit: 50 }, { signal: controller.signal });
+      } catch (err: unknown) {
+        if (controller.signal.aborted) return;
+        loading.set(false);
+        sendError.set(err instanceof Error ? err.message : String(err));
+        return;
+      }
+      if (controller.signal.aborted) return;
       loading.set(false);
       let maxRevision = 0;
       if (env.bizCode === 0) {
@@ -95,25 +145,43 @@ export function ChannelsTab(props: {
         sendError.set(env.message);
       }
 
-      if (cancelled) return;
+      if (controller.signal.aborted) return;
       stopFollow = props.session.subscribe(
         "channel.follow",
         { id: channelId, after: maxRevision },
         (raw) => {
-          if (cancelled) return;
+          if (controller.signal.aborted) return;
           const parsed = ChannelEventSchema.safeParse(raw);
           if (!parsed.success) return;
           const ev = parsed.data;
           switch (ev._tag) {
-            case "Message":
-              messages.update((prev) => mergeMessages(prev, [ev.message]));
-              break;
-            case "Reset":
-              void props.session.call("channel.message.list", { id: channelId, limit: 50 }).then((reloadEnv) => {
-                if (cancelled || reloadEnv.bizCode !== 0) return;
-                const reloaded = ChatMessageListSchema.safeParse(reloadEnv.data);
-                if (reloaded.success) messages.set(mergeMessages([], reloaded.data));
+            case "Message": {
+              const incoming = ev.message;
+              messages.update((prev) => mergeMessages(prev, [incoming]));
+              pendingMessages.update((prev) => {
+                let matched = false;
+                return prev.filter((item) => {
+                  if (matched || item.channelId !== incoming.channel) return true;
+                  const matchesKey = incoming.sendKey !== undefined && incoming.sendKey === item.sendKey;
+                  const matchesText = incoming.sendKey === undefined && incoming.text === item.message.text;
+                  if (matchesKey || matchesText) {
+                    matched = true;
+                    return false;
+                  }
+                  return true;
+                });
               });
+              break;
+            }
+            case "Reset":
+              void props.session
+                .call("channel.message.list", { id: channelId, limit: 50 }, { signal: controller.signal })
+                .then((reloadEnv) => {
+                  if (!controller.signal.aborted && reloadEnv.bizCode === 0) {
+                    applyReloadedMessages(reloadEnv.data);
+                  }
+                })
+                .catch(() => undefined);
               break;
           }
         },
@@ -126,26 +194,71 @@ export function ChannelsTab(props: {
     void loadAndFollow();
 
     return () => {
-      cancelled = true;
+      controller.abort();
       stopFollow?.();
     };
   });
 
   const sendReply = async () => {
-    const channelId = props.selectedChannelId();
-    const text = draft().trim();
-    if (channelId === undefined || text === "" || sending()) return;
+    const channelId = untracked(props.selectedChannelId);
+    const text = untracked(draft).trim();
+    if (channelId === undefined || text === "" || untracked(sending)) return;
+
+    const sendKey =
+      retrySend !== undefined && retrySend.channelId === channelId && retrySend.text === text ? retrySend.sendKey : `mobile-${Date.now()}-${++localSendSeq}`;
+    retrySend = undefined;
+
+    let maxNumber = 0;
+    for (const m of untracked(messages)) {
+      if (m.number > maxNumber) maxNumber = m.number;
+    }
+    for (const item of untracked(pendingMessages)) {
+      if (item.channelId === channelId && item.message.number > maxNumber) maxNumber = item.message.number;
+    }
+
+    const senderName = untracked(props.session.credentials)?.deviceName ?? "You";
+    const optimisticMessage: ChatMessage = {
+      id: messageId(`pending:${sendKey}`),
+      number: maxNumber + 1,
+      channel: channelId,
+      from: "user",
+      actor: { kind: "user", id: "user", name: senderName },
+      name: senderName,
+      kind: "chat",
+      text,
+      mentions: [],
+      outcome: null,
+      spoken: false,
+      sendKey,
+      at: Date.now(),
+      revision: 0,
+      reactions: [],
+      attachments: [],
+      embeds: [],
+    };
+
+    draft.set("");
     sending.set(true);
     sendError.set(undefined);
+    pendingMessages.update((prev) => [...prev, { channelId, sendKey, message: optimisticMessage }]);
+
+    const rollback = (message: string) => {
+      pendingMessages.update((prev) => prev.filter((item) => item.sendKey !== sendKey));
+      retrySend = { channelId, text, sendKey };
+      sendError.set(message);
+      hapticNotification("error");
+      if (untracked(draft) === "") draft.set(text);
+    };
+
     try {
-      const env = await props.session.call("channel.message.send", { id: channelId, text });
+      const env = await props.session.call("channel.message.send", { id: channelId, text, sendKey });
       if (env.bizCode !== 0) {
-        sendError.set(env.message);
-        hapticNotification("error");
+        rollback(env.message);
       } else {
-        draft.set("");
         hapticImpact("light");
       }
+    } catch (err: unknown) {
+      rollback(err instanceof Error ? err.message : String(err));
     } finally {
       sending.set(false);
     }
@@ -155,7 +268,7 @@ export function ChannelsTab(props: {
     <If when={channels().length > 0} else={<EmptyPanel testID="channels-empty" icon="chat" message={t("web.remote.channel.empty")} />}>
       <List testID="channels-list" each={channels()} keyExtractor={(ch) => ch.id} estimatedItemSize={72} class="min-h-0 flex-1" contentClass="gap-2.5 p-3.5">
         {(ch) => {
-          const active = () => isDual() && props.selectedChannelId() === ch().id;
+          const active = computed(() => isDual() && props.selectedChannelId() === ch().id);
           return (
             <SectionCard
               testID={`channel-row-${ch().id}`}
@@ -193,7 +306,7 @@ export function ChannelsTab(props: {
       <TopBar
         testID="channel-detail-bar"
         backTestID="channel-back"
-        title={selectedChannel() ? channelLabel(selectedChannel()!) : (props.selectedChannelId() ?? "")}
+        title={detailTitle()}
         subtitle={selectedChannel()?.description || undefined}
         onBack={isDual() ? undefined : () => props.onSelectChannel(undefined)}
       />
@@ -207,11 +320,11 @@ export function ChannelsTab(props: {
       </If>
 
       <If
-        when={!loading() && messages().length === 0}
+        when={isEmptyFeed()}
         else={
           <List
             testID="channel-messages-list"
-            each={messages()}
+            each={displayedMessages()}
             keyExtractor={(msg) => msg.id}
             estimatedItemSize={88}
             alignment="bottom"
@@ -245,7 +358,6 @@ export function ChannelsTab(props: {
           onSubmit={() => {
             void sendReply();
           }}
-          disabled={sending()}
           class="min-w-0 flex-1"
         />
         <PillButton
@@ -254,7 +366,7 @@ export function ChannelsTab(props: {
           size="sm"
           icon="send"
           label={t("web.remote.channel.send")}
-          disabled={sending() || draft().trim() === ""}
+          disabled={!canSend()}
           onPress={() => {
             void sendReply();
           }}

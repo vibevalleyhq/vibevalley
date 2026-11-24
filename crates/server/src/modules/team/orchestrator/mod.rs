@@ -425,21 +425,16 @@ impl Orchestrator {
         let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
         let task_cancel = cancel.clone();
         let fut = async move {
-            let boot_o = o.clone();
-            let boot_chat = chat.clone();
-            let _ = crate::spawn_blocking_traced(move || {
-                if let Some(o) = boot_o.upgrade()
-                    && let Ok(pending) = boot_chat.pending_deliveries(DeliveryTargetKind::Orchestrator)
-                {
-                    for d in pending {
-                        if o.closed.load(Ordering::Acquire) {
-                            return;
-                        }
-                        o.handle_chat_delivery(&boot_chat, &d, None);
+            if let Some(o) = o.upgrade()
+                && let Ok(pending) = chat.pending_deliveries_async(DeliveryTargetKind::Orchestrator).await
+            {
+                for d in pending {
+                    if o.closed.load(Ordering::Acquire) {
+                        return;
                     }
+                    o.handle_chat_delivery_async(&chat, &d, None).await;
                 }
-            })
-            .await;
+            }
             loop {
                 let dispatched = tokio::select! {
                     biased;
@@ -453,18 +448,14 @@ impl Orchestrator {
                 if o.closed.load(Ordering::Acquire) {
                     return;
                 }
-                let chat_c = chat.clone();
-                let _ = crate::spawn_blocking_traced(move || {
-                    for d in &dispatched.deliveries {
-                        if d.recipient_kind == DeliveryTargetKind::Orchestrator {
-                            o.handle_chat_delivery(&chat_c, d, Some(&dispatched.committed));
-                        }
+                for d in &dispatched.deliveries {
+                    if d.recipient_kind == DeliveryTargetKind::Orchestrator {
+                        o.handle_chat_delivery_async(&chat, d, Some(&dispatched.committed)).await;
                     }
-                })
-                .await;
+                }
             }
         };
-        let handle = if let Some(hub) = hub {
+        let handle = if let Some(hub) = &hub {
             hub.spawn_task(fut)
         } else {
             vibevalley_runtime::rt::current_or_global_handle().spawn(fut.in_current_span().with_current_subscriber())
@@ -472,55 +463,75 @@ impl Orchestrator {
         let prev = self.chat_listener.lock().replace((cancel, handle));
         if let Some((old_cancel, old_handle)) = prev {
             old_cancel.cancel();
-            let _ = vibevalley_runtime::rt::block_on(old_handle);
+            let reaper = async move {
+                let _ = old_handle.await;
+            };
+            if let Some(hub) = hub {
+                hub.spawn_task(reaper);
+            } else {
+                vibevalley_runtime::rt::current_or_global_handle().spawn(reaper);
+            }
         }
     }
 
-    fn handle_chat_delivery(self: &Arc<Self>, chat: &Chat, d: &QueuedDelivery, committed: Option<&Arc<Committed>>) {
+    async fn handle_chat_delivery_async(self: &Arc<Self>, chat: &Chat, d: &QueuedDelivery, committed: Option<&Arc<Committed>>) {
         use crate::modules::work::session::mailbox::{MailboxSource, MailboxStatus};
 
         const HANDED_EMOJI: &str = "👀";
-        let sessions = self.board.sessions();
-        if !chat.delivery_is_pending(d.id).unwrap_or(false) {
-            let _ = sessions.withdraw_mailbox_by_message(&d.message_id);
+        let sessions = self.board.sessions().clone();
+        if !chat.delivery_is_pending_async(d.id).await.unwrap_or(false) {
+            let msg_id = d.message_id.clone();
+            let _ = crate::spawn_blocking_traced(move || sessions.withdraw_mailbox_by_message(&msg_id)).await;
             return;
         }
         if !self.agents.profiles.is_orchestrator(&d.recipient_id) {
-            let _ = chat.settle_delivery(d.id, false);
+            let _ = chat.settle_delivery_async(d.id, false).await;
             return;
         }
         let owned;
         let c = match committed {
             Some(c) => c.as_ref(),
-            None => match chat.committed_of(&d.message_id).ok().flatten() {
+            None => match chat.committed_of_async(&d.message_id).await.ok().flatten() {
                 Some(c) => {
                     owned = c;
                     &owned
                 }
                 None => {
-                    let _ = sessions.withdraw_mailbox_by_message(&d.message_id);
-                    let _ = chat.withdraw_delivery(d.id);
+                    let msg_id = d.message_id.clone();
+                    let _ = crate::spawn_blocking_traced(move || sessions.withdraw_mailbox_by_message(&msg_id)).await;
+                    let _ = chat.withdraw_delivery_async(d.id).await;
                     return;
                 }
             },
         };
         if c.row.deleted_at.is_some() {
-            let _ = sessions.withdraw_mailbox_by_message(&d.message_id);
-            let _ = chat.withdraw_delivery(d.id);
+            let msg_id = d.message_id.clone();
+            let _ = crate::spawn_blocking_traced(move || sessions.withdraw_mailbox_by_message(&msg_id)).await;
+            let _ = chat.withdraw_delivery_async(d.id).await;
             return;
         }
         let m = chat.addressed_of(&c.row);
         let line = words::orchestrator_lines(std::slice::from_ref(&m));
         if !d.wakes {
             self.overhear(Some(&d.recipient_id), line);
-            let _ = chat.settle_delivery(d.id, true);
+            let _ = chat.settle_delivery_async(d.id, true).await;
             return;
         }
         let mail_key = format!("orchestrator:{}:{}", d.recipient_id, d.message_id);
-        let mail_entry = sessions
-            .enqueue_mailbox(&d.recipient_id, &mail_key, MailboxSource::ChannelOrchestrator, Some(&d.message_id), &c.row.body)
-            .ok();
-        let claimed = sessions.claim_mailbox_by_key(&mail_key).unwrap_or(false);
+        let recipient_id = d.recipient_id.clone();
+        let msg_id = d.message_id.clone();
+        let body = c.row.body.clone();
+        let sessions_for_claim = sessions.clone();
+        let key_for_claim = mail_key.clone();
+        let (mail_entry, claimed) = crate::spawn_blocking_traced(move || {
+            let mail_entry = sessions_for_claim
+                .enqueue_mailbox(&recipient_id, &key_for_claim, MailboxSource::ChannelOrchestrator, Some(&msg_id), &body)
+                .ok();
+            let claimed = sessions_for_claim.claim_mailbox_by_key(&key_for_claim).unwrap_or(false);
+            (mail_entry, claimed)
+        })
+        .await
+        .unwrap_or((None, false));
         if !claimed
             && mail_entry
                 .as_ref()
@@ -566,27 +577,33 @@ impl Orchestrator {
             messages: vec![c.row.id.clone()],
             port: meta.response_port.clone(),
         };
-        if self.hear(input) {
+        let o = self.clone();
+        let heard = crate::spawn_blocking_traced(move || o.hear(input)).await.unwrap_or(false);
+        if heard {
             if let Some(id) = settle_id {
-                let _ = sessions.settle_mailbox(id, true, Some(&d.recipient_id));
+                let sessions = sessions.clone();
+                let recipient = d.recipient_id.clone();
+                let _ = crate::spawn_blocking_traced(move || sessions.settle_mailbox(id, true, Some(&recipient))).await;
             }
-            let _ = chat.settle_delivery(d.id, true);
-            if let Err(e) = chat.react(&c.row.id, &d.recipient_id, HANDED_EMOJI, true) {
+            let _ = chat.settle_delivery_async(d.id, true).await;
+            if let Err(e) = chat.react_async(&c.row.id, &d.recipient_id, HANDED_EMOJI, true).await {
                 eprintln!("vibevalley-server: orchestrator: 👀: {}", e.message);
             }
         } else if !self.closed.load(Ordering::Acquire) {
             if let Some(id) = settle_id {
-                let _ = sessions.settle_mailbox(id, false, Some("rejected"));
+                let sessions = sessions.clone();
+                let _ = crate::spawn_blocking_traced(move || sessions.settle_mailbox(id, false, Some("rejected"))).await;
             }
-            let _ = chat.settle_delivery(d.id, false);
+            let _ = chat.settle_delivery_async(d.id, false).await;
         }
     }
 
-    pub fn close(&self) {
+    pub async fn close_async(&self) {
         self.closed.store(true, Ordering::Release);
-        if let Some((cancel, handle)) = self.chat_listener.lock().take() {
+        let chat_listener = self.chat_listener.lock().take();
+        if let Some((cancel, handle)) = chat_listener {
             cancel.cancel();
-            let _ = vibevalley_runtime::rt::block_on(handle);
+            let _ = handle.await;
         }
         self.execution.close();
         self.mcp.close();
@@ -594,6 +611,10 @@ impl Orchestrator {
         for me in self.instances.lock().values() {
             me.more.notify_waiters();
         }
+    }
+
+    pub fn close(&self) {
+        vibevalley_runtime::rt::block_on(self.close_async());
     }
 
     fn model_of(&self, id: &str) -> Result<String, String> {
@@ -795,28 +816,34 @@ impl Orchestrator {
                     return;
                 }
                 let inst = me.clone();
-                let keep_going = crate::spawn_blocking_traced(move || {
-                    if orch.closed.load(Ordering::Acquire) {
-                        return false;
+                let orch_run = orch.clone();
+                let seen_ids = crate::spawn_blocking_traced(move || {
+                    if orch_run.closed.load(Ordering::Acquire) {
+                        return None;
                     }
-                    let batch = match orch.execution.batch(&inst.id) {
+                    let batch = match orch_run.execution.batch(&inst.id) {
                         Ok(b) => b,
                         Err(e) => {
-                            if let Some(hub) = orch.hub() {
+                            if let Some(hub) = orch_run.hub() {
                                 hub.notice(NoticeLevel::Error, e.to_string());
                             }
-                            return false;
+                            return None;
                         }
                     };
                     if !batch.is_empty() {
-                        orch.turn(&inst, batch);
+                        Some(orch_run.turn(&inst, batch))
+                    } else {
+                        Some(Vec::new())
                     }
-                    true
                 })
                 .await
-                .unwrap_or(false);
-                if !keep_going {
+                .ok()
+                .flatten();
+                let Some(seen_ids) = seen_ids else {
                     return;
+                };
+                for id in seen_ids {
+                    let _ = orch.chat.mark_seen_async(&me.id, &id).await;
                 }
             }
         }
@@ -920,9 +947,9 @@ impl Orchestrator {
             .join("\n\n")
     }
 
-    fn turn(&self, me: &Instance, pending: Vec<(String, Input)>) {
+    fn turn(&self, me: &Instance, pending: Vec<(String, Input)>) -> Vec<String> {
         let (requests, batch): (Vec<_>, Vec<_>) = pending.into_iter().unzip();
-        let Some(last) = batch.last().cloned() else { return };
+        let Some(last) = batch.last().cloned() else { return Vec::new() };
         let route = Route {
             agent: me.id.clone(),
             channel: last.channel.clone(),
@@ -965,11 +992,15 @@ impl Orchestrator {
             }
         };
         if (self.key)().is_none_or(|k| k.trim().is_empty()) && self.client.is_none() {
-            return cannot(t("server.orchestrator.noKey", &[]));
+            cannot(t("server.orchestrator.noKey", &[]));
+            return Vec::new();
         }
         let model = match self.model_of(&me.id) {
             Ok(m) => m,
-            Err(why) => return cannot(t("server.orchestrator.cannotStart", &[("why", why.into())])),
+            Err(why) => {
+                cannot(t("server.orchestrator.cannotStart", &[("why", why.into())]));
+                return Vec::new();
+            }
         };
         me.cannot.lock().clear();
         let text = self.input_of(me, &batch);
@@ -984,12 +1015,10 @@ impl Orchestrator {
         };
         let outcome = self.execution.run(&mut run, input);
         if self.closed.load(Ordering::Acquire) {
-            return;
+            return Vec::new();
         }
         run.finish(outcome);
-        for id in batch.iter().flat_map(|i| &i.messages) {
-            let _ = self.chat.mark_seen(&me.id, id);
-        }
+        batch.into_iter().flat_map(|i| i.messages).collect()
     }
 }
 
@@ -1247,18 +1276,53 @@ impl<'a> Run<'a> {
 
 pub fn install(hub: &Hub, o: Arc<Orchestrator>) {
     let opened = o.clone();
-    hub.on::<ops::OrchestratorOpen>(move |_, ()| {
-        opened.ensure_open();
-        Ok(())
+    hub.on_async::<ops::OrchestratorOpen, _, _>(move |_, ()| {
+        let opened = opened.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                opened.ensure_open();
+                Ok(())
+            })
+            .await
+            .map_err(|e| vibevalley_protocol::ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?
+        }
     });
     let stopped = o.clone();
-    hub.on::<ops::OrchestratorStop>(move |_, input| {
-        stopped.stop(input.agent.as_deref());
-        Ok(())
+    hub.on_async::<ops::OrchestratorStop, _, _>(move |_, input| {
+        let stopped = stopped.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                stopped.stop(input.agent.as_deref());
+                Ok(())
+            })
+            .await
+            .map_err(|e| vibevalley_protocol::ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?
+        }
     });
     let approvals = o.clone();
-    hub.on::<ops::OrchestratorApprovalList>(move |_, input| approvals.execution.approvals(input.conversation_id.as_deref()));
+    hub.on_async::<ops::OrchestratorApprovalList, _, _>(move |_, input| {
+        let approvals = approvals.clone();
+        async move {
+            crate::spawn_blocking_traced(move || approvals.execution.approvals(input.conversation_id.as_deref()))
+                .await
+                .map_err(|e| vibevalley_protocol::ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?
+        }
+    });
     let decisions = o.clone();
-    hub.on::<ops::OrchestratorApprovalResolve>(move |_, input| decisions.execution.resolve_approval(input));
-    hub.on::<ops::OrchestratorEvalCreate>(move |_, input| o.mark_wrong(input.agent.as_deref(), input.on.0 as i64, &input.want));
+    hub.on_async::<ops::OrchestratorApprovalResolve, _, _>(move |_, input| {
+        let decisions = decisions.clone();
+        async move {
+            crate::spawn_blocking_traced(move || decisions.execution.resolve_approval(input))
+                .await
+                .map_err(|e| vibevalley_protocol::ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?
+        }
+    });
+    hub.on_async::<ops::OrchestratorEvalCreate, _, _>(move |_, input| {
+        let o = o.clone();
+        async move {
+            crate::spawn_blocking_traced(move || o.mark_wrong(input.agent.as_deref(), input.on.0 as i64, &input.want))
+                .await
+                .map_err(|e| vibevalley_protocol::ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?
+        }
+    });
 }

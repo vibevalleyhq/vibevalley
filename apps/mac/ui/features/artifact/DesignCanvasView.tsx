@@ -87,15 +87,15 @@ export function DesignCanvasView(props: StoreViewerProps) {
       }));
   });
 
-  const activeArtboard = () => {
+  const activeArtboard = createMemo(() => {
     const id = selectedId();
     const all = artboards();
     return (id ? all.find((a) => a.id === id) : undefined) ?? all.at(0);
-  };
-  const activePath = () => {
+  });
+  const activePath = createMemo(() => {
     const ab = activeArtboard();
     return ab ? resolveArtboardPath(ab.file) : "project/main.dc.html";
-  };
+  });
 
   useReportViewContext(
     () => props.artifact.id,

@@ -20,7 +20,7 @@ mod types;
 pub mod words;
 
 pub use dispatch::{ChannelDispatched, DeliveryTargetKind, HeldBy, QueuedDelivery, Reason};
-pub use service::{direct, direct_async, install, profile_id};
+pub use service::{direct_async, install, profile_id};
 pub use store::Inner;
 pub use types::{
     AddressedMessage, ArtifactRef, ChannelEvent, Committed, FileAt, Info, Made, Meta, Note, Noticing, Picked, Place, Posting, ReadOptions, ReadResult, Saying,
@@ -647,7 +647,7 @@ impl Chat {
         self.removals.subscribe()
     }
 
-    fn quoted(&self, refs: &[vibevalley_protocol::BlockRef]) -> Vec<QuotedBlock> {
+    pub(super) fn quoted(&self, refs: &[vibevalley_protocol::BlockRef]) -> Vec<QuotedBlock> {
         match &self.quoter {
             Some(q) if !refs.is_empty() => q.quote(refs),
             _ => vec![],
@@ -750,154 +750,148 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn read_paths_bypass_write_mutex_and_use_wal_read_pool() {
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn read_paths_bypass_write_mutex_and_use_wal_read_pool() {
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
         let hub = Hub::new(vibevalley_core::empty_space_state());
         let files = Attachments::open(dir.path(), db.clone());
-        let chat = Chat::open(db.clone(), &hub, files, None, false).unwrap();
+        let chat = Chat::open_async(db.clone(), &hub, files, None, false).await.unwrap();
         let gid = chat.default_channel();
 
         let (msg, _) = chat
-            .say(Saying {
+            .say_async(Saying {
                 channel: Some(gid.clone()),
                 text: "decontended wal read check".into(),
                 send_key: "decontend-1".into(),
                 ..Saying::default()
             })
+            .await
             .unwrap();
-        chat.pin(&msg.id, true).unwrap();
+        chat.pin_async(&msg.id, true).await.unwrap();
 
         // Hold BOTH the channel write mutex (`chat.inner`) AND a SQLite `BEGIN IMMEDIATE`
         // write transaction on `write_pool` simultaneously.
-        let _write_mutex_guard = vibevalley_runtime::rt::block_on(chat.locked());
-        let mut write_conn = db.acquire().unwrap();
-        vibevalley_runtime::rt::block_on(async {
-            sqlx::raw_sql("BEGIN IMMEDIATE;").execute(&mut *write_conn).await.unwrap();
-        });
+        let _write_mutex_guard = chat.locked().await;
+        let mut write_conn = db.write_pool().acquire().await.unwrap();
+        sqlx::raw_sql("BEGIN IMMEDIATE;").execute(&mut *write_conn).await.unwrap();
 
         let started = Instant::now();
-        let (tx, rx) = flume::bounded(1);
         let reader_chat = chat.clone();
         let reader_gid = gid.clone();
-        let reader = std::thread::spawn(move || {
-            let channels = reader_chat.list().unwrap();
+        let reader = tokio::spawn(async move {
+            let channels = reader_chat.list_async().await.unwrap();
             assert!(!channels.is_empty());
-            let history = reader_chat.history(&reader_gid, None, Some(20)).unwrap();
+            let history = reader_chat.history_async(&reader_gid, None, Some(20)).await.unwrap();
             assert_eq!(history.len(), 1);
-            let hits = reader_chat.search("decontended", None).unwrap();
+            let hits = reader_chat.search_async("decontended", None).await.unwrap();
             assert_eq!(hits.len(), 1);
-            let pins = reader_chat.pins(&reader_gid).unwrap();
+            let pins = reader_chat.pins_async(&reader_gid).await.unwrap();
             assert_eq!(pins.len(), 1);
-            let recent = reader_chat.recent_rows(&reader_gid, 10).unwrap();
+            let recent = reader_chat.recent_rows_async(&reader_gid, 10).await.unwrap();
             assert_eq!(recent.len(), 1);
-            let _unread = reader_chat.unread(USER_ID, None);
-            let _pending = reader_chat.pending_deliveries(DeliveryTargetKind::Orchestrator).unwrap();
+            let _unread = reader_chat.unread_async(USER_ID, None).await;
+            let _pending = reader_chat.pending_deliveries_async(DeliveryTargetKind::Orchestrator).await.unwrap();
             assert_eq!(reader_chat.default_channel(), reader_gid);
-            let _ = tx.send(());
         });
 
-        rx.recv_timeout(Duration::from_secs(2))
-            .expect("channel read paths must not block on AsyncMutex<Inner> or write_pool");
-        reader.join().unwrap();
+        tokio::time::timeout(Duration::from_secs(2), reader)
+            .await
+            .expect("channel read paths must not block on AsyncMutex<Inner> or write_pool")
+            .unwrap();
         assert!(started.elapsed() < Duration::from_secs(1));
 
-        vibevalley_runtime::rt::block_on(async {
-            sqlx::raw_sql("ROLLBACK;").execute(&mut *write_conn).await.unwrap();
-        });
+        sqlx::raw_sql("ROLLBACK;").execute(&mut *write_conn).await.unwrap();
         drop(write_conn);
         drop(_write_mutex_guard);
-        hub.close();
+        hub.close_async().await;
         db.close();
     }
 
-    #[test]
-    fn async_channel_handlers_execute_on_hub_on_async_with_thread_idempotency() {
+    #[tokio::test]
+    async fn async_channel_handlers_execute_on_hub_on_async_with_thread_idempotency() {
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
         let hub = Hub::new(vibevalley_core::empty_space_state());
         let files = Attachments::open(dir.path(), db.clone());
-        let chat = Chat::open(db.clone(), &hub, files, None, false).unwrap();
+        let chat = Chat::open_async(db.clone(), &hub, files, None, false).await.unwrap();
         let registry = Arc::new(vibevalley_runtime::oar::Registry::new());
         let agents = crate::modules::team::agent::Agents::open(&hub, dir.path(), &[], registry, false).unwrap();
         install(&hub, chat.clone(), agents, None);
 
-        vibevalley_runtime::rt::block_on(async {
-            use vibevalley_protocol::{Caller, ChannelMessageListInput, ChannelRequest, ChannelThreadCreateInput, SayRequest, ops};
+        use vibevalley_protocol::{Caller, ChannelMessageListInput, ChannelRequest, ChannelThreadCreateInput, SayRequest, ops};
 
-            let cid = hub
-                .invoke_as_async::<ops::ChannelCreate>(
-                    Caller::User,
-                    ChannelRequest {
-                        name: "async-room".into(),
-                        description: Some("native async room".into()),
-                        repo: None,
-                    },
-                )
-                .await
-                .unwrap();
-
-            hub.invoke_as_async::<ops::ChannelMessageSend>(
+        let cid = hub
+            .invoke_as_async::<ops::ChannelCreate>(
                 Caller::User,
-                SayRequest {
-                    id: cid.clone(),
-                    text: "hello async hub".into(),
-                    send_key: Some("async-send-1".into()),
-                    agent: None,
+                ChannelRequest {
+                    name: "async-room".into(),
+                    description: Some("native async room".into()),
                     repo: None,
-                    station: None,
-                    reply_to: None,
-                    attachments: None,
-                    to: None,
-                    blocks: None,
-                    view_context: None,
                 },
             )
             .await
             .unwrap();
 
-            let history = hub
-                .invoke_as_async::<ops::ChannelMessageList>(
-                    Caller::User,
-                    ChannelMessageListInput {
-                        id: cid.clone(),
-                        before: None,
-                        limit: Some(10),
-                    },
-                )
-                .await
-                .unwrap();
-            assert_eq!(history.len(), 1);
-            let msg_id = history[0].id.clone();
+        hub.invoke_as_async::<ops::ChannelMessageSend>(
+            Caller::User,
+            SayRequest {
+                id: cid.clone(),
+                text: "hello async hub".into(),
+                send_key: Some("async-send-1".into()),
+                agent: None,
+                repo: None,
+                station: None,
+                reply_to: None,
+                attachments: None,
+                to: None,
+                blocks: None,
+                view_context: None,
+            },
+        )
+        .await
+        .unwrap();
 
-            let t1 = hub
-                .invoke_as_async::<ops::ChannelThreadCreate>(
-                    Caller::User,
-                    ChannelThreadCreateInput {
-                        id: msg_id.clone(),
-                        request_key: Some("thread-key-1".into()),
-                    },
-                )
-                .await
-                .unwrap();
-            let t2 = hub
-                .invoke_as_async::<ops::ChannelThreadCreate>(
-                    Caller::User,
-                    ChannelThreadCreateInput {
-                        id: msg_id,
-                        request_key: Some("thread-key-1".into()),
-                    },
-                )
-                .await
-                .unwrap();
-            assert_eq!(t1, t2);
+        let history = hub
+            .invoke_as_async::<ops::ChannelMessageList>(
+                Caller::User,
+                ChannelMessageListInput {
+                    id: cid.clone(),
+                    before: None,
+                    limit: Some(10),
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(history.len(), 1);
+        let msg_id = history[0].id.clone();
 
-            let listed = hub.invoke_as_async::<ops::ChannelList>(Caller::User, ()).await.unwrap();
-            assert!(listed.iter().any(|c| c.id == cid));
-        });
+        let t1 = hub
+            .invoke_as_async::<ops::ChannelThreadCreate>(
+                Caller::User,
+                ChannelThreadCreateInput {
+                    id: msg_id.clone(),
+                    request_key: Some("thread-key-1".into()),
+                },
+            )
+            .await
+            .unwrap();
+        let t2 = hub
+            .invoke_as_async::<ops::ChannelThreadCreate>(
+                Caller::User,
+                ChannelThreadCreateInput {
+                    id: msg_id,
+                    request_key: Some("thread-key-1".into()),
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(t1, t2);
 
-        hub.close();
+        let listed = hub.invoke_as_async::<ops::ChannelList>(Caller::User, ()).await.unwrap();
+        assert!(listed.iter().any(|c| c.id == cid));
+
+        hub.close_async().await;
         db.close();
     }
 }

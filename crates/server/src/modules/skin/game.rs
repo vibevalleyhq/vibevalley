@@ -191,16 +191,23 @@ impl Game {
             let repos = repos.clone();
             let emails = git_emails.clone();
             async move {
-                tokio::task::spawn_blocking(move || {
-                    let Some(game) = g.upgrade() else { return false };
-                    game.set_commits(&repos.contributions(&emails));
-                    true
-                })
-                .await
-                .unwrap_or(false)
+                let Some(game) = g.upgrade() else { return false };
+                let counted = repos.contributions_async(emails).await;
+                game.set_commits(&counted);
+                true
             }
         }));
         *self.counter.lock() = Some((cancel, handle));
+    }
+
+    pub async fn close_async(&self) {
+        let prev = self.sub.lock().take();
+        drop(prev);
+        let counter = self.counter.lock().take();
+        if let Some((cancel, handle)) = counter {
+            cancel.cancel();
+            let _ = handle.await;
+        }
     }
 
     pub fn close(&self) {
@@ -307,9 +314,14 @@ pub fn install(hub: &Hub, game: Arc<Game>) {
         let standings = ctx.hub.read(|s| vibevalley_core::game::standings_of(s.progress.as_ref()));
         Ok(vibevalley_protocol::AchievementList { items, standings })
     });
-    hub.on::<ops::GameTitleSet>(move |_, req| {
-        game.choose_title(req.achievement, req.tier);
-        Ok(())
+    hub.on_async::<ops::GameTitleSet, _, _>(move |_, req| {
+        let game = game.clone();
+        async move {
+            crate::spawn_blocking_traced(move || game.choose_title(req.achievement, req.tier))
+                .await
+                .map_err(|e| vibevalley_protocol::ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?;
+            Ok(())
+        }
     });
 }
 
@@ -326,29 +338,27 @@ mod tests {
     use super::*;
     use crate::now;
 
-    fn until<T>(hub: &Hub, what: &str, mut f: impl FnMut() -> Option<T>) -> T {
-        vibevalley_runtime::rt::block_on(async {
-            let notify = Arc::new(Notify::new());
-            let wake = notify.clone();
-            let sub = hub.subscribe_transitions("test-game-wait", move |_, _| {
-                wake.notify_one();
-            });
-            let res = tokio::time::timeout(Duration::from_secs(3), async {
-                loop {
-                    let notified = notify.notified();
-                    tokio::pin!(notified);
-                    notified.as_mut().enable();
-                    if let Some(v) = f() {
-                        return v;
-                    }
-                    notified.await;
+    async fn until_async<T>(hub: &Hub, what: &str, mut f: impl FnMut() -> Option<T>) -> T {
+        let notify = Arc::new(Notify::new());
+        let wake = notify.clone();
+        let sub = hub.subscribe_transitions("test-game-wait", move |_, _| {
+            wake.notify_one();
+        });
+        let res = tokio::time::timeout(Duration::from_secs(3), async {
+            loop {
+                let notified = notify.notified();
+                tokio::pin!(notified);
+                notified.as_mut().enable();
+                if let Some(v) = f() {
+                    return v;
                 }
-            })
-            .await
-            .ok();
-            sub.close_async().await;
-            res.unwrap_or_else(|| panic!("timed out waiting for {what}"))
+                notified.await;
+            }
         })
+        .await
+        .ok();
+        sub.close_async().await;
+        res.unwrap_or_else(|| panic!("timed out waiting for {what}"))
     }
 
     fn working_phase(since: i64) -> Phase {
@@ -405,8 +415,8 @@ mod tests {
         s
     }
 
-    #[test]
-    fn workspace_sessions_are_filtered_from_station_agents_streak_and_full_house() {
+    #[tokio::test]
+    async fn workspace_sessions_are_filtered_from_station_agents_streak_and_full_house() {
         let home = tempfile::tempdir().unwrap();
         let hub = Hub::new(empty_space_state());
         let game = Game::open(home.path(), &hub);
@@ -456,13 +466,14 @@ mod tests {
         })]);
 
         // The real worker claims the planted station (ws1..ws6 did NOT steal it) and tallies `backend`.
-        until(&hub, "real worker station & tally", || {
+        until_async(&hub, "real worker station & tally", || {
             hub.read(|s| {
                 let station_ok = s.plays.as_ref().and_then(|p| p.get("w1")).map(|p| p.station) == Some(4);
                 let hired_ok = s.progress.as_ref().and_then(|p| p.agents.get("backend")).is_some_and(|t| t.hired == 1);
                 (station_ok && hired_ok).then_some(())
             })
-        });
+        })
+        .await;
 
         let progress = hub.read(|s| s.progress.clone().unwrap());
         assert!(
@@ -488,15 +499,16 @@ mod tests {
             checks: vec![],
             answer: None,
         })]);
-        until(&hub, "real worker failure resets streak", || {
+        until_async(&hub, "real worker failure resets streak", || {
             hub.read(|s| {
                 let p = s.progress.as_ref()?;
                 (p.streak == 0 && p.agents.get("backend").is_some_and(|t| t.failed == 1) && game.asked() == 1).then_some(())
             })
-        });
+        })
+        .await;
 
-        game.close();
-        hub.close_bus();
+        game.close_async().await;
+        hub.close_bus_async().await;
     }
 
     #[tokio::test(start_paused = true)]
@@ -560,8 +572,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn want_station_window_uses_injected_clock_without_sleeping() {
+    #[tokio::test]
+    async fn want_station_window_uses_injected_clock_without_sleeping() {
         let home = tempfile::tempdir().unwrap();
         let hub = Hub::new(empty_space_state());
         let clock = Arc::new(ManualClock::new(1_700_000_000_000));
@@ -574,9 +586,10 @@ mod tests {
             at: at_inside,
             session: issue_worker("w-in", "i1", false),
         })]);
-        until(&hub, "station claimed inside window", || {
+        until_async(&hub, "station claimed inside window", || {
             hub.read(|s| (s.plays.as_ref().and_then(|p| p.get("w-in")).map(|p| p.station) == Some(4)).then_some(()))
-        });
+        })
+        .await;
 
         // Plant another wish and advance past WANT_STATION_FOR_MS; the wish must expire without assigning station 5.
         game.want(5);
@@ -594,7 +607,7 @@ mod tests {
             spent: None,
             brief: None,
         })]);
-        until(&hub, "second worker hired tally processed", || {
+        until_async(&hub, "second worker hired tally processed", || {
             hub.read(|s| {
                 s.progress
                     .as_ref()
@@ -602,14 +615,15 @@ mod tests {
                     .is_some_and(|t| t.hired == 2)
                     .then_some(())
             })
-        });
+        })
+        .await;
         assert_ne!(
             hub.read(|s| s.plays.as_ref().and_then(|p| p.get("w-out")).map(|p| p.station)),
             Some(5),
             "expired station wish must not be applied"
         );
 
-        game.close();
-        hub.close_bus();
+        game.close_async().await;
+        hub.close_bus_async().await;
     }
 }

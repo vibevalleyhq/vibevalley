@@ -1,4 +1,4 @@
-import { signal, Text, View, type JSX } from "nsh";
+import { computed, signal, Text, untracked, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { type Memory, type MemorySourceInfo, memoryKeep } from "@vibevalley/protocol";
@@ -89,17 +89,19 @@ function Pill(props: { label: string; on: boolean; onClick: () => void; testid?:
 export function MemoryPanel(props: { agent: string }) {
   const shown = signal("");
   const viewQuery = useMemory(() => props.agent);
-  const view = () => ready(viewQuery, undefined);
+  const view = computed(() => ready(viewQuery, undefined));
   const forget = createForget(() => props.agent);
   const sessionsById = useSessionsMap();
   const now = useNow();
   const sessionNameOf = (id: string | undefined) => (id === undefined ? t("web.memory.memory.helper") : (sessionsById().get(id)?.name ?? id));
-  const all = () => view()?.memories ?? [];
-  const sources = () => new Map((view()?.sources ?? []).map((s) => [s.name, s]));
-  const notes = () => all().filter((m) => m.kind === "note");
-  const done = () => all().filter((m) => m.kind === "issue");
-  const repos = () => [...new Set(all().flatMap((m) => (m.repo ? [m.repo] : [])))].toSorted();
-  const filtered = () => notes().filter((m) => shown() === "" || (shown() === everywhere ? m.repo === undefined : m.repo === shown()));
+  const all = computed(() => view()?.memories ?? []);
+  const sources = computed(() => new Map((view()?.sources ?? []).map((s) => [s.name, s])));
+  const hasMultipleSources = computed(() => sources().size > 1);
+  const sourcesList = computed(() => [...sources().values()]);
+  const notes = computed(() => all().filter((m) => m.kind === "note"));
+  const done = computed(() => all().filter((m) => m.kind === "issue"));
+  const repos = computed(() => [...new Set(all().flatMap((m) => (m.repo ? [m.repo] : [])))].toSorted());
+  const filtered = computed(() => notes().filter((m) => shown() === "" || (shown() === everywhere ? m.repo === undefined : m.repo === shown())));
   const whose = (m: Memory) =>
     m.author === "user"
       ? t("web.memory.memory.yours")
@@ -108,16 +110,16 @@ export function MemoryPanel(props: { agent: string }) {
         : m.author === "agent"
           ? t("web.memory.memory.orchestrators")
           : t("web.memory.memory.own");
-  const pills = () => [
+  const pills = computed(() => [
     ["", t("web.memory.memory.all")] as const,
     [everywhere, t("web.memory.memory.allRepos")] as const,
     ...repos().map((p) => [p, p] as const),
-  ];
+  ]);
   return (
     <View testID="memory-panel" class="gap-4">
       <Text class="text-sm text-muted">{t("web.memory.memory.intro")}</Text>
-      <If when={sources().size > 1}>
-        <Sources sources={[...sources().values()]} />
+      <If when={hasMultipleSources()}>
+        <Sources sources={sourcesList()} />
       </If>
       <Section title={t("web.memory.memory.issues")} count={done().length} testid="memory-issues">
         <If when={done().length > 0} else={<Quiet>{t("web.memory.memory.noIssues")}</Quiet>}>
@@ -143,7 +145,7 @@ export function MemoryPanel(props: { agent: string }) {
       <Section title={t("web.memory.memory.notes")} count={notes().length} testid="notes">
         <If when={repos().length > 0}>
           <View class="flex-row flex-wrap gap-1">
-            <Each of={pills()}>
+            <Each of={pills()} key={(p) => p[0]}>
               {(p) => <Pill testid={`memory-repo-${p()[0] || "all"}`} label={p()[1]} on={shown() === p()[0]} onClick={() => shown.set(p()[0])} />}
             </Each>
           </View>
@@ -151,10 +153,10 @@ export function MemoryPanel(props: { agent: string }) {
         <If when={filtered().length > 0} else={<Quiet>{notes().length > 0 ? t("web.memory.memory.emptyHere") : t("web.memory.memory.nothing")}</Quiet>}>
           <Each of={filtered()} key={(m) => m.id}>
             {(m) => {
-              const src = () => {
+              const src = computed(() => {
                 const source = m().source;
                 return source ? sources().get(source) : undefined;
-              };
+              });
               return (
                 <If
                   when={src()}
@@ -195,9 +197,10 @@ export function MemoryPanel(props: { agent: string }) {
 
 /** Where its memories live besides the farm's own, and what each lets the panel do. */
 function Sources(props: { sources: MemorySourceInfo[] }) {
+  const onCount = computed(() => props.sources.filter((s) => s.on).length);
   return (
-    <Section title={t("web.memory.memory.sources")} count={props.sources.filter((s) => s.on).length} testid="memory-sources">
-      <Each of={props.sources}>
+    <Section title={t("web.memory.memory.sources")} count={onCount()} testid="memory-sources">
+      <Each of={props.sources} key={(s) => s.name}>
         {(s) => (
           <View class="flex-row flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md border border-line bg-page px-3 py-2">
             <Text class="text-sm font-medium text-ink">{s().label}</Text>
@@ -222,24 +225,25 @@ function Sources(props: { sources: MemorySourceInfo[] }) {
 /** The pick the server would make, without counting it (memory.recall). */
 function RecallPreview(props: { agent: string }) {
   const reposQuery = useRepos();
-  const repos = () => ready(reposQuery, []).map((p) => p.name);
+  const repos = computed(() => ready(reposQuery, []).map((p) => p.name));
+  const repoOptions = computed(() => repos().map((p) => ({ value: p, label: p })));
   const repo = signal("");
   const text = signal("");
-  const where = () => repo() || repos()[0] || "";
+  const where = computed(() => repo() || repos()[0] || "");
   const memory = useMemory(() => props.agent);
   const previewQuery = useQuery(() => recallQuery({ agent: props.agent, repo: where(), text: text(), version: memory.snapshot().record?.updatedAt ?? 0 }), {
     enabled: () => where() !== "",
   });
-  const preview = () => ready(previewQuery, undefined);
-  const lines = () => preview()?.lines ?? [];
+  const preview = computed(() => ready(previewQuery, undefined));
+  const lines = computed(() => preview()?.lines ?? []);
+  const hasLines = computed(() => lines().length > 0);
+  const joinedLines = computed(() => lines().join("\n"));
   return (
     <Section
       title={t("web.memory.memory.next")}
       testid="recall"
       aside={
-        lines().length > 0 && preview()
-          ? t("web.memory.memory.preview", { n: lines().length, chars: preview()?.chars ?? 0, limit: preview()?.limit ?? 0 })
-          : undefined
+        hasLines() && preview() ? t("web.memory.memory.preview", { n: lines().length, chars: preview()?.chars ?? 0, limit: preview()?.limit ?? 0 }) : undefined
       }
     >
       <View class="gap-1.5 sm:flex-row">
@@ -249,7 +253,7 @@ function RecallPreview(props: { agent: string }) {
           label={t("web.memory.memory.where")}
           placeholder={t("web.memory.memory.pick")}
           value={where()}
-          options={repos().map((p) => ({ value: p, label: p }))}
+          options={repoOptions()}
           onChange={(v) => repo.set(v)}
         />
         <TextInput
@@ -261,9 +265,9 @@ function RecallPreview(props: { agent: string }) {
           onInput={(v) => text.set(v)}
         />
       </View>
-      <If when={lines().length > 0} else={<Quiet>{where() ? t("web.memory.memory.blank") : t("web.memory.memory.noRepos")}</Quiet>}>
+      <If when={hasLines()} else={<Quiet>{where() ? t("web.memory.memory.blank") : t("web.memory.memory.noRepos")}</Quiet>}>
         <View testID="recall-lines" class="rounded-md border border-line bg-page px-3 py-2">
-          <Text class="text-sm text-ink">{lines().join("\n")}</Text>
+          <Text class="text-sm text-ink">{joinedLines()}</Text>
         </View>
       </If>
     </Section>
@@ -273,7 +277,7 @@ function RecallPreview(props: { agent: string }) {
 /** Notes belong to the profile; authorship distinguishes the user's words. */
 export function OrchestratorMemoryPanel(props: { agent: string }) {
   const viewQuery = useMemory(() => props.agent);
-  const view = () => ready(viewQuery, undefined);
+  const view = computed(() => ready(viewQuery, undefined));
   const forget = createForget(() => props.agent);
   const now = useNow();
   return (
@@ -310,26 +314,29 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
   // A refusal shows under the box, where the words are; the key stays until a note went in, so a retry is that note.
   const act = createAct((e) => error.set(e));
   const key = createRequestKey();
+  const canWrite = computed(() => text().trim().length > 0 && !act.busy());
   const write = async () => {
     const agent = props.agent;
-    const words = text();
-    const at = props.withRepo === true ? repo().trim() || undefined : undefined;
+    const words = untracked(text);
+    if (!words.trim() || untracked(act.busy)) return;
+    const at = props.withRepo === true ? untracked(repo).trim() || undefined : undefined;
     error.set(undefined);
+    text.set("");
     const done = await act.run(async () => {
       await api.memory.create(omitUndefined({ agent, text: words, repo: at, requestKey: key.now() }));
       key.used();
       await queries.invalidate({ key: ["memory", agent] });
       return true;
     });
-    if (done === true) text.set("");
+    if (done !== true && untracked(text) === "") text.set(words);
   };
-  const suggested = () => {
+  const suggested = computed(() => {
     const typed = repo().trim().toLowerCase();
     return ready(reposQuery, [])
       .map((p) => p.name)
       .filter((name) => name.toLowerCase() !== typed && (typed === "" || name.toLowerCase().includes(typed)))
       .slice(0, 6);
-  };
+  });
   return (
     <View class="gap-1">
       <Text class="text-xs font-medium text-muted">{t("web.memory.memory.note")}</Text>
@@ -352,7 +359,7 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
                 </Text>
               </If>
             </View>
-            <Button tone="primary" testID="note-write" class="shrink-0" disabled={!text().trim() || act.busy()} onPress={() => void write()}>
+            <Button tone="primary" testID="note-write" class="shrink-0" disabled={!canWrite()} onPress={() => void write()}>
               {t("web.base.write")}
             </Button>
           </View>
@@ -368,7 +375,7 @@ function WriteNote(props: { agent: string; withRepo?: boolean }) {
             value={repo()}
             onInput={(v) => repo.set(v)}
           />
-          <Button tone="primary" testID="note-write" class="shrink-0" disabled={!text().trim() || act.busy()} onPress={() => void write()}>
+          <Button tone="primary" testID="note-write" class="shrink-0" disabled={!canWrite()} onPress={() => void write()}>
             {t("web.base.write")}
           </Button>
         </View>

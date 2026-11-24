@@ -221,50 +221,65 @@ impl Jobs {
     }
 
     /// An understanding job's run, from `uploading`.
-    pub(super) fn understand(self: &Arc<Self>, r: &Record, request: &MediaUnderstandingRequest, account: &Account, stop: &Stop) {
+    pub(super) async fn understand_async(self: &Arc<Self>, r: &Record, request: &MediaUnderstandingRequest, account: &Account, stop: &Stop) {
         let id = r.id();
         let mut files = vec![];
         for input in &r.inputs {
-            match self.upload(id, input, account, stop) {
+            match self.upload_async(id, input, account, stop).await {
                 Ok(file) => files.push(file),
                 Err(outcome) => {
                     let (phase, key) = match outcome {
                         Outcome::Unknown => (Phase::Unknown, "remoteUploadUnknown"),
                         Outcome::Rejected | Outcome::NotSubmitted => (Phase::Failed, "remoteUploadRejected"),
                     };
-                    let _ = self.change(id, &[Phase::Uploading], |r| {
-                        r.phase = phase;
-                        r.problem = t(&format!("server.media.{key}"), &[]);
-                    });
+                    let _ = self
+                        .change_async(id, &[Phase::Uploading], |r| {
+                            r.phase = phase;
+                            r.problem = t(&format!("server.media.{key}"), &[]);
+                        })
+                        .await;
                     return;
                 }
             }
         }
-        if !matches!(self.change(id, &[Phase::Uploading], |r| r.phase = Phase::Generating), Ok(true)) {
+        if !matches!(self.change_async(id, &[Phase::Uploading], |r| r.phase = Phase::Generating).await, Ok(true)) {
             return;
         }
         let sent: Vec<(MediaInputKind, String)> = r.inputs.iter().map(|i| i.kind).zip(files).collect();
-        let answer = Moss::prepare_understanding(&account.model, &request.prompt, &sent, request.max_output_tokens)
-            .and_then(|body| self.moss.understand(&account.key, &body, stop));
+        let body = Moss::prepare_understanding(&account.model, &request.prompt, &sent, request.max_output_tokens);
+        let answer = match body {
+            Ok(body) => {
+                let fetch = self.moss.fetch.clone();
+                let key = account.key.clone();
+                let stop_req = stop.clone();
+                match crate::spawn_blocking_traced(move || Moss { fetch }.understand(&key, &body, &stop_req)).await {
+                    Ok(res) => res,
+                    Err(_) => Err(super::vendor::VendorError::new(super::vendor::Reason::Network, Outcome::Unknown)),
+                }
+            }
+            Err(e) => Err(e),
+        };
         if stop.aborted() {
             return;
         }
         match answer {
             Ok(result) => {
-                let answered = self.change(id, &[Phase::Generating], |r| {
-                    r.phase = match result.status {
-                        MediaUnderstandingStatus::Completed => Phase::Ready,
-                        MediaUnderstandingStatus::Incomplete => Phase::Incomplete,
-                    };
-                    r.understood = Some(result);
-                    r.cleanup = Some(MediaCleanup::Running);
-                    r.problem.clear();
-                });
+                let answered = self
+                    .change_async(id, &[Phase::Generating], |r| {
+                        r.phase = match result.status {
+                            MediaUnderstandingStatus::Completed => Phase::Ready,
+                            MediaUnderstandingStatus::Incomplete => Phase::Incomplete,
+                        };
+                        r.understood = Some(result);
+                        r.cleanup = Some(MediaCleanup::Running);
+                        r.problem.clear();
+                    })
+                    .await;
                 if matches!(answered, Ok(true)) {
-                    vibevalley_runtime::rt::block_on(self.tidy_understanding_async(id));
+                    self.tidy_understanding_async(id).await;
                 }
             }
-            Err(e) => self.failed(id, e.outcome),
+            Err(e) => self.failed_async(id, e.outcome).await,
         }
     }
 

@@ -203,12 +203,8 @@ async fn fold_sse_response(response: reqwest::Response, cancel: &CancelToken, on
     Ok(fold.finish())
 }
 
-impl ModelClient for OpenAiClient {
-    fn complete(&self, request: &ChatRequest, on: &mut dyn FnMut(Delta)) -> Result<Completion> {
-        self.complete_cancellable(request, &CancelToken::never(), on)
-    }
-
-    fn complete_cancellable(&self, request: &ChatRequest, cancel: &CancelToken, on: &mut dyn FnMut(Delta)) -> Result<Completion> {
+impl OpenAiClient {
+    pub(crate) async fn complete_cancellable_async(&self, request: &ChatRequest, cancel: &CancelToken, on: &mut dyn FnMut(Delta)) -> Result<Completion> {
         if cancel.is_cancelled() {
             return Err(BrainError::Cancelled);
         }
@@ -217,60 +213,68 @@ impl ModelClient for OpenAiClient {
         let body = request_body(request);
         let client = &self.client;
         let retry = self.retry;
-        crate::rt::block_on(async {
-            let mut backoff = retry.backoff();
-            loop {
-                if cancel.is_cancelled() {
-                    return Err(BrainError::Cancelled);
-                }
-                let sent = tokio::select! {
-                    biased;
-                    () = cancel.cancelled() => return Err(BrainError::Cancelled),
-                    res = client
-                        .post(&url)
-                        .header("Authorization", format!("Bearer {key}"))
-                        .header("Accept", "text/event-stream")
-                        .json(&body)
-                        .send() => res,
-                };
-                let response = match sent {
-                    Ok(r) => r,
-                    Err(err) => {
-                        let network = BrainError::Network(err.to_string());
-                        if RetryPolicy::is_retryable_error(&err)
-                            && let Some(delay) = backoff.next()
-                        {
-                            if !sleep_interruptible_async(delay, cancel).await {
-                                return Err(BrainError::Cancelled);
-                            }
-                            continue;
-                        }
-                        return Err(network);
-                    }
-                };
-                let status = response.status().as_u16();
-                let retry_after = response.headers().get("retry-after").and_then(|v| v.to_str().ok()).and_then(parse_retry_after);
-                if status >= 400 {
-                    let text = tokio::select! {
-                        biased;
-                        () = cancel.cancelled() => return Err(BrainError::Cancelled),
-                        res = response.text() => res.unwrap_or_default(),
-                    };
-                    let err = classify_http_error(status, &text);
-                    if RetryPolicy::is_retryable_status(status)
-                        && let Some(default_delay) = backoff.next()
+        let mut backoff = retry.backoff();
+        loop {
+            if cancel.is_cancelled() {
+                return Err(BrainError::Cancelled);
+            }
+            let sent = tokio::select! {
+                biased;
+                () = cancel.cancelled() => return Err(BrainError::Cancelled),
+                res = client
+                    .post(&url)
+                    .header("Authorization", format!("Bearer {key}"))
+                    .header("Accept", "text/event-stream")
+                    .json(&body)
+                    .send() => res,
+            };
+            let response = match sent {
+                Ok(r) => r,
+                Err(err) => {
+                    let network = BrainError::Network(err.to_string());
+                    if RetryPolicy::is_retryable_error(&err)
+                        && let Some(delay) = backoff.next()
                     {
-                        let delay = RetryPolicy::resolve_delay(default_delay, retry_after);
                         if !sleep_interruptible_async(delay, cancel).await {
                             return Err(BrainError::Cancelled);
                         }
                         continue;
                     }
-                    return Err(err);
+                    return Err(network);
                 }
-                return fold_sse_response(response, cancel, on).await;
+            };
+            let status = response.status().as_u16();
+            let retry_after = response.headers().get("retry-after").and_then(|v| v.to_str().ok()).and_then(parse_retry_after);
+            if status >= 400 {
+                let text = tokio::select! {
+                    biased;
+                    () = cancel.cancelled() => return Err(BrainError::Cancelled),
+                    res = response.text() => res.unwrap_or_default(),
+                };
+                let err = classify_http_error(status, &text);
+                if RetryPolicy::is_retryable_status(status)
+                    && let Some(default_delay) = backoff.next()
+                {
+                    let delay = RetryPolicy::resolve_delay(default_delay, retry_after);
+                    if !sleep_interruptible_async(delay, cancel).await {
+                        return Err(BrainError::Cancelled);
+                    }
+                    continue;
+                }
+                return Err(err);
             }
-        })
+            return fold_sse_response(response, cancel, on).await;
+        }
+    }
+}
+
+impl ModelClient for OpenAiClient {
+    fn complete(&self, request: &ChatRequest, on: &mut dyn FnMut(Delta)) -> Result<Completion> {
+        self.complete_cancellable(request, &CancelToken::never(), on)
+    }
+
+    fn complete_cancellable(&self, request: &ChatRequest, cancel: &CancelToken, on: &mut dyn FnMut(Delta)) -> Result<Completion> {
+        crate::rt::block_on(self.complete_cancellable_async(request, cancel, on))
     }
 }
 

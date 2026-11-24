@@ -102,6 +102,7 @@ export function Composer(props: {
   const selection = signal({ start: 0, end: 0 });
   const placed = signal<{ start: number; end?: number } | undefined>(undefined);
   const draft = () => draftOf(props.channel?.id);
+  const draftFiles = computed(() => draft().files, { equals: (a, b) => a === b || (a.length === 0 && b.length === 0) });
   const uploading = () => uploadsIn(props.channel?.id);
   const replying = useReplying(() => props.channel?.id);
   // Built once for the channel (the page keys the box by it): it starts from the draft kept for it.
@@ -115,13 +116,13 @@ export function Composer(props: {
     ...(at ? { initial: untracked(() => draftOf(at).text) } : {}),
     says: useIntents(chatSay),
     target: () => {
-      const d = draft();
+      const files = draftFiles();
       const replyNumber = replying()?.number ?? props.replyTo;
       const viewContext = untracked(activeArtifactViewContext);
       return {
         id: props.channel?.id ?? "",
         ...(replyNumber !== undefined ? { replyTo: replyNumber } : {}),
-        ...(d.files.length > 0 ? { attachments: d.files.map((f) => f.id) } : {}),
+        ...(files.length > 0 ? { attachments: files.map((f) => f.id) } : {}),
         ...((props.quoted?.length ?? 0) > 0 ? { blocks: (props.quoted ?? []).map((q) => q.ref) } : {}),
         ...(viewContext ? { viewContext } : {}),
       };
@@ -195,10 +196,11 @@ export function Composer(props: {
       { when: "always" },
     );
   });
+  const isEmpty = computed(() => box.text() === "");
   effect(() => {
     if (!focused() || menuOpen()) return;
     const offs: (() => void)[] = [];
-    if (box.text() === "") offs.push(keymap.bind("up", () => onKey("ArrowUp"), { when: "always" }));
+    if (isEmpty()) offs.push(keymap.bind("up", () => onKey("ArrowUp"), { when: "always" }));
     if (replying()) offs.push(keymap.bind("escape", () => onKey("Escape"), { when: "always" }));
     return () => offs.forEach((off) => off());
   });
@@ -335,9 +337,9 @@ export function Composer(props: {
           </View>
         )}
       </If>
-      <If when={draft().files.length > 0 || uploading().length > 0}>
+      <If when={draftFiles().length > 0 || uploading().length > 0}>
         <View class="mb-2 flex-row flex-wrap gap-1.5">
-          <Each of={draft().files} key={(f) => f.id}>
+          <Each of={draftFiles()} key={(f) => f.id}>
             {(f) => <AttachmentTile testid="pending-file" file={f()} onRemove={() => props.channel && drafts.drop(props.channel.id, f().id)} />}
           </Each>
           <Each of={uploading()} key={(u) => u.key}>
@@ -378,6 +380,8 @@ export function Composer(props: {
             selection.set({ start: caret, end: caret });
           }}
           onSelectionChange={(e) => {
+            const cur = untracked(selection);
+            if (cur.start === e.start && cur.end === e.end) return;
             selection.set({ start: e.start, end: e.end });
             box.caret(e.start);
           }}

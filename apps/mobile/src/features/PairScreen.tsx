@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, View } from "nsh";
+import { computed, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
@@ -11,7 +11,9 @@ export function PairScreen(props: { readonly session: RemoteSession; readonly la
   const serverUrl = signal("");
   const pairCode = signal("");
   const deviceName = signal(defaultDeviceName());
-  const isDual = () => props.layout().mode === "dual_pane";
+  const isDual = computed(() => props.layout().mode === "dual_pane");
+  const canSubmit = computed(() => !props.session.pairing());
+  const submitLabel = computed(() => (props.session.pairing() ? t("web.remote.mobile.pairing") : t("web.remote.mobile.pairAction")));
 
   const submit = () => {
     if (props.session.pairing()) return;
@@ -55,14 +57,7 @@ export function PairScreen(props: { readonly session: RemoteSession; readonly la
         )}
       </If>
 
-      <PillButton
-        testID="pair-submit"
-        tone="primary"
-        icon="link"
-        label={props.session.pairing() ? t("web.remote.mobile.pairing") : t("web.remote.mobile.pairAction")}
-        disabled={props.session.pairing()}
-        onPress={() => submit()}
-      />
+      <PillButton testID="pair-submit" tone="primary" icon="link" label={submitLabel()} disabled={!canSubmit()} onPress={() => submit()} />
     </SectionCard>
   );
 

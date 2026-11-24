@@ -66,10 +66,6 @@ fn get(board: &Board, reference: &str) -> Result<Issue, ApiError> {
     board.issue(reference).ok_or_else(|| api(board, BoardError::NoIssue(reference.to_string())))
 }
 
-fn applied(hub: &Hub, issue: Issue) -> AppliedIssue {
-    AppliedIssue::from_issue(issue, hub.seq())
-}
-
 /// `nextSteps`: what the user can do with the issue, as words and commands.
 pub fn next_steps(item: &Issue) -> Vec<Next> {
     let n = item.number.to_string();
@@ -458,166 +454,306 @@ pub fn install_on_with_clock(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Ag
     let b = board.clone();
     hub.on::<ops::IssueList>(move |_, filter| Ok(b.read(|s| vibevalley_core::pick_issues(&s.issues, &filter, clock.now_ms()))));
     let b = board.clone();
-    hub.on::<ops::IssueGet>(move |_, input| get(&b, &input.id));
-
-    let b = board.clone();
-    let keys = Arc::new(RequestKeys::default());
-    let profiles = names.clone();
-    hub.on::<ops::IssueCreate>(move |ctx, req| {
-        keys.once(req.request_key.as_deref(), || {
-            let issue = create(&b, profiles.as_deref(), &req)?;
-            Ok(applied(ctx.hub, issue))
-        })
-    });
-
-    let b = board.clone();
-    let profiles = names.clone();
-    hub.on::<ops::IssueUpdate>(move |ctx, input| {
-        let issue = update(&b, profiles.as_deref(), input)?;
-        Ok(applied(ctx.hub, issue))
-    });
-
-    let b = board.clone();
-    hub.on::<ops::IssueDelete>(move |_, input| {
-        let id = get(&b, &input.id)?.id;
-        b.remove(&id).map_err(|e| api(&b, e))
-    });
-    let b = board.clone();
-    hub.on::<ops::IssuePreviewDelete>(move |_, input| {
-        let item = get(&b, &input.id)?;
-        if item.was_sent() {
-            return Err(refused("server.issue.started", &[]));
+    hub.on_async::<ops::IssueGet, _, _>(move |_, input| {
+        let b = b.clone();
+        async move {
+            crate::spawn_blocking_traced(move || get(&b, &input.id))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
         }
-        let mut does = vec![t(
-            "server.issue.does.deleteIssue",
-            &[("n", item.number.into()), ("title", short_title(&item.title).into())],
-        )];
-        if let Some(r) = &item.refining {
-            does.push(t("server.issue.does.drafterLeaves", &[("name", r.name.clone().into())]));
-        }
-        if item.repo.is_some() {
-            does.push(t("server.issue.does.cleanWorktree", &[]));
-        }
-        Ok(Preview { does })
     });
 
     let b = board.clone();
     let keys = Arc::new(RequestKeys::default());
     let profiles = names.clone();
-    hub.on::<ops::IssueStatusUpdate>(move |ctx, input| {
-        keys.once(input.request_key.as_deref(), || Ok(applied(ctx.hub, status(&b, profiles.as_deref(), &input)?)))
+    let h = Arc::downgrade(hub);
+    hub.on_async::<ops::IssueCreate, _, _>(move |_, req| {
+        let b = b.clone();
+        let keys = keys.clone();
+        let profiles = profiles.clone();
+        let h = h.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                keys.once(req.request_key.as_deref(), || {
+                    let issue = create(&b, profiles.as_deref(), &req)?;
+                    Ok(AppliedIssue::from_issue(issue, h.upgrade().map_or(0, |hub| hub.seq())))
+                })
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
+
+    let b = board.clone();
+    let profiles = names.clone();
+    let h = Arc::downgrade(hub);
+    hub.on_async::<ops::IssueUpdate, _, _>(move |_, input| {
+        let b = b.clone();
+        let profiles = profiles.clone();
+        let h = h.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                let issue = update(&b, profiles.as_deref(), input)?;
+                Ok(AppliedIssue::from_issue(issue, h.upgrade().map_or(0, |hub| hub.seq())))
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
+
+    let b = board.clone();
+    hub.on_async::<ops::IssueDelete, _, _>(move |_, input| {
+        let b = b.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                let id = get(&b, &input.id)?.id;
+                b.remove(&id).map_err(|e| api(&b, e))
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
+    let b = board.clone();
+    hub.on_async::<ops::IssuePreviewDelete, _, _>(move |_, input| {
+        let b = b.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                let item = get(&b, &input.id)?;
+                if item.was_sent() {
+                    return Err(refused("server.issue.started", &[]));
+                }
+                let mut does = vec![t(
+                    "server.issue.does.deleteIssue",
+                    &[("n", item.number.into()), ("title", short_title(&item.title).into())],
+                )];
+                if let Some(r) = &item.refining {
+                    does.push(t("server.issue.does.drafterLeaves", &[("name", r.name.clone().into())]));
+                }
+                if item.repo.is_some() {
+                    does.push(t("server.issue.does.cleanWorktree", &[]));
+                }
+                Ok(Preview { does })
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
+
+    let b = board.clone();
+    let keys = Arc::new(RequestKeys::default());
+    let profiles = names.clone();
+    let h = Arc::downgrade(hub);
+    hub.on_async::<ops::IssueStatusUpdate, _, _>(move |_, input| {
+        let b = b.clone();
+        let keys = keys.clone();
+        let profiles = profiles.clone();
+        let h = h.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                keys.once(input.request_key.as_deref(), || {
+                    let issue = status(&b, profiles.as_deref(), &input)?;
+                    Ok(AppliedIssue::from_issue(issue, h.upgrade().map_or(0, |hub| hub.seq())))
+                })
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
     });
 
     let b = board.clone();
     let names = names.clone();
-    hub.on::<ops::IssueStatusPreviewUpdate>(move |_, input| {
-        let mut item = get(&b, &input.id)?;
-        Board::verify_approval(&item, input.status, input.revision.as_ref()).map_err(|e| api(&b, e))?;
-        if let Some(edit) = &input.edit {
-            if edit_rewords(edit) && item.was_sent() {
-                return Err(refused("server.issue.started", &[]));
-            }
-            apply_preview_edit(&mut item, edit);
-        }
-        if let Some(raw_agent) = &input.agent {
-            let agent = resolve_agent(names.as_deref(), raw_agent);
-            if !agent.is_empty() && item.assigned_agent() != Some(agent.as_str()) {
-                if input.status != IssueStatus::Todo {
-                    return Err(refused("server.issue.handOverOnTodo", &[]));
-                }
-                if let Some(agents) = names.as_deref()
-                    && agents.profiles.agent(&agent).is_none()
-                {
-                    return Err(refused("server.issue.profileGone", &[("id", agent.into())]));
-                }
-                edits::assign(&mut item, &agent, 0);
-                if item.status == IssueStatus::Todo {
-                    let settled = Settled {
-                        mv: Move::Start,
-                        said: input.text.as_deref().unwrap_or("").trim().to_string(),
-                    };
-                    return Ok(Preview {
-                        does: moves_words(&b, names.as_deref(), &item, &settled)?,
-                    });
-                }
-            }
-        }
-        let settled = settle(&item, input.status, input.text.as_deref().unwrap_or(""))?;
-        Ok(Preview {
-            does: moves_words(&b, names.as_deref(), &item, &settled)?,
-        })
-    });
-
-    let b = board.clone();
-    hub.on::<ops::IssueReview>(move |_, input| review(&b, input));
-
-    let b = board.clone();
-    hub.on::<ops::IssueCommentCreate>(move |ctx, input| {
-        comment(&b, &input.id, &input.text)?;
-        Ok(Applied { seq: ctx.hub.seq() })
-    });
-
-    let b = board.clone();
-    hub.on::<ops::IssueRefine>(move |_, input| refine(&b, None, &input));
-
-    let b = board.clone();
-    hub.on::<ops::IssueSplit>(move |_, input| split(&b, &input));
-
-    let b = board.clone();
-    hub.on::<ops::IssueTimelineGet>(move |_, input| {
-        let item = get(&b, &input.id)?;
-        let runs = b.runs(&item.id).map_err(|e| api(&b, e))?;
-        Ok(milestones_of(&item, &runs, |s| b.session(s).map(|s| s.name)))
-    });
-    let b = board.clone();
-    hub.on::<ops::IssueRunList>(move |_, input| {
-        let item = get(&b, &input.id)?;
-        b.runs(&item.id).map_err(|e| api(&b, e))
-    });
-    let b = board.clone();
-    hub.on::<ops::IssueDiffGet>(move |_, input| {
-        let item = get(&b, &input.id)?;
-        changes_of(&b, &item, input.since_tree.as_deref())
-    });
-    let b = board.clone();
-    hub.on::<ops::IssueHistoryList>(move |_, ()| {
-        Ok(b.read(|s| {
-            s.issues
-                .iter()
-                .map(|issue| {
-                    let ids: Vec<String> = issue.executions().map(|e| e.session().to_string()).collect();
-                    // A session that left is read from the board's past ones (lifecycle.ts keeps them in its table).
-                    let sessions: Vec<_> = ids
-                        .iter()
-                        .filter_map(|id| s.sessions.iter().find(|x| &x.id == id).cloned().or_else(|| b.past_session(id)))
-                        .collect();
-                    let missing_sessions = ids.iter().filter(|id| !sessions.iter().any(|x| &x.id == *id)).cloned().collect();
-                    IssueHistory {
-                        issue: issue.clone(),
-                        sessions,
-                        missing_sessions,
+    hub.on_async::<ops::IssueStatusPreviewUpdate, _, _>(move |_, input| {
+        let b = b.clone();
+        let names = names.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                let mut item = get(&b, &input.id)?;
+                Board::verify_approval(&item, input.status, input.revision.as_ref()).map_err(|e| api(&b, e))?;
+                if let Some(edit) = &input.edit {
+                    if edit_rewords(edit) && item.was_sent() {
+                        return Err(refused("server.issue.started", &[]));
                     }
+                    apply_preview_edit(&mut item, edit);
+                }
+                if let Some(raw_agent) = &input.agent {
+                    let agent = resolve_agent(names.as_deref(), raw_agent);
+                    if !agent.is_empty() && item.assigned_agent() != Some(agent.as_str()) {
+                        if input.status != IssueStatus::Todo {
+                            return Err(refused("server.issue.handOverOnTodo", &[]));
+                        }
+                        if let Some(agents) = names.as_deref()
+                            && agents.profiles.agent(&agent).is_none()
+                        {
+                            return Err(refused("server.issue.profileGone", &[("id", agent.into())]));
+                        }
+                        edits::assign(&mut item, &agent, 0);
+                        if item.status == IssueStatus::Todo {
+                            let settled = Settled {
+                                mv: Move::Start,
+                                said: input.text.as_deref().unwrap_or("").trim().to_string(),
+                            };
+                            return Ok(Preview {
+                                does: moves_words(&b, names.as_deref(), &item, &settled)?,
+                            });
+                        }
+                    }
+                }
+                let settled = settle(&item, input.status, input.text.as_deref().unwrap_or(""))?;
+                Ok(Preview {
+                    does: moves_words(&b, names.as_deref(), &item, &settled)?,
                 })
-                .collect()
-        }))
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
+
+    let b = board.clone();
+    hub.on_async::<ops::IssueReview, _, _>(move |_, input| {
+        let b = b.clone();
+        async move {
+            crate::spawn_blocking_traced(move || review(&b, input))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
+
+    let b = board.clone();
+    let h = Arc::downgrade(hub);
+    hub.on_async::<ops::IssueCommentCreate, _, _>(move |_, input| {
+        let b = b.clone();
+        let h = h.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                comment(&b, &input.id, &input.text)?;
+                Ok(Applied {
+                    seq: h.upgrade().map_or(0, |hub| hub.seq()),
+                })
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
+
+    let b = board.clone();
+    hub.on_async::<ops::IssueRefine, _, _>(move |_, input| {
+        let b = b.clone();
+        async move {
+            crate::spawn_blocking_traced(move || refine(&b, None, &input))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
+
+    let b = board.clone();
+    hub.on_async::<ops::IssueSplit, _, _>(move |_, input| {
+        let b = b.clone();
+        async move {
+            crate::spawn_blocking_traced(move || split(&b, &input))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
+
+    let b = board.clone();
+    hub.on_async::<ops::IssueTimelineGet, _, _>(move |_, input| {
+        let b = b.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                let item = get(&b, &input.id)?;
+                let runs = b.runs(&item.id).map_err(|e| api(&b, e))?;
+                Ok(milestones_of(&item, &runs, |s| b.session(s).map(|s| s.name)))
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
+    let b = board.clone();
+    hub.on_async::<ops::IssueRunList, _, _>(move |_, input| {
+        let b = b.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                let item = get(&b, &input.id)?;
+                b.runs(&item.id).map_err(|e| api(&b, e))
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
+    let b = board.clone();
+    hub.on_async::<ops::IssueDiffGet, _, _>(move |_, input| {
+        let b = b.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                let item = get(&b, &input.id)?;
+                changes_of(&b, &item, input.since_tree.as_deref())
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
+    let b = board.clone();
+    hub.on_async::<ops::IssueHistoryList, _, _>(move |_, ()| {
+        let b = b.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                Ok(b.read(|s| {
+                    s.issues
+                        .iter()
+                        .map(|issue| {
+                            let ids: Vec<String> = issue.executions().map(|e| e.session().to_string()).collect();
+                            // A session that left is read from the board's past ones (lifecycle.ts keeps them in its table).
+                            let sessions: Vec<_> = ids
+                                .iter()
+                                .filter_map(|id| s.sessions.iter().find(|x| &x.id == id).cloned().or_else(|| b.past_session(id)))
+                                .collect();
+                            let missing_sessions = ids.iter().filter(|id| !sessions.iter().any(|x| &x.id == *id)).cloned().collect();
+                            IssueHistory {
+                                issue: issue.clone(),
+                                sessions,
+                                missing_sessions,
+                            }
+                        })
+                        .collect()
+                }))
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
     });
     // Answered by `install_conversation` once the chat is open.
     let b = board.clone();
-    hub.on::<ops::IssueConversationGet>(move |_, input| get(&b, &input.id).map(|_| None));
+    hub.on_async::<ops::IssueConversationGet, _, _>(move |_, input| {
+        let b = b.clone();
+        async move {
+            crate::spawn_blocking_traced(move || get(&b, &input.id).map(|_| None))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
 }
 
 /// `issue.diff.get` that also reports to the caller hook when the user looks at a live session's changes.
 pub fn install_reviewed(hub: &Hub, board: Board, on_reviewed: Arc<dyn Fn(&str) + Send + Sync>) {
-    hub.on::<ops::IssueDiffGet>(move |ctx, input| {
-        let item = get(&board, &input.id)?;
-        let changes = changes_of(&board, &item, input.since_tree.as_deref())?;
-        if ctx.caller == vibevalley_protocol::Caller::User
-            && let Some(session) = item.latest_session_id()
-            && board.read(|s| s.sessions.iter().any(|h| &h.id == session))
-        {
-            on_reviewed(session);
+    hub.on_async::<ops::IssueDiffGet, _, _>(move |ctx, input| {
+        let board = board.clone();
+        let on_reviewed = on_reviewed.clone();
+        let caller = ctx.caller;
+        async move {
+            crate::spawn_blocking_traced(move || {
+                let item = get(&board, &input.id)?;
+                let changes = changes_of(&board, &item, input.since_tree.as_deref())?;
+                if caller == vibevalley_protocol::Caller::User
+                    && let Some(session) = item.latest_session_id()
+                    && board.read(|s| s.sessions.iter().any(|h| &h.id == session))
+                {
+                    on_reviewed(session);
+                }
+                Ok(changes)
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
         }
-        Ok(changes)
     });
 }
 
@@ -625,10 +761,26 @@ pub fn install_reviewed(hub: &Hub, board: Board, on_reviewed: Arc<dyn Fn(&str) +
 /// opened.
 pub fn install_conversation(hub: &Hub, board: Board, channel: Arc<dyn crate::ports::ChannelAnnouncePort>) {
     let (b, c) = (board.clone(), channel.clone());
-    hub.on::<ops::IssueConversationGet>(move |_, input| Ok(c.issue_thread_id(&get(&b, &input.id)?.id)));
+    hub.on_async::<ops::IssueConversationGet, _, _>(move |_, input| {
+        let b = b.clone();
+        let c = c.clone();
+        async move {
+            crate::spawn_blocking_traced(move || Ok(c.issue_thread_id(&get(&b, &input.id)?.id)))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
     // refinement.ts `draft`: the issue's thread is opened, the user's words go in it, and what was said there is the
     // draft's discussion.
-    hub.on::<ops::IssueRefine>(move |_, input| refine(&board, Some(channel.as_ref()), &input));
+    hub.on_async::<ops::IssueRefine, _, _>(move |_, input| {
+        let board = board.clone();
+        let channel = channel.clone();
+        async move {
+            crate::spawn_blocking_traced(move || refine(&board, Some(channel.as_ref()), &input))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
 }
 
 fn edit_rewords(edit: &IssueUpdate) -> bool {

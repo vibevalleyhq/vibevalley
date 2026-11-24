@@ -1,4 +1,4 @@
-import { signal, Text, View } from "nsh";
+import { computed, signal, Text, View } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -69,13 +69,17 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const edited = () => form().edited;
   const act = createAct();
   const moves = useIntents(issueMove);
-  const move = () => issueMoveOf(props.item.id, moves.list());
-  const busy = () => act.busy() || move()?.state === "moving";
+  const move = computed(() => issueMoveOf(props.item.id, moves.list()));
+  const busy = computed(() => act.busy() || move()?.state === "moving");
   const word = signal("");
   const newRepo = signal(false);
   const agents = useWorkAgents(true);
   const repoList = useRepos();
-  const repos = () => ready(repoList, []).map((p) => p.name);
+  const repos = computed(() => ready(repoList, []).map((p) => p.name));
+  const agentOptions = computed(() => agents().map((a) => ({ value: a.id, label: a.runtime ? `${a.name} · ${a.runtime}` : a.name })));
+  const repoOptions = computed(() => [...new Set([...repos(), ...(d().repo ? [d().repo] : [])])].map((p) => ({ value: p, label: p })));
+  const priorityOptions = computed(() => PriorityValues.map((p) => ({ value: p, label: t(`shared.priority.${p}`) })));
+  const deliverOptions = computed(() => DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) })));
 
   // The issue as the server has it now replaces the draft, unless the user has started changing it.
   createEffect(
@@ -118,10 +122,10 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const refined = () => isRefined(props.item);
   const questions = () => props.item.questions;
   const queued = () => props.item.queuedAt;
-  const canSave = () => !busy() && d().title.trim() !== "";
-  const canRefine = () => !busy() && !drafting() && (refined() || word().trim() !== "" || d().title.trim() !== newIssueTitle);
-  const startable = () => canSave() && !drafting() && d().agent !== "";
-  const said = (): [string, string] => {
+  const canSave = computed(() => !busy() && d().title.trim() !== "");
+  const canRefine = computed(() => !busy() && !drafting() && (refined() || word().trim() !== "" || d().title.trim() !== newIssueTitle));
+  const startable = computed(() => canSave() && !drafting() && d().agent !== "");
+  const said = computed((): [string, string] => {
     const by = drafting();
     return by
       ? [t("web.issue.todo.refining", { who: by.name }), t("web.issue.todo.refiningLine")]
@@ -130,16 +134,23 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         : refined()
           ? [t("web.issue.todo.drafted"), t("web.issue.todo.draftedLine")]
           : [t("web.issue.todo.what"), t("web.issue.todo.whatLine")];
-  };
+  });
 
   const draft = () => {
     const id = props.item.id;
-    const text = word().trim();
+    const raw = untrack(word);
+    const text = raw.trim();
     const edit = unsaved();
-    return act.run(async () => {
-      saved(await api.issue.refine(omitUndefined({ id, text, edit })));
-      word.set("");
-    });
+    if (text !== "") word.set("");
+    return act
+      .run(async () => {
+        saved(await api.issue.refine(omitUndefined({ id, text, edit })));
+        return true;
+      })
+      .then((ok) => {
+        if (ok !== true && text !== "" && untrack(word) === "") word.set(raw);
+        return ok;
+      });
   };
   const start = () => {
     const id = props.item.id;
@@ -164,7 +175,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     });
   };
 
-  const criteria = () => criteriaList(d().criteria);
+  const criteria = computed(() => criteriaList(d().criteria));
   const heading = (
     <View>
       <If when={props.item.parent}>
@@ -193,8 +204,8 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   // One place to start from: a new draft is one sentence to draft from; its description and criteria come in once drafted,
   // written, or asked for (manual entry).
   const own = signal(false);
-  const written = () => refined() || d().description.trim() !== "" || criteria().length > 0;
-  const fields = () => written() || own() || !backlog();
+  const written = computed(() => refined() || d().description.trim() !== "" || criteria().length > 0);
+  const fields = computed(() => written() || own() || !backlog());
   const talk = () => (
     <If when={backlog()}>
       <SheetLabel>{t("web.issue.todo.talk")}</SheetLabel>
@@ -312,7 +323,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           value={d().agent}
           placeholder={t("web.issue.todo.pickForMe")}
           onChange={(v) => edit({ agent: v })}
-          options={agents().map((a) => ({ value: a.id, label: a.runtime ? `${a.name} · ${a.runtime}` : a.name }))}
+          options={agentOptions()}
         />
       </Property>
       <Property align="start" label={t("web.issue.task.repo")}>
@@ -323,7 +334,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             value={d().repo}
             placeholder={t("web.issue.todo.whichRepo")}
             onChange={(v) => edit({ repo: v })}
-            options={[...new Set([...repos(), ...(d().repo ? [d().repo] : [])])].map((p) => ({ value: p, label: p }))}
+            options={repoOptions()}
           />
           <View
             role="button"
@@ -342,7 +353,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           testid="issue-priority"
           value={d().priority}
           onChange={(v) => edit({ priority: v })}
-          options={PriorityValues.map((p) => ({ value: p, label: t(`shared.priority.${p}`) }))}
+          options={priorityOptions()}
         />
       </Property>
       <Property label={t("web.issue.detail.deliver")}>
@@ -351,7 +362,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           testid="issue-deliver"
           value={d().deliver}
           onChange={(v) => edit({ deliver: v })}
-          options={DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) }))}
+          options={deliverOptions()}
         />
       </Property>
       <More>
@@ -412,8 +423,10 @@ function NewRepoDialog(props: { onClose: () => void; onMade: (name: string) => v
   const queries = useQueryClient();
   const name = signal("");
   const act = createAct();
+  const canCreate = computed(() => Boolean(name().trim()) && !act.busy());
   const make = async () => {
     const wanted = name().trim();
+    if (!wanted) return;
     const made = await act.run(() => api.repo.create({ name: wanted }));
     if (!made) return;
     await queries.invalidate({ prefix: ["repos"] });
@@ -425,13 +438,13 @@ function NewRepoDialog(props: { onClose: () => void; onMade: (name: string) => v
         autoFocus
         value={name()}
         onInput={(v) => name.set(v)}
-        onSubmit={() => name().trim() && void make()}
+        onSubmit={() => void make()}
         placeholder={t("web.issue.todo.repoHint")}
         accessibilityLabel={t("web.issue.todo.repoName")}
       />
       <View class="mt-5 flex-row justify-end gap-2">
         <Button onPress={() => props.onClose()}>{t("web.issue.never")}</Button>
-        <Button tone="primary" disabled={!name().trim() || act.busy()} onPress={() => void make()}>
+        <Button tone="primary" disabled={!canCreate()} onPress={() => void make()}>
           {t("web.issue.todo.create")}
         </Button>
       </View>

@@ -70,10 +70,10 @@ function AgentsPage() {
   const category = signal<CategoryFilter>("all");
   const query = signal("");
   const width = signal(0);
-  const wide = () => width() === 0 || width() >= 680;
+  const wide = createMemo(() => width() === 0 || width() >= 680);
 
   const runtimeById = createMemo(() => new Map(ready(runtimes, []).map((r) => [r.id, r])));
-  const needle = () => query().trim().toLowerCase();
+  const needle = createMemo(() => query().trim().toLowerCase());
 
   const visibleOrchestrators = createMemo(() =>
     showsOrchestrators(roleFilter()) ? orchestrators().filter((a) => matchesProfileQuery(a, runtimeById().get(a.runtime), needle())) : [],
@@ -90,10 +90,25 @@ function AgentsPage() {
     category() === "all" ? roleMatchedTemplates() : roleMatchedTemplates().filter((tpl) => templateCategoryOf(tpl) === category()),
   );
 
-  const hasFilter = () => roleFilter() !== "all" || needle().length > 0;
-  const noMatches = () => hasFilter() && visibleOrchestrators().length === 0 && visibleWorkers().length === 0 && visibleTemplates().length === 0;
-  const hasProfileSection = () =>
-    (showsOrchestrators(roleFilter()) && visibleOrchestrators().length > 0) || (showsWorkers(roleFilter()) && visibleWorkers().length > 0);
+  const hasFilter = createMemo(() => roleFilter() !== "all" || needle().length > 0);
+  const noMatches = createMemo(() => hasFilter() && visibleOrchestrators().length === 0 && visibleWorkers().length === 0 && visibleTemplates().length === 0);
+  const hasProfileSection = createMemo(
+    () => (showsOrchestrators(roleFilter()) && visibleOrchestrators().length > 0) || (showsWorkers(roleFilter()) && visibleWorkers().length > 0),
+  );
+  const roleOptions = createMemo(() => [
+    { value: "all" as const, label: t("web.agent.list.all"), count: orchestrators().length + agents().length },
+    { value: "orchestrator" as const, label: t("web.agent.list.orchestrators"), count: orchestrators().length },
+    { value: "worker" as const, label: t("web.agent.list.helpers"), count: agents().length },
+  ]);
+  const workerErrorsById = createMemo(() => {
+    const map = new Map<string, string[]>();
+    const all = problems();
+    for (const [id, list] of Object.entries(all)) {
+      const errs = list.filter((item) => item.level === "error").map((item) => item.text);
+      if (errs.length > 0) map.set(id, errs);
+    }
+    return map;
+  });
 
   const clearFilters = () => {
     roleFilter.set("all");
@@ -111,11 +126,7 @@ function AgentsPage() {
               label={t("web.agent.list.filterLabel")}
               value={roleFilter()}
               onChange={(v) => roleFilter.set(v)}
-              options={[
-                { value: "all", label: t("web.agent.list.all"), count: orchestrators().length + agents().length },
-                { value: "orchestrator", label: t("web.agent.list.orchestrators"), count: orchestrators().length },
-                { value: "worker", label: t("web.agent.list.helpers"), count: agents().length },
-              ]}
+              options={roleOptions()}
             />
             <SearchField
               testid="agents-search"
@@ -182,7 +193,7 @@ function AgentsPage() {
                     <WorkerRow
                       agent={a()}
                       runtime={runtimeById().get(a().runtime)}
-                      errors={(problems()[a().id] ?? []).filter((item) => item.level === "error").map((item) => item.text)}
+                      errors={workerErrorsById().get(a().id) ?? []}
                       first={i() === 0}
                       wide={wide()}
                     />
@@ -316,11 +327,11 @@ function WorkerRow(props: { agent: Agent; runtime?: RuntimeInfo | undefined; err
       await client.invalidate({ prefix: ["agents"] });
     });
   };
-  const runtimeSpec = () => [props.runtime?.preset.label ?? props.agent.runtime, props.agent.model, props.agent.effort].filter(Boolean).join(" · ");
+  const runtimeSpec = createMemo(() => [props.runtime?.preset.label ?? props.agent.runtime, props.agent.model, props.agent.effort].filter(Boolean).join(" · "));
   const toggleAction = () => (props.agent.enabled ? t("web.agent.list.disable") : t("web.agent.list.enable"));
   const toggleLabel = () => t("web.agent.list.toggle", { act: toggleAction(), name: props.agent.name });
-  const healthy = () => props.errors.length === 0;
-  const shownTags = () => (healthy() ? props.agent.tags.slice(0, 2) : []);
+  const healthy = createMemo(() => props.errors.length === 0);
+  const shownTags = createMemo(() => (healthy() ? props.agent.tags.slice(0, 2) : []));
   return (
     <RowShell
       agent={props.agent}

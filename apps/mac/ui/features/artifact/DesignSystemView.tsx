@@ -176,8 +176,8 @@ export function DesignSystemView(props: StoreViewerProps) {
     { value: "tokensJson" as const, label: t("web.artifact.designSystem.tokensJson") },
   ];
 
-  const draftValue = () => tokensDraft() ?? tokensRaw();
-  const draftValid = () => isJsonValid(draftValue());
+  const draftValue = computed(() => tokensDraft() ?? tokensRaw());
+  const draftValid = computed(() => isJsonValid(draftValue()));
 
   return (
     <View testID="design-system-view" class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-page">

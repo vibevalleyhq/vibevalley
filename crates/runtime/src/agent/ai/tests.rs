@@ -290,17 +290,24 @@ fn retry_policy_backoff_doubles_caps_and_honors_retry_after() {
 
 #[test]
 fn deepseek_https_client_initializes_rustls_platform_verifier_without_webpki() {
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    let server = std::thread::spawn(move || {
-        let _ = listener.accept();
+    let (addr, _guard) = crate::rt::block_on(async move {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let cancel = CancellationToken::new();
+        let guard = cancel.clone().drop_guard();
+        tokio::spawn(async move {
+            tokio::select! {
+                _ = cancel.cancelled() => {}
+                _ = listener.accept() => {}
+            }
+        });
+        (addr, guard)
     });
 
     let err = OpenAiClient::new(format!("https://{addr}"), || Some("sk-tls-test".into()))
         .with_retry(RetryPolicy::none())
         .fetch_balance()
         .unwrap_err();
-    let _ = server.join();
     match err {
         BrainError::Network(msg) => {
             assert!(
@@ -310,4 +317,71 @@ fn deepseek_https_client_initializes_rustls_platform_verifier_without_webpki() {
         }
         other => panic!("expected network EOF during TLS handshake against closed socket, got: {other:?}"),
     }
+}
+
+#[tokio::test(start_paused = true)]
+async fn complete_cancellable_async_honors_long_retry_after_on_virtual_clock() {
+    let hits = Arc::new(AtomicUsize::new(0));
+    let server_hits = hits.clone();
+    let app = Router::new().fallback(move || {
+        let n = server_hits.fetch_add(1, Ordering::SeqCst);
+        async move {
+            if n == 0 {
+                (
+                    StatusCode::TOO_MANY_REQUESTS,
+                    [(header::RETRY_AFTER, "45"), (header::CONTENT_TYPE, "application/json")],
+                    r#"{"error":{"message":"slow down"}}"#,
+                )
+                    .into_response()
+            } else {
+                let body = concat!(
+                    "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"virtual-ok\"}}]}\n\n",
+                    "data: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":2}}\n\n",
+                    "data: [DONE]\n\n"
+                );
+                (StatusCode::OK, [(header::CONTENT_TYPE, "text/event-stream")], body).into_response()
+            }
+        }
+    });
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let server_cancel = CancellationToken::new();
+    let _server_guard = server_cancel.clone().drop_guard();
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, app).with_graceful_shutdown(server_cancel.cancelled_owned()).await;
+    });
+
+    let wall = std::time::Instant::now();
+    let t0 = tokio::time::Instant::now();
+    let client = OpenAiClient::new(format!("http://{addr}"), || Some("sk-test".into())).with_retry(RetryPolicy {
+        max_retries: 2,
+        initial_backoff: Duration::from_secs(1),
+        max_backoff: Duration::from_secs(10),
+    });
+    let req = ChatRequest {
+        model: DEFAULT_MODEL.into(),
+        messages: vec![Message::user("ping")],
+        ..Default::default()
+    };
+    let cancel = CancelToken::never();
+    let mut on_delta = |_| {};
+    let (res, ()) = tokio::join!(client.complete_cancellable_async(&req, &cancel, &mut on_delta), async {
+        while hits.load(Ordering::SeqCst) == 0 {
+            tokio::task::yield_now().await;
+        }
+        // Wait until the 45s retry timer is armed on the paused runtime.
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        assert_eq!(hits.load(Ordering::SeqCst), 1, "must not retry before Retry-After: 45s");
+        tokio::time::advance(Duration::from_secs(43)).await;
+        tokio::task::yield_now().await;
+        assert_eq!(hits.load(Ordering::SeqCst), 1, "must still be waiting at 44s");
+        tokio::time::advance(Duration::from_secs(1)).await;
+    });
+
+    let completion = res.unwrap();
+    assert_eq!(completion.message.content.as_deref(), Some("virtual-ok"));
+    assert_eq!(hits.load(Ordering::SeqCst), 2);
+    assert!(t0.elapsed() >= Duration::from_secs(45), "expected >= 45s virtual delay, got {:?}", t0.elapsed());
+    assert!(wall.elapsed() < Duration::from_secs(1), "virtual retry took {:?}", wall.elapsed());
 }

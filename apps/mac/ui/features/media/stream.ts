@@ -3,12 +3,17 @@ import { z } from "zod";
 import { transport } from "../../infra/transport";
 
 const Playback = z.object({ phase: z.enum(["idle", "playing", "draining", "stopping"]), problem: z.string().nullable() });
+const POLL_MS = 250;
 
 export function playSpeech(id: string, changed: (state: "playing" | "done" | "finished") => void, failed: (error: string) => void) {
   const bridge = transport();
   let stopped = false;
-  let polling = false;
-  let timer: ReturnType<typeof setInterval> | undefined;
+  let finished = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const clear = () => {
+    clearTimeout(timer);
+    timer = undefined;
+  };
   const call = async (op: string, payload: Record<string, unknown>) => {
     const reply = await bridge.call(op, { ...payload, id });
     if (reply.bizCode !== 0) throw new Error(reply.message);
@@ -18,27 +23,38 @@ export function playSpeech(id: string, changed: (state: "playing" | "done" | "fi
   const stop = () => {
     if (stopped) return;
     stopped = true;
-    clearInterval(timer);
+    clear();
     void call("host.speechStop", {}).catch(problem);
   };
+  const schedule = () => {
+    if (!stopped && !finished) {
+      timer = setTimeout(() => void poll(), POLL_MS);
+    }
+  };
   const poll = async () => {
-    if (polling || stopped) return;
-    polling = true;
+    if (stopped || finished) return;
     try {
       const state = await call("host.speechState", {});
       if (stopped) return;
       if (state.problem) {
-        clearInterval(timer);
+        finished = true;
+        clear();
         failed(state.problem);
       } else if (state.phase === "idle") {
-        clearInterval(timer);
+        finished = true;
+        clear();
         changed("finished");
-      } else if (state.phase === "draining") changed("done");
+      } else if (state.phase === "draining") {
+        changed("done");
+      }
     } catch (error) {
+      finished = true;
       stop();
       problem(error);
     } finally {
-      polling = false;
+      if (!stopped && !finished) {
+        schedule();
+      }
     }
   };
   void call("host.speechStart", { id })
@@ -48,7 +64,7 @@ export function playSpeech(id: string, changed: (state: "playing" | "done" | "fi
         return;
       }
       changed("playing");
-      timer = setInterval(() => void poll(), 100);
+      schedule();
     })
     .catch((error: unknown) => {
       if (!stopped) {

@@ -1,4 +1,4 @@
-import { effect, keymap, signal, Scroll, Text, untracked, View, type InputRef, type JSX } from "nsh";
+import { computed, effect, keymap, signal, Scroll, Text, untracked, View, type InputRef, type JSX } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -254,17 +254,40 @@ export function BlocksView(props: {
     setWorking(undefined);
   };
 
-  effect(() => {
+  const activeBindMode = computed<"none" | "stale" | "ready">(() => {
     const target = activeSuggestion();
-    if (!target || working() !== undefined) return;
+    if (!target || working() !== undefined) return "none";
     version();
     const block = editor.blocks.find((b) => b.id === target.blockId);
-    const stale = isSuggestionStale(target, block);
+    return isSuggestionStale(target, block) ? "stale" : "ready";
+  });
+
+  effect(() => {
+    const mode = activeBindMode();
+    if (mode === "none") return;
     const offs: (() => void)[] = [];
-    if (!stale) {
-      offs.push(keymap.bind("tab", () => void resolve(target, true), { when: "always" }));
+    if (mode === "ready") {
+      offs.push(
+        keymap.bind(
+          "tab",
+          () => {
+            const target = untracked(activeSuggestion);
+            if (target) void resolve(target, true);
+          },
+          { when: "always" },
+        ),
+      );
     }
-    offs.push(keymap.bind("escape", () => void resolve(target, false), { when: "always" }));
+    offs.push(
+      keymap.bind(
+        "escape",
+        () => {
+          const target = untracked(activeSuggestion);
+          if (target) void resolve(target, false);
+        },
+        { when: "always" },
+      ),
+    );
     return () => offs.forEach((off) => off());
   });
 
@@ -373,7 +396,8 @@ function SuggestionsList(props: {
   onAccept: (s: Suggestion) => void;
   onReject: (s: Suggestion) => void;
 }) {
-  const open = () => props.list.filter((s) => s.status === "open");
+  const open = computed(() => props.list.filter((s) => s.status === "open"));
+  const blockById = computed(() => new Map(props.blocks.map((b) => [b.id, b])));
   return (
     <If when={open().length > 0}>
       <View testID="artifact-suggestions" class="mb-2.5 shrink-0 rounded-lg border border-line bg-page p-2.5">
@@ -383,10 +407,10 @@ function SuggestionsList(props: {
         </View>
         <Each of={open()} key={(s) => s.id}>
           {(s, i) => {
-            const block = () => props.blocks.find((b) => b.id === s().blockId);
-            const stale = () => isSuggestionStale(s(), block());
-            const agent = () => props.agents.get(s().author);
-            const who = () => (s().author === userId ? t("web.artifact.blocks.user") : (agent()?.name ?? s().author));
+            const block = computed(() => blockById().get(s().blockId));
+            const stale = computed(() => isSuggestionStale(s(), block()));
+            const agent = computed(() => props.agents.get(s().author));
+            const who = computed(() => (s().author === userId ? t("web.artifact.blocks.user") : (agent()?.name ?? s().author)));
             return (
               <View
                 testID="artifact-suggestion"
@@ -862,23 +886,29 @@ function Field(props: {
       }
     },
   );
+  const canIndent = computed(() => focused() && props.outline && !props.hasOpenSuggestion && !props.row.block.composing);
+  const atStart = computed(() => focused() && sel().start === 0 && sel().end === 0 && !props.row.block.composing);
+  const atEnd = computed(() => focused() && sel().start === sel().end && sel().end === props.row.text.length && !props.row.block.composing);
+  const goNeighbour = (step: 1 | -1) => {
+    const next = props.editor.neighbour(b(), step);
+    if (next) props.editor.moveTo(next, step === -1 ? next.text.length : 0);
+  };
   effect(() => {
-    if (!focused()) return;
-    const { start, end } = sel();
-    const offs: (() => void)[] = [];
-    if (props.outline && !props.hasOpenSuggestion && !b().composing) {
-      offs.push(keymap.bind("tab", () => props.editor.indent(b()), { when: "always" }));
-      offs.push(keymap.bind("shift+tab", () => props.editor.outdent(b()), { when: "always" }));
-    }
-    if (start === end && !b().composing) {
-      const go = (step: 1 | -1) => {
-        const next = props.editor.neighbour(b(), step);
-        if (next) props.editor.moveTo(next, step === -1 ? next.text.length : 0);
-      };
-      if (start === 0) offs.push(keymap.bind("up", () => go(-1), { when: "always" }));
-      if (end === props.row.text.length) offs.push(keymap.bind("down", () => go(1), { when: "always" }));
-    }
-    return () => offs.forEach((off) => off());
+    if (!canIndent()) return;
+    const offTab = keymap.bind("tab", () => props.editor.indent(b()), { when: "always" });
+    const offShiftTab = keymap.bind("shift+tab", () => props.editor.outdent(b()), { when: "always" });
+    return () => {
+      offTab();
+      offShiftTab();
+    };
+  });
+  effect(() => {
+    if (!atStart()) return;
+    return keymap.bind("up", () => goNeighbour(-1), { when: "always" });
+  });
+  effect(() => {
+    if (!atEnd()) return;
+    return keymap.bind("down", () => goNeighbour(1), { when: "always" });
   });
   return (
     <Input
@@ -916,6 +946,8 @@ function Field(props: {
         props.onPresence(b().id, at, at);
       }}
       onSelectionChange={(e) => {
+        const cur = untracked(sel);
+        if (cur.start === e.start && cur.end === e.end) return;
         sel.set({ start: e.start, end: e.end });
         if (untracked(focused)) props.onPresence(b().id, e.start, e.end);
       }}

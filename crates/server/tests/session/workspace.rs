@@ -477,13 +477,14 @@ fn recv_until(rx: &flume::Receiver<Value>, what: &str, mut pred: impl FnMut(&Val
     let deadline = Instant::now() + Duration::from_secs(10);
     let mut seen = Vec::new();
     loop {
-        let left = deadline.saturating_duration_since(Instant::now());
-        assert!(!left.is_zero(), "timed out waiting for {what}; seen: {seen:?}");
-        if let Ok(val) = rx.recv_timeout(left.min(Duration::from_millis(200))) {
-            if pred(&val) {
-                return val;
+        match rx.recv_deadline(deadline) {
+            Ok(val) => {
+                if pred(&val) {
+                    return val;
+                }
+                seen.push(val);
             }
-            seen.push(val);
+            Err(_) => panic!("timed out waiting for {what}; seen: {seen:?}"),
         }
     }
 }

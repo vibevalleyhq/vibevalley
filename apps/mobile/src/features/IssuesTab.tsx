@@ -1,4 +1,4 @@
-import { effect, List, platform, Scroll, signal, Text, View } from "nsh";
+import { computed, effect, List, platform, Scroll, signal, Text, untracked, View } from "nsh";
 import { isAvailable as mobileAvailable, SegmentedControl } from "nsh/mobile";
 
 import { t } from "@vibevalley/i18n";
@@ -61,24 +61,38 @@ export function IssuesTab(props: {
   readonly onSelectIssue: (id: string | undefined) => void;
 }) {
   const filter = signal<IssueFilterKind>("all");
-  const commentDraft = signal("");
+  const commentDrafts = signal<Readonly<Record<string, string>>>({});
   const busy = signal(false);
   const actionError = signal<string | undefined>(undefined);
-  const isDual = () => props.layout().mode === "dual_pane";
+  const isDual = computed(() => props.layout().mode === "dual_pane");
   // `SegmentedControl` in nsh/mobile maps to UISegmentedControl (iOS only); Android uses the pill filter bar.
   const useNativeSegmented = mobileAvailable && platform.os === "ios";
 
-  const allIssues = () => props.session.board()?.issues ?? [];
+  const allIssues = computed(() => props.session.board()?.issues ?? []);
+  const machineNames = computed(() => new Map((props.session.sessions()?.machines ?? []).map((m) => [m.id, m.name] as const)));
   const machineLabelOf = (machineId: string | undefined): string | undefined => {
     if (machineId === undefined || machineId === "") return undefined;
-    const found = (props.session.sessions()?.machines ?? []).find((m) => m.id === machineId);
-    return found ? found.name : machineId;
+    return machineNames().get(machineId) ?? machineId;
   };
-  const filteredIssues = () => allIssues().filter((issue) => matchesFilter(issue, filter()));
-  const selectedIssue = () => {
+  const filteredIssues = computed(() => allIssues().filter((issue) => matchesFilter(issue, filter())));
+  const hasFilteredIssues = computed(() => filteredIssues().length > 0);
+  const selectedIssue = computed(() => {
     const id = props.selectedIssueId();
     if (id === undefined) return undefined;
     return allIssues().find((issue) => issue.id === id);
+  });
+  const currentCommentDraft = computed(() => {
+    const id = props.selectedIssueId();
+    return id !== undefined ? (commentDrafts()[id] ?? "") : "";
+  });
+  const hasCommentDraft = computed(() => currentCommentDraft().trim() !== "");
+  const canSend = computed(() => !busy() && hasCommentDraft());
+  const filterItems = computed(() => FILTERS.map((kind) => ({ title: filterLabel(kind) })));
+  const selectedFilterIndex = computed(() => FILTERS.indexOf(filter()));
+
+  const setCommentDraft = (issueId: string, value: string) => {
+    if ((untracked(commentDrafts)[issueId] ?? "") === value) return;
+    commentDrafts.update((prev) => ({ ...prev, [issueId]: value }));
   };
 
   effect(() => {
@@ -97,7 +111,7 @@ export function IssuesTab(props: {
   };
 
   const updateStatus = async (issueId: string, status: IssueStatus) => {
-    if (busy()) return;
+    if (untracked(busy)) return;
     busy.set(true);
     actionError.set(undefined);
     try {
@@ -108,45 +122,57 @@ export function IssuesTab(props: {
       } else {
         hapticImpact("light");
       }
+    } catch (err: unknown) {
+      actionError.set(err instanceof Error ? err.message : String(err));
+      hapticNotification("error");
     } finally {
       busy.set(false);
     }
   };
 
   const submitReview = async (issueId: string, pass: boolean) => {
-    if (busy()) return;
+    if (untracked(busy)) return;
     busy.set(true);
     actionError.set(undefined);
     try {
-      const notes = commentDraft().trim();
+      const notes = (untracked(commentDrafts)[issueId] ?? "").trim();
       const payload = notes ? { id: issueId, pass, text: notes } : { id: issueId, pass };
       const env = await props.session.call("issue.review", payload);
       if (env.bizCode !== 0) {
         actionError.set(env.message);
         hapticNotification("error");
       } else {
-        if (notes) commentDraft.set("");
+        if (notes) setCommentDraft(issueId, "");
         hapticNotification(pass ? "success" : "warning");
       }
+    } catch (err: unknown) {
+      actionError.set(err instanceof Error ? err.message : String(err));
+      hapticNotification("error");
     } finally {
       busy.set(false);
     }
   };
 
   const submitComment = async (issueId: string) => {
-    const text = commentDraft().trim();
-    if (text === "" || busy()) return;
+    const text = (untracked(commentDrafts)[issueId] ?? "").trim();
+    if (text === "" || untracked(busy)) return;
+    setCommentDraft(issueId, "");
     busy.set(true);
     actionError.set(undefined);
+    const rollback = (message: string) => {
+      actionError.set(message);
+      hapticNotification("error");
+      if ((untracked(commentDrafts)[issueId] ?? "") === "") setCommentDraft(issueId, text);
+    };
     try {
       const env = await props.session.call("issue.comment.create", { id: issueId, text });
       if (env.bizCode !== 0) {
-        actionError.set(env.message);
-        hapticNotification("error");
+        rollback(env.message);
       } else {
-        commentDraft.set("");
         hapticImpact("light");
       }
+    } catch (err: unknown) {
+      rollback(err instanceof Error ? err.message : String(err));
     } finally {
       busy.set(false);
     }
@@ -180,8 +206,8 @@ export function IssuesTab(props: {
           <SegmentedControl
             testID="issue-filter-segmented"
             class="w-full"
-            items={FILTERS.map((kind) => ({ title: filterLabel(kind) }))}
-            selectedIndex={FILTERS.indexOf(filter())}
+            items={filterItems()}
+            selectedIndex={selectedFilterIndex()}
             onChange={(e) => {
               const next = FILTERS[e.index];
               if (next !== undefined) {
@@ -193,7 +219,7 @@ export function IssuesTab(props: {
         </If>
       </View>
 
-      <If when={filteredIssues().length > 0} else={<EmptyPanel testID="issues-empty" icon="issues" message={t("web.remote.issue.empty")} />}>
+      <If when={hasFilteredIssues()} else={<EmptyPanel testID="issues-empty" icon="issues" message={t("web.remote.issue.empty")} />}>
         <List
           testID="issues-list"
           each={filteredIssues()}
@@ -203,7 +229,7 @@ export function IssuesTab(props: {
           contentClass="gap-2.5 p-3.5"
         >
           {(issue) => {
-            const active = () => isDual() && props.selectedIssueId() === issue().id;
+            const active = computed(() => isDual() && props.selectedIssueId() === issue().id);
             return (
               <SectionCard
                 testID={`issue-row-${issue().id}`}
@@ -317,12 +343,11 @@ export function IssuesTab(props: {
             <FieldInput
               testID="issue-comment-input"
               placeholder={t("web.remote.issue.comment")}
-              value={commentDraft()}
-              onInput={(v) => commentDraft.set(v)}
+              value={currentCommentDraft()}
+              onInput={(v) => setCommentDraft(issue().id, v)}
               onSubmit={() => {
                 void submitComment(issue().id);
               }}
-              disabled={busy()}
               class="min-w-0 flex-1"
             />
             <PillButton
@@ -331,7 +356,7 @@ export function IssuesTab(props: {
               size="sm"
               icon="send"
               label={t("web.remote.issue.comment")}
-              disabled={busy() || commentDraft().trim() === ""}
+              disabled={!canSend()}
               onPress={() => {
                 void submitComment(issue().id);
               }}

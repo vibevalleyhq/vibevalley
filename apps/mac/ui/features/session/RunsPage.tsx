@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, untracked, View } from "nsh";
+import { computed, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Look, OrchestratorEval } from "@vibevalley/protocol";
@@ -170,7 +170,7 @@ export function RunsPage() {
 
   const query = signal("");
   const box = signal(0);
-  const wide = () => box() === 0 || box() >= 768;
+  const wide = createMemo(() => box() === 0 || box() >= 768);
   const parsed = createMemo(() => parseRunsSearch(search()));
   const narrowPane = signal<"list" | "detail">(untracked(() => (parsed().session !== undefined ? "detail" : "list")));
 
@@ -201,22 +201,30 @@ export function RunsPage() {
 
   const selected = createMemo(() => resolveSelectedRun(visibleEntries(), sessionParam()));
 
-  const hasFilters = () => scope() !== "all" || agentFilter() !== undefined || issueFilter() !== undefined || query().trim().length > 0;
+  const hasFilters = createMemo(() => scope() !== "all" || agentFilter() !== undefined || issueFilter() !== undefined || query().trim().length > 0);
   const agentById = createMemo(() => new Map(ready(agents, []).map((a) => [a.id, a])));
   const lookOf = (entry: RunEntry): Look | undefined => (entry.kind === "worker" ? agentById().get(sessionProfile(entry.session) ?? "")?.look : undefined);
 
-  const agentFilterName = () => {
+  const agentFilterName = createMemo(() => {
     const id = agentFilter();
     if (!id) return undefined;
     return agentById().get(id)?.name ?? id;
-  };
+  });
 
-  const issueFilterLabel = () => {
+  const issueFilterLabel = createMemo(() => {
     const id = issueFilter();
     if (!id) return undefined;
     const found = (board()?.issues ?? []).find((i) => i.id === id);
     return found ? `#${found.number} ${found.title}` : id;
-  };
+  });
+  const scopeOptions = createMemo(() =>
+    runsScopes.map((item) => ({
+      value: item,
+      label: scopeLabel(item),
+      count: item === "active" ? activeCount() : undefined,
+      countTone: "water" as const,
+    })),
+  );
 
   const setScope = (next: RunsScope) => {
     router.navigate(runsHref({ ...parsed(), scope: next }), { replace: true });
@@ -257,18 +265,7 @@ export function RunsPage() {
           label={t("web.session.hub.search")}
           class="w-full"
         />
-        <Segmented
-          testid="runs-scope"
-          label={t("web.session.hub.scopeLabel")}
-          value={scope()}
-          onChange={setScope}
-          options={runsScopes.map((item) => ({
-            value: item,
-            label: scopeLabel(item),
-            count: item === "active" ? activeCount() : undefined,
-            countTone: "water",
-          }))}
-        />
+        <Segmented testid="runs-scope" label={t("web.session.hub.scopeLabel")} value={scope()} onChange={setScope} options={scopeOptions()} />
         <If when={agentFilterName() !== undefined || issueFilterLabel() !== undefined}>
           <View class="flex-row flex-wrap items-center gap-1.5">
             <If when={agentFilterName()}>
@@ -447,7 +444,7 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
 }
 
 function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: number; showBack: boolean; onBack: () => void }) {
-  const status = () => statusMeta(runStatusOf(props.entry));
+  const status = computed(() => statusMeta(runStatusOf(props.entry)));
   const pillStyle = () => {
     const bg = status().pillBg;
     return bg ? { backgroundColor: bg() } : undefined;
@@ -457,7 +454,7 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
   const workerIssueNumber = () => (props.entry.kind === "worker" ? props.entry.issue?.number : undefined);
   const timing = () => entryTiming(props.entry, props.now);
   const repo = () => (props.entry.kind === "worker" ? sessionRepo(props.entry.session) : undefined);
-  const subLine = () => {
+  const subLine = computed(() => {
     const parts: string[] = [];
     if (props.entry.kind === "orchestrator") {
       parts.push(t("web.session.hub.orchestratorRole"));
@@ -467,7 +464,7 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
       if (timing()) parts.push(timing());
     }
     return parts.join(" · ");
-  };
+  });
 
   return (
     <View class="h-full min-h-0 flex-1 bg-page">

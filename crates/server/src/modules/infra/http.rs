@@ -46,7 +46,7 @@ pub enum FetchError {
 }
 
 /// How a request reaches the network (VibeValley's `fetch` / `publicFetch`).
-pub trait Fetch: Send + Sync {
+pub trait Fetch: Send + Sync + 'static {
     fn fetch(&self, request: Request) -> Result<Response, FetchError>;
 
     /// Like [`Fetch::fetch`], aborting early when `cancel` fires.
@@ -56,9 +56,18 @@ pub trait Fetch: Send + Sync {
         }
         self.fetch(request)
     }
+
+    /// Async counterpart to [`Fetch::fetch_with_cancel`]; defaults to offloading onto the blocking pool.
+    fn fetch_async(self: std::sync::Arc<Self>, request: Request, cancel: CancellationToken) -> crate::BoxFuture<'static, Result<Response, FetchError>> {
+        Box::pin(async move {
+            crate::spawn_blocking_traced(move || self.fetch_with_cancel(request, cancel))
+                .await
+                .map_err(|e| FetchError::Network(e.to_string()))?
+        })
+    }
 }
 
-impl<F: Fn(Request) -> Result<Response, FetchError> + Send + Sync> Fetch for F {
+impl<F: Fn(Request) -> Result<Response, FetchError> + Send + Sync + 'static> Fetch for F {
     fn fetch(&self, request: Request) -> Result<Response, FetchError> {
         self(request)
     }
@@ -68,7 +77,6 @@ impl<F: Fn(Request) -> Result<Response, FetchError> + Send + Sync> Fetch for F {
 pub struct Http;
 
 impl Http {
-    #[allow(dead_code)]
     pub(crate) async fn fetch_async(r: Request, cancel: Option<CancellationToken>) -> Result<Response, FetchError> {
         let client = no_redirect_client().map_err(FetchError::Network)?.clone();
         execute_request_async(client, r, cancel).await
@@ -84,6 +92,10 @@ impl Fetch for Http {
     fn fetch_with_cancel(&self, r: Request, cancel: CancellationToken) -> Result<Response, FetchError> {
         let client = no_redirect_client().map_err(FetchError::Network)?.clone();
         execute_request(client, r, Some(cancel))
+    }
+
+    fn fetch_async(self: std::sync::Arc<Self>, request: Request, cancel: CancellationToken) -> crate::BoxFuture<'static, Result<Response, FetchError>> {
+        Box::pin(Self::fetch_async(request, Some(cancel)))
     }
 }
 
@@ -222,6 +234,10 @@ impl Fetch for PublicDownload {
 
     fn fetch_with_cancel(&self, request: Request, cancel: CancellationToken) -> Result<Response, FetchError> {
         self.fetch_inner(request, Some(cancel))
+    }
+
+    fn fetch_async(self: std::sync::Arc<Self>, request: Request, cancel: CancellationToken) -> crate::BoxFuture<'static, Result<Response, FetchError>> {
+        Box::pin(Self::fetch_async(request, Some(cancel)))
     }
 }
 
@@ -433,21 +449,19 @@ mod tests {
 
     use super::*;
 
-    fn spawn_mock(router: Router) -> (SocketAddr, DropGuard) {
-        vibevalley_runtime::rt::block_on(async move {
-            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let addr = listener.local_addr().unwrap();
-            let cancel = CancellationToken::new();
-            let guard = cancel.clone().drop_guard();
-            tokio::spawn(async move {
-                let _ = axum::serve(listener, router).with_graceful_shutdown(cancel.cancelled_owned()).await;
-            });
-            (addr, guard)
-        })
+    async fn spawn_mock_async(router: Router) -> (SocketAddr, DropGuard) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let cancel = CancellationToken::new();
+        let guard = cancel.clone().drop_guard();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, router).with_graceful_shutdown(cancel.cancelled_owned()).await;
+        });
+        (addr, guard)
     }
 
-    #[test]
-    fn download_addresses_cannot_reach_private_networks_or_carry_credentials() {
+    #[tokio::test]
+    async fn download_addresses_cannot_reach_private_networks_or_carry_credentials() {
         for address in [
             "https://127.0.0.1/image",
             "https://[::ffff:7f00:1]/image",
@@ -464,22 +478,25 @@ mod tests {
             assert!(!public_https(&url::Url::parse(address).unwrap()), "{address}");
             assert!(
                 matches!(
-                    PublicDownload::get_bytes(address, Duration::from_secs(1), 1024),
+                    PublicDownload::get_bytes_async(address, Duration::from_secs(1), 1024).await,
                     Err(PublicDownloadError::BadUrl)
                 ),
-                "PublicDownload::get_bytes must reject {address}"
+                "PublicDownload::get_bytes_async must reject {address}"
             );
             assert!(
-                PublicDownload
-                    .fetch(Request {
+                PublicDownload::fetch_async(
+                    Request {
                         method: "GET",
                         url: address.into(),
                         headers: vec![],
                         body: None,
                         timeout: Duration::from_secs(1),
-                    })
-                    .is_err(),
-                "PublicDownload::fetch must reject {address}"
+                    },
+                    None,
+                )
+                .await
+                .is_err(),
+                "PublicDownload::fetch_async must reject {address}"
             );
         }
         for address in ["https://example.com/image?signed=x", "https://8.8.8.8/image"] {
@@ -487,8 +504,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn http_fetch_streams_post_body_and_never_follows_redirects() {
+    #[tokio::test]
+    async fn http_fetch_streams_post_body_and_never_follows_redirects() {
         let seen = Arc::new(Mutex::new(None::<(Option<String>, Vec<u8>)>));
         let seen_for_route = seen.clone();
         let app = Router::new()
@@ -504,73 +521,82 @@ mod tests {
                 "/redir",
                 get(|| async { (StatusCode::FOUND, [(header::LOCATION, "http://127.0.0.1:1/other")]) }),
             );
-        let (addr, _guard) = spawn_mock(app);
+        let (addr, _guard) = spawn_mock_async(app).await;
 
-        let mut res = Http
-            .fetch(Request {
+        let mut res = Http::fetch_async(
+            Request {
                 method: "POST",
                 url: format!("http://{addr}/upload"),
                 headers: vec![("x-test".into(), "ok".into())],
                 body: Some(("text/plain".into(), Box::new(Cursor::new(b"payload".to_vec())))),
                 timeout: Duration::from_secs(5),
-            })
-            .unwrap();
+            },
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(res.status, 201);
         assert_eq!(res.media_type(), "application/json");
-        let mut body = String::new();
-        res.body.read_to_string(&mut body).unwrap();
+        let body = tokio::task::spawn_blocking(move || {
+            let mut body = String::new();
+            res.body.read_to_string(&mut body).unwrap();
+            body
+        })
+        .await
+        .unwrap();
         assert_eq!(body, "{\"ok\":true}");
         assert_eq!(seen.lock().unwrap().as_ref(), Some(&(Some("ok".to_string()), b"payload".to_vec())));
 
-        let redirect = Http
-            .fetch(Request {
+        let redirect = Http::fetch_async(
+            Request {
                 method: "GET",
                 url: format!("http://{addr}/redir"),
                 headers: vec![],
                 body: None,
                 timeout: Duration::from_secs(5),
-            })
-            .unwrap();
+            },
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(redirect.status, 302);
         assert_eq!(redirect.header("location"), Some("http://127.0.0.1:1/other"));
     }
 
-    #[test]
-    fn async_fetch_and_public_download_reject_bad_urls_and_stream_without_block_on() {
+    #[tokio::test]
+    async fn async_fetch_and_public_download_reject_bad_urls_and_stream_without_block_on() {
         let app = Router::new().route("/ping", get(|| async { ([(header::CONTENT_TYPE, "text/plain")], "hello") }));
-        let (addr, _guard) = spawn_mock(app);
+        let (addr, _guard) = spawn_mock_async(app).await;
 
-        vibevalley_runtime::rt::block_on(async move {
-            assert!(matches!(
-                PublicDownload::get_bytes_async("https://127.0.0.1/private", Duration::from_secs(1), 1024).await,
-                Err(PublicDownloadError::BadUrl)
-            ));
-            let mut res = Http::fetch_async(
-                Request {
-                    method: "GET",
-                    url: format!("http://{addr}/ping"),
-                    headers: vec![],
-                    body: None,
-                    timeout: Duration::from_secs(5),
-                },
-                None,
-            )
-            .await
-            .unwrap();
-            assert_eq!(res.status, 200);
-            let body = tokio::task::spawn_blocking(move || {
-                let mut text = String::new();
-                res.body.read_to_string(&mut text).unwrap();
-                text
-            })
-            .await
-            .unwrap();
-            assert_eq!(body, "hello");
-        });
+        assert!(matches!(
+            PublicDownload::get_bytes_async("https://127.0.0.1/private", Duration::from_secs(1), 1024).await,
+            Err(PublicDownloadError::BadUrl)
+        ));
+        let mut res = Http::fetch_async(
+            Request {
+                method: "GET",
+                url: format!("http://{addr}/ping"),
+                headers: vec![],
+                body: None,
+                timeout: Duration::from_secs(5),
+            },
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(res.status, 200);
+        let body = tokio::task::spawn_blocking(move || {
+            let mut text = String::new();
+            res.body.read_to_string(&mut text).unwrap();
+            text
+        })
+        .await
+        .unwrap();
+        assert_eq!(body, "hello");
     }
 
-    #[test]
-    fn http_fetch_streams_chunks_enforces_read_max_and_aborts_on_cancel() {
+    #[tokio::test]
+    async fn http_fetch_streams_chunks_enforces_read_max_and_aborts_on_cancel() {
         let stream_cancel = CancellationToken::new();
         let stream_cancel_for_route = stream_cancel.clone();
         let app = Router::new()
@@ -596,53 +622,66 @@ mod tests {
                     async move { ([(header::CONTENT_TYPE, "text/plain")], Body::from_stream(stream)) }
                 }),
             );
-        let (addr, _guard) = spawn_mock(app);
+        let (addr, _guard) = spawn_mock_async(app).await;
         let _stream_guard = stream_cancel.drop_guard();
 
         // Response size limit enforced over streamed chunks.
-        let mut res = Http
-            .fetch(Request {
+        let mut res = Http::fetch_async(
+            Request {
                 method: "GET",
                 url: format!("http://{addr}/chunks"),
                 headers: vec![],
                 body: None,
                 timeout: Duration::from_secs(5),
-            })
-            .unwrap();
-        assert_eq!(read_max(&mut res.body, 8), Err(ReadError::TooLarge));
-        drop(res);
+            },
+            None,
+        )
+        .await
+        .unwrap();
+        let read_res = tokio::task::spawn_blocking(move || read_max(&mut res.body, 8)).await.unwrap();
+        assert_eq!(read_res, Err(ReadError::TooLarge));
 
         // Mid-stream cancellation immediately interrupts a stalled SyncIoBridge read.
         let cancel = CancellationToken::new();
-        let mut res = Http
-            .fetch_with_cancel(
-                Request {
-                    method: "GET",
-                    url: format!("http://{addr}/stalled"),
-                    headers: vec![],
-                    body: None,
-                    timeout: Duration::from_secs(30),
-                },
-                cancel.clone(),
-            )
-            .unwrap();
-        let mut first = [0u8; 5];
-        res.body.read_exact(&mut first).unwrap();
-        assert_eq!(&first, b"first");
+        let mut res = Http::fetch_async(
+            Request {
+                method: "GET",
+                url: format!("http://{addr}/stalled"),
+                headers: vec![],
+                body: None,
+                timeout: Duration::from_secs(30),
+            },
+            Some(cancel.clone()),
+        )
+        .await
+        .unwrap();
+        let res = tokio::task::spawn_blocking(move || {
+            let mut first = [0u8; 5];
+            res.body.read_exact(&mut first).unwrap();
+            assert_eq!(&first, b"first");
+            res
+        })
+        .await
+        .unwrap();
 
         let cancel_trigger = cancel.clone();
-        let canceller = std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(20));
+        let canceller = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
             cancel_trigger.cancel();
         });
         let started = std::time::Instant::now();
-        let mut rest = [0u8; 16];
-        let err = res.body.read(&mut rest).expect_err("cancelled read must fail");
-        assert_eq!(err.kind(), std::io::ErrorKind::Interrupted);
-        assert!(started.elapsed() < Duration::from_secs(2), "cancel must abort promptly");
-        // Subsequent reads after cancellation remain Interrupted without panicking.
-        assert_eq!(res.body.read(&mut rest).unwrap_err().kind(), std::io::ErrorKind::Interrupted);
+        tokio::task::spawn_blocking(move || {
+            let mut res = res;
+            let mut rest = [0u8; 16];
+            let err = res.body.read(&mut rest).expect_err("cancelled read must fail");
+            assert_eq!(err.kind(), std::io::ErrorKind::Interrupted);
+            assert!(started.elapsed() < Duration::from_secs(2), "cancel must abort promptly");
+            // Subsequent reads after cancellation remain Interrupted without panicking.
+            assert_eq!(res.body.read(&mut rest).unwrap_err().kind(), std::io::ErrorKind::Interrupted);
+        })
+        .await
+        .unwrap();
 
-        canceller.join().unwrap();
+        canceller.await.unwrap();
     }
 }

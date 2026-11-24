@@ -1,4 +1,4 @@
-import { cleanup, signal, Text, View } from "nsh";
+import { cleanup, computed, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { MediaAudioFormatValues, type MediaAudioFormat, type MediaSpeechJob, type MediaSpeechRequest } from "@vibevalley/protocol";
@@ -38,11 +38,11 @@ export function SpeechPanel() {
     },
     { enabled: () => status()?.speech !== null && status()?.speech !== undefined },
   );
-  const options = () => {
+  const options = computed(() => {
     const list = (ready(voices, undefined)?.voices ?? []).map((item) => ({ value: item.id, label: item.name ? `${item.name} · ${item.id}` : item.id }));
     const chosen = voice();
     return chosen && !list.some((item) => item.value === chosen.id) ? [{ value: chosen.id, label: chosen.name }, ...list] : list;
-  };
+  });
   const text = signal("");
   const format = signal<MediaAudioFormat>("wav");
   const execution = signal<"synchronous" | "asynchronous" | "streaming">("synchronous");
@@ -60,7 +60,7 @@ export function SpeechPanel() {
     draining.set(false);
   };
   cleanup(stop);
-  const jobs = () => ops()?.media?.filter((job): job is MediaSpeechJob => job.kind === "speech") ?? [];
+  const jobs = computed(() => ops()?.media?.filter((job): job is MediaSpeechJob => job.kind === "speech") ?? []);
 
   const submit = () => {
     if (act.busy()) return;

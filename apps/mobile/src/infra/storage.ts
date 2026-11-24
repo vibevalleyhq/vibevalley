@@ -38,39 +38,110 @@ interface NativeKeychainContract {
   readonly delete?: (key: string) => Promise<void> | void;
 }
 
-const fallbackProfileStore = new Map<string, string>();
+export interface AsyncStorageBackend {
+  readonly getItem: (key: string) => Promise<string | null>;
+  readonly setItem: (key: string, value: string) => Promise<void>;
+  readonly removeItem: (key: string) => Promise<void>;
+}
+
+export interface CoalescedStorage {
+  readonly getItem: (key: string) => Promise<string | undefined>;
+  readonly setItem: (key: string, value: string) => Promise<void>;
+  readonly removeItem: (key: string) => Promise<void>;
+  readonly flush: () => Promise<void>;
+}
+
+const nshStorageBackend: AsyncStorageBackend = {
+  getItem: (key) => Storage.getItem(key),
+  setItem: (key, value) => Storage.setItem(key, value),
+  removeItem: (key) => Storage.removeItem(key),
+};
+
+/**
+ * Per-key write-through coalescing queue over an async Storage backend: rapid writes or deletions
+ * on the same key collapse to the latest state while keeping memory reads synchronous-fresh.
+ */
+export function createCoalescedStorage(backend: AsyncStorageBackend = nshStorageBackend): CoalescedStorage {
+  const memoryCache = new Map<string, string>();
+  const queued = new Map<string, string | null>();
+  const activeLoops = new Map<string, Promise<void>>();
+  const lastWriteFailed = new Set<string>();
+
+  const enqueue = (key: string, op: string | null): Promise<void> => {
+    if (op === null) memoryCache.delete(key);
+    else memoryCache.set(key, op);
+    queued.set(key, op);
+
+    const existing = activeLoops.get(key);
+    if (existing !== undefined) return existing;
+
+    const loop = (async () => {
+      try {
+        while (queued.has(key)) {
+          const next = queued.get(key);
+          queued.delete(key);
+          if (next === undefined) continue;
+          try {
+            if (next === null) await backend.removeItem(key);
+            else await backend.setItem(key, next);
+            lastWriteFailed.delete(key);
+          } catch {
+            // Headless or restricted runs without storage keep metadata in memory for the session.
+            lastWriteFailed.add(key);
+          }
+        }
+      } finally {
+        activeLoops.delete(key);
+      }
+    })();
+
+    activeLoops.set(key, loop);
+    return loop;
+  };
+
+  return {
+    getItem: async (key) => {
+      if (activeLoops.has(key) || lastWriteFailed.has(key)) {
+        return memoryCache.get(key);
+      }
+      try {
+        const value = await backend.getItem(key);
+        return value ?? undefined;
+      } catch {
+        return memoryCache.get(key);
+      }
+    },
+    setItem: (key, value) => enqueue(key, value),
+    removeItem: (key) => enqueue(key, null),
+    flush: async () => {
+      while (activeLoops.size > 0 || queued.size > 0) {
+        await Promise.all([...activeLoops.values()]);
+      }
+    },
+  };
+}
+
+const defaultStorage = createCoalescedStorage();
 const volatileTokenStore = new Map<string, string>();
 
 async function readProfileRaw(key: string): Promise<string | undefined> {
-  try {
-    const value = await Storage.getItem(key);
-    return value ?? undefined;
-  } catch {
-    return fallbackProfileStore.get(key);
-  }
+  return defaultStorage.getItem(key);
 }
 
 async function writeProfileRaw(key: string, value: string): Promise<void> {
-  fallbackProfileStore.set(key, value);
-  try {
-    await Storage.setItem(key, value);
-  } catch {
-    // Headless or restricted runs without storage keep profile metadata in memory for the session.
-  }
+  await defaultStorage.setItem(key, value);
 }
 
 async function deleteProfileRaw(key: string): Promise<void> {
-  fallbackProfileStore.delete(key);
-  try {
-    await Storage.removeItem(key);
-  } catch {
-    // Headless or restricted runs without storage have nothing persisted to clear.
-  }
+  await defaultStorage.removeItem(key);
 }
 
+const HostErrorCodeSchema = z.object({ code: z.string() });
+
 function isUnavailableHostError(err: unknown): boolean {
-  if (typeof err !== "object" || err === null || !("code" in err)) return false;
-  const code = err.code;
+  const parsed = HostErrorCodeSchema.safeParse(err);
+  if (!parsed.success) return false;
+  const { code } = parsed.data;
   return code === "ERR_NSH_HOST_ERROR" || code === "ERR_FEATURE_UNAVAILABLE_ON_PLATFORM" || code === "ERR_ACCESS_DENIED";
 }
 
@@ -158,29 +229,17 @@ function createTestHarnessTokenStore(): SecureTokenStore {
   return {
     backend: "test-harness",
     getToken: async (account) => {
-      try {
-        const value = await Storage.getItem(TEST_HARNESS_TOKEN_KEY);
-        if (value !== null && value !== "") return value;
-      } catch {
-        // Fall through to volatile map when Storage is unavailable.
-      }
+      const value = await defaultStorage.getItem(TEST_HARNESS_TOKEN_KEY);
+      if (value !== undefined && value !== "") return value;
       return volatileTokenStore.get(account);
     },
     setToken: async (account, token) => {
       volatileTokenStore.set(account, token);
-      try {
-        await Storage.setItem(TEST_HARNESS_TOKEN_KEY, token);
-      } catch {
-        // Volatile map holds the token for the current test run.
-      }
+      await defaultStorage.setItem(TEST_HARNESS_TOKEN_KEY, token);
     },
     deleteToken: async (account) => {
       volatileTokenStore.delete(account);
-      try {
-        await Storage.removeItem(TEST_HARNESS_TOKEN_KEY);
-      } catch {
-        // Nothing persisted to clear.
-      }
+      await defaultStorage.removeItem(TEST_HARNESS_TOKEN_KEY);
     },
   };
 }

@@ -251,6 +251,82 @@ tester.run("nsh-no-eager-accessor", rule("nsh-no-eager-accessor"), {
   ],
 });
 
+tester.run("nsh-no-direct-storage-in-event", rule("nsh-no-direct-storage-in-event"), {
+  valid: [
+    { code: "const v = <Input onInput={(val) => draft.set(val)} />;", filename: "a.tsx" },
+    {
+      code: "const v = <Input onChange={(e) => { clearTimeout(t); t = setTimeout(() => localStorage.setItem('k', e.value), 250); }} />;",
+      filename: "a.tsx",
+    },
+    { code: "const v = <Button onPress={() => localStorage.setItem('k', 'v')} />;", filename: "a.tsx" },
+    { code: "const v = <View onClick={() => Storage.setItem('k', 'v')} />;", filename: "a.tsx" },
+    { code: "const v = <Input onInput={(val) => stored.set(val)} />;", filename: "a.tsx" },
+  ],
+  invalid: [
+    { code: "const v = <Input onChange={(e) => localStorage.setItem('k', e.value)} />;", filename: "a.tsx", errors: [{ messageId: "directWrite" }] },
+    { code: "const v = <Input onInput={(val) => { Storage.setItem('draft', val); }} />;", filename: "a.tsx", errors: [{ messageId: "directWrite" }] },
+    {
+      code: "const v = <Input onSelectionChange={() => window.localStorage.setItem('sel', '1')} />;",
+      filename: "a.tsx",
+      errors: [{ messageId: "directWrite" }],
+    },
+    {
+      code: "const v = <View onPanResponderMove={() => globalThis.localStorage.setItem('drag', '1')} />;",
+      filename: "a.tsx",
+      errors: [{ messageId: "directWrite" }],
+    },
+    { code: "const v = <Scroll onScroll={() => localStorage.setItem('y', '10')} />;", filename: "a.tsx", errors: [{ messageId: "directWrite" }] },
+    { code: "const v = <Scroll onScrollBeginDrag={() => Storage.setItem('drag', '1')} />;", filename: "a.tsx", errors: [{ messageId: "directWrite" }] },
+  ],
+});
+
+tester.run("nsh-keymap-no-text-signal", rule("nsh-keymap-no-text-signal"), {
+  valid: [
+    {
+      code: "const isEmpty = computed(() => box.text() === ''); effect(() => { if (!focused()) return; if (isEmpty()) return keymap.bind('up', go); });",
+      filename: "a.tsx",
+    },
+    {
+      code: "effect(() => { if (!focused() || working() !== undefined) return; return keymap.bind('tab', accept); });",
+      filename: "a.tsx",
+    },
+    {
+      code: "effect(() => keymap.bind('up', () => { if (box.text() === '') go(); }));",
+      filename: "a.tsx",
+    },
+    {
+      code: "effect(() => { if (draft() === '') setHint(true); });",
+      filename: "a.tsx",
+    },
+    {
+      code: "effect(() => { if (untracked(() => box.text()) === '') return keymap.bind('up', go); });",
+      filename: "a.tsx",
+    },
+  ],
+  invalid: [
+    {
+      code: "effect(() => { if (!focused()) return; if (box.text() === '') return keymap.bind('up', go); });",
+      filename: "a.tsx",
+      errors: [{ messageId: "textSignal" }],
+    },
+    {
+      code: "effect(() => { if (draft() !== '') return keymap.bind('escape', clear); });",
+      filename: "a.tsx",
+      errors: [{ messageId: "textSignal" }],
+    },
+    {
+      code: "effect(() => { if ('' === box.text().trim()) return keymap.bind('up', go); });",
+      filename: "a.tsx",
+      errors: [{ messageId: "textSignal" }],
+    },
+    {
+      code: "effect(() => { const offs = []; if (query() === 'all') offs.push(keymap.bind('enter', run)); return () => offs.forEach((f) => f()); });",
+      filename: "a.tsx",
+      errors: [{ messageId: "textSignal" }],
+    },
+  ],
+});
+
 const root = resolve(import.meta.dirname, "../..");
 
 describe("what a rule says", () => {
@@ -265,6 +341,18 @@ describe("what a rule says", () => {
       expect(text, where).toMatch(/\. Fix: .+\. See \S+$/u);
       expect(existsSync(resolve(root, see ?? "")), `${where}: ${see}`).toBe(true);
     }
+  });
+
+  it("prescribes fixes and docs for responsiveness ratchets", () => {
+    const storageMsg = rule("nsh-no-direct-storage-in-event").meta?.messages?.directWrite ?? "";
+    expect(storageMsg).toContain("Fix:");
+    expect(storageMsg).toContain("defineStored");
+    expect(storageMsg).toContain("See docs/style/nsh-tsx.md");
+
+    const keymapMsg = rule("nsh-keymap-no-text-signal").meta?.messages?.textSignal ?? "";
+    expect(keymapMsg).toContain("Fix:");
+    expect(keymapMsg).toContain("computed");
+    expect(keymapMsg).toContain("See docs/style/nsh-tsx.md");
   });
 
   it("leaves no-restricted-imports no message of its own outside refused", () => {
