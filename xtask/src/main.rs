@@ -1,5 +1,6 @@
 //! Native Rust workspace governance & verification task runner (`cargo xtask`).
 
+pub mod arch_audit;
 mod boundaries;
 mod changed;
 mod ratchets;
@@ -36,7 +37,8 @@ Commands:
   loom                                 Run loom concurrency tests (runtime & server)
   goldens [--check]                    Run vibevalley-core artifact golden tests
   protocol [--write]                   Check (or with --write, regenerate) TS contract & goldens
-  audit [--boundaries] [--ratchets]    Run Rust module-boundary and concurrency-ratchet audits"
+  audit [--boundaries] [--ratchets]    Run Rust module-boundary and concurrency-ratchet audits
+  arch-audit [--report-locks] [--json] Run flat server architecture audit (11 rules) & lock report"
     );
 }
 
@@ -222,6 +224,7 @@ fn dispatch(root: &Path, args: &[String]) -> Result<i32, String> {
         "goldens" => cmd_goldens(root, rest),
         "protocol" => cmd_protocol(root, rest),
         "audit" => cmd_audit(root, rest),
+        "arch-audit" => arch_audit::run(root, rest),
         other => {
             eprintln!("xtask: unknown subcommand `{other}`\n");
             print_usage();
