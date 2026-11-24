@@ -21,7 +21,7 @@ struct Network {
 }
 impl Network {
     fn new() -> Network {
-        let (vendor, download) = vibevalley_server::app::fakes::moss::network();
+        let (vendor, download) = vibevalley_server::app::fake::moss::network();
         let calls = Arc::new(Mutex::new(Vec::new()));
         let changed = Arc::new(Condvar::new());
         let seen = calls.clone();
@@ -109,7 +109,7 @@ fn input(s: &vibevalley_server::Started, kind: &str, mime: &str, name: &str, byt
     id
 }
 fn sample(s: &vibevalley_server::Started) -> String {
-    input(s, "audio", "audio/wav", "sample.wav", vibevalley_server::app::fakes::moss::wav(2880))
+    input(s, "audio", "audio/wav", "sample.wav", vibevalley_server::app::fake::moss::wav(2880))
 }
 fn picture(s: &vibevalley_server::Started) -> String {
     let mut png = b"\x89PNG\r\n\x1a\n".to_vec();

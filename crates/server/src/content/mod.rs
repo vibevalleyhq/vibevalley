@@ -364,7 +364,7 @@ mod tests {
             deepseek_api_key: String::new(),
         });
         let announce = TestAnnounce::new_async(db.clone()).await;
-        let (vendor, download) = crate::app::fakes::moss::network();
+        let (vendor, download) = crate::app::fake::moss::network();
         let jobs = MediaStore::open_with_clock_async(
             Parts {
                 db: db.clone(),

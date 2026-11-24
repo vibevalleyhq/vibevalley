@@ -263,26 +263,3 @@ impl Provider {
         })
     }
 }
-
-pub fn install(hub: &Hub, provider: Arc<Provider>) {
-    let p = provider.clone();
-    hub.on::<ops::ProviderGet>(move |_, ()| Ok(p.status()));
-    let p = provider.clone();
-    hub.on_async::<ops::ProviderUpdate, _, _>(move |_, u| {
-        let p = p.clone();
-        async move {
-            crate::spawn_blocking_traced(move || p.update(&u))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
-    });
-    let p = provider.clone();
-    hub.on_async::<ops::ProviderModelList, _, _>(move |_, r| {
-        let p = p.clone();
-        async move { p.models_async(&r.connection, r.revision).await }
-    });
-    hub.on_async::<ops::ProviderVoiceList, _, _>(move |_, r| {
-        let provider = provider.clone();
-        async move { provider.voices_async(&r).await }
-    });
-}

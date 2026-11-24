@@ -606,6 +606,13 @@ impl Setting {
         Ok(self.status())
     }
 
+    pub async fn save_async(self: &Arc<Self>, update: SettingsUpdate) -> Result<SettingsStatus, ApiError> {
+        let setting = self.clone();
+        crate::spawn_blocking_traced(move || setting.save(&update))
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+    }
+
     /// Changes the providers under the settings' lock (`updateProviders`).
     pub fn update_providers(&self, change: impl FnOnce(&Providers) -> Result<Providers, ApiError>) -> Result<Providers, ApiError> {
         let mut guard = self.stored.lock();
@@ -644,12 +651,4 @@ fn write_private(file: &Path, text: &str) -> std::io::Result<()> {
     f.write_all(text.as_bytes())?;
     f.sync_all()?;
     std::fs::rename(&tmp, file)
-}
-
-    pub async fn save_async(self: &Arc<Self>, update: SettingsUpdate) -> Result<SettingsStatus, ApiError> {
-        let setting = self.clone();
-        crate::spawn_blocking_traced(move || setting.save(&update))
-            .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-    }
 }

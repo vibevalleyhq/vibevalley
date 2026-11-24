@@ -1934,7 +1934,7 @@ mod tests {
         let inputs = MediaInputStore::open_async(dir.path(), db.clone(), runtime.clone(), files.clone())
             .await
             .unwrap();
-        let (vendor, download) = crate::app::fakes::moss::network();
+        let (vendor, download) = crate::app::fake::moss::network();
         let jobs = MediaStore::open_async(Parts {
             db: db.clone(),
             runtime: runtime.clone(),

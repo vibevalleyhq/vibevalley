@@ -137,5 +137,5 @@ pub struct App {
     pub(crate) cron: Arc<work::cron::CronStore>,
     pub(crate) voice: Arc<collab::voice::Voice>,
     pub(crate) connector: Arc<collab::connector::Connector>,
-    pub(crate) game: Arc<skin::game::Game>,
+    pub(crate) game: Arc<skin::game::GameStore>,
 }

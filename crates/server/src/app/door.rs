@@ -21,22 +21,18 @@ use vibevalley_core::SliceMask;
 use vibevalley_i18n::t;
 use vibevalley_protocol::native::{NATIVE_ENDPOINTS, native_ops};
 use vibevalley_protocol::{
-    ApiError, Applied, AppliedIssue, ArtifactListRequest, ArtifactMarkdown, BizCode, Caller, ChannelUpdate, ConnectorLogin, Endpoint, EndpointId, Envelope,
-    HistoryEntry, IssueHistory, LiveEvent, Op, ProviderVoiceRequest, SUBSCRIPTIONS, SliceKind, SubscriptionSpec, USER_ID, Validation, endpoints, ops,
-    subscriptions,
+    ApiError, ArtifactListRequest, ArtifactMarkdown, BizCode, Caller, ChannelUpdate, ConnectorLogin, Endpoint, EndpointId, Envelope, LiveEvent, Op,
+    ProviderVoiceRequest, SUBSCRIPTIONS, SliceKind, SubscriptionSpec, USER_ID, endpoints, ops, subscriptions,
 };
 
 use crate::app::App;
 use crate::app::live::bridge_live_receiver;
-use crate::app::projection::derived_issues_and_sessions;
-use crate::app::refusal::{AsyncRequestKeys, LookIn, missing, refused};
+use crate::app::refusal::{AsyncRequestKeys, LookIn, missing};
 use crate::app::slice::SliceSubscription;
 use crate::collab;
 use crate::content::artifact::Maker;
 use crate::content::library::AddedBy;
-use crate::content::media::jobs::MediaSource;
 use crate::infra;
-use crate::team::memory::{By, Note as MemoryNote};
 use crate::transport::api::{
     BoxFuture, CallerContext, Server, SharedFaultGate, SharedHostDebug, SharedInvokeObserver, SharedLiveVoice, SharedMachineBus, SharedMcp, SharedRemoteAuth,
     media::{SharedMediaInputs, SharedSpeechStreams},
@@ -75,10 +71,7 @@ pub struct ServerDoor {
     subscriptions: Mutex<HashMap<u64, flume::Sender<()>>>,
     next_sub_id: AtomicU64,
     next_trace_id: AtomicU64,
-    issue_create_keys: AsyncRequestKeys<AppliedIssue>,
-    issue_status_keys: AsyncRequestKeys<AppliedIssue>,
     channel_thread_keys: AsyncRequestKeys<String>,
-    memory_create_keys: AsyncRequestKeys<vibevalley_protocol::Memory>,
 }
 
 impl ServerDoor {
@@ -98,10 +91,7 @@ impl ServerDoor {
             subscriptions: Mutex::new(HashMap::new()),
             next_sub_id: AtomicU64::new(1),
             next_trace_id: AtomicU64::new(1),
-            issue_create_keys: AsyncRequestKeys::default(),
-            issue_status_keys: AsyncRequestKeys::default(),
             channel_thread_keys: AsyncRequestKeys::default(),
-            memory_create_keys: AsyncRequestKeys::default(),
         })
     }
 
@@ -340,313 +330,231 @@ impl ServerDoor {
             // memory
             EndpointId::MemoryList => {
                 let req: <ops::MemoryList as Op>::Input = decode(payload)?;
-                ok_json(self.app.memory.list_wire_async(&req.agent).await)
+                ok_json(self.app.memory.list_for_door_async(req).await?)
             }
             EndpointId::MemoryRecall => {
                 let req: <ops::MemoryRecall as Op>::Input = decode(payload)?;
-                ok_json(
-                    self.app
-                        .memory
-                        .recall_preview_async(&req.agent, req.repo.as_deref().unwrap_or(""), req.text.as_deref().unwrap_or(""))
-                        .await,
-                )
+                ok_json(self.app.memory.recall_for_door_async(req).await?)
             }
             EndpointId::MemoryCreate => {
                 let req: <ops::MemoryCreate as Op>::Input = decode(payload)?;
-                let by = match ctx.caller {
-                    Caller::Session => By::Session(ctx.client.as_ref().map(|c| c.id.clone()).unwrap_or_default()),
-                    Caller::Orchestrator => By::Orchestrator,
-                    Caller::User | Caller::Remote => By::User,
-                };
-                let memory = self.app.memory.clone();
-                let mem = self
-                    .memory_create_keys
-                    .once(req.request_key.as_deref(), async move {
-                        memory
-                            .write_async(&MemoryNote {
-                                agent: req.agent,
-                                text: req.text,
-                                repo: req.repo.unwrap_or_default(),
-                                by,
-                            })
-                            .await
-                    })
-                    .await?;
-                ok_json(mem)
+                let client_id = ctx.client.as_ref().map(|c| c.id.as_str());
+                ok_json(self.app.memory.create_for_caller_async(ctx.caller, client_id, req).await?)
             }
             EndpointId::MemorySearch => {
                 let req: <ops::MemorySearch as Op>::Input = decode(payload)?;
-                let agent = req
-                    .agent
-                    .as_deref()
-                    .map(|a| self.app.agent.profiles.named(a).map(|p| p.id).unwrap_or_else(|| a.to_string()));
-                ok_json(
-                    self.app
-                        .memory
-                        .search_async(agent.as_deref().unwrap_or(""), req.repo.as_deref().unwrap_or(""), req.text.as_deref().unwrap_or(""), 0)
-                        .await,
-                )
+                ok_json(self.app.memory.search_for_door_async(req).await?)
             }
             EndpointId::MemoryDelete => {
                 let req: <ops::MemoryDelete as Op>::Input = decode(payload)?;
-                self.app.memory.forget_async(&req.agent, &req.memory).await?;
+                self.app.memory.delete_for_door_async(req).await?;
                 Ok(Value::Null)
             }
             EndpointId::MemoryPreviewDelete => {
                 let req: <ops::MemoryPreviewDelete as Op>::Input = decode(payload)?;
-                ok_json(self.app.memory.preview_forget_async(&req.agent, &req.memory).await?)
+                ok_json(self.app.memory.preview_delete_for_door_async(req).await?)
             }
 
             // repo & github
             EndpointId::RepoPrSubmit => {
-                if ctx.caller != Caller::User {
-                    return Err(refused(BizCode::RepoRefused, t("server.repo.publish.userOnly", &[])));
-                }
                 let req: <ops::RepoPrSubmit as Op>::Input = decode(payload)?;
-                let issue_id = self.app.issue.open_issue_id_for_branch_async(&req.cwd, &req.branch).await;
-                ok_json(self.app.pull.publish_async(&req, issue_id.as_deref()).await?)
+                ok_json(self.app.pull.submit_pr_async(ctx.caller, &req).await?)
             }
             EndpointId::GithubGet => ok_json(self.app.repo.github_status()),
             EndpointId::GithubRefresh => ok_json(self.app.repo.refresh_github_async().await),
-            EndpointId::RepoList => ok_json(self.app.repo.summaries_async().await),
+            EndpointId::RepoList => ok_json(self.app.repo.list_summaries_async().await),
             EndpointId::RepoValidate => {
                 let req: <ops::RepoValidate as Op>::Input = decode(payload)?;
-                ok_json(self.app.repo.validate(&req))
+                ok_json(self.app.repo.validate_repo(&req))
             }
             EndpointId::RepoCreate => {
                 let req: <ops::RepoCreate as Op>::Input = decode(payload)?;
-                let path = self.app.repo.create_async(&req).await?;
-                ok_json(self.app.repo.summary_async(path).await)
+                ok_json(self.app.repo.create_repo_async(&req).await?)
             }
             EndpointId::RepoLanguageList => {
                 let req: <ops::RepoLanguageList as Op>::Input = decode(payload)?;
-                ok_json(self.app.repo.languages_by_id_async(&req.id).await?)
+                ok_json(self.app.repo.languages_endpoint_async(&req.id).await?)
             }
             EndpointId::RepoTemplateList => {
                 let req: <ops::RepoTemplateList as Op>::Input = decode(payload)?;
-                let issues = self.app.issue.list_async().await?;
-                ok_json(self.app.repo.templates_for_async(&req.id, &issues, &self.app.agent).await?)
+                let issues = self
+                    .app
+                    .issue
+                    .issues_async()
+                    .await
+                    .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
+                ok_json(self.app.repo.templates_endpoint_async(&req.id, &issues, &self.app.agent).await?)
             }
             EndpointId::RepoActivityGet => {
                 let req: <ops::RepoActivityGet as Op>::Input = decode(payload)?;
-                ok_json(self.app.repo.activity_by_id_async(&req.id).await?)
+                ok_json(self.app.repo.activity_endpoint_async(&req.id).await?)
             }
 
             // session
             EndpointId::SessionStop => {
                 let req: <ops::SessionStop as Op>::Input = decode(payload)?;
-                self.app.session.stop_live_async(&req.id).await?;
+                self.app.session.stop_endpoint_async(&req.id).await?;
                 Ok(Value::Null)
             }
             EndpointId::SessionList => {
                 let req: <ops::SessionList as Op>::Input = decode(payload)?;
-                let (_, mut sessions) = derived_issues_and_sessions(&self.app).await?;
-                let profile = req.profile.unwrap_or_default();
-                let controller = req.controller;
-                sessions.retain(|x| (profile.is_empty() || x.profile_id() == Some(profile.as_str())) && controller.is_none_or(|c| x.controller == c));
-                sessions.sort_by_key(|s| std::cmp::Reverse(s.hired_at));
-                ok_json(sessions)
+                ok_json(self.app.session.list_endpoint_async(req.profile, req.controller).await?)
             }
             EndpointId::SessionGet => {
                 let req: <ops::SessionGet as Op>::Input = decode(payload)?;
-                let (_, sessions) = derived_issues_and_sessions(&self.app).await?;
-                let found = sessions
-                    .into_iter()
-                    .find(|x| x.id == req.id)
-                    .ok_or_else(|| missing(t("server.session.noSession", &[("id", req.id.into())]), LookIn::Session))?;
-                ok_json(found)
+                ok_json(self.app.session.get_endpoint_async(&req.id).await?)
             }
             EndpointId::SessionEventList => {
                 let req: <ops::SessionEventList as Op>::Input = decode(payload)?;
-                ok_json(self.app.trajectory.events_page_async(&req).await.unwrap_or_default())
+                ok_json(self.app.session.event_list_endpoint_async(&req).await?)
             }
             EndpointId::SessionOpenWorkspace => {
                 let req: <ops::SessionOpenWorkspace as Op>::Input = decode(payload)?;
-                ok_json(self.app.session.open_workspace_async(req).await?)
+                ok_json(self.app.session.open_workspace_endpoint_async(req).await?)
             }
             EndpointId::SessionCloseWorkspace => {
                 let req: <ops::SessionCloseWorkspace as Op>::Input = decode(payload)?;
-                self.app.session.close_workspace_async(&req.id).await;
+                self.app.session.close_workspace_endpoint_async(&req.id).await?;
                 Ok(Value::Null)
             }
             EndpointId::SessionSend => {
                 let req: <ops::SessionSend as Op>::Input = decode(payload)?;
                 let trace_id = (ctx.trace_id != 0).then_some(ctx.trace_id);
-                self.app.session.send_workspace_with_trace_async(req, Some(&self.app.attachment), trace_id).await?;
-                Ok(Value::Null)
+                ok_json(
+                    self.app
+                        .session
+                        .send_workspace_endpoint_async(req, Some(&self.app.attachment), trace_id)
+                        .await?,
+                )
             }
             EndpointId::SessionRespondPermission => {
                 let req: <ops::SessionRespondPermission as Op>::Input = decode(payload)?;
-                self.app.session.respond_permission(req)?;
+                self.app.session.respond_permission_endpoint_async(req).await?;
                 Ok(Value::Null)
             }
             EndpointId::SessionRespondInteraction => {
                 let req: <ops::SessionRespondInteraction as Op>::Input = decode(payload)?;
-                self.app.session.respond_interaction(req)?;
+                self.app.session.respond_interaction_endpoint_async(req).await?;
                 Ok(Value::Null)
             }
             EndpointId::SessionSetConfig => {
                 let req: <ops::SessionSetConfig as Op>::Input = decode(payload)?;
-                self.app.session.set_workspace_config_async(req).await?;
-                Ok(Value::Null)
+                ok_json(self.app.session.set_config_endpoint_async(req).await?)
             }
             EndpointId::SessionChildTranscript => {
                 let req: <ops::SessionChildTranscript as Op>::Input = decode(payload)?;
-                let session = self.app.session.clone();
-                let res = spawn_blocking_traced(move || session.read_child_transcript(req))
-                    .await
-                    .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))??;
-                ok_json(res)
+                ok_json(self.app.session.child_transcript_endpoint_async(req).await?)
             }
             EndpointId::SessionBindingAttach => {
                 let req: <ops::SessionBindingAttach as Op>::Input = decode(payload)?;
-                ok_json(self.app.session.attach_binding_async(req).await?)
+                ok_json(self.app.session.attach_binding_endpoint_async(req).await?)
             }
             EndpointId::SessionBindingDetach => {
                 let req: <ops::SessionBindingDetach as Op>::Input = decode(payload)?;
-                ok_json(self.app.session.detach_binding_async(req).await?)
+                ok_json(self.app.session.detach_binding_endpoint_async(req).await?)
             }
 
             // issue
             EndpointId::IssueConversationGet => {
                 let req: <ops::IssueConversationGet as Op>::Input = decode(payload)?;
-                let item = self.app.issue.get_async(&req.id).await?;
-                ok_json(self.app.channel.issue_thread_id(&item.id))
+                ok_json(self.app.issue.issue_conversation_endpoint_async(Some(&*self.app.channel), &req.id).await?)
             }
             EndpointId::IssueCommentCreate => {
                 let req: <ops::IssueCommentCreate as Op>::Input = decode(payload)?;
-                self.app.issue.comment_async(&req.id, &req.text).await?;
-                ok_json(Applied { seq: self.app.projector.seq() })
+                ok_json(self.app.issue.issue_comment_endpoint_async(&req.id, &req.text).await?)
             }
             EndpointId::IssueDiffGet => {
                 let req: <ops::IssueDiffGet as Op>::Input = decode(payload)?;
-                let (changes, reviewed_session) = self.app.issue.diff_async(&req.id, req.since_tree.as_deref()).await?;
-                if ctx.caller == Caller::User
-                    && let Some(session_id) = reviewed_session
-                {
-                    self.app.game.reviewed(&session_id);
-                }
-                ok_json(changes)
+                let game = self.app.game.clone();
+                let on_reviewed = move |session_id: &str| game.reviewed(session_id);
+                ok_json(
+                    self.app
+                        .issue
+                        .issue_diff_endpoint_async(ctx.caller, &req.id, req.since_tree.as_deref(), Some(&on_reviewed))
+                        .await?,
+                )
             }
-            EndpointId::IssueHistoryList => {
-                let (issues, sessions) = derived_issues_and_sessions(&self.app).await?;
-                let mut out = Vec::with_capacity(issues.len());
-                for issue in issues {
-                    let ids: Vec<String> = issue.executions().map(|e| e.session().to_string()).collect();
-                    let mut found: Vec<_> = ids.iter().filter_map(|id| sessions.iter().find(|x| &x.id == id).cloned()).collect();
-                    for id in &ids {
-                        if !found.iter().any(|x| &x.id == id)
-                            && let Some(past) = self.app.issue.past_session_async(id).await
-                        {
-                            found.push(past);
-                        }
-                    }
-                    let missing_sessions = ids.iter().filter(|id| !found.iter().any(|x| &x.id == *id)).cloned().collect();
-                    out.push(IssueHistory {
-                        issue,
-                        sessions: found,
-                        missing_sessions,
-                    });
-                }
-                ok_json(out)
-            }
+            EndpointId::IssueHistoryList => ok_json(self.app.issue.issue_history_list_endpoint_async().await?),
             EndpointId::IssueList => {
                 let filter: <ops::IssueList as Op>::Input = decode(payload)?;
-                let (issues, _) = derived_issues_and_sessions(&self.app).await?;
-                ok_json(vibevalley_core::pick_issues(&issues, &filter, self.app.clock.now_ms()))
+                ok_json(self.app.issue.issue_list_endpoint_async(&filter, &*self.app.clock).await?)
             }
             EndpointId::IssueReview => {
                 let req: <ops::IssueReview as Op>::Input = decode(payload)?;
-                ok_json(self.app.issue.review_async(req).await?)
+                ok_json(self.app.issue.issue_review_endpoint_async(req).await?)
             }
             EndpointId::IssueSplit => {
                 let req: <ops::IssueSplit as Op>::Input = decode(payload)?;
-                ok_json(self.app.issue.split_async(&req).await?)
+                let split_id = self.app.issue.issue_split_endpoint_async(&req).await?;
+                self.app.game.on_issue_split();
+                ok_json(split_id)
             }
             EndpointId::IssueGet => {
                 let req: <ops::IssueGet as Op>::Input = decode(payload)?;
-                ok_json(self.app.issue.get_async(&req.id).await?)
+                ok_json(self.app.issue.issue_get_endpoint_async(&req.id).await?)
             }
             EndpointId::IssueRunList => {
                 let req: <ops::IssueRunList as Op>::Input = decode(payload)?;
-                ok_json(self.app.issue.runs_for_ref_async(&req.id).await?)
+                ok_json(self.app.issue.issue_run_list_endpoint_async(&req.id).await?)
             }
             EndpointId::IssueTimelineGet => {
                 let req: <ops::IssueTimelineGet as Op>::Input = decode(payload)?;
-                ok_json(self.app.issue.timeline_async(&req.id).await?)
+                ok_json(self.app.issue.issue_timeline_endpoint_async(&req.id).await?)
             }
             EndpointId::IssueCreate => {
                 let req: <ops::IssueCreate as Op>::Input = decode(payload)?;
-                let key = req.request_key.clone();
-                let app = self.app.clone();
-                let res = self
-                    .issue_create_keys
-                    .once(key.as_deref(), async move {
-                        let issue = app.issue.create_async(Some(&app.agent), &req).await?;
-                        Ok(AppliedIssue::from_issue(issue, app.projector.seq()))
-                    })
-                    .await?;
-                ok_json(res)
+                ok_json(self.app.issue.issue_create_endpoint_async(Some(&self.app.agent), &req).await?)
             }
             EndpointId::IssueUpdate => {
                 let req: <ops::IssueUpdate as Op>::Input = decode(payload)?;
-                let issue = self.app.issue.update_async(Some(&self.app.agent), req).await?;
-                ok_json(AppliedIssue::from_issue(issue, self.app.projector.seq()))
+                ok_json(self.app.issue.issue_update_endpoint_async(Some(&self.app.agent), req).await?)
             }
             EndpointId::IssueDelete => {
                 let req: <ops::IssueDelete as Op>::Input = decode(payload)?;
-                self.app.issue.delete_by_ref_async(&req.id).await?;
+                self.app.issue.issue_delete_endpoint_async(&req.id).await?;
                 Ok(Value::Null)
             }
             EndpointId::IssuePreviewDelete => {
                 let req: <ops::IssuePreviewDelete as Op>::Input = decode(payload)?;
-                ok_json(self.app.issue.preview_delete_async(&req.id).await?)
+                ok_json(self.app.issue.issue_preview_delete_endpoint_async(&req.id).await?)
             }
             EndpointId::IssueStatusUpdate => {
                 let req: <ops::IssueStatusUpdate as Op>::Input = decode(payload)?;
-                let key = req.request_key.clone();
-                let app = self.app.clone();
-                let res = self
-                    .issue_status_keys
-                    .once(key.as_deref(), async move {
-                        let issue = app.issue.status_async(Some(&app.agent), &req).await?;
-                        Ok(AppliedIssue::from_issue(issue, app.projector.seq()))
-                    })
-                    .await?;
-                ok_json(res)
+                ok_json(self.app.issue.issue_status_update_endpoint_async(Some(&self.app.agent), &req).await?)
             }
             EndpointId::IssueStatusPreviewUpdate => {
                 let req: <ops::IssueStatusPreviewUpdate as Op>::Input = decode(payload)?;
-                ok_json(self.app.issue.preview_status_async(Some(&self.app.agent), &req).await?)
+                ok_json(
+                    self.app
+                        .issue
+                        .issue_status_preview_update_endpoint_async(Some(&self.app.agent), &req)
+                        .await?,
+                )
             }
             EndpointId::IssueRefine => {
                 let req: <ops::IssueRefine as Op>::Input = decode(payload)?;
-                ok_json(self.app.issue.refine_async(Some(&*self.app.channel), &req).await?)
+                ok_json(self.app.issue.issue_refine_endpoint_async(Some(&*self.app.channel), &req).await?)
             }
 
             // cron
             EndpointId::CronCreate => {
                 let req: <ops::CronCreate as Op>::Input = decode(payload)?;
-                let by = match ctx.caller {
-                    Caller::User | Caller::Remote => HistoryEntry::User,
-                    Caller::Orchestrator | Caller::Session => HistoryEntry::Agent,
-                };
-                ok_json(self.app.cron.create_for_caller_async(req, by).await?)
+                ok_json(self.app.cron.create_endpoint_async(ctx.caller, req).await?)
             }
-            EndpointId::CronList => ok_json(self.app.cron.list()),
+            EndpointId::CronList => ok_json(self.app.cron.list_endpoint_async().await?),
             EndpointId::CronUpdate => {
                 let req: <ops::CronUpdate as Op>::Input = decode(payload)?;
-                self.app.cron.update_async(req).await?;
+                self.app.cron.update_endpoint_async(&req.id, req.enabled).await?;
                 Ok(Value::Null)
             }
             EndpointId::CronDelete => {
                 let req: <ops::CronDelete as Op>::Input = decode(payload)?;
-                self.app.cron.remove_async(&req.id).await?;
+                self.app.cron.delete_endpoint_async(&req.id).await?;
                 Ok(Value::Null)
             }
             EndpointId::CronPreviewDelete => {
                 let req: <ops::CronPreviewDelete as Op>::Input = decode(payload)?;
-                ok_json(self.app.cron.preview_remove(&req.id)?)
+                ok_json(self.app.cron.preview_delete_endpoint_async(&req.id).await?)
             }
 
             // channel
@@ -654,7 +562,11 @@ impl ServerDoor {
                 let body: <ops::ChannelMessageSend as Op>::Input = decode(payload)?;
                 let game = self.app.game.clone();
                 let on_station: Arc<dyn Fn(i64) + Send + Sync> = Arc::new(move |station| game.want(station));
+                let was_idle = self.app.live.call_snapshot().0 != vibevalley_protocol::CallState::Live;
                 collab::channel::send_message_async(&self.app.channel, &self.app.agent, body, Some(&on_station)).await?;
+                if was_idle && self.app.live.call_snapshot().0 == vibevalley_protocol::CallState::Live {
+                    self.app.game.on_call_live();
+                }
                 Ok(Value::Null)
             }
             EndpointId::ChannelCreate => {
@@ -804,34 +716,21 @@ impl ServerDoor {
             }
 
             // game
-            EndpointId::GameAchievementList => {
-                let items = vibevalley_core::game::achievements()
-                    .iter()
-                    .map(vibevalley_core::game::achievement_in_words)
-                    .collect();
-                let progress = self.app.live.progress_snapshot();
-                let standings = vibevalley_core::game::standings_of(progress.as_ref());
-                ok_json(vibevalley_protocol::AchievementList { items, standings })
-            }
+            EndpointId::GameAchievementList => ok_json(self.app.game.achievements_async().await?),
             EndpointId::GameTitleSet => {
                 let req: <ops::GameTitleSet as Op>::Input = decode(payload)?;
-                let game = self.app.game.clone();
-                spawn_blocking_traced(move || game.choose_title(req.achievement, req.tier))
-                    .await
-                    .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
+                self.app.game.set_title_async(req).await?;
                 Ok(Value::Null)
             }
 
             // media & library
             EndpointId::MediaDialogueCreate => {
-                require_user(ctx.caller)?;
                 let req: <ops::MediaDialogueCreate as Op>::Input = decode(payload)?;
-                ok_json(self.app.media.speakers_async(req, MediaSource::User {}).await?)
+                ok_json(self.app.media.create_speakers_for_caller_async(ctx.caller, req).await?)
             }
             EndpointId::MediaVoiceDesignCreate => {
-                require_user(ctx.caller)?;
                 let req: <ops::MediaVoiceDesignCreate as Op>::Input = decode(payload)?;
-                ok_json(self.app.media.voice_design_async(req, MediaSource::User {}).await?)
+                ok_json(self.app.media.create_voice_design_for_caller_async(ctx.caller, req).await?)
             }
             EndpointId::MediaCloneCreate => {
                 let req: <ops::MediaCloneCreate as Op>::Input = decode(payload)?;
@@ -877,9 +776,8 @@ impl ServerDoor {
                 ok_json(self.app.media_input.preview_delete_async(&req.id).await?)
             }
             EndpointId::MediaImageCreate => {
-                require_user(ctx.caller)?;
                 let req: <ops::MediaImageCreate as Op>::Input = decode(payload)?;
-                ok_json(self.app.media.image_async(req, MediaSource::User {}).await?)
+                ok_json(self.app.media.create_image_for_caller_async(ctx.caller, req).await?)
             }
             EndpointId::MediaUnderstandingCreate => {
                 let req: <ops::MediaUnderstandingCreate as Op>::Input = decode(payload)?;
@@ -890,16 +788,12 @@ impl ServerDoor {
                 ok_json(self.app.media.authorize_understanding_async(req).await?)
             }
             EndpointId::MediaUnderstandingStart => {
-                if ctx.caller != Caller::Orchestrator {
-                    return Err(refused(BizCode::MediaRefused, "authorizationRequired"));
-                }
                 let req: <ops::MediaUnderstandingStart as Op>::Input = decode(payload)?;
-                ok_json(self.app.media.start_understanding_by_id_async(&req.id).await?)
+                ok_json(self.app.media.start_understanding_for_caller_async(ctx.caller, &req.id).await?)
             }
             EndpointId::MediaSpeechCreate => {
-                require_user(ctx.caller)?;
                 let req: <ops::MediaSpeechCreate as Op>::Input = decode(payload)?;
-                ok_json(self.app.media.speech_async(req, MediaSource::User {}).await?)
+                ok_json(self.app.media.create_speech_for_caller_async(ctx.caller, req).await?)
             }
             EndpointId::MediaSpeechResume => {
                 let req: <ops::MediaSpeechResume as Op>::Input = decode(payload)?;
@@ -951,10 +845,11 @@ impl ServerDoor {
                     },
                     Caller::Session => {
                         let sid = ctx.client.as_ref().map(|c| c.id.clone()).unwrap_or_default();
-                        let sessions = self.app.session.list_async().await.unwrap_or_default();
-                        let (agent, dir) = sessions
-                            .into_iter()
-                            .find(|h| h.id == sid)
+                        let (agent, dir) = self
+                            .app
+                            .session
+                            .session_async(&sid)
+                            .await
                             .map(|h| (h.profile.unwrap_or_default(), h.cwd.map(PathBuf::from)))
                             .unwrap_or_default();
                         AddedBy::Agent {
@@ -1226,42 +1121,25 @@ impl ServerDoor {
 
             // orchestrator
             EndpointId::OrchestratorOpen => {
-                let orchestrator = self.app.orchestrator.clone();
-                spawn_blocking_traced(move || orchestrator.ensure_open())
-                    .await
-                    .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
+                self.app.orchestrator.open_for_door_async().await?;
                 Ok(Value::Null)
             }
             EndpointId::OrchestratorStop => {
                 let req: <ops::OrchestratorStop as Op>::Input = decode(payload)?;
-                let orchestrator = self.app.orchestrator.clone();
-                spawn_blocking_traced(move || orchestrator.stop(req.agent.as_deref()))
-                    .await
-                    .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
+                self.app.orchestrator.stop_for_door_async(req).await?;
                 Ok(Value::Null)
             }
             EndpointId::OrchestratorEvalCreate => {
                 let req: <ops::OrchestratorEvalCreate as Op>::Input = decode(payload)?;
-                let orchestrator = self.app.orchestrator.clone();
-                let eval = spawn_blocking_traced(move || orchestrator.mark_wrong(req.agent.as_deref(), req.on.0 as i64, &req.want))
-                    .await
-                    .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))??;
-                ok_json(eval)
+                ok_json(self.app.orchestrator.eval_create_for_door_async(req).await?)
             }
             EndpointId::OrchestratorApprovalList => {
                 let req: <ops::OrchestratorApprovalList as Op>::Input = decode(payload)?;
-                let orchestrator = self.app.orchestrator.clone();
-                let list = spawn_blocking_traced(move || orchestrator.execution.approvals(req.conversation_id.as_deref()))
-                    .await
-                    .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))??;
-                ok_json(list)
+                ok_json(self.app.orchestrator.approvals_for_door_async(req).await?)
             }
             EndpointId::OrchestratorApprovalResolve => {
                 let req: <ops::OrchestratorApprovalResolve as Op>::Input = decode(payload)?;
-                let orchestrator = self.app.orchestrator.clone();
-                spawn_blocking_traced(move || orchestrator.execution.resolve_approval(req))
-                    .await
-                    .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))??;
+                self.app.orchestrator.resolve_approval_for_door_async(req).await?;
                 Ok(Value::Null)
             }
 
@@ -1328,16 +1206,22 @@ impl ServerDoor {
         let r = reference.trim();
         let number = r.strip_prefix('#').unwrap_or(r);
         if !number.is_empty() && number.chars().all(|c| c.is_ascii_digit()) {
-            let issues = self.app.issue.list_async().await?;
+            let issues = self
+                .app
+                .issue
+                .raw_issues_async()
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
             return issues
                 .into_iter()
                 .find(|i| i.number.to_string() == number)
                 .map(|i| i.id)
                 .ok_or_else(|| missing(t("server.issue.issueNumbered", &[("n", number.into())]), LookIn::Issue));
         }
-        let sessions = self.app.session.list_async().await?;
-        if let Some(issue) = sessions.into_iter().find(|x| x.id == r).and_then(|x| x.issue_id().map(String::from)) {
-            return Ok(issue);
+        if let Some(session) = self.app.session.session_async(r).await
+            && let Some(issue) = session.issue_id()
+        {
+            return Ok(issue.to_string());
         }
         Ok(r.to_string())
     }
@@ -1356,9 +1240,8 @@ impl ServerDoor {
         let (events, rx) = flume::unbounded();
         let (stop_tx, stop) = flume::bounded(1);
         let id = self.next_sub_id.fetch_add(1, Ordering::Relaxed);
-        let sink = Sink { events, stop };
 
-        let opened = self.dispatch_subscription_async(spec, payload, sink).await;
+        let opened = self.dispatch_subscription_async(spec, payload, events, stop).await;
         if let Err(err) = opened {
             return Err(Envelope::failure(&err));
         }
@@ -1368,39 +1251,45 @@ impl ServerDoor {
         Ok((id, rx))
     }
 
-    async fn dispatch_subscription_async(&self, spec: &SubscriptionSpec, payload: Value, sink: Sink) -> Result<(), ApiError> {
+    async fn dispatch_subscription_async(
+        &self,
+        spec: &SubscriptionSpec,
+        payload: Value,
+        events: flume::Sender<Value>,
+        stop: flume::Receiver<()>,
+    ) -> Result<(), ApiError> {
         match spec.name {
             "channel.follow" => {
                 let p: <subscriptions::ChannelFollow as vibevalley_protocol::Subscription>::Payload = decode(payload)?;
-                self.app.channel.follow(&p.id, p.after, sink)
+                self.app.channel.follow(&p.id, p.after, Sink { events, stop })
             }
             "channel.reports" => {
                 let p: <subscriptions::ChannelReports as vibevalley_protocol::Subscription>::Payload = decode(payload)?;
-                self.app.channel.reports(p.after, sink)
+                self.app.channel.reports(p.after, Sink { events, stop })
             }
             "artifact.follow" => {
                 let p: <subscriptions::ArtifactFollow as vibevalley_protocol::Subscription>::Payload = decode(payload)?;
-                self.app.artifact.follow_async(&p.id, p.after, sink).await
+                self.app.artifact.follow_async(&p.id, p.after, Sink { events, stop }).await
             }
             "artifact.entry.follow" => {
                 let p: <subscriptions::ArtifactEntryFollow as vibevalley_protocol::Subscription>::Payload = decode(payload)?;
-                self.app.artifact.follow_entries_async(&p.id, p.after, sink).await
+                self.app.artifact.follow_entries_async(&p.id, p.after, Sink { events, stop }).await
             }
             "artifact.suggestion.follow" => {
                 let p: <subscriptions::ArtifactSuggestionFollow as vibevalley_protocol::Subscription>::Payload = decode(payload)?;
-                self.app.artifact.follow_suggestions_async(&p.id, sink).await
+                self.app.artifact.follow_suggestions_async(&p.id, Sink { events, stop }).await
             }
             "artifact.presence.follow" => {
                 let p: <subscriptions::ArtifactPresenceFollow as vibevalley_protocol::Subscription>::Payload = decode(payload)?;
-                self.app.artifact.follow_presence_async(&p.id, sink).await
+                self.app.artifact.follow_presence_async(&p.id, Sink { events, stop }).await
             }
             "session.watch" => {
                 let p: <subscriptions::SessionWatch as vibevalley_protocol::Subscription>::Payload = decode(payload)?;
-                self.app.session.watch_session_async(&p.id, p.after_seq, sink).await
+                self.app.session.watch_session_async(p, events, stop).await
             }
             "issue.watch" => {
                 let p: <subscriptions::IssueWatch as vibevalley_protocol::Subscription>::Payload = decode(payload)?;
-                self.app.issue.watch_issue_async(&p.id, sink).await
+                self.app.session.watch_issue_async(p, events, stop).await
             }
             other => Err(ApiError::new(BizCode::RouteNotFound, format!("no subscription {other}"))),
         }
@@ -1518,14 +1407,6 @@ impl Server for ServerDoor {
 
     fn machine_bus(&self) -> Option<SharedMachineBus> {
         Some(self.machine.clone())
-    }
-}
-
-fn require_user(caller: Caller) -> Result<(), ApiError> {
-    if caller == Caller::User {
-        Ok(())
-    } else {
-        Err(refused(BizCode::Forbidden, "userRequired"))
     }
 }
 

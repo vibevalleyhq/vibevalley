@@ -2,31 +2,34 @@
 //! [`ServerDoor`] with zero late-binding `attach_*` setters, zero `ShutdownList`,
 //! and deterministic cooperative `Runtime` shutdown.
 
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
+use tokio::sync::broadcast;
 use vibevalley_core::SliceMask;
+use vibevalley_protocol::Phase;
 use vibevalley_runtime::oar::Registry;
 
 use crate::app::App;
 use crate::app::door::{DoorParts, ServerDoor};
 use crate::app::live::LiveOverlay;
 use crate::app::outbox::Outbox;
-use crate::app::port::{ChannelQuotePort, CronOrchestratorPort, MemoryRecallPort};
+use crate::app::port::{ChannelMessageEvent, ChannelQuotePort, CronOrchestratorPort, MemoryRecallPort};
 use crate::app::projection::{debug_state_snapshot_async, project_slice_json};
 use crate::app::runtime::Runtime;
 use crate::app::runtime_inbox::RuntimeInboxObserver;
 use crate::app::slice::SliceProjector;
 use crate::db::ServerDb;
 use crate::transport::api::{BoxFuture, Server, SharedHostDebug};
+use crate::work::session::{OUTBOX_SESSION_REPORTED, OutboxSessionReported, SessionLifecycleEvent};
 use crate::{
     collab, content, infra,
     infra::setting::{Setting, SettingConfig},
     skin, team,
     team::agent::AgentStore,
-    team::memory::FinishedRun,
     work,
     work::issue::IssueStore,
     work::ledger::BoardConfig,
@@ -169,7 +172,7 @@ pub struct TestInternals<'a> {
     pub repo: &'a Arc<work::repo::RepoStore>,
     pub pull: &'a Arc<work::pull::PullStore>,
     pub cron: &'a Arc<work::cron::CronStore>,
-    pub game: &'a Arc<skin::game::Game>,
+    pub game: &'a Arc<skin::game::GameStore>,
     pub attachment: &'a Arc<content::attachment::AttachmentStore>,
     pub channel: &'a Arc<collab::channel::Chat>,
     pub issue_chat: &'a Arc<work::chat::IssueChat>,
@@ -262,9 +265,9 @@ impl Started {
             let artifact = app.artifact.clone();
             set.spawn_blocking(move || artifact.close());
             let library = app.library.clone();
-            set.spawn(async move { library.close_async().await });
+            set.spawn_blocking(move || library.close());
             let media_input = app.media_input.clone();
-            set.spawn_blocking(move || media_input.close());
+            set.spawn(async move { media_input.close_async().await });
             let media = app.media.clone();
             set.spawn_blocking(move || media.close());
             let repo = app.repo.clone();
@@ -344,6 +347,14 @@ fn runtimes(
     registry
 }
 
+struct LazyCronOrchestrator(Arc<OnceLock<Arc<dyn CronOrchestratorPort>>>);
+
+impl CronOrchestratorPort for LazyCronOrchestrator {
+    fn hear_cron(&self, agent: &str, channel: &str, line: &str) -> bool {
+        self.0.get().is_some_and(|o| o.hear_cron(agent, channel, line))
+    }
+}
+
 struct ServerDebugSources {
     trajectory: Arc<work::session::TrajectoryStore>,
     agent: Arc<AgentStore>,
@@ -360,7 +371,7 @@ struct ServerDebugSources {
 
 impl infra::debug::DebugDataSource for ServerDebugSources {
     fn trajectory_events(&self, session_id: &str) -> Vec<vibevalley_protocol::SessionEvent> {
-        self.trajectory.events(session_id, None).unwrap_or_default()
+        self.trajectory.open_events(session_id)
     }
 
     fn open_trajectory_ids(&self) -> Vec<String> {
@@ -414,11 +425,15 @@ impl infra::debug::DebugDataSource for ServerDebugSources {
     }
 
     fn repo_count(&self) -> u32 {
-        self.repo.list_cached().len() as u32
+        self.repo.list().len() as u32
     }
 
     fn artifact_count(&self) -> u32 {
-        self.artifact.cached_count()
+        self.projector
+            .snapshot_value(vibevalley_protocol::SliceKind::Ops)
+            .get("media")
+            .and_then(|v| v.as_array())
+            .map_or(0, |a| a.len() as u32)
     }
 
     fn state_snapshot_async(&self) -> BoxFuture<'_, infra::debug::DebugStateSnapshot> {
@@ -431,6 +446,103 @@ impl infra::debug::DebugDataSource for ServerDebugSources {
             &self.live,
         ))
     }
+}
+
+/// Bridges committed domain events (`SessionLifecycleEvent` & `ChannelMessageEvent`)
+/// to `GameStore` farm effects without dual-write `Facts` or `EventBus`.
+fn spawn_skin_event_bridge(
+    runtime: &Runtime,
+    game: &Arc<skin::game::GameStore>,
+    session_store: &Arc<work::session::SessionStore>,
+    channel: &Arc<collab::channel::Chat>,
+) {
+    let mut session_rx = session_store.subscribe_events();
+    let mut message_rx = channel.subscribe_message_events();
+    let game = Arc::downgrade(game);
+    let session_store = Arc::downgrade(session_store);
+    let cancel = runtime.child_token();
+
+    runtime.spawn(async move {
+        let mut known_sessions: HashMap<String, vibevalley_protocol::Session> = HashMap::new();
+        if let Some(store) = session_store.upgrade()
+            && let Ok(existing) = store.sessions_async().await
+        {
+            for s in existing {
+                known_sessions.insert(s.id.clone(), s);
+            }
+        }
+        let mut working_sessions: HashSet<String> = known_sessions
+            .iter()
+            .filter(|(_, s)| s.phase.is_working())
+            .map(|(id, _)| id.clone())
+            .collect();
+
+        loop {
+            tokio::select! {
+                biased;
+                _ = cancel.cancelled() => return,
+                ev = session_rx.recv() => match ev {
+                    Ok(SessionLifecycleEvent::Changed(session)) => {
+                        let Some(g) = game.upgrade() else { return };
+                        let is_new = !known_sessions.contains_key(&session.id);
+                        known_sessions.insert(session.id.clone(), session.clone());
+                        if is_new {
+                            let refs: Vec<&vibevalley_protocol::Session> = known_sessions
+                                .values()
+                                .filter(|s| s.id != session.id)
+                                .collect();
+                            g.on_session_hired(&session, &refs);
+                        }
+                        match &session.phase {
+                            Phase::Working(w) => {
+                                let was_working = !working_sessions.insert(session.id.clone());
+                                g.on_session_working(&session, was_working, &w.doing);
+                            }
+                            _ => {
+                                working_sessions.remove(&session.id);
+                            }
+                        }
+                    }
+                    Ok(SessionLifecycleEvent::Left { id, .. }) => {
+                        let Some(g) = game.upgrade() else { return };
+                        working_sessions.remove(&id);
+                        if let Some(prev) = known_sessions.remove(&id) {
+                            g.on_session_left(&prev, None, None);
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => {
+                        if let Some(store) = session_store.upgrade()
+                            && let Ok(all) = store.sessions_async().await
+                        {
+                            known_sessions = all.into_iter().map(|s| (s.id.clone(), s)).collect();
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Closed) => return,
+                },
+                ev = message_rx.recv() => match ev {
+                    Ok(ChannelMessageEvent::Posted { message, thread_issue_id, answers }) => {
+                        let Some(g) = game.upgrade() else { return };
+                        let thread_worker = thread_issue_id.as_deref().and_then(|iid| {
+                            known_sessions
+                                .values()
+                                .find(|s| s.is_board_worker() && s.issue_id() == Some(iid))
+                                .map(|s| s.id.as_str())
+                        });
+                        let mentioned_sessions: Vec<String> = message
+                            .mentions
+                            .iter()
+                            .filter(|m| known_sessions.contains_key(m.as_str()))
+                            .cloned()
+                            .collect();
+                        g.on_message_posted(&message.from, thread_worker, &mentioned_sessions, answers.is_some());
+                    }
+                    Ok(ChannelMessageEvent::Edited(_)) => {}
+                    Err(broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(broadcast::error::RecvError::Closed) => return,
+                }
+            }
+        }
+    });
 }
 
 /// Builds the whole server bottom-up (`L0 -> L1 -> L2 -> L3`). Blocking; call off the UI thread.
@@ -482,7 +594,7 @@ pub async fn start_async(config: ServerConfig) -> Result<Started, StartError> {
         .clone()
         .unwrap_or_else(|| Arc::new(runtimes(&setting, &config.home, execution.clone(), config.model_client.clone())));
     let machine = infra::machine::MachineStore::open(
-        runtime.clone(),
+        &runtime,
         live.clone(),
         projector.clone(),
         registry.clone(),
@@ -505,20 +617,7 @@ pub async fn start_async(config: ServerConfig) -> Result<Started, StartError> {
 
     // L2: team/memory, collab/channel, content/{artifact,library,media}, work/{repo,trajectory,issue,session,pull}
     let memory = team::memory::MemoryStore::open(db.clone(), agent.clone());
-    outbox.register("memory.keep_run", {
-        let memory = Arc::downgrade(&memory);
-        move |delivery| {
-            let memory = memory.clone();
-            async move {
-                let Some(memory) = memory.upgrade() else {
-                    return Ok::<(), String>(());
-                };
-                let run: FinishedRun = serde_json::from_value(delivery.payload).map_err(|e| e.to_string())?;
-                memory.keep_async(&run).await;
-                Ok(())
-            }
-        }
-    });
+    memory.register_outbox(&outbox);
 
     let quoter: Arc<dyn ChannelQuotePort> = Arc::new(content::artifact::BlockQuoter::new(db.clone()));
     let channel = collab::channel::Chat::open_async(
@@ -534,25 +633,20 @@ pub async fn start_async(config: ServerConfig) -> Result<Started, StartError> {
     .map_err(|e| failed("the chat")(&e.message))?;
     collab::channel::seat_orchestrators_async(&channel, &agent).await;
 
-    let artifact = content::artifact::ArtifactStore::open(
-        db.clone(),
-        runtime.clone(),
-        attachment.clone(),
-        channel.clone(),
-    );
-    let media_input = content::media::inputs::MediaInputStore::open_with_clock(
+    let artifact = content::artifact::ArtifactStore::open(db.clone(), runtime.clone(), attachment.clone(), channel.clone());
+    let media_input = content::media::inputs::MediaInputStore::open_with_clock_async(
         &config.home,
         db.clone(),
         runtime.clone(),
         attachment.clone(),
         config.clock.clone(),
     )
+    .await
     .map_err(|e| failed("the media inputs")(&e.message))?;
     let media = content::media::jobs::MediaStore::open_with_clock_async(
         content::media::jobs::Parts {
             db: db.clone(),
             runtime: runtime.clone(),
-            live: live.clone(),
             projector: projector.clone(),
             setting: setting.clone(),
             files: attachment.clone(),
@@ -584,125 +678,136 @@ pub async fn start_async(config: ServerConfig) -> Result<Started, StartError> {
         repo.probe_in_background(&runtime);
     }
 
-    let trajectory = work::session::TrajectoryStore::open(db.clone(), runtime.clone());
-    let drivers = Arc::new(work::session::AgentDrivers::new(
+    let trajectory = work::session::TrajectoryStore::open(db.clone(), live.clone(), &runtime);
+    let drivers = Arc::new(work::session::AgentDriver::new(
         agent.clone(),
         Some(memory.clone() as Arc<dyn MemoryRecallPort>),
     ));
-    let (issue, session, ledger) = work::ledger::open_with_async(
-        db.clone(),
-        runtime.clone(),
-        live.clone(),
-        projector.clone(),
-        outbox.clone(),
-        drivers,
-        board_config,
-        config.clock.clone(),
-        {
-            let trajectory = trajectory.clone();
-            move |news| {
-                let work::session::News::Step { session, cwd, step } = news;
-                trajectory.step(session, cwd, step.clone());
-            }
-        },
-    )
-    .await
-    .map_err(|e| failed("the board")(&e))?;
+    let issue = Arc::new(
+        IssueStore::open_with_async(
+            db.clone(),
+            live.clone(),
+            projector.clone(),
+            outbox.clone(),
+            runtime.clone(),
+            Some(trajectory.clone()),
+            drivers,
+            board_config,
+        )
+        .await
+        .map_err(|e| failed("the board")(&e))?,
+    );
+    let session = Arc::new(issue.sessions().clone());
 
     {
         let session = session.clone();
         channel.guard_removal(move |channel_id| {
             let session = session.clone();
-            Box::pin(async move { session.channel_in_use_reasons_async(&channel_id).await })
+            Box::pin(async move {
+                let sessions = session.sessions_async().await.unwrap_or_default();
+                let busy = sessions
+                    .iter()
+                    .any(|x| (x.is_board_worker() || x.is_direct_talker()) && x.channel_id() == Some(channel_id.as_str()));
+                if busy {
+                    vec![vibevalley_i18n::t("server.channel.helpersThere", &[])]
+                } else {
+                    vec![]
+                }
+            })
         });
     }
 
     let publisher = config.publisher.clone().unwrap_or_else(|| Arc::new(work::pull::Publisher::default()));
     let pull = work::pull::PullStore::open_async(
         db.clone(),
-        runtime.clone(),
-        projector.clone(),
         publisher,
         Some(repo.clone()),
-        Some(issue.clone()),
-        config.poll_pulls,
+        Some((*issue).clone()),
+        None,
+        None,
     )
     .await
     .map_err(|e| failed("the pulls")(&e.message))?;
+    pull.start_poller(&runtime, config.poll_pulls);
 
-    // L3: work/chat, team/mcp, team/tool, team/orchestrator, work/cron, collab/voice, collab/connector, skin/game
-    let issue_chat = work::chat::IssueChat::start(runtime.clone(), ledger.clone(), issue.clone(), channel.clone());
-    let session_chat = {
-        let ic = issue_chat.clone();
-        work::chat::SessionChat::start(
-            runtime.clone(),
-            ledger.clone(),
-            session.clone(),
-            channel.clone(),
-            agent.clone(),
-            Arc::new(move |s| ic.ensure_session_thread(s)),
-        )
-    };
+    // L3: work/chat, work/cron, team/mcp, team/tool, team/orchestrator, collab/voice, collab/connector, skin/game
+    let issue_chat = work::chat::IssueChat::start(&runtime, &live, &outbox, (*issue).clone(), channel.clone());
+    let session_chat = work::chat::SessionChat::start(
+        &runtime,
+        &outbox,
+        (*issue).clone(),
+        channel.clone(),
+        agent.clone(),
+        Some(issue_chat.clone()),
+    );
+
+    let cron_orch_slot = Arc::new(OnceLock::<Arc<dyn CronOrchestratorPort>>::new());
+    let cron_orchestrator: Option<Arc<dyn CronOrchestratorPort>> = config
+        .orchestrator_listens
+        .then(|| Arc::new(LazyCronOrchestrator(cron_orch_slot.clone())) as Arc<dyn CronOrchestratorPort>);
     let cron = work::cron::CronStore::open_with_clock_async(
         db.clone(),
         runtime.clone(),
+        live.clone(),
         projector.clone(),
-        issue.clone(),
+        (*issue).clone(),
         agent.clone(),
         Some(channel.clone()),
-        None,
+        cron_orchestrator,
         config.clock.clone(),
-        false,
     )
     .await
     .map_err(|e| failed("the crons")(&e.message))?;
 
-    let resource = team::mcp::ResourceStore::with_pulls(issue.clone(), session.clone(), channel.clone(), trajectory.clone(), pull.clone());
+    let resource = team::mcp::ResourceStore::with_pulls(issue.clone(), channel.clone(), trajectory.clone(), pull.clone());
     let tool = Arc::new(team::tool::ToolBox {
-        resource: resource.clone(),
-        agent: agent.clone(),
-        issue: issue.clone(),
-        session: session.clone(),
-        channel: channel.clone(),
-        pull: pull.clone(),
-        cron: cron.clone(),
+        runtime: runtime.clone(),
+        resources: resource.clone(),
+        crons: cron.clone(),
+        agents: agent.clone(),
+        memory: memory.clone(),
+        issues: issue.clone(),
+        sessions: session.clone(),
+        repos: repo.clone(),
+        chat: channel.clone(),
+        pulls: pull.clone(),
         media: media.clone(),
-        artifact: artifact.clone(),
+        artifacts: artifact.clone(),
+        library: library.clone(),
         repos_root: repo.root().to_path_buf(),
     });
-    let mcp_door = team::mcp::Door::new(tool.clone(), config.version.clone());
+    let mcp_door = team::mcp::McpDoor::new(tool.clone(), config.version.clone());
 
     let key = setting.clone();
-    let orchestrator = team::orchestrator::Orchestrator::open(team::orchestrator::Parts {
+    let orchestrator = team::orchestrator::Orchestrator::open_async(team::orchestrator::Parts {
         runtime: runtime.clone(),
         live: live.clone(),
         projector: projector.clone(),
-        tool: tool.clone(),
-        agent: agent.clone(),
-        channel: channel.clone(),
-        issue: issue.clone(),
-        session: session.clone(),
-        repo: repo.clone(),
-        memory: memory.clone(),
-        artifact: artifact.clone(),
-        home: config.home.clone(),
-        trajectory: trajectory.clone(),
         permissions: config.tool_permissions.clone(),
+        tools: tool.clone(),
+        agents: agent.clone(),
+        chat: channel.clone(),
+        issues: issue.clone(),
+        sessions: session.clone(),
+        repos: repo.clone(),
+        memories: memory.clone(),
+        artifacts: artifact.clone(),
+        home: config.home.clone(),
+        trajectories: trajectory.clone(),
         key: Arc::new(move || key.deepseek_api_key()),
         client: config.model_client.clone(),
         listen_chat: config.orchestrator_listens,
     })
+    .await
     .map_err(|e| failed("durable execution")(&e))?;
     let _ = execution.set(vibevalley_runtime::agent::harness::SharedExecution::new(orchestrator.execution.harness.clone()));
     RuntimeInboxObserver::start(orchestrator.execution.store(), &runtime, live.clone(), projector.clone())
         .map_err(|e| failed("durable projection")(&e))?;
 
     if config.orchestrator_listens {
-        cron.attach_orchestrator(orchestrator.clone() as Arc<dyn CronOrchestratorPort>);
+        let _ = cron_orch_slot.set(orchestrator.clone() as Arc<dyn CronOrchestratorPort>);
     }
-    if config.tick_crons {
-        cron.start_ticker();
-    }
+    cron.start_ticker(config.tick_crons);
 
     let voice = collab::voice::Voice::open(collab::voice::Parts {
         runtime: runtime.clone(),
@@ -715,7 +820,7 @@ pub async fn start_async(config: ServerConfig) -> Result<Started, StartError> {
     });
     let connector = collab::connector::Connector::open_async(
         db.clone(),
-        runtime.clone(),
+        &runtime,
         live.clone(),
         projector.clone(),
         channel.clone(),
@@ -724,16 +829,56 @@ pub async fn start_async(config: ServerConfig) -> Result<Started, StartError> {
     .await
     .map_err(|e| failed("the connectors")(&e.message))?;
 
-    let game = skin::game::Game::open_with_clock(
+    let game = skin::game::GameStore::open_with_clock(
         &config.home,
+        db.clone(),
         runtime.clone(),
         live.clone(),
         projector.clone(),
-        ledger.subscribe_events(),
-        channel.subscribe_message_events(),
         config.clock.clone(),
     );
-    game.count_commits(&runtime, repo.clone(), config.git_emails.clone());
+    game.register_outbox(&outbox);
+    game.count_commits(repo.clone(), config.git_emails.clone());
+    spawn_skin_event_bridge(&runtime, &game, &session, &channel);
+
+    // Fan out committed `work.session.reported` outbox deliveries to IssueChat,
+    // SessionChat, MemoryStore, GameStore, and AgentStore RuntimeFleet.
+    {
+        let ic = Arc::downgrade(&issue_chat);
+        let sc = Arc::downgrade(&session_chat);
+        let mem = Arc::downgrade(&memory);
+        let g = Arc::downgrade(&game);
+        let ag = Arc::downgrade(&agent);
+        let sess = Arc::downgrade(&session);
+        outbox.register(OUTBOX_SESSION_REPORTED, move |delivery| {
+            let (ic, sc, mem, g, ag, sess) = (ic.clone(), sc.clone(), mem.clone(), g.clone(), ag.clone(), sess.clone());
+            async move {
+                let report: OutboxSessionReported =
+                    serde_json::from_value(delivery.payload).map_err(|e| format!("invalid {OUTBOX_SESSION_REPORTED} payload: {e}"))?;
+                if let Some(ic) = ic.upgrade() {
+                    ic.handle_report_async(&report).await.map_err(|e| e.message)?;
+                }
+                if let Some(sc) = sc.upgrade() {
+                    sc.handle_report_async(&report).await;
+                }
+                if let Some(sess_store) = sess.upgrade()
+                    && let Some(reported_session) = sess_store.session_async(&report.id).await
+                {
+                    if let Some(mem) = mem.upgrade() {
+                        mem.keep_session_reported_async(&reported_session).await;
+                    }
+                    if let Some(g) = g.upgrade() {
+                        g.on_session_reported(&reported_session, report.outcome);
+                    }
+                    if let Some(ag) = ag.upgrade() {
+                        ag.fleet
+                            .on_session_reported(&reported_session.runtime, report.spent.as_ref().and_then(|s| s.cny));
+                    }
+                }
+                Ok::<(), String>(())
+            }
+        });
+    }
 
     let debug_sources = Arc::new(ServerDebugSources {
         trajectory: trajectory.clone(),
