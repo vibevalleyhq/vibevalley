@@ -4,7 +4,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use vibevalley_protocol::{AgentRole, AgentValidation, Installation, PersonaMode, RuntimeSettings, ops};
+use vibevalley_protocol::{AgentRole, AgentValidation, ApiError, BizCode, Installation, PersonaMode, RuntimeSettings, ops};
 use vibevalley_runtime::machine::MachineRegistry;
 use vibevalley_runtime::oar::Registry;
 
@@ -97,55 +97,93 @@ pub fn install(hub: &Hub, agents: Arc<Agents>) {
         let f = f.clone();
         move |_, ()| Ok(f.runtimes())
     });
-    hub.on::<ops::RuntimeRefresh>({
-        let f = f.clone();
-        move |_, i| f.refresh(&i.id).ok_or_else(|| no_runtime(&i.id))
-    });
-    hub.on::<ops::RuntimeSettingUpdate>({
+    hub.on_async::<ops::RuntimeRefresh, _, _>({
         let f = f.clone();
         move |_, i| {
-            let settings = RuntimeSettings {
-                enabled: i.enabled,
-                bin_path: i.bin_path,
-                default_model: i.default_model,
-                default_effort: i.default_effort,
-                env: i.env,
-                daily_budget: i.daily_budget,
-                max_working: i.max_working,
-            };
-            f.update(&i.id, settings)?.ok_or_else(|| no_runtime(&i.id))
+            let f = f.clone();
+            async move {
+                crate::spawn_blocking_traced(move || f.refresh(&i.id).ok_or_else(|| no_runtime(&i.id)))
+                    .await
+                    .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+            }
+        }
+    });
+    hub.on_async::<ops::RuntimeSettingUpdate, _, _>({
+        let f = f.clone();
+        move |_, i| {
+            let f = f.clone();
+            async move {
+                crate::spawn_blocking_traced(move || {
+                    let settings = RuntimeSettings {
+                        enabled: i.enabled,
+                        bin_path: i.bin_path,
+                        default_model: i.default_model,
+                        default_effort: i.default_effort,
+                        env: i.env,
+                        daily_budget: i.daily_budget,
+                        max_working: i.max_working,
+                    };
+                    f.update(&i.id, settings)?.ok_or_else(|| no_runtime(&i.id))
+                })
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+            }
         }
     });
 
-    macro_rules! on {
+    macro_rules! on_blocking {
         ($op:ty, |$p:ident, $i:pat_param| $body:expr) => {{
             let $p = p.clone();
-            hub.on::<$op>(move |_, $i| $body);
+            hub.on_async::<$op, _, _>(move |_, $i| {
+                let $p = $p.clone();
+                async move {
+                    crate::spawn_blocking_traced(move || $body)
+                        .await
+                        .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+                }
+            });
         }};
     }
-    on!(ops::AgentList, |p, ()| Ok(p.all()));
-    on!(ops::AgentCreate, |p, a| p.create(a));
-    on!(ops::AgentUpdate, |p, a| p.save(a));
-    on!(ops::AgentDelete, |p, i| p.remove(&i.id));
-    on!(ops::AgentPreviewDelete, |p, i| p.preview_remove(&i.id));
-    on!(ops::AgentTemplateList, |p, ()| Ok(p.templates()));
-    hub.on::<ops::AgentTemplateInstall>({
+    hub.on::<ops::AgentList>({
+        let p = p.clone();
+        move |_, ()| Ok(p.all())
+    });
+    on_blocking!(ops::AgentCreate, |p, a| p.create(a));
+    on_blocking!(ops::AgentUpdate, |p, a| p.save(a));
+    on_blocking!(ops::AgentDelete, |p, i| p.remove(&i.id));
+    on_blocking!(ops::AgentPreviewDelete, |p, i| p.preview_remove(&i.id));
+    hub.on::<ops::AgentTemplateList>({
+        let p = p.clone();
+        move |_, ()| Ok(p.templates())
+    });
+    hub.on_async::<ops::AgentTemplateInstall, _, _>({
         let p = p.clone();
         let f = f.clone();
         move |_, i| {
-            let override_cfg = p.template_of(&i.id).and_then(|item| resolve_install_runtime(&f, &item, i.runtime.as_deref()));
-            p.install_template_with_runtime(&i.id, override_cfg)
+            let p = p.clone();
+            let f = f.clone();
+            async move {
+                crate::spawn_blocking_traced(move || {
+                    let override_cfg = p.template_of(&i.id).and_then(|item| resolve_install_runtime(&f, &item, i.runtime.as_deref()));
+                    p.install_template_with_runtime(&i.id, override_cfg)
+                })
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+            }
         }
     });
-    on!(ops::AgentTemplateUpdate, |p, i| p.update_from_template(&i.agent));
-    on!(ops::AgentTemplateAdd, |p, i| p.add_template(&i.path));
-    on!(ops::AgentTemplateDelete, |p, i| p.remove_template(&i.id));
-    on!(ops::AgentTemplatePreviewDelete, |p, i| p.preview_remove_template(&i.id));
-    on!(ops::SkillList, |p, ()| Ok(p.skills()));
-    on!(ops::SkillCreate, |p, k| p.create_skill(k));
-    on!(ops::SkillUpdate, |p, k| p.save_skill(k));
-    on!(ops::SkillDelete, |p, i| p.remove_skill(&i.id));
-    on!(ops::SkillPreviewDelete, |p, i| p.preview_remove_skill(&i.id));
+    on_blocking!(ops::AgentTemplateUpdate, |p, i| p.update_from_template(&i.agent));
+    on_blocking!(ops::AgentTemplateAdd, |p, i| p.add_template(&i.path));
+    on_blocking!(ops::AgentTemplateDelete, |p, i| p.remove_template(&i.id));
+    on_blocking!(ops::AgentTemplatePreviewDelete, |p, i| p.preview_remove_template(&i.id));
+    hub.on::<ops::SkillList>({
+        let p = p.clone();
+        move |_, ()| Ok(p.skills())
+    });
+    on_blocking!(ops::SkillCreate, |p, k| p.create_skill(k));
+    on_blocking!(ops::SkillUpdate, |p, k| p.save_skill(k));
+    on_blocking!(ops::SkillDelete, |p, i| p.remove_skill(&i.id));
+    on_blocking!(ops::SkillPreviewDelete, |p, i| p.preview_remove_skill(&i.id));
 
     hub.on::<ops::AgentValidate>(move |_, body| {
         Ok(body

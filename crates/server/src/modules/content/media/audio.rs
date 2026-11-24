@@ -229,142 +229,180 @@ impl Jobs {
         Ok((bytes, format!("sample.{format}")))
     }
 
-    fn sample(&self, input: &MediaInputReference) -> Result<(Vec<u8>, String), ApiError> {
-        let format = sample_format(&input.mime).filter(|_| input.size <= SAMPLE_MAX).ok_or_else(invalid)?;
-        let content = self.inputs.content(&input.id).map_err(|_| invalid())?;
-        let bytes = std::fs::read(&content.path).map_err(|_| invalid())?;
-        let facts = super::validate::audio_facts(bytes.clone(), &input.mime).map_err(|_| invalid())?;
-        if facts.seconds > SAMPLE_SECONDS {
-            return Err(invalid());
-        }
-        Ok((bytes, format!("sample.{format}")))
-    }
-
     /// An audio job's run, from `generating`.
-    pub(super) fn generate_audio(self: &Arc<Self>, r: &Record, account: &Account, stop: &Stop) {
+    pub(super) async fn generate_audio_async(self: &Arc<Self>, r: &Record, account: &Account, stop: &Stop) {
         let id = r.id();
         let model = account.model.as_str();
         match &r.ask {
             Ask::Speakers(q) => match Moss::prepare_speakers(model, &q.speakers, &q.segments, q.format.as_str()) {
-                Ok(body) => self.follow(id, &account.key, "/audio/speech/speakers", &body, stop),
-                Err(e) => self.failed(id, e.outcome),
+                Ok(body) => self.follow_async(id, &account.key, "/audio/speech/speakers", &body, stop).await,
+                Err(e) => self.failed_async(id, e.outcome).await,
             },
             Ask::VoiceDesign(q) => match Moss::prepare_design(model, &q.text, &q.instruction, q.format.as_str()) {
-                Ok(body) => self.follow(id, &account.key, "/audio/voice/generations", &body, stop),
-                Err(e) => self.failed(id, e.outcome),
+                Ok(body) => self.follow_async(id, &account.key, "/audio/voice/generations", &body, stop).await,
+                Err(e) => self.failed_async(id, e.outcome).await,
             },
             Ask::Clone(q) => {
-                let Some(Ok((bytes, name))) = r.input.as_ref().map(|i| self.sample(i)) else {
-                    return self.failed(id, Outcome::NotSubmitted);
+                let sample = match r.input.as_ref() {
+                    Some(i) => self.sample_async(i).await,
+                    None => Err(invalid()),
                 };
-                match self.moss.clone_voice(&account.key, bytes, &name, q.name.as_deref(), stop) {
+                let Ok((bytes, name)) = sample else {
+                    return self.failed_async(id, Outcome::NotSubmitted).await;
+                };
+                let fetch = self.moss.fetch.clone();
+                let key = account.key.clone();
+                let voice_name = q.name.clone();
+                let stop_clone = stop.clone();
+                let cloned = crate::spawn_blocking_traced(move || Moss { fetch }.clone_voice(&key, bytes, &name, voice_name.as_deref(), &stop_clone)).await;
+                match cloned {
                     // Once cloned, the voice is written down whatever stopped the job meanwhile.
-                    Ok(voice) => {
-                        let _ = self.change(id, &[Phase::Generating, Phase::Canceled, Phase::Unknown], |r| {
-                            r.made = Some(MediaAudioResult::Clone { voice });
-                            r.phase = Phase::Ready;
-                            r.problem.clear();
-                        });
+                    Ok(Ok(voice)) => {
+                        let _ = self
+                            .change_async(id, &[Phase::Generating, Phase::Canceled, Phase::Unknown], |r| {
+                                r.made = Some(MediaAudioResult::Clone { voice });
+                                r.phase = Phase::Ready;
+                                r.problem.clear();
+                            })
+                            .await;
                     }
-                    Err(e) if !stop.aborted() => self.failed(id, e.outcome),
+                    Ok(Err(e)) if !stop.aborted() => self.failed_async(id, e.outcome).await,
+                    Ok(Err(_)) => {}
+                    Err(_) if !stop.aborted() => self.failed_async(id, Outcome::Unknown).await,
                     Err(_) => {}
                 }
             }
             Ask::Transcription(q) => {
                 let Some(input) = &r.input else {
-                    return self.failed(id, Outcome::NotSubmitted);
+                    return self.failed_async(id, Outcome::NotSubmitted).await;
                 };
-                let file = match self.upload(id, input, account, stop) {
+                let file = match self.upload_async(id, input, account, stop).await {
                     Ok(file) => file,
-                    Err(outcome) => return self.failed(id, outcome),
+                    Err(outcome) => return self.failed_async(id, outcome).await,
                 };
                 let body = match transcription_body(model, &file, q) {
                     Ok(body) => body,
-                    Err(e) => return self.failed(id, e.outcome),
+                    Err(e) => return self.failed_async(id, e.outcome).await,
                 };
                 if stop.aborted() {
                     return;
                 }
                 if q.streaming == Some(true) {
-                    self.receive_transcript(id, account, &body, stop);
+                    self.receive_transcript_async(id, account, &body, stop).await;
                 } else {
-                    self.follow(id, &account.key, "/audio/transcriptions", &body, stop);
+                    self.follow_async(id, &account.key, "/audio/transcriptions", &body, stop).await;
                 }
             }
-            Ask::Image(_) | Ask::Speech(_) | Ask::Understanding(_) => self.failed(id, Outcome::Unknown),
+            Ask::Image(_) | Ask::Speech(_) | Ask::Understanding(_) => self.failed_async(id, Outcome::Unknown).await,
         }
     }
 
     /// The vendor's transcript as it comes, written down at each segment and at most every 200 ms between; cut short,
     /// what came stays on the job, which is then unknown and never asked for again.
-    fn receive_transcript(&self, id: &str, account: &Account, body: &Value, stop: &Stop) {
+    async fn receive_transcript_async(&self, id: &str, account: &Account, body: &Value, stop: &Stop) {
         let mut text = String::new();
         let mut segments: Vec<MediaAudioSegment> = vec![];
         let mut seen: HashSet<i64> = HashSet::new();
         let mut usage: Option<Value> = None;
         let mut saved: Option<Instant> = None;
         let mut dirty = false;
-        let save = |text: &str, segments: &[MediaAudioSegment], usage: &Option<Value>, complete: bool| {
-            let patch = |r: &mut Record| {
-                r.made = Some(MediaAudioResult::Transcription {
-                    text: text.to_string(),
-                    segments: segments.to_vec(),
-                });
-                r.usage = usage.clone();
-            };
-            if !complete {
-                let _ = self.change(id, &[Phase::Generating, Phase::Canceled, Phase::Unknown], patch);
-                return;
-            }
-            let ready = self.change(id, &[Phase::Generating], |r| {
-                patch(r);
-                r.phase = Phase::Ready;
-                r.problem.clear();
-            });
-            if !matches!(ready, Ok(true)) {
-                let _ = self.change(id, &[Phase::Canceled, Phase::Unknown], patch);
-            }
-        };
-        let streamed = self.moss.transcription_stream(&account.key, body, stop, &mut |event| {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<TranscriptionEvent>(32);
+        let fetch = self.moss.fetch.clone();
+        let key = account.key.clone();
+        let body = body.clone();
+        let stop_stream = stop.clone();
+        let stream_task = crate::spawn_blocking_traced(move || {
+            Moss { fetch }.transcription_stream(&key, &body, &stop_stream, &mut |event| {
+                tx.blocking_send(event).map_err(|_| "stopped".to_string())?;
+                Ok(())
+            })
+        });
+        let mut mine_error = false;
+        while let Some(event) = rx.recv().await {
             match event {
                 TranscriptionEvent::TaskCreated(task) => {
-                    let _ = self.change(id, &[Phase::Generating, Phase::Canceled], |r| r.remote_task = Some(task));
+                    let _ = self
+                        .change_async(id, &[Phase::Generating, Phase::Canceled], |r| r.remote_task = Some(task))
+                        .await;
                 }
                 TranscriptionEvent::Delta(more) => {
                     text.push_str(&more);
                     dirty = true;
                     if saved.is_none_or(|at| at.elapsed() >= CHECKPOINT) {
-                        save(&text, &segments, &usage, false);
+                        self.save_transcript_async(id, &text, &segments, &usage, false).await;
                         saved = Some(Instant::now());
                         dirty = false;
                     }
                 }
                 TranscriptionEvent::Segment { index, segment, usage: said } => {
                     if !seen.insert(index) {
-                        return Err("a segment twice".into());
+                        mine_error = true;
+                        break;
                     }
                     segments.push(segment);
                     usage = said.or(usage.take());
-                    save(&text, &segments, &usage, false);
+                    self.save_transcript_async(id, &text, &segments, &usage, false).await;
                     saved = Some(Instant::now());
                     dirty = false;
                 }
                 TranscriptionEvent::Done { text: whole, usage: said } => {
                     text = whole;
                     usage = said.or(usage.take());
-                    save(&text, &segments, &usage, true);
+                    self.save_transcript_async(id, &text, &segments, &usage, true).await;
                     dirty = false;
                 }
             }
-            Ok(())
-        });
+        }
+        drop(rx);
+        let streamed = stream_task.await;
         if dirty {
-            save(&text, &segments, &usage, false);
+            self.save_transcript_async(id, &text, &segments, &usage, false).await;
+        }
+        if mine_error {
+            self.failed_async(id, Outcome::Unknown).await;
+            return;
         }
         match streamed {
-            Ok(()) | Err(StreamError::Stopped) => {}
-            Err(StreamError::Vendor(e)) => self.failed(id, e.outcome),
-            Err(StreamError::Mine(_)) => self.failed(id, Outcome::Unknown),
+            Ok(Ok(()) | Err(StreamError::Stopped)) => {}
+            Ok(Err(StreamError::Vendor(e))) => self.failed_async(id, e.outcome).await,
+            Ok(Err(StreamError::Mine(_))) | Err(_) => self.failed_async(id, Outcome::Unknown).await,
+        }
+    }
+
+    async fn save_transcript_async(&self, id: &str, text: &str, segments: &[MediaAudioSegment], usage: &Option<Value>, complete: bool) {
+        if !complete {
+            let _ = self
+                .change_async(id, &[Phase::Generating, Phase::Canceled, Phase::Unknown], |r| {
+                    r.made = Some(MediaAudioResult::Transcription {
+                        text: text.to_string(),
+                        segments: segments.to_vec(),
+                    });
+                    r.usage = usage.clone();
+                })
+                .await;
+            return;
+        }
+        let ready = self
+            .change_async(id, &[Phase::Generating], |r| {
+                r.made = Some(MediaAudioResult::Transcription {
+                    text: text.to_string(),
+                    segments: segments.to_vec(),
+                });
+                r.usage = usage.clone();
+                r.phase = Phase::Ready;
+                r.problem.clear();
+            })
+            .await;
+        if !matches!(ready, Ok(true)) {
+            let _ = self
+                .change_async(id, &[Phase::Canceled, Phase::Unknown], |r| {
+                    r.made = Some(MediaAudioResult::Transcription {
+                        text: text.to_string(),
+                        segments: segments.to_vec(),
+                    });
+                    r.usage = usage.clone();
+                })
+                .await;
         }
     }
 

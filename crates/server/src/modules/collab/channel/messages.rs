@@ -333,10 +333,6 @@ impl Chat {
     }
 
     /// `edit`: the user's own words, changed; nobody is woken.
-    pub fn edit(&self, id: &str, text: &str, keep: Option<&[String]>) -> Result<ChatMessage, ApiError> {
-        vibevalley_runtime::rt::block_on(self.edit_async(id, text, keep))
-    }
-
     pub async fn edit_async(&self, id: &str, text: &str, keep: Option<&[String]>) -> Result<ChatMessage, ApiError> {
         let mut inner = self.locked().await;
         let row = {
@@ -382,10 +378,6 @@ impl Chat {
     }
 
     /// `remove`: its words go, its number stays, pending deliveries are withdrawn immediately.
-    pub fn remove(&self, id: &str) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.remove_async(id))
-    }
-
     pub async fn remove_async(&self, id: &str) -> Result<(), ApiError> {
         let mut inner = self.locked().await;
         let row = {
@@ -420,10 +412,6 @@ impl Chat {
         Ok(())
     }
 
-    pub fn preview_remove(&self, id: &str) -> Result<Preview, ApiError> {
-        vibevalley_runtime::rt::block_on(self.preview_remove_async(id))
-    }
-
     pub async fn preview_remove_async(&self, id: &str) -> Result<Preview, ApiError> {
         let mut conn = self.db.read_pool().acquire().await.q()?;
         let row = message_of(&mut conn, id).await?;
@@ -451,10 +439,6 @@ impl Chat {
     }
 
     /// `reacting`: setting a reaction as it already is writes nothing.
-    pub fn react(&self, id: &str, who: &str, emoji: &str, on: bool) -> Result<ChatMessage, ApiError> {
-        vibevalley_runtime::rt::block_on(self.react_async(id, who, emoji, on))
-    }
-
     pub async fn react_async(&self, id: &str, who: &str, emoji: &str, on: bool) -> Result<ChatMessage, ApiError> {
         let mut inner = self.locked().await;
         let e = emoji.trim();
@@ -497,10 +481,6 @@ impl Chat {
         Ok(message)
     }
 
-    pub fn pin(&self, id: &str, on: bool) -> Result<ChatMessage, ApiError> {
-        vibevalley_runtime::rt::block_on(self.pin_async(id, on))
-    }
-
     pub async fn pin_async(&self, id: &str, on: bool) -> Result<ChatMessage, ApiError> {
         let mut inner = self.locked().await;
         let row = {
@@ -524,10 +504,6 @@ impl Chat {
         let message = self.finish_message_change_async(&inner.model, &row).await?;
         self.emit_event(ChannelEvent::Pinned(message.clone()));
         Ok(message)
-    }
-
-    pub fn pins(&self, channel: &str) -> Result<Vec<ChatMessage>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.pins_async(channel))
     }
 
     pub async fn pins_async(&self, channel: &str) -> Result<Vec<ChatMessage>, ApiError> {
@@ -626,10 +602,6 @@ impl Chat {
         let mut rows = db::messages_before(&mut conn, channel, NO_NUMBER, n).await.q()?;
         rows.reverse();
         Ok(rows.iter().map(|r| model.addressed_of(r, &self.files)).collect())
-    }
-
-    pub fn search(&self, text: &str, channel: Option<&str>) -> Result<Vec<MessageHit>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.search_async(text, channel))
     }
 
     pub async fn search_async(&self, text: &str, channel: Option<&str>) -> Result<Vec<MessageHit>, ApiError> {

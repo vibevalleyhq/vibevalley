@@ -653,5 +653,12 @@ pub fn install(hub: &Hub, setting: Arc<Setting>) {
     hub.on::<ops::SettingGet>(move |_, ()| Ok(s.status()));
     let s = setting.clone();
     hub.on::<ops::SettingValidate>(move |_, u| Ok(s.validate(&u)));
-    hub.on::<ops::SettingUpdate>(move |_, u| setting.save(&u));
+    hub.on_async::<ops::SettingUpdate, _, _>(move |_, u| {
+        let setting = setting.clone();
+        async move {
+            crate::spawn_blocking_traced(move || setting.save(&u))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
 }

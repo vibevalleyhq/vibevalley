@@ -387,31 +387,57 @@ impl Crons {
 /// Every `cron.*` endpoint, and the ticker every 20 s until the hub goes.
 pub fn install(hub: &Arc<Hub>, crons: Arc<Crons>, tick: bool) {
     let c = crons.clone();
-    hub.on::<ops::CronCreate>(move |ctx, req| {
+    hub.on_async::<ops::CronCreate, _, _>(move |ctx, req| {
+        let c = c.clone();
         let by = match ctx.caller {
             Caller::User | Caller::Remote => ActorKind::User,
             Caller::Orchestrator | Caller::Session => ActorKind::Agent,
         };
-        c.add(req, by)
+        async move {
+            crate::spawn_blocking_traced(move || c.add(req, by))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
     });
     let c = crons.clone();
     hub.on::<ops::CronList>(move |_, ()| Ok(c.list()));
     let c = crons.clone();
-    hub.on::<ops::CronUpdate>(move |_, input| {
-        match input.enabled {
-            Some(enabled) => {
-                c.set_enabled(&input.id, enabled)?;
-            }
-            None => {
-                c.find(&input.id)?;
-            }
+    hub.on_async::<ops::CronUpdate, _, _>(move |_, input| {
+        let c = c.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                match input.enabled {
+                    Some(enabled) => {
+                        c.set_enabled(&input.id, enabled)?;
+                    }
+                    None => {
+                        c.find(&input.id)?;
+                    }
+                }
+                Ok(())
+            })
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
         }
-        Ok(())
     });
     let c = crons.clone();
-    hub.on::<ops::CronDelete>(move |_, input| c.remove(&input.id).map(|_| ()));
+    hub.on_async::<ops::CronDelete, _, _>(move |_, input| {
+        let c = c.clone();
+        async move {
+            crate::spawn_blocking_traced(move || c.remove(&input.id).map(|_| ()))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
     let c = crons.clone();
-    hub.on::<ops::CronPreviewDelete>(move |_, input| c.preview_remove(&input.id));
+    hub.on_async::<ops::CronPreviewDelete, _, _>(move |_, input| {
+        let c = c.clone();
+        async move {
+            crate::spawn_blocking_traced(move || c.preview_remove(&input.id))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
     if tick {
         let weak = Arc::downgrade(&crons);
         let ticker = Ticker::spawn_on(hub, TICK, true, move || {

@@ -651,16 +651,65 @@ impl LiveVoicePort for Voice {
 
 pub fn install(hub: &Hub, voice: Arc<Voice>) {
     let v = voice.clone();
-    hub.on::<ops::VoiceGrantCreate>(move |_, ()| v.grant());
+    hub.on_async::<ops::VoiceGrantCreate, _, _>(move |_, ()| {
+        let v = v.clone();
+        async move {
+            crate::spawn_blocking_traced(move || v.grant())
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
     let v = voice.clone();
-    hub.on::<ops::VoiceCallStart>(move |_, s| v.start(&s.channel, &s.uid, s.about.as_deref()));
+    hub.on_async::<ops::VoiceCallStart, _, _>(move |_, s| {
+        let v = v.clone();
+        async move {
+            crate::spawn_blocking_traced(move || v.start(&s.channel, &s.uid, s.about.as_deref()))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
     let v = voice.clone();
-    hub.on::<ops::VoiceCallStop>(move |_, c| v.stop(&c.agent_id));
+    hub.on_async::<ops::VoiceCallStop, _, _>(move |_, c| {
+        let v = v.clone();
+        async move {
+            crate::spawn_blocking_traced(move || v.stop(&c.agent_id))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
     let v = voice.clone();
-    hub.on::<ops::VoiceCallHear>(move |_, h| v.heard(&h.agent_id, &h.text, h.agent.as_deref(), h.send_key.as_deref()));
+    hub.on_async::<ops::VoiceCallHear, _, _>(move |_, h| {
+        let v = v.clone();
+        async move {
+            crate::spawn_blocking_traced(move || v.heard(&h.agent_id, &h.text, h.agent.as_deref(), h.send_key.as_deref()))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
     let v = voice.clone();
-    hub.on::<ops::VoiceHear>(move |_, h| v.heard_current(&h.text, h.agent.as_deref(), h.send_key.as_deref()));
+    hub.on_async::<ops::VoiceHear, _, _>(move |_, h| {
+        let v = v.clone();
+        async move {
+            crate::spawn_blocking_traced(move || v.heard_current(&h.text, h.agent.as_deref(), h.send_key.as_deref()))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
     let v = voice.clone();
-    hub.on::<ops::VoiceCallSay>(move |_, s| v.said(&s.agent_id, &s.text));
-    hub.on::<ops::VoiceMossVerify>(move |_, ()| Ok(voice.verify_moss()));
+    hub.on_async::<ops::VoiceCallSay, _, _>(move |_, s| {
+        let v = v.clone();
+        async move {
+            crate::spawn_blocking_traced(move || v.said(&s.agent_id, &s.text))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
+    hub.on_async::<ops::VoiceMossVerify, _, _>(move |_, ()| {
+        let voice = voice.clone();
+        async move {
+            crate::spawn_blocking_traced(move || Ok(voice.verify_moss()))
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        }
+    });
 }

@@ -29,7 +29,7 @@ use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, ConnectorID, ConnectorLogin, ConnectorStatus, ops};
 
 use self::adapter::App;
-use self::bridge::{Bridge, Env, Handoff, handoff};
+use self::bridge::{Bridge, Env, Handoff};
 use self::store::Store;
 use crate::base::ServerDb;
 use crate::modules::collab::channel::{ChannelEvent, Chat, to_message};
@@ -172,8 +172,8 @@ impl Connectors {
     }
 
     /// Starts a login (or says how far the one going on is); `force` starts over.
-    pub fn login(&self, id: ConnectorID, input: ConnectorLogin) -> ConnectorStatus {
-        self.bridge(id).login(input)
+    pub async fn login_async(&self, id: ConnectorID, input: ConnectorLogin) -> ConnectorStatus {
+        self.bridge(id).login_async(input).await
     }
 
     /// The code the app asked the user for during a login.
@@ -181,8 +181,8 @@ impl Connectors {
         self.bridge(id).verify(code)
     }
 
-    pub fn logout(&self, id: ConnectorID) -> ConnectorStatus {
-        self.bridge(id).logout()
+    pub async fn logout_async(&self, id: ConnectorID) -> ConnectorStatus {
+        self.bridge(id).logout_async().await
     }
 
     /// Ties the app to the channel called `name`.
@@ -196,15 +196,21 @@ impl Connectors {
     }
 
     /// Every account's work stopped, and waited for.
-    pub fn close(&self) {
+    pub async fn close_async(&self) {
         self.env.closing.store(true, Ordering::SeqCst);
         for b in &self.bridges {
-            b.stop();
+            b.stop_async().await;
         }
-        if let Some((cancel, handle)) = self.feed.lock().take() {
+        let feed = self.feed.lock().take();
+        if let Some((cancel, handle)) = feed {
             cancel.cancel();
-            let _ = vibevalley_runtime::rt::block_on(handle);
+            let _ = handle.await;
         }
+    }
+
+    /// Every account's work stopped, and waited for.
+    pub fn close(&self) {
+        vibevalley_runtime::rt::block_on(self.close_async());
     }
 }
 
@@ -213,7 +219,7 @@ impl Connectors {
 async fn feed(env: Arc<Env>, bridges: Vec<Arc<Bridge>>, mut events: broadcast::Receiver<ChannelEvent>, cancel: CancellationToken) {
     loop {
         let prune_env = env.clone();
-        let _ = tokio::task::spawn_blocking(move || {
+        let _ = crate::spawn_blocking_traced(move || {
             if let Err(e) = prune_env.store.prune(now() - KEPT_MS) {
                 eprintln!("vibevalley-server: connector: history was not pruned: {}", e.0);
             }
@@ -242,17 +248,12 @@ async fn feed(env: Arc<Env>, bridges: Vec<Arc<Bridge>>, mut events: broadcast::R
                 Fed::Event(event) => {
                     let wake = match *event {
                         ChannelEvent::Posted(c) => {
-                            let env = env.clone();
-                            let bridges = bridges.clone();
-                            let _ = tokio::task::spawn_blocking(move || {
-                                let m = to_message(&c.row);
-                                if for_user(&m, env.chat.notify_of(&m.channel)) && matches!(handoff(&env.chat, &m.id), Ok(Handoff::Unseen)) {
-                                    for b in &bridges {
-                                        b.offer(&m);
-                                    }
+                            let m = to_message(&c.row);
+                            if for_user(&m, env.chat.notify_of(&m.channel)) && matches!(bridge::handoff_async(&env.chat, &m.id).await, Ok(Handoff::Unseen)) {
+                                for b in &bridges {
+                                    b.offer_async(&m).await;
                                 }
-                            })
-                            .await;
+                            }
                             true
                         }
                         ChannelEvent::Removed { .. } | ChannelEvent::UserRead { .. } => true,
@@ -260,7 +261,7 @@ async fn feed(env: Arc<Env>, bridges: Vec<Arc<Bridge>>, mut events: broadcast::R
                     };
                     if wake {
                         let bridges = bridges.clone();
-                        let _ = tokio::task::spawn_blocking(move || {
+                        let _ = crate::spawn_blocking_traced(move || {
                             for b in &bridges {
                                 if b.has_account() {
                                     b.changed();
@@ -272,7 +273,7 @@ async fn feed(env: Arc<Env>, bridges: Vec<Arc<Bridge>>, mut events: broadcast::R
                 }
                 Fed::Lagged => {
                     let bridges = bridges.clone();
-                    let _ = tokio::task::spawn_blocking(move || {
+                    let _ = crate::spawn_blocking_traced(move || {
                         for b in &bridges {
                             if b.has_account() {
                                 b.changed();
@@ -297,20 +298,53 @@ fn app_of(id: &str) -> Result<ConnectorID, ApiError> {
 
 pub fn install(hub: &Hub, connectors: Arc<Connectors>) {
     let c = connectors.clone();
-    hub.on::<ops::ConnectorList>(move |_, _| Ok(c.list()));
-    let c = connectors.clone();
-    hub.on::<ops::ConnectorLogin>(move |_, input| {
-        let login = ConnectorLogin {
-            force: input.force,
-            app_id: input.app_id,
-            secret: input.secret,
-        };
-        Ok(c.login(app_of(&input.id)?, login))
+    hub.on_async::<ops::ConnectorList, _, _>(move |_, _| {
+        let c = c.clone();
+        async move {
+            crate::spawn_blocking_traced(move || c.list())
+                .await
+                .map_err(|e| ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))
+        }
     });
     let c = connectors.clone();
-    hub.on::<ops::ConnectorVerify>(move |_, input| Ok(c.verify(app_of(&input.id)?, &input.code)));
+    hub.on_async::<ops::ConnectorLogin, _, _>(move |_, input| {
+        let c = c.clone();
+        async move {
+            let id = app_of(&input.id)?;
+            let login = ConnectorLogin {
+                force: input.force,
+                app_id: input.app_id,
+                secret: input.secret,
+            };
+            Ok(c.login_async(id, login).await)
+        }
+    });
     let c = connectors.clone();
-    hub.on::<ops::ConnectorLogout>(move |_, input| Ok(c.logout(app_of(&input.id)?)));
+    hub.on_async::<ops::ConnectorVerify, _, _>(move |_, input| {
+        let c = c.clone();
+        async move {
+            let id = app_of(&input.id)?;
+            crate::spawn_blocking_traced(move || c.verify(id, &input.code))
+                .await
+                .map_err(|e| ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))
+        }
+    });
+    let c = connectors.clone();
+    hub.on_async::<ops::ConnectorLogout, _, _>(move |_, input| {
+        let c = c.clone();
+        async move {
+            let id = app_of(&input.id)?;
+            Ok(c.logout_async(id).await)
+        }
+    });
     let c = connectors;
-    hub.on::<ops::ConnectorChannelSet>(move |_, input| c.set_channel(app_of(&input.id)?, &input.channel));
+    hub.on_async::<ops::ConnectorChannelSet, _, _>(move |_, input| {
+        let c = c.clone();
+        async move {
+            let id = app_of(&input.id)?;
+            crate::spawn_blocking_traced(move || c.set_channel(id, &input.channel))
+                .await
+                .map_err(|e| ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?
+        }
+    });
 }

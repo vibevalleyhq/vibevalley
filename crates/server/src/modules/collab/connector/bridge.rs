@@ -79,8 +79,8 @@ pub enum Handoff {
     Settled,
 }
 
-pub fn handoff(chat: &Chat, message: &str) -> Result<Handoff, ApiError> {
-    let Some((m, read_at, superseded)) = chat.user_receipt(message)? else {
+pub async fn handoff_async(chat: &Chat, message: &str) -> Result<Handoff, ApiError> {
+    let Some((m, read_at, superseded)) = chat.user_receipt_async(message).await? else {
         return Ok(Handoff::Settled);
     };
     if superseded || read_at.is_some() || !for_user(&m, chat.notify_of(&m.channel)) {
@@ -292,54 +292,69 @@ impl Bridge {
     }
 
     /// A farm message for the user: kept to go out when it was said in the account's channel.
-    pub fn offer(&self, m: &ChatMessage) {
+    pub async fn offer_async(self: &Arc<Self>, m: &ChatMessage) {
         let Some(a) = self.snapshot().filter(|a| !a.user.is_empty()) else { return };
-        let kept = || -> Result<bool, Held> {
-            let Some((place, top)) = self.env.chat.message_location(&m.id)? else {
-                return Ok(false);
-            };
-            if top != a.channel.clone().unwrap_or_else(|| self.env.chat.default_channel()) {
-                return Ok(false);
-            }
-            let pieces = split_text(&user_line(m, &place), self.app.max_chars());
-            self.env.store.add_outgoing(self.id(), &m.id, &pieces, now())?;
-            Ok(!pieces.is_empty())
+        let location = match self.env.chat.message_location_async(&m.id).await {
+            Ok(Some(loc)) => loc,
+            Ok(None) => return,
+            Err(e) => return self.set_err(e.message),
         };
-        match kept() {
-            Ok(true) => self.changed(),
-            Ok(false) => {}
-            Err(e) => self.set_err(e.0),
+        let (place, top) = location;
+        if top != a.channel.clone().unwrap_or_else(|| self.env.chat.default_channel()) {
+            return;
+        }
+        let pieces = split_text(&user_line(m, &place), self.app.max_chars());
+        let id = self.id();
+        let me = self.clone();
+        let msg_id = m.id.clone();
+        let kept = crate::spawn_blocking_traced(move || {
+            me.env.store.add_outgoing(id, &msg_id, &pieces, now())?;
+            Ok::<bool, Held>(!pieces.is_empty())
+        })
+        .await;
+        match kept {
+            Ok(Ok(true)) => self.changed(),
+            Ok(Ok(false)) => {}
+            Ok(Err(e)) => self.set_err(e.0),
+            Err(e) => self.set_err(e.to_string()),
         }
     }
 
-    /// Prepares pending outgoing batches synchronously on a blocking thread.
-    fn prepare_drain(&self, late: bool) -> Result<Option<DrainPlan>, ()> {
+    /// Prepares pending outgoing batches asynchronously on `chat` and `spawn_blocking_traced` for SQLite `store`.
+    async fn prepare_drain_async(self: &Arc<Self>, late: bool) -> Result<Option<DrainPlan>, ()> {
         let Some(a) = self.snapshot().filter(|a| !a.user.is_empty()) else {
             return Ok(None);
         };
         let id = self.id();
-        let store = &self.env.store;
-        let listed = match store.pending_outgoing(id) {
-            Ok(l) => l,
-            Err(e) => {
+        let me = self.clone();
+        let listed = match crate::spawn_blocking_traced(move || me.env.store.pending_outgoing(id)).await {
+            Ok(Ok(l)) => l,
+            Ok(Err(e)) => {
                 eprintln!("vibevalley-server: connector: {}: the outbox could not be read: {}", id.as_str(), e.0);
                 return Err(());
             }
+            Err(_) => return Err(()),
         };
-        let mut settled: Vec<&str> = vec![];
-        let mut unseen: Vec<&str> = vec![];
+        let mut settled: Vec<String> = vec![];
+        let mut unseen: Vec<String> = vec![];
         for row in &listed {
-            if settled.contains(&row.message.as_str()) || unseen.contains(&row.message.as_str()) {
+            if settled.iter().any(|s| s == &row.message) || unseen.iter().any(|s| s == &row.message) {
                 continue;
             }
-            match handoff(&self.env.chat, &row.message) {
-                Ok(Handoff::Unseen) => unseen.push(&row.message),
+            match handoff_async(&self.env.chat, &row.message).await {
+                Ok(Handoff::Unseen) => unseen.push(row.message.clone()),
                 Ok(Handoff::Settled) => {
-                    if let Err(e) = store.withdraw(&row.message) {
-                        self.set_err(e.0);
-                        return Err(());
+                    let me = self.clone();
+                    let msg = row.message.clone();
+                    match crate::spawn_blocking_traced(move || me.env.store.withdraw(&msg)).await {
+                        Ok(Ok(())) => {}
+                        Ok(Err(e)) => {
+                            self.set_err(e.0);
+                            return Err(());
+                        }
+                        Err(_) => return Err(()),
                     }
-                    settled.push(&row.message);
+                    settled.push(row.message.clone());
                 }
                 Err(e) => {
                     self.set_err(e.message);
@@ -347,7 +362,7 @@ impl Bridge {
                 }
             }
         }
-        let pending: Vec<_> = listed.iter().filter(|r| unseen.contains(&r.message.as_str())).collect();
+        let pending: Vec<_> = listed.iter().filter(|r| unseen.iter().any(|u| u == &r.message)).collect();
         if !settled.is_empty() {
             self.tell();
         }
@@ -366,11 +381,10 @@ impl Bridge {
     /// Sends what waits, in order; false when some of it is held. Only the worker calls it, so a message sent is
     /// marked before the next is looked at.
     async fn drain(self: &Arc<Self>, late: bool, cancel: &CancellationToken) -> bool {
-        let me = self.clone();
-        let DrainPlan { account: a, batches } = match crate::spawn_blocking_traced(move || me.prepare_drain(late)).await {
-            Ok(Ok(Some(plan))) => plan,
-            Ok(Ok(None)) => return true,
-            Ok(Err(())) | Err(_) => return false,
+        let DrainPlan { account: a, batches } = match self.prepare_drain_async(late).await {
+            Ok(Some(plan)) => plan,
+            Ok(None) => return true,
+            Err(()) => return false,
         };
         let id = self.id();
         for (rows, text) in batches {
@@ -413,14 +427,20 @@ impl Bridge {
         true
     }
 
-    fn quoted_channel(&self, ext: &str) -> Result<Option<String>, Held> {
+    async fn quoted_channel_async(self: &Arc<Self>, ext: &str) -> Result<Option<String>, Held> {
         if ext.is_empty() {
             return Ok(None);
         }
-        let Some(message) = self.env.store.message_of_ext(self.id(), ext)? else {
+        let id = self.id();
+        let me = self.clone();
+        let ext = ext.to_string();
+        let Some(message) = crate::spawn_blocking_traced(move || me.env.store.message_of_ext(id, &ext))
+            .await
+            .map_err(|e| Held(e.to_string()))??
+        else {
             return Ok(None);
         };
-        Ok(self.env.chat.message_location(&message)?.map(|(place, _)| place.id))
+        Ok(self.env.chat.message_location_async(&message).await?.map(|(place, _)| place.id))
     }
 
     /// One message of the app's: the pairing word, or the user's words into the farm. The farm's id of what was said.
@@ -428,7 +448,7 @@ impl Bridge {
         enum Step {
             Ignore,
             Paired(Account),
-            Said(Option<String>),
+            Speak { key: String },
         }
         let me = self.clone();
         let inbound = m.clone();
@@ -448,27 +468,16 @@ impl Bridge {
             }
             me.env.store.replied(id, &inbound.reply, now())?;
             me.reload()?;
-            let channel = match me.quoted_channel(&inbound.quoted)? {
-                Some(c) => Some(c),
-                None => me.snapshot().and_then(|a| a.channel),
-            };
-            let mut said = None;
-            if !inbound.text.is_empty() {
+            let key = if inbound.text.is_empty() {
+                String::new()
+            } else {
                 // Keyed by the app's message: one said but not yet settled when the farm stopped is said once, not twice.
-                let key = Sha256::digest(format!("{}:{}", id.as_str(), inbound.id))
+                Sha256::digest(format!("{}:{}", id.as_str(), inbound.id))
                     .iter()
                     .map(|b| format!("{b:02x}"))
-                    .collect::<String>();
-                let (message, _) = me.env.chat.say(Saying {
-                    text: inbound.text.clone(),
-                    channel,
-                    send_key: key,
-                    source: Some("connector".into()),
-                    ..Saying::default()
-                })?;
-                said = Some(message.id);
-            }
-            Ok(Step::Said(said))
+                    .collect::<String>()
+            };
+            Ok(Step::Speak { key })
         })
         .await
         .map_err(|e| Held(e.to_string()))??;
@@ -487,7 +496,27 @@ impl Bridge {
                 let _ = crate::spawn_blocking_traced(move || me.tell()).await;
                 Ok(None)
             }
-            Step::Said(said) => {
+            Step::Speak { key } => {
+                let said = if key.is_empty() {
+                    None
+                } else {
+                    let channel = match self.quoted_channel_async(&m.quoted).await? {
+                        Some(c) => Some(c),
+                        None => self.snapshot().and_then(|a| a.channel),
+                    };
+                    let (message, _) = self
+                        .env
+                        .chat
+                        .say_async(Saying {
+                            text: m.text.clone(),
+                            channel,
+                            send_key: key,
+                            source: Some("connector".into()),
+                            ..Saying::default()
+                        })
+                        .await?;
+                    Some(message.id)
+                };
                 // The user's words withdraw what they answer, before the fresh reply opens the app's delivery window.
                 self.drain(true, cancel).await;
                 Ok(said)
@@ -723,7 +752,7 @@ impl Bridge {
                 progress: &progress,
                 code: &code,
             };
-            if let Some(result) = b.app.login(&input, &io, &c) {
+            if let Some(result) = b.app.login(&input, &io, &c).await {
                 b.logged_in(&c, result).await;
             }
         });
@@ -795,64 +824,61 @@ impl Bridge {
 
     /// Goes on with the account there is.
     pub fn resume(self: &Arc<Self>) {
-        vibevalley_runtime::rt::block_on(async {
-            let mut current = self.commands.lock().await;
-            if current.is_none() {
-                *current = self.connected();
-            }
-        });
+        if let Ok(mut current) = self.commands.try_lock()
+            && current.is_none()
+        {
+            *current = self.connected();
+        }
     }
 
-    pub fn login(self: &Arc<Self>, input: ConnectorLogin) -> ConnectorStatus {
-        vibevalley_runtime::rt::block_on(async {
-            let started = {
-                let mut current = self.commands.lock().await;
-                let going = self.shown.lock().signing_in.is_some();
-                if going && input.force != Some(true) {
-                    self.shown.lock().login_try
-                } else {
-                    Self::stop_generation(&mut current).await;
-                    let attempt = {
-                        let mut shown = self.shown.lock();
-                        shown.login_try += 1;
-                        shown.error.clear();
-                        shown.signing_in = Some(SigningIn {
-                            progress: Progress {
-                                state: ConnectorState::Waiting,
-                                qr: String::new(),
-                            },
-                            code: String::new(),
-                        });
-                        shown.login_try
-                    };
-                    *current = Some(self.logging_in(input, attempt));
-                    attempt
-                }
-            };
-            self.tell();
-            // The answer carries the code when it shows within a moment.
-            let deadline = tokio::time::Instant::now() + self.env.moment;
-            loop {
-                let notified = self.progressed.notified();
-                tokio::pin!(notified);
-                notified.as_mut().enable();
-                let there = {
-                    let shown = self.shown.lock();
-                    shown.login_try != started || shown.signing_in.as_ref().is_none_or(|x| !x.progress.qr.is_empty())
+    pub async fn login_async(self: &Arc<Self>, input: ConnectorLogin) -> ConnectorStatus {
+        let started = {
+            let mut current = self.commands.lock().await;
+            let going = self.shown.lock().signing_in.is_some();
+            if going && input.force != Some(true) {
+                self.shown.lock().login_try
+            } else {
+                Self::stop_generation(&mut current).await;
+                let attempt = {
+                    let mut shown = self.shown.lock();
+                    shown.login_try += 1;
+                    shown.error.clear();
+                    shown.signing_in = Some(SigningIn {
+                        progress: Progress {
+                            state: ConnectorState::Waiting,
+                            qr: String::new(),
+                        },
+                        code: String::new(),
+                    });
+                    shown.login_try
                 };
-                if there {
-                    break;
-                }
-                let now_inst = tokio::time::Instant::now();
-                let Some(left) = deadline.checked_duration_since(now_inst) else {
-                    break;
-                };
-                if tokio::time::timeout(left, notified).await.is_err() {
-                    break;
-                }
+                *current = Some(self.logging_in(input, attempt));
+                attempt
             }
-            self.status()
-        })
+        };
+        self.tell();
+        // The answer carries the code when it shows within a moment.
+        let deadline = tokio::time::Instant::now() + self.env.moment;
+        loop {
+            let notified = self.progressed.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            let there = {
+                let shown = self.shown.lock();
+                shown.login_try != started || shown.signing_in.as_ref().is_none_or(|x| !x.progress.qr.is_empty())
+            };
+            if there {
+                break;
+            }
+            let now_inst = tokio::time::Instant::now();
+            let Some(left) = deadline.checked_duration_since(now_inst) else {
+                break;
+            };
+            if tokio::time::timeout(left, notified).await.is_err() {
+                break;
+            }
+        }
+        self.status()
     }
 
     /// The code the user typed for the login going on; with none going on it is for none.
@@ -867,32 +893,33 @@ impl Bridge {
         self.status()
     }
 
-    pub fn logout(self: &Arc<Self>) -> ConnectorStatus {
-        vibevalley_runtime::rt::block_on(async {
+    pub async fn logout_async(self: &Arc<Self>) -> ConnectorStatus {
+        {
+            let mut current = self.commands.lock().await;
+            Self::stop_generation(&mut current).await;
+            let me = self.clone();
+            let gone = crate::spawn_blocking_traced(move || me.env.store.disconnect(me.id(), &t("server.connector.disconnected", &[])))
+                .await
+                .unwrap_or_else(|e| Err(super::store::StoreFailed(e.to_string())));
             {
-                let mut current = self.commands.lock().await;
-                Self::stop_generation(&mut current).await;
-                let gone = self.env.store.disconnect(self.id(), &t("server.connector.disconnected", &[]));
-                {
-                    let mut shown = self.shown.lock();
-                    shown.signing_in = None;
-                    shown.login_try += 1;
-                    match &gone {
-                        Ok(()) => {
-                            shown.account = None;
-                            shown.error.clear();
-                        }
-                        Err(e) => shown.error = e.0.clone(),
+                let mut shown = self.shown.lock();
+                shown.signing_in = None;
+                shown.login_try += 1;
+                match &gone {
+                    Ok(()) => {
+                        shown.account = None;
+                        shown.error.clear();
                     }
-                }
-                self.progressed.notify_waiters();
-                if gone.is_err() {
-                    *current = self.connected();
+                    Err(e) => shown.error = e.0.clone(),
                 }
             }
-            self.tell();
-            self.status()
-        })
+            self.progressed.notify_waiters();
+            if gone.is_err() {
+                *current = self.connected();
+            }
+        }
+        self.tell();
+        self.status()
     }
 
     pub fn set_channel(&self, channel: Option<&str>) -> Result<ConnectorStatus, StoreFailed> {
@@ -905,10 +932,8 @@ impl Bridge {
         self.snapshot().is_some()
     }
 
-    pub fn stop(&self) {
-        vibevalley_runtime::rt::block_on(async {
-            let mut current = self.commands.lock().await;
-            Self::stop_generation(&mut current).await;
-        });
+    pub async fn stop_async(&self) {
+        let mut current = self.commands.lock().await;
+        Self::stop_generation(&mut current).await;
     }
 }

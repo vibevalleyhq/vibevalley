@@ -92,7 +92,7 @@ pub trait Adapter: Send + Sync + 'static {
     /// In UTF-16 units; longer messages are cut.
     const MAX_CHARS: usize;
 
-    async fn login(&self, input: &ConnectorLogin, io: &LoginIo<'_>) -> Result<Linked<Self::Keys>, AppFailed>;
+    fn login(&self, input: &ConnectorLogin, io: &LoginIo<'_>) -> impl Future<Output = Result<Linked<Self::Keys>, AppFailed>> + Send;
     /// Until the connection ends: why it did.
     fn receive(&self, keys: &Self::Keys, io: &Receiving<'_>) -> impl Future<Output = AppFailed> + Send;
     /// The app's id of what was sent; "" when it names none.
@@ -105,7 +105,12 @@ pub trait App: Send + Sync {
     fn max_chars(&self) -> usize;
     fn reads(&self, keys: &Secret) -> bool;
     /// Drives login until completion or cancellation (`None` when cancelled).
-    fn login(&self, input: &ConnectorLogin, io: &LoginIo<'_>, cancel: &CancellationToken) -> Option<Result<Linked<Secret>, AppFailed>>;
+    fn login<'a>(
+        &'a self,
+        input: &'a ConnectorLogin,
+        io: &'a LoginIo<'a>,
+        cancel: &'a CancellationToken,
+    ) -> BoxFuture<'a, Option<Result<Linked<Secret>, AppFailed>>>;
     fn receive<'a>(&'a self, keys: &'a Secret, io: &'a Receiving<'a>) -> BoxFuture<'a, AppFailed>;
     fn send<'a>(&'a self, keys: &'a Secret, to: &'a str, text: &'a str, reply: &'a str) -> BoxFuture<'a, Result<String, AppFailed>>;
 }
@@ -127,22 +132,26 @@ impl<A: Adapter> App for A {
         unsealed::<A::Keys>(keys).is_ok()
     }
 
-    fn login(&self, input: &ConnectorLogin, io: &LoginIo<'_>, cancel: &CancellationToken) -> Option<Result<Linked<Secret>, AppFailed>> {
-        // `Weixin::login` holds a non-Send URL serializer across an await, so login runs on a single thread via `block_on`.
-        let linked = vibevalley_runtime::rt::block_on(async {
-            tokio::select! {
+    fn login<'a>(
+        &'a self,
+        input: &'a ConnectorLogin,
+        io: &'a LoginIo<'a>,
+        cancel: &'a CancellationToken,
+    ) -> BoxFuture<'a, Option<Result<Linked<Secret>, AppFailed>>> {
+        Box::pin(async move {
+            let linked = tokio::select! {
                 biased;
-                _ = cancel.cancelled() => None,
-                done = Adapter::login(self, input, io) => Some(done),
-            }
-        })?;
-        Some(linked.and_then(|l| {
-            let sealed = serde_json::to_string(&l.keys).map_err(|e| AppFailed::failed(e.to_string()))?;
-            Ok(Linked {
-                keys: Secret::new(sealed),
-                user: l.user,
-            })
-        }))
+                _ = cancel.cancelled() => return None,
+                done = Adapter::login(self, input, io) => done,
+            };
+            Some(linked.and_then(|l| {
+                let sealed = serde_json::to_string(&l.keys).map_err(|e| AppFailed::failed(e.to_string()))?;
+                Ok(Linked {
+                    keys: Secret::new(sealed),
+                    user: l.user,
+                })
+            }))
+        })
     }
 
     fn receive<'a>(&'a self, keys: &'a Secret, io: &'a Receiving<'a>) -> BoxFuture<'a, AppFailed> {

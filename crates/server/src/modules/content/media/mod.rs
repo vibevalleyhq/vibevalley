@@ -39,16 +39,14 @@ impl Stop {
     }
 
     /// Waits for `duration`, returning `true` early if aborted.
-    pub(super) fn wait_timeout(&self, duration: Duration) -> bool {
+    pub(super) async fn wait_timeout_async(&self, duration: Duration) -> bool {
         if self.aborted() {
             return true;
         }
-        vibevalley_runtime::rt::block_on(async {
-            tokio::select! {
-                biased;
-                _ = self.0.cancelled() => true,
-                _ = tokio::time::sleep(duration) => false,
-            }
-        })
+        tokio::select! {
+            biased;
+            _ = self.0.cancelled() => true,
+            _ = tokio::time::sleep(duration) => false,
+        }
     }
 }

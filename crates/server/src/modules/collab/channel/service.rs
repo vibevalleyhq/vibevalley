@@ -89,12 +89,7 @@ fn seat_orchestrator(chat: &Chat, agents: &Agents, agent: &vibevalley_protocol::
     vibevalley_runtime::rt::block_on(seat_orchestrator_async(chat, agents, agent))
 }
 
-/// `watch.direct`: the direct channel with a profile (by name or id).
-pub fn direct(chat: &Chat, agents: &Agents, reference: &str) -> Result<String, ApiError> {
-    vibevalley_runtime::rt::block_on(direct_async(chat, agents, reference))
-}
-
-/// Async version of [`direct`] for non-blocking `Hub::on_async` handlers.
+/// Async direct channel lookup/creation with a profile (by name or id).
 pub async fn direct_async(chat: &Chat, agents: &Agents, reference: &str) -> Result<String, ApiError> {
     let name = reference.trim();
     let p = &agents.profiles;
@@ -143,7 +138,13 @@ pub fn install(hub: &Hub, chat: Arc<Chat>, agents: Arc<Agents>, on_station: Opti
                     on_station(station);
                 }
                 // A profile picked that is not there is not passed on.
-                let blocks = c.quoted(body.blocks.as_deref().unwrap_or_default());
+                let blocks = match body.blocks {
+                    Some(refs) if !refs.is_empty() => {
+                        let c_q = c.clone();
+                        crate::spawn_blocking_traced(move || c_q.quoted(&refs)).await.unwrap_or_default()
+                    }
+                    _ => Vec::new(),
+                };
                 let picked = body.agent.as_deref().and_then(|x| a.profiles.agent(x)).map(|x| x.id);
                 c.say_async(Saying {
                     text: body.text,

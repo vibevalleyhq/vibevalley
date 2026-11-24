@@ -423,13 +423,6 @@ pub async fn read_embed_async(link: &str) -> Option<Embed> {
     None
 }
 
-/// `readEmbed`: a link's preview, or none when it cannot be read (not
-/// public, not a page, too slow, too big).
-pub fn read_embed(link: &str) -> Option<Embed> {
-    let link = link.to_string();
-    crate::modules::infra::http::run_http(async move { read_embed_async(&link).await })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

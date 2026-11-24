@@ -635,10 +635,6 @@ impl Jobs {
         Self::read_db(&mut db, id).await?.ok_or_else(|| refused("missing"))
     }
 
-    pub(super) fn found(&self, id: &str) -> Result<Record, ApiError> {
-        vibevalley_runtime::rt::block_on(self.found_async(id))
-    }
-
     fn decode_rows(rows: Vec<q::GetJobRow>) -> Result<Vec<Record>, ApiError> {
         rows.into_iter().map(|row| serde_json::from_str(&row.data).map_err(storage)).collect()
     }
@@ -729,17 +725,9 @@ impl Jobs {
         Ok(true)
     }
 
-    pub(super) fn change(&self, id: &str, before: &[Phase], patch: impl FnOnce(&mut Record)) -> Result<bool, ApiError> {
-        vibevalley_runtime::rt::block_on(self.change_async(id, before, patch))
-    }
-
     /// Something about the job written down, wherever it is.
     pub(super) async fn note_async(&self, id: &str, patch: impl FnOnce(&mut Record)) -> Result<bool, ApiError> {
         self.change_async(id, &Phase::ALL, patch).await
-    }
-
-    pub(super) fn note(&self, id: &str, patch: impl FnOnce(&mut Record)) -> Result<bool, ApiError> {
-        self.change(id, &Phase::ALL, patch)
     }
 
     pub(super) fn open_for_work(&self) -> Result<(), ApiError> {
@@ -900,67 +888,74 @@ impl Jobs {
     }
 
     /// Starts what can run now: each kind's oldest waiting job while the kind has a free slot.
-    pub(super) async fn schedule_async(&self) {
-        if self.closed.load(Ordering::SeqCst) {
-            return;
-        }
-        let Some(me) = self.me.get().and_then(Weak::upgrade) else { return };
-        let _one = self.scheduling.lock().await;
-        let waiting = match self.waiting_jobs_async().await {
-            Ok(w) => w,
-            Err(e) => return eprintln!("media: {}", e.message),
-        };
-        for r in waiting {
-            let ready = match r.phase {
-                Phase::Queued | Phase::Downloading => true,
-                Phase::Generating => r.remote_task.is_some(),
-                _ => false,
-            };
-            let mut runs = self.runs();
-            if !ready || runs.contains_key(r.id()) {
-                continue;
+    pub(super) fn schedule_async(&self) -> crate::BoxFuture<'_, ()> {
+        Box::pin(async move {
+            if self.closed.load(Ordering::SeqCst) {
+                return;
             }
-            let Ok(permit) = self.semaphores.for_ask(&r.ask).try_acquire_owned() else {
-                continue;
+            let Some(me) = self.me.get().and_then(Weak::upgrade) else { return };
+            let _one = self.scheduling.lock().await;
+            let waiting = match self.waiting_jobs_async().await {
+                Ok(w) => w,
+                Err(e) => return eprintln!("media: {}", e.message),
             };
-            let stop = Stop::default();
-            runs.insert(
-                r.id().to_string(),
-                Running {
-                    stop: stop.clone(),
-                    _permit: permit,
-                },
-            );
-            drop(runs);
-            let id = r.id().to_string();
-            let work = me.clone();
-            let run_job = move || {
-                work.work(&id, &stop);
-                {
-                    let mut runs = work.runs();
-                    if runs.get(&id).is_some_and(|x| x.stop.same_as(&stop)) {
-                        runs.remove(&id);
-                    }
+            for r in waiting {
+                let ready = match r.phase {
+                    Phase::Queued | Phase::Downloading => true,
+                    Phase::Generating => r.remote_task.is_some(),
+                    _ => false,
+                };
+                if !ready {
+                    continue;
                 }
-                vibevalley_runtime::rt::block_on(work.schedule_async());
-            };
-            if let Some(hub) = self.hub.upgrade() {
-                hub.spawn_blocking_task(run_job);
-            } else {
-                vibevalley_runtime::rt::current_or_global_handle().spawn_blocking(run_job);
+                let stop = {
+                    let mut runs = self.runs();
+                    if runs.contains_key(r.id()) {
+                        continue;
+                    }
+                    let Ok(permit) = self.semaphores.for_ask(&r.ask).try_acquire_owned() else {
+                        continue;
+                    };
+                    let stop = Stop::default();
+                    runs.insert(
+                        r.id().to_string(),
+                        Running {
+                            stop: stop.clone(),
+                            _permit: permit,
+                        },
+                    );
+                    stop
+                };
+                let id = r.id().to_string();
+                let work = me.clone();
+                let fut = async move {
+                    work.work_async(&id, &stop).await;
+                    {
+                        let mut runs = work.runs();
+                        if runs.get(&id).is_some_and(|x| x.stop.same_as(&stop)) {
+                            runs.remove(&id);
+                        }
+                    }
+                    work.schedule_async().await;
+                };
+                if let Some(hub) = self.hub.upgrade() {
+                    hub.spawn_task(fut);
+                } else {
+                    vibevalley_runtime::rt::current_or_global_handle().spawn(fut);
+                }
             }
-        }
+        })
     }
 
-    fn work(self: &Arc<Self>, id: &str, stop: &Stop) {
-        let Ok(r) = self.found(id) else { return };
+    async fn work_async(self: &Arc<Self>, id: &str, stop: &Stop) {
+        let Ok(r) = self.found_async(id).await else { return };
         match r.phase {
-            Phase::Queued => self.generate(r, stop),
-            Phase::Downloading => self.download(id, stop),
-            Phase::Generating if r.remote_task.is_some() => self.poll(id, stop),
+            Phase::Queued => self.generate_async(r, stop).await,
+            Phase::Downloading => self.download_async(id, stop).await,
+            Phase::Generating if r.remote_task.is_some() => self.poll_async(id, stop).await,
             _ => {}
         }
-        vibevalley_runtime::rt::block_on(self.settle_async(id));
+        self.settle_async(id).await;
     }
 
     /// After a run or a cancel, an audio job lets go of what it sent to the vendor.
@@ -973,7 +968,7 @@ impl Jobs {
         }
     }
 
-    fn generate(self: &Arc<Self>, r: Record, stop: &Stop) {
+    async fn generate_async(self: &Arc<Self>, r: Record, stop: &Stop) {
         let id = r.id().to_string();
         let held = self.held.lock().remove(&id);
         let first = if matches!(r.ask, Ask::Understanding(_)) {
@@ -981,157 +976,210 @@ impl Jobs {
         } else {
             Phase::Generating
         };
-        if !matches!(self.change(&id, &[Phase::Queued], |r| r.phase = first), Ok(true)) {
+        if !matches!(self.change_async(&id, &[Phase::Queued], |r| r.phase = first).await, Ok(true)) {
             return;
         }
         match (held, &r.ask) {
-            (Some(Held::Account(account)), Ask::Understanding(request)) => self.understand(&r, request, &account, stop),
-            (Some(Held::Account(account)), ask) if ask.is_audio() => self.generate_audio(&r, &account, stop),
-            (Some(Held::Image { account, body }), Ask::Image(request)) => self.generate_image(&id, request.width, request.height, &account, &body, stop),
+            (Some(Held::Account(account)), Ask::Understanding(request)) => self.understand_async(&r, request, &account, stop).await,
+            (Some(Held::Account(account)), ask) if ask.is_audio() => self.generate_audio_async(&r, &account, stop).await,
+            (Some(Held::Image { account, body }), Ask::Image(request)) => {
+                self.generate_image_async(&id, request.width, request.height, &account, &body, stop).await;
+            }
             (Some(Held::Speech { account, body }), Ask::Speech(request)) => {
                 if request.streaming == Some(true) {
-                    self.receive(&id, &account, &body, stop);
+                    self.receive_async(&id, &account, &body, stop).await;
                 } else if request.asynchronous == Some(true) {
-                    match self.moss.speech_task(&account.key, &body, stop) {
-                        Ok(task) => {
-                            let _ = self.change(&id, &[Phase::Generating, Phase::Canceled, Phase::Unknown], |r| r.remote_task = Some(task));
-                            self.poll(&id, stop);
+                    let fetch = self.moss.fetch.clone();
+                    let key = account.key.clone();
+                    let body = body.clone();
+                    let stop_req = stop.clone();
+                    let task = crate::spawn_blocking_traced(move || Moss { fetch }.speech_task(&key, &body, &stop_req)).await;
+                    match task {
+                        Ok(Ok(task)) => {
+                            let _ = self
+                                .change_async(&id, &[Phase::Generating, Phase::Canceled, Phase::Unknown], |r| r.remote_task = Some(task))
+                                .await;
+                            self.poll_async(&id, stop).await;
                         }
-                        Err(e) if !stop.aborted() => self.failed(&id, e.outcome),
+                        Ok(Err(e)) if !stop.aborted() => self.failed_async(&id, e.outcome).await,
+                        Ok(Err(_)) => {}
+                        Err(_) if !stop.aborted() => self.failed_async(&id, Outcome::Unknown).await,
                         Err(_) => {}
                     }
                 } else {
-                    match self.moss.speech_generate(&account.key, &body, stop) {
-                        Ok(g) if !stop.aborted() => {
-                            if self.made(&id, g) {
-                                self.download(&id, stop);
+                    let fetch = self.moss.fetch.clone();
+                    let key = account.key.clone();
+                    let body = body.clone();
+                    let stop_req = stop.clone();
+                    let generated = crate::spawn_blocking_traced(move || Moss { fetch }.speech_generate(&key, &body, &stop_req)).await;
+                    match generated {
+                        Ok(Ok(g)) if !stop.aborted() => {
+                            if self.made_async(&id, g).await {
+                                self.download_async(&id, stop).await;
                             }
                         }
-                        Ok(_) => {}
-                        Err(e) if !stop.aborted() => self.failed(&id, e.outcome),
+                        Ok(Ok(_)) => {}
+                        Ok(Err(e)) if !stop.aborted() => self.failed_async(&id, e.outcome).await,
+                        Ok(Err(_)) => {}
+                        Err(_) if !stop.aborted() => self.failed_async(&id, Outcome::Unknown).await,
                         Err(_) => {}
                     }
                 }
             }
-            _ => self.failed(&id, Outcome::Unknown),
+            _ => self.failed_async(&id, Outcome::Unknown).await,
         }
     }
 
-    fn generate_image(self: &Arc<Self>, id: &str, width: i64, height: i64, account: &Account, body: &Value, stop: &Stop) {
-        let result = self.moss.image(&account.key, body, width, height, stop);
+    async fn generate_image_async(self: &Arc<Self>, id: &str, width: i64, height: i64, account: &Account, body: &Value, stop: &Stop) {
+        let fetch = self.moss.fetch.clone();
+        let key = account.key.clone();
+        let body = body.clone();
+        let stop_req = stop.clone();
+        let result = crate::spawn_blocking_traced(move || Moss { fetch }.image(&key, &body, width, height, &stop_req)).await;
         if stop.aborted() {
             return;
         }
         let moved = match result {
-            Ok((url, usage)) => self.change(id, &[Phase::Generating], |r| {
-                r.url = Some(url);
-                r.usage = serde_json::to_value(usage).ok();
-                r.phase = Phase::Downloading;
-            }),
-            Err(e) => {
-                self.failed(id, e.outcome);
+            Ok(Ok((url, usage))) => {
+                self.change_async(id, &[Phase::Generating], |r| {
+                    r.url = Some(url);
+                    r.usage = serde_json::to_value(usage).ok();
+                    r.phase = Phase::Downloading;
+                })
+                .await
+            }
+            Ok(Err(e)) => {
+                self.failed_async(id, e.outcome).await;
+                return;
+            }
+            Err(_) => {
+                self.failed_async(id, Outcome::Unknown).await;
                 return;
             }
         };
         if matches!(moved, Ok(true)) {
-            self.download(id, stop);
+            self.download_async(id, stop).await;
         }
     }
 
     /// The vendor refused it, or nothing says what came of it; what was never sent counts as refused.
-    pub(super) fn failed(&self, id: &str, outcome: Outcome) {
-        let Ok(r) = self.found(id) else { return };
+    pub(super) async fn failed_async(&self, id: &str, outcome: Outcome) {
+        let Ok(r) = self.found_async(id).await else { return };
         let words = r.ask.words();
         let (phase, key) = match outcome {
             Outcome::Rejected | Outcome::NotSubmitted => (Phase::Failed, words.rejected),
             Outcome::Unknown => (Phase::Unknown, words.unknown),
         };
-        let _ = self.change(id, &[Phase::Generating], |r| {
-            r.phase = phase;
-            r.problem = t(&format!("server.media.{key}"), &[]);
-        });
+        let _ = self
+            .change_async(id, &[Phase::Generating], |r| {
+                r.phase = phase;
+                r.problem = t(&format!("server.media.{key}"), &[]);
+            })
+            .await;
     }
 
     /// A vendor task asked for and followed; its id is kept even when the job was stopped meanwhile.
-    pub(super) fn follow(self: &Arc<Self>, id: &str, key: &str, path: &str, body: &Value, stop: &Stop) {
-        match self.moss.submit(key, path, body, stop) {
-            Ok(task) => {
-                let _ = self.change(id, &[Phase::Generating, Phase::Canceled, Phase::Unknown], |r| r.remote_task = Some(task));
-                self.poll(id, stop);
+    pub(super) async fn follow_async(self: &Arc<Self>, id: &str, key: &str, path: &str, body: &Value, stop: &Stop) {
+        let fetch = self.moss.fetch.clone();
+        let key = key.to_string();
+        let path = path.to_string();
+        let body = body.clone();
+        let stop_req = stop.clone();
+        let submitted = crate::spawn_blocking_traced(move || Moss { fetch }.submit(&key, &path, &body, &stop_req)).await;
+        match submitted {
+            Ok(Ok(task)) => {
+                let _ = self
+                    .change_async(id, &[Phase::Generating, Phase::Canceled, Phase::Unknown], |r| r.remote_task = Some(task))
+                    .await;
+                self.poll_async(id, stop).await;
             }
-            Err(e) if !stop.aborted() => self.failed(id, e.outcome),
+            Ok(Err(e)) if !stop.aborted() => self.failed_async(id, e.outcome).await,
+            Ok(Err(_)) => {}
+            Err(_) if !stop.aborted() => self.failed_async(id, Outcome::Unknown).await,
             Err(_) => {}
         }
     }
 
     /// The vendor made it: where to fetch it, then fetching.
-    fn made(&self, id: &str, g: vendor::Generated) -> bool {
+    async fn made_async(&self, id: &str, g: vendor::Generated) -> bool {
         matches!(
-            self.change(id, &[Phase::Generating], |r| {
+            self.change_async(id, &[Phase::Generating], |r| {
                 r.url = Some(g.url);
                 r.result_format = MediaAudioFormat::ALL.into_iter().find(|f| f.as_str() == g.format);
                 r.content_type = Some(g.content_type);
                 r.usage = g.usage;
                 r.phase = Phase::Downloading;
                 r.problem.clear();
-            }),
+            })
+            .await,
             Ok(true)
         )
     }
 
     /// `poll`: the vendor's task asked every 3 s until it answers, at most 600 times.
-    fn poll(self: &Arc<Self>, id: &str, stop: &Stop) {
+    async fn poll_async(self: &Arc<Self>, id: &str, stop: &Stop) {
         for _ in 0..POLLS {
             if stop.aborted() {
                 return;
             }
-            let Ok(r) = self.found(id) else { return };
+            let Ok(r) = self.found_async(id).await else { return };
             let (Some(task), Phase::Generating) = (r.remote_task.clone(), r.phase) else {
                 return;
             };
             let Ok(account) = self.account_of(&r) else { break };
-            match self.moss.task(&account.key, &task, stop) {
-                Ok(Task::Waiting) => {}
-                Ok(Task::Failed) => return self.failed(id, Outcome::Rejected),
-                Ok(Task::Audio(kind, g)) if r.ask.task() == Some(kind) => {
-                    if self.made(id, g) {
-                        self.download(id, stop);
+            let fetch = self.moss.fetch.clone();
+            let key = account.key.clone();
+            let stop_req = stop.clone();
+            let polled = crate::spawn_blocking_traced(move || Moss { fetch }.task(&key, &task, &stop_req)).await;
+            match polled {
+                Ok(Ok(Task::Waiting)) => {}
+                Ok(Ok(Task::Failed)) => return self.failed_async(id, Outcome::Rejected).await,
+                Ok(Ok(Task::Audio(kind, g))) if r.ask.task() == Some(kind) => {
+                    if self.made_async(id, g).await {
+                        self.download_async(id, stop).await;
                     }
                     return;
                 }
-                Ok(Task::Transcription { text, segments, usage }) if r.ask.task() == Some(TaskKind::Transcription) => {
-                    let _ = self.change(id, &[Phase::Generating], |r| {
-                        r.made = Some(MediaAudioResult::Transcription { text, segments });
-                        r.usage = usage;
-                        r.phase = Phase::Ready;
-                        r.problem.clear();
-                    });
+                Ok(Ok(Task::Transcription { text, segments, usage })) if r.ask.task() == Some(TaskKind::Transcription) => {
+                    let _ = self
+                        .change_async(id, &[Phase::Generating], |r| {
+                            r.made = Some(MediaAudioResult::Transcription { text, segments });
+                            r.usage = usage;
+                            r.phase = Phase::Ready;
+                            r.problem.clear();
+                        })
+                        .await;
                     return;
                 }
-                Ok(_) => return self.failed(id, Outcome::Unknown),
-                Err(e) if e.retryable() => {}
-                Err(_) => break,
+                Ok(Ok(_)) => return self.failed_async(id, Outcome::Unknown).await,
+                Ok(Err(e)) if e.retryable() => {}
+                Ok(Err(_)) | Err(_) => break,
             }
-            if stop.wait_timeout(POLL) {
+            if stop.wait_timeout_async(POLL).await {
                 return;
             }
         }
-        let _ = self.change(id, &[Phase::Generating], |r| {
-            r.phase = Phase::Unknown;
-            r.problem = t(&format!("server.media.{}", r.ask.words().paused), &[]);
-        });
+        let _ = self
+            .change_async(id, &[Phase::Generating], |r| {
+                r.phase = Phase::Unknown;
+                r.problem = t(&format!("server.media.{}", r.ask.words().paused), &[]);
+            })
+            .await;
     }
 
     /// The result fetched, checked and kept; anything off is a failed download.
-    fn download(self: &Arc<Self>, id: &str, stop: &Stop) {
-        let Ok(r) = self.found(id) else { return };
+    async fn download_async(self: &Arc<Self>, id: &str, stop: &Stop) {
+        let Ok(r) = self.found_async(id).await else { return };
         let (Some(url), Phase::Downloading) = (r.url.clone(), r.phase) else {
             return;
         };
         let (kept, failed_key) = match &r.ask {
-            Ask::Image(request) => (self.fetch_image(&url, request.width, request.height, id, stop), "downloadFailed"),
+            Ask::Image(request) => (self.fetch_image_async(&url, request.width, request.height, id, stop).await, "downloadFailed"),
             ask => match ask.audio() {
-                Some(asked) => (self.fetch_audio(&url, r.result_format.unwrap_or(asked), id, stop), "speechDownloadFailed"),
+                Some(asked) => (
+                    self.fetch_audio_async(&url, r.result_format.unwrap_or(asked), id, stop).await,
+                    "speechDownloadFailed",
+                ),
                 None => return,
             },
         };
@@ -1139,45 +1187,51 @@ impl Jobs {
             return;
         }
         let preview = match (&r.ask, &kept) {
-            (Ask::VoiceDesign(_), Ok((Some(attachment), _, Some(metadata)))) => self.preview(&r, attachment, metadata),
+            (Ask::VoiceDesign(_), Ok((Some(attachment), _, Some(metadata)))) => self.preview_async(&r, attachment, metadata).await,
             _ => None,
         };
         let moved = match kept {
-            Ok((attachment, input, metadata)) => self.change(id, &[Phase::Downloading], |r| {
-                if metadata.is_some() {
-                    r.metadata = metadata;
-                }
-                r.attachment = attachment;
-                r.result_input = input;
-                r.preview_input = preview;
-                r.url = None;
-                r.phase = Phase::Ready;
-                r.problem.clear();
-            }),
+            Ok((attachment, input, metadata)) => {
+                self.change_async(id, &[Phase::Downloading], |r| {
+                    if metadata.is_some() {
+                        r.metadata = metadata;
+                    }
+                    r.attachment = attachment;
+                    r.result_input = input;
+                    r.preview_input = preview;
+                    r.url = None;
+                    r.phase = Phase::Ready;
+                    r.problem.clear();
+                })
+                .await
+            }
             Err(why) => {
                 eprintln!("media {id}: {why}");
-                self.change(id, &[Phase::Downloading], |r| {
+                self.change_async(id, &[Phase::Downloading], |r| {
                     r.phase = Phase::DownloadFailed;
                     r.problem = t(&format!("server.media.{failed_key}"), &[]);
                 })
+                .await
             }
         };
         if let Err(e) = moved {
             eprintln!("media {id}: {}", e.message);
         }
-        if let Ok(r) = self.found(id) {
-            self.post_back(&r);
+        if let Ok(r) = self.found_async(id).await {
+            let me = self.clone();
+            let _ = crate::spawn_blocking_traced(move || me.post_back(&r)).await;
         }
     }
 
-    fn fetch_image(&self, url: &str, width: i64, height: i64, id: &str, stop: &Stop) -> Result<Kept, String> {
+    async fn fetch_image_async(&self, url: &str, width: i64, height: i64, id: &str, stop: &Stop) -> Result<Kept, String> {
         let parsed = url::Url::parse(url).map_err(|e| e.to_string())?;
         if !public_https(&parsed) {
             return Err("not a public https address".into());
         }
         let mut response = self
             .download
-            .fetch_with_cancel(
+            .clone()
+            .fetch_async(
                 Request {
                     method: "GET",
                     url: url.into(),
@@ -1187,22 +1241,30 @@ impl Jobs {
                 },
                 stop.token(),
             )
+            .await
             .map_err(|e| format!("{e:?}"))?;
         let kind = response.media_type();
         if response.status != 200 || kind != "image/png" {
             return Err(format!("{} {kind}", response.status));
         }
-        let bytes = vendor::read_max(&mut response.body, ATTACHMENT_MAX, Some(stop)).map_err(|e| format!("{e:?}"))?;
-        if !super::png::valid(&bytes, width, height) {
-            return Err("not the image asked for".into());
-        }
-        self.files
-            .keep(&bytes, &format!("moss-{id}.png"), "image/png")
-            .map(|a| (Some(a), None, None))
-            .map_err(|e| e.message)
+        let files = self.files.clone();
+        let stop_read = stop.clone();
+        let id = id.to_string();
+        crate::spawn_blocking_traced(move || {
+            let bytes = vendor::read_max(&mut response.body, ATTACHMENT_MAX, Some(&stop_read)).map_err(|e| format!("{e:?}"))?;
+            if !super::png::valid(&bytes, width, height) {
+                return Err("not the image asked for".into());
+            }
+            files
+                .keep(&bytes, &format!("moss-{id}.png"), "image/png")
+                .map(|a| (Some(a), None, None))
+                .map_err(|e| e.message)
+        })
+        .await
+        .map_err(|e| e.to_string())?
     }
 
-    fn fetch_audio(&self, url: &str, format: MediaAudioFormat, id: &str, stop: &Stop) -> Result<Kept, String> {
+    async fn fetch_audio_async(&self, url: &str, format: MediaAudioFormat, id: &str, stop: &Stop) -> Result<Kept, String> {
         let parsed = url::Url::parse(url).map_err(|e| e.to_string())?;
         if !public_https(&parsed) {
             return Err("not a public https address".into());
@@ -1210,7 +1272,8 @@ impl Jobs {
         let types = vendor::audio_mimes(format.as_str());
         let mut response = self
             .download
-            .fetch_with_cancel(
+            .clone()
+            .fetch_async(
                 Request {
                     method: "GET",
                     url: url.into(),
@@ -1220,6 +1283,7 @@ impl Jobs {
                 },
                 stop.token(),
             )
+            .await
             .map_err(|e| format!("{e:?}"))?;
         let kind = response.media_type();
         if response.status != 200 || !types.contains(&kind.as_str()) {
@@ -1229,12 +1293,19 @@ impl Jobs {
         if declared.is_some_and(|n| n == 0 || n > RESULT_MAX) {
             return Err("declared size".into());
         }
-        let bytes = vendor::read_max(&mut response.body, RESULT_MAX, Some(stop)).map_err(|e| format!("{e:?}"))?;
-        if declared.is_some_and(|n| n != bytes.len()) || bytes.is_empty() {
-            return Err("size".into());
-        }
+        let stop_read = stop.clone();
+        let kind_check = kind.clone();
+        let (bytes, facts) = crate::spawn_blocking_traced(move || -> Result<(Vec<u8>, super::validate::AudioFacts), String> {
+            let bytes = vendor::read_max(&mut response.body, RESULT_MAX, Some(&stop_read)).map_err(|e| format!("{e:?}"))?;
+            if declared.is_some_and(|n| n != bytes.len()) || bytes.is_empty() {
+                return Err("size".into());
+            }
+            let facts = super::validate::audio_facts(bytes.clone(), &kind_check).map_err(|e| e.message)?;
+            Ok((bytes, facts))
+        })
+        .await
+        .map_err(|e| e.to_string())??;
         let name = format!("moss-{id}.{}", format.as_str());
-        let facts = super::validate::audio_facts(bytes.clone(), &kind).map_err(|e| e.message)?;
         let metadata = MediaAudioMetadata {
             source: MediaAudioMetadataSource::File,
             sample_rate: Some(JsNumber(facts.sample_rate.into())),
@@ -1242,39 +1313,50 @@ impl Jobs {
             channels: Some(facts.channels as i64),
             bit_depth: facts.bits.map(i64::from),
         };
-        let (attachment, input) = self.keep_bytes(id, bytes, &name, &kind)?;
+        let (attachment, input) = self.keep_bytes_async(id, bytes, &name, &kind).await?;
         Ok((attachment, input, Some(metadata)))
     }
 
     /// A short designed voice kept as an input of the job too, to clone from or hear again.
-    fn preview(&self, r: &Record, attachment: &Attachment, metadata: &MediaAudioMetadata) -> Option<String> {
+    async fn preview_async(&self, r: &Record, attachment: &Attachment, metadata: &MediaAudioMetadata) -> Option<String> {
         let short = metadata.duration.is_some_and(|d| d.0 <= 30.0) && attachment.size <= 10_000_000;
         let cloneable = matches!(r.result_format, Some(MediaAudioFormat::Wav | MediaAudioFormat::Mp3 | MediaAudioFormat::Flac));
         if !short || !cloneable {
             return None;
         }
-        let input = self.inputs.adopt(&attachment.id).ok()?;
-        self.inputs.pin(std::slice::from_ref(&input.id), r.id()).ok()?;
+        let input = self.inputs.adopt_async(&attachment.id).await.ok()?;
+        self.inputs.pin_async(std::slice::from_ref(&input.id), r.id()).await.ok()?;
         Some(input.id)
     }
 
     /// Bytes kept for a job: an attachment, or past an attachment's size a pinned input released with the job.
-    fn keep_bytes(&self, id: &str, bytes: Vec<u8>, name: &str, kind: &str) -> Result<(Option<Attachment>, Option<MediaInputReference>), String> {
+    async fn keep_bytes_async(&self, id: &str, bytes: Vec<u8>, name: &str, kind: &str) -> Result<(Option<Attachment>, Option<MediaInputReference>), String> {
         if bytes.len() <= ATTACHMENT_MAX {
-            let a = self.files.keep(&bytes, name, kind).map_err(|e| e.message)?;
+            let files = self.files.clone();
+            let name = name.to_string();
+            let kind = kind.to_string();
+            let a = crate::spawn_blocking_traced(move || files.keep(&bytes, &name, &kind))
+                .await
+                .map_err(|e| e.to_string())?
+                .map_err(|e| e.message)?;
             return Ok((Some(a), None));
         }
         let input = self
             .inputs
-            .create(&MediaInputRequest {
+            .create_async(&MediaInputRequest {
                 kind: MediaInputKind::Audio,
                 name: serde_json::from_value(Value::String(name.to_string())).map_err(|e| e.to_string())?,
                 mime: kind.to_string(),
                 size: bytes.len() as i64,
             })
+            .await
             .map_err(|e| e.message)?;
-        let input = self.inputs.upload(&input.id, std::io::Cursor::new(bytes)).map_err(|e| e.message)?;
-        self.inputs.pin(std::slice::from_ref(&input.id), id).map_err(|e| e.message)?;
+        let input = self
+            .inputs
+            .upload_async(&input.id, Box::new(std::io::Cursor::new(bytes)))
+            .await
+            .map_err(|e| e.message)?;
+        self.inputs.pin_async(std::slice::from_ref(&input.id), id).await.map_err(|e| e.message)?;
         Ok((
             None,
             Some(MediaInputReference {
@@ -1289,7 +1371,7 @@ impl Jobs {
     }
 
     /// One event to the job's page, waiting while it is behind; false once the page or the job is gone.
-    fn emit(&self, id: &str, event: Value, stop: &Stop) -> bool {
+    async fn emit_async(&self, id: &str, event: Value, stop: &Stop) -> bool {
         let Some(tx) = self.streams.lock().get(id).map(|s| s.tx.clone()) else {
             return false;
         };
@@ -1297,17 +1379,15 @@ impl Jobs {
             return false;
         }
         let token = stop.token();
-        vibevalley_runtime::rt::block_on(async {
-            tokio::select! {
-                biased;
-                _ = token.cancelled() => false,
-                res = tx.send_async(event) => res.is_ok(),
-            }
-        })
+        tokio::select! {
+            biased;
+            _ = token.cancelled() => false,
+            res = tx.send_async(event) => res.is_ok(),
+        }
     }
 
     /// `receiveSpeechStream`: the vendor's PCM relayed to the page as it comes and kept whole (or as much as came) as a WAV.
-    fn receive(self: &Arc<Self>, id: &str, account: &Account, body: &Value, stop: &Stop) {
+    async fn receive_async(self: &Arc<Self>, id: &str, account: &Account, body: &Value, stop: &Stop) {
         let mut pcm: Vec<u8> = Vec::new();
         let mut pending: Vec<u8> = Vec::new();
         let mut sequence = 0i64;
@@ -1315,10 +1395,24 @@ impl Jobs {
         let mut usage: Option<Value> = None;
         let mut duration: Option<f64> = None;
         let mut complete = false;
-        let streamed = self.moss.speech_stream(&account.key, body, stop, &mut |event| {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<vendor::SpeechEvent>(32);
+        let fetch = self.moss.fetch.clone();
+        let key = account.key.clone();
+        let body = body.clone();
+        let stop_stream = stop.clone();
+        let stream_task = crate::spawn_blocking_traced(move || {
+            Moss { fetch }.speech_stream(&key, &body, &stop_stream, &mut |event| {
+                tx.blocking_send(event).map_err(|_| "stopped".to_string())?;
+                Ok(())
+            })
+        });
+        let mut mine_error = false;
+        while let Some(event) = rx.recv().await {
             match event {
                 vendor::SpeechEvent::TaskCreated(task) => {
-                    let _ = self.change(id, &[Phase::Generating, Phase::Canceled], |r| r.remote_task = Some(task));
+                    let _ = self
+                        .change_async(id, &[Phase::Generating, Phase::Canceled], |r| r.remote_task = Some(task))
+                        .await;
                 }
                 vendor::SpeechEvent::Created {
                     sample_rate,
@@ -1326,21 +1420,25 @@ impl Jobs {
                     bit_depth,
                 } => {
                     if bit_depth != 16 {
-                        return Err("bit depth".into());
+                        mine_error = true;
+                        break;
                     }
                     format = Some((sample_rate, channels));
-                    self.emit(
+                    self.emit_async(
                         id,
                         json!({ "type": "format", "sampleRate": sample_rate, "channels": channels, "bitDepth": 16 }),
                         stop,
-                    );
+                    )
+                    .await;
                 }
                 vendor::SpeechEvent::Delta(audio) => {
                     let Some((_, channels)) = format else {
-                        return Err("audio before its format".into());
+                        mine_error = true;
+                        break;
                     };
                     if pcm.len() + audio.len() > STREAM_MAX {
-                        return Err("too long".into());
+                        mine_error = true;
+                        break;
                     }
                     let block = channels as usize * 2;
                     pcm.extend_from_slice(&audio);
@@ -1349,38 +1447,50 @@ impl Jobs {
                     let step = 32768 / block * block;
                     for part in pending[..available].chunks(step) {
                         let audio = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, part);
-                        self.emit(id, json!({ "type": "audio", "sequence": sequence, "audio": audio }), stop);
+                        self.emit_async(id, json!({ "type": "audio", "sequence": sequence, "audio": audio }), stop)
+                            .await;
                         sequence += 1;
                     }
                     pending.drain(..available);
                 }
                 vendor::SpeechEvent::Done { usage: u, duration: d } => {
                     if pcm.is_empty() || !pending.is_empty() {
-                        return Err("an incomplete end".into());
+                        mine_error = true;
+                        break;
                     }
                     usage = u;
                     duration = d;
                     complete = true;
                 }
             }
-            Ok(())
-        });
-        let saved = format.map(|(rate, channels)| self.keep_stream(id, &pcm, rate, channels, complete, duration));
+        }
+        drop(rx);
+        let streamed = match stream_task.await {
+            Ok(res) if !mine_error => res,
+            Ok(_) => Err(vendor::StreamError::Mine("stream error".into())),
+            Err(_) => Err(vendor::StreamError::Mine("join error".into())),
+        };
+        let saved = match format {
+            Some((rate, channels)) => Some(self.keep_stream_async(id, &pcm, rate, channels, complete, duration).await),
+            None => None,
+        };
         match (streamed, saved) {
             (_, Some(Ok(()))) if !stop.aborted() || complete => {
                 if complete {
-                    let _ = self.change(id, &[Phase::Ready], |r| r.usage = usage.take());
-                    self.emit(id, json!({ "type": "done" }), stop);
+                    let _ = self.change_async(id, &[Phase::Ready], |r| r.usage = usage.take()).await;
+                    self.emit_async(id, json!({ "type": "done" }), stop).await;
                 } else {
-                    self.emit(id, json!({ "type": "failed" }), stop);
+                    self.emit_async(id, json!({ "type": "failed" }), stop).await;
                 }
             }
             (Err(_), _) | (_, Some(Err(_))) | (_, None) => {
-                let _ = self.change(id, &[Phase::Generating], |r| {
-                    r.phase = Phase::Unknown;
-                    r.problem = t("server.media.speechUnknown", &[]);
-                });
-                self.emit(id, json!({ "type": "failed" }), stop);
+                let _ = self
+                    .change_async(id, &[Phase::Generating], |r| {
+                        r.phase = Phase::Unknown;
+                        r.problem = t("server.media.speechUnknown", &[]);
+                    })
+                    .await;
+                self.emit_async(id, json!({ "type": "failed" }), stop).await;
             }
             _ => {}
         }
@@ -1406,7 +1516,7 @@ impl Jobs {
     }
 
     /// What came of a stream, kept as a WAV: ready when complete, else unknown with what came.
-    fn keep_stream(&self, id: &str, pcm: &[u8], rate: i64, channels: i64, complete: bool, duration: Option<f64>) -> Result<(), String> {
+    async fn keep_stream_async(&self, id: &str, pcm: &[u8], rate: i64, channels: i64, complete: bool, duration: Option<f64>) -> Result<(), String> {
         let block = channels as usize * 2;
         let length = pcm.len() - pcm.len() % block;
         if length == 0 {
@@ -1427,7 +1537,7 @@ impl Jobs {
         wav.extend_from_slice(&(length as u32).to_le_bytes());
         wav.extend_from_slice(&pcm[..length]);
         let name = format!("moss-{id}{}.wav", if complete { "" } else { "-partial" });
-        let (attachment, input) = self.keep_bytes(id, wav, &name, "audio/wav")?;
+        let (attachment, input) = self.keep_bytes_async(id, wav, &name, "audio/wav").await?;
         let seconds = match (complete, duration) {
             (true, Some(d)) => d,
             _ => length as f64 / (rate as f64 * block as f64),
@@ -1451,7 +1561,7 @@ impl Jobs {
             r.metadata = Some(metadata.clone());
         };
         let moved = self
-            .change(id, &[Phase::Generating], |r| {
+            .change_async(id, &[Phase::Generating], |r| {
                 patch(r);
                 if complete {
                     r.phase = Phase::Ready;
@@ -1461,9 +1571,10 @@ impl Jobs {
                     r.problem = t("server.media.speechPartial", &[]);
                 }
             })
+            .await
             .map_err(|e| e.message)?;
         if !moved {
-            self.change(id, &[Phase::Canceled], patch).map_err(|e| e.message)?;
+            self.change_async(id, &[Phase::Canceled], patch).await.map_err(|e| e.message)?;
         }
         Ok(())
     }
