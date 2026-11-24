@@ -84,10 +84,8 @@ export const subscriptions = {
   /** The turn reports in any channel after the one with this id (by message id, which sorts by time), or the newest
    * when absent, then each report from now on. */
   "channel.reports": { can: userAndRemote, payload: z.object({ after: z.exactOptional(z.string()) }), event: S.ChannelEvent },
-  /** A blocks artifact's changes after this seq, then each batch from now on. */
+  /** An artifact directory's collaborative file changes after this seq, then each commit from now on. */
   "artifact.follow": { can: userAndRemote, payload: z.object({ id: z.string(), after: z.number() }), event: S.ArtifactEvent },
-  /** A store artifact's entry changes after this seq, then each batch from now on. */
-  "artifact.entry.follow": { can: userAndRemote, payload: z.object({ id: z.string(), after: z.number() }), event: S.ArtifactEntryEvent },
   /** An artifact's suggestions as they now are, then the whole list after each change. */
   "artifact.suggestion.follow": { can: userAndRemote, payload: z.object({ id: z.string() }), event: S.SuggestionEvent },
   /** An artifact's ephemeral live presence peers as a snapshot, then incremental upserts and removals. */

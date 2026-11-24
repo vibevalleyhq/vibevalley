@@ -85,9 +85,7 @@ brands! {
     SessionId,
     /// An artifact's id.
     ArtifactId,
-    /// A block's id, within its artifact: a block op names the block it is for, never its artifact.
-    BlockId,
-    /// A suggested change to a block.
+    /// A suggested change to an artifact file.
     SuggestionId,
     MessageId,
 }

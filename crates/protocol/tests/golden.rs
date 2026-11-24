@@ -294,12 +294,11 @@ fn subscription_specs_and_native_attachment_permissions_stay_consistent() {
     assert_sub::<subscriptions::ChannelFollow>();
     assert_sub::<subscriptions::ChannelReports>();
     assert_sub::<subscriptions::ArtifactFollow>();
-    assert_sub::<subscriptions::ArtifactEntryFollow>();
     assert_sub::<subscriptions::ArtifactSuggestionFollow>();
     assert_sub::<subscriptions::ArtifactPresenceFollow>();
     assert_sub::<subscriptions::SessionWatch>();
     assert_sub::<subscriptions::IssueWatch>();
-    assert_eq!(SUBSCRIPTIONS.len(), 8);
+    assert_eq!(SUBSCRIPTIONS.len(), 7);
 
     let att = endpoint("attachment.file").expect("attachment.file");
     assert_eq!(att.can, &[Caller::User, Caller::Remote]);

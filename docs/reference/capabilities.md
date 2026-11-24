@@ -245,27 +245,19 @@ MOSS Live 语音通话
 | `artifact.content.get` | 读作品的正文：网页的一版，或块写成的 Markdown | `/api/v1/artifact/content/get` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.create` | 新建作品：空的一篇来一起写，或交上来一稿 | `/api/v1/artifact/create` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.version.create` | 给网页作品交新的一版，旧的留着 | `/api/v1/artifact/version/create` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.html.edit` | 在网页作品里换掉一段字，成为新的一版 | `/api/v1/artifact/html/edit` | ✓ | ✓ |   |   |
 | `artifact.update` | 给作品改标题或默认设置 | `/api/v1/artifact/update` | ✓ | ✓ |   |   |
 | `artifact.delete` | 删掉一篇作品 | `/api/v1/artifact/delete` | ✓ | ✓ |   |   |
 | `artifact.previewDelete` | 试删一篇作品：说会删掉什么，不真删 | `/api/v1/artifact/previewDelete` | ✓ | ✓ |   |   |
-| `artifact.block.list` | 按顺序列出作品现有的每一块 | `/api/v1/artifact/block/list` | ✓ | ✓ |   |   |
-| `artifact.submit` | 以你的身份交一批块的操作，按顺序一次做完 | `/api/v1/artifact/submit` | ✓ | ✓ |   |   |
-| `artifact.block.create` | 在作品里插一块 | `/api/v1/artifact/block/create` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.block.update` | 改一块的字、类型或属性 | `/api/v1/artifact/block/update` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.block.delete` | 删掉作品里的一块和它的子块 | `/api/v1/artifact/block/delete` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.block.previewDelete` | 试删一块：说会删掉什么，不真删 | `/api/v1/artifact/block/previewDelete` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.suggestion.list` | 列出作品上的改写建议，没答的和答过的 | `/api/v1/artifact/suggestion/list` | ✓ | ✓ |   |   |
-| `artifact.suggestion.create` | 对你写的一块提改写建议 | `/api/v1/artifact/suggestion/create` | ✓ | ✓ |   |   |
-| `artifact.suggestion.accept` | 接受一条改写建议 | `/api/v1/artifact/suggestion/accept` | ✓ | ✓ |   |   |
-| `artifact.suggestion.reject` | 拒绝一条改写建议 | `/api/v1/artifact/suggestion/reject` | ✓ | ✓ |   |   |
-| `artifact.markdown.get` | 把一起写的作品读成 Markdown | `/api/v1/artifact/markdown/get` | ✓ | ✓ |   |   |
 | `artifact.type.list` | 列出全部结构化作品类型与当前默认设计体系 | `/api/v1/artifact/type/list` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.type.read` | 读取一种作品类型的规范或参考分册 | `/api/v1/artifact/type/read` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.entry.list` | 列出结构化作品的条目（可按路径前缀筛） | `/api/v1/artifact/entry/list` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.entry.get` | 读取结构化作品的一个条目与当前版本号 | `/api/v1/artifact/entry/get` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.entry.batch` | 原子批量增改、合并或删除结构化作品的条目（带版本号校验） | `/api/v1/artifact/entry/batch` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.outline.import` | 从 Markdown 导入一篇大纲作品 | `/api/v1/artifact/outline/import` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.file.list` | cap.op.artifact.file.list | `/api/v1/artifact/file/list` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.file.get` | cap.op.artifact.file.get | `/api/v1/artifact/file/get` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.file.write` | cap.op.artifact.file.write | `/api/v1/artifact/file/write` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.file.delete` | cap.op.artifact.file.delete | `/api/v1/artifact/file/delete` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.suggestion.list` | 列出作品上的改写建议，没答的和答过的 | `/api/v1/artifact/suggestion/list` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.suggestion.create` | 对你写的一块提改写建议 | `/api/v1/artifact/suggestion/create` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.suggestion.accept` | 接受一条改写建议 | `/api/v1/artifact/suggestion/accept` | ✓ | ✓ |   |   |
+| `artifact.suggestion.reject` | 拒绝一条改写建议 | `/api/v1/artifact/suggestion/reject` | ✓ | ✓ |   |   |
 | `artifact.presence.update` | 更新实时在场状态（光标、选区、高亮区域或视口），仅驻留内存不落库 | `/api/v1/artifact/presence/update` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.history.list` | 列出作品的协作提交时间线，最新的在前 | `/api/v1/artifact/history/list` | ✓ | ✓ |   |   |
 | `artifact.history.preview` | 只读预览指定历史前沿上的作品快照 | `/api/v1/artifact/history/preview` | ✓ | ✓ |   |   |

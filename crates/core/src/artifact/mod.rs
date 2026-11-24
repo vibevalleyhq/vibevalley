@@ -1,33 +1,82 @@
-//! VibeValley's artifact engine that the server runs: block ops on a page, Markdown in and out, the HTML check,
-//! words edited in a page, the shell an html version is shown in, and the
-//! structured artifact store, tokens, starters, and sandboxed viewers.
-//! Golden-tested against VibeValley's own functions (`gen/artifact.ts`).
+//! Unified directory-backed artifact domain helpers (`<storage>/artifact/<id>/`):
+//! directory manifest & 12-type specs, safe relative path validation, starter
+//! directory builder, and CSP-safe live presence highlight projection.
 
-pub mod html;
-pub mod markdown;
-pub mod ops;
-pub mod shell;
-pub mod spans;
-pub mod starters;
-pub mod store;
-pub mod tokens;
-pub mod viewers;
+pub mod manifest;
+pub mod path;
+pub mod starter;
 
-pub use html::{
-    HtmlCheck, HtmlRefusal, InferredArtifactName, artifact_headers, artifact_problem, artifact_suffix_of, html_check, html_edit, html_problem,
-    infer_artifact_from_name,
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "collab")]
+use crate::collab::PresencePayload;
+
+pub use manifest::{
+    ArtifactManifest, ArtifactTypeSpec, MANIFEST_SCHEMA_VERSION, TITLE_MAX_LEN, all_type_specs, default_manifest, format_directory_summary, parse_manifest,
+    serialize_manifest, title_problem, type_spec, validate_manifest,
 };
-pub use markdown::{ImportedOutline, MdBlock, blocks_of_markdown, import_outline_markdown, inline_spans, markdown_of};
-pub use ops::{Page, Revision, RevisionKind, ordered, wire};
-pub use shell::{motion_recorder_helper, shell_theme_of, with_shell};
-pub use spans::{plain, unmarked};
-pub use starters::starter_entries_for_type;
-pub use store::{
-    ArtifactEntry, ArtifactEntryKind, ArtifactEntryOp, ArtifactEntryWriteInput, ArtifactType, ENTRY_MAX_BYTES, ENTRY_MAX_COUNT, INLINE_EVENT_MAX_BYTES,
-    apply_json_merge_patch, canonical_json, entry_path_problem, format_store_summary, infer_entry_kind, infer_entry_mime,
+pub use path::{
+    ASSET_DIR, ASSET_FILE_MAX_BYTES, ArtifactPathZone, FILE_MAX_COUNT, MANIFEST_FILE, PATH_MAX_LEN, STRUCTURE_DIR, STRUCTURE_FILE_MAX_BYTES,
+    apply_json_merge_patch, canonical_json, infer_encoding, infer_mime, is_text_mime, validate_artifact_path, validate_deletable_path, validate_prefix,
 };
-pub use tokens::{ParsedColorSwatch, ParsedFamily, ParsedTokenValue, ParsedTokensSpec, ParsedTypeStyle, contrast_ratio, parse_tokens_spec};
-pub use viewers::{
-    RenderStoreOptions, StoreViewQuery, render_store_artifact_html, sanitize_whiteboard_svg, store_html_problem, store_view_headers, store_view_url,
-    write_props_into_dc_html,
-};
+pub use starter::{StarterDirectory, StarterFile, starter_directory, starter_files_for_type};
+
+/// One live collaborator highlight rendered inside a sandboxed preview without
+/// weakening CSP (`default-src 'none'; connect-src 'none'`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresenceHighlight {
+    pub id: String,
+    pub name: String,
+    pub color: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub x: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub y: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub w: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub h: Option<f64>,
+}
+
+/// Outbound command posted into a sandboxed artifact preview to render
+/// breathing highlight boxes and author badges for active presence entries.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresenceHighlightCommand {
+    pub vibevalley: &'static str,
+    pub items: Vec<PresenceHighlight>,
+}
+
+#[cfg(feature = "collab")]
+pub fn presence_highlight_from_payloads<'a>(payloads: impl IntoIterator<Item = &'a PresencePayload>) -> PresenceHighlightCommand {
+    let items = payloads
+        .into_iter()
+        .filter(|p| p.selector.is_some() || (p.x.is_some() && p.y.is_some()))
+        .map(|p| PresenceHighlight {
+            id: p.id.clone(),
+            name: p.name.clone(),
+            color: p.color.clone(),
+            selector: p.selector.clone(),
+            status: p.status.clone(),
+            x: p.x,
+            y: p.y,
+            w: p.w,
+            h: p.h,
+        })
+        .collect();
+    PresenceHighlightCommand {
+        vibevalley: "presence-highlight",
+        items,
+    }
+}
+
+/// Inline strict-CSP-safe sandbox listener that renders breathing highlight boxes
+/// and author badges when the host posts `{ vibevalley: "presence-highlight", items }`.
+pub fn presence_highlight_script() -> &'static str {
+    r##"<style>@keyframes vv-presence-pulse{0%,100%{opacity:.95;box-shadow:0 0 0 2px var(--vv-hl)}50%{opacity:.6;box-shadow:0 0 0 5px color-mix(in srgb,var(--vv-hl) 35%,transparent)}}.vv-presence-layer{position:fixed;inset:0;pointer-events:none;z-index:2147483640}.vv-presence-box{position:fixed;border:2px solid var(--vv-hl);border-radius:6px;animation:vv-presence-pulse 1.8s ease-in-out infinite;box-sizing:border-box}.vv-presence-badge{position:absolute;top:-22px;left:-2px;padding:1px 6px;border-radius:4px;background:var(--vv-hl);color:#fff;font:600 11px/16px system-ui,sans-serif;white-space:nowrap}</style><script>(()=>{let layer=null;const ensure=()=>{if(layer&&layer.isConnected)return layer;layer=document.createElement("div");layer.className="vv-presence-layer";(document.body||document.documentElement).appendChild(layer);return layer};const render=(items)=>{const root=ensure();while(root.firstChild)root.removeChild(root.firstChild);if(!Array.isArray(items))return;for(const it of items){if(!it||typeof it!=="object")continue;let rect=null;if(typeof it.selector==="string"&&it.selector){try{const el=document.querySelector(it.selector);if(el)rect=el.getBoundingClientRect()}catch{}}if(!rect&&typeof it.x==="number"&&typeof it.y==="number"){rect={left:it.x,top:it.y,width:typeof it.w==="number"?it.w:16,height:typeof it.h==="number"?it.h:16}}if(!rect||rect.width<=0||rect.height<=0)continue;const box=document.createElement("div");box.className="vv-presence-box";box.style.setProperty("--vv-hl",typeof it.color==="string"&&it.color?it.color:"#3b82f6");box.style.left=rect.left+"px";box.style.top=rect.top+"px";box.style.width=rect.width+"px";box.style.height=rect.height+"px";const badge=document.createElement("div");badge.className="vv-presence-badge";badge.textContent=it.status?String(it.name||"")+" · "+String(it.status):String(it.name||"");box.appendChild(badge);root.appendChild(box)}};addEventListener("message",(e)=>{const d=e.data;if(d&&typeof d==="object"&&d.vibevalley==="presence-highlight")render(d.items)})})();</script>"##
+}

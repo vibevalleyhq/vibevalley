@@ -110,12 +110,11 @@
     },
     "agent": "s5615",
     "artifact": {
-     "body": "blocks",
-     "display": "slides",
      "id": "s5641",
-     "note": "s5644",
      "title": "s5642",
-     "version": 5643
+     "artifactType": "docs",
+     "version": 5643,
+     "note": "s5644"
     },
     "at": 5624,
     "attachments": [
@@ -124,18 +123,6 @@
       "name": "s5633",
       "size": 5635,
       "type": "s5634"
-     }
-    ],
-    "blocks": [
-     {
-      "artifactId": "s5645",
-      "blockId": "s5646",
-      "deleted": true,
-      "nowRev": 5651,
-      "rev": 5647,
-      "text": "s5650",
-      "title": "s5648",
-      "type": "s5649"
      }
     ],
     "channel": "s5609",
@@ -300,11 +287,11 @@
       },
       "agent": "s5719",
       "artifact": {
-       "body": "blocks",
        "id": "s5743",
-       "note": "s5746",
        "title": "s5744",
-       "version": 5745
+       "artifactType": "docs",
+       "version": 5745,
+       "note": "s5746"
       },
       "at": 5727,
       "attachments": [
@@ -313,14 +300,6 @@
         "name": "s5735",
         "size": 5737,
         "type": "s5736"
-       }
-      ],
-      "blocks": [
-       {
-        "artifactId": "s5747",
-        "blockId": "s5748",
-        "rev": 5749,
-        "title": "s5750"
        }
       ],
       "channel": "s5715",
