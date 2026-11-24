@@ -5,11 +5,11 @@ use std::collections::{BTreeMap, HashSet};
 use std::fs::{self, OpenOptions};
 use std::io::Write as _;
 use std::path::{Component, Path, PathBuf};
-use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use tokio::process::Command;
 
 use crate::agent::ai::ModelClient;
 use crate::agent::core::engine::Request;
@@ -109,7 +109,7 @@ pub struct EvalRunner;
 impl EvalRunner {
     /// Executes every `(task, trial)` across profiles in balanced rotated order, streaming each
     /// finished trial to `<out_dir>/results.jsonl` and writing `<out_dir>/report.{json,md}`.
-    pub fn run<F>(&self, suite: &EvalSuite, out_dir: &Path, client_factory: F) -> Result<EvalReport>
+    pub async fn run<F>(&self, suite: &EvalSuite, out_dir: &Path, client_factory: F) -> Result<EvalReport>
     where
         F: Fn(&EvalProfile, &EvalTask, usize) -> Arc<dyn ModelClient>,
     {
@@ -157,7 +157,7 @@ impl EvalRunner {
                 for p_idx in order {
                     let profile = &suite.profiles[p_idx];
                     let client = client_factory(profile, task, trial);
-                    let record = run_single_trial(out_dir, task, profile, trial, client)?;
+                    let record = run_single_trial(out_dir, task, profile, trial, client).await?;
                     let line = serde_json::to_string(&record)?;
                     results_file
                         .write_all(line.as_bytes())
@@ -178,14 +178,14 @@ impl EvalRunner {
     }
 }
 
-fn run_single_trial(out_dir: &Path, task: &EvalTask, profile: &EvalProfile, trial: usize, client: Arc<dyn ModelClient>) -> Result<TrialRecord> {
+async fn run_single_trial(out_dir: &Path, task: &EvalTask, profile: &EvalProfile, trial: usize, client: Arc<dyn ModelClient>) -> Result<TrialRecord> {
     let trial_dir = out_dir.join("trials").join(&task.id).join(&profile.name).join(format!("trial-{trial}"));
     if trial_dir.exists() {
         fs::remove_dir_all(&trial_dir).map_err(|e| Error::Invalid(format!("clean {}: {e}", trial_dir.display())))?;
     }
     let workspace_dir = trial_dir.join("workspace");
     let store_dir = trial_dir.join("store");
-    provision_workspace(&task.workspace, &workspace_dir)?;
+    provision_workspace(&task.workspace, &workspace_dir).await?;
 
     let conv_id = format!("eval:{}:{}:{}", task.id, profile.name, trial);
     let provider = Arc::new(EvalBrainProvider::new(profile.clone(), &workspace_dir, client.clone()));
@@ -193,26 +193,28 @@ fn run_single_trial(out_dir: &Path, task: &EvalTask, profile: &EvalProfile, tria
     let sink = Arc::new(JsonlTelemetrySink::open(&telemetry_path)?);
     let harness = Harness::open_jsonl(&store_dir, provider)?.with_telemetry(sink);
     mount_profile_extensions(&harness, profile, &workspace_dir, client.clone());
-    configure_profile_budget(harness.store(), &conv_id, profile)?;
-    harness.recover()?;
+    configure_profile_budget(harness.store(), &conv_id, profile).await?;
+    harness.recover().await?;
 
     let req_id = format!("trial-{}-{}-{}", task.id, profile.name, trial);
-    let submit_res = harness.submit(Request {
-        conversation: &conv_id,
-        provider: &profile.model,
-        request_id: &req_id,
-        prompt: &task.prompt,
-        source: "eval_suite",
-        system: &profile.system_prompt,
-        when_busy: WhenBusy::Reject,
-        ..Default::default()
-    });
+    let submit_res = harness
+        .submit(Request {
+            conversation: &conv_id,
+            provider: &profile.model,
+            request_id: &req_id,
+            prompt: &task.prompt,
+            source: "eval_suite",
+            system: &profile.system_prompt,
+            when_busy: WhenBusy::Reject,
+            ..Default::default()
+        })
+        .await;
 
     let mut run_error: Option<String> = None;
     let final_output = match submit_res {
         Ok((_, task_rec, _)) => {
             let timeout = Duration::from_secs(task.timeout_secs.max(1));
-            match harness.scheduler().wait(&task_rec.id, timeout) {
+            match harness.scheduler().wait(&task_rec.id, timeout).await {
                 Ok(done) => {
                     if done.status == TaskStatus::Terminal && done.terminal_reason != "completed" {
                         run_error = Some(if done.error_text.is_empty() {
@@ -224,7 +226,7 @@ fn run_single_trial(out_dir: &Path, task: &EvalTask, profile: &EvalProfile, tria
                     done.result["output"].as_str().unwrap_or_default().to_owned()
                 }
                 Err(Error::Timeout) => {
-                    let _ = harness.scheduler().abort(&task_rec.id);
+                    let _ = harness.scheduler().abort(&task_rec.id).await;
                     run_error = Some(format!("trial timed out after {}s", timeout.as_secs()));
                     String::new()
                 }
@@ -240,20 +242,26 @@ fn run_single_trial(out_dir: &Path, task: &EvalTask, profile: &EvalProfile, tria
         }
     };
 
-    harness.close();
+    harness.close().await;
     let telemetry = read_telemetry_jsonl(&telemetry_path)?;
-    let metrics = if harness.store().read(|r| r.conversation(&conv_id)).is_ok() {
-        analyze_store(harness.store(), &conv_id, &telemetry)?
+    let conv_read = conv_id.clone();
+    let metrics = if harness
+        .store()
+        .read_async(move |r| Box::pin(async move { r.conversation_async(&conv_read).await }))
+        .await
+        .is_ok()
+    {
+        analyze_store(harness.store(), &conv_id, &telemetry).await?
     } else {
         TraceMetrics {
             conversation_id: conv_id.clone(),
             ..Default::default()
         }
     };
-    if let Ok(html) = export_html(harness.store(), &conv_id, &telemetry) {
+    if let Ok(html) = export_html(harness.store(), &conv_id, &telemetry).await {
         let _ = fs::write(trial_dir.join("transcript.html"), html);
     }
-    let _ = harness.store().close();
+    let _ = harness.store().close().await;
 
     let grader_results = evaluate_graders(
         &task.graders,
@@ -265,7 +273,8 @@ fn run_single_trial(out_dir: &Path, task: &EvalTask, profile: &EvalProfile, tria
             judge_client: Some(client),
             default_model: &profile.model,
         },
-    );
+    )
+    .await;
     let passed = run_error.is_none() && grader_results.iter().all(|g| g.passed);
 
     Ok(TrialRecord {
@@ -282,12 +291,12 @@ fn run_single_trial(out_dir: &Path, task: &EvalTask, profile: &EvalProfile, tria
     })
 }
 
-fn provision_workspace(fixture: &WorkspaceFixture, dst: &Path) -> Result<()> {
+async fn provision_workspace(fixture: &WorkspaceFixture, dst: &Path) -> Result<()> {
     match fixture {
         WorkspaceFixture::Empty { init_git } => {
             fs::create_dir_all(dst).map_err(|e| Error::Invalid(format!("create workspace {}: {e}", dst.display())))?;
             if *init_git {
-                init_git_repo(dst)?;
+                init_git_repo(dst).await?;
             }
         }
         WorkspaceFixture::InlineFiles { files, init_git } => {
@@ -300,13 +309,13 @@ fn provision_workspace(fixture: &WorkspaceFixture, dst: &Path) -> Result<()> {
                 fs::write(&target, content).map_err(|e| Error::Invalid(format!("write {}: {e}", target.display())))?;
             }
             if *init_git {
-                init_git_repo(dst)?;
+                init_git_repo(dst).await?;
             }
         }
         WorkspaceFixture::CopyDir { path, init_git } => {
             copy_dir_all(path, dst)?;
             if *init_git && !dst.join(".git").exists() {
-                init_git_repo(dst)?;
+                init_git_repo(dst).await?;
             }
         }
         WorkspaceFixture::GitCheckout { repo, rev } => {
@@ -317,7 +326,9 @@ fn provision_workspace(fixture: &WorkspaceFixture, dst: &Path) -> Result<()> {
                 .args(["-c", "advice.detachedHead=false", "clone", "--no-hardlinks"])
                 .arg(repo)
                 .arg(dst)
+                .kill_on_drop(true)
                 .output()
+                .await
                 .map_err(|e| Error::Invalid(format!("git clone: {e}")))?;
             if !clone.status.success() {
                 return Err(Error::Invalid(format!(
@@ -330,7 +341,9 @@ fn provision_workspace(fixture: &WorkspaceFixture, dst: &Path) -> Result<()> {
                 .arg("-C")
                 .arg(dst)
                 .args(["-c", "advice.detachedHead=false", "checkout", rev])
+                .kill_on_drop(true)
                 .output()
+                .await
                 .map_err(|e| Error::Invalid(format!("git checkout: {e}")))?;
             if !checkout.status.success() {
                 return Err(Error::Invalid(format!(
@@ -338,18 +351,18 @@ fn provision_workspace(fixture: &WorkspaceFixture, dst: &Path) -> Result<()> {
                     String::from_utf8_lossy(&checkout.stderr)
                 )));
             }
-            run_git(dst, &["config", "user.name", "Eval"])?;
-            run_git(dst, &["config", "user.email", "eval@local"])?;
+            run_git(dst, &["config", "user.name", "Eval"]).await?;
+            run_git(dst, &["config", "user.email", "eval@local"]).await?;
         }
     }
     Ok(())
 }
 
-fn init_git_repo(dir: &Path) -> Result<()> {
-    run_git(dir, &["init"])?;
-    run_git(dir, &["config", "user.name", "Eval"])?;
-    run_git(dir, &["config", "user.email", "eval@local"])?;
-    run_git(dir, &["add", "-A"])?;
+async fn init_git_repo(dir: &Path) -> Result<()> {
+    run_git(dir, &["init"]).await?;
+    run_git(dir, &["config", "user.name", "Eval"]).await?;
+    run_git(dir, &["config", "user.email", "eval@local"]).await?;
+    run_git(dir, &["add", "-A"]).await?;
     run_git(
         dir,
         &[
@@ -362,15 +375,18 @@ fn init_git_repo(dir: &Path) -> Result<()> {
             "-m",
             "fixture",
         ],
-    )?;
+    )
+    .await?;
     Ok(())
 }
 
-fn run_git(dir: &Path, args: &[&str]) -> Result<()> {
+async fn run_git(dir: &Path, args: &[&str]) -> Result<()> {
     let out = Command::new("git")
         .args(args)
         .current_dir(dir)
+        .kill_on_drop(true)
         .output()
+        .await
         .map_err(|e| Error::Invalid(format!("git {}: {e}", args.join(" "))))?;
     if !out.status.success() {
         return Err(Error::Invalid(format!(

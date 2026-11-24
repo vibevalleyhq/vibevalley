@@ -1129,12 +1129,12 @@ pub(crate) fn usage_of(raw: &str) -> Result<AccountUsage> {
 
 /// Runs `agy --print /usage --output-format json` in a clean temp directory with
 /// auto-update disabled and a bounded async timeout + process-group reaper.
-pub(crate) fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
+pub(crate) async fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
     let mut cmd = tokio::process::Command::new(binary);
     cmd.args(["--print", "/usage", "--output-format", "json"])
         .current_dir(std::env::temp_dir())
         .env("AGY_CLI_DISABLE_AUTO_UPDATE", "1");
-    let output = crate::rt::block_on(crate::oar::process::run_output_with_timeout(cmd, USAGE_TIMEOUT, None)).map_err(|e| {
+    let output = crate::oar::process::run_output_with_timeout(cmd, USAGE_TIMEOUT, None).await.map_err(|e| {
         if matches!(e.kind(), std::io::ErrorKind::NotFound | std::io::ErrorKind::PermissionDenied) {
             AgentError::NotAvailable(format!("cannot start {}: {e}", binary.display()))
         } else {

@@ -31,13 +31,15 @@ impl MockClient {
 }
 
 impl ModelClient for MockClient {
-    fn complete(&self, request: &ChatRequest, on: &mut dyn FnMut(Delta)) -> AiResult<Completion> {
-        self.seen.lock().unwrap().push(request.clone());
-        let next = self.replies.lock().unwrap().pop_front().expect("unexpected model call");
-        if let Some(text) = &next.message.content {
-            on(Delta::Text(text.clone()));
-        }
-        Ok(next)
+    fn complete<'a>(&'a self, request: &'a ChatRequest, on: &'a mut (dyn FnMut(Delta) + Send)) -> crate::BoxFuture<'a, AiResult<Completion>> {
+        Box::pin(async move {
+            self.seen.lock().unwrap().push(request.clone());
+            let next = self.replies.lock().unwrap().pop_front().expect("unexpected model call");
+            if let Some(text) = &next.message.content {
+                on(Delta::Text(text.clone()));
+            }
+            Ok(next)
+        })
     }
 }
 
@@ -52,8 +54,8 @@ impl Tool for ExtPingTool {
         }
     }
 
-    fn execute(&self, _args: &Value) -> ToolOutput {
-        ToolOutput::ok("pong")
+    fn execute<'a>(&'a self, _args: &'a Value) -> crate::BoxFuture<'a, ToolOutput> {
+        Box::pin(std::future::ready(ToolOutput::ok("pong")))
     }
 }
 
@@ -73,12 +75,12 @@ impl Extension for SampleExtension {
     }
 }
 
-#[test]
-fn harness_worker_prompt_fork_and_standin_recovery() -> crate::agent::durable::Result<()> {
+#[tokio::test]
+async fn harness_worker_prompt_fork_and_standin_recovery() -> crate::agent::durable::Result<()> {
     let store = Store::memory()?;
     let harness = Harness::from_store(store.clone(), Arc::new(WorkersOnly));
     harness.register_extension(Arc::new(SampleExtension));
-    harness.recover()?;
+    harness.recover().await?;
 
     let client = Arc::new(MockClient::with(vec![Completion {
         message: Message::assistant("hello worker"),
@@ -89,18 +91,20 @@ fn harness_worker_prompt_fork_and_standin_recovery() -> crate::agent::durable::R
     let conv = worker_conversation("s1");
     let events = Arc::new(Mutex::new(Vec::new()));
     let sink = events.clone();
-    harness.attach_worker(&conv, brain, Arc::new(move |ev| sink.lock().unwrap().push(ev)))?;
+    harness.attach_worker(&conv, brain, Arc::new(move |ev| sink.lock().unwrap().push(ev))).await?;
 
-    let (_, task, _) = harness.submit(Request {
-        conversation: &conv,
-        provider: "mock",
-        request_id: "req-1",
-        prompt: "hi",
-        source: "user",
-        system: "base system",
-        ..Default::default()
-    })?;
-    let done = harness.scheduler().wait(&task.id, Duration::from_secs(3))?;
+    let (_, task, _) = harness
+        .submit(Request {
+            conversation: &conv,
+            provider: "mock",
+            request_id: "req-1",
+            prompt: "hi",
+            source: "user",
+            system: "base system",
+            ..Default::default()
+        })
+        .await?;
+    let done = harness.scheduler().wait(&task.id, Duration::from_secs(3)).await?;
     assert_eq!(done.terminal_reason, "completed");
     {
         let recorded = events.lock().unwrap();
@@ -109,7 +113,7 @@ fn harness_worker_prompt_fork_and_standin_recovery() -> crate::agent::durable::R
         assert!(recorded.iter().any(|e| matches!(e, AgentEvent::AgentEnd { .. })));
     }
 
-    let entries = harness.entries(&conv)?;
+    let entries = harness.entries(&conv).await?;
     assert!(
         entries
             .iter()
@@ -117,9 +121,12 @@ fn harness_worker_prompt_fork_and_standin_recovery() -> crate::agent::durable::R
     );
 
     let fork_seq = entries.last().unwrap().seq;
-    store.write(|tx| tx.fork_conversation(&conv, "worker:s1-fork", "mock", "", fork_seq))?;
-    assert_eq!(harness.entries("worker:s1-fork")?.len(), entries.len());
-    harness.close();
+    let conv_clone = conv.clone();
+    store
+        .write_async(move |tx| Box::pin(async move { tx.fork_conversation_async(&conv_clone, "worker:s1-fork", "mock", "", fork_seq).await }))
+        .await?;
+    assert_eq!(harness.entries("worker:s1-fork").await?.len(), entries.len());
+    harness.close().await;
     drop(harness);
 
     // Reopen a fresh Harness on the SAME store WITHOUT SampleExtension registered:
@@ -130,98 +137,134 @@ fn harness_worker_prompt_fork_and_standin_recovery() -> crate::agent::durable::R
         usage: Usage::default(),
     }]));
     let harness2 = Harness::from_store(store.clone(), Arc::new(WorkersOnly));
-    harness2.recover()?;
-    harness2.attach_worker(&conv, Arc::new(Brain::new(client2.clone(), "deepseek-chat", "base system")), Arc::new(|_| {}))?;
-    let missing = harness2.reconcile_sections(&conv)?;
+    harness2.recover().await?;
+    harness2
+        .attach_worker(&conv, Arc::new(Brain::new(client2.clone(), "deepseek-chat", "base system")), Arc::new(|_| {}))
+        .await?;
+    let missing = harness2.reconcile_sections(&conv).await?;
     assert_eq!(missing.len(), 1);
     assert_eq!(missing[0].key, "ExtSection");
 
-    let (_, t2, _) = harness2.submit(Request {
-        conversation: &conv,
-        provider: "mock",
-        request_id: "req-2",
-        prompt: "follow up",
-        source: "user",
-        system: "base system",
-        when_busy: WhenBusy::Reject,
-        ..Default::default()
-    })?;
-    let d2 = harness2.scheduler().wait(&t2.id, Duration::from_secs(3))?;
+    let (_, t2, _) = harness2
+        .submit(Request {
+            conversation: &conv,
+            provider: "mock",
+            request_id: "req-2",
+            prompt: "follow up",
+            source: "user",
+            system: "base system",
+            when_busy: WhenBusy::Reject,
+            ..Default::default()
+        })
+        .await?;
+    let d2 = harness2.scheduler().wait(&t2.id, Duration::from_secs(3)).await?;
     assert_eq!(d2.result["output"], "resumed without ext");
-    let seen = client2.seen.lock().unwrap();
-    assert!(seen[0].tools.iter().any(|t| t.name == "ext_ping"));
+    {
+        let seen = client2.seen.lock().unwrap();
+        assert!(seen[0].tools.iter().any(|t| t.name == "ext_ping"));
+    }
 
-    let stub_recovery = store.read(|r| StandIn::reconcile(r, &conv, &[], &[]))?;
+    let conv_clone2 = conv.clone();
+    let stub_recovery = store
+        .read_async(move |r| Box::pin(async move { StandIn::reconcile(r, &conv_clone2, &[], &[]).await }))
+        .await?;
     assert_eq!(stub_recovery.stub_tools.len(), 1);
-    let stub_out = stub_recovery.stub_tools[0].execute(&json!({}));
+    let stub_out = stub_recovery.stub_tools[0].execute(&json!({})).await;
     assert!(stub_out.is_error);
     assert!(stub_out.text.contains("ext_ping"));
     Ok(())
 }
 
-#[test]
-fn harness_abort_cancels_active_generation_and_settles_unanswered() -> crate::agent::durable::Result<()> {
+#[tokio::test]
+async fn harness_abort_cancels_active_generation_and_settles_unanswered() -> crate::agent::durable::Result<()> {
     let store = Store::memory()?;
     let harness = Harness::workers_only(store.clone());
-    harness.recover()?;
+    harness.recover().await?;
 
-    struct SlowClient(flume::Sender<()>, flume::Receiver<()>);
+    struct SlowClient(
+        tokio::sync::mpsc::UnboundedSender<()>,
+        tokio::sync::Mutex<tokio::sync::mpsc::UnboundedReceiver<()>>,
+    );
     impl ModelClient for SlowClient {
-        fn complete(&self, _req: &ChatRequest, _on: &mut dyn FnMut(Delta)) -> AiResult<Completion> {
-            let _ = self.0.send(());
-            let _ = self.1.recv_timeout(Duration::from_secs(5));
-            Ok(Completion {
-                message: Message::assistant("never"),
-                finish: FinishReason::Stop,
-                usage: Usage::default(),
+        fn complete<'a>(&'a self, _req: &'a ChatRequest, _on: &'a mut (dyn FnMut(Delta) + Send)) -> crate::BoxFuture<'a, AiResult<Completion>> {
+            Box::pin(async move {
+                let _ = self.0.send(());
+                let mut rx = self.1.lock().await;
+                let _ = tokio::time::timeout(Duration::from_secs(5), rx.recv()).await;
+                Ok(Completion {
+                    message: Message::assistant("never"),
+                    finish: FinishReason::Stop,
+                    usage: Usage::default(),
+                })
             })
         }
 
-        fn complete_cancellable(&self, _req: &ChatRequest, cancel: &crate::agent::ai::CancelToken, _on: &mut dyn FnMut(Delta)) -> AiResult<Completion> {
-            let _ = self.0.send(());
-            if let Some(rx) = cancel.receiver() {
-                let _ = flume::Selector::new()
-                    .recv(rx, |_| ())
-                    .recv(&self.1, |_| ())
-                    .wait_timeout(Duration::from_secs(5));
-            }
-            if cancel.is_cancelled() {
-                return Err(crate::agent::BrainError::Cancelled);
-            }
-            Ok(Completion {
-                message: Message::assistant("never"),
-                finish: FinishReason::Stop,
-                usage: Usage::default(),
+        fn complete_cancellable<'a>(
+            &'a self,
+            _req: &'a ChatRequest,
+            cancel: &'a crate::agent::ai::CancelToken,
+            _on: &'a mut (dyn FnMut(Delta) + Send),
+        ) -> crate::BoxFuture<'a, AiResult<Completion>> {
+            Box::pin(async move {
+                let _ = self.0.send(());
+                let mut rx = self.1.lock().await;
+                tokio::select! {
+                    _ = cancel.cancelled() => {}
+                    _ = tokio::time::timeout(Duration::from_secs(5), rx.recv()) => {}
+                }
+                if cancel.is_cancelled() {
+                    return Err(crate::agent::BrainError::Cancelled);
+                }
+                Ok(Completion {
+                    message: Message::assistant("never"),
+                    finish: FinishReason::Stop,
+                    usage: Usage::default(),
+                })
             })
         }
     }
 
-    let (started_tx, started_rx) = flume::bounded(1);
-    let (_hold_tx, hold_rx) = flume::bounded(1);
+    let (started_tx, mut started_rx) = tokio::sync::mpsc::unbounded_channel();
+    let (_hold_tx, hold_rx) = tokio::sync::mpsc::unbounded_channel();
     let conv = worker_conversation("abortable");
-    harness.attach_worker(
-        &conv,
-        Arc::new(Brain::new(Arc::new(SlowClient(started_tx, hold_rx)), "deepseek-chat", "sys")),
-        Arc::new(|_| {}),
-    )?;
+    harness
+        .attach_worker(
+            &conv,
+            Arc::new(Brain::new(
+                Arc::new(SlowClient(started_tx, tokio::sync::Mutex::new(hold_rx))),
+                "deepseek-chat",
+                "sys",
+            )),
+            Arc::new(|_| {}),
+        )
+        .await?;
 
-    let (sub, task, _) = harness.submit(Request {
-        conversation: &conv,
-        provider: "mock",
-        request_id: "req-abort",
-        prompt: "hang",
-        source: "user",
-        system: "sys",
-        ..Default::default()
-    })?;
-    started_rx.recv_timeout(Duration::from_secs(2)).expect("model started");
+    let (sub, task, _) = harness
+        .submit(Request {
+            conversation: &conv,
+            provider: "mock",
+            request_id: "req-abort",
+            prompt: "hang",
+            source: "user",
+            system: "sys",
+            ..Default::default()
+        })
+        .await?;
+    tokio::time::timeout(Duration::from_secs(2), started_rx.recv())
+        .await
+        .expect("model started")
+        .expect("sender alive");
 
-    let aborted = harness.abort_conversation(&conv)?;
+    let aborted = harness.abort_conversation(&conv).await?;
     assert_eq!(aborted, vec![task.id.clone()]);
-    let terminal = harness.scheduler().wait(&task.id, Duration::from_secs(2))?;
+    let terminal = harness.scheduler().wait(&task.id, Duration::from_secs(2)).await?;
     assert_eq!(terminal.terminal_reason, "aborted");
+    let sub_id = sub.id.clone();
     assert_eq!(
-        store.read(|r| r.submission(&sub.id))?.status,
+        store
+            .read_async(move |r| Box::pin(async move { r.submission_async(&sub_id).await }))
+            .await?
+            .status,
         crate::agent::durable::SubmissionStatus::Unanswered
     );
     Ok(())

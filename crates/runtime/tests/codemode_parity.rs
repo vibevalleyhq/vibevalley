@@ -23,26 +23,29 @@ fn task(spec: CodeModeSpec) -> Task {
     t.checkpoint = serde_json::to_value(spec).unwrap();
     t
 }
-fn run(s: &Scheduler, spec: CodeModeSpec) -> Task {
-    let (t, _) = s.start(task(spec)).unwrap();
-    s.wait(&t.id, Duration::from_secs(5)).unwrap()
+async fn run(s: &Scheduler, spec: CodeModeSpec) -> Task {
+    let (t, _) = s.start(task(spec)).await.unwrap();
+    s.wait(&t.id, Duration::from_secs(5)).await.unwrap()
 }
 fn done(t: Task) -> CodeModeResult {
     assert_eq!(t.terminal_reason, "completed", "{}", t.error_text);
     serde_json::from_value(t.result).unwrap()
 }
 
-#[test]
-fn seeded_clock_and_random_advance_deterministically_over_replayed_calls() -> Result<()> {
+#[tokio::test]
+async fn seeded_clock_and_random_advance_deterministically_over_replayed_calls() -> Result<()> {
     let s = Scheduler::new(Store::memory()?, 2);
     let count = Arc::new(AtomicUsize::new(0));
     let calls = count.clone();
     register(&s, move |_, name, args| {
-        calls.fetch_add(1, Ordering::Relaxed);
-        Ok(match name {
-            "values" => json!({"items":[1,2,3]}),
-            _ => args,
-        })
+        let calls = calls.clone();
+        async move {
+            calls.fetch_add(1, Ordering::Relaxed);
+            Ok(match name.as_str() {
+                "values" => json!({"items":[1,2,3]}),
+                _ => args,
+            })
+        }
     });
     let spec = make(
         r#"
@@ -54,7 +57,7 @@ fn seeded_clock_and_random_advance_deterministically_over_replayed_calls() -> Re
         return {v,t0,t1:new Date().getTime(),t2:Date.now(),r0,r1};
     "#,
     );
-    let r = done(run(&s, spec.clone()));
+    let r = done(run(&s, spec.clone()).await);
     assert_eq!(r.value["v"], json!({"sum":12,"label":"t=1700000000003"}));
     assert_eq!(r.value["t0"], "2023-11-14T22:13:20.000Z");
     assert_eq!(r.value["t1"], r.value["t2"]);
@@ -64,77 +67,88 @@ fn seeded_clock_and_random_advance_deterministically_over_replayed_calls() -> Re
     assert_eq!(r.replayed_calls, 2);
     assert_eq!(r.replayed_sleeps, 2);
     assert!(r.executed_steps > 5);
-    assert_eq!(done(run(&s, spec)).value, r.value);
+    assert_eq!(done(run(&s, spec).await).value, r.value);
     assert_eq!(count.load(Ordering::Relaxed), 4);
     Ok(())
 }
 
-#[test]
-fn interrupted_tool_recovers_without_repeating_completed_sibling_or_sleep() -> Result<()> {
+#[tokio::test]
+async fn interrupted_tool_recovers_without_repeating_completed_sibling_or_sleep() -> Result<()> {
     let dir = tempdir().unwrap();
     let path = dir.path().join("server.db");
-    let store = Store::open(&path)?;
+    let store = Store::open(&path).await?;
     let sched = Scheduler::new(store.clone(), 2);
-    let (entered, wait) = flume::bounded(1);
+    let (entered, mut wait) = tokio::sync::mpsc::unbounded_channel();
     let completed = Arc::new(AtomicUsize::new(0));
     let first = completed.clone();
     register(&sched, move |ctx, name, _| {
-        if name == "first" {
-            first.fetch_add(1, Ordering::Relaxed);
-            Ok(json!("product"))
-        } else {
-            entered.send(()).unwrap();
-            let _ = ctx.cancellation().recv_timeout(Duration::from_secs(10));
-            Err(Error::Invalid("interrupted".into()))
+        let first = first.clone();
+        let entered = entered.clone();
+        async move {
+            if name == "first" {
+                first.fetch_add(1, Ordering::Relaxed);
+                Ok(json!("product"))
+            } else {
+                entered.send(()).unwrap();
+                let _ = tokio::time::timeout(Duration::from_secs(10), ctx.cancel_token().cancelled()).await;
+                Err(Error::Invalid("interrupted".into()))
+            }
         }
     });
-    let (t, _) = sched.start(task(make("const a=call('first'); sleep(1); return call('second', {a});")))?;
-    wait.recv_timeout(Duration::from_secs(5)).unwrap();
-    sched.close();
-    store.close()?;
-    let fresh = Store::open(&path)?;
+    let (t, _) = sched.start(task(make("const a=call('first'); sleep(1); return call('second', {a});"))).await?;
+    tokio::time::timeout(Duration::from_secs(5), wait.recv()).await.unwrap().unwrap();
+    sched.close().await;
+    store.close().await?;
+    let fresh = Store::open(&path).await?;
     let sched = Scheduler::new(fresh.clone(), 2);
-    register(&sched, |_, name, args| {
+    register(&sched, |_, name, args| async move {
         assert_eq!(name, "second");
         Ok(args)
     });
-    sched.recover()?;
-    let r = done(sched.wait(&t.id, Duration::from_secs(5))?);
+    sched.recover().await?;
+    let r = done(sched.wait(&t.id, Duration::from_secs(5)).await?);
     assert_eq!(r.value, json!({"a":"product"}));
     assert_eq!(r.replayed_calls, 2);
     assert_eq!(r.replayed_sleeps, 1);
     assert_eq!(completed.load(Ordering::Relaxed), 1);
-    assert_eq!(fresh.read(|r| r.children(&t.id))?.len(), 2);
+    let tid = t.id.clone();
+    assert_eq!(fresh.read_async(move |r| Box::pin(async move { r.children_async(&tid).await })).await?.len(), 2);
     Ok(())
 }
 
-#[test]
-fn catchable_tool_failure_preserves_the_original_error() -> Result<()> {
+#[tokio::test]
+async fn catchable_tool_failure_preserves_the_original_error() -> Result<()> {
     let s = Scheduler::new(Store::memory()?, 1);
     let calls = Arc::new(AtomicUsize::new(0));
     let n = calls.clone();
     register(&s, move |_, name, args| {
-        n.fetch_add(1, Ordering::Relaxed);
-        if name == "flaky" {
-            Err(Error::Invalid("empty harvest".into()))
-        } else {
-            Ok(args)
+        let n = n.clone();
+        async move {
+            n.fetch_add(1, Ordering::Relaxed);
+            if name == "flaky" {
+                Err(Error::Invalid("empty harvest".into()))
+            } else {
+                Ok(args)
+            }
         }
     });
-    let result = done(run(
-        &s,
-        make("let caught=''; try{vibe.call('flaky');}catch(e){caught=e.message;} sleep(0); return callTool('ok',{caught});"),
-    ));
+    let result = done(
+        run(
+            &s,
+            make("let caught=''; try{vibe.call('flaky');}catch(e){caught=e.message;} sleep(0); return callTool('ok',{caught});"),
+        )
+        .await,
+    );
     assert!(result.value["caught"].as_str().unwrap().contains("empty harvest"));
     assert_eq!(result.replayed_calls, 2);
     assert_eq!(calls.load(Ordering::Relaxed), 2);
     Ok(())
 }
 
-#[test]
-fn metering_bounds_memory_strings_results_recursion_and_dynamic_code() -> Result<()> {
+#[tokio::test]
+async fn metering_bounds_memory_strings_results_recursion_and_dynamic_code() -> Result<()> {
     let s = Scheduler::new(Store::memory()?, 1);
-    register(&s, |_, _, _| Ok(Value::Null));
+    register(&s, |_, _, _| async { Ok(Value::Null) });
     for (source, changes, expected) in [
         ("while(true){}", json!({"maxSteps":30}), "step quota"),
         ("while(true);", json!({"maxSteps":30}), "step quota"),
@@ -168,57 +182,60 @@ fn metering_bounds_memory_strings_results_recursion_and_dynamic_code() -> Result
         for (k, v) in changes.as_object().unwrap() {
             spec[k] = v.clone();
         }
-        let t = run(&s, serde_json::from_value(spec)?);
+        let t = run(&s, serde_json::from_value(spec)?).await;
         assert_eq!(t.terminal_reason, "failed", "{source}: {:?}", t.result);
         assert!(t.error_text.to_lowercase().contains(expected), "{source}: {}", t.error_text);
     }
     Ok(())
 }
 
-#[test]
-fn go_replay_fixtures_match_results_clocks_random_and_instruction_counts() -> Result<()> {
+#[tokio::test]
+async fn go_replay_fixtures_match_results_clocks_random_and_instruction_counts() -> Result<()> {
     let store = Store::memory()?;
     let sched = Scheduler::new(store, 2);
-    register(&sched, |_, _, args| Ok(args));
+    register(&sched, |_, _, args| async move { Ok(args) });
     let rows: Vec<Value> = serde_json::from_str(include_str!("fixtures/go-script-results.json"))?;
     for case in rows {
         let mut spec = make(case["script"].as_str().unwrap());
         spec.start_time_ms = 1750000000000;
-        let task = run(&sched, spec);
+        let task = run(&sched, spec).await;
         assert_eq!(task.terminal_reason, case["reason"], "{}", task.error_text);
         assert_eq!(task.result, case["result"], "script {}", case["script"]);
     }
     Ok(())
 }
 
-#[test]
-fn parked_tool_retains_conversation_identity_and_resumes_on_approval() -> Result<()> {
+#[tokio::test]
+async fn parked_tool_retains_conversation_identity_and_resumes_on_approval() -> Result<()> {
     use vibevalley_runtime::agent::codemode::{RUN, register_with};
     use vibevalley_runtime::agent::durable::Transition;
     let store = Store::memory()?;
     let scheduler = Scheduler::new(store.clone(), 1);
-    let (tx, rx) = flume::bounded(1);
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     register_with(&scheduler, move |ctx, name, value| {
-        assert!(!ctx.task.is_model_task);
-        assert_eq!(ctx.task.conversation_id, "conv");
-        assert_eq!(name, "remember");
-        if ctx.signal.is_none() {
-            tx.send(ctx.task.id.clone()).unwrap();
-            return Ok(Transition::Sleep {
-                phase: RUN.into(),
-                checkpoint: None,
-                until_ms: None,
-                signal: Some("approved".into()),
-            });
+        let tx = tx.clone();
+        async move {
+            assert!(!ctx.task.is_model_task);
+            assert_eq!(ctx.task.conversation_id, "conv");
+            assert_eq!(name, "remember");
+            if ctx.signal.is_none() {
+                tx.send(ctx.task.id.clone()).unwrap();
+                return Ok(Transition::Sleep {
+                    phase: RUN.into(),
+                    checkpoint: None,
+                    until_ms: None,
+                    signal: Some("approved".into()),
+                });
+            }
+            assert_eq!(ctx.signal.as_ref().unwrap().payload, json!("ok"));
+            Ok(Transition::Complete(value))
         }
-        assert_eq!(ctx.signal.as_ref().unwrap().payload, json!("ok"));
-        Ok(Transition::Complete(value))
     });
     let mut t = task(make("return vibe.call('remember',{value:'keep'})"));
     t.conversation_id = "conv".into();
-    let (parent, _) = scheduler.start(t)?;
-    let child = rx.recv_timeout(Duration::from_secs(5)).unwrap();
-    scheduler.send_signal(&child, "approved", Some("one"), &json!("ok"))?;
-    assert_eq!(done(scheduler.wait(&parent.id, Duration::from_secs(5))?).value, json!({"value":"keep"}));
+    let (parent, _) = scheduler.start(t).await?;
+    let child = tokio::time::timeout(Duration::from_secs(5), rx.recv()).await.unwrap().unwrap();
+    scheduler.send_signal(&child, "approved", Some("one"), &json!("ok")).await?;
+    assert_eq!(done(scheduler.wait(&parent.id, Duration::from_secs(5)).await?).value, json!({"value":"keep"}));
     Ok(())
 }

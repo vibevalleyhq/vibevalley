@@ -40,28 +40,33 @@ pub struct TraceMetrics {
 }
 
 /// Picks an explicit conversation ID, or the first top-level non-grader conversation in the store.
-pub fn resolve_root_conversation(store: &Store, conv_id: Option<&str>) -> Result<String> {
-    store.read(|r| {
-        if let Some(id) = conv_id {
-            r.conversation(id)?;
-            return Ok(id.to_owned());
-        }
-        let convs = r.conversations()?;
-        if let Some(root) = convs.iter().find(|c| c.owner_task_id.is_empty() && !c.id.contains(":grader:")) {
-            return Ok(root.id.clone());
-        }
-        convs
-            .into_iter()
-            .next()
-            .map(|c| c.id)
-            .ok_or_else(|| Error::Missing("no conversations found".into()))
-    })
+pub async fn resolve_root_conversation(store: &Store, conv_id: Option<&str>) -> Result<String> {
+    let conv_id = conv_id.map(str::to_owned);
+    store
+        .read_async(move |r| {
+            Box::pin(async move {
+                if let Some(id) = conv_id {
+                    r.conversation_async(&id).await?;
+                    return Ok(id);
+                }
+                let convs = r.conversations_async().await?;
+                if let Some(root) = convs.iter().find(|c| c.owner_task_id.is_empty() && !c.id.contains(":grader:")) {
+                    return Ok(root.id.clone());
+                }
+                convs
+                    .into_iter()
+                    .next()
+                    .map(|c| c.id)
+                    .ok_or_else(|| Error::Missing("no conversations found".into()))
+            })
+        })
+        .await
 }
 
 /// Computes trajectory, usage, task-graph, and telemetry metrics from an open `Store`.
-pub fn analyze_store(store: &Store, conv_id: &str, telemetry: &[TelemetryEvent]) -> Result<TraceMetrics> {
-    let entries = collect_full_entries(store, conv_id)?;
-    let graph = store.task_graph(Some(conv_id))?;
+pub async fn analyze_store(store: &Store, conv_id: &str, telemetry: &[TelemetryEvent]) -> Result<TraceMetrics> {
+    let entries = collect_full_entries(store, conv_id).await?;
+    let graph = store.task_graph(Some(conv_id)).await?;
 
     let mut conv_ids = HashSet::from([conv_id.to_owned()]);
     let mut subagent_convs = HashSet::new();
@@ -95,19 +100,26 @@ pub fn analyze_store(store: &Store, conv_id: &str, telemetry: &[TelemetryEvent])
         }
     }
 
-    let (usage, gov) = store.read(|r| {
-        let mut total = UsageTotals::default();
-        for cid in &conv_ids {
-            let u = read_doc::<UsageDoc>(r, CONVERSATION_SCOPE, cid)?;
-            total.add(u);
-        }
-        for tid in &task_ids {
-            let u = read_doc::<UsageDoc>(r, crate::agent::core::doc::TASK_SCOPE, tid)?;
-            total.add(u);
-        }
-        let gov = read_doc::<GovernanceDoc>(r, CONVERSATION_SCOPE, conv_id)?;
-        Ok((total, gov))
-    })?;
+    let conv_ids_read = conv_ids.clone();
+    let task_ids_read = task_ids.clone();
+    let conv_id_read = conv_id.to_owned();
+    let (usage, gov) = store
+        .read_async(move |r| {
+            Box::pin(async move {
+                let mut total = UsageTotals::default();
+                for cid in &conv_ids_read {
+                    let u = read_doc::<UsageDoc>(r, CONVERSATION_SCOPE, cid).await?;
+                    total.add(u);
+                }
+                for tid in &task_ids_read {
+                    let u = read_doc::<UsageDoc>(r, crate::agent::core::doc::TASK_SCOPE, tid).await?;
+                    total.add(u);
+                }
+                let gov = read_doc::<GovernanceDoc>(r, CONVERSATION_SCOPE, &conv_id_read).await?;
+                Ok((total, gov))
+            })
+        })
+        .await?;
 
     let mut turns = 0usize;
     let mut user_messages = 0usize;
@@ -236,23 +248,23 @@ pub fn analyze_store(store: &Store, conv_id: &str, telemetry: &[TelemetryEvent])
 }
 
 /// Opens any SQLite database file or JSONL directory in read-only mode and analyzes it.
-pub fn analyze_path(path: &Path, conv_id: Option<&str>) -> Result<TraceMetrics> {
-    let store = Store::open_any_read_only(path)?;
-    let conv = resolve_root_conversation(&store, conv_id)?;
+pub async fn analyze_path(path: &Path, conv_id: Option<&str>) -> Result<TraceMetrics> {
+    let store = Store::open_any_read_only(path).await?;
+    let conv = resolve_root_conversation(&store, conv_id).await?;
     let telemetry = if path.is_dir() {
         read_telemetry_jsonl(&path.join("telemetry.jsonl"))?
     } else {
         Vec::new()
     };
-    let metrics = analyze_store(&store, &conv, &telemetry)?;
-    let _ = store.close();
+    let metrics = analyze_store(&store, &conv, &telemetry).await?;
+    let _ = store.close().await;
     Ok(metrics)
 }
 
 /// Renders a compact terminal-friendly line-by-line timeline for quick human inspection.
-pub fn render_timeline(store: &Store, conv_id: &str) -> Result<String> {
-    let entries = collect_full_entries(store, conv_id)?;
-    let graph = store.task_graph(Some(conv_id))?;
+pub async fn render_timeline(store: &Store, conv_id: &str) -> Result<String> {
+    let entries = collect_full_entries(store, conv_id).await?;
+    let graph = store.task_graph(Some(conv_id)).await?;
     let mut out = String::new();
     let _ = writeln!(out, "Conversation: {conv_id} ({} entries, {} tasks)", entries.len(), graph.nodes.len());
     for entry in &entries {
@@ -328,10 +340,10 @@ pub fn render_timeline(store: &Store, conv_id: &str) -> Result<String> {
 }
 
 /// Generates a self-contained offline HTML inspection report (`eval inspect --html`).
-pub fn export_html(store: &Store, conv_id: &str, telemetry: &[TelemetryEvent]) -> Result<String> {
-    let entries = collect_full_entries(store, conv_id)?;
-    let graph = store.task_graph(Some(conv_id))?;
-    let metrics = analyze_store(store, conv_id, telemetry)?;
+pub async fn export_html(store: &Store, conv_id: &str, telemetry: &[TelemetryEvent]) -> Result<String> {
+    let entries = collect_full_entries(store, conv_id).await?;
+    let graph = store.task_graph(Some(conv_id)).await?;
+    let metrics = analyze_store(store, conv_id, telemetry).await?;
 
     let mut html = String::with_capacity(4096);
     html.push_str("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">");
@@ -426,30 +438,35 @@ fn push_card(html: &mut String, label: &str, value: &str) {
     );
 }
 
-fn collect_full_entries(store: &Store, conv_id: &str) -> Result<Vec<Entry>> {
-    store.read(|r| {
-        let mut current = r.conversation(conv_id)?;
-        let mut limit = current.next_seq - 1;
-        let mut segments = Vec::new();
-        let mut seen = HashSet::new();
-        loop {
-            if !seen.insert(current.id.clone()) {
-                return Err(Error::Invalid("conversation fork cycle".into()));
-            }
-            let seg = if limit >= 1 {
-                r.ops.entries_within(&current.id, 1, limit)?
-            } else {
-                Vec::new()
-            };
-            segments.push(seg);
-            if current.parent_id.is_empty() {
-                break;
-            }
-            limit = limit.min(current.fork_entry_seq);
-            current = r.conversation(&current.parent_id)?;
-        }
-        Ok(segments.into_iter().rev().flatten().collect())
-    })
+async fn collect_full_entries(store: &Store, conv_id: &str) -> Result<Vec<Entry>> {
+    let conv_id = conv_id.to_owned();
+    store
+        .read_async(move |r| {
+            Box::pin(async move {
+                let mut current = r.conversation_async(&conv_id).await?;
+                let mut limit = current.next_seq - 1;
+                let mut segments = Vec::new();
+                let mut seen = HashSet::new();
+                loop {
+                    if !seen.insert(current.id.clone()) {
+                        return Err(Error::Invalid("conversation fork cycle".into()));
+                    }
+                    let seg = if limit >= 1 {
+                        r.ops.entries_within_async(&current.id, 1, limit).await?
+                    } else {
+                        Vec::new()
+                    };
+                    segments.push(seg);
+                    if current.parent_id.is_empty() {
+                        break;
+                    }
+                    limit = limit.min(current.fork_entry_seq);
+                    current = r.conversation_async(&current.parent_id).await?;
+                }
+                Ok(segments.into_iter().rev().flatten().collect())
+            })
+        })
+        .await
 }
 
 fn canonical_call_args(call: &Value) -> String {

@@ -40,12 +40,14 @@ impl ScriptedClient {
 }
 
 impl ModelClient for ScriptedClient {
-    fn complete(&self, _req: &ChatRequest, on: &mut dyn FnMut(Delta)) -> AiResult<Completion> {
-        let next = self.replies.lock().unwrap().pop_front().expect("scripted completion");
-        if let Some(text) = &next.message.content {
-            on(Delta::Text(text.clone()));
-        }
-        Ok(next)
+    fn complete<'a>(&'a self, _req: &'a ChatRequest, on: &'a mut (dyn FnMut(Delta) + Send)) -> vibevalley_runtime::BoxFuture<'a, AiResult<Completion>> {
+        Box::pin(async move {
+            let next = self.replies.lock().unwrap().pop_front().expect("scripted completion");
+            if let Some(text) = &next.message.content {
+                on(Delta::Text(text.clone()));
+            }
+            Ok(next)
+        })
     }
 }
 
@@ -56,11 +58,13 @@ struct OpenBrain {
 }
 
 impl BrainProvider for OpenBrain {
-    fn resolve_brain(&self, _conv: &str, provider: &str) -> DurableResult<Option<Arc<Brain>>> {
-        let mut b = Brain::new(self.client.clone(), if provider.is_empty() { "deepseek-flash" } else { provider }, "System");
-        b.cwd = self.cwd.clone();
-        b.tools = (self.tools_fn)();
-        Ok(Some(Arc::new(b)))
+    fn resolve_brain<'a>(&'a self, _conv: &'a str, provider: &'a str) -> vibevalley_runtime::BoxFuture<'a, DurableResult<Option<Arc<Brain>>>> {
+        Box::pin(async move {
+            let mut b = Brain::new(self.client.clone(), if provider.is_empty() { "deepseek-flash" } else { provider }, "System");
+            b.cwd = self.cwd.clone();
+            b.tools = (self.tools_fn)();
+            Ok(Some(Arc::new(b)))
+        })
     }
 }
 
@@ -82,8 +86,8 @@ fn msg(text: Option<&str>, calls: Vec<ToolCall>) -> Completion {
     }
 }
 
-#[test]
-fn telemetry_emits_pi_durable_schema_without_raw_payloads_and_skips_rolled_back_tx() -> DurableResult<()> {
+#[tokio::test]
+async fn telemetry_emits_pi_durable_schema_without_raw_payloads_and_skips_rolled_back_tx() -> DurableResult<()> {
     let dir = tempdir().unwrap();
     let work = tempdir().unwrap();
     fs::write(work.path().join("note.txt"), "SECRET_FILE_BODY").unwrap();
@@ -125,27 +129,33 @@ fn telemetry_emits_pi_durable_schema_without_raw_payloads_and_skips_rolled_back_
         }),
     )
     .with_telemetry(fanout);
-    harness.recover()?;
+    harness.recover().await?;
 
     let conv = "tel-conv-1";
-    let (_, task, _) = harness.submit(Request {
-        conversation: conv,
-        provider: "deepseek-flash",
-        request_id: "req-tel-1",
-        prompt: "SECRET_PROMPT_MARKER",
-        source: "user",
-        system: "SECRET_SYSTEM_MARKER",
-        ..Default::default()
-    })?;
-    let done = harness.scheduler().wait(&task.id, WAIT)?;
+    let (_, task, _) = harness
+        .submit(Request {
+            conversation: conv,
+            provider: "deepseek-flash",
+            request_id: "req-tel-1",
+            prompt: "SECRET_PROMPT_MARKER",
+            source: "user",
+            system: "SECRET_SYSTEM_MARKER",
+            ..Default::default()
+        })
+        .await?;
+    let done = harness.scheduler().wait(&task.id, WAIT).await?;
     assert_eq!(done.terminal_reason, "completed");
-    harness.close();
+    harness.close().await;
 
     let count_before_rollback = mem_sink.events().len();
-    let err = store.write(|tx| {
-        tx.append_entry(conv, "pi.user", &json!({ "text": "rolled back" }))?;
-        Err::<(), _>(vibevalley_runtime::agent::durable::Error::Invalid("boom".into()))
-    });
+    let err = store
+        .write_async(|tx| {
+            Box::pin(async move {
+                tx.append_entry_async(conv, "pi.user", &json!({ "text": "rolled back" })).await?;
+                Err::<(), _>(vibevalley_runtime::agent::durable::Error::Invalid("boom".into()))
+            })
+        })
+        .await;
     assert!(err.is_err());
     assert_eq!(mem_sink.events().len(), count_before_rollback);
 
@@ -175,12 +185,12 @@ fn telemetry_emits_pi_durable_schema_without_raw_payloads_and_skips_rolled_back_
     let parsed = read_telemetry_jsonl(&telemetry_path)?;
     assert_eq!(parsed.len(), events.len());
 
-    store.close()?;
+    store.close().await?;
     Ok(())
 }
 
-#[test]
-fn task_graph_captures_parent_child_and_owned_subagent_conversations() -> DurableResult<()> {
+#[tokio::test]
+async fn task_graph_captures_parent_child_and_owned_subagent_conversations() -> DurableResult<()> {
     let work = tempdir().unwrap();
     let client = ScriptedClient::new(vec![
         msg(
@@ -205,22 +215,24 @@ fn task_graph_captures_parent_child_and_owned_subagent_conversations() -> Durabl
         }),
     );
     harness.register_extension(Arc::new(SubagentExtension::default()));
-    harness.recover()?;
+    harness.recover().await?;
 
     let conv = "conv-graph-root";
-    let (_, task, _) = harness.submit(Request {
-        conversation: conv,
-        provider: "deepseek-flash",
-        request_id: "req-graph",
-        prompt: "delegate work",
-        source: "user",
-        system: "sys",
-        ..Default::default()
-    })?;
-    let done = harness.scheduler().wait(&task.id, WAIT)?;
+    let (_, task, _) = harness
+        .submit(Request {
+            conversation: conv,
+            provider: "deepseek-flash",
+            request_id: "req-graph",
+            prompt: "delegate work",
+            source: "user",
+            system: "sys",
+            ..Default::default()
+        })
+        .await?;
+    let done = harness.scheduler().wait(&task.id, WAIT).await?;
     assert_eq!(done.terminal_reason, "completed");
 
-    let graph = harness.task_graph(Some(conv))?;
+    let graph = harness.task_graph(Some(conv)).await?;
     assert!(graph.nodes.len() >= 3, "expected parent + tool + child generation: {:?}", graph.nodes);
     let root_node = graph.nodes.iter().find(|n| n.id == task.id).unwrap();
     assert!(!root_node.background);
@@ -236,215 +248,250 @@ fn task_graph_captures_parent_child_and_owned_subagent_conversations() -> Durabl
     assert_eq!(child_gen.kind, "pi.generation");
     assert_eq!(child_gen.owner_task_id, tool_node.id);
 
-    harness.close();
-    harness.store().close()?;
+    harness.close().await;
+    harness.store().close().await?;
     Ok(())
 }
 
-#[test]
-fn sqlite_to_jsonl_export_preserves_full_closure_and_at_seq_slice() -> DurableResult<()> {
+#[tokio::test]
+async fn sqlite_to_jsonl_export_preserves_full_closure_and_at_seq_slice() -> DurableResult<()> {
     let dir = tempdir().unwrap();
     let db_path = dir.path().join("execution.db");
     let full_dir = dir.path().join("full-jsonl");
     let slice_dir = dir.path().join("slice-jsonl");
 
-    let writer = Store::open(&db_path)?;
+    let writer = Store::open(&db_path).await?;
     // Open read-only against active WAL writer cleanly.
-    let reader = Store::open_read_only(&db_path)?;
+    let reader = Store::open_read_only(&db_path).await?;
     assert!(reader.is_read_only());
-    assert!(reader.write(|tx| tx.create_conversation("nope", "m")).is_err());
+    assert!(
+        reader
+            .write_async(|tx| Box::pin(async move { tx.create_conversation_async("nope", "m").await }))
+            .await
+            .is_err()
+    );
 
-    writer.write(|tx| {
-        tx.create_conversation("anc", "deepseek-flash")?;
-        tx.append_entry("anc", "pi.user", &json!({ "text": "ancestor turn" }))?;
-        tx.append_entry("anc", "pi.assistant", &json!({ "text": "ancestor reply" }))?;
-        tx.fork_conversation("anc", "leaf", "", "deepseek-flash", 2)?;
-        tx.append_entry("leaf", "pi.user", &json!({ "text": "leaf ask" }))?;
-        tx.append_entry("leaf", "pi.assistant", &json!({ "text": "leaf answer" }))?;
-        tx.compact(
-            "leaf",
-            Compaction {
-                level: "hard",
-                base_head: 1,
-                from: 1,
-                cut: 3,
-                summary: "sum 1..3",
-                token_count: 42,
-            },
-        )?;
-        tx.put_document(CONVERSATION_SCOPE, "leaf", "pi.verdict", &json!({ "satisfied": true }))?;
-        let mut gov = GovernanceState::default();
-        gov.pending_permissions.insert(
-            "call-1".into(),
-            PendingApproval {
-                task_id: "t-root".into(),
-                tool_call_id: "call-1".into(),
-                tool_name: "bash".into(),
-                args_json: json!({}),
-                evaluation: PermissionEvaluation::default(),
-                requested_at_ms: 1,
-            },
-        );
-        gov.last_rubric_verdict = Some(RubricVerdict {
-            satisfied: true,
-            summary: "ok".into(),
-            unmet_items: vec![],
-            iteration: 1,
-        });
-        write_doc::<GovernanceDoc>(tx, CONVERSATION_SCOPE, "leaf", &gov)?;
+    writer
+        .write_async(|tx| {
+            Box::pin(async move {
+                tx.create_conversation_async("anc", "deepseek-flash").await?;
+                tx.append_entry_async("anc", "pi.user", &json!({ "text": "ancestor turn" })).await?;
+                tx.append_entry_async("anc", "pi.assistant", &json!({ "text": "ancestor reply" })).await?;
+                tx.fork_conversation_async("anc", "leaf", "", "deepseek-flash", 2).await?;
+                tx.append_entry_async("leaf", "pi.user", &json!({ "text": "leaf ask" })).await?;
+                tx.append_entry_async("leaf", "pi.assistant", &json!({ "text": "leaf answer" })).await?;
+                tx.compact_async(
+                    "leaf",
+                    Compaction {
+                        level: "hard",
+                        base_head: 1,
+                        from: 1,
+                        cut: 3,
+                        summary: "sum 1..3",
+                        token_count: 42,
+                    },
+                )
+                .await?;
+                tx.put_document_async(CONVERSATION_SCOPE, "leaf", "pi.verdict", &json!({ "satisfied": true }))
+                    .await?;
+                let mut gov = GovernanceState::default();
+                gov.pending_permissions.insert(
+                    "call-1".into(),
+                    PendingApproval {
+                        task_id: "t-root".into(),
+                        tool_call_id: "call-1".into(),
+                        tool_name: "bash".into(),
+                        args_json: json!({}),
+                        evaluation: PermissionEvaluation::default(),
+                        requested_at_ms: 1,
+                    },
+                );
+                gov.last_rubric_verdict = Some(RubricVerdict {
+                    satisfied: true,
+                    summary: "ok".into(),
+                    unmet_items: vec![],
+                    iteration: 1,
+                });
+                write_doc::<GovernanceDoc>(tx, CONVERSATION_SCOPE, "leaf", &gov).await?;
 
-        let (sub, _) = tx.submit("leaf", "req-export", "prompt", &json!({ "text": "leaf ask" }), None)?;
-        tx.settle(&sub.id, SubmissionStatus::Done, &json!({ "output": "leaf answer" }))?;
+                let (sub, _) = tx.submit_async("leaf", "req-export", "prompt", &json!({ "text": "leaf ask" }), None).await?;
+                tx.settle_async(&sub.id, SubmissionStatus::Done, &json!({ "output": "leaf answer" })).await?;
 
-        let mut root_task = Task::new("pi.generation", "follow_up_check");
-        root_task.id = "t-root".into();
-        root_task.conversation_id = "leaf".into();
-        root_task.status = TaskStatus::Terminal;
-        root_task.terminal_reason = "completed".into();
-        tx.create_task(root_task)?;
+                let mut root_task = Task::new("pi.generation", "follow_up_check");
+                root_task.id = "t-root".into();
+                root_task.conversation_id = "leaf".into();
+                root_task.status = TaskStatus::Terminal;
+                root_task.terminal_reason = "completed".into();
+                tx.create_task_async(root_task).await?;
 
-        let (sig1, _) = tx.send_signal("t-root", "wake", Some("k1"), &json!(1))?;
-        let _ = tx.consume_first_signal("t-root", "wake")?;
-        let (sig2, _) = tx.send_signal("t-root", "wake", Some("k2"), &json!(2))?;
-        let _ = (sig1, sig2);
+                let (sig1, _) = tx.send_signal_async("t-root", "wake", Some("k1"), &json!(1)).await?;
+                let _ = tx.consume_first_signal_async("t-root", "wake").await?;
+                let (sig2, _) = tx.send_signal_async("t-root", "wake", Some("k2"), &json!(2)).await?;
+                let _ = (sig1, sig2);
 
-        tx.create_owned_conversation("subagent:child-1", "deepseek-flash", "t-root")?;
-        tx.append_entry("subagent:child-1", "pi.assistant", &json!({ "text": "child hi" }))?;
-        Ok(())
-    })?;
+                tx.create_owned_conversation_async("subagent:child-1", "deepseek-flash", "t-root").await?;
+                tx.append_entry_async("subagent:child-1", "pi.assistant", &json!({ "text": "child hi" }))
+                    .await?;
+                Ok(())
+            })
+        })
+        .await?;
 
-    let expected_visible: Vec<_> = reader.read(|r| r.visible_entries("leaf"))?;
+    let expected_visible: Vec<_> = reader.read_async(|r| Box::pin(async move { r.visible_entries_async("leaf").await })).await?;
 
     // Full closure export from read-only SQLite -> JSONL.
-    let manifest = reader.export_conversation_jsonl("leaf", &full_dir, ExportOptions::default())?;
+    let manifest = reader.export_conversation_jsonl("leaf", &full_dir, ExportOptions::default()).await?;
     assert_eq!(manifest.root_conversation_id, "leaf");
     assert_eq!(manifest.conversations_exported, 3);
 
     let full_store = Store::jsonl_read_only(&full_dir)?;
-    let actual_visible = full_store.read(|r| r.visible_entries("leaf"))?;
+    let actual_visible = full_store
+        .read_async(|r| Box::pin(async move { r.visible_entries_async("leaf").await }))
+        .await?;
     assert_eq!(
         actual_visible.iter().map(|e| (&e.conversation_id, e.seq, &e.kind)).collect::<Vec<_>>(),
         expected_visible.iter().map(|e| (&e.conversation_id, e.seq, &e.kind)).collect::<Vec<_>>()
     );
-    full_store.read(|r| {
-        let subs = r.submissions("leaf")?;
-        assert_eq!(subs.len(), 1);
-        assert_eq!(subs[0].status, SubmissionStatus::Done);
-        assert_eq!(subs[0].result, json!({ "output": "leaf answer" }));
+    full_store
+        .read_async(|r| {
+            Box::pin(async move {
+                let subs = r.submissions_async("leaf").await?;
+                assert_eq!(subs.len(), 1);
+                assert_eq!(subs[0].status, SubmissionStatus::Done);
+                assert_eq!(subs[0].result, json!({ "output": "leaf answer" }));
 
-        let all_sigs = r.signals("t-root", true)?;
-        assert_eq!(all_sigs.len(), 2);
-        assert!(all_sigs[0].consumed);
-        assert!(!all_sigs[1].consumed);
-        assert_eq!(r.entries("subagent:child-1", 1)?.len(), 1);
-        Ok(())
-    })?;
-    full_store.close()?;
+                let all_sigs = r.signals_async("t-root", true).await?;
+                assert_eq!(all_sigs.len(), 2);
+                assert!(all_sigs[0].consumed);
+                assert!(!all_sigs[1].consumed);
+                assert_eq!(r.entries_async("subagent:child-1", 1).await?.len(), 1);
+                Ok(())
+            })
+        })
+        .await?;
+    full_store.close().await?;
 
     // Sliced export at seq 3 (`head_seq = 1 < 3`, includes ancestor + leaf seq 3, strips live/governance runtime locks & tasks).
-    let slice_manifest = reader.export_conversation_jsonl(
-        "leaf",
-        &slice_dir,
-        ExportOptions {
-            at_seq: Some(3),
-            include_children: false,
-            fsync: true,
-        },
-    )?;
+    let slice_manifest = reader
+        .export_conversation_jsonl(
+            "leaf",
+            &slice_dir,
+            ExportOptions {
+                at_seq: Some(3),
+                include_children: false,
+                fsync: true,
+            },
+        )
+        .await?;
     assert_eq!(slice_manifest.tasks_exported, 0);
     assert_eq!(slice_manifest.submissions_exported, 0);
 
     let slice_store = Store::jsonl_read_only(&slice_dir)?;
-    slice_store.read(|r| {
-        let leaf = r.conversation("leaf")?;
-        assert_eq!(leaf.next_seq, 4);
-        assert!(r.entries("leaf", 1)?.iter().all(|e| e.seq <= 3));
-        assert!(r.document(CONVERSATION_SCOPE, "leaf", "pi.verdict")?.is_none());
-        let gov: GovernanceState = read_doc::<GovernanceDoc>(r, CONVERSATION_SCOPE, "leaf")?;
-        assert!(gov.pending_permissions.is_empty());
-        assert!(gov.last_rubric_verdict.is_none());
-        assert!(r.tasks_by_conversation("leaf")?.is_empty());
-        assert!(r.conversation("subagent:child-1").is_err());
-        Ok(())
-    })?;
+    slice_store
+        .read_async(|r| {
+            Box::pin(async move {
+                let leaf = r.conversation_async("leaf").await?;
+                assert_eq!(leaf.next_seq, 4);
+                assert!(r.entries_async("leaf", 1).await?.iter().all(|e| e.seq <= 3));
+                assert!(r.document_async(CONVERSATION_SCOPE, "leaf", "pi.verdict").await?.is_none());
+                let gov: GovernanceState = read_doc::<GovernanceDoc>(r, CONVERSATION_SCOPE, "leaf").await?;
+                assert!(gov.pending_permissions.is_empty());
+                assert!(gov.last_rubric_verdict.is_none());
+                assert!(r.tasks_by_conversation_async("leaf").await?.is_empty());
+                assert!(r.conversation_async("subagent:child-1").await.is_err());
+                Ok(())
+            })
+        })
+        .await?;
 
-    slice_store.close()?;
-    reader.close()?;
-    writer.close()?;
+    slice_store.close().await?;
+    reader.close().await?;
+    writer.close().await?;
     Ok(())
 }
 
-#[test]
-fn trace_metrics_detects_tool_errors_repeated_loops_compactions_and_renders_html() -> DurableResult<()> {
+#[tokio::test]
+async fn trace_metrics_detects_tool_errors_repeated_loops_compactions_and_renders_html() -> DurableResult<()> {
     let dir = tempdir().unwrap();
     let store = Store::jsonl(dir.path())?;
-    store.write(|tx| {
-        tx.create_conversation("trace-conv", "deepseek-flash")?;
-        tx.append_entry("trace-conv", "pi.user", &json!({ "text": "inspect <script>alert(1)</script>" }))?;
-        tx.append_entry(
-            "trace-conv",
-            "pi.assistant",
-            &json!({
-                "text": "",
-                "toolCalls": [{ "id": "c1", "toolName": "read", "argsJson": { "b": 2, "a": 1 } }]
-            }),
-        )?;
-        tx.append_entry(
-            "trace-conv",
-            "pi.tool_result",
-            &json!({ "toolCallId": "c1", "toolName": "read", "ok": true, "output": "ok" }),
-        )?;
-        tx.append_entry(
-            "trace-conv",
-            "pi.assistant",
-            &json!({
-                "text": "",
-                "toolCalls": [{ "id": "c2", "toolName": "read", "argsJson": { "a": 1, "b": 2 } }]
-            }),
-        )?;
-        tx.append_entry(
-            "trace-conv",
-            "pi.tool_result",
-            &json!({ "toolCallId": "c2", "toolName": "read", "ok": false, "error": "missing" }),
-        )?;
-        tx.compact(
-            "trace-conv",
-            Compaction {
-                level: "soft",
-                base_head: 1,
-                from: 1,
-                cut: 3,
-                summary: "short summary",
-                token_count: 55,
-            },
-        )?;
-        tx.append_entry("trace-conv", "pi.assistant", &json!({ "text": "done" }))?;
+    store
+        .write_async(|tx| {
+            Box::pin(async move {
+                tx.create_conversation_async("trace-conv", "deepseek-flash").await?;
+                tx.append_entry_async("trace-conv", "pi.user", &json!({ "text": "inspect <script>alert(1)</script>" }))
+                    .await?;
+                tx.append_entry_async(
+                    "trace-conv",
+                    "pi.assistant",
+                    &json!({
+                        "text": "",
+                        "toolCalls": [{ "id": "c1", "toolName": "read", "argsJson": { "b": 2, "a": 1 } }]
+                    }),
+                )
+                .await?;
+                tx.append_entry_async(
+                    "trace-conv",
+                    "pi.tool_result",
+                    &json!({ "toolCallId": "c1", "toolName": "read", "ok": true, "output": "ok" }),
+                )
+                .await?;
+                tx.append_entry_async(
+                    "trace-conv",
+                    "pi.assistant",
+                    &json!({
+                        "text": "",
+                        "toolCalls": [{ "id": "c2", "toolName": "read", "argsJson": { "a": 1, "b": 2 } }]
+                    }),
+                )
+                .await?;
+                tx.append_entry_async(
+                    "trace-conv",
+                    "pi.tool_result",
+                    &json!({ "toolCallId": "c2", "toolName": "read", "ok": false, "error": "missing" }),
+                )
+                .await?;
+                tx.compact_async(
+                    "trace-conv",
+                    Compaction {
+                        level: "soft",
+                        base_head: 1,
+                        from: 1,
+                        cut: 3,
+                        summary: "short summary",
+                        token_count: 55,
+                    },
+                )
+                .await?;
+                tx.append_entry_async("trace-conv", "pi.assistant", &json!({ "text": "done" })).await?;
 
-        UsageTotals {
-            input_tokens: 1000,
-            output_tokens: 200,
-            cost_micros: Some(1500),
-            ..Default::default()
-        }
-        .record(tx, "trace-conv")?;
+                UsageTotals {
+                    input_tokens: 1000,
+                    output_tokens: 200,
+                    cost_micros: Some(1500),
+                    ..Default::default()
+                }
+                .record(tx, "trace-conv")
+                .await?;
 
-        let mut gov = GovernanceState::default();
-        let verdict = RubricVerdict {
-            satisfied: true,
-            summary: "verified".into(),
-            unmet_items: vec![],
-            iteration: 1,
-        };
-        gov.last_rubric_verdict = Some(verdict.clone());
-        gov.rubric_history.push(verdict);
-        write_doc::<GovernanceDoc>(tx, CONVERSATION_SCOPE, "trace-conv", &gov)?;
-        Ok(())
-    })?;
-    let tl = render_timeline(&store, "trace-conv")?;
-    let html = export_html(&store, "trace-conv", &[])?;
-    store.close()?;
+                let mut gov = GovernanceState::default();
+                let verdict = RubricVerdict {
+                    satisfied: true,
+                    summary: "verified".into(),
+                    unmet_items: vec![],
+                    iteration: 1,
+                };
+                gov.last_rubric_verdict = Some(verdict.clone());
+                gov.rubric_history.push(verdict);
+                write_doc::<GovernanceDoc>(tx, CONVERSATION_SCOPE, "trace-conv", &gov).await?;
+                Ok(())
+            })
+        })
+        .await?;
+    let tl = render_timeline(&store, "trace-conv").await?;
+    let html = export_html(&store, "trace-conv", &[]).await?;
+    store.close().await?;
 
-    let metrics = analyze_path(dir.path(), None)?;
+    let metrics = analyze_path(dir.path(), None).await?;
     assert_eq!(metrics.conversation_id, "trace-conv");
     assert_eq!(metrics.turns, 3);
     assert_eq!(metrics.compactions, 1);
@@ -462,8 +509,8 @@ fn trace_metrics_detects_tool_errors_repeated_loops_compactions_and_renders_html
     Ok(())
 }
 
-#[test]
-fn l2_jsonl_slice_replay_branches_without_mutating_source_fixture() -> DurableResult<()> {
+#[tokio::test]
+async fn l2_jsonl_slice_replay_branches_without_mutating_source_fixture() -> DurableResult<()> {
     let dir = tempdir().unwrap();
     let src_store_dir = dir.path().join("src-store");
     let src_ws_dir = dir.path().join("src-ws");
@@ -472,15 +519,19 @@ fn l2_jsonl_slice_replay_branches_without_mutating_source_fixture() -> DurableRe
     fs::write(src_ws_dir.join("seed.txt"), "initial\n").unwrap();
 
     let src = Store::jsonl(&src_store_dir)?;
-    src.write(|tx| {
-        tx.create_conversation("replay-conv", "deepseek-flash")?;
-        tx.append_entry("replay-conv", "pi.system", &json!({ "text": "sys" }))?;
-        tx.append_entry("replay-conv", "pi.user", &json!({ "text": "step 1" }))?;
-        tx.append_entry("replay-conv", "pi.assistant", &json!({ "text": "bad draft before slice" }))?;
-        tx.append_entry("replay-conv", "pi.user", &json!({ "text": "stale follow-up" }))?;
-        Ok(())
-    })?;
-    src.close()?;
+    src.write_async(|tx| {
+        Box::pin(async move {
+            tx.create_conversation_async("replay-conv", "deepseek-flash").await?;
+            tx.append_entry_async("replay-conv", "pi.system", &json!({ "text": "sys" })).await?;
+            tx.append_entry_async("replay-conv", "pi.user", &json!({ "text": "step 1" })).await?;
+            tx.append_entry_async("replay-conv", "pi.assistant", &json!({ "text": "bad draft before slice" }))
+                .await?;
+            tx.append_entry_async("replay-conv", "pi.user", &json!({ "text": "stale follow-up" })).await?;
+            Ok(())
+        })
+    })
+    .await?;
+    src.close().await?;
 
     let client = ScriptedClient::new(vec![
         msg(
@@ -515,17 +566,22 @@ fn l2_jsonl_slice_replay_branches_without_mutating_source_fixture() -> DurableRe
         },
         &out_dir,
         client,
-    )?;
+    )
+    .await?;
 
     assert!(outcome.passed, "{:?}", outcome.grader_results);
     assert_eq!(fs::read_to_string(src_ws_dir.join("seed.txt")).unwrap(), "initial\n");
     let src_ro = Store::jsonl_read_only(&src_store_dir)?;
-    src_ro.read(|r| {
-        assert_eq!(r.entries("replay-conv", 1)?.len(), 4);
-        assert_eq!(r.conversation("replay-conv")?.next_seq, 5);
-        Ok(())
-    })?;
-    src_ro.close()?;
+    src_ro
+        .read_async(|r| {
+            Box::pin(async move {
+                assert_eq!(r.entries_async("replay-conv", 1).await?.len(), 4);
+                assert_eq!(r.conversation_async("replay-conv").await?.next_seq, 5);
+                Ok(())
+            })
+        })
+        .await?;
+    src_ro.close().await?;
 
     assert!(out_dir.join("replay_result.json").is_file());
     assert!(out_dir.join("transcript.html").is_file());
@@ -533,8 +589,8 @@ fn l2_jsonl_slice_replay_branches_without_mutating_source_fixture() -> DurableRe
     Ok(())
 }
 
-#[test]
-fn l3_eval_suite_runs_balanced_vanilla_vs_codemode_ab_with_isolated_workspaces_and_stats() -> DurableResult<()> {
+#[tokio::test]
+async fn l3_eval_suite_runs_balanced_vanilla_vs_codemode_ab_with_isolated_workspaces_and_stats() -> DurableResult<()> {
     assert!((pass_at_k(4, 2, 2) - (5.0 / 6.0)).abs() < 1e-9);
     assert!((pass_pow_k(4, 2, 2) - 0.25).abs() < 1e-9);
 
@@ -649,7 +705,8 @@ fn l3_eval_suite_runs_balanced_vanilla_vs_codemode_ab_with_isolated_workspaces_a
             ]),
             _ => unreachable!(),
         }
-    })?;
+    })
+    .await?;
 
     let order = execution_order.lock().unwrap();
     // Task 0 trial 0 -> [vanilla, codemode], Task 0 trial 1 -> [codemode, vanilla]

@@ -19,7 +19,9 @@ use base64::Engine;
 use parking_lot::Mutex;
 use serde::Deserialize;
 use serde_json::{Value, json};
+use tokio::sync::{mpsc, oneshot};
 
+use crate::BoxFuture;
 use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, rejected, rejection};
 use crate::oar::process::{AbortWatchdog, LineChild, LoginCheck, LoginStatus, Spawn, probe_installation_with, require_binary};
 use crate::oar::record::{self, Recorder};
@@ -780,7 +782,7 @@ struct Shared {
     child: OnceLock<Arc<LineChild>>,
     projector: Mutex<Projector>,
     pending: Mutex<HashMap<String, PendingPermission>>,
-    control: Mutex<HashMap<String, flume::Sender<std::result::Result<Value, String>>>>,
+    control: Mutex<HashMap<String, oneshot::Sender<std::result::Result<Value, String>>>>,
     /// Steers written during the turn that just ended; one of them is the
     /// likely cause when claude starts another turn by itself.
     steers: Mutex<VecDeque<String>>,
@@ -798,114 +800,130 @@ impl Shared {
         self.child.get().ok_or_else(|| AgentError::Io("claude is not running".into()))
     }
 
-    fn control_request(&self, request: Value) -> Result<flume::Receiver<std::result::Result<Value, String>>> {
+    async fn control_request(&self, request: Value) -> Result<oneshot::Receiver<std::result::Result<Value, String>>> {
         let id = format!("vibevalley-{}", self.next_control.fetch_add(1, Ordering::SeqCst));
-        let (tx, rx) = flume::bounded(1);
+        let (tx, rx) = oneshot::channel();
         self.control.lock().insert(id.clone(), tx);
-        self.child()?
-            .write_json(&json!({ "type": "control_request", "request_id": id, "request": request }))?;
+        let sent = self
+            .child()?
+            .write_json(&json!({ "type": "control_request", "request_id": id, "request": request }))
+            .await;
+        if let Err(err) = sent {
+            self.control.lock().remove(&id);
+            return Err(err);
+        }
         Ok(rx)
     }
 
-    fn answer(&self, request_id: &str, response: Value) -> Result<()> {
-        self.child()?.write_json(&json!({
-            "type": "control_response",
-            "response": { "subtype": "success", "request_id": request_id, "response": response },
-        }))
+    async fn answer(&self, request_id: &str, response: Value) -> Result<()> {
+        self.child()?
+            .write_json(&json!({
+                "type": "control_response",
+                "response": { "subtype": "success", "request_id": request_id, "response": response },
+            }))
+            .await
     }
 
-    fn on_line(&self, line: &str) {
+    async fn on_line(&self, line: &str) {
         let Ok(message) = serde_json::from_str::<Value>(line) else { return };
-        let meta = WireMeta::deserialize(&message).unwrap_or_default();
-        if self.core.runtime_id() != ID
-            && meta.parent_tool_use_id.is_none()
-            && let Some(id) = meta.session_id.as_deref().filter(|id| !id.is_empty())
-            && self.core.identify(id)
+        let mut questions_to_answer = Vec::new();
         {
-            self.core.emit_root(EventKind::SessionStarted {
-                session_id: id.into(),
-                model: meta.model.clone(),
-            });
-        }
-        let path = self.projector.lock().agent_path(meta.parent_tool_use_id.as_deref());
-        let ty = meta.kind.as_deref().unwrap_or("unknown");
-        let kind = meta.subtype.as_deref().map_or_else(|| ty.to_owned(), |s| format!("{ty}/{s}"));
-        let _frame = self.core.record_raw(&kind, path, line, &message);
-        let outs = self.projector.lock().feed(&message);
-        for out in outs {
-            match out {
-                Out::RootActivity => {
-                    if self.opened.load(Ordering::SeqCst) && !self.core.turn_active() {
-                        let steer = self.steers.lock().drain(..).collect::<Vec<_>>().join("\n");
-                        let _ = self.core.begin_turn(&steer);
+            let meta = WireMeta::deserialize(&message).unwrap_or_default();
+            if self.core.runtime_id() != ID
+                && meta.parent_tool_use_id.is_none()
+                && let Some(id) = meta.session_id.as_deref().filter(|id| !id.is_empty())
+                && self.core.identify(id)
+            {
+                self.core.emit_root(EventKind::SessionStarted {
+                    session_id: id.into(),
+                    model: meta.model.clone(),
+                });
+            }
+            let path = self.projector.lock().agent_path(meta.parent_tool_use_id.as_deref());
+            let ty = meta.kind.as_deref().unwrap_or("unknown");
+            let kind = meta.subtype.as_deref().map_or_else(|| ty.to_owned(), |s| format!("{ty}/{s}"));
+            let _frame = self.core.record_raw(&kind, path, line, &message);
+            let outs = self.projector.lock().feed(&message);
+            for out in outs {
+                match out {
+                    Out::RootActivity => {
+                        if self.opened.load(Ordering::SeqCst) && !self.core.turn_active() {
+                            let steer = self.steers.lock().drain(..).collect::<Vec<_>>().join("\n");
+                            let _ = self.core.begin_turn(&steer);
+                        }
                     }
-                }
-                Out::Event(path, kind) => {
-                    let finished = path.is_empty() && matches!(kind, EventKind::TurnFinished { .. });
-                    if finished {
-                        self.pending.lock().clear();
-                        self.watchdog.on_turn_finished();
+                    Out::Event(path, kind) => {
+                        let finished = path.is_empty() && matches!(kind, EventKind::TurnFinished { .. });
+                        if finished {
+                            self.pending.lock().clear();
+                            self.watchdog.on_turn_finished();
+                        }
+                        self.core.emit(path, kind);
                     }
-                    self.core.emit(path, kind);
-                }
-                Out::ControlResponse { request_id, result } => {
-                    if let Some(waiter) = self.control.lock().remove(&request_id) {
-                        let _ = waiter.send(result);
+                    Out::ControlResponse { request_id, result } => {
+                        if let Some(waiter) = self.control.lock().remove(&request_id) {
+                            let _ = waiter.send(result);
+                        }
                     }
-                }
-                Out::Permission {
-                    request_id,
-                    agent_path,
-                    tool,
-                    input,
-                    summary,
-                    suggestions,
-                } => {
-                    self.pending.lock().insert(
-                        request_id.clone(),
-                        PendingPermission {
-                            tool: tool.clone(),
-                            input: input.clone(),
-                            suggestions,
-                            agent_path: agent_path.clone(),
-                        },
-                    );
-                    self.core.emit(
+                    Out::Permission {
+                        request_id,
                         agent_path,
-                        EventKind::PermissionRequested {
-                            request_id,
-                            tool,
-                            input,
-                            summary,
-                        },
-                    );
-                }
-                Out::Question { request_id, text } => {
-                    self.core.emit_root(EventKind::Question { text });
-                    // The contract answers a question with the next prompt, so
-                    // the tool is declined and the turn left to end.
-                    let _ = self.answer(
-                        &request_id,
-                        json!({
-                            "behavior": "deny",
-                            "message": "The question was shown to the user. Stop here; they will answer in their next message.",
-                        }),
-                    );
-                }
-                Out::PermissionCancelled { request_id } => {
-                    if let Some(pending) = self.pending.lock().remove(&request_id) {
+                        tool,
+                        input,
+                        summary,
+                        suggestions,
+                    } => {
+                        self.pending.lock().insert(
+                            request_id.clone(),
+                            PendingPermission {
+                                tool: tool.clone(),
+                                input: input.clone(),
+                                suggestions,
+                                agent_path: agent_path.clone(),
+                            },
+                        );
                         self.core.emit(
-                            pending.agent_path,
-                            EventKind::PermissionResolved {
+                            agent_path,
+                            EventKind::PermissionRequested {
                                 request_id,
-                                decision: PermissionDecision::Deny {
-                                    message: Some("withdrawn by claude".into()),
-                                },
+                                tool,
+                                input,
+                                summary,
                             },
                         );
                     }
+                    Out::Question { request_id, text } => {
+                        self.core.emit_root(EventKind::Question { text });
+                        // The contract answers a question with the next prompt, so
+                        // the tool is declined and the turn left to end.
+                        questions_to_answer.push(request_id);
+                    }
+                    Out::PermissionCancelled { request_id } => {
+                        if let Some(pending) = self.pending.lock().remove(&request_id) {
+                            self.core.emit(
+                                pending.agent_path,
+                                EventKind::PermissionResolved {
+                                    request_id,
+                                    decision: PermissionDecision::Deny {
+                                        message: Some("withdrawn by claude".into()),
+                                    },
+                                },
+                            );
+                        }
+                    }
                 }
             }
+        }
+        for request_id in questions_to_answer {
+            let _ = self
+                .answer(
+                    &request_id,
+                    json!({
+                        "behavior": "deny",
+                        "message": "The question was shown to the user. Stop here; they will answer in their next message.",
+                    }),
+                )
+                .await;
         }
     }
 
@@ -976,19 +994,22 @@ struct ClaudeDriver {
 }
 
 impl ClaudeDriver {
-    fn send_user(&self, content: &[ContentBlock]) -> Result<()> {
+    async fn send_user(&self, content: &[ContentBlock]) -> Result<()> {
         let blocks = if content.iter().all(|b| matches!(b, ContentBlock::Text(_))) {
             json!(crate::oar::core::render_text(content))
         } else {
             json!(user_content(&self.shared.cwd, content)?)
         };
-        self.shared.child()?.write_json(&json!({
-            "type": "user",
-            "message": { "role": "user", "content": blocks },
-            "parent_tool_use_id": null,
-            "uuid": self.shared.core.span_id(),
-            "session_id": self.shared.core.session_id(),
-        }))
+        self.shared
+            .child()?
+            .write_json(&json!({
+                "type": "user",
+                "message": { "role": "user", "content": blocks },
+                "parent_tool_use_id": null,
+                "uuid": self.shared.core.span_id(),
+                "session_id": self.shared.core.session_id(),
+            }))
+            .await
     }
 }
 
@@ -997,76 +1018,100 @@ impl Driver for ClaudeDriver {
         user_content(&self.shared.cwd, content).map(|_| ())
     }
 
-    fn start_turn(&self, content: Vec<ContentBlock>) -> Result<()> {
-        self.shared.steers.lock().clear();
-        self.send_user(&content)
+    fn start_turn(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            self.shared.steers.lock().clear();
+            self.send_user(&content).await
+        })
     }
 
-    fn steer(&self, content: Vec<ContentBlock>) -> Result<()> {
-        self.send_user(&content)?;
-        self.shared.steers.lock().push_back(crate::oar::core::render_text(&content));
-        Ok(())
+    fn steer(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            self.send_user(&content).await?;
+            self.shared.steers.lock().push_back(crate::oar::core::render_text(&content));
+            Ok(())
+        })
     }
 
-    fn abort(&self) -> Result<()> {
-        self.shared.projector.lock().abort_requested = true;
-        // The interrupt's own answer says nothing new; the `result` frame ends the turn.
-        drop(self.shared.control_request(json!({ "subtype": "interrupt" }))?);
-        if let Some(child) = self.shared.child.get() {
-            self.shared.watchdog.arm(ABORT_GRACE, self.shared.core.clone(), child.clone());
-        }
-        Ok(())
-    }
-
-    fn respond_permission(&self, request_id: &str, decision: &PermissionDecision) -> Result<()> {
-        let Some(pending) = self.shared.pending.lock().remove(request_id) else {
-            return Err(rejected(rejection::UNKNOWN_REQUEST, format!("claude no longer waits on `{request_id}`")));
-        };
-        let response = match decision {
-            PermissionDecision::AllowOnce => json!({ "behavior": "allow", "updatedInput": pending.input }),
-            PermissionDecision::AllowAlways => {
-                // claude's own suggestion when it made one, else a session rule for the tool.
-                let updates = match pending.suggestions.as_array() {
-                    Some(suggestions) if !suggestions.is_empty() => pending.suggestions.clone(),
-                    _ => json!([{
-                        "type": "addRules",
-                        "rules": [{ "toolName": pending.tool }],
-                        "behavior": "allow",
-                        "destination": "session",
-                    }]),
-                };
-                json!({ "behavior": "allow", "updatedInput": pending.input, "updatedPermissions": updates })
+    fn abort(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            self.shared.projector.lock().abort_requested = true;
+            // The interrupt's own answer says nothing new; the `result` frame ends the turn.
+            drop(self.shared.control_request(json!({ "subtype": "interrupt" })).await?);
+            if let Some(child) = self.shared.child.get() {
+                self.shared.watchdog.arm(ABORT_GRACE, self.shared.core.clone(), child.clone());
             }
-            PermissionDecision::Deny { message } => json!({
-                "behavior": "deny",
-                "message": message.clone().unwrap_or_else(|| "The user denied this tool use.".into()),
-            }),
-        };
-        self.shared.answer(request_id, response)
+            Ok(())
+        })
     }
 
-    fn compact(&self) -> Result<()> {
-        if self.shared.core.runtime_id() == "qwen" {
-            return Err(AgentError::Unsupported {
-                option: "compact".into(),
-                reason: "Qwen has no manual compact operation".into(),
-            });
-        }
-        self.shared
-            .child()?
-            .write_json(&json!({"type":"user","session_id":self.shared.core.session_id(),"message":{"role":"user","content":"/compact"}}))
+    fn respond_permission<'a>(&'a self, request_id: &'a str, decision: &'a PermissionDecision) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let Some(pending) = self.shared.pending.lock().remove(request_id) else {
+                return Err(rejected(rejection::UNKNOWN_REQUEST, format!("claude no longer waits on `{request_id}`")));
+            };
+            let response = match decision {
+                PermissionDecision::AllowOnce => json!({ "behavior": "allow", "updatedInput": pending.input }),
+                PermissionDecision::AllowAlways => {
+                    // claude's own suggestion when it made one, else a session rule for the tool.
+                    let updates = match pending.suggestions.as_array() {
+                        Some(suggestions) if !suggestions.is_empty() => pending.suggestions.clone(),
+                        _ => json!([{
+                            "type": "addRules",
+                            "rules": [{ "toolName": pending.tool }],
+                            "behavior": "allow",
+                            "destination": "session",
+                        }]),
+                    };
+                    json!({ "behavior": "allow", "updatedInput": pending.input, "updatedPermissions": updates })
+                }
+                PermissionDecision::Deny { message } => json!({
+                    "behavior": "deny",
+                    "message": message.clone().unwrap_or_else(|| "The user denied this tool use.".into()),
+                }),
+            };
+            self.shared.answer(request_id, response).await
+        })
     }
-    fn stop_task(&self, id: &str) -> Result<()> {
-        self.shared
-            .control_request(json!({"subtype":"stop_task","task_id":id}))?
-            .recv_timeout(self.shared.timeout)
-            .map_err(|_| AgentError::Protocol("timed out stopping task".into()))?
-            .map(|_| ())
-            .map_err(|e| rejected("stop_task_failed", e))
+
+    fn compact(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            if self.shared.core.runtime_id() == "qwen" {
+                return Err(AgentError::Unsupported {
+                    option: "compact".into(),
+                    reason: "Qwen has no manual compact operation".into(),
+                });
+            }
+            self.shared
+                .child()?
+                .write_json(&json!({"type":"user","session_id":self.shared.core.session_id(),"message":{"role":"user","content":"/compact"}}))
+                .await
+        })
     }
-    fn dispose(&self) {
+    fn stop_task<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let rx = self.shared.control_request(json!({"subtype":"stop_task","task_id":id})).await?;
+            tokio::time::timeout(self.shared.timeout, rx)
+                .await
+                .map_err(|_| AgentError::Protocol("timed out stopping task".into()))?
+                .map_err(|_| AgentError::Protocol("timed out stopping task".into()))?
+                .map(|_| ())
+                .map_err(|e| rejected("stop_task_failed", e))
+        })
+    }
+    fn dispose(&self) -> BoxFuture<'_, ()> {
+        Box::pin(async move {
+            if let Some(child) = self.shared.child.get() {
+                child.kill().await;
+                self.shared.core.observe_exit(child.status());
+            }
+            self.shared.watchdog.wake();
+            self.shared.secrets.lock().take();
+        })
+    }
+    fn signal_dispose(&self) {
         if let Some(child) = self.shared.child.get() {
-            child.kill();
+            child.signal_kill();
             self.shared.core.observe_exit(child.status());
         }
         self.shared.watchdog.wake();
@@ -1106,12 +1151,12 @@ pub(crate) fn claude_launch(session_id: &str, opts: &SessionOptions) -> Result<S
     })
 }
 
-fn start(binary: &Path, session_id: &str, opts: &SessionOptions, recorder: Option<Recorder>) -> Result<Started> {
+async fn start(binary: &Path, session_id: &str, opts: &SessionOptions, recorder: Option<Recorder>) -> Result<Started> {
     let launch = claude_launch(session_id, opts)?;
-    start_stream(binary, session_id, opts, recorder, launch)
+    start_stream(binary, session_id, opts, recorder, launch).await
 }
 
-fn start_stream(binary: &Path, session_id: &str, opts: &SessionOptions, recorder: Option<Recorder>, launch: StreamLaunch) -> Result<Started> {
+async fn start_stream(binary: &Path, session_id: &str, opts: &SessionOptions, recorder: Option<Recorder>, launch: StreamLaunch) -> Result<Started> {
     let core = SessionCore::new(launch.runtime, session_id, recorder);
     let shared = Arc::new(Shared {
         core,
@@ -1130,11 +1175,14 @@ fn start_stream(binary: &Path, session_id: &str, opts: &SessionOptions, recorder
     });
     let on_line = {
         let shared = shared.clone();
-        move |line: &str| shared.on_line(line)
+        move |line: String| {
+            let shared = shared.clone();
+            async move { shared.on_line(&line).await }
+        }
     };
     let on_exit = {
         let shared = shared.clone();
-        move |code: Option<i32>, stderr: String| shared.on_exit(code, stderr)
+        move |code: Option<i32>, stderr: String| async move { shared.on_exit(code, stderr) }
     };
     let child = LineChild::spawn(
         Spawn {
@@ -1153,27 +1201,30 @@ fn start_stream(binary: &Path, session_id: &str, opts: &SessionOptions, recorder
     let Some(initialize) = launch.initialize else {
         return Ok(Started { shared, init: Value::Null });
     };
-    let ready = shared.control_request(initialize);
-    let init = match ready.and_then(|rx| {
-        rx.recv_timeout(shared.timeout)
-            .map_err(|_| AgentError::Protocol(format!("{} did not answer `initialize` in time", launch.runtime)))
-    }) {
-        Ok(Ok(init)) => init,
-        Ok(Err(message)) => {
-            child.kill();
-            return Err(open_failure(opts, message));
-        }
+    let init_res = match shared.control_request(initialize).await {
+        Ok(rx) => match tokio::time::timeout(shared.timeout, rx).await {
+            Ok(Ok(Ok(init))) => Ok(init),
+            Ok(Ok(Err(message))) => Err(open_failure(opts, message)),
+            Ok(Err(_)) | Err(_) => Err(AgentError::Protocol(format!("{} did not answer `initialize` in time", launch.runtime))),
+        },
+        Err(error) => Err(error),
+    };
+    let init = match init_res {
+        Ok(init) => init,
         Err(error) => {
-            child.kill();
+            child.kill().await;
             return Err(error);
         }
     };
     if opts.resume.is_some() && launch.runtime == ID {
-        let baseline = shared
-            .control_request(json!({"subtype":"get_usage"}))
-            .ok()
-            .and_then(|rx| rx.recv_timeout(opts.baseline_timeout.unwrap_or(Duration::from_secs(5))).ok())
-            .and_then(|r| r.ok());
+        let baseline = match shared.control_request(json!({"subtype":"get_usage"})).await {
+            Ok(rx) => tokio::time::timeout(opts.baseline_timeout.unwrap_or(Duration::from_secs(5)), rx)
+                .await
+                .ok()
+                .and_then(|r| r.ok())
+                .and_then(|r| r.ok()),
+            Err(_) => None,
+        };
         shared
             .core
             .resume_meter(baseline.as_ref().unwrap_or(&Value::Null), "missing_resume_usage_fields");
@@ -1258,62 +1309,70 @@ impl Runtime for ClaudeRuntime {
         crate::oar::runtime_spec(ID).expect("claude runtime spec").capabilities
     }
 
-    fn installation(&self) -> Installation {
-        probe_installation_with(ID, Some(&LOGIN))
+    fn installation(&self) -> BoxFuture<'_, Installation> {
+        Box::pin(async { probe_installation_with(ID, Some(&LOGIN)).await })
     }
 
-    fn account_usage(&self) -> Result<AccountUsage> {
-        let binary = require_binary(ID)?;
-        let help = crate::oar::process::run_capture(&binary, &["--help"], std::time::Duration::from_secs(10)).unwrap_or_default();
-        if !help.contains("--safe-mode") {
-            // Never query without isolation from the user's hooks and MCP servers.
-            return Ok(AccountUsage::Unsupported {
-                reason: "unsupported_installation".into(),
-            });
-        }
-        read_account_usage(&binary)
+    fn account_usage(&self) -> BoxFuture<'_, Result<AccountUsage>> {
+        Box::pin(async {
+            let binary = require_binary(ID)?;
+            let help = crate::oar::process::run_capture(&binary, &["--help"], std::time::Duration::from_secs(10))
+                .await
+                .unwrap_or_default();
+            if !help.contains("--safe-mode") {
+                // Never query without isolation from the user's hooks and MCP servers.
+                return Ok(AccountUsage::Unsupported {
+                    reason: "unsupported_installation".into(),
+                });
+            }
+            read_account_usage(&binary).await
+        })
     }
 
-    fn list_models(&self) -> Result<Vec<ModelInfo>> {
-        let binary = require_binary(ID)?;
-        let opts = SessionOptions {
-            cwd: std::env::temp_dir(),
-            ..Default::default()
-        };
-        let started = start(&binary, &uuid::Uuid::new_v4().to_string(), &opts, None)?;
-        if let Some(child) = started.shared.child.get() {
-            child.kill();
-        }
-        Ok(models_of(&started.init))
+    fn list_models(&self) -> BoxFuture<'_, Result<Vec<ModelInfo>>> {
+        Box::pin(async {
+            let binary = require_binary(ID)?;
+            let opts = SessionOptions {
+                cwd: std::env::temp_dir(),
+                ..Default::default()
+            };
+            let started = start(&binary, &uuid::Uuid::new_v4().to_string(), &opts, None).await?;
+            if let Some(child) = started.shared.child.get() {
+                child.kill().await;
+            }
+            Ok(models_of(&started.init))
+        })
     }
 
     /// Every `SessionOptions` field maps to a claude flag, so nothing is
     /// refused here beyond an unusable `cwd`. A `resume` id claude does not
     /// know fails the open (`Rejected("session_not_found: ...")`).
-    fn open(&self, mut opts: SessionOptions) -> Result<Arc<dyn Session>> {
-        opts.prepare(ID)?;
-        if let Some(resume) = &opts.resume
-            && resume.trim().is_empty()
-        {
-            return Err(AgentError::Unsupported {
-                option: "resume".into(),
-                reason: format!("invalid empty Claude session id: {resume:?}"),
-            });
-        }
-        let binary = opts.binary(ID)?;
-        let file = record::open_file(opts.record_to.as_deref())?;
-        let session_id = opts.resume.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-        let recorder = Recorder::start(file, ID, &session_id, &opts.cwd, opts.model.as_deref());
-        let started = start(&binary, &session_id, &opts, recorder)?;
-        Ok(running(started, &opts, self.capabilities()))
+    fn open(&self, mut opts: SessionOptions) -> BoxFuture<'_, Result<Arc<dyn Session>>> {
+        Box::pin(async move {
+            opts.prepare(ID)?;
+            if let Some(resume) = &opts.resume
+                && resume.trim().is_empty()
+            {
+                return Err(AgentError::Unsupported {
+                    option: "resume".into(),
+                    reason: format!("invalid empty Claude session id: {resume:?}"),
+                });
+            }
+            let binary = opts.binary(ID)?;
+            let file = record::open_file(opts.record_to.as_deref())?;
+            let session_id = opts.resume.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+            let recorder = Recorder::start(file, ID, &session_id, &opts.cwd, opts.model.as_deref());
+            let started = start(&binary, &session_id, &opts, recorder).await?;
+            Ok(running(started, &opts, self.capabilities()))
+        })
     }
 }
 
-pub(super) fn open_sdk(binary: &Path, opts: &SessionOptions, caps: Capabilities, launch: StreamLaunch) -> Result<Arc<dyn Session>> {
+pub(super) async fn open_sdk(binary: &Path, opts: &SessionOptions, caps: Capabilities, launch: StreamLaunch) -> Result<Arc<dyn Session>> {
     let id = opts.resume.clone().unwrap_or_else(|| format!("{}-pending", launch.runtime));
     let file = record::open_file(opts.record_to.as_deref())?;
     let recorder = Recorder::start(file, launch.runtime, &id, &opts.cwd, opts.model.as_deref());
-    let started = start_stream(binary, &id, opts, recorder, launch)?;
+    let started = start_stream(binary, &id, opts, recorder, launch).await?;
     Ok(running(started, opts, caps))
 }
 
@@ -1442,8 +1501,8 @@ fn usage_from_reply(parsed: WireUsageReply, email: Option<String>) -> Option<Acc
 
 /// A separate `claude -p --safe-mode` (no hooks, no MCP servers, no prompt)
 /// asked `initialize` and `get_usage`, as oar does.
-pub(crate) fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
-    let (tx, rx) = flume::unbounded::<WireControlResponse>();
+pub(crate) async fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
+    let (tx, mut rx) = mpsc::unbounded_channel::<WireControlResponse>();
     let child = LineChild::spawn(
         Spawn {
             label: "claude-usage",
@@ -1466,30 +1525,41 @@ pub(crate) fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
             env_remove: PARENT_SESSION_MARKERS,
         },
         move |line| {
-            if let Ok(env) = serde_json::from_str::<WireControlEnvelope>(line)
-                && env.kind.as_deref() == Some("control_response")
-                && let Some(resp) = env.response
-            {
-                let _ = tx.send(resp);
+            let tx = tx.clone();
+            async move {
+                if let Ok(env) = serde_json::from_str::<WireControlEnvelope>(&line)
+                    && env.kind.as_deref() == Some("control_response")
+                    && let Some(resp) = env.response
+                {
+                    let _ = tx.send(resp);
+                }
             }
         },
-        |_, _| {},
+        |_, _| async {},
     )?;
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
-    let ask = |id: &str, subtype: &str| -> Result<WireControlResponse> {
-        child.write_json(&json!({ "type": "control_request", "request_id": id, "request": { "subtype": subtype } }))?;
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(30);
+    async fn ask(
+        child: &Arc<LineChild>,
+        rx: &mut mpsc::UnboundedReceiver<WireControlResponse>,
+        deadline: tokio::time::Instant,
+        id: &str,
+        subtype: &'static str,
+    ) -> Result<WireControlResponse> {
+        child
+            .write_json(&json!({ "type": "control_request", "request_id": id, "request": { "subtype": subtype } }))
+            .await?;
         loop {
-            let left = deadline.saturating_duration_since(std::time::Instant::now());
-            let reply = rx
-                .recv_timeout(left)
-                .map_err(|_| AgentError::Io("claude did not answer the usage query in time".into()))?;
+            let reply = tokio::time::timeout_at(deadline, rx.recv())
+                .await
+                .map_err(|_| AgentError::Io("claude did not answer the usage query in time".into()))?
+                .ok_or_else(|| AgentError::Io("claude did not answer the usage query in time".into()))?;
             if reply.request_id.as_deref() == Some(id) {
                 return Ok(reply);
             }
         }
-    };
-    let result = (|| {
-        let init = ask("usage-init", "initialize")?;
+    }
+    let result = async {
+        let init = ask(&child, &mut rx, deadline, "usage-init", "initialize").await?;
         let email = init
             .response
             .as_ref()
@@ -1498,7 +1568,7 @@ pub(crate) fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
                 Some(WireInitAccount::Object { email }) => email,
                 _ => None,
             });
-        let reply = ask("usage-read", "get_usage")?;
+        let reply = ask(&child, &mut rx, deadline, "usage-read", "get_usage").await?;
         if reply.subtype.as_deref() != Some("success") {
             let detail = reply.error.as_deref().unwrap_or("malformed control response").to_lowercase();
             if detail.contains("not logged in") || detail.contains("authentication required") || detail.contains("/login") {
@@ -1521,7 +1591,8 @@ pub(crate) fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
             });
         }
         usage_from_reply(parsed, email).ok_or_else(|| AgentError::Protocol("claude get_usage returned no usable windows".into()))
-    })();
-    child.kill();
+    }
+    .await;
+    child.kill().await;
     result
 }

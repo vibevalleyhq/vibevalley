@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use serde_json::Value;
 
+use crate::BoxFuture;
 use crate::agent::ai::types::ToolSpec;
 use crate::agent::core::doc::{CONVERSATION_SCOPE, StandInDoc, StandInState, read_doc, write_doc};
 use crate::agent::core::pipeline::PromptSection;
@@ -25,11 +26,11 @@ impl Tool for StandInTool {
         self.spec.clone()
     }
 
-    fn execute(&self, _args: &Value) -> ToolOutput {
-        ToolOutput::error(format!(
-            "extension tool `{}` is currently unavailable after restart; reattach its extension before calling it",
-            self.spec.name
-        ))
+    fn execute<'a>(&'a self, _args: &'a Value) -> BoxFuture<'a, ToolOutput> {
+        let name = self.spec.name.clone();
+        Box::pin(std::future::ready(ToolOutput::error(format!(
+            "extension tool `{name}` is currently unavailable after restart; reattach its extension before calling it"
+        ))))
     }
 }
 
@@ -42,17 +43,17 @@ pub struct StandInRecovery {
 pub struct StandIn;
 
 impl StandIn {
-    pub fn save(tx: &mut Tx<'_>, conv: &str, sections: &[PromptSection], tool_specs: &[ToolSpec]) -> durable::Result<()> {
+    pub async fn save(tx: &mut Tx<'_>, conv: &str, sections: &[PromptSection], tool_specs: &[ToolSpec]) -> durable::Result<()> {
         let state = StandInState {
             sections: sections.to_vec(),
             tool_specs: tool_specs.to_vec(),
         };
-        write_doc::<StandInDoc>(tx, CONVERSATION_SCOPE, conv, &state)?;
+        write_doc::<StandInDoc>(tx, CONVERSATION_SCOPE, conv, &state).await?;
         Ok(())
     }
 
-    pub fn reconcile(read: &Read<'_>, conv: &str, active_sections: &[PromptSection], active_tools: &[ToolSpec]) -> durable::Result<StandInRecovery> {
-        let saved = read_doc::<StandInDoc>(read, CONVERSATION_SCOPE, conv)?;
+    pub async fn reconcile(read: &Read<'_>, conv: &str, active_sections: &[PromptSection], active_tools: &[ToolSpec]) -> durable::Result<StandInRecovery> {
+        let saved = read_doc::<StandInDoc>(read, CONVERSATION_SCOPE, conv).await?;
         let present_sections: HashSet<&str> = active_sections.iter().map(|s| s.key.as_str()).collect();
         let present_tools: HashSet<&str> = active_tools.iter().map(|t| t.name.as_str()).collect();
 

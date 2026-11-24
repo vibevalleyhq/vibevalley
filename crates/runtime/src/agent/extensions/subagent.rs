@@ -1,6 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::BoxFuture;
 use crate::agent::ai::types::ToolCall;
 use crate::agent::core::engine::{Engine, KIND as GENERATION_KIND, Request};
 use crate::agent::core::events::AgentEvent;
@@ -48,8 +49,8 @@ impl TypedTool for SpawnAgent {
         ReplayPolicy::Safe
     }
 
-    fn execute(&self, _args: Self::Args, _ctx: &ToolContext) -> Result<TypedToolOutput<Self::Details>, String> {
-        Err("spawn_agent requires the durable engine dispatcher".into())
+    fn execute<'a>(&'a self, _args: Self::Args, _ctx: &'a ToolContext) -> BoxFuture<'a, Result<TypedToolOutput<Self::Details>, String>> {
+        Box::pin(std::future::ready(Err("spawn_agent requires the durable engine dispatcher".into())))
     }
 }
 
@@ -86,8 +87,8 @@ impl SubagentExtension {
     }
 }
 
-fn last_assistant_answer(tx: &Read<'_>, conv: &str) -> durable::Result<String> {
-    let entries = tx.visible_entries(conv)?;
+async fn last_assistant_answer(tx: &Read<'_>, conv: &str) -> durable::Result<String> {
+    let entries = tx.visible_entries_async(conv).await?;
     let tr = Transcript {
         conversation_id: conv.to_owned(),
         provider_affinity: String::new(),
@@ -116,26 +117,30 @@ impl Extension for SubagentExtension {
         }
     }
 
-    fn on_before_tool(&self, ctx: &ToolCallHookCtx<'_>) -> durable::Result<HookOutcome> {
-        if ctx.tool_name == "spawn_agent" && ctx.conversation_id.starts_with("subagent:") {
-            return Ok(HookOutcome::Deny {
+    fn on_before_tool<'a>(&'a self, ctx: &'a ToolCallHookCtx<'_>) -> BoxFuture<'a, durable::Result<HookOutcome>> {
+        let outcome = if ctx.tool_name == "spawn_agent" && ctx.conversation_id.starts_with("subagent:") {
+            HookOutcome::Deny {
                 reason: "helpers cannot nest spawn_agent".into(),
                 overridable: false,
-            });
-        }
-        Ok(HookOutcome::Continue)
+            }
+        } else {
+            HookOutcome::Continue
+        };
+        Box::pin(std::future::ready(Ok(outcome)))
     }
 
-    fn dispatch_tool(&self, call: &ToolCall, tc: &TaskContext, engine: &Engine) -> Option<durable::Result<Transition>> {
-        if call.name != "spawn_agent" {
-            return None;
-        }
-        Some(self.dispatch_spawn(call, tc, engine))
+    fn dispatch_tool<'a>(&'a self, call: &'a ToolCall, tc: &'a TaskContext, engine: &'a Engine) -> BoxFuture<'a, Option<durable::Result<Transition>>> {
+        Box::pin(async move {
+            if call.name != "spawn_agent" {
+                return None;
+            }
+            Some(self.dispatch_spawn(call, tc, engine).await)
+        })
     }
 }
 
 impl SubagentExtension {
-    fn dispatch_spawn(&self, call: &ToolCall, tc: &TaskContext, engine: &Engine) -> durable::Result<Transition> {
+    async fn dispatch_spawn(&self, call: &ToolCall, tc: &TaskContext, engine: &Engine) -> durable::Result<Transition> {
         if let Some(res) = engine.check_dispatched_memo(tc) {
             return res;
         }
@@ -143,12 +148,14 @@ impl SubagentExtension {
         let args: SpawnAgentArgs = match serde_json::from_str(&call.arguments) {
             Ok(args) => args,
             Err(err) => {
-                return engine.complete_dispatched_tool(tc, call, format!("invalid arguments for `spawn_agent`: {err}"), true);
+                return engine
+                    .complete_dispatched_tool(tc, call, format!("invalid arguments for `spawn_agent`: {err}"), true)
+                    .await;
             }
         };
         let brief = args.brief.trim().to_owned();
         if brief.is_empty() {
-            return engine.complete_dispatched_tool(tc, call, "brief 是空的。".into(), true);
+            return engine.complete_dispatched_tool(tc, call, "brief 是空的。".into(), true).await;
         }
 
         let parent_conv = &tc.task.conversation_id;
@@ -156,24 +163,34 @@ impl SubagentExtension {
         let request_id = format!("spawn:{tool_task_id}");
         let child_conv = format!("subagent:{tool_task_id}");
 
-        let existing = engine.store().read(|tx| {
-            let provider = tx.conversation(parent_conv)?.provider_affinity;
-            let owned = tx.conversations_by_owner_task(tool_task_id)?;
-            let existing_conv = owned.into_iter().find(|c| c.id == child_conv).map(|c| c.id);
-            let sub = match existing_conv {
-                Some(ref cid) => tx.submission_by_request(cid, &request_id)?,
-                None => None,
-            };
-            let answer = match &sub {
-                Some(s) if s.status == SubmissionStatus::Done => Some(last_assistant_answer(tx, &child_conv)?),
-                _ => None,
-            };
-            let child_task_id = tx
-                .tasks_by_conversation(&child_conv)
-                .ok()
-                .and_then(|tasks| tasks.into_iter().find(|t| t.kind == GENERATION_KIND).map(|t| t.id));
-            Ok((provider, sub, answer, child_task_id))
-        })?;
+        let parent_conv_read = parent_conv.clone();
+        let tool_task_read = tool_task_id.clone();
+        let child_conv_read = child_conv.clone();
+        let request_id_read = request_id.clone();
+        let existing = engine
+            .store()
+            .read_async(move |tx| {
+                Box::pin(async move {
+                    let provider = tx.conversation_async(&parent_conv_read).await?.provider_affinity;
+                    let owned = tx.conversations_by_owner_task_async(&tool_task_read).await?;
+                    let existing_conv = owned.into_iter().find(|c| c.id == child_conv_read).map(|c| c.id);
+                    let sub = match existing_conv {
+                        Some(ref cid) => tx.submission_by_request_async(cid, &request_id_read).await?,
+                        None => None,
+                    };
+                    let answer = match &sub {
+                        Some(s) if s.status == SubmissionStatus::Done => Some(last_assistant_answer(tx, &child_conv_read).await?),
+                        _ => None,
+                    };
+                    let child_task_id = tx
+                        .tasks_by_conversation_async(&child_conv_read)
+                        .await
+                        .ok()
+                        .and_then(|tasks| tasks.into_iter().find(|t| t.kind == GENERATION_KIND).map(|t| t.id));
+                    Ok((provider, sub, answer, child_task_id))
+                })
+            })
+            .await?;
 
         let (provider, sub, answer, existing_child_task_id) = existing;
         if let Some(sub) = sub {
@@ -195,7 +212,7 @@ impl SubagentExtension {
                                 message: "帮手没有返回内容。".into(),
                             },
                         );
-                        return engine.complete_dispatched_tool(tc, call, "帮手没有返回内容。".into(), true);
+                        return engine.complete_dispatched_tool(tc, call, "帮手没有返回内容。".into(), true).await;
                     }
                     engine.emit(
                         parent_conv,
@@ -207,7 +224,7 @@ impl SubagentExtension {
                             message: answer_text.clone(),
                         },
                     );
-                    return engine.complete_dispatched_tool(tc, call, answer_text, false);
+                    return engine.complete_dispatched_tool(tc, call, answer_text, false).await;
                 }
                 SubmissionStatus::Unanswered => {
                     let child_tid = existing_child_task_id.unwrap_or_else(|| format!("gen-{}", sub.id));
@@ -222,7 +239,7 @@ impl SubagentExtension {
                             message: err.clone(),
                         },
                     );
-                    return engine.complete_dispatched_tool(tc, call, format!("帮手出错：{err}"), true);
+                    return engine.complete_dispatched_tool(tc, call, format!("帮手出错：{err}"), true).await;
                 }
                 SubmissionStatus::Queued | SubmissionStatus::Placed => {
                     return Ok(Transition::Sleep {
@@ -245,18 +262,20 @@ impl SubagentExtension {
                 arguments: call.arguments.clone(),
             },
         );
-        let (_, child_task, _) = engine.submit(Request {
-            conversation: &child_conv,
-            provider: &provider,
-            request_id: &request_id,
-            prompt: &brief,
-            source: "subagent",
-            system: &system,
-            notify_task: Some(tool_task_id),
-            owner_task: Some(tool_task_id),
-            when_busy: WhenBusy::Reject,
-            ..Default::default()
-        })?;
+        let (_, child_task, _) = engine
+            .submit(Request {
+                conversation: &child_conv,
+                provider: &provider,
+                request_id: &request_id,
+                prompt: &brief,
+                source: "subagent",
+                system: &system,
+                notify_task: Some(tool_task_id),
+                owner_task: Some(tool_task_id),
+                when_busy: WhenBusy::Reject,
+                ..Default::default()
+            })
+            .await?;
 
         engine.emit(
             parent_conv,

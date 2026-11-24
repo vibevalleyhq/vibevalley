@@ -2,12 +2,12 @@
 
 use std::fs;
 use std::path::{Component, Path, PathBuf};
-use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use tokio::process::Command;
 
 use crate::agent::ai::CancelToken;
 use crate::agent::ai::types::{ChatRequest, Message, ModelClient, ResponseFormat};
@@ -91,13 +91,17 @@ pub struct GradeContext<'a> {
     pub default_model: &'a str,
 }
 
-pub fn evaluate_graders(specs: &[GraderSpec], ctx: &GradeContext<'_>) -> Vec<GraderResult> {
-    specs.iter().map(|spec| evaluate_one(spec, ctx)).collect()
+pub async fn evaluate_graders(specs: &[GraderSpec], ctx: &GradeContext<'_>) -> Vec<GraderResult> {
+    let mut out = Vec::with_capacity(specs.len());
+    for spec in specs {
+        out.push(evaluate_one(spec, ctx).await);
+    }
+    out
 }
 
-fn evaluate_one(spec: &GraderSpec, ctx: &GradeContext<'_>) -> GraderResult {
+async fn evaluate_one(spec: &GraderSpec, ctx: &GradeContext<'_>) -> GraderResult {
     match spec {
-        GraderSpec::Shell { command, timeout_secs } => run_shell_grader(ctx.workspace, command, (*timeout_secs).max(1)),
+        GraderSpec::Shell { command, timeout_secs } => run_shell_grader(ctx.workspace, command, (*timeout_secs).max(1)).await,
         GraderSpec::FileExists { path } => match resolve_workspace_path(ctx.workspace, path) {
             Ok(target) => {
                 let exists = target.exists();
@@ -203,7 +207,7 @@ fn evaluate_one(spec: &GraderSpec, ctx: &GradeContext<'_>) -> GraderResult {
                 details: json!({ "failures": failures }),
             }
         }
-        GraderSpec::Rubric { markdown, model } => run_rubric_grader(ctx, markdown, model.as_deref()),
+        GraderSpec::Rubric { markdown, model } => run_rubric_grader(ctx, markdown, model.as_deref()).await,
     }
 }
 
@@ -258,11 +262,11 @@ fn resolve_workspace_path(workspace: &Path, rel: &str) -> Result<PathBuf, String
     Ok(workspace.join(p))
 }
 
-fn run_shell_grader(workspace: &Path, command: &str, timeout_secs: u64) -> GraderResult {
-    let mut cmd = tokio::process::Command::new("sh");
+async fn run_shell_grader(workspace: &Path, command: &str, timeout_secs: u64) -> GraderResult {
+    let mut cmd = Command::new("sh");
     cmd.arg("-c").arg(command).current_dir(workspace);
 
-    let output = match crate::rt::block_on(crate::oar::run_output_with_timeout(cmd, Duration::from_secs(timeout_secs), Some(8192))) {
+    let output = match crate::oar::run_output_with_timeout(cmd, Duration::from_secs(timeout_secs), Some(8192)).await {
         Ok(out) => out,
         Err(err) => {
             return GraderResult {
@@ -300,7 +304,7 @@ fn run_shell_grader(workspace: &Path, command: &str, timeout_secs: u64) -> Grade
     }
 }
 
-fn run_rubric_grader(ctx: &GradeContext<'_>, markdown: &str, model_override: Option<&str>) -> GraderResult {
+async fn run_rubric_grader(ctx: &GradeContext<'_>, markdown: &str, model_override: Option<&str>) -> GraderResult {
     let Some(judge) = &ctx.judge_client else {
         return GraderResult {
             kind: "rubric".into(),
@@ -310,7 +314,7 @@ fn run_rubric_grader(ctx: &GradeContext<'_>, markdown: &str, model_override: Opt
         };
     };
 
-    let (deliverables, truncated) = collect_workspace_deliverables(ctx.workspace);
+    let (deliverables, truncated) = collect_workspace_deliverables(ctx.workspace).await;
     let input = json!({
         "taskPrompt": ctx.task_prompt,
         "rubricMarkdown": markdown,
@@ -328,7 +332,8 @@ fn run_rubric_grader(ctx: &GradeContext<'_>, markdown: &str, model_override: Opt
         ..Default::default()
     };
     let cancel = CancelToken::never();
-    match judge.complete_cancellable(&req, &cancel, &mut |_| {}) {
+    let mut noop = |_| {};
+    match judge.complete_cancellable(&req, &cancel, &mut noop).await {
         Ok(resp) => {
             let raw = resp.message.content.unwrap_or_default();
             let clean = strip_json_fences(&raw);
@@ -356,13 +361,19 @@ fn run_rubric_grader(ctx: &GradeContext<'_>, markdown: &str, model_override: Opt
     }
 }
 
-fn collect_workspace_deliverables(workspace: &Path) -> (String, bool) {
+async fn collect_workspace_deliverables(workspace: &Path) -> (String, bool) {
     let mut parts = Vec::new();
     if workspace.join(".git").exists()
-        && let Ok(out) = Command::new("git").arg("status").arg("--short").current_dir(workspace).output()
+        && let Ok(out) = Command::new("git")
+            .arg("status")
+            .arg("--short")
+            .current_dir(workspace)
+            .kill_on_drop(true)
+            .output()
+            .await
     {
         parts.push(format!("git status:\n{}", String::from_utf8_lossy(&out.stdout)));
-        if let Ok(diff) = Command::new("git").arg("diff").current_dir(workspace).output()
+        if let Ok(diff) = Command::new("git").arg("diff").current_dir(workspace).kill_on_drop(true).output().await
             && !diff.stdout.is_empty()
         {
             parts.push(format!("git diff:\n{}", String::from_utf8_lossy(&diff.stdout)));

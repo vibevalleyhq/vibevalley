@@ -4,8 +4,8 @@ use super::prompts::{PromptSection, assemble_system_prompt, discover_context_fil
 use super::skills::{LoadSkill, front_matter, read_skill, scan_skills, skill_body, skill_index};
 use crate::agent::tools::{Tool, TypedTool, TypedToolAdapter};
 
-#[test]
-fn skills_scan_index_and_load_skill_typed_tool() {
+#[tokio::test]
+async fn skills_scan_index_and_load_skill_typed_tool() {
     let fm = front_matter("---\nname: deploy\ndescription: >\n  Ships the app\n  to prod\nquoted: \"x y\"\n---\nbody");
     assert_eq!(fm["name"], "deploy");
     assert_eq!(fm["description"], "Ships the app to prod");
@@ -41,11 +41,11 @@ fn skills_scan_index_and_load_skill_typed_tool() {
     assert_eq!(tool.spec().name, "load_skill");
     assert_eq!(tool.spec().parameters["required"], json!(["name"]));
 
-    let ok = tool.execute(&json!({"name": "deploy"}));
+    let ok = tool.execute(&json!({"name": "deploy"})).await;
     assert!(!ok.is_error);
     assert!(ok.text.ends_with("\n\nA"));
 
-    let bad = tool.execute(&json!({}));
+    let bad = tool.execute(&json!({})).await;
     assert!(bad.is_error);
     assert!(bad.text.contains("invalid arguments for `load_skill`"));
 }

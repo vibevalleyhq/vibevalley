@@ -22,10 +22,13 @@ fn write_executable(dir: &Path, name: &str, body: &str) -> PathBuf {
     path
 }
 
-fn recv_until(rx: &flume::Receiver<Event>, stop: impl Fn(&EventKind) -> bool) -> Vec<Event> {
+async fn recv_until(rx: &mut tokio::sync::mpsc::UnboundedReceiver<Event>, stop: impl Fn(&EventKind) -> bool) -> Vec<Event> {
     let mut out = Vec::new();
     loop {
-        let ev = rx.recv_timeout(WAIT).expect("expected event before timeout");
+        let ev = tokio::time::timeout(WAIT, rx.recv())
+            .await
+            .expect("expected event before timeout")
+            .expect("channel open before stop event");
         let done = stop(&ev.kind);
         out.push(ev);
         if done {
@@ -147,8 +150,8 @@ fn status_fold_transitions_to_waiting_reply_on_interaction() {
 
 // ---- Mock stdio ACP integration tests ---------------------------------------
 
-#[test]
-fn antigravity_stdout_auth_banner_prefiltered_without_jsonrpc_error() {
+#[tokio::test]
+async fn antigravity_stdout_auth_banner_prefiltered_without_jsonrpc_error() {
     let dir = tempfile::tempdir().unwrap();
     let script = write_executable(
         dir.path(),
@@ -167,6 +170,7 @@ sys.stdin.read()
             request_timeout: Some(Duration::from_secs(5)),
             ..Default::default()
         })
+        .await
         .err()
         .expect("should fail with NotAvailable");
     match err {
@@ -537,8 +541,8 @@ for raw in sys.stdin:
             send({"jsonrpc": "2.0", "id": req_id, "result": {"stopReason": "end_turn"}})
 "#;
 
-#[test]
-fn antigravity_v2_handshake_auth_append_prompt_config_order_and_models() {
+#[tokio::test]
+async fn antigravity_v2_handshake_auth_append_prompt_config_order_and_models() {
     let dir = tempfile::tempdir().unwrap();
     let script = write_executable(dir.path(), "mock-agy", MOCK_AGY_SCRIPT);
     let trace_list = dir.path().join("trace-list.jsonl");
@@ -549,7 +553,7 @@ fn antigravity_v2_handshake_auth_append_prompt_config_order_and_models() {
 
     // 1. list_models probes each model's thought_level dynamically.
     let rt = AcpRuntime::new(AcpAgentSpec::new("antigravity", "Antigravity CLI", script.to_string_lossy(), ["acp"]));
-    let models = rt.list_models().expect("list_models");
+    let models = rt.list_models().await.expect("list_models");
     assert_eq!(models.len(), 2);
     let pro = models.iter().find(|m| m.id == "gemini-3-pro").unwrap();
     assert!(pro.is_default);
@@ -569,6 +573,7 @@ fn antigravity_v2_handshake_auth_append_prompt_config_order_and_models() {
             permission_mode: PermissionMode::Plan,
             ..Default::default()
         })
+        .await
         .err()
         .expect("plan refused");
     assert!(matches!(plan_err, AgentError::Unsupported { option, .. } if option == "permission_mode"));
@@ -586,11 +591,12 @@ fn antigravity_v2_handshake_auth_append_prompt_config_order_and_models() {
             env: vec![("MOCK_TRACE_FILE".into(), trace_open.to_string_lossy().into_owned())],
             ..Default::default()
         })
+        .await
         .expect("open session");
 
-    let rx = session.events();
-    session.prompt(vec![ContentBlock::Text("hello".into())]).unwrap();
-    let events = recv_until(&rx, |k| matches!(k, EventKind::TurnFinished { .. }));
+    let mut rx = session.events();
+    session.prompt(vec![ContentBlock::Text("hello".into())]).await.unwrap();
+    let events = recv_until(&mut rx, |k| matches!(k, EventKind::TurnFinished { .. })).await;
     let EventKind::TurnFinished { reason, usage } = &events.last().unwrap().kind else {
         unreachable!()
     };
@@ -606,9 +612,10 @@ fn antigravity_v2_handshake_auth_append_prompt_config_order_and_models() {
     // Live set_config switches model -> thought_level -> AcceptEdits without wire auto_edit.
     session
         .set_config(Some("gemini-3-flash"), Some("low"), Some(PermissionMode::AcceptEdits))
+        .await
         .expect("set_config");
-    session.prompt(vec![ContentBlock::Text("after config".into())]).unwrap();
-    let events2 = recv_until(&rx, |k| matches!(k, EventKind::TurnFinished { .. }));
+    session.prompt(vec![ContentBlock::Text("after config".into())]).await.unwrap();
+    let events2 = recv_until(&mut rx, |k| matches!(k, EventKind::TurnFinished { .. })).await;
     let reply2: String = events2
         .iter()
         .filter_map(|e| match &e.kind {
@@ -617,7 +624,7 @@ fn antigravity_v2_handshake_auth_append_prompt_config_order_and_models() {
         })
         .collect();
     assert_eq!(reply2, "ok:gemini-3-flash:low");
-    session.dispose();
+    session.dispose().await;
 
     // Inspect recorded wire sequence.
     let entries = read_jsonl(&trace_open);
@@ -687,16 +694,17 @@ fn antigravity_v2_handshake_auth_append_prompt_config_order_and_models() {
             env: vec![("MOCK_TRACE_FILE".into(), trace_resume.to_string_lossy().into_owned())],
             ..Default::default()
         })
+        .await
         .expect("resume session");
-    let rx_res = resumed.events();
-    resumed.prompt(vec![ContentBlock::Text("resumed".into())]).unwrap();
-    let res_events = recv_until(&rx_res, |k| matches!(k, EventKind::TurnFinished { .. }));
+    let mut rx_res = resumed.events();
+    resumed.prompt(vec![ContentBlock::Text("resumed".into())]).await.unwrap();
+    let res_events = recv_until(&mut rx_res, |k| matches!(k, EventKind::TurnFinished { .. })).await;
     let EventKind::TurnFinished { usage: res_usage, .. } = &res_events.last().unwrap().kind else {
         unreachable!()
     };
     assert_eq!(res_usage.input_tokens, Some(1_000));
     assert_eq!(res_usage.output_tokens, Some(100));
-    resumed.dispose();
+    resumed.dispose().await;
 
     let res_entries = read_jsonl(&trace_resume);
     let resume_msg = res_entries
@@ -709,8 +717,8 @@ fn antigravity_v2_handshake_auth_append_prompt_config_order_and_models() {
     );
 }
 
-#[test]
-fn antigravity_interaction_never_auto_approved_in_bypass_and_normalizes_tool_payloads() {
+#[tokio::test]
+async fn antigravity_interaction_never_auto_approved_in_bypass_and_normalizes_tool_payloads() {
     let dir = tempfile::tempdir().unwrap();
     let script = write_executable(dir.path(), "mock-agy-interaction", MOCK_AGY_SCRIPT);
     let rt = AcpRuntime::new(AcpAgentSpec::new("antigravity", "Antigravity CLI", script.to_string_lossy(), ["acp"]));
@@ -722,14 +730,15 @@ fn antigravity_interaction_never_auto_approved_in_bypass_and_normalizes_tool_pay
             env: vec![("MOCK_SCENARIO".into(), "interaction".into())],
             ..Default::default()
         })
+        .await
         .expect("open interaction session");
 
-    let rx = session.events();
-    session.prompt(vec![ContentBlock::Text("deploy".into())]).unwrap();
+    let mut rx = session.events();
+    session.prompt(vec![ContentBlock::Text("deploy".into())]).await.unwrap();
 
     // Must NOT emit PermissionRequested for the normal execute tool (auto-approved in Bypass),
     // and MUST pause on InteractionRequested for `interaction_deploy_1`.
-    let before = recv_until(&rx, |k| matches!(k, EventKind::InteractionRequested { .. }));
+    let before = recv_until(&mut rx, |k| matches!(k, EventKind::InteractionRequested { .. })).await;
     assert!(
         !before.iter().any(|e| matches!(e.kind, EventKind::PermissionRequested { .. })),
         "normal execute tool should have auto-approved under Bypass: {before:#?}"
@@ -751,9 +760,10 @@ fn antigravity_interaction_never_auto_approved_in_bypass_and_normalizes_tool_pay
 
     session
         .respond_interaction(request_id, InteractionDecision::Select { option_id: "opt-b".into() })
+        .await
         .expect("respond_interaction");
 
-    let after = recv_until(&rx, |k| matches!(k, EventKind::TurnFinished { .. }));
+    let after = recv_until(&mut rx, |k| matches!(k, EventKind::TurnFinished { .. })).await;
     assert!(after.iter().any(|e| matches!(e.kind, EventKind::InteractionResolved { .. })));
 
     let tool_started = after
@@ -784,11 +794,11 @@ fn antigravity_interaction_never_auto_approved_in_bypass_and_normalizes_tool_pay
         })
         .collect();
     assert_eq!(text, "chosen:opt-b");
-    session.dispose();
+    session.dispose().await;
 }
 
-#[test]
-fn antigravity_mid_turn_steer_and_detached_background_continuation() {
+#[tokio::test]
+async fn antigravity_mid_turn_steer_and_detached_background_continuation() {
     let dir = tempfile::tempdir().unwrap();
     let script = write_executable(dir.path(), "mock-agy-steer", MOCK_AGY_SCRIPT);
     let trace = dir.path().join("trace-steer.jsonl");
@@ -803,18 +813,19 @@ fn antigravity_mid_turn_steer_and_detached_background_continuation() {
             ],
             ..Default::default()
         })
+        .await
         .expect("open steer session");
 
-    let rx = session.events();
-    session.prompt(vec![ContentBlock::Text("start bg".into())]).unwrap();
+    let mut rx = session.events();
+    session.prompt(vec![ContentBlock::Text("start bg".into())]).await.unwrap();
     // Wait until the open background execute tool call arrives.
-    recv_until(&rx, |k| matches!(k, EventKind::ToolCallStarted { id, .. } if id == "bg-cmd-1"));
+    recv_until(&mut rx, |k| matches!(k, EventKind::ToolCallStarted { id, .. } if id == "bg-cmd-1")).await;
 
     // Mid-turn steer sends another `session/prompt` (NOT `session/steer` or `session/cancel`).
-    session.steer(vec![ContentBlock::Text("also summarize".into())]).expect("steer");
+    session.steer(vec![ContentBlock::Text("also summarize".into())]).await.expect("steer");
 
     // Turn only finishes AFTER detached `bg-cmd-1` completes, `"bg done"` streams, and `usage_update` lands.
-    let rest = recv_until(&rx, |k| matches!(k, EventKind::TurnFinished { .. }));
+    let rest = recv_until(&mut rx, |k| matches!(k, EventKind::TurnFinished { .. })).await;
     let bg_text: String = rest
         .iter()
         .filter_map(|e| match &e.kind {
@@ -830,7 +841,7 @@ fn antigravity_mid_turn_steer_and_detached_background_continuation() {
     assert_eq!(usage.input_tokens, Some(1_000)); // 120 + 880
     assert_eq!(usage.output_tokens, Some(100)); // 45 + 55
     assert_eq!(usage.context_used_tokens, Some(9_000));
-    session.dispose();
+    session.dispose().await;
 
     let entries = read_jsonl(&trace);
     let methods: Vec<&str> = entries
@@ -843,8 +854,8 @@ fn antigravity_mid_turn_steer_and_detached_background_continuation() {
     assert!(!methods.contains(&"session/cancel"), "{methods:?}");
 }
 
-#[test]
-fn antigravity_silent_db_error_upgrades_end_turn_and_marks_unresumable() {
+#[tokio::test]
+async fn antigravity_silent_db_error_upgrades_end_turn_and_marks_unresumable() {
     let dir = tempfile::tempdir().unwrap();
     let script = write_executable(dir.path(), "mock-agy-db", MOCK_AGY_SCRIPT);
     let gemini_dir = dir.path().join("gemini");
@@ -853,13 +864,14 @@ fn antigravity_silent_db_error_upgrades_end_turn_and_marks_unresumable() {
     let db_path = conv_dir.join("sess-silent.db");
 
     // Create the steps table matching agy 1.5.14 schema via python3 sqlite3.
-    let status = std::process::Command::new("python3")
+    let status = tokio::process::Command::new("python3")
         .args([
             "-c",
             "import sqlite3, sys; c = sqlite3.connect(sys.argv[1]); c.execute('CREATE TABLE steps (idx integer PRIMARY KEY, step_type integer NOT NULL DEFAULT 0, status integer NOT NULL DEFAULT 0, has_subtrajectory numeric NOT NULL DEFAULT false, metadata blob, error_details blob, permissions blob, task_details blob, render_info blob, step_payload blob, step_format integer NOT NULL DEFAULT 0)'); c.execute('INSERT INTO steps (idx, step_type, step_payload) VALUES (0, 5, ?)', (b'init',)); c.commit()",
             &db_path.to_string_lossy(),
         ])
         .status()
+        .await
         .expect("seed sqlite db");
     assert!(status.success());
 
@@ -879,13 +891,14 @@ fn antigravity_silent_db_error_upgrades_end_turn_and_marks_unresumable() {
             ],
             ..Default::default()
         })
+        .await
         .expect("open silent_db session");
 
-    let rx = session.events();
+    let mut rx = session.events();
 
     // Turn 1: silent 429 QUOTA_EXHAUSTED -> upgraded to StopReason::Error, still resumable.
-    session.prompt(vec![ContentBlock::Text("turn 1".into())]).unwrap();
-    let t1 = recv_until(&rx, |k| matches!(k, EventKind::TurnFinished { .. }));
+    session.prompt(vec![ContentBlock::Text("turn 1".into())]).await.unwrap();
+    let t1 = recv_until(&mut rx, |k| matches!(k, EventKind::TurnFinished { .. })).await;
     assert!(matches!(t1.last().unwrap().kind, EventKind::TurnFinished { reason: StopReason::Error, .. }));
     let err1 = t1
         .iter()
@@ -898,15 +911,15 @@ fn antigravity_silent_db_error_upgrades_end_turn_and_marks_unresumable() {
     assert_eq!(session.resume_id().as_deref(), Some("sess-silent"));
 
     // Turn 2: silent INVALID_THINKING_SIGNATURE -> upgraded to StopReason::Error AND resume_id() == None.
-    session.prompt(vec![ContentBlock::Text("turn 2".into())]).unwrap();
-    let t2 = recv_until(&rx, |k| matches!(k, EventKind::TurnFinished { .. }));
+    session.prompt(vec![ContentBlock::Text("turn 2".into())]).await.unwrap();
+    let t2 = recv_until(&mut rx, |k| matches!(k, EventKind::TurnFinished { .. })).await;
     assert!(matches!(t2.last().unwrap().kind, EventKind::TurnFinished { reason: StopReason::Error, .. }));
     assert_eq!(session.resume_id(), None, "INVALID_THINKING_SIGNATURE must mark session unresumable");
-    session.dispose();
+    session.dispose().await;
 }
 
-#[test]
-fn antigravity_session_info_update_sets_and_updates_session_title_ignoring_blank_and_child() {
+#[tokio::test]
+async fn antigravity_session_info_update_sets_and_updates_session_title_ignoring_blank_and_child() {
     let dir = tempfile::tempdir().unwrap();
     let script = write_executable(
         dir.path(),
@@ -991,34 +1004,35 @@ for raw in sys.stdin:
             bin_path: Some(script),
             ..Default::default()
         })
+        .await
         .expect("open title session");
     assert_eq!(session.session_title().as_deref(), Some("Initial ACP Title"));
 
-    let rx = session.events();
-    session.prompt(vec![ContentBlock::Text("first".into())]).unwrap();
-    recv_until(&rx, |k| matches!(k, EventKind::TurnFinished { .. }));
+    let mut rx = session.events();
+    session.prompt(vec![ContentBlock::Text("first".into())]).await.unwrap();
+    recv_until(&mut rx, |k| matches!(k, EventKind::TurnFinished { .. })).await;
     assert_eq!(session.session_title().as_deref(), Some("Fix terminal titles"));
 
-    session.prompt(vec![ContentBlock::Text("second".into())]).unwrap();
-    recv_until(&rx, |k| matches!(k, EventKind::TurnFinished { .. }));
+    session.prompt(vec![ContentBlock::Text("second".into())]).await.unwrap();
+    recv_until(&mut rx, |k| matches!(k, EventKind::TurnFinished { .. })).await;
     assert_eq!(session.session_title().as_deref(), Some("Swarm Title Polish"));
-    session.dispose();
+    session.dispose().await;
 }
 
 // ---- Opt-in real local `agy 1.5+` smoke test --------------------------------
 
-#[test]
+#[tokio::test]
 #[ignore = "probes real local agy >= 1.5.0 CLI and spends quota"]
-fn live_antigravity_local_smoke() {
+async fn live_antigravity_local_smoke() {
     let rt = default_runtimes().require("antigravity").expect("antigravity runtime");
-    let install = rt.installation();
+    let install = rt.installation().await;
     println!("[agy smoke] installation = {install:?}");
     let Installation::Available { version, path } = install else {
         panic!("expected local agy >= 1.5.0 to be installed and available");
     };
     assert!(version.is_some(), "version should be detected for {}", path.display());
 
-    let models = rt.list_models().expect("list_models");
+    let models = rt.list_models().await.expect("list_models");
     println!("[agy smoke] models ({}):", models.len());
     for m in &models {
         println!(
@@ -1036,14 +1050,18 @@ fn live_antigravity_local_smoke() {
             permission_mode: PermissionMode::Bypass,
             ..Default::default()
         })
+        .await
         .expect("open fresh antigravity session");
     let session_id = session.id();
     println!("[agy smoke] opened fresh session_id = {session_id}");
-    let rx = session.events();
-    session.prompt(vec![ContentBlock::Text("Reply with the single word ok.".into())]).unwrap();
+    let mut rx = session.events();
+    session.prompt(vec![ContentBlock::Text("Reply with the single word ok.".into())]).await.unwrap();
     let mut reply = String::new();
     let fresh_usage = loop {
-        let ev = rx.recv_timeout(Duration::from_secs(120)).expect("event within 120s");
+        let ev = tokio::time::timeout(Duration::from_secs(120), rx.recv())
+            .await
+            .expect("event within 120s")
+            .expect("channel open");
         match ev.kind {
             EventKind::TextDelta { text } => reply.push_str(&text),
             EventKind::Error { message } => panic!("unexpected error on fresh turn: {message}"),
@@ -1070,7 +1088,7 @@ fn live_antigravity_local_smoke() {
         println!("[agy smoke] conversation db exists={} path={}", db.is_file(), db.display());
         assert!(db.is_file(), "expected conversation db at {}", db.display());
     }
-    session.dispose();
+    session.dispose().await;
 
     // Resume the same session and confirm per-turn usage is still reported.
     let resumed = rt
@@ -1081,12 +1099,19 @@ fn live_antigravity_local_smoke() {
             permission_mode: PermissionMode::Bypass,
             ..Default::default()
         })
+        .await
         .expect("resume antigravity session");
-    let rx2 = resumed.events();
-    resumed.prompt(vec![ContentBlock::Text("Now reply with the single word pong.".into())]).unwrap();
+    let mut rx2 = resumed.events();
+    resumed
+        .prompt(vec![ContentBlock::Text("Now reply with the single word pong.".into())])
+        .await
+        .unwrap();
     let mut reply2 = String::new();
     let resumed_usage = loop {
-        let ev = rx2.recv_timeout(Duration::from_secs(120)).expect("resumed event within 120s");
+        let ev = tokio::time::timeout(Duration::from_secs(120), rx2.recv())
+            .await
+            .expect("resumed event within 120s")
+            .expect("channel open");
         match ev.kind {
             EventKind::TextDelta { text } => reply2.push_str(&text),
             EventKind::Error { message } => panic!("unexpected error on resumed turn: {message}"),
@@ -1111,9 +1136,13 @@ fn live_antigravity_local_smoke() {
     // Exercise steer + abort + dispose cleanly.
     resumed
         .prompt(vec![ContentBlock::Text("Count slowly from 1 to 300, one number per line.".into())])
+        .await
         .unwrap();
     loop {
-        let ev = rx2.recv_timeout(Duration::from_secs(120)).expect("stream start");
+        let ev = tokio::time::timeout(Duration::from_secs(120), rx2.recv())
+            .await
+            .expect("stream start")
+            .expect("channel open");
         if matches!(ev.kind, EventKind::TextDelta { .. } | EventKind::ThinkingDelta { .. }) {
             break;
         }
@@ -1122,15 +1151,18 @@ fn live_antigravity_local_smoke() {
         }
     }
     if resumed.status() == SessionStatus::Running {
-        let _ = resumed.steer(vec![ContentBlock::Text("Stop counting and wait.".into())]);
-        let _ = resumed.abort();
+        let _ = resumed.steer(vec![ContentBlock::Text("Stop counting and wait.".into())]).await;
+        let _ = resumed.abort().await;
         loop {
-            let ev = rx2.recv_timeout(Duration::from_secs(60)).expect("turn end after abort");
+            let ev = tokio::time::timeout(Duration::from_secs(60), rx2.recv())
+                .await
+                .expect("turn end after abort")
+                .expect("channel open");
             if let EventKind::TurnFinished { reason, .. } = ev.kind {
                 println!("[agy smoke] post-steer/abort stop reason = {reason:?}");
                 break;
             }
         }
     }
-    resumed.dispose();
+    resumed.dispose().await;
 }

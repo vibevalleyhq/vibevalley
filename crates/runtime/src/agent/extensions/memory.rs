@@ -3,6 +3,7 @@ use std::sync::Arc;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::BoxFuture;
 use crate::agent::core::extension::Extension;
 use crate::agent::core::pipeline::PromptSection;
 use crate::agent::core::tool::{ReplayPolicy, Tool, ToolContext, TypedTool, TypedToolAdapter, TypedToolOutput};
@@ -51,15 +52,17 @@ impl TypedTool for Remember {
         ReplayPolicy::Unsafe
     }
 
-    fn execute(&self, args: Self::Args, ctx: &ToolContext) -> Result<TypedToolOutput<Self::Details>, String> {
-        if ctx.cancel.is_cancelled() {
-            return Err("aborted by the user".into());
-        }
-        if args.note.trim().is_empty() {
-            return Err("note 是空的。".into());
-        }
-        self.0.remember(&args.note)?;
-        Ok(TypedToolOutput::ok_with("记下了。", MemoryDetails { lines: None }))
+    fn execute<'a>(&'a self, args: Self::Args, ctx: &'a ToolContext) -> BoxFuture<'a, Result<TypedToolOutput<Self::Details>, String>> {
+        Box::pin(async move {
+            if ctx.cancel.is_cancelled() {
+                return Err("aborted by the user".into());
+            }
+            if args.note.trim().is_empty() {
+                return Err("note 是空的。".into());
+            }
+            self.0.remember(&args.note)?;
+            Ok(TypedToolOutput::ok_with("记下了。", MemoryDetails { lines: None }))
+        })
     }
 }
 
@@ -79,12 +82,14 @@ impl TypedTool for RewriteMemory {
         ReplayPolicy::Unsafe
     }
 
-    fn execute(&self, args: Self::Args, ctx: &ToolContext) -> Result<TypedToolOutput<Self::Details>, String> {
-        if ctx.cancel.is_cancelled() {
-            return Err("aborted by the user".into());
-        }
-        let n = self.0.rewrite(&args.content)?;
-        Ok(TypedToolOutput::ok_with(format!("重写好了，现在 {n} 行。"), MemoryDetails { lines: Some(n) }))
+    fn execute<'a>(&'a self, args: Self::Args, ctx: &'a ToolContext) -> BoxFuture<'a, Result<TypedToolOutput<Self::Details>, String>> {
+        Box::pin(async move {
+            if ctx.cancel.is_cancelled() {
+                return Err("aborted by the user".into());
+            }
+            let n = self.0.rewrite(&args.content)?;
+            Ok(TypedToolOutput::ok_with(format!("重写好了，现在 {n} 行。"), MemoryDetails { lines: Some(n) }))
+        })
     }
 }
 

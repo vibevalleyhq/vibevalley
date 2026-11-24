@@ -5,14 +5,16 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
+use tokio::sync::mpsc;
+
 use crate::agent::durable::{CommitStats, DocumentEvent, Error, Result};
 
 pub(crate) type DocKey = (String, String, String);
 
 #[derive(Default)]
 pub(crate) struct LiveInner {
-    pub(crate) docs: Vec<flume::Sender<DocumentEvent>>,
-    pub(crate) tasks: Vec<flume::Sender<()>>,
+    pub(crate) docs: Vec<mpsc::UnboundedSender<DocumentEvent>>,
+    pub(crate) tasks: Vec<mpsc::Sender<()>>,
     pub(crate) stats: CommitStats,
 }
 
@@ -50,22 +52,22 @@ impl LiveHub {
         inner.tasks.clear();
     }
 
-    pub fn subscribe_documents(&self) -> Result<flume::Receiver<DocumentEvent>> {
+    pub fn subscribe_documents(&self) -> Result<mpsc::UnboundedReceiver<DocumentEvent>> {
         let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         if self.is_closed() {
             return Err(Error::Closed);
         }
-        let (tx, rx) = flume::unbounded();
+        let (tx, rx) = mpsc::unbounded_channel();
         inner.docs.push(tx);
         Ok(rx)
     }
 
-    pub fn subscribe_tasks(&self) -> Result<flume::Receiver<()>> {
+    pub fn subscribe_tasks(&self) -> Result<mpsc::Receiver<()>> {
         let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         if self.is_closed() {
             return Err(Error::Closed);
         }
-        let (tx, rx) = flume::bounded(1);
+        let (tx, rx) = mpsc::channel(1);
         inner.tasks.push(tx);
         Ok(rx)
     }
@@ -88,7 +90,7 @@ impl LiveHub {
             inner.docs.retain(|tx| tx.send(event.clone()).is_ok());
         }
         if tasks_changed {
-            inner.tasks.retain(|tx| !matches!(tx.try_send(()), Err(flume::TrySendError::Disconnected(_))));
+            inner.tasks.retain(|tx| !matches!(tx.try_send(()), Err(mpsc::error::TrySendError::Closed(_))));
         }
     }
 

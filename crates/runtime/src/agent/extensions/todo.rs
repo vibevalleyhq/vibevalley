@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::BoxFuture;
 use crate::agent::core::doc::{CONVERSATION_SCOPE, TodoDoc, read_doc, write_doc};
 use crate::agent::core::extension::Extension;
 use crate::agent::core::tool::{ReplayPolicy, Tool, ToolContext, TypedTool, TypedToolAdapter, TypedToolOutput};
@@ -234,29 +235,39 @@ pub struct TodoDetails {
     pub count: usize,
 }
 
-fn read_todos(fallback: &Mutex<Vec<Todo>>, ctx: &ToolContext) -> Result<Vec<Todo>, String> {
+async fn read_todos(fallback: &Mutex<Vec<Todo>>, ctx: &ToolContext) -> Result<Vec<Todo>, String> {
     if let Some(store) = &ctx.store
         && !ctx.conversation_id.is_empty()
     {
+        let conv = ctx.conversation_id.clone();
         return store
-            .read(|tx| read_doc::<TodoDoc>(tx, CONVERSATION_SCOPE, &ctx.conversation_id))
+            .read_async(move |tx| Box::pin(async move { read_doc::<TodoDoc>(tx, CONVERSATION_SCOPE, &conv).await }))
+            .await
             .map(|doc| doc.items)
             .map_err(|e| e.to_string());
     }
     Ok(fallback.lock().unwrap_or_else(|p| p.into_inner()).clone())
 }
 
-fn mutate_todos<R>(fallback: &Mutex<Vec<Todo>>, ctx: &ToolContext, f: impl FnOnce(&mut Vec<Todo>) -> Result<R, String>) -> Result<R, String> {
+async fn mutate_todos<R: Send + 'static>(
+    fallback: &Mutex<Vec<Todo>>,
+    ctx: &ToolContext,
+    f: impl FnOnce(&mut Vec<Todo>) -> Result<R, String> + Send + 'static,
+) -> Result<R, String> {
     if let Some(store) = &ctx.store
         && !ctx.conversation_id.is_empty()
     {
+        let conv = ctx.conversation_id.clone();
         return store
-            .write(|tx| {
-                let mut doc = read_doc::<TodoDoc>(tx, CONVERSATION_SCOPE, &ctx.conversation_id)?;
-                let res = f(&mut doc.items).map_err(crate::agent::durable::Error::Invalid)?;
-                write_doc::<TodoDoc>(tx, CONVERSATION_SCOPE, &ctx.conversation_id, &doc)?;
-                Ok(res)
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    let mut doc = read_doc::<TodoDoc>(tx, CONVERSATION_SCOPE, &conv).await?;
+                    let res = f(&mut doc.items).map_err(crate::agent::durable::Error::Invalid)?;
+                    write_doc::<TodoDoc>(tx, CONVERSATION_SCOPE, &conv, &doc).await?;
+                    Ok(res)
+                })
             })
+            .await
             .map_err(|e| e.to_string());
     }
     let mut g = fallback.lock().unwrap_or_else(|p| p.into_inner());
@@ -283,15 +294,18 @@ impl TypedTool for TodoAdd {
         ReplayPolicy::Unsafe
     }
 
-    fn execute(&self, args: Self::Args, ctx: &ToolContext) -> Result<TypedToolOutput<Self::Details>, String> {
-        mutate_todos(&self.0, ctx, |g| {
-            let (next, problems) = todo_add(g, &args.tasks);
-            *g = next;
-            if problems.is_empty() {
-                Ok(TypedToolOutput::ok_with(todo_text(g), TodoDetails { count: g.len() }))
-            } else {
-                Err(format!("没收：{}\n\n{}", problems.join("；"), todo_text(g)))
-            }
+    fn execute<'a>(&'a self, args: Self::Args, ctx: &'a ToolContext) -> BoxFuture<'a, Result<TypedToolOutput<Self::Details>, String>> {
+        Box::pin(async move {
+            mutate_todos(&self.0, ctx, move |g| {
+                let (next, problems) = todo_add(g, &args.tasks);
+                *g = next;
+                if problems.is_empty() {
+                    Ok(TypedToolOutput::ok_with(todo_text(g), TodoDetails { count: g.len() }))
+                } else {
+                    Err(format!("没收：{}\n\n{}", problems.join("；"), todo_text(g)))
+                }
+            })
+            .await
         })
     }
 }
@@ -312,24 +326,27 @@ impl TypedTool for TodoUpdate {
         ReplayPolicy::Unsafe
     }
 
-    fn execute(&self, args: Self::Args, ctx: &ToolContext) -> Result<TypedToolOutput<Self::Details>, String> {
-        let change = TodoChange {
-            state: args.state.map(Into::into),
-            result: args.result,
-            brief: args.brief,
-            after: args.after,
-        };
-        mutate_todos(&self.0, ctx, |g| {
-            let next = todo_update(g, &args.id, &change)?;
-            let finished = !next.is_empty() && next.iter().all(|t| t.state.settled());
-            let text = todo_text(&next);
-            *g = if finished { vec![] } else { next };
-            let out = if finished {
-                text + "\n\n都做完了，这张图收起来了。"
-            } else {
-                text
+    fn execute<'a>(&'a self, args: Self::Args, ctx: &'a ToolContext) -> BoxFuture<'a, Result<TypedToolOutput<Self::Details>, String>> {
+        Box::pin(async move {
+            let change = TodoChange {
+                state: args.state.map(Into::into),
+                result: args.result,
+                brief: args.brief,
+                after: args.after,
             };
-            Ok(TypedToolOutput::ok_with(out, TodoDetails { count: g.len() }))
+            mutate_todos(&self.0, ctx, move |g| {
+                let next = todo_update(g, &args.id, &change)?;
+                let finished = !next.is_empty() && next.iter().all(|t| t.state.settled());
+                let text = todo_text(&next);
+                *g = if finished { vec![] } else { next };
+                let out = if finished {
+                    text + "\n\n都做完了，这张图收起来了。"
+                } else {
+                    text
+                };
+                Ok(TypedToolOutput::ok_with(out, TodoDetails { count: g.len() }))
+            })
+            .await
         })
     }
 }
@@ -350,9 +367,11 @@ impl TypedTool for TodoList {
         ReplayPolicy::Safe
     }
 
-    fn execute(&self, _args: Self::Args, ctx: &ToolContext) -> Result<TypedToolOutput<Self::Details>, String> {
-        let g = read_todos(&self.0, ctx)?;
-        Ok(TypedToolOutput::ok_with(todo_text(&g), TodoDetails { count: g.len() }))
+    fn execute<'a>(&'a self, _args: Self::Args, ctx: &'a ToolContext) -> BoxFuture<'a, Result<TypedToolOutput<Self::Details>, String>> {
+        Box::pin(async move {
+            let g = read_todos(&self.0, ctx).await?;
+            Ok(TypedToolOutput::ok_with(todo_text(&g), TodoDetails { count: g.len() }))
+        })
     }
 }
 

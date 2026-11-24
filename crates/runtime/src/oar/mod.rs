@@ -1,10 +1,9 @@
 //! A Rust implementation of the oar (Open Agent Runtime) interface:
 //! one API to drive many local coding agents. See https://github.com/botiverse/oar
 //!
-//! The public API is executor-agnostic: no method needs a tokio (or any other)
-//! runtime context. Events arrive on `flume` channels, which work from sync
-//! code and from any async executor. Control calls are non-blocking unless
-//! documented otherwise.
+//! Async Tokio-native API: events and voyage records arrive on
+//! `tokio::sync::mpsc::UnboundedReceiver` channels and I/O-bearing runtime and
+//! session operations return `BoxFuture`.
 //!
 //! CONTRACT: the items in this file are the public API other crates compile
 //! against. The owner may add items; do not rename or remove existing ones.
@@ -14,6 +13,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
+
+pub use crate::BoxFuture;
 
 mod accounting;
 pub mod acp;
@@ -1034,8 +1036,15 @@ pub struct ControlOutcome {
 /// One conversation with a runtime.
 pub trait Session: Send + Sync {
     fn id(&self) -> String;
-    fn control(&self, action: ControlAction, arg: &str, input_id: &str, span_id: &str) -> Result<ControlOutcome>;
-    fn control_with(&self, action: ControlAction, arg: &str, input_id: &str, span_id: &str, _opts: TurnOptions) -> Result<ControlOutcome> {
+    fn control<'a>(&'a self, action: ControlAction, arg: &'a str, input_id: &'a str, span_id: &'a str) -> BoxFuture<'a, Result<ControlOutcome>>;
+    fn control_with<'a>(
+        &'a self,
+        action: ControlAction,
+        arg: &'a str,
+        input_id: &'a str,
+        span_id: &'a str,
+        _opts: TurnOptions,
+    ) -> BoxFuture<'a, Result<ControlOutcome>> {
         self.control(action, arg, input_id, span_id)
     }
     fn usage(&self) -> Option<TokenTotals> {
@@ -1048,23 +1057,25 @@ pub trait Session: Send + Sync {
             .and_then(|e| serde_json::from_value(e["usage"]["tokens"].clone()).ok())
     }
     fn records(&self) -> Vec<voyage::Record>;
-    fn subscribe_records(&self, after: Option<u64>) -> flume::Receiver<voyage::Record>;
-    fn wait(&self) -> Result<()> {
-        let events = self.events();
-        for e in events {
-            if matches!(e.kind, EventKind::SessionEnded) {
-                break;
+    fn subscribe_records(&self, after: Option<u64>) -> mpsc::UnboundedReceiver<voyage::Record>;
+    fn wait(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            let mut events = self.events();
+            while let Some(e) = events.recv().await {
+                if matches!(e.kind, EventKind::SessionEnded) {
+                    break;
+                }
             }
-        }
-        Ok(())
+            Ok(())
+        })
     }
     fn resume_id(&self) -> Option<String> {
         Some(self.id())
     }
     /// Resolves the outcome of the specified child turn. Without its turn id,
     /// only thread identity is recoverable.
-    fn read_subagent(&self, _thread_id: &str, _turn_id: Option<&str>) -> Result<SubagentSnapshot> {
-        Err(SubagentSnapshot::unsupported())
+    fn read_subagent<'a>(&'a self, _thread_id: &'a str, _turn_id: Option<&'a str>) -> BoxFuture<'a, Result<SubagentSnapshot>> {
+        Box::pin(async { Err(SubagentSnapshot::unsupported()) })
     }
     /// Snapshot of an active native swarm sidecar (e.g. Antigravity `/swarm`),
     /// or `None` when the session has no swarm.
@@ -1084,39 +1095,45 @@ pub trait Session: Send + Sync {
     fn status(&self) -> SessionStatus;
     /// A new receiver that yields every event from now on. May be called
     /// several times; each receiver gets every event.
-    fn events(&self) -> flume::Receiver<Event>;
+    fn events(&self) -> mpsc::UnboundedReceiver<Event>;
     /// Starts a turn. Rejected while a turn is running (use `steer`/`queue`).
-    fn prompt(&self, content: Vec<ContentBlock>) -> Result<()>;
-    fn prompt_with(&self, content: Vec<ContentBlock>, _opts: TurnOptions) -> Result<()> {
+    fn prompt(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>>;
+    fn prompt_with(&self, content: Vec<ContentBlock>, _opts: TurnOptions) -> BoxFuture<'_, Result<()>> {
         self.prompt(content)
     }
     /// Injects a message into the running turn.
-    fn steer(&self, content: Vec<ContentBlock>) -> Result<()>;
+    fn steer(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>>;
     /// Runs after the current turn finishes.
-    fn queue(&self, content: Vec<ContentBlock>) -> Result<()>;
-    fn queue_with(&self, content: Vec<ContentBlock>, _opts: TurnOptions) -> Result<()> {
+    fn queue(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>>;
+    fn queue_with(&self, content: Vec<ContentBlock>, _opts: TurnOptions) -> BoxFuture<'_, Result<()>> {
         self.queue(content)
     }
-    fn abort(&self) -> Result<()>;
-    fn respond_permission(&self, request_id: &str, decision: PermissionDecision) -> Result<()>;
-    fn respond_interaction(&self, _request_id: &str, _decision: InteractionDecision) -> Result<()> {
-        Err(AgentError::Unsupported {
-            option: "respond_interaction".into(),
-            reason: "runtime has no interactive question channel".into(),
+    fn abort(&self) -> BoxFuture<'_, Result<()>>;
+    fn respond_permission<'a>(&'a self, request_id: &'a str, decision: PermissionDecision) -> BoxFuture<'a, Result<()>>;
+    fn respond_interaction<'a>(&'a self, _request_id: &'a str, _decision: InteractionDecision) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async {
+            Err(AgentError::Unsupported {
+                option: "respond_interaction".into(),
+                reason: "runtime has no interactive question channel".into(),
+            })
         })
     }
-    fn set_config(&self, _model: Option<&str>, _effort: Option<&str>, _permission_mode: Option<PermissionMode>) -> Result<()> {
-        Err(AgentError::Unsupported {
-            option: "set_config".into(),
-            reason: "runtime does not support live config updates".into(),
+    fn set_config<'a>(&'a self, _model: Option<&'a str>, _effort: Option<&'a str>, _permission_mode: Option<PermissionMode>) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async {
+            Err(AgentError::Unsupported {
+                option: "set_config".into(),
+                reason: "runtime does not support live config updates".into(),
+            })
         })
     }
-    /// Stops the underlying process. The session can still be resumed by id.
-    fn dispose(&self);
+    /// Stops the underlying process and awaits teardown. The session can still be resumed by id.
+    fn dispose(&self) -> BoxFuture<'_, ()>;
+    /// Non-blocking signal to begin stopping the underlying process (used by `Drop`).
+    fn signal_dispose(&self) {}
     /// Like `events`, but the receiver first yields every event emitted so
     /// far (so a subscriber attached after `open` still sees
     /// `SessionStarted`). Sessions that keep no history fall back to `events`.
-    fn events_with_history(&self) -> flume::Receiver<Event> {
+    fn events_with_history(&self) -> mpsc::UnboundedReceiver<Event> {
         self.events()
     }
 }
@@ -1129,17 +1146,17 @@ pub trait Runtime: Send + Sync {
     fn refused_options(&self) -> &'static [RefusableOption] {
         runtime_refused_options(self.id())
     }
-    /// Blocking: probes the local machine.
-    fn installation(&self) -> Installation;
-    /// Blocking.
-    fn list_models(&self) -> Result<Vec<ModelInfo>>;
-    /// Blocking until the session is ready to accept a prompt.
-    fn open(&self, opts: SessionOptions) -> Result<Arc<dyn Session>>;
-    /// The account's subscription usage. Blocking (it may start the CLI);
-    /// never call it on a UI thread.
-    fn account_usage(&self) -> Result<AccountUsage> {
-        Ok(AccountUsage::Unsupported {
-            reason: "capability_unavailable".into(),
+    /// Probes the local machine asynchronously.
+    fn installation(&self) -> BoxFuture<'_, Installation>;
+    fn list_models(&self) -> BoxFuture<'_, Result<Vec<ModelInfo>>>;
+    /// Resolves once the session is ready to accept a prompt.
+    fn open(&self, opts: SessionOptions) -> BoxFuture<'_, Result<Arc<dyn Session>>>;
+    /// The account's subscription usage.
+    fn account_usage(&self) -> BoxFuture<'_, Result<AccountUsage>> {
+        Box::pin(async {
+            Ok(AccountUsage::Unsupported {
+                reason: "capability_unavailable".into(),
+            })
         })
     }
 }

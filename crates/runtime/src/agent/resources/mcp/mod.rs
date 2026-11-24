@@ -11,6 +11,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use self::client::Client;
+use crate::BoxFuture;
 use crate::agent::ToolSpec;
 use crate::agent::ai::CancelToken;
 use crate::agent::tools::{Tool, ToolContext, ToolOutput};
@@ -85,8 +86,8 @@ pub struct McpHub {
 }
 
 impl McpHub {
-    /// Each configured server connects and enumerates independently on the shared Tokio runtime.
-    pub fn connect(config: &McpConfig) -> McpHub {
+    /// Each configured server connects and enumerates independently on the Tokio runtime.
+    pub async fn connect(config: &McpConfig) -> McpHub {
         if config.servers.is_empty() {
             return McpHub {
                 tools: vec![],
@@ -99,56 +100,54 @@ impl McpHub {
             .enumerate()
             .map(|(idx, (name, cfg))| (idx, name.clone(), cfg.clone()))
             .collect();
-        crate::rt::block_on(async move {
-            let mut set = tokio::task::JoinSet::new();
-            for (idx, name, cfg) in entries {
-                set.spawn(async move {
-                    let outcome = async {
-                        let client = Arc::new(Client::connect_async(cfg).await?);
-                        let mut tools = Vec::new();
-                        for tool in client.tools_async().await? {
-                            let remote = tool.name.into_owned();
-                            if remote.is_empty() {
-                                continue;
-                            }
-                            let description = tool.description.as_deref().unwrap_or_default();
-                            tools.push(McpTool {
-                                spec: ToolSpec {
-                                    name: tool_name(&name, &remote),
-                                    description: format!("（{name}）{description}"),
-                                    parameters: Value::Object((*tool.input_schema).clone()),
-                                },
-                                server: name.clone(),
-                                remote,
-                                read_only: tool.annotations.and_then(|a| a.read_only_hint).unwrap_or(false),
-                                client: client.clone(),
-                            });
+        let mut set = tokio::task::JoinSet::new();
+        for (idx, name, cfg) in entries {
+            set.spawn(async move {
+                let outcome = async {
+                    let client = Arc::new(Client::connect_async(cfg).await?);
+                    let mut tools = Vec::new();
+                    for tool in client.tools_async().await? {
+                        let remote = tool.name.into_owned();
+                        if remote.is_empty() {
+                            continue;
                         }
-                        Ok::<_, String>(tools)
+                        let description = tool.description.as_deref().unwrap_or_default();
+                        tools.push(McpTool {
+                            spec: ToolSpec {
+                                name: tool_name(&name, &remote),
+                                description: format!("（{name}）{description}"),
+                                parameters: Value::Object((*tool.input_schema).clone()),
+                            },
+                            server: name.clone(),
+                            remote,
+                            read_only: tool.annotations.and_then(|a| a.read_only_hint).unwrap_or(false),
+                            client: client.clone(),
+                        });
                     }
-                    .await;
-                    (idx, name, outcome)
-                });
-            }
-            let mut results: Vec<(usize, String, Result<Vec<McpTool>, String>)> = Vec::new();
-            while let Some(joined) = set.join_next().await {
-                if let Ok(item) = joined {
-                    results.push(item);
+                    Ok::<_, String>(tools)
                 }
+                .await;
+                (idx, name, outcome)
+            });
+        }
+        let mut results: Vec<(usize, String, Result<Vec<McpTool>, String>)> = Vec::new();
+        while let Some(joined) = set.join_next().await {
+            if let Ok(item) = joined {
+                results.push(item);
             }
-            results.sort_by_key(|(idx, _, _)| *idx);
-            let mut hub = McpHub {
-                tools: vec![],
-                failures: vec![],
-            };
-            for (_, name, outcome) in results {
-                match outcome {
-                    Ok(tools) => hub.tools.extend(tools),
-                    Err(why) => hub.failures.push((name.clone(), format!("连不上 MCP 服务 {name}：{why}"))),
-                }
+        }
+        results.sort_by_key(|(idx, _, _)| *idx);
+        let mut hub = McpHub {
+            tools: vec![],
+            failures: vec![],
+        };
+        for (_, name, outcome) in results {
+            match outcome {
+                Ok(tools) => hub.tools.extend(tools),
+                Err(why) => hub.failures.push((name.clone(), format!("连不上 MCP 服务 {name}：{why}"))),
             }
-            hub
-        })
+        }
+        hub
     }
 
     pub fn tools(&self) -> Vec<Box<dyn Tool>> {
@@ -178,23 +177,22 @@ impl Tool for McpTool {
         self.read_only
     }
 
-    fn execute(&self, args: &Value) -> ToolOutput {
-        self.call(args, &CancelToken::never())
+    fn execute<'a>(&'a self, args: &'a Value) -> BoxFuture<'a, ToolOutput> {
+        Box::pin(async move {
+            let never = CancelToken::never();
+            self.call(args, &never).await
+        })
     }
 
-    fn execute_cancellable(&self, args: &Value, cancelled: &flume::Receiver<()>) -> ToolOutput {
-        self.call(args, &CancelToken::from_receiver(cancelled.clone()))
-    }
-
-    fn execute_with_context(&self, args: &Value, ctx: &ToolContext) -> ToolOutput {
-        self.call(args, &ctx.cancel)
+    fn execute_with_context<'a>(&'a self, args: &'a Value, ctx: &'a ToolContext) -> BoxFuture<'a, ToolOutput> {
+        Box::pin(self.call(args, &ctx.cancel))
     }
 }
 
 impl McpTool {
-    fn call(&self, args: &Value, cancel: &CancelToken) -> ToolOutput {
+    async fn call(&self, args: &Value, cancel: &CancelToken) -> ToolOutput {
         let arguments = args.as_object().cloned().unwrap_or_default();
-        match self.client.call(self.remote.clone(), arguments, cancel) {
+        match self.client.call(self.remote.clone(), arguments, cancel).await {
             Err(e) => ToolOutput::error(format!("{} 的 {} 出错：{e}", self.server, self.remote)),
             Ok(result) => {
                 let content: Vec<_> = match result.content.iter().map(serde_json::to_value).collect::<Result<_, _>>() {

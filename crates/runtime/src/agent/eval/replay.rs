@@ -55,10 +55,10 @@ pub struct ReplayOutcome {
 
 /// Exports `[1..=at_seq]` from SQLite or JSONL into `<out_dir>/store`, provisions `<out_dir>/workspace`,
 /// executes one durable generation turn, and runs any configured graders.
-pub fn run_replay(spec: &ReplaySpec, out_dir: &Path, client: Arc<dyn ModelClient>) -> Result<ReplayOutcome> {
+pub async fn run_replay(spec: &ReplaySpec, out_dir: &Path, client: Arc<dyn ModelClient>) -> Result<ReplayOutcome> {
     fs::create_dir_all(out_dir).map_err(|e| Error::Invalid(format!("create replay dir {}: {e}", out_dir.display())))?;
-    let source = Store::open_any_read_only(&spec.source_path)?;
-    let conv_id = resolve_root_conversation(&source, spec.conversation_id.as_deref())?;
+    let source = Store::open_any_read_only(&spec.source_path).await?;
+    let conv_id = resolve_root_conversation(&source, spec.conversation_id.as_deref()).await?;
 
     let store_dir = out_dir.join("store");
     let workspace_dir = out_dir.join("workspace");
@@ -73,40 +73,44 @@ pub fn run_replay(spec: &ReplaySpec, out_dir: &Path, client: Arc<dyn ModelClient
         copy_dir_all(ws, &workspace_dir)?;
     }
 
-    source.export_conversation_jsonl(
-        &conv_id,
-        &store_dir,
-        ExportOptions {
-            at_seq: Some(spec.at_seq),
-            include_children: false,
-            fsync: true,
-        },
-    )?;
-    let _ = source.close();
+    source
+        .export_conversation_jsonl(
+            &conv_id,
+            &store_dir,
+            ExportOptions {
+                at_seq: Some(spec.at_seq),
+                include_children: false,
+                fsync: true,
+            },
+        )
+        .await?;
+    let _ = source.close().await;
 
     let provider = Arc::new(EvalBrainProvider::new(spec.profile.clone(), &workspace_dir, client.clone()));
     let telemetry_path = store_dir.join("telemetry.jsonl");
     let telemetry_sink = Arc::new(JsonlTelemetrySink::open(&telemetry_path)?);
     let harness = Harness::open_jsonl(&store_dir, provider)?.with_telemetry(telemetry_sink);
     mount_profile_extensions(&harness, &spec.profile, &workspace_dir, client.clone());
-    configure_profile_budget(harness.store(), &conv_id, &spec.profile)?;
-    harness.recover()?;
+    configure_profile_budget(harness.store(), &conv_id, &spec.profile).await?;
+    harness.recover().await?;
 
     let req_id = format!("eval-replay-{}", uuid::Uuid::now_v7());
-    let (_, task, _) = harness.submit(Request {
-        conversation: &conv_id,
-        provider: &spec.profile.model,
-        request_id: &req_id,
-        prompt: &spec.prompt,
-        source: "eval_replay",
-        system: &spec.profile.system_prompt,
-        when_busy: WhenBusy::Reject,
-        ..Default::default()
-    })?;
+    let (_, task, _) = harness
+        .submit(Request {
+            conversation: &conv_id,
+            provider: &spec.profile.model,
+            request_id: &req_id,
+            prompt: &spec.prompt,
+            source: "eval_replay",
+            system: &spec.profile.system_prompt,
+            when_busy: WhenBusy::Reject,
+            ..Default::default()
+        })
+        .await?;
 
     let timeout = Duration::from_secs(spec.timeout_secs.max(1));
     let mut run_error: Option<String> = None;
-    let final_output = match harness.scheduler().wait(&task.id, timeout) {
+    let final_output = match harness.scheduler().wait(&task.id, timeout).await {
         Ok(done) => {
             if done.status == TaskStatus::Terminal && done.terminal_reason != "completed" {
                 run_error = Some(if done.error_text.is_empty() {
@@ -118,7 +122,7 @@ pub fn run_replay(spec: &ReplaySpec, out_dir: &Path, client: Arc<dyn ModelClient
             done.result["output"].as_str().unwrap_or_default().to_owned()
         }
         Err(Error::Timeout) => {
-            let _ = harness.scheduler().abort(&task.id);
+            let _ = harness.scheduler().abort(&task.id).await;
             run_error = Some(format!("replay timed out after {}s", timeout.as_secs()));
             String::new()
         }
@@ -128,12 +132,12 @@ pub fn run_replay(spec: &ReplaySpec, out_dir: &Path, client: Arc<dyn ModelClient
         }
     };
 
-    harness.close();
+    harness.close().await;
     let telemetry = read_telemetry_jsonl(&telemetry_path)?;
-    let metrics = analyze_store(harness.store(), &conv_id, &telemetry)?;
-    let html = export_html(harness.store(), &conv_id, &telemetry)?;
+    let metrics = analyze_store(harness.store(), &conv_id, &telemetry).await?;
+    let html = export_html(harness.store(), &conv_id, &telemetry).await?;
     let _ = fs::write(out_dir.join("transcript.html"), html);
-    let _ = harness.store().close();
+    let _ = harness.store().close().await;
 
     let grader_results = evaluate_graders(
         &spec.graders,
@@ -145,7 +149,8 @@ pub fn run_replay(spec: &ReplaySpec, out_dir: &Path, client: Arc<dyn ModelClient
             judge_client: Some(client),
             default_model: &spec.profile.model,
         },
-    );
+    )
+    .await;
     let passed = run_error.is_none() && grader_results.iter().all(|g| g.passed);
     let outcome = ReplayOutcome {
         conversation_id: conv_id,

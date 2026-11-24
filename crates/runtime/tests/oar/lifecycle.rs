@@ -45,33 +45,33 @@ fn go_voyage_round_trips_and_rejects_broken_evidence() {
     }
 }
 
-#[test]
-fn child_slots_are_released_after_failure_dispose_and_close() {
+#[tokio::test]
+async fn child_slots_are_released_after_failure_dispose_and_close() {
     let pool = Pool::with_limits(Arc::new(vibevalley_runtime::oar::default_runtimes()), 1, 1, Some(0));
     let cwd = tempfile::tempdir().unwrap();
     let opts = || SessionOptions {
         cwd: cwd.path().into(),
         ..Default::default()
     };
-    assert!(pool.spawn("missing", opts()).is_err());
+    assert!(pool.spawn("missing", opts()).await.is_err());
     assert_eq!(pool.active(), 0);
-    let first = pool.spawn("scripted", opts()).unwrap();
-    assert!(matches!(pool.spawn("scripted",opts()),Err(e) if e.rejection_code()==Some("concurrency_limit")));
-    first.dispose();
+    let first = pool.spawn("scripted", opts()).await.unwrap();
+    assert!(matches!(pool.spawn("scripted",opts()).await,Err(e) if e.rejection_code()==Some("concurrency_limit")));
+    first.dispose().await;
     assert_eq!(pool.active(), 0);
-    let next = pool.spawn("scripted", opts()).unwrap();
-    pool.close();
+    let next = pool.spawn("scripted", opts()).await.unwrap();
+    pool.close().await;
     assert_eq!(pool.active(), 0);
-    assert_eq!(next.control(A::Prompt, "later", "", "").unwrap().status, S::NotRunning);
-    assert!(matches!(pool.spawn("scripted",opts()),Err(e) if e.rejection_code()==Some("pool_closed")));
+    assert_eq!(next.control(A::Prompt, "later", "", "").await.unwrap().status, S::NotRunning);
+    assert!(matches!(pool.spawn("scripted",opts()).await,Err(e) if e.rejection_code()==Some("pool_closed")));
     assert_eq!(parse_depth("").unwrap(), 0);
     assert!(parse_depth("-1").is_err());
     let capped = Pool::with_limits(Arc::new(vibevalley_runtime::oar::default_runtimes()), 1, 1, Some(1));
-    assert!(matches!(capped.spawn("scripted",opts()),Err(e) if e.rejection_code()==Some("depth_limit")));
+    assert!(matches!(capped.spawn("scripted",opts()).await,Err(e) if e.rejection_code()==Some("depth_limit")));
 }
 
-#[test]
-fn queue_withdraw_raw_frames_cursors_and_reopen() {
+#[tokio::test]
+async fn queue_withdraw_raw_frames_cursors_and_reopen() {
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("session.jsonl");
     let binary = PathBuf::from(env!("CARGO_BIN_EXE_vv_test_fixture"));
@@ -92,20 +92,20 @@ fn queue_withdraw_raw_frames_cursors_and_reopen() {
         ..Default::default()
     };
     let runtime = vibevalley_runtime::oar::default_runtimes().require("claude").unwrap();
-    let session = runtime.open(opts.clone()).unwrap();
-    assert_eq!(session.control(A::Abort, "", "", "").unwrap().code, "no_active_turn");
-    let events = session.events();
-    assert_eq!(session.control(A::Prompt, "hold", "", "my-span").unwrap().status, S::Accepted);
-    assert_eq!(session.control(A::Compact, "", "", "").unwrap().code, "busy");
-    assert_eq!(session.control(A::Prompt, "second", "", "").unwrap().code, "busy");
-    session.control(A::Queue, "drop", "drop-id", "").unwrap();
-    session.control(A::Queue, "keep", "keep-id", "second-span").unwrap();
-    assert_eq!(session.control(A::Withdraw, "drop-id", "", "").unwrap().status, S::Accepted);
-    assert_eq!(session.control(A::Withdraw, "drop-id", "", "").unwrap().code, "not_found");
-    session.control(A::Steer, "release", "", "").unwrap();
+    let session = runtime.open(opts.clone()).await.unwrap();
+    assert_eq!(session.control(A::Abort, "", "", "").await.unwrap().code, "no_active_turn");
+    let mut events = session.events();
+    assert_eq!(session.control(A::Prompt, "hold", "", "my-span").await.unwrap().status, S::Accepted);
+    assert_eq!(session.control(A::Compact, "", "", "").await.unwrap().code, "busy");
+    assert_eq!(session.control(A::Prompt, "second", "", "").await.unwrap().code, "busy");
+    session.control(A::Queue, "drop", "drop-id", "").await.unwrap();
+    session.control(A::Queue, "keep", "keep-id", "second-span").await.unwrap();
+    assert_eq!(session.control(A::Withdraw, "drop-id", "", "").await.unwrap().status, S::Accepted);
+    assert_eq!(session.control(A::Withdraw, "drop-id", "", "").await.unwrap().code, "not_found");
+    session.control(A::Steer, "release", "", "").await.unwrap();
     let mut turns = 0;
     while turns != 2 {
-        let e = events.recv_timeout(Duration::from_secs(6)).unwrap();
+        let e = tokio::time::timeout(Duration::from_secs(6), events.recv()).await.unwrap().unwrap();
         if matches!(e.kind, EventKind::TurnFinished { .. }) && e.agent_path.is_empty() {
             turns += 1;
         }
@@ -116,11 +116,14 @@ fn queue_withdraw_raw_frames_cursors_and_reopen() {
     assert!(!records.iter().any(|r| r.events.iter().any(|e| e["input"] == "drop")));
     assert!(records.iter().any(|r| r.span_id == "second-span" && !r.raw.is_empty()));
     let final_index = records.last().unwrap().seq;
-    let follow = session.subscribe_records(Some(final_index));
-    session.dispose();
-    assert_eq!(follow.recv_timeout(Duration::from_secs(5)).unwrap().seq, final_index + 1);
+    let mut follow = session.subscribe_records(Some(final_index));
+    session.dispose().await;
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(5), follow.recv()).await.unwrap().unwrap().seq,
+        final_index + 1
+    );
     let original_len = session.records().len();
-    runtime.open(opts).unwrap().dispose();
+    runtime.open(opts).await.unwrap().dispose().await;
     let mut reader = Reader::new(std::io::BufReader::new(fs::File::open(file).unwrap())).unwrap();
     let mut rows = 0;
     while reader.read().unwrap().is_some() {
@@ -129,10 +132,10 @@ fn queue_withdraw_raw_frames_cursors_and_reopen() {
     assert!(rows > original_len);
 }
 
-#[test]
-fn codex_compaction_blocks_queue_until_the_native_end_marker() {
-    use std::io::{Read, Write};
-    use std::os::unix::net::UnixListener;
+#[tokio::test]
+async fn codex_compaction_blocks_queue_until_the_native_end_marker() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::UnixListener;
     let dir = tempfile::tempdir().unwrap();
     let bin = PathBuf::from(env!("CARGO_BIN_EXE_vv_test_fixture"));
     let socket = dir.path().join("gate");
@@ -150,28 +153,31 @@ fn codex_compaction_blocks_queue_until_the_native_end_marker() {
             ],
             ..Default::default()
         })
+        .await
         .unwrap();
-    let observed = session.subscribe_records(None);
-    assert_eq!(session.control(A::Compact, "", "", "").unwrap().status, S::Accepted);
-    let (mut held, _) = listener.accept().unwrap();
+    let mut observed = session.subscribe_records(None);
+    assert_eq!(session.control(A::Compact, "", "", "").await.unwrap().status, S::Accepted);
+    let (mut held, _) = listener.accept().await.unwrap();
     let mut message = [0; 4];
-    held.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
-    held.read_exact(&mut message).unwrap();
-    let result = session.control(A::Queue, "later", "id", "").unwrap();
+    tokio::time::timeout(Duration::from_secs(3), held.read_exact(&mut message))
+        .await
+        .unwrap()
+        .unwrap();
+    let result = session.control(A::Queue, "later", "id", "").await.unwrap();
     assert_eq!((result.status, result.code.as_str()), (S::Rejected, "compacting"));
-    held.write_all(b"1").unwrap();
+    held.write_all(b"1").await.unwrap();
     loop {
-        let rec = observed.recv_timeout(Duration::from_secs(4)).unwrap();
+        let rec = tokio::time::timeout(Duration::from_secs(4), observed.recv()).await.unwrap().unwrap();
         if rec.events.iter().any(|e| e["kind"] == "compaction_ended") {
             break;
         }
     }
-    assert_eq!(session.control(A::Prompt, "hello", "", "").unwrap().status, S::Accepted);
-    session.dispose();
+    assert_eq!(session.control(A::Prompt, "hello", "", "").await.unwrap().status, S::Accepted);
+    session.dispose().await;
 }
 
-#[test]
-fn resumed_sessions_with_no_token_baseline_leave_usage_unknown() {
+#[tokio::test]
+async fn resumed_sessions_with_no_token_baseline_leave_usage_unknown() {
     let dir = tempfile::tempdir().unwrap();
     let bin = PathBuf::from(env!("CARGO_BIN_EXE_vv_test_fixture"));
     for (id, family, reason) in [
@@ -210,11 +216,12 @@ fn resumed_sessions_with_no_token_baseline_leave_usage_unknown() {
                 ],
                 ..Default::default()
             })
+            .await
             .unwrap();
-        let events = session.events();
-        session.control(A::Prompt, "hello", "", "").unwrap();
+        let mut events = session.events();
+        session.control(A::Prompt, "hello", "", "").await.unwrap();
         loop {
-            let e = events.recv_timeout(Duration::from_secs(4)).unwrap();
+            let e = tokio::time::timeout(Duration::from_secs(4), events.recv()).await.unwrap().unwrap();
             if e.agent_path.is_empty() && matches!(e.kind, EventKind::TurnFinished { .. }) {
                 break;
             }
@@ -227,12 +234,12 @@ fn resumed_sessions_with_no_token_baseline_leave_usage_unknown() {
                 .any(|r| r.agent_path.is_empty() && r.events.iter().any(|e| e["usage"]["unknownReason"] == reason)),
             "{id}"
         );
-        session.dispose();
+        session.dispose().await;
     }
 }
 
-#[test]
-fn nonzero_process_exit_fails_the_active_turn_and_waiter() {
+#[tokio::test]
+async fn nonzero_process_exit_fails_the_active_turn_and_waiter() {
     let dir = tempfile::tempdir().unwrap();
     let bin = PathBuf::from(env!("CARGO_BIN_EXE_vv_test_fixture"));
     let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/go-claude.json");
@@ -249,16 +256,17 @@ fn nonzero_process_exit_fails_the_active_turn_and_waiter() {
             ],
             ..Default::default()
         })
+        .await
         .unwrap();
-    session.control(A::Prompt, "run", "", "").unwrap();
-    assert!(session.wait().unwrap_err().to_string().contains("23"));
+    session.control(A::Prompt, "run", "", "").await.unwrap();
+    assert!(session.wait().await.unwrap_err().to_string().contains("23"));
     let records = session.records();
     assert_eq!(records.last().unwrap().events[0], json!({"kind":"exited","code":23}));
     assert!(records.iter().flat_map(|r| &r.events).any(|e| e["outcome"]["kind"] == "failed"));
 }
 
-#[test]
-fn dispose_removes_the_worker_process_group() {
+#[tokio::test]
+async fn dispose_removes_the_worker_process_group() {
     use nix::{errno::Errno, sys::signal::kill, unistd::Pid};
     let dir = tempfile::tempdir().unwrap();
     let bin = PathBuf::from(env!("CARGO_BIN_EXE_vv_test_fixture"));
@@ -277,18 +285,19 @@ fn dispose_removes_the_worker_process_group() {
             ],
             ..Default::default()
         })
+        .await
         .unwrap();
     let pids: Vec<i32> = serde_json::from_slice(&fs::read(file).unwrap()).unwrap();
     assert_eq!(pids.len(), 2);
     assert!(pids.iter().all(|p| kill(Pid::from_raw(*p), None).is_ok()));
-    session.dispose();
+    session.dispose().await;
     for pid in pids {
         assert_eq!(kill(Pid::from_raw(pid), None), Err(Errno::ESRCH));
     }
 }
 
-#[test]
-fn every_declared_refusal_precedes_process_spawn() {
+#[tokio::test]
+async fn every_declared_refusal_precedes_process_spawn() {
     use vibevalley_runtime::oar::RefusableOption::*;
     let dir = tempfile::tempdir().unwrap();
     let registry = vibevalley_runtime::oar::default_runtimes();
@@ -314,7 +323,7 @@ fn every_declared_refusal_precedes_process_spawn() {
                 LaunchArgs => opts.launch_args.push("flag".into()),
             }
             assert!(
-                matches!(rt.open(opts), Err(vibevalley_runtime::oar::AgentError::Unsupported { .. })),
+                matches!(rt.open(opts).await, Err(vibevalley_runtime::oar::AgentError::Unsupported { .. })),
                 "{id} {option:?}"
             );
         }

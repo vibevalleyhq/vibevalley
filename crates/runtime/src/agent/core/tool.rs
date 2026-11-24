@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
+use crate::BoxFuture;
 use crate::agent::ai::CancelToken;
 use crate::agent::ai::types::ToolSpec;
 use crate::agent::durable::{Scheduler, Store};
@@ -125,15 +126,15 @@ impl<D> TypedToolOutput<D> {
 }
 
 pub trait TypedTool: Send + Sync {
-    type Args: serde::de::DeserializeOwned + schemars::JsonSchema;
-    type Details: serde::Serialize;
+    type Args: serde::de::DeserializeOwned + schemars::JsonSchema + Send + 'static;
+    type Details: serde::Serialize + Send;
 
     fn name(&self) -> &'static str;
     fn description(&self) -> &'static str;
     fn replay(&self) -> ReplayPolicy {
         ReplayPolicy::Unsafe
     }
-    fn execute(&self, args: Self::Args, ctx: &ToolContext) -> Result<TypedToolOutput<Self::Details>, String>;
+    fn execute<'a>(&'a self, args: Self::Args, ctx: &'a ToolContext) -> BoxFuture<'a, Result<TypedToolOutput<Self::Details>, String>>;
 }
 
 pub trait Tool: Send + Sync {
@@ -145,22 +146,14 @@ pub trait Tool: Send + Sync {
     fn replay_safe(&self) -> bool {
         false
     }
-    fn execute(&self, args: &Value) -> ToolOutput;
-    fn execute_cancellable(&self, args: &Value, cancelled: &flume::Receiver<()>) -> ToolOutput {
-        if cancelled.is_disconnected() {
-            ToolOutput::error("aborted by the user")
-        } else {
-            self.execute(args)
-        }
-    }
-    fn execute_with_context(&self, args: &Value, ctx: &ToolContext) -> ToolOutput {
-        if ctx.cancel.is_cancelled() {
-            return ToolOutput::error("aborted by the user");
-        }
-        match ctx.cancel.receiver() {
-            Some(rx) => self.execute_cancellable(args, rx),
-            None => self.execute(args),
-        }
+    fn execute<'a>(&'a self, args: &'a Value) -> BoxFuture<'a, ToolOutput>;
+    fn execute_with_context<'a>(&'a self, args: &'a Value, ctx: &'a ToolContext) -> BoxFuture<'a, ToolOutput> {
+        Box::pin(async move {
+            if ctx.cancel.is_cancelled() {
+                return ToolOutput::error("aborted by the user");
+            }
+            self.execute(args).await
+        })
     }
 }
 
@@ -174,7 +167,7 @@ pub fn typed_spec<T: TypedTool>(tool: &T) -> ToolSpec {
     }
 }
 
-pub fn typed_execute<T: TypedTool>(tool: &T, args: &Value, ctx: &ToolContext) -> ToolOutput {
+pub async fn typed_execute<T: TypedTool>(tool: &T, args: &Value, ctx: &ToolContext) -> ToolOutput {
     if ctx.cancel.is_cancelled() {
         return ToolOutput::error("aborted by the user");
     }
@@ -184,7 +177,7 @@ pub fn typed_execute<T: TypedTool>(tool: &T, args: &Value, ctx: &ToolContext) ->
             return ToolOutput::error(format!("invalid arguments for `{}`: {err}", tool.name()));
         }
     };
-    match tool.execute(parsed, ctx) {
+    match tool.execute(parsed, ctx).await {
         Ok(out) => ToolOutput {
             text: out.text,
             is_error: out.is_error,
@@ -202,16 +195,14 @@ impl<T: TypedTool> Tool for TypedToolAdapter<T> {
         self.0.replay() == ReplayPolicy::Safe
     }
 
-    fn execute(&self, args: &Value) -> ToolOutput {
-        self.execute_with_context(args, &ToolContext::background())
+    fn execute<'a>(&'a self, args: &'a Value) -> BoxFuture<'a, ToolOutput> {
+        Box::pin(async move {
+            let ctx = ToolContext::background();
+            self.execute_with_context(args, &ctx).await
+        })
     }
 
-    fn execute_cancellable(&self, args: &Value, cancelled: &flume::Receiver<()>) -> ToolOutput {
-        let ctx = ToolContext::with_cancel(CancelToken::from_receiver(cancelled.clone()));
-        self.execute_with_context(args, &ctx)
-    }
-
-    fn execute_with_context(&self, args: &Value, ctx: &ToolContext) -> ToolOutput {
-        typed_execute(&self.0, args, ctx)
+    fn execute_with_context<'a>(&'a self, args: &'a Value, ctx: &'a ToolContext) -> BoxFuture<'a, ToolOutput> {
+        Box::pin(typed_execute(&self.0, args, ctx))
     }
 }

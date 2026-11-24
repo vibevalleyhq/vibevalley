@@ -18,16 +18,18 @@ use vibevalley_runtime::oar::{ContentBlock, EventKind, PermissionDecision, Permi
 
 const WAIT: Duration = Duration::from_secs(10);
 
-fn submit_prompt(harness: &Harness, conv: &str, provider: &str, request_id: &str, prompt: &str, system: &str) -> DurableResult<(Submission, Task, bool)> {
-    harness.submit(Request {
-        conversation: conv,
-        provider,
-        request_id,
-        prompt,
-        source: "user",
-        system,
-        ..Default::default()
-    })
+async fn submit_prompt(harness: &Harness, conv: &str, provider: &str, request_id: &str, prompt: &str, system: &str) -> DurableResult<(Submission, Task, bool)> {
+    harness
+        .submit(Request {
+            conversation: conv,
+            provider,
+            request_id,
+            prompt,
+            source: "user",
+            system,
+            ..Default::default()
+        })
+        .await
 }
 
 struct QueueClient {
@@ -45,13 +47,15 @@ impl QueueClient {
 }
 
 impl ModelClient for QueueClient {
-    fn complete(&self, req: &ChatRequest, on: &mut dyn FnMut(Delta)) -> AiResult<Completion> {
-        self.seen.lock().unwrap().push(req.clone());
-        let reply = self.replies.lock().unwrap().pop_front().expect("unexpected model call");
-        if let Some(t) = &reply.message.content {
-            on(Delta::Text(t.clone()));
-        }
-        Ok(reply)
+    fn complete<'a>(&'a self, req: &'a ChatRequest, on: &'a mut (dyn FnMut(Delta) + Send)) -> vibevalley_runtime::BoxFuture<'a, AiResult<Completion>> {
+        Box::pin(async move {
+            self.seen.lock().unwrap().push(req.clone());
+            let reply = self.replies.lock().unwrap().pop_front().expect("unexpected model call");
+            if let Some(t) = &reply.message.content {
+                on(Delta::Text(t.clone()));
+            }
+            Ok(reply)
+        })
     }
 }
 
@@ -89,8 +93,8 @@ fn call_tool(id: &str, name: &str, args: Value) -> Completion {
     }
 }
 
-#[test]
-fn path1_human_to_oar_drives_scripted_and_vibevalley_symmetrically() {
+#[tokio::test]
+async fn path1_human_to_oar_drives_scripted_and_vibevalley_symmetrically() {
     // 1. Default registry includes scripted & vibevalley with expected capabilities.
     let reg = default_registry();
     let vv = reg.require("vibevalley").unwrap();
@@ -105,16 +109,17 @@ fn path1_human_to_oar_drives_scripted_and_vibevalley_symmetrically() {
             cwd: scripted_work.path().to_path_buf(),
             ..Default::default()
         })
+        .await
         .unwrap();
-    let rx = s_sess.events();
-    s_sess.prompt(vec![ContentBlock::Text("write note".into())]).unwrap();
+    let mut rx = s_sess.events();
+    s_sess.prompt(vec![ContentBlock::Text("write note".into())]).await.unwrap();
     let mut saw_perm = false;
     let mut finished = None;
-    while let Ok(ev) = rx.recv_timeout(WAIT) {
+    while let Ok(Some(ev)) = tokio::time::timeout(WAIT, rx.recv()).await {
         match ev.kind {
             EventKind::PermissionRequested { request_id, .. } => {
                 saw_perm = true;
-                s_sess.respond_permission(&request_id, PermissionDecision::AllowOnce).unwrap();
+                s_sess.respond_permission(&request_id, PermissionDecision::AllowOnce).await.unwrap();
             }
             EventKind::TurnFinished { reason, usage } => {
                 finished = Some((reason, usage));
@@ -143,15 +148,16 @@ fn path1_human_to_oar_drives_scripted_and_vibevalley_symmetrically() {
             permission_mode: PermissionMode::Ask,
             ..Default::default()
         })
+        .await
         .unwrap();
-    let evs = sess.events();
-    sess.prompt(vec![ContentBlock::Text("work".into())]).unwrap();
+    let mut evs = sess.events();
+    sess.prompt(vec![ContentBlock::Text("work".into())]).await.unwrap();
     let mut saw_subagent = false;
     let mut done = false;
-    while let Ok(ev) = evs.recv_timeout(WAIT) {
+    while let Ok(Some(ev)) = tokio::time::timeout(WAIT, evs.recv()).await {
         match ev.kind {
             EventKind::PermissionRequested { request_id, .. } => {
-                sess.respond_permission(&request_id, PermissionDecision::AllowOnce).unwrap();
+                sess.respond_permission(&request_id, PermissionDecision::AllowOnce).await.unwrap();
             }
             EventKind::SubagentSpawned { .. } => saw_subagent = true,
             EventKind::TurnFinished { reason, .. } => {
@@ -166,15 +172,16 @@ fn path1_human_to_oar_drives_scripted_and_vibevalley_symmetrically() {
     assert_eq!(std::fs::read_to_string(work.path().join("ok.txt")).unwrap(), "1");
 }
 
-#[test]
-fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() {
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() {
     let dir_a = TempDir::new().unwrap();
     let dir_b = TempDir::new().unwrap();
     let disallowed_dir = TempDir::new().unwrap();
 
-    let (block_enter_tx, block_enter_rx) = flume::bounded(1);
-    let (block_rel_tx, block_rel_rx) = flume::bounded(1);
-    let (aborted_tx, aborted_rx) = flume::bounded(1);
+    let (block_enter_tx, mut block_enter_rx) = tokio::sync::mpsc::unbounded_channel();
+    let (block_rel_tx, block_rel_rx) = std::sync::mpsc::sync_channel(1);
+    let block_rel_rx = Mutex::new(block_rel_rx);
+    let (aborted_tx, mut aborted_rx) = tokio::sync::mpsc::unbounded_channel();
 
     let mut reg = Registry::new();
     reg.register(Arc::new(ScriptedRuntime::demo()));
@@ -182,7 +189,7 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
         "slow",
         Script::computed(Arc::new(move |_: &TurnAsk| {
             let _ = block_enter_tx.send(());
-            let _ = block_rel_rx.recv_timeout(WAIT);
+            let _ = block_rel_rx.lock().unwrap().recv_timeout(WAIT);
             Ok(vec![Step::Sleep(Duration::from_millis(50)), Step::finish(StopReason::Completed)])
         })),
     )));
@@ -206,7 +213,7 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
         overrides: BTreeMap::new(),
     })));
     harness.register_extension(oar_ext.clone());
-    harness.recover().unwrap();
+    harness.recover().await.unwrap();
 
     // A: Enforce allowed_runtimes, allowed_workdirs, oar_list filtering, and external cost attribution.
     let c1 = QueueClient::new(vec![
@@ -227,6 +234,7 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
     let conv1 = worker_conversation("p2-a");
     harness
         .attach_worker(&conv1, Arc::new(Brain::new(c1, "deepseek-flash", "sys")), Arc::new(|_| {}))
+        .await
         .unwrap();
     let (_, t1, _) = harness
         .submit(Request {
@@ -238,33 +246,42 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
             system: "sys",
             ..Default::default()
         })
+        .await
         .unwrap();
-    let d1 = harness.scheduler().wait(&t1.id, WAIT).unwrap();
+    let d1 = harness.scheduler().wait(&t1.id, WAIT).await.unwrap();
     assert_eq!(d1.terminal_reason, "completed");
 
-    let entries = harness.entries(&conv1).unwrap();
+    let entries = harness.entries(&conv1).await.unwrap();
     let results: Vec<_> = entries.iter().filter(|e| e.kind == "pi.tool_result").collect();
     assert!(results[0].payload["output"].as_str().unwrap().contains("\"scripted\""));
     assert!(!results[0].payload["output"].as_str().unwrap().contains("\"forbidden\""));
     assert_eq!(results[1].payload["ok"], false);
     assert_eq!(results[2].payload["ok"], false);
     assert_eq!(results[3].payload["ok"], true);
-    let spent = store.read(|tx| tree_spend(tx, &conv1)).unwrap();
+    let conv1_spend = conv1.clone();
+    let spent = store
+        .read_async(move |tx| Box::pin(async move { tree_spend(tx, &conv1_spend).await }))
+        .await
+        .unwrap();
     assert!(spent >= 4200, "expected >= 4200 micros from scripted demo usage, got {spent}");
 
     // B: Depth guard via SQL owner chain (`pi.oar.run` ancestor) rejects nested `oar_run` at max_depth = 1.
     let store_deep = Store::memory().unwrap();
     let conv_deep = "nested-from-oar";
+    let conv1_deep = conv1.clone();
     store_deep
-        .write(|tx| {
-            tx.create_conversation(conv1.as_str(), "deepseek-flash")?;
-            let mut parent_oar = vibevalley_runtime::agent::durable::Task::new(OAR_TASK_KIND, "run");
-            parent_oar.id = "ancestor-oar".into();
-            parent_oar.conversation_id = conv1.clone();
-            tx.create_task(parent_oar)?;
-            tx.create_owned_conversation(conv_deep, "deepseek-flash", "ancestor-oar")?;
-            Ok(())
+        .write_async(move |tx| {
+            Box::pin(async move {
+                tx.create_conversation_async(conv1_deep.as_str(), "deepseek-flash").await?;
+                let mut parent_oar = vibevalley_runtime::agent::durable::Task::new(OAR_TASK_KIND, "run");
+                parent_oar.id = "ancestor-oar".into();
+                parent_oar.conversation_id = conv1_deep.clone();
+                tx.create_task_async(parent_oar).await?;
+                tx.create_owned_conversation_async(conv_deep, "deepseek-flash", "ancestor-oar").await?;
+                Ok(())
+            })
         })
+        .await
         .unwrap();
     let c_deep = QueueClient::new(vec![
         call_tool("d1", "oar_run", json!({"runtime": "scripted", "cwd": dir_a.path(), "prompt": "nested"})),
@@ -272,13 +289,17 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
     ]);
     struct DeepBrain(Arc<Brain>);
     impl vibevalley_runtime::agent::core::engine::BrainProvider for DeepBrain {
-        fn resolve_brain(&self, _: &str, _: &str) -> vibevalley_runtime::agent::durable::Result<Option<Arc<Brain>>> {
-            Ok(Some(self.0.clone()))
+        fn resolve_brain<'a>(
+            &'a self,
+            _: &'a str,
+            _: &'a str,
+        ) -> vibevalley_runtime::BoxFuture<'a, vibevalley_runtime::agent::durable::Result<Option<Arc<Brain>>>> {
+            Box::pin(std::future::ready(Ok(Some(self.0.clone()))))
         }
     }
     let h_deep = Harness::from_store(store_deep.clone(), Arc::new(DeepBrain(Arc::new(Brain::new(c_deep, "deepseek-flash", "sys")))));
     h_deep.register_extension(oar_ext.clone());
-    h_deep.recover().unwrap();
+    h_deep.recover().await.unwrap();
     let (_, t_deep, _) = h_deep
         .submit(Request {
             conversation: conv_deep,
@@ -289,13 +310,14 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
             system: "sys",
             ..Default::default()
         })
+        .await
         .unwrap();
-    let dd = h_deep.scheduler().wait(&t_deep.id, WAIT).unwrap();
+    let dd = h_deep.scheduler().wait(&t_deep.id, WAIT).await.unwrap();
     assert_eq!(dd.terminal_reason, "completed");
-    let e_deep = h_deep.entries(conv_deep).unwrap();
+    let e_deep = h_deep.entries(conv_deep).await.unwrap();
     let err_deep = e_deep.iter().find(|e| e.kind == "pi.tool_result").unwrap().payload["error"].as_str().unwrap();
     assert!(err_deep.contains("max_depth"), "{err_deep}");
-    h_deep.close();
+    h_deep.close().await;
 
     // C: max_concurrent = 1 blocks concurrent session even on DIFFERENT dir_b, then parent abort cascades cleanly.
     let c_slow = QueueClient::new(vec![call_tool(
@@ -314,9 +336,12 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
                 }
             }),
         )
+        .await
         .unwrap();
-    let (_, t_slow, _) = submit_prompt(&harness, &conv_slow, "deepseek-flash", "r-slow", "run slow", "sys").unwrap();
-    block_enter_rx.recv_timeout(WAIT).unwrap();
+    let (_, t_slow, _) = submit_prompt(&harness, &conv_slow, "deepseek-flash", "r-slow", "run slow", "sys")
+        .await
+        .unwrap();
+    tokio::time::timeout(WAIT, block_enter_rx.recv()).await.unwrap().unwrap();
 
     // Concurrent second OAR request fails cleanly with max_concurrent (1) on different workdir dir_b.
     let c_conc = QueueClient::new(vec![
@@ -330,33 +355,38 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
     let conv_conc = worker_conversation("p2-conc");
     harness
         .attach_worker(&conv_conc, Arc::new(Brain::new(c_conc, "deepseek-flash", "sys")), Arc::new(|_| {}))
+        .await
         .unwrap();
-    let (_, t_conc, _) = submit_prompt(&harness, &conv_conc, "deepseek-flash", "r-conc", "second", "sys").unwrap();
-    let d_conc = harness.scheduler().wait(&t_conc.id, WAIT).unwrap();
+    let (_, t_conc, _) = submit_prompt(&harness, &conv_conc, "deepseek-flash", "r-conc", "second", "sys").await.unwrap();
+    let d_conc = harness.scheduler().wait(&t_conc.id, WAIT).await.unwrap();
     assert_eq!(d_conc.terminal_reason, "completed");
-    let e_conc = harness.entries(&conv_conc).unwrap();
+    let e_conc = harness.entries(&conv_conc).await.unwrap();
     let err_conc = e_conc.iter().find(|e| e.kind == "pi.tool_result").unwrap().payload["error"].as_str().unwrap();
     assert!(err_conc.contains("max concurrent OAR sessions"), "{err_conc}");
 
     // Parent abort cancels active slow OAR session & cascades.
-    harness.abort_conversation(&conv_slow).unwrap();
+    harness.abort_conversation(&conv_slow).await.unwrap();
     let _ = block_rel_tx.send(());
-    let d_slow = harness.scheduler().wait(&t_slow.id, WAIT).unwrap();
+    let d_slow = harness.scheduler().wait(&t_slow.id, WAIT).await.unwrap();
     assert_eq!(d_slow.terminal_reason, "aborted");
-    aborted_rx.recv_timeout(WAIT).expect("oar SubagentStatusChanged aborted");
-    harness.close();
-    assert!(oar_ext.active_sessions().is_empty());
+    tokio::time::timeout(WAIT, aborted_rx.recv())
+        .await
+        .expect("oar SubagentStatusChanged aborted")
+        .expect("sender open");
+    harness.close().await;
+    assert!(oar_ext.active_sessions().await.is_empty());
 
     // D: Same-cwd concurrent write guard (`Plan` & separate workdir allowed; concurrent mutating on same cwd rejected).
-    let (cw_enter_tx, cw_enter_rx) = flume::bounded(1);
-    let (cw_rel_tx, cw_rel_rx) = flume::bounded(1);
+    let (cw_enter_tx, mut cw_enter_rx) = tokio::sync::mpsc::unbounded_channel();
+    let (cw_rel_tx, cw_rel_rx) = std::sync::mpsc::sync_channel(1);
+    let cw_rel_rx = Mutex::new(cw_rel_rx);
     let mut reg_d = Registry::new();
     reg_d.register(Arc::new(ScriptedRuntime::demo()));
     reg_d.register(Arc::new(ScriptedRuntime::new(
         "slow",
         Script::computed(Arc::new(move |_: &TurnAsk| {
             let _ = cw_enter_tx.send(());
-            let _ = cw_rel_rx.recv_timeout(WAIT);
+            let _ = cw_rel_rx.lock().unwrap().recv_timeout(WAIT);
             Ok(vec![Step::text("slow done"), Step::finish(StopReason::Completed)])
         })),
     )));
@@ -377,7 +407,7 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
         overrides: BTreeMap::new(),
     })));
     h_d.register_extension(oar_d);
-    h_d.recover().unwrap();
+    h_d.recover().await.unwrap();
 
     let conv_hold = worker_conversation("p2-hold");
     h_d.attach_worker(
@@ -396,9 +426,10 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
         )),
         Arc::new(|_| {}),
     )
+    .await
     .unwrap();
-    let (_, t_hold, _) = submit_prompt(&h_d, &conv_hold, "deepseek-flash", "rh", "hold", "sys").unwrap();
-    cw_enter_rx.recv_timeout(WAIT).unwrap();
+    let (_, t_hold, _) = submit_prompt(&h_d, &conv_hold, "deepseek-flash", "rh", "hold", "sys").await.unwrap();
+    tokio::time::timeout(WAIT, cw_enter_rx.recv()).await.unwrap().unwrap();
 
     // Parallel Plan on SAME dir_a and parallel Bypass on DIFFERENT dir_b succeed; concurrent Bypass on SAME dir_a is rejected.
     let conv_probe = worker_conversation("p2-probe");
@@ -428,11 +459,12 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
         )),
         Arc::new(|_| {}),
     )
+    .await
     .unwrap();
-    let (_, t_probe, _) = submit_prompt(&h_d, &conv_probe, "deepseek-flash", "rp", "probe", "sys").unwrap();
-    let d_probe = h_d.scheduler().wait(&t_probe.id, WAIT).unwrap();
+    let (_, t_probe, _) = submit_prompt(&h_d, &conv_probe, "deepseek-flash", "rp", "probe", "sys").await.unwrap();
+    let d_probe = h_d.scheduler().wait(&t_probe.id, WAIT).await.unwrap();
     assert_eq!(d_probe.terminal_reason, "completed");
-    let e_probe = h_d.entries(&conv_probe).unwrap();
+    let e_probe = h_d.entries(&conv_probe).await.unwrap();
     let r_probe: Vec<_> = e_probe.iter().filter(|e| e.kind == "pi.tool_result").collect();
     assert_eq!(r_probe[0].payload["ok"], true, "plan on same cwd must be allowed");
     assert_eq!(r_probe[1].payload["ok"], true, "mutating on isolated dir_b must be allowed");
@@ -440,13 +472,13 @@ fn path2_builtin_agent_to_oar_enforces_limits_records_cost_and_cascades_abort() 
     assert!(r_probe[2].payload["error"].as_str().unwrap().contains("concurrent mutating"));
 
     cw_rel_tx.send(()).unwrap();
-    let d_hold = h_d.scheduler().wait(&t_hold.id, WAIT).unwrap();
+    let d_hold = h_d.scheduler().wait(&t_hold.id, WAIT).await.unwrap();
     assert_eq!(d_hold.terminal_reason, "completed");
-    h_d.close();
+    h_d.close().await;
 }
 
-#[test]
-fn path3_codemode_combines_local_grep_and_oar_run_and_default_experiments_mount_nothing() {
+#[tokio::test]
+async fn path3_codemode_combines_local_grep_and_oar_run_and_default_experiments_mount_nothing() {
     let dir = TempDir::new().unwrap();
     std::fs::write(dir.path().join("notes.rs"), "pub fn needle_finder() -> i32 { 42 }\n").unwrap();
 
@@ -458,7 +490,7 @@ fn path3_codemode_combines_local_grep_and_oar_run_and_default_experiments_mount_
     let empty_reg = Arc::new(empty_reg);
     h_def.with_experiments(&ExperimentFlags::default(), Some((empty_reg.clone(), OarPolicy::default())));
     assert!(h_def.extension_names().is_empty());
-    h_def.close();
+    h_def.close().await;
 
     // 2. Enabled flags mount codemode + oar + tree_branch and let run_code compose grep + oar_run.
     let mut reg = Registry::new();
@@ -484,7 +516,7 @@ fn path3_codemode_combines_local_grep_and_oar_run_and_default_experiments_mount_
         },
         Some((Arc::new(reg), OarPolicy::default())),
     );
-    harness.recover().unwrap();
+    harness.recover().await.unwrap();
     assert_eq!(harness.extension_names(), vec!["governance", "codemode", "oar", "tree_branch"]);
 
     let script = format!(
@@ -505,7 +537,7 @@ fn path3_codemode_combines_local_grep_and_oar_run_and_default_experiments_mount_
     brain.tools = coding_tools(&Workspace::new(dir.path()));
 
     let conv = worker_conversation("p3-combo");
-    harness.attach_worker(&conv, Arc::new(brain), Arc::new(|_| {})).unwrap();
+    harness.attach_worker(&conv, Arc::new(brain), Arc::new(|_| {})).await.unwrap();
     let (_, task, _) = harness
         .submit(Request {
             conversation: &conv,
@@ -516,18 +548,21 @@ fn path3_codemode_combines_local_grep_and_oar_run_and_default_experiments_mount_
             system: "sys",
             ..Default::default()
         })
+        .await
         .unwrap();
-    let done = harness.scheduler().wait(&task.id, WAIT).unwrap();
+    let done = harness.scheduler().wait(&task.id, WAIT).await.unwrap();
     assert_eq!(done.terminal_reason, "completed");
     assert_eq!(done.result["output"], "combined done");
 
-    let seen = client.seen.lock().unwrap();
-    assert!(seen[0].tools.iter().any(|t| t.name == "run_code"));
-    assert!(seen[0].tools.iter().any(|t| t.name == "oar_run"));
-    let tool_out = seen[1].messages.last().unwrap().content.as_deref().unwrap();
-    let parsed: Value = serde_json::from_str(tool_out).unwrap();
-    assert!(parsed["value"]["hits"].as_str().unwrap().contains("needle_finder"));
-    assert!(parsed["value"]["summaryOutput"].as_str().unwrap().contains("oar saw: summarize:"));
-    assert!(parsed["value"]["summaryOutput"].as_str().unwrap().contains("needle_finder"));
-    harness.close();
+    {
+        let seen = client.seen.lock().unwrap();
+        assert!(seen[0].tools.iter().any(|t| t.name == "run_code"));
+        assert!(seen[0].tools.iter().any(|t| t.name == "oar_run"));
+        let tool_out = seen[1].messages.last().unwrap().content.as_deref().unwrap();
+        let parsed: Value = serde_json::from_str(tool_out).unwrap();
+        assert!(parsed["value"]["hits"].as_str().unwrap().contains("needle_finder"));
+        assert!(parsed["value"]["summaryOutput"].as_str().unwrap().contains("oar saw: summarize:"));
+        assert!(parsed["value"]["summaryOutput"].as_str().unwrap().contains("needle_finder"));
+    }
+    harness.close().await;
 }
