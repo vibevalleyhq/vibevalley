@@ -161,12 +161,22 @@ fn conn_cache() -> &'static Mutex<ConnCache> {
 }
 
 #[cfg(test)]
-static READONLY_OPEN_COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+fn readonly_open_counts() -> &'static Mutex<HashMap<PathBuf, usize>> {
+    static COUNTS: OnceLock<Mutex<HashMap<PathBuf, usize>>> = OnceLock::new();
+    COUNTS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+#[cfg(test)]
+fn readonly_open_count(path: &Path) -> usize {
+    readonly_open_counts().lock().get(path).copied().unwrap_or(0)
+}
 
 fn open_readonly(path: &Path) -> Option<(SqliteConnection, (u64, u64))> {
     let before = safe_db_identity(path)?;
     #[cfg(test)]
-    READONLY_OPEN_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    {
+        *readonly_open_counts().lock().entry(path.to_path_buf()).or_insert(0) += 1;
+    }
     let options = SqliteConnectOptions::new().filename(path).read_only(true).busy_timeout(BUSY_TIMEOUT);
     let conn = block_on(options.connect()).ok()?;
     let after = safe_db_identity(path)?;
@@ -842,7 +852,7 @@ mod tests {
 
         // Prime cache with the first read.
         assert_eq!(latest_step_index(&db), Some(1));
-        let opens_after_first = READONLY_OPEN_COUNT.load(std::sync::atomic::Ordering::Relaxed);
+        let opens_after_first = readonly_open_count(&db);
 
         // Subsequent reads against the same inode hit the cached connection without reopening.
         insert_step(&db, 2, 5, Some(b"second"), None);
@@ -850,7 +860,7 @@ mod tests {
         assert_eq!(detect_silent_error(&db, 0), None);
         assert!(list_invoked_subagents(&db, 4).is_empty());
         assert_eq!(
-            READONLY_OPEN_COUNT.load(std::sync::atomic::Ordering::Relaxed),
+            readonly_open_count(&db),
             opens_after_first,
             "repeated polls on unchanged inode should reuse cached sqlite connection"
         );
@@ -862,7 +872,7 @@ mod tests {
         std::fs::rename(&replacement, &db).unwrap();
         assert_eq!(latest_step_index(&db), Some(99));
         assert!(
-            READONLY_OPEN_COUNT.load(std::sync::atomic::Ordering::Relaxed) > opens_after_first,
+            readonly_open_count(&db) > opens_after_first,
             "inode change must invalidate cached handle and reopen"
         );
     }

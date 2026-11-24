@@ -27,7 +27,7 @@ pub(crate) struct Inner {
 
 impl Drop for Inner {
     fn drop(&mut self) {
-        self.stopped.store(true, Ordering::Relaxed);
+        self.stopped.store(true, Ordering::Release);
     }
 }
 
@@ -278,7 +278,7 @@ impl Inner {
                             }
                         }
                     }
-                    if disconnected || thread_stopped.load(Ordering::Relaxed) {
+                    if disconnected || thread_stopped.load(Ordering::Acquire) {
                         return;
                     }
                     if !pending.is_empty() {
@@ -298,12 +298,23 @@ impl Inner {
 #[cfg(test)]
 mod tests {
     use std::fs;
-    use std::sync::Mutex;
+    use std::sync::{Condvar, Mutex};
 
     use super::*;
     use crate::Watcher;
 
-    type Log = Arc<Mutex<Vec<Vec<FsChange>>>>;
+    #[derive(Default)]
+    struct WatchLogInner {
+        batches: Mutex<Vec<Vec<FsChange>>>,
+        ready: Condvar,
+    }
+
+    type Log = Arc<WatchLogInner>;
+
+    fn push_batch(log: &Log, batch: Vec<FsChange>) {
+        log.batches.lock().unwrap().push(batch);
+        log.ready.notify_all();
+    }
 
     struct Watched {
         _tmp: tempfile::TempDir,
@@ -320,11 +331,12 @@ mod tests {
             fs::create_dir_all(root.join(".git/refs/heads")).unwrap();
             fs::write(root.join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
             prepare(&root);
-            // Let the events of the setup above drain before watching.
+            // OS FSEvents stream boundary: keep pre-watch setup events from leaking into the new stream.
             std::thread::sleep(Duration::from_millis(300));
             let log: Log = Arc::default();
             let sink = log.clone();
-            let watcher = Watcher::new(&root, move |batch| sink.lock().unwrap().push(batch)).unwrap();
+            let watcher = Watcher::new(&root, move |batch| push_batch(&sink, batch)).unwrap();
+            // Allow FSEvents CFRunLoop registration to settle before the first test write.
             std::thread::sleep(Duration::from_millis(200));
             Watched {
                 _tmp: tmp,
@@ -335,31 +347,30 @@ mod tests {
         }
 
         fn changes(&self) -> Vec<FsChange> {
-            self.log.lock().unwrap().iter().flatten().cloned().collect()
+            self.log.batches.lock().unwrap().iter().flatten().cloned().collect()
         }
 
-        fn kind_of(&self, relative: &str) -> Option<FsChangeKind> {
-            let path = self.root.join(relative);
-            self.changes().iter().rev().find(|c| c.path == path).map(|c| c.kind)
-        }
-
-        /// Waits until `relative` has been reported (with `kind`, if given).
         fn wait_for(&self, relative: &str, kind: Option<FsChangeKind>) {
             self.wait_for_kind(relative, |got| kind.is_none_or(|want| got == want));
         }
 
         fn wait_for_kind(&self, relative: &str, accept: impl Fn(FsChangeKind) -> bool) {
+            let path = self.root.join(relative);
             let deadline = Instant::now() + Duration::from_secs(10);
+            let mut guard = self.log.batches.lock().unwrap();
             loop {
-                if self.kind_of(relative).is_some_and(&accept) {
+                if guard.iter().flatten().rev().find(|c| c.path == path).is_some_and(|c| accept(c.kind)) {
                     return;
                 }
-                assert!(Instant::now() < deadline, "no matching change for {relative}; got {:#?}", self.changes());
-                std::thread::sleep(Duration::from_millis(20));
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                assert!(!remaining.is_zero(), "no matching change for {relative}; got {:#?}", guard);
+                let (next, _) = self.log.ready.wait_timeout(guard, remaining).unwrap();
+                guard = next;
             }
         }
 
         fn settle(&self) {
+            // Negative assertion window: ensure no stray/post-drop events arrive past MAX_DELAY.
             std::thread::sleep(MAX_DELAY + Duration::from_millis(400));
         }
     }
@@ -591,21 +602,77 @@ mod tests {
 
         let log: Log = Arc::default();
         let sink = log.clone();
-        let _watcher = Watcher::new(&root, move |batch| sink.lock().unwrap().push(batch)).unwrap();
+        let _watcher = Watcher::new(&root, move |batch| push_batch(&sink, batch)).unwrap();
         std::thread::sleep(Duration::from_millis(200));
         fs::write(git_dir.join("index"), "x").unwrap();
         fs::write(git_dir.join("ORIG_HEAD"), "x").unwrap();
 
         let deadline = Instant::now() + Duration::from_secs(10);
+        let mut guard = log.batches.lock().unwrap();
         loop {
-            let seen: Vec<PathBuf> = log.lock().unwrap().iter().flatten().map(|c| c.path.clone()).collect();
+            let seen: Vec<PathBuf> = guard.iter().flatten().map(|c| c.path.clone()).collect();
             if seen.contains(&git_dir.join("index")) {
                 assert!(!seen.contains(&git_dir.join("ORIG_HEAD")));
                 break;
             }
-            assert!(Instant::now() < deadline, "index change not reported: {seen:?}");
-            std::thread::sleep(Duration::from_millis(20));
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            assert!(!remaining.is_zero(), "index change not reported: {seen:?}");
+            let (next, _) = log.ready.wait_timeout(guard, remaining).unwrap();
+            guard = next;
         }
+    }
+
+    #[test]
+    fn pending_batch_deduplicates_preserves_order_and_marks_rescan() {
+        let root = tempfile::tempdir().unwrap();
+        let canonical = root.path().canonicalize().unwrap();
+        let created = canonical.join("created.txt");
+        let modified = canonical.join("modified.txt");
+        let removed = canonical.join("removed.txt");
+        fs::write(&created, "a").unwrap();
+        fs::write(&modified, "b").unwrap();
+
+        let mut filter = Filter::new(canonical, root.path().to_owned());
+        let mut pending = Pending::default();
+        pending.absorb(notify::Event::new(EventKind::Any).set_flag(notify::event::Flag::Rescan), &mut filter);
+        pending.absorb(
+            notify::Event::new(EventKind::Create(notify::event::CreateKind::File)).add_path(created),
+            &mut filter,
+        );
+        pending.absorb(
+            notify::Event::new(EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Content))).add_path(modified.clone()),
+            &mut filter,
+        );
+        pending.absorb(
+            notify::Event::new(EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Content))).add_path(modified),
+            &mut filter,
+        );
+        pending.absorb(
+            notify::Event::new(EventKind::Remove(notify::event::RemoveKind::File)).add_path(removed),
+            &mut filter,
+        );
+
+        assert_eq!(
+            pending.into_batch(&filter),
+            [
+                FsChange {
+                    path: root.path().to_owned(),
+                    kind: FsChangeKind::Modified,
+                },
+                FsChange {
+                    path: root.path().join("created.txt"),
+                    kind: FsChangeKind::Created,
+                },
+                FsChange {
+                    path: root.path().join("modified.txt"),
+                    kind: FsChangeKind::Modified,
+                },
+                FsChange {
+                    path: root.path().join("removed.txt"),
+                    kind: FsChangeKind::Removed,
+                },
+            ]
+        );
     }
 
     #[test]

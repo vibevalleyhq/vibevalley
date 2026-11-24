@@ -305,13 +305,14 @@ mod tests {
         assert!(out.details.unwrap().timed_out);
         let pid: i32 = std::fs::read_to_string(&pid_file).unwrap().trim().parse().unwrap();
         // Wait briefly for the kernel to complete SIGKILL teardown on the grandchild.
-        let deadline = std::time::Instant::now() + Duration::from_secs(1);
-        loop {
-            if nix::sys::signal::kill(Pid::from_raw(pid), None) == Err(Errno::ESRCH) {
-                break;
-            }
-            assert!(std::time::Instant::now() < deadline, "grandchild {pid} survived PGID reap");
-            std::thread::sleep(Duration::from_millis(10));
-        }
+        crate::rt::block_on(async {
+            tokio::time::timeout(Duration::from_secs(1), async {
+                while nix::sys::signal::kill(Pid::from_raw(pid), None) != Err(Errno::ESRCH) {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            })
+            .await
+        })
+        .unwrap_or_else(|_| panic!("grandchild {pid} survived PGID reap"));
     }
 }

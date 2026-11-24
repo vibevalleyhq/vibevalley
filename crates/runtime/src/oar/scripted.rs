@@ -25,7 +25,7 @@ use std::time::Duration;
 
 use parking_lot::Mutex;
 use serde_json::json;
-use tokio_util::sync::CancellationToken;
+use tokio_util::sync::{CancellationToken, DropGuard};
 
 use crate::oar::core::{CoreSession, Driver, SessionCore, check_cwd, render_text};
 use crate::oar::record::{self, Recorder};
@@ -275,6 +275,8 @@ struct ScriptedDriver {
     /// The session's folder and appended system prompt, for computed turns.
     opened: (PathBuf, Option<String>, Vec<McpServer>),
     turn_index: AtomicUsize,
+    session_cancel: CancellationToken,
+    _cancel_guard: DropGuard,
     current: Mutex<Option<CancellationToken>>,
     answers: flume::Sender<PermissionDecision>,
     answers_rx: flume::Receiver<PermissionDecision>,
@@ -371,7 +373,7 @@ impl Driver for ScriptedDriver {
         let computed = self.script.computed.clone();
         let opened = self.opened.clone();
         while self.answers_rx.try_recv().is_ok() {}
-        let cancel = CancellationToken::new();
+        let cancel = self.session_cancel.child_token();
         *self.current.lock() = Some(cancel.clone());
         let answer = self.answers_rx.clone();
         let core = self.core.clone();
@@ -440,6 +442,7 @@ impl Driver for ScriptedDriver {
     }
 
     fn dispose(&self) {
+        self.session_cancel.cancel();
         let _ = self.abort();
     }
 }
@@ -495,11 +498,15 @@ impl Runtime for ScriptedRuntime {
             model: opts.model.clone(),
         });
         let (answers, answers_rx) = flume::unbounded();
+        let session_cancel = CancellationToken::new();
+        let _cancel_guard = session_cancel.clone().drop_guard();
         let driver = ScriptedDriver {
             core: core.clone(),
             script: self.script.clone(),
             opened: (opts.cwd.clone(), opts.append_system_prompt.clone(), opts.mcp_servers.clone()),
             turn_index: AtomicUsize::new(0),
+            session_cancel,
+            _cancel_guard,
             current: Mutex::new(None),
             answers,
             answers_rx,

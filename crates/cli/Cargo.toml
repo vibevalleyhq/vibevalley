@@ -45,4 +45,5 @@ vibevalley-runtime = { path = "../runtime" }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
 vibevalley-server = { path = "../server" }
