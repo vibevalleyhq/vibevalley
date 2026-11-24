@@ -17,6 +17,7 @@ mod inbox;
 pub mod moves;
 pub mod pr;
 pub mod progress;
+pub mod projection;
 pub mod prompts;
 pub mod refine;
 pub mod rules;
@@ -34,6 +35,10 @@ pub use crate::deps::{
     CheckoutChecks, DagNode, DagProblem, acceptance_ancestors, blocked_issues, child_checks, dag_id_valid, dag_problems, dependency_problems,
 };
 pub use crate::moves::{Move, Refusal, status_move, status_moves};
+pub use crate::projection::{
+    BoardInput, CollabInput, FarmInput, InboxInput, LiveSessionOverlay, LiveSnapshot, OpsInput, SessionInput, derive_issues, overlay_sessions, project_board,
+    project_collab, project_farm, project_inbox, project_ops, project_sessions,
+};
 pub use crate::prompts::work_constraints;
 pub use crate::status::{issue_order, pick_issues};
 
