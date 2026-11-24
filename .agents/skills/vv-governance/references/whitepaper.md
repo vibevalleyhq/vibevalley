@@ -19,10 +19,10 @@
 
 | 铁律 | 处境 | 在哪 |
 |---|---|---|
-| 1. 机器能拦的错不花 token | 已有 | `AGENTS.md` 四层手段的第 1、2 层；`vp check`、`rust:check`（clippy `-D warnings`）、结构测试 |
+| 1. 机器能拦的错不花 token | 已有 | `AGENTS.md` 四层手段的第 1、2 层；`vp check`、`cargo xtask check`（clippy `-D warnings`）、结构测试 |
 | 2. 报错就是提示词 | 已做、改写 | 检查的话写错在哪、`Fix:`、`See`（`scripts/audit/oxlint-plugin.ts` 的 `says`，测试查 `See` 的文件在不在）；写文件不写行号 |
 | 3. 公共控制流焊进高阶函数，AI 只填空 | 已有、以后做 | 帮工经 oar 驱动；核心状态只由 `Core::apply`（`crates/core/src/core.rs`）改；git 子进程只经 `crates/git`；骨架见提案 |
-| 4. 契约和验收测试只读 | 改写 | 不锁目录，让改动被看见：`regression: ` 测试点名、生成的文件由 `docs:verify`、`protocol:check` 查 |
+| 4. 契约和验收测试只读 | 改写 | 不锁目录，让改动被看见：`regression: ` 测试点名、生成的文件由 `docs:verify`、`cargo xtask protocol` 查 |
 | 5. 功能和抽象拆成两张单，3:1 | 改写 | 重构自成提交，和同一批功能放一个 PR（[vv-pr](.agents/skills/vv-pr/SKILL.md) 第 1 节）；清哪里由 `vp run deadcode` 和 [vv-simplify](.agents/skills/vv-simplify/SKILL.md) 定，不按比例 |
 | 6. 跨 5 个以上文件写 codemod | 改写 | 做法写在 [SKILL.md](.agents/skills/vv-governance/SKILL.md#5-一次改很多文件)；漏改由 `vp check` 和 `scripts/docs/stale-names.ts` 兜底 |
 | 7. 测确定的 I/O 次数，不测毫秒 | 已做 | Rust 上没有数 I/O 次数的断言；分层耗时预算只报不挡 |

@@ -33,7 +33,7 @@ const plan = planned.plan;
 if (plan.cut && gitStatus("rev-parse", "--verify", "--quiet", `origin/${plan.branch}`) === 0)
   fail(`origin has ${plan.branch} already. Fix: git switch ${plan.branch}, and tag the next beta there`);
 
-if (asked !== "alpha" && !run("vp", "run", "release:verify")) fail("release:verify failed (above). Fix it on main, then bring the fix here");
+if (asked !== "alpha" && !run("make", "verify")) fail("make verify failed (above). Fix it on main, then bring the fix here");
 
 // What it has that the version before it had not: a release counts from the release before it, alphas and betas included.
 const previousArgs = ["describe", "--tags", "--abbrev=0", ...(asked === "final" ? ["--exclude", "*-*"] : []), "HEAD"];

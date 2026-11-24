@@ -1,5 +1,5 @@
 //! `packages/protocol/src/*/shapes.gen.ts` and `endpoints.gen.ts` are what `contract/` renders to.
-//! With `VIBEVALLEY_WRITE_TS=1` (`vp run protocol:ts`) the test writes them instead.
+//! With `VIBEVALLEY_WRITE_TS=1` (`cargo xtask protocol --write`) the test writes them instead.
 
 use std::path::Path;
 
@@ -37,7 +37,7 @@ fn typescript_matches_the_contract() {
     }
     assert!(
         stale.is_empty(),
-        "these differ from crates/protocol/src/contract: {stale:?}\nFix: vp run protocol:ts\nSee crates/protocol/src/typescript.rs"
+        "these differ from crates/protocol/src/contract: {stale:?}\nFix: cargo xtask protocol --write\nSee crates/protocol/src/typescript.rs"
     );
 }
 

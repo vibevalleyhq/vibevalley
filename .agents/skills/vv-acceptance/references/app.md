@@ -146,5 +146,3 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
 用旧包和候选包分别传给 `vpx scripts/release/verify-native-data.ts <旧.app> <新.app>`。脚本限制外部网络，在临时目录运行真实应用及包内 CLI。终端输出证据目录。旧包写入工单、工单目录、消息、记性、Artifact、媒体和宿主布局。连接器加载[旧版离线存储样本](scripts/release/fixtures/connector-275732ef1.json)。脚本平移样本时间以保留其有效期，并将待发分片关联到本次旧包生成的汇报。
 
 新包应能审查旧工单、合并原改动并结算一次新回复。回退前先归档升级后的完整数据，再将旧包的备份恢复到原绝对路径。查看 `result.json` 的新旧提交、实际 SQLite 版本、宿主与服务库版本和启动耗时。`backup-files.json` 记录冷备份清单。
-
-在有冻结源码和工具链的开发机上，运行 `python3 scripts/release/verify-native-schema.py <证据目录>/upgraded-cohort --source <候选包检出>`。需要已安装 JS 依赖、sqlc 和 Cargo 缓存。若当前仓库缺少 Go 对照提交，可用 `--go-repo <Go 仓库>` 指向含 `a2c1851ab` 的检出。输出给出宿主库与服务库的表归属、DDL、索引、外键、生产与测试依赖。脚本还在临时目录修改一份生成物，验证 CI 使用的 `sqlc diff` 能发现变化。

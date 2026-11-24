@@ -7,6 +7,7 @@ import { says } from "./scripts/audit/oxlint-plugin.ts";
 
 // `apps/mac/ui/.nsh/tsconfig.json` and `apps/mobile/.nsh/tsconfig.json` are generated on macOS by `nsh check` (gitignored).
 // Linux CI (`ci.yml`) cannot install the macOS-only nsh CLI, so type-aware lint skips each app only when its `.nsh/tsconfig.json` is absent.
+const hasNshCli = existsSync(resolve(import.meta.dirname, ".tools/bin/nsh"));
 const hasNshTypes = existsSync(resolve(import.meta.dirname, "apps/mac/ui/.nsh/tsconfig.json"));
 const hasMobileNshTypes = existsSync(resolve(import.meta.dirname, "apps/mobile/.nsh/tsconfig.json"));
 
@@ -20,7 +21,7 @@ export default defineConfig({
   // vp dev, build and preview at the root mean the site: the app is Rust (apps/mac), built by cargo.
   defaultPackage: "./apps/site",
   // Checks are tasks here and in each package's vite.config.ts: cached, so a run with nothing changed replays its
-  // result. What writes files (api:client, protocol:ts…) stays a package.json script.
+  // result. What writes files (api:client, i18n:gen…) stays a package.json script; Rust checks live in `cargo xtask`.
   run: {
     tasks: {
       "scripts:test": { command: "vp test run", cache: false },
@@ -43,7 +44,7 @@ export default defineConfig({
       // every check builds them first. Cached, so a package nobody changed is not built again; vp install runs it too.
       "packages:build": ["vp run --filter './packages/*' build", "vpx scripts/audit/built-types.ts"],
       "names:verify": "vpx scripts/docs/stale-names.ts",
-      // The TS packages the native views and the generators still use; the server and the command line are Rust (rust:check).
+      // The TS packages the native views and the generators use; the server and the command line are Rust (`cargo xtask check`).
       "packages:check": [
         "vp run packages:build",
         "vp check",
@@ -51,35 +52,6 @@ export default defineConfig({
       ],
       // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/audit/deadcode.ts says what to do).
       deadcode: "vpx scripts/audit/deadcode.ts",
-      // Static Rust module boundary gate (L0-L3 DAG, acyclicity, spine/mac isolation; docs/architecture-topology.md Section 3.2.2).
-      "audit:boundaries": { command: "vpx scripts/audit/module-boundaries.ts", cache: false },
-      "audit:rust": { command: "vpx scripts/audit/rust-ratchets.ts", cache: false },
-      // The Rust workspace (crates/, apps/mac): format, clippy, tests. protocol:check fails when packages/protocol's
-      // shapes.gen.ts differ from the Rust contract (vp run protocol:ts writes them), or the artifact goldens from
-      // its engine (vp run goldens).
-      "rust:check": {
-        command:
-          "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && { if command -v cargo-nextest >/dev/null 2>&1; then cargo nextest run --workspace --no-fail-fast && cargo test --workspace --doc; else cargo test --workspace; fi; }",
-        cache: false,
-      },
-      "rust:changed": { command: "vpx scripts/release/rust-changed.ts", cache: false },
-      "rust:loom": {
-        command:
-          "cargo test --profile loom -p vibevalley-runtime --features loom --lib loom_models && cargo test --profile loom -p vibevalley-server --features loom --lib loom_models",
-        cache: false,
-      },
-      "protocol:check": {
-        command: "cargo test -p vibevalley-protocol --features ts-gen --test typescript && vp run goldens --check",
-        cache: false,
-      },
-      // Inside release:verify, rust:check already runs every vibevalley-core golden test; serialize the ts-gen check
-      // after rust:check so Cargo never contends on .cargo-lock and goldens never run twice.
-      "release:rust": {
-        command: "cargo test -p vibevalley-protocol --features ts-gen --test typescript",
-        dependsOn: ["rust:check"],
-        cache: false,
-      },
-      "sql:check": { command: "sqlc diff && python3 scripts/release/verify-native-schema.py --queries-only", cache: false },
       "mac:build-test": {
         command:
           'cd apps/mac/ui && ../../../.tools/bin/nsh check && (../../../.tools/bin/nsh build App.tsx -o build & p1=$!; ../../../.tools/bin/nsh build ShellApp.tsx -o build-shell & p2=$!; s=0; wait "$p1" || s=$?; wait "$p2" || s=$?; exit "$s") && cd ../../.. && vpx scripts/audit/mac-tests.ts',
@@ -95,12 +67,7 @@ export default defineConfig({
           "cd apps/mobile && ../../.tools/bin/nsh check && ../../.tools/bin/nsh build App.tsx -o build && ../../.tools/bin/nsh test && cd ../.. && vp lint --deny-warnings apps/mobile",
         cache: false,
       },
-      // packages:check already runs type-aware vp check across apps/mac/ui, so release:verify uses mac:build-test to avoid linting twice.
-      "release:verify": {
-        command: "true",
-        dependsOn: ["release:rust", "sql:check", "audit:boundaries", "audit:rust", "packages:check", "scripts:test", "mac:build-test", "docs:verify"],
-        cache: false,
-      },
+      "ts:check": ["vp check --deny-warnings", "vp run packages:check", ...(hasNshCli ? ["vp run mac:check", "vp run mobile:check"] : [])],
     },
   },
   // scripts/'s own tests; each package has its vite.config.ts with its own.

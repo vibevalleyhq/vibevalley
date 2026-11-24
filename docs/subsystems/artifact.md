@@ -105,7 +105,7 @@ Artifact 使用 SeaORM + SeaQuery 读写双后端数据库。通过 `ChannelAnno
 ## 怎么验证
 
 - `crates/core/tests/collab_loro.rs`：Loro 1.18.0 内容平面单测与并发收敛属性测试（Ephemeral TTL、3 端 6 排列并发修改文本/属性/树层级、持久 `Cursor` 上游漂移、时间旅行 `checkout`/分叉、浅快照压缩、按 `origin` 选择性撤销）。
-- `crates/core/tests/artifact_golden.rs`：Rust 引擎的块操作、Markdown 往返、HTML 检查、划词改字、Store 补丁、设计令牌、初始模板与视图拼装回归 golden（`vp run protocol:check` / `vp run goldens` 校验）。
+- `crates/core/tests/artifact_golden.rs`：Rust 引擎的块操作、Markdown 往返、HTML 检查、划词改字、Store 补丁、设计令牌、初始模板与视图拼装回归 golden（`cargo xtask protocol` / `cargo xtask goldens` 校验）。
 - `crates/rich/tests/*`：原生 `VvWhiteboard` 实时在场解码、平滑插值、一键 Follow 视口与手动退出、`onCursorMove` / `onViewportChange` 回调与组件声明校验。
 - `crates/server/tests/artifact.rs`：HTML 与 Markdown 交稿、Markdown/Logseq 导入大纲（`artifact.outline.import`）、八种类型（含 `outline`）双语指南读取、Store 批处理与 `ifRev` 冲突、白板 SVG 净化、`artifact.view` 与默认设计体系令牌注入、`artifact.entry.follow`、纯内存 `artifact.presence.{update,follow}`、持久 `Cursor` 建议跨上游编辑合并与折叠、`artifact.history.*` 时间旅行/压缩/按 `origin` 选择性撤销，以及 `artifact.issue` `ON DELETE SET NULL` 外键测试（`crates/server/tests/mcp.rs` 另覆测 `artifact_block_list`、`artifact_block_batch` 与 `artifact_outline_import`）。
 - `apps/mac/ui/features/artifact/artifact.test.ts`、`apps/mac/ui/app/interactions.test.tsx`、`apps/mac/ui/app/scenarios.test.tsx`：客户端编辑 span 快捷键、UTF-16 offset、iframe 外壳/Store 消息守卫、复合后缀推断（含 `.outline.md`）、`TimelineBar`、全出血白板协作抽屉、二元内容中心上下文记忆与多密度场景页面测试（`nsh/test`）。

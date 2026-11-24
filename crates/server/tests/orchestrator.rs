@@ -441,6 +441,40 @@ fn crash_restores_the_builtin_worker_in_the_same_issue_run() {
     start.close();
 }
 
+fn vv_test_fixture_bin() -> &'static std::path::Path {
+    static BIN: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+    BIN.get_or_init(|| {
+        let bin_name = format!("vv_test_fixture{}", std::env::consts::EXE_SUFFIX);
+        let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("crates/server sits two levels below workspace root");
+        let mut candidates = Vec::new();
+        if let Ok(exe) = std::env::current_exe()
+            && let Some(dir) = exe.parent().and_then(|p| p.parent())
+        {
+            candidates.push(dir.join(&bin_name));
+        }
+        if let Some(target_dir) = std::env::var_os("CARGO_TARGET_DIR") {
+            candidates.push(std::path::PathBuf::from(target_dir).join("debug").join(&bin_name));
+        }
+        candidates.push(workspace_root.join("target").join("debug").join(&bin_name));
+        if let Some(found) = candidates.iter().find(|p| p.is_file()) {
+            return found.clone();
+        }
+        let status = std::process::Command::new("cargo")
+            .args(["build", "-q", "-p", "vibevalley-runtime", "--bin", "vv_test_fixture"])
+            .current_dir(workspace_root)
+            .status()
+            .expect("spawn cargo build for vv_test_fixture");
+        assert!(status.success(), "cargo build -p vibevalley-runtime --bin vv_test_fixture failed: {status}");
+        candidates
+            .into_iter()
+            .find(|p| p.is_file())
+            .expect("vv_test_fixture binary missing after cargo build")
+    })
+}
+
 #[test]
 fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases() {
     use vibevalley_protocol::{MCPServer, MCPServerStdio};
@@ -448,7 +482,7 @@ fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases(
 
     let dir = tempfile::tempdir().unwrap();
     let starts = dir.path().join("starts");
-    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../runtime/tests/fixtures/echo_mcp.py");
+    let fixture = vv_test_fixture_bin();
     let model = SignaledScripted::new([call("external", "probe__echo", json!({"text":"server roundtrip"})), say("external done")]);
     let started = vibevalley_server::start(vibevalley_server::ServerConfig {
         registry: Some(Arc::new(vibevalley_runtime::oar::Registry::new())),
@@ -466,14 +500,8 @@ fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases(
     let mut profile = started.test_internals().agents.profiles.agent("orchestrator").unwrap();
     profile.mcp_servers.push(MCPServer::Stdio(MCPServerStdio {
         name: "probe".into(),
-        command: "python3".into(),
-        args: vec![
-            "-I".into(),
-            "-c".into(),
-            "import sys,runpy; open(sys.argv[1],'a').write('start\\n'); runpy.run_path(sys.argv[2])".into(),
-            starts.to_string_lossy().into_owned(),
-            script.to_string_lossy().into_owned(),
-        ],
+        command: fixture.to_string_lossy().into_owned(),
+        args: vec!["--record-start".into(), starts.to_string_lossy().into_owned(), "echo_mcp".into()],
         env: Default::default(),
     }));
     profile.disallowed_tools.push("probe__fail".into());

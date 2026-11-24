@@ -16,7 +16,7 @@
 
 - **类型化（让非法状态不可表达）**：用结构体、enum（带数据的变体）、newtype（`Secret`）和返回 `Result` 的预期结果（合进去或冲突）把业务前提与输出承诺写进签名。门内不传 `serde_json::Value`，不按字符串分支，不用多个松散布尔拼状态，也不在成功返回值里夹带 `ok: bool`。
 - **静态化（让拓扑与归属在构建期确定）**：服务端的模块是 [modules/mod.rs](crates/server/src/modules/mod.rs) 里的 `pub mod`，每个模块对外一个窄的结构体（`Agents`、`Chat`、`Crons`…），在 [start.rs](crates/server/src/start.rs) 照次序建好并把端点注册到 `Hub`（`Hub::on::<O: Op>` 由契约的 `ops` 定入参和结果的类型）。不在运行期拼装依赖，不把整个服务端交给一个模块。
-- **可分析化（让架构边界可由编译器与检查对账）**：能交给类型和 clippy 的交给它们（`vp run rust:check` 带 `-D warnings`）；TS 一侧的约束写成 [lint](scripts/audit/oxlint-plugin.ts) 规则，无需启动运行时或通读上下文即可定位违规。
+- **可分析化（让架构边界可由编译器与检查对账）**：能交给类型和 clippy 的交给它们（`cargo xtask check` 带 `-D warnings`）；TS 一侧的约束写成 [lint](scripts/audit/oxlint-plugin.ts) 规则，无需启动运行时或通读上下文即可定位违规。
 
 ### 可控制、可观察、可关闭共同决定可测试性
 
@@ -158,6 +158,6 @@ Clock 的读取不应推进时间；同刻事件的顺序应由业务已有的�
 | 外部 agent 与模型 | oar 的 scripted 运行时（[scripted.rs](crates/runtime/src/oar/scripted.rs)）、测试用替身 agent `pi`（[testing.rs](crates/server/src/testing.rs)） | 控制端口协议，不复制业务；意外调用应失败 |
 | 任务与资源（页面） | `AbortSignal`、作用域的 `cleanup` | 关闭语义由业务定义，工具只实现归属与释放；有界等待不替代完成契约 |
 | 页面的时间与交互 | `nsh/test` 的页面测试、应用的调试脚本（[验收](.agents/skills/vv-acceptance/references/app.md)） | 页面的时间独立于服务端；截图不证明动态行为 |
-| 边界防退化 | `rust:check`（clippy `-D warnings`）、[lint](scripts/audit/oxlint-plugin.ts)、`mac:check` | 检查守住已确定的边界，不用行数或覆盖率指标代替设计判断 |
+| 边界防退化 | `cargo xtask check`（clippy `-D warnings`）、`cargo xtask audit`、[lint](scripts/audit/oxlint-plugin.ts)、`mac:check` | 检查守住已确定的边界，不用行数或覆盖率指标代替设计判断 |
 
 工具使用中的失败也可能是架构反馈：大量依赖替换可能来自过宽依赖，持续增加 gate 可能来自过度耦合的流程，越来越复杂的观察器可能来自缺失的结果契约。应先回到边界审查，不继续堆工具。

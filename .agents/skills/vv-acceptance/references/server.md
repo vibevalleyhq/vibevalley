@@ -12,7 +12,7 @@
 
 ## 准备
 
-1. `vp run rust:check`（至少跑改动所在 crate 的 `cargo test -p <crate>`）。
+1. `cargo xtask check`（至少跑改动所在 crate 的 `cargo test -p <crate>`）。
 2. `cargo build -p vibevalley-server -p vibevalley-cli`：沙箱用 `${CARGO_TARGET_DIR:-target}/debug` 下的两个二进制（`VIBEVALLEY_SERVER_BIN` 可指定别的服务端），不会替你构建；改了代码没重新构建，验的就是旧的。
 3. 改了接口，先 `vp run capabilities`。
 

@@ -88,5 +88,5 @@
 
 ## 怎么验证
 
-- `apps/mac/src/pixel/tests.rs`（`vp run rust:check` 里）：用真的素材和 `crates/server/fixtures/farm` 的样例帧画农场、地图、记忆树和开场；设 `VIBEVALLEY_PIXEL_OUT=<目录>` 把每个场景在 CPU 上画出的 PNG 写进去看。
+- `apps/mac/src/pixel/tests.rs`（`cargo xtask check` 里）：用真的素材和 `crates/server/fixtures/farm` 的样例帧画农场、地图、记忆树和开场；设 `VIBEVALLEY_PIXEL_OUT=<目录>` 把每个场景在 CPU 上画出的 PNG 写进去看。
 - 在真的应用上：照 [验收的应用分册](.agents/skills/vv-acceptance/references/app.md)，脚本里用 `pixel:<场景>` 打开、`pixel_tap` 点、`shot` 截图。

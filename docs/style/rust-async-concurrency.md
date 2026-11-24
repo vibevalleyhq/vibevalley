@@ -96,7 +96,7 @@
 
 ### `--features loom` 与 `[profile.loom]`
 
-根 [Cargo.toml](Cargo.toml) 定义 `[profile.loom]`（`inherits = "dev"`、`opt-level = 2`、`debug = false`、`incremental = true`），[crates/runtime/Cargo.toml](crates/runtime/Cargo.toml) 与 [crates/server/Cargo.toml](crates/server/Cargo.toml) 定义可选特性 `loom = ["dep:loom"]`。日常通过 `vp run rust:loom` 运行全量模型检验。
+根 [Cargo.toml](Cargo.toml) 定义 `[profile.loom]`（`inherits = "dev"`、`opt-level = 2`、`debug = false`、`incremental = true`），[crates/runtime/Cargo.toml](crates/runtime/Cargo.toml) 与 [crates/server/Cargo.toml](crates/server/Cargo.toml) 定义可选特性 `loom = ["dep:loom"]`。日常通过 `cargo xtask loom` 运行全量模型检验。
 
 - **为何不用全局 `--cfg loom`**：工作区 `Cargo.lock` 传递引入的 `event-listener` 会在全局 `RUSTFLAGS="--cfg loom"` 下激活其内部 `cfg(loom)` 编译分支并与非 loom 依赖树冲突；使用显式 Cargo feature `--features loom` 可将模型检验精确限定在 `vibevalley-runtime` 与 `vibevalley-server`。
 - **零侵入垫片与状态空间上界**：`#[cfg(feature = "loom")]` 仅允许出现在 [crates/server/src/loom_sync.rs](crates/server/src/loom_sync.rs)、[crates/runtime/src/loom_sync.rs](crates/runtime/src/loom_sync.rs) 及各内核文件的 `mod loom_models` 测试子模块中，业务代码保持零条件编译。每个模型只包含最小原子状态与 2–3 条线程；三线程竞争模型应设置 `builder.preemption_bound = Some(2)` 防止状态空间爆炸。
@@ -123,7 +123,7 @@
 
 | 检查 / 脚本 | 守卫范围 | 触发方式 |
 |---|---|---|
-| [rust-ratchets.ts](scripts/audit/rust-ratchets.ts) | 禁止引入 `pollster`、锁定服务端非测试 `rt::block_on(` 仅缩减上限（`SERVER_BLOCK_ON_CEILING = 91`）、禁止 `apps/mac/src` 使用 `rt::handle`、禁止 `crates/server/tests/`、`apps/mac/src/`、`crates/cli/src/` 与 `crates/runtime/src/` 使用 `std::thread::sleep`、禁止 `crates/rich` 在 `highlight.rs` 外经 `Handle::try_current()` 回退同步执行等 | `vp run audit:rust` |
-| [module-boundaries.ts](scripts/audit/module-boundaries.ts) | 守住服务端 `L0–L3` 无环 DAG、模块无循环依赖、脊柱（`lib.rs` / `ports.rs` / `transport/`）与 `apps/mac/src` 不直接导入 `crate::modules::*` | `vp run audit:boundaries` |
-| Rust 工作区全检 | `cargo fmt`、`cargo clippy --all-targets -- -D warnings`、工作区测试 | `vp run rust:check` |
-| Loom 状态机模型检验 | 4 个并发状态机内核穷举交错检查（`--features loom --profile loom`） | `vp run rust:loom` |
+| [ratchets.rs](xtask/src/ratchets.rs) | 禁止引入 `pollster`、锁定服务端非测试 `rt::block_on(` 仅缩减上限（`SERVER_BLOCK_ON_CEILING = 91`）、禁止 `apps/mac/src` 使用 `rt::handle`、禁止 `crates/server/tests/`、`apps/mac/src/`、`crates/cli/src/` 与 `crates/runtime/src/` 使用 `std::thread::sleep`、禁止 `crates/rich` 在 `highlight.rs` 外经 `Handle::try_current()` 回退同步执行等 | `cargo xtask audit --ratchets` |
+| [boundaries.rs](xtask/src/boundaries.rs) | 守住服务端 `L0–L3` 无环 DAG、模块无循环依赖、脊柱（`lib.rs` / `ports.rs` / `transport/`）与 `apps/mac/src` 不直接导入 `crate::modules::*` | `cargo xtask audit --boundaries` |
+| Rust 工作区全检 | `cargo fmt`、`cargo clippy --all-targets -- -D warnings`、工作区测试 | `cargo xtask check` |
+| Loom 状态机模型检验 | 4 个并发状态机内核穷举交错检查（`--features loom --profile loom`） | `cargo xtask loom` |

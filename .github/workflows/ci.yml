@@ -1,6 +1,6 @@
 # The checks a pull request must pass before it merges into main (docs/development.md#分支提交和-pr).
 # They run on Linux. The Rust workspace and the native views are checked on the developer's Mac before merging
-# (vp run release:verify): a macOS runner took 16 to 44 minutes a run.
+# (make verify): a macOS runner took 16 to 44 minutes a run.
 name: ci
 
 on:

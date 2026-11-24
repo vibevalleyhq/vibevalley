@@ -3,7 +3,7 @@
 The contracts between the server and the views (the shapes on the wire, their Schemas, the endpoints, the subscriptions,
 and the few pure rules both sides run), and between the page and the program around it (the host). The shapes and the
 endpoint table are Rust's: `crates/protocol/src/contract/` is the source, and `src/<concept>/shapes.gen.ts`
-and `src/endpoints.gen.ts` are written from it (`vp run protocol:ts`; `cargo test` fails when they are stale). The zod
+and `src/endpoints.gen.ts` are written from it (`cargo xtask protocol --write`; `cargo test` fails when they are stale). The zod
 Schemas, `api.ts`, the rules and the client are hand-written here for the native app's views (`apps/mac/ui`). No files, no network.
 
 | Entry | What |

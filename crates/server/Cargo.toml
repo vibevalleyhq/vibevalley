@@ -19,7 +19,7 @@ name = "dual_db"
 path = "tests/dual_db.rs"
 
 [features]
-# Test-only model checking (`vp run rust:loom`); never enable in release binaries.
+# Test-only model checking (`cargo xtask loom`); never enable in release binaries.
 loom = ["dep:loom"]
 
 [dependencies]

@@ -27,7 +27,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 ```
 
 - **三阶段**：`alpha` 自用，功能可变、数据可能重建；`beta` 冻结功能只修缺陷，修复先进 `main` 再 cherry-pick 到 `release/x.y`；`final` 与最后一个 beta 使用同一份代码。
-- **发布脚本**（`scripts/release/release.ts`）校验工作区干净、分支与 origin 一致，由已有 tag 推算下一版本号。beta 与正式版先在 Mac 上运行 `vp run release:verify`，确认后打 tag 推送。GitHub 对每个发布标签重新执行 CI，通过后才打包并创建草稿。
+- **发布脚本**（`scripts/release/release.ts`）校验工作区干净、分支与 origin 一致，由已有 tag 推算下一版本号。beta 与正式版先在 Mac 上运行 `make verify`，确认后打 tag 推送。GitHub 对每个发布标签重新执行 CI，通过后才打包并创建草稿。
 - **打包**：`vp run package:mac` 构建原生应用、命令行、灵动岛和页面，写出 `apps/mac/dist` 下的 `.app`、`.dmg`、`.zip` 和 `release.json`。Rust 发布配置（`Cargo.toml` `[profile.release]`）启用 `strip = "symbols"`、`lto = "thin"` 与 `codegen-units = 1`（保留默认 `panic = "unwind"`，因为 `nsh-core` SVG 引擎依赖 `catch_unwind`）；`scripts/release/package.ts` 复制 `assets/` 时通过 `scripts/release/package-assets.ts` 的 `shouldPackageAsset` 过滤仅官网使用的 `assets/title/` 与 `assets/pixel/title-*.jpg`，两份 `--release` 字节码已单份嵌入 `vibevalley-mac`，不再向 `Contents/Resources/ui` 复制开发页面包。本地默认 ad-hoc 签名；`--sign <Developer ID>` 指定签名身份，`--notary-profile <配置名>` 提交公证并装订票据。`--version` 指定版本，未指定时取当前版本标签，无标签是 `0.0.0`。两个包的更新验收见[应用验收](.agents/skills/vv-acceptance/references/app.md#打包和更新)。
 - **公开发布**。发布任务使用 Apple 芯片 runner。打包脚本检查应用、CLI 和灵动岛的 Mach-O 架构和最低系统版本。Info.plist 的最低版本为 macOS 14.0。Developer ID 打包还应有应用分发证书及私钥。公证需要当前 runner 钥匙串中可用的 notarytool profile。GitHub 仓库变量仅提供名称。当前托管 runner 的工作流还需接入签名材料及公证凭据的装配步骤。只有当前提交有同名版本标签时，更新清单才给出该版本的 GitHub 发布页。
 
@@ -36,10 +36,9 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 
 优先运行与改动相关的最窄检查（命令总表见 [AGENTS.md](AGENTS.md#命令)）：
 
-- `vp run rust:check`：`cargo fmt --check`、`cargo clippy --workspace --all-targets -D warnings` 与 `cargo test --workspace`（服务端、命令行、核心规则、原生应用）。
-- `vp run protocol:check` 校验 Rust 导出的 TypeScript 契约，并在临时目录生成 artifact 的 golden 与仓库逐个比较。用 `vp run protocol:ts` 和 `vp run goldens` 更新对应产物。
-- `vp run sql:check` 用 sqlc 1.31.1 校验 Rust 绑定，并用 Python 3 的 SQLite 预编译每条正式查询。
-- `vp run audit:boundaries` 运行 [module-boundaries.ts](scripts/audit/module-boundaries.ts) 静态检查服务端 `L0`–`L3` 分层、零循环依赖，以及脊柱与 `apps/mac/src/` 不导入具体业务模块（纳入 `release:verify`）。
+- `make rust`（`cargo xtask check`）：`cargo fmt --check`、`cargo clippy --workspace --all-targets -- -D warnings` 与 `cargo test --workspace`（服务端、命令行、核心规则、原生应用、`xtask`）。
+- `make protocol`（`cargo xtask protocol`）校验 Rust 导出的 TypeScript 契约，并在临时目录生成 artifact 的 golden 与仓库逐个比较。用 `make protocol-write`（`cargo xtask protocol --write`）更新契约产物。
+- `make rust-audit`（`cargo xtask audit`）运行 [boundaries.rs](xtask/src/boundaries.rs) 与 [ratchets.rs](xtask/src/ratchets.rs) 静态检查服务端 `L0`–`L3` 分层、零循环依赖、脊柱与 `apps/mac/src/` 不导入具体业务模块，以及 Rust 异步并发棘轮（纳入 `make verify`）。
 - `vp run mac:check` 对原生页面运行 nsh 类型检查、打包与虚拟时钟 UI 验收套件。[场景用例](apps/mac/ui/app/scenarios.test.tsx)、[交互用例](apps/mac/ui/app/interactions.test.tsx)、[主题令牌用例](apps/mac/ui/app/theme.test.tsx)与[工作区外壳用例](apps/mac/ui/workspace/workspace.test.tsx)
 - `vp run ui:gallery` 启动隔离原生窗口对典型/边界场景（含工作区与农场）一键截图、校验 `dump.json` 零错误并生成离线 HTML 画廊。
 - `vp check`：`apps/mac/ui` 以外的 TS 的格式（oxfmt）、lint（oxlint，带类型）与类型检查；`vp check --fix` 自动格式化。
@@ -51,7 +50,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 
 测试不连接真实模型：服务端的测试在 `crates/server/tests`，助手用替身模型，帮工用 oar 的 scripted 农机（`crates/server/src/testing.rs`）。页面的测试用 `nsh/test` 写在 `apps/mac/ui`，喂样例的 `Transport`；像素场景的测试在 `apps/mac/src/pixel/tests.rs`。
 
-CI 只在 Linux 上运行：PR 标题与正文、`vp check`、`sql:check`、`docs:verify`、脚本与软件包测试、`deadcode` 和官网构建。Rust 工作区和原生页面不在 CI 上查（macOS 机器一次要 16 到 44 分钟）：合并前在本机跑 `vp run release:verify`，它包含 `rust:check`、`protocol:check`、`sql:check` 和 `mac:check`。[CI 工作流](.github/workflows/ci.yml)
+CI 只在 Linux 上运行：PR 标题与正文、`vp check`、`docs:verify`、脚本与软件包测试、`deadcode` 和官网构建。Rust 工作区和原生页面不在 CI 上查（macOS 机器一次要 16 到 44 分钟）：合并前在本机跑 `make verify`，它包含 `cargo xtask check`、`cargo xtask audit`、`cargo xtask protocol`、`vp run packages:check` 和 `vp run mac:build-test`。[CI 工作流](.github/workflows/ci.yml)
 
 ## 分支、提交和 PR
 
@@ -62,13 +61,13 @@ CI 只在 Linux 上运行：PR 标题与正文、`vp check`、`sql:check`、`doc
 - **钩子**：`vp install` 自动配置 `.vite-hooks/`，pre-commit 对暂存文件跑 `vp check --fix`（编辑器使用 tsrs，见 [packages/tsrs](packages/tsrs/README.md)）。
 - **PR 正文**：英文填写 `## What changed`、`## Checks`（附 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 证据）、`## Not verified`。
 - **回归测试**：缺陷修复测试以 `regression: ` 开头；修改或删除已有回归测试、或 `fix/` 分支无新回归测试时，须在 PR 正文加 `## Regression` 说明，由 `scripts/release/regression.ts` 检查。
-- **死代码**：`vp run deadcode` 调用 knip 检查未使用的文件、导出和依赖（配置在 `knip.ts`，说明见 `scripts/audit/deadcode.ts`）。原生页面从 `App.tsx`、测试和故事入口追踪；Rust 生成的完整契约由 `protocol:check` 校验，不按 TS 调用方裁剪，手写重导出照常检查。`nsh check` 同时检查未用局部声明。
+- **死代码**：`vp run deadcode` 调用 knip 检查未使用的文件、导出和依赖（配置在 `knip.ts`，说明见 `scripts/audit/deadcode.ts`）。原生页面从 `App.tsx`、测试和故事入口追踪；Rust 生成的完整契约由 `cargo xtask protocol` 校验，不按 TS 调用方裁剪，手写重导出照常检查。`nsh check` 同时检查未用局部声明。
 
 ## 改形状、规则和表
 
-- **形状**：改 `crates/protocol/src/contract/<概念>.rs`，运行 `vp run protocol:ts` 重写 `packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`；页面要解码它的，同改手写的 `schema.ts` 和 `api.ts`（各自的测试对着生成物查）；改接口后再运行 `vp run api:client` 和 `vp run capabilities`。
+- **形状**：改 `crates/protocol/src/contract/<概念>.rs`，运行 `cargo xtask protocol --write` 重写 `packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`；页面要解码它的，同改手写的 `schema.ts` 和 `api.ts`（各自的测试对着生成物查）；改接口后再运行 `vp run api:client` 和 `vp run capabilities`。
 - **规则**：服务端的规则是 `crates/core` 或所属模块里的纯函数，页面的在所属包里，在旁边的测试里用手写的例子写出改了的行为。
-- **表和查询。** 服务端模块共用 `ServerDb`（双后端 SQLite + PostgreSQL，实体与迁移在 `crates/server/src/db/{entities,migration}/`），表名沿用「模块_概念」。宿主 `state.db` 的迁移按版本存放，改宿主表或命名查询后在根目录用 sqlc 1.31.1 执行 `sqlc generate`。CI 用 `sqlc diff` 对账，并用 `python3 scripts/release/verify-native-schema.py --queries-only` 在 SQLite 内存库预编译每条查询。修改生成器后运行 `scripts/gen/sqlc-rust/verify.sh`，检查重复生成、空值读写、事务回滚，以及错误参数类型和未知列能否被拒绝。[模块配置](sqlc.yaml) · [宿主迁移](apps/mac/crates/workspace/sql/migrations)
+- **表和查询。** 服务端模块共用 `ServerDb`（双后端 SQLite + PostgreSQL，实体与迁移在 `crates/server/src/db/{entities,migration}/`），表名沿用「模块_概念」。宿主 `state.db` 在 [宿主存储](apps/mac/crates/workspace/src/store/mod.rs) 使用 `SeaORM` + `SeaQuery` 实体与建表迁移（[schema.rs](apps/mac/crates/workspace/src/store/schema.rs)），修改后跑 `cargo test -p vibevalley-workspace` 验证。
 - **旧名字**：`vp run names:verify` 检查代码与词典中的废弃命名；重命名后将旧名登记到 `scripts/docs/stale-names.ts`。
 
 ## 只用命令行派一个活
