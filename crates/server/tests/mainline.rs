@@ -132,10 +132,7 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     assert!(Path::new(worker.cwd.as_ref().unwrap()).starts_with(dir.path().join("worktrees")));
     let thread = until(&server, "issue thread", || server.test_internals().chat.issue_thread_id(&id));
     until(&server, "report in issue thread", || {
-        server
-            .test_internals()
-            .chat
-            .history(&thread, None, None)
+        vibevalley_runtime::rt::block_on(server.test_internals().chat.history_async(&thread, None, None))
             .unwrap()
             .iter()
             .any(|m| m.text.contains("committed round-1.txt"))
@@ -280,10 +277,7 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     );
     assert!(reopened.test_internals().board.past_session(&session).is_some());
     assert!(
-        reopened
-            .test_internals()
-            .chat
-            .history(&thread, None, None)
+        vibevalley_runtime::rt::block_on(reopened.test_internals().chat.history_async(&thread, None, None))
             .unwrap()
             .iter()
             .any(|m| m.text == "Add the second file")

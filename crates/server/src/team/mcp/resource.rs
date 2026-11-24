@@ -149,7 +149,7 @@ impl Cache {
     }
 }
 
-pub struct Resources {
+pub struct ResourceStore {
     board: Board,
     chat: Arc<Chat>,
     trajectories: Arc<Trajectories>,
@@ -157,9 +157,13 @@ pub struct Resources {
     cache: Mutex<Cache>,
 }
 
-impl Resources {
-    pub fn new(board: Board, chat: Arc<Chat>, trajectories: Arc<Trajectories>) -> Arc<Resources> {
-        Arc::new(Resources {
+/// Temporary compatibility alias until remaining unowned callers migrate.
+#[doc(hidden)]
+pub type Resources = ResourceStore;
+
+impl ResourceStore {
+    pub fn new(board: Board, chat: Arc<Chat>, trajectories: Arc<Trajectories>) -> Arc<ResourceStore> {
+        Arc::new(ResourceStore {
             board,
             chat,
             trajectories,
@@ -168,8 +172,8 @@ impl Resources {
         })
     }
 
-    pub fn with_pulls(board: Board, chat: Arc<Chat>, trajectories: Arc<Trajectories>, pulls: Arc<Pulls>) -> Arc<Resources> {
-        Arc::new(Resources {
+    pub fn with_pulls(board: Board, chat: Arc<Chat>, trajectories: Arc<Trajectories>, pulls: Arc<Pulls>) -> Arc<ResourceStore> {
+        Arc::new(ResourceStore {
             board,
             chat,
             trajectories,
@@ -181,6 +185,11 @@ impl Resources {
     /// One page as `resource_read` answers it (JSON text), or the refusal.
     /// `reader` is a session; `None` reads as the orchestrator.
     pub fn read(&self, reader: Option<&Session>, args: &ResourceReadArgs) -> Result<String, String> {
+        vibevalley_runtime::rt::block_on(self.read_async(reader, args))
+    }
+
+    /// Async implementation of [`Self::read`].
+    pub async fn read_async(&self, reader: Option<&Session>, args: &ResourceReadArgs) -> Result<String, String> {
         let uri = args.uri.trim().to_string();
         let r = parse(&uri).ok_or_else(|| invalid_uri(&uri))?;
         let offset = match args.offset {
@@ -191,7 +200,7 @@ impl Resources {
         let orchestrator = reader.is_none_or(|s| s.is_orchestrator());
         let key = format!("{}:{uri}", reader.map(|s| s.id.as_str()).unwrap_or("orchestrator"));
         let text: Vec<u16> = if offset == 0 {
-            let loaded = self.load(r, reader, orchestrator, &uri)?;
+            let loaded = self.load_async(r, reader, orchestrator, &uri).await?;
             let units: Vec<u16> = loaded.encode_utf16().collect();
             if !self.cache.lock().put(key, units.clone()) {
                 return Err(SNAPSHOT_TOO_LARGE.into());
@@ -216,7 +225,7 @@ impl Resources {
         serde_json::to_string_pretty(&page).map_err(|e| e.to_string())
     }
 
-    fn load(&self, r: Ref, reader: Option<&Session>, orchestrator: bool, uri: &str) -> Result<String, String> {
+    async fn load_async(&self, r: Ref, reader: Option<&Session>, orchestrator: bool, uri: &str) -> Result<String, String> {
         let pretty = |v: Value| serde_json::to_string_pretty(&v).map_err(|e| e.to_string());
         match r {
             Ref::Absent => Err(missing(uri)),
@@ -225,15 +234,19 @@ impl Resources {
                 if !orchestrator && !reader.is_some_and(|s| self.may_read_issue(s, &issue)) {
                     return Err(forbidden(uri));
                 }
-                let runs = self.board.runs(&issue.id).unwrap_or_default();
-                let messages = self.chat.issue_messages(&issue.id).unwrap_or_default();
+                let board = self.board.clone();
+                let issue_id = issue.id.clone();
+                let runs = crate::spawn_blocking_traced(move || board.runs(&issue_id).unwrap_or_default())
+                    .await
+                    .unwrap_or_default();
+                let messages = self.chat.issue_messages_async(&issue.id).await.unwrap_or_default();
                 pretty(json!({ "issue": issue, "runs": runs, "messages": messages }))
             }
             Ref::Channel(id) => {
                 if !orchestrator && !reader.is_some_and(|s| self.may_read_channel(s, &id)) {
                     return Err(forbidden(uri));
                 }
-                let messages = self.chat.history(&id, None, Some(200)).map_err(|e| e.message)?;
+                let messages = self.chat.history_async(&id, None, Some(200)).await.map_err(|e| e.message)?;
                 let latest_page = messages.len() == 200;
                 pretty(json!({ "messages": messages, "latestPage": latest_page }))
             }
@@ -241,14 +254,22 @@ impl Resources {
                 if !orchestrator && reader.is_none_or(|s| s.id != id) {
                     return Err(forbidden(uri));
                 }
-                let events = self.trajectories.events(&id, None).ok_or_else(|| missing(uri))?;
+                let trajectories = self.trajectories.clone();
+                let events = crate::spawn_blocking_traced(move || trajectories.events(&id, None))
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .ok_or_else(|| missing(uri))?;
                 pretty(json!({ "events": events }))
             }
             Ref::GithubPull { repo, number, section } => {
                 let Some(pulls) = &self.pulls else {
                     return Err(missing(uri));
                 };
-                let snap = pulls.snapshot(&repo, number).map_err(|e| e.message)?;
+                let pulls = pulls.clone();
+                let snap = crate::spawn_blocking_traced(move || pulls.snapshot(&repo, number))
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .map_err(|e| e.message)?;
                 match section.as_deref() {
                     None => pretty(serde_json::to_value(&snap).map_err(|e| e.to_string())?),
                     Some("checks") => pretty(json!({ "repo": snap.repo, "number": snap.number, "head": snap.head, "checks": snap.checks })),
@@ -296,9 +317,9 @@ impl Resources {
     }
 }
 
-impl crate::app::hub::ports::ResourcePort for Resources {
+impl crate::app::hub::ports::ResourcePort for ResourceStore {
     fn read(&self, reader: Option<&Session>, uri: &str, offset: Option<i64>, limit: Option<i64>) -> Result<String, String> {
-        Resources::read(
+        ResourceStore::read(
             self,
             reader,
             &ResourceReadArgs {

@@ -16,7 +16,7 @@ use vibevalley_protocol::{
 };
 
 use super::Stop;
-use super::jobs::{Ask, Held, Jobs, Phase, Record, active, id_ok, refused};
+use super::jobs::{Ask, Held, MediaStore, Phase, Record, active, id_ok, refused};
 use super::vendor::{Account, Moss, Outcome, StreamError, TranscriptionEvent, VendorError};
 use crate::infra::provider::Use;
 
@@ -103,21 +103,13 @@ fn shown(r: &Record) -> Result<MediaAudioJob, ApiError> {
     r.audio_view().ok_or_else(|| refused("missing"))
 }
 
-impl Jobs {
+impl MediaStore {
     pub async fn speakers_async(&self, request: MediaSpeakersRequest, source: MediaSource) -> Result<MediaAudioJob, ApiError> {
         self.audio_async(Ask::Speakers(request), source).await
     }
 
-    pub fn speakers(&self, request: MediaSpeakersRequest, source: MediaSource) -> Result<MediaAudioJob, ApiError> {
-        vibevalley_runtime::rt::block_on(self.speakers_async(request, source))
-    }
-
     pub async fn voice_design_async(&self, request: MediaVoiceDesignRequest, source: MediaSource) -> Result<MediaAudioJob, ApiError> {
         self.audio_async(Ask::VoiceDesign(request), source).await
-    }
-
-    pub fn voice_design(&self, request: MediaVoiceDesignRequest, source: MediaSource) -> Result<MediaAudioJob, ApiError> {
-        vibevalley_runtime::rt::block_on(self.voice_design_async(request, source))
     }
 
     /// A voice cloned from the user's sample: only the user can say whose voice it is.

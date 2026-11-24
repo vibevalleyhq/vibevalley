@@ -20,7 +20,7 @@ use vibevalley_protocol::{
 };
 
 use crate::app::hub::refusal::{LookIn, missing};
-use crate::content::attachment::{ATTACHMENT_MAX, Attachments};
+use crate::content::attachment::{ATTACHMENT_MAX, AttachmentStore};
 use crate::db::ServerDb;
 use crate::db::entities::{content_attachment::attachment, content_library::media_library_item};
 use crate::db::write_tx;
@@ -159,14 +159,14 @@ fn escape_like(raw: &str) -> String {
 
 pub struct Library {
     db: Arc<ServerDb>,
-    files: Arc<Attachments>,
+    files: Arc<AttachmentStore>,
     sub: Mutex<Option<crate::app::hub::event_bus::Subscription>>,
     fact_task: Mutex<Option<(tokio_util::sync::CancellationToken, tokio::task::JoinHandle<()>)>>,
     edit_task: Mutex<Option<(tokio_util::sync::CancellationToken, tokio::task::JoinHandle<()>)>>,
 }
 
 impl Library {
-    pub fn open(db: Arc<ServerDb>, files: Arc<Attachments>) -> Arc<Library> {
+    pub fn open(db: Arc<ServerDb>, files: Arc<AttachmentStore>) -> Arc<Library> {
         Arc::new(Library {
             db,
             files,
@@ -661,7 +661,7 @@ mod tests {
     fn regression_failed_generated_item_is_retryable_after_reopen() {
         let home = tempfile::tempdir().unwrap();
         let db = ServerDb::open(home.path()).unwrap();
-        let files = Attachments::open(home.path(), db.clone());
+        let files = AttachmentStore::open(home.path(), db.clone());
         let attachment = vibevalley_runtime::rt::block_on(files.keep_async(b"image".to_vec(), "image.png".to_string(), "image/png".to_string())).unwrap();
         let job: MediaJob = serde_json::from_value(serde_json::json!({
             "kind":"image","id":"job","prompt":"p","model":"m","connection":"c","revision":1,
@@ -688,7 +688,10 @@ mod tests {
             vibevalley_runtime::rt::block_on(library.found_async(&attachment.id)).unwrap_err().biz_code,
             BizCode::LibraryNotFound
         );
-        assert_eq!(std::fs::read(files.file(&attachment.id).unwrap().path).unwrap(), b"image");
+        assert_eq!(
+            std::fs::read(vibevalley_runtime::rt::block_on(files.file_async(&attachment.id)).unwrap().path).unwrap(),
+            b"image"
+        );
         db.close();
     }
 }

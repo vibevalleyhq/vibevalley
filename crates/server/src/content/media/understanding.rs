@@ -12,7 +12,7 @@ use vibevalley_protocol::{
 };
 
 use super::Stop;
-use super::jobs::{Ask, Held, Jobs, Phase, Record, active, id_ok, refused};
+use super::jobs::{Ask, Held, MediaStore, Phase, Record, active, id_ok, refused};
 use super::vendor::{Account, Moss, Outcome};
 use crate::infra::provider::Use;
 
@@ -73,7 +73,7 @@ fn shown(r: &Record) -> Result<MediaUnderstandingJob, ApiError> {
     }
 }
 
-impl Jobs {
+impl MediaStore {
     /// `media.understanding.create`: the user asks, and it runs at once.
     pub async fn understanding_async(&self, request: MediaUnderstandingRequest) -> Result<MediaUnderstandingJob, ApiError> {
         self.understanding_for_async(request, None).await
@@ -203,10 +203,6 @@ impl Jobs {
             self.schedule_async().await;
         }
         shown(&self.found_async(id).await?)
-    }
-
-    pub fn start_understanding(&self, id: &str, agent: &str, channel: &str) -> Result<MediaUnderstandingJob, ApiError> {
-        vibevalley_runtime::rt::block_on(self.start_understanding_async(id, agent, channel))
     }
 
     pub async fn start_understanding_by_id_async(&self, id: &str) -> Result<MediaUnderstandingJob, ApiError> {
@@ -389,7 +385,7 @@ mod tests {
 
     use super::*;
     use crate::ServerConfig;
-    use crate::content::media::inputs::Inputs;
+    use crate::content::media::inputs::MediaInputStore;
     use crate::content::media::jobs::Parts;
     use crate::infra::http::{Fetch, FetchError, Request, Response};
 
@@ -438,9 +434,9 @@ mod tests {
         let revision = updated["revision"].as_i64().unwrap();
 
         let clock = Arc::new(ManualClock::new(1_700_000_000_000));
-        let inputs = Inputs::open_with_clock(dir.path(), started.db.clone(), started.attachments.clone(), clock.clone()).unwrap();
+        let inputs = MediaInputStore::open_with_clock(dir.path(), started.db.clone(), started.attachments.clone(), clock.clone()).unwrap();
         let fetch: Arc<dyn Fetch> = Arc::new(UnusedFetch);
-        let jobs = Jobs::open_with_clock(
+        let jobs = MediaStore::open_with_clock(
             Parts {
                 db: started.db.clone(),
                 hub: Arc::downgrade(&started.hub),
@@ -458,23 +454,22 @@ mod tests {
         let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
         png.resize(24, 0);
         let req: MediaInputRequest = serde_json::from_value(json!({"kind": "image", "mime": "image/png", "name": "cat.png", "size": 24})).unwrap();
-        let reserved = inputs.create(&req).unwrap();
-        inputs.upload(&reserved.id, Cursor::new(png)).unwrap();
-
         let channel = started.chat.default_channel();
-        let auth_req: MediaUnderstandingAuthorizationRequest = serde_json::from_value(json!({
-            "id": "approval-clock-test",
-            "prompt": "Describe this image.",
-            "inputs": [reserved.id],
-            "connection": "moss",
-            "revision": revision,
-            "allowUpload": true,
-            "maxOutputTokens": 256,
-            "channel": channel,
-        }))
-        .unwrap();
 
         vibevalley_runtime::rt::block_on(async {
+            let reserved = inputs.create_async(&req).await.unwrap();
+            inputs.upload_async(&reserved.id, Box::new(Cursor::new(png))).await.unwrap();
+            let auth_req: MediaUnderstandingAuthorizationRequest = serde_json::from_value(json!({
+                "id": "approval-clock-test",
+                "prompt": "Describe this image.",
+                "inputs": [reserved.id],
+                "connection": "moss",
+                "revision": revision,
+                "allowUpload": true,
+                "maxOutputTokens": 256,
+                "channel": channel,
+            }))
+            .unwrap();
             let job = jobs.authorize_understanding_async(auth_req).await.unwrap();
             assert_eq!(job.phase, MediaUnderstandingPhase::Authorized);
             assert_eq!(job.authorization.as_ref().unwrap().expires_at, 1_700_000_000_000 + APPROVAL);

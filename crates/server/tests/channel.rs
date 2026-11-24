@@ -218,13 +218,20 @@ fn the_chat_through_its_endpoints() {
     // Everything is there when the chat opens again.
     let hub2 = vibevalley_server::Hub::new(vibevalley_core::empty_space_state());
     let db2 = vibevalley_server::db::ServerDb::open(dir.path()).unwrap();
-    let files = vibevalley_server::content::attachment::Attachments::open(dir.path(), db2.clone());
+    let files = vibevalley_server::content::attachment::AttachmentStore::open(dir.path(), db2.clone());
     let chat = vibevalley_server::collab::channel::Chat::open(db2, &hub2, files, None, false).unwrap();
     let list = vibevalley_runtime::rt::block_on(chat.list_async()).unwrap();
     assert_eq!(list[0].id, dev);
-    assert_eq!(chat.history(&dev, None, None).unwrap().len(), 1);
+    assert_eq!(vibevalley_runtime::rt::block_on(chat.history_async(&dev, None, None)).unwrap().len(), 1);
     assert!(hub2.read(|s| s.chat.clone()).unwrap().channels.iter().any(|c| c.id == dev));
-    assert_eq!(chat.events(0, 1000).unwrap().iter().filter(|e| e.kind == "removed").count(), 1);
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(chat.events_async(0, 1000))
+            .unwrap()
+            .iter()
+            .filter(|e| e.kind == "removed")
+            .count(),
+        1
+    );
 }
 
 #[cfg(unix)]
@@ -244,10 +251,16 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
         for text in ["one", "two", "three"] {
             call("channel.message.send", json!({"id":channel,"text":text,"sendKey":text}));
         }
-        let root = server.test_internals().chat.history(&channel, None, None).unwrap()[0].id.clone();
+        let root = vibevalley_runtime::rt::block_on(server.test_internals().chat.history_async(&channel, None, None)).unwrap()[0]
+            .id
+            .clone();
         let thread = call("channel.thread.create", json!({"id":root}));
         call("channel.message.send", json!({"id":thread,"text":"first reply","sendKey":"thread-first"}));
-        let checkpoint = server.test_internals().chat.events(0, 100).unwrap().last().unwrap().seq;
+        let checkpoint = vibevalley_runtime::rt::block_on(server.test_internals().chat.events_async(0, 100))
+            .unwrap()
+            .last()
+            .unwrap()
+            .seq;
         std::fs::write(home.join("checkpoint"), checkpoint.to_string()).unwrap();
         call(
             "channel.message.send",
@@ -268,23 +281,20 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
     let server = start(dir.path());
     let call = |op, params| ok(server.hub.call_as(Caller::User, op, params));
     let channel = server.test_internals().chat.default_channel();
-    let last_two = server.test_internals().chat.history(&channel, None, Some(2)).unwrap();
+    let last_two = vibevalley_runtime::rt::block_on(server.test_internals().chat.history_async(&channel, None, Some(2))).unwrap();
     assert_eq!(last_two.iter().map(|m| m.number).collect::<Vec<_>>(), [2, 3]);
-    let first = server.test_internals().chat.history(&channel, Some(2), Some(2)).unwrap();
+    let first = vibevalley_runtime::rt::block_on(server.test_internals().chat.history_async(&channel, Some(2), Some(2))).unwrap();
     assert_eq!(first.len(), 1);
     let thread = call("channel.thread.create", json!({"id":first[0].id})).as_str().unwrap().to_owned();
-    let replies = server.test_internals().chat.history(&thread, None, Some(2)).unwrap();
+    let replies = vibevalley_runtime::rt::block_on(server.test_internals().chat.history_async(&thread, None, Some(2))).unwrap();
     assert_eq!(
         replies.iter().map(|m| m.text.as_str()).collect::<Vec<_>>(),
         ["first reply", "second reply @助手"]
     );
-    let unseen = server.test_internals().chat.events(checkpoint, 10).unwrap();
+    let unseen = vibevalley_runtime::rt::block_on(server.test_internals().chat.events_async(checkpoint, 10)).unwrap();
     assert_eq!(unseen.len(), 1);
     assert_eq!(unseen[0].message_id, replies[1].id);
-    let pending: Vec<_> = server
-        .test_internals()
-        .chat
-        .pending_deliveries(DeliveryTargetKind::Orchestrator)
+    let pending: Vec<_> = vibevalley_runtime::rt::block_on(server.test_internals().chat.pending_deliveries_async(DeliveryTargetKind::Orchestrator))
         .unwrap()
         .into_iter()
         .filter(|d| d.message_id == replies[1].id)
@@ -294,23 +304,25 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
         "channel.message.send",
         json!({"id":thread,"text":"second reply @助手","sendKey":"thread-second"}),
     );
-    assert_eq!(server.test_internals().chat.events(checkpoint, 10).unwrap(), unseen);
-    assert_eq!(server.test_internals().chat.history(&thread, None, Some(5)).unwrap().len(), 2);
-    let pending_after_retry: Vec<_> = server
-        .test_internals()
-        .chat
-        .pending_deliveries(DeliveryTargetKind::Orchestrator)
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(server.test_internals().chat.events_async(checkpoint, 10)).unwrap(),
+        unseen
+    );
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(server.test_internals().chat.history_async(&thread, None, Some(5)))
+            .unwrap()
+            .len(),
+        2
+    );
+    let pending_after_retry: Vec<_> = vibevalley_runtime::rt::block_on(server.test_internals().chat.pending_deliveries_async(DeliveryTargetKind::Orchestrator))
         .unwrap()
         .into_iter()
         .filter(|d| d.message_id == replies[1].id)
         .collect();
     assert_eq!(pending_after_retry.len(), 1, "sendKey retry must not duplicate deliveries");
-    server.test_internals().chat.settle_delivery(pending[0].id, true).unwrap();
+    vibevalley_runtime::rt::block_on(server.test_internals().chat.settle_delivery_async(pending[0].id, true)).unwrap();
     assert!(
-        server
-            .test_internals()
-            .chat
-            .pending_deliveries(DeliveryTargetKind::Orchestrator)
+        vibevalley_runtime::rt::block_on(server.test_internals().chat.pending_deliveries_async(DeliveryTargetKind::Orchestrator),)
             .unwrap()
             .iter()
             .all(|d| d.message_id != replies[1].id)

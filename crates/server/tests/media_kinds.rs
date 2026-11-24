@@ -105,7 +105,7 @@ fn bind(s: &vibevalley_server::Started, key: &str) -> i64 {
 fn input(s: &vibevalley_server::Started, kind: &str, mime: &str, name: &str, bytes: Vec<u8>) -> String {
     let made = ok(s, "media.input.create", json!({"kind":kind,"mime":mime,"name":name,"size":bytes.len()}));
     let id = made["id"].as_str().unwrap().to_string();
-    s.test_internals().media_inputs.upload(&id, Cursor::new(bytes)).unwrap();
+    vibevalley_runtime::rt::block_on(s.test_internals().media_inputs.upload_async(&id, Box::new(Cursor::new(bytes)))).unwrap();
     id
 }
 fn sample(s: &vibevalley_server::Started) -> String {
@@ -175,7 +175,7 @@ fn a_dialogue_and_a_designed_voice_are_followed_kept_and_released() {
     let ready = wait(&s, "talk", "ready");
     assert_eq!((&ready["format"], &ready["contentType"]), (&json!("wav"), &json!("audio/wav")));
     assert_eq!(ready["metadata"]["sampleRate"].as_f64(), Some(24000.0));
-    assert!(s.test_internals().attachments.file(ready["attachment"]["id"].as_str().unwrap()).is_ok());
+    assert!(vibevalley_runtime::rt::block_on(s.test_internals().attachments.file_async(ready["attachment"]["id"].as_str().unwrap())).is_ok());
     // The same request is the same job; another under its id is refused; nothing is asked of the vendor twice.
     assert_eq!(ok(&s, "media.dialogue.create", dialogue("talk", revision, "Hello there."))["phase"], "ready");
     refused(&s, "media.dialogue.create", dialogue("talk", revision, "Something else."));

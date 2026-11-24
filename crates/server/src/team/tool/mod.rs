@@ -19,10 +19,10 @@ use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use vibevalley_protocol::{Caller, Issue, Session};
 
-use crate::app::hub::ports::{ResourcePort, ToolDispatchPort, ToolSpecWire};
+use crate::app::hub::ports::{ResourcePort, ToolSpecWire};
 use crate::collab::channel::Chat;
-use crate::content::artifact::Artifacts;
-use crate::content::media::jobs::Jobs as MediaJobs;
+use crate::content::artifact::ArtifactStore;
+use crate::content::media::jobs::MediaStore;
 use crate::infra::text;
 use crate::team::agent::Agents;
 use crate::work::issue::Board;
@@ -64,7 +64,7 @@ pub enum Who {
     Helper(Box<Session>),
 }
 
-/// Dissolved tool dispatcher: routes cross-domain RPCs through `Hub::invoke`,
+/// Dissolved tool dispatcher: routes cross-domain RPCs through `Hub::invoke_async`,
 /// reads `vv://` resources through `ResourcePort`, and keeps only the narrow
 /// L1/L2 handles needed for non-RPC actor-scoped operations (zero L3 imports).
 pub struct ToolBox {
@@ -74,8 +74,8 @@ pub struct ToolBox {
     pub board: Board,
     pub chat: Arc<Chat>,
     pub pulls: Arc<Pulls>,
-    pub media: Arc<MediaJobs>,
-    pub artifacts: Arc<Artifacts>,
+    pub media: Arc<MediaStore>,
+    pub artifacts: Arc<ArtifactStore>,
     pub repos_root: PathBuf,
 }
 
@@ -152,10 +152,7 @@ impl ToolBox {
     pub fn session_line(&self, h: &Session) -> String {
         text::session_line(h, crate::now(), self.number_of(h))
     }
-}
-
-impl ToolDispatchPort for ToolBox {
-    fn helper_tools(&self) -> Vec<ToolSpecWire> {
+    pub fn helper_tools_wire(&self) -> Vec<ToolSpecWire> {
         helper()
             .into_iter()
             .map(|t| ToolSpecWire {
@@ -166,15 +163,15 @@ impl ToolDispatchPort for ToolBox {
             .collect()
     }
 
-    fn session_for_token(&self, token: &str) -> Option<Session> {
+    pub fn session_for_token(&self, token: &str) -> Option<Session> {
         let id = self.board.sessions().who(token)?;
         self.board.session(&id)
     }
 
-    fn call_helper(&self, session: Session, name: &str, args: &Value) -> Result<String, String> {
+    pub async fn call_helper_async(&self, session: Session, name: &str, args: &Value) -> Result<String, String> {
         let tools = helper();
-        match tools.iter().find(|t| t.words.name == name) {
-            Some(t) => t.run(self, &Who::Helper(Box::new(session)), args),
+        match tools.into_iter().find(|t| t.words.name == name) {
+            Some(t) => t.run_async(self, &Who::Helper(Box::new(session)), args).await,
             None => Err(format!("没成：没有 {name} 这个工具")),
         }
     }
@@ -231,7 +228,7 @@ fn coerce(schema: &Value, v: &Value) -> Value {
 }
 
 /// What a tool does with typed arguments.
-type Run = fn(&ToolBox, &Who, &Words, &Value) -> Result<String, String>;
+type Run = for<'a> fn(&'a ToolBox, &'a Who, &'a Words, &'a Value) -> crate::BoxFuture<'a, Result<String, String>>;
 
 /// A tool as one caller holds it.
 #[derive(Clone)]
@@ -243,7 +240,12 @@ pub struct Tool {
 /// `run` for a tool whose arguments read as `A`.
 macro_rules! typed {
     ($f:path) => {
-        |tools: &ToolBox, who: &Who, words: &Words, raw: &Value| $f(tools, who, $crate::team::tool::args(&words.parameters, raw)?)
+        |tools: &ToolBox, who: &Who, words: &Words, raw: &Value| {
+            Box::pin(async move {
+                let parsed = $crate::team::tool::args(&words.parameters, raw)?;
+                $f(tools, who, parsed).await
+            })
+        }
     };
 }
 
@@ -338,8 +340,8 @@ pub fn unrun() -> Vec<String> {
 
 impl Tool {
     /// The tool run as `who`: its answer, or its refusal in words for the model.
-    pub fn run(&self, tools: &ToolBox, who: &Who, raw: &Value) -> Result<String, String> {
-        (self.run)(tools, who, &self.words, raw)
+    pub async fn run_async(&self, tools: &ToolBox, who: &Who, raw: &Value) -> Result<String, String> {
+        (self.run)(tools, who, &self.words, raw).await
     }
 
     /// Reads only: safe to run again if the process died while it ran.
@@ -371,7 +373,7 @@ impl vibevalley_runtime::agent::Tool for Held {
 
     fn execute(&self, args: &Value) -> vibevalley_runtime::agent::ToolOutput {
         let route = self.route.lock().clone();
-        match self.tool.run(&self.tools, &Who::Orchestrator(route), args) {
+        match vibevalley_runtime::rt::block_on(self.tool.run_async(&self.tools, &Who::Orchestrator(route), args)) {
             Ok(text) => vibevalley_runtime::agent::ToolOutput::ok(text),
             Err(why) => vibevalley_runtime::agent::ToolOutput::error(why),
         }

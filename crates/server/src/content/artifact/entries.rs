@@ -25,7 +25,7 @@ use vibevalley_protocol::{
 
 use super::blocks::relay_with_reset;
 use super::collab::commit_meta_for_maker;
-use super::{Artifacts, Maker, artifact_type_of, db, q, refused};
+use super::{ArtifactStore, Maker, artifact_type_of, db, q, refused};
 use crate::app::hub::refusal::{LookIn, missing};
 use crate::db::begin_write_tx;
 use crate::{Hub, Sink, now};
@@ -106,7 +106,7 @@ fn sanitize_whiteboard_element_json(artifact_type: Option<ArtifactType>, path: &
     Ok(canonical_text.to_string())
 }
 
-impl Artifacts {
+impl ArtifactStore {
     pub(super) fn entry_lock(&self, id: &str) -> Arc<AsyncMutex<()>> {
         let mut map = self.entry_locks.lock();
         map.entry(id.to_string()).or_insert_with(|| Arc::new(AsyncMutex::new(()))).clone()
@@ -174,10 +174,6 @@ impl Artifacts {
         meta: &CommitMeta,
     ) -> Result<ArtifactEntryBatchResult, ApiError> {
         self.batch_entries_inner_async(maker, req, Some(meta)).await
-    }
-
-    pub fn batch_entries_with_meta(&self, maker: &Maker, req: &ArtifactEntryBatchRequest, meta: &CommitMeta) -> Result<ArtifactEntryBatchResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.batch_entries_with_meta_async(maker, req, meta))
     }
 
     async fn batch_entries_inner_async(
@@ -815,17 +811,17 @@ impl Artifacts {
 mod tests {
     use super::*;
     use crate::collab::channel::Chat;
-    use crate::content::attachment::Attachments;
+    use crate::content::attachment::AttachmentStore;
     use vibevalley_protocol::{ArtifactHtmlEdit, ArtifactKind, ArtifactRequest, HtmlAnchor, HtmlAnchorKind};
 
-    fn test_artifacts() -> (tempfile::TempDir, Arc<Artifacts>) {
+    fn test_artifacts() -> (tempfile::TempDir, Arc<ArtifactStore>) {
         vibevalley_i18n::set_locale("zh");
         let dir = tempfile::tempdir().unwrap();
         let db = crate::db::ServerDb::open(dir.path()).unwrap();
         let hub = crate::Hub::new(vibevalley_core::empty_space_state());
-        let files = Attachments::open(dir.path(), db.clone());
+        let files = AttachmentStore::open(dir.path(), db.clone());
         let chat = Chat::open(db.clone(), &hub, files.clone(), None, false).unwrap();
-        let artifacts = Artifacts::open(db, files, chat);
+        let artifacts = ArtifactStore::open(db, files, chat);
         (dir, artifacts)
     }
 
@@ -837,7 +833,7 @@ mod tests {
             .find(|e| e.path == "project/tokens.json")
             .and_then(|e| e.value.as_deref())
             .unwrap();
-        let inspected = Artifacts::inspect_tokens(&ArtifactTokensInspectInput { raw: raw.to_string() });
+        let inspected = ArtifactStore::inspect_tokens(&ArtifactTokensInspectInput { raw: raw.to_string() });
         assert!(inspected.colors.len() >= 4);
         assert!(inspected.css.contains("[data-theme=\"light\"]"));
         assert!(inspected.css.contains("[data-theme=\"dark\"]"));

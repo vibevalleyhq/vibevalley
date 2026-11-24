@@ -115,10 +115,6 @@ impl Chat {
     /// `speak`: an agent's words. A retry of the same words is the same
     /// message; newer words it has not seen are shown instead (held); a
     /// channel right after reading a thread elsewhere is confirmed once.
-    pub fn speak(&self, s: Speaking) -> Result<Spoken, ApiError> {
-        vibevalley_runtime::rt::block_on(self.speak_async(s))
-    }
-
     pub async fn speak_async(&self, s: Speaking) -> Result<Spoken, ApiError> {
         self.prepare_seat(&s.from);
         let mut inner = self.locked().await;
@@ -542,10 +538,6 @@ impl Chat {
     }
 
     /// The newest 50 messages of an issue's thread.
-    pub fn issue_messages(&self, issue: &str) -> Result<Vec<AddressedMessage>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.issue_messages_async(issue))
-    }
-
     pub async fn issue_messages_async(&self, issue: &str) -> Result<Vec<AddressedMessage>, ApiError> {
         let Some(thread) = self.issue_thread_id(issue) else { return Ok(vec![]) };
         self.recent_async(&thread, 50).await

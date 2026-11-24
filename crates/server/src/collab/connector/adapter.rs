@@ -74,7 +74,7 @@ pub struct LoginIo<'a> {
 }
 
 /// Takes what the app hands over, and how far it read (a cursor; "" for none).
-pub type Accept<'a> = dyn Fn(Vec<Inbound>, &str) -> Result<(), AppFailed> + Sync + 'a;
+pub type Accept<'a> = dyn Fn(Vec<Inbound>, String) -> BoxFuture<'a, Result<(), AppFailed>> + Send + Sync + 'a;
 
 pub struct Receiving<'a> {
     pub cursor: String,

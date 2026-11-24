@@ -7,7 +7,7 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, BlockCreate, BlockDelete, BlockUpdate, Caller, Envelope, SuggestionChange, SuggestionCreate, TextSpan};
 use vibevalley_server::Server;
-use vibevalley_server::content::artifact::{Artifacts, Maker};
+use vibevalley_server::content::artifact::{ArtifactStore, Maker};
 
 fn start(dir: &std::path::Path) -> vibevalley_server::Started {
     let mut registry = vibevalley_runtime::oar::Registry::new();
@@ -121,10 +121,8 @@ fn html_and_markdown_hand_ins_their_versions_and_refusals() {
     crate::support::execute_sql(&mut db, "update artifact set updated_at = updated_at - 1000");
     drop(db);
     let linked_issue = ok(call("issue.create", json!({ "title": "关联工单" })))["id"].as_str().unwrap().to_string();
-    let notes = started
-        .test_internals()
-        .artifacts
-        .create(
+    let notes = vibevalley_runtime::rt::block_on(
+        started.test_internals().artifacts.create_async(
             &Maker {
                 from: "user".into(),
                 by: "lab".into(),
@@ -132,8 +130,9 @@ fn html_and_markdown_hand_ins_their_versions_and_refusals() {
             },
             &serde_json::from_value(json!({ "title": "调研", "kind": "markdown", "content": "# 结论\n\n用**抽屉**。", "note": "初稿", "issue": linked_issue }))
                 .unwrap(),
-        )
-        .unwrap();
+        ),
+    )
+    .unwrap();
     assert_eq!((notes.version, notes.seq, notes.versions.len()), (0, 1, 0));
     assert_eq!(
         last_message(&call, &general)["artifact"],
@@ -272,7 +271,7 @@ fn html_edits_and_removal_keep_the_pages_once() {
     assert_eq!(pages(), before + 2);
 }
 
-fn blocks_now(a: &Artifacts, id: &str) -> Vec<vibevalley_protocol::Block> {
+fn blocks_now(a: &ArtifactStore, id: &str) -> Vec<vibevalley_protocol::Block> {
     vibevalley_runtime::rt::block_on(a.live_blocks_async(id)).unwrap()
 }
 
@@ -576,7 +575,7 @@ fn blocks_are_written_together() {
 
     // What was written is there for a fresh reader of the same database.
     let fresh_db = vibevalley_server::db::ServerDb::open(dir.path()).unwrap();
-    let reopened = Artifacts::open(fresh_db, started.test_internals().attachments.clone(), started.test_internals().chat.clone());
+    let reopened = ArtifactStore::open(fresh_db, started.test_internals().attachments.clone(), started.test_internals().chat.clone());
     assert_eq!(vibevalley_runtime::rt::block_on(reopened.suggestions_async(&id)).unwrap().len(), 4);
     assert_eq!(
         vibevalley_runtime::rt::block_on(reopened.markdown_async(&id)).unwrap(),
@@ -1204,41 +1203,39 @@ fn persistent_cursor_suggestion_survives_upstream_edit_and_coalesces_same_origin
 
     // Helper edits user-authored block twice in the same turn/origin -> coalesces into one persistent-cursor suggestion.
     let meta_turn1 = CommitMeta::session("Backend", "backend", "w1", 1, Some("bump version".into()), 1_700_000_000_000);
-    let r1 = a
-        .update_block_with_meta(
-            &id,
-            "backend",
-            &BlockUpdate {
-                block: block_id.clone(),
-                base_rev: 1,
-                text: Some("Hello world, ship v2 today.".into()),
-                r#type: None,
-                level: None,
-                checked: None,
-                language: None,
-            },
-            &meta_turn1,
-        )
-        .unwrap();
+    let r1 = vibevalley_runtime::rt::block_on(a.update_block_with_meta_async(
+        &id,
+        "backend",
+        &BlockUpdate {
+            block: block_id.clone(),
+            base_rev: 1,
+            text: Some("Hello world, ship v2 today.".into()),
+            r#type: None,
+            level: None,
+            checked: None,
+            language: None,
+        },
+        &meta_turn1,
+    ))
+    .unwrap();
     assert!(r1.suggestion.is_some());
     let s1_id = r1.suggestion.unwrap();
 
-    let r2 = a
-        .update_block_with_meta(
-            &id,
-            "backend",
-            &BlockUpdate {
-                block: block_id.clone(),
-                base_rev: 1,
-                text: Some("Hello world, ship v2.5 today.".into()),
-                r#type: None,
-                level: None,
-                checked: None,
-                language: None,
-            },
-            &meta_turn1,
-        )
-        .unwrap();
+    let r2 = vibevalley_runtime::rt::block_on(a.update_block_with_meta_async(
+        &id,
+        "backend",
+        &BlockUpdate {
+            block: block_id.clone(),
+            base_rev: 1,
+            text: Some("Hello world, ship v2.5 today.".into()),
+            r#type: None,
+            level: None,
+            checked: None,
+            language: None,
+        },
+        &meta_turn1,
+    ))
+    .unwrap();
     assert_eq!(r2.suggestion.as_deref(), Some(s1_id.as_str()));
 
     let before_drift = ok(call("artifact.suggestion.list", json!({ "id": id })));
@@ -1282,22 +1279,21 @@ fn time_travel_preview_restore_fork_compaction_and_selective_origin_undo() {
     let outline = ok(call("artifact.create", json!({ "title": "迭代大纲", "artifactType": "outline" })));
     let id = outline["id"].as_str().unwrap().to_string();
 
-    let b1 = a
-        .insert_block_with_meta(
-            &id,
-            "backend",
-            &BlockCreate {
-                r#type: Some("bulleted".into()),
-                text: "Spec: base".into(),
-                ..Default::default()
-            },
-            &CommitMeta::user("user", Some("initial outline".into()), 1_700_000_001_000),
-        )
-        .unwrap();
+    let b1 = vibevalley_runtime::rt::block_on(a.insert_block_with_meta_async(
+        &id,
+        "backend",
+        &BlockCreate {
+            r#type: Some("bulleted".into()),
+            text: "Spec: base".into(),
+            ..Default::default()
+        },
+        &CommitMeta::user("user", Some("initial outline".into()), 1_700_000_001_000),
+    ))
+    .unwrap();
     let b1_id = b1.block_id.clone();
 
     let meta_a = CommitMeta::session("AgentA", "backend", "sA", 1, Some("add A1".into()), 1_700_000_002_000);
-    a.update_block_with_meta(
+    vibevalley_runtime::rt::block_on(a.update_block_with_meta_async(
         &id,
         "backend",
         &BlockUpdate {
@@ -1310,9 +1306,9 @@ fn time_travel_preview_restore_fork_compaction_and_selective_origin_undo() {
             language: None,
         },
         &meta_a,
-    )
+    ))
     .unwrap();
-    a.insert_block_with_meta(
+    vibevalley_runtime::rt::block_on(a.insert_block_with_meta_async(
         &id,
         "backend",
         &BlockCreate {
@@ -1321,11 +1317,11 @@ fn time_travel_preview_restore_fork_compaction_and_selective_origin_undo() {
             ..Default::default()
         },
         &meta_a,
-    )
+    ))
     .unwrap();
 
     let meta_b = CommitMeta::session("AgentB", "frontend", "sB", 1, Some("add B1".into()), 1_700_000_003_000);
-    a.update_block_with_meta(
+    vibevalley_runtime::rt::block_on(a.update_block_with_meta_async(
         &id,
         "frontend",
         &BlockUpdate {
@@ -1338,9 +1334,9 @@ fn time_travel_preview_restore_fork_compaction_and_selective_origin_undo() {
             language: None,
         },
         &meta_b,
-    )
+    ))
     .unwrap();
-    a.insert_block_with_meta(
+    vibevalley_runtime::rt::block_on(a.insert_block_with_meta_async(
         &id,
         "frontend",
         &BlockCreate {
@@ -1349,7 +1345,7 @@ fn time_travel_preview_restore_fork_compaction_and_selective_origin_undo() {
             ..Default::default()
         },
         &meta_b,
-    )
+    ))
     .unwrap();
 
     // History timeline lists newest first with persisted `CommitMeta`.
@@ -1419,7 +1415,7 @@ fn time_travel_preview_restore_fork_compaction_and_selective_origin_undo() {
         by: "frontend".into(),
         run: None,
     };
-    a.batch_entries_with_meta(
+    vibevalley_runtime::rt::block_on(a.batch_entries_with_meta_async(
         &maker_a,
         &vibevalley_protocol::ArtifactEntryBatchRequest {
             id: bid.clone(),
@@ -1436,9 +1432,9 @@ fn time_travel_preview_restore_fork_compaction_and_selective_origin_undo() {
             announce: Some(false),
         },
         &CommitMeta::session("AgentA", "backend", "sA", 1, Some("recolor".into()), 1_700_000_010_000),
-    )
+    ))
     .unwrap();
-    a.batch_entries_with_meta(
+    vibevalley_runtime::rt::block_on(a.batch_entries_with_meta_async(
         &maker_b,
         &vibevalley_protocol::ArtifactEntryBatchRequest {
             id: bid.clone(),
@@ -1455,7 +1451,7 @@ fn time_travel_preview_restore_fork_compaction_and_selective_origin_undo() {
             announce: Some(false),
         },
         &CommitMeta::session("AgentB", "frontend", "sB", 1, Some("move".into()), 1_700_000_011_000),
-    )
+    ))
     .unwrap();
 
     ok(call("artifact.history.undoOrigin", json!({ "id": bid, "origin": "session:sA:turn:1" })));

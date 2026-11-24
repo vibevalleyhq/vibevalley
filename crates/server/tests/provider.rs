@@ -118,5 +118,8 @@ fn updates_keep_the_key_and_follow_revisions() {
     assert_eq!(serde_json::to_value(reopened.providers()).unwrap()["connections"][0]["key"], "test-key");
     let _ = Arc::strong_count(&setting);
     // Model discovery refuses an old revision before any call.
-    assert_eq!(p.models("moss", 0).unwrap_err().biz_code, BizCode::ProviderRefused);
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(p.models_async("moss", 0)).unwrap_err().biz_code,
+        BizCode::ProviderRefused
+    );
 }

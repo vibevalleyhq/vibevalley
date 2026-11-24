@@ -3,7 +3,7 @@
 //! as the user's own words; what the farm says for the user there goes out
 //! to the app while the user has not read it in the farm.
 //!
-//! `Connectors` is the door. Behind it each app is an `Adapter` (its login,
+//! `Connector` is the door. Behind it each app is an `Adapter` (its login,
 //! its connection, its sends) under a `Bridge` (the account, the durable
 //! inbox and outbox in `connector_*` of server.db, the status said to the
 //! core).
@@ -114,16 +114,24 @@ fn refused(text: String) -> ApiError {
     ApiError::new(BizCode::ConnectorRefused, text)
 }
 
-pub struct Connectors {
+pub struct Connector {
     env: Arc<Env>,
     bridges: Vec<Arc<Bridge>>,
     /// Cancelled and awaited on close to end the feed task.
     feed: Mutex<Option<(CancellationToken, JoinHandle<()>)>>,
 }
 
-impl Connectors {
+/// Temporary compatibility alias for unowned callers until spine cutover.
+#[doc(hidden)]
+pub type Connectors = Connector;
+
+impl Connector {
     /// Opens the accounts and goes on with those that are connected.
-    pub fn open(db: Arc<ServerDb>, hub: &Arc<Hub>, chat: Arc<Chat>, options: Options) -> Result<Arc<Connectors>, ApiError> {
+    pub fn open(db: Arc<ServerDb>, hub: &Arc<Hub>, chat: Arc<Chat>, options: Options) -> Result<Arc<Connector>, ApiError> {
+        crate::collab::block_on(Self::open_async(db, hub, chat, options))
+    }
+
+    pub async fn open_async(db: Arc<ServerDb>, hub: &Arc<Hub>, chat: Arc<Chat>, options: Options) -> Result<Arc<Connector>, ApiError> {
         let store = Store::open(db);
         let env = Arc::new(Env {
             store,
@@ -138,13 +146,18 @@ impl Connectors {
         let bridges: Vec<Arc<Bridge>> = apps(&options).into_iter().map(|app| Bridge::new(app, env.clone())).collect();
         {
             let env = env.clone();
-            chat.guard_removal(move |id| match env.store.accounts_in(id) {
-                Ok(0) => vec![],
-                _ => vec![t("server.channel.connectorsThere", &[])],
+            chat.guard_removal(move |id| {
+                let env = env.clone();
+                Box::pin(async move {
+                    match env.store.accounts_in_async(&id).await {
+                        Ok(0) => vec![],
+                        _ => vec![t("server.channel.connectorsThere", &[])],
+                    }
+                })
             });
         }
         for b in &bridges {
-            b.load();
+            b.load_async().await;
         }
         let cancel = hub.child_token();
         let feed_cancel = cancel.clone();
@@ -156,7 +169,7 @@ impl Connectors {
                 b.resume();
             }
         }
-        Ok(Arc::new(Connectors {
+        Ok(Arc::new(Connector {
             env,
             bridges,
             feed: Mutex::new(Some((cancel, handle))),
@@ -288,7 +301,7 @@ fn app_of(id: &str) -> Result<ConnectorID, ApiError> {
         .ok_or_else(|| refused(t("server.connector.noConnector", &[("id", id.into())])))
 }
 
-pub fn install(hub: &Hub, connectors: Arc<Connectors>) {
+pub fn install(hub: &Hub, connectors: Arc<Connector>) {
     let c = connectors.clone();
     hub.on_async::<ops::ConnectorList, _, _>(move |_, _| {
         let c = c.clone();

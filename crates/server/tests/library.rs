@@ -236,7 +236,15 @@ fn regression_library_sort_filter_and_attachment_identity_survive_reopen() {
     assert!(list(json!({"origin":"generated"})).is_empty());
     ok(s.hub.call_as(Caller::User, "library.item.delete", json!({"id":ids[1]})));
     assert!(list(json!({"text":"Alpha"})).is_empty());
-    assert_eq!(std::fs::read(s.test_internals().attachments.file(&ids[1]).unwrap().path).unwrap(), b"a");
+    assert_eq!(
+        std::fs::read(
+            vibevalley_runtime::rt::block_on(s.test_internals().attachments.file_async(&ids[1]))
+                .unwrap()
+                .path
+        )
+        .unwrap(),
+        b"a"
+    );
     s.close();
 }
 

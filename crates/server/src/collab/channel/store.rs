@@ -14,7 +14,7 @@ use super::types::{
 use super::words::{self, Nameable};
 use super::{CALLERS_MAX, LAST_MAX, THREAD_TITLE_MAX, line_of};
 use crate::app::hub::refusal::{LookIn, internal, missing};
-use crate::content::attachment::Attachments;
+use crate::content::attachment::AttachmentStore;
 use crate::now;
 
 pub(super) trait Q<T> {
@@ -409,7 +409,7 @@ impl ChatModel {
         }
     }
 
-    pub(super) fn addressed_of(&self, row: &MsgRow, files: &Attachments) -> AddressedMessage {
+    pub(super) fn addressed_of(&self, row: &MsgRow, files: &AttachmentStore) -> AddressedMessage {
         let meta = meta_of(row.meta.as_deref());
         let gone = row.deleted_at.is_some_and(|d| d != 0);
         let attached = meta.attachments.unwrap_or_default();

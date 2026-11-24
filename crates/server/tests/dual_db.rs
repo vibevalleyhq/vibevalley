@@ -376,11 +376,13 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
         json!({ "kind": "image", "mime": "image/png", "name": "in.png", "size": media_bytes.len() }),
     );
     let media_id = media_created["id"].as_str().unwrap().to_string();
-    started
-        .test_internals()
-        .media_inputs
-        .upload(&media_id, std::io::Cursor::new(media_bytes))
-        .unwrap();
+    vibevalley_runtime::rt::block_on(
+        started
+            .test_internals()
+            .media_inputs
+            .upload_async(&media_id, Box::new(std::io::Cursor::new(media_bytes.to_vec()))),
+    )
+    .unwrap();
     let media_got = ok(&started, "media.input.get", json!({ "id": media_id }));
     assert_eq!(media_got["phase"], "ready");
 

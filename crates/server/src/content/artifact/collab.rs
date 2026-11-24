@@ -31,7 +31,7 @@ use vibevalley_protocol::{
 use super::blocks::spans_of;
 use super::db::{self, ArtifactRow, StoredSuggestion};
 use super::entries::EntryChange;
-use super::{Artifacts, Maker, artifact_type_of, new_id, q, refused};
+use super::{ArtifactStore, Maker, artifact_type_of, new_id, q, refused};
 use crate::db::begin_write_tx;
 use crate::{Hub, Sink, now};
 
@@ -342,7 +342,7 @@ fn snapshot_store_entries_to_wire(artifact_id: &str, snap_entries: &[StoreEntryS
     out
 }
 
-impl Artifacts {
+impl ArtifactStore {
     // ---- Phase A: Pure in-memory PresenceHub --------------------------------
 
     fn presence_hub(&self, artifact_id: &str) -> PresenceHub {

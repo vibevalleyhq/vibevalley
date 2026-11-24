@@ -298,6 +298,10 @@ pub enum Verdict {
 /// How MOSS Live is asked whether it takes a key; a test answers for it.
 pub trait Realtime: Send + Sync {
     fn verify(&self, key: &Secret, model: &str) -> Verdict;
+
+    fn verify_async<'a>(&'a self, key: &'a Secret, model: &'a str) -> crate::BoxFuture<'a, Verdict> {
+        Box::pin(async move { self.verify(key, model) })
+    }
 }
 
 /// The realtime address asked over plain HTTPS with the key: 401 and 403
@@ -315,6 +319,20 @@ struct ErrorMessage {
     message: Option<String>,
 }
 
+fn parse_probe_response(key: &Secret, status: u16, body: Vec<u8>) -> Verdict {
+    let safe = |text: &str| -> String { text.replace(key.expose(), "[redacted]").chars().take(200).collect() };
+    match status {
+        401 | 403 => {
+            let said = serde_json::from_slice::<ErrorBody>(&body).ok().and_then(|b| b.error).and_then(|e| e.message);
+            Verdict::Refused(safe(
+                &said.filter(|m| !m.is_empty()).unwrap_or_else(|| String::from_utf8_lossy(&body).into_owned()),
+            ))
+        }
+        status if status >= 500 => Verdict::Failed(format!("HTTP {status}")),
+        _ => Verdict::Ok,
+    }
+}
+
 impl Realtime for HttpProbe {
     fn verify(&self, key: &Secret, model: &str) -> Verdict {
         let safe = |text: &str| -> String { text.replace(key.expose(), "[redacted]").chars().take(200).collect() };
@@ -330,17 +348,45 @@ impl Realtime for HttpProbe {
             Err(FetchError::Timeout) => return Verdict::Silent,
             Err(FetchError::Network(why)) => return Verdict::Unreachable(safe(&why)),
         };
-        match response.status {
-            401 | 403 => {
-                let body = read_max(&mut response.body, 1 << 16).unwrap_or_default();
-                let said = serde_json::from_slice::<ErrorBody>(&body).ok().and_then(|b| b.error).and_then(|e| e.message);
-                Verdict::Refused(safe(
-                    &said.filter(|m| !m.is_empty()).unwrap_or_else(|| String::from_utf8_lossy(&body).into_owned()),
-                ))
-            }
-            status if status >= 500 => Verdict::Failed(format!("HTTP {status}")),
-            _ => Verdict::Ok,
-        }
+        let body = if matches!(response.status, 401 | 403) {
+            read_max(&mut response.body, 1 << 16).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        parse_probe_response(key, response.status, body)
+    }
+
+    fn verify_async<'a>(&'a self, key: &'a Secret, model: &'a str) -> crate::BoxFuture<'a, Verdict> {
+        Box::pin(async move {
+            let safe = |text: &str| -> String { text.replace(key.expose(), "[redacted]").chars().take(200).collect() };
+            let answered = self
+                .0
+                .clone()
+                .fetch_async(
+                    Request {
+                        method: "GET",
+                        url: format!("{MOSS}/realtime?model={model}"),
+                        headers: vec![("authorization".into(), format!("Bearer {}", key.expose()))],
+                        body: None,
+                        timeout: Duration::from_secs(8),
+                    },
+                    tokio_util::sync::CancellationToken::new(),
+                )
+                .await;
+            let mut response = match answered {
+                Ok(r) => r,
+                Err(FetchError::Timeout) => return Verdict::Silent,
+                Err(FetchError::Network(why)) => return Verdict::Unreachable(safe(&why)),
+            };
+            let body = if matches!(response.status, 401 | 403) {
+                crate::spawn_blocking_traced(move || read_max(&mut response.body, 1 << 16).unwrap_or_default())
+                    .await
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            };
+            parse_probe_response(key, response.status, body)
+        })
     }
 }
 

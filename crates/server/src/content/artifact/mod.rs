@@ -42,7 +42,7 @@ use entries::EntryChange;
 
 use crate::app::hub::ports::{ChannelAnnouncePort, ChannelQuotePort};
 use crate::app::hub::refusal::{LookIn, missing};
-use crate::content::attachment::Attachments;
+use crate::content::attachment::AttachmentStore;
 use crate::db::ServerDb;
 use crate::db::begin_write_tx;
 use crate::{Hub, now};
@@ -107,7 +107,7 @@ type SuggestionsNow = (String, Vec<vibevalley_protocol::Suggestion>);
 type PresenceExtra = HashMap<(String, String), (Option<String>, Option<String>)>;
 
 /// Read-only artifact block quoter backed directly by [`ServerDb`], enabling
-/// bottom-up construction of `collab/channel::Chat` before `Artifacts` with
+/// bottom-up construction of `collab/channel::Chat` before `ArtifactStore` with
 /// zero post-init cycle-breaking hooks.
 pub struct BlockQuoter {
     db: Arc<ServerDb>,
@@ -157,7 +157,7 @@ impl ChannelQuotePort for BlockQuoter {
     }
 }
 
-pub struct Artifacts {
+pub struct ArtifactStore {
     db: Arc<ServerDb>,
     /// One change of an artifact's row at a time: a version's number is the
     /// latest's plus one.
@@ -166,7 +166,7 @@ pub struct Artifacts {
     batches: AsyncMutex<()>,
     /// Per-artifact write lock for structured entry store batches.
     entry_locks: Mutex<HashMap<String, Arc<AsyncMutex<()>>>>,
-    files: Arc<Attachments>,
+    files: Arc<AttachmentStore>,
     channel: Arc<dyn ChannelAnnouncePort>,
     changes: broadcast::Sender<Change>,
     entry_changes: broadcast::Sender<EntryChange>,
@@ -179,15 +179,19 @@ pub struct Artifacts {
     prune_task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
-impl Artifacts {
+/// Temporary compatibility alias for unowned callers until spine cutover.
+#[doc(hidden)]
+pub type Artifacts = ArtifactStore;
+
+impl ArtifactStore {
     /// Opens artifacts on the shared [`ServerDb`]. The daily prune task is
     /// attached to the hub's task tracker when [`install`] wires the endpoints.
-    pub fn open(db: Arc<ServerDb>, files: Arc<Attachments>, channel: Arc<dyn ChannelAnnouncePort>) -> Arc<Artifacts> {
+    pub fn open(db: Arc<ServerDb>, files: Arc<AttachmentStore>, channel: Arc<dyn ChannelAnnouncePort>) -> Arc<ArtifactStore> {
         let (changes, _) = broadcast::channel(STREAM_CAPACITY);
         let (entry_changes, _) = broadcast::channel(STREAM_CAPACITY);
         let (suggestion_changes, _) = broadcast::channel(STREAM_CAPACITY);
         let (presence_changes, _) = broadcast::channel(STREAM_CAPACITY);
-        Arc::new(Artifacts {
+        Arc::new(ArtifactStore {
             db,
             rows: AsyncMutex::new(()),
             batches: AsyncMutex::new(()),
@@ -343,16 +347,14 @@ impl Artifacts {
         Ok(out)
     }
 
+    /// Temporary compatibility wrapper for unowned sync callers until `spine-cutover-all`.
+    #[doc(hidden)]
     pub fn list(&self, req: &ArtifactListRequest) -> Result<Vec<Wire>, ApiError> {
         vibevalley_runtime::rt::block_on(self.list_async(req))
     }
 
     pub async fn get_async(&self, id: &str) -> Result<Wire, ApiError> {
         self.get_now_async(id).await
-    }
-
-    pub fn get(&self, id: &str) -> Result<Wire, ApiError> {
-        vibevalley_runtime::rt::block_on(self.get_async(id))
     }
 
     async fn version_of<C: ConnectionTrait>(&self, db: &C, id: &str, version: Option<i64>) -> Result<(ArtifactRow, db::VersionRow), ApiError> {
@@ -613,10 +615,6 @@ impl Artifacts {
         self.get_now_async(&id).await
     }
 
-    pub fn create(&self, maker: &Maker, req: &ArtifactRequest) -> Result<Wire, ApiError> {
-        vibevalley_runtime::rt::block_on(self.create_async(maker, req))
-    }
-
     async fn create_store_async(&self, maker: &Maker, req: &ArtifactRequest, title: &str, artifact_type: Option<ArtifactType>) -> Result<Wire, ApiError> {
         let title_for_check = if req.title.trim().is_empty() { title } else { req.title.as_str() };
         let problem = artifact_problem(Some(title_for_check), None, None);
@@ -868,10 +866,6 @@ impl Artifacts {
         self.get_now_async(&id).await
     }
 
-    pub fn import_outline(&self, maker: &Maker, req: &ArtifactOutlineImportRequest) -> Result<Wire, ApiError> {
-        vibevalley_runtime::rt::block_on(self.import_outline_async(maker, req))
-    }
-
     /// An html one's next version; a blocks or store one is refused.
     pub async fn version_async(&self, maker: &Maker, req: &ArtifactVersionRequest) -> Result<Wire, ApiError> {
         let _rows = self.rows.lock().await;
@@ -881,10 +875,6 @@ impl Artifacts {
     pub async fn version_with_meta_async(&self, maker: &Maker, req: &ArtifactVersionRequest, meta: &CommitMeta) -> Result<Wire, ApiError> {
         let _rows = self.rows.lock().await;
         self.version_locked_async(maker, req, Some(meta)).await
-    }
-
-    pub fn version_with_meta(&self, maker: &Maker, req: &ArtifactVersionRequest, meta: &CommitMeta) -> Result<Wire, ApiError> {
-        vibevalley_runtime::rt::block_on(self.version_with_meta_async(maker, req, meta))
     }
 
     async fn version_locked_async(&self, maker: &Maker, req: &ArtifactVersionRequest, explicit_meta: Option<&CommitMeta>) -> Result<Wire, ApiError> {
@@ -1140,10 +1130,6 @@ impl Artifacts {
         })
     }
 
-    pub fn snapshot(&self, id: &str) -> Result<BlockSnapshot, ApiError> {
-        vibevalley_runtime::rt::block_on(self.snapshot_async(id))
-    }
-
     /// VibeValley's `artifact.page`: what `GET /api/v1/artifact/:id/:version`
     /// answers. Plain, the version's bytes; with `shell`, the workbench's
     /// view of it in its theme (`artifactContent` in `gateway/http/api.ts`).
@@ -1198,7 +1184,7 @@ fn issue_id(hub: &Hub, reference: &str) -> Result<String, ApiError> {
 
 /// Every `artifact.*` endpoint and subscription, as the user calls them
 /// (`gateway/http/handlers/artifact.ts`).
-pub fn install(hub: &Hub, artifacts: Arc<Artifacts>) {
+pub fn install(hub: &Hub, artifacts: Arc<ArtifactStore>) {
     artifacts.start_prune_ticker(hub);
     let a = artifacts;
     hub.on_async::<ops::ArtifactList, _, _>({
@@ -1508,7 +1494,7 @@ pub fn install(hub: &Hub, artifacts: Arc<Artifacts>) {
             async move { a.write_entry_props_async(&Maker::user(), &r).await }
         }
     });
-    hub.on_async::<native_ops::ArtifactTokensInspect, _, _>(move |_, r| async move { Ok(Artifacts::inspect_tokens(&r)) });
+    hub.on_async::<native_ops::ArtifactTokensInspect, _, _>(move |_, r| async move { Ok(ArtifactStore::inspect_tokens(&r)) });
     hub.on_subscription_async::<subscriptions::ArtifactFollow, _, _>({
         let a = a.clone();
         move |hub, p, sink| {

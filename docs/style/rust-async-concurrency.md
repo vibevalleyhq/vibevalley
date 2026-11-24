@@ -123,7 +123,7 @@
 
 | 检查 / 脚本 | 守卫范围 | 触发方式 |
 |---|---|---|
-| [ratchets.rs](xtask/src/ratchets.rs) | 禁止引入 `pollster`、锁定服务端非测试 `rt::block_on(` 仅缩减上限（`SERVER_BLOCK_ON_CEILING = 73`）、禁止 `apps/mac/src` 使用 `rt::handle`、禁止 `crates/server/tests/`、`apps/mac/src/`、`crates/cli/src/` 与 `crates/runtime/src/` 使用 `std::thread::sleep`、禁止 `crates/rich` 在 `highlight.rs` 外经 `Handle::try_current()` 回退同步执行等 | `cargo xtask audit --ratchets` |
+| [ratchets.rs](xtask/src/ratchets.rs) | 禁止引入 `pollster`、锁定服务端非测试 `rt::block_on(` 仅缩减上限（`SERVER_BLOCK_ON_CEILING = 47`）、禁止 `apps/mac/src` 使用 `rt::handle`、禁止 `crates/server/tests/`、`apps/mac/src/`、`crates/cli/src/` 与 `crates/runtime/src/` 使用 `std::thread::sleep`、禁止 `crates/rich` 在 `highlight.rs` 外经 `Handle::try_current()` 回退同步执行等 | `cargo xtask audit --ratchets` |
 | [boundaries.rs](xtask/src/boundaries.rs) | 守住服务端 `L0–L3` 无环 DAG、模块无循环依赖、脊柱（`lib.rs` / `app/hub/ports.rs` / `transport/`）与 `apps/mac/src` 不直接导入 `crate::<domain>::*` | `cargo xtask audit --boundaries` |
 | Rust 工作区全检 | `cargo fmt`、`cargo clippy --all-targets -- -D warnings`、工作区测试 | `cargo xtask check` |
 | Loom 状态机模型检验 | 4 个并发状态机内核穷举交错检查（`--features loom --profile loom`） | `cargo xtask loom` |

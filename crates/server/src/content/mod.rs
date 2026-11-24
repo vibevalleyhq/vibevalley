@@ -23,11 +23,11 @@ mod tests {
         MediaInputKind, MediaInputPhase, MediaInputRequest, MediaJob, MediaSource, MessageKind, SuggestionChange, SuggestionCreate, SuggestionStatus, USER_ID,
     };
 
-    use super::artifact::{Artifacts, BlockQuoter, Maker, spans_of};
-    use super::attachment::Attachments;
+    use super::artifact::{ArtifactStore, BlockQuoter, Maker, spans_of};
+    use super::attachment::AttachmentStore;
     use super::library::{AddedBy, Library};
-    use super::media::inputs::Inputs;
-    use super::media::jobs::{Jobs, Parts};
+    use super::media::inputs::MediaInputStore;
+    use super::media::jobs::{MediaStore, Parts};
     use crate::Hub;
     use crate::app::hub::ports::{ChannelAnnouncePort, ChannelQuotePort};
     use crate::db::ServerDb;
@@ -221,7 +221,7 @@ mod tests {
 
     async fn verify_content_on(home: &Path, db: Arc<ServerDb>) {
         // 1. Attachments
-        let files = Attachments::open(home, db.clone());
+        let files = AttachmentStore::open(home, db.clone());
         let att_png = files
             .keep_async(b"\x89PNG\r\n\x1a\ncontent-bytes".to_vec(), "100%_chart.png".into(), "image/png".into())
             .await
@@ -333,7 +333,7 @@ mod tests {
 
         // 3. Media Inputs + Jobs
         let clock = Arc::new(ManualClock::new(1_700_000_000_000));
-        let inputs = Inputs::open_with_clock(home, db.clone(), files.clone(), clock.clone()).unwrap();
+        let inputs = MediaInputStore::open_with_clock(home, db.clone(), files.clone(), clock.clone()).unwrap();
         let req = MediaInputRequest {
             kind: MediaInputKind::Image,
             mime: "image/png".into(),
@@ -363,7 +363,7 @@ mod tests {
         });
         let announce = TestAnnounce::new(db.clone());
         let (vendor, download) = crate::app::fakes::moss::network();
-        let jobs = Jobs::open_with_clock(
+        let jobs = MediaStore::open_with_clock(
             Parts {
                 db: db.clone(),
                 hub: Arc::downgrade(&hub),
@@ -401,7 +401,7 @@ mod tests {
         inputs.close();
 
         // 4. Artifacts (blocks + html + store + collab/history + constraints)
-        let artifacts = Artifacts::open(db.clone(), files.clone(), announce.clone());
+        let artifacts = ArtifactStore::open(db.clone(), files.clone(), announce.clone());
         let quoter = BlockQuoter::new(db.clone());
         let maker = Maker::user();
 

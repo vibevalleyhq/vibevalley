@@ -22,7 +22,7 @@ use vibevalley_protocol::{
 
 use super::collab::commit_meta_for_actor;
 use super::db::{self, ArtifactRow, ChangeRow, StoredSuggestion};
-use super::{Artifacts, Change, new_id, q, refused};
+use super::{ArtifactStore, Change, new_id, q, refused};
 use crate::db::begin_write_tx;
 use crate::{Hub, Sink, now};
 
@@ -167,7 +167,7 @@ fn base_of(op: &BlockOp) -> Option<(&str, i64)> {
     }
 }
 
-impl Artifacts {
+impl ArtifactStore {
     /// `foundBlocks`: the artifact, refused when it is not written in blocks.
     pub(super) async fn found_blocks_async<C: ConnectionTrait>(&self, db: &C, id: &str) -> Result<ArtifactRow, ApiError> {
         let row = self.found(db, id).await?;
@@ -340,10 +340,6 @@ impl Artifacts {
         self.insert_block_inner_async(artifact, actor, req, Some(meta)).await
     }
 
-    pub fn insert_block_with_meta(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.insert_block_inner_async(artifact, actor, req, Some(meta)))
-    }
-
     async fn insert_block_inner_async(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
         self.found_blocks_async(self.db.read_conn(), artifact).await?;
         let name = req.r#type.as_deref().map(str::trim).filter(|s| !s.is_empty()).unwrap_or("paragraph");
@@ -399,10 +395,6 @@ impl Artifacts {
 
     pub async fn update_block_with_meta_async(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
         self.update_block_inner_async(artifact, actor, req, Some(meta)).await
-    }
-
-    pub fn update_block_with_meta(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.update_block_inner_async(artifact, actor, req, Some(meta)))
     }
 
     async fn update_block_inner_async(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
@@ -540,28 +532,12 @@ impl Artifacts {
         ack.results.into_iter().next().ok_or_else(|| refused(t("server.artifact.notApplied", &[])))
     }
 
-    pub fn move_block_with_meta(
-        &self,
-        artifact: &str,
-        actor: &str,
-        block: &str,
-        parent_id: Option<&str>,
-        after_block: Option<&str>,
-        meta: &CommitMeta,
-    ) -> Result<BlockOpResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.move_block_with_meta_async(artifact, actor, block, parent_id, after_block, meta))
-    }
-
     pub async fn delete_block_async(&self, artifact: &str, actor: &str, req: &BlockDelete) -> Result<BlockOpResult, ApiError> {
         self.delete_block_inner_async(artifact, actor, req, None).await
     }
 
     pub async fn delete_block_with_meta_async(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
         self.delete_block_inner_async(artifact, actor, req, Some(meta)).await
-    }
-
-    pub fn delete_block_with_meta(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.delete_block_inner_async(artifact, actor, req, Some(meta)))
     }
 
     async fn delete_block_inner_async(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {

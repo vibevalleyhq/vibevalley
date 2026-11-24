@@ -108,7 +108,7 @@ pub fn connections_over(current: &Providers, update: &ProviderUpdate) -> Result<
 }
 
 /// A GET to MOSS: the parsed 2xx body, else its failure in the user's words (`refusal`).
-fn moss_get(fetch: &dyn Fetch, key: &Secret, url: &str, query: &[(&str, String)], timeout: Duration) -> Result<Value, ApiError> {
+async fn moss_get_async(fetch: &Arc<dyn Fetch>, key: &Secret, url: &str, query: &[(&str, String)], timeout: Duration) -> Result<Value, ApiError> {
     let key = key.expose();
     if key.trim().is_empty() || key.chars().any(char::is_whitespace) {
         return Err(refuse("server.provider.noKey"));
@@ -118,13 +118,18 @@ fn moss_get(fetch: &dyn Fetch, key: &Secret, url: &str, query: &[(&str, String)]
         target.query_pairs_mut().append_pair(k, v);
     }
     let response = fetch
-        .fetch(Request {
-            method: "GET",
-            url: target.to_string(),
-            headers: vec![("authorization".into(), format!("Bearer {key}")), ("accept".into(), "application/json".into())],
-            body: None,
-            timeout,
-        })
+        .clone()
+        .fetch_async(
+            Request {
+                method: "GET",
+                url: target.to_string(),
+                headers: vec![("authorization".into(), format!("Bearer {key}")), ("accept".into(), "application/json".into())],
+                body: None,
+                timeout,
+            },
+            tokio_util::sync::CancellationToken::new(),
+        )
+        .await
         .map_err(|e| match e {
             FetchError::Timeout => refuse("server.provider.timeout"),
             FetchError::Network(_) => refuse("server.provider.network"),
@@ -142,7 +147,10 @@ fn moss_get(fetch: &dyn Fetch, key: &Secret, url: &str, query: &[(&str, String)]
         }
     }
     let mut body = response.body;
-    let bytes = read_max(&mut body, 1 << 20).map_err(|_| refuse("server.provider.tooLarge"))?;
+    let bytes = crate::spawn_blocking_traced(move || read_max(&mut body, 1 << 20))
+        .await
+        .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+        .map_err(|_| refuse("server.provider.tooLarge"))?;
     serde_json::from_slice(&bytes).map_err(|_| refuse("server.provider.invalidResponse"))
 }
 
@@ -183,9 +191,9 @@ impl Provider {
         Ok(())
     }
 
-    pub fn models(&self, connection: &str, revision: i64) -> Result<ProviderModelListing, ApiError> {
+    pub async fn models_async(&self, connection: &str, revision: i64) -> Result<ProviderModelListing, ApiError> {
         let key = self.key_at(connection, revision)?;
-        let list = moss_get(&*self.fetch, &key, &format!("{MOSS}/models"), &[], Duration::from_secs(15))?;
+        let list = moss_get_async(&self.fetch, &key, &format!("{MOSS}/models"), &[], Duration::from_secs(15)).await?;
         let data = list["data"]
             .as_array()
             .filter(|_| list["object"] == "list")
@@ -211,7 +219,7 @@ impl Provider {
         })
     }
 
-    pub fn voices(&self, r: &vibevalley_protocol::ProviderVoiceRequest) -> Result<ProviderVoiceListing, ApiError> {
+    pub async fn voices_async(&self, r: &vibevalley_protocol::ProviderVoiceRequest) -> Result<ProviderVoiceListing, ApiError> {
         let key = self.key_at(&r.connection, r.revision)?;
         let limit = r.limit.unwrap_or(20);
         let fits = (1..=150).contains(&limit)
@@ -230,7 +238,7 @@ impl Provider {
         if let Some(st) = &r.status {
             query.push(("status", st.clone()));
         }
-        let got = moss_get(&*self.fetch, &key, &format!("{MOSS}/audio/voices"), &query, Duration::from_secs(30))?;
+        let got = moss_get_async(&self.fetch, &key, &format!("{MOSS}/audio/voices"), &query, Duration::from_secs(30)).await?;
         let bad = || refuse("server.provider.invalidResponse");
         let data = got["data"]
             .as_array()
@@ -274,18 +282,10 @@ pub fn install(hub: &Hub, provider: Arc<Provider>) {
     let p = provider.clone();
     hub.on_async::<ops::ProviderModelList, _, _>(move |_, r| {
         let p = p.clone();
-        async move {
-            crate::spawn_blocking_traced(move || p.models(&r.connection, r.revision))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
+        async move { p.models_async(&r.connection, r.revision).await }
     });
     hub.on_async::<ops::ProviderVoiceList, _, _>(move |_, r| {
         let provider = provider.clone();
-        async move {
-            crate::spawn_blocking_traced(move || provider.voices(&r))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
+        async move { provider.voices_async(&r).await }
     });
 }

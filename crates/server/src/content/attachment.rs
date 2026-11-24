@@ -21,10 +21,14 @@ use crate::{Hub, now};
 /// `attachmentMax`: 25 MB.
 pub const ATTACHMENT_MAX: usize = 25 * 1024 * 1024;
 
-pub struct Attachments {
+pub struct AttachmentStore {
     root: PathBuf,
     db: Arc<ServerDb>,
 }
+
+/// Temporary compatibility alias for unowned callers until spine cutover.
+#[doc(hidden)]
+pub type Attachments = AttachmentStore;
 
 fn refused(text: String) -> ApiError {
     ApiError::new(BizCode::AttachmentRefused, text)
@@ -35,9 +39,9 @@ fn no_attachment(id: &str) -> ApiError {
     ApiError::new(BizCode::NotFound, t("server.attachment.noAttachment", &[("id", id.into())]))
 }
 
-impl Attachments {
-    pub fn open(home: &Path, db: Arc<ServerDb>) -> Arc<Attachments> {
-        Arc::new(Attachments {
+impl AttachmentStore {
+    pub fn open(home: &Path, db: Arc<ServerDb>) -> Arc<AttachmentStore> {
+        Arc::new(AttachmentStore {
             root: home.join("attachments"),
             db,
         })
@@ -162,11 +166,7 @@ impl Attachments {
         Ok(out)
     }
 
-    /// `get`: the file of a kept attachment.
-    pub fn file(&self, id: &str) -> Result<AttachmentFile, ApiError> {
-        vibevalley_runtime::rt::block_on(self.file_async(id))
-    }
-
+    /// `file_async`: the file of a kept attachment.
     pub async fn file_async(&self, id: &str) -> Result<AttachmentFile, ApiError> {
         let a = self.by_id_async(id).await?.ok_or_else(|| no_attachment(id))?;
         let path = self.path_of(&a.id);
@@ -178,6 +178,12 @@ impl Attachments {
             r#type: a.r#type,
             name: a.name,
         })
+    }
+
+    /// Temporary compatibility wrapper for unowned sync callers until `spine-cutover-all`.
+    #[doc(hidden)]
+    pub fn file(&self, id: &str) -> Result<AttachmentFile, ApiError> {
+        vibevalley_runtime::rt::block_on(self.file_async(id))
     }
 }
 
@@ -286,9 +292,9 @@ fn stream_import_to_cas(root: &Path, input: &AttachmentImportPathInput) -> Resul
     Ok((id, name, mime, size))
 }
 
-impl crate::app::hub::ports::AttachmentReadPort for Attachments {
+impl crate::app::hub::ports::AttachmentReadPort for AttachmentStore {
     fn read_bytes(&self, id: &str) -> Result<(String, Vec<u8>), ApiError> {
-        let file = self.file(id)?;
+        let file = vibevalley_runtime::rt::block_on(self.file_async(id))?;
         let bytes = std::fs::read(&file.path).map_err(|_| no_attachment(id))?;
         Ok((file.r#type, bytes))
     }
@@ -330,7 +336,7 @@ fn guess_mime_from_path(path: &Path) -> &'static str {
     }
 }
 
-pub fn install(hub: &Hub, files: Arc<Attachments>) {
+pub fn install(hub: &Hub, files: Arc<AttachmentStore>) {
     hub.on_async::<ops::AttachmentCreate, _, _>({
         let files = files.clone();
         move |_, upload| {
@@ -357,10 +363,10 @@ mod tests {
     use serde_json::json;
     use vibevalley_protocol::Caller;
 
-    fn test_hub() -> (tempfile::TempDir, Arc<Hub>, Arc<Attachments>) {
+    fn test_hub() -> (tempfile::TempDir, Arc<Hub>, Arc<AttachmentStore>) {
         let dir = tempfile::tempdir().expect("tempdir");
         let db = ServerDb::open(dir.path()).expect("open db");
-        let files = Attachments::open(dir.path(), db);
+        let files = AttachmentStore::open(dir.path(), db);
         let hub = Hub::new(vibevalley_core::empty_space_state());
         install(&hub, files.clone());
         (dir, hub, files)

@@ -90,10 +90,7 @@ fn issue_thread(server: &Started) -> (String, String) {
 }
 
 fn count_notes(server: &Started, thread: &str, summary: &str) -> usize {
-    server
-        .test_internals()
-        .chat
-        .history(thread, None, None)
+    vibevalley_runtime::rt::block_on(server.test_internals().chat.history_async(thread, None, None))
         .unwrap()
         .iter()
         .filter(|m| m.kind == MessageKind::Report && m.text == summary)
@@ -101,7 +98,7 @@ fn count_notes(server: &Started, thread: &str, summary: &str) -> usize {
 }
 
 fn reply_id(server: &Started, thread: &str, key: &str) -> String {
-    let messages = server.test_internals().chat.history(thread, None, None).unwrap();
+    let messages = vibevalley_runtime::rt::block_on(server.test_internals().chat.history_async(thread, None, None)).unwrap();
     let mut matches = messages.iter().filter(|m| m.send_key.as_deref() == Some(key));
     let id = matches.next().expect("reply persisted").id.clone();
     assert!(matches.next().is_none(), "duplicate chat reply: {key}");
@@ -152,10 +149,7 @@ fn regression_replies_and_reports_across_process_exit() {
             server.test_internals().issue_chat.close();
             comment(&url, &issue, FOLLOW_UP);
             assert!(
-                server
-                    .test_internals()
-                    .chat
-                    .history(&thread, None, None)
+                vibevalley_runtime::rt::block_on(server.test_internals().chat.history_async(&thread, None, None))
                     .unwrap()
                     .iter()
                     .any(|m| m.send_key.as_deref() == Some(FOLLOW_UP))
@@ -266,7 +260,7 @@ fn regression_replies_and_reports_across_process_exit() {
     assert_eq!(unknown.result["runId"], runs[2].id);
     assert_eq!(count_notes(&server, &thread, FOLLOW_UP), 1);
     assert_eq!(count_notes(&server, &thread, UNKNOWN), 0);
-    let history = server.test_internals().chat.history(&thread, None, None).unwrap();
+    let history = vibevalley_runtime::rt::block_on(server.test_internals().chat.history_async(&thread, None, None)).unwrap();
     let confirmed = history.iter().find(|m| m.kind == MessageKind::Report && m.text == FOLLOW_UP).unwrap();
     assert_eq!(confirmed.spent.as_ref().map(|s| s.tokens), Some(16));
     assert!(runs[2].spent.is_none(), "interrupted before its receipt");

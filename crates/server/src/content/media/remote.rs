@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use vibevalley_protocol::{ApiError, MediaInputReference};
 
 use super::Stop;
-use super::jobs::{Jobs, refused};
+use super::jobs::{MediaStore, refused};
 use super::vendor::{Account, Outcome, Uploaded};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -65,7 +65,7 @@ fn extension(mime: &str) -> Option<&'static str> {
     })
 }
 
-impl Jobs {
+impl MediaStore {
     /// The input sent to the vendor, once per job: its file id there. A file already sent is not sent again, so one
     /// whose answer was lost stays unknown.
     pub(super) async fn upload_async(&self, id: &str, input: &MediaInputReference, account: &Account, stop: &Stop) -> Result<String, Outcome> {

@@ -523,7 +523,7 @@ impl Feishu {
             if frame.header("type") == "event" {
                 let Some(payload) = whole(&mut parts, &frame) else { continue };
                 if let Some(m) = inbound_of(&payload) {
-                    (io.accept)(vec![m], "")?;
+                    (io.accept)(vec![m], String::new()).await?;
                 }
             }
             ws.send(WsMessage::binary(frame.acknowledged().encode()))

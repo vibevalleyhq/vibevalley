@@ -367,7 +367,7 @@ impl Adapter for Weixin {
                 within = Duration::from_millis(ms);
             }
             let next = updates.get_updates_buf.clone().unwrap_or_default();
-            if let Err(e) = (io.accept)(inbound_of(&updates), &next) {
+            if let Err(e) = (io.accept)(inbound_of(&updates), next.clone()).await {
                 return e;
             }
             if !next.is_empty() {

@@ -9,7 +9,6 @@ use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, 
 use vibevalley_protocol::ConnectorID;
 
 use super::adapter::Inbound;
-use crate::collab::block_on;
 use crate::db::ServerDb;
 use crate::db::begin_write_tx;
 use crate::db::entities::collab_connector::{connector_account, connector_inbound, connector_outbox};
@@ -71,10 +70,6 @@ impl Store {
         }))
     }
 
-    pub fn account(&self, id: ConnectorID) -> Kept<Option<Account>> {
-        block_on(self.account_async(id))
-    }
-
     /// Replacing an account retires its queued work before reopening the bridge.
     pub async fn connect_async(&self, id: ConnectorID, keys: &Secret, user: &str, pair_code: Option<&str>, at: i64, retired: &str) -> Kept<()> {
         let tx = begin_write_tx(self.db.write_conn()).await?;
@@ -109,11 +104,6 @@ impl Store {
         forget(&tx, id, retired).await?;
         tx.commit().await?;
         Ok(())
-    }
-
-    #[cfg(test)]
-    pub fn connect(&self, id: ConnectorID, keys: &Secret, user: &str, pair_code: Option<&str>, at: i64, retired: &str) -> Kept<()> {
-        block_on(self.connect_async(id, keys, user, pair_code, at, retired))
     }
 
     pub async fn disconnect_async(&self, id: ConnectorID, retired: &str) -> Kept<()> {
@@ -173,21 +163,12 @@ impl Store {
         Ok(())
     }
 
-    #[cfg(test)]
-    pub fn set_channel(&self, id: ConnectorID, channel: Option<&str>) -> Kept<()> {
-        block_on(self.set_channel_async(id, channel))
-    }
-
     pub async fn accounts_in_async(&self, channel: &str) -> Kept<i64> {
         let count = connector_account::Entity::find()
             .filter(connector_account::Column::ChannelId.eq(channel))
             .count(self.db.read_conn())
             .await?;
         Ok(count as i64)
-    }
-
-    pub fn accounts_in(&self, channel: &str) -> Kept<i64> {
-        block_on(self.accounts_in_async(channel))
     }
 
     /// Only advance the cursor after the whole batch of inbound messages is durable.
@@ -233,10 +214,6 @@ impl Store {
         Ok(true)
     }
 
-    pub fn accept(&self, id: ConnectorID, messages: &[Inbound], cursor: &str, at: i64) -> Kept<bool> {
-        block_on(self.accept_async(id, messages, cursor, at))
-    }
-
     pub async fn pending_inbound_async(&self, id: ConnectorID) -> Kept<Vec<Inbound>> {
         let rows = connector_inbound::Entity::find()
             .filter(connector_inbound::Column::Connector.eq(id.as_str()))
@@ -256,11 +233,6 @@ impl Store {
             .collect())
     }
 
-    #[cfg(test)]
-    pub fn pending_inbound(&self, id: ConnectorID) -> Kept<Vec<Inbound>> {
-        block_on(self.pending_inbound_async(id))
-    }
-
     pub async fn delivered_async(&self, id: ConnectorID, ext: &str, message: Option<&str>) -> Kept<()> {
         Update::many(connector_inbound::Entity)
             .col_expr(connector_inbound::Column::Delivered, Expr::value(true))
@@ -271,11 +243,6 @@ impl Store {
             .exec(self.db.write_conn())
             .await?;
         Ok(())
-    }
-
-    #[cfg(test)]
-    pub fn delivered(&self, id: ConnectorID, ext: &str, message: Option<&str>) -> Kept<()> {
-        block_on(self.delivered_async(id, ext, message))
     }
 
     pub async fn add_outgoing_async(&self, id: ConnectorID, message: &str, pieces: &[String], at: i64) -> Kept<()> {
@@ -299,11 +266,6 @@ impl Store {
         Ok(())
     }
 
-    #[cfg(test)]
-    pub fn add_outgoing(&self, id: ConnectorID, message: &str, pieces: &[String], at: i64) -> Kept<()> {
-        block_on(self.add_outgoing_async(id, message, pieces, at))
-    }
-
     pub async fn pending_outgoing_async(&self, id: ConnectorID) -> Kept<Vec<Outgoing>> {
         let rows = connector_outbox::Entity::find()
             .filter(connector_outbox::Column::Connector.eq(id.as_str()))
@@ -321,11 +283,6 @@ impl Store {
             .collect())
     }
 
-    #[cfg(test)]
-    pub fn pending_outgoing(&self, id: ConnectorID) -> Kept<Vec<Outgoing>> {
-        block_on(self.pending_outgoing_async(id))
-    }
-
     pub async fn count_pending_async(&self, id: ConnectorID) -> Kept<i64> {
         let count = connector_outbox::Entity::find()
             .filter(connector_outbox::Column::Connector.eq(id.as_str()))
@@ -333,10 +290,6 @@ impl Store {
             .count(self.db.read_conn())
             .await?;
         Ok(count as i64)
-    }
-
-    pub fn count_pending(&self, id: ConnectorID) -> Kept<i64> {
-        block_on(self.count_pending_async(id))
     }
 
     pub async fn withdraw_async(&self, message: &str) -> Kept<()> {
@@ -367,11 +320,6 @@ impl Store {
         Ok(())
     }
 
-    #[cfg(test)]
-    pub fn sent(&self, rows: &[i64], at: i64, ext: &str) -> Kept<()> {
-        block_on(self.sent_async(rows, at, ext))
-    }
-
     pub async fn not_sent_async(&self, rows: &[i64], error: &str) -> Kept<()> {
         if rows.is_empty() {
             return Ok(());
@@ -400,11 +348,6 @@ impl Store {
             .one(self.db.read_conn())
             .await?;
         Ok(row.and_then(|r| r.message_id))
-    }
-
-    #[cfg(test)]
-    pub fn message_of_ext(&self, id: ConnectorID, ext: &str) -> Kept<Option<String>> {
-        block_on(self.message_of_ext_async(id, ext))
     }
 
     pub async fn prune_async(&self, before: i64) -> Kept<()> {
