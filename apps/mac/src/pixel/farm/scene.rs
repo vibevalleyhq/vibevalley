@@ -18,8 +18,8 @@ use super::world::{
     bed_of_station, place_of_action, plot_calls, pose_of, spots_for, village_hit_at,
 };
 use vibevalley_protocol::{
-    AchievementList, BoardSlice, CallState, CollabSlice, Crop, FarmFrame, GameEffect, InboxSlice, IssueStageKind, PhaseView, SessionPlayView, SessionView,
-    SessionsSlice, StuckReason,
+    AchievementList, BoardSlice, CallState, CollabSlice, Crop, FarmFrame, GameEffect, InboxSlice, Issue, IssueStageKind, PhaseView, SessionPlayView,
+    SessionView, SessionsSlice, StuckReason,
 };
 
 const WALK_SPEED: f32 = 42.0;
@@ -297,20 +297,17 @@ impl FarmScene {
         }
     }
 
-    pub fn apply_farm(&mut self, farm: FarmFrame) {
-        let seq = farm.seq.max(0) as u64;
+    fn diff_farm_sounds(&mut self, seq: u64, effects: &[GameEffect], plays: &std::collections::BTreeMap<String, SessionPlayView>) {
         if self.heard_farm != Some(seq) {
-            self.apply_game_effects(&farm.effects, &farm.view.plays);
+            self.apply_game_effects(effects, plays);
             self.heard_farm = Some(seq);
         }
-        self.frame.apply_farm(farm);
     }
 
-    pub fn apply_board(&mut self, board: BoardSlice) {
-        let seq = board.seq.max(0) as u64;
+    fn diff_board_sounds(&mut self, seq: u64, issues: &[Issue]) {
         if self.heard_board != Some(seq) {
             if self.heard_board.is_some() {
-                for issue in &board.issues {
+                for issue in issues {
                     let Some(was) = self.frame.issues.iter().find(|i| i.id == issue.id).map(|i| &i.stage) else {
                         continue;
                     };
@@ -328,14 +325,12 @@ impl FarmScene {
             }
             self.heard_board = Some(seq);
         }
-        self.frame.apply_board(board);
     }
 
-    pub fn apply_sessions(&mut self, sessions: SessionsSlice) {
-        let seq = sessions.seq.max(0) as u64;
+    fn diff_session_sounds(&mut self, seq: u64, sessions: &[SessionView]) {
         if self.heard_sessions != Some(seq) {
             if self.heard_sessions.is_some() {
-                for session in &sessions.sessions {
+                for session in sessions {
                     if !self.frame.sessions.iter().any(|s| s.id == session.id) {
                         self.sounds.push("arrive");
                     }
@@ -343,21 +338,38 @@ impl FarmScene {
             }
             self.heard_sessions = Some(seq);
         }
-        self.frame.apply_sessions(sessions);
     }
 
-    pub fn apply_inbox(&mut self, inbox: InboxSlice) {
-        let seq = inbox.seq.max(0) as u64;
+    fn diff_inbox_sounds(&mut self, seq: u64, call: CallState) {
         if self.heard_inbox != Some(seq) {
-            if self.heard_inbox.is_some() && self.frame.call != inbox.call {
-                if inbox.call == CallState::Live {
+            if self.heard_inbox.is_some() && self.frame.call != call {
+                if call == CallState::Live {
                     self.sounds.push("voiceOn");
-                } else if inbox.call == CallState::Idle && matches!(self.frame.call, CallState::Live | CallState::Ending) {
+                } else if call == CallState::Idle && matches!(self.frame.call, CallState::Live | CallState::Ending) {
                     self.sounds.push("voiceOff");
                 }
             }
             self.heard_inbox = Some(seq);
         }
+    }
+
+    pub fn apply_farm(&mut self, farm: FarmFrame) {
+        self.diff_farm_sounds(farm.seq.max(0) as u64, &farm.effects, &farm.view.plays);
+        self.frame.apply_farm(farm);
+    }
+
+    pub fn apply_board(&mut self, board: BoardSlice) {
+        self.diff_board_sounds(board.seq.max(0) as u64, &board.issues);
+        self.frame.apply_board(board);
+    }
+
+    pub fn apply_sessions(&mut self, sessions: SessionsSlice) {
+        self.diff_session_sounds(sessions.seq.max(0) as u64, &sessions.sessions);
+        self.frame.apply_sessions(sessions);
+    }
+
+    pub fn apply_inbox(&mut self, inbox: InboxSlice) {
+        self.diff_inbox_sounds(inbox.seq.max(0) as u64, inbox.call);
         self.frame.apply_inbox(inbox);
     }
 
@@ -366,50 +378,10 @@ impl FarmScene {
     }
 
     pub fn apply_frame(&mut self, frame: Frame) {
-        if self.heard_sessions != Some(frame.seq) {
-            if self.heard_sessions.is_some() {
-                for session in &frame.sessions {
-                    if !self.frame.sessions.iter().any(|s| s.id == session.id) {
-                        self.sounds.push("arrive");
-                    }
-                }
-            }
-            self.heard_sessions = Some(frame.seq);
-        }
-        if self.heard_board != Some(frame.seq) {
-            if self.heard_board.is_some() {
-                for issue in &frame.issues {
-                    let Some(was) = self.frame.issues.iter().find(|i| i.id == issue.id).map(|i| &i.stage) else {
-                        continue;
-                    };
-                    let now = &issue.stage;
-                    if now.state == IssueStageKind::Reviewing && was.state != now.state {
-                        self.sounds.push("ripe");
-                    }
-                    if now.state == IssueStageKind::Stuck
-                        && matches!(now.stuck, Some(StuckReason::Failed | StuckReason::Conflict))
-                        && (was.state != now.state || was.stuck != now.stuck)
-                    {
-                        self.sounds.push("bug");
-                    }
-                }
-            }
-            self.heard_board = Some(frame.seq);
-        }
-        if self.heard_inbox != Some(frame.seq) {
-            if self.heard_inbox.is_some() && self.frame.call != frame.call {
-                if frame.call == CallState::Live {
-                    self.sounds.push("voiceOn");
-                } else if frame.call == CallState::Idle && matches!(self.frame.call, CallState::Live | CallState::Ending) {
-                    self.sounds.push("voiceOff");
-                }
-            }
-            self.heard_inbox = Some(frame.seq);
-        }
-        if self.heard_farm != Some(frame.seq) {
-            self.apply_game_effects(&frame.effects, &frame.view.plays);
-            self.heard_farm = Some(frame.seq);
-        }
+        self.diff_session_sounds(frame.seq, &frame.sessions);
+        self.diff_board_sounds(frame.seq, &frame.issues);
+        self.diff_inbox_sounds(frame.seq, frame.call);
+        self.diff_farm_sounds(frame.seq, &frame.effects, &frame.view.plays);
         self.frame = frame;
     }
 

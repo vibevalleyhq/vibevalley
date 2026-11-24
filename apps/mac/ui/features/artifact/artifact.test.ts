@@ -3,10 +3,10 @@ import { expect, test } from "nsh/test";
 
 import { userId } from "@vibevalley/protocol";
 
+import { decodeBase64Utf8 } from "../../infra/attachment";
 import { formatGenUiAction } from "../../infra/rich";
 import { codePointOffset, editSpans, markdownShortcut } from "./blocks";
 import { artifactSuffixOf, inferArtifactFromName, inferDisplayFromContent } from "./html";
-import { decodeBase64Utf8 } from "./OutlineImportModal";
 import { presenceHighlightCommand, selectionOf, shellMessageOf } from "./shell";
 import { storeMessageOf } from "./viewers";
 

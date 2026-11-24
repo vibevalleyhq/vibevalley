@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use gpui::{Context, MouseButton, MouseMoveEvent, Window};
 
+use crate::hosted::HostedView;
 use crate::panes::PaneEntity;
 use crate::theme::{MotionChoice, ThemeChoice, Ui};
 
@@ -140,58 +141,39 @@ impl Shell {
         cx.notify();
     }
 
-    pub(super) fn notify_motion(&mut self, motion: MotionChoice, cx: &mut Context<Self>) {
-        self.chrome.sidebar.update(cx, |v, cx| v.set_motion(motion, cx));
+    fn for_each_hosted_view(&self, cx: &mut Context<Self>, mut f: impl FnMut(&mut HostedView, &mut Context<HostedView>)) {
+        self.chrome.sidebar.update(cx, &mut f);
         if let Some(slot) = &self.chrome.inspector {
-            slot.view.update(cx, |v, cx| v.set_motion(motion, cx));
+            slot.view.update(cx, &mut f);
         }
-        self.chrome.workbench.update(cx, |v, cx| v.set_motion(motion, cx));
+        self.chrome.workbench.update(cx, &mut f);
         if let Some(p) = &self.overlays.palette {
-            p.view.update(cx, |v, cx| v.set_motion(motion, cx));
+            p.view.update(cx, &mut f);
         }
-        self.devtools_for_each_view(cx, |v, cx| v.set_motion(motion, cx));
+        self.devtools_for_each_view(cx, &mut f);
         for pane in self.workspace.panes.values() {
             if let PaneEntity::Hosted(view) = &pane.entity {
-                view.update(cx, |v, cx| v.set_motion(motion, cx));
+                view.update(cx, &mut f);
             }
         }
     }
 
+    pub(super) fn notify_motion(&mut self, motion: MotionChoice, cx: &mut Context<Self>) {
+        self.for_each_hosted_view(cx, |v, cx| v.set_motion(motion, cx));
+    }
+
     pub(super) fn apply_ui_font_size(&mut self, cx: &mut Context<Self>) {
         let size = Ui::get(cx).settings.ui_font_size;
-        self.chrome.sidebar.update(cx, |v, cx| v.set_ui_font_size(size, cx));
-        if let Some(slot) = &self.chrome.inspector {
-            slot.view.update(cx, |v, cx| v.set_ui_font_size(size, cx));
-        }
-        self.chrome.workbench.update(cx, |v, cx| v.set_ui_font_size(size, cx));
-        if let Some(p) = &self.overlays.palette {
-            p.view.update(cx, |v, cx| v.set_ui_font_size(size, cx));
-        }
-        self.devtools_for_each_view(cx, |v, cx| v.set_ui_font_size(size, cx));
+        self.for_each_hosted_view(cx, |v, cx| v.set_ui_font_size(size, cx));
         for pane in self.workspace.panes.values() {
-            match &pane.entity {
-                PaneEntity::Hosted(view) => view.update(cx, |v, cx| v.set_ui_font_size(size, cx)),
-                PaneEntity::Markdown(view) => view.update(cx, |v, cx| v.set_ui_font_size(size, cx)),
-                PaneEntity::File(_) | PaneEntity::Diff(_) | PaneEntity::Pixel(_) => {}
+            if let PaneEntity::Markdown(view) = &pane.entity {
+                view.update(cx, |v, cx| v.set_ui_font_size(size, cx));
             }
         }
     }
 
     pub(super) fn notify_locale(&mut self, locale: &str, cx: &mut Context<Self>) {
-        self.chrome.sidebar.update(cx, |v, cx| v.set_locale(locale, cx));
-        if let Some(slot) = &self.chrome.inspector {
-            slot.view.update(cx, |v, cx| v.set_locale(locale, cx));
-        }
-        self.chrome.workbench.update(cx, |v, cx| v.set_locale(locale, cx));
-        if let Some(p) = &self.overlays.palette {
-            p.view.update(cx, |v, cx| v.set_locale(locale, cx));
-        }
-        self.devtools_for_each_view(cx, |v, cx| v.set_locale(locale, cx));
-        for pane in self.workspace.panes.values() {
-            if let PaneEntity::Hosted(view) = &pane.entity {
-                view.update(cx, |v, cx| v.set_locale(locale, cx));
-            }
-        }
+        self.for_each_hosted_view(cx, |v, cx| v.set_locale(locale, cx));
     }
 
     /// Tells every open terminal, native markdown pane, and hosted view about the new theme.
@@ -200,20 +182,10 @@ impl Shell {
         for t in self.workspace.terminals.values() {
             t.view.update(cx, |t, cx| t.apply_theme(cx));
         }
-        self.chrome.sidebar.update(cx, |v, cx| v.set_dark(dark, cx));
-        if let Some(slot) = &self.chrome.inspector {
-            slot.view.update(cx, |v, cx| v.set_dark(dark, cx));
-        }
-        self.chrome.workbench.update(cx, |v, cx| v.set_dark(dark, cx));
-        if let Some(p) = &self.overlays.palette {
-            p.view.update(cx, |v, cx| v.set_dark(dark, cx));
-        }
-        self.devtools_for_each_view(cx, |v, cx| v.set_dark(dark, cx));
+        self.for_each_hosted_view(cx, |v, cx| v.set_dark(dark, cx));
         for pane in self.workspace.panes.values() {
-            match &pane.entity {
-                PaneEntity::Hosted(view) => view.update(cx, |v, cx| v.set_dark(dark, cx)),
-                PaneEntity::Markdown(view) => view.update(cx, |v, cx| v.set_dark(dark, cx)),
-                PaneEntity::File(_) | PaneEntity::Diff(_) | PaneEntity::Pixel(_) => {}
+            if let PaneEntity::Markdown(view) = &pane.entity {
+                view.update(cx, |v, cx| v.set_dark(dark, cx));
             }
         }
         cx.notify();

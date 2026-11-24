@@ -297,7 +297,7 @@ fn format_bytes(bytes: u64) -> String {
     }
 }
 
-fn split_display_path(path: &Path) -> (String, Option<String>) {
+pub(crate) fn split_display_path(path: &Path) -> (String, Option<String>) {
     let name = path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())

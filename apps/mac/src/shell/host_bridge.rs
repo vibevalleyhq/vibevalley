@@ -5,10 +5,10 @@ use gpui::{AppContext as _, Context, Entity, PathPromptOptions, Subscription, Wi
 use serde_json::{Value, json};
 use vibevalley_workspace::PaneKind;
 
+use crate::host::percent_decode;
 use crate::hosted::{Action, HostedEvent, HostedView};
 use crate::theme::{MotionChoice, ThemeChoice, Ui};
 
-use super::panes::percent_decode;
 use super::{Shell, update_menus};
 
 impl Shell {

@@ -240,15 +240,6 @@ impl Layout {
             .collect()
     }
 
-    pub fn chat_session_ids(&self) -> Vec<String> {
-        self.tabs()
-            .filter_map(|t| match &t.kind {
-                PaneKind::Chat { session_id, .. } if !session_id.is_empty() => Some(session_id.clone()),
-                _ => None,
-            })
-            .collect()
-    }
-
     /// Opens `kind` in an adjacent group (or splits horizontally to the right when only one group
     /// exists) so the currently active tab stays visible side-by-side.
     pub fn open_adjacent(&mut self, kind: PaneKind) -> TabId {
@@ -778,7 +769,6 @@ mod tests {
                 title: None,
             },
         );
-        assert_eq!(l.chat_session_ids(), vec!["sess-123".to_string()]);
         let restored = Layout::from_json(&l.to_json()).unwrap();
         assert_eq!(restored, l);
         assert!(matches!(restored.tab(t1).unwrap().kind, PaneKind::Terminal { .. }));

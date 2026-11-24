@@ -303,25 +303,6 @@ fn normalize_path(path: &Path) -> PathBuf {
     out
 }
 
-fn percent_decode(raw: &str) -> String {
-    let bytes = raw.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%'
-            && let Some(hex) = raw.get(i + 1..i + 3)
-            && let Ok(byte) = u8::from_str_radix(hex, 16)
-        {
-            out.push(byte);
-            i += 3;
-            continue;
-        }
-        out.push(bytes[i]);
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
 pub(crate) fn resolve_local_link(raw_url: &str, base_dir: Option<&Path>) -> Option<PathBuf> {
     let trimmed = raw_url.trim();
     if trimmed.is_empty() || trimmed.starts_with('#') {
@@ -338,7 +319,7 @@ pub(crate) fn resolve_local_link(raw_url: &str, base_dir: Option<&Path>) -> Opti
         if stripped.is_empty() {
             return None;
         }
-        let decoded = percent_decode(stripped);
+        let decoded = crate::host::percent_decode(stripped);
         return Some(normalize_path(Path::new(&decoded)));
     }
     if has_uri_scheme(trimmed) {
@@ -348,7 +329,7 @@ pub(crate) fn resolve_local_link(raw_url: &str, base_dir: Option<&Path>) -> Opti
     if stripped.is_empty() {
         return None;
     }
-    let decoded = percent_decode(stripped);
+    let decoded = crate::host::percent_decode(stripped);
     let candidate = Path::new(&decoded);
     if candidate.is_absolute() {
         Some(normalize_path(candidate))
@@ -357,23 +338,6 @@ pub(crate) fn resolve_local_link(raw_url: &str, base_dir: Option<&Path>) -> Opti
     } else {
         Some(normalize_path(candidate))
     }
-}
-
-fn split_display_path(path: &Path) -> (String, Option<String>) {
-    let name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| path.to_string_lossy().into_owned());
-    let home = std::env::var_os("HOME").map(PathBuf::from);
-    let parent = path.parent().filter(|p| !p.as_os_str().is_empty()).map(|p| match &home {
-        Some(h) if p == h => "~".to_string(),
-        Some(h) => match p.strip_prefix(h) {
-            Ok(rel) => format!("~/{}", rel.display()),
-            Err(_) => p.to_string_lossy().into_owned(),
-        },
-        None => p.to_string_lossy().into_owned(),
-    });
-    (name, parent)
 }
 
 fn transparent() -> Hsla {
@@ -498,7 +462,7 @@ fn error_card(detail: String, colors: &Palette) -> AnyElement {
 impl Render for MarkdownView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = Ui::get(cx).colors.clone();
-        let (file_name, parent_dir) = split_display_path(&self.path);
+        let (file_name, parent_dir) = crate::viewer::split_display_path(&self.path);
         let source_label = "Source".to_string();
         let toolbar = div()
             .h(px(36.0))
@@ -621,7 +585,7 @@ mod tests {
 
     #[test]
     fn split_display_path_separates_file_name_and_parent() {
-        let (name, parent) = split_display_path(Path::new("/tmp/repo/docs/guide.md"));
+        let (name, parent) = crate::viewer::split_display_path(Path::new("/tmp/repo/docs/guide.md"));
         assert_eq!(name, "guide.md");
         assert_eq!(parent.as_deref(), Some("/tmp/repo/docs"));
     }

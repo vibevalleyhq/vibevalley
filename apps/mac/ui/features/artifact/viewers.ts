@@ -42,7 +42,7 @@ const StoreProvenanceMarkSchema = z.object({
 
 const ParamPrimitive = z.union([z.string().max(1000), z.number(), z.boolean(), z.null()]);
 
-export const StoreBridgeMessageSchema = z.discriminatedUnion("vibevalley", [
+const StoreBridgeMessageSchema = z.discriminatedUnion("vibevalley", [
   z.object({
     vibevalley: z.literal("store-provenance"),
     marks: z.array(StoreProvenanceMarkSchema).max(500),

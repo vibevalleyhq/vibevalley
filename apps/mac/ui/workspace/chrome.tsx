@@ -16,42 +16,31 @@ export const menuSeparatorClass = "my-1 h-px bg-line";
 
 export const startEllipsis: TextStyle = { textOverflow: "ellipsis-start" };
 
-export function gitToneTextClass(tone: string | undefined): string {
+function gitTonePair(tone: string | undefined): readonly [textClass: string, iconTone: string] {
   switch (tone) {
     case "modified":
     case "dirty":
-      return "text-warn-ink";
+      return ["text-warn-ink", "warn-ink"];
     case "added":
     case "untracked":
-      return "text-leaf";
+      return ["text-leaf", "leaf"];
     case "deleted":
     case "conflicted":
-      return "text-berry";
+      return ["text-berry", "berry"];
     case "ignored":
     case "placeholder":
-      return "text-faint";
+      return ["text-faint", "faint"];
     default:
-      return "text-ink";
+      return ["text-ink", "ink"];
   }
 }
 
+export function gitToneTextClass(tone: string | undefined): string {
+  return gitTonePair(tone)[0];
+}
+
 export function gitToneIconTone(tone: string | undefined): string {
-  switch (tone) {
-    case "modified":
-    case "dirty":
-      return "warn-ink";
-    case "added":
-    case "untracked":
-      return "leaf";
-    case "deleted":
-    case "conflicted":
-      return "berry";
-    case "ignored":
-    case "placeholder":
-      return "faint";
-    default:
-      return "ink";
-  }
+  return gitTonePair(tone)[1];
 }
 
 function SectionCountBadge(props: { count: number; tone?: "default" | "danger" | "alert" | undefined }) {

@@ -2,8 +2,7 @@ import { type ArtifactPresence, type HtmlAnchor, type HtmlShellMessage, userId }
 import * as S from "@vibevalley/protocol/schema";
 
 /** The workbench theme the page is shown in: the frame cannot read the workbench's own setting. */
-export const ShellThemeValues = ["light", "dark"] as const;
-export type ShellTheme = (typeof ShellThemeValues)[number];
+export type ShellTheme = "light" | "dark";
 
 export const shellMessageOf = (data: unknown): HtmlShellMessage | undefined => {
   const got = S.HtmlShellMessage.safeParse(data);

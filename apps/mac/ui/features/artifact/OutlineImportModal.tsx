@@ -11,6 +11,7 @@ import { Icon } from "../../design/Icon";
 import { Banner } from "../../design/layout";
 import { toast } from "../../design/toasts";
 import { api } from "../../infra/api";
+import { decodeBase64Utf8 } from "../../infra/attachment";
 import { hostApi } from "../../infra/bridge";
 import { type QueryClient, useQueryClient } from "../../infra/query";
 import { useRouter } from "../../infra/router";
@@ -26,13 +27,6 @@ export function openOutlineImport(): void {
 
 function closeOutlineImport(): void {
   outlineImportOpen.set(false);
-}
-
-export function decodeBase64Utf8(b64: string): string {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return new TextDecoder().decode(bytes);
 }
 
 async function importOutlineMarkdown(deps: {

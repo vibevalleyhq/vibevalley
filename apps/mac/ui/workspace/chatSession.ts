@@ -99,7 +99,7 @@ export function asThoughtLevel(value: string | undefined): ThoughtLevel | undefi
   }
 }
 
-const FALLBACK_RUNTIMES: readonly WorkspaceRuntimeOption[] = [
+export const FALLBACK_RUNTIMES: readonly WorkspaceRuntimeOption[] = [
   { id: "antigravity", name: "Antigravity", available: true, models: [], supportsSteer: true, supportsConfig: true },
   { id: "claude", name: "Claude Code", available: true, models: [], supportsSteer: true, supportsConfig: true },
   { id: "codex", name: "Codex", available: true, models: [], supportsSteer: true, supportsConfig: true },
@@ -180,22 +180,6 @@ export function runtimeDisplayName(runtime: string): string {
     default:
       return runtime || "Chat";
   }
-}
-
-export function deriveChatTitle(sessionTitle: string | undefined, swarmTitle: string | undefined, firstUserMessage: string | undefined): string | undefined {
-  const realTitle = sessionTitle?.trim();
-  if (realTitle) return realTitle;
-  const swarm = swarmTitle?.trim();
-  if (swarm) return swarm;
-  if (firstUserMessage !== undefined) {
-    for (const rawLine of firstUserMessage.split(/\r?\n/u)) {
-      const cleaned = rawLine.trim().replace(/\s+/gu, " ");
-      if (cleaned.length > 0) {
-        return cleaned.length > 36 ? `${cleaned.slice(0, 35)}…` : cleaned;
-      }
-    }
-  }
-  return undefined;
 }
 
 const chatHiddenStepTypes: ReadonlySet<SessionEvent["type"]> = new Set([
