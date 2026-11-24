@@ -267,7 +267,7 @@ mod tests {
     use tokio::sync::Notify;
     use vibevalley_protocol::Issue;
     use vibevalley_server::gateway::bridge::fake::{FakeServer, empty_bundle};
-    use vibevalley_server::gateway::bridge::{ClientIdentity, ClientKind, Hub as BridgeHub, Outlet};
+    use vibevalley_server::gateway::bridge::{Bridge as BridgeHub, ClientIdentity, ClientKind, ClientRpc, Outlet};
 
     #[derive(Default)]
     struct Recorder {

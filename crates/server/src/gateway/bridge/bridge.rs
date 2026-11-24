@@ -10,7 +10,9 @@ use tokio::sync::{Notify, Semaphore, broadcast};
 use tokio_util::sync::{CancellationToken, DropGuard};
 
 use crate::context::SliceSubscription;
-use crate::gateway::bridge::{BizCode, Caller, CallerContext, CallerPrincipal, ClientIdentity, Envelope, LiveEvent, Server, SliceKind, refusal};
+use crate::gateway::bridge::{
+    BizCode, BridgeRpc, Caller, CallerContext, CallerPrincipal, ClientIdentity, ClientRpc, Envelope, LiveEvent, Server, SliceKind, refusal,
+};
 
 /// Where a view's events go (the app wires it to nsh's `HostChannel::send`).
 pub trait Outlet: Send + Sync + 'static {
@@ -33,17 +35,17 @@ struct ClientRecord {
 
 /// Serves one server to any number of views.
 #[derive(Clone)]
-pub struct Hub {
+pub struct Bridge {
     server: Arc<dyn Server>,
     permits: Arc<Semaphore>,
     clients: Arc<Mutex<HashMap<u64, ClientRecord>>>,
     next_client: Arc<AtomicU64>,
 }
 
-impl Hub {
+impl Bridge {
     /// Limits concurrent blocking calls to `workers` on the shared `vibevalley-io` runtime.
-    pub fn new(server: Arc<dyn Server>, workers: usize) -> Hub {
-        Hub {
+    pub fn new(server: Arc<dyn Server>, workers: usize) -> Bridge {
+        Bridge {
             server,
             permits: Arc::new(Semaphore::new(workers.max(1))),
             clients: Arc::new(Mutex::new(HashMap::new())),
@@ -53,22 +55,6 @@ impl Hub {
 
     pub fn server(&self) -> &Arc<dyn Server> {
         &self.server
-    }
-
-    /// Runs `op` on the shared runtime with explicit caller context and hands its envelope to `reply`.
-    pub fn call_with(&self, ctx: CallerContext, op: String, payload: Value, reply: impl FnOnce(Envelope) + Send + 'static) {
-        let server = self.server.clone();
-        let permits = self.permits.clone();
-        vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
-            let Ok(_permit) = permits.acquire_owned().await else { return };
-            let envelope = server.call_with_async(ctx, op, payload).await;
-            reply(envelope);
-        });
-    }
-
-    /// Runs `op` on a worker and hands its envelope to `reply` there.
-    pub fn call(&self, op: String, payload: Value, reply: impl FnOnce(Envelope) + Send + 'static) {
-        self.call_with(CallerContext::local(), op, payload, reply);
     }
 
     /// Attaches one view with an explicit [`ClientIdentity`] and returns its stream handle.
@@ -83,7 +69,7 @@ impl Hub {
             },
         );
         Client {
-            hub: self.clone(),
+            bridge: self.clone(),
             client_key,
             identity,
             outlet,
@@ -121,6 +107,24 @@ impl Hub {
     }
 }
 
+impl BridgeRpc for Bridge {
+    /// Runs `op` on the shared runtime with explicit caller context and hands its envelope to `reply`.
+    fn call_with(&self, ctx: CallerContext, op: String, payload: Value, reply: impl FnOnce(Envelope) + Send + 'static) {
+        let server = self.server.clone();
+        let permits = self.permits.clone();
+        vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+            let Ok(_permit) = permits.acquire_owned().await else { return };
+            let envelope = server.call_with_async(ctx, op, payload).await;
+            reply(envelope);
+        });
+    }
+
+    /// Runs `op` on a worker and hands its envelope to `reply` there.
+    fn call(&self, op: String, payload: Value, reply: impl FnOnce(Envelope) + Send + 'static) {
+        self.call_with(CallerContext::local(), op, payload, reply);
+    }
+}
+
 /// Cancels a forwarding task when dropped.
 struct Pump {
     _cancel_guard: DropGuard,
@@ -141,7 +145,7 @@ struct Inner {
 
 /// One view's watches and subscriptions; dropping it stops them all.
 pub struct Client {
-    hub: Hub,
+    bridge: Bridge,
     client_key: u64,
     identity: ClientIdentity,
     outlet: Arc<dyn Outlet>,
@@ -356,7 +360,7 @@ impl Client {
             });
             inner.slice_receipts.insert(topic.to_string(), receipt.clone());
             let revisions = self.revisions.clone();
-            let server = self.hub.server.clone();
+            let server = self.bridge.server.clone();
             let event_name = format!("frame:{topic}");
             spawn_when_ready(server, cancel.clone(), move |server, task_cancel| async move {
                 if let Some(sub) = server.subscribe_slice(slice_kind) {
@@ -366,7 +370,7 @@ impl Client {
                 }
             });
         } else if topic == "live" {
-            let server = self.hub.server.clone();
+            let server = self.bridge.server.clone();
             spawn_when_ready(server, cancel.clone(), move |server, task_cancel| async move {
                 if let Some(rx) = server.subscribe_live() {
                     pump_live_broadcast(rx, outlet, task_cancel).await;
@@ -416,8 +420,24 @@ impl Client {
         inner.slice_receipts.remove(topic);
     }
 
+    pub fn unsubscribe(&self, id: &str) {
+        let entry = self.inner.lock().subs.remove(id);
+        if let Some((_, mut pump)) = entry {
+            if let Some(server_id) = pump.server_sub.take() {
+                self.bridge.server.unsubscribe(server_id);
+            }
+            drop(pump);
+        }
+    }
+
+    pub fn subscription_count(&self) -> usize {
+        self.inner.lock().subs.len()
+    }
+}
+
+impl ClientRpc for Client {
     /// Runs a call for this view with its [`ClientIdentity`]: the envelope comes back as `reply:<id>`.
-    pub fn call(&self, id: &str, op: String, payload: Value) {
+    fn call(&self, id: &str, op: String, payload: Value) {
         let outlet = self.outlet.clone();
         let event = format!("reply:{id}");
         let ctx = CallerContext {
@@ -426,7 +446,7 @@ impl Client {
             client: Some(self.identity.clone()),
             trace_id: 0,
         };
-        self.hub.call_with(ctx, op, payload, move |envelope| {
+        self.bridge.call_with(ctx, op, payload, move |envelope| {
             outlet.send(&event, serde_json::to_value(envelope).unwrap_or(Value::Null));
         });
     }
@@ -435,7 +455,7 @@ impl Client {
     /// carrying `{ event }`, then once `{ end: null }`, or `{ end: <envelope> }`
     /// for a refusal. Dispatches asynchronously on the Tokio runtime so the
     /// caller thread (e.g. the nsh JS engine) never blocks.
-    pub fn subscribe(&self, id: &str, name: &str, payload: Value) {
+    fn subscribe(&self, id: &str, name: &str, payload: Value) {
         let event_name = format!("sub:{id}");
         let cancel = {
             let mut inner = self.inner.lock();
@@ -459,7 +479,7 @@ impl Client {
             client: Some(self.identity.clone()),
             trace_id: 0,
         };
-        let server = self.hub.server.clone();
+        let server = self.bridge.server.clone();
         let outlet = self.outlet.clone();
         let inner = Arc::downgrade(&self.inner);
         let key = id.to_string();
@@ -521,30 +541,16 @@ impl Client {
             }
         });
     }
-
-    pub fn unsubscribe(&self, id: &str) {
-        let entry = self.inner.lock().subs.remove(id);
-        if let Some((_, mut pump)) = entry {
-            if let Some(server_id) = pump.server_sub.take() {
-                self.hub.server.unsubscribe(server_id);
-            }
-            drop(pump);
-        }
-    }
-
-    pub fn subscription_count(&self) -> usize {
-        self.inner.lock().subs.len()
-    }
 }
 
 impl Drop for Client {
     fn drop(&mut self) {
-        self.hub.clients.lock().remove(&self.client_key);
+        self.bridge.clients.lock().remove(&self.client_key);
         let inner = std::mem::take(&mut *self.inner.lock());
         self.cancel.cancel();
         for (_, (_, mut pump)) in inner.subs {
             if let Some(id) = pump.server_sub.take() {
-                self.hub.server.unsubscribe(id);
+                self.bridge.server.unsubscribe(id);
             }
         }
     }
@@ -716,9 +722,9 @@ mod tests {
         }
     }
 
-    fn setup() -> (Arc<SignaledFake>, Hub, Arc<Recorder>, Client) {
+    fn setup() -> (Arc<SignaledFake>, Bridge, Arc<Recorder>, Client) {
         let fake = SignaledFake::new();
-        let hub = Hub::new(fake.clone(), 2);
+        let hub = Bridge::new(fake.clone(), 2);
         let rec = Arc::new(Recorder::default());
         let client = hub.attach(test_identity("c1"), rec.clone());
         (fake, hub, rec, client)

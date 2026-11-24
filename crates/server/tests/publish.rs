@@ -289,10 +289,10 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
     git(&repo_dir, &["push", "-q", bare.to_str().unwrap(), "main"]);
     git(&repo_dir, &["remote", "add", "origin", "https://github.com/acme/farm.git"]);
 
-    let mut coder = started.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut coder = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     coder.runtime = "scripted".into();
     coder.name = "Coder".into();
-    let coder = started.test_internals().agent.profile.store.save(coder).unwrap();
+    let coder = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.save_async(coder)).unwrap();
     let agent_id = coder.id.as_str();
 
     let created = started

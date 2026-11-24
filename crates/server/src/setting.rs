@@ -420,13 +420,16 @@ fn lacks(missing: Missing) -> Readiness {
 impl Setting {
     /// Reads `<home>/settings.json`; one that cannot be read is set aside
     /// (`settings.json.bad`) and the settings start empty.
-    pub fn open(config: SettingConfig) -> Arc<Setting> {
+    pub async fn open_async(config: SettingConfig) -> Arc<Setting> {
         let file = config.home.join(vibevalley_protocol::home::SETTINGS_FILE);
-        let stored = match std::fs::read_to_string(&file) {
-            Ok(text) => serde_json::from_str::<Stored>(&text).unwrap_or_else(|_| {
-                let _ = std::fs::rename(&file, file.with_extension("json.bad"));
-                Stored::default()
-            }),
+        let stored = match tokio::fs::read_to_string(&file).await {
+            Ok(text) => match serde_json::from_str::<Stored>(&text) {
+                Ok(parsed) => parsed,
+                Err(_) => {
+                    let _ = tokio::fs::rename(&file, file.with_extension("json.bad")).await;
+                    Stored::default()
+                }
+            },
             Err(_) => Stored::default(),
         };
         vibevalley_i18n::set_locale(stored.locale.unwrap_or(Locale::Zh).as_str());
@@ -562,71 +565,69 @@ impl Setting {
 
     /// A key missing from the update is kept, an empty one cleared; nothing
     /// is saved when something cannot be right.
-    pub fn save(&self, u: &SettingsUpdate) -> Result<SettingsStatus, ApiError> {
-        let problem = settings_problem(u);
+    pub async fn save_async(&self, u: SettingsUpdate) -> Result<SettingsStatus, ApiError> {
+        let problem = settings_problem(&u);
         if !problem.is_empty() {
             return Err(ApiError::new(BizCode::SettingRefused, problem));
         }
-        let mut guard = self.stored.lock();
-        let mut next = guard.clone();
-        if let Some(given) = &u.deepseek_api_key {
-            next.deepseek_api_key = Secret::new(given.trim());
-        }
-        if let Some(locale) = u.locale {
-            next.locale = (locale != Locale::Zh).then_some(locale);
-        }
-        if let Some(given) = &u.memory_sources {
-            let saved = std::mem::take(&mut next.memory_sources);
-            next.memory_sources = given
-                .iter()
-                .map(|m| StoredSource {
-                    kind: m.kind,
-                    url: m.url.trim().to_string(),
-                    enabled: m.enabled,
-                    read: m.read,
-                    write: m.write,
-                    everything: m.everything == Some(true),
-                    user: m.user.as_deref().map(str::trim).filter(|u| !u.is_empty()).map(String::from),
-                    key: match &m.key {
-                        Some(k) => Secret::new(k.trim()),
-                        None => saved.iter().find(|c| c.kind == m.kind).map(|c| c.key.clone()).unwrap_or_default(),
-                    },
-                })
-                .collect();
-        }
-        if let Some(v) = &u.voice {
-            let defaults = self.voice_defaults();
-            let overrides = voice_overrides(voice_over(defaults.clone(), v), &defaults);
-            next.voice = (overrides != SettingsUpdateVoice::default()).then_some(overrides);
-        }
-        self.persist(&next)?;
+        let defaults = self.voice_defaults();
+        let next = {
+            let guard = self.stored.lock();
+            let mut next = guard.clone();
+            if let Some(given) = &u.deepseek_api_key {
+                next.deepseek_api_key = Secret::new(given.trim());
+            }
+            if let Some(locale) = u.locale {
+                next.locale = (locale != Locale::Zh).then_some(locale);
+            }
+            if let Some(given) = &u.memory_sources {
+                let saved = std::mem::take(&mut next.memory_sources);
+                next.memory_sources = given
+                    .iter()
+                    .map(|m| StoredSource {
+                        kind: m.kind,
+                        url: m.url.trim().to_string(),
+                        enabled: m.enabled,
+                        read: m.read,
+                        write: m.write,
+                        everything: m.everything == Some(true),
+                        user: m.user.as_deref().map(str::trim).filter(|u| !u.is_empty()).map(String::from),
+                        key: match &m.key {
+                            Some(k) => Secret::new(k.trim()),
+                            None => saved.iter().find(|c| c.kind == m.kind).map(|c| c.key.clone()).unwrap_or_default(),
+                        },
+                    })
+                    .collect();
+            }
+            if let Some(v) = &u.voice {
+                let overrides = voice_overrides(voice_over(defaults.clone(), v), &defaults);
+                next.voice = (overrides != SettingsUpdateVoice::default()).then_some(overrides);
+            }
+            next
+        };
+        self.persist_async(&next).await?;
         vibevalley_i18n::set_locale(next.locale.unwrap_or(Locale::Zh).as_str());
-        *guard = next;
-        drop(guard);
+        *self.stored.lock() = next;
         Ok(self.status())
     }
 
-    pub async fn save_async(self: &Arc<Self>, update: SettingsUpdate) -> Result<SettingsStatus, ApiError> {
-        let setting = self.clone();
-        crate::log::spawn_blocking_traced(move || setting.save(&update))
-            .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-    }
-
     /// Changes the providers under the settings' lock.
-    pub fn update_providers(&self, change: impl FnOnce(&Providers) -> Result<Providers, ApiError>) -> Result<Providers, ApiError> {
-        let mut guard = self.stored.lock();
-        let providers = change(&guard.providers.clone().unwrap_or_default())?;
-        let mut next = guard.clone();
-        next.providers = Some(providers.clone());
-        self.persist(&next)?;
-        *guard = next;
+    pub async fn update_providers_async(&self, change: impl FnOnce(&Providers) -> Result<Providers, ApiError>) -> Result<Providers, ApiError> {
+        let (providers, next) = {
+            let guard = self.stored.lock();
+            let providers = change(&guard.providers.clone().unwrap_or_default())?;
+            let mut next = guard.clone();
+            next.providers = Some(providers.clone());
+            (providers, next)
+        };
+        self.persist_async(&next).await?;
+        *self.stored.lock() = next;
         Ok(providers)
     }
 
-    fn persist(&self, next: &Stored) -> Result<(), ApiError> {
+    async fn persist_async(&self, next: &Stored) -> Result<(), ApiError> {
         let text = serde_json::to_string_pretty(next).unwrap_or_default() + "\n";
-        write_private(&self.file, &text).map_err(|e| {
+        write_private_async(&self.file, &text).await.map_err(|e| {
             ApiError::new(
                 BizCode::SettingRefused,
                 t(
@@ -639,15 +640,19 @@ impl Setting {
 }
 
 /// Written whole (a temporary file renamed over it), readable by its owner only.
-fn write_private(file: &Path, text: &str) -> std::io::Result<()> {
-    use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
+async fn write_private_async(file: &Path, text: &str) -> std::io::Result<()> {
     if let Some(dir) = file.parent() {
-        std::fs::create_dir_all(dir)?;
+        tokio::fs::create_dir_all(dir).await?;
     }
     let tmp = file.with_extension("json.tmp");
-    let mut f = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&tmp)?;
-    f.write_all(text.as_bytes())?;
-    f.sync_all()?;
-    std::fs::rename(&tmp, file)
+    let mut f = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(&tmp)
+        .await?;
+    tokio::io::AsyncWriteExt::write_all(&mut f, text.as_bytes()).await?;
+    f.sync_all().await?;
+    tokio::fs::rename(&tmp, file).await
 }

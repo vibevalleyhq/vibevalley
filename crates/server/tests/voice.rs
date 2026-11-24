@@ -8,6 +8,7 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, Caller, Envelope, VoiceFix};
 use vibevalley_runtime::agent::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, Role, Usage};
+use vibevalley_server::gateway::bridge::LiveVoiceLine as _;
 use vibevalley_server::setting::Secret;
 use vibevalley_server::voice::Voice;
 use vibevalley_server::voice::moss::{Realtime, Verdict};

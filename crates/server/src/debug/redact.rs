@@ -244,7 +244,7 @@ impl Redactor {
         }
     }
 
-    pub fn redact_value(&self, value: Value, count: &mut u32) -> Value {
+    fn redact_value(&self, value: Value, count: &mut u32) -> Value {
         match value {
             Value::Null | Value::Bool(_) | Value::Number(_) => value,
             Value::String(s) => Value::String(self.redact_owned(s, count)),
@@ -267,6 +267,21 @@ impl Redactor {
                 Value::Object(map)
             }
         }
+    }
+
+    pub(crate) fn redact_json_value(&self, raw_json: &str, count: &mut u32) -> String {
+        let Ok(val) = serde_json::from_str::<Value>(raw_json) else {
+            return self.redact_str(raw_json, count);
+        };
+        serde_json::to_string(&self.redact_value(val, count)).unwrap_or_default()
+    }
+
+    pub(crate) fn redact_json_pretty_bytes(&self, raw_json: &str, count: &mut u32) -> Result<Vec<u8>, serde_json::Error> {
+        let val: Value = serde_json::from_str(raw_json)?;
+        let clean = self.redact_value(val, count);
+        let mut bytes = serde_json::to_vec_pretty(&clean)?;
+        bytes.push(b'\n');
+        Ok(bytes)
     }
 
     pub fn redact_session_event(&self, mut ev: SessionEvent, count: &mut u32) -> SessionEvent {

@@ -49,10 +49,10 @@ fn a_repo_is_made_by_name_and_an_issue_names_it() {
     let unassigned = issue["id"].as_str().unwrap().to_string();
     let refused = call("issue.status.previewUpdate", json!({ "id": unassigned, "status": "todo" }));
     assert_eq!(refused.biz_code, vibevalley_protocol::BizCode::IssueRefused.code(), "{}", refused.message);
-    let mut helper = app.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "scripted".into();
     helper.name = "小帮手".into();
-    let helper = app.test_internals().agent.profile.store.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let assigned = call("issue.create", json!({ "title": "say hi", "repo": "farm", "agent": "小帮手" }));
     let assigned = assigned.data.unwrap_or_else(|| panic!("{}", assigned.message));
     assert_eq!(assigned["assignments"][0]["agent"], helper.id.as_str());
@@ -200,15 +200,15 @@ fn sent_issue_hands_over_to_another_profile_and_split_renames_parent() {
     let repo = call("repo.create", json!({ "name": "handover-repo" }));
     assert_eq!(repo.biz_code, 0, "{}", repo.message);
 
-    let mut alpha = app.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut alpha = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     alpha.runtime = "scripted".into();
     alpha.name = "Alpha".into();
-    let alpha = app.test_internals().agent.profile.store.save(alpha).unwrap();
+    let alpha = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(alpha)).unwrap();
 
-    let mut beta = app.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut beta = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     beta.runtime = "scripted".into();
     beta.name = "Beta".into();
-    let beta = app.test_internals().agent.profile.store.save(beta).unwrap();
+    let beta = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(beta)).unwrap();
 
     let created = call("issue.create", json!({ "title": "first title", "repo": "handover-repo", "agent": "Alpha" }))
         .data

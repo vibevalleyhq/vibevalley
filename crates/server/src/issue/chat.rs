@@ -124,14 +124,13 @@ impl IssueChat {
             let w = w.clone();
             async move {
                 let Some(ic) = w.upgrade() else { return Ok::<(), String>(()) };
-                let report: OutboxSessionReported =
-                    serde_json::from_value(delivery.payload).map_err(|e| format!("invalid {OUTBOX_SESSION_REPORTED} payload: {e}"))?;
+                let report: OutboxSessionReported = delivery.decode().map_err(|e| format!("invalid {OUTBOX_SESSION_REPORTED} payload: {e}"))?;
                 ic.handle_report_async(&report).await.map_err(|e| e.to_string())
             }
         });
 
         let w = Arc::downgrade(&ic);
-        let mut session_events = ic.board.sessions().subscribe_events();
+        let mut session_events = ic.board.session_engine().subscribe_events();
         let task_cancel = cancel;
         let coordinator = ctx.spawn("issue_chat.coordinator", async move {
             let Some(boot_ic) = w.upgrade() else { return };
@@ -495,7 +494,7 @@ impl IssueChat {
     }
 
     async fn replay_reports_async(&self) {
-        let store = self.board.sessions().durable_store();
+        let store = self.board.session_engine().durable_store();
         let docs = match store
             .read_async(|r| Box::pin(async move { r.documents_by_kind_async("run", "issue.report").await }))
             .await
@@ -539,7 +538,7 @@ impl IssueChat {
         self.channel.note_once_async(note, run.map(|id| format!("report:{id}"))).await?;
         if let Some(id) = run {
             self.board
-                .sessions()
+                .session_engine()
                 .durable_store()
                 .write_with_async(id.to_string(), |tx, id| {
                     Box::pin(async move { tx.delete_document_async("run", id, "issue.report").await })
@@ -621,7 +620,7 @@ impl IssueChat {
     }
 
     async fn route_dispatched_async(self: &Arc<Self>, dispatched: ChannelDispatched) {
-        let sessions = self.board.sessions();
+        let sessions = self.board.session_engine();
         for d in dispatched.deliveries {
             match d.recipient_kind {
                 DeliveryTargetKind::Issue => {
@@ -749,7 +748,7 @@ impl IssueChat {
         };
 
         if !self.channel.delivery_is_pending_async(delivery.id).await.unwrap_or(false) {
-            let _ = self.board.sessions().withdraw_mailbox_by_message_async(&delivery.message_id).await;
+            let _ = self.board.session_engine().withdraw_mailbox_by_message_async(&delivery.message_id).await;
             return;
         }
         let c = match committed {
@@ -757,7 +756,7 @@ impl IssueChat {
             None => self.channel.committed_of_async(&delivery.message_id).await.ok().flatten().map(Arc::new),
         };
         let Some(c) = c else {
-            let _ = self.board.sessions().withdraw_mailbox_by_message_async(&delivery.message_id).await;
+            let _ = self.board.session_engine().withdraw_mailbox_by_message_async(&delivery.message_id).await;
             let _ = self.channel.withdraw_delivery_async(delivery.id).await;
             return;
         };
@@ -816,7 +815,7 @@ impl IssueChat {
 
     async fn deliver_to_session_async(&self, delivery: QueuedDelivery, issue_id: &str, committed: Option<Arc<Committed>>) {
         if !self.channel.delivery_is_pending_async(delivery.id).await.unwrap_or(false) {
-            let _ = self.board.sessions().withdraw_mailbox_by_message_async(&delivery.message_id).await;
+            let _ = self.board.session_engine().withdraw_mailbox_by_message_async(&delivery.message_id).await;
             return;
         }
         let pending = self
@@ -938,8 +937,7 @@ impl SessionChat {
                 let ic = ic.clone();
                 let sc_weak = sc_weak.clone();
                 async move {
-                    let report: OutboxSessionReported =
-                        serde_json::from_value(delivery.payload).map_err(|e| format!("invalid {OUTBOX_SESSION_REPORTED} payload: {e}"))?;
+                    let report: OutboxSessionReported = delivery.decode().map_err(|e| format!("invalid {OUTBOX_SESSION_REPORTED} payload: {e}"))?;
                     if let Some(ic) = ic.as_ref().and_then(std::sync::Weak::upgrade) {
                         ic.handle_report_async(&report).await.map_err(|e| e.to_string())?;
                     }
@@ -952,7 +950,7 @@ impl SessionChat {
         }
 
         let w = Arc::downgrade(&sc);
-        let mut session_events = sc.board.sessions().subscribe_events();
+        let mut session_events = sc.board.session_engine().subscribe_events();
         let task_cancel = cancel;
         let coordinator = ctx.spawn("session_chat.coordinator", async move {
             enum CoordinatorEvent {
@@ -1060,7 +1058,7 @@ impl SessionChat {
     }
 
     async fn withdraw_message_mailbox_async(&self, message_id: &str) {
-        let _ = self.board.sessions().withdraw_mailbox_by_message_async(message_id).await;
+        let _ = self.board.session_engine().withdraw_mailbox_by_message_async(message_id).await;
     }
 
     pub(crate) async fn handle_report_async(&self, report: &OutboxSessionReported) {
@@ -1077,7 +1075,7 @@ impl SessionChat {
     }
 
     async fn route_dispatched_async(self: &Arc<Self>, dispatched: ChannelDispatched) {
-        let sessions = self.board.sessions();
+        let sessions = self.board.session_engine();
         for d in dispatched.deliveries {
             if d.recipient_kind == DeliveryTargetKind::Direct {
                 let mailbox_owner = sessions
@@ -1158,7 +1156,7 @@ impl SessionChat {
     async fn on_direct_async(&self, wake: DirectWake) {
         let d = wake.delivery;
         let mail_key = direct_mail_key(&d.recipient_id, &d.message_id);
-        let sessions = self.board.sessions();
+        let sessions = self.board.session_engine();
         if !self.channel.delivery_is_pending_async(d.id).await.unwrap_or(false) {
             let _ = sessions.withdraw_mailbox_async(&mail_key).await;
             return;
@@ -1337,7 +1335,7 @@ mod tests {
             http.clone(),
             http,
         ));
-        let storage = Storage::open(dir, ctx.clone());
+        let storage = Storage::open_async(dir, ctx.clone()).await.unwrap();
         let channel = Chat::open_async(ctx.clone(), storage, false).await.unwrap();
         let board = Board::open_standalone_async(ctx.clone(), Arc::new(vibevalley_runtime::oar::Registry::new()), BoardConfig::under(dir))
             .await
@@ -1394,7 +1392,7 @@ mod tests {
         assert!(ic.delivery_waiters.lock().is_empty());
 
         ic.close_async().await;
-        board.close();
+        board.close_async().await;
         let _ = ctx.shutdown(Duration::from_secs(1)).await;
     }
 
@@ -1433,7 +1431,7 @@ mod tests {
         tokio::time::resume();
 
         ic.close_async().await;
-        board.close();
+        board.close_async().await;
         let _ = ctx.shutdown(Duration::from_secs(1)).await;
     }
 }

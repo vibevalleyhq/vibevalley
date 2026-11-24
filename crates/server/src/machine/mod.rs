@@ -14,30 +14,24 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use base64::Engine as _;
 use parking_lot::RwLock;
-use serde::Serialize;
-use serde_json::Value;
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument as _;
 use vibevalley_core::SliceMask;
 use vibevalley_protocol::{
-    ApiError, BizCode, EndpointId, LOCAL_MACHINE_ID, Machine as ProtocolMachine, MachineAttachmentData, MachineAttachmentFetch, MachineHello, MachineHelloAck,
-    MachineInfo, MachinePing, MachinePlatform, MachineRuntimeSummary, MachineStatus, MachineWireError, MachineWireFrame, Millis, RuntimeCapability,
+    LOCAL_MACHINE_ID, Machine as ProtocolMachine, MachineAttachmentData, MachineAttachmentFetch, MachineHello, MachineHelloAck, MachineInfo, MachinePing,
+    MachinePlatform, MachineRuntimeSummary, MachineStatus, MachineWireError, MachineWireFrame, Millis, RuntimeCapability,
 };
 use vibevalley_runtime::machine::{LocalMachine, Machine as RuntimeMachine, MachineRegistry};
 use vibevalley_runtime::oar::Registry;
 
 use crate::context::Context;
-use crate::gateway::api::{MachineBus, MachineConnection, SharedMachineBus};
+use crate::context::api::{MachineBus, MachineConnection, SharedMachineBus};
 use crate::storage::Storage;
 
 pub use remote::{RemoteDispatchMeta, RemoteMachine, RemoteRuntime, RemoteSession, attach_dispatch_meta};
 
 /// Heartbeat interval advertised in `MachineHelloAck` and used by `gateway::http::machine_ws`.
 pub const MACHINE_HEARTBEAT_MS: u64 = 15_000;
-
-fn ok_json<T: Serialize>(value: T) -> Result<Value, ApiError> {
-    serde_json::to_value(value).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
-}
 
 fn current_protocol_platform() -> MachinePlatform {
     if cfg!(target_os = "macos") {
@@ -148,17 +142,9 @@ impl Machine {
         manager
     }
 
-    /// Returns the [`SharedMachineBus`] adapter for wiring into [`crate::gateway::api::GatewayPorts`].
+    /// Returns the [`SharedMachineBus`] adapter for wiring into [`crate::context::api::GatewayPorts`].
     pub fn bus(self: &Arc<Self>) -> SharedMachineBus {
         Arc::new(MachineBusAdapter(self.clone()))
-    }
-
-    /// Dispatches all `Machine*` protocol endpoints for `router.rs`.
-    pub(crate) fn dispatch(&self, id: EndpointId) -> Result<Value, ApiError> {
-        match id {
-            EndpointId::MachineList => ok_json(self.list()),
-            other => Err(ApiError::new(BizCode::RouteNotFound, format!("unexpected machine endpoint {}", other.as_op()))),
-        }
     }
 
     pub fn registry(&self) -> &Arc<MachineRegistry> {

@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
-use serde_json::Value;
 use vibevalley_protocol::ApiError;
 
 use crate::db::entity::outbox_item;
@@ -82,31 +81,14 @@ impl OutboxService {
         insert_impl(tx, topic, payload_json, now_ms).await
     }
 
-    /// Serializes `payload` and inserts an outbox item inside an open write transaction.
-    pub async fn insert_value_in_tx(tx: &Tx, topic: &str, payload: &Value, now_ms: i64) -> Result<i64, ApiError> {
-        let payload_json = serde_json::to_string(payload).map_err(|e| DbError::custom(format!("outbox payload serialize failed: {e}")))?;
-        insert_impl(tx, topic, &payload_json, now_ms).await
-    }
-
     /// Enqueues an outbox item standalone on the write pool.
     pub async fn enqueue(&self, topic: &str, payload_json: &str, now_ms: i64) -> Result<i64, ApiError> {
         insert_impl(self.db.write_conn(), topic, payload_json, now_ms).await
     }
 
-    /// Serializes `payload` and enqueues an outbox item standalone on the write pool.
-    pub async fn enqueue_value(&self, topic: &str, payload: &Value, now_ms: i64) -> Result<i64, ApiError> {
-        let payload_json = serde_json::to_string(payload).map_err(|e| DbError::custom(format!("outbox payload serialize failed: {e}")))?;
-        insert_impl(self.db.write_conn(), topic, &payload_json, now_ms).await
-    }
-
     /// Enqueues an outbox item inside an open write transaction.
     pub async fn enqueue_in_tx(&self, tx: &Tx, topic: &str, payload_json: &str, now_ms: i64) -> Result<i64, ApiError> {
         insert_impl(tx, topic, payload_json, now_ms).await
-    }
-
-    /// Serializes `payload` and enqueues an outbox item inside an open write transaction.
-    pub async fn enqueue_value_in_tx(&self, tx: &Tx, topic: &str, payload: &Value, now_ms: i64) -> Result<i64, ApiError> {
-        Self::insert_value_in_tx(tx, topic, payload, now_ms).await
     }
 
     /// Requeues any rows left in `processing` from an unclean shutdown back to `pending`.

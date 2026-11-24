@@ -379,11 +379,6 @@ impl Chat {
         self.model().default_id()
     }
 
-    /// A refusal of removals: what still points at a channel.
-    pub fn guard_removal(&self, guard: impl Fn(String) -> crate::BoxFuture<'static, Vec<String>> + Send + Sync + 'static) {
-        self.guards.write().push(Arc::new(guard));
-    }
-
     pub fn channels(&self) -> Vec<Info> {
         self.model().channels("channel").iter().map(info_of).collect()
     }
@@ -613,10 +608,17 @@ impl Chat {
             return Err(refused(t("server.channel.defaultStays", &[])));
         }
         let topics = self.ctx.service.channel.topic_threads_in(id).await.q()?;
-        let guards = self.guards.read().clone();
         let mut why: Vec<String> = Vec::new();
-        for g in guards {
-            why.extend(g(id.to_owned()).await);
+        match self.ctx.service.connector.accounts_in(id).await {
+            Ok(0) => {}
+            _ => why.push(t("server.channel.connectorsThere", &[])),
+        }
+        if let Ok(sessions) = self.ctx.service.session.all().await
+            && sessions
+                .iter()
+                .any(|x| (x.is_board_worker() || x.is_direct_talker()) && x.channel_id() == Some(id))
+        {
+            why.push(t("server.channel.helpersThere", &[]));
         }
         if topics != 0 {
             why.push(t("server.channel.issuesThere", &[("n", topics.into())]));

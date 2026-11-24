@@ -239,9 +239,9 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     let started = start_server(home, database_url.clone(), &wx.base_url);
 
     // Install a scripted agent profile for memory / session exercises.
-    let mut reviewer = started.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut reviewer = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     reviewer.runtime = "scripted".into();
-    let reviewer = started.test_internals().agent.profile.store.save(reviewer).unwrap();
+    let reviewer = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.save_async(reviewer)).unwrap();
 
     // 1. work/issue
     let created_issue = ok(

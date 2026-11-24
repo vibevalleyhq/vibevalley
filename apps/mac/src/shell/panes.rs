@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use gpui::{AppContext as _, Context, Focusable, Window};
 use serde_json::{Value, json};
 use vibevalley_git::Repo;
+use vibevalley_server::gateway::bridge::BridgeRpc as _;
 use vibevalley_workspace::{Axis, PaneKind, ProjectId, TabId};
 
 use crate::diff::DiffView;

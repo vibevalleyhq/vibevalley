@@ -200,7 +200,7 @@ fn regression_slow_workbench_skips_revisions_and_farm_slice_and_http_receive_ord
     let initial_farm = farm_rx.recv_timeout(Duration::from_secs(2)).unwrap();
     assert_eq!(public_farm(), initial_farm);
 
-    let bridge = vibevalley_server::gateway::bridge::Hub::new(started.server(), 1);
+    let bridge = vibevalley_server::gateway::bridge::Bridge::new(started.server(), 1);
     let window = |id: &str| {
         let (tx, rx) = flume::unbounded();
         let identity = ClientIdentity {
@@ -289,8 +289,8 @@ fn spine_observer_fault_gate_and_host_debug_bridge_work() {
 
     struct TestHostDebug;
     impl HostDebugBridge for TestHostDebug {
-        fn snapshot(&self) -> Value {
-            json!({ "shell": "ready" })
+        fn snapshot_json(&self) -> String {
+            json!({ "shell": "ready" }).to_string()
         }
     }
 
@@ -308,7 +308,10 @@ fn spine_observer_fault_gate_and_host_debug_bridge_work() {
     })
     .unwrap();
     let router = started.router();
-    assert_eq!(router.host_debug().unwrap().snapshot(), json!({ "shell": "ready" }));
+    assert_eq!(
+        serde_json::from_str::<Value>(&router.host_debug().unwrap().snapshot_json()).unwrap(),
+        json!({ "shell": "ready" })
+    );
 
     let set_override = router.call_as(Caller::User, "debug.override.set", json!({ "rpcDelayMs": 15, "sliceDelayMs": 0 }));
     assert_eq!(set_override.biz_code, 0, "{}", set_override.message);

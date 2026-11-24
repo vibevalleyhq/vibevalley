@@ -662,3 +662,40 @@ impl Chat {
             .collect())
     }
 }
+
+impl crate::context::port::ChannelAnnounce for Chat {
+    fn place_exists(&self, id: &str) -> bool {
+        Chat::place_exists(self, id)
+    }
+
+    fn orchestrator_in(&self, channel: &str) -> String {
+        Chat::orchestrator_in(self, channel)
+    }
+
+    fn place_of_async<'a>(&'a self, who: &'a str, target: &'a str) -> crate::BoxFuture<'a, Result<String, ApiError>> {
+        Box::pin(Chat::place_of_async(self, who, target))
+    }
+
+    fn post_card_async<'a>(
+        &'a self,
+        from: &'a str,
+        channel: &'a str,
+        text: &'a str,
+        card: ArtifactCard,
+        run: Option<String>,
+        send_key: String,
+    ) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>> {
+        Box::pin(Chat::post_card_async(self, from, channel, text, card, run, send_key))
+    }
+
+    fn post_attachments_async<'a>(
+        &'a self,
+        from: &'a str,
+        channel: &'a str,
+        text: &'a str,
+        attachments: Vec<String>,
+        send_key: String,
+    ) -> crate::BoxFuture<'a, Result<ChatMessage, ApiError>> {
+        Box::pin(Chat::post_attachments_async(self, from, channel, text, attachments, send_key))
+    }
+}

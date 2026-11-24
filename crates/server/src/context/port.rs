@@ -5,14 +5,42 @@
 
 use std::time::Duration;
 
-use serde_json::Value;
-use vibevalley_protocol::Session;
+use vibevalley_protocol::{ApiError, ArtifactCard, ChatMessage, Session};
 
 use crate::BoxFuture;
 
 /// Breaks the `cron <-> orchestrator` cycle so `cron` triggers the orchestrator while `orchestrator`/`tool` manages crons.
 pub trait CronOrchestratorPort: Send + Sync {
     fn hear_cron(&self, agent: &str, channel: &str, line: &str) -> bool;
+}
+
+/// Breaks the `agent <-> cron` cycle so `cron` resolves agent ids/names without importing `crate::agent::Profile`.
+pub trait CronAgentPort: Send + Sync {
+    fn resolve_agent_id(&self, named: &str) -> Option<String>;
+}
+
+/// Breaks the `channel <- artifact` layering edge so `Chat` implements card/attachment announcements directly.
+pub trait ChannelAnnounce: Send + Sync {
+    fn place_exists(&self, id: &str) -> bool;
+    fn orchestrator_in(&self, channel: &str) -> String;
+    fn place_of_async<'a>(&'a self, who: &'a str, target: &'a str) -> BoxFuture<'a, Result<String, ApiError>>;
+    fn post_card_async<'a>(
+        &'a self,
+        from: &'a str,
+        channel: &'a str,
+        text: &'a str,
+        card: ArtifactCard,
+        run: Option<String>,
+        send_key: String,
+    ) -> BoxFuture<'a, Result<ChatMessage, ApiError>>;
+    fn post_attachments_async<'a>(
+        &'a self,
+        from: &'a str,
+        channel: &'a str,
+        text: &'a str,
+        attachments: Vec<String>,
+        send_key: String,
+    ) -> BoxFuture<'a, Result<ChatMessage, ApiError>>;
 }
 
 /// Breaks the `runtime/session -> memory` cycle so session drivers recall agent memories without importing `memory`.
@@ -30,12 +58,12 @@ pub trait VoiceOrchestratorPort: Send + Sync {
 pub struct ToolSpecWire {
     pub name: String,
     pub description: String,
-    pub parameters: Value,
+    pub parameters_json: String,
 }
 
 /// Breaks the `mcp <-> tool` cycle so the MCP door dispatches helper tool calls while `tool` reads `vv://` resources.
 pub trait ToolDispatchPort: Send + Sync {
     fn helper_tools(&self) -> Vec<ToolSpecWire>;
     fn session_for_token<'a>(&'a self, token: &'a str) -> BoxFuture<'a, Option<Session>>;
-    fn call_helper_async<'a>(&'a self, session: Session, name: &'a str, args: &'a Value) -> BoxFuture<'a, Result<String, String>>;
+    fn call_helper_async<'a>(&'a self, session: Session, name: &'a str, args_json: &'a str) -> BoxFuture<'a, Result<String, String>>;
 }

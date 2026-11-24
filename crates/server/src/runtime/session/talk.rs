@@ -73,7 +73,7 @@ impl SessionEngine {
         session.brief = vibevalley_core::text::clip(words, 120);
         let cwd = PathBuf::from(session.cwd.clone().unwrap_or_default());
         if drive.is_local {
-            std::fs::create_dir_all(&cwd).map_err(io)?;
+            tokio::fs::create_dir_all(&cwd).await.map_err(io)?;
         }
         let resume = if resuming && drive.runtime.capabilities().resume {
             self.extra(&session.id).agent_session

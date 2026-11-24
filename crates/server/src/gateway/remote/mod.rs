@@ -4,23 +4,20 @@
 use std::collections::{HashMap, VecDeque};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::process::{Command, Stdio};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock, Weak};
 
 use parking_lot::Mutex;
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, BizCode, Caller, EndpointId, Millis, Op, RemoteDeviceRevokeRequest, RemoteDeviceSummary, RemoteEnableRequest, RemotePairCode,
-    RemotePairExchangeRequest, RemotePairExchangeResult, RemotePlatform, RemoteStatus, RemoteWhoami, SCOPE_REMOTE_CLIENT, SCOPE_REMOTE_MACHINE, ops,
+    ApiError, BizCode, Caller, Millis, RemoteDeviceRevokeRequest, RemoteDeviceSummary, RemoteEnableRequest, RemotePairCode, RemotePairExchangeRequest,
+    RemotePairExchangeResult, RemotePlatform, RemoteStatus, RemoteWhoami, SCOPE_REMOTE_CLIENT, SCOPE_REMOTE_MACHINE,
 };
 
 use crate::context::Context;
-use crate::gateway::api::{BoxFuture, CallerContext, CallerPrincipal, RemoteAuth, RemoteDeviceIdentity, Server};
+use crate::gateway::api::{BoxFuture, CallerPrincipal, RemoteAuth, RemoteDeviceIdentity, Server};
 use crate::gateway::http::{Listener, is_allowed_remote_ip, is_remote_allow_all, serve_remote};
 
 pub mod tailscale;
@@ -61,14 +58,6 @@ fn env_bind_addr() -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
-fn decode<T: DeserializeOwned>(payload: Value) -> Result<T, ApiError> {
-    serde_json::from_value(payload).map_err(|e| ApiError::new(BizCode::InvalidInput, e.to_string()))
-}
-
-fn ok_json<T: Serialize>(value: T) -> Result<Value, ApiError> {
-    serde_json::to_value(value).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
-}
-
 #[derive(Debug, Clone)]
 struct PairCodeEntry {
     code: String,
@@ -85,7 +74,6 @@ struct PairingState {
 /// Manages the optional remote HTTP listener, one-time pairing codes, and paired device tokens.
 pub struct Remote {
     ctx: Arc<Context>,
-    server: OnceLock<Weak<dyn Server>>,
     version: String,
     enabled: AtomicBool,
     lifecycle: AsyncMutex<()>,
@@ -135,7 +123,7 @@ fn generate_device_token() -> String {
 }
 
 fn server_name() -> String {
-    static NAME: OnceLock<String> = OnceLock::new();
+    static NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
     NAME.get_or_init(|| {
         if let Some(name) = std::env::var("VIBEVALLEY_SERVER_NAME")
             .ok()
@@ -193,7 +181,6 @@ impl Remote {
         let persisted_enabled = ctx.service.remote.get_config().await?.is_some_and(|cfg| cfg.enabled);
         Ok(Arc::new(Self {
             ctx,
-            server: OnceLock::new(),
             version,
             enabled: AtomicBool::new(persisted_enabled),
             lifecycle: AsyncMutex::new(()),
@@ -203,38 +190,9 @@ impl Remote {
         }))
     }
 
-    /// Binds the [`Server`] door once after composition root construction.
-    pub fn bind_server(&self, server: Weak<dyn Server>) {
-        let _ = self.server.set(server);
-    }
-
-    /// Dispatches all `Remote*` protocol endpoints for `router.rs`.
-    pub(crate) async fn dispatch(&self, caller: &CallerContext, id: EndpointId, payload: Value) -> Result<Value, ApiError> {
-        match id {
-            EndpointId::RemoteStatus => ok_json(self.status_async().await?),
-            EndpointId::RemoteEnable => {
-                let req: <ops::RemoteEnable as Op>::Input = decode(payload)?;
-                ok_json(self.enable_async(req).await?)
-            }
-            EndpointId::RemoteDisable => ok_json(self.disable_async().await?),
-            EndpointId::RemotePairCreate => ok_json(self.pair_create()?),
-            EndpointId::RemotePairExchange => {
-                let req: <ops::RemotePairExchange as Op>::Input = decode(payload)?;
-                ok_json(self.pair_exchange_async(req).await?)
-            }
-            EndpointId::RemoteDeviceRevoke => {
-                let req: <ops::RemoteDeviceRevoke as Op>::Input = decode(payload)?;
-                self.revoke_device_async(req).await?;
-                Ok(Value::Null)
-            }
-            EndpointId::RemoteWhoami => ok_json(self.whoami_async(&caller.principal, caller.caller).await?),
-            other => Err(ApiError::new(BizCode::RouteNotFound, format!("unexpected remote endpoint {}", other.as_op()))),
-        }
-    }
-
     /// Starts the remote listener on boot only when persisted config has `enabled == true`.
     /// Failures (e.g. an offline Tailscale interface) log a warning without failing server boot.
-    pub async fn restore_if_enabled_async(&self) {
+    pub async fn restore_if_enabled_async(&self, server: Arc<dyn Server>) {
         let _guard = self.lifecycle.lock().await;
         let cfg = match self.ctx.service.remote.get_config().await {
             Ok(Some(cfg)) if cfg.enabled => cfg,
@@ -272,9 +230,6 @@ impl Remote {
         };
         let port = if cfg.port == 0 { default_remote_port() } else { cfg.port };
         let addr = SocketAddr::new(ip, port);
-        let Some(server) = self.server.get().and_then(Weak::upgrade) else {
-            return;
-        };
         match serve_remote(server, addr) {
             Ok(listener) => {
                 *self.listener.lock() = Some(listener);
@@ -323,7 +278,7 @@ impl Remote {
         })
     }
 
-    pub async fn enable_async(&self, req: RemoteEnableRequest) -> Result<RemoteStatus, ApiError> {
+    pub async fn enable_async(&self, req: RemoteEnableRequest, server: Arc<dyn Server>) -> Result<RemoteStatus, ApiError> {
         let _guard = self.lifecycle.lock().await;
         let ts = tailscale::probe_async().await;
         let stored = self.ctx.service.remote.get_config().await?;
@@ -364,10 +319,6 @@ impl Remote {
             self.enabled.store(true, Ordering::Release);
             return self.status_with_tailscale_async(ts).await;
         }
-
-        let Some(server) = self.server.get().and_then(Weak::upgrade) else {
-            return Err(ApiError::new(BizCode::ServiceUnavailable, "server is shutting down"));
-        };
 
         // Release an existing listener first if it holds the same port so re-binding does not collide.
         let need_drop_first = current_addr.is_some_and(|addr| addr.port() == port);
@@ -680,13 +631,15 @@ mod tests {
         let ctx = test_context(dir.path(), clock.clone()).await;
         let fake: Arc<dyn Server> = Arc::new(FakeServer::new());
         let remote = Remote::open(ctx.clone(), "0.1.0-test".into()).await.unwrap();
-        remote.bind_server(Arc::downgrade(&fake));
 
         let status = remote
-            .enable_async(RemoteEnableRequest {
-                bind_addr: Some("127.0.0.1".into()),
-                port: Some(0),
-            })
+            .enable_async(
+                RemoteEnableRequest {
+                    bind_addr: Some("127.0.0.1".into()),
+                    port: Some(0),
+                },
+                fake,
+            )
             .await
             .unwrap();
         assert!(status.enabled && status.listening);
@@ -827,13 +780,15 @@ mod tests {
         let ctx = test_context(dir.path(), vibevalley_core::system_clock()).await;
         let fake: Arc<dyn Server> = Arc::new(FakeServer::new());
         let remote = Remote::open(ctx.clone(), "0.1.0-test".into()).await.unwrap();
-        remote.bind_server(Arc::downgrade(&fake));
 
         let status = remote
-            .enable_async(RemoteEnableRequest {
-                bind_addr: Some("127.0.0.1".into()),
-                port: Some(0),
-            })
+            .enable_async(
+                RemoteEnableRequest {
+                    bind_addr: Some("127.0.0.1".into()),
+                    port: Some(0),
+                },
+                fake,
+            )
             .await
             .unwrap();
         assert!(status.enabled && status.listening);

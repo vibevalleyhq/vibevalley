@@ -59,8 +59,8 @@ impl FakeHostDebug {
 }
 
 impl HostDebugBridge for FakeHostDebug {
-    fn snapshot(&self) -> Value {
-        self.snapshot.lock().unwrap().clone()
+    fn snapshot_json(&self) -> String {
+        self.snapshot.lock().unwrap().to_string()
     }
 }
 
@@ -243,13 +243,13 @@ fn redaction_scrubs_secrets_across_rpc_timeline_trajectories_and_exported_zip() 
         },
     );
 
-    started.test_internals().runtime.trajectory().step(
+    vibevalley_runtime::rt::block_on(started.test_internals().runtime.trajectory().step_async(
         "sess-secret",
         "",
         Step::Asked {
             text: format!("Use {live_secret} and {sk_token} with {bearer_token}"),
         },
-    );
+    ));
     vibevalley_runtime::rt::block_on(started.test_internals().runtime.trajectory().flush_async(true));
     let mut vrec = VoyageRecord::new(VoyageKind::Frame, "sess-secret".into(), 1_732_000_000_700);
     vrec.seq = 0;
@@ -558,14 +558,17 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
     });
 
     let traj = started.test_internals().runtime.trajectory();
-    traj.step("sess-issue-1", "", Step::RunStarted { run: "run-1".into() });
-    traj.step(
-        "sess-issue-1",
-        "",
-        Step::Asked {
-            text: "Fix the silent failure".into(),
-        },
-    );
+    vibevalley_runtime::rt::block_on(async {
+        traj.step_async("sess-issue-1", "", Step::RunStarted { run: "run-1".into() }).await;
+        traj.step_async(
+            "sess-issue-1",
+            "",
+            Step::Asked {
+                text: "Fix the silent failure".into(),
+            },
+        )
+        .await;
+    });
     traj.with_log("sess-issue-1", |j| {
         j.said("Checking logs...", &[]);
         j.usage(
@@ -592,13 +595,13 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
     r0.raw = big_raw.into_bytes();
     write_voyage_file(&dir.path().join("issues/records/sess-issue-1.jsonl"), "claude", "sess-issue-1", &[r0]);
 
-    traj.step(
+    vibevalley_runtime::rt::block_on(traj.step_async(
         "sess-ws-1",
         "",
         Step::Asked {
             text: "Explain this diff".into(),
         },
-    );
+    ));
     vibevalley_runtime::rt::block_on(traj.flush_async(true));
     let mut ws_rec = VoyageRecord::new(VoyageKind::Frame, "sess-ws-1".into(), 1_732_000_000_250);
     ws_rec.seq = 0;

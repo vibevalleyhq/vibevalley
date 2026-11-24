@@ -538,14 +538,14 @@ impl Publisher {
         if !Path::new(&req.cwd).is_absolute() || !sha_like(&req.sha) || req.title.trim().is_empty() {
             return Err(refused("cwd / sha / title"));
         }
-        let req_cwd = req.cwd.clone();
+        let cwd = tokio::fs::canonicalize(&req.cwd).await.map_err(|_| refused("cwd"))?;
+        let cwd_for_git = cwd.clone();
         let (cwd, key) = spawn_blocking_traced(move || {
-            let cwd = std::fs::canonicalize(&req_cwd).map_err(|_| refused("cwd"))?;
-            let loc = git(&cwd, &["rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"])
+            let loc = git(&cwd_for_git, &["rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"])
                 .map_err(|_| refused("git failed; checkout retained"))?;
             let mut lines = loc.lines();
             let (top, common) = (lines.next().unwrap_or(""), lines.next().unwrap_or(""));
-            if Path::new(top) != cwd || common.is_empty() {
+            if Path::new(top) != cwd_for_git || common.is_empty() {
                 return Err(refused("checkout root"));
             }
             let common = PathBuf::from(common);
@@ -554,7 +554,7 @@ impl Publisher {
             } else {
                 &common
             };
-            Ok((cwd, key.display().to_string()))
+            Ok((cwd_for_git, key.display().to_string()))
         })
         .await
         .map_err(|_| refused("git failed; checkout retained"))??;

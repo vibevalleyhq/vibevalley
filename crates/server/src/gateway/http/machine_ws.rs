@@ -106,7 +106,7 @@ async fn handle_socket(socket: WebSocket, server: Arc<dyn Server>, shutdown: Can
                             let bus_ref = bus.clone();
                             let tx = out_tx.clone();
                             crate::log::spawn_traced(async move {
-                                let resp = bus_ref.mcp_tunnel_async(srv, req).await;
+                                let resp = bus_ref.mcp_tunnel_async(srv.mcp(), req).await;
                                 let _ = tx.send_async(MachineWireFrame::MachineMcpResponse(resp)).await;
                             });
                         }

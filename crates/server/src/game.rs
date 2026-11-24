@@ -3,23 +3,19 @@
 //! reflected into [`LiveState`](crate::context::LiveState), and marked dirty on
 //! [`StateFeed`](crate::context::StateFeed).
 
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-use serde_json::Value;
-use tokio::sync::Notify;
+use tokio::sync::{Notify, mpsc};
 use tokio::task::JoinHandle as TaskHandle;
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::SliceMask;
 use vibevalley_core::progress::{Folded, family_entry, progress_fold, progress_step};
 use vibevalley_protocol::{
-    AchievementList, Actor, AgentRole, ApiError, BizCode, ChooseTitleRequest, Doing, EndpointId, Issue, LedgerEntry, LedgerEntryCalled, LedgerEntryConflicted,
-    LedgerEntryFailed, LedgerEntryHandoff, LedgerEntryHarvested, LedgerEntryHired, LedgerEntryMoment, LedgerEntryReviewed, LedgerEntryTitled, LedgerEntryTold,
-    Op, Outcome, Session, SessionClose, ops,
+    AchievementList, Actor, AgentRole, ApiError, ChooseTitleRequest, Doing, Issue, LedgerEntry, LedgerEntryCalled, LedgerEntryConflicted, LedgerEntryFailed,
+    LedgerEntryHandoff, LedgerEntryHarvested, LedgerEntryHired, LedgerEntryMoment, LedgerEntryReviewed, LedgerEntryTitled, LedgerEntryTold, Outcome, Session,
+    SessionClose,
 };
 
 use crate::context::Context;
@@ -31,16 +27,7 @@ const COUNT_AFTER_RUN: std::time::Duration = std::time::Duration::from_secs(15);
 /// The next session hired within this long goes to the planted station.
 const WANT_STATION_FOR_MS: i64 = 10_000;
 
-fn decode<T: DeserializeOwned>(payload: Value) -> Result<T, ApiError> {
-    serde_json::from_value(payload).map_err(|e| ApiError::new(BizCode::InvalidInput, e.to_string()))
-}
-
-fn ok_json<T: Serialize>(value: T) -> Result<Value, ApiError> {
-    serde_json::to_value(value).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
-}
-
 pub struct Game {
-    file: PathBuf,
     ctx: Arc<Context>,
     repo: Arc<Repo>,
     folded: Mutex<Folded>,
@@ -48,12 +35,14 @@ pub struct Game {
     /// Asks the counting task for a count soon.
     soon: Arc<Notify>,
     counter: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
+    writer_tx: Mutex<Option<mpsc::UnboundedSender<String>>>,
+    writer_handle: Mutex<Option<TaskHandle<()>>>,
     asked: std::sync::atomic::AtomicU64,
 }
 
 /// The ledger's entries that still read as a `LedgerEntry`.
-fn read_ledger(file: &Path) -> Vec<LedgerEntry> {
-    let Ok(body) = std::fs::read_to_string(file) else { return vec![] };
+async fn read_ledger_async(file: &Path) -> Vec<LedgerEntry> {
+    let Ok(body) = tokio::fs::read_to_string(file).await else { return vec![] };
     body.lines().filter_map(|line| serde_json::from_str::<LedgerEntry>(line).ok()).collect()
 }
 
@@ -102,36 +91,41 @@ where
 impl Game {
     /// Opens the farm ledger under `home`, folds existing entries into `progress`,
     /// seeds `ctx.live`, marks `SliceMask::FARM` dirty, and subscribes to `ctx.outbox`.
-    pub fn open(home: &Path, ctx: Arc<Context>, repo: Arc<Repo>) -> Arc<Self> {
+    pub async fn open_async(home: &Path, ctx: Arc<Context>, repo: Arc<Repo>) -> Arc<Self> {
         let file = home.join("ledger.jsonl");
-        let folded = progress_fold(&read_ledger(&file));
+        let folded = progress_fold(&read_ledger_async(&file).await);
         ctx.live.set_progress(Some(folded.progress.clone()));
         ctx.mark_dirty(SliceMask::FARM);
+        let (writer_tx, mut writer_rx) = mpsc::unbounded_channel::<String>();
+        let writer_handle = ctx.task.spawn_named("game.ledger", async move {
+            use tokio::io::AsyncWriteExt;
+            let mut opened: Option<tokio::fs::File> = None;
+            while let Some(line) = writer_rx.recv().await {
+                if opened.is_none() {
+                    opened = tokio::fs::OpenOptions::new().create(true).append(true).open(&file).await.ok();
+                }
+                if let Some(f) = opened.as_mut() {
+                    let _ = f.write_all(line.as_bytes()).await;
+                    let _ = f.write_all(b"\n").await;
+                }
+            }
+            if let Some(f) = opened.as_mut() {
+                let _ = f.flush().await;
+            }
+        });
         let game = Arc::new(Self {
-            file,
             ctx,
             repo,
             folded: Mutex::new(folded),
             wanted: Mutex::new(None),
             soon: Arc::new(Notify::new()),
             counter: Mutex::new(None),
+            writer_tx: Mutex::new(Some(writer_tx)),
+            writer_handle: Mutex::new(Some(writer_handle)),
             asked: std::sync::atomic::AtomicU64::new(0),
         });
         game.register_outbox();
         game
-    }
-
-    /// Dispatches all `Game*` protocol endpoints for `router.rs`.
-    pub(crate) async fn dispatch(self: &Arc<Self>, id: EndpointId, payload: Value) -> Result<Value, ApiError> {
-        match id {
-            EndpointId::GameAchievementList => ok_json(self.achievements_async().await?),
-            EndpointId::GameTitleSet => {
-                let req: <ops::GameTitleSet as Op>::Input = decode(payload)?;
-                self.set_title_async(req).await?;
-                Ok(Value::Null)
-            }
-            other => Err(ApiError::new(BizCode::RouteNotFound, format!("unexpected game endpoint {}", other.as_op()))),
-        }
     }
 
     pub fn progress(&self) -> vibevalley_protocol::Progress {
@@ -164,6 +158,11 @@ impl Game {
         let counter = self.counter.lock().take();
         if let Some((cancel, handle)) = counter {
             cancel.cancel();
+            let _ = handle.await;
+        }
+        drop(self.writer_tx.lock().take());
+        let handle = self.writer_handle.lock().take();
+        if let Some(handle) = handle {
             let _ = handle.await;
         }
     }
@@ -212,12 +211,11 @@ impl Game {
         let Ok(line) = serde_json::to_string(&entry) else { return };
         let (progress, news) = {
             let mut folded = self.folded.lock();
-            let kept = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&self.file)
-                .and_then(|mut f| writeln!(f, "{line}"));
-            if kept.is_err() {
+            if let Some(tx) = self.writer_tx.lock().as_ref() {
+                if tx.send(line).is_err() {
+                    return;
+                }
+            } else {
                 return;
             }
             let (next, news) = progress_step(&folded, &entry);
@@ -370,7 +368,7 @@ impl Game {
                 let Some(game) = game.upgrade() else {
                     return Ok::<(), String>(());
                 };
-                if let Ok(payload) = serde_json::from_value::<ReportedPayload>(delivery.payload) {
+                if let Ok(payload) = delivery.decode::<ReportedPayload>() {
                     game.on_session_reported(&payload.session, payload.outcome);
                 }
                 Ok(())
@@ -416,7 +414,7 @@ impl Game {
             .task
             .spawn_blocking(move || game.choose_title(req.achievement, req.tier))
             .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
+            .map_err(|e| ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?;
         Ok(())
     }
 }
@@ -505,8 +503,8 @@ mod tests {
     async fn workspace_sessions_are_filtered_from_station_agents_streak_and_full_house() {
         let home = tempfile::tempdir().unwrap();
         let ctx = test_context(home.path(), vibevalley_core::system_clock()).await;
-        let repo = Repo::open(home.path(), 2).unwrap();
-        let game = Game::open(home.path(), ctx.clone(), repo);
+        let repo = Repo::open_async(home.path(), 2).await.unwrap();
+        let game = Game::open_async(home.path(), ctx.clone(), repo).await;
 
         // Seed an active streak and a planted station wish.
         game.record(LedgerEntry::Harvested(LedgerEntryHarvested {
@@ -633,8 +631,8 @@ mod tests {
         let home = tempfile::tempdir().unwrap();
         let clock = Arc::new(ManualClock::new(1_700_000_000_000));
         let ctx = test_context(home.path(), clock.clone()).await;
-        let repo = Repo::open(home.path(), 2).unwrap();
-        let game = Game::open(home.path(), ctx.clone(), repo);
+        let repo = Repo::open_async(home.path(), 2).await.unwrap();
+        let game = Game::open_async(home.path(), ctx.clone(), repo).await;
 
         // Plant a station wish at t0, advance 9_999ms (still within WANT_STATION_FOR_MS = 10_000ms).
         game.want(4);

@@ -1,42 +1,40 @@
 //! Pure-Rust standard ZIP (STORE method 0 + IEEE CRC32) writer exporting
 //! redacted diagnostics bundles to `<home>/debug-bundles/debug-bundle-<ts>.zip`.
 
-use std::io::Write;
 use std::path::Path;
 
-use serde_json::Value;
 use vibevalley_protocol::{ApiError, BizCode, DebugBundleResult};
 
 use super::redact::Redactor;
 use crate::context::now;
 
 pub struct BundlePayloads {
-    pub overview: Value,
-    pub routes: Value,
-    pub timeline: Value,
-    pub graph: Value,
-    pub state_cache: Value,
-    pub overrides: Value,
-    pub trajectories: Value,
+    pub overview_json: String,
+    pub routes_json: String,
+    pub timeline_json: String,
+    pub graph_json: String,
+    pub state_cache_json: String,
+    pub overrides_json: String,
+    pub trajectories_json: String,
 }
 
-pub fn export_bundle(home: &Path, redactor: &Redactor, payloads: BundlePayloads, prior_redactions: u32) -> Result<DebugBundleResult, ApiError> {
+pub async fn export_bundle_async(home: &Path, redactor: &Redactor, payloads: BundlePayloads, prior_redactions: u32) -> Result<DebugBundleResult, ApiError> {
     let mut redacted_count = prior_redactions;
-    let raw_entries: [(&str, Value); 7] = [
-        ("overview.json", payloads.overview),
-        ("routes.json", payloads.routes),
-        ("timeline.json", payloads.timeline),
-        ("graph.json", payloads.graph),
-        ("state-cache.json", payloads.state_cache),
-        ("overrides.json", payloads.overrides),
-        ("trajectories.json", payloads.trajectories),
+    let raw_entries: [(&str, String); 7] = [
+        ("overview.json", payloads.overview_json),
+        ("routes.json", payloads.routes_json),
+        ("timeline.json", payloads.timeline_json),
+        ("graph.json", payloads.graph_json),
+        ("state-cache.json", payloads.state_cache_json),
+        ("overrides.json", payloads.overrides_json),
+        ("trajectories.json", payloads.trajectories_json),
     ];
 
     let mut prepared: Vec<(&str, Vec<u8>)> = Vec::with_capacity(raw_entries.len());
-    for (name, val) in raw_entries {
-        let clean = redactor.redact_value(val, &mut redacted_count);
-        let mut bytes = serde_json::to_vec_pretty(&clean).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
-        bytes.push(b'\n');
+    for (name, raw_json) in raw_entries {
+        let bytes = redactor
+            .redact_json_pretty_bytes(&raw_json, &mut redacted_count)
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
         if let Some(reason) = redactor.contains_leak(&bytes) {
             return Err(ApiError::new(BizCode::InternalError, format!("redaction guard tripped on {name}: {reason}")));
         }
@@ -47,14 +45,20 @@ pub fn export_bundle(home: &Path, redactor: &Redactor, payloads: BundlePayloads,
     let archive = write_zip_store(&zip_entries);
 
     let dir = home.join("debug-bundles");
-    std::fs::create_dir_all(&dir).map_err(|e| ApiError::new(BizCode::InternalError, format!("create debug-bundles: {e}")))?;
+    tokio::fs::create_dir_all(&dir)
+        .await
+        .map_err(|e| ApiError::new(BizCode::InternalError, format!("create debug-bundles: {e}")))?;
     let stamp = now();
     let file_name = format!("debug-bundle-{stamp}.zip");
     let final_path = dir.join(&file_name);
     let tmp_path = dir.join(format!(".{file_name}.tmp"));
 
-    write_private_bytes(&tmp_path, &archive).map_err(|e| ApiError::new(BizCode::InternalError, format!("write debug bundle: {e}")))?;
-    std::fs::rename(&tmp_path, &final_path).map_err(|e| ApiError::new(BizCode::InternalError, format!("finalize debug bundle: {e}")))?;
+    write_private_bytes_async(&tmp_path, &archive)
+        .await
+        .map_err(|e| ApiError::new(BizCode::InternalError, format!("write debug bundle: {e}")))?;
+    tokio::fs::rename(&tmp_path, &final_path)
+        .await
+        .map_err(|e| ApiError::new(BizCode::InternalError, format!("finalize debug bundle: {e}")))?;
 
     Ok(DebugBundleResult {
         path: final_path.to_string_lossy().into_owned(),
@@ -64,11 +68,16 @@ pub fn export_bundle(home: &Path, redactor: &Redactor, payloads: BundlePayloads,
     })
 }
 
-fn write_private_bytes(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    use std::os::unix::fs::OpenOptionsExt;
-    let mut f = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(path)?;
-    f.write_all(bytes)?;
-    f.sync_all()
+async fn write_private_bytes_async(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let mut f = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)
+        .await?;
+    tokio::io::AsyncWriteExt::write_all(&mut f, bytes).await?;
+    f.sync_all().await
 }
 
 /// Packs `(name, bytes)` entries into a valid ZIP archive using STORE (method 0)

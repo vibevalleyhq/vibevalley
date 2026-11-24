@@ -16,31 +16,22 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{Value, json};
 use vibevalley_protocol::{
     ApiError, BizCode, DebugBundleResult, DebugCacheStat, DebugGraph, DebugGraphClient, DebugGraphSession, DebugOverrideConfig, DebugOverview,
     DebugRuntimeSummary, DebugSnapshot, DebugStateCache, DebugStateCounts, DebugTimelinePage, DebugTimelineQuery, DebugTrajectoryDetail,
-    DebugTrajectoryGetRequest, DebugTrajectoryKind, DebugTrajectorySummary, EndpointId, Issue, Op, Session, SessionEvent, ops,
+    DebugTrajectoryGetRequest, DebugTrajectoryKind, DebugTrajectorySummary, Issue, Session, SessionEvent,
 };
 
 use self::bundle::BundlePayloads;
 use self::collector::DebugCollector;
 use self::redact::Redactor;
 use crate::context::Context;
-use crate::gateway::api::{BoxFuture, SharedHostDebug};
+use crate::context::api::{BoxFuture, SharedHostDebug};
 use crate::setting::Setting;
 
 const SNAPSHOT_RECENT_TIMELINE_LIMIT: usize = 16;
-
-fn decode<T: DeserializeOwned>(payload: Value) -> Result<T, ApiError> {
-    serde_json::from_value(payload).map_err(|e| ApiError::new(BizCode::InvalidInput, e.to_string()))
-}
-
-fn ok_json<T: Serialize>(value: T) -> Result<Value, ApiError> {
-    serde_json::to_value(value).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
-}
 
 /// Snapshot of runtime probe status and profile counts injected from `app.rs`
 /// so `debug` stays free of upward business-domain imports.
@@ -241,34 +232,6 @@ impl DebugKit {
         self.collector.clone()
     }
 
-    /// Dispatches all 9 `Debug*` protocol endpoints for `router.rs`.
-    pub(crate) async fn dispatch(&self, id: EndpointId, payload: Value) -> Result<Value, ApiError> {
-        match id {
-            EndpointId::DebugSnapshot => ok_json(self.snapshot_async().await?),
-            EndpointId::DebugTimelineList => {
-                let req: <ops::DebugTimelineList as Op>::Input = decode(payload)?;
-                ok_json(self.timeline_list(&req)?)
-            }
-            EndpointId::DebugTimelineClear => {
-                self.timeline_clear()?;
-                Ok(Value::Null)
-            }
-            EndpointId::DebugTrajectoryList => ok_json(self.trajectory_list_async().await?),
-            EndpointId::DebugTrajectoryGet => {
-                let req: <ops::DebugTrajectoryGet as Op>::Input = decode(payload)?;
-                ok_json(self.trajectory_get_async(&req).await?)
-            }
-            EndpointId::DebugGraph => ok_json(self.graph_async().await?),
-            EndpointId::DebugOverrideGet => ok_json(self.override_get()?),
-            EndpointId::DebugOverrideSet => {
-                let req: <ops::DebugOverrideSet as Op>::Input = decode(payload)?;
-                ok_json(self.override_set(req)?)
-            }
-            EndpointId::DebugBundleExport => ok_json(self.bundle_export_async().await?),
-            other => Err(ApiError::new(BizCode::RouteNotFound, format!("unexpected debug endpoint {}", other.as_op()))),
-        }
-    }
-
     fn ensure_enabled(&self) -> Result<(), ApiError> {
         if !self.debug_enabled {
             return Err(ApiError::new(BizCode::Refused, vibevalley_i18n::t("server.debug.disabled", &[])));
@@ -280,14 +243,18 @@ impl DebugKit {
         let Some(bridge) = &self.host_debug else {
             return HostDebugPayload::default();
         };
-        let mut raw = bridge.snapshot();
-        self.collector.ingest_host_frames_with(&raw, redactor, redacted_count);
+        let raw_json = bridge.snapshot_json();
+        self.collector.ingest_host_frames_with(&raw_json, redactor, redacted_count);
+        let Ok(mut raw) = serde_json::from_str::<Value>(&raw_json) else {
+            return HostDebugPayload::default();
+        };
         // Frames are already ingested/redacted into the timeline ring and omitted from HostDebugPayload.
         if let Some(obj) = raw.as_object_mut() {
             obj.remove("frames");
         }
-        let clean = redactor.redact_value(raw, redacted_count);
-        serde_json::from_value(clean).unwrap_or_default()
+        let stripped_json = serde_json::to_string(&raw).unwrap_or_else(|_| "{}".to_string());
+        let clean_json = redactor.redact_json_value(&stripped_json, redacted_count);
+        serde_json::from_str(&clean_json).unwrap_or_default()
     }
 
     fn default_routes() -> Value {
@@ -376,7 +343,7 @@ impl DebugKit {
     pub fn timeline_list(&self, q: &DebugTimelineQuery) -> Result<DebugTimelinePage, ApiError> {
         self.ensure_enabled()?;
         if let Some(bridge) = &self.host_debug {
-            self.collector.ingest_host_frames(&bridge.snapshot());
+            self.collector.ingest_host_frames(&bridge.snapshot_json());
         }
         Ok(self.collector.query(q))
     }
@@ -394,14 +361,7 @@ impl DebugKit {
         let probe = self.sources.runtime_probe();
         let redactor = Redactor::from_setting(&self.setting);
         let mut count = 0u32;
-        Ok(trajectory::list_summaries(
-            &self.home,
-            &index,
-            self.sources.as_ref(),
-            &redactor,
-            &probe.orchestrator_ids,
-            &mut count,
-        ))
+        Ok(trajectory::list_summaries_async(&self.home, &index, self.sources.as_ref(), &redactor, &probe.orchestrator_ids, &mut count).await)
     }
 
     pub async fn trajectory_get_async(&self, req: &DebugTrajectoryGetRequest) -> Result<DebugTrajectoryDetail, ApiError> {
@@ -415,7 +375,7 @@ impl DebugKit {
         let probe = self.sources.runtime_probe();
         let redactor = Redactor::from_setting(&self.setting);
         let mut count = 0u32;
-        trajectory::build_detail(
+        trajectory::build_detail_async(
             &self.home,
             meta.as_ref(),
             self.sources.as_ref(),
@@ -424,6 +384,7 @@ impl DebugKit {
             &probe.orchestrator_ids,
             &mut count,
         )
+        .await
     }
 
     pub async fn graph_async(&self) -> Result<DebugGraph, ApiError> {
@@ -464,24 +425,26 @@ impl DebugKit {
         let routes = host.routes.unwrap_or_else(Self::default_routes);
         let overrides = self.collector.overrides();
         let timeline = self.collector.all_events();
-        let trajectories = trajectory::export_snapshot(
+        let trajectories = trajectory::export_snapshot_async(
             &self.home,
             &index,
             self.sources.as_ref(),
             &redactor,
             &probe.orchestrator_ids,
             &mut prior_redactions,
-        );
+        )
+        .await;
 
+        let ser = |val_res: Result<String, serde_json::Error>| val_res.map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()));
         let payloads = BundlePayloads {
-            overview: serde_json::to_value(&overview).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?,
-            routes,
-            timeline: serde_json::to_value(&timeline).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?,
-            graph: serde_json::to_value(&graph).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?,
-            state_cache: serde_json::to_value(&state_cache).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?,
-            overrides: serde_json::to_value(&overrides).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?,
-            trajectories,
+            overview_json: ser(serde_json::to_string(&overview))?,
+            routes_json: ser(serde_json::to_string(&routes))?,
+            timeline_json: ser(serde_json::to_string(&timeline))?,
+            graph_json: ser(serde_json::to_string(&graph))?,
+            state_cache_json: ser(serde_json::to_string(&state_cache))?,
+            overrides_json: ser(serde_json::to_string(&overrides))?,
+            trajectories_json: ser(serde_json::to_string(&trajectories))?,
         };
-        bundle::export_bundle(&self.home, &redactor, payloads, prior_redactions)
+        bundle::export_bundle_async(&self.home, &redactor, payloads, prior_redactions).await
     }
 }

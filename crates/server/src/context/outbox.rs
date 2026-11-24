@@ -1,5 +1,5 @@
 //! Transactional outbox dispatcher: atomic enqueue inside [`crate::db::Tx`]
-//! transactions via [`crate::service::Service`], topic handler registry,
+//! transactions via [`crate::service::Service`], typed [`OutboxEvent`] payloads,
 //! exponential-backoff retries, and [`TaskGroup`]-bound dispatch.
 
 use std::collections::HashMap;
@@ -9,12 +9,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::RwLock;
-use serde_json::Value;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use tokio::sync::Notify;
-use vibevalley_protocol::{ApiError, BizCode};
+use vibevalley_protocol::{ApiError, BizCode, Millis, Outcome, Spent};
 
+use super::api::BoxFuture;
 use super::task::TaskGroup;
-use crate::BoxFuture;
 use crate::db::Tx;
 use crate::service::Service;
 use crate::service::outbox::OutboxItem;
@@ -24,6 +25,54 @@ const DEFAULT_MAX_ATTEMPTS: i64 = 8;
 const DEFAULT_BASE_BACKOFF: Duration = Duration::from_millis(500);
 const DEFAULT_MAX_BACKOFF: Duration = Duration::from_secs(60);
 const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(5);
+
+pub const OUTBOX_SESSION_REPORTED: &str = "work.session.reported";
+pub const OUTBOX_SESSION_REMEMBER: &str = "memory.session_remember";
+
+/// Durable report payload persisted via `Outbox` when a session round finishes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OutboxSessionReported {
+    pub id: String,
+    pub at: Millis,
+    pub outcome: Outcome,
+    pub summary: String,
+    pub spent: Option<Spent>,
+    pub run: Option<String>,
+}
+
+/// Closed typed event catalog carried by the durable [`Outbox`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "topic", content = "payload")]
+pub enum OutboxEvent {
+    #[serde(rename = "work.session.reported")]
+    SessionReported(OutboxSessionReported),
+    #[serde(rename = "memory.session_remember")]
+    SessionRemember { agent: String, text: String, repo: Option<String> },
+}
+
+impl OutboxEvent {
+    pub const fn topic(&self) -> &'static str {
+        match self {
+            Self::SessionReported(_) => OUTBOX_SESSION_REPORTED,
+            Self::SessionRemember { .. } => OUTBOX_SESSION_REMEMBER,
+        }
+    }
+
+    pub fn serialize_payload_json(&self) -> Result<String, ApiError> {
+        let res = match self {
+            Self::SessionReported(report) => serde_json::to_string(report),
+            Self::SessionRemember { agent, text, repo } => serde_json::to_string(&RememberPayload { agent, text, repo }),
+        };
+        res.map_err(|e| ApiError::new(BizCode::InternalError, format!("outbox payload serialize failed: {e}")))
+    }
+}
+
+#[derive(Serialize)]
+struct RememberPayload<'a> {
+    agent: &'a str,
+    text: &'a str,
+    repo: &'a Option<String>,
+}
 
 /// Configuration governing outbox batch size, retry budget, and backoff timings.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,13 +97,42 @@ impl Default for OutboxConfig {
 }
 
 /// Claimed outbox item handed to a registered topic handler.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutboxDelivery {
     pub id: i64,
     pub topic: String,
-    pub payload: Value,
+    pub payload_json: String,
     pub attempts: i64,
     pub created_at: i64,
+}
+
+impl OutboxDelivery {
+    /// Decodes the delivery payload JSON into `T`.
+    pub fn decode<T: DeserializeOwned>(&self) -> Result<T, serde_json::Error> {
+        serde_json::from_str(&self.payload_json)
+    }
+
+    /// Decodes the delivery envelope as a typed [`OutboxEvent`].
+    pub fn decode_event(&self) -> Result<OutboxEvent, serde_json::Error> {
+        match self.topic.as_str() {
+            OUTBOX_SESSION_REPORTED => Ok(OutboxEvent::SessionReported(serde_json::from_str(&self.payload_json)?)),
+            OUTBOX_SESSION_REMEMBER => {
+                #[derive(Deserialize)]
+                struct OwnedRemember {
+                    agent: String,
+                    text: String,
+                    repo: Option<String>,
+                }
+                let p: OwnedRemember = serde_json::from_str(&self.payload_json)?;
+                Ok(OutboxEvent::SessionRemember {
+                    agent: p.agent,
+                    text: p.text,
+                    repo: p.repo,
+                })
+            }
+            _ => Err(serde::de::Error::custom(format!("unknown outbox topic `{}`", self.topic))),
+        }
+    }
 }
 
 type OutboxHandler = Arc<dyn Fn(OutboxDelivery) -> BoxFuture<'static, Result<(), String>> + Send + Sync>;
@@ -83,16 +161,31 @@ impl Outbox {
         }
     }
 
-    /// Enqueues an outbox item inside an open write transaction using the current wall clock.
-    pub async fn enqueue_in_tx(&self, tx: &Tx, topic: &str, payload: &Value) -> Result<i64, ApiError> {
-        self.enqueue_in_tx_at(tx, topic, payload, super::now()).await
+    /// Enqueues a typed [`OutboxEvent`] standalone on the write pool using the current wall clock.
+    pub async fn enqueue_event(&self, event: &OutboxEvent) -> Result<i64, ApiError> {
+        let payload_json = event.serialize_payload_json()?;
+        self.service.outbox.enqueue(event.topic(), &payload_json, super::now()).await
     }
 
-    /// Enqueues an outbox item inside an open write transaction with an explicit timestamp (ms).
-    pub async fn enqueue_in_tx_at(&self, tx: &Tx, topic: &str, payload: &Value, now_ms: i64) -> Result<i64, ApiError> {
-        let payload_json =
-            serde_json::to_string(payload).map_err(|e| ApiError::new(BizCode::InternalError, format!("outbox payload serialize failed: {e}")))?;
-        self.service.outbox.enqueue_in_tx(tx, topic, &payload_json, now_ms).await
+    /// Enqueues a typed [`OutboxEvent`] inside an open write transaction using the current wall clock.
+    pub async fn enqueue_event_in_tx(&self, tx: &Tx, event: &OutboxEvent) -> Result<i64, ApiError> {
+        self.enqueue_event_in_tx_at(tx, event, super::now()).await
+    }
+
+    /// Enqueues a typed [`OutboxEvent`] inside an open write transaction with an explicit timestamp (ms).
+    pub async fn enqueue_event_in_tx_at(&self, tx: &Tx, event: &OutboxEvent, now_ms: i64) -> Result<i64, ApiError> {
+        let payload_json = event.serialize_payload_json()?;
+        self.service.outbox.enqueue_in_tx(tx, event.topic(), &payload_json, now_ms).await
+    }
+
+    /// Enqueues a raw JSON payload inside an open write transaction using the current wall clock.
+    pub async fn enqueue_in_tx(&self, tx: &Tx, topic: &str, payload_json: &str) -> Result<i64, ApiError> {
+        self.enqueue_in_tx_at(tx, topic, payload_json, super::now()).await
+    }
+
+    /// Enqueues a raw JSON payload inside an open write transaction with an explicit timestamp (ms).
+    pub async fn enqueue_in_tx_at(&self, tx: &Tx, topic: &str, payload_json: &str, now_ms: i64) -> Result<i64, ApiError> {
+        self.service.outbox.enqueue_in_tx(tx, topic, payload_json, now_ms).await
     }
 
     /// Registers an async handler for `topic`.
@@ -191,14 +284,11 @@ impl Outbox {
     }
 
     async fn dispatch_row(&self, row: OutboxItem, current_ms: i64) -> Result<(), ApiError> {
-        let payload: Value = match serde_json::from_str(&row.payload_json) {
-            Ok(v) => v,
-            Err(err) => {
-                let msg = format!("invalid outbox payload json: {err}");
-                self.service.outbox.fail(row.id, &msg).await?;
-                return Ok(());
-            }
-        };
+        if let Err(err) = serde_json::from_str::<serde_json::Value>(&row.payload_json) {
+            let msg = format!("invalid outbox payload json: {err}");
+            self.service.outbox.fail(row.id, &msg).await?;
+            return Ok(());
+        }
 
         let handler = self.handlers.read().get(&row.topic).cloned();
         let Some(handler) = handler else {
@@ -210,7 +300,7 @@ impl Outbox {
         let delivery = OutboxDelivery {
             id: row.id,
             topic: row.topic,
-            payload,
+            payload_json: row.payload_json,
             attempts: row.attempts,
             created_at: row.created_at,
         };
@@ -235,7 +325,6 @@ impl Outbox {
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use serde_json::json;
     use tokio::sync::Notify;
     use vibevalley_core::SliceMask;
 
@@ -257,7 +346,7 @@ mod tests {
         let aborted: Result<((), SliceMask), ApiError> = service
             .write_dirty(move |tx| {
                 Box::pin(async move {
-                    outbox_c.enqueue_in_tx_at(tx, "channel.deliver", &json!({"id": "never"}), 1_000).await?;
+                    outbox_c.enqueue_in_tx_at(tx, "channel.deliver", r#"{"id":"never"}"#, 1_000).await?;
                     Err(ApiError::new(BizCode::InternalError, "abort tx"))
                 })
             })
@@ -269,7 +358,7 @@ mod tests {
         let (item_id, dirty): (i64, SliceMask) = service
             .write_dirty(move |tx| {
                 Box::pin(async move {
-                    let id = outbox_c.enqueue_in_tx_at(tx, "channel.deliver", &json!({"id": "ok"}), 1_000).await?;
+                    let id = outbox_c.enqueue_in_tx_at(tx, "channel.deliver", r#"{"id":"ok"}"#, 1_000).await?;
                     Ok::<_, ApiError>((id, SliceMask::COLLAB))
                 })
             })
@@ -321,8 +410,8 @@ mod tests {
         let (ok_id, fail_id) = service
             .write_dirty(move |tx| {
                 Box::pin(async move {
-                    let a = outbox_c.enqueue_in_tx_at(tx, "retry.then.ok", &json!({"n": 1}), 1_000).await?;
-                    let b = outbox_c.enqueue_in_tx_at(tx, "always.fail", &json!({"n": 2}), 1_000).await?;
+                    let a = outbox_c.enqueue_in_tx_at(tx, "retry.then.ok", r#"{"n":1}"#, 1_000).await?;
+                    let b = outbox_c.enqueue_in_tx_at(tx, "always.fail", r#"{"n":2}"#, 1_000).await?;
                     Ok::<_, ApiError>(((a, b), SliceMask::NONE))
                 })
             })
@@ -373,7 +462,7 @@ mod tests {
         let (id, _) = service
             .write_dirty(move |tx| {
                 Box::pin(async move {
-                    let id = outbox_c.enqueue_in_tx_at(tx, "job.run", &json!({"hello": "world"}), 500).await?;
+                    let id = outbox_c.enqueue_in_tx_at(tx, "job.run", r#"{"hello":"world"}"#, 500).await?;
                     Ok::<_, ApiError>((id, SliceMask::OPS))
                 })
             })
@@ -389,7 +478,7 @@ mod tests {
         outbox.register("job.run", move |delivery| {
             let done_tx = done_tx.clone();
             async move {
-                assert_eq!(delivery.payload, json!({"hello": "world"}));
+                assert_eq!(delivery.payload_json, r#"{"hello":"world"}"#);
                 done_tx.notify_one();
                 Ok::<_, String>(())
             }
@@ -411,7 +500,7 @@ mod tests {
         service
             .write_dirty(move |tx| {
                 Box::pin(async move {
-                    outbox_c.enqueue_in_tx(tx, "job.two", &json!({"two": true})).await?;
+                    outbox_c.enqueue_in_tx(tx, "job.two", r#"{"two":true}"#).await?;
                     Ok::<_, ApiError>(((), SliceMask::NONE))
                 })
             })

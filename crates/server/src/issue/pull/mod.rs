@@ -116,7 +116,7 @@ impl PullIndex {
         items
     }
 
-    pub fn open(&self) -> Vec<PullRecord> {
+    pub fn active(&self) -> Vec<PullRecord> {
         let mut items: Vec<PullRecord> = self.by_id.values().filter(|item| item.state == PullRequestState::Open).cloned().collect();
         items.sort_by(|a, b| a.created_at.cmp(&b.created_at).then_with(|| a.id.cmp(&b.id)));
         items
@@ -181,14 +181,6 @@ impl Pull {
         }
     }
 
-    pub fn close(&self) {
-        self.closed.store(true, std::sync::atomic::Ordering::Relaxed);
-        if let Some((cancel, handle)) = self.poller.lock().take() {
-            cancel.cancel();
-            handle.abort();
-        }
-    }
-
     pub fn of_issue(&self, issue_id: &str) -> Option<PullRequest> {
         self.index.lock().of_issue(issue_id)
     }
@@ -202,7 +194,7 @@ impl Pull {
     }
 
     pub fn open_pulls(&self) -> Vec<PullRecord> {
-        self.index.lock().open()
+        self.index.lock().active()
     }
 
     pub async fn upsert_async(&self, input: UpsertPullInput) -> Result<PullRecord, ApiError> {
@@ -242,18 +234,18 @@ impl Pull {
     async fn infer_farm_repo_async(&self, cwd: &str) -> Option<String> {
         let repos = self.repos.clone()?;
         let cwd = cwd.to_string();
-        spawn_blocking_traced(move || {
-            let discovered = vibevalley_git::Repo::discover(Path::new(&cwd)).ok()??;
-            let root_real = std::fs::canonicalize(discovered.root()).ok()?;
-            let listed = repos.list();
-            listed
-                .into_iter()
-                .find(|p| std::fs::canonicalize(&p.path).ok().as_ref() == Some(&root_real))
-                .map(|p| p.name)
-        })
-        .await
-        .ok()
-        .flatten()
+        let discovered_root = spawn_blocking_traced(move || vibevalley_git::Repo::discover(Path::new(&cwd)).ok().flatten().map(|r| r.root().to_path_buf()))
+            .await
+            .ok()
+            .flatten()?;
+        let root_real = tokio::fs::canonicalize(&discovered_root).await.ok()?;
+        let listed = repos.list_async().await;
+        for p in listed {
+            if tokio::fs::canonicalize(&p.path).await.ok().as_ref() == Some(&root_real) {
+                return Some(p.name);
+            }
+        }
+        None
     }
 
     pub(crate) async fn hosted_repo_of_async(&self, name: &str, platform: Option<PublishPlatform>) -> Result<HostedRepo, ApiError> {
@@ -269,10 +261,10 @@ impl Pull {
             .repos
             .clone()
             .ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
+        let listed = repos.list_async().await;
         let name = name.to_string();
         spawn_blocking_traced(move || {
-            let found = repos
-                .list()
+            let found = listed
                 .into_iter()
                 .find(|p| p.name == name)
                 .ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
@@ -681,7 +673,7 @@ mod tests {
         assert_eq!(board.issue_async(&issue2.id).await.unwrap().unwrap().canceled, Some(IssueCanceled::Dismissed));
 
         pulls.close_async().await;
-        board.close();
+        board.close_async().await;
         let _ = ctx.shutdown(Duration::from_secs(1)).await;
     }
 

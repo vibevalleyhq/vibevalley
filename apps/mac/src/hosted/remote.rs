@@ -767,7 +767,7 @@ mod tests {
     use vibevalley_protocol::{ApiError, BizCode, Issue, LiveEvent, NoticeLevel, RemoteDeviceSummary, RemotePlatform};
     use vibevalley_server::gateway::api::{GatewayPorts, RemoteAuth, RemoteDeviceIdentity};
     use vibevalley_server::gateway::bridge::fake::{FakeServer, empty_bundle};
-    use vibevalley_server::gateway::bridge::{ClientIdentity, ClientKind, Hub as BridgeHub, Outlet};
+    use vibevalley_server::gateway::bridge::{Bridge as BridgeHub, ClientIdentity, ClientKind, Outlet};
     use vibevalley_server::gateway::http;
 
     use super::*;

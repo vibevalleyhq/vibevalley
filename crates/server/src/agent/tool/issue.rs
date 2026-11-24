@@ -536,14 +536,7 @@ pub async fn report(f: &ToolRegistry, who: &Who, a: ReportArgs) -> Result<String
         checks: a.checks,
         remember: a.remember,
     };
-    let runtime = f.runtime.clone();
-    let session_id = me.id.clone();
-    f.ctx
-        .task
-        .spawn_blocking(move || runtime.report(&session_id, &report))
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())?;
+    f.runtime.report_async(&me.id, &report).await.map_err(|e| e.to_string())?;
     Ok("报告已记录；现在用简短正文说明结果。".into())
 }
 

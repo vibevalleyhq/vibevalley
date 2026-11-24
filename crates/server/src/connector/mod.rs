@@ -132,18 +132,6 @@ impl Connector {
             closing: AtomicBool::new(false),
         });
         let bridges: Vec<Arc<Bridge>> = apps(&options).into_iter().map(|app| Bridge::new(app, env.clone())).collect();
-        {
-            let env = env.clone();
-            chat.guard_removal(move |id| {
-                let env = env.clone();
-                Box::pin(async move {
-                    match env.ctx.service.connector.accounts_in(&id).await {
-                        Ok(0) => vec![],
-                        _ => vec![t("server.channel.connectorsThere", &[])],
-                    }
-                })
-            });
-        }
         for b in &bridges {
             b.load_async().await;
         }

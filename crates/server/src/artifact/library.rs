@@ -16,7 +16,6 @@ use vibevalley_protocol::{
 use crate::context::http::{PublicBytes, PublicDownload, PublicDownloadError};
 use crate::context::{Context, LookIn, missing};
 use crate::db::DbError;
-use crate::log::spawn_blocking_traced;
 use crate::storage::{ATTACHMENT_MAX, Storage};
 
 const LIST_MAX: u64 = 500;
@@ -231,11 +230,7 @@ impl Library {
         let (bytes, found_name, kind) = match &url {
             Some(u) => download_async(u).await?,
             None => {
-                let dir = dir.clone();
-                let path = path.clone();
-                let (bytes, name) = spawn_blocking_traced(move || work_file(dir.as_deref(), &path))
-                    .await
-                    .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))??;
+                let (bytes, name) = work_file_async(dir.as_deref(), &path).await?;
                 (bytes, name, String::new())
             }
         };
@@ -320,24 +315,26 @@ fn percent_decoded(s: &str) -> Option<String> {
 }
 
 /// Reads a regular file inside `dir` (after symlink/path canonicalization), up to `ATTACHMENT_MAX`.
-fn work_file(dir: Option<&Path>, path: &str) -> Result<(Vec<u8>, String), ApiError> {
+async fn work_file_async(dir: Option<&Path>, path: &str) -> Result<(Vec<u8>, String), ApiError> {
     let Some(dir) = dir else {
         return Err(refused(t("server.library.noPlace", &[])));
     };
     let unreadable = |e: std::io::Error| refused(t("server.library.unreadable", &[("path", path.into()), ("why", e.to_string().into())]));
-    let root = std::fs::canonicalize(dir).map_err(unreadable)?;
-    let full = std::fs::canonicalize(root.join(path)).map_err(|_| refused(t("server.library.notFile", &[("path", path.into())])))?;
+    let root = tokio::fs::canonicalize(dir).await.map_err(unreadable)?;
+    let full = tokio::fs::canonicalize(root.join(path))
+        .await
+        .map_err(|_| refused(t("server.library.notFile", &[("path", path.into())])))?;
     if !full.starts_with(&root) {
         return Err(refused(t("server.library.outside", &[("path", path.into())])));
     }
-    let info = std::fs::metadata(&full).map_err(unreadable)?;
+    let info = tokio::fs::metadata(&full).await.map_err(unreadable)?;
     if !info.is_file() {
         return Err(refused(t("server.library.notFile", &[("path", path.into())])));
     }
     if info.len() > ATTACHMENT_MAX as u64 {
         return Err(too_big());
     }
-    let bytes = std::fs::read(&full).map_err(unreadable)?;
+    let bytes = tokio::fs::read(&full).await.map_err(unreadable)?;
     let name = full.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     Ok((bytes, name))
 }

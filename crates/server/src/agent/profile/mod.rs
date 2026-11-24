@@ -11,13 +11,14 @@ use std::path::Path;
 use std::sync::Arc;
 
 use vibevalley_protocol::{
-    Agent, AgentRole, AgentTemplate, AgentValidation, ApiError, BizCode, Installation, PersonaMode, Preview, RuntimeInfo, RuntimeSettings, Skill,
+    Agent, AgentRole, AgentTemplate, AgentValidation, ApiError, Installation, PersonaMode, Preview, RuntimeInfo, RuntimeSettings, Skill,
 };
 use vibevalley_runtime::machine::MachineRegistry;
 use vibevalley_runtime::oar::Registry;
 
 use crate::context::Context;
 use crate::context::error::{LookIn, missing};
+use crate::context::port::CronAgentPort;
 
 pub use drive::{AgentDriver, instructions};
 pub use profile::ProfileStore;
@@ -29,15 +30,21 @@ pub struct Profile {
     pub fleet: Arc<RuntimeFleet>,
 }
 
+impl CronAgentPort for Profile {
+    fn resolve_agent_id(&self, named: &str) -> Option<String> {
+        self.named(named).map(|a| a.id)
+    }
+}
+
 impl Profile {
     /// Opens agent profiles under `home` and probes runtimes in `registry` when `background` is set.
-    pub fn open(ctx: Arc<Context>, home: &Path, starters: &[String], registry: Arc<Registry>, background: bool) -> std::io::Result<Arc<Profile>> {
+    pub async fn open_async(ctx: Arc<Context>, home: &Path, starters: &[String], registry: Arc<Registry>, background: bool) -> std::io::Result<Arc<Profile>> {
         let machines = Arc::new(MachineRegistry::with_local(registry.clone()));
-        Self::open_with_machines(ctx, home, starters, registry, machines, background)
+        Self::open_with_machines_async(ctx, home, starters, registry, machines, background).await
     }
 
-    /// Same as [`Self::open`], routing execution targets through a shared [`MachineRegistry`].
-    pub fn open_with_machines(
+    /// Same as [`Self::open_async`], routing execution targets through a shared [`MachineRegistry`].
+    pub async fn open_with_machines_async(
         ctx: Arc<Context>,
         home: &Path,
         starters: &[String],
@@ -45,7 +52,7 @@ impl Profile {
         machines: Arc<MachineRegistry>,
         background: bool,
     ) -> std::io::Result<Arc<Profile>> {
-        let store = ProfileStore::open(home, starters)?;
+        let store = ProfileStore::open_async(home, starters).await?;
         let fleet = RuntimeFleet::new_with_machines(registry, machines, store.clone(), ctx, background);
         Ok(Arc::new(Profile { store, fleet }))
     }
@@ -82,8 +89,8 @@ impl Profile {
         self.store.skills()
     }
 
-    pub fn templates(&self) -> Vec<AgentTemplate> {
-        self.store.templates()
+    pub async fn templates_async(&self) -> Vec<AgentTemplate> {
+        self.store.templates_async().await
     }
 
     pub fn runtimes(&self) -> Vec<RuntimeInfo> {
@@ -100,84 +107,77 @@ impl Profile {
         fleet.update_async(&id_owned, settings).await?.ok_or_else(|| no_runtime(id))
     }
 
-    pub async fn agent_create_async(&self, a: Agent) -> Result<Agent, ApiError> {
-        let p = self.store.clone();
-        run_blocking(move || p.create(a)).await
-    }
-
-    pub async fn agent_update_async(&self, a: Agent) -> Result<Agent, ApiError> {
-        let p = self.store.clone();
-        run_blocking(move || p.save(a)).await
-    }
-
-    pub async fn agent_delete_async(&self, id: &str) -> Result<(), ApiError> {
-        let p = self.store.clone();
-        let id = id.to_string();
-        run_blocking(move || p.remove(&id)).await
-    }
-
-    pub async fn agent_preview_delete_async(&self, id: &str) -> Result<Preview, ApiError> {
-        let p = self.store.clone();
-        let id = id.to_string();
-        run_blocking(move || p.preview_remove(&id)).await
-    }
-
-    pub async fn agent_template_install_async(&self, id: &str, runtime: Option<&str>) -> Result<Agent, ApiError> {
-        let p = self.store.clone();
-        let f = self.fleet.clone();
-        let id = id.to_string();
-        let runtime = runtime.map(str::to_string);
-        run_blocking(move || {
-            let override_cfg = p.template_of(&id).and_then(|item| resolve_install_runtime(&f, &item, runtime.as_deref()));
-            p.install_template_with_runtime(&id, override_cfg)
-        })
+    pub(crate) async fn runtime_setting_update_input_async(&self, r: vibevalley_protocol::RuntimeSettingUpdateInput) -> Result<RuntimeInfo, ApiError> {
+        self.runtime_setting_update_async(
+            &r.id,
+            RuntimeSettings {
+                enabled: r.enabled,
+                bin_path: r.bin_path,
+                default_model: r.default_model,
+                default_effort: r.default_effort,
+                env: r.env,
+                daily_budget: r.daily_budget,
+                max_working: r.max_working,
+            },
+        )
         .await
     }
 
+    pub async fn agent_create_async(&self, a: Agent) -> Result<Agent, ApiError> {
+        self.store.create_async(a).await
+    }
+
+    pub async fn agent_update_async(&self, a: Agent) -> Result<Agent, ApiError> {
+        self.store.save_async(a).await
+    }
+
+    pub async fn agent_delete_async(&self, id: &str) -> Result<(), ApiError> {
+        self.store.remove_async(id).await
+    }
+
+    pub fn agent_preview_delete(&self, id: &str) -> Result<Preview, ApiError> {
+        self.store.preview_remove(id)
+    }
+
+    pub async fn agent_template_install_async(&self, id: &str, runtime: Option<&str>) -> Result<Agent, ApiError> {
+        let override_cfg = self
+            .store
+            .template_of_async(id)
+            .await
+            .and_then(|item| resolve_install_runtime(&self.fleet, &item, runtime));
+        self.store.install_template_with_runtime_async(id, override_cfg).await
+    }
+
     pub async fn agent_template_update_async(&self, agent: &str) -> Result<Agent, ApiError> {
-        let p = self.store.clone();
-        let agent = agent.to_string();
-        run_blocking(move || p.update_from_template(&agent)).await
+        self.store.update_from_template_async(agent).await
     }
 
     pub async fn agent_template_add_async(&self, path: &str) -> Result<AgentTemplate, ApiError> {
-        let p = self.store.clone();
-        let path = path.to_string();
-        run_blocking(move || p.add_template(&path)).await
+        self.store.add_template_async(path).await
     }
 
     pub async fn agent_template_delete_async(&self, id: &str) -> Result<(), ApiError> {
-        let p = self.store.clone();
-        let id = id.to_string();
-        run_blocking(move || p.remove_template(&id)).await
+        self.store.remove_template_async(id).await
     }
 
     pub async fn agent_template_preview_delete_async(&self, id: &str) -> Result<Preview, ApiError> {
-        let p = self.store.clone();
-        let id = id.to_string();
-        run_blocking(move || p.preview_remove_template(&id)).await
+        self.store.preview_remove_template_async(id).await
     }
 
     pub async fn skill_create_async(&self, skill: Skill) -> Result<Skill, ApiError> {
-        let p = self.store.clone();
-        run_blocking(move || p.create_skill(skill)).await
+        self.store.create_skill_async(skill).await
     }
 
     pub async fn skill_update_async(&self, skill: Skill) -> Result<Skill, ApiError> {
-        let p = self.store.clone();
-        run_blocking(move || p.save_skill(skill)).await
+        self.store.save_skill_async(skill).await
     }
 
     pub async fn skill_delete_async(&self, id: &str) -> Result<(), ApiError> {
-        let p = self.store.clone();
-        let id = id.to_string();
-        run_blocking(move || p.remove_skill(&id)).await
+        self.store.remove_skill_async(id).await
     }
 
-    pub async fn skill_preview_delete_async(&self, id: &str) -> Result<Preview, ApiError> {
-        let p = self.store.clone();
-        let id = id.to_string();
-        run_blocking(move || p.preview_remove_skill(&id)).await
+    pub fn skill_preview_delete(&self, id: &str) -> Result<Preview, ApiError> {
+        self.store.preview_remove_skill(id)
     }
 
     pub async fn validate_async(&self, agents: &[Agent]) -> Vec<AgentValidation> {
@@ -190,12 +190,6 @@ impl Profile {
         }
         out
     }
-}
-
-async fn run_blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, ApiError> + Send + 'static) -> Result<T, ApiError> {
-    crate::log::spawn_blocking_traced(work)
-        .await
-        .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
 }
 
 fn no_runtime(id: &str) -> ApiError {

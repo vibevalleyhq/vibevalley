@@ -880,7 +880,7 @@ mod tests {
         let titles_late: Vec<&str> = list_late.iter().map(|i| i.title.as_str()).collect();
         assert_eq!(titles_late, vec!["explicit-since", "no-since"]);
 
-        board.close();
+        board.close_async().await;
         let _ = ctx.shutdown(Duration::from_secs(1)).await;
     }
 }

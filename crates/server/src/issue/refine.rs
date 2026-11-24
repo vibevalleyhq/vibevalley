@@ -44,12 +44,12 @@ impl Board {
             };
             (std::path::PathBuf::new(), branch, base)
         } else {
-            match wp.main_repo(issue.repo.as_deref())? {
+            match wp.main_repo_async(issue.repo.as_deref()).await? {
                 Some(main) => {
-                    let (dir, branch, base) = wp.fresh_worktree(&main, issue.number)?;
+                    let (dir, branch, base) = wp.fresh_worktree_async(&main, issue.number).await?;
                     (dir, Some(branch), Some(base))
                 }
-                None => (wp.context(&issue.id)?, None, None),
+                None => (wp.context_async(&issue.id).await?, None, None),
             }
         };
         let word = words.trim();
@@ -68,7 +68,7 @@ impl Board {
             issue
         };
         let name = format!("{} (draft #{})", drive.name, issue.number);
-        self.sessions()
+        self.session_engine()
             .hire_async(Hire {
                 issue: &issue,
                 name,
@@ -111,7 +111,7 @@ impl Board {
                 problem.clone(),
             ),
         };
-        let sessions = self.sessions();
+        let sessions = self.session_engine();
         let _ = sessions.end_run_async(&session.id, outcome, &said_back, spent.clone()).await;
         // What the issue's thread is told (`handedBack`).
         let name = |key: &str, extra: (&str, String)| vibevalley_i18n::t(key, &[("name", session.name.clone().into()), (extra.0, extra.1.into())]);

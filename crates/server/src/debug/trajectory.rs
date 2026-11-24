@@ -3,11 +3,11 @@
 //! DB/`LiveState` state, and on-disk `oar-voyage/3` JSONL records.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
-use serde_json::{Value, json};
+use serde::Serialize;
+use serde_json::Value;
 use vibevalley_protocol::{
     ApiError, BizCode, DebugTrajectoryDetail, DebugTrajectoryGetRequest, DebugTrajectoryKind, DebugTrajectoryRawEntry, DebugTrajectorySummary,
     DebugTrajectoryTurn, EventTokens, Issue, ORCHESTRATOR_RUNTIME, Phase, Session, SessionController, SessionEvent, SessionEventType,
@@ -169,24 +169,28 @@ pub(crate) fn extract_trajectory_index(issues: &[Issue], sessions: &[Session]) -
     index
 }
 
-fn voyage_record_path(home: &Path, id: &str) -> Option<PathBuf> {
+async fn voyage_record_path_async(home: &Path, id: &str) -> Option<PathBuf> {
     if !is_safe_id(id) {
         return None;
     }
-    let candidates = [
+    for candidate in [
         home.join("records").join(format!("{id}.jsonl")),
         home.join("issues").join("records").join(format!("{id}.jsonl")),
-    ];
-    candidates.into_iter().find(|p| p.is_file())
+    ] {
+        if tokio::fs::metadata(&candidate).await.is_ok_and(|m| m.is_file()) {
+            return Some(candidate);
+        }
+    }
+    None
 }
 
-fn scan_record_ids(home: &Path) -> Vec<String> {
+async fn scan_record_ids_async(home: &Path) -> Vec<String> {
     let mut ids = Vec::new();
     for dir in [home.join("records"), home.join("issues").join("records")] {
-        let Ok(entries) = std::fs::read_dir(&dir) else {
+        let Ok(mut entries) = tokio::fs::read_dir(&dir).await else {
             continue;
         };
-        for entry in entries.flatten() {
+        while let Ok(Some(entry)) = entries.next_entry().await {
             let path = entry.path();
             if path.extension().is_some_and(|e| e == "jsonl")
                 && let Some(stem) = path.file_stem().and_then(|s| s.to_str())
@@ -204,16 +208,21 @@ struct LoadedVoyage {
     records: Vec<VoyageRecord>,
 }
 
-fn load_voyage(home: &Path, id: &str) -> Option<LoadedVoyage> {
-    let path = voyage_record_path(home, id)?;
-    let file = File::open(&path).ok()?;
-    let mut reader = VoyageReader::new(BufReader::new(file)).ok()?;
-    let header = reader.header.clone();
-    let mut records = Vec::new();
-    while let Ok(Some(rec)) = reader.read() {
-        records.push(rec);
-    }
-    Some(LoadedVoyage { header, records })
+async fn load_voyage_async(home: &Path, id: &str) -> Option<LoadedVoyage> {
+    let path = voyage_record_path_async(home, id).await?;
+    let file = tokio::fs::File::open(&path).await.ok()?.into_std().await;
+    crate::log::spawn_blocking_traced(move || {
+        let mut reader = VoyageReader::new(BufReader::new(file)).ok()?;
+        let header = reader.header.clone();
+        let mut records = Vec::new();
+        while let Ok(Some(rec)) = reader.read() {
+            records.push(rec);
+        }
+        Some(LoadedVoyage { header, records })
+    })
+    .await
+    .ok()
+    .flatten()
 }
 
 fn merge_tokens(dst: &mut Option<EventTokens>, src: &EventTokens) {
@@ -850,7 +859,7 @@ fn build_turns(events: Vec<SessionEvent>, voyage: Option<&LoadedVoyage>, redacto
     (turns, subagent_paths)
 }
 
-pub(crate) fn build_detail(
+pub(crate) async fn build_detail_async(
     home: &Path,
     meta: Option<&SessionStateMeta>,
     sources: &dyn DebugDataSource,
@@ -864,7 +873,7 @@ pub(crate) fn build_detail(
         return Err(ApiError::new(BizCode::InvalidInput, "invalid trajectory id"));
     }
     let events = sources.trajectory_events(id);
-    let voyage = load_voyage(home, id);
+    let voyage = load_voyage_async(home, id).await;
     let exists_in_state = meta.is_some_and(|m| m.exists || m.in_issue_history);
     let is_orchestrator_profile = orchestrator_ids.iter().any(|o| o == id);
     if !exists_in_state && events.is_empty() && voyage.is_none() && !is_orchestrator_profile {
@@ -935,7 +944,7 @@ pub(crate) fn build_detail(
     })
 }
 
-fn build_summary(
+async fn build_summary_async(
     home: &Path,
     id: &str,
     meta: Option<&SessionStateMeta>,
@@ -948,7 +957,7 @@ fn build_summary(
         return None;
     }
     let events = sources.trajectory_events(id);
-    let voyage = load_voyage(home, id);
+    let voyage = load_voyage_async(home, id).await;
     let exists_in_state = meta.is_some_and(|m| m.exists || m.in_issue_history);
     let is_orchestrator_profile = orchestrator_ids.iter().any(|o| o == id);
     if !exists_in_state && events.is_empty() && voyage.is_none() && !is_orchestrator_profile {
@@ -1096,7 +1105,7 @@ fn build_summary(
     })
 }
 
-pub(crate) fn list_summaries(
+pub(crate) async fn list_summaries_async(
     home: &Path,
     index: &StateTrajectoryIndex,
     sources: &dyn DebugDataSource,
@@ -1111,14 +1120,14 @@ pub(crate) fn list_summaries(
     for id in sources.open_trajectory_ids() {
         ids.insert(id);
     }
-    for id in scan_record_ids(home) {
+    for id in scan_record_ids_async(home).await {
         ids.insert(id);
     }
 
     let mut out = Vec::with_capacity(ids.len());
     for id in ids {
         let meta = index.sessions.get(&id);
-        if let Some(summary) = build_summary(home, &id, meta, sources, redactor, orchestrator_ids, redacted_count) {
+        if let Some(summary) = build_summary_async(home, &id, meta, sources, redactor, orchestrator_ids, redacted_count).await {
             out.push(summary);
         }
     }
@@ -1126,15 +1135,21 @@ pub(crate) fn list_summaries(
     out
 }
 
-pub(crate) fn export_snapshot(
+#[derive(Serialize)]
+pub(crate) struct TrajectoryExport {
+    summaries: Vec<DebugTrajectorySummary>,
+    details: BTreeMap<String, DebugTrajectoryDetail>,
+}
+
+pub(crate) async fn export_snapshot_async(
     home: &Path,
     index: &StateTrajectoryIndex,
     sources: &dyn DebugDataSource,
     redactor: &Redactor,
     orchestrator_ids: &[String],
     redacted_count: &mut u32,
-) -> Value {
-    let summaries = list_summaries(home, index, sources, redactor, orchestrator_ids, redacted_count);
+) -> TrajectoryExport {
+    let summaries = list_summaries_async(home, index, sources, redactor, orchestrator_ids, redacted_count).await;
     let mut details = BTreeMap::new();
     for summary in summaries.iter().take(20) {
         let req = DebugTrajectoryGetRequest {
@@ -1142,12 +1157,9 @@ pub(crate) fn export_snapshot(
             kind: Some(summary.kind),
         };
         let meta = index.sessions.get(&summary.id);
-        if let Ok(detail) = build_detail(home, meta, sources, redactor, &req, orchestrator_ids, redacted_count) {
+        if let Ok(detail) = build_detail_async(home, meta, sources, redactor, &req, orchestrator_ids, redacted_count).await {
             details.insert(summary.id.clone(), detail);
         }
     }
-    json!({
-        "summaries": summaries,
-        "details": details,
-    })
+    TrajectoryExport { summaries, details }
 }

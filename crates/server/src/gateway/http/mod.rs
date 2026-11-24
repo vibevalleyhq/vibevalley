@@ -307,14 +307,17 @@ async fn mcp(State(state): State<HttpState>, _local: LocalOnly, headers: HeaderM
     let Some(door) = state.ports().mcp else {
         return refuse(BizCode::ServiceUnavailable, "no MCP here");
     };
-    let Ok(message) = serde_json::from_slice::<Value>(&body) else {
+    let Ok(message_json) = std::str::from_utf8(&body) else {
         let error = json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "parse error" } });
         return (StatusCode::BAD_REQUEST, axum::Json(error)).into_response();
     };
-    let answered = crate::gateway::api::dispatch_mcp_message_async(door, token, message).await;
-    match answered {
-        Some(answer) => (StatusCode::OK, axum::Json(answer)).into_response(),
-        None => StatusCode::ACCEPTED.into_response(),
+    match crate::gateway::api::dispatch_mcp_message_async(door, token, message_json.to_string()).await {
+        Ok(Some(answer_json)) => (StatusCode::OK, [("content-type", "application/json")], answer_json).into_response(),
+        Ok(None) => StatusCode::ACCEPTED.into_response(),
+        Err(_) => {
+            let error = json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "parse error" } });
+            (StatusCode::BAD_REQUEST, axum::Json(error)).into_response()
+        }
     }
 }
 

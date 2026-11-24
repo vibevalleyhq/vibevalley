@@ -8,7 +8,6 @@ use vibevalley_protocol::{ApiError, MediaInputReference};
 use super::Stop;
 use super::job::{Media, refused};
 use super::vendor::{Account, Outcome, Uploaded};
-use crate::log::spawn_blocking_traced;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -97,8 +96,8 @@ impl Media {
             return Err(Outcome::NotSubmitted);
         }
         let path = content.path;
-        let file = match spawn_blocking_traced(move || std::fs::File::open(&path)).await {
-            Ok(Ok(file)) => file,
+        let file = match tokio::fs::File::open(&path).await {
+            Ok(file) => file,
             _ => {
                 let _ = self
                     .note_async(id, |r| {

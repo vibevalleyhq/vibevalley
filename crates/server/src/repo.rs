@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -144,31 +144,6 @@ async fn run_async(program: &str, args: &[&str], cwd: Option<&Path>, env: &[(&st
     }
 }
 
-fn run(program: &str, args: &[&str], cwd: Option<&Path>, env: &[(&str, &str)]) -> Run {
-    let mut c = Command::new(program);
-    c.args(args).stdin(Stdio::null());
-    if let Some(cwd) = cwd {
-        c.current_dir(cwd);
-    }
-    for (k, v) in env {
-        c.env(k, v);
-    }
-    match c.output() {
-        Ok(o) => Run {
-            ok: o.status.success(),
-            out: String::from_utf8_lossy(&o.stdout).into_owned(),
-            err: String::from_utf8_lossy(&o.stderr).into_owned(),
-            missing: false,
-        },
-        Err(e) => Run {
-            ok: false,
-            out: String::new(),
-            err: e.to_string(),
-            missing: e.kind() == std::io::ErrorKind::NotFound,
-        },
-    }
-}
-
 fn open_repo(cwd: &Path) -> Option<vibevalley_git::Repo> {
     vibevalley_git::Repo::discover(cwd).ok().flatten()
 }
@@ -274,12 +249,6 @@ async fn gh_async(args: &[&str]) -> Run {
     r
 }
 
-fn gh(args: &[&str]) -> Run {
-    let mut r = run("gh", args, None, &[("GH_HOST", "github.com"), ("GH_PROMPT_DISABLED", "1")]);
-    r.out = format!("{}{}", r.out, r.err);
-    r
-}
-
 fn parse_github_probe(version: Run, auth: Option<Run>) -> GitHubStatus {
     let mut s = GitHubStatus {
         checked_at: now(),
@@ -328,16 +297,6 @@ pub async fn probe_github_async() -> GitHubStatus {
     parse_github_probe(version, Some(auth))
 }
 
-/// Probes local `gh` installation and authentication status synchronously.
-pub fn probe_github() -> GitHubStatus {
-    let version = gh(&["--version"]);
-    if !version.ok {
-        return parse_github_probe(version, None);
-    }
-    let auth = gh(&["auth", "status", "--hostname", "github.com", "--active"]);
-    parse_github_probe(version, Some(auth))
-}
-
 /// A folder under the repos root.
 #[derive(Debug, Clone)]
 pub struct RepoFolder {
@@ -361,9 +320,9 @@ pub struct Repo {
 
 impl Repo {
     /// Opens `<work_root>/repos` (creating it when missing).
-    pub fn open(work_root: &Path, per_repo: usize) -> std::io::Result<Arc<Repo>> {
+    pub async fn open_async(work_root: &Path, per_repo: usize) -> std::io::Result<Arc<Repo>> {
         let root = work_root.join("repos");
-        std::fs::create_dir_all(&root)?;
+        tokio::fs::create_dir_all(&root).await?;
         Ok(Arc::new(Repo {
             root,
             per_repo,
@@ -402,13 +361,6 @@ impl Repo {
         }
     }
 
-    pub fn close(&self) {
-        self.cancel.cancel();
-        if let Some(handle) = self.probe.lock().take() {
-            handle.abort();
-        }
-    }
-
     pub fn root(&self) -> &Path {
         &self.root
     }
@@ -419,25 +371,12 @@ impl Repo {
     }
 
     /// Lists folders under the root; symlinks are ignored.
-    pub fn list(&self) -> Vec<RepoFolder> {
-        let pending = self.pending.lock().clone();
-        list_folders(&self.root, &pending)
-    }
-
     pub async fn list_async(&self) -> Vec<RepoFolder> {
-        let root = self.root.clone();
         let pending = self.pending.lock().clone();
-        crate::log::spawn_blocking_traced(move || list_folders(&root, &pending))
-            .await
-            .unwrap_or_default()
-    }
-
-    pub fn find(&self, name: &str) -> Option<RepoFolder> {
-        self.list().into_iter().find(|p| p.name == name)
+        list_folders_async(&self.root, &pending).await
     }
 
     pub async fn find_async(&self, name: &str) -> Option<RepoFolder> {
-        let name = name.to_string();
         self.list_async().await.into_iter().find(|p| p.name == name)
     }
 
@@ -520,11 +459,6 @@ impl Repo {
         out.into_iter().map(|(_, s)| s).collect()
     }
 
-    /// Ensures `<root>/<name>` exists as a git repository with an initial commit.
-    pub fn ensure(&self, name: &str) -> Result<PathBuf, ApiError> {
-        ensure_under(&self.root, name)
-    }
-
     /// Creates a new repository by name, either empty or cloned from GitHub.
     pub async fn create_async(&self, req: &NewRepo) -> Result<RepoFolder, ApiError> {
         let problem = repo_problem(req);
@@ -532,21 +466,13 @@ impl Repo {
             return Err(refused(problem));
         }
         let path = self.root.join(&req.name);
-        {
-            let path = path.clone();
-            let name = req.name.clone();
-            crate::log::spawn_blocking_traced(move || {
-                std::fs::create_dir(&path).map_err(|e| {
-                    refused(if e.kind() == std::io::ErrorKind::AlreadyExists {
-                        t("server.repo.exists", &[("name", name.into())])
-                    } else {
-                        e.to_string()
-                    })
-                })
+        tokio::fs::create_dir(&path).await.map_err(|e| {
+            refused(if e.kind() == std::io::ErrorKind::AlreadyExists {
+                t("server.repo.exists", &[("name", req.name.clone().into())])
+            } else {
+                e.to_string()
             })
-            .await
-            .map_err(|e| refused(e.to_string()))??;
-        }
+        })?;
         self.pending.lock().insert(req.name.clone());
         struct PendingGuard<'a> {
             pending: &'a Mutex<std::collections::HashSet<String>>,
@@ -585,20 +511,12 @@ impl Repo {
                 .and_then(|r| r)
             }
         } else {
-            let root = self.root.clone();
-            let name = req.name.clone();
-            crate::log::spawn_blocking_traced(move || ensure_under(&root, &name).map(|_| ()))
-                .await
-                .map_err(|e| refused(e.to_string()))
-                .and_then(|r| r)
+            ensure_under_async(&self.root, &req.name).await.map(|_| ())
         };
         drop(_pending_guard);
         match made {
             Ok(()) => {
-                let path_for_canon = path.clone();
-                let canonical = crate::log::spawn_blocking_traced(move || std::fs::canonicalize(&path_for_canon).unwrap_or(path_for_canon))
-                    .await
-                    .unwrap_or(path);
+                let canonical = tokio::fs::canonicalize(&path).await.unwrap_or(path);
                 Ok(RepoFolder {
                     name: req.name.clone(),
                     path: canonical,
@@ -606,11 +524,7 @@ impl Repo {
                 })
             }
             Err(e) => {
-                let path_for_rm = path;
-                let _ = crate::log::spawn_blocking_traced(move || {
-                    let _ = std::fs::remove_dir_all(&path_for_rm);
-                })
-                .await;
+                let _ = tokio::fs::remove_dir_all(&path).await;
                 Err(e)
             }
         }
@@ -867,33 +781,32 @@ impl Repo {
     /// Detects the project stack for `name`, returning `None` when no such repo exists.
     pub async fn stack_async(&self, name: &str) -> Option<RepoStack> {
         let p = self.find_async(name).await?;
-        crate::log::spawn_blocking_traced(move || {
-            let files: std::collections::HashMap<&str, String> = STACK_FILES
-                .iter()
-                .filter_map(|f| std::fs::read_to_string(p.path.join(f)).ok().map(|body| (*f, body)))
-                .collect();
-            stack_of(&files)
-        })
-        .await
-        .ok()
+        let mut owned: Vec<(&'static str, String)> = Vec::new();
+        for f in STACK_FILES {
+            if let Ok(body) = tokio::fs::read_to_string(p.path.join(f)).await {
+                owned.push((f, body));
+            }
+        }
+        let files: std::collections::HashMap<&str, String> = owned.into_iter().collect();
+        Some(stack_of(&files))
     }
 }
 
-fn list_folders(root: &Path, pending: &std::collections::HashSet<String>) -> Vec<RepoFolder> {
-    let Ok(entries) = std::fs::read_dir(root) else { return vec![] };
-    let mut out: Vec<RepoFolder> = entries
-        .filter_map(Result::ok)
-        .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
-        .filter_map(|e| {
-            let name = e.file_name().into_string().ok()?;
-            if name.starts_with('.') || pending.contains(&name) {
-                return None;
-            }
-            let path = std::fs::canonicalize(e.path()).ok()?;
-            let git = path.join(".git").exists();
-            Some(RepoFolder { name, path, git })
-        })
-        .collect();
+async fn list_folders_async(root: &Path, pending: &std::collections::HashSet<String>) -> Vec<RepoFolder> {
+    let Ok(mut entries) = tokio::fs::read_dir(root).await else { return vec![] };
+    let mut out = Vec::new();
+    while let Ok(Some(e)) = entries.next_entry().await {
+        if !e.file_type().await.is_ok_and(|t| t.is_dir()) {
+            continue;
+        }
+        let Ok(name) = e.file_name().into_string() else { continue };
+        if name.starts_with('.') || pending.contains(&name) {
+            continue;
+        }
+        let Ok(path) = tokio::fs::canonicalize(e.path()).await else { continue };
+        let git = tokio::fs::try_exists(path.join(".git")).await.unwrap_or(false);
+        out.push(RepoFolder { name, path, git });
+    }
     out.sort_by(|a, b| a.name.cmp(&b.name));
     out
 }
@@ -914,30 +827,57 @@ fn summary_of(p: RepoFolder, max_sessions: i64, pull_request: PullRequestCapabil
     }
 }
 
-fn ensure_under(repos_root: &Path, name: &str) -> Result<PathBuf, ApiError> {
+async fn ensure_under_async(repos_root: &Path, name: &str) -> Result<PathBuf, ApiError> {
     if !good_name(name) {
         return Err(refused(t("server.repo.notRepoName", &[("name", name.into())])));
     }
     let made = repos_root.join(name);
-    std::fs::create_dir_all(&made).map_err(|e| refused(e.to_string()))?;
-    let path = std::fs::canonicalize(&made).map_err(|e| refused(e.to_string()))?;
-    let root = std::fs::canonicalize(repos_root).map_err(|e| refused(e.to_string()))?;
+    tokio::fs::create_dir_all(&made).await.map_err(|e| refused(e.to_string()))?;
+    let path = tokio::fs::canonicalize(&made).await.map_err(|e| refused(e.to_string()))?;
+    let root = tokio::fs::canonicalize(repos_root).await.map_err(|e| refused(e.to_string()))?;
     if path.parent() != Some(root.as_path()) {
         return Err(refused(t("server.repo.outside", &[])));
     }
-    if !path.join(".git").exists() {
-        vibevalley_git::init(&path, Some("main")).map_err(|e| refused(reason(&e.to_string())))?;
-        if !path.join(".gitignore").exists() {
-            std::fs::write(path.join(".gitignore"), GITIGNORE).map_err(|e| refused(e.to_string()))?;
+    if !tokio::fs::try_exists(path.join(".git")).await.unwrap_or(false) {
+        let p_git = path.clone();
+        crate::log::spawn_blocking_traced(move || vibevalley_git::init(&p_git, Some("main")).map_err(|e| refused(reason(&e.to_string()))))
+            .await
+            .map_err(|e| refused(e.to_string()))??;
+        if !tokio::fs::try_exists(path.join(".gitignore")).await.unwrap_or(false) {
+            tokio::fs::write(path.join(".gitignore"), GITIGNORE).await.map_err(|e| refused(e.to_string()))?;
         }
-        let others = std::fs::read_dir(&path).map(|d| d.filter_map(Result::ok).filter(|e| e.file_name() != ".git").count());
-        if others.unwrap_or(0) <= 1 {
-            std::fs::write(path.join("README.md"), format!("# {name}\n")).map_err(|e| refused(e.to_string()))?;
+        let mut others = 0usize;
+        if let Ok(mut d) = tokio::fs::read_dir(&path).await {
+            while let Ok(Some(e)) = d.next_entry().await {
+                if e.file_name() != ".git" {
+                    others += 1;
+                }
+            }
         }
-        git(&path, &["add", "-A"])?;
-        commit(&path, &t("server.repo.commit.initial", &[]))?;
-    } else if !git_raw(&path, &["rev-parse", "--verify", "HEAD"]).is_ok_and(|r| r.ok()) {
-        commit(&path, &t("server.repo.commit.initialShort", &[]))?;
+        if others <= 1 {
+            tokio::fs::write(path.join("README.md"), format!("# {name}\n"))
+                .await
+                .map_err(|e| refused(e.to_string()))?;
+        }
+        let p_commit = path.clone();
+        let initial = t("server.repo.commit.initial", &[]);
+        crate::log::spawn_blocking_traced(move || {
+            git(&p_commit, &["add", "-A"])?;
+            commit(&p_commit, &initial)
+        })
+        .await
+        .map_err(|e| refused(e.to_string()))??;
+    } else {
+        let p_check = path.clone();
+        let initial_short = t("server.repo.commit.initialShort", &[]);
+        crate::log::spawn_blocking_traced(move || {
+            if !git_raw(&p_check, &["rev-parse", "--verify", "HEAD"]).is_ok_and(|r| r.ok()) {
+                commit(&p_check, &initial_short)?;
+            }
+            Ok::<_, ApiError>(())
+        })
+        .await
+        .map_err(|e| refused(e.to_string()))??;
     }
     Ok(path)
 }
@@ -961,20 +901,27 @@ fn repo_ref(id: &str) -> ApiError {
 const SKIP_DIRS: [&str; 8] = ["node_modules", ".git", ".venv", "vendor", "dist", "build", "target", ".next"];
 
 /// Finds git repositories under `dir` up to `depth` folders deep without descending into a repo.
-fn repo_dirs(dir: &Path, depth: usize) -> Vec<PathBuf> {
-    let Ok(entries) = std::fs::read_dir(dir) else { return vec![] };
-    let entries: Vec<_> = entries.flatten().collect();
-    if entries.iter().any(|e| e.file_name() == ".git") {
-        return vec![dir.to_path_buf()];
-    }
-    if depth == 0 {
-        return vec![];
-    }
-    let mut out = vec![];
-    for e in entries {
-        let name = e.file_name();
-        if e.file_type().is_ok_and(|t| t.is_dir()) && !SKIP_DIRS.iter().any(|s| name == *s) {
-            out.extend(repo_dirs(&e.path(), depth - 1));
+async fn repo_dirs_async(root: &Path, max_depth: usize) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut stack = vec![(root.to_path_buf(), max_depth)];
+    while let Some((dir, depth)) = stack.pop() {
+        let Ok(mut rd) = tokio::fs::read_dir(&dir).await else { continue };
+        let mut entries = Vec::new();
+        while let Ok(Some(e)) = rd.next_entry().await {
+            entries.push(e);
+        }
+        if entries.iter().any(|e| e.file_name() == ".git") {
+            out.push(dir);
+            continue;
+        }
+        if depth == 0 {
+            continue;
+        }
+        for e in entries {
+            let name = e.file_name();
+            if e.file_type().await.is_ok_and(|t| t.is_dir()) && !SKIP_DIRS.iter().any(|s| name == *s) {
+                stack.push((e.path(), depth - 1));
+            }
         }
     }
     out.sort();
@@ -994,7 +941,7 @@ fn global_email() -> String {
 /// Counts the user's commits in each repository under `root`
 /// (matching global `user.email`, repo `user.email`, and `extra`).
 pub async fn contributions_of_async(root: PathBuf, extra: Vec<String>) -> Vec<vibevalley_protocol::Repo> {
-    let dirs = crate::log::spawn_blocking_traced(move || repo_dirs(&root, 3)).await.unwrap_or_default();
+    let dirs = repo_dirs_async(&root, 3).await;
     if dirs.is_empty() {
         return vec![];
     }
@@ -1278,7 +1225,7 @@ mod tests {
         let init = std::process::Command::new("git").args(["init", "-q"]).current_dir(&repo_dir).status().unwrap();
         assert!(init.success());
         std::fs::write(repo_dir.join("pyproject.toml"), "[tool.ruff]\n").unwrap();
-        let repo = Repo::open(work.path(), 3).unwrap();
+        let repo = Repo::open_async(work.path(), 3).await.unwrap();
         let detected = repo.stack_async("pyapp").await.unwrap();
         assert_eq!(detected.name, "python");
         assert_eq!(detected.lint.as_deref(), Some("ruff check ."));
@@ -1288,7 +1235,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn async_repo_handlers_and_contributions_run_on_repo() {
         let work = tempfile::tempdir().unwrap();
-        let repo = Repo::open(work.path(), 3).unwrap();
+        let repo = Repo::open_async(work.path(), 3).await.unwrap();
 
         let created = repo
             .create_repo_async(&NewRepo {

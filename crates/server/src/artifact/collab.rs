@@ -6,7 +6,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tokio::sync::broadcast;
 use vibevalley_core::artifact::{apply_json_merge_patch, infer_mime, is_text_mime, parse_manifest, serialize_manifest, validate_artifact_path};
@@ -1031,170 +1030,150 @@ impl Manager {
         self.get_async(&row.id).await
     }
 
-    pub async fn dispatch_subscription_async(self: &Arc<Self>, name: &str, payload: Value, sink: Sink) -> Result<(), ApiError> {
-        match name {
-            "artifact.follow" => {
-                #[derive(serde::Deserialize)]
-                struct Input {
-                    id: String,
-                    #[serde(default)]
-                    after: i64,
-                }
-                let input: Input = serde_json::from_value(payload).map_err(|e| refused(e.to_string()))?;
-                let row = self.row_async(&input.id).await?;
-                let mut rx = self.changes.subscribe();
+    pub async fn follow_files_async(self: &Arc<Self>, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
+        let row = self.row_async(id).await?;
+        let mut rx = self.changes.subscribe();
 
-                let mut last_seq = input.after;
-                if row.seq > input.after {
-                    let changes = self
-                        .ctx
-                        .service
-                        .artifact
-                        .file_changes_after(&row.id, input.after, CHANGE_EVENT_HISTORY_LIMIT + 1)
-                        .await
-                        .map_err(q)?;
-                    if changes.len() > CHANGE_EVENT_HISTORY_LIMIT as usize {
-                        let _ = sink.send(&ArtifactEvent::Reset {});
-                        last_seq = row.seq;
-                    } else {
-                        let current_metas: HashMap<String, ArtifactFileMeta> = self
-                            .storage
-                            .artifact
-                            .list_files_async(&row.id, None)
-                            .await?
-                            .into_iter()
-                            .map(|m| (m.path.clone(), m))
-                            .collect();
-                        for change in changes {
-                            let files = change.paths.iter().filter_map(|p| current_metas.get(p).cloned()).collect();
-                            let _ = sink.send(&ArtifactEvent::Files {
-                                seq: change.seq,
-                                files,
-                                deleted: change.deleted,
-                                origin: Some(change.actor),
-                                frontiers: change.frontiers,
-                            });
-                            last_seq = last_seq.max(change.seq);
-                        }
-                    }
+        let mut last_seq = after;
+        if row.seq > after {
+            let changes = self
+                .ctx
+                .service
+                .artifact
+                .file_changes_after(&row.id, after, CHANGE_EVENT_HISTORY_LIMIT + 1)
+                .await
+                .map_err(q)?;
+            if changes.len() > CHANGE_EVENT_HISTORY_LIMIT as usize {
+                let _ = sink.send(&ArtifactEvent::Reset {});
+                last_seq = row.seq;
+            } else {
+                let current_metas: HashMap<String, ArtifactFileMeta> = self
+                    .storage
+                    .artifact
+                    .list_files_async(&row.id, None)
+                    .await?
+                    .into_iter()
+                    .map(|m| (m.path.clone(), m))
+                    .collect();
+                for change in changes {
+                    let files = change.paths.iter().filter_map(|p| current_metas.get(p).cloned()).collect();
+                    let _ = sink.send(&ArtifactEvent::Files {
+                        seq: change.seq,
+                        files,
+                        deleted: change.deleted,
+                        origin: Some(change.actor),
+                        frontiers: change.frontiers,
+                    });
+                    last_seq = last_seq.max(change.seq);
                 }
-
-                let artifact_id = row.id;
-                let sink_task = self.ctx.clone();
-                sink_task.spawn("artifact.follow", async move {
-                    loop {
-                        tokio::select! {
-                            biased;
-                            _ = sink.stop.recv_async() => return,
-                            msg = rx.recv() => match msg {
-                                Ok((id, ev)) => {
-                                    if id == artifact_id {
-                                        if let ArtifactEvent::Files { seq, .. } = &ev {
-                                            if *seq <= last_seq {
-                                                continue;
-                                            }
-                                            last_seq = *seq;
-                                        }
-                                        if !sink.send(&ev) {
-                                            return;
-                                        }
-                                    }
-                                }
-                                Err(broadcast::error::RecvError::Lagged(_)) => {
-                                    if !sink.send(&ArtifactEvent::Reset {}) {
-                                        return;
-                                    }
-                                }
-                                Err(broadcast::error::RecvError::Closed) => return,
-                            }
-                        }
-                    }
-                });
-                Ok(())
             }
-            "artifact.suggestion.follow" => {
-                #[derive(serde::Deserialize)]
-                struct Input {
-                    id: String,
-                }
-                let input: Input = serde_json::from_value(payload).map_err(|e| refused(e.to_string()))?;
-                let initial = self.suggestions_async(&input.id).await?;
-                let _ = sink.send(&SuggestionEvent {
-                    tag: SuggestionEventKind::Suggestions,
-                    suggestions: initial,
-                });
-                let mut rx = self.suggestion_events.subscribe();
-                let artifact_id = input.id;
-                self.ctx.spawn("artifact.suggestion.follow", async move {
-                    loop {
-                        tokio::select! {
-                            biased;
-                            _ = sink.stop.recv_async() => return,
-                            msg = rx.recv() => match msg {
-                                Ok((id, ev)) => {
-                                    if id == artifact_id && !sink.send(&ev) {
-                                        return;
-                                    }
-                                }
-                                Err(broadcast::error::RecvError::Lagged(_)) => continue,
-                                Err(broadcast::error::RecvError::Closed) => return,
-                            }
-                        }
-                    }
-                });
-                Ok(())
-            }
-            "artifact.presence.follow" => {
-                #[derive(serde::Deserialize)]
-                struct Input {
-                    id: String,
-                }
-                let input: Input = serde_json::from_value(payload).map_err(|e| refused(e.to_string()))?;
-                let _ = self.row_async(&input.id).await?;
-                let room = self.presence_room(&input.id);
-                let initial = self.presence_snapshot_of(&room);
-                let _ = sink.send(&ArtifactPresenceEvent::Snapshot { peers: initial });
-                let mut rx = self.presence_events.subscribe();
-                let artifact_id = input.id;
-                let this = self.clone();
-                self.ctx.spawn("artifact.presence.follow", async move {
-                    let mut ticker = tokio::time::interval(PRESENCE_EVICT_INTERVAL);
-                    loop {
-                        tokio::select! {
-                            biased;
-                            _ = sink.stop.recv_async() => return,
-                            _ = ticker.tick() => {
-                                let evicted = room.hub.evict_stale(this.ctx.now());
-                                if !evicted.is_empty() {
-                                    room.meta.lock().retain(|k, _| !evicted.contains(k));
-                                    for peer_id in evicted {
-                                        if !sink.send(&ArtifactPresenceEvent::Remove { peer_id }) {
-                                            return;
-                                        }
-                                    }
-                                }
-                            }
-                            msg = rx.recv() => match msg {
-                                Ok((id, ev)) => {
-                                    if id == artifact_id && !sink.send(&ev) {
-                                        return;
-                                    }
-                                }
-                                Err(broadcast::error::RecvError::Lagged(_)) => {
-                                    let peers = this.presence_snapshot_of(&room);
-                                    if !sink.send(&ArtifactPresenceEvent::Snapshot { peers }) {
-                                        return;
-                                    }
-                                }
-                                Err(broadcast::error::RecvError::Closed) => return,
-                            }
-                        }
-                    }
-                });
-                Ok(())
-            }
-            _ => Err(refused(format!("unknown artifact subscription `{name}`"))),
         }
+
+        let artifact_id = row.id;
+        let sink_task = self.ctx.clone();
+        sink_task.spawn("artifact.follow", async move {
+            loop {
+                tokio::select! {
+                    biased;
+                    _ = sink.stop.recv_async() => return,
+                    msg = rx.recv() => match msg {
+                        Ok((id, ev)) => {
+                            if id == artifact_id {
+                                if let ArtifactEvent::Files { seq, .. } = &ev {
+                                    if *seq <= last_seq {
+                                        continue;
+                                    }
+                                    last_seq = *seq;
+                                }
+                                if !sink.send(&ev) {
+                                    return;
+                                }
+                            }
+                        }
+                        Err(broadcast::error::RecvError::Lagged(_)) => {
+                            if !sink.send(&ArtifactEvent::Reset {}) {
+                                return;
+                            }
+                        }
+                        Err(broadcast::error::RecvError::Closed) => return,
+                    }
+                }
+            }
+        });
+        Ok(())
+    }
+
+    pub async fn follow_suggestions_async(self: &Arc<Self>, id: &str, sink: Sink) -> Result<(), ApiError> {
+        let initial = self.suggestions_async(id).await?;
+        let _ = sink.send(&SuggestionEvent {
+            tag: SuggestionEventKind::Suggestions,
+            suggestions: initial,
+        });
+        let mut rx = self.suggestion_events.subscribe();
+        let artifact_id = id.to_string();
+        self.ctx.spawn("artifact.suggestion.follow", async move {
+            loop {
+                tokio::select! {
+                    biased;
+                    _ = sink.stop.recv_async() => return,
+                    msg = rx.recv() => match msg {
+                        Ok((id, ev)) => {
+                            if id == artifact_id && !sink.send(&ev) {
+                                return;
+                            }
+                        }
+                        Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                        Err(broadcast::error::RecvError::Closed) => return,
+                    }
+                }
+            }
+        });
+        Ok(())
+    }
+
+    pub async fn follow_presence_async(self: &Arc<Self>, id: &str, sink: Sink) -> Result<(), ApiError> {
+        let _ = self.row_async(id).await?;
+        let room = self.presence_room(id);
+        let initial = self.presence_snapshot_of(&room);
+        let _ = sink.send(&ArtifactPresenceEvent::Snapshot { peers: initial });
+        let mut rx = self.presence_events.subscribe();
+        let artifact_id = id.to_string();
+        let this = self.clone();
+        self.ctx.spawn("artifact.presence.follow", async move {
+            let mut ticker = tokio::time::interval(PRESENCE_EVICT_INTERVAL);
+            loop {
+                tokio::select! {
+                    biased;
+                    _ = sink.stop.recv_async() => return,
+                    _ = ticker.tick() => {
+                        let evicted = room.hub.evict_stale(this.ctx.now());
+                        if !evicted.is_empty() {
+                            room.meta.lock().retain(|k, _| !evicted.contains(k));
+                            for peer_id in evicted {
+                                if !sink.send(&ArtifactPresenceEvent::Remove { peer_id }) {
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    msg = rx.recv() => match msg {
+                        Ok((id, ev)) => {
+                            if id == artifact_id && !sink.send(&ev) {
+                                return;
+                            }
+                        }
+                        Err(broadcast::error::RecvError::Lagged(_)) => {
+                            let peers = this.presence_snapshot_of(&room);
+                            if !sink.send(&ArtifactPresenceEvent::Snapshot { peers }) {
+                                return;
+                            }
+                        }
+                        Err(broadcast::error::RecvError::Closed) => return,
+                    }
+                }
+            }
+        });
+        Ok(())
     }
 }
 

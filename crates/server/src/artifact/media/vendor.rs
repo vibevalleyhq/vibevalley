@@ -467,13 +467,16 @@ pub enum TranscriptionEvent {
 }
 
 /// MOSS vendor adapter routed through [`Fetch`].
+#[derive(Debug, Clone)]
+pub struct MossBody(Value);
+
 #[derive(Clone)]
 pub struct Moss {
     pub fetch: Arc<dyn Fetch>,
 }
 
-fn json_body(v: &Value) -> Option<(String, Box<dyn Read + Send>)> {
-    Some(("application/json".into(), Box::new(std::io::Cursor::new(v.to_string().into_bytes()))))
+fn json_body(v: &MossBody) -> Option<(String, Box<dyn Read + Send>)> {
+    Some(("application/json".into(), Box::new(std::io::Cursor::new(v.0.to_string().into_bytes()))))
 }
 
 /// One multipart form field or file part.
@@ -610,7 +613,7 @@ impl Moss {
         validate_image_prompt(r).map(|_| ())
     }
 
-    pub fn prepare_image(model: &str, r: &MediaImageRequest) -> Result<Value, VendorError> {
+    pub fn prepare_image(model: &str, r: &MediaImageRequest) -> Result<MossBody, VendorError> {
         if !IMAGE_MODELS.contains(&model) {
             return Err(invalid_input());
         }
@@ -636,10 +639,10 @@ impl Moss {
         if let Some(neg) = &r.negative_prompt {
             body["negative_prompt"] = json!(neg);
         }
-        Ok(body)
+        Ok(MossBody(body))
     }
 
-    pub async fn image(&self, key: &str, body: &Value, width: i64, height: i64, stop: &Stop) -> Result<(String, MediaImageUsage), VendorError> {
+    pub async fn image(&self, key: &str, body: &MossBody, width: i64, height: i64, stop: &Stop) -> Result<(String, MediaImageUsage), VendorError> {
         let r: WireImageResponse = self
             .call(VendorCall {
                 key,
@@ -661,7 +664,7 @@ impl Moss {
         Ok((url.clone(), MediaImageUsage { images: 1, width, height }))
     }
 
-    pub fn prepare_speech(model: &str, text: &str, voice: &str, format: &str) -> Result<Value, VendorError> {
+    pub fn prepare_speech(model: &str, text: &str, voice: &str, format: &str) -> Result<MossBody, VendorError> {
         let pro = model.starts_with("moss-tts-1.0-pro");
         let pauses_ok = if pro {
             !text.contains("[pause")
@@ -674,7 +677,9 @@ impl Moss {
         if !SPEECH_MODELS.contains(&model) || !text_ok(text, 10000) || !audio_id(voice) || !FORMATS.contains(&format) || !pauses_ok {
             return Err(invalid_input());
         }
-        Ok(json!({ "model": model, "input": text, "voice_id": voice, "response_format": format, "delivery_method": "url", "stream": false }))
+        Ok(MossBody(
+            json!({ "model": model, "input": text, "voice_id": voice, "response_format": format, "delivery_method": "url", "stream": false }),
+        ))
     }
 
     fn audio_result(url: String, format: String, content_type: String, usage: Option<WireAudioUsage>) -> Option<Generated> {
@@ -697,9 +702,9 @@ impl Moss {
         })
     }
 
-    pub async fn speech_generate(&self, key: &str, body: &Value, stop: &Stop) -> Result<Generated, VendorError> {
+    pub async fn speech_generate(&self, key: &str, body: &MossBody, stop: &Stop) -> Result<Generated, VendorError> {
         let mut b = body.clone();
-        b["async"] = json!(false);
+        b.0["async"] = json!(false);
         let r: WireSpeechResponse = self
             .call(VendorCall {
                 key,
@@ -717,7 +722,7 @@ impl Moss {
         Self::audio_result(r.url, r.response_format, r.content_type, r.usage).ok_or_else(invalid_response)
     }
 
-    pub async fn submit(&self, key: &str, path: &str, body: &Value, stop: &Stop) -> Result<String, VendorError> {
+    pub async fn submit(&self, key: &str, path: &str, body: &MossBody, stop: &Stop) -> Result<String, VendorError> {
         let r: WireTaskSubmitted = self
             .call(VendorCall {
                 key,
@@ -732,9 +737,9 @@ impl Moss {
         if audio_id(&r.task_id) { Ok(r.task_id) } else { Err(invalid_response()) }
     }
 
-    pub async fn speech_task(&self, key: &str, body: &Value, stop: &Stop) -> Result<String, VendorError> {
+    pub async fn speech_task(&self, key: &str, body: &MossBody, stop: &Stop) -> Result<String, VendorError> {
         let mut b = body.clone();
-        b["async"] = json!(true);
+        b.0["async"] = json!(true);
         self.submit(key, "/audio/speech", &b, stop).await
     }
 
@@ -797,18 +802,18 @@ impl Moss {
     }
 
     /// Streams SSE speech events into `tx`; ends with `Done` or fails.
-    pub async fn speech_stream(&self, key: &str, body: &Value, stop: &Stop, tx: tokio::sync::mpsc::Sender<SpeechEvent>) -> Result<(), StreamError> {
-        let flash = body["model"].as_str().is_some_and(|m| m.starts_with("moss-tts-1.5-flash"));
-        if !flash || body["response_format"] != "pcm" {
+    pub async fn speech_stream(&self, key: &str, body: &MossBody, stop: &Stop, tx: tokio::sync::mpsc::Sender<SpeechEvent>) -> Result<(), StreamError> {
+        let flash = body.0["model"].as_str().is_some_and(|m| m.starts_with("moss-tts-1.5-flash"));
+        if !flash || body.0["response_format"] != "pcm" {
             return Err(StreamError::Vendor(invalid_input()));
         }
         let mut b = body.clone();
-        if let Some(o) = b.as_object_mut() {
+        if let Some(o) = b.0.as_object_mut() {
             o.remove("delivery_method");
         }
-        b["stream"] = json!(true);
-        b["stream_format"] = json!("sse");
-        b["async"] = json!(false);
+        b.0["stream"] = json!(true);
+        b.0["stream_format"] = json!("sse");
+        b.0["async"] = json!(false);
         let started = Instant::now();
         let r = self
             .send(
@@ -937,7 +942,12 @@ impl Moss {
         .map_err(|_| StreamError::Mine("join error".into()))?
     }
 
-    pub fn prepare_speakers(model: &str, sp: &[MediaSpeakersRequestSpeakers], sg: &[MediaSpeakersRequestSegments], format: &str) -> Result<Value, VendorError> {
+    pub fn prepare_speakers(
+        model: &str,
+        sp: &[MediaSpeakersRequestSpeakers],
+        sg: &[MediaSpeakersRequestSegments],
+        format: &str,
+    ) -> Result<MossBody, VendorError> {
         if !(1..=100).contains(&sp.len()) || !(1..=1000).contains(&sg.len()) {
             return Err(invalid_input());
         }
@@ -957,26 +967,26 @@ impl Moss {
         if !SPEAKERS_MODELS.contains(&model) || !FORMATS.contains(&format) {
             return Err(invalid_input());
         }
-        Ok(json!({
+        Ok(MossBody(json!({
             "model": model,
             "speakers": sp.iter().map(|s| json!({ "id": s.id, "voice_id": s.voice })).collect::<Vec<_>>(),
             "segments": sg.iter().map(|s| json!({ "speaker": s.speaker, "text": s.text })).collect::<Vec<_>>(),
             "response_format": format,
             "delivery_method": "url",
             "async": true,
-        }))
+        })))
     }
 
-    pub fn prepare_design(model: &str, text: &str, instruction: &str, format: &str) -> Result<Value, VendorError> {
+    pub fn prepare_design(model: &str, text: &str, instruction: &str, format: &str) -> Result<MossBody, VendorError> {
         if !VOICE_DESIGN_MODELS.contains(&model) || !text_ok(text, 10000) || !text_ok(instruction, 10000) || !FORMATS.contains(&format) {
             return Err(invalid_input());
         }
-        Ok(
+        Ok(MossBody(
             json!({ "model": model, "input": text, "instruction": instruction, "response_format": format, "delivery_method": "url", "create_voice": false, "async": true }),
-        )
+        ))
     }
 
-    pub fn prepare_transcription(model: &str, file_id: &str, diarize: Option<bool>, keyterms: Option<&Vec<String>>) -> Result<Value, VendorError> {
+    pub fn prepare_transcription(model: &str, file_id: &str, diarize: Option<bool>, keyterms: Option<&Vec<String>>) -> Result<MossBody, VendorError> {
         let pro = model.starts_with("moss-transcribe-diarize-pro");
         let terms_ok = keyterms.is_none_or(|k| k.len() <= 20 && k.iter().all(|t| text_ok(t, 30)));
         if !TRANSCRIPTION_MODELS.contains(&model)
@@ -993,17 +1003,17 @@ impl Moss {
         if let Some(k) = keyterms {
             b["keyterms"] = json!(k);
         }
-        Ok(b)
+        Ok(MossBody(b))
     }
 
-    pub fn streams_transcripts(body: &Value) -> bool {
-        body["model"].as_str().is_some_and(|m| m.starts_with("moss-transcribe-diarize-pro"))
+    pub fn streams_transcripts(body: &MossBody) -> bool {
+        body.0["model"].as_str().is_some_and(|m| m.starts_with("moss-transcribe-diarize-pro"))
     }
 
     pub async fn transcription_stream(
         &self,
         key: &str,
-        body: &Value,
+        body: &MossBody,
         stop: &Stop,
         tx: tokio::sync::mpsc::Sender<TranscriptionEvent>,
     ) -> Result<(), StreamError> {
@@ -1011,9 +1021,9 @@ impl Moss {
             return Err(StreamError::Vendor(invalid_input()));
         }
         let mut b = body.clone();
-        b["response_format"] = json!("verbose_json");
-        b["stream"] = json!(true);
-        b["async"] = json!(false);
+        b.0["response_format"] = json!("verbose_json");
+        b.0["stream"] = json!(true);
+        b.0["async"] = json!(false);
         let started = Instant::now();
         let r = self
             .send(
@@ -1121,7 +1131,7 @@ impl Moss {
         .map_err(|_| StreamError::Mine("join error".into()))?
     }
 
-    pub fn prepare_understanding(model: &str, text: &str, media: &[(MediaInputKind, String)], max_tokens: i64) -> Result<Value, VendorError> {
+    pub fn prepare_understanding(model: &str, text: &str, media: &[(MediaInputKind, String)], max_tokens: i64) -> Result<MossBody, VendorError> {
         let images = media.iter().all(|(k, _)| *k == MediaInputKind::Image) && (1..=5).contains(&media.len());
         let video = media.len() == 1 && media[0].0 == MediaInputKind::Video;
         if !UNDERSTANDING_MODELS.contains(&model)
@@ -1136,10 +1146,12 @@ impl Moss {
         for (kind, id) in media {
             content.push(json!({ "type": if *kind == MediaInputKind::Image { "input_image" } else { "input_video" }, "file_id": id }));
         }
-        Ok(json!({ "model": model, "input": [{ "role": "user", "content": content }], "max_output_tokens": max_tokens }))
+        Ok(MossBody(
+            json!({ "model": model, "input": [{ "role": "user", "content": content }], "max_output_tokens": max_tokens }),
+        ))
     }
 
-    pub async fn understand(&self, key: &str, body: &Value, stop: &Stop) -> Result<MediaUnderstandingResult, VendorError> {
+    pub async fn understand(&self, key: &str, body: &MossBody, stop: &Stop) -> Result<MediaUnderstandingResult, VendorError> {
         let r = self
             .send(
                 VendorCall {
@@ -1203,7 +1215,7 @@ impl Moss {
     pub async fn upload(
         &self,
         key: &str,
-        file: std::fs::File,
+        file: tokio::fs::File,
         size: i64,
         filename: &str,
         purpose: &str,
@@ -1212,6 +1224,7 @@ impl Moss {
         if !(1..=512_000_000).contains(&size) || !code_points(filename, 1, 256) {
             return Err(invalid_input());
         }
+        let file = file.into_std().await;
         let parts = vec![
             Part {
                 name: "purpose".into(),

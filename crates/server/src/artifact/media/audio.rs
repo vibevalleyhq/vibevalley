@@ -15,7 +15,7 @@ use vibevalley_protocol::{
 
 use super::Stop;
 use super::job::{Ask, Held, Media, Phase, Record, active, id_ok, refused};
-use super::vendor::{Account, Moss, Outcome, StreamError, TranscriptionEvent, VendorError};
+use super::vendor::{Account, Moss, MossBody, Outcome, StreamError, TranscriptionEvent, VendorError};
 use crate::log::spawn_blocking_traced;
 use crate::setting::Use;
 
@@ -37,7 +37,7 @@ fn sample_format(mime: &str) -> Option<&'static str> {
     }
 }
 
-fn transcription_body(model: &str, file: &str, request: &MediaTranscriptionRequest) -> Result<Value, VendorError> {
+fn transcription_body(model: &str, file: &str, request: &MediaTranscriptionRequest) -> Result<MossBody, VendorError> {
     Moss::prepare_transcription(model, file, request.diarize, request.keyterms.as_ref())
 }
 
@@ -198,17 +198,15 @@ impl Media {
         let format = sample_format(&input.mime).filter(|_| input.size <= SAMPLE_MAX).ok_or_else(invalid)?;
         let content = self.storage.input_content_async(&input.id).await.map_err(|_| invalid())?;
         let mime = input.mime.clone();
-        let path = content.path;
-        let bytes = spawn_blocking_traced(move || -> Result<Vec<u8>, ApiError> {
-            let bytes = std::fs::read(&path).map_err(|_| invalid())?;
-            let facts = super::validate::audio_facts(bytes.clone(), &mime).map_err(|_| invalid())?;
-            if facts.seconds > SAMPLE_SECONDS {
-                return Err(invalid());
-            }
-            Ok(bytes)
-        })
-        .await
-        .map_err(|_| invalid())??;
+        let bytes = tokio::fs::read(&content.path).await.map_err(|_| invalid())?;
+        let bytes_for_probe = bytes.clone();
+        let facts = spawn_blocking_traced(move || super::validate::audio_facts(bytes_for_probe, &mime))
+            .await
+            .map_err(|_| invalid())?
+            .map_err(|_| invalid())?;
+        if facts.seconds > SAMPLE_SECONDS {
+            return Err(invalid());
+        }
         Ok((bytes, format!("sample.{format}")))
     }
 
@@ -272,7 +270,7 @@ impl Media {
         }
     }
 
-    async fn receive_transcript_async(&self, id: &str, account: &Account, body: &Value, stop: &Stop) {
+    async fn receive_transcript_async(&self, id: &str, account: &Account, body: &MossBody, stop: &Stop) {
         let mut text = String::new();
         let mut segments: Vec<MediaAudioSegment> = vec![];
         let mut seen: HashSet<i64> = HashSet::new();

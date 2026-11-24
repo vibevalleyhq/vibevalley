@@ -12,7 +12,7 @@ pub mod inbox;
 mod mcp;
 pub mod words;
 
-pub use execution::Execution;
+pub use execution::{Execution, PendingExecution};
 pub use inbox::RuntimeInboxObserver;
 
 use std::collections::{HashMap, VecDeque};
@@ -189,6 +189,7 @@ fn message_of_turn(entry: &execution::EvalEntry) -> Option<Option<Message>> {
 /// Dependencies required to open [`Orchestrator`].
 pub struct Parts {
     pub ctx: Arc<Context>,
+    pub pending_execution: Option<PendingExecution>,
     pub permissions: Permissions,
     pub tool: Arc<ToolRegistry>,
     pub profile: Arc<Profile>,
@@ -208,29 +209,36 @@ pub struct Parts {
 }
 
 impl Orchestrator {
-    pub async fn open_async(p: Parts) -> vibevalley_runtime::agent::durable::Result<Arc<Orchestrator>> {
+    pub async fn open_async(mut p: Parts) -> vibevalley_runtime::agent::durable::Result<Arc<Orchestrator>> {
         let store = p.runtime.durable_store().clone();
         let listen_chat = p.listen_chat;
-        let o = Arc::new_cyclic(|weak| Orchestrator {
-            me: weak.clone(),
-            execution: Execution::new(store, weak.clone(), p.permissions),
-            ctx: p.ctx,
-            tool: p.tool,
-            profile: p.profile,
-            chat: p.chat,
-            issue: p.issue,
-            runtime: p.runtime,
-            repo: p.repo,
-            memory: p.memory,
-            artifact: p.artifact,
-            home: p.home,
-            key: p.key,
-            client: p.client,
-            instances: Default::default(),
-            ports: Default::default(),
-            chat_listener: Default::default(),
-            mcp: Default::default(),
-            closed: AtomicBool::new(false),
+        let pending = p.pending_execution.take();
+        let o = Arc::new_cyclic(|weak| {
+            let execution = match pending {
+                Some(pending) => pending.attach(weak.clone()),
+                None => Execution::new(store, weak.clone(), p.permissions),
+            };
+            Orchestrator {
+                me: weak.clone(),
+                execution,
+                ctx: p.ctx,
+                tool: p.tool,
+                profile: p.profile,
+                chat: p.chat,
+                issue: p.issue,
+                runtime: p.runtime,
+                repo: p.repo,
+                memory: p.memory,
+                artifact: p.artifact,
+                home: p.home,
+                key: p.key,
+                client: p.client,
+                instances: Default::default(),
+                ports: Default::default(),
+                chat_listener: Default::default(),
+                mcp: Default::default(),
+                closed: AtomicBool::new(false),
+            }
         });
         for a in o.profile.orchestrators() {
             o.keep_on_duty_async(&a).await;
@@ -273,8 +281,18 @@ impl Orchestrator {
         }
     }
 
+    async fn ensure_skills_dir_async(&self, id: &str) {
+        let skills_dir = self.home.join("agent").join(id).join("skills");
+        if tokio::fs::try_exists(&skills_dir).await.unwrap_or(false) {
+            return;
+        }
+        let _ = tokio::fs::create_dir_all(&skills_dir).await;
+        let _ = crate::log::spawn_blocking_traced(move || SKILLS.extract(&skills_dir)).await;
+    }
+
     /// `keepOnDuty`: ensures an orchestrator's standing session is persisted.
     async fn keep_on_duty_async(&self, a: &vibevalley_protocol::Agent) {
+        self.ensure_skills_dir_async(&a.id).await;
         let name = if a.name.trim().is_empty() {
             t("server.channel.name.orchestrator", &[])
         } else {
@@ -726,21 +744,18 @@ impl Orchestrator {
         let dir = self.home.join("evals");
         let file = dir.join(format!("{}.json", case.id));
         let case_id = case.id.clone();
-        let file_for_write = file.clone();
-        let written = self
-            .ctx
-            .task
-            .spawn_blocking(move || {
-                std::fs::create_dir_all(&dir).and_then(|()| {
-                    use std::io::Write;
-                    use std::os::unix::fs::OpenOptionsExt;
-                    let mut out = std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(&file_for_write)?;
-                    out.write_all(format!("{}\n", serde_json::to_string_pretty(&case).unwrap_or_default()).as_bytes())
-                })
-            })
+        tokio::fs::create_dir_all(&dir).await.map_err(|e| refused(BizCode::Refused, e.to_string()))?;
+        let mut out = tokio::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&file)
             .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
-        written.map_err(|e| refused(BizCode::Refused, e.to_string()))?;
+            .map_err(|e| refused(BizCode::Refused, e.to_string()))?;
+        use tokio::io::AsyncWriteExt;
+        out.write_all(format!("{}\n", serde_json::to_string_pretty(&case).unwrap_or_default()).as_bytes())
+            .await
+            .map_err(|e| refused(BizCode::Refused, e.to_string()))?;
         Ok(OrchestratorEval {
             id: case_id,
             file: file.to_string_lossy().into_owned(),
@@ -750,10 +765,6 @@ impl Orchestrator {
     fn brain_at(&self, id: &str, route: &Arc<Mutex<Route>>, model: &str) -> Brain {
         let home = self.home.join("agent").join(id);
         let skills_dir = home.join("skills");
-        if !skills_dir.is_dir() {
-            let _ = std::fs::create_dir_all(&skills_dir);
-            let _ = SKILLS.extract(&skills_dir);
-        }
         let memory = self.memory.port(id, By::Orchestrator);
         let mut brain = Brain::new(self.client(), model, self.system_prompt(id, &home, memory.as_ref()));
         brain.tools = self.tools_for(id, route, skills_dir, memory);
@@ -1108,12 +1119,20 @@ impl<'a> Run<'a> {
         Self::start_async(o, me, route, format!("run-{}", uuid::Uuid::now_v7()), None).await
     }
 
-    fn open_recorder(o: &Orchestrator, id: &str, model: Option<&str>) -> Option<vibevalley_runtime::oar::record::Recorder> {
+    async fn open_recorder_async(o: &Orchestrator, id: &str, model: Option<&str>) -> Option<vibevalley_runtime::oar::record::Recorder> {
         let dir = o.home.join("records");
-        std::fs::create_dir_all(&dir).ok()?;
+        tokio::fs::create_dir_all(&dir).await.ok()?;
         let path = dir.join(format!("{id}.jsonl"));
-        let file = vibevalley_runtime::oar::record::open_file(Some(&path)).ok()??;
-        vibevalley_runtime::oar::record::Recorder::start(Some(file), ORCHESTRATOR_RUNTIME, id, o.repo.root(), model)
+        let id_owned = id.to_string();
+        let root = o.repo.root().to_path_buf();
+        let model_owned = model.map(str::to_string);
+        crate::log::spawn_blocking_traced(move || {
+            let file = vibevalley_runtime::oar::record::open_file(Some(&path)).ok()??;
+            vibevalley_runtime::oar::record::Recorder::start(Some(file), ORCHESTRATOR_RUNTIME, &id_owned, &root, model_owned.as_deref())
+        })
+        .await
+        .ok()
+        .flatten()
     }
 
     async fn start_async(o: &'a Orchestrator, me: &'a Instance, route: &'a Route, run: String, model: Option<&str>) -> Self {
@@ -1123,7 +1142,7 @@ impl<'a> Run<'a> {
             .events_async(&me.id, Some(&run))
             .await
             .is_some_and(|steps| steps.iter().any(|step| step.r#type == SessionEventType::RunStart));
-        let recorder = Self::open_recorder(o, &me.id, model);
+        let recorder = Self::open_recorder_async(o, &me.id, model).await;
         let r = Run {
             o,
             me,
@@ -1144,7 +1163,7 @@ impl<'a> Run<'a> {
     }
 
     fn step(&self, step: Step) {
-        self.o.runtime.trajectory().step(&self.me.id, "", step);
+        self.o.runtime.trajectory().record_step(&self.me.id, "", step);
     }
 
     fn record_event(&self, event: &vibevalley_runtime::oar::Event) {

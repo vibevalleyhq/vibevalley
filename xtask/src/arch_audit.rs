@@ -592,7 +592,12 @@ fn is_sea_orm_allowed_file(rel: &str) -> bool {
 }
 
 fn is_internal_value_sig_exempt_file(rel: &str) -> bool {
-    rel == "router.rs" || rel == "fake.rs" || rel.starts_with("fake/") || rel == "gateway/api.rs" || rel.starts_with("gateway/api/")
+    rel == "router.rs"
+        || rel == "fake.rs"
+        || rel.starts_with("fake/")
+        || rel == "gateway/bridge/fake.rs"
+        || rel == "gateway/api.rs"
+        || rel.starts_with("gateway/api/")
 }
 
 fn check_no_gateway_reverse_import(file_path: &str, rel: &str, file_mod_path: &[String], refs: &[PathRef], index: &LineIndex, out: &mut Vec<ArchViolation>) {
@@ -1596,8 +1601,10 @@ fn run_arch_audit_on_files(files: &[SourceFile], existing_legacy_dirs: &BTreeSet
         // Rule 8 file-level checks: ChannelQuotePort & gateway/bridge/hub.rs Hub
         check_legacy_items_in_file(&file.path, rel, &tokens, &index, &mut violations);
 
-        // Rule 9 input: std::fs:: calls in server
-        collect_sync_fs_sites(&file.path, &tokens, &index, &mut server_sync_fs_sites);
+        // Rule 9 input: std::fs:: calls in server (excluding `fake/` test-runtime sync fixture)
+        if rel != "fake.rs" && !rel.starts_with("fake/") {
+            collect_sync_fs_sites(&file.path, &tokens, &index, &mut server_sync_fs_sites);
+        }
 
         // Rule 10 input: pub / pub(crate) fn signatures using serde_json::Value / Value
         collect_internal_value_sig_sites(&file.path, rel, &tokens, &index, &mut server_internal_value_sites);

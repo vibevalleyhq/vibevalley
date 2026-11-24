@@ -29,9 +29,9 @@ fn notes_are_kept_searched_recalled_and_forgotten() {
         assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
         e.data.unwrap_or(Value::Null)
     };
-    let mut helper = app.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "scripted".into();
-    let helper = app.test_internals().agent.profile.store.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let a = helper.id.as_str();
 
     let empty = call("memory.create", json!({ "agent": a, "text": "   " }));

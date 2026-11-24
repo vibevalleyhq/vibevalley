@@ -1,6 +1,6 @@
 //! The bridge between VibeValley's hosted TSX views and the in-process server.
 //!
-//! [`Hub`] serves one [`Server`] to any number of views through an [`Outlet`]
+//! [`Bridge`] serves one [`Server`] to any number of views through an [`Outlet`]
 //! (the app wires outlets to nsh's `HostChannel`). [`fake::FakeServer`]
 //! serves fixture slices and canned answers for building views without the
 //! server.
@@ -16,14 +16,15 @@
 //! | `subscribe(name, payload, on, ended)` | `{ type: "subscribe", id, name, payload }` | `sub:<id>` = `{ event }` per event, then once `{ end: null \| Envelope }` |
 //! | `stop()` of a subscription | `{ type: "unsubscribe", id }` | |
 
+#[allow(clippy::module_inception, reason = "internal bridge module re-exported by gateway::bridge")]
+mod bridge;
 pub mod fake;
-mod hub;
 
 pub use crate::gateway::api::{
-    ApiError, BizCode, Caller, CallerContext, CallerPrincipal, ClientIdentity, ClientKind, Envelope, GatewayPorts, LiveEvent, LiveVoiceLine, LiveVoicePort,
-    Server, SharedLiveVoice, SliceKind, refusal,
+    ApiError, BizCode, BridgeRpc, Caller, CallerContext, CallerPrincipal, ClientIdentity, ClientKind, ClientRpc, Envelope, GatewayPorts, LiveEvent,
+    LiveVoiceLine, LiveVoicePort, Server, SharedLiveVoice, SliceKind, refusal,
 };
-pub use hub::{Client, ClientSnapshot, Hub, Outlet};
+pub use bridge::{Bridge, Client, ClientSnapshot, Outlet};
 
 #[cfg(test)]
 mod tests {

@@ -109,25 +109,35 @@ impl FakeServer {
         }
     }
 
-    /// Reads `state.json` (a [`SliceBundle`]) and `responses.json` from `dir` when present.
-    pub fn from_dir(dir: &Path) -> Result<FakeServer, String> {
-        let bundle = match std::fs::read_to_string(dir.join("state.json")) {
-            Ok(text) => serde_json::from_str::<SliceBundle>(&text).map_err(|e| format!("state.json: {e}"))?,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => empty_bundle(0),
-            Err(e) => return Err(format!("state.json: {e}")),
+    /// Builds a fake server from optional `state.json` and `responses.json` contents.
+    pub fn from_fixture_strs(state_json: Option<&str>, responses_json: Option<&str>) -> Result<FakeServer, String> {
+        let bundle = match state_json {
+            Some(text) => serde_json::from_str::<SliceBundle>(text).map_err(|e| format!("state.json: {e}"))?,
+            None => empty_bundle(0),
         };
         let fake = FakeServer::from_bundle(bundle);
-        match std::fs::read_to_string(dir.join("responses.json")) {
-            Ok(text) => {
-                let value: Value = serde_json::from_str(&text).map_err(|e| format!("responses.json: {e}"))?;
-                if let Value::Object(map) = value {
-                    fake.inner.lock().responses.extend(map);
-                }
+        if let Some(text) = responses_json {
+            let value: Value = serde_json::from_str(text).map_err(|e| format!("responses.json: {e}"))?;
+            if let Value::Object(map) = value {
+                fake.inner.lock().responses.extend(map);
             }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => return Err(format!("responses.json: {e}")),
         }
         Ok(fake)
+    }
+
+    /// Reads `state.json` (a [`SliceBundle`]) and `responses.json` from `dir` when present.
+    pub async fn from_dir_async(dir: &Path) -> Result<FakeServer, String> {
+        let state = match tokio::fs::read_to_string(dir.join("state.json")).await {
+            Ok(text) => Some(text),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => return Err(format!("state.json: {e}")),
+        };
+        let responses = match tokio::fs::read_to_string(dir.join("responses.json")).await {
+            Ok(text) => Some(text),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => return Err(format!("responses.json: {e}")),
+        };
+        Self::from_fixture_strs(state.as_deref(), responses.as_deref())
     }
 
     /// Replaces the backing [`SliceBundle`] and notifies every slice watcher.
@@ -266,14 +276,7 @@ impl Server for FakeServer {
     }
 
     fn slice_snapshot(&self, slice: SliceKind) -> Value {
-        match slice {
-            SliceKind::Board => self.feeds.board.snapshot_value(),
-            SliceKind::Sessions => self.feeds.sessions.snapshot_value(),
-            SliceKind::Collab => self.feeds.collab.snapshot_value(),
-            SliceKind::Inbox => self.feeds.inbox.snapshot_value(),
-            SliceKind::Ops => self.feeds.ops.snapshot_value(),
-            SliceKind::Farm => self.feeds.farm.snapshot_value(),
-        }
+        serde_json::from_str(&self.slice_snapshot_json(slice)).unwrap_or(Value::Null)
     }
 
     fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
@@ -288,13 +291,17 @@ impl Server for FakeServer {
     }
 
     fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+        let mut forward = |seq: i64, json: &str| {
+            let value: Value = serde_json::from_str(json).unwrap_or(Value::Null);
+            receive(seq, &value);
+        };
         match slice {
-            SliceKind::Board => self.feeds.board.watch_since(after_seq, stop, receive),
-            SliceKind::Sessions => self.feeds.sessions.watch_since(after_seq, stop, receive),
-            SliceKind::Collab => self.feeds.collab.watch_since(after_seq, stop, receive),
-            SliceKind::Inbox => self.feeds.inbox.watch_since(after_seq, stop, receive),
-            SliceKind::Ops => self.feeds.ops.watch_since(after_seq, stop, receive),
-            SliceKind::Farm => self.feeds.farm.watch_since(after_seq, stop, receive),
+            SliceKind::Board => self.feeds.board.watch_since_json(after_seq, stop, &mut forward),
+            SliceKind::Sessions => self.feeds.sessions.watch_since_json(after_seq, stop, &mut forward),
+            SliceKind::Collab => self.feeds.collab.watch_since_json(after_seq, stop, &mut forward),
+            SliceKind::Inbox => self.feeds.inbox.watch_since_json(after_seq, stop, &mut forward),
+            SliceKind::Ops => self.feeds.ops.watch_since_json(after_seq, stop, &mut forward),
+            SliceKind::Farm => self.feeds.farm.watch_since_json(after_seq, stop, &mut forward),
         }
     }
 
@@ -369,17 +376,17 @@ mod tests {
         assert_eq!(calls.as_array().unwrap().len(), 8, "fake.calls counts itself");
     }
 
-    #[test]
-    fn from_dir_reads_fixtures() {
+    #[tokio::test]
+    async fn from_dir_reads_fixtures() {
         let dir = std::env::temp_dir().join(format!("vibevalley-bridge-fake-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        tokio::fs::create_dir_all(&dir).await.unwrap();
         let mut bundle = empty_bundle(7);
         bundle.board.issues.push(vibevalley_protocol::Issue::new("i1", 1, "Demo", 1));
-        std::fs::write(dir.join("state.json"), serde_json::to_string(&bundle).unwrap()).unwrap();
-        std::fs::write(dir.join("responses.json"), r#"{"repo.list": [{"id": "r"}]}"#).unwrap();
-        let fake = FakeServer::from_dir(&dir).unwrap();
+        tokio::fs::write(dir.join("state.json"), serde_json::to_string(&bundle).unwrap()).await.unwrap();
+        tokio::fs::write(dir.join("responses.json"), r#"{"repo.list": [{"id": "r"}]}"#).await.unwrap();
+        let fake = FakeServer::from_dir_async(&dir).await.unwrap();
         assert_eq!(fake.slice_snapshot(SliceKind::Board)["issues"][0]["id"], "i1");
         assert_eq!(fake.call("repo.list", Value::Null).data.unwrap()[0]["id"], "r");
-        std::fs::remove_dir_all(&dir).unwrap();
+        tokio::fs::remove_dir_all(&dir).await.unwrap();
     }
 }

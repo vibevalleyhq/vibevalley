@@ -58,7 +58,7 @@ fn an_issue_goes_from_backlog_to_merged() {
     assert_eq!(session.phase, Phase::done());
     assert_eq!(session.last_run.as_ref().unwrap().summary, "Added feature.txt");
     assert_eq!(session.worktree_branch(), Some("vibevalley/issue-1"));
-    assert_eq!(w.board.sessions().base_branch(&session.id).as_deref(), Some("main"));
+    assert_eq!(w.board.session_engine().base_branch(&session.id).as_deref(), Some("main"));
     let worktree = session.cwd.clone().unwrap();
     assert!(worktree.ends_with("worktrees/app.1"), "{worktree}");
     assert!(prompts.lock().unwrap()[0].starts_with("Add the feature"));
@@ -351,7 +351,7 @@ fn a_restart_marks_a_working_session_interrupted_and_it_goes_on() {
     // Another process cannot take the board while this one holds it.
     let busy = open_board(&w.store, w.registry.clone(), config(w.dir.path()));
     assert!(matches!(busy, Err(BoardError::Busy(_))));
-    w.board.close();
+    block_on(w.board.close_async());
 
     let (board, _ctx) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
     let issue = board_issue(&board, "1").unwrap();
@@ -359,7 +359,7 @@ fn a_restart_marks_a_working_session_interrupted_and_it_goes_on() {
     let session = board_session(&board, &session_id).unwrap();
     assert_eq!(session.phase, Phase::resting());
     assert_eq!(session.last_run.unwrap().outcome, Outcome::Interrupted);
-    assert!(!board.sessions().is_live(&session_id));
+    assert!(!board.session_engine().is_live(&session_id));
     block_on(board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
     let done = wait_stage(&board, "1", StageKind::Reviewing);
     assert_eq!(done.latest_session_id(), Some(&session_id), "the same session, reopened");
@@ -376,7 +376,7 @@ fn a_lost_worktree_cancels_its_issue_on_open() {
     block_on(w.board.move_to_async("1", IssueStatus::Todo, None)).unwrap();
     let issue = wait_stage(&w.board, "1", StageKind::Reviewing);
     let worktree = board_session(&w.board, issue.latest_session_id().unwrap()).unwrap().cwd.unwrap();
-    w.board.close();
+    block_on(w.board.close_async());
     std::fs::remove_dir_all(&worktree).unwrap();
     let (board, _ctx) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
     let lost = board_issue(&board, "1").unwrap();
@@ -504,7 +504,7 @@ fn regression_review_keeps_the_seen_tree_and_records_the_delivered_commit() {
     let target = git(&main, &["rev-parse", "HEAD"]);
     block_on(w.board.move_to_async("1", IssueStatus::Done, None)).unwrap();
 
-    w.board.close();
+    block_on(w.board.close_async());
     let (board, _ctx) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
     let archived = block_on(board.changes_since_async("1", Some(&first.revision.tree))).unwrap();
     assert_eq!(archived.revision, next.revision);
@@ -546,7 +546,7 @@ fn regression_reopen_recognizes_an_already_published_candidate_without_running_g
     let head = git(&main, &["rev-parse", "HEAD"]);
     assert_eq!(git(&main, &["show", "HEAD:work"]), "reviewed");
     assert!(!branch_exists(&main, "vibevalley/issue-1"));
-    w.board.close();
+    block_on(w.board.close_async());
     execute_sql(&mut db, "drop trigger stop_delivery");
     let (board, _ctx) = open_board(&w.store, w.registry.clone(), config(w.dir.path())).unwrap();
     let restored = board_issue(&board, "1").unwrap();

@@ -81,8 +81,8 @@ fn lenient_answer<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Issue
 
 impl Report {
     /// `None` when the file is missing or unreadable.
-    pub fn read(path: &Path) -> Option<Report> {
-        let text = std::fs::read_to_string(path).ok()?;
+    pub async fn read_async(path: &Path) -> Option<Report> {
+        let text = tokio::fs::read_to_string(path).await.ok()?;
         serde_json::from_str(&text).ok()
     }
 }

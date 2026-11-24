@@ -57,7 +57,10 @@ fn an_issue_goes_through_the_endpoints_from_create_to_done() {
     assert_eq!(list["data"].as_array().unwrap().len(), 1);
     block_on(app.ctx().feed.flush());
     assert_eq!(
-        app.ctx().feed.snapshot_value(SliceKind::Board)["issues"].as_array().unwrap().len(),
+        serde_json::from_str::<Value>(&app.ctx().feed.snapshot_json(SliceKind::Board)).unwrap()["issues"]
+            .as_array()
+            .unwrap()
+            .len(),
         1,
         "the board's facts are projected into the board slice"
     );

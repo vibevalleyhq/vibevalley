@@ -396,11 +396,11 @@ fn crash_restores_the_builtin_worker_in_the_same_issue_run() {
             e.data.unwrap_or(Value::Null)
         };
         call("repo.create", json!({"name":"demo"}));
-        let mut helper = start.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+        let mut helper = vibevalley_runtime::rt::block_on(start.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
         helper.runtime = "vibevalley".into();
         helper.model = "deepseek-flash".into();
         helper.name = "Durable worker".into();
-        start.test_internals().agent.profile.store.save(helper).unwrap();
+        vibevalley_runtime::rt::block_on(start.test_internals().agent.profile.store.save_async(helper)).unwrap();
         let issue = call("issue.create", json!({"title":"Record one line","repo":"demo","agent":"Durable worker"}));
         call("issue.status.update", json!({"id":issue["id"],"status":"todo"}));
         std::thread::park_timeout(Duration::from_secs(30));
@@ -508,7 +508,7 @@ fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases(
         env: Default::default(),
     }));
     profile.disallowed_tools.push("probe__fail".into());
-    started.test_internals().agent.profile.store.save(profile.clone()).unwrap();
+    vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.save_async(profile.clone())).unwrap();
     let send = |key: &str| {
         let res = started.router().call_as(
             Caller::User,
@@ -535,7 +535,7 @@ fn regression_the_orchestrator_uses_one_mcp_connection_across_generation_phases(
     }
     assert_eq!(std::fs::read_to_string(starts).unwrap(), "start\n");
     profile.mcp_servers.clear();
-    started.test_internals().agent.profile.store.save(profile).unwrap();
+    vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.save_async(profile)).unwrap();
     send("after removing the server");
     model.wait_seen("the removed profile tool disappears", |seen| {
         seen.last().is_some_and(|r| r.tools.iter().all(|t| !t.name.starts_with("probe__")))

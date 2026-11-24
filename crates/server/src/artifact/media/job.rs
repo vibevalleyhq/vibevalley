@@ -24,9 +24,9 @@ use vibevalley_protocol::{
 use super::Stop;
 use super::remote::{RemoteFile, RemoteState};
 use super::understanding::Authorization;
-use super::vendor::{self, Account, Moss, Outcome, Task, TaskKind};
-use crate::artifact::ChannelAnnounce;
+use super::vendor::{self, Account, Moss, MossBody, Outcome, Task, TaskKind};
 use crate::context::http::{Fetch, Request, public_https};
+use crate::context::port::ChannelAnnounce;
 use crate::context::{Context, Ticker};
 use crate::db::Tx;
 use crate::log::spawn_blocking_traced;
@@ -253,8 +253,8 @@ impl Ask {
 }
 
 pub(super) enum Held {
-    Image { account: Account, body: Value },
-    Speech { account: Account, body: Value },
+    Image { account: Account, body: MossBody },
+    Speech { account: Account, body: MossBody },
     Account(Account),
 }
 
@@ -988,7 +988,7 @@ impl Media {
         }
     }
 
-    async fn generate_image_async(self: &Arc<Self>, id: &str, width: i64, height: i64, account: &Account, body: &Value, stop: &Stop) {
+    async fn generate_image_async(self: &Arc<Self>, id: &str, width: i64, height: i64, account: &Account, body: &MossBody, stop: &Stop) {
         let result = self.moss.image(&account.key, body, width, height, stop).await;
         if stop.aborted() {
             return;
@@ -1027,7 +1027,7 @@ impl Media {
             .await;
     }
 
-    pub(super) async fn follow_async(self: &Arc<Self>, id: &str, key: &str, path: &str, body: &Value, stop: &Stop) {
+    pub(super) async fn follow_async(self: &Arc<Self>, id: &str, key: &str, path: &str, body: &MossBody, stop: &Stop) {
         match self.moss.submit(key, path, body, stop).await {
             Ok(task) => {
                 let _ = self
@@ -1316,7 +1316,7 @@ impl Media {
         }
     }
 
-    async fn receive_async(self: &Arc<Self>, id: &str, account: &Account, body: &Value, stop: &Stop) {
+    async fn receive_async(self: &Arc<Self>, id: &str, account: &Account, body: &MossBody, stop: &Stop) {
         let mut pcm: Vec<u8> = Vec::new();
         let mut pending: Vec<u8> = Vec::new();
         let mut sequence = 0i64;
@@ -1743,8 +1743,8 @@ fn speech_view(r: &Record) -> MediaSpeechJob {
     }
 }
 
-impl crate::gateway::api::media::SpeechStreams for Media {
-    fn claim(&self, id: &str) -> Result<crate::gateway::api::media::SpeechClaim, ApiError> {
+impl crate::context::api::media::SpeechStreams for Media {
+    fn claim(&self, id: &str) -> Result<crate::context::api::media::SpeechClaim, ApiError> {
         let events = {
             let mut streams = self.streams.lock();
             let Some(s) = streams.get_mut(id).filter(|s| !s.claimed) else {
@@ -1755,7 +1755,7 @@ impl crate::gateway::api::media::SpeechStreams for Media {
         };
         let me = self.me.get().cloned().unwrap_or_default();
         let job = id.to_string();
-        Ok(crate::gateway::api::media::SpeechClaim {
+        Ok(crate::context::api::media::SpeechClaim {
             events,
             // Runs asynchronously so `Drop` never blocks a Tokio worker.
             gone: Box::new(move || {
@@ -1781,8 +1781,8 @@ mod tests {
     use vibevalley_protocol::{ArtifactCard, ChatMessage};
 
     use super::*;
+    use crate::context::api::media::SpeechStreams;
     use crate::context::{LiveState, Outbox, StateFeed, TaskGroup};
-    use crate::gateway::api::media::SpeechStreams;
     use crate::service::Service;
     use crate::setting::SettingConfig;
 
@@ -1841,12 +1841,13 @@ mod tests {
             vendor,
             download,
         ));
-        let setting = Setting::open(SettingConfig {
+        let setting = Setting::open_async(SettingConfig {
             home: dir.path().to_path_buf(),
             work_root: dir.path().to_path_buf(),
             version: "0.1.0-test".into(),
             deepseek_api_key: String::new(),
-        });
+        })
+        .await;
         let storage = Storage::open_async(dir.path(), ctx.clone()).await.unwrap();
         let jobs = Media::open_async(ctx.clone(), setting, storage.clone(), Arc::new(DummyAnnounce)).await.unwrap();
 

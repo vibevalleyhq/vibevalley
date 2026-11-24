@@ -2,287 +2,25 @@
 //! serve views and external clients through [`Server`] and [`GatewayPorts`].
 //! Payloads, slices, and events are VibeValley's protocol JSON.
 
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
-pub use vibevalley_protocol::{ApiError, BizCode, Caller, Envelope, LiveEvent, SliceKind};
 
+pub use crate::context::api::*;
 pub use crate::log::{InvokeObserver, SharedInvokeObserver};
-
-/// Heap-allocated `Send` future returned by async gateway trait methods.
-pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 pub mod media;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ClientKind {
-    GpuiWorkbench,
-    GpuiChatPane,
-    GpuiSidebar,
-    GpuiPixel,
-    GpuiShell,
-    Cli,
-    HttpLoopback,
-    RemoteDevice,
-    Mcp,
-    Connector,
-    DevTools,
-    Internal,
+/// In-process JSON-RPC bridge dispatch operations implemented by `gateway::bridge::Bridge`.
+pub trait BridgeRpc: Send + Sync + 'static {
+    fn call_with(&self, ctx: CallerContext, op: String, payload: Value, reply: impl FnOnce(Envelope) + Send + 'static);
+    fn call(&self, op: String, payload: Value, reply: impl FnOnce(Envelope) + Send + 'static);
 }
 
-impl ClientKind {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            ClientKind::GpuiWorkbench => "gpuiWorkbench",
-            ClientKind::GpuiChatPane => "gpuiChatPane",
-            ClientKind::GpuiSidebar => "gpuiSidebar",
-            ClientKind::GpuiPixel => "gpuiPixel",
-            ClientKind::GpuiShell => "gpuiShell",
-            ClientKind::Cli => "cli",
-            ClientKind::HttpLoopback => "httpLoopback",
-            ClientKind::RemoteDevice => "remoteDevice",
-            ClientKind::Mcp => "mcp",
-            ClientKind::Connector => "connector",
-            ClientKind::DevTools => "devTools",
-            ClientKind::Internal => "internal",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ClientIdentity {
-    pub id: String,
-    pub kind: ClientKind,
-    pub label: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
-pub enum CallerPrincipal {
-    #[default]
-    LocalOwner,
-    #[serde(rename_all = "camelCase")]
-    RemoteDevice { device_id: String, scope: String },
-    #[serde(rename_all = "camelCase")]
-    Connector { app: String },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CallerContext {
-    pub caller: Caller,
-    pub principal: CallerPrincipal,
-    pub client: Option<ClientIdentity>,
-    pub trace_id: u64,
-}
-
-impl CallerContext {
-    pub fn local() -> Self {
-        Self {
-            caller: Caller::User,
-            principal: CallerPrincipal::LocalOwner,
-            client: None,
-            trace_id: 0,
-        }
-    }
-
-    pub fn from_caller(caller: Caller) -> Self {
-        let principal = match caller {
-            Caller::Remote => CallerPrincipal::RemoteDevice {
-                device_id: String::new(),
-                scope: String::new(),
-            },
-            Caller::User | Caller::Orchestrator | Caller::Session => CallerPrincipal::LocalOwner,
-        };
-        Self {
-            caller,
-            principal,
-            client: None,
-            trace_id: 0,
-        }
-    }
-}
-
-impl Default for CallerContext {
-    fn default() -> Self {
-        Self::local()
-    }
-}
-
-/// Optional fault-injection gate for DevTools Lab & Overrides.
-pub trait FaultGate: Send + Sync {
-    fn delay_ms(&self, target: &str) -> u64;
-    fn should_disconnect(&self, topic: &str) -> bool;
-}
-
-pub type SharedFaultGate = Arc<dyn FaultGate>;
-
-/// Optional debug bridge exposing GPUI shell state to the in-process server.
-pub trait HostDebugBridge: Send + Sync {
-    fn snapshot(&self) -> Value;
-}
-
-pub type SharedHostDebug = Arc<dyn HostDebugBridge>;
-
-/// The helpers' MCP door (`POST /mcp`): one JSON-RPC message from a helper
-/// with the bearer token it was given. `None` answers a notification.
-pub trait Mcp: Send + Sync + 'static {
-    fn message(&self, token: &str, message: Value) -> Option<Value>;
-
-    fn message_async(self: Arc<Self>, token: String, message: Value) -> BoxFuture<'static, Option<Value>> {
-        Box::pin(async move { crate::log::spawn_blocking_traced(move || self.message(&token, message)).await.unwrap_or(None) })
-    }
-}
-
-pub type SharedMcp = Arc<dyn Mcp>;
-
-/// Executes one JSON-RPC MCP message or batch asynchronously through [`Mcp::message_async`].
-pub async fn dispatch_mcp_message_async(door: SharedMcp, token: String, message: Value) -> Option<Value> {
-    match message {
-        Value::Array(batch) => {
-            let mut answers = Vec::with_capacity(batch.len());
-            for item in batch {
-                if let Some(answer) = door.clone().message_async(token.clone(), item).await {
-                    answers.push(answer);
-                }
-            }
-            if answers.is_empty() { None } else { Some(Value::Array(answers)) }
-        }
-        one => door.message_async(token, one).await,
-    }
-}
-
-/// Authenticated remote mobile device identity returned by [`RemoteAuth::verify_bearer_async`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RemoteDeviceIdentity {
-    pub device_id: String,
-    pub name: String,
-    pub scope: String,
-}
-
-/// Remote mobile access gate: reports whether remote access is enabled and
-/// validates Bearer device tokens against paired devices.
-pub trait RemoteAuth: Send + Sync + 'static {
-    fn is_enabled(&self) -> bool;
-    fn verify_bearer_async(self: Arc<Self>, token: String) -> BoxFuture<'static, Result<RemoteDeviceIdentity, ApiError>>;
-}
-
-pub type SharedRemoteAuth = Arc<dyn RemoteAuth>;
-
-/// Authenticated bidirectional WebSocket frame channels handed from
-/// `gateway::http::machine_ws` to the server's [`MachineBus`].
-pub struct MachineConnection {
-    pub device: RemoteDeviceIdentity,
-    pub incoming: flume::Receiver<vibevalley_protocol::MachineWireFrame>,
-    pub outgoing: flume::Sender<vibevalley_protocol::MachineWireFrame>,
-}
-
-/// Port connecting the `/api/v1/machine/ws` transport to the server's
-/// execution-layer machine manager without importing business domains into
-/// `gateway/`.
-pub trait MachineBus: Send + Sync + 'static {
-    fn accept_connection(&self, conn: MachineConnection);
-
-    fn mcp_tunnel_async(
-        self: Arc<Self>,
-        server: Arc<dyn Server>,
-        req: vibevalley_protocol::MachineMcpRequest,
-    ) -> BoxFuture<'static, vibevalley_protocol::MachineMcpResponse> {
-        Box::pin(dispatch_mcp_tunnel_async(server, req))
-    }
-}
-
-pub type SharedMachineBus = Arc<dyn MachineBus>;
-
-/// Executes a reverse-tunneled MCP JSON-RPC HTTP request against `server.ports().mcp`,
-/// preserving the same single/batch semantics and device-token guard as `POST /mcp`.
-pub async fn dispatch_mcp_tunnel_async(server: Arc<dyn Server>, req: vibevalley_protocol::MachineMcpRequest) -> vibevalley_protocol::MachineMcpResponse {
-    let reply = |status: u16, body: String| vibevalley_protocol::MachineMcpResponse {
-        request_id: req.request_id.clone(),
-        status,
-        content_type: "application/json".to_string(),
-        body,
-    };
-    let (door, message) = match validate_mcp_tunnel(&*server, &req) {
-        Ok(pair) => pair,
-        Err(resp) => return resp,
-    };
-    match dispatch_mcp_message_async(door, req.session_token.clone(), message).await {
-        Some(answer) => reply(200, serde_json::to_string(&answer).unwrap_or_default()),
-        None => reply(202, String::new()),
-    }
-}
-
-fn validate_mcp_tunnel(
-    server: &dyn Server,
-    req: &vibevalley_protocol::MachineMcpRequest,
-) -> Result<(SharedMcp, Value), vibevalley_protocol::MachineMcpResponse> {
-    let reply = |status: u16, body: String| vibevalley_protocol::MachineMcpResponse {
-        request_id: req.request_id.clone(),
-        status,
-        content_type: "application/json".to_string(),
-        body,
-    };
-    if req.session_token.starts_with("vv_dev_") {
-        return Err(reply(403, serde_json::json!({ "error": "forbidden" }).to_string()));
-    }
-    if !req.method.eq_ignore_ascii_case("POST") {
-        return Err(reply(405, serde_json::json!({ "error": "use POST" }).to_string()));
-    }
-    let normalized_path = req.path.trim().trim_end_matches('/');
-    if !normalized_path.is_empty() && normalized_path != "/mcp" {
-        return Err(reply(404, serde_json::json!({ "error": "no such route" }).to_string()));
-    }
-    let Some(door) = server.ports().mcp else {
-        return Err(reply(503, serde_json::json!({ "error": "no MCP here" }).to_string()));
-    };
-    let Ok(message) = serde_json::from_str::<Value>(&req.body) else {
-        let error = serde_json::json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "parse error" } });
-        return Err(reply(400, error.to_string()));
-    };
-    Ok((door, message))
-}
-
-/// Live MOSS realtime line handle consumed by the desktop host audio pipeline.
-pub trait LiveVoiceLine: Send + Sync {
-    fn url(&self) -> &str;
-    fn bearer_token(&self) -> &str;
-    fn session_update(&self) -> String;
-    fn outgoing(&self) -> flume::Receiver<String>;
-    fn heard(&self, raw: &str);
-}
-
-/// Narrow live voice controller port consumed by the desktop host without
-/// importing `crate::voice`.
-pub trait LiveVoicePort: Send + Sync {
-    fn grant(&self) -> Result<vibevalley_protocol::VoiceGrant, ApiError>;
-    fn moss_line(&self) -> Result<Box<dyn LiveVoiceLine>, ApiError>;
-    fn start(&self, channel: &str, uid: &str) -> Result<vibevalley_protocol::VoiceCall, ApiError>;
-    fn heard(&self, agent_id: &str, text: &str, turn: Option<&str>) -> Result<(), ApiError>;
-    fn said(&self, agent_id: &str, text: &str) -> Result<(), ApiError>;
-    fn stop(&self, agent_id: &str);
-}
-
-pub type SharedLiveVoice = Arc<dyn LiveVoicePort>;
-
-/// Non-RPC stream and protocol ports exposed outside the JSON-RPC and
-/// slice/subscription surface (`mcp`, `remote`, `machine`, `media_input`,
-/// `voice`, `speech`).
-///
-/// Constructed immutably in `app.rs` and either queried via [`Server::ports`]
-/// or passed directly to `gateway::http` so `Router` stays purely RPC + subscriptions.
-#[derive(Clone, Default)]
-pub struct GatewayPorts {
-    pub mcp: Option<SharedMcp>,
-    pub remote: Option<SharedRemoteAuth>,
-    pub machine: Option<SharedMachineBus>,
-    pub media_input: Option<media::SharedMediaInputs>,
-    pub voice: Option<SharedLiveVoice>,
-    pub speech: Option<media::SharedSpeechStreams>,
+/// Per-view JSON-RPC & subscription dispatch implemented by `gateway::bridge::Client`.
+pub trait ClientRpc: Send + Sync {
+    fn call(&self, id: &str, op: String, payload: Value);
+    fn subscribe(&self, id: &str, name: &str, payload: Value);
 }
 
 /// What the server provides to views and transports.
@@ -429,7 +167,293 @@ pub trait Server: Send + Sync + 'static {
     }
 }
 
-/// An envelope refusing with `code`.
-pub fn refusal(code: BizCode, message: impl Into<String>) -> Envelope {
-    Envelope::failure(&ApiError::new(code, message))
+pub(crate) fn check_can(ctx: &CallerContext, op: &str, spec: &vibevalley_protocol::Endpoint) -> Option<Envelope> {
+    (ctx.caller != vibevalley_protocol::Caller::User && !spec.can.contains(&ctx.caller))
+        .then(|| refusal(BizCode::Forbidden, format!("{op} is not for the {:?}", ctx.caller)))
+}
+
+pub(crate) fn normalize_payload(spec: &vibevalley_protocol::Endpoint, payload: Value) -> Value {
+    match (spec.input, payload) {
+        (None, _) => Value::Null,
+        (Some(_), Value::Null) => Value::Object(Default::default()),
+        (Some(_), p) => p,
+    }
+}
+
+pub(crate) fn finish_outcome(spec: &vibevalley_protocol::Endpoint, outcome: Result<Value, ApiError>) -> Envelope {
+    match outcome {
+        Ok(_) if spec.result.is_none() => Envelope::void(),
+        Ok(data) => Envelope::ok(data),
+        Err(err) => Envelope::failure(&err),
+    }
+}
+
+pub(crate) fn ok_json<T: serde::Serialize>(value: T) -> Result<Value, ApiError> {
+    serde_json::to_value(value).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
+}
+
+pub(crate) fn decode<T: serde::de::DeserializeOwned>(payload: Value) -> Result<T, ApiError> {
+    serde_path_to_error::deserialize(payload).map_err(|e| {
+        let path = e.path().to_string();
+        let problem = e.into_inner().to_string();
+        let message = if path == "." || path.is_empty() {
+            problem
+        } else {
+            format!("{path}: {problem}")
+        };
+        ApiError::new(BizCode::InvalidInput, message)
+    })
+}
+
+pub(crate) fn begin_observed(observer: Option<&SharedInvokeObserver>, ctx: &CallerContext, op: &str, payload: &Value) -> Option<std::time::Instant> {
+    let is_debug = op.starts_with("debug.");
+    let observer = (!is_debug).then_some(observer).flatten();
+    if let Some(obs) = observer {
+        obs.on_call_start(ctx, op, payload);
+        Some(std::time::Instant::now())
+    } else {
+        tracing::enabled!(tracing::Level::DEBUG).then(std::time::Instant::now)
+    }
+}
+
+pub(crate) async fn run_observed_async<F>(
+    observer: Option<&SharedInvokeObserver>,
+    fault_gate: Option<&SharedFaultGate>,
+    ctx: &CallerContext,
+    op: &str,
+    started: Option<std::time::Instant>,
+    call: F,
+) -> Envelope
+where
+    F: std::future::Future<Output = Envelope>,
+{
+    use tracing::Instrument as _;
+    let is_debug = op.starts_with("debug.");
+    let observer = (!is_debug).then_some(observer).flatten();
+    let envelope = async {
+        if !is_debug && let Some(gate) = fault_gate {
+            let delay = gate.delay_ms(op);
+            if delay > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+            }
+        }
+        call.await
+    }
+    .instrument(crate::log::request_span(op, ctx.trace_id))
+    .await;
+    let duration_us = started.map_or(0, |t0| t0.elapsed().as_micros() as u64);
+    if let Some(obs) = observer {
+        obs.on_call_end(ctx, op, envelope.biz_code, duration_us);
+    }
+    crate::log::record_call(op, ctx.trace_id, envelope.biz_code, duration_us);
+    envelope
+}
+
+fn decode_native_input(id: vibevalley_protocol::NativeEndpointId, p: Value) -> Result<NativeEndpointInput, ApiError> {
+    use vibevalley_protocol::{NativeEndpointId, Op, native_ops};
+    Ok(match id {
+        NativeEndpointId::AttachmentFile => {
+            let r: <native_ops::AttachmentFile as Op>::Input = decode(p)?;
+            NativeEndpointInput::Attachment(r.id)
+        }
+        NativeEndpointId::MediaInputFile => {
+            let r: <native_ops::MediaInputFile as Op>::Input = decode(p)?;
+            NativeEndpointInput::MediaInput(r.id)
+        }
+        NativeEndpointId::MediaInputUploadFile => {
+            let r: <native_ops::MediaInputUploadFile as Op>::Input = decode(p)?;
+            NativeEndpointInput::MediaInputUpload(r.id, std::path::PathBuf::from(r.path))
+        }
+    })
+}
+
+#[allow(clippy::result_large_err)]
+pub(crate) async fn open_subscription_channel<F, Fut>(
+    gw: &GatewayMeta,
+    ctx: &CallerContext,
+    name: &str,
+    payload: Value,
+    open_domain: F,
+) -> Result<(u64, flume::Receiver<Value>), Envelope>
+where
+    F: FnOnce(DomainSubscription, crate::context::Sink) -> Fut,
+    Fut: std::future::Future<Output = Result<(), ApiError>>,
+{
+    use std::sync::atomic::Ordering;
+    use vibevalley_protocol::Subscription;
+    let Some(spec) = vibevalley_protocol::SUBSCRIPTIONS.iter().find(|s| s.name == name) else {
+        return Err(refusal(BizCode::RouteNotFound, format!("no subscription {name}")));
+    };
+    if ctx.caller != Caller::User && !spec.can.contains(&ctx.caller) {
+        return Err(refusal(BizCode::Forbidden, format!("{name} is not for the {:?}", ctx.caller)));
+    }
+    let p = if payload.is_null() { Value::Object(Default::default()) } else { payload };
+    macro_rules! sub {
+        ($s:ident) => {{ DomainSubscription::$s(decode::<<vibevalley_protocol::subscriptions::$s as Subscription>::Payload>(p).map_err(|e| Envelope::failure(&e))?) }};
+    }
+    let domain_sub = match spec.name {
+        "channel.follow" => sub!(ChannelFollow),
+        "channel.reports" => sub!(ChannelReports),
+        "artifact.follow" => sub!(ArtifactFollow),
+        "artifact.suggestion.follow" => sub!(ArtifactSuggestionFollow),
+        "artifact.presence.follow" => sub!(ArtifactPresenceFollow),
+        "session.watch" => sub!(SessionWatch),
+        "issue.watch" => sub!(IssueWatch),
+        other => return Err(refusal(BizCode::RouteNotFound, format!("no subscription {other}"))),
+    };
+    let (events, rx) = flume::unbounded();
+    let (stop_tx, stop) = flume::bounded(1);
+    let id = gw.subs.next_id.fetch_add(1, Ordering::Relaxed);
+    let sink = crate::context::Sink { events, stop };
+    if let Err(err) = open_domain(domain_sub, sink).await {
+        return Err(Envelope::failure(&err));
+    }
+    let mut active = gw.subs.active.lock();
+    active.insert(id, stop_tx);
+    gw.subs.count.store(active.len(), Ordering::Release);
+    Ok((id, rx))
+}
+
+pub(crate) fn slice_snapshot_value(ctx: &crate::context::Context, slice: SliceKind) -> Value {
+    serde_json::from_str(&ctx.feed.snapshot_json(slice)).unwrap_or(Value::Null)
+}
+
+pub(crate) fn watch_slice_value(
+    ctx: &crate::context::Context,
+    fault_gate: Option<&SharedFaultGate>,
+    slice: SliceKind,
+    after_seq: Option<i64>,
+    stop: &flume::Receiver<()>,
+    receive: &mut dyn FnMut(i64, &Value),
+) {
+    ctx.feed.feed(slice).watch_since_json_with_gate(after_seq, fault_gate, stop, &mut |seq, json| {
+        if let Ok(v) = serde_json::from_str::<Value>(json) {
+            receive(seq, &v);
+        }
+    });
+}
+
+pub(crate) async fn flush_and_snapshot_json(ctx: Arc<crate::context::Context>, slice: SliceKind) -> Arc<str> {
+    if ctx.feed.feed(slice).seq() < ctx.feed.dirty_seq(slice) {
+        ctx.feed.flush().await;
+    }
+    ctx.feed.snapshot_json(slice)
+}
+
+pub(crate) async fn flush_and_subscribe_slice(ctx: Arc<crate::context::Context>, slice: SliceKind) -> Option<crate::context::SliceSubscription> {
+    if ctx.feed.feed(slice).seq() < ctx.feed.dirty_seq(slice) {
+        ctx.feed.flush().await;
+    }
+    Some(ctx.feed.subscribe(slice))
+}
+
+pub(crate) fn invoke_server_op<O: vibevalley_protocol::Op>(server: &dyn Server, ctx: &CallerContext, input: O::Input) -> Result<O::Result, ApiError>
+where
+    O::Result: serde::de::DeserializeOwned,
+{
+    let p = serde_json::to_value(input).map_err(|e| ApiError::new(BizCode::InvalidInput, e.to_string()))?;
+    let env = server.call_with(ctx, O::NAME, p);
+    if let Some(err) = env.error() {
+        return Err(err);
+    }
+    serde_json::from_value(env.data.unwrap_or(Value::Null)).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
+}
+
+#[derive(Default)]
+pub(crate) struct SubscriptionRegistry {
+    pub(crate) active: parking_lot::Mutex<std::collections::HashMap<u64, flume::Sender<()>>>,
+    pub(crate) next_id: std::sync::atomic::AtomicU64,
+    pub(crate) count: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl SubscriptionRegistry {
+    pub(crate) fn with_counter(count: Arc<std::sync::atomic::AtomicUsize>) -> Self {
+        Self {
+            active: parking_lot::Mutex::new(std::collections::HashMap::new()),
+            next_id: std::sync::atomic::AtomicU64::new(1),
+            count,
+        }
+    }
+    pub(crate) fn len(&self) -> u32 {
+        self.active.lock().len() as u32
+    }
+    pub(crate) fn close_all(&self) {
+        let a = std::mem::take(&mut *self.active.lock());
+        self.count.store(0, std::sync::atomic::Ordering::Release);
+        drop(a);
+    }
+    pub(crate) fn remove(&self, id: u64) {
+        let mut a = self.active.lock();
+        a.remove(&id);
+        self.count.store(a.len(), std::sync::atomic::Ordering::Release);
+    }
+}
+
+pub(crate) struct GatewayMeta {
+    pub(crate) ports: GatewayPorts,
+    pub(crate) observer: Option<SharedInvokeObserver>,
+    pub(crate) fault_gate: Option<SharedFaultGate>,
+    pub(crate) host_debug: Option<SharedHostDebug>,
+    pub(crate) subs: SubscriptionRegistry,
+    pub(crate) next_trace_id: std::sync::atomic::AtomicU64,
+}
+
+impl GatewayMeta {
+    pub(crate) fn new(
+        ports: GatewayPorts,
+        observer: Option<SharedInvokeObserver>,
+        fault_gate: Option<SharedFaultGate>,
+        host_debug: Option<SharedHostDebug>,
+        active_subscriptions: Arc<std::sync::atomic::AtomicUsize>,
+    ) -> Self {
+        Self {
+            ports,
+            observer,
+            fault_gate,
+            host_debug,
+            subs: SubscriptionRegistry::with_counter(active_subscriptions),
+            next_trace_id: std::sync::atomic::AtomicU64::new(1),
+        }
+    }
+}
+
+pub(crate) async fn dispatch_boundary_async<T: ?Sized, F, FN>(
+    target: &T,
+    gw: &GatewayMeta,
+    mut ctx: CallerContext,
+    op: &str,
+    payload: Value,
+    dispatch_ep: F,
+    dispatch_native: FN,
+) -> Envelope
+where
+    F: for<'a> FnOnce(&'a T, &'a CallerContext, vibevalley_protocol::EndpointId, Value) -> BoxFuture<'a, Result<Value, ApiError>>,
+    FN: for<'a> FnOnce(&'a T, NativeEndpointInput) -> BoxFuture<'a, Result<NativeEndpointOutput, ApiError>>,
+{
+    if ctx.trace_id == 0 {
+        ctx.trace_id = gw.next_trace_id.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+    let started = begin_observed(gw.observer.as_ref(), &ctx, op, &payload);
+    run_observed_async(gw.observer.as_ref(), gw.fault_gate.as_ref(), &ctx, op, started, async {
+        if let Some(id) = vibevalley_protocol::EndpointId::from_op(op) {
+            let s = id.spec();
+            if let Some(d) = check_can(&ctx, op, s) {
+                return d;
+            }
+            finish_outcome(s, dispatch_ep(target, &ctx, id, normalize_payload(s, payload)).await)
+        } else if let Some(id) = vibevalley_protocol::NativeEndpointId::from_op(op) {
+            let s = id.spec();
+            if let Some(d) = check_can(&ctx, op, s) {
+                return d;
+            }
+            let outcome = match decode_native_input(id, normalize_payload(s, payload)) {
+                Ok(input) => dispatch_native(target, input).await.and_then(ok_json),
+                Err(e) => Err(e),
+            };
+            finish_outcome(s, outcome)
+        } else {
+            refusal(BizCode::RouteNotFound, format!("no endpoint {op}"))
+        }
+    })
+    .await
 }

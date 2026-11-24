@@ -65,7 +65,7 @@ fn a_key_saved_here_wins_over_the_configurations_and_only_its_end_is_shown() {
     assert_eq!(cleared["deepseekApiKey"], json!({ "source": "config", "hint": "…0000" }));
     assert!(file(dir.path()).get("deepseekApiKey").is_none());
     // Read again from the file.
-    let again = Setting::open(config(dir.path()));
+    let again = vibevalley_runtime::rt::block_on(Setting::open_async(config(dir.path())));
     assert_eq!(again.status().locale, vibevalley_protocol::Locale::En);
     app.close_blocking();
 }
@@ -102,24 +102,27 @@ fn the_voice_keeps_only_what_differs_from_its_defaults() {
 #[test]
 fn readiness_follows_moss_providers_and_hides_keys() {
     let dir = tempfile::tempdir().unwrap();
-    let setting = Setting::open(config(dir.path()));
-    let status = serde_json::to_value(setting.status()).unwrap();
-    assert_eq!(status["readiness"]["live"], json!({ "ready": false, "missing": "mossAccount" }));
-    assert_eq!(status["readiness"]["call"], json!({ "ready": false, "missing": "mossAccount" }));
-    assert!(status["readiness"].get("dictation").is_none());
-    setting
-        .update_providers(|p| {
-            let mut p = serde_json::to_value(p).unwrap();
-            p["revision"] = 1.into();
-            p["connections"] = json!([{ "id": "moss", "name": "MOSS", "adapter": "moss", "enabled": true, "key": "test-private-key" }]);
-            p["live"] = json!({ "connection": "moss", "model": "moss-live-1.0" });
-            Ok(serde_json::from_value(p).unwrap())
-        })
-        .unwrap();
-    let ready = serde_json::to_value(setting.status()).unwrap();
-    assert_eq!(ready["readiness"]["live"], json!({ "ready": true }));
-    assert_eq!(ready["readiness"]["call"], json!({ "ready": true }));
-    assert_eq!(ready["readiness"]["image"], json!({ "ready": false, "missing": "binding" }));
-    assert!(!ready.to_string().contains("test-private-key"));
-    assert_eq!(setting.providers().revision, 1);
+    vibevalley_runtime::rt::block_on(async {
+        let setting = Setting::open_async(config(dir.path())).await;
+        let status = serde_json::to_value(setting.status()).unwrap();
+        assert_eq!(status["readiness"]["live"], json!({ "ready": false, "missing": "mossAccount" }));
+        assert_eq!(status["readiness"]["call"], json!({ "ready": false, "missing": "mossAccount" }));
+        assert!(status["readiness"].get("dictation").is_none());
+        setting
+            .update_providers_async(|p| {
+                let mut p = serde_json::to_value(p).unwrap();
+                p["revision"] = 1.into();
+                p["connections"] = json!([{ "id": "moss", "name": "MOSS", "adapter": "moss", "enabled": true, "key": "test-private-key" }]);
+                p["live"] = json!({ "connection": "moss", "model": "moss-live-1.0" });
+                Ok(serde_json::from_value(p).unwrap())
+            })
+            .await
+            .unwrap();
+        let ready = serde_json::to_value(setting.status()).unwrap();
+        assert_eq!(ready["readiness"]["live"], json!({ "ready": true }));
+        assert_eq!(ready["readiness"]["call"], json!({ "ready": true }));
+        assert_eq!(ready["readiness"]["image"], json!({ "ready": false, "missing": "binding" }));
+        assert!(!ready.to_string().contains("test-private-key"));
+        assert_eq!(setting.providers().revision, 1);
+    });
 }

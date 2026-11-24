@@ -184,11 +184,6 @@ impl SliceFeed {
         self.state.lock().latest.json.clone()
     }
 
-    pub fn snapshot_value(&self) -> Value {
-        let json = self.snapshot_json();
-        serde_json::from_str(&json).unwrap_or(Value::Null)
-    }
-
     pub fn has_watchers(&self) -> bool {
         self.json_tx.receiver_count() > 0 || self.frame_tx.receiver_count() > 0
     }
@@ -262,20 +257,20 @@ impl SliceFeed {
         }
     }
 
-    /// Blocking bounded-1 watch helper for synchronous [`crate::Server::watch_slice`] fallback callers.
-    pub fn watch_since(&self, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
-        self.watch_since_with_gate(after_seq, None, stop, receive);
+    /// Blocking bounded-1 watch helper for synchronous callers passing JSON `&str`.
+    pub fn watch_since_json(&self, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &str)) {
+        self.watch_since_json_with_gate(after_seq, None, stop, receive);
     }
 
     /// Blocking bounded-1 watch helper honoring an optional DevTools [`crate::SharedFaultGate`].
-    pub fn watch_since_with_gate(
+    pub fn watch_since_json_with_gate(
         &self,
         after_seq: Option<i64>,
         gate: Option<&crate::SharedFaultGate>,
         stop: &flume::Receiver<()>,
-        receive: &mut dyn FnMut(i64, &Value),
+        receive: &mut dyn FnMut(i64, &str),
     ) {
-        let mut emit = |seq: i64, val: &Value| {
+        let mut emit = |seq: i64, json: &str| {
             if let Some(gate) = gate {
                 if gate.should_disconnect(self.topic) {
                     return false;
@@ -285,17 +280,14 @@ impl SliceFeed {
                     std::thread::sleep(Duration::from_millis(delay));
                 }
             }
-            receive(seq, val);
+            receive(seq, json);
             true
         };
         let mut sub = self.subscribe();
         let initial = sub.borrow_and_update(after_seq.is_none());
         let mut seen_gen = initial.generation;
-        if after_seq != Some(initial.seq) {
-            let value: Value = serde_json::from_str(&initial.json).unwrap_or(Value::Null);
-            if !emit(initial.seq, &value) {
-                return;
-            }
+        if after_seq != Some(initial.seq) && !emit(initial.seq, &initial.json) {
+            return;
         }
         let (tx, rx) = flume::bounded::<SliceFrame>(1);
         let handle = vibevalley_runtime::rt::current_or_global_handle();
@@ -336,8 +328,7 @@ impl SliceFeed {
                 continue;
             }
             seen_gen = frame.generation;
-            let value: Value = serde_json::from_str(&frame.json).unwrap_or(Value::Null);
-            if !emit(frame.seq, &value) {
+            if !emit(frame.seq, &frame.json) {
                 return;
             }
         }
@@ -574,11 +565,6 @@ impl StateFeed {
     /// Returns the current pre-encoded JSON snapshot for `kind`.
     pub fn snapshot_json(&self, kind: SliceKind) -> Arc<str> {
         self.feeds.get(kind).snapshot_json()
-    }
-
-    /// Returns the parsed JSON value snapshot for `kind`.
-    pub fn snapshot_value(&self, kind: SliceKind) -> Value {
-        self.feeds.get(kind).snapshot_value()
     }
 
     /// Subscribes to pre-encoded JSON updates on `kind` via `tokio::sync::watch<Arc<str>>`.

@@ -56,7 +56,7 @@ impl Board {
                 Some(path) => {
                     let dir = self.worktree().repo_dir(path);
                     let found = Repo::discover(&dir)?.ok_or(BoardError::NotARepo(dir))?;
-                    Some(self.worktree().repo_ref(found.root()))
+                    Some(self.worktree().repo_ref_async(found.root()).await)
                 }
             };
             if let Some(agent) = upd.agent.as_deref().map(str::trim).filter(|a| !a.is_empty()) {
@@ -144,9 +144,9 @@ impl Board {
             return Err(refused("server.issue.started", &[]));
         }
         if let Some(r) = &issue.refining {
-            self.sessions().dismiss_async(&r.session, Leave::Discard).await?;
+            self.session_engine().dismiss_async(&r.session, Leave::Discard).await?;
         }
-        if let Some(main) = self.worktree().main_repo(issue.repo.as_deref())?
+        if let Some(main) = self.worktree().main_repo_async(issue.repo.as_deref()).await?
             && !self.worktree().discard(&main, issue.number)?
         {
             return Err(refused(
@@ -294,7 +294,7 @@ impl Board {
                 self.change_async(&issue.id, IssueChange::Failed { findings: all }).await?;
             }
             if let Some(s) = self.on_board_async(&issue).await {
-                self.sessions().dismiss_async(&s.id, Leave::KeepBranch).await?;
+                self.session_engine().dismiss_async(&s.id, Leave::KeepBranch).await?;
             }
             self.change_async(&issue.id, IssueChange::Assigned(agent.to_string())).await?;
             let kind = if mv == vibevalley_core::Move::Start {

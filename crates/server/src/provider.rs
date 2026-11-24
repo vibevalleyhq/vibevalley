@@ -168,8 +168,8 @@ impl Provider {
         self.setting.providers().status()
     }
 
-    pub fn update(&self, input: &ProviderUpdate) -> Result<ProviderStatus, ApiError> {
-        let next = self.setting.update_providers(|current| connections_over(current, input))?;
+    pub async fn update_async(&self, input: &ProviderUpdate) -> Result<ProviderStatus, ApiError> {
+        let next = self.setting.update_providers_async(|current| connections_over(current, input)).await?;
         Ok(next.status())
     }
 

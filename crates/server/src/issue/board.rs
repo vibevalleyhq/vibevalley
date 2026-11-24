@@ -6,7 +6,6 @@
 //! One process holds a board at a time (a lock file next to its data); others
 //! read it with [`Board::snapshot_async`].
 
-use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
@@ -85,7 +84,7 @@ pub struct Board {
     /// Held by every change to the workflow (not by event pumps), so rooms
     /// are counted and issues sent one at a time.
     pub(super) work: AsyncMutex<()>,
-    lock: Mutex<Option<File>>,
+    lock: Mutex<Option<tokio::fs::File>>,
 }
 
 /// Bridges session round completions back onto [`Board`].
@@ -141,10 +140,10 @@ impl Board {
         channel: Option<Arc<Chat>>,
     ) -> Result<Arc<Board>> {
         let config = runtime.config();
-        std::fs::create_dir_all(config.data_dir.join("reports")).map_err(io)?;
-        std::fs::create_dir_all(config.data_dir.join("records")).map_err(io)?;
+        tokio::fs::create_dir_all(config.data_dir.join("reports")).await.map_err(io)?;
+        tokio::fs::create_dir_all(config.data_dir.join("records")).await.map_err(io)?;
         let lock_path = config.data_dir.join("board.lock");
-        let file = File::create(&lock_path).map_err(io)?;
+        let file = tokio::fs::File::create(&lock_path).await.map_err(io)?.into_std().await;
         // A child process forked while the last holder had it open may hold
         // it a moment longer.
         let deadline = Instant::now() + Duration::from_secs(2);
@@ -164,9 +163,9 @@ impl Board {
             create_keys: AsyncRequestKeys::default(),
             status_keys: AsyncRequestKeys::default(),
             work: AsyncMutex::new(()),
-            lock: Mutex::new(Some(file)),
+            lock: Mutex::new(Some(tokio::fs::File::from_std(file))),
         });
-        board.runtime.session().on_rounds(Box::new(Heard(Arc::downgrade(&board))));
+        board.runtime.session_engine().on_rounds(Box::new(Heard(Arc::downgrade(&board))));
         {
             let _work = board.work.lock().await;
             board.recover_published_deliveries_async().await?;
@@ -181,7 +180,7 @@ impl Board {
             }
             // A draft cut short leaves its issue as it was.
             for draft in opened.drafts {
-                board.runtime.session().dismiss_async(&draft, Leave::Discard).await?;
+                board.runtime.session_engine().dismiss_async(&draft, Leave::Discard).await?;
             }
         }
         Ok(board)
@@ -194,8 +193,8 @@ impl Board {
     }
 
     /// Lets the board go: active sessions stop and the lock is released.
-    pub fn close(&self) {
-        self.runtime.close();
+    pub async fn close_async(&self) {
+        self.runtime.close_async().await;
         self.lock.lock().take();
     }
 
@@ -215,8 +214,8 @@ impl Board {
         &self.runtime
     }
 
-    pub fn sessions(&self) -> &SessionEngine {
-        self.runtime.session()
+    pub fn session_engine(&self) -> &SessionEngine {
+        self.runtime.session_engine()
     }
 
     pub fn worktree(&self) -> &Worktree {
@@ -292,7 +291,7 @@ impl Board {
                 if remote_machine && is_remote_repo_url(&raw) {
                     (None, Some(raw.trim().to_string()))
                 } else {
-                    (Some(self.worktree().ensure_repo(self.worktree().repo_dir(&raw))?), None)
+                    (Some(self.worktree().ensure_repo_async(self.worktree().repo_dir(&raw)).await?), None)
                 }
             }
             None => (None, None),
@@ -317,7 +316,7 @@ impl Board {
             return Err(BoardError::Other(format!("issue #{} is closed", p.number)));
         }
         let repo_root = match (&repo, remote_repo_ref, &parent) {
-            (Some(r), _, _) => Some(self.worktree().repo_ref(r.root())),
+            (Some(r), _, _) => Some(self.worktree().repo_ref_async(r.root()).await),
             (None, Some(url), _) => Some(url),
             (None, None, Some(p)) => p.repo.clone(),
             (None, None, None) => None,
@@ -473,7 +472,7 @@ impl Board {
                 return Err(BoardError::Refused(if issue.was_sent() { Refusal::Reopen } else { Refusal::Revive }));
             }
             if let Some(session) = self.on_board_async(&issue).await
-                && let Some(steered) = self.sessions().steer_async(&session, words).await
+                && let Some(steered) = self.session_engine().steer_async(&session, words).await
             {
                 return steered;
             }
@@ -499,7 +498,7 @@ impl Board {
         }
         let _work = self.work.lock().await;
         let issue = self.stored_async(reference).await?;
-        let sessions = self.sessions();
+        let sessions = self.session_engine();
         let sub = sessions.submit_words_async(&issue.id, key, words).await?;
         match sub.status {
             vibevalley_runtime::agent::durable::SubmissionStatus::Done | vibevalley_runtime::agent::durable::SubmissionStatus::Placed => return Ok(()),
@@ -518,7 +517,7 @@ impl Board {
         if issue.status.is_closed() {
             let e = BoardError::Refused(if issue.was_sent() { Refusal::Reopen } else { Refusal::Revive });
             let _ = sessions.settle_mailbox_async(mail_entry.id, false, Some(&e.to_string())).await;
-            sessions.settle_words_async(&sub.id, false, &serde_json::json!({"error":e.to_string()})).await?;
+            sessions.settle_words_async(&sub.id, false, Some(&e.to_string())).await?;
             return Err(e);
         }
         if let Some(session) = board_session
@@ -535,7 +534,7 @@ impl Board {
                 .settle_mailbox_async(mail_entry.id, result.is_ok(), result.as_ref().err().map(|e| e.to_string()).as_deref())
                 .await;
             if let Err(e) = &result {
-                sessions.settle_words_async(&sub.id, false, &serde_json::json!({"error":e.to_string()})).await?;
+                sessions.settle_words_async(&sub.id, false, Some(&e.to_string())).await?;
             }
             return result;
         }
@@ -566,7 +565,7 @@ impl Board {
         let issue = self.stored_async(reference).await?;
         let refining = issue.refining.as_ref().map(|r| r.session.clone());
         let session = refining.or_else(|| issue.latest_session_id().cloned());
-        self.sessions().stop(&session.unwrap_or_default())
+        self.session_engine().stop(&session.unwrap_or_default())
     }
 
     /// Sends queued issues while there is room, in board order. Children in
@@ -624,7 +623,7 @@ impl Board {
             if self.on_board_async(issue).await.is_some_and(|s| s.phase.is_working()) {
                 continue;
             }
-            if self.sessions().queued_words_async(&issue.id).await.is_ok_and(|q| !q.is_empty())
+            if self.session_engine().queued_words_async(&issue.id).await.is_ok_and(|q| !q.is_empty())
                 && let Err(e) = self.dispatch_replies_async(issue).await
             {
                 eprintln!("vibevalley: queued replies for {}: {e}", issue.id);
@@ -684,7 +683,7 @@ impl Board {
             }
             let kept = self.take_words_async(id).await?;
             let original = words.clone();
-            let deliveries = self.sessions().queued_words_async(id).await?;
+            let deliveries = self.session_engine().queued_words_async(id).await?;
             let words = words
                 .into_iter()
                 .chain(deliveries.iter().filter_map(|s| s.payload["text"].as_str().map(str::to_owned)))
@@ -710,7 +709,7 @@ impl Board {
                             brief(&issue, &all_issues, Some(words))
                         )
                     };
-                    self.sessions().next_round_async(&issue, &s, words, again, trigger).await
+                    self.session_engine().next_round_async(&issue, &s, words, again, trigger).await
                 }
                 None => self.hire_async(&issue, &all_issues, words.clone(), kind).await,
             };
@@ -752,17 +751,17 @@ impl Board {
             };
             (PathBuf::new(), branch, base)
         } else {
-            match wp.main_repo(issue.repo.as_deref())? {
+            match wp.main_repo_async(issue.repo.as_deref()).await? {
                 Some(main) => {
                     let base = wp.base(&main, parent_number)?;
-                    let (dir, branch) = wp.worktree(&main, issue.number, &base)?;
+                    let (dir, branch) = wp.worktree_async(&main, issue.number, &base).await?;
                     (dir, Some(branch), Some(base))
                 }
-                None => (wp.context(&issue.id)?, None, None),
+                None => (wp.context_async(&issue.id).await?, None, None),
             }
         };
         let name = format!("{} #{}", drive.name, issue.number);
-        self.sessions()
+        self.session_engine()
             .hire_async(Hire {
                 issue,
                 prompt: brief(issue, all, words.as_deref()),
@@ -807,8 +806,8 @@ impl Board {
             return Ok(Some(updated));
         }
         if let Some(s) = self.on_board_async(&updated).await {
-            self.sessions().dismiss_async(&s.id, Leave::KeepBranch).await?;
-        } else if let Some(main) = self.worktree().main_repo(updated.repo.as_deref())? {
+            self.session_engine().dismiss_async(&s.id, Leave::KeepBranch).await?;
+        } else if let Some(main) = self.worktree().main_repo_async(updated.repo.as_deref()).await? {
             self.worktree().clear_checkout(&main, updated.number)?;
         }
         let change = match state {
@@ -825,40 +824,47 @@ impl Board {
     /// Finds an open issue whose worktree or `vibevalley/issue-<n>` branch
     /// matches a published branch in `cwd`.
     pub async fn open_issue_for_branch_async(&self, cwd: &str, branch: &str) -> Option<Issue> {
-        let cwd_canon = std::fs::canonicalize(cwd).ok();
-        let repo_root = vibevalley_git::Repo::discover(Path::new(cwd))
-            .ok()
-            .flatten()
-            .and_then(|r| std::fs::canonicalize(r.root()).ok());
+        let cwd_canon = tokio::fs::canonicalize(cwd).await.ok();
+        let cwd_owned = cwd.to_string();
+        let raw_repo_root = crate::log::spawn_blocking_traced(move || {
+            vibevalley_git::Repo::discover(Path::new(&cwd_owned))
+                .ok()
+                .flatten()
+                .map(|r| r.root().to_path_buf())
+        })
+        .await
+        .ok()
+        .flatten();
+        let repo_root = match raw_repo_root {
+            Some(r) => tokio::fs::canonicalize(r).await.ok(),
+            None => None,
+        };
         let issues = self.issues_async().await.ok()?;
         let sessions = self.sessions_async().await.ok()?;
-        issues.into_iter().find(|issue| {
+        for issue in issues {
             if issue.status.is_closed() {
-                return false;
+                continue;
             }
             let session = issue.latest_session_id().and_then(|id| sessions.iter().find(|s| s.id == *id));
             if let Some(wt) = session.and_then(|s| s.cwd.as_deref()) {
-                let wt_canon = std::fs::canonicalize(wt).ok();
+                let wt_canon = tokio::fs::canonicalize(wt).await.ok();
                 if (wt == cwd || (wt_canon.is_some() && wt_canon == cwd_canon))
                     && (session.and_then(|s| s.worktree_branch()) == Some(branch) || issue_branch(issue.number) == branch)
                 {
-                    return true;
+                    return Some(issue);
                 }
             }
             if issue_branch(issue.number) != branch {
-                return false;
+                continue;
             }
-            match (&issue.repo, &repo_root) {
-                (Some(repo), Some(root)) => self
-                    .worktree()
-                    .main_repo(Some(repo.as_str()))
-                    .ok()
-                    .flatten()
-                    .and_then(|m| std::fs::canonicalize(m.root()).ok())
-                    .is_some_and(|m| &m == root),
-                _ => false,
+            if let (Some(repo), Some(root)) = (&issue.repo, &repo_root)
+                && let Ok(Some(m)) = self.worktree().main_repo_async(Some(repo.as_str())).await
+                && tokio::fs::canonicalize(m.root()).await.ok().as_ref() == Some(root)
+            {
+                return Some(issue);
             }
-        })
+        }
+        None
     }
 
     /// The issue's work as it stands.
@@ -870,7 +876,8 @@ impl Board {
         let issue = self.stored_async(reference).await?;
         let wp = self.worktree();
         let main = wp
-            .main_repo(issue.repo.as_deref())?
+            .main_repo_async(issue.repo.as_deref())
+            .await?
             .ok_or_else(|| BoardError::Other("the issue has no repository".into()))?;
         if issue.status.is_closed()
             && let Some(evidence) = &issue.delivery_evidence
@@ -894,7 +901,7 @@ impl Board {
             title: &issue.title,
             worktree: worktree.as_deref(),
         };
-        wp.changes(
+        wp.changes_async(
             &main,
             &at,
             base,
@@ -907,12 +914,13 @@ impl Board {
                     .map(|r| r.revision.tree.as_str())
             }),
         )
+        .await
     }
 
     /// The branch the issue's work forked from: its session's, else its
     /// parent's or the main branch.
     async fn session_base_async(&self, issue: &Issue, main: &vibevalley_git::Repo) -> Result<String> {
-        match self.on_board_async(issue).await.and_then(|s| self.sessions().base_branch(&s.id)) {
+        match self.on_board_async(issue).await.and_then(|s| self.session_engine().base_branch(&s.id)) {
             Some(base) => Ok(base),
             None => {
                 let parent = match issue.parent.as_deref() {
@@ -956,7 +964,8 @@ impl Board {
         let worktree = session.as_ref().and_then(|s| s.cwd.as_deref());
         let tree = self
             .worktree()
-            .checkout(&main, issue.number, worktree, false)?
+            .checkout_async(&main, issue.number, worktree, false)
+            .await?
             .as_ref()
             .map(vibevalley_git::Repo::worktree_tree)
             .transpose()?;
@@ -977,7 +986,7 @@ impl Board {
             if issue.deliver == Deliverable::PullRequest && issue.pull_request.is_none() {
                 return Err(BoardError::Other(vibevalley_i18n::t("server.issue.deliveryNeedsPr", &[])));
             }
-            let main = wp.main_repo(issue.repo.as_deref())?;
+            let main = wp.main_repo_async(issue.repo.as_deref()).await?;
             let pr_merged = issue.deliver == Deliverable::Change
                 && issue
                     .pull_request
@@ -1058,7 +1067,7 @@ impl Board {
             } else {
                 Leave::Discard
             };
-            self.sessions().dismiss_async(&s.id, leave).await?;
+            self.session_engine().dismiss_async(&s.id, leave).await?;
         } else if let Some(main) = main {
             self.worktree().clear_checkout(main, issue.number)?;
         }
@@ -1082,10 +1091,10 @@ impl Board {
                 self.close_issue_async(&child, why).await?;
             }
             if let Some(r) = &issue.refining {
-                self.sessions().dismiss_async(&r.session, Leave::Discard).await?;
+                self.session_engine().dismiss_async(&r.session, Leave::Discard).await?;
             }
             if let Some(s) = self.on_board_async(issue).await {
-                self.sessions().dismiss_async(&s.id, Leave::KeepBranch).await?;
+                self.session_engine().dismiss_async(&s.id, Leave::KeepBranch).await?;
             }
             let _ = self.take_words_async(&issue.id).await;
             self.change_async(&issue.id, IssueChange::Canceled(why)).await?;

@@ -6,47 +6,37 @@ pub mod media;
 pub mod types;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::future::Future;
 use std::path::PathBuf;
-use std::pin::Pin;
 use std::sync::Arc;
 
 pub use library::{AddedBy, Library};
 pub use media::Media;
 use parking_lot::Mutex;
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-use serde_json::Value;
 use tokio::sync::broadcast;
 use vibevalley_core::artifact::{type_spec, validate_artifact_path, validate_deletable_path};
 use vibevalley_core::collab::{CommitMeta, encode_frontiers};
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    ApiError, Artifact as Wire, ArtifactCard, ArtifactContent, ArtifactDeleteInput, ArtifactEvent, ArtifactFileContent, ArtifactFileDeleteRequest,
-    ArtifactFileDeleteResult, ArtifactFileEncoding, ArtifactFileGetRequest, ArtifactFileListRequest, ArtifactFileListResult, ArtifactFileWriteItem,
-    ArtifactFileWriteRequest, ArtifactFileWriteResult, ArtifactGetInput, ArtifactHistoryCompactRequest, ArtifactHistoryForkRequest, ArtifactHistoryListRequest,
-    ArtifactHistoryPreviewRequest, ArtifactHistoryRestoreRequest, ArtifactHistoryUndoOriginRequest, ArtifactListRequest, ArtifactPresenceEvent,
-    ArtifactPresenceUpdateRequest, ArtifactReadRequest, ArtifactRequest, ArtifactSaid, ArtifactSuggestionAcceptInput, ArtifactSuggestionCreateInput,
-    ArtifactSuggestionListInput, ArtifactType, ArtifactTypeReadRequest, ArtifactUpdateRequest, ArtifactVersion, ArtifactVersionRequest, BizCode, Caller,
-    ChatMessage, EndpointId, Op, Preview, Suggestion, SuggestionChange, SuggestionEvent, USER_ID, ops,
+    ApiError, Artifact as Wire, ArtifactCard, ArtifactContent, ArtifactEvent, ArtifactFileContent, ArtifactFileDeleteRequest, ArtifactFileDeleteResult,
+    ArtifactFileEncoding, ArtifactFileGetRequest, ArtifactFileListRequest, ArtifactFileListResult, ArtifactFileWriteItem, ArtifactFileWriteRequest,
+    ArtifactFileWriteResult, ArtifactListRequest, ArtifactPresenceEvent, ArtifactRequest, ArtifactSaid, ArtifactType, ArtifactUpdateRequest, ArtifactVersion,
+    ArtifactVersionRequest, BizCode, Caller, ChatMessage, Preview, Suggestion, SuggestionChange, SuggestionEvent, USER_ID,
 };
 
 use self::collab::{
     PresenceRoom, commit_meta_for_maker, export_doc_snapshot, guess_mime, ingest_files_into_doc, sha256_hex_bytes, sync_manifest_title_raw,
     upsert_file_for_write,
 };
-use crate::CallerContext;
+use crate::context::api::{CallerContext, media::SharedSpeechStreams};
+use crate::context::port::ChannelAnnounce;
 use crate::context::{Context, LookIn, missing};
 use crate::db::DbError;
-use crate::gateway::api::media::SharedSpeechStreams;
 use crate::service::artifact::{ArtifactRow, NewArtifact, NewVersion, StoredSuggestion, VersionRow};
 use crate::setting::Setting;
 use crate::storage::Storage;
 
 const TITLE_MAX: usize = 200;
 const LIST_LIMIT: i64 = 500;
-
-pub(crate) type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 pub(super) fn refused(text: impl Into<String>) -> ApiError {
     ApiError::new(BizCode::ArtifactRefused, text.into())
@@ -74,30 +64,6 @@ pub(super) fn encode_manifest_title_if_needed(files: &mut BTreeMap<String, Vec<u
         files.insert("manifest.json".to_string(), updated);
     }
     Ok(())
-}
-
-/// Announces new or updated artifact cards back to the owning chat channel.
-pub trait ChannelAnnounce: Send + Sync {
-    fn place_exists(&self, id: &str) -> bool;
-    fn orchestrator_in(&self, channel: &str) -> String;
-    fn place_of_async<'a>(&'a self, who: &'a str, target: &'a str) -> BoxFuture<'a, Result<String, ApiError>>;
-    fn post_card_async<'a>(
-        &'a self,
-        from: &'a str,
-        channel: &'a str,
-        text: &'a str,
-        card: ArtifactCard,
-        run: Option<String>,
-        send_key: String,
-    ) -> BoxFuture<'a, Result<ChatMessage, ApiError>>;
-    fn post_attachments_async<'a>(
-        &'a self,
-        from: &'a str,
-        channel: &'a str,
-        text: &'a str,
-        attachments: Vec<String>,
-        send_key: String,
-    ) -> BoxFuture<'a, Result<ChatMessage, ApiError>>;
 }
 
 /// Identity of an artifact creator or editor.
@@ -913,8 +879,36 @@ impl Manager {
         })
     }
 
-    /// Dispatches all artifact, media library, and media job endpoints for `router.rs`.
-    pub async fn dispatch_endpoint_async(&self, caller: &CallerContext, id: EndpointId, payload: Value) -> Result<Value, ApiError> {
+    pub(crate) async fn added_by_for_caller_async(&self, caller: &CallerContext) -> AddedBy {
+        match caller.caller {
+            Caller::User | Caller::Remote => AddedBy::User,
+            Caller::Orchestrator => AddedBy::Agent {
+                agent: caller.client.as_ref().map(|c| c.id.clone()).unwrap_or_default(),
+                session: None,
+                dir: None,
+            },
+            Caller::Session => {
+                let sid = caller.client.as_ref().map(|c| c.id.clone()).unwrap_or_default();
+                let (agent, dir) = self
+                    .ctx
+                    .service
+                    .session
+                    .get(&sid)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|h| (h.profile.unwrap_or_default(), h.cwd.map(PathBuf::from)))
+                    .unwrap_or_default();
+                AddedBy::Agent {
+                    agent,
+                    session: (!sid.is_empty()).then_some(sid),
+                    dir,
+                }
+            }
+        }
+    }
+
+    pub(crate) fn caller_meta(&self, caller: &CallerContext) -> (Maker, String, CommitMeta) {
         let (maker, actor, meta_summary) = caller_identity(caller);
         let at = self.ctx.now();
         let mut commit_meta = commit_meta_for_maker(&maker, meta_summary, at);
@@ -923,235 +917,7 @@ impl Manager {
         {
             commit_meta = CommitMeta::session(&actor, &actor, &client.id, 1, None, at);
         }
-
-        match id {
-            EndpointId::MediaDialogueCreate => {
-                let req: <ops::MediaDialogueCreate as Op>::Input = decode(payload)?;
-                encode(self.media.create_speakers_for_caller_async(caller.caller, req).await?)
-            }
-            EndpointId::MediaVoiceDesignCreate => {
-                let req: <ops::MediaVoiceDesignCreate as Op>::Input = decode(payload)?;
-                encode(self.media.create_voice_design_for_caller_async(caller.caller, req).await?)
-            }
-            EndpointId::MediaCloneCreate => {
-                let req: <ops::MediaCloneCreate as Op>::Input = decode(payload)?;
-                encode(self.media.clone_voice_async(req).await?)
-            }
-            EndpointId::MediaTranscriptionCreate => {
-                let req: <ops::MediaTranscriptionCreate as Op>::Input = decode(payload)?;
-                encode(self.media.transcription_async(req).await?)
-            }
-            EndpointId::MediaAudioResume => {
-                let req: <ops::MediaAudioResume as Op>::Input = decode(payload)?;
-                encode(self.media.audio_resume_async(&req.id).await?)
-            }
-            EndpointId::MediaAudioPreviewCleanup => {
-                let req: <ops::MediaAudioPreviewCleanup as Op>::Input = decode(payload)?;
-                encode(self.media.preview_audio_cleanup_async(&req.id).await?)
-            }
-            EndpointId::MediaAudioCleanup => {
-                let req: <ops::MediaAudioCleanup as Op>::Input = decode(payload)?;
-                encode(self.media.audio_cleanup_async(&req.id).await?)
-            }
-            EndpointId::MediaImageCreate => {
-                let req: <ops::MediaImageCreate as Op>::Input = decode(payload)?;
-                encode(self.media.create_image_for_caller_async(caller.caller, req).await?)
-            }
-            EndpointId::MediaUnderstandingCreate => {
-                let req: <ops::MediaUnderstandingCreate as Op>::Input = decode(payload)?;
-                encode(self.media.understanding_async(req).await?)
-            }
-            EndpointId::MediaUnderstandingAuthorize => {
-                let req: <ops::MediaUnderstandingAuthorize as Op>::Input = decode(payload)?;
-                encode(self.media.authorize_understanding_async(req).await?)
-            }
-            EndpointId::MediaUnderstandingStart => {
-                let req: <ops::MediaUnderstandingStart as Op>::Input = decode(payload)?;
-                encode(self.media.start_understanding_for_caller_async(caller.caller, &req.id).await?)
-            }
-            EndpointId::MediaSpeechCreate => {
-                let req: <ops::MediaSpeechCreate as Op>::Input = decode(payload)?;
-                encode(self.media.create_speech_for_caller_async(caller.caller, req).await?)
-            }
-            EndpointId::MediaSpeechResume => {
-                let req: <ops::MediaSpeechResume as Op>::Input = decode(payload)?;
-                encode(self.media.resume_async(&req.id).await?)
-            }
-            EndpointId::MediaUnderstandingPreviewCleanup => {
-                let req: <ops::MediaUnderstandingPreviewCleanup as Op>::Input = decode(payload)?;
-                encode(self.media.preview_understanding_cleanup_async(&req.id).await?)
-            }
-            EndpointId::MediaUnderstandingCleanup => {
-                let req: <ops::MediaUnderstandingCleanup as Op>::Input = decode(payload)?;
-                encode(self.media.understanding_cleanup_async(&req.id).await?)
-            }
-            EndpointId::MediaJobGet => {
-                let req: <ops::MediaJobGet as Op>::Input = decode(payload)?;
-                encode(self.media.get_async(&req.id).await?)
-            }
-            EndpointId::MediaJobCancel => {
-                let req: <ops::MediaJobCancel as Op>::Input = decode(payload)?;
-                encode(self.media.cancel_async(&req.id).await?)
-            }
-            EndpointId::MediaJobPreviewRelease => {
-                let req: <ops::MediaJobPreviewRelease as Op>::Input = decode(payload)?;
-                encode(self.media.preview_release_async(&req.id).await?)
-            }
-            EndpointId::MediaJobRelease => {
-                let req: <ops::MediaJobRelease as Op>::Input = decode(payload)?;
-                encode(self.media.release_async(&req.id).await?)
-            }
-            EndpointId::MediaJobDownload => {
-                let req: <ops::MediaJobDownload as Op>::Input = decode(payload)?;
-                encode(self.media.retry_download_async(&req.id).await?)
-            }
-            EndpointId::MediaJobList => encode(self.media.list_async().await?),
-            EndpointId::LibraryItemList => {
-                let req: <ops::LibraryItemList as Op>::Input = decode(payload)?;
-                encode(self.library.list_async(&req).await?)
-            }
-            EndpointId::LibraryItemAdd => {
-                let req: <ops::LibraryItemAdd as Op>::Input = decode(payload)?;
-                let by = match caller.caller {
-                    Caller::User | Caller::Remote => AddedBy::User,
-                    Caller::Orchestrator => AddedBy::Agent {
-                        agent: caller.client.as_ref().map(|c| c.id.clone()).unwrap_or_default(),
-                        session: None,
-                        dir: None,
-                    },
-                    Caller::Session => {
-                        let sid = caller.client.as_ref().map(|c| c.id.clone()).unwrap_or_default();
-                        let (agent, dir) = self
-                            .ctx
-                            .service
-                            .session
-                            .get(&sid)
-                            .await
-                            .ok()
-                            .flatten()
-                            .map(|h| (h.profile.unwrap_or_default(), h.cwd.map(PathBuf::from)))
-                            .unwrap_or_default();
-                        AddedBy::Agent {
-                            agent,
-                            session: (!sid.is_empty()).then_some(sid),
-                            dir,
-                        }
-                    }
-                };
-                encode(self.library.add_async(&req, &by).await?)
-            }
-            EndpointId::LibraryItemDelete => {
-                let req: <ops::LibraryItemDelete as Op>::Input = decode(payload)?;
-                self.library.remove_async(&req.id).await?;
-                Ok(Value::Null)
-            }
-            EndpointId::LibraryItemPreviewDelete => {
-                let req: <ops::LibraryItemPreviewDelete as Op>::Input = decode(payload)?;
-                encode(self.library.preview_remove_async(&req.id).await?)
-            }
-            EndpointId::ArtifactList => {
-                let req: ArtifactListRequest = decode(payload)?;
-                encode(self.list_async(&req).await?)
-            }
-            EndpointId::ArtifactGet => {
-                let req: ArtifactGetInput = decode(payload)?;
-                encode(self.get_async(&req.id).await?)
-            }
-            EndpointId::ArtifactContentGet => {
-                let req: ArtifactReadRequest = decode(payload)?;
-                encode(self.content_async(&req.id, req.version).await?)
-            }
-            EndpointId::ArtifactCreate => {
-                let req: ArtifactRequest = decode(payload)?;
-                encode(self.create_async(&maker, &req).await?)
-            }
-            EndpointId::ArtifactVersionCreate => {
-                let req: ArtifactVersionRequest = decode(payload)?;
-                encode(self.version_with_meta_async(&maker, &req, &commit_meta).await?)
-            }
-            EndpointId::ArtifactUpdate => {
-                let req: ArtifactUpdateRequest = decode(payload)?;
-                encode(self.update_async(&req).await?)
-            }
-            EndpointId::ArtifactDelete => {
-                let req: ArtifactDeleteInput = decode(payload)?;
-                self.remove_async(&req.id).await?;
-                Ok(Value::Null)
-            }
-            EndpointId::ArtifactPreviewDelete => {
-                let req: <ops::ArtifactPreviewDelete as Op>::Input = decode(payload)?;
-                encode(self.preview_remove_async(&req.id).await?)
-            }
-            EndpointId::ArtifactFileList => {
-                let req: ArtifactFileListRequest = decode(payload)?;
-                encode(self.list_files_async(&req).await?)
-            }
-            EndpointId::ArtifactFileGet => {
-                let req: ArtifactFileGetRequest = decode(payload)?;
-                encode(self.get_file_async(&req).await?)
-            }
-            EndpointId::ArtifactFileWrite => {
-                let req: ArtifactFileWriteRequest = decode(payload)?;
-                encode(self.write_files_with_meta_async(&maker, &req, &commit_meta).await?)
-            }
-            EndpointId::ArtifactFileDelete => {
-                let req: ArtifactFileDeleteRequest = decode(payload)?;
-                encode(self.delete_file_with_meta_async(&maker, &req, &commit_meta).await?)
-            }
-            EndpointId::ArtifactSuggestionList => {
-                let req: ArtifactSuggestionListInput = decode(payload)?;
-                encode(self.suggestions_async(&req.id).await?)
-            }
-            EndpointId::ArtifactSuggestionCreate => {
-                let req: ArtifactSuggestionCreateInput = decode(payload)?;
-                encode(self.create_suggestion_async(&actor, &req).await?)
-            }
-            EndpointId::ArtifactSuggestionAccept => {
-                let req: ArtifactSuggestionAcceptInput = decode(payload)?;
-                encode(self.accept_suggestion_async(&actor, &req).await?)
-            }
-            EndpointId::ArtifactSuggestionReject => {
-                let req: ArtifactSuggestionAcceptInput = decode(payload)?;
-                encode(self.reject_suggestion_async(&actor, &req.id, &req.suggestion).await?)
-            }
-            EndpointId::ArtifactTypeList => encode(self.list_types_async().await?),
-            EndpointId::ArtifactTypeRead => {
-                let req: ArtifactTypeReadRequest = decode(payload)?;
-                encode(self.read_type_async(&req).await?)
-            }
-            EndpointId::ArtifactPresenceUpdate => {
-                let req: ArtifactPresenceUpdateRequest = decode(payload)?;
-                encode(self.update_presence_async(&req).await?)
-            }
-            EndpointId::ArtifactHistoryList => {
-                let req: ArtifactHistoryListRequest = decode(payload)?;
-                encode(self.history_list_async(&req).await?)
-            }
-            EndpointId::ArtifactHistoryPreview => {
-                let req: ArtifactHistoryPreviewRequest = decode(payload)?;
-                encode(self.history_preview_async(&req).await?)
-            }
-            EndpointId::ArtifactHistoryRestore => {
-                let req: ArtifactHistoryRestoreRequest = decode(payload)?;
-                encode(self.history_restore_async(&maker, &req).await?)
-            }
-            EndpointId::ArtifactHistoryFork => {
-                let req: ArtifactHistoryForkRequest = decode(payload)?;
-                encode(self.history_fork_async(&maker, &req).await?)
-            }
-            EndpointId::ArtifactHistoryUndoOrigin => {
-                let req: ArtifactHistoryUndoOriginRequest = decode(payload)?;
-                encode(self.history_undo_origin_async(&maker, &req).await?)
-            }
-            EndpointId::ArtifactHistoryCompact => {
-                let req: ArtifactHistoryCompactRequest = decode(payload)?;
-                encode(self.history_compact_async(&req).await?)
-            }
-            other => Err(ApiError::new(
-                BizCode::RouteNotFound,
-                format!("unexpected endpoint `{}` in artifact domain", other.as_op()),
-            )),
-        }
+        (maker, actor, commit_meta)
     }
 }
 
@@ -1201,14 +967,6 @@ fn caller_identity(caller: &CallerContext) -> (Maker, String, Option<String>) {
             None,
         ),
     }
-}
-
-fn decode<T: DeserializeOwned>(payload: Value) -> Result<T, ApiError> {
-    serde_json::from_value(payload).map_err(|e| refused(e.to_string()))
-}
-
-fn encode<T: Serialize>(value: T) -> Result<Value, ApiError> {
-    serde_json::to_value(value).map_err(|e| ApiError::new(BizCode::InternalError, format!("artifact serialize: {e}")))
 }
 
 fn say_of(key: &str, title: &str, note: &str) -> String {

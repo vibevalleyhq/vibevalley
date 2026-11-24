@@ -43,10 +43,10 @@ fn graded_issue(
     let user = |op: &str, req| via_http(&listener, op, req);
     user("repo.create", json!({"name":"r"}));
     user("artifact.create", json!({"title":"unrelated artifact private marker","artifactType":"docs"}));
-    let mut helper = server.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(server.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.name = "Checked".into();
     helper.runtime = "vibevalley".into();
-    server.test_internals().agent.profile.store.save(helper).unwrap();
+    vibevalley_runtime::rt::block_on(server.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let issue = user(
         "issue.create",
         json!({"title":"Deliver the requested file","description":"Local grading example","agent":"Checked","repo":"r","criteria":criteria}),

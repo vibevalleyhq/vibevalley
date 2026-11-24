@@ -10,8 +10,8 @@ use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
 use crate::BoxFuture;
+use crate::context::api::Mcp as McpGateway;
 use crate::context::port::{ToolDispatchPort, ToolSpecWire};
-use crate::gateway::api::Mcp as McpGateway;
 
 pub use resource::{Resource, ResourceReadArgs};
 
@@ -74,7 +74,7 @@ impl Mcp {
                     .tools
                     .iter()
                     .map(|t| {
-                        let mut schema = t.parameters.clone();
+                        let mut schema: Value = serde_json::from_str(&t.parameters_json).unwrap_or_else(|_| json!({}));
                         schema["type"] = json!("object");
                         json!({ "name": t.name, "description": t.description, "inputSchema": schema })
                     })
@@ -90,7 +90,8 @@ impl Mcp {
                     Value::Object(map) => Value::Object(map),
                     _ => Value::Object(Map::new()),
                 };
-                let called = self.dispatch.call_helper_async(me, &call.name, &args).await;
+                let args_json = serde_json::to_string(&args).unwrap_or_else(|_| "{}".to_string());
+                let called = self.dispatch.call_helper_async(me, &call.name, &args_json).await;
                 let (text, error) = match called {
                     Ok(text) => (text, false),
                     Err(why) if why.starts_with("没成：") => (why, true),
@@ -105,24 +106,26 @@ impl Mcp {
 }
 
 impl McpGateway for Mcp {
-    fn message(&self, _token: &str, message: Value) -> Option<Value> {
-        let req: RpcRequest = serde_json::from_value(message).ok()?;
+    fn message_json(&self, _token: &str, message_json: &str) -> Option<String> {
+        let req: RpcRequest = serde_json::from_str(message_json).ok()?;
         let id = req.id.filter(|id| !id.is_null())?;
-        Some(json!({
+        serde_json::to_string(&json!({
             "jsonrpc": "2.0",
             "id": id,
-            "error": { "code": -32603, "message": "sync Mcp::message is unsupported; use Mcp::message_async" },
+            "error": { "code": -32603, "message": "sync Mcp::message_json is unsupported; use Mcp::message_json_async" },
         }))
+        .ok()
     }
 
-    fn message_async(self: Arc<Self>, token: String, message: Value) -> BoxFuture<'static, Option<Value>> {
+    fn message_json_async(self: Arc<Self>, token: String, message_json: String) -> BoxFuture<'static, Option<String>> {
         Box::pin(async move {
-            let req: RpcRequest = serde_json::from_value(message).ok()?;
+            let req: RpcRequest = serde_json::from_str(&message_json).ok()?;
             let id = req.id.filter(|id| !id.is_null())?;
-            Some(match self.result_async(&token, &req.method, req.params).await {
+            let response = match self.result_async(&token, &req.method, req.params).await {
                 Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
                 Err((code, why)) => json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": why } }),
-            })
+            };
+            serde_json::to_string(&response).ok()
         })
     }
 }

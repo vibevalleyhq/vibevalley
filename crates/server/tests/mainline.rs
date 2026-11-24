@@ -117,10 +117,10 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     let url = listener.url();
     server.set_mcp_url(format!("{url}/mcp"));
     call(&url, "repo.create", json!({ "name": "demo" }));
-    let mut helper = server.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(server.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "scripted".into();
     helper.name = "Worker".into();
-    server.test_internals().agent.profile.store.save(helper).unwrap();
+    vibevalley_runtime::rt::block_on(server.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let issue = call(&url, "issue.create", json!({ "title": "Write a file", "repo": "demo", "agent": "Worker" }));
     let id = issue["id"].as_str().unwrap().to_string();
     call(&url, "issue.status.update", json!({ "id": id, "status": "todo" }));

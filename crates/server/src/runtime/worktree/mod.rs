@@ -124,10 +124,10 @@ impl Worktree {
 
     /// How an issue names a repository's top: its name when it is right
     /// under `repos_dir`, else its path.
-    pub fn repo_ref(&self, top: &Path) -> String {
+    pub async fn repo_ref_async(&self, top: &Path) -> String {
         if let Some(root) = &self.repos_dir {
-            let root = std::fs::canonicalize(root).unwrap_or_else(|_| root.clone());
-            let top = std::fs::canonicalize(top).unwrap_or_else(|_| top.to_path_buf());
+            let root = tokio::fs::canonicalize(root).await.unwrap_or_else(|_| root.clone());
+            let top = tokio::fs::canonicalize(top).await.unwrap_or_else(|_| top.to_path_buf());
             if top.parent() == Some(root.as_path())
                 && let Some(name) = top.file_name()
             {
@@ -138,41 +138,54 @@ impl Worktree {
     }
 
     /// `<work root>/AGENTS.md`, the rules every repo on this machine shares.
-    pub fn house_rules(&self) -> String {
+    pub async fn house_rules_async(&self) -> String {
         let Some(root) = self.repos_dir.as_deref().and_then(Path::parent) else {
             return String::new();
         };
-        std::fs::read_to_string(root.join("AGENTS.md")).unwrap_or_default()
+        tokio::fs::read_to_string(root.join("AGENTS.md")).await.unwrap_or_default()
     }
 
     /// The repo at `dir`; a folder under the work root that is not one yet
     /// (or not there) becomes one, with a first empty commit.
-    pub fn ensure_repo(&self, dir: PathBuf) -> Result<Repo> {
-        if let Some(repo) = Repo::discover(&dir)? {
+    pub async fn ensure_repo_async(&self, dir: PathBuf) -> Result<Repo> {
+        let dir_check = dir.clone();
+        if let Some(repo) = crate::log::spawn_blocking_traced(move || Repo::discover(&dir_check))
+            .await
+            .map_err(|e| RuntimeError::Other(e.to_string()))??
+        {
             return Ok(repo);
         }
         let ours = self.repos_dir.as_ref().is_some_and(|root| dir.starts_with(root));
         if !ours {
             return Err(RuntimeError::NotARepo(dir));
         }
-        std::fs::create_dir_all(&dir).map_err(|e| RuntimeError::Other(format!("{}: {e}", dir.display())))?;
-        let git = |args: &[&str]| {
-            std::process::Command::new("git")
-                .arg("-C")
-                .arg(&dir)
-                .args(["-c", "user.name=vibevalley", "-c", "user.email=vibevalley@localhost"])
-                .args(args)
-                .output()
-                .map_err(|e| RuntimeError::Other(e.to_string()))
-        };
-        git(&["init", "-q", "-b", "main"])?;
-        git(&["commit", "-q", "--allow-empty", "-m", "Start"])?;
-        Repo::discover(&dir)?.ok_or(RuntimeError::NotARepo(dir))
+        tokio::fs::create_dir_all(&dir)
+            .await
+            .map_err(|e| RuntimeError::Other(format!("{}: {e}", dir.display())))?;
+        crate::log::spawn_blocking_traced(move || {
+            let git = |args: &[&str]| {
+                std::process::Command::new("git")
+                    .arg("-C")
+                    .arg(&dir)
+                    .args(["-c", "user.name=vibevalley", "-c", "user.email=vibevalley@localhost"])
+                    .args(args)
+                    .output()
+                    .map_err(|e| RuntimeError::Other(e.to_string()))
+            };
+            git(&["init", "-q", "-b", "main"])?;
+            git(&["commit", "-q", "--allow-empty", "-m", "Start"])?;
+            Repo::discover(&dir)?.ok_or(RuntimeError::NotARepo(dir))
+        })
+        .await
+        .map_err(|e| RuntimeError::Other(e.to_string()))?
     }
 
     /// The repository an issue names, made when it is ours and missing.
-    pub fn main_repo(&self, repo: Option<&str>) -> Result<Option<Repo>> {
-        repo.map(|r| self.ensure_repo(self.repo_dir(r))).transpose()
+    pub async fn main_repo_async(&self, repo: Option<&str>) -> Result<Option<Repo>> {
+        match repo {
+            Some(r) => Ok(Some(self.ensure_repo_async(self.repo_dir(r)).await?)),
+            None => Ok(None),
+        }
     }
 
     /// The repository at `repo` as it is, made of nothing.
@@ -212,54 +225,70 @@ impl Worktree {
 
     /// The worktree issue `number` works in: `<worktrees>/<repo>.<number>`
     /// on its branch, cut from `base`.
-    pub fn worktree(&self, main: &Repo, number: i64, base: &str) -> Result<(PathBuf, String)> {
+    pub async fn worktree_async(&self, main: &Repo, number: i64, base: &str) -> Result<(PathBuf, String)> {
         let dir = self.dir_of(main, number);
         let branch = issue_branch(number);
-        if dir.join(".git").exists() {
+        if tokio::fs::try_exists(dir.join(".git")).await.unwrap_or(false) {
             return Ok((dir, branch));
         }
-        std::fs::create_dir_all(&self.worktrees_dir).map_err(io)?;
-        if git::branch_exists(main.root(), &branch)? {
-            git::add_worktree_on(main, &dir, &branch)?;
-        } else {
-            main.worktree_add(&dir, &branch, Some(base))?;
-        }
+        tokio::fs::create_dir_all(&self.worktrees_dir).await.map_err(io)?;
+        let main = main.clone();
+        let dir_owned = dir.clone();
+        let branch_owned = branch.clone();
+        let base_owned = base.to_string();
+        crate::log::spawn_blocking_traced(move || -> Result<()> {
+            if git::branch_exists(main.root(), &branch_owned)? {
+                git::add_worktree_on(&main, &dir_owned, &branch_owned)?;
+            } else {
+                main.worktree_add(&dir_owned, &branch_owned, Some(&base_owned))?;
+            }
+            Ok(())
+        })
+        .await
+        .map_err(|e| RuntimeError::Other(e.to_string()))??;
         Ok((dir, branch))
     }
 
     /// A new worktree for issue `number` from the main branch, whatever was
     /// there before gone: where a draft starts. Its dir, branch and base.
-    pub fn fresh_worktree(&self, main: &Repo, number: i64) -> Result<(PathBuf, String, String)> {
+    pub async fn fresh_worktree_async(&self, main: &Repo, number: i64) -> Result<(PathBuf, String, String)> {
         let base = Self::main_branch(main)?;
-        git::remove_worktree(main, &self.dir_of(main, number))?;
-        git::delete_branch(main.root(), &issue_branch(number))?;
-        let (dir, branch) = self.worktree(main, number, &base)?;
+        let main_clone = main.clone();
+        let dir_old = self.dir_of(main, number);
+        crate::log::spawn_blocking_traced(move || -> Result<()> {
+            git::remove_worktree(&main_clone, &dir_old)?;
+            git::delete_branch(main_clone.root(), &issue_branch(number))?;
+            Ok(())
+        })
+        .await
+        .map_err(|e| RuntimeError::Other(e.to_string()))??;
+        let (dir, branch) = self.worktree_async(main, number, &base).await?;
         Ok((dir, branch, base))
     }
 
     /// The folder a session works in when its issue has no repository.
-    pub fn context(&self, issue: &str) -> Result<PathBuf> {
+    pub async fn context_async(&self, issue: &str) -> Result<PathBuf> {
         let dir = self.data_dir.join("contexts").join(issue);
-        std::fs::create_dir_all(&dir).map_err(io)?;
+        tokio::fs::create_dir_all(&dir).await.map_err(io)?;
         Ok(dir)
     }
 
     /// Where the issue's work is: its session's worktree, or its own
     /// checkout (made when `make` and its branch exists).
-    pub fn checkout(&self, main: &Repo, number: i64, worktree: Option<&str>, make: bool) -> Result<Option<Repo>> {
+    pub async fn checkout_async(&self, main: &Repo, number: i64, worktree: Option<&str>, make: bool) -> Result<Option<Repo>> {
         if let Some(path) = worktree
             && let Some(repo) = Repo::discover(Path::new(path))?
         {
             return Ok(Some(repo));
         }
         let dir = self.dir_of(main, number);
-        if dir.join(".git").exists() {
+        if tokio::fs::try_exists(dir.join(".git")).await.unwrap_or(false) {
             return Ok(Repo::discover(&dir)?);
         }
         if !make || !git::branch_exists(main.root(), &issue_branch(number))? {
             return Ok(None);
         }
-        let (dir, _) = self.worktree(main, number, &Self::main_branch(main)?)?;
+        let (dir, _) = self.worktree_async(main, number, &Self::main_branch(main)?).await?;
         Ok(Repo::discover(&dir)?)
     }
 
@@ -283,9 +312,9 @@ impl Worktree {
     /// The issue's work as it stands: in its session's worktree, else (a
     /// parent whose children merged into it) its own checkout or branch.
     /// A child's conflicts are against `base`, others' against the main branch.
-    pub fn changes(&self, main: &Repo, issue: &OnDisk, base: String, child: bool, reviewed_tree: Option<&str>) -> Result<Changes> {
+    pub async fn changes_async(&self, main: &Repo, issue: &OnDisk<'_>, base: String, child: bool, reviewed_tree: Option<&str>) -> Result<Changes> {
         let branch = issue_branch(issue.number);
-        let (place, head) = match self.checkout(main, issue.number, issue.worktree, false)? {
+        let (place, head) = match self.checkout_async(main, issue.number, issue.worktree, false).await? {
             Some(place) => (place, "HEAD".to_string()),
             None if git::branch_exists(main.root(), &branch)? => (main.clone(), branch.clone()),
             None => return Err(RuntimeError::Other("never sent".into())),
@@ -355,7 +384,7 @@ impl Worktree {
                 }
                 Deliverable::Change => {
                     let target = base()?;
-                    let checkout = self.checkout(main, issue.number, issue.worktree, has_children)?;
+                    let checkout = self.checkout_async(main, issue.number, issue.worktree, has_children).await?;
                     let reviewed = evidence.and_then(|e| e.reviews.last());
                     let checked = evidence.and_then(|e| e.check.as_ref());
                     let current_tree = checkout.as_ref().map(Repo::worktree_tree).transpose()?;
@@ -427,7 +456,7 @@ impl Worktree {
     /// branch: into the parent's checkout when it has one, else straight
     /// into the branch. Not merged leaves it stuck with the reason; none
     /// when the child has no worktree to join.
-    pub fn join(&self, main: &Repo, child: &OnDisk, parent: &OnDisk, checks: &CheckoutChecks) -> Result<Option<Joined>> {
+    pub async fn join_async(&self, main: &Repo, child: &OnDisk<'_>, parent: &OnDisk<'_>, checks: &CheckoutChecks) -> Result<Option<Joined>> {
         let Some(place) = child.worktree.and_then(|w| Repo::discover(Path::new(w)).ok().flatten()) else {
             return Ok(None);
         };
@@ -440,7 +469,7 @@ impl Worktree {
             Ok(frozen) => frozen,
             Err(why) => return Ok(Some(Joined::Stuck { why, conflict: None })),
         };
-        let checkout = self.checkout(main, parent.number, parent.worktree, false)?;
+        let checkout = self.checkout_async(main, parent.number, parent.worktree, false).await?;
         if checkout.is_none() && !git::branch_exists(main.root(), &parent_branch)? {
             return Err(RuntimeError::Other(format!("issue #{} has no branch", parent.number)));
         }

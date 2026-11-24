@@ -363,8 +363,8 @@ mod tests {
     use vibevalley_protocol::{ArtifactCard, ChatMessage, MediaInputRequest, MediaUnderstandingPhase, ProviderUpdate};
 
     use super::*;
-    use crate::artifact::ChannelAnnounce;
     use crate::context::http::{Fetch, FetchError, Request, Response};
+    use crate::context::port::ChannelAnnounce;
     use crate::context::{Context, LiveState, Outbox, StateFeed, TaskGroup};
     use crate::provider::connections_over;
     use crate::service::Service;
@@ -440,12 +440,13 @@ mod tests {
             fetch.clone(),
             fetch,
         ));
-        let setting = Setting::open(SettingConfig {
+        let setting = Setting::open_async(SettingConfig {
             home: dir.path().to_path_buf(),
             work_root: dir.path().to_path_buf(),
             version: "0.1.0-test".into(),
             deepseek_api_key: String::new(),
-        });
+        })
+        .await;
         let rev = setting.providers().revision;
         let update: ProviderUpdate = serde_json::from_value(json!({
             "revision": rev,
@@ -454,7 +455,7 @@ mod tests {
             "image": null, "speech": null, "speakers": null, "voiceDesign": null, "transcription": null, "live": null, "vision": null,
         }))
         .unwrap();
-        let updated = setting.update_providers(|current| connections_over(current, &update)).unwrap();
+        let updated = setting.update_providers_async(|current| connections_over(current, &update)).await.unwrap();
         let revision = updated.revision;
 
         let storage = Storage::open_async(dir.path(), ctx.clone()).await.unwrap();

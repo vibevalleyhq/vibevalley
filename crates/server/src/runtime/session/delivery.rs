@@ -107,10 +107,11 @@ impl SessionEngine {
             .await?)
     }
 
-    pub(crate) async fn settle_words_async(&self, id: &str, ok: bool, payload: &Value) -> Result<()> {
+    pub(crate) async fn settle_words_async(&self, id: &str, ok: bool, error: Option<&str>) -> Result<()> {
+        let payload = error.map(|e| json!({ "error": e })).unwrap_or(Value::Null);
         self.0
             .durable
-            .write_with_async((id, ok, payload), |tx, &(id, ok, payload)| {
+            .write_with_async((id, ok, &payload), |tx, &(id, ok, payload)| {
                 Box::pin(async move {
                     let status = if ok { SubmissionStatus::Done } else { SubmissionStatus::Unanswered };
                     tx.settle_async(id, status, payload).await

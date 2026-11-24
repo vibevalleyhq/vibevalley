@@ -844,9 +844,9 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
         crate::support::board_session(server.test_internals().board, &sid).filter(|s| s.phase.is_working())
     });
 
-    let mut helper = server.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(server.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "scripted".into();
-    let helper = server.test_internals().agent.profile.store.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(server.test_internals().agent.profile.store.save_async(helper)).unwrap();
     assert_eq!(call("repo.create", json!({ "name": "farm" })).biz_code, 0);
     let issue = call("issue.create", json!({ "title": "parallel work", "repo": "farm", "agent": helper.id }))
         .data
@@ -871,7 +871,7 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
         server
             .test_internals()
             .runtime
-            .session()
+            .session_engine()
             .dismiss_async(&sid, vibevalley_server::runtime::Leave::Keep),
     )
     .unwrap();

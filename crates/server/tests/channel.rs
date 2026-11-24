@@ -214,9 +214,9 @@ fn the_chat_through_its_endpoints() {
     assert!(chat.channels.iter().all(|c| c.id != gid && c.id != thread));
 
     // A direct channel with a helper profile.
-    let mut helper = app.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.name = "小帮手".into();
-    let helper = app.test_internals().agent.profile.store.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let direct = ok(call("channel.direct.create", json!({ "agent": "小帮手" })));
     let listed = ok(call("channel.list", json!(null)));
     let d = listed.as_array().unwrap().iter().find(|c| c["id"] == direct).unwrap();

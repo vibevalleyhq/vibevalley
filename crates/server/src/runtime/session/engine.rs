@@ -8,7 +8,6 @@ use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use parking_lot::Mutex;
-use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex as AsyncMutex, broadcast};
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument as _;
@@ -16,8 +15,8 @@ use tracing::instrument::WithSubscriber as _;
 use vibevalley_core::{SliceMask, derive_issues, overlay_sessions};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, Deliverable, Doing, Issue, IssueAnswer, IssueReportMemoryScope, LastRun, MemoryCreateInput, Millis, Outcome, Phase, PhaseDone, PhaseFailed,
-    PhaseResting, PhaseWorking, Question, RunTrigger, Session, SessionAction, SessionSubagents, Spent,
+    ApiError, Deliverable, Doing, Issue, IssueAnswer, IssueReportMemoryScope, LastRun, Millis, Outcome, Phase, PhaseDone, PhaseFailed, PhaseResting,
+    PhaseWorking, Question, RunTrigger, Session, SessionAction, SessionSubagents, Spent,
 };
 use vibevalley_runtime::agent::durable::BoxFuture;
 use vibevalley_runtime::oar::{ContentBlock, EventKind, McpServer, PermissionDecision, PermissionMode, SessionOptions, StopReason};
@@ -35,18 +34,7 @@ use crate::runtime::worktree::{Leave, Leaving, Worktree};
 use crate::runtime::{IssueChange, Result, RuntimeConfig, RuntimeError, Step, find_issue};
 use crate::service::session::SessionExtra;
 
-pub(crate) const OUTBOX_SESSION_REPORTED: &str = "work.session.reported";
-
-/// Durable report payload persisted via `Outbox` when a session round finishes.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct OutboxSessionReported {
-    pub id: String,
-    pub at: Millis,
-    pub outcome: Outcome,
-    pub summary: String,
-    pub spent: Option<Spent>,
-    pub run: Option<String>,
-}
+pub(crate) use crate::context::{OUTBOX_SESSION_REPORTED, OutboxSessionReported};
 
 /// Lifecycle notification for in-domain chat thread seating & dismissal.
 #[derive(Debug, Clone)]
@@ -54,8 +42,6 @@ pub enum SessionLifecycleEvent {
     Changed(Box<Session>),
     Left { at: Millis, id: String },
 }
-
-pub type RememberHook = Arc<dyn Fn(MemoryCreateInput) -> BoxFuture<'static, std::result::Result<(), ApiError>> + Send + Sync>;
 
 pub(super) fn ended_phase(outcome: Outcome) -> Phase {
     match outcome {
@@ -125,7 +111,6 @@ pub(super) struct Inner {
     pub config: Arc<RuntimeConfig>,
     pub trajectory: Option<Arc<Trajectory>>,
     events: broadcast::Sender<SessionLifecycleEvent>,
-    on_remember: Mutex<Option<RememberHook>>,
     live: SessionGenerationTable<Arc<dyn vibevalley_runtime::oar::Session>>,
     pub(super) extras: Mutex<HashMap<String, SessionExtra>>,
     door: Mutex<Door>,
@@ -169,7 +154,6 @@ impl SessionEngine {
             config,
             trajectory,
             events,
-            on_remember: Mutex::new(None),
             live: SessionGenerationTable::new(),
             extras: Mutex::new(extras),
             door: Mutex::new(Door::default()),
@@ -203,11 +187,6 @@ impl SessionEngine {
 
     pub fn trajectory(&self) -> Option<&Arc<Trajectory>> {
         self.0.trajectory.as_ref()
-    }
-
-    /// Registers the hook called when a session report saves new agent memories.
-    pub fn set_remember(&self, hook: RememberHook) {
-        *self.0.on_remember.lock() = Some(hook);
     }
 
     /// Subscribes to in-domain session lifecycle events (`Changed`, `Left`).
@@ -289,15 +268,17 @@ impl SessionEngine {
 
     /// What the helper hands back at the end of its round (`issue_report`),
     /// read when the round ends.
-    pub fn report(&self, session: &str, report: &Report) -> Result<()> {
+    pub async fn report_async(&self, session: &str, report: &Report) -> Result<()> {
         let path = self.report_path(session);
         let failed = |e: &dyn std::fmt::Display| RuntimeError::Other(format!("the report for {session}: {e}"));
         if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir).map_err(|e| failed(&e))?;
+            tokio::fs::create_dir_all(dir).await.map_err(|e| failed(&e))?;
         }
         let tmp = path.with_extension("json.tmp");
-        std::fs::write(&tmp, serde_json::to_vec(report).map_err(|e| failed(&e))?).map_err(|e| failed(&e))?;
-        std::fs::rename(tmp, path).map_err(|e| failed(&e))
+        tokio::fs::write(&tmp, serde_json::to_vec(report).map_err(|e| failed(&e))?)
+            .await
+            .map_err(|e| failed(&e))?;
+        tokio::fs::rename(tmp, path).await.map_err(|e| failed(&e))
     }
 
     /// Where helpers reach the farm's MCP door (`http://<addr>/mcp`); a helper
@@ -424,7 +405,7 @@ impl SessionEngine {
     /// Opens the agent for `session`, puts it on the board and sends the
     /// first prompt. `resume` reopens the runtime's own session.
     async fn start_async(&self, drive: Drive, mut session: Session, issue: &Issue, prompt: String, resume: bool, trigger: RunTrigger) -> Result<String> {
-        let _ = std::fs::remove_file(self.report_path(&session.id));
+        let _ = tokio::fs::remove_file(self.report_path(&session.id)).await;
         let is_remote = !drive.is_local;
         let (agent, prompt) = self.open_for_async(drive, &session, issue, prompt, resume).await?;
         session.phase = Phase::working(now(), SessionAction::Thinking, "");
@@ -525,7 +506,7 @@ impl SessionEngine {
                 cwd: session.cwd.clone().unwrap_or_default(),
                 id: session.id.clone(),
                 pull_request: issue.deliver == Deliverable::PullRequest || !drive.is_local,
-                house: self.0.worktree.house_rules(),
+                house: self.0.worktree.house_rules_async().await,
             };
             self.0.drivers.rules(&place, issue.deliver)
         };
@@ -711,7 +692,7 @@ impl SessionEngine {
         let agent = self.0.live.get(&session.id);
         match agent {
             Some(agent) => {
-                let _ = std::fs::remove_file(self.report_path(&session.id));
+                let _ = tokio::fs::remove_file(self.report_path(&session.id)).await;
                 // Working from now, not from when the pump reads the turn's
                 // start: the room is counted by it. Apply `Answered` atomically
                 // so an `Asking` issue never flickers through `InReview`.
@@ -883,7 +864,7 @@ impl SessionEngine {
             };
             self.0.worktree.release(&leaving, leave)?;
         }
-        let _ = std::fs::remove_file(self.report_path(session_id));
+        let _ = tokio::fs::remove_file(self.report_path(session_id)).await;
         self.0.door.lock().tokens.retain(|_, s| s != session_id);
         let at = now();
         if let Some(s) = session.clone() {
@@ -1277,7 +1258,7 @@ impl SessionEngine {
         if issue.criteria.iter().all(|line| line.trim().is_empty()) {
             return Ok(None);
         }
-        let report = Report::read(&self.report_path(&run.session));
+        let report = Report::read_async(&self.report_path(&run.session)).await;
         let round = read_round(&issue, StopReason::Completed, report.as_ref(), candidate, &[]);
         if round.outcome != Outcome::Completed || !round.questions.is_empty() {
             return Ok(None);
@@ -1317,15 +1298,14 @@ impl SessionEngine {
             answer: answer.clone(),
         };
         let dirty = SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM;
-        let outbox_payload = serde_json::to_value(OutboxSessionReported {
+        let outbox_payload = OutboxSessionReported {
             id: session_id.clone(),
             at,
             outcome,
             summary: summary.clone(),
             spent: spent.clone(),
             run: run_id.clone(),
-        })
-        .unwrap_or(serde_json::Value::Null);
+        };
 
         let updated = {
             let _write = self.0.write_lock.lock().await;
@@ -1398,7 +1378,7 @@ impl SessionEngine {
                                 .map_err(DbError::into_durable_error)?;
                             let _ = ctx
                                 .outbox
-                                .enqueue_in_tx(db_tx, OUTBOX_SESSION_REPORTED, &outbox_payload)
+                                .enqueue_event_in_tx(db_tx, &crate::context::OutboxEvent::SessionReported(outbox_payload))
                                 .await
                                 .map_err(|e| vibevalley_runtime::agent::durable::Error::Invalid(e.message))?;
                             Ok((Some(stored), true))
@@ -1473,7 +1453,7 @@ impl SessionEngine {
                 return;
             }
         };
-        let report = Report::read(&self.report_path(session_id));
+        let report = Report::read_async(&self.report_path(session_id)).await;
         let failed = matches!(reason, StopReason::Error | StopReason::MaxTurns);
         let mut round = read_round(&issue, reason, report.as_ref(), output.as_deref().unwrap_or(said), asked);
         if failed && let Some(error) = failure {
@@ -1509,27 +1489,29 @@ impl SessionEngine {
             }
             self.record_async(session_id, Step::RunEnded { run: id, outcome }).await;
         }
-        let remember_hook = self.0.on_remember.lock().clone();
         if let Some(r) = report.as_ref().filter(|r| !r.remember.is_empty())
             && let Some(agent) = session.profile.clone()
-            && let Some(hook) = remember_hook
         {
             let repo_name = session.repo_name().unwrap_or_default().to_string();
+            let mut enqueued = false;
             for m in &r.remember {
                 let repo = match m.scope {
                     IssueReportMemoryScope::Repo => (!repo_name.is_empty()).then(|| repo_name.clone()),
                     IssueReportMemoryScope::All => None,
                 };
-                if let Err(e) = hook(MemoryCreateInput {
+                let event = crate::context::OutboxEvent::SessionRemember {
                     agent: agent.clone(),
                     text: m.text.clone(),
                     repo,
-                    request_key: None,
-                })
-                .await
-                {
+                };
+                if let Err(e) = self.0.ctx.outbox.enqueue_event(&event).await {
                     eprintln!("memory: {session_id}'s report note was not kept: {}", e.message);
+                } else {
+                    enqueued = true;
                 }
+            }
+            if enqueued {
+                self.0.ctx.outbox.wake();
             }
         }
     }

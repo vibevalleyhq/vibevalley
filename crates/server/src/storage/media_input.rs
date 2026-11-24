@@ -44,18 +44,8 @@ pub struct MediaInputStorage {
     sweeper: SyncMutex<Option<Ticker>>,
 }
 
-fn stage_upload_blocking(staging: &Path, r: &MediaInput, mut source: Box<dyn Read + Send>) -> Result<(PathBuf, String), ApiError> {
-    let directory = staging.join(&r.id);
-    std::fs::create_dir_all(&directory).map_err(storage)?;
-    let path = directory.join("content");
-    let mut options = std::fs::OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    let mut file = options.open(&path).map_err(storage)?;
+fn stage_upload_blocking(path: &Path, file: tokio::fs::File, r: &MediaInput, mut source: Box<dyn Read + Send>) -> Result<(PathBuf, String), ApiError> {
+    let mut file = file.try_into_std().map_err(|_| storage("media staging file busy"))?;
     let mut buffer = [0u8; 64 * 1024];
     let mut hash = Sha256::new();
     let mut size = 0i64;
@@ -91,23 +81,20 @@ fn stage_upload_blocking(staging: &Path, r: &MediaInput, mut source: Box<dyn Rea
     }
     file.sync_all().map_err(storage)?;
     drop(file);
-    if r.kind == MediaInputKind::Audio {
-        validate::audio(&path, &r.mime)?;
-    }
     let hash = hash.finalize().iter().map(|b| format!("{b:02x}")).collect::<String>();
     if r.hash.as_ref().is_some_and(|h| h != &hash) {
         return Err(refused("inputChanged"));
     }
-    Ok((path, hash))
+    Ok((path.to_path_buf(), hash))
 }
 
-fn verify_content_blocking(path: &Path, expected_size: u64, expected_hash: &str) -> Result<(), ApiError> {
-    let mut f = std::fs::File::open(path).map_err(storage)?;
+async fn verify_content_async(path: &Path, expected_size: u64, expected_hash: &str) -> Result<(), ApiError> {
+    let mut f = tokio::fs::File::open(path).await.map_err(storage)?;
     let mut digest = Sha256::new();
     let mut size = 0u64;
     let mut buffer = [0u8; 64 * 1024];
     loop {
-        let n = f.read(&mut buffer).map_err(storage)?;
+        let n = tokio::io::AsyncReadExt::read(&mut f, &mut buffer).await.map_err(storage)?;
         if n == 0 {
             break;
         }
@@ -124,28 +111,6 @@ fn verify_content_blocking(path: &Path, expected_size: u64, expected_hash: &str)
 }
 
 impl MediaInputStorage {
-    /// Opens staged media input storage synchronously, scheduling the initial recovery
-    /// sweep and periodic sweeper on `ctx.task`. Prefer [`Self::open_async`] during
-    /// server boot when startup sweep completion should be awaited first.
-    pub fn open(home: &Path, ctx: Arc<Context>, attachment: Arc<AttachmentStorage>) -> Arc<Self> {
-        let inputs = Arc::new(Self {
-            ctx: ctx.clone(),
-            inner: AsyncMutex::new(Inner { uploading: HashSet::new() }),
-            attachment,
-            staging: home.join("attachments/.staging/media"),
-            sweeper: SyncMutex::new(None),
-        });
-        let init = Arc::downgrade(&inputs);
-        ctx.spawn("storage.media_input.init", async move {
-            if let Some(inputs) = init.upgrade() {
-                let _ = inputs.restore_async().await;
-                let _ = inputs.sweep_async().await;
-            }
-        });
-        inputs.start_sweeper();
-        inputs
-    }
-
     pub async fn open_async(home: &Path, ctx: Arc<Context>, attachment: Arc<AttachmentStorage>) -> Result<Arc<Self>, ApiError> {
         let inputs = Arc::new(Self {
             ctx: ctx.clone(),
@@ -350,11 +315,24 @@ impl MediaInputStorage {
     }
 
     async fn upload_inner_async(&self, r: &MediaInput, source: Box<dyn Read + Send>) -> Result<(), ApiError> {
-        let staging = self.staging.clone();
+        let directory = self.staging.join(&r.id);
+        tokio::fs::create_dir_all(&directory).await.map_err(storage)?;
+        let stage_path = directory.join("content");
+        let mut options = tokio::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            options.mode(0o600);
+        }
+        let file = options.open(&stage_path).await.map_err(storage)?;
         let record = r.clone();
-        let (path, hash) = spawn_blocking_traced(move || stage_upload_blocking(&staging, &record, source))
+        let stage_path_owned = stage_path.clone();
+        let (path, hash) = spawn_blocking_traced(move || stage_upload_blocking(&stage_path_owned, file, &record, source))
             .await
             .map_err(storage)??;
+        if r.kind == MediaInputKind::Audio {
+            validate::audio_async(&path, &r.mime).await?;
+        }
         {
             let _inner = self.inner.lock().await;
             self.ctx.service.storage.set_media_input_hash(&r.id, &hash).await.map_err(storage)?;
@@ -390,10 +368,7 @@ impl MediaInputStorage {
             })
             .await?;
         let source_path = self.attachment.path_of(id);
-        let opened = spawn_blocking_traced(move || std::fs::File::open(&source_path))
-            .await
-            .map_err(storage)?
-            .map_err(storage)?;
+        let opened = tokio::fs::File::open(&source_path).await.map_err(storage)?.into_std().await;
         self.upload_async(&r.id, Box::new(opened)).await
     }
 
@@ -401,23 +376,19 @@ impl MediaInputStorage {
         if !path.is_absolute() {
             return Err(refused("inputInvalid"));
         }
-        let (file, file_len) = spawn_blocking_traced(move || -> Result<(std::fs::File, u64), ApiError> {
-            if !std::fs::metadata(&path).map_err(storage)?.is_file() {
-                return Err(refused("inputInvalid"));
-            }
-            let file = std::fs::File::open(&path).map_err(storage)?;
-            let metadata = file.metadata().map_err(storage)?;
-            if !metadata.is_file() {
-                return Err(refused("inputInvalid"));
-            }
-            Ok((file, metadata.len()))
-        })
-        .await
-        .map_err(storage)??;
+        if !tokio::fs::metadata(&path).await.map_err(storage)?.is_file() {
+            return Err(refused("inputInvalid"));
+        }
+        let file = tokio::fs::File::open(&path).await.map_err(storage)?;
+        let metadata = file.metadata().await.map_err(storage)?;
+        if !metadata.is_file() {
+            return Err(refused("inputInvalid"));
+        }
+        let file_len = metadata.len();
         if file_len != self.get_async(id).await?.size as u64 {
             return Err(refused("inputInvalid"));
         }
-        self.upload_async(id, Box::new(file)).await
+        self.upload_async(id, Box::new(file.into_std().await)).await
     }
 
     pub async fn content_async(&self, id: &str) -> Result<AttachmentFile, ApiError> {
@@ -427,11 +398,7 @@ impl MediaInputStorage {
         }
         let hash = r.hash.clone().ok_or_else(|| refused("inputMissing"))?;
         let path = self.attachment.path_of(&hash);
-        let verify_path = path.clone();
-        let expected_size = r.size as u64;
-        spawn_blocking_traced(move || verify_content_blocking(&verify_path, expected_size, &hash))
-            .await
-            .map_err(storage)??;
+        verify_content_async(&path, r.size as u64, &hash).await?;
         Ok(AttachmentFile {
             path: path.to_string_lossy().into_owned(),
             r#type: r.mime,
@@ -488,16 +455,14 @@ impl MediaInputStorage {
 }
 
 async fn remove_dir_async(path: PathBuf) -> Result<(), ApiError> {
-    spawn_blocking_traced(move || match std::fs::remove_dir_all(&path) {
+    match tokio::fs::remove_dir_all(&path).await {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(storage(e)),
-    })
-    .await
-    .map_err(storage)?
+    }
 }
 
-impl crate::gateway::api::media::MediaInputs for MediaInputStorage {
+impl crate::context::api::media::MediaInputs for MediaInputStorage {
     fn upload_async(self: Arc<Self>, id: String, source: Box<dyn Read + Send>) -> crate::BoxFuture<'static, Result<MediaInput, ApiError>> {
         Box::pin(async move { MediaInputStorage::upload_async(&self, &id, source).await })
     }

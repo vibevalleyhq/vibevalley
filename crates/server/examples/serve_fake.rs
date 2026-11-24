@@ -8,7 +8,7 @@ use vibevalley_server::gateway::bridge::fake::FakeServer;
 
 fn main() {
     let fake = match std::env::args().nth(1) {
-        Some(dir) => FakeServer::from_dir(std::path::Path::new(&dir)).expect("fixtures"),
+        Some(dir) => vibevalley_runtime::rt::block_on(FakeServer::from_dir_async(std::path::Path::new(&dir))).expect("fixtures"),
         None => FakeServer::new(),
     };
     fake.respond("issue.list", serde_json::json!([]));

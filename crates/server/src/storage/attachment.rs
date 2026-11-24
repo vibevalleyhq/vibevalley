@@ -1,7 +1,6 @@
 //! Content-addressed attachment storage: each file kept once by the SHA-256
 //! of its bytes at `<home>/attachments/<sha256>` and indexed via `ctx.service.storage`.
 
-use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -45,9 +44,8 @@ impl AttachmentStorage {
 
     /// Decodes a base64 upload, writes it to CAS, and records metadata.
     pub async fn attach_async(&self, upload: AttachmentUpload) -> Result<Attachment, ApiError> {
-        let root = self.root.clone();
         let data = upload.data;
-        let (id, size) = spawn_blocking_traced(move || -> Result<(String, i64), ApiError> {
+        let (id, bytes) = spawn_blocking_traced(move || -> Result<(String, Vec<u8>), ApiError> {
             let bytes = base64::engine::general_purpose::STANDARD
                 .decode(data.trim())
                 .map_err(|e| ApiError::new(BizCode::InvalidInput, format!("data: {e}")))?;
@@ -58,18 +56,18 @@ impl AttachmentStorage {
                 return Err(refused(t("server.attachment.emptyFile", &[])));
             }
             let id = Sha256::digest(&bytes).iter().map(|b| format!("{b:02x}")).collect::<String>();
-            write_once_at(&root, &id, &bytes).map_err(|e| refused(e.to_string()))?;
-            Ok((id, bytes.len() as i64))
+            Ok((id, bytes))
         })
         .await
         .map_err(internal)??;
+        let size = bytes.len() as i64;
+        write_once_at_async(&self.root, &id, &bytes).await.map_err(|e| refused(e.to_string()))?;
         self.record_async(&id, &upload.name, &upload.r#type, size).await
     }
 
     /// Streams a local regular file directly from disk into CAS without base64 framing (`Caller::User` only).
     pub async fn import_path_async(&self, input: AttachmentImportPathInput) -> Result<Attachment, ApiError> {
-        let root = self.root.clone();
-        let (id, name, mime, size) = spawn_blocking_traced(move || stream_import_to_cas(&root, &input)).await.map_err(internal)??;
+        let (id, name, mime, size) = stream_import_to_cas_async(&self.root, &input).await?;
         self.record_async(&id, &name, &mime, size).await
     }
 
@@ -78,14 +76,14 @@ impl AttachmentStorage {
         if bytes.is_empty() {
             return Err(refused(t("server.attachment.emptyFile", &[])));
         }
-        let root = self.root.clone();
-        let (id, size) = spawn_blocking_traced(move || -> Result<(String, i64), ApiError> {
-            let id = Sha256::digest(&bytes).iter().map(|b| format!("{b:02x}")).collect::<String>();
-            write_once_at(&root, &id, &bytes).map_err(|e| refused(e.to_string()))?;
-            Ok((id, bytes.len() as i64))
+        let bytes_for_hash = bytes.clone();
+        let (id, size) = spawn_blocking_traced(move || -> (String, i64) {
+            let id = Sha256::digest(&bytes_for_hash).iter().map(|b| format!("{b:02x}")).collect::<String>();
+            (id, bytes_for_hash.len() as i64)
         })
         .await
-        .map_err(internal)??;
+        .map_err(internal)?;
+        write_once_at_async(&self.root, &id, &bytes).await.map_err(|e| refused(e.to_string()))?;
         self.record_async(&id, &name, &kind, size).await
     }
 
@@ -94,15 +92,9 @@ impl AttachmentStorage {
         if hash.len() != 64 || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err(refused("invalid content hash".into()));
         }
-        let root = self.root.clone();
         let target = self.path_of(&hash);
-        spawn_blocking_traced(move || -> Result<(), ApiError> {
-            std::fs::create_dir_all(&root).map_err(|e| refused(e.to_string()))?;
-            std::fs::rename(&path, &target).map_err(|e| refused(e.to_string()))?;
-            Ok(())
-        })
-        .await
-        .map_err(internal)??;
+        tokio::fs::create_dir_all(&self.root).await.map_err(|e| refused(e.to_string()))?;
+        tokio::fs::rename(&path, &target).await.map_err(|e| refused(e.to_string()))?;
         self.record_async(&hash, &name, &kind, size).await
     }
 
@@ -171,26 +163,28 @@ impl AttachmentStorage {
 }
 
 /// Writes bytes via a sibling temp file + atomic rename so readers never observe partial content.
-fn write_once_at(root: &Path, id: &str, bytes: &[u8]) -> std::io::Result<()> {
+async fn write_once_at_async(root: &Path, id: &str, bytes: &[u8]) -> std::io::Result<()> {
     let target = root.join(id);
-    if std::fs::metadata(&target).is_ok_and(|m| m.len() == bytes.len() as u64) {
+    if tokio::fs::metadata(&target).await.is_ok_and(|m| m.len() == bytes.len() as u64) {
         return Ok(());
     }
-    std::fs::create_dir_all(root)?;
+    tokio::fs::create_dir_all(root).await?;
     let staging = root.join(format!(".put-{}", uuid::Uuid::new_v4()));
-    let mut f = std::fs::File::create(&staging)?;
-    f.write_all(bytes)?;
-    f.sync_all()?;
-    std::fs::rename(&staging, &target)
+    let mut f = tokio::fs::File::create(&staging).await?;
+    tokio::io::AsyncWriteExt::write_all(&mut f, bytes).await?;
+    f.sync_all().await?;
+    tokio::fs::rename(&staging, &target).await
 }
 
-fn stream_import_to_cas(root: &Path, input: &AttachmentImportPathInput) -> Result<(String, String, String, i64), ApiError> {
+async fn stream_import_to_cas_async(root: &Path, input: &AttachmentImportPathInput) -> Result<(String, String, String, i64), ApiError> {
     let raw = input.path.trim();
     let path = Path::new(raw);
     if raw.is_empty() || !path.is_absolute() {
         return Err(ApiError::new(BizCode::InvalidInput, "path must be an absolute path to a regular file"));
     }
-    let sym_meta = std::fs::symlink_metadata(path).map_err(|e| refused(format!("{}: {e}", path.display())))?;
+    let sym_meta = tokio::fs::symlink_metadata(path)
+        .await
+        .map_err(|e| refused(format!("{}: {e}", path.display())))?;
     if sym_meta.file_type().is_symlink() {
         return Err(refused("symlinks cannot be imported as attachments".into()));
     }
@@ -204,8 +198,8 @@ fn stream_import_to_cas(root: &Path, input: &AttachmentImportPathInput) -> Resul
         return Err(file_too_big());
     }
 
-    let mut source = std::fs::File::open(path).map_err(|e| refused(format!("{}: {e}", path.display())))?;
-    let file_meta = source.metadata().map_err(|e| refused(format!("{}: {e}", path.display())))?;
+    let mut source = tokio::fs::File::open(path).await.map_err(|e| refused(format!("{}: {e}", path.display())))?;
+    let file_meta = source.metadata().await.map_err(|e| refused(format!("{}: {e}", path.display())))?;
     if !file_meta.is_file() {
         return Err(refused(format!("{} is not a regular file", path.display())));
     }
@@ -213,15 +207,15 @@ fn stream_import_to_cas(root: &Path, input: &AttachmentImportPathInput) -> Resul
         return Err(file_too_big());
     }
 
-    std::fs::create_dir_all(root).map_err(|e| refused(e.to_string()))?;
+    tokio::fs::create_dir_all(root).await.map_err(|e| refused(e.to_string()))?;
     let staging = root.join(format!(".put-{}", uuid::Uuid::new_v4()));
-    let streamed = (|| -> Result<(String, i64), ApiError> {
-        let mut dest = std::fs::File::create(&staging).map_err(|e| refused(e.to_string()))?;
+    let streamed = async {
+        let mut dest = tokio::fs::File::create(&staging).await.map_err(|e| refused(e.to_string()))?;
         let mut hasher = Sha256::new();
         let mut buf = [0u8; 64 * 1024];
         let mut total: u64 = 0;
         loop {
-            let n = source.read(&mut buf).map_err(|e| refused(e.to_string()))?;
+            let n = tokio::io::AsyncReadExt::read(&mut source, &mut buf).await.map_err(|e| refused(e.to_string()))?;
             if n == 0 {
                 break;
             }
@@ -230,29 +224,32 @@ fn stream_import_to_cas(root: &Path, input: &AttachmentImportPathInput) -> Resul
                 return Err(file_too_big());
             }
             hasher.update(&buf[..n]);
-            dest.write_all(&buf[..n]).map_err(|e| refused(e.to_string()))?;
+            tokio::io::AsyncWriteExt::write_all(&mut dest, &buf[..n])
+                .await
+                .map_err(|e| refused(e.to_string()))?;
         }
         if total == 0 {
             return Err(refused(t("server.attachment.emptyFile", &[])));
         }
-        dest.sync_all().map_err(|e| refused(e.to_string()))?;
+        dest.sync_all().await.map_err(|e| refused(e.to_string()))?;
         let id = hasher.finalize().iter().map(|b| format!("{b:02x}")).collect::<String>();
         Ok((id, total as i64))
-    })();
+    }
+    .await;
 
     let (id, size) = match streamed {
         Ok(pair) => pair,
         Err(err) => {
-            let _ = std::fs::remove_file(&staging);
+            let _ = tokio::fs::remove_file(&staging).await;
             return Err(err);
         }
     };
 
     let target = root.join(&id);
-    if std::fs::metadata(&target).is_ok_and(|m| m.len() == size as u64) {
-        let _ = std::fs::remove_file(&staging);
-    } else if let Err(err) = std::fs::rename(&staging, &target) {
-        let _ = std::fs::remove_file(&staging);
+    if tokio::fs::metadata(&target).await.is_ok_and(|m| m.len() == size as u64) {
+        let _ = tokio::fs::remove_file(&staging).await;
+    } else if let Err(err) = tokio::fs::rename(&staging, &target).await {
+        let _ = tokio::fs::remove_file(&staging).await;
         return Err(refused(err.to_string()));
     }
 

@@ -417,20 +417,28 @@ impl Memory {
         .await;
     }
 
-    /// Registers `memory.session_reported` on the durable [`crate::context::Outbox`] so committed
-    /// session reports can persist round learnings asynchronously.
+    /// Registers `memory.session_remember` on the durable [`crate::context::Outbox`] so committed
+    /// session reports can persist round learnings asynchronously without a `Runtime` hook.
     pub(crate) fn register_outbox(self: &Arc<Self>) {
         let store = Arc::downgrade(self);
-        self.ctx.outbox.register("memory.session_reported", move |delivery| {
+        self.ctx.outbox.register(crate::context::outbox::OUTBOX_SESSION_REMEMBER, move |delivery| {
             let store = store.clone();
             async move {
                 let Some(store) = store.upgrade() else {
                     return Ok::<(), String>(());
                 };
-                if let Ok(session) = serde_json::from_value::<Session>(delivery.payload.clone()) {
-                    store.keep_session_reported_async(&session).await;
-                } else if let Ok(run) = serde_json::from_value::<FinishedRun>(delivery.payload) {
-                    store.keep_async(&run).await;
+                if let crate::context::OutboxEvent::SessionRemember { agent, text, repo } =
+                    delivery.decode_event().map_err(|e| format!("invalid remember outbox event: {e}"))?
+                    && let Err(e) = store
+                        .write_async(&Note {
+                            agent,
+                            text,
+                            repo: repo.unwrap_or_default(),
+                            by: By::Session(String::new()),
+                        })
+                        .await
+                {
+                    return Err(e.message);
                 }
                 Ok(())
             }
@@ -642,7 +650,7 @@ mod tests {
         let service = Service::open(home.path()).await.unwrap();
         let ctx = test_context(service.clone());
         let registry = Arc::new(vibevalley_runtime::oar::Registry::new());
-        let profile = Profile::open(ctx.clone(), home.path(), &[], registry, false).unwrap();
+        let profile = Profile::open_async(ctx.clone(), home.path(), &[], registry, false).await.unwrap();
         let memories = Memory::open(ctx.clone(), profile);
         memories.register_outbox();
 
@@ -712,7 +720,7 @@ mod tests {
         assert_eq!(service.backend(), expected_backend);
         let ctx = test_context(service);
         let registry = Arc::new(vibevalley_runtime::oar::Registry::new());
-        let profile = Profile::open(ctx.clone(), home, &[], registry, false).unwrap();
+        let profile = Profile::open_async(ctx.clone(), home, &[], registry, false).await.unwrap();
         let memories = Memory::open(ctx.clone(), profile);
 
         // Blank note is refused.

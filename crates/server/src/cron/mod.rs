@@ -9,19 +9,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use parking_lot::Mutex;
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-use serde_json::Value;
 use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_core::SliceMask;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ActorKind, ApiError, BizCode, Caller, Cron, CronRequest, EndpointId, IssueStatus, NoticeLevel, Op, Preview, ops};
+use vibevalley_protocol::{ActorKind, ApiError, BizCode, Cron, CronRequest, IssueStatus, NoticeLevel, Preview};
 
-use crate::agent::Profile;
 use crate::channel::{Chat, Noticing};
 use crate::context::Context;
 use crate::context::error::{LookIn, missing};
-use crate::context::port::CronOrchestratorPort;
+use crate::context::port::{CronAgentPort, CronOrchestratorPort};
 use crate::context::task::Ticker;
 use crate::db::error::internal_db;
 use crate::issue::{Board, BoardError, NewIssue};
@@ -70,7 +66,7 @@ pub struct Scheduler {
     crons: Mutex<Vec<Cron>>,
     links: Arc<Mutex<CronLinks>>,
     board: Arc<Board>,
-    profile: Arc<Profile>,
+    agents: Arc<dyn CronAgentPort>,
     /// The ticker, the endpoints, and the tools all change the list.
     lock: AsyncMutex<()>,
     chat: Option<Arc<Chat>>,
@@ -85,7 +81,7 @@ impl Scheduler {
     pub async fn open_async(
         ctx: Arc<Context>,
         board: Arc<Board>,
-        profile: Arc<Profile>,
+        agents: Arc<dyn CronAgentPort>,
         chat: Option<Arc<Chat>>,
         orchestrator: Option<Arc<dyn CronOrchestratorPort>>,
     ) -> Result<Arc<Scheduler>, ApiError> {
@@ -119,7 +115,7 @@ impl Scheduler {
             crons: Mutex::new(crons),
             links,
             board,
-            profile,
+            agents,
             lock: AsyncMutex::new(()),
             chat,
             orchestrator,
@@ -240,11 +236,9 @@ impl Scheduler {
         let agent = if named.is_empty() {
             None
         } else {
-            let agents = self.profile.agents();
-            let found = agents.iter().find(|a| a.id == named).or_else(|| agents.iter().find(|a| a.name == named));
             Some(
-                found
-                    .cloned()
+                self.agents
+                    .resolve_agent_id(named)
                     .ok_or_else(|| refused(t("server.cron.noProfile", &[("name", named.into())])).with_next(vec![LookIn::Agent.next()]))?,
             )
         };
@@ -258,7 +252,7 @@ impl Scheduler {
             name: req.name.trim().into(),
             text: req.text.trim().into(),
             channel,
-            agent: agent.map(|a| a.id),
+            agent,
             repo: Some(repo).filter(|r| !r.is_empty()),
             when: req.when,
             tz: req.tz.unwrap_or_else(local_zone),
@@ -442,10 +436,10 @@ impl Scheduler {
         *self.ticker.lock() = Some(ticker);
     }
 
-    pub(crate) async fn create_endpoint_async(&self, caller: Caller, req: CronRequest) -> Result<Cron, ApiError> {
+    pub(crate) async fn create_endpoint_async(&self, caller: vibevalley_protocol::Caller, req: CronRequest) -> Result<Cron, ApiError> {
         let by = match caller {
-            Caller::User | Caller::Remote => ActorKind::User,
-            Caller::Orchestrator | Caller::Session => ActorKind::Agent,
+            vibevalley_protocol::Caller::User | vibevalley_protocol::Caller::Remote => ActorKind::User,
+            vibevalley_protocol::Caller::Orchestrator | vibevalley_protocol::Caller::Session => ActorKind::Agent,
         };
         self.add_async(req, by).await
     }
@@ -473,61 +467,6 @@ impl Scheduler {
     pub(crate) async fn preview_delete_endpoint_async(&self, id: &str) -> Result<Preview, ApiError> {
         self.preview_remove(id)
     }
-
-    /// Domain router dispatch helper for all `Cron*` endpoints.
-    pub(crate) async fn dispatch_endpoint_async(&self, caller: Caller, id: EndpointId, payload: Value) -> Option<Result<Value, ApiError>> {
-        match id {
-            EndpointId::CronCreate => Some(
-                async {
-                    let req: <ops::CronCreate as Op>::Input = decode(payload)?;
-                    ok_json(self.create_endpoint_async(caller, req).await?)
-                }
-                .await,
-            ),
-            EndpointId::CronList => Some(async { ok_json(self.list_endpoint_async().await?) }.await),
-            EndpointId::CronUpdate => Some(
-                async {
-                    let req: <ops::CronUpdate as Op>::Input = decode(payload)?;
-                    self.update_endpoint_async(&req.id, req.enabled).await?;
-                    Ok(Value::Null)
-                }
-                .await,
-            ),
-            EndpointId::CronDelete => Some(
-                async {
-                    let req: <ops::CronDelete as Op>::Input = decode(payload)?;
-                    self.delete_endpoint_async(&req.id).await?;
-                    Ok(Value::Null)
-                }
-                .await,
-            ),
-            EndpointId::CronPreviewDelete => Some(
-                async {
-                    let req: <ops::CronPreviewDelete as Op>::Input = decode(payload)?;
-                    ok_json(self.preview_delete_endpoint_async(&req.id).await?)
-                }
-                .await,
-            ),
-            _ => None,
-        }
-    }
-}
-
-fn ok_json<T: Serialize>(value: T) -> Result<Value, ApiError> {
-    serde_json::to_value(value).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
-}
-
-fn decode<T: DeserializeOwned>(payload: Value) -> Result<T, ApiError> {
-    serde_path_to_error::deserialize(payload).map_err(|e| {
-        let path = e.path().to_string();
-        let problem = e.into_inner().to_string();
-        let message = if path == "." || path.is_empty() {
-            problem
-        } else {
-            format!("{path}: {problem}")
-        };
-        ApiError::new(BizCode::InvalidInput, message)
-    })
 }
 
 #[cfg(test)]
@@ -551,6 +490,14 @@ mod tests {
         fn hear_cron(&self, _agent: &str, _channel: &str, _words: &str) -> bool {
             self.heard.fetch_add(1, Ordering::SeqCst);
             true
+        }
+    }
+
+    struct EmptyAgents;
+
+    impl CronAgentPort for EmptyAgents {
+        fn resolve_agent_id(&self, _named: &str) -> Option<String> {
+            None
         }
     }
 
@@ -578,10 +525,9 @@ mod tests {
         });
         let (runtime, opened) = Runtime::open_async(ctx.clone(), driver, RuntimeConfig::under(dir.path())).await.unwrap();
         let board = Board::open_async(ctx.clone(), runtime.clone(), opened, None, None).await.unwrap();
-        let profile = Profile::open(ctx.clone(), &dir.path().join("agents"), &[], registry, false).unwrap();
 
         let orchestrator = Arc::new(CountingOrchestrator { heard: AtomicUsize::new(0) });
-        let crons = Scheduler::open_async(ctx.clone(), board.clone(), profile, None, Some(orchestrator.clone()))
+        let crons = Scheduler::open_async(ctx.clone(), board.clone(), Arc::new(EmptyAgents), None, Some(orchestrator.clone()))
             .await
             .unwrap();
 
@@ -639,7 +585,7 @@ mod tests {
         assert_eq!(orchestrator.heard.load(Ordering::SeqCst), 1);
 
         crons.close_async().await;
-        board.close();
+        board.close_async().await;
         let _ = ctx.shutdown(Duration::from_secs(1)).await;
         service.close().await;
     }

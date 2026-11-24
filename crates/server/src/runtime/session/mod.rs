@@ -34,7 +34,7 @@ mod talk;
 mod workspace;
 
 pub use driver::{AgentProfileInfo, Drive, HelperPlace, Persona, RuntimeDriver, SessionDriver};
-pub use engine::{DraftEnd, Hire, RememberHook, Rounds, SessionEngine, SessionLifecycleEvent};
+pub use engine::{DraftEnd, Hire, Rounds, SessionEngine, SessionLifecycleEvent};
 pub(crate) use engine::{OUTBOX_SESSION_REPORTED, OutboxSessionReported};
 pub use journal::{Journal, Trajectory};
 pub use mailbox::{MailboxEntry, MailboxSource, MailboxStatus};
@@ -63,18 +63,12 @@ pub(crate) fn session_error(e: RuntimeError) -> ApiError {
     }
 }
 
-fn send_watch_event<T: serde::Serialize>(events: &flume::Sender<serde_json::Value>, stop: &flume::Receiver<()>, event: &T) -> bool {
-    if !stop.is_empty() || matches!(stop.try_recv(), Err(flume::TryRecvError::Disconnected)) {
-        return false;
-    }
-    let Ok(val) = serde_json::to_value(event) else {
-        return false;
-    };
-    events.send(val).is_ok()
+fn send_watch_event<T: serde::Serialize>(sink: &crate::context::Sink, event: &T) -> bool {
+    sink.send(event)
 }
 
-fn watch_stopped(events: &flume::Sender<serde_json::Value>, stop: &flume::Receiver<()>) -> bool {
-    events.is_disconnected() || !stop.is_empty() || matches!(stop.try_recv(), Err(flume::TryRecvError::Disconnected))
+fn watch_stopped(sink: &crate::context::Sink) -> bool {
+    sink.stopped() || sink.events.is_disconnected()
 }
 
 impl SessionEngine {
@@ -156,12 +150,7 @@ impl SessionEngine {
         self.detach_binding_async(input).await.map_err(session_error)
     }
 
-    pub(crate) async fn watch_session_async(
-        &self,
-        input: SessionWatchPayload,
-        events: flume::Sender<serde_json::Value>,
-        stop: flume::Receiver<()>,
-    ) -> Result<(), ApiError> {
+    pub(crate) async fn watch_session_async(&self, input: SessionWatchPayload, sink: crate::context::Sink) -> Result<(), ApiError> {
         let initial = self.session_async(&input.id).await.ok_or_else(|| helper_ref(&input.id))?;
         let live = self.0.ctx.live.subscribe_live();
         let sessions_sub = self.0.ctx.feed.subscribe(SliceKind::Sessions);
@@ -170,17 +159,12 @@ impl SessionEngine {
         let me = self.clone();
         self.0.ctx.spawn(
             "session.watch",
-            watch_session(initial, input.after_seq, me, sessions_sub, live, workspace_updates, cancel, events, stop),
+            watch_session(initial, input.after_seq, me, sessions_sub, live, workspace_updates, cancel, sink),
         );
         Ok(())
     }
 
-    pub(crate) async fn watch_issue_async(
-        &self,
-        input: IssueGetInput,
-        events: flume::Sender<serde_json::Value>,
-        stop: flume::Receiver<()>,
-    ) -> Result<(), ApiError> {
+    pub(crate) async fn watch_issue_async(&self, input: IssueGetInput, sink: crate::context::Sink) -> Result<(), ApiError> {
         let initial = self
             .raw_issue_async(&input.id)
             .await
@@ -193,7 +177,7 @@ impl SessionEngine {
         let me = self.clone();
         self.0
             .ctx
-            .spawn("issue.watch", watch_issue(initial, me, board_sub, sessions_sub, live, cancel, events, stop));
+            .spawn("issue.watch", watch_issue(initial, me, board_sub, sessions_sub, live, cancel, sink));
         Ok(())
     }
 }
@@ -224,8 +208,7 @@ async fn watch_session(
     mut live: broadcast::Receiver<LiveEvent>,
     workspace_updates: flume::Receiver<()>,
     cancel: CancellationToken,
-    events: flume::Sender<serde_json::Value>,
-    stop: flume::Receiver<()>,
+    sink: crate::context::Sink,
 ) {
     let id = initial.id.clone();
     let history: Vec<_> = match &sessions.0.trajectory {
@@ -239,8 +222,7 @@ async fn watch_session(
         None => Vec::new(),
     };
     if !send_watch_event(
-        &events,
-        &stop,
+        &sink,
         &SessionWatchEvent::History {
             session: id.clone(),
             events: history,
@@ -249,7 +231,7 @@ async fn watch_session(
         return;
     }
     let first_state = workspace_state_event_async(initial, &sessions).await;
-    if watch_stopped(&events, &stop) || cancel.is_cancelled() || !send_watch_event(&events, &stop, &first_state) {
+    if watch_stopped(&sink) || cancel.is_cancelled() || !send_watch_event(&sink, &first_state) {
         return;
     }
     let mut previous: Option<SessionWatchEvent> = Some(first_state);
@@ -261,13 +243,13 @@ async fn watch_session(
         Stop,
     }
     loop {
-        if watch_stopped(&events, &stop) || cancel.is_cancelled() {
+        if watch_stopped(&sink) || cancel.is_cancelled() {
             return;
         }
         let got = tokio::select! {
             biased;
             _ = cancel.cancelled() => Msg::Stop,
-            _ = stop.recv_async() => Msg::Stop,
+            _ = sink.stop.recv_async() => Msg::Stop,
             changed = sessions_sub.changed() => if changed { Msg::State } else { Msg::Stop },
             ws = workspace_updates.recv_async(), if workspace_open => {
                 if ws.is_ok() { Msg::State } else { Msg::WorkspaceDropped }
@@ -286,8 +268,7 @@ async fn watch_session(
                 if let LiveEvent::Event(e) = *ev
                     && e.id == id
                     && !send_watch_event(
-                        &events,
-                        &stop,
+                        &sink,
                         &SessionWatchEvent::Event {
                             session: e.id.clone(),
                             event: e.activity,
@@ -305,7 +286,7 @@ async fn watch_session(
                 let Some(session) = current else {
                     let missing = SessionWatchEvent::Missing { session: id.clone() };
                     if previous.as_ref() != Some(&missing) {
-                        if !send_watch_event(&events, &stop, &missing) {
+                        if !send_watch_event(&sink, &missing) {
                             return;
                         }
                         previous = Some(missing);
@@ -313,13 +294,13 @@ async fn watch_session(
                     continue;
                 };
                 let state = workspace_state_event_async(session, &sessions).await;
-                if watch_stopped(&events, &stop) || cancel.is_cancelled() {
+                if watch_stopped(&sink) || cancel.is_cancelled() {
                     return;
                 }
                 if previous.as_ref() == Some(&state) {
                     continue;
                 }
-                if !send_watch_event(&events, &stop, &state) {
+                if !send_watch_event(&sink, &state) {
                     return;
                 }
                 previous = Some(state);
@@ -336,7 +317,7 @@ const HISTORY: usize = 241;
 /// settles), and their steps live.
 #[allow(
     clippy::too_many_arguments,
-    reason = "watch task carries engine, slice feeds, live stream, cancel token, and channels"
+    reason = "watch task carries engine, slice feeds, live stream, cancel token, and sink"
 )]
 async fn watch_issue(
     initial: Issue,
@@ -345,8 +326,7 @@ async fn watch_issue(
     mut sessions_sub: SliceSubscription,
     mut live: broadcast::Receiver<LiveEvent>,
     cancel: CancellationToken,
-    events: flume::Sender<serde_json::Value>,
-    stop: flume::Receiver<()>,
+    sink: crate::context::Sink,
 ) {
     let last = |ids: Vec<&SessionId>| -> Vec<SessionId> { ids.iter().skip(ids.len().saturating_sub(SHOWN_SESSIONS)).map(|s| (*s).clone()).collect() };
     let mut ids: HashSet<SessionId> = last(session_ids_of(&initial)).into_iter().collect();
@@ -360,7 +340,7 @@ async fn watch_issue(
         Stop,
     }
     loop {
-        if watch_stopped(&events, &stop) || cancel.is_cancelled() {
+        if watch_stopped(&sink) || cancel.is_cancelled() {
             return;
         }
         let step = if emit_initial {
@@ -370,7 +350,7 @@ async fn watch_issue(
             tokio::select! {
                 biased;
                 _ = cancel.cancelled() => WatchStep::Stop,
-                _ = stop.recv_async() => WatchStep::Stop,
+                _ = sink.stop.recv_async() => WatchStep::Stop,
                 changed = board_sub.changed() => if changed { WatchStep::State } else { WatchStep::Stop },
                 changed = sessions_sub.changed() => if changed { WatchStep::State } else { WatchStep::Stop },
                 ev = live.recv() => match ev {
@@ -386,8 +366,7 @@ async fn watch_issue(
                 if let LiveEvent::Event(e) = *ev
                     && ids.contains(&e.id)
                     && !send_watch_event(
-                        &events,
-                        &stop,
+                        &sink,
                         &IssueWatch::Event {
                             session: e.id.clone(),
                             event: e.activity,
@@ -407,7 +386,7 @@ async fn watch_issue(
                     .cloned()
                     .or_else(|| initial.closed_at.is_some().then(|| initial.clone()));
                 let Some(issue) = issue else {
-                    if !send_watch_event(&events, &stop, &IssueWatch::Missing { issue: initial.id.clone() }) {
+                    if !send_watch_event(&sink, &IssueWatch::Missing { issue: initial.id.clone() }) {
                         return;
                     }
                     continue;
@@ -458,7 +437,7 @@ async fn watch_issue(
                 was_settled = settled;
                 rows.push(state);
                 for row in rows {
-                    if !send_watch_event(&events, &stop, &row) {
+                    if !send_watch_event(&sink, &row) {
                         return;
                     }
                 }

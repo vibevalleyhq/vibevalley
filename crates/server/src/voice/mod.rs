@@ -20,9 +20,9 @@ use vibevalley_protocol::{ApiError, ApiErrorDetail, BizCode, DEFAULT_ORCHESTRATO
 
 use self::moss::{Realtime, Verdict};
 use crate::channel::{Chat, Picked, Posting, Saying};
+use crate::context::api::{LiveVoiceLine, LiveVoicePort};
 use crate::context::port::VoiceOrchestratorPort;
 use crate::context::{Context, now};
-use crate::gateway::api::{LiveVoiceLine, LiveVoicePort};
 use crate::setting::{Account, Secret, Setting, Use};
 
 /// How long an unused grant stays valid before expiring.
@@ -342,31 +342,19 @@ impl Voice {
         }
     }
 
-    /// `voice.call.say`: records what the MOSS Live session said in chat; its greeting is skipped.
-    pub fn said(self: &Arc<Self>, agent: &str, text: &str) -> Result<(), ApiError> {
-        let call = self.call(agent)?;
-        if text.trim() != call.greeting {
-            let voice = self.clone();
-            let text = text.to_string();
-            self.ctx.spawn("voice.said", async move {
-                if let Err(e) = voice
-                    .chat
-                    .post_async(Posting {
-                        from: DEFAULT_ORCHESTRATOR.into(),
-                        channel: voice.chat.default_channel(),
-                        text,
-                        spoken: true,
-                        ..Default::default()
-                    })
-                    .await
-                {
-                    voice.warn("voice: the orchestrator's spoken words were not kept", e.message);
-                }
-            });
-        }
+    /// Non-blocking host transcript handoff used by [`LiveVoicePort::said`].
+    fn said_background(self: &Arc<Self>, agent: &str, text: &str) -> Result<(), ApiError> {
+        self.call(agent)?;
+        let voice = self.clone();
+        let agent = agent.to_string();
+        let text = text.to_string();
+        self.ctx.spawn("voice.said", async move {
+            let _ = voice.said_async(&agent, &text).await;
+        });
         Ok(())
     }
 
+    /// `voice.call.say`: records what the MOSS Live session said in chat; its greeting is skipped.
     pub async fn said_async(&self, agent: &str, text: &str) -> Result<(), ApiError> {
         let call = self.call(agent)?;
         if text.trim() != call.greeting
@@ -590,7 +578,7 @@ impl MossLine {
     /// A text frame from MOSS: settings taken let the waiting commentary
     /// go; a tool call is put to the orchestrator and answered; an answer
     /// MOSS has taken lets its model go on.
-    pub fn heard(&self, raw: &str) {
+    fn hear_line(&self, raw: &str) {
         if moss::session_updated(raw) {
             let mut phase = self.shared.phase.lock();
             if let MossPhase::Waiting { pending, .. } = &mut *phase {
@@ -682,7 +670,7 @@ impl LiveVoiceLine for MossLine {
     }
 
     fn heard(&self, raw: &str) {
-        MossLine::heard(self, raw)
+        self.hear_line(raw)
     }
 }
 
@@ -708,7 +696,7 @@ impl LiveVoicePort for Voice {
 
     fn said(&self, agent_id: &str, text: &str) -> Result<(), ApiError> {
         let me = self.me.upgrade().ok_or_else(Voice::stopped)?;
-        Voice::said(&me, agent_id, text)
+        Voice::said_background(&me, agent_id, text)
     }
 
     fn stop(&self, agent_id: &str) {

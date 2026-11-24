@@ -22,12 +22,14 @@ pub use bridge::{Action, Outbox, Panel};
 
 mod late;
 
+use vibevalley_server::gateway::bridge::ClientRpc;
+
 pub type ClientsProvider = dyn Fn() -> Vec<vibevalley_server::gateway::bridge::ClientSnapshot> + Send + Sync;
 
 /// The server every hosted view talks to (`call`, slices, `live`,
 /// subscriptions), shared app-wide.
 pub struct BridgeHub(
-    pub vibevalley_server::gateway::bridge::Hub,
+    pub vibevalley_server::gateway::bridge::Bridge,
     #[allow(dead_code, reason = "keeps weak client snapshot provider alive for the app lifetime")] Arc<ClientsProvider>,
 );
 
@@ -165,7 +167,7 @@ impl ShellDebugHandle {
 }
 
 impl vibevalley_server::HostDebugBridge for ShellDebugHandle {
-    fn snapshot(&self) -> Value {
+    fn snapshot_json(&self) -> String {
         let (routes, caches, bundle_mode, loopback_url, boot_ms, last_frame_ms, frames, provider) = {
             let guard = self.inner.read();
             (
@@ -204,6 +206,7 @@ impl vibevalley_server::HostDebugBridge for ShellDebugHandle {
             "frames": frames,
             "caches": caches,
         })
+        .to_string()
     }
 }
 
@@ -313,7 +316,7 @@ impl vibevalley_server::gateway::bridge::Server for FailedServer {
     }
 
     fn slice_snapshot(&self, slice: vibevalley_server::gateway::bridge::SliceKind) -> Value {
-        self.feeds.feed(slice).snapshot_value()
+        serde_json::from_str(&self.feeds.feed(slice).snapshot_json()).unwrap_or(Value::Null)
     }
 
     fn slice_snapshot_json(&self, slice: vibevalley_server::gateway::bridge::SliceKind) -> Arc<str> {
@@ -327,7 +330,10 @@ impl vibevalley_server::gateway::bridge::Server for FailedServer {
         stop: &flume::Receiver<()>,
         receive: &mut dyn FnMut(i64, &Value),
     ) {
-        self.feeds.feed(slice).watch_since(after_seq, stop, receive);
+        self.feeds.feed(slice).watch_since_json(after_seq, stop, &mut |seq, json| {
+            let value: Value = serde_json::from_str(json).unwrap_or(Value::Null);
+            receive(seq, &value);
+        });
     }
 
     fn subscribe_slice(&self, slice: vibevalley_server::gateway::bridge::SliceKind) -> Option<vibevalley_server::SliceSubscription> {
@@ -391,7 +397,15 @@ impl BridgeHub {
             Some(dir) => {
                 drop(running_tx);
                 cx.set_global(ActiveDesktopConnection(Arc::new(connection::Mode::Embedded)));
-                let fake = vibevalley_server::gateway::bridge::fake::FakeServer::from_dir(std::path::Path::new(&dir));
+                let dir = std::path::Path::new(&dir);
+                let read_opt = |name: &str| match std::fs::read_to_string(dir.join(name)) {
+                    Ok(text) => Ok(Some(text)),
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+                    Err(e) => Err(format!("{name}: {e}")),
+                };
+                let fake = read_opt("state.json")
+                    .and_then(|s| read_opt("responses.json").map(|r| (s, r)))
+                    .and_then(|(s, r)| vibevalley_server::gateway::bridge::fake::FakeServer::from_fixture_strs(s.as_deref(), r.as_deref()));
                 let _ = ready.send_replace(Some(fake.as_ref().map(|_| ()).map_err(ToString::to_string)));
                 Arc::new(fake.unwrap_or_else(|_| vibevalley_server::gateway::bridge::fake::FakeServer::new()))
             }
@@ -479,7 +493,7 @@ impl BridgeHub {
                 }
             },
         };
-        let bridge = vibevalley_server::gateway::bridge::Hub::new(server, BRIDGE_CONCURRENCY);
+        let bridge = vibevalley_server::gateway::bridge::Bridge::new(server, BRIDGE_CONCURRENCY);
         let bridge_for_clients = bridge.clone();
         let clients_provider: Arc<ClientsProvider> = Arc::new(move || bridge_for_clients.clients_snapshot());
         host_debug.attach_clients(&clients_provider);
@@ -1078,6 +1092,7 @@ mod tests {
     use std::net::TcpListener;
 
     use super::*;
+    use vibevalley_server::HostDebugBridge;
 
     #[test]
     fn port_preference_parses_explicit_and_channel_defaults() {
@@ -1187,7 +1202,7 @@ mod tests {
         use std::time::Duration;
         use tokio::sync::Notify;
         use vibevalley_server::gateway::bridge::fake::{FakeServer, empty_bundle};
-        use vibevalley_server::gateway::bridge::{Hub, Outlet, SliceKind};
+        use vibevalley_server::gateway::bridge::{Bridge, Outlet, SliceKind};
 
         #[derive(Default)]
         struct Recorder {
@@ -1225,7 +1240,7 @@ mod tests {
         }
 
         let fake = Arc::new(FakeServer::from_bundle(empty_bundle(1)));
-        let hub = Hub::new(fake.clone(), 2);
+        let hub = Bridge::new(fake.clone(), 2);
         let rec = Arc::new(Recorder::default());
         let client = hub.attach(next_client_identity(vibevalley_server::ClientKind::GpuiWorkbench, "vv"), rec.clone());
 
@@ -1275,9 +1290,9 @@ mod tests {
 
     #[test]
     fn shell_debug_handle_bridges_snapshots_into_server_with_bounded_frames_and_clients() {
+        use vibevalley_server::SharedHostDebug;
         use vibevalley_server::gateway::bridge::fake::FakeServer;
-        use vibevalley_server::gateway::bridge::{CallerContext, Envelope, Hub as Bridge, LiveEvent, Outlet, Server, SliceKind};
-        use vibevalley_server::{HostDebugBridge, SharedHostDebug};
+        use vibevalley_server::gateway::bridge::{Bridge, CallerContext, Envelope, LiveEvent, Outlet, Server, SliceKind};
 
         struct NoopOutlet;
         impl Outlet for NoopOutlet {
@@ -1361,7 +1376,7 @@ mod tests {
         }
 
         let bridge = server.host_debug().expect("host debug bridge attached");
-        let snap = bridge.snapshot();
+        let snap: Value = serde_json::from_str(&bridge.snapshot_json()).unwrap();
         assert_eq!(snap["routes"]["current"], "/workspace");
         assert_eq!(snap["routes"]["nativeWorkspace"], true);
         assert_eq!(snap["routes"]["panel"], "git");
@@ -1386,7 +1401,7 @@ mod tests {
 
         drop(client);
         drop(provider);
-        assert_eq!(handle.snapshot()["clients"], json!([]));
+        assert_eq!(serde_json::from_str::<Value>(&handle.snapshot_json()).unwrap()["clients"], json!([]));
     }
 
     #[test]
@@ -1493,7 +1508,7 @@ mod tests {
         use tokio::sync::Notify;
         use vibevalley_server::gateway::api::BoxFuture;
         use vibevalley_server::gateway::bridge::fake::FakeServer;
-        use vibevalley_server::gateway::bridge::{CallerContext, Envelope, Hub as Bridge, Outlet, Server, SliceKind};
+        use vibevalley_server::gateway::bridge::{Bridge, CallerContext, Envelope, Outlet, Server, SliceKind};
 
         struct SlowOpenServer {
             inner: FakeServer,

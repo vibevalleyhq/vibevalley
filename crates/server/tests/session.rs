@@ -33,9 +33,9 @@ fn bash(j: &mut Journal, call: &str, text: &str, input: Option<&str>, from: &[St
 fn a_streaming_step_grows_in_place_with_its_revision() {
     let mut j = Journal::new(vec![]);
     j.said("测试", &[]);
-    assert_eq!((j.events()[0].seq, j.events()[0].revision), (0, 0));
+    assert_eq!((j.entries()[0].seq, j.entries()[0].revision), (0, 0));
     j.said("通过", &[]);
-    assert_eq!((j.events()[0].revision, j.events()[0].text.as_str()), (1, "测试通过"));
+    assert_eq!((j.entries()[0].revision, j.entries()[0].text.as_str()), (1, "测试通过"));
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn reasoning_runs_on() {
     bash(&mut j, "c1", "ls", Some("{}"), &[]);
     j.thought("看完了", &[]);
     let got: Vec<String> = j
-        .events()
+        .entries()
         .iter()
         .map(|s| format!("{}:{}", serde_json::to_value(s.r#type).unwrap().as_str().unwrap(), s.text))
         .collect();
@@ -79,7 +79,7 @@ fn a_sub_agents_steps_go_under_their_call() {
     j.tool_ended("task-1", "看完了", true, &[]);
     j.said("好", &[]);
     j.said("，就这样", &ghost);
-    let got: Vec<String> = j.events().iter().map(line).collect();
+    let got: Vec<String> = j.entries().iter().map(line).collect();
     assert_eq!(
         got,
         [
@@ -193,9 +193,9 @@ fn a_sent_issue_is_logged_listed_and_watched() {
     .unwrap();
     let router = app.router().clone();
     let call = |op: &str, p| router.call_as(Caller::User, op, p);
-    let mut helper = app.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "scripted".into();
-    let helper = app.test_internals().agent.profile.store.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(helper)).unwrap();
     call("repo.create", json!({ "name": "farm" })).data.unwrap();
     let issue = call("issue.create", json!({ "title": "say hello", "repo": "farm", "agent": helper.id }))
         .data

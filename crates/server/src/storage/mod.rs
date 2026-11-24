@@ -10,13 +10,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-use serde_json::Value;
-use vibevalley_protocol::{
-    ApiError, Attachment, AttachmentFile, AttachmentImportPathInput, AttachmentUpload, BizCode, EndpointId, MediaInput, MediaInputRequest, Op, Preview, ops,
-};
-use vibevalley_protocol::{NativeEndpointId, native_ops};
+use vibevalley_protocol::{ApiError, Attachment, AttachmentFile, AttachmentImportPathInput, AttachmentUpload, MediaInput, MediaInputRequest, Preview};
 
 pub use artifact::ArtifactStorage;
 pub use attachment::{ATTACHMENT_MAX, AttachmentStorage};
@@ -34,19 +28,6 @@ pub struct Storage {
 }
 
 impl Storage {
-    /// Opens attachment CAS, staged media input storage, and artifact directory storage synchronously under `home`,
-    /// scheduling the initial staged-input recovery and periodic sweeper on `ctx.task`.
-    pub fn open(home: &Path, ctx: Arc<Context>) -> Arc<Self> {
-        let attachment = AttachmentStorage::open(home, ctx.clone());
-        let media_input = MediaInputStorage::open(home, ctx.clone(), attachment.clone());
-        let artifact = ArtifactStorage::open(home, ctx);
-        Arc::new(Self {
-            attachment,
-            media_input,
-            artifact,
-        })
-    }
-
     /// Opens attachment CAS, staged media input storage, and artifact directory storage under `home`, awaiting the
     /// initial staged-input recovery sweep and starting the periodic sweeper on `ctx.task`.
     pub async fn open_async(home: &Path, ctx: Arc<Context>) -> Result<Arc<Self>, ApiError> {
@@ -152,67 +133,9 @@ impl Storage {
     pub async fn release_input_pins_async(&self, holder: &str) -> Result<(), ApiError> {
         self.media_input.release_async(holder).await
     }
-
-    /// Dispatches attachment and media-input protocol endpoints for `router.rs`.
-    pub(crate) async fn dispatch_endpoint_async(&self, id: EndpointId, payload: Value) -> Result<Value, ApiError> {
-        match id {
-            EndpointId::AttachmentCreate => {
-                let req: <ops::AttachmentCreate as Op>::Input = decode(payload)?;
-                ok_json(self.attachment.attach_async(req).await?)
-            }
-            EndpointId::AttachmentImportPath => {
-                let req: <ops::AttachmentImportPath as Op>::Input = decode(payload)?;
-                ok_json(self.attachment.import_path_async(req).await?)
-            }
-            EndpointId::MediaInputCreate => {
-                let req: <ops::MediaInputCreate as Op>::Input = decode(payload)?;
-                ok_json(self.media_input.create_async(&req).await?)
-            }
-            EndpointId::MediaInputAdopt => {
-                let req: <ops::MediaInputAdopt as Op>::Input = decode(payload)?;
-                ok_json(self.media_input.adopt_async(&req.attachment).await?)
-            }
-            EndpointId::MediaInputGet => {
-                let req: <ops::MediaInputGet as Op>::Input = decode(payload)?;
-                ok_json(self.media_input.get_async(&req.id).await?)
-            }
-            EndpointId::MediaInputList => ok_json(self.media_input.list_async().await?),
-            EndpointId::MediaInputDelete => {
-                let req: <ops::MediaInputDelete as Op>::Input = decode(payload)?;
-                self.media_input.delete_async(&req.id).await?;
-                Ok(Value::Null)
-            }
-            EndpointId::MediaInputPreviewDelete => {
-                let req: <ops::MediaInputPreviewDelete as Op>::Input = decode(payload)?;
-                ok_json(self.media_input.preview_delete_async(&req.id).await?)
-            }
-            other => Err(ApiError::new(
-                BizCode::RouteNotFound,
-                format!("storage does not handle endpoint {}", other.as_op()),
-            )),
-        }
-    }
-
-    /// Dispatches native attachment and media-input endpoints for `router.rs`.
-    pub(crate) async fn dispatch_native_async(&self, id: NativeEndpointId, payload: Value) -> Result<Value, ApiError> {
-        match id {
-            NativeEndpointId::AttachmentFile => {
-                let req: <native_ops::AttachmentFile as Op>::Input = decode(payload)?;
-                ok_json(self.attachment.file_async(&req.id).await?)
-            }
-            NativeEndpointId::MediaInputFile => {
-                let req: <native_ops::MediaInputFile as Op>::Input = decode(payload)?;
-                ok_json(self.media_input.content_async(&req.id).await?)
-            }
-            NativeEndpointId::MediaInputUploadFile => {
-                let req: <native_ops::MediaInputUploadFile as Op>::Input = decode(payload)?;
-                ok_json(self.media_input.upload_file_async(&req.id, PathBuf::from(req.path)).await?)
-            }
-        }
-    }
 }
 
-impl crate::gateway::api::media::MediaInputs for Storage {
+impl crate::context::api::media::MediaInputs for Storage {
     fn upload_async(self: Arc<Self>, id: String, source: Box<dyn Read + Send>) -> crate::BoxFuture<'static, Result<MediaInput, ApiError>> {
         self.media_input.clone().upload_async(id, source)
     }
@@ -220,21 +143,4 @@ impl crate::gateway::api::media::MediaInputs for Storage {
     fn content_async(self: Arc<Self>, id: String) -> crate::BoxFuture<'static, Result<AttachmentFile, ApiError>> {
         self.media_input.clone().content_async(id)
     }
-}
-
-fn ok_json<T: Serialize>(value: T) -> Result<Value, ApiError> {
-    serde_json::to_value(value).map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))
-}
-
-fn decode<T: DeserializeOwned>(payload: Value) -> Result<T, ApiError> {
-    serde_path_to_error::deserialize(payload).map_err(|e| {
-        let path = e.path().to_string();
-        let problem = e.into_inner().to_string();
-        let message = if path == "." || path.is_empty() {
-            problem
-        } else {
-            format!("{path}: {problem}")
-        };
-        ApiError::new(BizCode::InvalidInput, message)
-    })
 }

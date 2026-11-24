@@ -146,7 +146,7 @@ impl ToolRegistry {
             .map(|t| ToolSpecWire {
                 name: t.words.name,
                 description: t.words.description,
-                parameters: t.words.parameters,
+                parameters_json: t.words.parameters.to_string(),
             })
             .collect()
     }
@@ -156,10 +156,10 @@ impl ToolRegistry {
         self.ctx.service.session.get(&id).await.ok().flatten()
     }
 
-    pub async fn call_helper_async(&self, session: Session, name: &str, args: &Value) -> Result<String, String> {
+    pub async fn call_helper_async(&self, session: Session, name: &str, args_json: &str) -> Result<String, String> {
         let tools = helper();
         match tools.into_iter().find(|t| t.words.name == name) {
-            Some(t) => t.run_async(self, &Who::Helper(Box::new(session)), args).await,
+            Some(t) => t.run_async(self, &Who::Helper(Box::new(session)), args_json).await,
             None => Err(format!("没成：没有 {name} 这个工具")),
         }
     }
@@ -174,8 +174,8 @@ impl ToolDispatchPort for ToolRegistry {
         Box::pin(self.session_for_token_async(token))
     }
 
-    fn call_helper_async<'a>(&'a self, session: Session, name: &'a str, args: &'a Value) -> BoxFuture<'a, Result<String, String>> {
-        Box::pin(ToolRegistry::call_helper_async(self, session, name, args))
+    fn call_helper_async<'a>(&'a self, session: Session, name: &'a str, args_json: &'a str) -> BoxFuture<'a, Result<String, String>> {
+        Box::pin(ToolRegistry::call_helper_async(self, session, name, args_json))
     }
 }
 
@@ -183,8 +183,9 @@ impl ToolDispatchPort for ToolRegistry {
 /// integers given as strings are taken as such, `null` is no value, and
 /// fields the schema does not name are dropped; what still does not read is
 /// refused in words the model can act on.
-pub fn args<T: DeserializeOwned>(schema: &Value, raw: &Value) -> Result<T, String> {
-    let lenient = coerce(schema, raw);
+fn parse_args<T: DeserializeOwned>(schema: &Value, raw_json: &str) -> Result<T, String> {
+    let raw: Value = serde_json::from_str(raw_json).unwrap_or_else(|_| json!({}));
+    let lenient = coerce(schema, &raw);
     serde_json::from_value(lenient).map_err(|e| format!("参数不对：{e}"))
 }
 
@@ -230,7 +231,7 @@ fn coerce(schema: &Value, v: &Value) -> Value {
 }
 
 /// What a tool does with typed arguments.
-type Run = for<'a> fn(&'a ToolRegistry, &'a Who, &'a Words, &'a Value) -> BoxFuture<'a, Result<String, String>>;
+type Run = for<'a> fn(&'a ToolRegistry, &'a Who, &'a Words, &'a str) -> BoxFuture<'a, Result<String, String>>;
 
 /// A tool as one caller holds it.
 #[derive(Clone)]
@@ -242,9 +243,9 @@ pub struct Tool {
 /// `run` for a tool whose arguments read as `A`.
 macro_rules! typed {
     ($f:path) => {
-        |tools: &ToolRegistry, who: &Who, words: &Words, raw: &Value| {
+        |tools: &ToolRegistry, who: &Who, words: &Words, raw_json: &str| {
             Box::pin(async move {
-                let parsed = $crate::agent::tool::args(&words.parameters, raw)?;
+                let parsed = $crate::agent::tool::parse_args(&words.parameters, raw_json)?;
                 $f(tools, who, parsed).await
             })
         }
@@ -339,8 +340,8 @@ pub fn unrun() -> Vec<String> {
 
 impl Tool {
     /// The tool run as `who`: its answer, or its refusal in words for the model.
-    pub async fn run_async(&self, tools: &ToolRegistry, who: &Who, raw: &Value) -> Result<String, String> {
-        (self.run)(tools, who, &self.words, raw).await
+    pub async fn run_async(&self, tools: &ToolRegistry, who: &Who, raw_json: &str) -> Result<String, String> {
+        (self.run)(tools, who, &self.words, raw_json).await
     }
 
     /// Reads only: safe to run again if the process died while it ran.
@@ -374,11 +375,11 @@ impl vibevalley_runtime::agent::Tool for Held {
         let tool = self.tool.clone();
         let tools = self.tools.clone();
         let route = self.route.lock().clone();
-        let raw = args.clone();
+        let raw_json = args.to_string();
         let (tx, rx) = flume::bounded(1);
         let ctx = tools.ctx.clone();
         ctx.spawn("agent.tool.execute", async move {
-            let res = tool.run_async(&tools, &Who::Orchestrator(route), &raw).await;
+            let res = tool.run_async(&tools, &Who::Orchestrator(route), &raw_json).await;
             let _ = tx.send(res);
         });
         match rx.recv() {
@@ -445,9 +446,9 @@ mod tests {
             text: Option<String>,
         }
         let schema = json!({ "type": "object", "properties": { "n": { "type": "integer" }, "on": { "type": "boolean" }, "text": { "type": "string" } } });
-        let a: A = args(&schema, &json!({ "n": "3", "on": "true", "text": null, "extra": 1 })).unwrap();
+        let a: A = parse_args(&schema, &json!({ "n": "3", "on": "true", "text": null, "extra": 1 }).to_string()).unwrap();
         assert_eq!((a.n, a.on, a.text), (3, true, None));
-        let refused = args::<A>(&schema, &json!({ "n": "three", "on": true }));
+        let refused = parse_args::<A>(&schema, &json!({ "n": "three", "on": true }).to_string());
         assert!(refused.unwrap_err().starts_with("参数不对"));
     }
 }

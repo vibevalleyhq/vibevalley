@@ -137,10 +137,10 @@ fn regression_replies_and_reports_across_process_exit() {
         let url = listener.url();
         if window == "message" {
             call(&url, "repo.create", json!({"name":"demo"}));
-            let mut profile = server.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+            let mut profile = vibevalley_runtime::rt::block_on(server.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
             profile.runtime = "scripted".into();
             profile.name = "Worker".into();
-            server.test_internals().agent.profile.store.save(profile).unwrap();
+            vibevalley_runtime::rt::block_on(server.test_internals().agent.profile.store.save_async(profile)).unwrap();
             let issue = call(&url, "issue.create", json!({"title":"Write a file","repo":"demo","agent":"Worker"}));
             call(&url, "issue.status.update", json!({"id": issue["id"],"status":"todo"}));
             let (issue, thread) = issue_thread(&server);

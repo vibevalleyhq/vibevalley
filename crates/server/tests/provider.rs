@@ -81,45 +81,47 @@ fn an_unconfigured_connection_is_saved_without_a_default() {
 #[test]
 fn updates_keep_the_key_and_follow_revisions() {
     let home = tempfile::tempdir().unwrap();
-    let setting = Setting::open(SettingConfig {
-        home: home.path().into(),
-        work_root: home.path().into(),
-        ..Default::default()
+    vibevalley_runtime::rt::block_on(async {
+        let setting = Setting::open_async(SettingConfig {
+            home: home.path().into(),
+            work_root: home.path().into(),
+            ..Default::default()
+        })
+        .await;
+        let p = Provider::new(setting.clone(), std::sync::Arc::new(vibevalley_server::context::Http));
+        let first = p
+            .update_async(&update(|u| u["speech"] = json!({ "connection": "moss", "model": "moss-tts-1.5-flash" })))
+            .await
+            .unwrap();
+        assert_eq!(first.revision, 1);
+        let shown = serde_json::to_value(&first).unwrap();
+        assert_eq!(shown["connections"][0]["key"], json!({ "source": "settings", "hint": "…-key" }));
+        // Omitted keeps the key; a stale revision is refused.
+        let mut again = update(|u| {
+            u["revision"] = 1.into();
+            u["connections"][0].as_object_mut().unwrap().remove("key");
+        });
+        assert_eq!(p.update_async(&update(|_| {})).await.unwrap_err().biz_code, BizCode::ProviderRefused);
+        let kept = p.update_async(&again).await.unwrap();
+        assert_eq!(serde_json::to_value(&kept).unwrap()["connections"][0]["key"]["hint"], "…-key");
+        // Cleared while bound is refused.
+        again.revision = 2;
+        again.connections[0].key = Some(None);
+        again.speech = Some(vibevalley_protocol::ProviderBinding {
+            connection: "moss".into(),
+            model: "moss-tts-1.5-flash".into(),
+        });
+        assert_eq!(p.update_async(&again).await.unwrap_err().biz_code, BizCode::ProviderRefused);
+        // The settings' readiness reads the same providers.
+        let reopened = Setting::open_async(SettingConfig {
+            home: home.path().into(),
+            work_root: home.path().into(),
+            ..Default::default()
+        })
+        .await;
+        assert_eq!(serde_json::to_value(reopened.providers()).unwrap()["connections"][0]["key"], "test-key");
+        let _ = Arc::strong_count(&setting);
+        // Model discovery refuses an old revision before any call.
+        assert_eq!(p.models_async("moss", 0).await.unwrap_err().biz_code, BizCode::ProviderRefused);
     });
-    let p = Provider::new(setting.clone(), std::sync::Arc::new(vibevalley_server::context::Http));
-    let first = p
-        .update(&update(|u| u["speech"] = json!({ "connection": "moss", "model": "moss-tts-1.5-flash" })))
-        .unwrap();
-    assert_eq!(first.revision, 1);
-    let shown = serde_json::to_value(&first).unwrap();
-    assert_eq!(shown["connections"][0]["key"], json!({ "source": "settings", "hint": "…-key" }));
-    // Omitted keeps the key; a stale revision is refused.
-    let mut again = update(|u| {
-        u["revision"] = 1.into();
-        u["connections"][0].as_object_mut().unwrap().remove("key");
-    });
-    assert_eq!(p.update(&update(|_| {})).unwrap_err().biz_code, BizCode::ProviderRefused);
-    let kept = p.update(&again).unwrap();
-    assert_eq!(serde_json::to_value(&kept).unwrap()["connections"][0]["key"]["hint"], "…-key");
-    // Cleared while bound is refused.
-    again.revision = 2;
-    again.connections[0].key = Some(None);
-    again.speech = Some(vibevalley_protocol::ProviderBinding {
-        connection: "moss".into(),
-        model: "moss-tts-1.5-flash".into(),
-    });
-    assert_eq!(p.update(&again).unwrap_err().biz_code, BizCode::ProviderRefused);
-    // The settings' readiness reads the same providers.
-    let reopened = Setting::open(SettingConfig {
-        home: home.path().into(),
-        work_root: home.path().into(),
-        ..Default::default()
-    });
-    assert_eq!(serde_json::to_value(reopened.providers()).unwrap()["connections"][0]["key"], "test-key");
-    let _ = Arc::strong_count(&setting);
-    // Model discovery refuses an old revision before any call.
-    assert_eq!(
-        vibevalley_runtime::rt::block_on(p.models_async("moss", 0)).unwrap_err().biz_code,
-        BizCode::ProviderRefused
-    );
 }

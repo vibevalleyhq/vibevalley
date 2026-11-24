@@ -129,8 +129,8 @@ fn the_users_commits_are_counted_once_per_repository() {
             Arc::new(Http),
             Arc::new(PublicDownload),
         ));
-        let repo = Repo::open(dir.path(), 2).unwrap();
-        let game = Game::open(dir.path(), ctx.clone(), repo);
+        let repo = Repo::open_async(dir.path(), 2).await.unwrap();
+        let game = Game::open_async(dir.path(), ctx.clone(), repo).await;
         game.set_commits(&counted);
         assert_eq!(ctx.live.commits_snapshot().map(|c| c.total), Some(2));
         let _ = ctx.shutdown(Duration::from_secs(1)).await;

@@ -60,13 +60,21 @@ pub(crate) fn container(mime: &str, b: &[u8]) -> bool {
 
 /// Inspects audio containers without loading the whole upload into memory.
 /// Packet durations are counted when the container has no declared duration.
-pub(crate) fn audio(path: &Path, mime: &str) -> Result<(), ApiError> {
+pub(crate) async fn audio_async(path: &Path, mime: &str) -> Result<(), ApiError> {
     use symphonia::core::io::MediaSourceStream;
-    if mime == "audio/wav" {
-        wave(path)?;
-    }
-    let file = std::fs::File::open(path).map_err(|_| refused("inputStorage"))?;
-    inspect(MediaSourceStream::new(Box::new(file), Default::default()), mime).map(|_| ())
+    let file = tokio::fs::File::open(path).await.map_err(|_| refused("inputStorage"))?.into_std().await;
+    let mime = mime.to_string();
+    crate::log::spawn_blocking_traced(move || -> Result<(), ApiError> {
+        let mut file = file;
+        if mime == "audio/wav" {
+            wave(&mut file)?;
+            use std::io::Seek;
+            file.seek(std::io::SeekFrom::Start(0)).map_err(|_| refused("inputInvalid"))?;
+        }
+        inspect(MediaSourceStream::new(Box::new(file), Default::default()), &mime).map(|_| ())
+    })
+    .await
+    .map_err(|_| refused("inputInvalid"))?
 }
 
 /// Audio container metadata extracted by probing stream packets.
@@ -136,11 +144,11 @@ fn inspect(source: symphonia::core::io::MediaSourceStream<'static>, mime: &str) 
 }
 
 /// Validates RIFF lengths, PCM layout, and data chunk alignment of a WAV file.
-fn wave(path: &Path) -> Result<(), ApiError> {
-    use std::io::{Read, Seek, SeekFrom};
+fn wave<F: std::io::Read + std::io::Seek>(file: &mut F) -> Result<(), ApiError> {
+    use std::io::SeekFrom;
     let bad = || refused("inputInvalid");
-    let mut file = std::fs::File::open(path).map_err(|_| bad())?;
-    let size = file.metadata().map_err(|_| bad())?.len();
+    let size = file.seek(SeekFrom::End(0)).map_err(|_| bad())?;
+    file.seek(SeekFrom::Start(0)).map_err(|_| bad())?;
     let mut header = [0; 12];
     file.read_exact(&mut header).map_err(|_| bad())?;
     let u32_at = |b: &[u8], n: usize| u32::from_le_bytes(b[n..n + 4].try_into().unwrap_or([0; 4]));

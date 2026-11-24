@@ -34,9 +34,9 @@ fn the_watch_routes_the_chat_to_a_session() {
         assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
         e.data.unwrap_or(Value::Null)
     };
-    let mut helper = started.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "scripted".into();
-    let helper = started.test_internals().agent.profile.store.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.save_async(helper)).unwrap();
     call("repo.create", json!({ "name": "farm" }));
     let issue = call("issue.create", json!({ "title": "say hello", "repo": "farm", "agent": helper.id }));
     let id = issue["id"].as_str().unwrap().to_string();
@@ -190,10 +190,10 @@ fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
         e.data.unwrap_or(Value::Null)
     };
 
-    let mut helper = started.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "blocking".into();
     helper.name = "慢速帮手".into();
-    started.test_internals().agent.profile.store.save(helper).unwrap();
+    vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let direct = call("channel.direct.create", json!({ "agent": "慢速帮手" })).as_str().unwrap().to_string();
     let other = call("channel.create", json!({ "name": "other" })).as_str().unwrap().to_string();
 
@@ -314,10 +314,10 @@ fn pr2_direct_talk_reopen_passes_resume() {
     };
 
     let s1 = open_server(resumes.clone(), "round-1");
-    let mut helper = s1.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(s1.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "resumable".into();
     helper.name = "接续帮手".into();
-    let helper = s1.test_internals().agent.profile.store.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(s1.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let direct = s1
         .router()
         .call_as(Caller::User, "channel.direct.create", json!({ "agent": "接续帮手" }))
@@ -333,7 +333,7 @@ fn pr2_direct_talk_reopen_passes_resume() {
         let rows = s1.router().call_as(Caller::User, "channel.message.list", json!({ "id": direct })).data?;
         rows.as_array()?.iter().any(|m| m["kind"] == "report" && m["text"] == "round-1").then_some(())
     });
-    let session = vibevalley_runtime::rt::block_on(s1.test_internals().runtime.session().talker_async(&helper.id, &direct)).expect("talker session");
+    let session = vibevalley_runtime::rt::block_on(s1.test_internals().runtime.session_engine().talker_async(&helper.id, &direct)).expect("talker session");
     assert_eq!(resumes.lock().unwrap().as_slice(), &[None]);
     s1.close_blocking();
     drop(s1);
@@ -387,10 +387,10 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
         e.data.unwrap_or(Value::Null)
     };
 
-    let mut helper = started.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "blocking".into();
     helper.name = "信箱帮手".into();
-    let helper = started.test_internals().agent.profile.store.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let direct = call("channel.direct.create", json!({ "agent": "信箱帮手" })).as_str().unwrap().to_string();
 
     // First message enters BlockingRuntime::open so the lane thread is busy before second is claimed.
@@ -553,9 +553,9 @@ fn regression_issue_comment_clears_asking_in_board_slice_before_returning() {
         serde_json::from_str(&started.ctx().feed.snapshot_json(SliceKind::Inbox)).unwrap()
     };
 
-    let mut helper = started.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "scripted".into();
-    let helper = started.test_internals().agent.profile.store.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.save_async(helper)).unwrap();
     call("repo.create", json!({ "name": "clock" }));
     let issue = call("issue.create", json!({ "title": "Pick port", "repo": "clock", "agent": helper.id }));
     let id = issue["id"].as_str().unwrap().to_string();

@@ -55,7 +55,11 @@ impl AgentDriver {
     }
 
     fn drive_on(&self, agent: &Agent, machine_override: Option<&str>) -> Result<Drive, RuntimeError> {
-        let resolved = self.profile.fleet.resolve_on_machine(agent, machine_override).map_err(RuntimeError::Api)?;
+        let resolved = self
+            .profile
+            .fleet
+            .resolve_on_machine_cached(agent, machine_override)
+            .map_err(RuntimeError::Api)?;
         let bare_runtime = RuntimeRef::parse(agent.runtime.trim())
             .map(|r| r.runtime_id)
             .unwrap_or_else(|_| agent.runtime.clone());

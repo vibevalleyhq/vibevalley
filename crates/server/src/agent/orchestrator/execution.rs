@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
-use std::sync::{Arc, Weak, atomic::Ordering};
+use std::sync::{Arc, OnceLock, Weak, atomic::Ordering};
 
 use parking_lot::Mutex;
 use serde_json::{Value, json};
@@ -12,7 +12,7 @@ use vibevalley_runtime::agent::extensions::governance::{self, GovernanceExtensio
 use vibevalley_runtime::agent::extensions::grader::{GraderExtension, OutcomeReview, ReviewProvider, ReviewRequest, Rubric};
 use vibevalley_runtime::agent::extensions::subagent::SubagentExtension;
 use vibevalley_runtime::agent::extensions::todo::TodoExtension;
-use vibevalley_runtime::agent::harness::{Harness, generation_kind};
+use vibevalley_runtime::agent::harness::{Harness, SharedExecution, generation_kind};
 use vibevalley_runtime::agent::{AgentEvent, Brain, BrainError, Message, TurnOutcome};
 
 use super::{Input, Orchestrator, Run};
@@ -26,14 +26,14 @@ pub(super) enum EvalEntry {
 }
 
 struct Bound {
-    orchestrator: Weak<Orchestrator>,
+    orchestrator: OnceLock<Weak<Orchestrator>>,
     store: Store,
     listeners: Mutex<HashMap<String, flume::Sender<AgentEvent>>>,
 }
 
 impl BrainProvider for Bound {
     fn resolve_brain(&self, conv: &str, provider: &str) -> Result<Option<Arc<Brain>>> {
-        let o = self.orchestrator.upgrade().ok_or(Error::Closed)?;
+        let o = self.orchestrator.get().and_then(Weak::upgrade).ok_or(Error::Closed)?;
         let route = self.store.read(|tx| Ok(tx.document("conversation", conv, "pi.route")?.map(|d| d.state)))?;
         let route: Route = route.map(serde_json::from_value).transpose()?.unwrap_or_else(|| Route {
             agent: conv.into(),
@@ -55,7 +55,7 @@ impl ReviewProvider for Bound {
         let (Some(vendor), Some(run)) = (request.conversation.strip_prefix("worker:"), request.request_id.strip_prefix("work:")) else {
             return Ok(request.explicit());
         };
-        let o = self.orchestrator.upgrade().ok_or(Error::Closed)?;
+        let o = self.orchestrator.get().and_then(Weak::upgrade).ok_or(Error::Closed)?;
         let (tx, rx) = flume::bounded(1);
         let vendor = vendor.to_string();
         let run = run.to_string();
@@ -111,6 +111,47 @@ impl ReviewProvider for Bound {
     }
 }
 
+pub struct PendingExecution {
+    harness: Harness,
+    bound: Arc<Bound>,
+    shared: SharedExecution,
+}
+
+impl PendingExecution {
+    pub fn prepare(store: Store, permissions: Permissions) -> Self {
+        let bound = Arc::new(Bound {
+            orchestrator: OnceLock::new(),
+            store: store.clone(),
+            listeners: Default::default(),
+        });
+        let harness = Harness::from_store(store, bound.clone());
+        harness.register_extension(Arc::new(GovernanceExtension::new(permissions)));
+        harness.register_extension(Arc::new(BudgetExtension));
+        harness.register_extension(Arc::new(GraderExtension::new(bound.clone())));
+        harness.register_extension(Arc::new(TodoExtension::default().without_global_tools()));
+        harness.register_extension(Arc::new(SubagentExtension::new("VibeValley").without_global_tools()));
+        let shared = SharedExecution::new(harness.clone());
+        Self { harness, bound, shared }
+    }
+
+    pub fn shared(&self) -> SharedExecution {
+        self.shared.clone()
+    }
+
+    pub(super) fn attach(self, o: Weak<Orchestrator>) -> Execution {
+        let _ = self.bound.orchestrator.set(o);
+        let scheduler = self.harness.scheduler().clone();
+        let (shutdown, stopped) = flume::bounded(0);
+        Execution {
+            scheduler,
+            harness: self.harness,
+            bound: self.bound,
+            shutdown: Mutex::new(Some(shutdown)),
+            stopped,
+        }
+    }
+}
+
 pub struct Execution {
     pub scheduler: Scheduler,
     pub harness: Harness,
@@ -128,26 +169,7 @@ pub(super) struct TurnInput<'a> {
 
 impl Execution {
     pub(super) fn new(store: Store, o: Weak<Orchestrator>, permissions: Permissions) -> Self {
-        let bound = Arc::new(Bound {
-            orchestrator: o,
-            store: store.clone(),
-            listeners: Default::default(),
-        });
-        let harness = Harness::from_store(store, bound.clone());
-        let scheduler = harness.scheduler().clone();
-        harness.register_extension(Arc::new(GovernanceExtension::new(permissions)));
-        harness.register_extension(Arc::new(BudgetExtension));
-        harness.register_extension(Arc::new(GraderExtension::new(bound.clone())));
-        harness.register_extension(Arc::new(TodoExtension::default().without_global_tools()));
-        harness.register_extension(Arc::new(SubagentExtension::new("VibeValley").without_global_tools()));
-        let (shutdown, stopped) = flume::bounded(0);
-        Self {
-            scheduler,
-            harness,
-            bound,
-            shutdown: Mutex::new(Some(shutdown)),
-            stopped,
-        }
+        PendingExecution::prepare(store, permissions).attach(o)
     }
 
     pub(super) fn close(&self) {

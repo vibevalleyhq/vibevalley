@@ -595,11 +595,10 @@ impl RuntimeFleet {
         if !self.known(id) {
             return Ok(None);
         }
-        let profiles = self.profiles.clone();
-        let id_owned = id.to_string();
-        crate::log::spawn_blocking_traced(move || profiles.save_settings(&id_owned, settings))
+        let _ = self
+            .profiles
+            .save_settings_async(id, settings)
             .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
             .map_err(|e| refused(t("server.runtime.notSaved", &[("id", id.into()), ("why", e.message.into())])))?;
         Ok(self.refresh_async(id).await)
     }
@@ -759,14 +758,14 @@ impl RuntimeFleet {
     }
 
     /// Non-blocking resolution of `agent` using cached runtime metadata.
-    pub fn resolve(&self, agent: &Agent) -> Result<Resolved, ApiError> {
-        self.resolve_on_machine(agent, None)
+    pub fn resolve_cached(&self, agent: &Agent) -> Result<Resolved, ApiError> {
+        self.resolve_on_machine_cached(agent, None)
     }
 
     /// Non-blocking resolution of `agent` against an explicit `machine_override`
     /// (`Issue.machine_id`), falling back to `agent.machine_id`, any `RuntimeRef`
     /// machine prefix on `agent.runtime`, and finally `"local"`.
-    pub fn resolve_on_machine(&self, agent: &Agent, machine_override: Option<&str>) -> Result<Resolved, ApiError> {
+    pub fn resolve_on_machine_cached(&self, agent: &Agent, machine_override: Option<&str>) -> Result<Resolved, ApiError> {
         let (ref_machine, bare_runtime) = match RuntimeRef::parse(agent.runtime.trim()) {
             Ok(parsed) => (Some(parsed.machine_id), parsed.runtime_id),
             Err(_) => (None, agent.runtime.trim().to_string()),
@@ -1005,7 +1004,7 @@ mod usage_tests {
         ));
         let mut registry = Registry::new();
         registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-        let profiles = ProfileStore::open(home.path(), &[]).unwrap();
+        let profiles = ProfileStore::open_async(home.path(), &[]).await.unwrap();
         let fleet = RuntimeFleet::new(Arc::new(registry), profiles, ctx.clone(), false);
         fleet
             .update_async(

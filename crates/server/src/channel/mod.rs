@@ -68,7 +68,6 @@ fn no_channel(id: &str) -> ApiError {
     missing(t("server.channel.noChannel", &[("id", id.into())]), LookIn::Channel)
 }
 
-type Guard = Arc<dyn Fn(String) -> crate::BoxFuture<'static, Vec<String>> + Send + Sync>;
 type Seater = Arc<dyn Fn(&str) + Send + Sync>;
 
 /// The chat domain service.
@@ -88,7 +87,6 @@ pub struct Chat {
     removals: broadcast::Sender<String>,
     message_events: broadcast::Sender<ChannelMessageEvent>,
     dispatches: Mutex<Vec<flume::Sender<ChannelDispatched>>>,
-    guards: RwLock<Vec<Guard>>,
     seaters: RwLock<Vec<Seater>>,
     /// Link previews are read off the web; tests turn it off.
     embeds: bool,
@@ -156,7 +154,6 @@ impl Chat {
             removals,
             message_events,
             dispatches: Mutex::default(),
-            guards: RwLock::default(),
             seaters: RwLock::default(),
             embeds,
         }))
@@ -641,7 +638,7 @@ mod tests {
             Arc::new(Http),
             Arc::new(PublicDownload),
         ));
-        let storage = Storage::open(home, ctx.clone());
+        let storage = Storage::open_async(home, ctx.clone()).await.unwrap();
         (ctx, storage)
     }
 

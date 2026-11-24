@@ -12,8 +12,8 @@ use vibevalley_protocol::{DebugCacheStat, DebugOverrideConfig, DebugTimelineEven
 use vibevalley_runtime::oar::{Event as OarEvent, EventKind as OarEventKind, OarObserver};
 
 use super::redact::{Redactor, contains_ascii_ci};
+use crate::context::api::{CallerContext, FaultGate};
 use crate::context::now;
-use crate::gateway::api::{CallerContext, FaultGate};
 use crate::log::InvokeObserver;
 use crate::setting::Setting;
 
@@ -109,16 +109,19 @@ impl DebugCollector {
 
     /// Ingests GPUI frame samples published by `apps/mac`'s `ShellDebugHandle`,
     /// deduplicating strictly by monotonic `seq`.
-    pub fn ingest_host_frames(&self, host_snapshot: &Value) {
+    pub fn ingest_host_frames(&self, host_snapshot_json: &str) {
         let mut count = 0u32;
-        self.ingest_host_frames_inner(host_snapshot, None, &mut count);
+        self.ingest_host_frames_inner(host_snapshot_json, None, &mut count);
     }
 
-    pub(crate) fn ingest_host_frames_with(&self, host_snapshot: &Value, redactor: &Redactor, count: &mut u32) {
-        self.ingest_host_frames_inner(host_snapshot, Some(redactor), count);
+    pub(crate) fn ingest_host_frames_with(&self, host_snapshot_json: &str, redactor: &Redactor, count: &mut u32) {
+        self.ingest_host_frames_inner(host_snapshot_json, Some(redactor), count);
     }
 
-    fn ingest_host_frames_inner(&self, host_snapshot: &Value, shared_redactor: Option<&Redactor>, count: &mut u32) {
+    fn ingest_host_frames_inner(&self, host_snapshot_json: &str, shared_redactor: Option<&Redactor>, count: &mut u32) {
+        let Ok(host_snapshot) = serde_json::from_str::<Value>(host_snapshot_json) else {
+            return;
+        };
         let Some(frames) = host_snapshot.get("frames").and_then(Value::as_array) else {
             return;
         };
@@ -319,7 +322,9 @@ impl InvokeObserver for DebugCollector {
         let clean = if value_needs_redaction(payload) {
             let redactor = Redactor::from_setting(&self.setting);
             let mut count = 0u32;
-            cap_json_bytes(redactor.redact_value(payload.clone(), &mut count), MAX_PAYLOAD_BYTES)
+            let raw_json = serde_json::to_string(payload).unwrap_or_else(|_| "null".to_string());
+            let clean_val: Value = serde_json::from_str(&redactor.redact_json_value(&raw_json, &mut count)).unwrap_or(Value::Null);
+            cap_json_bytes(clean_val, MAX_PAYLOAD_BYTES)
         } else {
             payload.clone()
         };
@@ -405,8 +410,8 @@ impl OarObserver for DebugCollector {
                 format!("[{session_id}] {kind}: {snippet}")
             }
         };
-        let raw_event_val = serde_json::to_value(&event.kind).unwrap_or(Value::Null);
-        let clean_event_val = redactor.redact_value(raw_event_val, &mut count);
+        let raw_event_json = serde_json::to_string(&event.kind).unwrap_or_else(|_| "null".to_string());
+        let clean_event_val: Value = serde_json::from_str(&redactor.redact_json_value(&raw_event_json, &mut count)).unwrap_or(Value::Null);
         let detail = json!({
             "sessionId": session_id,
             "seq": event.seq,
@@ -536,7 +541,7 @@ fn json_upper_bound_bytes(val: &Value, limit: usize) -> usize {
     }
 }
 
-pub(crate) fn cap_json_bytes(val: Value, max_bytes: usize) -> Value {
+fn cap_json_bytes(val: Value, max_bytes: usize) -> Value {
     if json_upper_bound_bytes(&val, max_bytes) <= max_bytes {
         return val;
     }

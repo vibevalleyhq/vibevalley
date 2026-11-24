@@ -79,10 +79,10 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
 
     let call = |op: &str, p| app.router().call_as(Caller::User, op, p);
     assert!(call("repo.create", json!({ "name": "farm" })).data.is_some());
-    let mut helper = app.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "scripted".into();
     helper.name = "小帮手".into();
-    app.test_internals().agent.profile.store.save(helper).unwrap();
+    vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let made = call("issue.create", json!({ "title": "say hi", "repo": "farm", "agent": "小帮手" }));
     let id = made.data.unwrap()["id"].as_str().unwrap().to_string();
     let sent = call("issue.status.update", json!({ "id": id, "status": "todo" }));
@@ -107,7 +107,7 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
             _ => None,
         })
         .expect("the vibevalley door with a bearer token");
-    let session = app.test_internals().board.sessions().who(&token).expect("the token names the helper");
+    let session = app.test_internals().board.session_engine().who(&token).expect("the token names the helper");
 
     let hello = rpc(&door, &token, 1, "initialize", json!({ "protocolVersion": "2025-06-18", "capabilities": {} }));
     assert_eq!(hello["result"]["serverInfo"]["name"], "vibevalley");
@@ -177,7 +177,7 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
         json!({ "name": "issue_report", "arguments": { "summary": "打了招呼 abc123", "remember": [{ "text": "测试用 cargo test", "scope": "all" }] } }),
     );
     assert_eq!(text_of(&reported), "报告已记录；现在用简短正文说明结果。");
-    let kept = std::fs::read_to_string(app.test_internals().board.sessions().report_path(&session)).unwrap();
+    let kept = std::fs::read_to_string(app.test_internals().board.session_engine().report_path(&session)).unwrap();
     assert!(kept.contains("打了招呼 abc123") && kept.contains("测试用 cargo test"), "{kept}");
 
     let none = rpc(&door, &token, 9, "tools/call", json!({ "name": "no_such_tool", "arguments": {} }));

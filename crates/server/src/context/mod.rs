@@ -1,6 +1,7 @@
 //! Shared runtime context (`Context`) and L0 infrastructure primitives passed
 //! into every flat server domain module.
 
+pub mod api;
 pub mod error;
 pub mod feed;
 pub mod http;
@@ -19,13 +20,18 @@ use tokio_util::sync::CancellationToken;
 use vibevalley_core::{SharedClock, SliceMask};
 use vibevalley_protocol::Millis;
 
+pub use api::{
+    BoxFuture, CallerContext, CallerPrincipal, ClientIdentity, ClientKind, FaultGate, GatewayPorts, HostDebugBridge, LiveVoiceLine, LiveVoicePort, MachineBus,
+    MachineConnection, Mcp, RemoteAuth, RemoteDeviceIdentity, SharedFaultGate, SharedHostDebug, SharedLiveVoice, SharedMachineBus, SharedMcp, SharedRemoteAuth,
+    dispatch_mcp_message_async, dispatch_mcp_tunnel_async, refusal,
+};
 pub use error::{AsyncRequestKeys, LookIn, RequestKeys, internal, missing, refused};
 pub use feed::{SliceFeed, SliceFeedSet, SliceFrame, SliceProjectFn, SliceSubscription, SliceWakeGate, StateFeed, encode_slice};
 pub use http::{
     Fetch, FetchError, Http, PublicBytes, PublicDownload, PublicDownloadError, ReadError, Request, Response, install_tls, read_max, read_max_until,
 };
 pub use live::{FarmEffect, FarmEffectEntry, LiveSessionSnapshot, LiveState, Sink, bridge_live_receiver};
-pub use outbox::{Outbox, OutboxConfig, OutboxDelivery};
+pub use outbox::{OUTBOX_SESSION_REPORTED, Outbox, OutboxConfig, OutboxDelivery, OutboxEvent, OutboxSessionReported};
 pub use task::{TaskGroup, Ticker};
 
 use crate::service::Service;

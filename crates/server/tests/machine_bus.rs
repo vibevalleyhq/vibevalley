@@ -343,10 +343,10 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
     assert!(git_status.success());
 
     // Create an agent profile that targets remote runtime `"claude"` (not installed locally).
-    let mut profile = started.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut profile = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     profile.runtime = "claude".into();
     profile.name = "Remote Builder".into();
-    let profile = started.test_internals().agent.profile.store.save(profile).unwrap();
+    let profile = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.save_async(profile)).unwrap();
 
     // Connect remote machine `gpu-dev` advertising `"claude"`.
     let mut ws = vibevalley_runtime::rt::block_on(async {
@@ -485,7 +485,7 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
     crate::support::wait_until_transition(started.ctx(), Duration::from_secs(3), "gpu-dev offline", || {
         sessions_slice(&started).machines.iter().any(|m| m.id == "gpu-dev" && !m.online).then_some(())
     });
-    assert!(started.test_internals().runtime.session().is_live(&session_id));
+    assert!(started.test_internals().runtime.session_engine().is_live(&session_id));
     assert_eq!(
         crate::support::board_session(started.test_internals().board, &session_id)
             .unwrap()

@@ -32,10 +32,10 @@ fn crons_are_kept_refused_and_run_when_due() {
     let app = server(dir.path(), clock.clone());
     let crons = app.test_internals().cron;
     let call = |op: &str, p| app.router().call_as(Caller::User, op, p);
-    let mut helper = app.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "scripted".into();
     helper.name = "lab".into();
-    let helper = app.test_internals().agent.profile.store.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(helper)).unwrap();
     call("repo.create", json!({ "name": "farm" })).data.unwrap();
 
     let past = call("cron.create", json!({ "name": "x", "text": "y", "when": { "kind": "once", "at": 1 } }));

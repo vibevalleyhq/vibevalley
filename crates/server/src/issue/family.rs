@@ -152,7 +152,9 @@ impl Board {
             return Ok(());
         }
         let wp = self.worktree();
-        let Some(main) = wp.main_repo(parent.repo.as_deref())? else { return Ok(()) };
+        let Some(main) = wp.main_repo_async(parent.repo.as_deref()).await? else {
+            return Ok(());
+        };
         let Some(session) = self.on_board_async(child).await else { return Ok(()) };
         // The parent's session is busy in the parent's worktree: wait.
         let parent_session = self.on_board_async(&parent).await;
@@ -171,14 +173,14 @@ impl Board {
             title: &parent.title,
             worktree: parent_worktree.as_deref(),
         };
-        let joined = wp.join(&main, &child_at, &parent_at, &checks)?;
+        let joined = wp.join_async(&main, &child_at, &parent_at, &checks).await?;
         match joined {
             None => {}
             Some(Joined::Stuck { why, conflict }) => {
                 self.change_async(&child.id, IssueChange::Stuck { why, conflict }).await?;
             }
             Some(Joined::Merged { frozen }) => {
-                self.sessions().dismiss_async(&session.id, Leave::Discard).await?;
+                self.session_engine().dismiss_async(&session.id, Leave::Discard).await?;
                 self.change_async(&child.id, IssueChange::MergedIntoParent { frozen }).await?;
             }
         }

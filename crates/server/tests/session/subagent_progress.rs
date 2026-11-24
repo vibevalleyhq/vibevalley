@@ -84,9 +84,9 @@ fn call(server: &App, op: &str, body: Value) -> Value {
 fn regression_child_progress_outlives_log_retention_and_reopen() {
     let home = tempfile::tempdir().unwrap();
     let server = open(home.path());
-    let mut worker = server.test_internals().agent.profile.store.install_template("reviewer").unwrap();
+    let mut worker = vibevalley_runtime::rt::block_on(server.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     worker.runtime = "scripted".into();
-    let worker = server.test_internals().agent.profile.store.save(worker).unwrap();
+    let worker = vibevalley_runtime::rt::block_on(server.test_internals().agent.profile.store.save_async(worker)).unwrap();
     call(&server, "repo.create", json!({"name":"progress"}));
     let issue = call(&server, "issue.create", json!({"repo":"progress","agent":worker.id,"title":"Run checks"}));
     let id = issue["id"].as_str().unwrap();

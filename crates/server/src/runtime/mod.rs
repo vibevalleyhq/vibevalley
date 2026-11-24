@@ -24,9 +24,8 @@ use vibevalley_protocol::{
 use vibevalley_runtime::oar::{PermissionMode, Registry};
 
 pub use session::{
-    ANSWER_ONLY, AgentProfileInfo, DraftEnd, Drive, HelperPlace, Hire, Journal, MailboxEntry, MailboxSource, MailboxStatus, News, Persona, RememberHook,
-    Report, ReportQuestion, ReportStatus, Rounds, RuntimeDriver, SessionDriver, SessionEngine, SessionLifecycleEvent, Trajectory, WorkspaceSnapshot,
-    trigger_of,
+    ANSWER_ONLY, AgentProfileInfo, DraftEnd, Drive, HelperPlace, Hire, Journal, MailboxEntry, MailboxSource, MailboxStatus, News, Persona, Report,
+    ReportQuestion, ReportStatus, Rounds, RuntimeDriver, SessionDriver, SessionEngine, SessionLifecycleEvent, Trajectory, WorkspaceSnapshot, trigger_of,
 };
 pub(crate) use session::{OUTBOX_SESSION_REPORTED, OutboxSessionReported};
 pub use worktree::{Changes, Delivery, Joined, Landed, Leave, Leaving, OnDisk, Worktree, issue_branch};
@@ -501,8 +500,8 @@ impl Runtime {
     /// Runs reopen recovery and returns `(Arc<Runtime>, Opened)` so `issue::Board`
     /// can settle lost/draft issues.
     pub async fn open_async(ctx: Arc<Context>, drivers: Arc<dyn SessionDriver>, config: RuntimeConfig) -> Result<(Arc<Runtime>, Opened)> {
-        std::fs::create_dir_all(config.data_dir.join("reports")).map_err(io)?;
-        std::fs::create_dir_all(config.data_dir.join("records")).map_err(io)?;
+        tokio::fs::create_dir_all(config.data_dir.join("reports")).await.map_err(io)?;
+        tokio::fs::create_dir_all(config.data_dir.join("records")).await.map_err(io)?;
         let opened = reopen_sessions_async(&ctx).await?;
         let config = Arc::new(config);
         let worktree = Arc::new(Worktree::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
@@ -535,7 +534,7 @@ impl Runtime {
         &self.ctx
     }
 
-    pub fn session(&self) -> &SessionEngine {
+    pub fn session_engine(&self) -> &SessionEngine {
         &self.session
     }
 
@@ -563,11 +562,6 @@ impl Runtime {
         self.session.durable_store()
     }
 
-    /// Disposes live agent handles immediately.
-    pub fn close(&self) {
-        self.session.close();
-    }
-
     /// Disposes live agent handles and flushes all open trajectories.
     pub async fn close_async(&self) {
         self.session.close();
@@ -578,20 +572,12 @@ impl Runtime {
         self.session.set_mcp_url(url);
     }
 
-    pub fn set_remember(&self, hook: RememberHook) {
-        self.session.set_remember(hook);
-    }
-
     pub fn subscribe_events(&self) -> broadcast::Receiver<SessionLifecycleEvent> {
         self.session.subscribe_events()
     }
 
     pub fn who(&self, token: &str) -> Option<String> {
         self.session.who(token)
-    }
-
-    pub fn report(&self, session: &str, report: &Report) -> Result<()> {
-        self.session.report(session, report)
     }
 
     pub fn base_branch(&self, session: &str) -> Option<String> {
@@ -624,6 +610,10 @@ impl Runtime {
 
     pub async fn stop_async(&self, id: &str) -> std::result::Result<(), ApiError> {
         self.session.stop_async(id).await
+    }
+
+    pub async fn report_async(&self, session: &str, report: &Report) -> Result<()> {
+        self.session.report_async(session, report).await
     }
 
     pub async fn upsert_orchestrator_async(&self, session: &Session) -> std::result::Result<(), ApiError> {
@@ -734,21 +724,11 @@ impl Runtime {
         self.session.detach_binding_endpoint_async(input).await
     }
 
-    pub(crate) async fn watch_session_async(
-        &self,
-        input: SessionWatchPayload,
-        events: flume::Sender<serde_json::Value>,
-        stop: flume::Receiver<()>,
-    ) -> std::result::Result<(), ApiError> {
-        self.session.watch_session_async(input, events, stop).await
+    pub(crate) async fn watch_session_async(&self, input: SessionWatchPayload, sink: crate::context::Sink) -> std::result::Result<(), ApiError> {
+        self.session.watch_session_async(input, sink).await
     }
 
-    pub(crate) async fn watch_issue_async(
-        &self,
-        input: IssueGetInput,
-        events: flume::Sender<serde_json::Value>,
-        stop: flume::Receiver<()>,
-    ) -> std::result::Result<(), ApiError> {
-        self.session.watch_issue_async(input, events, stop).await
+    pub(crate) async fn watch_issue_async(&self, input: IssueGetInput, sink: crate::context::Sink) -> std::result::Result<(), ApiError> {
+        self.session.watch_issue_async(input, sink).await
     }
 }

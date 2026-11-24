@@ -233,12 +233,12 @@ fn template_from(text_of: &dyn Fn(&str) -> Option<String>, dir: &str, source: Ag
 
 /// A template folder on disk; a missing file is none, one that cannot be
 /// read is why it is not a template.
-fn read_template(dir: &Path, source: AgentTemplateSource) -> Result<AgentTemplate, String> {
+async fn read_template_async(dir: &Path, source: AgentTemplateSource) -> Result<AgentTemplate, String> {
     let mut texts = BTreeMap::new();
     let dir_text = dir.to_string_lossy().into_owned();
     for f in TEMPLATE_FILES {
         let path = dir.join(f);
-        match std::fs::read_to_string(&path) {
+        match tokio::fs::read_to_string(&path).await {
             Ok(text) => {
                 texts.insert(format!("{dir_text}/{f}"), text);
             }
@@ -293,18 +293,29 @@ fn added_dir(home: &Path) -> PathBuf {
 
 /// The templates added on this machine; a folder that no longer reads is
 /// left out.
-fn added_templates(home: &Path) -> Vec<AgentTemplate> {
-    let Ok(entries) = std::fs::read_dir(added_dir(home)) else { return vec![] };
-    let mut names: Vec<PathBuf> = entries.filter_map(|e| e.ok().map(|e| e.path())).collect();
+async fn added_templates_async(home: &Path) -> Vec<AgentTemplate> {
+    let Ok(mut entries) = tokio::fs::read_dir(added_dir(home)).await else {
+        return vec![];
+    };
+    let mut names = Vec::new();
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        names.push(entry.path());
+    }
     names.sort();
-    names.iter().filter_map(|dir| read_template(dir, AgentTemplateSource::Added).ok()).collect()
+    let mut out = Vec::new();
+    for dir in names {
+        if let Ok(item) = read_template_async(&dir, AgentTemplateSource::Added).await {
+            out.push(item);
+        }
+    }
+    out
 }
 
-fn copy_template(from: &Path, home: &Path, id: &str) -> std::io::Result<()> {
+async fn copy_template_async(from: &Path, home: &Path, id: &str) -> std::io::Result<()> {
     let to = added_dir(home).join(id);
-    std::fs::create_dir_all(&to)?;
+    tokio::fs::create_dir_all(&to).await?;
     for f in TEMPLATE_FILES {
-        match std::fs::copy(from.join(f), to.join(f)) {
+        match tokio::fs::copy(from.join(f), to.join(f)).await {
             Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e),
             _ => {}
         }
@@ -407,19 +418,20 @@ pub struct ProfileStore {
     file: PathBuf,
     stored: Mutex<Stored>,
     keeps: Mutex<Vec<Keep>>,
+    write_gate: tokio::sync::Semaphore,
 }
 
 impl ProfileStore {
     /// Reads `<home>/config.json`; a file that cannot be read is kept aside
     /// (`config.json.unreadable-<ms>`) and the profiles start from the
     /// default orchestrator and the `starters` (built-in template ids).
-    pub fn open(home: &Path, starters: &[String]) -> std::io::Result<Arc<ProfileStore>> {
+    pub async fn open_async(home: &Path, starters: &[String]) -> std::io::Result<Arc<ProfileStore>> {
         let file = home.join("config.json");
-        let read = match std::fs::read_to_string(&file) {
+        let read = match tokio::fs::read_to_string(&file).await {
             Ok(text) => match read_stored(&text) {
                 Ok(s) => Some(s),
                 Err(_) => {
-                    std::fs::rename(&file, format!("{}.unreadable-{}", file.to_string_lossy(), crate::context::now()))?;
+                    tokio::fs::rename(&file, format!("{}.unreadable-{}", file.to_string_lossy(), crate::context::now())).await?;
                     None
                 }
             },
@@ -453,31 +465,36 @@ impl ProfileStore {
             file,
             stored: Mutex::new(Stored::default()),
             keeps: Mutex::default(),
+            write_gate: tokio::sync::Semaphore::new(1),
         };
-        profiles.write(&s)?;
+        profiles.write_async(&s).await?;
         *profiles.stored.lock() = s;
         Ok(Arc::new(profiles))
     }
 
-    fn write(&self, s: &Stored) -> std::io::Result<()> {
-        std::fs::create_dir_all(&self.home)?;
+    async fn write_async(&self, s: &Stored) -> std::io::Result<()> {
+        tokio::fs::create_dir_all(&self.home).await?;
         let tmp = self.file.with_extension("json.tmp");
-        std::fs::write(&tmp, serde_json::to_string(s).map_err(std::io::Error::other)?)?;
-        std::fs::rename(&tmp, &self.file)
+        tokio::fs::write(&tmp, serde_json::to_string(s).map_err(std::io::Error::other)?).await?;
+        tokio::fs::rename(&tmp, &self.file).await
     }
 
     /// A change is kept only once it is on disk.
-    fn change<R>(&self, f: impl FnOnce(&mut Stored) -> Result<R, ApiError>) -> Result<R, ApiError> {
-        let mut guard = self.stored.lock();
-        let mut next = guard.clone();
+    async fn change_async<R>(&self, f: impl FnOnce(&mut Stored) -> Result<R, ApiError>) -> Result<R, ApiError> {
+        let _permit = self
+            .write_gate
+            .acquire()
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
+        let mut next = self.stored.lock().clone();
         let out = f(&mut next)?;
-        self.write(&next).map_err(|e| {
+        self.write_async(&next).await.map_err(|e| {
             refused(t(
                 "server.agent.notSaved",
                 &[("file", self.file.to_string_lossy().into_owned().into()), ("why", e.to_string().into())],
             ))
         })?;
-        *guard = next;
+        *self.stored.lock() = next;
         Ok(out)
     }
 
@@ -533,11 +550,12 @@ impl ProfileStore {
         self.stored.lock().settings.get(runtime).cloned().unwrap_or_else(default_settings)
     }
 
-    pub fn save_settings(&self, runtime: &str, settings: RuntimeSettings) -> Result<RuntimeSettings, ApiError> {
-        self.change(|s| {
+    pub async fn save_settings_async(&self, runtime: &str, settings: RuntimeSettings) -> Result<RuntimeSettings, ApiError> {
+        self.change_async(|s| {
             s.settings.insert(runtime.into(), settings.clone());
             Ok(settings)
         })
+        .await
     }
 
     /// Why a profile cannot be kept as it is.
@@ -551,34 +569,37 @@ impl ProfileStore {
         None
     }
 
-    pub fn save(&self, a: Agent) -> Result<Agent, ApiError> {
+    pub async fn save_async(&self, a: Agent) -> Result<Agent, ApiError> {
         if let Some(why) = Self::role_problem(&a) {
             return Err(refused(why));
         }
         let cast = with_cast(a);
-        self.change(|s| {
+        self.change_async(|s| {
             s.agents = upsert(&s.agents, cast.clone(), |a| &a.id);
             Ok(())
-        })?;
+        })
+        .await?;
         self.saved(cast)
     }
 
-    pub fn create(&self, draft: Agent) -> Result<Agent, ApiError> {
+    pub async fn create_async(&self, draft: Agent) -> Result<Agent, ApiError> {
         if !draft.id.is_empty() {
             return Err(refused(t("server.agent.newAgentId", &[])));
         }
         if let Some(why) = Self::role_problem(&draft) {
             return Err(refused(why));
         }
-        let created = self.change(|s| {
-            let n = (1..).find(|n| !s.agents.iter().any(|a| a.id == format!("agent-{n}"))).expect("a free id");
-            let created = with_cast(Agent {
-                id: format!("agent-{n}"),
-                ..draft
-            });
-            s.agents.push(created.clone());
-            Ok(created)
-        })?;
+        let created = self
+            .change_async(|s| {
+                let n = (1..).find(|n| !s.agents.iter().any(|a| a.id == format!("agent-{n}"))).expect("a free id");
+                let created = with_cast(Agent {
+                    id: format!("agent-{n}"),
+                    ..draft
+                });
+                s.agents.push(created.clone());
+                Ok(created)
+            })
+            .await?;
         self.saved(created)
     }
 
@@ -590,12 +611,13 @@ impl ProfileStore {
             .ok_or_else(|| missing(t("server.agent.noAgent", &[("id", id.into())]), LookIn::Agent))
     }
 
-    pub fn remove(&self, id: &str) -> Result<(), ApiError> {
+    pub async fn remove_async(&self, id: &str) -> Result<(), ApiError> {
         self.deletable_agent(id)?;
-        self.change(|s| {
+        self.change_async(|s| {
             s.agents.retain(|a| a.id != id);
             Ok(())
         })
+        .await
     }
 
     pub fn preview_remove(&self, id: &str) -> Result<Preview, ApiError> {
@@ -626,17 +648,18 @@ impl ProfileStore {
             .ok_or_else(|| missing(t("server.agent.noSkill", &[("id", id.into())]), LookIn::Skill))
     }
 
-    pub fn save_skill(&self, skill: Skill) -> Result<Skill, ApiError> {
+    pub async fn save_skill_async(&self, skill: Skill) -> Result<Skill, ApiError> {
         Self::not_built_in(&skill.id)?;
         let kept = Skill { built_in: None, ..skill };
-        self.change(|s| {
+        self.change_async(|s| {
             s.skills = upsert(&s.skills, kept.clone(), |k| &k.id);
             Ok(())
-        })?;
+        })
+        .await?;
         Ok(kept)
     }
 
-    pub fn create_skill(&self, draft: Skill) -> Result<Skill, ApiError> {
+    pub async fn create_skill_async(&self, draft: Skill) -> Result<Skill, ApiError> {
         if !draft.id.is_empty() {
             return Err(refused(t("server.agent.newSkillId", &[])));
         }
@@ -651,7 +674,7 @@ impl ProfileStore {
         let stem = stem.trim_matches('-').to_string();
         let stem = if stem.is_empty() { "skill".to_string() } else { stem };
         let own: BTreeSet<String> = built_in_skills().into_iter().map(|k| k.id).collect();
-        self.change(|s| {
+        self.change_async(|s| {
             let taken = |x: &str| own.contains(x) || s.skills.iter().any(|k| k.id == x);
             let mut id = stem.clone();
             let mut n = 2;
@@ -663,17 +686,19 @@ impl ProfileStore {
             s.skills.push(created.clone());
             Ok(created)
         })
+        .await
     }
 
-    pub fn remove_skill(&self, id: &str) -> Result<(), ApiError> {
+    pub async fn remove_skill_async(&self, id: &str) -> Result<(), ApiError> {
         self.deletable_skill(id)?;
-        self.change(|s| {
+        self.change_async(|s| {
             s.skills.retain(|k| k.id != id);
             for a in &mut s.agents {
                 a.skills.retain(|k| k != id);
             }
             Ok(())
         })
+        .await
     }
 
     pub fn preview_remove_skill(&self, id: &str) -> Result<Preview, ApiError> {
@@ -695,10 +720,10 @@ impl ProfileStore {
 
     /// Built in, then added; re-read on each call so a folder added or
     /// removed by hand shows at once.
-    pub fn templates(&self) -> Vec<AgentTemplate> {
+    pub async fn templates_async(&self) -> Vec<AgentTemplate> {
         let agents = self.all();
         let mut all = built_in_templates();
-        all.extend(added_templates(&self.home));
+        all.extend(added_templates_async(&self.home).await);
         for item in &mut all {
             item.installed = agents
                 .iter()
@@ -709,76 +734,80 @@ impl ProfileStore {
         all
     }
 
-    pub fn template_of(&self, id: &str) -> Option<AgentTemplate> {
-        self.templates().into_iter().find(|x| x.id == id)
+    pub async fn template_of_async(&self, id: &str) -> Option<AgentTemplate> {
+        self.templates_async().await.into_iter().find(|x| x.id == id)
     }
 
     fn no_template(id: &str) -> ApiError {
         missing(t("server.agent.template.noTemplate", &[("id", id.into())]), LookIn::Template)
     }
 
-    fn deletable_template(&self, id: &str) -> Result<AgentTemplate, ApiError> {
-        let item = self.template_of(id).ok_or_else(|| Self::no_template(id))?;
+    async fn deletable_template_async(&self, id: &str) -> Result<AgentTemplate, ApiError> {
+        let item = self.template_of_async(id).await.ok_or_else(|| Self::no_template(id))?;
         if item.source == AgentTemplateSource::BuiltIn {
             return Err(refused(t("server.agent.template.builtIn", &[("id", id.into())])));
         }
         Ok(item)
     }
 
-    pub fn install_template(&self, id: &str) -> Result<Agent, ApiError> {
-        self.install_template_with_runtime(id, None)
+    pub async fn install_template_async(&self, id: &str) -> Result<Agent, ApiError> {
+        self.install_template_with_runtime_async(id, None).await
     }
 
-    pub fn install_template_with_runtime(&self, id: &str, runtime_override: Option<(String, PersonaMode)>) -> Result<Agent, ApiError> {
-        let mut item = self.template_of(id).ok_or_else(|| Self::no_template(id))?;
+    pub async fn install_template_with_runtime_async(&self, id: &str, runtime_override: Option<(String, PersonaMode)>) -> Result<Agent, ApiError> {
+        let mut item = self.template_of_async(id).await.ok_or_else(|| Self::no_template(id))?;
         if let Some((runtime, persona_mode)) = runtime_override
             && item.role != AgentRole::Orchestrator
         {
             item.runtime = runtime;
             item.persona_mode = persona_mode;
         }
-        let made = self.change(|s| {
-            let made = with_cast(installed(&item, &s.agents, None));
-            s.agents.push(made.clone());
-            Ok(made)
-        })?;
+        let made = self
+            .change_async(|s| {
+                let made = with_cast(installed(&item, &s.agents, None));
+                s.agents.push(made.clone());
+                Ok(made)
+            })
+            .await?;
         self.saved(made)
     }
 
-    pub fn update_from_template(&self, agent: &str) -> Result<Agent, ApiError> {
+    pub async fn update_from_template_async(&self, agent: &str) -> Result<Agent, ApiError> {
         let a = self
             .agent(agent)
             .ok_or_else(|| missing(t("server.agent.noAgent", &[("id", agent.into())]), LookIn::Agent))?;
         let Some(from) = &a.from else {
             return Err(refused(t("server.agent.template.notFrom", &[("name", a.name.clone().into())])));
         };
-        let item = self.template_of(&from.template).ok_or_else(|| {
+        let item = self.template_of_async(&from.template).await.ok_or_else(|| {
             refused(t(
                 "server.agent.template.gone",
                 &[("name", a.name.clone().into()), ("template", from.template.clone().into())],
             ))
         })?;
         let next = with_cast(updated_from(&item, &a));
-        self.change(|s| {
+        self.change_async(|s| {
             s.agents = upsert(&s.agents, next.clone(), |a| &a.id);
             Ok(())
-        })?;
+        })
+        .await?;
         self.saved(next)
     }
 
-    pub fn add_template(&self, path: &str) -> Result<AgentTemplate, ApiError> {
-        let item = read_template(Path::new(path), AgentTemplateSource::Added).map_err(refused)?;
-        if self.template_of(&item.id).is_some() {
+    pub async fn add_template_async(&self, path: &str) -> Result<AgentTemplate, ApiError> {
+        let item = read_template_async(Path::new(path), AgentTemplateSource::Added).await.map_err(refused)?;
+        if self.template_of_async(&item.id).await.is_some() {
             return Err(refused(t("server.agent.template.taken", &[("id", item.id.into())])));
         }
-        copy_template(Path::new(path), &self.home, &item.id)
+        copy_template_async(Path::new(path), &self.home, &item.id)
+            .await
             .map_err(|e| refused(t("server.agent.notSaved", &[("file", path.into()), ("why", e.to_string().into())])))?;
         Ok(AgentTemplate { installed: vec![], ..item })
     }
 
-    pub fn remove_template(&self, id: &str) -> Result<(), ApiError> {
-        let item = self.deletable_template(id)?;
-        match std::fs::remove_dir_all(added_dir(&self.home).join(&item.id)) {
+    pub async fn remove_template_async(&self, id: &str) -> Result<(), ApiError> {
+        let item = self.deletable_template_async(id).await?;
+        match tokio::fs::remove_dir_all(added_dir(&self.home).join(&item.id)).await {
             Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
                 Err(refused(t("server.agent.notSaved", &[("file", id.into()), ("why", e.to_string().into())])))
             }
@@ -786,8 +815,8 @@ impl ProfileStore {
         }
     }
 
-    pub fn preview_remove_template(&self, id: &str) -> Result<Preview, ApiError> {
-        let item = self.deletable_template(id)?;
+    pub async fn preview_remove_template_async(&self, id: &str) -> Result<Preview, ApiError> {
+        let item = self.deletable_template_async(id).await?;
         let does = if item.installed.is_empty() {
             t("server.agent.template.delete", &[("name", item.name.into())])
         } else {

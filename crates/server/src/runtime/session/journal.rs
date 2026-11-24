@@ -161,7 +161,7 @@ impl Journal {
     }
 
     /// The log, oldest first, with what is being written last.
-    pub fn events(&self) -> Vec<SessionEvent> {
+    pub fn entries(&self) -> Vec<SessionEvent> {
         let mut out = self.steps.clone();
         out.extend(self.current_draft().cloned());
         out
@@ -456,7 +456,7 @@ impl Journal {
     }
 
     /// Seals what is being written.
-    pub fn close(&mut self) {
+    fn close(&mut self) {
         self.seal();
     }
 
@@ -685,7 +685,7 @@ impl Trajectory {
 
     /// Synchronous read of events currently in the open in-memory journal for `id`.
     pub fn open_events(&self, id: &str) -> Vec<SessionEvent> {
-        self.open.lock().get(id).map(Journal::events).unwrap_or_default()
+        self.open.lock().get(id).map(Journal::entries).unwrap_or_default()
     }
 
     /// A session's log, oldest first; a run's only when `run` is given.
@@ -805,11 +805,11 @@ impl Trajectory {
     /// Async entry point that ensures the stored event tail is loaded before recording `step`.
     pub async fn step_async(&self, id: &str, cwd: &str, step: Step) {
         self.prepare_async(id).await;
-        self.step(id, cwd, step);
+        self.record_step(id, cwd, step);
     }
 
     /// Takes one of the board's steps for session `id` working in `cwd`.
-    pub fn step(&self, id: &str, cwd: &str, step: Step) {
+    pub(crate) fn record_step(&self, id: &str, cwd: &str, step: Step) {
         let urgent = self
             .with(id, |j| {
                 match step {
@@ -947,7 +947,7 @@ mod tests {
         for _ in 0..(TEXT_MAX + 50) {
             journal.said("a", &[]);
         }
-        let events = journal.events();
+        let events = journal.entries();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].text.len(), TEXT_MAX + '…'.len_utf8());
         assert!(events[0].text.ends_with('…'));
@@ -958,7 +958,7 @@ mod tests {
         cjk.said(&chunk, &[]);
         cjk.said(&chunk, &[]);
         cjk.said(&chunk, &[]);
-        let ev = &cjk.events()[0];
+        let ev = &cjk.entries()[0];
         assert_eq!(ev.text.chars().count(), TEXT_MAX + 1);
         assert!(ev.text.ends_with('…'));
     }
