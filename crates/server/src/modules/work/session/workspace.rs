@@ -120,7 +120,7 @@ fn refused_session(message: String) -> BoardError {
 
 impl Sessions {
     fn load_workspace_meta(&self, session_id: &str) -> WorkspaceMeta {
-        match self.0.ledger.database(|db| super::db::config(db, session_id)) {
+        match self.0.ledger.read_db(async |db| super::db::config(db, session_id).await) {
             Ok(Some(cfg)) => WorkspaceMeta::from(cfg),
             Ok(None) => WorkspaceMeta::default(),
             Err(e) => {
@@ -137,7 +137,7 @@ impl Sessions {
             effort: meta.effort.clone(),
             permission_mode: Some(meta.permission_mode),
         };
-        if let Err(e) = self.0.ledger.database(|db| super::db::put_config(db, session_id, &cfg)) {
+        if let Err(e) = self.0.ledger.write_db(async |db| super::db::put_config(db, session_id, &cfg).await) {
             eprintln!("vibevalley: saving session config {session_id}: {e}");
         }
     }
@@ -629,10 +629,20 @@ impl Sessions {
             format!("[{} attachment(s)]", blocks.len())
         };
         let mail_key = format!("ws:{}:{}", session.id, uuid::Uuid::new_v4());
-        let entry = self
-            .0
-            .ledger
-            .database(|db| SessionMailbox::enqueue(db, &session.id, &mail_key, MailboxSource::WorkspaceUser, None, &logged_text, now()))?;
+        let session_id_for_mail = session.id.clone();
+        let logged_text_for_mail = logged_text.clone();
+        let entry = self.0.ledger.write_db(async move |db| {
+            SessionMailbox::enqueue(
+                db,
+                &session_id_for_mail,
+                &mail_key,
+                MailboxSource::WorkspaceUser,
+                None,
+                &logged_text_for_mail,
+                now(),
+            )
+            .await
+        })?;
 
         let agent = match self.live_agent(&session.id) {
             Some(agent) => agent,
@@ -652,14 +662,18 @@ impl Sessions {
                         let _ = self
                             .0
                             .ledger
-                            .database(|db| SessionMailbox::settle(db, entry.id, false, Some(&e.to_string()), now()));
+                            .write_db(async |db| SessionMailbox::settle(db, entry.id, false, Some(&e.to_string()), now()).await);
                         return Err(e);
                     }
                 }
             }
         };
 
-        if !self.0.ledger.database(|db| SessionMailbox::claim_by_key(db, &mail_key, now()))? {
+        if !self
+            .0
+            .ledger
+            .write_db(async |db| SessionMailbox::claim_by_key(db, &entry.idempotency_key, now()).await)?
+        {
             return Ok(self.session(&session.id).unwrap_or(session));
         }
         let settle_id = entry.id;
@@ -675,10 +689,13 @@ impl Sessions {
                 let _ = self
                     .0
                     .ledger
-                    .database(|db| SessionMailbox::settle(db, settle_id, false, Some(&e.to_string()), now()));
+                    .write_db(async |db| SessionMailbox::settle(db, settle_id, false, Some(&e.to_string()), now()).await);
                 return Err(e.into());
             }
-            let _ = self.0.ledger.database(|db| SessionMailbox::settle(db, settle_id, true, None, now()));
+            let _ = self
+                .0
+                .ledger
+                .write_db(async |db| SessionMailbox::settle(db, settle_id, true, None, now()).await);
             return Ok(self.session(&session.id).unwrap_or(session));
         }
 
@@ -697,12 +714,15 @@ impl Sessions {
             let _ = self
                 .0
                 .ledger
-                .database(|db| SessionMailbox::settle(db, settle_id, false, Some(&e.to_string()), now()));
+                .write_db(async |db| SessionMailbox::settle(db, settle_id, false, Some(&e.to_string()), now()).await);
             let _ = self.0.ledger.apply(vec![self.phase_changed(session.id.clone(), Phase::Failed(PhaseFailed {}))]);
             self.notify_workspace(&session.id);
             return Err(e.into());
         }
-        let _ = self.0.ledger.database(|db| SessionMailbox::settle(db, settle_id, true, None, now()));
+        let _ = self
+            .0
+            .ledger
+            .write_db(async |db| SessionMailbox::settle(db, settle_id, true, None, now()).await);
         self.notify_workspace(&session.id);
         Ok(self.session(&session.id).unwrap_or(session))
     }
@@ -1135,13 +1155,13 @@ mod tests {
 
     struct NoopIssueStore;
     impl crate::modules::work::ledger::IssueStore for NoopIssueStore {
-        fn all(&self, _db: &vibevalley_runtime::agent::durable::Sqlite<'_>) -> sqlx::Result<Vec<vibevalley_protocol::Issue>> {
+        fn all(&self, _db: &sea_orm::DatabaseConnection) -> std::result::Result<Vec<vibevalley_protocol::Issue>, sea_orm::DbErr> {
             Ok(vec![])
         }
-        fn put(&self, _db: &vibevalley_runtime::agent::durable::Sqlite<'_>, _issue: &vibevalley_protocol::Issue) -> sqlx::Result<()> {
+        fn put(&self, _tx: &sea_orm::DatabaseTransaction, _issue: &vibevalley_protocol::Issue) -> std::result::Result<(), sea_orm::DbErr> {
             Ok(())
         }
-        fn remove(&self, _db: &vibevalley_runtime::agent::durable::Sqlite<'_>, _id: &str) -> sqlx::Result<()> {
+        fn remove(&self, _tx: &sea_orm::DatabaseTransaction, _id: &str) -> std::result::Result<(), sea_orm::DbErr> {
             Ok(())
         }
     }

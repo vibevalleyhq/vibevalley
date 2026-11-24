@@ -1,17 +1,17 @@
-//! SQLite storage and synchronous in-memory index for tracked pull requests.
+//! Dual-backend SeaORM storage and synchronous in-memory index for tracked pull requests.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
+use sea_orm::sea_query::{Alias, Expr, Func, OnConflict};
+use sea_orm::{ActiveValue::Set, ColumnTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, Update};
 use vibevalley_protocol::{ApiError, PublishPlatform, PullRequest, PullRequestState};
 
-use crate::base::{ServerDb, internal};
-use crate::modules::infra::column::{read_word, word};
-
-use crate::db::generated::work_pull as queries;
-
-pub const SCHEMA: &str = crate::db::schema::WORK_PULL;
+use crate::base::ServerDb;
+use crate::db::entities::work_pull::{pull, pull_event};
+use crate::db::error::internal_db;
+use crate::modules::work::{block_on, read_word, word};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PullRecord {
@@ -49,7 +49,7 @@ pub struct UpsertPullInput {
     pub at: i64,
 }
 
-fn record_of(r: queries::ListPullsRow) -> sqlx::Result<PullRecord> {
+fn record_of(r: pull::Model) -> Result<PullRecord, DbErr> {
     Ok(PullRecord {
         id: r.id,
         platform: read_word(r.platform)?,
@@ -164,13 +164,17 @@ pub struct PullStore {
 
 impl PullStore {
     pub fn open(db: Arc<ServerDb>) -> Result<PullStore, ApiError> {
-        let rows: Vec<PullRecord> = db
-            .run(async |conn| queries::list_pulls(conn).await)
-            .map_err(internal)?
-            .into_iter()
-            .map(record_of)
-            .collect::<sqlx::Result<_>>()
-            .map_err(internal)?;
+        let rows: Vec<PullRecord> = block_on(async {
+            pull::Entity::find()
+                .order_by_asc(pull::Column::CreatedAt)
+                .order_by_asc(pull::Column::Id)
+                .all(db.read_conn())
+                .await?
+                .into_iter()
+                .map(record_of)
+                .collect::<Result<Vec<_>, DbErr>>()
+        })
+        .map_err(internal_db)?;
         let mut index = PullIndex::default();
         index.load(rows);
         Ok(PullStore {
@@ -200,106 +204,99 @@ impl PullStore {
     }
 
     pub async fn upsert_async(&self, input: UpsertPullInput) -> Result<PullRecord, ApiError> {
-        let params = queries::UpsertPullParams {
-            id: uuid::Uuid::now_v7().to_string(),
-            platform: word(&input.platform).map_err(internal)?,
-            repo: input.repo,
-            number: input.number,
-            url: input.url,
-            branch: input.branch,
-            base: input.base,
-            state: word(&input.state).map_err(internal)?,
-            issue_id: input.issue_id,
-            created_at: input.at,
-            updated_at: input.at,
+        let model = pull::ActiveModel {
+            id: Set(uuid::Uuid::now_v7().to_string()),
+            platform: Set(word(&input.platform).map_err(internal_db)?),
+            repo: Set(input.repo),
+            number: Set(input.number),
+            url: Set(input.url),
+            branch: Set(input.branch),
+            base: Set(input.base),
+            state: Set(word(&input.state).map_err(internal_db)?),
+            issue_id: Set(input.issue_id),
+            check_fingerprint: Set(String::new()),
+            check_revision: Set(0),
+            created_at: Set(input.at),
+            updated_at: Set(input.at),
         };
-        let mut conn = self.db.acquire_write().await.map_err(internal)?;
-        let saved = queries::upsert_pull(&mut *conn, params).await.and_then(record_of).map_err(internal)?;
-        drop(conn);
-        Ok(self.index.lock().put(saved))
+        let on_conflict = OnConflict::columns([pull::Column::Repo, pull::Column::Number])
+            .update_columns([
+                pull::Column::Platform,
+                pull::Column::Url,
+                pull::Column::Branch,
+                pull::Column::Base,
+                pull::Column::State,
+                pull::Column::UpdatedAt,
+            ])
+            .value(
+                pull::Column::IssueId,
+                Expr::expr(Func::coalesce([
+                    Expr::col((Alias::new("excluded"), pull::Column::IssueId)),
+                    Expr::col((pull::Entity, pull::Column::IssueId)),
+                ])),
+            )
+            .to_owned();
+        let saved = pull::Entity::insert(model)
+            .on_conflict(on_conflict)
+            .exec_with_returning(self.db.write_conn())
+            .await
+            .map_err(internal_db)?;
+        let record = record_of(saved).map_err(internal_db)?;
+        Ok(self.index.lock().put(record))
     }
 
     pub fn upsert(&self, input: UpsertPullInput) -> Result<PullRecord, ApiError> {
-        let params = queries::UpsertPullParams {
-            id: uuid::Uuid::now_v7().to_string(),
-            platform: word(&input.platform).map_err(internal)?,
-            repo: input.repo,
-            number: input.number,
-            url: input.url,
-            branch: input.branch,
-            base: input.base,
-            state: word(&input.state).map_err(internal)?,
-            issue_id: input.issue_id,
-            created_at: input.at,
-            updated_at: input.at,
-        };
-        let saved = self
-            .db
-            .run(async |conn| queries::upsert_pull(conn, params).await)
-            .and_then(record_of)
-            .map_err(internal)?;
-        Ok(self.index.lock().put(saved))
+        block_on(self.upsert_async(input))
     }
 
     pub async fn set_state_async(&self, id: &str, state: PullRequestState, at: i64) -> Result<PullRecord, ApiError> {
-        let params = queries::SetPullStateParams {
-            id: id.into(),
-            state: word(&state).map_err(internal)?,
-            updated_at: at,
-        };
-        let mut conn = self.db.acquire_write().await.map_err(internal)?;
-        let saved = queries::set_pull_state(&mut *conn, params).await.and_then(record_of).map_err(internal)?;
-        drop(conn);
-        Ok(self.index.lock().put(saved))
+        let state_word = word(&state).map_err(internal_db)?;
+        let rows = Update::many(pull::Entity)
+            .col_expr(pull::Column::State, Expr::value(state_word))
+            .col_expr(pull::Column::UpdatedAt, Expr::value(at))
+            .filter(pull::Column::Id.eq(id))
+            .exec_with_returning(self.db.write_conn())
+            .await
+            .map_err(internal_db)?;
+        let saved = rows
+            .into_iter()
+            .next()
+            .ok_or_else(|| internal_db(DbErr::RecordNotFound(format!("pull {id} not found"))))?;
+        let record = record_of(saved).map_err(internal_db)?;
+        Ok(self.index.lock().put(record))
     }
 
     pub fn set_state(&self, id: &str, state: PullRequestState, at: i64) -> Result<PullRecord, ApiError> {
-        let params = queries::SetPullStateParams {
-            id: id.into(),
-            state: word(&state).map_err(internal)?,
-            updated_at: at,
-        };
-        let saved = self
-            .db
-            .run(async |conn| queries::set_pull_state(conn, params).await)
-            .and_then(record_of)
-            .map_err(internal)?;
-        Ok(self.index.lock().put(saved))
+        block_on(self.set_state_async(id, state, at))
     }
 
     pub async fn observe_checks_async(&self, id: &str, fingerprint: &str, revision: i64, at: i64) -> Result<PullRecord, ApiError> {
-        let params = queries::ObservePullChecksParams {
-            id: id.into(),
-            check_fingerprint: fingerprint.into(),
-            check_revision: revision,
-            updated_at: at,
-        };
-        let mut conn = self.db.acquire_write().await.map_err(internal)?;
-        let saved = queries::observe_pull_checks(&mut *conn, params).await.and_then(record_of).map_err(internal)?;
-        drop(conn);
-        Ok(self.index.lock().put(saved))
+        let rows = Update::many(pull::Entity)
+            .col_expr(pull::Column::CheckFingerprint, Expr::value(fingerprint))
+            .col_expr(pull::Column::CheckRevision, Expr::value(revision))
+            .col_expr(pull::Column::UpdatedAt, Expr::value(at))
+            .filter(pull::Column::Id.eq(id))
+            .exec_with_returning(self.db.write_conn())
+            .await
+            .map_err(internal_db)?;
+        let saved = rows
+            .into_iter()
+            .next()
+            .ok_or_else(|| internal_db(DbErr::RecordNotFound(format!("pull {id} not found"))))?;
+        let record = record_of(saved).map_err(internal_db)?;
+        Ok(self.index.lock().put(record))
     }
 
     pub fn observe_checks(&self, id: &str, fingerprint: &str, revision: i64, at: i64) -> Result<PullRecord, ApiError> {
-        let params = queries::ObservePullChecksParams {
-            id: id.into(),
-            check_fingerprint: fingerprint.into(),
-            check_revision: revision,
-            updated_at: at,
-        };
-        let saved = self
-            .db
-            .run(async |conn| queries::observe_pull_checks(conn, params).await)
-            .and_then(record_of)
-            .map_err(internal)?;
-        Ok(self.index.lock().put(saved))
+        block_on(self.observe_checks_async(id, fingerprint, revision, at))
     }
 
     pub async fn known_events_async(&self, pull_id: &str) -> Result<Vec<KnownPullEvent>, ApiError> {
-        let mut conn = self.db.acquire_read_async().await.map_err(internal)?;
-        let rows = queries::known_pull_events(&mut *conn, queries::KnownPullEventsParams { pull_id: pull_id.into() })
+        let rows = pull_event::Entity::find()
+            .filter(pull_event::Column::PullId.eq(pull_id))
+            .all(self.db.read_conn())
             .await
-            .map_err(internal)?;
+            .map_err(internal_db)?;
         Ok(rows
             .into_iter()
             .map(|r| KnownPullEvent {
@@ -311,49 +308,25 @@ impl PullStore {
     }
 
     pub fn known_events(&self, pull_id: &str) -> Result<Vec<KnownPullEvent>, ApiError> {
-        let rows = self
-            .db
-            .run(async |conn| queries::known_pull_events(conn, queries::KnownPullEventsParams { pull_id: pull_id.into() }).await)
-            .map_err(internal)?;
-        Ok(rows
-            .into_iter()
-            .map(|r| KnownPullEvent {
-                key: r.key,
-                bot_round_key: r.bot_round_key,
-                bot_round: r.bot_round,
-            })
-            .collect())
+        block_on(self.known_events_async(pull_id))
     }
 
     pub async fn keep_event_async(&self, pull_id: &str, key: &str, bot_round_key: Option<&str>, bot_round: Option<i64>) -> Result<(), ApiError> {
-        let mut conn = self.db.acquire_write().await.map_err(internal)?;
-        queries::keep_pull_event(
-            &mut *conn,
-            queries::KeepPullEventParams {
-                pull_id: pull_id.into(),
-                key: key.into(),
-                bot_round_key: bot_round_key.map(str::to_owned),
-                bot_round,
-            },
-        )
-        .await
-        .map_err(internal)
+        let model = pull_event::ActiveModel {
+            pull_id: Set(pull_id.to_owned()),
+            key: Set(key.to_owned()),
+            bot_round_key: Set(bot_round_key.map(str::to_owned)),
+            bot_round: Set(bot_round),
+        };
+        pull_event::Entity::insert(model)
+            .on_conflict_do_nothing()
+            .exec(self.db.write_conn())
+            .await
+            .map_err(internal_db)?;
+        Ok(())
     }
 
     pub fn keep_event(&self, pull_id: &str, key: &str, bot_round_key: Option<&str>, bot_round: Option<i64>) -> Result<(), ApiError> {
-        self.db
-            .run(async |conn| {
-                queries::keep_pull_event(
-                    conn,
-                    queries::KeepPullEventParams {
-                        pull_id: pull_id.into(),
-                        key: key.into(),
-                        bot_round_key: bot_round_key.map(str::to_owned),
-                        bot_round,
-                    },
-                )
-                .await
-            })
-            .map_err(internal)
+        block_on(self.keep_event_async(pull_id, key, bot_round_key, bot_round))
     }
 }

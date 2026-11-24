@@ -131,7 +131,7 @@ impl Board {
     /// `open`, with the board's issues and sessions in `facts` (the server's
     /// state).
     pub fn open_on(path: &std::path::Path, registry: Arc<Registry>, config: BoardConfig, facts: Arc<dyn Facts>) -> Result<Board> {
-        let db = ServerDb::open_at(path)?;
+        let db = ServerDb::open_config(&crate::base::DatabaseConfig::Sqlite { path: path.to_path_buf() })?;
         let drivers = Arc::new(RuntimeDrivers {
             registry,
             model: config.model.clone(),
@@ -613,11 +613,11 @@ impl Board {
     }
 
     pub(super) fn keep_words(&self, id: &str, words: &str) -> Result<()> {
-        self.0.ledger.database(|db| super::db::keep_words(db, id, words))
+        self.0.ledger.write_db(async |db| super::db::keep_words(db, id, words).await)
     }
 
     pub(super) fn take_words(&self, id: &str) -> Result<Option<String>> {
-        let kept = self.0.ledger.database(|db| super::db::take_words(db, id))?;
+        let kept = self.0.ledger.write_db(async |db| super::db::take_words(db, id).await)?;
         Ok((!kept.is_empty()).then(|| kept.join("\n\n")))
     }
 

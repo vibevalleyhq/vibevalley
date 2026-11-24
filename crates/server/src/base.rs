@@ -343,9 +343,11 @@ impl ServerDb {
             return Ok(store.clone());
         }
         let store = match &self.backend_state {
-            DbBackendState::Sqlite { write_pool, read_pool, .. } => {
-                vibevalley_runtime::agent::durable::Store::from_sqlite_pools(write_pool.clone(), Some(read_pool.clone()))?
-            }
+            DbBackendState::Sqlite { .. } => vibevalley_runtime::agent::durable::Store::from_sea_orm_conns(
+                self.write_conn.clone(),
+                Some(self.read_conn.clone()),
+                vibevalley_runtime::agent::durable::now_ms,
+            )?,
             DbBackendState::Postgres => {
                 vibevalley_runtime::agent::durable::Store::from_sea_orm_conns(self.write_conn.clone(), None, vibevalley_runtime::agent::durable::now_ms)?
             }

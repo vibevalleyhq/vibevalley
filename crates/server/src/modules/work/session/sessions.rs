@@ -116,7 +116,7 @@ impl Sessions {
         config: Arc<BoardConfig>,
         hub: Option<Weak<Hub>>,
     ) -> Result<Sessions> {
-        let extras = ledger.database(super::db::extras)?;
+        let extras = ledger.read_db(async |db| super::db::extras(db).await)?;
         Ok(Sessions(Arc::new(Inner {
             durable,
             ledger,
@@ -237,7 +237,7 @@ impl Sessions {
         let mut extras = self.0.extras.lock();
         let extra = extras.entry(session.to_string()).or_default();
         change(extra);
-        self.0.ledger.database(|db| super::db::put_extra(db, session, extra))?;
+        self.0.ledger.write_db(async |db| super::db::put_extra(db, session, extra).await)?;
         Ok(())
     }
 
@@ -451,8 +451,8 @@ impl Sessions {
             }
             None => self.0.ledger.apply(vec![changed])?,
         }
-        // Persist extra columns after the `session` row exists in SQLite.
-        self.0.ledger.database(|db| super::db::put_extra(db, &id, &extra))?;
+        // Persist extra columns after the `session` row exists in server.db.
+        self.0.ledger.write_db(async |db| super::db::put_extra(db, &id, &extra).await)?;
         let hub = self.0.hub.as_ref().and_then(Weak::upgrade);
         if let Some(before) = previous {
             let me = self.clone();
@@ -606,7 +606,7 @@ impl Sessions {
             self.0.ledger.apply(vec![Fact::session_left(now(), session_id, None)])?;
         }
         self.0.extras.lock().remove(session_id);
-        self.0.ledger.database(|db| super::db::remove_extra(db, session_id))?;
+        self.0.ledger.write_db(async |db| super::db::remove_extra(db, session_id).await)?;
         self.remove_workspace_meta(session_id);
         Ok(())
     }
@@ -825,7 +825,7 @@ impl Sessions {
     }
 
     pub(crate) fn review_work(&self, vendor: &str, run_id: &str, candidate: &str) -> Result<Option<(Issue, Report)>> {
-        let Some(run) = self.0.ledger.database(|db| super::db::run(db, run_id))? else {
+        let Some(run) = self.0.ledger.read_db(async |db| super::db::run(db, run_id).await)? else {
             return Ok(None);
         };
         let Some(session) = self.session(&run.session) else { return Ok(None) };
@@ -932,15 +932,17 @@ impl Sessions {
             |fact| vec![fact, reported],
             |tx| {
                 if let Some(id) = run_id.as_deref()
-                    && let Some(mut r) = super::db::run(tx.connection(), id)?
+                    && let Some(mut r) = crate::modules::work::block_on(super::db::run(tx.transaction(), id))?
                 {
                     r.ended_at = Some(now());
                     r.outcome = Some(outcome);
                     r.summary = summary;
                     r.spent = spent;
-                    super::db::put_run(tx.connection(), &r)?;
+                    crate::modules::work::block_on(async {
+                        super::db::put_run(tx.transaction(), &r).await?;
+                        super::db::clear_run(tx.transaction(), session_id, id).await
+                    })?;
                     super::delivery::settle_run(tx, &r)?;
-                    super::db::clear_run(tx.connection(), session_id, id)?;
                 }
                 Ok(())
             },
@@ -1282,15 +1284,15 @@ mod tests {
     struct NoopIssueStore;
 
     impl IssueStore for NoopIssueStore {
-        fn all(&self, _db: &vibevalley_runtime::agent::durable::Sqlite<'_>) -> sqlx::Result<Vec<vibevalley_protocol::Issue>> {
+        fn all(&self, _db: &sea_orm::DatabaseConnection) -> std::result::Result<Vec<vibevalley_protocol::Issue>, sea_orm::DbErr> {
             Ok(vec![])
         }
 
-        fn put(&self, _db: &vibevalley_runtime::agent::durable::Sqlite<'_>, _issue: &vibevalley_protocol::Issue) -> sqlx::Result<()> {
+        fn put(&self, _tx: &sea_orm::DatabaseTransaction, _issue: &vibevalley_protocol::Issue) -> std::result::Result<(), sea_orm::DbErr> {
             Ok(())
         }
 
-        fn remove(&self, _db: &vibevalley_runtime::agent::durable::Sqlite<'_>, _id: &str) -> sqlx::Result<()> {
+        fn remove(&self, _tx: &sea_orm::DatabaseTransaction, _id: &str) -> std::result::Result<(), sea_orm::DbErr> {
             Ok(())
         }
     }

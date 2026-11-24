@@ -3,7 +3,7 @@
 //! with a request) are `vibevalley-cron`'s; crons live in `server.db`'s `cron`
 //! table and own the `issue_id` link (`references issue(id) on delete set null`).
 
-mod db;
+pub(crate) mod db;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -18,9 +18,11 @@ use vibevalley_protocol::{
 };
 
 use crate::Hub;
-use crate::base::{LookIn, ServerDb, Ticker, internal, missing};
+use crate::base::{LookIn, ServerDb, Ticker, missing};
+use crate::db::error::internal_db;
 use crate::modules::collab::channel::{Chat, Noticing};
 use crate::modules::team::agent::Agents;
+use crate::modules::work::block_on;
 use crate::modules::work::issue::{Board, NewIssue};
 use crate::ports::CronOrchestratorPort;
 
@@ -102,7 +104,7 @@ impl Crons {
         orchestrator: Option<Arc<dyn CronOrchestratorPort>>,
         clock: SharedClock,
     ) -> Result<Arc<Crons>, ApiError> {
-        let stored = db.run(async |conn| db::list(conn).await).map_err(internal)?;
+        let stored = block_on(db::list(db.read_conn())).map_err(internal_db)?;
         let links = Arc::new(Mutex::new(CronLinks::default()));
         let at = clock.now_ms();
         let mut facts = Vec::with_capacity(stored.len());
@@ -162,7 +164,7 @@ impl Crons {
     /// Persists `cron` (keeping its linked issue, if any) and tells the state.
     fn put(&self, cron: Cron) -> Result<(), ApiError> {
         let issue_id = self.issue_of(&cron.id);
-        self.db.run(async |conn| db::upsert(conn, &cron, issue_id.as_deref()).await).map_err(internal)?;
+        block_on(db::upsert(self.db.write_conn(), &cron, issue_id.as_deref())).map_err(internal_db)?;
         if let Some(hub) = self.hub() {
             hub.apply(vec![Fact::CronChanged(FactCronChanged { at: self.clock.now_ms(), cron })]);
         }
@@ -170,7 +172,7 @@ impl Crons {
     }
 
     fn link_issue(&self, cron_id: &str, issue_id: Option<&str>) -> Result<(), ApiError> {
-        self.db.run(async |conn| db::set_issue(conn, cron_id, issue_id).await).map_err(internal)?;
+        block_on(db::set_issue(self.db.write_conn(), cron_id, issue_id)).map_err(internal_db)?;
         let prev = self.links.lock().link(cron_id, issue_id);
         if let Some(prev_id) = prev
             && prev_id.as_str() != issue_id.unwrap_or("")
@@ -274,7 +276,7 @@ impl Crons {
     pub fn remove(&self, id: &str) -> Result<Cron, ApiError> {
         let _l = self.lock.lock();
         let was = self.find(id)?;
-        self.db.run(async |conn| db::remove(conn, id).await).map_err(internal)?;
+        block_on(db::remove(self.db.write_conn(), id)).map_err(internal_db)?;
         let prev_issue = self.links.lock().link(id, None);
         if let Some(hub) = self.hub() {
             hub.apply(vec![Fact::CronRemoved(FactCronRemoved {

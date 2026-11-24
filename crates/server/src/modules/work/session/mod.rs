@@ -39,6 +39,8 @@ pub use journal::{Journal, Trajectories};
 pub use news::News;
 pub use report::{ANSWER_ONLY, Report, ReportQuestion, ReportStatus};
 pub use runs::trigger_of;
+#[cfg(test)]
+pub(crate) use sessions::Extra;
 pub use sessions::{DraftEnd, Hire, Rounds, Sessions};
 pub use workspace::WorkspaceSnapshot;
 
