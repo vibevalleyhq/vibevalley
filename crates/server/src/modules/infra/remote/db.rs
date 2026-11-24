@@ -1,13 +1,15 @@
-//! SQLite persistence for remote access configuration and paired device tokens.
+//! Dual-backend persistence for remote access configuration and paired device tokens.
 
 use std::sync::Arc;
 
-use sqlx::Connection;
-use vibevalley_protocol::{ApiError, Millis, RemoteDeviceSummary, RemotePlatform};
+use sea_orm::sea_query::{Expr, OnConflict};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+use vibevalley_protocol::{ApiError, BizCode, Millis, RemoteDeviceSummary, RemotePlatform};
 
-use crate::base::{ServerDb, internal};
-use crate::db::generated::infra_remote as q;
-use crate::modules::infra::column::optional;
+use crate::base::ServerDb;
+use crate::db::entities::infra_remote::{remote_config, remote_device};
+use crate::db::error::{internal_db, is_unique_violation};
+use crate::modules::infra::column::{begin_write_tx, db_word, read_db_word};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StoredConfig {
@@ -21,27 +23,15 @@ pub(crate) struct RemoteDb {
     db: Arc<ServerDb>,
 }
 
-fn parse_platform(raw: &str) -> RemotePlatform {
-    RemotePlatform::from_str(raw).unwrap_or(RemotePlatform::Other)
-}
-
-fn summary_from(
-    id: String,
-    name: String,
-    platform: String,
-    scope: String,
-    created_at: i64,
-    last_seen_at: Option<i64>,
-    revoked_at: Option<i64>,
-) -> RemoteDeviceSummary {
+fn summary_from_model(row: remote_device::Model) -> RemoteDeviceSummary {
     RemoteDeviceSummary {
-        id,
-        name,
-        platform: parse_platform(&platform),
-        scope,
-        created_at,
-        last_seen_at,
-        revoked_at,
+        id: row.id,
+        name: row.name,
+        platform: read_db_word(row.platform).unwrap_or(RemotePlatform::Other),
+        scope: row.scope,
+        created_at: row.created_at,
+        last_seen_at: row.last_seen_at,
+        revoked_at: row.revoked_at,
     }
 }
 
@@ -51,10 +41,9 @@ impl RemoteDb {
     }
 
     pub(crate) async fn get_config(&self) -> Result<Option<StoredConfig>, ApiError> {
-        let mut conn = self.db.read_pool().acquire().await.map_err(internal)?;
-        let row = optional(q::get_config(&mut *conn).await).map_err(internal)?;
+        let row = remote_config::Entity::find_by_id(1i64).one(self.db.read_conn()).await.map_err(internal_db)?;
         Ok(row.map(|r| StoredConfig {
-            enabled: r.enabled != 0,
+            enabled: r.enabled,
             bind_addr: r.bind_addr.filter(|s| !s.is_empty()),
             port: u16::try_from(r.port).unwrap_or(0),
             updated_at: r.updated_at,
@@ -63,91 +52,107 @@ impl RemoteDb {
 
     pub(crate) async fn save_config(&self, enabled: bool, bind_addr: Option<&str>, port: u16, updated_at: Millis) -> Result<(), ApiError> {
         let bind_addr = bind_addr.map(str::trim).filter(|s| !s.is_empty()).map(String::from);
-        let mut conn = self.db.write_pool().acquire().await.map_err(internal)?;
-        q::save_config(
-            &mut *conn,
-            q::SaveConfigParams {
-                enabled: i64::from(enabled),
-                bind_addr,
-                port: i64::from(port),
-                updated_at,
-            },
-        )
-        .await
-        .map_err(internal)
+        let model = remote_config::ActiveModel {
+            id: Set(1),
+            enabled: Set(enabled),
+            bind_addr: Set(bind_addr),
+            port: Set(i64::from(port)),
+            updated_at: Set(updated_at),
+        };
+        let on_conflict = OnConflict::column(remote_config::Column::Id)
+            .update_columns([
+                remote_config::Column::Enabled,
+                remote_config::Column::BindAddr,
+                remote_config::Column::Port,
+                remote_config::Column::UpdatedAt,
+            ])
+            .to_owned();
+        remote_config::Entity::insert(model)
+            .on_conflict(on_conflict)
+            .exec(self.db.write_conn())
+            .await
+            .map_err(internal_db)?;
+        Ok(())
     }
 
     pub(crate) async fn insert_device(&self, device: &RemoteDeviceSummary, token_hash: &str) -> Result<(), ApiError> {
-        let mut conn = self.db.write_pool().acquire().await.map_err(internal)?;
-        q::insert_device(
-            &mut *conn,
-            q::InsertDeviceParams {
-                id: device.id.clone(),
-                name: device.name.clone(),
-                platform: device.platform.as_str().into(),
-                token_hash: token_hash.into(),
-                scope: device.scope.clone(),
-                created_at: device.created_at,
-            },
-        )
+        let platform = db_word(&device.platform).map_err(internal_db)?;
+        remote_device::ActiveModel {
+            id: Set(device.id.clone()),
+            name: Set(device.name.clone()),
+            platform: Set(platform),
+            token_hash: Set(token_hash.to_owned()),
+            scope: Set(device.scope.clone()),
+            created_at: Set(device.created_at),
+            last_seen_at: Set(device.last_seen_at),
+            revoked_at: Set(device.revoked_at),
+        }
+        .insert(self.db.write_conn())
         .await
-        .map_err(internal)
+        .map_err(|err| {
+            if is_unique_violation(&err) {
+                ApiError::new(BizCode::Refused, err.to_string())
+            } else {
+                internal_db(err)
+            }
+        })?;
+        Ok(())
     }
 
     pub(crate) async fn find_by_token_hash(&self, token_hash: &str) -> Result<Option<RemoteDeviceSummary>, ApiError> {
-        let mut conn = self.db.read_pool().acquire().await.map_err(internal)?;
-        let row =
-            optional(q::find_device_by_token_hash(&mut *conn, q::FindDeviceByTokenHashParams { token_hash: token_hash.into() }).await).map_err(internal)?;
-        Ok(row.map(|r| summary_from(r.id, r.name, r.platform, r.scope, r.created_at, r.last_seen_at, r.revoked_at)))
+        let row = remote_device::Entity::find()
+            .filter(remote_device::Column::TokenHash.eq(token_hash))
+            .one(self.db.read_conn())
+            .await
+            .map_err(internal_db)?;
+        Ok(row.map(summary_from_model))
     }
 
     pub(crate) async fn find_by_id(&self, id: &str) -> Result<Option<RemoteDeviceSummary>, ApiError> {
-        let mut conn = self.db.read_pool().acquire().await.map_err(internal)?;
-        let row = optional(q::find_device_by_id(&mut *conn, q::FindDeviceByIdParams { id: id.into() }).await).map_err(internal)?;
-        Ok(row.map(|r| summary_from(r.id, r.name, r.platform, r.scope, r.created_at, r.last_seen_at, r.revoked_at)))
+        let row = remote_device::Entity::find_by_id(id.to_owned())
+            .one(self.db.read_conn())
+            .await
+            .map_err(internal_db)?;
+        Ok(row.map(summary_from_model))
     }
 
     pub(crate) async fn list_devices(&self) -> Result<Vec<RemoteDeviceSummary>, ApiError> {
-        let mut conn = self.db.read_pool().acquire().await.map_err(internal)?;
-        let rows = q::list_devices(&mut *conn).await.map_err(internal)?;
-        Ok(rows
-            .into_iter()
-            .map(|r| summary_from(r.id, r.name, r.platform, r.scope, r.created_at, r.last_seen_at, r.revoked_at))
-            .collect())
+        let rows = remote_device::Entity::find()
+            .order_by_desc(remote_device::Column::CreatedAt)
+            .order_by_desc(remote_device::Column::Id)
+            .all(self.db.read_conn())
+            .await
+            .map_err(internal_db)?;
+        Ok(rows.into_iter().map(summary_from_model).collect())
     }
 
     pub(crate) async fn touch_last_seen(&self, id: &str, at: Millis) -> Result<(), ApiError> {
-        let mut conn = self.db.write_pool().acquire().await.map_err(internal)?;
-        q::touch_device_last_seen(
-            &mut *conn,
-            q::TouchDeviceLastSeenParams {
-                id: id.into(),
-                last_seen_at: Some(at),
-            },
-        )
-        .await
-        .map_err(internal)
+        remote_device::Entity::update_many()
+            .col_expr(remote_device::Column::LastSeenAt, Expr::value(Some(at)))
+            .filter(remote_device::Column::Id.eq(id))
+            .exec(self.db.write_conn())
+            .await
+            .map_err(internal_db)?;
+        Ok(())
     }
 
     pub(crate) async fn revoke_device(&self, id: &str, at: Millis) -> Result<bool, ApiError> {
-        let mut conn = self.db.write_pool().acquire().await.map_err(internal)?;
-        let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(internal)?;
-        let found = optional(q::find_device_by_id(&mut *tx, q::FindDeviceByIdParams { id: id.into() }).await).map_err(internal)?;
+        let txn = begin_write_tx(self.db.write_conn()).await.map_err(internal_db)?;
+        let found = remote_device::Entity::find_by_id(id.to_owned()).one(&txn).await.map_err(internal_db)?;
         let Some(device) = found else {
+            let _ = txn.rollback().await;
             return Ok(false);
         };
         if device.revoked_at.is_none() {
-            q::revoke_device(
-                &mut *tx,
-                q::RevokeDeviceParams {
-                    id: id.into(),
-                    revoked_at: Some(at),
-                },
-            )
-            .await
-            .map_err(internal)?;
+            remote_device::Entity::update_many()
+                .col_expr(remote_device::Column::RevokedAt, Expr::value(Some(at)))
+                .filter(remote_device::Column::Id.eq(id))
+                .filter(remote_device::Column::RevokedAt.is_null())
+                .exec(&txn)
+                .await
+                .map_err(internal_db)?;
         }
-        tx.commit().await.map_err(internal)?;
+        txn.commit().await.map_err(internal_db)?;
         Ok(true)
     }
 }

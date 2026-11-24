@@ -182,6 +182,10 @@ async fn stop_listener_async(listener: Option<Listener>) {
     }
 }
 
+fn block_on<F: std::future::Future>(future: F) -> F::Output {
+    vibevalley_runtime::rt::block_on(future)
+}
+
 impl Remote {
     pub fn open(db: Arc<ServerDb>, hub: Weak<Hub>, version: String) -> Result<Arc<Self>, ApiError> {
         Self::open_with_clock(db, hub, version, system_clock())
@@ -190,7 +194,7 @@ impl Remote {
     /// Same as [`Remote::open`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
     pub fn open_with_clock(db: Arc<ServerDb>, hub: Weak<Hub>, version: String, clock: SharedClock) -> Result<Arc<Self>, ApiError> {
         let db = RemoteDb::new(db);
-        let persisted_enabled = vibevalley_runtime::rt::block_on(db.get_config())?.is_some_and(|cfg| cfg.enabled);
+        let persisted_enabled = block_on(db.get_config())?.is_some_and(|cfg| cfg.enabled);
         Ok(Arc::new(Self {
             db,
             hub,
@@ -207,7 +211,7 @@ impl Remote {
     /// Starts the remote listener on boot only when persisted config has `enabled == true`.
     /// Failures (e.g. an offline Tailscale interface) log a warning without failing server boot.
     pub fn restore_if_enabled(&self) {
-        vibevalley_runtime::rt::block_on(self.restore_if_enabled_async());
+        block_on(self.restore_if_enabled_async());
     }
 
     pub async fn restore_if_enabled_async(&self) {
@@ -264,7 +268,7 @@ impl Remote {
 
     /// Stops the live remote listener without mutating persisted config.
     pub fn close(&self) {
-        vibevalley_runtime::rt::block_on(self.close_async());
+        block_on(self.close_async());
     }
 
     pub async fn close_async(&self) {
@@ -610,7 +614,7 @@ impl RemoteAuth for Remote {
     }
 
     fn verify_bearer(&self, token: &str) -> Result<RemoteDeviceIdentity, ApiError> {
-        vibevalley_runtime::rt::block_on(self.verify_bearer_inner_async(token))
+        block_on(self.verify_bearer_inner_async(token))
     }
 
     fn verify_bearer_async(self: Arc<Self>, token: String) -> BoxFuture<'static, Result<RemoteDeviceIdentity, ApiError>> {
@@ -850,23 +854,181 @@ mod tests {
         let first = RemoteAuth::verify_bearer_async(remote.clone(), exchanged.token.clone()).await.unwrap();
         assert_eq!(first.device_id, exchanged.device.id);
 
-        // Hold an open BEGIN IMMEDIATE write transaction on write_pool while verify_bearer_async runs.
-        let mut writer = db.write_pool().acquire().await.unwrap();
-        sqlx::raw_sql("BEGIN IMMEDIATE;").execute(&mut *writer).await.unwrap();
+        // Hold an open BEGIN IMMEDIATE write transaction on write_conn while verify_bearer_async runs.
+        use sea_orm::{SqliteTransactionMode, TransactionOptions, TransactionTrait};
+        let txn = db
+            .write_conn()
+            .begin_with_options(TransactionOptions {
+                sqlite_transaction_mode: Some(SqliteTransactionMode::Immediate),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
         let second = tokio::time::timeout(
             std::time::Duration::from_secs(2),
             RemoteAuth::verify_bearer_async(remote.clone(), exchanged.token.clone()),
         )
         .await
-        .expect("verify_bearer_async must not block on write_pool")
+        .expect("verify_bearer_async must not block on write_conn")
         .unwrap();
         assert_eq!(second.device_id, exchanged.device.id);
-        sqlx::raw_sql("ROLLBACK;").execute(&mut *writer).await.unwrap();
-        drop(writer);
+        txn.rollback().await.unwrap();
 
         hub.invoke_as_async::<ops::RemoteDisable>(Caller::User, ()).await.unwrap();
 
         hub.close_async().await;
         db.close();
+    }
+
+    async fn verify_remote_dual_db(db: Arc<ServerDb>, expected_backend: sea_orm::DatabaseBackend) {
+        assert_eq!(db.backend(), expected_backend);
+
+        let remote_db = RemoteDb::new(db.clone());
+        assert!(remote_db.get_config().await.unwrap().is_none());
+
+        remote_db.save_config(true, Some("127.0.0.1"), 8891, 1000).await.unwrap();
+        let cfg = remote_db.get_config().await.unwrap().unwrap();
+        assert_eq!(
+            cfg,
+            db::StoredConfig {
+                enabled: true,
+                bind_addr: Some("127.0.0.1".into()),
+                port: 8891,
+                updated_at: 1000,
+            }
+        );
+
+        // On-conflict upsert updates the singleton config row (id = 1).
+        remote_db.save_config(false, None, 8892, 2000).await.unwrap();
+        let updated = remote_db.get_config().await.unwrap().unwrap();
+        assert!(!updated.enabled);
+        assert_eq!(updated.bind_addr, None);
+        assert_eq!(updated.port, 8892);
+        assert_eq!(updated.updated_at, 2000);
+
+        // Device insert, lookup by token_hash and id, list ordering, unique token_hash check, touch_last_seen, revoke_device.
+        let d1 = RemoteDeviceSummary {
+            id: "dev_dual_1".into(),
+            name: "iPhone 16".into(),
+            platform: RemotePlatform::Ios,
+            scope: SCOPE_REMOTE_CLIENT.into(),
+            created_at: 100,
+            last_seen_at: None,
+            revoked_at: None,
+        };
+        let d2 = RemoteDeviceSummary {
+            id: "dev_dual_2".into(),
+            name: "Runner".into(),
+            platform: RemotePlatform::Machine,
+            scope: SCOPE_REMOTE_MACHINE.into(),
+            created_at: 200,
+            last_seen_at: None,
+            revoked_at: None,
+        };
+        remote_db.insert_device(&d1, "hash-1").await.unwrap();
+        remote_db.insert_device(&d2, "hash-2").await.unwrap();
+
+        let dup = remote_db.insert_device(&d2, "hash-1").await.unwrap_err();
+        assert_eq!(dup.biz_code, BizCode::Refused);
+
+        assert_eq!(
+            remote_db.find_by_token_hash("hash-1").await.unwrap().as_ref().map(|d| d.id.as_str()),
+            Some("dev_dual_1")
+        );
+        assert_eq!(
+            remote_db.find_by_id("dev_dual_2").await.unwrap().as_ref().map(|d| d.platform),
+            Some(RemotePlatform::Machine)
+        );
+
+        let listed = remote_db.list_devices().await.unwrap();
+        assert_eq!(listed.iter().map(|d| d.id.as_str()).collect::<Vec<_>>(), vec!["dev_dual_2", "dev_dual_1"]);
+
+        remote_db.touch_last_seen("dev_dual_1", 350).await.unwrap();
+        assert_eq!(remote_db.find_by_id("dev_dual_1").await.unwrap().unwrap().last_seen_at, Some(350));
+
+        assert!(!remote_db.revoke_device("missing", 400).await.unwrap());
+        assert!(remote_db.revoke_device("dev_dual_1", 400).await.unwrap());
+        assert_eq!(remote_db.find_by_id("dev_dual_1").await.unwrap().unwrap().revoked_at, Some(400));
+        // Second revoke keeps original revoked_at timestamp.
+        assert!(remote_db.revoke_device("dev_dual_1", 500).await.unwrap());
+        assert_eq!(remote_db.find_by_id("dev_dual_1").await.unwrap().unwrap().revoked_at, Some(400));
+
+        // Full Remote lifecycle: enable -> pair -> exchange -> verify_bearer_async -> whoami -> revoke -> disable.
+        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+        let remote = Remote::open_with_clock(db.clone(), Arc::downgrade(&hub), "0.1.0-dual".into(), clock.clone()).unwrap();
+        assert!(!remote.is_enabled());
+
+        let status = remote
+            .enable_async(RemoteEnableRequest {
+                bind_addr: Some("127.0.0.1".into()),
+                port: Some(0),
+            })
+            .await
+            .unwrap();
+        assert!(status.enabled && status.listening);
+        assert!(remote.is_enabled());
+
+        let pair = remote.pair_create_with_scope(Some(SCOPE_REMOTE_CLIENT)).unwrap();
+        let exchanged = remote
+            .pair_exchange_async(RemotePairExchangeRequest {
+                code: pair.code,
+                device_name: "Dual Device".into(),
+                platform: RemotePlatform::Android,
+                scope: None,
+            })
+            .await
+            .unwrap();
+        assert_eq!(exchanged.device.platform, RemotePlatform::Android);
+
+        let verified = RemoteAuth::verify_bearer_async(remote.clone(), exchanged.token.clone()).await.unwrap();
+        assert_eq!(verified.device_id, exchanged.device.id);
+        let whoami = remote
+            .whoami_async(
+                &CallerPrincipal::RemoteDevice {
+                    device_id: verified.device_id.clone(),
+                    scope: verified.scope.clone(),
+                },
+                Caller::Remote,
+            )
+            .await
+            .unwrap();
+        assert_eq!(whoami.device.as_ref().map(|d| d.id.as_str()), Some(exchanged.device.id.as_str()));
+
+        remote
+            .revoke_device_async(RemoteDeviceRevokeRequest {
+                id: exchanged.device.id.clone(),
+            })
+            .await
+            .unwrap();
+        let revoked_err = RemoteAuth::verify_bearer_async(remote.clone(), exchanged.token).await.unwrap_err();
+        assert_eq!(revoked_err.biz_code, BizCode::Unauthorized);
+
+        let disabled = remote.disable_async().await.unwrap();
+        assert!(!disabled.enabled && !disabled.listening);
+        assert!(remote_db.get_config().await.unwrap().is_some_and(|c| !c.enabled));
+
+        remote.close_async().await;
+        hub.close_async().await;
+    }
+
+    #[test]
+    fn dual_db_remote_persistence_works_on_sqlite_and_postgres() {
+        vibevalley_i18n::set_locale("en");
+
+        let dir = tempfile::tempdir().unwrap();
+        let sqlite_url = format!("sqlite://{}", dir.path().join("remote.db").display());
+        let sqlite_db = ServerDb::open_url(&sqlite_url).unwrap();
+        block_on(verify_remote_dual_db(sqlite_db.clone(), sea_orm::DatabaseBackend::Sqlite));
+        sqlite_db.close();
+
+        let Some(pg) = crate::modules::infra::column::test_pg::EphemeralPostgres::start() else {
+            eprintln!("skipping postgres remote dual-db test: Homebrew initdb/pg_ctl not found");
+            return;
+        };
+        pg.create_database("infra_remote_dual");
+        let pg_db = ServerDb::open_url(&pg.db_url("infra_remote_dual")).unwrap();
+        block_on(verify_remote_dual_db(pg_db.clone(), sea_orm::DatabaseBackend::Postgres));
+        pg_db.close();
     }
 }

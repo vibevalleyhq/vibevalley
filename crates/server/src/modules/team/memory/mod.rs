@@ -11,7 +11,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use parking_lot::Mutex;
-use sqlx::{Connection, SqliteConnection};
+use sea_orm::sea_query::{Expr, OnConflict};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DbErr, EntityTrait, ExprTrait, QueryFilter, QueryOrder};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ActorKind, ApiError, BizCode, Caller, Fact, Memory, MemoryFound, MemoryKind, MemoryList, MemoryScope, MemorySearch, MemorySourceInfo, Outcome, Preview,
@@ -19,6 +20,8 @@ use vibevalley_protocol::{
 };
 
 use crate::base::{RequestKeys, ServerDb};
+use crate::db::entities::team_memory::memory;
+use crate::modules::infra::column::{begin_write_tx, db_word, read_db_word};
 use crate::modules::team::agent::Agents;
 use crate::ports::MemoryRecallPort;
 use crate::{Hub, now};
@@ -28,18 +31,20 @@ mod rules;
 
 use rules as m;
 
-use crate::db::generated::team_memory as queries;
-
 /// Fading marks the ones that would go if this many more were kept.
 const FADING_SOON: usize = 10;
 pub const LOCAL: &str = "local";
 
-fn db_failed(e: sqlx::Error) -> ApiError {
+fn db_failed(e: DbErr) -> ApiError {
     ApiError::new(BizCode::MemoryRefused, format!("{}: {e}", t("server.memory.dbFailed", &[])))
 }
 
 fn refused(text: String) -> ApiError {
     ApiError::new(BizCode::MemoryRefused, text)
+}
+
+fn block_on<F: std::future::Future>(future: F) -> F::Output {
+    vibevalley_runtime::rt::block_on(future)
 }
 
 /// Who writes a note: the user, an orchestrator, or a session (kept with it).
@@ -117,23 +122,28 @@ impl Memories {
 
     /// An agent's own memories, newest first.
     pub fn list(&self, agent: &str) -> Result<Vec<m::Memory>, ApiError> {
-        self.db.run(async |db| Self::read_for(db, agent).await).map_err(db_failed)
+        block_on(self.list_async(agent))
     }
 
-    async fn read_for(db: &mut SqliteConnection, agent: &str) -> sqlx::Result<Vec<m::Memory>> {
-        let rows = queries::list_memories(db, queries::ListMemoriesParams { agent: agent.into() }).await?;
+    pub async fn list_async(&self, agent: &str) -> Result<Vec<m::Memory>, ApiError> {
+        Self::read_for(self.db.read_conn(), agent).await.map_err(db_failed)
+    }
+
+    async fn read_for<C: ConnectionTrait>(db: &C, agent: &str) -> Result<Vec<m::Memory>, DbErr> {
+        let rows = memory::Entity::find()
+            .filter(memory::Column::Agent.eq(agent))
+            .order_by_desc(memory::Column::CreatedAt)
+            .order_by_desc(memory::Column::Id)
+            .all(db)
+            .await?;
         Ok(rows
             .into_iter()
             .map(|row| m::Memory {
                 id: row.id,
-                agent: agent.into(),
-                kind: if row.kind == "issue" { m::MemoryKind::Issue } else { m::MemoryKind::Note },
+                agent: row.agent,
+                kind: read_db_word(row.kind).unwrap_or(m::MemoryKind::Note),
                 text: row.body,
-                author: match row.author.as_str() {
-                    "user" => m::ActorKind::User,
-                    "agent" => m::ActorKind::Agent,
-                    _ => m::ActorKind::System,
-                },
+                author: read_db_word(row.author).unwrap_or(m::ActorKind::System),
                 repo: row.repo,
                 session: row.session,
                 at: row.created_at,
@@ -146,8 +156,8 @@ impl Memories {
     }
 
     /// The memories with the ones that would go next marked fading.
-    fn listed(&self, agent: &str) -> Vec<m::Memory> {
-        let all = self.list(agent).unwrap_or_default();
+    async fn listed_async(&self, agent: &str) -> Vec<m::Memory> {
+        let all = self.list_async(agent).await.unwrap_or_default();
         let fading: HashSet<String> = m::next_forgotten(&all, FADING_SOON).into_iter().collect();
         all.into_iter()
             .map(|x| m::Memory {
@@ -174,34 +184,42 @@ impl Memories {
     }
 
     pub fn write(&self, n: &Note) -> Result<Memory, ApiError> {
-        self.db.run_api(async |db| Self::insert_note(db, n).await)
+        block_on(self.write_async(n))
     }
 
-    async fn insert_note(db: &mut SqliteConnection, n: &Note) -> Result<Memory, ApiError> {
+    pub async fn write_async(&self, n: &Note) -> Result<Memory, ApiError> {
+        Self::insert_note(self.db.write_conn(), n).await
+    }
+
+    async fn insert_note<C: ConnectionTrait>(db: &C, n: &Note) -> Result<Memory, ApiError> {
         let body = m::clip(&n.text, m::NOTE_MAX_CHARS);
         if body.is_empty() {
             return Err(refused(t("server.memory.empty", &[])));
         }
         let repo = Some(n.repo.trim().to_string()).filter(|r| !r.is_empty());
         let (author, session) = match &n.by {
-            By::User => ("user", None),
-            By::Orchestrator => ("agent", None),
-            By::Session(s) => ("agent", Some(s.clone()).filter(|s| !s.is_empty())),
+            By::User => (m::ActorKind::User, None),
+            By::Orchestrator => (m::ActorKind::Agent, None),
+            By::Session(s) => (m::ActorKind::Agent, Some(s.clone()).filter(|s| !s.is_empty())),
         };
         let at = now();
         let id = uuid::Uuid::now_v7().to_string();
-        queries::write_note(
-            db,
-            queries::WriteNoteParams {
-                id: id.clone(),
-                agent: n.agent.clone(),
-                body: body.clone(),
-                repo: repo.clone(),
-                session: session.clone(),
-                author: author.into(),
-                created_at: at,
-            },
-        )
+        let kind_word = db_word(&m::MemoryKind::Note).map_err(db_failed)?;
+        let author_word = db_word(&author).map_err(db_failed)?;
+        memory::ActiveModel {
+            id: Set(id.clone()),
+            agent: Set(n.agent.clone()),
+            kind: Set(kind_word),
+            body: Set(body.clone()),
+            repo: Set(repo.clone()),
+            session: Set(session.clone()),
+            author: Set(author_word),
+            created_at: Set(at),
+            updated_at: Set(at),
+            recalled: Set(0),
+            recalled_at: Set(None),
+        }
+        .insert(db)
         .await
         .map_err(db_failed)?;
         Ok(to_wire(m::Memory {
@@ -209,7 +227,7 @@ impl Memories {
             agent: n.agent.clone(),
             kind: m::MemoryKind::Note,
             text: body,
-            author: if author == "user" { m::ActorKind::User } else { m::ActorKind::Agent },
+            author,
             repo,
             session,
             at,
@@ -222,14 +240,22 @@ impl Memories {
 
     /// `rewrite`: the agent's own notes replaced; the user's stay.
     pub fn rewrite(&self, agent: &str, texts: &[String], by: By) -> Result<usize, ApiError> {
-        self.db.run_api(async |db| {
-            let mut tx = db.begin_with("BEGIN IMMEDIATE").await.map_err(db_failed)?;
-            queries::clear_agent_notes(&mut *tx, queries::ClearAgentNotesParams { agent: agent.into() })
+        block_on(self.rewrite_async(agent, texts, by))
+    }
+
+    pub async fn rewrite_async(&self, agent: &str, texts: &[String], by: By) -> Result<usize, ApiError> {
+        let txn = begin_write_tx(self.db.write_conn()).await.map_err(db_failed)?;
+        let res: Result<usize, ApiError> = async {
+            memory::Entity::delete_many()
+                .filter(memory::Column::Agent.eq(agent))
+                .filter(memory::Column::Kind.eq("note"))
+                .filter(memory::Column::Author.ne("user"))
+                .exec(&txn)
                 .await
                 .map_err(db_failed)?;
             for text in texts {
                 Self::insert_note(
-                    &mut tx,
+                    &txn,
                     &Note {
                         agent: agent.into(),
                         text: text.clone(),
@@ -239,13 +265,23 @@ impl Memories {
                 )
                 .await?;
             }
-            tx.commit().await.map_err(db_failed)?;
             Ok(texts.len())
-        })
+        }
+        .await;
+        match res {
+            Ok(count) => {
+                txn.commit().await.map_err(db_failed)?;
+                Ok(count)
+            }
+            Err(err) => {
+                let _ = txn.rollback().await;
+                Err(err)
+            }
+        }
     }
 
-    fn forgettable(&self, agent: &str, id: &str) -> Result<m::Memory, ApiError> {
-        self.list(agent)?.into_iter().find(|x| x.id == id).ok_or_else(|| {
+    async fn forgettable_async(&self, agent: &str, id: &str) -> Result<m::Memory, ApiError> {
+        self.list_async(agent).await?.into_iter().find(|x| x.id == id).ok_or_else(|| {
             ApiError::new(
                 BizCode::MemoryNotFound,
                 t("server.memory.noMemory", &[("agent", agent.into()), ("id", id.into())]),
@@ -258,24 +294,26 @@ impl Memories {
     }
 
     pub fn forget(&self, agent: &str, id: &str) -> Result<(), ApiError> {
-        self.forgettable(agent, id)?;
-        self.db
-            .run(async |db| {
-                queries::forget(
-                    db,
-                    queries::ForgetParams {
-                        agent: agent.into(),
-                        id: id.into(),
-                    },
-                )
-                .await
-            })
+        block_on(self.forget_async(agent, id))
+    }
+
+    pub async fn forget_async(&self, agent: &str, id: &str) -> Result<(), ApiError> {
+        self.forgettable_async(agent, id).await?;
+        memory::Entity::delete_many()
+            .filter(memory::Column::Agent.eq(agent))
+            .filter(memory::Column::Id.eq(id))
+            .exec(self.db.write_conn())
+            .await
             .map_err(db_failed)?;
         Ok(())
     }
 
     pub fn preview_forget(&self, agent: &str, id: &str) -> Result<Preview, ApiError> {
-        let x = self.forgettable(agent, id)?;
+        block_on(self.preview_forget_async(agent, id))
+    }
+
+    pub async fn preview_forget_async(&self, agent: &str, id: &str) -> Result<Preview, ApiError> {
+        let x = self.forgettable_async(agent, id).await?;
         Ok(Preview {
             does: vec![t("server.memory.forget", &[("agent", agent.into()), ("text", x.text.into())])],
         })
@@ -284,10 +322,14 @@ impl Memories {
     /// What a run on `agent` recalls (`recallable`); with `peek` nothing is
     /// counted and a cue with no repo recalls nothing.
     pub fn recall(&self, agent: &str, session: Option<&str>, repo: &str, text: &str, peek: bool) -> Vec<(String, String)> {
+        block_on(self.recall_async(agent, session, repo, text, peek))
+    }
+
+    pub async fn recall_async(&self, agent: &str, session: Option<&str>, repo: &str, text: &str, peek: bool) -> Vec<(String, String)> {
         if peek && repo.is_empty() {
             return vec![];
         }
-        let all = self.list(agent).unwrap_or_default();
+        let all = self.list_async(agent).await.unwrap_or_default();
         let cue = m::Cue {
             session: if peek { None } else { session },
             repo,
@@ -297,21 +339,15 @@ impl Memories {
             matches: self.matches(&all, text),
         };
         let picked = m::pick(&all, &cue);
-        if !peek {
+        if !peek && !picked.is_empty() {
             let at = now();
-            let _ = self.db.run(async |db| {
-                for x in &picked {
-                    let _ = queries::count_recall(
-                        &mut *db,
-                        queries::CountRecallParams {
-                            recalled_at: Some(at),
-                            id: x.id.clone(),
-                        },
-                    )
-                    .await;
-                }
-                Ok(())
-            });
+            let ids: Vec<String> = picked.iter().map(|x| x.id.clone()).collect();
+            let _ = memory::Entity::update_many()
+                .col_expr(memory::Column::Recalled, Expr::col(memory::Column::Recalled).add(1))
+                .col_expr(memory::Column::RecalledAt, Expr::value(Some(at)))
+                .filter(memory::Column::Id.is_in(ids))
+                .exec(self.db.write_conn())
+                .await;
         }
         picked.iter().map(|x| (x.id.clone(), m::line_of(x, repo))).collect()
     }
@@ -327,39 +363,70 @@ impl Memories {
 
     /// `keep`: a finished round's issue memory, then the oldest past the limit go.
     pub fn keep(&self, run: &FinishedRun) {
+        block_on(self.keep_async(run));
+    }
+
+    pub async fn keep_async(&self, run: &FinishedRun) {
         if run.outcome == Outcome::Interrupted {
             return;
         }
-        let saved = self.db.run(async |db| {
-            let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
-            if run.issue.is_some() {
-                let text = m::issue_memory_text(&run.brief, &run.summary, run.outcome == Outcome::Failed);
-                queries::keep_issue(
-                    &mut *tx,
-                    queries::KeepIssueParams {
-                        id: uuid::Uuid::now_v7().to_string(),
-                        agent: run.agent.clone(),
-                        body: text,
-                        repo: Some(run.repo.clone()),
-                        session: Some(run.session.clone()),
-                        created_at: now(),
-                    },
-                )
-                .await?;
+        let res: Result<(), DbErr> = async {
+            let txn = begin_write_tx(self.db.write_conn()).await?;
+            let inner: Result<(), DbErr> = async {
+                if run.issue.is_some() {
+                    let text = m::issue_memory_text(&run.brief, &run.summary, run.outcome == Outcome::Failed);
+                    let ts = now();
+                    let model = memory::ActiveModel {
+                        id: Set(uuid::Uuid::now_v7().to_string()),
+                        agent: Set(run.agent.clone()),
+                        kind: Set(db_word(&m::MemoryKind::Issue)?),
+                        body: Set(text),
+                        repo: Set(Some(run.repo.clone())),
+                        session: Set(Some(run.session.clone())),
+                        author: Set(db_word(&m::ActorKind::System)?),
+                        created_at: Set(ts),
+                        updated_at: Set(ts),
+                        recalled: Set(0),
+                        recalled_at: Set(None),
+                    };
+                    let on_conflict = OnConflict::columns([memory::Column::Agent, memory::Column::Session])
+                        .target_and_where(Expr::col(memory::Column::Kind).eq(Expr::cust("'issue'")))
+                        .update_columns([memory::Column::Body, memory::Column::Repo, memory::Column::CreatedAt, memory::Column::UpdatedAt])
+                        .to_owned();
+                    memory::Entity::insert(model).on_conflict(on_conflict).exec(&txn).await?;
+                }
+                let all = Self::read_for(&txn, &run.agent).await?;
+                let to_forget = m::next_forgotten(&all, 0);
+                if !to_forget.is_empty() {
+                    memory::Entity::delete_many()
+                        .filter(memory::Column::Agent.eq(&run.agent))
+                        .filter(memory::Column::Id.is_in(to_forget))
+                        .exec(&txn)
+                        .await?;
+                }
+                Ok(())
             }
-            let all = Self::read_for(&mut tx, &run.agent).await?;
-            for id in m::next_forgotten(&all, 0) {
-                queries::forget(&mut *tx, queries::ForgetParams { agent: run.agent.clone(), id }).await?;
+            .await;
+            match inner {
+                Ok(()) => txn.commit().await,
+                Err(err) => {
+                    let _ = txn.rollback().await;
+                    Err(err)
+                }
             }
-            tx.commit().await
-        });
-        if let Err(error) = saved {
+        }
+        .await;
+        if let Err(error) = res {
             eprintln!("could not keep the completed run for {}: {error}", run.session);
         }
     }
 
     /// `search`: one agent's, or every profile's when none is named.
     pub fn search(&self, agent: &str, repo: &str, text: &str, limit: usize) -> MemorySearch {
+        block_on(self.search_async(agent, repo, text, limit))
+    }
+
+    pub async fn search_async(&self, agent: &str, repo: &str, text: &str, limit: usize) -> MemorySearch {
         let agents: Vec<String> = if agent.is_empty() {
             self.agents.profiles.agents().into_iter().map(|a| a.id).collect()
         } else {
@@ -367,7 +434,7 @@ impl Memories {
         };
         let mut all = vec![];
         for a in &agents {
-            all.extend(self.list(a).unwrap_or_default());
+            all.extend(self.list_async(a).await.unwrap_or_default());
         }
         let matches = self.matches(&all, text);
         let found = m::search(&all, repo, text, None, limit, &matches)
@@ -523,41 +590,34 @@ pub fn install(hub: &Arc<Hub>, memories: Arc<Memories>) {
     hub.on_async::<ops::MemoryList, _, _>(move |_, input| {
         let s = s.clone();
         async move {
-            crate::spawn_blocking_traced(move || {
-                Ok(MemoryList {
-                    memories: s.listed(&input.agent).into_iter().map(to_wire).collect(),
-                    sources: s.sources(),
-                })
+            Ok(MemoryList {
+                memories: s.listed_async(&input.agent).await.into_iter().map(to_wire).collect(),
+                sources: s.sources(),
             })
-            .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
         }
     });
     let s = memories.clone();
     hub.on_async::<ops::MemoryRecall, _, _>(move |_, input| {
         let s = s.clone();
         async move {
-            crate::spawn_blocking_traced(move || {
-                let lines: Vec<String> = s
-                    .recall(
-                        &input.agent,
-                        None,
-                        input.repo.as_deref().unwrap_or(""),
-                        input.text.as_deref().unwrap_or(""),
-                        true,
-                    )
-                    .into_iter()
-                    .map(|(_, l)| l)
-                    .collect();
-                let chars = lines.iter().map(|l| l.encode_utf16().count() as i64 + 1).sum();
-                Ok(RecallPreview {
-                    lines,
-                    chars,
-                    limit: m::RECALL_CHARS as i64,
-                })
+            let lines: Vec<String> = s
+                .recall_async(
+                    &input.agent,
+                    None,
+                    input.repo.as_deref().unwrap_or(""),
+                    input.text.as_deref().unwrap_or(""),
+                    true,
+                )
+                .await
+                .into_iter()
+                .map(|(_, l)| l)
+                .collect();
+            let chars = lines.iter().map(|l| l.encode_utf16().count() as i64 + 1).sum();
+            Ok(RecallPreview {
+                lines,
+                chars,
+                limit: m::RECALL_CHARS as i64,
             })
-            .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
         }
     });
     let s = memories.clone();
@@ -589,39 +649,28 @@ pub fn install(hub: &Arc<Hub>, memories: Arc<Memories>) {
     hub.on_async::<ops::MemorySearch, _, _>(move |_, input| {
         let s = s.clone();
         async move {
-            crate::spawn_blocking_traced(move || {
-                let agent = input
-                    .agent
-                    .as_deref()
-                    .map(|a| s.agents.profiles.named(a).map(|p| p.id).unwrap_or_else(|| a.to_string()));
-                Ok(s.search(
-                    agent.as_deref().unwrap_or(""),
-                    input.repo.as_deref().unwrap_or(""),
-                    input.text.as_deref().unwrap_or(""),
-                    0,
-                ))
-            })
-            .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+            let agent = input
+                .agent
+                .as_deref()
+                .map(|a| s.agents.profiles.named(a).map(|p| p.id).unwrap_or_else(|| a.to_string()));
+            Ok(s.search_async(
+                agent.as_deref().unwrap_or(""),
+                input.repo.as_deref().unwrap_or(""),
+                input.text.as_deref().unwrap_or(""),
+                0,
+            )
+            .await)
         }
     });
     let s = memories.clone();
     hub.on_async::<ops::MemoryDelete, _, _>(move |_, input| {
         let s = s.clone();
-        async move {
-            crate::spawn_blocking_traced(move || s.forget(&input.agent, &input.memory))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
+        async move { s.forget_async(&input.agent, &input.memory).await }
     });
     let s = memories.clone();
     hub.on_async::<ops::MemoryPreviewDelete, _, _>(move |_, input| {
         let s = s.clone();
-        async move {
-            crate::spawn_blocking_traced(move || s.preview_forget(&input.agent, &input.memory))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
+        async move { s.preview_forget_async(&input.agent, &input.memory).await }
     });
 
     // A round that reported: what it did is kept for its profile on the async bus thread.
@@ -749,5 +798,160 @@ mod tests {
         assert_eq!(memories.list("backend").unwrap().len(), 1);
         memories.close();
         hub.close_bus_async().await;
+    }
+
+    async fn verify_memory_dual_db(db: Arc<ServerDb>, home: &std::path::Path, expected_backend: sea_orm::DatabaseBackend) {
+        assert_eq!(db.backend(), expected_backend);
+        let hub = Hub::new(empty_space_state());
+        let registry = Arc::new(vibevalley_runtime::oar::Registry::new());
+        let agents = Agents::open(&hub, home, &[], registry, false).unwrap();
+        let memories = Memories::open(db, agents);
+
+        // Blank note is refused.
+        let blank_err = memories
+            .write_async(&Note {
+                agent: "backend".into(),
+                text: "   ".into(),
+                repo: "farm".into(),
+                by: By::User,
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(blank_err.biz_code, BizCode::MemoryRefused);
+
+        let user_note = memories
+            .write_async(&Note {
+                agent: "backend".into(),
+                text: "Run cargo test in farm repo".into(),
+                repo: "farm".into(),
+                by: By::User,
+            })
+            .await
+            .unwrap();
+        let _orch_note = memories
+            .write_async(&Note {
+                agent: "backend".into(),
+                text: "Prefer SeaORM queries over raw SQL".into(),
+                repo: String::new(),
+                by: By::Orchestrator,
+            })
+            .await
+            .unwrap();
+
+        let listed = memories.listed_async("backend").await;
+        assert_eq!(listed.len(), 2);
+
+        // Rewrite rollback preserves existing agent notes when a replacement fails validation.
+        let before = memories.list_async("backend").await.unwrap();
+        let rewrite_err = memories
+            .rewrite_async("backend", &["Valid replacement".into(), "  ".into()], By::Orchestrator)
+            .await
+            .unwrap_err();
+        assert_eq!(rewrite_err.biz_code, BizCode::MemoryRefused);
+        assert_eq!(memories.list_async("backend").await.unwrap(), before);
+
+        // Successful rewrite replaces agent notes while keeping user notes.
+        let replaced = memories
+            .rewrite_async("backend", &["Use read_conn for queries".into()], By::Orchestrator)
+            .await
+            .unwrap();
+        assert_eq!(replaced, 1);
+        let after = memories.list_async("backend").await.unwrap();
+        assert_eq!(after.len(), 2);
+        assert!(after.iter().any(|m| m.id == user_note.id && m.author == m::ActorKind::User));
+        assert!(after.iter().any(|m| m.text == "Use read_conn for queries" && m.author == m::ActorKind::Agent));
+
+        // Peek recall does not increment recalled counter; active recall increments recalled and sets recalled_at.
+        let peeked = memories.recall_async("backend", None, "farm", "cargo test", true).await;
+        assert!(!peeked.is_empty());
+        let after_peek = memories.list_async("backend").await.unwrap();
+        assert!(after_peek.iter().all(|m| m.recalled == 0 && m.recalled_at.is_none()));
+
+        let recalled = memories.recall_async("backend", Some("sess-1"), "farm", "cargo test", false).await;
+        assert!(!recalled.is_empty());
+        let after_recall = memories.list_async("backend").await.unwrap();
+        let recalled_row = after_recall.iter().find(|m| m.id == user_note.id).unwrap();
+        assert_eq!(recalled_row.recalled, 1);
+        assert!(recalled_row.recalled_at.is_some());
+
+        // keep_async skips Interrupted and upserts on partial unique index (agent, session) WHERE kind = 'issue'.
+        memories
+            .keep_async(&FinishedRun {
+                agent: "backend".into(),
+                session: "sess-int".into(),
+                issue: Some("iss-int".into()),
+                repo: "farm".into(),
+                brief: "ignored".into(),
+                outcome: Outcome::Interrupted,
+                summary: "aborted".into(),
+            })
+            .await;
+        assert!(memories.list_async("backend").await.unwrap().iter().all(|m| m.kind != m::MemoryKind::Issue));
+
+        memories
+            .keep_async(&FinishedRun {
+                agent: "backend".into(),
+                session: "sess-1".into(),
+                issue: Some("iss-1".into()),
+                repo: "farm".into(),
+                brief: "fix dual db".into(),
+                outcome: Outcome::Failed,
+                summary: "first attempt".into(),
+            })
+            .await;
+        memories
+            .keep_async(&FinishedRun {
+                agent: "backend".into(),
+                session: "sess-1".into(),
+                issue: Some("iss-1".into()),
+                repo: "farm".into(),
+                brief: "fix dual db".into(),
+                outcome: Outcome::Completed,
+                summary: "second attempt succeeded".into(),
+            })
+            .await;
+        let issue_rows: Vec<_> = memories
+            .list_async("backend")
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|m| m.kind == m::MemoryKind::Issue)
+            .collect();
+        assert_eq!(issue_rows.len(), 1);
+        assert!(issue_rows[0].text.contains("second attempt succeeded"), "{}", issue_rows[0].text);
+
+        // Search and forget.
+        let search = memories.search_async("backend", "farm", "cargo test", 10).await;
+        assert!(search.found.iter().any(|f| f.id == user_note.id));
+
+        let preview = memories.preview_forget_async("backend", &user_note.id).await.unwrap();
+        assert!(!preview.does.is_empty());
+        memories.forget_async("backend", &user_note.id).await.unwrap();
+        let gone = memories.forget_async("backend", &user_note.id).await.unwrap_err();
+        assert_eq!(gone.biz_code, BizCode::MemoryNotFound);
+
+        memories.close();
+        hub.close_async().await;
+    }
+
+    #[test]
+    fn dual_db_memory_persistence_works_on_sqlite_and_postgres() {
+        vibevalley_i18n::set_locale("en");
+
+        let sqlite_home = tempfile::tempdir().unwrap();
+        let sqlite_url = format!("sqlite://{}", sqlite_home.path().join("memory.db").display());
+        let sqlite_db = ServerDb::open_url(&sqlite_url).unwrap();
+        block_on(verify_memory_dual_db(sqlite_db.clone(), sqlite_home.path(), sea_orm::DatabaseBackend::Sqlite));
+        sqlite_db.close();
+
+        let Some(pg) = crate::modules::infra::column::test_pg::EphemeralPostgres::start() else {
+            eprintln!("skipping postgres memory dual-db test: Homebrew initdb/pg_ctl not found");
+            return;
+        };
+        pg.create_database("team_memory_dual");
+        let pg_home = tempfile::tempdir().unwrap();
+        let pg_db = ServerDb::open_url(&pg.db_url("team_memory_dual")).unwrap();
+        block_on(verify_memory_dual_db(pg_db.clone(), pg_home.path(), sea_orm::DatabaseBackend::Postgres));
+        pg_db.close();
     }
 }
