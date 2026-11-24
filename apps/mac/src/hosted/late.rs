@@ -11,7 +11,7 @@ use std::sync::{Arc, OnceLock};
 use parking_lot::Mutex;
 use serde_json::Value;
 use tokio::sync::{broadcast, watch};
-use vibevalley_server::slice_feed::SliceSubscription;
+use vibevalley_server::SliceSubscription;
 use vibevalley_server::transport::api::{BoxFuture, refusal};
 use vibevalley_server::transport::bridge::{BizCode, CallerContext, Envelope, LiveEvent, Server, SliceKind};
 

@@ -10,22 +10,24 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use parking_lot::Mutex;
 use sea_orm::sea_query::{Alias, Condition, Expr, Func, LikeExpr, OnConflict, Order, Query};
 use sea_orm::{ActiveValue::Set, ColumnTrait, DbErr, EntityTrait, ExprTrait, FromQueryResult, QueryFilter, Update};
+use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    Actor, ApiError, Attachment, BizCode, Fact, JobKind, LibraryAddRequest, LibraryFileKind, LibraryItem, LibraryListRequest, LibraryOrigin,
-    LibraryOriginFetchedFrom, LibrarySort, MediaAudioJob, MediaJob, MediaPhase, MessageKind, Preview, ops,
+    Actor, ApiError, Attachment, BizCode, JobKind, LibraryAddRequest, LibraryFileKind, LibraryItem, LibraryListRequest, LibraryOrigin,
+    LibraryOriginFetchedFrom, LibrarySort, MediaAudioJob, MediaJob, MediaPhase, MessageKind, Preview,
 };
 
-use crate::app::hub::refusal::{LookIn, missing};
+use crate::app::port::{ChannelMessageEvent, ChannelMessageEventsPort, MediaJobEventsPort};
+use crate::app::refusal::{LookIn, missing};
+use crate::app::runtime::Runtime;
 use crate::content::attachment::{ATTACHMENT_MAX, AttachmentStore};
 use crate::db::ServerDb;
 use crate::db::entities::{content_attachment::attachment, content_library::media_library_item};
 use crate::db::write_tx;
 use crate::infra::http::{PublicDownload, PublicDownloadError};
-use crate::{Hub, now};
+use crate::now;
 
 const LIST_MAX: u64 = 500;
 const DOWNLOAD: Duration = Duration::from_secs(60);
@@ -157,38 +159,83 @@ fn escape_like(raw: &str) -> String {
     out
 }
 
-pub struct Library {
+pub struct LibraryStore {
     db: Arc<ServerDb>,
+    runtime: Arc<Runtime>,
     files: Arc<AttachmentStore>,
-    sub: Mutex<Option<crate::app::hub::event_bus::Subscription>>,
-    fact_task: Mutex<Option<(tokio_util::sync::CancellationToken, tokio::task::JoinHandle<()>)>>,
-    edit_task: Mutex<Option<(tokio_util::sync::CancellationToken, tokio::task::JoinHandle<()>)>>,
+    cancel: CancellationToken,
 }
 
-impl Library {
-    pub fn open(db: Arc<ServerDb>, files: Arc<AttachmentStore>) -> Arc<Library> {
-        Arc::new(Library {
+impl LibraryStore {
+    pub fn open(
+        db: Arc<ServerDb>,
+        runtime: Arc<Runtime>,
+        files: Arc<AttachmentStore>,
+        channel_events: Option<Arc<dyn ChannelMessageEventsPort>>,
+        media_events: Option<Arc<dyn MediaJobEventsPort>>,
+    ) -> Arc<LibraryStore> {
+        let cancel = runtime.child_token();
+        let store = Arc::new(LibraryStore {
             db,
+            runtime: runtime.clone(),
             files,
-            sub: Mutex::new(None),
-            fact_task: Mutex::new(None),
-            edit_task: Mutex::new(None),
-        })
+            cancel: cancel.clone(),
+        });
+
+        if let Some(port) = channel_events {
+            let mut rx = port.subscribe_message_events();
+            let weak = Arc::downgrade(&store);
+            let task_cancel = cancel.clone();
+            runtime.spawn(async move {
+                loop {
+                    let event = tokio::select! {
+                        biased;
+                        _ = task_cancel.cancelled() => return,
+                        res = rx.recv() => match res {
+                            Ok(ev) => ev,
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
+                        },
+                    };
+                    let Some(l) = weak.upgrade() else { return };
+                    let message = match event {
+                        ChannelMessageEvent::Posted { message, .. } | ChannelMessageEvent::Edited(message) => message,
+                    };
+                    if let Err(e) = l.record_said_async(&message).await {
+                        eprintln!("vibevalley-server: library: recording: {}", e.message);
+                    }
+                }
+            });
+        }
+
+        if let Some(port) = media_events {
+            let mut rx = port.subscribe_job_updates();
+            let weak = Arc::downgrade(&store);
+            let task_cancel = cancel;
+            runtime.spawn(async move {
+                loop {
+                    let jobs = tokio::select! {
+                        biased;
+                        _ = task_cancel.cancelled() => return,
+                        res = rx.recv() => match res {
+                            Ok(j) => j,
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
+                        },
+                    };
+                    let Some(l) = weak.upgrade() else { return };
+                    if let Err(e) = l.record_made_async(&jobs).await {
+                        eprintln!("vibevalley-server: library: recording: {}", e.message);
+                    }
+                }
+            });
+        }
+
+        store
     }
 
-    pub async fn close_async(&self) {
-        let prev = self.sub.lock().take();
-        drop(prev);
-        let fact_task = self.fact_task.lock().take();
-        if let Some((cancel, handle)) = fact_task {
-            cancel.cancel();
-            let _ = handle.await;
-        }
-        let edit_task = self.edit_task.lock().take();
-        if let Some((cancel, handle)) = edit_task {
-            cancel.cancel();
-            let _ = handle.await;
-        }
+    pub fn close(&self) {
+        self.cancel.cancel();
     }
 
     async fn found_async(&self, id: &str) -> Result<LibraryItem, ApiError> {
@@ -360,7 +407,9 @@ impl Library {
             None => {
                 let dir = dir.clone();
                 let path = path.clone();
-                let (bytes, name) = crate::spawn_blocking_traced(move || work_file(dir.as_deref(), &path))
+                let (bytes, name) = self
+                    .runtime
+                    .spawn_blocking(move || work_file(dir.as_deref(), &path))
                     .await
                     .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))??;
                 (bytes, name, String::new())
@@ -526,168 +575,48 @@ fn ready_made(job: &MediaJob) -> Option<(&str, JobKind, &str, i64)> {
     }
 }
 
-/// The `library.item.*` endpoints (the user's), and the recording of what
-/// the farm hears (media jobs and posted/edited chat attachments via [`EventBus`]).
-pub fn install(hub: &Hub, library: Arc<Library>, channel_events: Option<Arc<dyn crate::app::hub::ports::ChannelMessageEventsPort>>) {
-    let l = library.clone();
-    hub.on_async::<ops::LibraryItemList, _, _>(move |_, r| {
-        let l = l.clone();
-        async move { l.list_async(&r).await }
-    });
-    let l = library.clone();
-    hub.on_async::<ops::LibraryItemAdd, _, _>(move |ctx, r| {
-        let l = l.clone();
-        let by = match ctx.caller {
-            vibevalley_protocol::Caller::User | vibevalley_protocol::Caller::Remote => AddedBy::User,
-            vibevalley_protocol::Caller::Orchestrator => AddedBy::Agent {
-                agent: ctx.client.as_ref().map(|c| c.id.clone()).unwrap_or_default(),
-                session: None,
-                dir: None,
-            },
-            vibevalley_protocol::Caller::Session => {
-                let sid = ctx.client.as_ref().map(|c| c.id.clone()).unwrap_or_default();
-                let (agent, dir) = ctx
-                    .hub
-                    .read(|s| {
-                        s.sessions
-                            .iter()
-                            .find(|h| h.id == sid)
-                            .map(|h| (h.profile.clone().unwrap_or_default(), h.cwd.as_ref().map(PathBuf::from)))
-                    })
-                    .unwrap_or_default();
-                AddedBy::Agent {
-                    agent,
-                    session: (!sid.is_empty()).then_some(sid),
-                    dir,
-                }
-            }
-        };
-        async move { l.add_async(&r, &by).await }
-    });
-    let l = library.clone();
-    hub.on_async::<ops::LibraryItemDelete, _, _>(move |_, r| {
-        let l = l.clone();
-        async move { l.remove_async(&r.id).await }
-    });
-    let l = library.clone();
-    hub.on_async::<ops::LibraryItemPreviewDelete, _, _>(move |_, r| {
-        let l = l.clone();
-        async move { l.preview_remove_async(&r.id).await }
-    });
-
-    let (fact_tx, mut fact_rx) = tokio::sync::mpsc::unbounded_channel::<Fact>();
-    let sub = hub.subscribe_transitions("library", move |_, tr| {
-        if matches!(tr.fact, Fact::MediaChanged(_) | Fact::MessageChanged(_)) {
-            let _ = fact_tx.send(tr.fact.clone());
-        }
-    });
-    let prev = library.sub.lock().replace(sub);
-    drop(prev);
-
-    let weak = Arc::downgrade(&library);
-    let cancel = hub.child_token();
-    let task_cancel = cancel.clone();
-    let handle = hub.spawn_task(async move {
-        while let Some(fact) = tokio::select! {
-            biased;
-            _ = task_cancel.cancelled() => None,
-            msg = fact_rx.recv() => msg,
-        } {
-            let Some(l) = weak.upgrade() else { return };
-            match fact {
-                Fact::MediaChanged(m) => {
-                    if let Err(e) = l.record_made_async(&m.jobs).await {
-                        eprintln!("vibevalley-server: library: recording: {}", e.message);
-                    }
-                }
-                Fact::MessageChanged(m) => {
-                    if let Err(e) = l.record_said_async(&m.message).await {
-                        eprintln!("vibevalley-server: library: recording: {}", e.message);
-                    }
-                }
-                _ => {}
-            }
-        }
-    });
-    if let Some((old_cancel, old_handle)) = library.fact_task.lock().replace((cancel, handle)) {
-        old_cancel.cancel();
-        hub.spawn_task(async move {
-            let _ = old_handle.await;
-        });
-    }
-
-    if let Some(port) = channel_events {
-        let mut rx = port.subscribe_edited_messages();
-        let weak = Arc::downgrade(&library);
-        let cancel = hub.child_token();
-        let task_cancel = cancel.clone();
-        let handle = hub.spawn_task(async move {
-            loop {
-                let message = tokio::select! {
-                    biased;
-                    _ = task_cancel.cancelled() => return,
-                    res = rx.recv() => match res {
-                        Ok(m) => m,
-                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                        Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
-                    },
-                };
-                let Some(l) = weak.upgrade() else { return };
-                if let Err(e) = l.record_said_async(&message).await {
-                    eprintln!("vibevalley-server: library: recording: {}", e.message);
-                }
-            }
-        });
-        if let Some((old_cancel, old_handle)) = library.edit_task.lock().replace((cancel, handle)) {
-            old_cancel.cancel();
-            hub.spawn_task(async move {
-                let _ = old_handle.await;
-            });
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use sea_orm::ConnectionTrait;
 
     use super::*;
 
-    #[test]
-    fn regression_failed_generated_item_is_retryable_after_reopen() {
+    #[tokio::test]
+    async fn regression_failed_generated_item_is_retryable_after_reopen() {
         let home = tempfile::tempdir().unwrap();
         let db = ServerDb::open(home.path()).unwrap();
+        let runtime = Arc::new(Runtime::new());
         let files = AttachmentStore::open(home.path(), db.clone());
-        let attachment = vibevalley_runtime::rt::block_on(files.keep_async(b"image".to_vec(), "image.png".to_string(), "image/png".to_string())).unwrap();
+        let attachment = files
+            .keep_async(b"image".to_vec(), "image.png".to_string(), "image/png".to_string())
+            .await
+            .unwrap();
         let job: MediaJob = serde_json::from_value(serde_json::json!({
             "kind":"image","id":"job","prompt":"p","model":"m","connection":"c","revision":1,
             "source":{"kind":"user"},"phase":"ready","phaseText":"","problem":"","canCancel":false,
             "canRetryDownload":false,"createdAt":1,"updatedAt":2,"attachment":attachment
         }))
         .unwrap();
-        let library = Library::open(db.clone(), files.clone());
-        let admin = |sql: &'static str| {
-            vibevalley_runtime::rt::block_on(db.write_conn().execute_unprepared(sql)).unwrap();
-        };
-        admin("CREATE TRIGGER refuse_media_item BEFORE INSERT ON media_library_item BEGIN SELECT RAISE(ABORT, 'item failed'); END;");
-        assert!(vibevalley_runtime::rt::block_on(library.record_made_async(std::slice::from_ref(&job))).is_err());
+        let library = LibraryStore::open(db.clone(), runtime.clone(), files.clone(), None, None);
+        db.write_conn()
+            .execute_unprepared("CREATE TRIGGER refuse_media_item BEFORE INSERT ON media_library_item BEGIN SELECT RAISE(ABORT, 'item failed'); END;")
+            .await
+            .unwrap();
+        assert!(library.record_made_async(std::slice::from_ref(&job)).await.is_err());
+        library.close();
         drop(library);
-        let library = Library::open(db.clone(), files.clone());
-        admin("DROP TRIGGER refuse_media_item;");
-        vibevalley_runtime::rt::block_on(library.record_made_async(std::slice::from_ref(&job))).unwrap();
-        let stored = vibevalley_runtime::rt::block_on(library.found_async(&attachment.id)).unwrap();
+        let library = LibraryStore::open(db.clone(), runtime.clone(), files.clone(), None, None);
+        db.write_conn().execute_unprepared("DROP TRIGGER refuse_media_item;").await.unwrap();
+        library.record_made_async(std::slice::from_ref(&job)).await.unwrap();
+        let stored = library.found_async(&attachment.id).await.unwrap();
         assert_eq!(stored.attachment, attachment);
-        assert!(matches!(stored.origin,LibraryOrigin::Generated{ref job,..} if job=="job"));
-        vibevalley_runtime::rt::block_on(library.remove_async(&attachment.id)).unwrap();
-        vibevalley_runtime::rt::block_on(library.record_made_async(&[job])).unwrap();
-        assert_eq!(
-            vibevalley_runtime::rt::block_on(library.found_async(&attachment.id)).unwrap_err().biz_code,
-            BizCode::LibraryNotFound
-        );
-        assert_eq!(
-            std::fs::read(vibevalley_runtime::rt::block_on(files.file_async(&attachment.id)).unwrap().path).unwrap(),
-            b"image"
-        );
-        db.close();
+        assert!(matches!(stored.origin, LibraryOrigin::Generated { ref job, .. } if job == "job"));
+        library.remove_async(&attachment.id).await.unwrap();
+        library.record_made_async(&[job]).await.unwrap();
+        assert_eq!(library.found_async(&attachment.id).await.unwrap_err().biz_code, BizCode::LibraryNotFound);
+        assert_eq!(std::fs::read(files.file_async(&attachment.id).await.unwrap().path).unwrap(), b"image");
+        library.close();
+        runtime.shutdown(Duration::from_secs(2)).await;
+        db.close_async().await;
     }
 }

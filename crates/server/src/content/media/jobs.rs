@@ -21,23 +21,24 @@ use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use tokio::sync::{Mutex as AsyncMutex, OwnedSemaphorePermit, Semaphore};
+use tokio::sync::{Mutex as AsyncMutex, OwnedSemaphorePermit, Semaphore, broadcast};
 use tokio_util::sync::CancellationToken;
-use vibevalley_core::{SharedClock, system_clock};
+use vibevalley_core::{SharedClock, SliceMask, system_clock};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, Attachment, BizCode, Caller, Fact, JsNumber, MediaAudioFormat, MediaAudioMetadata, MediaAudioMetadataSource, MediaAudioResult, MediaCleanup,
+    ApiError, Attachment, BizCode, Caller, JsNumber, MediaAudioFormat, MediaAudioMetadata, MediaAudioMetadataSource, MediaAudioResult, MediaCleanup,
     MediaCloneRequest, MediaImageJob, MediaImageJobKind, MediaImageRequest, MediaInputKind, MediaInputReference, MediaInputRequest, MediaJob, MediaPhase,
     MediaSource, MediaSpeakersRequest, MediaSpeechJob, MediaSpeechJobKind, MediaSpeechRequest, MediaTranscriptionRequest, MediaUnderstandingPhase,
-    MediaUnderstandingRequest, MediaUnderstandingResult, MediaVoiceDesignRequest, Millis, Preview, ops,
+    MediaUnderstandingRequest, MediaUnderstandingResult, MediaVoiceDesignRequest, Millis, Preview,
 };
 
 use super::Stop;
 use super::remote::{RemoteFile, RemoteState};
 use super::understanding::Authorization;
 use super::vendor::{self, Account, Moss, Outcome, Task, TaskKind};
-use crate::Hub;
-use crate::app::hub::ports::ChannelAnnouncePort;
+use crate::app::port::{ChannelAnnouncePort, MediaJobEventsPort};
+use crate::app::runtime::Runtime;
+use crate::app::slice::SliceProjector;
 use crate::content::attachment::{ATTACHMENT_MAX, AttachmentStore};
 use crate::content::media::inputs::MediaInputStore;
 use crate::db::ServerDb;
@@ -523,7 +524,8 @@ struct Running {
 /// What the machine reaches.
 pub struct Parts {
     pub db: Arc<ServerDb>,
-    pub hub: Weak<Hub>,
+    pub runtime: Arc<Runtime>,
+    pub projector: Arc<SliceProjector>,
     pub setting: Arc<Setting>,
     pub files: Arc<AttachmentStore>,
     pub inputs: Arc<MediaInputStore>,
@@ -547,7 +549,9 @@ pub struct MediaStore {
     files: Arc<AttachmentStore>,
     pub(super) inputs: Arc<MediaInputStore>,
     pub(super) channel: Arc<dyn ChannelAnnouncePort>,
-    hub: Weak<Hub>,
+    runtime: Arc<Runtime>,
+    projector: Arc<SliceProjector>,
+    job_updates: broadcast::Sender<Vec<MediaJob>>,
     clock: SharedClock,
     closed: AtomicBool,
     me: OnceLock<Weak<MediaStore>>,
@@ -556,18 +560,15 @@ pub struct MediaStore {
     cancel: CancellationToken,
 }
 
-/// Temporary compatibility alias for unowned callers until spine cutover.
-#[doc(hidden)]
-pub type Jobs = MediaStore;
-
 impl MediaStore {
-    pub fn open(p: Parts) -> Result<Arc<MediaStore>, ApiError> {
-        Self::open_with_clock(p, system_clock())
+    pub async fn open_async(p: Parts) -> Result<Arc<MediaStore>, ApiError> {
+        Self::open_with_clock_async(p, system_clock()).await
     }
 
-    /// Same as [`MediaStore::open`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
-    pub fn open_with_clock(p: Parts, clock: SharedClock) -> Result<Arc<MediaStore>, ApiError> {
-        let cancel = p.hub.upgrade().map(|h| h.child_token()).unwrap_or_default();
+    /// Same as [`MediaStore::open_async`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
+    pub async fn open_with_clock_async(p: Parts, clock: SharedClock) -> Result<Arc<MediaStore>, ApiError> {
+        let cancel = p.runtime.child_token();
+        let (job_updates, _) = broadcast::channel(64);
         let jobs = Arc::new(MediaStore {
             db: p.db,
             held: Mutex::default(),
@@ -581,7 +582,9 @@ impl MediaStore {
             files: p.files,
             inputs: p.inputs,
             channel: p.channel,
-            hub: p.hub,
+            runtime: p.runtime,
+            projector: p.projector,
+            job_updates,
             clock,
             closed: AtomicBool::new(false),
             me: OnceLock::new(),
@@ -589,16 +592,13 @@ impl MediaStore {
             cancel,
         });
         let _ = jobs.me.set(Arc::downgrade(&jobs));
-        vibevalley_runtime::rt::block_on(async {
-            jobs.pick_up_async().await?;
-            let recent = jobs.recent_async().await?;
-            jobs.publish_async().await;
-            jobs.schedule_async().await;
-            for r in recent {
-                jobs.post_back_async(&r).await;
-            }
-            Ok::<_, ApiError>(())
-        })?;
+        jobs.pick_up_async().await?;
+        let recent = jobs.recent_async().await?;
+        jobs.publish_async().await;
+        jobs.schedule_async().await;
+        for r in recent {
+            jobs.post_back_async(&r).await;
+        }
         jobs.sweep_each_minute();
         Ok(jobs)
     }
@@ -607,7 +607,7 @@ impl MediaStore {
     fn sweep_each_minute(self: &Arc<Self>) {
         let cancel = self.cancel.clone();
         let me = Arc::downgrade(self);
-        let fut = async move {
+        self.runtime.spawn(async move {
             loop {
                 tokio::select! {
                     biased;
@@ -617,12 +617,7 @@ impl MediaStore {
                 let Some(jobs) = me.upgrade() else { break };
                 jobs.expire_approvals_async().await;
             }
-        };
-        if let Some(hub) = self.hub.upgrade() {
-            hub.spawn_task(fut);
-        } else {
-            vibevalley_runtime::rt::current_or_global_handle().spawn(fut);
-        }
+        });
     }
 
     fn runs(&self) -> MutexGuard<'_, HashMap<String, Running>> {
@@ -722,14 +717,13 @@ impl MediaStore {
         Ok(())
     }
 
-    /// Tells the state of every job now (`mediaChanged`).
+    /// Broadcasts the current media jobs to subscribers and marks `SliceMask::OPS` dirty.
     async fn publish_async(&self) {
         match self.recent_async().await {
             Ok(jobs) => {
-                if let Some(hub) = self.hub.upgrade() {
-                    let jobs = jobs.iter().map(Record::view).collect();
-                    hub.apply(vec![Fact::MediaChanged(vibevalley_protocol::FactMediaChanged { at: self.now_ms(), jobs })]);
-                }
+                let views: Vec<MediaJob> = jobs.iter().map(Record::view).collect();
+                let _ = self.job_updates.send(views);
+                self.projector.mark_dirty(SliceMask::OPS);
             }
             Err(e) => eprintln!("media: {}", e.message),
         }
@@ -983,7 +977,7 @@ impl MediaStore {
                 };
                 let id = r.id().to_string();
                 let work = me.clone();
-                let fut = async move {
+                self.runtime.spawn(async move {
                     work.work_async(&id, &stop).await;
                     {
                         let mut runs = work.runs();
@@ -992,12 +986,7 @@ impl MediaStore {
                         }
                     }
                     work.schedule_async().await;
-                };
-                if let Some(hub) = self.hub.upgrade() {
-                    hub.spawn_task(fut);
-                } else {
-                    vibevalley_runtime::rt::current_or_global_handle().spawn(fut);
-                }
+                });
             }
         })
     }
@@ -1546,7 +1535,7 @@ impl MediaStore {
         let me = Arc::downgrade(self);
         let cancel = self.cancel.clone();
         let job = id.to_string();
-        let cleanup = async move {
+        self.runtime.spawn(async move {
             tokio::select! {
                 biased;
                 _ = cancel.cancelled() => {}
@@ -1555,12 +1544,7 @@ impl MediaStore {
             if let Some(me) = me.upgrade() {
                 me.streams.lock().remove(&job);
             }
-        };
-        if let Some(hub) = self.hub.upgrade() {
-            hub.spawn_task(cleanup);
-        } else {
-            vibevalley_runtime::rt::current_or_global_handle().spawn(cleanup);
-        }
+        });
     }
 
     /// What came of a stream, kept as a WAV: ready when complete, else unknown with what came.
@@ -1845,129 +1829,47 @@ fn speech_view(r: &Record) -> MediaSpeechJob {
     }
 }
 
-pub fn install(hub: &Hub, jobs: Arc<MediaStore>) {
-    let user_only = |caller: Caller| if caller == Caller::User { Ok(()) } else { Err(refused("userRequired")) };
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaImageCreate, _, _>(move |ctx, r| {
-        let j = j.clone();
-        async move {
-            user_only(ctx.caller)?;
-            j.image_async(r, MediaSource::User {}).await
+impl MediaStore {
+    pub(crate) async fn create_image_for_caller_async(&self, caller: Caller, request: MediaImageRequest) -> Result<MediaImageJob, ApiError> {
+        if caller != Caller::User {
+            return Err(refused("userRequired"));
         }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaSpeechCreate, _, _>(move |ctx, r| {
-        let j = j.clone();
-        async move {
-            user_only(ctx.caller)?;
-            j.speech_async(r, MediaSource::User {}).await
+        self.image_async(request, MediaSource::User {}).await
+    }
+
+    pub(crate) async fn create_speech_for_caller_async(&self, caller: Caller, request: MediaSpeechRequest) -> Result<MediaSpeechJob, ApiError> {
+        if caller != Caller::User {
+            return Err(refused("userRequired"));
         }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaSpeechResume, _, _>(move |_, r| {
-        let j = j.clone();
-        async move { j.resume_async(&r.id).await }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaDialogueCreate, _, _>(move |ctx, r| {
-        let j = j.clone();
-        async move {
-            user_only(ctx.caller)?;
-            j.speakers_async(r, MediaSource::User {}).await
+        self.speech_async(request, MediaSource::User {}).await
+    }
+
+    pub(crate) async fn create_speakers_for_caller_async(&self, caller: Caller, request: MediaSpeakersRequest) -> Result<MediaAudioJob, ApiError> {
+        if caller != Caller::User {
+            return Err(refused("userRequired"));
         }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaVoiceDesignCreate, _, _>(move |ctx, r| {
-        let j = j.clone();
-        async move {
-            user_only(ctx.caller)?;
-            j.voice_design_async(r, MediaSource::User {}).await
+        self.speakers_async(request, MediaSource::User {}).await
+    }
+
+    pub(crate) async fn create_voice_design_for_caller_async(&self, caller: Caller, request: MediaVoiceDesignRequest) -> Result<MediaAudioJob, ApiError> {
+        if caller != Caller::User {
+            return Err(refused("userRequired"));
         }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaCloneCreate, _, _>(move |_, r| {
-        let j = j.clone();
-        async move { j.clone_voice_async(r).await }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaTranscriptionCreate, _, _>(move |_, r| {
-        let j = j.clone();
-        async move { j.transcription_async(r).await }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaAudioResume, _, _>(move |_, r| {
-        let j = j.clone();
-        async move { j.audio_resume_async(&r.id).await }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaAudioPreviewCleanup, _, _>(move |_, r| {
-        let j = j.clone();
-        async move { j.preview_audio_cleanup_async(&r.id).await }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaAudioCleanup, _, _>(move |_, r| {
-        let j = j.clone();
-        async move { j.audio_cleanup_async(&r.id).await }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaUnderstandingCreate, _, _>(move |_, r| {
-        let j = j.clone();
-        async move { j.understanding_async(r).await }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaUnderstandingAuthorize, _, _>(move |_, r| {
-        let j = j.clone();
-        async move { j.authorize_understanding_async(r).await }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaUnderstandingStart, _, _>(move |ctx, r| {
-        let j = j.clone();
-        async move {
-            if ctx.caller != Caller::Orchestrator {
-                return Err(refused("authorizationRequired"));
-            }
-            j.start_understanding_by_id_async(&r.id).await
+        self.voice_design_async(request, MediaSource::User {}).await
+    }
+
+    pub(crate) async fn start_understanding_for_caller_async(&self, caller: Caller, id: &str) -> Result<MediaUnderstandingJob, ApiError> {
+        if caller != Caller::Orchestrator {
+            return Err(refused("authorizationRequired"));
         }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaUnderstandingPreviewCleanup, _, _>(move |_, r| {
-        let j = j.clone();
-        async move { j.preview_understanding_cleanup_async(&r.id).await }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaUnderstandingCleanup, _, _>(move |_, r| {
-        let j = j.clone();
-        async move { j.understanding_cleanup_async(&r.id).await }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaJobList, _, _>(move |_, _| {
-        let j = j.clone();
-        async move { j.list_async().await }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaJobGet, _, _>(move |_, r| {
-        let j = j.clone();
-        async move { j.get_async(&r.id).await }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaJobCancel, _, _>(move |_, r| {
-        let j = j.clone();
-        async move { j.cancel_async(&r.id).await }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaJobDownload, _, _>(move |_, r| {
-        let j = j.clone();
-        async move { j.retry_download_async(&r.id).await }
-    });
-    let j = jobs.clone();
-    hub.on_async::<ops::MediaJobPreviewRelease, _, _>(move |_, r| {
-        let j = j.clone();
-        async move { j.preview_release_async(&r.id).await }
-    });
-    hub.on_async::<ops::MediaJobRelease, _, _>(move |_, r| {
-        let jobs = jobs.clone();
-        async move { jobs.release_async(&r.id).await }
-    });
+        self.start_understanding_by_id_async(id).await
+    }
+}
+
+impl MediaJobEventsPort for MediaStore {
+    fn subscribe_job_updates(&self) -> broadcast::Receiver<Vec<MediaJob>> {
+        self.job_updates.subscribe()
+    }
 }
 
 impl crate::transport::api::media::SpeechStreams for MediaStore {
@@ -1989,8 +1891,8 @@ impl crate::transport::api::media::SpeechStreams for MediaStore {
             gone: Box::new(move || {
                 let Some(me) = me.upgrade() else { return };
                 me.streams.lock().remove(&job);
-                let hub = me.hub.upgrade();
-                let fut = async move {
+                let runtime = me.runtime.clone();
+                runtime.spawn(async move {
                     let _ = me
                         .change_async(&job, &[Phase::Queued, Phase::Generating], |r| {
                             r.phase = Phase::Canceled;
@@ -1998,12 +1900,7 @@ impl crate::transport::api::media::SpeechStreams for MediaStore {
                         })
                         .await;
                     me.stop_run(&job);
-                };
-                if let Some(hub) = hub {
-                    hub.spawn_task(fut);
-                } else {
-                    vibevalley_runtime::rt::current_or_global_handle().spawn(fut);
-                }
+                });
             }),
         })
     }
@@ -2012,15 +1909,18 @@ impl crate::transport::api::media::SpeechStreams for MediaStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::live::LiveOverlay;
     use crate::collab::channel::Chat;
     use crate::infra::setting::SettingConfig;
     use crate::transport::api::media::SpeechStreams;
 
-    #[test]
-    fn regression_speech_claim_gone_does_not_block_tokio_worker_on_drop() {
+    #[tokio::test]
+    async fn regression_speech_claim_gone_does_not_block_tokio_worker_on_drop() {
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
-        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let runtime = Arc::new(Runtime::new());
+        let live = Arc::new(LiveOverlay::new());
+        let projector = Arc::new(SliceProjector::new());
         let setting = Setting::open(SettingConfig {
             home: dir.path().to_path_buf(),
             work_root: dir.path().to_path_buf(),
@@ -2028,12 +1928,17 @@ mod tests {
             deepseek_api_key: String::new(),
         });
         let files = AttachmentStore::open(dir.path(), db.clone());
-        let chat = Chat::open(db.clone(), &hub, files.clone(), None, false).unwrap();
-        let inputs = MediaInputStore::open(dir.path(), db.clone(), files.clone()).unwrap();
+        let chat = Chat::open_async(db.clone(), runtime.clone(), live, projector.clone(), files.clone(), None, false)
+            .await
+            .unwrap();
+        let inputs = MediaInputStore::open_async(dir.path(), db.clone(), runtime.clone(), files.clone())
+            .await
+            .unwrap();
         let (vendor, download) = crate::app::fakes::moss::network();
-        let jobs = MediaStore::open(Parts {
+        let jobs = MediaStore::open_async(Parts {
             db: db.clone(),
-            hub: Arc::downgrade(&hub),
+            runtime: runtime.clone(),
+            projector,
             setting,
             files,
             inputs: inputs.clone(),
@@ -2041,6 +1946,7 @@ mod tests {
             vendor,
             download,
         })
+        .await
         .unwrap();
 
         let job_id = "speech-drop-1";
@@ -2064,9 +1970,7 @@ mod tests {
             1_700_000_000_000,
         );
         rec.phase = Phase::Generating;
-        vibevalley_runtime::rt::block_on(async {
-            MediaStore::save_db(db.write_conn(), &mut rec, 1_700_000_000_000).await.unwrap();
-        });
+        MediaStore::save_db(db.write_conn(), &mut rec, 1_700_000_000_000).await.unwrap();
         let (tx, rx) = flume::bounded(16);
         jobs.streams.lock().insert(job_id.into(), Stream { tx, rx, claimed: false });
 
@@ -2076,31 +1980,28 @@ mod tests {
         // if `gone` still called `rt::block_on(change_async)`, this would deadlock before returning.
         let jobs_async = jobs.clone();
         let db_async = db.clone();
-        let hub_async = hub.clone();
-        vibevalley_runtime::rt::block_on(async move {
-            vibevalley_runtime::rt::spawn(async move {
-                use sea_orm::TransactionTrait;
-                let held_write = db_async.write_conn().begin().await.unwrap();
-                (claim.gone)();
-                assert!(!jobs_async.streams.lock().contains_key(job_id));
-                drop(held_write);
+        tokio::spawn(async move {
+            use sea_orm::TransactionTrait;
+            let held_write = db_async.write_conn().begin().await.unwrap();
+            (claim.gone)();
+            assert!(!jobs_async.streams.lock().contains_key(job_id));
+            drop(held_write);
 
-                let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
-                loop {
-                    if jobs_async.found_async(job_id).await.unwrap().phase == Phase::Canceled {
-                        break;
-                    }
-                    assert!(tokio::time::Instant::now() < deadline, "SpeechClaim::gone must cancel the job asynchronously");
-                    tokio::time::sleep(Duration::from_millis(10)).await;
+            let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
+            loop {
+                if jobs_async.found_async(job_id).await.unwrap().phase == Phase::Canceled {
+                    break;
                 }
-                jobs_async.close();
-                hub_async.close_async().await;
-            })
-            .await
-            .unwrap();
-        });
+                assert!(tokio::time::Instant::now() < deadline, "SpeechClaim::gone must cancel the job asynchronously");
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
 
-        inputs.close();
-        db.close();
+        jobs.close();
+        inputs.close_async().await;
+        runtime.shutdown(Duration::from_secs(2)).await;
+        db.close_async().await;
     }
 }

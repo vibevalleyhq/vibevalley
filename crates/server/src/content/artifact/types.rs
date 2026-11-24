@@ -58,10 +58,10 @@ fn list_references(ty: ArtifactType) -> Vec<String> {
 fn read_asset(path: &str) -> Result<String, ApiError> {
     let file = TYPES_DIR
         .get_file(path)
-        .ok_or_else(|| crate::app::hub::refusal::internal(format!("missing embedded artifact guide: {path}")))?;
+        .ok_or_else(|| crate::app::refusal::internal(format!("missing embedded artifact guide: {path}")))?;
     let raw = file
         .contents_utf8()
-        .ok_or_else(|| crate::app::hub::refusal::internal(format!("non-utf8 artifact guide: {path}")))?;
+        .ok_or_else(|| crate::app::refusal::internal(format!("non-utf8 artifact guide: {path}")))?;
     Ok(strip_frontmatter(raw))
 }
 

@@ -14,16 +14,15 @@ use std::time::Duration;
 use futures_util::{Stream, StreamExt, TryStreamExt};
 use parking_lot::Mutex;
 use serde::Serialize;
-use serde::de::DeserializeOwned;
 use serde_json::Value;
-use tokio::sync::{broadcast, watch};
+use tokio::sync::broadcast;
 use tokio_util::codec::{FramedRead, LinesCodec, LinesCodecError};
 use tokio_util::io::StreamReader;
 use tokio_util::sync::{CancellationToken, DropGuard};
-use vibevalley_protocol::{BizCode, BoardSlice, CollabSlice, Envelope, FarmFrame, InboxSlice, LiveEvent, OpsSlice, SessionsSlice, SliceKind};
-use vibevalley_server::slice_feed::{Sequenced, SliceFeed, SliceSnapshot, SliceSubscription};
+use vibevalley_protocol::{BizCode, Envelope, LiveEvent, SliceKind};
 use vibevalley_server::transport::api::{BoxFuture, CallerContext, Server, refusal};
 use vibevalley_server::transport::bridge::fake::empty_bundle;
+use vibevalley_server::{SliceFeed, SliceSubscription};
 
 use crate::hosted::connection::{Secret, is_loopback_url, normalize_url};
 
@@ -260,37 +259,23 @@ fn backoff_delay(attempt: usize) -> Duration {
     Duration::from_millis(BACKOFF_MS[idx])
 }
 
-fn slice_topic(kind: SliceKind) -> &'static str {
-    match kind {
-        SliceKind::Board => "slice:board",
-        SliceKind::Sessions => "slice:sessions",
-        SliceKind::Collab => "slice:collab",
-        SliceKind::Inbox => "slice:inbox",
-        SliceKind::Ops => "slice:ops",
-        SliceKind::Farm => "slice:farm",
-    }
-}
-
-struct RemoteSlice<T> {
+struct RemoteSlice {
     kind: SliceKind,
-    feed: Arc<SliceFeed<T>>,
+    feed: Arc<SliceFeed>,
     pump: Arc<Mutex<Option<CancellationToken>>>,
 }
 
-impl<T> RemoteSlice<T>
-where
-    T: Sequenced + Serialize + DeserializeOwned + Send + Sync + 'static,
-{
-    fn new(kind: SliceKind, initial: T) -> Self {
+impl RemoteSlice {
+    fn new<T: Serialize>(kind: SliceKind, initial_seq: i64, initial: &T) -> Self {
         Self {
             kind,
-            feed: Arc::new(SliceFeed::new(slice_topic(kind), initial)),
+            feed: Arc::new(SliceFeed::from_value(kind, initial_seq, initial)),
             pump: Arc::new(Mutex::new(None)),
         }
     }
 
-    fn subscribe(&self, server: &RemoteServer) -> watch::Receiver<Arc<SliceSnapshot<T>>> {
-        let rx = self.feed.subscribe();
+    fn subscribe(&self, server: &RemoteServer) -> SliceSubscription {
+        let sub = self.feed.subscribe();
         let mut guard = self.pump.lock();
         if guard.as_ref().is_none_or(CancellationToken::is_cancelled) {
             let cancel = server.shutdown.child_token();
@@ -321,11 +306,10 @@ where
                                 if !feed.has_watchers() {
                                     return SseStep::Stop;
                                 }
-                                match serde_json::from_str::<T>(&msg.data) {
-                                    Ok(slice) => {
-                                        let seq = parse_sse_seq(&msg, slice.seq());
-                                        feed.replace(slice);
-                                        feed.publish_forced();
+                                match serde_json::from_str::<Value>(&msg.data) {
+                                    Ok(val) => {
+                                        let seq = parse_sse_seq(&msg, val.get("seq").and_then(Value::as_i64).unwrap_or(0));
+                                        feed.publish(seq, msg.data);
                                         if feed.has_watchers() { SseStep::ContinueWithSeq(seq) } else { SseStep::Stop }
                                     }
                                     Err(err) => {
@@ -351,29 +335,29 @@ where
                 }
             });
         }
-        rx
+        sub
     }
 }
 
 struct RemoteSlices {
-    board: RemoteSlice<BoardSlice>,
-    sessions: RemoteSlice<SessionsSlice>,
-    collab: RemoteSlice<CollabSlice>,
-    inbox: RemoteSlice<InboxSlice>,
-    ops: RemoteSlice<OpsSlice>,
-    farm: RemoteSlice<FarmFrame>,
+    board: RemoteSlice,
+    sessions: RemoteSlice,
+    collab: RemoteSlice,
+    inbox: RemoteSlice,
+    ops: RemoteSlice,
+    farm: RemoteSlice,
 }
 
 impl RemoteSlices {
     fn new() -> Self {
         let bundle = empty_bundle(0);
         Self {
-            board: RemoteSlice::new(SliceKind::Board, bundle.board),
-            sessions: RemoteSlice::new(SliceKind::Sessions, bundle.sessions),
-            collab: RemoteSlice::new(SliceKind::Collab, bundle.collab),
-            inbox: RemoteSlice::new(SliceKind::Inbox, bundle.inbox),
-            ops: RemoteSlice::new(SliceKind::Ops, bundle.ops),
-            farm: RemoteSlice::new(SliceKind::Farm, bundle.farm),
+            board: RemoteSlice::new(SliceKind::Board, bundle.board.seq, &bundle.board),
+            sessions: RemoteSlice::new(SliceKind::Sessions, bundle.sessions.seq, &bundle.sessions),
+            collab: RemoteSlice::new(SliceKind::Collab, bundle.collab.seq, &bundle.collab),
+            inbox: RemoteSlice::new(SliceKind::Inbox, bundle.inbox.seq, &bundle.inbox),
+            ops: RemoteSlice::new(SliceKind::Ops, bundle.ops.seq, &bundle.ops),
+            farm: RemoteSlice::new(SliceKind::Farm, bundle.farm.seq, &bundle.farm),
         }
     }
 }
@@ -600,15 +584,12 @@ impl Server for RemoteServer {
 
     fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
         Some(match slice {
-            SliceKind::Board => SliceSubscription::Board(self.slices.board.subscribe(self)),
-            SliceKind::Sessions => SliceSubscription::Sessions(self.slices.sessions.subscribe(self)),
-            SliceKind::Collab => SliceSubscription::Collab(self.slices.collab.subscribe(self)),
-            SliceKind::Inbox => SliceSubscription::Inbox(self.slices.inbox.subscribe(self)),
-            SliceKind::Ops => SliceSubscription::Ops(self.slices.ops.subscribe(self)),
-            SliceKind::Farm => SliceSubscription::Farm {
-                rx: self.slices.farm.subscribe(self),
-                strip_initial_effects: false,
-            },
+            SliceKind::Board => self.slices.board.subscribe(self),
+            SliceKind::Sessions => self.slices.sessions.subscribe(self),
+            SliceKind::Collab => self.slices.collab.subscribe(self),
+            SliceKind::Inbox => self.slices.inbox.subscribe(self),
+            SliceKind::Ops => self.slices.ops.subscribe(self),
+            SliceKind::Farm => self.slices.farm.subscribe(self),
         })
     }
 

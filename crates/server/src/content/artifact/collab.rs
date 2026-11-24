@@ -33,7 +33,7 @@ use super::db::{self, ArtifactRow, StoredSuggestion};
 use super::entries::EntryChange;
 use super::{ArtifactStore, Maker, artifact_type_of, new_id, q, refused};
 use crate::db::begin_write_tx;
-use crate::{Hub, Sink, now};
+use crate::{Sink, now};
 
 const DEFAULT_PRESENCE_COLORS: [&str; 6] = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
 const PRESENCE_EVICT_INTERVAL: Duration = Duration::from_secs(2);
@@ -469,15 +469,15 @@ impl ArtifactStore {
 
     /// Streams initial `Snapshot` of live peers followed by incremental `Upsert`
     /// and `Remove` events (including TTL evictions).
-    pub async fn follow_presence_async(self: &Arc<Self>, hub: &Hub, id: &str, sink: Sink) -> Result<(), ApiError> {
+    pub async fn follow_presence_async(self: &Arc<Self>, id: &str, sink: Sink) -> Result<(), ApiError> {
         self.found(self.db.read_conn(), id).await?;
         let mut rx = self.presence_changes.subscribe();
         let initial = self.presence_snapshot(id);
         let weak = Arc::downgrade(self);
         let artifact_id = id.to_string();
-        let hub_cancel = hub.child_token();
+        let runtime_cancel = self.runtime.child_token();
         let closed = self.cancel.clone();
-        hub.spawn_task(async move {
+        self.runtime.spawn(async move {
             if !sink.send(&ArtifactPresenceEvent::Snapshot { peers: initial }) {
                 return;
             }
@@ -491,7 +491,7 @@ impl ArtifactStore {
                 }
                 tokio::select! {
                     biased;
-                    _ = hub_cancel.cancelled() => return,
+                    _ = runtime_cancel.cancelled() => return,
                     _ = closed.cancelled() => return,
                     _ = sink.stop.recv_async() => return,
                     _ = evict.tick() => {
