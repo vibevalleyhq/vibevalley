@@ -1,10 +1,13 @@
 use std::cell::RefCell;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use nsh_core::ViewKind;
 use nsh_core::element::Root;
 use nsh_core::prelude::*;
-use vibevalley_rich::{VvGenUiActionEvent, chart_cache_stats, clear_chart_cache, render_chart, vv_chart, vv_gen_ui, vv_markdown};
+use vibevalley_rich::{
+    ASYNC_CHART_BYTE_THRESHOLD, VvGenUiActionEvent, cached_render_chart, chart_cache_stats, clear_chart_cache, render_chart, vv_chart, vv_gen_ui, vv_markdown,
+};
 
 use crate::support::{TestHarness, assert_inline_svg_image};
 
@@ -257,4 +260,81 @@ fn native_vv_markdown_forwards_genui_actions() {
         assert_eq!(actions[0].action.as_str(), "state_change");
         assert_eq!(actions[0].payload.as_str(), "enabled=true");
     });
+}
+
+#[component]
+fn StreamingChartAndGenUiRoot() -> impl IntoElement {
+    let chart_spec = signal(SharedString::from("{\"type\":\"bar\",\"series\":"));
+    let chart_streaming = signal(true);
+    let genui_spec = signal(SharedString::from(concat!(
+        "{\"op\":\"state_init\",\"state\":{\"count\":1}}\n",
+        "{\"op\":\"set_node\",\"root\":true,\"node\":{\"id\":\"root\",\"kind\":\"text\",\"value\":\"Count: ${count}\"}}\n",
+        "{\"op\":\"set_node\",\"node\":{\"id\":\"part",
+    )));
+    let genui_streaming = signal(true);
+
+    let c_spec = chart_spec;
+    let c_stream = chart_streaming;
+    let g_spec = genui_spec;
+    let g_stream = genui_streaming;
+
+    view()
+        .child(vv_chart().spec(move || chart_spec.get()).streaming(move || chart_streaming.get()))
+        .child(vv_gen_ui().spec(move || genui_spec.get()).streaming(move || genui_streaming.get()))
+        .child(view().test_id("append-partial").on_press(move |_: &nsh_core::prelude::PressEvent| {
+            g_spec.set(SharedString::from(concat!(
+                "{\"op\":\"state_init\",\"state\":{\"count\":1}}\n",
+                "{\"op\":\"set_node\",\"root\":true,\"node\":{\"id\":\"root\",\"kind\":\"text\",\"value\":\"Count: ${count}\"}}\n",
+                "{\"op\":\"set_node\",\"node\":{\"id\":\"partial\",\"kind\":\"text\",\"value\":\"More",
+            )));
+        }))
+        .child(view().test_id("finish-all").on_press(move |_: &nsh_core::prelude::PressEvent| {
+            c_spec.set(SharedString::from(
+                r#"{"type":"bar","categories":["A","B"],"series":[{"name":"S","data":[1,2]}]}"#,
+            ));
+            c_stream.set(false);
+            g_spec.set(SharedString::from(concat!(
+                "{\"op\":\"state_init\",\"state\":{\"count\":1}}\n",
+                "{\"op\":\"set_node\",\"root\":true,\"node\":{\"id\":\"root\",\"kind\":\"stack\",\"direction\":\"vertical\",\"gap\":4,\"children\":[\"h\",\"partial\"]}}\n",
+                "{\"op\":\"set_node\",\"node\":{\"id\":\"h\",\"kind\":\"text\",\"value\":\"Count: ${count}\"}}\n",
+                "{\"op\":\"set_node\",\"node\":{\"id\":\"partial\",\"kind\":\"text\",\"value\":\"Complete\"}}\n",
+                "{\"op\":\"done\"}",
+            )));
+            g_stream.set(false);
+        }))
+}
+
+#[test]
+fn vv_chart_streaming_and_large_offload_plus_genui_incremental_streaming_work_cleanly() {
+    let _guard = CHART_GENUI_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    clear_chart_cache();
+
+    let mut harness = TestHarness::mount(Root::of::<StreamingChartAndGenUiRoot>());
+    assert!(harness.find_test_id("chart-loading").is_some());
+    assert!(harness.find_test_id("chart-error").is_none());
+    assert!(harness.contains_text("Count: 1"));
+
+    let partial_btn = harness.find_test_id("append-partial").expect("append-partial");
+    assert!(harness.press(partial_btn));
+    assert!(harness.contains_text("Count: 1"));
+
+    let finish_btn = harness.find_test_id("finish-all").expect("finish-all");
+    assert!(harness.press(finish_btn));
+    assert!(harness.find_test_id("chart-image").is_some());
+    assert!(harness.contains_text("Complete"));
+
+    clear_chart_cache();
+    let cats: Vec<String> = (0..300).map(|i| format!("\"Category-{i:03}\"")).collect();
+    let vals: Vec<String> = (0..300).map(|i| (i % 40 + 1).to_string()).collect();
+    let large_spec = format!(
+        r#"{{"type":"bar","title":"Large","categories":[{}],"series":[{{"name":"S","data":[{}]}}]}}"#,
+        cats.join(","),
+        vals.join(",")
+    );
+    assert!(large_spec.len() >= ASYNC_CHART_BYTE_THRESHOLD);
+    assert!(cached_render_chart(&large_spec, false).is_none());
+
+    let mut large_harness = TestHarness::mount(Root::new::<NativeChartRoot>(move || NativeChartRootProps { spec: large_spec.clone() }));
+    assert!(large_harness.find_test_id("chart-loading").is_some());
+    assert!(large_harness.wait_until(Duration::from_secs(5), |h| h.find_test_id("chart-image").is_some()));
 }

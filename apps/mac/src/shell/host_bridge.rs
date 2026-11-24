@@ -110,7 +110,7 @@ impl Shell {
                 if let Some(pv) = active.and_then(|id| self.workspace.projects.get_mut(&id))
                     && pv.tree.expanded.remove(&path)
                 {
-                    self.push_sidebar(cx);
+                    self.push_sidebar_topics(super::projects::SidebarTopics::FILES, cx);
                 }
             }
             Action::OpenFile { path } => self.open_file(PathBuf::from(path), None, window, cx),
@@ -370,22 +370,44 @@ impl Shell {
             }
             HostOp::OpenFile(req) => {
                 if let Some(worktree) = req.worktree {
-                    let Some((root, file)) = crate::host::worktree_file(Path::new(&worktree), Path::new(&req.path)) else {
-                        return reply.send(refusal(
-                            BizCode::Refused,
-                            vibevalley_i18n::t("desktop.files.missingInWorktree", &[("path", req.path.into())]),
-                        ));
-                    };
-                    self.with_project_at(root, window, cx, move |s, id, window, cx| {
-                        reply.send(match id {
-                            Ok(id) => {
-                                s.activate_project(id, window, cx);
-                                s.open_file(file, None, window, cx);
-                                Envelope::void()
+                    let window_handle = window.window_handle();
+                    let rel = req.path;
+                    cx.spawn(async move |this, cx| {
+                        let resolved = cx
+                            .background_spawn(async move { crate::host::worktree_file(Path::new(&worktree), Path::new(&rel)).ok_or(rel) })
+                            .await;
+                        match resolved {
+                            Ok((root, file)) => {
+                                let updated = cx.update_window(window_handle, |_, window, cx| {
+                                    if this
+                                        .update(cx, |shell, cx| {
+                                            shell.with_project_at(root, window, cx, move |s, id, window, cx| {
+                                                reply.send(match id {
+                                                    Ok(id) => {
+                                                        s.activate_project(id, window, cx);
+                                                        s.open_file(file, None, window, cx);
+                                                        Envelope::void()
+                                                    }
+                                                    Err(why) => refusal(BizCode::Refused, why),
+                                                });
+                                            });
+                                        })
+                                        .is_err()
+                                    {
+                                        // Window/shell dropped before update ran; refusal already unreachable.
+                                    }
+                                });
+                                let _ = updated;
                             }
-                            Err(why) => refusal(BizCode::Refused, why),
-                        });
-                    });
+                            Err(missing) => {
+                                reply.send(refusal(
+                                    BizCode::Refused,
+                                    vibevalley_i18n::t("desktop.files.missingInWorktree", &[("path", missing.into())]),
+                                ));
+                            }
+                        }
+                    })
+                    .detach();
                     return;
                 }
                 // Opens a file in the system's default app (a PDF, a picture).

@@ -8,7 +8,7 @@
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use nsh_base::text_view::{
     CodeBlock, CustomNode, Document, Image as TextViewImage, ImageLength, MarkdownExtension, MarkdownOptions, Parser, TextViewClasses, TextViewLinkPressEvent,
@@ -19,6 +19,7 @@ use nsh_core::keymap::Modifiers;
 use nsh_core::prelude::*;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
+use crate::cache::{LruCache, hash_str};
 use crate::canvas::vv_canvas;
 use crate::chart::vv_chart;
 use crate::code_block::{VvCodeCopyEvent, vv_code_block};
@@ -191,6 +192,7 @@ pub enum ResolvedMarkdownImage {
 }
 
 const IMAGE_HEADER_PROBE_BYTES: usize = 65_536;
+const IMAGE_META_CACHE_CAPACITY: usize = 128;
 const SMALL_INLINE_MAX_WIDTH: f32 = 160.0;
 const SMALL_INLINE_MAX_HEIGHT: f32 = 36.0;
 
@@ -754,11 +756,53 @@ fn render_resolved_image(img: &TextViewImage, uri: String, initial_natural: Opti
         .into_element()
 }
 
+struct ImageMetaCacheKey {
+    raw_src: String,
+    base_dir: Option<String>,
+}
+
+type ImageMetaEntry = (ResolvedMarkdownImage, Option<(f32, f32)>);
+
+fn image_meta_cache() -> &'static Mutex<LruCache<ImageMetaCacheKey, ImageMetaEntry>> {
+    static CACHE: OnceLock<Mutex<LruCache<ImageMetaCacheKey, ImageMetaEntry>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(LruCache::new(IMAGE_META_CACHE_CAPACITY)))
+}
+
+fn resolve_markdown_image_cached(raw_src: &str, base_dir: Option<&str>) -> (ResolvedMarkdownImage, Option<(f32, f32)>) {
+    let hash = hash_str(raw_src) ^ base_dir.map_or(0, |d| hash_str(d).rotate_left(13));
+    if let Some(hit) = image_meta_cache()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .get_by(hash, |k| k.raw_src == raw_src && k.base_dir.as_deref() == base_dir)
+    {
+        return hit;
+    }
+
+    let resolved = resolve_markdown_image_src(raw_src, base_dir);
+    let dims = match &resolved {
+        ResolvedMarkdownImage::LocalFile { path, .. } => read_local_image_dimensions(path),
+        ResolvedMarkdownImage::Remote { .. } | ResolvedMarkdownImage::Missing { .. } => None,
+    };
+    let entry = (resolved, dims);
+    if !matches!(entry.0, ResolvedMarkdownImage::Missing { .. }) {
+        let key = ImageMetaCacheKey {
+            raw_src: raw_src.to_owned(),
+            base_dir: base_dir.map(str::to_owned),
+        };
+        image_meta_cache()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .insert_by(hash, key, entry.clone(), |k| k.raw_src == raw_src && k.base_dir.as_deref() == base_dir);
+    }
+    entry
+}
+
 fn render_markdown_image(img: &TextViewImage, base_dir: Option<&str>, size: VvMarkdownSize) -> AnyElement {
-    match resolve_markdown_image_src(&img.src, base_dir) {
+    let (resolved, dims) = resolve_markdown_image_cached(&img.src, base_dir);
+    match resolved {
         ResolvedMarkdownImage::Missing { raw } => render_missing_image(&img.alt, &raw),
-        ResolvedMarkdownImage::LocalFile { path, uri } => {
-            let initial_natural = read_local_image_dimensions(&path).map(|(w, h)| Size::new(px(w), px(h)));
+        ResolvedMarkdownImage::LocalFile { uri, .. } => {
+            let initial_natural = dims.map(|(w, h)| Size::new(px(w), px(h)));
             render_resolved_image(img, uri, initial_natural, size)
         }
         ResolvedMarkdownImage::Remote { uri } => render_resolved_image(img, uri, None, size),
@@ -816,8 +860,8 @@ fn render_custom_node(node: &CustomNode, streaming: bool, cx: Scope<VvMarkdownEv
             with_optional_prefix(prefix, span)
         }
         CustomNodeKind::Mermaid => vv_diagram().source(node.text.clone()).into_element(),
-        CustomNodeKind::Canvas => vv_canvas().data(node.text.clone()).into_element(),
-        CustomNodeKind::Chart => vv_chart().spec(node.text.clone()).into_element(),
+        CustomNodeKind::Canvas => vv_canvas().data(node.text.clone()).streaming(streaming).into_element(),
+        CustomNodeKind::Chart => vv_chart().spec(node.text.clone()).streaming(streaming).into_element(),
         CustomNodeKind::GenUi => vv_gen_ui()
             .spec(node.text.clone())
             .streaming(streaming)
@@ -972,8 +1016,12 @@ impl Component for NativeMarkdownSurface {
         {
             spawn(async move {
                 while let Some(doc) = rx.recv().await {
-                    text_sig.set(SharedString::from(doc.text));
-                    base_dir_sig.set(doc.base_dir.map(SharedString::from));
+                    if text_sig.with_untracked(|cur| cur.as_str() != doc.text) {
+                        text_sig.set(SharedString::from(doc.text));
+                    }
+                    if base_dir_sig.with_untracked(|cur| cur.as_deref() != doc.base_dir.as_deref()) {
+                        base_dir_sig.set(doc.base_dir.map(SharedString::from));
+                    }
                 }
             });
         }

@@ -5,8 +5,8 @@ use nsh_core::ViewKind;
 use nsh_core::element::Root;
 use nsh_core::prelude::*;
 use vibevalley_rich::{
-    cached_render_diagram_with_max_width, canvas_cache_stats, clear_canvas_cache, clear_diagram_cache, diagram_cache_stats, render_canvas, render_diagram,
-    render_diagram_with_max_width, vv_canvas, vv_diagram,
+    ASYNC_CANVAS_BYTE_THRESHOLD, cached_render_diagram_with_max_width, canvas_cache_stats, clear_canvas_cache, clear_diagram_cache, diagram_cache_stats,
+    render_canvas, render_diagram, render_diagram_with_max_width, vv_canvas, vv_diagram,
 };
 
 use crate::support::{TestHarness, assert_inline_svg_image};
@@ -177,6 +177,7 @@ fn vv_diagram_mounts_as_image_svg_markup_never_element_svg_and_falls_back_on_err
 
 #[test]
 fn canvas_rendering_produces_resolved_light_and_dark_svgs_with_lru_cache() {
+    let _guard = DIAGRAM_CACHE_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     clear_canvas_cache();
 
     let light = render_canvas(SAMPLE_CANVAS, false, true, 32.0).expect("light canvas render");
@@ -213,6 +214,7 @@ fn CanvasHarness(props: CanvasHarnessProps) -> impl IntoElement {
 
 #[test]
 fn vv_canvas_mounts_as_image_svg_markup_and_falls_back_on_invalid_json() {
+    let _guard = DIAGRAM_CACHE_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     let mut harness = TestHarness::mount(Root::new::<CanvasHarness>(|| CanvasHarnessProps {
         data: SAMPLE_CANVAS.to_owned(),
     }));
@@ -236,4 +238,41 @@ fn vv_canvas_mounts_as_image_svg_markup_and_falls_back_on_invalid_json() {
     assert!(bad.find_test_id("canvas-image").is_none());
     assert!(bad.find_test_id("code-block").is_some());
     assert!(bad.find_test_id("canvas-error").is_some());
+}
+
+#[component]
+fn StreamingCanvasHarness() -> impl IntoElement {
+    let data = signal(SharedString::from("{\"nodes\":[{\"id\":\"n1\""));
+    let streaming = signal(true);
+    let data_for_btn = data;
+    let stream_for_btn = streaming;
+    view()
+        .child(vv_canvas().data(move || data.get()).streaming(move || streaming.get()))
+        .child(view().test_id("finish-canvas-stream").on_press(move |_: &nsh_core::prelude::PressEvent| {
+            data_for_btn.set(SharedString::from(SAMPLE_CANVAS));
+            stream_for_btn.set(false);
+        }))
+}
+
+#[test]
+fn vv_canvas_streaming_shows_loading_without_caching_errors_and_offloads_large_payloads() {
+    let _guard = DIAGRAM_CACHE_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    clear_canvas_cache();
+    let mut streaming_harness = TestHarness::mount(Root::of::<StreamingCanvasHarness>());
+    assert!(streaming_harness.find_test_id("canvas-loading").is_some());
+    assert!(streaming_harness.find_test_id("canvas-error").is_none());
+    assert!(streaming_harness.find_test_id("code-block").is_none());
+    assert_eq!(canvas_cache_stats().entries, 0, "transient streaming errors must not pollute canvas cache");
+
+    let finish_id = streaming_harness.find_test_id("finish-canvas-stream").expect("finish button");
+    assert!(streaming_harness.press(finish_id));
+    assert!(streaming_harness.find_test_id("canvas-image").is_some());
+
+    clear_canvas_cache();
+    let padding_text = "x".repeat(ASYNC_CANVAS_BYTE_THRESHOLD + 256);
+    let large_canvas = format!(r#"{{"nodes":[{{"id":"n1","type":"text","x":0,"y":0,"width":220,"height":120,"text":"{padding_text}"}}],"edges":[]}}"#);
+    assert!(large_canvas.len() >= ASYNC_CANVAS_BYTE_THRESHOLD);
+    let mut large_harness = TestHarness::mount(Root::new::<CanvasHarness>(move || CanvasHarnessProps { data: large_canvas.clone() }));
+    assert!(large_harness.find_test_id("canvas-loading").is_some());
+    assert!(large_harness.wait_until(Duration::from_secs(5), |h| h.find_test_id("canvas-image").is_some()));
 }

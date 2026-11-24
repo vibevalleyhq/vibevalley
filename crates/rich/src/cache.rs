@@ -1,8 +1,8 @@
 //! Bounded O(1) LRU cache used by diagram, canvas, and code-block renderers.
 
 use std::collections::HashMap;
-use std::hash::Hash;
-use std::sync::Arc;
+use std::collections::hash_map::RandomState;
+use std::hash::{BuildHasher as _, Hash};
 
 /// Runtime hit/miss/eviction counters for cache diagnostics and tests.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -15,7 +15,8 @@ pub struct CacheStats {
 }
 
 struct Node<K, V> {
-    key: Arc<K>,
+    hash: u64,
+    key: K,
     value: V,
     prev: Option<usize>,
     next: Option<usize>,
@@ -23,57 +24,74 @@ struct Node<K, V> {
 
 /// Bounded O(1) LRU cache with exact-key verification (zero hash-collision risk).
 ///
-/// Uses an intrusive index-linked list backed by a dense `Vec` plus a free list so
-/// `get`, `insert`, recency touch, and LRU eviction all run in O(1) without extra
-/// crate dependencies or requiring `K: Clone`.
+/// Uses an intrusive index-linked list backed by a dense `Vec` plus a free list and
+/// hash buckets so `get_by` looks up entries from borrowed slices without allocating
+/// owned keys on cache hits.
 pub(crate) struct LruCache<K, V> {
     capacity: usize,
-    index: HashMap<Arc<K>, usize>,
+    hasher: RandomState,
+    buckets: HashMap<u64, Vec<usize>>,
     nodes: Vec<Option<Node<K, V>>>,
     free: Vec<usize>,
     head: Option<usize>,
     tail: Option<usize>,
+    entries: usize,
     hits: u64,
     misses: u64,
     evictions: u64,
 }
 
-impl<K: Eq + Hash, V: Clone> LruCache<K, V> {
+impl<K, V: Clone> LruCache<K, V> {
     pub(crate) fn new(capacity: usize) -> Self {
         let cap = capacity.max(1);
         Self {
             capacity: cap,
-            index: HashMap::with_capacity(cap),
+            hasher: RandomState::new(),
+            buckets: HashMap::with_capacity(cap),
             nodes: Vec::with_capacity(cap),
             free: Vec::new(),
             head: None,
             tail: None,
+            entries: 0,
             hits: 0,
             misses: 0,
             evictions: 0,
         }
     }
 
-    pub(crate) fn get(&mut self, key: &K) -> Option<V> {
-        if let Some(&slot) = self.index.get(key) {
+    pub(crate) fn get_by(&mut self, hash: u64, mut matches: impl FnMut(&K) -> bool) -> Option<V> {
+        let found = self.buckets.get(&hash).and_then(|slots| {
+            slots
+                .iter()
+                .copied()
+                .find(|&slot| self.nodes[slot].as_ref().is_some_and(|node| matches(&node.key)))
+        });
+        if let Some(slot) = found {
             self.hits += 1;
+            let value = self.nodes[slot].as_ref().map(|node| node.value.clone());
             self.move_to_front(slot);
-            self.nodes[slot].as_ref().map(|node| node.value.clone())
+            value
         } else {
             self.misses += 1;
             None
         }
     }
 
-    pub(crate) fn insert(&mut self, key: K, value: V) {
-        if let Some(&slot) = self.index.get(&key) {
+    pub(crate) fn insert_by(&mut self, hash: u64, key: K, value: V, mut matches: impl FnMut(&K) -> bool) {
+        let existing = self.buckets.get(&hash).and_then(|slots| {
+            slots
+                .iter()
+                .copied()
+                .find(|&slot| self.nodes[slot].as_ref().is_some_and(|node| matches(&node.key)))
+        });
+        if let Some(slot) = existing {
             if let Some(node) = self.nodes[slot].as_mut() {
                 node.value = value;
             }
             self.move_to_front(slot);
             return;
         }
-        if self.index.len() >= self.capacity {
+        if self.entries >= self.capacity {
             self.evict_lru();
         }
         let slot = match self.free.pop() {
@@ -84,23 +102,25 @@ impl<K: Eq + Hash, V: Clone> LruCache<K, V> {
                 idx
             }
         };
-        let key = Arc::new(key);
         self.nodes[slot] = Some(Node {
-            key: Arc::clone(&key),
+            hash,
+            key,
             value,
             prev: None,
             next: None,
         });
-        self.index.insert(key, slot);
+        self.buckets.entry(hash).or_default().push(slot);
+        self.entries += 1;
         self.push_front(slot);
     }
 
     pub(crate) fn clear(&mut self) {
-        self.index.clear();
+        self.buckets.clear();
         self.nodes.clear();
         self.free.clear();
         self.head = None;
         self.tail = None;
+        self.entries = 0;
         self.hits = 0;
         self.misses = 0;
         self.evictions = 0;
@@ -108,7 +128,7 @@ impl<K: Eq + Hash, V: Clone> LruCache<K, V> {
 
     pub(crate) fn stats(&self) -> CacheStats {
         CacheStats {
-            entries: self.index.len(),
+            entries: self.entries,
             capacity: self.capacity,
             hits: self.hits,
             misses: self.misses,
@@ -174,10 +194,41 @@ impl<K: Eq + Hash, V: Clone> LruCache<K, V> {
         };
         self.unlink(slot);
         if let Some(node) = self.nodes[slot].take() {
-            self.index.remove(&node.key);
+            if let Some(slots) = self.buckets.get_mut(&node.hash) {
+                if let Some(pos) = slots.iter().position(|&s| s == slot) {
+                    slots.swap_remove(pos);
+                }
+                if slots.is_empty() {
+                    self.buckets.remove(&node.hash);
+                }
+            }
             self.free.push(slot);
+            self.entries = self.entries.saturating_sub(1);
             self.evictions += 1;
         }
+    }
+}
+
+impl<K: Eq + Hash, V: Clone> LruCache<K, V> {
+    pub(crate) fn get(&mut self, key: &K) -> Option<V> {
+        let hash = self.hasher.hash_one(key);
+        self.get_by(hash, |candidate| candidate == key)
+    }
+
+    pub(crate) fn insert(&mut self, key: K, value: V) {
+        let hash = self.hasher.hash_one(&key);
+        if let Some(slot) = self
+            .buckets
+            .get(&hash)
+            .and_then(|slots| slots.iter().copied().find(|&slot| self.nodes[slot].as_ref().is_some_and(|n| n.key == key)))
+        {
+            if let Some(node) = self.nodes[slot].as_mut() {
+                node.value = value;
+            }
+            self.move_to_front(slot);
+            return;
+        }
+        self.insert_by(hash, key, value, |_| false);
     }
 }
 
@@ -287,5 +338,24 @@ mod tests {
         }
         assert_eq!(cache.stats().entries, CAP);
         assert_eq!(cache.stats().evictions, (CAP / 2) as u64);
+    }
+
+    #[test]
+    fn lru_cache_get_by_handles_borrowed_lookup_and_hash_collisions() {
+        let mut cache: LruCache<String, usize> = LruCache::new(2);
+        let same_hash = 0xdead_beef_u64;
+        cache.insert_by(same_hash, "alpha".to_owned(), 1, |k| k == "alpha");
+        cache.insert_by(same_hash, "beta".to_owned(), 2, |k| k == "beta");
+
+        assert_eq!(cache.get_by(same_hash, |k| k == "alpha"), Some(1));
+        assert_eq!(cache.get_by(same_hash, |k| k == "beta"), Some(2));
+        assert_eq!(cache.get_by(same_hash, |k| k == "gamma"), None);
+
+        // Inserting a third key evicts the LRU entry ("alpha") cleanly from its bucket.
+        cache.insert_by(0x1234_u64, "gamma".to_owned(), 3, |k| k == "gamma");
+        assert_eq!(cache.get_by(same_hash, |k| k == "alpha"), None);
+        assert_eq!(cache.get_by(same_hash, |k| k == "beta"), Some(2));
+        assert_eq!(cache.get_by(0x1234_u64, |k| k == "gamma"), Some(3));
+        assert_eq!(cache.stats().evictions, 1);
     }
 }

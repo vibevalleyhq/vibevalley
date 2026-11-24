@@ -51,7 +51,6 @@ const KATEX_FONTS: [FontId; 19] = [
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct FormulaKey {
-    hash: u64,
     tex: String,
     display: bool,
 }
@@ -61,17 +60,25 @@ fn formula_cache() -> &'static Mutex<LruCache<FormulaKey, Option<Arc<DisplayList
     CACHE.get_or_init(|| Mutex::new(LruCache::new(FORMULA_CACHE_CAPACITY)))
 }
 
+fn formula_hash(tex: &str, display: bool) -> u64 {
+    hash_str(tex) ^ u64::from(display)
+}
+
 fn typeset_cached(tex: &str, display: bool) -> Option<Arc<DisplayList>> {
-    let key = FormulaKey {
-        hash: hash_str(tex),
-        tex: tex.to_owned(),
-        display,
-    };
-    if let Some(cached) = formula_cache().lock().unwrap_or_else(|p| p.into_inner()).get(&key) {
+    let hash = formula_hash(tex, display);
+    if let Some(cached) = formula_cache()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .get_by(hash, |k| k.display == display && k.tex == tex)
+    {
         return cached;
     }
     let computed = typeset_display_list(tex, display).map(Arc::new);
-    formula_cache().lock().unwrap_or_else(|p| p.into_inner()).insert(key, computed.clone());
+    let key = FormulaKey { tex: tex.to_owned(), display };
+    formula_cache()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .insert_by(hash, key, computed.clone(), |k| k.display == display && k.tex == tex);
     computed
 }
 

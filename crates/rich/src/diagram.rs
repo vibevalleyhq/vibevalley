@@ -5,7 +5,8 @@
 //! `image(ImageSrc::svg_markup(&svg).size(...))` so `nsh_core::svg::rasterize` preserves all
 //! `<text>` labels at retina DPI (NEVER `element::svg`, which drops `<text>` nodes).
 
-use std::sync::{Mutex, OnceLock};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use nsh_core::element::ImageSrc;
 use nsh_core::prelude::*;
@@ -45,31 +46,39 @@ impl std::error::Error for DiagramError {}
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct DiagramCacheKey {
-    hash: u64,
     dark: bool,
     max_width_bits: Option<u32>,
     source: String,
 }
 
-fn diagram_cache() -> &'static Mutex<LruCache<DiagramCacheKey, Result<RenderedDiagram, DiagramError>>> {
-    static CACHE: OnceLock<Mutex<LruCache<DiagramCacheKey, Result<RenderedDiagram, DiagramError>>>> = OnceLock::new();
+type DiagramCacheEntry = Result<Arc<RenderedDiagram>, DiagramError>;
+type DiagramAsyncSlot = Option<(u64, DiagramCacheEntry)>;
+
+fn diagram_cache() -> &'static Mutex<LruCache<DiagramCacheKey, DiagramCacheEntry>> {
+    static CACHE: OnceLock<Mutex<LruCache<DiagramCacheKey, DiagramCacheEntry>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(LruCache::new(DIAGRAM_CACHE_CAPACITY)))
 }
 
-fn make_diagram_cache_key(source: &str, dark: bool, max_width: Option<f32>) -> DiagramCacheKey {
-    let sanitized_max_width = max_width.filter(|w| w.is_finite() && *w > 0.0);
-    DiagramCacheKey {
-        hash: hash_str(source),
-        dark,
-        max_width_bits: sanitized_max_width.map(f32::to_bits),
-        source: source.to_owned(),
-    }
+fn sanitize_max_width(max_width: Option<f32>) -> Option<u32> {
+    max_width.filter(|w| w.is_finite() && *w > 0.0).map(f32::to_bits)
+}
+
+fn diagram_cache_hash(source: &str, dark: bool, max_width_bits: Option<u32>) -> u64 {
+    hash_str(source) ^ u64::from(dark) ^ (u64::from(max_width_bits.unwrap_or(0)) << 1)
+}
+
+pub(crate) fn cached_render_diagram_arc(source: &str, dark: bool, max_width: Option<f32>) -> Option<Result<Arc<RenderedDiagram>, DiagramError>> {
+    let max_width_bits = sanitize_max_width(max_width);
+    let hash = diagram_cache_hash(source, dark, max_width_bits);
+    diagram_cache()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .get_by(hash, |k| k.dark == dark && k.max_width_bits == max_width_bits && k.source == source)
 }
 
 /// Looks up a previously rendered Mermaid diagram in the LRU cache without running layout.
 pub fn cached_render_diagram_with_max_width(source: &str, dark: bool, max_width: Option<f32>) -> Option<Result<RenderedDiagram, DiagramError>> {
-    let key = make_diagram_cache_key(source, dark, max_width);
-    diagram_cache().lock().unwrap_or_else(|p| p.into_inner()).get(&key)
+    cached_render_diagram_arc(source, dark, max_width).map(|res| res.map(|arc| (*arc).clone()))
 }
 
 /// Renders a Mermaid diagram using `vibevalley-pele` with VibeValley's resolved warm palette.
@@ -79,11 +88,15 @@ pub fn render_diagram(source: &str, dark: bool) -> Result<RenderedDiagram, Diagr
     render_diagram_with_max_width(source, dark, None)
 }
 
-/// Renders a Mermaid diagram with an optional maximum width constraint (LRU-cached).
-pub fn render_diagram_with_max_width(source: &str, dark: bool, max_width: Option<f32>) -> Result<RenderedDiagram, DiagramError> {
-    let key = make_diagram_cache_key(source, dark, max_width);
+pub(crate) fn render_diagram_arc(source: &str, dark: bool, max_width: Option<f32>) -> Result<Arc<RenderedDiagram>, DiagramError> {
+    let max_width_bits = sanitize_max_width(max_width);
+    let hash = diagram_cache_hash(source, dark, max_width_bits);
 
-    if let Some(cached) = diagram_cache().lock().unwrap_or_else(|p| p.into_inner()).get(&key) {
+    if let Some(cached) = diagram_cache()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .get_by(hash, |k| k.dark == dark && k.max_width_bits == max_width_bits && k.source == source)
+    {
         return cached;
     }
 
@@ -92,21 +105,38 @@ pub fn render_diagram_with_max_width(source: &str, dark: bool, max_width: Option
         theme_mode: ThemeMode::resolved(palette),
         font_family: Some(DIAGRAM_FONT_SANS.to_owned()),
         font_family_mono: Some(CODE_FONT_MONO.to_owned()),
-        max_width: key.max_width_bits.map(|bits| f64::from(f32::from_bits(bits))),
+        max_width: max_width_bits.map(|bits| f64::from(f32::from_bits(bits))),
         ..RenderOptions::default()
     };
 
     let result = vibevalley_pele::render(source, &options)
-        .map(|rendered| RenderedDiagram {
-            diagram_type: rendered.diagram_type,
-            svg: rendered.svg,
-            width: (rendered.width as f32).max(1.0),
-            height: (rendered.height as f32).max(1.0),
+        .map(|rendered| {
+            Arc::new(RenderedDiagram {
+                diagram_type: rendered.diagram_type,
+                svg: rendered.svg,
+                width: (rendered.width as f32).max(1.0),
+                height: (rendered.height as f32).max(1.0),
+            })
         })
         .map_err(|err| DiagramError { message: err.to_string() });
 
-    diagram_cache().lock().unwrap_or_else(|p| p.into_inner()).insert(key, result.clone());
+    let key = DiagramCacheKey {
+        dark,
+        max_width_bits,
+        source: source.to_owned(),
+    };
+    diagram_cache()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .insert_by(hash, key, result.clone(), |k| {
+            k.dark == dark && k.max_width_bits == max_width_bits && k.source == source
+        });
     result
+}
+
+/// Renders a Mermaid diagram with an optional maximum width constraint (LRU-cached).
+pub fn render_diagram_with_max_width(source: &str, dark: bool, max_width: Option<f32>) -> Result<RenderedDiagram, DiagramError> {
+    render_diagram_arc(source, dark, max_width).map(|arc| (*arc).clone())
 }
 
 /// Returns LRU hit/miss/eviction metrics for [`render_diagram`].
@@ -138,10 +168,12 @@ pub fn VvDiagram(props: VvDiagramProps) -> impl IntoElement {
     let label = SharedString::from(t("web.base.rich.diagram", &[]));
     let image_label = label.clone();
     let placeholder_label = label.clone();
-    let async_result: Signal<Option<(u64, Result<RenderedDiagram, DiagramError>)>> = signal(None);
+    let async_result: Signal<DiagramAsyncSlot> = signal(None);
     let generation = signal(0u64);
+    let latest_gen = Arc::new(AtomicU64::new(0));
 
     // Offload uncached Mermaid layout/SVG rendering off the UI thread with generation cancellation.
+    let effect_latest_gen = Arc::clone(&latest_gen);
     effect(move || {
         let source = props.source.get();
         let max_width = props.max_width.get();
@@ -149,17 +181,23 @@ pub fn VvDiagram(props: VvDiagramProps) -> impl IntoElement {
 
         let next_gen = generation.get_untracked().wrapping_add(1);
         generation.set(next_gen);
+        effect_latest_gen.store(next_gen, Ordering::Release);
 
-        if cached_render_diagram_with_max_width(source.as_str(), is_dark, max_width).is_some() {
+        if cached_render_diagram_arc(source.as_str(), is_dark, max_width).is_some() {
             async_result.set(None);
             return;
         }
 
         async_result.set(None);
         let source_owned = source.to_string();
+        let job_latest_gen = Arc::clone(&effect_latest_gen);
         spawn(async move {
-            let rendered = run_offloaded(move || render_diagram_with_max_width(&source_owned, is_dark, max_width)).await;
-            if generation.get_untracked() == next_gen {
+            let rendered =
+                run_offloaded(move || (job_latest_gen.load(Ordering::Acquire) == next_gen).then(|| render_diagram_arc(&source_owned, is_dark, max_width)))
+                    .await;
+            if let Some(rendered) = rendered
+                && generation.get_untracked() == next_gen
+            {
                 async_result.set(Some((next_gen, rendered)));
             }
         });
@@ -182,7 +220,7 @@ pub fn VvDiagram(props: VvDiagramProps) -> impl IntoElement {
                     Some((gen_id, res)) if *gen_id == current_gen => Some(res.clone()),
                     Some(_) | None => None,
                 })
-                .or_else(|| cached_render_diagram_with_max_width(source.as_str(), is_dark, max_width));
+                .or_else(|| cached_render_diagram_arc(source.as_str(), is_dark, max_width));
 
             match result {
                 Some(Ok(rendered)) => {
