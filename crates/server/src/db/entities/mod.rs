@@ -8,6 +8,7 @@ pub mod content_attachment;
 pub mod content_library;
 pub mod content_media;
 pub mod infra_remote;
+pub mod outbox_item;
 pub mod shared;
 pub mod team_memory;
 pub mod work_cron;
