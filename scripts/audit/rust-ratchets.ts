@@ -7,7 +7,7 @@ const CONCURRENCY_DOC = "docs/style/rust-async-concurrency.md";
 
 // Shrink-only ceiling for non-test `rt::block_on(` calls under `crates/server/src/`.
 // This ceiling may only decrease as sync wrappers migrate to async; never raise it.
-export const SERVER_BLOCK_ON_CEILING = 152;
+export const SERVER_BLOCK_ON_CEILING = 102;
 
 const NON_HTTP_RAW_TCP_ALLOWLIST: Readonly<
   Record<
@@ -434,7 +434,13 @@ function isCrateOrMacRust(path: string): boolean {
 }
 
 function isThreadSleepZeroedZone(path: string): boolean {
-  return (path.startsWith("crates/server/tests/") || path.startsWith("apps/mac/src/")) && path.endsWith(".rs");
+  return (
+    (path.startsWith("crates/server/tests/") ||
+      path.startsWith("apps/mac/src/") ||
+      path.startsWith("crates/cli/src/") ||
+      path.startsWith("crates/runtime/src/")) &&
+    path.endsWith(".rs")
+  );
 }
 
 function hasDocumentedThreadSleepAllowance(rawLines: readonly string[], line: number): boolean {

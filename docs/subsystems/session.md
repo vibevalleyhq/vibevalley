@@ -88,7 +88,7 @@
 
 ## 怎么验证
 
-- `crates/server/tests/issue_board.rs`：开工、提问、失败、打断与续上、排队与上限、重启、静默、权限放行。
+- `crates/server/tests/issue_board.rs`、`crates/server/tests/issue_family.rs`：开工、提问、失败、打断与续上、排队与上限、重启、静默、权限放行，并通过 `TurnGate`（[support/mod.rs](crates/server/tests/support/mod.rs)）确定性卡住并放行帮工轮次。
 - `crates/server/tests/session.rs`、`crates/server/tests/session/workspace.rs`：轨迹的流式步骤、子 agent 的步骤、落盘读回、`issue.watch` / `session.watch` 与工作区直连会话全链路（权限、交互提问、在线改配、重启续接、与工单板并发隔离）。
 - `crates/server/tests/mcp.rs`：`/mcp` 帮工门。
 - `crates/runtime/src/oar/tests.rs`、`crates/runtime/tests/antigravity_acp.rs`、`crates/runtime/tests/antigravity_swarm.rs`、`crates/runtime/tests/live.rs`：各家农机、Antigravity ACP 与 Swarm 旁路（离线单元、模拟 stdio 协议测试、只读旁路边界测试及 `#[ignore]` 实机冒烟）。

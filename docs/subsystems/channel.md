@@ -24,7 +24,7 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/server/src/modules/collab/channel/` | `Chat` 核心、事务保存点（`store.rs`）、消息写入/编辑/搜索（`messages.rs`）、房间/投递/订阅流（`rooms.rs`）、DTO 与 `ChannelEvent` 定义（`types.rs`）及 Hub 端点安装（`service.rs`）；每条消息连同 `channel_event` 与 `channel_delivery` 待发记录在同一个事务里落库，提交后非阻塞广播 `ChannelEvent`（`Chat::subscribe_events()`）并推送 `Chat::dispatches()` |
+| `crates/server/src/modules/collab/channel/` | `Chat` 核心、事务保存点（`store.rs`）、原生异步消息写入/编辑/搜索（`messages.rs`）、异步房间/投递/订阅流（`rooms.rs`）、DTO 与 `ChannelEvent` 定义（`types.rs`）及通过 `Hub::on_async` 安装全部 `channel.*` 端点的服务层（`service.rs`）；每条消息连同 `channel_event` 与 `channel_delivery` 待发记录在同一个事务里落库，提交后非阻塞广播 `ChannelEvent`（`Chat::subscribe_events()`）并推送 `Chat::dispatches()` |
 | `crates/server/src/modules/collab/channel/dispatch.rs` | 纯受众规则（`who_hears`）、两道环路刹车（`brakes`：`hopLimit = 4`、`cooldown = 60s`）与 `plan_deliveries`，仅读频道模型与参与者表，零依赖 `issue`、`session` 或 `orchestrator` |
 | [频道表结构](crates/server/src/db/schema/collab_channel.sql)、[命名查询](crates/server/src/db/queries/collab_channel.sql)、`db.rs` | sqlc 生成 SQLx 查询。频道连接在 `server.db` 上读写消息、串与 `channel_delivery` |
 | `crates/server/src/modules/collab/channel/model.rs` | 写事务在频道锁内更新镜像。回滚恢复原镜像与环路记账，提交后才向订阅者发布 |

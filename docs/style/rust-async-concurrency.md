@@ -112,10 +112,10 @@
 
 ## 原生富内容离线程卸载
 
-`crates/rich` 中的计算密集型组件（如 [code_block.rs](crates/rich/src/code_block.rs) 的 `VvCodeBlock` 语法高亮与 [diagram.rs](crates/rich/src/diagram.rs) 的 `VvDiagram` Mermaid 渲染）对未命中 LRU 缓存的负载应统一经后台卸载辅助（`nsh_core::prelude::blocking` + `spawn` + 代次校验 `Signal`）移出 GPUI UI 线程：
+`crates/rich` 中的计算密集型组件（[code_block.rs](crates/rich/src/code_block.rs) 的 `VvCodeBlock` 语法高亮、[diagram.rs](crates/rich/src/diagram.rs) 的 `VvDiagram` Mermaid 渲染、[canvas.rs](crates/rich/src/canvas.rs) 的 `VvCanvas` 与 [chart.rs](crates/rich/src/chart.rs) 的 `VvChart`）对未命中 `LruCache::get_by`（[cache.rs](crates/rich/src/cache.rs)，命中时按借用切片比对、零堆键分配）缓存的负载统一经 [highlight.rs](crates/rich/src/highlight.rs) 的 `run_offloaded`（在 Tokio 上下文中走 `Handle::spawn_blocking`，否则派发至共享 2 线程 `vv-rich-offload` 后台池并支持 panic 恢复）与 `AtomicU64` 代次取消守卫移出 GPUI UI 线程：
 
-- 超过阈值（如 `ASYNC_HIGHLIGHT_BYTE_THRESHOLD = 4_096` 或 `ASYNC_HIGHLIGHT_LINE_THRESHOLD = 120`）的未缓存高亮与 Mermaid `vibevalley-pele` 排版不得在 GPUI 主线程同步阻塞，首帧应先渲染纯文本或占位视图，后台计算完成后按 `generation` 校验并局部刷新 `Signal`。
-- 禁止用 `tokio::runtime::Handle::try_current()` 检测当前是否存在 Tokio 运行时并在失败分支静默回退到同步执行：GPUI UI 线程本身并不处于 Tokio 运行时内，该回退会把重计算直接拉回 UI 主线程造成掉帧；后台卸载应由统一辅助稳定派发到后台线程池。
+- 超过阈值（如 `ASYNC_HIGHLIGHT_BYTE_THRESHOLD = 4_096`、`ASYNC_HIGHLIGHT_LINE_THRESHOLD = 120`、`ASYNC_CANVAS_BYTE_THRESHOLD = 4_096`、`ASYNC_CHART_BYTE_THRESHOLD = 4_096`）的未缓存高亮、Mermaid `vibevalley-pele`、JSON Canvas 与 `vibevalley-chart` 排版不得在 GPUI 主线程同步阻塞，首帧应先渲染纯文本或占位视图，后台计算完成后按 `generation` / `latest_gen` 校验并局部刷新 `Signal`。
+- 禁止在 [highlight.rs](crates/rich/src/highlight.rs) 之外调用 `tokio::runtime::Handle::try_current()` 并在失败分支静默回退到同步执行：GPUI UI 线程本身并不处于 Tokio 运行时内，该回退会把重计算直接拉回 UI 主线程造成掉帧；后台卸载统一经 `run_offloaded` 稳定派发。
 
 ## 静态护栏清单
 
@@ -123,7 +123,7 @@
 
 | 检查 / 脚本 | 守卫范围 | 触发方式 |
 |---|---|---|
-| [rust-ratchets.ts](scripts/audit/rust-ratchets.ts) | 禁止引入 `pollster`、禁止异步上下文与 `Drop` 调用 `rt::block_on`、禁止 `apps/mac/src` 使用 `rt::handle`、禁止测试与异步路径使用 `std::thread::sleep`、禁止 `crates/rich` 经 `Handle::try_current()` 回退同步执行等 | `vp run audit:rust` |
+| [rust-ratchets.ts](scripts/audit/rust-ratchets.ts) | 禁止引入 `pollster`、锁定服务端非测试 `rt::block_on(` 仅缩减上限（`SERVER_BLOCK_ON_CEILING = 102`）、禁止 `apps/mac/src` 使用 `rt::handle`、禁止 `crates/server/tests/`、`apps/mac/src/`、`crates/cli/src/` 与 `crates/runtime/src/` 使用 `std::thread::sleep`、禁止 `crates/rich` 在 `highlight.rs` 外经 `Handle::try_current()` 回退同步执行等 | `vp run audit:rust` |
 | [module-boundaries.ts](scripts/audit/module-boundaries.ts) | 守住服务端 `L0–L3` 无环 DAG、模块无循环依赖、脊柱（`lib.rs` / `ports.rs` / `transport/`）与 `apps/mac/src` 不直接导入 `crate::modules::*` | `vp run audit:boundaries` |
 | Rust 工作区全检 | `cargo fmt`、`cargo clippy --all-targets -- -D warnings`、工作区测试 | `vp run rust:check` |
 | Loom 状态机模型检验 | 4 个并发状态机内核穷举交错检查（`--features loom --profile loom`） | `vp run rust:loom` |

@@ -36,8 +36,8 @@
 
 ## 6. `crates/rich` 离 UI 线程渲染
 
-- [ ] **大代码块异步高亮**：在 `crates/rich/src/code_block.rs` 中，命中 `should_offload_highlight`（超过 `ASYNC_HIGHLIGHT_BYTE_THRESHOLD` 或 `ASYNC_HIGHLIGHT_LINE_THRESHOLD`）且未命中 `cached_highlight_code` 的代码块，必须先画纯文本首帧并经 `nsh_core::prelude::blocking` 后台执行 `highlight_code`，回填前校验单调 `generation` 防止旧结果覆盖新内容。
-- [ ] **Mermaid 图表缓存与 SVG 光栅化路径**：`crates/rich/src/diagram.rs` 必须走带 `(hash, source, max_width_bits, dark)` 键的有界 LRU 缓存 `render_diagram_with_max_width`，并用 `ImageSrc::svg_markup` 保留 `<text>` 标签。
+- [ ] **大代码块与图表异步离线程渲染**：在 `crates/rich/src/{code_block,diagram,canvas,chart}.rs` 中，命中阈值且未命中 `LruCache::get_by` 缓存的渲染负载，必须先画纯文本/占位首帧并经 `crate::highlight::run_offloaded` 后台执行，回填前校验 `AtomicU64` + `generation` 防止旧结果覆盖新内容。
+- [ ] **Mermaid / Canvas / Chart 缓存与 SVG 光栅化路径**：`crates/rich/src/{diagram,canvas,chart}.rs` 必须走 `LruCache::get_by`（零键堆分配命中）并用 `ImageSrc::svg_markup` 保留 `<text>` 标签。
 - [ ] **Mac 原生面板后台准备**：`apps/mac/src/viewer.rs` 与 `apps/mac/src/markdown_pane.rs` 的文件读取和 `vibevalley_rich::tokenize_scopes` 必须放在 `cx.background_spawn` 后台执行，禁止在 GPUI 绘制/视图构建路径上同步读盘或分词。
 
 ## 验证命令

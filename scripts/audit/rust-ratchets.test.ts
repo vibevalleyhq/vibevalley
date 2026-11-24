@@ -56,7 +56,7 @@ describe("no-pollster", () => {
 });
 
 describe("no-thread-sleep-in-zeroed-zones", () => {
-  test("forbids std::thread::sleep and thread::sleep in crates/server/tests/ and apps/mac/src/", () => {
+  test("forbids std::thread::sleep and thread::sleep in crates/server/tests/, apps/mac/src/, crates/cli/src/, and crates/runtime/src/", () => {
     const files: SourceFile[] = [
       {
         path: "crates/server/tests/issue.rs",
@@ -66,11 +66,21 @@ describe("no-thread-sleep-in-zeroed-zones", () => {
         path: "apps/mac/src/hosted/mod.rs",
         text: "use std::thread;\nfn pause() { thread::sleep(std::time::Duration::from_millis(5)); }\n",
       },
+      {
+        path: "crates/cli/src/domains/work/issue.rs",
+        text: "fn retry() { std::thread::sleep(std::time::Duration::from_secs(1)); }\n",
+      },
+      {
+        path: "crates/runtime/src/oar/scripted.rs",
+        text: "fn step() { std::thread::sleep(std::time::Duration::from_millis(1)); }\n",
+      },
     ];
 
     const violations = auditRustRatchets(files);
     expect(violations.map((v) => `${v.rule}@${v.file}:${v.line}`)).toEqual([
       "no-thread-sleep-in-zeroed-zones@apps/mac/src/hosted/mod.rs:2",
+      "no-thread-sleep-in-zeroed-zones@crates/cli/src/domains/work/issue.rs:1",
+      "no-thread-sleep-in-zeroed-zones@crates/runtime/src/oar/scripted.rs:1",
       "no-thread-sleep-in-zeroed-zones@crates/server/tests/issue.rs:1",
     ]);
     const formatted = formatRatchetViolations(violations);
@@ -218,8 +228,8 @@ describe("no-raw-tcp-http-mock", () => {
 });
 
 describe("no-block-on-in-async-server", () => {
-  test("locks shrink-only ceiling at 152 and excludes #[cfg(test)] inline and external submodules", () => {
-    expect(SERVER_BLOCK_ON_CEILING).toBe(152);
+  test("locks shrink-only ceiling at 102 and excludes #[cfg(test)] inline and external submodules", () => {
+    expect(SERVER_BLOCK_ON_CEILING).toBe(102);
 
     const files: SourceFile[] = [
       {

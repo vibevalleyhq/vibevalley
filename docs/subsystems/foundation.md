@@ -92,7 +92,7 @@
 | 页面 | `nsh/test`，样例的 `Transport` | `apps/mac/ui/app/*.test.tsx`、`apps/mac/ui/features/*/*.test.ts` |
 | 像素场景 | 真的素材、样例帧，在 CPU 上画 | `apps/mac/src/pixel/tests.rs` |
 
-- **不靠睡眠等待**：Rust 测试用 `until` 轮询条件；TS 测试禁止写死 `setTimeout` 或 `waitForTimeout`（`vibevalley/no-test-sleep` 查）。
+- **不靠睡眠等待**：Rust 测试用 `until` 与 `TurnGate`（[support/mod.rs](crates/server/tests/support/mod.rs)）确定性同步轮次；TS 测试禁止写死 `setTimeout` 或 `waitForTimeout`（`vibevalley/no-test-sleep` 查）。
 - **对照 golden**：`reduce` 与出帧、artifact 的规则对着 golden；artifact 的 golden 由 `vp run goldens` 校验与更新（`crates/core/tests/projection.rs`、`crates/core/tests/artifact_golden.rs`）。
 
 ### 话放在哪
@@ -109,7 +109,7 @@
 **新增或修改接口**
 
 1. 改 `crates/protocol/src/contract/<概念>.rs`，跑 `vp run protocol:ts` 重写 TS 类型；页面要用的同改 `packages/protocol/src/<概念>/` 的 `schema.ts`、`api.ts`。
-2. 在 `crates/server/src/modules/<概念>` 用 `Hub::on` 注册处理函数。
+2. 在 `crates/server/src/modules/<概念>` 用 `Hub::on_async`（I/O 端点）或 `Hub::on`（纯内存短读）注册处理函数。
 3. 跑 `vp run api:client`、`vp run capabilities` 更新生成的客户端与能力表。
 
 ## 为什么这样
@@ -123,6 +123,7 @@
 ## 怎么验证
 
 - `vp run rust:check`：格式、clippy 与全部 Rust 测试。
+- `vp run audit:rust`：静态校验零 `pollster`、仅缩减 `rt::block_on(` 上限（`SERVER_BLOCK_ON_CEILING = 102`）与零睡眠边界。
 - `vp run audit:boundaries`：静态校验脊柱、桌面宿主与服务端 `L0`–`L3` 分层边界及零循环依赖（纳入 `release:verify`）。
 - `vp run protocol:check`：生成的线上类型与 golden 是最新的。
 - `vp check`、`vp run packages:check`、`vp run mac:check`、`vp run mobile:check`：TS 与原生页面（桌面与移动端）。
