@@ -17,24 +17,25 @@ use tracing::Instrument;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, BranchPublication, Caller, PublishPlatform, PullRequest, PullRequestState, SubmitBranch, ops};
 
-use crate::app::hub::refusal::refused as refuse;
+use crate::app::refusal::refused as refuse;
+use crate::app::runtime::Runtime;
 use crate::db::ServerDb;
-use crate::work::issue::Board;
-use crate::work::repo::Repos;
-use crate::{Hub, now};
+use crate::work::issue::IssueStore;
+use crate::work::ledger::now;
+use crate::work::repo::RepoStore;
 
 use publish::HostRunner;
 pub use publish::{Answer, HostRun, HostedRepo, Network, Publisher, hosted_origin};
 pub use snapshot::{GitHubCheck, GitHubComment, GitHubPullSnapshot, GitHubReview, actions_job_of, checks_fingerprint, checks_verdict};
-pub use store::{KnownPullEvent, PullIndex, PullRecord, PullStore, UpsertPullInput};
+pub use store::{KnownPullEvent, PullIndex, PullRecord, PullRepo, UpsertPullInput};
 
 const DEFAULT_POLL_SECONDS: u64 = 180;
 
-pub struct Pulls {
-    pub(crate) store: PullStore,
+pub struct PullStore {
+    pub(crate) store: PullRepo,
     pub(crate) publisher: Arc<Publisher>,
-    pub(crate) repos: Option<Arc<Repos>>,
-    pub(crate) board: Option<Board>,
+    pub(crate) repos: Option<Arc<RepoStore>>,
+    pub(crate) board: Option<IssueStore>,
     pub(crate) gh: HostRunner,
     pub(crate) glab: HostRunner,
     pub(crate) refresh_lock: tokio::sync::Mutex<()>,
@@ -43,23 +44,23 @@ pub struct Pulls {
     poller: Mutex<Option<(CancellationToken, tokio::task::JoinHandle<()>)>>,
 }
 
-impl Pulls {
+impl PullStore {
     /// Opens `pull` and `pull_event` on the shared `ServerDb` and wires
     /// `Issue.pull_request` projection onto `board` when present.
     pub async fn open_async(
         db: Arc<ServerDb>,
         publisher: Arc<Publisher>,
-        repos: Option<Arc<Repos>>,
-        board: Option<Board>,
+        repos: Option<Arc<RepoStore>>,
+        board: Option<IssueStore>,
         gh: Option<HostRun>,
         glab: Option<HostRun>,
-    ) -> Result<Arc<Pulls>, ApiError> {
-        let store = PullStore::open_async(db).await?;
+    ) -> Result<Arc<PullStore>, ApiError> {
+        let store = PullRepo::open_async(db).await?;
         if let Some(board) = &board {
             let idx = store.index();
             board.use_pull_of_issue_async(Arc::new(move |issue_id| idx.lock().of_issue(issue_id))).await;
         }
-        Ok(Arc::new(Pulls {
+        Ok(Arc::new(PullStore {
             store,
             publisher,
             repos,
@@ -102,7 +103,7 @@ impl Pulls {
         self.store.all()
     }
 
-    pub fn store(&self) -> &PullStore {
+    pub fn store(&self) -> &PullRepo {
         &self.store
     }
 
@@ -220,38 +221,28 @@ impl Pulls {
     pub async fn poll_async(&self) {
         poll::poll(self).await;
     }
-}
 
-/// Registers `repo.pr.submit` (user-only) and optionally starts the background poller.
-pub fn install(hub: &Hub, pulls: Arc<Pulls>, poll_seconds: Option<u64>) {
-    let p = pulls.clone();
-    hub.on_async::<ops::RepoPrSubmit, _, _>(move |ctx, req| {
-        let p = p.clone();
-        async move {
-            if ctx.caller != Caller::User {
-                return Err(refuse(BizCode::RepoRefused, t("server.repo.publish.userOnly", &[])));
-            }
-            let issue_id = if let Some(board) = p.board.clone() {
-                let cwd = req.cwd.clone();
-                let branch = req.branch.clone();
-                crate::spawn_blocking_traced(move || board.open_issue_for_branch(&cwd, &branch).map(|i| i.id))
-                    .await
-                    .ok()
-                    .flatten()
-            } else {
-                None
-            };
-            p.publish_async(&req, issue_id.as_deref()).await
+    pub(crate) async fn submit_pr_async(&self, caller: Caller, req: &SubmitBranch) -> Result<BranchPublication, ApiError> {
+        if caller != Caller::User {
+            return Err(refuse(BizCode::RepoRefused, t("server.repo.publish.userOnly", &[])));
         }
-    });
+        let issue_id = if let Some(board) = &self.board {
+            board.open_issue_for_branch_async(&req.cwd, &req.branch).await.map(|i| i.id)
+        } else {
+            None
+        };
+        self.publish_async(req, issue_id.as_deref()).await
+    }
 
-    if let Some(secs) = poll_seconds {
+    /// Starts the background PR refresh/poll loop on `runtime`.
+    pub fn start_poller(self: &Arc<Self>, runtime: &Runtime, poll_seconds: Option<u64>) {
+        let Some(secs) = poll_seconds else { return };
         let interval = Duration::from_secs(if secs > 0 { secs } else { DEFAULT_POLL_SECONDS });
-        let cancel = hub.child_token();
+        let cancel = runtime.child_token();
         let task_cancel = cancel.clone();
-        let weak = Arc::downgrade(&pulls);
+        let weak = Arc::downgrade(self);
         let span = tracing::debug_span!("pull.poll", interval_secs = interval.as_secs());
-        let handle = hub.spawn_task(
+        let handle = runtime.spawn(
             async move {
                 let mut timer = tokio::time::interval_at(tokio::time::Instant::now() + interval, interval);
                 timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -280,17 +271,18 @@ pub fn install(hub: &Hub, pulls: Arc<Pulls>, poll_seconds: Option<u64>) {
             }
             .instrument(span),
         );
-        *pulls.poller.lock() = Some((cancel, handle));
+        *self.poller.lock() = Some((cancel, handle));
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::team::mcp::{ResourceReadArgs, Resources};
-    use crate::work::issue::{Board, NewIssue};
+    use crate::app::live::LiveOverlay;
+    use crate::app::outbox::Outbox;
+    use crate::app::slice::SliceProjector;
+    use crate::work::issue::{IssueStore, NewIssue};
     use crate::work::ledger::BoardConfig;
-    use crate::work::session::Trajectories;
     use vibevalley_protocol::{Deliverable, IssueCanceled, IssueStatus, Landing};
     use vibevalley_runtime::oar::Registry;
 
@@ -356,14 +348,23 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn pull_refresh_poll_snapshot_and_issue_fk_preservation() {
         let dir = tempfile::tempdir().unwrap();
-        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let db_path = dir.path().join("server.db");
+        let db = ServerDb::open_config(&crate::db::DatabaseConfig::Sqlite { path: db_path.clone() }).unwrap();
+        let live = LiveOverlay::new();
+        let projector = SliceProjector::new();
+        let outbox = Outbox::new(db.clone());
+        let runtime = Runtime::new();
         let mut reg = Registry::new();
         reg.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-        let board = Board::open_on_async(
-            &dir.path().join("server.db"),
+        let board = IssueStore::open_async(
+            &db_path,
+            live,
+            projector,
+            outbox,
+            runtime.clone(),
             Arc::new(reg),
             BoardConfig::under(dir.path()),
-            Arc::new(Arc::downgrade(&hub)),
+            None,
         )
         .await
         .unwrap();
@@ -439,8 +440,7 @@ mod tests {
             }
         });
 
-        let db = ServerDb::open(dir.path()).unwrap();
-        let pulls = Pulls::open_async(db.clone(), Arc::new(Publisher::default()), None, Some(board.clone()), Some(gh.clone()), None)
+        let pulls = PullStore::open_async(db.clone(), Arc::new(Publisher::default()), None, Some(board.clone()), Some(gh.clone()), None)
             .await
             .unwrap();
 
@@ -477,30 +477,21 @@ mod tests {
             .unwrap();
         assert_eq!(standalone.issue_id, None);
         board.refresh_issue_async(&issue.id).await;
-        assert_eq!(board.issue(&issue.id).unwrap().pull_request.as_ref().map(|p| p.number), Some(9));
+        assert_eq!(
+            board.issue_async(&issue.id).await.unwrap().unwrap().pull_request.as_ref().map(|p| p.number),
+            Some(9)
+        );
 
         // Updating the issue MUST NOT null pull.issue_id (regression test for PutIssue ON CONFLICT DO UPDATE)
         board.move_to_async(&issue.id, IssueStatus::Todo, None).await.unwrap();
-        let reopened_store = PullStore::open_async(db.clone()).await.unwrap();
+        let reopened_store = PullRepo::open_async(db.clone()).await.unwrap();
         assert_eq!(reopened_store.find("acme/demo", 9).unwrap().issue_id.as_deref(), Some(issue.id.as_str()));
 
-        // Snapshot via MCP resource_read (`vv://github/acme/demo/pulls/9` and `/checks`)
-        let attachments = crate::content::attachment::Attachments::open(dir.path(), db.clone());
-        let chat = crate::collab::channel::Chat::open(db.clone(), &hub, attachments, None, false).unwrap();
-        let trajectories = Trajectories::open(db, &hub);
-        let resources = Resources::with_pulls(board.clone(), chat, trajectories, pulls.clone());
-        let page = resources
-            .read_async(
-                None,
-                &ResourceReadArgs {
-                    uri: "vv://github/acme/demo/pulls/9/checks".into(),
-                    offset: None,
-                    limit: None,
-                },
-            )
-            .await
-            .unwrap();
-        assert!(page.contains("deadbeef") && page.contains("FAILURE"), "{page}");
+        // Direct PR snapshot fetch (`snapshot::fetch_snapshot` via `HostRunner`)
+        let snap = snapshot::fetch_snapshot(&pulls.gh, "acme/demo", 9).await.unwrap();
+        assert_eq!(snap.head, "deadbeef");
+        let (failed, _) = checks_verdict(&snap.checks);
+        assert_eq!(failed.len(), 1);
 
         // Poll CI + reviews/comments: viewer skipped, review+inline comment share bot_round 1, standalone bot comment gets bot_round 2
         pulls.poll_async().await;
@@ -524,7 +515,7 @@ mod tests {
         *pr_state.lock() = "MERGED".into();
         pulls.refresh_async().await;
         assert_eq!(pulls.find("acme/demo", 9).unwrap().state, PullRequestState::Merged);
-        let settled = board.issue(&issue.id).unwrap();
+        let settled = board.issue_async(&issue.id).await.unwrap().unwrap();
         assert_eq!(settled.delivered, Some(Landing::PullRequest));
 
         // Closing an issue's PR settles as Dismissed
@@ -556,16 +547,17 @@ mod tests {
         board.refresh_issue_async(&issue2.id).await;
         *pr_state.lock() = "CLOSED".into();
         pulls.refresh_async().await;
-        assert_eq!(board.issue(&issue2.id).unwrap().canceled, Some(IssueCanceled::Dismissed));
+        assert_eq!(board.issue_async(&issue2.id).await.unwrap().unwrap().canceled, Some(IssueCanceled::Dismissed));
 
         pulls.close_async().await;
         board.close();
+        let _ = runtime.shutdown(Duration::from_secs(1)).await;
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn pull_background_poller_preserves_pull_poll_span_and_stops_on_hub_close() {
+    async fn pull_background_poller_preserves_pull_poll_span_and_stops_on_runtime_shutdown() {
         let dir = tempfile::tempdir().unwrap();
-        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let runtime = Runtime::new();
         let db = ServerDb::open(dir.path()).unwrap();
         let seen_span = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let seen_span_gh = seen_span.clone();
@@ -590,7 +582,9 @@ mod tests {
                 missing: false,
             }
         });
-        let pulls = Pulls::open_async(db, Arc::new(Publisher::default()), None, None, Some(gh), None).await.unwrap();
+        let pulls = PullStore::open_async(db, Arc::new(Publisher::default()), None, None, Some(gh), None)
+            .await
+            .unwrap();
         pulls
             .store()
             .upsert_async(UpsertPullInput {
@@ -609,7 +603,7 @@ mod tests {
 
         let subscriber = tracing_subscriber::fmt().with_max_level(tracing::Level::DEBUG).with_test_writer().finish();
         let _guard = tracing::subscriber::set_default(subscriber);
-        install(&hub, pulls.clone(), Some(1));
+        pulls.start_poller(&runtime, Some(1));
 
         tokio::time::timeout(Duration::from_secs(5), notify.notified())
             .await
@@ -620,6 +614,6 @@ mod tests {
         );
 
         pulls.close_async().await;
-        hub.close_async().await;
+        let _ = runtime.shutdown(Duration::from_secs(1)).await;
     }
 }

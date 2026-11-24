@@ -1,17 +1,18 @@
 //! Direct user workspace chat sessions (`session.openWorkspace`, `session.send`,
 //! `session.respondPermission`, `session.respondInteraction`,
 //! `session.setConfig`): a `Session` with `SessionController::User` and
-//! `ExecutionPolicy::DirectCwd`, reusing `Sessions::go_live`, `pump()`, and `Trajectories`.
+//! `ExecutionPolicy::DirectCwd`, reusing `SessionStore::go_live_async`,
+//! `pump_async`, and `TrajectoryStore`.
 
 use std::path::{Path, PathBuf};
 
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, BizCode, EventTokens, ExecutionPolicy, Fact, FactSessionPhaseChanged, FactSessionReported, Outcome, Phase, PhaseFailed, PhaseResting, Session,
-    SessionAction, SessionChildStep, SessionChildToolCall, SessionChildTranscript, SessionChildTranscriptInput, SessionController, SessionInteractionOption,
-    SessionInteractionRequest, SessionOpenWorkspaceInput, SessionPermissionDecision, SessionPermissionMode, SessionPermissionRequest,
-    SessionRespondInteractionInput, SessionRespondPermissionInput, SessionSendInput, SessionSetConfigInput, SessionSwarmMember, SessionSwarmMemberState,
-    SessionSwarmMessage, SessionSwarmOverview, SessionSwarmRole, SessionSwarmState, SessionSwarmThread, SessionWorkspace, Spent,
+    ApiError, BizCode, EventTokens, ExecutionPolicy, Outcome, Phase, PhaseFailed, PhaseResting, Session, SessionAction, SessionChildStep, SessionChildToolCall,
+    SessionChildTranscript, SessionChildTranscriptInput, SessionController, SessionInteractionOption, SessionInteractionRequest, SessionOpenWorkspaceInput,
+    SessionPermissionDecision, SessionPermissionMode, SessionPermissionRequest, SessionRespondInteractionInput, SessionRespondPermissionInput,
+    SessionSendInput, SessionSetConfigInput, SessionSwarmMember, SessionSwarmMemberState, SessionSwarmMessage, SessionSwarmOverview, SessionSwarmRole,
+    SessionSwarmState, SessionSwarmThread, SessionWorkspace, Spent,
 };
 use vibevalley_runtime::oar::{
     AgentError, ContentBlock, InteractionDecision, InteractionOption, PermissionDecision, PermissionMode, RefusableOption, SessionOptions, StopReason,
@@ -20,8 +21,8 @@ use vibevalley_runtime::oar::{
 
 use super::db::SessionConfig;
 use super::mailbox::{MailboxSource, SessionMailbox};
-use super::sessions::Sessions;
-use crate::app::hub::refusal::{LookIn, missing};
+use super::sessions::SessionStore;
+use crate::app::refusal::{LookIn, missing};
 use crate::content::attachment::Attachments;
 use crate::work::ledger::{BoardError, Result, Step, now};
 
@@ -118,7 +119,7 @@ fn refused_session(message: String) -> BoardError {
     BoardError::Api(ApiError::new(BizCode::SessionRefused, message))
 }
 
-impl Sessions {
+impl SessionStore {
     #[cfg(test)]
     async fn load_workspace_meta_async(&self, session_id: &str) -> WorkspaceMeta {
         match self.0.ledger.read_db_async(async |db| super::db::config(db, session_id).await).await {
@@ -154,7 +155,7 @@ impl Sessions {
         if session_id.is_empty() {
             return;
         }
-        let existing = self.session(session_id);
+        let existing = self.session_async(session_id).await;
         if existing.as_ref().is_some_and(|s| s.controller != SessionController::User) {
             return;
         }
@@ -273,9 +274,9 @@ impl Sessions {
     }
 
     /// Reads bounded recent transcript steps for a child agent or swarm member.
-    pub fn read_child_transcript(&self, input: SessionChildTranscriptInput) -> Result<SessionChildTranscript> {
-        let session = self.session(&input.id).ok_or_else(|| missing_session(&input.id))?;
-        let conversation_id = input.conversation_id.trim();
+    pub async fn read_child_transcript_async(&self, input: SessionChildTranscriptInput) -> Result<SessionChildTranscript> {
+        let session = self.session_async(&input.id).await.ok_or_else(|| missing_session(&input.id))?;
+        let conversation_id = input.conversation_id.trim().to_string();
         if conversation_id.is_empty()
             || conversation_id.contains("..")
             || conversation_id.contains('/')
@@ -285,37 +286,42 @@ impl Sessions {
             return Err(invalid_input("invalid conversationId".into()));
         }
         let limit = input.limit.unwrap_or(30).clamp(1, 30) as usize;
-        let steps = match self.live_agent(&session.id) {
-            Some(agent) => agent
-                .read_child_transcript(conversation_id, limit)
-                .into_iter()
-                .map(|s| SessionChildStep {
-                    step_index: i64::try_from(s.step_index).unwrap_or(0),
-                    source: s.source,
-                    kind: s.kind,
-                    status: s.status,
-                    created_at: s.created_at,
-                    model: s.model,
-                    thinking: s.thinking,
-                    content: s.content,
-                    error: s.error,
-                    tool_calls: s
-                        .tool_calls
-                        .into_iter()
-                        .map(|tc| SessionChildToolCall {
-                            name: tc.name,
-                            args: tc.summary,
-                        })
-                        .collect(),
-                    input_tokens: s.input_tokens.and_then(|n| i64::try_from(n).ok()),
-                    cache_read_tokens: s.cache_read_tokens.and_then(|n| i64::try_from(n).ok()),
-                    output_tokens: s.output_tokens.and_then(|n| i64::try_from(n).ok()),
-                })
-                .collect(),
+        let agent = self.live_agent(&session.id);
+        let steps = match agent {
+            Some(agent) => crate::spawn_blocking_traced(move || {
+                agent
+                    .read_child_transcript(&conversation_id, limit)
+                    .into_iter()
+                    .map(|s| SessionChildStep {
+                        step_index: i64::try_from(s.step_index).unwrap_or(0),
+                        source: s.source,
+                        kind: s.kind,
+                        status: s.status,
+                        created_at: s.created_at,
+                        model: s.model,
+                        thinking: s.thinking,
+                        content: s.content,
+                        error: s.error,
+                        tool_calls: s
+                            .tool_calls
+                            .into_iter()
+                            .map(|tc| SessionChildToolCall {
+                                name: tc.name,
+                                args: tc.summary,
+                            })
+                            .collect(),
+                        input_tokens: s.input_tokens.and_then(|n| i64::try_from(n).ok()),
+                        cache_read_tokens: s.cache_read_tokens.and_then(|n| i64::try_from(n).ok()),
+                        output_tokens: s.output_tokens.and_then(|n| i64::try_from(n).ok()),
+                    })
+                    .collect()
+            })
+            .await
+            .map_err(|e| BoardError::Other(e.to_string()))?,
             None => Vec::new(),
         };
         Ok(SessionChildTranscript {
-            conversation_id: conversation_id.to_string(),
+            conversation_id: input.conversation_id.trim().to_string(),
             steps,
         })
     }
@@ -365,7 +371,7 @@ impl Sessions {
     pub async fn open_workspace_async(&self, input: SessionOpenWorkspaceInput) -> Result<SessionWorkspace> {
         let cwd = input.cwd.trim().to_string();
         if let Some(existing_id) = input.session_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-            let mut session = self.session(existing_id).ok_or_else(|| missing_session(existing_id))?;
+            let mut session = self.session_async(existing_id).await.ok_or_else(|| missing_session(existing_id))?;
             if session.controller != SessionController::User {
                 return Err(refused_session(t("server.session.workspace.notWorkspace", &[])));
             }
@@ -409,7 +415,7 @@ impl Sessions {
                 };
                 self.set_workspace_meta_async(&session.id, next_meta).await;
                 self.notify_workspace(&session.id);
-                return Ok(self.workspace_reply_async(self.session(&session.id).unwrap_or(session)).await);
+                return Ok(self.workspace_reply_async(self.session_async(&session.id).await.unwrap_or(session)).await);
             }
             let runtime_id = if !input.runtime.trim().is_empty() {
                 input.runtime.trim().to_string()
@@ -512,7 +518,7 @@ impl Sessions {
         self.go_live_async(agent, session.clone(), None).await?;
         self.set_workspace_meta_async(&id, meta).await;
         self.notify_workspace(&id);
-        Ok(self.workspace_reply_async(self.session(&id).unwrap_or(session)).await)
+        Ok(self.workspace_reply_async(self.session_async(&id).await.unwrap_or(session)).await)
     }
 
     async fn set_workspace_meta_async(&self, session_id: &str, meta: WorkspaceMeta) {
@@ -574,7 +580,7 @@ impl Sessions {
         self.go_live_async(agent, session.clone(), None).await?;
         self.set_workspace_meta_async(&session.id, meta).await;
         self.notify_workspace(&session.id);
-        Ok(self.session(&session.id).unwrap_or(session))
+        Ok(self.session_async(&session.id).await.unwrap_or(session))
     }
 
     /// Sends a user message to a user workspace session: starts a turn when idle,
@@ -590,7 +596,7 @@ impl Sessions {
         if !has_text && !has_attachments && !has_context {
             return Err(invalid_input(t("server.session.workspace.emptyMessage", &[])));
         }
-        let session = self.session(&input.id).ok_or_else(|| missing_session(&input.id))?;
+        let session = self.session_async(&input.id).await.ok_or_else(|| missing_session(&input.id))?;
         if session.controller != SessionController::User {
             return Err(refused_session(t("server.session.workspace.notWorkspace", &[])));
         }
@@ -684,13 +690,13 @@ impl Sessions {
             .write_db_async(async |db| SessionMailbox::claim_by_key(db, &entry.idempotency_key, now()).await)
             .await?
         {
-            return Ok(self.session(&session.id).unwrap_or(session));
+            return Ok(self.session_async(&session.id).await.unwrap_or(session));
         }
         let settle_id = entry.id;
 
         let turn_opts = TurnOptions { trace_id };
         if session.phase.is_working() {
-            self.record(&session.id, Step::Asked { text: logged_text });
+            self.record_async(&session.id, Step::Asked { text: logged_text }).await;
             let sent = match agent.steer(blocks.clone()) {
                 Ok(()) => Ok(()),
                 Err(_) => agent.queue_with(blocks, turn_opts),
@@ -708,34 +714,20 @@ impl Sessions {
                 .ledger
                 .write_db_async(async |db| SessionMailbox::settle(db, settle_id, true, None, now()).await)
                 .await;
-            return Ok(self.session(&session.id).unwrap_or(session));
+            return Ok(self.session_async(&session.id).await.unwrap_or(session));
         }
 
         let phase = Phase::working(now(), SessionAction::Thinking, "");
         let brief = session.brief.is_empty().then(|| vibevalley_core::text::clip(&logged_text, 120));
-        self.0
-            .ledger
-            .apply_async(vec![Fact::SessionPhaseChanged(FactSessionPhaseChanged {
-                at: now(),
-                id: session.id.clone(),
-                phase,
-                channel: session.channel_id().map(str::to_string),
-                spent: None,
-                brief,
-            })])
-            .await?;
-        self.record(&session.id, Step::Asked { text: logged_text });
+        self.persist_phase_change_async(&session.id, phase, brief, None).await?;
+        self.record_async(&session.id, Step::Asked { text: logged_text }).await;
         if let Err(e) = agent.prompt_with(blocks, turn_opts) {
             let _ = self
                 .0
                 .ledger
                 .write_db_async(async |db| SessionMailbox::settle(db, settle_id, false, Some(&e.to_string()), now()).await)
                 .await;
-            let _ = self
-                .0
-                .ledger
-                .apply_async(vec![self.phase_changed(session.id.clone(), Phase::Failed(PhaseFailed {}))])
-                .await;
+            let _ = self.persist_phase_change_async(&session.id, Phase::Failed(PhaseFailed {}), None, None).await;
             self.notify_workspace(&session.id);
             return Err(e.into());
         }
@@ -745,12 +737,12 @@ impl Sessions {
             .write_db_async(async |db| SessionMailbox::settle(db, settle_id, true, None, now()).await)
             .await;
         self.notify_workspace(&session.id);
-        Ok(self.session(&session.id).unwrap_or(session))
+        Ok(self.session_async(&session.id).await.unwrap_or(session))
     }
 
     /// Answers a pending tool permission request on a live session.
-    pub fn respond_permission(&self, input: SessionRespondPermissionInput) -> Result<()> {
-        let session = self.session(&input.id).ok_or_else(|| missing_session(&input.id))?;
+    pub async fn respond_permission_async(&self, input: SessionRespondPermissionInput) -> Result<()> {
+        let session = self.session_async(&input.id).await.ok_or_else(|| missing_session(&input.id))?;
         let agent = self
             .live_agent(&session.id)
             .ok_or_else(|| refused_session(t("server.session.workspace.notLive", &[])))?;
@@ -765,8 +757,8 @@ impl Sessions {
     }
 
     /// Answers a pending interactive question (`interaction_*`) on a live session.
-    pub fn respond_interaction(&self, input: SessionRespondInteractionInput) -> Result<()> {
-        let session = self.session(&input.id).ok_or_else(|| missing_session(&input.id))?;
+    pub async fn respond_interaction_async(&self, input: SessionRespondInteractionInput) -> Result<()> {
+        let session = self.session_async(&input.id).await.ok_or_else(|| missing_session(&input.id))?;
         let agent = self
             .live_agent(&session.id)
             .ok_or_else(|| refused_session(t("server.session.workspace.notLive", &[])))?;
@@ -788,7 +780,7 @@ impl Sessions {
 
     /// Updates a user session's `model`, `effort`, and/or `permission_mode`.
     pub async fn set_workspace_config_async(&self, input: SessionSetConfigInput) -> Result<SessionWorkspace> {
-        let mut session = self.session(&input.id).ok_or_else(|| missing_session(&input.id))?;
+        let mut session = self.session_async(&input.id).await.ok_or_else(|| missing_session(&input.id))?;
         if session.controller != SessionController::User {
             return Err(refused_session(t("server.session.workspace.notWorkspace", &[])));
         }
@@ -826,17 +818,17 @@ impl Sessions {
             };
             if session.policy != next_policy {
                 session.policy = next_policy;
-                let _ = self.0.ledger.apply_async(vec![Fact::session_changed(now(), session.clone())]).await;
+                let _ = self.persist_session_update_async(&session).await;
             }
         }
         self.set_workspace_meta_async(&session.id, next).await;
         self.notify_workspace(&session.id);
-        Ok(self.workspace_reply_async(self.session(&session.id).unwrap_or(session)).await)
+        Ok(self.workspace_reply_async(self.session_async(&session.id).await.unwrap_or(session)).await)
     }
 
     pub(super) async fn on_workspace_session_started_async(&self, session_id: &str, model: Option<String>) {
         let Some(model) = model.filter(|m| !m.trim().is_empty()) else { return };
-        if !self.session(session_id).is_some_and(|s| s.controller == SessionController::User) {
+        if !self.session_async(session_id).await.is_some_and(|s| s.controller == SessionController::User) {
             return;
         }
         let mut updated = None;
@@ -938,9 +930,6 @@ impl Sessions {
     }
 
     pub(super) fn on_workspace_turn_finished(&self, session_id: &str, usage: &Usage) {
-        if !self.session(session_id).is_some_and(|s| s.controller == SessionController::User) {
-            return;
-        }
         let tokens = super::journal::event_tokens_of(usage);
         {
             let mut map = self.0.workspaces.lock();
@@ -975,28 +964,12 @@ impl Sessions {
                 "Did not finish.".into()
             }
         };
-        let _ = self
-            .0
-            .ledger
-            .apply_async(vec![Fact::SessionReported(FactSessionReported {
-                at: now(),
-                id: session.id.clone(),
-                run: None,
-                outcome,
-                phase: None,
-                summary,
-                runs: session.runs + 1,
-                spent,
-                questions: vec![],
-                checks: vec![],
-                answer: None,
-            })])
-            .await;
+        let _ = self.settle_report_async(session, outcome, summary, spent, None, None, None).await;
         self.notify_workspace(&session.id);
     }
 
     pub(super) async fn on_workspace_pump_exited_async(&self, session_id: &str) {
-        let Some(session) = self.session(session_id).filter(|s| s.controller == SessionController::User) else {
+        let Some(session) = self.session_async(session_id).await.filter(|s| s.controller == SessionController::User) else {
             return;
         };
         let had_pending = {
@@ -1011,11 +984,7 @@ impl Sessions {
             }
         };
         if session.phase.is_working() {
-            let _ = self
-                .0
-                .ledger
-                .apply_async(vec![self.phase_changed(session_id, Phase::Resting(PhaseResting {}))])
-                .await;
+            let _ = self.persist_phase_change_async(session_id, Phase::Resting(PhaseResting {}), None, None).await;
             self.notify_workspace(session_id);
         } else if had_pending {
             self.notify_workspace(session_id);
@@ -1027,42 +996,22 @@ impl Sessions {
 mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
 
-    use parking_lot::Mutex;
-    use vibevalley_core::Applied;
-    use vibevalley_protocol::{
-        ContextRef, ExecutionPolicy, Fact, Outcome, Session, SessionController, SessionOpenWorkspaceInput, SessionSendInput, SliceBundle, SpaceState,
-    };
+    use vibevalley_protocol::{ContextRef, ExecutionPolicy, Outcome, Phase, Session, SessionController, SessionOpenWorkspaceInput, SessionSendInput};
     use vibevalley_runtime::oar::{
         Capabilities, ControlAction, ControlOutcome, ControlStatus, Event, Installation, ModelInfo, Registry, Runtime, Session as OarSession, SessionOptions,
         SessionStatus, voyage,
     };
 
     use super::*;
-    use crate::work::ledger::{BoardConfig, Facts, Ledger, LocalFacts};
-    use crate::work::session::RuntimeDrivers;
+    use crate::app::live::LiveOverlay;
+    use crate::app::outbox::Outbox;
+    use crate::app::runtime::Runtime as AppRuntime;
+    use crate::app::slice::SliceProjector;
+    use crate::work::ledger::{BoardConfig, IssuePersistence, Ledger};
+    use crate::work::session::RuntimeDriver;
     use crate::work::workplace::Workplace;
-
-    #[derive(Default)]
-    struct RecordingFacts {
-        inner: LocalFacts,
-        applied: Mutex<Vec<Fact>>,
-    }
-
-    impl Facts for RecordingFacts {
-        fn apply(&self, facts: Vec<Fact>) -> Applied {
-            self.applied.lock().extend(facts.iter().cloned());
-            self.inner.apply(facts)
-        }
-
-        fn read(&self, f: &mut dyn FnMut(&SpaceState)) {
-            self.inner.read(f);
-        }
-
-        fn bundle(&self) -> SliceBundle {
-            self.inner.bundle()
-        }
-    }
 
     struct StubSession {
         id: String,
@@ -1183,12 +1132,19 @@ mod tests {
     }
 
     struct NoopIssueStore;
-    impl crate::work::ledger::IssueStore for NoopIssueStore {
+    impl IssuePersistence for NoopIssueStore {
         fn all<'a>(
             &'a self,
             _db: &'a sea_orm::DatabaseConnection,
         ) -> vibevalley_runtime::agent::durable::BoxFuture<'a, std::result::Result<Vec<vibevalley_protocol::Issue>, sea_orm::DbErr>> {
             Box::pin(async { Ok(vec![]) })
+        }
+        fn get<'a>(
+            &'a self,
+            _db: &'a sea_orm::DatabaseConnection,
+            _id: &'a str,
+        ) -> vibevalley_runtime::agent::durable::BoxFuture<'a, std::result::Result<Option<vibevalley_protocol::Issue>, sea_orm::DbErr>> {
+            Box::pin(async { Ok(None) })
         }
         fn put<'a>(
             &'a self,
@@ -1206,165 +1162,178 @@ mod tests {
         }
     }
 
-    #[test]
-    fn sqlite_session_config_persists_without_workspace_json_files() {
-        vibevalley_runtime::rt::block_on(async {
-            let dir = tempfile::tempdir().unwrap();
-            let db = crate::db::ServerDb::open(dir.path()).unwrap();
-            let facts = Arc::new(RecordingFacts::default());
-            let (ledger, _) = Ledger::open_async(db.clone(), facts, Arc::new(NoopIssueStore), Arc::new(super::super::db::SqliteSessionStore))
-                .await
-                .unwrap();
-            let durable = db.durable().unwrap();
-            let config = Arc::new(BoardConfig::under(dir.path()));
-            let workplaces = Arc::new(Workplace::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
-            let mut registry = Registry::new();
-            registry.register(Arc::new(StubRuntime {
-                aborts: Arc::new(AtomicUsize::new(0)),
-                disposes: Arc::new(AtomicUsize::new(0)),
-            }));
-            let drivers = Arc::new(RuntimeDrivers {
-                registry: Arc::new(registry),
-                model: None,
-            });
-            let sessions = Sessions::new_async(durable, Arc::new(ledger), drivers, workplaces, config.clone(), None)
-                .await
-                .unwrap();
-
-            let session = Session::new(
-                "u1",
-                SessionController::User,
-                "Refactor",
-                "stub",
-                ExecutionPolicy::DirectCwd {
-                    repo: None,
-                    permission_mode: SessionPermissionMode::AcceptEdits,
-                },
-                now(),
-            );
-            sessions.0.ledger.apply_async(vec![Fact::session_changed(now(), session)]).await.unwrap();
-            assert_eq!(
-                sessions.load_workspace_meta_async("u1").await.permission_mode,
-                SessionPermissionMode::AcceptEdits
-            );
-
-            let meta = WorkspaceMeta {
-                title: Some("Refactor".into()),
-                model: Some("claude-sonnet".into()),
-                effort: Some("high".into()),
-                permission_mode: SessionPermissionMode::ReadOnly,
-            };
-            sessions.save_workspace_meta_async("u1", &meta).await;
-            let loaded = sessions.load_workspace_meta_async("u1").await;
-            assert_eq!(loaded.title.as_deref(), Some("Refactor"));
-            assert_eq!(loaded.model.as_deref(), Some("claude-sonnet"));
-            assert_eq!(loaded.effort.as_deref(), Some("high"));
-            assert_eq!(loaded.permission_mode, SessionPermissionMode::ReadOnly);
-            assert!(!config.data_dir.join("workspace/u1.json").exists());
+    #[tokio::test]
+    async fn sqlite_session_config_persists_without_workspace_json_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = crate::db::ServerDb::open(dir.path()).unwrap();
+        let live = LiveOverlay::new();
+        let projector = SliceProjector::new();
+        let outbox = Outbox::new(db.clone());
+        let runtime = AppRuntime::new();
+        let (ledger, _) = Ledger::open_async(
+            db.clone(),
+            live,
+            projector,
+            outbox,
+            Arc::new(NoopIssueStore),
+            Arc::new(super::super::db::SqliteSessionStore),
+        )
+        .await
+        .unwrap();
+        let durable = db.durable().unwrap();
+        let config = Arc::new(BoardConfig::under(dir.path()));
+        let workplaces = Arc::new(Workplace::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
+        let mut registry = Registry::new();
+        registry.register(Arc::new(StubRuntime {
+            aborts: Arc::new(AtomicUsize::new(0)),
+            disposes: Arc::new(AtomicUsize::new(0)),
+        }));
+        let drivers = Arc::new(RuntimeDriver {
+            registry: Arc::new(registry),
+            model: None,
         });
+        let sessions = SessionStore::new_async(durable, Arc::new(ledger), drivers, workplaces, config.clone(), runtime.clone(), None)
+            .await
+            .unwrap();
+
+        let session = Session::new(
+            "u1",
+            SessionController::User,
+            "Refactor",
+            "stub",
+            ExecutionPolicy::DirectCwd {
+                repo: None,
+                permission_mode: SessionPermissionMode::AcceptEdits,
+            },
+            now(),
+        );
+        sessions.persist_session_update_async(&session).await.unwrap();
+        assert_eq!(
+            sessions.load_workspace_meta_async("u1").await.permission_mode,
+            SessionPermissionMode::AcceptEdits
+        );
+
+        let meta = WorkspaceMeta {
+            title: Some("Refactor".into()),
+            model: Some("claude-sonnet".into()),
+            effort: Some("high".into()),
+            permission_mode: SessionPermissionMode::ReadOnly,
+        };
+        sessions.save_workspace_meta_async("u1", &meta).await;
+        let loaded = sessions.load_workspace_meta_async("u1").await;
+        assert_eq!(loaded.title.as_deref(), Some("Refactor"));
+        assert_eq!(loaded.model.as_deref(), Some("claude-sonnet"));
+        assert_eq!(loaded.effort.as_deref(), Some("high"));
+        assert_eq!(loaded.permission_mode, SessionPermissionMode::ReadOnly);
+        assert!(!config.data_dir.join("workspace/u1.json").exists());
+        let _ = runtime.shutdown(Duration::from_secs(1)).await;
     }
 
-    #[test]
-    fn close_workspace_aborts_disposes_ends_turn_preserves_dir_and_emits_session_left() {
-        vibevalley_runtime::rt::block_on(async {
-            let dir = tempfile::tempdir().unwrap();
-            let project_dir = dir.path().join("repo");
-            std::fs::create_dir_all(&project_dir).unwrap();
-            let sentinel = project_dir.join("keep.txt");
-            std::fs::write(&sentinel, "precious").unwrap();
+    #[tokio::test]
+    async fn close_workspace_aborts_disposes_ends_turn_preserves_dir_and_emits_session_left() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_dir = dir.path().join("repo");
+        std::fs::create_dir_all(&project_dir).unwrap();
+        let sentinel = project_dir.join("keep.txt");
+        std::fs::write(&sentinel, "precious").unwrap();
 
-            let db = crate::db::ServerDb::open(dir.path()).unwrap();
-            let facts = Arc::new(RecordingFacts::default());
-            let (ledger, _) = Ledger::open_async(
-                db.clone(),
-                facts.clone(),
-                Arc::new(NoopIssueStore),
-                Arc::new(super::super::db::SqliteSessionStore),
+        let db = crate::db::ServerDb::open(dir.path()).unwrap();
+        let live = LiveOverlay::new();
+        let projector = SliceProjector::new();
+        let outbox = Outbox::new(db.clone());
+        let runtime = AppRuntime::new();
+        let (ledger, _) = Ledger::open_async(
+            db.clone(),
+            live,
+            projector.clone(),
+            outbox,
+            Arc::new(NoopIssueStore),
+            Arc::new(super::super::db::SqliteSessionStore),
+        )
+        .await
+        .unwrap();
+        let durable = db.durable().unwrap();
+        let config = Arc::new(BoardConfig::under(dir.path()));
+        let workplaces = Arc::new(Workplace::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
+
+        let aborts = Arc::new(AtomicUsize::new(0));
+        let disposes = Arc::new(AtomicUsize::new(0));
+        let mut registry = Registry::new();
+        registry.register(Arc::new(StubRuntime {
+            aborts: aborts.clone(),
+            disposes: disposes.clone(),
+        }));
+        let drivers = Arc::new(RuntimeDriver {
+            registry: Arc::new(registry),
+            model: None,
+        });
+        let sessions = SessionStore::new_async(durable, Arc::new(ledger), drivers, workplaces, config.clone(), runtime.clone(), None)
+            .await
+            .unwrap();
+        let mut events_rx = sessions.subscribe_events();
+
+        let opened = sessions
+            .open_workspace_async(SessionOpenWorkspaceInput {
+                runtime: "stub".into(),
+                cwd: project_dir.to_string_lossy().into_owned(),
+                repo: None,
+                model: None,
+                effort: None,
+                permission_mode: None,
+                title: Some("Chat tab".into()),
+                session_id: None,
+            })
+            .await
+            .unwrap();
+        let sid = opened.id.clone();
+        assert!(sessions.is_live(&sid));
+        assert!(!config.data_dir.join("workspace").exists());
+        assert_eq!(sessions.session_async(&sid).await.unwrap().controller, SessionController::User);
+        assert!(sessions.session_async(&sid).await.unwrap().is_free_user());
+
+        sessions
+            .send_workspace_async(
+                SessionSendInput {
+                    id: sid.clone(),
+                    text: "investigate".into(),
+                    attachments: None,
+                    context_files: None,
+                },
+                None,
             )
             .await
             .unwrap();
-            let durable = db.durable().unwrap();
-            let config = Arc::new(BoardConfig::under(dir.path()));
-            let workplaces = Arc::new(Workplace::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
+        assert!(sessions.session_async(&sid).await.unwrap().phase.is_working());
+        assert_eq!(sessions.mailbox_entries_async(&sid).await.unwrap().len(), 1);
 
-            let aborts = Arc::new(AtomicUsize::new(0));
-            let disposes = Arc::new(AtomicUsize::new(0));
-            let mut registry = Registry::new();
-            registry.register(Arc::new(StubRuntime {
-                aborts: aborts.clone(),
-                disposes: disposes.clone(),
-            }));
-            let drivers = Arc::new(RuntimeDrivers {
-                registry: Arc::new(registry),
-                model: None,
-            });
-            let sessions = Sessions::new_async(durable, Arc::new(ledger), drivers, workplaces, config.clone(), None)
-                .await
-                .unwrap();
-
-            let opened = sessions
-                .open_workspace_async(SessionOpenWorkspaceInput {
-                    runtime: "stub".into(),
-                    cwd: project_dir.to_string_lossy().into_owned(),
-                    repo: None,
-                    model: None,
-                    effort: None,
-                    permission_mode: None,
-                    title: Some("Chat tab".into()),
-                    session_id: None,
-                })
-                .await
-                .unwrap();
-            let sid = opened.id.clone();
-            assert!(sessions.is_live(&sid));
-            assert!(!config.data_dir.join("workspace").exists());
-            assert_eq!(sessions.session(&sid).unwrap().controller, SessionController::User);
-            assert!(sessions.session(&sid).unwrap().is_free_user());
-
-            sessions
-                .send_workspace_async(
-                    SessionSendInput {
-                        id: sid.clone(),
-                        text: "investigate".into(),
-                        attachments: None,
-                        context_files: None,
-                    },
-                    None,
-                )
-                .await
-                .unwrap();
-            assert!(sessions.session(&sid).unwrap().phase.is_working());
-            assert_eq!(sessions.mailbox_entries_async(&sid).await.unwrap().len(), 1);
-
-            let mut issue_session = Session::new("w-issue", SessionController::IssueBoard, "worker", "stub", ExecutionPolicy::SandboxDir, now());
-            issue_session.attach_binding(ContextRef::Issue {
-                id: "i1".into(),
-                refining: None,
-            });
-            sessions.0.ledger.apply_async(vec![Fact::session_changed(now(), issue_session)]).await.unwrap();
-
-            sessions.close_workspace_async("w-issue").await;
-            assert!(sessions.session("w-issue").is_some(), "non-user session must not be closed");
-
-            sessions.close_workspace_async(&sid).await;
-            assert_eq!(aborts.load(Ordering::SeqCst), 1);
-            assert_eq!(disposes.load(Ordering::SeqCst), 1);
-            assert!(!sessions.is_live(&sid));
-            assert!(sessions.session(&sid).is_none());
-            assert!(!sessions.0.workspaces.lock().contains_key(&sid));
-            assert_eq!(std::fs::read_to_string(&sentinel).unwrap(), "precious");
-
-            let applied = facts.applied.lock();
-            assert!(
-                applied
-                    .iter()
-                    .any(|f| matches!(f, Fact::SessionReported(r) if r.id == sid && r.outcome == Outcome::Interrupted)),
-                "closing a working workspace session must interrupt its active turn"
-            );
-            assert!(
-                applied.iter().any(|f| matches!(f, Fact::SessionLeft(l) if l.id == sid)),
-                "closing a workspace session must emit Fact::session_left"
-            );
+        let mut issue_session = Session::new("w-issue", SessionController::IssueBoard, "worker", "stub", ExecutionPolicy::SandboxDir, now());
+        issue_session.attach_binding(ContextRef::Issue {
+            id: "i1".into(),
+            refining: None,
         });
+        sessions.persist_session_update_async(&issue_session).await.unwrap();
+
+        sessions.close_workspace_async("w-issue").await;
+        assert!(sessions.session_async("w-issue").await.is_some(), "non-user session must not be closed");
+
+        sessions.close_workspace_async(&sid).await;
+        assert_eq!(aborts.load(Ordering::SeqCst), 1);
+        assert_eq!(disposes.load(Ordering::SeqCst), 1);
+        assert!(!sessions.is_live(&sid));
+        assert!(sessions.session_async(&sid).await.is_none());
+        assert!(!sessions.0.workspaces.lock().contains_key(&sid));
+        assert_eq!(std::fs::read_to_string(&sentinel).unwrap(), "precious");
+
+        let past = sessions.0.ledger.past_session_async(&sid).await.expect("closed session archived in DB");
+        assert_eq!(past.last_run.as_ref().map(|r| r.outcome), Some(Outcome::Interrupted));
+        assert!(projector.seq() > 0);
+        let mut saw_left = false;
+        while let Ok(ev) = events_rx.try_recv() {
+            if matches!(ev, crate::work::session::SessionLifecycleEvent::Left { ref id, .. } if id == &sid) {
+                saw_left = true;
+            }
+        }
+        assert!(saw_left, "closing a workspace session must emit SessionLifecycleEvent::Left");
+        let _ = runtime.shutdown(Duration::from_secs(1)).await;
     }
 }

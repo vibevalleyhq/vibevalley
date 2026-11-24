@@ -173,7 +173,7 @@ impl SessionMailbox {
     }
 }
 
-impl super::sessions::Sessions {
+impl super::sessions::SessionStore {
     pub async fn enqueue_mailbox_async(
         &self,
         session_id: &str,
@@ -239,55 +239,53 @@ mod tests {
     use super::*;
     use crate::db::ServerDb;
 
-    #[test]
-    fn mailbox_enqueue_idempotency_single_claim_and_withdraw_semantics() {
+    #[tokio::test]
+    async fn mailbox_enqueue_idempotency_single_claim_and_withdraw_semantics() {
         let dir = tempfile::tempdir().unwrap();
         let server_db = ServerDb::open(dir.path()).unwrap();
         let w = server_db.write_conn();
         let r = server_db.read_conn();
 
-        vibevalley_runtime::rt::block_on(async {
-            let a = SessionMailbox::enqueue(w, "s1", "k1", MailboxSource::WorkspaceUser, None, "hello", 10)
-                .await
-                .unwrap();
-            let a_dup = SessionMailbox::enqueue(w, "s1", "k1", MailboxSource::WorkspaceUser, None, "changed", 20)
-                .await
-                .unwrap();
-            assert_eq!(a_dup.id, a.id);
-            assert_eq!(a_dup.payload, "hello");
-            assert_eq!(a_dup.status, MailboxStatus::Pending);
+        let a = SessionMailbox::enqueue(w, "s1", "k1", MailboxSource::WorkspaceUser, None, "hello", 10)
+            .await
+            .unwrap();
+        let a_dup = SessionMailbox::enqueue(w, "s1", "k1", MailboxSource::WorkspaceUser, None, "changed", 20)
+            .await
+            .unwrap();
+        assert_eq!(a_dup.id, a.id);
+        assert_eq!(a_dup.payload, "hello");
+        assert_eq!(a_dup.status, MailboxStatus::Pending);
 
-            let b = SessionMailbox::enqueue(w, "s1", "k2", MailboxSource::ChannelDirect, Some("m-2"), "second", 30)
-                .await
-                .unwrap();
-            let c = SessionMailbox::enqueue(w, "orch", "k3", MailboxSource::ChannelOrchestrator, Some("m-2"), "second", 30)
-                .await
-                .unwrap();
-            let d = SessionMailbox::enqueue(w, "issue:1", "k4", MailboxSource::IssueComment, Some("m-2"), "second", 30)
-                .await
-                .unwrap();
-            assert_eq!(SessionMailbox::withdraw_by_message(w, "m-2", 31).await.unwrap(), 3);
-            assert_eq!(SessionMailbox::withdraw_by_message(w, "m-2", 32).await.unwrap(), 0);
-            assert!(!SessionMailbox::withdraw(w, "k2", 32).await.unwrap());
+        let b = SessionMailbox::enqueue(w, "s1", "k2", MailboxSource::ChannelDirect, Some("m-2"), "second", 30)
+            .await
+            .unwrap();
+        let c = SessionMailbox::enqueue(w, "orch", "k3", MailboxSource::ChannelOrchestrator, Some("m-2"), "second", 30)
+            .await
+            .unwrap();
+        let d = SessionMailbox::enqueue(w, "issue:1", "k4", MailboxSource::IssueComment, Some("m-2"), "second", 30)
+            .await
+            .unwrap();
+        assert_eq!(SessionMailbox::withdraw_by_message(w, "m-2", 31).await.unwrap(), 3);
+        assert_eq!(SessionMailbox::withdraw_by_message(w, "m-2", 32).await.unwrap(), 0);
+        assert!(!SessionMailbox::withdraw(w, "k2", 32).await.unwrap());
 
-            assert!(SessionMailbox::claim_by_key(w, "k1", 40).await.unwrap());
-            assert!(!SessionMailbox::claim_by_key(w, "k1", 41).await.unwrap());
-            assert!(!SessionMailbox::withdraw(w, "k1", 42).await.unwrap());
-            assert!(!SessionMailbox::claim_by_key(w, "k2", 43).await.unwrap());
+        assert!(SessionMailbox::claim_by_key(w, "k1", 40).await.unwrap());
+        assert!(!SessionMailbox::claim_by_key(w, "k1", 41).await.unwrap());
+        assert!(!SessionMailbox::withdraw(w, "k1", 42).await.unwrap());
+        assert!(!SessionMailbox::claim_by_key(w, "k2", 43).await.unwrap());
 
-            SessionMailbox::settle(w, a.id, true, Some("ok"), 50).await.unwrap();
-            let entries = SessionMailbox::list(r, "s1").await.unwrap();
-            assert_eq!(entries.len(), 2);
-            assert_eq!(entries[0].id, a.id);
-            assert_eq!(entries[0].status, MailboxStatus::Done);
-            assert_eq!(entries[0].result.as_deref(), Some("ok"));
-            assert_eq!(entries[1].id, b.id);
-            assert_eq!(entries[1].status, MailboxStatus::Withdrawn);
-            assert_eq!(SessionMailbox::list(r, "orch").await.unwrap()[0].id, c.id);
-            assert_eq!(SessionMailbox::list(r, "orch").await.unwrap()[0].status, MailboxStatus::Withdrawn);
-            assert_eq!(SessionMailbox::list(r, "issue:1").await.unwrap()[0].id, d.id);
-            assert_eq!(SessionMailbox::list(r, "issue:1").await.unwrap()[0].status, MailboxStatus::Withdrawn);
-        });
-        server_db.close();
+        SessionMailbox::settle(w, a.id, true, Some("ok"), 50).await.unwrap();
+        let entries = SessionMailbox::list(r, "s1").await.unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].id, a.id);
+        assert_eq!(entries[0].status, MailboxStatus::Done);
+        assert_eq!(entries[0].result.as_deref(), Some("ok"));
+        assert_eq!(entries[1].id, b.id);
+        assert_eq!(entries[1].status, MailboxStatus::Withdrawn);
+        assert_eq!(SessionMailbox::list(r, "orch").await.unwrap()[0].id, c.id);
+        assert_eq!(SessionMailbox::list(r, "orch").await.unwrap()[0].status, MailboxStatus::Withdrawn);
+        assert_eq!(SessionMailbox::list(r, "issue:1").await.unwrap()[0].id, d.id);
+        assert_eq!(SessionMailbox::list(r, "issue:1").await.unwrap()[0].status, MailboxStatus::Withdrawn);
+        server_db.close_async().await;
     }
 }

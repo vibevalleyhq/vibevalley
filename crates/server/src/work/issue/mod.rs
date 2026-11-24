@@ -10,25 +10,27 @@ mod edits;
 mod family;
 mod refine;
 
-pub use board::{Board, NewIssue, Sent};
+pub use board::{IssueStore, NewIssue, Sent};
 pub use db::SqliteIssueStore;
 pub use family::{ChildDraft, MAX_CHILDREN};
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use vibevalley_core::Clock;
+use vibevalley_core::Move;
 use vibevalley_core::brief::{findings_of, milestones_of, resume_words};
 use vibevalley_core::rules::short_title;
-use vibevalley_core::{Move, SharedClock, system_clock};
 use vibevalley_i18n::{Params, t};
 use vibevalley_protocol::{
-    ActWords, ApiError, Applied, AppliedIssue, BizCode, ChangedFile, Changes, Commit, Issue, IssueAction, IssueHistory, IssueReviewInput, IssueStageKind,
-    IssueStatus, IssueUpdate, Next, Preview, Session, StuckReason, UncommittedItem, ops,
+    ActWords, ApiError, Applied, AppliedIssue, BizCode, Caller, ChangedFile, Changes, Commit, Issue, IssueAction, IssueFilter, IssueHistory, IssueRefineInput,
+    IssueRequest, IssueReviewInput, IssueSplitInput, IssueStageKind, IssueStatus, IssueStatusPreviewUpdateInput, IssueStatusUpdateInput, IssueTimeline,
+    IssueUpdate, IssueUpdateInput, Next, Preview, Run, Session, StuckReason, UncommittedItem,
 };
 
-use crate::Hub;
-use crate::app::hub::refusal::{AsyncRequestKeys, LookIn};
-use crate::team::agent::Agents;
+use crate::app::port::ChannelAnnouncePort;
+use crate::app::refusal::LookIn;
+use crate::team::agent::AgentStore;
 use crate::work::ledger::{BoardError, Undelivered};
 
 fn refused(key: &str, params: Params) -> ApiError {
@@ -43,7 +45,7 @@ fn look_in_issues() -> Next {
 }
 
 /// A board error as the endpoint refuses with it.
-fn api(board: &Board, e: BoardError) -> ApiError {
+fn api(board: &IssueStore, e: BoardError) -> ApiError {
     match e {
         BoardError::NoIssue(r) => ApiError::new(BizCode::IssueNotFound, t("server.issue.issueRef", &[("ref", r.into())])).with_next(vec![look_in_issues()]),
         BoardError::Refused(r) => ApiError::new(BizCode::IssueRefused, r.text()),
@@ -62,8 +64,12 @@ fn api(board: &Board, e: BoardError) -> ApiError {
 }
 
 /// `get`: by id, number or `#number`, else IssueNotFound.
-fn get(board: &Board, reference: &str) -> Result<Issue, ApiError> {
-    board.issue(reference).ok_or_else(|| api(board, BoardError::NoIssue(reference.to_string())))
+async fn get_async(board: &IssueStore, reference: &str) -> Result<Issue, ApiError> {
+    board
+        .issue_async(reference)
+        .await
+        .map_err(|e| api(board, e))?
+        .ok_or_else(|| api(board, BoardError::NoIssue(reference.to_string())))
 }
 
 /// `nextSteps`: what the user can do with the issue, as words and commands.
@@ -141,15 +147,15 @@ fn settle(item: &Issue, to: IssueStatus, text: &str) -> Result<Settled, ApiError
     Ok(Settled { mv, said })
 }
 
-fn helper_name(board: &Board, item: &Issue) -> String {
-    item.latest_session_id()
-        .and_then(|s| board.session(s))
-        .map(|s| s.name)
-        .unwrap_or_else(|| t("server.issue.helper", &[]))
+async fn helper_name_async(board: &IssueStore, item: &Issue) -> String {
+    match item.latest_session_id() {
+        Some(s) => board.session_async(s).await.map(|s| s.name).unwrap_or_else(|| t("server.issue.helper", &[])),
+        None => t("server.issue.helper", &[]),
+    }
 }
 
 /// `movesWords`: a settled move in words, one step a line.
-fn moves_words(board: &Board, agents: Option<&Agents>, item: &Issue, s: &Settled) -> Result<Vec<String>, ApiError> {
+async fn moves_words_async(board: &IssueStore, agents: Option<&AgentStore>, item: &Issue, s: &Settled) -> Result<Vec<String>, ApiError> {
     let name = match (agents, s.mv) {
         // `readyOf`: what starting it would refuse, its preview refuses.
         (Some(agents), Move::Start) => {
@@ -173,16 +179,16 @@ fn moves_words(board: &Board, agents: Option<&Agents>, item: &Issue, s: &Settled
         }
         _ => None,
     };
-    Ok(move_lines(board, item, s, name))
+    Ok(move_lines_async(board, item, s, name).await)
 }
 
-fn move_lines(board: &Board, item: &Issue, s: &Settled, name: Option<String>) -> Vec<String> {
+async fn move_lines_async(board: &IssueStore, item: &Issue, s: &Settled, name: Option<String>) -> Vec<String> {
     let n = format!("#{}", item.number);
-    let helper = || helper_name(board, item);
+    let helper = helper_name_async(board, item).await;
     let agent = || name.clone().unwrap_or_else(|| item.assigned_agent().unwrap_or("claude").to_string());
     match s.mv {
         Move::Start => {
-            let full = board.no_room(item);
+            let full = board.no_room_async(item).await;
             if !full.is_empty() {
                 return vec![
                     t("server.issue.does.sendTo", &[("n", n.into()), ("agent", agent().into())]),
@@ -205,7 +211,7 @@ fn move_lines(board: &Board, item: &Issue, s: &Settled, name: Option<String>) ->
                     Some(StuckReason::Interrupted) => "server.issue.does.resume",
                     _ => "server.issue.does.cure",
                 };
-                return vec![t(key, &[("helper", helper().into()), ("words", resume_words().into())])];
+                return vec![t(key, &[("helper", helper.into()), ("words", resume_words().into())])];
             }
             if item.stage.state == IssueStageKind::Reviewing {
                 return vec![t(
@@ -213,11 +219,11 @@ fn move_lines(board: &Board, item: &Issue, s: &Settled, name: Option<String>) ->
                     &[
                         ("n", item.number.into()),
                         ("findings", findings_of(&s.said).len().into()),
-                        ("helper", helper().into()),
+                        ("helper", helper.into()),
                     ],
                 )];
             }
-            vec![t("server.issue.does.round", &[("helper", helper().into()), ("said", s.said.clone().into())])]
+            vec![t("server.issue.does.round", &[("helper", helper.into()), ("said", s.said.clone().into())])]
         }
         Move::Reopen => {
             let mut out = vec![t("server.issue.does.reopen", &[("n", n.into())])];
@@ -228,12 +234,15 @@ fn move_lines(board: &Board, item: &Issue, s: &Settled, name: Option<String>) ->
         }
         Move::Revive => vec![t("server.issue.does.revive", &[("n", n.into())])],
         Move::Complete => {
-            let changes = item.repo.as_ref().and_then(|_| board.changes(&item.id).ok());
+            let changes = match item.repo.as_ref() {
+                Some(_) => board.changes_async(&item.id).await.ok(),
+                None => None,
+            };
             let commits = changes.as_ref().map(|c| c.commits.len()).unwrap_or(0);
             if commits == 0 || item.deliver == vibevalley_protocol::Deliverable::Answer {
                 return vec![
                     t("server.issue.does.completeNone", &[("n", n.into())]),
-                    t("server.issue.does.helperLeaves", &[("helper", helper().into())]),
+                    t("server.issue.does.helperLeaves", &[("helper", helper.into())]),
                 ];
             }
             if matches!(
@@ -243,7 +252,7 @@ fn move_lines(board: &Board, item: &Issue, s: &Settled, name: Option<String>) ->
             {
                 return vec![
                     t("server.issue.does.completeKept", &[("n", n.into()), ("commits", commits.into())]),
-                    t("server.issue.does.helperLeaves", &[("helper", helper().into())]),
+                    t("server.issue.does.helperLeaves", &[("helper", helper.into())]),
                 ];
             }
             let mut out = Vec::new();
@@ -251,7 +260,7 @@ fn move_lines(board: &Board, item: &Issue, s: &Settled, name: Option<String>) ->
             if !c.uncommitted.is_empty() {
                 out.push(t(
                     "server.issue.does.commitFirst",
-                    &[("helper", helper().into()), ("files", c.uncommitted.len().into())],
+                    &[("helper", helper.into()), ("files", c.uncommitted.len().into())],
                 ));
             }
             if !c.conflicts.is_empty() {
@@ -265,13 +274,13 @@ fn move_lines(board: &Board, item: &Issue, s: &Settled, name: Option<String>) ->
             out.push(t("server.issue.does.check", &[]));
             out.push(t(
                 "server.issue.does.merge",
-                &[("base", c.base.into()), ("commits", commits.into()), ("helper", helper().into())],
+                &[("base", c.base.into()), ("commits", commits.into()), ("helper", helper.into())],
             ));
             out
         }
         Move::Cancel => vec![
             t("server.issue.does.cancel", &[("n", n.into())]),
-            t("server.issue.does.cancelLeaves", &[("helper", helper().into())]),
+            t("server.issue.does.cancelLeaves", &[("helper", helper.into())]),
         ],
         Move::Drop => {
             let mut out = vec![t("server.issue.does.drop", &[("n", n.into())])];
@@ -283,7 +292,7 @@ fn move_lines(board: &Board, item: &Issue, s: &Settled, name: Option<String>) ->
     }
 }
 
-fn resolve_agent(profiles: Option<&Agents>, agent: &str) -> String {
+fn resolve_agent(profiles: Option<&AgentStore>, agent: &str) -> String {
     let agent = agent.trim();
     match profiles {
         Some(agents) if !agent.is_empty() => agents.agent_key(agent),
@@ -291,13 +300,14 @@ fn resolve_agent(profiles: Option<&Agents>, agent: &str) -> String {
     }
 }
 
-pub(crate) fn changes_of(board: &Board, item: &Issue, since_tree: Option<&str>) -> Result<Changes, ApiError> {
+pub(crate) async fn changes_of_async(board: &IssueStore, item: &Issue, since_tree: Option<&str>) -> Result<Changes, ApiError> {
     // A parent is worked through its children: their merges are its changes.
-    let has_children = board.read(|s| s.issues.iter().any(|i| i.parent.as_deref() == Some(item.id.as_str())));
+    let all_issues = board.issues_async().await.map_err(|e| api(board, e))?;
+    let has_children = all_issues.iter().any(|i| i.parent.as_deref() == Some(item.id.as_str()));
     if item.repo.is_none() || !(item.was_sent() || has_children) {
         return Err(refused("server.issue.notStarted", &[]));
     }
-    let c = board.changes_since(&item.id, since_tree).map_err(|e| api(board, e))?;
+    let c = board.changes_since_async(&item.id, since_tree).await.map_err(|e| api(board, e))?;
     let letter = |d: &vibevalley_git::FileDiff| -> String {
         use vibevalley_git::Change::*;
         match d.change {
@@ -374,8 +384,8 @@ fn patch_of(d: &vibevalley_git::FileDiff, path: &str) -> String {
 }
 
 /// `issue.review`: the verdict on what was handed back.
-pub(crate) async fn review_async(board: &Board, input: IssueReviewInput) -> Result<Issue, ApiError> {
-    let item = get(board, &input.id)?;
+pub(crate) async fn review_async(board: &IssueStore, input: IssueReviewInput) -> Result<Issue, ApiError> {
+    let item = get_async(board, &input.id).await?;
     if item.status != IssueStatus::InReview {
         return Err(refused("server.issue.nothingToAccept", &[]).with_next(next_steps(&item)));
     }
@@ -392,16 +402,16 @@ pub(crate) async fn review_async(board: &Board, input: IssueReviewInput) -> Resu
 }
 
 /// `issue.comment.create`: words to the issue's helper.
-pub(crate) async fn comment_async(board: &Board, id: &str, text: &str) -> Result<(), ApiError> {
-    let item = get(board, id)?;
+pub(crate) async fn comment_async(board: &IssueStore, id: &str, text: &str) -> Result<(), ApiError> {
+    let item = get_async(board, id).await?;
     if item.status.is_closed() {
         return Err(refused("server.issue.closedReopen", &[]));
     }
     board.tell_async(&item.id, text).await.map_err(|e| api(board, e))
 }
 
-async fn split_async(board: &Board, input: &vibevalley_protocol::IssueSplitInput) -> Result<String, ApiError> {
-    let mut parent = get(board, &input.id)?;
+async fn split_async(board: &IssueStore, input: &IssueSplitInput) -> Result<String, ApiError> {
+    let mut parent = get_async(board, &input.id).await?;
     if let Some(title) = input.title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
         parent = board
             .edit_async(
@@ -436,305 +446,188 @@ async fn split_async(board: &Board, input: &vibevalley_protocol::IssueSplitInput
     Ok(out)
 }
 
-/// Every `issue.*` endpoint, answered by `board`, with an issue's agent a
-/// runtime id. The board's facts must go into `hub`
-/// (`Board::open_on(.., hub.clone())`).
-pub fn install(hub: &Arc<Hub>, board: Board) {
-    install_on(hub, board, None);
-}
+impl IssueStore {
+    pub(crate) async fn issue_list_endpoint_async(&self, filter: &IssueFilter, clock: &dyn Clock) -> Result<Vec<Issue>, ApiError> {
+        let issues = self.issues_async().await.map_err(|e| api(self, e))?;
+        Ok(vibevalley_core::pick_issues(&issues, filter, clock.now_ms()))
+    }
 
-/// `install`, with an issue's agent one of `agents`' profiles (the board
-/// opened with `Board::open_with(.., agents, ..)`).
-pub fn install_on(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>) {
-    install_on_with_clock(hub, board, agents, system_clock());
-}
+    pub(crate) async fn issue_get_endpoint_async(&self, id: &str) -> Result<Issue, ApiError> {
+        get_async(self, id).await
+    }
 
-/// Same as [`install_on`], injecting an explicit wall [`Clock`](vibevalley_core::Clock)
-/// for `issue.list` patrol ordering.
-pub fn install_on_with_clock(hub: &Arc<Hub>, board: Board, agents: Option<Arc<Agents>>, clock: SharedClock) {
-    let names = agents;
-    let b = board.clone();
-    hub.on::<ops::IssueList>(move |_, filter| Ok(b.read(|s| vibevalley_core::pick_issues(&s.issues, &filter, clock.now_ms()))));
-    let b = board.clone();
-    hub.on_async::<ops::IssueGet, _, _>(move |_, input| {
-        let b = b.clone();
-        async move { get(&b, &input.id) }
-    });
-
-    let b = board.clone();
-    let keys = Arc::new(AsyncRequestKeys::default());
-    let profiles = names.clone();
-    let h = Arc::downgrade(hub);
-    hub.on_async::<ops::IssueCreate, _, _>(move |_, req| {
-        let b = b.clone();
-        let keys = keys.clone();
-        let profiles = profiles.clone();
-        let h = h.clone();
-        async move {
-            let key = req.request_key.clone();
-            keys.once(key.as_deref(), async move {
-                let issue = create_async(&b, profiles.as_deref(), &req).await?;
-                Ok(AppliedIssue::from_issue(issue, h.upgrade().map_or(0, |hub| hub.seq())))
+    pub(crate) async fn issue_create_endpoint_async(&self, agents: Option<&AgentStore>, req: &IssueRequest) -> Result<AppliedIssue, ApiError> {
+        let key = req.request_key.clone();
+        self.0
+            .create_keys
+            .once(key.as_deref(), async move {
+                let issue = create_async(self, agents, req).await?;
+                Ok(AppliedIssue::from_issue(issue, self.seq()))
             })
             .await
-        }
-    });
+    }
 
-    let b = board.clone();
-    let profiles = names.clone();
-    let h = Arc::downgrade(hub);
-    hub.on_async::<ops::IssueUpdate, _, _>(move |_, input| {
-        let b = b.clone();
-        let profiles = profiles.clone();
-        let h = h.clone();
-        async move {
-            let issue = update_async(&b, profiles.as_deref(), input).await?;
-            Ok(AppliedIssue::from_issue(issue, h.upgrade().map_or(0, |hub| hub.seq())))
-        }
-    });
+    pub(crate) async fn issue_update_endpoint_async(&self, agents: Option<&AgentStore>, input: IssueUpdateInput) -> Result<AppliedIssue, ApiError> {
+        let issue = update_async(self, agents, input).await?;
+        Ok(AppliedIssue::from_issue(issue, self.seq()))
+    }
 
-    let b = board.clone();
-    hub.on_async::<ops::IssueDelete, _, _>(move |_, input| {
-        let b = b.clone();
-        async move {
-            let id = get(&b, &input.id)?.id;
-            b.remove_async(&id).await.map_err(|e| api(&b, e))
+    pub(crate) async fn issue_delete_endpoint_async(&self, id: &str) -> Result<(), ApiError> {
+        let id = get_async(self, id).await?.id;
+        self.remove_async(&id).await.map_err(|e| api(self, e))
+    }
+
+    pub(crate) async fn issue_preview_delete_endpoint_async(&self, id: &str) -> Result<Preview, ApiError> {
+        let item = get_async(self, id).await?;
+        if item.was_sent() {
+            return Err(refused("server.issue.started", &[]));
         }
-    });
-    let b = board.clone();
-    hub.on_async::<ops::IssuePreviewDelete, _, _>(move |_, input| {
-        let b = b.clone();
-        async move {
-            let item = get(&b, &input.id)?;
-            if item.was_sent() {
+        let mut does = vec![t(
+            "server.issue.does.deleteIssue",
+            &[("n", item.number.into()), ("title", short_title(&item.title).into())],
+        )];
+        if let Some(r) = &item.refining {
+            does.push(t("server.issue.does.drafterLeaves", &[("name", r.name.clone().into())]));
+        }
+        if item.repo.is_some() {
+            does.push(t("server.issue.does.cleanWorktree", &[]));
+        }
+        Ok(Preview { does })
+    }
+
+    pub(crate) async fn issue_status_update_endpoint_async(
+        &self,
+        agents: Option<&AgentStore>,
+        input: &IssueStatusUpdateInput,
+    ) -> Result<AppliedIssue, ApiError> {
+        let key = input.request_key.clone();
+        self.0
+            .status_keys
+            .once(key.as_deref(), async move {
+                let issue = status_async(self, agents, input).await?;
+                Ok(AppliedIssue::from_issue(issue, self.seq()))
+            })
+            .await
+    }
+
+    pub(crate) async fn issue_status_preview_update_endpoint_async(
+        &self,
+        agents: Option<&AgentStore>,
+        input: &IssueStatusPreviewUpdateInput,
+    ) -> Result<Preview, ApiError> {
+        let mut item = get_async(self, &input.id).await?;
+        Self::verify_approval(&item, input.status, input.revision.as_ref()).map_err(|e| api(self, e))?;
+        if let Some(edit) = &input.edit {
+            if edit_rewords(edit) && item.was_sent() {
                 return Err(refused("server.issue.started", &[]));
             }
-            let mut does = vec![t(
-                "server.issue.does.deleteIssue",
-                &[("n", item.number.into()), ("title", short_title(&item.title).into())],
-            )];
-            if let Some(r) = &item.refining {
-                does.push(t("server.issue.does.drafterLeaves", &[("name", r.name.clone().into())]));
-            }
-            if item.repo.is_some() {
-                does.push(t("server.issue.does.cleanWorktree", &[]));
-            }
-            Ok(Preview { does })
+            apply_preview_edit(&mut item, edit);
         }
-    });
-
-    let b = board.clone();
-    let keys = Arc::new(AsyncRequestKeys::default());
-    let profiles = names.clone();
-    let h = Arc::downgrade(hub);
-    hub.on_async::<ops::IssueStatusUpdate, _, _>(move |_, input| {
-        let b = b.clone();
-        let keys = keys.clone();
-        let profiles = profiles.clone();
-        let h = h.clone();
-        async move {
-            let key = input.request_key.clone();
-            keys.once(key.as_deref(), async move {
-                let issue = status_async(&b, profiles.as_deref(), &input).await?;
-                Ok(AppliedIssue::from_issue(issue, h.upgrade().map_or(0, |hub| hub.seq())))
-            })
-            .await
-        }
-    });
-
-    let b = board.clone();
-    let names = names.clone();
-    hub.on_async::<ops::IssueStatusPreviewUpdate, _, _>(move |_, input| {
-        let b = b.clone();
-        let names = names.clone();
-        async move {
-            crate::spawn_blocking_traced(move || {
-                let mut item = get(&b, &input.id)?;
-                Board::verify_approval(&item, input.status, input.revision.as_ref()).map_err(|e| api(&b, e))?;
-                if let Some(edit) = &input.edit {
-                    if edit_rewords(edit) && item.was_sent() {
-                        return Err(refused("server.issue.started", &[]));
-                    }
-                    apply_preview_edit(&mut item, edit);
+        if let Some(raw_agent) = &input.agent {
+            let agent = resolve_agent(agents, raw_agent);
+            if !agent.is_empty() && item.assigned_agent() != Some(agent.as_str()) {
+                if input.status != IssueStatus::Todo {
+                    return Err(refused("server.issue.handOverOnTodo", &[]));
                 }
-                if let Some(raw_agent) = &input.agent {
-                    let agent = resolve_agent(names.as_deref(), raw_agent);
-                    if !agent.is_empty() && item.assigned_agent() != Some(agent.as_str()) {
-                        if input.status != IssueStatus::Todo {
-                            return Err(refused("server.issue.handOverOnTodo", &[]));
-                        }
-                        if let Some(agents) = names.as_deref()
-                            && agents.profiles.agent(&agent).is_none()
-                        {
-                            return Err(refused("server.issue.profileGone", &[("id", agent.into())]));
-                        }
-                        edits::assign(&mut item, &agent, 0);
-                        if item.status == IssueStatus::Todo {
-                            let settled = Settled {
-                                mv: Move::Start,
-                                said: input.text.as_deref().unwrap_or("").trim().to_string(),
-                            };
-                            return Ok(Preview {
-                                does: moves_words(&b, names.as_deref(), &item, &settled)?,
-                            });
-                        }
-                    }
-                }
-                let settled = settle(&item, input.status, input.text.as_deref().unwrap_or(""))?;
-                Ok(Preview {
-                    does: moves_words(&b, names.as_deref(), &item, &settled)?,
-                })
-            })
-            .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
-    });
-
-    let b = board.clone();
-    hub.on_async::<ops::IssueReview, _, _>(move |_, input| {
-        let b = b.clone();
-        async move { review_async(&b, input).await }
-    });
-
-    let b = board.clone();
-    let h = Arc::downgrade(hub);
-    hub.on_async::<ops::IssueCommentCreate, _, _>(move |_, input| {
-        let b = b.clone();
-        let h = h.clone();
-        async move {
-            comment_async(&b, &input.id, &input.text).await?;
-            Ok(Applied {
-                seq: h.upgrade().map_or(0, |hub| hub.seq()),
-            })
-        }
-    });
-
-    let b = board.clone();
-    hub.on_async::<ops::IssueRefine, _, _>(move |_, input| {
-        let b = b.clone();
-        async move { refine_async(&b, None, &input).await }
-    });
-
-    let b = board.clone();
-    hub.on_async::<ops::IssueSplit, _, _>(move |_, input| {
-        let b = b.clone();
-        async move { split_async(&b, &input).await }
-    });
-
-    let b = board.clone();
-    hub.on_async::<ops::IssueTimelineGet, _, _>(move |_, input| {
-        let b = b.clone();
-        async move {
-            let item = get(&b, &input.id)?;
-            let runs = b.runs_async(&item.id).await.map_err(|e| api(&b, e))?;
-            Ok(milestones_of(&item, &runs, |s| b.session(s).map(|s| s.name)))
-        }
-    });
-    let b = board.clone();
-    hub.on_async::<ops::IssueRunList, _, _>(move |_, input| {
-        let b = b.clone();
-        async move {
-            let item = get(&b, &input.id)?;
-            b.runs_async(&item.id).await.map_err(|e| api(&b, e))
-        }
-    });
-    let b = board.clone();
-    hub.on_async::<ops::IssueDiffGet, _, _>(move |_, input| {
-        let b = b.clone();
-        async move {
-            crate::spawn_blocking_traced(move || {
-                let item = get(&b, &input.id)?;
-                changes_of(&b, &item, input.since_tree.as_deref())
-            })
-            .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
-    });
-    let b = board.clone();
-    hub.on_async::<ops::IssueHistoryList, _, _>(move |_, ()| {
-        let b = b.clone();
-        async move {
-            let entries: Vec<(Issue, Vec<String>, Vec<Session>)> = b.read(|s| {
-                s.issues
-                    .iter()
-                    .map(|issue| {
-                        let ids: Vec<String> = issue.executions().map(|e| e.session().to_string()).collect();
-                        let live_sessions: Vec<_> = ids.iter().filter_map(|id| s.sessions.iter().find(|x| &x.id == id).cloned()).collect();
-                        (issue.clone(), ids, live_sessions)
-                    })
-                    .collect()
-            });
-            let mut out = Vec::with_capacity(entries.len());
-            for (issue, ids, mut sessions) in entries {
-                for id in &ids {
-                    if !sessions.iter().any(|x| &x.id == id)
-                        && let Some(past) = b.past_session_async(id).await
-                    {
-                        sessions.push(past);
-                    }
-                }
-                let missing_sessions = ids.iter().filter(|id| !sessions.iter().any(|x| &x.id == *id)).cloned().collect();
-                out.push(IssueHistory {
-                    issue,
-                    sessions,
-                    missing_sessions,
-                });
-            }
-            Ok(out)
-        }
-    });
-    // Answered by `install_conversation` once the chat is open.
-    let b = board.clone();
-    hub.on_async::<ops::IssueConversationGet, _, _>(move |_, input| {
-        let b = b.clone();
-        async move { get(&b, &input.id).map(|_| None) }
-    });
-}
-
-/// `issue.diff.get` that also reports to the caller hook when the user looks at a live session's changes.
-pub fn install_reviewed(hub: &Hub, board: Board, on_reviewed: Arc<dyn Fn(&str) + Send + Sync>) {
-    hub.on_async::<ops::IssueDiffGet, _, _>(move |ctx, input| {
-        let board = board.clone();
-        let on_reviewed = on_reviewed.clone();
-        let caller = ctx.caller;
-        async move {
-            crate::spawn_blocking_traced(move || {
-                let item = get(&board, &input.id)?;
-                let changes = changes_of(&board, &item, input.since_tree.as_deref())?;
-                if caller == vibevalley_protocol::Caller::User
-                    && let Some(session) = item.latest_session_id()
-                    && board.read(|s| s.sessions.iter().any(|h| &h.id == session))
+                if let Some(agents) = agents
+                    && agents.profiles.agent(&agent).is_none()
                 {
-                    on_reviewed(session);
+                    return Err(refused("server.issue.profileGone", &[("id", agent.into())]));
                 }
-                Ok(changes)
-            })
-            .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+                edits::assign(&mut item, &agent, 0);
+                if item.status == IssueStatus::Todo {
+                    let settled = Settled {
+                        mv: Move::Start,
+                        said: input.text.as_deref().unwrap_or("").trim().to_string(),
+                    };
+                    return Ok(Preview {
+                        does: moves_words_async(self, agents, &item, &settled).await?,
+                    });
+                }
+            }
         }
-    });
-}
+        let settled = settle(&item, input.status, input.text.as_deref().unwrap_or(""))?;
+        Ok(Preview {
+            does: moves_words_async(self, agents, &item, &settled).await?,
+        })
+    }
 
-/// `issue.conversation.get`: the issue's thread in the chat, if one was
-/// opened.
-pub fn install_conversation(hub: &Hub, board: Board, channel: Arc<dyn crate::app::hub::ports::ChannelAnnouncePort>) {
-    let (b, c) = (board.clone(), channel.clone());
-    hub.on_async::<ops::IssueConversationGet, _, _>(move |_, input| {
-        let b = b.clone();
-        let c = c.clone();
-        async move {
-            crate::spawn_blocking_traced(move || Ok(c.issue_thread_id(&get(&b, &input.id)?.id)))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+    pub(crate) async fn issue_review_endpoint_async(&self, input: IssueReviewInput) -> Result<Issue, ApiError> {
+        review_async(self, input).await
+    }
+
+    pub(crate) async fn issue_comment_endpoint_async(&self, id: &str, text: &str) -> Result<Applied, ApiError> {
+        comment_async(self, id, text).await?;
+        Ok(Applied { seq: self.seq() })
+    }
+
+    pub(crate) async fn issue_refine_endpoint_async(&self, channel: Option<&dyn ChannelAnnouncePort>, input: &IssueRefineInput) -> Result<Issue, ApiError> {
+        refine_async(self, channel, input).await
+    }
+
+    pub(crate) async fn issue_split_endpoint_async(&self, input: &IssueSplitInput) -> Result<String, ApiError> {
+        split_async(self, input).await
+    }
+
+    pub(crate) async fn issue_timeline_endpoint_async(&self, id: &str) -> Result<IssueTimeline, ApiError> {
+        let item = get_async(self, id).await?;
+        let runs = self.runs_async(&item.id).await.map_err(|e| api(self, e))?;
+        let sessions = self.sessions_async().await.map_err(|e| api(self, e))?;
+        Ok(milestones_of(&item, &runs, |s| sessions.iter().find(|x| x.id == s).map(|x| x.name.clone())))
+    }
+
+    pub(crate) async fn issue_run_list_endpoint_async(&self, id: &str) -> Result<Vec<Run>, ApiError> {
+        let item = get_async(self, id).await?;
+        self.runs_async(&item.id).await.map_err(|e| api(self, e))
+    }
+
+    pub(crate) async fn issue_diff_endpoint_async(
+        &self,
+        caller: Caller,
+        id: &str,
+        since_tree: Option<&str>,
+        on_reviewed: Option<&dyn Fn(&str)>,
+    ) -> Result<Changes, ApiError> {
+        let item = get_async(self, id).await?;
+        let changes = changes_of_async(self, &item, since_tree).await?;
+        if let Some(on_reviewed) = on_reviewed
+            && caller == Caller::User
+            && let Some(session) = item.latest_session_id()
+            && self.session_async(session).await.is_some()
+        {
+            on_reviewed(session);
         }
-    });
-    // refinement.ts `draft`: the issue's thread is opened, the user's words go in it, and what was said there is the
-    // draft's discussion.
-    hub.on_async::<ops::IssueRefine, _, _>(move |_, input| {
-        let board = board.clone();
-        let channel = channel.clone();
-        async move { refine_async(&board, Some(channel.as_ref()), &input).await }
-    });
+        Ok(changes)
+    }
+
+    pub(crate) async fn issue_history_list_endpoint_async(&self) -> Result<Vec<IssueHistory>, ApiError> {
+        let issues = self.issues_async().await.map_err(|e| api(self, e))?;
+        let active_sessions = self.sessions_async().await.map_err(|e| api(self, e))?;
+        let mut out = Vec::with_capacity(issues.len());
+        for issue in issues {
+            let ids: Vec<String> = issue.executions().map(|e| e.session().to_string()).collect();
+            let mut sessions: Vec<Session> = ids.iter().filter_map(|id| active_sessions.iter().find(|x| &x.id == id).cloned()).collect();
+            for id in &ids {
+                if !sessions.iter().any(|x| &x.id == id)
+                    && let Some(past) = self.past_session_async(id).await
+                {
+                    sessions.push(past);
+                }
+            }
+            let missing_sessions = ids.iter().filter(|id| !sessions.iter().any(|x| &x.id == *id)).cloned().collect();
+            out.push(IssueHistory {
+                issue,
+                sessions,
+                missing_sessions,
+            });
+        }
+        Ok(out)
+    }
+
+    pub(crate) async fn issue_conversation_endpoint_async(&self, channel: Option<&dyn ChannelAnnouncePort>, id: &str) -> Result<Option<String>, ApiError> {
+        let item = get_async(self, id).await?;
+        Ok(channel.and_then(|c| c.issue_thread_id(&item.id)))
+    }
 }
 
 fn edit_rewords(edit: &IssueUpdate) -> bool {
@@ -774,7 +667,7 @@ fn apply_preview_edit(item: &mut Issue, edit: &IssueUpdate) {
     }
 }
 
-pub(crate) async fn create_async(board: &Board, profiles: Option<&Agents>, req: &vibevalley_protocol::IssueRequest) -> Result<Issue, ApiError> {
+pub(crate) async fn create_async(board: &IssueStore, profiles: Option<&AgentStore>, req: &IssueRequest) -> Result<Issue, ApiError> {
     let agent = req.agent.clone().unwrap_or_default();
     let agent = match profiles {
         Some(agents) => agents.agent_key(&agent),
@@ -805,7 +698,7 @@ pub(crate) async fn create_async(board: &Board, profiles: Option<&Agents>, req: 
     Ok(issue)
 }
 
-pub(crate) async fn update_async(board: &Board, profiles: Option<&Agents>, input: vibevalley_protocol::IssueUpdateInput) -> Result<Issue, ApiError> {
+pub(crate) async fn update_async(board: &IssueStore, profiles: Option<&AgentStore>, input: IssueUpdateInput) -> Result<Issue, ApiError> {
     let upd = IssueUpdate {
         title: input.title,
         description: input.description,
@@ -817,19 +710,19 @@ pub(crate) async fn update_async(board: &Board, profiles: Option<&Agents>, input
         deliver: input.deliver,
         before: input.before,
     };
-    let id = get(board, &input.id)?.id;
+    let id = get_async(board, &input.id).await?.id;
     let issue = board.edit_async(&id, &upd).await.map_err(|e| api(board, e))?;
     Ok(issue)
 }
 
 pub(crate) fn status_async<'a>(
-    board: &'a Board,
-    profiles: Option<&'a Agents>,
-    input: &'a vibevalley_protocol::IssueStatusUpdateInput,
+    board: &'a IssueStore,
+    profiles: Option<&'a AgentStore>,
+    input: &'a IssueStatusUpdateInput,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Issue, ApiError>> + Send + 'a>> {
     Box::pin(async move {
-        let mut item = get(board, &input.id)?;
-        Board::verify_approval(&item, input.status, input.revision.as_ref()).map_err(|e| api(board, e))?;
+        let mut item = get_async(board, &input.id).await?;
+        IssueStore::verify_approval(&item, input.status, input.revision.as_ref()).map_err(|e| api(board, e))?;
         if let Some(mut edit) = input.edit.clone() {
             edit.agent = edit.agent.map(|a| resolve_agent(profiles, &a));
             item = board.edit_async(&item.id, &edit).await.map_err(|e| api(board, e))?;
@@ -857,7 +750,7 @@ pub(crate) fn status_async<'a>(
                         .hand_over_and_move_async(&item.id, &agent, words, &findings)
                         .await
                         .map_err(|e| api(board, e))?;
-                    return get(board, &item.id);
+                    return get_async(board, &item.id).await;
                 }
                 let edit = IssueUpdate {
                     agent: Some(agent),
@@ -879,16 +772,12 @@ pub(crate) fn status_async<'a>(
                 .await
                 .map_err(|e| api(board, e))?;
         }
-        get(board, &item.id)
+        get_async(board, &item.id).await
     })
 }
 
-pub(crate) async fn refine_async(
-    board: &Board,
-    channel: Option<&dyn crate::app::hub::ports::ChannelAnnouncePort>,
-    input: &vibevalley_protocol::IssueRefineInput,
-) -> Result<Issue, ApiError> {
-    let mut item = get(board, &input.id)?;
+pub(crate) async fn refine_async(board: &IssueStore, channel: Option<&dyn ChannelAnnouncePort>, input: &IssueRefineInput) -> Result<Issue, ApiError> {
+    let mut item = get_async(board, &input.id).await?;
     if let Some(edit) = &input.edit {
         item = board.edit_async(&item.id, edit).await.map_err(|e| api(board, e))?;
     }
@@ -916,7 +805,7 @@ pub(crate) async fn refine_async(
         String::new()
     };
     board.refine_with_async(&item.id, &said, &discussion).await.map_err(|e| api(board, e))?;
-    get(board, &item.id)
+    get_async(board, &item.id).await
 }
 
 #[cfg(test)]
@@ -924,80 +813,91 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
-    use serde_json::json;
-    use vibevalley_core::{ManualClock, empty_space_state};
-    use vibevalley_protocol::{Caller, Fact, FactIssueChanged, IssueLastRun, Landing, Outcome};
+    use vibevalley_core::ManualClock;
+    use vibevalley_protocol::{IssueFilter, IssueLastRun, Landing, Outcome};
     use vibevalley_runtime::oar::Registry;
 
     use super::*;
+    use crate::app::live::LiveOverlay;
+    use crate::app::outbox::Outbox;
+    use crate::app::runtime::Runtime;
+    use crate::app::slice::SliceProjector;
+    use crate::db::ServerDb;
     use crate::work::ledger::BoardConfig;
 
-    #[test]
-    fn install_on_with_clock_uses_injected_clock_for_issue_list_patrol_order() {
-        vibevalley_runtime::rt::block_on(async {
-            let dir = tempfile::tempdir().unwrap();
-            let hub = Hub::new(empty_space_state());
-            let board = Board::open_on_async(
-                &dir.path().join("server.db"),
-                Arc::new(Registry::new()),
-                BoardConfig::under(dir.path()),
-                Arc::new(Arc::downgrade(&hub)),
-            )
+    #[tokio::test]
+    async fn issue_list_uses_injected_clock_for_patrol_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("server.db");
+        let db = ServerDb::open_config(&crate::db::DatabaseConfig::Sqlite { path: db_path.clone() }).unwrap();
+        let live = LiveOverlay::new();
+        let projector = SliceProjector::new();
+        let outbox = Outbox::new(db);
+        let runtime = Runtime::new();
+        let board = IssueStore::open_async(
+            &db_path,
+            live,
+            projector,
+            outbox,
+            runtime.clone(),
+            Arc::new(Registry::new()),
+            BoardConfig::under(dir.path()),
+            None,
+        )
+        .await
+        .unwrap();
+        let clock = ManualClock::new(1_000);
+
+        // A parent whose children are all closed is InReview with `stage.since == None`,
+        // so `pick_issues(..., clock.now_ms())` falls back to `clock.now_ms()`.
+        let first = board
+            .create_async(NewIssue {
+                title: "no-since".into(),
+                ..Default::default()
+            })
             .await
             .unwrap();
-            let clock = Arc::new(ManualClock::new(1_000));
-            install_on_with_clock(&hub, board.clone(), None, clock.clone());
+        let mut child = board
+            .create_async(NewIssue {
+                title: "closed-child".into(),
+                parent: Some(first.id.clone()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        child.delivered = Some(Landing::Merged);
+        child.closed_at = Some(900);
 
-            // A parent whose children are all closed is InReview with `stage.since == None`,
-            // so `pick_issues(..., clock.now_ms())` falls back to `clock.now_ms()`.
-            let first = board
-                .create_async(NewIssue {
-                    title: "no-since".into(),
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
-            let mut child = board
-                .create_async(NewIssue {
-                    title: "closed-child".into(),
-                    parent: Some(first.id.clone()),
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
-            child.delivered = Some(Landing::Merged);
-            child.closed_at = Some(900);
-
-            let mut second = board
-                .create_async(NewIssue {
-                    title: "explicit-since".into(),
-                    ..Default::default()
-                })
-                .await
-                .unwrap();
-            second.last_run = Some(IssueLastRun {
-                started_at: 4_000,
-                ended_at: Some(5_000),
-                outcome: Some(Outcome::Completed),
-            });
-            hub.apply(vec![
-                Fact::IssueChanged(FactIssueChanged { at: 1_000, issue: child }),
-                Fact::IssueChanged(FactIssueChanged { at: 1_000, issue: second }),
-            ]);
-
-            // At clock=1_000, `first` falls back to `clock.now_ms()` (1_000) < 5_000, so `first` sorts before `second`.
-            let list_early = hub.call_as(Caller::User, "issue.list", json!({ "wantsUser": true })).data.unwrap();
-            let titles_early: Vec<&str> = list_early.as_array().unwrap().iter().map(|item| item["title"].as_str().unwrap()).collect();
-            assert_eq!(titles_early, vec!["no-since", "explicit-since"]);
-
-            // Advancing ManualClock past 5_000 flips the patrol ordering deterministically.
-            clock.advance(Duration::from_secs(10));
-            let list_late = hub.call_as(Caller::User, "issue.list", json!({ "wantsUser": true })).data.unwrap();
-            let titles_late: Vec<&str> = list_late.as_array().unwrap().iter().map(|item| item["title"].as_str().unwrap()).collect();
-            assert_eq!(titles_late, vec!["explicit-since", "no-since"]);
-
-            board.close();
-            hub.close_async().await;
+        let mut second = board
+            .create_async(NewIssue {
+                title: "explicit-since".into(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        second.last_run = Some(IssueLastRun {
+            started_at: 4_000,
+            ended_at: Some(5_000),
+            outcome: Some(Outcome::Completed),
         });
+        board.ledger().put_issues_async(&[child, second]).await.unwrap();
+
+        let filter = IssueFilter {
+            wants_user: Some(true),
+            ..Default::default()
+        };
+        // At clock=1_000, `first` falls back to `clock.now_ms()` (1_000) < 5_000, so `first` sorts before `second`.
+        let list_early = board.issue_list_endpoint_async(&filter, &clock).await.unwrap();
+        let titles_early: Vec<&str> = list_early.iter().map(|i| i.title.as_str()).collect();
+        assert_eq!(titles_early, vec!["no-since", "explicit-since"]);
+
+        // Advancing ManualClock past 5_000 flips the patrol ordering deterministically.
+        clock.advance(Duration::from_secs(10));
+        let list_late = board.issue_list_endpoint_async(&filter, &clock).await.unwrap();
+        let titles_late: Vec<&str> = list_late.iter().map(|i| i.title.as_str()).collect();
+        assert_eq!(titles_late, vec!["explicit-since", "no-since"]);
+
+        board.close();
+        let _ = runtime.shutdown(Duration::from_secs(1)).await;
     }
 }

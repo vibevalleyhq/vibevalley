@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use vibevalley_protocol::{ApiError, BizCode};
 
-use crate::app::hub::refusal::refused as refuse;
+use crate::app::refusal::refused as refuse;
 use crate::work::pull::publish::HostRunner;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

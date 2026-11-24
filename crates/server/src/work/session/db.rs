@@ -12,13 +12,17 @@ use vibevalley_runtime::agent::durable::{BoxFuture, Store as DurableStore, Tx};
 use super::sessions::Extra;
 use crate::db::column::{db_json as json, db_word as word, read_db_json as read_json, read_db_word as read_word};
 use crate::db::entities::work_session::{session, session_event, session_run};
-use crate::work::ledger::{ReopenInterrupt, Result as LedgerResult, SessionStore};
+use crate::work::ledger::{ReopenInterrupt, Result as LedgerResult, SessionPersistence};
 
 pub struct SqliteSessionStore;
 
-impl SessionStore for SqliteSessionStore {
+impl SessionPersistence for SqliteSessionStore {
     fn all<'a>(&'a self, db: &'a DatabaseConnection) -> BoxFuture<'a, Result<Vec<Session>, DbErr>> {
         Box::pin(all(db))
+    }
+
+    fn get<'a>(&'a self, db: &'a DatabaseConnection, id: &'a str) -> BoxFuture<'a, Result<Option<Session>, DbErr>> {
+        Box::pin(get(db, id))
     }
 
     fn past<'a>(&'a self, db: &'a DatabaseConnection, id: &'a str) -> BoxFuture<'a, Result<Option<Session>, DbErr>> {
@@ -207,6 +211,14 @@ pub async fn all<C: ConnectionTrait>(db: &C) -> Result<Vec<Session>, DbErr> {
     let stmt = session_select(false, None);
     let rows = db.query_all(&stmt).await?;
     rows.into_iter().map(|row| SessionRow::from_query_result(&row, "").and_then(read)).collect()
+}
+
+pub async fn get<C: ConnectionTrait>(db: &C, id: &str) -> Result<Option<Session>, DbErr> {
+    let stmt = session_select(false, Some(id));
+    db.query_one(&stmt)
+        .await?
+        .map(|row| SessionRow::from_query_result(&row, "").and_then(read))
+        .transpose()
 }
 
 pub async fn past<C: ConnectionTrait>(db: &C, id: &str) -> Result<Option<Session>, DbErr> {

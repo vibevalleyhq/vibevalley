@@ -7,26 +7,26 @@ pub(crate) mod db;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
 use tokio::sync::Mutex as AsyncMutex;
-use vibevalley_core::{SharedClock, system_clock};
+use vibevalley_core::{SharedClock, SliceMask, system_clock};
 use vibevalley_i18n::t;
-use vibevalley_protocol::{
-    ActorKind, ApiError, BizCode, Caller, Cron, CronRequest, Fact, FactCronChanged, FactCronRemoved, IssueStatus, NoticeLevel, Preview, ops,
-};
+use vibevalley_protocol::{ActorKind, ApiError, BizCode, Caller, Cron, CronRequest, IssueStatus, NoticeLevel, Preview};
 
-use crate::Hub;
-use crate::app::hub::ports::CronOrchestratorPort;
-use crate::app::hub::refusal::{LookIn, missing};
-use crate::app::hub::ticker::Ticker;
+use crate::app::live::LiveOverlay;
+use crate::app::port::{CronOrchestratorPort, CronToolPort};
+use crate::app::refusal::{LookIn, missing};
+use crate::app::runtime::Runtime;
+use crate::app::slice::SliceProjector;
+use crate::app::ticker::Ticker;
 use crate::collab::channel::{Chat, Noticing};
 use crate::db::ServerDb;
 use crate::db::error::internal_db;
-use crate::team::agent::Agents;
-use crate::work::issue::{Board, NewIssue};
+use crate::team::agent::AgentStore;
+use crate::work::issue::{IssueStore, NewIssue};
 
 pub const DEFAULT_CHANNEL: &str = "general";
 const TICK: Duration = Duration::from_secs(20);
@@ -66,12 +66,15 @@ impl CronLinks {
     }
 }
 
-pub struct Crons {
+pub struct CronStore {
     db: Arc<ServerDb>,
+    crons: Mutex<Vec<Cron>>,
     links: Arc<Mutex<CronLinks>>,
-    hub: Weak<Hub>,
-    board: Board,
-    agents: Arc<Agents>,
+    runtime: Arc<Runtime>,
+    live: Arc<LiveOverlay>,
+    projector: Arc<SliceProjector>,
+    board: IssueStore,
+    agents: Arc<AgentStore>,
     /// The ticker, the endpoints and the tools all change the list.
     lock: AsyncMutex<()>,
     chat: Option<Arc<Chat>>,
@@ -81,55 +84,68 @@ pub struct Crons {
     ticker: Mutex<Option<Ticker>>,
 }
 
-impl Crons {
-    /// Opens `cron` on the shared `ServerDb`, puts stored crons into the hub's
-    /// state, and registers `Issue.cron` projection on `board`. Constructed
-    /// bottom-up with `chat` and `orchestrator` directly (zero late bindings).
+impl CronStore {
+    /// Opens `cron` on the shared `ServerDb`, loads stored crons into the
+    /// store's slice-projected list, and registers `Issue.cron` projection on `board`.
+    #[allow(clippy::too_many_arguments)]
     pub async fn open_async(
         db: Arc<ServerDb>,
-        hub: &Arc<Hub>,
-        board: Board,
-        agents: Arc<Agents>,
+        runtime: Arc<Runtime>,
+        live: Arc<LiveOverlay>,
+        projector: Arc<SliceProjector>,
+        board: IssueStore,
+        agents: Arc<AgentStore>,
         chat: Option<Arc<Chat>>,
         orchestrator: Option<Arc<dyn CronOrchestratorPort>>,
-    ) -> Result<Arc<Crons>, ApiError> {
-        Self::open_with_clock_async(db, hub, board, agents, chat, orchestrator, system_clock()).await
+    ) -> Result<Arc<CronStore>, ApiError> {
+        Self::open_with_clock_async(db, runtime, live, projector, board, agents, chat, orchestrator, system_clock()).await
     }
 
-    /// Same as [`Crons::open_async`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
+    /// Same as [`CronStore::open_async`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
+    #[allow(clippy::too_many_arguments)]
     pub async fn open_with_clock_async(
         db: Arc<ServerDb>,
-        hub: &Arc<Hub>,
-        board: Board,
-        agents: Arc<Agents>,
+        runtime: Arc<Runtime>,
+        live: Arc<LiveOverlay>,
+        projector: Arc<SliceProjector>,
+        board: IssueStore,
+        agents: Arc<AgentStore>,
         chat: Option<Arc<Chat>>,
         orchestrator: Option<Arc<dyn CronOrchestratorPort>>,
         clock: SharedClock,
-    ) -> Result<Arc<Crons>, ApiError> {
+    ) -> Result<Arc<CronStore>, ApiError> {
         let stored = db::list(db.read_conn()).await.map_err(internal_db)?;
         let links = Arc::new(Mutex::new(CronLinks::default()));
-        let at = clock.now_ms();
-        let mut facts = Vec::with_capacity(stored.len());
+        let mut crons = Vec::with_capacity(stored.len());
+        let mut has_pending = false;
         {
             let mut map = links.lock();
             for item in stored {
                 if let Some(issue_id) = item.issue_id.as_deref() {
                     map.link(&item.cron.id, Some(issue_id));
                 }
-                facts.push(Fact::CronChanged(FactCronChanged { at, cron: item.cron }));
+                has_pending |= item.cron.pending;
+                crons.push(item.cron);
             }
         }
-        if !facts.is_empty() {
-            hub.apply(facts);
+        if !crons.is_empty() {
+            let mut dirty = SliceMask::OPS;
+            if has_pending {
+                dirty |= SliceMask::INBOX;
+            }
+            projector.mark_dirty(dirty);
         }
         let lookup_links = links.clone();
         board
             .use_cron_of_issue_async(Arc::new(move |issue_id| lookup_links.lock().cron_of_issue.get(issue_id).cloned()))
             .await;
-        Ok(Arc::new(Crons {
+        Ok(Arc::new(CronStore {
             db,
+            crons: Mutex::new(crons),
             links,
-            hub: Arc::downgrade(hub),
+            runtime,
+            live,
+            projector,
             board,
             agents,
             lock: AsyncMutex::new(()),
@@ -150,12 +166,8 @@ impl Crons {
         }
     }
 
-    fn hub(&self) -> Option<Arc<Hub>> {
-        self.hub.upgrade()
-    }
-
     pub fn list(&self) -> Vec<Cron> {
-        self.hub().map(|h| h.read(|s| s.crons.clone())).unwrap_or_default()
+        self.crons.lock().clone()
     }
 
     pub fn issue_of(&self, cron_id: &str) -> Option<String> {
@@ -166,12 +178,32 @@ impl Crons {
         self.links.lock().cron_of_issue.get(issue_id).cloned()
     }
 
-    /// Persists `cron` (keeping its linked issue, if any) and tells the state.
+    /// Persists `cron` (keeping its linked issue, if any) and marks dirty slices.
     async fn put_async(&self, cron: Cron) -> Result<(), ApiError> {
         let issue_id = self.issue_of(&cron.id);
         db::upsert(self.db.write_conn(), &cron, issue_id.as_deref()).await.map_err(internal_db)?;
-        if let Some(hub) = self.hub() {
-            hub.apply(vec![Fact::CronChanged(FactCronChanged { at: self.clock.now_ms(), cron })]);
+        let (changed, was_pending, is_pending) = {
+            let mut list = self.crons.lock();
+            let pending_after = cron.pending;
+            match list.iter_mut().find(|c| c.id == cron.id) {
+                Some(existing) if *existing == cron => (false, existing.pending, pending_after),
+                Some(existing) => {
+                    let prev = existing.pending;
+                    *existing = cron;
+                    (true, prev, pending_after)
+                }
+                None => {
+                    list.push(cron);
+                    (true, false, pending_after)
+                }
+            }
+        };
+        if changed {
+            let mut dirty = SliceMask::OPS;
+            if was_pending || is_pending {
+                dirty |= SliceMask::INBOX;
+            }
+            self.projector.mark_dirty(dirty);
         }
         Ok(())
     }
@@ -198,7 +230,7 @@ impl Crons {
     }
 
     /// `add_async`: `by` is who asks, and on whose word (`needsOK`).
-    pub async fn add_async(self: &Arc<Self>, req: CronRequest, by: ActorKind) -> Result<Cron, ApiError> {
+    pub async fn add_async(&self, req: CronRequest, by: ActorKind) -> Result<Cron, ApiError> {
         let resolved_channel = match &self.chat {
             Some(chat) => Some(match req.channel.as_deref() {
                 None => chat.default_channel(),
@@ -290,12 +322,12 @@ impl Crons {
         let was = self.find(id)?;
         db::remove(self.db.write_conn(), id).await.map_err(internal_db)?;
         let prev_issue = self.links.lock().link(id, None);
-        if let Some(hub) = self.hub() {
-            hub.apply(vec![Fact::CronRemoved(FactCronRemoved {
-                at: self.clock.now_ms(),
-                id: id.into(),
-            })]);
+        self.crons.lock().retain(|c| c.id != id);
+        let mut dirty = SliceMask::OPS;
+        if was.pending {
+            dirty |= SliceMask::INBOX;
         }
+        self.projector.mark_dirty(dirty);
         if let Some(issue_id) = prev_issue {
             self.board.refresh_issue_async(&issue_id).await;
         }
@@ -335,15 +367,13 @@ impl Crons {
             for (after, words) in due_runs {
                 if let Err(e) = self.put_async(after.clone()).await {
                     // Not kept: due again at the next tick.
-                    if let Some(hub) = self.hub() {
-                        hub.notice(NoticeLevel::Warn, format!("cron {}: {}", after.id, e.message));
-                    }
+                    self.live
+                        .publish_notice(self.clock.now_ms(), NoticeLevel::Warn, format!("cron {}: {}", after.id, e.message));
                     continue;
                 }
-                if let Err(e) = self.scheduled_async(&after, &words).await
-                    && let Some(hub) = self.hub()
-                {
-                    hub.notice(NoticeLevel::Warn, format!("{}: {}", after.name, e.message));
+                if let Err(e) = self.scheduled_async(&after, &words).await {
+                    self.live
+                        .publish_notice(self.clock.now_ms(), NoticeLevel::Warn, format!("{}: {}", after.name, e.message));
                 }
             }
         })
@@ -351,7 +381,7 @@ impl Crons {
 
     /// A cron for no profile: its words said in its channel and handed to
     /// the channel's orchestrator via `CronOrchestratorPort`.
-    fn to_orchestrator(&self, cron: &Cron, words: &str) -> Result<(), ApiError> {
+    async fn to_orchestrator_async(&self, cron: &Cron, words: &str) -> Result<(), ApiError> {
         let unserved = || ApiError::new(BizCode::ServiceUnavailable, "no orchestrator takes scheduled tasks".to_string());
         let o = self.orchestrator.as_ref().ok_or_else(unserved)?;
         let chat = self.chat.as_ref().ok_or_else(unserved)?;
@@ -360,12 +390,13 @@ impl Crons {
         } else {
             chat.default_channel()
         };
-        chat.notice(Noticing {
+        chat.notice_async(Noticing {
             channel: channel.clone(),
             text: words.to_string(),
             code: "cron".into(),
             ..Default::default()
-        });
+        })
+        .await;
         let agent = chat.orchestrator_in(&channel);
         if o.hear_cron(&agent, &channel, words) { Ok(()) } else { Err(unserved()) }
     }
@@ -378,8 +409,13 @@ impl Crons {
                 crate::work::ledger::BoardError::Api(e) => e,
                 e => ApiError::new(BizCode::IssueRefused, e.to_string()),
             };
-            let Some(agent) = &cron.agent else { return self.to_orchestrator(cron, words) };
-            let found = self.issue_of(&cron.id).and_then(|id| self.board.issue(&id));
+            let Some(agent) = &cron.agent else {
+                return self.to_orchestrator_async(cron, words).await;
+            };
+            let found = match self.issue_of(&cron.id) {
+                Some(id) => self.board.issue_async(&id).await.map_err(fail)?,
+                None => None,
+            };
             let Some(issue) = found else {
                 let made = self
                     .board
@@ -407,57 +443,77 @@ impl Crons {
             .map_err(fail)
         })
     }
-}
 
-/// Every `cron.*` endpoint, and the ticker every 20 s until the hub goes.
-pub fn install(hub: &Arc<Hub>, crons: Arc<Crons>, tick: bool) {
-    let c = crons.clone();
-    hub.on_async::<ops::CronCreate, _, _>(move |ctx, req| {
-        let c = c.clone();
-        let by = match ctx.caller {
+    pub(crate) async fn create_endpoint_async(&self, caller: Caller, req: CronRequest) -> Result<Cron, ApiError> {
+        let by = match caller {
             Caller::User | Caller::Remote => ActorKind::User,
             Caller::Orchestrator | Caller::Session => ActorKind::Agent,
         };
-        async move { c.add_async(req, by).await }
-    });
-    let c = crons.clone();
-    hub.on::<ops::CronList>(move |_, ()| Ok(c.list()));
-    let c = crons.clone();
-    hub.on_async::<ops::CronUpdate, _, _>(move |_, input| {
-        let c = c.clone();
-        async move {
-            match input.enabled {
-                Some(enabled) => {
-                    c.set_enabled_async(&input.id, enabled).await?;
-                }
-                None => {
-                    c.find(&input.id)?;
-                }
+        self.add_async(req, by).await
+    }
+
+    pub(crate) async fn list_endpoint_async(&self) -> Result<Vec<Cron>, ApiError> {
+        Ok(self.list())
+    }
+
+    pub(crate) async fn update_endpoint_async(&self, id: &str, enabled: Option<bool>) -> Result<(), ApiError> {
+        match enabled {
+            Some(enabled) => {
+                self.set_enabled_async(id, enabled).await?;
             }
-            Ok(())
+            None => {
+                self.find(id)?;
+            }
         }
-    });
-    let c = crons.clone();
-    hub.on_async::<ops::CronDelete, _, _>(move |_, input| {
-        let c = c.clone();
-        async move { c.remove_async(&input.id).await.map(|_| ()) }
-    });
-    let c = crons.clone();
-    hub.on::<ops::CronPreviewDelete>(move |_, input| c.preview_remove(&input.id));
-    if tick {
-        let weak = Arc::downgrade(&crons);
-        let ticker = Ticker::spawn_async_on(hub, TICK, true, move || {
+        Ok(())
+    }
+
+    pub(crate) async fn delete_endpoint_async(&self, id: &str) -> Result<(), ApiError> {
+        self.remove_async(id).await.map(|_| ())
+    }
+
+    pub(crate) async fn preview_delete_endpoint_async(&self, id: &str) -> Result<Preview, ApiError> {
+        self.preview_remove(id)
+    }
+
+    /// Starts the 20 s cron ticker on the shared `Runtime`.
+    pub fn start_ticker(self: &Arc<Self>, tick: bool) {
+        if !tick {
+            return;
+        }
+        let weak = Arc::downgrade(self);
+        let ticker = Ticker::spawn_async_on(&self.runtime, TICK, true, move || {
             let weak = weak.clone();
             Box::pin(async move {
                 let Some(c) = weak.upgrade() else { return false };
-                if c.hub.strong_count() == 0 || c.closed.load(std::sync::atomic::Ordering::Relaxed) {
+                if c.runtime.is_cancelled() || c.closed.load(std::sync::atomic::Ordering::Relaxed) {
                     return false;
                 }
                 c.tick_async().await;
                 true
             })
         });
-        *crons.ticker.lock() = Some(ticker);
+        *self.ticker.lock() = Some(ticker);
+    }
+}
+
+impl CronToolPort for CronStore {
+    fn list_async(&self) -> vibevalley_runtime::agent::durable::BoxFuture<'_, Result<Vec<Cron>, ApiError>> {
+        Box::pin(async move { Ok(self.list()) })
+    }
+
+    fn create_async<'a>(&'a self, by: &'a str, req: &'a CronRequest) -> vibevalley_runtime::agent::durable::BoxFuture<'a, Result<Cron, ApiError>> {
+        Box::pin(async move {
+            let actor = match by {
+                "user" => ActorKind::User,
+                _ => ActorKind::Agent,
+            };
+            self.add_async(req.clone(), actor).await
+        })
+    }
+
+    fn delete_async<'a>(&'a self, id: &'a str) -> vibevalley_runtime::agent::durable::BoxFuture<'a, Result<(), ApiError>> {
+        Box::pin(async move { self.remove_async(id).await.map(|_| ()) })
     }
 }
 
@@ -467,9 +523,11 @@ mod tests {
 
     use vibevalley_core::{Clock, ManualClock};
     use vibevalley_protocol::{CronRequest, CronWhen, CronWhenOnce};
+    use vibevalley_runtime::oar::Registry;
 
     use super::*;
-    use crate::ServerConfig;
+    use crate::app::outbox::Outbox;
+    use crate::work::ledger::BoardConfig;
 
     struct CountingOrchestrator {
         heard: AtomicUsize,
@@ -486,24 +544,37 @@ mod tests {
     async fn manual_clock_drives_once_due_execution_and_reenable_timestamps_without_sleep() {
         vibevalley_i18n::set_locale("en");
         let dir = tempfile::tempdir().unwrap();
-        let started = crate::app::bootstrap::start_async(ServerConfig {
-            probe_runtimes: false,
-            orchestrator_listens: false,
-            link_previews: false,
-            tick_crons: false,
-            ..ServerConfig::under(dir.path())
-        })
+        let db_path = dir.path().join("server.db");
+        let db = ServerDb::open_config(&crate::db::DatabaseConfig::Sqlite { path: db_path.clone() }).unwrap();
+        let runtime = Runtime::new();
+        let live = LiveOverlay::new();
+        let projector = SliceProjector::new();
+        let outbox = Outbox::new(db.clone());
+        let registry = Arc::new(Registry::new());
+        let board = IssueStore::open_async(
+            &db_path,
+            live.clone(),
+            projector.clone(),
+            outbox,
+            runtime.clone(),
+            registry.clone(),
+            BoardConfig::under(dir.path()),
+            None,
+        )
         .await
         .unwrap();
+        let agents = AgentStore::open(&runtime, live.clone(), &dir.path().join("agents"), &[], registry, false).unwrap();
 
         let clock = Arc::new(ManualClock::new(1_700_000_000_000));
         let orchestrator = Arc::new(CountingOrchestrator { heard: AtomicUsize::new(0) });
-        let crons = Crons::open_with_clock_async(
-            started.db.clone(),
-            &started.hub,
-            started.board.clone(),
-            started.agents.clone(),
-            Some(started.chat.clone()),
+        let crons = CronStore::open_with_clock_async(
+            db.clone(),
+            runtime.clone(),
+            live,
+            projector,
+            board.clone(),
+            agents,
+            None,
             Some(orchestrator.clone()),
             clock.clone(),
         )
@@ -564,6 +635,8 @@ mod tests {
         assert_eq!(orchestrator.heard.load(Ordering::SeqCst), 1);
 
         crons.close_async().await;
-        started.close_async().await;
+        board.close();
+        let _ = runtime.shutdown(Duration::from_secs(1)).await;
+        db.close_async().await;
     }
 }

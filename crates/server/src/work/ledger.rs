@@ -1,9 +1,7 @@
-//! The board's one write path. Issues and sessions are stored in
-//! SQLite tables in `server.db`, then folded into the state as facts (`Facts`: the
-//! hub's `Core`, or a [`LocalFacts`] standing alone), and every subscriber
-//! gets the new frame. The issue and session modules change an existing
-//! issue only by an [`IssueChange`]; a new or edited issue and every session
-//! change go out as protocol facts through [`Ledger::apply`].
+//! The board's one write path. Issues and sessions live in SQLite (`ServerDb`),
+//! live ephemeral run telemetry lives in `LiveOverlay`, and commits mark dirty
+//! slices on `SliceProjector` (and optionally enqueue durable notifications in
+//! `Outbox`).
 //!
 //! Also here, because all three board modules (issue, session, workplace)
 //! share them: the board's config, its error, and its counters.
@@ -13,20 +11,21 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::app::live::LiveOverlay;
+use crate::app::outbox::Outbox;
+use crate::app::slice::SliceProjector;
 use crate::db::ServerDb;
 use parking_lot::Mutex;
 use sea_orm::{DatabaseConnection, DatabaseTransaction, DbErr};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex as AsyncMutex;
-use vibevalley_core::{Applied, Core, Refusal};
+use vibevalley_core::{BoardInput, LiveSnapshot, Refusal, SessionInput, SliceMask, derive_issues, overlay_sessions, project_board, project_sessions};
 use vibevalley_protocol::{
-    Assignment, Conflict, CriterionCheck, Execution, ExecutionPolicy, Fact, Finding, Issue, IssueAnswer, IssueCanceled, Landing, LastRun, Millis, Outcome,
-    Phase, PullRequest, Question, Run, Session, SessionSubagents, SliceBundle, SpaceState,
+    Assignment, Conflict, CriterionCheck, Execution, ExecutionPolicy, Finding, Issue, IssueAnswer, IssueCanceled, Landing, LastRun, Millis, Outcome, Phase,
+    PullRequest, Question, Run, Session, SessionSubagents, SliceBundle,
 };
 use vibevalley_runtime::agent::durable::BoxFuture;
 use vibevalley_runtime::oar::PermissionMode;
-
-pub use crate::app::hub::ports::Facts;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BoardError {
@@ -130,7 +129,12 @@ impl BoardConfig {
     }
 }
 
-pub(crate) use crate::now;
+pub(crate) fn now() -> Millis {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as Millis)
+        .unwrap_or(0)
+}
 
 pub(crate) fn io(e: std::io::Error) -> BoardError {
     BoardError::Other(e.to_string())
@@ -155,27 +159,9 @@ pub enum Step {
     Agent(vibevalley_runtime::oar::Event),
 }
 
-/// A state of the board's own, for a board without a server.
-#[derive(Default)]
-pub struct LocalFacts(Mutex<Core>);
-
-impl Facts for LocalFacts {
-    fn apply(&self, facts: Vec<Fact>) -> Applied {
-        self.0.lock().apply(facts)
-    }
-
-    fn read(&self, f: &mut dyn FnMut(&SpaceState)) {
-        f(self.0.lock().state())
-    }
-
-    fn bundle(&self) -> SliceBundle {
-        self.0.lock().slice_bundle(vec![])
-    }
-}
-
 /// Every way an issue on the board changes after it is made, besides an
-/// edit of its fields (`Board::edit`). [`IssueChange::fold`] is the one place
-/// each is written.
+/// edit of its fields (`IssueStore::edit_async`). [`IssueChange::fold`] is the
+/// one place each is written.
 #[derive(Debug, Clone)]
 pub enum IssueChange {
     /// Waits in todo to be sent.
@@ -238,6 +224,30 @@ pub enum IssueChange {
 }
 
 impl IssueChange {
+    pub(crate) fn dirty_mask(&self) -> SliceMask {
+        let base = SliceMask::BOARD | SliceMask::INBOX | SliceMask::FARM;
+        match self {
+            IssueChange::Reopened
+            | IssueChange::Delivered(_, _)
+            | IssueChange::Conflicted(_)
+            | IssueChange::Stuck { conflict: Some(_), .. }
+            | IssueChange::MergedIntoParent { .. }
+            | IssueChange::Started { .. } => base | SliceMask::SESSIONS,
+            IssueChange::Queued
+            | IssueChange::Unqueued
+            | IssueChange::Revived
+            | IssueChange::Answered
+            | IssueChange::Canceled(_)
+            | IssueChange::Stuck { conflict: None, .. }
+            | IssueChange::ProjectChecked(_)
+            | IssueChange::Reviewed(_)
+            | IssueChange::Failed { .. }
+            | IssueChange::Drafted { .. }
+            | IssueChange::Reported { .. }
+            | IssueChange::Assigned(_) => base,
+        }
+    }
+
     pub fn fold(self, t: &mut Issue, at: Millis) {
         match self {
             IssueChange::Queued => t.queued_at = Some(at),
@@ -388,16 +398,18 @@ pub struct ReopenInterrupt {
 
 /// Narrow SeaORM issue persistence port injected by `work/issue` so `work/ledger`
 /// stays strictly below `work/issue` in the module DAG.
-pub trait IssueStore: Send + Sync {
+pub trait IssuePersistence: Send + Sync {
     fn all<'a>(&'a self, db: &'a DatabaseConnection) -> BoxFuture<'a, std::result::Result<Vec<Issue>, DbErr>>;
+    fn get<'a>(&'a self, db: &'a DatabaseConnection, id: &'a str) -> BoxFuture<'a, std::result::Result<Option<Issue>, DbErr>>;
     fn put<'a>(&'a self, tx: &'a DatabaseTransaction, issue: &'a Issue) -> BoxFuture<'a, std::result::Result<(), DbErr>>;
     fn remove<'a>(&'a self, tx: &'a DatabaseTransaction, id: &'a str) -> BoxFuture<'a, std::result::Result<(), DbErr>>;
 }
 
 /// Narrow SeaORM session persistence & reopen-recovery port injected by
 /// `work/session` so `work/ledger` stays strictly below `work/session`.
-pub trait SessionStore: Send + Sync {
+pub trait SessionPersistence: Send + Sync {
     fn all<'a>(&'a self, db: &'a DatabaseConnection) -> BoxFuture<'a, std::result::Result<Vec<Session>, DbErr>>;
+    fn get<'a>(&'a self, db: &'a DatabaseConnection, id: &'a str) -> BoxFuture<'a, std::result::Result<Option<Session>, DbErr>>;
     fn past<'a>(&'a self, db: &'a DatabaseConnection, id: &'a str) -> BoxFuture<'a, std::result::Result<Option<Session>, DbErr>>;
     fn put<'a>(&'a self, tx: &'a DatabaseTransaction, s: &'a Session, departed: bool) -> BoxFuture<'a, std::result::Result<(), DbErr>>;
     fn put_subagents<'a>(&'a self, tx: &'a DatabaseTransaction, summary: &'a SessionSubagents) -> BoxFuture<'a, std::result::Result<(), DbErr>>;
@@ -423,47 +435,65 @@ pub trait SessionStore: Send + Sync {
 pub struct Ledger {
     pub(crate) durable: vibevalley_runtime::agent::durable::Store,
     db: Arc<ServerDb>,
-    issues: Arc<dyn IssueStore>,
-    sessions: Arc<dyn SessionStore>,
-    facts: Arc<dyn Facts>,
-    /// Held across every apply and every read-modify-apply of an issue.
+    live: Arc<LiveOverlay>,
+    projector: Arc<SliceProjector>,
+    outbox: Arc<Outbox>,
+    issues: Arc<dyn IssuePersistence>,
+    sessions: Arc<dyn SessionPersistence>,
+    /// Held across every read-modify-write transaction of an issue or session.
     write: AsyncMutex<()>,
     cron_of_issue: Mutex<Option<CronOfIssue>>,
     pull_of_issue: Mutex<Option<PullOfIssue>>,
 }
 
-fn loaded(sessions: Vec<Session>, issues: Vec<Issue>) -> Vec<Fact> {
-    let at = now();
-    let mut facts: Vec<Fact> = sessions.into_iter().map(|session| Fact::session_changed(at, session)).collect();
-    facts.extend(issues.into_iter().map(|issue| Fact::issue_changed(at, issue)));
-    facts
-}
-
 impl Ledger {
     /// The board as stored, without taking it: for reading while another
     /// process holds it.
-    pub async fn snapshot_async(path: &Path, issues: &dyn IssueStore, sessions: &dyn SessionStore) -> Result<SliceBundle> {
+    pub async fn snapshot_async(path: &Path, issues: &dyn IssuePersistence, sessions: &dyn SessionPersistence) -> Result<SliceBundle> {
         let server_db = ServerDb::open_config(&crate::db::DatabaseConfig::Sqlite { path: path.to_path_buf() })?;
         let stored_sessions = sessions.all(server_db.read_conn()).await?;
         let stored_issues = issues.all(server_db.read_conn()).await?;
-        server_db.close();
-        let facts = LocalFacts::default();
-        facts.apply(loaded(stored_sessions, stored_issues));
-        Ok(facts.bundle())
+        server_db.close_async().await;
+        let derived_issues = derive_issues(&stored_issues, &stored_sessions);
+        let live = LiveSnapshot::default();
+        let board = project_board(
+            &BoardInput {
+                issues: derived_issues.clone(),
+                sessions: stored_sessions.clone(),
+                ..Default::default()
+            },
+            &live,
+            0,
+        );
+        let sessions_slice = project_sessions(
+            &SessionInput {
+                sessions: stored_sessions,
+                issues: derived_issues,
+                ..Default::default()
+            },
+            &live,
+            0,
+        );
+        Ok(SliceBundle {
+            board: Some(board),
+            sessions: Some(sessions_slice),
+            ..Default::default()
+        })
     }
 
-    /// Loads what is stored into `facts`. A working session was interrupted:
-    /// it rests now, its run counted. A session whose worktree is gone is
-    /// dropped and its issue listed as lost.
+    /// Opens the ledger against SQLite + spine primitives. A working session was
+    /// interrupted: it rests now, its run counted. A session whose worktree is
+    /// gone is dropped and its issue listed as lost.
     pub async fn open_async(
         db: Arc<ServerDb>,
-        facts: Arc<dyn Facts>,
-        issue_store: Arc<dyn IssueStore>,
-        session_store: Arc<dyn SessionStore>,
+        live: Arc<LiveOverlay>,
+        projector: Arc<SliceProjector>,
+        outbox: Arc<Outbox>,
+        issue_store: Arc<dyn IssuePersistence>,
+        session_store: Arc<dyn SessionPersistence>,
     ) -> Result<(Ledger, Opened)> {
         let durable = db.durable()?;
         let stored = session_store.all(db.read_conn()).await?;
-        let issues = issue_store.all(db.read_conn()).await?;
         let recoverable_ids = session_store.recoverable_ids(db.read_conn(), &durable, &stored).await?;
         let mut sessions = Vec::new();
         let mut opened = Opened::default();
@@ -526,13 +556,21 @@ impl Ledger {
                 sessions.push(session);
             }
         }
-        facts.apply(loaded(sessions, issues));
+        for (idx, session) in sessions.iter().enumerate() {
+            if vibevalley_core::status::is_farm_worker(session) {
+                let others: Vec<&Session> = sessions.iter().take(idx).collect();
+                live.ensure_play_station(session, &others, None);
+            }
+        }
+        projector.mark_dirty(SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM);
         let ledger = Ledger {
             durable,
             db,
+            live,
+            projector,
+            outbox,
             issues: issue_store,
             sessions: session_store,
-            facts,
             write: AsyncMutex::new(()),
             cron_of_issue: Mutex::new(None),
             pull_of_issue: Mutex::new(None),
@@ -540,64 +578,45 @@ impl Ledger {
         Ok((ledger, opened))
     }
 
-    /// Registers the owner-backed `Issue.cron` projection and syncs current issues.
+    pub fn db(&self) -> &Arc<ServerDb> {
+        &self.db
+    }
+
+    pub fn live(&self) -> &Arc<LiveOverlay> {
+        &self.live
+    }
+
+    pub fn projector(&self) -> &Arc<SliceProjector> {
+        &self.projector
+    }
+
+    pub fn outbox(&self) -> &Arc<Outbox> {
+        &self.outbox
+    }
+
+    pub fn seq(&self) -> i64 {
+        self.projector.seq()
+    }
+
+    pub fn mark_dirty(&self, dirty: SliceMask) -> i64 {
+        self.projector.mark_dirty(dirty)
+    }
+
+    /// Registers the owner-backed `Issue.cron` projection and marks slices dirty.
     pub async fn use_cron_of_issue_async(&self, lookup: CronOfIssue) {
-        let _write = self.write.lock().await;
-        *self.cron_of_issue.lock() = Some(lookup.clone());
-        let at = now();
-        let mut facts = Vec::new();
-        for mut issue in self.state().issues {
-            let next = lookup(&issue.id);
-            if issue.cron != next {
-                issue.cron = next;
-                facts.push(Fact::issue_changed(at, issue));
-            }
-        }
-        if !facts.is_empty() {
-            self.publish(facts);
-        }
+        *self.cron_of_issue.lock() = Some(lookup);
+        self.projector.mark_dirty(SliceMask::BOARD | SliceMask::INBOX | SliceMask::FARM);
     }
 
-    /// Registers the owner-backed `Issue.pull_request` projection and syncs current issues.
+    /// Registers the owner-backed `Issue.pull_request` projection and marks slices dirty.
     pub async fn use_pull_of_issue_async(&self, lookup: PullOfIssue) {
-        let _write = self.write.lock().await;
-        *self.pull_of_issue.lock() = Some(lookup.clone());
-        let at = now();
-        let mut facts = Vec::new();
-        for mut issue in self.state().issues {
-            let next = lookup(&issue.id);
-            if issue.pull_request != next {
-                issue.pull_request = next;
-                facts.push(Fact::issue_changed(at, issue));
-            }
-        }
-        if !facts.is_empty() {
-            self.publish(facts);
-        }
+        *self.pull_of_issue.lock() = Some(lookup);
+        self.projector.mark_dirty(SliceMask::BOARD | SliceMask::INBOX | SliceMask::FARM);
     }
 
-    /// Re-projects `cron` and `pull_request` onto `id` from their owners without touching SQLite.
-    pub async fn refresh_issue_async(&self, id: &str) {
-        let _write = self.write.lock().await;
-        let Some(mut issue) = self.issue(id) else { return };
-        let mut changed = false;
-        if let Some(lookup) = self.cron_of_issue.lock().clone() {
-            let next = lookup(&issue.id);
-            if issue.cron != next {
-                issue.cron = next;
-                changed = true;
-            }
-        }
-        if let Some(lookup) = self.pull_of_issue.lock().clone() {
-            let next = lookup(&issue.id);
-            if issue.pull_request != next {
-                issue.pull_request = next;
-                changed = true;
-            }
-        }
-        if changed {
-            self.publish(vec![Fact::issue_changed(now(), issue)]);
-        }
+    /// Re-projects `cron` and `pull_request` onto `id` without touching SQLite.
+    pub async fn refresh_issue_async(&self, _id: &str) {
+        self.projector.mark_dirty(SliceMask::BOARD | SliceMask::INBOX | SliceMask::FARM);
     }
 
     pub(crate) async fn read_db_async<R>(&self, query: impl AsyncFnOnce(&DatabaseConnection) -> std::result::Result<R, DbErr>) -> Result<R> {
@@ -608,33 +627,56 @@ impl Ledger {
         Ok(query(self.db.write_conn()).await?)
     }
 
-    pub fn bundle(&self) -> SliceBundle {
-        self.facts.bundle()
+    fn enrich_issue(&self, issue: &mut Issue) {
+        if let Some(lookup) = self.cron_of_issue.lock().as_ref() {
+            issue.cron = lookup(&issue.id);
+        }
+        if let Some(lookup) = self.pull_of_issue.lock().as_ref() {
+            issue.pull_request = lookup(&issue.id);
+        }
     }
 
-    /// Reads the state the board's facts went into.
-    pub fn read<R>(&self, f: impl FnOnce(&SpaceState) -> R) -> R {
-        let mut f = Some(f);
-        let mut out = None;
-        self.facts.read(&mut |s| {
-            if let Some(f) = f.take() {
-                out = Some(f(s));
-            }
-        });
-        out.expect("Facts::read calls back once")
+    pub async fn raw_issues_async(&self) -> Result<Vec<Issue>> {
+        let mut issues = self.issues.all(self.db.read_conn()).await?;
+        for issue in &mut issues {
+            self.enrich_issue(issue);
+        }
+        Ok(issues)
     }
 
-    pub fn state(&self) -> SpaceState {
-        self.read(SpaceState::clone)
+    pub async fn sessions_async(&self) -> Result<Vec<Session>> {
+        let stored = self.sessions.all(self.db.read_conn()).await?;
+        let overlays = self.live.core_session_overlays();
+        Ok(overlay_sessions(&stored, &overlays))
+    }
+
+    pub async fn issues_async(&self) -> Result<Vec<Issue>> {
+        let (raw_issues, sessions) = tokio::try_join!(self.raw_issues_async(), self.sessions_async())?;
+        Ok(derive_all_issues(&raw_issues, &sessions))
     }
 
     /// By id, number or `#number`.
-    pub fn issue(&self, reference: &str) -> Option<Issue> {
-        self.read(|s| find(&s.issues, reference).cloned())
+    pub async fn issue_async(&self, reference: &str) -> Result<Option<Issue>> {
+        let (raw_issues, sessions) = tokio::try_join!(self.raw_issues_async(), self.sessions_async())?;
+        let Some(target) = find(&raw_issues, reference) else {
+            return Ok(None);
+        };
+        let target_id = target.id.clone();
+        let derived = derive_issues(&raw_issues, &sessions);
+        if let Some(found) = derived.into_iter().find(|i| i.id == target_id) {
+            return Ok(Some(found));
+        }
+        // Older closed issue trimmed from BoardSlice retention: derive alone.
+        let single = derive_issues(std::slice::from_ref(target), &sessions);
+        Ok(single.into_iter().next())
     }
 
-    pub fn session(&self, id: &str) -> Option<Session> {
-        self.read(|s| s.sessions.iter().find(|s| s.id == id).cloned())
+    pub async fn session_async(&self, id: &str) -> Result<Option<Session>> {
+        let Some(stored) = self.sessions.get(self.db.read_conn(), id).await? else {
+            return Ok(None);
+        };
+        let overlays = self.live.core_session_overlays();
+        Ok(overlay_sessions(&[stored], &overlays).into_iter().next())
     }
 
     /// A session that left the board, as it was when it did.
@@ -642,96 +684,132 @@ impl Ledger {
         self.sessions.past(self.db.read_conn(), id).await.ok().flatten()
     }
 
-    /// Stores `facts`, folds them in as one commit.
-    pub async fn apply_async(&self, facts: Vec<Fact>) -> Result<()> {
-        let _write = self.write.lock().await;
-        self.apply_locked_async(facts, |_| Box::pin(async { Ok(()) })).await
-    }
-
     /// `change` made to issue `id`; the issue as it is after.
     pub async fn change_async(&self, id: &str, change: IssueChange) -> Result<Issue> {
-        self.change_with_async(id, change, |fact| vec![fact]).await
+        self.change_commit_async(id, change, SliceMask::NONE, |_| Box::pin(async { Ok(()) })).await
     }
 
-    /// `change` made to issue `id`, committed as the facts `batch` makes
-    /// around the issue's own.
-    pub async fn change_with_async(&self, id: &str, change: IssueChange, batch: impl FnOnce(Fact) -> Vec<Fact>) -> Result<Issue> {
-        self.change_commit_async(id, change, batch, |_| Box::pin(async { Ok(()) })).await
-    }
-
-    pub(crate) async fn change_commit_async<F>(&self, id: &str, change: IssueChange, batch: impl FnOnce(Fact) -> Vec<Fact>, also: F) -> Result<Issue>
+    pub(crate) async fn change_commit_async<F>(&self, id: &str, change: IssueChange, extra_dirty: SliceMask, also: F) -> Result<Issue>
     where
         F: for<'call, 'tx> FnOnce(&'call mut vibevalley_runtime::agent::durable::Tx<'tx>) -> BoxFuture<'call, vibevalley_runtime::agent::durable::Result<()>>
             + Send,
     {
+        let dirty = change.dirty_mask() | extra_dirty;
         let id = {
             let _write = self.write.lock().await;
-            let mut issue = self.issue(id).ok_or_else(|| BoardError::NoIssue(id.into()))?;
+            let raw = self.raw_issues_async().await?;
+            let mut issue = find(&raw, id).cloned().ok_or_else(|| BoardError::NoIssue(id.into()))?;
             let at = now();
             change.fold(&mut issue, at);
-            let id = issue.id.clone();
-            self.apply_locked_async(batch(Fact::issue_changed(at, issue)), also).await?;
-            id
+            let issue_id = issue.id.clone();
+            let also = Mutex::new(Some(also));
+            self.durable
+                .write_with_async((self, &issue, &also), |tx, &(ledger, issue, also)| {
+                    let also = also.lock().take().expect("change_commit_async calls once");
+                    Box::pin(async move {
+                        also(tx).await?;
+                        ledger.issues.put(tx.transaction(), issue).await?;
+                        Ok(())
+                    })
+                })
+                .await?;
+            self.projector.mark_dirty(dirty);
+            issue_id
         };
-        self.issue(&id).ok_or(BoardError::NoIssue(id))
+        self.issue_async(&id).await?.ok_or(BoardError::NoIssue(id))
     }
 
-    async fn apply_locked_async<F>(&self, facts: Vec<Fact>, also: F) -> Result<()>
-    where
-        F: for<'call, 'tx> FnOnce(&'call mut vibevalley_runtime::agent::durable::Tx<'tx>) -> BoxFuture<'call, vibevalley_runtime::agent::durable::Result<()>>
-            + Send,
-    {
-        let prospective = self.state();
-        let also = Mutex::new(Some(also));
-        self.durable
-            .write_with_async((self, &facts, prospective, &also), |tx, &(ledger, facts, ref prospective, also)| {
-                let mut prospective = prospective.clone();
-                let also = also.lock().take().expect("apply_locked_async calls once");
+    pub async fn put_issues_async(&self, issues: &[Issue]) -> Result<()> {
+        let _write = self.write.lock().await;
+        let dirty = SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM;
+        let issue_store = &self.issues;
+        let (_, written_dirty) = self
+            .db
+            .write_dirty_with(BoardError::Store, |tx| {
                 Box::pin(async move {
-                    also(tx).await?;
-                    let db_tx = tx.transaction();
-                    for fact in facts {
-                        match fact {
-                            Fact::IssueChanged(vibevalley_protocol::FactIssueChanged { issue, .. }) => ledger.issues.put(db_tx, issue).await?,
-                            Fact::IssueRemoved(vibevalley_protocol::FactIssueRemoved { id, .. }) => ledger.issues.remove(db_tx, id).await?,
-                            Fact::SessionSubagentsChanged(f) => {
-                                if let Some(summary) = &f.subagents {
-                                    ledger.sessions.put_subagents(db_tx, summary).await?;
-                                }
-                            }
-                            Fact::SessionLeft(vibevalley_protocol::FactSessionLeft { id, closed, at, .. }) => {
-                                if let Some(mut past) = prospective.sessions.iter().find(|s| &s.id == id).cloned() {
-                                    if let Some(closed) = closed {
-                                        past.phase = Phase::Closed(vibevalley_protocol::PhaseClosed { at: *at, closed: *closed });
-                                    }
-                                    ledger.sessions.put(db_tx, &past, true).await?;
-                                }
-                            }
-                            _ => {}
-                        }
-                        vibevalley_core::reduce(&mut prospective, fact);
-                        let id = match fact {
-                            Fact::SessionChanged(vibevalley_protocol::FactSessionChanged { session, .. }) => Some(&session.id),
-                            Fact::SessionPhaseChanged(vibevalley_protocol::FactSessionPhaseChanged { id, .. })
-                            | Fact::SessionReported(vibevalley_protocol::FactSessionReported { id, .. }) => Some(id),
-                            _ => None,
-                        };
-                        if let Some(id) = id
-                            && let Some(session) = prospective.sessions.iter().find(|s| &s.id == id)
-                        {
-                            ledger.sessions.put(db_tx, session, false).await?;
-                        }
+                    for issue in issues {
+                        issue_store.put(tx, issue).await?;
                     }
-                    Ok(())
+                    Ok(((), dirty))
                 })
             })
             .await?;
-        self.publish(facts);
+        self.projector.mark_dirty(written_dirty);
         Ok(())
     }
 
-    fn publish(&self, facts: Vec<Fact>) {
-        self.facts.apply(facts);
+    pub async fn remove_issue_async(&self, id: &str) -> Result<()> {
+        let _write = self.write.lock().await;
+        let dirty = SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM;
+        let issue_store = &self.issues;
+        let (_, written_dirty) = self
+            .db
+            .write_dirty_with(BoardError::Store, |tx| {
+                Box::pin(async move {
+                    issue_store.remove(tx, id).await?;
+                    Ok(((), dirty))
+                })
+            })
+            .await?;
+        self.projector.mark_dirty(written_dirty);
+        Ok(())
+    }
+
+    pub(crate) async fn commit_tx_async<R>(
+        &self,
+        dirty: SliceMask,
+        f: impl for<'call> FnOnce(&'call DatabaseTransaction, &'call dyn IssuePersistence, &'call dyn SessionPersistence) -> BoxFuture<'call, Result<(R, bool)>>
+        + Send,
+    ) -> Result<R>
+    where
+        R: Send,
+    {
+        let _write = self.write.lock().await;
+        let issue_store = self.issues.as_ref();
+        let session_store = self.sessions.as_ref();
+        let ((result, wake_outbox), written_dirty) = self
+            .db
+            .write_dirty_with(BoardError::Store, |tx| {
+                Box::pin(async move {
+                    let (result, wake_outbox) = f(tx, issue_store, session_store).await?;
+                    Ok(((result, wake_outbox), dirty))
+                })
+            })
+            .await?;
+        self.projector.mark_dirty(written_dirty);
+        if wake_outbox {
+            self.outbox.wake();
+        }
+        Ok(result)
+    }
+
+    pub(crate) async fn commit_durable_async<R>(
+        &self,
+        dirty: SliceMask,
+        f: impl for<'call, 'tx> FnOnce(
+            &'call mut vibevalley_runtime::agent::durable::Tx<'tx>,
+            &'call dyn IssuePersistence,
+            &'call dyn SessionPersistence,
+        ) -> BoxFuture<'call, vibevalley_runtime::agent::durable::Result<(R, bool)>>
+        + Send,
+    ) -> Result<R>
+    where
+        R: Send,
+    {
+        let _write = self.write.lock().await;
+        let f = Mutex::new(Some(f));
+        let (result, wake_outbox) = self
+            .durable
+            .write_with_async((self, &f), |tx, &(ledger, f)| {
+                let f = f.lock().take().expect("commit_durable_async calls once");
+                Box::pin(async move { f(tx, ledger.issues.as_ref(), ledger.sessions.as_ref()).await })
+            })
+            .await?;
+        self.projector.mark_dirty(dirty);
+        if wake_outbox {
+            self.outbox.wake();
+        }
+        Ok(result)
     }
 
     pub(crate) async fn update_subagents_async(
@@ -739,19 +817,22 @@ impl Ledger {
         session_id: &str,
         run: &str,
         root: &str,
-        observe: impl FnOnce(&Session) -> Option<vibevalley_protocol::FactSessionSubagentsChanged>,
+        observe: impl FnOnce(&Session) -> Option<SessionSubagents>,
     ) -> Result<()> {
         let _write = self.write.lock().await;
-        let Some(fact) = self.session(session_id).as_ref().and_then(observe) else {
+        let Some(current_session) = self.session_async(session_id).await? else {
+            return Ok(());
+        };
+        let Some(summary) = observe(&current_session) else {
             return Ok(());
         };
         let current = self
             .durable
-            .write_with_async((self, session_id, run, root, &fact), |tx, &(ledger, session_id, run, root, fact)| {
+            .write_with_async((self, session_id, run, root, &summary), |tx, &(ledger, session_id, run, root, summary)| {
                 Box::pin(async move {
                     let db = tx.transaction();
                     let active = ledger.sessions.active_run(db, session_id, run, root).await?;
-                    if active && let Some(summary) = &fact.subagents {
+                    if active {
                         ledger.sessions.put_subagents(db, summary).await?;
                     }
                     Ok(active)
@@ -759,38 +840,35 @@ impl Ledger {
             })
             .await?;
         if current {
-            self.publish(vec![Fact::SessionSubagentsChanged(fact)]);
+            self.live.update_session(session_id, |snap| {
+                snap.subagents = Some(Some(summary));
+            });
+            self.projector
+                .mark_dirty(SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM);
         }
         Ok(())
     }
 
-    pub(crate) async fn reconcile_subagents_async(
-        &self,
-        session: &str,
-        before: &vibevalley_protocol::SessionSubagents,
-        after: vibevalley_protocol::SessionSubagents,
-    ) -> Result<()> {
+    pub(crate) async fn reconcile_subagents_async(&self, session: &str, before: &SessionSubagents, after: SessionSubagents) -> Result<()> {
         let _write = self.write.lock().await;
         let stored = self.sessions.run(self.db.read_conn(), &before.run).await?;
         if !stored.is_some_and(|r| r.session == session && r.subagents.as_ref() == Some(before)) {
             return Ok(());
         }
-        if self.session(session).is_some_and(|s| s.subagents.as_ref() == Some(before)) {
-            let fact = vibevalley_protocol::FactSessionSubagentsChanged {
-                at: now(),
-                id: session.into(),
-                subagents: Some(after),
-            };
-            self.apply_locked_async(vec![Fact::SessionSubagentsChanged(fact)], |_| Box::pin(async { Ok(()) }))
-                .await
-        } else {
-            self.durable
-                .write_with_async((self, &after), |tx, &(ledger, after)| {
-                    Box::pin(async move { Ok(ledger.sessions.put_subagents(tx.transaction(), after).await?) })
-                })
-                .await?;
-            Ok(())
+        let matches_live = self.session_async(session).await?.is_some_and(|s| s.subagents.as_ref() == Some(before));
+        self.durable
+            .write_with_async((self, &after), |tx, &(ledger, after)| {
+                Box::pin(async move { Ok(ledger.sessions.put_subagents(tx.transaction(), after).await?) })
+            })
+            .await?;
+        if matches_live {
+            self.live.update_session(session, |snap| {
+                snap.subagents = Some(Some(after));
+            });
+            self.projector
+                .mark_dirty(SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM);
         }
+        Ok(())
     }
 
     /// The next number of `counter`, above `at_least`.
@@ -798,4 +876,17 @@ impl Ledger {
         let _write = self.write.lock().await;
         self.write_db_async(async |db| crate::db::next_seq_async(db, counter, at_least).await).await
     }
+}
+
+fn derive_all_issues(raw_issues: &[Issue], sessions: &[Session]) -> Vec<Issue> {
+    let mut out = derive_issues(raw_issues, sessions);
+    if out.len() < raw_issues.len() {
+        let seen: HashSet<&str> = out.iter().map(|i| i.id.as_str()).collect();
+        for issue in raw_issues {
+            if !seen.contains(issue.id.as_str()) {
+                out.extend(derive_issues(std::slice::from_ref(issue), sessions));
+            }
+        }
+    }
+    out
 }

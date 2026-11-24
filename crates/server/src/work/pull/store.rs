@@ -157,13 +157,13 @@ impl PullIndex {
     }
 }
 
-pub struct PullStore {
+pub struct PullRepo {
     db: Arc<ServerDb>,
     index: Arc<Mutex<PullIndex>>,
 }
 
-impl PullStore {
-    pub async fn open_async(db: Arc<ServerDb>) -> Result<PullStore, ApiError> {
+impl PullRepo {
+    pub async fn open_async(db: Arc<ServerDb>) -> Result<PullRepo, ApiError> {
         let rows: Vec<PullRecord> = pull::Entity::find()
             .order_by_asc(pull::Column::CreatedAt)
             .order_by_asc(pull::Column::Id)
@@ -176,7 +176,7 @@ impl PullStore {
             .map_err(internal_db)?;
         let mut index = PullIndex::default();
         index.load(rows);
-        Ok(PullStore {
+        Ok(PullRepo {
             db,
             index: Arc::new(Mutex::new(index)),
         })

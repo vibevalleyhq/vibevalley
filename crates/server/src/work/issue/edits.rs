@@ -5,9 +5,9 @@
 use vibevalley_core::brief::{failed_text, issue_words};
 use vibevalley_git::Repo;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{Assignment, Deliverable, Fact, Finding, Issue, IssueStatus, IssueUpdate, ReviewRevision};
+use vibevalley_protocol::{Assignment, Deliverable, Finding, Issue, IssueStatus, IssueUpdate, ReviewRevision};
 
-use super::board::Board;
+use super::board::IssueStore;
 use crate::work::ledger::{BoardError, IssueChange, Result, now};
 use crate::work::workplace::Leave;
 
@@ -18,7 +18,7 @@ fn refused(key: &str, params: vibevalley_i18n::Params) -> BoardError {
     BoardError::Other(t(key, params))
 }
 
-impl Board {
+impl IssueStore {
     /// The title, the priority and `deliver` may change while the issue is
     /// open; the rest is what the helper was asked, so only before it is
     /// sent. An empty `agent` leaves it unassigned; `before` places it on
@@ -30,7 +30,7 @@ impl Board {
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Issue>> + Send + 'a>> {
         Box::pin(async move {
             let _work = self.0.work.lock().await;
-            let was = self.stored(reference)?;
+            let was = self.stored_async(reference).await?;
             let while_open = upd.description.is_none()
                 && upd.repo.is_none()
                 && upd.agent.is_none()
@@ -81,36 +81,33 @@ impl Board {
             if let Some(machine) = upd.machine_id.as_deref().map(str::trim) {
                 issue.machine_id = (!machine.is_empty()).then(|| machine.to_string());
             }
-            let mut facts = vec![Fact::issue_changed(at, issue)];
+            let mut edited = vec![issue];
             if let Some(before) = &upd.before {
-                facts.extend(self.placed(&was.id, before).into_iter().map(|i| Fact::issue_changed(at, i)));
-            }
-            // The placing reads the edit's fields from the issue it is given.
-            let mut merged: Vec<Fact> = Vec::new();
-            for f in facts {
-                if let Fact::IssueChanged(c) = &f
-                    && let Some(Fact::IssueChanged(earlier)) = merged.iter_mut().find(|m| matches!(m, Fact::IssueChanged(e) if e.issue.id == c.issue.id))
-                {
-                    earlier.issue.rank = c.issue.rank;
-                    continue;
+                for placed in self.placed_async(&was.id, before).await? {
+                    if let Some(earlier) = edited.iter_mut().find(|m| m.id == placed.id) {
+                        earlier.rank = placed.rank;
+                    } else {
+                        edited.push(placed);
+                    }
                 }
-                merged.push(f);
             }
-            self.0.ledger.apply_async(merged).await?;
-            self.stored(&was.id)
+            self.0.ledger.put_issues_async(&edited).await?;
+            self.stored_async(&was.id).await
         })
     }
 
     /// The unsent issues reranked so `id` stands before `before` ("" or
     /// unknown: last). Only those whose rank changes.
-    fn placed(&self, id: &str, before: &str) -> Vec<Issue> {
-        let mut unsent: Vec<Issue> = self.read(|s| s.issues.iter().filter(|i| i.executions().next().is_none()).cloned().collect());
+    async fn placed_async(&self, id: &str, before: &str) -> Result<Vec<Issue>> {
+        let mut unsent: Vec<Issue> = self.issues_async().await?.into_iter().filter(|i| i.executions().next().is_none()).collect();
         unsent.sort_by(vibevalley_core::issue_order);
-        let Some(from) = unsent.iter().position(|i| i.id == id) else { return vec![] };
+        let Some(from) = unsent.iter().position(|i| i.id == id) else {
+            return Ok(vec![]);
+        };
         let moving = unsent.remove(from);
         let at = unsent.iter().position(|i| i.id == before).unwrap_or(unsent.len());
         if at == from {
-            return vec![];
+            return Ok(vec![]);
         }
         let prev = at.checked_sub(1).map(|p| unsent[p].rank.unwrap_or(0));
         let next = unsent.get(at).map(|n| n.rank.unwrap_or(0));
@@ -121,10 +118,10 @@ impl Board {
             _ => None,
         };
         if let Some(rank) = single {
-            return vec![Issue { rank: Some(rank), ..moving }];
+            return Ok(vec![Issue { rank: Some(rank), ..moving }]);
         }
         unsent.insert(at, moving);
-        unsent
+        Ok(unsent
             .into_iter()
             .enumerate()
             .filter_map(|(i, mut issue)| {
@@ -134,14 +131,14 @@ impl Board {
                     issue
                 })
             })
-            .collect()
+            .collect())
     }
 
     /// Deletes an issue never sent: a draft being written goes home, its
     /// checkout is cleared.
     pub async fn remove_async(&self, reference: &str) -> Result<()> {
         let _work = self.0.work.lock().await;
-        let issue = self.stored(reference)?;
+        let issue = self.stored_async(reference).await?;
         if issue.executions().next().is_some() {
             return Err(refused("server.issue.started", &[]));
         }
@@ -157,7 +154,7 @@ impl Board {
             ));
         }
         let _ = self.take_words_async(&issue.id).await;
-        self.0.ledger.apply_async(vec![Fact::issue_removed(now(), issue.id.clone())]).await
+        self.0.ledger.remove_issue_async(&issue.id).await
     }
 
     /// The verdict on what was handed back: a pass marks it reviewed (the
@@ -173,13 +170,13 @@ impl Board {
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Issue>> + Send + 'a>> {
         Box::pin(async move {
             let _work = if pass { Some(self.0.work.lock().await) } else { None };
-            let issue = self.stored(reference)?;
+            let issue = self.stored_async(reference).await?;
             if issue.status != IssueStatus::InReview {
                 return Err(refused("server.issue.nothingToAccept", &[]));
             }
             if pass {
                 let revision = if issue.deliver == Deliverable::Change && issue.repo.is_some() && issue.parent.is_none() {
-                    let c = self.changes(&issue.id)?;
+                    let c = self.changes_async(&issue.id).await?;
                     if seen.is_some_and(|seen| seen != &c.revision) {
                         return Err(refused("server.issue.reviewChanged", &[]));
                     }
@@ -237,7 +234,7 @@ pub(super) fn assign(issue: &mut Issue, agent: &str, at: i64) {
     }
 }
 
-impl Board {
+impl IssueStore {
     pub fn hand_over_and_move_async<'a>(
         &'a self,
         reference: &'a str,
@@ -247,7 +244,7 @@ impl Board {
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<vibevalley_core::Move>> + Send + 'a>> {
         Box::pin(async move {
             let _work = self.0.work.lock().await;
-            let issue = self.stored(reference)?;
+            let issue = self.stored_async(reference).await?;
             let agent = agent.trim();
             self.0.drivers.check(agent)?;
             let words = words.map(str::trim).filter(|w| !w.is_empty()).map(String::from);
@@ -295,7 +292,7 @@ impl Board {
                 send_words = Some(failed_text(&all, if findings.is_empty() { text } else { "" }));
                 self.change_async(&issue.id, IssueChange::Failed { findings: all }).await?;
             }
-            if let Some(s) = self.on_board(&issue) {
+            if let Some(s) = self.on_board_async(&issue).await {
                 self.0.sessions.dismiss_async(&s.id, Leave::KeepBranch).await?;
             }
             self.change_async(&issue.id, IssueChange::Assigned(agent.to_string())).await?;
@@ -314,11 +311,12 @@ impl Board {
 
     /// Why one more session cannot start on `issue` now (`noRoom`), or ""
     /// when there is room. Its own session does not count against it.
-    pub fn no_room(&self, issue: &Issue) -> String {
+    pub async fn no_room_async(&self, issue: &Issue) -> String {
         let except = issue.latest_session_id().cloned().unwrap_or_default();
         let repo = issue.repo.clone().unwrap_or_default();
         let config = &self.0.config;
-        let room = self.read(|s| vibevalley_core::rules::room_left(&s.sessions, &repo, config.space_limit, config.per_repo, &except));
+        let sessions = self.sessions_async().await.unwrap_or_default();
+        let room = vibevalley_core::rules::room_left(&sessions, &repo, config.space_limit, config.per_repo, &except);
         if room.farm == 0 {
             return t("server.session.noRoom.farm", &[("max", config.space_limit.into())]);
         }

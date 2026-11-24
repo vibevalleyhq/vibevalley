@@ -5,35 +5,33 @@
 
 use std::path::PathBuf;
 
-use vibevalley_protocol::{ContextRef, ExecutionPolicy, Fact, Issue, Outcome, Phase, Session, SessionAction, SessionController};
+use vibevalley_protocol::{ContextRef, ExecutionPolicy, Issue, Outcome, Phase, Session, SessionAction, SessionController};
 use vibevalley_runtime::oar::{SessionOptions, StopReason};
 
 use super::drivers::Persona;
-use super::sessions::{Sessions, text};
+use super::sessions::{SessionStore, text};
 use crate::work::ledger::{BoardError, Result, Step, io, now};
 
-impl Sessions {
+impl SessionStore {
     /// The session talking for `agent` in `channel`, still on the board.
-    pub fn talker(&self, agent: &str, channel: &str) -> Option<Session> {
-        self.0.ledger.read(|s| {
-            s.sessions
-                .iter()
-                .filter(|h| h.is_direct_talker() && h.issue_id().is_none() && h.profile_id() == Some(agent) && h.channel_id() == Some(channel))
-                .max_by_key(|h| h.hired_at)
-                .cloned()
-        })
+    pub async fn talker_async(&self, agent: &str, channel: &str) -> Option<Session> {
+        let sessions = self.sessions_async().await.ok()?;
+        sessions
+            .into_iter()
+            .filter(|h| h.is_direct_talker() && h.issue_id().is_none() && h.profile_id() == Some(agent) && h.channel_id() == Some(channel))
+            .max_by_key(|h| h.hired_at)
     }
 
     /// The user's words to `agent` in `channel`: its talking session's next
     /// round, hiring one the first time.
     pub async fn talk_async(&self, agent: &str, channel: &str, words: &str) -> Result<String> {
         let _talking = self.0.talking.lock().await;
-        if let Some(session) = self.talker(agent, channel) {
+        if let Some(session) = self.talker_async(agent, channel).await {
             if let Some(live) = self.live_agent(&session.id) {
                 let phase = Phase::working(now(), SessionAction::Thinking, "");
-                self.0.ledger.apply_async(vec![self.phase_changed(session.id.clone(), phase)]).await?;
+                self.persist_phase_change_async(&session.id, phase, None, None).await?;
                 let words = self.with_recall(&session, words.to_string());
-                self.record(&session.id, Step::Asked { text: words.clone() });
+                self.record_async(&session.id, Step::Asked { text: words.clone() }).await;
                 live.prompt(text(&words))?;
                 return Ok(session.id);
             }
@@ -122,7 +120,7 @@ impl Sessions {
         session.phase = Phase::working(now(), SessionAction::Thinking, "");
         self.go_live_async(agent.clone(), session.clone(), None).await?;
         let prompt = self.with_recall(&session, prompt);
-        self.record(&session.id, Step::Asked { text: prompt.clone() });
+        self.record_async(&session.id, Step::Asked { text: prompt.clone() }).await;
         let prompt_agent = agent.clone();
         crate::spawn_blocking_traced(move || prompt_agent.prompt(text(&prompt)))
             .await
@@ -146,23 +144,6 @@ impl Sessions {
         } else {
             "Did not finish.".into()
         };
-        let runs = session.runs + 1;
-        let _ = self
-            .0
-            .ledger
-            .apply_async(vec![Fact::SessionReported(vibevalley_protocol::FactSessionReported {
-                at: now(),
-                id: session.id.clone(),
-                run: None,
-                outcome,
-                phase: None,
-                summary,
-                runs,
-                spent,
-                questions: vec![],
-                checks: vec![],
-                answer: None,
-            })])
-            .await;
+        let _ = self.settle_report_async(session, outcome, summary, spent, None, None, None).await;
     }
 }

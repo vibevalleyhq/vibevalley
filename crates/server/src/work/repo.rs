@@ -20,12 +20,13 @@ use tracing::Instrument;
 use tracing::instrument::WithSubscriber;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, Author, BizCode, DayCount, GitHubStatus, IssueTemplate, JsNumber, LanguageCount, MAX_RUNNING, NewRepo, PullRequestCapability, RepoActivity,
-    RepoLanguages, RepoStack, RepoSummary, RepoTemplates, TemplateBlank, TemplateKind, Validation, ops,
+    ApiError, Author, BizCode, DayCount, GitHubStatus, Issue, IssueTemplate, JsNumber, LanguageCount, MAX_RUNNING, NewRepo, PullRequestCapability,
+    RepoActivity, RepoLanguages, RepoStack, RepoSummary, RepoTemplates, TemplateBlank, TemplateKind, Validation,
 };
 
-use crate::app::hub::refusal::{LookIn, missing};
-use crate::{Hub, now};
+use crate::app::refusal::{LookIn, missing};
+use crate::app::runtime::Runtime;
+use crate::work::ledger::now;
 
 const REPO_CONCURRENCY: usize = 4;
 
@@ -345,7 +346,7 @@ pub struct RepoFolder {
     pub git: bool,
 }
 
-pub struct Repos {
+pub struct RepoStore {
     root: PathBuf,
     per_repo: usize,
     tokei: String,
@@ -357,12 +358,12 @@ pub struct Repos {
     probe: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
-impl Repos {
+impl RepoStore {
     /// The repos under `<work_root>/repos` (made when missing).
-    pub fn open(work_root: &Path, per_repo: usize) -> std::io::Result<Arc<Repos>> {
+    pub fn open(work_root: &Path, per_repo: usize) -> std::io::Result<Arc<RepoStore>> {
         let root = work_root.join("repos");
         std::fs::create_dir_all(&root)?;
-        Ok(Arc::new(Repos {
+        Ok(Arc::new(RepoStore {
             root,
             per_repo,
             tokei: "tokei".into(),
@@ -374,13 +375,14 @@ impl Repos {
         }))
     }
 
-    pub fn probe_in_background(self: &Arc<Repos>) {
+    pub fn probe_in_background(self: &Arc<RepoStore>, runtime: &Runtime) {
         let weak = Arc::downgrade(self);
         let span = tracing::debug_span!("repo.probe");
-        let handle = vibevalley_runtime::rt::current_or_global_handle().spawn(
+        let cancel = runtime.child_token();
+        let handle = runtime.spawn(
             async move {
                 let Some(repos) = weak.upgrade() else { return };
-                if !repos.cancel.is_cancelled() {
+                if !cancel.is_cancelled() && !repos.cancel.is_cancelled() {
                     let _ = repos.refresh_github_async().await;
                 }
             }
@@ -981,47 +983,86 @@ pub async fn contributions_of_async(root: PathBuf, extra: Vec<String>) -> Vec<vi
     out.into_iter().map(|(_, repo)| repo).collect()
 }
 
-impl Repos {
+impl RepoStore {
     /// `contributions_async`: the user's commits per repository under the root.
     pub async fn contributions_async(&self, extra: Vec<String>) -> Vec<vibevalley_protocol::Repo> {
         contributions_of_async(self.root().to_path_buf(), extra).await
     }
-}
 
-pub fn install(hub: &Hub, repos: Arc<Repos>) {
-    let r = repos.clone();
-    hub.on_async::<ops::RepoList, _, _>(move |_, ()| {
-        let r = r.clone();
-        async move { Ok(r.summaries_async().await) }
-    });
-    hub.on_async::<ops::RepoValidate, _, _>(move |_, req| async move { Ok(Validation { problem: repo_problem(&req) }) });
-    let r = repos.clone();
-    hub.on_async::<ops::RepoCreate, _, _>(move |_, req| {
-        let r = r.clone();
-        async move {
-            let p = r.create_async(&req).await?;
-            Ok(r.summary_async(p).await)
+    pub(crate) async fn list_summaries_async(&self) -> Vec<RepoSummary> {
+        self.summaries_async().await
+    }
+
+    pub(crate) fn validate_repo(&self, req: &NewRepo) -> Validation {
+        Validation { problem: repo_problem(req) }
+    }
+
+    pub(crate) async fn create_repo_async(&self, req: &NewRepo) -> Result<RepoSummary, ApiError> {
+        let p = self.create_async(req).await?;
+        Ok(self.summary_async(p).await)
+    }
+
+    pub(crate) async fn languages_endpoint_async(&self, id: &str) -> Result<RepoLanguages, ApiError> {
+        self.languages_async(id).await?.ok_or_else(|| repo_ref(id))
+    }
+
+    pub(crate) async fn activity_endpoint_async(&self, id: &str) -> Result<RepoActivity, ApiError> {
+        self.activity_async(id).await.ok_or_else(|| repo_ref(id))
+    }
+
+    /// `repo.template.list` (`issue.templates`): the stack, the titles last
+    /// sent there, and the catalog filled with its commands.
+    pub(crate) async fn templates_endpoint_async(
+        &self,
+        id: &str,
+        issues: &[Issue],
+        agents: &crate::team::agent::AgentStore,
+    ) -> Result<RepoTemplates, ApiError> {
+        let name = id.to_string();
+        let stack = self
+            .stack_async(&name)
+            .await
+            .ok_or_else(|| missing(t("server.issue.repoRef", &[("name", name.clone().into())]), LookIn::Repo))?;
+        let mut mine: Vec<Issue> = issues
+            .iter()
+            .filter(|i| {
+                i.repo.as_deref() == Some(name.as_str())
+                    && i.was_sent()
+                    && i.parent.is_none()
+                    && i.cron.is_none()
+                    && !i.assigned_agent().is_some_and(|a| agents.profiles.is_orchestrator(a))
+            })
+            .cloned()
+            .collect();
+        mine.sort_by_key(|i| std::cmp::Reverse(i.created_at));
+        let mut recent: Vec<String> = Vec::new();
+        for i in mine {
+            let title = i.title.split_whitespace().collect::<Vec<_>>().join(" ");
+            if title.is_empty() || title.chars().count() > 60 || recent.contains(&title) {
+                continue;
+            }
+            recent.push(title);
+            if recent.len() == 5 {
+                break;
+            }
         }
-    });
-    let r = repos.clone();
-    hub.on_async::<ops::RepoLanguageList, _, _>(move |_, i| {
-        let r = r.clone();
-        async move { r.languages_async(&i.id).await?.ok_or_else(|| repo_ref(&i.id)) }
-    });
-    let r = repos.clone();
-    hub.on_async::<ops::RepoActivityGet, _, _>(move |_, i| {
-        let r = r.clone();
-        async move { r.activity_async(&i.id).await.ok_or_else(|| repo_ref(&i.id)) }
-    });
-    let r = repos.clone();
-    hub.on_async::<ops::GithubGet, _, _>(move |_, ()| {
-        let r = r.clone();
-        async move { Ok(r.github_status()) }
-    });
-    hub.on_async::<ops::GithubRefresh, _, _>(move |_, ()| {
-        let repos = repos.clone();
-        async move { Ok(repos.refresh_github_async().await) }
-    });
+        let kinds = catalog()
+            .kinds
+            .iter()
+            .map(|k| TemplateKind {
+                id: k.id.clone(),
+                name: k.name.clone(),
+                icon: k.icon.clone(),
+                templates: k.templates.iter().map(|s| filled_template(s, &stack)).collect(),
+            })
+            .collect();
+        Ok(RepoTemplates {
+            repo: name,
+            stack,
+            recent,
+            kinds,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -1052,8 +1093,8 @@ mod tests {
         assert_eq!((counts[0].name.as_str(), counts[0].files), ("Rust", 2));
     }
 
-    #[test]
-    fn regression_pyproject_toml_detects_python_stack_and_ruff() {
+    #[tokio::test]
+    async fn regression_pyproject_toml_detects_python_stack_and_ruff() {
         let mut with_ruff = std::collections::HashMap::new();
         with_ruff.insert("pyproject.toml", "[tool.ruff]\nline-length = 100\n".to_string());
         let py = stack_of(&with_ruff);
@@ -1078,51 +1119,40 @@ mod tests {
         let init = std::process::Command::new("git").args(["init", "-q"]).current_dir(&repo_dir).status().unwrap();
         assert!(init.success());
         std::fs::write(repo_dir.join("pyproject.toml"), "[tool.ruff]\n").unwrap();
-        let repos = Repos::open(work.path(), 3).unwrap();
-        let detected = vibevalley_runtime::rt::block_on(repos.stack_async("pyapp")).unwrap();
+        let repos = RepoStore::open(work.path(), 3).unwrap();
+        let detected = repos.stack_async("pyapp").await.unwrap();
         assert_eq!(detected.name, "python");
         assert_eq!(detected.lint.as_deref(), Some("ruff check ."));
-        repos.close();
+        repos.close_async().await;
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn async_repo_handlers_and_contributions_run_on_hub_on_async() {
+    async fn async_repo_handlers_and_contributions_run_on_repo_store() {
         let work = tempfile::tempdir().unwrap();
-        let repos = Repos::open(work.path(), 3).unwrap();
-        let hub = Hub::new(vibevalley_core::empty_space_state());
-        install(&hub, repos.clone());
+        let repos = RepoStore::open(work.path(), 3).unwrap();
 
-        let created = hub
-            .invoke_async::<ops::RepoCreate>(
-                &crate::CallerContext::local(),
-                NewRepo {
-                    name: "alpha".into(),
-                    github: None,
-                },
-            )
+        let created = repos
+            .create_repo_async(&NewRepo {
+                name: "alpha".into(),
+                github: None,
+            })
             .await
             .unwrap();
         assert_eq!(created.name, "alpha");
         assert!(created.git);
 
-        let _beta = hub
-            .invoke_async::<ops::RepoCreate>(
-                &crate::CallerContext::local(),
-                NewRepo {
-                    name: "beta".into(),
-                    github: None,
-                },
-            )
+        let _beta = repos
+            .create_repo_async(&NewRepo {
+                name: "beta".into(),
+                github: None,
+            })
             .await
             .unwrap();
 
-        let listed = hub.invoke_async::<ops::RepoList>(&crate::CallerContext::local(), ()).await.unwrap();
+        let listed = repos.list_summaries_async().await;
         assert_eq!(listed.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(), vec!["alpha", "beta"]);
 
-        let activity = hub
-            .invoke_async::<ops::RepoActivityGet>(&crate::CallerContext::local(), vibevalley_protocol::RepoActivityGetInput { id: "alpha".into() })
-            .await
-            .unwrap();
+        let activity = repos.activity_endpoint_async("alpha").await.unwrap();
         assert_eq!(activity.repo, "alpha");
         assert!(activity.total >= 1);
 
@@ -1283,7 +1313,7 @@ fn filled_template(s: &WrittenTemplate, stack: &RepoStack) -> IssueTemplate {
     }
 }
 
-impl Repos {
+impl RepoStore {
     /// `stack_async`: none when there is no repo by that name.
     pub async fn stack_async(&self, name: &str) -> Option<RepoStack> {
         let p = self.find_async(name).await?;
@@ -1297,61 +1327,4 @@ impl Repos {
         .await
         .ok()
     }
-}
-
-/// `repo.template.list` (`issue.templates`): the stack, the titles last
-/// sent there, and the catalog filled with its commands.
-pub fn install_templates(hub: &Hub, repos: Arc<Repos>, agents: Arc<crate::team::agent::Agents>) {
-    hub.on_async::<ops::RepoTemplateList, _, _>(move |ctx, input| {
-        let repos = repos.clone();
-        let agents = agents.clone();
-        async move {
-            let name = input.id;
-            let stack = repos
-                .stack_async(&name)
-                .await
-                .ok_or_else(|| missing(t("server.issue.repoRef", &[("name", name.clone().into())]), LookIn::Repo))?;
-            let mut mine: Vec<vibevalley_protocol::Issue> = ctx.hub.read(|s| {
-                s.issues
-                    .iter()
-                    .filter(|i| {
-                        i.repo.as_deref() == Some(name.as_str())
-                            && i.was_sent()
-                            && i.parent.is_none()
-                            && i.cron.is_none()
-                            && !i.assigned_agent().is_some_and(|a| agents.profiles.is_orchestrator(a))
-                    })
-                    .cloned()
-                    .collect()
-            });
-            mine.sort_by_key(|i| std::cmp::Reverse(i.created_at));
-            let mut recent: Vec<String> = Vec::new();
-            for i in mine {
-                let title = i.title.split_whitespace().collect::<Vec<_>>().join(" ");
-                if title.is_empty() || title.chars().count() > 60 || recent.contains(&title) {
-                    continue;
-                }
-                recent.push(title);
-                if recent.len() == 5 {
-                    break;
-                }
-            }
-            let kinds = catalog()
-                .kinds
-                .iter()
-                .map(|k| TemplateKind {
-                    id: k.id.clone(),
-                    name: k.name.clone(),
-                    icon: k.icon.clone(),
-                    templates: k.templates.iter().map(|s| filled_template(s, &stack)).collect(),
-                })
-                .collect();
-            Ok(RepoTemplates {
-                repo: name,
-                stack,
-                recent,
-                kinds,
-            })
-        }
-    });
 }
