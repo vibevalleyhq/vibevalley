@@ -245,6 +245,30 @@ impl SliceFeed {
 
     /// Blocking bounded-1 watch helper for synchronous [`crate::Server::watch_slice`] fallback callers.
     pub fn watch_since(&self, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+        self.watch_since_with_gate(after_seq, None, stop, receive);
+    }
+
+    /// Blocking bounded-1 watch helper honoring an optional DevTools [`crate::SharedFaultGate`].
+    pub fn watch_since_with_gate(
+        &self,
+        after_seq: Option<i64>,
+        gate: Option<&crate::transport::api::SharedFaultGate>,
+        stop: &flume::Receiver<()>,
+        receive: &mut dyn FnMut(i64, &Value),
+    ) {
+        let mut emit = |seq: i64, val: &Value| {
+            if let Some(gate) = gate {
+                if gate.should_disconnect(self.topic) {
+                    return false;
+                }
+                let delay = gate.delay_ms(self.topic);
+                if delay > 0 {
+                    std::thread::sleep(Duration::from_millis(delay));
+                }
+            }
+            receive(seq, val);
+            true
+        };
         let mut sub = self.subscribe();
         let mut is_initial = after_seq.is_none();
         let initial = sub.borrow_and_update(is_initial);
@@ -252,7 +276,9 @@ impl SliceFeed {
         let mut seen_gen = initial.generation;
         if after_seq != Some(initial.seq) {
             let value: Value = serde_json::from_str(&initial.json).unwrap_or(Value::Null);
-            receive(initial.seq, &value);
+            if !emit(initial.seq, &value) {
+                return;
+            }
         }
         let handle = vibevalley_runtime::rt::current_or_global_handle();
         let wait_changed = |sub: &mut SliceSubscription| {
@@ -272,7 +298,9 @@ impl SliceFeed {
             }
             seen_gen = frame.generation;
             let value: Value = serde_json::from_str(&frame.json).unwrap_or(Value::Null);
-            receive(frame.seq, &value);
+            if !emit(frame.seq, &value) {
+                return;
+            }
         }
     }
 }

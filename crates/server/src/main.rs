@@ -70,7 +70,7 @@ fn run() -> Result<(), String> {
     }
     let started = vibevalley_server::start(config).map_err(|e| e.to_string())?;
     let addr = format!("127.0.0.1:{port}").parse().map_err(|e| format!("{e}"))?;
-    let listener = vibevalley_server::transport::http::serve(started.hub.clone(), addr).map_err(|e| format!("listening on {addr}: {e}"))?;
+    let listener = vibevalley_server::transport::http::serve(started.door.clone(), addr).map_err(|e| format!("listening on {addr}: {e}"))?;
     let url = listener.url();
     started.set_mcp_url(format!("{url}/mcp"));
     let announced = vibevalley_server::home::announce(&home, &url).map_err(|e| format!("server.json: {e}"))?;

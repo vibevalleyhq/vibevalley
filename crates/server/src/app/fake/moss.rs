@@ -271,7 +271,7 @@ fn answer(state: &Mutex<State>, r: Request, cancel: Option<CancellationToken>) -
         s.assets.insert(
             url.clone(),
             Asset {
-                bytes: crate::app::fakes::runtime::png(width, height),
+                bytes: crate::app::fake::runtime::png(width, height),
                 kind: "image/png".into(),
                 fail_once: prompt.contains("[media:download-failure]"),
             },
