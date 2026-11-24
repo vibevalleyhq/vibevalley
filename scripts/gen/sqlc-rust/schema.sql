@@ -1,1 +1,0 @@
-../../../crates/vibevalley-store/sql/migrations/0001_workspace.sql

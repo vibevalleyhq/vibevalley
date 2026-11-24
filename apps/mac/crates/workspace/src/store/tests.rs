@@ -1,3 +1,4 @@
+use sea_orm::{DbBackend, PaginatorTrait, Statement};
 use serde_json::json;
 
 use super::*;
@@ -63,7 +64,10 @@ fn rename_relocate_touch() {
     assert!(matches!(s.relocate_project(a.id, &b.path), Err(StoreError::Db(_))));
 
     s.run(async |conn| {
-        sqlx::query("UPDATE projects SET last_opened_ms = 1").execute(conn).await?;
+        projects::Entity::update_many()
+            .col_expr(projects::Column::LastOpenedMs, Expr::value(1i64))
+            .exec(conn)
+            .await?;
         Ok(())
     })
     .unwrap();
@@ -161,9 +165,8 @@ fn removing_a_project_removes_everything_it_owns() {
     assert_eq!(s.layout(p.id).unwrap(), None);
     assert!(s.terminals(p.id).unwrap().is_empty());
     s.run(async |conn| {
-        for sql in ["SELECT COUNT(*) FROM layouts", "SELECT COUNT(*) FROM terminals"] {
-            assert_eq!(sqlx::query_scalar::<_, i64>(sql).fetch_one(&mut *conn).await?, 1);
-        }
+        assert_eq!(layouts::Entity::find().count(conn).await?, 1);
+        assert_eq!(terminals::Entity::find().count(conn).await?, 1);
         Ok(())
     })
     .unwrap();
@@ -222,7 +225,13 @@ fn on_disk_reopen_keeps_data_and_migrations_are_idempotent() {
         s.set_terminals(p.id, &[terminal("t1", p.id), terminal("t2", p.id)]).unwrap();
         s.set_setting("k", &json!([true, null])).unwrap();
         let mode: String = s
-            .run(async |conn| Ok(sqlx::query_scalar("PRAGMA journal_mode").fetch_one(conn).await?))
+            .run(async |conn| {
+                let row = conn
+                    .query_one_raw(Statement::from_string(DbBackend::Sqlite, "PRAGMA journal_mode"))
+                    .await?
+                    .unwrap();
+                Ok(row.try_get_by_index(0)?)
+            })
             .unwrap();
         assert_eq!(mode, "wal");
         (p, layout)
@@ -237,7 +246,9 @@ fn on_disk_reopen_keeps_data_and_migrations_are_idempotent() {
                 ("PRAGMA busy_timeout", 5000),
                 ("PRAGMA synchronous", 1),
             ] {
-                assert_eq!(sqlx::query_scalar::<_, i64>(sql).fetch_one(&mut *conn).await?, expected, "{sql}");
+                let row = conn.query_one_raw(Statement::from_string(DbBackend::Sqlite, sql)).await?.unwrap();
+                let actual: i64 = row.try_get_by_index(0)?;
+                assert_eq!(actual, expected, "{sql}");
             }
             Ok(())
         })
@@ -250,13 +261,77 @@ fn on_disk_reopen_keeps_data_and_migrations_are_idempotent() {
 }
 
 #[test]
+fn opens_existing_legacy_user_version_1_database() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("legacy state#1?.db");
+    let url = sqlite_file_url(&path);
+    vibevalley_runtime::rt::block_on(async {
+        let conn = Database::connect(&url).await.unwrap();
+        conn.execute_unprepared(
+            r#"
+            CREATE TABLE projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                path TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                position INTEGER NOT NULL,
+                last_opened_ms INTEGER NOT NULL
+            );
+            CREATE TABLE layouts (
+                project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+                json TEXT NOT NULL
+            );
+            CREATE TABLE terminals (
+                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                id TEXT NOT NULL,
+                ord INTEGER NOT NULL,
+                cwd TEXT NOT NULL,
+                title TEXT,
+                scrollback TEXT NOT NULL,
+                PRIMARY KEY (project_id, id)
+            );
+            CREATE TABLE settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            INSERT INTO projects (id, path, name, position, last_opened_ms) VALUES (7, '/legacy/app', 'app', 0, 12345);
+            INSERT INTO layouts (project_id, json) VALUES (7, '{"tabs":["main"]}');
+            INSERT INTO terminals (project_id, id, ord, cwd, title, scrollback) VALUES (7, 't1', 0, '/legacy/app', NULL, 'hi');
+            INSERT INTO settings (key, value) VALUES ('theme', '"warm"');
+            PRAGMA user_version = 1;
+            "#,
+        )
+        .await
+        .unwrap();
+        conn.close().await.unwrap();
+    });
+
+    let s = Store::open(&path).unwrap();
+    let projects = s.projects().unwrap();
+    assert_eq!(projects.len(), 1);
+    assert_eq!(projects[0].id, 7);
+    assert_eq!(projects[0].path, PathBuf::from("/legacy/app"));
+    assert_eq!(s.layout(7).unwrap(), Some(json!({"tabs": ["main"]})));
+    assert_eq!(
+        s.terminals(7).unwrap(),
+        vec![SavedTerminal {
+            id: "t1".into(),
+            project_id: 7,
+            cwd: PathBuf::from("/legacy/app"),
+            title: None,
+            scrollback: "hi".into(),
+        }]
+    );
+    assert_eq!(s.setting("theme").unwrap(), Some(json!("warm")));
+}
+
+#[test]
 fn refuses_a_database_from_a_newer_build() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("state.db");
     let store = Store::open(&path).unwrap();
     store
         .run(async |conn| {
-            sqlx::query("PRAGMA user_version = 2147483647").execute(conn).await?;
+            conn.execute_unprepared("PRAGMA user_version = 2147483647").await?;
             Ok(())
         })
         .unwrap();
