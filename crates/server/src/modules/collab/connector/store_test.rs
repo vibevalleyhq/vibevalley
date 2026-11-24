@@ -1,3 +1,5 @@
+use sea_orm::ConnectionTrait;
+
 use super::*;
 
 fn message(id: &str) -> Inbound {
@@ -17,7 +19,7 @@ fn regression_cursor_inbound_and_account_retirement_survive_rollback_and_restart
     let id = ConnectorID::Weixin;
     let s = Store::open(db.clone());
     let admin = |sql: &'static str| {
-        db.run(async |conn| sqlx::raw_sql(sql).execute(&mut *conn).await).unwrap();
+        block_on(db.write_conn().execute_unprepared(sql)).unwrap();
     };
     s.connect(id, &Secret::new("first"), "local", None, 1, "replaced").unwrap();
     s.set_channel(id, Some("room")).unwrap();

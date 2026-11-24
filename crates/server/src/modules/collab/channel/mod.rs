@@ -10,7 +10,6 @@
 
 pub mod db;
 pub mod dispatch;
-pub(in crate::modules::collab::channel) use crate::db::generated::collab_channel as queries;
 mod messages;
 pub mod model;
 mod rooms;
@@ -85,7 +84,7 @@ pub struct Chat {
     db: Arc<ServerDb>,
     files: Arc<Attachments>,
     /// Lock-free atomic snapshot of the committed in-memory [`ChatModel`],
-    /// used by read-only queries alongside [`ServerDb`]'s WAL `read_pool`
+    /// used by read-only queries alongside [`ServerDb::read_conn`]
     /// without contending on `inner`.
     snapshot: Arc<ArcSwap<ChatModel>>,
     /// Write-side async lock serializing transactions and protecting `reach`.
@@ -122,7 +121,7 @@ impl Chat {
         vibevalley_runtime::rt::block_on(Self::open_async(db, hub, files, quoter, embeds))
     }
 
-    async fn open_async(
+    pub(in crate::modules::collab) async fn open_async(
         db: Arc<ServerDb>,
         hub: &Arc<Hub>,
         files: Arc<Attachments>,
@@ -131,13 +130,13 @@ impl Chat {
     ) -> Result<Arc<Chat>, ApiError> {
         let at = now();
         {
-            let mut wconn = db.write_pool().acquire().await.q()?;
+            let wconn = db.write_conn();
             for (id, kind, name) in [
                 (USER_ID, "user", t("server.channel.name.user", &[])),
                 ("system", "system", "VibeValley".to_string()),
             ] {
                 db::upsert_participant(
-                    &mut wconn,
+                    wconn,
                     &ParticipantRow {
                         id: id.into(),
                         kind: kind.into(),
@@ -151,23 +150,23 @@ impl Chat {
                 .await
                 .q()?;
             }
-            db::add_participant(&mut wconn, DEFAULT_ORCHESTRATOR, "agent", &t("server.channel.name.orchestrator", &[]), at)
+            db::add_participant(wconn, DEFAULT_ORCHESTRATOR, "agent", &t("server.channel.name.orchestrator", &[]), at)
                 .await
                 .q()?;
-            if db::default_id(&mut wconn).await.q()?.is_none() {
+            if db::default_id(wconn).await.q()?.is_none() {
                 let id = new_id();
-                db::create_channel(&mut wconn, &id, true, FIRST_CHANNEL, None, None, at).await.q()?;
-                db::add_member(&mut wconn, &id, DEFAULT_ORCHESTRATOR, "manual", 0).await.q()?;
+                db::create_channel(wconn, &id, true, FIRST_CHANNEL, None, None, at).await.q()?;
+                db::add_member(wconn, &id, DEFAULT_ORCHESTRATOR, "manual", 0).await.q()?;
             }
         }
         let mut model = ChatModel::default();
         {
-            let mut rconn = db.read_pool().acquire().await.q()?;
+            let rconn = db.read_conn();
             model.load(
-                db::all_channels(&mut rconn).await.q()?,
-                db::participants(&mut rconn).await.q()?,
-                db::read_cursors_of(&mut rconn, USER_ID).await.q()?,
-                &db::all_members(&mut rconn).await.q()?,
+                db::all_channels(rconn).await.q()?,
+                db::participants(rconn).await.q()?,
+                db::read_cursors_of(rconn, USER_ID).await.q()?,
+                &db::all_members(rconn).await.q()?,
             );
         }
         let snapshot = Arc::new(ArcSwap::from_pointee(model.clone()));
@@ -196,17 +195,16 @@ impl Chat {
         });
         {
             let model = chat.model();
-            let mut rconn = chat.db.read_pool().acquire().await.q()?;
-            let mut recent = db::recent_channels(&mut rconn, KEEP_CHANNELS).await.q()?;
+            let rconn = chat.db.read_conn();
+            let mut recent = db::recent_channels(rconn, KEEP_CHANNELS).await.q()?;
             recent.reverse();
             let mut facts = vec![];
             for c in &recent {
                 facts.push(Fact::ChannelChanged(FactChannelChanged {
                     at: now(),
-                    channel: model.counted_async(&mut rconn, c).await?,
+                    channel: model.counted_async(rconn, c).await?,
                 }));
             }
-            drop(rconn);
             hub.apply(facts);
             chat.publish_user_mentions_async(&model).await?;
         }
@@ -243,9 +241,7 @@ impl Chat {
     /// `publishChannel`: the place as it stands into the state.
     async fn publish_channel_async(&self, model: &ChatModel, id: &str) -> Result<(), ApiError> {
         let Some(row) = model.channel(id) else { return Ok(()) };
-        let mut conn = self.db.read_pool().acquire().await.q()?;
-        let mut channel = model.counted_async(&mut conn, row).await?;
-        drop(conn);
+        let mut channel = model.counted_async(self.db.read_conn(), row).await?;
         // A metadata change can read a message's number before the message's own fact is applied.
         if let Some(published) = model.published_number(id)
             && channel.last_number.unwrap_or(0) > published
@@ -258,9 +254,7 @@ impl Chat {
 
     async fn publish_user_mentions_async(&self, model: &ChatModel) -> Result<(), ApiError> {
         let quiet = |id: &str| model.channel(id).is_some_and(|c| c.notify == "none");
-        let mut conn = self.db.read_pool().acquire().await.q()?;
-        let rows = db::user_mentions(&mut conn).await.q()?;
-        drop(conn);
+        let rows = db::user_mentions(self.db.read_conn()).await.q()?;
         let mentions = rows
             .into_iter()
             .filter(|r| !quiet(&r.row.channel_id) && !quiet(&r.top_id))
@@ -294,8 +288,7 @@ impl Chat {
     async fn read_through_async(&self, inner: &mut Inner, who: &str, channel: &str, upto: i64) -> Result<(), ApiError> {
         let at = now();
         {
-            let mut conn = self.db.write_pool().acquire().await.q()?;
-            let mut wtx = WriteTx::begin(inner, &mut conn).await?;
+            let mut wtx = WriteTx::begin(inner, self.db.write_conn()).await?;
             wtx.set_read(who, channel, upto, at).await?;
             wtx.commit().await?;
         }
@@ -312,21 +305,17 @@ impl Chat {
 
     /// Reads back the committed row after a message mutation and publishes its updated channel summary.
     async fn finish_message_change_async(&self, model: &ChatModel, row: &MsgRow) -> Result<ChatMessage, ApiError> {
-        let updated = {
-            let mut conn = self.db.read_pool().acquire().await.q()?;
-            db::message_by_id(&mut conn, &row.id).await.q()?
-        };
+        let updated = db::message_by_id(self.db.read_conn(), &row.id).await.q()?;
         let message = to_message(updated.as_ref().unwrap_or(row));
         self.publish_channel_async(model, &row.channel_id).await?;
         Ok(message)
     }
 
     async fn answered_async(&self, channel: &str, number: Option<i64>) -> Result<(), ApiError> {
-        if let Some(n) = number {
-            let mut conn = self.db.read_pool().acquire().await.q()?;
-            if db::message_by_number(&mut conn, channel, n).await.q()?.is_none() {
-                return Err(refused(t("server.channel.noMessage", &[("n", n.into())])));
-            }
+        if let Some(n) = number
+            && db::message_by_number(self.db.read_conn(), channel, n).await.q()?.is_none()
+        {
+            return Err(refused(t("server.channel.noMessage", &[("n", n.into())])));
         }
         Ok(())
     }
@@ -365,21 +354,17 @@ impl Chat {
             channel = found.id.clone();
         }
         let Some(root) = root else { return Ok((channel, None)) };
-        let row = {
-            let mut conn = self.db.read_pool().acquire().await.q()?;
-            db::message_by_number(&mut conn, &channel, root)
-                .await
-                .q()?
-                .ok_or_else(|| refused(t("server.channel.noMessage", &[("n", root.into())])))?
-        };
+        let row = db::message_by_number(self.db.read_conn(), &channel, root)
+            .await
+            .q()?
+            .ok_or_else(|| refused(t("server.channel.noMessage", &[("n", root.into())])))?;
         let talk = ThreadSubject {
             kind: SubjectKind::Talk,
             id: String::new(),
             owner: String::new(),
         };
         let thread = {
-            let mut conn = self.db.write_pool().acquire().await.q()?;
-            let mut wtx = WriteTx::begin(inner, &mut conn).await?;
+            let mut wtx = WriteTx::begin(inner, self.db.write_conn()).await?;
             let id = wtx.thread_for(&row.id, row.number, &row.channel_id, &talk).await?;
             wtx.commit().await?;
             id
@@ -391,10 +376,9 @@ impl Chat {
     /// follows, the state told; the readers are told after the commit.
     async fn write_async(&self, inner: &mut Inner, w: Write) -> Result<Written, ApiError> {
         let written = {
-            let mut conn = self.db.write_pool().acquire().await.q()?;
-            let mut wtx = WriteTx::begin(inner, &mut conn).await?;
+            let mut wtx = WriteTx::begin(inner, self.db.write_conn()).await?;
             if let Some(key) = w.send_key.as_deref().filter(|k| !k.is_empty())
-                && let Some(seen) = db::message_by_send_key(&mut wtx.tx, &w.from, key).await.q()?
+                && let Some(seen) = db::message_by_send_key(&wtx.tx, &w.from, key).await.q()?
             {
                 wtx.commit().await?;
                 Written {
@@ -414,18 +398,20 @@ impl Chat {
                     .cloned()
                     .ok_or_else(|| internal(format!("no participant {}", w.from)))?;
                 let id = new_id();
+                let system_code = w.meta.as_ref().and_then(|m| m.code.as_deref()).filter(|c| !c.is_empty()).map(str::to_owned);
                 let meta = meta_text(w.meta.as_ref());
                 let at = now();
                 let send_key = w.send_key.clone().filter(|k| !k.is_empty());
-                let revision = db::bump_revision(&mut wtx.tx, &w.channel).await.q()?;
+                let revision = db::bump_revision(&wtx.tx, &w.channel).await.q()?;
                 let number = db::insert_message(
-                    &mut wtx.tx,
+                    &wtx.tx,
                     &id,
                     &w.channel,
                     &w.from,
                     w.kind.as_str(),
                     &w.text,
                     meta.as_deref(),
+                    system_code.as_deref(),
                     send_key.as_deref(),
                     at,
                     revision,
@@ -434,7 +420,7 @@ impl Chat {
                 .await
                 .q()?;
                 wtx.touch_channel(&w.channel, number).await?;
-                let seq = db::insert_event(&mut wtx.tx, "posted", &w.channel, &id, at).await.q()?;
+                let seq = db::insert_event(&wtx.tx, "posted", &w.channel, &id, at).await.q()?;
                 let inserted = MsgRow {
                     id: id.clone(),
                     channel_id: w.channel.clone(),
@@ -480,7 +466,7 @@ impl Chat {
                     let mut queued = Vec::with_capacity(plan.deliveries.len());
                     for d in plan.deliveries {
                         let did = db::insert_delivery(
-                            &mut wtx.tx,
+                            &wtx.tx,
                             &row.id,
                             &row.channel_id,
                             d.recipient_kind.as_str(),
@@ -524,10 +510,7 @@ impl Chat {
             return Ok(written);
         }
         let Some(event) = written.event.clone() else { return Ok(written) };
-        let answers = {
-            let mut conn = self.db.read_pool().acquire().await.q()?;
-            inner.model.answers_of_async(&mut conn, &written.row).await?
-        };
+        let answers = inner.model.answers_of_async(self.db.read_conn(), &written.row).await?;
         let written = Written { answers, ..written };
         // after(): the state, the link previews, the places.
         self.publish_message(inner, &written.row, written.answers.clone());
@@ -603,12 +586,8 @@ impl Chat {
             }
             let Some(chat) = me.upgrade() else { return };
             let mut inner = chat.locked().await;
-            let current = {
-                let Ok(mut conn) = chat.db.read_pool().acquire().await else { return };
-                let Ok(Some(current)) = db::message_by_id(&mut conn, &row.id).await else {
-                    return;
-                };
-                current
+            let Ok(Some(current)) = db::message_by_id(chat.db.read_conn(), &row.id).await else {
+                return;
             };
             // Changed meanwhile: its words are not the ones read.
             if current.deleted_at.is_some() || current.body != row.body {
@@ -621,12 +600,13 @@ impl Chat {
             meta.embeds = Some(found);
             let text = meta_text(Some(&meta));
             let committed = {
-                let Ok(mut conn) = chat.db.write_pool().acquire().await else { return };
-                let Ok(mut wtx) = WriteTx::begin(&mut inner, &mut conn).await else { return };
-                let Ok(revision) = db::bump_revision(&mut wtx.tx, &current.channel_id).await else {
+                let Ok(wtx) = WriteTx::begin(&mut inner, chat.db.write_conn()).await else {
                     return;
                 };
-                if db::set_meta(&mut wtx.tx, &current.id, text.as_deref(), revision).await.is_err() {
+                let Ok(revision) = db::bump_revision(&wtx.tx, &current.channel_id).await else {
+                    return;
+                };
+                if db::set_meta(&wtx.tx, &current.id, text.as_deref(), revision).await.is_err() {
                     return;
                 }
                 wtx.commit().await.is_ok()
@@ -771,10 +751,10 @@ mod tests {
         chat.pin_async(&msg.id, true).await.unwrap();
 
         // Hold BOTH the channel write mutex (`chat.inner`) AND a SQLite `BEGIN IMMEDIATE`
-        // write transaction on `write_pool` simultaneously.
+        // write transaction on `write_conn()` simultaneously.
         let _write_mutex_guard = chat.locked().await;
-        let mut write_conn = db.write_pool().acquire().await.unwrap();
-        sqlx::raw_sql("BEGIN IMMEDIATE;").execute(&mut *write_conn).await.unwrap();
+        let write_tx = crate::modules::collab::begin_write_tx(db.write_conn()).await.unwrap();
+        let _ = db::bump_revision(&write_tx, &gid).await.unwrap();
 
         let started = Instant::now();
         let reader_chat = chat.clone();
@@ -801,8 +781,7 @@ mod tests {
             .unwrap();
         assert!(started.elapsed() < Duration::from_secs(1));
 
-        sqlx::raw_sql("ROLLBACK;").execute(&mut *write_conn).await.unwrap();
-        drop(write_conn);
+        write_tx.rollback().await.unwrap();
         drop(_write_mutex_guard);
         hub.close_async().await;
         db.close_async().await;

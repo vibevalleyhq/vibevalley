@@ -8,12 +8,12 @@
 //! inbox and outbox in `connector_*` of server.db, the status said to the
 //! core).
 
-mod adapter;
+pub(in crate::modules::collab) mod adapter;
 mod bridge;
 mod digest;
 mod feishu;
 mod qq;
-mod store;
+pub(in crate::modules::collab) mod store;
 mod weixin;
 
 use std::sync::Arc;
@@ -186,13 +186,13 @@ impl Connectors {
     }
 
     /// Ties the app to the channel called `name`.
-    pub fn set_channel(&self, id: ConnectorID, name: &str) -> Result<ConnectorStatus, ApiError> {
+    pub async fn set_channel_async(&self, id: ConnectorID, name: &str) -> Result<ConnectorStatus, ApiError> {
         let chat = &self.env.chat;
         let channel = chat
             .channel_by_name(name)
             .ok_or_else(|| refused(t("server.connector.noChannel", &[("name", name.into())])))?;
         let bound = (!channel.default).then_some(channel.id.as_str());
-        self.bridge(id).set_channel(bound).map_err(|e| refused(e.0))
+        self.bridge(id).set_channel_async(bound).await.map_err(|e| refused(e.0))
     }
 
     /// Every account's work stopped, and waited for.
@@ -218,13 +218,9 @@ impl Connectors {
 /// make them look again at what waits; what went through long ago is dropped, at start and daily.
 async fn feed(env: Arc<Env>, bridges: Vec<Arc<Bridge>>, mut events: broadcast::Receiver<ChannelEvent>, cancel: CancellationToken) {
     loop {
-        let prune_env = env.clone();
-        let _ = crate::spawn_blocking_traced(move || {
-            if let Err(e) = prune_env.store.prune(now() - KEPT_MS) {
-                eprintln!("vibevalley-server: connector: history was not pruned: {}", e.0);
-            }
-        })
-        .await;
+        if let Err(e) = env.store.prune_async(now() - KEPT_MS).await {
+            eprintln!("vibevalley-server: connector: history was not pruned: {}", e.0);
+        }
         let day = tokio::time::sleep(DAY);
         tokio::pin!(day);
         loop {
@@ -342,9 +338,7 @@ pub fn install(hub: &Hub, connectors: Arc<Connectors>) {
         let c = c.clone();
         async move {
             let id = app_of(&input.id)?;
-            crate::spawn_blocking_traced(move || c.set_channel(id, &input.channel))
-                .await
-                .map_err(|e| ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?
+            c.set_channel_async(id, &input.channel).await
         }
     });
 }
