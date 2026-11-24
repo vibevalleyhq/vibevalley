@@ -5,7 +5,6 @@ use std::path::Path;
 
 use crate::support::*;
 use vibevalley_protocol::{IssueConstraints, IssueStageKind as StageKind, IssueStatus, Landing};
-use vibevalley_runtime::oar::scripted::{Script, Step};
 use vibevalley_server::modules::work::issue::{ChildDraft, NewIssue};
 
 fn issue(title: &str, repo: &Path) -> NewIssue {
@@ -123,7 +122,8 @@ fn regression_native_child_acceptance_rejects_an_implementation_that_fails_the_i
 
 #[test]
 fn a_split_queues_its_children_in_dependency_order() {
-    let rt = HookRuntime::new("t", slow_first(150), |turn| {
+    let gate = TurnGate::new();
+    let rt = HookRuntime::new("t", gate.script("done"), |turn| {
         let name = if turn.prompt.contains("Part A") { "a.txt" } else { "b.txt" };
         turn.commit(name, "x\n");
         turn.done("ok");
@@ -172,6 +172,7 @@ fn a_split_queues_its_children_in_dependency_order() {
     assert_eq!(first.stage.state, StageKind::Working);
     assert_eq!(w.board.issue(&children[1].id).unwrap().stage.state, StageKind::Queued);
     assert_eq!(w.board.issue(&parent.id).unwrap().status, IssueStatus::InProgress);
+    gate.release_n(2);
     wait_issue(&w.board, &children[1].id, "B merged", |t| t.status == IssueStatus::Done);
     let b_prompt = prompts.lock().unwrap().iter().find(|p| p.contains("Part B")).cloned().unwrap();
     assert!(b_prompt.contains("检查命令：test -f a.txt"), "{b_prompt}");
@@ -186,8 +187,8 @@ fn a_draft_writes_the_issue_up_and_leaves_no_trace() {
     let said = "I read the code.\n\nAsk the user: which port? (options: 8080 | 9090)\n\n```json\n\
         {\"title\": \"Serve on a port\", \"why\": \"it has none\", \"todo\": [\"add a flag\"], \
         \"criteria\": [\"app --port 8080 serves\"], \"notDoing\": [], \"files\": [\"src/main.rs\"]}\n```\n\nReady.";
-    let script = Script::new().turn(vec![Step::sleep_ms(100), Step::text(said)]);
-    let rt = HookRuntime::new("t", script, |turn| {
+    let gate = TurnGate::new();
+    let rt = HookRuntime::new("t", gate.script(said), |turn| {
         assert!(turn.prompt.contains("用户想做的：it should listen somewhere"), "{}", turn.prompt);
         turn.write("scratch.txt", "drafts leave no files");
     });
@@ -198,6 +199,7 @@ fn a_draft_writes_the_issue_up_and_leaves_no_trace() {
     let drafting = w.board.issue("1").unwrap();
     assert!(drafting.refining.is_some());
     assert!(w.board.move_to("1", IssueStatus::Todo, None).is_err(), "a draft being written cannot start");
+    gate.release();
     let drafted = wait_issue(&w.board, "1", "drafted", |t| t.refining.is_none() && t.title != "Port");
     assert_eq!(drafted.title, "Serve on a port");
     assert_eq!(drafted.description, "Why\nit has none\n\nTo do\n- add a flag\n\nFiles\n- src/main.rs");

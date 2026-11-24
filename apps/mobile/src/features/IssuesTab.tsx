@@ -61,7 +61,7 @@ export function IssuesTab(props: {
   readonly onSelectIssue: (id: string | undefined) => void;
 }) {
   const filter = signal<IssueFilterKind>("all");
-  const commentDraft = signal("");
+  const commentDrafts = signal<Readonly<Record<string, string>>>({});
   const busy = signal(false);
   const actionError = signal<string | undefined>(undefined);
   const isDual = computed(() => props.layout().mode === "dual_pane");
@@ -81,10 +81,19 @@ export function IssuesTab(props: {
     if (id === undefined) return undefined;
     return allIssues().find((issue) => issue.id === id);
   });
-  const hasCommentDraft = computed(() => commentDraft().trim() !== "");
+  const currentCommentDraft = computed(() => {
+    const id = props.selectedIssueId();
+    return id !== undefined ? (commentDrafts()[id] ?? "") : "";
+  });
+  const hasCommentDraft = computed(() => currentCommentDraft().trim() !== "");
   const canSend = computed(() => !busy() && hasCommentDraft());
   const filterItems = computed(() => FILTERS.map((kind) => ({ title: filterLabel(kind) })));
   const selectedFilterIndex = computed(() => FILTERS.indexOf(filter()));
+
+  const setCommentDraft = (issueId: string, value: string) => {
+    if ((untracked(commentDrafts)[issueId] ?? "") === value) return;
+    commentDrafts.update((prev) => ({ ...prev, [issueId]: value }));
+  };
 
   effect(() => {
     if (!isDual()) return;
@@ -113,6 +122,9 @@ export function IssuesTab(props: {
       } else {
         hapticImpact("light");
       }
+    } catch (err: unknown) {
+      actionError.set(err instanceof Error ? err.message : String(err));
+      hapticNotification("error");
     } finally {
       busy.set(false);
     }
@@ -123,31 +135,34 @@ export function IssuesTab(props: {
     busy.set(true);
     actionError.set(undefined);
     try {
-      const notes = untracked(commentDraft).trim();
+      const notes = (untracked(commentDrafts)[issueId] ?? "").trim();
       const payload = notes ? { id: issueId, pass, text: notes } : { id: issueId, pass };
       const env = await props.session.call("issue.review", payload);
       if (env.bizCode !== 0) {
         actionError.set(env.message);
         hapticNotification("error");
       } else {
-        if (notes) commentDraft.set("");
+        if (notes) setCommentDraft(issueId, "");
         hapticNotification(pass ? "success" : "warning");
       }
+    } catch (err: unknown) {
+      actionError.set(err instanceof Error ? err.message : String(err));
+      hapticNotification("error");
     } finally {
       busy.set(false);
     }
   };
 
   const submitComment = async (issueId: string) => {
-    const text = untracked(commentDraft).trim();
+    const text = (untracked(commentDrafts)[issueId] ?? "").trim();
     if (text === "" || untracked(busy)) return;
-    commentDraft.set("");
+    setCommentDraft(issueId, "");
     busy.set(true);
     actionError.set(undefined);
     const rollback = (message: string) => {
       actionError.set(message);
       hapticNotification("error");
-      if (untracked(commentDraft) === "") commentDraft.set(text);
+      if ((untracked(commentDrafts)[issueId] ?? "") === "") setCommentDraft(issueId, text);
     };
     try {
       const env = await props.session.call("issue.comment.create", { id: issueId, text });
@@ -214,7 +229,7 @@ export function IssuesTab(props: {
           contentClass="gap-2.5 p-3.5"
         >
           {(issue) => {
-            const active = () => isDual() && props.selectedIssueId() === issue().id;
+            const active = computed(() => isDual() && props.selectedIssueId() === issue().id);
             return (
               <SectionCard
                 testID={`issue-row-${issue().id}`}
@@ -328,8 +343,8 @@ export function IssuesTab(props: {
             <FieldInput
               testID="issue-comment-input"
               placeholder={t("web.remote.issue.comment")}
-              value={commentDraft()}
-              onInput={(v) => commentDraft.set(v)}
+              value={currentCommentDraft()}
+              onInput={(v) => setCommentDraft(issue().id, v)}
               onSubmit={() => {
                 void submitComment(issue().id);
               }}

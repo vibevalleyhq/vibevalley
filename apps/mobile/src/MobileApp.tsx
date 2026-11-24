@@ -1,4 +1,4 @@
-import { cleanup, effect, locale, platform, signal, Text, View } from "nsh";
+import { cleanup, computed, effect, locale, platform, signal, Text, View } from "nsh";
 import { BackHandler, isAvailable as mobileAvailable, TabBar, type TabBarItem } from "nsh/mobile";
 
 import { t } from "@vibevalley/i18n";
@@ -72,7 +72,7 @@ export function MobileApp(props: MobileAppProps = {}) {
   });
 
   const layout = useMobileLayout();
-  const isDualPane = () => layout().mode === "dual_pane";
+  const isDualPane = computed(() => layout().mode === "dual_pane");
 
   const activeTab = signal<MobileTabId>("inbox");
   const selectedInboxKey = signal<string | undefined>(undefined);
@@ -135,9 +135,9 @@ export function MobileApp(props: MobileAppProps = {}) {
   });
   cleanup(() => stopBackHandler());
 
-  const inboxBadgeCount = () => session.pendingPermissions().length + session.pendingInteractions().length + (session.inbox()?.items.length ?? 0);
+  const inboxBadgeCount = computed(() => session.pendingPermissions().length + session.pendingInteractions().length + (session.inbox()?.items.length ?? 0));
 
-  const activeSessionsCount = () => (session.sessions()?.sessions ?? []).filter((s) => s.phase._tag === "working").length;
+  const activeSessionsCount = computed(() => (session.sessions()?.sessions ?? []).filter((s) => s.phase._tag === "working").length);
 
   const badgeForTab = (tab: MobileTabId): number => {
     switch (tab) {
@@ -152,7 +152,7 @@ export function MobileApp(props: MobileAppProps = {}) {
     }
   };
 
-  const tabBarItems = (): TabBarItem[] =>
+  const tabBarItems = computed((): TabBarItem[] =>
     TAB_ORDER.map((id) => {
       const count = badgeForTab(id);
       const nativeIcon = platform.select({
@@ -164,7 +164,10 @@ export function MobileApp(props: MobileAppProps = {}) {
         icon: nativeIcon ?? null,
         badge: count > 0 ? String(count) : null,
       };
-    });
+    }),
+  );
+
+  const selectedTabIndex = computed(() => TAB_ORDER.indexOf(activeTab()));
 
   const handleNavigateTarget = (target: InboxItem["target"]) => {
     switch (target.kind) {
@@ -222,7 +225,7 @@ export function MobileApp(props: MobileAppProps = {}) {
   return (
     <If when={session.credentials()} else={<PairScreen session={session} layout={layout} />}>
       {(creds) => {
-        const status = () => connectionTag(session.connectionState());
+        const status = computed(() => connectionTag(session.connectionState()));
         return (
           <If
             when={isDualPane()}
@@ -257,8 +260,8 @@ export function MobileApp(props: MobileAppProps = {}) {
                     >
                       <Each of={TAB_ORDER} key={(id) => id}>
                         {(id) => {
-                          const active = () => activeTab() === id();
-                          const count = () => badgeForTab(id());
+                          const active = computed(() => activeTab() === id());
+                          const count = computed(() => badgeForTab(id()));
                           return (
                             <View
                               role="button"
@@ -290,7 +293,7 @@ export function MobileApp(props: MobileAppProps = {}) {
                     testID="native-tabbar"
                     class="w-full"
                     items={tabBarItems()}
-                    selectedIndex={TAB_ORDER.indexOf(activeTab())}
+                    selectedIndex={selectedTabIndex()}
                     onChange={(e) => {
                       const next = TAB_ORDER[e.index];
                       if (next !== undefined) {
@@ -317,8 +320,8 @@ export function MobileApp(props: MobileAppProps = {}) {
                 <View class="w-full items-center gap-1.5 px-1">
                   <Each of={TAB_ORDER} key={(id) => id}>
                     {(id) => {
-                      const active = () => activeTab() === id();
-                      const count = () => badgeForTab(id());
+                      const active = computed(() => activeTab() === id());
+                      const count = computed(() => badgeForTab(id()));
                       return (
                         <View
                           role="button"

@@ -102,15 +102,34 @@ export function ChannelsTab(props: {
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
     let stopFollow: (() => void) | undefined;
     messages.set([]);
     sendError.set(undefined);
     loading.set(true);
 
+    const applyReloadedMessages = (data: unknown) => {
+      const reloaded = ChatMessageListSchema.safeParse(data);
+      if (!reloaded.success) return;
+      const ordered = mergeMessages([], reloaded.data);
+      messages.set(ordered);
+      const reloadedKeys = new Set(ordered.map((m) => m.sendKey).filter((k): k is string => k !== undefined));
+      if (reloadedKeys.size > 0) {
+        pendingMessages.update((prev) => prev.filter((item) => item.channelId !== channelId || !reloadedKeys.has(item.sendKey)));
+      }
+    };
+
     const loadAndFollow = async () => {
-      const env = await props.session.call("channel.message.list", { id: channelId, limit: 50 });
-      if (cancelled) return;
+      let env;
+      try {
+        env = await props.session.call("channel.message.list", { id: channelId, limit: 50 }, { signal: controller.signal });
+      } catch (err: unknown) {
+        if (controller.signal.aborted) return;
+        loading.set(false);
+        sendError.set(err instanceof Error ? err.message : String(err));
+        return;
+      }
+      if (controller.signal.aborted) return;
       loading.set(false);
       let maxRevision = 0;
       if (env.bizCode === 0) {
@@ -126,12 +145,12 @@ export function ChannelsTab(props: {
         sendError.set(env.message);
       }
 
-      if (cancelled) return;
+      if (controller.signal.aborted) return;
       stopFollow = props.session.subscribe(
         "channel.follow",
         { id: channelId, after: maxRevision },
         (raw) => {
-          if (cancelled) return;
+          if (controller.signal.aborted) return;
           const parsed = ChannelEventSchema.safeParse(raw);
           if (!parsed.success) return;
           const ev = parsed.data;
@@ -155,18 +174,14 @@ export function ChannelsTab(props: {
               break;
             }
             case "Reset":
-              void props.session.call("channel.message.list", { id: channelId, limit: 50 }).then((reloadEnv) => {
-                if (cancelled || reloadEnv.bizCode !== 0) return;
-                const reloaded = ChatMessageListSchema.safeParse(reloadEnv.data);
-                if (reloaded.success) {
-                  const ordered = mergeMessages([], reloaded.data);
-                  messages.set(ordered);
-                  const reloadedKeys = new Set(ordered.map((m) => m.sendKey).filter((k): k is string => k !== undefined));
-                  if (reloadedKeys.size > 0) {
-                    pendingMessages.update((prev) => prev.filter((item) => item.channelId !== channelId || !reloadedKeys.has(item.sendKey)));
+              void props.session
+                .call("channel.message.list", { id: channelId, limit: 50 }, { signal: controller.signal })
+                .then((reloadEnv) => {
+                  if (!controller.signal.aborted && reloadEnv.bizCode === 0) {
+                    applyReloadedMessages(reloadEnv.data);
                   }
-                }
-              });
+                })
+                .catch(() => undefined);
               break;
           }
         },
@@ -179,7 +194,7 @@ export function ChannelsTab(props: {
     void loadAndFollow();
 
     return () => {
-      cancelled = true;
+      controller.abort();
       stopFollow?.();
     };
   });
@@ -253,7 +268,7 @@ export function ChannelsTab(props: {
     <If when={channels().length > 0} else={<EmptyPanel testID="channels-empty" icon="chat" message={t("web.remote.channel.empty")} />}>
       <List testID="channels-list" each={channels()} keyExtractor={(ch) => ch.id} estimatedItemSize={72} class="min-h-0 flex-1" contentClass="gap-2.5 p-3.5">
         {(ch) => {
-          const active = () => isDual() && props.selectedChannelId() === ch().id;
+          const active = computed(() => isDual() && props.selectedChannelId() === ch().id);
           return (
             <SectionCard
               testID={`channel-row-${ch().id}`}

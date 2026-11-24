@@ -336,6 +336,9 @@ fn ring_buffer_bounds_each_lane_at_512_and_truncates_oversized_payloads() {
     let _guard = DEBUG_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let dir = tempfile::tempdir().unwrap();
     let started = start_server(dir.path(), true, "");
+    // Detach the process-global OarObserver and clear startup events so concurrent suite tests do not perturb ring counts.
+    vibevalley_runtime::oar::set_observer(None);
+    assert_eq!(started.hub.call_as(Caller::User, "debug.timeline.clear", json!({})).biz_code, 0);
     let collector = started.test_internals().debug.collector();
 
     const PER_LANE: usize = 2000;

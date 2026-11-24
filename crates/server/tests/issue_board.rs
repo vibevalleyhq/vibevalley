@@ -240,7 +240,8 @@ fn canceling_lets_the_session_go_and_keeps_a_branch_with_work() {
 
 #[test]
 fn the_queue_waits_for_room_in_the_space_and_sends_the_next() {
-    let rt = HookRuntime::new("t", slow_first(150), |turn| {
+    let gate = TurnGate::new();
+    let rt = HookRuntime::new("t", gate.script("done"), |turn| {
         turn.commit(&format!("f{}.txt", turn.prompt.len()), "x\n");
         turn.done("ok");
     });
@@ -256,10 +257,12 @@ fn the_queue_waits_for_room_in_the_space_and_sends_the_next() {
     assert_eq!((queued.status, queued.stage.state), (IssueStatus::Todo, StageKind::Queued));
     assert!(queued.queued_at.is_some());
     // When the first round ends there is room: the second goes by itself.
+    gate.release();
     wait_stage(&w.board, "1", StageKind::Reviewing);
     wait_stage(&w.board, "2", StageKind::Working);
     // A round for the first now finds no room, and says so.
     assert!(matches!(w.board.move_to("1", IssueStatus::Todo, Some("more")), Err(BoardError::NoRoom(_))));
+    gate.release();
     wait_stage(&w.board, "2", StageKind::Reviewing);
     // Unqueue before it goes.
     w.board.create(new("Third", Some(&main))).unwrap();
@@ -267,6 +270,7 @@ fn the_queue_waits_for_room_in_the_space_and_sends_the_next() {
     w.board.move_to("3", IssueStatus::Todo, Some("go")).unwrap();
     w.board.move_to("4", IssueStatus::Todo, None).unwrap();
     assert_eq!(w.board.move_to("4", IssueStatus::Backlog, None).unwrap(), Move::Unqueue);
+    gate.release();
     wait_stage(&w.board, "3", StageKind::Reviewing);
     w.board.refresh_queue().unwrap();
     assert_eq!(w.board.issue("4").unwrap().status, IssueStatus::Backlog);
@@ -274,7 +278,8 @@ fn the_queue_waits_for_room_in_the_space_and_sends_the_next() {
 
 #[test]
 fn the_per_repo_limit_holds_one_repo_back_and_not_another() {
-    let rt = HookRuntime::new("t", slow_first(150), |turn| turn.done("ok"));
+    let gate = TurnGate::new();
+    let rt = HookRuntime::new("t", gate.script("done"), |turn| turn.done("ok"));
     let w = world(vec![rt], |c| {
         c.space_limit = 5;
         c.per_repo = 1;
@@ -290,13 +295,15 @@ fn the_per_repo_limit_holds_one_repo_back_and_not_another() {
     assert_eq!(w.board.issue("1").unwrap().stage.state, StageKind::Working);
     assert_eq!(w.board.issue("2").unwrap().stage.state, StageKind::Queued);
     assert_eq!(w.board.issue("3").unwrap().stage.state, StageKind::Working);
+    gate.release_n(3);
     wait_stage(&w.board, "2", StageKind::Reviewing);
     // Words for a queued issue go with it when it is sent.
 }
 
 #[test]
 fn words_for_a_queued_issue_go_with_it() {
-    let rt = HookRuntime::new("t", slow_first(150), |turn| turn.done("ok"));
+    let gate = TurnGate::new();
+    let rt = HookRuntime::new("t", gate.script("done"), |turn| turn.done("ok"));
     let prompts = rt.prompts.clone();
     let w = world(vec![rt], |c| c.space_limit = 1);
     let main = repo(w.dir.path(), "app");
@@ -305,6 +312,7 @@ fn words_for_a_queued_issue_go_with_it() {
     w.board.move_to("1", IssueStatus::Todo, None).unwrap();
     w.board.move_to("2", IssueStatus::Todo, None).unwrap();
     w.board.tell("2", "mind the tests").unwrap();
+    gate.release_n(2);
     wait_stage(&w.board, "2", StageKind::Reviewing);
     let all = prompts.lock().unwrap().clone();
     assert!(
@@ -646,15 +654,16 @@ fn a_branch_issue_keeps_its_branch() {
 
 #[test]
 fn a_quiet_session_is_stuck_until_it_speaks() {
-    let script = Script::new().turn(vec![Step::sleep_ms(500), Step::text("back")]);
-    let rt = HookRuntime::new("t", script, |turn| turn.done("ok"));
-    let w = world(vec![rt], |c| c.quiet_after = Duration::from_millis(120));
+    let gate = TurnGate::new();
+    let rt = HookRuntime::new("t", gate.script("back"), |turn| turn.done("ok"));
+    let w = world(vec![rt], |c| c.quiet_after = Duration::from_millis(25));
     let main = repo(w.dir.path(), "app");
     w.board.create(new("Quiet", Some(&main))).unwrap();
     w.board.move_to("1", IssueStatus::Todo, None).unwrap();
     let quiet = wait_issue(&w.board, "1", "quiet", |t| t.stage.stuck == Some(StuckReason::Quiet));
     assert_eq!(quiet.status, IssueStatus::InProgress);
     assert_eq!(w.board.bundle().inbox.items[0].kind, vibevalley_protocol::InboxKind::Quiet);
+    gate.release();
     wait_stage(&w.board, "1", StageKind::Reviewing);
 }
 

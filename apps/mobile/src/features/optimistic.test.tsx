@@ -469,3 +469,208 @@ test("memoized selectors keep send buttons disabled until non-whitespace draft i
   await app.type("id:issue-comment-input", "LGTM");
   expect(app.enabled("id:issue-comment-send")).toBe(true);
 });
+
+test("SessionsTab isolates confirmedSeqKeys and promptDraft per session", async () => {
+  const twoSessionsSlice = {
+    seq: 3,
+    machines: [],
+    sessions: [
+      sampleSessionsSlice.sessions[0],
+      {
+        ...sampleSessionsSlice.sessions[0],
+        id: "sess-2",
+        name: "Verifier Owl",
+      },
+    ],
+  };
+
+  const app = await open("../../App.story.tsx", {
+    platform: "macos",
+    locale: "en-US",
+    width: 390,
+    height: 844,
+    storage: harnessStorage(),
+    network: {
+      [`GET ${BASE}/api/v1/slice/inbox`]: sseResponse([{ id: "1", data: sampleInboxSlice }]),
+      [`GET ${BASE}/api/v1/slice/collab`]: sseResponse([{ id: "2", data: sampleCollabSlice }]),
+      [`GET ${BASE}/api/v1/slice/sessions`]: sseResponse([{ id: "3", data: twoSessionsSlice }]),
+      [`GET ${BASE}/api/v1/slice/board`]: sseResponse([{ id: "4", data: sampleBoardSlice }]),
+      [`GET ${BASE}/api/v1/subscribe/session.watch*`]: (req: StubRequest) => {
+        if (req.url.includes("sess-2")) {
+          return sseResponse([
+            {
+              data: {
+                kind: "state",
+                session: twoSessionsSlice.sessions[1],
+                permissionMode: "ask",
+                pendingPermissions: [],
+                pendingInteractions: [],
+              },
+            },
+            {
+              data: {
+                kind: "history",
+                session: "sess-2",
+                events: [
+                  {
+                    seq: 2,
+                    revision: 1,
+                    time: NOW,
+                    type: "assistant/message",
+                    text: "Second session event",
+                  },
+                ],
+              },
+            },
+          ]);
+        }
+        return sseResponse([
+          ...sampleSessionWatchInitial,
+          {
+            data: {
+              kind: "event",
+              session: "sess-1",
+              event: {
+                seq: 2,
+                revision: 1,
+                time: NOW,
+                type: "assistant/message",
+                text: "First session event",
+              },
+            },
+          },
+        ]);
+      },
+    },
+  });
+
+  await app.press("id:tab-sessions");
+  await app.waitFor("id:session-row-sess-1");
+  await app.press("id:session-row-sess-1");
+  await app.waitFor("id:session-event-2");
+  expect(app.texts()).toContain("First session event");
+
+  await app.type("id:session-prompt-input", "Draft for one");
+  await app.press("id:session-back");
+  await app.waitFor("id:session-row-sess-2");
+  await app.press("id:session-row-sess-2");
+  await app.waitFor("id:session-event-2");
+  expect(app.texts()).toContain("Second session event");
+  expect(app.value("id:session-prompt-input")).toBe("");
+
+  await app.type("id:session-prompt-input", "Draft for two");
+  await app.press("id:session-back");
+  await app.waitFor("id:session-row-sess-1");
+  await app.press("id:session-row-sess-1");
+  await app.waitFor("id:session-event-2");
+  expect(app.value("id:session-prompt-input")).toBe("Draft for one");
+});
+
+test("IssuesTab isolates commentDraft per issue and surfaces review errors", async () => {
+  const twoIssuesBoard = {
+    seq: 4,
+    issues: [
+      sampleBoardSlice.issues[0],
+      {
+        ...sampleBoardSlice.issues[0],
+        id: "issue-2",
+        number: 102,
+        title: "Second reviewable issue",
+      },
+    ],
+  };
+
+  const app = await open("../../App.story.tsx", {
+    platform: "macos",
+    locale: "en-US",
+    width: 390,
+    height: 844,
+    storage: harnessStorage(),
+    network: {
+      [`GET ${BASE}/api/v1/slice/inbox`]: sseResponse([{ id: "1", data: sampleInboxSlice }]),
+      [`GET ${BASE}/api/v1/slice/collab`]: sseResponse([{ id: "2", data: sampleCollabSlice }]),
+      [`GET ${BASE}/api/v1/slice/sessions`]: sseResponse([{ id: "3", data: sampleSessionsSlice }]),
+      [`GET ${BASE}/api/v1/slice/board`]: sseResponse([{ id: "4", data: twoIssuesBoard }]),
+      [`POST ${BASE}/api/v1/issue/review`]: () => errEnvelope("review rejected"),
+    },
+  });
+
+  await app.press("id:tab-issues");
+  await app.waitFor("id:issue-row-issue-1");
+  await app.press("id:issue-row-issue-1");
+  await app.waitFor("id:issue-comment-input");
+  await app.type("id:issue-comment-input", "Note on one");
+
+  await app.press("id:issue-back");
+  await app.waitFor("id:issue-row-issue-2");
+  await app.press("id:issue-row-issue-2");
+  await app.waitFor("id:issue-review-changes");
+  expect(app.value("id:issue-comment-input")).toBe("");
+
+  await app.press("id:issue-review-changes");
+  await app.waitFor("id:issue-error");
+  expect(app.texts()).toContain("review rejected");
+
+  await app.press("id:issue-back");
+  await app.waitFor("id:issue-row-issue-1");
+  await app.press("id:issue-row-issue-1");
+  await app.waitFor("id:issue-comment-input");
+  expect(app.value("id:issue-comment-input")).toBe("Note on one");
+});
+
+test("ChannelsTab switches channels cleanly in dual-pane and updates rendered messages", async () => {
+  const twoChannelsCollab = {
+    ...sampleCollabSlice,
+    chat: {
+      ...sampleCollabSlice.chat,
+      channels: [
+        sampleCollabSlice.chat.channels[0],
+        {
+          ...sampleCollabSlice.chat.channels[0],
+          id: "ch-2",
+          default: false,
+          name: "mobile",
+          title: "mobile",
+        },
+      ],
+    },
+  };
+
+  const app = await open("../../App.story.tsx", {
+    platform: "macos",
+    locale: "en-US",
+    width: 900,
+    height: 700,
+    storage: harnessStorage(),
+    network: {
+      [`GET ${BASE}/api/v1/slice/inbox`]: sseResponse([{ id: "1", data: sampleInboxSlice }]),
+      [`GET ${BASE}/api/v1/slice/collab`]: sseResponse([{ id: "2", data: twoChannelsCollab }]),
+      [`GET ${BASE}/api/v1/slice/sessions`]: sseResponse([{ id: "3", data: sampleSessionsSlice }]),
+      [`GET ${BASE}/api/v1/slice/board`]: sseResponse([{ id: "4", data: sampleBoardSlice }]),
+      [`POST ${BASE}/api/v1/channel/message/list`]: (req: StubRequest) => {
+        const parsed = JSON.parse(req.body ?? "{}") as { id?: string };
+        if (parsed.id === "ch-2") {
+          return okEnvelope([
+            {
+              ...sampleChannelHistory[0],
+              id: "msg-ch2",
+              channel: "ch-2",
+              text: "Mobile channel message",
+            },
+          ]);
+        }
+        return okEnvelope(sampleChannelHistory);
+      },
+      [`GET ${BASE}/api/v1/subscribe/channel.follow*`]: sseResponse([]),
+    },
+  });
+
+  await app.press("id:tab-channels");
+  await app.waitFor("id:channel-message-msg-1");
+  expect(app.texts()).toContain("Morning check-in");
+
+  await app.press("id:channel-row-ch-2");
+  await app.waitFor("id:channel-message-msg-ch2");
+  expect(app.texts()).toContain("Mobile channel message");
+  expect(app.count("id:channel-message-msg-1")).toBe(0);
+});

@@ -481,4 +481,114 @@ describe("createHttpRemoteTransport", () => {
     unsubKept();
     transport.close();
   });
+
+  it("coalesces reconnect backoff across concurrent failing SSE streams and clears timer on close()", async () => {
+    vi.useFakeTimers();
+    let boardAttempt = 0;
+    let inboxAttempt = 0;
+    const boardSeqs: number[] = [];
+    const inboxSeqs: number[] = [];
+
+    const transport = createHttpRemoteTransport({
+      baseUrl: "http://127.0.0.1:8890",
+      token: "vv_dev_tok_coalesced",
+      fetch: (input) => {
+        const url = urlOf(input);
+        if (url.includes("/slice/board")) {
+          boardAttempt++;
+          if (boardAttempt === 1) {
+            return Promise.reject(new Error("offline"));
+          }
+          const { stream } = streamFromChunks(['id: 1\ndata: {"seq":1,"issues":[]}\n\n'], { holdOpen: true });
+          return Promise.resolve(new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } }));
+        }
+        inboxAttempt++;
+        if (inboxAttempt === 1) {
+          return Promise.reject(new Error("offline"));
+        }
+        const { stream } = streamFromChunks(['id: 2\ndata: {"seq":2,"call":"idle","callReason":"","items":[]}\n\n'], { holdOpen: true });
+        return Promise.resolve(new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } }));
+      },
+    });
+
+    const unsubBoard = transport.slice("board", (frame) => boardSeqs.push(frame.seq));
+    const unsubInbox = transport.slice("inbox", (frame) => inboxSeqs.push(frame.seq));
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(boardAttempt).toBe(1);
+    expect(inboxAttempt).toBe(1);
+    expect(vi.getTimerCount()).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(boardAttempt).toBe(2);
+    expect(inboxAttempt).toBe(2);
+    expect(boardSeqs).toEqual([1]);
+    expect(inboxSeqs).toEqual([2]);
+    expect(vi.getTimerCount()).toBe(0);
+
+    unsubBoard();
+    unsubInbox();
+    transport.close();
+
+    // Closing while a coalesced backoff timer is pending cancels the timer.
+    const transport2 = createHttpRemoteTransport({
+      baseUrl: "http://127.0.0.1:8890",
+      token: "vv_dev_tok_cancel_timer",
+      fetch: () => Promise.reject(new Error("offline")),
+    });
+    const unsub2 = transport2.slice("board", () => undefined);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(1);
+    unsub2();
+    transport2.close();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("short-circuits pre-aborted call() signals, forwards mid-flight aborts, and rejects malformed envelopes", async () => {
+    let fetchCalls = 0;
+    let seenSignal: AbortSignal | undefined;
+
+    const transport = createHttpRemoteTransport({
+      baseUrl: "http://127.0.0.1:8890",
+      token: "vv_dev_tok_abort",
+      fetch: (_input, init) => {
+        fetchCalls++;
+        seenSignal = init?.signal ?? undefined;
+        if (fetchCalls === 1) {
+          return new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener(
+              "abort",
+              () => {
+                reject(new DOMException("The operation was aborted.", "AbortError"));
+              },
+              { once: true },
+            );
+          });
+        }
+        return Promise.resolve(new Response(JSON.stringify({ unexpected: true }), { status: 200 }));
+      },
+    });
+
+    const preAborted = new AbortController();
+    preAborted.abort();
+    const preErr = await transport.call("issue.list", {}, { signal: preAborted.signal }).catch((e: unknown) => e);
+    expect(preErr).toBeInstanceOf(Error);
+    expect((preErr as Error).name).toBe("AbortError");
+    expect(fetchCalls).toBe(0);
+
+    const midController = new AbortController();
+    const pendingCall = transport.call("issue.list", {}, { signal: midController.signal }).catch((e: unknown) => e);
+    expect(fetchCalls).toBe(1);
+    expect(seenSignal?.aborted).toBe(false);
+    midController.abort();
+    const midErr = await pendingCall;
+    expect(seenSignal?.aborted).toBe(true);
+    expect(midErr).toBeInstanceOf(Error);
+    expect((midErr as Error).name).toBe("AbortError");
+
+    const badEnvErr = await transport.call("issue.list", {}).catch((e: unknown) => e);
+    expect(badEnvErr).toBeInstanceOf(Error);
+
+    transport.close();
+  });
 });

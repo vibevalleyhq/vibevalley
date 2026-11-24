@@ -1,4 +1,4 @@
-import { computed, effect, List, Scroll, signal, Text, View } from "nsh";
+import { computed, effect, List, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { InboxItem, SessionPermissionDecision } from "@vibevalley/protocol";
@@ -105,12 +105,13 @@ export function InboxTab(props: {
   });
 
   const setDraft = (key: string, value: string) => {
+    if ((untracked(answerDrafts)[key] ?? "") === value) return;
     answerDrafts.update((prev) => ({ ...prev, [key]: value }));
   };
 
   const respondPermission = async (sessionId: string, requestId: string, decision: SessionPermissionDecision) => {
     const key = `perm:${requestId}`;
-    if (busyKey() === key) return;
+    if (untracked(busyKey) === key) return;
     busyKey.set(key);
     actionError.set(undefined);
     try {
@@ -125,6 +126,9 @@ export function InboxTab(props: {
       } else {
         hapticNotification(decision === "deny" ? "warning" : "success");
       }
+    } catch (err: unknown) {
+      actionError.set(err instanceof Error ? err.message : String(err));
+      hapticNotification("error");
     } finally {
       busyKey.set(undefined);
     }
@@ -132,7 +136,7 @@ export function InboxTab(props: {
 
   const respondInteraction = async (sessionId: string, requestId: string, payload: { readonly optionId?: string; readonly text?: string }) => {
     const key = `inter:${requestId}`;
-    if (busyKey() === key) return;
+    if (untracked(busyKey) === key) return;
     busyKey.set(key);
     actionError.set(undefined);
     try {
@@ -148,13 +152,16 @@ export function InboxTab(props: {
         setDraft(requestId, "");
         hapticImpact("light");
       }
+    } catch (err: unknown) {
+      actionError.set(err instanceof Error ? err.message : String(err));
+      hapticNotification("error");
     } finally {
       busyKey.set(undefined);
     }
   };
 
   const renderPermissionCard = (entry: () => PendingPermissionItem) => {
-    const req = () => entry().request;
+    const req = computed(() => entry().request);
     const isBusy = computed(() => busyKey() === `perm:${req().requestId}`);
     return (
       <SectionCard testID={`inbox-permission-${req().requestId}`} class="gap-3">
@@ -201,7 +208,7 @@ export function InboxTab(props: {
   };
 
   const renderInteractionCard = (entry: () => PendingInteractionItem) => {
-    const req = () => entry().request;
+    const req = computed(() => entry().request);
     const isBusy = computed(() => busyKey() === `inter:${req().requestId}`);
     const draft = computed(() => answerDrafts()[req().requestId] ?? "");
     const canSubmit = computed(() => !isBusy() && draft().trim() !== "");
@@ -314,8 +321,8 @@ export function InboxTab(props: {
             contentClass="gap-2.5 p-3"
           >
             {(entry) => {
-              const selected = () => props.selectedKey() === entry().key;
-              const title = () => {
+              const selected = computed(() => props.selectedKey() === entry().key);
+              const title = computed(() => {
                 const current = entry();
                 switch (current.kind) {
                   case "permission":
@@ -324,8 +331,8 @@ export function InboxTab(props: {
                   case "inbox":
                     return current.item.words.title || current.item.who;
                 }
-              };
-              const subtitle = () => {
+              });
+              const subtitle = computed(() => {
                 const current = entry();
                 switch (current.kind) {
                   case "permission":
@@ -335,8 +342,8 @@ export function InboxTab(props: {
                   case "inbox":
                     return current.item.words.body || current.item.text;
                 }
-              };
-              const badge = (): { readonly label: string; readonly tone: TagTone } => {
+              });
+              const badge = computed((): { readonly label: string; readonly tone: TagTone } => {
                 const current = entry();
                 switch (current.kind) {
                   case "permission":
@@ -346,7 +353,7 @@ export function InboxTab(props: {
                   case "inbox":
                     return { label: current.item.words.label || current.item.kind, tone: inboxKindTone(current.item.kind) };
                 }
-              };
+              });
 
               return (
                 <SectionCard

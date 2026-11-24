@@ -136,9 +136,12 @@ async function deleteProfileRaw(key: string): Promise<void> {
   await defaultStorage.removeItem(key);
 }
 
+const HostErrorCodeSchema = z.object({ code: z.string() });
+
 function isUnavailableHostError(err: unknown): boolean {
-  if (typeof err !== "object" || err === null || !("code" in err)) return false;
-  const code = err.code;
+  const parsed = HostErrorCodeSchema.safeParse(err);
+  if (!parsed.success) return false;
+  const { code } = parsed.data;
   return code === "ERR_NSH_HOST_ERROR" || code === "ERR_FEATURE_UNAVAILABLE_ON_PLATFORM" || code === "ERR_ACCESS_DENIED";
 }
 

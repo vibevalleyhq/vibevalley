@@ -74,15 +74,26 @@ export function SessionsTab(props: {
   readonly selectedSessionId: () => string | undefined;
   readonly onSelectSession: (id: string | undefined) => void;
 }) {
-  const promptDraft = signal("");
+  const promptDrafts = signal<Readonly<Record<string, string>>>({});
   const sending = signal(false);
   const stopping = signal(false);
   const busyAction = signal<string | undefined>(undefined);
   const interactionDrafts = signal<Readonly<Record<string, string>>>({});
   const actionError = signal<string | undefined>(undefined);
   const pendingEvents = signal<readonly OptimisticSessionEvent[]>([]);
-  const confirmedSeqs = new Set<number>();
+  // Keyed by `${sessionId}:${seq}` so confirming seq N in one session never suppresses deduplication in another.
+  const confirmedSeqKeys = new Set<string>();
   let localEventSeq = 0;
+
+  const setPromptDraft = (sessionId: string, value: string) => {
+    if ((untracked(promptDrafts)[sessionId] ?? "") === value) return;
+    promptDrafts.update((prev) => ({ ...prev, [sessionId]: value }));
+  };
+
+  const setInteractionDraft = (requestId: string, value: string) => {
+    if ((untracked(interactionDrafts)[requestId] ?? "") === value) return;
+    interactionDrafts.update((prev) => ({ ...prev, [requestId]: value }));
+  };
 
   const isDual = computed(() => props.layout().mode === "dual_pane");
 
@@ -140,11 +151,15 @@ export function SessionsTab(props: {
       if (item.sessionId !== id) return true;
       const match = canonical.find(
         (ev) =>
-          !confirmedSeqs.has(ev.seq) && !consumedSeqs.has(ev.seq) && !item.knownSeqs.has(ev.seq) && ev.type === "user/message" && ev.text === item.event.text,
+          !confirmedSeqKeys.has(`${id}:${ev.seq}`) &&
+          !consumedSeqs.has(ev.seq) &&
+          !item.knownSeqs.has(ev.seq) &&
+          ev.type === "user/message" &&
+          ev.text === item.event.text,
       );
       if (match) {
         consumedSeqs.add(match.seq);
-        confirmedSeqs.add(match.seq);
+        confirmedSeqKeys.add(`${id}:${match.seq}`);
         return false;
       }
       return true;
@@ -166,7 +181,11 @@ export function SessionsTab(props: {
     for (const opt of pendingForSession) {
       const match = canonical.find(
         (ev) =>
-          !confirmedSeqs.has(ev.seq) && !consumedSeqs.has(ev.seq) && !opt.knownSeqs.has(ev.seq) && ev.type === "user/message" && ev.text === opt.event.text,
+          !confirmedSeqKeys.has(`${id}:${ev.seq}`) &&
+          !consumedSeqs.has(ev.seq) &&
+          !opt.knownSeqs.has(ev.seq) &&
+          ev.type === "user/message" &&
+          ev.text === opt.event.text,
       );
       if (match) {
         consumedSeqs.add(match.seq);
@@ -178,7 +197,11 @@ export function SessionsTab(props: {
     return [...canonical, ...remaining];
   });
 
-  const hasPromptDraft = computed(() => promptDraft().trim() !== "");
+  const currentPromptDraft = computed(() => {
+    const id = props.selectedSessionId();
+    return id !== undefined ? (promptDrafts()[id] ?? "") : "";
+  });
+  const hasPromptDraft = computed(() => currentPromptDraft().trim() !== "");
   const canSend = computed(() => props.selectedSessionId() !== undefined && !sending() && hasPromptDraft());
   const detailTitle = computed(() => selectedView()?.name ?? watchState()?.session?.name ?? props.selectedSessionId() ?? "");
   const detailSubtitle = computed(() => selectedView()?.runtime ?? watchState()?.session?.runtime);
@@ -186,7 +209,7 @@ export function SessionsTab(props: {
 
   const sendPrompt = async () => {
     const id = untracked(props.selectedSessionId);
-    const text = untracked(promptDraft).trim();
+    const text = (id !== undefined ? (untracked(promptDrafts)[id] ?? "") : "").trim();
     if (id === undefined || text === "" || untracked(sending)) return;
 
     const canonical = untracked(watchState)?.events ?? [];
@@ -200,7 +223,7 @@ export function SessionsTab(props: {
       text,
     };
 
-    promptDraft.set("");
+    setPromptDraft(id, "");
     sending.set(true);
     actionError.set(undefined);
     pendingEvents.update((prev) => [...prev, { sessionId: id, knownSeqs, event: optEvent }]);
@@ -209,7 +232,7 @@ export function SessionsTab(props: {
       pendingEvents.update((prev) => prev.filter((item) => item.event.seq !== seq));
       actionError.set(message);
       hapticNotification("error");
-      if (untracked(promptDraft) === "") promptDraft.set(text);
+      if ((untracked(promptDrafts)[id] ?? "") === "") setPromptDraft(id, text);
     };
 
     try {
@@ -227,8 +250,8 @@ export function SessionsTab(props: {
   };
 
   const stopSession = async () => {
-    const id = props.selectedSessionId();
-    if (id === undefined || stopping()) return;
+    const id = untracked(props.selectedSessionId);
+    if (id === undefined || untracked(stopping)) return;
     stopping.set(true);
     actionError.set(undefined);
     try {
@@ -239,14 +262,17 @@ export function SessionsTab(props: {
       } else {
         hapticNotification("warning");
       }
+    } catch (err: unknown) {
+      actionError.set(err instanceof Error ? err.message : String(err));
+      hapticNotification("error");
     } finally {
       stopping.set(false);
     }
   };
 
   const respondPermission = async (requestId: string, decision: SessionPermissionDecision) => {
-    const id = props.selectedSessionId();
-    if (id === undefined || busyAction() === requestId) return;
+    const id = untracked(props.selectedSessionId);
+    if (id === undefined || untracked(busyAction) === requestId) return;
     busyAction.set(requestId);
     actionError.set(undefined);
     try {
@@ -257,14 +283,17 @@ export function SessionsTab(props: {
       } else {
         hapticNotification(decision === "deny" ? "warning" : "success");
       }
+    } catch (err: unknown) {
+      actionError.set(err instanceof Error ? err.message : String(err));
+      hapticNotification("error");
     } finally {
       busyAction.set(undefined);
     }
   };
 
   const respondInteraction = async (requestId: string, payload: { readonly optionId?: string; readonly text?: string }) => {
-    const id = props.selectedSessionId();
-    if (id === undefined || busyAction() === requestId) return;
+    const id = untracked(props.selectedSessionId);
+    if (id === undefined || untracked(busyAction) === requestId) return;
     busyAction.set(requestId);
     actionError.set(undefined);
     try {
@@ -273,9 +302,12 @@ export function SessionsTab(props: {
         actionError.set(env.message);
         hapticNotification("error");
       } else {
-        interactionDrafts.update((prev) => ({ ...prev, [requestId]: "" }));
+        setInteractionDraft(requestId, "");
         hapticImpact("light");
       }
+    } catch (err: unknown) {
+      actionError.set(err instanceof Error ? err.message : String(err));
+      hapticNotification("error");
     } finally {
       busyAction.set(undefined);
     }
@@ -285,7 +317,7 @@ export function SessionsTab(props: {
     <If when={sessionList().length > 0} else={<EmptyPanel testID="sessions-empty" icon="terminal" message={t("web.remote.session.empty")} />}>
       <List testID="sessions-list" each={sessionList()} keyExtractor={(s) => s.id} estimatedItemSize={88} class="min-h-0 flex-1" contentClass="gap-2.5 p-3.5">
         {(s) => {
-          const active = () => isDual() && props.selectedSessionId() === s().id;
+          const active = computed(() => isDual() && props.selectedSessionId() === s().id);
           return (
             <SectionCard
               testID={`session-row-${s().id}`}
@@ -395,7 +427,7 @@ export function SessionsTab(props: {
                     testID={`session-interaction-input-${req().requestId}`}
                     placeholder={t("web.remote.inbox.answer")}
                     value={draft()}
-                    onInput={(v) => interactionDrafts.update((prev) => ({ ...prev, [req().requestId]: v }))}
+                    onInput={(v) => setInteractionDraft(req().requestId, v)}
                     class="min-w-0 flex-1"
                   />
                   <PillButton
@@ -493,8 +525,11 @@ export function SessionsTab(props: {
         <FieldInput
           testID="session-prompt-input"
           placeholder={t("web.remote.session.promptPlaceholder")}
-          value={promptDraft()}
-          onInput={(v) => promptDraft.set(v)}
+          value={currentPromptDraft()}
+          onInput={(v) => {
+            const id = props.selectedSessionId();
+            if (id !== undefined) setPromptDraft(id, v);
+          }}
           onSubmit={() => {
             void sendPrompt();
           }}

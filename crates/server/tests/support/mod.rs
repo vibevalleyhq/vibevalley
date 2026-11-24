@@ -246,6 +246,48 @@ pub fn slow_first(ms: u64) -> Script {
         .turn(vec![Step::text("done")])
 }
 
+/// Deterministic gate that holds each turn until released by the test.
+#[derive(Clone)]
+pub struct TurnGate {
+    tx: flume::Sender<()>,
+    rx: flume::Receiver<()>,
+}
+
+impl Default for TurnGate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TurnGate {
+    pub fn new() -> Self {
+        let (tx, rx) = flume::unbounded();
+        Self { tx, rx }
+    }
+
+    /// Unblocks one gated turn.
+    pub fn release(&self) {
+        let _ = self.tx.send(());
+    }
+
+    /// Unblocks `count` gated turns.
+    pub fn release_n(&self, count: usize) {
+        for _ in 0..count {
+            self.release();
+        }
+    }
+
+    /// A `Script` whose turns block on the gate (15 s safety ceiling) before emitting `text`.
+    pub fn script(&self, text: impl Into<String>) -> Script {
+        let rx = self.rx.clone();
+        let text = text.into();
+        Script::computed(Arc::new(move |_| {
+            let _ = rx.recv_timeout(Duration::from_secs(15));
+            Ok(vec![Step::text(text.clone())])
+        }))
+    }
+}
+
 pub fn git(cwd: &Path, args: &[&str]) -> String {
     let out = Command::new("git").arg("-C").arg(cwd).args(args).output().unwrap();
     assert!(

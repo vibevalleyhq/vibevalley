@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { VibeValleyApiError } from "../client";
 import { BoardSlice, CollabSlice, InboxSlice, LiveEvent, OpsSlice, SessionsSlice } from "../core/schema";
 import type {
@@ -79,7 +81,16 @@ const sliceDecoders: { readonly [K in SliceKind]: SliceDecoder<K> } = {
   farm: decodeWith(FarmFrame),
 };
 
-const isRecord = (u: unknown): u is Record<string, unknown> => typeof u === "object" && u !== null;
+const RemoteEnvelopeSchema = z.object({
+  bizCode: z.number(),
+  message: z.string(),
+  data: z.exactOptional(z.unknown()),
+  error: z.exactOptional(z.unknown()),
+});
+
+const MessageEnvelopeSchema = z.object({
+  message: z.string().min(1),
+});
 
 const parseJsonSafe = (text: string): unknown => {
   if (text === "") return undefined;
@@ -91,12 +102,13 @@ const parseJsonSafe = (text: string): unknown => {
 };
 
 function toEnvelope(raw: unknown): RemoteEnvelope | undefined {
-  if (!isRecord(raw) || typeof raw.bizCode !== "number" || typeof raw.message !== "string") return undefined;
+  const parsed = RemoteEnvelopeSchema.safeParse(raw);
+  if (!parsed.success) return undefined;
   return {
-    bizCode: raw.bizCode,
-    message: raw.message,
-    ...("data" in raw && raw.data !== undefined ? { data: raw.data } : {}),
-    ...("error" in raw && raw.error !== undefined ? { error: raw.error } : {}),
+    bizCode: parsed.data.bizCode,
+    message: parsed.data.message,
+    ...(parsed.data.data !== undefined ? { data: parsed.data.data } : {}),
+    ...(parsed.data.error !== undefined ? { error: parsed.data.error } : {}),
   };
 }
 
@@ -114,7 +126,8 @@ function decodeApiErrorOrThrow(status: number, raw: unknown, text: string): Vibe
     const meta = bizCodeMeta[env.data.bizCode];
     return new VibeValleyApiError(status === 200 ? meta.status : status, meta.kind, env.data.message, env.data.error, text, env.data.bizCode);
   }
-  const reason = isRecord(raw) && typeof raw.message === "string" && raw.message !== "" ? raw.message : text.trim() || `HTTP ${status}`;
+  const msg = MessageEnvelopeSchema.safeParse(raw);
+  const reason = msg.success ? msg.data.message : text.trim() || `HTTP ${status}`;
   return new VibeValleyApiError(status, undefined, reason, undefined, text);
 }
 
@@ -158,6 +171,15 @@ export function parsePairUrl(raw: string): ParsedPairUrl | null {
   };
 }
 
+function createAbortError(): Error {
+  if (typeof DOMException === "function") {
+    return new DOMException("The operation was aborted.", "AbortError");
+  }
+  const err = new Error("The operation was aborted.");
+  err.name = "AbortError";
+  return err;
+}
+
 /** Exchanges a one-time pairing code for a persistent Bearer device token via `POST /api/v1/remote/pair/exchange`. */
 export async function pairWithServer(
   baseUrl: string,
@@ -165,6 +187,9 @@ export async function pairWithServer(
   fetchImpl: typeof fetch = fetch,
   options?: { readonly signal?: AbortSignal },
 ): Promise<RemotePairExchangeResultShape> {
+  if (options?.signal?.aborted === true) {
+    throw createAbortError();
+  }
   const base = normalizeServerUrl(baseUrl);
   const res = await fetchImpl(`${base}${pathOf("remote.pair.exchange")}`, {
     method: "POST",
@@ -187,8 +212,9 @@ export async function pairWithServer(
       const meta = bizCodeMeta[errEnv.data.bizCode];
       throw new VibeValleyApiError(meta.status, meta.kind, errEnv.data.message, errEnv.data.error, text, errEnv.data.bizCode);
     }
-    if (isRecord(parsed) && typeof parsed.bizCode === "number" && parsed.bizCode !== 0) {
-      const reason = typeof parsed.message === "string" && parsed.message !== "" ? parsed.message : `HTTP ${res.status}`;
+    const rawEnv = toEnvelope(parsed);
+    if (rawEnv && rawEnv.bizCode !== 0) {
+      const reason = rawEnv.message !== "" ? rawEnv.message : `HTTP ${res.status}`;
       throw new VibeValleyApiError(500, undefined, reason, undefined, text);
     }
     throw new Error(`remote.pair.exchange: invalid response shape: ${checked.error.message}`);
@@ -287,46 +313,81 @@ async function readSseStream(body: ReadableStream<Uint8Array>, signal: AbortSign
   }
 }
 
-function abortableDelay(ms: number, signal: AbortSignal): Promise<boolean> {
-  if (signal.aborted) return Promise.resolve(false);
-  return new Promise<boolean>((resolve) => {
-    const onAbort = () => {
+function createCoalescedBackoff() {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let deadline = 0;
+  const waiters = new Set<(completed: boolean) => void>();
+
+  const schedule = (targetDeadline: number) => {
+    if (timer !== undefined) clearTimeout(timer);
+    deadline = targetDeadline;
+    const delay = Math.max(0, deadline - Date.now());
+    timer = setTimeout(() => {
+      timer = undefined;
+      deadline = 0;
+      const pending = [...waiters];
+      waiters.clear();
+      for (const resolve of pending) resolve(true);
+    }, delay);
+  };
+
+  const wait = (ms: number, signal: AbortSignal): Promise<boolean> => {
+    if (signal.aborted) return Promise.resolve(false);
+    return new Promise<boolean>((resolve) => {
+      const target = Date.now() + ms;
+      const onAbort = () => {
+        waiters.delete(done);
+        if (waiters.size === 0 && timer !== undefined) {
+          clearTimeout(timer);
+          timer = undefined;
+          deadline = 0;
+        }
+        resolve(false);
+      };
+      const done = (completed: boolean) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(completed);
+      };
+      waiters.add(done);
+      signal.addEventListener("abort", onAbort, { once: true });
+      if (timer === undefined || target < deadline) {
+        schedule(target);
+      }
+    });
+  };
+
+  const cancelAll = () => {
+    if (timer !== undefined) {
       clearTimeout(timer);
-      resolve(false);
-    };
-    const timer = setTimeout(() => {
-      signal.removeEventListener("abort", onAbort);
-      resolve(true);
-    }, ms);
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
+      timer = undefined;
+      deadline = 0;
+    }
+    const pending = [...waiters];
+    waiters.clear();
+    for (const resolve of pending) resolve(false);
+  };
+
+  return { wait, cancelAll };
 }
 
 function combineSignals(parent: AbortSignal, child?: AbortSignal): { readonly signal: AbortSignal; readonly cleanup: () => void } {
   if (!child) return { signal: parent, cleanup: () => {} };
+  if (parent.aborted) return { signal: parent, cleanup: () => {} };
+  if (child.aborted) return { signal: child, cleanup: () => {} };
   const controller = new AbortController();
+  const cleanup = () => {
+    parent.removeEventListener("abort", onParent);
+    child.removeEventListener("abort", onChild);
+  };
   const abortFrom = (source: AbortSignal) => {
+    cleanup();
     if (!controller.signal.aborted) controller.abort(source.reason);
   };
-  if (parent.aborted) {
-    abortFrom(parent);
-    return { signal: controller.signal, cleanup: () => {} };
-  }
-  if (child.aborted) {
-    abortFrom(child);
-    return { signal: controller.signal, cleanup: () => {} };
-  }
   const onParent = () => abortFrom(parent);
   const onChild = () => abortFrom(child);
   parent.addEventListener("abort", onParent, { once: true });
   child.addEventListener("abort", onChild, { once: true });
-  return {
-    signal: controller.signal,
-    cleanup: () => {
-      parent.removeEventListener("abort", onParent);
-      child.removeEventListener("abort", onChild);
-    },
-  };
+  return { signal: controller.signal, cleanup };
 }
 
 /** Pure Web-Fetch HTTP + SSE transport for remote mobile clients with Bearer auth and `Last-Event-ID` resync. */
@@ -339,6 +400,7 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
   const attemptControllers = new Set<AbortController>();
   const resumeWaiters = new Set<() => void>();
   const tasks = new Set<Promise<void>>();
+  const backoff = createCoalescedBackoff();
 
   let closed = false;
   let unauthorized = false;
@@ -392,6 +454,7 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
     unauthorized = true;
     reportState("unauthorized");
     abortActiveAttempts();
+    backoff.cancelAll();
     releaseResumeWaiters();
   };
 
@@ -426,6 +489,10 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
 
   const call: HttpRemoteTransport["call"] = async (op, payload, callOptions) => {
     const combined = combineSignals(master.signal, callOptions?.signal);
+    if (combined.signal.aborted) {
+      combined.cleanup();
+      throw createAbortError();
+    }
     try {
       const hasPayload = payload !== undefined;
       const res = await fetchImpl(`${base}${pathOf(op)}`, {
@@ -492,6 +559,7 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
         });
 
         if (res.status === 401 || res.status === 403) {
+          await res.body?.cancel().catch(() => undefined);
           markUnauthorized();
           return;
         }
@@ -503,6 +571,8 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
           await readSseStream(res.body, attemptLink.signal, (msg) => {
             if (!attemptLink.signal.aborted && !signal.aborted && !closed) onEvent(msg);
           });
+        } else {
+          await res.body?.cancel().catch(() => undefined);
         }
       } catch {
         // Network drops and aborts fall through to the lifecycle/reconnect check below.
@@ -530,7 +600,7 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
       const generationBeforeBackoff = resumeGeneration;
       let waited = false;
       try {
-        waited = await abortableDelay(delay, backoffLink.signal);
+        waited = await backoff.wait(delay, backoffLink.signal);
       } finally {
         attemptControllers.delete(backoffController);
         backoffLink.cleanup();
@@ -656,6 +726,7 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
     if (closed || unauthorized || suspended) return;
     suspended = true;
     abortActiveAttempts();
+    backoff.cancelAll();
   };
 
   const resume = () => {
@@ -664,6 +735,7 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
     resumeGeneration++;
     // Abort any stale socket or pending backoff delay, then wake suspended streams for immediate resync.
     abortActiveAttempts();
+    backoff.cancelAll();
     releaseResumeWaiters();
   };
 
@@ -673,6 +745,7 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
     suspended = false;
     if (!master.signal.aborted) master.abort();
     abortActiveAttempts();
+    backoff.cancelAll();
     releaseResumeWaiters();
     for (const controller of controllers) {
       if (!controller.signal.aborted) controller.abort();

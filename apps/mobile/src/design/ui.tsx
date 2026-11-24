@@ -1,4 +1,4 @@
-import { openUrl, safeArea, Text, View, type JSX } from "nsh";
+import { computed, openUrl, safeArea, Text, untracked, View, type JSX } from "nsh";
 import { Input, TextView, type TextViewClasses } from "nsh/base";
 
 import type { IconName } from "../../design/icons";
@@ -18,7 +18,7 @@ export function SafeScreen(props: {
   readonly testID?: string;
   readonly children?: JSX.Element;
 }) {
-  const paddingStyle = () => {
+  const paddingStyle = computed(() => {
     const insets = safeArea();
     return {
       paddingTop: props.topInset === false ? 0 : insets.top,
@@ -26,7 +26,7 @@ export function SafeScreen(props: {
       paddingLeft: props.leftInset === false ? 0 : insets.left,
       paddingRight: props.rightInset === false ? 0 : insets.right,
     };
-  };
+  });
 
   return (
     <View testID={props.testID} class={`flex-1 bg-page ${props.class ?? ""}`} style={paddingStyle()}>
@@ -43,7 +43,7 @@ export function SplitPane(props: {
   readonly emptyDetail?: () => JSX.Element;
   readonly testID?: string;
 }) {
-  const isDual = () => props.layout().mode === "dual_pane";
+  const isDual = computed(() => props.layout().mode === "dual_pane");
 
   return (
     <If
@@ -166,9 +166,9 @@ export function PillButton(props: {
   readonly accessibilityLabel?: string;
   readonly onPress?: () => void;
 }) {
-  const tone = () => props.tone ?? "plain";
-  const small = () => props.size === "sm";
-  const disabled = () => props.disabled === true;
+  const tone = computed(() => props.tone ?? "plain");
+  const small = computed(() => props.size === "sm");
+  const disabled = computed(() => props.disabled === true);
 
   return (
     <View
@@ -211,11 +211,11 @@ export function StatusTag(props: {
   readonly dot?: boolean;
   readonly testID?: string;
 }) {
-  const look = () => tagStyles[props.tone];
-  const dynamicBg = () => {
+  const look = computed(() => tagStyles[props.tone]);
+  const dynamicBg = computed(() => {
     const fn = look().bgStyle;
     return fn ? { backgroundColor: fn() } : undefined;
-  };
+  });
 
   return (
     <View testID={props.testID} class={`h-6 flex-row items-center gap-1.5 self-start rounded-full px-2.5 ${look().bgClass}`} style={dynamicBg()}>
@@ -261,7 +261,9 @@ export function FieldInput(props: {
         placeholder={props.placeholder}
         multiline={props.multiline}
         readonly={props.disabled}
-        onChange={(e) => props.onInput(e.value)}
+        onChange={(e) => {
+          if (e.value !== untracked(() => props.value)) props.onInput(e.value);
+        }}
         onSubmit={(e) => props.onSubmit?.(e.text)}
         submitBehavior={props.multiline === true ? "newline" : "submit"}
         class={[
@@ -315,17 +317,18 @@ export function MarkdownText(props: {
   readonly testID?: string;
   readonly class?: string;
 }) {
-  const sizeClass = () => (props.size === "base" ? "text-base" : "text-sm");
+  const sizeClass = computed(() => (props.size === "base" ? "text-base" : "text-sm"));
+  const classes = computed<TextViewClasses>(() => ({
+    ...MARKDOWN_CLASSES,
+    root: `min-w-0 gap-0 text-ink ${sizeClass()} ${props.class ?? ""}`,
+  }));
 
   return (
     <TextView
       testID={props.testID}
       markdown={props.text}
       selectable={props.selectable ?? true}
-      classes={{
-        ...MARKDOWN_CLASSES,
-        root: `min-w-0 gap-0 text-ink ${sizeClass()} ${props.class ?? ""}`,
-      }}
+      classes={classes()}
       onLinkPress={(e) => openExternalLink(e.url)}
     />
   );

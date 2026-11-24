@@ -2,9 +2,10 @@ use std::collections::VecDeque;
 use std::path::Path;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde_json::{Value, json};
+use vibevalley_core::{Clock, ManualClock, SharedClock};
 use vibevalley_protocol::{BizCode, Caller, IssueStageKind, IssueStatus};
 use vibevalley_runtime::agent::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, Role, ToolCall, Usage};
 use vibevalley_runtime::oar::scripted::{Script, ScriptedRuntime, Step};
@@ -57,26 +58,11 @@ fn call(url: &str, op: &str, input: Value) -> Value {
     envelope["data"].clone()
 }
 
-fn until<T>(server: &Started, what: &str, mut read: impl FnMut() -> Option<T>) -> T {
-    let mut board = server.hub.subscribe_slice_feed(vibevalley_protocol::SliceKind::Board);
-    let mut sessions = server.hub.subscribe_slice_feed(vibevalley_protocol::SliceKind::Sessions);
-    let deadline = Instant::now() + Duration::from_secs(20);
-    loop {
-        if let Some(value) = read() {
-            return value;
-        }
-        assert!(Instant::now() < deadline, "timed out: {what}");
-        vibevalley_runtime::rt::block_on(async {
-            tokio::select! {
-                _ = board.changed() => {}
-                _ = sessions.changed() => {}
-                _ = tokio::time::sleep(Duration::from_millis(50)) => {}
-            }
-        });
-    }
+fn until<T>(server: &Started, what: &str, read: impl FnMut() -> Option<T>) -> T {
+    crate::support::wait_until_settled(Some(&server.hub), Duration::from_secs(20), what, read)
 }
 
-fn config(home: &Path, model: Arc<Model>) -> ServerConfig {
+fn config(home: &Path, model: Arc<Model>, clock: SharedClock) -> ServerConfig {
     let mut registry = Registry::new();
     registry.register(Arc::new(ScriptedRuntime::new("scripted", Script::computed(Arc::new(|ask| {
         let file = format!("round-{}.txt", ask.turn + 1);
@@ -115,6 +101,7 @@ fn config(home: &Path, model: Arc<Model>) -> ServerConfig {
         tick_crons: false,
         link_previews: false,
         model_client: Some(model),
+        clock,
         ..ServerConfig::under(home)
     }
 }
@@ -123,8 +110,9 @@ fn config(home: &Path, model: Arc<Model>) -> ServerConfig {
 fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
+    let clock = Arc::new(ManualClock::new(1_700_000_000_000));
     let model = Arc::new(Model(Mutex::new(VecDeque::new())));
-    let server = vibevalley_server::start(config(dir.path(), model.clone())).unwrap();
+    let server = vibevalley_server::start(config(dir.path(), model.clone(), clock.clone())).unwrap();
     let listener = vibevalley_server::transport::http::serve(server.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let url = listener.url();
     server.test_internals().board.sessions().set_mcp_url(format!("{url}/mcp"));
@@ -255,10 +243,11 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     let cron = call(
         &url,
         "cron.create",
-        json!({ "name": "Scheduled task", "text": "Write a scheduled file", "agent": "Worker", "repo": "demo", "when": { "kind": "once", "at": vibevalley_server::now() + 100 } }),
+        json!({ "name": "Scheduled task", "text": "Write a scheduled file", "agent": "Worker", "repo": "demo", "when": { "kind": "once", "at": clock.now_ms() + 100 } }),
     );
+    clock.advance(Duration::from_millis(150));
+    server.test_internals().crons.tick();
     let scheduled = until(&server, "cron dispatched", || {
-        server.test_internals().crons.tick();
         server
             .test_internals()
             .board
@@ -277,7 +266,7 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     drop(listener);
     drop(server);
 
-    let reopened = vibevalley_server::start(config(dir.path(), model)).unwrap();
+    let reopened = vibevalley_server::start(config(dir.path(), model, Arc::new(ManualClock::new(clock.now_ms())))).unwrap();
     assert_eq!(reopened.test_internals().board.issue(&id).unwrap().status, IssueStatus::Done);
     assert_eq!(reopened.test_internals().board.runs(&id).unwrap().len(), 2);
     assert!(
